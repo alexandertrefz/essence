@@ -284,11 +284,11 @@ describe("Rename", () => {
 		let source = [
 			"implementation {",
 			'\tconstant name: String = "Essence"',
-			"\t__print(name)",
+			"\tTerminal.inspect(name)",
 			"}",
 		].join("\n")
 
-		// NOTE: `String` in the Type Annotation, `__print` as a value.
+		// NOTE: `String` in the Type Annotation, `Terminal` as a value.
 		expect(findOccurrence(source, { line: 2, column: 17 })).toBeNull()
 		expect(findOccurrence(source, { line: 3, column: 3 })).toBeNull()
 	})
@@ -442,8 +442,8 @@ describe("Rename of Methods and Record members", () => {
 			"\t\t}",
 			"\t}",
 			"",
-			"\t__print(1::<Stringify>string())",
-			"\t__print(1::string())",
+			"\tTerminal.inspect(1::<Stringify>string())",
+			"\tTerminal.inspect(1::string())",
 			"}",
 		].join("\n")
 
@@ -455,8 +455,8 @@ describe("Rename of Methods and Record members", () => {
 			"\t\t}",
 			"\t}",
 			"",
-			"\t__print(1::<Stringify>stringify())",
-			"\t__print(1::stringify())",
+			"\tTerminal.inspect(1::<Stringify>stringify())",
+			"\tTerminal.inspect(1::stringify())",
 			"}",
 		].join("\n")
 
@@ -464,10 +464,10 @@ describe("Rename of Methods and Record members", () => {
 		expect(rename(source, { line: 3, column: 4 }, "stringify")).toBe(
 			renamed,
 		)
-		expect(rename(source, { line: 8, column: 25 }, "stringify")).toBe(
+		expect(rename(source, { line: 8, column: 34 }, "stringify")).toBe(
 			renamed,
 		)
-		expect(rename(source, { line: 9, column: 14 }, "stringify")).toBe(
+		expect(rename(source, { line: 9, column: 23 }, "stringify")).toBe(
 			renamed,
 		)
 	})
@@ -479,7 +479,7 @@ describe("Rename of Methods and Record members", () => {
 			'\t\tstatic version = "1"',
 			"\t}",
 			"",
-			"\t__print(Config.version)",
+			"\tTerminal.inspect(Config.version)",
 			"}",
 		].join("\n")
 
@@ -489,12 +489,12 @@ describe("Rename of Methods and Record members", () => {
 			'\t\tstatic release = "1"',
 			"\t}",
 			"",
-			"\t__print(Config.release)",
+			"\tTerminal.inspect(Config.release)",
 			"}",
 		].join("\n")
 
 		expect(rename(source, { line: 3, column: 10 }, "release")).toBe(renamed)
-		expect(rename(source, { line: 6, column: 17 }, "release")).toBe(renamed)
+		expect(rename(source, { line: 6, column: 26 }, "release")).toBe(renamed)
 	})
 
 	it("should rename Record members across Type, literal and Lookup", () => {
@@ -504,7 +504,7 @@ describe("Rename of Methods and Record members", () => {
 			"",
 			'\tconstant person: Person = { firstName = "Ada", lastName = "Lovelace" }',
 			"",
-			"\t__print(person.firstName)",
+			"\tTerminal.inspect(person.firstName)",
 			"}",
 		].join("\n")
 
@@ -514,7 +514,7 @@ describe("Rename of Methods and Record members", () => {
 			"",
 			'\tconstant person: Person = { givenName = "Ada", lastName = "Lovelace" }',
 			"",
-			"\t__print(person.givenName)",
+			"\tTerminal.inspect(person.givenName)",
 			"}",
 		].join("\n")
 
@@ -524,7 +524,7 @@ describe("Rename of Methods and Record members", () => {
 		expect(rename(source, { line: 4, column: 31 }, "givenName")).toBe(
 			renamed,
 		)
-		expect(rename(source, { line: 6, column: 18 }, "givenName")).toBe(
+		expect(rename(source, { line: 6, column: 27 }, "givenName")).toBe(
 			renamed,
 		)
 	})
@@ -536,7 +536,7 @@ describe("Rename of Methods and Record members", () => {
 			"\t\t<- subject.name",
 			"\t}",
 			"",
-			'\t__print(describe({ name = "Essence" }))',
+			'\tTerminal.inspect(describe({ name = "Essence" }))',
 			"}",
 		].join("\n")
 
@@ -547,7 +547,7 @@ describe("Rename of Methods and Record members", () => {
 				"\t\t<- subject.title",
 				"\t}",
 				"",
-				'\t__print(describe({ title = "Essence" }))',
+				'\tTerminal.inspect(describe({ title = "Essence" }))',
 				"}",
 			].join("\n"),
 		)
@@ -558,18 +558,18 @@ describe("Rename of Methods and Record members", () => {
 			"implementation {",
 			'\tconstant box = { name = "box", size = 1 }',
 			'\tconstant person = { name = "Ada", age = 36 }',
-			"\t__print(box.name)",
+			"\tTerminal.inspect(box.name)",
 			"}",
 		].join("\n")
 
 		// NOTE: `person` also has a `name`, but its shape is neither a
 		// subset nor a superset of `box` — it stays untouched.
-		expect(rename(source, { line: 4, column: 14 }, "label")).toBe(
+		expect(rename(source, { line: 4, column: 23 }, "label")).toBe(
 			[
 				"implementation {",
 				'\tconstant box = { label = "box", size = 1 }',
 				'\tconstant person = { name = "Ada", age = 36 }',
-				"\t__print(box.label)",
+				"\tTerminal.inspect(box.label)",
 				"}",
 			].join("\n"),
 		)
@@ -715,11 +715,11 @@ describe("findDefinition", () => {
 			"\t\t}",
 			"\t}",
 			"",
-			"\t__print(1::string())",
+			"\tTerminal.inspect(1::string())",
 			"}",
 		].join("\n")
 
-		expect(definitionOf(source, { line: 8, column: 14 })).toEqual({
+		expect(definitionOf(source, { line: 8, column: 23 })).toEqual({
 			start: { line: 3, column: 3 },
 			end: { line: 3, column: 9 },
 		})
@@ -821,7 +821,7 @@ describe("findOccurrence (References)", () => {
 			"implementation {",
 			"\tconstant value = 1",
 			"\tconstant other = value",
-			"\t__print(value)",
+			"\tTerminal.inspect(value)",
 			"}",
 		].join("\n")
 
@@ -838,8 +838,8 @@ describe("findOccurrence (References)", () => {
 	it("should report occurrences of builtins, unlike renaming", () => {
 		let source = [
 			"implementation {",
-			'\t__print("one")',
-			'\t__print("two")',
+			'\tTerminal.inspect("one")',
+			'\tTerminal.inspect("two")',
 			"}",
 		].join("\n")
 
@@ -860,12 +860,12 @@ describe("findOccurrence (References)", () => {
 			'\t\t\t<- "one"',
 			"\t\t}",
 			"\t}",
-			"\t__print(1::string())",
-			"\t__print(2::<Stringify>string())",
+			"\tTerminal.inspect(1::string())",
+			"\tTerminal.inspect(2::<Stringify>string())",
 			"}",
 		].join("\n")
 
-		let occurrence = occurrencesOf(source, { line: 7, column: 14 })
+		let occurrence = occurrencesOf(source, { line: 7, column: 23 })
 
 		expect(occurrence?.declaration.occurrences).toHaveLength(3)
 	})
@@ -884,7 +884,7 @@ describe("findOccurrences (Document Highlight)", () => {
 			"implementation {",
 			"\tvariable count = 1",
 			"\tcount = 2",
-			"\t__print(count)",
+			"\tTerminal.inspect(count)",
 			"}",
 		].join("\n")
 

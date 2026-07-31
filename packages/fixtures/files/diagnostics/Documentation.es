@@ -24,6 +24,6 @@ implementation {
 	§§ @param subject — who to greet
 	constant defaultSubject = "World"
 
-	__print(greet(subject defaultSubject))
-	__print(join(left "Hello, ", right "Essence!"))
+	Terminal.inspect(greet(subject defaultSubject))
+	Terminal.inspect(join(left "Hello, ", right "Essence!"))
 }

@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test"
 
-import { getStringRepresentation } from "../functions"
 import { anyIs } from "../internalHelpers"
 import { createRecord } from "../Record"
 import { createString, ends, length, split } from "../String"
+import { getStringRepresentation } from "../Terminal"
 
 const countOf = (value: string) => length(createString(value)).value
 

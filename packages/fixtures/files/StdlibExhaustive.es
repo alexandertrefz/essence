@@ -29,7 +29,7 @@ implementation {
 		_ label: String,
 		_ value: Value,
 	) -> {} {
-		__print("{label} => {value}")
+		Terminal.inspect("{label} => {value}")
 		<- {}
 	}
 

@@ -25,18 +25,18 @@ implementation {
 	history = history::push("Hello, World")
 	history = history::push("Hello, World!")
 
-	__print(history::peek()) § Optional#Value("Hello, World!")
+	Terminal.inspect(history::peek()) § Optional#Value("Hello, World!")
 
 	§ Undo is a pop.
 	history = history::pop()
 
-	__print(history::peek()) § Optional#Value("Hello, World")
-	__print(history::length()) § 2
+	Terminal.inspect(history::peek()) § Optional#Value("Hello, World")
+	Terminal.inspect(history::length()) § 2
 
 	§ The same Namespace, bound to a different Item by a different receiver.
 	constant moves: List<Integer> = []
 
-	__print(moves::push(4)::push(2)::pop()::peek()) § Optional#Value(4)
+	Terminal.inspect(moves::push(4)::push(2)::pop()::peek()) § Optional#Value(4)
 
 	§ A generic Function stands alone, and infers several Type Parameters at
 	§ once — `First` and `Second` bind from the two Arguments, and the Record
@@ -48,6 +48,8 @@ implementation {
 		<- { first = first, second = second }
 	}
 
-	__print(paired(1, with "one")) § { first = 1, second = "one" }
-	__print(paired("half", with 1/2)) § { first = "half", second = 1/2 }
+	Terminal.inspect(paired(1, with "one")) § { first = 1, second = "one" }
+	Terminal.inspect(
+		paired("half", with 1/2),
+	) § { first = "half", second = 1/2 }
 }

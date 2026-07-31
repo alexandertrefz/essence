@@ -35,7 +35,7 @@ implementation {
 	§ Match narrows an instantiated Case to its concrete member Types, and the
 	§ Matcher's binding names the payload the constructor took — `carried` is the
 	§ Record, `carried.total` inside it is an Integer.
-	__print(match startState -> Integer {
+	Terminal.inspect(match startState -> Integer {
 		case #Going(carried) { <- carried.total }
 		case #Stopped(total) { <- total }
 	}) § 0
@@ -55,13 +55,13 @@ implementation {
 		total = state.total::add(state.index) })
 	})
 
-	__print(summed::toString()) § "15"
+	Terminal.inspect(summed::toString()) § "15"
 
 	§ A bare `#Stopped` resolves against the annotation; the shorthand wraps the
 	§ lone Integer into the Case's one-member Record.
 	constant answer: Progress<Integer, Integer> = #Stopped(42)
 
-	__print(match answer -> Integer {
+	Terminal.inspect(match answer -> Integer {
 		case #Going(state)  { <- state }
 		case #Stopped(done) { <- done }
 	}) § 42
@@ -75,12 +75,12 @@ implementation {
 	constant full: Box<String>  = #Full("packed")
 	constant empty: Box<String> = Box#Empty
 
-	__print(match full -> String {
+	Terminal.inspect(match full -> String {
 		case #Full  { <- @.value }
 		case #Empty { <- "nothing" }
 	}) § "packed"
 
-	__print(match empty -> String {
+	Terminal.inspect(match empty -> String {
 		case #Full  { <- @.value }
 		case #Empty { <- "nothing" }
 	}) § "nothing"

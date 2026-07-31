@@ -3,7 +3,7 @@
 // values arrive as live arguments, bigints and all, and one JSON string comes
 // back — so it must stay SELF-CONTAINED: nothing of this module exists in the
 // debuggee's realm. The display rules retell the runtime's own
-// `getStringRepresentation` (runtime/src/functions.ts); the tag symbol is
+// `getStringRepresentation` (runtime/src/Terminal.ts); the tag symbol is
 // found by its description, because every bundle mints its own
 // `Symbol("$type")`.
 //

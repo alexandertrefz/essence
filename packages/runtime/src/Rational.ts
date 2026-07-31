@@ -153,7 +153,7 @@ export function raise(
 
 // #endregion
 
-// NOTE: Exported for `getStringRepresentation` in `functions.ts` — the
+// NOTE: Exported for `getStringRepresentation` in `Terminal.ts` — the
 // no-Argument `toString` is written in Essence now, so the universal printer
 // renders a Rational off this helper rather than calling a native that no
 // longer exists.

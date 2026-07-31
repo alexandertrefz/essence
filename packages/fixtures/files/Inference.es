@@ -4,21 +4,25 @@ implementation {
 
 	§ A Function literal passed as an Argument may leave its annotations out —
 	§ the parameter it is passed to says what they are.
-	__print(numbers::removeEvery(where (item) { <- item::isGreaterThan(2) }))
+	Terminal.inspect(
+		numbers::removeEvery(where (item) { <- item::isGreaterThan(2) }),
+	)
 
 	§ An unannotated Parameter takes its label from the expected Type too, so
 	§ these two spellings mean exactly the same thing. Neither has to know that
 	§ `removeEvery`'s callback is labelless.
-	__print(numbers::removeEvery(where (_ item) { <- item::isGreaterThan(2) }))
+	Terminal.inspect(
+		numbers::removeEvery(where (_ item) { <- item::isGreaterThan(2) }),
+	)
 
 	§ Annotations are still accepted, and still win where they are written.
-	__print(
+	Terminal.inspect(
 		numbers::removeEvery(where (item) -> Boolean {
 			<- item::isGreaterThan(2)
 		}),
 	)
 
-	__print(
+	Terminal.inspect(
 		numbers::removeEvery(where (_ item: Integer) -> Boolean {
 			<- item::isGreaterThan(2)
 		}),
@@ -30,7 +34,7 @@ implementation {
 		<- item::toString()::is("2")
 	})
 
-	__print(withoutTwo)
+	Terminal.inspect(withoutTwo)
 
 	namespace Mapper<infer Item> for List<Item> {
 		transformFirst<infer Target>(
@@ -44,7 +48,7 @@ implementation {
 	§ `Item` is bound by the receiver, which types the Parameter. `Target` is
 	§ bound by nothing but this literal's own body — so the body is what it is
 	§ read off, and it decides the Type of the whole invocation.
-	__print(
+	Terminal.inspect(
 		numbers::transformFirst(
 			(item) { <- item::toString() },
 			fallback "none",
@@ -52,7 +56,7 @@ implementation {
 	)
 
 	§ The same call with a body returning a Boolean binds `Target` to Boolean.
-	__print(
+	Terminal.inspect(
 		numbers::transformFirst(
 			(item) { <- item::isGreaterThan(0) },
 			fallback false,
@@ -60,7 +64,7 @@ implementation {
 	)
 
 	§ Several `<-` Statements give the Union of what they return.
-	__print(
+	Terminal.inspect(
 		numbers::transformFirst((item) {
 			if item::isGreaterThan(0) {
 				<- item::multiply(with 2)
@@ -75,5 +79,5 @@ implementation {
 	§ body is what makes a Program hard to follow.
 	constant halve = (_ value: Integer) -> Rational { <- value::divide(by 2) }
 
-	__print(halve(9))
+	Terminal.inspect(halve(9))
 }

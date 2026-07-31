@@ -1,6 +1,5 @@
 import { describe, expect, test } from "bun:test"
 
-import { getStringRepresentation } from "../functions"
 import { createInteger } from "../Integer"
 import { anyIs } from "../internalHelpers"
 import { decimal, fraction } from "../NumberFormat"
@@ -13,6 +12,7 @@ import {
 	toString__overload$2 as toStringAs,
 } from "../Rational"
 import { createRecord } from "../Record"
+import { getStringRepresentation } from "../Terminal"
 import { type AnyType, typeKeySymbol } from "../type"
 
 // NOTE: The payload of the Optional a fallible Rational Method answers with.

@@ -12,9 +12,12 @@ with `NestedList` and `NonEmptyList`.
 The only things NOT declared here are the ones no declaration could produce:
 the bare Type tags — `Boolean`, `String`, `Integer`, `Rational`, `Algebraic`,
 `Transcendental`, the open Record and the unapplied `List` — which
-live in `packages/compiler/src/enricher/primitives.ts`. `__print` — the one
-native Function with no Namespace to live in — is declared here after all, in
-`Print.es`, as an ordinary body-less free Function.
+live in `packages/compiler/src/enricher/primitives.ts`. `loop` — the one
+native Function family with no Namespace to live in — is declared here after
+all, in `Loop.es`, as ordinary free Functions. Printing is a Namespace:
+`Terminal.print` renders through `Printable` and ends the line,
+`Terminal.inspect` shows a value's structure and answers with it unchanged, and
+`Terminal.write` is the raw primitive both are built on (`Terminal.es`).
 
 About half of the declared Method entries are also IMPLEMENTED here, in
 Essence; the rest bind to `@essence-lang/runtime`. What stays native is a

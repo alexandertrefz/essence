@@ -62,7 +62,7 @@ describe("Document Symbols", () => {
 
 	it("should not produce symbols for top level Expressions", () => {
 		let symbols = symbolsOf(
-			["implementation {", '\t__print("Hello")', "}"].join("\n"),
+			["implementation {", '\tTerminal.inspect("Hello")', "}"].join("\n"),
 		)
 
 		expect(symbols).toEqual([])
@@ -304,7 +304,9 @@ describe("Document Symbols", () => {
 
 		it("should still produce no symbols for a top level Expression", () => {
 			let symbols = symbolsOf(
-				["implementation {", '\t__print("Hello")', "}"].join("\n"),
+				["implementation {", '\tTerminal.inspect("Hello")', "}"].join(
+					"\n",
+				),
 			)
 
 			expect(symbols).toEqual([])

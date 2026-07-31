@@ -10,10 +10,12 @@ import type { common } from "@essence-lang/interfaces"
 // NOTE: So it is conservative to the point of dullness. `true` means the
 // Compiler can NAME every reason this Expression could matter and there is
 // none; everything it can not name is `false`. A missing rule costs an
-// optimisation, and a wrong one costs a `__print`.
+// optimisation, and a wrong one costs a `Terminal.print`.
 //
 // NOTE: What "matters" means, exactly, in the language as it stands:
-//   - it PRINTS. `__print` is the only observable effect a Program has.
+//   - it PRINTS. `Terminal` is the only observable effect a Program has —
+//     `write` reaches a stream and `inspect` reaches stdout, and `print` is
+//     written on `write`.
 //   - it ASSIGNS. A variable assignment is the only mutation there is, and it
 //     is an Expression here as well as a Statement.
 //   - it DIVERGES or THROWS. Neither is an effect the language offers on
@@ -77,7 +79,7 @@ export function isPureExpression(
 		case "ConformanceValue":
 			return node.conditions.every(isPure)
 		// NOTE: A call, and the whole of what this function refuses. A native
-		// Function is `__print` itself for all it can tell here, a
+		// Function is `Terminal.write` itself for all it can tell here, a
 		// Function-valued Expression is whatever was bound to it, and a Union
 		// dispatch is a Method call with a search in front of it.
 		case "NativeFunctionInvocation":
@@ -195,6 +197,14 @@ function isPureIntrinsic(
 // Arguments and run them, so their purity is the caller's Function's. `String`
 // allocates freely but the Methods worth naming here are the comparisons, which
 // `lower-scalar-operations` reaches without this.
+//
+// NOTE: And `Terminal` above all, whose absence is the one this table can least
+// afford to lose. It is named here rather than left to be inferred because the
+// table is an ALLOWLIST — a Namespace with no entry has every Method refused —
+// and the next reader adding one should not have to wonder whether the printing
+// Namespace was forgotten. `print`, `write` and `inspect` ARE the observable
+// effect the enumeration above is written to protect; every one of them has to
+// survive every pass.
 const pureMethods: Record<string, ReadonlySet<string>> = {
 	Integer: new Set([
 		"is",

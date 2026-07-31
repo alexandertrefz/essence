@@ -21,6 +21,7 @@ import * as record from "@essence-lang/runtime/Record"
 import * as rounding from "@essence-lang/runtime/Rounding"
 import * as side from "@essence-lang/runtime/Side"
 import * as string from "@essence-lang/runtime/String"
+import * as terminal from "@essence-lang/runtime/Terminal"
 import * as transcendental from "@essence-lang/runtime/Transcendental"
 
 import { builtinNamespaces } from "../enricher/builtins"
@@ -34,6 +35,7 @@ import { nativeArity } from "../tools/generateNatives"
 // cross-checked against `runtimeNamespaceNames` below, so this table can not
 // silently fall out of step with what the Rewriter actually imports.
 const runtimeModules: Record<string, Record<string, unknown>> = {
+	Terminal: terminal,
 	String: string,
 	Boolean: boolean,
 	Integer: integer,
@@ -214,7 +216,7 @@ describe("Builtins", () => {
 	})
 
 	// NOTE: The free Functions — the ones that belong to no Namespace, like
-	// `__print` — are held to the same two promises a Namespace Method is: a
+	// `loop` — are held to the same two promises a Namespace Method is: a
 	// native one must have a runtime export under the name the Simplifier will
 	// ask for, and every one must be documented. `natives.generated.ts` checks
 	// the SHAPE of each export under tsc; this gives the friendlier miss-by-name
@@ -279,16 +281,53 @@ describe("Builtins", () => {
 			expect(undocumented).toEqual([])
 		})
 
-		// NOTE: `__print` is the one SINGLE-signature free Function — a body-less
-		// native bound to `functions.__print`, beside the overloaded `loop`. It is
-		// listed in `builtinMemberOrder` and resolves to a `Function`, which is
-		// what its `__`-sigil invocation reads.
-		it("declares __print as a native free Function", () => {
+		// NOTE: `loop` is the only free Function left — printing used to be one
+		// as well and is a Namespace now — and it is the shape this whole block
+		// exists for: an `overload function` block mixing native entries with
+		// Essence-bodied ones, where the flag's POSITION is the `__overload$N`
+		// index the Rewriter binds by.
+		it("declares loop as a partly native overloaded free Function", () => {
 			let stdlib = loadStdlib()
 
-			expect(stdlib.functionBindings["__print"]).toEqual([true])
-			expect(stdlib.members["__print"]?.type).toBe("Function")
-			expect(typeof functions.__print).toBe("function")
+			expect(Object.keys(stdlib.functionBindings)).toEqual(["loop"])
+			expect(stdlib.functionBindings["loop"]).toEqual([
+				true,
+				false,
+				false,
+				true,
+			])
+			expect(stdlib.members["loop"]?.type).toBe("OverloadedStaticMethod")
+			expect(typeof functions.loop__overload$1).toBe("function")
+			expect(typeof functions.loop__overload$4).toBe("function")
+		})
+	})
+
+	// NOTE: The Namespace printing moved onto. It is checked here, beside the
+	// free Functions it replaced, because its two natives are the only ones in
+	// the language whose whole purpose is an effect — nothing about the value
+	// they answer with says whether they ran, so the binding is all that stands
+	// between a `Terminal.print` and a Program that prints nothing.
+	describe("Terminal", () => {
+		it("binds exactly the two native entries to the runtime", () => {
+			let bindings = loadStdlib().nativeBindings["Terminal"]
+
+			// NOTE: `print` is Essence both ways round, `write` is Essence for
+			// the stream-less entry and native for the one that names a Stream,
+			// and `inspect` is native. The position in each Array is the
+			// `__overload$N` index.
+			expect(bindings?.methods).toEqual({
+				print: [false, false],
+				write: [false, true],
+				inspect: [true],
+			})
+
+			let runtime = terminal as Record<string, unknown>
+
+			expect(typeof runtime["write__overload$2"]).toBe("function")
+			expect(typeof runtime["inspect"]).toBe("function")
+			expect(runtime["print__overload$1"]).toBeUndefined()
+			expect(runtime["print__overload$2"]).toBeUndefined()
+			expect(runtime["write__overload$1"]).toBeUndefined()
 		})
 	})
 

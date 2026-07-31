@@ -76,7 +76,7 @@ function generate(
 }
 
 // NOTE: Emits the Program, writes it to a throwaway module and imports it so
-// its top-level `__print` calls run. The emitted imports are absolute paths
+// its top-level `Terminal.inspect` calls run. The emitted imports are absolute paths
 // into this repo's runtime, so the module resolves from anywhere; `console.log`
 // is captured to collect the output, then restored.
 async function run(
@@ -151,7 +151,7 @@ describe("Code Generation", () => {
 						static version = "1.0"
 					}
 
-					__print(Config.version)
+					Terminal.inspect(Config.version)
 				}
 			`)
 
@@ -166,7 +166,7 @@ describe("Code Generation", () => {
 							static version = "1.0"
 						}
 
-						__print(Config.version)
+						Terminal.inspect(Config.version)
 					}
 				`),
 			).toEqual(['"1.0"'])
@@ -189,7 +189,7 @@ describe("Code Generation", () => {
 					{ x = 1, y = 2 }
 					[1, 2, 3]
 
-					__print("done")
+					Terminal.inspect("done")
 				}
 			`)
 
@@ -211,7 +211,7 @@ describe("Code Generation", () => {
 
 						{ x = $discarded }
 
-						__print($discarded)
+						Terminal.inspect($discarded)
 					}
 				`),
 			).toEqual(["1"])
@@ -223,11 +223,11 @@ describe("Code Generation", () => {
 			// print.
 			let generated = generate(`
 				implementation {
-					__print("done")
+					Terminal.inspect("done")
 				}
 			`)
 
-			expect(generated).toContain("$_.__print($pool_0);")
+			expect(generated).toContain("Terminal.inspect($pool_0);")
 			expect(generated).not.toContain("$discarded")
 		})
 
@@ -244,41 +244,46 @@ describe("Code Generation", () => {
 						{ base with x = 9 }
 						Colour#Red
 
-						__print("done")
+						Terminal.inspect("done")
 					}
 				`),
 			).toEqual(['"done"'])
 		})
 	})
 
-	// NOTE: `__print` migrated from a TypeScript table to `packages/stdlib/sources/Print.es`
-	// as an ordinary native free Function. Its emission is a read off the runtime
-	// `functions` module under its OWN name now — the `__` prefix used to be
-	// stripped so the runtime exported a differently-spelled `print`. The
-	// observable behavior is unchanged: it prints the value and answers with it.
-	describe("__print", () => {
-		it("emits a read off the functions module under its own name", () => {
+	// NOTE: Structural printing used to be the free Function `__print`, reached
+	// through the `__` sigil and read off the runtime `functions` module. It is
+	// `Terminal.inspect` now — an ordinary native static Method of an ordinary
+	// Namespace, emitted as a read off that Namespace's runtime import like every
+	// other native. The observable behaviour is unchanged, which is why the
+	// golden file did not move when every call site was rewritten.
+	describe("Terminal.inspect", () => {
+		it("emits a read off the Terminal module, not the functions one", () => {
 			let generated = generate(`
 				implementation {
-					__print("hello")
+					Terminal.inspect("hello")
 				}
 			`)
 
-			expect(generated).toContain("$_.__print(")
-			// NOTE: The old prefix-stripping spelling must be gone.
+			expect(generated).toContain("Terminal.inspect(")
+			// NOTE: The free-Function spellings must both be gone — the `__`
+			// sigil's `$_.__print(` and the prefix-stripped `$_.print(` before
+			// it.
+			expect(generated).not.toContain("$_.__print(")
 			expect(generated).not.toContain("$_.print(")
 		})
 
 		it("prints the value and is unchanged at runtime", async () => {
 			let output = await run(`
 				implementation {
-					__print("hello")
-					__print(42)
+					Terminal.inspect("hello")
+					Terminal.inspect(42)
 				}
 			`)
 
-			// NOTE: A String prints quoted, an Integer bare — the same
-			// representation `getStringRepresentation` always produced.
+			// NOTE: A String prints QUOTED, an Integer bare — the structural
+			// representation `getStringRepresentation` always produced, which is
+			// exactly what tells `inspect` apart from `print`.
 			expect(output).toEqual(['"hello"', "42"])
 		})
 	})
@@ -294,7 +299,7 @@ describe("Code Generation", () => {
 		it("prints each member of a multi-line Record exactly once", async () => {
 			expect(
 				await run(`implementation {
-					__print({
+					Terminal.inspect({
 						firstName = "Alexander",
 						lastName = "Trefz",
 						occupation = "Language designer",
@@ -321,9 +326,9 @@ describe("Code Generation", () => {
 						<- value::multiply(with 2)
 					}
 
-					__print(double)
-					__print({ callback = double })
-					__print([double])
+					Terminal.inspect(double)
+					Terminal.inspect({ callback = double })
+					Terminal.inspect([double])
 				}`),
 			).toEqual(["Function", "{ callback = Function }", "[ Function ]"])
 		})
@@ -338,9 +343,9 @@ describe("Code Generation", () => {
 					constant composed = "café"::normalize()
 					constant decomposed = "café"::normalize(as #DecomposedCanonical)
 
-					__print(composed::is(decomposed))
-					__print({ v = composed }::is({ v = decomposed }))
-					__print([{ v = composed }]::is([{ v = decomposed }]))
+					Terminal.inspect(composed::is(decomposed))
+					Terminal.inspect({ v = composed }::is({ v = decomposed }))
+					Terminal.inspect([{ v = composed }]::is([{ v = decomposed }]))
 				}`),
 			).toEqual(["true", "true", "true"])
 		})
@@ -354,10 +359,10 @@ describe("Code Generation", () => {
 					constant whole: Number = 1
 					constant ratio: Number = 1/1
 
-					__print(whole::is(ratio))
-					__print({ x = 1 }::is({ x = 1/1 }))
-					__print({ x = 1/2::add(1/2) }::is({ x = 1 }))
-					__print({ x = 1 }::is({ x = 1/2 }))
+					Terminal.inspect(whole::is(ratio))
+					Terminal.inspect({ x = 1 }::is({ x = 1/1 }))
+					Terminal.inspect({ x = 1/2::add(1/2) }::is({ x = 1 }))
+					Terminal.inspect({ x = 1 }::is({ x = 1/2 }))
 				}`),
 			).toEqual(["true", "true", "true", "false"])
 		})
@@ -373,7 +378,7 @@ describe("Code Generation", () => {
 				implementation {
 					variable value: Integer | Rational | String | Boolean = true
 
-					__print(match value -> String {
+					Terminal.inspect(match value -> String {
 						case Integer  { <- "handled integer" }
 						case Rational { <- "handled rational" }
 						case String   { <- "handled string" }
@@ -393,7 +398,7 @@ describe("Code Generation", () => {
 				implementation {
 					variable value: Integer | Rational | Boolean = true
 
-					__print(match value -> String {
+					Terminal.inspect(match value -> String {
 						case Integer  { <- "a" }
 						case Rational { <- "b" }
 						case Boolean  { <- "c" }
@@ -431,7 +436,7 @@ describe("Code Generation", () => {
 				implementation {
 					variable value: Integer | Rational | Boolean = true
 
-					__print(match value -> String {
+					Terminal.inspect(match value -> String {
 						case Integer | Rational { <- "number" }
 						case Boolean            { <- "boolean" }
 					})
@@ -447,7 +452,7 @@ describe("Code Generation", () => {
 				implementation {
 					variable value: Integer | Rational | Boolean = true
 
-					__print(match value -> String {
+					Terminal.inspect(match value -> String {
 						case Boolean { <- "handled boolean" }
 						case _       { <- "handled the rest" }
 					})
@@ -470,7 +475,7 @@ describe("Code Generation", () => {
 					implementation {
 						variable value: Integer | Boolean = 5
 
-						__print(match value -> Integer {
+						Terminal.inspect(match value -> Integer {
 							case Boolean { <- 0 }
 							case _       { <- @::multiply(with 2) }
 						})
@@ -485,7 +490,7 @@ describe("Code Generation", () => {
 					implementation {
 						variable value: Integer | Boolean = 5
 
-						__print(match value -> String {
+						Terminal.inspect(match value -> String {
 							case _ { <- "anything" }
 						})
 					}
@@ -500,7 +505,7 @@ describe("Code Generation", () => {
 				implementation {
 					variable value: Integer | Boolean = 0
 
-					__print(match value -> String {
+					Terminal.inspect(match value -> String {
 						case 0       { <- "zero" }
 						case Integer { <- "other" }
 						case Boolean { <- "boolean" }
@@ -519,7 +524,7 @@ describe("Code Generation", () => {
 				implementation {
 					variable value: Integer | Boolean = 1
 
-					__print(match value -> String {
+					Terminal.inspect(match value -> String {
 						case Integer where @::isGreaterThan(0) { <- "positive" }
 						case Integer                           { <- "other" }
 						case Boolean                           { <- "boolean" }
@@ -537,7 +542,7 @@ describe("Code Generation", () => {
 				implementation {
 					variable value: Integer | Boolean = 0
 
-					__print(match value -> String {
+					Terminal.inspect(match value -> String {
 						case 0       { <- "zero" }
 						case Boolean { <- "boolean" }
 					})
@@ -552,7 +557,7 @@ describe("Code Generation", () => {
 				implementation {
 					variable value: Integer | Boolean = 1
 
-					__print(match value -> String {
+					Terminal.inspect(match value -> String {
 						case Integer where @::isGreaterThan(0) { <- "positive" }
 						case Boolean                           { <- "boolean" }
 					})
@@ -570,7 +575,7 @@ describe("Code Generation", () => {
 				implementation {
 					variable value: Integer | Boolean = 1
 
-					__print(match value -> Integer {
+					Terminal.inspect(match value -> Integer {
 						case 0 { <- 0 }
 						case _ { <- @::multiply(with 2) }
 					})
@@ -586,7 +591,7 @@ describe("Code Generation", () => {
 					implementation {
 						variable value: Integer | Boolean = 1
 
-						__print(match value -> Integer {
+						Terminal.inspect(match value -> Integer {
 							case Boolean { <- 0 }
 							case 0       { <- 0 }
 							case _       { <- @::multiply(with 2) }
@@ -606,7 +611,7 @@ describe("Code Generation", () => {
 				implementation {
 					variable value: { a: Integer } | String = { a = 1 }
 
-					__print(match value -> String {
+					Terminal.inspect(match value -> String {
 						case { a: Integer } { <- "handled record" }
 						case String         { <- "handled string" }
 					})
@@ -622,7 +627,7 @@ describe("Code Generation", () => {
 				implementation {
 					variable value: { a: Integer, b: Integer } | String = { a = 6, b = 2 }
 
-					__print(match value -> String {
+					Terminal.inspect(match value -> String {
 						case { a = 6, b: Integer } { <- "six" }
 						case { a: Integer }        { <- "record" }
 						case String                { <- "string" }
@@ -639,7 +644,7 @@ describe("Code Generation", () => {
 					implementation {
 						variable value: { a: Integer, b: Integer } | String = { a = 6, b = 7 }
 
-						__print(match value -> Integer {
+						Terminal.inspect(match value -> Integer {
 							case { a = 6, b: Integer } { <- @.b }
 							case { a: Integer }        { <- @.a }
 							case String                { <- 0 }
@@ -654,7 +659,7 @@ describe("Code Generation", () => {
 				implementation {
 					variable value: { a: Integer } | String = { a = 6 }
 
-					__print(match value -> String {
+					Terminal.inspect(match value -> String {
 						case { a = 6 }  { <- "six" }
 						case String     { <- "string" }
 					})
@@ -670,7 +675,7 @@ describe("Code Generation", () => {
 					implementation {
 						variable value: { a: Integer } | String = { a = 6 }
 
-						__print(match value -> String {
+						Terminal.inspect(match value -> String {
 							case { a: Integer } { <- "record" }
 							case String         { <- "string" }
 						})
@@ -688,7 +693,7 @@ describe("Code Generation", () => {
 						<- 1
 					}
 
-					__print(f(1, "a", true))
+					Terminal.inspect(f(1, "a", true))
 				}
 			`)
 
@@ -709,7 +714,7 @@ describe("Code Generation", () => {
 							<- transform(1)
 						}
 
-						__print(apply((_ value: Integer) -> String {
+						Terminal.inspect(apply((_ value: Integer) -> String {
 							<- value::toString()
 						}))
 					}
@@ -725,7 +730,7 @@ describe("Code Generation", () => {
 		it("sorts a List of Strings through String.compare", () => {
 			let generated = generate(`
 				implementation {
-					__print(["b", "a"]::sort(by 
+					Terminal.inspect(["b", "a"]::sort(by 
 						(first, second) { <- first::compare(to second) },
 					))
 				}
@@ -751,7 +756,7 @@ describe("Code Generation", () => {
 		it("emits map with an inferred callback", () => {
 			let generated = generate(`
 				implementation {
-					__print([1, 2]::map((n) { <- n::toString() }))
+					Terminal.inspect([1, 2]::map((n) { <- n::toString() }))
 				}
 			`)
 
@@ -762,7 +767,7 @@ describe("Code Generation", () => {
 		it("emits reduce with its starting value and callback", () => {
 			let generated = generate(`
 				implementation {
-					__print([1, 2]::reduce(
+					Terminal.inspect([1, 2]::reduce(
 						startingWith 0,
 						(total, n) { <- total::add(n) },
 					))
@@ -787,7 +792,7 @@ describe("Code Generation", () => {
 						<- n::multiply(with 2)
 					}
 
-					__print([1, 2]::map(double))
+					Terminal.inspect([1, 2]::map(double))
 				}
 			`)
 
@@ -805,7 +810,7 @@ describe("Code Generation", () => {
 		it("types the body from the inferred Parameter", () => {
 			let generated = generate(`
 				implementation {
-					__print([1, 2, 3]::removeEvery(
+					Terminal.inspect([1, 2, 3]::removeEvery(
 						where (item) { <- item::isGreaterThan(2) },
 					))
 				}
@@ -818,7 +823,7 @@ describe("Code Generation", () => {
 		it("emits the same JavaScript however the literal was written", () => {
 			let annotated = generate(`
 				implementation {
-					__print([1, 2, 3]::removeEvery(
+					Terminal.inspect([1, 2, 3]::removeEvery(
 						where (_ item: Integer) -> Boolean { <- item::isGreaterThan(2) },
 					))
 				}
@@ -826,7 +831,7 @@ describe("Code Generation", () => {
 
 			let inferred = generate(`
 				implementation {
-					__print([1, 2, 3]::removeEvery(
+					Terminal.inspect([1, 2, 3]::removeEvery(
 						where (item) { <- item::isGreaterThan(2) },
 					))
 				}
@@ -843,7 +848,7 @@ describe("Code Generation", () => {
 					toString() -> String
 				}
 
-				__print("done")
+				Terminal.inspect("done")
 			}`)
 
 			expect(code).not.toContain("Showable")
@@ -868,7 +873,7 @@ describe("Code Generation", () => {
 					<- value::toString()
 				}
 
-				__print(describeValue({ x = 1, y = 2 }))
+				Terminal.inspect(describeValue({ x = 1, y = 2 }))
 			}`)
 
 			// NOTE: The bounded Function gains a hidden trailing parameter, its
@@ -889,7 +894,7 @@ describe("Code Generation", () => {
 					}
 				}
 
-				__print(smaller(5, 3))
+				Terminal.inspect(smaller(5, 3))
 			}`)
 
 			expect(code).toContain("compare: Integer.compare")
@@ -918,7 +923,7 @@ describe("Code Generation", () => {
 					<- inner(item)
 				}
 
-				__print(outer({ x = 1, y = 2 }))
+				Terminal.inspect(outer({ x = 1, y = 2 }))
 			}`)
 
 			expect(code).toContain("inner(item, Item__conformance)")
@@ -965,7 +970,7 @@ describe("Code Generation", () => {
 
 				constant a = { key = 1, value = "x" }
 				constant b = { key = 1, value = "y" }
-				__print(a::compare(to b))
+				Terminal.inspect(a::compare(to b))
 			}`)
 
 			// NOTE: R7 — the hidden conformance Parameters follow the Namespace's
@@ -995,7 +1000,7 @@ describe("Code Generation", () => {
 					<- topic::append("!")::repeat(times count)
 				}
 
-				__print(shout(about "hi", times 2))
+				Terminal.inspect(shout(about "hi", times 2))
 			}`
 
 			const code = generate(source)
@@ -1017,13 +1022,13 @@ describe("Code Generation", () => {
 		it("picks the Overload the label names", async () => {
 			expect(
 				await run(`implementation {
-					__print(loop(
+					Terminal.inspect(loop(
 						startingWith 1,
 						while (n) { <- n::isLessThan(4) },
 						step (n) { <- n::add(1) },
 					))
 
-					__print(loop(
+					Terminal.inspect(loop(
 						startingWith 1,
 						until (n) { <- n::isLessThan(4) },
 						step (n) { <- n::add(1) },
@@ -1047,8 +1052,8 @@ describe("Code Generation", () => {
 					}
 				}
 
-				__print("hello"::greet())
-				__print("hello"::greet(" world"))
+				Terminal.inspect("hello"::greet())
+				Terminal.inspect("hello"::greet(" world"))
 			}`
 
 			const code = generate(source)
@@ -1066,7 +1071,7 @@ describe("Code Generation", () => {
 			const source = `implementation {
 				constant value: Integer | Boolean = 5
 
-				__print(value::toString())
+				Terminal.inspect(value::toString())
 			}`
 			const code = generate(source)
 
@@ -1094,7 +1099,7 @@ describe("Code Generation", () => {
 			const code = generate(`implementation {
 				constant number: Number = 5
 
-				__print(number::multiply(with 2)::toString())
+				Terminal.inspect(number::multiply(with 2)::toString())
 			}`)
 
 			// NOTE: The mangled name survives into both spellings — the
@@ -1126,8 +1131,8 @@ describe("Code Generation", () => {
 					<- fallback::toString()
 				}
 
-				__print(describe(1, or 2))
-				__print(describe(1, or true))
+				Terminal.inspect(describe(1, or 2))
+				Terminal.inspect(describe(1, or true))
 			}`
 			const code = generate(source)
 
@@ -1146,8 +1151,8 @@ describe("Code Generation", () => {
 					<- fallback::toString()
 				}
 
-				__print(describe(1, or 2))
-				__print(describe(1, or true))
+				Terminal.inspect(describe(1, or 2))
+				Terminal.inspect(describe(1, or true))
 			}`)
 
 			// NOTE: `lastIndexOf` is what picks the emitted branch out —
@@ -1179,7 +1184,7 @@ describe("Code Generation", () => {
 
 				constant value: Integer | Boolean = 5
 
-				__print(value::tag())
+				Terminal.inspect(value::tag())
 			}`)
 
 			expect(code).toContain("IntegerTag.tag")
@@ -1198,9 +1203,9 @@ describe("Code Generation", () => {
 					<- a::is(b)
 				}
 
-				__print(stringify([1, 2, 3]))
-				__print(same([1, 2], [1, 2])::toString())
-				__print(same([1, 2], [3, 4])::toString())
+				Terminal.inspect(stringify([1, 2, 3]))
+				Terminal.inspect(same([1, 2], [1, 2])::toString())
+				Terminal.inspect(same([1, 2], [3, 4])::toString())
 			}`)
 
 			expect(output).toEqual(['"[ 1, 2, 3 ]"', '"true"', '"false"'])
@@ -1272,7 +1277,7 @@ describe("Code Generation", () => {
 				implementation {
 					constant new = 5
 
-					__print(new::toString())
+					Terminal.inspect(new::toString())
 				}
 			`)
 
@@ -1291,7 +1296,7 @@ describe("Code Generation", () => {
 
 						delete = delete::add(new)
 
-						__print(delete::toString())
+						Terminal.inspect(delete::toString())
 					}
 				`),
 			).toEqual([`"15"`])
@@ -1305,7 +1310,7 @@ describe("Code Generation", () => {
 							<- default::add(fallback)
 						}
 
-						__print(pick(3, or 4)::toString())
+						Terminal.inspect(pick(3, or 4)::toString())
 					}
 				`),
 			).toEqual([`"7"`])
@@ -1320,7 +1325,7 @@ describe("Code Generation", () => {
 					implementation {
 						constant thing = { new = 1, default = 2 }
 
-						__print(thing.new::add(thing.default)::toString())
+						Terminal.inspect(thing.new::add(thing.default)::toString())
 					}
 				`),
 			).toEqual([`"3"`])
@@ -1340,7 +1345,7 @@ describe("Code Generation", () => {
 
 		it("emits an Essence-implemented Method as its own const", () => {
 			const code = generate(`implementation {
-				__print(true::isNot(false))
+				Terminal.inspect(true::isNot(false))
 			}`)
 
 			// NOTE: The Namespace is imported under its own name — no `$native_`
@@ -1367,7 +1372,7 @@ describe("Code Generation", () => {
 		// writes it out as JavaScript's own `!`.
 		it("emits a body that reads the natives off the runtime module", () => {
 			const code = generate(`implementation {
-				__print(true::isNot(false))
+				Terminal.inspect(true::isNot(false))
 			}`)
 
 			expect(code).toContain("!Boolean.is(_self, other).value")
@@ -1380,7 +1385,7 @@ describe("Code Generation", () => {
 		// unreferenced, the Bundler shakes it away.
 		it("emits no const for a Method the Program never names", () => {
 			const code = generate(`implementation {
-				__print("hello")
+				Terminal.inspect("hello")
 			}`)
 
 			expect(code).not.toContain("$es_Boolean_isNot")
@@ -1399,7 +1404,7 @@ describe("Code Generation", () => {
 
 				constant yes = true
 
-				__print(differ(yes, yes))
+				Terminal.inspect(differ(yes, yes))
 			}`)
 
 			expect(code).toContain("isNot: $es_Boolean_isNot")
@@ -1415,7 +1420,7 @@ describe("Code Generation", () => {
 			const code = generate(`implementation {
 				constant record = { Boolean = "not the Namespace" }
 
-				__print(record.Boolean)
+				Terminal.inspect(record.Boolean)
 			}`)
 
 			expect(code).toContain("record.Boolean")
@@ -1446,7 +1451,7 @@ describe("Code Generation", () => {
 			const source = `implementation {
 				constant $esBooleanisNot = "mine"
 
-				__print($esBooleanisNot::append(true::isNot(false)::toString()))
+				Terminal.inspect($esBooleanisNot::append(true::isNot(false)::toString()))
 			}`
 
 			const code = generate(source)
@@ -1459,9 +1464,9 @@ describe("Code Generation", () => {
 		it("runs isNot from its const", async () => {
 			expect(
 				await run(`implementation {
-					__print(false::isNot(true)::toString())
-					__print(true::isNot(true)::toString())
-					__print(false::isNot(false)::toString())
+					Terminal.inspect(false::isNot(true)::toString())
+					Terminal.inspect(true::isNot(true)::toString())
+					Terminal.inspect(false::isNot(false)::toString())
 				}`),
 			).toEqual(['"true"', '"false"', '"false"'])
 		})
@@ -1475,8 +1480,8 @@ describe("Code Generation", () => {
 					<- a::isNot(b)
 				}
 
-				__print(differ(true, false)::toString())
-				__print(differ(true, true)::toString())
+				Terminal.inspect(differ(true, false)::toString())
+				Terminal.inspect(differ(true, true)::toString())
 			}`
 
 			expect(generate(source)).toContain("isNot: $es_Boolean_isNot")
@@ -1492,7 +1497,7 @@ describe("Code Generation", () => {
 			const source = `implementation {
 				constant value: Integer | Boolean = true
 
-				__print(value::toString())
+				Terminal.inspect(value::toString())
 			}`
 
 			const code = generate(source)
@@ -1516,12 +1521,12 @@ describe("Code Generation", () => {
 		it("runs isBetween from its const", async () => {
 			expect(
 				await run(`implementation {
-					__print(5::isBetween(1, and 10)::toString())
-					__print(1::isBetween(1, and 10)::toString())
-					__print(10::isBetween(1, and 10)::toString())
-					__print(11::isBetween(1, and 10)::toString())
-					__print(0::isBetween(1, and 10)::toString())
-					__print(5::isBetween(10, and 1)::toString())
+					Terminal.inspect(5::isBetween(1, and 10)::toString())
+					Terminal.inspect(1::isBetween(1, and 10)::toString())
+					Terminal.inspect(10::isBetween(1, and 10)::toString())
+					Terminal.inspect(11::isBetween(1, and 10)::toString())
+					Terminal.inspect(0::isBetween(1, and 10)::toString())
+					Terminal.inspect(5::isBetween(10, and 1)::toString())
 				}`),
 			).toEqual([
 				'"true"',
@@ -1539,9 +1544,9 @@ describe("Code Generation", () => {
 		it("runs isBetween across the whole numeric tower", async () => {
 			expect(
 				await run(`implementation {
-					__print(Number.Pi::isBetween(3, and 22/7)::toString())
-					__print(Number.Pi::isBetween(22/7, and 4)::toString())
-					__print(3/2::isBetween(1, and 2)::toString())
+					Terminal.inspect(Number.Pi::isBetween(3, and 22/7)::toString())
+					Terminal.inspect(Number.Pi::isBetween(22/7, and 4)::toString())
+					Terminal.inspect(3/2::isBetween(1, and 2)::toString())
 				}`),
 			).toEqual(['"true"', '"false"', '"true"'])
 		})
@@ -1553,7 +1558,7 @@ describe("Code Generation", () => {
 		// const in with it, and the per-Method gate is precise enough not to.
 		it("emits each Essence Method's const only where it is reached", () => {
 			const both = generate(`implementation {
-				__print(5::isBetween(1, and 10)::isNot(false))
+				Terminal.inspect(5::isBetween(1, and 10)::isNot(false))
 			}`)
 
 			expect(both).toContain("const $es_Number_isBetween")
@@ -1561,7 +1566,7 @@ describe("Code Generation", () => {
 
 			// NOTE: `isNot` alone — a Program that never names a Number.
 			const booleanOnly = generate(`implementation {
-				__print(true::isNot(false))
+				Terminal.inspect(true::isNot(false))
 			}`)
 
 			expect(booleanOnly).not.toContain("$es_Number_isBetween")
@@ -1570,7 +1575,7 @@ describe("Code Generation", () => {
 			// NOTE: `isBetween` alone reaches only natives, so its const stands
 			// alone.
 			const numberReached = generate(`implementation {
-				__print(5::isBetween(1, and 10))
+				Terminal.inspect(5::isBetween(1, and 10))
 			}`)
 
 			expect(numberReached).toContain(
@@ -1581,7 +1586,7 @@ describe("Code Generation", () => {
 			// NOTE: Neither. A String-only Program names no Essence Method at all
 			// and gets no const.
 			const neither = generate(`implementation {
-				__print("hello")
+				Terminal.inspect("hello")
 			}`)
 
 			expect(neither).not.toContain("$es_Number_isBetween")
@@ -1593,9 +1598,9 @@ describe("Code Generation", () => {
 		// plain member read off the runtime module, `Number.Pi`, like every native.
 		it("reads Pi and Tau as native member reads", async () => {
 			const source = `implementation {
-				__print(Number.Pi::toString())
-				__print(Number.Tau::toString())
-				__print(Number.Pi::isBetween(3, and 22/7)::toString())
+				Terminal.inspect(Number.Pi::toString())
+				Terminal.inspect(Number.Tau::toString())
+				Terminal.inspect(Number.Pi::isBetween(3, and 22/7)::toString())
 			}`
 
 			expect(generate(source)).toContain("Number.Pi")
@@ -1686,7 +1691,6 @@ describe("Code Generation", () => {
 
 			it("names every native entry, one per native slot", () => {
 				expect([...nativeFreeFunctionNames()].sort()).toEqual([
-					"__print",
 					"loop__overload$1",
 					"loop__overload$4",
 				])
@@ -2902,7 +2906,7 @@ declarations {
 
 				it("routes a Property read to its const, in a band below the Functions", () => {
 					let code = generate(`implementation {
-	__print(Constants.DOUBLE::toString())
+	Terminal.inspect(Constants.DOUBLE::toString())
 }`)
 
 					// NOTE: The read is the bare const, not the
@@ -2910,7 +2914,7 @@ declarations {
 					// and no import for the Namespace is emitted at all, since
 					// nothing about it is native.
 					expect(code).toContain(
-						"$_.__print(Integer.toString($es_Constants_DOUBLE));",
+						"Terminal.inspect(Integer.toString($es_Constants_DOUBLE));",
 					)
 					expect(code).not.toContain("Constants.DOUBLE")
 					expect(code).not.toContain('import * as Constants from "')
@@ -2934,8 +2938,8 @@ declarations {
 				it("runs the value band", async () => {
 					expect(
 						await run(`implementation {
-	__print(Constants.DOUBLE)
-	__print(Constants.BASE)
+	Terminal.inspect(Constants.DOUBLE)
+	Terminal.inspect(Constants.BASE)
 }`),
 					).toEqual(["42", "21"])
 				})
@@ -2981,13 +2985,13 @@ declarations {
 	constant red: Colour = #Red
 	constant green: Colour = #Green({ shade = 2 })
 
-	__print(match green -> String {
+	Terminal.inspect(match green -> String {
 		case #Red { <- "red" }
 		case #Green { <- @.shade::toString() }
 	})
 
-	__print(red::is(green)::toString())
-	__print(red::is(#Red)::toString())
+	Terminal.inspect(red::is(green)::toString())
+	Terminal.inspect(red::is(#Red)::toString())
 }`
 
 		it("tags a Module's Cases with the Module's path", () => {
@@ -3038,8 +3042,8 @@ declarations {
 		<- 0
 	}
 
-	__print(doubledOrZero(21))
-	__print(doubledOrZero(0))
+	Terminal.inspect(doubledOrZero(21))
+	Terminal.inspect(doubledOrZero(0))
 }`
 
 		// NOTE: The same Program with the check taken out, which is the only thing
@@ -3056,8 +3060,8 @@ declarations {
 		<- doubled(d)
 	}
 
-	__print(doubledOrZero(21))
-	__print(doubledOrZero(0))
+	Terminal.inspect(doubledOrZero(21))
+	Terminal.inspect(doubledOrZero(0))
 }`
 
 		it("runs the checked value through the total operation", async () => {
@@ -3096,9 +3100,9 @@ declarations {
 		<- 3
 	}
 
-	__print(doubled(twentyOne))
-	__print(doubled(three()))
-	__print(shouted("essence"))
+	Terminal.inspect(doubled(twentyOne))
+	Terminal.inspect(doubled(three()))
+	Terminal.inspect(shouted("essence"))
 }`
 
 		// NOTE: The same Program with the values the predicates refuse, which is
@@ -3111,7 +3115,7 @@ declarations {
 		<- d::multiply(with 2)
 	}
 
-	__print(doubled(0))
+	Terminal.inspect(doubled(0))
 }`
 
 		it("runs the written value through the total operation", async () => {
@@ -3154,9 +3158,9 @@ declarations {
 		}
 	}
 
-	__print(shoutedOr(#Value("essence")))
-	__print(shoutedOr(#Value("")))
-	__print(shoutedOr(#Empty))
+	Terminal.inspect(shoutedOr(#Value("essence")))
+	Terminal.inspect(shoutedOr(#Value("")))
+	Terminal.inspect(shoutedOr(#Empty))
 }`
 
 		// NOTE: The same Program with the Guard taken out, which is the only thing
@@ -3181,7 +3185,7 @@ declarations {
 		}
 	}
 
-	__print(shoutedOr(#Value("essence")))
+	Terminal.inspect(shoutedOr(#Value("essence")))
 }`
 
 		it("runs the named value through the total operation", async () => {
@@ -3229,8 +3233,8 @@ declarations {
 		}
 	}
 
-	__print(namedOrDoubled(21))
-	__print(namedOrDoubled(0))
+	Terminal.inspect(namedOrDoubled(21))
+	Terminal.inspect(namedOrDoubled(0))
 }`
 
 		// NOTE: The same Match with a different value named, which is what makes the
@@ -3252,7 +3256,7 @@ declarations {
 		}
 	}
 
-	__print(namedOrDoubled(21))
+	Terminal.inspect(namedOrDoubled(21))
 }`
 
 		it("runs the value each Case proved through its total operation", async () => {
@@ -3295,9 +3299,9 @@ declarations {
 	§ And a written List is its own proof, with nothing asking anything.
 	constant proven: Filled<String> = ["written"]
 
-	__print(firstOrEmpty(["a", "b"]))
-	__print(firstOrEmpty([]))
-	__print(firstOf(proven))
+	Terminal.inspect(firstOrEmpty(["a", "b"]))
+	Terminal.inspect(firstOrEmpty([]))
+	Terminal.inspect(firstOf(proven))
 }`
 
 		// NOTE: The same Program with the check taken out, which is the only thing
@@ -3314,7 +3318,7 @@ declarations {
 		<- firstOf(items)
 	}
 
-	__print(firstOrEmpty(["a", "b"]))
+	Terminal.inspect(firstOrEmpty(["a", "b"]))
 }`
 
 		// NOTE: And the same Program asking about a List of the wrong items, which
@@ -3336,7 +3340,7 @@ declarations {
 		<- "nothing"
 	}
 
-	__print(firstOrEmpty([1, 2]))
+	Terminal.inspect(firstOrEmpty([1, 2]))
 }`
 
 		it("runs the narrowed List through the total operation", async () => {
@@ -3372,8 +3376,8 @@ declarations {
 
 	§ Each call decides 'Item' by the List it is written with, and the List is its
 	§ own proof of the predicate.
-	__print(firstOf(["written", "second"]))
-	__print(firstOf([1, 2]))
+	Terminal.inspect(firstOf(["written", "second"]))
+	Terminal.inspect(firstOf([1, 2]))
 }`
 
 		// NOTE: The empty List is what says the evidence is still being read: it
@@ -3384,7 +3388,7 @@ declarations {
 		<- items::firstItem()
 	}
 
-	__print(firstOf([]))
+	Terminal.inspect(firstOf([]))
 }`
 
 		it("runs the written List through the total operation", async () => {
@@ -3421,11 +3425,11 @@ declarations {
 	constant huge: NonZeroInteger = 9_007_199_254_740_991
 	constant negative: NonZeroInteger = -3
 
-	__print(product(six, seven))
-	__print(product(huge, huge))
-	__print(product(six, negative))
+	Terminal.inspect(product(six, seven))
+	Terminal.inspect(product(huge, huge))
+	Terminal.inspect(product(six, negative))
 	§ And the answer is proven in its turn, which is what the Namespace is for.
-	__print(product(product(six, seven), seven))
+	Terminal.inspect(product(product(six, seven), seven))
 }`
 
 		it("runs the proven product through the lowered path", async () => {

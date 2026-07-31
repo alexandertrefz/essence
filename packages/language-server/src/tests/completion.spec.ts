@@ -399,7 +399,7 @@ describe("Completion", () => {
 			expect(labels).toContain("subject")
 			expect(labels).toContain("worldName")
 			expect(labels).toContain("greet")
-			expect(labels).toContain("__print")
+			expect(labels).toContain("Terminal")
 		})
 
 		it("should respect shadowing — the Parameter wins over the outer Constant", () => {
@@ -431,7 +431,7 @@ describe("Completion", () => {
 
 			expect(labels).toContain("Name")
 			expect(labels).toContain("String")
-			expect(labels).not.toContain("__print")
+			expect(labels).not.toContain("Terminal")
 		})
 
 		it("should see a hoisted Function used before its declaration", () => {
@@ -1105,7 +1105,7 @@ describe("Completion", () => {
 			let labels = labelsOf(source, { line: 3, column: 33 })
 
 			expect(labels).toContain("Printable")
-			expect(labels).not.toContain("__print")
+			expect(labels).not.toContain("Terminal")
 		})
 
 		it("should switch after a Generic bound's 'is'", () => {
@@ -1133,7 +1133,7 @@ describe("Completion", () => {
 			let labels = labelsOf(source, { line: 3, column: 28 })
 
 			expect(labels).toContain("Name")
-			expect(labels).not.toContain("__print")
+			expect(labels).not.toContain("Terminal")
 		})
 
 		it("should switch after a comma inside a Generic Argument list", () => {
@@ -1147,7 +1147,7 @@ describe("Completion", () => {
 			let labels = labelsOf(source, { line: 3, column: 36 })
 
 			expect(labels).toContain("Name")
-			expect(labels).not.toContain("__print")
+			expect(labels).not.toContain("Terminal")
 		})
 
 		it("should stay in the value space after a comma inside an Argument list", () => {
@@ -1161,7 +1161,7 @@ describe("Completion", () => {
 			].join("\n")
 
 			expect(labelsOf(source, { line: 5, column: 16 })).toContain(
-				"__print",
+				"Terminal",
 			)
 		})
 
@@ -1177,7 +1177,7 @@ describe("Completion", () => {
 			].join("\n")
 
 			expect(labelsOf(source, { line: 3, column: 2 })).toContain(
-				"__print",
+				"Terminal",
 			)
 		})
 	})
@@ -1291,7 +1291,7 @@ describe("Completion", () => {
 			expect(entryFor(source, inBody, "subject")?.tier).toBe(1)
 			expect(entryFor(source, inBody, "worldName")?.tier).toBe(3)
 			expect(entryFor(source, inBody, "greet")?.tier).toBe(3)
-			expect(entryFor(source, inBody, "__print")?.tier).toBe(4)
+			expect(entryFor(source, inBody, "Terminal")?.tier).toBe(4)
 		})
 
 		it("should rank Keywords last", () => {

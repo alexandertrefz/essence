@@ -51,7 +51,7 @@ describe("LSP", () => {
 			expect(
 				analyse(`implementation {
 					constant name: String = "essence"
-					__print(name)
+					Terminal.inspect(name)
 				}`),
 			).toEqual([])
 		})
@@ -705,7 +705,7 @@ describe("LSP", () => {
 				[
 					"implementation {",
 					"\tfunction broken () -> Integer {",
-					'\t\t__print("no return")',
+					'\t\tTerminal.inspect("no return")',
 					"\t}",
 					"}",
 				].join("\n"),
@@ -1009,7 +1009,7 @@ describe("LSP in a standard library source", () => {
 		let ordinary = [
 			"implementation {",
 			'\tconstant greeting = "hello"',
-			"\t__print(greeting)",
+			"\tTerminal.inspect(greeting)",
 			"}",
 		].join("\n")
 

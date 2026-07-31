@@ -55,6 +55,9 @@ const RUNTIME_TYPE_MODULES: Record<string, string> = {
 	StepType: "./Step",
 	ContinueType: "./Step",
 	DoneType: "./Step",
+	StreamType: "./Stream",
+	OutputType: "./Stream",
+	ErrorType: "./Stream",
 	StringType: "./String",
 	TranscendentalType: "./Transcendental",
 	AnyType: "./type",
@@ -71,6 +74,7 @@ const UNION_NAME_ALIASES: Record<string, string> = {
 	NumberFormat: "NumberFormatType",
 	NormalizationForm: "NormalizationFormType",
 	Number: "NumberType",
+	Stream: "StreamType",
 }
 
 // NOTE: The generic siblings of `UNION_NAME_ALIASES`, keyed on `UnionType.alias.name`
@@ -96,9 +100,10 @@ const GENERIC_CASE_TYPES: Record<string, string> = {
 	"Optional#Empty": "EmptyType",
 }
 
-// NOTE: The runtime unit types of the builtin `Ordering` and `Side` Choices — the only
-// Cases reachable in a signature, and then only inside the `Ordering` Union,
-// which is mapped whole before its Cases are ever visited.
+// NOTE: The runtime unit types of the builtin unit Choices — `Ordering`,
+// `Side`, `NumberFormat`, `NormalizationForm` and `Stream` — the only Cases
+// reachable in a signature, and then only inside their own Union, which is
+// mapped whole before its Cases are ever visited.
 const CASE_TYPES: Record<string, string> = {
 	"Ordering#Less": "LessType",
 	"Ordering#Equal": "EqualType",
@@ -112,6 +117,8 @@ const CASE_TYPES: Record<string, string> = {
 	"NormalizationForm#DecomposedCanonical": "DecomposedCanonicalType",
 	"NormalizationForm#ComposedCompatibility": "ComposedCompatibilityType",
 	"NormalizationForm#DecomposedCompatibility": "DecomposedCompatibilityType",
+	"Stream#Output": "OutputType",
+	"Stream#Error": "ErrorType",
 }
 
 // NOTE: The mutable state threaded through one render — every runtime type name
@@ -598,8 +605,9 @@ function renderNamespace(
 // Methods. A free Function belongs to no Namespace, so it is keyed by its own
 // name and rendered static (no receiver Parameter to inject). Returns the export
 // names of any Essence-bodied free Function so the assertion can forbid a runtime
-// export for it — none exist today, so `FunctionsNatives` is every declared free
-// Function and nothing is forbidden. `__print` is the sole inhabitant.
+// export for it. `loop` is the sole inhabitant — the `while` and general entries
+// are native, the `until` and counted ones are written in Essence and forbidden
+// here.
 function renderFunctionsNatives(
 	stdlib: Stdlib,
 	ctx: RenderContext,

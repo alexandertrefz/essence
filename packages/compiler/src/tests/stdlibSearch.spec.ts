@@ -113,8 +113,8 @@ describe("Stdlib searching Methods", () => {
 				await run(`implementation {
 					constant empties: List<Optional<Integer>> = [#Empty, #Empty]
 
-					__print(empties::firstIndex(of #Empty)::toString())
-					__print(empties::lastIndex(of #Empty)::toString())
+					Terminal.inspect(empties::firstIndex(of #Empty)::toString())
+					Terminal.inspect(empties::lastIndex(of #Empty)::toString())
 				}`),
 			).toEqual(['"Value(0)"', '"Value(1)"'])
 		})
@@ -124,9 +124,9 @@ describe("Stdlib searching Methods", () => {
 				await run(`implementation {
 					constant empties: List<Optional<Integer>> = [#Empty, #Empty]
 
-					__print(empties::contains(#Empty)::toString())
-					__print(empties::doesNotContain(#Empty)::toString())
-					__print(empties::count(of #Empty)::toString())
+					Terminal.inspect(empties::contains(#Empty)::toString())
+					Terminal.inspect(empties::doesNotContain(#Empty)::toString())
+					Terminal.inspect(empties::count(of #Empty)::toString())
 				}`),
 			).toEqual(['"true"', '"false"', '"2"'])
 		})
@@ -139,7 +139,7 @@ describe("Stdlib searching Methods", () => {
 				await run(`implementation {
 					constant empties: List<Optional<Integer>> = [#Empty, #Empty]
 
-					__print(empties::removeDuplicates()::length()::toString())
+					Terminal.inspect(empties::removeDuplicates()::length()::toString())
 				}`),
 			).toEqual(['"1"'])
 		})
@@ -156,10 +156,10 @@ describe("Stdlib searching Methods", () => {
 					constant empties: List<Optional<Integer>> = [#Empty, #Empty]
 					constant none: List<Optional<Integer>> = []
 
-					__print(empties::item(at 0)::toString())
-					__print(empties::item(at 5)::toString())
-					__print(empties::firstItem()::toString())
-					__print(none::firstItem()::toString())
+					Terminal.inspect(empties::item(at 0)::toString())
+					Terminal.inspect(empties::item(at 5)::toString())
+					Terminal.inspect(empties::firstItem()::toString())
+					Terminal.inspect(none::firstItem()::toString())
 				}`),
 			).toEqual([
 				'"Value(Empty)"',
@@ -182,13 +182,13 @@ describe("Stdlib searching Methods", () => {
 						#Empty,
 					]
 
-					__print(mixed::firstIndex(of #Empty)::toString())
-					__print(mixed::lastIndex(of #Empty)::toString())
-					__print(mixed::count(of #Empty)::toString())
-					__print(mixed::firstIndex(of #Value(1))::toString())
-					__print(mixed::lastIndex(of #Value(1))::toString())
-					__print(mixed::firstIndex(of #Value(7))::toString())
-					__print(mixed::lastIndex(of #Value(7))::toString())
+					Terminal.inspect(mixed::firstIndex(of #Empty)::toString())
+					Terminal.inspect(mixed::lastIndex(of #Empty)::toString())
+					Terminal.inspect(mixed::count(of #Empty)::toString())
+					Terminal.inspect(mixed::firstIndex(of #Value(1))::toString())
+					Terminal.inspect(mixed::lastIndex(of #Value(1))::toString())
+					Terminal.inspect(mixed::firstIndex(of #Value(7))::toString())
+					Terminal.inspect(mixed::lastIndex(of #Value(7))::toString())
 				}`),
 			).toEqual([
 				'"Value(0)"',
@@ -216,9 +216,9 @@ describe("Stdlib searching Methods", () => {
 
 					constant mixed: List<Integer | String> = ["a", 1, "a"]
 
-					__print(mixed::firstIndex(of "a")::toString())
-					__print(mixed::lastIndex(of "a")::toString())
-					__print(mixed::count(of "a")::toString())
+					Terminal.inspect(mixed::firstIndex(of "a")::toString())
+					Terminal.inspect(mixed::lastIndex(of "a")::toString())
+					Terminal.inspect(mixed::count(of "a")::toString())
 				}`),
 			).toEqual(['"Value(0)"', '"Value(2)"', '"2"'])
 		})
@@ -230,10 +230,10 @@ describe("Stdlib searching Methods", () => {
 
 					constant mixed: List<Integer | String> = ["a", 1, "a"]
 
-					__print(mixed::firstIndex(of 1)::toString())
-					__print(mixed::lastIndex(of 1)::toString())
-					__print(mixed::firstIndex(of 7)::toString())
-					__print(mixed::lastIndex(of 7)::toString())
+					Terminal.inspect(mixed::firstIndex(of 1)::toString())
+					Terminal.inspect(mixed::lastIndex(of 1)::toString())
+					Terminal.inspect(mixed::firstIndex(of 7)::toString())
+					Terminal.inspect(mixed::lastIndex(of 7)::toString())
 				}`),
 			).toEqual(['"Value(1)"', '"Value(1)"', '"Empty"', '"Empty"'])
 		})
@@ -257,7 +257,7 @@ describe("Stdlib searching Methods", () => {
 						Integer.parse("5"),
 					]
 
-					__print(parsed::anyItem(where (value) {
+					Terminal.inspect(parsed::anyItem(where (value) {
 						<- value::isEmpty()
 					})::toString())
 				}`),
@@ -272,7 +272,7 @@ describe("Stdlib searching Methods", () => {
 						Integer.parse("5"),
 					]
 
-					__print(parsed::everyItem(where (value) {
+					Terminal.inspect(parsed::everyItem(where (value) {
 						<- value::hasValue()
 					})::toString())
 				}`),
@@ -296,16 +296,16 @@ describe("Stdlib searching Methods", () => {
 						Integer.parse("5"),
 					]
 
-					__print(parsed::firstItem(where (value) {
+					Terminal.inspect(parsed::firstItem(where (value) {
 						<- value::isEmpty()
 					})::toString())
-					__print(parsed::firstItem(where (value) {
+					Terminal.inspect(parsed::firstItem(where (value) {
 						<- value::isEmpty()
 					})::hasValue()::toString())
-					__print(allValues::firstItem(where (value) {
+					Terminal.inspect(allValues::firstItem(where (value) {
 						<- value::isEmpty()
 					})::toString())
-					__print(allValues::anyItem(where (value) {
+					Terminal.inspect(allValues::anyItem(where (value) {
 						<- value::isEmpty()
 					})::toString())
 				}`),
@@ -318,22 +318,22 @@ describe("Stdlib searching Methods", () => {
 					constant numbers = [1, 2, 3]
 					constant none: List<Integer> = []
 
-					__print(numbers::anyItem(where (item) {
+					Terminal.inspect(numbers::anyItem(where (item) {
 						<- item::isGreaterThan(2)
 					})::toString())
-					__print(numbers::anyItem(where (item) {
+					Terminal.inspect(numbers::anyItem(where (item) {
 						<- item::isGreaterThan(9)
 					})::toString())
-					__print(none::anyItem(where (item) {
+					Terminal.inspect(none::anyItem(where (item) {
 						<- item::isGreaterThan(0)
 					})::toString())
-					__print(numbers::everyItem(where (item) {
+					Terminal.inspect(numbers::everyItem(where (item) {
 						<- item::isGreaterThan(0)
 					})::toString())
-					__print(numbers::everyItem(where (item) {
+					Terminal.inspect(numbers::everyItem(where (item) {
 						<- item::isGreaterThan(2)
 					})::toString())
-					__print(none::everyItem(where (item) {
+					Terminal.inspect(none::everyItem(where (item) {
 						<- item::isGreaterThan(0)
 					})::toString())
 				}`),
@@ -347,7 +347,7 @@ describe("Stdlib searching Methods", () => {
 			])
 		})
 
-		// NOTE: `__print` answers with the value it prints, so a check that
+		// NOTE: `Terminal.inspect` answers with the value it prints, so a check that
 		// wraps its item leaves a record of every item the walk reached. This is
 		// what proves the Boolean fold still LEAVES the walk: both stop at the
 		// item that decided the answer and never see the fourth.
@@ -355,14 +355,14 @@ describe("Stdlib searching Methods", () => {
 			expect(
 				await run(`implementation {
 					constant any = [1, 2, 3, 4]::anyItem(where (item) {
-						<- __print(item)::isGreaterThan(1)
+						<- Terminal.inspect(item)::isGreaterThan(1)
 					})
 					constant every = [1, 2, 3, 4]::everyItem(where (item) {
-						<- __print(item)::isLessThan(2)
+						<- Terminal.inspect(item)::isLessThan(2)
 					})
 
-					__print(any::toString())
-					__print(every::toString())
+					Terminal.inspect(any::toString())
+					Terminal.inspect(every::toString())
 				}`),
 			).toEqual(["1", "2", "1", "2", '"true"', '"false"'])
 		})
@@ -378,10 +378,10 @@ describe("Stdlib searching Methods", () => {
 			// is what "the last occurrence" means: "aaa" has "aa" at 0 AND at 1.
 			expect(
 				await run(`implementation {
-					__print("aaa"::lastIndex(of "aa")::toString())
-					__print("aaaa"::lastIndex(of "aa")::toString())
-					__print("banana"::lastIndex(of "ana")::toString())
-					__print("mississippi"::lastIndex(of "issi")::toString())
+					Terminal.inspect("aaa"::lastIndex(of "aa")::toString())
+					Terminal.inspect("aaaa"::lastIndex(of "aa")::toString())
+					Terminal.inspect("banana"::lastIndex(of "ana")::toString())
+					Terminal.inspect("mississippi"::lastIndex(of "issi")::toString())
 				}`),
 			).toEqual(['"Value(1)"', '"Value(2)"', '"Value(3)"', '"Value(4)"'])
 		})
@@ -389,11 +389,11 @@ describe("Stdlib searching Methods", () => {
 		it("keeps the answers the non-overlapping cases had", async () => {
 			expect(
 				await run(`implementation {
-					__print("a-b-a"::lastIndex(of "a")::toString())
-					__print("hello, World"::lastIndex(of "l")::toString())
-					__print("hello, World"::lastIndex(of "hello")::toString())
-					__print("hello, World"::lastIndex(of "World")::toString())
-					__print("hello, World"::lastIndex(of "zz")::toString())
+					Terminal.inspect("a-b-a"::lastIndex(of "a")::toString())
+					Terminal.inspect("hello, World"::lastIndex(of "l")::toString())
+					Terminal.inspect("hello, World"::lastIndex(of "hello")::toString())
+					Terminal.inspect("hello, World"::lastIndex(of "World")::toString())
+					Terminal.inspect("hello, World"::lastIndex(of "zz")::toString())
 				}`),
 			).toEqual([
 				'"Value(4)"',
@@ -407,10 +407,10 @@ describe("Stdlib searching Methods", () => {
 		it("answers the length for the empty part, as its mirror does", async () => {
 			expect(
 				await run(`implementation {
-					__print("hello"::lastIndex(of "")::toString())
-					__print(""::lastIndex(of "")::toString())
-					__print(""::lastIndex(of "a")::toString())
-					__print("hello"::firstIndex(of "")::toString())
+					Terminal.inspect("hello"::lastIndex(of "")::toString())
+					Terminal.inspect(""::lastIndex(of "")::toString())
+					Terminal.inspect(""::lastIndex(of "a")::toString())
+					Terminal.inspect("hello"::firstIndex(of "")::toString())
 				}`),
 			).toEqual(['"Value(5)"', '"Value(0)"', '"Empty"', '"Value(0)"'])
 		})
@@ -421,8 +421,8 @@ describe("Stdlib searching Methods", () => {
 		it("counts the positions by grapheme", async () => {
 			expect(
 				await run(`implementation {
-					__print("😀a😀"::lastIndex(of "😀")::toString())
-					__print("😀a😀"::firstIndex(of "😀")::toString())
+					Terminal.inspect("😀a😀"::lastIndex(of "😀")::toString())
+					Terminal.inspect("😀a😀"::firstIndex(of "😀")::toString())
 				}`),
 			).toEqual(['"Value(2)"', '"Value(0)"'])
 		})
@@ -438,10 +438,10 @@ describe("Stdlib searching Methods", () => {
 				await run(`implementation {
 					constant numbers = [1, 2, 3, 1]
 
-					__print(numbers::firstIndex(of 1)::toString())
-					__print(numbers::lastIndex(of 1)::toString())
-					__print(numbers::firstIndex(of 3)::toString())
-					__print(numbers::lastIndex(of 3)::toString())
+					Terminal.inspect(numbers::firstIndex(of 1)::toString())
+					Terminal.inspect(numbers::lastIndex(of 1)::toString())
+					Terminal.inspect(numbers::firstIndex(of 3)::toString())
+					Terminal.inspect(numbers::lastIndex(of 3)::toString())
 				}`),
 			).toEqual(['"Value(0)"', '"Value(3)"', '"Value(2)"', '"Value(2)"'])
 		})
@@ -452,10 +452,10 @@ describe("Stdlib searching Methods", () => {
 					constant numbers = [1, 2, 3, 1]
 					constant none: List<Integer> = []
 
-					__print(numbers::firstIndex(of 9)::toString())
-					__print(numbers::lastIndex(of 9)::toString())
-					__print(none::firstIndex(of 1)::toString())
-					__print(none::lastIndex(of 1)::toString())
+					Terminal.inspect(numbers::firstIndex(of 9)::toString())
+					Terminal.inspect(numbers::lastIndex(of 9)::toString())
+					Terminal.inspect(none::firstIndex(of 1)::toString())
+					Terminal.inspect(none::lastIndex(of 1)::toString())
 				}`),
 			).toEqual(['"Empty"', '"Empty"', '"Empty"', '"Empty"'])
 		})
@@ -467,9 +467,9 @@ describe("Stdlib searching Methods", () => {
 		it("searches through the items' own conformance", async () => {
 			expect(
 				await run(`implementation {
-					__print(["a", "b", "a"]::lastIndex(of "a")::toString())
-					__print([[1], [2], [1]]::firstIndex(of [1])::toString())
-					__print([[1], [2], [1]]::lastIndex(of [1])::toString())
+					Terminal.inspect(["a", "b", "a"]::lastIndex(of "a")::toString())
+					Terminal.inspect([[1], [2], [1]]::firstIndex(of [1])::toString())
+					Terminal.inspect([[1], [2], [1]]::lastIndex(of [1])::toString())
 				}`),
 			).toEqual(['"Value(2)"', '"Value(0)"', '"Value(2)"'])
 		})

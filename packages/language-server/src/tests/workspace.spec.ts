@@ -1064,7 +1064,7 @@ describe("Workspace", () => {
 					"}",
 					"",
 					"implementation {",
-					"\t__print(answer()::toString())",
+					"\tTerminal.inspect(answer()::toString())",
 					"}",
 					"",
 				].join("\n"),

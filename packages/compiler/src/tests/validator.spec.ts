@@ -41,7 +41,7 @@ describe("Validator", () => {
 			expect(
 				diagnosticsFor(`implementation {
 					constant name: String = "essence"
-					__print(name)
+					Terminal.inspect(name)
 				}`),
 			).toEqual([])
 		})
@@ -73,14 +73,14 @@ describe("Validator", () => {
 			expect(
 				diagnosticsFor(`implementation {
 					constant nested: Optional<Integer | Rational> = #Value(1)
-					__print(nested)
+					Terminal.inspect(nested)
 				}`),
 			).toEqual([])
 
 			let unwrapped = diagnosticsFor(`implementation {
 				constant nested: Optional<Integer | Rational> = #Value(1)
 				constant flat: Integer | Rational = nested
-				__print(flat)
+				Terminal.inspect(flat)
 			}`)
 
 			expect(unwrapped).toHaveLength(1)
@@ -92,7 +92,7 @@ describe("Validator", () => {
 			let rewrapped = diagnosticsFor(`implementation {
 				constant flat: Integer | Rational = 1
 				constant back: Optional<Integer | Rational> = flat
-				__print(back)
+				Terminal.inspect(back)
 			}`)
 
 			expect(rewrapped).toHaveLength(1)
@@ -114,7 +114,7 @@ describe("Validator", () => {
 				diagnosticsFor(`implementation {
 					constant inner: Optional<Integer> = #Empty
 					constant nested: Optional<Optional<Integer>> = #Value(inner)
-					__print(nested::flatten())
+					Terminal.inspect(nested::flatten())
 				}`),
 			).toEqual([])
 
@@ -122,7 +122,7 @@ describe("Validator", () => {
 				constant inner: Optional<Integer> = #Value(1)
 				constant nested: Optional<Optional<Integer>> = #Value(inner)
 				constant flat: Optional<Integer> = nested
-				__print(flat)
+				Terminal.inspect(flat)
 			}`)
 
 			expect(diagnostics).toHaveLength(1)
@@ -178,7 +178,7 @@ describe("Validator", () => {
 		it("should report non-Boolean If Conditions", () => {
 			let diagnostics = diagnosticsFor(`implementation {
 				if "value" {
-					__print("then")
+					Terminal.inspect("then")
 				}
 			}`)
 
@@ -191,9 +191,9 @@ describe("Validator", () => {
 		it("should report non-Boolean IfElse Conditions", () => {
 			let diagnostics = diagnosticsFor(`implementation {
 				if "value" {
-					__print("then")
+					Terminal.inspect("then")
 				} else {
-					__print("else")
+					Terminal.inspect("else")
 				}
 			}`)
 
@@ -349,7 +349,7 @@ describe("Validator", () => {
 			expect(
 				diagnosticsFor(`implementation {
 					function log (_ value: String) -> {} {
-						__print(value)
+						Terminal.inspect(value)
 					}
 				}`),
 			).toEqual([])
@@ -379,7 +379,7 @@ describe("Validator", () => {
 					}
 
 					case Rational {
-						__print(@)
+						Terminal.inspect(@)
 					}
 				}
 			}`)
@@ -396,7 +396,7 @@ describe("Validator", () => {
 				<- "value"
 
 				if "value" {
-					__print("then")
+					Terminal.inspect("then")
 				}
 			}`)
 
@@ -422,7 +422,7 @@ describe("Validator", () => {
 						<- topic
 					}
 
-					__print(shout(about "hi", times 2))
+					Terminal.inspect(shout(about "hi", times 2))
 				}`),
 			).toEqual([])
 		})
@@ -433,7 +433,7 @@ describe("Validator", () => {
 					<- topic
 				}
 
-				__print(shout(regarding "hi"))
+				Terminal.inspect(shout(regarding "hi"))
 			}`)
 
 			expect(diagnostics).toHaveLength(1)
@@ -458,7 +458,7 @@ describe("Validator", () => {
 					<- topic
 				}
 
-				__print(shout("hi"))
+				Terminal.inspect(shout("hi"))
 			}`)
 
 			expect(diagnostics).toHaveLength(1)
@@ -474,7 +474,7 @@ describe("Validator", () => {
 					<- topic
 				}
 
-				__print(shout(about "hi"))
+				Terminal.inspect(shout(about "hi"))
 			}`)
 
 			expect(diagnostics).toHaveLength(1)
@@ -498,7 +498,7 @@ describe("Validator", () => {
 					<- topic
 				}
 
-				__print(shout(regarding 2))
+				Terminal.inspect(shout(regarding 2))
 			}`)
 
 			expect(diagnostics).toHaveLength(1)
@@ -511,7 +511,7 @@ describe("Validator", () => {
 					<- topic
 				}
 
-				__print(shout(about 2))
+				Terminal.inspect(shout(about 2))
 			}`)
 
 			expect(diagnostics).toHaveLength(1)
@@ -534,7 +534,7 @@ describe("Validator", () => {
 					case Integer { <- @ }
 				}]
 
-				__print(values)
+				Terminal.inspect(values)
 			}`)
 
 			expect(diagnostics).toHaveLength(1)
@@ -549,7 +549,7 @@ describe("Validator", () => {
 
 				constant values = [shout(1)]
 
-				__print(values)
+				Terminal.inspect(values)
 			}`)
 
 			expect(diagnostics).toHaveLength(1)
@@ -564,7 +564,7 @@ describe("Validator", () => {
 
 				constant record = { loud = shout(1) }
 
-				__print(record.loud)
+				Terminal.inspect(record.loud)
 			}`)
 
 			expect(diagnostics).toHaveLength(1)
@@ -575,11 +575,11 @@ describe("Validator", () => {
 			let diagnostics = diagnosticsFor(`implementation {
 				constant record = {
 					compute = (_ value: Integer) -> Integer {
-						__print(value)
+						Terminal.inspect(value)
 					}
 				}
 
-				__print(record.compute(1))
+				Terminal.inspect(record.compute(1))
 			}`)
 
 			expect(diagnostics).toHaveLength(1)
@@ -595,7 +595,7 @@ describe("Validator", () => {
 				constant base = { x = 1, y = 2 }
 				constant combined = { base with x = takesInteger("bad") }
 
-				__print(combined.x)
+				Terminal.inspect(combined.x)
 			}`)
 
 			expect(diagnostics).toHaveLength(1)
@@ -610,7 +610,7 @@ describe("Validator", () => {
 					case Integer { <- @ }
 				} }
 
-				__print(combined.x)
+				Terminal.inspect(combined.x)
 			}`)
 
 			expect(diagnostics).toHaveLength(1)
@@ -625,7 +625,7 @@ describe("Validator", () => {
 
 				constant combined = { makeBase("bad") with x = 2 }
 
-				__print(combined.x)
+				Terminal.inspect(combined.x)
 			}`)
 
 			expect(diagnostics).toHaveLength(1)
@@ -644,9 +644,9 @@ describe("Validator", () => {
 					constant record = { first = double(2) }
 					constant combined = { base with x = double(3) }
 
-					__print(values)
-					__print(record.first)
-					__print(combined.x)
+					Terminal.inspect(values)
+					Terminal.inspect(record.first)
+					Terminal.inspect(combined.x)
 				}`),
 			).toEqual([])
 		})
@@ -662,7 +662,7 @@ describe("Validator", () => {
 					case Integer { <- 222 }
 				}
 
-				__print(a)
+				Terminal.inspect(a)
 			}`)
 
 			expect(diagnostics).toHaveLength(1)
@@ -688,7 +688,7 @@ describe("Validator", () => {
 					case _ { <- 0 }
 				}
 
-				__print(a)
+				Terminal.inspect(a)
 			}`)
 
 			expect(diagnostics).toHaveLength(1)
@@ -705,7 +705,7 @@ describe("Validator", () => {
 						case String { <- 0 }
 					}
 
-					__print(a)
+					Terminal.inspect(a)
 				}`),
 			).toEqual([])
 		})
@@ -719,7 +719,7 @@ describe("Validator", () => {
 					case String { <- "a word" }
 				}
 
-				__print(a)
+				Terminal.inspect(a)
 			}`)
 
 			expect(diagnostics).toHaveLength(1)
@@ -737,7 +737,7 @@ describe("Validator", () => {
 					case String { <- "a word" }
 				}
 
-				__print(a)
+				Terminal.inspect(a)
 			}`)
 
 			expect(diagnostics).toHaveLength(1)
@@ -755,7 +755,7 @@ describe("Validator", () => {
 					case String { <- 0 }
 				}
 
-				__print(a)
+				Terminal.inspect(a)
 			}`)
 
 			expect(diagnostics).toHaveLength(1)
@@ -782,7 +782,7 @@ describe("Validator", () => {
 					case Integer { <- 1 }
 				}
 
-				__print(a)
+				Terminal.inspect(a)
 			}`)
 
 			expect(diagnostics).toHaveLength(1)
@@ -800,7 +800,7 @@ describe("Validator", () => {
 						case String { <- 0 }
 					}
 
-					__print(a)
+					Terminal.inspect(a)
 				}`),
 			).toEqual([])
 		})
@@ -815,7 +815,7 @@ describe("Validator", () => {
 						case String { <- "not a count at all" }
 					}
 
-					__print(a)
+					Terminal.inspect(a)
 				}`),
 			).toEqual([])
 		})
@@ -829,7 +829,7 @@ describe("Validator", () => {
 						case _ { <- @ }
 					}
 
-					__print(a)
+					Terminal.inspect(a)
 				}`),
 			).toEqual([])
 		})
@@ -855,7 +855,7 @@ describe("Validator", () => {
 					}
 				}
 
-				__print(unwrap("missing", fallback 7))
+				Terminal.inspect(unwrap("missing", fallback 7))
 			}`)
 
 			expect(diagnostics).toHaveLength(1)
@@ -889,7 +889,7 @@ describe("Validator", () => {
 						}
 					}
 
-					__print(unwrap("missing", fallback 7))
+					Terminal.inspect(unwrap("missing", fallback 7))
 				}`),
 			).toEqual([])
 		})
@@ -913,7 +913,7 @@ describe("Validator", () => {
 					case { fn: (_ s: String) -> String } { <- "string handler" }
 				}
 
-				__print(a)
+				Terminal.inspect(a)
 			}`)
 
 			expect(diagnostics).toHaveLength(1)
@@ -944,7 +944,7 @@ describe("Validator", () => {
 						case { fn: (_ s: String) -> String, label: String } { <- "string handler" }
 					}
 
-					__print(a)
+					Terminal.inspect(a)
 				}`),
 			).toEqual([])
 		})
@@ -966,7 +966,7 @@ describe("Validator", () => {
 						}
 					}
 
-					__print(unwrap("missing", fallback 7))
+					Terminal.inspect(unwrap("missing", fallback 7))
 				}`),
 			).toEqual([])
 		})
@@ -983,7 +983,7 @@ describe("Validator", () => {
 				constant empty: List<Integer> = []
 				constant scrutinee: List<Integer> | List<String> = empty
 
-				__print(match scrutinee -> String {
+				Terminal.inspect(match scrutinee -> String {
 					case List<String>  { <- "took the String arm" }
 					case List<Integer> { <- "took the Integer arm" }
 				})
@@ -1004,7 +1004,7 @@ describe("Validator", () => {
 			let diagnostics = diagnosticsFor(`implementation {
 				constant scrutinee: List<Integer> | List<String> = [1]
 
-				__print(match scrutinee -> String {
+				Terminal.inspect(match scrutinee -> String {
 					case List<String>  { <- "strings" }
 					case List<Integer> { <- "integers" }
 				})
@@ -1019,7 +1019,7 @@ describe("Validator", () => {
 				diagnosticsFor(`implementation {
 					constant scrutinee: List<Integer> | String = [1]
 
-					__print(match scrutinee -> String {
+					Terminal.inspect(match scrutinee -> String {
 						case String        { <- "a word" }
 						case List<Integer> { <- "integers" }
 					})
@@ -1034,7 +1034,7 @@ describe("Validator", () => {
 				diagnosticsFor(`implementation {
 					constant scrutinee: List<Integer> | List<String> = [1]
 
-					__print(match scrutinee -> String {
+					Terminal.inspect(match scrutinee -> String {
 						case List<String> where @::hasItems()  { <- "strings" }
 						case List<Integer> where @::hasItems() { <- "integers" }
 						case _ { <- "empty" }
@@ -1056,7 +1056,7 @@ describe("Validator", () => {
 				${arms}
 			}
 
-			__print(answer)
+			Terminal.inspect(answer)
 		}`
 
 		it("should accept values above a Case for the rest", () => {
@@ -1154,7 +1154,7 @@ describe("Validator", () => {
 				diagnosticsFor(`implementation {
 					constant text = "essence"
 
-					__print(match text -> String {
+					Terminal.inspect(match text -> String {
 						case "" { <- "nothing" }
 						case _  { <- text }
 					})
@@ -1177,7 +1177,7 @@ describe("Validator", () => {
 						}
 					}
 
-					__print(named(3))
+					Terminal.inspect(named(3))
 				}`),
 			).toEqual([])
 		})
@@ -1188,7 +1188,7 @@ describe("Validator", () => {
 			let diagnostics = diagnosticsFor(`implementation {
 				constant flag = true
 
-				__print(match flag -> String {
+				Terminal.inspect(match flag -> String {
 					case true { <- "yes" }
 					case _    { <- "no" }
 				})
@@ -1235,7 +1235,7 @@ describe("Validator", () => {
 					fn = (_ s: String) -> String { <- s }
 				}
 
-				__print(input::describe())
+				Terminal.inspect(input::describe())
 			}`)
 
 			expect(diagnostics).toHaveLength(1)
@@ -1259,7 +1259,7 @@ describe("Validator", () => {
 
 				constant items: List<Integer> | List<String> = [1]
 
-				__print(items::describe())
+				Terminal.inspect(items::describe())
 			}`)
 
 			expect(diagnostics).toHaveLength(1)
@@ -1284,7 +1284,7 @@ describe("Validator", () => {
 
 					constant thing: List<Integer> | String = "hi"
 
-					__print(thing::describe())
+					Terminal.inspect(thing::describe())
 				}`),
 			).toEqual([])
 		})
@@ -1303,7 +1303,7 @@ describe("Validator", () => {
 					}
 				}
 
-				__print(Things.fallback)
+				Terminal.inspect(Things.fallback)
 			}`)
 
 			expect(diagnostics).toHaveLength(1)
@@ -1322,7 +1322,7 @@ describe("Validator", () => {
 					static fallback: Integer = takesInteger("nope")
 				}
 
-				__print(Things.fallback)
+				Terminal.inspect(Things.fallback)
 			}`)
 
 			expect(diagnostics).toHaveLength(1)
@@ -1337,7 +1337,7 @@ describe("Validator", () => {
 					static fallback: Integer = "not an Integer"
 				}
 
-				__print(Things.fallback)
+				Terminal.inspect(Things.fallback)
 			}`)
 
 			expect(diagnostics).toHaveLength(1)
@@ -1360,7 +1360,7 @@ describe("Validator", () => {
 						static fallback: Integer = double(21)
 					}
 
-					__print(Things.fallback)
+					Terminal.inspect(Things.fallback)
 				}`),
 			).toEqual([])
 		})
@@ -1465,7 +1465,7 @@ describe("Validator", () => {
 						}
 					}
 
-					__print([1]::firstOr(fallback 0))
+					Terminal.inspect([1]::firstOr(fallback 0))
 				}`),
 			).toEqual([])
 		})
@@ -1498,7 +1498,7 @@ describe("Validator", () => {
 				diagnosticsFor(`implementation {
 					${boundFunctionSetup}
 
-					__print(describeValue({ x = 1, y = 2 }))
+					Terminal.inspect(describeValue({ x = 1, y = 2 }))
 				}`),
 			).toEqual([])
 		})
@@ -1521,7 +1521,7 @@ describe("Validator", () => {
 			let diagnostics = diagnosticsFor(`implementation {
 				${boundFunctionSetup}
 
-				__print(describeValue)
+				Terminal.inspect(describeValue)
 			}`)
 
 			expect(
@@ -1664,7 +1664,7 @@ describe("Validator", () => {
 	describe("Use Before Declaration", () => {
 		it("reports a Method call whose Namespace is declared below it", () => {
 			let diagnostics = diagnosticsFor(`implementation {
-				__print(21::doubled())
+				Terminal.inspect(21::doubled())
 
 				namespace Doubling for Integer {
 					doubled() -> Integer { <- @::multiply(with 2) }
@@ -1687,7 +1687,7 @@ describe("Validator", () => {
 
 		it("reports a static Property read above the Namespace", () => {
 			let diagnostics = diagnosticsFor(`implementation {
-				__print(Greeter.greeting)
+				Terminal.inspect(Greeter.greeting)
 
 				namespace Greeter {
 					static greeting = "hello"
@@ -1701,7 +1701,7 @@ describe("Validator", () => {
 
 		it("reports a static Method call above the Namespace", () => {
 			let diagnostics = diagnosticsFor(`implementation {
-				__print(Greeter.greet())
+				Terminal.inspect(Greeter.greet())
 
 				namespace Greeter {
 					static greet() -> String { <- "hello" }
@@ -1715,7 +1715,7 @@ describe("Validator", () => {
 		it("reports a use in the body of a top-level If, which runs where it is written", () => {
 			let diagnostics = diagnosticsFor(`implementation {
 				if true {
-					__print(Greeter.greeting)
+					Terminal.inspect(Greeter.greeting)
 				}
 
 				namespace Greeter {
@@ -1737,7 +1737,7 @@ describe("Validator", () => {
 					static value = 5
 				}
 
-				__print(First.value)
+				Terminal.inspect(First.value)
 			}`)
 
 			expect(diagnostics).toHaveLength(1)
@@ -1751,7 +1751,7 @@ describe("Validator", () => {
 			let diagnostics = diagnosticsFor(`implementation {
 				constant value: Integer | String = 5
 
-				__print(value::described())
+				Terminal.inspect(value::described())
 
 				namespace Ints for Integer {
 					described() -> String { <- "an Integer" }
@@ -1778,7 +1778,7 @@ describe("Validator", () => {
 			let source = `implementation {
 				constant things = [{ value = 3 }, { value = 1 }]
 
-				__print(things::sort()::length()::toString())
+				Terminal.inspect(things::sort()::length()::toString())
 
 				namespace Thing for { value: Integer } is Comparable {
 					compare(to other: { value: Integer }) -> Ordering {
@@ -1817,7 +1817,7 @@ describe("Validator", () => {
 					<- items::sort()
 				}
 
-				__print(ordered([{ value = 3 }, { value = 1 }])::length()::toString())
+				Terminal.inspect(ordered([{ value = 3 }, { value = 1 }])::length()::toString())
 
 				namespace Thing for { value: Integer } is Comparable {
 					compare(to other: { value: Integer }) -> Ordering {
@@ -1847,7 +1847,7 @@ describe("Validator", () => {
 			let source = `implementation {
 				constant boxes = [{ item = { value = 3 } }, { item = { value = 1 } }]
 
-				__print(boxes::sort()::length()::toString())
+				Terminal.inspect(boxes::sort()::length()::toString())
 
 				namespace Boxes<infer Item> for { item: Item }
 					is Comparable where Item is Comparable
@@ -1903,7 +1903,7 @@ describe("Validator", () => {
 
 				constant receiver: { left: Integer } | { right: Integer } = { left = 1 }
 
-				__print(receiver::ranked({ value = 3 }))
+				Terminal.inspect(receiver::ranked({ value = 3 }))
 
 				namespace Ordered for { value: Integer } is Comparable {
 					compare(to other: { value: Integer }) -> Ordering {
@@ -1959,7 +1959,7 @@ describe("Validator", () => {
 
 					constant things = [{ value = 3 }, { value = 1 }]
 
-					__print(things::sort()::length()::toString())
+					Terminal.inspect(things::sort()::length()::toString())
 				}`),
 			).toEqual([])
 		})
@@ -1977,7 +1977,7 @@ describe("Validator", () => {
 						}
 					}
 
-					__print(ordered([{ value = 3 }, { value = 1 }])::length()::toString())
+					Terminal.inspect(ordered([{ value = 3 }, { value = 1 }])::length()::toString())
 				}`),
 			).toEqual([])
 		})
@@ -1993,7 +1993,7 @@ describe("Validator", () => {
 						static greeting = "hello"
 					}
 
-					__print(greeting())
+					Terminal.inspect(greeting())
 				}`),
 			).toEqual([])
 		})
@@ -2009,8 +2009,8 @@ describe("Validator", () => {
 						doubled() -> Integer { <- @::multiply(with 2) }
 					}
 
-					__print(Greeter.greeting)
-					__print(21::doubled())
+					Terminal.inspect(Greeter.greeting)
+					Terminal.inspect(21::doubled())
 				}`),
 			).toEqual([])
 		})
@@ -2030,7 +2030,7 @@ describe("Validator", () => {
 							static doubled = Reader.base::multiply(with 2)
 						}
 
-						__print(Reader.doubled)
+						Terminal.inspect(Reader.doubled)
 					}`),
 				).toEqual([])
 			})
@@ -2042,7 +2042,7 @@ describe("Validator", () => {
 						static base = 10
 					}
 
-					__print(Reader.doubled)
+					Terminal.inspect(Reader.doubled)
 				}`)
 
 				expect(diagnostics).toHaveLength(1)
@@ -2068,7 +2068,7 @@ describe("Validator", () => {
 						static base = Reader.base
 					}
 
-					__print(Reader.base)
+					Terminal.inspect(Reader.base)
 				}`)
 
 				expect(diagnostics).toHaveLength(1)
@@ -2090,7 +2090,7 @@ describe("Validator", () => {
 							static computed() -> Integer { <- 10 }
 						}
 
-						__print(Reader.base)
+						Terminal.inspect(Reader.base)
 					}`),
 				).toEqual([])
 			})
@@ -2105,7 +2105,7 @@ describe("Validator", () => {
 						static compute = () -> Integer { <- 10 }
 					}
 
-					__print(Reader.base)
+					Terminal.inspect(Reader.base)
 				}`)
 
 				expect(diagnostics).toHaveLength(1)
@@ -2123,7 +2123,7 @@ describe("Validator", () => {
 							static base = 10
 						}
 
-						__print(Reader.reader())
+						Terminal.inspect(Reader.reader())
 					}`),
 				).toEqual([])
 			})
@@ -2139,7 +2139,7 @@ describe("Validator", () => {
 							}
 						}
 
-						__print(2::doubled())
+						Terminal.inspect(2::doubled())
 					}`),
 				).toEqual([])
 			})
@@ -2212,7 +2212,7 @@ describe("Validator", () => {
 				<- receiver::pair(item)
 			}
 
-			__print(both(1, 2))
+			Terminal.inspect(both(1, 2))
 		}`
 
 		it("accepts a bounded call that forwards the enclosing Function's witness", () => {
@@ -2223,7 +2223,7 @@ describe("Validator", () => {
 							<- items::sort()
 						}
 
-						__print(ordered([3, 1, 2]))
+						Terminal.inspect(ordered([3, 1, 2]))
 					}`),
 				),
 			).toEqual([])
@@ -2234,7 +2234,7 @@ describe("Validator", () => {
 				validate(
 					enrichedProgram(`implementation {
 						constant ordered: List<List<Integer>> = [[2], [1]]::sort()
-						__print(ordered)
+						Terminal.inspect(ordered)
 					}`),
 				),
 			).toEqual([])
@@ -2247,7 +2247,7 @@ describe("Validator", () => {
 		it("reports a call that was handed fewer witnesses than its callee has bounds", () => {
 			let program = enrichedProgram(`implementation {
 				constant ordered: List<List<Integer>> = [[2], [1]]::sort()
-				__print(ordered)
+				Terminal.inspect(ordered)
 			}`)
 
 			// NOTE: What the silent `continue` in conformance solving left
@@ -2274,7 +2274,7 @@ describe("Validator", () => {
 					total() -> Integer { <- @::length() }
 				}
 
-				__print([1, 2]::total())
+				Terminal.inspect([1, 2]::total())
 			}`)
 
 			// NOTE: The weave a conditional conformance performs, arriving after
@@ -2318,7 +2318,7 @@ describe("Validator", () => {
 					<- items::sort()
 				}
 
-				__print(ordered([3, 1, 2]))
+				Terminal.inspect(ordered([3, 1, 2]))
 			}`)
 
 			// NOTE: The bound gone from the Declaration the Simplifier emits the
@@ -2364,7 +2364,7 @@ describe("Validator", () => {
 				}
 			}
 
-			__print(Tags.tag(1))
+			Terminal.inspect(Tags.tag(1))
 		}`
 
 		function overloadedCalls(
@@ -2430,7 +2430,7 @@ describe("Validator", () => {
 		// through and the Program would be emitted against the other entry.
 		it("re-matches a labelled free-Function call by its labels", () => {
 			let program = enrichedProgram(`implementation {
-				__print(loop(
+				Terminal.inspect(loop(
 					startingWith 1,
 					while (n) { <- n::isLessThan(4) },
 					step (n) { <- n::add(1) },
@@ -2541,14 +2541,16 @@ describe("Validator", () => {
 
 					e = 5
 
-					__print(doubled(d))
-					__print(doubled(e))
+					Terminal.inspect(doubled(d))
+					Terminal.inspect(doubled(e))
 				`),
 			).toEqual([])
 		})
 
 		it("should admit a written value into a refined Parameter", () => {
-			expect(diagnosticsOfBody("__print(doubled(21))")).toEqual([])
+			expect(diagnosticsOfBody("Terminal.inspect(doubled(21))")).toEqual(
+				[],
+			)
 		})
 
 		it("should admit a written value where a refinement is returned", () => {
@@ -2558,7 +2560,7 @@ describe("Validator", () => {
 						<- 3
 					}
 
-					__print(doubled(three()))
+					Terminal.inspect(doubled(three()))
 				`),
 			).toEqual([])
 		})
@@ -2583,7 +2585,7 @@ describe("Validator", () => {
 						}
 					}
 
-					__print(Scale.tripled(7))
+					Terminal.inspect(Scale.tripled(7))
 				`),
 			).toEqual([])
 		})
@@ -2597,7 +2599,7 @@ describe("Validator", () => {
 					static factor: NonZero = ${value}
 				}
 
-				__print(Scale.factor)
+				Terminal.inspect(Scale.factor)
 			`
 
 			expect(diagnosticsOfBody(property("2"))).toEqual([])
@@ -2618,8 +2620,8 @@ describe("Validator", () => {
 						<- items::length()
 					}
 
-					__print(shouted("essence"))
-					__print(counted(["a", "b"]))
+					Terminal.inspect(shouted("essence"))
+					Terminal.inspect(counted(["a", "b"]))
 				`),
 			).toEqual([])
 		})
@@ -2634,7 +2636,7 @@ describe("Validator", () => {
 						<- digit::add(1)
 					}
 
-					__print(placed(7))
+					Terminal.inspect(placed(7))
 				`),
 			).toEqual([])
 		})
@@ -2645,7 +2647,7 @@ describe("Validator", () => {
 					<- n::multiply(with 3)
 				}
 
-				__print(tripled(7))
+				Terminal.inspect(tripled(7))
 			`
 
 			expect(diagnosticsOfBody(source)).toEqual([])
@@ -2677,7 +2679,7 @@ describe("Validator", () => {
 					<- 0
 				}
 
-				__print(doubled(zero()))
+				Terminal.inspect(doubled(zero()))
 			`)
 
 			expect(diagnostics).toHaveLength(1)
@@ -2689,7 +2691,7 @@ describe("Validator", () => {
 		})
 
 		it("should name the predicate where an Argument is refused", () => {
-			let diagnostics = diagnosticsOfBody("__print(doubled(0))")
+			let diagnostics = diagnosticsOfBody("Terminal.inspect(doubled(0))")
 
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].code).toBe("argument-type-mismatch")
@@ -2708,7 +2710,7 @@ describe("Validator", () => {
 					<- n::multiply(with 3)
 				}
 
-				__print(tripled(12))
+				Terminal.inspect(tripled(12))
 			`)
 
 			expect(diagnostics[0].helps).toEqual([
@@ -2840,9 +2842,9 @@ describe("Validator", () => {
 								<- ["a", "b"]
 							}
 
-							__print(firstOf(proven))
-							__print(firstOf(["a"]))
-							__print(firstOf(two()))
+							Terminal.inspect(firstOf(proven))
+							Terminal.inspect(firstOf(["a"]))
+							Terminal.inspect(firstOf(two()))
 						`),
 					),
 				).toEqual([])
@@ -2903,7 +2905,9 @@ describe("Validator", () => {
 
 				it("should admit a written List, deciding the Type Argument by it", () => {
 					expect(
-						diagnosticsFor(withCountOf(`__print(countOf(["a"]))`)),
+						diagnosticsFor(
+							withCountOf(`Terminal.inspect(countOf(["a"]))`),
+						),
 					).toEqual([])
 				})
 
@@ -2914,7 +2918,7 @@ describe("Validator", () => {
 				// Arguments, and the note claimed a predicate had been proven of it.
 				it("should refuse an empty written List, naming the Type with its Parameter", () => {
 					let diagnostics = diagnosticsFor(
-						withCountOf("__print(countOf([]))"),
+						withCountOf("Terminal.inspect(countOf([]))"),
 					)
 
 					expect(diagnostics).toHaveLength(1)
@@ -2936,7 +2940,10 @@ describe("Validator", () => {
 				// `Filled<String>`, and `Filled<Item>` accepts no such thing.
 				it("should refuse a written List against an opaque Type Parameter", () => {
 					let diagnostics = diagnosticsFor(
-						withCountOf(`__print(countOf(["a"]))`, "<Item>"),
+						withCountOf(
+							`Terminal.inspect(countOf(["a"]))`,
+							"<Item>",
+						),
 					)
 
 					expect(diagnostics).toHaveLength(1)
@@ -2964,8 +2971,8 @@ describe("Validator", () => {
 								}
 							}
 
-							__print(Take.count(["a"]))
-							__print(Take.count([1]))
+							Terminal.inspect(Take.count(["a"]))
+							Terminal.inspect(Take.count([1]))
 						`),
 					),
 				).toEqual([])
@@ -3006,9 +3013,9 @@ describe("Validator", () => {
 								<- [{ x = 1 }, { x = 2 }]
 							}
 
-							__print(countOf(proven))
-							__print(countOf([{ x = 1 }]))
-							__print(countOf(two()))
+							Terminal.inspect(countOf(proven))
+							Terminal.inspect(countOf([{ x = 1 }]))
+							Terminal.inspect(countOf(two()))
 						`),
 					),
 				).toEqual([])
@@ -3023,7 +3030,7 @@ describe("Validator", () => {
 					diagnosticsFor(`implementation {
 						constant proven: NonEmptyList<{ x: Integer }> = [{ x = 1 }]
 
-						__print(proven::firstItem().x)
+						Terminal.inspect(proven::firstItem().x)
 					}`),
 				).toEqual([])
 			})
@@ -3043,7 +3050,7 @@ describe("Validator", () => {
 								<- { x = 2 }
 							}
 
-							__print(countOf([one, made()]))
+							Terminal.inspect(countOf([one, made()]))
 						`),
 					),
 				).toEqual([])
@@ -3057,7 +3064,7 @@ describe("Validator", () => {
 						withCountOf(`
 							constant n = 1
 
-							__print(countOf([{ x = n }]))
+							Terminal.inspect(countOf([{ x = n }]))
 						`),
 					),
 				).toEqual([])
@@ -3075,7 +3082,7 @@ describe("Validator", () => {
 					constant outer: Filled<List<{ x: Integer }>> = [${inner}]
 					constant inside: Filled<{ x: Integer }> = ${inner}
 
-					__print(outer::length()::add(inside::length()))
+					Terminal.inspect(outer::length()::add(inside::length()))
 				}`
 
 				expect(diagnosticsFor(source("[{ x = 1 }]"))).toEqual([])

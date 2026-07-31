@@ -296,7 +296,7 @@ export class TriviaCursor {
 	// line — a Comment runs to its line break.
 	//
 	// Claimed by the OUTERMOST node ending on that line, before its children
-	// are printed. `__print(list::map((box) { <- box.value })) § note` ends the
+	// are printed. `Terminal.inspect(list::map((box) { <- box.value })) § note` ends the
 	// inner `<- box.value` on the same line as the whole Statement, and
 	// whichever asks first wins — so the outer one asks first, and the note
 	// stays at the end of the line instead of moving inside the braces.
