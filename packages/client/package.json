@@ -1,0 +1,34 @@
+{
+	"name": "@essence-lang/client",
+	"version": "0.1.0",
+	"description": "Load Essence Modules from JavaScript, compiled on the way in.",
+	"private": true,
+	"type": "module",
+	"exports": {
+		".": "./src/index.ts",
+		"./*": "./src/*.ts"
+	},
+	"author": "Alexander Trefz",
+	"license": "MIT",
+	"homepage": "https://github.com/alexandertrefz/essence/tree/master/packages/client",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/alexandertrefz/essence.git",
+		"directory": "packages/client"
+	},
+	"bugs": "https://github.com/alexandertrefz/essence/issues",
+	"keywords": [
+		"essence",
+		"language",
+		"interop",
+		"embedding"
+	],
+	"dependencies": {
+		"@essence-lang/compiler": "workspace:*",
+		"@essence-lang/interfaces": "workspace:*",
+		"@essence-lang/runtime": "workspace:*"
+	},
+	"devDependencies": {
+		"@essence-lang/fixtures": "workspace:*"
+	}
+}
