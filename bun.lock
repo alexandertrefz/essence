@@ -45,6 +45,7 @@
       },
       "devDependencies": {
         "@essence-lang/fixtures": "workspace:*",
+        "esbuild": "0.28.1",
       },
     },
     "packages/compiler": {

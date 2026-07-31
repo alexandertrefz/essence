@@ -13,8 +13,14 @@ let math = await loadModule("./math/Math.es")
 There is no build step and no artifact to manage. The whole Module graph is
 compiled in memory, the bundle is written under the hash of every source it
 was compiled from, and a second load of unchanged sources reuses that file —
-so the Program inside it is evaluated once. The cache lives in the platform's
-own cache directory; `ESSENCE_CLIENT_CACHE` moves it.
+so the Program inside it is evaluated once.
+
+The cache lives in the platform's own cache directory: `$XDG_CACHE_HOME/essence/client`
+where that is set, `~/Library/Caches/essence/client` on macOS,
+`%LOCALAPPDATA%\essence\client\Cache` on Windows, and `~/.cache/essence/client`
+otherwise. `ESSENCE_CLIENT_CACHE` moves it, and `loadModule`'s `cacheDirectory`
+option overrides both — for a host that wants its compiled bundles to travel
+with its own build output.
 
 Source that does not compile throws an `EssenceCompileError` whose message is
 the report `esc` prints: the excerpt, the underline, the Notes and the Helps,
@@ -92,6 +98,63 @@ signature and both ways of writing it. An overloaded Method throws one too:
 which Overload a call means is decided by the Argument Types, and a JavaScript
 value carries none, so each Overload is reached by its own name on `raw`.
 
+## Types
+
+`generateDeclarations` turns a Module's export surface into a TypeScript
+declaration file — the same mapping as the table above, read as Types.
+
+```ts
+import { generateDeclarations, loadModule } from "@essence-lang/client"
+
+let math = await loadModule("./math/Math.es")
+
+generateDeclarations(math.surface, { moduleName: "Math.es" })
+```
+
+```ts
+export declare const PI: EssenceRational
+export declare function square(p0: bigint): bigint
+```
+
+A Type Alias is declared under the name it was written with and referred to by
+it everywhere else, a Choice becomes the union of its Cases, `Optional<T>` is
+`T | undefined`, and a Type Parameter becomes a TypeScript one wherever it maps
+cleanly. A Parameter is named by its label; a `_` Parameter by its position. An
+overloaded Method is declared `never`: which Overload a call means is decided by
+the Argument Types, so declaring the signatures would typecheck a call that
+throws.
+
+## In a bundler
+
+`essence()` is a Vite plugin and `essenceEsbuild()` an esbuild one. Both compile
+an imported `.es` file where the bundler asks for its text, and hand back one
+standalone Module — the whole Essence graph and the runtime it needs, already
+bundled.
+
+```js
+import { essence } from "@essence-lang/client/plugin"
+
+export default { plugins: [essence()] }
+```
+
+What a build holds this way is the **bundle's** exports: Essence's own values,
+under the names the Rewriter emitted them as, and the bridge that builds values
+they accept. Not the marshalled ones — the Marshaller reads a Type out of an
+export surface and prints its errors with the compiler's own printer, so
+shipping it would ship the compiler. Marshal at the edge, with `loadModule`, or
+reach for the bridge:
+
+```js
+import { square, $bridge_integer } from "./math/Math.es"
+
+square($bridge_integer(12n)) // an Essence Integer
+```
+
+While a dev server is serving, a `<Name>.d.es.ts` is written beside each
+compiled file, describing exactly that — which is where TypeScript looks for the
+declarations of a `.es` import under `allowArbitraryExtensions`. `declarations`
+turns it on in a build or off in a server.
+
 ## The raw door
 
 `raw` holds every export under the name its author wrote and marshals nothing.
@@ -107,3 +170,16 @@ let squared = math.surface.values.square
 
 toJS(math.raw.square(fromJS(12n, squared.parameterTypes[0].type))) // 144n
 ```
+
+## What this does not do yet
+
+- **Callbacks.** A Function comes out of a Module as it is and can be called;
+  one can not be passed *in*. `fromJS` against a Function Type says so.
+- **Overloads.** A JavaScript value carries no Type, so nothing at the boundary
+  can decide which Overload a call means. Each Overload is on `raw` under its
+  own `name__overload$N`.
+- **Compiling in a browser.** The compiler reads files and shells out to
+  esbuild. What a browser can run is the *output* — which is what the bundler
+  plugins are for.
+- **Checked refinements.** A refined Type marshals as its base, unproven. The
+  predicate belongs at the boundary, and will run there once refinements land.
