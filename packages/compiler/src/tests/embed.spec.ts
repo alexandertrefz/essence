@@ -12,8 +12,11 @@ import { pathToFileURL } from "node:url"
 
 import { fixturePath } from "@essence-lang/fixtures"
 
-import { compileToMemory } from "../embed/index"
-import { unoptimisedOptions } from "../optimiser/index"
+import { hashGraph } from "../embed/hash"
+import { compileToMemory, linkToMemory, toolchainKey } from "../embed/index"
+import { loadModuleGraph } from "../modules/graph"
+import { diskModuleHost } from "../modules/host"
+import { defaultOptimiserOptions, unoptimisedOptions } from "../optimiser/index"
 
 // NOTE: A project on disk, in a directory of its own that is removed again —
 // the same shape `modules.spec.ts` builds its graphs in, because what is under
@@ -244,7 +247,7 @@ export {
 				expect(
 					result.diagnostics.map((diagnostic) => diagnostic.severity),
 				).toContain("error")
-				expect(result.sourceHash).not.toBe("")
+				expect(result.bundleHash).not.toBe("")
 			},
 		)
 	})
@@ -261,7 +264,7 @@ export {
 		})
 	})
 
-	describe("Source Hash", () => {
+	describe("Bundle Hash", () => {
 		it("is the same for the same sources and changes with them", async () => {
 			let sources = {
 				"Main.es": `import {
@@ -295,9 +298,9 @@ export {
 				)
 
 				return {
-					first: first.sourceHash,
-					again: again.sourceHash,
-					edited: (await compileToMemory(entry)).sourceHash,
+					first: first.bundleHash,
+					again: again.bundleHash,
+					edited: (await compileToMemory(entry)).bundleHash,
 				}
 			})
 
@@ -311,7 +314,7 @@ export {
 				compileToMemory(path.join(directory, "Main.es")),
 			)
 
-			expect(elsewhere.sourceHash).not.toBe(hashes.first)
+			expect(elsewhere.bundleHash).not.toBe(hashes.first)
 		})
 
 		it("separates two sets of Optimiser Options", async () => {
@@ -322,7 +325,80 @@ export {
 			})
 
 			expect(plain.diagnostics).toEqual([])
-			expect(plain.sourceHash).not.toBe(optimised.sourceHash)
+			expect(plain.bundleHash).not.toBe(optimised.bundleHash)
+		})
+
+		// NOTE: The bundle holds more than the graph does — the standard library
+		// is compiled into it, the runtime is inlined into it, and neither is a
+		// Module — so a key over the `.es` files alone names a file an older
+		// toolchain wrote, and a host caching by that name runs it forever.
+		it("carries the toolchain that emitted the bundle", () => {
+			let entryPath = fixturePath("modules", "Main.es")
+			let parts = {
+				entryPath,
+				modules: loadModuleGraph(entryPath, diskModuleHost).modules,
+				optimisation: defaultOptimiserOptions,
+				emitterKey: "",
+			}
+
+			expect(toolchainKey()).toMatch(/^[0-9a-f]{64}$/)
+			expect(hashGraph(parts)).toBe(
+				hashGraph({ ...parts, toolchain: toolchainKey() }),
+			)
+			expect(
+				hashGraph({ ...parts, toolchain: "another-toolchain" }),
+			).not.toBe(hashGraph(parts))
+		})
+
+		// NOTE: A host that injects a Module of its own — the client's runtime
+		// bridge is one — changes the bytes without touching a source. Without
+		// this there would be two bundles under one name, and whichever was
+		// written first would answer for both.
+		it("separates two emitters over one set of sources", async () => {
+			let entry = fixturePath("modules", "Main.es")
+			let plain = await compileToMemory(entry)
+			let injected = await compileToMemory(entry, {
+				emitterKey: "a-host-of-its-own",
+			})
+
+			expect(injected.diagnostics).toEqual([])
+			expect(injected.bundleHash).not.toBe(plain.bundleHash)
+		})
+	})
+
+	// NOTE: The front half on its own, which is what a host with a cache asks
+	// before it decides to emit at all.
+	describe("Linking To Memory", () => {
+		it("answers with the Export Surface and the same hash a compile would", async () => {
+			let entry = fixturePath("modules", "Main.es")
+			let linked = linkToMemory(entry)
+			let compiled = await compileToMemory(entry)
+
+			expect(linked.diagnostics).toEqual([])
+			expect(linked.bundleHash).toBe(compiled.bundleHash)
+			expect(Object.keys(linked.surface.kinds).sort()).toEqual(
+				Object.keys(compiled.surface.kinds).sort(),
+			)
+			expect(linked.files).toEqual(compiled.files)
+		})
+
+		it("reports what a Module graph that does not link has to say", async () => {
+			await withProject(
+				{
+					"Main.es": `implementation {
+	Terminal.print(missing)
+}
+`,
+				},
+				async (directory) => {
+					let linked = linkToMemory(path.join(directory, "Main.es"))
+
+					expect(
+						linked.diagnostics.map((diagnostic) => diagnostic.code),
+					).not.toEqual([])
+					expect(linked.diagnosticGroups.length).toBeGreaterThan(0)
+				},
+			)
 		})
 	})
 })

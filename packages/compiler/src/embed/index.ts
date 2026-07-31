@@ -1,21 +1,20 @@
-import { createHash, type Hash } from "node:crypto"
 import * as path from "node:path"
 
 import type { common } from "@essence-lang/interfaces"
 
 import type { ModuleSources } from "../bundler/index"
 import { containsErrors } from "../diagnostics/index"
-import { loadModuleGraph, type Module } from "../modules/graph"
+import { loadModuleGraph, type ModuleGraph } from "../modules/graph"
 import { diskModuleHost, type ModuleHost } from "../modules/host"
 import { type ExportSurface, linkModuleGraph } from "../modules/link"
 import { canonicalPath } from "../modules/resolve"
 import {
 	defaultOptimiserOptions,
 	type OptimiserOptions,
-	optimiserOptionsKey,
 } from "../optimiser/index"
 import { validate } from "../validator/index"
 import { emitBundle } from "./emit"
+import { hashGraph } from "./hash"
 
 // NOTE: The back half of the pipeline is shared with `esc` rather than owned
 // here, and it is reached through this entry: one stage, one entry in the
@@ -27,6 +26,10 @@ export {
 	type EmitRequest,
 	type EmitStage,
 } from "./emit"
+// NOTE: Exported because a host that writes its own bundles somewhere shared
+// has the same question this seam answers — what is the toolchain that wrote
+// them — and no way to ask it otherwise.
+export { toolchainKey } from "./hash"
 
 // NOTE: The seam a HOST compiles Essence through — a test harness, a build
 // tool, the JavaScript client. It is `esc` without the command line: the same
@@ -47,6 +50,12 @@ export type EmbedOptions = {
 	host?: ModuleHost
 	optimisation?: OptimiserOptions
 	transformSources?: (sources: ModuleSources) => ModuleSources
+	// NOTE: What the HOST puts into the bundle beyond the sources, named. A
+	// `transformSources` changes the bytes and can not be hashed — it is a
+	// Function — so a host that injects a Module says here what it injects, and
+	// `bundleHash` tells the two bundles apart. Leaving it out is the claim
+	// that nothing was injected.
+	emitterKey?: string
 	// NOTE: Nothing is written there — the name only decides what the source map
 	// spells its `.es` sources relative to. A host that goes on to write the
 	// bundle should name the place it is going to write it, or its map points at
@@ -87,46 +96,100 @@ export type MemoryCompileResult = {
 	// `diagnostics` is exactly this, flattened. A host that only counts errors
 	// reads the flat list; one that renders them reads these.
 	diagnosticGroups: Array<DiagnosticGroup>
-	sourceHash: string
+	// NOTE: What this bundle IS, in one name — every source of the graph, the
+	// Optimiser Options, the toolchain that emitted it and whatever the host
+	// injected. Deliberately not a hash of the sources alone: a bundle carries
+	// the standard library and the runtime, and neither is in the graph, so a
+	// key that named only the `.es` files would name a file an older Compiler
+	// wrote and go on answering with it forever.
+	bundleHash: string
+}
+
+// NOTE: The front half alone — the sources read, hashed and linked, and nothing
+// emitted. This is what a host holding a CACHE of bundles asks first: the hash
+// says whether it already has the answer, and the Export Surface is the other
+// half of what it needs, which no cached file carries. Running the whole
+// pipeline to find out that its output was already on disk is the one thing a
+// content-addressed cache exists to avoid.
+//
+// NOTE: Validation does NOT run here, so `diagnostics` is what parsing and
+// linking had to say and no more. A cache hit means these exact sources, under
+// this exact toolchain, emitted a bundle once — which they could not have done
+// while the Validator had anything to report. A host using this for anything
+// else compiles.
+export type MemoryLinkResult = {
+	surface: ExportSurface
+	files: Array<string>
+	diagnostics: Array<common.Diagnostic>
+	diagnosticGroups: Array<DiagnosticGroup>
+	bundleHash: string
+}
+
+export function linkToMemory(
+	entryPath: string,
+	options: EmbedOptions = {},
+): MemoryLinkResult {
+	let front = readSources(entryPath, options)
+	let answer = (
+		surface: ExportSurface,
+		perModule: Array<ModuleDiagnostics>,
+		own: Array<common.Diagnostic>,
+	): MemoryLinkResult => {
+		let diagnosticGroups = front.group(perModule, own)
+
+		return {
+			surface,
+			files: front.files,
+			diagnostics: diagnosticGroups.flatMap((group) => group.diagnostics),
+			diagnosticGroups,
+			bundleHash: front.bundleHash,
+		}
+	}
+
+	let parsed = answer(
+		emptySurface(),
+		[...front.graph.modules.values()],
+		front.graph.diagnostics,
+	)
+
+	if (containsErrors(parsed.diagnostics)) {
+		return parsed
+	}
+
+	let linked = linkModuleGraph(front.graph)
+
+	return answer(
+		linked.modules.get(front.entry)?.surface ?? emptySurface(),
+		[...linked.modules.values()].map((module) => ({
+			filePath: module.module.filePath,
+			diagnostics: [...module.diagnostics],
+		})),
+		linked.diagnostics,
+	)
 }
 
 export async function compileToMemory(
 	entryPath: string,
 	options: EmbedOptions = {},
 ): Promise<MemoryCompileResult> {
-	let entry = canonicalPath(entryPath)
-	let optimisation = options.optimisation ?? defaultOptimiserOptions
-	let graph = loadModuleGraph(entry, options.host ?? diskModuleHost)
-	let sourceHash = hashGraph(entry, graph.modules, optimisation)
-	let sourceTexts = new Map(
-		[...graph.modules.values()].map((module) => [
-			module.filePath,
-			module.sourceText,
-		]),
-	)
+	let front = readSources(entryPath, options)
+	let entry = front.entry
+	let graph = front.graph
 	let answer = (
 		code: string,
 		surface: ExportSurface,
-		perModule: Array<{
-			filePath: string
-			diagnostics: Array<common.Diagnostic>
-		}>,
+		perModule: Array<ModuleDiagnostics>,
 		own: Array<common.Diagnostic>,
 	): MemoryCompileResult => {
-		let diagnosticGroups = groupDiagnostics(
-			entry,
-			sourceTexts,
-			perModule,
-			own,
-		)
+		let diagnosticGroups = front.group(perModule, own)
 
 		return {
 			code,
 			surface,
-			files: [...graph.modules.keys()].sort(),
+			files: front.files,
 			diagnostics: diagnosticGroups.flatMap((group) => group.diagnostics),
 			diagnosticGroups,
-			sourceHash,
+			bundleHash: front.bundleHash,
 		}
 	}
 
@@ -188,7 +251,7 @@ export async function compileToMemory(
 		// reach is a stack trace it can not read.
 		sourcemap: true,
 		sourcemapMode: "inline",
-		optimisation,
+		optimisation: front.optimisation,
 		transformSources: options.transformSources,
 	})
 
@@ -212,15 +275,62 @@ export async function compileToMemory(
 	)
 }
 
+// NOTE: One Module's Diagnostics on their way to a group, before the source
+// text they are rendered against is looked up.
+type ModuleDiagnostics = {
+	filePath: string
+	diagnostics: Array<common.Diagnostic>
+}
+
+// NOTE: Everything both entries do before they part: the entry canonicalised,
+// the files read and parsed, and the hash that names what they compile to. Both
+// stop at exactly the same place, so neither can drift into hashing something
+// the other does not.
+type ReadSources = {
+	entry: string
+	optimisation: OptimiserOptions
+	graph: ModuleGraph
+	bundleHash: string
+	files: Array<string>
+	group: (
+		perModule: Array<ModuleDiagnostics>,
+		own: Array<common.Diagnostic>,
+	) => Array<DiagnosticGroup>
+}
+
+function readSources(entryPath: string, options: EmbedOptions): ReadSources {
+	let entry = canonicalPath(entryPath)
+	let optimisation = options.optimisation ?? defaultOptimiserOptions
+	let graph = loadModuleGraph(entry, options.host ?? diskModuleHost)
+	let sourceTexts = new Map(
+		[...graph.modules.values()].map((module) => [
+			module.filePath,
+			module.sourceText,
+		]),
+	)
+
+	return {
+		entry,
+		optimisation,
+		graph,
+		bundleHash: hashGraph({
+			entryPath: entry,
+			modules: graph.modules,
+			optimisation,
+			emitterKey: options.emitterKey ?? "",
+		}),
+		files: [...graph.modules.keys()].sort(),
+		group: (perModule, own) =>
+			groupDiagnostics(entry, sourceTexts, perModule, own),
+	}
+}
+
 // NOTE: Empty groups are dropped so that a host can render every group it is
 // handed without asking whether there is anything in it.
 function groupDiagnostics(
 	entryPath: string,
 	sourceTexts: ReadonlyMap<string, string>,
-	perModule: Array<{
-		filePath: string
-		diagnostics: Array<common.Diagnostic>
-	}>,
+	perModule: Array<ModuleDiagnostics>,
 	own: Array<common.Diagnostic>,
 ): Array<DiagnosticGroup> {
 	let groups: Array<DiagnosticGroup> = []
@@ -268,39 +378,4 @@ function emptySurface(): ExportSurface {
 		constants: new Set(),
 		kinds: {},
 	}
-}
-
-// NOTE: What the bundle was compiled FROM, in one string — every source of the
-// graph in canonical path order, and the Optimiser Options mixed in, because
-// the same sources compiled with a pass off are different bytes. It is a cache
-// key: two compiles agreeing here have to have produced the same output, and a
-// change anywhere the compile read has to change it.
-//
-// NOTE: The order is sorted rather than the graph's own. Dependency order
-// depends on which entry was asked for, and the same set of files reached from
-// two entries has to hash the same.
-function hashGraph(
-	entryPath: string,
-	modules: Map<string, Module>,
-	optimisation: OptimiserOptions,
-): string {
-	let hash = createHash("sha256")
-
-	mix(hash, "essence-embed-1")
-	mix(hash, entryPath)
-	mix(hash, optimiserOptionsKey(optimisation))
-
-	for (let filePath of [...modules.keys()].sort()) {
-		mix(hash, filePath)
-		mix(hash, modules.get(filePath)!.sourceText)
-	}
-
-	return hash.digest("hex")
-}
-
-// NOTE: Length-prefixed, so that no two different sequences of parts can spell
-// the same bytes — a file whose name ends where the next one's text begins is
-// otherwise indistinguishable from the pair that swaps the boundary.
-function mix(hash: Hash, text: string): void {
-	hash.update(`${text.length}:${text}`)
 }

@@ -10,11 +10,13 @@ import { readdir, stat } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import * as path from "node:path"
 
+import { linkToMemory } from "@essence-lang/compiler/embed"
 import { fixturePath } from "@essence-lang/fixtures"
 import { typeKeySymbol } from "@essence-lang/runtime/type"
 
 import {
 	BRIDGE_EXPORTS,
+	BRIDGE_KEY,
 	type EssenceValue,
 	type RuntimeBridge,
 } from "../bridge"
@@ -396,5 +398,40 @@ export {
 				})
 			},
 		)
+	})
+
+	// NOTE: The file's NAME is what makes the cache worth having: `loadModule`
+	// asks for it before it emits anything, and only compiles where nothing on
+	// disk answers. That only works while the hash it looks the file up by is the
+	// same hash the compile would have written it under — an option set on one
+	// side and not the other leaves the fast path permanently cold and says
+	// nothing about it.
+	it("names the bundle by a hash it can compute without emitting", async () => {
+		await withProject({}, async (directory) => {
+			let entry = fixturePath("modules", "math", "Math.es")
+
+			await loadModule(entry, { cacheDirectory: directory })
+
+			let linked = linkToMemory(entry, { emitterKey: BRIDGE_KEY })
+
+			expect(
+				(await readdir(directory)).filter((name) =>
+					name.endsWith(".mjs"),
+				),
+			).toEqual([`${linked.bundleHash}.mjs`])
+		})
+	})
+
+	// NOTE: The bridge is bytes the sources do not say, so a bundle built with it
+	// and one built without it can not be one file — otherwise whichever was
+	// written first answers for both, and the loser is either a plugin build
+	// handed exports it never asked for or a `loadModule` told the bundle "was
+	// not built through the runtime bridge".
+	it("names a bridged bundle apart from a plain one", async () => {
+		let entry = fixturePath("modules", "math", "Math.es")
+		let plain = linkToMemory(entry)
+		let bridged = linkToMemory(entry, { emitterKey: BRIDGE_KEY })
+
+		expect(bridged.bundleHash).not.toBe(plain.bundleHash)
 	})
 })
