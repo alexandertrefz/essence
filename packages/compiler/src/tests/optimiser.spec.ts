@@ -127,21 +127,34 @@ async function outputOf(javaScript: string): Promise<Array<string>> {
 
 	writeFileSync(file, javaScript)
 
-	let output: Array<string> = []
+	// NOTE: Both doors, into one buffer in writing order. `Terminal.inspect`
+	// goes through `console.log` and `Terminal.print` through the stream, so a
+	// harness holding only `console.log` would read a printing Program as
+	// silent — and two silences compare equal, which is the one answer this
+	// file must never accept.
+	let written = ""
 	let originalLog = console.log
+	let originalOut = process.stdout.write
 
 	console.log = (...args: Array<unknown>) => {
-		output.push(args.map((argument) => String(argument)).join(" "))
+		written += `${args.map((argument) => String(argument)).join(" ")}\n`
 	}
+
+	process.stdout.write = ((chunk: unknown) => {
+		written += String(chunk)
+
+		return true
+	}) as typeof process.stdout.write
 
 	try {
 		await import(file)
 	} finally {
 		console.log = originalLog
+		process.stdout.write = originalOut
 		rmSync(directory, { recursive: true, force: true })
 	}
 
-	return output
+	return written === "" ? [] : written.replace(/\n$/, "").split("\n")
 }
 
 // NOTE: One emitted top-level const, read out by the name it starts with — the
@@ -3545,7 +3558,7 @@ describe("Optimiser", () => {
 					"inline-loops",
 					readFileSync(fixturePath("Loops.es"), "utf8"),
 				),
-			).toEqual(['"55"', '"15"', '"128"', '"128"', '"2"'])
+			).toEqual(["55", "15", "128", "128", "2"])
 		})
 
 		it("prints the same thing with the pass off over a List Program", async () => {

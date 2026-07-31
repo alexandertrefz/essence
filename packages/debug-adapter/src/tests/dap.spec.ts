@@ -105,9 +105,9 @@ describe("a debug session", () => {
 
 		let joined = output.join("")
 
-		expect(joined).toContain('"Greetee can not be empty!"')
-		expect(joined).toContain('"Hello, World."')
-		expect(joined).toContain('"Hello, Universe!"')
+		expect(joined).toContain("Greetee can not be empty!")
+		expect(joined).toContain("Hello, World.")
+		expect(joined).toContain("Hello, Universe!")
 	}, 60_000)
 
 	it("binds a breakpoint on a source line and stops on it", async () => {
@@ -219,9 +219,9 @@ describe("a debug session", () => {
 
 		expect((await stopped).body.reason).toBe("entry")
 
-		// NOTE: Line 17 is `greet("")` — the entry's first statement. The raw
-		// entry pause sits in runtime glue far above it; the user never sees
-		// that.
+		// NOTE: Line 17 is `Terminal.print(greet(""))` — the entry's first
+		// statement. The raw entry pause sits in runtime glue far above it;
+		// the user never sees that.
 		let stack = await client.stackTraceRequest({ threadId: 1 })
 
 		expect(stack.body.stackFrames[0]!.line).toBe(17)

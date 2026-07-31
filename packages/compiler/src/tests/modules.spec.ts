@@ -1964,9 +1964,12 @@ function generateModules(linked: LinkedGraph): ModuleSources {
 }
 
 // NOTE: Bundles the whole graph and imports the result, so its top-level
-// `Terminal.inspect` calls run — the same shape `fixtureSweep.spec.ts` uses for a lone
-// Program. The bundle is standalone: the runtime is inlined into it, so it runs
-// from wherever it is written.
+// `Terminal` calls run — the same shape `fixtureSweep.spec.ts` uses for a lone
+// Program, and both doors are held for the same reason: `inspect` ends its line
+// through `console.log`, `print` writes its own to the stream, and a harness
+// holding one of the two reads half a Program as silent. The bundle is
+// standalone: the runtime is inlined into it, so it runs from wherever it is
+// written.
 async function runBundle(
 	sources: ModuleSources,
 	directory: string,
@@ -1982,20 +1985,28 @@ async function runBundle(
 
 	writeFileSync(file, result.outputs[0]!.contents)
 
-	let output: Array<string> = []
+	let written = ""
 	let originalLog = console.log
+	let originalOut = process.stdout.write
 
 	console.log = (...args: Array<unknown>) => {
-		output.push(args.map((argument) => String(argument)).join(" "))
+		written += `${args.map((argument) => String(argument)).join(" ")}\n`
 	}
+
+	process.stdout.write = ((chunk: unknown) => {
+		written += String(chunk)
+
+		return true
+	}) as typeof process.stdout.write
 
 	try {
 		await import(file)
 	} finally {
 		console.log = originalLog
+		process.stdout.write = originalOut
 	}
 
-	return output
+	return written === "" ? [] : written.replace(/\n$/, "").split("\n")
 }
 
 describe("Module Code Generation", () => {
@@ -2026,9 +2037,9 @@ describe("Module Code Generation", () => {
 
 		await withBuiltProject({}, async (directory) => {
 			expect(await runBundle(sources, directory)).toEqual([
-				'"area: 12"',
-				'"25"',
-				'"157/1"',
+				"area: 12",
+				"25",
+				"157/1",
 			])
 		})
 	})

@@ -1333,21 +1333,35 @@ function plainReport() {
 // NOTE: The bundle is imported rather than started as a program, which is what
 // `esc run` does with this very file: a child process inherits the test
 // runner's streams, so what it printed could not be read back here.
+// NOTE: Both doors a Program writes through, into one buffer in writing order:
+// `Terminal.inspect` ends its line through `console.log`, while
+// `Terminal.print` and `Terminal.write` go to the stream, there being no way to
+// spell "no newline" through the console. A harness holding only `console.log`
+// would read a printing Program as silent, and silence is what every comparison
+// below would then be making.
 async function runBundle(fileName: string): Promise<Array<string>> {
-	let printed: Array<string> = []
+	let written = ""
 	let log = console.log
+	let out = process.stdout.write
 
 	console.log = (...values: Array<unknown>) => {
-		printed.push(values.map((value) => String(value)).join(" "))
+		written += `${values.map((value) => String(value)).join(" ")}\n`
 	}
+
+	process.stdout.write = ((chunk: unknown) => {
+		written += String(chunk)
+
+		return true
+	}) as typeof process.stdout.write
 
 	try {
 		await import(fileName)
 	} finally {
 		console.log = log
+		process.stdout.write = out
 	}
 
-	return printed
+	return written === "" ? [] : written.replace(/\n$/, "").split("\n")
 }
 
 const brokenDependency = {
@@ -1455,9 +1469,9 @@ describe("CLI on a Module graph", () => {
 			])
 
 			expect(await runBundle(outputFileName)).toEqual([
-				'"area: 12"',
-				'"25"',
-				'"157/1"',
+				"area: 12",
+				"25",
+				"157/1",
 			])
 		} finally {
 			rmSync(directory, { recursive: true, force: true })
@@ -1719,11 +1733,11 @@ describe("the Debug Adapter's compile", () => {
 			// NOTE: And it still runs, and prints what an optimised build of
 			// the same file prints.
 			expect(await runBundle(outputFileName)).toEqual([
-				'"55"',
-				'"15"',
-				'"128"',
-				'"128"',
-				'"2"',
+				"55",
+				"15",
+				"128",
+				"128",
+				"2",
 			])
 		} finally {
 			rmSync(directory, { recursive: true, force: true })

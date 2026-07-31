@@ -87,32 +87,58 @@ function sweep(fileName: string, source: string): SweptFixture {
 }
 
 // NOTE: Writes the emitted Program to a throwaway module and imports it so its
-// top-level `Terminal.inspect` calls run, the way `matchLowering.spec.ts` does — the
+// top-level `Terminal` calls run, the way `matchLowering.spec.ts` does — the
 // emitted imports are absolute paths into this repo's runtime, so the module
 // resolves from the temporary directory it is written to. A fixture that throws
 // on its way through fails the test with its own error, which is the other half
 // of what running one is for.
+//
+// NOTE: All three doors, into ONE buffer in the order they were written.
+// `Terminal.inspect` goes through `console.log`, and `Terminal.print` and
+// `Terminal.write` through the streams, because there is no way to spell "no
+// newline" through the console — so a harness that only replaced `console.log`
+// would capture nothing at all for a fixture that prints, and record its
+// silence as the fixture's output. One buffer rather than one per stream
+// because what is snapshotted is what a reader watching the terminal sees, and
+// a `write` with no newline belongs on the same line as whatever follows it.
 async function outputOf(javaScript: string): Promise<Array<string>> {
 	let directory = mkdtempSync(join(tmpdir(), "essence-sweep-"))
 	let file = join(directory, "program.ts")
 
 	writeFileSync(file, javaScript)
 
-	let output: Array<string> = []
+	let written = ""
 	let originalLog = console.log
+	let originalOut = process.stdout.write
+	let originalError = process.stderr.write
+	let intercept = ((chunk: unknown) => {
+		written += String(chunk)
 
+		return true
+	}) as typeof process.stdout.write
+
+	// NOTE: `console.log` ends its line itself, so the interception has to end
+	// it too — otherwise an `inspect` would run into whatever printed next.
 	console.log = (...args: Array<unknown>) => {
-		output.push(args.map((argument) => String(argument)).join(" "))
+		written += `${args.map((argument) => String(argument)).join(" ")}\n`
 	}
+
+	process.stdout.write = intercept
+	process.stderr.write = intercept
 
 	try {
 		await import(file)
 	} finally {
 		console.log = originalLog
+		process.stdout.write = originalOut
+		process.stderr.write = originalError
 		rmSync(directory, { recursive: true, force: true })
 	}
 
-	return output
+	// NOTE: The trailing newline of the last line is the line's ending rather
+	// than a line of its own, so it is dropped — a fixture that ends without
+	// one keeps its unterminated last line all the same.
+	return written === "" ? [] : written.replace(/\n$/, "").split("\n")
 }
 
 let fixtureFiles = readdirSync(FIXTURES_DIRECTORY)

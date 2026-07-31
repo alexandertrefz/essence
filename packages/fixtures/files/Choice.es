@@ -55,10 +55,10 @@ implementation {
 	§ just an `#Empty` the tape prints as such.
 	tape::map((operation) {
 		if operation::is(#ClearAll) {
-			<- Terminal.inspect("AC — cleared")
+			<- Terminal.print("AC — cleared")
 		}
 
-		<- Terminal.inspect(
+		<- Terminal.print(
 			"{spelled(operation)} = {match evaluated(operation) -> String {
 				case #Value(result) { <- result::toString() }
 				case #Empty         { <- "nothing" }

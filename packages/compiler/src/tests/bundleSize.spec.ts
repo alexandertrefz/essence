@@ -317,6 +317,18 @@ describe("Bundle Size", () => {
 	// it nothing. The ceiling keeps ~500 bytes of headroom deliberately: the
 	// duplication it exists to catch is about a kilobyte here, so it has to stay
 	// nearer than that to the measurement to catch one.
+	//
+	// NOTE: It now measures 10,887, down 4,436, and the ceiling comes DOWN to
+	// 11,400 with it — a ceiling 4 kB above the measurement would no longer
+	// catch the kilobyte of duplication this test is for, so a fall has to be
+	// followed just as a rise is. `Main.es` prints for a reader now rather than
+	// inspecting, and the structural printer is what left with the last
+	// `inspect`: `getStringRepresentation` and the whole layout behind it —
+	// Records, Lists, the Algebraic radical rendering and its two rational
+	// formatters. The prelude GREW by three bodies while the bundle shrank
+	// (`Terminal::print`'s two Overloads and `String::toString`), which is the
+	// shape worth remembering: what these Programs carry is decided by the
+	// runtime reach of what they call, not by how much Essence they inline.
 	it("carries one copy of the prelude across a bundle of Modules", async () => {
 		let linked = linkModuleGraph(
 			loadModuleGraph(fixturePath("modules", "Main.es"), diskModuleHost),
@@ -352,6 +364,6 @@ describe("Bundle Size", () => {
 
 		expect(inBundle.length).toBeGreaterThan(0)
 		expect(inBundle.length).toBeLessThanOrEqual(inPrelude.length)
-		expect(result.outputs[0]!.contents.byteLength).toBeLessThan(15_800)
+		expect(result.outputs[0]!.contents.byteLength).toBeLessThan(11_400)
 	})
 })

@@ -19,9 +19,9 @@ implementation {
 		<- amount.cents::multiply(with Pi)
 	}
 
-	Terminal.inspect(describe(Rectangle.of(width 3, height 4))) § "area: 12"
-	Terminal.inspect(square(5)::toString()) § "25"
-	Terminal.inspect(scaled(averaged({ cents = 50 }))::toString()) § "157/1"
+	Terminal.print(describe(Rectangle.of(width 3, height 4))) § area: 12
+	Terminal.print(square(5)) § 25
+	Terminal.print(scaled(averaged({ cents = 50 }))) § 157/1
 }
 
 export {
