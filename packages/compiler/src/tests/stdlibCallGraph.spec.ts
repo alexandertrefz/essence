@@ -1007,7 +1007,7 @@ describe("Stdlib Call Graph", () => {
 		})
 
 		// NOTE: The same edge inside ONE Namespace, which is the shape a Namespace
-		// naming itself opened up — `static TAU = Number.PI` is the spelling the
+		// naming itself opened up — `static Tau = Number.Pi` is the spelling the
 		// numeric tower's constants want, and it is an edge of this graph like any
 		// other rather than something the Namespace hides.
 		it("records a read of one static Property by another in the same Namespace", () => {

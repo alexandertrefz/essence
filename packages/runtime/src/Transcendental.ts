@@ -350,7 +350,7 @@ export function addTranscendental(
 }
 
 // NOTE: A quotient of two linear-in-π values is representable exactly when
-// they are proportional — π/π = 1, TAU/PI = 2, (1 + π)/(2 + 2·π) = 1/2.
+// they are proportional — π/π = 1, Tau/Pi = 2, (1 + π)/(2 + 2·π) = 1/2.
 // Anything else leaves the grammar and comes back empty.
 export function divideByTranscendental(
 	transcendental: TranscendentalType,

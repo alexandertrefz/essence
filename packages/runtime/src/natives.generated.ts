@@ -205,10 +205,10 @@ export type TranscendentalNatives = {
 }
 
 export type NumberNatives = {
-	// PI: Transcendental
-	PI: TranscendentalType
-	// TAU: Transcendental
-	TAU: TranscendentalType
+	// Pi: Transcendental
+	Pi: TranscendentalType
+	// Tau: Transcendental
+	Tau: TranscendentalType
 	// compare(to: Number) -> Ordering
 	compare: (self: NumberType, to: NumberType) => OrderingType
 }
