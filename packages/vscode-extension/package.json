@@ -7,14 +7,14 @@
 	"publisher": "essence",
 	"license": "MIT",
 	"icon": "icon.png",
-	"homepage": "https://github.com/atrefz/essence/tree/master/packages/vscode-extension",
+	"homepage": "https://github.com/alexandertrefz/essence/tree/master/packages/vscode-extension",
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/atrefz/essence.git",
+		"url": "https://github.com/alexandertrefz/essence.git",
 		"directory": "packages/vscode-extension"
 	},
 	"bugs": {
-		"url": "https://github.com/atrefz/essence/issues"
+		"url": "https://github.com/alexandertrefz/essence/issues"
 	},
 	"keywords": [
 		"essence",
