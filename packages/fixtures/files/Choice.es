@@ -1,71 +1,80 @@
 implementation {
 
-	choice CalculatorOperation {
+	§ A Choice declares the shapes a value can take — here, everything the keys
+	§ of a pocket calculator can ask for. Each Case carries a Record of its own
+	§ fields, and a Case with nothing to carry, like `ClearAll`, carries none.
+
+	choice Operation {
 		Add { left: Integer, right: Integer },
 		Subtract { left: Integer, right: Integer },
-		Divide { left: Integer, right: Integer },
 		Multiply { left: Integer, right: Integer },
-
-		Negate { number: Integer },
-		Factorial { number: Integer },
+		Divide { left: Integer, right: Integer },
 		SquareRoot { number: Integer },
-		RaiseToPower { base: Integer, power: Integer },
-
 		ClearAll,
 	}
 
-	constant operation: CalculatorOperation = #Add({ left = 1, right = 1 })
-
 	§ `divide` and `squareRoot` are already fallible, so their arms hand their
-	§ Optional on; the total ones wrap what they computed.
-	constant result = match operation -> Optional<Number> {
-		case #Add        { <- #Value(@.left::add(@.right)) }
-
-		case #Subtract   { <- #Value(@.left::subtract(@.right)) }
-
-		case #Divide     { <- @.left::divide(by @.right) }
-
-		case #Multiply   { <- #Value(@.left::multiply(with @.right)) }
-
-		case #SquareRoot { <- @.number::squareRoot() }
-
-		case _           { <- #Empty }
+	§ Optional straight on; the total ones wrap what they computed.
+	function evaluated(_ operation: Operation) -> Optional<Number> {
+		<- match operation -> Optional<Number> {
+			case #Add        { <- #Value(@.left::add(@.right)) }
+			case #Subtract   { <- #Value(@.left::subtract(@.right)) }
+			case #Multiply   { <- #Value(@.left::multiply(with @.right)) }
+			case #Divide     { <- @.left::divide(by @.right) }
+			case #SquareRoot { <- @.number::squareRoot() }
+			case #ClearAll   { <- #Empty }
+		}
 	}
 
-	__print(match result -> String {
-		case #Empty { <- "nothing" }
-
-		case #Value(value) {
-			<- match value -> String {
-				case Integer        { <- @::toString() }
-				case Rational       { <- @::toString() }
-				case Algebraic      { <- @::toString() }
-				case Transcendental { <- @::toString() }
-			}
+	§ Each key, as a person would write it down.
+	function spelled(_ operation: Operation) -> String {
+		<- match operation -> String {
+			case #Add        { <- "{@.left} + {@.right}" }
+			case #Subtract   { <- "{@.left} - {@.right}" }
+			case #Multiply   { <- "{@.left} × {@.right}" }
+			case #Divide     { <- "{@.left} ÷ {@.right}" }
+			case #SquareRoot { <- "√{@.number}" }
+			case #ClearAll   { <- "AC" }
 		}
+	}
+
+	§ A tape of key presses. The annotation types the List, so every bare
+	§ `#Case` resolves against `Operation` without a prefix.
+	constant tape: List<Operation> = [
+		#Add({ left = 7, right = 5 }),
+		#Multiply({ left = 6, right = 7 }),
+		#Divide({ left = 1, right = 3 }),
+		#Divide({ left = 1, right = 0 }),
+		#SquareRoot({ number = 9 }),
+		#SquareRoot({ number = 2 }),
+		#ClearAll,
+	]
+
+	§ One line per press. A payload-less Case compares with `is`, so clearing
+	§ is told apart without a Match — and a failed computation is not an error,
+	§ just an `#Empty` the tape prints as such.
+	tape::map((operation) {
+		if operation::is(#ClearAll) {
+			<- __print("AC — cleared")
+		}
+
+		<- __print(
+			"{spelled(operation)} = {match evaluated(operation) -> String {
+				case #Value(result) { <- result::toString() }
+				case #Empty         { <- "nothing" }
+			}}",
+		)
 	})
 
-	constant cleared: CalculatorOperation = #ClearAll
-
-	__print(match cleared -> String {
-		case #ClearAll { <- "cleared" }
-		case _         { <- "not cleared" }
-	})
-
-	§ `EditorCommand` also declares `ClearAll` — the annotations above pick
-	§ the right Choice from context, so the bare Cases need no prefix even
-	§ though the name is shared between two Choices.
+	§ Another Choice may declare a Case of the same name — context picks the
+	§ Choice, so even the shared names never need a prefix.
 	choice EditorCommand {
 		Undo,
 		Redo,
 		ClearAll,
 	}
 
-	constant undone: EditorCommand = #Undo
+	constant command: EditorCommand = #Undo
 
-	__print(match undone -> String {
-		case #Undo     { <- "undone" }
-		case #Redo     { <- "redone" }
-		case #ClearAll { <- "cleared everything" }
-	})
+	__print(command::isNot(#ClearAll)) § true — EditorCommand's own ClearAll
 }
