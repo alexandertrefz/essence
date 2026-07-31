@@ -175,15 +175,15 @@ describe("Irrationals", () => {
 	})
 
 	describe("Transcendental Runtime", () => {
-		it("keeps PI and TAU exact", () => {
-			expect(number.PI[typeKeySymbol]).toBe("Transcendental")
-			expect(transcendental.toString(number.PI).value).toBe("π")
-			expect(transcendental.toString(number.TAU).value).toBe("2·π")
+		it("keeps Pi and Tau exact", () => {
+			expect(number.Pi[typeKeySymbol]).toBe("Transcendental")
+			expect(transcendental.toString(number.Pi).value).toBe("π")
+			expect(transcendental.toString(number.Tau).value).toBe("2·π")
 		})
 
 		it("uses canonical-form equality", () => {
 			const doubled = transcendental.multiply(
-				number.PI,
+				number.Pi,
 				integer.createInteger(2n),
 			)
 
@@ -191,7 +191,7 @@ describe("Irrationals", () => {
 			// NOTE: `Transcendental.is` is written in Essence now
 			// (packages/stdlib/sources/Transcendental.es) — `anyIs` compares the canonical
 			// form the same way the deleted native did.
-			expect(anyIs(doubled, number.TAU)).toBeTrue()
+			expect(anyIs(doubled, number.Tau)).toBeTrue()
 		})
 
 		it("collapses cancelling π-parts to a Rational", () => {
@@ -200,32 +200,32 @@ describe("Irrationals", () => {
 			// is that composition, and the still-native gateway is what
 			// collapses the cancelled π-part.
 			const difference = transcendental.addTranscendental(
-				number.TAU,
-				transcendental.negate(number.TAU),
+				number.Tau,
+				transcendental.negate(number.Tau),
 			)
 
 			expect(difference[typeKeySymbol]).toBe("Rational")
 		})
 
-		it("divides proportional values exactly — TAU/π is 2", () => {
+		it("divides proportional values exactly — Tau/π is 2", () => {
 			const quotient = unwrap(
-				transcendental.divideByTranscendental(number.TAU, number.PI),
+				transcendental.divideByTranscendental(number.Tau, number.Pi),
 			)
 
 			expect(quotient[typeKeySymbol]).toBe("Rational")
-			// NOTE: `Number.is` (TAU/π is 2) is Essence now, covered by the golden harness.
+			// NOTE: `Number.is` (Tau/π is 2) is Essence now, covered by the golden harness.
 		})
 
 		it("answers nothing for non-proportional quotients", () => {
 			const shifted = transcendental.add(
-				number.PI,
+				number.Pi,
 				integer.createInteger(1n),
 			)
 
 			expect(
 				transcendental.divideByTranscendental(
 					shifted as transcendental.TranscendentalType,
-					number.PI,
+					number.Pi,
 				)[typeKeySymbol],
 			).toBe("Optional#Empty")
 		})
@@ -234,22 +234,22 @@ describe("Irrationals", () => {
 			// NOTE: 22/7 and 355/113 are the classic over-approximations;
 			// 333/106 under-approximates. All three are decided exactly.
 			expect(
-				number.compare(number.PI, rational.createRational(22n, 7n)),
+				number.compare(number.Pi, rational.createRational(22n, 7n)),
 			).toEqual(ordering.less)
 			expect(
-				number.compare(number.PI, rational.createRational(355n, 113n)),
+				number.compare(number.Pi, rational.createRational(355n, 113n)),
 			).toEqual(ordering.less)
 			expect(
-				number.compare(number.PI, rational.createRational(333n, 106n)),
+				number.compare(number.Pi, rational.createRational(333n, 106n)),
 			).toEqual(ordering.greater)
 		})
 
 		it("orders π against Algebraics", () => {
 			// NOTE: √10 ≈ 3.162 > π > √9 — and √9 collapses, so use √8.
-			expect(number.compare(number.PI, radical(10n))).toEqual(
+			expect(number.compare(number.Pi, radical(10n))).toEqual(
 				ordering.less,
 			)
-			expect(number.compare(number.PI, radical(8n))).toEqual(
+			expect(number.compare(number.Pi, radical(8n))).toEqual(
 				ordering.greater,
 			)
 		})
@@ -291,8 +291,8 @@ describe("Irrationals", () => {
 		})
 
 		it("finds a Transcendental in a List", () => {
-			expect(anyIs(number.PI, number.PI)).toBeTrue()
-			expect(anyIs(number.PI, number.TAU)).toBeFalse()
+			expect(anyIs(number.Pi, number.Pi)).toBeTrue()
+			expect(anyIs(number.Pi, number.Tau)).toBeFalse()
 		})
 
 		it("compares Lists of irrationals through the item witness", () => {
@@ -306,8 +306,8 @@ describe("Irrationals", () => {
 
 			expect(
 				list.is(
-					list.createList([number.PI, number.TAU]),
-					list.createList([number.PI, number.PI]),
+					list.createList([number.Pi, number.Tau]),
+					list.createList([number.Pi, number.Pi]),
 					{ is: irrationalIs },
 				).value,
 			).toBeFalse()
@@ -317,8 +317,8 @@ describe("Irrationals", () => {
 			// NOTE: An Algebraic is irrational by construction and a
 			// Transcendental is provably not algebraic, so no cross-kind pair
 			// is ever equal — the same rule `Number::is` states.
-			expect(anyIs(radical(2n), number.PI)).toBeFalse()
-			expect(anyIs(number.PI, radical(2n))).toBeFalse()
+			expect(anyIs(radical(2n), number.Pi)).toBeFalse()
+			expect(anyIs(number.Pi, radical(2n))).toBeFalse()
 			expect(anyIs(radical(2n), integer.createInteger(2n))).toBeFalse()
 		})
 	})
@@ -335,7 +335,7 @@ describe("Irrationals", () => {
 		it("resolves the Irrational alias to Algebraic | Transcendental", () => {
 			expect(
 				diagnosticsFor(`implementation {
-					constant value: Irrational = Number.PI
+					constant value: Irrational = Number.Pi
 
 					__print(match value -> String {
 						case Algebraic { <- "algebraic" }
@@ -362,10 +362,10 @@ describe("Irrationals", () => {
 			])
 		})
 
-		it("types PI as Transcendental", () => {
+		it("types Pi as Transcendental", () => {
 			expect(
 				diagnosticsFor(`implementation {
-					constant exactPi: Transcendental = Number.PI
+					constant exactPi: Transcendental = Number.Pi
 				}`),
 			).toEqual([])
 		})
@@ -373,7 +373,7 @@ describe("Irrationals", () => {
 		it("routes mixed compare through the Number Namespace", () => {
 			expect(
 				diagnosticsFor(`implementation {
-					constant order: Ordering = Number.PI::compare(to 22/7)
+					constant order: Ordering = Number.Pi::compare(to 22/7)
 				}`),
 			).toEqual([])
 		})
@@ -385,12 +385,12 @@ describe("Irrationals", () => {
 		it("satisfies the Equatable bound of the searching List Methods", () => {
 			expect(
 				diagnosticsFor(`implementation {
-					constant roots: List<Irrational> = [Number.PI, Number.TAU]
+					constant roots: List<Irrational> = [Number.Pi, Number.Tau]
 
-					__print(roots::contains(Number.PI)::toString())
-					__print(roots::count(of Number.TAU)::toString())
+					__print(roots::contains(Number.Pi)::toString())
+					__print(roots::count(of Number.Tau)::toString())
 					__print(roots::removeDuplicates()::length()::toString())
-					__print(roots::is([Number.PI])::toString())
+					__print(roots::is([Number.Pi])::toString())
 				}`),
 			).toEqual([])
 		})

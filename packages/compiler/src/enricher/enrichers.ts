@@ -8177,7 +8177,7 @@ export function resolveNamespaceDefinitionStatementType(
 		}
 
 		// NOTE: A native static Property declares its Type instead of carrying
-		// a value — `static PI: Transcendental` — so the annotation IS the
+		// a value — `static Pi: Transcendental` — so the annotation IS the
 		// Type. Resolved in the outer Scope, like the bodied form's value.
 		//
 		// With neither a value nor an annotation there is nothing left to say

@@ -203,10 +203,10 @@ describe("Stdlib", () => {
 		})
 
 		it("negates a Transcendental", () => {
-			const negatedPi = transcendental.negate(number.PI)
+			const negatedPi = transcendental.negate(number.Pi)
 
 			expect(negatedPi.piCoefficientNumerator).toBe(-1n)
-			expect(transcendental.negate(negatedPi)).toEqual(number.PI)
+			expect(transcendental.negate(negatedPi)).toEqual(number.Pi)
 		})
 	})
 
@@ -526,7 +526,7 @@ describe("Stdlib", () => {
 		it("types isBetween across the tower", () => {
 			expect(
 				diagnosticsFor(`implementation {
-					constant inRange: Boolean = Number.PI::isBetween(3, and 22/7)
+					constant inRange: Boolean = Number.Pi::isBetween(3, and 22/7)
 					constant plain: Boolean = 5::isBetween(1, and 10)
 				}`),
 			).toEqual([])

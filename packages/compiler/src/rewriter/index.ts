@@ -1319,8 +1319,8 @@ function renamePooledReferences(
 // and the const for each. A const is emitted only where something names it:
 // unlike a native, whose unused `import * as <Name>` esbuild shakes away, an
 // unused const still names the runtime Methods its body reaches, and once a
-// module is in the graph its impure top-level initialisers (`Number.PI`,
-// `Number.TAU`) can no longer be dropped — so an unconditional const would
+// module is in the graph its impure top-level initialisers (`Number.Pi`,
+// `Number.Tau`) can no longer be dropped — so an unconditional const would
 // charge a Program for a numeric tower it never used. The gate is per-Method,
 // finer than the per-Namespace one it replaced.
 //
@@ -3084,7 +3084,7 @@ function rewriteListValue(
 }
 
 // NOTE: A Lookup reaches here for a static Method call (`Number.sum(…)`), a
-// static Property read (`Number.PI`) and a plain Record member access
+// static Property read (`Number.Pi`) and a plain Record member access
 // (`record.field`). Only the first two name a Namespace, and WHICH of the three
 // this is has to be read off the base's resolved Type, not off its spelling: a
 // local may be named after a Namespace — `constant Optional = { otherwise = 5 }`

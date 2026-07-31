@@ -3711,8 +3711,8 @@ describe("Enricher", () => {
 		it("should compare across Number kinds through the Number Namespace", () => {
 			expect(
 				diagnosticsFor(`implementation {
-					constant belowPi: Boolean = 3::isLessThan(Number.PI)
-					constant orderedPis: Boolean = Number.PI::isGreaterThan(Number.TAU)
+					constant belowPi: Boolean = 3::isLessThan(Number.Pi)
+					constant orderedPis: Boolean = Number.Pi::isGreaterThan(Number.Tau)
 					constant rootVsHalf = match 2::squareRoot() -> Boolean {
 						case #Value(root) {
 							<- match root -> Boolean {
@@ -3735,7 +3735,7 @@ describe("Enricher", () => {
 			// turns on resolution, not on the result Type.
 			expect(
 				diagnosticsFor(`implementation {
-					constant withPi: Transcendental = 1::add(Number.PI)
+					constant withPi: Transcendental = 1::add(Number.Pi)
 					constant withRoot: String = match 2::squareRoot() -> String {
 						case #Value(root) {
 							<- match root -> String {

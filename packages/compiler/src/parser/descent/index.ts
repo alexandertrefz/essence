@@ -1358,7 +1358,7 @@ class DescentParser {
 
 			let type = this.parseOptionalDeclarationType()
 
-			// NOTE: A native static Property — `static PI: Transcendental` with
+			// NOTE: A native static Property — `static Pi: Transcendental` with
 			// no `=` — is legal only in declarations mode. Everywhere else the
 			// missing `=` stays a parse error, produced by the `expect` below.
 			if (
