@@ -8,8 +8,8 @@ import {
 	type ModuleHost,
 } from "@essence-lang/compiler/modules"
 import type { OptimiserOptions } from "@essence-lang/compiler/optimiser"
-import { escapeName } from "@essence-lang/compiler/rewriter"
 
+import { bindModule } from "./bind"
 import {
 	type RuntimeBridge,
 	runtimeBridgeOf,
@@ -19,6 +19,7 @@ import { bundlePath, cacheBundle, cacheDirectory } from "./cache"
 import { EssenceCompileError } from "./errors"
 import { createMarshaller, type Marshaller } from "./marshal"
 
+export { bindModule, type ModuleBindings } from "./bind"
 export {
 	BRIDGE_EXPORTS,
 	BRIDGE_SPECIFIER,
@@ -66,14 +67,11 @@ export type EssenceModule = {
 	// its exports, what each was declared as, and where. A host binding names off
 	// this is reading the Essence, not the JavaScript.
 	surface: ExportSurface
-	// NOTE: What a host came for: the Module's exports as JavaScript values. An
-	// Integer is a bigint here, a Rational an `EssenceRational`, an
-	// `Optional<Integer>` a `number | undefined`.
-	//
-	// NOTE: Constants only, for now. A Function needs its Arguments marshalled
-	// the other way round and its labels honoured, which is a slice of its own —
-	// until it lands, a Function is reached through `raw` and its Arguments built
-	// through `marshaller`.
+	// NOTE: What a host came for: the Module as JavaScript. A constant is a
+	// JavaScript value — an Integer a bigint, a Rational an `EssenceRational`, an
+	// `Optional<Integer>` a `bigint | undefined` — a Function is a JavaScript
+	// Function taking and answering the same, and a Namespace an object of those.
+	// Nothing on this side has to know that Essence was involved.
 	exports: Readonly<Record<string, unknown>>
 	// NOTE: The bundle's own bindings, under the names the AUTHOR wrote — `raw`
 	// undoes the Rewriter's escaping and nothing else. What comes out and what
@@ -128,71 +126,14 @@ export async function loadModule(
 
 	let bridge = runtimeBridgeOf(namespace)
 	let marshaller = createMarshaller(bridge, { entryPath: entry })
-	let raw = rawExports(compiled.surface, namespace)
+	let { exports, raw } = bindModule(namespace, compiled.surface, marshaller)
 
 	return {
 		entryPath: entry,
 		surface: compiled.surface,
-		exports: marshalledExports(compiled.surface, raw, marshaller),
+		exports,
 		raw,
 		bridge,
 		marshaller,
 	}
-}
-
-// NOTE: The exports a value can be MADE of, marshalled once — a constant is
-// evaluated when the bundle is imported and can not change afterwards, so
-// reading one twice can not answer differently and there is nothing for a getter
-// to be lazy about. (`variable` is listed beside it because the vocabulary has
-// it; the Validator refuses to export one today, so nothing reaches here under
-// that kind.)
-//
-// NOTE: A Function and a Namespace are left out rather than passed through
-// unmarshalled. `exports` promises JavaScript values, and half-keeping that
-// promise is worse than a name a host has to reach through `raw` for — which is
-// where it stays until calling lands.
-function marshalledExports(
-	surface: ExportSurface,
-	raw: Readonly<Record<string, unknown>>,
-	marshaller: Marshaller,
-): Readonly<Record<string, unknown>> {
-	let exports: Record<string, unknown> = {}
-
-	for (let [name, value] of Object.entries(raw)) {
-		let kind = surface.kinds[name]
-
-		if (kind === "constant" || kind === "variable") {
-			exports[name] = marshaller.toJS(value, name)
-		}
-	}
-
-	return Object.freeze(exports)
-}
-
-// NOTE: The Module's exports under the names they were WRITTEN under. The
-// Rewriter escapes a name JavaScript can not spell — `ok?` is bound as
-// `$user_ok_3f_` — and asking `escapeName` rather than reading the bundle's own
-// key list is what keeps the two spellings from drifting.
-//
-// NOTE: `surface.values` is the list, not `surface.kinds`. `kinds` says what a
-// name was DECLARED as, and a Type Alias that shares its name with a Namespace
-// is exported as a value while its kind reads `type`; `values` holds exactly the
-// exports that have a runtime binding. A name it lists that the bundle does not
-// bind would be a Compiler bug, and is left out rather than bound to `undefined`
-// — reading it then says "no such export" instead of handing back nothing.
-function rawExports(
-	surface: ExportSurface,
-	namespace: Record<string, unknown>,
-): Readonly<Record<string, unknown>> {
-	let raw: Record<string, unknown> = {}
-
-	for (let name of Object.keys(surface.values)) {
-		let binding = escapeName(name)
-
-		if (binding in namespace) {
-			raw[name] = namespace[binding]
-		}
-	}
-
-	return Object.freeze(raw)
 }
