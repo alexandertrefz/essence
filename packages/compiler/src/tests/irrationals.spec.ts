@@ -253,6 +253,18 @@ describe("Irrationals", () => {
 				ordering.greater,
 			)
 		})
+
+		it("refuses an unregistered base at the gateway", () => {
+			// NOTE: γ — Euler–Mascheroni — is not even known to be irrational,
+			// so no enclosure of it could promise single-base totality. The
+			// gateway is what keeps the invariant "every registered base is
+			// provably transcendental" true.
+			expect(() =>
+				transcendental.createTranscendental(bigRational(0n), [
+					{ base: "γ", coefficient: bigRational(1n) },
+				]),
+			).toThrow(/not a registered transcendental base/)
+		})
 	})
 
 	describe("Number cross-kind semantics", () => {

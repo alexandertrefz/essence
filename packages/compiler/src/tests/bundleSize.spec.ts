@@ -208,8 +208,16 @@ describe("Bundle Size", () => {
 	// the two Namespaces share; `keepEvery` and both `reduce` entries can answer
 	// with fewer items than they were handed, are not declared on `NonEmptyList`
 	// at all, and were reaching `List`'s own entry by widening the whole time.
+	//
+	// NOTE: It now measures 54,932, up 2,779, and the ceiling moves to 56,000
+	// with it — the same ~1 kB of headroom as every move above. What grew is
+	// `Transcendental.ts` becoming a linear span over a basis REGISTRY: a term
+	// list a walk visits, in place of two struct fields, so that registering a
+	// new constant is data rather than a change to the arithmetic. π is still
+	// the only registered base, so the generality is text this Program carries
+	// before anything uses it — what it buys lands with the next base.
 	it("keeps Everyday.es from dragging in the whole numeric tower", async () => {
-		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(53_200)
+		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(56_000)
 	})
 
 	// NOTE: Measured 42,719 bytes; a reintroduced `Number` spread was 54,849.
@@ -240,8 +248,12 @@ describe("Bundle Size", () => {
 	// and a name at every site. That is the honest shape of that pass — it is
 	// measured on what a Program DOES, and Everyday, which writes the same
 	// handful of Integers and witnesses over and over, lost 2,392 bytes to it.
+	//
+	// NOTE: It now measures 31,151, up 2,886, for the same reason Everyday's
+	// figure rose: the Transcendental representation is a basis-registry span
+	// now. The ceiling moves to 32,200, keeping the same order of headroom.
 	it("keeps Irrational.es from dragging in the whole numeric tower", async () => {
-		expect(await bundleSizeOf("Irrational.es")).toBeLessThan(29_300)
+		expect(await bundleSizeOf("Irrational.es")).toBeLessThan(32_200)
 	})
 
 	// NOTE: The same claim for a bundle of several Modules, where it is far
