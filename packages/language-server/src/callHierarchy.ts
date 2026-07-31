@@ -358,9 +358,6 @@ function collectItemsFromNode(
 			collectItemsFromNode(node.base, container, items)
 			collectItemsFromArguments(node.arguments, container, items)
 			return
-		case "NativeFunctionInvocation":
-			collectItemsFromArguments(node.arguments, container, items)
-			return
 		case "Lookup":
 			collectItemsFromNode(node.base, container, items)
 			return
@@ -694,9 +691,6 @@ function visitNode(
 				recordCall(node.member.position, caller, context, sites)
 			}
 
-			visitArguments(node.arguments, caller, context, sites)
-			return
-		case "NativeFunctionInvocation":
 			visitArguments(node.arguments, caller, context, sites)
 			return
 		case "Lookup":

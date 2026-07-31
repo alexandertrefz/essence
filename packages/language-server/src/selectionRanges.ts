@@ -178,9 +178,6 @@ function collectFromNode(
 			descend(node.name, cursor, chain)
 			descendArguments(node.arguments, cursor, chain)
 			return
-		case "NativeFunctionInvocation":
-			descendArguments(node.arguments, cursor, chain)
-			return
 		case "Combination":
 			descend(node.lhs, cursor, chain)
 			descend(node.rhs, cursor, chain)

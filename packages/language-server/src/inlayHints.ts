@@ -139,9 +139,6 @@ function visitNode(
 			visitNode(node.base, hints)
 			visitArguments(node.arguments, hints)
 			return
-		case "NativeFunctionInvocation":
-			visitArguments(node.arguments, hints)
-			return
 		case "Lookup":
 			visitNode(node.base, hints)
 			return

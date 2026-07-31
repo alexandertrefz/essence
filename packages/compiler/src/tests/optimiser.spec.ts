@@ -1420,13 +1420,12 @@ const deadCode = `implementation {
 }`
 
 // NOTE: The Node kinds `typedSimple.ExpressionNode` is made of, minus
-// `Identifier`. The three Identifier positions the walk leaves alone — the
-// Namespace a Method Invocation answers on, the runtime Function a native
-// Invocation names, the member a Lookup reads — hold nothing else and are
-// nothing the Program computes, so counting Identifiers here would be counting
-// the difference between two deliberate answers.
+// `Identifier`. The two Identifier positions the walk leaves alone — the
+// Namespace a Method Invocation answers on and the member a Lookup reads —
+// hold nothing else and are nothing the Program computes, so counting
+// Identifiers here would be counting the difference between two deliberate
+// answers.
 const expressionKinds = new Set([
-	"NativeFunctionInvocation",
 	"FunctionInvocation",
 	"MethodInvocation",
 	"UnionMethodInvocation",

@@ -156,7 +156,6 @@ export function enrichNode(
 	hoistedTypes?: HoistedTypes,
 ): common.typed.ImplementationNode {
 	switch (node.nodeType) {
-		case "NativeFunctionInvocation":
 		case "MethodInvocation":
 		case "FunctionInvocation":
 		case "Combination":
@@ -203,8 +202,6 @@ export function enrichExpression(
 	expectedType: common.Type | null = null,
 ): common.typed.ExpressionNode {
 	switch (node.nodeType) {
-		case "NativeFunctionInvocation":
-			return enrichNativeFunctionInvocation(node, scope)
 		case "MethodInvocation":
 			return enrichMethodInvocation(node, scope)
 		case "FunctionInvocation":
@@ -811,27 +808,6 @@ function payloadStandsForCase(
 	}
 
 	return payloadFitsCase(caseType, value.type)
-}
-
-export function enrichNativeFunctionInvocation(
-	node: parser.NativeFunctionInvocationNode,
-	scope: enricher.Scope,
-): common.typed.NativeFunctionInvocationNode {
-	// NOTE: The name and every Argument are enriched exactly once — the typed
-	// Nodes below and the Type resolution share them, rather than each walking
-	// the same subtrees again.
-	let typer = makeArgumentTyper(scope)
-	let name = enrichIdentifier(node.name, scope)
-
-	return {
-		nodeType: "NativeFunctionInvocation",
-		name,
-		arguments: node.arguments.map((argument) =>
-			typer.enrichArgumentNode(argument),
-		),
-		position: node.position,
-		type: resolveNativeFunctionInvocationType(node, name.type, typer),
-	}
 }
 
 export function enrichMethodInvocation(
@@ -4934,82 +4910,6 @@ function reportUnboundGenerics(
 			},
 		)
 	}
-}
-
-function resolveNativeFunctionInvocationType(
-	node: parser.NativeFunctionInvocationNode,
-	nameType: common.Type,
-	typer: ArgumentTyper,
-): common.Type {
-	let type = nameType
-
-	if (type.type === "Function") {
-		return resolveInferredReturnType(
-			type,
-			node.arguments,
-			node.position,
-			typer,
-		)
-	}
-
-	if (type.type !== "Error") {
-		reportError(
-			`'${node.name.content}' is not a native Function`,
-			node.name.position,
-			{
-				code: "unknown-native-function",
-				labels: [
-					primary(
-						node.name.position,
-						"the Compiler provides no such native Function",
-					),
-				],
-			},
-		)
-	}
-
-	return { type: "Error" }
-}
-
-// NOTE: Infers a Generic signature's return Type at an invocation whose
-// Argument mismatches are reported by the Validator — a failed match still
-// substitutes whatever could be bound, and "Could not infer" is only
-// reported when the Arguments actually matched.
-function resolveInferredReturnType(
-	signature: common.BaseFunction,
-	invocationArguments: Array<parser.ArgumentNode>,
-	position: common.Position,
-	typer: ArgumentTyper,
-): common.Type {
-	if (signature.generics.length === 0) {
-		return signature.returnType
-	}
-
-	let matchableArguments: Array<MatchableArgument> = invocationArguments.map(
-		(argument) => ({
-			name: argument.name?.content ?? null,
-			getType: (expectedType, bindings) =>
-				typer.getType(argument.value, expectedType, bindings),
-			bindsNothing: bindsNoTypeParameter(argument),
-		}),
-	)
-
-	let { parameterTypes, context, freshToOriginal } =
-		createFreshenedInference(signature)
-	let matchResult = matchArguments(parameterTypes, matchableArguments, {
-		inference: context,
-	})
-
-	let inferred = substituteInferredReturnType(
-		signature,
-		unfreshenBindings(context.bindings, freshToOriginal),
-	)
-
-	if (matchResult.type === "Match") {
-		reportUnboundGenerics(inferred.unboundGenerics, position, typer)
-	}
-
-	return inferred.returnType
 }
 
 // NOTE: A Method that is called on its Namespace (`Namespace.method(…)`)

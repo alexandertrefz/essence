@@ -260,7 +260,7 @@ describe("Terminal", () => {
 
 		// NOTE: It answers with the very value it was handed, so it can be
 		// wrapped around any Expression without changing what that Expression
-		// evaluates to. That is what let every `__print` call site in this
+		// evaluates to. That is what let every printing call site in this
 		// repository become a `Terminal.inspect` without the golden file moving.
 		it("answers with the value it was given", async () => {
 			let written = await write(`implementation {
