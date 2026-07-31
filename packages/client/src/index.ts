@@ -30,6 +30,11 @@ export {
 } from "./bridge"
 export { bundlePath, cacheBundle, cacheDirectory } from "./cache"
 export {
+	type DeclarationOptions,
+	type DeclarationView,
+	generateDeclarations,
+} from "./dts"
+export {
 	EssenceCallError,
 	EssenceCompileError,
 	EssenceMarshalError,
@@ -39,6 +44,14 @@ export {
 	type Marshaller,
 	type MarshallerOptions,
 } from "./marshal"
+export {
+	declarationsPath,
+	essence,
+	essenceEsbuild,
+	type EsbuildPlugin,
+	type PluginOptions,
+	type VitePlugin,
+} from "./plugin"
 export { EssenceRational } from "./rational"
 // NOTE: Re-exported so a host can spell what `raw` holds — the JavaScript name
 // an Essence one is bound under — without importing the Compiler itself.

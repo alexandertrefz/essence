@@ -29,6 +29,7 @@
 		"@essence-lang/runtime": "workspace:*"
 	},
 	"devDependencies": {
-		"@essence-lang/fixtures": "workspace:*"
+		"@essence-lang/fixtures": "workspace:*",
+		"esbuild": "0.28.1"
 	}
 }
