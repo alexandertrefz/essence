@@ -73,13 +73,42 @@ function scaledPi(digits: bigint): { low: bigint; high: bigint } {
 	}
 }
 
+// NOTE: floor(e·10^digits) and its successor via the factorial series,
+// e = Σ 1/k!, on scaled bigints — each term is the previous one divided by
+// the next k, so the series needs no factorials of its own. The same guard
+// digits absorb the truncation.
+function scaledE(digits: bigint): { low: bigint; high: bigint } {
+	const guardDigits = 8n
+	const scale = 10n ** (digits + guardDigits)
+
+	let sum = 0n
+	let term = scale
+	let k = 0n
+
+	while (term !== 0n) {
+		sum += term
+		k += 1n
+		term = term / k
+	}
+
+	const guardScale = 10n ** guardDigits
+
+	return {
+		low: sum / guardScale - 1n,
+		high: sum / guardScale + 2n,
+	}
+}
+
 // NOTE: Everything the rest of this module knows about a base: the symbol a
 // term prints under — also its identity in the representation — and a
 // certified enclosure of its value. Registration order is canonical term
 // order, which is what keeps structural equality a plain walk. Every entry
 // must be a PROVABLY transcendental constant: single-term totality rests on
 // it, and `createTranscendental` is gated on membership here.
-const bases = new Map<string, ScaledEnclosure>([["π", scaledPi]])
+const bases = new Map<string, ScaledEnclosure>([
+	["π", scaledPi],
+	["e", scaledE],
+])
 
 const baseOrder = new Map([...bases.keys()].map((key, index) => [key, index]))
 

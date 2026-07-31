@@ -801,6 +801,18 @@ third"::lines())
 		"Transcendental.divide(by: Transcendental) [proportional]",
 		Number.Tau::divide(by Number.Pi),
 	)
+	show(
+		"Transcendental.divide(by: Transcendental) [π by e]",
+		Number.Pi::divide(by Number.E),
+	)
+	show(
+		"Transcendental.add(_ Transcendental) [mixed bases]",
+		Number.Pi::add(Number.E),
+	)
+	show(
+		"Transcendental.subtract(_ Transcendental) [e parts cancel]",
+		Number.Pi::add(Number.E)::subtract(Number.E),
+	)
 	show("Transcendental.absolute()", Number.Pi::absolute())
 	show(
 		"Transcendental.absolute() [negative]",
@@ -815,6 +827,8 @@ third"::lines())
 	§ Method below shares its name with one on Integer or Rational.
 	show("Number.Pi", Number.Pi)
 	show("Number.Tau", Number.Tau)
+	show("Number.E", Number.E)
+	show("Number.GoldenRatio", Number.GoldenRatio)
 
 	withRootTwo((_ rootTwo: Algebraic) -> {} {
 		show("Number.is(_ Number) [Integer]", Number.is(2, 2/1))

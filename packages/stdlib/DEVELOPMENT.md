@@ -137,14 +137,18 @@ direction an edge points. A value-LESS
 `static Pi: Transcendental` stays a native and reaches a call site as the plain
 `Number.Pi` member read — no standard library Property has a value yet.
 
-`Number.Pi` and `Number.Tau` look like the two that should have gone first, and
-neither can. No Essence expression produces a Transcendental out of nothing —
-every native that answers with one takes one — so `Pi` IS the primitive the rest
-are written from, and there is no Transcendental literal to write instead. Every
-arithmetic route to `Tau` is Typed `Transcendental | Rational`
-(`Number.Pi::multiply(with 2)`, `Number.Pi::add(Number.Pi)`), because a zero
-factor and a cancelled π term collapse the value to a Rational, and the declared
-`Transcendental` refuses the Union. So the band is exercised through `useStdlib`
+`Number.Pi`, `Number.Tau` and `Number.E` look like the ones that should have
+gone first, and none of them can. No Essence expression produces a
+Transcendental out of nothing — every native that answers with one takes one —
+so `Pi` and `E` ARE the primitives the rest are written from, and there is no
+Transcendental literal to write instead. Every arithmetic route to `Tau` is
+Typed `Transcendental | Rational` (`Number.Pi::multiply(with 2)`,
+`Number.Pi::add(Number.Pi)`), because a zero factor and a cancelled π term
+collapse the value to a Rational, and the declared `Transcendental` refuses the
+Union. `Number.GoldenRatio` alone has an Essence spelling — a half plus half of
+`5::squareRoot()` — but `squareRoot` answers an `Optional` the `Algebraic`
+annotation refuses, so it stays value-less with the others. So the band is
+exercised through `useStdlib`
 (`packages/compiler/src/enricher/stdlib.ts`), the seam that swaps the
 process-wide library for one a test wrote, until a Property that can carry a
 value is written here.
