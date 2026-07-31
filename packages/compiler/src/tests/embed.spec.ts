@@ -103,6 +103,65 @@ describe("Compiling To Memory", () => {
 		expect(Object.keys(result.surface.types)).toEqual(["Rectangle"])
 	})
 
+	// NOTE: The whole graph, so a host watching for a reason to compile again
+	// watches all of it. The file that changed is rarely the file that was asked
+	// for — a bundler plugin registering only the entry would sit still through
+	// every edit to what the entry imports.
+	it("says which sources it read", async () => {
+		let result = await compileToMemory(fixturePath("modules", "Main.es"))
+
+		expect(result.files).toEqual(
+			[
+				fixturePath("modules", "A.es"),
+				fixturePath("modules", "B.es"),
+				fixturePath("modules", "Geometry.es"),
+				fixturePath("modules", "Main.es"),
+				fixturePath("modules", "math", "Math.es"),
+			].sort(),
+		)
+	})
+
+	// NOTE: Present even where the compile stopped, because a host watching for
+	// the edit that FIXES a broken Module needs the same list as one watching a
+	// working one.
+	it("says which sources it read of a Module that does not compile", async () => {
+		await withProject(
+			{
+				"Main.es": `import {
+	value from "./Dep.es"
+}
+
+implementation {
+	constant doubled: String = value
+}
+
+export {
+	doubled
+}
+`,
+				"Dep.es": `implementation {
+	constant value = 1
+}
+
+export {
+	value
+}
+`,
+			},
+			async (directory) => {
+				let result = await compileToMemory(
+					path.join(directory, "Main.es"),
+				)
+
+				expect(result.code).toBe("")
+				expect(result.files).toEqual([
+					path.join(directory, "Dep.es"),
+					path.join(directory, "Main.es"),
+				])
+			},
+		)
+	})
+
 	// NOTE: The map rides inside the bundle rather than beside it, because a
 	// host is handed one string and a map it can not reach is a stack trace it
 	// can not read.

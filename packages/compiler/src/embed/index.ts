@@ -77,6 +77,11 @@ export type MemoryCompileResult = {
 	code: string
 	// NOTE: The ENTRY Module's, which is what a host imports names out of.
 	surface: ExportSurface
+	// NOTE: Every source the compile READ, in canonical path order — the whole
+	// graph, not the entry alone, and present even where the compile stopped. A
+	// host watching for a reason to compile again has to watch all of them: the
+	// file that changed is rarely the file that was asked for.
+	files: Array<string>
 	diagnostics: Array<common.Diagnostic>
 	// NOTE: The same Diagnostics, paired with the sources they index into —
 	// `diagnostics` is exactly this, flattened. A host that only counts errors
@@ -118,6 +123,7 @@ export async function compileToMemory(
 		return {
 			code,
 			surface,
+			files: [...graph.modules.keys()].sort(),
 			diagnostics: diagnosticGroups.flatMap((group) => group.diagnostics),
 			diagnosticGroups,
 			sourceHash,
