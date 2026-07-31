@@ -1,9 +1,14 @@
 // Bun Snapshot v1, https://bun.sh/docs/test/snapshots
 
 exports[`Fixture Sweep Choice.es should print what it printed before 1`] = `
-""2"
-"cleared"
-"undone""
+""7 + 5 = 12"
+"6 × 7 = 42"
+"1 ÷ 3 = 1/3"
+"1 ÷ 0 = nothing"
+"√9 = 3"
+"√2 = √2"
+"AC — cleared"
+true"
 `;
 
 exports[`Fixture Sweep ConditionalConformance.es should print what it printed before 1`] = `
@@ -25,8 +30,15 @@ exports[`Fixture Sweep Documentation.es should print what it printed before 1`] 
 `;
 
 exports[`Fixture Sweep Event.es should print what it printed before 1`] = `
-""The Records are the same!"
-"The Records are not the same anymore!""
+""click"
+[ "menu", "navigation" ]
+true
+false
+true
+true
+true
+false
+true"
 `;
 
 exports[`Fixture Sweep Everyday.es should print what it printed before 1`] = `
@@ -81,11 +93,12 @@ exports[`Fixture Sweep GenericChoice.es should print what it printed before 1`] 
 `;
 
 exports[`Fixture Sweep Generics.es should print what it printed before 1`] = `
-""1"
-1
-42
-"hello"
-7"
+"Optional#Value("Hello, World!")
+Optional#Value("Hello, World")
+2
+Optional#Value(4)
+{ first = 1, second = "one" }
+{ first = "half", second = 1/2 }"
 `;
 
 exports[`Fixture Sweep HelloWorld.es should print what it printed before 1`] = `
@@ -143,29 +156,29 @@ true
 `;
 
 exports[`Fixture Sweep List.es should print what it printed before 1`] = `
-"[ 1/1, 2/1 ]
-[ 1/1, 2/1, 3/1, 4/1, 5/1 ]
-[ 1/1, 2/1 ]
-[ 1/1, 2/1 ]
-[ 0, 1, 2 ]
-[ "3", "1", "2", "1", "4" ]
-11
-[ 3, 2, 4 ]
-Optional#Value(3)
+"[ 3, 1, 4, 1, 5, 9, 2 ]
+[ "3°", "1°", "4°", "1°", "5°", "9°", "2°" ]
+25
+[ 3, 4, 5, 9 ]
+Optional#Value(5)
+[ 3, 1, 4, 1, 2 ]
+[ 3, 1, 1, 2 ]
+[ 3, 7/2 ]
 true
 true
-Optional#Value(2)
+Optional#Value(4)
 Optional#Empty
 Optional#Value(1)
-[ 1, 2 ]
+[ 3, 1, 4, 1, 5 ]
 2
 true
 true
-[ 4, 1, 2, 1, 3 ]
-[ 3, 1, 1, 4 ]
-[ 3, 1, 99, 2, 1, 4 ]
-[ 99, 1, 2, 1, 4 ]
-[ 1, 1, 2, 3, 4 ]"
+[ 2, 9, 5, 1, 4, 1, 3 ]
+[ 1, 4, 1, 5, 9, 2 ]
+[ 2, 3, 1, 4, 1, 5, 9, 2 ]
+[ 3, 1, 4, 1, 5, 8, 2 ]
+[ 1, 1, 2, 3, 4, 5, 9 ]
+[ 9, 5, 4, 3, 2, 1, 1 ]"
 `;
 
 exports[`Fixture Sweep Loops.es should print what it printed before 1`] = `
@@ -197,10 +210,12 @@ Maybe#None
 `;
 
 exports[`Fixture Sweep Namespace.es should print what it printed before 1`] = `
-""stringForInteger: 3"
-"stringForNumber: 3"
-"stringForRational: 3/1"
-"stringForNumber: 3/1""
+"3672
+1
+"1h 1m 12s"
+"01:01:12"
+"12:00:00"
+true"
 `;
 
 exports[`Fixture Sweep Number.es should print what it printed before 1`] = `
@@ -285,4 +300,12 @@ Optional#Value(2)
 "Less""
 `;
 
-exports[`Fixture Sweep Tree.es should print what it printed before 1`] = `""`;
+exports[`Fixture Sweep Tree.es should print what it printed before 1`] = `
+""Readme.md"
+"sources/"
+"  Lexer.es"
+"  Parser.es"
+"tests/"
+"  Lexer.es"
+"4 files, 2 directories""
+`;
