@@ -15,12 +15,9 @@ import { fixturePath } from "@essence-lang/fixtures"
 import * as esbuild from "esbuild"
 
 import { EssenceCompileError } from "../errors"
-import {
-	declarationsPath,
-	essence,
-	essenceEsbuild,
-	type PluginContext,
-} from "../plugin"
+import { essenceEsbuild } from "../esbuild-plugin"
+import { declarationsPath } from "../plugin-core"
+import { essence, type PluginContext } from "../vite-plugin"
 
 const MATH_MODULE = `implementation {
 

@@ -11,9 +11,12 @@ let math = await loadModule("./math/Math.es")
 ```
 
 There is no build step and no artifact to manage. The whole Module graph is
-compiled in memory, the bundle is written under the hash of every source it
-was compiled from, and a second load of unchanged sources reuses that file —
-so the Program inside it is evaluated once.
+compiled in memory, the bundle is written under the hash of everything it was
+compiled from **and by** — every source, the compiler, the standard library,
+the runtime — and a second load of unchanged sources reads that file back
+without compiling anything, so the Program inside it is evaluated once. An
+upgraded toolchain hashes differently and recompiles, which is what keeps a
+cache that is never invalidated from serving yesterday's code.
 
 The cache lives in the platform's own cache directory: `$XDG_CACHE_HOME/essence/client`
 where that is set, `~/Library/Caches/essence/client` on macOS,
@@ -52,7 +55,15 @@ math.exports.square(12n) // 144n
 The mapping loses nothing in either direction. There is no JavaScript number
 for `1/3`, so a `Rational` crosses as its two `bigint` parts; a `number` handed
 back to one is read for the value it actually holds, so `0.1` becomes
-`3602879701896397/36028797018963968` rather than `1/10`.
+`3602879701896397/36028797018963968` rather than `1/10`. Where there is no
+lossless spelling at all the value is refused rather than approximated: an
+`Optional` inside an `Optional` would be `undefined` at both levels, and
+`#Value(#Empty)` is not `#Empty`.
+
+A constant is marshalled when it is read, not when the Module is loaded, so an
+export the boundary has no mapping for — the numeric tower above `Rational`,
+today — throws where it is read instead of taking the whole Module with it.
+Each read builds a fresh value, exactly as `marshaller.toJS(raw.…)` does.
 
 Which direction a value is going decides how it is read. Coming out, a value
 says what it is — every Essence value but a Function carries its Type — so
@@ -117,12 +128,24 @@ export declare function square(p0: bigint): bigint
 ```
 
 A Type Alias is declared under the name it was written with and referred to by
-it everywhere else, a Choice becomes the union of its Cases, `Optional<T>` is
-`T | undefined`, and a Type Parameter becomes a TypeScript one wherever it maps
-cleanly. A Parameter is named by its label; a `_` Parameter by its position. An
-overloaded Method is declared `never`: which Overload a call means is decided by
-the Argument Types, so declaring the signatures would typecheck a call that
-throws.
+it everywhere else, a Choice becomes the union of its Cases, and `Optional<T>`
+is `T | undefined`. A Parameter is named by its label; a `_` Parameter by its
+position.
+
+What the boundary cannot carry is declared `never` rather than spelled out,
+because a declaration is only worth having if the calls it admits are the calls
+that work. An overloaded Method is `never` — which Overload a call means is
+decided by the Argument Types, which a JavaScript value does not carry. So is a
+callback Parameter, and so is a Type Parameter in an input position: a Type
+Parameter is a shape that has not been decided yet, and a value going *in* has
+to be built against a shape. A Type Parameter in the *return* position is a
+TypeScript one, where it maps cleanly.
+
+```ts
+export declare function firstOf<ItemType>(
+	p0: Array<never /* a Type Parameter can not be marshalled */>,
+): ItemType | undefined
+```
 
 ## In a bundler
 
@@ -132,10 +155,13 @@ standalone Module — the whole Essence graph and the runtime it needs, already
 bundled.
 
 ```js
-import { essence } from "@essence-lang/client/plugin"
+import { essence } from "@essence-lang/client/vite-plugin"
 
 export default { plugins: [essence()] }
 ```
+
+The esbuild shape of the same plugin lives one door over, at
+`@essence-lang/client/esbuild-plugin`.
 
 What a build holds this way is the **bundle's** exports: Essence's own values,
 under the names the Rewriter emitted them as, and the bridge that builds values
@@ -149,6 +175,16 @@ import { square, $bridge_integer } from "./math/Math.es"
 
 square($bridge_integer(12n)) // an Essence Integer
 ```
+
+**One `.es` entry per build.** Each entry compiles to its own standalone
+bundle, with its own copy of the runtime and its own hidden Type key — minted
+while that bundle was evaluated — so a value built by one is not recognised by
+the other, and a `match` on it would take the wrong Case rather than fail.
+Importing two `.es` files that reach a common source is therefore refused with
+an `EssenceBuildError`: import one entry and reach the rest of the graph
+through it, or load the second with `loadModule`, which marshals to plain
+JavaScript at every boundary. Two entries that share no source at all are two
+unrelated Programs and are left alone.
 
 While a dev server is serving, a `<Name>.d.es.ts` is written beside each
 compiled file, describing exactly that — which is where TypeScript looks for the
@@ -175,9 +211,19 @@ toJS(math.raw.square(fromJS(12n, squared.parameterTypes[0].type))) // 144n
 
 - **Callbacks.** A Function comes out of a Module as it is and can be called;
   one can not be passed *in*. `fromJS` against a Function Type says so.
+- **Generics.** A Type Parameter is a shape that has not been decided yet, and
+  a value going in has to be built against a shape — so an Argument at a Type
+  Parameter position is refused, and only an empty `List` gets through. A
+  generic Function is still perfectly callable through `raw`, where nothing is
+  marshalled.
 - **Overloads.** A JavaScript value carries no Type, so nothing at the boundary
   can decide which Overload a call means. Each Overload is on `raw` under its
   own `name__overload$N`.
+- **Nested Optionals.** `Optional<T>` is `T | undefined`, and `undefined` does
+  not nest. `Optional<Optional<T>>` is refused in both directions rather than
+  collapsed into the one level JavaScript can spell.
+- **More than one `.es` entry per bundler build.** See above — the two bundles
+  would not recognise each other's values.
 - **Compiling in a browser.** The compiler reads files and shells out to
   esbuild. What a browser can run is the *output* — which is what the bundler
   plugins are for.

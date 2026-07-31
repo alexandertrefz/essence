@@ -16,6 +16,7 @@ than one barrel — a front end composes the stages it needs:
 | `@essence-lang/compiler/optimiser` | simplifications on the typed simple AST |
 | `@essence-lang/compiler/rewriter` | typed simple AST → JavaScript module text |
 | `@essence-lang/compiler/bundler` | module texts → one self-contained ES module, via esbuild |
+| `@essence-lang/compiler/embed` | the whole pipeline in memory, for an embedding host |
 | `@essence-lang/compiler/modules` | module graph resolution |
 | `@essence-lang/compiler/diagnostics` | the Diagnostic type, codes and rendering |
 | `@essence-lang/compiler/documents` | position and text-document helpers |
@@ -30,6 +31,8 @@ unmapped, which is what lets a debugger step over them.
 
 Most consumers want a front end instead of the stages:
 [`@essence-lang/cli`](https://www.npmjs.com/package/@essence-lang/cli) assembles the
-whole pipeline behind `essence build`, and
+whole pipeline behind `essence build`,
+[`@essence-lang/client`](https://www.npmjs.com/package/@essence-lang/client) drives
+`embed` to load an Essence Module from JavaScript, and
 [`@essence-lang/language-server`](https://www.npmjs.com/package/@essence-lang/language-server)
 runs the analysis half of it over an editor's documents.

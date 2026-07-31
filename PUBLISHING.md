@@ -1,11 +1,11 @@
 # Publishing
 
-Ten packages publish to npm under the `@essence-lang` scope, always together and
-always at one version: `interfaces`, `escodegen` (the vendored fork),
-`ariadne`, `standard-library`, `runtime`, `compiler`, `formatter`, `debug-adapter`,
-`language-server` and `cli`. `fixtures` and the website stay private, and the
-VS Code extension ships to the Marketplace instead, via `bun run package` in
-its own directory.
+Eleven packages publish to npm under the `@essence-lang` scope, always together
+and always at one version: `interfaces`, `escodegen` (the vendored fork),
+`ariadne`, `standard-library`, `runtime`, `compiler`, `client`, `formatter`,
+`debug-adapter`, `language-server` and `cli`. `fixtures` and the website stay
+private, and the VS Code extension ships to the Marketplace instead, via
+`bun run package` in its own directory.
 
 ## One-time setup
 

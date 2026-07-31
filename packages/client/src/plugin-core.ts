@@ -30,9 +30,11 @@ import { EssenceBuildError, EssenceCompileError } from "./errors"
 // declaration file therefore describes what is really there — see the `bundle`
 // view in `./dts`.
 //
-// NOTE: Both plugins are the same three lines of work behind two shapes, because
-// there is exactly one interesting question here (what does this `.es` file
-// compile to) and two bundlers that ask it differently.
+// NOTE: Both plugins — `essence` in `./vite-plugin` and `essenceEsbuild` in
+// `./esbuild-plugin` — are the same three lines of work behind two shapes,
+// because there is exactly one interesting question here (what does this `.es`
+// file compile to) and two bundlers that ask it differently. This module is
+// that one question.
 
 export type PluginOptions = {
 	// NOTE: Where the sources are read from. The default reads disk.
@@ -48,7 +50,7 @@ export type PluginOptions = {
 // NOTE: Only `.es`, and only where nothing follows it. A dev server asks for
 // `/src/Main.es?import` and `/src/Main.es?t=1730` as well, which is why the id is
 // cut at the query before it is matched.
-const ESSENCE_FILE = /\.es$/
+export const ESSENCE_FILE = /\.es$/
 
 // NOTE: Where TypeScript looks for the declarations of a file it does not
 // otherwise understand: `Math.es` is declared by `Math.d.es.ts`, under
@@ -60,8 +62,6 @@ export function declarationsPath(entryPath: string): string {
 		`${path.basename(entryPath, ".es")}.d.es.ts`,
 	)
 }
-
-// #region The shared core
 
 export type CompiledModule = {
 	// NOTE: Standalone ESM. The Bundler inlined the runtime, so this imports
@@ -85,14 +85,14 @@ export type CompiledModule = {
 // Two entries that share NO source are two unrelated Programs and are left
 // alone. They still duplicate the runtime, and values still may not pass between
 // them, but nothing in either of them says otherwise.
-type EssenceCompiler = {
+export type EssenceCompiler = {
 	compile: (
 		entryPath: string,
 		declarations: boolean,
 	) => Promise<CompiledModule>
 }
 
-function createCompiler(options: PluginOptions): EssenceCompiler {
+export function createCompiler(options: PluginOptions): EssenceCompiler {
 	// NOTE: Keyed by entry rather than a plain list, so that recompiling the
 	// SAME entry — which is what a dev server does on every edit — replaces its
 	// graph instead of colliding with it.
@@ -182,150 +182,8 @@ async function writeDeclarations(
 	await writeFile(target, text, "utf8")
 }
 
-function essenceFile(id: string): string | null {
+export function essenceFile(id: string): string | null {
 	let file = id.split("?")[0] ?? id
 
 	return ESSENCE_FILE.test(file) ? file : null
 }
-
-// #endregion
-
-// #region Vite and Rollup
-
-// NOTE: Typed structurally rather than against Vite. A plugin object is the
-// whole of the contract, Vite is not a dependency of anything here, and adding
-// one so a hook can be spelled would put a bundler in the dependency tree of
-// every host that only ever wanted `loadModule`.
-export type PluginContext = {
-	addWatchFile?: (id: string) => void
-}
-
-export type ResolvedConfig = {
-	command: string
-}
-
-export type VitePlugin = {
-	name: string
-	enforce?: "pre" | "post"
-	configResolved: (config: ResolvedConfig) => void
-	resolveId: (
-		this: PluginContext | undefined,
-		source: string,
-		importer: string | undefined,
-	) => string | null
-	load: (
-		this: PluginContext | undefined,
-		id: string,
-	) => Promise<string | null>
-}
-
-export function essence(options: PluginOptions = {}): VitePlugin {
-	// NOTE: A build writes its output where it was asked to; a server is somebody
-	// sitting in an editor. Which one this is is not known until Vite says.
-	let serving = false
-	// NOTE: Replaced when Vite resolves a configuration, which is once per build
-	// — so what a previous build compiled is not held against this one.
-	let compiler = createCompiler(options)
-
-	return {
-		name: "essence",
-		// NOTE: Ahead of Vite's own resolution, so that a `.es` id is claimed
-		// before anything tries to read it as JavaScript.
-		enforce: "pre",
-		configResolved(config) {
-			serving = config.command === "serve"
-			compiler = createCompiler(options)
-		},
-		resolveId(source, importer) {
-			let file = essenceFile(source)
-
-			if (file === null) {
-				return null
-			}
-
-			// NOTE: An absolute id is already the answer; a relative one is
-			// resolved against the file that WROTE it, exactly as an Essence
-			// specifier is, rather than against the working directory.
-			if (path.isAbsolute(file)) {
-				return canonicalPath(file)
-			}
-
-			return importer === undefined
-				? null
-				: canonicalPath(path.resolve(path.dirname(importer), file))
-		},
-		async load(id) {
-			let file = essenceFile(id)
-
-			if (file === null) {
-				return null
-			}
-
-			let compiled = await compiler.compile(
-				file,
-				options.declarations ?? serving,
-			)
-
-			for (let source of compiled.files) {
-				this?.addWatchFile?.(source)
-			}
-
-			return compiled.code
-		},
-	}
-}
-
-// #endregion
-
-// #region esbuild
-
-export type EsbuildLoadArguments = {
-	path: string
-}
-
-export type EsbuildLoadResult = {
-	contents: string
-	loader: "js"
-	watchFiles: Array<string>
-}
-
-export type EsbuildBuild = {
-	onLoad(
-		options: { filter: RegExp },
-		callback: (args: EsbuildLoadArguments) => Promise<EsbuildLoadResult>,
-	): void
-}
-
-export type EsbuildPlugin = {
-	name: string
-	setup(build: EsbuildBuild): void
-}
-
-// NOTE: esbuild resolves a relative path to a file itself, whatever its
-// extension, so there is nothing to claim on the way in — only the text to
-// answer with once it has been asked for.
-export function essenceEsbuild(options: PluginOptions = {}): EsbuildPlugin {
-	return {
-		name: "essence",
-		// NOTE: `setup` runs once per build, which is exactly the scope the
-		// compiler's memory of what it has already compiled has to have.
-		setup(build) {
-			let compiler = createCompiler(options)
-
-			build.onLoad({ filter: ESSENCE_FILE }, async (args) => {
-				let compiled = await compiler.compile(
-					args.path,
-					options.declarations ?? false,
-				)
-
-				return {
-					contents: compiled.code,
-					loader: "js",
-					watchFiles: compiled.files,
-				}
-			})
-		},
-	}
-}
-
-// #endregion

@@ -130,7 +130,7 @@ do. `--json` turns any of them into a machine-readable report for editors and CI
 
 # Repository layout
 
-One workspace, twelve packages. Nothing is built: every package points `main` straight at its TypeScript, and
+One workspace, fourteen packages. Nothing is built: every package points `main` straight at its TypeScript, and
 Bun runs the sources.
 
 | Package | What it is |
@@ -141,9 +141,11 @@ Bun runs the sources.
 | [`runtime`](packages/runtime) | the native halves of the standard library, inlined into every compiled program |
 | [`ariadne`](packages/ariadne) | a TypeScript port of the `ariadne` diagnostic renderer |
 | [`escodegen`](packages/escodegen) | vendored fork of the ECMAScript code generator, see its [PATCHES.md](packages/escodegen/PATCHES.md) |
+| [`client`](packages/client) | Essence from JavaScript — `loadModule`, the marshalling boundary, the bundler plugins |
 | [`cli`](packages/cli) | `essence` — every command, and `esc` |
 | [`formatter`](packages/formatter) | the source formatter behind `essence format`, and `esfmt` |
 | [`language-server`](packages/language-server) | the server behind `essence lsp`, spoken over stdio, and `esls` |
+| [`debug-adapter`](packages/debug-adapter) | the Debug Adapter behind `essence dap` |
 | [`vscode-extension`](packages/vscode-extension) | the VS Code extension, which bundles the language server |
 | [`website`](packages/website) | the documentation |
 | [`fixtures`](packages/fixtures) | Essence sources the test suite compiles |
