@@ -21,6 +21,7 @@
 		"./rewriter": "./src/rewriter/index.ts",
 		"./rewriter/stdlibPrelude": "./src/rewriter/stdlibPrelude.ts",
 		"./bundler": "./src/bundler/index.ts",
+		"./embed": "./src/embed/index.ts",
 		"./diagnostics": "./src/diagnostics/index.ts",
 		"./diagnostics/render": "./src/diagnostics/render.ts",
 		"./documents": "./src/documents.ts",
