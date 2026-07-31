@@ -17,6 +17,7 @@ import {
 } from "./bridge"
 import { bundlePath, cacheBundle, cacheDirectory } from "./cache"
 import { EssenceCompileError } from "./errors"
+import { createMarshaller, type Marshaller } from "./marshal"
 
 export {
 	BRIDGE_EXPORTS,
@@ -32,6 +33,12 @@ export {
 	EssenceCompileError,
 	EssenceMarshalError,
 } from "./errors"
+export {
+	createMarshaller,
+	type Marshaller,
+	type MarshallerOptions,
+} from "./marshal"
+export { EssenceRational } from "./rational"
 // NOTE: Re-exported so a host can spell what `raw` holds — the JavaScript name
 // an Essence one is bound under — without importing the Compiler itself.
 export { escapeName } from "@essence-lang/compiler/rewriter"
@@ -59,15 +66,30 @@ export type EssenceModule = {
 	// its exports, what each was declared as, and where. A host binding names off
 	// this is reading the Essence, not the JavaScript.
 	surface: ExportSurface
+	// NOTE: What a host came for: the Module's exports as JavaScript values. An
+	// Integer is a bigint here, a Rational an `EssenceRational`, an
+	// `Optional<Integer>` a `number | undefined`.
+	//
+	// NOTE: Constants only, for now. A Function needs its Arguments marshalled
+	// the other way round and its labels honoured, which is a slice of its own —
+	// until it lands, a Function is reached through `raw` and its Arguments built
+	// through `marshaller`.
+	exports: Readonly<Record<string, unknown>>
 	// NOTE: The bundle's own bindings, under the names the AUTHOR wrote — `raw`
 	// undoes the Rewriter's escaping and nothing else. What comes out and what
-	// goes in are runtime values: an Integer is `{ value: 12n }` behind a Symbol,
-	// not `12`. Marshalling arrives in a later slice; until then this is the door.
+	// goes in here are runtime values: an Integer is `{ value: 12n }` behind a
+	// Symbol, not `12`. This is the unmarshalled door, and it stays open — a host
+	// with its own ideas about the boundary should not have to fight one.
 	raw: Readonly<Record<string, unknown>>
 	// NOTE: This bundle's own Type key and value constructors. Every Essence
 	// value carries its Type on a Symbol minted when the bundle was evaluated, so
 	// the only values this Module's Functions accept are the ones built here.
 	bridge: RuntimeBridge
+	// NOTE: The boundary itself, bound to that bridge and to this entry — the
+	// two things marshalling can not be done without. Handed over because a host
+	// calling through `raw` needs exactly it, and building a second one correctly
+	// means knowing both.
+	marshaller: Marshaller
 }
 
 export async function loadModule(
@@ -104,12 +126,47 @@ export async function loadModule(
 		unknown
 	>
 
+	let bridge = runtimeBridgeOf(namespace)
+	let marshaller = createMarshaller(bridge, { entryPath: entry })
+	let raw = rawExports(compiled.surface, namespace)
+
 	return {
 		entryPath: entry,
 		surface: compiled.surface,
-		raw: rawExports(compiled.surface, namespace),
-		bridge: runtimeBridgeOf(namespace),
+		exports: marshalledExports(compiled.surface, raw, marshaller),
+		raw,
+		bridge,
+		marshaller,
 	}
+}
+
+// NOTE: The exports a value can be MADE of, marshalled once — a constant is
+// evaluated when the bundle is imported and can not change afterwards, so
+// reading one twice can not answer differently and there is nothing for a getter
+// to be lazy about. (`variable` is listed beside it because the vocabulary has
+// it; the Validator refuses to export one today, so nothing reaches here under
+// that kind.)
+//
+// NOTE: A Function and a Namespace are left out rather than passed through
+// unmarshalled. `exports` promises JavaScript values, and half-keeping that
+// promise is worse than a name a host has to reach through `raw` for — which is
+// where it stays until calling lands.
+function marshalledExports(
+	surface: ExportSurface,
+	raw: Readonly<Record<string, unknown>>,
+	marshaller: Marshaller,
+): Readonly<Record<string, unknown>> {
+	let exports: Record<string, unknown> = {}
+
+	for (let [name, value] of Object.entries(raw)) {
+		let kind = surface.kinds[name]
+
+		if (kind === "constant" || kind === "variable") {
+			exports[name] = marshaller.toJS(value, name)
+		}
+	}
+
+	return Object.freeze(exports)
 }
 
 // NOTE: The Module's exports under the names they were WRITTEN under. The
