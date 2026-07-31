@@ -1232,9 +1232,9 @@ describe("Code Generation", () => {
 		})
 
 		it("returns null for a native static Property", () => {
-			// NOTE: The lookup keys on Methods only. `Number.PI` is a Property
+			// NOTE: The lookup keys on Methods only. `Number.Pi` is a Property
 			// and reaches a call site through a member read, never a const.
-			expect(essenceMethodName("Number", "PI")).toBeNull()
+			expect(essenceMethodName("Number", "Pi")).toBeNull()
 		})
 
 		it("keeps an overload's mangled suffix in the name", () => {
@@ -1248,8 +1248,8 @@ describe("Code Generation", () => {
 		// tables must not both answer for one member. No standard library Property
 		// has a value today, so every one of them is a member read.
 		it("returns null for a static Property the library gives no value", () => {
-			expect(essencePropertyName("Number", "PI")).toBeNull()
-			expect(essencePropertyName("Number", "TAU")).toBeNull()
+			expect(essencePropertyName("Number", "Pi")).toBeNull()
+			expect(essencePropertyName("Number", "Tau")).toBeNull()
 		})
 
 		it("keeps a Method out of the Property table", () => {
@@ -1539,8 +1539,8 @@ describe("Code Generation", () => {
 		it("runs isBetween across the whole numeric tower", async () => {
 			expect(
 				await run(`implementation {
-					__print(Number.PI::isBetween(3, and 22/7)::toString())
-					__print(Number.PI::isBetween(22/7, and 4)::toString())
+					__print(Number.Pi::isBetween(3, and 22/7)::toString())
+					__print(Number.Pi::isBetween(22/7, and 4)::toString())
 					__print(3/2::isBetween(1, and 2)::toString())
 				}`),
 			).toEqual(['"true"', '"false"', '"true"'])
@@ -1588,17 +1588,17 @@ describe("Code Generation", () => {
 			expect(neither).not.toContain("$es_Boolean_isNot")
 		})
 
-		// NOTE: A value-LESS `static PI: Transcendental` is a native — it reaches
+		// NOTE: A value-LESS `static Pi: Transcendental` is a native — it reaches
 		// no typed Node, so the prelude has nothing to emit for it — and it stays a
-		// plain member read off the runtime module, `Number.PI`, like every native.
-		it("reads PI and TAU as native member reads", async () => {
+		// plain member read off the runtime module, `Number.Pi`, like every native.
+		it("reads Pi and Tau as native member reads", async () => {
 			const source = `implementation {
-				__print(Number.PI::toString())
-				__print(Number.TAU::toString())
-				__print(Number.PI::isBetween(3, and 22/7)::toString())
+				__print(Number.Pi::toString())
+				__print(Number.Tau::toString())
+				__print(Number.Pi::isBetween(3, and 22/7)::toString())
 			}`
 
-			expect(generate(source)).toContain("Number.PI")
+			expect(generate(source)).toContain("Number.Pi")
 			expect(await run(source)).toEqual(['"π"', '"2·π"', '"true"'])
 		})
 
@@ -2139,7 +2139,7 @@ describe("Code Generation", () => {
 				// NOTE: A static Property READ is the same Node shape as a static
 				// Method reference, so which table holds the pair is the whole of
 				// the difference — and a native Property is in neither, which is why
-				// `Number.PI` draws no edge to a const nothing emitted.
+				// `Number.Pi` draws no edge to a const nothing emitted.
 				it("follows a read of a static Property the prelude gives a value", () => {
 					const lookup = {
 						nodeType: "Lookup",
@@ -2533,7 +2533,7 @@ describe("Code Generation", () => {
 			})
 
 			// NOTE: The edge inside ONE Namespace, which is the shape a Namespace
-			// naming itself made writable — `static TAU = Number.PI` is the
+			// naming itself made writable — `static Tau = Number.Pi` is the
 			// spelling the numeric tower's constants want. It is an ordinary edge
 			// of the band, and it is the only direction there is: a Property
 			// reading one written BELOW it is refused by the Validator, so the
@@ -2818,7 +2818,7 @@ describe("Code Generation", () => {
 			// reaches it — the whole standard library with one more file on the
 			// end, installed as THE library for the length of the block, so a
 			// user Program can be compiled and run against a Property that has a
-			// value. No library on disk gives one a value yet (`Number.PI` is the
+			// value. No library on disk gives one a value yet (`Number.Pi` is the
 			// primitive every other Transcendental is written from, and nothing
 			// in Essence produces one), so a source of its own is the only way to
 			// compile against the band at all.

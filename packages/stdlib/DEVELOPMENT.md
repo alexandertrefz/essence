@@ -13,7 +13,7 @@ pass — a changed value means a body is wrong.
 Each file opens with `declarations { … }` rather than `implementation { … }`.
 It is the Program form that lets a Namespace body hold **body-less native
 Method signatures** (`method(a: Integer) -> Integer` with no block) and
-**value-less static Properties** (`static PI: Transcendental`). A signature
+**value-less static Properties** (`static Pi: Transcendental`). A signature
 alone declares that the runtime implements the Method; a signature with a body
 implements it here, in Essence. Nothing else about the form differs — the same
 Parser, Enricher and Validator run over it.
@@ -134,15 +134,15 @@ only hands on — `static F = Boolean.isNot`, or a conformance witness — is no
 followed, since its body runs whenever it is eventually called. A Property's value
 can only name a Namespace declared above its own, so backwards is the only
 direction an edge points. A value-LESS
-`static PI: Transcendental` stays a native and reaches a call site as the plain
-`Number.PI` member read — no standard library Property has a value yet.
+`static Pi: Transcendental` stays a native and reaches a call site as the plain
+`Number.Pi` member read — no standard library Property has a value yet.
 
-`Number.PI` and `Number.TAU` look like the two that should have gone first, and
+`Number.Pi` and `Number.Tau` look like the two that should have gone first, and
 neither can. No Essence expression produces a Transcendental out of nothing —
-every native that answers with one takes one — so `PI` IS the primitive the rest
+every native that answers with one takes one — so `Pi` IS the primitive the rest
 are written from, and there is no Transcendental literal to write instead. Every
-arithmetic route to `TAU` is Typed `Transcendental | Rational`
-(`Number.PI::multiply(with 2)`, `Number.PI::add(Number.PI)`), because a zero
+arithmetic route to `Tau` is Typed `Transcendental | Rational`
+(`Number.Pi::multiply(with 2)`, `Number.Pi::add(Number.Pi)`), because a zero
 factor and a cancelled π term collapse the value to a Rational, and the declared
 `Transcendental` refuses the Union. So the band is exercised through `useStdlib`
 (`packages/compiler/src/enricher/stdlib.ts`), the seam that swaps the

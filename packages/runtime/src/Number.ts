@@ -14,11 +14,11 @@ import { typeKeySymbol } from "./type"
 
 // #region Constants
 
-export const PI = createTranscendental(
+export const Pi = createTranscendental(
 	{ numerator: 0n, denominator: 1n },
 	{ numerator: 1n, denominator: 1n },
 ) as TranscendentalType
-export const TAU = createTranscendental(
+export const Tau = createTranscendental(
 	{ numerator: 0n, denominator: 1n },
 	{ numerator: 2n, denominator: 1n },
 ) as TranscendentalType

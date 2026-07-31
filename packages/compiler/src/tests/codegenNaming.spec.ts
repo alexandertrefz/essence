@@ -130,8 +130,8 @@ describe("Code Generation — Naming and Escaping", () => {
 			// NOTE: The counterpart guard — an Identifier base whose Type IS a
 			// Namespace still routes through `namespaceMember`, so a static
 			// Property is the plain member read it always was.
-			expect(generate(`implementation { __print(Number.PI) }`)).toContain(
-				"Number.PI",
+			expect(generate(`implementation { __print(Number.Pi) }`)).toContain(
+				"Number.Pi",
 			)
 		})
 	})

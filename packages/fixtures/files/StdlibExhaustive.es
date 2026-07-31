@@ -331,10 +331,10 @@ third"::lines())
 	show("Integer.add(_ Integer)", 66::add(34))
 	show("Integer.add(_ Integer) [negative]", 66::add(-100))
 	show("Integer.add(_ Rational)", 1::add(1/2))
-	show("Integer.add(_ Transcendental)", 1::add(Number.PI))
+	show("Integer.add(_ Transcendental)", 1::add(Number.Pi))
 	show("Integer.subtract(_ Integer)", 1234::subtract(234))
 	show("Integer.subtract(_ Rational)", 1::subtract(1/2))
-	show("Integer.subtract(_ Transcendental)", 1::subtract(Number.PI))
+	show("Integer.subtract(_ Transcendental)", 1::subtract(Number.Pi))
 	show("Integer.divide(by: Integer)", 1110::divide(by computedTwo))
 	show("Integer.divide(by: Integer) [by zero]", 1::divide(by 0))
 	show("Integer.divide(by: Rational)", 1::divide(by 1/2))
@@ -346,10 +346,10 @@ third"::lines())
 		9_007_199_254_740_991::multiply(with 500),
 	)
 	show("Integer.multiply(with: Rational)", 3::multiply(with 1/3))
-	show("Integer.multiply(with: Transcendental)", 2::multiply(with Number.PI))
+	show("Integer.multiply(with: Transcendental)", 2::multiply(with Number.Pi))
 	show(
 		"Integer.multiply(with: Transcendental) [collapses to Rational]",
-		0::multiply(with Number.PI),
+		0::multiply(with Number.Pi),
 	)
 	show("Integer.isLessThan(_ Integer)", 1::isLessThan(2))
 	show("Integer.isLessThan(_ Integer) [equal]", 2::isLessThan(2))
@@ -529,10 +529,10 @@ third"::lines())
 	show("Rational.add(_ Rational)", 1/2::add(1/3))
 	show("Rational.add(_ Rational) [collapses to a whole]", 1/2::add(1/2))
 	show("Rational.add(_ Integer)", 1/2::add(1))
-	show("Rational.add(_ Transcendental)", 1/2::add(Number.PI))
+	show("Rational.add(_ Transcendental)", 1/2::add(Number.Pi))
 	show("Rational.subtract(_ Rational)", 1/2::subtract(1/3))
 	show("Rational.subtract(_ Integer)", 1/2::subtract(1))
-	show("Rational.subtract(_ Transcendental)", 1/2::subtract(Number.PI))
+	show("Rational.subtract(_ Transcendental)", 1/2::subtract(Number.Pi))
 	show("Rational.divide(by: Rational)", 1/2::divide(by 1/6))
 	show("Rational.divide(by: Rational) [by zero]", 1/2::divide(by 0/1))
 	show("Rational.divide(by: Integer)", 1/2::divide(by 2))
@@ -541,11 +541,11 @@ third"::lines())
 	show("Rational.multiply(with: Integer)", 1/2::multiply(with 2))
 	show(
 		"Rational.multiply(with: Transcendental)",
-		1/2::multiply(with Number.PI),
+		1/2::multiply(with Number.Pi),
 	)
 	show(
 		"Rational.multiply(with: Transcendental) [collapses to Rational]",
-		0/1::multiply(with Number.PI),
+		0/1::multiply(with Number.Pi),
 	)
 	show("Rational.isLessThan(_ Rational)", 1/2::isLessThan(2/3))
 	show("Rational.isLessThan(_ Rational) [greater]", 2/3::isLessThan(1/2))
@@ -755,66 +755,66 @@ third"::lines())
 	})
 
 	§ ——— Transcendental ———————————————————————————————————————————————————
-	show("Transcendental.is(_ Transcendental)", Number.PI::is(Number.PI))
+	show("Transcendental.is(_ Transcendental)", Number.Pi::is(Number.Pi))
 	show(
 		"Transcendental.is(_ Transcendental) [differing]",
-		Number.PI::is(Number.TAU),
+		Number.Pi::is(Number.Tau),
 	)
-	show("Transcendental.isNot(_ Transcendental)", Number.PI::isNot(Number.TAU))
+	show("Transcendental.isNot(_ Transcendental)", Number.Pi::isNot(Number.Tau))
 	show(
 		"Transcendental.isNot(_ Transcendental) [equal]",
-		Number.PI::isNot(Number.PI),
+		Number.Pi::isNot(Number.Pi),
 	)
-	show("Transcendental.add(_ Integer)", Number.PI::add(1))
-	show("Transcendental.add(_ Rational)", Number.PI::add(1/2))
-	show("Transcendental.add(_ Transcendental)", Number.PI::add(Number.PI))
-	show("Transcendental.subtract(_ Integer)", Number.PI::subtract(1))
-	show("Transcendental.subtract(_ Rational)", Number.PI::subtract(1/2))
+	show("Transcendental.add(_ Integer)", Number.Pi::add(1))
+	show("Transcendental.add(_ Rational)", Number.Pi::add(1/2))
+	show("Transcendental.add(_ Transcendental)", Number.Pi::add(Number.Pi))
+	show("Transcendental.subtract(_ Integer)", Number.Pi::subtract(1))
+	show("Transcendental.subtract(_ Rational)", Number.Pi::subtract(1/2))
 	show(
 		"Transcendental.subtract(_ Transcendental) [collapses to Rational]",
-		Number.PI::subtract(Number.PI),
+		Number.Pi::subtract(Number.Pi),
 	)
 	show(
 		"Transcendental.subtract(_ Transcendental) [stays Transcendental]",
-		Number.TAU::subtract(Number.PI),
+		Number.Tau::subtract(Number.Pi),
 	)
-	show("Transcendental.multiply(with: Integer)", Number.PI::multiply(with 2))
+	show("Transcendental.multiply(with: Integer)", Number.Pi::multiply(with 2))
 	show(
 		"Transcendental.multiply(with: Integer) [by zero]",
-		Number.PI::multiply(with 0),
+		Number.Pi::multiply(with 0),
 	)
 	show(
 		"Transcendental.multiply(with: Rational)",
-		Number.PI::multiply(with 1/2),
+		Number.Pi::multiply(with 1/2),
 	)
-	show("Transcendental.divide(by: Integer)", Number.PI::divide(by 2))
+	show("Transcendental.divide(by: Integer)", Number.Pi::divide(by 2))
 	show(
 		"Transcendental.divide(by: Integer) [by zero]",
-		Number.PI::divide(by 0),
+		Number.Pi::divide(by 0),
 	)
-	show("Transcendental.divide(by: Rational)", Number.PI::divide(by 1/2))
+	show("Transcendental.divide(by: Rational)", Number.Pi::divide(by 1/2))
 	show(
 		"Transcendental.divide(by: Rational) [by zero]",
-		Number.PI::divide(by 0/1),
+		Number.Pi::divide(by 0/1),
 	)
 	show(
 		"Transcendental.divide(by: Transcendental) [proportional]",
-		Number.TAU::divide(by Number.PI),
+		Number.Tau::divide(by Number.Pi),
 	)
-	show("Transcendental.absolute()", Number.PI::absolute())
+	show("Transcendental.absolute()", Number.Pi::absolute())
 	show(
 		"Transcendental.absolute() [negative]",
-		Number.PI::negate()::absolute(),
+		Number.Pi::negate()::absolute(),
 	)
-	show("Transcendental.negate()", Number.PI::negate())
-	show("Transcendental.toString()", Number.PI::toString())
+	show("Transcendental.negate()", Number.Pi::negate())
+	show("Transcendental.toString()", Number.Pi::toString())
 
 	§ ——— Number ———————————————————————————————————————————————————————————
 	§ Reached through the Namespace spelling throughout, because the `::`
 	§ spelling only lands here when no narrower Namespace matches — every
 	§ Method below shares its name with one on Integer or Rational.
-	show("Number.PI", Number.PI)
-	show("Number.TAU", Number.TAU)
+	show("Number.Pi", Number.Pi)
+	show("Number.Tau", Number.Tau)
 
 	withRootTwo((_ rootTwo: Algebraic) -> {} {
 		show("Number.is(_ Number) [Integer]", Number.is(2, 2/1))
@@ -822,26 +822,26 @@ third"::lines())
 		show("Number.is(_ Number) [Algebraic]", Number.is(rootTwo, 2))
 		show(
 			"Number.is(_ Number) [Transcendental]",
-			Number.is(Number.PI::multiply(with 2), Number.TAU),
+			Number.is(Number.Pi::multiply(with 2), Number.Tau),
 		)
 		show("Number.isNot(_ Number) [Integer]", Number.isNot(2, 2/1))
 		show("Number.isNot(_ Number) [Rational]", Number.isNot(1/2, 1))
 		show("Number.isNot(_ Number) [Algebraic]", Number.isNot(rootTwo, 2))
 		show(
 			"Number.isNot(_ Number) [Transcendental]",
-			Number.isNot(Number.PI, Number.TAU),
+			Number.isNot(Number.Pi, Number.Tau),
 		)
 		show("Number.toString() [Integer]", Number.toString(42))
 		show("Number.toString() [Rational]", Number.toString(3/4))
 		show("Number.toString() [Algebraic]", Number.toString(rootTwo))
-		show("Number.toString() [Transcendental]", Number.toString(Number.PI))
+		show("Number.toString() [Transcendental]", Number.toString(Number.Pi))
 		show(
 			"Number.compare(to: Number) [Integer]",
-			Number.compare(3, to Number.PI),
+			Number.compare(3, to Number.Pi),
 		)
 		show(
 			"Number.compare(to: Number) [Rational]",
-			Number.compare(22/7, to Number.PI),
+			Number.compare(22/7, to Number.Pi),
 		)
 		show(
 			"Number.compare(to: Number) [Algebraic]",
@@ -849,15 +849,15 @@ third"::lines())
 		)
 		show(
 			"Number.compare(to: Number) [Transcendental]",
-			Number.compare(Number.PI, to Number.TAU),
+			Number.compare(Number.Pi, to Number.Tau),
 		)
 		show(
 			"Number.isLessThan(_ Number) [Integer]",
-			Number.isLessThan(3, Number.PI),
+			Number.isLessThan(3, Number.Pi),
 		)
 		show(
 			"Number.isLessThan(_ Number) [Rational]",
-			Number.isLessThan(22/7, Number.PI),
+			Number.isLessThan(22/7, Number.Pi),
 		)
 		show(
 			"Number.isLessThan(_ Number) [Algebraic]",
@@ -865,15 +865,15 @@ third"::lines())
 		)
 		show(
 			"Number.isLessThan(_ Number) [Transcendental]",
-			Number.isLessThan(Number.PI, Number.TAU),
+			Number.isLessThan(Number.Pi, Number.Tau),
 		)
 		show(
 			"Number.isLessThanOrEqualTo(_ Number) [Integer]",
-			Number.isLessThanOrEqualTo(4, Number.PI),
+			Number.isLessThanOrEqualTo(4, Number.Pi),
 		)
 		show(
 			"Number.isLessThanOrEqualTo(_ Number) [Rational]",
-			Number.isLessThanOrEqualTo(22/7, Number.PI),
+			Number.isLessThanOrEqualTo(22/7, Number.Pi),
 		)
 		show(
 			"Number.isLessThanOrEqualTo(_ Number) [Algebraic]",
@@ -881,15 +881,15 @@ third"::lines())
 		)
 		show(
 			"Number.isLessThanOrEqualTo(_ Number) [Transcendental]",
-			Number.isLessThanOrEqualTo(Number.PI, Number.PI),
+			Number.isLessThanOrEqualTo(Number.Pi, Number.Pi),
 		)
 		show(
 			"Number.isGreaterThan(_ Number) [Integer]",
-			Number.isGreaterThan(4, Number.PI),
+			Number.isGreaterThan(4, Number.Pi),
 		)
 		show(
 			"Number.isGreaterThan(_ Number) [Rational]",
-			Number.isGreaterThan(22/7, Number.PI),
+			Number.isGreaterThan(22/7, Number.Pi),
 		)
 		show(
 			"Number.isGreaterThan(_ Number) [Algebraic]",
@@ -897,15 +897,15 @@ third"::lines())
 		)
 		show(
 			"Number.isGreaterThan(_ Number) [Transcendental]",
-			Number.isGreaterThan(Number.TAU, Number.PI),
+			Number.isGreaterThan(Number.Tau, Number.Pi),
 		)
 		show(
 			"Number.isGreaterThanOrEqualTo(_ Number) [Integer]",
-			Number.isGreaterThanOrEqualTo(3, Number.PI),
+			Number.isGreaterThanOrEqualTo(3, Number.Pi),
 		)
 		show(
 			"Number.isGreaterThanOrEqualTo(_ Number) [Rational]",
-			Number.isGreaterThanOrEqualTo(22/7, Number.PI),
+			Number.isGreaterThanOrEqualTo(22/7, Number.Pi),
 		)
 		show(
 			"Number.isGreaterThanOrEqualTo(_ Number) [Algebraic]",
@@ -913,7 +913,7 @@ third"::lines())
 		)
 		show(
 			"Number.isGreaterThanOrEqualTo(_ Number) [Transcendental]",
-			Number.isGreaterThanOrEqualTo(Number.TAU, Number.PI),
+			Number.isGreaterThanOrEqualTo(Number.Tau, Number.Pi),
 		)
 		show(
 			"Number.isBetween(_ Number, and: Number) [Integer]",
@@ -929,11 +929,11 @@ third"::lines())
 		)
 		show(
 			"Number.isBetween(_ Number, and: Number) [Transcendental]",
-			Number.isBetween(Number.PI, 3, and 22/7),
+			Number.isBetween(Number.Pi, 3, and 22/7),
 		)
 		show(
 			"Number.isBetween(_ Number, and: Number) [outside]",
-			Number.isBetween(Number.PI, 22/7, and 4),
+			Number.isBetween(Number.Pi, 22/7, and 4),
 		)
 		show(
 			"Number.isBetween(_ Number, and: Number) [on the bound]",

@@ -41,12 +41,12 @@ implementation {
 	__print(Number.average([1, 2])::otherwise(0/1)) § 3/2
 
 	§ The sign Methods reach the whole tower.
-	__print(Number.PI::negate()::absolute()) § π
+	__print(Number.Pi::negate()::absolute()) § π
 
 	§ isBetween reads the tower's one order, bounds included.
 	__print(5::isBetween(1, and 10)) § true
-	__print(Number.PI::isBetween(3, and 22/7)) § true — the classic enclosure
-	__print(Number.PI::isBetween(22/7, and 4)) § false — π is below 22/7
+	__print(Number.Pi::isBetween(3, and 22/7)) § true — the classic enclosure
+	__print(Number.Pi::isBetween(22/7, and 4)) § false — π is below 22/7
 
 	§ Splitting a String is no longer a one-way door.
 	__print("a,b,c"::split(on ",")::join(with " + ")) § "a + b + c"

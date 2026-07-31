@@ -316,16 +316,16 @@ describe("Runtime Internals", () => {
 			it("answers unequal for an irrational beside a rational value", () => {
 				expect(anyIs(radical(2n), whole(2n))).toBeFalse()
 				expect(anyIs(whole(2n), radical(2n))).toBeFalse()
-				expect(anyIs(number.PI, ratio(22n, 7n))).toBeFalse()
-				expect(anyIs(ratio(22n, 7n), number.PI)).toBeFalse()
-				expect(anyIs(number.PI, radical(2n))).toBeFalse()
+				expect(anyIs(number.Pi, ratio(22n, 7n))).toBeFalse()
+				expect(anyIs(ratio(22n, 7n), number.Pi)).toBeFalse()
+				expect(anyIs(number.Pi, radical(2n))).toBeFalse()
 			})
 
 			it("keeps the same-kind answers it always gave", () => {
 				expect(anyIs(radical(2n), radical(2n))).toBeTrue()
 				expect(anyIs(radical(2n), radical(3n))).toBeFalse()
-				expect(anyIs(number.PI, number.PI)).toBeTrue()
-				expect(anyIs(number.PI, number.TAU)).toBeFalse()
+				expect(anyIs(number.Pi, number.Pi)).toBeTrue()
+				expect(anyIs(number.Pi, number.Tau)).toBeFalse()
 			})
 
 			// NOTE: A Number is still only equal to a Number — the numeric cell

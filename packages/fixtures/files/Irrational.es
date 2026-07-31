@@ -37,30 +37,30 @@ implementation {
 		case #Empty { <- "not representable" }
 	})
 
-	§ π and TAU are exact Transcendentals now, not approximations.
-	__print(Number.PI)
-	__print(Number.TAU)
+	§ π and Tau are exact Transcendentals now, not approximations.
+	__print(Number.Pi)
+	__print(Number.Tau)
 
-	§ Proportional Transcendentals divide exactly: TAU / π = 2.
-	__print(Number.TAU::divide(by Number.PI))
+	§ Proportional Transcendentals divide exactly: Tau / π = 2.
+	__print(Number.Tau::divide(by Number.Pi))
 
 	§ Numeric equality reaches across representations.
-	__print(Number.PI::multiply(with 2)::is(Number.TAU))
+	__print(Number.Pi::multiply(with 2)::is(Number.Tau))
 
 	§ Comparing π against 22/7 is exact and total — the classic bound.
-	__print(Number.PI::compare(to 22/7)::toString())
+	__print(Number.Pi::compare(to 22/7)::toString())
 
 	§ The whole tower is comparable through Number, across any two kinds.
 	§ An Integer against π, a Rational against π, two Transcendentals.
-	__print(3::isLessThan(Number.PI)) § true  (3 < π)
-	__print(4::isLessThan(Number.PI)) § false (4 > π)
+	__print(3::isLessThan(Number.Pi)) § true  (3 < π)
+	__print(4::isLessThan(Number.Pi)) § false (4 > π)
 	constant piBound = 22/7
-	__print(piBound::isGreaterThan(Number.PI)) § true  (22/7 > π)
-	__print(Number.PI::isLessThan(Number.TAU)) § true  (π < 2·π)
-	__print(Number.TAU::isGreaterThanOrEqualTo(Number.PI))
+	__print(piBound::isGreaterThan(Number.Pi)) § true  (22/7 > π)
+	__print(Number.Pi::isLessThan(Number.Tau)) § true  (π < 2·π)
+	__print(Number.Tau::isGreaterThanOrEqualTo(Number.Pi))
 
 	§ An Integer now adds across the whole tower, staying exact.
-	__print(1::add(Number.PI)) § 1 + π
+	__print(1::add(Number.Pi)) § 1 + π
 
 	§ An Integer against √2, through Number — √2 ≈ 1.414.
 	__print(match 2::squareRoot() -> String {
@@ -78,7 +78,7 @@ implementation {
 	})
 
 	§ `Irrational` names exactly the Union of the two new Types.
-	constant someIrrational: Irrational = Number.PI
+	constant someIrrational: Irrational = Number.Pi
 
 	__print(match someIrrational -> String {
 		case Algebraic      { <- "algebraic" }

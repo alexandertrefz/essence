@@ -10,7 +10,7 @@ import {
 declarations {
 
 	§ A number that is provably not algebraic — for now the linear-in-π
-	§ slice `a + b·π`, which is how PI and TAU stay exact. `is` means
+	§ slice `a + b·π`, which is how Pi and Tau stay exact. `is` means
 	§ equality of canonical forms: reflexive and sound, and within this
 	§ grammar it coincides with numeric equality. Transcendental
 	§ deliberately does NOT conform to Comparable — deciding
@@ -74,13 +74,13 @@ declarations {
 			(with other: Rational) -> Transcendental | Rational
 		}
 
-		§§ Divides this Transcendental by a number, exactly. Dividing by an Integer or Rational is empty only for zero; dividing by another Transcendental succeeds exactly when the two are proportional — `TAU::divide(by PI)` is `2` — and is empty otherwise.
+		§§ Divides this Transcendental by a number, exactly. Dividing by an Integer or Rational is empty only for zero; dividing by another Transcendental succeeds exactly when the two are proportional — `Tau::divide(by Pi)` is `2` — and is empty otherwise.
 		overload divide {
 			(by other: Integer) -> Optional<Transcendental>
 
 			(by other: Rational) -> Optional<Transcendental>
 
-			§§ Divides by another Transcendental. Proportional values give an exact Rational — TAU divided by PI is exactly 2. Anything else is not representable yet and is empty.
+			§§ Divides by another Transcendental. Proportional values give an exact Rational — Tau divided by Pi is exactly 2. Anything else is not representable yet and is empty.
 			(by other: Transcendental) -> Optional<Rational>
 		}
 

@@ -306,8 +306,8 @@ export function essenceMethodName(
 // because the KIND decides where the const is emitted: a Method's holds a
 // Function expression and may sit anywhere, a Property's holds the value itself
 // and is ordered against the other Properties it reads. A value-LESS
-// `static PI: Transcendental` is a native, reaches no typed Node, and stays the
-// plain `Number.PI` member read off the runtime module.
+// `static Pi: Transcendental` is a native, reaches no typed Node, and stays the
+// plain `Number.Pi` member read off the runtime module.
 const essencePropertyNames = derivedFromStdlib(
 	() =>
 		new Set(

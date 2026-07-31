@@ -443,7 +443,7 @@ export type NamespaceMethods = Record<
 >
 
 // NOTE: `value` is null only for a native static Property in a
-// `declarations { … }` Program — `static PI: Transcendental` with no `=`. Every
+// `declarations { … }` Program — `static Pi: Transcendental` with no `=`. Every
 // static Property in a user Program still parses its `= value`.
 export interface NamespacePropertyNode {
 	name: IdentifierNode

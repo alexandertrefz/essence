@@ -270,7 +270,7 @@ function callTargetsIn(node: unknown): Set<string> {
 }
 
 // NOTE: The `Namespace.member` a Property Lookup reads — a `Lookup` off a
-// Namespace base that is NOT a call. `Number.PI` is the only shape this matches
+// Namespace base that is NOT a call. `Number.Pi` is the only shape this matches
 // in the harness, and it is how a Property label (no `(`) is checked against
 // its value.
 function propertyReadsIn(node: unknown): Set<string> {
@@ -313,7 +313,7 @@ function propertyReadsIn(node: unknown): Set<string> {
 }
 
 // NOTE: A label is a printed signature — `List.map<ItemType, Result>(_ …)` or
-// `Number.isBetween(_ Number, and: Number)` or the bare `Number.PI` of a
+// `Number.isBetween(_ Number, and: Number)` or the bare `Number.Pi` of a
 // Property. Its `Namespace.method` base is everything before the Type
 // Parameter clause or the Parameter list, with the ` [note]` suffix already
 // gone.

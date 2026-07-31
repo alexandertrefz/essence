@@ -42,10 +42,10 @@ declarations {
 	§ place two Transcendentals can be compared with a `<`.
 	namespace Number for Number is Equatable, is Printable, is Comparable {
 		§§ The ratio of a circle's circumference to its diameter, exactly.
-		static PI: Transcendental
+		static Pi: Transcendental
 
-		§§ Twice `PI` — the ratio of a circle's circumference to its radius.
-		static TAU: Transcendental
+		§§ Twice `Pi` — the ratio of a circle's circumference to its radius.
+		static Tau: Transcendental
 
 		§§ Checks whether the Number has the same numeric value as another Number — an Integer and a Rational are the same Number when their values are equal, so `1 is 1/1` holds.
 		§§
@@ -107,7 +107,7 @@ declarations {
 			<- @::isLessThan(other)::negate()
 		}
 
-		§§ Whether this Number lies between the two given ones, both included — across every member of the numeric tower, so `Number.PI::isBetween(3, and 22/7)` holds. Bounds in the wrong order enclose no Number, so the answer is `false`.
+		§§ Whether this Number lies between the two given ones, both included — across every member of the numeric tower, so `Number.Pi::isBetween(3, and 22/7)` holds. Bounds in the wrong order enclose no Number, so the answer is `false`.
 		§§
 		§§ @param lower — the lower bound, included
 		§§ @param and — the upper bound, included

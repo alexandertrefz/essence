@@ -456,7 +456,7 @@ it on the Namespace instead, as `Namespace.make(…)`.
 ### `native-property-without-type`
 
 A static Property in a `declarations { … }` Program declared neither a value
-nor a Type. A native Property is exactly its annotation — `static PI:
+nor a Type. A native Property is exactly its annotation — `static Pi:
 Transcendental` — so without one there is nothing to declare.
 
 ## Choices
