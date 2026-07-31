@@ -1,41 +1,53 @@
 implementation {
 
-	namespace FunctionalList<infer Item> for List<Item> {
-		transformFirst<infer TargetType>(
-			_ transform: (_ item: Item) -> TargetType,
-			fallback fallbackValue: TargetType,
-		) -> TargetType {
-			<- @::firstItem()::map(transform)::otherwise(fallbackValue)
+	§ A generic Namespace is written once and works over every List — the Type
+	§ Parameter is inferred from the receiver of each call. This one turns any
+	§ List into a Stack, and a Stack of Strings into an undo history.
+
+	namespace Stack<infer Item> for List<Item> {
+		push(_ item: Item) -> NonEmptyList<Item> {
+			<- @::append(item)
 		}
 
-		firstOr(fallback fallbackValue: Item) -> Item {
-			<- @::firstItem()::otherwise(fallbackValue)
+		pop() -> List<Item> {
+			<- @::removeLast()
+		}
+
+		peek() -> Optional<Item> {
+			<- @::lastItem()
 		}
 	}
 
-	function wrap<infer Value>(_ value: Value) -> Optional<Value> {
-		<- #Value(value)
+	§ Editing a document, remembering every state it passes through.
+	variable history: List<String> = []
+
+	history = history::push("Hello")
+	history = history::push("Hello, World")
+	history = history::push("Hello, World!")
+
+	__print(history::peek()) § Optional#Value("Hello, World!")
+
+	§ Undo is a pop.
+	history = history::pop()
+
+	__print(history::peek()) § Optional#Value("Hello, World")
+	__print(history::length()) § 2
+
+	§ The same Namespace, bound to a different Item by a different receiver.
+	constant moves: List<Integer> = []
+
+	__print(moves::push(4)::push(2)::pop()::peek()) § Optional#Value(4)
+
+	§ A generic Function stands alone, and infers several Type Parameters at
+	§ once — `First` and `Second` bind from the two Arguments, and the Record
+	§ Type of the answer is built from both.
+	function paired<infer First, infer Second>(
+		_ first: First,
+		with second: Second,
+	) -> { first: First, second: Second } {
+		<- { first = first, second = second }
 	}
 
-	function unwrap<infer Value>(
-		_ maybe: Optional<Value>,
-		fallback fallbackValue: Value,
-	) -> Value {
-		<- maybe::otherwise(fallbackValue)
-	}
-
-	constant numbers = [1, 2, 3]
-
-	constant firstAsString: String = numbers::transformFirst(
-		(_ item: Integer) -> String { <- item::toString() },
-		fallback "none",
-	)
-
-	constant wrapped: Optional<String> = wrap("hello")
-
-	__print(firstAsString) § "1"
-	__print(numbers::firstOr(fallback 0)) § 1
-	__print([]::firstOr(fallback 42)) § 42
-	__print(unwrap(wrapped, fallback "empty")) § "hello"
-	__print(unwrap(#Empty, fallback 7)) § 7
+	__print(paired(1, with "one")) § { first = 1, second = "one" }
+	__print(paired("half", with 1/2)) § { first = "half", second = 1/2 }
 }
