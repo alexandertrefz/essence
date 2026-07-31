@@ -1,3 +1,5 @@
+import { displayPath } from "@essence-lang/compiler/diagnostics/render"
+
 import { optimiserOptionsFor } from "./args"
 import type { CommandSpec } from "./commands"
 import type { CLIContext } from "./context"
@@ -19,7 +21,6 @@ import {
 	shouldUseWorkers,
 } from "./pool"
 import {
-	displayPath,
 	renderBatchReport,
 	renderDiagnosticsFor,
 	renderSingleReport,

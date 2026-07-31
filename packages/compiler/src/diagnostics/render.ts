@@ -1,3 +1,5 @@
+import * as path from "node:path"
+
 import {
 	type Cache,
 	type Color,
@@ -14,6 +16,25 @@ import { countOf } from "../helpers/index"
 
 export interface RenderOptions {
 	color?: boolean
+}
+
+// NOTE: How a report names a file. A path given as an absolute one is usually
+// still inside the project, and the part that matters is the part below the
+// working directory; the longer of the two spellings is never the more useful
+// one.
+//
+// NOTE: Here rather than in whichever program is doing the printing, because
+// every one of them shows the same Diagnostics and a file has to be called the
+// same thing in all of them — `esc`'s report, its JSON, and the report a host
+// gets thrown at it out of the client.
+export function displayPath(fileName: string): string {
+	let relative = path.relative(process.cwd(), fileName)
+
+	if (relative === "" || relative.startsWith("..")) {
+		return fileName
+	}
+
+	return relative.length < fileName.length ? relative : fileName
 }
 
 // NOTE: Compiler Positions are 1-based with exclusive end columns, counted in
