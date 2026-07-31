@@ -209,6 +209,10 @@ export type NumberNatives = {
 	Pi: TranscendentalType
 	// Tau: Transcendental
 	Tau: TranscendentalType
+	// E: Transcendental
+	E: TranscendentalType
+	// GoldenRatio: Algebraic
+	GoldenRatio: AlgebraicType
 	// compare(to: Number) -> Ordering
 	compare: (self: NumberType, to: NumberType) => OrderingType
 }

@@ -254,6 +254,79 @@ describe("Irrationals", () => {
 			)
 		})
 
+		it("keeps E exact and prints mixed forms symbolically", () => {
+			expect(number.E[typeKeySymbol]).toBe("Transcendental")
+			expect(transcendental.toString(number.E).value).toBe("e")
+
+			const mixed = transcendental.addTranscendental(number.Pi, number.E)
+
+			expect(mixed[typeKeySymbol]).toBe("Transcendental")
+			expect(
+				transcendental.toString(
+					mixed as transcendental.TranscendentalType,
+				).value,
+			).toBe("π + e")
+		})
+
+		it("collapses a cancelled e-part back to the π term", () => {
+			const mixed = transcendental.addTranscendental(
+				number.Pi,
+				number.E,
+			) as transcendental.TranscendentalType
+			const difference = transcendental.addTranscendental(
+				mixed,
+				transcendental.negate(number.E),
+			)
+
+			expect(anyIs(difference, number.Pi)).toBeTrue()
+		})
+
+		it("orders e exactly against tight rational bounds", () => {
+			// NOTE: 2718/1000 < e < 2719/1000 — decided exactly through the
+			// single-base threshold, no cutoff in sight.
+			expect(
+				number.compare(number.E, rational.createRational(2719n, 1000n)),
+			).toEqual(ordering.less)
+			expect(
+				number.compare(number.E, rational.createRational(2718n, 1000n)),
+			).toEqual(ordering.greater)
+		})
+
+		it("orders e against π through the mixed-form refinement", () => {
+			expect(number.compare(number.E, number.Pi)).toEqual(ordering.less)
+			expect(number.compare(number.Pi, number.E)).toEqual(
+				ordering.greater,
+			)
+
+			// NOTE: π + e against 2·π is e against π in disguise — the
+			// difference carries both bases, so this walks the refinement.
+			expect(
+				number.compare(
+					transcendental.addTranscendental(
+						number.Pi,
+						number.E,
+					) as transcendental.TranscendentalType,
+					number.Tau,
+				),
+			).toEqual(ordering.less)
+		})
+
+		it("orders e against Algebraics", () => {
+			// NOTE: √8 ≈ 2.828 > e > √7 ≈ 2.646.
+			expect(number.compare(number.E, radical(8n))).toEqual(ordering.less)
+			expect(number.compare(number.E, radical(7n))).toEqual(
+				ordering.greater,
+			)
+		})
+
+		it("answers nothing for π divided by e", () => {
+			expect(
+				transcendental.divideByTranscendental(number.Pi, number.E)[
+					typeKeySymbol
+				],
+			).toBe("Optional#Empty")
+		})
+
 		it("refuses an unregistered base at the gateway", () => {
 			// NOTE: γ — Euler–Mascheroni — is not even known to be irrational,
 			// so no enclosure of it could promise single-base totality. The
@@ -264,6 +337,82 @@ describe("Irrationals", () => {
 					{ base: "γ", coefficient: bigRational(1n) },
 				]),
 			).toThrow(/not a registered transcendental base/)
+		})
+
+		it("distinguishes forms that differ only in a later term", () => {
+			// NOTE: π + e against π + 2·e — the rational part and the π term
+			// agree, so only a walk over the WHOLE term list can tell them
+			// apart. The hand-written six-field equality this replaces went
+			// blind past the fields it named; the term walk cannot.
+			const mixed = transcendental.addTranscendental(
+				number.Pi,
+				number.E,
+			) as transcendental.TranscendentalType
+			const wider = transcendental.addTranscendental(
+				mixed,
+				number.E,
+			) as transcendental.TranscendentalType
+
+			expect(anyIs(mixed, wider)).toBeFalse()
+			expect(anyIs(mixed, mixed)).toBeTrue()
+			expect(transcendental.is(mixed, wider).value).toBeFalse()
+		})
+
+		it("divides proportional mixed forms exactly", () => {
+			// NOTE: (1 + π + e) / (2 + 2·π + 2·e) = 1/2 — proportionality is
+			// componentwise across all three parts.
+			const mixedForm = transcendental.createTranscendental(
+				bigRational(1n),
+				[
+					{ base: "π", coefficient: bigRational(1n) },
+					{ base: "e", coefficient: bigRational(1n) },
+				],
+			) as transcendental.TranscendentalType
+			const doubled = transcendental.multiply(
+				mixedForm,
+				integer.createInteger(2n),
+			) as transcendental.TranscendentalType
+
+			const quotient = unwrap(
+				transcendental.divideByTranscendental(mixedForm, doubled),
+			)
+
+			expect(anyIs(quotient, rational.createRational(1n, 2n))).toBeTrue()
+		})
+
+		it("holds the golden ratio exactly", () => {
+			expect(number.GoldenRatio[typeKeySymbol]).toBe("Algebraic")
+			expect(algebraic.toString(number.GoldenRatio).value).toBe(
+				"1/2 + 1/2·√5",
+			)
+
+			// NOTE: φ² = φ + 1, the defining identity — exact, structural.
+			const squared = unwrap(
+				algebraic.multiplyWithAlgebraic(
+					number.GoldenRatio,
+					number.GoldenRatio,
+				),
+			)
+			const incremented = algebraic.add(
+				number.GoldenRatio,
+				integer.createInteger(1n),
+			)
+
+			expect(anyIs(squared, incremented)).toBeTrue()
+
+			// NOTE: 1618/1000 < φ < 1619/1000.
+			expect(
+				number.compare(
+					number.GoldenRatio,
+					rational.createRational(1618n, 1000n),
+				),
+			).toEqual(ordering.greater)
+			expect(
+				number.compare(
+					number.GoldenRatio,
+					rational.createRational(1619n, 1000n),
+				),
+			).toEqual(ordering.less)
 		})
 	})
 
@@ -378,6 +527,15 @@ describe("Irrationals", () => {
 			expect(
 				diagnosticsFor(`implementation {
 					constant exactPi: Transcendental = Number.Pi
+				}`),
+			).toEqual([])
+		})
+
+		it("types E as Transcendental and GoldenRatio as Algebraic", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					constant exactE: Transcendental = Number.E
+					constant golden: Algebraic = Number.GoldenRatio
 				}`),
 			).toEqual([])
 		})

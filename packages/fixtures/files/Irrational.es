@@ -62,6 +62,21 @@ implementation {
 	§ An Integer now adds across the whole tower, staying exact.
 	__print(1::add(Number.Pi)) § 1 + π
 
+	§ Euler's number is exact too — the slice holds `a + b·π + c·e`, so π
+	§ and e coexist symbolically, and enclosures decide their order.
+	__print(Number.E)
+	__print(Number.E::isLessThan(Number.Pi)) § true (e ≈ 2.718 < π)
+	__print(Number.Pi::add(Number.E)) § π + e, exact and symbolic
+
+	§ π and e are not proportional, so their quotient has no exact form yet.
+	__print(Number.Pi::divide(by Number.E))
+
+	§ The golden ratio is Algebraic — `(1 + √5) / 2` — and satisfies its
+	§ defining identity exactly: φ² is φ + 1.
+	__print(Number.GoldenRatio)
+	__print(Number.GoldenRatio::multiply(with Number.GoldenRatio)) § φ² …
+	__print(Number.GoldenRatio::add(1)) § … is φ + 1
+
 	§ An Integer against √2, through Number — √2 ≈ 1.414.
 	__print(match 2::squareRoot() -> String {
 		case #Value(root) {

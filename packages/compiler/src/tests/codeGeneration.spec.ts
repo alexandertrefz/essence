@@ -1588,7 +1588,7 @@ describe("Code Generation", () => {
 			expect(neither).not.toContain("$es_Boolean_isNot")
 		})
 
-		// NOTE: A value-LESS `static Pi: Transcendental` is a native — it reaches
+		// NOTE: A value-LESS `static PI: Transcendental` is a native — it reaches
 		// no typed Node, so the prelude has nothing to emit for it — and it stays a
 		// plain member read off the runtime module, `Number.Pi`, like every native.
 		it("reads Pi and Tau as native member reads", async () => {

@@ -124,6 +124,10 @@ to break:
 - **Keep return Types tight.** Add Overloads rather than widening one signature:
   `Integer::add(Integer) -> Integer` beside `add(Rational) -> Rational`, never a
   single `add(Number) -> Number`.
+- **A static constant is a proper noun.** `Number.Pi`, `Number.Tau`, `Number.E`,
+  `Number.GoldenRatio` — PascalCase, named for the thing itself; never
+  SCREAMING_CASE, and spelled out (`GoldenRatio`) unless the mathematics itself
+  writes the short form (`Pi`, `E`).
 
 ## `List`'s bounded Methods
 

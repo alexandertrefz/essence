@@ -34,10 +34,10 @@ declarations {
 	§
 	§ `compare` hand-writes all sixteen member cells and keeps the
 	§ Comparable conformance even though Transcendental alone does not
-	§ conform: every cross-kind cell is total because equality across kinds
-	§ is impossible by definition, and the only cell that could ever need a
-	§ documented cutoff — Transcendental against Transcendental — is exact
-	§ within the current linear-in-π grammar. The `isLessThan` family reads
+	§ conform: every cell touching a single-base Transcendental is total
+	§ because equality across kinds is impossible by definition, and only a
+	§ Transcendental carrying both π and e reaches the one documented
+	§ precision cutoff in the tower. The `isLessThan` family reads
 	§ that same order, so it lives here for the same reason and is the one
 	§ place two Transcendentals can be compared with a `<`.
 	namespace Number for Number is Equatable, is Printable, is Comparable {
@@ -46,6 +46,12 @@ declarations {
 
 		§§ Twice `Pi` — the ratio of a circle's circumference to its radius.
 		static Tau: Transcendental
+
+		§§ Euler's number — the base of the natural logarithm, exactly.
+		static E: Transcendental
+
+		§§ The golden ratio — `(1 + √5) / 2`, the positive solution of `x² = x + 1`, exactly.
+		static GoldenRatio: Algebraic
 
 		§§ Checks whether the Number has the same numeric value as another Number — an Integer and a Rational are the same Number when their values are equal, so `1 is 1/1` holds.
 		§§

@@ -1,5 +1,5 @@
 import type { AlgebraicType } from "./Algebraic"
-import { compare as compareAlgebraicTo } from "./Algebraic"
+import { compare as compareAlgebraicTo, createAlgebraic } from "./Algebraic"
 import type { IntegerType } from "./Integer"
 import type { OrderingType } from "./Ordering"
 import { equal, greater, less } from "./Ordering"
@@ -20,6 +20,14 @@ export const Pi = createTranscendental({ numerator: 0n, denominator: 1n }, [
 export const Tau = createTranscendental({ numerator: 0n, denominator: 1n }, [
 	{ base: "π", coefficient: { numerator: 2n, denominator: 1n } },
 ]) as TranscendentalType
+export const E = createTranscendental({ numerator: 0n, denominator: 1n }, [
+	{ base: "e", coefficient: { numerator: 1n, denominator: 1n } },
+]) as TranscendentalType
+export const GoldenRatio = createAlgebraic(
+	{ numerator: 1n, denominator: 2n },
+	{ numerator: 1n, denominator: 2n },
+	5n,
+) as AlgebraicType
 
 // #endregion
 
@@ -68,10 +76,11 @@ function denominatorOf(number: RationalKind): bigint {
 // ordering primitive they all fall out of, and it stays native.
 
 // NOTE: Wiring B — the covering Namespace hand-writes all sixteen cells.
-// Every cross-kind cell is total and exact, because equality across kinds is
-// impossible by definition; only comparing two Transcendentals could ever
-// need refinement, and with a single registered base even that cell is exact
-// — see the basis registry in `Transcendental.ts`.
+// Every cell involving a single-base Transcendental is total and exact,
+// because equality across kinds is impossible by definition. Only a
+// Transcendental carrying several bases — π and e, today — meets the one
+// conjectural spot in the tower: its comparisons refine enclosures to a deep
+// documented precision cutoff — see `Transcendental.ts`.
 export function compare(number: NumberType, other: NumberType): OrderingType {
 	const numberKind = number[typeKeySymbol]
 	const otherKind = other[typeKeySymbol]
