@@ -2,6 +2,7 @@ import { readFile, writeFile } from "node:fs/promises"
 import * as path from "node:path"
 
 import { containsErrors } from "@essence-lang/compiler/diagnostics"
+import { displayPath } from "@essence-lang/compiler/diagnostics/render"
 import { compileToMemory } from "@essence-lang/compiler/embed"
 import {
 	canonicalPath,
@@ -10,9 +11,9 @@ import {
 } from "@essence-lang/compiler/modules"
 import type { OptimiserOptions } from "@essence-lang/compiler/optimiser"
 
-import { withRuntimeBridge } from "./bridge"
+import { BRIDGE_KEY, withRuntimeBridge } from "./bridge"
 import { generateDeclarations } from "./dts"
-import { EssenceCompileError } from "./errors"
+import { EssenceBuildError, EssenceCompileError } from "./errors"
 
 // NOTE: Essence inside somebody else's build. A `.es` file is compiled where the
 // bundler asks for its text, and what comes back is one standalone Module — the
@@ -72,30 +73,91 @@ export type CompiledModule = {
 	files: Array<string>
 }
 
-async function compileModule(
-	entryPath: string,
-	options: PluginOptions,
-	declarations: boolean,
-): Promise<CompiledModule> {
-	let entry = canonicalPath(entryPath)
-	let compiled = await compileToMemory(entry, {
-		host: options.host,
-		optimisation: options.optimisation,
-		transformSources: withRuntimeBridge,
-	})
+// NOTE: One compiler per BUILD, because what it has to remember is what that
+// build has already compiled. Every `.es` entry becomes its own standalone
+// bundle — its own copy of the runtime, and its own `typeKeySymbol`, minted
+// while that bundle was evaluated — so a value built by one is untagged as far
+// as the other is concerned. Nothing fails: a `match` on it silently takes the
+// wrong arm, an `Optional` reads as `#Empty`, an area comes back `0`. Two `.es`
+// entries out of one Module graph are two halves of one Program, and this is
+// where that is caught.
+//
+// Two entries that share NO source are two unrelated Programs and are left
+// alone. They still duplicate the runtime, and values still may not pass between
+// them, but nothing in either of them says otherwise.
+type EssenceCompiler = {
+	compile: (
+		entryPath: string,
+		declarations: boolean,
+	) => Promise<CompiledModule>
+}
 
-	// NOTE: Thrown rather than returned, because a bundler's load hook has one
-	// way to fail and this is it. The message is the report `esc` prints, which
-	// is the thing a developer staring at a failed build actually needs.
-	if (containsErrors(compiled.diagnostics)) {
-		throw new EssenceCompileError(entry, compiled.diagnosticGroups)
+function createCompiler(options: PluginOptions): EssenceCompiler {
+	// NOTE: Keyed by entry rather than a plain list, so that recompiling the
+	// SAME entry — which is what a dev server does on every edit — replaces its
+	// graph instead of colliding with it.
+	let compiled = new Map<string, Array<string>>()
+
+	return {
+		async compile(entryPath, declarations) {
+			let entry = canonicalPath(entryPath)
+			let result = await compileToMemory(entry, {
+				host: options.host,
+				optimisation: options.optimisation,
+				transformSources: withRuntimeBridge,
+				emitterKey: BRIDGE_KEY,
+			})
+
+			// NOTE: Thrown rather than returned, because a bundler's load hook
+			// has one way to fail and this is it. The message is the report `esc`
+			// prints, which is the thing a developer staring at a failed build
+			// actually needs.
+			if (containsErrors(result.diagnostics)) {
+				throw new EssenceCompileError(entry, result.diagnosticGroups)
+			}
+
+			refuseSharedGraph(compiled, entry, result.files)
+			compiled.set(entry, result.files)
+
+			if (declarations) {
+				await writeDeclarations(entry, result.surface)
+			}
+
+			return { code: result.code, files: result.files }
+		},
 	}
+}
 
-	if (declarations) {
-		await writeDeclarations(entry, compiled.surface)
+function refuseSharedGraph(
+	compiled: Map<string, Array<string>>,
+	entry: string,
+	files: Array<string>,
+): void {
+	let reached = new Set(files)
+
+	for (let [other, otherFiles] of compiled) {
+		if (other === entry) {
+			continue
+		}
+
+		let shared = otherFiles.filter((filePath) => reached.has(filePath))
+
+		if (shared.length > 0) {
+			throw new EssenceBuildError(
+				`This build compiles two Essence entries out of one Module graph — '${displayPath(
+					entry,
+				)}' and '${displayPath(other)}', which both reach '${displayPath(
+					shared[0]!,
+				)}'.\n\n` +
+					"Each entry becomes its own standalone bundle, with its own copy of the\n" +
+					"runtime and its own hidden Type key, so a value built by one is not\n" +
+					"recognised by the other — a Choice would match the wrong Case rather\n" +
+					"than fail. Import one `.es` entry per build and reach the rest through\n" +
+					"it, or load the second one with `loadModule`, which marshals to plain\n" +
+					"JavaScript at every boundary.",
+			)
+		}
 	}
-
-	return { code: compiled.code, files: compiled.files }
 }
 
 // NOTE: Written only when the text would change. A dev server compiles on every
@@ -161,6 +223,9 @@ export function essence(options: PluginOptions = {}): VitePlugin {
 	// NOTE: A build writes its output where it was asked to; a server is somebody
 	// sitting in an editor. Which one this is is not known until Vite says.
 	let serving = false
+	// NOTE: Replaced when Vite resolves a configuration, which is once per build
+	// — so what a previous build compiled is not held against this one.
+	let compiler = createCompiler(options)
 
 	return {
 		name: "essence",
@@ -169,6 +234,7 @@ export function essence(options: PluginOptions = {}): VitePlugin {
 		enforce: "pre",
 		configResolved(config) {
 			serving = config.command === "serve"
+			compiler = createCompiler(options)
 		},
 		resolveId(source, importer) {
 			let file = essenceFile(source)
@@ -195,9 +261,8 @@ export function essence(options: PluginOptions = {}): VitePlugin {
 				return null
 			}
 
-			let compiled = await compileModule(
+			let compiled = await compiler.compile(
 				file,
-				options,
 				options.declarations ?? serving,
 			)
 
@@ -242,11 +307,14 @@ export type EsbuildPlugin = {
 export function essenceEsbuild(options: PluginOptions = {}): EsbuildPlugin {
 	return {
 		name: "essence",
+		// NOTE: `setup` runs once per build, which is exactly the scope the
+		// compiler's memory of what it has already compiled has to have.
 		setup(build) {
+			let compiler = createCompiler(options)
+
 			build.onLoad({ filter: ESSENCE_FILE }, async (args) => {
-				let compiled = await compileModule(
+				let compiled = await compiler.compile(
 					args.path,
-					options,
 					options.declarations ?? false,
 				)
 
