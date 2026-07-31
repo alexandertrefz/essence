@@ -575,7 +575,12 @@ function admitsCase(tag: unknown, expected: common.CaseType): boolean {
 // NOTE: A JavaScript object with members, and nothing that merely is one: an
 // Array is a List's shape and an `EssenceRational` is a Rational's, so admitting
 // either as a Record would make the Type that named it unreachable.
-function plainObject(value: unknown): Record<string, unknown> | null {
+//
+// NOTE: Exported because a labelled call asks the very same question of its one
+// Argument — an `EssenceRational` passed to a Function whose labels happen to be
+// `numerator` and `denominator` is a Rational, not a labelled call — and two
+// spellings of one rule is exactly how the two would come to disagree.
+export function plainObject(value: unknown): Record<string, unknown> | null {
 	if (
 		value === null ||
 		typeof value !== "object" ||

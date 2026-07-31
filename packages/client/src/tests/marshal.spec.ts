@@ -333,22 +333,33 @@ describe("The exports of a Module", () => {
 		expect(module.exports.absent).toBeUndefined()
 	})
 
-	// NOTE: A Function needs its Arguments marshalled the other way round and
-	// its labels honoured, which is a slice of its own — leaving it out beats
-	// handing over a runtime value under a name that promises JavaScript.
-	it("leaves the Functions to `raw` until calling lands", () => {
-		expect(module.exports.integer).toBeUndefined()
-		expect(typeof module.raw.integer).toBe("function")
+	// NOTE: And every Function beside them, marshalling both ways around the
+	// call — which is what makes `exports` JavaScript all the way down rather
+	// than JavaScript until the first call.
+	it("hands back every Function as a JavaScript one", () => {
+		expect(typeof module.exports.integer).toBe("function")
 		expect(Object.keys(module.exports).sort()).toEqual([
 			"absent",
 			"answer",
+			"areaOf",
 			"blank",
+			"box",
+			"boxes",
 			"circle",
+			"flag",
 			"greeting",
+			"integer",
+			"labelled",
+			"maybe",
+			"maybes",
 			"names",
 			"point",
 			"present",
+			"rational",
+			"shape",
+			"text",
 			"third",
+			"words",
 			"yes",
 		])
 	})

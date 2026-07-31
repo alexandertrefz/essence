@@ -22,12 +22,14 @@ one block per file.
 
 ## Values
 
-`exports` holds the Module's constants as ordinary JavaScript.
+`exports` holds the Module as ordinary JavaScript: constants as values,
+Functions as Functions, Namespaces as objects of the same.
 
 ```js
 let math = await loadModule("./math/Math.es")
 
 math.exports.PI.toString() // "157/50"
+math.exports.square(12n) // 144n
 ```
 
 | Essence           | JavaScript                            |
@@ -57,13 +59,46 @@ Type, the value, and where inside it the two parted ways.
 argument 1 → [1].height: expected Integer, got the string "four".
 ```
 
-Functions and Namespaces are not on `exports` yet — calling is the next slice.
-Until then they are reached through `raw`, which holds every export under the
-name its author wrote and marshals nothing. Values there are Essence's own: an
-Integer is a tagged object holding a `bigint`, and the Symbol it is tagged with
-is minted when the bundle is evaluated, so the constructors come out of that
-bundle too, on `bridge`. `marshaller` is the same boundary `exports` was built
-through, bound to that bridge.
+## Calls
+
+A call is marshalled on both sides: the Arguments against the Parameter Types
+the Module declared, the answer against whatever comes back.
+
+Essence writes a label at every call site, so a Function whose Parameters all
+carry one may be called either way — with the Arguments in order, or with a
+single object whose keys are exactly the labels.
+
+```js
+let geometry = await loadModule("./Geometry.es")
+
+geometry.exports.Rectangle.of(3n, 4n) // { width: 3n, height: 4n }
+geometry.exports.Rectangle.of({ width: 3n, height: 4n }) // the same call
+```
+
+A Function of one Record Parameter is positional whatever its label says —
+both readings take an object, and a Record is the one that can hold any shape,
+so `describe({ width: 3n, height: 4n })` passes the Rectangle.
+
+A Namespace comes back as an object of its Methods. There is no `::` on this
+side, so an instance Method takes its receiver where a call passes it, first.
+
+```js
+geometry.exports.RectangleMeasurable.area({ width: 3n, height: 4n }) // 12n
+```
+
+A call the signature does not admit — the wrong number of Arguments, an object
+whose keys are not the labels — throws an `EssenceCallError` naming the
+signature and both ways of writing it. An overloaded Method throws one too:
+which Overload a call means is decided by the Argument Types, and a JavaScript
+value carries none, so each Overload is reached by its own name on `raw`.
+
+## The raw door
+
+`raw` holds every export under the name its author wrote and marshals nothing.
+Values there are Essence's own: an Integer is a tagged object holding a
+`bigint`, and the Symbol it is tagged with is minted when the bundle is
+evaluated, so the constructors come out of that bundle too, on `bridge`.
+`marshaller` is the same boundary `exports` was built through, bound to it.
 
 ```js
 let math = await loadModule("./math/Math.es")
