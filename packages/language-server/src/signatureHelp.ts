@@ -400,12 +400,6 @@ function findEnclosingInvocation(
 			case "ReturnStatement":
 				visitNode(node.expression)
 				return
-			case "NativeFunctionInvocation":
-				for (let argument of node.arguments) {
-					visitNode(argument.value)
-				}
-
-				return
 			case "MethodInvocation":
 				visitNode(node.base)
 

@@ -159,7 +159,6 @@ export type DiagnosticCode =
 	| "unknown-name"
 	| "unknown-type"
 	| "unknown-protocol"
-	| "unknown-native-function"
 	| "unknown-member"
 	| "type-without-members"
 	// Types — a value that does not fit where it was put.

@@ -327,9 +327,9 @@ export function indexProgram(
 	context.scopes.push({ range: null, scope: topLevelScope })
 
 	// NOTE: The KIND is read off the member's own Type rather than off its name.
-	// Every builtin used to be a Namespace but one — the free Function `__print`,
-	// named here as the exception — and printing is a Namespace now, which left
-	// `loop` mis-kinded as a Namespace on the strength of not being that name.
+	// It used to be read off a hard-coded list of the one builtin that was not a
+	// Namespace, which left `loop` mis-kinded as a Namespace on the strength of
+	// not being on it.
 	for (let [name, member] of builtinValues()) {
 		topLevelScope.values.set(name, {
 			builtin: true,
@@ -863,10 +863,6 @@ function walkNode(
 			return
 		case "Identifier":
 			reference(scope, "values", node, context)
-			return
-		case "NativeFunctionInvocation":
-			reference(scope, "values", node.name, context)
-			walkArguments(node.arguments, scope, context)
 			return
 		case "MethodInvocation":
 			walkNode(node.base, scope, context)
@@ -1701,9 +1697,6 @@ function walkTypedNode(
 			return
 		case "ReturnStatement":
 			walkTypedNode(node.expression, context)
-			return
-		case "NativeFunctionInvocation":
-			walkTypedArguments(node.arguments, context)
 			return
 		case "MethodInvocation":
 			bindNamespaceMember(

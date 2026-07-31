@@ -19,9 +19,9 @@ does, and the standard library ships from `@essence-lang/stdlib` the same way.
 - Stacks speak Essence: the author's names demangled, a `match` shown as one
   construct, standard library frames as `List.sorted`, and compiler glue
   hidden (`glueFrames: "subtle"` shows it greyed out).
-- The Variables view renders Essence values the way `__print` spells them —
-  `3/4`, `"text"`, `Ordering#Less`, `{ width = 3, height = 4 }` — expanded
-  children included, rendered live inside the debuggee.
+- The Variables view renders Essence values the way `Terminal.inspect` spells
+  them — `3/4`, `"text"`, `Ordering#Less`, `{ width = 3, height = 4 }` —
+  expanded children included, rendered live inside the debuggee.
 - Stepping is carried over the prelude and the runtime; `stopOnEntry` pauses
   on the first statement the author wrote, not the bundle's bootstrap.
 - "Uncaught Exceptions" pauses a failing Program on the mapped line with the

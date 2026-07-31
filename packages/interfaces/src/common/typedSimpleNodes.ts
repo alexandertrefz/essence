@@ -75,7 +75,6 @@ export type ImplementationNode = ExpressionNode | StatementNode
 // Return, a conformance witness — and those stay unset, which emits no
 // mapping.
 export type ExpressionNode =
-	| NativeFunctionInvocationNode
 	| FunctionInvocationNode
 	| MethodInvocationNode
 	| UnionMethodInvocationNode
@@ -114,14 +113,6 @@ export interface ConformanceValueNode {
 	// Equatable — the Rewriter then emits `$helpers.boundChoiceIs(<descriptor>)`
 	// for each mapped Method instead of the plain `choiceIs`.
 	derivedDescriptor?: DerivedEquatableDescriptor
-	type: Type
-	position?: Position
-}
-
-export interface NativeFunctionInvocationNode {
-	nodeType: "NativeFunctionInvocation"
-	name: IdentifierNode
-	arguments: Array<ArgumentNode>
 	type: Type
 	position?: Position
 }

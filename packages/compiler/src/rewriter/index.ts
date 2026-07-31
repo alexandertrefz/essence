@@ -1612,7 +1612,6 @@ export function essenceMethodReferences(
 			record["nodeType"] === "MethodInvocation" ||
 			record["nodeType"] === "UnionMethodInvocation" ||
 			record["nodeType"] === "FunctionInvocation" ||
-			record["nodeType"] === "NativeFunctionInvocation" ||
 			(record["nodeType"] === "Intrinsic" &&
 				record["kind"] === "dispatch-chain") ||
 			// NOTE: An inlined loop RUNS the bodies it holds, which is what the
@@ -1976,8 +1975,6 @@ function rewriteExpressionByKind(
 	switch (node.nodeType) {
 		case "VariableAssignmentStatement":
 			return rewriteVariableAssignmentStatement(node)
-		case "NativeFunctionInvocation":
-			return rewriteNativeFunctionInvocation(node)
 		case "FunctionInvocation":
 			return rewriteFunctionInvocation(node)
 		case "MethodInvocation":
@@ -2551,29 +2548,6 @@ function functionsModuleMember(name: string): estree.MemberExpression {
 			name,
 		},
 		computed: false,
-	}
-}
-
-function rewriteNativeFunctionInvocation(
-	node: common.typedSimple.NativeFunctionInvocationNode,
-): estree.CallExpression {
-	if (node.name.nodeType !== "Identifier") {
-		throw Error(
-			"Lookups on NativeFunctionIvocations are not implemented yet.",
-		)
-	}
-
-	// NOTE: The `__`-sigil name IS the runtime export name — the prefix is not
-	// stripped here, so a `__name(…)` call binds to `functions.__name`. No
-	// standard library declaration uses this any more: printing moved onto the
-	// `Terminal` Namespace, whose natives are ordinary Namespace members. What is
-	// left is the generic `__`-sigil machinery, kept until the phase that removes
-	// it.
-	return {
-		type: "CallExpression",
-		optional: false,
-		callee: functionsModuleMember(node.name.name),
-		arguments: node.arguments.map((arg) => rewriteArgument(arg)),
 	}
 }
 

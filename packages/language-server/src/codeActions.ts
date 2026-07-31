@@ -979,9 +979,6 @@ function walkNode(
 			walkNode(node.name, visit)
 			walkArguments(node.arguments, visit)
 			return
-		case "NativeFunctionInvocation":
-			walkArguments(node.arguments, visit)
-			return
 		case "Combination":
 			walkNode(node.lhs, visit)
 			walkNode(node.rhs, visit)

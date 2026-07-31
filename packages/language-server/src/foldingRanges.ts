@@ -189,10 +189,6 @@ function collectFromNode(
 			collectFromNode(node.name, ranges)
 			collectFromArguments(node.arguments, ranges)
 			return
-		case "NativeFunctionInvocation":
-			addRange(ranges, node.position)
-			collectFromArguments(node.arguments, ranges)
-			return
 		case "Combination":
 			collectFromNode(node.lhs, ranges)
 			collectFromNode(node.rhs, ranges)

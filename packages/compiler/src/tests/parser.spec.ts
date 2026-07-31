@@ -7,53 +7,41 @@ import { parse, parseWithDiagnostics } from "../parser/index"
 
 describe("Parser", () => {
 	describe("Expressions", () => {
-		describe("NativeInvocations", () => {
-			it("should not parse NativePrefix without Identifier", () => {
+		// NOTE: `_` is a Symbol wherever the Lexer meets it — a wildcard Matcher,
+		// a labelless Parameter, a Number's group separator — and never a
+		// character inside a name. A leading `__` used to be the ONE exception:
+		// the sigil of a native free Function, whose name the Parser reassembled
+		// out of `_ _ name` at its declaration and at every call. Printing is the
+		// `Terminal` Namespace now, nothing carries the sigil, and the reassembly
+		// is gone with it — so an underscore in a name is refused wherever it
+		// stands, leading pair included, and there is no rule about `__` left to
+		// state.
+		describe("Underscores in names", () => {
+			it("should refuse a leading double underscore in Expression position", () => {
 				let { diagnostics } = parseWithDiagnostics(
-					"implementation { __ }",
+					"implementation { __print(1) }",
 				)
 
 				expect(containsErrors(diagnostics)).toBe(true)
 			})
 
-			it("should not parse NativeLookups without second Identifier", () => {
+			it("should refuse a leading double underscore where a name is declared", () => {
 				let { diagnostics } = parseWithDiagnostics(
-					"implementation { __lookup. }",
+					"implementation { constant __value = 1 }",
 				)
 
 				expect(containsErrors(diagnostics)).toBe(true)
 			})
 
-			it("should parse NativeFunctionInvocation with one argument", () => {
-				let input: parser.Program = parse(
-					"implementation { __lookup(arguments) }",
+			// NOTE: The same refusal, from the same Lexer rule — which is the
+			// point. A `__`-prefixed name is not a special case any more; it is an
+			// underscore inside a name, like every other one.
+			it("should refuse an underscore in the middle of a name", () => {
+				let { diagnostics } = parseWithDiagnostics(
+					"implementation { foo_bar(1) }",
 				)
 
-				expect(input).toMatchSnapshot()
-			})
-
-			it("should parse NativeFunctionInvocation with one argument with trailing comma", () => {
-				let input: parser.Program = parse(
-					"implementation { __lookup(argument,) }",
-				)
-
-				expect(input).toMatchSnapshot()
-			})
-
-			it("should parse NativeFunctionInvocation with multiple arguments", () => {
-				let input: parser.Program = parse(
-					"implementation { __lookup(argument, argument2) }",
-				)
-
-				expect(input).toMatchSnapshot()
-			})
-
-			it("should parse NativeFunctionInvocation with multiple arguments with trailing comma", () => {
-				let input: parser.Program = parse(
-					"implementation { __lookup(argument, argument2,) }",
-				)
-
-				expect(input).toMatchSnapshot()
+				expect(containsErrors(diagnostics)).toBe(true)
 			})
 		})
 
@@ -2189,19 +2177,20 @@ describe("Parser", () => {
 			}
 		})
 
-		it("should reassemble the __ sigil in a native free Function's name", () => {
-			let node = declarationsNode(
+		// NOTE: A declaration name is an ordinary Identifier — the Parser no longer
+		// reassembles a `__`-prefixed one out of `_ _ name`, so the standard
+		// library can not declare a native free Function whose name a Program
+		// could never spell back.
+		it("should refuse a double underscore in a native free Function's name", () => {
+			let { diagnostics } = parseWithDiagnostics(
 				`declarations {
 					§§ Prints a value.
 					function __native <infer Item>(_ value: Item) -> Item
 				}`,
+				{ allowDeclarationsHeader: true },
 			)
 
-			expect(node.nodeType).toBe("NativeFunctionStatement")
-
-			if (node.nodeType === "NativeFunctionStatement") {
-				expect(node.name.content).toBe("__native")
-			}
+			expect(containsErrors(diagnostics)).toBe(true)
 		})
 
 		it("should still parse a bodied free Function in declarations mode", () => {

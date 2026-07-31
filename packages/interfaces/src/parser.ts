@@ -82,7 +82,6 @@ export type ImplementationNode = ExpressionNode | StatementNode
 // #region Expressions
 
 export type ExpressionNode =
-	| NativeFunctionInvocationNode
 	| MethodInvocationNode
 	| FunctionInvocationNode
 	| ValueNode
@@ -112,13 +111,6 @@ export interface CaseValueNode {
 	typeArguments: Array<TypeDeclarationNode> | null
 	caseName: IdentifierNode
 	value: ExpressionNode | null
-	position: Position
-}
-
-export interface NativeFunctionInvocationNode {
-	nodeType: "NativeFunctionInvocation"
-	name: IdentifierNode
-	arguments: Array<ArgumentNode>
 	position: Position
 }
 

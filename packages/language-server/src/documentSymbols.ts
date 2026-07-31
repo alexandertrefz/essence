@@ -164,8 +164,6 @@ function symbolsOfNode(
 				...symbolsOfNode(node.base),
 				...symbolsOfArguments(node.arguments),
 			]
-		case "NativeFunctionInvocation":
-			return symbolsOfArguments(node.arguments)
 		case "Lookup":
 			return symbolsOfNode(node.base)
 		case "Combination":
@@ -560,9 +558,6 @@ function collectDetail(
 			return
 		case "MethodInvocation":
 			collectDetail(node.base, details)
-			collectArgumentDetails(node.arguments, details)
-			return
-		case "NativeFunctionInvocation":
 			collectArgumentDetails(node.arguments, details)
 			return
 		case "Lookup":

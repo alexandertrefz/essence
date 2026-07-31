@@ -110,9 +110,8 @@ export type WorkspaceCompletions = {
 	}>
 }
 
-// NOTE: Must be a valid Identifier on its own — `_` and `-` are Symbols, and
-// a leading `__` is the Native Function convention, so a plain camelCase
-// name is used instead.
+// NOTE: Must be a valid Identifier on its own — `_` and `-` are Symbols the
+// Lexer never puts inside a name, so a plain camelCase name is used.
 const probeMemberName = "lspProbeMember"
 
 // NOTE: Mirrors `forbiddenIdentifierCharacters` in rename.ts — anything the
@@ -406,8 +405,6 @@ function findProbeLookupInNode(
 			return findProbeLookupInNode(node.expression)
 		case "ProtocolDeclarationStatement":
 			return null
-		case "NativeFunctionInvocation":
-			return findProbeLookupInArguments(node.arguments)
 		case "MethodInvocation":
 			return (
 				findProbeLookupInNode(node.base) ??
@@ -1074,9 +1071,6 @@ function analyseCaseProbe(program: common.typed.Program): {
 				visitNode(node.base, null)
 				visitArguments(node.arguments, null)
 				return
-			case "NativeFunctionInvocation":
-				visitArguments(node.arguments, null)
-				return
 			case "Lookup":
 				visitNode(node.base, null)
 				return
@@ -1455,9 +1449,6 @@ function describeDeclarations(
 				return
 			case "MethodInvocation":
 				visitNode(node.base)
-				visitArguments(node.arguments)
-				return
-			case "NativeFunctionInvocation":
 				visitArguments(node.arguments)
 				return
 			case "Lookup":

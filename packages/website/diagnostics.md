@@ -180,10 +180,6 @@ conformance clause.
 **Quick Fix — "Change to 'X'":** replaces the name with the suggestion, when
 there is one.
 
-### `unknown-native-function`
-
-`__(…)` names a native Function the Compiler does not provide.
-
 ### `unknown-member`
 
 A Record, Case or Namespace does not have the member that was looked up.

@@ -514,11 +514,6 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 		case "Identifier":
 			visitIdentifier(node, state)
 			return
-		case "NativeFunctionInvocation":
-			consider(state, node.position, node.type, null)
-			visitIdentifier(node.name, state)
-			visitArguments(node.arguments, state)
-			return
 		case "MethodInvocation": {
 			consider(state, node.position, node.type, null)
 			visitNode(node.base, state)

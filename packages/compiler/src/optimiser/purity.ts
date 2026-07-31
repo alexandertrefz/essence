@@ -78,11 +78,11 @@ export function isPureExpression(
 		// those references. Nothing in either runs.
 		case "ConformanceValue":
 			return node.conditions.every(isPure)
-		// NOTE: A call, and the whole of what this function refuses. A native
-		// Function is `Terminal.write` itself for all it can tell here, a
-		// Function-valued Expression is whatever was bound to it, and a Union
-		// dispatch is a Method call with a search in front of it.
-		case "NativeFunctionInvocation":
+		// NOTE: A call, and the whole of what this function refuses. A
+		// Function-valued Expression is whatever was bound to it — a native free
+		// Function such as `loop`, which runs the callbacks it is handed, among
+		// them — and a Union dispatch is a Method call with a search in front of
+		// it.
 		case "FunctionInvocation":
 		case "UnionMethodInvocation":
 			return false
