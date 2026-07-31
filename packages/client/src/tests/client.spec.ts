@@ -20,6 +20,7 @@ import {
 } from "../bridge"
 import { EssenceCompileError } from "../errors"
 import { type EssenceModule, loadModule } from "../index"
+import { EssenceRational } from "../rational"
 
 // NOTE: Every load in this file caches into a directory of its own, so that a
 // run touches neither the developer's real cache nor another test's.
@@ -137,6 +138,20 @@ describe("Loading a Module", () => {
 		expect(tagOf(math.bridge, pi)).toBe("Rational")
 		expect(fieldOf(pi, "numerator")).toBe(314n)
 		expect(fieldOf(pi, "denominator")).toBe(100n)
+	})
+
+	// NOTE: And the same constant as JavaScript, which is what a host that never
+	// wants to know about a Type key came for. The parts are held UNREDUCED by
+	// the runtime — `314/100` is what the source wrote — and reduced on the way
+	// out, because a Rational on this side has one spelling per value.
+	it("hands back its constants as JavaScript values", async () => {
+		let math = await loadModule(fixturePath("modules", "math", "Math.es"), {
+			cacheDirectory,
+		})
+
+		expect(Object.keys(math.exports)).toEqual(["PI"])
+		expect((math.exports.PI as EssenceRational).toString()).toBe("157/50")
+		expect((math.exports.PI as EssenceRational).toNumber()).toBe(3.14)
 	})
 
 	it("takes a Record built through the bridge", async () => {

@@ -42,13 +42,20 @@ export class EssenceCompileError extends Error {
 }
 
 // NOTE: A value that does not fit the Type on the other side of the boundary,
-// in either direction. Marshalling arrives in a later slice; the Error exists
-// now so that nothing has to invent a second name for the same failure.
+// in either direction.
+//
+// NOTE: `path` says WHERE, as the message already does — `argument 2 →
+// .items[0].width`. It is carried apart from the prose so that a host can group,
+// match or point an editor at the failure without reading the sentence back
+// again, which is the one thing a caught Error's message is bad at.
 export class EssenceMarshalError extends Error {
-	constructor(message: string) {
+	readonly path: string
+
+	constructor(message: string, path = "") {
 		super(message)
 
 		this.name = "EssenceMarshalError"
+		this.path = path
 	}
 }
 
