@@ -108,9 +108,7 @@
 				"editor.detectIndentation": false,
 				"editor.insertSpaces": false,
 				"editor.tabSize": 4,
-				"editor.rulers": [
-					80
-				],
+				"editor.rulers": [],
 				"editor.defaultFormatter": "essence.essence-language",
 				"editor.semanticHighlighting.enabled": true
 			}
