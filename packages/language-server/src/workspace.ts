@@ -1308,7 +1308,6 @@ function topLevelDeclarations(
 				remember(node.name, "variable")
 				break
 			case "FunctionStatement":
-			case "NativeFunctionStatement":
 			case "OverloadedFunctionStatement":
 				remember(node.name, "function")
 				break

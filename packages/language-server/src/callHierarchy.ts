@@ -295,19 +295,6 @@ function collectItemsFromNode(
 			// container does not travel into bodies.
 			collectItems(node.value.body, null, items)
 			return
-		case "NativeFunctionStatement":
-			addItem(
-				{
-					name: node.name.content,
-					kind: "function",
-					container,
-					range: node.position,
-					selectionRange: node.name.position,
-				},
-				items,
-			)
-
-			return
 		case "OverloadedFunctionStatement":
 			addItem(
 				{

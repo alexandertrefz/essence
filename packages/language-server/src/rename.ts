@@ -459,7 +459,6 @@ function topLevelNames(program: parser.Program): Set<string> {
 			case "ConstantDeclarationStatement":
 			case "VariableDeclarationStatement":
 			case "FunctionStatement":
-			case "NativeFunctionStatement":
 			case "OverloadedFunctionStatement":
 			case "NamespaceDefinitionStatement":
 			case "TypeAliasStatement":

@@ -2147,34 +2147,28 @@ describe("Parser", () => {
 			}
 		})
 
-		// NOTE: The free-Function counterparts of the body-less Method forms —
-		// only a `declarations { … }` Program produces them, and only the
-		// standard library opens one.
+		// NOTE: The free-Function forms of a `declarations { … }` Program —
+		// only the standard library opens one.
 		function declarationsNode(source: string): parser.ImplementationNode {
 			let program = parse(source, { allowDeclarationsHeader: true })
 
 			return program.implementation.nodes[0]
 		}
 
-		it("should parse a body-less native free Function", () => {
-			let node = declarationsNode(
+		// NOTE: The standalone body-less form left the language with `__print`
+		// — a native free Function exists only as an `overload function`
+		// entry now, so a free `function` signature with no block is the
+		// plain missing-body parse error in every mode.
+		it("should refuse a body-less free Function in declarations mode", () => {
+			let { diagnostics } = parseWithDiagnostics(
 				`declarations {
 					§§ Answers with the value it was given.
 					function identity <infer Item>(_ value: Item) -> Item
 				}`,
+				{ allowDeclarationsHeader: true },
 			)
 
-			expect(node.nodeType).toBe("NativeFunctionStatement")
-
-			if (node.nodeType === "NativeFunctionStatement") {
-				expect(node.name.content).toBe("identity")
-				expect(node.signature.nodeType).toBe("NativeMethodSignature")
-				expect(node.signature.generics).toHaveLength(1)
-				expect(node.signature.parameters).toHaveLength(1)
-				expect(node.documentation?.description).toBe(
-					"Answers with the value it was given.",
-				)
-			}
+			expect(containsErrors(diagnostics)).toBe(true)
 		})
 
 		// NOTE: A declaration name is an ordinary Identifier — the Parser no longer

@@ -921,40 +921,13 @@ class DescentParser {
 		return { name, type }
 	}
 
-	protected parseFunctionStatement():
-		| parser.FunctionStatementNode
-		| parser.NativeFunctionStatementNode {
+	// NOTE: A free `function` always carries a body, in every mode. A native
+	// free Function exists only as an `overload function` entry — the
+	// body-less non-overloaded form left with `__print`, the last declaration
+	// that used it — so a signature with no block gets the plain "Expected
+	// '{'" the missing body is.
+	protected parseFunctionStatement(): parser.FunctionStatementNode {
 		let keyword = this.tokens.expect(TokenType.KeywordFunction)
-
-		// NOTE: A `declarations { … }` Program's free `function` may be body-less
-		// — a native signature bound to a runtime export by name — exactly as a
-		// Namespace Method may. `parseMethodBodyOrSignature` decides which by
-		// whether a block follows; the bodied branch it returns is identical to
-		// what `parseOptionallyGenericFunctionLiteral` builds for a user Program.
-		if (this.mode === "declarations") {
-			let name = this.parseIdentifier()
-			let documentation = this.tokens.documentationAbove(
-				keyword.position.start.line,
-			)
-			let result = this.parseMethodBodyOrSignature()
-
-			if (result.nodeType === "NativeMethodSignature") {
-				return generators.nativeFunctionStatement(
-					name,
-					result,
-					{
-						start: keyword.position.start,
-						end: result.position.end,
-					},
-					documentation,
-				)
-			}
-
-			return generators.functionStatement(name, result.value, {
-				start: keyword.position.start,
-				end: result.position.end,
-			})
-		}
 
 		let name = this.parseIdentifier()
 		let value = this.parseOptionallyGenericFunctionLiteral()

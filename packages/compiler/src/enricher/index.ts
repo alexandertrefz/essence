@@ -30,7 +30,6 @@ import {
 	referencedTypeNames,
 	resolveChoiceDeclarationStatementType,
 	resolveFunctionSignatureType,
-	resolveNativeFunctionStatementType,
 	resolveOverloadedFunctionStatementType,
 	resolveProtocolDeclarationStatementType,
 } from "./resolvers"
@@ -316,7 +315,6 @@ type HoistableStatementNode =
 	| parser.TypeAliasStatementNode
 	| parser.ChoiceDeclarationStatementNode
 	| parser.FunctionStatementNode
-	| parser.NativeFunctionStatementNode
 	| parser.OverloadedFunctionStatementNode
 	| parser.NamespaceDefinitionStatementNode
 	| parser.ProtocolDeclarationStatementNode
@@ -328,7 +326,6 @@ function isHoistable(
 		node.nodeType === "TypeAliasStatement" ||
 		node.nodeType === "ChoiceDeclarationStatement" ||
 		node.nodeType === "FunctionStatement" ||
-		node.nodeType === "NativeFunctionStatement" ||
 		node.nodeType === "OverloadedFunctionStatement" ||
 		node.nodeType === "NamespaceDefinitionStatement" ||
 		node.nodeType === "ProtocolDeclarationStatement"
@@ -971,13 +968,6 @@ function hoistDeclarationsInner(
 								scope,
 							)
 						} else if (
-							node.nodeType === "NativeFunctionStatement"
-						) {
-							return resolveNativeFunctionStatementType(
-								node,
-								scope,
-							)
-						} else if (
 							node.nodeType === "OverloadedFunctionStatement"
 						) {
 							return resolveOverloadedFunctionStatementType(
@@ -1063,7 +1053,6 @@ function hoistDeclarationsInner(
 
 				if (
 					node.nodeType === "FunctionStatement" ||
-					node.nodeType === "NativeFunctionStatement" ||
 					node.nodeType === "OverloadedFunctionStatement" ||
 					node.nodeType === "NamespaceDefinitionStatement"
 				) {
@@ -1188,16 +1177,6 @@ const enrichImplementation = (
 	return {
 		nodeType: "ImplementationSection",
 		nodes: implementation.nodes.flatMap((node) => {
-			// NOTE: A native free Function declares a name bound to a runtime
-			// export and has nothing to emit — no body — so it carries no typed
-			// Node into the tree, exactly as a native Namespace Method carries
-			// none; the Rewriter reaches it through the runtime bindings. An
-			// `overload function` block is handled inside the try below, because
-			// its BODIED entries DO carry Nodes (its native entries do not).
-			if (node.nodeType === "NativeFunctionStatement") {
-				return []
-			}
-
 			// NOTE: Expected errors are reported as Diagnostics and recovered
 			// from in place — anything thrown past this point is a Compiler
 			// bug. It is reported as a Diagnostic as well, so that a single
