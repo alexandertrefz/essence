@@ -122,12 +122,11 @@ let samples: Array<Sample> = [
 	{
 		name: "Transcendental",
 		type: { type: "Transcendental" },
-		// NOTE: π, as `0 + 1·π`.
+		// NOTE: π, as the single-term span `0 + 1·π`.
 		values: [
-			createTranscendental(
-				{ numerator: 0n, denominator: 1n },
-				{ numerator: 1n, denominator: 1n },
-			),
+			createTranscendental({ numerator: 0n, denominator: 1n }, [
+				{ base: "π", coefficient: { numerator: 1n, denominator: 1n } },
+			]),
 		],
 	},
 	{

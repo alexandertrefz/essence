@@ -22,68 +22,23 @@ import type { StringType } from "./String"
 import { createString } from "./String"
 import { typeKeySymbol } from "./type"
 
-// NOTE: The linear-in-π slice of the transcendentals: every value is
-// `rationalPart + piCoefficient·π` with a non-zero piCoefficient, held as
-// reduced bigint rationals. Within this grammar equality is canonical-form
-// equality — and because π is provably transcendental, a value here can never
-// equal an Integer, Rational or Algebraic, which is what keeps every
-// cross-kind comparison in `Number` total.
-export type TranscendentalType = {
-	[typeKeySymbol]: "Transcendental"
-	rationalPartNumerator: bigint
-	rationalPartDenominator: bigint
-	piCoefficientNumerator: bigint
-	piCoefficientDenominator: bigint
-}
+// NOTE: The linear span of the transcendentals over a registry of named
+// constant bases: every value is `rationalPart + Σ coefficient·base` with at
+// least one term, held as reduced bigint rationals over canonically-ordered,
+// zero-free terms. The basis is DATA — adding a constant is a registry entry
+// and an enclosure routine, not a change to the arithmetic. Within this
+// grammar equality is canonical-form equality. A value with a SINGLE term can
+// never equal an Integer, Rational or Algebraic — each registered base is
+// provably transcendental — which keeps those comparisons total. A value
+// carrying SEVERAL bases is different: whether such a combination can ever be
+// algebraic is an open problem (already for π + e), so the comparisons that
+// meet one run an interval refinement that terminates unless the two values
+// are equal — conjecturally never (Schanuel) — and give up at a deep,
+// documented precision cutoff instead of looping forever.
 
-// #region Construction
+// #region Basis registry
 
-export function createTranscendental(
-	rationalPart: BigRational,
-	piCoefficient: BigRational,
-): TranscendentalType | RationalType {
-	const reducedRationalPart = reduced(
-		rationalPart.numerator,
-		rationalPart.denominator,
-	)
-	const reducedPiCoefficient = reduced(
-		piCoefficient.numerator,
-		piCoefficient.denominator,
-	)
-
-	if (reducedPiCoefficient.numerator === 0n) {
-		return createRational(
-			reducedRationalPart.numerator,
-			reducedRationalPart.denominator,
-		)
-	}
-
-	return {
-		[typeKeySymbol]: "Transcendental",
-		rationalPartNumerator: reducedRationalPart.numerator,
-		rationalPartDenominator: reducedRationalPart.denominator,
-		piCoefficientNumerator: reducedPiCoefficient.numerator,
-		piCoefficientDenominator: reducedPiCoefficient.denominator,
-	}
-}
-
-function rationalPartOf(transcendental: TranscendentalType): BigRational {
-	return {
-		numerator: transcendental.rationalPartNumerator,
-		denominator: transcendental.rationalPartDenominator,
-	}
-}
-
-function piCoefficientOf(transcendental: TranscendentalType): BigRational {
-	return {
-		numerator: transcendental.piCoefficientNumerator,
-		denominator: transcendental.piCoefficientDenominator,
-	}
-}
-
-// #endregion
-
-// #region π enclosure
+type ScaledEnclosure = (digits: bigint) => { low: bigint; high: bigint }
 
 // NOTE: floor(π·10^digits) and its successor via Machin's formula,
 // π = 16·arctan(1/5) − 4·arctan(1/239), on scaled bigints. A few guard
@@ -118,65 +73,331 @@ function scaledPi(digits: bigint): { low: bigint; high: bigint } {
 	}
 }
 
+// NOTE: Everything the rest of this module knows about a base: the symbol a
+// term prints under — also its identity in the representation — and a
+// certified enclosure of its value. Registration order is canonical term
+// order, which is what keeps structural equality a plain walk. Every entry
+// must be a PROVABLY transcendental constant: single-term totality rests on
+// it, and `createTranscendental` is gated on membership here.
+const bases = new Map<string, ScaledEnclosure>([["π", scaledPi]])
+
+const baseOrder = new Map([...bases.keys()].map((key, index) => [key, index]))
+
+function enclosureOf(base: string): ScaledEnclosure {
+	const enclosure = bases.get(base)
+
+	if (enclosure === undefined) {
+		throw new Error(`'${base}' is not a registered transcendental base.`)
+	}
+
+	return enclosure
+}
+
+// #endregion
+
+export type TranscendentalTerm = {
+	base: string
+	coefficientNumerator: bigint
+	coefficientDenominator: bigint
+}
+
+export type TranscendentalType = {
+	[typeKeySymbol]: "Transcendental"
+	rationalPartNumerator: bigint
+	rationalPartDenominator: bigint
+	// NOTE: Canonically ordered by base registration, free of zero
+	// coefficients, at most one term per base, never empty — `createTranscendental`
+	// enforces all four, and everything below relies on them.
+	terms: Array<TranscendentalTerm>
+}
+
+// #region Construction
+
+// NOTE: The canonical term list of a coefficient map: reduced, zero-free,
+// in registration order. Shared by the gateway and by the difference forms
+// the comparisons build.
+function canonicalTerms(
+	coefficients: ReadonlyArray<{ base: string; coefficient: BigRational }>,
+): Array<TranscendentalTerm> {
+	const merged = new Map<string, BigRational>()
+
+	for (const { base, coefficient } of coefficients) {
+		enclosureOf(base)
+
+		const running = merged.get(base)
+
+		merged.set(
+			base,
+			running === undefined
+				? coefficient
+				: addRationals(running, coefficient),
+		)
+	}
+
+	return [...merged.entries()]
+		.map(([base, coefficient]) => ({
+			base,
+			coefficient: reduced(
+				coefficient.numerator,
+				coefficient.denominator,
+			),
+		}))
+		.filter(({ coefficient }) => coefficient.numerator !== 0n)
+		.sort((a, b) => baseOrder.get(a.base)! - baseOrder.get(b.base)!)
+		.map(({ base, coefficient }) => ({
+			base,
+			coefficientNumerator: coefficient.numerator,
+			coefficientDenominator: coefficient.denominator,
+		}))
+}
+
+export function createTranscendental(
+	rationalPart: BigRational,
+	coefficients: ReadonlyArray<{ base: string; coefficient: BigRational }>,
+): TranscendentalType | RationalType {
+	const reducedRationalPart = reduced(
+		rationalPart.numerator,
+		rationalPart.denominator,
+	)
+	const terms = canonicalTerms(coefficients)
+
+	if (terms.length === 0) {
+		return createRational(
+			reducedRationalPart.numerator,
+			reducedRationalPart.denominator,
+		)
+	}
+
+	return {
+		[typeKeySymbol]: "Transcendental",
+		rationalPartNumerator: reducedRationalPart.numerator,
+		rationalPartDenominator: reducedRationalPart.denominator,
+		terms,
+	}
+}
+
+function rationalPartOf(transcendental: TranscendentalType): BigRational {
+	return {
+		numerator: transcendental.rationalPartNumerator,
+		denominator: transcendental.rationalPartDenominator,
+	}
+}
+
+function coefficientOf(term: TranscendentalTerm): BigRational {
+	return {
+		numerator: term.coefficientNumerator,
+		denominator: term.coefficientDenominator,
+	}
+}
+
+function coefficientsOf(
+	transcendental: TranscendentalType,
+): Array<{ base: string; coefficient: BigRational }> {
+	return transcendental.terms.map((term) => ({
+		base: term.base,
+		coefficient: coefficientOf(term),
+	}))
+}
+
+function scaledCoefficients(
+	transcendental: TranscendentalType,
+	factor: BigRational,
+): Array<{ base: string; coefficient: BigRational }> {
+	return transcendental.terms.map((term) => ({
+		base: term.base,
+		coefficient: multiplyRationals(coefficientOf(term), factor),
+	}))
+}
+
+// #endregion
+
+// #region Sign decisions
+
+// NOTE: The refinement depth at which the conjecturally-total comparisons stop.
+// Only a comparison whose difference carries SEVERAL bases can reach it —
+// deciding such a tie would settle an open problem (is `b·π + c·e` ever
+// algebraic?), so past this depth the runtime reports the impasse instead of
+// looping forever.
+const precisionCutoffDigits = 32768n
+
+function throwPrecisionCutoff(): never {
+	throw new Error(
+		"Comparing these two numbers exceeded the precision cutoff of " +
+			`${precisionCutoffDigits} digits. They combine several ` +
+			"transcendental constants, agree to that depth, and deciding " +
+			"whether such a pair is exactly equal is an open problem in " +
+			"mathematics.",
+	)
+}
+
+// NOTE: A certified enclosure of `rationalPart + Σ coefficient·base`, scaled
+// by 10^digits. Each base's enclosure is computed only when a term carries it.
+function scaledFormInterval(
+	rationalPart: BigRational,
+	terms: ReadonlyArray<TranscendentalTerm>,
+	digits: bigint,
+): { low: bigint; high: bigint } {
+	const scale = 10n ** digits
+	const scaledRationalPart =
+		(rationalPart.numerator * scale) / rationalPart.denominator
+
+	let low = scaledRationalPart - 2n
+	let high = scaledRationalPart + 2n
+
+	for (const term of terms) {
+		const enclosure = enclosureOf(term.base)(digits)
+		const candidates = [
+			(term.coefficientNumerator * enclosure.low) /
+				term.coefficientDenominator,
+			(term.coefficientNumerator * enclosure.high) /
+				term.coefficientDenominator,
+		]
+
+		low +=
+			(candidates[0] < candidates[1] ? candidates[0] : candidates[1]) - 2n
+		high +=
+			(candidates[0] > candidates[1] ? candidates[0] : candidates[1]) + 2n
+	}
+
+	return { low, high }
+}
+
 // NOTE: A certified enclosure of the value, scaled by 10^digits.
 export function scaledTranscendentalInterval(
 	transcendental: TranscendentalType,
 	digits: bigint,
 ): { low: bigint; high: bigint } {
-	const scale = 10n ** digits
-	const pi = scaledPi(digits)
-	const coefficient = piCoefficientOf(transcendental)
-	const rationalPart = rationalPartOf(transcendental)
+	return scaledFormInterval(
+		rationalPartOf(transcendental),
+		transcendental.terms,
+		digits,
+	)
+}
 
-	const candidates = [
-		(coefficient.numerator * pi.low) / coefficient.denominator,
-		(coefficient.numerator * pi.high) / coefficient.denominator,
-	]
-	const scaledRationalPart =
-		(rationalPart.numerator * scale) / rationalPart.denominator
+// NOTE: The sign of `base − rational` for a provably irrational base. The loop
+// terminates *because* the base can never equal the rational, so the
+// enclosures must eventually separate.
+function signOfBaseMinusRational(
+	base: ScaledEnclosure,
+	rational: BigRational,
+): -1n | 1n {
+	for (let digits = 8n; ; digits *= 2n) {
+		const scale = 10n ** digits
+		const enclosure = base(digits)
+		const scaledRational =
+			(rational.numerator * scale) / rational.denominator
 
-	return {
-		low:
-			scaledRationalPart +
-			(candidates[0] < candidates[1] ? candidates[0] : candidates[1]) -
-			2n,
-		high:
-			scaledRationalPart +
-			(candidates[0] > candidates[1] ? candidates[0] : candidates[1]) +
-			2n,
+		if (enclosure.high < scaledRational - 1n) {
+			return -1n
+		}
+
+		if (enclosure.low > scaledRational + 1n) {
+			return 1n
+		}
 	}
 }
 
+// NOTE: The sign of `A + B·base` with B ≠ 0 — such a value being zero would
+// make the base rational, so the sign is decided by comparing the base against
+// the rational threshold −A/B. Total, no cutoff needed.
+function signOfSingleBaseForm(
+	base: ScaledEnclosure,
+	rationalPart: BigRational,
+	coefficient: BigRational,
+): -1n | 1n {
+	const threshold = divideRationals(
+		{
+			numerator: -rationalPart.numerator,
+			denominator: rationalPart.denominator,
+		},
+		coefficient,
+	)
+	const baseSideSign = signOfBaseMinusRational(base, threshold)
+
+	return coefficient.numerator > 0n
+		? baseSideSign
+		: (-baseSideSign as -1n | 1n)
+}
+
+// NOTE: The sign of a form carrying several bases. Zero here would settle an
+// open problem — conjecturally impossible (Schanuel), never witnessed — so
+// the refinement runs to the documented cutoff.
+function signOfMixedForm(
+	rationalPart: BigRational,
+	terms: ReadonlyArray<TranscendentalTerm>,
+): -1n | 1n {
+	for (let digits = 8n; ; digits *= 2n) {
+		if (digits > precisionCutoffDigits) {
+			throwPrecisionCutoff()
+		}
+
+		const enclosure = scaledFormInterval(rationalPart, terms, digits)
+
+		if (enclosure.high < 0n) {
+			return -1n
+		}
+
+		if (enclosure.low > 0n) {
+			return 1n
+		}
+	}
+}
+
+// NOTE: The sign of a non-zero `A + Σ B·base` with at least one term — the
+// single-base case is exact and total, only a several-base form runs the
+// cutoff refinement.
+function signOfForm(
+	rationalPart: BigRational,
+	terms: ReadonlyArray<TranscendentalTerm>,
+): -1n | 1n {
+	if (terms.length === 1) {
+		const term = terms[0]!
+
+		return signOfSingleBaseForm(
+			enclosureOf(term.base),
+			rationalPart,
+			coefficientOf(term),
+		)
+	}
+
+	return signOfMixedForm(rationalPart, terms)
+}
+
 // NOTE: The sign of `transcendental − other` for any non-transcendental
-// operand. The loop terminates *because* equality is impossible — the two
-// values are of provably different kinds, so their enclosures must
-// eventually separate.
+// operand. Against an Integer or Rational the difference is again a form this
+// module can sign directly. Against an Algebraic the loop refines both
+// enclosures; it terminates whenever the transcendental carries a single base
+// — equality across those kinds is provably impossible — and runs to the
+// documented cutoff when it carries several.
 export function signRelativeTo(
 	transcendental: TranscendentalType,
 	other: IntegerType | RationalType | AlgebraicType,
 ): -1n | 1n {
+	if (other[typeKeySymbol] !== "Algebraic") {
+		return signOfForm(
+			subtractRationals(
+				rationalPartOf(transcendental),
+				bigRationalOf(other),
+			),
+			transcendental.terms,
+		)
+	}
+
+	const mixed = transcendental.terms.length > 1
+
 	for (let digits = 8n; ; digits *= 2n) {
-		const scale = 10n ** digits
-		const enclosure = scaledTranscendentalInterval(transcendental, digits)
-
-		let otherLow: bigint
-		let otherHigh: bigint
-
-		if (other[typeKeySymbol] === "Algebraic") {
-			const otherEnclosure = scaledIntervalOf(other, digits)
-			otherLow = otherEnclosure.low
-			otherHigh = otherEnclosure.high
-		} else {
-			const rational = bigRationalOf(other)
-			otherLow = (rational.numerator * scale) / rational.denominator - 1n
-			otherHigh = otherLow + 2n
+		if (mixed && digits > precisionCutoffDigits) {
+			throwPrecisionCutoff()
 		}
 
-		if (enclosure.high < otherLow) {
+		const enclosure = scaledTranscendentalInterval(transcendental, digits)
+		const otherEnclosure = scaledIntervalOf(other, digits)
+
+		if (enclosure.high < otherEnclosure.low) {
 			return -1n
 		}
 
-		if (enclosure.low > otherHigh) {
+		if (enclosure.low > otherEnclosure.high) {
 			return 1n
 		}
 	}
@@ -187,8 +408,8 @@ export function signRelativeTo(
 // #region Methods
 
 // NOTE: Canonical-form equality, decided structurally: `createTranscendental`
-// reduces both components and `reduced` puts the sign in the numerator, so two
-// values are the same number exactly when all four bigints agree. Native
+// reduces, orders and de-zeroes every component, so two values are the same
+// number exactly when their rational parts and term lists agree. Native
 // because this Namespace has no ordering to write equality on — the Essence
 // body it replaces asked the covering `Number`, which put the whole numeric
 // tower behind an equality check.
@@ -200,16 +421,25 @@ export function is(
 		transcendental.rationalPartNumerator === other.rationalPartNumerator &&
 			transcendental.rationalPartDenominator ===
 				other.rationalPartDenominator &&
-			transcendental.piCoefficientNumerator ===
-				other.piCoefficientNumerator &&
-			transcendental.piCoefficientDenominator ===
-				other.piCoefficientDenominator,
+			transcendental.terms.length === other.terms.length &&
+			transcendental.terms.every((term, index) => {
+				const otherTerm = other.terms[index]!
+
+				return (
+					term.base === otherTerm.base &&
+					term.coefficientNumerator ===
+						otherTerm.coefficientNumerator &&
+					term.coefficientDenominator ===
+						otherTerm.coefficientDenominator
+				)
+			}),
 	)
 }
 
-// NOTE: A Transcendental is never zero — `a + b·π = 0` with b ≠ 0 would make π
-// rational, and a zero b makes the value a Rational at construction — so it is
-// below its own negation exactly when it is negative, and the exact comparison
+// NOTE: A Transcendental is never zero — a single-term `a + b·B = 0` with
+// b ≠ 0 would make that base rational, a several-base zero would settle an
+// open problem, and a value with no terms is a Rational at construction — so
+// it is below its own negation exactly when it is negative, and the comparison
 // below decides that with no zero value to build. Native because the sign
 // reaches no primitive this Namespace declares: Transcendental deliberately
 // does not conform to Comparable, and the Essence body this replaces borrowed
@@ -226,8 +456,9 @@ export function absolute(
 		: transcendental
 }
 
-// NOTE: Exact within the linear grammar: the difference is again
-// `A + B·π`; its sign is B's sign when B ≠ 0 (π-dominance), else A's.
+// NOTE: The difference of two values is again a form in the span; its sign is
+// decided by `signOfForm` — exactly for single-base differences, through the
+// cutoff refinement for several-base ones.
 export function compareTranscendentals(
 	transcendental: TranscendentalType,
 	other: TranscendentalType,
@@ -236,12 +467,12 @@ export function compareTranscendentals(
 		rationalPartOf(transcendental),
 		rationalPartOf(other),
 	)
-	const piDifference = subtractRationals(
-		piCoefficientOf(transcendental),
-		piCoefficientOf(other),
-	)
+	const differenceTerms = canonicalTerms([
+		...coefficientsOf(transcendental),
+		...scaledCoefficients(other, { numerator: -1n, denominator: 1n }),
+	])
 
-	if (piDifference.numerator === 0n) {
+	if (differenceTerms.length === 0) {
 		if (rationalDifference.numerator === 0n) {
 			return equal
 		}
@@ -249,37 +480,7 @@ export function compareTranscendentals(
 		return rationalDifference.numerator < 0n ? less : greater
 	}
 
-	// NOTE: A + B·π = 0 with B ≠ 0 would make π rational; so the sign is
-	// decided by comparing π against the rational −A/B.
-	const threshold = divideRationals(
-		{
-			numerator: -rationalDifference.numerator,
-			denominator: rationalDifference.denominator,
-		},
-		piDifference,
-	)
-	const piSideSign = signOfPiMinusRational(threshold)
-
-	return (piDifference.numerator > 0n ? piSideSign : -piSideSign) < 0n
-		? less
-		: greater
-}
-
-function signOfPiMinusRational(rational: BigRational): -1n | 1n {
-	for (let digits = 8n; ; digits *= 2n) {
-		const scale = 10n ** digits
-		const pi = scaledPi(digits)
-		const scaledRational =
-			(rational.numerator * scale) / rational.denominator
-
-		if (pi.high < scaledRational - 1n) {
-			return -1n
-		}
-
-		if (pi.low > scaledRational + 1n) {
-			return 1n
-		}
-	}
+	return signOfForm(rationalDifference, differenceTerms) < 0n ? less : greater
 }
 
 export function add(
@@ -288,7 +489,7 @@ export function add(
 ): TranscendentalType {
 	return createTranscendental(
 		addRationals(rationalPartOf(transcendental), bigRationalOf(other)),
-		piCoefficientOf(transcendental),
+		coefficientsOf(transcendental),
 	) as TranscendentalType
 }
 
@@ -300,7 +501,7 @@ export function multiply(
 
 	return createTranscendental(
 		multiplyRationals(rationalPartOf(transcendental), factor),
-		multiplyRationals(piCoefficientOf(transcendental), factor),
+		scaledCoefficients(transcendental, factor),
 	)
 }
 
@@ -314,28 +515,28 @@ export function divide(
 		return createEmpty()
 	}
 
+	const reciprocal = {
+		numerator: divisor.denominator,
+		denominator: divisor.numerator,
+	}
+
 	return createValue(
 		createTranscendental(
 			divideRationals(rationalPartOf(transcendental), divisor),
-			divideRationals(piCoefficientOf(transcendental), divisor),
+			scaledCoefficients(transcendental, reciprocal),
 		) as TranscendentalType,
 	)
 }
 
 // NOTE: `value − transcendental`, for the commuted overloads on Integer and
-// Rational — total, since the π-coefficient merely flips sign.
+// Rational — total, since the term coefficients merely flip sign.
 export function subtractedFrom(
 	transcendental: TranscendentalType,
 	value: IntegerType | RationalType,
 ): TranscendentalType {
-	const coefficient = piCoefficientOf(transcendental)
-
 	return createTranscendental(
 		subtractRationals(bigRationalOf(value), rationalPartOf(transcendental)),
-		{
-			numerator: -coefficient.numerator,
-			denominator: coefficient.denominator,
-		},
+		scaledCoefficients(transcendental, { numerator: -1n, denominator: 1n }),
 	) as TranscendentalType
 }
 
@@ -345,25 +546,50 @@ export function addTranscendental(
 ): TranscendentalType | RationalType {
 	return createTranscendental(
 		addRationals(rationalPartOf(transcendental), rationalPartOf(other)),
-		addRationals(piCoefficientOf(transcendental), piCoefficientOf(other)),
+		[...coefficientsOf(transcendental), ...coefficientsOf(other)],
 	)
 }
 
-// NOTE: A quotient of two linear-in-π values is representable exactly when
-// they are proportional — π/π = 1, Tau/Pi = 2, (1 + π)/(2 + 2·π) = 1/2.
-// Anything else leaves the grammar and comes back empty.
+// NOTE: A quotient of two values in the span is representable exactly when
+// they are proportional — π/π = 1, Tau/Pi = 2, (1 + π)/(2 + 2·π) = 1/2 — and
+// proportionality is componentwise: the term lists must carry the same bases,
+// every part must scale by the same ratio, read off the divisor's first term.
+// Anything else — π/e most famously — leaves the grammar and comes back empty.
 export function divideByTranscendental(
 	transcendental: TranscendentalType,
 	other: TranscendentalType,
 ): OptionalType<RationalType> {
+	if (transcendental.terms.length !== other.terms.length) {
+		return createEmpty()
+	}
+
 	const ratio = divideRationals(
-		piCoefficientOf(transcendental),
-		piCoefficientOf(other),
+		coefficientOf(transcendental.terms[0]!),
+		coefficientOf(other.terms[0]!),
 	)
-	const scaledRationalPart = multiplyRationals(rationalPartOf(other), ratio)
+
+	const componentPairs: Array<[BigRational, BigRational]> = [
+		[rationalPartOf(transcendental), rationalPartOf(other)],
+		...transcendental.terms.map(
+			(term, index): [BigRational, BigRational] => [
+				coefficientOf(term),
+				coefficientOf(other.terms[index]!),
+			],
+		),
+	]
+
+	const sameBases = transcendental.terms.every(
+		(term, index) => term.base === other.terms[index]!.base,
+	)
 	const isProportional =
-		subtractRationals(rationalPartOf(transcendental), scaledRationalPart)
-			.numerator === 0n
+		sameBases &&
+		componentPairs.every(
+			([component, otherComponent]) =>
+				subtractRationals(
+					component,
+					multiplyRationals(otherComponent, ratio),
+				).numerator === 0n,
+		)
 
 	if (!isProportional) {
 		return createEmpty()
@@ -372,16 +598,19 @@ export function divideByTranscendental(
 	return createValue(createRational(ratio.numerator, ratio.denominator))
 }
 
-// NOTE: Negation flips both components and keeps the π coefficient non-zero,
-// so the result stays a Transcendental without consulting the
-// `createTranscendental` gateway.
+// NOTE: Negation flips the rational part and every term, and cannot create a
+// zero coefficient or disturb the canonical order, so the result stays a
+// Transcendental without consulting the `createTranscendental` gateway.
 export function negate(transcendental: TranscendentalType): TranscendentalType {
 	return {
 		[typeKeySymbol]: "Transcendental",
 		rationalPartNumerator: -transcendental.rationalPartNumerator,
 		rationalPartDenominator: transcendental.rationalPartDenominator,
-		piCoefficientNumerator: -transcendental.piCoefficientNumerator,
-		piCoefficientDenominator: transcendental.piCoefficientDenominator,
+		terms: transcendental.terms.map((term) => ({
+			base: term.base,
+			coefficientNumerator: -term.coefficientNumerator,
+			coefficientDenominator: term.coefficientDenominator,
+		})),
 	}
 }
 
@@ -399,28 +628,34 @@ function formatRational(rational: BigRational): string {
 
 export function toString(transcendental: TranscendentalType): StringType {
 	const rationalPart = rationalPartOf(transcendental)
-	const coefficient = piCoefficientOf(transcendental)
-	const absoluteCoefficient = {
-		numerator:
-			coefficient.numerator < 0n
-				? -coefficient.numerator
-				: coefficient.numerator,
-		denominator: coefficient.denominator,
+
+	let text = rationalPart.numerator === 0n ? "" : formatRational(rationalPart)
+
+	for (const term of transcendental.terms) {
+		const absoluteCoefficient = {
+			numerator:
+				term.coefficientNumerator < 0n
+					? -term.coefficientNumerator
+					: term.coefficientNumerator,
+			denominator: term.coefficientDenominator,
+		}
+		const termText =
+			absoluteCoefficient.numerator === 1n &&
+			absoluteCoefficient.denominator === 1n
+				? term.base
+				: `${formatRational(absoluteCoefficient)}·${term.base}`
+
+		if (text === "") {
+			text = term.coefficientNumerator < 0n ? `-${termText}` : termText
+		} else {
+			text +=
+				term.coefficientNumerator < 0n
+					? ` − ${termText}`
+					: ` + ${termText}`
+		}
 	}
 
-	const piText =
-		absoluteCoefficient.numerator === 1n &&
-		absoluteCoefficient.denominator === 1n
-			? "π"
-			: `${formatRational(absoluteCoefficient)}·π`
-
-	if (rationalPart.numerator === 0n) {
-		return createString(coefficient.numerator < 0n ? `-${piText}` : piText)
-	}
-
-	const operator = coefficient.numerator < 0n ? " − " : " + "
-
-	return createString(`${formatRational(rationalPart)}${operator}${piText}`)
+	return createString(text)
 }
 
 // #endregion

@@ -14,14 +14,12 @@ import { typeKeySymbol } from "./type"
 
 // #region Constants
 
-export const Pi = createTranscendental(
-	{ numerator: 0n, denominator: 1n },
-	{ numerator: 1n, denominator: 1n },
-) as TranscendentalType
-export const Tau = createTranscendental(
-	{ numerator: 0n, denominator: 1n },
-	{ numerator: 2n, denominator: 1n },
-) as TranscendentalType
+export const Pi = createTranscendental({ numerator: 0n, denominator: 1n }, [
+	{ base: "π", coefficient: { numerator: 1n, denominator: 1n } },
+]) as TranscendentalType
+export const Tau = createTranscendental({ numerator: 0n, denominator: 1n }, [
+	{ base: "π", coefficient: { numerator: 2n, denominator: 1n } },
+]) as TranscendentalType
 
 // #endregion
 
@@ -72,8 +70,8 @@ function denominatorOf(number: RationalKind): bigint {
 // NOTE: Wiring B — the covering Namespace hand-writes all sixteen cells.
 // Every cross-kind cell is total and exact, because equality across kinds is
 // impossible by definition; only comparing two Transcendentals could ever
-// need refinement, and within the current linear-in-π grammar even that cell
-// is exact.
+// need refinement, and with a single registered base even that cell is exact
+// — see the basis registry in `Transcendental.ts`.
 export function compare(number: NumberType, other: NumberType): OrderingType {
 	const numberKind = number[typeKeySymbol]
 	const otherKind = other[typeKeySymbol]

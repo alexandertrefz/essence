@@ -156,8 +156,16 @@ export function anyIs(a: AnyType, b: AnyType): boolean {
 		return (
 			a.rationalPartNumerator === b.rationalPartNumerator &&
 			a.rationalPartDenominator === b.rationalPartDenominator &&
-			a.piCoefficientNumerator === b.piCoefficientNumerator &&
-			a.piCoefficientDenominator === b.piCoefficientDenominator
+			a.terms.length === b.terms.length &&
+			a.terms.every((term, index) => {
+				const other = b.terms[index]!
+
+				return (
+					term.base === other.base &&
+					term.coefficientNumerator === other.coefficientNumerator &&
+					term.coefficientDenominator === other.coefficientDenominator
+				)
+			})
 		)
 	} else if (
 		a[typeKeySymbol] === "Record" && //
