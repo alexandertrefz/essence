@@ -50,6 +50,39 @@ export const BRIDGE_EXPORTS = {
 	record: "$bridge_record",
 } as const
 
+// NOTE: What the bridge injects, as one table: the runtime module, the name
+// inside it, and the name the bundle exports it under. The Module below is
+// written OUT of this and `BRIDGE_KEY` is spelled out of it too, so what goes
+// into a bundle and what a bundle is named by can not drift apart.
+const BRIDGE_MODULES: Array<[string, Array<[string, string]>]> = [
+	[
+		"type",
+		[
+			["typeKeySymbol", BRIDGE_EXPORTS.typeKey],
+			["createCase", BRIDGE_EXPORTS.case],
+		],
+	],
+	["Integer", [["createInteger", BRIDGE_EXPORTS.integer]]],
+	["Rational", [["createRational", BRIDGE_EXPORTS.rational]]],
+	["String", [["createString", BRIDGE_EXPORTS.string]]],
+	["Boolean", [["createBoolean", BRIDGE_EXPORTS.boolean]]],
+	["List", [["createList", BRIDGE_EXPORTS.list]]],
+	["Record", [["createRecord", BRIDGE_EXPORTS.record]]],
+]
+
+// NOTE: This package's contribution to a bundle, named for the Compiler's
+// cache key. A bundle built through the bridge and one built without it are
+// different bytes over identical sources, so they have to be different files —
+// otherwise whichever was written first answers for both, and the loser is
+// either a plugin build handed exports it never asked for or a `loadModule`
+// told the bundle "was not built through the runtime bridge".
+export const BRIDGE_KEY = `essence-client-bridge-1:${BRIDGE_MODULES.map(
+	([fileName, members]) =>
+		`${fileName}(${members
+			.map(([member, alias]) => `${member}->${alias}`)
+			.join(",")})`,
+).join(";")}`
+
 // NOTE: An Essence value as JavaScript holds it — deliberately opaque. The
 // runtime's own `IntegerType` and friends are keyed by the Symbol THIS process
 // minted, and a value built inside a bundle does not carry it, so typing these
@@ -94,16 +127,9 @@ function reExport(fileName: string, members: Array<[string, string]>): string {
 export function withRuntimeBridge(sources: ModuleSources): ModuleSources {
 	let source = `${[
 		`export * from "${sources.entry}"`,
-		reExport("type", [
-			["typeKeySymbol", BRIDGE_EXPORTS.typeKey],
-			["createCase", BRIDGE_EXPORTS.case],
-		]),
-		reExport("Integer", [["createInteger", BRIDGE_EXPORTS.integer]]),
-		reExport("Rational", [["createRational", BRIDGE_EXPORTS.rational]]),
-		reExport("String", [["createString", BRIDGE_EXPORTS.string]]),
-		reExport("Boolean", [["createBoolean", BRIDGE_EXPORTS.boolean]]),
-		reExport("List", [["createList", BRIDGE_EXPORTS.list]]),
-		reExport("Record", [["createRecord", BRIDGE_EXPORTS.record]]),
+		...BRIDGE_MODULES.map(([fileName, members]) =>
+			reExport(fileName, members),
+		),
 	].join("\n")}\n`
 
 	return {

@@ -6,9 +6,16 @@ import * as path from "node:path"
 // NOTE: A compiled bundle has to become a FILE before it can be imported —
 // `import()` takes a URL, and a data URL loses the identity that makes two loads
 // of the same sources the same Module. So the bundle is written, and it is
-// written under the hash of everything it was compiled from: a name that can
-// only mean this text, so a file already sitting there is already the answer and
-// nothing has to be invalidated, ever.
+// written under the hash of everything it was compiled from AND BY: a name that
+// can only mean this text, so a file already sitting there is already the answer
+// and nothing has to be invalidated, ever.
+//
+// The "and by" is what makes that last clause true rather than merely
+// convenient. The hash covers the Compiler, the standard library, the runtime
+// and this package's own bridge — see `bundleHash` on the Compiler's embed
+// seam — because a bundle is not a function of the `.es` sources alone, and a
+// name that pretended it was would go on answering with the bundle an older
+// toolchain wrote long after the upgrade meant to replace it.
 
 // NOTE: Where a host asks for the cache to live. Set it to a directory inside a
 // build's own output and the bundles travel with that build; leave it and they
@@ -48,14 +55,27 @@ export function cacheDirectory(): string {
 
 // NOTE: `.mjs`, so that Node reads the file as a Module whatever the nearest
 // `package.json` in the cache directory's ancestry happens to say.
-export function bundlePath(directory: string, sourceHash: string): string {
-	return path.join(directory, `${sourceHash}.mjs`)
+export function bundlePath(directory: string, bundleHash: string): string {
+	return path.join(directory, `${bundleHash}.mjs`)
+}
+
+// NOTE: The bundle already on disk, or `null`. Asked BEFORE anything is
+// generated — that is what a content-addressed name is for, and a cache that
+// only saved the `writeFile` would have saved nothing worth naming.
+export async function cachedBundle(
+	directory: string,
+	bundleHash: string,
+): Promise<string | null> {
+	let file = bundlePath(directory, bundleHash)
+
+	return (await exists(file)) ? file : null
 }
 
 // NOTE: The bundle on disk, written if it is not there yet. Nothing is
-// overwritten: the name is the hash of the sources, so a file that exists holds
-// this exact text already, and rewriting it would only invalidate the Module
-// every process that has already imported it is holding.
+// overwritten: the name is the hash of everything it was compiled from and by,
+// so a file that exists holds this exact text already, and rewriting it would
+// only invalidate the Module every process that has already imported it is
+// holding.
 //
 // NOTE: Written to a private temporary name and RENAMED into place, because
 // `import()` is going to read this file and several processes may be compiling
@@ -64,10 +84,10 @@ export function bundlePath(directory: string, sourceHash: string): string {
 // process is still writing, which imports as a syntax error out of nowhere.
 export async function cacheBundle(
 	directory: string,
-	sourceHash: string,
+	bundleHash: string,
 	code: string,
 ): Promise<string> {
-	let file = bundlePath(directory, sourceHash)
+	let file = bundlePath(directory, bundleHash)
 
 	if (await exists(file)) {
 		return file

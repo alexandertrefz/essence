@@ -1,7 +1,7 @@
 import { pathToFileURL } from "node:url"
 
 import { containsErrors } from "@essence-lang/compiler/diagnostics"
-import { compileToMemory } from "@essence-lang/compiler/embed"
+import { compileToMemory, linkToMemory } from "@essence-lang/compiler/embed"
 import {
 	canonicalPath,
 	type ExportSurface,
@@ -11,33 +11,40 @@ import type { OptimiserOptions } from "@essence-lang/compiler/optimiser"
 
 import { bindModule } from "./bind"
 import {
+	BRIDGE_KEY,
 	type RuntimeBridge,
 	runtimeBridgeOf,
 	withRuntimeBridge,
 } from "./bridge"
-import { bundlePath, cacheBundle, cacheDirectory } from "./cache"
+import { bundlePath, cacheBundle, cachedBundle, cacheDirectory } from "./cache"
 import { EssenceCompileError } from "./errors"
 import { createMarshaller, type Marshaller } from "./marshal"
 
 export { bindModule, type ModuleBindings } from "./bind"
 export {
 	BRIDGE_EXPORTS,
+	BRIDGE_KEY,
 	BRIDGE_SPECIFIER,
 	type EssenceValue,
 	type RuntimeBridge,
 	runtimeBridgeOf,
 	withRuntimeBridge,
 } from "./bridge"
-export { bundlePath, cacheBundle, cacheDirectory } from "./cache"
+export { bundlePath, cacheBundle, cachedBundle, cacheDirectory } from "./cache"
 export {
 	type DeclarationOptions,
 	type DeclarationView,
 	generateDeclarations,
 } from "./dts"
 export {
+	EssenceBuildError,
 	EssenceCallError,
 	EssenceCompileError,
 	EssenceMarshalError,
+	// NOTE: The Diagnostic report an `EssenceCompileError` carries, rendered
+	// again — with colour, this time, for a host that knows it is writing to a
+	// terminal. It is on the root because that is where the Error is.
+	renderGroups,
 } from "./errors"
 export {
 	createMarshaller,
@@ -48,14 +55,27 @@ export {
 	declarationsPath,
 	essence,
 	essenceEsbuild,
+	type EsbuildBuild,
+	type EsbuildLoadArguments,
+	type EsbuildLoadResult,
 	type EsbuildPlugin,
+	type PluginContext,
 	type PluginOptions,
+	type ResolvedConfig,
 	type VitePlugin,
 } from "./plugin"
 export { EssenceRational } from "./rational"
 // NOTE: Re-exported so a host can spell what `raw` holds — the JavaScript name
 // an Essence one is bound under — without importing the Compiler itself.
 export { escapeName } from "@essence-lang/compiler/rewriter"
+// NOTE: The Compiler's own vocabulary, as far as the signatures below name it.
+// A host writing `let host: ModuleHost` or `function report(groups:
+// Array<DiagnosticGroup>)` should not have to take a direct dependency on the
+// Compiler to spell what this package already handed it — which is the same
+// reason `escapeName` is re-exported above.
+export type { DiagnosticGroup } from "@essence-lang/compiler/embed"
+export type { ExportSurface, ModuleHost } from "@essence-lang/compiler/modules"
+export type { OptimiserOptions } from "@essence-lang/compiler/optimiser"
 
 // NOTE: Essence from JavaScript, in one call: a path to a `.es` file goes in and
 // its exports come back, compiled, bundled and imported on the way. The Compiler
@@ -109,9 +129,34 @@ export async function loadModule(
 ): Promise<EssenceModule> {
 	let entry = canonicalPath(entryPath)
 	let directory = options.cacheDirectory ?? cacheDirectory()
-	let compiled = await compileToMemory(entry, {
+	let embedding = {
 		host: options.host,
 		optimisation: options.optimisation,
+		// NOTE: What this package puts into the bundle that the sources do not
+		// say — the runtime bridge. Without it one file would stand for the
+		// bridged bundle and the plain one both.
+		emitterKey: BRIDGE_KEY,
+	}
+
+	// NOTE: The hash BEFORE the emit, which is the whole point of naming a
+	// bundle after what it was compiled from. The sources are read and linked —
+	// a few milliseconds — and where the file that names is already on disk,
+	// nothing is simplified, optimised, generated, bundled or written: the
+	// answer was computed by whoever asked first. Running the pipeline to the
+	// end and only then discovering the output was already there would leave the
+	// name saving one `writeFile`.
+	let linked = linkToMemory(entry, embedding)
+
+	if (!containsErrors(linked.diagnostics)) {
+		let cached = await cachedBundle(directory, linked.bundleHash)
+
+		if (cached !== null) {
+			return await importModule(entry, linked.surface, cached)
+		}
+	}
+
+	let compiled = await compileToMemory(entry, {
+		...embedding,
 		transformSources: withRuntimeBridge,
 		// NOTE: The bundle is going to be written into the cache directory, and
 		// the inline source map spells its `.es` sources relative to wherever the
@@ -127,26 +172,29 @@ export async function loadModule(
 		throw new EssenceCompileError(entry, compiled.diagnosticGroups)
 	}
 
-	let file = await cacheBundle(directory, compiled.sourceHash, compiled.code)
-	// NOTE: A URL rather than a path, because `import()` reads a specifier and a
-	// Windows path is not one. The host's own Module cache keys off it, so a
-	// second load of unchanged sources resolves to the same hash, the same file
-	// and the same evaluated Module — the Program inside a bundle runs once.
+	return await importModule(
+		entry,
+		compiled.surface,
+		await cacheBundle(directory, compiled.bundleHash, compiled.code),
+	)
+}
+
+// NOTE: A URL rather than a path, because `import()` reads a specifier and a
+// Windows path is not one. The host's own Module cache keys off it, so a second
+// load of unchanged sources resolves to the same hash, the same file and the
+// same evaluated Module — the Program inside a bundle runs once.
+async function importModule(
+	entry: string,
+	surface: ExportSurface,
+	file: string,
+): Promise<EssenceModule> {
 	let namespace = (await import(pathToFileURL(file).href)) as Record<
 		string,
 		unknown
 	>
-
 	let bridge = runtimeBridgeOf(namespace)
 	let marshaller = createMarshaller(bridge, { entryPath: entry })
-	let { exports, raw } = bindModule(namespace, compiled.surface, marshaller)
+	let { exports, raw } = bindModule(namespace, surface, marshaller)
 
-	return {
-		entryPath: entry,
-		surface: compiled.surface,
-		exports,
-		raw,
-		bridge,
-		marshaller,
-	}
+	return { entryPath: entry, surface, exports, raw, bridge, marshaller }
 }
