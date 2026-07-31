@@ -34,8 +34,8 @@ Essence compiles to modern ECMAScript, allowing execution in Bun, Node.js as wel
 
 
 # Example Code
-You can find the most recent and working example of syntax in the [HelloWorld.es](https://github.com/atrefz/essence/blob/master/packages/fixtures/files/HelloWorld.es)
-as well as the other files in [packages/fixtures/files](https://github.com/atrefz/essence/tree/master/packages/fixtures/files). It also should be noted that the syntax is meant to
+You can find the most recent and working example of syntax in the [HelloWorld.es](https://github.com/alexandertrefz/essence/blob/master/packages/fixtures/files/HelloWorld.es)
+as well as the other files in [packages/fixtures/files](https://github.com/alexandertrefz/essence/tree/master/packages/fixtures/files). It also should be noted that the syntax is meant to
 be viewed with a font with code ligatures, like FiraCode.
 
 You can compile any of them with the `essence` executable in `packages/cli/bin`. This produces a self-contained ES

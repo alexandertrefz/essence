@@ -49,8 +49,8 @@ You can find the most recent and working example of syntax in [HelloWorld.es](pa
 as well as the other files in [packages/fixtures/files](packages/fixtures/files). It also should be noted that the
 syntax is meant to be viewed with a font with code ligatures, like FiraCode.
 
-The standard library is written in Essence and lives in [packages/stdlib/sources](packages/stdlib/sources); its
-[README](packages/stdlib/README.md) is the most substantial writing about the language there is.
+The standard library is written in Essence and lives in [packages/standard-library/sources](packages/standard-library/sources); its
+[README](packages/standard-library/README.md) is the most substantial writing about the language there is.
 
 # Modules
 A file is a module. Everything it declares is private until its `export { … }` block lists it, and an
@@ -137,7 +137,7 @@ Bun runs the sources.
 |---|---|
 | [`compiler`](packages/compiler) | the pipeline — lexer, parser, enricher, validator, simplifier, optimiser, rewriter, bundler |
 | [`interfaces`](packages/interfaces) | the types every stage agrees on. Depends on nothing |
-| [`stdlib`](packages/stdlib) | the standard library, written in Essence |
+| [`standard-library`](packages/standard-library) | the standard library, written in Essence |
 | [`runtime`](packages/runtime) | the native halves of the standard library, inlined into every compiled program |
 | [`ariadne`](packages/ariadne) | a TypeScript port of the `ariadne` diagnostic renderer |
 | [`escodegen`](packages/escodegen) | vendored fork of the ECMAScript code generator, see its [PATCHES.md](packages/escodegen/PATCHES.md) |

@@ -7,7 +7,7 @@ A debugger — the Essence Debug Adapter, `essence dap`.
 The Language Server the extension bundles is now the published
 `@essence-lang/language-server` package, pinned by version — built from the
 monorepo the workspace satisfies the pin, built anywhere else the registry
-does, and the standard library ships from `@essence-lang/stdlib` the same way.
+does, and the standard library ships from `@essence-lang/standard-library` the same way.
 
 - `F5` on an `.es` file compiles it and starts it under the debugger, no
   launch.json needed — breakpoints, stepping, call stacks and watch all speak

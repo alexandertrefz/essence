@@ -32,7 +32,7 @@ export const GoldenRatio = createAlgebraic(
 // #endregion
 
 // NOTE: `lowestNumber`, `greatestNumber`, `sum`, `product` and `average` are
-// written in Essence now — `packages/stdlib/sources/Number.es`. The pairwise
+// written in Essence now — `packages/standard-library/sources/Number.es`. The pairwise
 // `lowestNumber`/`greatestNumber` entries were already there; the List entries
 // fold them over the items, and the aggregates fold the members' own
 // arithmetic, collapsing a whole mixed total back to an Integer.
@@ -70,7 +70,7 @@ function denominatorOf(number: RationalKind): bigint {
 }
 
 // NOTE: `is`, `isNot` and `toString` are written in Essence now —
-// `packages/stdlib/sources/Number.es`. `is` reads the covering `compare` against
+// `packages/standard-library/sources/Number.es`. `is` reads the covering `compare` against
 // `Ordering#Equal`, `isNot` negates it, and `toString` matches the member Type
 // and defers to that member's own `toString`. `compare` below is the one
 // ordering primitive they all fall out of, and it stays native.
@@ -154,12 +154,12 @@ export function compare(number: NumberType, other: NumberType): OrderingType {
 
 // NOTE: The Union-level ordering family — `isLessThan`, `isLessThanOrEqualTo`,
 // `isGreaterThan` and `isGreaterThanOrEqualTo` — is written in Essence now,
-// `packages/stdlib/sources/Number.es`. Each reads the covering `compare` above against the
+// `packages/standard-library/sources/Number.es`. Each reads the covering `compare` above against the
 // matching `Ordering` variant (`isLessThan` against `Ordering#Less`, and so
 // on), and the `…OrEqualTo` pair negates the strict opposite. `compare` is
 // the one ordering primitive they all fall out of, and it stays native.
 
-// NOTE: `isBetween` is written in Essence now — `packages/stdlib/sources/Number.es` — as
+// NOTE: `isBetween` is written in Essence now — `packages/standard-library/sources/Number.es` — as
 // `@::isGreaterThanOrEqualTo(lower)::and(@::isLessThanOrEqualTo(upper))`, which
 // is the same two comparisons this function made, read off the same covering
 // order. Both bounds stay included, and bounds in the wrong order still enclose

@@ -538,7 +538,7 @@ describe("Standard Library Loader", () => {
 			// same synthetic file rather than a builtin like
 			// `Integer::multiply`. A synthetic standard library is
 			// enriched against the bare Type tags plus these sources ALONE —
-			// nothing of `packages/stdlib/sources` is in scope — so reaching for a real
+			// nothing of `packages/standard-library/sources` is in scope — so reaching for a real
 			// builtin Method would simply not resolve.
 			`declarations {
 				namespace Doubler for Integer {
@@ -1877,7 +1877,7 @@ describe("Standard Library Loader", () => {
 	// NOTE: A standard library file is the WHOLE of what the Namespace it
 	// declares contains. No member is merged in from anywhere else — a name the
 	// sources do not write is a name a Program can not reach, which is what
-	// makes `packages/stdlib/sources/*.es` readable as the definition of the language.
+	// makes `packages/standard-library/sources/*.es` readable as the definition of the language.
 	//
 	// NOTE: The file name and the Namespace name are both taken from a REAL
 	// standard library file, which is what makes the claim worth pinning: the

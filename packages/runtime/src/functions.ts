@@ -3,7 +3,7 @@ import type { StepType } from "./Step"
 import { type AnyType, typeKeySymbol } from "./type"
 
 // NOTE: The `loop` family — the native drivers behind the `loop` Overloads
-// declared in `packages/stdlib/sources/Loop.es`. Each is a free Function, bound by its
+// declared in `packages/standard-library/sources/Loop.es`. Each is a free Function, bound by its
 // mangled `loop__overload$N` name to the Overload it implements; the order here
 // is the order the entries are written there. Only TWO are native: a loop can
 // not be written in Essence — it would need a loop to write — so the two

@@ -13,7 +13,7 @@ import { simplify } from "../simplifier/index"
 
 // NOTE: A standard library Namespace is written in TWO languages at once: some
 // of its members are bound to a runtime module in `@essence-lang/runtime`, the
-// rest are implemented in Essence in `packages/stdlib/sources/`. Emitted user
+// rest are implemented in Essence in `packages/standard-library/sources/`. Emitted user
 // code can not tell the two apart — it says `Boolean.isNot(…)` either way — so
 // this module is what the Rewriter asks which half a member belongs to. The
 // prelude is the Essence-implemented half: the typed Nodes of the BODIED

@@ -156,4 +156,4 @@ Diagnostic says which bound to add. `List` conforms
 Editing the library itself — the `declarations { … }` form, how the loader
 reads these files, the native contract, the emission model, the editing
 hazards, and what registering a new Namespace takes — is covered in
-[DEVELOPMENT.md](https://github.com/alexandertrefz/essence/blob/master/packages/stdlib/DEVELOPMENT.md).
+[DEVELOPMENT.md](https://github.com/alexandertrefz/essence/blob/master/packages/standard-library/DEVELOPMENT.md).

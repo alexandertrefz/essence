@@ -4,13 +4,13 @@ import type { common } from "@essence-lang/interfaces"
 // anywhere, because they ARE what a declaration bottoms out in. A standard
 // library file writes `Boolean`, `String`, `Integer` in its signatures; these
 // are what those names resolve to, and there is nowhere else they could come
-// from: `packages/stdlib/sources/Boolean.es` declares the Boolean NAMESPACE, and writes
+// from: `packages/standard-library/sources/Boolean.es` declares the Boolean NAMESPACE, and writes
 // `Boolean` in its own signatures.
 //
 // NOTE: This is the ONLY TypeScript left that describes a Type of the language.
 // A Type belongs here if and only if no `type`, `choice` or `protocol`
 // declaration could produce it — `Number` and `Irrational` are Unions and live
-// in `packages/stdlib/sources/Number.es`, `Optional` and `Ordering` in files of their own.
+// in `packages/standard-library/sources/Number.es`, `Optional` and `Ordering` in files of their own.
 // Nothing compares these by identity; a consumer that needs "is this an
 // Integer?" reads the `type` tag.
 

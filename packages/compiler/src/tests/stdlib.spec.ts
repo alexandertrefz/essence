@@ -26,7 +26,7 @@ const str = (value: string) => string.createString(value)
 const bool = (value: boolean) => boolean.createBoolean(value)
 const ints = (...values: Array<bigint>) => list.createList(values.map(int))
 
-// NOTE: `Optional` is a nominal Choice now (packages/stdlib/sources/Optional.es), not a
+// NOTE: `Optional` is a nominal Choice now (packages/standard-library/sources/Optional.es), not a
 // Type Alias for `ItemType | Nothing`, so a fallible native no longer answers
 // its result bare — it answers `Optional#Value { item }` or `Optional#Empty`.
 // These two build exactly what the natives build, so an assertion about a
@@ -48,7 +48,7 @@ const unwrap = <ItemType extends AnyType>(
 	return (answer as optional.ValueType<ItemType>).item
 }
 
-// NOTE: `Rational.is` is written in Essence now (packages/stdlib/sources/Rational.es), so
+// NOTE: `Rational.is` is written in Essence now (packages/standard-library/sources/Rational.es), so
 // there is no runtime function left to compare two Rationals with. The
 // assertions below that reach for it are about OTHER natives — `parse`,
 // `raise`, the Number aggregates — and only need value equality, so
@@ -60,13 +60,13 @@ const ratIs = (
 	first.numerator * second.denominator ===
 	second.numerator * first.denominator
 
-// NOTE: `String.toString` is written in Essence now (packages/stdlib/sources/String.es) —
+// NOTE: `String.toString` is written in Essence now (packages/standard-library/sources/String.es) —
 // `<- @`, the identity — so there is no runtime export left to hand `join`
 // as its `Printable` witness. This spells the identity out, which is exactly
 // what the Simplifier now passes.
 const stringToString = (value: string.StringType) => value
 
-// NOTE: The same story for `Integer.is` (packages/stdlib/sources/Integer.es), which the
+// NOTE: The same story for `Integer.is` (packages/standard-library/sources/Integer.es), which the
 // List Methods bounded by `Equatable` now take as their hidden witness. The
 // Essence body reads `compare(other)::is(Ordering#Equal)`; two Integers
 // answer that exactly when their values match, so this is what the Simplifier
@@ -125,13 +125,13 @@ describe("Stdlib", () => {
 		it("negates a value", () => {
 			// NOTE: absolute, parity (isEven/isOdd), sign (isPositive/
 			// isNegative/isZero) and clamp are implemented in Essence
-			// now (packages/stdlib/sources/Integer.es); the golden harness covers them. Only
+			// now (packages/standard-library/sources/Integer.es); the golden harness covers them. Only
 			// negate stays native here.
 			expect(integer.negate(int(5n))).toEqual(int(-5n))
 		})
 
 		// NOTE: `parse` is written in Essence now
-		// (`packages/stdlib/sources/Integer.es`) — a fold over the characters
+		// (`packages/standard-library/sources/Integer.es`) — a fold over the characters
 		// with the digit's value read off its position in "0123456789". The
 		// golden harness covers the same shapes the runtime-direct test here
 		// asserted: plain, negative, leading zeroes, and the refusals — plus
@@ -148,7 +148,7 @@ describe("Stdlib", () => {
 
 		// NOTE: `absolute`, `negate`, `reciprocal` and `isWholeNumber` used to
 		// be tested here against the runtime functions directly. They are
-		// written in Essence now — `packages/stdlib/sources/Rational.es` — so there is no
+		// written in Essence now — `packages/standard-library/sources/Rational.es` — so there is no
 		// runtime function left to call, and the golden harness
 		// (`testFiles/StdlibExhaustive.es`) covers every one of them, including
 		// the reciprocal of zero. The same move was made for the Integer
@@ -176,7 +176,7 @@ describe("Stdlib", () => {
 		})
 
 		// NOTE: `parse` is written in Essence now
-		// (`packages/stdlib/sources/Rational.es`) — one leading sign, then a
+		// (`packages/standard-library/sources/Rational.es`) — one leading sign, then a
 		// split on `/` or `.` with each piece read by `Integer.parse`. The
 		// golden harness covers the same shapes the runtime-direct test here
 		// asserted — fractions, decimals and wholes, each signed and not —
@@ -185,8 +185,8 @@ describe("Stdlib", () => {
 	})
 
 	// NOTE: `absolute` and `is` are written in Essence now for both Algebraic
-	// (packages/stdlib/sources/Algebraic.es) and Transcendental
-	// (packages/stdlib/sources/Transcendental.es), so only `negate` is still native here.
+	// (packages/standard-library/sources/Algebraic.es) and Transcendental
+	// (packages/standard-library/sources/Transcendental.es), so only `negate` is still native here.
 	// Their behaviour is covered through the language by
 	// testFiles/Irrational.es and the golden output.
 	describe("Irrational sign Methods", () => {
@@ -211,14 +211,14 @@ describe("Stdlib", () => {
 	})
 
 	// NOTE: `sum`, `product` and `average` are written in Essence now
-	// (`packages/stdlib/sources/Number.es`) — folds over the members' own
+	// (`packages/standard-library/sources/Number.es`) — folds over the members' own
 	// arithmetic, with the mixed entries collapsing a whole total back to an
 	// Integer. The golden harness covers every entry, the empty Lists and the
 	// mixed collapse included, so the runtime-direct tests that lived here are
 	// retired.
 
 	// NOTE: `Number.isBetween` used to be tested here, against the runtime
-	// function directly. It is written in Essence now — `packages/stdlib/sources/Number.es`
+	// function directly. It is written in Essence now — `packages/standard-library/sources/Number.es`
 	// — so there is no runtime function left to call, and the same five cases
 	// are asserted end to end in `codeGeneration.spec.ts` ("runs isBetween from
 	// the merged const" and the two beside it), where they exercise the
@@ -226,11 +226,11 @@ describe("Stdlib", () => {
 	// `Boolean.isNot` when it became the first Method to be written in Essence.
 
 	// NOTE: `Boolean.exclusiveOr` is implemented in Essence now
-	// (`packages/stdlib/sources/Boolean.es`) — the golden harness exercises it end to end,
+	// (`packages/standard-library/sources/Boolean.es`) — the golden harness exercises it end to end,
 	// so the runtime-direct test that lived here is retired.
 
 	// NOTE: `Optional.otherwise` is implemented in Essence now
-	// (`packages/stdlib/sources/Optional.es`) — the golden harness exercises it end to end,
+	// (`packages/standard-library/sources/Optional.es`) — the golden harness exercises it end to end,
 	// so the runtime-direct test that lived here is retired.
 
 	describe("List round trips and construction", () => {
@@ -262,7 +262,7 @@ describe("Stdlib", () => {
 		})
 
 		// NOTE: `List.repeat` is implemented in Essence now
-		// (`packages/stdlib/sources/List.es`), on top of the `List.of` below — the golden
+		// (`packages/standard-library/sources/List.es`), on top of the `List.of` below — the golden
 		// harness covers a count of three, zero and minus one, so the
 		// runtime-direct test that lived here is retired.
 
@@ -324,7 +324,7 @@ describe("Stdlib", () => {
 		})
 
 		// NOTE: `List.partition` is implemented in Essence now
-		// (`packages/stdlib/sources/List.es`), as `keepEvery` beside `removeEvery(where:)`
+		// (`packages/standard-library/sources/List.es`), as `keepEvery` beside `removeEvery(where:)`
 		// — the golden harness covers both halves and the empty List, so the
 		// runtime-direct test that lived here is retired.
 
@@ -351,7 +351,7 @@ describe("Stdlib", () => {
 		})
 
 		// NOTE: `List.sorted` is implemented in Essence now
-		// (`packages/stdlib/sources/List.es`) — it hands its hidden conformance Argument's
+		// (`packages/standard-library/sources/List.es`) — it hands its hidden conformance Argument's
 		// `compare` straight to `sort__overload$2`, and the golden harness covers the
 		// flat case. What is NOT covered there, and what the two tests below
 		// keep, is the WITNESS a nested List is sorted through: the Essence

@@ -34,6 +34,6 @@
 	},
 	"devDependencies": {
 		"@essence-lang/fixtures": "workspace:*",
-		"@essence-lang/stdlib": "workspace:*"
+		"@essence-lang/standard-library": "workspace:*"
 	}
 }

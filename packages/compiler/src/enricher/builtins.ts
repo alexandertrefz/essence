@@ -8,7 +8,7 @@ import { loadStdlib } from "./stdlib"
 // builtin registered here reaches resolution, completion, rename and
 // semantic tokens in one step, and can not be half-wired again.
 //
-// NOTE: The standard library itself is written in Essence, under `packages/stdlib/sources`.
+// NOTE: The standard library itself is written in Essence, under `packages/standard-library/sources`.
 // Nothing a Program starts with is declared in TypeScript any more: `loadStdlib`
 // reads those sources once per process and the accessors at the foot of this
 // file hand out what it produced. What is left in this file is the ORDER those
@@ -18,7 +18,7 @@ import { loadStdlib } from "./stdlib"
 // NOTE: The order the builtin members are listed in. A source declaration is
 // enriched INTO the Scope, so it lands where insertion put it — which is the
 // order `readStdlibSources` happened to sort the file names in, and nothing an
-// editor of `packages/stdlib/sources` would think to control. The order is observable:
+// editor of `packages/standard-library/sources` would think to control. The order is observable:
 // `builtinNamespaces()` derives from it, Completion dedupes members
 // first-Namespace-wins (`lsp/completion.ts`), and the Enricher builds its
 // `matchingNamespaces` in the same order — so it is stated here, once, rather
@@ -129,7 +129,7 @@ export const builtinTypeOrder: Array<string> = [
 // looked up — Hover and Completion both build their list by spreading this, and
 // `rename` walks it — so leaving it to fall out of whatever order the sources
 // were merged in makes an editor's list reorder itself for reasons no one
-// editing `packages/stdlib/sources` would think to control. It is the order they
+// editing `packages/standard-library/sources` would think to control. It is the order they
 // are declared in, which is also the order they build on each other: `Comparable`
 // is the only one whose signature names a Type rather than only bare tags.
 export const builtinProtocolOrder: Array<string> = [
@@ -140,7 +140,7 @@ export const builtinProtocolOrder: Array<string> = [
 
 // NOTE: Accessors rather than consts, because what they answer with is read
 // from Essence source at first call. `loadStdlib` parses, enriches and
-// validates `packages/stdlib/sources/*.es`, caches the result for the process, and hands
+// validates `packages/standard-library/sources/*.es`, caches the result for the process, and hands
 // back the SAME object every time — so these stay as cheap as the consts they
 // replaced after the first call.
 export function builtinMembers(): Record<string, common.Type> {

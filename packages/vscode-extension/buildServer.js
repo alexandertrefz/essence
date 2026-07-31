@@ -15,7 +15,9 @@ import { fileURLToPath } from "node:url"
 let serverEntry = fileURLToPath(
 	import.meta.resolve("@essence-lang/language-server/serverEntry"),
 )
-let stdlibEntry = fileURLToPath(import.meta.resolve("@essence-lang/stdlib"))
+let stdlibEntry = fileURLToPath(
+	import.meta.resolve("@essence-lang/standard-library"),
+)
 let stdlibSources = path.resolve(path.dirname(stdlibEntry), "../sources")
 
 let build = spawnSync(
@@ -34,7 +36,11 @@ if (build.status !== 0) {
 	process.exit(build.status ?? 1)
 }
 
-let bundledSources = path.join(import.meta.dirname, "server", "stdlib")
+let bundledSources = path.join(
+	import.meta.dirname,
+	"server",
+	"standard-library",
+)
 
 rmSync(bundledSources, { recursive: true, force: true })
 cpSync(stdlibSources, bundledSources, { recursive: true })

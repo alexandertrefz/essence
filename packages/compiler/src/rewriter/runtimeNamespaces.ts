@@ -6,7 +6,7 @@
 // in Essence is NOT a member of one of these; it is its own
 // `$es_<Namespace>_<member>` const, emitted alongside. The tests cross-check
 // this list against the other registration sites — a Namespace here but missing
-// a runtime module, or declared in `packages/stdlib/sources` but missing here,
+// a runtime module, or declared in `packages/standard-library/sources` but missing here,
 // emits a call to `undefined`.
 //
 // NOTE: A file of its own, rather than a const in the Rewriter that owns it,

@@ -32,7 +32,7 @@
       },
       "devDependencies": {
         "@essence-lang/fixtures": "workspace:*",
-        "@essence-lang/stdlib": "workspace:*",
+        "@essence-lang/standard-library": "workspace:*",
       },
     },
     "packages/compiler": {
@@ -43,7 +43,7 @@
         "@essence-lang/escodegen": "workspace:*",
         "@essence-lang/interfaces": "workspace:*",
         "@essence-lang/runtime": "workspace:*",
-        "@essence-lang/stdlib": "workspace:*",
+        "@essence-lang/standard-library": "workspace:*",
         "esbuild": "0.28.1",
         "source-map": "0.6.1",
       },
@@ -94,7 +94,7 @@
       },
       "devDependencies": {
         "@essence-lang/fixtures": "workspace:*",
-        "@essence-lang/stdlib": "workspace:*",
+        "@essence-lang/standard-library": "workspace:*",
       },
     },
     "packages/interfaces": {
@@ -116,7 +116,7 @@
       },
       "devDependencies": {
         "@essence-lang/fixtures": "workspace:*",
-        "@essence-lang/stdlib": "workspace:*",
+        "@essence-lang/standard-library": "workspace:*",
       },
     },
     "packages/runtime": {
@@ -126,8 +126,8 @@
         "@essence-lang/interfaces": "workspace:*",
       },
     },
-    "packages/stdlib": {
-      "name": "@essence-lang/stdlib",
+    "packages/standard-library": {
+      "name": "@essence-lang/standard-library",
       "version": "0.1.0",
     },
     "packages/vscode-extension": {
@@ -135,7 +135,7 @@
       "version": "0.3.0",
       "devDependencies": {
         "@essence-lang/language-server": "0.1.0",
-        "@essence-lang/stdlib": "0.1.0",
+        "@essence-lang/standard-library": "0.1.0",
         "@vscode/vsce": "3.9.2",
         "vscode-languageclient": "9.0.1",
       },
@@ -255,7 +255,7 @@
 
     "@essence-lang/runtime": ["@essence-lang/runtime@workspace:packages/runtime"],
 
-    "@essence-lang/stdlib": ["@essence-lang/stdlib@workspace:packages/stdlib"],
+    "@essence-lang/standard-library": ["@essence-lang/standard-library@workspace:packages/standard-library"],
 
     "@essence-lang/website": ["@essence-lang/website@workspace:packages/website"],
 

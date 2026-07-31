@@ -19,7 +19,7 @@ import {
 } from "@essence-lang/compiler/documents"
 import { testDiagnostic } from "@essence-lang/compiler/tests/diagnosticFactory"
 import { fixturePath } from "@essence-lang/fixtures"
-import { STDLIB_DIRECTORY } from "@essence-lang/stdlib"
+import { STDLIB_DIRECTORY } from "@essence-lang/standard-library"
 import {
 	CodeActionKind,
 	CompletionItemKind,
@@ -883,7 +883,7 @@ describe("LSP in a standard library source", () => {
 
 	// NOTE: A standard library source that has never been saved is still a
 	// standard library source — the Editor opens
-	// `packages/stdlib/sources/Ordering.es` as a new file and the
+	// `packages/standard-library/sources/Ordering.es` as a new file and the
 	// `declarations` header has to be allowed while it is typed.
 	// Canonicalising must therefore not require the file to exist.
 	it("should recognise a standard library document that is not on disk yet", () => {

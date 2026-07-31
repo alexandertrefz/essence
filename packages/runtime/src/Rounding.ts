@@ -3,7 +3,7 @@ import { typeKeySymbol } from "./type"
 // NOTE: `Rounding` is a builtin Choice, like `Side` and `NumberFormat` — its
 // values carry Case tags (`"Rounding#Nearest"`) exactly as user-declared Cases
 // do. `is`, `isNot` and `toString` are implemented in Essence
-// (`packages/stdlib/sources/Rational.es`, beside the Method that takes one), so
+// (`packages/standard-library/sources/Rational.es`, beside the Method that takes one), so
 // nothing but the tags lives here. `Rational::round(toward:)` READS one, and it
 // is written in Essence too — this Choice reaches no native at all, unlike
 // `Side`, whose `String::trim(at:)` is one.

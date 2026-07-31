@@ -3,7 +3,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs"
 import * as path from "node:path"
 
 import { fixturePath } from "@essence-lang/fixtures"
-import { readStdlibFiles } from "@essence-lang/stdlib"
+import { readStdlibFiles } from "@essence-lang/standard-library"
 
 import { format, guarded } from "../index"
 import { commentAnchors } from "../trivia"

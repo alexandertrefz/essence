@@ -89,7 +89,7 @@ Documentation Positions read out of these files are stripped before the tables
 are handed out — a builtin is sourceless to Hover, Signature Help and `go to
 definition` in a USER's Program. The Language Server opens these files as
 ordinary documents when you edit them, which is a different path, so navigation
-inside `packages/stdlib/sources` works normally.
+inside `packages/standard-library/sources` works normally.
 
 ## Native and Essence in one Namespace
 

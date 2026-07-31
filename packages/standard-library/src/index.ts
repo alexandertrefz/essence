@@ -9,7 +9,7 @@ import * as path from "node:path"
 //
 // NOTE: Two layouts, because this module is read in two situations that do not
 // look alike. Run from the workspace — `esc`, `esls`, the test suite — it sits
-// in `packages/stdlib/src/` and the sources are its sibling. Run from a BUNDLE
+// in `packages/standard-library/src/` and the sources are its sibling. Run from a BUNDLE
 // it does not: the Language Server inside the VS Code extension is one file,
 // `import.meta.dirname` is wherever that file was written, and the sources have
 // to have been copied next to it. They cannot be inlined instead — the loader
@@ -22,7 +22,7 @@ import * as path from "node:path"
 // value". So `build:server` copies the sources beside the bundle, and this
 // finds them there.
 const WORKSPACE_SOURCES = path.resolve(import.meta.dirname, "../sources")
-const BUNDLED_SOURCES = path.resolve(import.meta.dirname, "stdlib")
+const BUNDLED_SOURCES = path.resolve(import.meta.dirname, "standard-library")
 
 export const STDLIB_DIRECTORY = existsSync(WORKSPACE_SOURCES)
 	? WORKSPACE_SOURCES
@@ -58,9 +58,9 @@ export function readStdlibFiles(): Array<StdlibFile> {
 	if (fileNames.length === 0) {
 		throw new Error(
 			`The standard library is missing: no '.es' sources under '${STDLIB_DIRECTORY}'.\n\n` +
-				"In a workspace checkout they are 'packages/stdlib/sources'. In a\n" +
-				"bundle they have to be copied beside it — see the 'copy:stdlib'\n" +
-				"script in the VS Code extension.",
+				"In a workspace checkout they are 'packages/standard-library/sources'. In a\n" +
+				"bundle they have to be copied beside it — see 'buildServer.js'\n" +
+				"in the VS Code extension.",
 		)
 	}
 

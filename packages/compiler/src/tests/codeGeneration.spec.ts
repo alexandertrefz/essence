@@ -5,7 +5,7 @@ import { join } from "node:path"
 
 import { fixturePath } from "@essence-lang/fixtures"
 import type { common } from "@essence-lang/interfaces"
-import { readStdlibFiles } from "@essence-lang/stdlib"
+import { readStdlibFiles } from "@essence-lang/standard-library"
 import type * as estree from "estree"
 
 import { containsErrors } from "../diagnostics/index"

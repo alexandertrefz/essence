@@ -1,5 +1,8 @@
 import type { common, enricher, parser } from "@essence-lang/interfaces"
-import { readStdlibFiles, STDLIB_DIRECTORY } from "@essence-lang/stdlib"
+import {
+	readStdlibFiles,
+	STDLIB_DIRECTORY,
+} from "@essence-lang/standard-library"
 
 import { renderDiagnostics } from "../diagnostics/render"
 import {
@@ -65,7 +68,7 @@ function refuseUnexpectedCycles(graph: ModuleGraph): void {
 	// NOTE: Only checked for the library ON DISK, told apart by where its files
 	// are rather than by what they are called — a test may well write a file
 	// named `Prelude.es`, and does. The frozen set is a fact about
-	// `packages/stdlib/sources`, not about the loader.
+	// `packages/standard-library/sources`, not about the loader.
 	let isRealLibrary = [...graph.modules.keys()].some((filePath) =>
 		filePath.startsWith(`${STDLIB_DIRECTORY}/`),
 	)
@@ -94,7 +97,7 @@ function refuseUnexpectedCycles(graph: ModuleGraph): void {
 // and a surface forwards only what its block lists — so without this a file with
 // no block would contribute nothing and the name would simply not exist in the
 // language. Writing the block out is what a source SHOULD do, and every file in
-// `packages/stdlib/sources` does; this is what keeps a library assembled in a
+// `packages/standard-library/sources` does; this is what keeps a library assembled in a
 // test from having to, and what makes the rule "everything declared is a
 // builtin" hold whether or not the block was written.
 function exportingEverything(program: parser.Program): parser.Program {
@@ -183,7 +186,7 @@ export type StdlibSource = {
 
 export type Stdlib = {
 	// NOTE: The three Scope tables the Enricher and the Language Server start
-	// from — everything `packages/stdlib/sources/*.es` declared, listed in
+	// from — everything `packages/standard-library/sources/*.es` declared, listed in
 	// `builtinMemberOrder`/`builtinTypeOrder`. `members` also carries the
 	// native Functions, which have no Namespace to be declared in.
 	members: Record<string, common.Type>
@@ -339,12 +342,12 @@ function inBuiltinOrder<Entry>(
 // NOTE: A Documentation Position read out of a standard library file points
 // into a file no consumer of these tables has opened — Hover, Signature Help
 // and `go to definition` all treat a builtin as SOURCELESS, and would otherwise
-// offer to jump into `packages/stdlib/sources/List.es` from a user's project. Stripping it
+// offer to jump into `packages/standard-library/sources/List.es` from a user's project. Stripping it
 // here makes it impossible to hand out a Position with no file attached.
 //
 // NOTE: The Language Server DOES open the standard library sources — as
 // ordinary documents, enriched in their own right. That path never goes through
-// this loader, so `go to definition` inside `packages/stdlib/sources` keeps working.
+// this loader, so `go to definition` inside `packages/standard-library/sources` keeps working.
 function stripPosition(documentation: common.Documentation | undefined): void {
 	if (documentation != null) {
 		documentation.position = null
@@ -731,7 +734,7 @@ export function parseStdlibSource(
 	return { fileName, sourceText, program, diagnostics }
 }
 
-// NOTE: `@essence-lang/stdlib` finds and reads the files — it owns them, so it is
+// NOTE: `@essence-lang/standard-library` finds and reads the files — it owns them, so it is
 // the one that knows where they are, and it hands them over already sorted.
 // Parsing is what stays here, because parsing is the Compiler's half.
 function readStdlibSources(): {

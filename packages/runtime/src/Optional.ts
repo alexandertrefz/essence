@@ -3,7 +3,7 @@ import { type AnyType, typeKeySymbol } from "./type"
 // NOTE: `Optional` is a builtin generic Choice, like `Step` — its values carry
 // Case tags (`"Optional#Value"`, `"Optional#Empty"`) exactly as user-declared
 // Cases do. Every Method of the covering Namespace is written in Essence
-// (`packages/stdlib/sources/Optional.es`), so nothing here is a Method; what
+// (`packages/standard-library/sources/Optional.es`), so nothing here is a Method; what
 // lives here are the Types the generated native contract renders a fallible
 // signature against, and the two constructors the natives ANSWER with.
 //
