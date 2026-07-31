@@ -121,6 +121,11 @@
 					"default": "",
 					"markdownDescription": "Absolute path to a Language Server to run instead of the bundled one. A built `.js` bundle is run with `node`; anything else — a `.ts` entry point, or `packages/language-server/bin/esls` — is run with `bun`. Useful for developing against a checkout of the Essence monorepo without rebuilding the bundle."
 				},
+				"essence.inlayHints.enabled": {
+					"type": "boolean",
+					"default": true,
+					"description": "Show inferred Types as inlay hints where the source states none — Constants, Variables, and the Parameters and return Type of contextually typed Function literals."
+				},
 				"essence.trace.server": {
 					"type": "string",
 					"enum": [

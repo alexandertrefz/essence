@@ -14,6 +14,7 @@ import {
 	type CompletionItem,
 	CompletionItemKind,
 	createConnection,
+	DidChangeConfigurationNotification,
 	DidChangeWatchedFilesNotification,
 	DocumentHighlightKind,
 	type DocumentSymbol,
@@ -191,6 +192,12 @@ export function startServer() {
 	// so a URI that drops out of an analysis is sent an explicitly empty set —
 	// unless another open document still reports on it.
 	let publishedByEntry = new Map<string, Set<string>>()
+	// NOTE: Whether Type Hints are served — the client's
+	// `essence.inlayHints.enabled`. True until a client says otherwise, so an
+	// editor that answers no configuration requests keeps the Hints it always
+	// had.
+	let inlayHintsEnabled = true
+	let clientSupportsConfiguration = false
 
 	// NOTE: The standard library is read, hoisted, enriched and validated once
 	// per process. Doing it here — while the client is still setting up —
@@ -202,6 +209,8 @@ export function startServer() {
 	// than anywhere in the workspace.
 	connection.onInitialize((params) => {
 		loadStdlib()
+		clientSupportsConfiguration =
+			params.capabilities.workspace?.configuration === true
 		workspace.setFolders(
 			params.workspaceFolders?.map((folder) =>
 				documentFilePath(folder.uri),
@@ -224,6 +233,36 @@ export function startServer() {
 				watchers: [{ globPattern: "**/*.es" }],
 			})
 			.catch(() => {})
+
+		// NOTE: The one setting this Server reads. Pulled rather than taken off
+		// the notification — the notification only says that something under
+		// `essence` changed, not what it is now — and pulled again on every
+		// change, with a refresh so open editors drop or regain their Hints
+		// without waiting for an edit to invalidate them.
+		if (clientSupportsConfiguration) {
+			let readInlayHintSetting = () =>
+				connection.workspace
+					.getConfiguration("essence.inlayHints.enabled")
+					.then((enabled) => {
+						if (inlayHintsEnabled === (enabled !== false)) {
+							return
+						}
+
+						inlayHintsEnabled = enabled !== false
+						connection.languages.inlayHint.refresh().catch(() => {})
+					})
+					.catch(() => {})
+
+			connection.client
+				.register(DidChangeConfigurationNotification.type, {
+					section: "essence",
+				})
+				.catch(() => {})
+			connection.onDidChangeConfiguration(() => {
+				readInlayHintSetting()
+			})
+			readInlayHintSetting()
+		}
 
 		connection.workspace.onDidChangeWorkspaceFolders((event) => {
 			let folders = new Set(workspace.folders())
@@ -848,6 +887,10 @@ export function startServer() {
 	})
 
 	connection.languages.inlayHint.on((params) => {
+		if (!inlayHintsEnabled) {
+			return null
+		}
+
 		let parsed = parseAndEnrich(params.textDocument.uri)
 
 		if (parsed?.enrichedProgram == null) {
