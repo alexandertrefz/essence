@@ -1,6 +1,6 @@
 import { gzipSync } from "node:zlib"
 
-import { bundle, writeOutputs } from "@essence-lang/compiler/bundler"
+import { writeOutputs } from "@essence-lang/compiler/bundler"
 import {
 	containsErrors,
 	placelessDiagnostic,
@@ -10,11 +10,11 @@ import {
 	isStdlibDocument,
 	parseDocument,
 } from "@essence-lang/compiler/documents"
+import { emitBundle } from "@essence-lang/compiler/embed"
 import {
 	defaultOptimiserOptions,
 	type OptimiserOptions,
 } from "@essence-lang/compiler/optimiser"
-import { rewriteModules } from "@essence-lang/compiler/rewriter"
 import { validate } from "@essence-lang/compiler/validator"
 import type { common } from "@essence-lang/interfaces"
 
@@ -445,46 +445,32 @@ export async function compileFile(
 			return finish(true, null)
 		}
 
-		let optimisation = request.optimisation ?? defaultOptimiserOptions
-
-		let simplified = await timeline.run("simplify", () =>
-			programs.map((program) => session.simplify(program)),
-		)
-
-		let optimised = await timeline.run("optimise", () =>
-			simplified.map((program) =>
-				session.optimise(program, optimisation),
-			),
-		)
-
-		// NOTE: The whole graph is rewritten in one call, which is what shares
-		// the standard library prelude between its Modules — rewriting them
-		// one at a time would put a copy of every reachable Essence Method into
-		// every Module that reaches it.
-		let generated = await timeline.run("generate", () =>
-			rewriteModules(
-				optimised.map((program, index) => ({
+		// NOTE: Everything past validation is the emitter's, which `esc`
+		// SHARES with the in-memory compile rather than owning: what the stages
+		// are, what order they run in and what each of them is handed is one
+		// description, and it lives in the Compiler. What stays here is what is
+		// the CLI's own — the Session's caches, and the timings this file
+		// reports.
+		let bundled = await emitBundle(
+			{
+				modules: programs.map((program, index) => ({
 					filePath: modules[index]!.fileName,
 					program,
 					sourceText: modules[index]!.sourceText,
 				})),
-				front.entryPath,
-				// NOTE: The Options the user Program was optimised under reach
-				// the Rewriter too: the standard library's bodies are optimised
-				// inside the prelude it builds, and a Program compiled with a
-				// pass off must not import one compiled with it on.
-				{ sourcemap: request.sourcemap, optimiser: optimisation },
-			),
-		)
-
-		let bundled = await timeline.run("bundle", () =>
-			bundle(generated, {
+				entryPath: front.entryPath,
 				sourceFileName: request.inputFileName,
-				outputFileName: request.outputFileName as string,
+				outputFileName: request.outputFileName,
 				minify: request.minify,
 				sourcemap: request.sourcemap,
 				sourcemapMode: request.sourcemapMode,
-			}),
+				optimisation: request.optimisation ?? defaultOptimiserOptions,
+			},
+			{
+				simplify: session.simplify,
+				optimise: session.optimise,
+				stage: (name, work) => timeline.run(name, work),
+			},
 		)
 
 		own.push(...bundled.diagnostics)
