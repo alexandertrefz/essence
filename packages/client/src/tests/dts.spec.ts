@@ -168,11 +168,25 @@ export declare const Rectangle: { of(width: bigint, height: bigint): Rectangle }
 		expect(text).not.toContain(clientFixture("Marshal.es"))
 	})
 
-	it("maps a Type Parameter to a TypeScript one", async () => {
+	// NOTE: A Type Parameter is a shape that has not been decided yet, and
+	// `fromJS` builds a value AGAINST a shape — so there is nothing to build one
+	// against and the Marshaller says so. Declaring the Parameter `ItemType`
+	// would typecheck `firstOf([1n])`, which throws; `never` typechecks
+	// `firstOf([])`, which is exactly the call that works.
+	it("refuses a Type Parameter in a Parameter position", async () => {
 		expect(
 			await declarationsOf(clientFixture("Declarations.es")),
 		).toContain(
-			"export declare function firstOf<ItemType>(p0: Array<ItemType>): ItemType | undefined",
+			"export declare function firstOf<ItemType>(p0: Array<never /* a Type Parameter can not be marshalled */>): ItemType | undefined",
+		)
+	})
+
+	// NOTE: "Callbacks are not supported yet" is a decision the Marshaller makes
+	// and this file has to keep — a callable Parameter Type typechecks a call
+	// that always throws, which is what the Overload branch above already avoids.
+	it("refuses a callback in a Parameter position", async () => {
+		expect(await declarationsOf(clientFixture("Calls.es"))).toContain(
+			"export declare function applied(p0: bigint, p1: never /* callbacks are not supported yet */): bigint",
 		)
 	})
 

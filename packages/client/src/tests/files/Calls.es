@@ -26,6 +26,13 @@ implementation {
 		<- "nothing"
 	}
 
+	§ A Parameter nothing on the JavaScript side can fill: a Function can come
+	§ out of a Module, but one can not be built from a JavaScript value and
+	§ passed in.
+	function applied(_ value: Integer, with transform: (_: Integer) -> Integer) -> Integer {
+		<- transform(value)
+	}
+
 	function moved(_ point: Point) -> Point {
 		<- point
 	}
@@ -94,6 +101,7 @@ export {
 	positional
 	mixed
 	nothing
+	applied
 	moved
 	evened
 	coloured

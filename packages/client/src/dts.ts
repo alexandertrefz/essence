@@ -224,6 +224,38 @@ type Scope = ReadonlySet<string>
 
 const EMPTY_SCOPE: Scope = new Set<string>()
 
+// NOTE: Which way a value at this position CROSSES — into the Module as an
+// Argument, or out of it as a constant or an answer. The two are not the same
+// Type, because the Marshaller is not symmetric: coming out a value says what it
+// is, and going in it has to be BUILT against the Type the Module declared. What
+// `fromJS` has no way to build is therefore uninhabited on the way in and
+// perfectly ordinary on the way out — a Type Parameter is the clearest case, and
+// a Function the one a host is most likely to try.
+type Direction = "in" | "out"
+
+// NOTE: The Types `fromJS` refuses outright, as the one TypeScript Type nothing
+// is assignable to. `never` is not a shrug: it makes the call the Marshaller
+// would throw on fail to typecheck instead, which is the whole reason an
+// Overload set is already declared this way. The comment is what a reader can do
+// about it, so it travels with the Type.
+function inputRefusal(type: common.Type): string | null {
+	switch (type.type) {
+		// NOTE: `fromJS` walks the declared Type to decide what to build, and an
+		// unapplied Type Parameter is a hole where that shape should be. An
+		// empty Array typechecks and works, which is why this hole was invisible.
+		case "GenericUse":
+			return "never /* a Type Parameter can not be marshalled */"
+		case "Function":
+		case "SimpleMethod":
+		case "StaticMethod":
+			return "never /* callbacks are not supported yet */"
+		case "Namespace":
+			return "never /* a Namespace can not be built from a JavaScript value */"
+		default:
+			return null
+	}
+}
+
 type Walker = {
 	// NOTE: Whether a name can be DECLARED as a Type. A Type Alias is reachable
 	// only under the name it was written with, and TypeScript has no spelling for
@@ -258,7 +290,22 @@ function createWalker(surface: ExportSurface, imports: Set<string>): Walker {
 	// stack instead of saying what it does not know.
 	let printing = new Set<common.Type>()
 
-	function print(type: common.Type, scope: Scope): string {
+	function print(
+		type: common.Type,
+		scope: Scope,
+		direction: Direction,
+	): string {
+		// NOTE: Ahead of the naming table, so that a Type Alias for a callback —
+		// `type Handler = (_ Integer) -> Integer` — is refused where it is passed
+		// IN rather than named there and declared callable somewhere else.
+		if (direction === "in") {
+			let refusal = inputRefusal(type)
+
+			if (refusal !== null) {
+				return refusal
+			}
+		}
+
 		let alias = named.get(type)
 
 		if (alias !== undefined) {
@@ -272,7 +319,7 @@ function createWalker(surface: ExportSurface, imports: Set<string>): Walker {
 		printing.add(type)
 
 		try {
-			return printBody(type, scope)
+			return printBody(type, scope, direction)
 		} finally {
 			printing.delete(type)
 		}
@@ -281,7 +328,11 @@ function createWalker(surface: ExportSurface, imports: Set<string>): Walker {
 	// NOTE: The shape itself, with the naming table skipped — what a Type Alias'
 	// own declaration prints, since looking the name up there would declare it as
 	// itself.
-	function printBody(type: common.Type, scope: Scope): string {
+	function printBody(
+		type: common.Type,
+		scope: Scope,
+		direction: Direction,
+	): string {
 		switch (type.type) {
 			case "Integer":
 				return "bigint"
@@ -301,27 +352,28 @@ function createWalker(surface: ExportSurface, imports: Set<string>): Walker {
 			case "Transcendental":
 				return `unknown /* ${type.type} values can not be marshalled yet */`
 			case "List":
-				return `Array<${print(type.itemType, scope)}>`
+				return `Array<${print(type.itemType, scope, direction)}>`
 			case "GenericList":
 				return "Array<unknown>"
 			case "Record":
 			case "Namespace":
-				return inlined(objectEntries(type, scope))
+				return inlined(objectEntries(type, scope, direction))
 			case "Case":
-				return printCase(type, scope)
+				return printCase(type, scope, direction)
 			case "UnionType":
-				return unionMembers(type, scope).join(" | ")
+				return unionMembers(type, scope, direction).join(" | ")
 			// TODO: A checked refinement prints as its base, because that is what
 			// the Marshaller builds — the predicate is not run at the boundary
 			// yet. When it is, this is where the proven Type gets a spelling of
 			// its own; TypeScript has no predicates, so a branded Alias is the
 			// most one could ever be.
 			case "Refinement":
-				return print(type.base, scope)
+				return print(type.base, scope, direction)
 			case "GenericAlias":
 				return print(
 					type.aliasedType,
 					withGenerics(scope, type.generics),
+					direction,
 				)
 			case "GenericUse": {
 				let name = displayGenericName(type.name)
@@ -330,6 +382,9 @@ function createWalker(surface: ExportSurface, imports: Set<string>): Walker {
 					? name
 					: `unknown /* the Type Parameter ${name} is not in scope here */`
 			}
+			// NOTE: Coming OUT only — `inputRefusal` has already answered for the
+			// other direction. A Function that comes back is handed over as it
+			// is, and its own Parameters are values a caller passes IN.
 			case "Function":
 			case "SimpleMethod":
 			case "StaticMethod": {
@@ -338,7 +393,7 @@ function createWalker(surface: ExportSurface, imports: Set<string>): Walker {
 				return `${printGenerics(type.generics)}(${printParameters(
 					type.parameterTypes,
 					inner,
-				)}) => ${print(type.returnType, inner)}`
+				)}) => ${print(type.returnType, inner, "out")}`
 			}
 			// NOTE: Never callable, and deliberately not spelled as TypeScript
 			// Overloads — which Overload a call means is decided by the Argument
@@ -360,17 +415,20 @@ function createWalker(surface: ExportSurface, imports: Set<string>): Walker {
 	function objectEntries(
 		type: common.RecordType | common.NamespaceType,
 		scope: Scope,
+		direction: Direction,
 	): Array<string> {
 		if (type.type === "Record") {
 			return Object.entries(type.members).map(
 				([name, memberType]) =>
-					`${memberName(name)}: ${print(memberType, scope)}`,
+					`${memberName(name)}: ${print(memberType, scope, direction)}`,
 			)
 		}
 
+		// NOTE: A Namespace's static constants come OUT whichever way the
+		// Namespace itself was reached — there is no writing one.
 		let entries = Object.entries(type.properties).map(
 			([name, propertyType]) =>
-				`${memberName(name)}: ${print(propertyType, scope)}`,
+				`${memberName(name)}: ${print(propertyType, scope, "out")}`,
 		)
 
 		for (let [name, methodType] of Object.entries(type.methods)) {
@@ -400,7 +458,7 @@ function createWalker(surface: ExportSurface, imports: Set<string>): Walker {
 				`${memberName(name)}${printGenerics(generics)}(${printParameters(
 					methodType.parameterTypes,
 					inner,
-				)}): ${print(methodType.returnType, inner)}`,
+				)}): ${print(methodType.returnType, inner, "out")}`,
 			)
 		}
 
@@ -412,13 +470,17 @@ function createWalker(surface: ExportSurface, imports: Set<string>): Walker {
 	// `undefined`. Every other Case carries which one it is as a member, under the
 	// `$case` the Marshaller writes — the Choice as it was DECLARED and the Case,
 	// never the path of the machine that compiled it.
-	function printCase(type: common.CaseType, scope: Scope): string {
+	function printCase(
+		type: common.CaseType,
+		scope: Scope,
+		direction: Direction,
+	): string {
 		if (type.choice === "Optional") {
 			let item = type.members.item
 
 			return type.name === "Empty" || item === undefined
 				? "undefined"
-				: print(item, scope)
+				: print(item, scope, direction)
 		}
 
 		let tag = `${displayChoiceName(type.choice)}#${type.name}`
@@ -427,7 +489,7 @@ function createWalker(surface: ExportSurface, imports: Set<string>): Walker {
 			`$case: ${JSON.stringify(tag)}`,
 			...Object.entries(type.members).map(
 				([name, memberType]) =>
-					`${memberName(name)}: ${print(memberType, scope)}`,
+					`${memberName(name)}: ${print(memberType, scope, direction)}`,
 			),
 		])
 	}
@@ -435,7 +497,11 @@ function createWalker(surface: ExportSurface, imports: Set<string>): Walker {
 	// NOTE: The arms as they cross, in declaration order and deduplicated —
 	// `Optional<Integer> | Integer` is one `bigint` on this side, and printing it
 	// twice would only ask a reader what the difference was.
-	function unionMembers(type: common.UnionType, scope: Scope): Array<string> {
+	function unionMembers(
+		type: common.UnionType,
+		scope: Scope,
+		direction: Direction,
+	): Array<string> {
 		let parts: Array<string> = []
 		let optional = false
 
@@ -450,7 +516,7 @@ function createWalker(surface: ExportSurface, imports: Set<string>): Walker {
 				continue
 			}
 
-			parts.push(print(arm, scope))
+			parts.push(print(arm, scope, direction))
 		}
 
 		if (optional) {
@@ -462,6 +528,9 @@ function createWalker(surface: ExportSurface, imports: Set<string>): Walker {
 		return unique.length === 0 ? ["never"] : unique
 	}
 
+	// NOTE: A Parameter is the one position a value goes IN at, and everything
+	// under it goes in with it — the item Type of a List Parameter, the member
+	// Type of a Record one.
 	function printParameters(
 		parameters: Array<common.Parameter>,
 		scope: Scope,
@@ -469,13 +538,17 @@ function createWalker(surface: ExportSurface, imports: Set<string>): Walker {
 		return parameterNames(parameters)
 			.map(
 				(name, index) =>
-					`${name}: ${print(parameters[index]!.type, scope)}`,
+					`${name}: ${print(parameters[index]!.type, scope, "in")}`,
 			)
 			.join(", ")
 	}
 
 	// #region Declarations
 
+	// NOTE: Declared as it comes OUT. A Type Alias has one spelling and is used
+	// in both directions, so a body that crosses differently each way — a
+	// callback — is named here in its permissive form and refused at the
+	// Parameter that would pass one, which is where the mistake actually is.
 	function aliasDeclaration(name: string, type: common.Type): string {
 		let generic = type.type === "GenericAlias" ? type : null
 		let generics = generic === null ? [] : generic.generics
@@ -484,16 +557,16 @@ function createWalker(surface: ExportSurface, imports: Set<string>): Walker {
 		let body = generic === null ? type : generic.aliasedType
 
 		if (body.type === "UnionType") {
-			return unioned(head, unionMembers(body, scope))
+			return unioned(head, unionMembers(body, scope, "out"))
 		}
 
 		if (body.type === "Record" || body.type === "Namespace") {
-			return braced(head, objectEntries(body, scope))
+			return braced(head, objectEntries(body, scope, "out"))
 		}
 
 		// NOTE: The body, never the name — this IS the declaration of that name,
 		// and asking the naming table here would declare it as itself.
-		return `${head} ${printBody(body, scope)}`
+		return `${head} ${printBody(body, scope, "out")}`
 	}
 
 	function valueDeclaration(name: string, type: common.Type): string {
@@ -510,11 +583,11 @@ function createWalker(surface: ExportSurface, imports: Set<string>): Walker {
 			)}(${printParameters(
 				type.parameterTypes,
 				scope,
-			)}): ${print(type.returnType, scope)}`
+			)}): ${print(type.returnType, scope, "out")}`
 		}
 
 		if (type.type === "Record" || type.type === "Namespace") {
-			let entries = objectEntries(type, EMPTY_SCOPE)
+			let entries = objectEntries(type, EMPTY_SCOPE, "out")
 
 			if (isValueName(name)) {
 				return `${notice}${braced(
@@ -524,7 +597,7 @@ function createWalker(surface: ExportSurface, imports: Set<string>): Walker {
 			}
 		}
 
-		return `${notice}${exported(name, print(type, EMPTY_SCOPE))}`
+		return `${notice}${exported(name, print(type, EMPTY_SCOPE, "out"))}`
 	}
 
 	// NOTE: The bundle's binding: the name the Rewriter emitted, and a Type that
