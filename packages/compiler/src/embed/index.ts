@@ -54,6 +54,22 @@ export type EmbedOptions = {
 	outputFileName?: string
 }
 
+// NOTE: One file's Diagnostics with the text they are about. A Diagnostic
+// carries a Position and no file, so a flat list can not be RENDERED — the
+// pairing has to be made where the sources are still in hand, which is here and
+// nowhere a host can reach.
+//
+// The grouping is the one `esc` prints: one group per Module against that
+// Module's own source, and whatever belongs to the compilation rather than to a
+// file — an entry that could not be read, a bundle that failed — under the
+// entry, which is the file the caller named. A group with nothing to say is
+// left out entirely.
+export type DiagnosticGroup = {
+	filePath: string
+	sourceText: string
+	diagnostics: Array<common.Diagnostic>
+}
+
 export type MemoryCompileResult = {
 	// NOTE: Empty exactly when the compile stopped — a bundle is either whole or
 	// not there, and a host that reads `code` without reading `diagnostics`
@@ -62,6 +78,10 @@ export type MemoryCompileResult = {
 	// NOTE: The ENTRY Module's, which is what a host imports names out of.
 	surface: ExportSurface
 	diagnostics: Array<common.Diagnostic>
+	// NOTE: The same Diagnostics, paired with the sources they index into —
+	// `diagnostics` is exactly this, flattened. A host that only counts errors
+	// reads the flat list; one that renders them reads these.
+	diagnosticGroups: Array<DiagnosticGroup>
 	sourceHash: string
 }
 
@@ -73,42 +93,79 @@ export async function compileToMemory(
 	let optimisation = options.optimisation ?? defaultOptimiserOptions
 	let graph = loadModuleGraph(entry, options.host ?? diskModuleHost)
 	let sourceHash = hashGraph(entry, graph.modules, optimisation)
-	let diagnostics = [
-		...[...graph.modules.values()].flatMap((module) => module.diagnostics),
-		...graph.diagnostics,
-	]
+	let sourceTexts = new Map(
+		[...graph.modules.values()].map((module) => [
+			module.filePath,
+			module.sourceText,
+		]),
+	)
+	let answer = (
+		code: string,
+		surface: ExportSurface,
+		perModule: Array<{
+			filePath: string
+			diagnostics: Array<common.Diagnostic>
+		}>,
+		own: Array<common.Diagnostic>,
+	): MemoryCompileResult => {
+		let diagnosticGroups = groupDiagnostics(
+			entry,
+			sourceTexts,
+			perModule,
+			own,
+		)
+
+		return {
+			code,
+			surface,
+			diagnostics: diagnosticGroups.flatMap((group) => group.diagnostics),
+			diagnosticGroups,
+			sourceHash,
+		}
+	}
 
 	// NOTE: A specifier that names nothing is a parse-stage answer as much as a
 	// syntax error is: the graph resolved every entry while it was reading the
 	// files, and linking a graph with a hole in it would report the same mistake
 	// again as a name that is not in scope.
-	if (containsErrors(diagnostics)) {
-		return { code: "", surface: emptySurface(), diagnostics, sourceHash }
+	let parsed = answer(
+		"",
+		emptySurface(),
+		[...graph.modules.values()],
+		graph.diagnostics,
+	)
+
+	if (containsErrors(parsed.diagnostics)) {
+		return parsed
 	}
 
 	let linked = linkModuleGraph(graph)
 	let modules = [...linked.modules.values()]
 	let surface = linked.modules.get(entry)?.surface ?? emptySurface()
+	// NOTE: Copied rather than pointed at, because validation appends to these
+	// below and a LinkedModule's own collection is not this stage's to grow.
+	let perModule = modules.map((module) => ({
+		filePath: module.module.filePath,
+		diagnostics: [...module.diagnostics],
+	}))
+	let enriched = answer("", surface, perModule, linked.diagnostics)
 
-	diagnostics = [
-		...modules.flatMap((module) => module.diagnostics),
-		...linked.diagnostics,
-	]
-
-	if (containsErrors(diagnostics)) {
-		return { code: "", surface, diagnostics, sourceHash }
+	if (containsErrors(enriched.diagnostics)) {
+		return enriched
 	}
 
 	// NOTE: Validation runs over the whole graph, and only once nothing in it has
 	// reported an error — a Module that failed to enrich carries Types that were
 	// never established, and validating those answers about the failure rather
 	// than about the source.
-	for (let module of modules) {
-		diagnostics.push(...validate(module.program))
+	for (let [index, module] of modules.entries()) {
+		perModule[index]!.diagnostics.push(...validate(module.program))
 	}
 
-	if (containsErrors(diagnostics)) {
-		return { code: "", surface, diagnostics, sourceHash }
+	let validated = answer("", surface, perModule, linked.diagnostics)
+
+	if (containsErrors(validated.diagnostics)) {
+		return validated
 	}
 
 	let bundled = await emitBundle({
@@ -129,25 +186,61 @@ export async function compileToMemory(
 		transformSources: options.transformSources,
 	})
 
-	diagnostics.push(...bundled.diagnostics)
+	// NOTE: A bundling failure is a Compiler bug rather than a file's, so it goes
+	// where the graph's own Diagnostics go: under the entry.
+	let own = [...linked.diagnostics, ...bundled.diagnostics]
 
 	if (containsErrors(bundled.diagnostics)) {
-		return { code: "", surface, diagnostics, sourceHash }
+		return answer("", surface, perModule, own)
 	}
 
 	let primary = bundled.outputs.find(
 		(output) => !output.path.endsWith(".map"),
 	)
 
-	return {
-		code:
-			primary === undefined
-				? ""
-				: new TextDecoder().decode(primary.contents),
+	return answer(
+		primary === undefined ? "" : new TextDecoder().decode(primary.contents),
 		surface,
-		diagnostics,
-		sourceHash,
+		perModule,
+		own,
+	)
+}
+
+// NOTE: Empty groups are dropped so that a host can render every group it is
+// handed without asking whether there is anything in it.
+function groupDiagnostics(
+	entryPath: string,
+	sourceTexts: ReadonlyMap<string, string>,
+	perModule: Array<{
+		filePath: string
+		diagnostics: Array<common.Diagnostic>
+	}>,
+	own: Array<common.Diagnostic>,
+): Array<DiagnosticGroup> {
+	let groups: Array<DiagnosticGroup> = []
+
+	for (let module of perModule) {
+		if (module.diagnostics.length > 0) {
+			groups.push({
+				filePath: module.filePath,
+				sourceText: sourceTexts.get(module.filePath) ?? "",
+				diagnostics: [...module.diagnostics],
+			})
+		}
 	}
+
+	if (own.length > 0) {
+		groups.push({
+			// NOTE: An entry that could not be read is not in the graph at all, so
+			// its text is empty — which is the right excerpt for the placeless
+			// Diagnostic saying exactly that.
+			filePath: entryPath,
+			sourceText: sourceTexts.get(entryPath) ?? "",
+			diagnostics: [...own],
+		})
+	}
+
+	return groups
 }
 
 // NOTE: `.mjs` rather than `.js`, so that a host writing the bundle out under
