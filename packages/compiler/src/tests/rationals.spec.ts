@@ -259,7 +259,7 @@ describe("Rationals", () => {
 						constant text = value
 							::toString(formatAs NumberFormat#Decimal)
 
-						<- __print(match Rational.parse(text) -> String {
+						<- Terminal.inspect(match Rational.parse(text) -> String {
 							case #Value(parsed) {
 								<- parsed::is(value)::toString()
 							}
@@ -335,14 +335,14 @@ describe("Rationals", () => {
 
 					match 1/2::divide(by negativeThree) -> {} {
 						case #Value(quotient) {
-							__print(quotient::toString())
-							__print(quotient::isLessThan(0/1)::toString())
-							__print(quotient::absolute()::toString())
-							__print(quotient::round(toward #Down)::toString())
+							Terminal.inspect(quotient::toString())
+							Terminal.inspect(quotient::isLessThan(0/1)::toString())
+							Terminal.inspect(quotient::absolute()::toString())
+							Terminal.inspect(quotient::round(toward #Down)::toString())
 							<- {}
 						}
 						case #Empty {
-							__print("Empty")
+							Terminal.inspect("Empty")
 							<- {}
 						}
 					}
@@ -357,14 +357,14 @@ describe("Rationals", () => {
 
 					match 1/2::divide(by negativeThree) -> {} {
 						case #Value(quotient) {
-							__print(quotient::round()::toString())
-							__print(quotient::round(toward #TowardZero)::toString())
-							__print(quotient::isLessThan(0)::toString())
-							__print(quotient::isGreaterThan(0)::toString())
+							Terminal.inspect(quotient::round()::toString())
+							Terminal.inspect(quotient::round(toward #TowardZero)::toString())
+							Terminal.inspect(quotient::isLessThan(0)::toString())
+							Terminal.inspect(quotient::isGreaterThan(0)::toString())
 							<- {}
 						}
 						case #Empty {
-							__print("Empty")
+							Terminal.inspect("Empty")
 							<- {}
 						}
 					}
@@ -379,9 +379,9 @@ describe("Rationals", () => {
 					constant negativeThree = 0::subtract(3)
 					constant negativeOne = 0::subtract(1)
 
-					__print(half::multiply(with negativeThree)::toString())
-					__print(half::add(negativeOne)::toString())
-					__print(half::toString())
+					Terminal.inspect(half::multiply(with negativeThree)::toString())
+					Terminal.inspect(half::add(negativeOne)::toString())
+					Terminal.inspect(half::toString())
 				}`),
 			).toEqual(['"-3/2"', '"-1/2"', '"1/2"'])
 		})
@@ -395,15 +395,15 @@ describe("Rationals", () => {
 						case #Value(quotient) {
 							constant text = quotient::toString()
 
-							__print(text)
-							__print(match Rational.parse(text) -> String {
+							Terminal.inspect(text)
+							Terminal.inspect(match Rational.parse(text) -> String {
 								case #Value(parsed) { <- parsed::toString() }
 								case #Empty         { <- "Empty" }
 							})
 							<- {}
 						}
 						case #Empty {
-							__print("Empty")
+							Terminal.inspect("Empty")
 							<- {}
 						}
 					}
@@ -420,7 +420,7 @@ describe("Rationals", () => {
 						::divide(by negativeThree)
 						::otherwise(0/1)
 
-					__print(match Number.lowestNumber(
+					Terminal.inspect(match Number.lowestNumber(
 						[quotient, negativeOne],
 					) -> String {
 						case #Value(lowest) {
@@ -440,9 +440,9 @@ describe("Rationals", () => {
 				await run(`implementation {
 					constant cancelled = 1/2::subtract(1/2)
 
-					__print(cancelled::toString())
-					__print(cancelled::denominator()::toString())
-					__print(cancelled::isWholeNumber()::toString())
+					Terminal.inspect(cancelled::toString())
+					Terminal.inspect(cancelled::denominator()::toString())
+					Terminal.inspect(cancelled::isWholeNumber()::toString())
 				}`),
 			).toEqual(['"0/1"', '"1"', '"true"'])
 		})
@@ -450,9 +450,9 @@ describe("Rationals", () => {
 		it("prints a whole-valued Rational as a decimal a caller can read back", async () => {
 			expect(
 				await run(`implementation {
-					__print(4/2::toString(formatAs NumberFormat#Decimal))
-					__print(1/2::subtract(1/2)::toString(formatAs NumberFormat#Decimal))
-					__print(match Rational.parse(4/2::toString(formatAs NumberFormat#Decimal)) -> String {
+					Terminal.inspect(4/2::toString(formatAs NumberFormat#Decimal))
+					Terminal.inspect(1/2::subtract(1/2)::toString(formatAs NumberFormat#Decimal))
+					Terminal.inspect(match Rational.parse(4/2::toString(formatAs NumberFormat#Decimal)) -> String {
 						case #Value(parsed) { <- parsed::toString() }
 						case #Empty         { <- "Empty" }
 					})
@@ -463,7 +463,7 @@ describe("Rationals", () => {
 		it("takes the root of zero as an Integer, not an Algebraic", async () => {
 			expect(
 				await run(`implementation {
-					__print(match 0::squareRoot() -> String {
+					Terminal.inspect(match 0::squareRoot() -> String {
 						case #Value(root) {
 							<- match root -> String {
 								case Integer   { <- @::toString() }
@@ -473,7 +473,7 @@ describe("Rationals", () => {
 						case #Empty { <- "Empty" }
 					})
 
-					__print(match 0/5::squareRoot() -> String {
+					Terminal.inspect(match 0/5::squareRoot() -> String {
 						case #Value(root) {
 							<- match root -> String {
 								case Rational  { <- @::toString() }

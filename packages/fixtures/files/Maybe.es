@@ -56,19 +56,21 @@ implementation {
 		<- #Some(item::multiply(with 1/5))
 	})
 
-	__print(maybeRational) § Maybe#Some(1/5)
-	__print(asMaybe(list::firstItem())::default(to 0)) § 1
+	Terminal.inspect(maybeRational) § Maybe#Some(1/5)
+	Terminal.inspect(asMaybe(list::firstItem())::default(to 0)) § 1
 
 	constant empty: List<Integer> = []
 
-	__print(asMaybe(empty::firstItem())::default(to 42)) § 42
+	Terminal.inspect(asMaybe(empty::firstItem())::default(to 42)) § 42
 
 	constant missing: Maybe<Integer> = #None
 
-	__print(
+	Terminal.inspect(
 		missing::andThen((_ item: Integer) -> Maybe<Rational> {
 			<- #Some(item::multiply(with 1/5))
 		}),
 	) § Maybe#None
-	__print(maybeRational::default(computedBy () -> Rational { <- 0/1 })) § 1/5
+	Terminal.inspect(
+		maybeRational::default(computedBy () -> Rational { <- 0/1 }),
+	) § 1/5
 }

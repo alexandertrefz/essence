@@ -43,14 +43,14 @@ implementation {
 	§ contents — a path sorts ahead of every path it is a prefix of.
 	entries
 		::sort()
-		::map((entry) { <- __print(rendered(entry, within entries)) })
+		::map((entry) { <- Terminal.inspect(rendered(entry, within entries)) })
 
 	§ And the usual tree questions are List questions.
 	constant files = entries::removeEvery(where (entry) {
 		<- isDirectory(entry, within entries)
 	})
 
-	__print(
+	Terminal.inspect(
 		"{files::length()} files, {
 			entries::length()::subtract(files::length())
 		} directories",

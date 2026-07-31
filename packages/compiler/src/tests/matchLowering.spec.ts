@@ -40,7 +40,7 @@ function generate(
 }
 
 // NOTE: Writes the emitted Program to a throwaway module and imports it so its
-// top-level `__print` calls run. The emitted imports are absolute paths into
+// top-level `Terminal.inspect` calls run. The emitted imports are absolute paths into
 // this repo's runtime, so the module resolves from anywhere; `console.log` is
 // captured to collect the output, then restored.
 async function run(source: string): Promise<Array<string>> {
@@ -88,7 +88,7 @@ describe("Match Lowering", () => {
 	// it printed a line of Compiler prose into the Program's own output and
 	// answered false. Every Handler of an exhaustive Match declined, the
 	// emitted chain fell off its end, and the Match answered `undefined` —
-	// which `__print` then read a Type key off, so a Program that compiled
+	// which the printer then read a Type key off, so a Program that compiled
 	// green died with a `TypeError` naming the runtime's internals.
 	describe("Record Matchers naming a Function member", () => {
 		let source = (value: string) => `implementation {
@@ -97,7 +97,7 @@ describe("Match Lowering", () => {
 
 			constant input: Click | Handler = ${value}
 
-			__print(match input -> String {
+			Terminal.inspect(match input -> String {
 				case { x: Integer } { <- "click" }
 				case { fn: (_ n: Integer) -> Integer } { <- "handler" }
 			})
@@ -125,7 +125,7 @@ describe("Match Lowering", () => {
 						fn = (_ n: Integer) -> Integer { <- n::multiply(with 2) }
 					}
 
-					__print(match input -> Integer {
+					Terminal.inspect(match input -> Integer {
 						case { x: Integer } { <- @.x }
 						case { fn: (_ n: Integer) -> Integer } { <- @.fn(21) }
 					})
@@ -148,7 +148,7 @@ describe("Match Lowering", () => {
 						label = "strings",
 					}
 
-					__print(match input -> String {
+					Terminal.inspect(match input -> String {
 						case { fn: (_ n: Integer) -> Integer, arity: Integer } { <- "int handler" }
 						case { fn: (_ s: String) -> String, label: String } { <- "string handler" }
 					})
@@ -169,7 +169,7 @@ describe("Match Lowering", () => {
 						times = 3,
 					}
 
-					__print(match input -> String {
+					Terminal.inspect(match input -> String {
 						case { x: Integer } { <- "click" }
 						case { fn: (_ n: Integer) -> Integer, times: Integer } where @.times::isGreaterThan(2) {
 							<- "handler, more than twice"
@@ -194,7 +194,7 @@ describe("Match Lowering", () => {
 		let source = (value: string) => `implementation {
 			constant input: { ok?: Boolean } | { count: Integer } = ${value}
 
-			__print(match input -> String {
+			Terminal.inspect(match input -> String {
 				case { ok?: Boolean } { <- "flag" }
 				case { count: Integer } { <- "count" }
 			})
@@ -222,7 +222,7 @@ describe("Match Lowering", () => {
 
 					variable thing: { ok?: Boolean } | { count: Integer } = { ok? = true }
 
-					__print(thing::describe())
+					Terminal.inspect(thing::describe())
 				}`),
 			).toEqual(['"flag"'])
 		})
@@ -257,7 +257,7 @@ describe("Match Lowering", () => {
 				`implementation {
 					constant scrutinee: Integer | String = 5
 
-					__print(match scrutinee -> String {
+					Terminal.inspect(match scrutinee -> String {
 						case Integer { <- "an Integer" }
 						case String { <- "a String" }
 					})
@@ -278,7 +278,7 @@ describe("Match Lowering", () => {
 			let generated = generate(`implementation {
 				constant scrutinee: { x: Integer } | String = "text"
 
-				__print(match scrutinee -> String {
+				Terminal.inspect(match scrutinee -> String {
 					case String { <- "a String" }
 					case { x: Integer } { <- "a Record" }
 				})
@@ -297,8 +297,8 @@ describe("Match Lowering", () => {
 					constant scrutinee: Integer | String = "text"
 
 					match scrutinee -> {} {
-						case Integer { __print("an Integer") }
-						case String { __print("a String") }
+						case Integer { Terminal.inspect("an Integer") }
+						case String { Terminal.inspect("a String") }
 					}
 				}`),
 			).toEqual(['"a String"'])
@@ -322,8 +322,8 @@ describe("Match Lowering", () => {
 				}
 			}
 
-			__print(pick("missing", fallback 7))
-			__print(pick(3, fallback 7))
+			Terminal.inspect(pick("missing", fallback 7))
+			Terminal.inspect(pick(3, fallback 7))
 		}`
 
 		it("refuses the Case a Generic Case above it swallows", () => {
@@ -358,7 +358,7 @@ describe("Match Lowering", () => {
 			constant empty: List<Integer> = []
 			constant scrutinee: List<Integer> | List<String> = empty
 
-			__print(match scrutinee -> String {
+			Terminal.inspect(match scrutinee -> String {
 				case List<String>  { <- "took the String arm" }
 				case List<Integer> { <- "took the Integer arm" }
 			})
@@ -381,7 +381,7 @@ describe("Match Lowering", () => {
 				await run(`implementation {
 					constant scrutinee: List<Integer> | List<String> = [1, 2]
 
-					__print(match scrutinee -> String {
+					Terminal.inspect(match scrutinee -> String {
 						case List<String>  { <- "took the String arm" }
 						case List<Integer> { <- "took the Integer arm" }
 					})
@@ -413,8 +413,8 @@ describe("Match Lowering", () => {
 				}
 			}
 
-			__print(doubledOrZero(21))
-			__print(doubledOrZero(0))
+			Terminal.inspect(doubledOrZero(21))
+			Terminal.inspect(doubledOrZero(0))
 		}`
 
 		it("answers per value, with the narrowed value reaching the total operation", async () => {

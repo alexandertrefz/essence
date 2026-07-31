@@ -64,7 +64,7 @@ describe("loop", () => {
 				constant sum = loop(from 1, through 10, startingWith 0,
 					step (index, total) { <- total::add(index) })
 
-				__print(sum::toString())
+				Terminal.inspect(sum::toString())
 			}`),
 		).toEqual(['"55"'])
 	})
@@ -77,7 +77,7 @@ describe("loop", () => {
 				constant digits = loop(from 3, through 1, startingWith "",
 					step (index, acc) { <- acc::append(index::toString()) })
 
-				__print(digits)
+				Terminal.inspect(digits)
 			}`),
 		).toEqual(['"321"'])
 	})
@@ -88,7 +88,7 @@ describe("loop", () => {
 				constant once = loop(from 7, through 7, startingWith 0,
 					step (index, total) { <- total::add(index) })
 
-				__print(once::toString())
+				Terminal.inspect(once::toString())
 			}`),
 		).toEqual(['"7"'])
 	})
@@ -101,7 +101,7 @@ describe("loop", () => {
 					while (n) { <- n::isLessThan(100) },
 					step (n) { <- n::multiply(with 2) })
 
-				__print(doubled::toString())
+				Terminal.inspect(doubled::toString())
 			}`),
 		).toEqual(['"128"'])
 	})
@@ -113,7 +113,7 @@ describe("loop", () => {
 					while (n) { <- n::isLessThan(100) },
 					step (n) { <- n::multiply(with 2) })
 
-				__print(untouched::toString())
+				Terminal.inspect(untouched::toString())
 			}`),
 		).toEqual(['"500"'])
 	})
@@ -125,7 +125,7 @@ describe("loop", () => {
 					until (n) { <- n::isGreaterThanOrEqualTo(100) },
 					step (n) { <- n::multiply(with 2) })
 
-				__print(doubled::toString())
+				Terminal.inspect(doubled::toString())
 			}`),
 		).toEqual(['"128"'])
 	})
@@ -137,7 +137,7 @@ describe("loop", () => {
 					until (n) { <- n::isGreaterThanOrEqualTo(100) },
 					step (n) { <- n::multiply(with 2) })
 
-				__print(untouched::toString())
+				Terminal.inspect(untouched::toString())
 			}`),
 		).toEqual(['"500"'])
 	})
@@ -158,7 +158,7 @@ describe("loop", () => {
 						})
 					})
 
-				__print(total::toString())
+				Terminal.inspect(total::toString())
 			}`),
 		).toEqual(['"15"'])
 	})
@@ -175,7 +175,7 @@ describe("loop", () => {
 						<- #Continue(count::add(1))
 					})
 
-				__print(word)
+				Terminal.inspect(word)
 			}`),
 		).toEqual(['"done"'])
 	})
@@ -205,7 +205,7 @@ describe("loop", () => {
 						<- #Continue(doubled)
 					})
 
-				__print(word)
+				Terminal.inspect(word)
 			}`),
 		).toEqual(['"done"'])
 	})
@@ -225,7 +225,7 @@ describe("loop", () => {
 						<- Step#Continue({ state = { index = state.index::add(1), total = state.total::add(state.index) } })
 					})
 
-				__print(total::toString())
+				Terminal.inspect(total::toString())
 			}`),
 		).toEqual(['"6"'])
 	})
@@ -247,7 +247,7 @@ describe("loop", () => {
 					<- ${sigil}#Continue(count::add(1))
 				})
 
-				__print(word)
+				Terminal.inspect(word)
 			}`
 
 		expect(await run(walk("", ""))).toEqual(['"done"'])
@@ -266,7 +266,7 @@ describe("reduce(startingWith:step:)", () => {
 				constant sum = [1, 2, 3, 4]::reduce(startingWith 0,
 					step (total, item) { <- #Continue(total::add(item)) })
 
-				__print(sum::toString())
+				Terminal.inspect(sum::toString())
 			}`),
 		).toEqual(['"10"'])
 	})
@@ -286,7 +286,7 @@ describe("reduce(startingWith:step:)", () => {
 						<- #Continue(next)
 					})
 
-				__print(seen::toString())
+				Terminal.inspect(seen::toString())
 			}`),
 		).toEqual(['"2"'])
 	})
@@ -298,7 +298,7 @@ describe("reduce(startingWith:step:)", () => {
 				constant sum = noNumbers::reduce(startingWith 42,
 					step (total, item) { <- #Continue(total::add(item)) })
 
-				__print(sum::toString())
+				Terminal.inspect(sum::toString())
 			}`),
 		).toEqual(['"42"'])
 	})
@@ -319,10 +319,10 @@ describe("a Step compares by its derived Equality", () => {
 				constant c: Step<Integer, Integer> = #Done(6)
 				constant going: Step<Integer, Integer> = #Continue(5)
 
-				__print(a::is(b)::toString())
-				__print(a::is(c)::toString())
-				__print(a::is(going)::toString())
-				__print(a::isNot(going)::toString())
+				Terminal.inspect(a::is(b)::toString())
+				Terminal.inspect(a::is(c)::toString())
+				Terminal.inspect(a::is(going)::toString())
+				Terminal.inspect(a::isNot(going)::toString())
 			}`),
 		).toEqual(['"true"', '"false"', '"false"', '"true"'])
 	})
@@ -338,9 +338,9 @@ describe("a Step compares by its derived Equality", () => {
 					#Continue({ index = 2, total = 0 })
 				constant stopped: Step<{ index: Integer, total: Integer }, Integer> = #Done(9)
 
-				__print(here::is(same)::toString())
-				__print(here::is(moved)::toString())
-				__print(here::is(stopped)::toString())
+				Terminal.inspect(here::is(same)::toString())
+				Terminal.inspect(here::is(moved)::toString())
+				Terminal.inspect(here::is(stopped)::toString())
 			}`),
 		).toEqual(['"true"', '"false"', '"false"'])
 	})
@@ -350,9 +350,9 @@ describe("a Step compares by its derived Equality", () => {
 			await run(`implementation {
 				constant steps: List<Step<Integer, Integer>> = [#Continue(1), #Done(2)]
 
-				__print(steps::contains(#Done(2))::toString())
-				__print(steps::contains(#Done(9))::toString())
-				__print(steps::contains(#Continue(1))::toString())
+				Terminal.inspect(steps::contains(#Done(2))::toString())
+				Terminal.inspect(steps::contains(#Done(9))::toString())
+				Terminal.inspect(steps::contains(#Continue(1))::toString())
 			}`),
 		).toEqual(['"true"', '"false"', '"true"'])
 	})
@@ -367,8 +367,8 @@ describe("a Step compares by its derived Equality", () => {
 				constant half: Step<Integer, Rational> = #Done(1/2)
 				constant twoQuarters: Step<Integer, Rational> = #Done(2/4)
 
-				__print(half::is(twoQuarters)::toString())
-				__print(half::isNot(twoQuarters)::toString())
+				Terminal.inspect(half::is(twoQuarters)::toString())
+				Terminal.inspect(half::isNot(twoQuarters)::toString())
 			}`),
 		).toEqual(['"true"', '"false"'])
 	})

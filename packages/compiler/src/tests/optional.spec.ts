@@ -85,8 +85,8 @@ describe("Optional", () => {
 				await run(`implementation {
 					${stored}
 
-					__print(stored::firstItem())
-					__print(stored::item(at 9))
+					Terminal.inspect(stored::firstItem())
+					Terminal.inspect(stored::item(at 9))
 				}`),
 			).toEqual(["Optional#Value(Optional#Empty)", "Optional#Empty"])
 		})
@@ -96,7 +96,7 @@ describe("Optional", () => {
 				await run(`implementation {
 					${stored}
 
-					__print(stored::lastItem())
+					Terminal.inspect(stored::lastItem())
 				}`),
 			).toEqual(["Optional#Value(Optional#Value(7))"])
 		})
@@ -106,9 +106,9 @@ describe("Optional", () => {
 				await run(`implementation {
 					${stored}
 
-					__print(stored::firstItem()::flatten())
-					__print(stored::lastItem()::flatten())
-					__print(stored::item(at 9)::flatten())
+					Terminal.inspect(stored::firstItem()::flatten())
+					Terminal.inspect(stored::lastItem()::flatten())
+					Terminal.inspect(stored::item(at 9)::flatten())
 				}`),
 			).toEqual(["Optional#Empty", "Optional#Value(7)", "Optional#Empty"])
 		})
@@ -121,8 +121,8 @@ describe("Optional", () => {
 				await run(`implementation {
 					${stored}
 
-					__print(stored::firstItem(where (item) { <- item::isEmpty() }))
-					__print(stored::firstItem(where (item) { <- item::is(#Value(9)) }))
+					Terminal.inspect(stored::firstItem(where (item) { <- item::isEmpty() }))
+					Terminal.inspect(stored::firstItem(where (item) { <- item::is(#Value(9)) }))
 				}`),
 			).toEqual(["Optional#Value(Optional#Empty)", "Optional#Empty"])
 		})
@@ -138,9 +138,9 @@ describe("Optional", () => {
 					constant numbers = [3, 1]
 					constant none: List<Integer> = []
 
-					__print(numbers::firstItem()::toString())
-					__print(none::firstItem()::toString())
-					__print("{numbers::firstItem()}")
+					Terminal.inspect(numbers::firstItem()::toString())
+					Terminal.inspect(none::firstItem()::toString())
+					Terminal.inspect("{numbers::firstItem()}")
 				}`),
 			).toEqual([`"Value(3)"`, `"Empty"`, `"Value(3)"`])
 		})
@@ -151,10 +151,10 @@ describe("Optional", () => {
 					constant numbers = [3, 1]
 					constant none: List<Integer> = []
 
-					__print(numbers::firstItem()::is(#Value(3)))
-					__print(numbers::firstItem()::is(#Value(1)))
-					__print(numbers::firstItem()::is(#Empty))
-					__print(none::firstItem()::is(#Empty))
+					Terminal.inspect(numbers::firstItem()::is(#Value(3)))
+					Terminal.inspect(numbers::firstItem()::is(#Value(1)))
+					Terminal.inspect(numbers::firstItem()::is(#Empty))
+					Terminal.inspect(none::firstItem()::is(#Empty))
 				}`),
 			).toEqual(["true", "false", "false", "true"])
 		})
@@ -164,9 +164,9 @@ describe("Optional", () => {
 				await run(`implementation {
 					constant stored: List<Optional<Integer>> = [#Empty, #Value(7)]
 
-					__print(stored::firstIndex(of #Empty))
-					__print(stored::firstIndex(of #Value(7)))
-					__print(stored::contains(#Value(9)))
+					Terminal.inspect(stored::firstIndex(of #Empty))
+					Terminal.inspect(stored::firstIndex(of #Value(7)))
+					Terminal.inspect(stored::contains(#Value(9)))
 				}`),
 			).toEqual(["Optional#Value(0)", "Optional#Value(1)", "false"])
 		})
@@ -179,10 +179,10 @@ describe("Optional", () => {
 					constant numbers = [3, 1]
 					constant none: List<Integer> = []
 
-					__print(numbers::firstItem()::map((n) { <- n::multiply(with 10) }))
-					__print(none::firstItem()::map((n) { <- n::multiply(with 10) }))
-					__print(numbers::firstItem()::keep(where (n) { <- n::isOdd() }))
-					__print(numbers::firstItem()::keep(where (n) { <- n::isEven() }))
+					Terminal.inspect(numbers::firstItem()::map((n) { <- n::multiply(with 10) }))
+					Terminal.inspect(none::firstItem()::map((n) { <- n::multiply(with 10) }))
+					Terminal.inspect(numbers::firstItem()::keep(where (n) { <- n::isOdd() }))
+					Terminal.inspect(numbers::firstItem()::keep(where (n) { <- n::isEven() }))
 				}`),
 			).toEqual([
 				"Optional#Value(30)",
@@ -198,10 +198,10 @@ describe("Optional", () => {
 					constant numbers = [3]
 					constant none: List<Integer> = []
 
-					__print(numbers::firstItem()::hasValue())
-					__print(numbers::firstItem()::isEmpty())
-					__print(none::firstItem()::hasValue())
-					__print(none::firstItem()::isEmpty())
+					Terminal.inspect(numbers::firstItem()::hasValue())
+					Terminal.inspect(numbers::firstItem()::isEmpty())
+					Terminal.inspect(none::firstItem()::hasValue())
+					Terminal.inspect(none::firstItem()::isEmpty())
 				}`),
 			).toEqual(["true", "false", "false", "true"])
 		})
@@ -216,7 +216,7 @@ describe("Optional", () => {
 				await run(`implementation {
 					constant stored: List<Optional<Integer>> = [#Empty, #Value(7)]
 
-					__print(match stored::lastItem() -> String {
+					Terminal.inspect(match stored::lastItem() -> String {
 						case #Value(inner) where inner::hasValue() {
 							<- "found {inner}"
 						}
@@ -236,7 +236,7 @@ describe("Optional", () => {
 			let diagnostics = diagnosticsOf(`implementation {
 				constant numbers = [3]
 
-				__print(numbers::firstItem()::hasValu())
+				Terminal.inspect(numbers::firstItem()::hasValu())
 			}`)
 
 			expect(diagnostics.map(({ code }) => code)).toContain(
@@ -257,7 +257,7 @@ describe("Optional", () => {
 			let diagnostics = diagnosticsOf(`implementation {
 				constant maybe: Optional<Rational> = #Empty
 
-				__print(maybe::otherwise(0))
+				Terminal.inspect(maybe::otherwise(0))
 			}`)
 
 			expect(diagnostics.map(({ code }) => code)).toEqual([
@@ -278,7 +278,7 @@ describe("Optional", () => {
 			let diagnostics = diagnosticsOf(`implementation {
 				constant mixed: Integer | String = 1
 
-				__print(mixed::isEven())
+				Terminal.inspect(mixed::isEven())
 			}`)
 
 			expect(diagnostics.map(({ code }) => code)).toEqual([
@@ -294,7 +294,7 @@ describe("Optional", () => {
 				diagnosticsOf(`implementation {
 					constant numbers = [3]
 
-					__print(match numbers::firstItem() -> Integer {
+					Terminal.inspect(match numbers::firstItem() -> Integer {
 						case #Value(item) { <- item }
 					})
 				}`).map(({ code }) => code),
@@ -318,8 +318,8 @@ describe("Optional", () => {
 					constant boxed: Box<Integer> = #Empty
 					constant missing: Optional<Integer> = #Empty
 
-					__print(boxed)
-					__print(missing)
+					Terminal.inspect(boxed)
+					Terminal.inspect(missing)
 				}`),
 			).toEqual(["Box#Empty", "Optional#Empty"])
 		})

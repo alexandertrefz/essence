@@ -108,7 +108,7 @@ launch.json needed. Breakpoints bind on source lines, stepping lands where the
 source says, and the call stack and the Variables view speak Essence
 throughout: frames carry the names the author wrote (`greet`, `List.sorted`,
 a `match` reads as one), compiler glue is hidden, and values render the way
-`__print` spells them — `3/4`, `"text"`, `Ordering#Less`,
+`Terminal.inspect` spells them — `3/4`, `"text"`, `Ordering#Less`,
 `{ width = 3, height = 4 }` — expanded children included.
 
 The session is the Essence Debug Adapter, `essence dap`: the same binary that

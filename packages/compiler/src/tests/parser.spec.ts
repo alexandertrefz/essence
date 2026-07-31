@@ -2193,14 +2193,14 @@ describe("Parser", () => {
 			let node = declarationsNode(
 				`declarations {
 					§§ Prints a value.
-					function __print <infer Item>(_ value: Item) -> Item
+					function __native <infer Item>(_ value: Item) -> Item
 				}`,
 			)
 
 			expect(node.nodeType).toBe("NativeFunctionStatement")
 
 			if (node.nodeType === "NativeFunctionStatement") {
-				expect(node.name.content).toBe("__print")
+				expect(node.name.content).toBe("__native")
 			}
 		})
 

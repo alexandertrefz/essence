@@ -51,15 +51,15 @@ implementation {
 	constant flight = { departure = 41_400, arrival = 45_072 }
 
 	§ Only Duration declares `hours`, so the bare call finds it.
-	__print(flight::duration()) § 3672
-	__print(flight::duration()::hours()) § 1
+	Terminal.inspect(flight::duration()) § 3672
+	Terminal.inspect(flight::duration()::hours()) § 1
 
 	§ Both declare `formatted`, so the call says which reading it wants.
-	__print(flight::duration()::<Duration>formatted()) § "1h 1m 12s"
-	__print(flight::duration()::<Clock>formatted()) § "01:01:12"
+	Terminal.inspect(flight::duration()::<Duration>formatted()) § "1h 1m 12s"
+	Terminal.inspect(flight::duration()::<Clock>formatted()) § "01:01:12"
 
-	__print(Clock.noon::<Clock>formatted()) § "12:00:00"
-	__print(
+	Terminal.inspect(Clock.noon::<Clock>formatted()) § "12:00:00"
+	Terminal.inspect(
 		flight.arrival::isGreaterThan(Clock.noon),
 	) § true — landing after noon
 }

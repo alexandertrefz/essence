@@ -29,7 +29,7 @@ describe("Parser Diagnostics", () => {
 	describe("Number Literals", () => {
 		it("should report a Number Literal that holds letters", () => {
 			let { diagnostics } = parseWithDiagnostics(
-				"implementation { __print(0xFF::toString()) }",
+				"implementation { Terminal.inspect(0xFF::toString()) }",
 			)
 
 			expect(diagnostics).toHaveLength(1)
@@ -39,8 +39,8 @@ describe("Parser Diagnostics", () => {
 			expect(diagnostics[0].labels).toHaveLength(1)
 			expect(diagnostics[0].labels[0]?.kind).toBe("primary")
 			expect(diagnostics[0].position).toEqual({
-				start: { line: 1, column: 26 },
-				end: { line: 1, column: 30 },
+				start: { line: 1, column: 35 },
+				end: { line: 1, column: 39 },
 			})
 		})
 

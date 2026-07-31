@@ -21,7 +21,7 @@ import { validate } from "../validator/index"
 // seen none of it, so these run.
 
 // NOTE: Emits the Program, writes it to a throwaway module and imports it so
-// its top-level `__print` calls run — the same harness `codeGeneration.spec.ts`
+// its top-level `Terminal.inspect` calls run — the same harness `codeGeneration.spec.ts`
 // and `resolvers.spec.ts` use.
 //
 // NOTE: `expectedWarnings` names the Diagnostics a Program is SUPPOSED to carry.
@@ -108,7 +108,7 @@ describe("Dispatch and Resolution", () => {
 						}
 					}
 
-					__print(1::apply((item) { <- item::toString() }))
+					Terminal.inspect(1::apply((item) { <- item::toString() }))
 				}`),
 			).toEqual(['"1"'])
 		})
@@ -131,7 +131,7 @@ describe("Dispatch and Resolution", () => {
 						}
 					}
 
-					__print(1::apply((item) { <- item::toString() }))
+					Terminal.inspect(1::apply((item) { <- item::toString() }))
 				}`),
 			).toEqual(['"1"'])
 		})
@@ -166,7 +166,7 @@ describe("Dispatch and Resolution", () => {
 
 						variable values: List<{ a: Integer }> | List<{ b: Integer }> = [{ a = 1 }]
 
-						__print(values::map((item) { <- item::label() }))
+						Terminal.inspect(values::map((item) { <- item::label() }))
 					}`,
 					["empty-list-overlap"],
 				),
@@ -184,7 +184,7 @@ describe("Dispatch and Resolution", () => {
 
 						variable values: List<{ b: Integer }> | List<{ a: Integer }> = [{ a = 1 }]
 
-						__print(values::map((item) { <- item::label() }))
+						Terminal.inspect(values::map((item) { <- item::label() }))
 					}`,
 					["empty-list-overlap"],
 				),
@@ -203,8 +203,8 @@ describe("Dispatch and Resolution", () => {
 						variable numbers: List<Integer> | List<String> = [1, 2]
 						variable words: List<Integer> | List<String> = ["a", "b"]
 
-						__print(numbers::map((item) { <- item::toString() }))
-						__print(words::map((item) { <- item::toString() }))
+						Terminal.inspect(numbers::map((item) { <- item::toString() }))
+						Terminal.inspect(words::map((item) { <- item::toString() }))
 					}`,
 					["empty-list-overlap", "empty-list-overlap"],
 				),
@@ -226,7 +226,7 @@ describe("Dispatch and Resolution", () => {
 					`implementation {
 						variable words: List<String> | List<Integer> = ["a", "b"]
 
-						__print(words::map((item) { <- item::toString() }))
+						Terminal.inspect(words::map((item) { <- item::toString() }))
 					}`,
 					["empty-list-overlap"],
 				),
@@ -264,7 +264,7 @@ describe("Dispatch and Resolution", () => {
 
 					variable value: { a: Integer } | { b: Integer } = { a = 1 }
 
-					__print(value::pair((item) { <- item::label() }, second (item) { <- item::label()::append("!") }))
+					Terminal.inspect(value::pair((item) { <- item::label() }, second (item) { <- item::label()::append("!") }))
 				}`),
 			).toEqual(['"ALPHAALPHA!"'])
 		})
@@ -304,14 +304,14 @@ describe("Dispatch and Resolution", () => {
 					}
 
 					function noisy() -> String {
-						__print("evaluated")
+						Terminal.inspect("evaluated")
 
 						<- "!"
 					}
 
 					variable value: { a: Integer } | { b: Integer } = { a = 1 }
 
-					__print(value::combine((item) { <- item::label() }, with noisy()))
+					Terminal.inspect(value::combine((item) { <- item::label() }, with noisy()))
 				}`),
 			).toEqual(['"evaluated"', '"ALPHA!"'])
 		})
@@ -338,7 +338,7 @@ describe("Dispatch and Resolution", () => {
 
 					variable value: { a: Integer } | { b: Integer } = { a = 1 }
 
-					__print(value::apply((item) { <- item.b::toString() }))
+					Terminal.inspect(value::apply((item) { <- item.b::toString() }))
 				}`),
 			)
 
@@ -378,7 +378,7 @@ describe("Dispatch and Resolution", () => {
 
 			variable shape: Mixed<{ width: Integer, height: Integer }> = { width = 1, height = 2 }
 
-			__print(shape::describe())
+			Terminal.inspect(shape::describe())
 		}`
 
 		it("reaches the more specific Record's branch", async () => {
@@ -418,11 +418,11 @@ describe("Dispatch and Resolution", () => {
 
 					variable shape: Mixed<{ width: Integer, height: Integer }> = { width = 1 }
 
-					__print(shape::describe())
+					Terminal.inspect(shape::describe())
 
 					shape = true
 
-					__print(shape::describe())
+					Terminal.inspect(shape::describe())
 				}`),
 			).toEqual(['"square"', '"flag"'])
 		})
@@ -460,7 +460,7 @@ describe("Dispatch and Resolution", () => {
 				await run(`implementation {
 					${ratios}
 
-					__print(6::describe(by 3))
+					Terminal.inspect(6::describe(by 3))
 				}`),
 			).toEqual(['"total"'])
 		})
@@ -478,8 +478,8 @@ describe("Dispatch and Resolution", () => {
 						<- "zero"
 					}
 
-					__print(describeChecked(3))
-					__print(describeChecked(0))
+					Terminal.inspect(describeChecked(3))
+					Terminal.inspect(describeChecked(0))
 				}`),
 			).toEqual(['"total"', '"zero"'])
 		})
@@ -498,8 +498,8 @@ describe("Dispatch and Resolution", () => {
 						<- 6::describe(by n)
 					}
 
-					__print(describeAny(3))
-					__print(describeAny(0))
+					Terminal.inspect(describeAny(3))
+					Terminal.inspect(describeAny(0))
 				}`),
 			).toEqual(['"checked"', '"checked"'])
 		})
@@ -541,8 +541,8 @@ describe("Dispatch and Resolution", () => {
 
 					constant vector: Vector = { x = 1, y = 2 }
 
-					__print(Picker.pick(true, with 3))
-					__print(Picker.pick(vector, with 3))
+					Terminal.inspect(Picker.pick(true, with 3))
+					Terminal.inspect(Picker.pick(vector, with 3))
 				}`),
 			).toEqual(['"base"', '"vector"'])
 		})
@@ -567,7 +567,7 @@ describe("Dispatch and Resolution", () => {
 						}
 					}
 
-					__print(6::describe(by 3))
+					Terminal.inspect(6::describe(by 3))
 				}`),
 			).toEqual(['"wide"'])
 		})
@@ -600,7 +600,7 @@ describe("Dispatch and Resolution", () => {
 				await run(`implementation {
 					${lists}
 
-					__print(Firsts.describe(["a"]))
+					Terminal.inspect(Firsts.describe(["a"]))
 				}`),
 			).toEqual(['"total"'])
 		})
@@ -622,9 +622,9 @@ describe("Dispatch and Resolution", () => {
 						<- Firsts.describe(items)
 					}
 
-					__print(describeChecked(["a"]))
-					__print(describeChecked([]))
-					__print(describeAny(["a"]))
+					Terminal.inspect(describeChecked(["a"]))
+					Terminal.inspect(describeChecked([]))
+					Terminal.inspect(describeAny(["a"]))
 				}`),
 			).toEqual(['"total"', '"empty"', '"checked"'])
 		})
@@ -690,7 +690,7 @@ describe("Dispatch and Resolution", () => {
 
 					${bounds("NonZero")}
 
-					__print(6::describe(by 3, with true))
+					Terminal.inspect(6::describe(by 3, with true))
 				}`
 
 				let diagnostics = diagnosticsFor(source)
@@ -715,7 +715,7 @@ describe("Dispatch and Resolution", () => {
 				let source = `implementation {
 					${bounds("Integer")}
 
-					__print(6::describe(by 3, with true))
+					Terminal.inspect(6::describe(by 3, with true))
 				}`
 
 				let diagnostics = diagnosticsFor(source)
@@ -772,7 +772,7 @@ describe("Dispatch and Resolution", () => {
 
 					${appliers("NonZero")}
 
-					__print(1::apply((item) { <- item::isEven()::toString() }, with true))
+					Terminal.inspect(1::apply((item) { <- item::isEven()::toString() }, with true))
 				}`
 
 				// NOTE: One Diagnostic, and it is about the call rather than about
@@ -802,7 +802,7 @@ describe("Dispatch and Resolution", () => {
 				let source = `implementation {
 					${appliers("String")}
 
-					__print(1::apply((item) { <- item::isEven()::toString() }, with true))
+					Terminal.inspect(1::apply((item) { <- item::isEven()::toString() }, with true))
 				}`
 
 				let diagnostics = diagnosticsFor(source)
@@ -875,8 +875,8 @@ describe("Dispatch and Resolution", () => {
 						}
 					}
 
-					__print(Maker.describe(5))
-					__print(Maker.describe(true))
+					Terminal.inspect(Maker.describe(5))
+					Terminal.inspect(Maker.describe(true))
 				}`),
 			).toEqual(['"5"', '"boolean"'])
 		})

@@ -37,30 +37,30 @@ describe("Selection Ranges", () => {
 			"\tfunction identity (_ value: Integer) -> Integer {",
 			"\t\t<- value",
 			"\t}",
-			"\t__print(identity(identity(1)))",
+			"\tTerminal.inspect(identity(identity(1)))",
 			"}",
 		].join("\n")
 
 		// NOTE: The cursor sits on the `1` inside the innermost call.
-		let ranges = selectionRangesOf(source, { line: 5, column: 28 })
+		let ranges = selectionRangesOf(source, { line: 5, column: 37 })
 
 		expect(ranges.slice(0, 4)).toEqual([
-			// NOTE: The literal, then each enclosing call, then `__print(…)`.
+			// NOTE: The literal, then each enclosing call, then `Terminal.inspect(…)`.
+			{
+				start: { line: 5, column: 37 },
+				end: { line: 5, column: 38 },
+			},
 			{
 				start: { line: 5, column: 28 },
-				end: { line: 5, column: 29 },
+				end: { line: 5, column: 39 },
 			},
 			{
 				start: { line: 5, column: 19 },
-				end: { line: 5, column: 30 },
-			},
-			{
-				start: { line: 5, column: 10 },
-				end: { line: 5, column: 31 },
+				end: { line: 5, column: 40 },
 			},
 			{
 				start: { line: 5, column: 2 },
-				end: { line: 5, column: 32 },
+				end: { line: 5, column: 41 },
 			},
 		])
 

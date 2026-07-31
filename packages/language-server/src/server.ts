@@ -709,7 +709,7 @@ export function startServer() {
 	connection.languages.onLinkedEditingRange((params) => {
 		// NOTE: Editing one occurrence updates the rest as they are typed, so
 		// this is deliberately restricted to what renaming would accept —
-		// Builtins are excluded, since typing over `__print` must not look
+		// Builtins are excluded, since typing over `Terminal` must not look
 		// like it is renaming it.
 		let occurrence = renameableOccurrenceAt(
 			params.textDocument.uri,

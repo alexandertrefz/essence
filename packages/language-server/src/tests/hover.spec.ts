@@ -33,11 +33,11 @@ describe("Hover", () => {
 		let source = [
 			"implementation {",
 			'\tconstant name = "Essence"',
-			"\t__print(name)",
+			"\tTerminal.inspect(name)",
 			"}",
 		].join("\n")
 
-		expect(hover(source, { line: 3, column: 10 })).toBe("name: String")
+		expect(hover(source, { line: 3, column: 19 })).toBe("name: String")
 	})
 
 	it("should describe Functions with their full signature", () => {
@@ -79,22 +79,22 @@ describe("Hover", () => {
 			"implementation {",
 			"\ttype Value = Integer | String",
 			"\tconstant something: Value = 42",
-			"\t__print(something)",
+			"\tTerminal.inspect(something)",
 			"}",
 		].join("\n")
 
-		expect(hover(source, { line: 4, column: 10 })).toBe("something: Value")
+		expect(hover(source, { line: 4, column: 19 })).toBe("something: Value")
 	})
 
 	it("should describe an anonymous Union Type member by member", () => {
 		let source = [
 			"implementation {",
 			"\tconstant something: Integer | String = 42",
-			"\t__print(something)",
+			"\tTerminal.inspect(something)",
 			"}",
 		].join("\n")
 
-		expect(hover(source, { line: 3, column: 10 })).toBe(
+		expect(hover(source, { line: 3, column: 19 })).toBe(
 			"something: Integer | String",
 		)
 	})
@@ -108,11 +108,11 @@ describe("Hover", () => {
 		let source = [
 			"implementation {",
 			"\tconstant something: Integer | Rational | String = 42",
-			"\t__print(something)",
+			"\tTerminal.inspect(something)",
 			"}",
 		].join("\n")
 
-		expect(hover(source, { line: 3, column: 10 })).toBe(
+		expect(hover(source, { line: 3, column: 19 })).toBe(
 			"something: Integer | Rational | String",
 		)
 	})
@@ -127,11 +127,11 @@ describe("Hover", () => {
 			"implementation {",
 			"\ttype IntOrText = Integer | String",
 			"\tconstant mixed: IntOrText | Rational = 1",
-			"\t__print(mixed)",
+			"\tTerminal.inspect(mixed)",
 			"}",
 		].join("\n")
 
-		expect(hover(source, { line: 4, column: 10 })).toBe(
+		expect(hover(source, { line: 4, column: 19 })).toBe(
 			"mixed: IntOrText | Rational",
 		)
 	})
@@ -143,11 +143,11 @@ describe("Hover", () => {
 		let source = [
 			"implementation {",
 			"\tconstant something: Number | String = 42",
-			"\t__print(something)",
+			"\tTerminal.inspect(something)",
 			"}",
 		].join("\n")
 
-		expect(hover(source, { line: 3, column: 10 })).toBe(
+		expect(hover(source, { line: 3, column: 19 })).toBe(
 			"something: Number | String",
 		)
 	})
@@ -156,11 +156,11 @@ describe("Hover", () => {
 		let source = [
 			"implementation {",
 			"\tconstant something: Optional<Integer> = #Empty",
-			"\t__print(something)",
+			"\tTerminal.inspect(something)",
 			"}",
 		].join("\n")
 
-		expect(hover(source, { line: 3, column: 10 })).toBe(
+		expect(hover(source, { line: 3, column: 19 })).toBe(
 			"something: Optional<Integer>",
 		)
 	})
@@ -170,11 +170,11 @@ describe("Hover", () => {
 			"implementation {",
 			"\ttype Fallible<Value> = Value | String",
 			"\tconstant something: Fallible<Integer> = 42",
-			"\t__print(something)",
+			"\tTerminal.inspect(something)",
 			"}",
 		].join("\n")
 
-		expect(hover(source, { line: 4, column: 10 })).toBe(
+		expect(hover(source, { line: 4, column: 19 })).toBe(
 			"something: Fallible<Integer>",
 		)
 	})
@@ -187,7 +187,7 @@ describe("Hover", () => {
 		let source = [
 			"implementation {",
 			"\tconstant value: Number | String = 42",
-			"\t__print(match value -> Number {",
+			"\tTerminal.inspect(match value -> Number {",
 			"\t\tcase String { <- 0 }",
 			"\t\tcase _ { <- @ }",
 			"\t})",
@@ -200,13 +200,13 @@ describe("Hover", () => {
 	it("should describe Method invocations", () => {
 		let source = [
 			"implementation {",
-			'\t__print("Hello"::append("!"))',
+			'\tTerminal.inspect("Hello"::append("!"))',
 			"}",
 		].join("\n")
 
 		// NOTE: Self is stripped from the signature — `append` takes two
 		// Strings internally, but a call site only passes one.
-		expect(hover(source, { line: 2, column: 20 })).toBe(
+		expect(hover(source, { line: 2, column: 29 })).toBe(
 			"append(_ String) -> String",
 		)
 	})
@@ -310,23 +310,25 @@ describe("Hover", () => {
 			"\t\t\t}",
 			"\t\t}",
 			"\t}",
-			"\t__print(1::combine(2))",
+			"\tTerminal.inspect(1::combine(2))",
 			"}",
 		].join("\n")
 
 		// NOTE: The Arguments pick the first Overload, so only that one is
 		// shown — the others are noise once the call resolved.
-		expect(hover(source, { line: 12, column: 14 })).toBe(
+		expect(hover(source, { line: 12, column: 23 })).toBe(
 			"combine(_ Integer) -> Integer",
 		)
 	})
 
 	it("should pick the Overload the Arguments selected, not the first one", () => {
-		let source = ["implementation {", "\t__print(1::add(2/1))", "}"].join(
-			"\n",
-		)
+		let source = [
+			"implementation {",
+			"\tTerminal.inspect(1::add(2/1))",
+			"}",
+		].join("\n")
 
-		expect(hover(source, { line: 2, column: 13 })).toBe(
+		expect(hover(source, { line: 2, column: 22 })).toBe(
 			"add(_ Rational) -> Rational",
 		)
 	})
@@ -423,7 +425,7 @@ describe("Hover of Type annotations", () => {
 		let source = [
 			"implementation {",
 			"\tconstant xs: List<Integer> = [1]",
-			"\t__print(xs)",
+			"\tTerminal.inspect(xs)",
 			"}",
 		].join("\n")
 
@@ -589,7 +591,7 @@ describe("Hover inside a declaration's body", () => {
 			"\tfunction f (n: Integer) -> Integer {",
 			"",
 			"\t\tif n::isGreaterThan(1) {",
-			"\t\t\t__print(n)",
+			"\t\t\tTerminal.inspect(n)",
 			"\t\t}",
 			"",
 			"\t\t<- n",
@@ -791,15 +793,15 @@ describe("Hover inside a Protocol or Choice declaration", () => {
 			'\tconstant words = ["essence"]',
 			"",
 			"\tif words::hasItems() {",
-			"\t\t__print(words::firstItem())",
+			"\t\tTerminal.inspect(words::firstItem())",
 			"\t}",
 			"}",
 		].join("\n")
 
-		expect(hover(source, { line: 5, column: 12 })).toBe(
+		expect(hover(source, { line: 5, column: 21 })).toBe(
 			"words: NonEmptyList<String>",
 		)
-		expect(hover(source, { line: 5, column: 21 })).toBe(
+		expect(hover(source, { line: 5, column: 28 })).toBe(
 			"firstItem<ItemType>() -> ItemType",
 		)
 	})
@@ -840,16 +842,16 @@ describe("Hover of conformance clauses", () => {
 describe("Hover of a standard library Method", () => {
 	let source = [
 		"implementation {",
-		"\t__print(true::negate())",
-		"\t__print(true::is(false))",
+		"\tTerminal.inspect(true::negate())",
+		"\tTerminal.inspect(true::is(false))",
 		"}",
 	].join("\n")
 
 	it("should describe a Method declared in Essence", () => {
-		expect(hover(source, { line: 2, column: 17 })).toBe(
+		expect(hover(source, { line: 2, column: 26 })).toBe(
 			"negate() -> Boolean",
 		)
-		expect(hoverDocumentation(source, { line: 2, column: 17 })).toBe(
+		expect(hoverDocumentation(source, { line: 2, column: 26 })).toBe(
 			"The opposite truth value — `false` for `true`, `true` for `false`.",
 		)
 	})
@@ -866,7 +868,7 @@ describe("Hover of a standard library Method", () => {
 	// Signature Help can reach it. Nothing is said twice; the description
 	// carries no copy of it.
 	it("should show a Parameter's text and the return text", () => {
-		expect(hoverDocumentation(source, { line: 3, column: 17 })).toBe(
+		expect(hoverDocumentation(source, { line: 3, column: 26 })).toBe(
 			[
 				"Checks whether the Boolean has the same truth value as another.",
 				"**other** — the Boolean to compare against",
@@ -919,7 +921,7 @@ describe("Hover of a standard library Method", () => {
 				"\t\tEmpty,",
 				"\t}",
 				"\tconstant b: Box<Integer> = #Empty",
-				"\t__print(match b -> Integer {",
+				"\tTerminal.inspect(match b -> Integer {",
 				"\t\tcase #Holding { <- 0 }",
 				"\t\tcase #Empty { <- 1 }",
 				"\t})",

@@ -120,7 +120,7 @@ function generate(
 
 // NOTE: The other half of every toggle: not what the two builds LOOK like but
 // what they DO. The emitted module is written to a throwaway file and imported
-// so its top-level `__print` calls run.
+// so its top-level `Terminal.inspect` calls run.
 async function outputOf(javaScript: string): Promise<Array<string>> {
 	let directory = mkdtempSync(join(tmpdir(), "essence-optimiser-"))
 	let file = join(directory, "program.ts")
@@ -206,33 +206,33 @@ const typeTests = `implementation {
 	constant mixed: List<Integer> | List<String> = ["a"]
 	constant clicked: { x: Integer, y: Integer } | String = { x = 1, y = 2 }
 
-	__print(match scalar -> String {
+	Terminal.inspect(match scalar -> String {
 		case Integer { <- "integer" }
 		case String  { <- "string" }
 	})
 
-	__print(match shape -> Integer {
+	Terminal.inspect(match shape -> Integer {
 		case #Circle { <- @.radius }
 		case #Blank  { <- 0 }
 	})
 
-	__print(match numbers -> Integer {
+	Terminal.inspect(match numbers -> Integer {
 		case List<Integer> { <- 1 }
 		case Integer       { <- 2 }
 	})
 
-	__print(match mixed -> Integer {
+	Terminal.inspect(match mixed -> Integer {
 		case List<String>  { <- 1 }
 		case List<Integer> { <- 2 }
 	})
 
-	__print(match clicked -> String {
+	Terminal.inspect(match clicked -> String {
 		case { x: Integer, y: Integer } { <- "click" }
 		case String                     { <- "text" }
 	})
 
-	__print(label(["a"], or [1, 2]))
-	__print(label(["a"], or "b"))
+	Terminal.inspect(label(["a"], or [1, 2]))
+	Terminal.inspect(label(["a"], or "b"))
 }`
 
 // NOTE: One of each thing `pool-constants` declares once — a literal written
@@ -264,14 +264,14 @@ const constants = `implementation {
 	constant shape: { x: Integer } | String = { x = 7 }
 	constant chosen: Colour = #Red
 
-	__print(1::add(1))
-	__print(1/2)
-	__print(chosen::is(#Red))
-	__print(true)
-	__print("a count: {7}")
-	__print([2, 1]::sort())
-	__print(boxes::sort())
-	__print(match shape -> String {
+	Terminal.inspect(1::add(1))
+	Terminal.inspect(1/2)
+	Terminal.inspect(chosen::is(#Red))
+	Terminal.inspect(true)
+	Terminal.inspect("a count: {7}")
+	Terminal.inspect([2, 1]::sort())
+	Terminal.inspect(boxes::sort())
+	Terminal.inspect(match shape -> String {
 		case String            { <- "text" }
 		case { x: Integer }    { <- "a Record" }
 	})
@@ -302,17 +302,17 @@ const unitCaseEquality = `implementation {
 	constant void: Box<Integer> = #Void
 	constant held: Box<Integer> = Box#Holding({ item = 1 })
 
-	__print(red::is(#Green))
-	__print(red::isNot(#Green))
-	__print(Colour#Red::is(red))
-	__print(Colour#Red::isNot(green))
-	__print(blank::is(#Blank))
-	__print(circle::is(#Blank))
-	__print(circle::is(Shape#Circle({ radius = 1 })))
-	__print(void::is(#Void))
-	__print(held::is(#Void))
-	__print(held::is(Box#Holding({ item = 1 })))
-	__print(1::isLessThan(2))
+	Terminal.inspect(red::is(#Green))
+	Terminal.inspect(red::isNot(#Green))
+	Terminal.inspect(Colour#Red::is(red))
+	Terminal.inspect(Colour#Red::isNot(green))
+	Terminal.inspect(blank::is(#Blank))
+	Terminal.inspect(circle::is(#Blank))
+	Terminal.inspect(circle::is(Shape#Circle({ radius = 1 })))
+	Terminal.inspect(void::is(#Void))
+	Terminal.inspect(held::is(#Void))
+	Terminal.inspect(held::is(Box#Holding({ item = 1 })))
+	Terminal.inspect(1::isLessThan(2))
 }`
 
 // NOTE: Every operation `lower-scalar-operations` writes out, beside the ones
@@ -333,7 +333,7 @@ const scalarOperations = `implementation {
 	§§
 	§§ @returns — always true.
 	function noisy() -> Boolean {
-		__print("evaluated")
+		Terminal.inspect("evaluated")
 
 		<- true
 	}
@@ -347,28 +347,28 @@ const scalarOperations = `implementation {
 	constant yes = true
 	constant no = false
 
-	__print(a::isLessThan(b))
-	__print(a::isLessThanOrEqualTo(b))
-	__print(a::isGreaterThan(b))
-	__print(a::isGreaterThanOrEqualTo(b))
-	__print(a::is(b))
-	__print(a::isNot(b))
-	__print(a::add(b))
-	__print(a::subtract(b))
-	__print(a::multiply(with b))
-	__print(proven::multiply(with alsoProven))
+	Terminal.inspect(a::isLessThan(b))
+	Terminal.inspect(a::isLessThanOrEqualTo(b))
+	Terminal.inspect(a::isGreaterThan(b))
+	Terminal.inspect(a::isGreaterThanOrEqualTo(b))
+	Terminal.inspect(a::is(b))
+	Terminal.inspect(a::isNot(b))
+	Terminal.inspect(a::add(b))
+	Terminal.inspect(a::subtract(b))
+	Terminal.inspect(a::multiply(with b))
+	Terminal.inspect(proven::multiply(with alsoProven))
 
-	__print(text::is(other))
-	__print(text::isNot(other))
-	__print(text::is("AB", comparing #Insensitive))
+	Terminal.inspect(text::is(other))
+	Terminal.inspect(text::isNot(other))
+	Terminal.inspect(text::is("AB", comparing #Insensitive))
 
-	__print(yes::negate())
-	__print(yes::and(no))
-	__print(yes::or(no))
-	__print(no::and(noisy()))
+	Terminal.inspect(yes::negate())
+	Terminal.inspect(yes::and(no))
+	Terminal.inspect(yes::or(no))
+	Terminal.inspect(no::and(noisy()))
 
-	__print(a::isLessThan(1/2))
-	__print(a::add(1/2))
+	Terminal.inspect(a::isLessThan(1/2))
+	Terminal.inspect(a::add(1/2))
 }`
 
 // NOTE: A shadowed Namespace standing where an `and` would skip it. `Integer`
@@ -393,7 +393,7 @@ const shadowedArgument = `implementation {
 			is(_ other: Integer) -> Boolean {
 				ran = true
 
-				__print("the shadow ran")
+				Terminal.inspect("the shadow ran")
 
 				<- true
 			}
@@ -402,8 +402,8 @@ const shadowedArgument = `implementation {
 		<- false::and(1::is(2))
 	}
 
-	__print(trick())
-	__print(ran)
+	Terminal.inspect(trick())
+	Terminal.inspect(ran)
 }`
 
 // NOTE: One dispatch of each shape `compile-union-dispatch` has to answer for:
@@ -419,7 +419,7 @@ const unionDispatch = `implementation {
 	§§
 	§§ @returns — a suffix.
 	function noisy() -> String {
-		__print("evaluated")
+		Terminal.inspect("evaluated")
 
 		<- "!"
 	}
@@ -471,16 +471,16 @@ const unionDispatch = `implementation {
 	constant items: List<Integer> | List<String> = ["b", "a"]
 	constant either: Box | Boolean = { size = 3 }
 
-	__print(value::toString())
-	__print(items::length())
-	__print(items::map((item) { <- "{item}!" }))
-	__print(items::sort())
-	__print(either::tagged(with "?"))
-	__print(either::tagged(with noisy()))
-	__print(identity(5)::toString())
-	__print(describe(1, or 2))
-	__print(describe(1, or true))
-	__print(number::multiply(with 2)::toString())
+	Terminal.inspect(value::toString())
+	Terminal.inspect(items::length())
+	Terminal.inspect(items::map((item) { <- "{item}!" }))
+	Terminal.inspect(items::sort())
+	Terminal.inspect(either::tagged(with "?"))
+	Terminal.inspect(either::tagged(with noisy()))
+	Terminal.inspect(identity(5)::toString())
+	Terminal.inspect(describe(1, or 2))
+	Terminal.inspect(describe(1, or true))
+	Terminal.inspect(number::multiply(with 2)::toString())
 }`
 
 // NOTE: The dispatch whose ANSWER depends on the order the operands are
@@ -522,7 +522,7 @@ const dispatchOrder = `implementation {
 		<- "!"
 	}
 
-	__print(either::tagged(with flip()))
+	Terminal.inspect(either::tagged(with flip()))
 }`
 
 // NOTE: A witness of each kind a hole can be given — a standard library
@@ -555,10 +555,10 @@ const witnesses = `implementation {
 	constant box: Box = { size = 3 }
 	constant nested: List<Integer> = [1, 2]
 
-	__print("you have {count} left")
-	__print("{box}")
-	__print("nested: {nested}")
-	__print([2, 1]::sort()::toString())
+	Terminal.inspect("you have {count} left")
+	Terminal.inspect("{box}")
+	Terminal.inspect("nested: {nested}")
+	Terminal.inspect([2, 1]::sort()::toString())
 }`
 
 // NOTE: Records, Lists, Cases with a payload and without, a payload that is a
@@ -582,17 +582,17 @@ const constructions = `implementation {
 	constant held: Shape = Shape#Circle(payload)
 	constant blank: Shape = Shape#Blank
 
-	__print(point)
-	__print(single)
-	__print(awkward)
-	__print(items)
-	__print(nested)
-	__print(circle)
-	__print(held)
-	__print(blank)
-	__print(circle::is(held))
-	__print(blank::is(Shape#Blank))
-	__print(match circle -> Integer {
+	Terminal.inspect(point)
+	Terminal.inspect(single)
+	Terminal.inspect(awkward)
+	Terminal.inspect(items)
+	Terminal.inspect(nested)
+	Terminal.inspect(circle)
+	Terminal.inspect(held)
+	Terminal.inspect(blank)
+	Terminal.inspect(circle::is(held))
+	Terminal.inspect(blank::is(Shape#Blank))
+	Terminal.inspect(match circle -> Integer {
 		case #Circle { <- @.radius }
 		case #Blank { <- 0 }
 	})
@@ -608,9 +608,9 @@ const constructions = `implementation {
 // them, so a constant answering for both would sort the deeper Lists by the
 // shallower one's comparison, which is a wrong ANSWER rather than a slower one.
 const conditionalConformances = `implementation {
-	__print([[3], [1, 2]]::sort())
-	__print([[[2]], [[1]]]::sort())
-	__print([1, 2]::compare(to [1, 2, 3])::toString())
+	Terminal.inspect([[3], [1, 2]]::sort())
+	Terminal.inspect([[[2]], [[1]]]::sort())
+	Terminal.inspect([1, 2]::compare(to [1, 2, 3])::toString())
 }`
 
 // NOTE: A Combination whose right-hand side is a literal, one whose right-hand
@@ -626,11 +626,11 @@ const combinations = `implementation {
 	constant both = { base with x = 8, y = 9 }
 	constant replaced = { base with x = 7 }
 
-	__print(base)
-	__print(overridden)
-	__print(both)
-	__print(replaced)
-	__print(base::is({ x = 1, y = 2 }))
+	Terminal.inspect(base)
+	Terminal.inspect(overridden)
+	Terminal.inspect(both)
+	Terminal.inspect(replaced)
+	Terminal.inspect(base::is({ x = 1, y = 2 }))
 }`
 
 // NOTE: A Match in each position `lower-matches-to-statements` writes out,
@@ -639,7 +639,7 @@ const combinations = `implementation {
 // READS `_self` and may not bind it in the same Scope; `sized` answers before
 // its last Statement, which is the one shape that needs a labelled break;
 // `described` is a Declaration's initialiser and the `match` after it is written
-// for its effects. The two `__print`s at the end hold a Match mid-Expression,
+// for its effects. The two prints at the end hold a Match mid-Expression,
 // where there is nowhere to write a Statement and the wrapper stays.
 const statementMatches = `implementation {
 	choice Shape {
@@ -702,17 +702,17 @@ const statementMatches = `implementation {
 	}
 
 	match blank -> {} {
-		case #Circle { __print("circle") }
-		case #Blank { __print("blank") }
+		case #Circle { Terminal.inspect("circle") }
+		case #Blank { Terminal.inspect("blank") }
 	}
 
-	__print(circle::radius())
-	__print(circle::sized())
-	__print(small::sized())
-	__print(blank::sized())
-	__print(box::holding())
-	__print(described)
-	__print(match blank -> String {
+	Terminal.inspect(circle::radius())
+	Terminal.inspect(circle::sized())
+	Terminal.inspect(small::sized())
+	Terminal.inspect(blank::sized())
+	Terminal.inspect(box::holding())
+	Terminal.inspect(described)
+	Terminal.inspect(match blank -> String {
 		case #Circle { <- "a circle" }
 		case #Blank { <- "nothing" }
 	})
@@ -747,9 +747,9 @@ const nestedStatementMatches = `implementation {
 		<- name
 	}
 
-	__print(named(1))
-	__print(named(-1))
-	__print(named("x"))
+	Terminal.inspect(named(1))
+	Terminal.inspect(named(-1))
+	Terminal.inspect(named("x"))
 }`
 
 // NOTE: A Handler binding the very name the lowered Match writes its answer to,
@@ -845,12 +845,12 @@ const shadowedAnswerNames = `implementation {
 		case String { <- 0 }
 	}
 
-	__print(answerA)
-	__print(answerB)
-	__print(answerC)
-	__print(answerD)
-	__print(answerE)
-	__print(answerF)
+	Terminal.inspect(answerA)
+	Terminal.inspect(answerB)
+	Terminal.inspect(answerC)
+	Terminal.inspect(answerD)
+	Terminal.inspect(answerE)
+	Terminal.inspect(answerF)
 }`
 
 // NOTE: A Match written for its effects whose Handler answers a call that only
@@ -870,7 +870,7 @@ const shadowedDiscardedAnswer = `implementation {
 			§§ @param other — ignored
 			§§ @returns — nine.
 			add(_ other: Integer) -> Integer {
-				__print("the shadow ran")
+				Terminal.inspect("the shadow ran")
 
 				<- 9
 			}
@@ -886,7 +886,7 @@ const shadowedDiscardedAnswer = `implementation {
 		<- 0
 	}
 
-	__print(trick())
+	Terminal.inspect(trick())
 }`
 
 // NOTE: The same shadow, standing where a Constant nobody reads is bound to it.
@@ -903,7 +903,7 @@ const shadowedDeadCode = `implementation {
 			§§ @param other — ignored
 			§§ @returns — nine.
 			add(_ other: Integer) -> Integer {
-				__print("the shadow ran")
+				Terminal.inspect("the shadow ran")
 
 				<- 9
 			}
@@ -914,7 +914,7 @@ const shadowedDeadCode = `implementation {
 		<- 0
 	}
 
-	__print(trick())
+	Terminal.inspect(trick())
 }`
 
 // NOTE: A compiled Union dispatch that HOLDS operands, in each Statement
@@ -974,9 +974,9 @@ const heldDispatches = `implementation {
 
 	identity(5)::toString()
 
-	__print(rendered())
-	__print(tagged)
-	__print(either)
+	Terminal.inspect(rendered())
+	Terminal.inspect(tagged)
+	Terminal.inspect(either)
 }`
 
 // NOTE: A Conditional whose question an earlier pass already asked in
@@ -998,15 +998,15 @@ const conditions = `implementation {
 	constant yes = true
 
 	if a::isLessThan(b) {
-		__print("less")
+		Terminal.inspect("less")
 	} else {
-		__print("more")
+		Terminal.inspect("more")
 	}
 
 	if yes::itself() {
-		__print("yes")
+		Terminal.inspect("yes")
 	} else {
-		__print("no")
+		Terminal.inspect("no")
 	}
 }`
 
@@ -1030,9 +1030,9 @@ const countedLoop = `implementation {
 		total,
 	) { <- total::add(index) })
 
-	__print(sum)
-	__print(down)
-	__print(once)
+	Terminal.inspect(sum)
+	Terminal.inspect(down)
+	Terminal.inspect(once)
 }`
 
 // NOTE: The two condition-driven entries, which are one driver read two ways.
@@ -1045,8 +1045,8 @@ const conditionLoops = `implementation {
 		<- n::isGreaterThanOrEqualTo(100)
 	}, step (n) { <- n::multiply(with 2) })
 
-	__print(doubled)
-	__print(same)
+	Terminal.inspect(doubled)
+	Terminal.inspect(same)
 }`
 
 // NOTE: The general entry, whose body answers with a \`Step\` built at the
@@ -1064,7 +1064,7 @@ const generalLoop = `implementation {
 		total = state.total::add(state.index) })
 	})
 
-	__print(result)
+	Terminal.inspect(result)
 }`
 
 // NOTE: And the same entry answering with a \`Step\` the Compiler can NOT see
@@ -1076,7 +1076,7 @@ const heldStep = `implementation {
 		<- answer
 	})
 
-	__print(stopped)
+	Terminal.inspect(stopped)
 }`
 
 // NOTE: List's four walking Methods, and the one call that must stay a call:
@@ -1084,11 +1084,11 @@ const heldStep = `implementation {
 const listWalks = `implementation {
 	constant items = [1, 2, 3]
 
-	__print(items::reduce(startingWith 0, (total, item) {
+	Terminal.inspect(items::reduce(startingWith 0, (total, item) {
 		<- total::add(item)
 	}))
 
-	__print(items::reduce(startingWith 0, step (total, item) {
+	Terminal.inspect(items::reduce(startingWith 0, step (total, item) {
 		if item::isGreaterThan(2) {
 			<- #Done(total)
 		}
@@ -1096,14 +1096,14 @@ const listWalks = `implementation {
 		<- #Continue(total::add(item))
 	})::toString())
 
-	__print(items::map((item) { <- item::multiply(with 2) })::length())
-	__print(items::keepEvery(where (item) {
+	Terminal.inspect(items::map((item) { <- item::multiply(with 2) })::length())
+	Terminal.inspect(items::keepEvery(where (item) {
 		<- item::isGreaterThan(1)
 	})::length())
 
 	constant double = (_ item: Integer) -> Integer { <- item::multiply(with 2) }
 
-	__print(items::map(double)::length())
+	Terminal.inspect(items::map(double)::length())
 }`
 
 // NOTE: The same four walks over a receiver a Program has PROVEN something
@@ -1124,18 +1124,18 @@ const provenWalks = `implementation {
 	constant proven: NonEmptyList<Integer> = [1, 2, 3]
 	constant written = [1, 2, 3]
 
-	__print(proven::map((item) { <- item::multiply(with 2) })::length())
-	__print(written::map((item) { <- item::multiply(with 2) })::length())
+	Terminal.inspect(proven::map((item) { <- item::multiply(with 2) })::length())
+	Terminal.inspect(written::map((item) { <- item::multiply(with 2) })::length())
 
-	__print(proven::keepEvery(where (item) {
+	Terminal.inspect(proven::keepEvery(where (item) {
 		<- item::isGreaterThan(1)
 	})::length())
 
-	__print(proven::reduce(startingWith 0, (total, item) {
+	Terminal.inspect(proven::reduce(startingWith 0, (total, item) {
 		<- total::add(item)
 	}))
 
-	__print(proven::reduce(startingWith 0, step (total, item) {
+	Terminal.inspect(proven::reduce(startingWith 0, step (total, item) {
 		if item::isGreaterThan(2) {
 			<- #Done(total)
 		}
@@ -1143,8 +1143,8 @@ const provenWalks = `implementation {
 		<- #Continue(total::add(item))
 	})::toString())
 
-	__print(proven::reverse()::firstItem())
-	__print(proven::prepend(contentsOf [0])::firstItem())
+	Terminal.inspect(proven::reverse()::firstItem())
+	Terminal.inspect(proven::prepend(contentsOf [0])::firstItem())
 }`
 
 // NOTE: The same claim for the second name, and the difference the second name
@@ -1172,9 +1172,9 @@ const shadowedNonEmptyList = `implementation {
 
 	constant proven: NonEmptyList<Integer> = [1, 2]
 
-	__print(trick())
-	__print(proven::map((item) { <- item::add(1) })::length())
-	__print([1, 2]::map((item) { <- item::add(1) })::length())
+	Terminal.inspect(trick())
+	Terminal.inspect(proven::map((item) { <- item::add(1) })::length())
+	Terminal.inspect([1, 2]::map((item) { <- item::add(1) })::length())
 }`
 
 // NOTE: A Program that declares a Namespace named \`List\`, which stands in front
@@ -1198,21 +1198,21 @@ const shadowedList = `implementation {
 		<- 21::doubled()
 	}
 
-	__print(trick())
-	__print([1, 2]::map((item) { <- item::add(1) })::length())
+	Terminal.inspect(trick())
+	Terminal.inspect([1, 2]::map((item) { <- item::add(1) })::length())
 }`
 
 // NOTE: A walk standing in an Argument, where there is nowhere to write a
 // \`while\` and the arrow stays.
 const argumentLoop = `implementation {
-	__print(loop(startingWith 1, while (n) {
+	Terminal.inspect(loop(startingWith 1, while (n) {
 		<- n::isLessThan(10)
 	}, step (n) { <- n::multiply(with 2) }))
 }`
 
 // NOTE: A walk inside a walk's body, which is what numbers the names apart.
 const nestedLoops = `implementation {
-	__print(loop(from 1, through 3, startingWith 0, step (index, total) {
+	Terminal.inspect(loop(from 1, through 3, startingWith 0, step (index, total) {
 		<- total::add(loop(from 1, through index, startingWith 0, step (
 			inner,
 			carried,
@@ -1231,23 +1231,23 @@ const shadowedParameter = `implementation {
 		<- total::isLessThan(10)
 	}, step (n) { <- n::add(total) })
 
-	__print(answer)
+	Terminal.inspect(answer)
 
 	constant items = [1, 2, 3]
 
-	__print(items::keepEvery(where (items) {
+	Terminal.inspect(items::keepEvery(where (items) {
 		<- items::isGreaterThan(1)
 	})::length())
-	__print(items::map((total) { <- total::add(1) })::length())
+	Terminal.inspect(items::map((total) { <- total::add(1) })::length())
 }`
 
 // NOTE: What the call evaluated, in the order it evaluated it — printed,
 // because printing is the only way a Program can tell.
 const orderedLoops = `implementation {
-	__print(loop(from __print(1), through __print(3), startingWith __print(0),
+	Terminal.inspect(loop(from Terminal.inspect(1), through Terminal.inspect(3), startingWith Terminal.inspect(0),
 	step (index, total) { <- total::add(index) }))
 
-	__print(__print([1, 2])::reduce(startingWith __print(0), (total, item) {
+	Terminal.inspect(Terminal.inspect([1, 2])::reduce(startingWith Terminal.inspect(0), (total, item) {
 		<- total::add(item)
 	}))
 }`
@@ -1263,32 +1263,32 @@ const constantFolding = `implementation {
 	§§
 	§§ @returns — two.
 	function noisy() -> Integer {
-		__print("evaluated")
+		Terminal.inspect("evaluated")
 
 		<- 2
 	}
 
 	constant seconds = 60::multiply(with 60)::multiply(with 24)
 
-	__print(seconds)
-	__print(10::subtract(4))
-	__print(-7::absolute())
-	__print(7::negate())
-	__print(1::isLessThan(2))
-	__print(2::is(2))
-	__print(2::isNot(2))
-	__print(1/2::add(1/4))
-	__print(1/2::subtract(1/4))
-	__print(1/2::multiply(with 2/3))
-	__print(4/2::absolute())
-	__print(1/2::negate())
-	__print(1/2::is(2/4))
-	__print(1/2::isLessThan(2/3))
-	__print("a"::append("b"))
-	__print("b"::prepend("a"))
-	__print("a count: {7}, {1/2}, {true}, {"x"}")
-	__print(3::add(noisy()))
-	__print(1::add(1/2))
+	Terminal.inspect(seconds)
+	Terminal.inspect(10::subtract(4))
+	Terminal.inspect(-7::absolute())
+	Terminal.inspect(7::negate())
+	Terminal.inspect(1::isLessThan(2))
+	Terminal.inspect(2::is(2))
+	Terminal.inspect(2::isNot(2))
+	Terminal.inspect(1/2::add(1/4))
+	Terminal.inspect(1/2::subtract(1/4))
+	Terminal.inspect(1/2::multiply(with 2/3))
+	Terminal.inspect(4/2::absolute())
+	Terminal.inspect(1/2::negate())
+	Terminal.inspect(1/2::is(2/4))
+	Terminal.inspect(1/2::isLessThan(2/3))
+	Terminal.inspect("a"::append("b"))
+	Terminal.inspect("b"::prepend("a"))
+	Terminal.inspect("a count: {7}, {1/2}, {true}, {"x"}")
+	Terminal.inspect(3::add(noisy()))
+	Terminal.inspect(1::add(1/2))
 }`
 
 // NOTE: A Program that declares a Namespace named after a builtin, whose `add`
@@ -1306,7 +1306,7 @@ const shadowedArithmetic = `implementation {
 			§§ @param other — ignored
 			§§ @returns — nine.
 			add(_ other: Integer) -> Integer {
-				__print("the shadow ran")
+				Terminal.inspect("the shadow ran")
 
 				<- 9
 			}
@@ -1315,7 +1315,7 @@ const shadowedArithmetic = `implementation {
 		<- 1::add(2)
 	}
 
-	__print(trick())
+	Terminal.inspect(trick())
 }`
 
 // NOTE: A Handler of each shape `prune-dead-match-arms` decides by. Two that
@@ -1335,31 +1335,31 @@ const deadMatchArms = `implementation {
 	constant items: List<Integer> | List<String> = [1, 2]
 	constant record: { x: Integer } | String = { x = 1 }
 
-	__print(match scalar -> String {
+	Terminal.inspect(match scalar -> String {
 		case Integer { <- "an Integer" }
 		case Boolean { <- "never" }
 		case String  { <- "a String" }
 	})
 
-	__print(match shape -> String {
+	Terminal.inspect(match shape -> String {
 		case #Circle { <- "a Circle" }
 		case Integer { <- "never" }
 		case #Blank  { <- "Blank" }
 	})
 
-	__print(match items -> String {
+	Terminal.inspect(match items -> String {
 		case List<String>  { <- "Strings" }
 		case List<Integer> { <- "Integers" }
 	})
 
-	__print(match record -> String {
+	Terminal.inspect(match record -> String {
 		case String         { <- "a String" }
 		case { x: Integer } { <- "a Record" }
 	})
 
 	§ The dead Handler LAST, where dropping it leaves a chain
 	§ 'elide-final-match-test' then ends in the Handler above it.
-	__print(match scalar -> String {
+	Terminal.inspect(match scalar -> String {
 		case Integer { <- "the Integer" }
 		case String  { <- "the String" }
 		case Boolean { <- "never" }
@@ -1378,7 +1378,7 @@ const deadCode = `implementation {
 	§§
 	§§ @returns — one.
 	function noisy() -> Integer {
-		__print("evaluated")
+		Terminal.inspect("evaluated")
 
 		<- 1
 	}
@@ -1401,9 +1401,9 @@ const deadCode = `implementation {
 
 	counted = counted::add(1)
 
-	__print(kept)
-	__print(reader())
-	__print(counted)
+	Terminal.inspect(kept)
+	Terminal.inspect(reader())
+	Terminal.inspect(counted)
 }`
 
 // NOTE: The Node kinds `typedSimple.ExpressionNode` is made of, minus
@@ -1613,7 +1613,7 @@ describe("Optimiser", () => {
 			let program = simplifiedSource(`implementation {
 				constant value: Integer | String = 1
 
-				__print(match value -> String {
+				Terminal.inspect(match value -> String {
 					case Integer { <- "integer" }
 					case String  { <- "string" }
 				})
@@ -1665,7 +1665,7 @@ describe("Optimiser", () => {
 
 		it("hands a Program carrying none back as itself", () => {
 			let program = simplifiedSource(`implementation {
-				__print("nothing to erase")
+				Terminal.inspect("nothing to erase")
 			}`)
 
 			expect(
@@ -1865,7 +1865,7 @@ describe("Optimiser", () => {
 			// hook left — `lower-matches-to-statements` reads a compiled
 			// dispatch, which `compile-union-dispatch` writes as an Expression.
 			let program = simplifiedSource(`implementation {
-				__print(1)
+				Terminal.inspect(1)
 			}`)
 			let order: Array<string> = []
 
@@ -1882,10 +1882,15 @@ describe("Optimiser", () => {
 				},
 			})
 
+			// NOTE: The callee is walked too — `Terminal.inspect` is a Lookup
+			// off an Identifier — because a static Method call is an ordinary
+			// `FunctionInvocation` whose name is an Expression like any other.
 			expect(order).toEqual([
+				"expression:Identifier",
+				"expression:Lookup",
 				"expression:IntegerValue",
-				"expression:NativeFunctionInvocation",
-				"statement:NativeFunctionInvocation",
+				"expression:FunctionInvocation",
+				"statement:FunctionInvocation",
 			])
 		})
 	})
@@ -1956,7 +1961,7 @@ describe("Optimiser", () => {
 					}
 				}
 
-				__print(label(["a"], or "b"))
+				Terminal.inspect(label(["a"], or "b"))
 			}`)
 
 			expect(generated).toMatch(/isValueOfType\(_self, \$pool_\d+\)/)
@@ -1968,7 +1973,7 @@ describe("Optimiser", () => {
 		// every fallible answer in the library is read back by one of these.
 		it("compiles the standard library's own Matches", () => {
 			let generated = generate(`implementation {
-				__print(Integer.parse("7")::otherwise(0))
+				Terminal.inspect(Integer.parse("7")::otherwise(0))
 			}`)
 
 			expect(generated).toContain(
@@ -2120,7 +2125,7 @@ describe("Optimiser", () => {
 
 				constant red: Colour = #Red
 
-				__print(red::is(#Green))
+				Terminal.inspect(red::is(#Green))
 			}`)
 
 			expect(generated).toContain("Colour.is(red,")
@@ -2356,7 +2361,7 @@ describe("Optimiser", () => {
 					<- 5::isLessThan(3)
 				}
 
-				__print(trick())
+				Terminal.inspect(trick())
 			}`)
 
 			expect(generated).toContain("$user_Integer.isLessThan(")
@@ -2369,7 +2374,7 @@ describe("Optimiser", () => {
 			// the shadowed Method stands as the Argument of an `and`, whose
 			// receiver decides the answer without it — so lowering the `and`
 			// puts a Method somebody wrote behind JavaScript's `&&`, and the
-			// `__print` inside it stops happening. `Boolean` is not shadowed and
+			// print inside it stops happening. `Boolean` is not shadowed and
 			// `Integer` is, which is exactly the shape a per-Invocation check
 			// misses.
 			let generated = generate(shadowedArgument)
@@ -2398,7 +2403,7 @@ describe("Optimiser", () => {
 			let generated = generate(`implementation {
 				constant a = 3
 
-				__print(false::and(a::isLessThan(1/2)))
+				Terminal.inspect(false::and(a::isLessThan(1/2)))
 			}`)
 
 			expect(generated).toContain("Boolean.and(")
@@ -2420,8 +2425,8 @@ describe("Optimiser", () => {
 				constant advance = (_ index: Integer, _ total: Integer)
 					-> Integer { <- total::add(index) }
 
-				__print(loop(from 1, through 3, startingWith 0, step advance))
-				__print(4::isEven())
+				Terminal.inspect(loop(from 1, through 3, startingWith 0, step advance))
+				Terminal.inspect(4::isEven())
 			}`)
 
 			expect(generated).toContain("start.value <= end.value")
@@ -2435,7 +2440,7 @@ describe("Optimiser", () => {
 		// Program: the bodies stop being reached, so they stop being emitted.
 		it("takes the comparison bodies out of the emission", () => {
 			let source = `implementation {
-				__print(1::isLessThanOrEqualTo(2))
+				Terminal.inspect(1::isLessThanOrEqualTo(2))
 			}`
 
 			expect(generate(source)).not.toContain(
@@ -2463,8 +2468,8 @@ describe("Optimiser", () => {
 				generate(`implementation {
 					constant n = 2
 
-					__print(n::add(1))
-					__print(n::multiply(with 1))
+					Terminal.inspect(n::add(1))
+					Terminal.inspect(n::multiply(with 1))
 				}`),
 			).toContain("value: n.value + $pool_")
 		})
@@ -2574,7 +2579,7 @@ describe("Optimiser", () => {
 			let generated = generate(`implementation {
 				constant value: Integer | Boolean = 5
 
-				__print(value::toString())
+				Terminal.inspect(value::toString())
 			}`)
 
 			expect(generated).toContain(
@@ -2786,7 +2791,7 @@ describe("Optimiser", () => {
 				generate(`implementation {
 					constant count = 3
 
-					__print("{count}")
+					Terminal.inspect("{count}")
 				}`),
 			).not.toContain("toString: Integer.toString")
 		})
@@ -2838,8 +2843,8 @@ describe("Optimiser", () => {
 
 				constant count = 3
 
-				__print(show(count))
-				__print("and {count}")
+				Terminal.inspect(show(count))
+				Terminal.inspect("and {count}")
 			}`)
 
 			expect(generated).toContain("Item__conformance.toString(item)")
@@ -2963,7 +2968,7 @@ describe("Optimiser", () => {
 			let generated = generate(statementMatches)
 
 			expect(generated).toContain(
-				'{\n\tconst _self = blank;\n\tif (_self[$type.typeKeySymbol] === "Shape#Circle") {\n\t\t$_.__print($pool_',
+				'{\n\tconst _self = blank;\n\tif (_self[$type.typeKeySymbol] === "Shape#Circle") {\n\t\tTerminal.inspect($pool_',
 			)
 			expect(generated).not.toContain("$discarded")
 		})
@@ -3016,7 +3021,7 @@ describe("Optimiser", () => {
 			// the one Expression JavaScript has that holds Statements is still
 			// what a Match there compiles to.
 			expect(generate(statementMatches)).toContain(
-				"$_.__print(function (_self) {",
+				"Terminal.inspect(function (_self) {",
 			)
 		})
 
@@ -3026,7 +3031,7 @@ describe("Optimiser", () => {
 		// already and the Handlers' Returns are the Method's own.
 		it("takes the wrapper off the standard library's own Matches", () => {
 			let source = `implementation {
-				__print(Integer.parse("7")::otherwise(0))
+				Terminal.inspect(Integer.parse("7")::otherwise(0))
 			}`
 			let body = bodyOf(generate(source), "$es_Optional_otherwise")
 
@@ -3211,7 +3216,7 @@ describe("Optimiser", () => {
 				let generated = generate(`implementation {
 					constant value: Integer | Boolean = 5
 
-					__print(value::toString())
+					Terminal.inspect(value::toString())
 				}`)
 
 				expect(generated).not.toContain("$dispatch_0")
@@ -3495,7 +3500,7 @@ describe("Optimiser", () => {
 			let generated = generate(argumentLoop)
 
 			expect(generated).toContain(
-				"$_.__print((() => {\n\tlet $loop_0_state",
+				"Terminal.inspect((() => {\n\tlet $loop_0_state",
 			)
 			expect(generated).toContain("\treturn $loop_0_state;\n})())")
 		})
@@ -3643,13 +3648,13 @@ describe("Optimiser", () => {
 
 			expect(
 				generate(`implementation {
-					__print(${large}::multiply(with 10))
+					Terminal.inspect(${large}::multiply(with 10))
 				}`),
 			).toContain(".value * ")
 
 			expect(
 				generate(`implementation {
-					__print(${"9".repeat(4090)}::multiply(with 10))
+					Terminal.inspect(${"9".repeat(4090)}::multiply(with 10))
 				}`),
 			).not.toContain(".value * ")
 		})
@@ -3891,7 +3896,7 @@ describe("Optimiser", () => {
 			let generated = generate(`implementation {
 				constant scrutinee: Integer | String = 5
 
-				__print(match scrutinee -> String {
+				Terminal.inspect(match scrutinee -> String {
 					case String { <- "a String" }
 					case Integer where @::isNegative() { <- "a negative" }
 					case Integer { <- "an Integer" }
@@ -3903,7 +3908,7 @@ describe("Optimiser", () => {
 			let guardedLast = generate(`implementation {
 				constant scrutinee: Integer | String = 5
 
-				__print(match scrutinee -> String {
+				Terminal.inspect(match scrutinee -> String {
 					case String { <- "a String" }
 					case Integer { <- "an Integer" }
 					case Integer where @::isNegative() { <- "unreachable" }
@@ -3917,7 +3922,7 @@ describe("Optimiser", () => {
 			let generated = generate(`implementation {
 				constant scrutinee: Integer | String = 5
 
-				__print(match scrutinee -> String {
+				Terminal.inspect(match scrutinee -> String {
 					case String { <- "a String" }
 					case Integer { <- "an Integer" }
 					case 0 { <- "unreachable" }
@@ -3935,7 +3940,7 @@ describe("Optimiser", () => {
 			let generated = generate(`implementation {
 				constant scrutinee: { x: Integer } | String = "text"
 
-				__print(match scrutinee -> String {
+				Terminal.inspect(match scrutinee -> String {
 					case String { <- "a String" }
 					case { x: Integer } { <- "a Record" }
 				})
@@ -3950,7 +3955,7 @@ describe("Optimiser", () => {
 		it("elides the standard library's own final tests", () => {
 			let body = bodyOf(
 				generate(`implementation {
-					__print(Integer.parse("7")::otherwise(0))
+					Terminal.inspect(Integer.parse("7")::otherwise(0))
 				}`),
 				"$es_Optional_otherwise",
 			)
@@ -4152,7 +4157,7 @@ describe("Optimiser", () => {
 		// Record and List construction actually happens.
 		it("collapses the standard library's bodies too", () => {
 			const source = `implementation {
-				__print([1, 2, 2]::removeDuplicates())
+				Terminal.inspect([1, 2, 2]::removeDuplicates())
 			}`
 
 			let generated = generate(source)
@@ -4326,7 +4331,7 @@ describe("Optimiser", () => {
 				generated.indexOf("const $es_"),
 			)
 			expect(generated.indexOf("const $pool_0")).toBeLessThan(
-				generated.indexOf("$_.__print("),
+				generated.indexOf("Terminal.inspect("),
 			)
 		})
 

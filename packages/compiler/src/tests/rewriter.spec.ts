@@ -1880,7 +1880,7 @@ describe("Rewriter", () => {
 		}
 
 		let printing = (value: string) =>
-			`implementation {\n\t__print(${value}::toString())\n}\n`
+			`implementation {\n\tTerminal.inspect(${value}::toString())\n}\n`
 
 		it("emits one copy of a standard library Method three Modules share", () => {
 			let bundle = rewriteModules(
@@ -1955,7 +1955,7 @@ describe("Rewriter", () => {
 
 	constant chosen: Colour = #Red
 
-	__print(match chosen -> String {
+	Terminal.inspect(match chosen -> String {
 		case Colour { <- "a Colour" }
 	})
 }
@@ -1995,8 +1995,8 @@ describe("Rewriter", () => {
 
 	constant chosen: Colour = #Red
 
-	__print(chosen)
-	__print(true::toString())
+	Terminal.inspect(chosen)
+	Terminal.inspect(true::toString())
 }
 `)
 			let enriched = enrich(parsed.program)

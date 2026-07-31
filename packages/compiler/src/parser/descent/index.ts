@@ -366,10 +366,12 @@ class DescentParser {
 		})
 	}
 
-	// NOTE: `parseNativeSigilName` rather than `parseIdentifier`, because
-	// `__print` lexes as two Underscore Symbols and an Identifier rather than as
-	// one name — a name a Program can DECLARE has to be a name its sections can
-	// spell, or the standard library's one free Function could never be exported.
+	// NOTE: `parseNativeSigilName` rather than `parseIdentifier`, because a
+	// `__`-sigil name lexes as two Underscore Symbols and an Identifier rather
+	// than as one name — a name a Program can DECLARE has to be a name its
+	// sections can spell, or such a Function could never be exported. Nothing in
+	// the standard library carries the sigil now that printing is `Terminal`'s;
+	// the machinery stays until the phase that takes it out.
 	protected parseImportEntry(): parser.ImportNode {
 		let name = this.parseNativeSigilName()
 		let alias = this.parseOptionalAlias()
@@ -937,10 +939,10 @@ class DescentParser {
 		// what `parseOptionallyGenericFunctionLiteral` builds for a user Program.
 		if (this.mode === "declarations") {
 			// NOTE: `__` is the sigil for a native free Function bound to the
-			// runtime — `__print` lexes as `_ _ print`, so the declaration name
-			// is reassembled the same way `parseNativeFunctionInvocation` does at
-			// the call site. It is the one free Function whose name a Program can
-			// not spell as a bare Identifier.
+			// runtime — `__name` lexes as `_ _ name`, so the declaration name is
+			// reassembled the same way `parseNativeFunctionInvocation` does at the
+			// call site. It is the one shape of free Function whose name a Program
+			// can not spell as a bare Identifier, and no declaration uses it.
 			let name = this.parseNativeSigilName()
 			let documentation = this.tokens.documentationAbove(
 				keyword.position.start.line,
@@ -975,7 +977,7 @@ class DescentParser {
 	}
 
 	// NOTE: A free-Function declaration name, allowing the `__` native sigil that
-	// `parseNativeFunctionInvocation` accepts at the call site — `__print` lexes
+	// `parseNativeFunctionInvocation` accepts at the call site — `__name` lexes
 	// as two Underscore Symbols and an Identifier, so the `__`-prefixed name is
 	// reassembled here rather than lexed whole. Without the sigil it is an
 	// ordinary Identifier.

@@ -134,7 +134,7 @@ describe("formatter", () => {
 				"",
 				"\tconstant drawn: Shape = #Circle(3)",
 				"",
-				"\t__print(match drawn -> Integer {",
+				"\tTerminal.inspect(match drawn -> Integer {",
 				"\t\tcase #Circle(radius) { <- radius }",
 				"\t\tcase #Dot            { <- 0 }",
 				"\t})",
@@ -155,7 +155,7 @@ describe("formatter", () => {
 				"",
 				"\tconstant held: Held = #Item(1)",
 				"",
-				"\t__print(match held -> Integer {",
+				"\tTerminal.inspect(match held -> Integer {",
 				"\t\tcase #Item(value) { <- value }",
 				"\t})",
 				"}",
@@ -261,7 +261,7 @@ describe("formatter", () => {
 				"§ a third line under it.",
 				"",
 				"implementation {",
-				'\t__print("hi")',
+				'\tTerminal.inspect("hi")',
 				"}",
 				"",
 			].join("\n")
@@ -277,7 +277,7 @@ describe("formatter", () => {
 				"§ One.",
 				"§ Two.",
 				"implementation {",
-				'\t__print("hi")',
+				'\tTerminal.inspect("hi")',
 				"}",
 				"",
 			].join("\n")
@@ -335,23 +335,24 @@ describe("formatter", () => {
 		}
 
 		it("leaves a hole that is already canonical alone", () => {
-			roundTrips('__print("Hello, {name}! {count} left")')
+			roundTrips('Terminal.inspect("Hello, {name}! {count} left")')
 		})
 
 		it("leaves escapes and literal braces untouched", () => {
-			roundTrips('__print("a \\"b\\" \\\\ \\{c\\}")')
+			roundTrips('Terminal.inspect("a \\"b\\" \\\\ \\{c\\}")')
 		})
 
 		it("leaves a nested interpolation alone", () => {
-			roundTrips('__print("outer {"inner {name}"}")')
+			roundTrips('Terminal.inspect("outer {"inner {name}"}")')
 		})
 
 		// NOTE: A hole holds an Expression, not text, so it is formatted like
 		// one — the String's own text around it is what stays as written.
 		it("formats the code inside a hole", () => {
 			expect(
-				format('implementation {\n\t__print("sum {1::add( 2 )}")\n}\n')
-					.text,
+				format(
+					'implementation {\n\tTerminal.inspect("sum {1::add( 2 )}")\n}\n',
+				).text,
 			).toContain('"sum {1::add(2)}"')
 		})
 
@@ -361,7 +362,7 @@ describe("formatter", () => {
 		it("closes the braces up against what the hole holds", () => {
 			expect(
 				format(
-					'implementation {\n\tconstant name = "x"\n\t__print("a { name } b { name}c")\n}\n',
+					'implementation {\n\tconstant name = "x"\n\tTerminal.inspect("a { name } b { name}c")\n}\n',
 				).text,
 			).toContain('"a {name} b {name}c"')
 		})
@@ -372,7 +373,7 @@ describe("formatter", () => {
 		it("leaves an escaped brace and the text around it alone", () => {
 			expect(
 				format(
-					'implementation {\n\tconstant name = "x"\n\t__print("pre \\{ lit \\} post { name } tail")\n}\n',
+					'implementation {\n\tconstant name = "x"\n\tTerminal.inspect("pre \\{ lit \\} post { name } tail")\n}\n',
 				).text,
 			).toContain('"pre \\{ lit \\} post {name} tail"')
 		})
@@ -384,7 +385,7 @@ describe("formatter", () => {
 			let result = format(
 				"implementation {\n" +
 					"\tconstant a: Integer | Rational = 1/2\n" +
-					'\t__print("n: {match a -> String {\n' +
+					'\tTerminal.inspect("n: {match a -> String {\n' +
 					'case Integer { <- "whole" }\n' +
 					'\t\t\t\tcase Rational { <- "fraction" }\n' +
 					'}}")\n' +
@@ -651,7 +652,7 @@ describe("formatter", () => {
 
 			it("does not align a run of one", () => {
 				expect(
-					formatted(block("constant a = 1", "__print(a)")),
+					formatted(block("constant a = 1", "Terminal.inspect(a)")),
 				).toContain("constant a = 1")
 			})
 
@@ -762,15 +763,15 @@ describe("formatter", () => {
 			)
 		})
 
-		// NOTE: Only the outermost list that has to break does. Once `__print(`
+		// NOTE: Only the outermost list that has to break does. Once `Terminal.inspect(`
 		// is broken its Argument starts a level in, where it fits on one line —
 		// breaking the inner call as well would be gratuitous.
 		it("breaks the outermost argument list that does not fit, and no more", () => {
 			let source =
-				'implementation {\n\t__print("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"::append("bbbbbbbbbbbbbbbbbbbbbbbbbb"))\n}\n'
+				'implementation {\n\tTerminal.inspect("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"::append("bbbbbbbbbbbbbbbbbbbbbbbbbb"))\n}\n'
 
 			expect(formatted(source)).toBe(
-				'implementation {\n\t__print(\n\t\t"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"::append("bbbbbbbbbbbbbbbbbbbbbbbbbb"),\n\t)\n}\n',
+				'implementation {\n\tTerminal.inspect(\n\t\t"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"::append("bbbbbbbbbbbbbbbbbbbbbbbbbb"),\n\t)\n}\n',
 			)
 		})
 
@@ -800,7 +801,7 @@ describe("formatter", () => {
 
 		it("adds a trailing comma to a broken argument list", () => {
 			let source =
-				'implementation {\n\t__print("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")\n}\n'
+				'implementation {\n\tTerminal.inspect("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")\n}\n'
 
 			expect(formatted(source)).toContain('",\n\t)\n')
 		})
@@ -945,7 +946,7 @@ describe("formatter", () => {
 		// before it asks.
 		it("gives a trailing comment to the outermost node on its line", () => {
 			let source =
-				"implementation {\n\tconstant list = [1]\n\n\t__print(list::map((box) { <- box }))  § note\n}\n"
+				"implementation {\n\tconstant list = [1]\n\n\tTerminal.inspect(list::map((box) { <- box }))  § note\n}\n"
 			let result = format(source)
 
 			expect(result.refusal).toBeNull()
@@ -958,7 +959,7 @@ describe("formatter", () => {
 		// written below it.
 		it("keeps a comment that trails an opening brace", () => {
 			let source =
-				"implementation {\n\tconstant list = [1]\n\n\t__print(list::map((n) { § why\n\t\t<- n\n\t}))\n\n\t§ still here\n\tconstant after = 2\n}\n"
+				"implementation {\n\tconstant list = [1]\n\n\tTerminal.inspect(list::map((n) { § why\n\t\t<- n\n\t}))\n\n\t§ still here\n\tconstant after = 2\n}\n"
 			let result = format(source)
 
 			expect(result.refusal).toBeNull()

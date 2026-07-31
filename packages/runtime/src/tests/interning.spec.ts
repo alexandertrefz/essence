@@ -7,11 +7,11 @@ import {
 	negate,
 	trueInstance,
 } from "../Boolean"
-import { getStringRepresentation } from "../functions"
 import { anyIs } from "../internalHelpers"
 import { createEmpty, createValue } from "../Optional"
 import { equal, greater, less } from "../Ordering"
 import { createString } from "../String"
+import { getStringRepresentation } from "../Terminal"
 import { type AnyType, createCase, typeKeySymbol } from "../type"
 
 // NOTE: `CaseInstanceType` is deliberately kept out of `AnyType` — its

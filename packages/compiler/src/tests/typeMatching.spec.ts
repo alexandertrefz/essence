@@ -63,10 +63,10 @@ describe("Type matching", () => {
 					constant integers: List<List<Integer>> = [[], [1]]
 					constant empty: List<String> = []
 					constant onlyEmpties: List<List<String>> = [[], []]
-					__print(nested::length()::toString())
-					__print(integers::length()::toString())
-					__print(empty::length()::toString())
-					__print(onlyEmpties::length()::toString())
+					Terminal.inspect(nested::length()::toString())
+					Terminal.inspect(integers::length()::toString())
+					Terminal.inspect(empty::length()::toString())
+					Terminal.inspect(onlyEmpties::length()::toString())
 				}`),
 			).toEqual([])
 		})
@@ -162,7 +162,7 @@ describe("Type matching", () => {
 					}
 
 					constant result: Integer = apply(transform (x) { <- x }, to 5)
-					__print(result::toString())
+					Terminal.inspect(result::toString())
 				}`),
 			).toEqual([])
 		})
@@ -178,7 +178,7 @@ describe("Type matching", () => {
 					}
 
 					constant result: Integer = apply(transform (x) { <- x::add(1) }, to 5)
-					__print(result::toString())
+					Terminal.inspect(result::toString())
 				}`),
 			).toEqual([])
 		})
@@ -207,7 +207,7 @@ describe("Type matching", () => {
 			expect(
 				errorsFor(`implementation {
 					constant lengths: List<Integer> = ["a", "bb"]::map((word) { <- word::length() })
-					__print(lengths::length()::toString())
+					Terminal.inspect(lengths::length()::toString())
 				}`),
 			).toEqual([])
 		})
@@ -231,7 +231,7 @@ describe("Type matching", () => {
 					}
 
 					constant read: (_ x: Integer) -> Integer = Reader.readsBase
-					__print(read(1)::toString())
+					Terminal.inspect(read(1)::toString())
 				}`),
 			).toEqual([])
 		})
@@ -249,7 +249,7 @@ describe("Type matching", () => {
 					}
 
 					constant double: (_ x: Integer) -> Integer = Doubler.double
-					__print(double(21)::toString())
+					Terminal.inspect(double(21)::toString())
 				}`),
 			).toEqual([])
 		})
@@ -292,7 +292,7 @@ describe("Type matching", () => {
 						static READER: (_ x: Integer) -> Integer = Reader.readsBase
 					}
 
-					__print(Holder.READER(1)::toString())
+					Terminal.inspect(Holder.READER(1)::toString())
 				}`),
 			).toEqual([])
 		})
@@ -311,8 +311,8 @@ describe("Type matching", () => {
 					}
 
 					constant readers: List<(_ x: Integer) -> Integer> = [Reader.readsBase]
-					__print(apply(Reader.readsBase, to 1)::toString())
-					__print(readers::length()::toString())
+					Terminal.inspect(apply(Reader.readsBase, to 1)::toString())
+					Terminal.inspect(readers::length()::toString())
 				}`),
 			).toEqual([])
 		})
@@ -333,7 +333,7 @@ describe("Type matching", () => {
 
 					variable read = Reader.readsBase
 					read = (_ x: Integer) -> Integer { <- x::add(1) }
-					__print(read(1)::toString())
+					Terminal.inspect(read(1)::toString())
 				}`),
 			).toEqual([])
 		})
@@ -358,7 +358,7 @@ describe("Type matching", () => {
 
 					variable read = Reader.readsBase
 					read = Doubler.double
-					__print(read(1)::toString())
+					Terminal.inspect(read(1)::toString())
 				}`),
 			).toEqual([])
 		})

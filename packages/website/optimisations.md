@@ -184,7 +184,7 @@ before the call, and JavaScript's `&&` and `||` do not evaluate their right-hand
 side when the left decides — so the two are the same Program only when the
 right-hand side has nothing to say. The pass proves that before it lowers one,
 of the WHOLE Argument and not just of the call standing at the top of it: nothing
-anywhere inside it may reach a `__print`, an assignment, or a call the Compiler
+anywhere inside it may reach a `Terminal.print`, an assignment, or a call the Compiler
 can not name. Names, member reads, literals, values built out of those, and calls
 to a short list of Integer and Boolean Methods — each given values of its own
 kind — qualify. Anything else, a call to a Function the Program wrote, an

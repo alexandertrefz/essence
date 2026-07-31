@@ -6,7 +6,7 @@ implementation {
 
 	constant STEP = 2
 
-	__print(stepped(0)::toString())
+	Terminal.inspect(stepped(0)::toString())
 }
 
 export {

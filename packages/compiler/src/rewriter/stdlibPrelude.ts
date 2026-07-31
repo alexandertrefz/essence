@@ -336,8 +336,8 @@ export function essencePropertyName(
 // unless this set says otherwise. Built from the loader's `functionBindings`: a
 // body-less `function` contributes its plain name, an `overload function` block
 // one `__overload$N` name per native entry — the very numbering the Simplifier
-// mangled the call site to, so the two agree by construction. `__print` appears
-// here too, though it reaches the runtime through the `__` sigil instead.
+// mangled the call site to, so the two agree by construction. `loop`'s two
+// native entries are the whole of it.
 export const nativeFreeFunctionNames = derivedFromStdlib((stdlib) => {
 	let names = new Set<string>()
 

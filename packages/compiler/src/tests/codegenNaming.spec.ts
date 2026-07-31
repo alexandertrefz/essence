@@ -102,7 +102,7 @@ describe("Code Generation — Naming and Escaping", () => {
 				<- Optional.otherwise
 			}
 
-			__print(f())
+			Terminal.inspect(f())
 		}`
 
 		it("reads the Record field, not the standard library Method", () => {
@@ -130,9 +130,9 @@ describe("Code Generation — Naming and Escaping", () => {
 			// NOTE: The counterpart guard — an Identifier base whose Type IS a
 			// Namespace still routes through `namespaceMember`, so a static
 			// Property is the plain member read it always was.
-			expect(generate(`implementation { __print(Number.Pi) }`)).toContain(
-				"Number.Pi",
-			)
+			expect(
+				generate(`implementation { Terminal.inspect(Number.Pi) }`),
+			).toContain("Number.Pi")
 		})
 	})
 
@@ -149,12 +149,12 @@ describe("Code Generation — Naming and Escaping", () => {
 					constant List = 5
 					constant items = [1, 2]
 
-					__print(items)
+					Terminal.inspect(items)
 
 					<- List
 				}
 
-				__print(f())
+				Terminal.inspect(f())
 			}`
 
 			let generated = generate(source)
@@ -183,12 +183,12 @@ describe("Code Generation — Naming and Escaping", () => {
 				variable value: Integer | String = 5
 				constant $type = "hi"
 
-				__print(match value -> String {
+				Terminal.inspect(match value -> String {
 					case Integer { <- "integer" }
 					case String  { <- "string" }
 				})
 
-				__print($type)
+				Terminal.inspect($type)
 			}`
 
 			let generated = generate(source)
@@ -216,8 +216,8 @@ describe("Code Generation — Naming and Escaping", () => {
 				constant base = { a = 1 }
 				constant combined = { base with a = 2 }
 
-				__print(combined.a)
-				__print(Object)
+				Terminal.inspect(combined.a)
+				Terminal.inspect(Object)
 			}`
 
 			let generated = generate(source)
@@ -249,7 +249,7 @@ describe("Code Generation — Naming and Escaping", () => {
 				constant base = { a = 1 }
 				constant combined = { base with a = 3::doubled() }
 
-				__print(combined.a)
+				Terminal.inspect(combined.a)
 			}`
 
 			let generated = generate(source)
@@ -276,10 +276,10 @@ describe("Code Generation — Naming and Escaping", () => {
 					<- Record
 				}
 
-				__print($helpers)
-				__print(f())
-				__print({ a = 1 })
-				__print(true::isNot(false))
+				Terminal.inspect($helpers)
+				Terminal.inspect(f())
+				Terminal.inspect({ a = 1 })
+				Terminal.inspect(true::isNot(false))
 			}`
 
 			expect(await run(source)).toEqual(["1", "3", "{ a = 1 }", "true"])
@@ -312,12 +312,12 @@ describe("Code Generation — Naming and Escaping", () => {
 
 				constant items = [1, 2]
 
-				__print(items)
+				Terminal.inspect(items)
 
 				<- 21::doubledValue()
 			}
 
-			__print(f())
+			Terminal.inspect(f())
 		}`
 
 		it("does not shadow the List import a list literal calls", async () => {
@@ -370,8 +370,8 @@ describe("Code Generation — Naming and Escaping", () => {
 					<- items::firstItem()::otherwise(0)
 				}
 
-				__print(f())
-				__print(g())
+				Terminal.inspect(f())
+				Terminal.inspect(g())
 			}`
 
 			let generated = generate(source)
@@ -404,12 +404,12 @@ describe("Code Generation — Naming and Escaping", () => {
 
 					constant items = [1, 2]
 
-					__print(items::firstItem()::otherwise(0))
+					Terminal.inspect(items::firstItem()::otherwise(0))
 
 					<- total
 				}
 
-				__print(f())
+				Terminal.inspect(f())
 			}`
 
 			let generated = generate(source)
@@ -446,7 +446,7 @@ describe("Code Generation — Naming and Escaping", () => {
 					<- 5::contains(5)
 				}
 
-				__print(f())
+				Terminal.inspect(f())
 			}`
 
 			let generated = generate(source)
@@ -484,13 +484,13 @@ describe("Code Generation — Naming and Escaping", () => {
 					variable value: Integer | String = "hi"
 					constant items = [1, 2]
 
-					__print(items)
-					__print(List.zero())
+					Terminal.inspect(items)
+					Terminal.inspect(List.zero())
 
 					<- value::describe()
 				}
 
-				__print(f())
+				Terminal.inspect(f())
 			}`
 
 			let generated = generate(source)
@@ -539,12 +539,12 @@ describe("Code Generation — Naming and Escaping", () => {
 
 					constant greeting = "hi"
 
-					__print(greeting)
+					Terminal.inspect(greeting)
 
 					<- describeValue({ x = 1 })
 				}
 
-				__print(f())
+				Terminal.inspect(f())
 			}`
 
 			let generated = generate(source)
@@ -633,7 +633,7 @@ describe("Code Generation — Naming and Escaping", () => {
 			const source = `implementation {
 				constant this = { x = 1 }
 
-				__print(this.x)
+				Terminal.inspect(this.x)
 			}`
 
 			let generated = generate(source)
@@ -653,7 +653,7 @@ describe("Code Generation — Naming and Escaping", () => {
 			const source = `implementation {
 				constant new = { x = 1 }
 
-				__print(new.x)
+				Terminal.inspect(new.x)
 			}`
 
 			expect(generate(source)).toContain("_new.x")
@@ -671,7 +671,7 @@ describe("Code Generation — Naming and Escaping", () => {
 					}
 				}
 
-				__print(new.zero())
+				Terminal.inspect(new.zero())
 			}`
 
 			let generated = generate(source)
@@ -694,7 +694,7 @@ describe("Code Generation — Naming and Escaping", () => {
 			const source = `implementation {
 				constant ok? = true
 
-				__print(ok?)
+				Terminal.inspect(ok?)
 			}`
 
 			let generated = generate(source)
@@ -711,7 +711,7 @@ describe("Code Generation — Naming and Escaping", () => {
 					<- true
 				}
 
-				__print(ok?())
+				Terminal.inspect(ok?())
 			}`
 
 			expect(generate(source)).toContain("function $user_ok_3f_(")
@@ -726,8 +726,8 @@ describe("Code Generation — Naming and Escaping", () => {
 				constant a+b = 1
 				constant a?b = 2
 
-				__print(a+b)
-				__print(a?b)
+				Terminal.inspect(a+b)
+				Terminal.inspect(a?b)
 			}`
 
 			let generated = generate(source)
@@ -742,7 +742,7 @@ describe("Code Generation — Naming and Escaping", () => {
 			const source = `implementation {
 				constant ok? = true
 
-				__print(ok?)
+				Terminal.inspect(ok?)
 			}`
 
 			expect(generate(source)).toBe(generate(source))
@@ -755,8 +755,8 @@ describe("Code Generation — Naming and Escaping", () => {
 			const source = `implementation {
 				constant r = { ok? = true, a+b = 5 }
 
-				__print(r.ok?)
-				__print(r.a+b)
+				Terminal.inspect(r.ok?)
+				Terminal.inspect(r.a+b)
 			}`
 
 			let generated = generate(source)
@@ -775,7 +775,7 @@ describe("Code Generation — Naming and Escaping", () => {
 					}
 				}
 
-				__print(1::ok?())
+				Terminal.inspect(1::ok?())
 			}`
 
 			let generated = generate(source)
@@ -792,7 +792,7 @@ describe("Code Generation — Naming and Escaping", () => {
 			let generated = generate(`implementation {
 				constant value = 5
 
-				__print(value)
+				Terminal.inspect(value)
 			}`)
 
 			expect(generated).toContain("const value = ")

@@ -1123,7 +1123,10 @@ describe("essence format", () => {
 			`essence-format-${process.pid}.es`,
 		)
 
-		writeFileSync(filePath, 'implementation {\n  __print("hi")\n}\n')
+		writeFileSync(
+			filePath,
+			'implementation {\n  Terminal.inspect("hi")\n}\n',
+		)
 
 		try {
 			let { code, out } = await capture(() =>
@@ -1132,7 +1135,9 @@ describe("essence format", () => {
 
 			expect(code).toBe(1)
 			expect(out).toContain(`essence-format-${process.pid}.es`)
-			expect(readFileSync(filePath, "utf8")).toContain('  __print("hi")')
+			expect(readFileSync(filePath, "utf8")).toContain(
+				'  Terminal.inspect("hi")',
+			)
 		} finally {
 			rmSync(filePath, { force: true })
 		}
@@ -1141,7 +1146,10 @@ describe("essence format", () => {
 	it("formats a source in place through the fmt alias", async () => {
 		let filePath = path.resolve(tmpdir(), `essence-fmt-${process.pid}.es`)
 
-		writeFileSync(filePath, 'implementation {\n  __print("hi")\n}\n')
+		writeFileSync(
+			filePath,
+			'implementation {\n  Terminal.inspect("hi")\n}\n',
+		)
 
 		try {
 			let { code } = await capture(() =>
@@ -1150,7 +1158,7 @@ describe("essence format", () => {
 
 			expect(code).toBe(0)
 			expect(readFileSync(filePath, "utf8")).toBe(
-				'implementation {\n\t__print("hi")\n}\n',
+				'implementation {\n\tTerminal.inspect("hi")\n}\n',
 			)
 		} finally {
 			rmSync(filePath, { force: true })
@@ -1363,7 +1371,7 @@ const brokenDependency = {
 		"",
 		"implementation {",
 		"",
-		"\t__print(halve(4)::toString())",
+		"\tTerminal.inspect(halve(4)::toString())",
 		"}",
 		"",
 	].join("\n"),
@@ -1390,7 +1398,7 @@ const sharedDependency = {
 		"",
 		"implementation {",
 		"",
-		"\t__print(halve(9)::toString())",
+		"\tTerminal.inspect(halve(9)::toString())",
 		"}",
 		"",
 	].join("\n"),
@@ -1488,7 +1496,7 @@ describe("CLI on a Module graph", () => {
 
 			expect(rendered).toContain("Dep.es")
 			expect(rendered).toContain('<- "not a Number"')
-			expect(rendered).not.toContain("__print")
+			expect(rendered).not.toContain("Terminal.inspect")
 		})
 	})
 

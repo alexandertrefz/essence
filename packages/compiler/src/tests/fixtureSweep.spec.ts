@@ -87,7 +87,7 @@ function sweep(fileName: string, source: string): SweptFixture {
 }
 
 // NOTE: Writes the emitted Program to a throwaway module and imports it so its
-// top-level `__print` calls run, the way `matchLowering.spec.ts` does — the
+// top-level `Terminal.inspect` calls run, the way `matchLowering.spec.ts` does — the
 // emitted imports are absolute paths into this repo's runtime, so the module
 // resolves from the temporary directory it is written to. A fixture that throws
 // on its way through fails the test with its own error, which is the other half

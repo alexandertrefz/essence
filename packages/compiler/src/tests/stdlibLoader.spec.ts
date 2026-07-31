@@ -978,12 +978,12 @@ describe("Standard Library Loader", () => {
 		expect(load).not.toThrow(/Alpha\.es:[\s\S]*?Nonexistent/)
 	})
 
-	// NOTE: `Print.es` is reachable from nothing — no standard library file
-	// imports `__print`, and it imports none of them. A graph walked from a
-	// single entry would leave it out and the language would quietly lose its
-	// one free Function, with every other test still green.
+	// NOTE: `Terminal.es` is reachable from nothing — no standard library file
+	// imports `Terminal`, and it imports only `String` and `Printable`. A graph
+	// walked from a single entry would leave it out and the language would
+	// quietly lose printing altogether, with every other test still green.
 	it("loads a file that nothing imports", () => {
-		expect(Object.keys(loadStdlib().members)).toContain("__print")
+		expect(Object.keys(loadStdlib().members)).toContain("Terminal")
 	})
 
 	// NOTE: The point of `Prelude.es`. A name reaches the language by being
@@ -1055,7 +1055,8 @@ describe("Standard Library Loader", () => {
 		])
 
 		for (let name of [
-			"__print",
+			"Terminal",
+			"Stream",
 			"loop",
 			"Integer",
 			"String",
@@ -1322,6 +1323,7 @@ describe("Standard Library Loader", () => {
 		expect(
 			loadStdlib().namespaces.map((namespace) => namespace.name),
 		).toEqual([
+			"Terminal",
 			"String",
 			"Boolean",
 			"Integer",
@@ -1497,7 +1499,7 @@ describe("Standard Library Loader", () => {
 	// NOTE: A free Function belongs to no Namespace, so its nativeness is kept in
 	// `functionBindings` rather than `nativeBindings` — one flag per entry in
 	// written order, the same shape a Method's overloads carry, and the same
-	// `__overload$N` index. `__print` is the one the real library ships.
+	// `__overload$N` index. `loop` is the one the real library ships.
 	describe("free Functions", () => {
 		// NOTE: A user Program enriched against a scope that holds one synthetic
 		// free Function and the primitive Type tags — enough for the call sites
@@ -1566,8 +1568,7 @@ describe("Standard Library Loader", () => {
 		}
 
 		// NOTE: A body-less `function` is a single native flag and resolves to a
-		// `Function` — exactly what `__print`'s `__`-sigil invocation reads. It
-		// carries no typed Node: a native has no body to emit.
+		// `Function`. It carries no typed Node: a native has no body to emit.
 		it("collects a body-less free Function as one native flag", () => {
 			let stdlib = load([
 				"Identity.es",

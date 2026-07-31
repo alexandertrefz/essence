@@ -930,7 +930,7 @@ export {
 }
 
 implementation {
-	__print(area(3)::toString())
+	Terminal.inspect(area(3)::toString())
 }
 `,
 				"Geometry.es": `implementation {
@@ -976,7 +976,7 @@ implementation {
 		<- shape.width
 	}
 
-	__print(widthOf({ width = 2 })::toString())
+	Terminal.inspect(widthOf({ width = 2 })::toString())
 }
 `,
 				"Facade.es": `implementation {}
@@ -1071,8 +1071,8 @@ implementation {
 		<- 0
 	}
 
-	__print(local()::toString())
-	__print("literal"::append(""))
+	Terminal.inspect(local()::toString())
+	Terminal.inspect("literal"::append(""))
 }
 `,
 				"Library.es": `implementation {
@@ -1150,7 +1150,7 @@ implementation {
 		<- shape::area()
 	}
 
-	__print(areaOf({ width = 2, height = 3 })::toString())
+	Terminal.inspect(areaOf({ width = 2, height = 3 })::toString())
 }
 `,
 				"Geometry.es": `implementation {
@@ -1346,7 +1346,7 @@ export {
 }
 
 implementation {
-	__print(SCALE::toString())
+	Terminal.inspect(SCALE::toString())
 }
 `,
 				"Settings.es": `implementation {
@@ -1382,7 +1382,7 @@ implementation {
 		<- 1
 	}
 
-	__print(fromB()::toString())
+	Terminal.inspect(fromB()::toString())
 }
 
 export {
@@ -1430,7 +1430,7 @@ export {
 }
 
 implementation {
-	__print(kept()::toString())
+	Terminal.inspect(kept()::toString())
 }
 `,
 				"Library.es": `implementation {
@@ -1482,7 +1482,7 @@ implementation {
 		<- shape::area()
 	}
 
-	__print(areaOf({ width = 2, height = 3 })::toString())
+	Terminal.inspect(areaOf({ width = 2, height = 3 })::toString())
 }
 `,
 				"Geometry.es": `implementation {
@@ -1528,7 +1528,7 @@ implementation {
 		<- shape.width
 	}
 
-	__print(widthOf({ width = 2 })::toString())
+	Terminal.inspect(widthOf({ width = 2 })::toString())
 }
 `,
 				"Geometry.es": `implementation {
@@ -1558,7 +1558,7 @@ export {
 				"Main.es": `implementation {
 	variable counter = 0
 
-	__print(counter::toString())
+	Terminal.inspect(counter::toString())
 }
 
 export {
@@ -1603,7 +1603,7 @@ export {
 }
 
 implementation {
-	__print(2::missing()::toString())
+	Terminal.inspect(2::missing()::toString())
 }
 `,
 				"Alpha.es": `implementation {
@@ -1672,7 +1672,7 @@ implementation {
 		<- shape::area()
 	}
 
-	__print(areaOf({ width = 2, height = 3 })::toString())
+	Terminal.inspect(areaOf({ width = 2, height = 3 })::toString())
 }
 `,
 				"Geometry.es": `implementation {
@@ -1746,7 +1746,7 @@ export {
 implementation {
 	constant wrong = missing
 
-	__print(broken()::toString())
+	Terminal.inspect(broken()::toString())
 }
 `,
 				"Other.es": `implementation {
@@ -1806,8 +1806,8 @@ export {
 }
 
 implementation {
-	__print(broken()::toString())
-	__print(broken()::toString())
+	Terminal.inspect(broken()::toString())
+	Terminal.inspect(broken()::toString())
 }
 `,
 				"Other.es": `implementation {
@@ -1860,7 +1860,7 @@ implementation {
 
 	constant mine: Result = #Ok
 
-	__print(take(mine)::toString())
+	Terminal.inspect(take(mine)::toString())
 }
 `,
 				"Other.es": `implementation {
@@ -1964,7 +1964,7 @@ function generateModules(linked: LinkedGraph): ModuleSources {
 }
 
 // NOTE: Bundles the whole graph and imports the result, so its top-level
-// `__print` calls run — the same shape `fixtureSweep.spec.ts` uses for a lone
+// `Terminal.inspect` calls run — the same shape `fixtureSweep.spec.ts` uses for a lone
 // Program. The bundle is standalone: the runtime is inlined into it, so it runs
 // from wherever it is written.
 async function runBundle(
@@ -2050,11 +2050,11 @@ implementation {
 		<- amount.cents
 	}
 
-	__print(total({ cents = 7 })::toString())
+	Terminal.inspect(total({ cents = 7 })::toString())
 }
 `,
 				"Dep.es": `implementation {
-	__print("Dep")
+	Terminal.inspect("Dep")
 
 	type Amount = { cents: Integer }
 }
@@ -2099,8 +2099,8 @@ export {
 }
 
 implementation {
-	__print("Main")
-	__print(left()::add(right())::toString())
+	Terminal.inspect("Main")
+	Terminal.inspect(left()::add(right())::toString())
 }
 `,
 				"Left.es": `import {
@@ -2108,7 +2108,7 @@ implementation {
 }
 
 implementation {
-	__print("Left")
+	Terminal.inspect("Left")
 
 	function left() -> Integer {
 		<- shared()
@@ -2124,7 +2124,7 @@ export {
 }
 
 implementation {
-	__print("Right")
+	Terminal.inspect("Right")
 
 	function right() -> Integer {
 		<- shared()::multiply(with 2)
@@ -2136,7 +2136,7 @@ export {
 }
 `,
 				"Shared.es": `implementation {
-	__print("Shared")
+	Terminal.inspect("Shared")
 
 	function shared() -> Integer {
 		<- 21
@@ -2196,8 +2196,8 @@ implementation {
 		}
 	}
 
-	__print(describe(mine))
-	__print(describe(theirRed))
+	Terminal.inspect(describe(mine))
+	Terminal.inspect(describe(theirRed))
 }
 `,
 				"Other.es": `implementation {

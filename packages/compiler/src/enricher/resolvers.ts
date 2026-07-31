@@ -835,7 +835,7 @@ function resolveFreeFunctionEntry(
 
 // NOTE: A body-less native free Function resolves to the same `Function` Type a
 // bodied one would — the missing block is a binding-by-name to the runtime, not
-// a difference in the signature the Enricher reads. `__print` is exactly this.
+// a difference in the signature the Enricher reads.
 export function resolveNativeFunctionStatementType(
 	node: parser.NativeFunctionStatementNode,
 	scope: enricher.Scope,

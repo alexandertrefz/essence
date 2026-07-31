@@ -155,8 +155,8 @@ export type NativeBindings = Record<string, NamespaceNativeBindings>
 // are bound to the runtime rather than implemented in Essence, keyed by the
 // Function's name. ONE FLAG PER ENTRY in written order, exactly as a Method's:
 // a body-less `function` has a single `true`, an `overload function` block has
-// one flag per entry, and the position IS the `__overload$N` index. `__print`
-// is the first inhabitant. The Rewriter reads this to tell a native free
+// one flag per entry, and the position IS the `__overload$N` index. `loop` is
+// the sole inhabitant. The Rewriter reads this to tell a native free
 // Function (a read off the runtime `functions` module) from an Essence-bodied
 // one, and `generateNatives` renders the module's contract from it.
 export type FunctionBindings = Record<string, Array<boolean>>
@@ -505,7 +505,7 @@ export function loadStdlibFrom(
 
 	// NOTE: A standard library file starts from the bare Type tags alone — the
 	// handful of Types a declaration bottoms out in. Everything else in the
-	// language, `__print` and every other free Function included, is declared by
+	// language, `loop` and every other free Function included, is declared by
 	// the sources being loaded here.
 	//
 	// The tags sit on a PARENT Scope rather than in the declaring one, because

@@ -455,8 +455,9 @@ function resolveAll(
 // and parsed by its own package before the Compiler ever sees it, resolves a
 // specifier against that set by name rather than against the file system.
 // EVERY entry is a root: a collection loaded as a whole has files nothing
-// imports, and `Print.es` is exactly that. Nothing reaches it, so a graph rooted
-// at one entry would leave `__print` out of the language.
+// imports, and `Terminal.es` is exactly that. Nothing in the standard library
+// reaches it, so a graph rooted at one entry would leave printing out of the
+// language.
 export function loadModuleGraphOver(
 	entries: Array<{
 		filePath: string

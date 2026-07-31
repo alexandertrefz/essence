@@ -226,7 +226,7 @@ describe("Enricher", () => {
 			expect(
 				diagnosticsFor(`implementation {
 					constant name = "essence"
-					__print(name)
+					Terminal.inspect(name)
 				}`),
 			).toEqual([])
 		})
@@ -765,7 +765,7 @@ describe("Enricher", () => {
 						<- isEven(value::subtract(1))
 					}
 
-					__print(isEven(4))
+					Terminal.inspect(isEven(4))
 				}`),
 			).toEqual([])
 		})
@@ -1651,7 +1651,7 @@ describe("Enricher", () => {
 						}
 					}
 
-					__print([1, 2, 3]::firstItem())
+					Terminal.inspect([1, 2, 3]::firstItem())
 				}`).map((diagnostic) => diagnostic.code),
 			).toEqual(["ambiguous-namespace"])
 		})
@@ -2790,7 +2790,7 @@ describe("Enricher", () => {
 					}
 				}
 
-				__print(Bags.nameOf("a", "b"))
+				Terminal.inspect(Bags.nameOf("a", "b"))
 			}`)
 
 			expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
@@ -3575,13 +3575,13 @@ describe("Enricher", () => {
 						<- value::toString()
 					}
 
-					__print(describeValue(5))
-					__print(describeValue(1/2))
-					__print(describeValue("text"))
-					__print(describeValue(true))
-					__print(describeValue({}))
-					__print(describeValue({ x = 1 }))
-					__print(describeValue(Ordering#Less))
+					Terminal.inspect(describeValue(5))
+					Terminal.inspect(describeValue(1/2))
+					Terminal.inspect(describeValue("text"))
+					Terminal.inspect(describeValue(true))
+					Terminal.inspect(describeValue({}))
+					Terminal.inspect(describeValue({ x = 1 }))
+					Terminal.inspect(describeValue(Ordering#Less))
 				}`),
 			).toEqual([])
 		})
@@ -4712,7 +4712,7 @@ describe("Enricher", () => {
 					constant named: Colour = Colour#Red
 					constant bare: Colour = #Green({ shade = 1 })
 
-					__print(match named -> String {
+					Terminal.inspect(match named -> String {
 						case #Red { <- "red" }
 						case Colour#Green { <- @.shade::toString() }
 					})
@@ -4731,7 +4731,7 @@ describe("Enricher", () => {
 					constant red: Colour = #Red
 					constant same = red::is(#Green)
 
-					__print(same::toString())
+					Terminal.inspect(same::toString())
 				}`),
 			).toEqual([])
 		})
@@ -4747,7 +4747,7 @@ describe("Enricher", () => {
 					constant full: Box<Integer> = Box<Integer>#Full({ value = 1 })
 					constant same = full::is(Box<Integer>#Empty)
 
-					__print(same::toString())
+					Terminal.inspect(same::toString())
 				}`),
 			).toEqual([])
 		})
@@ -4764,7 +4764,7 @@ describe("Enricher", () => {
 
 					constant red: Shade = Shade#Red
 
-					__print(match red -> String {
+					Terminal.inspect(match red -> String {
 						case #Red { <- "red" }
 						case #Green { <- "green" }
 					})
@@ -4791,7 +4791,7 @@ describe("Enricher", () => {
 
 					constant red: Colour = #Red
 
-					__print(red::name())
+					Terminal.inspect(red::name())
 				}`),
 			).toEqual([])
 		})
@@ -5522,7 +5522,7 @@ describe("Enricher", () => {
 						constant d = 3
 
 						if d::isNot(0) {
-							__print(d)
+							Terminal.inspect(d)
 						}
 					}`,
 					"d",
@@ -5543,7 +5543,7 @@ describe("Enricher", () => {
 					constant d = 3
 
 					if d::isNot(0) {
-						__print(doubled(d))
+						Terminal.inspect(doubled(d))
 					}
 				}`),
 			).toEqual([])
@@ -5559,7 +5559,7 @@ describe("Enricher", () => {
 						variable d = 3
 
 						if d::isNot(0) {
-							__print(d)
+							Terminal.inspect(d)
 						}
 					}`,
 					"d",
@@ -5578,7 +5578,7 @@ describe("Enricher", () => {
 						constant d = 3
 
 						if d::isGreaterThan(0) {
-							__print(d)
+							Terminal.inspect(d)
 						}
 					}`,
 					"d",
@@ -5594,7 +5594,7 @@ describe("Enricher", () => {
 						constant e = 4
 
 						if e::isNot(0) {
-							__print(d)
+							Terminal.inspect(d)
 						}
 					}`,
 					"d",
@@ -5611,7 +5611,7 @@ describe("Enricher", () => {
 						constant d = 3
 
 						if d::isNot(0)::and(d::isLessThan(10)) {
-							__print(d)
+							Terminal.inspect(d)
 						}
 					}`,
 					"d",
@@ -5630,7 +5630,7 @@ describe("Enricher", () => {
 						constant d = 3
 
 						if d::isNot(0)::and(d::isLessThan(10)) {
-							__print(d)
+							Terminal.inspect(d)
 						}
 					}`,
 					"d",
@@ -5655,7 +5655,7 @@ describe("Enricher", () => {
 						constant d = 3
 
 						if d::isNot(0) {
-							__print(d)
+							Terminal.inspect(d)
 						}
 					}`,
 					"d",
@@ -5673,8 +5673,8 @@ describe("Enricher", () => {
 				constant s = "essence"
 
 				if d::isNot(0)::and(s::hasAnyContent()) {
-					__print(s)
-					__print(d)
+					Terminal.inspect(s)
+					Terminal.inspect(d)
 				}
 			}`
 
@@ -5693,9 +5693,9 @@ describe("Enricher", () => {
 							constant d = 3
 
 							if d::is(0) {
-								__print(0)
+								Terminal.inspect(0)
 							} else {
-								__print(d)
+								Terminal.inspect(d)
 							}
 						}`,
 						"d",
@@ -5712,9 +5712,9 @@ describe("Enricher", () => {
 							constant d = 3
 
 							if d::isNot(0) {
-								__print(0)
+								Terminal.inspect(0)
 							} else {
-								__print(d)
+								Terminal.inspect(d)
 							}
 						}`,
 						"d",
@@ -5731,9 +5731,9 @@ describe("Enricher", () => {
 							constant s = "essence"
 
 							if s::isEmpty() {
-								__print(0)
+								Terminal.inspect(0)
 							} else {
-								__print(s)
+								Terminal.inspect(s)
 							}
 						}`,
 						"s",
@@ -5750,9 +5750,9 @@ describe("Enricher", () => {
 							constant items = ["a", "b"]
 
 							if items::isEmpty() {
-								__print(0)
+								Terminal.inspect(0)
 							} else {
-								__print(items)
+								Terminal.inspect(items)
 							}
 						}`,
 						"items",
@@ -5769,9 +5769,9 @@ describe("Enricher", () => {
 							constant d = 3
 
 							if d::is(0)::and(d::isLessThan(10)) {
-								__print(0)
+								Terminal.inspect(0)
 							} else {
-								__print(d)
+								Terminal.inspect(d)
 							}
 						}`,
 						"d",
@@ -5791,9 +5791,9 @@ describe("Enricher", () => {
 							constant flag = true
 
 							if d::is(0)::and(flag) {
-								__print(0)
+								Terminal.inspect(0)
 							} else {
-								__print(d)
+								Terminal.inspect(d)
 							}
 						}`,
 						"d",
@@ -5810,9 +5810,9 @@ describe("Enricher", () => {
 							constant d = 3
 
 							if d::isGreaterThanOrEqualTo(10) {
-								__print(0)
+								Terminal.inspect(0)
 							} else {
-								__print(d)
+								Terminal.inspect(d)
 							}
 						}`,
 						"d",
@@ -5828,11 +5828,11 @@ describe("Enricher", () => {
 					constant d = 3
 
 					if d::is(0) {
-						__print(0)
+						Terminal.inspect(0)
 					} else if d::isLessThan(0) {
-						__print(d)
+						Terminal.inspect(d)
 					} else {
-						__print(d)
+						Terminal.inspect(d)
 					}
 				}`
 
@@ -5857,7 +5857,7 @@ describe("Enricher", () => {
 				if d::isNot(0) {
 					constant d = 1
 
-					__print(d)
+					Terminal.inspect(d)
 				}
 			}`
 
@@ -6120,7 +6120,7 @@ describe("Enricher", () => {
 				constant items = [nope]
 
 				if items::hasItems() {
-					__print(items)
+					Terminal.inspect(items)
 				}
 			}`)
 
@@ -6139,7 +6139,7 @@ describe("Enricher", () => {
 
 			let printed = branch.body[0]
 
-			if (printed.nodeType !== "NativeFunctionInvocation") {
+			if (printed.nodeType !== "FunctionInvocation") {
 				throw new Error("The branch does not print.")
 			}
 
@@ -6162,7 +6162,7 @@ describe("Enricher", () => {
 						constant text = "essence"
 
 						if text::hasAnyContent() {
-							__print(text)
+							Terminal.inspect(text)
 						}
 					}`,
 					"text",
@@ -6194,7 +6194,7 @@ describe("Enricher", () => {
 							constant items = ["a", "b"]
 
 							if items::hasItems() {
-								__print(items)
+								Terminal.inspect(items)
 							}
 						}`,
 						"items",
@@ -6212,7 +6212,7 @@ describe("Enricher", () => {
 							constant items = [["a"], ["b"]]
 
 							if items::hasItems() {
-								__print(items)
+								Terminal.inspect(items)
 							}
 						}`,
 						"items",
@@ -6237,7 +6237,7 @@ describe("Enricher", () => {
 						constant items = ["a", "b"]
 
 						if items::hasItems() {
-							__print(firstOf(items))
+							Terminal.inspect(firstOf(items))
 						}
 					}`),
 				).toEqual([])
@@ -6254,9 +6254,9 @@ describe("Enricher", () => {
 							constant items = ["a", "b"]
 
 							if items::isEmpty() {
-								__print(0)
+								Terminal.inspect(0)
 							} else {
-								__print(items)
+								Terminal.inspect(items)
 							}
 						}`,
 						"items",
@@ -6344,7 +6344,7 @@ describe("Enricher", () => {
 							variable items = ["a", "b"]
 
 							if items::hasItems() {
-								__print(items)
+								Terminal.inspect(items)
 							}
 						}`,
 						"items",
@@ -6367,7 +6367,7 @@ describe("Enricher", () => {
 							constant items = ["a", "b"]
 
 							if items::isEmpty() {
-								__print(items)
+								Terminal.inspect(items)
 							}
 						}`,
 						"items",
@@ -6386,7 +6386,7 @@ describe("Enricher", () => {
 						`implementation {
 							function probe<Item>(_ items: List<Item>) -> Integer {
 								if items::hasItems() {
-									__print(items)
+									Terminal.inspect(items)
 								}
 
 								<- 0

@@ -17,7 +17,7 @@ throughout: breakpoints bind on source lines, stacks carry the names the
 author wrote — a `match` reads as one frame, standard-library frames as
 `List.sorted`, compiler glue hidden or greyed out — stepping is carried over
 the runtime and the prelude, and the Variables view renders values the way
-`__print` spells them, live inside the debuggee.
+`Terminal.inspect` spells them, live inside the debuggee.
 
 The adapter deliberately does not depend on the compiler. What compiling
 *means* is a capability the host injects — `essence dap` hands in the CLI's

@@ -745,9 +745,9 @@ Error: Constant 'STEP' is imported across a cycle
 Warning: This Statement runs in an order the cycle does not state
     ╭─┤ Ping.es:11:2 │
     │
- 11 │     __print(stepped(1)::toString())
-    │     ───────────────┬───────────────  
-    │                    ╰───────────────── this runs when the Module body runs
+ 11 │     Terminal.inspect(stepped(1)::toString())
+    │     ────────────────────┬───────────────────  
+    │                         ╰───────────────────── this runs when the Module body runs
     │ 
     │ Help: Break the cycle, or move the Statement into a Module outside it.
     │ 
@@ -764,9 +764,9 @@ exports[`Module Diagnostic Showcase Ping.es should render the same report every 
 Warning: This Statement runs in an order the cycle does not state
    ╭─┤ Pong.es:9:2 │
    │
- 9 │     __print(stepped(0)::toString())
-   │     ───────────────┬───────────────  
-   │                    ╰───────────────── this runs when the Module body runs
+ 9 │     Terminal.inspect(stepped(0)::toString())
+   │     ────────────────────┬───────────────────  
+   │                         ╰───────────────────── this runs when the Module body runs
    │ 
    │ Help: Break the cycle, or move the Statement into a Module outside it.
    │ 

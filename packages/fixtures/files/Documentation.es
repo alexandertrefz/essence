@@ -97,12 +97,12 @@ implementation {
 		}
 	}
 
-	__print(greet(subject defaultSubject))
-	__print(greetTwice(first "Hello!", second "Hello again!"))
-	__print(shout("Look"))
-	__print(join(left "Hello, ", right "Essence!"))
-	__print(1::combine(2)::text())
-	__print(1::combine(2, 3)::text())
-	__print(Greetings.fallback)
-	__print(Greetings.forCrowd(count 3))
+	Terminal.inspect(greet(subject defaultSubject))
+	Terminal.inspect(greetTwice(first "Hello!", second "Hello again!"))
+	Terminal.inspect(shout("Look"))
+	Terminal.inspect(join(left "Hello, ", right "Essence!"))
+	Terminal.inspect(1::combine(2)::text())
+	Terminal.inspect(1::combine(2, 3)::text())
+	Terminal.inspect(Greetings.fallback)
+	Terminal.inspect(Greetings.forCrowd(count 3))
 }

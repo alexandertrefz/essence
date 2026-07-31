@@ -47,7 +47,7 @@ function emitted(source: string): string {
 }
 
 // NOTE: Emits the Program, writes it to a throwaway module and imports it so
-// its top-level `__print` calls run — the same harness `codeGeneration.spec.ts`
+// its top-level `Terminal.inspect` calls run — the same harness `codeGeneration.spec.ts`
 // uses, because the same faults only show up in what the Program prints.
 async function run(source: string): Promise<Array<string>> {
 	let javascript = emitted(source)
@@ -105,7 +105,7 @@ describe("Resolvers", () => {
 					diagnosticsFor(`implementation {
 						constant ${name} = 5
 
-						__print(${name})
+						Terminal.inspect(${name})
 					}`),
 				).toEqual([])
 			})
@@ -120,7 +120,7 @@ describe("Resolvers", () => {
 						<- valueOf
 					}
 
-					__print(inner())
+					Terminal.inspect(inner())
 				}`),
 			).toEqual([])
 		})
@@ -140,7 +140,7 @@ describe("Resolvers", () => {
 				await run(`implementation {
 					constant toString = 5
 
-					__print(toString)
+					Terminal.inspect(toString)
 				}`),
 			).toEqual(["5"])
 		})
@@ -150,7 +150,7 @@ describe("Resolvers", () => {
 				await run(`implementation {
 					constant record = { toString = "written" }
 
-					__print(record.toString)
+					Terminal.inspect(record.toString)
 				}`),
 			).toEqual(['"written"'])
 		})
@@ -182,7 +182,7 @@ describe("Resolvers", () => {
 						static doubled = Reader.base::multiply(with 2)
 					}
 
-					__print(Reader.doubled)
+					Terminal.inspect(Reader.doubled)
 				}`),
 			).toEqual(["20"])
 		})
@@ -196,7 +196,7 @@ describe("Resolvers", () => {
 						static computed() -> Integer { <- 10 }
 					}
 
-					__print(Reader.doubled)
+					Terminal.inspect(Reader.doubled)
 				}`),
 			).toEqual(["20"])
 		})
@@ -210,7 +210,7 @@ describe("Resolvers", () => {
 						scaled() -> Integer { <- Reader.base::multiply(with @) }
 					}
 
-					__print(2::scaled())
+					Terminal.inspect(2::scaled())
 				}`),
 			).toEqual(["20"])
 		})
@@ -225,7 +225,7 @@ describe("Resolvers", () => {
 						first() -> Optional<Item> { <- @::firstItem() }
 					}
 
-					__print(Boxes.label)
+					Terminal.inspect(Boxes.label)
 				}`),
 			).toEqual(['"none"'])
 		})
@@ -250,7 +250,7 @@ describe("Resolvers", () => {
 					<- "x"::<Greeter>greet()
 				}
 
-				__print(shadowed())
+				Terminal.inspect(shadowed())
 			}`)
 
 			let specifier = diagnostics.find(
@@ -289,7 +289,7 @@ describe("Resolvers", () => {
 						<- "x"::<Greeter>greet()
 					}
 
-					__print(greeting())
+					Terminal.inspect(greeting())
 				}`),
 			).toEqual(['"hi"'])
 		})
@@ -335,7 +335,7 @@ describe("Resolvers", () => {
 				${body}
 			}
 
-			__print(ambiguously())
+			Terminal.inspect(ambiguously())
 		}`
 
 		// NOTE: The control — one solve, below a second conforming Namespace
@@ -420,7 +420,7 @@ describe("Resolvers", () => {
 
 				${order === "above" ? `${use}\n\n${namespace}` : `${namespace}\n\n${use}`}
 
-				__print(rankBoxes({ value = 1 }, { value = 2 }))
+				Terminal.inspect(rankBoxes({ value = 1 }, { value = 2 }))
 			}`
 		}
 
@@ -461,8 +461,8 @@ describe("Resolvers", () => {
 					rank(_ other: Self) -> String
 				}
 
-				__print(rankBoxes({ value = 1 }, { value = 2 }))
-				__print(rankBoxes({ value = 5 }, { value = 2 }))
+				Terminal.inspect(rankBoxes({ value = 1 }, { value = 2 }))
+				Terminal.inspect(rankBoxes({ value = 5 }, { value = 2 }))
 			}`
 		}
 
@@ -502,7 +502,7 @@ describe("Resolvers", () => {
 	describe("Witness conditions over an unpinned item Type", () => {
 		it("should report sorting a List of empty Lists", () => {
 			let diagnostics = diagnosticsFor(`implementation {
-				__print([[], []]::sort())
+				Terminal.inspect([[], []]::sort())
 			}`)
 
 			expect(diagnostics).toHaveLength(1)
@@ -517,7 +517,7 @@ describe("Resolvers", () => {
 		it("should report searching one by value", () => {
 			expect(
 				codesFor(`implementation {
-					__print([[], []]::contains([]))
+					Terminal.inspect([[], []]::contains([]))
 				}`),
 			).toEqual(["unsatisfied-conformance-condition"])
 		})
@@ -535,7 +535,7 @@ describe("Resolvers", () => {
 
 					items = [1, 2]
 
-					__print([items, items]::sort())
+					Terminal.inspect([items, items]::sort())
 				}`),
 			).toEqual(["[ [ 1, 2 ], [ 1, 2 ] ]"])
 		})
@@ -543,7 +543,7 @@ describe("Resolvers", () => {
 		it("should keep sorting Lists one of which pins the item Type", async () => {
 			expect(
 				await run(`implementation {
-					__print([[], [1]]::sort())
+					Terminal.inspect([[], [1]]::sort())
 				}`),
 			).toEqual(["[ [], [ 1 ] ]"])
 		})
@@ -553,7 +553,7 @@ describe("Resolvers", () => {
 				await run(`implementation {
 					constant items: List<Integer> = []
 
-					__print([items, [1]]::sort())
+					Terminal.inspect([items, [1]]::sort())
 				}`),
 			).toEqual(["[ [], [ 1 ] ]"])
 		})
@@ -612,7 +612,7 @@ describe("Resolvers", () => {
 
 					constant one: Ranked<Integer> = { value = 7 }
 
-					__print(one.value::rank())
+					Terminal.inspect(one.value::rank())
 				}`),
 			).toEqual(["7"])
 		})
@@ -629,7 +629,7 @@ describe("Resolvers", () => {
 						value = (_ x: Integer) -> Integer { <- x }
 					}
 
-					__print(held.value(1))
+					Terminal.inspect(held.value(1))
 				}`),
 			).toEqual([])
 		})
@@ -655,8 +655,8 @@ describe("Resolvers", () => {
 
 					match first -> {} {
 						case #First {
-							__print(@::is(@))
-							__print(@::isNot(@))
+							Terminal.inspect(@::is(@))
+							Terminal.inspect(@::isNot(@))
 
 							<- {}
 						}
@@ -680,7 +680,7 @@ describe("Resolvers", () => {
 
 					match signal -> {} {
 						case #Ping {
-							__print(@::is(@))
+							Terminal.inspect(@::is(@))
 
 							<- {}
 						}
@@ -702,7 +702,7 @@ describe("Resolvers", () => {
 
 					match first -> {} {
 						case #First {
-							__print(@::is(second))
+							Terminal.inspect(@::is(second))
 
 							<- {}
 						}
@@ -735,7 +735,7 @@ describe("Resolvers", () => {
 
 					constant value: Pace<Integer, String> = #First({ a = 1 })
 
-					__print(compareNarrowed(value))
+					Terminal.inspect(compareNarrowed(value))
 				}`),
 			).toEqual(["true"])
 		})
@@ -749,8 +749,8 @@ describe("Resolvers", () => {
 					constant same: Pace<Integer, String> = #First({ a = 1 })
 					constant other: Pace<Integer, String> = #First({ a = 2 })
 
-					__print(first::is(same))
-					__print(first::is(other))
+					Terminal.inspect(first::is(same))
+					Terminal.inspect(first::is(other))
 				}`),
 			).toEqual(["true", "false"])
 		})
@@ -788,8 +788,8 @@ describe("Resolvers", () => {
 					constant wrapped: Wrapper<Named> = #Val({ v = lhs })
 					constant otherWrapped: Wrapper<Named> = #Val({ v = rhs })
 
-					__print(lhs::is(rhs))
-					__print(wrapped::is(otherWrapped))
+					Terminal.inspect(lhs::is(rhs))
+					Terminal.inspect(wrapped::is(otherWrapped))
 				}`),
 			).toEqual(["true", "true"])
 		})
@@ -821,8 +821,8 @@ describe("Resolvers", () => {
 					constant wrapped: Boxed<List<Named>> = #Val({ v = lhs })
 					constant otherWrapped: Boxed<List<Named>> = #Val({ v = rhs })
 
-					__print(lhs::is(rhs))
-					__print(wrapped::is(otherWrapped))
+					Terminal.inspect(lhs::is(rhs))
+					Terminal.inspect(wrapped::is(otherWrapped))
 				}`),
 			).toEqual(["true", "true"])
 		})
@@ -843,10 +843,10 @@ describe("Resolvers", () => {
 					constant sameCode: Wrapper<String> = #Val({ v = { code = 1 } })
 					constant otherCode: Wrapper<String> = #Val({ v = { code = 2 } })
 
-					__print(text::is(sameText))
-					__print(code::is(sameCode))
-					__print(code::is(otherCode))
-					__print(text::is(code))
+					Terminal.inspect(text::is(sameText))
+					Terminal.inspect(code::is(sameCode))
+					Terminal.inspect(code::is(otherCode))
+					Terminal.inspect(text::is(code))
 				}`),
 			).toEqual(["true", "true", "false", "false"])
 		})
@@ -868,11 +868,11 @@ describe("Resolvers", () => {
 					constant e: Wrapper<Named> = #Val({ v = { code = 3 } })
 					constant f: Wrapper<Named> = #Val({ v = { code = 4 } })
 
-					__print(a::is(b))
-					__print(a::is(c))
-					__print(a::is(d))
-					__print(d::is(e))
-					__print(d::is(f))
+					Terminal.inspect(a::is(b))
+					Terminal.inspect(a::is(c))
+					Terminal.inspect(a::is(d))
+					Terminal.inspect(d::is(e))
+					Terminal.inspect(d::is(f))
 				}`),
 			).toEqual(["true", "false", "false", "true", "false"])
 		})
@@ -904,9 +904,9 @@ describe("Resolvers", () => {
 					constant numbers: Boxed<Named> = #Val({ v = [1, 2] })
 					constant sameNumbers: Boxed<Named> = #Val({ v = [1, 2] })
 
-					__print(named::is(sameNamed))
-					__print(numbers::is(sameNumbers))
-					__print(named::is(numbers))
+					Terminal.inspect(named::is(sameNamed))
+					Terminal.inspect(numbers::is(sameNumbers))
+					Terminal.inspect(named::is(numbers))
 				}`),
 			).toEqual(["true", "true", "false"])
 		})
@@ -939,10 +939,10 @@ describe("Resolvers", () => {
 					constant sameCode: Wrapper<Named> = #Val({ v = { code = 3 } })
 					constant flag: Wrapper<Named> = #Val({ v = { flag = true } })
 
-					__print(named::is(sameNamed))
-					__print(code::is(sameCode))
-					__print(flag::is(code))
-					__print(flag::is(named))
+					Terminal.inspect(named::is(sameNamed))
+					Terminal.inspect(code::is(sameCode))
+					Terminal.inspect(flag::is(code))
+					Terminal.inspect(flag::is(named))
 				}`),
 			).toEqual(["true", "true", "false", "false"])
 		})
@@ -973,9 +973,9 @@ describe("Resolvers", () => {
 					constant number: Wrapper<Coded> = #Val({ v = { code = 1 } })
 					constant sameNumber: Wrapper<Coded> = #Val({ v = { code = 1 } })
 
-					__print(text::is(sameText))
-					__print(number::is(sameNumber))
-					__print(text::is(number))
+					Terminal.inspect(text::is(sameText))
+					Terminal.inspect(number::is(sameNumber))
+					Terminal.inspect(text::is(number))
 				}`),
 			).toEqual(["true", "true", "false"])
 		})
@@ -1005,7 +1005,7 @@ describe("Resolvers", () => {
 					constant one: Wrapper<Code> = #Val({ v = { code = 1 } })
 					constant two: Wrapper<Code> = #Val({ v = { code = 2 } })
 
-					__print(one::is(two))
+					Terminal.inspect(one::is(two))
 				}`),
 			).toEqual(["true"])
 		})
@@ -1039,10 +1039,10 @@ describe("Resolvers", () => {
 					constant sameCode: Wrapper<Tagged> = #Val({ v = { code = 1 } })
 					constant otherCode: Wrapper<Tagged> = #Val({ v = { code = 2 } })
 
-					__print(tagged::is(sameTagged))
-					__print(code::is(sameCode))
-					__print(code::is(otherCode))
-					__print(tagged::is(code))
+					Terminal.inspect(tagged::is(sameTagged))
+					Terminal.inspect(code::is(sameCode))
+					Terminal.inspect(code::is(otherCode))
+					Terminal.inspect(tagged::is(code))
 				}`),
 			).toEqual(["true", "true", "false", "false"])
 		})

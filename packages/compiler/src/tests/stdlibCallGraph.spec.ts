@@ -634,6 +634,9 @@ describe("Stdlib Call Graph", () => {
 			"String.starts",
 			"String.toString",
 			"String.trim__overload$1",
+			"Terminal.print__overload$1",
+			"Terminal.print__overload$2",
+			"Terminal.write__overload$1",
 			// NOTE: `Transcendental.is` and `absolute` are natives, and
 			// `List.toString` is one too — each was written on a Namespace
 			// heavier than its own (`Number`, `String`) and none could be

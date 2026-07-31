@@ -1,11 +1,11 @@
 import { describe, expect, it } from "bun:test"
 
 import { createBoolean } from "@essence-lang/runtime/Boolean"
-import { getStringRepresentation } from "@essence-lang/runtime/functions"
 import { createInteger } from "@essence-lang/runtime/Integer"
 import { createList } from "@essence-lang/runtime/List"
 import { createRecord } from "@essence-lang/runtime/Record"
 import { createString } from "@essence-lang/runtime/String"
+import { getStringRepresentation } from "@essence-lang/runtime/Terminal"
 import { createCase } from "@essence-lang/runtime/type"
 
 import { type DescribedValue, DESCRIBE_BATCH_SOURCE } from "../render"
@@ -25,7 +25,7 @@ function describeOne(value: unknown): DescribedValue {
 describe("the in-debuggee renderer", () => {
 	// NOTE: The display contract is `getStringRepresentation` itself — the
 	// REAL runtime values, built by the REAL constructors, must render to the
-	// very line `__print` would have printed.
+	// very line `Terminal.inspect` would have printed.
 	it("agrees with the runtime's own printer", () => {
 		let values = [
 			createInteger(42n),

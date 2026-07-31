@@ -2,7 +2,6 @@ import { describe, expect, it } from "bun:test"
 
 import * as algebraic from "@essence-lang/runtime/Algebraic"
 import { createBoolean } from "@essence-lang/runtime/Boolean"
-import { getStringRepresentation } from "@essence-lang/runtime/functions"
 import * as integer from "@essence-lang/runtime/Integer"
 import {
 	anyIs,
@@ -15,6 +14,7 @@ import * as number from "@essence-lang/runtime/Number"
 import * as rational from "@essence-lang/runtime/Rational"
 import * as record from "@essence-lang/runtime/Record"
 import * as string from "@essence-lang/runtime/String"
+import { getStringRepresentation } from "@essence-lang/runtime/Terminal"
 import {
 	type AnyType,
 	createCase,
@@ -162,7 +162,7 @@ describe("Runtime Internals", () => {
 
 		// NOTE: The regression — a Function carries no Type key, so the tag
 		// cascade fell through to `obj[typeKeySymbol].includes("#")` and threw
-		// `undefined is not an object`. `__print(f)`, `Record::toString()` and
+		// `undefined is not an object`. `Terminal.inspect(f)`, `Record::toString()` and
 		// `List::toString()` all reach here, so all three crashed.
 		it("prints a Function as a stable placeholder", () => {
 			expect(getStringRepresentation(functionValue())).toBe("Function")

@@ -28,7 +28,7 @@ function generate(source: string): string {
 }
 
 // NOTE: Writes the emitted Program to a throwaway module and imports it so its
-// top-level `__print` calls run. The emitted imports are absolute paths into
+// top-level `Terminal.inspect` calls run. The emitted imports are absolute paths into
 // this repo's runtime, so the module resolves from anywhere; `console.log` is
 // captured to collect the output, then restored.
 async function run(source: string): Promise<Array<string>> {
@@ -72,7 +72,7 @@ describe("Return Synthesis", () => {
 					function noop () -> {} {
 					}
 
-					__print(noop())
+					Terminal.inspect(noop())
 				}`),
 			).toEqual(["{}"])
 		})
@@ -85,7 +85,7 @@ describe("Return Synthesis", () => {
 
 					constant wrapper = { result = noop() }
 
-					__print(wrapper)
+					Terminal.inspect(wrapper)
 				}`),
 			).toEqual(["{ result = {} }"])
 		})
@@ -98,7 +98,7 @@ describe("Return Synthesis", () => {
 
 					constant value: Integer | {} = noop()
 
-					__print(match value -> String {
+					Terminal.inspect(match value -> String {
 						case Integer {
 							<- "integer"
 						}
@@ -121,7 +121,7 @@ describe("Return Synthesis", () => {
 			await run(`implementation {
 				constant value: Integer | String = 1
 
-				__print(match value -> {} {
+				Terminal.inspect(match value -> {} {
 					case Integer {
 					}
 					case String {
@@ -140,7 +140,7 @@ describe("Return Synthesis", () => {
 				<- {}
 			}
 
-			__print(explicit())
+			Terminal.inspect(explicit())
 		}`)
 
 		expect(generated.match(/\breturn\b/g)).toHaveLength(1)
