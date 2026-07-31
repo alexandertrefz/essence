@@ -8,7 +8,7 @@ implementation {
 		<- value::add(STEP)
 	}
 
-	__print(stepped(1)::toString())
+	Terminal.inspect(stepped(1)::toString())
 }
 
 export {

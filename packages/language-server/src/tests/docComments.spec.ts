@@ -223,11 +223,11 @@ describe("Documentation Comments", () => {
 	it("should carry Documentation on the builtin Namespaces", () => {
 		let source = [
 			"implementation {",
-			'\t__print("a"::append("b"))',
+			'\tTerminal.inspect("a"::append("b"))',
 			"}",
 		].join("\n")
 
-		expect(hover(source, { line: 2, column: 15 })?.documentation).toContain(
+		expect(hover(source, { line: 2, column: 24 })?.documentation).toContain(
 			"Joins another String onto the end of this one.",
 		)
 

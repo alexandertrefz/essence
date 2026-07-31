@@ -1,11 +1,11 @@
 import type { BooleanType } from "./Boolean"
 import { createBoolean } from "./Boolean"
-import { getStringRepresentation } from "./functions"
 import { anyIs } from "./internalHelpers"
 import type { ListType } from "./List"
 import { createList } from "./List"
 import type { StringType } from "./String"
 import { createString } from "./String"
+import { getStringRepresentation } from "./Terminal"
 import type { AnyType } from "./type"
 import { typeKeySymbol } from "./type"
 

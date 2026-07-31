@@ -498,7 +498,7 @@ describe("Irrationals", () => {
 				diagnosticsFor(`implementation {
 					constant value: Irrational = Number.Pi
 
-					__print(match value -> String {
+					Terminal.inspect(match value -> String {
 						case Algebraic { <- "algebraic" }
 						case Transcendental { <- "transcendental" }
 					})
@@ -510,7 +510,7 @@ describe("Irrationals", () => {
 			let diagnostics = diagnosticsFor(`implementation {
 				constant value: Number = 5
 
-				__print(match value -> String {
+				Terminal.inspect(match value -> String {
 					case Integer { <- @::toString() }
 					case Rational { <- @::toString() }
 				})
@@ -557,10 +557,10 @@ describe("Irrationals", () => {
 				diagnosticsFor(`implementation {
 					constant roots: List<Irrational> = [Number.Pi, Number.Tau]
 
-					__print(roots::contains(Number.Pi)::toString())
-					__print(roots::count(of Number.Tau)::toString())
-					__print(roots::removeDuplicates()::length()::toString())
-					__print(roots::is([Number.Pi])::toString())
+					Terminal.inspect(roots::contains(Number.Pi)::toString())
+					Terminal.inspect(roots::count(of Number.Tau)::toString())
+					Terminal.inspect(roots::removeDuplicates()::length()::toString())
+					Terminal.inspect(roots::is([Number.Pi])::toString())
 				}`),
 			).toEqual([])
 		})
@@ -578,7 +578,7 @@ describe("Irrationals", () => {
 				diagnosticsFor(`implementation {
 					constant root = 2::squareRoot()
 
-					__print(match root -> String {
+					Terminal.inspect(match root -> String {
 						case #Value(value) {
 							<- match value -> String {
 								case Algebraic { <- 1::divide(by @)::toString() }

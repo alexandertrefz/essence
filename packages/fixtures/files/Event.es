@@ -66,20 +66,26 @@ implementation {
 
 	constant clicked = Event.createFrom("click.menu.navigation.menu")
 
-	__print(clicked.eventName) § "click"
-	__print(clicked.namespaces) § [ "menu", "navigation" ] — the repeat dropped
-	__print(clicked::hasNamespaces()) § true
-	__print(Event.createFrom()::hasNamespaces()) § false — the blank event
+	Terminal.inspect(clicked.eventName) § "click"
+	Terminal.inspect(
+		clicked.namespaces,
+	) § [ "menu", "navigation" ] — the repeat dropped
+	Terminal.inspect(clicked::hasNamespaces()) § true
+	Terminal.inspect(
+		Event.createFrom()::hasNamespaces(),
+	) § false — the blank event
 
 	§ Records compare structurally — parsing the same description twice gives
 	§ the same Event, and `is` says so.
-	__print(clicked::is(Event.createFrom("click.menu.navigation.menu"))) § true
+	Terminal.inspect(
+		clicked::is(Event.createFrom("click.menu.navigation.menu")),
+	) § true
 
 	§ A handler marks the event handled; the copies chain, the original stays.
 	constant handled = clicked::preventDefault()::stopPropagation()
 
-	__print(handled.isDefaultPrevented) § true
-	__print(handled.isPropagationStopped) § true
-	__print(clicked.isPropagationStopped) § false — untouched
-	__print(handled::isNot(clicked)) § true
+	Terminal.inspect(handled.isDefaultPrevented) § true
+	Terminal.inspect(handled.isPropagationStopped) § true
+	Terminal.inspect(clicked.isPropagationStopped) § false — untouched
+	Terminal.inspect(handled::isNot(clicked)) § true
 }

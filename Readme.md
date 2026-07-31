@@ -70,7 +70,7 @@ implementation {
 		<- "area: "::append(shape::area()::multiply(with Pi)::toString())
 	}
 
-	__print(describe({ width = 3, height = 4 }))
+	Terminal.print(describe({ width = 3, height = 4 }))
 }
 
 export {

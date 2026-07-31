@@ -2563,10 +2563,12 @@ function rewriteNativeFunctionInvocation(
 		)
 	}
 
-	// NOTE: The `__`-sigil name IS the runtime export name now — `__print` binds
-	// to `functions.__print`. The prefix used to be stripped here, so the runtime
-	// exported a differently-spelled `print`; unifying the two lets `__print`
-	// migrate into `packages/stdlib/sources/Print.es` as an ordinary native free Function.
+	// NOTE: The `__`-sigil name IS the runtime export name — the prefix is not
+	// stripped here, so a `__name(…)` call binds to `functions.__name`. No
+	// standard library declaration uses this any more: printing moved onto the
+	// `Terminal` Namespace, whose natives are ordinary Namespace members. What is
+	// left is the generic `__`-sigil machinery, kept until the phase that removes
+	// it.
 	return {
 		type: "CallExpression",
 		optional: false,

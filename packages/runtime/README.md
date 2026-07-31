@@ -18,7 +18,7 @@ checkout does.
 Values are plain objects tagged with a `$type` symbol; `Integer` holds a
 `bigint`, `Rational` a pair of them, and the numeric tower continues through
 `Algebraic` and `Transcendental` so that `1::divide(by 3)` stays exact. The
-pretty-printer behind `__print` lives here too, in `functions.ts`.
+pretty-printer behind `Terminal.inspect` lives here too, in `Terminal.ts`.
 
 You would depend on this package directly only to build tooling that
 manipulates compiled Essence values —

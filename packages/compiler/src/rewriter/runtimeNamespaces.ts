@@ -15,6 +15,7 @@
 // prelude, the prelude is optimised, and the Optimiser would read the Rewriter.
 // Nothing is imported here, so nothing can.
 export const runtimeNamespaceNames = [
+	"Terminal",
 	"String",
 	"Integer",
 	"NonZeroInteger",

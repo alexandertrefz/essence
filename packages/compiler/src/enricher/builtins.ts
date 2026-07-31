@@ -31,7 +31,7 @@ import { loadStdlib } from "./stdlib"
 // A name missing from this list is appended in the order it was declared, so
 // a genuinely new builtin costs nothing until it needs a place of its own.
 export const builtinMemberOrder: Array<string> = [
-	"__print",
+	"Terminal",
 	"loop",
 	"String",
 	"Boolean",
@@ -118,6 +118,10 @@ export const builtinTypeOrder: Array<string> = [
 	"NormalizationForm",
 	"NumberFormat",
 	"Rounding",
+	// NOTE: With the other mode Choices, and last among them because it is the
+	// newest — `Stream` is the only one of them with no Namespace of its own, so
+	// it appears in this table and not in the member order above.
+	"Stream",
 ]
 
 // NOTE: The third table's order, stated for the same reason as the two above.

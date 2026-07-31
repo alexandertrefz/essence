@@ -119,7 +119,7 @@ describe("Call Hierarchy", () => {
 			"\t\t<- value::add(value)",
 			"\t}",
 			"",
-			"\t__print(double(total)::toString())",
+			"\tTerminal.inspect(double(total)::toString())",
 			"}",
 		].join("\n")
 
@@ -142,7 +142,7 @@ describe("Call Hierarchy", () => {
 			"\t\t<- helper(2)::add(helper(3))",
 			"\t}",
 			"",
-			"\t__print(helper(4)::toString())",
+			"\tTerminal.inspect(helper(4)::toString())",
 			"}",
 		].join("\n")
 

@@ -29,7 +29,7 @@ function codesFor(source: string): Array<string> {
 }
 
 // NOTE: Writes the emitted Program to a throwaway module and imports it so its
-// top-level `__print` calls run, capturing `console.log` — the decided item
+// top-level `Terminal.inspect` calls run, capturing `console.log` — the decided item
 // Type is what picks the witness a Method is handed, so what the Program PRINTS
 // is the only place a Type that was decided wrongly can be caught.
 async function run(source: string): Promise<Array<string>> {
@@ -81,7 +81,7 @@ describe("Unknown Slot Narrowing", () => {
 
 					constant integers: List<Integer> = items
 
-					__print(integers::sort())
+					Terminal.inspect(integers::sort())
 				}`),
 			).toEqual(["[ 1, 2 ]"])
 		})
@@ -151,7 +151,7 @@ describe("Unknown Slot Narrowing", () => {
 
 					items = [1, 2]
 
-					__print(items::sort())
+					Terminal.inspect(items::sort())
 				}`),
 			).toEqual(["[ 1, 2 ]"])
 		})
@@ -214,7 +214,7 @@ describe("Unknown Slot Narrowing", () => {
 
 					items = [1, 2]
 
-					__print(read())
+					Terminal.inspect(read())
 				}`),
 			).toEqual(["[ 1, 2 ]"])
 		})
@@ -246,7 +246,7 @@ describe("Unknown Slot Narrowing", () => {
 						<- inner::length()
 					}
 
-					__print(lengthOf()::toString())
+					Terminal.inspect(lengthOf()::toString())
 				}`),
 			).toEqual(['"2"'])
 		})
@@ -262,9 +262,9 @@ describe("Unknown Slot Narrowing", () => {
 				constant strings: List<String> = []
 				constant nested: List<List<Integer>> = []
 
-				__print(integers::length()::toString())
-				__print(strings::length()::toString())
-				__print(nested::length()::toString())
+				Terminal.inspect(integers::length()::toString())
+				Terminal.inspect(strings::length()::toString())
+				Terminal.inspect(nested::length()::toString())
 			}`),
 		).toEqual(['"0"', '"0"', '"0"'])
 	})

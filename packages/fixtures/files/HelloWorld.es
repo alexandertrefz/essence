@@ -11,7 +11,7 @@ implementation {
 			message = "{message}."
 		}
 
-		<- __print(message)
+		<- Terminal.inspect(message)
 	}
 
 	greet("")

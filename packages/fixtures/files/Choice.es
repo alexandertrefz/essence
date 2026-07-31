@@ -55,10 +55,10 @@ implementation {
 	§ just an `#Empty` the tape prints as such.
 	tape::map((operation) {
 		if operation::is(#ClearAll) {
-			<- __print("AC — cleared")
+			<- Terminal.inspect("AC — cleared")
 		}
 
-		<- __print(
+		<- Terminal.inspect(
 			"{spelled(operation)} = {match evaluated(operation) -> String {
 				case #Value(result) { <- result::toString() }
 				case #Empty         { <- "nothing" }
@@ -76,5 +76,7 @@ implementation {
 
 	constant command: EditorCommand = #Undo
 
-	__print(command::isNot(#ClearAll)) § true — EditorCommand's own ClearAll
+	Terminal.inspect(
+		command::isNot(#ClearAll),
+	) § true — EditorCommand's own ClearAll
 }

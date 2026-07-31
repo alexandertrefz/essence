@@ -103,6 +103,17 @@ function labelOf(line: string): string {
 	return separator === -1 ? text : text.slice(0, separator)
 }
 
+// NOTE: The one Namespace this harness can not cover, and the reason is the
+// harness itself: `show` works by CALLING `Terminal.inspect`, and every other
+// entry of that Namespace writes to a stream too. A `show("Terminal.print(…)",
+// …)` line would print twice — once for the call it is testing and once for the
+// label — and `Terminal.write` would put text on stdout with no newline in the
+// middle of a captured line, so the record below would stop being one value per
+// line. The Namespace that PRINTS can not be held to account by a record made of
+// printing; its behaviour is covered by `terminal.spec.ts`, which compiles small
+// Programs and reads back what each stream actually received.
+const COVERED_ELSEWHERE = new Set(["Terminal"])
+
 // NOTE: Every Method a Program can call, spelled the way `StdlibExhaustive.es`
 // labels it: the signature `printSignature` produces, minus its return Type.
 // A static Property has no signature and is named on its own.
@@ -110,7 +121,10 @@ function declaredSignatures(): Array<string> {
 	let signatures: Array<string> = []
 
 	for (let [namespaceName, member] of Object.entries(loadStdlib().members)) {
-		if (member.type !== "Namespace") {
+		if (
+			member.type !== "Namespace" ||
+			COVERED_ELSEWHERE.has(namespaceName)
+		) {
 			continue
 		}
 
@@ -163,12 +177,11 @@ function declaredSignatures(): Array<string> {
 		}
 	}
 
-	// NOTE: The free Functions that belong to no Namespace — `loop` is the one
-	// with several entries. A single `Function` like `__print` reaches the
-	// runtime through its `__` sigil and is never labelled in the harness, so
-	// only the OVERLOADED free Functions are enumerated here: each entry is a
-	// label of its own, exactly as an overloaded Method's entries are, but with
-	// no Namespace to prefix its name.
+	// NOTE: The free Functions that belong to no Namespace — `loop` is the only
+	// one, and it has several entries. Only the OVERLOADED free Functions are
+	// enumerated here: each entry is a label of its own, exactly as an
+	// overloaded Method's entries are, but with no Namespace to prefix its
+	// name.
 	for (let [name, member] of Object.entries(loadStdlib().members)) {
 		if (member.type !== "OverloadedStaticMethod") {
 			continue

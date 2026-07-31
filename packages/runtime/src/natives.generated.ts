@@ -24,6 +24,7 @@ import type { RationalType } from "./Rational"
 import type { RecordType } from "./Record"
 import type { SideType } from "./Side"
 import type { StepType } from "./Step"
+import type { StreamType } from "./Stream"
 import type { StringType } from "./String"
 import type { TranscendentalType } from "./Transcendental"
 import type { AnyType } from "./type"
@@ -59,6 +60,13 @@ type EquatableConformance<Self extends AnyType> = {
 
 type PrintableConformance<Self extends AnyType> = {
 	toString: (self: Self) => StringType
+}
+
+export type TerminalNatives = {
+	// static write(_: String, to: Stream) -> Record
+	write__overload$2: (argument0: StringType, to: StreamType) => RecordType
+	// static inspect<Value>(_: Value) -> Value
+	inspect: <Value extends AnyType>(argument0: Value) => Value
 }
 
 export type StringNatives = {
@@ -336,9 +344,15 @@ export type FunctionsNatives = {
 	loop__overload$1: <State extends AnyType>(startingWith: State, argument1: (argument0: State) => BooleanType, step: (argument0: State) => State) => State
 	// static loop<State, Result>(startingWith: State, step: (_: State) -> Step<State, Result>) -> Result
 	loop__overload$4: <State extends AnyType, Result extends AnyType>(startingWith: State, step: (argument0: State) => StepType<State, Result>) => Result
-	// static __print<Item>(_: Item) -> Item
-	__print: <Item extends AnyType>(argument0: Item) => Item
 }
+
+declare const TerminalModule: typeof import("./Terminal")
+export const $Terminal: TerminalNatives = TerminalModule
+export const $TerminalAbsent: AssertNoEssenceExports<typeof import("./Terminal"), "print__overload$1" | "print__overload$2" | "write__overload$1"> = true
+export const $TerminalArity: AssertArities<typeof import("./Terminal"), {
+	write__overload$2: 2
+	inspect: 1
+}> = true
 
 declare const StringModule: typeof import("./String")
 export const $String: StringNatives = StringModule
@@ -544,5 +558,4 @@ export const $functionsAbsent: AssertNoEssenceExports<typeof import("./functions
 export const $functionsArity: AssertArities<typeof import("./functions"), {
 	loop__overload$1: 3
 	loop__overload$4: 2
-	__print: 1
 }> = true

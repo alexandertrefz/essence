@@ -149,7 +149,7 @@ export type ExternalMemberReference = {
 // NOTE: Read on use rather than at import. Half of what the tables answer with
 // is enriched from Essence source, once per process and cached — building the
 // index is where that belongs, not module evaluation order.
-const builtinValues = () => Object.keys(builtinMembers())
+const builtinValues = () => Object.entries(builtinMembers())
 
 const builtinTypes = () => Object.keys(builtinTypeTable())
 
@@ -326,10 +326,14 @@ export function indexProgram(
 
 	context.scopes.push({ range: null, scope: topLevelScope })
 
-	for (let name of builtinValues()) {
+	// NOTE: The KIND is read off the member's own Type rather than off its name.
+	// Every builtin used to be a Namespace but one — the free Function `__print`,
+	// named here as the exception — and printing is a Namespace now, which left
+	// `loop` mis-kinded as a Namespace on the strength of not being that name.
+	for (let [name, member] of builtinValues()) {
 		topLevelScope.values.set(name, {
 			builtin: true,
-			kind: name === "__print" ? "function" : "namespace",
+			kind: member.type === "Namespace" ? "namespace" : "function",
 			definition: null,
 			visibleFrom: null,
 			occurrences: [],

@@ -25,7 +25,6 @@ export {
 	NestedOptional    from "./Optional.es"
 	Optional          from "./Optional.es"
 	Ordering          from "./Ordering.es"
-	__print           from "./Print.es"
 	Equatable         from "./Protocols.es"
 	Printable         from "./Protocols.es"
 	NumberFormat      from "./Rational.es"
@@ -37,5 +36,7 @@ export {
 	NormalizationForm from "./String.es"
 	Side              from "./String.es"
 	String            from "./String.es"
+	Stream            from "./Terminal.es"
+	Terminal          from "./Terminal.es"
 	Transcendental    from "./Transcendental.es"
 }

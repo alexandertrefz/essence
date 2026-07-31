@@ -88,7 +88,7 @@ function labelsOf(source: string): Array<string> {
 }
 
 // NOTE: Emits the Program, writes it to a throwaway module and imports it so
-// its top-level `__print` calls run — the counterpart of `generate`, mirroring
+// its top-level `Terminal.inspect` calls run — the counterpart of `generate`, mirroring
 // codeGeneration.spec's own `run`, so a generic Choice is exercised end to end
 // rather than only type-checked.
 async function run(source: string): Promise<Array<string>> {
@@ -341,7 +341,7 @@ describe("Choices", () => {
 			let { diagnostics } = parseWithDiagnostics(`implementation {
 				variable choice = 1
 				choice = 2
-				__print(choice)
+				Terminal.inspect(choice)
 			}`)
 
 			expect(containsErrors(diagnostics)).toBe(false)
@@ -376,7 +376,7 @@ describe("Choices", () => {
 				messagesOf(`implementation { ${calculatorChoice}
 					constant operation: CalculatorOperation = CalculatorOperation#Add({ left = 1, right = 1 })
 
-					__print(match operation -> Integer {
+					Terminal.inspect(match operation -> Integer {
 						case #Add { <- @.left::add(@.right) }
 						case #Negate { <- @.number::multiply(with 2) }
 						case #ClearAll { <- 0 }
@@ -436,7 +436,7 @@ describe("Choices", () => {
 					constant operation: CalculatorOperation = CalculatorOperation#Add({ left = 1, right = 1 })
 
 					match operation -> {} {
-						case #Add { __print(@.missing) <- {} }
+						case #Add { Terminal.inspect(@.missing) <- {} }
 						case _ { <- {} }
 					}
 				}`),
@@ -693,7 +693,7 @@ describe("Choices", () => {
 					type Boxed<T> = { value: T }
 					constant b: Boxed<Integer> = { value = 1 }
 					constant updated = { b with value = 2 }
-					__print(updated.value::toString())
+					Terminal.inspect(updated.value::toString())
 				}`),
 			).toEqual([])
 		})
@@ -954,7 +954,7 @@ describe("Choices", () => {
 						}
 					}
 
-					__print(1::pick((n) { <- n::toString() }))
+					Terminal.inspect(1::pick((n) { <- n::toString() }))
 				}`),
 			).toEqual(['"1"'])
 		})
@@ -1064,7 +1064,7 @@ describe("Choices", () => {
 				messagesOf(`implementation {
 					constant smaller: Ordering = #Less
 
-					__print(smaller::is(1::compare(to 2)))
+					Terminal.inspect(smaller::is(1::compare(to 2)))
 				}`),
 			).toEqual([])
 		})
@@ -1212,7 +1212,7 @@ describe("Choices", () => {
 					Step<Integer, Integer>#Done(2),
 				]
 
-				__print(steps::contains(#Done(2)))
+				Terminal.inspect(steps::contains(#Done(2)))
 			}`
 
 			expect(await run(program)).toEqual(["true"])
@@ -1240,9 +1240,9 @@ describe("Choices", () => {
 					}
 				}
 
-				__print(1::take(#Left({ a = 1 })))
-				__print(1::take(#Left({ a = "x" })))
-				__print(1::take("x"))
+				Terminal.inspect(1::take(#Left({ a = 1 })))
+				Terminal.inspect(1::take(#Left({ a = "x" })))
+				Terminal.inspect(1::take("x"))
 			}`
 
 			expect(messagesOf(program)).toEqual([])
@@ -1326,7 +1326,7 @@ describe("Choices", () => {
 							}
 						}
 
-						__print(describe(#Empty))
+						Terminal.inspect(describe(#Empty))
 					}`),
 				).toEqual(['"empty"'])
 			})
@@ -1348,7 +1348,7 @@ describe("Choices", () => {
 							}
 						}
 
-						__print(orElse(#Empty, 7)::toString())
+						Terminal.inspect(orElse(#Empty, 7)::toString())
 					}`),
 				).toEqual(['"7"'])
 			})
@@ -1389,7 +1389,7 @@ describe("Choices", () => {
 
 					constant other: Other = #Thing({ name = "x" })
 
-					__print(match other -> Boolean {
+					Terminal.inspect(match other -> Boolean {
 						case Box#Full { <- @.value::is(@.value) }
 						case #Thing { <- true }
 					})
@@ -1417,7 +1417,7 @@ describe("Choices", () => {
 
 					constant walk: Walk<Integer> = #Done({ value = 3 })
 
-					__print(match walk -> String {
+					Terminal.inspect(match walk -> String {
 						case Walk#Done { <- @.value::toString() }
 						case #Going { <- "going" }
 					})
@@ -1459,9 +1459,9 @@ describe("Choices", () => {
 			constant number: Box<Integer> | Box<String> = Box#Full(5)
 			constant nothingInside: Box<Integer> | Box<String> = Box#Empty
 
-			__print(describe(text))
-			__print(describe(number))
-			__print(describe(nothingInside))
+			Terminal.inspect(describe(text))
+			Terminal.inspect(describe(number))
+			Terminal.inspect(describe(nothingInside))
 		}`
 
 		it("narrows the payload to what every instantiation carries", () => {
@@ -1469,7 +1469,7 @@ describe("Choices", () => {
 				messagesOf(`implementation { ${box}
 					constant boxed: Box<Integer> | Box<String> = Box#Full("hello")
 
-					__print(match boxed -> Integer {
+					Terminal.inspect(match boxed -> Integer {
 						case Box#Full { <- @.value::add(1) }
 						case Box#Empty { <- 0 }
 					})
@@ -1503,7 +1503,7 @@ describe("Choices", () => {
 
 					constant thing: Box<Integer> | Crate = Crate#Full({ weight = 2 })
 
-					__print(match thing -> String {
+					Terminal.inspect(match thing -> String {
 						case #Full { <- "full" }
 						case #Empty { <- "empty" }
 					})
@@ -1537,8 +1537,8 @@ describe("Choices", () => {
 					constant text: Box<Integer> | Box<String> = Box#Full("hello")
 					constant number: Box<Integer> | Box<String> = Box#Full(5)
 
-					__print(text::describe())
-					__print(number::describe())
+					Terminal.inspect(text::describe())
+					Terminal.inspect(number::describe())
 				}`),
 			).toEqual(['"String box"', '"Integer box"'])
 		})
@@ -1635,7 +1635,7 @@ describe("Choices", () => {
 				await run(`implementation { ${boundedBox}
 					constant b: Box<Integer> = #Full({ value = 5 })
 
-					__print(match b -> Boolean {
+					Terminal.inspect(match b -> Boolean {
 						case Box#Full { <- @.value::is(5) }
 						case #Empty { <- false }
 					})
@@ -1709,7 +1709,7 @@ describe("Choices", () => {
 					await run(`implementation { ${holder}
 						constant ok: Holder<String> = Holder#Bare
 
-						__print(ok::is(Holder#Bare))
+						Terminal.inspect(ok::is(Holder#Bare))
 					}`),
 				).toEqual(["true"])
 			})
@@ -1719,7 +1719,7 @@ describe("Choices", () => {
 					await run(`implementation { ${holder}
 						function bare() -> Holder<Integer> { <- Holder#Bare }
 
-						__print(match bare() -> String {
+						Terminal.inspect(match bare() -> String {
 							case Holder#Full { <- "full" }
 							case Holder#Bare { <- "bare" }
 						})
@@ -1737,8 +1737,8 @@ describe("Choices", () => {
 							}
 						}
 
-						__print(describe(Holder#Bare))
-						__print(describe(Holder#Full(5)))
+						Terminal.inspect(describe(Holder#Bare))
+						Terminal.inspect(describe(Holder#Full(5)))
 					}`),
 				).toEqual(['"bare"', '"full"'])
 			})
@@ -1752,7 +1752,7 @@ describe("Choices", () => {
 					await run(`implementation { ${holder}
 						constant items: List<Holder<Integer>> = [Holder#Bare]
 
-						__print(items::length()::toString())
+						Terminal.inspect(items::length()::toString())
 					}`),
 				).toEqual(['"1"'])
 			})
@@ -1779,7 +1779,7 @@ describe("Choices", () => {
 
 						constant nested: Box<Box<Integer>> = Box#Full(Box#Full(1))
 
-						__print(match nested -> String {
+						Terminal.inspect(match nested -> String {
 							case #Full {
 								<- match @.value -> String {
 									case #Full { <- @.value::toString() }
@@ -1831,7 +1831,7 @@ describe("Choices", () => {
 						constant outer: Box<Box<Integer>> = Box#Full(#Full(1))
 						constant inner: Box<Box<Integer>> = #Full(Box#Full(1))
 
-						__print(outer::is(inner))
+						Terminal.inspect(outer::is(inner))
 					}`),
 				).toEqual(["true"])
 			})
@@ -1963,8 +1963,8 @@ describe("Choices", () => {
 							}
 						}
 
-						__print(1::take(Box#Full(5)))
-						__print(1::take(Box#Full("x")))
+						Terminal.inspect(1::take(Box#Full(5)))
+						Terminal.inspect(1::take(Box#Full("x")))
 					}`),
 				).toEqual(['"integer"', '"string"'])
 			})
@@ -1987,8 +1987,8 @@ describe("Choices", () => {
 							}
 						}
 
-						__print(1::take(#Full(5)))
-						__print(1::take(#Full("x")))
+						Terminal.inspect(1::take(#Full(5)))
+						Terminal.inspect(1::take(#Full("x")))
 					}`),
 				).toEqual(['"integer"', '"string"'])
 			})
@@ -2003,7 +2003,7 @@ describe("Choices", () => {
 							<- Holder#Full({ value = value })
 						}
 
-						__print(match wrap(5) -> String {
+						Terminal.inspect(match wrap(5) -> String {
 							case Holder#Full { <- "full" }
 							case Holder#Bare { <- "bare" }
 						})
@@ -2025,7 +2025,7 @@ describe("Choices", () => {
 						<- "took"
 					}
 
-					__print(take(Holder#Full(1)))
+					Terminal.inspect(take(Holder#Full(1)))
 				}`
 
 				expect(codesOf(source)).toEqual(["undecided-type-arguments"])
@@ -2043,7 +2043,7 @@ describe("Choices", () => {
 							}
 						}
 
-						__print(1::take(Holder#Full(1)))
+						Terminal.inspect(1::take(Holder#Full(1)))
 					}`),
 				).toEqual(["undecided-type-arguments"])
 			})
@@ -2060,7 +2060,7 @@ describe("Choices", () => {
 							<- "took"
 						}
 
-						__print(take(Box#Full(1)))
+						Terminal.inspect(take(Box#Full(1)))
 					}`),
 				).toEqual(["undecided-type-arguments"])
 			})
@@ -2080,7 +2080,7 @@ describe("Choices", () => {
 						}
 					}
 
-					__print(unwrap(Result#Ok(1))::toString())
+					Terminal.inspect(unwrap(Result#Ok(1))::toString())
 				}`
 
 				expect(codesOf(source)).toEqual(["undecided-type-arguments"])
@@ -2099,9 +2099,9 @@ describe("Choices", () => {
 
 						constant bound: Holder<Integer> = Holder#Full(1)
 
-						__print(take(Holder<Integer>#Full(1)))
-						__print(take(#Full(1)))
-						__print(take(bound))
+						Terminal.inspect(take(Holder<Integer>#Full(1)))
+						Terminal.inspect(take(#Full(1)))
+						Terminal.inspect(take(bound))
 					}`),
 				).toEqual(['"took"', '"took"', '"took"'])
 			})
@@ -2131,8 +2131,8 @@ describe("Choices", () => {
 
 				expect(
 					await run(`implementation { ${orElse}
-						__print(orElse(Result#Ok(1), 0)::toString())
-						__print(orElse(Result#Err, 7)::toString())
+						Terminal.inspect(orElse(Result#Ok(1), 0)::toString())
+						Terminal.inspect(orElse(Result#Err, 7)::toString())
 					}`),
 				).toEqual(['"1"', '"7"'])
 			})
@@ -2153,13 +2153,13 @@ describe("Choices", () => {
 
 				expect(
 					codesOf(`implementation { ${namespaces}
-						__print(Box#Full(1)::label())
+						Terminal.inspect(Box#Full(1)::label())
 					}`),
 				).toEqual(["undecided-type-arguments"])
 
 				expect(
 					messagesOf(`implementation { ${namespaces}
-						__print(Box<Integer>#Full(1)::label())
+						Terminal.inspect(Box<Integer>#Full(1)::label())
 					}`),
 				).toEqual([])
 			})
@@ -2201,7 +2201,7 @@ describe("Choices", () => {
 					await run(`implementation { ${holder}
 						constant left: Holder<Integer> = Holder#Bare
 
-						__print(left)
+						Terminal.inspect(left)
 					}`),
 				).toEqual(["Holder#Bare"])
 			})
@@ -2229,7 +2229,7 @@ describe("Choices", () => {
 					await run(`implementation { ${holder}
 						constant left = Holder<Integer>#Bare
 
-						__print(left::is(Holder<Integer>#Bare))
+						Terminal.inspect(left::is(Holder<Integer>#Bare))
 					}`),
 				).toEqual(["true"])
 			})
@@ -2242,7 +2242,7 @@ describe("Choices", () => {
 					await run(`implementation { ${holder}
 						constant left = Holder<Integer>#Full({ value = 1 })
 
-						__print(left.value::toString())
+						Terminal.inspect(left.value::toString())
 					}`),
 				).toEqual(['"1"'])
 			})
@@ -2255,7 +2255,7 @@ describe("Choices", () => {
 					await run(`implementation { ${holder}
 						constant left = Holder<String>#Full("packed")
 
-						__print(left.value)
+						Terminal.inspect(left.value)
 					}`),
 				).toEqual(['"packed"'])
 			})
@@ -2360,7 +2360,7 @@ describe("Choices", () => {
 					codesOf(`implementation { ${holder}
 						function take(_ held: Holder<String>) -> Integer { <- 1 }
 
-						__print(take(Holder<Integer>#Full(1))::toString())
+						Terminal.inspect(take(Holder<Integer>#Full(1))::toString())
 					}`),
 				).toEqual(["argument-type-mismatch"])
 			})
@@ -2398,7 +2398,7 @@ describe("Choices", () => {
 					codesOf(`implementation { ${tagged}
 						function take(_ b: Box<String>) -> Integer { <- 1 }
 
-						__print(take(Box<Integer>#Tag("x"))::toString())
+						Terminal.inspect(take(Box<Integer>#Tag("x"))::toString())
 					}`),
 				).toEqual(["argument-type-mismatch"])
 			})
@@ -2448,7 +2448,7 @@ describe("Choices", () => {
 							<- "ok"
 						}
 
-						__print(id(Box<Integer>#Empty, 1))
+						Terminal.inspect(id(Box<Integer>#Empty, 1))
 					}`),
 				).toEqual(['"ok"'])
 
@@ -2460,7 +2460,7 @@ describe("Choices", () => {
 							}
 						}
 
-						__print(1::id(Box<Integer>#Empty, 1))
+						Terminal.inspect(1::id(Box<Integer>#Empty, 1))
 					}`),
 				).toEqual(['"ok"'])
 
@@ -2470,7 +2470,7 @@ describe("Choices", () => {
 							<- "ok"
 						}
 
-						__print(id(Tagged<Integer>#Tag("x"), 1))
+						Terminal.inspect(id(Tagged<Integer>#Tag("x"), 1))
 					}`),
 				).toEqual(['"ok"'])
 
@@ -2480,7 +2480,7 @@ describe("Choices", () => {
 							<- "ok"
 						}
 
-						__print(id(with Box<Integer>#Empty, seed 1))
+						Terminal.inspect(id(with Box<Integer>#Empty, seed 1))
 					}`),
 				).toEqual(['"ok"'])
 			})
@@ -2496,7 +2496,7 @@ describe("Choices", () => {
 						<- "ok"
 					}
 
-					__print(id(Box<String>#Empty, 1))
+					Terminal.inspect(id(Box<String>#Empty, 1))
 				}`
 
 				expect(codesOf(source)).toEqual(["argument-type-mismatch"])
@@ -2534,7 +2534,7 @@ describe("Choices", () => {
 							<- Box<Value>#Empty
 						}
 
-						__print(match empty(1) -> String {
+						Terminal.inspect(match empty(1) -> String {
 							case #Full  { <- "full" }
 							case #Empty { <- "empty" }
 						})
@@ -2551,7 +2551,7 @@ describe("Choices", () => {
 					messagesOf(`implementation {
 						constant a = 1
 
-						__print(a::isLessThan(2))
+						Terminal.inspect(a::isLessThan(2))
 					}`),
 				).toEqual([])
 			})
@@ -2681,13 +2681,13 @@ describe("Choices", () => {
 		it("constructs and matches Ordering Cases like any other Choice", () => {
 			expect(
 				messagesOf(`implementation {
-					__print(match 1::compare(to 2) -> String {
+					Terminal.inspect(match 1::compare(to 2) -> String {
 						case #Less { <- "smaller" }
 						case #Equal { <- "same" }
 						case #Greater { <- "bigger" }
 					})
 
-					__print(Ordering#Less::is(1::compare(to 2)))
+					Terminal.inspect(Ordering#Less::is(1::compare(to 2)))
 				}`),
 			).toEqual([])
 		})
@@ -2728,8 +2728,8 @@ describe("Choices", () => {
 					constant red: Colour = #Red
 					constant green: Colour = #Green
 
-					__print(red::is(green))
-					__print(red::isNot(green))
+					Terminal.inspect(red::is(green))
+					Terminal.inspect(red::isNot(green))
 				}`),
 			).toEqual([])
 		})
@@ -2739,7 +2739,7 @@ describe("Choices", () => {
 				messagesOf(`implementation { ${colourChoice}
 					constant red: Colour = #Red
 
-					__print(match red -> Boolean {
+					Terminal.inspect(match red -> Boolean {
 						case #Red { <- @::is(#Green) }
 						case _ { <- false }
 					})
@@ -2752,8 +2752,8 @@ describe("Choices", () => {
 				messagesOf(`implementation { ${colourChoice}
 					constant red: Colour = #Red
 
-					__print([red]::contains(#Green))
-					__print([red]::is([red]))
+					Terminal.inspect([red]::contains(#Green))
+					Terminal.inspect([red]::is([red]))
 				}`),
 			).toEqual([])
 		})
@@ -2764,7 +2764,7 @@ describe("Choices", () => {
 					constant one: CalculatorOperation = #Add({ left = 1, right = 1 })
 					constant two: CalculatorOperation = #Negate({ number = 1 })
 
-					__print(one::is(two))
+					Terminal.inspect(one::is(two))
 				}`),
 			).toEqual([])
 		})
@@ -2776,7 +2776,7 @@ describe("Choices", () => {
 
 					constant red: Colour = #Red
 
-					__print(red::is(#Green))
+					Terminal.inspect(red::is(#Green))
 				}`),
 			).toEqual([])
 		})
@@ -2786,7 +2786,7 @@ describe("Choices", () => {
 				messagesOf(`implementation {
 					constant value: Integer | Boolean = 5
 
-					__print(value::is(5))
+					Terminal.inspect(value::is(5))
 				}`),
 			).not.toEqual([])
 		})
@@ -2808,9 +2808,9 @@ describe("Choices", () => {
 		it("compares two instantiated Cases through their payload's equality", async () => {
 			expect(
 				await run(`implementation { ${maybe}
-					__print(#Some({ value = 1 })::is(#Some({ value = 1 }))::toString())
-					__print(#Some({ value = 1 })::is(#Some({ value = 2 }))::toString())
-					__print(#Some({ value = 1 })::is(#None)::toString())
+					Terminal.inspect(#Some({ value = 1 })::is(#Some({ value = 1 }))::toString())
+					Terminal.inspect(#Some({ value = 1 })::is(#Some({ value = 2 }))::toString())
+					Terminal.inspect(#Some({ value = 1 })::is(#None)::toString())
 				}`),
 			).toEqual(['"true"', '"false"', '"false"'])
 		})
@@ -2818,8 +2818,8 @@ describe("Choices", () => {
 		it("answers 'isNot' as the negation", async () => {
 			expect(
 				await run(`implementation { ${maybe}
-					__print(#Some({ value = 1 })::isNot(#Some({ value = 2 }))::toString())
-					__print(#Some({ value = 1 })::isNot(#Some({ value = 1 }))::toString())
+					Terminal.inspect(#Some({ value = 1 })::isNot(#Some({ value = 2 }))::toString())
+					Terminal.inspect(#Some({ value = 1 })::isNot(#Some({ value = 1 }))::toString())
 				}`),
 			).toEqual(['"true"', '"false"'])
 		})
@@ -2831,8 +2831,8 @@ describe("Choices", () => {
 					constant b: Bag<Integer> = #Full({ items = [1, 2, 3] })
 					constant c: Bag<Integer> = #Full({ items = [1, 2] })
 
-					__print(a::is(b)::toString())
-					__print(a::is(c)::toString())
+					Terminal.inspect(a::is(b)::toString())
+					Terminal.inspect(a::is(c)::toString())
 				}`),
 			).toEqual(['"true"', '"false"'])
 		})
@@ -2849,10 +2849,10 @@ describe("Choices", () => {
 					constant b: Opt<Integer> = #Holding({ value = 2 })
 					constant text: Opt<Integer> = #Holding({ value = "x" })
 
-					__print(a::is(a)::toString())
-					__print(a::is(b)::toString())
-					__print(a::is(text)::toString())
-					__print(text::is(text)::toString())
+					Terminal.inspect(a::is(a)::toString())
+					Terminal.inspect(a::is(b)::toString())
+					Terminal.inspect(a::is(text)::toString())
+					Terminal.inspect(text::is(text)::toString())
 				}`),
 			).toEqual(['"true"', '"false"', '"false"', '"true"'])
 		})
@@ -2862,9 +2862,9 @@ describe("Choices", () => {
 				await run(`implementation { ${maybe}
 					constant items: List<Maybe<Integer>> = [#Some({ value = 1 }), #None]
 
-					__print(items::contains(#Some({ value = 1 }))::toString())
-					__print(items::contains(#Some({ value = 9 }))::toString())
-					__print(items::contains(#None)::toString())
+					Terminal.inspect(items::contains(#Some({ value = 1 }))::toString())
+					Terminal.inspect(items::contains(#Some({ value = 9 }))::toString())
+					Terminal.inspect(items::contains(#None)::toString())
 				}`),
 			).toEqual(['"true"', '"false"', '"true"'])
 		})
@@ -2878,7 +2878,7 @@ describe("Choices", () => {
 					constant a: Wrap<Rational> = #It(1/2)
 					constant b: Wrap<Rational> = #It(2/4)
 
-					__print(a::is(b)::toString())
+					Terminal.inspect(a::is(b)::toString())
 				}`),
 			).toEqual(['"true"'])
 		})
@@ -2890,10 +2890,10 @@ describe("Choices", () => {
 					constant g: Bag<Integer> = #Full({ items = [1] })
 					constant o: Opt<Integer> = #Holding({ value = 1 })
 
-					__print(m::is(#None))
-					__print(g::isNot(g))
-					__print(o::is(o))
-					__print([m]::contains(#None))
+					Terminal.inspect(m::is(#None))
+					Terminal.inspect(g::isNot(g))
+					Terminal.inspect(o::is(o))
+					Terminal.inspect([m]::contains(#None))
 				}`),
 			).toEqual([])
 		})
@@ -2905,7 +2905,7 @@ describe("Choices", () => {
 				constant f: Maybe<(_ x: Integer) -> Integer> =
 					#Some({ value = (_ x: Integer) -> Integer { <- x } })
 
-				__print(f::is(f))
+				Terminal.inspect(f::is(f))
 			}`)
 
 			expect(diagnostics).not.toEqual([])
@@ -2914,15 +2914,15 @@ describe("Choices", () => {
 				constant f: Maybe<(_ x: Integer) -> Integer> =
 					#Some({ value = (_ x: Integer) -> Integer { <- x } })
 
-				__print(f::is(f))
+				Terminal.inspect(f::is(f))
 			}`),
 			).toContain("unsatisfied-bound")
 		})
 
 		it("emits the widened helper and descriptor for a generic Choice", () => {
 			let generated = generate(`implementation { ${maybe}
-				__print(#Some({ value = 1 })::is(#Some({ value = 1 })))
-				__print(#Some({ value = 1 })::isNot(#Some({ value = 1 })))
+				Terminal.inspect(#Some({ value = 1 })::is(#Some({ value = 1 })))
+				Terminal.inspect(#Some({ value = 1 })::isNot(#Some({ value = 1 })))
 			}`)
 
 			expect(generated).toContain("$helpers.boundChoiceIs(")
@@ -2937,7 +2937,7 @@ describe("Choices", () => {
 			let generated = generate(`implementation { ${maybe}
 				constant items: List<Maybe<Integer>> = [#Some({ value = 1 })]
 
-				__print(items::contains(#None))
+				Terminal.inspect(items::contains(#None))
 			}`)
 
 			expect(generated).toContain("$type.boundConformance(")
@@ -2954,8 +2954,8 @@ describe("Choices", () => {
 					constant b: List<Maybe<Integer>> = [#Some({ value = 1 }), #None]
 					constant c: List<Maybe<Integer>> = [#Some({ value = 2 }), #None]
 
-					__print(a::is(b)::toString())
-					__print(a::is(c)::toString())
+					Terminal.inspect(a::is(b)::toString())
+					Terminal.inspect(a::is(c)::toString())
 				}`),
 			).toEqual(['"true"', '"false"'])
 		})
@@ -2969,7 +2969,7 @@ describe("Choices", () => {
 					constant f: Maybe<(_ x: Integer) -> Integer> =
 						#Some({ value = (_ x: Integer) -> Integer { <- x } })
 
-					__print([f]::contains(f))
+					Terminal.inspect([f]::contains(f))
 				}`),
 			).toContain("unsatisfied-bound")
 		})
@@ -2987,9 +2987,9 @@ describe("Choices", () => {
 					constant b: Tagged<Rational, (_ x: Integer) -> Integer> =
 						#Val({ value = 2/4 })
 
-					__print(a::is(b)::toString())
-					__print(a::is(#Empty)::toString())
-					__print([a]::contains(b)::toString())
+					Terminal.inspect(a::is(b)::toString())
+					Terminal.inspect(a::is(#Empty)::toString())
+					Terminal.inspect([a]::contains(b)::toString())
 				}`),
 			).toEqual(['"true"', '"false"', '"true"'])
 		})
@@ -3004,9 +3004,9 @@ describe("Choices", () => {
 					constant b: Maybe<Maybe<Integer>> = #Some({ value = #Some({ value = 1 }) })
 					constant c: Maybe<Maybe<Integer>> = #Some({ value = #Some({ value = 2 }) })
 
-					__print(a::is(b)::toString())
-					__print(a::is(c)::toString())
-					__print([a]::contains(c)::toString())
+					Terminal.inspect(a::is(b)::toString())
+					Terminal.inspect(a::is(c)::toString())
+					Terminal.inspect([a]::contains(c)::toString())
 				}`),
 			).toEqual(['"true"', '"false"', '"false"'])
 		})
@@ -3039,9 +3039,9 @@ describe("Choices", () => {
 					constant a: Maybe<Integer> = #Some({ value = 1 })
 					constant b: Maybe<Integer> = #Some({ value = 2 })
 
-					__print(a::is(b)::toString())
-					__print(a::isNot(b)::toString())
-					__print([a]::contains(b)::toString())
+					Terminal.inspect(a::is(b)::toString())
+					Terminal.inspect(a::isNot(b)::toString())
+					Terminal.inspect([a]::contains(b)::toString())
 				}`),
 			).toEqual(['"true"', '"false"', '"true"'])
 		})
@@ -3069,10 +3069,10 @@ describe("Choices", () => {
 					constant y: Maybe<Rational> = #Some({ value = 2/4 })
 					constant z: Maybe<Rational> = #Some({ value = 1/3 })
 
-					__print(same(x, y)::toString())
-					__print(same(x, z)::toString())
-					__print(differs(x, z)::toString())
-					__print(same(x, #None)::toString())
+					Terminal.inspect(same(x, y)::toString())
+					Terminal.inspect(same(x, z)::toString())
+					Terminal.inspect(differs(x, z)::toString())
+					Terminal.inspect(same(x, #None)::toString())
 				}`),
 			).toEqual(['"true"', '"false"', '"true"', '"false"'])
 		})
@@ -3096,8 +3096,8 @@ describe("Choices", () => {
 					constant q: Pair<Rational, String> = #Both({ a = 2/4, b = "x" })
 					constant r: Pair<Rational, String> = #Both({ a = 2/4, b = "y" })
 
-					__print(same(p, q)::toString())
-					__print(same(p, r)::toString())
+					Terminal.inspect(same(p, q)::toString())
+					Terminal.inspect(same(p, r)::toString())
 				}`),
 			).toEqual(['"true"', '"false"'])
 		})
@@ -3137,8 +3137,8 @@ describe("Choices", () => {
 					constant y: Maybe<Rational> = #Some({ value = 2/4 })
 					constant z: Maybe<Rational> = #Some({ value = 1/3 })
 
-					__print(has([x], y)::toString())
-					__print(has([x], z)::toString())
+					Terminal.inspect(has([x], y)::toString())
+					Terminal.inspect(has([x], z)::toString())
 				}`),
 			).toEqual(['"true"', '"false"'])
 		})
@@ -3172,7 +3172,7 @@ describe("Choices", () => {
 
 					constant a: Maybe<Integer> = #Some({ value = 1 })
 
-					__print(a::is(a)::toString())
+					Terminal.inspect(a::is(a)::toString())
 				}`),
 			).toEqual(["uninferred-namespace-parameter"])
 		})
@@ -3191,9 +3191,9 @@ describe("Choices", () => {
 					constant b: Boxed<Rational> = { value = 2/4 }
 					constant c: Boxed<Rational> = { value = 1/3 }
 
-					__print(a::is(b)::toString())
-					__print(a::is(c)::toString())
-					__print([a]::contains(b)::toString())
+					Terminal.inspect(a::is(b)::toString())
+					Terminal.inspect(a::is(c)::toString())
+					Terminal.inspect([a]::contains(b)::toString())
 				}`),
 			).toEqual(['"true"', '"false"', '"true"'])
 		})
@@ -3219,10 +3219,10 @@ describe("Choices", () => {
 						constant listC: Wrapped<Integer> = #Val({ v = [2] })
 						constant plain: Wrapped<Integer> = #Val({ v = 2 })
 
-						__print(listA::is(listB)::toString())
-						__print(listA::is(listC)::toString())
-						__print(listA::is(plain)::toString())
-						__print(plain::is(listA)::toString())
+						Terminal.inspect(listA::is(listB)::toString())
+						Terminal.inspect(listA::is(listC)::toString())
+						Terminal.inspect(listA::is(plain)::toString())
+						Terminal.inspect(plain::is(listA)::toString())
 					}`),
 				).toEqual(['"false"', '"true"', '"false"', '"false"'])
 			})
@@ -3238,7 +3238,7 @@ describe("Choices", () => {
 						constant a: Wrapped<Rational> = #Val({ v = [1/2] })
 						constant b: Wrapped<Rational> = #Val({ v = [2/4] })
 
-						__print(a::is(b)::toString())
+						Terminal.inspect(a::is(b)::toString())
 					}`),
 				).toEqual(['"true"'])
 			})
@@ -3276,7 +3276,7 @@ describe("Choices", () => {
 
 					constant a: Opt<Integer> = #Holding({ value = 1 })
 
-					__print(a::is(a))
+					Terminal.inspect(a::is(a))
 				}`)
 
 				expect(generated).toContain('"tag": null')
@@ -3294,7 +3294,7 @@ describe("Choices", () => {
 
 				constant red: Colour = #Red
 
-				__print(red::is(#Green))
+				Terminal.inspect(red::is(#Green))
 			}`,
 				withoutLoweredUnitCaseEquality,
 			)
@@ -3312,8 +3312,8 @@ describe("Choices", () => {
 
 				constant red: Colour = #Red
 
-				__print(red::is(#Green))
-				__print(red::isNot(#Green))
+				Terminal.inspect(red::is(#Green))
+				Terminal.inspect(red::isNot(#Green))
 			}`,
 				withoutLoweredUnitCaseEquality,
 			)
@@ -3356,8 +3356,8 @@ describe("Choices", () => {
 
 				constant red: Colour = #Red
 
-				__print(red::is(#Green))
-				__print([red]::contains(#Green))
+				Terminal.inspect(red::is(#Green))
+				Terminal.inspect([red]::contains(#Green))
 			}`)
 
 			expect(generated).toContain("Colour.is(red,")
@@ -3374,8 +3374,8 @@ describe("Choices", () => {
 				constant operation: CalculatorOperation = CalculatorOperation#Add({ left = 1, right = 1 })
 				constant cleared: CalculatorOperation = CalculatorOperation#ClearAll
 
-				__print(operation)
-				__print(cleared)
+				Terminal.inspect(operation)
+				Terminal.inspect(cleared)
 			}`)
 
 			// NOTE: A Case carrying a payload is built in one allocation, its
@@ -3397,7 +3397,7 @@ describe("Choices", () => {
 			const source = `implementation { ${calculatorChoice}
 				constant operation: CalculatorOperation = CalculatorOperation#ClearAll
 
-				__print(match operation -> Integer {
+				Terminal.inspect(match operation -> Integer {
 					case #Add { <- @.left }
 					case _ { <- 0 }
 				})
@@ -3500,7 +3500,7 @@ describe("Choices", () => {
 				messagesOf(`implementation { ${progressChoice}
 					constant step: Progress<Integer, String> = #Going({ state = 5 })
 
-					__print(match step -> String {
+					Terminal.inspect(match step -> String {
 						case #Going { <- @.state::toString() }
 						case #Stopped { <- @.value }
 					})
@@ -3513,7 +3513,7 @@ describe("Choices", () => {
 				messagesOf(`implementation { ${progressChoice}
 					constant step: Progress<Integer, String> = #Going({ state = 5 })
 
-					__print(match step -> String {
+					Terminal.inspect(match step -> String {
 						case #Going { <- @.state::append("!") }
 						case #Stopped { <- @.value }
 					})
@@ -3541,12 +3541,12 @@ describe("Choices", () => {
 			let short = generate(`implementation { ${progressChoice}
 				constant done: Progress<String, Integer> = #Stopped(5)
 
-				__print(done)
+				Terminal.inspect(done)
 			}`)
 			let long = generate(`implementation { ${progressChoice}
 				constant done: Progress<String, Integer> = #Stopped({ value = 5 })
 
-				__print(done)
+				Terminal.inspect(done)
 			}`)
 
 			expect(short).toContain('[$type.typeKeySymbol]: "Progress#Stopped"')
@@ -3646,7 +3646,7 @@ describe("Choices", () => {
 							})
 						})
 
-					__print(total::toString())
+					Terminal.inspect(total::toString())
 				}`),
 			).toEqual([])
 		})
@@ -3688,7 +3688,7 @@ describe("Choices", () => {
 							})
 						})
 
-					__print(total::toString())
+					Terminal.inspect(total::toString())
 				}`),
 			).toEqual(['"15"'])
 		})
@@ -3725,7 +3725,7 @@ describe("Choices", () => {
 
 					constant drawn: Shape = #Circle(3)
 
-					__print(match drawn -> Integer {
+					Terminal.inspect(match drawn -> Integer {
 						case #Circle(radius) { <- radius }
 						case #Rect           { <- 0 }
 						case #Dot            { <- 0 }
@@ -3741,7 +3741,7 @@ describe("Choices", () => {
 
 					constant drawn: Shape = #Circle(4)
 
-					__print(match drawn -> String {
+					Terminal.inspect(match drawn -> String {
 						case #Circle(radius) {
 							<- "{radius} / {@.radius}"
 						}
@@ -3767,7 +3767,7 @@ describe("Choices", () => {
 						case #Dot            { <- @ }
 					}
 
-					__print(match same -> Integer {
+					Terminal.inspect(match same -> Integer {
 						case #Circle(radius) { <- radius }
 						case #Rect           { <- 0 }
 						case #Dot            { <- 0 }
@@ -3782,7 +3782,7 @@ describe("Choices", () => {
 
 				constant drawn: Shape = #Dot
 
-				__print(match drawn -> Integer {
+				Terminal.inspect(match drawn -> Integer {
 					case #Circle { <- 0 }
 					case #Rect   { <- 0 }
 					case #Dot(what) { <- 0 }
@@ -3804,7 +3804,7 @@ describe("Choices", () => {
 
 				constant drawn: Shape = #Dot
 
-				__print(match drawn -> Integer {
+				Terminal.inspect(match drawn -> Integer {
 					case #Circle    { <- 0 }
 					case #Rect(box) { <- 0 }
 					case #Dot       { <- 0 }
@@ -3842,8 +3842,8 @@ describe("Choices", () => {
 						}
 					}
 
-					__print(describe(#Circle(1)))
-					__print(describe(#Circle(9)))
+					Terminal.inspect(describe(#Circle(1)))
+					Terminal.inspect(describe(#Circle(9)))
 				}`),
 			).toEqual(['"small 1"', '"big 9"'])
 		})
@@ -3858,7 +3858,7 @@ describe("Choices", () => {
 
 					constant drawn: Shape = #Circle(3)
 
-					__print(match drawn -> String {
+					Terminal.inspect(match drawn -> String {
 						case #Circle(radius) where [10, 20]::anyItem(where (radius) {
 							<- radius::isGreaterThan(15)
 						}) {
@@ -3879,7 +3879,7 @@ describe("Choices", () => {
 
 					constant drawn: Shape = #Dot
 
-					__print(match drawn -> Integer {
+					Terminal.inspect(match drawn -> Integer {
 						case #Circle(radius)                    { <- radius }
 						case #Rect where radius::isLessThan(2)  { <- 0 }
 						case #Dot                               { <- 0 }
@@ -3895,7 +3895,7 @@ describe("Choices", () => {
 
 					constant drawn: Shape = #Dot
 
-					__print(match drawn -> Integer {
+					Terminal.inspect(match drawn -> Integer {
 						case #Circle(radius) { <- radius }
 						case #Rect           { <- radius }
 						case #Dot            { <- 0 }

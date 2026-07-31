@@ -13,7 +13,7 @@ implementation {
 		total,
 	) { <- total::add(index) })
 
-	__print(sum::toString()) § "55"
+	Terminal.inspect(sum::toString()) § "55"
 
 	§ The general loop — a Record State threaded with `{ state with … }`,
 	§ stopping on the first `#Done`, which finishes with the running total. The
@@ -29,7 +29,7 @@ implementation {
 		total = state.total::add(state.index) })
 	})
 
-	__print(result::toString()) § "15"
+	Terminal.inspect(result::toString()) § "15"
 
 	§ The condition-driven loops — `while` steps while its predicate holds,
 	§ `until` steps until its predicate holds. Both check BEFORE each step, so a
@@ -38,13 +38,13 @@ implementation {
 		<- n::isLessThan(100)
 	}, step (n) { <- n::multiply(with 2) })
 
-	__print(doubledWhile::toString()) § "128"
+	Terminal.inspect(doubledWhile::toString()) § "128"
 
 	constant doubledUntil = loop(startingWith 1, until (n) {
 		<- n::isGreaterThanOrEqualTo(100)
 	}, step (n) { <- n::multiply(with 2) })
 
-	__print(doubledUntil::toString()) § "128"
+	Terminal.inspect(doubledUntil::toString()) § "128"
 
 	§ The early-stopping fold — `reduce`'s `step` sibling leaves the walk on the
 	§ first `#Done`, where the plain fold always runs to the end. Here the
@@ -62,5 +62,5 @@ implementation {
 		<- #Continue(next)
 	})
 
-	__print(firstTwo::toString()) § "2"
+	Terminal.inspect(firstTwo::toString()) § "2"
 }
