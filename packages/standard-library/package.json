@@ -1,5 +1,5 @@
 {
-	"name": "@essence-lang/stdlib",
+	"name": "@essence-lang/standard-library",
 	"version": "0.1.0",
 	"description": "The Essence standard library, written in Essence.",
 	"private": true,
@@ -11,11 +11,11 @@
 	},
 	"author": "Alexander Trefz",
 	"license": "MIT",
-	"homepage": "https://github.com/alexandertrefz/essence/tree/master/packages/stdlib",
+	"homepage": "https://github.com/alexandertrefz/essence/tree/master/packages/standard-library",
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/alexandertrefz/essence.git",
-		"directory": "packages/stdlib"
+		"directory": "packages/standard-library"
 	},
 	"bugs": "https://github.com/alexandertrefz/essence/issues",
 	"keywords": [

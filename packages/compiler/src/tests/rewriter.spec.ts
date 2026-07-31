@@ -76,7 +76,7 @@ describe("Rewriter", () => {
 		describe("Internal Helpers", () => {
 			// NOTE: `isFirstRationalBigger` is gone — the `lowestNumber` and
 			// `greatestNumber` List entries it served are written in Essence
-			// now (`packages/stdlib/sources/Number.es`), folding the pairwise
+			// now (`packages/standard-library/sources/Number.es`), folding the pairwise
 			// entries, which read the members' own `compare`.
 
 			describe("anyIs", () => {
@@ -596,7 +596,7 @@ describe("Rewriter", () => {
 			})
 
 			// NOTE: `isNot` is not here because it is not native any more — it
-			// is written in Essence in `packages/stdlib/sources/Boolean.es` and reaches the
+			// is written in Essence in `packages/standard-library/sources/Boolean.es` and reaches the
 			// emitted Program through the standard library prelude. There is
 			// nothing in this module left to call; what it does now is asserted
 			// end to end in `codeGeneration.spec.ts`.
@@ -646,12 +646,12 @@ describe("Rewriter", () => {
 			})
 
 			// NOTE: `toString` and `exclusiveOr` are implemented in Essence now
-			// (`packages/stdlib/sources/Boolean.es`); the golden harness covers them.
+			// (`packages/standard-library/sources/Boolean.es`); the golden harness covers them.
 		})
 
 		describe("String", () => {
 			// NOTE: Most of this Namespace is written in Essence now
-			// (`packages/stdlib/sources/String.es`) and the golden harness covers it —
+			// (`packages/standard-library/sources/String.es`) and the golden harness covers it —
 			// `isEmpty`, `is`, `prepend`, `contains`, `length`, `characters`,
 			// `character`, `trimmed`, `startsWith`, `endsWith`, `repeat`,
 			// `reverse`, `slice`, `firstIndex`, `pad`,
@@ -834,7 +834,7 @@ describe("Rewriter", () => {
 		})
 
 		describe("Integer", () => {
-			// NOTE: isNot / isOdd are implemented in Essence now (packages/stdlib/sources/Integer.es); the golden harness covers them.
+			// NOTE: isNot / isOdd are implemented in Essence now (packages/standard-library/sources/Integer.es); the golden harness covers them.
 
 			describe("add", () => {
 				it("adds 2 integers correctly", () => {
@@ -886,7 +886,7 @@ describe("Rewriter", () => {
 
 			// NOTE: the Rational-operand entries of `add`, `multiply` and the
 			// four comparisons are written in Essence now
-			// (`packages/stdlib/sources/Integer.es`) — each is the flipped
+			// (`packages/standard-library/sources/Integer.es`) — each is the flipped
 			// call onto Rational's own mixed entry — and the golden harness
 			// covers them. Only the Integer-Integer entries stay native above.
 
@@ -948,7 +948,7 @@ describe("Rewriter", () => {
 			// whole arithmetic cluster followed — `add`, `multiply`, `divide`,
 			// all four comparisons, `round`, `truncate`, `parse` and the
 			// no-Argument `toString` are written in Essence now
-			// (`packages/stdlib/sources/Rational.es`), on the lowest-terms
+			// (`packages/standard-library/sources/Rational.es`), on the lowest-terms
 			// accessors and `Rational.of`, and the golden harness covers every
 			// one. Only `of`, the accessors, `raise`, `squareRoot`, `compare`,
 			// the decimal `toString(formatAs:)` and the Algebraic-operand
@@ -957,7 +957,7 @@ describe("Rewriter", () => {
 
 		describe("Number", () => {
 			// NOTE: every `lowestNumber`/`greatestNumber` overload is
-			// implemented in Essence now (`packages/stdlib/sources/Number.es`)
+			// implemented in Essence now (`packages/standard-library/sources/Number.es`)
 			// — the List forms fold the pairwise ones — as are `sum`,
 			// `product` and `average`. The golden harness covers them all;
 			// only the constants and the covering `compare` stay native.
@@ -1057,7 +1057,7 @@ describe("Rewriter", () => {
 				})
 			})
 
-			// NOTE: isNot / hasItems / doesNotContain are implemented in Essence now (packages/stdlib/sources/List.es); the golden harness covers them.
+			// NOTE: isNot / hasItems / doesNotContain are implemented in Essence now (packages/standard-library/sources/List.es); the golden harness covers them.
 
 			describe("length", () => {
 				it("returns the number of items in the list", () => {
@@ -1099,7 +1099,7 @@ describe("Rewriter", () => {
 			// / removeDuplicates / prepend (both forms) / append(_:) / contains /
 			// anyItem / everyItem / count (both forms) / insert / replace /
 			// partition / sorted / repeat are implemented in Essence now
-			// (packages/stdlib/sources/List.es), so there is no runtime Function left to call
+			// (packages/standard-library/sources/List.es), so there is no runtime Function left to call
 			// here. The golden harness covers them end to end; the entries of a
 			// mixed `overload` block that are still native keep their tests below.
 
@@ -1573,7 +1573,7 @@ describe("Rewriter", () => {
 				})
 			})
 
-			// NOTE: isNot is implemented in Essence now (packages/stdlib/sources/Record.es); the golden harness covers it.
+			// NOTE: isNot is implemented in Essence now (packages/standard-library/sources/Record.es); the golden harness covers it.
 
 			describe("toString", () => {
 				it("prints correctly", () => {
@@ -1595,7 +1595,7 @@ describe("Rewriter", () => {
 
 		describe("Ordering", () => {
 			// NOTE: `Ordering.is`, `isNot` and `toString` are implemented in
-			// Essence now (`packages/stdlib/sources/Ordering.es`) — the golden harness
+			// Essence now (`packages/standard-library/sources/Ordering.es`) — the golden harness
 			// exercises them end to end. `Integer.compare` and
 			// `Rational.compare` are Essence too now (both route through the
 			// native `Number.compare`); only the runtime `anyIs` remains
@@ -1609,11 +1609,11 @@ describe("Rewriter", () => {
 
 		describe("Protocol runtime gap fills", () => {
 			// NOTE: `String.toString` is implemented in Essence now
-			// (`packages/stdlib/sources/String.es`, `<- @`) and covered by the golden
+			// (`packages/standard-library/sources/String.es`, `<- @`) and covered by the golden
 			// harness; only `List.toString`, which has a representation to
 			// build, is still native.
 			// NOTE: `List.toString` is written in Essence now
-			// (`packages/stdlib/sources/List.es`) — the Printable conformance
+			// (`packages/standard-library/sources/List.es`) — the Printable conformance
 			// is conditional on the items, and the golden harness covers the
 			// filled, empty and single-item renderings.
 			// NOTE: There was a third entry here, for `Nothing.is`, `isNot` and
@@ -1626,7 +1626,7 @@ describe("Rewriter", () => {
 		describe("Number", () => {
 			// NOTE: `Number.is`, `isNot`, `toString` and the `isLessThan`
 			// family are implemented in Essence now
-			// (`packages/stdlib/sources/Number.es`) and covered by the golden harness.
+			// (`packages/standard-library/sources/Number.es`) and covered by the golden harness.
 			// Only `compare`, the one ordering primitive they all fall
 			// out of, stays native.
 			it("orders numerically across members", () => {

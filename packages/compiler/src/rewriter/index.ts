@@ -2582,7 +2582,7 @@ function rewriteFunctionInvocation(
 // const, reached by a bare `$es_<Namespace>_<member>` Identifier, so nothing has
 // to materialise the module namespace object to get at it. The literal constructors
 // (`String.createString`, `List.createList`, …) do NOT come through here: they
-// name their Namespace directly and are not declared in `packages/stdlib/sources`, so they
+// name their Namespace directly and are not declared in `packages/standard-library/sources`, so they
 // can never be Essence-implemented.
 function namespaceMember(
 	namespaceName: string,

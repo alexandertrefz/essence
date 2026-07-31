@@ -16,7 +16,7 @@ import { closestMatch } from "@essence-lang/compiler/helpers"
 import { optimiserPassNames } from "@essence-lang/compiler/optimiser"
 import { testDiagnostic } from "@essence-lang/compiler/tests/diagnosticFactory"
 import { fixturePath } from "@essence-lang/fixtures"
-import { STDLIB_DIRECTORY } from "@essence-lang/stdlib"
+import { STDLIB_DIRECTORY } from "@essence-lang/standard-library"
 
 import { runCheck } from "../actions"
 import {
@@ -979,7 +979,7 @@ describe("CLI", () => {
 })
 
 // NOTE: The CLI and the Language Server have to agree about the file in front
-// of them. `esc check packages/stdlib/sources/List.es` used to reject the `declarations { …
+// of them. `esc check packages/standard-library/sources/List.es` used to reject the `declarations { …
 // }` header of the very sources the compiler loads at startup — while the
 // Editor reported the same file clean — so a compiler developer could not
 // check their own transcription. Both now route through `documents.ts`.

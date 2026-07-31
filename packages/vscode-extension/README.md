@@ -1,6 +1,6 @@
 # Essence for VS Code
 
-Language support for [Essence](https://github.com/atrefz/essence). Syntax
+Language support for [Essence](https://github.com/alexandertrefz/essence). Syntax
 highlighting comes from a TextMate grammar refined by semantic tokens;
 diagnostics, Quick Fixes, renaming, go-to-definition, hovers, references, an
 outline, call hierarchy, completion, signature help, formatting, folding,

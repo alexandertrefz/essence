@@ -189,14 +189,14 @@ describe("Irrationals", () => {
 
 			expect(doubled[typeKeySymbol]).toBe("Transcendental")
 			// NOTE: `Transcendental.is` is written in Essence now
-			// (packages/stdlib/sources/Transcendental.es) — `anyIs` compares the canonical
+			// (packages/standard-library/sources/Transcendental.es) — `anyIs` compares the canonical
 			// form the same way the deleted native did.
 			expect(anyIs(doubled, number.Tau)).toBeTrue()
 		})
 
 		it("collapses cancelling π-parts to a Rational", () => {
 			// NOTE: `Transcendental.subtract` is written in Essence now
-			// (packages/stdlib/sources/Transcendental.es) as `add(other::negate())` — this
+			// (packages/standard-library/sources/Transcendental.es) as `add(other::negate())` — this
 			// is that composition, and the still-native gateway is what
 			// collapses the cancelled π-part.
 			const difference = transcendental.addTranscendental(
@@ -417,14 +417,14 @@ describe("Irrationals", () => {
 	})
 
 	describe("Number cross-kind semantics", () => {
-		// NOTE: cross-kind `Number.is` is Essence now (`packages/stdlib/sources/Number.es`) and covered by the golden harness.
+		// NOTE: cross-kind `Number.is` is Essence now (`packages/standard-library/sources/Number.es`) and covered by the golden harness.
 		// NOTE: the List entries of `lowestNumber`/`greatestNumber` — and the
 		// empty Optional they answer for an empty List — are Essence now
-		// (`packages/stdlib/sources/Number.es`), folds over the pairwise
+		// (`packages/standard-library/sources/Number.es`), folds over the pairwise
 		// entries seeded with `#Empty`; the golden harness covers every entry
 		// including the empty Lists.
-		// NOTE: the `isLessThan` family is Essence now (`packages/stdlib/sources/Number.es`) — its agreement with `compare` is covered by the golden harness.
-		// NOTE: the `isLessThan` family is Essence now (`packages/stdlib/sources/Number.es`); its symmetry with itself is covered by the golden harness.
+		// NOTE: the `isLessThan` family is Essence now (`packages/standard-library/sources/Number.es`) — its agreement with `compare` is covered by the golden harness.
+		// NOTE: the `isLessThan` family is Essence now (`packages/standard-library/sources/Number.es`); its symmetry with itself is covered by the golden harness.
 	})
 
 	describe("Structural equality", () => {

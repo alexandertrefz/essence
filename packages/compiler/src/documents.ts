@@ -2,7 +2,7 @@ import { realpathSync } from "node:fs"
 import path from "node:path"
 
 import type { common, parser } from "@essence-lang/interfaces"
-import { STDLIB_DIRECTORY } from "@essence-lang/stdlib"
+import { STDLIB_DIRECTORY } from "@essence-lang/standard-library"
 
 import { enrich } from "./enricher/index"
 import { declaredNames } from "./enricher/stdlib"
@@ -79,7 +79,7 @@ export function canonicalPath(filePath: string): string {
 const CANONICAL_STDLIB_DIRECTORY = canonicalPath(STDLIB_DIRECTORY)
 
 // NOTE: The Language Server is handed URIs
-// (`file:///…/packages/stdlib/sources/List.es`) and the tests plain paths;
+// (`file:///…/packages/standard-library/sources/List.es`) and the tests plain paths;
 // both are matched, and a `%20` or the like is decoded first so a path with a
 // space is not missed.
 //

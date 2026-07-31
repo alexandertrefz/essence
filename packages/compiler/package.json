@@ -47,7 +47,7 @@
 		"@essence-lang/escodegen": "workspace:*",
 		"@essence-lang/interfaces": "workspace:*",
 		"@essence-lang/runtime": "workspace:*",
-		"@essence-lang/stdlib": "workspace:*",
+		"@essence-lang/standard-library": "workspace:*",
 		"esbuild": "0.28.1",
 		"source-map": "0.6.1"
 	},

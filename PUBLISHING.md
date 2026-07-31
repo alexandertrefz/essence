@@ -2,7 +2,7 @@
 
 Ten packages publish to npm under the `@essence-lang` scope, always together and
 always at one version: `interfaces`, `escodegen` (the vendored fork),
-`ariadne`, `stdlib`, `runtime`, `compiler`, `formatter`, `debug-adapter`,
+`ariadne`, `standard-library`, `runtime`, `compiler`, `formatter`, `debug-adapter`,
 `language-server` and `cli`. `fixtures` and the website stay private, and the
 VS Code extension ships to the Marketplace instead, via `bun run package` in
 its own directory.
@@ -20,7 +20,7 @@ its own directory.
    script reads them from the manifests — the manifests are the single source
    of truth, there is no version anywhere else. The one consumer to carry
    along: the VS Code extension pins `@essence-lang/language-server` and
-   `@essence-lang/stdlib` by exact version in its `devDependencies`.
+   `@essence-lang/standard-library` by exact version in its `devDependencies`.
 2. `bun install`, `bun test`, `bun run typecheck` — the tree the release is
    cut from is green.
 3. `bun run publish:smoke` — stages everything and proves the *artifacts*:

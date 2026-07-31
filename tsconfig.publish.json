@@ -28,7 +28,7 @@
 		"packages/interfaces/src/**/*",
 		"packages/language-server/src/**/*",
 		"packages/runtime/src/**/*",
-		"packages/stdlib/src/**/*"
+		"packages/standard-library/src/**/*"
 	],
 	"exclude": ["**/tests/**", "**/*.spec.ts", "**/tools/**"]
 }
