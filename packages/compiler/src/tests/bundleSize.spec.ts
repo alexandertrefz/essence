@@ -216,8 +216,17 @@ describe("Bundle Size", () => {
 	// new constant is data rather than a change to the arithmetic. π is still
 	// the only registered base, so the generality is text this Program carries
 	// before anything uses it — what it buys lands with the next base.
+	//
+	// NOTE: It now measures 56,926, up 1,994, and the ceiling moves to 58,200
+	// — the registry gained e, and `Number` gained the `E` and `GoldenRatio`
+	// constants, whose initialisers ride into every Program that touches the
+	// module. This is the move the registry design was bought for: the e-series
+	// enclosure and two constants are the WHOLE of the growth, where the
+	// previous base — π, hardcoded — cost 2,779 of machinery to merely
+	// generalise. This Program writes no `e`, but "a stdlib body pulls its
+	// whole transitive reach" is the standing shape of these bundles.
 	it("keeps Everyday.es from dragging in the whole numeric tower", async () => {
-		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(56_000)
+		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(58_200)
 	})
 
 	// NOTE: Measured 42,719 bytes; a reintroduced `Number` spread was 54,849.
@@ -252,8 +261,13 @@ describe("Bundle Size", () => {
 	// NOTE: It now measures 31,151, up 2,886, for the same reason Everyday's
 	// figure rose: the Transcendental representation is a basis-registry span
 	// now. The ceiling moves to 32,200, keeping the same order of headroom.
+	//
+	// NOTE: It now measures 32,300, up 1,149, for the same reason Everyday's
+	// figure rose — and this Program actually exercises the new base: it
+	// prints `Number.E`, adds it to π, and holds the golden ratio. The ceiling
+	// moves to 33,000, keeping the same order of headroom.
 	it("keeps Irrational.es from dragging in the whole numeric tower", async () => {
-		expect(await bundleSizeOf("Irrational.es")).toBeLessThan(32_200)
+		expect(await bundleSizeOf("Irrational.es")).toBeLessThan(33_000)
 	})
 
 	// NOTE: The same claim for a bundle of several Modules, where it is far

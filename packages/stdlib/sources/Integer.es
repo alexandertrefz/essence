@@ -74,7 +74,7 @@ declarations {
 				<- other::add(@)
 			}
 
-			§§ Adds a Transcendental to an Integer. Shifting the rational part of `a + b·π` leaves the π term untouched, so the sum is exact.
+			§§ Adds a Transcendental to an Integer. Shifting the rational part of `a + b·π + c·e` leaves the base terms untouched, so the sum is exact.
 			§§
 			§§ @param other — the Transcendental to add
 			(_ other: Transcendental) -> Transcendental {
