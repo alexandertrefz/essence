@@ -3221,7 +3221,12 @@ function mangleName(name: string): string {
 // word is a legal property key (`record.case`, `{ case: … }`) and escaping one
 // would part it from the key the Record literal wrote. `memberKey` answers for
 // those.
-function escapeName(name: string): string {
+//
+// NOTE: Exported because a host binding names off an Export Surface has to ask
+// the same question — an Essence Module exports `square` and `ok?`, and the
+// bundle binds `square` and `$user_ok_3f_`. Answering it a second time
+// somewhere else is how the two spellings drift apart.
+export function escapeName(name: string): string {
 	if (compilerOwnedNames.has(name) || !isJavaScriptIdentifierName(name)) {
 		return mangleName(name)
 	}
