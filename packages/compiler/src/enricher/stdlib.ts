@@ -111,7 +111,6 @@ function exportingEverything(program: parser.Program): parser.Program {
 			case "ProtocolDeclarationStatement":
 			case "NamespaceDefinitionStatement":
 			case "FunctionStatement":
-			case "NativeFunctionStatement":
 			case "OverloadedFunctionStatement":
 				entries.push({
 					nodeType: "Export",
@@ -295,7 +294,6 @@ export function declaredNames(programs: Array<parser.Program>): {
 					break
 				case "NamespaceDefinitionStatement":
 				case "FunctionStatement":
-				case "NativeFunctionStatement":
 				case "OverloadedFunctionStatement":
 				case "ConstantDeclarationStatement":
 				case "VariableDeclarationStatement":
@@ -463,8 +461,6 @@ function collectFunctionBindings(
 		for (let node of program.implementation.nodes) {
 			if (node.nodeType === "FunctionStatement") {
 				bindings[node.name.content] = [false]
-			} else if (node.nodeType === "NativeFunctionStatement") {
-				bindings[node.name.content] = [true]
 			} else if (node.nodeType === "OverloadedFunctionStatement") {
 				bindings[node.name.content] = node.methods.map(
 					(entry) => entry.nodeType === "NativeMethodSignature",

@@ -184,7 +184,6 @@ export function enrichNode(
 		case "IfStatement":
 		case "ReturnStatement":
 		case "FunctionStatement":
-		case "NativeFunctionStatement":
 		case "OverloadedFunctionStatement":
 			return enrichStatement(node, scope, hoistedTypes)
 	}
@@ -1956,11 +1955,10 @@ export function enrichStatement(
 				scope,
 				hoistedType as common.FunctionType | undefined,
 			)
-		case "NativeFunctionStatement":
 		case "OverloadedFunctionStatement":
-			// NOTE: These declare a name and nothing to emit, and are dropped
+			// NOTE: This declares a name and nothing to emit, and is handled
 			// before enrichment by `enrichImplementation` — the top level is the
-			// only place they are valid. Reaching here means one was nested in a
+			// only place it is valid. Reaching here means one was nested in a
 			// body (a `declarations`-mode Program only), which the Compiler has
 			// no typed Node to represent.
 			throw new Error(
@@ -2981,7 +2979,7 @@ export function enrichOverloadedFunctionStatement(
 
 		// NOTE: The per-entry Function Type is exactly what the call site
 		// resolves against — the hoisted `overloads[index]` lifted to a
-		// `Function` Type, mirroring `resolveNativeFunctionStatementType`.
+		// `Function` Type.
 		let type: common.FunctionType = {
 			type: "Function",
 			...overloadedType.overloads[index]!,

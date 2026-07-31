@@ -97,7 +97,6 @@ function declarationOf(
 			return { name: node.name, kind: "variable" }
 
 		case "FunctionStatement":
-		case "NativeFunctionStatement":
 		case "OverloadedFunctionStatement":
 			return { name: node.name, kind: "function" }
 

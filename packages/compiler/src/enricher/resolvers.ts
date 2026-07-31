@@ -833,19 +833,6 @@ function resolveFreeFunctionEntry(
 	}
 }
 
-// NOTE: A body-less native free Function resolves to the same `Function` Type a
-// bodied one would — the missing block is a binding-by-name to the runtime, not
-// a difference in the signature the Enricher reads.
-export function resolveNativeFunctionStatementType(
-	node: parser.NativeFunctionStatementNode,
-	scope: enricher.Scope,
-): common.FunctionType {
-	return {
-		type: "Function",
-		...resolveFreeFunctionEntry(node.signature, scope),
-	}
-}
-
 // NOTE: An overloaded free Function resolves to an `OverloadedStaticMethod` — a
 // free Function is static by nature (no receiver), and `resolveFunctionInvocation`
 // already resolves that callee Type by matching Arguments against each overload.

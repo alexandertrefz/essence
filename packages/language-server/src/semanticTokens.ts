@@ -337,7 +337,6 @@ function collectCasesFromNode(
 			return
 		case "ProtocolDeclarationStatement":
 		case "TypeAliasStatement":
-		case "NativeFunctionStatement":
 		case "Identifier":
 		case "Self":
 		case "StringValue":
