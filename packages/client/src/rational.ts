@@ -89,7 +89,7 @@ export class EssenceRational {
 				? (this.numerator << BigInt(shift)) / this.denominator
 				: this.numerator / (this.denominator << BigInt(-shift))
 
-		return Number(scaled) * 2 ** -shift
+		return scaledByPowerOfTwo(Number(scaled), -shift)
 	}
 
 	// NOTE: How Essence itself prints a Rational — `1/3`, and a whole one as
@@ -111,4 +111,33 @@ export class EssenceRational {
 
 function bitLength(value: bigint): number {
 	return (value < 0n ? -value : value).toString(2).length
+}
+
+// NOTE: The largest power of two a double holds. `2 ** 1024` is `Infinity` and
+// `2 ** -1075` is `0`, so anything past this has to be applied in more than one
+// multiplication.
+const POWER_STEP = 1023
+
+// NOTE: `value * 2 ** exponent`, in steps a double's own exponent can hold.
+// Done in one multiplication it is wrong at both ends: `1/2 ** 1024` scales back
+// by `2 ** -1088`, which IS `0` — so the answer is `0` rather than the perfectly
+// ordinary subnormal `5.56e-309` the Rational actually is. Stepping keeps every
+// intermediate in range, and each step is exact until the last one, which is the
+// single rounding a conversion to a double is allowed.
+//
+// NOTE: The loop stops early on `0` and on `Infinity` because both are fixed
+// points — a Rational of a million-bit numerator would otherwise multiply
+// `Infinity` by `2 ** 1023` a thousand times to reach the same answer.
+function scaledByPowerOfTwo(value: number, exponent: number): number {
+	let scaled = value
+	let remaining = exponent
+
+	while (remaining !== 0 && scaled !== 0 && Number.isFinite(scaled)) {
+		let step = Math.max(-POWER_STEP, Math.min(POWER_STEP, remaining))
+
+		scaled *= 2 ** step
+		remaining -= step
+	}
+
+	return scaled
 }

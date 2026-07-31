@@ -149,7 +149,7 @@ describe("Loading a Module", () => {
 			cacheDirectory,
 		})
 
-		expect(Object.keys(math.exports)).toEqual(["PI"])
+		expect(Object.keys(math.exports)).toEqual(["PI", "square"])
 		expect((math.exports.PI as EssenceRational).toString()).toBe("157/50")
 		expect((math.exports.PI as EssenceRational).toNumber()).toBe(3.14)
 	})
