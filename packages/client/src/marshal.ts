@@ -56,6 +56,9 @@ function index(at: Path, position: number): Path {
 	return { root: at.root, trail: `${at.trail}[${position}]` }
 }
 
+// NOTE: How many names an Error spells out before it starts counting.
+const NAMES_SHOWN = 5
+
 export type Marshaller = {
 	// NOTE: An Essence value out, as the JavaScript it maps to. The optional
 	// name is what an Error calls the value — a caller marshalling a return
@@ -125,8 +128,19 @@ export function createMarshaller(
 			// path gains no segment for it either. A host reading `.item` off
 			// what came back would be reading the Module's bookkeeping rather
 			// than its value.
-			case "Optional#Value":
-				return toJS((value as { item: unknown }).item, at)
+			case "Optional#Value": {
+				let item = (value as { item: unknown }).item
+
+				// NOTE: Absence does not nest. `#Value(#Empty)` and `#Empty`
+				// would both be `undefined` here, and Essence is explicit that
+				// they are two values — so the pair is refused rather than
+				// collapsed into the one of them a round trip would hand back.
+				if (isOptionalValue(item)) {
+					throw nestedOptional(at)
+				}
+
+				return toJS(item, at)
+			}
 			case "Optional#Empty":
 				return undefined
 		}
@@ -140,10 +154,7 @@ export function createMarshaller(
 			// is the single thing a lossless boundary may not do — so it is
 			// refused instead of quietly lost.
 			if ("$case" in fields) {
-				throw new EssenceMarshalError(
-					`${spell(at)}: this Case can not be marshalled — its payload declares a member named '$case', which is the name the Case tag is carried under.`,
-					spell(at),
-				)
+				throw collidingCase(at)
 			}
 
 			return { ...fields, $case: caseName(tag) }
@@ -157,6 +168,18 @@ export function createMarshaller(
 			`${spell(at)}: ${tag} values can not be marshalled yet.`,
 			spell(at),
 		)
+	}
+
+	// NOTE: Read through the bridge's key like every other tag, so a value from
+	// another bundle is not mistaken for one of this Module's Optionals.
+	function isOptionalValue(value: unknown): boolean {
+		if (value === null || typeof value !== "object") {
+			return false
+		}
+
+		let tag = (value as Record<symbol, unknown>)[bridge.typeKey]
+
+		return tag === "Optional#Value" || tag === "Optional#Empty"
 	}
 
 	function fieldsOf(value: object, at: Path): Record<string, unknown> {
@@ -252,13 +275,18 @@ export function createMarshaller(
 
 				let fields: Record<string, EssenceValue> = {}
 
+				// NOTE: An absent key IS a value here — `undefined`, which is
+				// exactly what an `Optional` member is spelled as — so what the
+				// key holds is read and the member's own Type decides. Refusing
+				// absence up front reported "expected Optional<String>, got
+				// nothing" for a Type whose whole point is that it accepts
+				// nothing, and made a Record that had been through JSON — which
+				// drops an `undefined`-valued key — impossible to hand back. A
+				// member that is not Optional still fails, with the same
+				// sentence, where the sentence is true.
 				for (let [name, memberType] of Object.entries(
 					expected.members,
 				)) {
-					if (!Object.hasOwn(given, name)) {
-						throw mismatch(undefined, memberType, member(at, name))
-					}
-
 					fields[name] = fromJS(
 						given[name],
 						memberType,
@@ -284,6 +312,19 @@ export function createMarshaller(
 			case "Case":
 				return caseFromJS(value, expected, at)
 			case "UnionType": {
+				// NOTE: Before any arm is tried, because a nested Optional is
+				// refused rather than answered and an arm's refusal is something
+				// the next arm gets to overrule. `Optional<Optional<Integer>>`
+				// reaches here as the Union of its two Cases, and `#Empty` would
+				// take the `undefined` that `#Value` had just refused — turning
+				// a Type with no JavaScript spelling into a confident wrong
+				// answer.
+				let item = optionalItemOf(expected)
+
+				if (item !== null && admitsAbsence(item)) {
+					throw nestedOptional(at)
+				}
+
 				// NOTE: In declaration order, and the first arm that admits the
 				// value is the one it becomes. Overlapping arms are therefore
 				// DECIDED rather than ambiguous: `Optional<String> | Integer`
@@ -311,8 +352,15 @@ export function createMarshaller(
 				// instead would throw away the only sentence that says what is
 				// actually wrong. Where two did, the value fits none of them
 				// clearly and naming the Union is the honest answer.
+				//
+				// NOTE: A deeper path is the usual sign of that, and not the only
+				// one: a Case whose `$case` named this arm and whose PAYLOAD is
+				// then wrong refuses the value itself, at this very path, and says
+				// so — so it marks itself instead. Without that, every misspelled
+				// payload member of every Choice reads as "expected Shape", while
+				// the same mistake in a Record names the member.
 				let reached = refused.filter(
-					(failure) => failure.path !== spell(at),
+					(failure) => failure.inside || failure.path !== spell(at),
 				)
 
 				if (reached.length === 1) {
@@ -389,23 +437,40 @@ export function createMarshaller(
 				return bridge.case(tag)
 			}
 
-			if (
-				value === undefined ||
-				value === null ||
-				!Object.hasOwn(expected.members, "item")
-			) {
+			let item = expected.members.item
+
+			if (item === undefined) {
 				throw mismatch(value, expected, at)
 			}
 
-			return bridge.case(tag, {
-				item: fromJS(value, expected.members.item, at),
-			})
+			// NOTE: The same refusal the Union above makes, for the Case reached
+			// on its own — `#Value(#Empty)` is not `#Empty`, and both are
+			// `undefined` here.
+			if (admitsAbsence(item)) {
+				throw nestedOptional(at)
+			}
+
+			if (value === undefined || value === null) {
+				throw mismatch(value, expected, at)
+			}
+
+			return bridge.case(tag, { item: fromJS(value, item, at) })
 		}
 
 		let given = plainObject(value)
 
 		if (given === null || !admitsCase(given.$case, expected)) {
 			throw mismatch(value, expected, at)
+		}
+
+		// NOTE: The refusal `toJS` makes for the same Case, made here too. The
+		// tag is written under `$case`, so a payload member of that name has
+		// nowhere to sit: read it and the tag string becomes the member's value,
+		// silently, and there is no way to pass any other. Coming out it is
+		// refused; going in it has to be refused, or the boundary accepts a
+		// value it can not then describe.
+		if (Object.hasOwn(expected.members, "$case")) {
+			throw collidingCase(at, true)
 		}
 
 		let members = Object.entries(expected.members)
@@ -415,7 +480,7 @@ export function createMarshaller(
 		)
 
 		if (undeclared.length > 0) {
-			throw undeclaredMembers(expected, undeclared, at)
+			throw undeclaredMembers(expected, undeclared, at, true)
 		}
 
 		if (members.length === 0) {
@@ -428,11 +493,9 @@ export function createMarshaller(
 
 		let payload: Record<string, EssenceValue> = {}
 
+		// NOTE: An absent key is read as `undefined` and the member's Type
+		// decides, for the reason the Record branch above states.
 		for (let [name, memberType] of members) {
-			if (!Object.hasOwn(given, name)) {
-				throw mismatch(undefined, memberType, member(at, name))
-			}
-
 			payload[name] = fromJS(given[name], memberType, member(at, name))
 		}
 
@@ -460,14 +523,37 @@ export function createMarshaller(
 		expected: common.Type,
 		names: Array<string>,
 		at: Path,
+		inside = false,
 	): EssenceMarshalError {
 		return new EssenceMarshalError(
 			`${spell(at)}: expected ${printType(expected)}, got an object with ${
 				names.length === 1 ? "a member" : "members"
-			} it does not declare — ${names
-				.map((name) => `'${name}'`)
-				.join(", ")}.`,
+			} it does not declare — ${quoted(names)}.`,
 			spell(at),
+			inside,
+		)
+	}
+
+	// NOTE: The one shape `Optional<T> ↔ T | undefined` can not describe, in
+	// both directions, worded the same way. `null` is no help — JSON turns an
+	// `undefined` into one, so it is the same absence wearing another name — and
+	// there is no third spelling of nothing to spend on the second level.
+	function nestedOptional(at: Path): EssenceMarshalError {
+		return new EssenceMarshalError(
+			`${spell(
+				at,
+			)}: an Optional inside an Optional has no JavaScript spelling — both levels would be 'undefined', and '#Value(#Empty)' is not '#Empty'.`,
+			spell(at),
+		)
+	}
+
+	function collidingCase(at: Path, inside = false): EssenceMarshalError {
+		return new EssenceMarshalError(
+			`${spell(
+				at,
+			)}: this Case can not be marshalled — its payload declares a member named '$case', which is the name the Case tag is carried under.`,
+			spell(at),
+			inside,
 		)
 	}
 
@@ -533,7 +619,26 @@ export function createMarshaller(
 
 		return keys.length === 0
 			? "an empty object"
-			: `an object with ${keys.map((key) => `'${key}'`).join(", ")}`
+			: `an object with ${quoted(keys)}`
+	}
+
+	// #endregion
+
+	// #region Wording
+
+	// NOTE: Bounded, for the reason the note above `describe` gives: the object
+	// being described is one a host got wrong, and a parsed JSON document with a
+	// thousand keys is exactly that. The first few name the mistake as well as
+	// all of them would.
+	function quoted(names: Array<string>): string {
+		let shown = names
+			.slice(0, NAMES_SHOWN)
+			.map((name) => `'${name}'`)
+			.join(", ")
+
+		return names.length <= NAMES_SHOWN
+			? shown
+			: `${shown} and ${names.length - NAMES_SHOWN} more`
 	}
 
 	// #endregion
@@ -556,6 +661,54 @@ function caseName(tag: string): string {
 	return `${displayChoiceName(tag.slice(0, separator))}#${tag.slice(
 		separator + 1,
 	)}`
+}
+
+// NOTE: What an `Optional` holds, or `null` where the Type is not one. A
+// `Optional<T>` reaches a Surface as the Union of its two Cases, so the question
+// is asked of the Union: the `#Value` arm's `item` is the answer.
+function optionalItemOf(type: common.Type): common.Type | null {
+	switch (type.type) {
+		case "Case":
+			return type.choice === "Optional" && type.name === "Value"
+				? (type.members.item ?? null)
+				: null
+		case "UnionType": {
+			for (let arm of type.types) {
+				let item = optionalItemOf(arm)
+
+				if (item !== null) {
+					return item
+				}
+			}
+
+			return null
+		}
+		case "Refinement":
+			return optionalItemOf(type.base)
+		case "GenericAlias":
+			return optionalItemOf(type.aliasedType)
+		default:
+			return null
+	}
+}
+
+// NOTE: Whether `undefined` is a value of this Type — which is exactly whether
+// an `Optional`'s `#Empty` is reachable in it. What it decides here is whether
+// an `Optional` is about to be put inside another one, and both levels spelled
+// as nothing.
+function admitsAbsence(type: common.Type): boolean {
+	switch (type.type) {
+		case "Case":
+			return type.choice === "Optional" && type.name === "Empty"
+		case "UnionType":
+			return type.types.some(admitsAbsence)
+		case "Refinement":
+			return admitsAbsence(type.base)
+		case "GenericAlias":
+			return admitsAbsence(type.aliasedType)
+		default:
+			return false
+	}
 }
 
 // NOTE: Either spelling of the same Case. `Shape#Circle` is what `toJS` writes,

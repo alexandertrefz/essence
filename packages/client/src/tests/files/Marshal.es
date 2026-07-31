@@ -12,6 +12,11 @@ implementation {
 
 	type Box = { width: Integer, height: Integer }
 
+	§ A Record with an Optional member, which is the shape an absent key has to
+	§ be admitted for — `undefined` is how `Optional<String>` is spelled here,
+	§ and a key holding `undefined` does not survive JSON.
+	type Card = { title: String, note: Optional<String> }
+
 	type Label = String | Integer
 
 	function integer(_ value: Integer) -> Integer {
@@ -35,6 +40,10 @@ implementation {
 	}
 
 	function box(_ value: Box) -> Box {
+		<- value
+	}
+
+	function card(_ value: Card) -> Card {
 		<- value
 	}
 
@@ -81,6 +90,7 @@ implementation {
 export {
 	Shape
 	Box
+	Card
 	Label
 	integer
 	rational
@@ -88,6 +98,7 @@ export {
 	flag
 	words
 	box
+	card
 	maybe
 	shape
 	labelled

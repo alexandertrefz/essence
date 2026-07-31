@@ -53,7 +53,7 @@ export function bindModule(
 			continue
 		}
 
-		exports[name] = bindValue(raw[name], type, name, marshal)
+		bindValue(exports, name, () => raw[name], type, name, marshal)
 	}
 
 	return { exports: Object.freeze(exports), raw }
@@ -108,22 +108,59 @@ function bindRaw(
 }
 
 function bindValue(
-	value: unknown,
+	target: Record<string, unknown>,
+	key: string,
+	read: () => unknown,
 	type: common.Type,
 	name: string,
 	marshal: Marshaller,
-): unknown {
+): void {
 	switch (type.type) {
 		case "Function":
-			return wrapFunction(value as EssenceFunction, type, name, marshal)
+			target[key] = wrapFunction(
+				read() as EssenceFunction,
+				type,
+				name,
+				marshal,
+			)
+
+			break
 		case "Namespace":
-			return bindNamespace(value, type, marshal)
+			target[key] = bindNamespace(read(), type, marshal)
+
+			break
 		// NOTE: Everything a value can be MADE of — a constant, and nothing
 		// else, since the Validator refuses to export a `variable` and a Method
 		// is only ever reached through the Namespace that holds it.
 		default:
-			return marshal.toJS(value, name)
+			defineConstant(target, key, read, name, marshal)
 	}
+}
+
+// NOTE: A constant is marshalled ON READ rather than at bind time, for two
+// reasons that happen to have one answer.
+//
+// A value the Marshaller has no mapping for — the numeric tower above Rational,
+// today — would otherwise take the whole Module down: one `constant root =
+// 2::squareRoot()` and `exports`, `raw`, `bridge` and `marshaller` are all
+// unreachable over an export nobody asked for. Bound this way, the refusal lands
+// on the export that caused it, where it can be read and worked around.
+//
+// And what a read hands back is a fresh value every time, exactly as
+// `marshaller.toJS(raw.…)` is. A single marshalled Array shared by every reader
+// is one a host can push onto, which changes what every other holder of the same
+// Module sees — while `Object.freeze(exports)` says, wrongly, that it cannot.
+function defineConstant(
+	target: Record<string, unknown>,
+	key: string,
+	read: () => unknown,
+	name: string,
+	marshal: Marshaller,
+): void {
+	Object.defineProperty(target, key, {
+		get: () => marshal.toJS(read(), name),
+		enumerable: true,
+	})
 }
 
 // #region Functions
@@ -337,9 +374,19 @@ function bindNamespace(
 	// inherits `name`, `length`, `call` and `bind` from `Function` — an `in`
 	// would answer for a Method the bundle does not bind and hand back
 	// JavaScript's own.
+	//
+	// NOTE: A static constant is bound ON READ for the reasons `defineConstant`
+	// states — a constant is a constant wherever it sits, and one the Marshaller
+	// has no mapping for would otherwise take the whole Namespace with it.
 	for (let name of Object.keys(type.properties)) {
 		if (Object.hasOwn(namespace, name)) {
-			bound[name] = marshal.toJS(namespace[name], `${type.name}.${name}`)
+			defineConstant(
+				bound,
+				name,
+				() => namespace[name],
+				`${type.name}.${name}`,
+				marshal,
+			)
 		}
 	}
 

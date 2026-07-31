@@ -151,6 +151,40 @@ describe("Round trips", () => {
 		})
 	})
 
+	// NOTE: An absent key IS `undefined`, which is how `Optional<String>` is
+	// spelled on this side — so leaving it off is the same statement as writing
+	// it. Refusing absence reported "expected Optional<String>, got nothing" for
+	// the one Type that accepts exactly nothing, and made a Record that had been
+	// through `JSON.stringify` — which drops an `undefined`-valued key —
+	// impossible to hand back.
+	it("takes a Record with an Optional member left off", () => {
+		expect(through("card", { title: "a", note: "b" })).toEqual({
+			title: "a",
+			note: "b",
+		})
+		expect(through("card", { title: "a", note: undefined })).toEqual({
+			title: "a",
+			note: undefined,
+		})
+		expect(through("card", { title: "a" })).toEqual({
+			title: "a",
+			note: undefined,
+		})
+		expect(
+			through(
+				"card",
+				JSON.parse(JSON.stringify({ title: "a", note: undefined })),
+			),
+		).toEqual({ title: "a", note: undefined })
+	})
+
+	// NOTE: The same rule, and the same sentence, where the sentence is true.
+	it("still refuses a Record with a member that is not Optional left off", () => {
+		expect(marshalError(() => through("box", { width: 3n })).message).toBe(
+			"argument 1 → .height: expected Integer, got nothing.",
+		)
+	})
+
 	it("carries an Optional as the value or nothing", () => {
 		expect(through("maybe", 7n)).toBe(7n)
 		expect(through("maybe", undefined)).toBeUndefined()
@@ -278,6 +312,26 @@ describe("Numbers", () => {
 		).toBeCloseTo(1 / 3, 15)
 	})
 
+	// NOTE: The scale back is a power of two far outside a double's own exponent
+	// — `2 ** -1088` for the first of these — and `2 ** -1088` IS `0`. Applied in
+	// one multiplication it answered `0` for a value that is a perfectly ordinary
+	// subnormal: not the magnitude, not a `NaN`, a wrong finite number.
+	it("answers a small Rational with a huge denominator exactly", () => {
+		expect(new EssenceRational(1n, 2n ** 1024n).toNumber()).toBe(2 ** -1024)
+		expect(new EssenceRational(-1n, 2n ** 1024n).toNumber()).toBe(
+			-(2 ** -1024),
+		)
+		// NOTE: The smallest double there is, and the first value below it.
+		expect(new EssenceRational(1n, 2n ** 1074n).toNumber()).toBe(
+			Number.MIN_VALUE,
+		)
+		expect(new EssenceRational(1n, 2n ** 1100n).toNumber()).toBe(0)
+		// NOTE: And the other end, where `Infinity` is the right answer rather
+		// than the one that got away.
+		expect(new EssenceRational(2n ** 2000n, 3n).toNumber()).toBe(Infinity)
+		expect(new EssenceRational(2n ** 1200n, 2n ** 1199n).toNumber()).toBe(2)
+	})
+
 	it("refuses a denominator of zero and a number that is not finite", () => {
 		expect(() => new EssenceRational(1n, 0n)).toThrow(RangeError)
 		expect(() => EssenceRational.fromNumber(Number.NaN)).toThrow(RangeError)
@@ -345,6 +399,7 @@ describe("The exports of a Module", () => {
 			"blank",
 			"box",
 			"boxes",
+			"card",
 			"circle",
 			"flag",
 			"greeting",
@@ -589,6 +644,40 @@ describe("Errors", () => {
 			marshalError(() => marshaller.fromJS(() => 1, signature)).message,
 		).toContain("callbacks are not supported yet")
 	})
+
+	// NOTE: A misspelled payload member has to be as findable as a misspelled
+	// Record member. A Choice always reaches `fromJS` as the Union of its Cases,
+	// so a refusal raised at the value's own path is one the Union throws away —
+	// which left `argument 1: expected Shape` as the whole answer.
+	it("keeps a Case's own reason where its tag matched", () => {
+		let error = marshalError(() =>
+			marshaller.fromJS(
+				{ $case: "Shape#Circle", radius: 1n, extra: 2n },
+				parameterType("shape"),
+				"argument 1",
+			),
+		)
+
+		expect(error.message).toContain(
+			"got an object with a member it does not declare — 'extra'",
+		)
+	})
+
+	// NOTE: Bounded, because the object being described is one a host got wrong,
+	// and a parsed JSON document with a thousand keys is exactly that.
+	it("does not spell out every key of a wide object", () => {
+		let wide: Record<string, unknown> = {}
+
+		for (let position = 0; position < 200; position += 1) {
+			wide[`key${position}`] = position
+		}
+
+		let message = marshalError(() => marshaller.toJS(wide)).message
+
+		expect(message).toContain("'key0', 'key1', 'key2', 'key3', 'key4'")
+		expect(message).toContain("and 195 more")
+		expect(message.length).toBeLessThan(200)
+	})
 })
 
 describe("The Types a Surface actually carries", () => {
@@ -693,5 +782,128 @@ export {
 				).toEqual({ $case: "Shape#Circle", radius: 2n })
 			},
 		)
+	})
+})
+
+// NOTE: What the boundary can not describe, refused in both directions. The rule
+// this file holds is that a value the mapping has no spelling for is REFUSED
+// rather than answered wrongly — silently turning `#Value(#Empty)` into `#Empty`
+// is the one thing a boundary called lossless may not do.
+describe("What the boundary refuses", () => {
+	let refused: EssenceModule
+	let refusedMarshaller: Marshaller
+
+	beforeAll(async () => {
+		refused = await loadModule(
+			path.join(import.meta.dirname, "files", "Refused.es"),
+			{ cacheDirectory },
+		)
+		refusedMarshaller = refused.marshaller
+	})
+
+	function refusedParameter(name: string): common.Type {
+		let signature = refused.surface.values[name] as common.FunctionType
+
+		return signature.parameterTypes[0]!.type as common.Type
+	}
+
+	// NOTE: `Optional<T>` is `T | undefined` here, and `undefined` does not
+	// nest: `#Value(#Empty)` and `#Empty` would both be `undefined`, so a round
+	// trip through a host would turn the first into the second and say nothing.
+	// `Optional.es` states the opposite invariant outright.
+	it("refuses an Optional inside an Optional coming out", () => {
+		let error = marshalError(() => refused.exports.deep)
+
+		expect(error.message).toContain(
+			"an Optional inside an Optional has no JavaScript spelling",
+		)
+		// NOTE: One level is still perfectly ordinary.
+		expect(refused.exports.shallow).toBeUndefined()
+	})
+
+	it("refuses an Optional inside an Optional going in", () => {
+		let error = marshalError(() =>
+			refusedMarshaller.fromJS(
+				undefined,
+				refusedParameter("nested"),
+				"argument 1",
+			),
+		)
+
+		expect(error.message).toContain("'#Value(#Empty)' is not '#Empty'")
+		expect(
+			marshalError(() =>
+				(refused.exports.nested as (value: unknown) => unknown)(7n),
+			).message,
+		).toContain("an Optional inside an Optional")
+	})
+
+	// NOTE: `$` is an ordinary Essence identifier character, so a Choice CAN
+	// declare a payload member named after the tag. Coming out it was already
+	// refused; going in it used to read the tag string as the member's value —
+	// a corrupted value the boundary accepts and can then never describe.
+	it("refuses a Case whose payload is named after the tag", () => {
+		let error = marshalError(() =>
+			refusedMarshaller.fromJS(
+				{ $case: "One" },
+				refusedParameter("nameOf"),
+				"argument 1",
+			),
+		)
+
+		expect(error.message).toBe(
+			"argument 1: this Case can not be marshalled — its payload declares a member named '$case', which is the name the Case tag is carried under.",
+		)
+		expect(
+			marshalError(() =>
+				refusedMarshaller.toJS(
+					(
+						refused.raw.tagged as (
+							value: EssenceValue,
+						) => EssenceValue
+					)(refused.bridge.string("hi")),
+					"return value",
+				),
+			).message,
+		).toContain("declares a member named '$case'")
+	})
+
+	// NOTE: A Case of the same Choice that declares no such member is untouched
+	// — the refusal is about the Case, not about the Choice.
+	it("still takes a Case of that Choice that does not collide", () => {
+		expect(
+			(refused.exports.nameOf as (value: unknown) => unknown)({
+				$case: "Plain",
+			}),
+		).toBe("plain")
+	})
+
+	// NOTE: One export the Marshaller has no mapping for used to take the whole
+	// Module with it — `exports`, `raw`, `bridge` and `marshaller` all
+	// unreachable over a constant nobody asked for. Bound on read, the refusal
+	// lands on the export that caused it.
+	it("keeps the rest of the Module reachable past an export it can not marshal", () => {
+		expect(marshalError(() => refused.exports.root).message).toBe(
+			"root: Algebraic values can not be marshalled yet.",
+		)
+		expect(refused.exports.answer).toBe(42n)
+		expect((refused.exports.doubled as (value: bigint) => bigint)(4n)).toBe(
+			8n,
+		)
+		expect(typeof refused.raw.root).toBe("object")
+	})
+
+	// NOTE: What `exports` hands out is what `marshaller.toJS(raw.…)` hands out,
+	// which means a fresh value on every read. One shared Array is one a host can
+	// push onto, and every other holder of the same Module sees the push —
+	// while `Object.freeze(exports)` says, wrongly, that it cannot.
+	it("hands out a constant a reader can not corrupt for the next one", () => {
+		let names = module.exports.names as Array<string>
+
+		expect(names).toEqual(["a", "b"])
+
+		names.push("MUTATED")
+
+		expect(module.exports.names).toEqual(["a", "b"])
 	})
 })
