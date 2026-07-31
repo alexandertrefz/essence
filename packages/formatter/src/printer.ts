@@ -641,12 +641,6 @@ export class Printer {
 					this.printFunctionDefinition(node.value, node.position),
 				])
 
-			case "NativeFunctionStatement":
-				return concat([
-					text("function " + node.name.content),
-					this.printSignature(node.signature),
-				])
-
 			case "OverloadedFunctionStatement":
 				return concat([
 					text("overload function " + node.name.content + " "),

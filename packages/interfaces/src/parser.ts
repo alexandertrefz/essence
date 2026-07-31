@@ -325,7 +325,6 @@ export type StatementNode =
 	| IfStatementNode
 	| ReturnStatementNode
 	| FunctionStatementNode
-	| NativeFunctionStatementNode
 	| OverloadedFunctionStatementNode
 
 export interface ConstantDeclarationStatementNode {
@@ -584,19 +583,6 @@ export interface FunctionStatementNode {
 	name: IdentifierNode
 	value: FunctionDefinitionNode
 	position: Position
-}
-
-// NOTE: A body-less native free Function — the `declarations { … }` form of a
-// top-level `function`, bound to a runtime export by name. It reuses the same
-// `NativeMethodSignatureNode` a Namespace's native Methods carry, minus the
-// receiver a Namespace injects. Only the standard library produces one; a user
-// Program's `function` always carries a body.
-export interface NativeFunctionStatementNode {
-	nodeType: "NativeFunctionStatement"
-	name: IdentifierNode
-	signature: NativeMethodSignatureNode
-	position: Position
-	documentation: Documentation | null
 }
 
 // NOTE: An `overload function <name> { … }` block, mirroring an `overload`

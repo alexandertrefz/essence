@@ -1567,20 +1567,20 @@ describe("Standard Library Loader", () => {
 			return found
 		}
 
-		// NOTE: A body-less `function` is a single native flag and resolves to a
-		// `Function`. It carries no typed Node: a native has no body to emit.
-		it("collects a body-less free Function as one native flag", () => {
-			let stdlib = load([
-				"Identity.es",
-				`declarations {
-					§§ Answers with the value it was given.
-					function identity <Item>(_ value: Item) -> Item
-				}`,
-			])
-
-			expect(stdlib.functionBindings["identity"]).toEqual([true])
-			expect(stdlib.members["identity"]?.type).toBe("Function")
-			expect(stdlib.typedPrograms[0]!.implementation.nodes).toEqual([])
+		// NOTE: The standalone body-less `function` form left the language with
+		// `__print` — a native free Function exists only as an `overload
+		// function` entry now, so the loader refuses the signature form at
+		// parse.
+		it("refuses a body-less free Function", () => {
+			expect(() =>
+				load([
+					"Identity.es",
+					`declarations {
+						§§ Answers with the value it was given.
+						function identity <Item>(_ value: Item) -> Item
+					}`,
+				]),
+			).toThrow()
 		})
 
 		// NOTE: A bodied free Function is a single `false` — Essence-implemented,
