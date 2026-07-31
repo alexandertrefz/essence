@@ -11,10 +11,10 @@ implementation {
 			message = "{message}."
 		}
 
-		<- Terminal.inspect(message)
+		<- message
 	}
 
-	greet("")
-	greet("World")
-	greet("Universe")
+	Terminal.print(greet(""))
+	Terminal.print(greet("World"))
+	Terminal.print(greet("Universe"))
 }

@@ -8,24 +8,24 @@ implementation {
 	constant count = 3
 
 	§ Values of different Types, each rendered by its own `toString`.
-	Terminal.inspect("Hello, {name}! You have {count} left.")
-	Terminal.inspect("one plus two is {1::add(2)}") § the Integer renders itself
-	Terminal.inspect("the answer is {count::isBetween(1, and 5)}") § a Boolean
+	Terminal.print("Hello, {name}! You have {count} left.")
+	Terminal.print("one plus two is {1::add(2)}") § the Integer renders itself
+	Terminal.print("the answer is {count::isBetween(1, and 5)}") § a Boolean
 
 	§ A hole holds a whole Expression, not just a name.
-	Terminal.inspect("reversed: {name::reverse()}, upper: {name::uppercase()}")
+	Terminal.print("reversed: {name::reverse()}, upper: {name::uppercase()}")
 
 	§ Escapes: a quote, a backslash, and a literal brace inside a String.
-	Terminal.inspect("she said \"hi\" \\ wrote \{braces\}")
+	Terminal.print("she said \"hi\" \\ wrote \{braces\}")
 
 	§ A hole nested inside a hole's own String.
-	Terminal.inspect("greeting is {"Hello, {name}"}")
+	Terminal.print("greeting is {"Hello, {name}"}")
 
 	§ An empty hole renders the empty String, so this is just the two words.
-	Terminal.inspect("empty{""}between")
+	Terminal.print("empty{""}between")
 
 	§ Interpolation is an ordinary String Expression — it can be named, passed
 	§ and combined like any other.
 	constant sentence = "{name} has {count} apples"
-	Terminal.inspect(sentence::append(" today"))
+	Terminal.print(sentence::append(" today"))
 }
