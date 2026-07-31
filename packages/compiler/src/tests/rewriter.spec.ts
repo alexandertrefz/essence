@@ -27,7 +27,12 @@ import {
 	type OptimiserOptions,
 } from "../optimiser/index"
 import { parseWithDiagnostics } from "../parser/index"
-import { type ModuleInput, rewrite, rewriteModules } from "../rewriter/index"
+import {
+	emittedIdentity,
+	type ModuleInput,
+	rewrite,
+	rewriteModules,
+} from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
@@ -2005,6 +2010,70 @@ describe("Rewriter", () => {
 			expect(declarationsOf(generated, "$es_Boolean_toString")).toBe(1)
 			expect(generated).not.toContain("essence:")
 			expect(generated).toContain('$type.createCase("Colour#Red")')
+		})
+
+		// NOTE: The same spelling for somebody holding one identity and no graph
+		// — a host building a Case value has to stamp it with the tag the
+		// bundle's own values carry, and these two answers being one is what
+		// makes that possible at all.
+		describe("emittedIdentity", () => {
+			it("agrees with the tag the bundle writes", () => {
+				let bundle = rewriteModules(
+					[
+						moduleOf(
+							"/project/deep/Main.es",
+							`implementation {
+	choice Colour {
+		Red,
+	}
+
+	constant chosen: Colour = #Red
+
+	Terminal.inspect(chosen)
+}
+`,
+						),
+					],
+					"/project/deep/Main.es",
+				)
+
+				expect(bundle.sources.get("essence:./Main.es")!).toContain(
+					`"${emittedIdentity(
+						"/project/deep/Main.es",
+						"/project/deep/Main.es#Colour",
+					)}#Red"`,
+				)
+			})
+
+			it("spells a dependency's Choice relative to the entry", () => {
+				expect(
+					emittedIdentity(
+						"/project/Main.es",
+						"/project/shapes/Shapes.es#Shape",
+					),
+				).toBe("./shapes/Shapes.es#Shape")
+				expect(
+					emittedIdentity(
+						"/project/deep/Main.es",
+						"/project/Shared.es#Shape",
+					),
+				).toBe("../Shared.es#Shape")
+			})
+
+			// NOTE: A builtin Choice is identified by its bare name — there is no
+			// Module path in it to render, and a `#` that is not preceded by one
+			// is not a Module path either.
+			it("leaves an identity with no Module path alone", () => {
+				expect(emittedIdentity("/project/Main.es", "Optional")).toBe(
+					"Optional",
+				)
+				expect(emittedIdentity("/project/Main.es", "Ordering")).toBe(
+					"Ordering",
+				)
+				expect(emittedIdentity("/project/Main.es", "Colour#Red")).toBe(
+					"Colour#Red",
+				)
+			})
 		})
 	})
 })
