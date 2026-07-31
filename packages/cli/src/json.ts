@@ -1,7 +1,7 @@
+import { displayPath } from "@essence-lang/compiler/diagnostics/render"
 import type { common } from "@essence-lang/interfaces"
 
 import { type CompileOutcome, ownDiagnostics } from "./pipeline"
-import { displayPath } from "./report"
 
 // NOTE: The machine-readable form of a run. Positions are flattened to plain
 // line and column numbers — a consumer should not have to know the Compiler's

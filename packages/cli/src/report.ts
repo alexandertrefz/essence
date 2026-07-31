@@ -1,6 +1,7 @@
-import * as path from "node:path"
-
-import { renderDiagnostics } from "@essence-lang/compiler/diagnostics/render"
+import {
+	displayPath,
+	renderDiagnostics,
+} from "@essence-lang/compiler/diagnostics/render"
 import type { common } from "@essence-lang/interfaces"
 
 import { type CompileOutcome, ownDiagnostics, type StageName } from "./pipeline"
@@ -53,19 +54,6 @@ export function formatDuration(milliseconds: number): string {
 	}
 
 	return `${(milliseconds / 1000).toFixed(2)} s`
-}
-
-// NOTE: An output path given as an absolute path is usually still inside the
-// project, and the part that matters is the part below the working directory.
-// The longer of the two spellings is never the more useful one.
-export function displayPath(fileName: string): string {
-	let relative = path.relative(process.cwd(), fileName)
-
-	if (relative === "" || relative.startsWith("..")) {
-		return fileName
-	}
-
-	return relative.length < fileName.length ? relative : fileName
 }
 
 export function countDiagnostics(diagnostics: Array<common.Diagnostic>): {
