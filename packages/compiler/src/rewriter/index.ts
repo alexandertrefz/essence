@@ -688,6 +688,31 @@ function renderIdentity(text: string): string {
 	return text
 }
 
+// NOTE: The same answer for a caller that holds one identity and the entry it
+// belongs to, and no graph — a host building a Case value has to stamp it with
+// the tag the bundle's own values carry, and that tag is entry-relative. The
+// rule is stated once, above; this reaches it from outside.
+//
+// NOTE: Where a Module path ENDS is decided by the last `#` rather than by the
+// spellings map, because a Choice name can hold no `#` — the same split
+// `displayChoiceName` reads a Choice's name by. An identity with no `#` at all
+// is a builtin Choice's bare name (`Optional`, `Ordering`), which is emitted
+// verbatim, and a prefix that is not absolute is not a Module path, so neither
+// is rewritten.
+export function emittedIdentity(entryPath: string, identity: string): string {
+	let separator = identity.lastIndexOf("#")
+	let modulePath = identity.slice(0, separator)
+
+	if (separator === -1 || !path.isAbsolute(modulePath)) {
+		return identity
+	}
+
+	return `${moduleSpelling(
+		path.dirname(entryPath),
+		modulePath,
+	)}${identity.slice(separator)}`
+}
+
 function rewriteImplementationSection(
 	implementation: common.typedSimple.ImplementationSectionNode,
 ): Array<estree.ModuleDeclaration | estree.Statement> {
