@@ -11,6 +11,7 @@ import {
 } from "../diagnostics/index"
 import { enrichPrograms, topLevelScope } from "../enricher/index"
 import { invalidateNamespacesInScope } from "../enricher/resolvers"
+import { patternBindings } from "../helpers/index"
 import type { Module, ModuleGraph } from "./graph"
 
 // NOTE: What a top level declaration was written as, which is what decides the
@@ -86,34 +87,50 @@ function emptySurface(): ExportSurface {
 	}
 }
 
-function declarationOf(
+// NOTE: A list rather than one entry, because a Declaration whose name is a
+// Pattern declares as many names as the Pattern binds. This runs BEFORE the
+// Enricher, so the desugar that turns those into Constants everywhere else has
+// not happened yet and can not be waited for — which is exactly why the names
+// are read off the Pattern here instead.
+function declarationsOf(
 	node: parser.ImplementationNode,
-): { name: parser.IdentifierNode; kind: DeclaredKind } | null {
+): Array<{ name: parser.IdentifierNode; kind: DeclaredKind }> {
 	switch (node.nodeType) {
 		case "ConstantDeclarationStatement":
-			return { name: node.name, kind: "constant" }
+		case "VariableDeclarationStatement": {
+			let kind =
+				node.nodeType === "ConstantDeclarationStatement"
+					? ("constant" as const)
+					: ("variable" as const)
 
-		case "VariableDeclarationStatement":
-			return { name: node.name, kind: "variable" }
+			if (node.name.nodeType === "Pattern") {
+				return patternBindings(node.name).map((binding) => ({
+					name: binding.name,
+					kind,
+				}))
+			}
+
+			return [{ name: node.name, kind }]
+		}
 
 		case "FunctionStatement":
 		case "OverloadedFunctionStatement":
-			return { name: node.name, kind: "function" }
+			return [{ name: node.name, kind: "function" }]
 
 		case "NamespaceDefinitionStatement":
-			return { name: node.name, kind: "namespace" }
+			return [{ name: node.name, kind: "namespace" }]
 
 		case "TypeAliasStatement":
-			return { name: node.name, kind: "type" }
+			return [{ name: node.name, kind: "type" }]
 
 		case "ChoiceDeclarationStatement":
-			return { name: node.name, kind: "choice" }
+			return [{ name: node.name, kind: "choice" }]
 
 		case "ProtocolDeclarationStatement":
-			return { name: node.name, kind: "protocol" }
+			return [{ name: node.name, kind: "protocol" }]
 
 		default:
-			return null
+			return []
 	}
 }
 
@@ -129,19 +146,16 @@ function topLevelDeclarations(
 	let declarations = new Map<string, Declaration>()
 
 	for (let node of program.implementation.nodes) {
-		let declaration = declarationOf(node)
+		for (let declaration of declarationsOf(node)) {
+			if (declarations.has(declaration.name.content)) {
+				continue
+			}
 
-		if (
-			declaration === null ||
-			declarations.has(declaration.name.content)
-		) {
-			continue
+			declarations.set(declaration.name.content, {
+				kind: declaration.kind,
+				position: declaration.name.position,
+			})
 		}
-
-		declarations.set(declaration.name.content, {
-			kind: declaration.kind,
-			position: declaration.name.position,
-		})
 	}
 
 	return declarations
@@ -1132,7 +1146,7 @@ function reportUnusedImports(
 // the source states.
 function sideEffectIn(module: Module): parser.ImplementationNode | null {
 	for (let node of module.program.implementation.nodes) {
-		if (declarationOf(node) === null) {
+		if (declarationsOf(node).length === 0) {
 			return node
 		}
 	}

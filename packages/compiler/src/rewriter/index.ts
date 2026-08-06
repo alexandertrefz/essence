@@ -3356,6 +3356,16 @@ function memberKey(name: string): estree.Identifier | estree.Literal {
 
 // NOTE: One member read, `computed` iff the key had to become a Literal — the
 // dotted form for every ordinary name, the bracketed one for the rest.
+// NOTE: A spine before the spines it is a prefix of, so a requirement about
+// `payload` is tested before one about `payload.origin` — the second reads
+// through what the first established. Sorted by depth rather than by text,
+// because that is the property being relied on.
+function shallowestFirst(spines: Array<string>): Array<string> {
+	return [...spines].sort(
+		(left, right) => left.split(".").length - right.split(".").length,
+	)
+}
+
 function memberRead(
 	object: estree.Expression,
 	name: string,
@@ -3437,12 +3447,43 @@ function handlerTest(
 	// rely on `&&` short-circuiting — that check is what guarantees the
 	// value is a Record carrying every member named here, so reading them
 	// is only safe once it has passed.
-	if (handler.memberLiterals !== null) {
-		for (let [name, literal] of Object.entries(handler.memberLiterals)) {
+	//
+	// A key is the DOTTED SPINE that reaches the member, so a Pattern that
+	// constrains a nested member by value — `{ origin as { x = 0 } }` — reads
+	// its way down. A member name can hold no dot, so splitting on one can not
+	// mistake anything else for a spine.
+	// NOTE: What a Case Matcher's payload Pattern requires of a member, tested
+	// behind the Matcher's own check and BEFORE any member comparison. The
+	// order is load-bearing rather than tidy: a value comparison may read down
+	// a spine — `@.payload.origin.x` — and only these requirements establish
+	// that the spine exists. Shallowest first, for the same reason.
+	//
+	// `memberTests` is what `compile-type-tests` leaves where it has DECIDED a
+	// requirement — a tag comparison where the tag decides it, and otherwise the
+	// same check over a descriptor `pool-constants` can hoist out of the test.
+	// Without that pass the requirement is emitted from its Type instead, which
+	// is the same question asked the general way, so a build with the Optimiser
+	// off answers what an optimised one answers.
+	if (handler.memberTests !== null) {
+		for (let path of shallowestFirst(Object.keys(handler.memberTests))) {
+			test = and(test, rewriteExpression(handler.memberTests[path]!))
+		}
+	} else if (handler.memberTypes !== null) {
+		for (let path of shallowestFirst(Object.keys(handler.memberTypes))) {
+			let read = path.split(".").reduce(memberRead, value)
+
 			test = and(
 				test,
-				callAnyIs(memberRead(value, name), rewriteExpression(literal)),
+				callIsValueOfType(read, handler.memberTypes[path]!),
 			)
+		}
+	}
+
+	if (handler.memberLiterals !== null) {
+		for (let [path, literal] of Object.entries(handler.memberLiterals)) {
+			let read = path.split(".").reduce(memberRead, value)
+
+			test = and(test, callAnyIs(read, rewriteExpression(literal)))
 		}
 	}
 

@@ -2956,6 +2956,8 @@ describe("Helpers", () => {
 										typeTest: null,
 										literal: null,
 										memberLiterals: null,
+										memberTypes: null,
+										memberTests: null,
 										guard: null,
 										body: [],
 									},

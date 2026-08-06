@@ -324,7 +324,9 @@ describe("Choices", () => {
 				(handler) => handler.matcher as parser.CaseMatcherNode,
 			)
 
-			expect(bare!.binding?.content).toBe("pair")
+			expect((bare!.binding as parser.IdentifierNode).content).toBe(
+				"pair",
+			)
 			// NOTE: The Matcher's Position has to reach the closing paren, or
 			// an editor greys out a dead Handler short of its own binding.
 			expect(bare!.position.end.column).toBeGreaterThan(
@@ -334,7 +336,9 @@ describe("Choices", () => {
 			expect(unit!.binding).toBeNull()
 
 			expect(prefixed!.choice?.content).toBe("Wrapper")
-			expect(prefixed!.binding?.content).toBe("item")
+			expect((prefixed!.binding as parser.IdentifierNode).content).toBe(
+				"item",
+			)
 		})
 
 		it("keeps 'choice' usable as an Identifier", () => {
@@ -3798,7 +3802,10 @@ describe("Choices", () => {
 			)
 		})
 
-		it("refuses a binding on a Case that carries several, naming them", () => {
+		// NOTE: A NAME is what a multi-member Case has nothing single to bind;
+		// a Pattern is the form that takes such a payload apart, and the help
+		// names it rather than sending the reader back to `@.member`.
+		it("refuses a NAME on a Case that carries several, naming them", () => {
 			let source = `implementation {
 				${shape}
 
@@ -3818,7 +3825,7 @@ describe("Choices", () => {
 				"Its values are 'width', 'height'.",
 			)
 			expect(helpsOf(source)).toContain(
-				"Read them off the Matcher instead: '@.width'.",
+				"Take the payload apart instead: '#Rect({ width, height })'.",
 			)
 		})
 

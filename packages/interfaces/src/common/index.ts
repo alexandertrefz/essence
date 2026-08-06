@@ -206,6 +206,10 @@ export type DiagnosticCode =
 	| "recursive-generic-choice"
 	| "indistinguishable-union-arms"
 	| "undecided-type-arguments"
+	// Patterns — naming the parts of a value.
+	| "refutable-pattern"
+	| "redundant-pattern-binder"
+	| "pattern-without-body"
 	// Match Expressions.
 	| "missing-case"
 	| "unreachable-case"

@@ -7,6 +7,7 @@ import {
 	isStdlibDocument,
 	parseDocument,
 } from "@essence-lang/compiler/documents"
+import { patternBindings } from "@essence-lang/compiler/helpers"
 import {
 	linkModuleGraph,
 	loadModuleGraph,
@@ -27,6 +28,7 @@ import {
 	occurrenceAt,
 	type OccurrenceAccess,
 	type ProgramIndex,
+	type RenameEdit,
 } from "./rename"
 
 // NOTE: One file is one Module and a Module is named by its canonical path, so
@@ -62,6 +64,12 @@ export type WorkspaceOccurrence = {
 	filePath: string
 	position: common.Position
 	access: OccurrenceAccess
+	// NOTE: How renaming THROUGH this occurrence is written — see
+	// `RenameSite.edits`. Absent everywhere but a Pattern's shorthand binder,
+	// which is the one site whose name can not simply be overwritten; an entry
+	// of an `import`/`export` block never has any, because a Module's own
+	// grammar already writes the two names apart.
+	edits?: Array<RenameEdit> | null
 }
 
 // NOTE: One symbol as the workspace sees it: the declaration, wherever it is
@@ -778,9 +786,10 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 			kind: occurrence.declaration.kind,
 			filePath,
 			definition: occurrence.declaration.definition,
-			occurrences: occurrence.declaration.occurrences.map((position) => ({
+			occurrences: occurrence.declaration.occurrences.map((site) => ({
 				filePath,
-				position,
+				position: site.position,
+				edits: site.edits,
 				access: "read" as const,
 			})),
 		}
@@ -941,6 +950,7 @@ function joinComponent(
 			addOccurrence(key, {
 				filePath,
 				position: occurrence.position,
+				edits: occurrence.edits,
 				access: occurrence.access,
 			})
 		}
@@ -1301,12 +1311,25 @@ function topLevelDeclarations(
 
 	for (let node of program.implementation.nodes) {
 		switch (node.nodeType) {
+			// NOTE: A Pattern declares one name per binding, and every one of
+			// them is a name this Module could export.
 			case "ConstantDeclarationStatement":
-				remember(node.name, "constant")
+			case "VariableDeclarationStatement": {
+				let kind =
+					node.nodeType === "ConstantDeclarationStatement"
+						? ("constant" as const)
+						: ("variable" as const)
+
+				if (node.name.nodeType === "Pattern") {
+					for (let binding of patternBindings(node.name)) {
+						remember(binding.name, kind)
+					}
+				} else {
+					remember(node.name, kind)
+				}
+
 				break
-			case "VariableDeclarationStatement":
-				remember(node.name, "variable")
-				break
+			}
 			case "FunctionStatement":
 			case "OverloadedFunctionStatement":
 				remember(node.name, "function")

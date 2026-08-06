@@ -4,6 +4,10 @@ import {
 	builtinProtocols as builtinProtocolTable,
 	builtinTypes as builtinTypeTable,
 } from "@essence-lang/compiler/enricher/builtins"
+import {
+	parameterInternalName,
+	patternBindings,
+} from "@essence-lang/compiler/helpers"
 import type { common, parser } from "@essence-lang/interfaces"
 
 import { typedHandlerExpressions } from "./matchHandlerChildren"
@@ -48,6 +52,54 @@ export type DeclarationKind =
 	// file's index sees the entry for what it is here: a name from elsewhere.
 	| "import"
 
+// NOTE: The text ONE edit of a rename writes, in parts: a String stands as it
+// is written, and `null` is where the new name goes. Renaming an ordinary
+// occurrence writes `[null]` over the Identifier it was found at, which is why
+// nothing but a Pattern's shorthand binder carries any of this.
+export type RenameText = Array<string | null>
+
+export type RenameEdit = {
+	// NOTE: The span the edit replaces. An EMPTY span INSERTS, which is what
+	// expanding a shorthand binder does — the name it writes was not there to
+	// begin with.
+	position: common.Position
+	text: RenameText
+}
+
+// NOTE: Where one occurrence is written, and what renaming THROUGH it writes.
+//
+// `edits` is what a bare Pattern binder needs and nothing else does: `{ width }`
+// names two things with one Identifier — the Record's member and the local it
+// binds — so renaming either end has to spell the other one out beside it.
+// Renaming the local gives `{ width as w }`, renaming the member `{ w as width }`,
+// and an annotated member takes its binder after the Type (`{ width: Integer as
+// w }`), which is why an edit carries a Position of its own instead of reusing
+// this one. Null — every other site in the index — means the new name over
+// `position`.
+//
+// `position` is deliberately NOT widened to cover the expansion: it is the
+// cursor hit test, the Document Highlight span and the Semantic Token span as
+// well, and all three mean the Identifier itself.
+export type RenameSite = {
+	position: common.Position
+	edits: Array<RenameEdit> | null
+}
+
+// NOTE: What a rename writes for one site, with the new name filled in.
+// Everything that applies a rename asks here — the Server, the workspace join
+// and the tests — so that an expansion can not be forgotten at one of them.
+export function renameEdits(
+	site: { position: common.Position; edits: Array<RenameEdit> | null },
+	newName: string,
+): Array<{ position: common.Position; newText: string }> {
+	let edits = site.edits ?? [{ position: site.position, text: [null] }]
+
+	return edits.map((edit) => ({
+		position: edit.position,
+		newText: edit.text.map((part) => part ?? newName).join(""),
+	}))
+}
+
 export type Declaration = {
 	builtin: boolean
 	kind: DeclarationKind
@@ -58,7 +110,7 @@ export type Declaration = {
 	// declaration site. Constants and Variables are deliberately not hoisted,
 	// so they only become visible after their declaring Statement.
 	visibleFrom: common.Cursor | null
-	occurrences: Array<common.Position>
+	occurrences: Array<RenameSite>
 }
 
 export type Scope = {
@@ -82,6 +134,9 @@ export type Occurrence = {
 	name: string
 	position: common.Position
 	access: OccurrenceAccess
+	// NOTE: The same field `RenameSite` carries, for the same reason — an
+	// Occurrence is one site with its Declaration attached.
+	edits: Array<RenameEdit> | null
 	declaration: Declaration
 }
 
@@ -89,7 +144,18 @@ export type RenameIndex = Array<Occurrence>
 
 type RecordMemberSite = {
 	names: Array<string>
-	members: Array<{ name: string; position: common.Position }>
+	// NOTE: Whether the members are WRITTEN here. A Record literal and a Record
+	// Type declaration write them, so one of those is where the member is
+	// defined; a Pattern only NAMES members that are declared by the Type of
+	// whatever it takes apart, so it must not claim to define them — the local
+	// it binds is written at that very Position, and two Declarations sharing a
+	// definition Position are one symbol to the workspace join.
+	declares: boolean
+	members: Array<{
+		name: string
+		position: common.Position
+		edits: Array<RenameEdit> | null
+	}>
 }
 
 type RecordMemberLookup = {
@@ -175,6 +241,13 @@ const reservedWords = new Set([
 	"choice",
 	"true",
 	"false",
+	// NOTE: Structurally significant inside a Pattern, where it separates a
+	// member from the name it binds under — renaming a binder to `as` writes
+	// `{ width as as }`, or `{ as }` where the shorthand is expanded, and
+	// neither says what it reads as. It only ever restricts rename TARGETS, so
+	// the `import`/`export` grammar, which spells its own `as`, is untouched:
+	// a member may still BE called `as` and be bound under that name.
+	"as",
 ])
 
 // NOTE: Anything the Lexer would not produce as a single Identifier Token —
@@ -456,8 +529,18 @@ function topLevelNames(program: parser.Program): Set<string> {
 
 	for (let node of program.implementation.nodes) {
 		switch (node.nodeType) {
+			// NOTE: A Pattern declares as many names as it binds, and every one
+			// of them is a name an import could collide with.
 			case "ConstantDeclarationStatement":
 			case "VariableDeclarationStatement":
+				if (node.name.nodeType === "Pattern") {
+					for (let binding of patternBindings(node.name)) {
+						names.add(binding.name.content)
+					}
+				} else {
+					names.add(node.name.content)
+				}
+				break
 			case "FunctionStatement":
 			case "OverloadedFunctionStatement":
 			case "NamespaceDefinitionStatement":
@@ -548,13 +631,41 @@ function record(
 	position: common.Position,
 	index: RenameIndex,
 	access: OccurrenceAccess = "read",
+	// NOTE: See `RenameSite.edits` — null is "write the new name here", which
+	// is what every site but a Pattern's shorthand binder means.
+	edits: Array<RenameEdit> | null = null,
 ) {
-	declaration.occurrences.push(position)
+	// NOTE: One Position is one occurrence OF ONE DECLARATION. A Pattern's
+	// shorthand binder is reached twice for the member it names — once from the
+	// Pattern itself, and once through the Lookup the Enricher desugared it
+	// into, whose member Identifier carries that very span — and two entries
+	// would write their edits twice, the second over text the first had already
+	// rewritten. The entry that knows how to rewrite itself wins.
+	//
+	// Two DECLARATIONS at one Position stay two, which is the whole point of
+	// the shorthand: the member and the local it binds are different symbols
+	// written with one Identifier.
+	let existing = declaration.occurrences.find(
+		(site) =>
+			site.position.start.line === position.start.line &&
+			site.position.start.column === position.start.column &&
+			site.position.end.line === position.end.line &&
+			site.position.end.column === position.end.column,
+	)
+
+	if (existing !== undefined) {
+		existing.edits ??= edits
+
+		return
+	}
+
+	declaration.occurrences.push({ position, edits })
 
 	index.push({
 		name,
 		position,
 		access,
+		edits,
 		declaration,
 	})
 }
@@ -569,6 +680,10 @@ function declareInScope(
 	// Only set when the Declaration is created: a re-declaration is an error
 	// the Enricher reports, and the first one is what use sites bound to.
 	visibleFrom: common.Cursor | null = null,
+	// NOTE: How the declaring occurrence is REWRITTEN — see `RenameSite.edits`.
+	// A Pattern's shorthand binder is the one declaration whose name can not
+	// simply be overwritten.
+	edits: Array<RenameEdit> | null = null,
 ): Declaration {
 	// NOTE: Re-declarations share the first Declaration — the Enricher
 	// reports the duplicate; grouping the occurrences is harmless here.
@@ -593,6 +708,7 @@ function declareInScope(
 		identifier.position,
 		context.index,
 		"write",
+		edits,
 	)
 
 	return declaration
@@ -739,13 +855,34 @@ function walkNode(
 
 			walkNode(node.value, scope, context)
 
+			let kind =
+				node.nodeType === "ConstantDeclarationStatement"
+					? ("constant" as const)
+					: ("variable" as const)
+
+			// NOTE: A Pattern declares every name it binds, and none of them is
+			// the Declaration's — so there is no one Declaration for a Function
+			// value to be linked to either.
+			if (node.name.nodeType === "Pattern") {
+				declarePattern(
+					node.name,
+					scope,
+					context,
+					kind,
+					// NOTE: Visible only after the whole Statement — the value
+					// is resolved in the Scope as it was before the
+					// declaration, so no name it binds can refer to itself.
+					node.position.end,
+				)
+
+				return
+			}
+
 			let declaration = declareInScope(
 				scope,
 				"values",
 				node.name,
-				node.nodeType === "ConstantDeclarationStatement"
-					? "constant"
-					: "variable",
+				kind,
 				context,
 				// NOTE: Visible only after the whole Statement — the value is
 				// resolved in the Scope as it was before the declaration, so
@@ -926,14 +1063,12 @@ function walkNode(
 			for (let handler of node.handlers) {
 				// NOTE: Neither a wildcard nor a literal Matcher names a Type,
 				// so neither holds a reference that a rename could have to
-				// touch. A Record Matcher names one per Type-constrained
-				// member, so those are walked individually.
-				if (handler.matcher.nodeType === "RecordMatcher") {
-					for (let member of Object.values(handler.matcher.members)) {
-						if (member.kind === "Type") {
-							walkTypeDeclaration(member.type, scope, context)
-						}
-					}
+				// touch. A Pattern is walked below instead, inside the Scope it
+				// binds into — its members are names as well as Types.
+				if (handler.matcher.nodeType === "Pattern") {
+					// NOTE: Nothing here: the Pattern's Types and its bindings
+					// both belong to the Handler's own Scope, which does not
+					// exist yet.
 				} else if (handler.matcher.nodeType === "CaseMatcher") {
 					// NOTE: The Case's name resolves through the matched
 					// value's Type — only a prefixed Choice name is an
@@ -969,18 +1104,35 @@ function walkNode(
 				)
 
 				// NOTE: Declared BEFORE the Guard and the body are walked, so
-				// a use in either binds to it.
-				if (
+				// a use in either binds to it — which is the whole reason the
+				// Handler's Scope starts at its Matcher.
+				if (handler.matcher.nodeType === "Pattern") {
+					declarePattern(
+						handler.matcher,
+						handlerScope,
+						context,
+						"constant",
+					)
+				} else if (
 					handler.matcher.nodeType === "CaseMatcher" &&
 					handler.matcher.binding !== null
 				) {
-					declareInScope(
-						handlerScope,
-						"values",
-						handler.matcher.binding,
-						"constant",
-						context,
-					)
+					if (handler.matcher.binding.nodeType === "Pattern") {
+						declarePattern(
+							handler.matcher.binding,
+							handlerScope,
+							context,
+							"constant",
+						)
+					} else {
+						declareInScope(
+							handlerScope,
+							"values",
+							handler.matcher.binding,
+							"constant",
+							context,
+						)
+					}
 				}
 
 				if (handler.guard !== null) {
@@ -1113,6 +1265,40 @@ function walkFunctionDefinition(
 		// NOTE: `_: Type` declares neither a Parameter name nor a call site
 		// label, so it holds no symbol a rename could reach.
 		if (parameter.internalName === null) {
+			continue
+		}
+
+		// NOTE: A Pattern where the internal name goes brings in as many names
+		// as it binds and none of them is the Parameter's own, so there is no
+		// symbol for a label to share. An explicit label is still its own, and
+		// is recorded below exactly as it would be beside a written name.
+		if (parameter.internalName.nodeType === "Pattern") {
+			declarePattern(
+				parameter.internalName,
+				functionScope,
+				context,
+				"parameter",
+			)
+
+			if (parameter.externalName !== null) {
+				let labelDeclaration: Declaration = {
+					builtin: false,
+					kind: "label",
+					definition: parameter.externalName.position,
+					visibleFrom: null,
+					occurrences: [],
+				}
+
+				record(
+					labelDeclaration,
+					parameter.externalName.content,
+					parameter.externalName.position,
+					context.index,
+					"write",
+				)
+				labels.set(parameter.externalName.content, labelDeclaration)
+			}
+
 			continue
 		}
 
@@ -1384,9 +1570,10 @@ function walkNamespaceDefinition(
 				// name doubles as the call site label, so the pair is deduped
 				// by identity rather than by name.
 				let identifiers = new Set(
-					[parameter.externalName, parameter.internalName].filter(
-						(identifier) => identifier !== null,
-					),
+					[
+						parameter.externalName,
+						parameterInternalName(parameter),
+					].filter((identifier) => identifier !== null),
 				)
 
 				for (let identifier of identifiers) {
@@ -1504,11 +1691,202 @@ function registerRecordSite(
 
 	context.recordSites.push({
 		names: members.map((member) => member.name.content),
+		declares: true,
 		members: members.map((member) => ({
 			name: member.name.content,
 			position: member.name.position,
+			edits: null,
 		})),
 	})
+}
+
+// NOTE: A Pattern NAMES members that something else declares — the Type of
+// whatever it takes apart — so it joins the member group without claiming to
+// define anything. That distinction is load-bearing rather than tidy: a bare
+// `{ width }` writes the member and the local it binds at ONE Position, and the
+// workspace keys a Declaration by its definition Position, so a Pattern
+// claiming to define the member would collapse the two into one symbol and
+// rename both at once, across every file.
+//
+// Each member also carries how renaming THROUGH it is written: a shorthand
+// binder has to spell the other end out beside the new name, because one
+// Identifier is standing for both.
+function registerPatternSite(
+	pattern: parser.PatternNode,
+	context: WalkContext,
+) {
+	let members = Object.values(pattern.members)
+
+	if (members.length > 0) {
+		context.recordSites.push({
+			names: members.map((member) => member.name.content),
+			declares: false,
+			members: members.map((member) => ({
+				name: member.name.content,
+				position: member.name.position,
+				edits: memberRenameEdits(member),
+			})),
+		})
+	}
+
+	for (let member of members) {
+		if (member.kind === "Type" && member.binder?.nodeType === "Pattern") {
+			registerPatternSite(member.binder, context)
+		}
+	}
+}
+
+// NOTE: What renaming the MEMBER writes at a Pattern member. Only a shorthand
+// binder needs anything: `{ width }` becomes `{ newName as width }`, so that
+// the body reading `width` still reads the member it was bound from. Every
+// other spelling already writes the two names apart, and the member's own span
+// is simply overwritten.
+function memberRenameEdits(
+	member: parser.PatternMemberNode,
+): Array<RenameEdit> | null {
+	if (member.kind !== "Type" || member.binder !== null) {
+		return null
+	}
+
+	// NOTE: The binder goes AFTER the Type, because the grammar is
+	// `Identifier ":" Type "as" Binder`. Writing it straight after the name
+	// instead produced `{ breadth as width: Integer }`, which is not a Pattern
+	// at all — a plain rename turned a clean file into a syntax error.
+	if (member.type !== null) {
+		return [
+			{ position: member.name.position, text: [null] },
+			{
+				position: {
+					start: member.type.position.end,
+					end: member.type.position.end,
+				},
+				text: [` as ${member.name.content}`],
+			},
+		]
+	}
+
+	return [
+		{
+			position: member.name.position,
+			text: [null, ` as ${member.name.content}`],
+		},
+	]
+}
+
+// NOTE: What renaming the LOCAL writes at a Pattern member — the mirror of
+// `memberRenameEdits`. `{ width }` becomes `{ width as newName }`; an annotated
+// `{ width: Integer }` takes its binder AFTER the Type, so the edit inserts at
+// an empty span there rather than overwriting the member's name. A member that
+// already writes its binder needs nothing: that binder IS the local.
+function binderRenameEdits(
+	member: Extract<parser.PatternMemberNode, { kind: "Type" }>,
+): Array<RenameEdit> | null {
+	if (member.binder !== null) {
+		return null
+	}
+
+	if (member.type !== null) {
+		return [
+			{
+				position: {
+					start: member.type.position.end,
+					end: member.type.position.end,
+				},
+				text: [" as ", null],
+			},
+		]
+	}
+
+	return [
+		{
+			position: member.name.position,
+			text: [`${member.name.content} as `, null],
+		},
+	]
+}
+
+// NOTE: Every name a Pattern brings into scope, declared where the author wrote
+// it, plus the Type references its annotated members make. `patternBindings`
+// decides WHICH names, so the Enricher and this index can never disagree about
+// what a Pattern binds.
+function declarePattern(
+	pattern: parser.PatternNode,
+	scope: Scope,
+	context: WalkContext,
+	kind: DeclarationKind,
+	// NOTE: Where the names start being resolvable, exactly as an ordinary
+	// Declaration passes it — a Pattern's bindings are Constants and Variables
+	// and do not hoist, so a Declaration hands the end of its own Statement and
+	// Completion stops offering them above it. A Matcher's and a Parameter's are
+	// visible throughout the Scope they were made for, which is what null means.
+	visibleFrom: common.Cursor | null = null,
+) {
+	registerPatternSite(pattern, context)
+	walkPatternTypes(pattern, scope, context)
+
+	for (let binding of patternBindings(pattern)) {
+		declareInScope(
+			scope,
+			"values",
+			binding.name,
+			kind,
+			context,
+			visibleFrom,
+			editsForBinding(pattern, binding.name),
+		)
+	}
+}
+
+// NOTE: Every Type a Pattern names, at every depth. Written as its own walk
+// because a nested Pattern's annotation is a Type reference like any other: one
+// left out of the index is one a rename leaves behind, turning a clean file into
+// `unknown-type` — and it would get no definition and no Semantic Token either.
+function walkPatternTypes(
+	pattern: parser.PatternNode,
+	scope: Scope,
+	context: WalkContext,
+) {
+	for (let member of Object.values(pattern.members)) {
+		if (member.kind !== "Type") {
+			continue
+		}
+
+		if (member.type !== null) {
+			walkTypeDeclaration(member.type, scope, context)
+		}
+
+		if (member.binder?.nodeType === "Pattern") {
+			walkPatternTypes(member.binder, scope, context)
+		}
+	}
+}
+
+// NOTE: The rewrite a binding's own declaration site needs, found by the
+// Identifier the binding was read under — a shorthand member is the only one
+// that needs any, and it is the only one whose `name` node IS the member's.
+function editsForBinding(
+	pattern: parser.PatternNode,
+	name: parser.IdentifierNode,
+): Array<RenameEdit> | null {
+	for (let member of Object.values(pattern.members)) {
+		if (member.kind !== "Type") {
+			continue
+		}
+
+		if (member.name === name && member.binder === null) {
+			return binderRenameEdits(member)
+		}
+
+		if (member.binder?.nodeType === "Pattern") {
+			let nested = editsForBinding(member.binder, name)
+
+			if (nested !== null) {
+				return nested
+			}
+		}
+	}
+
+	return null
 }
 
 // NOTE: Record Types are structural — there is no single declaration a
@@ -1580,19 +1958,24 @@ function resolveRecordMembers(context: WalkContext) {
 	}
 
 	// NOTE: Declaration sites first, so `definition` points at one of them
-	// instead of at a Lookup.
+	// instead of at a Lookup. A Pattern's site is not one of them — it names
+	// members something else declares, and taking a definition Position from it
+	// would be taking the one its own local binding already occupies.
 	context.recordSites.forEach((site, siteIndex) => {
 		for (let member of site.members) {
 			let declaration = declarationFor(siteIndex, member.name)
 
-			declaration.definition ??= member.position
+			if (site.declares) {
+				declaration.definition ??= member.position
+			}
 
 			record(
 				declaration,
 				member.name,
 				member.position,
 				context.index,
-				"write",
+				site.declares ? "write" : "read",
+				member.edits,
 			)
 		}
 	})

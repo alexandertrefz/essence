@@ -27,6 +27,7 @@ import {
 	matchesType,
 	matchesTypeWithBindings,
 	type NamespaceTarget,
+	parameterInternalName,
 	refinementWithTypeArguments,
 	typeContainsError,
 	typeMentionsGeneric,
@@ -4147,7 +4148,10 @@ export function reportUnknownDocumentationParameters(
 			// NOTE: A `_` label leaves the external name null, so only the
 			// internal one can be written about. Both are collected in the
 			// order `parameterDocumentation` looks them up.
-			for (let name of [parameter.externalName, parameter.internalName]) {
+			for (let name of [
+				parameter.externalName,
+				parameterInternalName(parameter),
+			]) {
 				if (name !== null && !names.includes(name.content)) {
 					names.push(name.content)
 				}
@@ -4207,7 +4211,10 @@ export function parameterDocumentation(
 		return parameter.documentation.description
 	}
 
-	for (let name of [parameter.externalName, parameter.internalName]) {
+	for (let name of [
+		parameter.externalName,
+		parameterInternalName(parameter),
+	]) {
 		let tagged = documentation?.parameters[name?.content ?? ""]
 
 		// NOTE: An own property, because a Parameter may be named after a
