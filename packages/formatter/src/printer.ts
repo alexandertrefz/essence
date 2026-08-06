@@ -663,6 +663,7 @@ export class Printer {
 		padding: Doc,
 	): { doc: Doc; headWidth: number | null; flat: boolean } {
 		let head: Array<Doc> = []
+		let takesApart = false
 
 		if (node.nodeType === "VariableAssignmentStatement") {
 			head.push(text(node.name.content))
@@ -672,14 +673,27 @@ export class Printer {
 					? "constant"
 					: "variable"
 
-			head.push(text(keyword + " " + node.name.content))
+			takesApart = node.name.nodeType === "Pattern"
+
+			head.push(
+				text(keyword + " "),
+				node.name.nodeType === "Pattern"
+					? this.printPattern(node.name, true)
+					: text(node.name.content),
+			)
 
 			if (node.type !== null) {
 				head.push(text(": "), this.printType(node.type))
 			}
 		}
 
-		let written = renderFlat(concat(head))
+		// NOTE: A head that takes the value apart reports no width, which ends
+		// its alignment run the way a value that cannot be written flat already
+		// does. A Pattern is the one head that lays ITSELF out: padded to a
+		// column it shares with a sibling of a similar width, both could then
+		// break, and the padding each was given would be left stranded after
+		// its own closing brace.
+		let written = takesApart ? null : renderFlat(concat(head))
 		let value = this.printExpression(node.value)
 
 		// NOTE: The `=` never breaks away from what it assigns. A value starts on
@@ -1219,6 +1233,43 @@ export class Printer {
 
 	private printParameter(parameter: parser.ParameterNode): Doc {
 		let { externalName, internalName, type } = parameter
+
+		// NOTE: A Pattern stands where the internal name goes — `of { width,
+		// height }: Rectangle`. It is printed rather than sliced back out of
+		// the source the way the unannotated Parameter below is: a Pattern lays
+		// itself out, so slicing one would freeze the spacing it was typed with
+		// and put the line breaks of a Pattern written across several lines
+		// inside a `text` Doc, which is measured as though they were not there.
+		//
+		// `_ { … }` and a bare `{ … }` are one node — both are labelless, and
+		// the label is the only thing an external name records — but the `_` is
+		// a Token, and the one Token formatting may ever add is a comma. So
+		// whether one was written is asked of the source rather than of the
+		// node, which has nowhere to keep it.
+		if (internalName?.nodeType === "Pattern") {
+			let parts: Array<Doc> = []
+
+			if (externalName !== null) {
+				parts.push(text(externalName.content + " "))
+			} else if (
+				this.source
+					.slice({
+						start: parameter.position.start,
+						end: internalName.position.start,
+					})
+					.trim() !== ""
+			) {
+				parts.push(text("_ "))
+			}
+
+			parts.push(this.printPattern(internalName, true))
+
+			if (type !== null) {
+				parts.push(text(": "), this.printType(type))
+			}
+
+			return concat(parts)
+		}
 
 		// NOTE: An unannotated Parameter of a contextually typed literal —
 		// `(item) { … }` — takes both its Type and its label from the expected
@@ -1786,66 +1837,131 @@ export class Printer {
 			case "LiteralMatcher":
 				return this.printValue(node.value)
 
-			case "CaseMatcher":
+			case "CaseMatcher": {
 				// NOTE: The payload binder rides on the Matcher's own line
 				// whatever the arm does — `case #Value(item)` is one token to a
 				// reader, and the `match` case-brace alignment measures it as
-				// part of the Matcher's width.
-				return text(
+				// part of the Matcher's width. A Pattern taking the payload
+				// apart is held to that line for the same reason.
+				let head = text(
 					(node.choice === null ? "" : node.choice.content) +
 						"#" +
-						node.caseName.content +
-						(node.binding === null
-							? ""
-							: `(${node.binding.content})`),
+						node.caseName.content,
 				)
 
-			case "RecordMatcher": {
-				let members = Object.values(node.members)
-
-				if (members.length === 0) {
-					return text("{}")
+				if (node.binding === null) {
+					return head
 				}
 
-				return group(
-					concat([
-						text("{"),
-						indent(
-							concat([
-								line,
-								join(
-									concat([text(","), line]),
-									members.map((member) =>
-										member.kind === "Type"
-											? concat([
-													text(
-														member.name.content +
-															": ",
-													),
-													this.printType(member.type),
-												])
-											: concat([
-													text(
-														member.name.content +
-															" = ",
-													),
-													this.printValue(
-														member.value,
-													),
-												]),
-									),
-								),
-							]),
-						),
-						line,
-						text("}"),
-					]),
-				)
+				return concat([
+					head,
+					text("("),
+					node.binding.nodeType === "Pattern"
+						? this.printPattern(node.binding, false)
+						: text(node.binding.content),
+					text(")"),
+				])
 			}
+
+			case "Pattern":
+				return this.printPattern(node, false)
 
 			default:
 				return this.printType(node)
 		}
+	}
+
+	// #endregion
+
+	// #region Patterns
+
+	// NOTE: One Pattern, shared by the four positions that take a value apart:
+	// a Matcher, a Case payload, a Parameter and a Declaration.
+	//
+	// What was written is what comes back. The safety gate compares TOKENS, so
+	// canonicalising a spelling here — writing out the elided Type of `{ x }`,
+	// dropping the `as x` of a member bound under its own name, rewriting
+	// `#Done({ value = x })` as `#Done(x)` — is not a diff a reader would
+	// argue with. It is a blanket refusal to format the file at all.
+	//
+	// `breakable` is false in Matcher position, and only there. `printMatch`
+	// measures a Matcher's width from its FLAT rendering and admits the
+	// Handler to a brace-alignment run without asking whether the Matcher
+	// itself can break — so a Pattern that broke there would drop the run's
+	// padding after its own closing brace and drag its short siblings apart
+	// with it. That is the stance a Case value and a Type application already
+	// take, reached here by flattening: a Pattern holds no hard break, so the
+	// one-line rendering always exists.
+	private printPattern(node: parser.PatternNode, breakable: boolean): Doc {
+		let members = Object.values(node.members)
+
+		// NOTE: `} as name`, outside the group, so that the name never breaks
+		// away from the brace whose value it names.
+		let binder =
+			node.binder === null ? EMPTY : text(" as " + node.binder.content)
+
+		if (members.length === 0) {
+			return concat([text("{}"), binder])
+		}
+
+		let doc = group(
+			concat([
+				text("{"),
+				indent(
+					concat([
+						line,
+						join(
+							concat([text(","), line]),
+							members.map((member) =>
+								this.printPatternMember(member, breakable),
+							),
+						),
+						ifBreak(text(","), EMPTY),
+					]),
+				),
+				line,
+				text("}"),
+				binder,
+			]),
+		)
+
+		return breakable ? doc : flattened(doc)
+	}
+
+	// NOTE: `name` binds under its own name; `name: Type` binds and constrains
+	// the Type as well; `name = literal` constrains the value and binds
+	// nothing; and `as` binds under another name or takes the member apart
+	// further, which is the whole of nesting. Each is printed from what the
+	// node records and from nothing else — an elided Type has no spelling to
+	// write out, and a member that binds under its own name has no `as` to
+	// grow.
+	private printPatternMember(
+		member: parser.PatternMemberNode,
+		breakable: boolean,
+	): Doc {
+		if (member.kind === "Value") {
+			return concat([
+				text(member.name.content + " = "),
+				this.printValue(member.value),
+			])
+		}
+
+		let parts: Array<Doc> = [text(member.name.content)]
+
+		if (member.type !== null) {
+			parts.push(text(": "), this.printType(member.type))
+		}
+
+		if (member.binder !== null) {
+			parts.push(
+				text(" as "),
+				member.binder.nodeType === "Pattern"
+					? this.printPattern(member.binder, breakable)
+					: text(member.binder.content),
+			)
+		}
+
+		return concat(parts)
 	}
 
 	// #endregion
@@ -2120,6 +2236,17 @@ function overloadPosition(
 		start: { line: first.position.start.line - 1, column: 1 },
 		end: { line: last.position.end.line + 1, column: 1 },
 	}
+}
+
+// NOTE: A Doc reduced to the single line it reads as, for a position with no
+// break to spend. Null — a Doc holding a hard break, or a group already
+// resolved to break — cannot arise from a Pattern, which is the only thing
+// this is used on; the Doc is handed back untouched rather than lost if that
+// ever changed.
+function flattened(doc: Doc): Doc {
+	let written = renderFlat(doc)
+
+	return written === null ? doc : text(written)
 }
 
 // NOTE: An Expression that lays itself out over several lines and closes with

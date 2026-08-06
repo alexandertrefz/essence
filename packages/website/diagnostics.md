@@ -579,6 +579,62 @@ as one — `assignment-type-mismatch` in a Declaration, `argument-type-mismatch`
 an Argument — including where the Case carries nothing that could differ, as
 `Box<String>#Tag("x")` under a `Box<Integer>` does.
 
+## Patterns
+
+A Pattern names the parts of a value — `{ width, height }` — and is written in
+the four positions that take one apart: a Matcher, a Case payload binder, a
+Parameter and a Declaration. The grammar is one and the same in all four; what
+differs is what each position can do with what a Pattern says, and these three
+are reported where it can do nothing with it.
+
+### `refutable-pattern`
+
+A Pattern in a position that can not decline a value holds a member constrained
+by a written value — `{ width = 0 }` — at any depth.
+
+A Matcher may hold one, because a member constrained by value asks a question,
+and an arm whose question is answered `no` falls through to the next arm. A
+`constant` or `variable` Declaration and a Parameter have nowhere to fall
+through to: a Declaration is the only thing that answers for the name it binds,
+and a Parameter is bound after the call has already been made. A Pattern that
+declined in either position would leave the Program with no value and nothing to
+do about it.
+
+A member constrained by TYPE is not refutable. `{ width: Integer }` is an
+annotation rather than a test, so in an irrefutable position it is checked and
+not asked — a value that does not fit it fails as `assignment-type-mismatch`,
+the way every annotation fails. Only the written VALUE of `=` makes a Pattern
+able to decline, which is also why the bare `{ width }` never can.
+
+Where the question was the point, write a `match`. Its arms are the somewhere
+else that a Declaration and a Parameter do not have, and a Pattern that can
+decline belongs in one of them — with the Declaration below it, or the call
+around it, reading what the arm produced.
+
+### `redundant-pattern-binder`
+
+A Matcher's Pattern names the whole value — `case { x, y } as point`.
+
+Inside an arm, `@` is the scrutinee narrowed to what the Matcher established,
+which is exactly what the binder would name a second time. Write `@` where the
+name was meant; the names the Pattern's members bind are untouched either way.
+
+A Case PAYLOAD Pattern may carry one — `case #Rect({ width, height } as box)` —
+because what the constructor took is not `@`. There `@` is the Case narrowed to
+`#Rect` and `box` is the payload inside it, so the two name different values and
+an arm has reason to want both.
+
+### `pattern-without-body`
+
+A Pattern stands where a Parameter's name would on a native Method signature or
+on a Protocol Method signature.
+
+Neither has a body — a native Method ends at its return Type, and a Protocol
+Method never had a block — so a Pattern there would name parts for nobody to
+read. A signature says what a call looks like and nothing about how it is
+carried out, and how a value is taken apart is the second question. Write one
+name here, and take it apart in the implementation that binds it.
+
 ## Match Expressions
 
 ### `missing-case`

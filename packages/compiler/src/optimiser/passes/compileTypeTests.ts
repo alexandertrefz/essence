@@ -1,7 +1,11 @@
 import type { common } from "@essence-lang/interfaces"
 
 import type { OptimiserPass } from "../index"
-import { matcherResidual } from "../residual"
+import {
+	matcherResidual,
+	matcherResidualOverMembers,
+	unionMembersOf,
+} from "../residual"
 import { rewriteExpressions } from "../walk"
 
 // NOTE: A Match asks the runtime which Type a value has, and it asked in the
@@ -33,6 +37,15 @@ import { rewriteExpressions } from "../walk"
 // are untouched for the opposite reason: they are ANDed onto whichever test the
 // Matcher produced, so replacing the Matcher's half leaves them saying what they
 // said.
+//
+// NOTE: `memberTypes` — what a Case Matcher's payload Pattern requires — IS
+// compiled, because it is a Type check like the Matcher's own and was the one
+// left asking the runtime the general question. Each requirement is decided by
+// the same `residual.ts` rules against the Type the value declares AT that
+// spine, so `case #Fired({ payload: Click })` becomes a tag comparison on
+// `_self.payload` where the tag decides it, and otherwise a descriptor `pool-
+// constants` can hoist out of the test. Nothing about WHICH values the Handler
+// accepts changes; only how it is asked.
 
 export const compileTypeTests: OptimiserPass = {
 	name: "compile-type-tests",
@@ -47,8 +60,12 @@ function compile(
 	}
 
 	let handlers = node.handlers.map((handler) => {
+		let memberTests = compileMemberTests(handler)
+
 		if (handler.literal !== null || handler.typeTest !== null) {
-			return handler
+			return memberTests === handler.memberTests
+				? handler
+				: { ...handler, memberTests }
 		}
 
 		let residual = matcherResidual(handler.matcher, node.value.type)
@@ -59,6 +76,7 @@ function compile(
 				residual.kind === "tag"
 					? tagTest(node.value.type, residual.tag)
 					: typeTest(node.value.type, handler.matcher),
+			memberTests,
 		}
 	})
 
@@ -67,6 +85,84 @@ function compile(
 	}
 
 	return { ...node, handlers }
+}
+
+// NOTE: One compiled check per requirement, under the spine that reaches it.
+// The value each is asked OF is the member read, not `_self` — the Rewriter
+// builds the same read from `memberTypes`, and building it here instead is what
+// puts the descriptor somewhere `pool-constants` can see.
+//
+// The Type the residual is measured against is what the value DECLARES at that
+// spine, which is the set of values that can arrive there — the same argument
+// `matcherResidual` takes for the Matcher's own check, one level down.
+function compileMemberTests(
+	handler: common.typedSimple.MatchHandler,
+): Record<string, common.typedSimple.ExpressionNode> | null {
+	if (handler.memberTypes === null || handler.memberTests !== null) {
+		return handler.memberTests
+	}
+
+	let tests: Record<string, common.typedSimple.ExpressionNode> = {}
+
+	for (let [path, required] of Object.entries(handler.memberTypes)) {
+		let steps = path.split(".")
+		let declared = declaredTypeAtPath(handler.matcher, steps)
+		let read = memberRead(handler.matcher, steps)
+		let residual = matcherResidualOverMembers(
+			required,
+			unionMembersOf(declared),
+		)
+
+		tests[path] =
+			residual.kind === "tag"
+				? tagTestOf(read, residual.tag)
+				: typeTestOf(read, required)
+	}
+
+	return tests
+}
+
+// NOTE: The read the requirement is asked of — `_self.payload.origin` — built
+// from the spine the Enricher keyed it by. A member name can hold no dot, so
+// splitting on one can not mistake anything else for a spine.
+function memberRead(
+	valueType: common.Type,
+	steps: Array<string>,
+): common.typedSimple.ExpressionNode {
+	let node = matchedValue(valueType)
+	let type = valueType
+
+	for (let step of steps) {
+		type = memberTypeAt(type, step)
+		node = {
+			nodeType: "Lookup",
+			base: node,
+			member: { nodeType: "Identifier", name: step, type },
+			type,
+		}
+	}
+
+	return node
+}
+
+function declaredTypeAtPath(
+	valueType: common.Type,
+	steps: Array<string>,
+): common.Type {
+	return steps.reduce(memberTypeAt, valueType)
+}
+
+// NOTE: Silent, and `Unknown` where nothing carries the member — the Enricher
+// has already reported anything worth reporting about a Pattern's members, and
+// an Optimiser pass says nothing about a Program either way.
+function memberTypeAt(type: common.Type, name: string): common.Type {
+	let found = unionMembersOf(type).flatMap((member: common.Type) =>
+		member.type === "Record" || member.type === "Case"
+			? (member.members[name] ?? [])
+			: [],
+	)
+
+	return found.length === 1 ? found[0]! : { type: "Unknown" }
 }
 
 // NOTE: `_self` is the name the Rewriter binds the matched value to, and the
@@ -83,10 +179,20 @@ function tagTest(
 	valueType: common.Type,
 	tag: string,
 ): common.typedSimple.ExpressionNode {
+	return tagTestOf(matchedValue(valueType), tag)
+}
+
+// NOTE: The same check asked of an arbitrary read rather than of `_self` — what
+// a payload requirement needs, since it is about a member of the matched value
+// and not the value itself.
+function tagTestOf(
+	value: common.typedSimple.ExpressionNode,
+	tag: string,
+): common.typedSimple.ExpressionNode {
 	return {
 		nodeType: "Intrinsic",
 		kind: "tag-test",
-		value: matchedValue(valueType),
+		value,
 		tag,
 		negated: false,
 		type: { type: "Boolean" },
@@ -104,10 +210,17 @@ function typeTest(
 	valueType: common.Type,
 	matcher: common.Type,
 ): common.typedSimple.ExpressionNode {
+	return typeTestOf(matchedValue(valueType), matcher)
+}
+
+function typeTestOf(
+	value: common.typedSimple.ExpressionNode,
+	matcher: common.Type,
+): common.typedSimple.ExpressionNode {
 	return {
 		nodeType: "Intrinsic",
 		kind: "type-test",
-		value: matchedValue(valueType),
+		value,
 		descriptor: {
 			nodeType: "Intrinsic",
 			kind: "type-descriptor",

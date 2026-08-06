@@ -1,3 +1,4 @@
+import { patternBindings } from "@essence-lang/compiler/helpers"
 import {
 	printCaseWithPayload,
 	printSignatureSummary,
@@ -193,11 +194,51 @@ function symbolsOfArguments(
 	return nodeArguments.flatMap((argument) => symbolsOfNode(argument.value))
 }
 
+// NOTE: A Declaration whose name is a Pattern is ONE Statement binding several
+// names, and the outline says both: the entry stands for the Statement and is
+// titled by what the Pattern binds, with a child per name so that a reader
+// looking for `matching` finds it where the outline is searched.
+function patternSymbols(
+	node:
+		| parser.ConstantDeclarationStatementNode
+		| parser.VariableDeclarationStatementNode,
+	pattern: parser.PatternNode,
+	kind: "constant" | "variable",
+): DocumentSymbolEntry {
+	let bindings = patternBindings(pattern)
+
+	return {
+		name: `{ ${bindings.map((binding) => binding.name.content).join(", ")} }`,
+		kind,
+		detail: null,
+		range: node.position,
+		selectionRange: pattern.position,
+		children: [
+			...bindings.map((binding) => ({
+				name: binding.name.content,
+				kind,
+				detail: null,
+				range: binding.name.position,
+				selectionRange: binding.name.position,
+				children: [],
+			})),
+			...symbolsOfNode(node.value),
+		],
+	}
+}
+
 function symbolForStatement(
 	node: parser.ImplementationNode,
 ): DocumentSymbolEntry | null {
 	switch (node.nodeType) {
 		case "ConstantDeclarationStatement":
+			// NOTE: A Pattern names no one thing, so the outline lists what it
+			// BINDS — one entry per name, which is what a reader is looking for
+			// when they open the outline to find where `matching` comes from.
+			if (node.name.nodeType === "Pattern") {
+				return patternSymbols(node, node.name, "constant")
+			}
+
 			return {
 				name: node.name.content,
 				kind: "constant",
@@ -207,6 +248,10 @@ function symbolForStatement(
 				children: symbolsOfNode(node.value),
 			}
 		case "VariableDeclarationStatement":
+			if (node.name.nodeType === "Pattern") {
+				return patternSymbols(node, node.name, "variable")
+			}
+
 			return {
 				name: node.name.content,
 				kind: "variable",

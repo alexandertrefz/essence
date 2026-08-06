@@ -312,7 +312,7 @@ export function literalMatcher(
 export function caseMatcher(
 	choice: parser.IdentifierNode | null,
 	caseName: parser.IdentifierNode,
-	binding: parser.IdentifierNode | null,
+	binding: parser.IdentifierNode | parser.PatternNode | null,
 	position: common.Position,
 ): parser.CaseMatcherNode {
 	return {
@@ -324,15 +324,34 @@ export function caseMatcher(
 	}
 }
 
-export function recordMatcher(
-	members: Record<string, parser.RecordMatcherMemberNode>,
+export function pattern(
+	members: Record<string, parser.PatternMemberNode>,
+	binder: parser.IdentifierNode | null,
 	position: common.Position,
-): parser.RecordMatcherNode {
+): parser.PatternNode {
 	return {
-		nodeType: "RecordMatcher",
+		nodeType: "Pattern",
 		members,
+		binder,
 		position,
 	}
+}
+
+export function patternTypeMember(
+	name: parser.IdentifierNode,
+	type: parser.TypeDeclarationNode | null,
+	binder: parser.PatternBinderNode | null,
+	position: common.Position,
+): parser.PatternMemberNode {
+	return { kind: "Type", name, type, binder, position }
+}
+
+export function patternValueMember(
+	name: parser.IdentifierNode,
+	value: parser.LiteralMatcherValueNode,
+	position: common.Position,
+): parser.PatternMemberNode {
+	return { kind: "Value", name, value, position }
 }
 
 // #endregion
@@ -340,7 +359,7 @@ export function recordMatcher(
 // #region Statements
 
 export function constantDeclarationStatement(
-	name: parser.IdentifierNode,
+	name: parser.IdentifierNode | parser.PatternNode,
 	type: parser.TypeDeclarationNode | null,
 	value: parser.ExpressionNode,
 	position: common.Position,
@@ -357,7 +376,7 @@ export function constantDeclarationStatement(
 }
 
 export function variableDeclarationStatement(
-	name: parser.IdentifierNode,
+	name: parser.IdentifierNode | parser.PatternNode,
 	type: parser.TypeDeclarationNode | null,
 	value: parser.ExpressionNode,
 	position: common.Position,
@@ -814,7 +833,7 @@ export function functionDefinition(
 
 export function parameter(
 	externalName: parser.IdentifierNode | null,
-	internalName: parser.IdentifierNode | null,
+	internalName: parser.IdentifierNode | parser.PatternNode | null,
 	type: parser.TypeDeclarationNode | null,
 	position: common.Position,
 	documentation: common.Documentation | null = null,

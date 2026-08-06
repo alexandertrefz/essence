@@ -294,6 +294,18 @@ export interface MatchNode {
 		matcherPosition: Position
 		literal: ExpressionNode | null
 		memberLiterals: Record<string, ExpressionNode> | null
+		// NOTE: What a Case Matcher's payload Pattern requires OF a member,
+		// keyed by the dotted spine that reaches it from the matched value.
+		// `matcher` describes the ARM — which Case this is — and everything
+		// that can make the Handler DECLINE a value the arm accepted lives
+		// beside it, exactly as `memberLiterals` does: writing a narrowing into
+		// `matcher` instead would tell the Validator the Case is only partly
+		// covered AND that the Handler is dead, which are both wrong.
+		//
+		// Only a Case Matcher needs it. A Pattern in Matcher position IS its
+		// own Record Type, so what it requires of a nested member is already in
+		// `matcher` and is tested by the same walk.
+		memberTypes: Record<string, Type> | null
 		guard: ExpressionNode | null
 		body: Array<ImplementationNode>
 	}>
@@ -318,6 +330,13 @@ export type StatementNode =
 	| ReturnStatementNode
 	| FunctionStatementNode
 
+// NOTE: `synthesized` marks a Constant no source wrote — the base a Pattern
+// Declaration reads its members off, and the Constants a Pattern's bindings
+// desugar into. It carries a borrowed Position so that Hover, Completion and
+// go-to-definition answer over the binder the author DID write; everything
+// that reports on a Statement in its own right asks this first. The Simplifier
+// drops the Position of a base Constant on the strength of it, so no source
+// map claims a span for a Statement nobody wrote.
 export interface ConstantDeclarationStatementNode {
 	nodeType: "ConstantDeclarationStatement"
 	name: IdentifierNode
@@ -327,8 +346,14 @@ export interface ConstantDeclarationStatementNode {
 	declaredType: Type | null
 	type: Type
 	documentation: Documentation | null
+	synthesized?: "base" | "binding"
 }
 
+// NOTE: `synthesized` means the same here as on a Constant — a Statement no
+// source wrote. Only `"binding"` occurs: a Pattern's base is always a Constant,
+// even under `variable`, because the value it holds is evaluated once and never
+// assigned to again; only the names the Pattern binds follow the Declaration's
+// own keyword.
 export interface VariableDeclarationStatementNode {
 	nodeType: "VariableDeclarationStatement"
 	name: IdentifierNode
@@ -338,6 +363,7 @@ export interface VariableDeclarationStatementNode {
 	declaredType: Type | null
 	type: Type
 	documentation: Documentation | null
+	synthesized?: "binding"
 }
 
 export interface VariableAssignmentStatementNode {

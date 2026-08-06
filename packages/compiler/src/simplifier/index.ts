@@ -549,6 +549,10 @@ function simplifyMatch(
 										],
 									),
 								),
+					// NOTE: Types, not Expressions — nothing to simplify.
+					memberTypes: handler.memberTypes,
+					// NOTE: Filled by `compile-type-tests`, like `typeTest`.
+					memberTests: null,
 					guard:
 						handler.guard === null
 							? null
@@ -608,6 +612,17 @@ function simplifyConstantDeclarationStatement(
 		value: simplifyExpression(node.value),
 		type: node.type,
 		isConstant: true,
+		// NOTE: Every Constant keeps its Position, the base a Pattern
+		// Declaration reads its members off included. It is synthesized in the
+		// sense that no source wrote its NAME, but what it holds is the
+		// Declaration's own value Expression — real source, on the line the
+		// author wrote it — and it is the statement a debugger should stop on
+		// for that line.
+		//
+		// Dropping it was tried and is wrong: an unmapped statement is how the
+		// debug adapter recognises Compiler glue, so it answers a Step Over
+		// there with a step OUT, and a single step across a Pattern Declaration
+		// abandoned the rest of the function.
 		position: node.position,
 	}
 }

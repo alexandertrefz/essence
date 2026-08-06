@@ -305,6 +305,16 @@ export type MatchHandler = {
 	typeTest: ExpressionNode | null
 	literal: ExpressionNode | null
 	memberLiterals: Record<string, ExpressionNode> | null
+	// NOTE: What a Case Matcher's payload Pattern requires of a member, keyed
+	// by the dotted spine reaching it — ANDed behind the Matcher's own check,
+	// which is what makes reading down that spine safe.
+	memberTypes: Record<string, Type> | null
+	// NOTE: The same requirements COMPILED, under the same keys — what
+	// `compile-type-tests` leaves where it has written the check out, exactly as
+	// `typeTest` is what it leaves for the Matcher's own. Null until that pass
+	// runs, and the Rewriter emits from `memberTypes` in that case, so a build
+	// with the Optimiser off says the same thing the slow way.
+	memberTests: Record<string, ExpressionNode> | null
 	guard: ExpressionNode | null
 	body: Array<ImplementationNode>
 }

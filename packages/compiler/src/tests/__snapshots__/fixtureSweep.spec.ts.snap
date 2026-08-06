@@ -316,3 +316,26 @@ tests/
   Lexer.es
 4 files, 2 directories"
 `;
+
+exports[`Fixture Sweep Patterns.es should print what it printed before 1`] = `
+"y axis at 7
+the diagonal at 3
+3/3, not 99
+12
+10
+5
+5
+8
+6
+first, 7
+[ a1, b2 ]
+15
+42
+26
+[ 2, 4 ]
+[ 1, 3 ]
+3
+12
+13
+yes"
+`;

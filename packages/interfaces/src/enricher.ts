@@ -55,17 +55,31 @@ export type Scope = {
 	// because that binding sits closer to the use.
 	isStaticMethodBody?: boolean
 	// NOTE: Names that stand for a member of `@` rather than for a binding of
-	// their own — what a Case Matcher's payload binding lends its Guard. A use
-	// resolves into the Lookup the author could have written instead, because a
-	// Guard is emitted into the Handler's TEST and runs before any Statement of
-	// the body: the Constant the body reads the same name through does not
-	// exist yet. Reading `@` there is safe regardless, since the Matcher's own
-	// check is ANDed in front of the Guard and short-circuits it.
+	// their own — what a Matcher's Pattern and payload bindings lend their
+	// Guard. A use resolves into the Lookup the author could have written
+	// instead, because a Guard is emitted into the Handler's TEST and runs
+	// before any Statement of the body: the Constant the body reads the same
+	// name through does not exist yet. Reading `@` there is safe regardless,
+	// since the Matcher's own check is ANDed in front of the Guard and
+	// short-circuits it.
+	//
+	// `path` is the whole spine from `@` down, so a nested Pattern binding
+	// (`case #Going({ state as { index, total } })`) lends `@.state.total`
+	// rather than only its last step. A Pattern's `as` binder lends the empty
+	// path, which is `@` itself.
 	//
 	// Only ever consulted on the Scope that DECLARES the name, so an inner
 	// binding of the same name shadows the alias like any other.
 	selfMemberAliases?: Record<
 		string,
-		{ member: string; selfType: common.Type }
+		{
+			path: Array<string>
+			// NOTE: Where each step of `path` was WRITTEN. The Lookup a use
+			// lowers to is indexed by the Language Server, so a step given the
+			// USE's span instead would be read as an occurrence of that member
+			// there — and renaming the member would overwrite the Guard's text.
+			stepPositions: Array<common.Position>
+			selfType: common.Type
+		}
 	>
 }

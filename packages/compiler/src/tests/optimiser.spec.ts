@@ -2007,6 +2007,57 @@ describe("Optimiser", () => {
 			)
 		})
 
+		// NOTE: A Case Matcher's payload Pattern requires something of a member,
+		// and that requirement is a Type check like the Matcher's own — so it
+		// goes through this pass too. Left out, it was the one check still
+		// asking the runtime the general question with a descriptor rebuilt at
+		// every test.
+		describe("a payload Pattern's requirements", () => {
+			const payloadPattern = `implementation {
+				type Click = { x: Integer, y: Integer }
+				type KeyPress = { key: String }
+
+				choice Event {
+					Fired { payload: Click | KeyPress },
+					Idle,
+				}
+
+				constant event: Event = #Fired({ payload = { key = "a" } })
+
+				Terminal.inspect(match event -> String {
+					case #Fired({ key }) { <- key }
+					case _               { <- "other" }
+				})
+			}`
+
+			it("puts the descriptor where it can be pooled", () => {
+				// NOTE: The requirement reads the MEMBER, not `_self`, and the
+				// descriptor it is asked against is a pooled Constant rather
+				// than an object literal rebuilt on every turn.
+				expect(generate(payloadPattern)).toMatch(
+					/isValueOfType\(_self\.payload, \$pool_\d+\)/,
+				)
+			})
+
+			it("asks the general question when it is turned off", () => {
+				expect(
+					generate(payloadPattern, {
+						enabled: true,
+						disabledPasses: new Set(["compile-type-tests"]),
+					}),
+				).toContain("$type.isValueOfType(_self.payload, {")
+			})
+
+			it("prints the same thing with the pass off", async () => {
+				expect(
+					await expectSamePrintedOutput(
+						"compile-type-tests",
+						payloadPattern,
+					),
+				).toEqual(['"a"'])
+			})
+		})
+
 		it("builds the descriptors again when it is turned off", () => {
 			let generated = generate(typeTests, {
 				enabled: true,

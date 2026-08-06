@@ -30,8 +30,13 @@ import {
 	matchesTypeWithBindings,
 	mentionsUnsolvedTypeParameter,
 	mergeUnionMembers,
+	parameterInternalName,
+	type PatternBinding,
+	type PatternStep,
+	patternBindings,
 	predicateConjunctKey,
 	provenConjuncts,
+	refutablePatternMembers,
 	refinementWithTypeArguments,
 	resolveOverloadedMethodName,
 	resolveUnknownSlots,
@@ -150,11 +155,19 @@ export function signatureHeadPositionOf(
 	])
 }
 
+// NOTE: One parsed Node becomes a LIST of typed ones, because one of them can:
+// a Declaration whose name is a Pattern is the Constants an author could have
+// written instead — the base the members are read off, and one per name the
+// Pattern binds. Everything else answers with a list of one.
+//
+// An Array rather than a Node so that TypeScript names every body walk: a walk
+// that mapped where it should flatMap would drop a Pattern's bindings on the
+// floor, and nothing downstream would be any the wiser.
 export function enrichNode(
 	node: parser.ImplementationNode,
 	scope: enricher.Scope,
 	hoistedTypes?: HoistedTypes,
-): common.typed.ImplementationNode {
+): Array<common.typed.ImplementationNode> {
 	switch (node.nodeType) {
 		case "MethodInvocation":
 		case "FunctionInvocation":
@@ -172,9 +185,10 @@ export function enrichNode(
 		case "Self":
 		case "Match":
 		case "CaseValue":
-			return enrichExpression(node, scope)
+			return [enrichExpression(node, scope)]
 		case "ConstantDeclarationStatement":
 		case "VariableDeclarationStatement":
+			return enrichDeclarationStatement(node, scope)
 		case "VariableAssignmentStatement":
 		case "NamespaceDefinitionStatement":
 		case "ProtocolDeclarationStatement":
@@ -185,7 +199,7 @@ export function enrichNode(
 		case "ReturnStatement":
 		case "FunctionStatement":
 		case "OverloadedFunctionStatement":
-			return enrichStatement(node, scope, hoistedTypes)
+			return [enrichStatement(node, scope, hoistedTypes)]
 	}
 }
 
@@ -946,6 +960,12 @@ export function enrichMethodFunctionDefinition(
 	let returnType = signature.returnType
 	newScope.expectedReturnType = returnType
 
+	let { parameters, bindings } = enrichParameterList(
+		method.value.parameters,
+		newScope,
+		signature.parameterTypes,
+	)
+
 	return {
 		nodeType: "FunctionDefinition",
 		generics: [
@@ -954,14 +974,13 @@ export function enrichMethodFunctionDefinition(
 				enrichGenericDeclarationNode(generic, scope),
 			),
 		],
-		parameters: method.value.parameters.map((parameter, index) =>
-			enrichParameter(
-				parameter,
-				newScope,
-				signature.parameterTypes[index],
-			),
-		),
-		body: method.value.body.map((node) => enrichNode(node, newScope)),
+		parameters,
+		// NOTE: A Parameter's Pattern desugars into Constants at the head of the
+		// body, exactly as a Matcher's bindings do.
+		body: [
+			...bindings,
+			...method.value.body.flatMap((node) => enrichNode(node, newScope)),
+		],
 		returnType,
 		// NOTE: A Method always writes its annotations — the Parser only
 		// allows omitting them for a literal in expression position.
@@ -1053,19 +1072,24 @@ export function enrichFunctionDefinition(
 
 	newScope.expectedReturnType = returnType
 
+	let { parameters, bindings } = enrichParameterList(
+		node.parameters,
+		newScope,
+		contextualType?.parameterTypes,
+	)
+
 	return {
 		nodeType: "FunctionDefinition",
-		parameters: node.parameters.map((parameter, index) =>
-			enrichParameter(
-				parameter,
-				newScope,
-				contextualType?.parameterTypes[index],
-			),
-		),
+		parameters,
 		generics: node.generics.map((generic) =>
 			enrichGenericDeclarationNode(generic, scope),
 		),
-		body: node.body.map((node) => enrichNode(node, newScope)),
+		// NOTE: A Parameter's Pattern desugars into Constants at the head of the
+		// body, exactly as a Matcher's bindings do.
+		body: [
+			...bindings,
+			...node.body.flatMap((node) => enrichNode(node, newScope)),
+		],
 		returnType,
 		inferredReturnType: node.returnType === null ? returnType : null,
 		parameterListPosition: node.parameterListPosition,
@@ -1609,11 +1633,12 @@ function enrichIdentifierExpression(
 		return enrichIdentifier(node, scope)
 	}
 
-	return selfMemberLookup(
-		alias.member,
+	return selfPathLookup(
+		alias.path,
 		declaringScope.members[node.content]!,
 		alias.selfType,
 		node.position,
+		alias.stepPositions,
 	)
 }
 
@@ -1718,6 +1743,8 @@ export function enrichMatch(
 				string,
 				common.typed.ExpressionNode
 			> | null = null
+			let memberTypes: Record<string, common.Type> | null = null
+			let payload: PayloadRequirements | null = null
 			let matcher: common.Type
 
 			if (handler.matcher.nodeType === "LiteralMatcher") {
@@ -1731,35 +1758,38 @@ export function enrichMatch(
 					handledMatchers,
 				)
 			} else if (handler.matcher.nodeType === "CaseMatcher") {
+				let literals: Record<string, common.typed.ExpressionNode> = {}
+
 				matcher = resolveCaseMatcherType(
 					handler.matcher,
 					value.type,
 					scope,
 				)
-			} else if (handler.matcher.nodeType === "RecordMatcher") {
-				// NOTE: Both kinds of member contribute a Type, so `@` is a
-				// Record either way and `@.name` works inside the Handler — a
-				// value-constrained member simply takes its literal's Type.
-				let members: Record<string, common.Type> = {}
+
+				// NOTE: What the payload Pattern requires — beside the Matcher
+				// rather than inside it, so the Case stays the arm it is and
+				// only the Handler becomes conditional. It also says what the
+				// arm PROVED, which is what its bindings are read at.
+				payload = resolvePayloadRequirements(
+					handler.matcher,
+					matcher,
+					scope,
+					literals,
+				)
+
+				memberTypes = payload.memberTypes
+				memberLiterals =
+					Object.keys(literals).length > 0 ? literals : null
+			} else if (handler.matcher.nodeType === "Pattern") {
 				let literals: Record<string, common.typed.ExpressionNode> = {}
 
-				for (let [name, member] of Object.entries(
-					handler.matcher.members,
-				)) {
-					if (member.kind === "Value") {
-						let enrichedValue = enrichExpression(
-							member.value,
-							scope,
-						)
+				matcher = resolvePatternMatcherType(
+					handler.matcher,
+					value.type,
+					scope,
+					literals,
+				)
 
-						literals[name] = enrichedValue
-						members[name] = enrichedValue.type
-					} else {
-						members[name] = resolveType(member.type, scope)
-					}
-				}
-
-				matcher = { type: "Record", members }
 				memberLiterals =
 					Object.keys(literals).length > 0 ? literals : null
 			} else {
@@ -1767,12 +1797,14 @@ export function enrichMatch(
 			}
 
 			// NOTE: Only an unconditional Handler retires a Type. A literal
-			// Matcher, a value-constrained Record member or a Guard can all
-			// decline a value whose Type they accepted, so a later wildcard
-			// still has to account for that Type.
+			// Matcher, a value-constrained Record member, a payload Pattern
+			// requiring something of a member, or a Guard can all decline a
+			// value whose Type they accepted, so a later wildcard still has to
+			// account for that Type.
 			if (
 				literal === null &&
 				memberLiterals === null &&
+				memberTypes === null &&
 				handler.guard === null
 			) {
 				handledMatchers.push(matcher)
@@ -1799,9 +1831,13 @@ export function enrichMatch(
 			}
 
 			// NOTE: Resolved before the Guard is enriched, so that the Guard
-			// can name it — and reported here, once, rather than once per place
-			// the name is lent to.
-			let binding = resolveCaseMatcherBinding(handler.matcher, matcher)
+			// can name them — and reported here, once, rather than once per
+			// place a name is lent to.
+			let bindings = resolveMatcherBindings(
+				handler.matcher,
+				matcher,
+				payload,
+			)
 
 			// NOTE: A Guard proves things about `@` the same way an `if`'s
 			// condition proves them about a Constant, and it runs before any
@@ -1815,13 +1851,13 @@ export function enrichMatch(
 			if (handler.guard !== null) {
 				// NOTE: The Guard is enriched in the body Scope so that it can
 				// use `@` — narrowing is what makes a Guard worth writing. A
-				// payload binding is lent to it through an alias Scope rather
-				// than through the Constant the body reads: see
+				// Matcher's bindings are lent to it through an alias Scope
+				// rather than through the Constants the body reads: see
 				// `selfMemberAliases`.
 				let guardScope =
-					binding === null
+					bindings.length === 0
 						? bodyScope
-						: scopeLendingBinding(binding, matcher, bodyScope)
+						: scopeLendingBindings(bindings, matcher, bodyScope)
 
 				guard = enrichExpression(handler.guard, guardScope)
 
@@ -1835,55 +1871,62 @@ export function enrichMatch(
 				)
 			}
 
-			// NOTE: What the Guard established for the payload binding is not
-			// SHADOWED but DECLARED. The binding comes into being at the head of the
-			// body, so there is no earlier declaration for a shadow to stand in front
-			// of — and a shadow one Scope further out would be the wrong shape
-			// anyway: the Constant it stood in front of is a Statement of this very
-			// body, so a body re-declaring that name is declaring it twice, and a
-			// Scope between the two would quietly make that legal and emit one block
-			// holding two Constants of one name.
+			// NOTE: What the Guard established for a Matcher's own bindings is
+			// not SHADOWED but DECLARED. A binding comes into being at the head
+			// of the body, so there is no earlier declaration for a shadow to
+			// stand in front of — and a shadow one Scope further out would be
+			// the wrong shape anyway: the Constant it stood in front of is a
+			// Statement of this very body, so a body re-declaring that name is
+			// declaring it twice, and a Scope between the two would quietly make
+			// that legal and emit one block holding two Constants of one name.
 			//
 			// Everything else the Guard established is shadowed as an `if`'s
 			// condition shadows it, and the body goes one Scope deeper only when
-			// something WAS established — so a Handler that narrows nothing keeps
-			// declaring its payload binding in the Scope it always did.
-			let bindingNarrowing = guardNarrowings.find(
-				(narrowing) => narrowing.name === binding?.name.content,
+			// something WAS established — so a Handler that narrows nothing
+			// keeps declaring its bindings in the Scope it always did.
+			//
+			// Every bound name is excluded, not just the first: a Pattern binds
+			// as many as it names, and one of them being narrowed must not leave
+			// the others shadowed.
+			let boundNames = new Set(
+				bindings.map((binding) => binding.name.content),
+			)
+			let bindingNarrowings = new Map(
+				guardNarrowings
+					.filter((narrowing) => boundNames.has(narrowing.name))
+					.map((narrowing) => [narrowing.name, narrowing.type]),
 			)
 			let shadowedNarrowings = guardNarrowings.filter(
-				(narrowing) => narrowing !== bindingNarrowing,
+				(narrowing) => !boundNames.has(narrowing.name),
 			)
 			let handlerScope =
 				shadowedNarrowings.length === 0
 					? bodyScope
 					: childScope(scopeShadowing(shadowedNarrowings, bodyScope))
 
-			// NOTE: `case #Value(item)` — desugared here rather than carried
-			// through the typed tree, so the Simplifier, Rewriter and every
-			// walker downstream see the constant an author could have written
-			// themselves. `@` is untouched and still means the narrowed
-			// scrutinee, so an arm can bind the payload AND hand the whole Case
-			// onwards.
-			let bindingStatements =
-				binding === null
-					? []
-					: declareCaseMatcherBinding(
-							binding,
-							matcher,
-							handlerScope,
-							bindingNarrowing?.type,
-						)
+			// NOTE: `case #Value(item)` and `case { x, y }` alike — desugared
+			// here rather than carried through the typed tree, so the
+			// Simplifier, Rewriter and every walker downstream see the Constants
+			// an author could have written themselves. `@` is untouched and
+			// still means the narrowed scrutinee, so an arm can bind the parts
+			// AND hand the whole value onwards.
+			let bindingStatements = declareMatcherBindings(
+				bindings,
+				matcher,
+				handlerScope,
+				bindingNarrowings,
+			)
 
 			return {
 				body: [
 					...bindingStatements,
-					...handler.body.map((node) =>
+					...handler.body.flatMap((node) =>
 						enrichNode(node, handlerScope),
 					),
 				],
 				literal,
 				memberLiterals,
+				memberTypes,
 				guard,
 				matcher,
 				matcherPosition: handler.matcher.position,
@@ -1898,8 +1941,17 @@ export function enrichMatch(
 
 // #region Statements
 
+// NOTE: The two Declarations are NOT among these — they are the only Statements
+// that can become several, so `enrichNode` routes them through
+// `enrichDeclarationStatement` before they get here. Excluding them from the
+// parameter Type rather than leaving unreachable cases in the switch is what
+// keeps that routing a fact TypeScript checks.
 export function enrichStatement(
-	node: parser.StatementNode,
+	node: Exclude<
+		parser.StatementNode,
+		| parser.ConstantDeclarationStatementNode
+		| parser.VariableDeclarationStatementNode
+	>,
 	scope: enricher.Scope,
 	hoistedTypes?: HoistedTypes,
 ): common.typed.StatementNode {
@@ -1910,10 +1962,6 @@ export function enrichStatement(
 	let hoistedType = hoistedTypes?.get(node)
 
 	switch (node.nodeType) {
-		case "ConstantDeclarationStatement":
-			return enrichConstantDeclarationStatement(node, scope)
-		case "VariableDeclarationStatement":
-			return enrichVariableDeclarationStatement(node, scope)
 		case "VariableAssignmentStatement":
 			return enrichVariableAssignmentStatement(node, scope)
 		case "NamespaceDefinitionStatement":
@@ -2016,8 +2064,29 @@ function reportUnknownDocumentationOfValue(
 	}
 }
 
+// NOTE: A Declaration is one Statement or several — several exactly when its
+// name is a Pattern, which is the only thing in the language that declares more
+// than one name at a time.
+function enrichDeclarationStatement(
+	node:
+		| parser.ConstantDeclarationStatementNode
+		| parser.VariableDeclarationStatementNode,
+	scope: enricher.Scope,
+): Array<common.typed.ImplementationNode> {
+	if (node.name.nodeType === "Pattern") {
+		return enrichPatternDeclarationStatement(node, node.name, scope)
+	}
+
+	return [
+		node.nodeType === "ConstantDeclarationStatement"
+			? enrichConstantDeclarationStatement(node, node.name, scope)
+			: enrichVariableDeclarationStatement(node, node.name, scope),
+	]
+}
+
 export function enrichConstantDeclarationStatement(
 	node: parser.ConstantDeclarationStatementNode,
+	name: parser.IdentifierNode,
 	scope: enricher.Scope,
 ): common.typed.ConstantDeclarationStatementNode {
 	reportUnknownDocumentationOfValue(node.documentation, node.value)
@@ -2027,15 +2096,15 @@ export function enrichConstantDeclarationStatement(
 	let declaredType = node.type !== null ? resolveType(node.type, scope) : null
 	let value = enrichExpression(node.value, scope, declaredType)
 
-	declareVariableInScope(node.name, declaredType ?? value.type, scope, true)
+	declareVariableInScope(name, declaredType ?? value.type, scope, true)
 
 	return {
 		nodeType: "ConstantDeclarationStatement",
-		name: enrichIdentifier(node.name, scope),
+		name: enrichIdentifier(name, scope),
 		value,
 		position: node.position,
 		headPosition: headPositionOf(node.position, [
-			node.name.position,
+			name.position,
 			node.type?.position,
 		]),
 		type: value.type,
@@ -2046,6 +2115,7 @@ export function enrichConstantDeclarationStatement(
 
 export function enrichVariableDeclarationStatement(
 	node: parser.VariableDeclarationStatementNode,
+	name: parser.IdentifierNode,
 	scope: enricher.Scope,
 ): common.typed.VariableDeclarationStatementNode {
 	reportUnknownDocumentationOfValue(node.documentation, node.value)
@@ -2055,21 +2125,229 @@ export function enrichVariableDeclarationStatement(
 	let declaredType = node.type !== null ? resolveType(node.type, scope) : null
 	let value = enrichExpression(node.value, scope, declaredType)
 
-	declareVariableInScope(node.name, declaredType ?? value.type, scope)
+	declareVariableInScope(name, declaredType ?? value.type, scope)
 
 	return {
 		nodeType: "VariableDeclarationStatement",
-		name: enrichIdentifier(node.name, scope, value.type),
+		name: enrichIdentifier(name, scope, value.type),
 		value,
 		position: node.position,
 		headPosition: headPositionOf(node.position, [
-			node.name.position,
+			name.position,
 			node.type?.position,
 		]),
 		type: value.type,
 		declaredType,
 		documentation: node.documentation,
 	}
+}
+
+// NOTE: `constant { matching, rest } = list::partition(where …)` — the Pattern
+// desugars into the Statements an author could have written instead: one
+// Constant holding the value, and one per name the Pattern binds, each reading
+// its way down that Constant.
+//
+// The base is a Constant even where the Declaration was a `variable`, and even
+// where the value is a bare name that could have been read again: the value
+// must be evaluated EXACTLY ONCE, because it is one Expression in the source
+// and an author reading `partition(…)` twice is not what was written. Only the
+// bindings themselves follow the Declaration's own keyword, so
+// `variable { index, total } = …` gives two Variables.
+//
+// The base KEEPS its Position, because what it holds is the Declaration's own
+// value Expression — real source, on the line the author wrote it, and the
+// statement a debugger should stop on for that line. Dropping it was tried and
+// is wrong: an unmapped statement is how the debug adapter recognises Compiler
+// glue, so it answered a Step Over there with a step OUT and one step across a
+// Pattern Declaration abandoned the rest of the body.
+//
+// Only its NAME is the Compiler's, and that name is unspellable in Essence for
+// the same reason the Optimiser's are: the Lexer reads `_` as a Symbol, so no
+// user Identifier holds one. It is derived from the Pattern's own Position so
+// that enriching a body twice — which is what return-Type inference does —
+// mints the same name both times, and `isSynthesizedName` is what every place
+// that must not SHOW it asks.
+function enrichPatternDeclarationStatement(
+	node:
+		| parser.ConstantDeclarationStatementNode
+		| parser.VariableDeclarationStatementNode,
+	pattern: parser.PatternNode,
+	scope: enricher.Scope,
+): Array<common.typed.ImplementationNode> {
+	reportUnknownDocumentationOfValue(node.documentation, node.value)
+
+	refuseRefutablePattern(pattern, "Declaration")
+
+	let declaredType = node.type !== null ? resolveType(node.type, scope) : null
+	let value = enrichExpression(node.value, scope, declaredType)
+
+	// NOTE: The members are read off what the author DECLARED where they
+	// declared anything, not off what the value happened to be — otherwise the
+	// bindings and the annotation could disagree about the same value.
+	let subjectType = declaredType ?? value.type
+	let baseName = synthesizedName("pattern", pattern.position)
+
+	declareVariableInScope(baseName, subjectType, scope, true)
+
+	let base: common.typed.ConstantDeclarationStatementNode = {
+		nodeType: "ConstantDeclarationStatement",
+		name: {
+			nodeType: "Identifier",
+			content: baseName,
+			position: pattern.position,
+			type: subjectType,
+		},
+		value,
+		position: pattern.position,
+		headPosition: pattern.position,
+		declaredType,
+		type: value.type,
+		documentation: null,
+		synthesized: "base",
+	}
+
+	return [
+		base,
+		...declarePatternBindings(
+			pattern,
+			baseName,
+			subjectType,
+			scope,
+			node.nodeType === "ConstantDeclarationStatement",
+		),
+	]
+}
+
+// NOTE: The Statements a Pattern in an IRREFUTABLE position desugars into — a
+// Parameter's and a Declaration's alike. Both hold the value under one name
+// first (a Parameter already is one; a Declaration has to make one), and both
+// then read each binding off it.
+//
+// `isConstant` follows the Declaration's own keyword, so
+// `variable { index, total } = state` gives two Variables while a Parameter's
+// bindings, which nothing may assign to, are always Constants.
+function declarePatternBindings(
+	pattern: parser.PatternNode,
+	baseName: string,
+	subjectType: common.Type,
+	scope: enricher.Scope,
+	isConstant: boolean,
+): Array<common.typed.ImplementationNode> {
+	return irrefutablePatternBindings(pattern).map((binding) => {
+		let type = memberTypeInIrrefutablePosition(binding, subjectType, scope)
+		// NOTE: Carried as a written annotation rather than checked here, so
+		// that a member annotated `width: String` over an Integer fails as the
+		// `assignment-type-mismatch` the Validator reports for every other
+		// annotated Declaration — the same Diagnostic, at the member's own span.
+		let declaredType =
+			binding.type === null ? null : resolveType(binding.type, scope)
+
+		declareVariableInScope(
+			binding.name,
+			declaredType ?? type,
+			scope,
+			isConstant,
+		)
+
+		return {
+			nodeType: isConstant
+				? "ConstantDeclarationStatement"
+				: "VariableDeclarationStatement",
+			name: {
+				nodeType: "Identifier",
+				content: binding.name.content,
+				position: binding.name.position,
+				type,
+			},
+			value: memberPathLookup(
+				baseName,
+				subjectType,
+				binding,
+				type,
+				pattern.position,
+			),
+			position: binding.name.position,
+			headPosition: binding.name.position,
+			declaredType,
+			type,
+			documentation: null,
+			synthesized: "binding",
+		} as common.typed.ImplementationNode
+	})
+}
+
+// NOTE: What a binding actually reads in an irrefutable position, resolved
+// through `lookupTypeOf` — the very resolver the Lookup an author could have
+// written instead goes through.
+//
+// That is the whole point rather than a convenience: a Declaration Pattern
+// PROMISES to be the Constants an author could have written, so it may not
+// admit what those are refused for. `constant x = value.x` on a Union reports
+// `type-without-members`, and on a misspelled member `unknown-member`; a
+// `constant { x } = value` that quietly answered `Unknown` instead would bind
+// a name to nothing and hand the body a value the checker had blessed.
+//
+// A Matcher is the opposite case and asks `memberTypeOf` instead: naming a
+// member only some arms carry is how a Matcher DISCRIMINATES, and an arm that
+// no value reaches is `unreachable-case` rather than an error.
+function memberTypeInIrrefutablePosition(
+	binding: PatternBinding,
+	subjectType: common.Type,
+	scope: enricher.Scope,
+): common.Type {
+	let type = subjectType
+
+	for (let step of binding.steps) {
+		type = lookupTypeOf(type, step.name.content, {
+			member: step.name.position,
+			base: step.name.position,
+		})
+
+		// NOTE: An annotation on an INTERMEDIATE step constrains that step and
+		// nothing below it, so it is checked here and then stepped past — the
+		// binding's own annotation is the last one, and the Validator checks
+		// that through `declaredType` like any other.
+		let annotation = step.type
+
+		if (annotation !== null && step !== binding.steps.at(-1)) {
+			let declared = resolveType(annotation, scope)
+
+			if (!matchesType(declared, type)) {
+				reportPatternMemberMismatch(step.name, declared, type)
+			}
+
+			type = declared
+		}
+	}
+
+	return type
+}
+
+// NOTE: An intermediate step's annotation fails the way every annotation fails,
+// under the code a reader already knows — this only has to be reported by hand
+// because such a step becomes no Statement of its own for the Validator to
+// check.
+function reportPatternMemberMismatch(
+	name: parser.IdentifierNode,
+	declared: common.Type,
+	actual: common.Type,
+): void {
+	reportError(
+		`This value does not fit the declared Type of member '${name.content}'`,
+		name.position,
+		{
+			code: "assignment-type-mismatch",
+			labels: [
+				primary(
+					name.position,
+					`this is ${withArticle(describeType(actual))}`,
+				),
+			],
+			notes: [
+				`'${name.content}' is declared as ${describeType(declared)}.`,
+			],
+		},
+	)
 }
 
 export function enrichVariableAssignmentStatement(
@@ -2864,8 +3142,10 @@ export function enrichIfElseStatementNode(
 	return {
 		nodeType: "IfElseStatement",
 		condition,
-		trueBody: node.trueBody.map((node) => enrichNode(node, trueScope)),
-		falseBody: node.falseBody.map((node) => enrichNode(node, falseScope)),
+		trueBody: node.trueBody.flatMap((node) => enrichNode(node, trueScope)),
+		falseBody: node.falseBody.flatMap((node) =>
+			enrichNode(node, falseScope),
+		),
 		position: node.position,
 	}
 }
@@ -2880,7 +3160,7 @@ export function enrichIfStatement(
 	return {
 		nodeType: "IfStatement",
 		condition,
-		body: node.body.map((node) => enrichNode(node, bodyScope)),
+		body: node.body.flatMap((node) => enrichNode(node, bodyScope)),
 		position: node.position,
 	}
 }
@@ -3371,18 +3651,87 @@ function enrichMethods(
 	return result
 }
 
+// NOTE: A Parameter list and the Statements its Patterns desugar into, which
+// belong at the HEAD of the body those Parameters were declared for — the same
+// shape a Matcher's bindings take, and for the same reason: a body that reads
+// `width` reads a Constant an author could have written on its first line.
+function enrichParameterList(
+	nodes: Array<parser.ParameterNode>,
+	scope: enricher.Scope,
+	contextualParameters?: Array<common.Parameter | undefined>,
+): {
+	parameters: Array<common.typed.ParameterNode>
+	bindings: Array<common.typed.ImplementationNode>
+} {
+	let parameters: Array<common.typed.ParameterNode> = []
+	let bindings: Array<common.typed.ImplementationNode> = []
+
+	for (let [index, node] of nodes.entries()) {
+		let enriched = enrichParameter(
+			node,
+			scope,
+			contextualParameters?.[index],
+		)
+
+		parameters.push(enriched.parameter)
+		bindings.push(...enriched.bindings)
+	}
+
+	return { parameters, bindings }
+}
+
 function enrichParameter(
 	node: parser.ParameterNode,
 	scope: enricher.Scope,
 	// NOTE: Set for an unannotated Parameter, whose Type and label both came
 	// from the expected signature rather than from anything written here.
 	contextualParameter?: common.Parameter,
-): common.typed.ParameterNode {
+): {
+	parameter: common.typed.ParameterNode
+	bindings: Array<common.typed.ImplementationNode>
+} {
 	let type =
 		contextualParameter?.type ??
 		(node.type === null
 			? { type: "Error" as const }
 			: resolveType(node.type, scope))
+
+	// NOTE: A Pattern where the internal name goes. The Parameter still needs a
+	// name of its own — the desugared Constants read off it, and the Simplifier
+	// would otherwise mint `_0` for it and collide with a sibling `_: Type` at
+	// the same index — so one is synthesized from the Pattern's Position, which
+	// no source could have written and which is the same on every pass.
+	if (node.internalName?.nodeType === "Pattern") {
+		let pattern = node.internalName
+		let internalName = synthesizedName("parameter", pattern.position)
+
+		refuseRefutablePattern(pattern, "Parameter")
+		declareVariableInScope(internalName, type, scope, true)
+
+		return {
+			parameter: {
+				nodeType: "Parameter",
+				externalName: node.externalName
+					? enrichIdentifier(node.externalName, scope, type)
+					: null,
+				internalName: {
+					nodeType: "Identifier",
+					content: internalName,
+					position: pattern.position,
+					type,
+				},
+				position: node.position,
+				inferredType: node.type === null ? type : null,
+			},
+			bindings: declarePatternBindings(
+				pattern,
+				internalName,
+				type,
+				scope,
+				true,
+			),
+		}
+	}
 
 	// NOTE: `_: Type` binds no name, so there is nothing to declare — leaving
 	// it out of Scope is what makes the Parameter unreferenceable rather than
@@ -3392,15 +3741,18 @@ function enrichParameter(
 	}
 
 	return {
-		nodeType: "Parameter",
-		externalName: node.externalName
-			? enrichIdentifier(node.externalName, scope, type)
-			: null,
-		internalName: node.internalName
-			? enrichIdentifier(node.internalName, scope)
-			: null,
-		position: node.position,
-		inferredType: node.type === null ? type : null,
+		parameter: {
+			nodeType: "Parameter",
+			externalName: node.externalName
+				? enrichIdentifier(node.externalName, scope, type)
+				: null,
+			internalName: node.internalName
+				? enrichIdentifier(node.internalName, scope)
+				: null,
+			position: node.position,
+			inferredType: node.type === null ? type : null,
+		},
+		bindings: [],
 	}
 }
 
@@ -3588,8 +3940,10 @@ function narrowableReceiverName(
 		return "@"
 	}
 
-	if (base.nodeType === "Lookup" && base.base.nodeType === "Self") {
-		return lentBindingName(base.member.content, scope)
+	if (base.nodeType === "Lookup") {
+		let path = selfLookupPath(base)
+
+		return path === null ? null : lentBindingName(path, scope)
 	}
 
 	if (base.nodeType !== "Identifier") {
@@ -3599,6 +3953,25 @@ function narrowableReceiverName(
 	return findDeclaringScope(base.content, scope)?.constants.has(base.content)
 		? base.content
 		: null
+}
+
+// NOTE: The spine of member names a chain of Lookups reads off `@`, outermost
+// step last — `@.state.total` gives `["state", "total"]`. Null where the chain
+// does not bottom out in `@` at all.
+function selfLookupPath(
+	node: common.typed.ExpressionNode,
+): Array<string> | null {
+	if (node.nodeType === "Self") {
+		return []
+	}
+
+	if (node.nodeType !== "Lookup") {
+		return null
+	}
+
+	let prefix = selfLookupPath(node.base)
+
+	return prefix === null ? null : [...prefix, node.member.content]
 }
 
 // NOTE: The name a member of `@` is LENT to in this Scope, or null where the
@@ -3612,7 +3985,7 @@ function narrowableReceiverName(
 // its own, and the member names of two Cases can agree while their values have
 // nothing to do with each other.
 function lentBindingName(
-	memberName: string,
+	path: Array<string>,
 	scope: enricher.Scope,
 ): string | null {
 	for (
@@ -3623,7 +3996,13 @@ function lentBindingName(
 		for (let [name, alias] of Object.entries(
 			current.selfMemberAliases ?? {},
 		)) {
-			if (alias.member === memberName) {
+			// NOTE: The WHOLE spine, not its last step. A Pattern lends several
+			// names off one `@`, and `@.x` must not answer with a nested
+			// `origin.x` binding that happens to end in the same member.
+			if (
+				alias.path.length === path.length &&
+				alias.path.every((step, index) => step === path[index])
+			) {
 				return name
 			}
 		}
@@ -4128,20 +4507,13 @@ function inferReturnTypeFromBody(
 		let { result } = collectDiagnostics(() => {
 			let inferenceScope = childScope(scope)
 
-			node.parameters.forEach((parameter, index) => {
-				let type = parameterTypes[index]?.type ?? {
-					type: "Error" as const,
-				}
-
-				if (parameter.internalName !== null) {
-					declareVariableInScope(
-						parameter.internalName,
-						type,
-						inferenceScope,
-						true,
-					)
-				}
-			})
+			// NOTE: Declared through the same path the real pass uses, rather
+			// than by hand: a Parameter whose internal name is a Pattern brings
+			// in as many names as the Pattern binds, and a body reading one of
+			// them would otherwise report `unknown-name` HERE — where the
+			// Diagnostics are dropped — and hand back no return Type at all.
+			// The bindings it produces are discarded; only the Scope matters.
+			enrichParameterList(node.parameters, inferenceScope, parameterTypes)
 
 			// NOTE: No `expectedReturnType` is seeded — there is none yet,
 			// which is the whole reason this runs. A bare Case in return
@@ -4162,7 +4534,7 @@ function inferReturnTypeFromBody(
 			let types: Array<common.Type> = []
 
 			collectReturnedTypes(
-				node.body.map((bodyNode) =>
+				node.body.flatMap((bodyNode) =>
 					enrichNode(bodyNode, inferenceScope),
 				),
 				types,
@@ -6878,39 +7250,318 @@ function joinCaseInstantiations(
 	}
 }
 
-// NOTE: The payload binder of a Case Matcher: `case #Value(item)` names what
-// the CONSTRUCTOR takes, which for a one-member Case is that member's value —
-// the same shorthand that lets `#Value(5)` stand for `#Value({ item = 5 })`.
+// NOTE: The Type a value has for ONE member, asked silently. The Lookup
+// resolver reports `type-without-members` on a Union base, and a Union base is
+// exactly the shape asked here — a Pattern discriminating `Click | KeyPress`
+// names members only some arms carry, which is the whole reason to write one.
+// Arms without the member contribute nothing.
 //
-// A Case with no members has nothing to bind, and one with several has nothing
-// SINGLE to bind: binding the payload Record whole is the destructuring form
-// (`case #Rectangle({ width, height })`), which is deliberately not in this
-// slice. Both are refused here rather than half-answered, and the Diagnostic
-// names `@.member` as the way to read them today.
-type CaseMatcherBinding = {
-	name: parser.IdentifierNode
-	memberName: string
-	memberType: common.Type
-}
+// No arm carrying it answers `Unknown`, which constrains nothing at runtime and
+// is the honest degradation for "binds, and says nothing about the Type". It is
+// deliberately NOT a Diagnostic here: a Matcher naming a member no arm carries
+// makes an arm that can never be taken, and `unreachable-case` is the Validator's
+// to report. Where the position can not decline anything — a Parameter, a
+// Declaration — the caller asks about the member itself and does report.
+function memberTypeOf(type: common.Type, name: string): common.Type {
+	let found: Array<common.Type> = []
 
-function resolveCaseMatcherBinding(
-	node: parser.MatcherNode,
-	matcher: common.Type,
-): CaseMatcherBinding | null {
-	if (node.nodeType !== "CaseMatcher" || node.binding === null) {
-		return null
+	for (let arm of unionArmsOf(type)) {
+		let member =
+			arm.type === "Record" || arm.type === "Case"
+				? arm.members[name]
+				: undefined
+
+		if (member !== undefined) {
+			found.push(member)
+		}
 	}
 
-	let binding = node.binding
+	return found.length === 0 ? { type: "Unknown" } : buildUnion(found)
+}
+
+// NOTE: The Type at the end of a Pattern binding's spine — `["state", "total"]`
+// walked from the value the Pattern took apart.
+function typeAtPath(type: common.Type, path: Array<string>): common.Type {
+	return path.reduce(memberTypeOf, type)
+}
+
+// NOTE: What a Pattern in Matcher position establishes about the value it
+// matched. Every member contributes a Type, so `@` is a Record and `@.name`
+// works inside the Handler whatever form the member took: a value-constrained
+// member takes its literal's Type, an annotated one the Type it wrote, and a
+// bare one the Type the VALUE has for that member — a bare member being the
+// annotated one with its annotation elided, read off the scrutinee rather than
+// off the source.
+//
+// `literals` is filled with the value-constrained members, keyed by the DOTTED
+// SPINE that reaches each one. A member name can not hold a dot, so the two can
+// not be confused, and the Rewriter walks the spine to build the member reads
+// its test ANDs together. That is what lets a nested Pattern constrain by value
+// at all — `case #Rect({ origin as { x = 0 } })`.
+function resolvePatternMatcherType(
+	pattern: parser.PatternNode,
+	valueType: common.Type,
+	scope: enricher.Scope,
+	literals: Record<string, common.typed.ExpressionNode>,
+	path: Array<string> = [],
+	// NOTE: Set only where a member the VALUE has not got is a mistake rather
+	// than a discrimination. A Matcher over a Union names members only some
+	// arms carry — that is what a Record Matcher is FOR — and an arm nothing
+	// reaches is the Validator's `unreachable-case`. A Case payload is
+	// different: the Validator reads only the tag there, so a member nothing
+	// carries would make the arm silently unreachable with nothing said.
+	reportUnknownIn: parser.PatternNode | null = null,
+): common.Type {
+	let members: Record<string, common.Type> = {}
+
+	for (let [name, member] of Object.entries(pattern.members)) {
+		let memberPath = [...path, name]
+
+		if (member.kind === "Value") {
+			let enrichedValue = enrichExpression(member.value, scope)
+
+			literals[memberPath.join(".")] = enrichedValue
+			members[name] = enrichedValue.type
+
+			continue
+		}
+
+		let declaredType =
+			member.type === null ? null : resolveType(member.type, scope)
+
+		if (member.binder?.nodeType === "Pattern") {
+			// NOTE: A written annotation is what the arm narrows to; the nested
+			// Pattern only says which of its members the arm goes on to name —
+			// and where nothing was written, requiring those members IS the
+			// narrowing.
+			let nested = resolvePatternMatcherType(
+				member.binder,
+				declaredType ?? memberTypeOf(valueType, name),
+				scope,
+				literals,
+				memberPath,
+				reportUnknownIn === null ? null : member.binder,
+			)
+
+			members[name] = declaredType ?? nested
+
+			continue
+		}
+
+		let memberType = declaredType ?? memberTypeOf(valueType, name)
+
+		if (
+			reportUnknownIn !== null &&
+			declaredType === null &&
+			memberType.type === "Unknown" &&
+			!typeContainsError(valueType)
+		) {
+			reportUnknownPayloadMember(member.name, valueType)
+
+			memberType = { type: "Error" }
+		}
+
+		members[name] = memberType
+	}
+
+	return { type: "Record", members }
+}
+
+// NOTE: A name no source could have written, derived from the Position of what
+// it stands for. The Lexer reads `_` as a Symbol, so no Essence Identifier holds
+// one, and the `$` keeps it clear of the Rewriter's own `_self` — the same
+// convention the Optimiser's lowered bindings follow.
+//
+// Derived from a Position rather than from a counter because a Function
+// literal's body is enriched TWICE where its return Type is inferred from it,
+// and a counter would mint a different name on each pass.
+function synthesizedName(kind: string, position: common.Position): string {
+	return `$${kind}_${position.start.line}_${position.start.column}`
+}
+
+// NOTE: The Statements a Pattern that can DECLINE a value would need somewhere
+// to fall through to. A Matcher has the next arm; a Declaration and a Parameter
+// have nothing, so a member matched against a written value is refused there.
+//
+// A member constrained by TYPE is not refused: in an irrefutable position that
+// is an annotation, and it fails as `assignment-type-mismatch` like any other.
+function refuseRefutablePattern(
+	pattern: parser.PatternNode,
+	kind: string,
+): void {
+	for (let { member } of refutablePatternMembers(pattern)) {
+		reportError(
+			`A ${kind} can not match a value against a Pattern`,
+			member.position,
+			{
+				code: "refutable-pattern",
+				labels: [
+					primary(member.position, "this can decline the value"),
+				],
+				notes: [
+					`A Matcher may constrain a member by value, because an arm that declines falls through to the next one. A ${kind} has nowhere to fall through to.`,
+				],
+				helps: [
+					`Write only '${member.name.content}' to bind it, and ask about its value with 'match'.`,
+				],
+			},
+		)
+	}
+}
+
+// NOTE: What a Pattern binds in an irrefutable position, INCLUDING the members
+// that were refused. A refused member still brings its name in — recovery, not
+// semantics: the Program does not compile either way, and a body reading
+// `width` after the Diagnostic about `{ width = 0 }` must not be told a second
+// time that `width` is not declared. The Diagnostic that explains the mistake
+// is the one worth reading, and a cascade buries it.
+function irrefutablePatternBindings(
+	pattern: parser.PatternNode,
+): Array<PatternBinding> {
+	return [
+		...patternBindings(pattern),
+		...refutablePatternMembers(pattern).map(({ member, path }) => ({
+			name: member.name,
+			path,
+			// NOTE: A refused member is recovered as if it had been written
+			// bare, so the spine ends at its own name and carries no Type.
+			steps: path.map((step, index) => ({
+				name:
+					index === path.length - 1
+						? member.name
+						: {
+								nodeType: "Identifier" as const,
+								content: step,
+								position: member.name.position,
+							},
+				type: null,
+			})),
+			type: null,
+			member: member.name,
+		})),
+	]
+}
+
+// NOTE: A binding's value in an irrefutable position — the synthesized base
+// Constant, read down the binding's spine. A whole-value binder has an empty
+// spine and is therefore the base itself.
+//
+// The last step carries the MEMBER's span where one was written, so that
+// renaming the Record's member rewrites the member and not the name it was
+// bound under; every other span is the binder's, which is where a reader's
+// cursor is when they ask about it.
+function memberPathLookup(
+	baseName: string,
+	baseType: common.Type,
+	binding: PatternBinding,
+	type: common.Type,
+	basePosition: common.Position,
+): common.typed.ExpressionNode {
+	let node: common.typed.ExpressionNode = {
+		nodeType: "Identifier",
+		content: baseName,
+		position: basePosition,
+		type: baseType,
+	}
+
+	let currentType = baseType
+
+	for (let [index, step] of binding.steps.entries()) {
+		let isLast = index === binding.steps.length - 1
+		let stepType = isLast
+			? type
+			: memberTypeOf(currentType, step.name.content)
+
+		node = {
+			nodeType: "Lookup",
+			base: node,
+			member: {
+				nodeType: "Identifier",
+				content: step.name.content,
+				// NOTE: The span the step was WRITTEN at, every step of the
+				// way. An intermediate step given the innermost binder's span
+				// instead made the Language Server index it as an occurrence of
+				// the outer member, so renaming `origin` overwrote `x` and `y`.
+				position: step.name.position,
+				type: stepType,
+			},
+			position: binding.name.position,
+			type: stepType,
+		}
+
+		currentType = stepType
+	}
+
+	return node
+}
+
+// NOTE: One name a Matcher brings into scope, with the spine that reaches it
+// from `@` and the Type at the end of that spine. An empty spine is `@` itself,
+// which only a payload Pattern's own `as` binder can be.
+type MatcherBinding = {
+	name: parser.IdentifierNode
+	member: parser.IdentifierNode | null
+	path: Array<string>
+	// NOTE: Where each step of the spine was written — see `selfPathLookup`.
+	stepPositions: Array<common.Position>
+	type: common.Type
+}
+
+// NOTE: Every name a Handler's Matcher binds. Two Matchers bind anything: a
+// Pattern binds what its members name, and a Case Matcher binds what its
+// payload binder names.
+function resolveMatcherBindings(
+	node: parser.MatcherNode,
+	matcher: common.Type,
+	payload: PayloadRequirements | null = null,
+): Array<MatcherBinding> {
+	if (node.nodeType === "Pattern") {
+		return bindingsOf(node, matcher, [])
+	}
+
+	if (node.nodeType !== "CaseMatcher" || node.binding === null) {
+		return []
+	}
 
 	// NOTE: An unresolved Case already reported; adding a second Diagnostic
 	// about its payload would bury the one that matters.
 	if (matcher.type !== "Case") {
-		return null
+		return []
 	}
 
+	if (node.binding.nodeType === "Pattern") {
+		// NOTE: Read at what the arm PROVED, not at what the Case declared. The
+		// requirements the Handler tests are exactly the narrowing, so
+		// `case #Some({ value: Integer })` binds an Integer — the same answer
+		// the equivalent Record Matcher gives, which is the whole point of the
+		// two spellings meaning one thing.
+		let subject = payload ?? {
+			subjectType: payloadPatternSubject(node.binding, matcher).type,
+			subjectPath: payloadPatternSubject(node.binding, matcher).path,
+			memberTypes: null,
+		}
+
+		return bindingsOf(
+			node.binding,
+			subject.subjectType,
+			subject.subjectPath.map((step) => ({
+				name: {
+					nodeType: "Identifier" as const,
+					content: step,
+					position: node.position,
+				},
+				type: null,
+			})),
+		)
+	}
+
+	let binding = node.binding
 	let memberNames = Object.keys(matcher.members)
 
+	// NOTE: A binder that is one NAME names what the constructor takes, which
+	// for a one-member Case is that member's value. A Case with no members has
+	// nothing to name, and one with several has nothing SINGLE to name — for
+	// those the Pattern form is the answer, and the help says so.
 	if (memberNames.length !== 1) {
 		reportError(
 			`'${describeType(matcher)}' has no single value to bind`,
@@ -6934,113 +7585,353 @@ function resolveCaseMatcherBinding(
 					memberNames.length === 0
 						? ["Drop the binding — the Matcher alone is the test."]
 						: [
-								`Read them off the Matcher instead: '@.${memberNames[0]}'.`,
+								`Take the payload apart instead: '#${node.caseName.content}({ ${memberNames.join(", ")} })'.`,
 							],
 			},
 		)
 
-		return null
+		return []
 	}
 
 	let memberName = memberNames[0]!
 
-	return {
-		name: binding,
-		memberName,
-		memberType: matcher.members[memberName]!,
-	}
-}
-
-// NOTE: The Scope a Guard is enriched in when its Handler binds a payload. The
-// name is declared for real — shadowing a Namespace, refusing reassignment —
-// but resolves through `selfMemberAliases` into `@.member` rather than through
-// the body's Constant, which does not exist where a Guard runs. A Scope of its
-// own so that the body's Constant is still the body's, declared in the Scope
-// the body is enriched in and reported against whatever it collides with there.
-function scopeLendingBinding(
-	binding: CaseMatcherBinding,
-	matcher: common.Type,
-	bodyScope: enricher.Scope,
-): enricher.Scope {
-	let guardScope = childScope(bodyScope, {
-		selfMemberAliases: {
-			[binding.name.content]: {
-				member: binding.memberName,
-				selfType: matcher,
-			},
-		},
-	})
-
-	declareVariableInScope(binding.name, binding.memberType, guardScope, true)
-
-	return guardScope
-}
-
-// NOTE: Desugared into the Constant an author could have written —
-// `constant item = @.item` at the head of the arm — so the Simplifier, the
-// Rewriter and every walker downstream see nothing new.
-//
-// NOTE: `narrowedType` is what the Handler's Guard proved about this binding, and
-// it is what the SCOPE holds while the body is enriched. The Statement keeps the
-// Case's own member Type, because a refinement is evidence the Enricher carries
-// and never something the emitted Program has heard of — which is the shape a
-// narrowing takes everywhere: a Scope entry the body reads, and a typed tree that
-// says what it always said.
-function declareCaseMatcherBinding(
-	binding: CaseMatcherBinding,
-	matcher: common.Type,
-	bodyScope: enricher.Scope,
-	narrowedType?: common.RefinementType,
-): Array<common.typed.ImplementationNode> {
-	let { name, memberName, memberType } = binding
-
-	declareVariableInScope(name, narrowedType ?? memberType, bodyScope, true)
-
 	return [
 		{
-			nodeType: "ConstantDeclarationStatement",
-			name: {
-				nodeType: "Identifier",
-				content: name.content,
-				position: name.position,
-				type: memberType,
-			},
-			value: selfMemberLookup(
-				memberName,
-				memberType,
-				matcher,
-				name.position,
-			),
-			position: name.position,
-			headPosition: name.position,
-			declaredType: null,
-			type: memberType,
-			documentation: null,
+			name: binding,
+			member: null,
+			path: [memberName],
+			// NOTE: The shorthand's one step is not written anywhere, so it
+			// stands at the binder the reader DID write.
+			stepPositions: [binding.position],
+			type: matcher.members[memberName]!,
 		},
 	]
 }
 
-// NOTE: A `Self` Node, not an Identifier spelled "@" — the Rewriter escapes an
-// Identifier as a user name, and inside a lifted Handler the scrutinee is the
-// `_self` Parameter.
-function selfMemberLookup(
-	memberName: string,
-	memberType: common.Type,
+// NOTE: What a Case Matcher's payload Pattern REQUIRES, keyed by the dotted
+// spine that reaches each requirement from the matched value. Without it a
+// payload Pattern would say where to read and never what must be there:
+// `case #Fired({ x, y })` on a `Fired { payload: Click | KeyPress }` would
+// accept every `#Fired` and then read `x` off a KeyPress.
+//
+// Beside the Matcher rather than inside it, which is the same split
+// `memberLiterals` makes and for the same reason: `matcher` says WHICH ARM this
+// is, and the Validator reads it to decide both coverage and reachability.
+// Narrowing it would claim the Case is only partly handled AND that the Handler
+// is dead — the second of which is plainly false.
+//
+// Only the member the Pattern's own spine reaches is required. Anything deeper
+// is already inside that requirement, because a Pattern's Type is a Record whose
+// members are Records in turn, and the runtime check walks the whole of it.
+//
+// The value-constrained members are collected on the way, under the same
+// spines — which is where the tie-break shows in the emitted test: the Record
+// reading compares `@.width`, the shorthand reading `@.state.index`.
+// NOTE: A payload Pattern naming a member no arm of the payload carries. The
+// same shape `reportUnknownMember` writes for a Lookup, because it is the same
+// mistake — the Pattern reads a member off the payload, and the payload has not
+// got one.
+function reportUnknownPayloadMember(
+	name: parser.IdentifierNode,
+	valueType: common.Type,
+): void {
+	let memberNames = [
+		...new Set(
+			unionArmsOf(valueType).flatMap((arm) =>
+				arm.type === "Record" || arm.type === "Case"
+					? Object.keys(arm.members)
+					: [],
+			),
+		),
+	]
+	let suggestion = closestMatch(name.content, memberNames)
+
+	reportError(
+		`'${describeType(valueType)}' has no member '${name.content}'`,
+		name.position,
+		{
+			code: "unknown-member",
+			labels: [primary(name.position, "no such member")],
+			notes:
+				memberNames.length === 0
+					? [`'${describeType(valueType)}' has no members.`]
+					: [
+							`'${describeType(valueType)}' has ${memberNames
+								.map((member) => `'${member}'`)
+								.join(", ")}.`,
+						],
+			helps: suggestion === null ? [] : [`Did you mean '${suggestion}'?`],
+		},
+	)
+}
+
+type PayloadRequirements = {
+	// NOTE: What the Handler TESTS, keyed by dotted spine.
+	memberTypes: Record<string, common.Type> | null
+	// NOTE: What the Handler PROVED — where the payload Pattern's bindings are
+	// read, and at which Type. A requirement is a narrowing, so an arm that
+	// tests `value: Integer` must bind an Integer and not the Union the Case
+	// declared: the test and the binding are two halves of one statement.
+	subjectPath: Array<string>
+	subjectType: common.Type
+}
+
+function resolvePayloadRequirements(
+	node: parser.CaseMatcherNode,
+	caseType: common.Type,
+	scope: enricher.Scope,
+	literals: Record<string, common.typed.ExpressionNode>,
+): PayloadRequirements {
+	let fallback = { memberTypes: null, subjectPath: [], subjectType: caseType }
+
+	if (node.binding?.nodeType !== "Pattern" || caseType.type !== "Case") {
+		return fallback
+	}
+
+	let subject = payloadPatternSubject(node.binding, caseType)
+	let required = resolvePatternMatcherType(
+		node.binding,
+		typeAtPath(caseType, subject.path),
+		scope,
+		literals,
+		subject.path,
+		// NOTE: A payload member no arm of the payload carries is a typo, and
+		// is reported HERE because nothing downstream can see it: the Validator
+		// reads only `matcher`, which for a Case Matcher is the tag. Left
+		// silent, the emitted test demanded a member nothing has and the arm
+		// simply never ran.
+		node.binding,
+	)
+
+	if (required.type !== "Record") {
+		return {
+			...fallback,
+			subjectPath: subject.path,
+			subjectType: subject.type,
+		}
+	}
+
+	// NOTE: The SHORTHAND reading requires its one member to be the Record the
+	// Pattern describes; the Record reading has no spine of its own and
+	// requires each named member individually.
+	//
+	// A requirement the DECLARED Type already guarantees is dropped, and that
+	// is what keeps the everyday `case #Rectangle({ width, height })`
+	// unconditional: naming members the Case itself declares asks nothing new,
+	// so the arm still retires its Case and a Match over a Choice stays
+	// exhaustive without a `case _`. Only a Pattern that asks for MORE than the
+	// Case promises — the union-typed payload it can decline — makes it
+	// conditional.
+	let requirements: Record<string, common.Type> = {}
+	let require = (path: string, requiredType: common.Type) => {
+		if (!matchesType(requiredType, typeAtPath(caseType, path.split(".")))) {
+			requirements[path] = requiredType
+		}
+	}
+
+	if (subject.path.length > 0) {
+		require(subject.path.join("."), required)
+	} else {
+		for (let [name, memberType] of Object.entries(required.members)) {
+			require(name, memberType)
+		}
+	}
+
+	return {
+		memberTypes: Object.keys(requirements).length > 0 ? requirements : null,
+		subjectPath: subject.path,
+		// NOTE: What the arm proved about the payload — the Record the Pattern
+		// required where it required one, so the bindings below it read the
+		// narrowed Types rather than the declared ones.
+		subjectType: required,
+	}
+}
+
+// NOTE: Which of the two readings a payload Pattern is. Construction faces the
+// same fork — `#Done(x)` and `#Done({ value = x })` are two spellings of one
+// value — and answers it by trying the payload Record first; the Matcher
+// mirrors that, so a reader who knows how a value is built knows how it comes
+// apart. The question is different only in what it can ask: a Pattern carries no
+// Type to compare, so it asks whether the Case carries the members the Pattern
+// names.
+//
+// The Record reading is also what a Case with any number of members but one
+// gets, because the shorthand exists only for a one-member Case. A member the
+// Case does not carry then answers `Unknown` and shows up as an arm the
+// Validator can prove unreachable, which is the same answer a Record Matcher
+// naming a stray member has always given.
+function payloadPatternSubject(
+	pattern: parser.PatternNode,
+	matcher: common.CaseType,
+): { path: Array<string>; type: common.Type } {
+	let memberNames = Object.keys(matcher.members)
+	let fitsPayloadRecord = Object.keys(pattern.members).every(
+		(name) => matcher.members[name] !== undefined,
+	)
+
+	if (fitsPayloadRecord || memberNames.length !== 1) {
+		return { path: [], type: matcher }
+	}
+
+	let memberName = memberNames[0]!
+
+	return { path: [memberName], type: matcher.members[memberName]! }
+}
+
+// NOTE: `patternBindings` decides WHICH names a Pattern brings in and under
+// which spine; this only has to say what each one's Type is. `subjectType` is
+// the Type at the end of `prefix`, so a binding's own steps are the ones past
+// it.
+//
+// The prefix is a step the SOURCE DID NOT WRITE — the one member a one-member
+// Case carries, which the shorthand reading walks through without naming. It
+// stands at the Matcher's own Position, because that is the nearest thing a
+// reader could point at.
+function bindingsOf(
+	pattern: parser.PatternNode,
+	subjectType: common.Type,
+	prefix: Array<PatternStep>,
+): Array<MatcherBinding> {
+	return patternBindings(pattern, prefix).map((binding) => ({
+		name: binding.name,
+		member: binding.member,
+		path: binding.path,
+		stepPositions: binding.steps.map((step) => step.name.position),
+		type: typeAtPath(subjectType, binding.path.slice(prefix.length)),
+	}))
+}
+
+// NOTE: The Scope a Guard is enriched in when its Handler binds anything. Each
+// name is declared for real — shadowing a Namespace, refusing reassignment —
+// but resolves through `selfMemberAliases` into the `@.member` spine it stands
+// for rather than through the body's Constant, which does not exist where a
+// Guard runs. A Scope of its own so that the body's Constants are still the
+// body's, declared in the Scope the body is enriched in and reported against
+// whatever they collide with there.
+function scopeLendingBindings(
+	bindings: Array<MatcherBinding>,
+	matcher: common.Type,
+	bodyScope: enricher.Scope,
+): enricher.Scope {
+	let guardScope = childScope(bodyScope, {
+		selfMemberAliases: Object.fromEntries(
+			bindings.map((binding) => [
+				binding.name.content,
+				{
+					path: binding.path,
+					stepPositions: binding.stepPositions,
+					selfType: matcher,
+				},
+			]),
+		),
+	})
+
+	for (let binding of bindings) {
+		declareVariableInScope(binding.name, binding.type, guardScope, true)
+	}
+
+	return guardScope
+}
+
+// NOTE: Desugared into the Constants an author could have written —
+// `constant item = @.item` at the head of the arm — so the Simplifier, the
+// Rewriter and every walker downstream see nothing new.
+//
+// NOTE: `narrowings` holds what the Handler's Guard proved about a binding, and
+// it is what the SCOPE holds while the body is enriched. The Statement keeps the
+// Matcher's own Type, because a refinement is evidence the Enricher carries and
+// never something the emitted Program has heard of — which is the shape a
+// narrowing takes everywhere: a Scope entry the body reads, and a typed tree that
+// says what it always said.
+function declareMatcherBindings(
+	bindings: Array<MatcherBinding>,
+	matcher: common.Type,
+	bodyScope: enricher.Scope,
+	narrowings: Map<string, common.RefinementType>,
+): Array<common.typed.ImplementationNode> {
+	return bindings.map((binding) => {
+		declareVariableInScope(
+			binding.name,
+			narrowings.get(binding.name.content) ?? binding.type,
+			bodyScope,
+			true,
+		)
+
+		return {
+			nodeType: "ConstantDeclarationStatement",
+			name: {
+				nodeType: "Identifier",
+				content: binding.name.content,
+				position: binding.name.position,
+				type: binding.type,
+			},
+			value: selfPathLookup(
+				binding.path,
+				binding.type,
+				matcher,
+				binding.name.position,
+				binding.stepPositions,
+			),
+			position: binding.name.position,
+			headPosition: binding.name.position,
+			declaredType: null,
+			type: binding.type,
+			documentation: null,
+			synthesized: "binding",
+		} satisfies common.typed.ConstantDeclarationStatementNode
+	})
+}
+
+// NOTE: A `Self` Node at the bottom, not an Identifier spelled "@" — the
+// Rewriter escapes an Identifier as a user name, and inside a lifted Handler the
+// scrutinee is the `_self` Parameter.
+//
+// `memberPosition` is where the LAST step of the spine was written, which is a
+// different span from the binding's own name wherever `as` renamed it. The
+// Language Server reads a member Lookup off this tree to join a Pattern member
+// to the Record member it reads, so handing it the binder's span would make
+// renaming the member rewrite the binder's text instead.
+function selfPathLookup(
+	path: Array<string>,
+	type: common.Type,
 	selfType: common.Type,
 	position: common.Position,
-): common.typed.LookupNode {
-	return {
-		nodeType: "Lookup",
-		base: { nodeType: "Self", position, type: selfType },
-		member: {
-			nodeType: "Identifier",
-			content: memberName,
-			position,
-			type: memberType,
-		},
+	// NOTE: Where each step of the spine was WRITTEN, where the caller knows —
+	// a Matcher's bindings do, a Guard's lent alias does not, because the alias
+	// stands for a Lookup nobody wrote. Every step given the same span would
+	// make the Language Server index an intermediate member as an occurrence of
+	// the binder, and renaming the member would overwrite the binder's text.
+	stepPositions?: Array<common.Position>,
+): common.typed.ExpressionNode {
+	let base: common.typed.ExpressionNode = {
+		nodeType: "Self",
 		position,
-		type: memberType,
+		type: selfType,
 	}
+
+	let baseType = selfType
+
+	for (let [index, step] of path.entries()) {
+		let isLast = index === path.length - 1
+		let stepType = isLast ? type : memberTypeOf(baseType, step)
+
+		base = {
+			nodeType: "Lookup",
+			base,
+			member: {
+				nodeType: "Identifier",
+				content: step,
+				position: stepPositions?.[index] ?? position,
+				type: stepType,
+			},
+			position,
+			type: stepType,
+		}
+
+		baseType = stepType
+	}
+
+	return base
 }
 
 // NOTE: A bare Case Matcher (`case #Add`) resolves against the matched
@@ -7613,7 +8504,7 @@ function resolveContextualReturnType(
 
 function parameterLabel(parameter: parser.ParameterNode): string {
 	return (
-		parameter.internalName?.content ??
+		parameterInternalName(parameter)?.content ??
 		parameter.externalName?.content ??
 		"_"
 	)

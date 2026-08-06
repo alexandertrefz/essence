@@ -3,6 +3,7 @@ import { describe, expect, it } from "bun:test"
 import type { parser } from "@essence-lang/interfaces"
 
 import { containsErrors } from "../diagnostics/index"
+import { parameterInternalName } from "../helpers/index"
 import { parse, parseWithDiagnostics } from "../parser/index"
 
 describe("Parser", () => {
@@ -1927,7 +1928,9 @@ describe("Parser", () => {
 				expect(node.nodeType).toBe("ConstantDeclarationStatement")
 
 				if (node.nodeType === "ConstantDeclarationStatement") {
-					expect(node.name.content).toBe("infer")
+					expect((node.name as parser.IdentifierNode).content).toBe(
+						"infer",
+					)
 				}
 			})
 
@@ -2007,7 +2010,8 @@ describe("Parser", () => {
 				expect(method.signature.generics[0].name.content).toBe("Item")
 				expect(method.signature.parameters).toHaveLength(1)
 				expect(
-					method.signature.parameters[0].internalName?.content,
+					parameterInternalName(method.signature.parameters[0])
+						?.content,
 				).toBe("value")
 
 				let documentation = method.signature.documentation
@@ -2819,7 +2823,8 @@ export { Rectangle from "./Geometry.es" }`,
 					).toEqual(["from", "as"])
 					expect(
 						node.value.parameters.map(
-							(parameter) => parameter.internalName?.content,
+							(parameter) =>
+								parameterInternalName(parameter)?.content,
 						),
 					).toEqual(["start", "end"])
 				}

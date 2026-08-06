@@ -1,5 +1,7 @@
 import { describe, expect, it } from "bun:test"
 
+import type { parser } from "@essence-lang/interfaces"
+
 import { parseWithDiagnostics } from "../parser/index"
 import { testDiagnostic } from "./diagnosticFactory"
 
@@ -66,7 +68,7 @@ describe("Parser Recovery", () => {
 		expect(nodes[0].nodeType).toBe("ConstantDeclarationStatement")
 
 		if (nodes[0].nodeType === "ConstantDeclarationStatement") {
-			expect(nodes[0].name.content).toBe("y")
+			expect((nodes[0].name as parser.IdentifierNode).content).toBe("y")
 			expect(nodes[0].value.nodeType).toBe("IntegerValue")
 		}
 	})
@@ -267,7 +269,7 @@ describe("Parser Recovery", () => {
 		expect(nodes[0].nodeType).toBe("ConstantDeclarationStatement")
 
 		if (nodes[0].nodeType === "ConstantDeclarationStatement") {
-			expect(nodes[0].name.content).toBe("y")
+			expect((nodes[0].name as parser.IdentifierNode).content).toBe("y")
 		}
 	})
 })

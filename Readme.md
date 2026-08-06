@@ -40,6 +40,7 @@ Essence compiles to modern ECMAScript, allowing execution in Bun, Node.js as wel
 * Protocols
 * Generics
 * Named Parameters
+* Patterns — one way to name the parts of a value, in every position that takes one apart
 * Arbitrary Precision Numbers
 * First-Class Functions
 

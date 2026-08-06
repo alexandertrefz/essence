@@ -359,6 +359,87 @@ Error: This Match has no Case for the rest of the values
 "
 `;
 
+exports[`Diagnostic Showcase Patterns.es should render the same report every time 1`] = `
+"[refutable-pattern]
+Error: A Declaration can not match a value against a Pattern
+    ╭─┤ Patterns.es:21:13 │
+    │
+ 21 │     constant { width = 0, height } = rectangle
+    │                ────┬────  
+    │                    ╰────── this can decline the value
+    │ 
+    │ Help: Write only 'width' to bind it, and ask about its value with 'match'.
+    │ 
+    │ Note: A Matcher may constrain a member by value, because an arm that declines falls through to the next one. A Declaration has nowhere to fall through to.
+────╯
+
+[refutable-pattern]
+Error: A Declaration can not match a value against a Pattern
+    ╭─┤ Patterns.es:27:25 │
+    │
+ 27 │     constant { origin as { x = 0, y } } = nested
+    │                            ──┬──  
+    │                              ╰──── this can decline the value
+    │ 
+    │ Help: Write only 'x' to bind it, and ask about its value with 'match'.
+    │ 
+    │ Note: A Matcher may constrain a member by value, because an arm that declines falls through to the next one. A Declaration has nowhere to fall through to.
+────╯
+
+[refutable-pattern]
+Error: A Parameter can not match a value against a Pattern
+    ╭─┤ Patterns.es:31:21 │
+    │
+ 31 │     function area(of { width = 1, height }: {
+    │                        ────┬────  
+    │                            ╰────── this can decline the value
+    │ 
+    │ Help: Write only 'width' to bind it, and ask about its value with 'match'.
+    │ 
+    │ Note: A Matcher may constrain a member by value, because an arm that declines falls through to the next one. A Parameter has nowhere to fall through to.
+────╯
+
+[unknown-member]
+Error: { width: Integer, height: Integer } has no member 'widht'
+    ╭─┤ Patterns.es:41:13 │
+    │
+ 41 │     constant { widht } = rectangle
+    │                ──┬──  
+    │                  ╰──── no such member
+    │ 
+    │ Help: Did you mean 'width'?
+    │ 
+    │ Note: { width: Integer, height: Integer } has 'width', 'height'.
+────╯
+
+[duplicate-variable]
+Error: Variable 'measure' is already declared
+    ╭─┤ Patterns.es:46:41 │
+    │
+ 46 │     constant { width as measure, height as measure } = rectangle
+    │                         ───┬───            ───┬───  
+    │                            ╰──────────────────│───── first declared here
+    │                                               │     
+    │                                               ╰───── declared a second time here
+────╯
+
+[unbindable-case-payload]
+Error: 'Shape#Rectangle' has no single value to bind
+    ╭─┤ Patterns.es:59:19 │
+    │
+ 59 │        case #Rectangle(box) { <- 0 }
+    │                        ─┬─  
+    │                         ╰─── this Case carries 2 values
+    │ 
+    │ Help: Take the payload apart instead: '#Rectangle({ width, height })'.
+    │ 
+    │ Note: Its values are 'width', 'height'.
+────╯
+
+─── 6 errors
+"
+`;
+
 exports[`Diagnostic Showcase RecursiveTypes.es should render the same report every time 1`] = `
 "[recursive-type-declaration]
 Error: Type 'Node' names itself
@@ -537,21 +618,47 @@ Error: Expected '=' but found '42'.
     │                      ╰── expected '='
 ────╯
 
+[redundant-pattern-binder]
+Error: A Matcher's Pattern can not name the whole value
+    ╭─┤ Syntax.es:22:17 │
+    │
+ 22 │        case { x, y } as whole { <- x }
+    │                      ────┬───  
+    │                          ╰───── '@' already names it
+    │ 
+    │ Help: Write '@' where 'whole' was meant.
+    │ 
+    │ Note: Inside an arm, '@' is the scrutinee narrowed to what the Matcher established — which is exactly what this would name a second time.
+────╯
+
+[pattern-without-body]
+Error: A Protocol Method can not take a Parameter apart
+    ╭─┤ Syntax.es:30:11 │
+    │
+ 30 │        area(of { width, height }: { width: Integer, height: Integer }) -> Integer
+    │                ────────┬────────  
+    │                        ╰────────── no body to bind these in
+    │ 
+    │ Help: Write one name, and take it apart where it is used.
+    │ 
+    │ Note: A Protocol Method declares what a call looks like and nothing about how it is carried out, so a Pattern here would name parts for nobody to read.
+────╯
+
 [unclosed-block]
 Error: This block is never closed
-    ╭─┤ Syntax.es:19:10 │
+    ╭─┤ Syntax.es:36:10 │
     │
- 18 │     function greet(_ name: String) -> String {
+ 35 │     function greet(_ name: String) -> String {
     │                                              ▲  
     │                                              ╰── opened here
- 19 │        <- name
+ 36 │        <- name
     │               │ 
     │               ╰─ the input ends here
     │ 
     │ Help: Add the missing '}'.
 ────╯
 
-─── 2 errors
+─── 4 errors
 "
 `;
 

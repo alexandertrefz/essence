@@ -1,5 +1,9 @@
 import { builtinProtocols } from "@essence-lang/compiler/enricher/builtins"
 import {
+	isSynthesizedName,
+	parameterInternalName,
+} from "@essence-lang/compiler/helpers"
+import {
 	printCaseWithPayload,
 	printConformanceClauses,
 	printSignature,
@@ -299,6 +303,15 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 	switch (node.nodeType) {
 		case "ConstantDeclarationStatement":
 		case "VariableDeclarationStatement":
+			// NOTE: The Constant a Pattern holds its value in is named by the
+			// Compiler, so hovering it would answer with a name no source
+			// wrote. Its value is still visited: the Expression under the
+			// cursor is the author's either way.
+			if (node.synthesized === "base") {
+				visitNode(node.value, state)
+				return
+			}
+
 			consider(
 				state,
 				node.headPosition,
@@ -512,6 +525,16 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 			visitNode(node.expression, state)
 			return
 		case "Identifier":
+			// NOTE: A Pattern's bindings read off a Constant the Compiler
+			// named, and that Identifier stands at the Pattern's own span — so
+			// hovering anywhere in `{ width, height }` answered with
+			// `$pattern_2_11`, a name no source wrote and no reader has seen.
+			// The binders themselves are Constants of their own and answer for
+			// their own spans, which is what a hover there should say.
+			if (isSynthesizedName(node.content)) {
+				return
+			}
+
 			visitIdentifier(node, state)
 			return
 		case "MethodInvocation": {
@@ -861,7 +884,15 @@ function visitFunctionDefinition(
 			visitIdentifier(parameter.externalName, state)
 		}
 
-		if (parameter.internalName !== null) {
+		// NOTE: A Parameter taken apart by a Pattern has a Compiler-made
+		// internal name standing over the Pattern's own span, so offering it
+		// would answer a hover anywhere in the Pattern with a name no source
+		// wrote. The names the Pattern BINDS are Constants at the head of the
+		// body and are visited with it.
+		if (
+			parameter.internalName !== null &&
+			!isSynthesizedName(parameter.internalName.content)
+		) {
 			visitIdentifier(parameter.internalName, state)
 		}
 	}
@@ -1059,7 +1090,7 @@ function visitNativeSignatures(
 
 					for (let identifier of [
 						parameter.externalName,
-						parameter.internalName,
+						parameterInternalName(parameter),
 					]) {
 						if (identifier !== null) {
 							consider(
@@ -1193,7 +1224,7 @@ function visitProtocolBodies(
 
 					for (let identifier of [
 						parameter.externalName,
-						parameter.internalName,
+						parameterInternalName(parameter),
 					]) {
 						if (identifier !== null) {
 							consider(

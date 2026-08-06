@@ -251,7 +251,7 @@ export type MatcherNode =
 	| TypeDeclarationNode
 	| WildcardMatcherNode
 	| LiteralMatcherNode
-	| RecordMatcherNode
+	| PatternNode
 	| CaseMatcherNode
 
 // NOTE: `case #Add` — a bare Case Matcher resolves its name against the
@@ -260,33 +260,78 @@ export type MatcherNode =
 // when two Choices in one Union share a Case name.
 //
 // NOTE: `binding` is the optional payload binder — `case #Value(item)` names
-// the payload for the span of the arm. It binds exactly what the CONSTRUCTOR
-// takes, so a one-member Case binds that member's value through the same
-// shorthand that lets `#Value(5)` stand for `#Value({ item = 5 })`, and any
-// other Case binds the payload Record whole. `@` is untouched by it and still
-// means the scrutinee narrowed to this Matcher — which is what lets an arm
-// bind the payload AND hand the whole Case onwards.
+// the payload for the span of the arm. It names exactly what the CONSTRUCTOR
+// takes, which is what makes `case #Value(item)` the mirror of `#Value(5)`: on
+// a one-member Case the constructor takes that member's value, through the
+// same shorthand that lets `#Value(5)` stand for `#Value({ item = 5 })`.
+//
+// A Pattern in that position takes the payload apart instead of naming it
+// whole — `case #Rectangle({ width, height })`. Where both readings fit a
+// one-member Case, the payload Record wins, which is the tie-break
+// construction already applies to the same two spellings.
+//
+// `@` is untouched by either form and still means the scrutinee narrowed to
+// this Matcher — which is what lets an arm bind the payload AND hand the whole
+// Case onwards.
 export interface CaseMatcherNode {
 	nodeType: "CaseMatcher"
 	choice: IdentifierNode | null
 	caseName: IdentifierNode
-	binding: IdentifierNode | null
+	binding: IdentifierNode | PatternNode | null
 	position: Position
 }
 
-// NOTE: A Record Matcher constrains members individually — `name: Type` by
-// Type, `name = value` by value. A Matcher that constrains any member by value
-// is conditional in the same way `case 0` is, since it can decline a Record
-// whose Types all matched.
-export interface RecordMatcherNode {
-	nodeType: "RecordMatcher"
-	members: Record<string, RecordMatcherMemberNode>
+// NOTE: A Pattern names the parts of a value. It is the Record Matcher
+// grammar — `name: Type` constrains by Type, `name = value` by value —
+// generalised into the four positions that take a value apart: a Matcher, a
+// Case payload binder, a Parameter and a Declaration.
+//
+// Every member BINDS except `name = value`, which constrains without binding
+// because the value is written right there. The bare form `{ x }` is the
+// annotated one with its Type elided, exactly as `(item)` is `(_ item: Type)`
+// with its Type left to the expected signature — so `{ x }` and
+// `{ x: Integer }` differ in what they constrain and not in what they bind.
+//
+// A Pattern that constrains any member by value is conditional in the same way
+// `case 0` is, since it can decline a Record whose Types all matched. That is
+// also why such a member is refused in the positions that can not decline
+// anything — a Parameter and a Declaration.
+export interface PatternNode {
+	nodeType: "Pattern"
+	members: Record<string, PatternMemberNode>
+	// NOTE: `} as name` — one name for the whole value, alongside the names its
+	// members bind. It is what lets a Function literal take a Record apart and
+	// still write `{ state with … }`. Refused at the top level of a Matcher,
+	// where `@` already means exactly that.
+	binder: IdentifierNode | null
 	position: Position
 }
 
-export type RecordMatcherMemberNode =
-	| { kind: "Type"; name: IdentifierNode; type: TypeDeclarationNode }
-	| { kind: "Value"; name: IdentifierNode; value: LiteralMatcherValueNode }
+// NOTE: `position` spans the member as written, which is what a Diagnostic
+// about one member underlines — neither `name` nor `type`/`value` alone covers
+// `width: Integer as w`.
+export type PatternMemberNode =
+	| {
+			kind: "Type"
+			name: IdentifierNode
+			// NOTE: Null is the elided form, `{ x }`. The Type then comes from
+			// the value being taken apart rather than from the source.
+			type: TypeDeclarationNode | null
+			// NOTE: `as` — another name, or a nested Pattern. Null binds the
+			// member under its own name.
+			binder: PatternBinderNode | null
+			position: Position
+	  }
+	| {
+			kind: "Value"
+			name: IdentifierNode
+			value: LiteralMatcherValueNode
+			position: Position
+	  }
+
+// NOTE: A binder is a name or another Pattern. That one line is the whole of
+// nesting: `{ origin as { x, y } }` needs no syntax of its own.
+export type PatternBinderNode = IdentifierNode | PatternNode
 
 // NOTE: `case _` carries no Type of its own — the Enricher resolves it to
 // whatever the Handlers before it have not already caught.
@@ -327,9 +372,14 @@ export type StatementNode =
 	| FunctionStatementNode
 	| OverloadedFunctionStatementNode
 
+// NOTE: `name` is a Pattern where the Declaration takes the value apart —
+// `constant { matching, rest } = list::partition(where …)`. A Declaration can
+// not decline a value, so the Pattern there must be irrefutable: a member
+// constrained by value is refused, and so is a Case. A member constrained by
+// Type is not a test but an annotation, and fails the way any annotation does.
 export interface ConstantDeclarationStatementNode {
 	nodeType: "ConstantDeclarationStatement"
-	name: IdentifierNode
+	name: IdentifierNode | PatternNode
 	type: TypeDeclarationNode | null
 	value: ExpressionNode
 	position: Position
@@ -338,7 +388,7 @@ export interface ConstantDeclarationStatementNode {
 
 export interface VariableDeclarationStatementNode {
 	nodeType: "VariableDeclarationStatement"
-	name: IdentifierNode
+	name: IdentifierNode | PatternNode
 	type: TypeDeclarationNode | null
 	value: ExpressionNode
 	position: Position
@@ -702,10 +752,18 @@ export interface FunctionDefinitionNode {
 // expected signature, which is why `externalName` is null alongside it — in
 // `(item) { … }` there is no label to read off the source, and writing one
 // would have nothing to agree with.
+//
+// `internalName` is a Pattern where the Parameter takes its value apart —
+// `area(of { width, height }: Rectangle)`. The Pattern stands where the one
+// name would, so `externalName` is untouched and the CALL SITE is too: what a
+// Parameter is called by its caller and what its body calls the parts of it
+// are separate questions, and only the second one a Pattern answers.
+// `externalName` is never a Pattern, which is what lets the Parser keep
+// reusing ONE Identifier for both names in the `count: Integer` form.
 export interface ParameterNode {
 	nodeType: "Parameter"
 	externalName: IdentifierNode | null
-	internalName: IdentifierNode | null
+	internalName: IdentifierNode | PatternNode | null
 	type: TypeDeclarationNode | null
 	position: Position
 	documentation: Documentation | null

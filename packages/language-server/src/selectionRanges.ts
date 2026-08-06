@@ -1,5 +1,6 @@
 import type { common, parser } from "@essence-lang/interfaces"
 
+import { matcherValueExpressions } from "./matchHandlerChildren"
 import { contains } from "./positions"
 
 // NOTE: "Expand selection" wants the chain of ever-larger constructs
@@ -127,16 +128,12 @@ function collectFromNode(
 			descend(node.value, cursor, chain)
 
 			for (let handler of node.handlers) {
-				// NOTE: A Record Matcher's by-value members are the only part
-				// of a Matcher that is smaller than the Matcher itself — a
-				// literal Matcher's value spans the whole Matcher, so it would
-				// only repeat a range the chain already has.
-				if (handler.matcher.nodeType === "RecordMatcher") {
-					for (let member of Object.values(handler.matcher.members)) {
-						if (member.kind === "Value") {
-							descend(member.value, cursor, chain)
-						}
-					}
+				// NOTE: A Pattern's by-value members are the only part of a
+				// Matcher that is smaller than the Matcher itself — a literal
+				// Matcher's value spans the whole Matcher, so it would only
+				// repeat a range the chain already has.
+				for (let value of matcherValueExpressions(handler.matcher)) {
+					descend(value, cursor, chain)
 				}
 
 				if (handler.guard !== null) {

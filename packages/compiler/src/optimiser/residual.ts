@@ -292,7 +292,7 @@ function soleClaimantOf(
 // however it was spelled, and an alias (`Optional<Integer>`) is the Union it
 // stands for by the time a Type reaches here. Anything else is one member: its
 // own.
-function unionMembersOf(type: common.Type): Array<common.Type> {
+export function unionMembersOf(type: common.Type): Array<common.Type> {
 	if (type.type !== "UnionType") {
 		return [type]
 	}
