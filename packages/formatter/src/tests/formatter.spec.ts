@@ -170,6 +170,383 @@ describe("formatter", () => {
 		})
 	})
 
+	// NOTE: A Pattern takes a value apart, in five written positions. Every one
+	// of them is here because the printer reaches each by a different path — a
+	// Matcher, a Case payload, a Parameter, and the head of a Declaration —
+	// and because the safety gate compares Tokens: a spelling canonicalised
+	// anywhere along those paths is not a diff a reader would argue with, it is
+	// a refusal to format the file at all.
+	describe("Patterns", () => {
+		let block = (...lines: Array<string>) =>
+			["implementation {", ...lines, "}", ""].join("\n")
+
+		// NOTE: One source per position, each already written the way the
+		// printer writes it, so that round-tripping it byte for byte is the
+		// whole assertion.
+		let positions: Array<[string, string]> = [
+			[
+				"a Matcher",
+				block(
+					"\tTerminal.print(match input -> String {",
+					'\t\tcase { x = 0, y = 0 }           { <- "the origin" }',
+					'\t\tcase { x: Integer, y: Integer } { <- "somewhere else" }',
+					'\t\tcase _                          { <- "not a point" }',
+					"\t})",
+				),
+			],
+			[
+				"a Matcher read by a Guard",
+				block(
+					"\tTerminal.print(match input -> String {",
+					'\t\tcase { x, y } where x::is(y) { <- "on the diagonal" }',
+					'\t\tcase _ { <- "elsewhere" }',
+					"\t})",
+				),
+			],
+			[
+				"a Case payload",
+				block(
+					"\tTerminal.inspect(match drawn -> Integer {",
+					"\t\tcase #Rect({ width, height }) { <- width::multiplyWith(height) }",
+					"\t\tcase #Dot                     { <- 0 }",
+					"\t})",
+				),
+			],
+			[
+				"a Case payload naming the whole value",
+				block(
+					"\tTerminal.inspect(match drawn -> Integer {",
+					"\t\tcase #Rect({ width, height } as box)       { <- box.width }",
+					"\t\tcase #Going({ state as { index, total } }) { <- index }",
+					"\t})",
+				),
+			],
+			[
+				"a Function literal Parameter",
+				block(
+					"\tconstant first = ({ first, second }) { <- first }",
+					"\tconstant whole = ({ first, second } as pair) { <- pair }",
+				),
+			],
+			[
+				"a named Function's Parameter",
+				block(
+					"\tfunction area(of { width, height }: Rectangle) -> Integer {",
+					"\t\t<- width::multiplyWith(height)",
+					"\t}",
+					"",
+					"\tfunction span(_ { width, height }: Rectangle) -> Integer {",
+					"\t\t<- width",
+					"\t}",
+					"",
+					"\tfunction edge({ width, height }: Rectangle) -> Integer {",
+					"\t\t<- height",
+					"\t}",
+				),
+			],
+			[
+				"a Declaration",
+				block(
+					"\tconstant { matching, rest } = list::partition(where predicate)",
+					"\tconstant { width, height } as size: Rectangle = rect",
+					"\tvariable { index, total } = state",
+				),
+			],
+			[
+				"a nested Declaration",
+				block("\tconstant { origin as { x, y } } = shape"),
+			],
+		]
+
+		for (let [name, source] of positions) {
+			it(`round-trips a Pattern in ${name}`, () => {
+				let result = format(source)
+
+				expect(result.refusal).toBeNull()
+				expect(result.text).toBe(source)
+			})
+
+			it(`is idempotent over a Pattern in ${name}`, () => {
+				let once = format(source)
+				let twice = format(once.text)
+
+				expect(once.refusal).toBeNull()
+				expect(twice.text).toBe(once.text)
+			})
+		}
+
+		// NOTE: Declaration position has no alignment column at stake, so a
+		// Pattern there lays itself out like the Record Type it reads as — one
+		// member to a line, with the trailing comma every broken list gets.
+		describe("in Declaration position", () => {
+			it("breaks a Pattern too wide for its line", () => {
+				let source = block(
+					"\tconstant { firstMemberName, secondMemberName, thirdMemberName, fourthMember } = record",
+				)
+
+				expect(format(source).text).toBe(
+					block(
+						"\tconstant {",
+						"\t\tfirstMemberName,",
+						"\t\tsecondMemberName,",
+						"\t\tthirdMemberName,",
+						"\t\tfourthMember,",
+						"\t} = record",
+					),
+				)
+			})
+
+			it("is idempotent over a broken Pattern", () => {
+				let once = format(
+					block(
+						"\tconstant { firstMemberName, secondMemberName, thirdMemberName, fourthMember } = record",
+					),
+				)
+
+				expect(once.refusal).toBeNull()
+				expect(format(once.text).text).toBe(once.text)
+			})
+
+			it("breaks a nested Pattern with the Pattern that holds it", () => {
+				let source = block(
+					"\tconstant { origin as { horizontal, vertical }, extent as { width, height } } = shape",
+				)
+
+				expect(format(source).text).toBe(
+					block(
+						"\tconstant {",
+						"\t\torigin as { horizontal, vertical },",
+						"\t\textent as { width, height },",
+						"\t} = shape",
+					),
+				)
+			})
+
+			// NOTE: A Pattern head reports no width, which ends its alignment
+			// run — two of a similar width padded to one column could each then
+			// break, leaving the padding they were given stranded after their
+			// closing braces.
+			it("never pads a Pattern head out to a sibling's column", () => {
+				let source = block(
+					"\tconstant { alpha, beta } = first",
+					"\tconstant { gamma, delta } = second",
+				)
+
+				expect(format(source).text).toBe(source)
+			})
+
+			it("ends the run around it rather than dragging its neighbours", () => {
+				let source = block(
+					"\tconstant a = 1",
+					"\tconstant { x, y } = point",
+					"\tconstant bbbb = 2",
+				)
+
+				expect(format(source).text).toBe(source)
+			})
+		})
+
+		// NOTE: A Matcher's Pattern is never broken. `printMatch` measures a
+		// Matcher from its FLAT width and admits the Handler to a brace
+		// alignment run without asking whether the Matcher can break — so one
+		// that broke would drop the run's padding after its own closing brace,
+		// and every short sibling would be padded out to a column that no
+		// longer means anything.
+		describe("in Matcher position", () => {
+			// NOTE: The LAST brace of the line, unlike the `match` alignment's
+			// own helper above: a Pattern opens a brace of its own, and the
+			// column being measured is the one the Handler's body opens in.
+			let bracesOf = (source: string) =>
+				format(source)
+					.text.split("\n")
+					.filter((sourceLine) => sourceLine.includes("case "))
+					.map((sourceLine) => sourceLine.lastIndexOf("{"))
+
+			it("lines a Pattern up with a short sibling arm", () => {
+				expect(
+					bracesOf(
+						block(
+							"\tTerminal.print(match input -> String {",
+							'\t\tcase { x: Integer, y: Integer } { <- "a point" }',
+							'\t\tcase _ { <- "elsewhere" }',
+							"\t})",
+						),
+					),
+				).toEqual([34, 34])
+			})
+
+			// NOTE: The width at which a breakable Pattern would give way. It
+			// stays on one line instead, which leaves the alignment column
+			// where the Matchers are — the arms give way in their bodies, the
+			// way every arm too wide for its line does.
+			it("keeps a wide Pattern and its short sibling's on one line", () => {
+				let text = format(
+					block(
+						"\tTerminal.print(match input -> String {",
+						'\t\tcase { horizontal: Integer, vertical: Integer, depth: Integer, time: Integer } { <- "in space" }',
+						'\t\tcase { x: Integer } { <- "flat" }',
+						'\t\tcase _ { <- "elsewhere" }',
+						"\t})",
+					),
+				).text
+
+				expect(text).toContain(
+					"\t\tcase { horizontal: Integer, vertical: Integer, depth: Integer, time: Integer } {\n",
+				)
+				expect(text).toContain("\t\tcase { x: Integer }")
+				expect(text).not.toContain("\t\tcase {\n")
+			})
+
+			// NOTE: A Type inside a Matcher's Pattern is flattened with it. A
+			// Union is the one Type that would otherwise offer the group a
+			// break, and it would cost the same column.
+			it("keeps a Union written inside a Matcher's Pattern flat", () => {
+				let source = block(
+					"\tTerminal.print(match input -> String {",
+					'\t\tcase { value: Integer | Rational | String | Boolean, other: Integer } { <- "x" }',
+					'\t\tcase _ { <- "y" }',
+					"\t})",
+				)
+				let result = format(source)
+
+				expect(result.refusal).toBeNull()
+				expect(result.text).toContain(
+					"\t\tcase { value: Integer | Rational | String | Boolean, other: Integer } {\n",
+				)
+			})
+
+			it("is idempotent over a wide Pattern beside a short arm", () => {
+				let once = format(
+					block(
+						"\tTerminal.print(match input -> String {",
+						'\t\tcase { horizontal: Integer, vertical: Integer, depth: Integer, time: Integer } { <- "in space" }',
+						'\t\tcase { x: Integer } { <- "flat" }',
+						'\t\tcase _ { <- "elsewhere" }',
+						"\t})",
+					),
+				)
+
+				expect(once.refusal).toBeNull()
+				expect(format(once.text).text).toBe(once.text)
+			})
+		})
+
+		// NOTE: `as` is an ordinary Identifier everywhere it is not a Keyword,
+		// so a member may be CALLED `as` — `{ as }` binds it, `{ as as as }`
+		// binds it under that name, and `{ as as { … } }` takes it apart. The
+		// printer writes the name it was given without ever asking what it
+		// spells.
+		describe("a member named as", () => {
+			let source = block(
+				"\tconstant { as } = record",
+				"\tconstant { as as as } = record",
+				"\tconstant { as as { index, total } } = record",
+			)
+
+			it("round-trips every spelling of it", () => {
+				let result = format(source)
+
+				expect(result.refusal).toBeNull()
+				expect(result.text).toBe(source)
+			})
+
+			it("is idempotent over it", () => {
+				let once = format(source)
+
+				expect(once.refusal).toBeNull()
+				expect(format(once.text).text).toBe(once.text)
+			})
+		})
+
+		// NOTE: Parameter position has no alignment column at stake either, so
+		// a Pattern there breaks like the one in a Declaration — and the
+		// Parameter list around it breaks first, since a Parameter that fits on
+		// a line of its own is the cheaper break.
+		describe("in Parameter position", () => {
+			let source = block(
+				"\tfunction area(of { horizontal, vertical, depth, timeIndex, weight }: Box) -> Integer {",
+				"\t\t<- horizontal",
+				"\t}",
+			)
+
+			it("breaks the Parameter list around a wide Pattern", () => {
+				expect(format(source).text).toBe(
+					block(
+						"\tfunction area(",
+						"\t\tof { horizontal, vertical, depth, timeIndex, weight }: Box,",
+						"\t) -> Integer {",
+						"\t\t<- horizontal",
+						"\t}",
+					),
+				)
+			})
+
+			it("is idempotent over a broken Parameter list", () => {
+				let once = format(source)
+
+				expect(once.refusal).toBeNull()
+				expect(format(once.text).text).toBe(once.text)
+			})
+		})
+
+		// NOTE: Every one of these is a spelling the printer could tidy away
+		// and a Token the safety gate would then miss — which costs the whole
+		// file its formatting, not one member's.
+		describe("what must never be rewritten", () => {
+			let roundTrips = (source: string) => {
+				let result = format(source)
+
+				expect(result.refusal).toBeNull()
+				expect(result.text).toBe(source)
+			}
+
+			it("keeps a member bound under its own name", () => {
+				roundTrips(block("\tconstant { x as x, y } = record"))
+			})
+
+			it("keeps a Type elided where it was elided", () => {
+				roundTrips(block("\tconstant { x, y: Integer } = record"))
+			})
+
+			// NOTE: A one-member Case payload has two readings, and the
+			// Pattern one is what was written — rewriting it as `#Done(value)`
+			// would bind the payload whole instead of taking it apart.
+			it("keeps a one-member payload Pattern as a Pattern", () => {
+				roundTrips(
+					block(
+						"\tTerminal.inspect(match job -> Integer {",
+						"\t\tcase #Done({ value = 0 }) { <- 0 }",
+						"\t\tcase _                    { <- 1 }",
+						"\t})",
+					),
+				)
+			})
+
+			// NOTE: `_ { … }` and a bare `{ … }` are ONE node — both are
+			// labelless — so which was written lives in the source and nowhere
+			// else, and the `_` is a Token like any other.
+			it("keeps the underscore of a labelless Pattern Parameter", () => {
+				roundTrips(
+					block(
+						"\tconstant kept = list::map((_ { value }) { <- value })",
+					),
+				)
+			})
+
+			it("keeps a labelless Pattern Parameter without one", () => {
+				roundTrips(
+					block(
+						"\tconstant kept = list::map(({ value }) { <- value })",
+					),
+				)
+			})
+
+			it("keeps an empty Pattern and the name it binds", () => {
+				roundTrips(block("\tconstant {} as whole = record"))
+			})
+		})
+	})
+
 	// NOTE: A checked refinement's `where` clause has to come back on the Type's
 	// own line, because that is the only line the Parser reads it on — a clause
 	// broken onto the next one would be a Statement beginning with the name

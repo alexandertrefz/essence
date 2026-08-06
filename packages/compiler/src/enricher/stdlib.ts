@@ -5,6 +5,7 @@ import {
 } from "@essence-lang/standard-library"
 
 import { renderDiagnostics } from "../diagnostics/render"
+import { patternBindings } from "../helpers/index"
 import {
 	linkModuleGraph,
 	loadModuleGraphOver,
@@ -298,9 +299,20 @@ export function declaredNames(programs: Array<parser.Program>): {
 				case "NamespaceDefinitionStatement":
 				case "FunctionStatement":
 				case "OverloadedFunctionStatement":
+					members.add(node.name.content)
+					break
+				// NOTE: A Pattern declares as many names as it binds, and this
+				// runs off the parsed tree — before the desugar that turns them
+				// into ordinary Constants everywhere else.
 				case "ConstantDeclarationStatement":
 				case "VariableDeclarationStatement":
-					members.add(node.name.content)
+					if (node.name.nodeType === "Pattern") {
+						for (let binding of patternBindings(node.name)) {
+							members.add(binding.name.content)
+						}
+					} else {
+						members.add(node.name.content)
+					}
 					break
 				default:
 					break

@@ -770,7 +770,7 @@ class DescentParser {
 
 	protected parseConstantDeclarationStatement(): parser.ConstantDeclarationStatementNode {
 		let keyword = this.tokens.expect(TokenType.KeywordConstant)
-		let name = this.parseIdentifier()
+		let name = this.parseDeclaredName()
 		let type = this.parseOptionalDeclarationType()
 
 		this.tokens.expect(TokenType.SymbolEqual)
@@ -788,7 +788,7 @@ class DescentParser {
 
 	protected parseVariableDeclarationStatement(): parser.VariableDeclarationStatementNode {
 		let keyword = this.tokens.expect(TokenType.KeywordVariable)
-		let name = this.parseIdentifier()
+		let name = this.parseDeclaredName()
 		let type = this.parseOptionalDeclarationType()
 
 		this.tokens.expect(TokenType.SymbolEqual)
@@ -802,6 +802,19 @@ class DescentParser {
 			{ start: keyword.position.start, end: value.position.end },
 			this.tokens.documentationAbove(keyword.position.start.line),
 		)
+	}
+
+	// NOTE: What a Declaration declares — one name, or a Pattern naming the
+	// parts of the value. The Keyword in front is what makes this unambiguous:
+	// a keyword-less `{ a, b } = x` could not be told from the Record Literal
+	// `{ a = 1 }` written as a Statement until its closing brace, which is why
+	// assignment position takes no Pattern.
+	protected parseDeclaredName(): parser.IdentifierNode | parser.PatternNode {
+		if (this.tokens.peek()?.type === TokenType.SymbolLeftBrace) {
+			return this.parsePattern()
+		}
+
+		return this.parseIdentifier()
 	}
 
 	protected parseVariableAssignmentStatement(): parser.VariableAssignmentStatementNode {
@@ -1391,6 +1404,8 @@ class DescentParser {
 			})
 		}
 
+		this.refusePatternParameters(parameterList.parameters, "native Method")
+
 		return generators.nativeMethodSignature(
 			generics,
 			parameterList.parameters,
@@ -1506,6 +1521,11 @@ class DescentParser {
 		let documentation = this.documentationHere()
 		let parameterList = this.parseParameterList()
 		let returnType = this.parseReturnType()
+
+		this.refusePatternParameters(
+			parameterList.parameters,
+			"Protocol Method",
+		)
 
 		return generators.protocolMethodSignature(
 			parameterList.parameters,
@@ -1835,11 +1855,15 @@ class DescentParser {
 			return generators.literalMatcher(value, value.position)
 		}
 
-		// NOTE: A Record in Matcher position is always a Record Matcher rather
-		// than a Record Type, because only the Matcher form admits
-		// `name = value` members alongside `name: Type` ones.
+		// NOTE: A Record in Matcher position is always a Pattern rather than a
+		// Record Type, because only the Pattern form admits `name = value`
+		// members alongside `name: Type` ones — and a bare `name`, which binds.
+		//
+		// No whole-value binder here: `@` is the scrutinee narrowed to this
+		// Matcher, so `} as name` would be a second name for what already has
+		// one.
 		if (token?.type === TokenType.SymbolLeftBrace) {
-			return this.parseRecordMatcher()
+			return this.parsePattern(false)
 		}
 
 		// NOTE: `case #Add` — the bare form resolves against the matched
@@ -1878,54 +1902,64 @@ class DescentParser {
 		return this.parseType()
 	}
 
-	// NOTE: The payload binder of a Case Matcher — `case #Value(item)`. Parens
-	// bind a NAME; braces are left free for the payload pattern form
-	// (`case #Add { left = 0 }`), which constrains a shape instead. The two can
-	// not be confused at the token level, which is the whole reason for the
-	// split.
+	// NOTE: The payload binder of a Case Matcher — `case #Value(item)`. It names
+	// what the CONSTRUCTOR takes, so the parens hold either one name or a
+	// Pattern that takes apart what the constructor was handed:
+	// `case #Rectangle({ width, height })`.
 	//
-	// NOTE: A Case Matcher is the only Matcher that takes one. `@` already
+	// Braces after the Case name are NOT a second spelling of this. After a
+	// Matcher a `{` opens the arm's own block, and `{ left = 0 }` IS a block —
+	// one holding a variable assignment. So `case #Add { left = 0 }` has two
+	// readings that are both valid Programs, and no lookahead settles which was
+	// written. The parens have no such problem, which is why the payload Pattern
+	// lives in them.
+	//
+	// NOTE: A Case Matcher is the only Matcher that takes a binder. `@` already
 	// answers for every Matcher kind — the scrutinee, narrowed — so this adds a
-	// second name rather than redefining the one that exists.
-	protected parseCaseMatcherBinding(): parser.IdentifierNode | null {
+	// second name rather than redefining the one that exists. That is also why a
+	// Pattern in Matcher position carries no whole-value binder of its own,
+	// while one in a payload does: what the constructor took is not `@`.
+	protected parseCaseMatcherBinding():
+		| parser.IdentifierNode
+		| parser.PatternNode
+		| null {
 		if (this.tokens.peek()?.type !== TokenType.SymbolLeftParen) {
 			return null
 		}
 
 		this.tokens.expect(TokenType.SymbolLeftParen)
 
-		let binding = this.parseIdentifier()
+		let binding =
+			this.tokens.peek()?.type === TokenType.SymbolLeftBrace
+				? this.parsePattern()
+				: this.parseIdentifier()
 
 		this.tokens.expect(TokenType.SymbolRightParen)
 
 		return binding
 	}
 
-	protected parseRecordMatcher(): parser.RecordMatcherNode {
+	// NOTE: A Pattern names the parts of a value, in every position that takes
+	// one apart: a Matcher, a Case payload, a Parameter and a Declaration.
+	// `allowsBinder` is false only at the top level of a Matcher, where `@`
+	// already names the whole value.
+	protected parsePattern(allowsBinder = true): parser.PatternNode {
 		let leftBrace = this.tokens.expect(TokenType.SymbolLeftBrace)
 
-		if (this.tokens.peek()?.type === TokenType.SymbolRightBrace) {
-			let rightBrace = this.tokens.next()
+		let members: Array<[string, parser.PatternMemberNode]> = []
 
-			return generators.recordMatcher(
-				{},
-				{
-					start: leftBrace.position.start,
-					end: rightBrace.position.end,
-				},
-			)
-		}
+		if (this.tokens.peek()?.type !== TokenType.SymbolRightBrace) {
+			members.push(this.parsePatternMember())
 
-		let members = [this.parseRecordMatcherMember()]
+			while (this.tokens.peek()?.type === TokenType.SymbolComma) {
+				this.tokens.next()
 
-		while (this.tokens.peek()?.type === TokenType.SymbolComma) {
-			this.tokens.next()
+				if (this.tokens.peek()?.type === TokenType.SymbolRightBrace) {
+					break
+				}
 
-			if (this.tokens.peek()?.type === TokenType.SymbolRightBrace) {
-				break
+				members.push(this.parsePatternMember())
 			}
-
-			members.push(this.parseRecordMatcherMember())
 		}
 
 		let rightBrace = this.tokens.expect(TokenType.SymbolRightBrace)
@@ -1936,32 +1970,130 @@ class DescentParser {
 			"duplicate-member",
 		)
 
-		return generators.recordMatcher(Object.fromEntries(members), {
+		let binder = this.parseWholeValueBinder(allowsBinder)
+
+		return generators.pattern(Object.fromEntries(members), binder, {
 			start: leftBrace.position.start,
-			end: rightBrace.position.end,
+			end: (binder ?? rightBrace).position.end,
 		})
 	}
 
-	// NOTE: `name: Type` constrains a member by Type, `name = value` by value.
-	// The two mix freely inside one Matcher.
-	protected parseRecordMatcherMember(): [
-		string,
-		parser.RecordMatcherMemberNode,
-	] {
+	// NOTE: `name` binds the member under its own name; `name: Type` binds it
+	// and constrains the Type as well; `name = value` constrains the value and
+	// binds nothing, because the value is written right there. The bare form is
+	// the annotated one with its Type elided, which is the same relation
+	// `(item)` has to `(_ item: Type)`.
+	protected parsePatternMember(): [string, parser.PatternMemberNode] {
 		let name = this.parseIdentifier()
 
 		if (this.tokens.peek()?.type === TokenType.SymbolEqual) {
 			this.tokens.next()
 
+			let value = this.parseLiteralMatcherValue()
+
 			return [
 				name.content,
-				{ kind: "Value", name, value: this.parseLiteralMatcherValue() },
+				generators.patternValueMember(name, value, {
+					start: name.position.start,
+					end: value.position.end,
+				}),
 			]
 		}
 
-		this.tokens.expect(TokenType.SymbolColon)
+		let type: parser.TypeDeclarationNode | null = null
 
-		return [name.content, { kind: "Type", name, type: this.parseType() }]
+		if (this.tokens.peek()?.type === TokenType.SymbolColon) {
+			this.tokens.next()
+
+			type = this.parseType()
+		}
+
+		let binder = this.parseMemberBinder()
+
+		return [
+			name.content,
+			generators.patternTypeMember(name, type, binder, {
+				start: name.position.start,
+				end: (binder ?? type ?? name).position.end,
+			}),
+		]
+	}
+
+	// NOTE: `as` binds a member under another name, or takes it apart further —
+	// a binder is a name or another Pattern, which is the whole of nesting.
+	//
+	// `as` is an ordinary Identifier everywhere it is not a Keyword (the Module
+	// grammar says the same about its own use of it), so a member may be CALLED
+	// `as`. Two Tokens settle it: an `as` is the binder only when a name or a
+	// `{` follows. `{ as }` binds a member called `as`; `{ as as as }` binds
+	// that member under that name; `{ as as }` ends the member at the first
+	// `as` and reports the stray one.
+	protected parseMemberBinder(): parser.PatternBinderNode | null {
+		if (!this.binderFollows()) {
+			return null
+		}
+
+		this.tokens.expect(TokenType.KeywordAs)
+
+		if (this.tokens.peek()?.type === TokenType.SymbolLeftBrace) {
+			return this.parsePattern()
+		}
+
+		return this.parseIdentifier()
+	}
+
+	// NOTE: `} as name` — one name for the whole value, alongside the names its
+	// members bind. Never a nested Pattern: the Pattern that would take it apart
+	// is the one this is written on.
+	protected parseWholeValueBinder(
+		allowsBinder: boolean,
+	): parser.IdentifierNode | null {
+		if (
+			this.tokens.peek()?.type !== TokenType.KeywordAs ||
+			!isIdentifierToken(this.tokens.peek(1))
+		) {
+			return null
+		}
+
+		let keyword = this.tokens.next()
+		let name = this.parseIdentifier()
+
+		if (allowsBinder) {
+			return name
+		}
+
+		// NOTE: Reported and then dropped, rather than failed on, so that one
+		// redundant binder does not cascade into a parse failure for the arm.
+		let position = { start: keyword.position.start, end: name.position.end }
+
+		reportError(
+			"A Matcher's Pattern can not name the whole value",
+			position,
+			{
+				code: "redundant-pattern-binder",
+				labels: [primary(position, "'@' already names it")],
+				notes: [
+					"Inside an arm, '@' is the scrutinee narrowed to what the Matcher established — which is exactly what this would name a second time.",
+				],
+				helps: [`Write '@' where '${name.content}' was meant.`],
+			},
+		)
+
+		return null
+	}
+
+	// NOTE: Whether the `as` at the cursor opens a binder rather than being a
+	// name in its own right. Two Tokens, no backtracking.
+	protected binderFollows(): boolean {
+		if (this.tokens.peek()?.type !== TokenType.KeywordAs) {
+			return false
+		}
+
+		let next = this.tokens.peek(1)
+
+		return (
+			isIdentifierToken(next) || next?.type === TokenType.SymbolLeftBrace
+		)
 	}
 
 	// NOTE: A Matcher compares against a written literal and nothing else —
@@ -2549,8 +2681,26 @@ class DescentParser {
 		let annotationFollows = () =>
 			this.tokens.peek()?.type === TokenType.SymbolColon
 
+		// NOTE: A leading `{` — a Pattern standing where the internal name goes,
+		// with no label written. Like a bare `item`, it takes both its Type and
+		// its label from the expected signature.
+		if (this.tokens.peek()?.type === TokenType.SymbolLeftBrace) {
+			return this.parsePatternParameter(null, null, documentation)
+		}
+
 		if (this.tokens.peek()?.type === TokenType.SymbolUnderscore) {
 			let underscore = this.tokens.next()
+
+			// NOTE: `_ { … }` — the labelless Pattern Parameter written out,
+			// which is what a named Function needs, since it parses its
+			// annotations rather than reading them off a signature.
+			if (this.tokens.peek()?.type === TokenType.SymbolLeftBrace) {
+				return this.parsePatternParameter(
+					null,
+					underscore.position,
+					documentation,
+				)
+			}
 
 			// NOTE: A bare `_` — binds no name and takes its Type from the
 			// expected signature, the contextual counterpart of `_: Type`.
@@ -2615,6 +2765,13 @@ class DescentParser {
 		}
 
 		let name = this.parseIdentifier()
+
+		// NOTE: `of { width, height }: Rectangle` — a label, then a Pattern where
+		// the internal name goes. The label is what the caller writes, so the
+		// call site is untouched by anything the Pattern says.
+		if (this.tokens.peek()?.type === TokenType.SymbolLeftBrace) {
+			return this.parsePatternParameter(name, null, documentation)
+		}
 
 		if (isIdentifierToken(this.tokens.peek())) {
 			let internalName = this.parseIdentifier()
@@ -2695,6 +2852,63 @@ class DescentParser {
 			{ start: name.position.start, end: type.position.end },
 			documentation,
 		)
+	}
+
+	// NOTE: The tail of every Pattern Parameter, shared by its three spellings —
+	// `({ … })`, `(_ { … }: Type)` and `(label { … }: Type)`. The annotation is
+	// optional for the same reason a bare `item`'s is: a Function literal in
+	// Argument position has an expected signature to read it off.
+	protected parsePatternParameter(
+		externalName: parser.IdentifierNode | null,
+		underscorePosition: common.Position | null,
+		documentation: common.Documentation | null,
+	): parser.ParameterNode {
+		let pattern = this.parsePattern()
+
+		let type =
+			this.tokens.peek()?.type === TokenType.SymbolColon
+				? (this.tokens.next(), this.parseType())
+				: null
+
+		return generators.parameter(
+			externalName,
+			pattern,
+			type,
+			{
+				start:
+					externalName?.position.start ??
+					underscorePosition?.start ??
+					pattern.position.start,
+				end: (type ?? pattern).position.end,
+			},
+			documentation,
+		)
+	}
+
+	// NOTE: A signature with no body has nothing for a Pattern's bindings to be
+	// read in — a native Method ends at its return Type and a Protocol Method
+	// never had a block. Refused here rather than in the Enricher, because the
+	// Parameter is well-formed and only its POSITION is wrong.
+	protected refusePatternParameters(
+		parameters: Array<parser.ParameterNode>,
+		kind: string,
+	): void {
+		for (let parameter of parameters) {
+			if (parameter.internalName?.nodeType !== "Pattern") {
+				continue
+			}
+
+			let position = parameter.internalName.position
+
+			reportError(`A ${kind} can not take a Parameter apart`, position, {
+				code: "pattern-without-body",
+				labels: [primary(position, "no body to bind these in")],
+				notes: [
+					`A ${kind} declares what a call looks like and nothing about how it is carried out, so a Pattern here would name parts for nobody to read.`,
+				],
+				helps: ["Write one name, and take it apart where it is used."],
+			})
+		}
 	}
 
 	protected parseArgumentList(): {

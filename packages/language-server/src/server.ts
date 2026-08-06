@@ -67,6 +67,7 @@ import {
 	findRenameableOccurrence,
 	identifierPattern,
 	isValidIdentifierName,
+	renameEdits,
 } from "./rename"
 import { findSelectionRanges } from "./selectionRanges"
 import {
@@ -500,9 +501,10 @@ export function startServer() {
 
 		let occurrences: Array<WorkspaceOccurrence> =
 			anchor?.symbol.occurrences ??
-			occurrence!.declaration.occurrences.map((position) => ({
+			occurrence!.declaration.occurrences.map((site) => ({
 				filePath: documentFilePath(params.textDocument.uri),
-				position,
+				position: site.position,
+				edits: site.edits,
 				access: "read" as const,
 			}))
 		let changes: Record<string, Array<TextEdit>> = {}
@@ -522,10 +524,21 @@ export function startServer() {
 				changes[uri] = edits
 			}
 
-			edits.push({
-				range: toLspRange(entry.position),
-				newText: params.newName,
-			})
+			// NOTE: Most sites are the new name written over the Identifier
+			// that was found. A Pattern's shorthand binder is not: `{ width }`
+			// names the Record's member and the local it binds with ONE
+			// Identifier, so renaming either end has to spell the other out
+			// beside it — `renameEdits` is where that is decided, once, for
+			// every caller.
+			edits.push(
+				...renameEdits(
+					{ position: entry.position, edits: entry.edits ?? null },
+					params.newName,
+				).map((edit) => ({
+					range: toLspRange(edit.position),
+					newText: edit.newText,
+				})),
+			)
 		}
 
 		return { changes }
@@ -631,14 +644,14 @@ export function startServer() {
 
 			return occurrence.declaration.occurrences
 				.filter(
-					(position) =>
+					(site) =>
 						params.context.includeDeclaration ||
 						definition === null ||
-						!isSamePosition(position, definition),
+						!isSamePosition(site.position, definition),
 				)
-				.map((position) => ({
+				.map((site) => ({
 					uri: params.textDocument.uri,
-					range: toLspRange(position),
+					range: toLspRange(site.position),
 				}))
 		}
 
@@ -720,8 +733,25 @@ export function startServer() {
 			return null
 		}
 
+		// NOTE: Linked editing propagates the SAME text to every range, so a
+		// symbol with a site that needs different text can not be offered —
+		// which is exactly a Pattern's shorthand binder: typing over `width` in
+		// `{ width }` has to leave the member behind as `{ width as … }`, and
+		// no amount of propagating one word does that. Renaming still works;
+		// this is the one capability that can not express the expansion, which
+		// is what the restriction above already anticipated.
+		if (
+			occurrence.declaration.occurrences.some(
+				(site) => site.edits !== null,
+			)
+		) {
+			return null
+		}
+
 		return {
-			ranges: occurrence.declaration.occurrences.map(toLspRange),
+			ranges: occurrence.declaration.occurrences.map((site) =>
+				toLspRange(site.position),
+			),
 			// NOTE: Typing a character an Identifier cannot contain ends the
 			// linked edit instead of propagating something unparseable.
 			wordPattern: identifierPattern,

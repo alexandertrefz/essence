@@ -80,6 +80,17 @@ function visitNode(
 			// NOTE: `declaredType` is set exactly when the source spelled the
 			// Type out — annotating an annotated declaration would be noise.
 			// A failed inference is left alone rather than shown as `Error`.
+			//
+			// A SYNTHESIZED Declaration is skipped outright. It stands for a
+			// binder the author wrote somewhere no annotation may follow — a
+			// Matcher's `case #Value(item)`, a Pattern's `{ width }` — so a
+			// hint there proposes an edit that does not parse, and the Quick
+			// Fix offering to apply it would break the file.
+			if (node.synthesized !== undefined) {
+				visitNode(node.value, hints)
+				return
+			}
+
 			if (
 				node.declaredType === null &&
 				node.type.type !== "Error" &&

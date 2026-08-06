@@ -1197,7 +1197,7 @@ const enrichImplementation = (
 					)
 				}
 
-				return [enrichNode(node, scope, hoistedTypes)]
+				return enrichNode(node, scope, hoistedTypes)
 			} catch (error) {
 				reportError(
 					`Internal Compiler Error: ${

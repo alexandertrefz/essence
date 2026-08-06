@@ -80,10 +80,22 @@ function elide<
 		return node
 	}
 
+	// NOTE: Everything that can make a Handler DECLINE a value its Matcher
+	// accepted. `memberTypes` — what a Case Matcher's payload Pattern requires
+	// — belongs on this list for the same reason `memberLiterals` does, and
+	// leaving it off would turn the final `case #Fired({ x, y })` into an
+	// unconditional `else` that runs for a payload carrying neither.
+	//
+	// No Program reaches that today, because a Handler carrying either one does
+	// not retire its Case and the Validator refuses the Match as inexhaustive
+	// first. This list is the pass's own statement of what unconditional means,
+	// though, and a list that is only right by someone else's accident is one
+	// the next change breaks silently.
 	if (
 		final.guard !== null ||
 		final.literal !== null ||
-		final.memberLiterals !== null
+		final.memberLiterals !== null ||
+		final.memberTypes !== null
 	) {
 		return node
 	}

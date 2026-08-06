@@ -250,9 +250,23 @@
 			"name": "keyword.control.essence"
 		},
 		"contextualKeyword": {
-			"comment": "`is` is also a Method name — `@::is(other)` — and `where` is also an Argument label — `keepEvery(where check:)` — so neither can be lit on the word alone. What follows decides: a conformance bound and a Match guard are followed by a Type or by `@`, a call and a label never are. The known miss is a guard on a bare lowercase name, `case Integer where isNegative()`, which stays unlit.",
-			"match": "\\b(is|where)\\b(?=[ \\t]+(@|[A-Z]))",
-			"name": "keyword.other.essence"
+			"comment": "The words that are Keywords in one place and ordinary Identifiers everywhere else. None of them can be lit on the word alone, so each rule here is what scopes its own.",
+			"patterns": [
+				{
+					"comment": "`is` is also a Method name — `@::is(other)` — and `where` is also an Argument label — `keepEvery(where check:)` — so neither can be lit on the word alone. What follows decides: a conformance bound and a Match guard are followed by a Type or by `@`, a call and a label never are. The known miss is a guard on a bare lowercase name, `case Integer where isNegative()`, which stays unlit.",
+					"match": "\\b(is|where)\\b(?=[ \\t]+(@|[A-Z]))",
+					"name": "keyword.other.essence"
+				},
+				{
+					"comment": "`as` binds a Pattern's member under another name — `{ x as y }`, `{ origin as { x, y } }` — or names the whole value, `{ x, y } as point`. It is an Argument label as well, so `normalize(as #ComposedCanonical)` is a call and not a Pattern, and only what sits on BOTH sides tells the two apart: a label opens its Argument, so a `(`, a comma or the head of the line precedes it, where a binder follows what it binds — a member name, the `>` closing the Type that member was constrained to, or the Pattern's own `}`. What may follow is the Parser's own two-Token rule verbatim, a name or a nested Pattern and nothing else, which leaves `{ as }` and the trailing name of `{ as as as }` unlit as the Identifiers they are. The whitespace is matched rather than looked behind because Oniguruma looks back a fixed number of characters only. NOTE: A binder written on the line below what it binds stays unlit, and a value NAMED `as` in front of a block — `if as { … }` — lights as though it were a binder. Both need the Parser to tell, which one line read by one regex is not.",
+					"match": "(?<=[^\\s\"§(){\\[\\]<|/@,.:=~_#-])[ \\t]+(as)(?=[ \\t]+[^\\s\"§()}\\[\\]<>|/@,.:=~_#-])",
+					"captures": {
+						"1": {
+							"name": "keyword.other.essence"
+						}
+					}
+				}
+			]
 		},
 		"declarationKeyword": {
 			"match": "\\b(declarations|implementation|constant|variable|function|namespace|type|choice|protocol)\\b",

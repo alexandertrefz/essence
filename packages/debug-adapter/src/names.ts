@@ -75,6 +75,8 @@ function demangleUserName(mangled: string): string {
 // NOTE: One emitted name, answered as the author spelled it. The overload
 // suffix goes first — it is appended to an already-escaped name — and what
 // remains is exactly one of the Rewriter's cases, or already the name itself.
+import { isSynthesizedName } from "@essence-lang/compiler/helpers"
+
 export function demangleName(name: string): string {
 	let base = name.replace(overloadSuffix, "")
 
@@ -129,6 +131,13 @@ export function isCompilerBinding(name: string): boolean {
 		name === "$type" ||
 		name === "$helpers" ||
 		name === "$_" ||
+		// NOTE: What a Pattern holds its value in while it reads the members
+		// off — `$pattern_6_12`, `$parameter_9_4`. The names the Pattern BINDS
+		// are the author's and stay; this is the one the Compiler made up, and
+		// it is the first Enricher-produced binding a reader could ever have
+		// seen, since every other one belongs to the Optimiser and a debug
+		// session compiles without it.
+		isSynthesizedName(name) ||
 		name.startsWith(stdlibMethodPrefix) ||
 		name.endsWith("__conformance")
 	)

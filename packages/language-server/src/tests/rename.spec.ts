@@ -11,6 +11,7 @@ import {
 	findRenameableOccurrence,
 	identifierPattern,
 	isValidIdentifierName,
+	renameEdits,
 } from "../rename"
 
 function findOccurrence(source: string, cursor: common.Cursor) {
@@ -31,17 +32,24 @@ function rename(source: string, cursor: common.Cursor, newName: string) {
 
 	let lines = source.split("\n")
 
-	let sortedOccurrences = [...occurrence.declaration.occurrences].sort(
-		(a, b) =>
-			b.start.line - a.start.line || b.start.column - a.start.column,
-	)
+	// NOTE: Applied through `renameEdits`, which is what the Server applies —
+	// so a Pattern's shorthand expansion is exercised here rather than only
+	// described. One site can write more than one edit, and an edit's span is
+	// its own: a binder added after a Type is an INSERTION at an empty span.
+	let edits = occurrence.declaration.occurrences
+		.flatMap((site) => renameEdits(site, newName))
+		.sort(
+			(a, b) =>
+				b.position.start.line - a.position.start.line ||
+				b.position.start.column - a.position.start.column,
+		)
 
-	for (let position of sortedOccurrences) {
+	for (let { position, newText } of edits) {
 		let line = lines[position.start.line - 1]
 
 		lines[position.start.line - 1] =
 			line.slice(0, position.start.column - 1) +
-			newName +
+			newText +
 			line.slice(position.end.column - 1)
 	}
 
@@ -1051,6 +1059,270 @@ describe("Rename through where clauses", () => {
 
 		expect(rename(source, { line: 6, column: 7 }, "Measurable")).toBe(
 			source.replaceAll("Sizable", "Measurable"),
+		)
+	})
+})
+
+// NOTE: A Pattern's bare member names TWO things with one Identifier — the
+// Record's member and the local it binds — so renaming either end has to spell
+// the other out beside it. Everything here is about that one fact; a Pattern
+// that already writes its binder needs nothing special and is asserted to stay
+// ordinary.
+describe("Rename with Patterns", () => {
+	const declaration = [
+		"implementation {",
+		"\tconstant box = { width = 1, height = 2 }",
+		"",
+		"\tconstant { width, height } = box",
+		"",
+		"\tTerminal.print(width::add(height))",
+		"}",
+	].join("\n")
+
+	it("expands a shorthand binder when the LOCAL is renamed", () => {
+		expect(rename(declaration, { line: 4, column: 13 }, "w")).toBe(
+			[
+				"implementation {",
+				"\tconstant box = { width = 1, height = 2 }",
+				"",
+				"\tconstant { width as w, height } = box",
+				"",
+				"\tTerminal.print(w::add(height))",
+				"}",
+			].join("\n"),
+		)
+	})
+
+	it("expands a shorthand binder the other way when the MEMBER is renamed", () => {
+		// NOTE: Started from the Record literal, because a cursor ON the binder
+		// always finds the local first — the member half is reached from any of
+		// the sites that write the member itself.
+		expect(rename(declaration, { line: 2, column: 19 }, "breadth")).toBe(
+			[
+				"implementation {",
+				"\tconstant box = { breadth = 1, height = 2 }",
+				"",
+				"\tconstant { breadth as width, height } = box",
+				"",
+				"\tTerminal.print(width::add(height))",
+				"}",
+			].join("\n"),
+		)
+	})
+
+	it("writes an annotated member's binder after its Type", () => {
+		let source = [
+			"implementation {",
+			"\tconstant box = { width = 1 }",
+			"",
+			"\tconstant { width: Integer } = box",
+			"",
+			"\tTerminal.print(width)",
+			"}",
+		].join("\n")
+
+		expect(rename(source, { line: 4, column: 13 }, "w")).toBe(
+			[
+				"implementation {",
+				"\tconstant box = { width = 1 }",
+				"",
+				"\tconstant { width: Integer as w } = box",
+				"",
+				"\tTerminal.print(w)",
+				"}",
+			].join("\n"),
+		)
+	})
+
+	it("renames a written binder without expanding anything", () => {
+		let source = [
+			"implementation {",
+			"\tconstant box = { width = 1 }",
+			"",
+			"\tconstant { width as measure } = box",
+			"",
+			"\tTerminal.print(measure)",
+			"}",
+		].join("\n")
+
+		expect(rename(source, { line: 4, column: 22 }, "size")).toBe(
+			[
+				"implementation {",
+				"\tconstant box = { width = 1 }",
+				"",
+				"\tconstant { width as size } = box",
+				"",
+				"\tTerminal.print(size)",
+				"}",
+			].join("\n"),
+		)
+	})
+
+	it("renames a Matcher's binding across its Guard and its body", () => {
+		let source = [
+			"implementation {",
+			"\tconstant point: { x: Integer } | { key: String } = { x = 1 }",
+			"",
+			"\tconstant read = match point -> Integer {",
+			"\t\tcase { x } where x::isPositive() { <- x }",
+			"\t\tcase _ { <- 0 }",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(rename(source, { line: 5, column: 10 }, "across")).toBe(
+			[
+				"implementation {",
+				"\tconstant point: { x: Integer } | { key: String } = { x = 1 }",
+				"",
+				"\tconstant read = match point -> Integer {",
+				"\t\tcase { x as across } where across::isPositive() { <- across }",
+				"\t\tcase _ { <- 0 }",
+				"\t}",
+				"}",
+			].join("\n"),
+		)
+	})
+
+	it("renames a Pattern Parameter's binding", () => {
+		let source = [
+			"implementation {",
+			"\tfunction area(of { width, height }: {",
+			"\t\twidth: Integer,",
+			"\t\theight: Integer,",
+			"\t}) -> Integer {",
+			"\t\t<- width::multiply(with height)",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(rename(source, { line: 2, column: 21 }, "w")).toBe(
+			[
+				"implementation {",
+				"\tfunction area(of { width as w, height }: {",
+				"\t\twidth: Integer,",
+				"\t\theight: Integer,",
+				"\t}) -> Integer {",
+				"\t\t<- w::multiply(with height)",
+				"\t}",
+				"}",
+			].join("\n"),
+		)
+	})
+
+	// NOTE: `as` separates a member from the name it binds under, so a binder
+	// renamed to it would read as the separator it is.
+	it("refuses 'as' as a rename target", () => {
+		expect(isValidIdentifierName("as")).toBe(false)
+	})
+
+	// NOTE: The grammar is `Identifier ":" Type "as" Binder`, so the binder goes
+	// after the Type. Writing it straight after the name produced
+	// `{ breadth as width: Integer }`, which is not a Pattern — a plain rename
+	// turned a clean file into a syntax error.
+	it("writes the expansion AFTER the Type when the member is renamed", () => {
+		let source = [
+			"implementation {",
+			"\tconstant box = { width = 1 }",
+			"",
+			"\tconstant { width: Integer } = box",
+			"",
+			"\tTerminal.print(width)",
+			"}",
+		].join("\n")
+
+		expect(rename(source, { line: 2, column: 19 }, "breadth")).toBe(
+			[
+				"implementation {",
+				"\tconstant box = { breadth = 1 }",
+				"",
+				"\tconstant { breadth: Integer as width } = box",
+				"",
+				"\tTerminal.print(width)",
+				"}",
+			].join("\n"),
+		)
+	})
+
+	// NOTE: Every step of a spine carries the span it was WRITTEN at. Given the
+	// innermost binder's span instead, renaming the outer member overwrote the
+	// inner binders and destroyed the whole Pattern.
+	it("renames a nested Pattern's outer member without touching its binders", () => {
+		let source = [
+			"implementation {",
+			"\tconstant point = { origin = { x = 1, y = 2 } }",
+			"",
+			"\tconstant { origin as { x, y } } = point",
+			"",
+			"\tTerminal.print(x::add(y))",
+			"}",
+		].join("\n")
+
+		expect(rename(source, { line: 2, column: 21 }, "start")).toBe(
+			[
+				"implementation {",
+				"\tconstant point = { start = { x = 1, y = 2 } }",
+				"",
+				"\tconstant { start as { x, y } } = point",
+				"",
+				"\tTerminal.print(x::add(y))",
+				"}",
+			].join("\n"),
+		)
+	})
+
+	// NOTE: A Guard's use of a binding lowers to a Lookup off `@`, and that
+	// Lookup is indexed. Given the USE's span for its member step, renaming the
+	// member overwrote the Guard's own identifier and left the binder behind.
+	it("renames a member without rewriting a Guard's use of the binding", () => {
+		let source = [
+			"implementation {",
+			"\ttype Inner = { index: Integer, total: Integer }",
+			"\ttype Other = { key: String }",
+			"",
+			"\tconstant value: Inner | Other = { index = 1, total = 2 }",
+			"",
+			"\tTerminal.print(match value -> String {",
+			'\t\tcase { index, total } where index::isLessThan(total) { <- "rising" }',
+			'\t\tcase _ { <- "other" }',
+			"\t})",
+			"}",
+		].join("\n")
+
+		expect(rename(source, { line: 2, column: 17 }, "position")).toBe(
+			[
+				"implementation {",
+				"\ttype Inner = { position: Integer, total: Integer }",
+				"\ttype Other = { key: String }",
+				"",
+				"\tconstant value: Inner | Other = { position = 1, total = 2 }",
+				"",
+				"\tTerminal.print(match value -> String {",
+				'\t\tcase { position as index, total } where index::isLessThan(total) { <- "rising" }',
+				'\t\tcase _ { <- "other" }',
+				"\t})",
+				"}",
+			].join("\n"),
+		)
+	})
+
+	// NOTE: An annotation inside a nested Pattern is a Type reference like any
+	// other; one left out of the index is one a rename leaves dangling.
+	it("renames a Type named inside a nested Pattern", () => {
+		let source = [
+			"implementation {",
+			"\ttype Len = Integer",
+			"",
+			"\tconstant point = { origin = { x = 1, y = 2 } }",
+			"",
+			"\tconstant { origin as { x: Len, y } } = point",
+			"",
+			"\tTerminal.print(x::add(y))",
+			"}",
+		].join("\n")
+
+		expect(rename(source, { line: 2, column: 7 }, "Length")).toBe(
+			source.replaceAll("Len", "Length"),
 		)
 	})
 })

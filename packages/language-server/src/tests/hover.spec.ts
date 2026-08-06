@@ -934,3 +934,36 @@ describe("Hover of a standard library Method", () => {
 		})
 	})
 })
+
+// NOTE: A Pattern's bindings read off a Constant the Compiler named, and that
+// Identifier stands at the Pattern's own span — so a hover anywhere in
+// `{ width, height }` answered with `$pattern_2_11`, a name no source wrote.
+describe("Hover of a Pattern", () => {
+	const source = [
+		"implementation {",
+		"\tconstant { width, height } = { width = 1, height = 2 }",
+		"",
+		"\tfunction area(of { w, h }: { w: Integer, h: Integer }) -> Integer {",
+		"\t\t<- w::multiply(with h)",
+		"\t}",
+		"",
+		"\tTerminal.print(area(of { w = width, h = height }))",
+		"}",
+	].join("\n")
+
+	it("says nothing over the braces of a Declaration Pattern", () => {
+		expect(hover(source, { line: 2, column: 11 })).toBeNull()
+	})
+
+	it("answers for a binder with the binder", () => {
+		expect(hover(source, { line: 2, column: 13 })).toBe("width: Integer")
+	})
+
+	// NOTE: A Parameter taken apart by a Pattern has a Compiler-made internal
+	// name over the Pattern's span; the label is what a reader wrote there.
+	it("answers for a Parameter Pattern with its label", () => {
+		expect(hover(source, { line: 4, column: 18 })).toBe(
+			"of: { w: Integer, h: Integer }",
+		)
+	})
+})

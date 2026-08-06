@@ -3,6 +3,7 @@ import type { common, parser } from "@essence-lang/interfaces"
 import { analyseDocument, documentFilePath } from "./analyse"
 import { insertImportEdit, relativeSpecifier } from "./autoImport"
 import { findInlayHints } from "./inlayHints"
+import { matcherValueExpressions } from "./matchHandlerChildren"
 import { isSamePosition } from "./positions"
 import type { Workspace } from "./workspace"
 
@@ -932,12 +933,8 @@ function walkNode(
 			walkNode(node.value, visit)
 
 			for (let handler of node.handlers) {
-				if (handler.matcher.nodeType === "RecordMatcher") {
-					for (let member of Object.values(handler.matcher.members)) {
-						if (member.kind === "Value") {
-							walkNode(member.value, visit)
-						}
-					}
+				for (let value of matcherValueExpressions(handler.matcher)) {
+					walkNode(value, visit)
 				}
 
 				if (handler.guard !== null) {

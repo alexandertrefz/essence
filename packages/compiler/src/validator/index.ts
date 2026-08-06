@@ -1465,6 +1465,13 @@ function finalHandlerLabel(handler: MatchHandler): common.DiagnosticLabel {
 		)
 	}
 
+	if (handler.memberTypes !== null) {
+		return primary(
+			handler.matcherPosition,
+			"this Case asks something of the payload, so it can decline one",
+		)
+	}
+
 	if (handler.guard !== null) {
 		return primary(
 			handler.guard.position,
@@ -1487,6 +1494,7 @@ function isUnconditionalHandler(handler: MatchHandler): boolean {
 	return (
 		handler.literal === null &&
 		handler.memberLiterals === null &&
+		handler.memberTypes === null &&
 		handler.guard === null
 	)
 }
@@ -1888,7 +1896,7 @@ function validateConstantDeclarationStatement(
 		if (!fitsExpectedType(node.declaredType, node.value)) {
 			reportDeclarationMismatch(
 				"Constant",
-				node.name.content,
+				node.synthesized === "base" ? null : node.name.content,
 				node.declaredType,
 				node.value,
 			)
@@ -1924,16 +1932,21 @@ function validateVariableDeclarationStatement(
 // NOTE: A Declaration's Type Annotation carries no Position of its own, so
 // the Type it demands is stated as a note rather than pointed at. The value
 // is what gets the arrow — it is the part that can be changed.
+// NOTE: `name` is null for the Constant a Pattern Declaration holds its value
+// in. That Constant is real and its annotation is the author's, but its NAME is
+// the Compiler's — unspellable on purpose — so the report names the Pattern
+// instead of a `$pattern_2_11` no reader has ever seen.
 function reportDeclarationMismatch(
 	kind: "Constant" | "Variable" | "Property",
-	name: string,
+	name: string | null,
 	declaredType: common.Type,
 	value: common.typed.ExpressionNode,
 ): void {
 	let evidence = refinementEvidence(declaredType)
+	let subject = name === null ? "the Pattern" : `${kind} '${name}'`
 
 	reportError(
-		`This value does not fit the declared Type of ${kind} '${name}'`,
+		`This value does not fit the declared Type of ${subject}`,
 		value.position,
 		{
 			code: "assignment-type-mismatch",
@@ -1944,7 +1957,7 @@ function reportDeclarationMismatch(
 				),
 			],
 			notes: [
-				`'${name}' is declared as ${describeType(declaredType)}.`,
+				`${name === null ? "The Pattern" : `'${name}'`} is declared as ${describeType(declaredType)}.`,
 				...evidence.notes,
 			],
 			helps: evidence.helps,

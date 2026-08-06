@@ -630,6 +630,16 @@ function walkHandlers(
 				: mapRecord(handler.memberLiterals, (member) =>
 						walkExpression(member, rewrites),
 					)
+		// NOTE: `memberTypes` holds Types and is walked past; `memberTests` is
+		// what `compile-type-tests` compiled them into, and is Expressions like
+		// any other — a pass that rewrote every Expression but these would leave
+		// a Handler's requirements reading the shape the pass before it replaced.
+		let memberTests =
+			handler.memberTests === null
+				? null
+				: mapRecord(handler.memberTests, (test) =>
+						walkExpression(test, rewrites),
+					)
 		let guard =
 			handler.guard === null
 				? null
@@ -640,13 +650,22 @@ function walkHandlers(
 			typeTest === handler.typeTest &&
 			literal === handler.literal &&
 			memberLiterals === handler.memberLiterals &&
+			memberTests === handler.memberTests &&
 			guard === handler.guard &&
 			body === handler.body
 		) {
 			return handler
 		}
 
-		return { ...handler, typeTest, literal, memberLiterals, guard, body }
+		return {
+			...handler,
+			typeTest,
+			literal,
+			memberLiterals,
+			memberTests,
+			guard,
+			body,
+		}
 	})
 }
 
