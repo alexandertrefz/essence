@@ -1932,13 +1932,15 @@ third"::lines())
 	)
 	show(
 		"loop<State, Result>(startingWith: State, step: (_ State) -> Step<State, Result>)",
-		loop(startingWith { index = 1, total = 0 }, step (state) {
-			if state.index::isGreaterThan(5) {
-				<- #Done(state.total)
+		loop(startingWith { index = 1, total = 0 }, step (
+			{ index, total } as state,
+		) {
+			if index::isGreaterThan(5) {
+				<- #Done(total)
 			}
 
-			<- #Continue({ state with index = state.index::add(1),
-			total = state.total::add(state.index) })
+			<- #Continue({ state with index = index::add(1),
+			total = total::add(index) })
 		}),
 	)
 }

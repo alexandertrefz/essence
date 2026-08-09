@@ -5,8 +5,8 @@ import {
 
 implementation {
 
-	function halved(_ amount: Amount) -> Amount {
-		<- { cents = amount.cents::divide(by 2)::round(toward #TowardZero) }
+	function halved(_ { cents }: Amount) -> Amount {
+		<- { cents = cents::divide(by 2)::round(toward #TowardZero) }
 	}
 
 	function quadrupled(_ amount: Amount) -> Amount {

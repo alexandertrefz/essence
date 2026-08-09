@@ -13,28 +13,34 @@ implementation {
 		ClearAll,
 	}
 
+	§ A Case Matcher's binder may be a Pattern, which takes the payload apart
+	§ into the fields the arm actually uses — so an arm reads its Case's own
+	§ names rather than reaching through `@` for each of them.
+	§
 	§ `divide` and `squareRoot` are already fallible, so their arms hand their
 	§ Optional straight on; the total ones wrap what they computed.
 	function evaluated(_ operation: Operation) -> Optional<Number> {
 		<- match operation -> Optional<Number> {
-			case #Add        { <- #Value(@.left::add(@.right)) }
-			case #Subtract   { <- #Value(@.left::subtract(@.right)) }
-			case #Multiply   { <- #Value(@.left::multiply(with @.right)) }
-			case #Divide     { <- @.left::divide(by @.right) }
-			case #SquareRoot { <- @.number::squareRoot() }
-			case #ClearAll   { <- #Empty }
+			case #Add({ left, right })      { <- #Value(left::add(right)) }
+			case #Subtract({ left, right }) { <- #Value(left::subtract(right)) }
+			case #Multiply({ left, right }) {
+				<- #Value(left::multiply(with right))
+			}
+			case #Divide({ left, right })   { <- left::divide(by right) }
+			case #SquareRoot({ number })    { <- number::squareRoot() }
+			case #ClearAll                  { <- #Empty }
 		}
 	}
 
 	§ Each key, as a person would write it down.
 	function spelled(_ operation: Operation) -> String {
 		<- match operation -> String {
-			case #Add        { <- "{@.left} + {@.right}" }
-			case #Subtract   { <- "{@.left} - {@.right}" }
-			case #Multiply   { <- "{@.left} × {@.right}" }
-			case #Divide     { <- "{@.left} ÷ {@.right}" }
-			case #SquareRoot { <- "√{@.number}" }
-			case #ClearAll   { <- "AC" }
+			case #Add({ left, right })      { <- "{left} + {right}" }
+			case #Subtract({ left, right }) { <- "{left} - {right}" }
+			case #Multiply({ left, right }) { <- "{left} × {right}" }
+			case #Divide({ left, right })   { <- "{left} ÷ {right}" }
+			case #SquareRoot({ number })    { <- "√{number}" }
+			case #ClearAll                  { <- "AC" }
 		}
 	}
 
