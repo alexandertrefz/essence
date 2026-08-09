@@ -69,9 +69,9 @@ implementation {
 
 	function areaOf(_ value: Shape) -> Integer {
 		<- match value -> Integer {
-			case #Circle { <- @.radius::multiply(with @.radius) }
-			case #Rect   { <- @.width::multiply(with @.height) }
-			case #Blank  { <- 0 }
+			case #Circle({ radius })      { <- radius::multiply(with radius) }
+			case #Rect({ width, height }) { <- width::multiply(with height) }
+			case #Blank                   { <- 0 }
 		}
 	}
 

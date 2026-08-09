@@ -18,15 +18,21 @@ implementation {
 	§ The general loop — a Record State threaded with `{ state with … }`,
 	§ stopping on the first `#Done`, which finishes with the running total. The
 	§ payload is written with the single-value `#Done(…)` shorthand.
+	§
+	§ The step takes its State apart into the two fields it reads and names the
+	§ whole of it with `as` besides, which is what keeps `{ state with … }`
+	§ writable — the two halves of the body each read the way they want to.
 	constant limit = 5
 
-	constant result = loop(startingWith { index = 1, total = 0 }, step (state) {
-		if state.index::isGreaterThan(limit) {
-			<- #Done(state.total)
+	constant result = loop(startingWith { index = 1, total = 0 }, step (
+		{ index, total } as state,
+	) {
+		if index::isGreaterThan(limit) {
+			<- #Done(total)
 		}
 
-		<- #Continue({ state with index = state.index::add(1),
-		total = state.total::add(state.index) })
+		<- #Continue({ state with index = index::add(1),
+		total = total::add(index) })
 	})
 
 	Terminal.print(result) § 15

@@ -2493,7 +2493,10 @@ describe("Optimiser", () => {
 			}`)
 
 			expect(generated).toContain("start.value <= end.value")
-			expect(generated).toContain("current.index.value <= end.value")
+			// NOTE: `index` rather than `current.index` because the driver's
+			// `while` predicate takes its State apart with a Pattern — the
+			// binding is what the lowered comparison reads.
+			expect(generated).toContain("index.value <= end.value")
 			expect(bodyOf(generated, "$es_Integer_isEven")).toContain(
 				".value === ",
 			)

@@ -32,27 +32,30 @@ implementation {
 		total: Integer,
 	}, Integer> = Progress#Going({ state = { index = 1, total = 0 } })
 
-	§ Match narrows an instantiated Case to its concrete member Types, and the
-	§ Matcher's binding names the payload the constructor took — `carried` is the
-	§ Record, `carried.total` inside it is an Integer.
+	§ Match narrows an instantiated Case to its concrete member Types, and a
+	§ Pattern in the Matcher's binder takes the payload the constructor took
+	§ apart — `#Going` carries one member, so `{ total }` fits only the
+	§ shorthand reading and binds straight out of the State Record, as an
+	§ Integer.
 	Terminal.inspect(match startState -> Integer {
-		case #Going(carried) { <- carried.total }
-		case #Stopped(total) { <- total }
+		case #Going({ total }) { <- total }
+		case #Stopped(total)   { <- total }
 	}) § 0
 
 	§ The driver, threading a Record State through `{ state with … }` and
-	§ stopping with the one-member `#Stopped` shorthand — `#Stopped(state.total)`
-	§ instead of `#Stopped({ value = state.total })`.
+	§ stopping with the one-member `#Stopped` shorthand — `#Stopped(total)`
+	§ instead of `#Stopped({ value = total })`. The step names the State's
+	§ fields and, with `as`, the State itself.
 	constant summed: Integer = Loop.run(startingWith {
 		index = 1,
 		total = 0,
-	}, step (state) {
-		if state.index::isGreaterThan(5) {
-			<- #Stopped(state.total)
+	}, step ({ index, total } as state) {
+		if index::isGreaterThan(5) {
+			<- #Stopped(total)
 		}
 
-		<- #Going({ state with index = state.index::add(1),
-		total = state.total::add(state.index) })
+		<- #Going({ state with index = index::add(1),
+		total = total::add(index) })
 	})
 
 	Terminal.inspect(summed::toString()) § "15"

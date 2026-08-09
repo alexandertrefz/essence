@@ -15,8 +15,8 @@ implementation {
 		<- "area: {shape::area()}"
 	}
 
-	function scaled(_ amount: Amount) -> Rational {
-		<- amount.cents::multiply(with Pi)
+	function scaled(_ { cents }: Amount) -> Rational {
+		<- cents::multiply(with Pi)
 	}
 
 	Terminal.print(describe(Rectangle.of(width 3, height 4))) § area: 12

@@ -43,7 +43,10 @@ implementation {
 
 	§ Record Cases match structurally, by the fields they name — a mix of
 	§ required Types (`:`) and exact values (`=`) picks the Union member
-	§ apart without naming it.
+	§ apart without naming it. Every field a Matcher names also BINDS, so an
+	§ arm reads what it matched on by name; a field constrained by VALUE is
+	§ the one exception, because the value it stands for is written right
+	§ there.
 	type Click = { x: Integer, y: Integer }
 	type KeyPress = { key: String }
 
@@ -51,8 +54,8 @@ implementation {
 
 	Terminal.print(match input -> String {
 		case { x = 0, y = 0 }           { <- "clicked the origin" }
-		case { x = 0, y: Integer }      { <- "clicked the y axis at {@.y}" }
-		case { x: Integer, y: Integer } { <- "clicked somewhere else" }
-		case { key: String }            { <- "pressed {@.key}" }
+		case { x = 0, y: Integer }      { <- "clicked the y axis at {y}" }
+		case { x: Integer, y: Integer } { <- "clicked at {x}, {y}" }
+		case { key: String }            { <- "pressed {key}" }
 	}) § clicked the y axis at 7
 }
