@@ -71,6 +71,12 @@ export type CompiledModule = {
 	// rebuild for an edit to the entry and sit still for an edit to what the
 	// entry imports.
 	files: Array<string>
+	// NOTE: The entries whose stale records this compile displaced — see
+	// `refuseSharedGraph`. A host whose modules outlive an invalidation (a Vite
+	// dev server re-transforms a module only when its OWN files change) has to
+	// force each one's next load itself, or a displaced entry that is still
+	// live keeps its cached bundle and the collision goes unseen.
+	superseded: Array<string>
 }
 
 // NOTE: One compiler per BUILD, because what it has to remember is what that
@@ -90,13 +96,24 @@ export type EssenceCompiler = {
 		entryPath: string,
 		declarations: boolean,
 	) => Promise<CompiledModule>
+	// NOTE: Told, not asked: the host says the shape of the build may have
+	// changed — a watch rebuild started, a file changed under a dev server —
+	// and every remembered entry stops being trusted as one until it is loaded
+	// again. A refactor that folds one entry into the other's graph would
+	// otherwise collide with the record of an entry that no longer is one, and
+	// refuse a build with exactly one entry until the server is restarted.
+	invalidate: () => void
 }
+
+// NOTE: `fresh` says the entry was loaded since the last `invalidate` — which
+// is what makes it an entry of the build as it NOW is, rather than as it was.
+type CompiledEntry = { files: Array<string>; fresh: boolean }
 
 export function createCompiler(options: PluginOptions): EssenceCompiler {
 	// NOTE: Keyed by entry rather than a plain list, so that recompiling the
 	// SAME entry — which is what a dev server does on every edit — replaces its
 	// graph instead of colliding with it.
-	let compiled = new Map<string, Array<string>>()
+	let compiled = new Map<string, CompiledEntry>()
 
 	return {
 		async compile(entryPath, declarations) {
@@ -116,48 +133,73 @@ export function createCompiler(options: PluginOptions): EssenceCompiler {
 				throw new EssenceCompileError(entry, result.diagnosticGroups)
 			}
 
-			refuseSharedGraph(compiled, entry, result.files)
-			compiled.set(entry, result.files)
+			let superseded = refuseSharedGraph(compiled, entry, result.files)
+
+			compiled.set(entry, { files: result.files, fresh: true })
 
 			if (declarations) {
 				await writeDeclarations(entry, result.surface)
 			}
 
-			return { code: result.code, files: result.files }
+			return { code: result.code, files: result.files, superseded }
+		},
+		invalidate() {
+			for (let record of compiled.values()) {
+				record.fresh = false
+			}
 		},
 	}
 }
 
 function refuseSharedGraph(
-	compiled: Map<string, Array<string>>,
+	compiled: Map<string, CompiledEntry>,
 	entry: string,
 	files: Array<string>,
-): void {
+): Array<string> {
 	let reached = new Set(files)
+	let superseded: Array<string> = []
 
-	for (let [other, otherFiles] of compiled) {
+	for (let [other, record] of compiled) {
 		if (other === entry) {
 			continue
 		}
 
-		let shared = otherFiles.filter((filePath) => reached.has(filePath))
+		let shared = record.files.filter((filePath) => reached.has(filePath))
 
-		if (shared.length > 0) {
-			throw new EssenceBuildError(
-				`This build compiles two Essence entries out of one Module graph — '${displayPath(
-					entry,
-				)}' and '${displayPath(other)}', which both reach '${displayPath(
-					shared[0]!,
-				)}'.\n\n` +
-					"Each entry becomes its own standalone bundle, with its own copy of the\n" +
-					"runtime and its own hidden Type key, so a value built by one is not\n" +
-					"recognised by the other — a Choice would match the wrong Case rather\n" +
-					"than fail. Import one `.es` entry per build and reach the rest through\n" +
-					"it, or load the second one with `loadModule`, which marshals to plain\n" +
-					"JavaScript at every boundary.",
-			)
+		if (shared.length === 0) {
+			continue
 		}
+
+		// NOTE: A record from before the last invalidation may describe an
+		// entry the build no longer has — superseded rather than refused. Where
+		// it IS still an entry, its own next load collides with the record this
+		// compile is about to write, which is fresh, and refuses there. That
+		// next load is not something every host grants on its own — which is
+		// why the superseded entries are handed back to the caller, for it to
+		// force where it has to.
+		if (!record.fresh) {
+			compiled.delete(other)
+			superseded.push(other)
+
+			continue
+		}
+
+		throw new EssenceBuildError(
+			`This build compiles two Essence entries out of one Module graph — '${displayPath(
+				entry,
+			)}' and '${displayPath(other)}', which both reach '${displayPath(
+				shared[0]!,
+			)}'.\n\n` +
+				"Each entry becomes its own standalone bundle, with its own copy of the\n" +
+				"runtime and its own hidden Type key, so a value built by one is not\n" +
+				"recognised by the other — a Choice would match the wrong Case rather\n" +
+				"than fail. Import one `.es` entry per build and reach the rest through\n" +
+				"it, or load the second one with `loadModule`, which marshals to plain\n" +
+				"JavaScript at every boundary.",
+		)
 	}
+
+	return superseded
 }
 
 // NOTE: Written only when the text would change. A dev server compiles on every

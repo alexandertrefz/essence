@@ -11,6 +11,7 @@ export type EsbuildLoadResult = {
 }
 
 export type EsbuildBuild = {
+	onStart(callback: () => void): void
 	onLoad(
 		options: { filter: RegExp },
 		callback: (args: EsbuildLoadArguments) => Promise<EsbuildLoadResult>,
@@ -32,6 +33,15 @@ export function essenceEsbuild(options: PluginOptions = {}): EsbuildPlugin {
 		// compiler's memory of what it has already compiled has to have.
 		setup(build) {
 			let compiler = createCompiler(options)
+
+			// NOTE: A watch context runs `setup` once and every REBUILD through
+			// `onStart` — and a rebuild may have different entries than the last
+			// one. The compiler keeps its graphs and drops only its confidence
+			// in who the entries are; whatever the rebuild still loads earns it
+			// back before anything can collide with it.
+			build.onStart(() => {
+				compiler.invalidate()
+			})
 
 			build.onLoad({ filter: ESSENCE_FILE }, async (args) => {
 				let compiled = await compiler.compile(

@@ -9,6 +9,7 @@ import {
 	reportWarning,
 	secondary,
 } from "../diagnostics/index"
+import { eraseRefinements } from "../helpers/eraseRefinements"
 import {
 	applyGenericBindings,
 	buildUnion,
@@ -899,7 +900,11 @@ export function enrichCombination(
 	scope: enricher.Scope,
 ): common.typed.CombinationNode {
 	let lhs = enrichExpression(node.lhs, scope)
-	let rhs = enrichExpression(node.rhs, scope)
+	// NOTE: The update is enriched with the value it updates as its expected
+	// Type, so each updated member is read against the Type the original
+	// declared for it — a bare Case resolves, and one arm of a Union-typed
+	// member is enough, exactly as it is at the Declaration.
+	let rhs = enrichExpression(node.rhs, scope, lhs.type)
 
 	return {
 		nodeType: "Combination",
@@ -1715,6 +1720,47 @@ function resolveWildcardMatcherType(
 	return buildUnion(remainingTypes)
 }
 
+// NOTE: A checked refinement can not stand where a runtime test is emitted — the
+// predicate is a check the runtime never hears of, so the test could only ask
+// about the base and the arm would run for values the predicate refuses, typed
+// as evidence nothing proved. Refused wherever a Matcher narrows by Type: the
+// Matcher itself, and the annotation on a Pattern's member. Refused however
+// DEEP the refinement stands, too — `List<NonZero>` spells no refinement at its
+// top level, but the emitted check could still only ask about `List<Integer>`,
+// and the arm would bind items the predicate refuses. The Error Type is the
+// usual poison, so the one Diagnostic does not cascade.
+function refuseRefinementMatcher(
+	type: common.Type,
+	position: common.Position,
+): common.Type {
+	if (!typeContainsRefinement(type)) {
+		return type
+	}
+
+	let described = describeType(type)
+	let base = describeType(eraseRefinements(type))
+
+	reportError(`A Matcher can not test for '${described}'`, position, {
+		code: "refinement-as-matcher",
+		labels: [
+			primary(
+				position,
+				type.type === "Refinement"
+					? "this is a checked refinement"
+					: "this carries a checked refinement",
+			),
+		],
+		notes: [
+			`A refinement's predicate erases before the Program runs, so the emitted check could only ask about '${base}' — and the arm would run for values the predicate refuses.`,
+		],
+		helps: [
+			`Match on '${base}' and prove the predicate inside the arm, the way every '${described}' is proven: an 'if' condition, a Case naming a written value, or a written value.`,
+		],
+	})
+
+	return { type: "Error" }
+}
+
 export function enrichMatch(
 	node: parser.MatchNode,
 	scope: enricher.Scope,
@@ -1793,7 +1839,10 @@ export function enrichMatch(
 				memberLiterals =
 					Object.keys(literals).length > 0 ? literals : null
 			} else {
-				matcher = resolveType(handler.matcher, scope)
+				matcher = refuseRefinementMatcher(
+					resolveType(handler.matcher, scope),
+					handler.matcher.position,
+				)
 			}
 
 			// NOTE: Only an unconditional Handler retires a Type. A literal
@@ -3486,7 +3535,10 @@ function expectedRecordMembers(
 		return null
 	}
 
-	let members: Record<string, Array<common.Type>> = {}
+	// NOTE: A null prototype, because the keys are the SOURCE's member names — a
+	// member called 'toString' would otherwise find Object.prototype's function
+	// where the `??=` expects a missing entry.
+	let members: Record<string, Array<common.Type>> = Object.create(null)
 
 	for (let record of records) {
 		for (let [name, type] of Object.entries(record.members)) {
@@ -7266,8 +7318,12 @@ function memberTypeOf(type: common.Type, name: string): common.Type {
 	let found: Array<common.Type> = []
 
 	for (let arm of unionArmsOf(type)) {
+		// NOTE: `Object.hasOwn` before the read — a member named after one of
+		// `Object.prototype`'s would otherwise answer with a JavaScript function
+		// the arm does not carry.
 		let member =
-			arm.type === "Record" || arm.type === "Case"
+			(arm.type === "Record" || arm.type === "Case") &&
+			Object.hasOwn(arm.members, name)
 				? arm.members[name]
 				: undefined
 
@@ -7283,6 +7339,30 @@ function memberTypeOf(type: common.Type, name: string): common.Type {
 // walked from the value the Pattern took apart.
 function typeAtPath(type: common.Type, path: Array<string>): common.Type {
 	return path.reduce(memberTypeOf, type)
+}
+
+// NOTE: What a value PROVES by passing a Pattern's requirements — each arm of
+// the value's Type that could pass, with the required members merged over its
+// declared ones. One Type serves both halves of a Handler: the emitted test
+// asks it and the bindings read it, so an `as` binder keeps every member the
+// arm proved rather than only the ones the Pattern named. Arms without members
+// contribute nothing, and where none is left the requirement stands alone — a
+// test nothing passes, which is the arm the Validator can prove unreachable.
+function provenPatternType(
+	valueType: common.Type,
+	required: common.Type,
+): common.Type {
+	if (required.type !== "Record") {
+		return required
+	}
+
+	let narrowed = unionArmsOf(valueType).flatMap((arm) =>
+		arm.type === "Record" || arm.type === "Case"
+			? [{ ...arm, members: { ...arm.members, ...required.members } }]
+			: [],
+	)
+
+	return narrowed.length === 0 ? required : buildUnion(narrowed)
 }
 
 // NOTE: What a Pattern in Matcher position establishes about the value it
@@ -7327,23 +7407,31 @@ function resolvePatternMatcherType(
 		}
 
 		let declaredType =
-			member.type === null ? null : resolveType(member.type, scope)
+			member.type === null
+				? null
+				: refuseRefinementMatcher(
+						resolveType(member.type, scope),
+						member.type.position,
+					)
 
 		if (member.binder?.nodeType === "Pattern") {
-			// NOTE: A written annotation is what the arm narrows to; the nested
-			// Pattern only says which of its members the arm goes on to name —
-			// and where nothing was written, requiring those members IS the
-			// narrowing.
+			// NOTE: A written annotation is what the arm narrows to, and the
+			// nested Pattern requires its members ON TOP of it — the two are one
+			// requirement, the annotation's arms with the nested requirements
+			// merged over them. Keeping only the annotation would drop what the
+			// nested Pattern asks, and the arm would run for a value without the
+			// very members it reads.
+			let memberType = declaredType ?? memberTypeOf(valueType, name)
 			let nested = resolvePatternMatcherType(
 				member.binder,
-				declaredType ?? memberTypeOf(valueType, name),
+				memberType,
 				scope,
 				literals,
 				memberPath,
 				reportUnknownIn === null ? null : member.binder,
 			)
 
-			members[name] = declaredType ?? nested
+			members[name] = provenPatternType(memberType, nested)
 
 			continue
 		}
@@ -7740,10 +7828,11 @@ function resolvePayloadRequirements(
 	return {
 		memberTypes: Object.keys(requirements).length > 0 ? requirements : null,
 		subjectPath: subject.path,
-		// NOTE: What the arm proved about the payload — the Record the Pattern
-		// required where it required one, so the bindings below it read the
-		// narrowed Types rather than the declared ones.
-		subjectType: required,
+		// NOTE: What the arm proved about the payload — the subject's declared
+		// arms with the Pattern's requirements merged over them, so the bindings
+		// below read the narrowed Types AND an `as` binder keeps the declared
+		// members the Pattern did not name.
+		subjectType: provenPatternType(subject.type, required),
 	}
 }
 
@@ -7765,8 +7854,8 @@ function payloadPatternSubject(
 	matcher: common.CaseType,
 ): { path: Array<string>; type: common.Type } {
 	let memberNames = Object.keys(matcher.members)
-	let fitsPayloadRecord = Object.keys(pattern.members).every(
-		(name) => matcher.members[name] !== undefined,
+	let fitsPayloadRecord = Object.keys(pattern.members).every((name) =>
+		Object.hasOwn(matcher.members, name),
 	)
 
 	if (fitsPayloadRecord || memberNames.length !== 1) {

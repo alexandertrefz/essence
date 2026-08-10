@@ -142,6 +142,8 @@ export type DiagnosticCode =
 	| "unclosed-block"
 	| "invalid-number"
 	| "invalid-escape"
+	| "comment-in-hole"
+	| "nesting-too-deep"
 	| "redundant-parameter-label"
 	| "declarations-outside-stdlib"
 	| "overload-function-outside-stdlib"
@@ -215,6 +217,7 @@ export type DiagnosticCode =
 	| "unreachable-case"
 	| "erased-case-conflict"
 	| "empty-list-overlap"
+	| "refinement-as-matcher"
 	| "match-on-non-union"
 	| "literal-match-shape"
 	// Protocols and conformance.
@@ -581,7 +584,7 @@ export type DescriptorNode =
 	| { k: "case"; m: Record<string, DescriptorNode> }
 	// NOTE: A Union-typed payload member — its arms are claimed at runtime by
 	// the value's `typeKeySymbol` tag, and the generic arm (`tag: null`)
-	// catches everything no arm claims, so `T | Nothing` compares a Nothing
+	// catches everything no arm claims, so `T | Integer` compares an Integer
 	// structurally and a `T` through its witness.
 	//
 	// NOTE: A tag says which KIND a value is, not which Type — every Record

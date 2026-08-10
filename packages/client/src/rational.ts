@@ -65,31 +65,22 @@ export class EssenceRational {
 
 	// NOTE: The nearest double, which is an approximation by definition — this
 	// is the lossy door, offered because a host that wants one usually knows it.
-	// The division is done on the parts where a double can hold them, and on a
-	// scaled quotient where it can not, so a Rational built out of thousand-bit
-	// bigints answers with its magnitude rather than with `NaN`.
+	// The division is done on the parts where a double holds them EXACTLY, and
+	// on a scaled quotient everywhere else — parts that are merely finite as
+	// doubles have already been rounded by the reading, and dividing two
+	// roundings misrounds the quotient by an ulp often enough to matter.
 	toNumber(): number {
 		if (this.numerator === 0n) {
 			return 0
 		}
 
-		let numerator = Number(this.numerator)
-		let denominator = Number(this.denominator)
+		let negative = this.numerator < 0n
+		let magnitude = dividedMagnitude(
+			negative ? -this.numerator : this.numerator,
+			this.denominator,
+		)
 
-		if (Number.isFinite(numerator) && Number.isFinite(denominator)) {
-			return numerator / denominator
-		}
-
-		// NOTE: 64 bits of quotient — more than a double's 53 — so the one
-		// rounding that happens is the conversion, and the power of two it is
-		// scaled back by is exact.
-		let shift = bitLength(this.denominator) - bitLength(this.numerator) + 64
-		let scaled =
-			shift >= 0
-				? (this.numerator << BigInt(shift)) / this.denominator
-				: this.numerator / (this.denominator << BigInt(-shift))
-
-		return scaledByPowerOfTwo(Number(scaled), -shift)
+		return negative ? -magnitude : magnitude
 	}
 
 	// NOTE: How Essence itself prints a Rational — `1/3`, and a whole one as
@@ -107,6 +98,77 @@ export class EssenceRational {
 			this.denominator === other.denominator
 		)
 	}
+}
+
+// NOTE: The largest integer every one of whose neighbours a double still tells
+// apart. Two parts at most this large divide in ONE hardware rounding, which
+// IEEE 754 requires to be correct — the fast path.
+const EXACT_LIMIT = 1n << 53n
+
+// NOTE: `numerator / denominator` for positive parts, correctly rounded to
+// nearest-even. Everything past the fast path rounds exactly once: the
+// quotient is taken to 64 bits with the truncated remainder folded into the
+// low bit — round-to-odd, which any later rounding of 53 bits or fewer reads
+// as "not exactly halfway" precisely when the true quotient is not — and the
+// power of two it is scaled back by is exact. A subnormal answer has fewer
+// bits than the conversion to a double would keep, so IT would round twice;
+// the rounding is done in bigint instead, at the one width that counts.
+function dividedMagnitude(numerator: bigint, denominator: bigint): number {
+	if (numerator <= EXACT_LIMIT && denominator <= EXACT_LIMIT) {
+		return Number(numerator) / Number(denominator)
+	}
+
+	let shift = bitLength(denominator) - bitLength(numerator) + 64
+	let scaled: bigint
+
+	if (shift >= 0) {
+		let widened = numerator << BigInt(shift)
+
+		scaled = widened / denominator
+
+		if (scaled * denominator !== widened) {
+			scaled |= 1n
+		}
+	} else {
+		let widened = denominator << BigInt(-shift)
+
+		scaled = numerator / widened
+
+		if (scaled * widened !== numerator) {
+			scaled |= 1n
+		}
+	}
+
+	// NOTE: The floor of the answer's exponent. At `-1023` and below the answer
+	// is subnormal — its ulp is `2 ** -1074` however few bits that leaves — so
+	// the 64-bit quotient is rounded to multiples of that ulp here, half to
+	// even, and what remains converts and scales exactly.
+	let exponent = bitLength(scaled) - 1 - shift
+
+	if (exponent < -1022) {
+		return scaledByPowerOfTwo(
+			Number(roundedShift(scaled, shift - 1074)),
+			-1074,
+		)
+	}
+
+	return scaledByPowerOfTwo(Number(scaled), -shift)
+}
+
+// NOTE: `value >> shift`, rounded to nearest with ties to even — the rounding
+// `Number(…)` would have done, at a coarser width than it would have done it.
+// The tie can not lie: a truncated quotient was already marked odd, so an
+// exact-looking half really is one.
+function roundedShift(value: bigint, shift: number): bigint {
+	let half = 1n << BigInt(shift - 1)
+	let rest = value & ((1n << BigInt(shift)) - 1n)
+	let whole = value >> BigInt(shift)
+
+	if (rest > half || (rest === half && (whole & 1n) === 1n)) {
+		return whole + 1n
+	}
+
+	return whole
 }
 
 function bitLength(value: bigint): number {

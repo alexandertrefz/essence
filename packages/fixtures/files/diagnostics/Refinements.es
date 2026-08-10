@@ -1,8 +1,9 @@
 § This file does not compile — on purpose.
 §
-§ Every Type Alias below writes a `where` clause the Enricher refuses, so that
-§ the whole of what a checked refinement's predicate may say can be read as one
-§ run of error output:
+§ Every Type Alias below writes a `where` clause the Enricher refuses, and the
+§ Matches at the end write a refinement where a runtime test would have to be
+§ emitted for it, so that the whole of what a checked refinement may and may
+§ not say can be read as one run of error output:
 §
 §     bun packages/cli/bin/esc check packages/fixtures/files/diagnostics/Refinements.es
 §
@@ -39,4 +40,28 @@ implementation {
 	§ predicate-not-boolean — a predicate is a question, and this one answers
 	§ with a number.
 	type Sized = Integer where @::absolute()
+
+	§ refinement-as-matcher — a Matcher narrows by Type, and a refinement's
+	§ predicate erases before the Program runs, so there is nothing left for
+	§ the emitted check to ask.
+	constant answer: Integer | String = 0
+
+	constant sorted = match answer -> String {
+		case NonZeroInteger { <- "nonzero" }
+		case _              { <- "other" }
+	}
+
+	§ refinement-as-matcher, in a payload Pattern's annotation — the same
+	§ refusal, because the annotation is the same runtime test.
+	choice Box {
+		Full { value: Integer | String },
+		Empty,
+	}
+
+	constant box: Box = #Full({ value = 0 })
+
+	constant label = match box -> String {
+		case #Full({ value: NonZeroInteger }) { <- "nonzero" }
+		case _                                { <- "other" }
+	}
 }

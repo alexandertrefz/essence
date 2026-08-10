@@ -1,11 +1,14 @@
 import { describe, expect, it } from "bun:test"
 
-import { parseWithDiagnostics } from "@essence-lang/compiler/parser"
+import {
+	type ParserOptions,
+	parseWithDiagnostics,
+} from "@essence-lang/compiler/parser"
 
 import { findFoldingRanges } from "../foldingRanges"
 
-function foldingRangesOf(source: string) {
-	let { program } = parseWithDiagnostics(source)
+function foldingRangesOf(source: string, options?: ParserOptions) {
+	let { program } = parseWithDiagnostics(source, options)
 
 	return findFoldingRanges(program)
 }
@@ -98,6 +101,44 @@ describe("Folding Ranges", () => {
 			startLine: 4,
 			endLine: 6,
 		})
+	})
+
+	it("should fold a multi line Case payload", () => {
+		let source = [
+			"implementation {",
+			"\tchoice Shape {",
+			"\t\tRect { width: Integer, height: Integer },",
+			"\t}",
+			"\tconstant shape: Shape = #Rect({",
+			"\t\twidth = 3,",
+			"\t\theight = 4,",
+			"\t})",
+			"}",
+		].join("\n")
+
+		expect(foldingRangesOf(source)).toContainEqual({
+			startLine: 5,
+			endLine: 7,
+		})
+	})
+
+	it("should fold an overload function block and its bodied entries", () => {
+		let source = [
+			"declarations {",
+			"\toverload function double {",
+			"\t\t(_ value: Integer) -> Integer",
+			"",
+			"\t\t(over values: Integer) -> Integer {",
+			"\t\t\t<- values",
+			"\t\t}",
+			"\t}",
+			"}",
+		].join("\n")
+
+		let ranges = foldingRangesOf(source, { allowDeclarationsHeader: true })
+
+		expect(ranges).toContainEqual({ startLine: 2, endLine: 7 })
+		expect(ranges).toContainEqual({ startLine: 5, endLine: 6 })
 	})
 
 	it("should fold a Guard spelled across several lines", () => {

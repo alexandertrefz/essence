@@ -629,7 +629,6 @@ describe("Stdlib Call Graph", () => {
 			"String.repeat",
 			"String.replaceEvery",
 			"String.replaceFirst",
-			"String.reverse",
 			"String.slice",
 			"String.starts",
 			"String.toString",

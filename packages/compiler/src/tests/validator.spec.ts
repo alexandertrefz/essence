@@ -928,6 +928,114 @@ describe("Validator", () => {
 			])
 		})
 
+		// NOTE: Regression test — a payload requirement lived beside the
+		// Matcher and this analysis read only the tag, so the Case spelling of
+		// the callback conflict compiled clean while its Record spelling was
+		// refused: the first arm accepted every callable, bound it at the wrong
+		// Signature, and the second arm was silently dead.
+		it("should reject a payload requirement a differently-signed callback swallows", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				type IntFn = (_ n: Integer) -> Integer
+				type StrFn = (_ s: String) -> String
+
+				choice Op {
+					Apply { fn: IntFn | StrFn },
+					Skip,
+				}
+
+				function shout(_ s: String) -> String { <- s::append("!") }
+
+				constant op: Op = #Apply({ fn = shout })
+
+				Terminal.inspect(match op -> String {
+					case #Apply({ fn: IntFn }) { <- "int fn" }
+					case #Apply({ fn: StrFn }) { <- "str fn" }
+					case _ { <- "other" }
+				})
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].severity).toBe("error")
+			expect(diagnostics[0].code).toBe("erased-case-conflict")
+			expect(diagnostics[0].position?.start.line).toBe(16)
+			expect(diagnostics[0].notes[1]).toBe(
+				"A Function's Signature erases before a Match runs, so a Function-typed member is only ever checked for being callable — which makes these two Matchers ask the same question.",
+			)
+		})
+
+		// NOTE: A requirement that narrows is not erased — the arm declines the
+		// payloads it does not name and leaves them to the Cases below, exactly
+		// as the Record spelling does.
+		it("should not warn about payload requirements that survive to runtime", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					type Click = { x: Integer, y: Integer }
+					type KeyPress = { key: String }
+
+					choice Event {
+						Fired { payload: Click | KeyPress },
+						Quiet,
+					}
+
+					constant event: Event = #Fired({ payload = { key = "a" } })
+
+					Terminal.inspect(match event -> String {
+						case #Fired({ x, y }) { <- "click" }
+						case #Fired({ key })  { <- "key" }
+						case _                { <- "other" }
+					})
+				}`),
+			).toEqual([])
+		})
+
+		it("should warn about a payload requirement no payload can pass", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				type Click = { x: Integer, y: Integer }
+				type KeyPress = { key: String }
+
+				choice Event {
+					Fired { payload: Click | KeyPress },
+					Quiet,
+				}
+
+				constant event: Event = #Fired({ payload = { key = "a" } })
+
+				Terminal.inspect(match event -> String {
+					case #Fired({ payload: Boolean }) { <- "?" }
+					case _ { <- "other" }
+				})
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].severity).toBe("warning")
+			expect(diagnostics[0].code).toBe("unreachable-case")
+		})
+
+		// NOTE: An Alias hiding a refinement is refused as a Matcher at the
+		// Enricher, before this analysis ever sees it — the conflict wording
+		// would only name a symptom, and a single such arm beside a wildcard
+		// has no conflict at all while being just as unsound. The refusal is
+		// pinned in `enricher.spec.ts` with the other Matcher refusals.
+
+		it("should warn about a Pattern naming a member only Object.prototype has", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				type A = { x: Integer }
+				type B = { y: Integer }
+
+				constant v: A | B = { x = 1 }
+
+				Terminal.inspect(match v -> String {
+					case { hasOwnProperty } { <- "?" }
+					case _ { <- "ok" }
+				})
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].severity).toBe("warning")
+			expect(diagnostics[0].code).toBe("unreachable-case")
+			expect(diagnostics[0].position?.start.line).toBe(8)
+		})
+
 		it("should not warn about callback Cases told apart by another member", () => {
 			expect(
 				diagnosticsFor(`implementation {
@@ -1022,6 +1130,52 @@ describe("Validator", () => {
 					Terminal.inspect(match scrutinee -> String {
 						case String        { <- "a word" }
 						case List<Integer> { <- "integers" }
+					})
+				}`),
+			).toEqual([])
+		})
+
+		// NOTE: Regression test — the requirement was invisible here too, so
+		// the payload spelling of the List crossover lost the warning its
+		// Record spelling had.
+		it("should warn about a List-typed payload requirement", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				choice Hold {
+					Items { items: List<String> | List<Integer> },
+					None,
+				}
+
+				constant held: Hold = #Items({ items = [1] })
+
+				Terminal.inspect(match held -> String {
+					case #Items({ items: List<String> })  { <- "strings" }
+					case #Items({ items: List<Integer> }) { <- "integers" }
+					case _ { <- "other" }
+				})
+			}`)
+
+			expect(diagnostics[0].severity).toBe("warning")
+			expect(diagnostics[0].code).toBe("empty-list-overlap")
+			expect(diagnostics[0].position?.start.line).toBe(11)
+		})
+
+		// NOTE: A Matcher that narrows a member by Type overlaps the Cases
+		// below it too, but the values it takes are exactly the ones it names —
+		// Cases being tried in order, with no List and no erasure anywhere.
+		it("should stay silent for a Record member narrowed by Type", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					type Click = { x: Integer, y: Integer }
+					type KeyPress = { key: String }
+					type Wrapped = { payload: Click | KeyPress }
+					type Other = { tag: String }
+
+					constant value: Wrapped | Other = { payload = { x = 1, y = 2 } }
+
+					Terminal.inspect(match value -> String {
+						case { payload as { key } } { <- key }
+						case { tag } { <- tag }
+						case _ { <- "rest" }
 					})
 				}`),
 			).toEqual([])

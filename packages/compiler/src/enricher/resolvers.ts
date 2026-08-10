@@ -148,7 +148,12 @@ export function combinationTypeOf(
 	lhsPosition: common.Position,
 	rhsPosition: common.Position,
 ): common.Type {
-	function isSubType(
+	// NOTE: Judged by assignability, not by identity — an update sets a member
+	// to a VALUE, and a value of one arm is enough for a Union-typed member,
+	// exactly as it is at the Declaration. Deep equality refused `{ c with
+	// n = 5 }` against a declared `Integer | String`, and told two spellings
+	// of one Union apart.
+	function isPartialOf(
 		lhs: common.RecordType,
 		rhs: common.RecordType,
 	): boolean {
@@ -158,7 +163,7 @@ export function combinationTypeOf(
 			// JavaScript function the Record does not have.
 			if (
 				!Object.hasOwn(lhs.members, rhsName) ||
-				!isDeepStrictEqual(lhs.members[rhsName], rhsMemberType)
+				!matchesType(lhs.members[rhsName], rhsMemberType)
 			) {
 				return false
 			}
@@ -211,36 +216,28 @@ export function combinationTypeOf(
 
 	// TODO: Resolve Applied Types and check wether they are Records
 
-	if (isDeepStrictEqual(lhsType, rhsType)) {
+	if (isPartialOf(lhsType, rhsType)) {
 		return lhsType
-	} else {
-		if (isSubType(lhsType, rhsType)) {
-			return lhsType
-		} else {
-			reportError(
-				"This is not a Partial of the value it updates",
-				rhsPosition,
-				{
-					code: "partial-type-mismatch",
-					labels: [
-						primary(
-							rhsPosition,
-							`this is ${withArticle(describeType(rhsType))}`,
-						),
-						secondary(
-							lhsPosition,
-							`this is ${withArticle(describeType(lhsType))}`,
-						),
-					],
-					notes: [
-						"An update may only set members the original already has, with the Types it declared for them.",
-					],
-				},
-			)
-
-			return lhsType
-		}
 	}
+
+	reportError("This is not a Partial of the value it updates", rhsPosition, {
+		code: "partial-type-mismatch",
+		labels: [
+			primary(
+				rhsPosition,
+				`this is ${withArticle(describeType(rhsType))}`,
+			),
+			secondary(
+				lhsPosition,
+				`this is ${withArticle(describeType(lhsType))}`,
+			),
+		],
+		notes: [
+			"An update may only set members the original already has, with the Types it declared for them.",
+		],
+	})
+
+	return lhsType
 }
 
 // NOTE: Every Type name a Type declaration Node mentions, as the Identifier

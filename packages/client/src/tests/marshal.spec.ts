@@ -225,6 +225,23 @@ describe("Round trips", () => {
 		expect(through("labelled", 12n)).toBe(12n)
 	})
 
+	// NOTE: `toString` lives on `Object.prototype`, so reading an absent key
+	// through the prototype chain finds JavaScript's own function where the
+	// absent-key rule promises `undefined` — a plain literal and a JSON-parsed
+	// object both inherit it.
+	it("reads a member through its own keys, never the prototype's", () => {
+		expect(through("config", JSON.parse("{}"))).toEqual({
+			toString: undefined,
+		})
+		expect(through("config", { toString: "spelled" })).toEqual({
+			toString: "spelled",
+		})
+		expect(through("styled", { $case: "Styled#Tagged" })).toEqual({
+			$case: "Styled#Tagged",
+			valueOf: undefined,
+		})
+	})
+
 	it("carries a List of Records", () => {
 		expect(
 			through("boxes", [
@@ -310,6 +327,30 @@ describe("Numbers", () => {
 		expect(
 			new EssenceRational(10n ** 400n, 3n * 10n ** 400n).toNumber(),
 		).toBeCloseTo(1 / 3, 15)
+	})
+
+	// NOTE: Both parts past 2 ** 53 are already rounded by the mere reading, so
+	// dividing the two readings rounds three times and lands an ulp off the
+	// nearest double — these pairs are known to. The last is a part small
+	// enough to read exactly over one so large the answer is subnormal, which
+	// the hardware division answers in its one correctly rounded step and a
+	// 53-bit intermediate would double-round.
+	it("rounds to the nearest double, down to the last ulp", () => {
+		expect(
+			new EssenceRational(
+				129907132001406551n,
+				63955986924371064n,
+			).toNumber(),
+		).toBe(2.0311957996211323)
+		expect(
+			new EssenceRational(
+				22903556286483331n,
+				9330191837554713n,
+			).toNumber(),
+		).toBe(2.4547787103685073)
+		expect(new EssenceRational(1n, 5n << 1021n).toNumber()).toBe(
+			1 / (5 * 2 ** 1021),
+		)
 	})
 
 	// NOTE: The scale back is a power of two far outside a double's own exponent
@@ -401,6 +442,7 @@ describe("The exports of a Module", () => {
 			"boxes",
 			"card",
 			"circle",
+			"config",
 			"flag",
 			"greeting",
 			"integer",
@@ -412,6 +454,7 @@ describe("The exports of a Module", () => {
 			"present",
 			"rational",
 			"shape",
+			"styled",
 			"text",
 			"third",
 			"words",

@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 
 import { anyIs } from "../internalHelpers"
 import { createRecord } from "../Record"
-import { createString, ends, length, split } from "../String"
+import { createString, ends, length, reverse, split } from "../String"
 import { getStringRepresentation } from "../Terminal"
 
 const countOf = (value: string) => length(createString(value)).value
@@ -164,5 +164,44 @@ describe("the remembered view", () => {
 				createRecord({ name: createString("other") }),
 			),
 		).toBeFalse()
+	})
+})
+
+describe("reversing", () => {
+	// NOTE: Three regional indicators segment as a pair and a single —
+	// `🇦🇧, 🇨` — and segmenting the reversed TEXT afresh would re-pair them
+	// as `🇨🇦, 🇧`: characters the original never had. The reversed String
+	// remembers its view instead, so its characters are the original's in the
+	// opposite order.
+	test("reversal keeps the original's characters", () => {
+		let flags = createString("🇦🇧🇨")
+		let reversed = reverse(flags)
+
+		expect(reversed.value).toBe("🇨🇦🇧")
+		expect(
+			split(reversed, createString("")).value.map((piece) => piece.value),
+		).toEqual(["🇨", "🇦🇧"])
+		expect(length(reversed).value).toBe(2n)
+	})
+
+	test("reversing twice answers the original", () => {
+		for (let value of ["", "hello", "🇦🇧🇨", `a${family}b`, decomposed]) {
+			let twice = reverse(reverse(createString(value)))
+
+			expect(anyIs(twice, createString(value)), value).toBeTrue()
+		}
+	})
+
+	// NOTE: What the `lastIndex` derivation in `String.es` rests on — a piece
+	// cut from a reversed String carries the clusters it was cut into, so its
+	// length is counted off them rather than off a fresh segmentation of the
+	// joined text.
+	test("a piece of a reversed String counts its own characters", () => {
+		let reversed = reverse(createString("🇦🇧🇨"))
+		let pieces = split(reversed, createString("🇨"))
+
+		expect(pieces.value.map((piece) => piece.value)).toEqual(["", "🇦🇧"])
+		expect(length(pieces.value[0]!).value).toBe(0n)
+		expect(length(pieces.value[1]!).value).toBe(1n)
 	})
 })

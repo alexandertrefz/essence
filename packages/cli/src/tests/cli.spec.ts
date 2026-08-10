@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test"
+import { spawnSync } from "node:child_process"
 import {
 	existsSync,
 	mkdirSync,
@@ -18,7 +19,7 @@ import { testDiagnostic } from "@essence-lang/compiler/tests/diagnosticFactory"
 import { fixturePath } from "@essence-lang/fixtures"
 import { STDLIB_DIRECTORY } from "@essence-lang/standard-library"
 
-import { runCheck } from "../actions"
+import { EXIT_SUCCESS, runCheck, runRun } from "../actions"
 import {
 	optimiserOptionsFor,
 	type OptionValues,
@@ -1809,5 +1810,124 @@ describe("source maps", () => {
 		} finally {
 			rmSync(directory, { recursive: true, force: true })
 		}
+	})
+})
+
+describe("essence run", () => {
+	// NOTE: `--out` may name a directory. What runs has to be the bundle the
+	// compiler actually wrote into it — resolved per file inside the plan —
+	// never the directory path the option was given as.
+	it("executes the bundle it wrote into an --out directory", async () => {
+		await withModules(
+			{ "Quiet.es": 'implementation {\n\tTerminal.write("")\n}\n' },
+			async (directory) => {
+				let outDirectory = path.join(directory, "out")
+
+				mkdirSync(outDirectory)
+
+				let context = createContext(
+					testOptions({
+						quiet: true,
+						out: outDirectory + path.sep,
+					}),
+					"essence",
+					captureTerminal().terminal,
+				)
+
+				let code = await runRun(
+					context,
+					runCommand,
+					[path.join(directory, "Quiet.es")],
+					[],
+				)
+
+				expect(code).toBe(EXIT_SUCCESS)
+				expect(existsSync(path.join(outDirectory, "Quiet.js"))).toBe(
+					true,
+				)
+			},
+		)
+	})
+
+	// NOTE: --json changes how the compilation is reported, not what `run`
+	// does — the command documents itself as exiting with the program's own
+	// exit code, with no --json qualification. The program here overflows the
+	// stack at run time, something no Diagnostic can see, so a non-zero exit
+	// can only mean it actually ran.
+	it("still executes the program and answers its exit code under --json", async () => {
+		await withModules(
+			{
+				"Overflow.es": [
+					"implementation {",
+					"\tfunction deepen(_ n: Integer) -> Integer {",
+					"\t\tif n::isGreaterThan(0) {",
+					"\t\t\t<- deepen(n::add(1))::add(0)",
+					"\t\t} else {",
+					"\t\t\t<- 0",
+					"\t\t}",
+					"\t}",
+					"",
+					"\tTerminal.write(deepen(1)::toString())",
+					"}",
+					"",
+				].join("\n"),
+			},
+			async (directory) => {
+				let { terminal, lines } = captureTerminal()
+				let context = createContext(
+					testOptions({ json: true, noOptimise: true }),
+					"essence",
+					terminal,
+				)
+
+				let code = await runRun(
+					context,
+					runCommand,
+					[path.join(directory, "Overflow.es")],
+					[],
+				)
+
+				let report = JSON.parse(lines.join("\n")) as JSONReport
+
+				expect(report.command).toBe("run")
+				expect(report.ok).toBe(true)
+				expect(code).not.toBe(EXIT_SUCCESS)
+			},
+		)
+	})
+
+	// NOTE: The one assertion the in-process harness can not make — the
+	// program's streams are inherited, so only a real child process shows
+	// where its printing lands. --json promises stdout carries the report as
+	// a single JSON document and nothing else, so the program's own output is
+	// routed to stderr, and a printing program must not break `… --json | jq`.
+	it("keeps stdout a single JSON document while the program prints under --json", async () => {
+		await withModules(
+			{
+				"Noisy.es": [
+					"implementation {",
+					'\tTerminal.print("hello from the program")',
+					"}",
+					"",
+				].join("\n"),
+			},
+			async (directory) => {
+				let binary = fileURLToPath(
+					import.meta.resolve("../../bin/essence"),
+				)
+				let result = spawnSync(
+					process.execPath,
+					[binary, "run", path.join(directory, "Noisy.es"), "--json"],
+					{ encoding: "utf-8" },
+				)
+
+				let report = JSON.parse(result.stdout) as JSONReport
+
+				expect(report.command).toBe("run")
+				expect(report.ok).toBe(true)
+				expect(result.stderr).toContain("hello from the program")
+				expect(result.status).toBe(EXIT_SUCCESS)
+			},
+		)
 	})
 })

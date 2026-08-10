@@ -61,6 +61,20 @@ function collectFromNode(
 			addRange(ranges, node.position)
 			collectFromBody(node.value.body, ranges)
 			return
+		case "OverloadedFunctionStatement":
+			addRange(ranges, node.position)
+
+			// NOTE: An `overload function` block mixes bodied Function literals
+			// with body-less native signatures — only the bodied entries have a
+			// block to fold.
+			for (let method of node.methods) {
+				if (method.nodeType === "FunctionValue") {
+					addRange(ranges, method.position)
+					collectFromBody(method.value.body, ranges)
+				}
+			}
+
+			return
 		case "NamespaceDefinitionStatement": {
 			addRange(ranges, node.position)
 
@@ -176,6 +190,14 @@ function collectFromNode(
 				if (segment.kind === "expression") {
 					collectFromNode(segment.expression, ranges)
 				}
+			}
+
+			return
+		case "CaseValue":
+			addRange(ranges, node.position)
+
+			if (node.value !== null) {
+				collectFromNode(node.value, ranges)
 			}
 
 			return

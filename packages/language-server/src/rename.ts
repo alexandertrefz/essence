@@ -276,6 +276,28 @@ export function isValidIdentifierName(name: string): boolean {
 	)
 }
 
+// NOTE: The Keywords the grammar's Identifier rule reads as ordinary
+// Identifiers — the Parser's `identifierTokenTypes`. The standard library
+// already writes labels with them (`slice(from 1, to 3)`, `normalize(as
+// #ComposedCanonical)`), so a LABEL may be renamed to any of these even though
+// an ordinary binding must not be: a binding named `with` would collide with
+// the `{ … with … }` Combination the moment it is read in one.
+const keywordIdentifiers = new Set([
+	"with",
+	"static",
+	"case",
+	"infer",
+	"choice",
+	"import",
+	"export",
+	"from",
+	"as",
+])
+
+export function isValidLabelName(name: string): boolean {
+	return isValidIdentifierName(name) || keywordIdentifiers.has(name)
+}
+
 // NOTE: REFUSED outright inside a standard library source — and with it
 // Prepare Rename and Linked Editing, which both resolve through here. Not out
 // of caution; a rename there is silently destructive:
@@ -785,15 +807,16 @@ function hoistDeclarations(
 			}
 		} else if (
 			node.nodeType === "FunctionStatement" ||
+			node.nodeType === "OverloadedFunctionStatement" ||
 			node.nodeType === "NamespaceDefinitionStatement"
 		) {
 			if (!scope.values.has(node.name.content)) {
 				scope.values.set(node.name.content, {
 					builtin: false,
 					kind:
-						node.nodeType === "FunctionStatement"
-							? "function"
-							: "namespace",
+						node.nodeType === "NamespaceDefinitionStatement"
+							? "namespace"
+							: "function",
 					definition: null,
 					visibleFrom: null,
 					occurrences: [],
@@ -927,6 +950,35 @@ function walkNode(
 
 			linkFunctionDefinition(declaration, node.value, context)
 			walkFunctionDefinition(node.value, scope, context, node.position)
+			return
+		}
+		case "OverloadedFunctionStatement": {
+			let declaration = declareInScope(
+				scope,
+				"values",
+				node.name,
+				"function",
+				context,
+			)
+
+			// NOTE: An `overload function` block mixes bodied Function literals
+			// with body-less native signatures, exactly as an `overload` Method
+			// block in declarations mode does — only the bodied entries hold a
+			// definition to link and walk.
+			for (let method of node.methods) {
+				if (method.nodeType === "FunctionValue") {
+					linkFunctionDefinition(declaration, method.value, context)
+					walkFunctionDefinition(
+						method.value,
+						scope,
+						context,
+						method.position,
+					)
+				} else {
+					walkNativeSignature(method, scope, context)
+				}
+			}
+
 			return
 		}
 		case "NamespaceDefinitionStatement":
@@ -1553,47 +1605,7 @@ function walkNamespaceDefinition(
 		}
 
 		for (let signature of nativeSignatures) {
-			let signatureScope = scopeWithGenerics(
-				signature.generics,
-				genericScope,
-				context,
-			)
-
-			for (let parameter of signature.parameters) {
-				walkTypeDeclaration(parameter.type, signatureScope, context)
-
-				// NOTE: A Parameter of a body-less signature binds nothing —
-				// there is no body to read it — so it is recorded as a
-				// standalone Declaration rather than declared in a Scope,
-				// exactly as a Protocol signature's would be.
-				// NOTE: The Parser reuses ONE Identifier Node when the internal
-				// name doubles as the call site label, so the pair is deduped
-				// by identity rather than by name.
-				let identifiers = new Set(
-					[
-						parameter.externalName,
-						parameterInternalName(parameter),
-					].filter((identifier) => identifier !== null),
-				)
-
-				for (let identifier of identifiers) {
-					record(
-						{
-							builtin: false,
-							kind: "parameter",
-							definition: identifier.position,
-							visibleFrom: null,
-							occurrences: [],
-						},
-						identifier.content,
-						identifier.position,
-						context.index,
-						"write",
-					)
-				}
-			}
-
-			walkTypeDeclaration(signature.returnType, signatureScope, context)
+			walkNativeSignature(signature, genericScope, context)
 		}
 
 		// NOTE: Only bodied Methods have a Function definition to walk.
@@ -1628,6 +1640,49 @@ function walkNamespaceDefinition(
 			)
 		}
 	}
+}
+
+function walkNativeSignature(
+	signature: parser.NativeMethodSignatureNode,
+	scope: Scope,
+	context: WalkContext,
+) {
+	let signatureScope = scopeWithGenerics(signature.generics, scope, context)
+
+	for (let parameter of signature.parameters) {
+		walkTypeDeclaration(parameter.type, signatureScope, context)
+
+		// NOTE: A Parameter of a body-less signature binds nothing —
+		// there is no body to read it — so it is recorded as a
+		// standalone Declaration rather than declared in a Scope,
+		// exactly as a Protocol signature's would be.
+		// NOTE: The Parser reuses ONE Identifier Node when the internal
+		// name doubles as the call site label, so the pair is deduped
+		// by identity rather than by name.
+		let identifiers = new Set(
+			[parameter.externalName, parameterInternalName(parameter)].filter(
+				(identifier) => identifier !== null,
+			),
+		)
+
+		for (let identifier of identifiers) {
+			record(
+				{
+					builtin: false,
+					kind: "parameter",
+					definition: identifier.position,
+					visibleFrom: null,
+					occurrences: [],
+				},
+				identifier.content,
+				identifier.position,
+				context.index,
+				"write",
+			)
+		}
+	}
+
+	walkTypeDeclaration(signature.returnType, signatureScope, context)
 }
 
 // NOTE: Null for an annotation a contextually typed Function literal omitted —

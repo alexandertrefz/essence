@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test"
 
 import {
+	breakParent,
 	concat,
 	type Doc,
 	group,
@@ -12,6 +13,7 @@ import {
 	printDoc,
 	softline,
 	text,
+	verbatim,
 } from "../doc"
 
 // NOTE: The shape every list-like construct in the printer uses — an opening
@@ -117,6 +119,28 @@ describe("doc", () => {
 		let doc = indent(concat([text("a"), hardline, hardline, text("b")]))
 
 		expect(printDoc(doc, 80)).toBe("a\n\n\tb")
+	})
+
+	// NOTE: A multi-line String Literal's trailing spaces are characters of the
+	// value, not layout — trimming them changes what the file says.
+	it("keeps trailing whitespace inside verbatim text", () => {
+		let doc = concat([verbatim('"hello   \nworld"'), hardline, text("b")])
+
+		expect(printDoc(doc, 80)).toBe('"hello   \nworld"\nb')
+	})
+
+	it("trims layout whitespace back to the last verbatim piece", () => {
+		let doc = concat([verbatim("a  "), text("   "), hardline, text("b")])
+
+		expect(printDoc(doc, 80)).toBe("a  \nb")
+	})
+
+	// NOTE: What a Comment claimed onto a Statement rides on — the group can
+	// never render flat, but no line break is written where the marker stands.
+	it("renders breakParent as nothing and breaks the enclosing group", () => {
+		let doc = group(concat([text("a"), line, text("b"), breakParent]))
+
+		expect(printDoc(doc, 80)).toBe("a\nb")
 	})
 
 	it("picks the ifBreak branch matching the enclosing group's mode", () => {

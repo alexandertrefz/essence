@@ -2370,11 +2370,11 @@ exports[`Parser Expressions Combination should parse 2 identifier combinations 1
         "nodeType": "Combination",
         "position": {
           "end": {
-            "column": 38,
+            "column": 40,
             "line": 1,
           },
           "start": {
-            "column": 20,
+            "column": 18,
             "line": 1,
           },
         },
@@ -2445,11 +2445,11 @@ exports[`Parser Expressions Combination should parse inline combinations 1`] = `
         "nodeType": "Combination",
         "position": {
           "end": {
-            "column": 49,
+            "column": 51,
             "line": 1,
           },
           "start": {
-            "column": 20,
+            "column": 18,
             "line": 1,
           },
         },
@@ -2552,11 +2552,11 @@ exports[`Parser Expressions Combination should parse inline combinations with tr
         "nodeType": "Combination",
         "position": {
           "end": {
-            "column": 49,
+            "column": 52,
             "line": 1,
           },
           "start": {
-            "column": 20,
+            "column": 18,
             "line": 1,
           },
         },
@@ -2659,11 +2659,11 @@ exports[`Parser Expressions Combination should parse inline combinations with mu
         "nodeType": "Combination",
         "position": {
           "end": {
-            "column": 80,
+            "column": 83,
             "line": 1,
           },
           "start": {
-            "column": 20,
+            "column": 18,
             "line": 1,
           },
         },

@@ -162,6 +162,110 @@ describe("Parser Recovery", () => {
 		expect(diagnostics[0].position).not.toBeNull()
 	})
 
+	it("should point an unterminated String Literal at the end of the input and at its quote", () => {
+		let { diagnostics } = parseWithDiagnostics(
+			'implementation {\nconstant x = "abc\n}',
+		)
+
+		expect(diagnostics).toHaveLength(1)
+		expect(diagnostics[0].code).toBe("unclosed-string")
+		expect(diagnostics[0].position).toEqual({
+			start: { line: 3, column: 2 },
+			end: { line: 3, column: 2 },
+		})
+		expect(diagnostics[0].labels).toHaveLength(2)
+		expect(diagnostics[0].labels[0]).toMatchObject({
+			kind: "primary",
+			message: "the input ends here",
+		})
+		expect(diagnostics[0].labels[1]).toMatchObject({
+			kind: "secondary",
+			message: "opened here",
+			position: {
+				start: { line: 2, column: 14 },
+				end: { line: 2, column: 15 },
+			},
+		})
+	})
+
+	// NOTE: The Lexer stops one line PAST the last one when the file ends in a
+	// newline — a label there has no text to point at and renders dangling, so
+	// the position is clamped to just after the last visible character.
+	it("should keep an unterminated String Literal's label on the last line of content", () => {
+		let { diagnostics } = parseWithDiagnostics(
+			'implementation {\nconstant x = "abc\n}\n',
+		)
+
+		expect(diagnostics).toHaveLength(1)
+		expect(diagnostics[0].code).toBe("unclosed-string")
+		expect(diagnostics[0].position).toEqual({
+			start: { line: 3, column: 2 },
+			end: { line: 3, column: 2 },
+		})
+	})
+
+	it("should keep reporting after a speculative parse ran to the end of the input", () => {
+		// NOTE: The speculative reading of `f(g(match …` runs to the end of
+		// the input during its own recovery and latches the suppression that
+		// keeps cascades quiet — `backtrack` has to unlatch it along with
+		// everything else, or the whole broken file parses in silence.
+		let { program, diagnostics } = parseWithDiagnostics(
+			`implementation {
+	variable u: Integer | String = 1
+	Terminal.print(99)
+	constant x = f(g(match u -> Integer { case Integer { <- 1 } case String { <- 2`,
+		)
+
+		expect(diagnostics.length).toBeGreaterThan(0)
+		expect(
+			diagnostics.some((diagnostic) => diagnostic.severity === "error"),
+		).toBeTrue()
+		expect(program.implementation.nodes).toHaveLength(3)
+	})
+
+	it("should refuse nesting past the depth limit with a Diagnostic instead of overflowing", () => {
+		let source = `implementation { constant x = ${"[".repeat(20000)}1${"]".repeat(20000)} }`
+
+		let { diagnostics } = parseWithDiagnostics(source)
+
+		expect(diagnostics).toHaveLength(1)
+		expect(diagnostics[0].severity).toBe("error")
+		expect(diagnostics[0].code).toBe("nesting-too-deep")
+		expect(diagnostics[0].position).not.toBeNull()
+		expect(diagnostics[0].notes.length).toBeGreaterThan(0)
+		expect(diagnostics[0].helps.length).toBeGreaterThan(0)
+	})
+
+	it("should parse ordinary nesting nowhere near the limit unbothered", () => {
+		let source = `implementation { constant x = ${"[".repeat(100)}1${"]".repeat(100)} }`
+
+		let { diagnostics } = parseWithDiagnostics(source)
+
+		expect(diagnostics).toEqual([])
+	})
+
+	// NOTE: The budget is shared across Expressions, Types and blocks because
+	// the three recur into each other on the one call stack — so it has to be
+	// wide enough that a machine-generated file (a serialized tree nests one
+	// level per node) does not spend it on a single construct, and that blocks
+	// and Expressions merely SUMMING past a few hundred levels stay a program
+	// rather than an error.
+	it("should parse machine-generated nesting several hundred levels deep", () => {
+		let source = `implementation { constant x = ${"[".repeat(600)}1${"]".repeat(600)} }`
+
+		let { diagnostics } = parseWithDiagnostics(source)
+
+		expect(diagnostics).toEqual([])
+	})
+
+	it("should parse blocks and Expressions whose depths sum past a few hundred", () => {
+		let source = `implementation { ${"if true { ".repeat(300)}constant x = ${"[".repeat(200)}1${"]".repeat(200)} ${"}".repeat(300)} }`
+
+		let { diagnostics } = parseWithDiagnostics(source)
+
+		expect(diagnostics).toEqual([])
+	})
+
 	it("should report a missing implementation section", () => {
 		let { program, diagnostics } = parseWithDiagnostics("constant x = 1")
 

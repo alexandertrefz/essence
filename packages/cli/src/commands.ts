@@ -86,7 +86,9 @@ export const globalOptions: Array<OptionSpec> = [
 		details:
 			"Diagnostics, timings and output sizes are written to stdout as a " +
 			"single JSON document, and nothing else is. Intended for editors, " +
-			"CI checks and scripts.",
+			"CI checks and scripts. A program run or --execute starts still " +
+			"runs, with its own output routed to stderr so the document stays " +
+			"alone on stdout.",
 	},
 	{
 		name: "color",

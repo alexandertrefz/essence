@@ -172,9 +172,13 @@ export function isValueOfType(value: AnyType, type: common.Type): boolean {
 
 		// NOTE: Structural and open — the value has to carry every member the
 		// Matcher names, matching in Type, but may carry more besides.
+		// `Object.hasOwn`, never `in`: a member named `toString` or `valueOf`
+		// would otherwise be found on `Object.prototype` and satisfy the
+		// Matcher for a value that does not carry it.
 		return Object.entries(type.members).every(
 			([name, memberType]) =>
-				name in value && isValueOfType(value[name], memberType),
+				Object.hasOwn(value, name) &&
+				isValueOfType(value[name], memberType),
 		)
 	} else if (type.type === "List" || type.type === "GenericList") {
 		if (value[typeKeySymbol] !== "List") {
@@ -217,7 +221,8 @@ export function isValueOfType(value: AnyType, type: common.Type): boolean {
 
 		return Object.entries(type.members).every(
 			([name, memberType]) =>
-				name in instance && isValueOfType(instance[name], memberType),
+				Object.hasOwn(instance, name) &&
+				isValueOfType(instance[name], memberType),
 		)
 	} else if (type.type === "UnionType") {
 		return type.types.some((memberType) => isValueOfType(value, memberType))

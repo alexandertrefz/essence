@@ -287,7 +287,7 @@ export interface MatchNode {
 	value: ExpressionNode
 	handlers: Array<{
 		matcher: Type
-		// NOTE: Where the Matcher was written — `case Nothing`, not the whole
+		// NOTE: Where the Matcher was written — `case Integer`, not the whole
 		// Handler and not the whole Match. What a Diagnostic about one
 		// Handler underlines, and what an editor greys out when the Handler
 		// turns out to be dead.
@@ -335,8 +335,9 @@ export type StatementNode =
 // desugar into. It carries a borrowed Position so that Hover, Completion and
 // go-to-definition answer over the binder the author DID write; everything
 // that reports on a Statement in its own right asks this first. The Simplifier
-// drops the Position of a base Constant on the strength of it, so no source
-// map claims a span for a Statement nobody wrote.
+// keeps that Position even for a base Constant — an unmapped Statement reads
+// as Compiler glue to the Debug Adapter, which answers a Step Over there with
+// a step OUT and abandons the rest of the body.
 export interface ConstantDeclarationStatementNode {
 	nodeType: "ConstantDeclarationStatement"
 	name: IdentifierNode

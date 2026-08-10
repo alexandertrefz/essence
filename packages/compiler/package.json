@@ -19,7 +19,6 @@
 		"./simplifier": "./src/simplifier/index.ts",
 		"./optimiser": "./src/optimiser/index.ts",
 		"./rewriter": "./src/rewriter/index.ts",
-		"./rewriter/stdlibPrelude": "./src/rewriter/stdlibPrelude.ts",
 		"./bundler": "./src/bundler/index.ts",
 		"./embed": "./src/embed/index.ts",
 		"./diagnostics": "./src/diagnostics/index.ts",

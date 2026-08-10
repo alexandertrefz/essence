@@ -734,33 +734,29 @@ describe("Rewriter", () => {
 				})
 
 				it("splits correctly using a substring", () => {
-					expect(
-						string.split(
-							string.createString("1 2 3"),
-							string.createString(" "),
-						),
-					).toEqual(
-						list.createList([
-							string.createString("1"),
-							string.createString("2"),
-							string.createString("3"),
-						]),
+					let pieces = string.split(
+						string.createString("1 2 3"),
+						string.createString(" "),
 					)
+
+					expect(pieces.value.map((piece) => piece.value)).toEqual([
+						"1",
+						"2",
+						"3",
+					])
 				})
 
 				it("splits on an astral separator", () => {
-					expect(
-						string.split(
-							string.createString("a\u{1F600}b\u{1F600}c"),
-							string.createString("\u{1F600}"),
-						),
-					).toEqual(
-						list.createList([
-							string.createString("a"),
-							string.createString("b"),
-							string.createString("c"),
-						]),
+					let pieces = string.split(
+						string.createString("a\u{1F600}b\u{1F600}c"),
+						string.createString("\u{1F600}"),
 					)
+
+					expect(pieces.value.map((piece) => piece.value)).toEqual([
+						"a",
+						"b",
+						"c",
+					])
 				})
 			})
 

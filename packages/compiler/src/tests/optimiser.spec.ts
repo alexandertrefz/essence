@@ -17,6 +17,7 @@ import {
 	optimiserPassNames,
 } from "../optimiser/index"
 import { eliminateDeadCode } from "../optimiser/passes/eliminateDeadCode"
+import { poolConstants } from "../optimiser/passes/poolConstants"
 import { pruneDeadMatchArms } from "../optimiser/passes/pruneDeadMatchArms"
 import {
 	rewriteExpressions,
@@ -4322,6 +4323,62 @@ describe("Optimiser", () => {
 
 			expect(generated).toMatch(/isValueOfType\(_self, \$pool_\d+\)/)
 			expect(generated).toMatch(/const \$pool_\d+ = \{\n\ttype: "Record"/)
+		})
+
+		// NOTE: A Choice's payload may name the Choice, so the descriptor a
+		// compiled test embeds can lead back into itself — the shape every
+		// structural Type walker in the stage carries a guard for.
+		// `JSON.stringify` answered it by throwing, turning a legal Program into
+		// a compiler crash. No source-level Program builds one today (recursive
+		// Type declarations are refused), so the pass is asked directly.
+		it("keys a descriptor whose graph leads back into itself", () => {
+			function descriptorProgram(): common.typedSimple.Program {
+				let union: common.UnionType = {
+					type: "UnionType",
+					name: "Tree",
+					types: [],
+				}
+
+				union.types.push({
+					type: "Case",
+					choice: "Tree",
+					name: "Node",
+					members: {
+						weight: { type: "Integer" },
+						children: { type: "List", itemType: union },
+					},
+				})
+
+				return {
+					nodeType: "Program",
+					imports: null,
+					exports: null,
+					implementation: {
+						nodeType: "ImplementationSection",
+						nodes: [
+							{
+								nodeType: "Intrinsic",
+								kind: "type-descriptor",
+								descriptor: union,
+								type: { type: "Unknown" },
+							},
+						],
+					},
+				}
+			}
+
+			function keyOf(program: common.typedSimple.Program): string {
+				let node = poolConstants.run(program).implementation.nodes[0]!
+
+				expect(node.nodeType).toBe("Intrinsic")
+
+				return (node as common.typedSimple.PooledReferenceNode).key
+			}
+
+			let key = keyOf(descriptorProgram())
+
+			expect(key).toContain("<cycle:")
+			expect(keyOf(descriptorProgram())).toBe(key)
 		})
 
 		it("pools a conformance witness", () => {

@@ -108,6 +108,53 @@ describe("Parser Diagnostics", () => {
 		})
 	})
 
+	describe("Interpolation holes", () => {
+		it("should refuse a Comment inside a hole without swallowing the String", () => {
+			let { program, diagnostics } = parseWithDiagnostics(
+				`implementation {
+	constant s = "a{ 1 § note }"
+	constant t = 2
+}`,
+			)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].severity).toBe("error")
+			expect(diagnostics[0].code).toBe("comment-in-hole")
+			expect(diagnostics[0].position).toEqual({
+				start: { line: 2, column: 21 },
+				end: { line: 2, column: 28 },
+			})
+
+			// NOTE: The Comment ends at the hole's '}', so the String closes
+			// where it was written and the Statement after it survives.
+			let nodes = program.implementation.nodes
+
+			expect(nodes).toHaveLength(2)
+			expect(declaredValue(nodes[1])).toMatchObject({
+				nodeType: "IntegerValue",
+				value: "2",
+			})
+		})
+	})
+
+	describe("Line endings", () => {
+		it("should parse a file with Windows line endings", () => {
+			let { diagnostics } = parseWithDiagnostics(
+				"implementation {\r\n\tconstant x = 1\r\n}\r\n",
+			)
+
+			expect(diagnostics).toEqual([])
+		})
+
+		it("should parse a file opening with a byte order mark", () => {
+			let { diagnostics } = parseWithDiagnostics(
+				"\uFEFFimplementation { constant x = 1 }",
+			)
+
+			expect(diagnostics).toEqual([])
+		})
+	})
+
 	describe("Number Literal joining", () => {
 		it("should not join a '_' group on the next line", () => {
 			let { program, diagnostics } = parseWithDiagnostics(
@@ -184,6 +231,36 @@ _ 2
 				numerator: "1000",
 				denominator: "9",
 			})
+		})
+
+		it("should not join the ':' of a Method call written apart", () => {
+			let { diagnostics } = parseWithDiagnostics(
+				"implementation { constant x = a :  : b() }",
+			)
+
+			expect(containsErrors(diagnostics)).toBe(true)
+		})
+
+		it("should not join the ':' of a Method call split across lines", () => {
+			let { diagnostics } = parseWithDiagnostics(
+				`implementation {
+					constant x = a :
+: b()
+				}`,
+			)
+
+			expect(containsErrors(diagnostics)).toBe(true)
+		})
+
+		it("should read a '::' written flush as a Method call", () => {
+			let { program, diagnostics } = parseWithDiagnostics(
+				"implementation { constant x = a::b() }",
+			)
+
+			expect(diagnostics).toEqual([])
+			expect(
+				declaredValue(program.implementation.nodes[0]),
+			).toMatchObject({ nodeType: "MethodInvocation" })
 		})
 	})
 
@@ -574,5 +651,38 @@ describe("Parser AST", () => {
 		expect(
 			declaredValue(firstNode("implementation { constant x = 1_000 }")),
 		).toMatchObject({ nodeType: "IntegerValue", value: "1000" })
+	})
+
+	it("should span a Combination from brace to brace", () => {
+		// NOTE: Like the Record Literal branches — the Formatter reads the
+		// span as the braces it claims trailing trivia behind, so a span
+		// ending before the closing brace left a Comment on the '}' line
+		// unclaimed and made it refuse the file.
+		let node = declaredValue(
+			firstNode(
+				`implementation { constant a = { base with
+	x = 1,
+	y = 2
+} }`,
+			),
+		)
+
+		expect(node).toMatchObject({ nodeType: "Combination" })
+		expect(node?.position).toEqual({
+			start: { line: 1, column: 31 },
+			end: { line: 4, column: 2 },
+		})
+	})
+
+	it("should span an Expression Combination from brace to brace", () => {
+		let node = declaredValue(
+			firstNode("implementation { constant a = { base with other } }"),
+		)
+
+		expect(node).toMatchObject({ nodeType: "Combination" })
+		expect(node?.position).toEqual({
+			start: { line: 1, column: 31 },
+			end: { line: 1, column: 50 },
+		})
 	})
 })

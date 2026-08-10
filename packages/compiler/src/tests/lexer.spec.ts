@@ -1241,4 +1241,60 @@ describe("Lexer", () => {
 			expect(lexer.errors).toEqual([])
 		})
 	})
+
+	describe("Windows line endings", () => {
+		it("should keep a '\\r' out of an Identifier", () => {
+			let lexer = new Lexer()
+
+			lexer.reset("name\r\nother")
+
+			expect(
+				stripPositionFromArray([
+					lexer.next(),
+					lexer.next(),
+					lexer.next(),
+				]),
+			).toEqual([
+				{ value: "name", type: TokenType.Identifier },
+				{ value: "\n", type: TokenType.Linebreak },
+				{ value: "other", type: TokenType.Identifier },
+			])
+		})
+
+		it("should keep a '\\r' out of a Number", () => {
+			let lexer = new Lexer()
+
+			lexer.reset("1\r\n")
+
+			expect(stripPosition(lexer.next())).toEqual({
+				value: "1",
+				type: TokenType.LiteralNumber,
+			})
+			expect(lexer.errors).toEqual([])
+		})
+
+		it("should end a Comment before the '\\r' of its line", () => {
+			let lexer = new Lexer()
+
+			lexer.reset("§ note\r\n")
+
+			expect(stripPosition(lexer.next())).toEqual({
+				value: "§ note",
+				type: TokenType.Comment,
+			})
+		})
+	})
+
+	describe("Byte order marks", () => {
+		it("should read a byte order mark as whitespace", () => {
+			let lexer = new Lexer()
+
+			lexer.reset("\uFEFFimplementation")
+
+			expect(stripPosition(lexer.next())).toEqual({
+				value: "implementation",
+				type: TokenType.KeywordImplementation,
+			})
+		})
+	})
 })

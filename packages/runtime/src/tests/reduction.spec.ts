@@ -90,6 +90,29 @@ describe("remembered lowest terms", () => {
 		)
 	})
 
+	// NOTE: The 80-digit cap can cut an expansion before its first significant
+	// digit — every kept digit a zero. The rounded value is the whole part
+	// alone, so it prints as that whole, and never with a minus sign when the
+	// whole is zero: there is no negative zero for `Rational.parse` to read
+	// back.
+	test("an all-zero expansion prints as the whole it rounds to", () => {
+		expect(toStringAs(createRational(-4n, 10n ** 81n), decimal).value).toBe(
+			"0",
+		)
+		expect(toStringAs(createRational(4n, 10n ** 81n), decimal).value).toBe(
+			"0",
+		)
+		expect(
+			toStringAs(
+				createRational(-(5n * 10n ** 81n + 4n), 10n ** 81n),
+				decimal,
+			).value,
+		).toBe("-5")
+		expect(toStringAs(createRational(-1n, 3n), decimal).value).toBe(
+			`-0.${"3".repeat(80)}`,
+		)
+	})
+
 	// NOTE: `raise` reads the reduced form and builds a NEW Rational off it, so
 	// it is where a shared, mutated parts object would show up as a wrong
 	// answer the second time round.

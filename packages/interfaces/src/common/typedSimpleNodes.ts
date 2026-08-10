@@ -71,7 +71,7 @@ export type ImplementationNode = ExpressionNode | StatementNode
 // NOTE: Every Expression and Statement carries the `position` of the typed
 // node it was simplified from, so code generation can map what it emits back
 // onto the source. It is optional because the Simplifier also synthesizes
-// nodes no source was written for — a Nothing-returning function's trailing
+// nodes no source was written for — a unit-returning function's trailing
 // Return, a conformance witness — and those stay unset, which emits no
 // mapping.
 export type ExpressionNode =

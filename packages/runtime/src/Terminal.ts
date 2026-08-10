@@ -22,6 +22,30 @@ import { type AnyType, typeKeySymbol } from "./type"
 
 const singleLineMaxLength = 60
 
+// NOTE: The escapes are the String Literal's own spellings, so what a quoted
+// rendering shows is unambiguous: an embedded quote no longer reads as the
+// closing one, a backslash as an escape it never was, and a line break no
+// longer splits the one value across two lines of output. The remaining
+// control characters have no Essence spelling of their own, so they render as
+// their code point.
+const stringEscapes: { [character: string]: string } = {
+	"\\": "\\\\",
+	'"': '\\"',
+	"\n": "\\n",
+	"\r": "\\r",
+	"\t": "\\t",
+}
+
+function escapeStringContents(value: string): string {
+	return value.replace(
+		// oxlint-disable-next-line no-control-regex -- matching control characters is this function's job
+		/[\\"\n\r\t\u0000-\u001F\u007F-\u009F]/g,
+		(character) =>
+			stringEscapes[character] ??
+			`\\u{${character.charCodeAt(0).toString(16).toUpperCase()}}`,
+	)
+}
+
 export function getStringRepresentation(obj: AnyType, indentLevel = 0): string {
 	const baseIndent = " ".repeat(4 * indentLevel)
 	const contentIndent = " ".repeat(4 * (indentLevel + 1))
@@ -104,7 +128,7 @@ export function getStringRepresentation(obj: AnyType, indentLevel = 0): string {
 		// rendering it does is spelled out here rather than called.
 		return obj.value ? "true" : "false"
 	} else if (obj[typeKeySymbol] === "String") {
-		return `"${obj.value}"`
+		return `"${escapeStringContents(obj.value)}"`
 	} else if (obj[typeKeySymbol].includes("#")) {
 		// NOTE: Case values print as their tag, with the payload spelled out
 		// like a Record when the Case carries one.

@@ -6,5 +6,5 @@
 	// source rather than against a declaration file that would have to be
 	// generated first.
 	"extends": "./tsconfig.base.json",
-	"include": ["packages/*/src/**/*", "scripts/**/*"]
+	"include": ["packages/*/src/**/*", "packages/*/tests/**/*", "scripts/**/*"]
 }

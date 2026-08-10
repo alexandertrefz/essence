@@ -447,6 +447,52 @@ describe("Enricher", () => {
 			)
 		})
 
+		// NOTE: A Partial is judged by ASSIGNABILITY, not identity — an update
+		// sets a member to a value, and a value of one arm is enough for a
+		// Union-typed member, exactly as it is at the Declaration. Deep
+		// equality refused every one of these.
+		it("should accept an update setting one arm of a Union-typed member", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					constant c: { n: Integer | String } = { n = "a" }
+					constant updated = { c with n = 5 }
+				}`),
+			).toEqual([])
+		})
+
+		it("should accept a Partial spelling a member's Union in another order", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					constant c: { n: Integer | String } = { n = "a" }
+					constant partial: { n: String | Integer } = { n = 5 }
+					constant updated = { c with partial }
+				}`),
+			).toEqual([])
+		})
+
+		it("should resolve a bare Case in an update against the declared member", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					choice Status { Active, Done }
+
+					constant c: { status: Status, n: Integer } = {
+						status = #Active,
+						n = 1,
+					}
+					constant updated = { c with status = #Done }
+				}`),
+			).toEqual([])
+		})
+
+		it("should still report an update whose member Type the value refuses", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					constant a = { name = "x" }
+					constant c = { a with name = 5 }
+				}`).map((diagnostic) => diagnostic.code),
+			).toEqual(["partial-type-mismatch"])
+		})
+
 		it("should report non-Record Type Annotations on Record Literals", () => {
 			let diagnostics = diagnosticsFor(`implementation {
 				constant a = String ~> { name = "x" }
@@ -490,6 +536,39 @@ describe("Enricher", () => {
 			expect(diagnostics[0].message).toBe(
 				"{ name: String } has no member 'age'",
 			)
+		})
+
+		// NOTE: Regression test — the expected-members map was a plain object,
+		// so a member named after one of `Object.prototype`'s found the
+		// JavaScript builtin where `??=` expected a missing entry, and the
+		// Enricher died with an Internal Compiler Error instead of enriching.
+		it("should enrich a literal against a member named after Object.prototype's", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					type A = { toString: () -> String }
+					type B = { x: Integer }
+
+					constant input: A | B = { x = 1 }
+				}`),
+			).toEqual([])
+
+			expect(
+				diagnosticsFor(`implementation {
+					type A = { valueOf: Integer }
+					type B = { x: Integer }
+
+					constant input: A | B = { x = 1 }
+				}`),
+			).toEqual([])
+		})
+
+		it("should report a Lookup of a member only Object.prototype has", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					constant a = { name = "x" }
+					constant b = a.toString
+				}`).map((diagnostic) => diagnostic.code),
+			).toEqual(["unknown-member"])
 		})
 
 		it("should report all independent errors of a Program", () => {
@@ -5201,6 +5280,109 @@ describe("Enricher", () => {
 					.nodes[0] as common.typed.TypeAliasStatementNode
 
 				expect(alias.type).toEqual({ type: "Integer" })
+			})
+
+			// NOTE: A Matcher narrows by TYPE, and a refinement's predicate is
+			// not a runtime question — the emitted check could only ask about
+			// the base, and the arm would run for values the predicate refuses,
+			// typed as evidence nothing proved.
+			it("should refuse a refinement in Matcher position", () => {
+				expect(
+					refusal(`implementation {
+						constant v: Integer | String = 0
+
+						constant sorted = match v -> String {
+							case NonZeroInteger { <- "nonzero" }
+							case _ { <- "other" }
+						}
+					}`),
+				).toEqual({
+					code: "refinement-as-matcher",
+					underlined: "NonZeroInteger",
+				})
+			})
+
+			// NOTE: The refinement need not stand at the Matcher's top level —
+			// `List<NonZeroInteger>` spells one inside a Type Argument, the
+			// emitted check could still only ask about `List<Integer>`, and
+			// the arm would bind items the predicate refuses.
+			it("should refuse a refinement nested inside a Matcher's Type Argument", () => {
+				expect(
+					refusal(`implementation {
+						constant v: List<Integer> | String = [0]
+
+						constant sorted = match v -> String {
+							case List<NonZeroInteger> { <- "nonzero" }
+							case _ { <- "other" }
+						}
+					}`),
+				).toEqual({
+					code: "refinement-as-matcher",
+					underlined: "List<NonZeroInteger>",
+				})
+			})
+
+			// NOTE: An Alias hiding a refinement in a member is just as much a
+			// Matcher that can not be tested for — and beside a wildcard there
+			// is no second arm for the Validator's erased-conflict analysis to
+			// notice, so the refusal has to happen here.
+			it("should refuse an Alias hiding a refinement in a member", () => {
+				expect(
+					refusal(`implementation {
+						type Weird = { n: NonZeroInteger }
+						type Plain = { n: Integer, p: String }
+
+						constant v: Weird | Plain = Plain ~> { n = 0, p = "x" }
+
+						constant told = match v -> String {
+							case Weird { <- "weird" }
+							case _ { <- "other" }
+						}
+					}`),
+				).toEqual({
+					code: "refinement-as-matcher",
+					underlined: "Weird",
+				})
+			})
+
+			it("should refuse a refinement in a payload Pattern's annotation", () => {
+				expect(
+					refusal(`implementation {
+						choice Box {
+							Full { value: Integer | String },
+							Empty,
+						}
+
+						constant box: Box = #Full({ value = 0 })
+
+						constant label = match box -> String {
+							case #Full({ value: NonZeroInteger }) { <- "nonzero" }
+							case _ { <- "other" }
+						}
+					}`),
+				).toEqual({
+					code: "refinement-as-matcher",
+					underlined: "NonZeroInteger",
+				})
+			})
+
+			it("should refuse a refinement in a Record Pattern's annotation", () => {
+				expect(
+					refusal(`implementation {
+						type Holder = { n: Integer | String }
+						type Other = { tag: String }
+
+						constant v: Holder | Other = { n = 0 }
+
+						constant told = match v -> String {
+							case { n: NonZeroInteger } { <- "nonzero" }
+							case _ { <- "other" }
+						}
+					}`),
+				).toEqual({
+					code: "refinement-as-matcher",
+					underlined: "NonZeroInteger",
+				})
 			})
 		})
 

@@ -497,24 +497,6 @@ export function divideByAlgebraic(
 	return createEmpty()
 }
 
-// NOTE: `value − algebraic`, for the commuted overloads on Integer and
-// Rational — total, since subtracting a rational can not collapse the radical.
-export function subtractedFrom(
-	algebraic: AlgebraicType,
-	value: IntegerType | RationalType,
-): AlgebraicType {
-	const coefficient = radicalCoefficientOf(algebraic)
-
-	return createAlgebraic(
-		subtractRationals(bigRationalOf(value), rationalPartOf(algebraic)),
-		{
-			numerator: -coefficient.numerator,
-			denominator: coefficient.denominator,
-		},
-		algebraic.radicand,
-	) as AlgebraicType
-}
-
 // NOTE: `value ÷ algebraic`, for the commuted overloads on Integer and
 // Rational — total, because an Algebraic is never zero. This is the
 // "dividing by an Irrational can not fail" guarantee, in code.

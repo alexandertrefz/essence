@@ -28,6 +28,7 @@ import {
 	canonicalPredicateConjuncts,
 	closePendingRefinementCopies,
 	computeConformanceMethodMap,
+	conformanceKey,
 	createInferenceContext,
 	describeType,
 	first,
@@ -2224,6 +2225,99 @@ describe("Helpers", () => {
 			expect(typeContainsError(shared(8, error))).toBe(true)
 			expect(typeMentionsGeneric(shared(8, generic), "Value")).toBe(true)
 			expect(typeMentionsGeneric(shared(8, generic), "Other")).toBe(false)
+		})
+	})
+
+	// NOTE: A Choice's payload may name the Choice, so the Type under a memo key
+	// can lead back to itself — the same shape `eraseRefinements` rebuilds
+	// below. The serialisation walked such a Type without remembering what it
+	// was inside, so keying a conformance for one never returned.
+	describe("conformanceKey", () => {
+		function tree(): UnionType {
+			let union: UnionType = {
+				type: "UnionType",
+				name: "Tree",
+				types: [],
+			}
+
+			union.types.push({
+				type: "Case",
+				choice: "Tree",
+				name: "Node",
+				members: {
+					weight: { type: "Integer" },
+					children: { type: "List", itemType: union },
+				},
+			})
+
+			return union
+		}
+
+		it("answers for a Type that leads back to itself", () => {
+			expect(conformanceKey("Equatable", tree())).toContain("<cycle:")
+		})
+
+		it("keys two structurally identical cyclic Types alike", () => {
+			expect(conformanceKey("Equatable", tree())).toBe(
+				conformanceKey("Equatable", tree()),
+			)
+		})
+
+		it("keys two cycles that unfold differently apart", () => {
+			// NOTE: Both spell `{ next: { next: …, tag: String }, tag: Integer }`
+			// at every level a bare marker can see — what tells them apart is
+			// where the back-edge returns to, which is what the marker's
+			// distance carries.
+			let straight: RecordType = {
+				type: "Record",
+				members: { tag: { type: "Integer" } },
+			}
+			let looped: RecordType = {
+				type: "Record",
+				members: { tag: { type: "String" } },
+			}
+
+			straight.members["next"] = looped
+			looped.members["next"] = looped
+
+			let alternating: RecordType = {
+				type: "Record",
+				members: { tag: { type: "Integer" } },
+			}
+			let back: RecordType = {
+				type: "Record",
+				members: { tag: { type: "String" } },
+			}
+
+			alternating.members["next"] = back
+			back.members["next"] = alternating
+
+			expect(conformanceKey("Equatable", straight)).not.toBe(
+				conformanceKey("Equatable", alternating),
+			)
+		})
+
+		it("serialises a shared part fully at every reach", () => {
+			// NOTE: A resolved Type is a DAG — only an object the walk is still
+			// INSIDE is a back-edge, so sharing must not put a marker where the
+			// separately built spelling has none.
+			let leaf: Type = { type: "Integer" }
+			let sharing: RecordType = {
+				type: "Record",
+				members: { left: leaf, right: leaf },
+			}
+			let separate: RecordType = {
+				type: "Record",
+				members: {
+					left: { type: "Integer" },
+					right: { type: "Integer" },
+				},
+			}
+
+			let key = conformanceKey("Equatable", sharing)
+
+			expect(key).not.toContain("<cycle:")
+			expect(conformanceKey("Equatable", separate)).toBe(key)
 		})
 	})
 

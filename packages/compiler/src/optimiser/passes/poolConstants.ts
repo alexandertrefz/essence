@@ -102,10 +102,52 @@ function poolKeyOf(
 			// — which is where this earns most, because that object was
 			// rebuilt at every test of every turn.
 			return node.kind === "type-descriptor"
-				? `descriptor:${JSON.stringify(node.descriptor)}`
+				? `descriptor:${serializeKey(node.descriptor)}`
 				: null
 		default:
 			return null
+	}
+}
+
+// NOTE: `JSON.stringify`, with the one answer it lacks: a descriptor whose
+// object graph leads back into itself — the shape a Choice's payload naming the
+// Choice builds, and the one every structural Type walker in the stage carries
+// a guard for. A back-edge becomes a bare `<cycle:N>` marker naming how many
+// objects up the walk it returns to — no value can collide with it (a string of
+// that spelling keeps its quotes), and the distance keeps two graphs that
+// unfold differently from keying, and so pooling, alike. Only the objects
+// currently OPEN are held, not everything seen, so a shared sub-object still
+// serializes fully at every reach and equal descriptors keep equal keys.
+function serializeKey(value: unknown, visiting: Array<object> = []): string {
+	if (value === null || typeof value !== "object") {
+		return JSON.stringify(value) ?? "null"
+	}
+
+	let backEdge = visiting.indexOf(value)
+
+	if (backEdge !== -1) {
+		return `<cycle:${visiting.length - backEdge}>`
+	}
+
+	visiting.push(value)
+
+	try {
+		if (Array.isArray(value)) {
+			return `[${value
+				.map((item) => serializeKey(item, visiting))
+				.join(",")}]`
+		}
+
+		let entries = Object.entries(value)
+			.filter(([, member]) => member !== undefined)
+			.map(
+				([key, member]) =>
+					`${JSON.stringify(key)}:${serializeKey(member, visiting)}`,
+			)
+
+		return `{${entries.join(",")}}`
+	} finally {
+		visiting.pop()
 	}
 }
 
@@ -171,7 +213,7 @@ function conformanceKeyOf(
 	// one's comparison. The witness's `type` is left out: it is what the
 	// Compiler called the conformance, and two witnesses spelled alike emit
 	// alike whatever it says.
-	return `conformance:${JSON.stringify({
+	return `conformance:${serializeKey({
 		namespace: node.namespaceName,
 		methods: node.methodMap,
 		descriptor: node.derivedDescriptor ?? null,

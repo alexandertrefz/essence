@@ -10,9 +10,9 @@ import { commentAnchors } from "../trivia"
 
 // NOTE: Every `.es` source in the repository, which is what a formatter has to
 // survive before it is allowed anywhere near a source tree. The Diagnostic
-// showcase files are included deliberately: six of the seven parse perfectly
-// well and only fail later, so a formatter must handle them like any other
-// file, and the seventh is the one file here that must be refused.
+// showcase files are included deliberately: all but two parse perfectly well
+// and only fail later, so a formatter must handle them like any other file,
+// and those two are the only files here that must be refused.
 function corpus(): Array<{ name: string; filePath: string; source: string }> {
 	let files = readStdlibFiles().map((file) => ({
 		name: "stdlib/" + path.basename(file.filePath),
@@ -53,7 +53,10 @@ function essenceFilesUnder(directory: string): Array<string> {
 
 const CORPUS = corpus()
 
-const UNPARSEABLE = new Set(["diagnostics/Syntax.es"])
+const UNPARSEABLE = new Set([
+	"diagnostics/Syntax.es",
+	"diagnostics/UnclosedString.es",
+])
 
 describe("formatter", () => {
 	it("finds the corpus", () => {
@@ -1263,6 +1266,46 @@ describe("formatter", () => {
 			)
 		})
 
+		// NOTE: The right side of a `with` is unwrapped to bare members only
+		// when the source never braced it — a typed Record always braces
+		// itself, so unwrapping it dropped the `Type ~>` outright.
+		it("keeps the ~> of a typed record on the right of a with", () => {
+			roundTrips(
+				"implementation {\n\tconstant moved = { point with Point ~> { x = 3, y = 4 } }\n}\n",
+				"{ point with Point ~> { x = 3, y = 4 } }",
+			)
+		})
+
+		it("is idempotent over a typed record on the right of a with", () => {
+			let once = format(
+				"implementation {\n\tconstant moved = { point with Point ~> { x = 3, y = 4 } }\n}\n",
+			)
+
+			expect(once.refusal).toBeNull()
+			expect(format(once.text).text).toBe(once.text)
+		})
+
+		// NOTE: The spaces before a line break inside a multi-line String are
+		// characters of the value, so the line-end trimming has to leave them
+		// alone — trimmed, the file means something else and is refused.
+		it("keeps trailing spaces inside a multi-line string", () => {
+			let source =
+				'implementation {\n\tconstant s = "hello   \nworld"\n}\n'
+			let result = format(source)
+
+			expect(result.refusal).toBeNull()
+			expect(result.text).toBe(source)
+		})
+
+		it("keeps trailing spaces inside an interpolated string", () => {
+			let source =
+				'implementation {\n\tconstant s = "hey {1}   \nworld"\n}\n'
+			let result = format(source)
+
+			expect(result.refusal).toBeNull()
+			expect(result.text).toBe(source)
+		})
+
 		it("never reflows a comment", () => {
 			let divider = "§ ——— String ———————————————————————————————————————"
 			let result = format(
@@ -1349,6 +1392,55 @@ describe("formatter", () => {
 				"§ about the file\n\nimplementation {\n\tconstant a = 1\n}\n"
 
 			expect(format(source).text).toBe(source)
+		})
+
+		// NOTE: A Handler carries no Position for its own `}`, and its last
+		// Statement's line is only the brace's when the Handler was written
+		// flat — so a Comment trailing a broken Handler's brace was claimed by
+		// nobody and swept to the end of the block.
+		it("keeps a comment that trails a broken handler's closing brace", () => {
+			let source =
+				"implementation {\n\tconstant x = match 1 -> Integer {\n\t\tcase Integer {\n\t\t\t<- 1\n\t\t} § one\n\t\tcase _ { <- 2 }\n\t}\n}\n"
+			let once = format(source)
+
+			expect(once.refusal).toBeNull()
+			expect(once.text).toContain("{ <- 1 } § one")
+			expect(format(once.text).text).toBe(once.text)
+		})
+
+		// NOTE: The Handler used to claim this Comment as its own and write it
+		// after the brace — across which the anchor comparison rightly refused
+		// to let it move. It belongs to the Statement, and holds the body open.
+		it("keeps a comment that trails the last statement of a handler", () => {
+			let source =
+				"implementation {\n\tconstant x = match 1 -> Integer {\n\t\tcase Integer {\n\t\t\tconstant y = 3\n\t\t\t<- y § note\n\t\t}\n\t\tcase _ { <- 2 }\n\t}\n}\n"
+			let once = format(source)
+
+			expect(once.refusal).toBeNull()
+			expect(once.text).toContain("<- y § note\n\t\t}")
+			expect(format(once.text).text).toBe(once.text)
+		})
+
+		// NOTE: A Comment runs to the end of its line, so a body holding one on
+		// its last Statement can never collapse onto one line — flattened, the
+		// closing brace lands inside the Comment and the output no longer
+		// parses.
+		it("holds a body open around a trailing comment", () => {
+			let source =
+				"implementation {\n\tconstant doubled = [1, 2]::map((n) {\n\t\t<- n::multiplyWith(2) § note\n\t})\n}\n"
+			let once = format(source)
+
+			expect(once.refusal).toBeNull()
+			expect(once.text).toContain("<- n::multiplyWith(2) § note\n\t})")
+			expect(format(once.text).text).toBe(once.text)
+		})
+
+		it("keeps a comment's trailing spaces", () => {
+			let source = "implementation {\n\t§ note   \n\tconstant a = 1\n}\n"
+			let result = format(source)
+
+			expect(result.refusal).toBeNull()
+			expect(result.text).toBe(source)
 		})
 	})
 

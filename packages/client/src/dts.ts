@@ -4,10 +4,14 @@ import {
 	resolveOverloadedMethodName,
 } from "@essence-lang/compiler/helpers"
 import type { ExportSurface } from "@essence-lang/compiler/modules"
-import { escapeName } from "@essence-lang/compiler/rewriter"
+import {
+	escapeName,
+	namespaceMemberName,
+} from "@essence-lang/compiler/rewriter"
 import type { common } from "@essence-lang/interfaces"
 
 import { BRIDGE_EXPORTS } from "./bridge"
+import { admitsAbsence, optionalItemOf } from "./marshal"
 
 // NOTE: An Export Surface as TypeScript — `printType`'s sibling, walking the
 // same `common.Type` vocabulary and printing the other language. Every rule the
@@ -239,6 +243,15 @@ type Direction = "in" | "out"
 // Overload set is already declared this way. The comment is what a reader can do
 // about it, so it travels with the Type.
 function inputRefusal(type: common.Type): string | null {
+	// NOTE: The refusal `fromJS` makes before any arm is tried — both levels of
+	// a nested `Optional` would be `undefined`, so no value at all is admitted.
+	// Asked through the Marshaller's own readers, so the two can not disagree.
+	let item = optionalItemOf(type)
+
+	if (item !== null && admitsAbsence(item)) {
+		return "never /* an Optional inside an Optional has no JavaScript spelling */"
+	}
+
 	switch (type.type) {
 		// NOTE: `fromJS` walks the declared Type to decide what to build, and an
 		// unapplied Type Parameter is a hole where that shape should be. An
@@ -253,6 +266,46 @@ function inputRefusal(type: common.Type): string | null {
 			return "never /* a Namespace can not be built from a JavaScript value */"
 		default:
 			return null
+	}
+}
+
+// NOTE: Whether anything a value of this Type CARRIES would be refused on the
+// way in — a callback member three levels down means no value the declaration
+// admits can actually be built. What it decides is whether an in-position use
+// may go by name: a Type Alias is declared once, in its permissive out-form,
+// so a Parameter naming a tainted one would typecheck the call that always
+// throws. Spelling the shape out instead puts the `never` on the member that
+// is the mistake.
+function containsInputRefusal(
+	type: common.Type,
+	visited: Set<common.Type>,
+): boolean {
+	if (inputRefusal(type) !== null) {
+		return true
+	}
+
+	if (visited.has(type)) {
+		return false
+	}
+
+	visited.add(type)
+
+	switch (type.type) {
+		case "List":
+			return containsInputRefusal(type.itemType, visited)
+		case "Record":
+		case "Case":
+			return Object.values(type.members).some((memberType) =>
+				containsInputRefusal(memberType, visited),
+			)
+		case "UnionType":
+			return type.types.some((arm) => containsInputRefusal(arm, visited))
+		case "Refinement":
+			return containsInputRefusal(type.base, visited)
+		case "GenericAlias":
+			return containsInputRefusal(type.aliasedType, visited)
+		default:
+			return false
 	}
 }
 
@@ -306,9 +359,17 @@ function createWalker(surface: ExportSurface, imports: Set<string>): Walker {
 			}
 		}
 
+		// NOTE: By name only where the name tells the truth. A declaration is
+		// printed once, in its out-form, and a Type whose in-form differs — a
+		// callback among its members, a nested Optional — is spelled out at the
+		// Parameter instead, so the refusal lands on the member that is the
+		// mistake.
 		let alias = named.get(type)
 
-		if (alias !== undefined) {
+		if (
+			alias !== undefined &&
+			(direction === "out" || !containsInputRefusal(type, new Set()))
+		) {
 			return alias
 		}
 
@@ -383,8 +444,10 @@ function createWalker(surface: ExportSurface, imports: Set<string>): Walker {
 					: `unknown /* the Type Parameter ${name} is not in scope here */`
 			}
 			// NOTE: Coming OUT only — `inputRefusal` has already answered for the
-			// other direction. A Function that comes back is handed over as it
-			// is, and its own Parameters are values a caller passes IN.
+			// other direction. A Function that comes back is wrapped by the
+			// Marshaller to marshal around its calls, so the signature printed
+			// here is the one a caller really calls — and its own Parameters
+			// are values that pass IN.
 			case "Function":
 			case "SimpleMethod":
 			case "StaticMethod": {
@@ -516,6 +579,31 @@ function createWalker(surface: ExportSurface, imports: Set<string>): Walker {
 				continue
 			}
 
+			// NOTE: A `#Value` holding a Union is that Union's own arms here —
+			// flattened, so that `Optional<Optional<Integer>>` coming out reads
+			// `bigint | undefined` rather than printing the inner Union as one
+			// arm and its `undefined` twice.
+			if (
+				arm.type === "Case" &&
+				arm.choice === "Optional" &&
+				arm.name === "Value" &&
+				arm.members.item?.type === "UnionType"
+			) {
+				for (let part of unionMembers(
+					arm.members.item,
+					scope,
+					direction,
+				)) {
+					if (part === "undefined") {
+						optional = true
+					} else {
+						parts.push(part)
+					}
+				}
+
+				continue
+			}
+
 			parts.push(print(arm, scope, direction))
 		}
 
@@ -547,8 +635,10 @@ function createWalker(surface: ExportSurface, imports: Set<string>): Walker {
 
 	// NOTE: Declared as it comes OUT. A Type Alias has one spelling and is used
 	// in both directions, so a body that crosses differently each way — a
-	// callback — is named here in its permissive form and refused at the
-	// Parameter that would pass one, which is where the mistake actually is.
+	// callback — is named here in its permissive form and spelled out, with the
+	// refusal on it, at the Parameter that would pass one — which is where the
+	// mistake actually is. `containsInputRefusal` is what keeps the name off
+	// such a Parameter.
 	function aliasDeclaration(name: string, type: common.Type): string {
 		let generic = type.type === "GenericAlias" ? type : null
 		let generics = generic === null ? [] : generic.generics
@@ -640,9 +730,13 @@ function createWalker(surface: ExportSurface, imports: Set<string>): Walker {
 			: `// '${name}' as the Rewriter emits it.\n`
 	}
 
+	// NOTE: `namespaceMemberName`, because these are the CLASS's members — a
+	// member named `prototype` or `constructor` is bound under the mangled
+	// name, and a declaration spelling the written one would promise a member
+	// the bundle does not have.
 	function emittedMembers(type: common.NamespaceType): Array<string> {
 		let entries = Object.keys(type.properties).map(
-			(name) => `${memberName(name)}: EssenceValue`,
+			(name) => `${memberName(namespaceMemberName(name))}: EssenceValue`,
 		)
 
 		for (let [name, methodType] of Object.entries(type.methods)) {
@@ -657,7 +751,7 @@ function createWalker(surface: ExportSurface, imports: Set<string>): Walker {
 
 			for (let [spelling, signature] of overloads) {
 				entries.push(
-					`${memberName(spelling)}(${opaqueParameters(
+					`${memberName(namespaceMemberName(spelling))}(${opaqueParameters(
 						signature.parameterTypes,
 					)}): EssenceValue`,
 				)

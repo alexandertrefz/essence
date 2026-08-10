@@ -14,7 +14,7 @@ itself.
 | Subpath | |
 | --- | --- |
 | `@essence-lang/interfaces` | everything, namespaced by stage |
-| `@essence-lang/interfaces/common` | the shared node and position types |
+| `@essence-lang/interfaces/common` | the shared node and position types, the typed ASTs, and the `Type` union |
 | `@essence-lang/interfaces/lexer` | token types |
 | `@essence-lang/interfaces/parser` | parsed AST node types |
-| `@essence-lang/interfaces/enricher` | typed AST node and Type types |
+| `@essence-lang/interfaces/enricher` | the enricher's `Scope` types |
