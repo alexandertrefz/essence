@@ -146,6 +146,41 @@ describe("Patterns", () => {
 			)
 		})
 
+		// NOTE: Regression test — the same annotated-plus-nested-binder hole in
+		// plain Matcher position: the requirement vanished, the Match passed as
+		// exhaustive without a wildcard, and the arm ran for a value without
+		// the member it bound.
+		it("declines on an annotated member's nested requirements", async () => {
+			const wrapped = `type Click = { x: Integer, y: Integer }
+				type KeyPress = { key: String }
+				type Wrapped = { payload: Click | KeyPress }
+				type Other = { tag: String }
+
+				constant value: Wrapped | Other = { payload = { x = 1, y = 2 } }`
+
+			expect(
+				codesOf(`implementation {
+					${wrapped}
+
+					constant described = match value -> String {
+						case { payload: Click | KeyPress as { key } } { <- key }
+						case { tag } { <- tag }
+					}
+				}`),
+			).toContain("missing-case")
+
+			expect(
+				await run(`implementation {
+					${wrapped}
+
+					Terminal.inspect(match value -> String {
+						case { payload: Click | KeyPress as { key } } { <- key }
+						case _ { <- "declined" }
+					})
+				}`),
+			).toEqual([`"declined"`])
+		})
+
 		it("shadows an outer name, and 'as' declines to", async () => {
 			expect(
 				await run(`implementation {
@@ -205,6 +240,46 @@ describe("Patterns", () => {
 					})
 				}`),
 			).toEqual(["10"])
+		})
+
+		// NOTE: Regression test — the `as` binder was typed as only the members
+		// the Pattern named, so `box.height` was refused though the tag test
+		// proves the value is a #Rectangle, which declares it.
+		it("gives the 'as' binder every member the Case declares", async () => {
+			expect(
+				await run(`implementation {
+					${shape}
+
+					constant shape: Shape = #Rectangle({ width = 3, height = 4 })
+
+					Terminal.inspect(match shape -> Integer {
+						case #Rectangle({ width } as box) {
+							<- width::add(box.height)
+						}
+						case #Circle({ radius }) { <- radius }
+					})
+				}`),
+			).toEqual(["7"])
+		})
+
+		it("gives a shorthand reading's 'as' binder the whole payload", async () => {
+			expect(
+				await run(`implementation {
+					choice Progress {
+						Going { state: { index: Integer, total: Integer } },
+						Stopped,
+					}
+
+					constant started: Progress = #Going({
+						state = { index = 1, total = 7 },
+					})
+
+					Terminal.inspect(match started -> Integer {
+						case #Going({ index } as st) { <- index::add(st.total) }
+						case #Stopped { <- 0 }
+					})
+				}`),
+			).toEqual(["8"])
 		})
 
 		// NOTE: Decision 2 — construction answers the same fork by trying the
@@ -659,6 +734,44 @@ describe("Patterns", () => {
 			}`
 
 			expect(codesOf(source)).toContain("unknown-member")
+		})
+
+		// NOTE: Regression test — a member with BOTH an annotation and a nested
+		// binder kept only the annotation, so the nested Pattern's requirements
+		// were dropped: the arm ran for a payload without the members it read,
+		// bound them as nothing, and retired its Case as if nothing could
+		// decline. The requirement is the annotation with the nested members
+		// merged in, so the arm declines and the Match is conditional again.
+		it("keep a nested binder's requirements beside a written annotation", async () => {
+			expect(
+				codesOf(`implementation {
+					${event}
+
+					constant fired: Event = #Fired({ payload = { x = 1, y = 2 } })
+
+					constant described = match fired -> String {
+						case #Fired({ payload: Click | KeyPress as { key } }) {
+							<- key
+						}
+						case #Quiet { <- "quiet" }
+					}
+				}`),
+			).toContain("missing-case")
+
+			expect(
+				await run(`implementation {
+					${event}
+
+					constant fired: Event = #Fired({ payload = { x = 1, y = 2 } })
+
+					Terminal.inspect(match fired -> String {
+						case #Fired({ payload: Click | KeyPress as { key } }) {
+							<- key
+						}
+						case _ { <- "declined" }
+					})
+				}`),
+			).toEqual([`"declined"`])
 		})
 
 		// NOTE: …and a Pattern naming only what the Case already declares asks

@@ -823,7 +823,7 @@ function rewriteNamespaceDefinitionStatement(
 				).map<estree.PropertyDefinition>(([name, value]) => {
 					return {
 						type: "PropertyDefinition",
-						key: memberKey(name),
+						key: memberKey(namespaceMemberName(name)),
 						value: rewriteExpression(value),
 						computed: false,
 						static: true,
@@ -833,7 +833,7 @@ function rewriteNamespaceDefinitionStatement(
 					([name, method]) => {
 						return {
 							type: "MethodDefinition",
-							key: memberKey(name),
+							key: memberKey(namespaceMemberName(name)),
 							value: rewriteFunctionExpression(
 								method.method.value,
 							),
@@ -2675,7 +2675,9 @@ function namespaceMember(
 
 	return memberRead(
 		{ type: "Identifier", name: namespaceIdentifierName(namespaceName) },
-		memberName,
+		isBuiltinNamespaceReference(namespaceName)
+			? memberName
+			: namespaceMemberName(memberName),
 	)
 }
 
@@ -3293,9 +3295,15 @@ function rewriteIdentifier(
 // every reference alike — and the import keeps the name it was imported under,
 // so a List literal beside a `namespace List` calls the runtime and
 // `21::doubledValue()` calls `$user_List`.
-function namespaceIdentifierName(namespaceName: string): string {
-	return runtimeNamespaceNameSet.has(namespaceName) &&
+function isBuiltinNamespaceReference(namespaceName: string): boolean {
+	return (
+		runtimeNamespaceNameSet.has(namespaceName) &&
 		!isShadowingUserNamespace(namespaceName)
+	)
+}
+
+function namespaceIdentifierName(namespaceName: string): string {
+	return isBuiltinNamespaceReference(namespaceName)
 		? namespaceName
 		: escapeName(namespaceName)
 }
@@ -3352,6 +3360,25 @@ function memberKey(name: string): estree.Identifier | estree.Literal {
 	return isJavaScriptIdentifierName(name)
 		? { type: "Identifier", name }
 		: { type: "Literal", value: name }
+}
+
+// NOTE: A user Namespace is a `class`, and a class refuses two member names an
+// object literal accepts: no static member may be named `prototype` and no
+// field may be named `constructor` — computed keys only move the refusal from
+// the parser to a `TypeError` at definition. `namespace Shape for Shape {
+// prototype () -> … }` is a legal Program, so such a member is mangled instead,
+// at the class body and at every read alike — `namespaceMember` is the one
+// place every read routes through, which is what keeps the two agreeing. A
+// builtin's members are module exports, not class members, so they keep their
+// names.
+//
+// NOTE: Exported for the same reason `escapeName` is — a host binding reads a
+// Namespace's members off the emitted class, so it has to ask the same
+// question.
+const forbiddenClassMemberNames = new Set(["prototype", "constructor"])
+
+export function namespaceMemberName(name: string): string {
+	return forbiddenClassMemberNames.has(name) ? mangleName(name) : name
 }
 
 // NOTE: One member read, `computed` iff the key had to become a Literal — the

@@ -1,7 +1,12 @@
 import { type common, lexer } from "@essence-lang/interfaces"
 
-import { primary, reportError, reportWarning } from "../../diagnostics/index"
-import { Lexer } from "../../lexer/index"
+import {
+	primary,
+	reportError,
+	reportWarning,
+	secondary,
+} from "../../diagnostics/index"
+import { Lexer, UnterminatedStringError } from "../../lexer/index"
 import {
 	type DocumentationLine,
 	type DocumentationProblem,
@@ -15,7 +20,7 @@ type Token = lexer.Token
 // catches this on every backtrack, and capturing a stack trace per throw is
 // the single most expensive thing the parser does. Nothing outside the parser
 // ever sees a ParseError — it is caught by `backtrack` or by the Statement
-// loops, which read only `message`, `position` and `label`.
+// loops, which turn it into the one Diagnostic its fields describe.
 export class ParseError {
 	name = "ParseError"
 	message: string
@@ -24,15 +29,31 @@ export class ParseError {
 	// as opposed to `message`, which is the whole sentence. The renderer puts
 	// them in different places, so they are kept apart here.
 	label: string | null
+	// NOTE: Almost every ParseError is the generic "expected X, found Y" and
+	// reports as `syntax-error` with nothing to add. The few that are their
+	// own kind of problem carry their code and context here, so the Statement
+	// loop that finally reports them needs no knowledge of which failure it
+	// caught.
+	code: common.DiagnosticCode
+	notes: Array<string>
+	helps: Array<string>
 
 	constructor(
 		message: string,
 		position: common.Position | null = null,
 		label: string | null = null,
+		details: {
+			code?: common.DiagnosticCode
+			notes?: Array<string>
+			helps?: Array<string>
+		} = {},
 	) {
 		this.message = message
 		this.position = position
 		this.label = label
+		this.code = details.code ?? "syntax-error"
+		this.notes = details.notes ?? []
+		this.helps = details.helps ?? []
 	}
 }
 
@@ -212,13 +233,45 @@ export class TokenStream {
 
 				token = sourceLexer.next()
 			}
-		} catch {
-			let cursor = sourceLexer.save()
-			let position = { start: cursor, end: cursor }
+		} catch (error) {
+			if (!(error instanceof UnterminatedStringError)) {
+				throw error
+			}
+
+			// NOTE: `endOfInput` is where the Lexer STOPPED — one line past
+			// the last one when the file ends in a newline, where a label has
+			// no text to point at and renders dangling. Clamped to just after
+			// the last visible character, the way `endPosition()` keeps the
+			// parser's own end-of-input Diagnostics on real content. Counted
+			// character by character as the Lexer counts, so the two spellings
+			// of one column can not drift.
+			let endOfContent = { line: 1, column: 1 }
+
+			for (let character of source.trimEnd()) {
+				endOfContent =
+					character === "\n"
+						? { line: endOfContent.line + 1, column: 1 }
+						: {
+								line: endOfContent.line,
+								column: endOfContent.column + 1,
+							}
+			}
+
+			let position = { start: endOfContent, end: endOfContent }
+			let openingQuote = {
+				start: error.openedAt,
+				end: {
+					line: error.openedAt.line,
+					column: error.openedAt.column + 1,
+				},
+			}
 
 			reportError("This String Literal is never closed", position, {
 				code: "unclosed-string",
-				labels: [primary(position, "the input ends here")],
+				labels: [
+					primary(position, "the input ends here"),
+					secondary(openingQuote, "opened here"),
+				],
 				helps: ["Add the missing '\"'."],
 			})
 
@@ -230,6 +283,26 @@ export class TokenStream {
 		// written — so both are reported without setting `hadLexerError`: every
 		// Diagnostic after them is about a Statement that was read in full.
 		for (let error of sourceLexer.errors) {
+			if (error.code === "comment-in-hole") {
+				reportError(error.message, error.position, {
+					code: "comment-in-hole",
+					labels: [
+						primary(
+							error.position,
+							"this Comment would swallow the rest of the String",
+						),
+					],
+					notes: [
+						"A Comment runs to the end of its line — inside a hole it would take the hole's '}' and the String's closing '\"' with it.",
+					],
+					helps: [
+						"Move the Comment out of the String — behind the closing '\"' works.",
+					],
+				})
+
+				continue
+			}
+
 			if (error.code === "invalid-escape") {
 				reportError(error.message, error.position, {
 					code: "invalid-escape",

@@ -144,6 +144,37 @@ describe("ariadne report rendering", () => {
 		)
 	})
 
+	// The header and the margin describe the same lines, so a display line
+	// offset moves both together — and widens the margin when the shifted
+	// numbers need more digits.
+	test("display line offset shifts the margin with the header", () => {
+		let source = Source.from("apple\n== orange;").withDisplayLineOffset(10)
+		let message = new Report({
+			kind: "error",
+			span: { start: 0, end: 0 },
+			message: "can't compare apples with oranges",
+			labels: [
+				new Label({ start: 0, end: 5 }),
+				new Label({ start: 9, end: 15 }),
+			],
+			config: noColor(),
+		}).render(source)
+
+		expectOutput(
+			message,
+			`
+			Error: can't compare apples with oranges
+			    ╭─┤ <unknown>:11:1 │
+			    │
+			 11 │ apple
+			    │ ─────
+			 12 │ == orange;
+			    │    ──────
+			────╯
+			`,
+		)
+	})
+
 	test("two labels with messages", () => {
 		let source = "apple == orange;"
 		let message = new Report({

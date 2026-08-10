@@ -31,7 +31,11 @@ describe("resolveCli", () => {
 		let launcher = path.join("/repo", "packages", "cli", "bin", "essence")
 
 		expect(
-			resolveCli("", "/repo", (candidate) => candidate === launcher),
+			resolveCli(
+				"",
+				"/repo",
+				(candidate: string) => candidate === launcher,
+			),
 		).toEqual({
 			command: "bun",
 			args: [launcher],

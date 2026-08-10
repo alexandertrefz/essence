@@ -73,6 +73,10 @@ export function execute(
 			context.terminal.out(rule(context, "program output"))
 		}
 
+		// NOTE: --json promises stdout carries the report as a single JSON
+		// document and nothing else — so under it the program's own stdout is
+		// routed to stderr, where it still streams as it is produced. The
+		// program runs either way; only where its output lands changes.
 		let child = spawn(
 			process.execPath,
 			[
@@ -81,7 +85,9 @@ export function execute(
 				...programArguments,
 			],
 			{
-				stdio: "inherit",
+				stdio: context.options.json
+					? ["inherit", 2, "inherit"]
+					: "inherit",
 			},
 		)
 

@@ -1,6 +1,7 @@
 import type { common, parser } from "@essence-lang/interfaces"
 
 import {
+	breakParent,
 	concat,
 	type Doc,
 	group,
@@ -14,6 +15,7 @@ import {
 	stringWidth,
 	text,
 	type TextDoc,
+	verbatim,
 } from "./doc"
 import { compareExportEntries, compareImportEntries } from "./sections"
 import type { SourceText } from "./source"
@@ -61,7 +63,7 @@ export class Printer {
 		return {
 			startLine: comment.startLine,
 			endLine: comment.endLine,
-			doc: text(comment.text),
+			doc: verbatim(comment.text),
 		}
 	}
 
@@ -116,8 +118,12 @@ export class Printer {
 			let trailing = this.trivia.claimTrailingOn(endLine)
 			let doc = print(item)
 
+			// NOTE: The Comment runs to the end of its line, so a block holding
+			// this entry can never render flat — the `}` would land inside the
+			// Comment. `breakParent` is what says so without spending a line
+			// break of its own.
 			if (trailing !== null) {
-				doc = concat([doc, text(" " + trailing.text)])
+				doc = concat([doc, verbatim(" " + trailing.text), breakParent])
 			}
 
 			entries.push({ startLine, endLine, doc })
@@ -282,7 +288,7 @@ export class Printer {
 		opening: Comment | null = null,
 		prefix: Doc = EMPTY,
 	): Doc {
-		let brace = opening === null ? text("{") : text("{ " + opening.text)
+		let brace = opening === null ? text("{") : verbatim("{ " + opening.text)
 
 		if (entries.length === 0) {
 			return opening === null
@@ -446,7 +452,7 @@ export class Printer {
 					parts.push(hardline)
 				}
 
-				parts.push(text(comment.text))
+				parts.push(verbatim(comment.text))
 				previousEnd = comment.endLine
 			}
 		}
@@ -466,7 +472,7 @@ export class Printer {
 		let comments = this.trivia.takeBefore(line)
 
 		for (let [index, comment] of comments.entries()) {
-			parts.push(text(comment.text), hardline)
+			parts.push(verbatim(comment.text), hardline)
 
 			// NOTE: A blank line is judged against WHAT FOLLOWS this Comment —
 			// the next Comment of the run, or the keyword when this is the last
@@ -527,7 +533,7 @@ export class Printer {
 
 		for (let entry of entries) {
 			for (let comment of entry.leading) {
-				lines.push(text(comment.text))
+				lines.push(verbatim(comment.text))
 			}
 
 			let written = entry.head
@@ -542,18 +548,23 @@ export class Printer {
 					this.source.slice(entry.node.source.position)
 			}
 
+			let entryDoc: Doc = text(written)
+
 			if (entry.trailing !== null) {
-				written += " " + entry.trailing.text
+				entryDoc = concat([
+					entryDoc,
+					verbatim(" " + entry.trailing.text),
+				])
 			}
 
-			lines.push(text(written))
+			lines.push(entryDoc)
 		}
 
 		// NOTE: A Comment written below the last entry belongs to no entry, so
 		// nothing carries it — it is written where it stands, above the block's
 		// closing brace.
 		for (let comment of loose) {
-			lines.push(text(comment.text))
+			lines.push(verbatim(comment.text))
 		}
 
 		// NOTE: Every line is laid out as if it were on line 0, which leaves
@@ -1207,7 +1218,7 @@ export class Printer {
 
 			for (let comment of leading) {
 				documented = true
-				parts.push(text(comment.text), hardline)
+				parts.push(verbatim(comment.text), hardline)
 			}
 
 			parts.push(this.printParameter(parameter))
@@ -1463,12 +1474,14 @@ export class Printer {
 	// NOTE: `{ a with x = 1 }` reaches the AST as a Combination whose right
 	// side is a Record the source never braced. A genuinely braced right side
 	// — `{ a with { x = 1 } }` — is only distinguishable by looking at what was
-	// written at its Position.
+	// written at its Position. A typed Record — `{ a with Point ~> { x = 1 } }`
+	// — always braces itself, and its `Type ~>` must be written back with it.
 	private printCombination(node: parser.CombinationNode): Doc {
 		let right: Doc
 
 		if (
 			node.rhs.nodeType === "RecordValue" &&
+			node.rhs.type === null &&
 			!this.source.slice(node.rhs.position).trimStart().startsWith("{")
 		) {
 			right = this.printRecordMembers(node.rhs)
@@ -1513,15 +1526,28 @@ export class Printer {
 			run = []
 		}
 
-		for (let handler of node.handlers) {
+		for (let [index, handler] of node.handlers.entries()) {
 			let startLine = handler.matcher.position.start.line
 			let endLine = handlerEndLine(handler)
+
+			// NOTE: The Handler's own `}` line, found in the source — a Handler
+			// node carries no Position of its own, and its last Statement's line
+			// is only the brace's when the Handler was written flat. A Comment
+			// trailing that brace belongs to this Handler, not to the Statement
+			// above it and not to the end of the `match`.
+			let next = node.handlers[index + 1]
+			let closeLine =
+				this.source.closingBraceLine(
+					endLine + 1,
+					(next?.matcher.position.start.line ??
+						node.position.end.line) - 1,
+				) ?? endLine
 
 			for (let comment of this.trivia.takeBefore(startLine)) {
 				entries.push(this.commentEntry(comment))
 			}
 
-			let trailing = this.trivia.claimTrailingOn(endLine)
+			let trailing = this.trivia.claimTrailingOn(closeLine)
 
 			let matcher = this.printMatcher(handler.matcher)
 			let matcherText = renderFlat(matcher) ?? ""
@@ -1536,7 +1562,7 @@ export class Printer {
 			let body = this.bodyBlock(
 				handler.body,
 				handler.matcher.position.end.line,
-				endLine + 1,
+				closeLine,
 				true,
 				// NOTE: Padded whether or not this Handler ends up on one line.
 				// A Handler that breaks still opens its brace right after its
@@ -1549,10 +1575,10 @@ export class Printer {
 			let doc = concat([concat(head), text(" "), body])
 
 			if (trailing !== null) {
-				doc = concat([doc, text(" " + trailing.text)])
+				doc = concat([doc, verbatim(" " + trailing.text)])
 			}
 
-			entries.push({ startLine, endLine, doc })
+			entries.push({ startLine, endLine: closeLine, doc })
 
 			// NOTE: A run is consecutive Handlers that all stay on one line and
 			// none of which is guarded. A `where` clause is an arbitrary
@@ -1628,11 +1654,12 @@ export class Printer {
 			// normalises `1_000` to `1000`, a Rational's parts must stay flush
 			// to keep parsing as one literal, and the Lexer decodes a String's
 			// escapes — so only the source still holds a String exactly as it
-			// was written.
+			// was written. Verbatim, because a multi-line String's trailing
+			// spaces are characters of the value, not layout to be trimmed.
 			case "IntegerValue":
 			case "RationalValue":
 			case "StringValue":
-				return text(this.source.slice(node.position))
+				return verbatim(this.source.slice(node.position))
 
 			case "InterpolatedStringValue":
 				return this.printInterpolatedString(node)
@@ -1703,10 +1730,10 @@ export class Printer {
 			// there. The whole String goes back verbatim rather than being taken
 			// apart on an assumption that did not hold.
 			if (before === null) {
-				return text(this.source.slice(node.position))
+				return verbatim(this.source.slice(node.position))
 			}
 
-			parts.push(text(before), this.printHole(segment.expression))
+			parts.push(verbatim(before), this.printHole(segment.expression))
 
 			cursor = hole.end
 			closing = true
@@ -1719,10 +1746,10 @@ export class Printer {
 		let tail = holeText(written, closing, false)
 
 		if (tail === null) {
-			return text(this.source.slice(node.position))
+			return verbatim(this.source.slice(node.position))
 		}
 
-		parts.push(text(tail))
+		parts.push(verbatim(tail))
 
 		return concat(parts)
 	}

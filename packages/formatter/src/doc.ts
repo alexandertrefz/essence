@@ -13,7 +13,7 @@ export const TAB_WIDTH = 4
 // to its `value` later. The `match` Handler alignment does exactly that: it
 // lays a Handler out before it knows how wide its siblings are, and fills the
 // padding in once the run has ended.
-export type TextDoc = { kind: "text"; value: string }
+export type TextDoc = { kind: "text"; value: string; verbatim: boolean }
 
 export type Doc =
 	| TextDoc
@@ -22,6 +22,7 @@ export type Doc =
 	// rather than a space when the group is flat; `hard` never renders flat at
 	// all and forces every group enclosing it to break.
 	| { kind: "line"; soft: boolean; hard: boolean }
+	| { kind: "breakParent" }
 	| { kind: "group"; contents: Doc; shouldBreak: boolean }
 	| { kind: "indent"; contents: Doc }
 	| { kind: "ifBreak"; broken: Doc; flat: Doc }
@@ -30,8 +31,20 @@ type Mode = "flat" | "break"
 
 type Command = [indent: number, mode: Mode, doc: Doc]
 
+// NOTE: One piece of output, remembering whether it came from verbatim text —
+// which is what the line-end trimming has to know to leave a multi-line String
+// Literal's spaces alone.
+type Segment = { value: string; verbatim: boolean }
+
 export function text(value: string): TextDoc {
-	return { kind: "text", value }
+	return { kind: "text", value, verbatim: false }
+}
+
+// NOTE: Text the renderer hands through untouched — a String Literal sliced
+// back out of the source, or a Comment. Trailing spaces in it are characters
+// of the file rather than layout, so the line-end trimming stops at it.
+export function verbatim(value: string): TextDoc {
+	return { kind: "text", value, verbatim: true }
 }
 
 export function concat(parts: Array<Doc>): Doc {
@@ -41,6 +54,13 @@ export function concat(parts: Array<Doc>): Doc {
 export const line: Doc = { kind: "line", soft: false, hard: false }
 export const softline: Doc = { kind: "line", soft: true, hard: false }
 export const hardline: Doc = { kind: "line", soft: false, hard: true }
+
+// NOTE: Renders as nothing and forces every enclosing group to break, the way
+// a hard line does without spending a line break of its own. A Comment runs to
+// the end of its line, so nothing may ever be laid out after one — this is
+// what takes the flat shape off the table for a block whose last Statement
+// carries a trailing Comment, without deciding where the break goes.
+export const breakParent: Doc = { kind: "breakParent" }
 
 export function group(contents: Doc, options?: { shouldBreak?: boolean }): Doc {
 	return {
@@ -134,6 +154,9 @@ export function renderFlat(doc: Doc): string | null {
 				}
 				break
 
+			case "breakParent":
+				return null
+
 			case "ifBreak":
 				commands.push(current.flat)
 				break
@@ -155,6 +178,9 @@ function propagateBreaks(doc: Doc): boolean {
 
 		case "line":
 			return doc.hard
+
+		case "breakParent":
+			return true
 
 		case "concat": {
 			let broken = false
@@ -255,6 +281,11 @@ function fits(
 				}
 				break
 
+			// NOTE: Zero width — the groups it forces to break were already
+			// marked by `propagateBreaks`, so here there is nothing to measure.
+			case "breakParent":
+				break
+
 			case "ifBreak":
 				commands.push([
 					commandIndent,
@@ -272,7 +303,7 @@ export function printDoc(doc: Doc, width: number): string {
 	propagateBreaks(doc)
 
 	let commands: Array<Command> = [[0, "break", doc]]
-	let out: Array<string> = []
+	let out: Array<Segment> = []
 	let column = 0
 
 	while (commands.length > 0) {
@@ -280,7 +311,7 @@ export function printDoc(doc: Doc, width: number): string {
 
 		switch (current.kind) {
 			case "text":
-				out.push(current.value)
+				out.push({ value: current.value, verbatim: current.verbatim })
 				column += stringWidth(current.value)
 				break
 
@@ -319,15 +350,21 @@ export function printDoc(doc: Doc, width: number): string {
 			case "line":
 				if (mode === "flat" && !current.hard) {
 					if (!current.soft) {
-						out.push(" ")
+						out.push({ value: " ", verbatim: false })
 						column += 1
 					}
 
 					break
 				}
 
-				out.push("\n" + "\t".repeat(commandIndent))
+				out.push({
+					value: "\n" + "\t".repeat(commandIndent),
+					verbatim: false,
+				})
 				column = commandIndent * TAB_WIDTH
+				break
+
+			case "breakParent":
 				break
 
 			case "ifBreak":
@@ -343,9 +380,50 @@ export function printDoc(doc: Doc, width: number): string {
 	// NOTE: A break followed by another break lays down the first line's
 	// indentation with nothing after it. Trimming line ends here costs one pass
 	// and saves every caller from having to emit blank lines in a special way.
-	return out
-		.join("")
-		.split("\n")
-		.map((sourceLine) => sourceLine.trimEnd())
-		.join("\n")
+	// Verbatim text is exempt: its trailing spaces are characters of the file,
+	// not layout, so the trim reaches back only as far as the last verbatim
+	// piece of each line.
+	let lines: Array<Array<Segment>> = [[]]
+
+	for (let segment of out) {
+		let pieces = segment.value.split("\n")
+
+		for (let [index, piece] of pieces.entries()) {
+			if (index > 0) {
+				lines.push([])
+			}
+
+			if (piece !== "") {
+				let current = lines[lines.length - 1] as Array<Segment>
+
+				current.push({ value: piece, verbatim: segment.verbatim })
+			}
+		}
+	}
+
+	return lines.map((segments) => trimmedLine(segments)).join("\n")
+}
+
+function trimmedLine(segments: Array<Segment>): string {
+	while (segments.length > 0) {
+		let last = segments[segments.length - 1] as Segment
+
+		if (last.verbatim) {
+			break
+		}
+
+		let trimmed = last.value.trimEnd()
+
+		if (trimmed === "") {
+			segments.pop()
+
+			continue
+		}
+
+		segments[segments.length - 1] = { value: trimmed, verbatim: false }
+
+		break
+	}
+
+	return segments.map((segment) => segment.value).join("")
 }

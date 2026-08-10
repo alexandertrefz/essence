@@ -11,6 +11,7 @@ import {
 	findRenameableOccurrence,
 	identifierPattern,
 	isValidIdentifierName,
+	isValidLabelName,
 	renameEdits,
 } from "../rename"
 
@@ -438,6 +439,124 @@ describe("Rename of argument labels", () => {
 			].join("\n"),
 		)
 	})
+
+	// NOTE: `with` is a Keyword the grammar's Identifier rule reads as an
+	// ordinary Identifier in label position — the standard library's own
+	// dominant label — so a label may be renamed to it and the result parses.
+	it("should rename an explicit label to a Keyword the grammar accepts there", () => {
+		let source = [
+			"implementation {",
+			"\tfunction pad (using filler: String) -> String {",
+			"\t\t<- filler",
+			"\t}",
+			"",
+			'\tpad(using "-")',
+			"}",
+		].join("\n")
+
+		let renamed = rename(source, { line: 2, column: 16 }, "with")
+
+		expect(renamed).toBe(
+			[
+				"implementation {",
+				"\tfunction pad (with filler: String) -> String {",
+				"\t\t<- filler",
+				"\t}",
+				"",
+				'\tpad(with "-")',
+				"}",
+			].join("\n"),
+		)
+		expect(parseWithDiagnostics(renamed!).diagnostics).toEqual([])
+	})
+})
+
+describe("Rename in an overload function block", () => {
+	// NOTE: `overload function` is a declarations-mode form — the standard
+	// library's alone — so these parse with its header and rename off the
+	// Parser index, exactly as the Server indexes a standard library source.
+	function renameDeclarations(
+		source: string,
+		cursor: common.Cursor,
+		newName: string,
+	) {
+		let { program } = parseWithDiagnostics(source, {
+			allowDeclarationsHeader: true,
+		})
+		let occurrence = findRenameableOccurrence(program, cursor)
+
+		if (occurrence === null) {
+			return null
+		}
+
+		let lines = source.split("\n")
+		let edits = occurrence.declaration.occurrences
+			.flatMap((site) => renameEdits(site, newName))
+			.sort(
+				(a, b) =>
+					b.position.start.line - a.position.start.line ||
+					b.position.start.column - a.position.start.column,
+			)
+
+		for (let { position, newText } of edits) {
+			let line = lines[position.start.line - 1]
+
+			lines[position.start.line - 1] =
+				line.slice(0, position.start.column - 1) +
+				newText +
+				line.slice(position.end.column - 1)
+		}
+
+		return lines.join("\n")
+	}
+
+	let source = [
+		"declarations {",
+		"\toverload function double {",
+		"\t\t(_ value: Integer) -> Integer",
+		"",
+		"\t\t(over values: Integer) -> Integer {",
+		"\t\t\t<- double(values)",
+		"\t\t}",
+		"\t}",
+		"}",
+	].join("\n")
+
+	it("should rename a Parameter used inside an overload body", () => {
+		expect(
+			renameDeclarations(source, { line: 5, column: 9 }, "amounts"),
+		).toBe(
+			[
+				"declarations {",
+				"\toverload function double {",
+				"\t\t(_ value: Integer) -> Integer",
+				"",
+				"\t\t(over amounts: Integer) -> Integer {",
+				"\t\t\t<- double(amounts)",
+				"\t\t}",
+				"\t}",
+				"}",
+			].join("\n"),
+		)
+	})
+
+	it("should rename the overloaded Function together with its calls", () => {
+		expect(
+			renameDeclarations(source, { line: 2, column: 20 }, "twice"),
+		).toBe(
+			[
+				"declarations {",
+				"\toverload function twice {",
+				"\t\t(_ value: Integer) -> Integer",
+				"",
+				"\t\t(over values: Integer) -> Integer {",
+				"\t\t\t<- twice(values)",
+				"\t\t}",
+				"\t}",
+				"}",
+			].join("\n"),
+		)
+	})
 })
 
 describe("Rename of Methods and Record members", () => {
@@ -816,6 +935,28 @@ describe("isValidIdentifierName", () => {
 	})
 })
 
+describe("isValidLabelName", () => {
+	it("should accept the Keywords the grammar's Identifier rule admits", () => {
+		expect(isValidLabelName("with")).toBe(true)
+		expect(isValidLabelName("from")).toBe(true)
+		expect(isValidLabelName("as")).toBe(true)
+		expect(isValidLabelName("case")).toBe(true)
+	})
+
+	it("should accept everything a plain Identifier accepts", () => {
+		expect(isValidLabelName("value")).toBe(true)
+		expect(isValidLabelName("Name2")).toBe(true)
+	})
+
+	it("should keep refusing what no Identifier Token can spell", () => {
+		expect(isValidLabelName("for")).toBe(false)
+		expect(isValidLabelName("match")).toBe(false)
+		expect(isValidLabelName("true")).toBe(false)
+		expect(isValidLabelName("two words")).toBe(false)
+		expect(isValidLabelName("1value")).toBe(false)
+	})
+})
+
 describe("findOccurrence (References)", () => {
 	function occurrencesOf(source: string, cursor: common.Cursor) {
 		let { program } = parseWithDiagnostics(source)
@@ -933,6 +1074,31 @@ describe("findOccurrences (Document Highlight)", () => {
 		)
 
 		expect(occurrencesOf(source, { line: 2, column: 2 })).toEqual([])
+	})
+
+	// NOTE: The Server's Document Highlight falls back to this for anything
+	// the workspace join has no symbol for — a builtin above all — so builtins
+	// highlight exactly as References already finds them.
+	it("should report occurrences of builtins, like References", () => {
+		let source = [
+			"implementation {",
+			'\tTerminal.inspect("one")',
+			'\tTerminal.inspect("two")',
+			"}",
+		].join("\n")
+
+		let occurrences = occurrencesOf(source, { line: 2, column: 3 })
+
+		expect(occurrences).toHaveLength(2)
+		expect(
+			occurrences.map((occurrence) => [
+				occurrence.position.start.line,
+				occurrence.access,
+			]),
+		).toEqual([
+			[2, "read"],
+			[3, "read"],
+		])
 	})
 })
 

@@ -683,6 +683,72 @@ describe("Code Generation — Naming and Escaping", () => {
 		})
 	})
 
+	// NOTE: A user Namespace is a `class`, and a class refuses two member names
+	// an object literal accepts: no static member may be named `prototype`, and
+	// no field may be named `constructor`. Both are ordinary Essence
+	// identifiers, so `namespace Shape for Shape { prototype () -> … }` compiled
+	// green and died in the bundler — `Invalid static method name "prototype"`
+	// quoting generated text. Such a member is mangled instead, at the class
+	// body and at every read alike.
+	describe("A Namespace member a class can not hold", () => {
+		it("mangles a Method named prototype, at definition and call", async () => {
+			const source = `implementation {
+				type Box = { value: Integer }
+
+				namespace Box for Box {
+					prototype() -> Integer {
+						<- @.value
+					}
+				}
+
+				constant box: Box = { value = 4 }
+
+				Terminal.inspect(box::prototype())
+			}`
+
+			let generated = generate(source)
+
+			expect(generated).toContain("static $user_prototype(")
+			expect(generated).toContain("Box.$user_prototype(")
+			expect(generated).not.toMatch(/\bstatic prototype\b/)
+
+			expect(await run(source)).toEqual(["4"])
+		})
+
+		it("mangles a static Property named constructor, at definition and read", async () => {
+			const source = `implementation {
+				namespace Box for Integer {
+					static constructor = 5
+				}
+
+				Terminal.inspect(Box.constructor)
+			}`
+
+			let generated = generate(source)
+
+			expect(generated).toContain("static $user_constructor = ")
+			expect(generated).toContain("Box.$user_constructor")
+
+			expect(await run(source)).toEqual(["5"])
+		})
+
+		it("leaves a Record member of either name alone", async () => {
+			// NOTE: A Record is an object literal, which holds both names happily
+			// — and the read has to match the key the literal wrote.
+			const source = `implementation {
+				constant r = { prototype = 1 }
+
+				Terminal.inspect(r.prototype)
+			}`
+
+			let generated = generate(source)
+
+			expect(generated).not.toContain("$user_prototype")
+
+			expect(await run(source)).toEqual(["1"])
+		})
+	})
+
 	// NOTE: The Lexer ends an Identifier only at one of ITS symbols, and `?`,
 	// `+`, `!`, `%`, `*`, `&`, `^` and `;` are not among them — so `ok?` and
 	// `a+b` are single Identifier Tokens every stage carries to the Rewriter.

@@ -64,9 +64,11 @@ import { isSamePosition } from "./positions"
 import {
 	findDefinition,
 	findOccurrence,
+	findOccurrences,
 	findRenameableOccurrence,
 	identifierPattern,
 	isValidIdentifierName,
+	isValidLabelName,
 	renameEdits,
 } from "./rename"
 import { findSelectionRanges } from "./selectionRanges"
@@ -390,6 +392,20 @@ export function startServer() {
 		)
 	}
 
+	function occurrencesAt(uri: string, position: Position) {
+		let parsed = parseAndEnrich(uri)
+
+		if (parsed === null) {
+			return []
+		}
+
+		return findOccurrences(
+			parsed.program,
+			toCursor(position),
+			parsed.enrichedProgram,
+		)
+	}
+
 	// NOTE: The workspace's answer where there is one, the document's own where
 	// there is not — an untitled buffer, or a file outside every folder, is
 	// still one file whose names rename among themselves. The standard library
@@ -479,13 +495,6 @@ export function startServer() {
 	})
 
 	connection.onRenameRequest((params) => {
-		if (!isValidIdentifierName(params.newName)) {
-			return new ResponseError(
-				ErrorCodes.InvalidParams,
-				`'${params.newName}' is not a valid Identifier.`,
-			)
-		}
-
 		let anchor = renameAnchorAt(params.textDocument.uri, params.position)
 		let occurrence =
 			anchor === null
@@ -497,6 +506,21 @@ export function startServer() {
 
 		if (anchor === null && occurrence === null) {
 			return null
+		}
+
+		// NOTE: What counts as a valid new name depends on what is renamed: a
+		// LABEL lives in the grammar's Identifier rule, which reads Keywords
+		// like `with` and `from` as ordinary Identifiers — the standard
+		// library's own labels are spelled with them.
+		let kind = anchor?.symbol.kind ?? occurrence!.declaration.kind
+		let isValidNewName =
+			kind === "label" ? isValidLabelName : isValidIdentifierName
+
+		if (!isValidNewName(params.newName)) {
+			return new ResponseError(
+				ErrorCodes.InvalidParams,
+				`'${params.newName}' is not a valid Identifier.`,
+			)
 		}
 
 		let occurrences: Array<WorkspaceOccurrence> =
@@ -683,8 +707,26 @@ export function startServer() {
 			{ localOnly: true },
 		)
 
+		// NOTE: The same fallback References takes — a builtin has no workspace
+		// symbol, but highlighting is read-only and works on builtins too, and
+		// `findOccurrences` keeps the access each entry carries.
 		if (symbol === null) {
-			return null
+			let occurrences = occurrencesAt(
+				params.textDocument.uri,
+				params.position,
+			)
+
+			if (occurrences.length === 0) {
+				return null
+			}
+
+			return occurrences.map((entry) => ({
+				range: toLspRange(entry.position),
+				kind:
+					entry.access === "write"
+						? DocumentHighlightKind.Write
+						: DocumentHighlightKind.Read,
+			}))
 		}
 
 		let filePath = documentFilePath(params.textDocument.uri)

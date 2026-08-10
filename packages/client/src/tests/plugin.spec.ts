@@ -14,7 +14,7 @@ import { pathToFileURL } from "node:url"
 import { fixturePath } from "@essence-lang/fixtures"
 import * as esbuild from "esbuild"
 
-import { EssenceCompileError } from "../errors"
+import { EssenceBuildError, EssenceCompileError } from "../errors"
 import { essenceEsbuild } from "../esbuild-plugin"
 import { declarationsPath } from "../plugin-core"
 import { essence, type PluginContext } from "../vite-plugin"
@@ -305,6 +305,28 @@ describe("The Vite plugin", () => {
 		)
 	})
 
+	// NOTE: `/src/Main.es` is the id the canonical Vite entry writes — `<script
+	// type="module" src="/src/Main.es">` — and it names a file under the
+	// project ROOT, not one at the root of the filesystem. A filesystem path
+	// that really exists still answers as itself.
+	it("resolves a root-relative id against the Vite root", () => {
+		let directory = project({ "src/Main.es": MATH_MODULE })
+		let plugin = essence({ declarations: false })
+
+		plugin.configResolved({ command: "serve", root: directory })
+
+		expect(
+			plugin.resolveId.call(undefined, "/src/Main.es", undefined),
+		).toBe(path.join(directory, "src", "Main.es"))
+		expect(
+			plugin.resolveId.call(
+				undefined,
+				path.join(directory, "src", "Main.es"),
+				undefined,
+			),
+		).toBe(path.join(directory, "src", "Main.es"))
+	})
+
 	it("answers with the compiled bundle and watches every source", async () => {
 		let directory = project({ "Math.es": MATH_MODULE })
 		let plugin = essence({ declarations: false })
@@ -350,6 +372,198 @@ export {
 		expect(error).toBeInstanceOf(EssenceCompileError)
 		expect((error as EssenceCompileError).message).toContain(
 			"[assignment-type-mismatch]",
+		)
+	})
+
+	// NOTE: A dev server never rebuilds from the top — entries load one at a
+	// time, and only the changed ones again — so the compiler's record of WHO
+	// the entries are goes stale the moment a file changes. A refactor that
+	// folds one entry into the other's graph collided with the record of an
+	// entry that no longer is one, and refused a one-entry build until the
+	// server was restarted.
+	it("lets an edit refactor one entry into the other's graph", async () => {
+		let shared = `implementation {
+
+	function shared() -> Integer {
+		<- 1
+	}
+}
+
+export {
+	shared
+}
+`
+		let directory = project({
+			"Shared.es": shared,
+			"Entry.es": `implementation {
+	constant value = 2
+}
+
+export {
+	value
+}
+`,
+		})
+		let plugin = essence({ declarations: false })
+
+		plugin.configResolved({ command: "serve", root: directory })
+		plugin.buildStart()
+
+		expect(
+			await plugin.load.call(
+				context(),
+				path.join(directory, "Shared.es"),
+			),
+		).not.toBe(null)
+		expect(
+			await plugin.load.call(context(), path.join(directory, "Entry.es")),
+		).not.toBe(null)
+
+		writeFileSync(
+			path.join(directory, "Entry.es"),
+			`import {
+	shared from "./Shared.es"
+}
+
+implementation {
+	constant value = shared()
+}
+
+export {
+	value
+}
+`,
+		)
+		plugin.watchChange(path.join(directory, "Entry.es"))
+
+		expect(
+			await plugin.load.call(context(), path.join(directory, "Entry.es")),
+		).not.toBe(null)
+	})
+
+	// NOTE: The refusal itself stands: two entries BOTH loaded since the last
+	// change really are two halves of one Program, and the second load is
+	// where that is caught.
+	it("still refuses two live entries out of one Module graph", async () => {
+		let directory = project({
+			"Shared.es": `implementation {
+
+	function shared() -> Integer {
+		<- 1
+	}
+}
+
+export {
+	shared
+}
+`,
+			"Entry.es": `import {
+	shared from "./Shared.es"
+}
+
+implementation {
+	constant value = shared()
+}
+
+export {
+	value
+}
+`,
+		})
+		let plugin = essence({ declarations: false })
+
+		plugin.configResolved({ command: "serve", root: directory })
+		plugin.buildStart()
+
+		expect(
+			await plugin.load.call(
+				context(),
+				path.join(directory, "Shared.es"),
+			),
+		).not.toBe(null)
+
+		let error = await plugin.load
+			.call(context(), path.join(directory, "Entry.es"))
+			.catch((thrown: unknown) => thrown)
+
+		expect(error).toBeInstanceOf(EssenceBuildError)
+		expect((error as EssenceBuildError).message).toContain(
+			"two Essence entries out of one Module graph",
+		)
+	})
+
+	// NOTE: Regression test — a dev server re-transforms a module only when
+	// its OWN watched files change, so an edit to a file in neither graph (a
+	// stylesheet, say) staled the first entry's record, the second entry's
+	// load silently displaced it, and both duplicated-runtime bundles ran side
+	// by side undetected. Displacing the record now invalidates the entry's
+	// module too, so an entry the server still holds is loaded again — where
+	// it collides with the fresh record and refuses.
+	it("forces a displaced entry to load again, where a live one still refuses", async () => {
+		let entry = `import {
+	shared from "./Shared.es"
+}
+
+implementation {
+	constant value = shared()
+}
+
+export {
+	value
+}
+`
+		let directory = project({
+			"Shared.es": `implementation {
+
+	function shared() -> Integer {
+		<- 1
+	}
+}
+
+export {
+	shared
+}
+`,
+			"First.es": entry,
+			"Second.es": entry,
+		})
+		let plugin = essence({ declarations: false })
+		let invalidated: Array<string> = []
+
+		plugin.configResolved({ command: "serve", root: directory })
+		plugin.configureServer({
+			moduleGraph: {
+				getModuleById: (id) => ({ id }),
+				invalidateModule(module) {
+					invalidated.push((module as { id: string }).id)
+				},
+			},
+		})
+		plugin.buildStart()
+
+		expect(
+			await plugin.load.call(context(), path.join(directory, "First.es")),
+		).not.toBe(null)
+
+		plugin.watchChange(path.join(directory, "style.css"))
+
+		expect(
+			await plugin.load.call(
+				context(),
+				path.join(directory, "Second.es"),
+			),
+		).not.toBe(null)
+		expect(invalidated).toEqual([path.join(directory, "First.es")])
+
+		// NOTE: What Vite does with an invalidated module a page still uses —
+		// the next request loads it again.
+		let error = await plugin.load
+			.call(context(), path.join(directory, "First.es"))
+			.catch((thrown: unknown) => thrown)
+
+		expect(error).toBeInstanceOf(EssenceBuildError)
+		expect((error as EssenceBuildError).message).toContain(
+			"two Essence entries out of one Module graph",
 		)
 	})
 })

@@ -353,10 +353,17 @@ declarations {
 			<- List.repeat(@, times count)::join(with "")
 		}
 
+		§ NATIVE. The Essence body — `characters()::reverse()::join` — joins the
+		§ reversed characters into plain text, and segmenting that text afresh
+		§ does not always read the same characters back: a flag's regional
+		§ indicators pair up by position, so reversing three of them re-pairs
+		§ them into characters the original never had. The native remembers the
+		§ reversed view on the String it answers, which no Essence body can do —
+		§ and which is what keeps `reverse` an involution and the `lastIndex`
+		§ derivation below sound.
+
 		§§ The String with its characters in the opposite order.
-		reverse() -> String {
-			<- @::characters()::reverse()::join(with "")
-		}
+		reverse() -> String
 
 		§§ The characters from one position up to, but not including, another. A negative position counts back from the end, so `slice(from 0, to -1)` drops the last character.
 		§§

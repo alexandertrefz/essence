@@ -63,6 +63,8 @@ export {
 	essence,
 	type PluginContext,
 	type ResolvedConfig,
+	type ViteDevServer,
+	type ViteModule,
 	type VitePlugin,
 } from "./vite-plugin"
 export { EssenceRational } from "./rational"

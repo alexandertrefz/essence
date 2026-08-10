@@ -103,6 +103,18 @@ function isAdjacent(left: common.Position, right: common.Position): boolean {
 	)
 }
 
+// NOTE: The parser reads nesting by recursion, one call level per written
+// level, so a Program that nests deeply enough would overflow the call stack
+// and crash without a report. The guard refuses it with one instead, well
+// before the stack runs out — 1024 levels is far past anything written by
+// hand while leaving room for a machine-generated file (a serialized tree
+// nests one level per node, and the budget is SHARED across Expressions,
+// Types and blocks, so the per-construct headroom is what a file actually
+// gets). Measured end to end, the toolchain survives nested blocks to about
+// 2,000 levels and nested Lists to about 10,000 before some stage's own
+// recursion gives out, so 1024 keeps a real margin under the worst of them.
+const maximumNestingDepth = 1024
+
 export type ParserOptions = {
 	// NOTE: Opt-in that lets a Program open with `declarations { … }` — the
 	// standard library sets it, every user file leaves it off so that a
@@ -134,6 +146,11 @@ class DescentParser {
 	// are simply never reached, so the absence of a body stays a parse error
 	// exactly as before.
 	protected mode: parser.Program["kind"] = "implementation"
+	// NOTE: How many levels of Expressions, Types and blocks the parser is
+	// currently inside — `enterNesting` counts them against
+	// `maximumNestingDepth`. One shared budget, because the three recur into
+	// each other and it is the call stack they share that the limit protects.
+	protected nestingDepth = 0
 
 	constructor(source: string, options: ParserOptions = {}) {
 		this.tokens = new TokenStream(source)
@@ -496,19 +513,23 @@ class DescentParser {
 
 		if (error.position === null) {
 			reportError(error.message, null, {
-				code: "syntax-error",
+				code: error.code,
 				labels: [],
+				notes: error.notes,
+				helps: error.helps,
 			})
 
 			return
 		}
 
 		reportError(error.message, error.position, {
-			code: "syntax-error",
+			code: error.code,
 			labels:
 				error.label === null
 					? [primary(error.position, "here")]
 					: [primary(error.position, error.label)],
+			notes: error.notes,
+			helps: error.helps,
 		})
 	}
 
@@ -1565,14 +1586,29 @@ class DescentParser {
 	// #region Expressions
 
 	protected parseExpression(): parser.ExpressionNode {
+		this.enterNesting()
+
+		try {
+			return this.parseExpressionLevels()
+		} finally {
+			this.nestingDepth--
+		}
+	}
+
+	protected parseExpressionLevels(): parser.ExpressionNode {
 		let expression = this.parsePrimaryExpression()
 
 		while (true) {
 			let token = this.tokens.peek()
+			let following = this.tokens.peek(1)
 
+			// NOTE: The two ':' of a Method call are one lexeme — only written
+			// flush against each other do they read as '::', the same adjacency
+			// rule every other multi-Token lexeme gets.
 			if (
 				token?.type === TokenType.SymbolColon &&
-				this.tokens.peek(1)?.type === TokenType.SymbolColon
+				following?.type === TokenType.SymbolColon &&
+				isAdjacent(token.position, following.position)
 			) {
 				this.tokens.next()
 				this.tokens.next()
@@ -2237,7 +2273,7 @@ class DescentParser {
 
 		let keyValuePairCombination = this.backtrack(() => {
 			let keyValuePairList = this.parseKeyValuePairList()
-			this.tokens.expect(TokenType.SymbolRightBrace)
+			let rightBrace = this.tokens.expect(TokenType.SymbolRightBrace)
 
 			return generators.combination(
 				lhs,
@@ -2247,8 +2283,8 @@ class DescentParser {
 					keyValuePairList.position,
 				),
 				{
-					start: lhs.position.start,
-					end: keyValuePairList.position.end,
+					start: leftBrace.position.start,
+					end: rightBrace.position.end,
 				},
 			)
 		})
@@ -2258,11 +2294,11 @@ class DescentParser {
 		}
 
 		let rhs = this.parseExpression()
-		this.tokens.expect(TokenType.SymbolRightBrace)
+		let rightBrace = this.tokens.expect(TokenType.SymbolRightBrace)
 
 		return generators.combination(lhs, rhs, {
-			start: lhs.position.start,
-			end: rhs.position.end,
+			start: leftBrace.position.start,
+			end: rightBrace.position.end,
 		})
 	}
 
@@ -2987,23 +3023,29 @@ class DescentParser {
 	// Generic argument (`List<Item | Nothing>`), where the angle brackets
 	// delimit it.
 	protected parseType(): parser.TypeDeclarationNode {
-		let firstType = this.parseGenericType()
+		this.enterNesting()
 
-		if (this.tokens.peek()?.type === TokenType.SymbolPipe) {
-			let types = [firstType]
+		try {
+			let firstType = this.parseGenericType()
 
-			while (this.tokens.peek()?.type === TokenType.SymbolPipe) {
-				this.tokens.next()
-				types.push(this.parseGenericType())
+			if (this.tokens.peek()?.type === TokenType.SymbolPipe) {
+				let types = [firstType]
+
+				while (this.tokens.peek()?.type === TokenType.SymbolPipe) {
+					this.tokens.next()
+					types.push(this.parseGenericType())
+				}
+
+				return generators.unionTypeDeclaration(types, {
+					start: firstType.position.start,
+					end: types[types.length - 1].position.end,
+				})
 			}
 
-			return generators.unionTypeDeclaration(types, {
-				start: firstType.position.start,
-				end: types[types.length - 1].position.end,
-			})
+			return firstType
+		} finally {
+			this.nestingDepth--
 		}
-
-		return firstType
 	}
 
 	protected parseGenericType(): parser.TypeDeclarationNode {
@@ -3248,18 +3290,56 @@ class DescentParser {
 	// #region Helpers
 
 	protected parseBlock(): BlockResult {
-		let leftBrace = this.tokens.expect(TokenType.SymbolLeftBrace)
+		this.enterNesting()
 
-		let body = this.parseStatementList(() => this.parseImplementationNode())
-		let closingPosition = this.parseClosingBrace(leftBrace.position)
+		try {
+			let leftBrace = this.tokens.expect(TokenType.SymbolLeftBrace)
 
-		return {
-			body,
-			position: {
-				start: leftBrace.position.start,
-				end: closingPosition.end,
-			},
+			let body = this.parseStatementList(() =>
+				this.parseImplementationNode(),
+			)
+			let closingPosition = this.parseClosingBrace(leftBrace.position)
+
+			return {
+				body,
+				position: {
+					start: leftBrace.position.start,
+					end: closingPosition.end,
+				},
+			}
+		} finally {
+			this.nestingDepth--
 		}
+	}
+
+	// NOTE: Called on the way into every parsing method that recurs once per
+	// written nesting level — `parseExpression`, `parseType` and `parseBlock`
+	// reach each other through everything between them, so counting the three
+	// bounds the whole descent. The caller decrements in a `finally`: a throw
+	// unwinds any number of levels at once, and the count has to unwind with
+	// them.
+	protected enterNesting(): void {
+		if (this.nestingDepth >= maximumNestingDepth) {
+			let position =
+				this.tokens.peek()?.position ?? this.tokens.endPosition()
+
+			throw new ParseError(
+				"This code is nested too deeply",
+				position,
+				`the ${maximumNestingDepth}th level of nesting starts here`,
+				{
+					code: "nesting-too-deep",
+					notes: [
+						`The parser reads nesting by recursion, so there is a depth at which it would run out of call stack mid-read and crash without a report — it refuses at ${maximumNestingDepth} levels instead, with one.`,
+					],
+					helps: [
+						"Break the nesting up: name intermediate values as Constants, or intermediate Types as Type Aliases.",
+					],
+				},
+			)
+		}
+
+		this.nestingDepth++
 	}
 
 	protected parseIdentifier(): parser.IdentifierNode {
@@ -3293,12 +3373,15 @@ class DescentParser {
 	}
 
 	// NOTE: A speculation that is thrown away must leave nothing behind — not
-	// the Tokens it read and not the Diagnostics it reported, which are about
-	// a shape the Program was never in. The same text is often read twice
-	// (a typed Record Literal, then a Record Literal), and only the reading
-	// that is kept gets to report on it.
+	// the Tokens it read, not the Diagnostics it reported, which are about a
+	// shape the Program was never in, and not the suppression latch an attempt
+	// that ran to the end of the input left set: rewinding the Diagnostics
+	// while the latch survived is how a broken file once parsed in silence.
+	// The same text is often read twice (a typed Record Literal, then a Record
+	// Literal), and only the reading that is kept gets to report on it.
 	protected backtrack<T>(parseAttempt: () => T): T | null {
 		let saved = this.tokens.save()
+		let savedSuppressDiagnostics = this.suppressDiagnostics
 		let diagnosticMark = markDiagnostics()
 
 		try {
@@ -3306,6 +3389,7 @@ class DescentParser {
 		} catch (error) {
 			if (error instanceof ParseError) {
 				this.tokens.restore(saved)
+				this.suppressDiagnostics = savedSuppressDiagnostics
 				rewindDiagnostics(diagnosticMark)
 
 				return null

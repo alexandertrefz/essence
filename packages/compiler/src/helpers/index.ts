@@ -1421,35 +1421,63 @@ export function conformanceKey(
 }
 
 function stableSerialize(value: unknown): string {
-	if (value === null || typeof value !== "object") {
-		return JSON.stringify(value) ?? "null"
+	// NOTE: A Choice's payload may name the Choice, so the walk can lead back
+	// to an object it is inside — the same back-edge `resolveUnknownSlots`
+	// guards for. Meeting one is answered with a bare `<cycle:N>` marker naming
+	// how many objects up the walk it returns to: no value can collide with it
+	// (a string of that spelling keeps its quotes), and the distance keeps two
+	// Types that unfold differently from sharing a memo key. Only the objects
+	// currently OPEN are held, not everything seen: a resolved Type is a DAG,
+	// and a shared object reached twice sideways has to serialize fully both
+	// times, or two structurally identical Types built with different sharing
+	// would stop producing the same key.
+	let visiting: Array<object> = []
+
+	let serialize = (value: unknown): string => {
+		if (value === null || typeof value !== "object") {
+			return JSON.stringify(value) ?? "null"
+		}
+
+		let backEdge = visiting.indexOf(value)
+
+		if (backEdge !== -1) {
+			return `<cycle:${visiting.length - backEdge}>`
+		}
+
+		visiting.push(value)
+
+		try {
+			if (Array.isArray(value)) {
+				return `[${value.map(serialize).join(",")}]`
+			}
+
+			// NOTE: A generic walker does not go through `provenConjuncts`, so it keeps
+			// the same promise by hand: a refinement whose predicate has not resolved
+			// yet must not become anybody's memo key, because the key would keep naming
+			// the empty predicate after the conjuncts were written in. The throw is the
+			// hoisting rounds' "not this round", exactly as it is at every other reader.
+			if (
+				(value as Record<string, unknown>).type === "Refinement" &&
+				(value as Record<string, unknown>).conjuncts === null
+			) {
+				throw new Error(
+					`Internal Compiler Error: the predicate of refinement '${String(
+						(value as Record<string, unknown>).name,
+					)}' was read before it resolved`,
+				)
+			}
+
+			let entries = Object.entries(value as Record<string, unknown>)
+				.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+				.map(([key, val]) => `${JSON.stringify(key)}:${serialize(val)}`)
+
+			return `{${entries.join(",")}}`
+		} finally {
+			visiting.pop()
+		}
 	}
 
-	if (Array.isArray(value)) {
-		return `[${value.map(stableSerialize).join(",")}]`
-	}
-
-	// NOTE: A generic walker does not go through `provenConjuncts`, so it keeps
-	// the same promise by hand: a refinement whose predicate has not resolved
-	// yet must not become anybody's memo key, because the key would keep naming
-	// the empty predicate after the conjuncts were written in. The throw is the
-	// hoisting rounds' "not this round", exactly as it is at every other reader.
-	if (
-		(value as Record<string, unknown>).type === "Refinement" &&
-		(value as Record<string, unknown>).conjuncts === null
-	) {
-		throw new Error(
-			`Internal Compiler Error: the predicate of refinement '${String(
-				(value as Record<string, unknown>).name,
-			)}' was read before it resolved`,
-		)
-	}
-
-	let entries = Object.entries(value as Record<string, unknown>)
-		.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-		.map(([key, val]) => `${JSON.stringify(key)}:${stableSerialize(val)}`)
-
-	return `{${entries.join(",")}}`
+	return serialize(value)
 }
 
 // NOTE: Whether a Type mentions a Generic anywhere in its tree. Types are
@@ -2388,7 +2416,10 @@ function matchTypes(
 
 	if (lhs.type === "Record" && rhs.type === "Record") {
 		for (let memberName in lhs.members) {
-			if (rhs.members[memberName] === undefined) {
+			// NOTE: `Object.hasOwn` before the read — a member named after one
+			// of `Object.prototype`'s would otherwise be compared against a
+			// JavaScript function the Record does not have.
+			if (!Object.hasOwn(rhs.members, memberName)) {
 				return false
 			}
 

@@ -557,18 +557,6 @@ export function divide(
 	)
 }
 
-// NOTE: `value − transcendental`, for the commuted overloads on Integer and
-// Rational — total, since the term coefficients merely flip sign.
-export function subtractedFrom(
-	transcendental: TranscendentalType,
-	value: IntegerType | RationalType,
-): TranscendentalType {
-	return createTranscendental(
-		subtractRationals(bigRationalOf(value), rationalPartOf(transcendental)),
-		scaledCoefficients(transcendental, { numerator: -1n, denominator: 1n }),
-	) as TranscendentalType
-}
-
 export function addTranscendental(
 	transcendental: TranscendentalType,
 	other: TranscendentalType,

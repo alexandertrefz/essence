@@ -435,95 +435,99 @@ declarations {
 			§ here rather than read as signed pieces.
 			if unsignedText::contains("-") {
 				<- #Empty
-			}
-
-			§ The sign folds back in as a factor on the numerator — the pieces
-			§ below are unsigned, so multiplying the parsed numerator by this
-			§ is the whole of what the leading `-` means.
-			constant signFactor = match sign -> Integer {
-				case #Value { <- -1 }
-
-				case #Empty { <- 1 }
-			}
-
-			constant fractionPieces = unsignedText::split(on "/")
-
-			if fractionPieces::length()::is(2) {
-				§ One slash — a numerator over a denominator. `Rational.of`
-				§ answers the zero-denominator empty itself, so both arms
-				§ below hand back what it decided rather than wrapping it.
-				<- match Integer.parse(
-					fractionPieces::firstItem()::otherwise(""),
-				) -> Optional<Rational> {
-					case #Empty { <- #Empty }
-
-					case #Value(parsedNumerator) {
-						<- match Integer.parse(
-							fractionPieces::lastItem()::otherwise(""),
-						) -> Optional<Rational> {
-							case #Empty                    { <- #Empty }
-
-							case #Value(parsedDenominator) {
-								<- Rational.of(
-									parsedNumerator::multiply(with signFactor),
-									over parsedDenominator,
-								)
-							}
-						}
-					}
-				}
-			} else if fractionPieces::length()::isNot(1) {
-				<- #Empty
 			} else {
-				constant decimalPieces = unsignedText::split(on ".")
+				§ The sign folds back in as a factor on the numerator — the pieces
+				§ below are unsigned, so multiplying the parsed numerator by this
+				§ is the whole of what the leading `-` means.
+				constant signFactor = match sign -> Integer {
+					case #Value { <- -1 }
 
-				if decimalPieces::length()::is(2) {
-					§ One dot — the digits on both sides of it over a power
-					§ of ten, one factor per fractional digit.
-					constant wholeText      = decimalPieces
-						::firstItem()
-						::otherwise("")
-					constant fractionalText = decimalPieces
-						::lastItem()
-						::otherwise("")
+					case #Empty { <- 1 }
+				}
 
-					if wholeText::isEmpty()::or(fractionalText::isEmpty()) {
-						<- #Empty
-					}
+				constant fractionPieces = unsignedText::split(on "/")
 
+				if fractionPieces::length()::is(2) {
+					§ One slash — a numerator over a denominator. `Rational.of`
+					§ answers the zero-denominator empty itself, so both arms
+					§ below hand back what it decided rather than wrapping it.
 					<- match Integer.parse(
-						wholeText::append(fractionalText),
+						fractionPieces::firstItem()::otherwise(""),
 					) -> Optional<Rational> {
 						case #Empty { <- #Empty }
 
-						case #Value(digitsValue) {
-							constant scale = fractionalText
-								::characters()
-								::reduce(startingWith 1, (scaled, _) {
-									<- scaled::multiply(with 10)
-								})
+						case #Value(parsedNumerator) {
+							<- match Integer.parse(
+								fractionPieces::lastItem()::otherwise(""),
+							) -> Optional<Rational> {
+								case #Empty                    { <- #Empty }
 
-							<- Rational.of(
-								digitsValue::multiply(with signFactor),
-								over scale,
-							)
+								case #Value(parsedDenominator) {
+									<- Rational.of(
+										parsedNumerator::multiply(
+											with signFactor,
+										),
+										over parsedDenominator,
+									)
+								}
+							}
 						}
 					}
-				} else if decimalPieces::length()::isNot(1) {
+				} else if fractionPieces::length()::isNot(1) {
 					<- #Empty
 				} else {
-					§ No slash and no dot — a whole number.
-					<- match Integer.parse(unsignedText) -> Optional<Rational> {
-						case #Empty { <- #Empty }
+					constant decimalPieces = unsignedText::split(on ".")
 
-						case #Value(parsedWhole) {
-							§ Over a denominator of `1`, written where it
-							§ stands — so this arm hands back a Rational rather
-							§ than an Optional, and has to say which it is.
-							<- #Value(Rational.of(
-								parsedWhole::multiply(with signFactor),
-								over 1,
-							))
+					if decimalPieces::length()::is(2) {
+						§ One dot — the digits on both sides of it over a power
+						§ of ten, one factor per fractional digit.
+						constant wholeText      = decimalPieces
+							::firstItem()
+							::otherwise("")
+						constant fractionalText = decimalPieces
+							::lastItem()
+							::otherwise("")
+
+						if wholeText::isEmpty()::or(fractionalText::isEmpty()) {
+							<- #Empty
+						} else {
+							<- match Integer.parse(
+								wholeText::append(fractionalText),
+							) -> Optional<Rational> {
+								case #Empty { <- #Empty }
+
+								case #Value(digitsValue) {
+									constant scale = fractionalText
+										::characters()
+										::reduce(startingWith 1, (scaled, _) {
+											<- scaled::multiply(with 10)
+										})
+
+									<- Rational.of(
+										digitsValue::multiply(with signFactor),
+										over scale,
+									)
+								}
+							}
+						}
+					} else if decimalPieces::length()::isNot(1) {
+						<- #Empty
+					} else {
+						§ No slash and no dot — a whole number.
+						<- match Integer.parse(
+							unsignedText,
+						) -> Optional<Rational> {
+							case #Empty { <- #Empty }
+
+							case #Value(parsedWhole) {
+								§ Over a denominator of `1`, written where it
+								§ stands — so this arm hands back a Rational rather
+								§ than an Optional, and has to say which it is.
+								<- #Value(Rational.of(
+									parsedWhole::multiply(with signFactor),
+									over 1,
+								))
+							}
 						}
 					}
 				}

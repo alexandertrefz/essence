@@ -1,17 +1,19 @@
 import { resolveOverloadedMethodName } from "@essence-lang/compiler/helpers"
 import type { ExportSurface } from "@essence-lang/compiler/modules"
 import { printSignature } from "@essence-lang/compiler/printType"
-import { escapeName } from "@essence-lang/compiler/rewriter"
+import {
+	escapeName,
+	namespaceMemberName,
+} from "@essence-lang/compiler/rewriter"
 import type { common } from "@essence-lang/interfaces"
 
-import type { EssenceValue } from "./bridge"
 import { EssenceCallError } from "./errors"
-import { type Marshaller, plainObject } from "./marshal"
+import type { EssenceFunction, Marshaller } from "./marshal"
 
 // NOTE: The Module's exports as things a host can USE — a Function it can call,
 // a Namespace it can reach a Method on — rather than the tagged values the
 // bundle binds. Marshalling says what a value crossing the boundary becomes;
-// this says how a call crosses it.
+// this says which name is bound to what.
 //
 // NOTE: What a name is bound to is decided by the Export Surface's TYPE, never
 // by its `kind`. A `type Rectangle` sharing its name with `namespace Rectangle`
@@ -28,8 +30,6 @@ export type ModuleBindings = {
 }
 
 type Callable = (...args: Array<unknown>) => unknown
-
-type EssenceFunction = (...args: Array<EssenceValue>) => EssenceValue
 
 export function bindModule(
 	bundle: Record<string, unknown>,
@@ -117,11 +117,10 @@ function bindValue(
 ): void {
 	switch (type.type) {
 		case "Function":
-			target[key] = wrapFunction(
+			target[key] = marshal.wrapFunction(
 				read() as EssenceFunction,
 				type,
 				name,
-				marshal,
 			)
 
 			break
@@ -133,7 +132,7 @@ function bindValue(
 		// else, since the Validator refuses to export a `variable` and a Method
 		// is only ever reached through the Namespace that holds it.
 		default:
-			defineConstant(target, key, read, name, marshal)
+			defineConstant(target, key, read, type, name, marshal)
 	}
 }
 
@@ -150,179 +149,24 @@ function bindValue(
 // `marshaller.toJS(raw.…)` is. A single marshalled Array shared by every reader
 // is one a host can push onto, which changes what every other holder of the same
 // Module sees — while `Object.freeze(exports)` says, wrongly, that it cannot.
+//
+// NOTE: The declared Type rides along for the one value a tag does not
+// describe — a Function inside the constant, which `toJS` wraps against it.
 function defineConstant(
 	target: Record<string, unknown>,
 	key: string,
 	read: () => unknown,
+	type: common.Type,
 	name: string,
 	marshal: Marshaller,
 ): void {
 	Object.defineProperty(target, key, {
-		get: () => marshal.toJS(read(), name),
+		get: () => marshal.toJS(read(), name, type),
 		enumerable: true,
 	})
 }
 
 // #region Functions
-
-// NOTE: One Essence Function as a JavaScript one: Arguments marshalled against
-// the Parameter Types the Module declared, the call made positionally — which is
-// how every Essence call is emitted, labels and all — and the answer marshalled
-// back. Everything a caller can get wrong before the first Argument is even
-// looked at is an `EssenceCallError`; everything about a value is an
-// `EssenceMarshalError`. The two are told apart because they are fixed in
-// different places.
-function wrapFunction(
-	target: EssenceFunction,
-	signature: common.BaseFunction,
-	name: string,
-	marshal: Marshaller,
-): Callable {
-	let parameters = signature.parameterTypes
-	let labels = labelsOf(signature)
-
-	return (...args: Array<unknown>): unknown => {
-		let call = readCall(args, signature, labels, name)
-		let marshalled = call.ordered.map((argument, position) =>
-			marshal.fromJS(
-				argument,
-				parameters[position]!.type,
-				argumentPath(parameters[position]!, position, call.labelled),
-			),
-		)
-
-		return marshal.toJS(target(...marshalled), "return value")
-	}
-}
-
-// NOTE: The Arguments a call resolved to, and which of the two ways it was
-// written — an Error names an Argument by its label where the caller wrote one,
-// and by its position where they counted.
-type Call = { ordered: Array<unknown>; labelled: boolean }
-
-// NOTE: The Arguments in the order the emitted Function takes them, whichever
-// way the caller wrote the call.
-//
-// A Function whose every Parameter carries a label may be called with one
-// object instead — `Rectangle.of({ width: 3n, height: 4n })` — because that is
-// the call Essence itself writes, and dropping to positional Arguments at the
-// boundary would lose the one thing the Declaration insisted on. The keys have
-// to be EXACTLY the labels: a labelled call with a missing or a misspelled one
-// is a mistake, not a positional call that happens to pass an object.
-function readCall(
-	args: Array<unknown>,
-	signature: common.BaseFunction,
-	labels: Array<string> | null,
-	name: string,
-): Call {
-	if (labels !== null && args.length === 1) {
-		let given = plainObject(args[0])
-
-		if (given !== null) {
-			let keys = Object.keys(given)
-
-			if (sameNames(keys, labels)) {
-				return {
-					ordered: labels.map((label) => given[label]),
-					labelled: true,
-				}
-			}
-
-			// NOTE: One object that is not a labelled call is only a positional
-			// call while the Function takes exactly one Argument. Where it takes
-			// more, the caller plainly meant the labels and got them wrong, and
-			// saying which is worth more than "takes 2 Arguments, 1 was passed".
-			if (signature.parameterTypes.length !== 1) {
-				throw new EssenceCallError(
-					`${callShape(signature, labels, name)}. It was passed one object with ${
-						keys.length === 0 ? "no keys" : quoted(keys)
-					}.`,
-				)
-			}
-		}
-	}
-
-	if (args.length !== signature.parameterTypes.length) {
-		throw new EssenceCallError(
-			`${callShape(signature, labels, name)}; ${count(
-				args.length,
-				"Argument",
-			)} ${args.length === 1 ? "was" : "were"} passed.`,
-		)
-	}
-
-	return { ordered: args, labelled: false }
-}
-
-// NOTE: How the Function may be called, as the first half of every refusal —
-// the signature it was declared with, and both ways of writing a call to it.
-// The caller who got one wrong is reading it to find the other.
-function callShape(
-	signature: common.BaseFunction,
-	labels: Array<string> | null,
-	name: string,
-): string {
-	let positions = count(signature.parameterTypes.length, "Argument")
-
-	return labels === null
-		? `${printSignature(signature, name)} takes ${positions}`
-		: `${printSignature(
-				signature,
-				name,
-			)} takes ${positions} positionally, or one object with the labels ${quoted(
-				labels,
-			)}`
-}
-
-// NOTE: The labels a call may be written with, or `null` where it may not be
-// written that way at all. Every Parameter has to carry one: a Function with a
-// single `_` among its Parameters can not be called by label in Essence either,
-// and half a labelled call is no call.
-//
-// NOTE: A Function of ONE Record Parameter is positional whatever its label
-// says. Both readings take an object, and the Record is the one that can hold
-// any shape at all — so `describe({ width: 3n, height: 4n })` passes the
-// Rectangle rather than looking for a label named `width`. This is the whole of
-// the ambiguity: with two Parameters or more the key set decides, since a
-// labelled call's keys are the labels and a positional call passes no object.
-function labelsOf(signature: common.BaseFunction): Array<string> | null {
-	let parameters = signature.parameterTypes
-
-	if (parameters.length === 0) {
-		return null
-	}
-
-	if (
-		parameters.length === 1 &&
-		underlying(parameters[0]!.type) === "Record"
-	) {
-		return null
-	}
-
-	let labels: Array<string> = []
-
-	for (let parameter of parameters) {
-		if (parameter.name === null) {
-			return null
-		}
-
-		labels.push(parameter.name)
-	}
-
-	return labels
-}
-
-// NOTE: What an Error calls the Argument that went wrong. A labelled call has no
-// positions to count, so it is named the way it was written.
-function argumentPath(
-	parameter: common.Parameter,
-	position: number,
-	labelled: boolean,
-): string {
-	return labelled && parameter.name !== null
-		? `argument '${parameter.name}'`
-		: `argument ${position + 1}`
-}
 
 // NOTE: WHICH Overload a call means is a question only the Compiler answers —
 // it reads the Argument Types, and a JavaScript value has none to read. So the
@@ -368,7 +212,12 @@ function bindNamespace(
 	// NOTE: A Namespace's members are keyed by the name as it was WRITTEN —
 	// `memberKey` quotes what JavaScript can not spell rather than escaping it,
 	// so a Method named `ok?` is the property `"ok?"`. `escapeName` belongs to
-	// the top level alone and would look for a member nothing binds.
+	// the top level alone and would look for a member nothing binds. The one
+	// exception is `namespaceMemberName`'s own: a class refuses a static member
+	// named `prototype` or `constructor`, so the Rewriter mangles those two, and
+	// the read here has to ask the same question — `prototype` would otherwise
+	// answer with the class-prototype object every class owns, and
+	// `constructor` with `Function` off the prototype chain.
 	//
 	// NOTE: OWN members, because a Namespace is emitted as a class and a class
 	// inherits `name`, `length`, `call` and `bind` from `Function` — an `in`
@@ -378,12 +227,15 @@ function bindNamespace(
 	// NOTE: A static constant is bound ON READ for the reasons `defineConstant`
 	// states — a constant is a constant wherever it sits, and one the Marshaller
 	// has no mapping for would otherwise take the whole Namespace with it.
-	for (let name of Object.keys(type.properties)) {
-		if (Object.hasOwn(namespace, name)) {
+	for (let [name, propertyType] of Object.entries(type.properties)) {
+		let binding = namespaceMemberName(name)
+
+		if (Object.hasOwn(namespace, binding)) {
 			defineConstant(
 				bound,
 				name,
-				() => namespace[name],
+				() => namespace[binding],
+				propertyType,
 				`${type.name}.${name}`,
 				marshal,
 			)
@@ -399,15 +251,16 @@ function bindNamespace(
 			continue
 		}
 
+		let binding = namespaceMemberName(name)
+
 		if (
-			Object.hasOwn(namespace, name) &&
-			typeof namespace[name] === "function"
+			Object.hasOwn(namespace, binding) &&
+			typeof namespace[binding] === "function"
 		) {
-			bound[name] = wrapFunction(
-				namespace[name] as EssenceFunction,
+			bound[name] = marshal.wrapFunction(
+				namespace[binding] as EssenceFunction,
 				methodType,
 				qualified,
-				marshal,
 			)
 		}
 	}
@@ -426,40 +279,6 @@ function isOverloaded(
 		type.type === "OverloadedMethod" ||
 		type.type === "OverloadedStaticMethod"
 	)
-}
-
-// NOTE: What a Type IS underneath the names it is reachable by. A checked
-// refinement is its base and an unapplied Alias is its body, which is the same
-// unwrapping `fromJS` does — the two have to agree, or a Parameter would be read
-// as a Record by one and not the other.
-function underlying(type: common.Type): common.Type["type"] {
-	switch (type.type) {
-		case "Refinement":
-			return underlying(type.base)
-		case "GenericAlias":
-			return underlying(type.aliasedType)
-		default:
-			return type.type
-	}
-}
-
-function sameNames(given: Array<string>, expected: Array<string>): boolean {
-	return (
-		given.length === expected.length &&
-		expected.every((name) => given.includes(name))
-	)
-}
-
-// #endregion
-
-// #region Wording
-
-function quoted(names: Array<string>): string {
-	return names.map((name) => `'${name}'`).join(", ")
-}
-
-function count(amount: number, noun: string): string {
-	return `${amount} ${noun}${amount === 1 ? "" : "s"}`
 }
 
 // #endregion

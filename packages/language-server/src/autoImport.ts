@@ -81,8 +81,12 @@ function indentationOf(lines: Array<string>, line: number): string {
 	return (lines[line - 1] ?? "").match(/^[ \t]*/)?.[0] ?? ""
 }
 
-function insertionAt(line: number, newText: string): ImportEdit {
-	let cursor = { line, column: 1 }
+function insertionAt(
+	line: number,
+	newText: string,
+	column: number = 1,
+): ImportEdit {
+	let cursor = { line, column }
 
 	return { range: { start: cursor, end: cursor }, newText }
 }
@@ -127,10 +131,25 @@ export function insertImportEdit(
 	}
 
 	if (section.entries.length === 0) {
-		// NOTE: An empty block still owns two lines, so the entry goes on the
-		// one after the brace rather than replacing anything.
 		let line = section.position.start.line
 
+		// NOTE: A one-line `import {}` takes the entry INSIDE its braces — an
+		// insertion on the line after the statement lands outside the block,
+		// and the file no longer parses.
+		if (section.position.end.line === line) {
+			let column = section.position.end.column - 1
+			let separator =
+				(lines[line - 1] ?? "")[column - 2] === "{" ? " " : ""
+
+			return insertionAt(
+				line,
+				`${separator}${spellEntry(entry)} `,
+				column,
+			)
+		}
+
+		// NOTE: An empty block still owns two lines, so the entry goes on the
+		// one after the brace rather than replacing anything.
 		return insertionAt(
 			line + 1,
 			`${indentationOf(lines, line)}\t${spellEntry(entry)}\n`,
@@ -143,6 +162,21 @@ export function insertImportEdit(
 
 	if (successor !== undefined) {
 		let line = successor.position.start.line
+		let before = (lines[line - 1] ?? "").slice(
+			0,
+			successor.position.start.column - 1,
+		)
+
+		// NOTE: A successor sharing its line with the opening brace takes the
+		// entry inline, directly in front of it — inserting a line of its own
+		// above would splice the entry before the whole statement.
+		if (/[^ \t]/.test(before)) {
+			return insertionAt(
+				line,
+				`${spellEntry(entry)} `,
+				successor.position.start.column,
+			)
+		}
 
 		return insertionAt(
 			line,
@@ -152,6 +186,17 @@ export function insertImportEdit(
 
 	let last = section.entries[section.entries.length - 1]!
 	let line = last.position.end.line
+
+	// NOTE: The closing brace sharing the last entry's line takes the entry
+	// inline as well, directly after that entry — the line after it is already
+	// outside the block.
+	if (section.position.end.line === line) {
+		return insertionAt(
+			line,
+			` ${spellEntry(entry)}`,
+			last.position.end.column,
+		)
+	}
 
 	return insertionAt(
 		line + 1,

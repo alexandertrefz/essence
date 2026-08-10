@@ -14,7 +14,23 @@ type Cursor = common.Cursor
 export type LexingError = {
 	message: string
 	position: common.Position
-	code: "invalid-number" | "invalid-escape"
+	code: "invalid-number" | "invalid-escape" | "comment-in-hole"
+}
+
+// NOTE: The one fatal Lexer error — after an unterminated String there is
+// nothing left to lex. It carries the two Cursors the report needs: where the
+// input ran out, and where the String that never closed was opened.
+export class UnterminatedStringError extends Error {
+	endOfInput: Cursor
+	openedAt: Cursor
+
+	constructor(endOfInput: Cursor, openedAt: Cursor) {
+		super(
+			`String Token not closed at line: ${endOfInput.line}, column: ${endOfInput.column}`,
+		)
+		this.endOfInput = endOfInput
+		this.openedAt = openedAt
+	}
 }
 
 // NOTE: `extraTokens` and `errors` carry the tail of a String that interpolated
@@ -115,7 +131,12 @@ const symbols = [
 	"#",
 ]
 const numbers = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
-const whitespaces = [" ", "\t"]
+// NOTE: `\r` is here so a file with Windows line endings lexes as its Unix
+// twin — the `\n` alone is the line break, and the `\r` before it is never
+// part of an Identifier, a Number or a Comment. `\uFEFF` is here for the
+// same reason: a byte order mark is invisible whitespace, not the first
+// letter of `implementation`.
+const whitespaces = [" ", "\t", "\r", "\uFEFF"]
 
 const isWhitespace = createIsHelper(whitespaces)
 const isLinebreak = createIsHelper(linebreak)
@@ -405,10 +426,8 @@ const scanStringChunk = (input: string, cursor: Cursor): ChunkResult => {
 	return { value, input: "", cursor, terminator: "eof", errors }
 }
 
-const throwUnterminatedString = (cursor: Cursor): never => {
-	throw new Error(
-		`String Token not closed at line: ${cursor.line}, column: ${cursor.column}`,
-	)
+const throwUnterminatedString = (cursor: Cursor, openedAt: Cursor): never => {
+	throw new UnterminatedStringError(cursor, openedAt)
 }
 
 // NOTE: A String Literal reads as one `LiteralString` Token when it holds no
@@ -435,7 +454,7 @@ const lexString = (
 	cursor = firstChunk.cursor
 
 	if (firstChunk.terminator === "eof") {
-		throwUnterminatedString(cursor)
+		throwUnterminatedString(cursor, stringStart)
 	}
 
 	if (firstChunk.terminator === "quote") {
@@ -469,10 +488,45 @@ const lexString = (
 		let depth = 0
 
 		while (true) {
+			// NOTE: A Comment has no place inside a hole — it would run to the
+			// end of the line and take the hole's `}` and the String's closing
+			// `"` with it. It is reported and read as ending at the first `}`
+			// (or the end of its line), so the String and everything after it
+			// still lex.
+			while (input.length > 0 && isWhitespace(input[0])) {
+				cursor = moveCursor(input[0], cursor)
+				input = input.slice(1)
+			}
+
+			if (isCommentLiteral(input[0])) {
+				let commentStart = cursor
+				let commentLength = 0
+
+				while (
+					commentLength < input.length &&
+					!isLinebreak(input[commentLength]) &&
+					input[commentLength] !== "}"
+				) {
+					cursor = moveCursor(input[commentLength], cursor)
+					commentLength++
+				}
+
+				errors.push({
+					message:
+						"A Comment can not be written inside an interpolation hole",
+					position: { start: commentStart, end: cursor },
+					code: "comment-in-hole",
+				})
+
+				input = input.slice(commentLength)
+
+				continue
+			}
+
 			let holeResult = lexToken(input, cursor, ignoreList)
 
 			if (holeResult.token === undefined) {
-				throwUnterminatedString(cursor)
+				throwUnterminatedString(cursor, stringStart)
 				return { input, token: tokens[0], cursor }
 			}
 
@@ -513,7 +567,7 @@ const lexString = (
 		errors.push(...chunk.errors)
 
 		if (chunk.terminator === "eof") {
-			throwUnterminatedString(cursor)
+			throwUnterminatedString(cursor, stringStart)
 		}
 
 		if (chunk.terminator === "quote") {
@@ -556,7 +610,7 @@ const lexComment = (input: string, cursor: Cursor): SubLexingResult => {
 	for (i = 0; i < input.length; i++) {
 		let currentChar = input[i]
 
-		if (isLinebreak(currentChar)) {
+		if (isLinebreak(currentChar) || currentChar === "\r") {
 			i--
 			break
 		}

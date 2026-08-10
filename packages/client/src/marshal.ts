@@ -1,17 +1,21 @@
 import { displayChoiceName } from "@essence-lang/compiler/helpers"
-import { printType } from "@essence-lang/compiler/printType"
+import { printSignature, printType } from "@essence-lang/compiler/printType"
 import { emittedIdentity } from "@essence-lang/compiler/rewriter"
 import type { common } from "@essence-lang/interfaces"
 
 import type { EssenceValue, RuntimeBridge } from "./bridge"
-import { EssenceMarshalError } from "./errors"
+import { EssenceCallError, EssenceMarshalError } from "./errors"
 import { EssenceRational } from "./rational"
 
 // NOTE: The two directions across the boundary, and they are not mirror images.
 //
 // Coming OUT, a value says what it is: every Essence value but a Function
 // carries its Type on the bundle's own hidden key, so `toJS` reads the tag and
-// answers. No Type is needed and none is asked for.
+// answers. The exception is the one untagged value: a Function says nothing,
+// so the Type its position DECLARED travels beside it — through the members of
+// a Record and the items of a List — and where that Type names exactly one
+// signature, the Function crosses as a callable that marshals around its
+// calls rather than as the raw emitted one.
 //
 // Going IN, a JavaScript value says nothing. `7` could be an Integer, a
 // Rational, an `Optional<Integer>` or one arm of a Union, and which of them it
@@ -63,15 +67,29 @@ export type Marshaller = {
 	// NOTE: An Essence value out, as the JavaScript it maps to. The optional
 	// name is what an Error calls the value — a caller marshalling a return
 	// value or a constant says which — and everything below it is spelled
-	// relative to that.
-	toJS: (value: unknown, path?: string) => unknown
+	// relative to that. The optional Type is for the one value that carries
+	// none of its own: a Function met where the Type declares one is wrapped
+	// into a callable rather than handed over raw.
+	toJS: (value: unknown, path?: string, expected?: common.Type) => unknown
 	// NOTE: A JavaScript value in, as the Essence Type it is being handed to.
 	fromJS: (
 		value: unknown,
 		expected: common.Type,
 		path?: string,
 	) => EssenceValue
+	// NOTE: One Essence Function as a JavaScript one: Arguments marshalled
+	// against the Parameter Types the Module declared, the call made
+	// positionally — which is how every Essence call is emitted, labels and all
+	// — and the answer marshalled back. The name is what an Error calls the
+	// Function.
+	wrapFunction: (
+		target: EssenceFunction,
+		signature: common.BaseFunction,
+		name: string,
+	) => (...args: Array<unknown>) => unknown
 }
+
+export type EssenceFunction = (...args: Array<EssenceValue>) => EssenceValue
 
 export type MarshallerOptions = {
 	// NOTE: The canonical path of the entry the bridge's bundle was emitted for.
@@ -86,12 +104,36 @@ export function createMarshaller(
 ): Marshaller {
 	// #region Out
 
-	function toJS(value: unknown, at: Path): unknown {
+	function toJS(
+		value: unknown,
+		at: Path,
+		expected: common.Type | null,
+	): unknown {
 		// NOTE: The one untagged Essence value — a Function is emitted as a bare
-		// JavaScript function, and a Namespace as a class, which is one too.
-		// Both pass through as they are; giving a Function an Essence-shaped
-		// call is a separate job from marshalling one.
+		// JavaScript function, and a Namespace as a class, which is one too. So
+		// only the Type its position declared can say what a call to one means:
+		// where it names exactly one signature the Function is wrapped, so a
+		// caller calls it as the declaration reads, and where it names none — a
+		// direct `toJS` with no Type, a Namespace — the value passes through as
+		// it is.
 		if (typeof value === "function") {
+			let signatures = callableSignatures(expected)
+
+			if (signatures.length === 1) {
+				return wrapFunction(
+					value as EssenceFunction,
+					signatures[0]!,
+					spell(at),
+				)
+			}
+
+			// NOTE: A Union of two signatures says two things a call could
+			// mean, and an untagged value can not say which — refused rather
+			// than wrapped as whichever was written first and misdispatched.
+			if (signatures.length > 1) {
+				throw undecidableSignature(expected!, at)
+			}
+
 			return value
 		}
 
@@ -117,12 +159,16 @@ export function createMarshaller(
 				return (value as { value: string }).value
 			case "Boolean":
 				return (value as { value: boolean }).value
-			case "List":
+			case "List": {
+				let itemType = listItemOf(expected)
+
 				return (value as { value: Array<unknown> }).value.map(
-					(item, position) => toJS(item, index(at, position)),
+					(item, position) =>
+						toJS(item, index(at, position), itemType),
 				)
+			}
 			case "Record":
-				return fieldsOf(value, at)
+				return fieldsOf(value, at, recordMembersOf(expected))
 			// NOTE: An Optional is transparent — `Optional<T>` IS `T | undefined`
 			// on this side — so the Case does not appear in the answer, and the
 			// path gains no segment for it either. A host reading `.item` off
@@ -139,14 +185,18 @@ export function createMarshaller(
 					throw nestedOptional(at)
 				}
 
-				return toJS(item, at)
+				return toJS(
+					item,
+					at,
+					expected === null ? null : optionalItemOf(expected),
+				)
 			}
 			case "Optional#Empty":
 				return undefined
 		}
 
 		if (tag.includes("#")) {
-			let fields = fieldsOf(value, at)
+			let fields = fieldsOf(value, at, caseMembersOf(expected, tag))
 
 			// NOTE: WHICH Case a value is is part of the value, so the tag is
 			// written last and wins the collision. A payload member actually
@@ -182,17 +232,107 @@ export function createMarshaller(
 		return tag === "Optional#Value" || tag === "Optional#Empty"
 	}
 
-	function fieldsOf(value: object, at: Path): Record<string, unknown> {
+	function fieldsOf(
+		value: object,
+		at: Path,
+		members: Record<string, common.Type> | null,
+	): Record<string, unknown> {
 		let fields: Record<string, unknown> = {}
 
 		// NOTE: Own, enumerable and string-keyed, which is exactly the members —
 		// the Type key is a Symbol, and is skipped here by the same rule that
 		// makes it hidden inside Essence.
 		for (let [name, field] of Object.entries(value)) {
-			fields[name] = toJS(field, member(at, name))
+			fields[name] = toJS(
+				field,
+				member(at, name),
+				members !== null && Object.hasOwn(members, name)
+					? members[name]!
+					: null,
+			)
 		}
 
 		return fields
+	}
+
+	// NOTE: The payload Types of the Case a value's own tag names, where the
+	// declared Type carries that Case — so a Function inside a payload crosses
+	// out wrapped like any other member. The tag is entry-relative and the
+	// Surface's identity canonical, so the comparison is `emittedIdentity`'s,
+	// exactly as `caseFromJS` builds it.
+	function caseMembersOf(
+		type: common.Type | null,
+		tag: string,
+	): Record<string, common.Type> | null {
+		if (type === null) {
+			return null
+		}
+
+		switch (type.type) {
+			case "Case":
+				return `${emittedIdentity(options.entryPath, type.choice)}#${
+					type.name
+				}` === tag
+					? type.members
+					: null
+			case "UnionType": {
+				for (let arm of type.types) {
+					let members = caseMembersOf(arm, tag)
+
+					if (members !== null) {
+						return members
+					}
+				}
+
+				return null
+			}
+			case "Refinement":
+				return caseMembersOf(type.base, tag)
+			case "GenericAlias":
+				return caseMembersOf(type.aliasedType, tag)
+			default:
+				return null
+		}
+	}
+
+	// #endregion
+
+	// #region Calls
+
+	// NOTE: Everything a caller can get wrong before the first Argument is even
+	// looked at is an `EssenceCallError`; everything about a value is an
+	// `EssenceMarshalError`. The two are told apart because they are fixed in
+	// different places.
+	//
+	// NOTE: The answer is marshalled back through `toJS` WITH the declared
+	// return Type, so a Function a call answers with comes back callable too.
+	function wrapFunction(
+		target: EssenceFunction,
+		signature: common.BaseFunction,
+		name: string,
+	): (...args: Array<unknown>) => unknown {
+		let parameters = signature.parameterTypes
+		let labels = labelsOf(signature)
+
+		return (...args: Array<unknown>): unknown => {
+			let call = readCall(args, signature, labels, name)
+			let marshalled = call.ordered.map((argument, position) =>
+				fromJS(argument, parameters[position]!.type, {
+					root: argumentPath(
+						parameters[position]!,
+						position,
+						call.labelled,
+					),
+					trail: "",
+				}),
+			)
+
+			return toJS(
+				target(...marshalled),
+				{ root: "return value", trail: "" },
+				signature.returnType,
+			)
+		}
 	}
 
 	// #endregion
@@ -284,11 +424,15 @@ export function createMarshaller(
 				// drops an `undefined`-valued key — impossible to hand back. A
 				// member that is not Optional still fails, with the same
 				// sentence, where the sentence is true.
+				//
+				// NOTE: An OWN key, because an absent `toString` read plainly
+				// finds `Object.prototype`'s — a function where the rule above
+				// promises `undefined`.
 				for (let [name, memberType] of Object.entries(
 					expected.members,
 				)) {
 					fields[name] = fromJS(
-						given[name],
+						Object.hasOwn(given, name) ? given[name] : undefined,
 						memberType,
 						member(at, name),
 					)
@@ -493,10 +637,15 @@ export function createMarshaller(
 
 		let payload: Record<string, EssenceValue> = {}
 
-		// NOTE: An absent key is read as `undefined` and the member's Type
-		// decides, for the reason the Record branch above states.
+		// NOTE: An absent key is read as `undefined` — through an OWN-key check,
+		// past what `Object.prototype` holds — and the member's Type decides,
+		// for the reasons the Record branch above states.
 		for (let [name, memberType] of members) {
-			payload[name] = fromJS(given[name], memberType, member(at, name))
+			payload[name] = fromJS(
+				Object.hasOwn(given, name) ? given[name] : undefined,
+				memberType,
+				member(at, name),
+			)
 		}
 
 		return bridge.case(tag, payload)
@@ -566,6 +715,18 @@ export function createMarshaller(
 		)
 	}
 
+	function undecidableSignature(
+		expected: common.Type,
+		at: Path,
+	): EssenceMarshalError {
+		return new EssenceMarshalError(
+			`${spell(at)}: a Function carries no Type of its own, and ${printType(
+				expected,
+			)} declares more than one signature it could be — which of them to marshal a call against is undecidable.`,
+			spell(at),
+		)
+	}
+
 	// NOTE: What the value IS, in one clause, for the second half of an Error.
 	// Never the value itself past a bounded length: what is being described is a
 	// value a host got wrong, which is exactly the sort that turns out to be a
@@ -624,31 +785,176 @@ export function createMarshaller(
 
 	// #endregion
 
-	// #region Wording
-
-	// NOTE: Bounded, for the reason the note above `describe` gives: the object
-	// being described is one a host got wrong, and a parsed JSON document with a
-	// thousand keys is exactly that. The first few name the mistake as well as
-	// all of them would.
-	function quoted(names: Array<string>): string {
-		let shown = names
-			.slice(0, NAMES_SHOWN)
-			.map((name) => `'${name}'`)
-			.join(", ")
-
-		return names.length <= NAMES_SHOWN
-			? shown
-			: `${shown} and ${names.length - NAMES_SHOWN} more`
-	}
-
-	// #endregion
-
 	return {
-		toJS: (value, path = "value") => toJS(value, { root: path, trail: "" }),
+		toJS: (value, path = "value", expected) =>
+			toJS(value, { root: path, trail: "" }, expected ?? null),
 		fromJS: (value, expected, path = "value") =>
 			fromJS(value, expected, { root: path, trail: "" }),
+		wrapFunction,
 	}
 }
+
+// #region Calls
+
+// NOTE: The Arguments a call resolved to, and which of the two ways it was
+// written — an Error names an Argument by its label where the caller wrote one,
+// and by its position where they counted.
+type Call = { ordered: Array<unknown>; labelled: boolean }
+
+// NOTE: The Arguments in the order the emitted Function takes them, whichever
+// way the caller wrote the call.
+//
+// A Function whose every Parameter carries a label may be called with one
+// object instead — `Rectangle.of({ width: 3n, height: 4n })` — because that is
+// the call Essence itself writes, and dropping to positional Arguments at the
+// boundary would lose the one thing the Declaration insisted on. The keys have
+// to be EXACTLY the labels: a labelled call with a missing or a misspelled one
+// is a mistake, not a positional call that happens to pass an object.
+function readCall(
+	args: Array<unknown>,
+	signature: common.BaseFunction,
+	labels: Array<string> | null,
+	name: string,
+): Call {
+	if (labels !== null && args.length === 1) {
+		let given = plainObject(args[0])
+
+		if (given !== null) {
+			let keys = Object.keys(given)
+
+			if (sameNames(keys, labels)) {
+				return {
+					ordered: labels.map((label) => given[label]),
+					labelled: true,
+				}
+			}
+
+			// NOTE: One object that is not a labelled call is only a positional
+			// call while the Function takes exactly one Argument. Where it takes
+			// more, the caller plainly meant the labels and got them wrong, and
+			// saying which is worth more than "takes 2 Arguments, 1 was passed".
+			if (signature.parameterTypes.length !== 1) {
+				throw new EssenceCallError(
+					`${callShape(signature, labels, name)}. It was passed one object with ${
+						keys.length === 0 ? "no keys" : quoted(keys)
+					}.`,
+				)
+			}
+		}
+	}
+
+	if (args.length !== signature.parameterTypes.length) {
+		throw new EssenceCallError(
+			`${callShape(signature, labels, name)}; ${count(
+				args.length,
+				"Argument",
+			)} ${args.length === 1 ? "was" : "were"} passed.`,
+		)
+	}
+
+	return { ordered: args, labelled: false }
+}
+
+// NOTE: How the Function may be called, as the first half of every refusal —
+// the signature it was declared with, and both ways of writing a call to it.
+// The caller who got one wrong is reading it to find the other.
+function callShape(
+	signature: common.BaseFunction,
+	labels: Array<string> | null,
+	name: string,
+): string {
+	let positions = count(signature.parameterTypes.length, "Argument")
+
+	return labels === null
+		? `${printSignature(signature, name)} takes ${positions}`
+		: `${printSignature(
+				signature,
+				name,
+			)} takes ${positions} positionally, or one object with the labels ${quoted(
+				labels,
+			)}`
+}
+
+// NOTE: The labels a call may be written with, or `null` where it may not be
+// written that way at all. Every Parameter has to carry one: a Function with a
+// single `_` among its Parameters can not be called by label in Essence either,
+// and half a labelled call is no call.
+//
+// NOTE: A Function of ONE Parameter an object can inhabit is positional
+// whatever its label says. Both readings take an object, and the Parameter is
+// the one that can hold any shape at all — so `describe({ width: 3n, height:
+// 4n })` passes the Rectangle rather than looking for a label named `width`,
+// and a Union or an `Optional` with a Record among what it admits reads the
+// same way. This is the whole of the ambiguity: with two Parameters or more
+// the key set decides, since a labelled call's keys are the labels and a
+// positional call passes no object.
+function labelsOf(signature: common.BaseFunction): Array<string> | null {
+	let parameters = signature.parameterTypes
+
+	if (parameters.length === 0) {
+		return null
+	}
+
+	if (parameters.length === 1 && admitsRecord(parameters[0]!.type)) {
+		return null
+	}
+
+	let labels: Array<string> = []
+
+	for (let parameter of parameters) {
+		if (parameter.name === null) {
+			return null
+		}
+
+		labels.push(parameter.name)
+	}
+
+	return labels
+}
+
+// NOTE: What an Error calls the Argument that went wrong. A labelled call has no
+// positions to count, so it is named the way it was written.
+function argumentPath(
+	parameter: common.Parameter,
+	position: number,
+	labelled: boolean,
+): string {
+	return labelled && parameter.name !== null
+		? `argument '${parameter.name}'`
+		: `argument ${position + 1}`
+}
+
+function sameNames(given: Array<string>, expected: Array<string>): boolean {
+	return (
+		given.length === expected.length &&
+		expected.every((name) => given.includes(name))
+	)
+}
+
+// #endregion
+
+// #region Wording
+
+// NOTE: Bounded, for the reason the note above `describe` gives: the object
+// being described is one a host got wrong, and a parsed JSON document with a
+// thousand keys is exactly that. The first few name the mistake as well as
+// all of them would.
+function quoted(names: Array<string>): string {
+	let shown = names
+		.slice(0, NAMES_SHOWN)
+		.map((name) => `'${name}'`)
+		.join(", ")
+
+	return names.length <= NAMES_SHOWN
+		? shown
+		: `${shown} and ${names.length - NAMES_SHOWN} more`
+}
+
+function count(amount: number, noun: string): string {
+	return `${amount} ${noun}${amount === 1 ? "" : "s"}`
+}
+
+// #endregion
 
 // NOTE: The spelling a Case is known by on this side — the Choice as it was
 // DECLARED and the Case, with the Module path a bundle qualifies its tags with
@@ -666,7 +972,11 @@ function caseName(tag: string): string {
 // NOTE: What an `Optional` holds, or `null` where the Type is not one. A
 // `Optional<T>` reaches a Surface as the Union of its two Cases, so the question
 // is asked of the Union: the `#Value` arm's `item` is the answer.
-function optionalItemOf(type: common.Type): common.Type | null {
+//
+// NOTE: Exported, with `admitsAbsence` below, because the generated
+// declarations refuse exactly what `fromJS` refuses — a second spelling of the
+// nested-Optional rule is how the two would come to disagree.
+export function optionalItemOf(type: common.Type): common.Type | null {
 	switch (type.type) {
 		case "Case":
 			return type.choice === "Optional" && type.name === "Value"
@@ -696,7 +1006,7 @@ function optionalItemOf(type: common.Type): common.Type | null {
 // an `Optional`'s `#Empty` is reachable in it. What it decides here is whether
 // an `Optional` is about to be put inside another one, and both levels spelled
 // as nothing.
-function admitsAbsence(type: common.Type): boolean {
+export function admitsAbsence(type: common.Type): boolean {
 	switch (type.type) {
 		case "Case":
 			return type.choice === "Optional" && type.name === "Empty"
@@ -708,6 +1018,119 @@ function admitsAbsence(type: common.Type): boolean {
 			return admitsAbsence(type.aliasedType)
 		default:
 			return false
+	}
+}
+
+// NOTE: Whether a plain object could BE a value of this Type — a Record
+// anywhere the Type reaches without a tag in the way: itself, an arm of a
+// Union, the item of an `Optional`, which is transparent on this side. A Case
+// does not count, because its object spelling always carries `$case`, which no
+// set of labels is. What it decides is whether a single labelled Parameter's
+// labelled call is ambiguous — see `labelsOf`.
+function admitsRecord(type: common.Type): boolean {
+	switch (type.type) {
+		case "Record":
+			return true
+		case "Case":
+			return (
+				type.choice === "Optional" &&
+				type.name === "Value" &&
+				type.members.item !== undefined &&
+				admitsRecord(type.members.item)
+			)
+		case "UnionType":
+			return type.types.some(admitsRecord)
+		case "Refinement":
+			return admitsRecord(type.base)
+		case "GenericAlias":
+			return admitsRecord(type.aliasedType)
+		default:
+			return false
+	}
+}
+
+// NOTE: The signatures a Type declares a Function to have, for the way OUT —
+// one is the wrap, none is the passthrough, and two are a refusal, because an
+// untagged value can not say which of them it is.
+function callableSignatures(
+	type: common.Type | null,
+): Array<common.BaseFunction> {
+	if (type === null) {
+		return []
+	}
+
+	switch (type.type) {
+		case "Function":
+		case "SimpleMethod":
+		case "StaticMethod":
+			return [type]
+		case "UnionType":
+			return type.types.flatMap((arm) => callableSignatures(arm))
+		case "Refinement":
+			return callableSignatures(type.base)
+		case "GenericAlias":
+			return callableSignatures(type.aliasedType)
+		default:
+			return []
+	}
+}
+
+// NOTE: What a container's pieces were DECLARED as, where the Type says —
+// asked on the way out only for the sake of the one value that carries no tag
+// of its own. A Union offering two Lists (or two Records) does not decide, and
+// `null` is the honest answer: the pieces still cross as their tags say, and a
+// Function among them passes through raw exactly as it would with no Type at
+// all.
+function listItemOf(type: common.Type | null): common.Type | null {
+	if (type === null) {
+		return null
+	}
+
+	switch (type.type) {
+		case "List":
+			return type.itemType
+		case "UnionType": {
+			let items = type.types
+				.map(listItemOf)
+				.filter((item): item is common.Type => item !== null)
+
+			return items.length === 1 ? items[0]! : null
+		}
+		case "Refinement":
+			return listItemOf(type.base)
+		case "GenericAlias":
+			return listItemOf(type.aliasedType)
+		default:
+			return null
+	}
+}
+
+function recordMembersOf(
+	type: common.Type | null,
+): Record<string, common.Type> | null {
+	if (type === null) {
+		return null
+	}
+
+	switch (type.type) {
+		case "Record":
+			return type.members
+		case "UnionType": {
+			let candidates = type.types
+				.map(recordMembersOf)
+				.filter(
+					(members): members is Record<string, common.Type> =>
+						members !== null,
+				)
+
+			return candidates.length === 1 ? candidates[0]! : null
+		}
+		case "Refinement":
+			return recordMembersOf(type.base)
+		case "GenericAlias":
+			return recordMembersOf(type.aliasedType)
+		default:
+			return null
 	}
 }
 
@@ -729,11 +1152,11 @@ function admitsCase(tag: unknown, expected: common.CaseType): boolean {
 // Array is a List's shape and an `EssenceRational` is a Rational's, so admitting
 // either as a Record would make the Type that named it unreachable.
 //
-// NOTE: Exported because a labelled call asks the very same question of its one
-// Argument — an `EssenceRational` passed to a Function whose labels happen to be
-// `numerator` and `denominator` is a Rational, not a labelled call — and two
-// spellings of one rule is exactly how the two would come to disagree.
-export function plainObject(value: unknown): Record<string, unknown> | null {
+// NOTE: A labelled call asks the very same question of its one Argument — an
+// `EssenceRational` passed to a Function whose labels happen to be `numerator`
+// and `denominator` is a Rational, not a labelled call — which is why
+// `readCall` reads through this rather than through a spelling of its own.
+function plainObject(value: unknown): Record<string, unknown> | null {
 	if (
 		value === null ||
 		typeof value !== "object" ||

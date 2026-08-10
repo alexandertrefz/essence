@@ -190,6 +190,50 @@ export declare const Rectangle: { of(width: bigint, height: bigint): Rectangle }
 		)
 	})
 
+	// NOTE: The same refusal where the callback hides behind a name. The Alias
+	// is declared once, in its out-form — a Function COMES BACK callable — so a
+	// Parameter naming it would typecheck the call that always throws; the
+	// shape is spelled out there instead, with the `never` on the member that
+	// is the mistake.
+	it("spells out a named Type whose member can not cross in", async () => {
+		let text = await declarationsOf(clientFixture("Calls.es"))
+
+		expect(text).toContain(
+			"export type Handler = { callback: (p0: bigint) => bigint }",
+		)
+		expect(text).toContain(
+			"export declare function invoke(p0: { callback: never /* callbacks are not supported yet */ }): bigint",
+		)
+	})
+
+	// NOTE: A Function crossing OUT is wrapped by the Marshaller, so the
+	// callable signature printed here is the one a caller really calls.
+	it("declares a Function that comes back as callable", async () => {
+		let text = await declarationsOf(clientFixture("Calls.es"))
+
+		expect(text).toContain(
+			"export declare function makeAdder(p0: bigint): (p0: bigint) => bigint",
+		)
+		expect(text).toContain(
+			"export declare const handler: { callback: (p0: bigint) => bigint }",
+		)
+	})
+
+	// NOTE: `fromJS` refuses EVERY value for a nested Optional — both levels
+	// would be `undefined` — so the Parameter has to refuse every call, exactly
+	// as the callback and Type Parameter positions already do. Coming out, only
+	// the collapse is deduplicated: `bigint | undefined`, not the inner Union
+	// printed as one arm with its `undefined` twice.
+	it("refuses an Optional inside an Optional in a Parameter position", async () => {
+		let text = await declarationsOf(clientFixture("Refused.es"))
+
+		expect(text).toContain(
+			"export declare function nested(p0: never /* an Optional inside an Optional has no JavaScript spelling */): bigint | undefined",
+		)
+		expect(text).toContain("export declare const deep: bigint | undefined")
+		expect(text).not.toContain("undefined | undefined")
+	})
+
 	it("declares a Protocol as a Type nothing holds", async () => {
 		expect(
 			await declarationsOf(clientFixture("Declarations.es")),
@@ -273,6 +317,18 @@ export declare const $bridge_record: (fields: Record<string, EssenceValue>) => E
 			"from__overload$2(x: EssenceValue, y: EssenceValue): EssenceValue",
 		)
 		expect(text).not.toContain("export type Colour")
+	})
+
+	// NOTE: A class refuses a static member named `prototype` or `constructor`,
+	// so the Rewriter mangles the two — a declaration spelling the written name
+	// would promise a member the bundle does not have.
+	it("declares the two member names a class refuses as the Rewriter emits them", async () => {
+		let text = await declarationsOf(clientFixture("Calls.es"), "bundle")
+
+		expect(text).toContain("$user_constructor: EssenceValue")
+		expect(text).toContain(
+			"$user_prototype(p0: EssenceValue): EssenceValue",
+		)
 	})
 
 	it("declares a name JavaScript can not spell as the Rewriter emits it", async () => {

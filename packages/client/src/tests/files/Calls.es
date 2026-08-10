@@ -10,6 +10,12 @@ implementation {
 
 	type Point = { x: Integer, y: Integer }
 
+	type Box = { box: Integer }
+
+	§ A Type Alias holding a callback — nothing on the JavaScript side can fill
+	§ the member, and a Parameter naming the Alias has to say so.
+	type Handler = { callback: (_: Integer) -> Integer }
+
 	function labelled(first: Integer, second: Integer) -> Integer {
 		<- first::subtract(second)
 	}
@@ -29,12 +35,44 @@ implementation {
 	§ A Parameter nothing on the JavaScript side can fill: a Function can come
 	§ out of a Module, but one can not be built from a JavaScript value and
 	§ passed in.
-	function applied(_ value: Integer, with transform: (_: Integer) -> Integer) -> Integer {
+	function applied(
+		_ value: Integer,
+		with transform: (_: Integer) -> Integer,
+	) -> Integer {
 		<- transform(value)
 	}
 
 	function moved(_ point: Point) -> Point {
 		<- point
+	}
+
+	§ One labelled Parameter a Record can inhabit without BEING its Type — the
+	§ Union's Box arm, and the Box inside an Optional. An object passed to
+	§ either is the value, never a labelled call.
+	function boxed(box: Box | Integer) -> Box | Integer {
+		<- box
+	}
+
+	function measure(box: Optional<Box>) -> Optional<Box> {
+		<- box
+	}
+
+	§ A Function crossing OUT — the answer of a call, and a Record member. Each
+	§ crosses wrapped against its declared signature rather than raw.
+	function makeAdder(_ amount: Integer) -> (_: Integer) -> Integer {
+		<- (_ value: Integer) -> Integer { <- value::add(amount) }
+	}
+
+	function doubled(_ value: Integer) -> Integer {
+		<- value::multiply(with 2)
+	}
+
+	constant handler: Handler = { callback = doubled }
+
+	function invoke(_ handler: Handler) -> Integer {
+		constant { callback } = handler
+
+		<- callback(7)
 	}
 
 	function evened(_ value: Integer) -> Optional<Integer> {
@@ -63,6 +101,14 @@ implementation {
 		}
 
 		static named = "Point"
+
+		§ The two member names a JavaScript class refuses — the Rewriter mangles
+		§ them, and the binding has to read them under the mangled key.
+		static constructor = 5
+
+		prototype() -> Integer {
+			<- @.x
+		}
 
 		overload static from {
 			(x: Integer) -> Point {
@@ -95,14 +141,21 @@ implementation {
 }
 
 export {
+	Box
 	Colour
+	Handler
 	Point
-	labelled
-	positional
-	mixed
-	nothing
 	applied
-	moved
-	evened
+	boxed
 	coloured
+	evened
+	handler
+	invoke
+	labelled
+	makeAdder
+	measure
+	mixed
+	moved
+	nothing
+	positional
 }

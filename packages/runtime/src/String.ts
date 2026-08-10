@@ -75,6 +75,22 @@ function graphemesIn(string: StringType): Array<string> {
 	return segments
 }
 
+// NOTE: A String assembled FROM a known character view keeps that view — the
+// clusters are remembered under the Symbol keys right away, so every Method
+// reading `graphemesIn` sees exactly the characters the assembly meant.
+// Segmenting the joined text afresh does not always answer the same view back:
+// grapheme boundaries are decided by neighbours, so three regional indicators
+// re-pair however they happen to stand. The handed-in array is remembered
+// as-is, so a caller building one must not change it afterwards.
+function createSegmentedString(characters: Array<string>): StringType {
+	let string = createString(characters.join("")) as MeasuredString
+
+	string[graphemesKey] = characters
+	string[graphemeCountKey] = characters.length
+
+	return string
+}
+
 // NOTE: Whether counting this String's characters can skip the Segmenter
 // entirely. ASCII is closed under NFC and carries no combining marks, so each
 // of its code units stands alone as a grapheme cluster and the count is simply
@@ -174,7 +190,24 @@ export function split(
 
 	pieces.push(current)
 
-	return createList(pieces.map((piece) => createString(piece.join(""))))
+	// NOTE: Each piece is handed its own characters along with its text — the
+	// clusters it was cut into ARE its character view, so `length` on a piece
+	// answers off them rather than segmenting the joined text afresh, which
+	// could pair the clusters differently (see `createSegmentedString`).
+	return createList(pieces.map((piece) => createSegmentedString(piece)))
+}
+
+// NOTE: The reversed String REMEMBERS its character view — the original's
+// clusters in the opposite order — rather than letting the joined text be
+// segmented afresh. Re-segmenting would hand back characters the original
+// never had: `"🇦🇧🇨"` holds the characters `🇦🇧` and `🇨`, and its reversal
+// spells the very code points a fresh segmentation reads as `🇨🇦` and `🇧`.
+// The remembered view is what keeps "the characters in the opposite order"
+// true as stated, makes a second `reverse` answer the original String back,
+// and is what the `lastIndex` derivation off `reverse` + `firstIndex` in
+// `String.es` rests on.
+export function reverse(originalString: StringType): StringType {
+	return createSegmentedString([...graphemesIn(originalString)].reverse())
 }
 
 export function ends(

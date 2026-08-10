@@ -15,7 +15,7 @@ the bundle under Node's inspector, and translates between the two protocols
 while reading the compiler's source maps. The session speaks Essence
 throughout: breakpoints bind on source lines, stacks carry the names the
 author wrote — a `match` reads as one frame, standard-library frames as
-`List.sorted`, compiler glue hidden or greyed out — stepping is carried over
+`List.sort`, compiler glue hidden or greyed out — stepping is carried over
 the runtime and the prelude, and the Variables view renders values the way
 `Terminal.inspect` spells them, live inside the debuggee.
 

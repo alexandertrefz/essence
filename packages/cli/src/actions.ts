@@ -168,17 +168,27 @@ export async function runRun(
 
 		printCompilationResult(context, result)
 
+		// NOTE: --json changes how the compilation is reported, not what `run`
+		// does — the program still executes, and the exit code is still its
+		// own, exactly as the command documents.
 		if (context.options.json) {
 			emitJSON(context, result, "run")
-
-			return hasFailures(result) ? EXIT_FAILURE : EXIT_SUCCESS
 		}
 
 		if (hasFailures(result)) {
 			return EXIT_FAILURE
 		}
 
-		let execution = await execute(context, outputFileName, programArguments)
+		// NOTE: `--out` may name a directory; what runs is the bundle the
+		// compiler actually wrote, resolved per file inside the plan.
+		let compiledFileName =
+			result.outcomes[0]?.outputFileName ?? outputFileName
+
+		let execution = await execute(
+			context,
+			compiledFileName,
+			programArguments,
+		)
 
 		return execution.code
 	} finally {

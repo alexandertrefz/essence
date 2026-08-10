@@ -41,7 +41,9 @@ stray `}` or a statement outside `implementation { … }`.
 
 ### `unclosed-string`
 
-A String Literal runs to the end of the file without its closing quote.
+A String Literal runs to the end of the file without its closing quote. The
+end of the input is where that is noticed; the opening quote is where the
+String began, and the report points at both.
 
 ### `unclosed-block`
 
@@ -60,6 +62,22 @@ A backslash in a String Literal is followed by something that is not a known
 escape. A String understands `\"`, `\\`, `\n`, `\t`, `\{` and `\}`; every other
 backslash is an error. The character after it is read as itself so the rest of
 the String still lexes — write `\\` for a literal backslash.
+
+### `comment-in-hole`
+
+A `§` Comment was written inside a String's interpolation hole. A Comment runs
+to the end of its line, which inside a hole would swallow the hole's `}` and
+the String's closing `"`. The Comment is read as ending at the first `}` (or
+the end of its line) so the String and everything after it still lex — move
+the Comment out of the String.
+
+### `nesting-too-deep`
+
+Expressions, Types and blocks nest more than 256 levels deep at one point in
+the Program. The parser reads nesting by recursion, so there is a depth at
+which it would run out of call stack mid-read and crash without a report — it
+refuses at 256 levels instead, with one. Break the nesting up: name
+intermediate values as Constants, or intermediate Types as Type Aliases.
 
 ### `redundant-parameter-label`
 
@@ -693,7 +711,11 @@ question, so `case { fn: (_ n: Integer) -> Integer }` accepts every Record
 carrying a callable `fn`, whatever that callback was declared as. Two Cases
 telling themselves apart by nothing but a callback's Signature can not be told
 apart at all — reordering does not help, and one of them has to name a member
-that survives to runtime, or carry a Guard.
+that survives to runtime, or carry a Guard. The payload spelling is the same
+test — `case #Apply({ fn: (_ n: Integer) -> Integer })` erases exactly as the
+Record Matcher does. A refinement nested in a Matcher's Type erases too — its
+predicate is never checked, so two Cases told apart only by a refinement's
+evidence ask one question — and the Diagnostic names which erasure it was.
 
 Both erasures reach a Method Invocation on a Union-typed receiver too, whose
 branches are the Cases nobody wrote. They are ordered most specific first, so a
@@ -706,12 +728,26 @@ A Warning: an earlier `case` — or an earlier dispatch branch — answers for t
 one's EMPTY Lists. Item Types erase before a Match runs, so a List Matcher asks
 about the items the value holds, and an empty List holds none, which makes it a
 value of every List Type there is. `case List<String>` above `case
-List<Integer>` therefore runs for an empty `List<Integer>`.
+List<Integer>` therefore runs for an empty `List<Integer>` — and a List-typed
+payload requirement (`case #Items({ items: List<String> })`) asks the same
+question, so it crosses over the same way.
 
 Only the empty List crosses over; every List with items still reaches the Case
 its items belong to. Guard the Cases with `where @::hasItems()` and answer for
 the empty List in a Case of its own, or, for a Method Invocation, narrow the
 receiver with a Match before calling the Method.
+
+### `refinement-as-matcher`
+
+A checked refinement written where a Matcher narrows by Type — `case
+NonZeroInteger`, or the annotation on a Pattern's member (`case #Full({ value:
+NonZeroInteger })`). A refinement's predicate erases before the Program runs,
+so the emitted check could only ask about the base Type, and the arm would run
+for values the predicate refuses — typed as evidence nothing proved.
+
+Match on the base Type instead, and prove the predicate inside the arm the way
+every refinement is proven: an `if` condition, a Case naming a written value,
+or a written value.
 
 ### `match-on-non-union`
 

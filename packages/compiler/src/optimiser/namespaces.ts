@@ -37,16 +37,29 @@ export function declaredNamespaces(
 	// the question is "anywhere at all" and a Namespace may be declared in a
 	// Function body, a Method body or a Match Handler's. A position added to
 	// `typedSimple` later is searched without this having to hear about it.
+	//
+	// NOTE: The question is monotone — "collect every name" — so each object is
+	// visited once, the way `typeWalkFinds` visits a Type: a Node's Types ride
+	// along in the search, they are DAGs as they are actually held, and a
+	// Choice's payload may name the Choice.
+	let visited = new Set<object>()
+
 	let visitNested = (value: unknown): void => {
+		if (value === null || typeof value !== "object") {
+			return
+		}
+
+		if (visited.has(value)) {
+			return
+		}
+
+		visited.add(value)
+
 		if (Array.isArray(value)) {
 			for (let entry of value) {
 				visitNested(entry)
 			}
 
-			return
-		}
-
-		if (value === null || typeof value !== "object") {
 			return
 		}
 

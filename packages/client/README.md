@@ -67,7 +67,10 @@ Each read builds a fresh value, exactly as `marshaller.toJS(raw.…)` does.
 
 Which direction a value is going decides how it is read. Coming out, a value
 says what it is — every Essence value but a Function carries its Type — so
-nothing has to be told. Going in, `7` could be an `Integer`, a `Rational` or an
+nothing has to be told. The Function is the exception: it carries nothing, so
+the Type its position declared is what it crosses as — the answer of a call
+and a Record member alike come back as JavaScript Functions that marshal
+around their calls. Going in, `7` could be an `Integer`, a `Rational` or an
 `Optional<Integer>`, so the Type the Module declared is what decides, read off
 `surface`. A value that does not fit throws an `EssenceMarshalError` naming the
 Type, the value, and where inside it the two parted ways.
@@ -92,9 +95,10 @@ geometry.exports.Rectangle.of(3n, 4n) // { width: 3n, height: 4n }
 geometry.exports.Rectangle.of({ width: 3n, height: 4n }) // the same call
 ```
 
-A Function of one Record Parameter is positional whatever its label says —
-both readings take an object, and a Record is the one that can hold any shape,
-so `describe({ width: 3n, height: 4n })` passes the Rectangle.
+A Function of one Parameter a Record can inhabit — the Record itself, or a
+Union or `Optional` with one among its arms — is positional whatever its label
+says. Both readings take an object, and the Record is the one that can hold
+any shape, so `describe({ width: 3n, height: 4n })` passes the Rectangle.
 
 A Namespace comes back as an object of its Methods. There is no `::` on this
 side, so an instance Method takes its receiver where a call passes it, first.
@@ -136,10 +140,13 @@ What the boundary cannot carry is declared `never` rather than spelled out,
 because a declaration is only worth having if the calls it admits are the calls
 that work. An overloaded Method is `never` — which Overload a call means is
 decided by the Argument Types, which a JavaScript value does not carry. So is a
-callback Parameter, and so is a Type Parameter in an input position: a Type
+callback Parameter, so is a nested `Optional` — both of its levels would be
+`undefined` — and so is a Type Parameter in an input position: a Type
 Parameter is a shape that has not been decided yet, and a value going *in* has
 to be built against a shape. A Type Parameter in the *return* position is a
-TypeScript one, where it maps cleanly.
+TypeScript one, where it maps cleanly. A named Type whose members hit one of
+these refusals going in is spelled out at that Parameter, with the `never` on
+the member that is the mistake.
 
 ```ts
 export declare function firstOf<ItemType>(
@@ -209,8 +216,9 @@ toJS(math.raw.square(fromJS(12n, squared.parameterTypes[0].type))) // 144n
 
 ## What this does not do yet
 
-- **Callbacks.** A Function comes out of a Module as it is and can be called;
-  one can not be passed *in*. `fromJS` against a Function Type says so.
+- **Callbacks.** A Function comes out of a Module callable — wrapped against
+  the Type its position declared — but one can not be passed *in*. `fromJS`
+  against a Function Type says so.
 - **Generics.** A Type Parameter is a shape that has not been decided yet, and
   a value going in has to be built against a shape — so an Argument at a Type
   Parameter position is refused, and only an empty `List` gets through. A

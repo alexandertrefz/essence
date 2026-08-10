@@ -147,6 +147,23 @@ describe("Calling a Function", () => {
 		})
 	})
 
+	// NOTE: A Function is the one value that carries no Type tag, so the Type
+	// its position declared is what says how it crosses: the answer of a call
+	// and a Record member both come back wrapped, callable exactly as the
+	// generated declarations spell them — not as the raw emitted Function,
+	// which takes tagged values no host holds.
+	it("marshals a Function that comes back out of a call", () => {
+		let adder = exported(calls, "makeAdder")(5n) as AnyCall
+
+		expect(adder(3n)).toBe(8n)
+	})
+
+	it("marshals a Function held by a Record member", () => {
+		let handler = calls.exports.handler as { callback: AnyCall }
+
+		expect(handler.callback(4n)).toBe(8n)
+	})
+
 	// NOTE: A Choice is erased — it names Cases, and a Case is a value's Type
 	// rather than a value. Nothing binds it, so nothing is bound.
 	it("leaves a Choice off both doors", () => {
@@ -205,6 +222,17 @@ describe("A labelled call", () => {
 			x: 1n,
 			y: 2n,
 		})
+	})
+
+	// NOTE: And to a single Parameter a Record merely CAN inhabit — the Box arm
+	// of a Union, the Box inside an Optional. Read as a labelled call, the
+	// object would be unwrapped to its one member and the Module silently
+	// handed the wrong value.
+	it("loses to a single Parameter a Record can inhabit", () => {
+		expect(exported(calls, "boxed")({ box: 5n })).toEqual({ box: 5n })
+		expect(exported(calls, "boxed")(5n)).toBe(5n)
+		expect(exported(calls, "measure")({ box: 5n })).toEqual({ box: 5n })
+		expect(exported(calls, "measure")(undefined)).toBeUndefined()
 	})
 
 	it("names the Argument that failed by its label", () => {
@@ -291,6 +319,14 @@ describe("A Namespace", () => {
 
 	it("binds a static Property as a value", () => {
 		expect(namespaceOf(calls, "Point").named).toBe("Point")
+	})
+
+	// NOTE: A class refuses a static member named `prototype` or `constructor`,
+	// so the Rewriter mangles the two — reading them raw would answer with the
+	// class-prototype object and `Function` instead.
+	it("binds the two member names a class refuses", () => {
+		expect(namespaceOf(calls, "Point")["constructor"]).toBe(5n)
+		expect(method(calls, "Point", "prototype")({ x: 7n, y: 2n })).toBe(7n)
 	})
 
 	it("takes a Method that takes nothing", () => {

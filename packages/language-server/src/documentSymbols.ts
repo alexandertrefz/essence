@@ -269,6 +269,21 @@ function symbolForStatement(
 				selectionRange: node.name.position,
 				children: symbolsOfBody(node.value.body),
 			}
+		case "OverloadedFunctionStatement":
+			return {
+				name: node.name.content,
+				kind: "function",
+				detail: null,
+				range: node.position,
+				selectionRange: node.name.position,
+				// NOTE: A body-less native signature declares nothing to
+				// outline — only the bodied entries do.
+				children: node.methods.flatMap((method) =>
+					method.nodeType === "FunctionValue"
+						? symbolsOfBody(method.value.body)
+						: [],
+				),
+			}
 		case "TypeAliasStatement":
 			return {
 				name: node.name.content,

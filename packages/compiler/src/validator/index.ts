@@ -979,10 +979,14 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 		// NOTE: Which Handler already answers for each member of the Union, by
 		// index — a Handler is dead not only when its Matcher names a Type the
 		// Union does not have, but also when every Type it could match was
-		// already taken by an earlier Handler. Only an unconditional Handler
-		// takes one: a Handler that can decline a value it accepted by Type
-		// leaves that Type for whatever comes after it.
+		// already taken by an earlier Handler. A Handler takes one when its
+		// emitted TEST accepts every value of it and nothing else of the
+		// Handler could still decline — a payload requirement is part of that
+		// test, so `case #Apply({ fn: IntFn })` claims exactly as its Record
+		// spelling does, while a literal or a Guard declines after the test and
+		// leaves the Type for whatever comes after it.
 		let claimedBy: Array<number | null> = memberTypes.map(() => null)
+		let runtimeMatchers = node.handlers.map(runtimeMatcherOf)
 
 		for (
 			let handlerIndex = 0;
@@ -990,6 +994,12 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 			handlerIndex++
 		) {
 			let handler = node.handlers[handlerIndex]
+			let runtimeMatcher = runtimeMatchers[handlerIndex]
+			// NOTE: The members SOME value of which can take this Handler's
+			// test — overlap, not acceptance, because a test that narrows (a
+			// Record member, a payload requirement) still runs for the values
+			// that pass it. Acceptance here called such a Handler dead while
+			// the runtime took it.
 			let matchedMemberIndices: Array<number> = []
 
 			for (
@@ -998,10 +1008,7 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 				memberIndex++
 			) {
 				if (
-					acceptsAllAtRuntime(
-						handler.matcher,
-						memberTypes[memberIndex],
-					)
+					overlapsAtRuntime(runtimeMatcher, memberTypes[memberIndex])
 				) {
 					matchedMemberIndices.push(memberIndex)
 				}
@@ -1021,7 +1028,9 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 						labels: [
 							primary(
 								handler.matcherPosition,
-								`${describeType(handler.matcher)} is not a member of the matched Union`,
+								handler.memberTypes === null
+									? `${describeType(handler.matcher)} is not a member of the matched Union`
+									: `no value of the matched Union passes ${describeType(runtimeMatcher)}`,
 							),
 							secondary(
 								node.value.position,
@@ -1050,8 +1059,9 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 			// below the `case _` that swallows it. Its own Guard or literal
 			// makes no difference: the earlier Handler decides first.
 			if (claimingHandlerIndices.length === matchedMemberIndices.length) {
-				let claimingHandler =
-					node.handlers[Math.min(...claimingHandlerIndices)]
+				let claimingHandlerIndex = Math.min(...claimingHandlerIndices)
+				let claimingHandler = node.handlers[claimingHandlerIndex]
+				let claimingMatcher = runtimeMatchers[claimingHandlerIndex]
 
 				// NOTE: WHY the earlier Case answers for this one decides what
 				// there is to say about it, and two of the three reasons are
@@ -1085,18 +1095,24 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 					helps = [
 						`Write this Case above 'case ${describeType(claimingHandler.matcher)}', which can only ever be the last one.`,
 					]
-				} else if (
-					!matchesType(claimingHandler.matcher, handler.matcher)
-				) {
-					// NOTE: The earlier Matcher does not accept this one's Type
-					// at all, so what it claimed it claimed through erasure —
-					// which is only ever a Function-typed member. Reordering can
-					// not help here: whichever of the two is written first
-					// swallows the other.
+				} else if (!matchesType(claimingMatcher, runtimeMatcher)) {
+					// NOTE: The earlier test does not accept this one's Type at
+					// all, so what it claimed it claimed through erasure.
+					// Reordering can not help here: whichever of the two is
+					// written first swallows the other. WHICH erasure decides
+					// the explanation — a refinement erases to its base, so
+					// where the bases alone reconcile the two, that is the
+					// whole story; anything else that claims without
+					// assignability is a Function's Signature.
 					erased = true
 
 					notes.push(
-						"A Function's Signature erases before a Match runs, so a Function-typed member is only ever checked for being callable — which makes these two Matchers ask the same question.",
+						matchesType(
+							eraseRefinements(claimingMatcher),
+							eraseRefinements(runtimeMatcher),
+						)
+							? "A refinement's predicate erases before a Match runs, so a refined Type is only ever checked as its base — which makes these two Matchers ask the same question."
+							: "A Function's Signature erases before a Match runs, so a Function-typed member is only ever checked for being callable — which makes these two Matchers ask the same question.",
 					)
 
 					helps = [
@@ -1151,11 +1167,18 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 					handlerIndex,
 					matchedMemberIndices,
 					memberTypes,
+					runtimeMatchers,
 				)
 
-				if (isUnconditionalHandler(handler)) {
+				if (claimsWhatItsTestAccepts(handler)) {
 					for (let memberIndex of matchedMemberIndices) {
-						if (claimedBy[memberIndex] === null) {
+						if (
+							claimedBy[memberIndex] === null &&
+							acceptsAllAtRuntime(
+								runtimeMatcher,
+								memberTypes[memberIndex],
+							)
+						) {
 							claimedBy[memberIndex] = handlerIndex
 						}
 					}
@@ -1229,13 +1252,14 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 	return node
 }
 
-// NOTE: A Case that an earlier one takes values from without covering it — the
-// two Matchers are told apart by something that does not survive to runtime.
-// Only one thing overlaps that way: an empty List fits every List Matcher, so
-// `case List<String>` above `case List<Integer>` answers for an empty
-// `List<Integer>` and this Case never sees one. Nothing said so before, in
-// either direction — the Validator called the two unrelated and the runtime
-// took the earlier branch.
+// NOTE: A Case that an earlier one takes EMPTY LISTS from without covering it:
+// an empty List fits every List Matcher, so `case List<String>` above `case
+// List<Integer>` answers for an empty `List<Integer>` and this Case never sees
+// one. Nothing said so before, in either direction — the Validator called the
+// two unrelated and the runtime took the earlier branch. Only that crossover
+// is reported here: a Matcher that narrows a member by Type overlaps the Cases
+// below it too, but the values it takes are exactly the ones it names, which
+// is Cases being tried in order and nothing to warn about.
 //
 // NOTE: One Diagnostic per Handler, on the first earlier Case that overlaps it.
 // Members the earlier Case takes ENTIRELY are none of this: those are the
@@ -1245,13 +1269,15 @@ function reportEmptyListOverlap(
 	handlerIndex: number,
 	matchedMemberIndices: Array<number>,
 	memberTypes: Array<common.Type>,
+	runtimeMatchers: Array<common.Type>,
 ): void {
 	let handler = node.handlers[handlerIndex]
 
 	for (let earlierIndex = 0; earlierIndex < handlerIndex; earlierIndex++) {
 		let earlierHandler = node.handlers[earlierIndex]
+		let earlierMatcher = runtimeMatchers[earlierIndex]
 
-		if (!isUnconditionalHandler(earlierHandler)) {
+		if (!claimsWhatItsTestAccepts(earlierHandler)) {
 			continue
 		}
 
@@ -1259,8 +1285,9 @@ function reportEmptyListOverlap(
 			let memberType = memberTypes[memberIndex]
 
 			if (
-				acceptsAllAtRuntime(earlierHandler.matcher, memberType) ||
-				!overlapsAtRuntime(earlierHandler.matcher, memberType)
+				acceptsAllAtRuntime(earlierMatcher, memberType) ||
+				!overlapsAtRuntime(earlierMatcher, memberType) ||
+				!overlapsThroughEmptyList(earlierMatcher, memberType)
 			) {
 				continue
 			}
@@ -1499,6 +1526,70 @@ function isUnconditionalHandler(handler: MatchHandler): boolean {
 	)
 }
 
+// NOTE: Whether the Handler's emitted TEST is its whole question — nothing left
+// that could decline a value the test accepted. Payload requirements stay in:
+// they are part of the test itself, which `runtimeMatcherOf` folds into the
+// Matcher, so a requirement that erases at runtime claims the Cases below it
+// exactly as the equivalent Record Matcher does. A literal, a member literal or
+// a Guard decides AFTER the test, and takes nothing from anyone.
+function claimsWhatItsTestAccepts(handler: MatchHandler): boolean {
+	return (
+		handler.literal === null &&
+		handler.memberLiterals === null &&
+		handler.guard === null
+	)
+}
+
+// NOTE: The question a Handler's emitted test asks, as ONE Type — the Matcher
+// with the payload requirements grafted onto the members their spines reach.
+// `case #Apply({ fn: IntFn })` and `case { fn: IntFn }` are two spellings of
+// one test, and reachability has to read them as one: a requirement kept
+// beside the Matcher was invisible here, and a requirement whose check erases
+// (a Function's Signature) claimed nothing while the runtime took everything.
+function runtimeMatcherOf(handler: MatchHandler): common.Type {
+	if (handler.memberTypes === null) {
+		return handler.matcher
+	}
+
+	let matcher = handler.matcher
+
+	for (let [path, requiredType] of Object.entries(handler.memberTypes)) {
+		matcher = graftRequirement(matcher, path.split("."), requiredType)
+	}
+
+	return matcher
+}
+
+function graftRequirement(
+	type: common.Type,
+	path: Array<string>,
+	requiredType: common.Type,
+): common.Type {
+	let step = path[0]
+
+	if (step === undefined) {
+		return requiredType
+	}
+
+	if (type.type !== "Record" && type.type !== "Case") {
+		return type
+	}
+
+	return {
+		...type,
+		members: {
+			...type.members,
+			[step]: graftRequirement(
+				Object.hasOwn(type.members, step)
+					? type.members[step]!
+					: { type: "Unknown" },
+				path.slice(1),
+				requiredType,
+			),
+		},
+	}
+}
+
 // NOTE: Whether the check emitted for `matcher` answers TRUE for EVERY value of
 // `memberType` — which decides reachability, and is a WIDER question than
 // assignability. Some of what a Matcher names does not survive to runtime, and
@@ -1668,13 +1759,65 @@ export function overlapsAtRuntime(
 	return false
 }
 
+// NOTE: Whether the values that cross from `memberType` into `matcher` are the
+// EMPTY LISTS — a List Matcher somewhere in the overlap whose own item Type
+// does not take the member's. That crossover is the one `overlapsAtRuntime`
+// exists to see, and the one worth a warning: every other partial overlap is a
+// Matcher taking exactly the values it names, in order, as Matchers do.
+function overlapsThroughEmptyList(
+	matcher: common.Type,
+	memberType: common.Type,
+): boolean {
+	if (matcher.type === "Refinement" || memberType.type === "Refinement") {
+		return overlapsThroughEmptyList(
+			eraseRefinements(matcher),
+			eraseRefinements(memberType),
+		)
+	}
+
+	if (isRuntimeList(matcher) && isRuntimeList(memberType)) {
+		return !acceptsAllAtRuntime(matcher, memberType)
+	}
+
+	if (memberType.type === "UnionType") {
+		return flattenUnionMembers(memberType).some((armType) =>
+			overlapsThroughEmptyList(matcher, armType),
+		)
+	}
+
+	if (matcher.type === "UnionType") {
+		return flattenUnionMembers(matcher).some((armType) =>
+			overlapsThroughEmptyList(armType, memberType),
+		)
+	}
+
+	if (
+		(matcher.type === "Record" && memberType.type === "Record") ||
+		(matcher.type === "Case" && memberType.type === "Case")
+	) {
+		return Object.entries(matcher.members).some(
+			([name, memberMatcher]) =>
+				Object.hasOwn(memberType.members, name) &&
+				overlapsThroughEmptyList(
+					memberMatcher,
+					memberType.members[name],
+				),
+		)
+	}
+
+	return false
+}
+
 function membersAcceptAllAtRuntime(
 	matcherMembers: Record<string, common.Type>,
 	memberTypes: Record<string, common.Type>,
 ): boolean {
+	// NOTE: `Object.hasOwn` before the read — a member named after one of
+	// `Object.prototype`'s would otherwise be checked against a JavaScript
+	// function the value does not carry.
 	return Object.entries(matcherMembers).every(
 		([name, memberMatcher]) =>
-			name in memberTypes &&
+			Object.hasOwn(memberTypes, name) &&
 			acceptsAllAtRuntime(memberMatcher, memberTypes[name]),
 	)
 }
@@ -1685,7 +1828,7 @@ function membersOverlapAtRuntime(
 ): boolean {
 	return Object.entries(matcherMembers).every(
 		([name, memberMatcher]) =>
-			name in memberTypes &&
+			Object.hasOwn(memberTypes, name) &&
 			overlapsAtRuntime(memberMatcher, memberTypes[name]),
 	)
 }

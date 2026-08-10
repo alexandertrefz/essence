@@ -309,19 +309,32 @@ export function writeReport<Id>(report: Report<Id>, cache: Cache<Id>): string {
 	let groups = getSourceGroups(report, cache)
 
 	// Line number maximum width
-	let lineNumberWidth = groups.reduce(
-		(maximum, group) =>
-			Math.max(maximum, numberOfDigits(group.displayRange.end)),
-		0,
-	)
+	// NOTE: The margin prints its numbers with the source's display offset
+	// applied — the same offset the header location carries — so the width has
+	// to be measured on the offset numbers too.
+	let lineNumberWidth = groups.reduce((maximum, group) => {
+		let fetched = fetchSource(cache, group.sourceId as Id)
+		let offset = fetched === null ? 0 : fetched[0].displayLineOffset
+
+		return Math.max(
+			maximum,
+			numberOfDigits(group.displayRange.end + offset),
+		)
+	}, 0)
 
 	const marginCharacter = (character: string): string =>
 		paint(character, config.marginColor())
 
+	// NOTE: `displayLineOffset` shifts the printed number exactly as it shifts
+	// the header location — one report never shows two accounts of the same
+	// line. Upstream applies the offset only to the header, which leaves the
+	// gutter contradicting it; that is a bug in the feature, not a behaviour
+	// to preserve.
 	const writeMargin = (
 		index: number,
 		isSourceLine: boolean,
 		isEllipsis: boolean,
+		displayLineOffset = 0,
 	): void => {
 		if (groups.length === 0) {
 			return
@@ -330,7 +343,7 @@ export function writeReport<Id>(report: Report<Id>, cache: Cache<Id>): string {
 		let lineNumberMargin: string
 		if (isSourceLine && !isEllipsis) {
 			lineNumberMargin = paint(
-				`${String(index + 1).padStart(lineNumberWidth)} ${draw.vbar}`,
+				`${String(index + 1 + displayLineOffset).padStart(lineNumberWidth)} ${draw.vbar}`,
 				config.marginColor(),
 			)
 		} else {
@@ -470,7 +483,12 @@ export function writeReport<Id>(report: Report<Id>, cache: Cache<Id>): string {
 			lineLabels: Array<LineLabel>,
 			marginLabel: LineLabel | null,
 		): void => {
-			writeMargin(index, isSourceLine, isEllipsis)
+			writeMargin(
+				index,
+				isSourceLine,
+				isEllipsis,
+				source.displayLineOffset,
+			)
 
 			// Multi-line margins
 			let columnCount =

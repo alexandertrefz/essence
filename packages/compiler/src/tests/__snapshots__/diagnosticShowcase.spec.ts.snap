@@ -530,9 +530,9 @@ Error: Type 'Boxed' names itself
 exports[`Diagnostic Showcase Refinements.es should render the same report every time 1`] = `
 "[invalid-refinement-predicate]
 Error: A 'where' clause can not refine Boolean
-    ╭─┤ Refinements.es:19:13 │
+    ╭─┤ Refinements.es:20:13 │
     │
- 19 │     type Yes = Boolean where @::is(true)
+ 20 │     type Yes = Boolean where @::is(true)
     │                ───┬───  
     │                   ╰───── this is Boolean
     │ 
@@ -543,9 +543,9 @@ Error: A 'where' clause can not refine Boolean
 
 [invalid-refinement-predicate]
 Error: A 'where' clause can not refine List
-    ╭─┤ Refinements.es:23:17 │
+    ╭─┤ Refinements.es:24:17 │
     │
- 23 │     type Several = List where @::hasItems()
+ 24 │     type Several = List where @::hasItems()
     │                    ──┬─  
     │                      ╰─── this is List
     │ 
@@ -556,9 +556,9 @@ Error: A 'where' clause can not refine List
 
 [invalid-refinement-predicate]
 Error: This is not a predicate a refinement can be checked by
-    ╭─┤ Refinements.es:27:29 │
+    ╭─┤ Refinements.es:28:29 │
     │
- 27 │     type Named = Integer where "essence"::hasAnyContent()
+ 28 │     type Named = Integer where "essence"::hasAnyContent()
     │                                ────┬────  
     │                                    ╰────── this is not '@'
     │ 
@@ -569,9 +569,9 @@ Error: This is not a predicate a refinement can be checked by
 
 [invalid-refinement-predicate]
 Error: This is not a predicate a refinement can be checked by
-    ╭─┤ Refinements.es:31:30 │
+    ╭─┤ Refinements.es:32:30 │
     │
- 31 │     type Trimmed = String where @::trim()::hasAnyContent()
+ 32 │     type Trimmed = String where @::trim()::hasAnyContent()
     │                                 ────┬────  
     │                                     ╰────── this is not '@'
     │ 
@@ -582,9 +582,9 @@ Error: This is not a predicate a refinement can be checked by
 
 [invalid-refinement-predicate]
 Error: This is not a predicate a refinement can be checked by
-    ╭─┤ Refinements.es:37:45 │
+    ╭─┤ Refinements.es:38:45 │
     │
- 37 │     type Bounded = Integer where @::isLessThan(limit)
+ 38 │     type Bounded = Integer where @::isLessThan(limit)
     │                                                ──┬──  
     │                                                  ╰──── this is not a literal value
     │ 
@@ -595,21 +595,60 @@ Error: This is not a predicate a refinement can be checked by
 
 [predicate-not-boolean]
 Error: This predicate is not a Boolean
-    ╭─┤ Refinements.es:41:29 │
+    ╭─┤ Refinements.es:42:29 │
     │
- 41 │     type Sized = Integer where @::absolute()
+ 42 │     type Sized = Integer where @::absolute()
     │                                ──────┬──────  
     │                                      ╰──────── this is Integer
     │ 
     │ Note: A 'where' clause is a question about the value being refined, so it has to answer 'true' or 'false'.
 ────╯
 
-─── 6 errors
+[refinement-as-matcher]
+Error: A Matcher can not test for 'NonZeroInteger'
+    ╭─┤ Refinements.es:50:8 │
+    │
+ 50 │        case NonZeroInteger { <- "nonzero" }
+    │             ───────┬──────  
+    │                    ╰──────── this is a checked refinement
+    │ 
+    │ Help: Match on 'Integer' and prove the predicate inside the arm, the way every 'NonZeroInteger' is proven: an 'if' condition, a Case naming a written value, or a written value.
+    │ 
+    │ Note: A refinement's predicate erases before the Program runs, so the emitted check could only ask about 'Integer' — and the arm would run for values the predicate refuses.
+────╯
+
+[refinement-as-matcher]
+Error: A Matcher can not test for 'NonZeroInteger'
+    ╭─┤ Refinements.es:64:23 │
+    │
+ 64 │        case #Full({ value: NonZeroInteger }) { <- "nonzero" }
+    │                            ───────┬──────  
+    │                                   ╰──────── this is a checked refinement
+    │ 
+    │ Help: Match on 'Integer' and prove the predicate inside the arm, the way every 'NonZeroInteger' is proven: an 'if' condition, a Case naming a written value, or a written value.
+    │ 
+    │ Note: A refinement's predicate erases before the Program runs, so the emitted check could only ask about 'Integer' — and the arm would run for values the predicate refuses.
+────╯
+
+─── 8 errors
 "
 `;
 
 exports[`Diagnostic Showcase Syntax.es should render the same report every time 1`] = `
-"[syntax-error]
+"[comment-in-hole]
+Error: A Comment can not be written inside an interpolation hole
+    ╭─┤ Syntax.es:37:36 │
+    │
+ 37 │     constant labelled = "answer: { 42 § the answer }"
+    │                                       ──────┬──────  
+    │                                             ╰──────── this Comment would swallow the rest of the String
+    │ 
+    │ Help: Move the Comment out of the String — behind the closing '"' works.
+    │ 
+    │ Note: A Comment runs to the end of its line — inside a hole it would take the hole's '}' and the String's closing '"' with it.
+────╯
+
+[syntax-error]
 Error: Expected '=' but found '42'.
     ╭─┤ Syntax.es:14:18 │
     │
@@ -644,21 +683,34 @@ Error: A Protocol Method can not take a Parameter apart
     │ Note: A Protocol Method declares what a call looks like and nothing about how it is carried out, so a Pattern here would name parts for nobody to read.
 ────╯
 
+[nesting-too-deep]
+Error: This code is nested too deeply
+    ╭─┤ Syntax.es:42:1042 │
+    │
+ 42 │     constant deep = [[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[1]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]
+    │                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     ▲  
+    │                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     ╰── the 1024th level of nesting starts here
+    │ 
+    │ Help: Break the nesting up: name intermediate values as Constants, or intermediate Types as Type Aliases.
+    │ 
+    │ Note: The parser reads nesting by recursion, so there is a depth at which it would run out of call stack mid-read and crash without a report — it refuses at 1024 levels instead, with one.
+────╯
+
 [unclosed-block]
 Error: This block is never closed
-    ╭─┤ Syntax.es:36:10 │
+    ╭─┤ Syntax.es:47:10 │
     │
- 35 │     function greet(_ name: String) -> String {
+ 46 │     function greet(_ name: String) -> String {
     │                                              ▲  
     │                                              ╰── opened here
- 36 │        <- name
+ 47 │        <- name
     │               │ 
     │               ╰─ the input ends here
     │ 
     │ Help: Add the missing '}'.
 ────╯
 
-─── 4 errors
+─── 6 errors
 "
 `;
 
@@ -721,6 +773,25 @@ Error: This Argument does not fit Parameter 'times'
 ────╯
 
 ─── 5 errors
+"
+`;
+
+exports[`Diagnostic Showcase UnclosedString.es should render the same report every time 1`] = `
+"[unclosed-string]
+Error: This String Literal is never closed
+    ╭─┤ UnclosedString.es:17:2 │
+    │
+ 16 │     constant greeting = "hello
+    │                         ▲  
+    │                         ╰── opened here
+ 17 │ }
+    │  │ 
+    │  ╰─ the input ends here
+    │ 
+    │ Help: Add the missing '"'.
+────╯
+
+─── 1 error
 "
 `;
 

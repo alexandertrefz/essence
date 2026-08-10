@@ -625,7 +625,7 @@
 "List.join<ItemType is Printable>(with: String) [single] => 7"
 "List.partition<ItemType>(where: (_ ItemType) -> Boolean) => { matching = [ 2, 4 ], rest = [ 3, 1, 1 ] }"
 "List.partition<ItemType>(where: (_ ItemType) -> Boolean) [empty] => { matching = [], rest = [] }"
-"List.pair<ItemType, Other>(with: List<Other>) => [ { first = "a", second = 1 } ]"
+"List.pair<ItemType, Other>(with: List<Other>) => [ { first = \"a\", second = 1 } ]"
 "List.pair<ItemType, Other>(with: List<Other>) [empty] => []"
 "List.split<ItemType>(intoGroupsOf: Integer) => Value([ [ 1, 2 ], [ 3, 4 ], [ 5 ] ])"
 "List.split<ItemType>(intoGroupsOf: Integer) [zero] => Empty"

@@ -19,6 +19,14 @@ implementation {
 
 	type Label = String | Integer
 
+	§ Member names that live on JavaScript's `Object.prototype` — an absent key
+	§ has to read as absent, never as JavaScript's own `toString` or `valueOf`.
+	type Config = { toString: Optional<String> }
+
+	choice Styled {
+		Tagged { valueOf: Optional<String> },
+	}
+
 	function integer(_ value: Integer) -> Integer {
 		<- value
 	}
@@ -59,11 +67,21 @@ implementation {
 		<- value
 	}
 
+	function config(_ value: Config) -> Config {
+		<- value
+	}
+
+	function styled(_ value: Styled) -> Styled {
+		<- value
+	}
+
 	function boxes(_ value: List<Box>) -> List<Box> {
 		<- value
 	}
 
-	function maybes(_ value: List<Optional<Integer>>) -> List<Optional<Integer>> {
+	function maybes(
+		_ value: List<Optional<Integer>>,
+	) -> List<Optional<Integer>> {
 		<- value
 	}
 
@@ -75,44 +93,48 @@ implementation {
 		}
 	}
 
-	constant answer = 42
-	constant third = 1/3
-	constant greeting = "hé"
-	constant yes = true
-	constant names = ["a", "b"]
-	constant point = { x = 1, y = 2 }
-	constant blank: Shape = #Blank
+	constant answer        = 42
+	constant third         = 1/3
+	constant greeting      = "hé"
+	constant yes           = true
+	constant names         = ["a", "b"]
+	constant point         = { x = 1, y = 2 }
+	constant blank: Shape  = #Blank
 	constant circle: Shape = #Circle({ radius = 3 })
 	constant present: Optional<Integer> = #Value(7)
-	constant absent: Optional<Integer> = #Empty
+	constant absent: Optional<Integer>  = #Empty
 }
 
 export {
-	Shape
 	Box
 	Card
+	Config
 	Label
-	integer
-	rational
-	text
-	flag
-	words
-	box
-	card
-	maybe
-	shape
-	labelled
-	boxes
-	maybes
-	areaOf
+	Shape
+	Styled
+	absent
 	answer
-	third
+	areaOf
+	blank
+	box
+	boxes
+	card
+	circle
+	config
+	flag
 	greeting
-	yes
+	integer
+	labelled
+	maybe
+	maybes
 	names
 	point
-	blank
-	circle
 	present
-	absent
+	rational
+	shape
+	styled
+	text
+	third
+	words
+	yes
 }

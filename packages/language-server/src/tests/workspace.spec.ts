@@ -768,6 +768,92 @@ describe("Workspace", () => {
 			expect(last?.newText).toBe('\tPI as Pi from "./math/Math.es"\n')
 		})
 
+		// NOTE: Applied and reparsed rather than matched against a spelling —
+		// what an insertion must never do is land outside the braces of a
+		// block written on one line, which only a reparse can attest.
+		function withInsertedEntry(
+			source: string,
+			entry: { name: string; alias: string | null; specifier: string },
+		): string {
+			let edit = insertImportEdit(
+				source,
+				parseDocument(source).program,
+				entry,
+			)
+
+			expect(edit).not.toBeNull()
+
+			let lines = source.split("\n")
+			let line = lines[edit!.range.start.line - 1] ?? ""
+
+			lines[edit!.range.start.line - 1] =
+				line.slice(0, edit!.range.start.column - 1) +
+				edit!.newText +
+				line.slice(edit!.range.end.column - 1)
+
+			return lines.join("\n")
+		}
+
+		it("should insert inside the braces of a one-line empty block", () => {
+			let source = ["import {}", "", "implementation {", "}", ""].join(
+				"\n",
+			)
+
+			let updated = withInsertedEntry(source, {
+				name: "Rectangle",
+				alias: null,
+				specifier: "./Geometry.es",
+			})
+			let reparsed = parseDocument(updated)
+
+			expect(reparsed.diagnostics).toEqual([])
+			expect(
+				reparsed.program.imports?.entries.map(
+					(entry) => entry.name.content,
+				),
+			).toEqual(["Rectangle"])
+		})
+
+		it("should insert inline into a block written on one line", () => {
+			let source = [
+				'import { Zeta from "./z.es" }',
+				"",
+				"implementation {",
+				"}",
+				"",
+			].join("\n")
+
+			let first = parseDocument(
+				withInsertedEntry(source, {
+					name: "Alpha",
+					alias: null,
+					specifier: "./a.es",
+				}),
+			)
+
+			expect(first.diagnostics).toEqual([])
+			expect(
+				first.program.imports?.entries.map(
+					(entry) => entry.name.content,
+				),
+			).toEqual(["Alpha", "Zeta"])
+
+			let last = parseDocument(
+				withInsertedEntry(source, {
+					name: "Last",
+					alias: null,
+					specifier: "./zz.es",
+				}),
+			)
+
+			expect(last.diagnostics).toEqual([])
+			expect(
+				last.program.imports?.entries.map(
+					(entry) => entry.name.content,
+				),
+			).toEqual(["Zeta", "Last"])
+		})
+
 		it("should refuse to insert an entry the block already holds", () => {
 			let source = [
 				"import {",

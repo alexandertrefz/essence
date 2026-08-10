@@ -207,7 +207,17 @@ function formatAsDecimal(rational: RationalType): string {
 		}
 	}
 
-	let sign = parts.numerator < 0n ? "-" : ""
+	// NOTE: A cut that kept only zeroes rounded to the whole part alone — the
+	// digits are dropped so the value prints as the whole it rounded to, and
+	// the sign goes with them when nothing is left: there is no negative zero.
+	if (digits.length > 0 && digits.every((digit) => digit === "0")) {
+		digits = []
+	}
+
+	let sign =
+		parts.numerator < 0n && (wholePart !== 0n || digits.length > 0)
+			? "-"
+			: ""
 
 	if (digits.length === 0) {
 		return `${sign}${wholePart}`
