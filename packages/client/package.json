@@ -1,6 +1,6 @@
 {
 	"name": "@essence-lang/client",
-	"version": "0.1.0",
+	"version": "0.2.0",
 	"description": "Load Essence Modules from JavaScript, compiled on the way in.",
 	"private": true,
 	"type": "module",

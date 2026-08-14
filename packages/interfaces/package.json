@@ -1,6 +1,6 @@
 {
 	"name": "@essence-lang/interfaces",
-	"version": "0.1.0",
+	"version": "0.2.0",
 	"description": "The types every stage of the Essence compiler agrees on.",
 	"private": true,
 	"type": "module",
