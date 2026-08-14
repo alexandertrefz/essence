@@ -2,7 +2,7 @@
 	"name": "essence-language",
 	"displayName": "Essence",
 	"description": "Language support for Essence: syntax highlighting, diagnostics, navigation, completion and debugging.",
-	"version": "0.3.0",
+	"version": "0.4.0",
 	"type": "module",
 	"publisher": "essence",
 	"license": "MIT",
@@ -248,8 +248,8 @@
 		]
 	},
 	"devDependencies": {
-		"@essence-lang/language-server": "0.1.0",
-		"@essence-lang/standard-library": "0.1.0",
+		"@essence-lang/language-server": "0.2.0",
+		"@essence-lang/standard-library": "0.2.0",
 		"@vscode/vsce": "3.9.2",
 		"vscode-languageclient": "9.0.1"
 	}

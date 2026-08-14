@@ -1,6 +1,6 @@
 {
 	"name": "@essence-lang/cli",
-	"version": "0.1.0",
+	"version": "0.2.0",
 	"description": "essence — the Essence command line.",
 	"private": true,
 	"type": "module",

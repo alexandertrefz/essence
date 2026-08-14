@@ -1,5 +1,50 @@
 # Change Log
 
+## [0.4.0]
+
+The language moved: destructuring, checked refinements, Optional as a
+Choice, a `Terminal` namespace and an optimising compiler. The bundled
+toolchain moves to 0.2.0 in lockstep, and everything the editor does —
+diagnostics, completion, hover, rename, the debugger — speaks the new
+surface.
+
+- Destructuring, in every position that takes a value apart: the Record
+  Matcher a `match` already writes, generalised to Function Parameters,
+  `constant` and `variable` Declarations and a Case payload's parens —
+  `constant { matching, rest } = list::partition(where …)`. The editor
+  follows a Pattern's names everywhere, and renaming either end of a bare
+  `{ width }` — the Record's member or the local — writes the `as` that
+  keeps the other meaning what it did.
+- Checked refinements: `type NonZeroInteger = Integer where @::isNot(0)`
+  declares a Type by evidence, and the compiler carries the proof.
+  `divide(by:)` a `NonZeroInteger` answers the Rational itself rather
+  than an Optional, `NonEmptyList<ItemType>` answers `firstItem` and
+  `lastItem` totally, and a plain Integer arriving where a proven one is
+  asked for is refused where it stands.
+- Optional is a nominal Choice: `#Value` and `#Empty` are ordinary Cases,
+  matched and completed like any other. `Nothing` is gone — the unit
+  Type is the empty Record `{}`.
+- A Case Matcher binds its payload to a name — or a Pattern — in its
+  parens, and a Guard sees what it bound.
+- `Terminal.print`, `Terminal.inspect` and `Terminal.write` replace
+  `__print`; the `__` sigil is gone from the language.
+- The compiler now optimises what it emits — fourteen named passes;
+  compiled programs run 2.8–20× faster on the measured benchmarks.
+- `Number.Pi`, `Number.Tau`, `Number.E` and `Number.GoldenRatio`, kept
+  exact through symbolic arithmetic for as long as the arithmetic allows.
+- Renames, carried by the editor's own rename machinery: `compareTo` is
+  `compare(to:)`, and `anyItem`/`everyItem` label their predicate
+  `where`, like every other predicate in the standard library.
+- New diagnostics: an Argument mismatch is reported against the receiver
+  as written, and a String interpolation hole that calls the `toString`
+  interpolation would call itself is warned about.
+- `essence.inlayHints.enabled` can turn inlay hints off. The Server
+  re-reads it on every configuration change and refreshes open editors,
+  no edit required.
+- The column-80 ruler is no longer set as an editor default for Essence
+  files.
+- One audit fixed 51 bugs across the whole toolchain.
+
 ## [0.3.0]
 
 A debugger — the Essence Debug Adapter, `essence dap`.

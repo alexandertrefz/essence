@@ -1,6 +1,6 @@
 {
 	"name": "@essence-lang/escodegen",
-	"version": "0.1.0",
+	"version": "0.2.0",
 	"description": "The Essence compiler's vendored fork of escodegen 2.1.0 — upstream plus a twelve-line PropertyDefinition patch, see PATCHES.md",
 	"private": true,
 	"main": "./escodegen.js",
