@@ -5,12 +5,15 @@ import * as path from "node:path"
 import { RUNTIME_DIRECTORY } from "@essence-lang/runtime"
 import { readStdlibFiles } from "@essence-lang/standard-library"
 
-import type { Module } from "../modules/graph"
 import { type OptimiserOptions, optimiserOptionsKey } from "../optimiser/index"
 
 export type BundleHashParts = {
 	entryPath: string
-	modules: Map<string, Module>
+	// NOTE: Only what each Module is spelled and what it SAYS. A parsed graph
+	// answers this and so does a linked one, which is what lets a caller hash
+	// before it has decided to link — the whole point of naming a bundle after
+	// what it was compiled from.
+	modules: ReadonlyMap<string, { readonly sourceText: string }>
 	optimisation: OptimiserOptions
 	// NOTE: What the HOST puts into the bundle beyond the sources. A
 	// `transformSources` is a Function and a Function can not be hashed, so the

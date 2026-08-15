@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test"
+import { afterAll, describe, expect, it } from "bun:test"
 import { spawnSync } from "node:child_process"
 import {
 	existsSync,
@@ -66,6 +66,18 @@ import {
 	supportsUnicode,
 	visibleLength,
 } from "../theme"
+
+// NOTE: A directory of this run's own, so that a spec compiling a fixture
+// neither answers out of the user's bundle cache nor fills it. It is set before
+// anything below imports its way to a compile, because where the cache lives is
+// read off the environment every time it is asked for.
+let bundleCache = mkdtempSync(path.join(tmpdir(), "essence-cli-cache-"))
+
+process.env.ESSENCE_CLI_CACHE = bundleCache
+
+afterAll(() => {
+	rmSync(bundleCache, { recursive: true, force: true })
+})
 
 type Command = NonNullable<ReturnType<typeof findCommand>>
 
@@ -1938,10 +1950,14 @@ describe("essence run", () => {
 				let binary = fileURLToPath(
 					import.meta.resolve("../../bin/essence"),
 				)
+				// NOTE: The environment is handed over rather than inherited:
+				// Bun does not carry a `process.env` a spec assigned into a
+				// child, and the bundle cache this suite compiles against is
+				// named by exactly such an assignment.
 				let result = spawnSync(
 					process.execPath,
 					[binary, "run", path.join(directory, "Noisy.es"), "--json"],
-					{ encoding: "utf-8" },
+					{ encoding: "utf-8", env: { ...process.env } },
 				)
 
 				let report = JSON.parse(result.stdout) as JSONReport
