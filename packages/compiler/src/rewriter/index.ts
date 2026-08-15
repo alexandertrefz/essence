@@ -3443,9 +3443,11 @@ function callAnyIs(
 //
 // NOTE: A Handler carrying a residual test was given one by
 // `compile-type-tests`, which found something cheaper that answers what the
-// Matcher's descriptor answers. It reads the value under the same `_self`
-// this binds, so it goes where the descriptor call would have gone and
-// everything ANDed on after it is unchanged.
+// Matcher's check answers — a tag comparison in place of a descriptor, or a
+// raw comparison in place of `anyIs` over a scalar literal. It reads the value
+// under the same `_self` this binds, so it goes where the call would have gone
+// and everything ANDed on after it is unchanged. It is asked FIRST for that
+// reason: it stands for whatever the Matcher's own half was, literal or not.
 function handlerTest(
 	handler: common.typedSimple.MatchHandler,
 	value: estree.Identifier,
@@ -3464,13 +3466,13 @@ function handlerTest(
 	let test: estree.Expression
 	let selfTagTest = selfTagTestOf(handler)
 
-	if (handler.literal !== null) {
-		test = callAnyIs(value, rewriteExpression(handler.literal))
-	} else if (handler.typeTest !== null) {
+	if (handler.typeTest !== null) {
 		test =
 			tagName !== null && selfTagTest !== null
 				? boundTagTest(tagName, selfTagTest)
 				: rewriteExpression(handler.typeTest)
+	} else if (handler.literal !== null) {
+		test = callAnyIs(value, rewriteExpression(handler.literal))
 	} else {
 		test = callIsValueOfType(value, handler.matcher)
 	}

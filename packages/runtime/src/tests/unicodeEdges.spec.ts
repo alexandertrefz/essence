@@ -3,13 +3,17 @@ import { describe, expect, test } from "bun:test"
 import { createInteger } from "../Integer"
 import { anyIs } from "../internalHelpers"
 import { createList } from "../List"
+import { createEmpty, createValue } from "../Optional"
 import { createRational } from "../Rational"
 import { createRecord } from "../Record"
 import {
 	append,
+	character,
 	compare__overload$1 as compare,
 	createString,
 	length,
+	repeat,
+	slice,
 	split,
 } from "../String"
 import { typeKeySymbol } from "../type"
@@ -29,6 +33,8 @@ const decomposedAccent = "é".normalize("NFD")
 const family = "\u{1F468}‍\u{1F469}‍\u{1F467}‍\u{1F466}"
 
 const string = createString
+const integer = createInteger
+const value = createValue
 const countOf = (value: string) => length(createString(value)).value
 const orderOf = (first: string, second: string) =>
 	compare(createString(first), createString(second))[typeKeySymbol]
@@ -68,12 +74,29 @@ describe("carriage returns across a join", () => {
 		expect(length(append(left, right)).value).toBe(3n)
 	})
 
-	test("the joined String splits on the cluster", () => {
+	test("the joined String splits and slices on the cluster", () => {
 		let joined = append(string("a\r"), string("\nb"))
 
 		expect(
 			split(joined, string("")).value.map((piece) => piece.value),
 		).toEqual(["a", "\r\n", "b"])
+		expect(slice(joined, integer(0n), integer(2n)).value).toBe("a\r\n")
+		expect(slice(joined, integer(1n), integer(3n)).value).toBe("\r\nb")
+		expect(character(joined, integer(1n))).toEqual(value(string("\r\n")))
+	})
+
+	// NOTE: A repeat is a join of the String with ITSELF, so its every seam is
+	// the same seam — a String ending in CR and beginning with LF loses one
+	// character per copy after the first.
+	test("a repeat that meets its own end is measured too", () => {
+		expect(length(repeat(string("a\r\n"), integer(3n))).value).toBe(6n)
+		expect(length(repeat(string("\r\n"), integer(3n))).value).toBe(3n)
+		expect(length(repeat(string("\n\r"), integer(3n))).value).toBe(4n)
+		expect(repeat(string("\n\r"), integer(3n)).value).toBe("\n\r\n\r\n\r")
+		// NOTE: The ASCII case the marker is for — no seam, so the count is the
+		// text's own length.
+		expect(length(repeat(string("ab"), integer(3n))).value).toBe(6n)
+		expect(repeat(string("ab"), integer(3n)).value).toBe("ababab")
 	})
 
 	// NOTE: An ASCII join with nothing at its seam is the case the marker is
@@ -117,6 +140,82 @@ describe("combining marks", () => {
 
 		expect(length(joined).value).toBe(4n)
 		expect(anyIs(joined, string(composed))).toBeTrue()
+	})
+
+	test("both spellings slice alike", () => {
+		let first = slice(string(composed), integer(3n), integer(4n))
+		let second = slice(string(decomposed), integer(3n), integer(4n))
+
+		expect(anyIs(first, second)).toBeTrue()
+		expect(length(first).value).toBe(1n)
+		expect(length(second).value).toBe(1n)
+		expect(anyIs(first, string(composedAccent))).toBeTrue()
+	})
+
+	// NOTE: A position Method reads the grapheme view, so it can never cut a
+	// mark away from the base it belongs to — whichever way the text is spelled.
+	// The view is taken of the NFC form, so the character it hands back is the
+	// COMPOSED spelling however the String was written: the two are one
+	// character, and this is which of them a reader is given.
+	test("a mark is never cut away from its base", () => {
+		expect(character(string(decomposed), integer(3n))).toEqual(
+			value(string(composedAccent)),
+		)
+		expect(character(string(decomposed), integer(3n))).toEqual(
+			character(string(composed), integer(3n)),
+		)
+		expect(slice(string(decomposed), integer(0n), integer(3n)).value).toBe(
+			"caf",
+		)
+		expect(character(string(family), integer(0n))).toEqual(
+			value(string(family)),
+		)
+		expect(length(repeat(string(family), integer(3n))).value).toBe(3n)
+	})
+})
+
+// NOTE: Positions count from zero, a negative one counts back from the end, and
+// an empty or inverted range is the empty String — the resolution `List.slice`
+// used to perform for these, now performed where they are.
+describe("positions", () => {
+	test("a negative position counts back from the end", () => {
+		expect(slice(string("abcde"), integer(0n), integer(-1n)).value).toBe(
+			"abcd",
+		)
+		expect(slice(string("abcde"), integer(-2n), integer(5n)).value).toBe(
+			"de",
+		)
+		expect(character(string("abcde"), integer(-1n))).toEqual(
+			value(string("e")),
+		)
+		expect(character(string("abcde"), integer(-5n))).toEqual(
+			value(string("a")),
+		)
+	})
+
+	test("a position outside the String has no character", () => {
+		expect(character(string(""), integer(0n))).toEqual(createEmpty())
+		expect(character(string("ab"), integer(2n))).toEqual(createEmpty())
+		expect(character(string("ab"), integer(-3n))).toEqual(createEmpty())
+	})
+
+	test("each end of a range is clamped, and an inverted one is empty", () => {
+		expect(slice(string("abc"), integer(-99n), integer(99n)).value).toBe(
+			"abc",
+		)
+		expect(slice(string("abc"), integer(2n), integer(1n)).value).toBe("")
+		expect(slice(string("abc"), integer(1n), integer(1n)).value).toBe("")
+		expect(slice(string(""), integer(0n), integer(5n)).value).toBe("")
+		expect(slice(string("abc"), integer(5n), integer(9n)).value).toBe("")
+	})
+
+	// NOTE: A repeat below one is the empty String, which is what repeating
+	// into the empty List and joining it gave.
+	test("a repeat below one is the empty String", () => {
+		expect(repeat(string("ab"), integer(0n)).value).toBe("")
+		expect(repeat(string("ab"), integer(-3n)).value).toBe("")
+		expect(repeat(string(""), integer(5n)).value).toBe("")
+		expect(length(repeat(string(""), integer(5n))).value).toBe(0n)
 	})
 })
 

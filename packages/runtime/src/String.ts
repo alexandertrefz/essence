@@ -5,6 +5,8 @@ import { createInteger } from "./Integer"
 import type { ListType } from "./List"
 import { createList } from "./List"
 import type { NormalizationFormType } from "./NormalizationForm"
+import type { OptionalType } from "./Optional"
+import { createEmpty, createValue } from "./Optional"
 import type { OrderingType } from "./Ordering"
 import { equal, greater, less } from "./Ordering"
 import type { SideType } from "./Side"
@@ -332,6 +334,98 @@ export function ends(
 			(character, index) => characters[offset + index] === character,
 		),
 	)
+}
+
+// NOTE: A position as the grapheme view sees it — a negative one counts back
+// from the end, so -1 is the last character and -length the first. This is
+// exactly what `List.positionFromEnd` does for a List, which is what these
+// Methods used to reach through, and it is spelled here rather than imported so
+// that a Program slicing Strings carries no List.
+function positionFromEnd(index: bigint, count: number): bigint {
+	return index < 0n ? index + BigInt(count) : index
+}
+
+// NOTE: Native — one read out of the grapheme view, where the Essence body
+// (`@::characters()::item(at index)`) built a String for every character of the
+// receiver and a List to hold them, to hand back one of them. Reading a
+// character of a ten thousand character String allocated ten thousand and one
+// values.
+//
+// NOTE: The answer is a plain String rather than a segmented one: a single
+// cluster taken out of the view segments to itself, so there is nothing for
+// remembering to protect. `split` hands its pieces their clusters because a
+// piece is SEVERAL of them and re-segmenting could pair them differently.
+export function character(
+	originalString: StringType,
+	index: IntegerType,
+): OptionalType<StringType> {
+	let characters = graphemesIn(originalString)
+	let position = positionFromEnd(index.value, characters.length)
+
+	if (position < 0n || position >= BigInt(characters.length)) {
+		return createEmpty()
+	}
+
+	return createValue(createString(characters[Number(position)]!))
+}
+
+// NOTE: Native — the characters between two positions, where the Essence body
+// went through `characters()` and `List.slice` and `join`: a String per
+// character of the receiver, a List of them, a second List for the window and a
+// join to put the text back together. Half-open [from, to), a negative position
+// counting back from the end, each end THEN clamped — the same resolution
+// `List.slice` performs, and the reason it is written out is that this is now
+// the only place that needs it.
+//
+// NOTE: The answer carries the clusters it was cut into, exactly as a piece of
+// a `split` does — a window of a view is several clusters, and segmenting the
+// joined text afresh does not always read the same ones back.
+export function slice(
+	originalString: StringType,
+	from: IntegerType,
+	to: IntegerType,
+): StringType {
+	let characters = graphemesIn(originalString)
+	let count = BigInt(characters.length)
+	let first = positionFromEnd(from.value, characters.length)
+	let last = positionFromEnd(to.value, characters.length)
+	let start = first < 0n ? 0n : first > count ? count : first
+	let end = last < 0n ? 0n : last > count ? count : last
+
+	if (end <= start) {
+		return createSegmentedString([])
+	}
+
+	return createSegmentedString(characters.slice(Number(start), Number(end)))
+}
+
+// NOTE: Native — the String joined to itself, where the Essence body built a
+// List of `count` copies of it and joined them. A count below one repeats into
+// nothing, which is the empty String.
+//
+// NOTE: The ASCII marker rides along, and only then: joining ASCII copies of an
+// ASCII String gives an ASCII String, for the reason `append` gives — no unit
+// at or above 128 and no carriage return, so nothing can pair across a seam and
+// the characters are the units. Everything else is a plain String, because a
+// copy's last cluster and the next copy's first may join.
+export function repeat(
+	originalString: StringType,
+	count: IntegerType,
+): StringType {
+	if (count.value < 1n) {
+		return createString("")
+	}
+
+	let repeated = createString(
+		originalString.value.repeat(Number(count.value)),
+	) as MeasuredString
+
+	if (isAsciiIn(originalString)) {
+		repeated[isAsciiKey] = true
+		repeated[graphemeCountKey] = repeated.value.length
+	}
+
+	return repeated
 }
 
 export function uppercase(originalString: StringType): StringType {

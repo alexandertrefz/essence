@@ -252,8 +252,27 @@ describe("Bundle Size", () => {
 	// composition left the prelude — and Irrational.es, which edits no List at
 	// all, is unchanged to the byte, which is the shape to expect: what a
 	// Program carries is the runtime reach of what it calls.
+	//
+	// NOTE: It measures 63,632 now, up 1,187 from 62,445, and the ceiling moves
+	// to 64,700 to keep the same ~1 kB of headroom. It moved in three steps and
+	// each is worth its own line, because two of them are the runtime growing
+	// and one is the standard library shrinking. Up 1,028 for remembering a
+	// String's normal form and its ASCII marker — the scan, the two Symbol keys
+	// and `append` propagating them — which is what makes equality stop
+	// normalising both sides per comparison and an append-build loop linear.
+	// Down 278 when Rational's four same-kind arithmetic entries became natives
+	// on the bigint-rational core: four Essence bodies left the prelude and what
+	// replaced them is code the module already carried. Up 437 for `slice`,
+	// `character(at:)` and `repeat` becoming natives, which is this file paying
+	// TEXT for work in the plainest form — the Essence bodies were four calls
+	// each into List Methods Everyday carries anyway, so nothing left with them,
+	// and what arrived is a window taken out of the grapheme view instead of a
+	// String allocated per character of the receiver. A String-heavy Program
+	// collects the other side of that: String.es falls 1,851 to 25,406, which is
+	// 807 BELOW where it started, because `characters`, `List.slice`, `List.item`
+	// and `List.repeat` stop being reached through them at all.
 	it("keeps Everyday.es from dragging in the whole numeric tower", async () => {
-		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(63_500)
+		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(64_700)
 	})
 
 	// NOTE: Measured 42,719 bytes; a reintroduced `Number` spread was 54,849.
@@ -374,7 +393,8 @@ describe("Bundle Size", () => {
 	// the honest worst case for it. Against that, the eagerly built
 	// `Intl.Segmenter` left: it is constructed on first use now, so a Program
 	// that never segments neither carries it nor pays the millisecond of table
-	// loading it cost at startup.
+	// loading it cost at startup. 26 more arrived with Rational's arithmetic
+	// natives, for 11,701; the ceiling is sized for moves of a different order.
 	it("carries one copy of the prelude across a bundle of Modules", async () => {
 		let linked = linkModuleGraph(
 			loadModuleGraph(fixturePath("modules", "Main.es"), diskModuleHost),
