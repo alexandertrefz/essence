@@ -3892,6 +3892,16 @@ function buildNamespaceIndex(
 // NOTE: The Namespaces worth matching against `baseType`, in the order they
 // are visible in — a superset of those that can match, never a subset, so the
 // matching below decides exactly what it decided when it saw all of them.
+//
+// NOTE: Visible order is not restored by a sort here, it is never lost:
+// `buildNamespaceIndex` fills every bucket in `order` order, so each bucket is
+// already ascending and the buckets a receiver reads are MERGED rather than
+// concatenated and re-sorted. Order is not cosmetic — the ambiguity Diagnostic
+// names the Namespaces in the order they are visible in, so a merge that got
+// this wrong would rewrite Diagnostics rather than just reorder work.
+//
+// NOTE: The returned Array is READ-ONLY to its caller: when a receiver reads
+// exactly one bucket, that bucket IS the return value rather than a copy of it.
 function namespaceCandidatesFor(
 	namespaces: Map<string, common.NamespaceType>,
 	baseType: common.Type,
@@ -3903,13 +3913,31 @@ function namespaceCandidatesFor(
 		namespaceIndexes.set(namespaces, index)
 	}
 
-	return index.always
-		.concat(kindCandidatesFor(index, baseType))
-		.sort((lhs, rhs) => lhs.order - rhs.order)
+	let buckets: Array<Array<IndexedNamespace>> = []
+
+	if (index.always.length > 0) {
+		buckets.push(index.always)
+	}
+
+	collectKindCandidates(index, baseType, buckets)
+
+	if (buckets.length === 0) {
+		return EMPTY_CANDIDATES
+	}
+
+	if (buckets.length === 1) {
+		return buckets[0]!
+	}
+
+	return mergeCandidateBuckets(buckets)
 }
 
-// NOTE: The buckets a receiver of this KIND can be answered by — everything but
-// the blanket ones every lookup pays for.
+const EMPTY_CANDIDATES: Array<IndexedNamespace> = []
+
+// NOTE: The sorted buckets a receiver of this KIND can be answered by —
+// everything but the blanket ones every lookup pays for, which the caller has
+// already put in. Empty buckets are left out so the merge below never walks
+// one.
 //
 // NOTE: A refined receiver reads two of them. Evidence adds Methods to a Type
 // and never takes any away, so a `NonZeroInteger` keeps every Method an Integer
@@ -3919,36 +3947,142 @@ function namespaceCandidatesFor(
 // pointless. Every Namespace targeting ANY refinement is offered, which is a
 // superset exactly as this function promises: `matchTypes` is what decides that
 // a `NonEmptyString` Namespace does not answer for a `NonZeroInteger`.
-function kindCandidatesFor(
+function collectKindCandidates(
 	index: NamespaceIndex,
 	baseType: common.Type,
-): Array<IndexedNamespace> {
+	buckets: Array<Array<IndexedNamespace>>,
+): void {
 	if (baseType.type === "Refinement") {
-		return (index.byKind.get("Refinement") ?? []).concat(
-			kindCandidatesFor(index, baseType.base),
-		)
+		pushBucket(buckets, index.byKind.get("Refinement"))
+		collectKindCandidates(index, baseType.base, buckets)
+
+		return
 	}
 
 	if (baseType.type === "Record") {
-		let candidates = index.recordsWithoutMembers
+		pushBucket(buckets, index.recordsWithoutMembers)
 
 		for (let memberName in baseType.members) {
-			let bucket = index.recordsByMember.get(memberName)
-
-			if (bucket !== undefined) {
-				candidates = candidates.concat(bucket)
-			}
+			pushBucket(buckets, index.recordsByMember.get(memberName))
 		}
 
-		return candidates
+		return
 	}
 
 	if (baseType.type === "List" || baseType.type === "GenericList") {
-		return index.byKind.get("List") ?? []
+		// NOTE: The two List spellings share one bucket — see
+		// `buildNamespaceIndex`.
+		pushBucket(buckets, index.byKind.get("List"))
+
+		return
 	}
 
-	return index.byKind.get(baseType.type) ?? []
+	pushBucket(buckets, index.byKind.get(baseType.type))
 }
+
+function pushBucket(
+	buckets: Array<Array<IndexedNamespace>>,
+	bucket: Array<IndexedNamespace> | undefined,
+): void {
+	if (bucket !== undefined && bucket.length > 0) {
+		buckets.push(bucket)
+	}
+}
+
+// NOTE: A k-way merge of buckets that are each already ascending by `order`,
+// which reproduces exactly what sorting their concatenation produced —
+// `order` is unique per Namespace, so there are no ties for a merge rule to
+// decide differently from a sort. `k` is one or two for every receiver but a
+// Record's, so the linear scan for the smallest head beats a heap.
+function mergeCandidateBuckets(
+	buckets: Array<Array<IndexedNamespace>>,
+): Array<IndexedNamespace> {
+	let cursors: Array<number> = []
+	let total = 0
+
+	for (let bucket of buckets) {
+		cursors.push(0)
+		total += bucket.length
+	}
+
+	let merged: Array<IndexedNamespace> = []
+
+	for (let written = 0; written < total; written++) {
+		let smallestBucket = -1
+		let smallestOrder = Infinity
+
+		for (let index = 0; index < buckets.length; index++) {
+			let cursor = cursors[index]!
+			let bucket = buckets[index]!
+
+			if (cursor >= bucket.length) {
+				continue
+			}
+
+			let candidate = bucket[cursor]!
+
+			if (candidate.order < smallestOrder) {
+				smallestOrder = candidate.order
+				smallestBucket = index
+			}
+		}
+
+		merged.push(buckets[smallestBucket]![cursors[smallestBucket]!]!)
+		cursors[smallestBucket]! += 1
+	}
+
+	return merged
+}
+
+// NOTE: The answer `namespacesTargeting` gave for one (namespaces, receiver)
+// pair. Sound to keep because that answer is a PURE function of the two: the
+// only state the matching below touches is a `createInferenceContext` made
+// fresh per Namespace and thrown away with the loop — what it binds decides
+// whether the Namespace is a candidate and is never read again, because Method
+// resolution re-binds every Generic from the receiver Argument at the
+// invocation. So what is remembered here is the candidate SET and nothing that
+// carries per-call inference state.
+//
+// NOTE: Keyed by identity twice over, which is what makes it hit. The outer
+// key is the namespaces Map — `getAllNamespacesInScope` hands the same Map
+// object to every Scope in a subtree that neither declares nor shadows a
+// Namespace, so a whole file's invocations share one entry (`namespaceIndexes`
+// above already leans on exactly this). The inner key is the receiver Type,
+// where a fresh structural Type is a MISS that simply recomputes: the memo is
+// an optimisation, never a correctness requirement. Types are never mutated
+// after construction anywhere in the Enricher, which is what lets one be a key
+// at all.
+type TargetingAnswers = {
+	// NOTE: A Type whose whole identity is its tag can not be told apart from
+	// another of the same tag, so all of them share one answer — which is what
+	// makes the everyday receiver (`1::add(2)`) a hit even though the literal
+	// Enricher builds it a fresh `{ type: "Integer" }` every time.
+	byTag: Map<string, Map<string, common.NamespaceType>>
+	// NOTE: Everything with structure is keyed by identity instead, in a
+	// WeakMap so that per-compile Types do not pin the answers for them alive:
+	// the entry dies with the Type it is about, and the whole memo dies with
+	// the namespaces Map it hangs off.
+	byType: WeakMap<common.Type, Map<string, common.NamespaceType>>
+}
+
+// NOTE: The Types with no fields but `type` — see `common.Type`. `List` is NOT
+// here (its `itemType` is part of it), and neither is `GenericList`, whose
+// `generics` is fixed today but is a field a receiver could come to differ in.
+const tagOnlyTypes: ReadonlySet<string> = new Set([
+	"Unknown",
+	"Error",
+	"Boolean",
+	"String",
+	"Integer",
+	"Rational",
+	"Algebraic",
+	"Transcendental",
+])
+
+let namespacesTargetingMemos = new WeakMap<
+	Map<string, common.NamespaceType>,
+	TargetingAnswers
+>()
 
 // NOTE: Which of the given Namespaces target `baseType`, in the order they were
 // given in. Separated from the Scope walk above because the graph-aware half of
@@ -3956,7 +4090,44 @@ function kindCandidatesFor(
 // the ones a dependency exports and this Module never imported — and the answer
 // has to be decided by exactly the rule dispatch is decided by, or the help
 // would name a Namespace that would not have resolved anyway.
+//
+// NOTE: The returned Map is SHARED with every other caller that asked the same
+// question, so it is read-only to all of them. Nothing mutates it today —
+// `namespacesDeclaringMethod`, `partitionInstanceMethodNamespaces` and
+// `methodNamesOf` all build their own — and a caller that needs to must copy it
+// at its own mutation site rather than here.
 export function namespacesTargeting(
+	namespaces: Map<string, common.NamespaceType>,
+	baseType: common.Type,
+): Map<string, common.NamespaceType> {
+	let memo = namespacesTargetingMemos.get(namespaces)
+
+	if (memo === undefined) {
+		memo = { byTag: new Map(), byType: new WeakMap() }
+		namespacesTargetingMemos.set(namespaces, memo)
+	}
+
+	let byTag = tagOnlyTypes.has(baseType.type)
+	let remembered = byTag
+		? memo.byTag.get(baseType.type)
+		: memo.byType.get(baseType)
+
+	if (remembered !== undefined) {
+		return remembered
+	}
+
+	let matchingNamespaces = computeNamespacesTargeting(namespaces, baseType)
+
+	if (byTag) {
+		memo.byTag.set(baseType.type, matchingNamespaces)
+	} else {
+		memo.byType.set(baseType, matchingNamespaces)
+	}
+
+	return matchingNamespaces
+}
+
+function computeNamespacesTargeting(
 	namespaces: Map<string, common.NamespaceType>,
 	baseType: common.Type,
 ): Map<string, common.NamespaceType> {
@@ -4074,14 +4245,18 @@ export function resolveMethodLookupNamespacesForReceiverType(
 		return matchingNamespaces
 	}
 
-	for (let [name, namespace] of namespacesTargeting(
+	// NOTE: Returned as it comes back rather than copied into the Map above.
+	// The copy this replaces protected nothing: every caller
+	// (`resolveMethodInvocation`, `resolveUnionMethodDispatch`, the near-miss
+	// lookup) only ever iterates the answer or reads names off it, and the
+	// three functions they hand it to — `namespacesDeclaringMethod`,
+	// `partitionInstanceMethodNamespaces`, `methodNamesOf` — each build a Map
+	// of their own. The answer is memoised and therefore SHARED, so a caller
+	// that ever needs to mutate it has to copy it where it mutates.
+	return namespacesTargeting(
 		getAllNamespacesInScope(scope, namespaceSpecifier),
 		baseType,
-	)) {
-		matchingNamespaces.set(name, namespace)
-	}
-
-	return matchingNamespaces
+	)
 }
 
 // NOTE: The enclosing Namespace's Generics are merged into every Method
