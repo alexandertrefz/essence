@@ -1307,6 +1307,75 @@ const bothEnds = `implementation {
 	})
 }`
 
+// NOTE: The same List EDITED every way there is, which is the other shape the
+// two representations could be told apart by. `slice`, `remove(at:)` and
+// `replace(_:at:)` may each answer with a box over the runs their receiver
+// holds, viewing less of them, and `insert(_:at:)` hands its ends to the two
+// growers — so `both` has four other Lists living on its Arrays by the time it
+// is printed, and `window`, which owns neither Array it reads, is grown at both
+// ends itself. Every answer is bound BEFORE anything is printed, because
+// printing combines a List's runs and a Program that printed as it went would
+// only ever edit flat ones.
+const bothEndsEdited = `implementation {
+	constant seed = [4, 5, 6]
+	constant both = seed::prepend(3)::prepend(2)::prepend(1)::append(7)::append(8)
+	constant window = both::slice(from 1, to 7)
+
+	constant withoutFirst = both::remove(at 0)
+	constant withoutMiddle = both::remove(at 3)
+	constant withoutLast = both::remove(at -1)
+	constant pastTheEnd = both::remove(at 8)
+	constant beforeTheStart = both::remove(at -9)
+
+	constant atTheHead = both::insert(0, at 0)
+	constant inTheMiddle = both::insert(99, at 3)
+	constant atTheTail = both::insert(99, at 8)
+	constant beforeTheLast = both::insert(99, at -1)
+	constant clampedPastTheEnd = both::insert(99, at 99)
+
+	constant firstReplaced = both::replace(99, at 0)
+	constant fifthReplaced = both::replace(99, at 4)
+	constant lastReplaced = both::replace(99, at -1)
+	constant nothingReplaced = both::replace(99, at 99)
+
+	constant windowReplaced = window::replace(99, at 2)
+	constant windowShortened = window::remove(at 2)
+	constant windowGrown = window::append(97)
+	constant windowLed = window::prepend(96)
+
+	constant firstDropped = both::removeFirst()
+	constant lastDropped = both::removeLast()
+	constant threeDropped = both::removeFirst(3)
+	constant threeTrimmed = both::removeLast(3)
+
+	Terminal.inspect(both)
+	Terminal.inspect(window)
+	Terminal.inspect(withoutFirst)
+	Terminal.inspect(withoutMiddle)
+	Terminal.inspect(withoutLast)
+	Terminal.inspect(pastTheEnd)
+	Terminal.inspect(beforeTheStart)
+	Terminal.inspect(atTheHead)
+	Terminal.inspect(inTheMiddle)
+	Terminal.inspect(atTheTail)
+	Terminal.inspect(beforeTheLast)
+	Terminal.inspect(clampedPastTheEnd)
+	Terminal.inspect(firstReplaced)
+	Terminal.inspect(fifthReplaced)
+	Terminal.inspect(lastReplaced)
+	Terminal.inspect(nothingReplaced)
+	Terminal.inspect(windowReplaced)
+	Terminal.inspect(windowShortened)
+	Terminal.inspect(windowGrown)
+	Terminal.inspect(windowLed)
+	Terminal.inspect(firstDropped)
+	Terminal.inspect(lastDropped)
+	Terminal.inspect(threeDropped)
+	Terminal.inspect(threeTrimmed)
+	Terminal.inspect(both)
+	Terminal.inspect(window)
+}`
+
 // NOTE: One of everything `fold-constants` works out, beside the operands it
 // must refuse: an Argument that PRINTS, which is the whole of what folding
 // through a call would cost, and a mixed-kind sum, which reaches a Method whose
@@ -4737,6 +4806,54 @@ describe("Optimiser", () => {
 				"36",
 				"true",
 				"4",
+			])
+			expect(none).toEqual(all)
+		})
+	})
+
+	// NOTE: The sibling claim for the edits — what an edited List answers may
+	// not depend on which representation it was edited in, nor on whether the
+	// Optimiser wrote its literals and its walks out. `both` and `window` are
+	// printed LAST as well as first: everything between them lives on the
+	// Arrays those two hold, and either of them answering an item another one
+	// added would show up there.
+	describe("a List edited at both ends and in the middle", () => {
+		it("prints the same thing with the whole registry off", async () => {
+			let all = await outputOf(generate(bothEndsEdited))
+			let none = await outputOf(
+				generate(bothEndsEdited, {
+					enabled: false,
+					disabledPasses: new Set(),
+				}),
+			)
+
+			expect(all).toEqual([
+				"[ 1, 2, 3, 4, 5, 6, 7, 8 ]",
+				"[ 2, 3, 4, 5, 6, 7 ]",
+				"[ 2, 3, 4, 5, 6, 7, 8 ]",
+				"[ 1, 2, 3, 5, 6, 7, 8 ]",
+				"[ 1, 2, 3, 4, 5, 6, 7 ]",
+				"[ 1, 2, 3, 4, 5, 6, 7, 8 ]",
+				"[ 1, 2, 3, 4, 5, 6, 7, 8 ]",
+				"[ 0, 1, 2, 3, 4, 5, 6, 7, 8 ]",
+				"[ 1, 2, 3, 99, 4, 5, 6, 7, 8 ]",
+				"[ 1, 2, 3, 4, 5, 6, 7, 8, 99 ]",
+				"[ 1, 2, 3, 4, 5, 6, 7, 99, 8 ]",
+				"[ 1, 2, 3, 4, 5, 6, 7, 8, 99 ]",
+				"[ 99, 2, 3, 4, 5, 6, 7, 8 ]",
+				"[ 1, 2, 3, 4, 99, 6, 7, 8 ]",
+				"[ 1, 2, 3, 4, 5, 6, 7, 99 ]",
+				"[ 1, 2, 3, 4, 5, 6, 7, 8 ]",
+				"[ 2, 3, 99, 5, 6, 7 ]",
+				"[ 2, 3, 5, 6, 7 ]",
+				"[ 2, 3, 4, 5, 6, 7, 97 ]",
+				"[ 96, 2, 3, 4, 5, 6, 7 ]",
+				"[ 2, 3, 4, 5, 6, 7, 8 ]",
+				"[ 1, 2, 3, 4, 5, 6, 7 ]",
+				"[ 4, 5, 6, 7, 8 ]",
+				"[ 1, 2, 3, 4, 5 ]",
+				"[ 1, 2, 3, 4, 5, 6, 7, 8 ]",
+				"[ 2, 3, 4, 5, 6, 7 ]",
 			])
 			expect(none).toEqual(all)
 		})

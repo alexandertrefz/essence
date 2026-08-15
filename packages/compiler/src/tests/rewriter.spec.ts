@@ -76,6 +76,16 @@ const integerIs = (first: integer.IntegerType, second: integer.IntegerType) =>
 const stringIs = (first: string.StringType, second: string.StringType) =>
 	boolean.createBoolean(first.value === second.value)
 
+// NOTE: Two Lists of Integers hold the same items, asked the way the language
+// asks it. The edits below answer with a box over the receiver's own runs
+// wherever the answer is a WINDOW of them, so the box is not shaped like the
+// literal it holds the same items as — which is the runtime's business and not
+// something a test may pin.
+const sameItems = (
+	first: list.ListType<integer.IntegerType>,
+	second: list.ListType<integer.IntegerType>,
+) => list.is(first, second, { is: integerIs })
+
 describe("Rewriter", () => {
 	describe("Runtime", () => {
 		describe("Internal Helpers", () => {
@@ -1096,13 +1106,15 @@ describe("Rewriter", () => {
 			})
 
 			// NOTE: isEmpty / firstItem (both forms) / lastItem / removeFirst (both
-			// forms) / remove / removeEvery (both forms) / removeLast (both forms)
-			// / removeDuplicates / prepend (both forms) / append(_:) / contains /
+			// forms) / removeEvery (both forms) / removeLast (both forms) /
+			// removeDuplicates / prepend (both forms) / append(_:) / contains /
 			// anyItem / everyItem / count (both forms) / insert / replace /
 			// partition / sorted / repeat are implemented in Essence now
 			// (packages/standard-library/sources/List.es), so there is no runtime Function left to call
 			// here. The golden harness covers them end to end; the entries of a
 			// mixed `overload` block that are still native keep their tests below.
+			// `remove(at:)` came BACK from Essence and has a describe of its own
+			// beside `slice`.
 
 			describe("append", () => {
 				// NOTE: Asked through the runtime's own `is` rather than of the
@@ -1290,12 +1302,15 @@ describe("Rewriter", () => {
 				it("returns the half-open range", () => {
 					// NOTE: [1, 3) — positions 1 and 2, stopping before 3.
 					expect(
-						list.slice(
-							abcd(),
-							integerOne(),
-							integer.createInteger(3n),
+						sameItems(
+							list.slice(
+								abcd(),
+								integerOne(),
+								integer.createInteger(3n),
+							),
+							list.createList([integerOne(), integerTwo()]),
 						),
-					).toEqual(list.createList([integerOne(), integerTwo()]))
+					).toEqual(booleanTrue())
 				})
 
 				it("clamps each end to the list", () => {
@@ -1303,35 +1318,42 @@ describe("Rewriter", () => {
 					// which reaches past the start — so it settles on zero
 					// rather than wrapping a second time.
 					expect(
-						list.slice(
+						sameItems(
+							list.slice(
+								abcd(),
+								integer.createInteger(-5n),
+								integer.createInteger(99n),
+							),
 							abcd(),
-							integer.createInteger(-5n),
-							integer.createInteger(99n),
 						),
-					).toEqual(abcd())
+					).toEqual(booleanTrue())
 				})
 
 				it("counts a negative end back from the end", () => {
 					expect(
-						list.slice(
-							abcd(),
-							integerZero(),
-							integer.createInteger(-1n),
+						sameItems(
+							list.slice(
+								abcd(),
+								integerZero(),
+								integer.createInteger(-1n),
+							),
+							list.createList([
+								integerZero(),
+								integerOne(),
+								integerTwo(),
+							]),
 						),
-					).toEqual(
-						list.createList([
-							integerZero(),
-							integerOne(),
-							integerTwo(),
-						]),
-					)
+					).toEqual(booleanTrue())
 					expect(
-						list.slice(
-							abcd(),
-							integer.createInteger(-2n),
-							integer.createInteger(-1n),
+						sameItems(
+							list.slice(
+								abcd(),
+								integer.createInteger(-2n),
+								integer.createInteger(-1n),
+							),
+							list.createList([integerTwo()]),
 						),
-					).toEqual(list.createList([integerTwo()]))
+					).toEqual(booleanTrue())
 				})
 
 				it("returns empty when the range is empty or reversed", () => {
@@ -1342,22 +1364,150 @@ describe("Rewriter", () => {
 
 				it("clamps a position past a 32 bit index instead of wrapping", () => {
 					expect(
-						list.slice(
+						sameItems(
+							list.slice(
+								abcd(),
+								integerZero(),
+								integer.createInteger(2n ** 40n),
+							),
 							abcd(),
-							integerZero(),
-							integer.createInteger(2n ** 40n),
 						),
-					).toEqual(abcd())
+					).toEqual(booleanTrue())
 					// NOTE: The same in the other direction — counting back
 					// from the end by more than a 32 bit index leaves the
 					// position far below zero, where it clamps to the start.
 					expect(
-						list.slice(
+						sameItems(
+							list.slice(
+								abcd(),
+								integer.createInteger(0n - 2n ** 40n),
+								integer.createInteger(4n),
+							),
 							abcd(),
-							integer.createInteger(0n - 2n ** 40n),
-							integer.createInteger(4n),
 						),
-					).toEqual(abcd())
+					).toEqual(booleanTrue())
+				})
+			})
+
+			// NOTE: `remove(at:)` is a native again — the Essence body that
+			// composed two `slice`s and an `append(contentsOf:)` is gone, and
+			// with it the intermediates. These hold the CONTRACT that body set:
+			// which positions name an item and which leave the List alone. The
+			// golden harness calls it from Essence over the same positions; what
+			// is held here is the Function the emitted call lands on.
+			describe("remove", () => {
+				const abcd = () =>
+					list.createList([
+						integerZero(),
+						integerOne(),
+						integerTwo(),
+						integerHundred(),
+					])
+
+				it("drops the item at the position", () => {
+					expect(
+						sameItems(
+							list.remove(abcd(), integerZero()),
+							list.createList([
+								integerOne(),
+								integerTwo(),
+								integerHundred(),
+							]),
+						),
+					).toEqual(booleanTrue())
+					expect(
+						sameItems(
+							list.remove(abcd(), integerTwo()),
+							list.createList([
+								integerZero(),
+								integerOne(),
+								integerHundred(),
+							]),
+						),
+					).toEqual(booleanTrue())
+					expect(
+						sameItems(
+							list.remove(abcd(), integer.createInteger(3n)),
+							list.createList([
+								integerZero(),
+								integerOne(),
+								integerTwo(),
+							]),
+						),
+					).toEqual(booleanTrue())
+				})
+
+				it("counts a negative position back from the end", () => {
+					expect(
+						sameItems(
+							list.remove(abcd(), integer.createInteger(-1n)),
+							list.createList([
+								integerZero(),
+								integerOne(),
+								integerTwo(),
+							]),
+						),
+					).toEqual(booleanTrue())
+					expect(
+						sameItems(
+							list.remove(abcd(), integer.createInteger(-4n)),
+							list.createList([
+								integerOne(),
+								integerTwo(),
+								integerHundred(),
+							]),
+						),
+					).toEqual(booleanTrue())
+				})
+
+				it("leaves the List alone when the position names no item", () => {
+					// NOTE: At the length, past it, and reaching back past the
+					// first item — the three ways to name nothing.
+					expect(
+						sameItems(
+							list.remove(abcd(), integer.createInteger(4n)),
+							abcd(),
+						),
+					).toEqual(booleanTrue())
+					expect(
+						sameItems(
+							list.remove(abcd(), integer.createInteger(99n)),
+							abcd(),
+						),
+					).toEqual(booleanTrue())
+					expect(
+						sameItems(
+							list.remove(abcd(), integer.createInteger(-5n)),
+							abcd(),
+						),
+					).toEqual(booleanTrue())
+					expect(
+						sameItems(
+							list.remove(listEmpty(), integerZero()),
+							listEmpty(),
+						),
+					).toEqual(booleanTrue())
+				})
+
+				it("clamps a position past a 32 bit index instead of wrapping", () => {
+					expect(
+						sameItems(
+							list.remove(
+								abcd(),
+								integer.createInteger(2n ** 40n),
+							),
+							abcd(),
+						),
+					).toEqual(booleanTrue())
+					expect(
+						sameItems(
+							list.remove(
+								abcd(),
+								integer.createInteger(0n - 2n ** 40n),
+							),
+							abcd(),
+						),
+					).toEqual(booleanTrue())
 				})
 			})
 

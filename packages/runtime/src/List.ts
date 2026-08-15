@@ -91,18 +91,49 @@ export type ListView<ItemType extends AnyType> = {
 export function viewOf<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 ): ListView<ItemType> {
-	let backCount = originalList.length ?? originalList.value.length
+	let view = runsOf(originalList)
 
 	// NOTE: A box whose view is shorter than its run is holding the whole of
 	// its chain's high-water Array alive. Reading it trims that away and stores
 	// the trimmed Array back, so the work happens once however often the box is
 	// read afterwards — and the Array a reader is handed keeps its identity
 	// across reads.
-	if (backCount !== originalList.value.length) {
-		originalList.value = originalList.value.slice(0, backCount)
-		originalList.length = backCount
+	if (view.backCount !== view.back.length) {
+		let trimmed = view.back.slice(0, view.backCount)
+
+		originalList.value = trimmed
+		originalList.length = view.backCount
+		view.back = trimmed
 	}
 
+	// NOTE: A front-less box views zero items of the one shared `noItems`, which
+	// is zero items long, so this can not fire for it and no box is ever given a
+	// front run it did not have.
+	if (view.frontCount !== view.front.length) {
+		let trimmed = view.front.slice(0, view.frontCount)
+
+		originalList.front = trimmed
+		originalList.frontLen = view.frontCount
+		view.front = trimmed
+	}
+
+	return view
+}
+
+// NOTE: The same two runs and the same fixed counts, read WITHOUT writing
+// anything back. Trimming as `viewOf` does is right for a walk that is about to
+// visit every item anyway, and wrong for everything below that visits none: the
+// EDITS, whose whole business is answering with a shorter view of the runs they
+// were handed, and `length`, which the stdlib's edits ask before they slice.
+// Read through `viewOf`, a chain of shrinking answers trims its parent's Array
+// at every step and each O(1) shrink is a whole copy again — draining a
+// front-built List one item at a time would stay quadratic, which is the very
+// thing the shrink is for. So they fix their counts here and leave the
+// receiver's representation exactly as they found it.
+export function runsOf<ItemType extends AnyType>(
+	originalList: ListType<ItemType>,
+): ListView<ItemType> {
+	let backCount = originalList.length ?? originalList.value.length
 	let front = originalList.front
 
 	if (front === undefined) {
@@ -116,12 +147,6 @@ export function viewOf<ItemType extends AnyType>(
 	}
 
 	let frontCount = originalList.frontLen ?? front.length
-
-	if (frontCount !== front.length) {
-		front = front.slice(0, frontCount)
-		originalList.front = front
-		originalList.frontLen = frontCount
-	}
 
 	return {
 		front,
@@ -209,6 +234,114 @@ function pushItemsOf<ItemType extends AnyType>(
 	}
 }
 
+// NOTE: What a native owes the receiver before it hands one of the receiver's
+// run Arrays to a second box: both of the receiver's counts written down. A box
+// whose count is ABSENT means "the whole Array", so a receiver left that way
+// would view whatever the answer later pushes onto the run they now share.
+// These are the two lines `prepend` and `append` write inline before they share,
+// gathered up for the edits below, which share both runs at once.
+function stampClosed<ItemType extends AnyType>(
+	originalList: ListType<ItemType>,
+	view: ListView<ItemType>,
+): void {
+	originalList.length = view.backCount
+
+	if (originalList.front !== undefined) {
+		originalList.frontLen = view.frontCount
+	}
+}
+
+// NOTE: THE WHOLE OF WHAT IS SHAREABLE. Shrinking `frontLen` by k drops the
+// first k logical items, because the front run is stored reversed; shrinking
+// the back view by k drops the last k. So the sub-lists a box can answer with
+// while COPYING NOTHING are exactly the windows that still contain the seam
+// between the runs — starting at or before it and stopping at or after it — and
+// a window lying wholly inside one run has to be copied. A flat box keeps its
+// seam at zero, which leaves it the prefixes and nothing else.
+//
+// NOTE: The answer is a STALE box, and that is the point. It holds both of the
+// receiver's Arrays and views less of them, so the first read trims it —
+// copying exactly the WINDOW's size, never the parent Array's, and releasing the
+// parent then. A shared window is a copy deferred to the first read and sized by
+// the answer rather than by the receiver, and no copy at all for a value nothing
+// ever reads. What it costs in exchange is the only honest debit: an unread
+// window keeps its parent's Arrays alive.
+function sharedWindowOf<ItemType extends AnyType>(
+	originalList: ListType<ItemType>,
+	view: ListView<ItemType>,
+	start: number,
+	end: number,
+): ListType<ItemType> {
+	stampClosed(originalList, view)
+
+	let frontLen = view.frontCount - start
+	let length = end - view.frontCount
+
+	if (frontLen === 0) {
+		return { [typeKeySymbol]: "List", value: view.back, length }
+	}
+
+	return {
+		[typeKeySymbol]: "List",
+		value: view.back,
+		length,
+		front: view.front,
+		frontLen,
+	}
+}
+
+// NOTE: The answer of an edit that rebuilt ONE of the receiver's two runs — the
+// fresh run stands where the old one stood, and the untouched one rides along by
+// reference under the count the receiver viewed of it. The receiver is stamped
+// closed first, for the reason every sharing answer stamps: the two boxes hold
+// that run's Array between them from here on.
+//
+// NOTE: Exported, and the only two things `NonEmptyList::replace` has to answer
+// such an edit with. Every branded List literal in the runtime is written in
+// THIS file, and deliberately: what a box owes the receiver whose run it is
+// about to share — both counts written down, before the two of them hold that
+// Array between them — is an invariant of this file, and a second module writing
+// the literal where it stands would be a second place for that debt to be
+// forgotten. Nothing is traded for the indirection: inlining both of them into
+// `replace` measures no slower than the calls, on either branch.
+export function listRebuildingFront<ItemType extends AnyType>(
+	front: Array<ItemType>,
+	originalList: ListType<ItemType>,
+	view: ListView<ItemType>,
+): ListType<ItemType> {
+	stampClosed(originalList, view)
+
+	return {
+		[typeKeySymbol]: "List",
+		value: view.back,
+		length: view.backCount,
+		front,
+		frontLen: view.frontCount,
+	}
+}
+
+export function listRebuildingBack<ItemType extends AnyType>(
+	back: Array<ItemType>,
+	originalList: ListType<ItemType>,
+	view: ListView<ItemType>,
+): ListType<ItemType> {
+	// NOTE: A receiver with no front run has nothing to share, so the fresh back
+	// run IS the whole answer and the receiver is left exactly as it was.
+	if (view.frontCount === 0) {
+		return createList(back)
+	}
+
+	stampClosed(originalList, view)
+
+	return {
+		[typeKeySymbol]: "List",
+		value: back,
+		length: view.backCount,
+		front: view.front,
+		frontLen: view.frontCount,
+	}
+}
+
 // NOTE: The answer of an operation on the BACK of a List — a new box over the
 // back run it built, carrying the receiver's front run through BY REFERENCE,
 // since appending leaves the front alone. The `frontLen` comes with it, so a
@@ -270,8 +403,14 @@ export function is<ItemType extends AnyType>(
 	return createBoolean(true)
 }
 
+// NOTE: Counting is not reading — `runsOf`, for the reason stated there. The
+// stdlib writes `removeFirst()` as `@::slice(from 1, to @::length())`, so a
+// drain from the front asks each shrinking answer for its length before slicing
+// it again, and a `length` that trimmed would copy the whole front run at every
+// turn and hand back exactly the shrink `slice` had just bought.
+// `removeFirst(count)` and `removeLast(count)` are the same composition.
 export function length(originalList: ListType<AnyType>): IntegerType {
-	return createInteger(BigInt(viewOf(originalList).total))
+	return createInteger(BigInt(runsOf(originalList).total))
 }
 
 // NOTE: The single-item half of `prepend`, whose sibling `prepend(contentsOf:)`
@@ -544,8 +683,8 @@ export function slice<ItemType extends AnyType>(
 	// zero rather than wrapping a second time. Kept in bigint throughout:
 	// narrowing first would turn a position past 2³¹ into a negative one and
 	// slice from the far end.
-	let items = materialise(originalList)
-	let length = BigInt(items.length)
+	let view = runsOf(originalList)
+	let length = BigInt(view.total)
 	let fromPosition = positionFromEnd(from.value, length)
 	let toPosition = positionFromEnd(to.value, length)
 	let start =
@@ -556,7 +695,122 @@ export function slice<ItemType extends AnyType>(
 		return createList([])
 	}
 
-	return createList(items.slice(Number(start), Number(end)))
+	let first = Number(start)
+	let last = Number(end)
+
+	// NOTE: The window the receiver can answer with by sharing both runs. It is
+	// what makes `removeLast()` and `removeFirst()` — the stdlib's two slices at
+	// the ends — cost nothing but a box, and a middle window of an upgraded List
+	// with it.
+	if (first <= view.frontCount && last >= view.frontCount) {
+		return sharedWindowOf(originalList, view, first, last)
+	}
+
+	// NOTE: Every other window lies wholly inside ONE run, since the two above
+	// are the only ways to miss the seam, so what is left is a copy out of that
+	// run — a bulk one for the back, and a reversed walk for the front, whose
+	// head is stored last.
+	if (last < view.frontCount) {
+		let count = last - first
+		// NOTE: The argument is the answer's LENGTH. The rule below suggests
+		// `Array.from({ length })` instead, which fills through an iterator —
+		// the very turn-by-turn work these three fills exist to avoid.
+		// oxlint-disable-next-line unicorn/no-new-array -- the answer's length
+		let items: Array<ItemType> = new Array(count)
+		let front = view.front
+		let highest = view.frontCount - 1 - first
+
+		for (let index = 0; index < count; index++) {
+			items[index] = front[highest - index]
+		}
+
+		return createList(items)
+	}
+
+	return createList(
+		view.back.slice(first - view.frontCount, last - view.frontCount),
+	)
+}
+
+// NOTE: The item at a position is ABSENT from the answer, and every position
+// naming no item leaves the List alone: one reaching back past the first item,
+// and one standing at or past the end. That is the four-branch Essence body this
+// replaces, said once — the position is resolved from the end BEFORE either
+// decision, because `-1` is the last item and the branch that drops it has to
+// know which item that is.
+//
+// NOTE: Native because no Essence composition can avoid the intermediates. The
+// body was two `slice`s and an `append(contentsOf:)`, which builds the whole
+// answer twice over and reads the receiver twice; here it is one Array of the
+// answer's own size, filled once — the same reason `split` and `of` stayed
+// native.
+//
+// NOTE: Dropping the FIRST item of a box with a front run, or the LAST of one
+// with a back run, is a window rather than a fill: it shrinks the run it touches
+// and shares both. The last item of a box whose back is empty lives at the
+// bottom of the front run, where no view can reach it, so that one goes the
+// general way rather than growing front-tail surgery for it.
+export function remove<ItemType extends AnyType>(
+	originalList: ListType<ItemType>,
+	at: IntegerType,
+): ListType<ItemType> {
+	let view = runsOf(originalList)
+	let total = BigInt(view.total)
+	let requested = positionFromEnd(at.value, total)
+
+	if (requested < 0n || requested >= total) {
+		return originalList
+	}
+
+	let position = Number(requested)
+
+	if (position === 0 && view.frontCount > 0) {
+		return sharedWindowOf(originalList, view, 1, view.total)
+	}
+
+	if (position === view.total - 1 && view.backCount > 0) {
+		return sharedWindowOf(originalList, view, 0, view.total - 1)
+	}
+
+	// NOTE: Everything before the position and everything after it, with each run
+	// walked in two halves split there. The position falls in ONE of the runs, so
+	// the pair of loops on the other side runs the whole of it and the split
+	// leaves nothing out: no turn asks whether this is the item being dropped.
+	//
+	// oxlint-disable-next-line unicorn/no-new-array -- the length, as above
+	let items: Array<ItemType> = new Array(view.total - 1)
+	let front = view.front
+	let frontCount = view.frontCount
+	let back = view.back
+	let backCount = view.backCount
+	let inFront = position < frontCount
+	let frontSplit = inFront ? position : frontCount
+	let frontResume = inFront ? position + 1 : frontCount
+	let backSplit = inFront ? 0 : position - frontCount
+	let backResume = inFront ? 0 : position - frontCount + 1
+	let target = 0
+
+	for (let index = 0; index < frontSplit; index++) {
+		items[target] = front[frontCount - 1 - index]
+		target++
+	}
+
+	for (let index = 0; index < backSplit; index++) {
+		items[target] = back[index]
+		target++
+	}
+
+	for (let index = frontResume; index < frontCount; index++) {
+		items[target] = front[frontCount - 1 - index]
+		target++
+	}
+
+	for (let index = backResume; index < backCount; index++) {
+		items[target] = back[index]
+		target++
+	}
+
+	return createList(items)
 }
 
 export function reverse<ItemType extends AnyType>(
@@ -566,8 +820,8 @@ export function reverse<ItemType extends AnyType>(
 }
 
 // NOTE: Everything before the position, the item, then everything from the
-// position on — the three parts the Essence body built with `slice`, `append`
-// and `append(contentsOf:)`, kept exactly. The position is resolved from the end
+// position on — what the Essence body built with `slice`, `append` and
+// `append(contentsOf:)`, kept exactly. The position is resolved from the end
 // and CLAMPED, so one before the start settles on zero and one past the end on
 // the length: there is no position that drops the item, which is what lets the
 // Declaration promise a `NonEmptyList` and is why the body could not stay in
@@ -575,23 +829,73 @@ export function reverse<ItemType extends AnyType>(
 //
 // NOTE: Clamped in bigint before it narrows, exactly as `slice` is: a position
 // past 2³¹ narrowed first would come out as an unrelated one.
+//
+// NOTE: Both ENDS are what the two growers already do, so both are handed
+// straight to them and inherit their upgrade-or-push. There is no fast path at
+// the seam and there can not be one: an item pushed onto the front run lands at
+// the logical HEAD, not between the runs, so neither push can say what a seam
+// insertion means. Everything between the ends is one Array of the answer's own
+// size, filled once from the two runs.
 export function insert<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 	item: ItemType,
 	at: IntegerType,
 ): ListType<ItemType> {
-	let items = materialise(originalList)
-	let length = BigInt(items.length)
+	let view = runsOf(originalList)
+	let length = BigInt(view.total)
 	let requested = positionFromEnd(at.value, length)
 	let position = Number(
 		requested < 0n ? 0n : requested > length ? length : requested,
 	)
 
-	return createList([
-		...items.slice(0, position),
-		item,
-		...items.slice(position),
-	])
+	if (position === 0) {
+		return prepend__overload$1(originalList, item)
+	}
+
+	if (position === view.total) {
+		return append__overload$1(originalList, item)
+	}
+
+	// NOTE: Everything before the position, the item, everything from it on —
+	// the three parts, with each run walked in two halves split at the position.
+	// The position falls in ONE of the runs, so one of the two splits sits at an
+	// end of its run and the pair of loops on that side runs the whole of it and
+	// nothing of the other: no turn asks where the item goes.
+	//
+	// oxlint-disable-next-line unicorn/no-new-array -- the length, as above
+	let items: Array<ItemType> = new Array(view.total + 1)
+	let front = view.front
+	let frontCount = view.frontCount
+	let back = view.back
+	let backCount = view.backCount
+	let frontSplit = position < frontCount ? position : frontCount
+	let backSplit = position > frontCount ? position - frontCount : 0
+	let target = 0
+
+	for (let index = 0; index < frontSplit; index++) {
+		items[target] = front[frontCount - 1 - index]
+		target++
+	}
+
+	for (let index = 0; index < backSplit; index++) {
+		items[target] = back[index]
+		target++
+	}
+
+	items[target] = item
+	target++
+
+	for (let index = frontSplit; index < frontCount; index++) {
+		items[target] = front[frontCount - 1 - index]
+		target++
+	}
+
+	for (let index = backSplit; index < backCount; index++) {
+		items[target] = back[index]
+		target++
+	}
+
+	return createList(items)
 }
 
 // NOTE: `sort` is one Method with two Overloads, so both bind by position.

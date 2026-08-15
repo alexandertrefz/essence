@@ -994,12 +994,11 @@ array itself where the List is flat and views all of it, a trimmed one where it
 views less, a combined one where there are two runs — and in the last case the
 List KEEPS what was combined and forgets its front, so a List read twice pays
 for combining once. The Methods written more simply against one array than two
-ask for one and are otherwise the code they were: `slice`, `reverse`, `insert`,
-`sort`, `split`, `pair`. The Methods that walk do not ask, reading the two runs
-in turn instead; and neither do the ones that index, because which run holds a
-position is one comparison and some arithmetic, so reading an item out of a
-prepended-to List costs what reading one out of a flat List costs rather than
-collapsing it first.
+ask for one and are otherwise the code they were: `reverse`, `sort`, `split`,
+`pair`. The Methods that walk do not ask, reading the two runs in turn instead;
+and neither do the ones that index, because which run holds a position is one
+comparison and some arithmetic, so reading an item out of a prepended-to List
+costs what reading one out of a flat List costs rather than collapsing it first.
 
 **Every walk fixes its count before its first turn and never asks an array how
 long it is again.** A run can GROW under a walk, because a callback may append
@@ -1029,6 +1028,64 @@ over once at the end. Those are the callers that can be read and checked. A
 host of the client package cannot be, so the door it builds Lists through is a
 second constructor that copies: an array a host keeps is never one Essence
 pushes onto, and no contract of ours reaches a published surface.
+
+**The edits share the runs they do not touch.** Growing a List at an end was the
+first half of this; the second is that shortening it, lengthening it or altering
+one item of it need not copy the whole of it either. Which sub-Lists can be
+answered by sharing follows from how the two runs are stored, and the set is
+small and exact. Shrinking the front count drops LEADING items, because that run
+is stored reversed; shrinking the back view drops trailing ones. So the
+sub-Lists a List can answer with while copying nothing are exactly the windows
+that still contain the seam between its runs — starting at or before it and
+stopping at or after it — and a window lying wholly inside one run has to be
+copied out of that run. A flat List keeps its seam at zero, which leaves it the
+prefixes and nothing else.
+
+That is enough for the ends, as far as the runs reach. `slice` answers such a
+window with a List over both of the receiver's arrays, so a slice at an end
+costs a small object and no items at all whenever the run at that end has an
+item to give up — which is what makes `removeLast()`, a prefix of any List,
+free, and `removeFirst()` free of a List that was prepended to. A flat List has
+no front run, so taking its first item away is a copy like any other.
+`remove(at:)` reads the same way: it drops the first item by shrinking the
+front count where there is one and the last by shrinking the back view where
+there is one, and fills an array where there is neither. `replace(_:at:)`
+copies only the run the position falls in and carries the other through by
+reference, so changing one item of a List built at both ends pays for half of
+it. `insert(_:at:)` hands its two ends to `prepend` and `append` and inherits
+their push; there is no fast path at the seam and there cannot be one, because
+an item pushed onto the front run lands at the List's head rather than between
+the runs, so neither push can say what a seam insertion would mean.
+
+**A shared window is a copy DEFERRED, and sized by the answer.** The List it
+answers with holds both of the receiver's arrays and views less of them, which
+is exactly the shape a read already knows how to trim — so the first read
+copies the WINDOW's size, never the parent array's, and lets the parent go
+then. A window nothing ever reads is never copied at all. Counting is not
+reading: `length` visits no item and hands out no array, so it answers off the
+counts and leaves the window shared, which is what keeps `removeFirst()` —
+written as a slice up to the length — from giving back at each turn the shrink
+the turn before it made. At no size is that worse than the eager copy it
+replaces; what it trades is retention, the same debit the rest of this section
+pays, and it is paid until the first read rather than for ever.
+
+**The honest limit is a window that misses the seam.** A flat List keeps its
+seam at zero and so has no front count to shrink: dropping its first item
+copies the whole of the rest, exactly as dropping one from the middle of any
+List does. Such an edit is still a copy — one array of exactly the items the
+answer holds, filled once from the two runs, where the composition it replaced
+built the answer twice over and read the receiver twice to do it. Nothing here
+makes it cheap; it makes it cost once. Measured on a hundred thousand items, a
+thousand operations, best of five: removing at the middle falls from 157 ms to
+63 ms, inserting at the middle from 176 ms to 63 ms, and replacing an item of a
+List built at both ends from 40 ms to 12 ms. Taking a prefix falls from 35 ms
+to 0.1 ms, which is the difference between copying and not.
+
+What changes ORDER rather than constant is the drain — taking a List built by
+prepending apart from the front, one item at a time, which each step answered by
+slicing and rejoining the whole of it and now answers with one small object.
+Twenty thousand items fall from 437 ms to 1.2 ms; as a whole Program, subprocess
+startup included in both figures, from 497 ms to 24 ms.
 
 **One qualification to what this section opened with.** These are improvements
 to the runtime rather than to the code the Compiler emits, and this one is an
