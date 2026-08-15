@@ -1266,6 +1266,47 @@ const orderedLoops = `implementation {
 	}))
 }`
 
+// NOTE: A List grown at BOTH ends and read every way there is, which is the one
+// Program shape the runtime's two representations can be told apart by if
+// anything can tell them apart. `prepend` gives a List a second run of items,
+// `append` may hand its answer the very Array its receiver holds, and `both` is
+// branched twice — so by the time it is printed, two other Lists have grown out
+// of the Array it holds and it has to answer its own six items regardless.
+//
+// NOTE: The Match is here because a Type test WALKS: `List<Integer>` beside
+// `List<String>` is the one Matcher pair `compile-type-tests` may not compile
+// to a tag, so the check falls to `isValueOfType`, which asks every item — of a
+// List carrying them in two runs.
+const bothEnds = `implementation {
+	constant seed = [3, 4]
+	constant front = seed::prepend(2)::prepend(1)
+	constant both = front::append(5)::append(6)
+	constant more = both::append(contentsOf [7, 8])
+	constant other = both::append(9)
+	constant tagged: List<Integer> | List<String> = front
+
+	Terminal.inspect(seed)
+	Terminal.inspect(front)
+	Terminal.inspect(both)
+	Terminal.inspect(more)
+	Terminal.inspect(other)
+	Terminal.inspect(more::length())
+	Terminal.inspect(more::item(at 0))
+	Terminal.inspect(more::item(at 2))
+	Terminal.inspect(more::item(at -1))
+	Terminal.inspect(more::slice(from 1, to 4))
+	Terminal.inspect(more::reverse())
+	Terminal.inspect(more::map((item) { <- item::multiply(with 2) }))
+	Terminal.inspect(more::keepEvery(where (item) { <- item::isGreaterThan(3) }))
+	Terminal.inspect(more::reduce(startingWith 0, (total, item) { <- total::add(item) }))
+	Terminal.inspect(front::is([1, 2, 3, 4]))
+
+	Terminal.inspect(match tagged -> Integer {
+		case List<String>  { <- 0 }
+		case List<Integer> { <- @::length() }
+	})
+}`
+
 // NOTE: One of everything `fold-constants` works out, beside the operands it
 // must refuse: an Argument that PRINTS, which is the whole of what folding
 // through a call would cost, and a mixed-kind sum, which reaches a Method whose
@@ -3423,10 +3464,34 @@ describe("Optimiser", () => {
 			let generated = generate(listWalks)
 
 			expect(generated).toContain(
-				"for (let $loop_0_position = 0; $loop_0_position < $loop_0_items.length; $loop_0_position++)",
+				"for (let $loop_0_position = 0; $loop_0_position < $loop_0_count; $loop_0_position++)",
 			)
 			expect(generated).not.toContain("List.reduce__overload$1(")
 			expect(generated).not.toContain("List.keepEvery(")
+		})
+
+		it("holds the items and their count before the first turn", () => {
+			// NOTE: `List.materialise` rather than `.value` because a List that
+			// has been prepended to carries its items in two runs, and the
+			// count under a name of its own because the Array a List holds can
+			// GROW under the walk — an append to a List sitting at its Array's
+			// tip pushes onto that Array, so a body that appends to the very
+			// List it walks would otherwise walk what it is writing. Every walk
+			// covers the items its receiver held when it began.
+			let generated = generate(listWalks)
+
+			// NOTE: The count stands between the receiver and the seed, which is
+			// where a fold's seed can not lengthen the walk it seeds — the walk
+			// covers what the receiver held when the call began, and
+			// `reduce(startingWith list::append(x), …)` is written with the
+			// receiver first.
+			expect(generated).toContain(
+				"const $loop_0_items = List.materialise(items);\n\tconst $loop_0_count = $loop_0_items.length;\n\tlet $loop_0_state =",
+			)
+			// NOTE: And nowhere does a walk read the Array's own length again.
+			expect(generated).not.toMatch(
+				/\$loop_\d+_position < \$loop_\d+_items/,
+			)
 		})
 
 		it("answers the accumulator where an early fold runs to the end", () => {
@@ -3474,9 +3539,13 @@ describe("Optimiser", () => {
 			// is all this pass has to go by.
 			let generated = generate(provenWalks)
 
-			expect(generated).toContain("const $loop_0_items = proven.value;")
+			expect(generated).toContain(
+				"const $loop_0_items = List.materialise(proven);",
+			)
 			expect(generated).toContain("const $loop_0_mapped = [];")
-			expect(generated).toContain("const $loop_1_items = written.value;")
+			expect(generated).toContain(
+				"const $loop_1_items = List.materialise(written);",
+			)
 			expect(generated).not.toContain("NonEmptyList.map(")
 		})
 
@@ -4622,6 +4691,53 @@ describe("Optimiser", () => {
 			)
 
 			expect(neither).toEqual(all)
+			expect(none).toEqual(all)
+		})
+	})
+
+	// NOTE: Not a pass, but a claim only this file can make: what a List
+	// answers may not depend on which of its representations the Optimiser
+	// happened to leave it in. With the registry on, a List literal is a
+	// branded object `collapse-construction` wrote out and a walk is a `for`
+	// over the Array `List.materialise` answers; with it off, the same literal
+	// goes through `List.createList` and the same walk is a native call. A
+	// List grown at both ends holds its items in two runs either way, and both
+	// builds have to print the same items in the same order.
+	//
+	// NOTE: The two Lists branched off `both` are what a shared Array can get
+	// wrong, and the expectation below is where that is asserted: `more` takes
+	// the tip and grows the Array `both` holds, `other` finds that tip taken
+	// and copies, and `both` — printed after both of them exist — still answers
+	// the six items it was built with. A List reading another's items would
+	// print a longer one there, whatever the Optimiser did.
+	describe("a List grown at both ends", () => {
+		it("prints the same thing with the whole registry off", async () => {
+			let all = await outputOf(generate(bothEnds))
+			let none = await outputOf(
+				generate(bothEnds, {
+					enabled: false,
+					disabledPasses: new Set(),
+				}),
+			)
+
+			expect(all).toEqual([
+				"[ 3, 4 ]",
+				"[ 1, 2, 3, 4 ]",
+				"[ 1, 2, 3, 4, 5, 6 ]",
+				"[ 1, 2, 3, 4, 5, 6, 7, 8 ]",
+				"[ 1, 2, 3, 4, 5, 6, 9 ]",
+				"8",
+				"Optional#Value(1)",
+				"Optional#Value(3)",
+				"Optional#Value(8)",
+				"[ 2, 3, 4 ]",
+				"[ 8, 7, 6, 5, 4, 3, 2, 1 ]",
+				"[ 2, 4, 6, 8, 10, 12, 14, 16 ]",
+				"[ 4, 5, 6, 7, 8 ]",
+				"36",
+				"true",
+				"4",
+			])
 			expect(none).toEqual(all)
 		})
 	})

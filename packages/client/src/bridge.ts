@@ -54,6 +54,14 @@ export const BRIDGE_EXPORTS = {
 // inside it, and the name the bundle exports it under. The Module below is
 // written OUT of this and `BRIDGE_KEY` is spelled out of it too, so what goes
 // into a bundle and what a bundle is named by can not drift apart.
+//
+// NOTE: The List entry names `createListFrom` and not `createList`, which is
+// the one place this table does not hand over the constructor a native would
+// reach for. `createList` TAKES OWNERSHIP of the Array it is given — a later
+// append pushes onto it in place — and a host's Array is not the host's to give
+// away by calling a Function. Every caller inside the runtime can be read and
+// checked; a host cannot, so the copy is made on this side of the door, and the
+// contract never reaches a published surface at all.
 const BRIDGE_MODULES: Array<[string, Array<[string, string]>]> = [
 	[
 		"type",
@@ -66,7 +74,7 @@ const BRIDGE_MODULES: Array<[string, Array<[string, string]>]> = [
 	["Rational", [["createRational", BRIDGE_EXPORTS.rational]]],
 	["String", [["createString", BRIDGE_EXPORTS.string]]],
 	["Boolean", [["createBoolean", BRIDGE_EXPORTS.boolean]]],
-	["List", [["createList", BRIDGE_EXPORTS.list]]],
+	["List", [["createListFrom", BRIDGE_EXPORTS.list]]],
 	["Record", [["createRecord", BRIDGE_EXPORTS.record]]],
 ]
 

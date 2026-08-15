@@ -70,9 +70,20 @@ function describeEssenceValues(...values: Array<unknown>): string {
 		}
 
 		if (tag === "List") {
-			let items = record.value as Array<unknown>
+			// NOTE: A List is two runs and a VIEW into each — the back run
+			// forward in `value`, the front run REVERSED in `front`, each as
+			// long as its count says and no longer (`ListType` in
+			// runtime/src/List.ts is the authority). Both Arrays are SHARED
+			// with the other boxes of the chain and can hold items this box
+			// never had, so what is shown is the view and never the Array: a
+			// box viewing four items may not be drawn as five.
+			let back = record.value as Array<unknown>
+			let backCount = (record.length as number | undefined) ?? back.length
+			let front = (record.front as Array<unknown> | undefined) ?? []
+			let frontCount =
+				(record.frontLen as number | undefined) ?? front.length
 
-			if (items.length === 0) {
+			if (frontCount + backCount === 0) {
 				return "[]"
 			}
 
@@ -80,7 +91,16 @@ function describeEssenceValues(...values: Array<unknown>): string {
 				return "[ … ]"
 			}
 
-			let rendered = items.map((item) => render(item, depth + 1) ?? "…")
+			let rendered: Array<string> = []
+
+			for (let index = frontCount - 1; index >= 0; index--) {
+				rendered.push(render(front[index], depth + 1) ?? "…")
+			}
+
+			for (let index = 0; index < backCount; index++) {
+				rendered.push(render(back[index], depth + 1) ?? "…")
+			}
+
 			let line = `[ ${rendered.join(", ")} ]`
 
 			return line.length < 60 ? line : `[ ${rendered[0]}, … ]`
@@ -163,6 +183,39 @@ function describeEssenceValues(...values: Array<unknown>): string {
 	}
 }
 
-// NOTE: Shipped as the function's own source — one implementation, testable
-// here as a value and evaluated over there as text.
+// NOTE: A List's logical items, gathered INSIDE the debuggee so that expanding
+// a List in the Variables view offers exactly the items the box views, in
+// order — its inner Array is shared with the rest of its chain and may run past
+// the view, and a box that was prepended to holds a second, reversed run in
+// front of it.
+//
+// NOTE: It repeats the renderer's view arithmetic rather than sharing it, for
+// the reason the renderer inlines everything: this source is evaluated in a
+// realm where nothing else of this module exists.
+//
+// NOTE: A NEW Array, never the runtime's own `materialise`, which would swap
+// the box's representation in place. That swap is invisible to a running
+// program, but looking at a paused one may not write to it at all.
+function essenceListItems(list: unknown): Array<unknown> {
+	let record = list as Record<string, never>
+	let back = (record.value as Array<unknown> | undefined) ?? []
+	let backCount = (record.length as number | undefined) ?? back.length
+	let front = (record.front as Array<unknown> | undefined) ?? []
+	let frontCount = (record.frontLen as number | undefined) ?? front.length
+	let items: Array<unknown> = []
+
+	for (let index = frontCount - 1; index >= 0; index--) {
+		items.push(front[index])
+	}
+
+	for (let index = 0; index < backCount; index++) {
+		items.push(back[index])
+	}
+
+	return items
+}
+
+// NOTE: Shipped as the functions' own source — one implementation each,
+// testable here as a value and evaluated over there as text.
 export const DESCRIBE_BATCH_SOURCE = describeEssenceValues.toString()
+export const LIST_ITEMS_SOURCE = essenceListItems.toString()

@@ -225,8 +225,25 @@ describe("Bundle Size", () => {
 	// previous base — π, hardcoded — cost 2,779 of machinery to merely
 	// generalise. This Program writes no `e`, but "a stdlib body pulls its
 	// whole transitive reach" is the standing shape of these bundles.
+	//
+	// NOTE: It now measures 61,136 and the ceiling moves to 62,200, keeping the
+	// same ~1 kB of headroom. The figure it rose FROM is 57,859 rather than the
+	// 56,926 recorded above — 933 bytes arrived between the two without a NOTE
+	// — and the 3,277 that follow are `list-tail-sharing`, split two ways.
+	// 2,877 are the runtime's: a List holds its items in two runs now, so every
+	// walking native reads them through `viewOf` and walks the two rather than
+	// one, `materialise` is the choke point that makes an upgraded List hold
+	// them in one again, and both ride in wherever a List does. The remaining
+	// 400 are the ONE emission change the improvement makes — each of this
+	// Program's eight inlined walks reads `List.materialise(…)` where it read
+	// `.value` and hoists its count into a const of its own.
+	//
+	// NOTE: 61,157 now, up 21: `split` binds the count of the Array it walks
+	// instead of asking for it each turn, which is the rule the rest of the
+	// file already kept. The ceiling stays where it is — the headroom was sized
+	// for moves of a different order than a `let`.
 	it("keeps Everyday.es from dragging in the whole numeric tower", async () => {
-		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(58_200)
+		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(62_200)
 	})
 
 	// NOTE: Measured 42,719 bytes; a reintroduced `Number` spread was 54,849.
@@ -266,8 +283,16 @@ describe("Bundle Size", () => {
 	// figure rose — and this Program actually exercises the new base: it
 	// prints `Number.E`, adds it to π, and holds the golden ratio. The ceiling
 	// moves to 33,000, keeping the same order of headroom.
+	//
+	// NOTE: It now measures 33,635, up 852 from 32,783 — again a figure above
+	// the 32,300 recorded, for the same unrecorded drift Everyday's saw — and
+	// the ceiling moves to 34,400. All 852 are `list-tail-sharing`'s runtime
+	// half; the emission half costs this Program nothing at all, because it
+	// inlines no List walk, and that is the honest shape of the split: what
+	// every Program pays is the runtime a List now needs, and what a walking
+	// Program pays on top is a call and a const per walk.
 	it("keeps Irrational.es from dragging in the whole numeric tower", async () => {
-		expect(await bundleSizeOf("Irrational.es")).toBeLessThan(33_000)
+		expect(await bundleSizeOf("Irrational.es")).toBeLessThan(34_400)
 	})
 
 	// NOTE: The same claim for a bundle of several Modules, where it is far

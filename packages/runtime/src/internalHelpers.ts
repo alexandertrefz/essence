@@ -4,6 +4,7 @@ import type { BooleanType } from "./Boolean"
 import { is as boolIs, createBoolean } from "./Boolean"
 import type { IntegerType } from "./Integer"
 import type { ListType } from "./List"
+import { itemOfView, viewOf } from "./List"
 import type { RationalType } from "./Rational"
 import type { RecordType } from "./Record"
 import { is as recordIs } from "./Record"
@@ -180,12 +181,20 @@ export function anyIs(a: AnyType, b: AnyType): boolean {
 		// its items' own equality — and there is no witness to hand it here.
 		// Recurse through this same universal comparison instead, which is what
 		// the native did before the witness arrived.
-		if (a.value.length !== b.value.length) {
+		//
+		// NOTE: Through a view rather than off the Arrays, exactly as
+		// `List.is` does it — a List holds its items in two runs, and the two
+		// sides may be in different representations while holding the same
+		// items.
+		let first = viewOf(a)
+		let second = viewOf(b)
+
+		if (first.total !== second.total) {
 			return false
 		}
 
-		for (let index = 0; index < a.value.length; index++) {
-			if (!anyIs(a.value[index], b.value[index])) {
+		for (let index = 0; index < first.total; index++) {
+			if (!anyIs(itemOfView(first, index), itemOfView(second, index))) {
 				return false
 			}
 		}
@@ -333,18 +342,22 @@ function memberEqual(
 		case "w":
 			return witnesses[node.i].is(a, b).value
 		case "list": {
-			let aList = a as ListType<AnyType>
-			let bList = b as ListType<AnyType>
+			// NOTE: The counts are fixed before the walk, for the reason
+			// `List.ts` gives: the item comparison is a witness call and so
+			// user code, which may append to a List whose run either side is
+			// being read out of.
+			let aView = viewOf(a as ListType<AnyType>)
+			let bView = viewOf(b as ListType<AnyType>)
 
-			if (aList.value.length !== bList.value.length) {
+			if (aView.total !== bView.total) {
 				return false
 			}
 
-			for (let index = 0; index < aList.value.length; index++) {
+			for (let index = 0; index < aView.total; index++) {
 				if (
 					!memberEqual(
-						aList.value[index],
-						bList.value[index],
+						itemOfView(aView, index),
+						itemOfView(bView, index),
 						node.of,
 						witnesses,
 					)

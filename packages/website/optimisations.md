@@ -947,3 +947,141 @@ raw parts — which is what lets `4/2` equal `2` — while every accessor and ev
 formatter goes on answering in lowest terms, so `4/2` prints `2/1` and its
 `numerator` is 2, exactly as before. This is only the read side, computed once
 instead of once per question.
+
+### `list-tail-sharing`
+
+Every Method that grew a List copied the whole of it. `append` was
+`createList([...list.value, item])` — a fresh array of every item there was, in
+order to add one — so the work of building a List by adding to it grew with how
+much of it had already been built, and adding one item at a time is how most
+Lists are built. Forty thousand appends took a little over a second, essentially
+all of it spent copying.
+
+A List is now TWO runs and a view into each: the back run stored forward in
+`value`, the front run stored REVERSED in `front`, and a count beside each
+saying how much of that run this List owns. Its items are the front read
+backwards from its count, then the back read forwards up to its. A List that has
+never been prepended to carries no front at all, and is then exactly what a List
+has always been — an array, and the hidden Type key every value carries — plus a
+number. Which is what lets `collapse-construction` go on writing the literal it
+writes: both counts absent has to mean flat, and the view the whole array.
+
+The runs are SHARED between the Lists of one chain, and what keeps those apart
+is that each says how much of each run is its own. Appending asks one question.
+Does the receiver view all of its back run? Then it stands at that run's tip, so
+the item is pushed onto the array in place and the answer is a List over the
+same array viewing one more of it. Does it view less than all of it? Then
+somebody else has appended there already, and the answer gets a run of its own —
+the receiver's view copied, and the item pushed onto the copy. Prepending asks
+the same question of the front run, with one case ahead of it: a receiver that
+has never prepended is UPGRADED, keeping its back run by reference and starting
+a front of its own. So a List grown at either end costs one push per item, and a
+List branched at an end costs one copy at the branch and one push per item after
+it.
+
+**The receiver's view is stamped closed BEFORE the push**, and that order is the
+whole of what makes the sharing honest. A List carrying no count is one whose
+view is IMPLIED to be the whole array, so there may be no moment at which such a
+List has an item in its array that was pushed for somebody else. An upgrade
+stamps for the same reason although it pushes nothing: the receiver and the
+answer now share a back run that either of them may later push onto, and the
+count each carries is the only thing stopping one of them from viewing an item
+that was added for the other.
+
+**Everything that wants a List as one array goes through one function.**
+`materialise` answers an array whose whole length IS that List's view — the
+array itself where the List is flat and views all of it, a trimmed one where it
+views less, a combined one where there are two runs — and in the last case the
+List KEEPS what was combined and forgets its front, so a List read twice pays
+for combining once. The Methods written more simply against one array than two
+ask for one and are otherwise the code they were: `slice`, `reverse`, `insert`,
+`sort`, `split`, `pair`. The Methods that walk do not ask, reading the two runs
+in turn instead; and neither do the ones that index, because which run holds a
+position is one comparison and some arithmetic, so reading an item out of a
+prepended-to List costs what reading one out of a flat List costs rather than
+collapsing it first.
+
+**Every walk fixes its count before its first turn and never asks an array how
+long it is again.** A run can GROW under a walk, because a callback may append
+to the very List being walked:
+
+```essence
+list::reduce(startingWith list, (accumulated, item) {
+	<- accumulated::append(item)
+})
+```
+
+The seed there IS the List the walk is reading, so the first append finds it at
+its run's tip and pushes onto the very array being walked. A walk bounded by
+that array's length would go on to walk the items it is itself adding, and would
+never reach the end. What it has to answer is what it answered when every append
+copied — the items the receiver held when the call began — and a count taken at
+entry is what says so. That this is sound at all rests on a push only ever
+EXTENDING an array: the positions a List has already answered for are frozen for
+good, because every path that would change one writes an array of its own.
+
+**`createList` takes ownership of the array it is handed.** It stores that array
+rather than copying it, and a later append may push onto it in place, so no
+caller may keep the array it passed or hand the same one to two Lists. Every
+caller builds a fresh one — the natives here, and the JavaScript the Compiler
+emits, where an inlined walk fills its output array turn by turn and hands it
+over once at the end. Those are the callers that can be read and checked. A
+host of the client package cannot be, so the door it builds Lists through is a
+second constructor that copies: an array a host keeps is never one Essence
+pushes onto, and no contract of ours reaches a published surface.
+
+**One qualification to what this section opened with.** These are improvements
+to the runtime rather than to the code the Compiler emits, and this one is an
+improvement to the runtime too — but it is the only one of them that also needed
+the emitted code to change. `inline-loops` writes `map`, `keepEvery` and both
+`reduce` entries out where they are called, and what it wrote read the
+receiver's array directly and tested that array's length on every turn — the
+first of which now reads one run of two, while the second is exactly the live
+length the rule above forbids. Both are answered in the walk's preamble, which
+is two consts where it was one:
+
+```js
+const $loop_0_items = List.materialise(items);
+const $loop_0_count = $loop_0_items.length;
+```
+
+The count is emitted with the receiver rather than after the seed, because the
+seed is an Expression that may append to that receiver. Nothing else about
+emission moved, and there is still nothing to turn off: turning `inline-loops`
+off sends the walk back through the native it was written from, which reads the
+same two runs, so an inlined walk and a native one say the same thing either
+way.
+
+Safe because a List always answers exactly the items its view holds, and nothing
+can ask it for anything else. A shared array is indistinguishable from a copied
+one for the reason everything in this section is invisible — values are
+immutable, and no operator asks whether two values are the SAME value — and
+swapping a List's representation under it, which is what `materialise` does to
+one holding two runs, is invisible for that reason twice over, the items before
+and after being the same items. Equality and ordering read both sides through
+their views rather than off their arrays, so a `[1, 2, 3]` written as a literal
+and a `[2, 3]` prepended with a `1` are equal, which they had better be.
+
+What it costs is retention, a comparison and a view. **A List viewing less than
+its run holds the whole of that run alive** — the array its chain grew to,
+rather than the part it can see — until something reads it, which trims the
+array once and puts the trimmed one back, so it retains more than its items
+until first read and exactly its items ever after. **A positional read of a
+prepended-to List pays that one comparison**, measured at about 1.13× a flat
+List's on a loop doing nothing but reading positions.
+
+A List only ever appended to escapes the retention and the second run — no front
+array is ever allocated for it, and what it carries that it did not carry before
+is one number — but it does not read for free. `item(at:)` and `length()` take
+their view the same way every walk does, and taking a view is a small object,
+so a loop doing nothing but reading positions of a flat List measures about
+1.05× what it used to and one asking only for its length about 1.1×. Reading
+the runs off the box instead would spare it that, at the price of a second place
+that knows how a view is put together — which is a trade taken exactly once, by
+the type test a `match` runs, and taken there because that Module is the one
+every Program carries and may not reach into the List Module at all.
+
+What it is worth: forty thousand appends fall from about 1,030 ms to about 1 ms,
+forty thousand prepends from about 990 ms to about 2 ms, and a million appends —
+roughly ten minutes, which is to say not something a Program could do — take
+about 40 ms. Measured on Bun 1.3.14 on Apple Silicon.

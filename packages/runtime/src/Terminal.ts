@@ -1,5 +1,6 @@
 import { toString as algebraicToString } from "./Algebraic"
 import { toString as integerToString } from "./Integer"
+import { materialise } from "./List"
 import { formatAsRational } from "./Rational"
 import type { RecordType } from "./Record"
 import type { StreamType } from "./Stream"
@@ -96,15 +97,21 @@ export function getStringRepresentation(obj: AnyType, indentLevel = 0): string {
 			return "{}"
 		}
 	} else if (obj[typeKeySymbol] === "List") {
-		if (obj.value.length > 0) {
-			let singleLineString = `[ ${obj.value
+		// NOTE: A List holds its items in two runs with a view into each — see
+		// `List.ts` — so what is rendered is the LOGICAL items rather than
+		// whatever the backing Array happens to hold. `materialise` is what
+		// answers those, and the box it collapses reads the same afterwards.
+		let items = materialise(obj)
+
+		if (items.length > 0) {
+			let singleLineString = `[ ${items
 				.map((value) => getStringRepresentation(value, 0))
 				.join(", ")} ]`
 
 			if (singleLineString.length < singleLineMaxLength) {
 				return singleLineString
 			} else {
-				return `[\n${contentIndent}${obj.value
+				return `[\n${contentIndent}${items
 					.map((value) =>
 						getStringRepresentation(value, indentLevel + 1),
 					)

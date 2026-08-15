@@ -262,6 +262,32 @@ describe("Round trips", () => {
 		])
 	})
 
+	// NOTE: A List is stored as two runs and a VIEW into each — the authority is
+	// `packages/runtime/src/List.ts` — because the Arrays under one are SHARED
+	// with every List built from it. So a value added to at both ends keeps its
+	// first items in a different Array from its last, and a value another List
+	// was built from is stored in an Array holding more items than it has. What
+	// crosses the boundary has to be the items the value holds, and these are
+	// the two shapes a List built here and handed straight back can never be in.
+	it("carries a List that was added to at both ends", () => {
+		expect(through("grown", ["b", "c"])).toEqual([
+			"first",
+			"b",
+			"c",
+			"last",
+		])
+		expect(through("grown", [])).toEqual(["first", "last"])
+	})
+
+	it("carries Lists built from one another, each with its own items", () => {
+		expect(through("branched", ["b", "c"])).toEqual([
+			["b", "c", "z"],
+			["a", "b", "c"],
+			["b", "c"],
+		])
+		expect(through("branched", [])).toEqual([["z"], ["a"], []])
+	})
+
 	// NOTE: The Module does something with the value rather than handing it
 	// back, so this is what says the value it was given was a real one — a Case
 	// the Match did not recognise would have thrown inside the bundle.
@@ -440,11 +466,13 @@ describe("The exports of a Module", () => {
 			"blank",
 			"box",
 			"boxes",
+			"branched",
 			"card",
 			"circle",
 			"config",
 			"flag",
 			"greeting",
+			"grown",
 			"integer",
 			"labelled",
 			"maybe",

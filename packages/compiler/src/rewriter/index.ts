@@ -4448,6 +4448,7 @@ function foldWalk(
 	driver: Extract<common.typedSimple.InlineLoopDriver, { kind: "fold" }>,
 ): InlinedWalk {
 	let items = `${prefix}_items`
+	let count = `${prefix}_count`
 	let position = `${prefix}_position`
 	let state = `${prefix}_state`
 	let answer = `${prefix}_answer`
@@ -4460,13 +4461,12 @@ function foldWalk(
 	// NOTE: The receiver before the seed, which is the order the call evaluated
 	// them in — a Method's receiver is its first Argument — and both before the
 	// body, so that what the emission collects on the way is collected in the
-	// order the Program says it.
+	// order the Program says it. The count goes with the receiver rather than
+	// after the seed: the walk covers the items the receiver held when the call
+	// began, and a seed that appends to that very receiver — `reduce(startingWith
+	// list::append(x), …)` — must not lengthen the walk.
 	let held = [
-		loopDeclaration(
-			"const",
-			items,
-			valueRead(rewriteExpression(driver.items)),
-		),
+		...heldItems(items, count, rewriteExpression(driver.items)),
 		loopDeclaration("let", state, rewriteExpression(driver.seed)),
 	]
 	let body = inlinedCallback(
@@ -4475,7 +4475,7 @@ function foldWalk(
 		`${prefix}_body`,
 		target,
 	)
-	let walk = itemsWalk(items, position, [body])
+	let walk = itemsWalk(count, position, [body])
 
 	if (!driver.stepped) {
 		return {
@@ -4504,13 +4504,10 @@ function mapWalk(
 	driver: Extract<common.typedSimple.InlineLoopDriver, { kind: "map" }>,
 ): InlinedWalk {
 	let items = `${prefix}_items`
+	let count = `${prefix}_count`
 	let position = `${prefix}_position`
 	let mapped = `${prefix}_mapped`
-	let held = loopDeclaration(
-		"const",
-		items,
-		valueRead(rewriteExpression(driver.items)),
-	)
+	let held = heldItems(items, count, rewriteExpression(driver.items))
 	let body = inlinedCallback(
 		driver.transform,
 		[itemAt(items, position)],
@@ -4526,12 +4523,12 @@ function mapWalk(
 
 	return {
 		statements: [
-			held,
+			...held,
 			loopDeclaration("const", mapped, {
 				type: "ArrayExpression",
 				elements: [],
 			}),
-			itemsWalk(items, position, [body]),
+			itemsWalk(count, position, [body]),
 		],
 		answer: createdList(loopIdentifier(mapped)),
 	}
@@ -4545,14 +4542,11 @@ function keepWalk(
 	driver: Extract<common.typedSimple.InlineLoopDriver, { kind: "keep" }>,
 ): InlinedWalk {
 	let items = `${prefix}_items`
+	let count = `${prefix}_count`
 	let position = `${prefix}_position`
 	let item = `${prefix}_item`
 	let kept = `${prefix}_kept`
-	let held = loopDeclaration(
-		"const",
-		items,
-		valueRead(rewriteExpression(driver.items)),
-	)
+	let held = heldItems(items, count, rewriteExpression(driver.items))
 	let body = inlinedCallback(
 		driver.check,
 		[loopIdentifier(item)],
@@ -4573,12 +4567,12 @@ function keepWalk(
 
 	return {
 		statements: [
-			held,
+			...held,
 			loopDeclaration("const", kept, {
 				type: "ArrayExpression",
 				elements: [],
 			}),
-			itemsWalk(items, position, [
+			itemsWalk(count, position, [
 				loopDeclaration("const", item, itemAt(items, position)),
 				body,
 			]),
@@ -4784,12 +4778,40 @@ function inlinedCallback(
 	return broke ? labelled(label, loopBlock(body)) : loopBlock(body)
 }
 
+// NOTE: What an inlined List walk begins with: the items under a name, and how
+// many of them there are under another. `List.materialise` answers the Array a
+// List's logical items live in — a List that has been prepended to holds two
+// runs, and reading `.value` would walk one of them — and caches the work on
+// the box, so the second walk over the same List pays nothing.
+//
+// NOTE: The count is read HERE and never again. A List's backing Array grows
+// under an append that finds its receiver at the Array's tip, so a body that
+// appends to the very List it walks pushes onto the Array the walk is reading:
+// `list::reduce(startingWith list, (acc, item) { <- acc::append(item) })` seeds
+// the accumulator with the walked List and does exactly that. The walk covers
+// the items the receiver held when it began — which is what it covered when
+// every append copied — and only a count fixed before the first turn says so.
+function heldItems(
+	items: string,
+	count: string,
+	expression: estree.Expression,
+): Array<estree.VariableDeclaration> {
+	return [
+		loopDeclaration("const", items, materialisedRead(expression)),
+		loopDeclaration(
+			"const",
+			count,
+			memberRead(loopIdentifier(items), "length"),
+		),
+	]
+}
+
 // NOTE: The walk every List Method performs — over the positions of the Array
 // the List holds, which is the walk the natives perform and the one shape a
-// `for` says better than an iterator does. The Array can not change under it:
-// every Essence value is immutable, and the callbacks below build their own.
+// `for` says better than an iterator does. Its bound is the count `heldItems`
+// froze, not the Array's own live length.
 function itemsWalk(
-	items: string,
+	count: string,
 	position: string,
 	body: Array<estree.Statement>,
 ): estree.Statement {
@@ -4800,7 +4822,7 @@ function itemsWalk(
 			type: "BinaryExpression",
 			operator: "<",
 			left: loopIdentifier(position),
-			right: memberRead(loopIdentifier(items), "length"),
+			right: loopIdentifier(count),
 		},
 		update: {
 			type: "UpdateExpression",
@@ -4869,6 +4891,27 @@ function createdList(value: estree.Expression): estree.Expression {
 		optional: false,
 		callee: memberRead(loopIdentifier("List"), "createList"),
 		arguments: [value],
+	}
+}
+
+// NOTE: The Array a List's logical items live in, read off the `import * as
+// List` the same way `createdList` reads its constructor. Not a member the
+// language has: it is the runtime's own choke point, the one place a List that
+// carries its items in two runs is made to carry them in one.
+//
+// NOTE: It is what the natives WRITTEN AGAINST ONE ARRAY reach for — `slice`,
+// `reverse`, `insert`, `sort`, `split`, `pair` — and what an inlined walk
+// reaches for because the `for` below indexes one Array rather than two. The
+// natives that WALK a List do the opposite deliberately: `map`, `keepEvery`,
+// both `reduce` entries, `is`, `compare`, `join` and the rest take a view and
+// read the two runs in turn, so that walking a List never collapses it. An
+// emitted walk cannot afford that shape, and pays one combining instead.
+function materialisedRead(list: estree.Expression): estree.Expression {
+	return {
+		type: "CallExpression",
+		optional: false,
+		callee: memberRead(loopIdentifier("List"), "materialise"),
+		arguments: [list],
 	}
 }
 
