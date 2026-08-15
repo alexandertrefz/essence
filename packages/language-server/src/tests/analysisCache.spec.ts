@@ -985,6 +985,42 @@ describe("the Server's request loop", () => {
 		}
 	})
 
+	// NOTE: Closing a file hands its Diagnostics back to the Modules that import
+	// it, and one of them has to RUN for that to reach the Editor — no keystroke
+	// is going to land in a file the reader just closed. Without it a Module
+	// closed while broken keeps its squiggles cleared for the rest of the session.
+	it("should keep a closed Module's Diagnostics through the documents importing it", async () => {
+		let broken = `implementation {\n\tconstant amount: Integer = "two"\n}\n\nexport {\n\tamount\n}\n`
+		let importer = `import {\n\tamount from "./Broken.es"\n}\n\nimplementation {\n\tTerminal.print(amount::toString())\n}\n`
+		let files = makeSessionWorkspace({
+			"Broken.es": broken,
+			"Importer.es": importer,
+		})
+		let session = startSession()
+
+		try {
+			await session.initialize([files.root])
+			await session.open(files.pathOf("Importer.es"), importer)
+			await session.settle(800)
+
+			expect(session.codesFor(files.pathOf("Broken.es"))).toEqual([
+				"assignment-type-mismatch",
+			])
+
+			await session.open(files.pathOf("Broken.es"), broken)
+			await session.settle(800)
+			await session.close(files.pathOf("Broken.es"))
+			await session.settle(800)
+
+			expect(session.codesFor(files.pathOf("Broken.es"))).toEqual([
+				"assignment-type-mismatch",
+			])
+		} finally {
+			await session.dispose()
+			files.dispose()
+		}
+	})
+
 	// NOTE: The debounced analysis is a timer callback, and a throw out of one is
 	// the process — no request left to answer, no Diagnostic, nothing in the log.
 	// The Parser reaching that state is not hypothetical: see `unparseableSource`.
