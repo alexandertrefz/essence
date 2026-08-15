@@ -1,7 +1,6 @@
 import type { common } from "@essence-lang/interfaces"
 
 import type { OptimiserPass } from "../index"
-import { declaredNamespaces } from "../namespaces"
 import { rewriteNodes } from "../walk"
 
 // NOTE: Essence has no loop Statement. A walk is a driver Function handed
@@ -51,7 +50,7 @@ import { rewriteNodes } from "../walk"
 
 export const inlineLoops: OptimiserPass = {
 	name: "inline-loops",
-	run: (program) => {
+	run: (program, namespaces) => {
 		// NOTE: `List` is a name a Program may take for itself — nested, where
 		// it is not taken yet — and a `namespace List for List` writing its own
 		// `map` answers under exactly the name and shape this pass is written
@@ -65,7 +64,7 @@ export const inlineLoops: OptimiserPass = {
 		// refused outside the standard library, and no name a Program can write
 		// holds a `_` — the Lexer reads it as a Symbol. There is no Program that
 		// can put a different Function behind those four names.
-		let shadowed = declaredNamespaces(program).nested
+		let shadowed = namespaces.nested
 		let inlining = new Inlining(shadowed)
 
 		return rewriteNodes(program, {

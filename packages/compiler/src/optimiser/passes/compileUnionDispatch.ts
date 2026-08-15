@@ -1,7 +1,6 @@
 import type { common } from "@essence-lang/interfaces"
 
 import type { OptimiserPass } from "../index"
-import { declaredNamespaces } from "../namespaces"
 import { isPureExpression } from "../purity"
 import { type MatcherResidual, matcherResidualOverMembers } from "../residual"
 import { rewriteExpressions } from "../walk"
@@ -62,7 +61,7 @@ import { rewriteExpressions } from "../walk"
 
 export const compileUnionDispatch: OptimiserPass = {
 	name: "compile-union-dispatch",
-	run: (program) => {
+	run: (program, namespaces) => {
 		// NOTE: The Namespaces the Program declares below its top level, which
 		// is what `isPureExpression` needs to know before it reads a Namespace
 		// name out of its enumeration. This pass never lowers a Method call
@@ -70,7 +69,7 @@ export const compileUnionDispatch: OptimiserPass = {
 		// because the question the purity of an operand answers is the same one
 		// whoever asks it, and a caller that could not have been wrong is
 		// cheaper than a caller that has to be checked.
-		let shadowed = declaredNamespaces(program).nested
+		let shadowed = namespaces.nested
 
 		return rewriteExpressions(program, (node) => compile(node, shadowed))
 	},

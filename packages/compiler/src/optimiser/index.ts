@@ -1,6 +1,7 @@
 import type { common } from "@essence-lang/interfaces"
 
 import { eraseRefinements } from "../helpers/eraseRefinements"
+import { type DeclaredNamespaces, declaredNamespaces } from "./namespaces"
 import { collapseCombinations } from "./passes/collapseCombinations"
 import { collapseConstruction } from "./passes/collapseConstruction"
 import { compileTypeTests } from "./passes/compileTypeTests"
@@ -40,7 +41,26 @@ export type OptimiserPass = {
 	// in `packages/website/tests/optimisationPasses.spec.ts` is what keeps the
 	// last of those true.
 	name: string
-	run: (program: common.typedSimple.Program) => common.typedSimple.Program
+	// NOTE: The Namespaces the Program declares are HANDED to a pass rather
+	// than looked up by it. Seven passes need them, the walk that answers
+	// reaches every object the Program holds — Types included — and seven of
+	// those walks was half of this phase on a large file.
+	//
+	// NOTE: One answer serves the whole registry because no pass can change it:
+	// nothing here builds a `NamespaceDefinitionStatement`, the Simplifier is
+	// the only thing that does, and `eliminate-dead-code` — the one pass that
+	// removes a Statement at all — removes Constants. So the set is a property
+	// of the Program the PHASE was given, not of the Program a pass was given,
+	// and a pass added later that declares a Namespace has to compute its own.
+	//
+	// NOTE: Handed in rather than memoised behind `declaredNamespaces`, because
+	// a memo keyed on Program identity would never hit: a pass rebuilds the
+	// Program whenever it changes anything, and measured on the fixtures every
+	// one of the seven is preceded by a pass that did.
+	run: (
+		program: common.typedSimple.Program,
+		namespaces: DeclaredNamespaces,
+	) => common.typedSimple.Program
 }
 
 export type OptimiserOptions = {
@@ -139,13 +159,17 @@ export function optimise(
 	}
 
 	let result = erased
+	// NOTE: Asked of the erased Program, which is what the first pass is given
+	// — and, by the argument on `OptimiserPass.run`, what every pass after it
+	// would answer for itself.
+	let namespaces = declaredNamespaces(erased)
 
 	for (let pass of optimiserPasses) {
 		if (options.disabledPasses.has(pass.name)) {
 			continue
 		}
 
-		result = pass.run(result)
+		result = pass.run(result, namespaces)
 	}
 
 	return result

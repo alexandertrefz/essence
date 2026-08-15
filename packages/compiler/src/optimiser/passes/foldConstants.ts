@@ -2,7 +2,6 @@ import type { common } from "@essence-lang/interfaces"
 import { reduced } from "@essence-lang/runtime/bigRational"
 
 import type { OptimiserPass } from "../index"
-import { declaredNamespaces } from "../namespaces"
 import { isPureExpression, withoutOverloadSuffix } from "../purity"
 import { rewriteExpressions } from "../walk"
 
@@ -40,13 +39,13 @@ import { rewriteExpressions } from "../walk"
 
 export const foldConstants: OptimiserPass = {
 	name: "fold-constants",
-	run: (program) => {
+	run: (program, namespaces) => {
 		// NOTE: The same set `lower-scalar-operations` refuses to lower on, for
 		// the same reason: a Namespace named after a builtin stands in front of
 		// it for the rest of its block, and an `add` written there is a Method
 		// the Program wrote. Refused for the whole Program rather than per
 		// Scope — the Optimiser walks Expressions and not Scopes.
-		let shadowed = declaredNamespaces(program).nested
+		let shadowed = namespaces.nested
 
 		return rewriteExpressions(program, (node) => fold(node, shadowed))
 	},

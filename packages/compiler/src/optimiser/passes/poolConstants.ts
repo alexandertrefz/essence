@@ -3,7 +3,6 @@ import type { common } from "@essence-lang/interfaces"
 import { derivedEquatableNamespaceName } from "../../enricher/resolvers"
 import { runtimeNamespaceNames } from "../../rewriter/runtimeNamespaces"
 import type { OptimiserPass } from "../index"
-import { declaredNamespaces } from "../namespaces"
 import { rewriteExpressions } from "../walk"
 
 // NOTE: A constant written in a Program is BUILT at every site it is written
@@ -30,14 +29,14 @@ import { rewriteExpressions } from "../walk"
 
 export const poolConstants: OptimiserPass = {
 	name: "pool-constants",
-	run: (program) => {
+	run: (program, namespaces) => {
 		// NOTE: A Namespace a Program DECLARES is a `class` in the emitted
 		// Module, and a class is not hoisted — so a const band above it can not
 		// read one. The witnesses below name a Namespace, so this is what they
 		// are checked against, and a Namespace name a Program declares is
 		// refused whether the name is the Program's own or one it took from the
 		// standard library.
-		let declared = declaredNamespaces(program).all
+		let declared = namespaces.all
 
 		return rewriteExpressions(program, (node) => pool(node, declared))
 	},

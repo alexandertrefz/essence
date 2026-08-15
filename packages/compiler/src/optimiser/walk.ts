@@ -115,45 +115,71 @@ function walkBody(
 	return rewrites.body === undefined ? walked : rewrites.body(walked)
 }
 
+// NOTE: The copy is not made until something is IN it. Most passes leave most
+// of the tree alone — fourteen of them walk it and each is written for one
+// shape — so the common answer here is the array that was given, and building
+// one to throw away is the whole of what a no-op walk used to cost. Every entry
+// is still mapped, in order, exactly once: the laziness is in the allocation,
+// not in the work.
 function mapArray<Value>(
 	values: Array<Value>,
 	map: (value: Value) => Value,
 ): Array<Value> {
-	let changed = false
-	let mapped = values.map((value) => {
+	let mapped: Array<Value> | undefined
+
+	for (let index = 0; index < values.length; index++) {
+		let value = values[index]!
 		let result = map(value)
 
-		if (result !== value) {
-			changed = true
+		if (mapped === undefined) {
+			if (result === value) {
+				continue
+			}
+
+			mapped = values.slice(0, index)
 		}
 
-		return result
-	})
+		mapped.push(result)
+	}
 
-	return changed ? mapped : values
+	return mapped ?? values
 }
 
 // NOTE: Insertion order is preserved, which is not a detail — a Record's
 // members are emitted in the order they are written, and `Object.keys` over the
 // emitted literal is what the runtime's Record equality and its printer read.
+// The copy is filled from the same key order it is abandoned in, so a Record
+// one member of which changed keeps the order the whole of it was written in.
 function mapRecord<Value>(
 	members: Record<string, Value>,
 	map: (value: Value) => Value,
 ): Record<string, Value> {
-	let changed = false
-	let mapped: Record<string, Value> = {}
+	let names = Object.keys(members)
+	let mapped: Record<string, Value> | undefined
 
-	for (let [name, value] of Object.entries(members)) {
+	for (let index = 0; index < names.length; index++) {
+		let name = names[index]!
+		let value = members[name]!
 		let result = map(value)
 
-		if (result !== value) {
-			changed = true
+		if (mapped === undefined) {
+			if (result === value) {
+				continue
+			}
+
+			mapped = {}
+
+			for (let earlier = 0; earlier < index; earlier++) {
+				let earlierName = names[earlier]!
+
+				mapped[earlierName] = members[earlierName]!
+			}
 		}
 
 		mapped[name] = result
 	}
 
-	return changed ? mapped : members
+	return mapped ?? members
 }
 
 // NOTE: Every Statement POSITION, offered once. An Expression written for its

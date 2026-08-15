@@ -1,7 +1,6 @@
 import type { common } from "@essence-lang/interfaces"
 
 import type { OptimiserPass } from "../index"
-import { declaredNamespaces } from "../namespaces"
 import { isPureExpression } from "../purity"
 import { rewriteStatements } from "../walk"
 
@@ -63,7 +62,7 @@ import { rewriteStatements } from "../walk"
 
 export const lowerMatchesToStatements: OptimiserPass = {
 	name: "lower-matches-to-statements",
-	run: (program) => {
+	run: (program, namespaces) => {
 		// NOTE: Asked for the one thing this pass drops rather than moves: a
 		// Handler answering a value nobody reads, in a Match written for its
 		// effects. Whether answering it can be observed is the same question
@@ -71,7 +70,7 @@ export const lowerMatchesToStatements: OptimiserPass = {
 		// the same way — of the Program's own Namespaces, because a Namespace a
 		// Program declares can answer under a builtin's name and do anything at
 		// all.
-		let shadowed = declaredNamespaces(program).nested
+		let shadowed = namespaces.nested
 		let lowering = new Lowering(shadowed)
 
 		return rewriteStatements(program, (node) => lowering.lower(node))

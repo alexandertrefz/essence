@@ -5,6 +5,11 @@ import type { common } from "@essence-lang/interfaces"
 // reasons, and the difference between the two sets is the whole of what tells
 // the standard library's own Namespaces from a Program's.
 //
+// NOTE: Asked ONCE per optimisation and handed to every pass that needs it —
+// see `OptimiserPass.run` for why one answer serves the whole registry. The
+// walk below reaches every object the Program holds, so this is a function to
+// call once and read many times, not one to call where the answer is wanted.
+//
 // NOTE: A Program can not declare a top-level Namespace named after a builtin:
 // `Integer` is already a name in that Scope, and the Enricher answers
 // 'Variable 'Integer' is already declared'. A NESTED one is accepted — it
