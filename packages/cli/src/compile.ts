@@ -47,7 +47,7 @@ export async function planCompilation(
 	context: CLIContext,
 	command: CommandSpec,
 	patterns: Array<string>,
-	options: { emit: boolean; watch: boolean },
+	options: { emit: boolean },
 ): Promise<CompilationPlan> {
 	let inputFileNames = await resolveInputFiles(
 		patterns,
@@ -62,7 +62,7 @@ export async function planCompilation(
 	let useWorkers = shouldUseWorkers({
 		fileCount: inputFileNames.length,
 		totalBytes,
-		watch: options.watch,
+		emit: options.emit,
 		jobs: context.options.jobs,
 	})
 
