@@ -1,6 +1,10 @@
 import { describe, expect, test } from "bun:test"
 
+import { createInteger } from "../Integer"
 import { anyIs } from "../internalHelpers"
+import { createList } from "../List"
+import { createRational } from "../Rational"
+import { createRecord } from "../Record"
 import {
 	append,
 	compare__overload$1 as compare,
@@ -179,5 +183,102 @@ describe("empty Strings", () => {
 		expect(orderOf("a", "")).toBe(greater)
 		expect(append(string(""), string("ab")).value).toBe("ab")
 		expect(append(string("ab"), string("")).value).toBe("ab")
+	})
+})
+
+// NOTE: The one cross-kind cell of the universal equality, and the trap in
+// deciding it by tag: an Integer and a Rational spell the SAME value two ways,
+// so `1 is 1/1` holds and differing tags do NOT mean differing values. Asked in
+// both directions, bare and wrapped, because a comparison that reads the two
+// tags and dispatches on them is one early return away from losing this
+// quietly.
+describe("Integer beside Rational", () => {
+	test("the same value is equal either way round", () => {
+		expect(anyIs(createInteger(1n), createRational(1n, 1n))).toBeTrue()
+		expect(anyIs(createRational(1n, 1n), createInteger(1n))).toBeTrue()
+		expect(anyIs(createInteger(2n), createRational(4n, 2n))).toBeTrue()
+		expect(anyIs(createRational(4n, 2n), createInteger(2n))).toBeTrue()
+		expect(anyIs(createInteger(0n), createRational(0n, 5n))).toBeTrue()
+		expect(anyIs(createInteger(-3n), createRational(-9n, 3n))).toBeTrue()
+		expect(anyIs(createRational(-9n, 3n), createInteger(-3n))).toBeTrue()
+	})
+
+	test("a different value is unequal either way round", () => {
+		expect(anyIs(createInteger(1n), createRational(1n, 2n))).toBeFalse()
+		expect(anyIs(createRational(1n, 2n), createInteger(1n))).toBeFalse()
+		expect(anyIs(createRational(1n, 2n), createRational(2n, 4n))).toBeTrue()
+		expect(
+			anyIs(createRational(1n, 2n), createRational(1n, 3n)),
+		).toBeFalse()
+		expect(anyIs(createInteger(1n), createInteger(2n))).toBeFalse()
+	})
+
+	// NOTE: Inside a Record and inside a List, which is where a lost cell shows
+	// up as a value that stopped being equal to its equal the moment either was
+	// wrapped.
+	test("the same value is equal wrapped as well as bare", () => {
+		expect(
+			anyIs(
+				createRecord({ count: createInteger(1n) }),
+				createRecord({ count: createRational(1n, 1n) }),
+			),
+		).toBeTrue()
+		expect(
+			anyIs(
+				createRecord({ count: createRational(4n, 2n) }),
+				createRecord({ count: createInteger(2n) }),
+			),
+		).toBeTrue()
+		expect(
+			anyIs(
+				createRecord({ count: createInteger(1n) }),
+				createRecord({ count: createRational(1n, 2n) }),
+			),
+		).toBeFalse()
+		expect(
+			anyIs(
+				createList([createInteger(2n), createInteger(1n)]),
+				createList([createRational(4n, 2n), createRational(3n, 3n)]),
+			),
+		).toBeTrue()
+	})
+
+	// NOTE: Records are equal by their MEMBERS, whatever order they were
+	// written in, and a Record carrying a member the other lacks is unequal
+	// however the counts fall.
+	test("Records compare by their members, in any order", () => {
+		expect(
+			anyIs(
+				createRecord({ a: createInteger(1n), b: string("x") }),
+				createRecord({ b: string("x"), a: createRational(1n, 1n) }),
+			),
+		).toBeTrue()
+		expect(
+			anyIs(
+				createRecord({ a: createInteger(1n) }),
+				createRecord({ b: createInteger(1n) }),
+			),
+		).toBeFalse()
+		expect(
+			anyIs(
+				createRecord({ a: createInteger(1n) }),
+				createRecord({ a: createInteger(1n), b: createInteger(2n) }),
+			),
+		).toBeFalse()
+		expect(
+			anyIs(
+				createRecord({ a: createInteger(1n), b: createInteger(2n) }),
+				createRecord({ a: createInteger(1n) }),
+			),
+		).toBeFalse()
+		expect(anyIs(createRecord({}), createRecord({}))).toBeTrue()
+	})
+
+	test("a value of one kind is equal to no value of another", () => {
+		expect(anyIs(createRational(1n, 1n), string("1"))).toBeFalse()
+		expect(anyIs(createInteger(1n), string("1"))).toBeFalse()
+		expect(anyIs(string("1"), createInteger(1n))).toBeFalse()
+		expect(anyIs(createInteger(1n), createList([]))).toBeFalse()
+		expect(anyIs(createRecord({}), createList([]))).toBeFalse()
 	})
 })

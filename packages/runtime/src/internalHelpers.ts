@@ -1,5 +1,6 @@
 import type { common } from "@essence-lang/interfaces"
 
+import type { AlgebraicType } from "./Algebraic"
 import type { BooleanType } from "./Boolean"
 import { is as boolIs, createBoolean } from "./Boolean"
 import type { IntegerType } from "./Integer"
@@ -10,6 +11,7 @@ import type { RecordType } from "./Record"
 import { is as recordIs } from "./Record"
 import type { StringType } from "./String"
 import { normalisedFormOf } from "./String"
+import type { TranscendentalType } from "./Transcendental"
 import type { AnyType } from "./type"
 import { isValueOfType, typeKeySymbol } from "./type"
 
@@ -94,127 +96,152 @@ export function anyIs(a: AnyType, b: AnyType): boolean {
 		return a === b
 	}
 
-	if (a[typeKeySymbol] === "Boolean" && b[typeKeySymbol] === "Boolean") {
-		return boolIs(a, b).value
-	} else if (
-		a[typeKeySymbol] === "String" && //
-		b[typeKeySymbol] === "String"
-	) {
-		// NOTE: String.is is written in Essence now — it reads `compare`,
-		// which is lexicographic by code point over the NFC-normalised String,
-		// so it answers `Equal` for any two canonically equivalent Strings (an
-		// accent composed or decomposed). `stringEquals` above is that same
-		// answer without importing the whole comparison. Comparing the RAW
-		// representations, as this did, made the same pair of Strings equal on
-		// their own and unequal inside a Record.
-		return stringEquals(a, b)
-	} else if (isRationalKind(a) && isRationalKind(b)) {
-		// NOTE: ONE cell for the two rational kinds, because that is what the
-		// language promises: `Number.is` is `compare(other)::is(#Equal)` over
-		// the covering order, and it answers by VALUE — `1 is 1/1` holds. A cell
-		// per kind could not see across the two, so an Integer beside a
-		// numerically equal Rational matched nothing and fell to `false`: a
-		// value stopped being equal to its equal the moment either was wrapped
-		// in a Record or a Case payload. Ordinary arithmetic reaches the mixed
-		// pair, too — `createRational` never reduces, so `(1/2)::add(1/2)` is
-		// the Rational `4/4` beside anyone else's Integer `1`.
-		//
-		// NOTE: Cross-multiplication, which is what `Number.compare` does for
-		// this pairing — it answers for unreduced parts and for either sign,
-		// and it is not the covering `compare` itself because EVERY emitted
-		// Program imports this module: reading the covering order here dragged
-		// π's interval arithmetic and the algebraic sign routines into Programs
-		// holding no Numbers at all (measured at ~11 kB on one that only
-		// compares Records of Strings). The pairings that order needs it for are
-		// exactly the ones equality can decide by tag — see `isRationalKind`.
+	// NOTE: Each tag read ONCE, and dispatched on rather than walked past. This
+	// used to be a ladder of nine cells, each asking both values what kind they
+	// were, so deciding that two Records were Records read twelve tags to
+	// answer a question two reads settle — and every comparison of a Record's
+	// members comes back through here.
+	const aTag = a[typeKeySymbol]
+	const bTag = b[typeKeySymbol]
+
+	// NOTE: THE ONE PAIRING THAT SURVIVES DIFFERING TAGS, and the reason this
+	// stands in front of the dispatch rather than inside it. Integer and
+	// Rational spell the SAME value two ways, and that is what the language
+	// promises: `Number.is` is `compare(other)::is(#Equal)` over the covering
+	// order, and it answers by VALUE — `1 is 1/1` holds. Answering `false` for
+	// differing tags first would take that away silently, and take it away only
+	// where the comparison went through here: a value would stop being equal to
+	// its equal the moment either was wrapped in a Record or a Case payload.
+	// Ordinary arithmetic reaches the mixed pair too, since an Integer beside a
+	// Rational is what widening leaves.
+	//
+	// NOTE: Every OTHER cross-kind pairing really is decided by the tags alone.
+	// `Algebraic` and `Transcendental` need no cell each: both are provably
+	// irrational and canonically formed, so a value of either can equal only a
+	// value of its own kind.
+	//
+	// NOTE: Cross-multiplication, which is what `Number.compare` does for this
+	// pairing — it answers for unreduced parts and for either sign, and it is
+	// not the covering `compare` itself because EVERY emitted Program imports
+	// this module: reading the covering order here dragged π's interval
+	// arithmetic and the algebraic sign routines into Programs holding no
+	// Numbers at all (measured at ~11 kB on one that only compares Records of
+	// Strings).
+	if (aTag !== bTag) {
 		return (
+			isRationalKind(a) &&
+			isRationalKind(b) &&
 			numeratorOf(a) * denominatorOf(b) ===
-			numeratorOf(b) * denominatorOf(a)
+				numeratorOf(b) * denominatorOf(a)
 		)
-	} else if (
-		a[typeKeySymbol] === "Algebraic" &&
-		b[typeKeySymbol] === "Algebraic"
-	) {
-		// NOTE: Algebraic.is is written in Essence now — it reads `compare`,
-		// which decides the sign of the difference symbolically. Normal forms
-		// make that the same answer as comparing the representation directly,
-		// which is what the deleted native did. An Algebraic is irrational, so
-		// it can equal no Integer, Rational or Transcendental — those pairings
-		// need no cell of their own and fall through to `false` below.
-		return (
-			a.radicand === b.radicand &&
-			a.rationalPartNumerator === b.rationalPartNumerator &&
-			a.rationalPartDenominator === b.rationalPartDenominator &&
-			a.radicalCoefficientNumerator === b.radicalCoefficientNumerator &&
-			a.radicalCoefficientDenominator === b.radicalCoefficientDenominator
-		)
-	} else if (
-		a[typeKeySymbol] === "Transcendental" &&
-		b[typeKeySymbol] === "Transcendental"
-	) {
-		// NOTE: Transcendental.is is written in Essence now — it reads the
-		// `Number` Union's `is`, whose Transcendental/Transcendental cell is
-		// exact. Canonical forms make that the same answer as comparing the
-		// representation directly, which is what the deleted native did. A
-		// Transcendental equals no value of any other kind, for the same reason
-		// an Algebraic does not.
-		return (
-			a.rationalPartNumerator === b.rationalPartNumerator &&
-			a.rationalPartDenominator === b.rationalPartDenominator &&
-			a.terms.length === b.terms.length &&
-			a.terms.every((term, index) => {
-				const other = b.terms[index]!
+	}
 
-				return (
-					term.base === other.base &&
-					term.coefficientNumerator === other.coefficientNumerator &&
-					term.coefficientDenominator === other.coefficientDenominator
-				)
-			})
-		)
-	} else if (
-		a[typeKeySymbol] === "Record" && //
-		b[typeKeySymbol] === "Record"
-	) {
-		return recordIs(a, b).value
-	} else if (
-		a[typeKeySymbol] === "List" && //
-		b[typeKeySymbol] === "List"
-	) {
-		// NOTE: List.is takes a conformance witness now — equality of a List is
-		// its items' own equality — and there is no witness to hand it here.
-		// Recurse through this same universal comparison instead, which is what
-		// the native did before the witness arrived.
-		//
-		// NOTE: Through a view rather than off the Arrays, exactly as
-		// `List.is` does it — a List holds its items in two runs, and the two
-		// sides may be in different representations while holding the same
-		// items.
-		let first = viewOf(a)
-		let second = viewOf(b)
+	switch (aTag) {
+		case "Boolean":
+			return boolIs(a as BooleanType, b as BooleanType).value
+		case "String":
+			// NOTE: String.is is written in Essence now — it reads `compare`,
+			// which is lexicographic by code point over the NFC-normalised
+			// String, so it answers `Equal` for any two canonically equivalent
+			// Strings (an accent composed or decomposed). `stringEquals` above
+			// is that same answer without importing the whole comparison.
+			// Comparing the RAW representations, as this did, made the same
+			// pair of Strings equal on their own and unequal inside a Record.
+			return stringEquals(a as StringType, b as StringType)
+		case "Integer":
+		case "Rational":
+			// NOTE: The same cross-multiplication the differing tags reached,
+			// for the two same-kind pairings — a Rational holds the parts it
+			// was BUILT with, so two spellings of one value meet here as well.
+			return (
+				numeratorOf(a as IntegerType | RationalType) *
+					denominatorOf(b as IntegerType | RationalType) ===
+				numeratorOf(b as IntegerType | RationalType) *
+					denominatorOf(a as IntegerType | RationalType)
+			)
+		case "Algebraic": {
+			// NOTE: Algebraic.is is written in Essence now — it reads
+			// `compare`, which decides the sign of the difference symbolically.
+			// Normal forms make that the same answer as comparing the
+			// representation directly, which is what the deleted native did.
+			const other = b as AlgebraicType
 
-		if (first.total !== second.total) {
-			return false
+			return (
+				a.radicand === other.radicand &&
+				a.rationalPartNumerator === other.rationalPartNumerator &&
+				a.rationalPartDenominator === other.rationalPartDenominator &&
+				a.radicalCoefficientNumerator ===
+					other.radicalCoefficientNumerator &&
+				a.radicalCoefficientDenominator ===
+					other.radicalCoefficientDenominator
+			)
 		}
+		case "Transcendental": {
+			// NOTE: Transcendental.is is written in Essence now — it reads the
+			// `Number` Union's `is`, whose Transcendental/Transcendental cell
+			// is exact. Canonical forms make that the same answer as comparing
+			// the representation directly, which is what the deleted native
+			// did.
+			const other = b as TranscendentalType
 
-		for (let index = 0; index < first.total; index++) {
-			if (!anyIs(itemOfView(first, index), itemOfView(second, index))) {
+			return (
+				a.rationalPartNumerator === other.rationalPartNumerator &&
+				a.rationalPartDenominator === other.rationalPartDenominator &&
+				a.terms.length === other.terms.length &&
+				a.terms.every((term, index) => {
+					const otherTerm = other.terms[index]!
+
+					return (
+						term.base === otherTerm.base &&
+						term.coefficientNumerator ===
+							otherTerm.coefficientNumerator &&
+						term.coefficientDenominator ===
+							otherTerm.coefficientDenominator
+					)
+				})
+			)
+		}
+		case "Record":
+			return recordIs(a, b as RecordType).value
+		case "List": {
+			// NOTE: List.is takes a conformance witness now — equality of a
+			// List is its items' own equality — and there is no witness to hand
+			// it here. Recurse through this same universal comparison instead,
+			// which is what the native did before the witness arrived.
+			//
+			// NOTE: Through a view rather than off the Arrays, exactly as
+			// `List.is` does it — a List holds its items in two runs, and the
+			// two sides may be in different representations while holding the
+			// same items.
+			let first = viewOf(a)
+			let second = viewOf(b as ListType<AnyType>)
+
+			if (first.total !== second.total) {
 				return false
 			}
-		}
 
-		return true
-	} else if (
-		a[typeKeySymbol].includes("#") &&
-		a[typeKeySymbol] === b[typeKeySymbol]
-	) {
-		// NOTE: Case values (`Ordering#Less`, `CalculatorOperation#Add`) —
-		// the tag decides the Case (nominal), the payload members compare
-		// structurally like a Record's.
-		return recordIs(a as unknown as RecordType, b as unknown as RecordType)
-			.value
-	} else {
-		return false
+			for (let index = 0; index < first.total; index++) {
+				if (
+					!anyIs(itemOfView(first, index), itemOfView(second, index))
+				) {
+					return false
+				}
+			}
+
+			return true
+		}
+		default:
+			// NOTE: Case values (`Ordering#Less`, `CalculatorOperation#Add`) —
+			// the tag decides the Case (nominal) and it has already decided,
+			// since the two tags are the same one; the payload members compare
+			// structurally like a Record's. A tag carrying no `#` is no Case,
+			// and there is nothing left for it to be.
+			return aTag.includes("#")
+				? recordIs(
+						a as unknown as RecordType,
+						b as unknown as RecordType,
+					).value
+				: false
 	}
 }
 
