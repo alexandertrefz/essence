@@ -9,6 +9,7 @@ import type { RationalType } from "./Rational"
 import type { RecordType } from "./Record"
 import { is as recordIs } from "./Record"
 import type { StringType } from "./String"
+import { normalisedFormOf } from "./String"
 import type { AnyType } from "./type"
 import { isValueOfType, typeKeySymbol } from "./type"
 
@@ -46,18 +47,21 @@ function denominatorOf(number: IntegerType | RationalType): bigint {
 // importing it.
 //
 // NOTE: Identical code units are already canonically equivalent, so the
-// normalisation — which allocates twice — only has to run for a pair that
-// differs.
+// normal form is only asked for by a pair that differs.
+//
+// NOTE: And it is ASKED FOR rather than computed — `normalisedFormOf` remembers
+// it on the String, under a Symbol key beside its character view. Normalising
+// here computed it afresh for BOTH sides of every unequal comparison, which is
+// the common case in a search or a filter: one needle against a thousand
+// candidates normalised the needle a thousand times, and a pure-ASCII pair
+// normalised twice to be handed back what it already held.
 //
 // NOTE: It is exported because the Compiler emits a call to it:
 // `lower-scalar-operations` compiles `a::is(b)` on two Strings to this, rather
-// than writing the double normalisation out at every site. `anyIs` reads it too,
-// so there is one answer to the question rather than two that must agree.
+// than writing the comparison out at every site. `anyIs` reads it too, so there
+// is one answer to the question rather than two that must agree.
 export function stringEquals(a: StringType, b: StringType): boolean {
-	return (
-		a.value === b.value ||
-		a.value.normalize("NFC") === b.value.normalize("NFC")
-	)
+	return a.value === b.value || normalisedFormOf(a) === normalisedFormOf(b)
 }
 
 export function anyIs(a: AnyType, b: AnyType): boolean {

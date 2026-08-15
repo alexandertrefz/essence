@@ -24,14 +24,34 @@ export function createString(value: string): StringType {
 // one. NFC first means canonically equivalent Strings (an accent composed or
 // decomposed) have the SAME view, which is what makes `is`/`compare` agree.
 // The Segmenter is built once — constructing one per call is the expensive part.
-const graphemeSegmenter = new Intl.Segmenter(undefined, {
-	granularity: "grapheme",
-})
+//
+// NOTE: Built on FIRST USE rather than when the module is loaded, and that is
+// worth a named variable. Constructing one costs about a millisecond of table
+// loading, which every Program used to pay before its first Statement ran —
+// including the many that never segment anything, because ASCII counts by code
+// unit and the Symbol-keyed views answer the rest. It is remembered in a
+// variable rather than rebuilt, so a Program that DOES segment pays that
+// millisecond once, exactly as it did before.
+//
+// NOTE: It also keeps this module free of a top-level side effect, which is why
+// a Program can import `normalisedFormOf` — the answer `is` and `compare` are
+// decided by — without carrying the segmenter it does not reach.
+let graphemeSegmenter: Intl.Segmenter | null = null
+
+function segmenter(): Intl.Segmenter {
+	if (graphemeSegmenter === null) {
+		graphemeSegmenter = new Intl.Segmenter(undefined, {
+			granularity: "grapheme",
+		})
+	}
+
+	return graphemeSegmenter
+}
 
 function graphemesOf(value: string): Array<string> {
 	let result: Array<string> = []
 
-	for (let { segment } of graphemeSegmenter.segment(value.normalize("NFC"))) {
+	for (let { segment } of segmenter().segment(value.normalize("NFC"))) {
 		result.push(segment)
 	}
 
@@ -52,12 +72,22 @@ function graphemesOf(value: string): Array<string> {
 // that has been measured is indistinguishable from one that has not. And a
 // String is immutable, so a remembered answer can never go stale: the value the
 // answer was taken from is the value the wrapper still holds.
+// NOTE: The same remembering serves `is` and `compare`, which ask a different
+// question of the same String: what its NFC form is. Normalising allocates a
+// String per call and both sides of every comparison paid it, so sorting a
+// thousand names normalised twenty thousand times — for a thousand distinct
+// answers. `isAscii` is remembered beside it because it is what decides whether
+// there is anything to normalise at all.
 const graphemesKey = Symbol("$graphemes")
 const graphemeCountKey = Symbol("$graphemeCount")
+const isAsciiKey = Symbol("$isAscii")
+const normalisedKey = Symbol("$normalised")
 
 type MeasuredString = StringType & {
 	[graphemesKey]?: Array<string>
 	[graphemeCountKey]?: number
+	[isAsciiKey]?: boolean
+	[normalisedKey]?: string
 }
 
 // NOTE: The segmented view of a String, segmented at most once. The remembered
@@ -114,6 +144,45 @@ function isSingleUnitAscii(value: string): boolean {
 	return true
 }
 
+// NOTE: The scan above, remembered — it is asked by the count, by `append` and
+// by every comparison, and its answer can not change any more than the String
+// can. A remembered `true` is also what `append` PROPAGATES: joining two
+// carriage-return-free ASCII Strings can produce neither a non-ASCII unit nor a
+// carriage return, so the answer is known without scanning the join.
+function isAsciiIn(string: StringType): boolean {
+	let measured = string as MeasuredString
+	let answer = measured[isAsciiKey]
+
+	if (answer === undefined) {
+		answer = isSingleUnitAscii(string.value)
+		measured[isAsciiKey] = answer
+	}
+
+	return answer
+}
+
+// NOTE: The String's NFC form, normalised at most once — what `is` and
+// `compare` decide over, so that an accent written as one code point and the
+// same accent written as two are one String. It is the whole of the comparison
+// for equality (two NFC Strings hold the same characters exactly when their
+// code points match) and the text `compare` walks.
+//
+// NOTE: ASCII is already NFC — it carries no combining marks and no
+// decomposable character — so a String the scan above accepted IS its own
+// normal form and the JavaScript call is skipped outright. That is the common
+// case, and the one that used to allocate two Strings per unequal comparison.
+export function normalisedFormOf(string: StringType): string {
+	let measured = string as MeasuredString
+	let form = measured[normalisedKey]
+
+	if (form === undefined) {
+		form = isAsciiIn(string) ? string.value : string.value.normalize("NFC")
+		measured[normalisedKey] = form
+	}
+
+	return form
+}
+
 // NOTE: How many characters a String holds, counted at most once. A String
 // already segmented for some other Method is counted off that view rather than
 // scanned again.
@@ -126,7 +195,7 @@ function graphemeCountIn(string: StringType): number {
 
 		if (segments !== undefined) {
 			count = segments.length
-		} else if (isSingleUnitAscii(string.value)) {
+		} else if (isAsciiIn(string)) {
 			count = string.value.length
 		} else {
 			count = graphemesIn(string).length
@@ -138,11 +207,40 @@ function graphemeCountIn(string: StringType): number {
 	return count
 }
 
+// NOTE: The joined String is a NEW String and remembers nothing of either
+// operand's character view — grapheme boundaries are decided by NEIGHBOURS, so
+// the last cluster of one and the first of the other may join across the seam
+// (a base and a following combining mark, two regional indicators, a carriage
+// return and a line feed) and neither operand's clusters survive the join
+// intact.
+//
+// NOTE: With ONE exception, which is the whole point: the join of two Strings
+// the ASCII scan accepted is itself such a String, and its characters are its
+// code units. Both facts follow from what the scan excludes — a unit at or
+// above 128 (so no combining mark, no surrogate, nothing decomposable) and a
+// carriage return (so the CR LF cluster can not form at the seam either). So
+// the answer is marked ASCII and given the two counts added, and a loop that
+// builds a String by appending and reads its length per turn stops re-scanning
+// everything it has built so far.
 export function append(
 	originalString: StringType,
 	otherString: StringType,
 ): StringType {
-	return createString(originalString.value + otherString.value)
+	let joined = createString(
+		originalString.value + otherString.value,
+	) as MeasuredString
+
+	// NOTE: The count is the joined text's own unit count, which for two such
+	// operands is exactly the two counts added — each of them counts by unit
+	// for the same reason. Written this way rather than as the sum so that
+	// joining does not reach the counting Method at all, and a Program that
+	// only joins Strings carries no segmenter.
+	if (isAsciiIn(originalString) && isAsciiIn(otherString)) {
+		joined[isAsciiKey] = true
+		joined[graphemeCountKey] = joined.value.length
+	}
+
+	return joined
 }
 
 export function split(
@@ -297,31 +395,55 @@ export function compare__overload$1(
 	originalString: StringType,
 	otherString: StringType,
 ): OrderingType {
+	// NOTE: Identical text is identical text, whatever it holds — normalisation
+	// is a function of the String, so two Strings spelling the same units have
+	// the same normal form and nothing after this could answer anything but
+	// `Equal`. It is asked first because it is the case a sort spends most of
+	// its comparisons on the far side of: `a::is(b)` routes to `stringEquals`,
+	// but `sort` and `isLessThan` come through here.
+	if (originalString.value === otherString.value) {
+		return equal
+	}
+
 	// NOTE: Lexicographic by code point, over the NFC-normalised String — so a
 	// canonically equivalent pair (an accent composed or decomposed) compares
 	// `Equal`, and the order agrees with the grapheme view the character
 	// Methods take rather than JS's UTF-16 `<`. This is also the whole of
 	// String equality: `String.is` is `compare(other)::is(Ordering#Equal)` in
 	// Essence, so equality is canonical equivalence too.
-	let first = Array.from(originalString.value.normalize("NFC"))
-	let second = Array.from(otherString.value.normalize("NFC"))
-	let shared = Math.min(first.length, second.length)
+	//
+	// NOTE: Walked in place rather than through two Arrays of one-character
+	// Strings. `codePointAt` reads the whole code point at a position and a
+	// point above the Basic Multilingual Plane occupies two units, so stepping
+	// by that width visits exactly the elements `Array.from` used to build —
+	// and a lone surrogate, which is no whole point, is read and stepped over
+	// as the single unit it is, exactly as the iterator yielded it.
+	let first = normalisedFormOf(originalString)
+	let second = normalisedFormOf(otherString)
+	let firstIndex = 0
+	let secondIndex = 0
 
-	for (let index = 0; index < shared; index++) {
-		let firstPoint = first[index].codePointAt(0) as number
-		let secondPoint = second[index].codePointAt(0) as number
+	while (firstIndex < first.length && secondIndex < second.length) {
+		let firstPoint = first.codePointAt(firstIndex) as number
+		let secondPoint = second.codePointAt(secondIndex) as number
 
 		if (firstPoint < secondPoint) {
 			return less
 		} else if (firstPoint > secondPoint) {
 			return greater
 		}
+
+		firstIndex += firstPoint > 0xffff ? 2 : 1
+		secondIndex += secondPoint > 0xffff ? 2 : 1
 	}
 
-	if (first.length < second.length) {
-		return less
-	} else if (first.length > second.length) {
+	// NOTE: On an equal prefix the shorter String comes first, counted in code
+	// POINTS — which is what is left over here: every step above advanced both
+	// sides by one point, so whichever still has units has more points.
+	if (firstIndex < first.length) {
 		return greater
+	} else if (secondIndex < second.length) {
+		return less
 	} else {
 		return equal
 	}

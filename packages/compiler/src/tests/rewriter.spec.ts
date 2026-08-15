@@ -677,32 +677,41 @@ describe("Rewriter", () => {
 			// code-point behaviour is actually decided.
 
 			describe("append", () => {
+				// NOTE: The TEXT, not the wrapper. A joined String may carry
+				// what `append` worked out about it — that it is ASCII, and
+				// how many characters it therefore has — under Symbol keys,
+				// and `toEqual` sees those where `Object.keys` and everything
+				// else that reads a value does not. What this is about is
+				// which characters the join holds, so that is what it asks
+				// for; `unicodeEdges.spec.ts` is where the remembered answers
+				// are held to account.
 				it("appends any string to any other", () => {
 					expect(
-						string.append(stringEmpty(), string.createString("a")),
-					).toEqual(string.createString("a"))
+						string.append(stringEmpty(), string.createString("a"))
+							.value,
+					).toBe("a")
 
 					expect(
-						string.append(
-							stringEmpty(),
-							string.createString("abc"),
-						),
-					).toEqual(string.createString("abc"))
+						string.append(stringEmpty(), string.createString("abc"))
+							.value,
+					).toBe("abc")
 
 					expect(
-						string.append(stringEmpty(), string.createString("!")),
-					).toEqual(string.createString("!"))
+						string.append(stringEmpty(), string.createString("!"))
+							.value,
+					).toBe("!")
 
 					expect(
-						string.append(stringEmpty(), string.createString(" ")),
-					).toEqual(string.createString(" "))
+						string.append(stringEmpty(), string.createString(" "))
+							.value,
+					).toBe(" ")
 
 					expect(
 						string.append(
 							string.createString("a"),
 							string.createString("bc"),
-						),
-					).toEqual(string.createString("abc"))
+						).value,
+					).toBe("abc")
 				})
 			})
 
