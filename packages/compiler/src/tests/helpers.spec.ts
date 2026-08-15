@@ -120,6 +120,8 @@ describe("Helpers", () => {
 					start: { line: 0, column: 0 },
 					end: { line: 0, column: 0 },
 				},
+				start: 0,
+				end: 0,
 			}
 
 			let output: SimpleToken = {
@@ -141,6 +143,8 @@ describe("Helpers", () => {
 						start: { line: 0, column: 0 },
 						end: { line: 0, column: 0 },
 					},
+					start: 0,
+					end: 0,
 				},
 			]
 

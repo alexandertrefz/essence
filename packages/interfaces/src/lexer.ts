@@ -66,6 +66,14 @@ export interface Token {
 	value: string
 	type: TokenType
 	position: Position
+	// NOTE: Where the Token stands in the source as absolute offsets — `start`
+	// is the first character of it, `end` the one after its last, so
+	// `source.slice(start, end)` is the Token as it was written. The same span
+	// `position` describes, counted the one way that needs no line table: it is
+	// what an incremental Lexer would key its reuse on, and what maps an editor
+	// position onto a Token without walking lines. Nothing reads them yet.
+	start: number
+	end: number
 }
 
 export interface SimpleToken {

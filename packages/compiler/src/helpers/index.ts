@@ -257,12 +257,19 @@ export function stripPositionFromArray(
 	return tokens.map((value) => stripPosition(value))
 }
 
+// NOTE: A Token with everything that says WHERE it is taken off it, leaving the
+// Token itself — which is what a test about what was lexed wants to compare.
+// The absolute offsets go with the Position they duplicate; lexer.spec.ts
+// asserts them where they are the point, and everywhere else they would only be
+// the same fact written twice in every expected Token.
 export function stripPosition(
 	token: lexer.Token | undefined,
 ): lexer.SimpleToken | undefined {
 	let tokenCopy: lexer.SimpleToken | undefined = structuredClone(token)
 	if (tokenCopy) {
 		;(tokenCopy as any).position = undefined
+		;(tokenCopy as any).start = undefined
+		;(tokenCopy as any).end = undefined
 		return tokenCopy
 	}
 
