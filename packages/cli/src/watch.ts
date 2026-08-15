@@ -40,7 +40,6 @@ export async function runWatch(
 	let { palette, terminal, theme } = context
 	let plan = await planCompilation(context, command, files, {
 		emit: options.emit,
-		watch: true,
 	})
 
 	let signatures = new Map<string, string>()

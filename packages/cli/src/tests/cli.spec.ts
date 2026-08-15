@@ -707,67 +707,90 @@ describe("CLI", () => {
 	})
 
 	describe("worker dispatch", () => {
-		it("stays on the main thread for one small file", () => {
+		// NOTE: One entry is one graph and a graph is one worker's, so a second
+		// worker has nothing to take — however large the file is.
+		it("stays on the main thread for one file", () => {
 			expect(
 				shouldUseWorkers({
 					fileCount: 1,
 					totalBytes: 400,
-					watch: false,
+					emit: true,
 					jobs: undefined,
 				}),
 			).toBe(false)
-		})
-
-		it("uses workers for several files", () => {
-			expect(
-				shouldUseWorkers({
-					fileCount: 4,
-					totalBytes: 400,
-					watch: false,
-					jobs: undefined,
-				}),
-			).toBe(true)
-		})
-
-		// NOTE: A large single file is the case the workers exist for — the
-		// Enricher blocks for long enough that the main thread could not draw.
-		it("uses a worker for one large file", () => {
 			expect(
 				shouldUseWorkers({
 					fileCount: 1,
 					totalBytes: 200_000,
-					watch: false,
+					emit: false,
 					jobs: undefined,
 				}),
-			).toBe(true)
+			).toBe(false)
 		})
 
-		it("keeps warm workers for a watch session", () => {
+		it("uses workers for a batch that emits", () => {
 			expect(
 				shouldUseWorkers({
-					fileCount: 1,
-					totalBytes: 10,
-					watch: true,
+					fileCount: 4,
+					totalBytes: 4_000,
+					emit: true,
+					jobs: undefined,
+				}),
+			).toBe(false)
+			expect(
+				shouldUseWorkers({
+					fileCount: 8,
+					totalBytes: 4_000,
+					emit: true,
 					jobs: undefined,
 				}),
 			).toBe(true)
 		})
 
-		it("honours --jobs 1", () => {
+		// NOTE: Checking divides enrichment and nothing else, and there is not
+		// enough of it to divide until the batch is a quarter of a megabyte.
+		it("keeps a check on the main thread until the sources are large", () => {
+			expect(
+				shouldUseWorkers({
+					fileCount: 40,
+					totalBytes: 130_000,
+					emit: false,
+					jobs: undefined,
+				}),
+			).toBe(false)
+			expect(
+				shouldUseWorkers({
+					fileCount: 6,
+					totalBytes: 430_000,
+					emit: false,
+					jobs: undefined,
+				}),
+			).toBe(true)
+		})
+
+		it("honours an explicit --jobs either way", () => {
 			expect(
 				shouldUseWorkers({
 					fileCount: 40,
 					totalBytes: 900_000,
-					watch: true,
+					emit: true,
 					jobs: 1,
 				}),
 			).toBe(false)
+			expect(
+				shouldUseWorkers({
+					fileCount: 1,
+					totalBytes: 10,
+					emit: false,
+					jobs: 4,
+				}),
+			).toBe(true)
 		})
 
 		it("never asks for more workers than there are files", () => {
 			expect(defaultWorkerCount(1)).toBe(1)
 			expect(defaultWorkerCount(2)).toBeLessThanOrEqual(2)
-			expect(defaultWorkerCount(1000)).toBeLessThanOrEqual(8)
+			expect(defaultWorkerCount(1000)).toBeLessThanOrEqual(4)
 		})
 
 		// NOTE: The worker is booted as whatever `pool.ts` itself is running

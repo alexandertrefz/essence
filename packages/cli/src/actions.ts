@@ -46,7 +46,6 @@ async function compileAll(
 ): Promise<CompilationResult> {
 	let plan = await planCompilation(context, command, files, {
 		emit: options.emit,
-		watch: false,
 	})
 
 	try {
