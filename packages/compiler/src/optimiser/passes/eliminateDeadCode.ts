@@ -1,7 +1,6 @@
 import type { common } from "@essence-lang/interfaces"
 
 import type { OptimiserPass } from "../index"
-import { declaredNamespaces } from "../namespaces"
 import { isPureExpression } from "../purity"
 import { rewriteNodes } from "../walk"
 
@@ -34,8 +33,8 @@ import { rewriteNodes } from "../walk"
 
 export const eliminateDeadCode: OptimiserPass = {
 	name: "eliminate-dead-code",
-	run: (program) => {
-		let shadowed = declaredNamespaces(program).nested
+	run: (program, namespaces) => {
+		let shadowed = namespaces.nested
 		let read = namesReadBy(program)
 
 		return rewriteNodes(program, {

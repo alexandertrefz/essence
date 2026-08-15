@@ -16,6 +16,7 @@ import {
 	optimiserPasses,
 	optimiserPassNames,
 } from "../optimiser/index"
+import { declaredNamespaces } from "../optimiser/namespaces"
 import { eliminateDeadCode } from "../optimiser/passes/eliminateDeadCode"
 import { poolConstants } from "../optimiser/passes/poolConstants"
 import { pruneDeadMatchArms } from "../optimiser/passes/pruneDeadMatchArms"
@@ -3982,7 +3983,12 @@ describe("Optimiser", () => {
 
 			expect(
 				matchHandlerCount(program) -
-					matchHandlerCount(pruneDeadMatchArms.run(program)),
+					matchHandlerCount(
+						pruneDeadMatchArms.run(
+							program,
+							declaredNamespaces(program),
+						),
+					),
 			).toBe(unreachable.length)
 		})
 
@@ -4011,7 +4017,9 @@ describe("Optimiser", () => {
 			// only ever ascend.
 			let program = simplifiedSource(deadMatchArms)
 			let before = matchMatchers(program)
-			let after = matchMatchers(pruneDeadMatchArms.run(program))
+			let after = matchMatchers(
+				pruneDeadMatchArms.run(program, declaredNamespaces(program)),
+			)
 
 			expect(after).toHaveLength(before.length)
 
@@ -4286,10 +4294,17 @@ describe("Optimiser", () => {
 			}
 
 			expect(
-				declaredConstantNames(eliminateDeadCode.run(program)),
+				declaredConstantNames(
+					eliminateDeadCode.run(program, declaredNamespaces(program)),
+				),
 			).toEqual([])
 			expect(
-				declaredConstantNames(eliminateDeadCode.run(exported)),
+				declaredConstantNames(
+					eliminateDeadCode.run(
+						exported,
+						declaredNamespaces(exported),
+					),
+				),
 			).toEqual(["shared"])
 		})
 
@@ -4506,7 +4521,10 @@ describe("Optimiser", () => {
 			}
 
 			function keyOf(program: common.typedSimple.Program): string {
-				let node = poolConstants.run(program).implementation.nodes[0]!
+				let node = poolConstants.run(
+					program,
+					declaredNamespaces(program),
+				).implementation.nodes[0]!
 
 				expect(node.nodeType).toBe("Intrinsic")
 

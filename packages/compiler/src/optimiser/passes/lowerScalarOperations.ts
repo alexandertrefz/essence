@@ -1,7 +1,6 @@
 import type { common } from "@essence-lang/interfaces"
 
 import type { OptimiserPass } from "../index"
-import { declaredNamespaces } from "../namespaces"
 import { isPureExpression, withoutOverloadSuffix } from "../purity"
 import { rewriteExpressions } from "../walk"
 
@@ -37,7 +36,7 @@ import { rewriteExpressions } from "../walk"
 
 export const lowerScalarOperations: OptimiserPass = {
 	name: "lower-scalar-operations",
-	run: (program) => {
+	run: (program, namespaces) => {
 		// NOTE: A Program may write `namespace Integer for Integer` in a block
 		// of its own and give it an `isLessThan` that answers whatever it likes
 		// — the name is free there, and it stands in front of the builtin for
@@ -53,7 +52,7 @@ export const lowerScalarOperations: OptimiserPass = {
 		// to LOWER `5::isLessThan(3)` says nothing about whether that call may
 		// be skipped where it stands as the Argument of an `and` — and it may
 		// not, for exactly the reason it may not be lowered.
-		let shadowed = declaredNamespaces(program).nested
+		let shadowed = namespaces.nested
 
 		return rewriteExpressions(program, (node) => lower(node, shadowed))
 	},
