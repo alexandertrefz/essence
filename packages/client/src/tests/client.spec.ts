@@ -127,8 +127,13 @@ describe("Loading a Module", () => {
 
 		let squared = call(math, "square", math.bridge.integer(12n))
 
+		// NOTE: The BUNDLE's own value, read without marshalling it — so what
+		// it holds is the hybrid Integer's own representation, a number for
+		// anything a double carries exactly. `toJS` is what makes an Integer a
+		// bigint on the way out, and this call deliberately does not go
+		// through it.
 		expect(tagOf(math.bridge, squared)).toBe("Integer")
-		expect(fieldOf(squared, "value")).toBe(144n)
+		expect(fieldOf(squared, "value")).toBe(144)
 	})
 
 	it("hands back the Module's own values, not JavaScript ones", async () => {
@@ -241,7 +246,7 @@ describe("The Runtime Bridge", () => {
 		}
 
 		expect(tagOf(escaped.bridge, userConstant)).toBe("Integer")
-		expect(fieldOf(userConstant, "value")).toBe(12n)
+		expect(fieldOf(userConstant, "value")).toBe(12)
 	})
 
 	// NOTE: The runtime's `createList` TAKES OWNERSHIP of the Array it is given
@@ -415,7 +420,7 @@ export {
 					).toHaveLength(2)
 					expect(
 						fieldOf(edited.raw.value as EssenceValue, "value"),
-					).toBe(2n)
+					).toBe(2)
 				})
 			},
 		)

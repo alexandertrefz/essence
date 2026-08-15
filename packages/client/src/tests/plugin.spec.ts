@@ -117,11 +117,11 @@ export const typeKey = $bridge_typeKey
 		let bundle = await built(directory, "entry.js", "out.mjs")
 		let typeKey = bundle.typeKey as symbol
 		let squared = bundle.squared as Record<symbol, unknown> & {
-			value: bigint
+			value: number
 		}
 
 		expect(squared[typeKey]).toBe("Integer")
-		expect(squared.value).toBe(144n)
+		expect(squared.value).toBe(144)
 		expect((bundle.pi as Record<symbol, unknown>)[typeKey]).toBe("Rational")
 	})
 
@@ -153,11 +153,11 @@ export const typeKey = $bridge_typeKey
 		})
 		let bundle = await built(directory, "entry.js", "out.mjs")
 		let answer = bundle.answer as Record<symbol, unknown> & {
-			value: bigint
+			value: number
 		}
 
 		expect(answer[bundle.typeKey as symbol]).toBe("Integer")
-		expect(answer.value).toBe(50n)
+		expect(answer.value).toBe(50)
 	})
 
 	it("reports a Module that does not compile as a build failure", async () => {
@@ -282,8 +282,8 @@ export const trebled = tripled(otherInteger(4n))
 		})
 		let bundle = await built(directory, "entry.js", "twoGraphs.mjs")
 
-		expect((bundle.squared as { value: bigint }).value).toBe(144n)
-		expect((bundle.trebled as { value: bigint }).value).toBe(12n)
+		expect((bundle.squared as { value: number }).value).toBe(144)
+		expect((bundle.trebled as { value: number }).value).toBe(12)
 	})
 })
 

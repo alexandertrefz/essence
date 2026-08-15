@@ -263,7 +263,7 @@ function isPureIntrinsic(
 //
 // NOTE: The Namespace name is the Type name on purpose: `Integer`'s entry is the
 // Method called on an Integer and GIVEN an Integer, which is the shape whose
-// body is a bigint operation. `add` and the comparisons are Overloads that also
+// body is exact integer arithmetic and nothing else. `add` and the comparisons are Overloads that also
 // take a Rational, an Algebraic and a Transcendental, and those entries are
 // written on the covering `Number` Namespace rather than on the native — a
 // different Method, weighed separately or not at all. Requiring the Types
@@ -273,8 +273,8 @@ function isPureIntrinsic(
 // NOTE: It is short on purpose, and every entry is here for the same three
 // reasons: the Method prints nothing and assigns nothing, it answers for EVERY
 // value of its Parameter Types rather than throwing for some of them, and it
-// terminates in a bounded number of steps. `Integer`'s entries are bigint
-// operations and the Essence one-liners written on them; `Boolean`'s are the
+// terminates in a bounded number of steps. `Integer`'s entries are exact integer
+// arithmetic and the Essence one-liners written on them; `Boolean`'s are the
 // two interned instances and the logic over them.
 //
 // NOTE: `String`'s entries are the comparisons and `toString`, and they earn
@@ -288,7 +288,7 @@ function isPureIntrinsic(
 //
 // NOTE: `toString` is on every entry that has one, because a hole of an
 // interpolated String is a call of exactly that Method and is weighed here.
-// `Integer`'s is a bigint's decimal spelling, `Boolean`'s is the Conditional
+// `Integer`'s is its value's decimal spelling, `Boolean`'s is the Conditional
 // that answers one of two literals, `Rational`'s is its numerator and
 // denominator with a slash between them. `Rational` is otherwise absent: its
 // arithmetic reduces through a gcd on every operation, which is a decision

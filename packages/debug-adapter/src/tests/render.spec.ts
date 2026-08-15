@@ -39,7 +39,7 @@ function describeOne(value: unknown): DescribedValue {
 const integers = (...values: Array<number>): ListType<IntegerType> =>
 	createList(values.map((value) => createInteger(BigInt(value))))
 
-const valuesOf = (items: Array<unknown>): Array<bigint> =>
+const valuesOf = (items: Array<unknown>): Array<number | bigint> =>
 	items.map((item) => (item as IntegerType).value)
 
 describe("the in-debuggee renderer", () => {
@@ -190,7 +190,7 @@ describe("the in-debuggee List reader", () => {
 
 		append(base, createInteger(9n))
 
-		expect(valuesOf(listItems(upgraded))).toEqual([1n, 2n, 3n])
+		expect(valuesOf(listItems(upgraded))).toEqual([1, 2, 3])
 	})
 
 	it("answers nothing for a box whose view is empty", () => {

@@ -25,33 +25,33 @@ const flag = "\u{1F1E9}\u{1F1EA}"
 
 describe("counting characters", () => {
 	test("ASCII counts by code unit", () => {
-		expect(countOf("")).toBe(0n)
-		expect(countOf("a")).toBe(1n)
-		expect(countOf("hello world!")).toBe(12n)
-		expect(countOf("\t\n ~")).toBe(4n)
+		expect(countOf("")).toBe(0)
+		expect(countOf("a")).toBe(1)
+		expect(countOf("hello world!")).toBe(12)
+		expect(countOf("\t\n ~")).toBe(4)
 	})
 
 	// NOTE: The fast path's one exception. CR LF is a SINGLE grapheme cluster,
 	// so counting code units would answer one too many for every line break a
 	// Windows-authored text carries — the String has to be segmented properly.
 	test("a carriage return declines the fast path", () => {
-		expect(countOf("a\r\nb")).toBe(3n)
-		expect(countOf("\r\n")).toBe(1n)
-		expect(countOf("a\rb")).toBe(3n)
-		expect(countOf("a\nb")).toBe(3n)
+		expect(countOf("a\r\nb")).toBe(3)
+		expect(countOf("\r\n")).toBe(1)
+		expect(countOf("a\rb")).toBe(3)
+		expect(countOf("a\nb")).toBe(3)
 	})
 
 	test("canonically equivalent text counts alike", () => {
 		expect(composed).not.toBe(decomposed)
-		expect(countOf(composed)).toBe(4n)
-		expect(countOf(decomposed)).toBe(4n)
+		expect(countOf(composed)).toBe(4)
+		expect(countOf(decomposed)).toBe(4)
 	})
 
 	test("a joined emoji is one character", () => {
 		expect(family.length).toBe(11)
-		expect(countOf(family)).toBe(1n)
-		expect(countOf(`a${family}b`)).toBe(3n)
-		expect(countOf(flag)).toBe(1n)
+		expect(countOf(family)).toBe(1)
+		expect(countOf(`a${family}b`)).toBe(3)
+		expect(countOf(flag)).toBe(1)
 	})
 
 	// NOTE: The remembered count has to be the count, however the value was
@@ -181,7 +181,7 @@ describe("reversing", () => {
 		expect(
 			split(reversed, createString("")).value.map((piece) => piece.value),
 		).toEqual(["🇨", "🇦🇧"])
-		expect(length(reversed).value).toBe(2n)
+		expect(length(reversed).value).toBe(2)
 	})
 
 	test("reversing twice answers the original", () => {
@@ -201,7 +201,7 @@ describe("reversing", () => {
 		let pieces = split(reversed, createString("🇨"))
 
 		expect(pieces.value.map((piece) => piece.value)).toEqual(["", "🇦🇧"])
-		expect(length(pieces.value[0]!).value).toBe(0n)
-		expect(length(pieces.value[1]!).value).toBe(1n)
+		expect(length(pieces.value[0]!).value).toBe(0)
+		expect(length(pieces.value[1]!).value).toBe(1)
 	})
 })

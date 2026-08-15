@@ -16,7 +16,14 @@ import type { AnyType } from "./type"
 import { isValueOfType, typeKeySymbol } from "./type"
 
 export function getInt32(number: IntegerType): number {
-	return Number(BigInt.asIntN(32, number.value))
+	let value = number.value
+
+	// NOTE: `| 0` IS `BigInt.asIntN(32, …)` for an integer a double holds
+	// exactly — both keep the low 32 bits and read them signed — without
+	// building a bigint to throw away.
+	return typeof value === "number"
+		? value | 0
+		: Number(BigInt.asIntN(32, value))
 }
 
 // NOTE: Integer and Rational — the two members of the numeric tower that spell
@@ -33,7 +40,9 @@ function isRationalKind(value: AnyType): value is IntegerType | RationalType {
 }
 
 function numeratorOf(number: IntegerType | RationalType): bigint {
-	return number[typeKeySymbol] === "Integer" ? number.value : number.numerator
+	return number[typeKeySymbol] === "Integer"
+		? BigInt(number.value)
+		: number.numerator
 }
 
 function denominatorOf(number: IntegerType | RationalType): bigint {
@@ -149,9 +158,18 @@ export function anyIs(a: AnyType, b: AnyType): boolean {
 			// pair of Strings equal on their own and unequal inside a Record.
 			return stringEquals(a as StringType, b as StringType)
 		case "Integer":
+			// NOTE: Two Integers by `===` on what they hold, which is the whole
+			// answer under the canonical invariant: one mathematical Integer
+			// has one representation, so equal values compare equal and
+			// unequal ones can not — a number and a bigint are unequal to
+			// `===` and are, since their magnitudes must differ to be spelled
+			// differently. It is answered here rather than by falling into the
+			// Rational cell below so that comparing two Integers — which is
+			// most comparisons — costs neither a bigint nor a multiplication.
+			return a.value === (b as IntegerType).value
 		case "Rational":
 			// NOTE: The same cross-multiplication the differing tags reached,
-			// for the two same-kind pairings — a Rational holds the parts it
+			// for a Rational against a Rational — a Rational holds the parts it
 			// was BUILT with, so two spellings of one value meet here as well.
 			return (
 				numeratorOf(a as IntegerType | RationalType) *

@@ -38,15 +38,16 @@ import { rewriteExpressions } from "../walk"
 // operator, so where the matched value's Type and the literal are EXACTLY one
 // scalar kind, the raw comparison is what is written:
 //
-//   _self.value === 0n
+//   _self.value === $pool_0.value
 //
 // That is the same lowering `lower-scalar-operations` performs for `a::is(b)`,
 // and it rests on the same argument: `Integer` means an Integer and nothing else
 // — not a Union it is a member of, not a Type Parameter that could be one — so
 // the value at run time is the branded object the runtime's constructor built,
-// holding a bigint under `value`. A Union-typed scrutinee is left alone, because
-// a value arriving there may be of any member and `.value` is not what decides
-// it. Strings go through `$helpers.stringEquals` rather than `===`, exactly as
+// holding under `value` the ONE representation the canonical invariant gives it,
+// which is what lets the comparison be `===` at all. A Union-typed scrutinee is
+// left alone, because a value arriving there may be of any member and `.value`
+// is not what decides it. Strings go through `$helpers.stringEquals` rather than `===`, exactly as
 // that pass emits them: two Strings are equal when their CHARACTERS are, which
 // is a comparison of canonically normalised forms.
 //

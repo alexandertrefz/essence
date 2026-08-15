@@ -341,8 +341,14 @@ export function ends(
 // exactly what `List.positionFromEnd` does for a List, which is what these
 // Methods used to reach through, and it is spelled here rather than imported so
 // that a Program slicing Strings carries no List.
-function positionFromEnd(index: bigint, count: number): bigint {
-	return index < 0n ? index + BigInt(count) : index
+function positionFromEnd(index: number | bigint, count: number): number {
+	// NOTE: A bigint index is past either end of any String, for the reason
+	// `List.positionFromEnd` states.
+	if (typeof index !== "number") {
+		return index < 0n ? -1 : count
+	}
+
+	return index < 0 ? index + count : index
 }
 
 // NOTE: Native — one read out of the grapheme view, where the Essence body
@@ -362,11 +368,11 @@ export function character(
 	let characters = graphemesIn(originalString)
 	let position = positionFromEnd(index.value, characters.length)
 
-	if (position < 0n || position >= BigInt(characters.length)) {
+	if (position < 0 || position >= characters.length) {
 		return createEmpty()
 	}
 
-	return createValue(createString(characters[Number(position)]!))
+	return createValue(createString(characters[position]!))
 }
 
 // NOTE: Native — the characters between two positions, where the Essence body
@@ -386,17 +392,17 @@ export function slice(
 	to: IntegerType,
 ): StringType {
 	let characters = graphemesIn(originalString)
-	let count = BigInt(characters.length)
-	let first = positionFromEnd(from.value, characters.length)
-	let last = positionFromEnd(to.value, characters.length)
-	let start = first < 0n ? 0n : first > count ? count : first
-	let end = last < 0n ? 0n : last > count ? count : last
+	let count = characters.length
+	let first = positionFromEnd(from.value, count)
+	let last = positionFromEnd(to.value, count)
+	let start = first < 0 ? 0 : first > count ? count : first
+	let end = last < 0 ? 0 : last > count ? count : last
 
 	if (end <= start) {
 		return createSegmentedString([])
 	}
 
-	return createSegmentedString(characters.slice(Number(start), Number(end)))
+	return createSegmentedString(characters.slice(start, end))
 }
 
 // NOTE: Native — the String joined to itself, where the Essence body built a
@@ -412,7 +418,8 @@ export function repeat(
 	originalString: StringType,
 	count: IntegerType,
 ): StringType {
-	if (count.value < 1n) {
+	// NOTE: `1` rather than `1n`, for the reason `List.split` gives.
+	if (count.value < 1) {
 		return createString("")
 	}
 
@@ -551,5 +558,5 @@ export function compare__overload$1(
 // `split`/`characters`/`slice`/`reverse` take, so a base and its combining
 // marks — or a ZWJ emoji — count as the one character a reader sees.
 export function length(originalString: StringType): IntegerType {
-	return createInteger(BigInt(graphemeCountIn(originalString)))
+	return createInteger(graphemeCountIn(originalString))
 }

@@ -271,8 +271,24 @@ describe("Bundle Size", () => {
 	// collects the other side of that: String.es falls 1,851 to 25,406, which is
 	// 807 BELOW where it started, because `characters`, `List.slice`, `List.item`
 	// and `List.repeat` stop being reached through them at all.
+	//
+	// NOTE: It now measures 68,476, up 4,822, and the ceiling moved to keep
+	// ~1 kB of headroom. The hybrid Integer is what grew it, and it grew the
+	// TEXT rather than the work: an emitted `+`, `-` or `*` is now a guard —
+	// two `typeof` reads and a pair of bounds on the answer — around the object
+	// literal it used to be, and the answer's bound is a sixteen-digit number
+	// written twice a site. Everyday performs arithmetic in twelve places it
+	// can guard in line, which is about 3.3 kB of that; the rest is the three
+	// escape entries and the canonicalisation the runtime gained. What RUNS is
+	// between 1.4× and 2.2× faster on every arithmetic-bearing benchmark.
+	//
+	// NOTE: 68,858 now, up 382, and the ceiling STAYS: the three escape entries
+	// each gained the arm that skips a canonicalisation the answer can not need.
+	// Minifying does not take the guard back — it shortens the names AROUND a
+	// pair of sixteen-digit literals it can not fold — so the figure this file
+	// measures is the one to read.
 	it("keeps Everyday.es from dragging in the whole numeric tower", async () => {
-		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(64_700)
+		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(69_500)
 	})
 
 	// NOTE: Measured 42,719 bytes; a reintroduced `Number` spread was 54,849.
@@ -430,6 +446,10 @@ describe("Bundle Size", () => {
 
 		expect(inBundle.length).toBeGreaterThan(0)
 		expect(inBundle.length).toBeLessThanOrEqual(inPrelude.length)
-		expect(result.outputs[0]!.contents.byteLength).toBeLessThan(12_200)
+		// NOTE: 14,683 since the hybrid Integer, for the reason Everyday's
+		// figure rose: the prelude carries the standard library's own
+		// arithmetic, and each site it can guard in line is a guard wider than
+		// the operation it wraps.
+		expect(result.outputs[0]!.contents.byteLength).toBeLessThan(15_500)
 	})
 })

@@ -22,9 +22,12 @@ import { rewriteExpressions } from "../walk"
 // NOTE: What makes it safe is that the Types are EXACT. `Integer` means an
 // Integer and nothing else — not a Union it is a member of, not a Type
 // Parameter that could be one — so the value at run time is the branded object
-// the runtime's own constructor built, holding a bigint under `value`. Every
-// operation below is then what the runtime Method does to that bigint, with the
-// call taken out: exact arithmetic, a total order, and structural equality.
+// the runtime's own constructor built, holding a number or a bigint under
+// `value` and holding whichever of the two the canonical invariant gives that
+// value. Every operation below is then what the runtime Method does to what is
+// under there, with the call taken out: exact arithmetic, a total order, and
+// structural equality. Equality is `===` because the invariant leaves one
+// spelling per value; the arithmetic carries the guard that keeps it that way.
 // Mixed kinds are left alone — an Integer beside a Rational is a widening the
 // covering Namespace decides, and cross-multiplication is not `===`.
 //
@@ -389,9 +392,10 @@ function rawBooleanOf(
 
 // NOTE: The opposite of a raw test, asked rather than negated wherever the test
 // has an opposite to ask. Each rewrite below is an identity over the values
-// that can reach it: the Integers a `raw-compare` reads hold bigints and are
-// totally ordered, with no value unequal to itself the way a floating-point NaN
-// is, so `!(a < b)` and `a >= b` decide the same thing; `!(a === b)` is
+// that can reach it: the Integers a `raw-compare` reads are totally ordered
+// whichever of their two representations each is holding, with no value unequal
+// to itself the way a floating-point NaN is, so `!(a < b)` and `a >= b` decide
+// the same thing; `!(a === b)` is
 // `a !== b`; and a tag either is the tag or is not. What is left over —
 // anything else — becomes JavaScript's own `!`, and `!` over a `!` is the
 // operand again.

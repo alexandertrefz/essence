@@ -140,9 +140,9 @@ export { reverse, sort__overload$1, sort__overload$2 } from "./List"
 // leave the List alone. Every case keeps the length, which is the whole of why
 // the receiver's proof is still good for the answer.
 //
-// NOTE: The position is resolved from the end in bigint before it narrows,
-// exactly as `slice` and `insert` do and for the same reason — a position past
-// 2³¹ narrowed first would come out as an unrelated one.
+// NOTE: The position is resolved from the end exactly as `slice` and `insert`
+// resolve theirs, through `List.positionFromEnd`, so an index past either end
+// stays past it.
 //
 // NOTE: One item changes, so only the RUN holding it is copied and the other
 // rides along by reference. A List built at both ends pays for the half the
@@ -155,14 +155,12 @@ export function replace<ItemType extends AnyType>(
 	at: IntegerType,
 ): ListType<ItemType> {
 	let view = runsOf(originalList)
-	let length = BigInt(view.total)
-	let requested = positionFromEnd(at.value, length)
+	let length = view.total
+	let position = positionFromEnd(at.value, length)
 
-	if (requested < 0n || requested >= length) {
+	if (position < 0 || position >= length) {
 		return originalList
 	}
-
-	let position = Number(requested)
 
 	if (position < view.frontCount) {
 		let front = view.front.slice(0, view.frontCount)

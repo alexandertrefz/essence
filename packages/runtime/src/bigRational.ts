@@ -95,8 +95,13 @@ export function rationalSign(rational: BigRational): -1n | 0n | 1n {
 }
 
 export function bigRationalOf(value: IntegerType | RationalType): BigRational {
+	// NOTE: THE boundary between the hybrid Integer and the numeric tower.
+	// Everything past here — Rational, Algebraic, Transcendental — is written
+	// on pairs of bigints, and this is the one place an Integer that may be
+	// holding a number is normalised into one, so the tower needs to know
+	// nothing about the two representations.
 	if (value[typeKeySymbol] === "Integer") {
-		return { numerator: value.value, denominator: 1n }
+		return { numerator: BigInt(value.value), denominator: 1n }
 	}
 
 	return reduced(value.numerator, value.denominator)

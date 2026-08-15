@@ -497,7 +497,7 @@ describe("Rewriter", () => {
 					}
 
 					let double = (value: integer.IntegerType) =>
-						integer.createInteger(value.value * 2n)
+						integer.product(value.value, 2)
 
 					// NOTE: A Function value carries no Type key — `typeof` is
 					// the whole check, because the Signature is erased by the
@@ -1208,10 +1208,7 @@ describe("Rewriter", () => {
 							(
 								accumulator: integer.IntegerType,
 								item: integer.IntegerType,
-							) =>
-								integer.createInteger(
-									accumulator.value + item.value,
-								),
+							) => integer.sum(accumulator.value, item.value),
 						),
 					).toEqual(integer.createInteger(103n))
 				})

@@ -43,7 +43,7 @@ math.exports.square(12n) // 144n
 
 | Essence           | JavaScript                            |
 | ----------------- | ------------------------------------- |
-| `Integer`         | `bigint`                              |
+| `Integer`         | `bigint` out; `bigint` or a safe `number` in |
 | `Rational`        | `EssenceRational`                     |
 | `String`          | `string`, normalised to NFC on the way in |
 | `Boolean`         | `boolean`                             |
@@ -55,7 +55,11 @@ math.exports.square(12n) // 144n
 The mapping loses nothing in either direction. There is no JavaScript number
 for `1/3`, so a `Rational` crosses as its two `bigint` parts; a `number` handed
 back to one is read for the value it actually holds, so `0.1` becomes
-`3602879701896397/36028797018963968` rather than `1/10`. Where there is no
+`3602879701896397/36028797018963968` rather than `1/10`. An `Integer` goes out
+as a `bigint` at every size — one kind out, so a call's Type does not depend on
+how big its answer happened to be — and comes in as either a `bigint` or a
+`number` that is exactly an integer a double holds, `2 ** 53` being refused
+rather than accepted already wrong. Where there is no
 lossless spelling at all the value is refused rather than approximated: an
 `Optional` inside an `Optional` would be `undefined` at both levels, and
 `#Value(#Empty)` is not `#Empty`.
@@ -202,8 +206,14 @@ turns it on in a build or off in a server.
 
 `raw` holds every export under the name its author wrote and marshals nothing.
 Values there are Essence's own: an Integer is a tagged object holding a
-`bigint`, and the Symbol it is tagged with is minted when the bundle is
-evaluated, so the constructors come out of that bundle too, on `bridge`.
+`number` while its value is one a double carries exactly and a `bigint` beyond
+that, and the Symbol it is tagged with is minted when the bundle is evaluated,
+so the constructors come out of that bundle too, on `bridge`. Those constructors
+take the same numbers the marshalled door does and refuse the same ones —
+`$bridge_integer(1.5)` and `$bridge_integer(2 ** 53)` throw rather than tag a
+value that is not an Integer. The marshalled
+door does not show that split — `toJS` answers a `bigint` for every Integer, so
+that an export's Type does not change the day a value crosses 2^53.
 `marshaller` is the same boundary `exports` was built through, bound to it.
 
 ```js

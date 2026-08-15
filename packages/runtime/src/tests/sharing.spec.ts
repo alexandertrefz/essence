@@ -4,7 +4,12 @@ import type { common } from "@essence-lang/interfaces"
 
 import { createBoolean } from "../Boolean"
 import type { IntegerType } from "../Integer"
-import { compare as compareIntegers, createInteger } from "../Integer"
+import {
+	compare as compareIntegers,
+	createInteger,
+	product,
+	sum,
+} from "../Integer"
 import { anyIs } from "../internalHelpers"
 import {
 	append__overload$1 as append,
@@ -412,26 +417,22 @@ describe("every native against an upgraded receiver", () => {
 
 	test("map, keepEvery and both folds", () => {
 		expect(
-			itemsOf(
-				map(upgraded(), (each) =>
-					createInteger(each.value * each.value),
-				),
-			),
+			itemsOf(map(upgraded(), (each) => product(each.value, each.value))),
 		).toEqual([1, 4, 9, 16, 25])
 
 		expect(
 			itemsOf(
 				keepEvery(upgraded(), (each) =>
-					createBoolean(each.value % 2n === 0n),
+					createBoolean(Number(each.value) % 2 === 0),
 				),
 			),
 		).toEqual([2, 4])
 
-		let sum = reduce(upgraded(), createInteger(0n), (accumulator, each) =>
-			createInteger(accumulator.value + each.value),
+		let total = reduce(upgraded(), createInteger(0), (accumulator, each) =>
+			sum(accumulator.value, each.value),
 		)
 
-		expect(Number(sum.value)).toBe(15)
+		expect(Number(total.value)).toBe(15)
 
 		// NOTE: Stopping inside the FRONT run is the case the two loops could
 		// get wrong — the back run must not be walked after a `#Done`.
@@ -442,13 +443,11 @@ describe("every native against an upgraded receiver", () => {
 			(accumulator, each) => {
 				visited.push(Number(each.value))
 
-				return each.value === 2n
+				return each.value === 2
 					? { [typeKeySymbol]: "Step#Done", value: accumulator }
 					: {
 							[typeKeySymbol]: "Step#Continue",
-							state: createInteger(
-								accumulator.value + each.value,
-							),
+							state: sum(accumulator.value, each.value),
 						}
 			},
 		)
