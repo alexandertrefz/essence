@@ -1,8 +1,4 @@
-import {
-	enrichDocument,
-	isStdlibDocument,
-	parseDocument,
-} from "@essence-lang/compiler/documents"
+import { isStdlibDocument } from "@essence-lang/compiler/documents"
 import {
 	builtinNamespaces,
 	builtinProtocols as builtinProtocolTable,
@@ -16,6 +12,9 @@ import {
 	matchesTypeWithBindings,
 } from "@essence-lang/compiler/helpers"
 import type { common } from "@essence-lang/interfaces"
+
+import type { DocumentAnalysis } from "./analyse"
+import { enrichDocument, parseDocument } from "./compilation"
 
 // NOTE: Shared between Completion's `::` Method listing and Signature
 // Help's Method resolution — both need "every Namespace whose target Type
@@ -74,6 +73,7 @@ export function matchingNamespaces(
 	specifierName: string | null,
 	documentPath?: string,
 	workspaceNamespaces: Array<common.NamespaceType> = [],
+	document: DocumentAnalysis | null = null,
 ): Array<common.NamespaceType> {
 	// NOTE: A receiver whose Type is a Protocol-bounded Type Parameter
 	// resolves only through its Protocol — mirroring the Enricher's Method
@@ -82,7 +82,7 @@ export function matchingNamespaces(
 		let constraint = baseType.constraint
 		let protocol = [
 			...builtinProtocols(),
-			...collectProtocolTypes(documentText, documentPath),
+			...collectProtocolTypes(documentText, documentPath, document),
 		].find((candidate) => candidate.name === constraint)
 
 		if (protocol === undefined) {
@@ -117,7 +117,11 @@ export function matchingNamespaces(
 	// builtin twin is dropped. Without this every signature is listed TWICE:
 	// Completion happens to dedupe by Method name and hides it, Signature Help
 	// does not, and an Overload set would double entry for entry.
-	let documentNamespaces = collectNamespaceTypes(documentText, documentPath)
+	let documentNamespaces = collectNamespaceTypes(
+		documentText,
+		documentPath,
+		document,
+	)
 
 	let shadowed = isStdlibDocument(documentPath)
 		? new Set(documentNamespaces.map((namespace) => namespace.name))
@@ -289,13 +293,23 @@ function unionReceiverNamespaces(
 // "probe" built from the text up to the cursor only sees Namespaces declared
 // before it, so a Namespace declared further down would otherwise be
 // invisible.
+//
+// NOTE: The unmodified document is exactly what the Workspace holds enriched,
+// so a caller that has it hands it in and this compiles nothing. Enriching here
+// anyway is what a caller WITHOUT a Workspace needs — the tests, and a document
+// the Workspace deliberately holds nothing for.
 function collectNamespaceTypes(
 	documentText: string,
-	documentPath?: string,
+	documentPath: string | undefined,
+	document: DocumentAnalysis | null,
 ): Array<common.NamespaceType> {
 	try {
-		let { program } = parseDocument(documentText, documentPath)
-		let { program: enrichedProgram } = enrichDocument(program, documentPath)
+		let enrichedProgram =
+			document?.enrichedProgram ??
+			enrichDocument(
+				parseDocument(documentText, documentPath).program,
+				documentPath,
+			).program
 		let namespaces: Array<common.NamespaceType> = []
 
 		collectNamespaceTypesInBody(
@@ -330,10 +344,15 @@ function collectNamespaceTypesInBody(
 export function collectProtocolTypes(
 	documentText: string,
 	documentPath?: string,
+	document: DocumentAnalysis | null = null,
 ): Array<common.ProtocolType> {
 	try {
-		let { program } = parseDocument(documentText, documentPath)
-		let { program: enrichedProgram } = enrichDocument(program, documentPath)
+		let enrichedProgram =
+			document?.enrichedProgram ??
+			enrichDocument(
+				parseDocument(documentText, documentPath).program,
+				documentPath,
+			).program
 		let protocols: Array<common.ProtocolType> = []
 
 		for (let node of enrichedProgram.implementation.nodes) {

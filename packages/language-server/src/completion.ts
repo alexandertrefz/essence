@@ -1,4 +1,3 @@
-import { enrichDocument, parseDocument } from "@essence-lang/compiler/documents"
 import {
 	filterMostSpecificByTarget,
 	flattenUnionMembers,
@@ -11,6 +10,7 @@ import {
 } from "@essence-lang/compiler/printType"
 import type { common, parser } from "@essence-lang/interfaces"
 
+import type { DocumentAnalysis } from "./analyse"
 import { type ArgumentContext, findArgumentContext } from "./argumentContext"
 import { type ImportEdit, insertImportEdit } from "./autoImport"
 import {
@@ -18,6 +18,7 @@ import {
 	callSnippetsFor,
 	qualifiedCallSnippetsFor,
 } from "./callSnippets"
+import { enrichDocument, parseDocument } from "./compilation"
 import { describe, documentationOf } from "./documentation"
 import { typedHandlerExpressions } from "./matchHandlerChildren"
 import { matchingNamespaces } from "./namespaces"
@@ -164,6 +165,7 @@ export function findCompletions(
 	cursor: common.Cursor,
 	documentPath?: string,
 	workspace: WorkspaceCompletions = { offers: [], namespaces: [] },
+	document: DocumentAnalysis | null = null,
 ): Array<CompletionEntry> {
 	let lines = documentText.split("\n")
 	let currentLine = lines[cursor.line - 1] ?? ""
@@ -191,7 +193,12 @@ export function findCompletions(
 		}
 
 		if (specifierMatch !== null) {
-			return specifierCompletions(documentText, base.type, documentPath)
+			return specifierCompletions(
+				documentText,
+				base.type,
+				documentPath,
+				document,
+			)
 		}
 
 		return methodMatch !== null
@@ -201,6 +208,7 @@ export function findCompletions(
 					methodMatch[1] ?? null,
 					documentPath,
 					workspace.namespaces,
+					document,
 				)
 			: memberCompletions(base.type, base.program)
 	}
@@ -240,6 +248,7 @@ export function findCompletions(
 			space,
 			documentPath,
 			workspace.offers,
+			document,
 		),
 		...(space === "values" ? keywordCompletions(headText) : []),
 	]
@@ -707,6 +716,7 @@ function methodCompletions(
 		offer: WorkspaceOffer
 		namespace: common.NamespaceType
 	}> = [],
+	document: DocumentAnalysis | null = null,
 ): Array<CompletionEntry> {
 	// NOTE: The Namespaces in scope are offered first and the unimported ones
 	// after them, so a Method that resolves today wins the name over one that
@@ -723,6 +733,8 @@ function methodCompletions(
 		baseType,
 		specifierName,
 		documentPath,
+		[],
+		document,
 	)
 	let namespaces = [
 		...inScope,
@@ -732,6 +744,7 @@ function methodCompletions(
 			specifierName,
 			documentPath,
 			workspaceNamespaces.map((candidate) => candidate.namespace),
+			document,
 		).filter((namespace) => offers.has(namespace.name)),
 	]
 	let seen = new Set<string>()
@@ -816,6 +829,7 @@ function specifierCompletions(
 	documentText: string,
 	baseType: common.Type,
 	documentPath?: string,
+	document: DocumentAnalysis | null = null,
 ): Array<CompletionEntry> {
 	let seen = new Set<string>()
 	let entries: Array<CompletionEntry> = []
@@ -825,6 +839,8 @@ function specifierCompletions(
 		baseType,
 		null,
 		documentPath,
+		[],
+		document,
 	)) {
 		if (namespace.name === "" || seen.has(namespace.name)) {
 			continue
@@ -1175,15 +1191,23 @@ function scopeCompletions(
 	space: SymbolSpace,
 	documentPath?: string,
 	offers: Array<WorkspaceOffer> = [],
+	document: DocumentAnalysis | null = null,
 ): Array<CompletionEntry> {
-	let { program } = parseDocument(documentText, documentPath)
-	let enrichedProgram: common.typed.Program | null = null
+	// NOTE: The unmodified document, which is what the Workspace holds parsed,
+	// enriched and indexed. Derived here only for a caller that has no Workspace
+	// behind it — the same list, at the price this one used to cost every time.
+	let program =
+		document?.program ?? parseDocument(documentText, documentPath).program
+	let enrichedProgram: common.typed.Program | null =
+		document?.enrichedProgram ?? null
 
-	try {
-		enrichedProgram = enrichDocument(program, documentPath).program
-	} catch {}
+	if (document === null) {
+		try {
+			enrichedProgram = enrichDocument(program, documentPath).program
+		} catch {}
+	}
 
-	let { scopes } = indexProgram(program, enrichedProgram)
+	let { scopes } = document?.index ?? indexProgram(program, enrichedProgram)
 	let scope = scopeAt(scopes, cursor)
 	let described =
 		enrichedProgram === null

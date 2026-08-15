@@ -3,20 +3,28 @@ import * as path from "node:path"
 
 import {
 	canonicalPath,
-	enrichDocument,
 	isStdlibDocument,
-	parseDocument,
 } from "@essence-lang/compiler/documents"
 import { patternBindings } from "@essence-lang/compiler/helpers"
 import {
-	linkModuleGraph,
-	loadModuleGraph,
+	type LinkedGraph,
 	type ModuleHost,
 	resolveSpecifier,
 } from "@essence-lang/compiler/modules"
 import type { common, parser } from "@essence-lang/interfaces"
 
+import {
+	type Analysis,
+	analyseEnrichedDocument,
+	analyseLinkedGraph,
+	type Cancellation,
+	type DocumentAnalysis,
+	internalError,
+	isCancelled,
+	isModule,
+} from "./analyse"
 import { relativeSpecifier } from "./autoImport"
+import { linkModuleGraph, loadModuleGraph, parseDocument } from "./compilation"
 import {
 	type DocumentSymbolEntry,
 	findDocumentSymbols,
@@ -139,6 +147,20 @@ const skippedDirectories = new Set([
 	".claude",
 ])
 
+// NOTE: THE cache. One entry is everything this Server ever derives from one
+// file at one version, and every request reads it rather than deriving its own:
+// the parse, the typed Program, the rename index, the written annotations, the
+// Diagnostics, and which other Modules those Diagnostics reached. What used to
+// be three independent pipelines — the debounced analysis, the Hover seam, and
+// the raw parse-and-enrich behind Completion — are three readers of this.
+//
+// Every field below `program` is filled lazily and INDEPENDENTLY, and no filled
+// field is ever overwritten between two invalidations. That is what keeps object
+// identity stable across requests: an index built against one typed Program must
+// not find a different one under it the next time it is read. An invalidation
+// empties them all together (`invalidateEnrichment`), so a reader that held one
+// of them across a keystroke is holding the previous version's answer — which is
+// what every request checking the version for itself is for.
 type FileEntry = {
 	filePath: string
 	sourceText: string
@@ -148,15 +170,34 @@ type FileEntry = {
 	// text is compared as well.
 	version: number
 	program: parser.Program
+	// NOTE: Kept because an analysis needs them and the parse happens once: a
+	// Diagnostic list that dropped the Parser's half would report a file with a
+	// syntax error as clean.
+	parseDiagnostics: Array<common.Diagnostic>
 	index: ProgramIndex | null
 	enriched: common.typed.Program | null
 	// NOTE: Enrichment can legitimately answer with nothing — a Compiler bug
 	// must not take the Server down — so "was it tried" is its own question.
 	enrichmentAttempted: boolean
 	// NOTE: The written annotations of THIS file, resolved against its graph —
-	// null until a Hover asks, because collecting them costs a collection per
-	// enrichment and every other request reads Types off the typed Program.
+	// null until something asks, because the collector can only be opened for
+	// ONE Module of a graph at a time, so the graph-wide analysis fills this for
+	// its entry alone and a Hover elsewhere pays for its own.
 	annotations: Array<common.TypeAnnotation> | null
+	// NOTE: This file's own Diagnostics, complete: parse, link, enrichment,
+	// validation and what its dependencies came to. Null until an analysis ran —
+	// this file's, or one for another Module of the same graph, since a Module's
+	// Diagnostics depend on that Module and on what it reaches and on nothing
+	// else.
+	diagnostics: Array<common.Diagnostic> | null
+	// NOTE: Every OTHER Module this file reaches, with the Diagnostics that
+	// belong to it — its transitive dependencies and no more, which is exactly
+	// what analysing this file on its own would have found.
+	dependencyDiagnostics: Map<string, Array<common.Diagnostic>> | null
+	// NOTE: What this file's entries resolve to, by the specifier as written.
+	// Memoised because it costs a `realpath` per specifier and is asked for by
+	// every walk of the dependency edges.
+	dependencies: Map<string, string> | null
 }
 
 const diskVersion = -1
@@ -166,6 +207,19 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 	let files = new Map<string, FileEntry>()
 	let discovered: Set<string> | null = null
 	let openDocument = options.openDocument ?? (() => undefined)
+	// NOTE: The dependency edges of the workspace, both ways, kept rather than
+	// rebuilt. Rebuilding them meant reading the entries of every known file,
+	// which meant a parse and a `realpath` per specifier per file — on a
+	// keystroke, because that is when a component has to be invalidated. Held as
+	// two maps rather than one undirected one because they are maintained from
+	// the out-edges of one file at a time, and a dependent is what an
+	// invalidation needs to find.
+	let outEdges = new Map<string, Set<string>>()
+	let inEdges = new Map<string, Set<string>>()
+	// NOTE: The files whose recorded edges may not match their current text.
+	// Refreshed only where an EXACT component is wanted — a rename, a reference
+	// search — never on the invalidation path.
+	let staleEdges = new Set<string>()
 
 	// NOTE: Read through the same host the graph uses, so that a file the
 	// workspace holds parsed and the same file inside a Module graph are the
@@ -196,8 +250,16 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 	// file that imports nothing and is imported by nothing invalidates itself
 	// alone. Parses are kept throughout, since the text of the other files did
 	// not change.
+	//
+	// NOTE: Walked over the RECORDED edges, without refreshing them, and that is
+	// the point: this runs on every keystroke, and refreshing means re-parsing.
+	// The recorded edges are the ones the invalidation needs — an edit to F can
+	// only have changed F's own entries, so every file that reaches F still
+	// reaches it by the edges that were there before the keystroke. A specifier
+	// F gained points at a file that does not depend on F and whose enrichment
+	// therefore did not go stale.
 	function invalidateEnrichment(filePath: string): void {
-		for (let affected of componentOf(filePath)) {
+		for (let affected of connectedComponent(filePath, false)) {
 			let entry = files.get(affected)
 
 			if (entry === undefined) {
@@ -208,6 +270,8 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 			entry.enriched = null
 			entry.enrichmentAttempted = false
 			entry.annotations = null
+			entry.diagnostics = null
+			entry.dependencyDiagnostics = null
 		}
 	}
 
@@ -215,14 +279,24 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 		folders = nextFolders.map((folder) => canonicalPath(folder))
 		discovered = null
 		files.clear()
+		outEdges.clear()
+		inEdges.clear()
+		staleEdges.clear()
 	}
 
 	function changed(filePath: string): void {
 		invalidate(filePath)
 		invalidateEnrichment(filePath)
+		staleEdges.add(filePath)
 
-		if (isInWorkspace(filePath)) {
-			discovered?.add(filePath)
+		if (isInWorkspace(filePath) && discovered?.has(filePath) === false) {
+			discovered.add(filePath)
+			// NOTE: A file that did not exist a moment ago is exactly what an
+			// unresolved specifier in some OTHER file was waiting for, so every
+			// file's edges are suspect — which specifier resolves to what is the
+			// one question a parse alone can not answer. A file appearing is a
+			// watcher event; a keystroke never comes through here.
+			markEdgesStale()
 		}
 	}
 
@@ -230,6 +304,10 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 		invalidateEnrichment(filePath)
 		invalidate(filePath)
 		discovered?.delete(filePath)
+		forgetEdges(filePath)
+		// NOTE: The mirror of a file appearing: every specifier that resolved to
+		// this one resolves to nothing now.
+		markEdgesStale()
 	}
 
 	function isInWorkspace(filePath: string): boolean {
@@ -247,9 +325,199 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 			for (let folder of folders) {
 				collectEssenceFiles(folder, discovered)
 			}
+
+			for (let filePath of discovered) {
+				staleEdges.add(filePath)
+			}
 		}
 
 		return discovered
+	}
+
+	/*************************/
+	/* The dependency edges  */
+	/*************************/
+
+	// NOTE: The out-edges of one file, and the reverse edges that go with them.
+	// Called from two places: a graph that was just linked, which knows every
+	// Module's dependencies exactly and for free, and a refresh, which reads
+	// them off a parse.
+	function recordEdges(filePath: string, targets: Iterable<string>): void {
+		let next = new Set(targets)
+		let previous = outEdges.get(filePath)
+
+		for (let target of previous ?? []) {
+			if (!next.has(target)) {
+				dropInEdge(target, filePath)
+			}
+		}
+
+		for (let target of next) {
+			let back = inEdges.get(target)
+
+			if (back === undefined) {
+				back = new Set()
+				inEdges.set(target, back)
+			}
+
+			back.add(filePath)
+		}
+
+		outEdges.set(filePath, next)
+		staleEdges.delete(filePath)
+	}
+
+	// NOTE: The key goes with the last edge into it, so that a path named once by
+	// a specifier that has since been rewritten is not kept for the process'
+	// lifetime by an empty Set.
+	function dropInEdge(target: string, dependent: string): void {
+		let back = inEdges.get(target)
+
+		if (back === undefined) {
+			return
+		}
+
+		back.delete(dependent)
+
+		if (back.size === 0) {
+			inEdges.delete(target)
+		}
+	}
+
+	// NOTE: The out-edges go, the IN-edges deliberately stay: a file that was
+	// deleted is one a branch switch may bring back, and the importers waiting
+	// for it are exactly what has to be invalidated when it does. They are
+	// reachable only through this path until then, since nothing resolves to it.
+	function forgetEdges(filePath: string): void {
+		for (let target of outEdges.get(filePath) ?? []) {
+			dropInEdge(target, filePath)
+		}
+
+		outEdges.delete(filePath)
+		staleEdges.delete(filePath)
+	}
+
+	function refreshEdges(filePath: string): void {
+		recordEdges(filePath, dependenciesOf(filePath).values())
+	}
+
+	// NOTE: Everything whose recorded edges may no longer match its text, marked
+	// without asking what is in the workspace: this runs on a watcher
+	// notification, and discovery is a recursive walk of every folder of it. A
+	// walk that has not happened yet marks its own findings stale when it does
+	// (see `knownFiles`), so deferring to it loses nothing.
+	function markEdgesStale(): void {
+		for (let filePath of discovered ?? []) {
+			staleEdges.add(filePath)
+		}
+
+		for (let filePath of outEdges.keys()) {
+			staleEdges.add(filePath)
+		}
+	}
+
+	// NOTE: Every recorded edge brought up to the text as it is now, which is
+	// what a walk that has to be EXACT needs — a rename, a reference search, the
+	// set of documents an edit obliges the Server to publish again.
+	//
+	// Drained rather than iterated: reading one file's entries parses it, and a
+	// parse is what makes the NEXT file's edges knowable. The delete is what
+	// guarantees the loop ends, whatever `refreshEdges` finds.
+	function refreshAllEdges(): void {
+		knownFiles()
+
+		while (staleEdges.size > 0) {
+			let [stale] = staleEdges
+
+			staleEdges.delete(stale!)
+			refreshEdges(stale!)
+		}
+	}
+
+	// NOTE: Every file that could possibly hold an occurrence of a symbol
+	// written in this one, and no others. A name crosses a Module boundary only
+	// through an entry, so anything sharing a symbol with this file is connected
+	// to it by entries — walked in BOTH directions, since a dependency holds the
+	// declaration and a dependent holds the uses.
+	//
+	// `exact` is what tells the two callers apart. A rename must see the edges
+	// as the current text writes them, and pays a parse for each file whose text
+	// has moved since the edges were read. An invalidation must not pay
+	// anything, and does not have to: see `invalidateEnrichment`.
+	function connectedComponent(
+		filePath: string,
+		exact: boolean,
+	): Array<string> {
+		if (exact) {
+			refreshAllEdges()
+
+			if (!outEdges.has(filePath)) {
+				refreshEdges(filePath)
+			}
+		}
+
+		let component = new Set<string>([filePath])
+		let pending = [filePath]
+
+		while (pending.length > 0) {
+			let current = pending.shift()!
+
+			for (let neighbour of [
+				...(outEdges.get(current) ?? []),
+				...(inEdges.get(current) ?? []),
+			]) {
+				if (
+					component.has(neighbour) ||
+					(exact && fileOf(neighbour) === null)
+				) {
+					continue
+				}
+
+				component.add(neighbour)
+				pending.push(neighbour)
+			}
+		}
+
+		return [...component]
+	}
+
+	function componentOf(filePath: string): Array<string> {
+		return connectedComponent(filePath, true)
+	}
+
+	// NOTE: This file and everything that reaches it through entries, which is
+	// exactly the set an edit to it can change the meaning of — and therefore the
+	// set whose published Diagnostics have gone stale with it.
+	//
+	// Directed, where `componentOf` is not, and that is the whole point: a file
+	// that merely SHARES a dependency with this one imports nothing from it, so
+	// nothing it means can have moved. Answering with the undirected component
+	// would make one keystroke in a Module thirty files import cost thirty graph
+	// links — one per open sibling, since no sibling's graph contains another's.
+	function dependentsOf(filePath: string): Array<string> {
+		refreshAllEdges()
+
+		if (!outEdges.has(filePath)) {
+			refreshEdges(filePath)
+		}
+
+		let found = new Set<string>([filePath])
+		let pending = [filePath]
+
+		while (pending.length > 0) {
+			let current = pending.shift()!
+
+			for (let dependent of inEdges.get(current) ?? []) {
+				if (found.has(dependent) || fileOf(dependent) === null) {
+					continue
+				}
+
+				found.add(dependent)
+				pending.push(dependent)
+			}
+		}
+
+		return [...found]
 	}
 
 	function fileOf(filePath: string): FileEntry | null {
@@ -273,15 +541,20 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 			return null
 		}
 
+		let parsed = parseSafely(sourceText, filePath)
 		let entry: FileEntry = {
 			filePath,
 			sourceText,
 			version,
-			program: parseDocument(sourceText, filePath).program,
+			program: parsed.program,
+			parseDiagnostics: parsed.diagnostics,
 			index: null,
 			enriched: null,
 			enrichmentAttempted: false,
 			annotations: null,
+			diagnostics: null,
+			dependencyDiagnostics: null,
+			dependencies: null,
 		}
 
 		files.set(filePath, entry)
@@ -289,103 +562,307 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 		return entry
 	}
 
-	// NOTE: A Module is enriched against the whole graph it reaches, because
-	// what an entry brings in is only known there — enriched on its own, every
-	// imported name resolves to nothing and every Method dispatching through an
-	// imported Namespace stays unbound, which is exactly the binding the join
-	// below rides on. The other Modules of that graph are enriched by the same
-	// pass, so they are kept: the next request for one of them costs nothing.
-	function enrichedOf(filePath: string): common.typed.Program | null {
+	/*****************/
+	/* The analysis  */
+	/*****************/
+
+	// NOTE: The one door text comes through, and therefore where the promise that
+	// a Compiler bug never takes this Server down has to be kept: `fileOf` is
+	// called from request handlers, from the edge walk and from the debounced
+	// analysis' own timer callback, none of which sits inside a `try` — and a
+	// throw out of a timer callback is the process.
+	//
+	// Reachable rather than defensive: the Lexer recurs once per nesting level of
+	// an interpolated String and runs out of call stack before the Parser's own
+	// depth guard can refuse it, so a file holding one deep enough throws here.
+	// The empty Program is what every reader then sees, which is what analysing
+	// such a file on its own has always answered with.
+	function parseSafely(
+		sourceText: string,
+		filePath: string,
+	): { program: parser.Program; diagnostics: Array<common.Diagnostic> } {
+		try {
+			return parseDocument(sourceText, filePath)
+		} catch (error) {
+			return {
+				program: unreadableProgram(sourceText),
+				diagnostics: [internalError(error)],
+			}
+		}
+	}
+
+	// NOTE: The ONE producer. Everything else in this file that answers with a
+	// typed Program, an index, an annotation or a Diagnostic reads what this
+	// left behind — the debounced analysis the Server publishes from included,
+	// which is why a Hover arriving before that debounce fires does not make the
+	// Server compile the same text twice.
+	//
+	// A Module is enriched against the whole graph it reaches, because what an
+	// entry brings in is only known there — enriched on its own, every imported
+	// name resolves to nothing and every Method dispatching through an imported
+	// Namespace stays unbound. That makes a write for one file a write for its
+	// whole component: the graph judged every Module in it, and a Module's
+	// Diagnostics depend on that Module and on what IT reaches, never on the
+	// entry the graph happened to be loaded from.
+	//
+	// NOTE: The annotations are collected for the asked-about file and no other.
+	// The collector can only be open for one Module of a graph at a time
+	// (`annotationsFor`), so a Hover over a DIFFERENT Module of the same
+	// component pays for one more link — once, for that file at that version.
+	function analysisOf(
+		filePath: string,
+		options: {
+			annotations?: boolean
+			// NOTE: Whose written annotations the graph-wide enrichment should
+			// collect, when that is not the file being analysed. The collector
+			// only opens for ONE Module of a graph at a time, and the analysis
+			// of a component is deliberately anchored at the Module that reaches
+			// the most others — which is rarely the one under the reader's
+			// cursor. The Server passes the document the keystroke landed in.
+			annotationsFor?: string
+			cancellation?: Cancellation
+		} = {},
+	): Analysis | null {
 		let entry = fileOf(filePath)
 
 		if (entry === null) {
 			return null
 		}
 
-		if (entry.enrichmentAttempted) {
-			return entry.enriched
+		if (
+			entry.diagnostics !== null &&
+			!(options.annotations === true && entry.annotations === null)
+		) {
+			return cachedAnalysis(entry)
 		}
 
-		entry.enrichmentAttempted = true
+		if (isCancelled(options.cancellation)) {
+			return null
+		}
 
 		try {
-			if (
-				entry.program.imports === null &&
-				entry.program.exports === null
-			) {
-				entry.enriched = enrichDocument(entry.program, filePath).program
-
-				return entry.enriched
-			}
-
-			let linked = linkModuleGraph(loadModuleGraph(filePath, host))
-
-			for (let [modulePath, module] of linked.modules) {
-				let moduleEntry = fileOf(modulePath)
-
+			if (isModule(entry.program, filePath)) {
 				if (
-					moduleEntry === null ||
-					moduleEntry.sourceText !== module.module.sourceText
+					!analyseGraphFrom(
+						entry,
+						options.cancellation,
+						options.annotationsFor,
+					)
 				) {
-					continue
+					return null
 				}
-
-				moduleEntry.enriched = module.program
-				moduleEntry.enrichmentAttempted = true
+			} else {
+				analyseAloneFrom(entry)
 			}
-		} catch {}
+		} catch (error) {
+			// NOTE: A Compiler bug must never take the Language Server down, so
+			// an unexpected throw becomes the one Diagnostic that says so — and
+			// it is CACHED, because the alternative is throwing again for every
+			// request over a document that will not compile until it is edited.
+			//
+			// The annotations are part of that: they are what a Hover asks for,
+			// the guard above re-enters whenever they are still null, and a Hover
+			// is the request a reader repeats. Empty is the honest answer — a
+			// document that would not enrich has no written Types to report.
+			entry.diagnostics ??= [internalError(error)]
+			entry.dependencyDiagnostics ??= new Map()
+			entry.annotations ??= []
+			entry.enrichmentAttempted = true
+		}
 
-		return entry.enriched
+		return cachedAnalysis(entry)
 	}
 
-	// NOTE: The Hover seam. The same linked enrichment `enrichedOf` runs, with
-	// the annotation collector open for this one file — an annotation resolved
-	// WITHOUT the graph answers 'Error' for every imported name it uses, which
-	// is exactly the Hover this exists to prevent. The enrichment it produces
-	// is kept for the whole graph, so an `enrichedOf` that follows reads cache.
-	function annotationsOf(filePath: string): Array<common.TypeAnnotation> {
-		let entry = fileOf(filePath)
+	function cachedAnalysis(entry: FileEntry): Analysis {
+		return {
+			program: entry.program,
+			enrichedProgram: entry.enriched,
+			diagnostics: entry.diagnostics ?? [],
+			dependencies: entry.dependencyDiagnostics ?? new Map(),
+		}
+	}
 
-		if (entry === null) {
-			return []
+	// NOTE: The entry's own text is handed to the graph rather than read through
+	// the host a second time, so that the parse this cache holds and the parse
+	// inside the graph are of the same bytes — which is what the guard on every
+	// write below compares against.
+	//
+	// NOTE: False when the work was abandoned, and then NOTHING was written: an
+	// enrichment without the Diagnostics that were being computed from it is a
+	// cache entry that answers for a file it never judged.
+	function analyseGraphFrom(
+		entry: FileEntry,
+		cancellation: Cancellation | undefined,
+		annotationsFor?: string,
+	): boolean {
+		let entryPath = entry.filePath
+		let graph = loadModuleGraph(entryPath, {
+			readFile: (filePath) =>
+				filePath === entryPath
+					? entry.sourceText
+					: host.readFile(filePath),
+		})
+		// NOTE: A file the graph does not hold can not have its annotations
+		// collected from it, and asking for one anyway collects NOBODY's.
+		let annotated =
+			annotationsFor !== undefined && graph.modules.has(annotationsFor)
+				? annotationsFor
+				: entryPath
+		let linked = linkModuleGraph(graph, { annotationsFor: annotated })
+		let analyses = analyseLinkedGraph(linked, { cancellation })
+
+		if (analyses === null) {
+			return false
 		}
 
-		// NOTE: A file without sections is enriched by `enrichDocument`, whose
-		// Choices stay unqualified — linking it here would cache a typed
-		// Program with DIFFERENT identities than every other request sees.
-		if (entry.program.imports === null && entry.program.exports === null) {
-			return []
+		// NOTE: The graph knows every Module's dependencies for free, so the edge
+		// index is maintained from it rather than re-derived — but only the ones
+		// it could READ, and the edge an invalidation most needs is the other
+		// kind: a specifier naming a file that does not exist yet is precisely
+		// what has to be re-analysed when that file appears. Unrecorded, the
+		// importer keeps answering `Error` for a name that now resolves, for
+		// ever. The lexical resolutions know the edge whether the file is there
+		// or not, so both are recorded.
+		for (let [modulePath, module] of linked.modules) {
+			recordEdges(modulePath, [
+				...module.module.dependencies,
+				...dependenciesOf(modulePath).values(),
+			])
 		}
 
-		if (entry.annotations !== null) {
-			return entry.annotations
-		}
+		for (let [modulePath, module] of linked.modules) {
+			let moduleEntry = fileOf(modulePath)
 
-		try {
-			let linked = linkModuleGraph(loadModuleGraph(filePath, host), {
-				annotationsFor: filePath,
-			})
+			// NOTE: The text moved between the graph reading it and this cache
+			// reading it, so what the graph produced belongs to a version that
+			// has already gone.
+			if (
+				moduleEntry === null ||
+				moduleEntry.sourceText !== module.module.sourceText
+			) {
+				continue
+			}
 
-			for (let [modulePath, module] of linked.modules) {
-				let moduleEntry = fileOf(modulePath)
+			// NOTE: A file that writes NEITHER section is a Program of its own
+			// everywhere else in this Server — enriched by `enrichDocument`,
+			// whose Choices stay unqualified — while a graph that reaches it as
+			// a dependency enriches it under a Module path instead. Its own
+			// answer is the one every request for it must see, so the graph's is
+			// used for the importer and dropped here.
+			if (!isModule(moduleEntry.program, modulePath)) {
+				continue
+			}
 
-				if (
-					moduleEntry === null ||
-					moduleEntry.sourceText !== module.module.sourceText
-				) {
-					continue
-				}
-
+			// NOTE: Whichever graph reached this Module first keeps it, so a file
+			// two graphs both reach is enriched twice and only one of the two
+			// typed Programs is ever read for it — the other stays embedded in
+			// the importer that was enriched alongside it. That is sound because
+			// nothing across the seam compares Types by identity: the join is by
+			// (declaring file, Position) and the member tables are by name. What
+			// it buys is the stable identity the entry promises, which an index
+			// built against the first copy depends on.
+			if (!moduleEntry.enrichmentAttempted) {
 				moduleEntry.enriched = module.program
 				moduleEntry.enrichmentAttempted = true
-
-				if (modulePath === filePath) {
-					moduleEntry.annotations = module.annotations
-				}
 			}
-		} catch {}
 
-		return entry.annotations ?? []
+			if (modulePath === annotated && moduleEntry.annotations === null) {
+				moduleEntry.annotations = module.annotations
+			}
+
+			if (moduleEntry.diagnostics === null) {
+				moduleEntry.diagnostics =
+					modulePath === entryPath
+						? [
+								...linked.diagnostics,
+								...(analyses.get(modulePath) ?? []),
+							]
+						: (analyses.get(modulePath) ?? [])
+				moduleEntry.dependencyDiagnostics = reachedDiagnostics(
+					modulePath,
+					linked,
+					analyses,
+				)
+			}
+		}
+
+		// NOTE: The entry could not be read as a Module at all, so the graph
+		// holds none for it and the Diagnostics saying so are all there is.
+		if (entry.diagnostics === null) {
+			entry.diagnostics = [...linked.diagnostics]
+			entry.dependencyDiagnostics = new Map()
+			entry.enrichmentAttempted = true
+		}
+
+		return true
+	}
+
+	function analyseAloneFrom(entry: FileEntry): void {
+		let analysed = analyseEnrichedDocument(
+			entry.program,
+			entry.parseDiagnostics,
+			entry.filePath,
+			{ annotations: true },
+		)
+
+		recordEdges(entry.filePath, [])
+
+		if (!entry.enrichmentAttempted) {
+			entry.enriched = analysed.enrichedProgram
+			entry.enrichmentAttempted = true
+		}
+
+		entry.annotations ??= analysed.annotations
+		entry.diagnostics ??= analysed.diagnostics
+		entry.dependencyDiagnostics ??= new Map()
+	}
+
+	// NOTE: What THIS Module reaches, which is what analysing it on its own
+	// would have found — not the whole graph, which is what the file the graph
+	// was loaded from reaches. The Server publishes these under the other files'
+	// own URIs and owns them afterwards, so answering with a file this Module
+	// never names would make it own a squiggle it can not clear.
+	function reachedDiagnostics(
+		modulePath: string,
+		linked: LinkedGraph,
+		analyses: Map<string, Array<common.Diagnostic>>,
+	): Map<string, Array<common.Diagnostic>> {
+		let reached = new Map<string, Array<common.Diagnostic>>()
+		let pending = [
+			...(linked.modules.get(modulePath)?.module.dependencies ?? []),
+		]
+
+		while (pending.length > 0) {
+			let current = pending.shift()!
+
+			if (current === modulePath || reached.has(current)) {
+				continue
+			}
+
+			reached.set(current, analyses.get(current) ?? [])
+			pending.push(
+				...(linked.modules.get(current)?.module.dependencies ?? []),
+			)
+		}
+
+		return reached
+	}
+
+	function enrichedOf(filePath: string): common.typed.Program | null {
+		return analysisOf(filePath)?.enrichedProgram ?? null
+	}
+
+	// NOTE: The Hover seam. The same linked enrichment the analysis runs, with
+	// the annotation collector open for this one file — an annotation resolved
+	// WITHOUT the graph answers 'Error' for every imported name it writes, which
+	// is exactly the Hover this exists to prevent.
+	function annotationsOf(
+		filePath: string,
+		options: { cancellation?: Cancellation } = {},
+	): Array<common.TypeAnnotation> {
+		analysisOf(filePath, { ...options, annotations: true })
+
+		return fileOf(filePath)?.annotations ?? []
 	}
 
 	function indexOf(filePath: string): ProgramIndex | null {
@@ -402,6 +879,36 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 		return entry.index
 	}
 
+	// NOTE: The three things a request answering ABOUT a document needs, in one
+	// read: Completion, Signature Help and the Namespace listing all used to
+	// derive every one of them for themselves, several times per request.
+	//
+	// The index is deliberately part of it. Building one rebuilds the whole
+	// builtin top level Scope — every builtin value and Type, as fresh
+	// Declarations, because the walk records occurrences onto them — and
+	// Completion, Semantic Tokens and Document Highlight each did it per
+	// request.
+	function documentOf(
+		filePath: string,
+		options: { cancellation?: Cancellation } = {},
+	): DocumentAnalysis | null {
+		let analysis = analysisOf(filePath, options)
+
+		// NOTE: Null covers both "there is nothing here" and "the work was
+		// abandoned". Neither is a document a request may answer from: half an
+		// analysis would answer with an unenriched Program, which is a Hover
+		// that says 'Error' about names that are perfectly fine.
+		if (analysis === null || analysis.program === null) {
+			return null
+		}
+
+		return {
+			program: analysis.program,
+			enrichedProgram: analysis.enrichedProgram,
+			index: indexOf(filePath),
+		}
+	}
+
 	function programOf(filePath: string): parser.Program | null {
 		return fileOf(filePath)?.program ?? null
 	}
@@ -415,16 +922,22 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 	// on it. Keyed by the specifier as written, which is what an entry names it
 	// by everywhere else.
 	function dependenciesOf(filePath: string): Map<string, string> {
-		let program = programOf(filePath)
+		let file = fileOf(filePath)
 		let resolutions = new Map<string, string>()
 
-		if (program === null) {
+		if (file === null) {
 			return resolutions
 		}
 
+		if (file.dependencies !== null) {
+			return file.dependencies
+		}
+
 		let sources = [
-			...(program.imports?.entries ?? []).map((entry) => entry.source),
-			...(program.exports?.entries ?? []).flatMap((entry) =>
+			...(file.program.imports?.entries ?? []).map(
+				(entry) => entry.source,
+			),
+			...(file.program.exports?.entries ?? []).flatMap((entry) =>
 				entry.source === null ? [] : [entry.source],
 			),
 		]
@@ -441,52 +954,9 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 			}
 		}
 
+		file.dependencies = resolutions
+
 		return resolutions
-	}
-
-	// NOTE: Every file that could possibly hold an occurrence of a symbol
-	// written in this one, and no others. A name crosses a Module boundary only
-	// through an entry, so anything sharing a symbol with this file is connected
-	// to it by entries — walked in BOTH directions, since a dependency holds the
-	// declaration and a dependent holds the uses. Read off the parses alone;
-	// only the component this answers with is ever enriched.
-	function componentOf(filePath: string): Array<string> {
-		let component = new Set<string>([filePath])
-		let neighbours = new Map<string, Set<string>>()
-		let add = (from: string, to: string) => {
-			let known = neighbours.get(from)
-
-			if (known === undefined) {
-				known = new Set()
-				neighbours.set(from, known)
-			}
-
-			known.add(to)
-		}
-
-		for (let candidate of [...knownFiles(), filePath]) {
-			for (let dependency of dependenciesOf(candidate).values()) {
-				add(candidate, dependency)
-				add(dependency, candidate)
-			}
-		}
-
-		let pending = [filePath]
-
-		while (pending.length > 0) {
-			let current = pending.shift()!
-
-			for (let neighbour of neighbours.get(current) ?? []) {
-				if (component.has(neighbour) || fileOf(neighbour) === null) {
-					continue
-				}
-
-				component.add(neighbour)
-				pending.push(neighbour)
-			}
-		}
-
-		return [...component]
 	}
 
 	// NOTE: What every Module in the workspace publishes, read off the parses.
@@ -805,10 +1275,13 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 		programOf,
 		sourceOf,
 		indexOf,
+		analysisOf,
+		documentOf,
 		enrichedOf,
 		annotationsOf,
 		dependenciesOf,
 		componentOf,
+		dependentsOf,
 		exportsOf,
 		exportersOf,
 		offersFor,
@@ -1241,6 +1714,31 @@ function declaringSite(
 /*************/
 /* Utilities */
 /*************/
+
+// NOTE: A Program with nothing in it, standing in for a file the Parser could
+// not read at all. Neither Module section, so every reader treats it as the
+// single declaration space it now is — and its one Diagnostic, the Internal
+// Compiler Error, is what the file actually shows.
+function unreadableProgram(sourceText: string): parser.Program {
+	let lines = sourceText.split("\n")
+	let position: common.Position = {
+		start: { line: 1, column: 1 },
+		end: { line: lines.length, column: lines.at(-1)!.length + 1 },
+	}
+
+	return {
+		nodeType: "Program",
+		kind: "implementation",
+		imports: null,
+		implementation: {
+			nodeType: "ImplementationSection",
+			nodes: [],
+			position,
+		},
+		exports: null,
+		position,
+	}
+}
 
 function positionKey(position: common.Position): string {
 	return `${position.start.line}:${position.start.column}`

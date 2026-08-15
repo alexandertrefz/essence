@@ -34,56 +34,32 @@ export type CodeActionEntry = {
 	edits: Array<CodeActionEdit>
 }
 
-// NOTE: The last analysis, kept for the next request to ask for again. What a
-// Code Action offers depends on the document, not on where in it the cursor
-// stands — and the Editor asks on every cursor move, which is a full compile
-// per keystroke of navigation through a file nobody has edited.
+// NOTE: What a Code Action offers depends on the document, not on where in it
+// the cursor stands — and the Editor asks on every cursor move, which used to be
+// a full compile per keystroke of navigation through a file nobody has edited.
+// The analysis is therefore handed in: the Workspace holds one per file and
+// version, the debounced analysis that publishes the Diagnostics is the same
+// one, and this reads it.
 //
-// NOTE: Kept only when the analysis read NO OTHER FILE. `dependencies` names
-// every other Module the graph reached, so an empty one says the answer came
-// out of this text and this path alone, and can not have gone stale while both
-// stand. A Module with dependencies is analysed afresh every time: what it
-// depends on lives on disk or in another buffer, and the invalidation that
-// tracks those belongs to the Workspace, which is where the cache covering them
-// belongs too.
-//
-// NOTE: Why not read the Workspace's cached enrichment instead — it holds the
-// parse and the typed Program, but not the DIAGNOSTICS, and the Diagnostics are
-// half of what a Code Action is: every quick fix here is an answer to one.
-// Putting them in the Workspace is the unified cache, which is its own slice.
-let lastAnalysis: {
-	documentText: string
-	documentPath: string | undefined
-	analysis: Analysis
-} | null = null
-
+// A caller with no Workspace behind it — the tests, or a document the Workspace
+// deliberately holds nothing for — passes nothing and gets the pipeline run
+// here, which is what this always did.
 export function findCodeActions(
 	documentText: string,
 	range: common.Position,
 	documentPath?: string,
 	workspace?: Workspace,
+	cached: Analysis | null = null,
 ): Array<CodeActionEntry> {
 	// NOTE: ONE run of the pipeline per request — the analysis hands back both
 	// the Parser AST an edit is measured against and the enriched Program the
 	// annotation refactors read. Parsing the same text again would be a second
 	// full compile for one lightbulb.
 	let analysis =
-		lastAnalysis !== null &&
-		lastAnalysis.documentText === documentText &&
-		lastAnalysis.documentPath === documentPath
-			? lastAnalysis.analysis
-			: null
-
-	if (analysis === null) {
-		analysis = analyseDocument(documentText, documentPath, {
+		cached ??
+		analyseDocument(documentText, documentPath, {
 			host: workspace?.host,
 		})
-
-		lastAnalysis =
-			analysis.dependencies.size === 0
-				? { documentText, documentPath, analysis }
-				: null
-	}
 
 	let { program, enrichedProgram, diagnostics } = analysis
 

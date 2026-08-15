@@ -1,6 +1,6 @@
 import type { common, parser } from "@essence-lang/interfaces"
 
-import { type DeclarationKind, indexProgram } from "./rename"
+import { type DeclarationKind, indexProgram, type ProgramIndex } from "./rename"
 
 // NOTE: Semantic Tokens classify Identifiers by what they actually resolve
 // to, which the TextMate grammar cannot do — it has no way to tell a
@@ -101,11 +101,16 @@ const readonlyKinds = new Set<DeclarationKind>([
 	"label",
 ])
 
+// NOTE: `programIndex` is the document's own index where the caller holds one.
+// Building it rebuilds the whole builtin top level Scope — every builtin value
+// and Type as fresh Declarations, because the walk records occurrences onto
+// them — and this request fires on every keystroke over the whole file.
 export function findSemanticTokens(
 	program: parser.Program,
 	enrichedProgram: common.typed.Program | null = null,
+	programIndex: ProgramIndex | null = null,
 ): Array<SemanticToken> {
-	let { index } = indexProgram(program, enrichedProgram)
+	let { index } = programIndex ?? indexProgram(program, enrichedProgram)
 	let tokens: Array<SemanticToken> = []
 
 	collectCases(program.implementation.nodes, tokens)
