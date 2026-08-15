@@ -171,8 +171,16 @@ export function createMarshaller(
 		}
 
 		switch (tag) {
+			// NOTE: ALWAYS a bigint on the way out, whichever of its two
+			// representations the Integer arrived in. An Integer holds a
+			// JavaScript number while its value fits one and a bigint beyond
+			// that, and handing that split across the boundary would make the
+			// TYPE of what an embedding receives depend on the SIZE of the
+			// answer: `total` would be a number until the day it crossed 2⁵³
+			// and every `+` on it started throwing. One kind out is the
+			// contract, and bigint is the one that can carry every Integer.
 			case "Integer":
-				return (value as { value: bigint }).value
+				return BigInt((value as { value: number | bigint }).value)
 			case "Rational": {
 				let parts = value as { numerator: bigint; denominator: bigint }
 
@@ -399,6 +407,11 @@ export function createMarshaller(
 	): EssenceValue {
 		switch (expected.type) {
 			case "Integer": {
+				// NOTE: Both kinds go in AS THEY ARE — the bridge's
+				// `createInteger` canonicalises, so a bigint that fits a double
+				// arrives as a number and a number that does not arrives as a
+				// bigint, and neither caller has to know which side of 2⁵³ its
+				// value sits.
 				if (typeof value === "bigint") {
 					return bridge.integer(value)
 				}
@@ -408,7 +421,7 @@ export function createMarshaller(
 				// hand the Module a value already off by whatever the double had
 				// lost before it ever arrived.
 				if (typeof value === "number" && Number.isSafeInteger(value)) {
-					return bridge.integer(BigInt(value))
+					return bridge.integer(value)
 				}
 
 				throw mismatch(value, expected, at)

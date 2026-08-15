@@ -3489,11 +3489,16 @@ describe("Optimiser", () => {
 	})
 
 	describe("inline-loops", () => {
-		it("writes the counted loop as a for over the bigints", () => {
+		it("writes the counted loop as a for over what the bounds hold", () => {
 			// NOTE: The whole of what the counted entry costs, gone: the
-			// direction is decided once, the counter IS the bigint its bounds
-			// hold, and the `{ index, carried }` Record its Essence body threads
+			// direction is decided once, the counter IS what its bounds hold,
+			// and the `{ index, carried }` Record its Essence body threads
 			// through the `while` driver is never built.
+			//
+			// NOTE: And the KIND of counter is decided once as well — a number
+			// where both bounds are held as ones, which is every loop over
+			// ordinary quantities, and a bigint only where a bound has left
+			// safe range.
 			let generated = generate(countedLoop)
 
 			expect(generated).toContain("const $loop_0_from = $pool_0.value;")
@@ -3501,7 +3506,13 @@ describe("Optimiser", () => {
 				"const $loop_0_up = $loop_0_from <= $loop_0_to;",
 			)
 			expect(generated).toContain(
-				"for (let $loop_0_index = $loop_0_from; $loop_0_up ? $loop_0_index <= $loop_0_to : $loop_0_index >= $loop_0_to; $loop_0_index += $loop_0_delta)",
+				'const $loop_0_big = typeof $loop_0_from !== "number" || typeof $loop_0_to !== "number";',
+			)
+			expect(generated).toContain(
+				"const $loop_0_delta = $loop_0_big ? $loop_0_up ? 1n : -1n : $loop_0_up ? 1 : -1;",
+			)
+			expect(generated).toContain(
+				"for (let $loop_0_index = $loop_0_big ? BigInt($loop_0_from) : $loop_0_from; $loop_0_up ? $loop_0_index <= $loop_0_to : $loop_0_index >= $loop_0_to; $loop_0_index += $loop_0_delta)",
 			)
 			expect(generated).not.toContain("loop__overload$3")
 			expect(generated).not.toContain("function (")
@@ -3816,11 +3827,11 @@ describe("Optimiser", () => {
 		it("writes the answer where the operation was written", () => {
 			let generated = generate(constantFolding)
 
-			expect(generated).toContain("Integer.createInteger(86400n)")
-			expect(generated).toContain("Integer.createInteger(6n)")
-			expect(generated).toContain("Integer.createInteger(7n)")
-			expect(generated).toContain("Integer.createInteger(-7n)")
-			expect(generated).not.toContain("Integer.createInteger(60n)")
+			expect(generated).toContain("Integer.createInteger(86400)")
+			expect(generated).toContain("Integer.createInteger(6)")
+			expect(generated).toContain("Integer.createInteger(7)")
+			expect(generated).toContain("Integer.createInteger(-7)")
+			expect(generated).not.toContain("Integer.createInteger(60)")
 		})
 
 		it("stores a folded Rational as the operation would", () => {
@@ -3871,7 +3882,12 @@ describe("Optimiser", () => {
 			// NOTE: The whole of what folding through a call would cost: the
 			// print inside `noisy` is the answer's own evaluation, and a fold
 			// that took it would be a Program that says less.
-			expect(generate(constantFolding)).toContain(".value + ")
+			//
+			// NOTE: It is the runtime entry rather than an inlined guard
+			// because the guard reads its operands more than once and a call
+			// may only be evaluated once — which is exactly the operand that
+			// stopped the fold.
+			expect(generate(constantFolding)).toContain("Integer.sum(")
 		})
 
 		it("leaves a mixed-kind operation to the Namespace that widens it", () => {
@@ -3890,7 +3906,7 @@ describe("Optimiser", () => {
 			// Program wrote — and it prints.
 			let generated = generate(shadowedArithmetic)
 
-			expect(generated).not.toContain("Integer.createInteger(3n)")
+			expect(generated).not.toContain("Integer.createInteger(3)")
 			expect(await outputOf(generated)).toEqual(['"the shadow ran"', "9"])
 		})
 
@@ -3920,10 +3936,10 @@ describe("Optimiser", () => {
 				disabledPasses: new Set(["fold-constants"]),
 			})
 
-			expect(generated).toContain("Integer.createInteger(60n)")
+			expect(generated).toContain("Integer.createInteger(60)")
 			expect(generated).toContain("Rational.add__overload$1(")
 			expect(generated).toContain("String.append(")
-			expect(generated).not.toContain("Integer.createInteger(86400n)")
+			expect(generated).not.toContain("Integer.createInteger(86400)")
 		})
 
 		it("prints the same thing with the pass off", async () => {
@@ -3984,8 +4000,8 @@ describe("Optimiser", () => {
 				disabledPasses: new Set(["lower-scalar-operations"]),
 			})
 
-			expect(generated).toContain("Integer.createInteger(86400n)")
-			expect(generated).not.toContain("Integer.createInteger(60n)")
+			expect(generated).toContain("Integer.createInteger(86400)")
+			expect(generated).not.toContain("Integer.createInteger(60)")
 		})
 
 		// NOTE: And the same on the other side of the hole. A witness is a
@@ -4537,7 +4553,7 @@ describe("Optimiser", () => {
 			let generated = generate(constants)
 
 			expect(generated).toMatch(
-				/const \$pool_\d+ = Integer\.createInteger\(1n\);/,
+				/const \$pool_\d+ = Integer\.createInteger\(1\);/,
 			)
 			expect(generated).toMatch(
 				/const \$pool_\d+ = Rational\.createRational\(1n, 2n\);/,
@@ -4553,7 +4569,7 @@ describe("Optimiser", () => {
 			let generated = generate(constants)
 			let declarations = [
 				...generated.matchAll(
-					/const \$pool_\d+ = Integer\.createInteger\(1n\)/g,
+					/const \$pool_\d+ = Integer\.createInteger\(1\)/g,
 				),
 			]
 
@@ -4740,7 +4756,7 @@ describe("Optimiser", () => {
 			})
 
 			expect(generated).not.toContain("$pool_")
-			expect(generated).toContain("Integer.createInteger(1n)")
+			expect(generated).toContain("Integer.createInteger(1)")
 			expect(generated).toContain("{ compare: Integer.compare }")
 		})
 
@@ -4789,7 +4805,7 @@ describe("Optimiser", () => {
 			})
 
 			expect(generated).toMatch(
-				/const \$pool_\d+ = Integer\.createInteger\(1n\);/,
+				/const \$pool_\d+ = Integer\.createInteger\(1\);/,
 			)
 			expect(generated).toContain("$type.isValueOfType(_self, {")
 

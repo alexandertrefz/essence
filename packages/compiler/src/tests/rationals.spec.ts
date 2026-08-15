@@ -125,8 +125,8 @@ describe("Rationals", () => {
 		it("reads the accessors off the numerator's sign", () => {
 			const quotient = rational.createRational(1n, -6n)
 
-			expect(rational.numerator(quotient).value).toBe(-1n)
-			expect(rational.denominator(quotient).value).toBe(6n)
+			expect(rational.numerator(quotient).value).toBe(-1)
+			expect(rational.denominator(quotient).value).toBe(6)
 		})
 	})
 
@@ -145,10 +145,10 @@ describe("Rationals", () => {
 		})
 
 		it("answers a denominator of one for every zero", () => {
-			expect(rational.denominator(cancelled()).value).toBe(1n)
+			expect(rational.denominator(cancelled()).value).toBe(1)
 			expect(
 				rational.denominator(rational.createRational(0n, 6n)).value,
-			).toBe(1n)
+			).toBe(1)
 		})
 
 		it("prints every zero as 0/1", () => {

@@ -891,15 +891,15 @@ describe("Code Generation — Naming and Escaping", () => {
 		}
 
 		it("does not read a hexadecimal digit string as a number", () => {
-			expect(emitInteger("0xFF")).toContain("Integer.createInteger(0n)")
+			expect(emitInteger("0xFF")).toContain("Integer.createInteger(0)")
 		})
 
 		it("does not throw on a digit string with no digits", () => {
-			expect(emitInteger("FF")).toContain("Integer.createInteger(0n)")
+			expect(emitInteger("FF")).toContain("Integer.createInteger(0)")
 		})
 
 		it("leaves a well-formed Literal byte-identical", () => {
-			expect(emitInteger("42")).toContain("Integer.createInteger(42n)")
+			expect(emitInteger("42")).toContain("Integer.createInteger(42)")
 		})
 	})
 })

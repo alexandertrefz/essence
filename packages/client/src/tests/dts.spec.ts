@@ -294,7 +294,7 @@ export declare function square(p0: EssenceValue): EssenceValue
 // constructors whose values its Functions recognise.
 export declare const $bridge_typeKey: symbol
 export declare const $bridge_case: (tag: string, payload?: Record<string, EssenceValue>) => EssenceValue
-export declare const $bridge_integer: (value: bigint) => EssenceValue
+export declare const $bridge_integer: (value: number | bigint) => EssenceValue
 export declare const $bridge_rational: (numerator: bigint, denominator: bigint) => EssenceValue
 export declare const $bridge_string: (value: string) => EssenceValue
 export declare const $bridge_boolean: (value: boolean) => EssenceValue

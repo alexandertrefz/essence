@@ -410,7 +410,7 @@ export function is<ItemType extends AnyType>(
 // turn and hand back exactly the shrink `slice` had just bought.
 // `removeFirst(count)` and `removeLast(count)` are the same composition.
 export function length(originalList: ListType<AnyType>): IntegerType {
-	return createInteger(BigInt(runsOf(originalList).total))
+	return createInteger(runsOf(originalList).total)
 }
 
 // NOTE: The single-item half of `prepend`, whose sibling `prepend(contentsOf:)`
@@ -637,11 +637,24 @@ export function keepEvery<ItemType extends AnyType>(
 }
 
 // NOTE: A negative position counts back from the end — -1 is the last item, and
-// -length the first. The arithmetic stays in bigint and narrows to a Number only
-// once the position is known to sit inside the List: narrowing first would wrap
-// a position past 2³¹ into an unrelated one.
-export function positionFromEnd(index: bigint, length: bigint): bigint {
-	return index < 0n ? index + length : index
+// -length the first. The arithmetic is a double's, which is exact for every
+// position a List can have and for every index a caller can pass: an out-of-
+// range answer stays out of range at any size, since a double does not wrap the
+// way a 32-bit narrowing used to.
+export function positionFromEnd(
+	index: number | bigint,
+	length: number,
+): number {
+	// NOTE: A bigint index is outside safe range by the canonical invariant, so
+	// it is past either end of any Array JavaScript can hold — which is all a
+	// caller needs of it. Answering with the nearest position that is out of
+	// range says exactly that, and says it without building a bigint length to
+	// compare against.
+	if (typeof index !== "number") {
+		return index < 0n ? -1 : length
+	}
+
+	return index < 0 ? index + length : index
 }
 
 // NOTE: Reading a position does NOT combine the runs — an upgraded List has to
@@ -652,11 +665,11 @@ export function item<ItemType extends AnyType>(
 	index: IntegerType,
 ): OptionalType<ItemType> {
 	let view = viewOf(originalList)
-	let length = BigInt(view.total)
+	let length = view.total
 	let position = positionFromEnd(index.value, length)
 
-	if (position > -1n && position < length) {
-		return createValue(itemOfView(view, Number(position)))
+	if (position > -1 && position < length) {
+		return createValue(itemOfView(view, position))
 	} else {
 		return createEmpty()
 	}
@@ -680,23 +693,18 @@ export function slice<ItemType extends AnyType>(
 	// NOTE: Half-open [from, to). A negative end counts back from the List's
 	// end — `slice(from 0, to -1)` drops the last item — and only THEN is each
 	// end clamped, so a position that reaches back past the start settles on
-	// zero rather than wrapping a second time. Kept in bigint throughout:
-	// narrowing first would turn a position past 2³¹ into a negative one and
-	// slice from the far end.
+	// zero rather than wrapping a second time.
 	let view = runsOf(originalList)
-	let length = BigInt(view.total)
+	let length = view.total
 	let fromPosition = positionFromEnd(from.value, length)
 	let toPosition = positionFromEnd(to.value, length)
-	let start =
-		fromPosition < 0n ? 0n : fromPosition > length ? length : fromPosition
-	let end = toPosition < 0n ? 0n : toPosition > length ? length : toPosition
+	let first =
+		fromPosition < 0 ? 0 : fromPosition > length ? length : fromPosition
+	let last = toPosition < 0 ? 0 : toPosition > length ? length : toPosition
 
-	if (end <= start) {
+	if (last <= first) {
 		return createList([])
 	}
-
-	let first = Number(start)
-	let last = Number(end)
 
 	// NOTE: The window the receiver can answer with by sharing both runs. It is
 	// what makes `removeLast()` and `removeFirst()` — the stdlib's two slices at
@@ -755,14 +763,12 @@ export function remove<ItemType extends AnyType>(
 	at: IntegerType,
 ): ListType<ItemType> {
 	let view = runsOf(originalList)
-	let total = BigInt(view.total)
-	let requested = positionFromEnd(at.value, total)
+	let total = view.total
+	let position = positionFromEnd(at.value, total)
 
-	if (requested < 0n || requested >= total) {
+	if (position < 0 || position >= total) {
 		return originalList
 	}
-
-	let position = Number(requested)
 
 	if (position === 0 && view.frontCount > 0) {
 		return sharedWindowOf(originalList, view, 1, view.total)
@@ -827,8 +833,8 @@ export function reverse<ItemType extends AnyType>(
 // Declaration promise a `NonEmptyList` and is why the body could not stay in
 // Essence — every step of it answered a plain `List`.
 //
-// NOTE: Clamped in bigint before it narrows, exactly as `slice` is: a position
-// past 2³¹ narrowed first would come out as an unrelated one.
+// NOTE: Clamped exactly as `slice` clamps — a position outside the List settles
+// on the nearest end rather than wrapping to the far one.
 //
 // NOTE: Both ENDS are what the two growers already do, so both are handed
 // straight to them and inherit their upgrade-or-push. There is no fast path at
@@ -842,11 +848,9 @@ export function insert<ItemType extends AnyType>(
 	at: IntegerType,
 ): ListType<ItemType> {
 	let view = runsOf(originalList)
-	let length = BigInt(view.total)
+	let length = view.total
 	let requested = positionFromEnd(at.value, length)
-	let position = Number(
-		requested < 0n ? 0n : requested > length ? length : requested,
-	)
+	let position = requested < 0 ? 0 : requested > length ? length : requested
 
 	if (position === 0) {
 		return prepend__overload$1(originalList, item)
@@ -1067,7 +1071,9 @@ export function split<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 	groupSize: IntegerType,
 ): OptionalType<ListType<ListType<ItemType>>> {
-	if (groupSize.value < 1n) {
+	// NOTE: `1` rather than `1n`: an ordering comparison reads both
+	// representations, so one spelling asks the question of either.
+	if (groupSize.value < 1) {
 		return createEmpty()
 	}
 
@@ -1088,21 +1094,36 @@ export function of(
 	lastInteger: IntegerType,
 ): ListType<IntegerType> {
 	let integers: Array<IntegerType> = []
+	let first = firstInteger.value
+	let last = lastInteger.value
 
-	if (firstInteger.value <= lastInteger.value) {
-		for (
-			let value = firstInteger.value;
-			value <= lastInteger.value;
-			value++
-		) {
+	// NOTE: Counted in numbers where both ends are held as ones, which is every
+	// range a List can actually hold — a range needing bigint ends spans more
+	// items than there is memory for, and is only ever reached to be refused by
+	// whatever runs out first.
+	if (typeof first === "number" && typeof last === "number") {
+		if (first <= last) {
+			for (let value = first; value <= last; value++) {
+				integers.push(createInteger(value))
+			}
+		} else {
+			for (let value = first; value >= last; value--) {
+				integers.push(createInteger(value))
+			}
+		}
+
+		return createList(integers)
+	}
+
+	let from = BigInt(first)
+	let to = BigInt(last)
+
+	if (from <= to) {
+		for (let value = from; value <= to; value++) {
 			integers.push(createInteger(value))
 		}
 	} else {
-		for (
-			let value = firstInteger.value;
-			value >= lastInteger.value;
-			value--
-		) {
+		for (let value = from; value >= to; value--) {
 			integers.push(createInteger(value))
 		}
 	}

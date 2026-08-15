@@ -525,6 +525,31 @@ describe("Values built through the bridge", () => {
 		).toEqual({ name: "a", size: 1n })
 	})
 
+	// NOTE: The raw door is the only place a host reaches a constructor
+	// directly, so it is the only place a value that is not an Integer at all
+	// can get under an Integer's tag. `createInteger` itself does not ask —
+	// every caller inside the runtime and in emitted code is already holding an
+	// integer, and it is the hottest construction path there is — so the door
+	// asks instead.
+	it("refuses a number that is not an Integer a double holds", () => {
+		let bridge = module.bridge
+
+		expect(() => bridge.integer(1.5)).toThrow("1.5 is not an Integer")
+		expect(() => bridge.integer(-0.5)).toThrow()
+		expect(() => bridge.integer(2 ** 53)).toThrow()
+		expect(() => bridge.integer(1e21)).toThrow()
+		expect(() => bridge.integer(Number.NaN)).toThrow()
+		expect(() => bridge.integer(Number.POSITIVE_INFINITY)).toThrow()
+
+		expect(marshaller.toJS(bridge.integer(-0))).toBe(0n)
+		expect(marshaller.toJS(bridge.integer(9007199254740991))).toBe(
+			9007199254740991n,
+		)
+		expect(marshaller.toJS(bridge.integer(9007199254740992n))).toBe(
+			9007199254740992n,
+		)
+	})
+
 	it("unwraps an Optional built through the bridge", () => {
 		let bridge = module.bridge
 

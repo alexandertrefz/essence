@@ -56,10 +56,10 @@ test("the two spellings really are two spellings", () => {
 // outright, which is why the seam can not arise — this is the test that says so.
 describe("carriage returns across a join", () => {
 	test("a CR meeting an LF is one character", () => {
-		expect(length(append(string("a\r"), string("\nb"))).value).toBe(3n)
-		expect(length(append(string("\r"), string("\n"))).value).toBe(1n)
-		expect(length(append(string("a\r"), string("b"))).value).toBe(3n)
-		expect(length(append(string("a"), string("\nb"))).value).toBe(3n)
+		expect(length(append(string("a\r"), string("\nb"))).value).toBe(3)
+		expect(length(append(string("\r"), string("\n"))).value).toBe(1)
+		expect(length(append(string("a\r"), string("b"))).value).toBe(3)
+		expect(length(append(string("a"), string("\nb"))).value).toBe(3)
 	})
 
 	test("the joined String is measured however it was reached", () => {
@@ -69,9 +69,9 @@ describe("carriage returns across a join", () => {
 		// NOTE: Both operands measured FIRST, so the join is asked after each
 		// side has remembered its own count — the state in which a wrongly
 		// propagated count would be handed out.
-		expect(length(left).value).toBe(2n)
-		expect(length(right).value).toBe(2n)
-		expect(length(append(left, right)).value).toBe(3n)
+		expect(length(left).value).toBe(2)
+		expect(length(right).value).toBe(2)
+		expect(length(append(left, right)).value).toBe(3)
 	})
 
 	test("the joined String splits and slices on the cluster", () => {
@@ -89,13 +89,13 @@ describe("carriage returns across a join", () => {
 	// the same seam — a String ending in CR and beginning with LF loses one
 	// character per copy after the first.
 	test("a repeat that meets its own end is measured too", () => {
-		expect(length(repeat(string("a\r\n"), integer(3n))).value).toBe(6n)
-		expect(length(repeat(string("\r\n"), integer(3n))).value).toBe(3n)
-		expect(length(repeat(string("\n\r"), integer(3n))).value).toBe(4n)
+		expect(length(repeat(string("a\r\n"), integer(3n))).value).toBe(6)
+		expect(length(repeat(string("\r\n"), integer(3n))).value).toBe(3)
+		expect(length(repeat(string("\n\r"), integer(3n))).value).toBe(4)
 		expect(repeat(string("\n\r"), integer(3n)).value).toBe("\n\r\n\r\n\r")
 		// NOTE: The ASCII case the marker is for — no seam, so the count is the
 		// text's own length.
-		expect(length(repeat(string("ab"), integer(3n))).value).toBe(6n)
+		expect(length(repeat(string("ab"), integer(3n))).value).toBe(6)
 		expect(repeat(string("ab"), integer(3n)).value).toBe("ababab")
 	})
 
@@ -105,12 +105,10 @@ describe("carriage returns across a join", () => {
 		let left = string("hello")
 		let right = string(" world")
 
-		expect(length(left).value).toBe(5n)
-		expect(length(append(left, right)).value).toBe(11n)
-		expect(length(append(string("hello"), string(" world"))).value).toBe(
-			11n,
-		)
-		expect(length(append(string(""), string(""))).value).toBe(0n)
+		expect(length(left).value).toBe(5)
+		expect(length(append(left, right)).value).toBe(11)
+		expect(length(append(string("hello"), string(" world"))).value).toBe(11)
+		expect(length(append(string(""), string(""))).value).toBe(0)
 	})
 })
 
@@ -119,10 +117,10 @@ describe("carriage returns across a join", () => {
 // spellings count, order and compare alike.
 describe("combining marks", () => {
 	test("both spellings count alike", () => {
-		expect(countOf(composed)).toBe(4n)
-		expect(countOf(decomposed)).toBe(4n)
-		expect(countOf(composedAccent)).toBe(1n)
-		expect(countOf(decomposedAccent)).toBe(1n)
+		expect(countOf(composed)).toBe(4)
+		expect(countOf(decomposed)).toBe(4)
+		expect(countOf(composedAccent)).toBe(1)
+		expect(countOf(decomposedAccent)).toBe(1)
 	})
 
 	test("both spellings are one String", () => {
@@ -138,7 +136,7 @@ describe("combining marks", () => {
 	test("a mark joined onto a base is one character", () => {
 		let joined = append(string("cafe"), string("́"))
 
-		expect(length(joined).value).toBe(4n)
+		expect(length(joined).value).toBe(4)
 		expect(anyIs(joined, string(composed))).toBeTrue()
 	})
 
@@ -147,8 +145,8 @@ describe("combining marks", () => {
 		let second = slice(string(decomposed), integer(3n), integer(4n))
 
 		expect(anyIs(first, second)).toBeTrue()
-		expect(length(first).value).toBe(1n)
-		expect(length(second).value).toBe(1n)
+		expect(length(first).value).toBe(1)
+		expect(length(second).value).toBe(1)
 		expect(anyIs(first, string(composedAccent))).toBeTrue()
 	})
 
@@ -170,7 +168,7 @@ describe("combining marks", () => {
 		expect(character(string(family), integer(0n))).toEqual(
 			value(string(family)),
 		)
-		expect(length(repeat(string(family), integer(3n))).value).toBe(3n)
+		expect(length(repeat(string(family), integer(3n))).value).toBe(3)
 	})
 })
 
@@ -215,7 +213,7 @@ describe("positions", () => {
 		expect(repeat(string("ab"), integer(0n)).value).toBe("")
 		expect(repeat(string("ab"), integer(-3n)).value).toBe("")
 		expect(repeat(string(""), integer(5n)).value).toBe("")
-		expect(length(repeat(string(""), integer(5n))).value).toBe(0n)
+		expect(length(repeat(string(""), integer(5n))).value).toBe(0)
 	})
 })
 
@@ -273,7 +271,7 @@ describe("normalisation-sensitive equality", () => {
 
 describe("empty Strings", () => {
 	test("the empty String is equal to and orders below every other", () => {
-		expect(countOf("")).toBe(0n)
+		expect(countOf("")).toBe(0)
 		expect(anyIs(string(""), string(""))).toBeTrue()
 		expect(anyIs(string(""), string("a"))).toBeFalse()
 		expect(anyIs(string("a"), string(""))).toBeFalse()

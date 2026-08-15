@@ -55,13 +55,15 @@ export const BRIDGE_EXPORTS = {
 // written OUT of this and `BRIDGE_KEY` is spelled out of it too, so what goes
 // into a bundle and what a bundle is named by can not drift apart.
 //
-// NOTE: The List entry names `createListFrom` and not `createList`, which is
-// the one place this table does not hand over the constructor a native would
-// reach for. `createList` TAKES OWNERSHIP of the Array it is given — a later
-// append pushes onto it in place — and a host's Array is not the host's to give
-// away by calling a Function. Every caller inside the runtime can be read and
-// checked; a host cannot, so the copy is made on this side of the door, and the
-// contract never reaches a published surface at all.
+// NOTE: The List and Integer entries name `createListFrom` and
+// `createIntegerFrom`, the two places this table does not hand over the
+// constructor a native would reach for. `createList` TAKES OWNERSHIP of the
+// Array it is given — a later append pushes onto it in place — and a host's
+// Array is not the host's to give away by calling a Function; `createInteger`
+// canonicalises a value but takes it for an integer, which every caller inside
+// the runtime is and a host is not. Every caller in here can be read and
+// checked; a host cannot, so the copy and the check are made on this side of
+// the door, and neither contract reaches a published surface at all.
 const BRIDGE_MODULES: Array<[string, Array<[string, string]>]> = [
 	[
 		"type",
@@ -70,7 +72,7 @@ const BRIDGE_MODULES: Array<[string, Array<[string, string]>]> = [
 			["createCase", BRIDGE_EXPORTS.case],
 		],
 	],
-	["Integer", [["createInteger", BRIDGE_EXPORTS.integer]]],
+	["Integer", [["createIntegerFrom", BRIDGE_EXPORTS.integer]]],
 	["Rational", [["createRational", BRIDGE_EXPORTS.rational]]],
 	["String", [["createString", BRIDGE_EXPORTS.string]]],
 	["Boolean", [["createBoolean", BRIDGE_EXPORTS.boolean]]],
@@ -105,7 +107,7 @@ export type EssenceValue = object
 export type RuntimeBridge = {
 	typeKey: symbol
 	case: (tag: string, payload?: Record<string, EssenceValue>) => EssenceValue
-	integer: (value: bigint) => EssenceValue
+	integer: (value: number | bigint) => EssenceValue
 	rational: (numerator: bigint, denominator: bigint) => EssenceValue
 	string: (value: string) => EssenceValue
 	boolean: (value: boolean) => EssenceValue

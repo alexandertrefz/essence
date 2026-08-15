@@ -197,7 +197,15 @@ function bridgeDeclarations(): Array<string> {
 			BRIDGE_EXPORTS.case,
 			"(tag: string, payload?: Record<string, EssenceValue>) => EssenceValue",
 		],
-		[BRIDGE_EXPORTS.integer, "(value: bigint) => EssenceValue"],
+		// NOTE: Both kinds in, because the door canonicalises — an Integer
+		// holds a number while its value fits one and a bigint beyond that, and
+		// a caller has no business knowing which side of 2⁵³ its value sits. A
+		// number that is not exactly an integer a double holds is refused
+		// rather than admitted, which is what the declared Type can not say.
+		// Out is always a `bigint`, which is what the marshalled Type below
+		// says, so that an export's declared Type does not depend on the SIZE
+		// of the answer.
+		[BRIDGE_EXPORTS.integer, "(value: number | bigint) => EssenceValue"],
 		[
 			BRIDGE_EXPORTS.rational,
 			"(numerator: bigint, denominator: bigint) => EssenceValue",
@@ -692,9 +700,9 @@ function createWalker(surface: ExportSurface, imports: Set<string>): Walker {
 
 	// NOTE: The bundle's binding: the name the Rewriter emitted, and a Type that
 	// says only that the value is Essence's. It IS only that — an Integer there is
-	// a tagged object holding a `bigint`, keyed by a Symbol this side never sees,
-	// and every shape it might have is one the bridge builds rather than one
-	// TypeScript can check.
+	// a tagged object holding a number or a bigint, keyed by a Symbol this side
+	// never sees, and every shape it might have is one the bridge builds rather
+	// than one TypeScript can check.
 	function emittedDeclaration(name: string, type: common.Type): string {
 		if (isCallable(type)) {
 			return emittedFunction(name, type)

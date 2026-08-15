@@ -8950,9 +8950,10 @@ function reportInvalidPredicateLeaf(
 }
 
 // NOTE: A literal Argument as the stable scalar a conjunct key is built from.
-// The Integer's digits rather than its value, because a value is a bigint at run
-// time and JSON has no bigint; the Rational's two halves under the slash it was
-// written with, which no Integer's digits can spell.
+// The Integer's digits rather than its value, because a value is a number or a
+// bigint at run time and neither spells every Integer in JSON; the Rational's
+// two halves under the slash it was written with, which no Integer's digits can
+// spell.
 function literalPredicateArgument(
 	value: common.typed.ExpressionNode,
 ): string | boolean | null {

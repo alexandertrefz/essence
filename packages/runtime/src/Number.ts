@@ -55,7 +55,7 @@ type RationalKind = IntegerType | RationalType
 // the rest of the runtime does.
 function numeratorOf(number: RationalKind): bigint {
 	if (number[typeKeySymbol] === "Integer") {
-		return number.value
+		return BigInt(number.value)
 	} else {
 		return number.numerator
 	}

@@ -13,6 +13,7 @@ import {
 	subtractRationals,
 } from "./bigRational"
 import type { IntegerType } from "./Integer"
+import { createInteger } from "./Integer"
 import type { NumberFormatType } from "./NumberFormat"
 import type { OptionalType } from "./Optional"
 import { createEmpty, createValue } from "./Optional"
@@ -63,11 +64,15 @@ export function of__overload$1(
 	numerator: IntegerType,
 	denominator: IntegerType,
 ): OptionalType<RationalType> {
-	if (denominator.value === 0n) {
+	// NOTE: Zero is in safe range, so the canonical invariant makes it the
+	// number `0` — `0n` would answer `false` for the value it looks for.
+	if (denominator.value === 0) {
 		return createEmpty()
 	}
 
-	return createValue(createRational(numerator.value, denominator.value))
+	return createValue(
+		createRational(BigInt(numerator.value), BigInt(denominator.value)),
+	)
 }
 
 // NOTE: The same construction with the zero check taken OUT rather than skipped
@@ -79,7 +84,7 @@ export function of__overload$2(
 	numerator: IntegerType,
 	denominator: IntegerType,
 ): RationalType {
-	return createRational(numerator.value, denominator.value)
+	return createRational(BigInt(numerator.value), BigInt(denominator.value))
 }
 
 // NOTE: The lowest-terms form with the sign on the numerator — the shape the
@@ -208,18 +213,15 @@ export function divide__overload$1(
 
 // #region Everyday methods
 
+// NOTE: Through `createInteger` rather than written out, because the parts are
+// bigints and an Integer holding one that fits a double would be a second
+// spelling of a value that already has one.
 export function numerator(rational: RationalType): IntegerType {
-	return {
-		[typeKeySymbol]: "Integer",
-		value: reducedParts(rational).numerator,
-	}
+	return createInteger(reducedParts(rational).numerator)
 }
 
 export function denominator(rational: RationalType): IntegerType {
-	return {
-		[typeKeySymbol]: "Integer",
-		value: reducedParts(rational).denominator,
-	}
+	return createInteger(reducedParts(rational).denominator)
 }
 
 export function raise(
@@ -228,11 +230,13 @@ export function raise(
 ): OptionalType<RationalType> {
 	let parts = reducedParts(rational)
 
-	if (exponent.value >= 0n) {
+	let power = BigInt(exponent.value)
+
+	if (power >= 0n) {
 		return createValue(
 			createRational(
-				parts.numerator ** exponent.value,
-				parts.denominator ** exponent.value,
+				parts.numerator ** power,
+				parts.denominator ** power,
 			),
 		)
 	}
@@ -242,10 +246,7 @@ export function raise(
 	}
 
 	return createValue(
-		createRational(
-			parts.denominator ** -exponent.value,
-			parts.numerator ** -exponent.value,
-		),
+		createRational(parts.denominator ** -power, parts.numerator ** -power),
 	)
 }
 

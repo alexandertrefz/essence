@@ -2118,9 +2118,12 @@ function rewriteIntrinsic(
 						left: rewriteExpression(node.operand),
 						right: rewriteExpression(node.other),
 					}
-		// NOTE: The bigint each Integer holds, compared by JavaScript's own
-		// operator — which is what `Integer.compare` compares, and it is exact
-		// for a bigint at any size.
+		// NOTE: What each Integer holds, compared by JavaScript's own operator.
+		// `<`, `>`, `<=` and `>=` are defined ACROSS a number and a bigint and
+		// decide the mathematical order without converting either side, so one
+		// comparison answers for all four pairings of the hybrid Integer's two
+		// representations — which is why this site needs nothing from the
+		// canonical invariant and no guard.
 		case "raw-compare":
 			return {
 				type: "BinaryExpression",
@@ -2130,29 +2133,8 @@ function rewriteIntrinsic(
 			}
 		case "raw-equals":
 			return rawEquals(node)
-		// NOTE: The branded literal `createInteger` builds, around the
-		// operation the Method would have handed it.
 		case "raw-arithmetic":
-			return {
-				type: "ObjectExpression",
-				properties: [
-					typeKeyProperty("Integer"),
-					{
-						type: "Property",
-						key: { type: "Identifier", name: "value" },
-						value: {
-							type: "BinaryExpression",
-							operator: node.operator,
-							left: valueRead(rewriteExpression(node.left)),
-							right: valueRead(rewriteExpression(node.right)),
-						},
-						kind: "init",
-						computed: false,
-						method: false,
-						shorthand: false,
-					},
-				],
-			}
+			return rawArithmetic(node)
 		// NOTE: Through the one function every reference to a standard library
 		// member routes through, so a devirtualised Method is spelled exactly
 		// as the witness spelled it — an Essence-implemented one as its own
@@ -2363,18 +2345,38 @@ function noDispatchCaseMatched(): estree.CallExpression {
 	}
 }
 
-// NOTE: The value a scalar wrapper holds — the bigint under an Integer, the
-// JavaScript boolean under a Boolean. Not a member the language has: it is the
-// runtime's own field, read here exactly as every runtime Method reads it.
+// NOTE: The value a scalar wrapper holds — the number or bigint under an
+// Integer, the JavaScript boolean under a Boolean. Not a member the language
+// has: it is the runtime's own field, read here exactly as every runtime Method
+// reads it.
 function valueRead(object: estree.Expression): estree.MemberExpression {
 	return memberRead(object, "value")
 }
 
+// NOTE: `Number.MAX_SAFE_INTEGER`, written as the literal the guard below
+// compares against rather than reached for by name: `Number` is a Namespace of
+// the language, and an emitted Module that opens with `import * as Number` would
+// shadow the global this took it from. `Integer.ts` in the runtime holds the
+// same bound; `src/tests/hybridIntegers.spec.ts` holds the two to each other.
+const SAFE_INTEGER = 9007199254740991
+
 // NOTE: Two Strings are equal when their CHARACTERS are, which is not what
 // `===` decides — the same accent written as one code point and as two is one
 // String — so the runtime helper that normalises decides it, and the double
-// normalisation stays in the one place that has always performed it. An Integer
-// holds a bigint, where `===` is the whole answer.
+// normalisation stays in the one place that has always performed it.
+//
+// NOTE: An Integer is `===` on what it holds, and THE CANONICAL INVARIANT is
+// what makes that the whole answer. An Integer holds a number while its value is
+// one a double holds exactly and a bigint beyond that, never the other way
+// round, so one mathematical Integer has exactly one representation. Two equal
+// values therefore meet as two numbers or as two bigints, where `===` is exact
+// either way; two unequal ones answer false in those pairings, and in the mixed
+// pairing `===` answers false between a number and a bigint without comparing —
+// which is right, because a mixed pairing can only be values whose magnitudes
+// put them on opposite sides of safe range. Every construction site canonicalises
+// (`Integer.createInteger` is the one place it happens), so the invariant is what
+// this site depends on and what `runtime/src/tests/hybridIntegers.spec.ts` is
+// there to keep true.
 function rawEquals(node: common.typedSimple.RawEqualsNode): estree.Expression {
 	if (node.scalar === "Integer") {
 		return {
@@ -2406,6 +2408,197 @@ function rawEquals(node: common.typedSimple.RawEqualsNode): estree.Expression {
 				argument: equals,
 			}
 		: equals
+}
+
+// NOTE: The three exact operations, written INLINE around a guard rather than as
+// a call — a call is what `lower-scalar-operations` took this site away from,
+// and putting one back would give the saving away.
+//
+// NOTE: A hybrid Integer holds a number or a bigint, and JavaScript's `+`, `-`
+// and `*` THROW on a mix of the two, so the two operands have to be known to be
+// numbers before they meet. That is asked with `typeof` rather than with the
+// range test the canonical invariant would also allow: the two decide the same
+// question, but a range test compares a bigint against a double, which is a real
+// comparison and measured ~10ns a side, while `typeof` is a tag read. On values
+// that HAVE escaped — where the guard exists only to be refused — the range test
+// cost 21ns a turn against 0.3, and it bought about 1ns a turn on values that had
+// not.
+//
+// NOTE: The ANSWER is then checked against safe range, which is what keeps the
+// result canonical, and the check is EXACT rather than a conservative
+// approximation. IEEE 754 `+`, `-` and `*` are correctly rounded, so the double
+// answer is the nearest double to the true result. Rounding is monotone and 2⁵³
+// is itself a double, so a true result of magnitude ≥ 2⁵³ can only round to a
+// double of magnitude ≥ 2⁵³ and fails the check; a true result inside safe range
+// is exactly representable and rounds to itself. The check therefore passes
+// exactly when the double IS the true result. Multiplication is the case worth
+// stating: two factors well inside safe range can have a product far outside it,
+// and the rounded product can not sneak back INSIDE — which is why the operands
+// need no bound of their own beyond being numbers at all.
+//
+// NOTE: The escape arm hands the two RAW values to the runtime, which redoes the
+// guard and falls to bigint. It is reached by an operation that left safe range
+// and by one whose operands had already left it, and both are cold.
+function rawArithmetic(
+	node: common.typedSimple.RawArithmeticNode,
+): estree.Expression {
+	let left = rewriteExpression(node.left)
+	let right = rewriteExpression(node.right)
+	let escaped: estree.Expression = {
+		type: "CallExpression",
+		optional: false,
+		callee: memberRead(
+			{ type: "Identifier", name: "Integer" },
+			escapedArithmetic[node.operator],
+		),
+		arguments: [valueRead(left), valueRead(right)],
+	}
+
+	// NOTE: The guard reads each operand twice and the answer three times, so
+	// an operand it can not read twice — anything with a call in it — is handed
+	// to the runtime whole instead. What is left is what the hot sites are: a
+	// name, a Record member, a pooled constant.
+	if (!isRepeatable(left) || !isRepeatable(right)) {
+		return escaped
+	}
+
+	let leftValue = valueRead(left)
+	let rightValue = valueRead(right)
+	let answer: estree.Expression = {
+		type: "BinaryExpression",
+		operator: node.operator,
+		left: leftValue,
+		right: rightValue,
+	}
+
+	return {
+		type: "ConditionalExpression",
+		test: allOf([
+			heldAsNumber(leftValue),
+			heldAsNumber(rightValue),
+			...withinSafeRange(answer),
+		]),
+		consequent: {
+			type: "ObjectExpression",
+			properties: [
+				typeKeyProperty("Integer"),
+				{
+					type: "Property",
+					key: { type: "Identifier", name: "value" },
+					value: answer,
+					kind: "init",
+					computed: false,
+					method: false,
+					shorthand: false,
+				},
+			],
+		},
+		alternate: escaped,
+	}
+}
+
+// NOTE: The runtime entry each operator escapes to. Each takes the two raw
+// values, not the Integers around them — the guard already read them, and
+// neither side wants an Integer built to be taken apart again.
+const escapedArithmetic: Record<"+" | "-" | "*", string> = {
+	"+": "sum",
+	"-": "difference",
+	"*": "product",
+}
+
+// NOTE: Which of its two representations a value an Integer holds is in — the
+// one question about a hybrid Integer that a comparison can not ask, since `<`
+// and `>` read both alike. Asked here as the tag read it is rather than as the
+// range test the canonical invariant would also answer it with, because that
+// test compares a bigint against a double whenever the answer is `false`.
+function heldAsNumber(value: estree.Expression): estree.Expression {
+	return typeIs(value, "===")
+}
+
+function heldAsBigInt(value: estree.Expression): estree.Expression {
+	return typeIs(value, "!==")
+}
+
+function typeIs(
+	value: estree.Expression,
+	operator: "===" | "!==",
+): estree.Expression {
+	return {
+		type: "BinaryExpression",
+		operator,
+		left: {
+			type: "UnaryExpression",
+			operator: "typeof",
+			prefix: true,
+			argument: value,
+		},
+		right: { type: "Literal", value: "number" },
+	}
+}
+
+function withinSafeRange(
+	value: estree.Expression,
+): [estree.Expression, estree.Expression] {
+	return [
+		{
+			type: "BinaryExpression",
+			operator: ">=",
+			left: value,
+			right: numberLiteral(-SAFE_INTEGER),
+		},
+		{
+			type: "BinaryExpression",
+			operator: "<=",
+			left: value,
+			right: numberLiteral(SAFE_INTEGER),
+		},
+	]
+}
+
+// NOTE: A JavaScript number as a literal expression. JavaScript has no negative
+// numeric literal — `-1` is a negation of `1`, and the emitter says so by
+// refusing one — so a negative value is written as the negation it is.
+function numberLiteral(value: number): estree.Expression {
+	return value < 0
+		? {
+				type: "UnaryExpression",
+				operator: "-",
+				prefix: true,
+				argument: { type: "Literal", value: -value },
+			}
+		: { type: "Literal", value }
+}
+
+function allOf(tests: Array<estree.Expression>): estree.Expression {
+	return tests.reduce((left, right) => ({
+		type: "LogicalExpression",
+		operator: "&&",
+		left,
+		right,
+	}))
+}
+
+// NOTE: Whether an emitted expression may be written into the output more than
+// once. A name and a chain of plain member reads over one are: every value the
+// Rewriter emits is a plain object, there are no accessors anywhere in the
+// runtime or in what a Program can build, so reading `state.total.value` twice
+// costs two loads and observes nothing. Everything else — a call above all — is
+// evaluated once and once only.
+function isRepeatable(node: estree.Expression): boolean {
+	switch (node.type) {
+		case "Identifier":
+		case "Literal":
+			return true
+		case "MemberExpression":
+			return (
+				!node.computed &&
+				!node.optional &&
+				node.object.type !== "Super" &&
+				isRepeatable(node.object)
+			)
+		default:
+			return false
+	}
 }
 
 // NOTE: The hidden Type key every runtime value carries, as emitted code
@@ -2956,10 +3149,27 @@ function decimalDigits(value: string): string {
 	return digits === undefined ? "0" : digits
 }
 
+// NOTE: The literal is written in the representation the value CANONICALLY has
+// — a JavaScript number where a double holds it exactly, a bigint beyond that —
+// so that `createInteger` has nothing to convert and a pooled literal is already
+// the shape every comparison against it expects.
 function rewriteIntegerValue(
 	node: common.typedSimple.IntegerValueNode,
 ): estree.CallExpression {
 	let value = decimalDigits(node.value)
+	let held = BigInt(value)
+
+	if (held >= -BigInt(SAFE_INTEGER) && held <= BigInt(SAFE_INTEGER)) {
+		return {
+			type: "CallExpression",
+			optional: false,
+			callee: memberRead(
+				{ type: "Identifier", name: "Integer" },
+				"createInteger",
+			),
+			arguments: [numberLiteral(Number(held))],
+		}
+	}
 
 	return {
 		type: "CallExpression",
@@ -3186,6 +3396,10 @@ const compilerOwnedNames = new Set([
 	"$type",
 	"$helpers",
 	"Object",
+	// NOTE: A counted walk whose bounds escaped safe range converts its start
+	// with it, so a Program declaring its own `BigInt` would take the
+	// conversion away from the loop it sits above.
+	"BigInt",
 ])
 
 // NOTE: The builtin Namespaces as a set, for the one question emission asks of
@@ -4420,12 +4634,20 @@ function conditionWalk(
 // through the `while` driver — a Record and an Integer built per turn, a closure
 // asking whether the index has passed the end and another advancing it. All of
 // it is decided here: the direction once, before the first turn, exactly as that
-// body decides it, and then a `for` over the bigints the two bounds hold.
+// body decides it, and then a `for` over what the two bounds hold.
+//
+// NOTE: The counter counts in NUMBERS wherever both bounds are held as ones,
+// which is every loop written over ordinary quantities: a counter between two
+// safe bounds never leaves safe range, so counting it as a double is exact, and
+// a double `+ 1` is a fraction of the cost of a heap bigint per turn. A bound
+// held as a bigint — one past 2⁵³, so a loop of more turns than a Program can
+// run — falls back to the bigint counter this always was, and the kind is
+// decided ONCE, before the first turn, so no turn asks.
 //
 // NOTE: The bounds and the seed are evaluated in the order the call passed them,
 // which is the order the driver would have evaluated them in. What follows —
-// which way the count runs — is a comparison of two bigints and observes
-// nothing.
+// which way the count runs, and in which representation — reads the two bounds
+// and observes nothing.
 function countedWalk(
 	prefix: string,
 	driver: Extract<common.typedSimple.InlineLoopDriver, { kind: "counted" }>,
@@ -4433,6 +4655,7 @@ function countedWalk(
 	let from = `${prefix}_from`
 	let to = `${prefix}_to`
 	let ascending = `${prefix}_up`
+	let escaped = `${prefix}_big`
 	let delta = `${prefix}_delta`
 	let index = `${prefix}_index`
 	let state = `${prefix}_state`
@@ -4471,19 +4694,52 @@ function countedWalk(
 				left: loopIdentifier(from),
 				right: loopIdentifier(to),
 			}),
+			// NOTE: Either bound being a bigint is what sends the counter to
+			// bigint, and by the canonical invariant that is the same question
+			// as either bound being outside safe range.
+			loopDeclaration("const", escaped, {
+				type: "LogicalExpression",
+				operator: "||",
+				left: heldAsBigInt(loopIdentifier(from)),
+				right: heldAsBigInt(loopIdentifier(to)),
+			}),
 			loopDeclaration("const", delta, {
 				type: "ConditionalExpression",
-				test: loopIdentifier(ascending),
-				consequent: countLiteral(1n),
-				alternate: countLiteral(-1n),
+				test: loopIdentifier(escaped),
+				consequent: {
+					type: "ConditionalExpression",
+					test: loopIdentifier(ascending),
+					consequent: countLiteral(1n),
+					alternate: countLiteral(-1n),
+				},
+				alternate: {
+					type: "ConditionalExpression",
+					test: loopIdentifier(ascending),
+					consequent: numberLiteral(1),
+					alternate: numberLiteral(-1),
+				},
 			}),
 			{
 				type: "ForStatement",
-				init: loopDeclaration("let", index, loopIdentifier(from)),
+				// NOTE: The start has to match the step's kind — a number
+				// counter stepped by a bigint throws — so a bigint walk whose
+				// lower bound happens to be a number converts it once here.
+				init: loopDeclaration("let", index, {
+					type: "ConditionalExpression",
+					test: loopIdentifier(escaped),
+					consequent: {
+						type: "CallExpression",
+						optional: false,
+						callee: loopIdentifier("BigInt"),
+						arguments: [loopIdentifier(from)],
+					},
+					alternate: loopIdentifier(from),
+				}),
 				// NOTE: Counting up runs while the index has not passed the end
 				// from below and counting down while it has not passed it from
 				// above — the two predicates the Essence body writes, asked of
-				// the bigint rather than through a closure and an Ordering.
+				// the counter rather than through a closure and an Ordering.
+				// The comparison is exact whichever kind each side is holding.
 				test: {
 					type: "ConditionalExpression",
 					test: loopIdentifier(ascending),
@@ -4992,9 +5248,8 @@ function createdInteger(value: estree.Expression): estree.Expression {
 	}
 }
 
-// NOTE: One step of the counter, as the bigint an Integer holds — the same
-// literal an Integer's own emission writes, and the only kind of number the
-// counted walk's bounds can be.
+// NOTE: One step of a counter that had to escape to bigint, as the literal an
+// Integer past safe range holds.
 function countLiteral(value: bigint): estree.BigIntLiteral {
 	return { type: "Literal", bigint: value.toString(), value }
 }

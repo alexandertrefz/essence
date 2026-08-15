@@ -31,23 +31,28 @@ describe("remembered lowest terms", () => {
 
 		// NOTE: Asking twice, because the first ask is what fills the memory and
 		// the second is what would read a written-back value if one had been.
-		expect(numerator(unreduced).value).toBe(2n)
-		expect(denominator(unreduced).value).toBe(1n)
-		expect(numerator(unreduced).value).toBe(2n)
-		expect(denominator(unreduced).value).toBe(1n)
+		//
+		// NOTE: The accessors answer INTEGERS, whose parts are canonicalised
+		// into the hybrid representation — a number for anything a double
+		// carries — while the Rational goes on holding the bigints it was built
+		// with, which is what the assertions either side of these are for.
+		expect(numerator(unreduced).value).toBe(2)
+		expect(denominator(unreduced).value).toBe(1)
+		expect(numerator(unreduced).value).toBe(2)
+		expect(denominator(unreduced).value).toBe(1)
 
 		expect(unreduced.numerator).toBe(4n)
 		expect(unreduced.denominator).toBe(2n)
 	})
 
 	test("the accessors answer the lowest-terms parts", () => {
-		let cases: Array<[bigint, bigint, bigint, bigint]> = [
-			[4n, 2n, 2n, 1n],
-			[1n, 2n, 1n, 2n],
-			[6n, 4n, 3n, 2n],
-			[-6n, 4n, -3n, 2n],
-			[6n, -4n, -3n, 2n],
-			[0n, 5n, 0n, 1n],
+		let cases: Array<[bigint, bigint, number, number]> = [
+			[4n, 2n, 2, 1],
+			[1n, 2n, 1, 2],
+			[6n, 4n, 3, 2],
+			[-6n, 4n, -3, 2],
+			[6n, -4n, -3, 2],
+			[0n, 5n, 0, 1],
 		]
 
 		for (let [

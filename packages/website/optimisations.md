@@ -99,8 +99,10 @@ literal are EXACTLY one scalar kind it becomes `_self.value === 0n`, the same
 lowering `lower-scalar-operations` performs for `a::is(b)`. It rests on the same
 argument, too: `Integer` means an Integer and nothing else — not a Union it is a
 member of, not a Type Parameter that could be one — so the value at run time is
-the branded object the runtime's constructor built, holding a bigint under
-`value`. A Union-typed scrutinee is left alone, because a value arriving there
+the branded object the runtime's constructor built, holding a number or a bigint
+under `value` — and the canonical representation `hybrid-integers` describes is
+what makes `===` on that field the whole answer.
+ A Union-typed scrutinee is left alone, because a value arriving there
 may be of any member and `.value` is not what decides it. Strings go through
 `$helpers.stringEquals` rather than `===`, exactly as that pass emits them: two
 Strings are equal when their CHARACTERS are. Everything else — a Case, a Record
@@ -154,8 +156,8 @@ Writes the primitive operations out where they were called.
 
 `a::isLessThan(b)` on two Integers went through a Method that called
 `Integer.compare`, which built an `Ordering` Case, which was compared against
-`#Less` — three calls and an allocation to decide something the bigints both
-values were holding all along decide with one `<`:
+`#Less` — three calls and an allocation to decide something the values both
+Integers were holding all along decide with one `<`:
 
 ```js
 a.value < b.value ? Boolean.trueInstance : Boolean.falseInstance
@@ -166,13 +168,18 @@ What is lowered, and nothing else:
 - **Integer**, where the receiver AND the Argument are exactly `Integer`:
   `isLessThan`, `isGreaterThan`, `isLessThanOrEqualTo`,
   `isGreaterThanOrEqualTo`, `is`, `isNot`, and `add`, `subtract`, `multiply`.
-  The comparisons become JavaScript's own operators over the bigints; the
-  arithmetic becomes the operation inside the branded literal
-  `Integer.createInteger` would have built, so `a::subtract(b)` — which is
-  `@::add(other::negate())` — is one allocation where it was two, and no call.
+  The comparisons become JavaScript's own operators, which decide the
+  mathematical order across both of a hybrid Integer's representations without
+  converting either side. The arithmetic becomes the operation inside the
+  branded literal `Integer.createInteger` would have built, wrapped in the guard
+  `hybrid-integers` describes: both operands held as numbers, the double answer
+  inside safe range, and a call to `Integer.sum`, `Integer.difference` or
+  `Integer.product` where either fails. So `a::subtract(b)` — which is
+  `@::add(other::negate())` — is one allocation where it was two, and no call on
+  the path that is taken.
 - **NonZeroInteger**: `multiply`, and only that one — the Namespace declares
   nothing else. A checked refinement is erased before the first pass runs, so
-  what a call of it holds is two Integers with bigints in them, and the Method it
+  what a call of it holds is two ordinary Integers, and the Method it
   would have reached is Integer's own product re-exported under the refined
   Namespace's name. Same operator, same operands, same answer: the evidence was
   spent while compiling and there is nothing left of it to run.
@@ -189,10 +196,12 @@ rather than by `===`; a Union-typed or generic operand is not known to be an
 Integer at all. Where the Types are not exactly the named kind, the call stays.
 
 Safe because those Types are exact and those values are what the runtime built.
-An `Integer` is the branded object holding a bigint, and bigint arithmetic is
-exact at any size and totally ordered, with no value that is unequal to itself
-the way a floating-point NaN is — so `!(a < b)` may be asked as `a >= b`, which
-is what makes `isLessThanOrEqualTo` a single `<=` rather than a negated `>`.
+An `Integer` is the branded object holding a number or a bigint, Essence's
+Integer arithmetic is exact at any size and totally ordered, and no Integer is
+unequal to itself the way a floating-point NaN is — so `!(a < b)` may be asked as
+`a >= b`, which is what makes `isLessThanOrEqualTo` a single `<=` rather than a
+negated `>`. The two representations do not weaken any of that: `<` and `>` read
+both alike, and equality is `===` because one value has one representation.
 
 **`and` and `or` keep eager evaluation.** Essence evaluates every Argument
 before the call, and JavaScript's `&&` and `||` do not evaluate their right-hand
@@ -564,10 +573,33 @@ fixes its direction once, before the first turn.
 `loop(from:through:startingWith:step:)` is written in Essence on the `while`
 driver and threads a `{ index, carried }` Record through it — a Record and an
 Integer built per turn, a closure asking whether the index has passed the end,
-another advancing it. Inlined it is a `for` over the bigint the two bounds hold,
+another advancing it. Inlined it is a `for` over what the two bounds hold,
 counting up when `from` is the lesser and down when it is the greater exactly as
-that body decides it, and the only allocation a turn still costs is the Integer
-the body is HANDED.
+that body decides it.
+
+The counter counts in NUMBERS wherever both bounds are held as ones, which is
+every loop written over ordinary quantities; a bound past 2⁵³ — a walk of more
+turns than a Program can run — falls back to a bigint counter, and which of the
+two it is, is decided once before the first turn. Where both bounds are written
+as Integers a double holds exactly, it is decided while COMPILING and the bigint
+half is not emitted at all: no kind test, no two-kind step, no converting start.
+
+**And the Integer the body is handed is not built at all where the body never
+needs one.** A body that COUNTS reads through to the value at every mention of
+the counter, so it is handed the counter itself; the swap is refused on any
+mention that is not a read of the value, so a body that hands the Integer on,
+stores it, or shadows the name keeps its box. Measured on a two-million-turn sum
+in a fresh process, dropping it takes the walk from about 12.3 ms to about
+6.5 ms.
+
+What the body is handed is the counter as the canonical invariant spells it,
+which is the counter itself on every walk that counts in numbers. The kind is
+decided from the BOUNDS and canonicality belongs to each VALUE, so a walk with
+one bound inside safe range and one outside counts in bigint through values a
+double holds exactly — and a bigint spelling of one of those is a second
+spelling of a value that already has one, which `===` answers `false` for. Such a
+walk canonicalises the turn's counter; every other walk reads one loop-invariant
+`false` and the counter it already had.
 
 **A `Step` is read where it is built.** The general loop and `reduce`'s
 early-stopping entry both decide by a tag the body has just written — `#Done(x)`
@@ -646,11 +678,14 @@ hole of an interpolated String folds, the whole String becomes a literal — and
 `pool-constants` then declares it once.
 
 Safe because the Compiler works the answer out THE SAME WAY the Program would
-have. Essence arithmetic is exact — bigints, and pairs of bigints — so there is
-no rounding for the two to disagree about, and each fold is the body of the
-Method it replaces carried out on the literals it was given. Where that body is
-a runtime native it is one bigint operation; where it is written in Essence it is
-followed statement by statement.
+have. Essence arithmetic is exact — the fold is carried out in bigints and pairs
+of bigints whatever the runtime would have used — so there is no rounding for the
+two to disagree about, and each fold is the body of the Method it replaces
+carried out on the literals it was given. Where that body is a runtime native it
+is one bigint operation; where it is written in Essence it is followed statement
+by statement. A folded Integer is then WRITTEN in the representation its value
+canonically has, so it is the literal the same value written by hand would have
+been.
 
 **Which matters most for Rationals, where what an operation STORES is a separate
 question from what it is worth.** A Rational holds the parts it was BUILT with
@@ -787,7 +822,7 @@ root**, whether or not this compilation can see who reads it.
 and the member are written down where a written Invocation writes them — so the
 same allowlist answers for it: the Namespace must have an entry, the Program must
 not have taken the name, the hole's value must be of that Namespace's own Type,
-and the value must itself be pure. `Integer`'s `toString` is a bigint's decimal
+and the value must itself be pure. `Integer`'s `toString` is its value's decimal
 spelling and `Boolean`'s is a Conditional over two literals, so
 `constant greeting = "you have {count}"` with nothing reading `greeting` is a
 String built and dropped. A `namespace Mood for Mood is Printable` whose
@@ -862,7 +897,7 @@ Builds each constant once, in a band of consts, instead of at every site.
 
 A constant written in a Program was built at every site it was written at, and
 built again on every turn of whatever loop reached it. `1` is
-`Integer.createInteger(1n)` — an object, a bigint and a call, per turn.
+`Integer.createInteger(1)` — an object and a call, per turn.
 `"{value}"` builds `{ toString: Integer.toString }` before it renders anything,
 once per hole. A Match's Record Matcher rebuilds `{ type: "Record", members: … }`
 to hand to the check, per test, per turn. None of them can differ from one
@@ -1131,6 +1166,128 @@ answered in lowest terms, and equality cross-multiplies the raw parts, so
 untouched — `4/2` still holds 4 and 2 — and `fold-constants` folds these four
 through the same core functions, so a folded answer is the one the Program
 builds.
+
+### `hybrid-integers`
+
+An Integer was one object and one heap bigint, whatever it held — and almost
+every Integer a Program builds is small. It now holds a JavaScript **number**
+while its value is one a double carries exactly (`|value| ≤ 2⁵³ − 1`) and a
+**bigint** beyond that, so the ordinary Integer costs a double in a field and the
+unbounded ones stay exact.
+
+**The canonical invariant is the whole design.** A value in safe range is ALWAYS
+a number and a value outside it is ALWAYS a bigint, so one mathematical Integer
+has exactly ONE representation. `Integer.createInteger` is where it is
+established for a value that arrives from anywhere else — a literal, a native,
+the client bridge, an escaped arithmetic result — and the operations that check
+their own answer establish it for themselves rather than asking again. Three
+things rest on it directly. Equality is `===` on what the two hold, which is exact
+between two numbers and between two bigints, and correctly `false` between a
+number and a bigint — because two values spelled differently must lie on opposite
+sides of safe range. A test against zero is written `=== 0` rather than `=== 0n`,
+because zero is in safe range and so is always the number. And the emitted
+arithmetic below can check its own ANSWER rather than reason about its operands.
+
+**Every operation checks its answer, and the check is exact.** An emitted `+`,
+`-` or `*` is a guard around the object literal it used to be:
+
+```js
+typeof a.value === "number" && typeof b.value === "number" &&
+a.value + b.value >= -9007199254740991 &&
+a.value + b.value <= 9007199254740991
+	? { [$type.typeKeySymbol]: "Integer", value: a.value + b.value }
+	: Integer.sum(a.value, b.value)
+```
+
+The operands are asked by KIND, because JavaScript's `+` throws on a mix of a
+number and a bigint. It is asked with `typeof` rather than with a range test —
+which the invariant would answer just as well — because a range test compares a
+bigint against a double whenever the answer is `false`: measured at about 21 ns a
+turn on values that HAVE escaped, against 0.3 ns, and it bought about 1 ns a turn
+on values that had not.
+
+The ANSWER is asked by range, and that is exact rather than approximate. IEEE 754
+`+`, `-` and `*` are correctly rounded, so the double answer is the nearest
+double to the true result; rounding is monotone and 2⁵³ is itself a double, so a
+true result of magnitude ≥ 2⁵³ can only round to a double of magnitude ≥ 2⁵³ and
+fails the check, while a true result inside safe range is exactly representable
+and rounds to itself. **The check therefore passes exactly when the double IS the
+true result.** Multiplication is the case worth stating: two factors well inside
+safe range can have a product far outside it, and the rounded product can not
+sneak back INSIDE to be mistaken for an exact answer — `94906266 · 94906266` is
+caught, and `94906265 · 94906265` is not, because it fits.
+
+**And the escaped arm only asks where the answer can still BE inside safe
+range**, because asking costs two bigint comparisons and that is most of what an
+operation past 2⁵³ pays over the bigint-only arithmetic it replaced. It can not
+be inside for a pair of number operands whose double answer left safe range —
+that is the exactness argument read the other way round — nor for a product with
+an escaped factor, whose magnitude is at least that factor's unless the other
+operand is zero. What is left, a sum or a difference with an escaped operand, is
+asked; the two may very nearly cancel. The test itself is written as the refusal,
+upper bound first, so the values that escaping actually produces settle in one
+comparison rather than two.
+
+Raising is not inlined and stays in bigint. `**` on doubles is `Math.pow`, which
+the specification only requires to be APPROXIMATED, so the argument above does
+not cover it and a double power can not be checked after the fact.
+
+**An operand the guard may not read twice goes to the runtime whole.** The guard
+reads each operand twice and the answer three times, so an operand with a call in
+it is handed to `Integer.sum`, `Integer.difference` or `Integer.product`
+directly, where the same decision is made after one evaluation. What is left
+inlined is what the hot sites are: a name, a Record member, a pooled constant.
+
+**The numeric tower is untouched.** Rational, Algebraic and Transcendental are
+written on pairs of bigints, and `bigRationalOf` is the one boundary where an
+Integer is normalised into one — so the tower needs to know nothing about the two
+representations, and the cross-kind cell that makes `1 is 1/1` true goes on
+cross-multiplying in bigint. What DID simplify is the position bridges: `List`
+and `String` used to convert an index to a bigint and a length back, and a bigint
+index is now past either end of any Array by the invariant, which is all a caller
+needs of it.
+
+**Going out to a host, an Integer is always a bigint.** `toJS` normalises, so an
+embedding's Integer does not change TYPE the day a value crosses 2⁵³ and every
+`+` on it starts throwing. Coming in, both kinds are accepted and canonicalised.
+
+What it is worth, on Apple Silicon, each the minimum of eleven fresh processes
+and net of startup, on **both** the engines Essence runs on — Bun 1.3.14 and
+Node 24.19, which is V8, and the two do not agree:
+
+| Program                          | Bun before | Bun after | V8 before | V8 after |
+| -------------------------------- | ---------: | --------: | --------: | -------: |
+| two million Integer sums          |    50.5 ms |   19.3 ms |   28.4 ms |  25.1 ms |
+| a million Matches                 |    43.4 ms |   23.8 ms |   28.3 ms |  25.8 ms |
+| a million Record folds            |    72.5 ms |   47.0 ms |   30.6 ms |  33.2 ms |
+| fifty thousand interpolations     |    13.6 ms |   11.4 ms |   11.5 ms |  13.1 ms |
+| twenty thousand List reads        |    10.1 ms |    8.6 ms |   14.0 ms |  14.1 ms |
+| two hundred thousand Rationals    |    57.0 ms |   52.2 ms |   23.0 ms |  20.9 ms |
+| factorial 200, two thousand times |    21.7 ms |   19.4 ms |   15.7 ms |  16.9 ms |
+| half a million 54-bit sums        |    20.5 ms |   23.9 ms |   10.5 ms |  12.6 ms |
+| three hundred thousand 64-bit hashes |  25.3 ms |   33.9 ms |   19.8 ms |  30.0 ms |
+
+The shape of it is the same on both, but the size is not: what is 2.6× on Bun is
+1.1× on V8, and two rows that improve on Bun are 1.1× slower on V8. An engine
+whose bigint arithmetic is cheap has less to gain from not doing it.
+
+**Where it costs is a Program whose values are all past 2⁵³** — 64-bit hashes,
+ids, nanosecond timestamps — and the reason is not the guard, which is one
+predictable branch, but the double-to-bigint conversion each small operand needs
+and the range test on each answer. The second of those is now only asked where
+the answer can still be inside safe range, which is what took factorial 200 from
+paying 1.2× to answering faster than it did before the hybrid; a hash mixing an
+escaped accumulator with small constants still pays about 1.35× on Bun and 1.5×
+on V8, and is the one direction this costs anything.
+
+What it costs in TEXT is the guard, which is wider than the operation it wraps: a
+sweep of the twenty-three fixture Programs grew 6.4% unminified, from `Loops.es`
+at 33.9% — a small Program that is almost entirely arithmetic — to `Irrational.es`
+at 1.4%. Minified it is 8.8% and gzipped 6.1%: a minifier shortens the names
+around the guard but can not fold the two sixteen-digit bounds it is written
+against. Interning the small Integers was measured against this and rejected: a
+shared object defeats the allocation sinking a branded literal gets, and cost
+between 1.1× and 2.8× both warm and cold.
 
 ### `list-tail-sharing`
 
