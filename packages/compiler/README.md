@@ -22,6 +22,18 @@ than one barrel — a front end composes the stages it needs:
 | `@essence-lang/compiler/documents` | position and text-document helpers |
 | `@essence-lang/compiler/helpers` | shared utilities |
 | `@essence-lang/compiler/printType` | rendering a Type back to Essence notation |
+| `@essence-lang/compiler/cache` | where the toolchain's on-disk caches live |
+
+Two things every process would otherwise rebuild — the enriched standard
+library, and the simplified and optimised prelude derived from it — are kept as
+snapshots under the platform's cache directory, and read back in about two
+milliseconds instead of a hundred and ten. They depend on nothing a user typed,
+and their key names everything they were built from: the compiler's version,
+the standard library's sources, the runtime's, the compiler's own code, and the
+optimiser options. `ESSENCE_COMPILER_CACHE` moves that directory, and
+`ESSENCE_COMPILER_CACHE=off` turns the snapshots off entirely — a comparison
+worth making when a compile answers something surprising, though a snapshot can
+not survive an edit to the compiler that would change it.
 
 Passing `--sourcemap` through the pipeline emits real source maps: positions
 survive from the parser to the rewriter, each module's map rides inline, and

@@ -1,7 +1,8 @@
 import type { common } from "@essence-lang/interfaces"
 
+import { throughSnapshot } from "../cache/snapshot"
 import type { NativeBindings, Stdlib } from "../enricher/stdlib"
-import { loadStdlib } from "../enricher/stdlib"
+import { isCanonicalStdlib, loadStdlib } from "../enricher/stdlib"
 import { resolveOverloadedMethodName } from "../helpers/index"
 import {
 	defaultOptimiserOptions,
@@ -225,11 +226,56 @@ function derivedFromStdlib<Value>(
 	}
 }
 
+// NOTE: The shape a snapshot has to have before it is believed — see
+// `isStdlib` in the loader, which guards the same door for the same reason.
+// The nodes inside are not walked: what could be wrong with them is not a shape
+// this could name, and the snapshot key is what answers for their content.
+function isStdlibArtifacts(value: unknown): boolean {
+	let artifacts = value as StdlibArtifacts
+
+	return (
+		typeof artifacts === "object" &&
+		artifacts !== null &&
+		Array.isArray(artifacts.namespaces) &&
+		Array.isArray(artifacts.freeFunctions)
+	)
+}
+
+// NOTE: The same artifacts, kept between processes as well as within one. Every
+// process that EMITS anything pays this — forty-odd milliseconds of simplifying
+// and optimising seventeen Programs — for a result that depends on the standard
+// library and the Optimiser Options and on nothing else. Both are in the key.
+//
+// NOTE: Only for the library the real sources produced. A test installs one of
+// its own through `useStdlib`, and a snapshot keyed by what the DISK hashes to
+// would answer for it with the wrong prelude entirely — silently, because the
+// two are the same shape. The refusal is by identity rather than by comparing
+// content, which is the only comparison that could not be fooled by a synthetic
+// library that happens to look like the real one.
+//
+// NOTE: A snapshot skips the clash refusal in `buildStdlibArtifacts` — the
+// Namespace that spells a static Property exactly like a Method of its own. It
+// can only exist if that refusal passed for these exact sources under this exact
+// Compiler, which is what the key names, so what is skipped is a check that has
+// already answered.
+function snapshotStdlibArtifacts(stdlib: Stdlib): StdlibArtifacts {
+	if (!isCanonicalStdlib(stdlib)) {
+		return buildStdlibArtifacts(stdlib)
+	}
+
+	return throughSnapshot<StdlibArtifacts>({
+		kind: "prelude",
+		variant: optimiserOptionsKey(currentOptimiserOptions),
+		isValid: isStdlibArtifacts,
+		build: () => buildStdlibArtifacts(stdlib),
+	})
+}
+
 // NOTE: Simplifying and optimising the standard library's Programs for every
 // user file would be paid over and over for a result that can not differ. The
 // Namespaces and the free Functions come out of the one simplify pass, so both
 // accessors share this cache rather than each walking the library again.
-const stdlibArtifacts = derivedFromStdlib(buildStdlibArtifacts)
+const stdlibArtifacts = derivedFromStdlib(snapshotStdlibArtifacts)
 
 export function stdlibPrelude(): Array<PreludeNamespace> {
 	return stdlibArtifacts().namespaces

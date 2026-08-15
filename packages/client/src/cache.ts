@@ -1,7 +1,10 @@
-import { randomBytes } from "node:crypto"
 import { mkdir, rename, rm, stat, writeFile } from "node:fs/promises"
-import * as os from "node:os"
 import * as path from "node:path"
+
+import {
+	cacheDirectory as cacheDirectoryFor,
+	temporaryPath,
+} from "@essence-lang/compiler/cache"
 
 // NOTE: A compiled bundle has to become a FILE before it can be imported —
 // `import()` takes a URL, and a data URL loses the identity that makes two loads
@@ -17,40 +20,17 @@ import * as path from "node:path"
 // name that pretended it was would go on answering with the bundle an older
 // toolchain wrote long after the upgrade meant to replace it.
 
-// NOTE: Where a host asks for the cache to live. Set it to a directory inside a
-// build's own output and the bundles travel with that build; leave it and they
-// land beside every other program's caches.
-const CACHE_OVERRIDE = "ESSENCE_CLIENT_CACHE"
-
-// NOTE: The platform's own cache location rather than `~/.cache` everywhere:
-// these are regenerable files, and a directory the operating system already
-// knows to be regenerable is one its backups and its cleaners handle correctly.
+// NOTE: Where a host asks for the cache to live — `ESSENCE_CLIENT_CACHE`. Set
+// it to a directory inside a build's own output and the bundles travel with
+// that build; leave it and they land beside every other program's caches.
+//
+// NOTE: The rules are the Compiler's, in `@essence-lang/compiler/cache`, so
+// that the toolchain has ONE answer to where a user's caches are — this package
+// asks for the `client` area of it. Unlike the Compiler's own snapshots there
+// is no way to turn this off: a bundle has to become a file before `import()`
+// can reach it, so there is nothing here to fall back to.
 export function cacheDirectory(): string {
-	let override = process.env[CACHE_OVERRIDE]
-
-	if (override !== undefined && override !== "") {
-		return path.resolve(override)
-	}
-
-	let xdg = process.env.XDG_CACHE_HOME
-
-	if (xdg !== undefined && xdg !== "") {
-		return path.join(xdg, "essence", "client")
-	}
-
-	if (process.platform === "darwin") {
-		return path.join(os.homedir(), "Library", "Caches", "essence", "client")
-	}
-
-	if (process.platform === "win32") {
-		let local = process.env.LOCALAPPDATA
-
-		if (local !== undefined && local !== "") {
-			return path.join(local, "essence", "client", "Cache")
-		}
-	}
-
-	return path.join(os.homedir(), ".cache", "essence", "client")
+	return cacheDirectoryFor("client")
 }
 
 // NOTE: `.mjs`, so that Node reads the file as a Module whatever the nearest
@@ -75,7 +55,9 @@ export async function cachedBundle(
 // overwritten: the name is the hash of everything it was compiled from and by,
 // so a file that exists holds this exact text already, and rewriting it would
 // only invalidate the Module every process that has already imported it is
-// holding.
+// holding. That rule is why this writes for itself rather than through the
+// Compiler's `writeAtomicSync`, which has no such thing to protect and swallows
+// what it can not write.
 //
 // NOTE: Written to a private temporary name and RENAMED into place, because
 // `import()` is going to read this file and several processes may be compiling
@@ -95,9 +77,7 @@ export async function cacheBundle(
 
 	await mkdir(directory, { recursive: true })
 
-	// NOTE: The process and a random suffix, so that two processes racing on the
-	// same hash write to two different temporary files rather than to one.
-	let temporary = `${file}.${process.pid}.${randomBytes(6).toString("hex")}`
+	let temporary = temporaryPath(file)
 
 	await writeFile(temporary, code)
 

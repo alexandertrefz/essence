@@ -4,6 +4,7 @@ import {
 	STDLIB_DIRECTORY,
 } from "@essence-lang/standard-library"
 
+import { throughSnapshot } from "../cache/snapshot"
 import { renderDiagnostics } from "../diagnostics/render"
 import { patternBindings } from "../helpers/index"
 import {
@@ -762,20 +763,95 @@ function readStdlibSources(): {
 	return { sources, parseDuration: performance.now() - started }
 }
 
+// NOTE: The shape a snapshot has to have before it is believed. It is a guess
+// about bytes another process wrote, and `v8.deserialize` answers with whatever
+// they say rather than throwing — so the tables every consumer indexes into are
+// checked to be there and to be the right kind of thing. What this can not
+// check is whether the CONTENT is current; that is the snapshot key's job, and
+// it is keyed on the Compiler's own sources for exactly that reason.
+function isStdlib(value: unknown): boolean {
+	let stdlib = value as Stdlib
+
+	return (
+		typeof stdlib === "object" &&
+		stdlib !== null &&
+		typeof stdlib.members === "object" &&
+		typeof stdlib.types === "object" &&
+		typeof stdlib.protocols === "object" &&
+		Array.isArray(stdlib.namespaces) &&
+		Array.isArray(stdlib.typedPrograms) &&
+		typeof stdlib.nativeBindings === "object" &&
+		typeof stdlib.functionBindings === "object" &&
+		typeof stdlib.timing === "object"
+	)
+}
+
 // NOTE: Enriched once per process. Every consumer — the Enricher's top level
 // Scope, the Language Server's builtin listings, the test suite — reads the
 // same object, so the standard library is parsed, hoisted and validated exactly
 // once no matter how many files are compiled.
+//
+// NOTE: And once per MACHINE rather than once per process, through the
+// snapshot. Reading seventeen files, parsing, enriching and validating them
+// costs seventy milliseconds and produces a value that depends on nothing a
+// user typed — paid by every `esc`, by every worker thread, by every Language
+// Server start and by every Debug Adapter session. Deserialising the finished
+// object costs under two.
 let cachedStdlib: Stdlib | null = null
+
+// NOTE: The library built from the standard library ON DISK, as opposed to
+// whichever one `useStdlib` has installed. Everything derived from the library
+// and cached BETWEEN processes has to know the difference: a snapshot is keyed
+// by what the real sources hash to, and a test's synthetic library would be
+// answered for by a snapshot of the real one. Held by identity, which is what
+// makes it survive `useStdlib` putting a library aside and handing it back.
+let canonicalStdlib: Stdlib | null = null
+
+export function isCanonicalStdlib(stdlib: Stdlib): boolean {
+	return stdlib === canonicalStdlib
+}
 
 export function loadStdlib(): Stdlib {
 	if (cachedStdlib === null) {
-		let { sources, parseDuration } = readStdlibSources()
-
-		cachedStdlib = loadStdlibFrom(sources, { parseDuration })
+		canonicalStdlib = loadCanonicalStdlib()
+		cachedStdlib = canonicalStdlib
 	}
 
 	return cachedStdlib
+}
+
+function loadCanonicalStdlib(): Stdlib {
+	let started = performance.now()
+	let built = false
+
+	let stdlib = throughSnapshot<Stdlib>({
+		kind: "stdlib",
+		variant: "",
+		isValid: isStdlib,
+		build: () => {
+			built = true
+
+			let { sources, parseDuration } = readStdlibSources()
+
+			return loadStdlibFrom(sources, { parseDuration })
+		},
+	})
+
+	// NOTE: The timings a snapshot carries are the ones the process that WROTE
+	// it paid, and reporting those as this process's would be a Timeline
+	// claiming seventy milliseconds nobody spent. What a restore costs is the
+	// read, which belongs to no stage — so the stages are zero and the total is
+	// what it really was.
+	if (!built) {
+		stdlib.timing = {
+			parse: 0,
+			enrich: 0,
+			validate: 0,
+			total: performance.now() - started,
+		}
+	}
+
+	return stdlib
 }
 
 // NOTE: The one seam through which the process-wide standard library becomes a
@@ -788,6 +864,12 @@ export function loadStdlib(): Stdlib {
 // NOTE: Everything derived from the library downstream — the Rewriter's prelude
 // and its name tables — is keyed by this OBJECT, so swapping it here is the
 // whole of the swap. There is deliberately no second cache to remember to clear.
+//
+// NOTE: `canonicalStdlib` is deliberately NOT moved. It names the library the
+// real sources produced, and it goes on naming it while a synthetic one is
+// installed — which is what `isCanonicalStdlib` reads to refuse a disk snapshot
+// for a library that was never on disk. Putting the real library back restores
+// the identity along with it, so nothing here has to be undone.
 export function useStdlib(stdlib: Stdlib | null): Stdlib | null {
 	let previous = cachedStdlib
 
