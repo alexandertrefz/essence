@@ -41,3 +41,9 @@ author wrote, which is what the debugger and mapped stack traces read.
 
 `essence --help` documents every option; `essence help <command>` goes deeper
 on one. `--json` turns any build into a machine-readable report.
+
+The first run on a machine writes a snapshot of the enriched standard library
+to the platform's cache directory; every run after it starts about sixty
+milliseconds sooner. `ESSENCE_COMPILER_CACHE` moves that directory — point it
+inside a build's own output to keep it there — and
+`ESSENCE_COMPILER_CACHE=off` turns it off.

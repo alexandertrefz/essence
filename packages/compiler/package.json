@@ -20,6 +20,7 @@
 		"./optimiser": "./src/optimiser/index.ts",
 		"./rewriter": "./src/rewriter/index.ts",
 		"./bundler": "./src/bundler/index.ts",
+		"./cache": "./src/cache/index.ts",
 		"./embed": "./src/embed/index.ts",
 		"./diagnostics": "./src/diagnostics/index.ts",
 		"./diagnostics/render": "./src/diagnostics/render.ts",
