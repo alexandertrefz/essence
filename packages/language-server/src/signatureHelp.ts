@@ -1,4 +1,3 @@
-import { enrichDocument, parseDocument } from "@essence-lang/compiler/documents"
 import {
 	describeSignature,
 	type ParameterRange,
@@ -6,6 +5,8 @@ import {
 } from "@essence-lang/compiler/printType"
 import type { common } from "@essence-lang/interfaces"
 
+import type { DocumentAnalysis } from "./analyse"
+import { enrichDocument, parseDocument } from "./compilation"
 import { describe, documentationOf } from "./documentation"
 import { typedHandlerExpressions } from "./matchHandlerChildren"
 import { matchingNamespaces } from "./namespaces"
@@ -55,6 +56,7 @@ export function findSignatureHelp(
 	documentText: string,
 	cursor: common.Cursor,
 	documentPath?: string,
+	document: DocumentAnalysis | null = null,
 ): SignatureHelpInfo | null {
 	let lines = documentText.split("\n")
 	let headText = [
@@ -139,6 +141,8 @@ export function findSignatureHelp(
 		invocation.base.type,
 		null,
 		documentPath,
+		[],
+		document,
 	)
 
 	let candidates: Array<{

@@ -7,18 +7,23 @@ import {
 } from "@essence-lang/compiler/diagnostics"
 import {
 	canonicalPath,
-	enrichDocument,
 	isStdlibDocument,
-	parseDocument,
 } from "@essence-lang/compiler/documents"
 import {
 	diskModuleHost,
-	linkModuleGraph,
-	loadModuleGraph,
+	type LinkedGraph,
 	type ModuleHost,
 } from "@essence-lang/compiler/modules"
 import { validate } from "@essence-lang/compiler/validator"
 import type { common, parser } from "@essence-lang/interfaces"
+
+import {
+	enrichDocument,
+	linkModuleGraph,
+	loadModuleGraph,
+	parseDocument,
+} from "./compilation"
+import type { ProgramIndex } from "./rename"
 
 // NOTE: Either Program is null when the stage that builds it threw — the
 // Diagnostics then hold the Internal Compiler Error and nothing else.
@@ -32,6 +37,26 @@ export type Analysis = {
 	// mistake in an unopened dependency visible at all — and what obliges the
 	// Server to clear them again, since nothing else will.
 	dependencies: Map<string, Array<common.Diagnostic>>
+}
+
+// NOTE: The typed view of ONE document, as every request that answers about the
+// document itself reads it. Handed down into `findCompletions`, `matchingNamespaces`
+// and Signature Help so that the places which used to parse and enrich the
+// unmodified text for themselves read the Workspace's copy instead — a
+// Completion list fires on every keystroke, and three enrichments of one file to
+// draw one list is three quarters of the request.
+//
+// NOTE: A probe is deliberately NOT this. A probe is a DIFFERENT text — the
+// document with a synthetic member, a Case or a padded tail written into it —
+// so it has no cache entry and can not have one; what it must not do is
+// re-derive the unmodified document beside it.
+export type DocumentAnalysis = {
+	program: parser.Program
+	enrichedProgram: common.typed.Program | null
+	// NOTE: The rename index of this document, which is where the Scope model
+	// comes from. Null where the caller holds none — it is rebuilt then, exactly
+	// as it always was.
+	index: ProgramIndex | null
 }
 
 export type AnalysisOptions = {
@@ -87,21 +112,18 @@ export function analyseDocument(
 			}
 		}
 
-		let { program: typedProgram, diagnostics: enricherDiagnostics } =
-			enrichDocument(parsedProgram, documentPath)
+		let analysed = analyseEnrichedDocument(
+			parsedProgram,
+			parserDiagnostics,
+			documentPath,
+		)
 
-		enrichedProgram = typedProgram
-
-		let diagnostics = [...parserDiagnostics, ...enricherDiagnostics]
-
-		if (!containsErrors(enricherDiagnostics)) {
-			diagnostics.push(...validate(typedProgram))
-		}
+		enrichedProgram = analysed.enrichedProgram
 
 		return {
 			program,
 			enrichedProgram,
-			diagnostics,
+			diagnostics: analysed.diagnostics,
 			dependencies: new Map(),
 		}
 	} catch (error) {
@@ -160,11 +182,6 @@ export function documentFilePath(documentPath: string): string {
 	return canonicalPath(filePath)
 }
 
-type ModuleAnalysis = {
-	program: common.typed.Program
-	diagnostics: Array<common.Diagnostic>
-}
-
 // NOTE: The whole graph the document reaches, enriched together, so that a name
 // an entry brings in resolves to what the other Module actually declares rather
 // than to nothing. Every Module in it is validated and reported on under its own
@@ -176,6 +193,12 @@ type ModuleAnalysis = {
 // Parsing is the cheap half of an analysis and the alternative is a second way
 // into the graph that takes an already-parsed entry — one more thing to keep
 // agreeing with the first.
+//
+// NOTE: This is the way in for a caller with no Workspace behind it — the tests
+// and anything holding a document as a string. The Language Server goes through
+// `workspace.analysisOf`, which runs the same two passes below over a graph it
+// caches per file and version. The two must keep answering identically: the
+// Workspace path is what an Editor sees, and this one is what the tests pin.
 function analyseModuleGraph(
 	source: string,
 	documentPath: string,
@@ -187,10 +210,45 @@ function analyseModuleGraph(
 			filePath === entryPath ? source : host.readFile(filePath),
 	})
 	let linked = linkModuleGraph(graph)
+	let analyses = analyseLinkedGraph(linked)!
+
+	return {
+		program: linked.modules.get(entryPath)?.module.program ?? null,
+		enrichedProgram: linked.modules.get(entryPath)?.program ?? null,
+		diagnostics: [
+			...linked.diagnostics,
+			...(analyses.get(entryPath) ?? []),
+		],
+		dependencies: new Map(
+			[...analyses].filter(([filePath]) => filePath !== entryPath),
+		),
+	}
+}
+
+// NOTE: Every Module of a linked graph, judged: its own Diagnostics, then the
+// Validator's, then what its dependencies came to. The Diagnostics of a Module
+// depend on that Module and on what IT reaches — never on the entry the graph
+// was loaded from — which is what lets the Workspace keep the answer for every
+// Module a single graph touched rather than only for the one that was asked
+// about. Two passes, because a Module can only be told it depends on a broken
+// one once every Module has been judged, and a cycle means a Module may depend
+// on one that comes after it.
+//
+// NOTE: Null when the work was abandoned. A cancelled analysis produces NOTHING
+// — half a pass is a Module judged against dependencies that were never judged,
+// and a Diagnostic list is not a thing that can be half right.
+export function analyseLinkedGraph(
+	linked: LinkedGraph,
+	options: { cancellation?: Cancellation } = {},
+): Map<string, Array<common.Diagnostic>> | null {
 	let failed = new Set<string>()
-	let analyses = new Map<string, ModuleAnalysis>()
+	let analyses = new Map<string, Array<common.Diagnostic>>()
 
 	for (let [filePath, module] of linked.modules) {
+		if (isCancelled(options.cancellation)) {
+			return null
+		}
+
 		let diagnostics = [...module.diagnostics]
 
 		if (!containsErrors(diagnostics)) {
@@ -205,37 +263,78 @@ function analyseModuleGraph(
 			failed.add(filePath)
 		}
 
-		analyses.set(filePath, { program: module.program, diagnostics })
+		analyses.set(filePath, diagnostics)
 	}
 
-	// NOTE: Second pass, because a Module can only be told it depends on a
-	// broken one once every Module has been judged — and a cycle means a Module
-	// may depend on one that comes after it.
 	for (let [filePath, module] of linked.modules) {
-		let broken = brokenDependencyDiagnostics(
-			module.module.program,
-			(specifier) =>
-				failed.has(module.module.resolutions.get(specifier) ?? ""),
-		)
+		if (isCancelled(options.cancellation)) {
+			return null
+		}
 
-		analyses.get(filePath)!.diagnostics.push(...broken)
+		analyses
+			.get(filePath)!
+			.push(
+				...brokenDependencyDiagnostics(
+					module.module.program,
+					(specifier) =>
+						failed.has(
+							module.module.resolutions.get(specifier) ?? "",
+						),
+				),
+			)
 	}
 
-	let entry = analyses.get(entryPath)
-	let dependencies = new Map<string, Array<common.Diagnostic>>()
+	return analyses
+}
 
-	for (let [filePath, analysis] of analyses) {
-		if (filePath !== entryPath) {
-			dependencies.set(filePath, analysis.diagnostics)
-		}
+// NOTE: The other half of the pipeline: a Program that is no Module, analysed
+// as the single declaration space it is. Split out for the same reason the graph
+// pass above is — the Workspace runs it to fill its cache, and a second copy of
+// "what does analysing a document mean" is a second thing to keep in step.
+export function analyseEnrichedDocument(
+	program: parser.Program,
+	parserDiagnostics: Array<common.Diagnostic>,
+	documentPath: string | undefined,
+	options: { annotations?: boolean } = {},
+): {
+	enrichedProgram: common.typed.Program
+	diagnostics: Array<common.Diagnostic>
+	annotations: Array<common.TypeAnnotation>
+} {
+	let enriched = enrichDocument(program, documentPath, options)
+	let diagnostics = [...parserDiagnostics, ...enriched.diagnostics]
+
+	if (!containsErrors(enriched.diagnostics)) {
+		diagnostics.push(...validate(enriched.program))
 	}
 
 	return {
-		program: linked.modules.get(entryPath)?.module.program ?? null,
-		enrichedProgram: entry?.program ?? null,
-		diagnostics: [...linked.diagnostics, ...(entry?.diagnostics ?? [])],
-		dependencies,
+		enrichedProgram: enriched.program,
+		diagnostics,
+		annotations: enriched.annotations,
 	}
+}
+
+// NOTE: Structurally the LSP's own CancellationToken, so a handler can pass the
+// one it was handed straight down without wrapping it. Read rather than awaited:
+// every stage below is synchronous, so the only thing a token can do is stop the
+// NEXT one from starting.
+export type Cancellation = {
+	isCancellationRequested: boolean
+}
+
+export function isCancelled(cancellation: Cancellation | undefined): boolean {
+	return cancellation?.isCancellationRequested === true
+}
+
+export function internalError(error: unknown): common.Diagnostic {
+	return placelessDiagnostic(
+		"error",
+		`Internal Compiler Error: ${
+			error instanceof Error ? error.message : String(error)
+		}`,
+		"internal-error",
+	)
 }
 
 // NOTE: One Diagnostic per broken dependency rather than per entry naming it:
@@ -283,14 +382,4 @@ function brokenDependencyDiagnostics(
 	})
 
 	return diagnostics
-}
-
-function internalError(error: unknown): common.Diagnostic {
-	return placelessDiagnostic(
-		"error",
-		`Internal Compiler Error: ${
-			error instanceof Error ? error.message : String(error)
-		}`,
-		"internal-error",
-	)
 }

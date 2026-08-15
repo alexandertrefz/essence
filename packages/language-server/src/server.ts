@@ -1,18 +1,16 @@
-import {
-	enrichDocument,
-	isStdlibDocument,
-	parseDocument,
-} from "@essence-lang/compiler/documents"
+import { isStdlibDocument } from "@essence-lang/compiler/documents"
 import { loadStdlib } from "@essence-lang/compiler/enricher/stdlib"
-import type { common } from "@essence-lang/interfaces"
+import type { common, parser } from "@essence-lang/interfaces"
 import { TextDocument } from "vscode-languageserver-textdocument"
 import {
 	type CallHierarchyItem as LspCallHierarchyItem,
+	type CancellationToken,
 	type CodeAction,
 	CodeActionKind,
 	type CodeActionParams,
 	type CompletionItem,
 	CompletionItemKind,
+	type Connection,
 	createConnection,
 	DidChangeConfigurationNotification,
 	DidChangeWatchedFilesNotification,
@@ -22,6 +20,7 @@ import {
 	FileChangeType,
 	InlayHintKind,
 	InsertTextFormat,
+	LSPErrorCodes,
 	type MarkupContent,
 	type Position,
 	ProposedFeatures,
@@ -36,7 +35,12 @@ import {
 	type WorkspaceSymbol as LspWorkspaceSymbol,
 } from "vscode-languageserver/node"
 
-import { analyseDocument, documentFilePath, isModule } from "./analyse"
+import {
+	analyseDocument,
+	type Cancellation,
+	documentFilePath,
+	isCancelled,
+} from "./analyse"
 import {
 	type CallHierarchyItem,
 	type CallHierarchyItemKind,
@@ -46,6 +50,7 @@ import {
 } from "./callHierarchy"
 import { escapeSnippet } from "./callSnippets"
 import { type CodeActionEntry, findCodeActions } from "./codeActions"
+import { enrichDocument, parseDocument } from "./compilation"
 import {
 	type CompletionEntry,
 	type CompletionKind,
@@ -86,6 +91,24 @@ import {
 } from "./workspace"
 
 const analysisDebounceInMilliseconds = 200
+
+// NOTE: One turn of the event loop before a request does anything expensive,
+// and it is what makes a Cancellation observable at all: `$/cancelRequest` is a
+// message on the same connection, and a handler that runs straight through from
+// the moment it is called reads its token before that message was ever read off
+// the socket. A macrotask, deliberately — a microtask runs before any I/O, so
+// yielding to one would prove nothing.
+//
+// This is the ONLY place this Server suspends. Every stage of the Compiler
+// collects its Diagnostics into module level state, which is safe exactly as
+// long as no two collections interleave: a handler may suspend BEFORE it starts
+// compiling and never inside. The debounced analysis is a timer callback that
+// runs to completion, so it can not interleave either.
+function yieldToConnection(): Promise<void> {
+	return new Promise((resolve) => {
+		setImmediate(resolve)
+	})
+}
 
 // NOTE: Module level rather than written into the `onInitialize` result, so
 // that the answer to "what does this Server advertise" is a value a test can
@@ -168,12 +191,40 @@ export function ensureTransportArgument() {
 	}
 }
 
-export function startServer() {
+function defaultConnection(): Connection {
 	ensureTransportArgument()
 
-	let connection = createConnection(ProposedFeatures.all)
+	return createConnection(ProposedFeatures.all)
+}
+
+// NOTE: The connection is injectable for one reason: what this Server costs is
+// a property of the whole request loop — the debounce, the document store, the
+// order the Editor asks in — and a test that calls the handlers' insides
+// measures something else. A harness hands in a connection over a pair of
+// in-memory pipes and drives the real thing. Every other caller passes nothing
+// and gets stdio, which is what `esls` speaks.
+export function startServer(options: { connection?: Connection } = {}) {
+	let connection = options.connection ?? defaultConnection()
 	let documents = new TextDocuments(TextDocument)
-	let pendingAnalyses = new Map<string, ReturnType<typeof setTimeout>>()
+	// NOTE: ONE timer for every document waiting to be analysed, rather than one
+	// each, so that a burst of keystrokes and a branch switch that touched forty
+	// files both come out as a single window — and inside that window the
+	// documents are analysed in an order that makes their graphs overlap instead
+	// of repeat (see `analysisOrder`).
+	//
+	// The DEADLINE is per document all the same, and the timer is armed for the
+	// earliest of them. One timer that every keystroke restarts is a document
+	// that never gets analysed while another one is being typed in: at one
+	// keystroke per debounce, which is ordinary typing, the file the reader is
+	// not in waits for them to stop, and nothing bounds how long that is.
+	let pendingAnalyses = new Map<string, number>()
+	let analysisTimer: ReturnType<typeof setTimeout> | null = null
+	// NOTE: The document the last keystroke landed in, which is the one a Hover is
+	// about to be asked over — see `annotationsFor`. Deliberately not the first
+	// entry of `pendingAnalyses`: that is whichever document opened the window, so
+	// a burst crossing files would collect the annotations for the file the reader
+	// has already left, and the Hover that follows would pay for its own link.
+	let analysisFocus: string | null = null
 	// NOTE: An open document by its canonical path, which is what the workspace
 	// and the Module graph both key on. Maintained alongside `documents` rather
 	// than searched for on every read: the graph asks for a file once per Module
@@ -195,6 +246,10 @@ export function startServer() {
 	// so a URI that drops out of an analysis is sent an explicitly empty set —
 	// unless another open document still reports on it.
 	let publishedByEntry = new Map<string, Set<string>>()
+	// NOTE: The list each URI was last SENT, so an unchanged one is not sent
+	// again. Kept by URI rather than by entry because two open documents can both
+	// report on one dependency, and what the client holds for it is one list.
+	let publishedContent = new Map<string, string>()
 	// NOTE: Whether Type Hints are served — the client's
 	// `essence.inlayHints.enabled`. True until a client says otherwise, so an
 	// editor that answers no configuration requests keeps the Hints it always
@@ -300,20 +355,32 @@ export function startServer() {
 		// going to ask for. Every open document, rather than the importers of
 		// what changed, because a file that did not exist a moment ago is
 		// exactly what an unresolved import was waiting for.
+		//
+		// NOTE: N documents scheduled is not N analyses. They go through the
+		// same debounce every keystroke does, so a checkout switching branches
+		// under the Editor coalesces into one window — and inside it the first
+		// document that runs fills the cache for every other Module of its
+		// component, which the rest then read.
 		for (let document of documents.all()) {
 			scheduleAnalysis(document.uri)
 		}
 	})
 
-	// NOTE: Requests are resolved on a fresh parse of the current document
-	// state — the AST is not kept around between requests, parsing is far
-	// cheaper than a rename is rare. Enrichment provides the Types that
-	// bind Method and Record member references; a compiler bug in it must
-	// never take down the Language Server, so those features degrade to the
-	// purely lexical index instead.
+	// NOTE: Every request that answers ABOUT a document comes through here, and
+	// what it gets is the Workspace's cache entry for that document at its
+	// current version — the parse, the typed Program, the rename index and, for
+	// Hover, the written annotations. A request arriving before the debounced
+	// analysis has run for this version computes the entry itself; the analysis
+	// that follows then reads it. Whoever asks first pays, once.
+	//
+	// NOTE: The fallback below is not a fast path for anything — it is the
+	// answer for the documents the Workspace deliberately holds nothing for: a
+	// standard library source, which is enriched with its own declarations
+	// subtracted back out of the builtin tables, and a buffer whose path can not
+	// be read. Both were always analysed on their own.
 	function parseAndEnrich(
 		uri: string,
-		options: { annotations?: boolean } = {},
+		options: { annotations?: boolean; cancellation?: Cancellation } = {},
 	) {
 		let document = documents.get(uri)
 
@@ -321,43 +388,106 @@ export function startServer() {
 			return null
 		}
 
-		let { program } = parseDocument(document.getText(), uri)
-		let enrichedProgram: common.typed.Program | null = null
-		// NOTE: Only Hover asks for these. Every other request enriches without
-		// a collector and pays nothing for it.
-		let annotations: Array<common.TypeAnnotation> = []
+		let filePath = documentFilePath(uri)
 
-		// NOTE: A Module is enriched against the whole graph it reaches, or
-		// every name an entry brought in resolves to nothing and every Method
-		// dispatching through an imported Namespace stays unbound. Hover's
-		// annotations come from the same linked enrichment, collected for this
-		// one file — resolved without the graph, an annotation answers 'Error'
-		// for every imported name it writes. `isModule` is shared with
-		// `analyse.ts` rather than spelled again here: a standard library source
-		// writes import sections but is deliberately not a graph Module, and two
-		// copies of that question are two chances to answer it differently.
-		if (isModule(program, uri)) {
-			let filePath = documentFilePath(uri)
+		if (workspace.programOf(filePath) !== null) {
+			let cached = workspace.documentOf(filePath, {
+				cancellation: options.cancellation,
+			})
 
-			if (options.annotations === true) {
-				annotations = workspace.annotationsOf(filePath)
+			// NOTE: Abandoned. The Workspace holds this file, so the fallback
+			// below is not what it wants answering with — nothing is.
+			if (cached === null) {
+				return null
 			}
 
-			enrichedProgram = workspace.enrichedOf(filePath)
+			return {
+				program: cached.program,
+				enrichedProgram: cached.enrichedProgram,
+				index: cached.index,
+				// NOTE: Only Hover asks for these, and collecting them for a
+				// Module of a component whose analysis was anchored elsewhere
+				// costs one more link — so they are asked for and not merely
+				// read.
+				annotations:
+					options.annotations === true
+						? workspace.annotationsOf(filePath, {
+								cancellation: options.cancellation,
+							})
+						: [],
+			}
 		}
 
-		if (enrichedProgram !== null) {
-			return { program, enrichedProgram, annotations }
-		}
+		let { program } = parseDocument(document.getText(), uri)
+		let enrichedProgram: common.typed.Program | null = null
+		let annotations: Array<common.TypeAnnotation> = []
 
 		try {
-			let enriched = enrichDocument(program, uri, options)
+			let enriched = enrichDocument(program, uri, {
+				annotations: options.annotations,
+			})
 
 			enrichedProgram = enriched.program
 			annotations = enriched.annotations
 		} catch {}
 
-		return { program, enrichedProgram, annotations }
+		return { program, enrichedProgram, annotations, index: null }
+	}
+
+	// NOTE: Whether a request is still worth answering, checked after the one
+	// suspension this Server makes. Two ways it stops being worth answering: the
+	// Editor cancelled it, or the document moved on. A request is answered on
+	// the version it named or not at all — its Positions belong to that version,
+	// and an answer measured against a later one points at whatever moved into
+	// their place.
+	async function isCurrent(
+		uri: string,
+		token: CancellationToken,
+	): Promise<boolean> {
+		let version = documents.get(uri)?.version
+
+		await yieldToConnection()
+
+		return !isCancelled(token) && documents.get(uri)?.version === version
+	}
+
+	// NOTE: The protocol's own answer for a request nobody is waiting for any
+	// more, and the two reasons `isCurrent` refuses for are two different codes.
+	// `RequestCancelled` says the Editor asked for this to stop; `ContentModified`
+	// says the document moved on underneath it. Clients act on the difference —
+	// vscode-languageclient returns the request's default value for
+	// `ContentModified` and THROWS a CancellationError for a `RequestCancelled`
+	// whose own token was never cancelled, which is exactly the version case.
+	//
+	// The token is asked again rather than remembered: it answers the same
+	// question `isCurrent` asked of it, and a cancelled request is cancelled
+	// whatever else also happened to it.
+	function abandoned(token: CancellationToken) {
+		return isCancelled(token)
+			? new ResponseError(
+					LSPErrorCodes.RequestCancelled,
+					"This request was cancelled.",
+				)
+			: new ResponseError(
+					LSPErrorCodes.ContentModified,
+					"The document moved on before this request was answered.",
+				)
+	}
+
+	// NOTE: The Parser AST alone, for the requests that need no Types. Read from
+	// the same cache as everything else so that a Folding Range and a Hover over
+	// one document are two readers of one parse.
+	function parsedOf(uri: string): parser.Program | null {
+		let document = documents.get(uri)
+
+		if (document === undefined) {
+			return null
+		}
+
+		return (
+			workspace.programOf(documentFilePath(uri)) ??
+			parseDocument(document.getText(), uri).program
+		)
 	}
 
 	// NOTE: The `uri` is what lets `findRenameableOccurrence` refuse inside a
@@ -451,7 +581,11 @@ export function startServer() {
 		return here === undefined ? null : { symbol, position: here.position }
 	}
 
-	connection.onPrepareRename((params) => {
+	connection.onPrepareRename(async (params, token) => {
+		if (!(await isCurrent(params.textDocument.uri, token))) {
+			return abandoned(token)
+		}
+
 		let anchor = renameAnchorAt(params.textDocument.uri, params.position)
 		let occurrence =
 			anchor === null
@@ -494,7 +628,11 @@ export function startServer() {
 				}
 	})
 
-	connection.onRenameRequest((params) => {
+	connection.onRenameRequest(async (params, token) => {
+		if (!(await isCurrent(params.textDocument.uri, token))) {
+			return abandoned(token)
+		}
+
 		let anchor = renameAnchorAt(params.textDocument.uri, params.position)
 		let occurrence =
 			anchor === null
@@ -572,7 +710,11 @@ export function startServer() {
 		workspace.symbols(params.query).map(toLspWorkspaceSymbol),
 	)
 
-	connection.onDefinition((params) => {
+	connection.onDefinition(async (params, token) => {
+		if (!(await isCurrent(params.textDocument.uri, token))) {
+			return abandoned(token)
+		}
+
 		// NOTE: The workspace join answers first, because the local index
 		// stops at the import entry — the entry IS this file's declaration of
 		// the name, and a reader asking from it (or from any use bound through
@@ -612,9 +754,14 @@ export function startServer() {
 		}
 	})
 
-	connection.onHover((params) => {
+	connection.onHover(async (params, token) => {
+		if (!(await isCurrent(params.textDocument.uri, token))) {
+			return abandoned(token)
+		}
+
 		let parsed = parseAndEnrich(params.textDocument.uri, {
 			annotations: true,
+			cancellation: token,
 		})
 
 		if (parsed?.enrichedProgram == null) {
@@ -651,7 +798,11 @@ export function startServer() {
 	// NOTE: Every file, not only this one — a name an entry carries is one
 	// symbol, and half its uses being findable is the failure mode References
 	// exists to prevent.
-	connection.onReferences((params) => {
+	connection.onReferences(async (params, token) => {
+		if (!(await isCurrent(params.textDocument.uri, token))) {
+			return abandoned(token)
+		}
+
 		let symbol = workspaceSymbolAt(params.textDocument.uri, params.position)
 
 		if (symbol === null) {
@@ -700,7 +851,11 @@ export function startServer() {
 	// request that enriches a workspace. What the join still buys here is the
 	// two Module sections: highlighting a name in the body lights up the entry
 	// that brought it in.
-	connection.onDocumentHighlight((params) => {
+	connection.onDocumentHighlight(async (params, token) => {
+		if (!(await isCurrent(params.textDocument.uri, token))) {
+			return abandoned(token)
+		}
+
 		let symbol = workspaceSymbolAt(
 			params.textDocument.uri,
 			params.position,
@@ -747,8 +902,18 @@ export function startServer() {
 		}))
 	})
 
-	connection.languages.semanticTokens.on((params) => {
-		let parsed = parseAndEnrich(params.textDocument.uri)
+	// NOTE: Not debounced, and deliberately: once the whole request is a read of
+	// the analysis cache, coalescing it would only delay a highlight that costs
+	// nothing to draw. What it does need is the abandonment above — an Editor
+	// asks for these on every keystroke and cancels the ones it overtook.
+	connection.languages.semanticTokens.on(async (params, token) => {
+		if (!(await isCurrent(params.textDocument.uri, token))) {
+			return abandoned(token)
+		}
+
+		let parsed = parseAndEnrich(params.textDocument.uri, {
+			cancellation: token,
+		})
 
 		if (parsed === null) {
 			return { data: [] }
@@ -756,12 +921,20 @@ export function startServer() {
 
 		return {
 			data: encodeSemanticTokens(
-				findSemanticTokens(parsed.program, parsed.enrichedProgram),
+				findSemanticTokens(
+					parsed.program,
+					parsed.enrichedProgram,
+					parsed.index,
+				),
 			),
 		}
 	})
 
-	connection.languages.onLinkedEditingRange((params) => {
+	connection.languages.onLinkedEditingRange(async (params, token) => {
+		if (!(await isCurrent(params.textDocument.uri, token))) {
+			return abandoned(token)
+		}
+
 		// NOTE: Editing one occurrence updates the rest as they are typed, so
 		// this is deliberately restricted to what renaming would accept —
 		// Builtins are excluded, since typing over `Terminal` must not look
@@ -800,8 +973,14 @@ export function startServer() {
 		}
 	})
 
-	connection.languages.callHierarchy.onPrepare((params) => {
-		let parsed = parseAndEnrich(params.textDocument.uri)
+	connection.languages.callHierarchy.onPrepare(async (params, token) => {
+		if (!(await isCurrent(params.textDocument.uri, token))) {
+			return abandoned(token)
+		}
+
+		let parsed = parseAndEnrich(params.textDocument.uri, {
+			cancellation: token,
+		})
 
 		if (parsed === null) {
 			return null
@@ -823,46 +1002,68 @@ export function startServer() {
 	// NOTE: An Item round-trips its uri and its selectionRange, so the
 	// Declaration it names is resolved again from a fresh parse — nothing is
 	// kept between the prepare and the expansion that follows it.
-	connection.languages.callHierarchy.onIncomingCalls((params) => {
-		let parsed = parseAndEnrich(params.item.uri)
+	connection.languages.callHierarchy.onIncomingCalls(
+		async (params, token) => {
+			if (!(await isCurrent(params.item.uri, token))) {
+				return abandoned(token)
+			}
 
-		if (parsed === null) {
-			return null
-		}
+			let parsed = parseAndEnrich(params.item.uri, {
+				cancellation: token,
+			})
 
-		return findIncomingCalls(
-			parsed.program,
-			toCursor(params.item.selectionRange.start),
-			parsed.enrichedProgram,
-		).map((entry) => ({
-			from: toLspCallHierarchyItem(entry.item, params.item.uri),
-			fromRanges: entry.ranges.map(toLspRange),
-		}))
-	})
+			if (parsed === null) {
+				return null
+			}
 
-	connection.languages.callHierarchy.onOutgoingCalls((params) => {
-		let parsed = parseAndEnrich(params.item.uri)
+			return findIncomingCalls(
+				parsed.program,
+				toCursor(params.item.selectionRange.start),
+				parsed.enrichedProgram,
+			).map((entry) => ({
+				from: toLspCallHierarchyItem(entry.item, params.item.uri),
+				fromRanges: entry.ranges.map(toLspRange),
+			}))
+		},
+	)
 
-		if (parsed === null) {
-			return null
-		}
+	connection.languages.callHierarchy.onOutgoingCalls(
+		async (params, token) => {
+			if (!(await isCurrent(params.item.uri, token))) {
+				return abandoned(token)
+			}
 
-		return findOutgoingCalls(
-			parsed.program,
-			toCursor(params.item.selectionRange.start),
-			parsed.enrichedProgram,
-		).map((entry) => ({
-			to: toLspCallHierarchyItem(entry.item, params.item.uri),
-			fromRanges: entry.ranges.map(toLspRange),
-		}))
-	})
+			let parsed = parseAndEnrich(params.item.uri, {
+				cancellation: token,
+			})
+
+			if (parsed === null) {
+				return null
+			}
+
+			return findOutgoingCalls(
+				parsed.program,
+				toCursor(params.item.selectionRange.start),
+				parsed.enrichedProgram,
+			).map((entry) => ({
+				to: toLspCallHierarchyItem(entry.item, params.item.uri),
+				fromRanges: entry.ranges.map(toLspRange),
+			}))
+		},
+	)
 
 	// NOTE: The outline enriches so that entries can carry their Types, and
 	// degrades to the Parser's answer alone when enrichment throws — the whole
 	// point of building it off the Parser AST is that it survives a Program
 	// that does not type check.
-	connection.onDocumentSymbol((params) => {
-		let parsed = parseAndEnrich(params.textDocument.uri)
+	connection.onDocumentSymbol(async (params, token) => {
+		if (!(await isCurrent(params.textDocument.uri, token))) {
+			return abandoned(token)
+		}
+
+		let parsed = parseAndEnrich(params.textDocument.uri, {
+			cancellation: token,
+		})
 
 		if (parsed === null) {
 			return null
@@ -899,11 +1100,32 @@ export function startServer() {
 		return result.edits
 	})
 
-	connection.onCodeAction((params) => {
+	connection.onCodeAction(async (params, token) => {
+		if (!(await isCurrent(params.textDocument.uri, token))) {
+			return abandoned(token)
+		}
+
 		let document = documents.get(params.textDocument.uri)
 
 		if (document === undefined) {
 			return null
+		}
+
+		// NOTE: The same analysis the Diagnostics were published from, which is
+		// what a quick fix is an answer to — half of what a Code Action offers
+		// IS a Diagnostic, so reading them from anywhere else would let the
+		// lightbulb disagree with the squiggle it is offered on.
+		let analysis = workspace.analysisOf(
+			documentFilePath(params.textDocument.uri),
+			{ cancellation: token },
+		)
+
+		// NOTE: Checked rather than inferred from the null: `findCodeActions`
+		// runs the pipeline itself when it is handed nothing, which is right for
+		// a document the Workspace holds none of and exactly wrong for a request
+		// that was abandoned halfway.
+		if (isCancelled(token)) {
+			return abandoned(token)
 		}
 
 		return findCodeActions(
@@ -911,20 +1133,16 @@ export function startServer() {
 			toRange(params.range),
 			params.textDocument.uri,
 			workspace,
+			analysis,
 		).map((entry) => toLspCodeAction(entry, params))
 	})
 
 	connection.onFoldingRanges((params) => {
-		let document = documents.get(params.textDocument.uri)
+		let program = parsedOf(params.textDocument.uri)
 
-		if (document === undefined) {
+		if (program === null) {
 			return null
 		}
-
-		let { program } = parseDocument(
-			document.getText(),
-			params.textDocument.uri,
-		)
 
 		return findFoldingRanges(program).map((range) => ({
 			startLine: range.startLine - 1,
@@ -933,16 +1151,11 @@ export function startServer() {
 	})
 
 	connection.onSelectionRanges((params) => {
-		let document = documents.get(params.textDocument.uri)
+		let program = parsedOf(params.textDocument.uri)
 
-		if (document === undefined) {
+		if (program === null) {
 			return null
 		}
-
-		let { program } = parseDocument(
-			document.getText(),
-			params.textDocument.uri,
-		)
 
 		return params.positions.map((position) => {
 			let chain = findSelectionRanges(program, toCursor(position))
@@ -958,12 +1171,19 @@ export function startServer() {
 		})
 	})
 
-	connection.languages.inlayHint.on((params) => {
+	// NOTE: Not debounced either, for the same reason Semantic Tokens are not.
+	connection.languages.inlayHint.on(async (params, token) => {
 		if (!inlayHintsEnabled) {
 			return null
 		}
 
-		let parsed = parseAndEnrich(params.textDocument.uri)
+		if (!(await isCurrent(params.textDocument.uri, token))) {
+			return abandoned(token)
+		}
+
+		let parsed = parseAndEnrich(params.textDocument.uri, {
+			cancellation: token,
+		})
 
 		if (parsed?.enrichedProgram == null) {
 			return null
@@ -998,7 +1218,11 @@ export function startServer() {
 		})
 	})
 
-	connection.onCompletion((params) => {
+	connection.onCompletion(async (params, token) => {
+		if (!(await isCurrent(params.textDocument.uri, token))) {
+			return abandoned(token)
+		}
+
 		let document = documents.get(params.textDocument.uri)
 
 		if (document === undefined) {
@@ -1022,6 +1246,9 @@ export function startServer() {
 						namespaces: workspace.namespaceOffersFor(filePath),
 					}
 				: { offers: [], namespaces: [] },
+			// NOTE: The unmodified document, which every one of the three
+			// listings below the probe used to derive again for itself.
+			workspace.documentOf(filePath),
 		)
 
 		return entries.map(toLspCompletionItem)
@@ -1033,7 +1260,11 @@ export function startServer() {
 	// would be worse than no pass at all.
 	connection.onCompletionResolve((item) => item)
 
-	connection.onSignatureHelp((params) => {
+	connection.onSignatureHelp(async (params, token) => {
+		if (!(await isCurrent(params.textDocument.uri, token))) {
+			return abandoned(token)
+		}
+
 		let document = documents.get(params.textDocument.uri)
 
 		if (document === undefined) {
@@ -1044,6 +1275,7 @@ export function startServer() {
 			document.getText(),
 			toCursor(params.position),
 			params.textDocument.uri,
+			workspace.documentOf(documentFilePath(params.textDocument.uri)),
 		)
 
 		if (help === null) {
@@ -1082,17 +1314,40 @@ export function startServer() {
 		return false
 	}
 
+	// NOTE: Only what CHANGED goes over the wire. Refreshing a dependent whose
+	// meaning moved is the point of expanding a batch to them; re-sending it the
+	// same list it already has is a message and a client-side rebuild for a file
+	// the reader is not even in, and a keystroke in a Module several open files
+	// import produces one of those per file.
+	//
+	// NOTE: The `version` is the buffer the list was computed against, which is
+	// what lets a client throw away a publish that raced a keystroke — the one
+	// window a debounce widens. Absent for a dependency nobody has open: there is
+	// no version to name, and its content came off disk.
+	function publish(uri: string, diagnostics: Array<common.Diagnostic>): void {
+		let sent = diagnostics.map((diagnostic) =>
+			toLspDiagnostic(diagnostic, uri),
+		)
+		let signature = JSON.stringify(sent)
+
+		if (publishedContent.get(uri) === signature) {
+			return
+		}
+
+		publishedContent.set(uri, signature)
+		connection.sendDiagnostics({
+			uri,
+			version: documents.get(uri)?.version,
+			diagnostics: sent,
+		})
+	}
+
 	function publishAnalysis(
 		entryUri: string,
 		results: Map<string, Array<common.Diagnostic>>,
 	) {
 		for (let [targetUri, diagnostics] of results) {
-			connection.sendDiagnostics({
-				uri: targetUri,
-				diagnostics: diagnostics.map((diagnostic) =>
-					toLspDiagnostic(diagnostic, targetUri),
-				),
-			})
+			publish(targetUri, diagnostics)
 		}
 
 		for (let staleUri of publishedByEntry.get(entryUri) ?? []) {
@@ -1100,56 +1355,176 @@ export function startServer() {
 				continue
 			}
 
-			connection.sendDiagnostics({ uri: staleUri, diagnostics: [] })
+			publish(staleUri, [])
 		}
 
 		publishedByEntry.set(entryUri, new Set(results.keys()))
 	}
 
-	function scheduleAnalysis(uri: string) {
-		let pendingTimer = pendingAnalyses.get(uri)
+	// NOTE: The documents whose graph reaches the most others first. One analysis
+	// fills the cache for every Module its graph touched, so analysing a
+	// dependency BEFORE the file importing it links the same Modules twice —
+	// once as a graph of their own, and once again inside the larger one. The
+	// order is what makes a batch cost one link per graph ROOT rather than one
+	// per document — a document nothing else in the batch imports pays for its
+	// own link and every document below it in that graph reads the result. Read
+	// off the parses, which are cached.
+	function analysisOrder(uris: Array<string>): Array<string> {
+		let reachOf = (uri: string): number => {
+			let reached = new Set<string>()
+			let pending = [documentFilePath(uri)]
 
-		if (pendingTimer !== undefined) {
-			clearTimeout(pendingTimer)
+			while (pending.length > 0) {
+				let current = pending.shift()!
+
+				for (let dependency of workspace
+					.dependenciesOf(current)
+					.values()) {
+					if (reached.has(dependency)) {
+						continue
+					}
+
+					reached.add(dependency)
+					pending.push(dependency)
+				}
+			}
+
+			return reached.size
+		}
+		let reach = new Map(uris.map((uri) => [uri, reachOf(uri)]))
+
+		return [...uris].sort(
+			(left, right) => reach.get(right)! - reach.get(left)!,
+		)
+	}
+
+	// NOTE: Every open document that IMPORTS what changed, because an edit to a
+	// Module changes what its dependents mean — their published Diagnostics go
+	// stale with it, and nothing else will ever refresh them, since no keystroke
+	// is going to land in those files.
+	//
+	// Dependents rather than the whole undirected component, which is the only
+	// set that is both sufficient and paid for. A file that merely shares a
+	// dependency with the edited one imports nothing from it, so its Diagnostics
+	// provably can not have moved — and it is its own graph root, whose link no
+	// other document's graph subsumes. Expanding to the component therefore cost
+	// one link per open sibling: thirty tabs on one shared Module, thirty links,
+	// on the keystroke path.
+	//
+	// Expanded when the window FIRES rather than when the keystroke arrives: the
+	// walk reads the file's entries, which means parsing it, and a parse per
+	// keystroke is the cost this whole cache exists to remove.
+	function withOpenDependents(uris: Array<string>): Array<string> {
+		let expanded = new Set(uris)
+
+		for (let uri of uris) {
+			for (let filePath of workspace.dependentsOf(
+				documentFilePath(uri),
+			)) {
+				let openUri = openPaths.get(filePath)
+
+				if (openUri !== undefined && documents.get(openUri)) {
+					expanded.add(openUri)
+				}
+			}
 		}
 
-		pendingAnalyses.set(
-			uri,
-			setTimeout(() => {
-				pendingAnalyses.delete(uri)
+		return [...expanded]
+	}
 
-				let document = documents.get(uri)
+	function scheduleAnalysis(uri: string) {
+		pendingAnalyses.set(uri, Date.now() + analysisDebounceInMilliseconds)
+		analysisFocus = uri
+		armAnalysis()
+	}
 
-				if (document === undefined) {
-					return
+	// NOTE: Everything pending is flushed together once the FIRST of them is due,
+	// rather than each at its own deadline. Both halves of that matter: waiting
+	// for the earliest is what stops a document from being held back by an edit
+	// somewhere else, and flushing the rest with it is what keeps a batch to one
+	// link per graph root instead of splitting a fan-out into one window each.
+	// A document still being typed in pays at most one extra analysis per other
+	// document that came due, and its own debounce starts again from there.
+	function armAnalysis() {
+		if (analysisTimer !== null) {
+			clearTimeout(analysisTimer)
+			analysisTimer = null
+		}
+
+		if (pendingAnalyses.size === 0) {
+			return
+		}
+
+		let due = Infinity
+
+		for (let deadline of pendingAnalyses.values()) {
+			due = Math.min(due, deadline)
+		}
+
+		analysisTimer = setTimeout(
+			() => {
+				analysisTimer = null
+
+				let focus = analysisFocus ?? undefined
+				let scheduled = analysisOrder(
+					withOpenDependents([...pendingAnalyses.keys()]),
+				)
+
+				pendingAnalyses.clear()
+				analysisFocus = null
+
+				for (let scheduledUri of scheduled) {
+					analyseAndPublish(scheduledUri, focus)
 				}
-
-				// NOTE: The Diagnostics collector is module-level state, so
-				// documents are analysed strictly one at a time — the analysis
-				// is synchronous, which guarantees that here.
-				let analysis = analyseDocument(document.getText(), uri, {
-					host: workspace.host,
-				})
-				let results = new Map<string, Array<common.Diagnostic>>([
-					[uri, analysis.diagnostics],
-				])
-
-				// NOTE: A dependency's Diagnostics are published under ITS OWN
-				// URI, which is what makes a mistake in a file nobody has open
-				// visible at all. An open document reports on itself, so its own
-				// entry is left to its own analysis rather than overwritten by
-				// an importer's view of it.
-				for (let [filePath, diagnostics] of analysis.dependencies) {
-					let dependencyUri = uriOf(filePath)
-
-					if (documents.get(dependencyUri) === undefined) {
-						results.set(dependencyUri, diagnostics)
-					}
-				}
-
-				publishAnalysis(uri, results)
-			}, analysisDebounceInMilliseconds),
+			},
+			Math.max(0, due - Date.now()),
 		)
+	}
+
+	function analyseAndPublish(uri: string, focus?: string) {
+		let document = documents.get(uri)
+
+		if (document === undefined) {
+			return
+		}
+
+		// NOTE: The Diagnostics collector is module-level state, so documents
+		// are analysed strictly one at a time — every batched analysis runs to
+		// completion inside one timer callback, which guarantees that, and it is
+		// the reason a request may only suspend before it compiles anything (see
+		// `yieldToConnection`).
+		//
+		// NOTE: Through the Workspace, so that this WRITES the cache every
+		// request reads: one analysis fills the entry for this document and for
+		// every other Module of its graph, and a Hover that already paid for one
+		// finds it here rather than paying again. A document the Workspace holds
+		// nothing for — a standard library source — is analysed on its own,
+		// exactly as it was.
+		let analysis =
+			workspace.analysisOf(documentFilePath(uri), {
+				annotationsFor:
+					focus === undefined ? undefined : documentFilePath(focus),
+			}) ??
+			analyseDocument(document.getText(), uri, {
+				host: workspace.host,
+			})
+		let results = new Map<string, Array<common.Diagnostic>>([
+			[uri, analysis.diagnostics],
+		])
+
+		// NOTE: A dependency's Diagnostics are published under ITS OWN URI,
+		// which is what makes a mistake in a file nobody has open visible at
+		// all. An open document reports on itself, so its own entry is left to
+		// its own analysis rather than overwritten by an importer's view of it.
+		for (let [filePath, diagnostics] of analysis.dependencies) {
+			let dependencyUri = uriOf(filePath)
+
+			if (documents.get(dependencyUri) === undefined) {
+				results.set(dependencyUri, diagnostics)
+			}
+		}
+
+		publishAnalysis(uri, results)
 	}
 
 	// NOTE: `onDidChangeContent` also fires when a document is opened.
@@ -1162,12 +1537,7 @@ export function startServer() {
 	})
 
 	documents.onDidClose((event) => {
-		let pendingTimer = pendingAnalyses.get(event.document.uri)
-
-		if (pendingTimer !== undefined) {
-			clearTimeout(pendingTimer)
-			pendingAnalyses.delete(event.document.uri)
-		}
+		pendingAnalyses.delete(event.document.uri)
 
 		let filePath = documentFilePath(event.document.uri)
 
@@ -1181,10 +1551,7 @@ export function startServer() {
 		// its own URI included — an empty set for each, unless another open
 		// document still reports on it.
 		publishAnalysis(event.document.uri, new Map())
-		connection.sendDiagnostics({
-			uri: event.document.uri,
-			diagnostics: [],
-		})
+		publish(event.document.uri, [])
 		publishedByEntry.delete(event.document.uri)
 	})
 
