@@ -31,12 +31,28 @@ import { rewriteExpressions } from "../walk"
 // well. This pass is the emission half: it takes a residual of `tag` and writes
 // the test, and leaves every other answer exactly as the Simplifier stated it.
 //
-// NOTE: A Handler with a LITERAL Matcher (`case 0`) is untouched, because there
-// is no Type check to replace — `anyIs(_self, 0)` is the whole test, and it
-// answers false across differing Types on its own. Member literals and Guards
-// are untouched for the opposite reason: they are ANDed onto whichever test the
-// Matcher produced, so replacing the Matcher's half leaves them saying what they
-// said.
+// NOTE: A Handler with a LITERAL Matcher (`case 0`, `case "beta"`) has no Type
+// check to replace — `anyIs(_self, 0)` is the whole test, and it answers false
+// across differing Types on its own. What it has instead is a call into the
+// universal structural equality to decide something two scalars decide with an
+// operator, so where the matched value's Type and the literal are EXACTLY one
+// scalar kind, the raw comparison is what is written:
+//
+//   _self.value === 0n
+//
+// That is the same lowering `lower-scalar-operations` performs for `a::is(b)`,
+// and it rests on the same argument: `Integer` means an Integer and nothing else
+// — not a Union it is a member of, not a Type Parameter that could be one — so
+// the value at run time is the branded object the runtime's constructor built,
+// holding a bigint under `value`. A Union-typed scrutinee is left alone, because
+// a value arriving there may be of any member and `.value` is not what decides
+// it. Strings go through `$helpers.stringEquals` rather than `===`, exactly as
+// that pass emits them: two Strings are equal when their CHARACTERS are, which
+// is a comparison of canonically normalised forms.
+//
+// NOTE: Member literals and Guards are untouched, for the opposite reason: they
+// are ANDed onto whichever test the Matcher produced, so replacing the Matcher's
+// half leaves them saying what they said.
 //
 // NOTE: `memberTypes` — what a Case Matcher's payload Pattern requires — IS
 // compiled, because it is a Type check like the Matcher's own and was the one
@@ -62,10 +78,29 @@ function compile(
 	let handlers = node.handlers.map((handler) => {
 		let memberTests = compileMemberTests(handler)
 
-		if (handler.literal !== null || handler.typeTest !== null) {
+		if (handler.typeTest !== null) {
 			return memberTests === handler.memberTests
 				? handler
 				: { ...handler, memberTests }
+		}
+
+		// NOTE: A literal Matcher's test IS the comparison, so the compiled
+		// form of it goes where a Type check's compiled form goes — the
+		// Rewriter reads `typeTest` first and falls back to `anyIs` over the
+		// literal where there is none. The `literal` itself stays: it is what
+		// `elide-final-match-test` reads to know that a final Handler with one
+		// can still decline a value, and what a build with this pass turned off
+		// is emitted from.
+		if (handler.literal !== null) {
+			let compiled = literalTest(node.value.type, handler.literal)
+
+			if (compiled === null) {
+				return memberTests === handler.memberTests
+					? handler
+					: { ...handler, memberTests }
+			}
+
+			return { ...handler, typeTest: compiled, memberTests }
 		}
 
 		let residual = matcherResidual(handler.matcher, node.value.type)
@@ -85,6 +120,37 @@ function compile(
 	}
 
 	return { ...node, handlers }
+}
+
+// NOTE: The scalar kinds a literal Matcher can be compiled for, and null for
+// everything else. BOTH Types must be exactly the kind: the matched value's,
+// because a Union-typed scrutinee may hold a value of any member and reading
+// `.value` off it decides nothing, and the literal's, because the two have to be
+// the same question. `Boolean` is absent because a Match over one is refused
+// before this ever sees it — a Type with a single shape has a single outcome —
+// and a Case, a Record or a List literal is left to `anyIs`, which is a walk
+// rather than a comparison.
+function literalTest(
+	valueType: common.Type,
+	literal: common.typedSimple.ExpressionNode,
+): common.typedSimple.ExpressionNode | null {
+	if (valueType.type !== "Integer" && valueType.type !== "String") {
+		return null
+	}
+
+	if (literal.type.type !== valueType.type) {
+		return null
+	}
+
+	return {
+		nodeType: "Intrinsic",
+		kind: "raw-equals",
+		scalar: valueType.type,
+		left: matchedValue(valueType),
+		right: literal,
+		negated: false,
+		type: { type: "Boolean" },
+	}
 }
 
 // NOTE: One compiled check per requirement, under the spine that reaches it.

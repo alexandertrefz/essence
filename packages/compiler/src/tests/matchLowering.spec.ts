@@ -427,8 +427,12 @@ describe("Match Lowering", () => {
 			// NOTE: A literal Matcher is a value comparison rather than a Type
 			// check, and the refinement is not a Type the emitted Program has ever
 			// heard of — it erases to the Integer it refines, which is the same
-			// object built by the same constructor.
-			expect(generated).toContain("anyIs")
+			// object built by the same constructor. The scrutinee is exactly an
+			// Integer, so `compile-type-tests` writes the comparison out as the
+			// bigints both values hold rather than calling the universal
+			// structural equality to decide it.
+			expect(generated).toContain("_self.value === $pool_1.value")
+			expect(generated).not.toContain("anyIs")
 			expect(generated).not.toContain("Divisor")
 
 			// NOTE: What the product resolved to IS `NonZeroInteger` — a Namespace

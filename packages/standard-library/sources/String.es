@@ -223,12 +223,16 @@ declarations {
 			<- @::split(on "")
 		}
 
+		§ NATIVE. The Essence body — `@::characters()::item(at index)` — built a
+		§ String for every character of the receiver and a List to hold them, in
+		§ order to hand back one of them: reading a character of a ten thousand
+		§ character String allocated ten thousand and one values. The native is
+		§ one read out of the grapheme view `characters()` is made of.
+
 		§§ The character at the given position, counting from zero — or, for a negative position, counting back from the end: -1 is the last character and -length the first.
 		§§
 		§§ @returns — the character, or nothing when the position is outside the String.
-		character(at index: Integer) -> Optional<String> {
-			<- @::characters()::item(at index)
-		}
+		character(at index: Integer) -> Optional<String>
 
 		§§ The String with every character in upper case.
 		uppercase() -> String
@@ -344,14 +348,15 @@ declarations {
 			}
 		}
 
+		§ NATIVE. The Essence body — `List.repeat(@, times count)::join(with "")`
+		§ — built a List of `count` copies of the String and joined it back into
+		§ one. The native repeats the text; a count below one still answers the
+		§ empty String, which is what repeating into the empty List gave.
+
 		§§ The String joined to itself the given number of times.
 		§§
 		§§ @returns — the repeated String; the empty String for a count below one.
-		repeat(times count: Integer) -> String {
-			§ A count below one repeats into the empty List, which joins to the
-			§ empty String.
-			<- List.repeat(@, times count)::join(with "")
-		}
+		repeat(times count: Integer) -> String
 
 		§ NATIVE. The Essence body — `characters()::reverse()::join` — joins the
 		§ reversed characters into plain text, and segmenting that text afresh
@@ -365,18 +370,22 @@ declarations {
 		§§ The String with its characters in the opposite order.
 		reverse() -> String
 
+		§ NATIVE. The Essence body — `@::characters()::slice(…)::join(with "")` —
+		§ went the long way round through a List: a String per character of the
+		§ receiver, a List of them, a second List for the window, and a join to
+		§ put the text back together. The native takes the window out of the
+		§ grapheme view directly, resolving and clamping the two positions
+		§ exactly as `List.slice` did — a negative position counts back from the
+		§ end, and an empty or inverted range is the empty String. The answer
+		§ carries the clusters it was cut into, exactly as a piece of `split`
+		§ does.
+
 		§§ The characters from one position up to, but not including, another. A negative position counts back from the end, so `slice(from 0, to -1)` drops the last character.
 		§§
 		§§ @param from — the first position to include, counting from zero, or back from the end when negative.
 		§§ @param to — the position to stop before, counting the same way.
 		§§ @returns — the String of that range of characters.
-		slice(from: Integer, to: Integer) -> String {
-			§ `List.slice` resolves a negative position against the List's
-			§ length, clamps each end to it, and answers the empty List for an
-			§ empty or inverted range — which is exactly what a String slice
-			§ does with its own bounds, the characters being the List.
-			<- @::characters()::slice(from from, to to)::join(with "")
-		}
+		slice(from: Integer, to: Integer) -> String
 
 		§§ The position of the first occurrence of the given String.
 		§§

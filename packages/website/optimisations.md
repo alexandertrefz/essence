@@ -91,10 +91,25 @@ that the value is a Record, and a Match over Records distinguishes them by their
 MEMBERS — which is a decision tree over the discriminating members rather than a
 tag test, and a pass of its own that has not been written.
 
-Literal Matchers (`case 0`) are untouched: `anyIs` is their whole test and it
-answers false across differing Types on its own. Member literals and Guards are
-untouched too — they are ANDed onto whichever test the Matcher produced, so
-replacing the Matcher's half leaves them saying what they said.
+**A literal Matcher (`case 0`, `case "beta"`) has no Type check to replace — the
+comparison IS its test — so what is compiled is the comparison.** `anyIs(_self,
+0)` is a call into the universal structural equality to decide something two
+scalars decide with an operator, and where the matched value's Type and the
+literal are EXACTLY one scalar kind it becomes `_self.value === 0n`, the same
+lowering `lower-scalar-operations` performs for `a::is(b)`. It rests on the same
+argument, too: `Integer` means an Integer and nothing else — not a Union it is a
+member of, not a Type Parameter that could be one — so the value at run time is
+the branded object the runtime's constructor built, holding a bigint under
+`value`. A Union-typed scrutinee is left alone, because a value arriving there
+may be of any member and `.value` is not what decides it. Strings go through
+`$helpers.stringEquals` rather than `===`, exactly as that pass emits them: two
+Strings are equal when their CHARACTERS are. Everything else — a Case, a Record
+or a List literal — stays with `anyIs`, which is a walk rather than a
+comparison.
+
+Member literals and Guards are untouched: they are ANDed onto whichever test the
+Matcher produced, so replacing the Matcher's half leaves them saying what they
+said.
 
 ### `lower-unit-case-equality`
 
@@ -1075,6 +1090,21 @@ return outright.
 **The segmenter itself is built on first use.** Constructing an `Intl.Segmenter`
 costs about a millisecond of table loading, which every Program used to pay
 before its first Statement ran — including the many that never segment anything.
+
+**And the position Methods read that view directly.** `slice`,
+`character(at:)` and `repeat` were written in Essence on top of `characters()`,
+which is `split(on "")` — so slicing a ten thousand character String built ten
+thousand Strings and a List of them, took a window of that List, and joined the
+window back into text, and reading ONE character built the same ten thousand to
+hand back one. Each is a native now: a window taken out of the remembered view,
+one read out of it, and a repeat of the text. The answers still go through the
+same assembly `split`'s pieces do, so a slice carries the clusters it was cut
+into rather than being segmented afresh, and the position resolution — a
+negative position counting back from the end, each end then clamped, an inverted
+range empty — is what `List.slice` performed for them, written where it is now
+needed. A String-heavy Program gets SMALLER from this as well as faster:
+`String.es` stops reaching `characters`, `List.slice`, `List.item` and
+`List.repeat` at all.
 
 ### `rational-reduction-caching`
 
