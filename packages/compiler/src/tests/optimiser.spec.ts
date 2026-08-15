@@ -3495,16 +3495,42 @@ describe("Optimiser", () => {
 			// and the `{ index, carried }` Record its Essence body threads
 			// through the `while` driver is never built.
 			//
-			// NOTE: And the KIND of counter is decided once as well — a number
-			// where both bounds are held as ones, which is every loop over
-			// ordinary quantities, and a bigint only where a bound has left
-			// safe range.
+			// NOTE: And the KIND of counter is decided while COMPILING, because
+			// both bounds are written as Integers a double holds exactly. None
+			// of what asks at run time is emitted at all.
 			let generated = generate(countedLoop)
 
 			expect(generated).toContain("const $loop_0_from = $pool_0.value;")
 			expect(generated).toContain(
 				"const $loop_0_up = $loop_0_from <= $loop_0_to;",
 			)
+			expect(generated).not.toContain("$loop_0_big")
+			expect(generated).toContain(
+				"const $loop_0_delta = $loop_0_up ? 1 : -1;",
+			)
+			expect(generated).toContain(
+				"for (let $loop_0_index = $loop_0_from; $loop_0_up ? $loop_0_index <= $loop_0_to : $loop_0_index >= $loop_0_to; $loop_0_index += $loop_0_delta)",
+			)
+			expect(generated).not.toContain("loop__overload$3")
+			expect(generated).not.toContain("function (")
+		})
+
+		it("decides the counter's kind at run time for a bound it can not read", () => {
+			// NOTE: A bound that is not a Literal is a value nothing is known
+			// about, so the walk asks which representation the two are holding
+			// — and a bigint counter is canonicalised per turn, because the kind
+			// is decided from the bounds and canonicality belongs to the value.
+			let generated = generate(`implementation {
+	function upTo(_ limit: Integer) -> Integer {
+		<- loop(from 1, through limit, startingWith 0, step (
+			index,
+			total,
+		) { <- total::add(index) })
+	}
+
+	Terminal.inspect(upTo(10))
+}`)
+
 			expect(generated).toContain(
 				'const $loop_0_big = typeof $loop_0_from !== "number" || typeof $loop_0_to !== "number";',
 			)
@@ -3512,17 +3538,46 @@ describe("Optimiser", () => {
 				"const $loop_0_delta = $loop_0_big ? $loop_0_up ? 1n : -1n : $loop_0_up ? 1 : -1;",
 			)
 			expect(generated).toContain(
-				"for (let $loop_0_index = $loop_0_big ? BigInt($loop_0_from) : $loop_0_from; $loop_0_up ? $loop_0_index <= $loop_0_to : $loop_0_index >= $loop_0_to; $loop_0_index += $loop_0_delta)",
+				"for (let $loop_0_index = $loop_0_big ? BigInt($loop_0_from) : $loop_0_from;",
 			)
-			expect(generated).not.toContain("loop__overload$3")
-			expect(generated).not.toContain("function (")
+			expect(generated).toContain(
+				"const $loop_0_held = $loop_0_big ? Integer.canonical($loop_0_index) : $loop_0_index;",
+			)
 		})
 
-		it("hands the body the counter as an Integer", () => {
-			// NOTE: The one allocation a turn of a counted loop still costs,
-			// where the driver built that Integer out of a pooled `1` and an
-			// `add`, inside a Record, behind two closure calls.
-			expect(generate(countedLoop)).toContain(
+		it("hands the body the counter raw where no Integer is needed", () => {
+			// NOTE: The driver built that Integer out of a pooled `1` and an
+			// `add`, inside a Record, behind two closure calls. Now it is not
+			// built at all: a counting body reads through to the value at every
+			// mention of the counter, so the counter itself is what it is
+			// handed. Both bounds are Literals a double holds, so the counter
+			// counts in numbers and every value it takes is already the
+			// canonical spelling of itself — there is nothing to view it
+			// through.
+			let generated = generate(countedLoop)
+
+			expect(generated).not.toContain(
+				"Integer.createInteger($loop_0_index)",
+			)
+			expect(generated).not.toContain("$loop_0_held")
+			expect(generated).toContain("total.value + $loop_0_index")
+		})
+
+		it("keeps the counter's Integer where the body needs one", () => {
+			// NOTE: A body that hands the counter on rather than reading
+			// through it needs the Integer, and the swap has to see that. The
+			// mention here is an Argument, which is every position that is not
+			// a read of the value.
+			let generated = generate(`implementation {
+	constant seen = loop(from 1, through 3, startingWith [], step (
+		index,
+		gathered,
+	) { <- gathered::append(index) })
+
+	Terminal.inspect(seen)
+}`)
+
+			expect(generated).toContain(
 				"const index = Integer.createInteger($loop_0_index);",
 			)
 		})
