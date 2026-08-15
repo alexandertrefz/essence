@@ -364,6 +364,17 @@ describe("Bundle Size", () => {
 	// (`Terminal::print`'s two Overloads and `String::toString`), which is the
 	// shape worth remembering: what these Programs carry is decided by the
 	// runtime reach of what they call, not by how much Essence they inline.
+	//
+	// NOTE: It now measures 11,675 and the ceiling moves to 12,200, keeping the
+	// same ~500 bytes. 652 of the rise are `append` propagating the ASCII marker
+	// — the scan, the remembering around it and the branch that hands the join
+	// the two counts added — which is what makes building a String by appending
+	// and measuring it linear rather than quadratic. These Modules append
+	// without ever measuring, so they pay for it and collect nothing, which is
+	// the honest worst case for it. Against that, the eagerly built
+	// `Intl.Segmenter` left: it is constructed on first use now, so a Program
+	// that never segments neither carries it nor pays the millisecond of table
+	// loading it cost at startup.
 	it("carries one copy of the prelude across a bundle of Modules", async () => {
 		let linked = linkModuleGraph(
 			loadModuleGraph(fixturePath("modules", "Main.es"), diskModuleHost),
@@ -399,6 +410,6 @@ describe("Bundle Size", () => {
 
 		expect(inBundle.length).toBeGreaterThan(0)
 		expect(inBundle.length).toBeLessThanOrEqual(inPrelude.length)
-		expect(result.outputs[0]!.contents.byteLength).toBeLessThan(11_400)
+		expect(result.outputs[0]!.contents.byteLength).toBeLessThan(12_200)
 	})
 })

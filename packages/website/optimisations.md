@@ -1045,7 +1045,31 @@ String is immutable, so a remembered answer can not go stale.
 Counting also skips the segmenter outright for ASCII, which is closed under NFC
 and carries no combining marks, so each code unit stands alone as a cluster —
 with the one exception of a carriage return, which Unicode joins to a following
-line feed.
+line feed. Whether a String qualifies is itself remembered, because three
+different Methods ask it.
+
+**The NFC form is remembered the same way, and it is what equality is.** `is` and
+`compare` decide over the normalised String, so an accent written as one code
+point and the same accent written as two are one String — and both sides used to
+be normalised afresh at every comparison, which is two allocations per unequal
+pair and the common case in a search, a filter or a sort. It is now computed at
+most once per String, and not at all for one the ASCII scan accepted: such a
+String IS its own normal form. Sorting a thousand of them normalised twenty
+thousand times for a thousand answers.
+
+**Joining two ASCII Strings gives an ASCII String, and it is marked as one.** The
+character count of the join is then the two counts added, without a scan — which
+is what makes building a String by appending and reading its length per turn
+linear instead of quadratic. Nothing else about a join is inherited: grapheme
+boundaries are decided by NEIGHBOURS, so a base at the end of one String and a
+combining mark at the start of the next are one character, and the join keeps no
+view of either operand. The one Unicode subtlety at the seam — CR LF being a
+single cluster — can not arise, because the ASCII marker declines a carriage
+return outright.
+
+**The segmenter itself is built on first use.** Constructing an `Intl.Segmenter`
+costs about a millisecond of table loading, which every Program used to pay
+before its first Statement ran — including the many that never segment anything.
 
 ### `rational-reduction-caching`
 
