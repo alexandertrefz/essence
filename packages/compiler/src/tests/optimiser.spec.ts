@@ -2778,6 +2778,52 @@ describe("Optimiser", () => {
 			expect(generated).toMatch(/const \$pool_\d+ = \{\n\ttype: "List"/)
 		})
 
+		it("writes one call where every case answers with the same Method", () => {
+			// NOTE: `List<Integer>` and `List<String>` both resolve `length` to
+			// `List.length`, so the two checks in front of the two identical
+			// calls decide nothing — and the descriptor walk each of them costs
+			// goes with them, along with the throw the chain ended in.
+			let generated = generate(`implementation {
+				constant mixed: List<Integer> | List<String> = [1, 2]
+
+				Terminal.inspect(mixed::length())
+			}`)
+
+			expect(generated).toContain("List.length(mixed)")
+			expect(generated).not.toContain("isValueOfType")
+			expect(generated).not.toContain("noDispatchCaseMatched")
+		})
+
+		it("keeps the tests where one case answers with another Method", () => {
+			// NOTE: The rule is that the branches are the SAME call, not that
+			// they share a receiver — two Methods behind two checks is what the
+			// checks are for.
+			let generated = generate(`implementation {
+				constant value: Integer | Boolean = 5
+
+				Terminal.inspect(value::toString())
+			}`)
+
+			expect(generated).toContain('=== "Integer"')
+		})
+
+		it("prints the same thing with a uniform chain collapsed", async () => {
+			let source = `implementation {
+				constant mixed: List<Integer> | List<String> = [1, 2, 3]
+
+				Terminal.inspect(mixed::length())
+			}`
+
+			expect(await outputOf(generate(source))).toEqual(
+				await outputOf(
+					generate(source, {
+						enabled: true,
+						disabledPasses: new Set(["compile-union-dispatch"]),
+					}),
+				),
+			)
+		})
+
 		it("ends the chain in a throw where the last case still asks something", () => {
 			// NOTE: The counterpart to a Match's fall-through, and the same
 			// trade: a check that could not be reduced to a tag is one where a

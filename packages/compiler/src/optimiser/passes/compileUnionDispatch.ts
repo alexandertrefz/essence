@@ -107,7 +107,7 @@ function compile(
 		return node
 	}
 
-	let branches = planBranches(node.cases)
+	let branches = collapsedIfUniform(planBranches(node.cases))
 	// NOTE: The receiver and the shared Arguments, in the order the dispatch
 	// evaluated them — which is the order they have to stay in.
 	let operands = [
@@ -214,6 +214,71 @@ function planBranches(
 	}
 
 	return branches
+}
+
+// NOTE: A chain every branch of which is the SAME CALL, written as that call.
+// `List<Integer> | List<String>` asked for its `length` resolves to `List.length`
+// for both members, so the chain the plan above describes is two branches that
+// do the same thing behind two checks that decide which of them does it.
+//
+// NOTE: The residual is what says the checks are all a test can be. Each
+// branch's is `matcherResidualOverMembers` of that branch's member Type against
+// the members — a check that accepts this member's values and declines the
+// others — and the only thing the chain does with the answer is pick a branch. A
+// dispatch never narrows or converts what it dispatches on: the receiver is
+// passed to the Method exactly as it arrived, in every branch, and the tests
+// decide WHICH Method sees it and nothing else. Where that is one Method, they
+// decide nothing, and a check that decides nothing removes nothing by going —
+// which is why this needs no argument about tags, unlike
+// `elide-final-match-test`. That pass drops the LAST test because the ones before
+// it failed; this one drops ALL of them because their answers are
+// interchangeable.
+//
+// NOTE: What is given up is the same throw, and it is given up on a stronger
+// footing. The Enricher emits a dispatch only where every member of the
+// receiver's Union has a case, so every value that can arrive has a branch, and
+// `$type.noDispatchCaseMatched` is there for a receiver that satisfies none —
+// which can only happen where a runtime check and the static Type part company
+// over an erased payload. Two `List` cases are exactly that shape: both tag
+// `"List"`, so both keep a full descriptor check today, and the check walks the
+// items to tell them apart. With one call on every branch there is nothing for
+// the two to disagree ABOUT — whichever member arrived, the Method it reaches is
+// the same one.
+//
+// NOTE: A branch's own Arguments are what makes two branches different calls, so
+// a chain where any branch carries one is left alone. That is stricter than
+// comparing them: two branches of the same Method with different conformance
+// witnesses are two different calls and must keep their tests, and two carrying
+// the SAME witness is a shape nothing writes today and would cost a structural
+// comparison of Expressions to recognise. A derived descriptor is refused on the
+// same footing — it is the branch's own, spelt per member Type.
+function collapsedIfUniform(
+	branches: Array<PlannedBranch>,
+): Array<PlannedBranch> {
+	let first = branches[0]
+
+	if (first === undefined || branches.length === 1) {
+		return branches
+	}
+
+	let isUniform = branches.every(
+		(branch) =>
+			branch.dispatchCase.namespaceName ===
+				first.dispatchCase.namespaceName &&
+			branch.dispatchCase.methodName === first.dispatchCase.methodName &&
+			branch.dispatchCase.derivedDescriptor === undefined &&
+			branch.dispatchCase.conformanceArguments.length === 0 &&
+			branch.dispatchCase.contextualArguments.length === 0,
+	)
+
+	if (!isUniform) {
+		return branches
+	}
+
+	// NOTE: The first branch, untested — which is the shape `holdPlan` already
+	// knows as "one branch, no test" and writes the operands out for, so the
+	// chain emits as the call it is.
+	return [{ dispatchCase: first.dispatchCase, residual: null }]
 }
 
 // NOTE: Which operands the chain HOLDS — evaluated once, in order, before any

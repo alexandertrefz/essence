@@ -285,6 +285,41 @@ The pass proves that per case rather than assuming it, and leaves the call as it
 was where the proof fails. An Argument EVERY branch replaces is not built at
 all, which is the one evaluation the chain drops that the search performed.
 
+**A chain every branch of which is the same call is written as that call.**
+`List<Integer> | List<String>` asked for its `length` resolves to `List.length`
+for both members, so the tests in front of the two identical calls decide which
+of them runs and nothing else — and a dispatch never narrows or converts what it
+dispatches on, so a test that decides nothing takes nothing with it when it goes:
+
+```js
+$type.isValueOfType(mixed, $pool_4)
+	? List.length(mixed)
+	: $type.isValueOfType(mixed, $pool_3)
+		? List.length(mixed)
+		: $type.noDispatchCaseMatched()
+```
+
+```js
+List.length(mixed)
+```
+
+Two `List` cases are the worst shape the residual analysis has: both tag
+`"List"`, so neither test reduces to a key comparison and each walks a
+descriptor's items. Collapsing takes away both walks, both pooled descriptors and
+the throw — measured on Bun, best of five, process start subtracted, a three
+million turn loop over that Program falls from 193 ms to 102 ms, **1.89×**, and
+the bundle from 7,708 to 4,981 bytes because `isValueOfType` and the descriptor
+machinery behind it stop being reachable at all.
+
+The throw goes for a stronger reason than the one below. The Enricher emits a
+dispatch only where every member of the Union has a case, so every value that can
+arrive has a branch; `$type.noDispatchCaseMatched` is there for a receiver that
+satisfies none, which can only happen where a runtime check and a static Type
+part company over an erased payload — and with one call on every branch there is
+nothing left for the two to disagree ABOUT. A branch carrying Arguments of its
+own is a different call and is refused: two branches of the same Method with
+different conformance witnesses keep their tests.
+
 **The last case is the `else`**, on the argument `elide-final-match-test` makes
 for a Match's last Handler and with the same thing given up. The Enricher emits
 a dispatch only where every member of the receiver's Union has a case, so a
