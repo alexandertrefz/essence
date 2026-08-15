@@ -4269,6 +4269,46 @@ describe("Optimiser", () => {
 			expect(generate(deadCode)).toContain("let counted")
 		})
 
+		it("drops a Constant holding an interpolated String nobody reads", () => {
+			// NOTE: A hole CALLS `toString` through its witness, and the witness
+			// names which Method — so the call is weighed by the enumeration
+			// that weighs a written one. `Integer.toString` is a bigint's
+			// decimal spelling and can not be told it did not happen.
+			let generated = generate(`implementation {
+				constant count = 3
+				constant greeting = "you have {count}"
+
+				Terminal.inspect(count)
+			}`)
+
+			expect(generated).not.toContain("greeting")
+		})
+
+		it("keeps one whose hole is answered by a Namespace with no entry", async () => {
+			// NOTE: A Namespace the Program wrote can print, so its `toString`
+			// is refused exactly as every other Method of it is — the table is
+			// an allowlist and this Namespace is not on it.
+			let generated = generate(`implementation {
+				choice Mood { Loud }
+
+				namespace Mood for Mood is Printable {
+					toString() -> String {
+						Terminal.print("rendered")
+
+						<- "loud"
+					}
+				}
+
+				constant mood: Mood = #Loud
+				constant unread = "the mood is {mood}"
+
+				Terminal.inspect(1)
+			}`)
+
+			expect(generated).toContain("unread")
+			expect(await outputOf(generated)).toEqual(["rendered", "1"])
+		})
+
 		it("keeps a Constant its Module exports", () => {
 			// NOTE: What a Module publishes is read by Modules this compilation
 			// may never see, so every exported name is a root — asked here of

@@ -727,6 +727,20 @@ Constants alone: a `variable` can be assigned after it is declared, and an
 assignment is a Statement this does not read. **Everything a Module exports is a
 root**, whether or not this compilation can see who reads it.
 
+**An interpolated String is weighed like the calls it is.** Each hole calls
+`toString` through a witness, and the witness NAMES the Method — the Namespace
+and the member are written down where a written Invocation writes them — so the
+same allowlist answers for it: the Namespace must have an entry, the Program must
+not have taken the name, the hole's value must be of that Namespace's own Type,
+and the value must itself be pure. `Integer`'s `toString` is a bigint's decimal
+spelling and `Boolean`'s is a Conditional over two literals, so
+`constant greeting = "you have {count}"` with nothing reading `greeting` is a
+String built and dropped. A `namespace Mood for Mood is Printable` whose
+`toString` prints is not on the list and the Declaration that runs it stays.
+`String`'s comparisons are on the list for the same reason `Integer`'s are:
+`compare` normalises both sides and walks the code points, which is bounded by
+the two lengths and answers for every pair.
+
 One reading, not a fixed point. A Constant read only by another Constant that is
 itself dropped stays, because the reference was counted before either went —
 running this to exhaustion would take a pass allowed to loop, and what it would
