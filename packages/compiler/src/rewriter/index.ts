@@ -3449,6 +3449,7 @@ function callAnyIs(
 function handlerTest(
 	handler: common.typedSimple.MatchHandler,
 	value: estree.Identifier,
+	tagName: string | null,
 ): estree.Expression {
 	let and = (
 		left: estree.Expression,
@@ -3461,11 +3462,15 @@ function handlerTest(
 	})
 
 	let test: estree.Expression
+	let selfTagTest = selfTagTestOf(handler)
 
 	if (handler.literal !== null) {
 		test = callAnyIs(value, rewriteExpression(handler.literal))
 	} else if (handler.typeTest !== null) {
-		test = rewriteExpression(handler.typeTest)
+		test =
+			tagName !== null && selfTagTest !== null
+				? boundTagTest(tagName, selfTagTest)
+				: rewriteExpression(handler.typeTest)
 	} else {
 		test = callIsValueOfType(value, handler.matcher)
 	}
@@ -3556,6 +3561,100 @@ function selfIdentifier(): estree.Identifier {
 	return { type: "Identifier", name: "_self" }
 }
 
+// NOTE: The matched value's tag, read ONCE for a chain that asks about it more
+// than once. `_self[$type.typeKeySymbol] === "…"` per Handler is N reads of one
+// key off one object, and where the Cases carry different fields — which is what
+// a Choice with payloads is — every value has a hidden class of its own and the
+// read goes megamorphic: measured on an eight-Case chain over such values, a
+// bound tag is a third off the chain, and over uniformly shaped values (a Choice
+// of unit Cases) it is exactly as fast as the reads it replaces.
+//
+// NOTE: This is EMISSION, not a pass, and the difference is what decides where
+// it belongs. Nothing about the Program changes: the same key is read off the
+// same immutable value, before the same tests, in the same order, and no Node is
+// added, removed or reordered. There is no Node to add one with either — a tag
+// is a raw JavaScript string, and `typedSimple` has no Expression that holds one
+// and no Statement that binds one, so a pass would have to grow both and every
+// pass after it would have to learn a shape that exists only to be emitted.
+//
+// NOTE: And it depends on no pass having run, which is what the registry's
+// "any subset must be correct" rule asks of everything around it. The binding is
+// made off the `tag-test` Nodes `compile-type-tests` leaves; turn that pass off
+// — or the whole phase, with `--no-optimise` — and there are none, so no name is
+// bound and the chain is emitted exactly as it was before. It can not make a
+// subset of the registry wrong because it reads whatever reached it.
+//
+// NOTE: One name, not a numbered series. A Match nested inside a Handler binds
+// its own inside its own block and SHADOWS this one, which is harmless for the
+// reason a nested dispatch's `$dispatch_0` is: a chain reads the tag it bound
+// and nothing else's. The `_` is what keeps the name unspellable in Essence —
+// the Lexer reads one as a Symbol — exactly as it does for `_self`.
+const selfTagName = "$self_tag"
+
+// NOTE: The Handler's own check where it is a tag comparison on the MATCHED
+// VALUE, and null for everything else. A literal Matcher is checked by `anyIs`
+// and reads no tag; a member test reads its way down a spine, which is a
+// different object every time and is left where it stands.
+function selfTagTestOf(
+	handler: common.typedSimple.MatchHandler,
+): common.typedSimple.TagTestNode | null {
+	let test = handler.typeTest
+
+	if (handler.literal !== null || test === null) {
+		return null
+	}
+
+	if (test.nodeType !== "Intrinsic" || test.kind !== "tag-test") {
+		return null
+	}
+
+	return test.value.nodeType === "Identifier" &&
+		test.value.name === selfIdentifier().name
+		? test
+		: null
+}
+
+// NOTE: Two, because one read is not worth a name — and a chain of one tag test
+// is what a two-member Union compiles to, which is most of them.
+function hoistedTagName(
+	handlers: ReadonlyArray<common.typedSimple.MatchHandler>,
+): string | null {
+	let asked = handlers.filter(
+		(handler) => selfTagTestOf(handler) !== null,
+	).length
+
+	return asked >= 2 ? selfTagName : null
+}
+
+function bindTag(
+	tagName: string,
+	value: estree.Identifier,
+): estree.VariableDeclaration {
+	return {
+		type: "VariableDeclaration",
+		kind: "const",
+		declarations: [
+			{
+				type: "VariableDeclarator",
+				id: { type: "Identifier", name: tagName },
+				init: typeKeyRead(value),
+			},
+		],
+	}
+}
+
+function boundTagTest(
+	tagName: string,
+	test: common.typedSimple.TagTestNode,
+): estree.BinaryExpression {
+	return {
+		type: "BinaryExpression",
+		operator: test.negated ? "!==" : "===",
+		left: { type: "Identifier", name: tagName },
+		right: { type: "Literal", value: renderIdentity(test.tag) },
+	}
+}
+
 // NOTE: The chain a Match's Handlers become, and the one place it is built. The
 // Handlers are folded BACK TO FRONT, so that each `if` becomes the `else` of
 // the one before it — the first Handler ends up at the head of the chain and is
@@ -3572,12 +3671,16 @@ function selfIdentifier(): estree.Identifier {
 // body is emitted as written; in a Statement position it is whatever the
 // Statement's own answer is, and the caller hands in a body that writes it
 // there.
+// NOTE: A run of Statements rather than one, because a chain that asks about the
+// matched value's tag more than once binds it first — see `selfTagName`. The
+// callers splice them into the block they are already building, so the binding
+// costs no block of its own wherever one is there.
 function matchChain(
 	handlers: Array<common.typedSimple.MatchHandler>,
 	finalHandlerIsElse: boolean,
 	value: estree.Identifier,
 	bodyOf: (handler: common.typedSimple.MatchHandler) => estree.BlockStatement,
-): estree.Statement {
+): Array<estree.Statement> {
 	let tested = handlers
 	let tail: estree.Statement = {
 		type: "BlockStatement",
@@ -3589,6 +3692,9 @@ function matchChain(
 		tail = bodyOf(handlers.at(-1)!)
 	}
 
+	// NOTE: Asked of the TESTED Handlers alone. The last one is the `else` where
+	// `elide-final-match-test` proved it is, and an `else` reads no tag.
+	let tagName = hoistedTagName(tested)
 	let ifChain: estree.IfStatement | undefined
 
 	for (let index = tested.length - 1; index >= 0; index--) {
@@ -3596,13 +3702,15 @@ function matchChain(
 
 		ifChain = {
 			type: "IfStatement",
-			test: handlerTest(currentHandler, value),
+			test: handlerTest(currentHandler, value, tagName),
 			consequent: bodyOf(currentHandler),
 			alternate: ifChain ?? tail,
 		}
 	}
 
-	return ifChain ?? tail
+	let chain = ifChain ?? tail
+
+	return tagName === null ? [chain] : [bindTag(tagName, value), chain]
 }
 
 // NOTE: A Match standing in an Expression position, which is the only place
@@ -3625,14 +3733,12 @@ function rewriteMatch(
 			type: "FunctionExpression",
 			body: {
 				type: "BlockStatement",
-				body: [
-					matchChain(
-						node.handlers,
-						node.finalHandlerIsElse,
-						value,
-						(handler) => rewriteBlockStatement(handler.body),
-					),
-				],
+				body: matchChain(
+					node.handlers,
+					node.finalHandlerIsElse,
+					value,
+					(handler) => rewriteBlockStatement(handler.body),
+				),
 			},
 			params: [value],
 		},
@@ -4001,14 +4107,20 @@ function statementMatch(
 }
 
 // NOTE: The chain with the matched value bound in front of it, in as few blocks
-// as the binding needs.
+// as the binding needs. `chain` is a run of Statements because a chain may bind
+// the matched value's tag ahead of itself, and where a block is being built for
+// the value anyway the two bindings stand side by side in it. Where none is —
+// `match @`, whose value is already `_self` — a chain that bound nothing is
+// still the one Statement it always was.
 function boundChain(
 	node: common.typedSimple.StatementMatchNode,
-	chain: estree.Statement,
+	chain: Array<estree.Statement>,
 	value: estree.Identifier,
 ): estree.Statement {
 	if (node.binding.kind === "self") {
-		return chain
+		return chain.length === 1
+			? chain[0]!
+			: { type: "BlockStatement", body: chain }
 	}
 
 	let bind = (
@@ -4023,7 +4135,7 @@ function boundChain(
 	if (node.binding.kind === "block") {
 		return {
 			type: "BlockStatement",
-			body: [bind(value, rewriteExpression(node.value)), chain],
+			body: [bind(value, rewriteExpression(node.value)), ...chain],
 		}
 	}
 
@@ -4038,7 +4150,7 @@ function boundChain(
 			bind(held, rewriteExpression(node.value)),
 			{
 				type: "BlockStatement",
-				body: [bind(value, held), chain],
+				body: [bind(value, held), ...chain],
 			},
 		],
 	}

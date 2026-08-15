@@ -76,6 +76,26 @@ describe("Optimisation Passes", () => {
 		).toEqual([])
 	})
 
+	it("documents every emitted shape, by name", () => {
+		// NOTE: Written out here for the reason the runtime improvements are:
+		// there is no registry to read them out of, because they are decisions
+		// the Rewriter makes while writing a Program out rather than values a
+		// Compiler holds. One that is renamed, dropped or added without the page
+		// following fails.
+		expect(headingsUnder("Emitted shapes")).toEqual(["tag-binding"])
+	})
+
+	it("keeps the emitted shapes apart from the passes", () => {
+		// NOTE: The distinction the section is FOR. An emitted shape has no name
+		// `--without-optimisation` takes, so one that shared a name with a pass
+		// would be a flag that half worked.
+		expect(
+			headingsUnder("Emitted shapes").filter((name) =>
+				(optimiserPassNames as Array<string>).includes(name),
+			),
+		).toEqual([])
+	})
+
 	it("says how a pass is turned off", () => {
 		let documentation = readFileSync(OPTIMISATIONS_PAGE, "utf8")
 

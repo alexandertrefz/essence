@@ -22,6 +22,7 @@ import {
 	defaultOptimiserOptions,
 	optimise,
 	type OptimiserOptions,
+	unoptimisedOptions,
 } from "../optimiser/index"
 import { parseWithDiagnostics } from "../parser/index"
 import {
@@ -460,6 +461,81 @@ describe("Code Generation", () => {
 
 			expect(generated).toContain("handled boolean")
 			expect(generated).toContain("handled the rest")
+		})
+
+		// NOTE: The matched value's tag is read once for a chain that asks about
+		// it more than once. It is emission rather than a pass — nothing about
+		// the Program changes, the same key is read off the same immutable value
+		// before the same tests — so it is held to account here rather than in
+		// the Optimiser's registry.
+		it("binds the matched value's tag where the chain asks for it twice", () => {
+			let generated = generate(`
+				implementation {
+					variable value: Integer | Rational | String | Boolean = true
+
+					Terminal.inspect(match value -> String {
+						case Integer  { <- "handled integer" }
+						case Rational { <- "handled rational" }
+						case String   { <- "handled string" }
+						case Boolean  { <- "handled boolean" }
+					})
+				}
+			`)
+
+			expect(generated).toContain(
+				"const $self_tag = _self[$type.typeKeySymbol]",
+			)
+			expect(generated).toContain('$self_tag === "Integer"')
+			expect(generated).not.toContain(
+				'_self[$type.typeKeySymbol] === "Integer"',
+			)
+		})
+
+		it("leaves a chain that asks once reading the key where it stands", () => {
+			// NOTE: One tag test is one read, and a name for it would say what
+			// the read already says. Two Handlers is one test: the last is the
+			// `else` `elide-final-match-test` proved it is.
+			let generated = generate(`
+				implementation {
+					variable value: Integer | Boolean = true
+
+					Terminal.inspect(match value -> String {
+						case Integer { <- "handled integer" }
+						case Boolean { <- "handled boolean" }
+					})
+				}
+			`)
+
+			expect(generated).toContain(
+				'_self[$type.typeKeySymbol] === "Integer"',
+			)
+			expect(generated).not.toContain("$self_tag")
+		})
+
+		it("binds nothing where the Optimiser left no tag test", () => {
+			// NOTE: The binding is made off the `tag-test` Nodes
+			// `compile-type-tests` leaves. With the phase off there are none, so
+			// the chain is emitted exactly as it was — which is what makes this
+			// safe under any subset of the registry.
+			let generated = generate(
+				`
+				implementation {
+					variable value: Integer | Rational | String | Boolean = true
+
+					Terminal.inspect(match value -> String {
+						case Integer  { <- "handled integer" }
+						case Rational { <- "handled rational" }
+						case String   { <- "handled string" }
+						case Boolean  { <- "handled boolean" }
+					})
+				}
+			`,
+				undefined,
+				unoptimisedOptions,
+			)
+
+			expect(generated).not.toContain("$self_tag")
+			expect(generated).toContain("$type.isValueOfType(_self,")
 		})
 	})
 
