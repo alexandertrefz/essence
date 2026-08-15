@@ -1297,4 +1297,108 @@ describe("Lexer", () => {
 			})
 		})
 	})
+
+	// NOTE: `start` and `end` are absolute offsets into the source, and the
+	// contract they have to keep is that `source.slice(start, end)` is the
+	// Token as it was WRITTEN — which is not the Token's value wherever the two
+	// differ: a String does not carry its quotes, an escape decodes to
+	// something shorter than it was spelled, and a malformed Number keeps only
+	// its leading digits. `stripPosition` takes them off everywhere else, so
+	// this is where they are held to it.
+	describe("Offsets", () => {
+		function offsetsOf(input: string): Array<[number, number, string]> {
+			let lexer = new Lexer()
+
+			lexer.reset(input)
+
+			let spans: Array<[number, number, string]> = []
+			let token = lexer.next()
+
+			while (token !== undefined) {
+				spans.push([token.start, token.end, token.type])
+				token = lexer.next()
+			}
+
+			return spans
+		}
+
+		it("should span each Token exactly", () => {
+			expect(offsetsOf("constant x = 1")).toEqual([
+				[0, 8, TokenType.KeywordConstant],
+				[9, 10, TokenType.Identifier],
+				[11, 12, TokenType.SymbolEqual],
+				[13, 14, TokenType.LiteralNumber],
+			])
+		})
+
+		it("should include a String's quotes, which its value does not", () => {
+			expect(offsetsOf('"ab"')).toEqual([[0, 4, TokenType.LiteralString]])
+		})
+
+		it("should span an escape as it was written", () => {
+			expect(offsetsOf('"a\\nb"')).toEqual([
+				[0, 6, TokenType.LiteralString],
+			])
+		})
+
+		it("should span every chunk and hole of an interpolated String", () => {
+			expect(offsetsOf('"a{b}c"')).toEqual([
+				[0, 3, TokenType.LiteralStringStart],
+				[3, 4, TokenType.Identifier],
+				[5, 7, TokenType.LiteralStringEnd],
+			])
+		})
+
+		it("should span a malformed Number, which its value does not", () => {
+			expect(offsetsOf("0xFF")).toEqual([[0, 4, TokenType.LiteralNumber]])
+		})
+
+		it("should span a Comment without its line break", () => {
+			expect(offsetsOf("§ note\n")).toEqual([
+				[0, 6, TokenType.Comment],
+				[6, 7, TokenType.Linebreak],
+			])
+		})
+
+		it("should carry on counting across lines", () => {
+			expect(offsetsOf("a\nbb\nccc")).toEqual([
+				[0, 1, TokenType.Identifier],
+				[1, 2, TokenType.Linebreak],
+				[2, 4, TokenType.Identifier],
+				[4, 5, TokenType.Linebreak],
+				[5, 8, TokenType.Identifier],
+			])
+		})
+
+		// NOTE: The `}` that closes a hole belongs to no Token — the Lexer reads
+		// it to know the hole ended and drops it, exactly as it drops the `{`
+		// into the chunk before it — so the spans of an interpolated String do
+		// not cover every character between its quotes.
+		it("should slice the written Token back out of the source", () => {
+			let source = 'constant greeting = "Hello, {name}!"\n§ note\n'
+			let lexer = new Lexer()
+
+			lexer.reset(source)
+
+			let written: Array<string> = []
+			let token = lexer.next()
+
+			while (token !== undefined) {
+				written.push(source.slice(token.start, token.end))
+				token = lexer.next()
+			}
+
+			expect(written).toEqual([
+				"constant",
+				"greeting",
+				"=",
+				'"Hello, {',
+				"name",
+				'!"',
+				"\n",
+				"§ note",
+				"\n",
+			])
+		})
+	})
 })
