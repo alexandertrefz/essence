@@ -864,6 +864,66 @@ dispatch's per-case member Types used to be in the same position and are not
 any more — `compile-union-dispatch` rebuilds those sites, and the descriptors
 its cases still need are pooled like a Match Handler's.
 
+## Emitted shapes
+
+These are decisions the Rewriter makes while writing a Program out, rather than
+transforms on the Program itself — so there is no name to turn one off under, and
+the registry above, whose every entry IS such a name, is the wrong place for
+them. What makes one of these and not a pass is that nothing about the Program
+changes: the same values are read, in the same order, and no Node is added,
+removed or reordered. They are named here because a reader chasing what the
+emitted JavaScript says should find them beside the passes and not have to guess
+which of the two produced a line.
+
+Each of them holds under ANY subset of the registry, which is the same contract a
+pass is held to and is met the same way: the Rewriter reads whatever reached it.
+Turn off the pass that leaves the shape one of these acts on — or the whole
+phase, with `--no-optimise` — and the shape is not there, so nothing is done and
+the emission is what it always was.
+
+### `tag-binding`
+
+Reads the matched value's Type key once for a chain that asks about it more than
+once.
+
+```js
+if (_self[$type.typeKeySymbol] === "Shape#Circle") { … }
+else if (_self[$type.typeKeySymbol] === "Shape#Square") { … }
+else if (_self[$type.typeKeySymbol] === "Shape#Rect") { … }
+else { … }
+```
+
+```js
+const $self_tag = _self[$type.typeKeySymbol];
+if ($self_tag === "Shape#Circle") { … }
+else if ($self_tag === "Shape#Square") { … }
+else if ($self_tag === "Shape#Rect") { … }
+else { … }
+```
+
+**Where the Cases carry different fields, every value has a shape of its own and
+the read is megamorphic** — which is what a Choice with payloads is, and the
+whole of why this is worth a name. Measured on Bun, best of five, over an
+eight-Case chain: uniformly shaped values (a Choice of unit Cases) take 146 ms
+with the reads and 146 ms with the binding, and differently shaped ones fall from
+168 ms to 115 ms, **1.47×**. As a whole Program the share is smaller — fifteen
+million `area()` calls over a five-Case Choice fall from 342 ms to 329 ms,
+1.04× — because a Match's cost is mostly what its Handlers do.
+
+Two tests, not one: one read is one read, and a name for it would say what the
+read already says — which is also what a two-member Union compiles to, since the
+last Handler is the `else` `elide-final-match-test` proved it is. Only the
+MATCHED VALUE's own tag is bound; a member test reads its way down a spine to a
+different object each time and is left where it stands. One name, not a numbered
+series: a Match nested inside a Handler binds its own inside its own block and
+shadows this one, which is harmless for the reason a nested dispatch's
+`$dispatch_0` is — a chain reads the tag it bound and nothing else's.
+
+**It costs bytes.** The binding is a Statement the chain did not have, and across
+the twenty-eight fixture builds it is 613 bytes on 725 kB — 229 of them in
+StdlibExhaustive.es, which has the most chains. Nothing shrinks: a Program with
+no multi-tag chain is emitted unchanged.
+
 ## Not done yet
 
 Four things the passes above deliberately leave undone. Each is written here

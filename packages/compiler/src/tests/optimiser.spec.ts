@@ -4043,9 +4043,11 @@ describe("Optimiser", () => {
 			})
 
 			expect(generated).toContain('"never"')
-			expect(generated).toContain(
-				'_self[$type.typeKeySymbol] === "Boolean"',
-			)
+			// NOTE: The tag comparison, not the read in front of it — a chain
+			// asking about the matched value's tag more than once binds it to a
+			// name first, and which side of that the arm is emitted on is not
+			// what this test is about.
+			expect(generated).toContain('=== "Boolean"')
 		})
 
 		it("prints the same thing with the pass off", async () => {
