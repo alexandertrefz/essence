@@ -9,7 +9,7 @@ import {
 	printType,
 	signaturesOf,
 } from "@essence-lang/compiler/printType"
-import type { common } from "@essence-lang/interfaces"
+import type { common, parser } from "@essence-lang/interfaces"
 
 import { type ArgumentContext, findArgumentContext } from "./argumentContext"
 import { type ImportEdit, insertImportEdit } from "./autoImport"
@@ -736,11 +736,24 @@ function methodCompletions(
 	]
 	let seen = new Set<string>()
 	let entries: Array<CompletionEntry> = []
+	// NOTE: One parse for the whole loop. Every offering Namespace wants an
+	// import edit built against the document as it is now, which is the same
+	// document for all of them — asking for it per offer re-parsed the whole
+	// file once per Namespace, on a request the editor fires per keystroke.
+	// Lazy, so a completion with no offers at all still parses nothing.
+	let importProgram: parser.Program | null = null
 
 	for (let namespace of namespaces) {
 		let offer = offers.get(namespace.name)
+
+		if (offer !== undefined && importProgram === null) {
+			importProgram = parseDocument(documentText).program
+		}
+
 		let importEdit =
-			offer === undefined ? null : importEditFor(documentText, offer)
+			offer === undefined
+				? null
+				: importEditFor(documentText, importProgram!, offer)
 
 		for (let [name, method] of Object.entries(namespace.methods)) {
 			if (isStaticMethod(method)) {
@@ -787,10 +800,9 @@ function methodCompletions(
 // dropped for it, since the Method IS reachable once the entry is there.
 function importEditFor(
 	documentText: string,
+	program: parser.Program,
 	offer: WorkspaceOffer,
 ): ImportEdit | null {
-	let { program } = parseDocument(documentText)
-
 	return insertImportEdit(documentText, program, {
 		name: offer.name,
 		alias: null,

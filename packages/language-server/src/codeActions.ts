@@ -1,6 +1,6 @@
 import type { common, parser } from "@essence-lang/interfaces"
 
-import { analyseDocument, documentFilePath } from "./analyse"
+import { type Analysis, analyseDocument, documentFilePath } from "./analyse"
 import { insertImportEdit, relativeSpecifier } from "./autoImport"
 import { findInlayHints } from "./inlayHints"
 import { matcherValueExpressions } from "./matchHandlerChildren"
@@ -34,6 +34,29 @@ export type CodeActionEntry = {
 	edits: Array<CodeActionEdit>
 }
 
+// NOTE: The last analysis, kept for the next request to ask for again. What a
+// Code Action offers depends on the document, not on where in it the cursor
+// stands — and the Editor asks on every cursor move, which is a full compile
+// per keystroke of navigation through a file nobody has edited.
+//
+// NOTE: Kept only when the analysis read NO OTHER FILE. `dependencies` names
+// every other Module the graph reached, so an empty one says the answer came
+// out of this text and this path alone, and can not have gone stale while both
+// stand. A Module with dependencies is analysed afresh every time: what it
+// depends on lives on disk or in another buffer, and the invalidation that
+// tracks those belongs to the Workspace, which is where the cache covering them
+// belongs too.
+//
+// NOTE: Why not read the Workspace's cached enrichment instead — it holds the
+// parse and the typed Program, but not the DIAGNOSTICS, and the Diagnostics are
+// half of what a Code Action is: every quick fix here is an answer to one.
+// Putting them in the Workspace is the unified cache, which is its own slice.
+let lastAnalysis: {
+	documentText: string
+	documentPath: string | undefined
+	analysis: Analysis
+} | null = null
+
 export function findCodeActions(
 	documentText: string,
 	range: common.Position,
@@ -42,15 +65,27 @@ export function findCodeActions(
 ): Array<CodeActionEntry> {
 	// NOTE: ONE run of the pipeline per request — the analysis hands back both
 	// the Parser AST an edit is measured against and the enriched Program the
-	// annotation refactors read. The Editor asks for Code Actions on every
-	// cursor move, so parsing the same text again would be a second full
-	// compile for one lightbulb. Nothing is kept between requests: the text is
-	// what changed, and it is analysed again in full.
-	let { program, enrichedProgram, diagnostics } = analyseDocument(
-		documentText,
-		documentPath,
-		{ host: workspace?.host },
-	)
+	// annotation refactors read. Parsing the same text again would be a second
+	// full compile for one lightbulb.
+	let analysis =
+		lastAnalysis !== null &&
+		lastAnalysis.documentText === documentText &&
+		lastAnalysis.documentPath === documentPath
+			? lastAnalysis.analysis
+			: null
+
+	if (analysis === null) {
+		analysis = analyseDocument(documentText, documentPath, {
+			host: workspace?.host,
+		})
+
+		lastAnalysis =
+			analysis.dependencies.size === 0
+				? { documentText, documentPath, analysis }
+				: null
+	}
+
+	let { program, enrichedProgram, diagnostics } = analysis
 
 	if (program === null) {
 		return []
