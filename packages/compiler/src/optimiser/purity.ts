@@ -89,12 +89,12 @@ export function isPureExpression(
 		case "MethodInvocation":
 			return isPureMethodInvocation(node, shadowed)
 		// NOTE: An interpolated String CALLS `toString` on each hole, through a
-		// witness that may name a Method a Namespace wrote — so it is a call
-		// like any other, and refused like one. (`fold-constants` will want
-		// this widened for the holes whose witness is a standard library
-		// Method; that is a rule to add here, with its own argument.)
+		// witness — so it is weighed as the calls it is, against the same
+		// enumeration a written call is weighed against.
 		case "InterpolatedStringValue":
-			return false
+			return node.segments.every((segment) =>
+				isPureSegment(segment, shadowed),
+			)
 		// NOTE: A Match runs a Handler's BODY, which is Statements — an
 		// assignment among them is exactly the effect this is asked about, and
 		// Statements are not what this function reads. Refused whole rather
@@ -104,6 +104,94 @@ export function isPureExpression(
 		case "Intrinsic":
 			return isPureIntrinsic(node, shadowed)
 	}
+}
+
+// NOTE: One hole of an interpolated String, and the argument for admitting one
+// at all. A hole is a call, but it is a call the tree NAMES: the Namespace and
+// the member are written down where a written Invocation writes them, so the
+// same question can be asked of it. `devirtualise-witnesses` leaves a
+// `direct-method` wherever it could name the Function, and an unconditional
+// `ConformanceValue`'s method map says which Method its `toString` is — while a
+// CONDITIONAL conformance names a Function the call curries rather than one
+// anybody declared, and is refused. What is left is a Namespace name and a
+// member, weighed by the enumeration below exactly as `a::toString()` written
+// out would be: the Namespace must have an entry, the Program must not have
+// taken the name, the value must be of that Namespace's own Type, and the value
+// itself must be pure.
+//
+// NOTE: What this buys is a Constant nobody reads that holds a greeting, and a
+// Match Handler answering one — `eliminate-dead-code` and
+// `lower-matches-to-statements` both refused those on the strength of a call
+// that can not do anything. What it does NOT do is let a hole be evaluated
+// twice or out of order: purity says an Expression may be SKIPPED, and every
+// caller that asks is a caller about to skip one.
+function isPureSegment(
+	segment: common.typedSimple.InterpolationSegmentNode,
+	shadowed: ReadonlySet<string>,
+): boolean {
+	if (segment.kind === "text") {
+		return true
+	}
+
+	let namespaceName = printingNamespaceOf(segment.witness)
+
+	if (namespaceName === null || shadowed.has(namespaceName)) {
+		return false
+	}
+
+	if (segment.expression.type.type !== namespaceName) {
+		return false
+	}
+
+	if (!(pureMethods[namespaceName]?.has("toString") ?? false)) {
+		return false
+	}
+
+	return isPureExpression(segment.expression, shadowed)
+}
+
+// NOTE: The Namespace whose `toString` a hole's witness names — and only where
+// the witness says so outright. `devirtualise-witnesses` runs first and leaves a
+// `direct-method` at every hole it could name a Function for; a witness that is
+// still a `ConformanceValue` is one that pass refused, or one it never saw
+// because it was turned off, and it is read here the same way. A CONDITIONAL
+// conformance is refused by both: the Function behind its `toString` is one the
+// call curries rather than one anybody declared.
+//
+// NOTE: The name is the standard library's only where the Program has not taken
+// it, which is the caller's question — and it is a Namespace's own name rather
+// than the conforming Type's, so a `namespace Loud for Integer is Printable`
+// answers `"Loud"` here and is left alone.
+export function printingNamespaceOf(
+	witness: common.typedSimple.ExpressionNode,
+): string | null {
+	if (witness.nodeType === "Intrinsic" && witness.kind === "direct-method") {
+		if (witness.derivedDescriptor !== undefined) {
+			return null
+		}
+
+		return withoutOverloadSuffix(witness.memberName) === "toString"
+			? witness.namespaceName
+			: null
+	}
+
+	if (witness.nodeType !== "ConformanceValue") {
+		return null
+	}
+
+	if (witness.conditions.length !== 0 || witness.derivedDescriptor) {
+		return null
+	}
+
+	let memberName = witness.methodMap["toString"]
+
+	if (memberName === undefined) {
+		return null
+	}
+
+	return withoutOverloadSuffix(memberName) === "toString"
+		? witness.namespaceName
+		: null
 }
 
 function isPureIntrinsic(
@@ -189,14 +277,29 @@ function isPureIntrinsic(
 // operations and the Essence one-liners written on them; `Boolean`'s are the
 // two interned instances and the logic over them.
 //
+// NOTE: `String`'s entries are the comparisons and `toString`, and they earn
+// their place on the same three counts. `compare` normalises both sides to NFC
+// and walks the code points, which is bounded by the two lengths and answers
+// for every pair; `is` and `isNot` are written on it; `toString` answers the
+// String itself. Allocating is not an effect — a String nobody keeps is a
+// String nobody can tell was built. The two-Argument entries of `is` and
+// `compare` take a `Case` rather than a String and are refused by the Type rule
+// above without needing a word here.
+//
+// NOTE: `toString` is on every entry that has one, because a hole of an
+// interpolated String is a call of exactly that Method and is weighed here.
+// `Integer`'s is a bigint's decimal spelling, `Boolean`'s is the Conditional
+// that answers one of two literals, `Rational`'s is its numerator and
+// denominator with a slash between them. `Rational` is otherwise absent: its
+// arithmetic reduces through a gcd on every operation, which is a decision
+// somebody should take on its own merits rather than get for free here.
+//
 // NOTE: What is deliberately absent, so that adding one is a decision rather
 // than an oversight. `Number`'s covering comparison reaches π's interval
 // arithmetic, which narrows until it can decide a sign and is not obviously
 // bounded for every pair. `Integer.raise` is `a ** b`, which is bounded only by
 // how much memory the answer needs. `List` and `Optional` take Function
-// Arguments and run them, so their purity is the caller's Function's. `String`
-// allocates freely but the Methods worth naming here are the comparisons, which
-// `lower-scalar-operations` reaches without this.
+// Arguments and run them, so their purity is the caller's Function's.
 //
 // NOTE: And `Terminal` above all, whose absence is the one this table can least
 // afford to lose. It is named here rather than left to be inferred because the
@@ -219,8 +322,19 @@ const pureMethods: Record<string, ReadonlySet<string>> = {
 		"multiply",
 		"negate",
 		"absolute",
+		"toString",
 	]),
-	Boolean: new Set(["is", "isNot", "and", "or", "negate", "exclusiveOr"]),
+	Boolean: new Set([
+		"is",
+		"isNot",
+		"and",
+		"or",
+		"negate",
+		"exclusiveOr",
+		"toString",
+	]),
+	String: new Set(["is", "isNot", "compare", "toString"]),
+	Rational: new Set(["toString"]),
 }
 
 function isPureMethodInvocation(

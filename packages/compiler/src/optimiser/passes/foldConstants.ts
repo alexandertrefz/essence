@@ -2,7 +2,11 @@ import type { common } from "@essence-lang/interfaces"
 import { reduced } from "@essence-lang/runtime/bigRational"
 
 import type { OptimiserPass } from "../index"
-import { isPureExpression, withoutOverloadSuffix } from "../purity"
+import {
+	isPureExpression,
+	printingNamespaceOf,
+	withoutOverloadSuffix,
+} from "../purity"
 import { rewriteExpressions } from "../walk"
 
 // NOTE: An operation whose operands are written out in the source has one
@@ -482,50 +486,6 @@ function renderedHole(
 		default:
 			return null
 	}
-}
-
-// NOTE: The Namespace whose `toString` a hole's witness names — and only where
-// the witness says so outright. `devirtualise-witnesses` runs first and leaves a
-// `direct-method` at every hole it could name a Function for; a witness that is
-// still a `ConformanceValue` is one that pass refused, or one it never saw
-// because it was turned off, and it is read here the same way. A CONDITIONAL
-// conformance is refused by both: the Function behind its `toString` is one the
-// call curries rather than one anybody declared.
-//
-// NOTE: The name is the standard library's only where the Program has not taken
-// it, which is the caller's question — and it is a Namespace's own name rather
-// than the conforming Type's, so a `namespace Loud for Integer is Printable`
-// answers `"Loud"` here and is left alone.
-function printingNamespaceOf(
-	witness: common.typedSimple.ExpressionNode,
-): string | null {
-	if (witness.nodeType === "Intrinsic" && witness.kind === "direct-method") {
-		if (witness.derivedDescriptor !== undefined) {
-			return null
-		}
-
-		return withoutOverloadSuffix(witness.memberName) === "toString"
-			? witness.namespaceName
-			: null
-	}
-
-	if (witness.nodeType !== "ConformanceValue") {
-		return null
-	}
-
-	if (witness.conditions.length !== 0 || witness.derivedDescriptor) {
-		return null
-	}
-
-	let memberName = witness.methodMap["toString"]
-
-	if (memberName === undefined) {
-		return null
-	}
-
-	return withoutOverloadSuffix(memberName) === "toString"
-		? witness.namespaceName
-		: null
 }
 
 // NOTE: The receiver and the Method's own Parameters, all of EXACTLY the named
