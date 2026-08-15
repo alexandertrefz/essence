@@ -232,7 +232,10 @@ describe("a folded operation", () => {
 })
 
 describe("a counted walk", () => {
-	it("counts in numbers where both bounds are held as ones", () => {
+	// NOTE: Two Literals a double holds exactly answer the question before the
+	// Program runs, so the walk is written with no bigint in it anywhere. A
+	// bound the Compiler can not read is what the run-time test below is for.
+	it("counts in numbers where both bounds are written as ones", () => {
 		let generated = generate(
 			program(`	constant sum = loop(from 1, through 10, startingWith 0, step (
 		index,
@@ -240,6 +243,25 @@ describe("a counted walk", () => {
 	) { <- total::add(index) })
 
 	Terminal.print(sum)`),
+		)
+
+		expect(generated).not.toContain("$loop_0_big")
+		expect(generated).not.toContain("BigInt(")
+		expect(generated).toContain(
+			"const $loop_0_delta = $loop_0_up ? 1 : -1;",
+		)
+	})
+
+	it("asks which kind a bound it can not read is holding", () => {
+		let generated = generate(
+			program(`	function upTo(_ limit: Integer) -> Integer {
+		<- loop(from 1, through limit, startingWith 0, step (
+			index,
+			total,
+		) { <- total::add(index) })
+	}
+
+	Terminal.print(upTo(10))`),
 		)
 
 		expect(generated).toContain(
@@ -273,6 +295,31 @@ describe("a counted walk", () => {
 		).toEqual(["5", "9007199254740994", "9007199254740990"])
 	})
 
+	// NOTE: The counter's Integer is dropped where the body only reads what it
+	// holds, so the two shapes that must not be got wrong are a body that hands
+	// the counter ON — which needs the Integer — and a nested walk reading the
+	// outer counter, which reads through a second walk's worth of emitted code
+	// to reach it.
+	it("counts alike whether the counter's Integer survives or not", async () => {
+		expect(
+			await outputOf(
+				program(`	constant seed: List<Integer> = []
+
+	constant gathered = loop(from 1, through 3, startingWith seed,
+		step (index, seen) { <- seen::append(index) })
+
+	constant nested = loop(from 1, through 3, startingWith 0, step (outer, carried) {
+		<- loop(from 1, through 3, startingWith carried, step (inner, running) {
+			<- running::add(outer::multiply(with inner))
+		})
+	})
+
+	Terminal.print(gathered::length())
+	Terminal.print(nested)`),
+			),
+		).toEqual(["3", "36"])
+	})
+
 	it("hands the body a counter that is canonical on both sides", async () => {
 		expect(
 			await outputOf(
@@ -284,6 +331,70 @@ describe("a counted walk", () => {
 	Terminal.print(seen)`),
 			),
 		).toEqual(["9007199254740991 9007199254740992 9007199254740993 "])
+	})
+
+	// NOTE: The counter's KIND is decided once, from the bounds, because a `for`
+	// counter can not change kind mid-walk. Canonicality is a property of each
+	// VALUE, so a walk with one bound inside safe range and one outside counts
+	// in bigint through values a double holds exactly — and the body that had
+	// its Integer elided reads the counter itself. Every one of those turns is a
+	// value with two spellings unless the turn canonicalises it, and `is` is
+	// emitted as `===`, which answers `false` across the two.
+	//
+	// NOTE: Asked with `is` and not with `toString`: a mention of the counter
+	// that is not a read of its value REFUSES the elision, so a body that prints
+	// the counter never reaches the shape this is about.
+	it("compares a counter of a crossing walk by its value", async () => {
+		expect(
+			await outputOf(
+				program(`	constant hits = loop(from 9007199254740988, through 9007199254740992,
+		startingWith 0, step (index, found) {
+		if index::is(9007199254740990) { <- found::add(1) } else { <- found }
+	})
+
+	constant misses = loop(from 9007199254740991, through 9007199254740993,
+		startingWith 0, step (index, found) {
+		if index::isNot(9007199254740992) { <- found::add(1) } else { <- found }
+	})
+
+	constant below = loop(from -9007199254740992, through -9007199254740988,
+		startingWith 0, step (index, found) {
+		if index::is(-9007199254740990) { <- found::add(1) } else { <- found }
+	})
+
+	Terminal.print(hits)
+	Terminal.print(misses)
+	Terminal.print(below)`),
+			),
+		).toEqual(["1", "2", "1"])
+	})
+
+	// NOTE: Neither bound written as a literal, so nothing about the walk is
+	// decided while compiling, and the two counters that meet are two walks'
+	// worth of emitted code apart.
+	it("compares two crossing counters against each other", async () => {
+		expect(
+			await outputOf(
+				program(`	function matches(_ target: Integer, upTo limit: Integer) -> Integer {
+		<- loop(from 9007199254740988, through limit, startingWith 0,
+			step (index, found) {
+			if index::is(target) { <- found::add(1) } else { <- found }
+		})
+	}
+
+	constant paired = loop(from 9007199254740990, through 9007199254740991,
+		startingWith 0, step (outer, carried) {
+		<- loop(from 9007199254740990, through 9007199254740992,
+			startingWith carried, step (inner, running) {
+			if inner::is(outer) { <- running::add(1) } else { <- running }
+		})
+	})
+
+	Terminal.print(matches(9007199254740990, upTo 9007199254740992))
+	Terminal.print(matches(9007199254740990, upTo 9007199254740991))
+	Terminal.print(paired)`),
+			),
+		).toEqual(["1", "1", "2"])
 	})
 })
 

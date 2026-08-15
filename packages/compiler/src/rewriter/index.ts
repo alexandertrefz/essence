@@ -4658,7 +4658,16 @@ function countedWalk(
 	let escaped = `${prefix}_big`
 	let delta = `${prefix}_delta`
 	let index = `${prefix}_index`
+	let held = `${prefix}_held`
 	let state = `${prefix}_state`
+	// NOTE: Two bounds written as Integers a double holds exactly decide the
+	// whole of the bigint half below while compiling, and that is the shape all
+	// but a handful of counted walks have. A counter between two safe bounds
+	// never leaves safe range, so it counts in numbers, every value it takes is
+	// already the canonical spelling of itself, and none of the machinery that
+	// asks — the kind test, the two-kind step, the converting start, the per-turn
+	// view — is written at all.
+	let mayEscape = !(safeBound(driver.from) && safeBound(driver.through))
 	// NOTE: The bounds and the seed, in the order the call passed them and
 	// before the body is written, so that what the emission collects on the way
 	// is collected in the order the Program says it.
@@ -4678,11 +4687,15 @@ function countedWalk(
 	let body = inlinedCallback(
 		driver.step,
 		// NOTE: The body is handed the counter as the Integer it was always
-		// handed — the one allocation a turn of this loop still costs, where it
-		// used to cost that Integer, the Record around it and two calls.
+		// handed — where it used to cost that Integer, the Record around it and
+		// two calls — and `inlinedCallback` drops even that where the body only
+		// ever reads what the Integer holds.
 		[createdInteger(loopIdentifier(index)), loopIdentifier(state)],
 		`${prefix}_body`,
 		{ kind: "temporary", name: state },
+		mayEscape
+			? { read: held, binding: [canonicalCounter(held, index, escaped)] }
+			: { read: index, binding: [] },
 	)
 
 	return {
@@ -4697,44 +4710,55 @@ function countedWalk(
 			// NOTE: Either bound being a bigint is what sends the counter to
 			// bigint, and by the canonical invariant that is the same question
 			// as either bound being outside safe range.
-			loopDeclaration("const", escaped, {
-				type: "LogicalExpression",
-				operator: "||",
-				left: heldAsBigInt(loopIdentifier(from)),
-				right: heldAsBigInt(loopIdentifier(to)),
-			}),
-			loopDeclaration("const", delta, {
-				type: "ConditionalExpression",
-				test: loopIdentifier(escaped),
-				consequent: {
-					type: "ConditionalExpression",
-					test: loopIdentifier(ascending),
-					consequent: countLiteral(1n),
-					alternate: countLiteral(-1n),
-				},
-				alternate: {
-					type: "ConditionalExpression",
-					test: loopIdentifier(ascending),
-					consequent: numberLiteral(1),
-					alternate: numberLiteral(-1),
-				},
-			}),
+			...(mayEscape
+				? [
+						loopDeclaration("const", escaped, {
+							type: "LogicalExpression",
+							operator: "||",
+							left: heldAsBigInt(loopIdentifier(from)),
+							right: heldAsBigInt(loopIdentifier(to)),
+						}),
+					]
+				: []),
+			loopDeclaration(
+				"const",
+				delta,
+				mayEscape
+					? {
+							type: "ConditionalExpression",
+							test: loopIdentifier(escaped),
+							consequent: {
+								type: "ConditionalExpression",
+								test: loopIdentifier(ascending),
+								consequent: countLiteral(1n),
+								alternate: countLiteral(-1n),
+							},
+							alternate: steppedBy(ascending),
+						}
+					: steppedBy(ascending),
+			),
 			{
 				type: "ForStatement",
 				// NOTE: The start has to match the step's kind — a number
 				// counter stepped by a bigint throws — so a bigint walk whose
 				// lower bound happens to be a number converts it once here.
-				init: loopDeclaration("let", index, {
-					type: "ConditionalExpression",
-					test: loopIdentifier(escaped),
-					consequent: {
-						type: "CallExpression",
-						optional: false,
-						callee: loopIdentifier("BigInt"),
-						arguments: [loopIdentifier(from)],
-					},
-					alternate: loopIdentifier(from),
-				}),
+				init: loopDeclaration(
+					"let",
+					index,
+					mayEscape
+						? {
+								type: "ConditionalExpression",
+								test: loopIdentifier(escaped),
+								consequent: {
+									type: "CallExpression",
+									optional: false,
+									callee: loopIdentifier("BigInt"),
+									arguments: [loopIdentifier(from)],
+								},
+								alternate: loopIdentifier(from),
+							}
+						: loopIdentifier(from),
+				),
 				// NOTE: Counting up runs while the index has not passed the end
 				// from below and counting down while it has not passed it from
 				// above — the two predicates the Essence body writes, asked of
@@ -5099,6 +5123,16 @@ function stepPayload(
 	return null
 }
 
+// NOTE: What a body may be handed in place of the first Argument's Integer: the
+// name it reads where it read `<name>.value`, and whatever has to be bound for
+// the turn to establish that name. The binding is emitted ONLY where the swap is
+// taken, so a body that keeps its box does not also pay for a view of it, and it
+// is empty where the name is already what the body should read.
+type UnboxedArgument = {
+	read: string
+	binding: Array<estree.Statement>
+}
+
 // NOTE: One callback's body, where the call to it was. The Parameters are bound
 // as the `const`s of a block around it, which is the Scope the closure gave them
 // and nothing more: the body reads its Parameters and everything enclosing the
@@ -5117,6 +5151,7 @@ function inlinedCallback(
 	args: Array<estree.Expression>,
 	label: string,
 	result: RedirectTarget,
+	unboxable: UnboxedArgument | null = null,
 ): estree.Statement {
 	let broke = false
 	let body = withNamespaceScope(() => [
@@ -5144,8 +5179,117 @@ function inlinedCallback(
 			},
 		}),
 	])
+	let first = callback.parameters[0]
+
+	// NOTE: The Integer the first Argument boxes, NEVER BUILT where the body
+	// only ever reads what it holds — which is what a counting body does, since
+	// every arithmetic and every comparison reads through to the value. It is
+	// one allocation a turn, and the walk's own measured cost roughly halves
+	// without it.
+	//
+	// NOTE: What makes the swap safe is that it is refused on ANY other mention
+	// of the name. A body that hands the Integer on, stores it, or shadows the
+	// name keeps its box, and so does one that merely reads a member called
+	// `index` off something else — the test does not try to tell those apart,
+	// because being wrong once is worse than optimising every time.
+	//
+	// NOTE: The counter is a `for` head's `let`, so each turn binds a fresh one
+	// and a closure the body builds captures the turn it was built in — which is
+	// exactly what capturing the Integer gave it.
+	if (unboxable !== null && first !== undefined) {
+		let name = rewriteIdentifier(first).name
+		let statements = body.slice(callback.parameters.length)
+
+		if (!mentionsBeyondValue(statements, name)) {
+			replaceValueReads(statements, name, unboxable.read)
+			body = [
+				...unboxable.binding,
+				...body.slice(1, callback.parameters.length),
+				...statements,
+			]
+		}
+	}
 
 	return broke ? labelled(label, loopBlock(body)) : loopBlock(body)
+}
+
+// NOTE: Whether a name is mentioned anywhere in the emitted body OTHER than as
+// `<name>.value`. Every position is read — a property key and a member name
+// included, which no reference can be — so the answer is conservative in the one
+// direction that matters: a name this says nothing about is a name nothing may
+// be assumed of.
+function mentionsBeyondValue(root: unknown, name: string): boolean {
+	let found = false
+
+	function visit(node: unknown): void {
+		if (found || node === null || typeof node !== "object") {
+			return
+		}
+
+		if (isValueRead(node, name)) {
+			return
+		}
+
+		let record = node as Record<string, unknown>
+
+		if (record["type"] === "Identifier" && record["name"] === name) {
+			found = true
+
+			return
+		}
+
+		for (let value of Object.values(record)) {
+			visit(value)
+		}
+	}
+
+	visit(root)
+
+	return found
+}
+
+// NOTE: The other half, run only once the question above has been answered:
+// every `<name>.value` becomes the raw counter, in place. Written as a walk over
+// the PARENT so the read can be replaced where it sits, since a node can not
+// turn itself into another kind.
+function replaceValueReads(root: unknown, name: string, counter: string): void {
+	function visit(node: unknown): void {
+		if (node === null || typeof node !== "object") {
+			return
+		}
+
+		let record = node as Record<string, unknown>
+
+		for (let [key, value] of Object.entries(record)) {
+			if (isValueRead(value, name)) {
+				record[key] = loopIdentifier(counter)
+			} else {
+				visit(value)
+			}
+		}
+	}
+
+	visit(root)
+}
+
+function isValueRead(node: unknown, name: string): boolean {
+	if (node === null || typeof node !== "object") {
+		return false
+	}
+
+	let record = node as Record<string, unknown>
+	let object = record["object"] as Record<string, unknown> | undefined
+	let property = record["property"] as Record<string, unknown> | undefined
+
+	return (
+		record["type"] === "MemberExpression" &&
+		record["computed"] === false &&
+		record["optional"] !== true &&
+		object?.["type"] === "Identifier" &&
+		object["name"] === name &&
+		property?.["type"] === "Identifier" &&
+		property["name"] === "value"
+	)
 }
 
 // NOTE: What an inlined List walk begins with: the items under a name, and how
@@ -5248,10 +5392,74 @@ function createdInteger(value: estree.Expression): estree.Expression {
 	}
 }
 
+// NOTE: Whether a bound is written as an Integer the canonical invariant holds
+// as a NUMBER, which is what a counted walk asks of both of its bounds before it
+// writes any of the bigint half. Only a Literal answers yes — a folded operation
+// is one by the time this reads it, and `pool-constants` has already put every
+// Literal behind a reference, so the value is read through that. Anything else
+// is a value nothing is known about, and the walk decides at run time.
+function safeBound(node: common.typedSimple.ExpressionNode): boolean {
+	if (node.nodeType === "Intrinsic" && node.kind === "pooled-reference") {
+		return safeBound(node.value)
+	}
+
+	if (node.nodeType !== "IntegerValue") {
+		return false
+	}
+
+	let held = BigInt(decimalDigits(node.value))
+
+	return held >= -BigInt(SAFE_INTEGER) && held <= BigInt(SAFE_INTEGER)
+}
+
+// NOTE: One step of the counter, in numbers: up or down by one, which is the
+// step of every walk whose bounds a double holds.
+function steppedBy(ascending: string): estree.Expression {
+	return {
+		type: "ConditionalExpression",
+		test: loopIdentifier(ascending),
+		consequent: numberLiteral(1),
+		alternate: numberLiteral(-1),
+	}
+}
+
 // NOTE: One step of a counter that had to escape to bigint, as the literal an
 // Integer past safe range holds.
 function countLiteral(value: bigint): estree.BigIntLiteral {
 	return { type: "Literal", bigint: value.toString(), value }
+}
+
+// NOTE: The turn's counter, in the representation the canonical invariant gives
+// it. The KIND is decided once, from the bounds, because a `for` counter can not
+// change kind mid-walk — its `+=` would throw — but canonicality is a property
+// of each VALUE, and a walk with one bound inside safe range and one outside
+// counts in bigint through values a double holds exactly. A bigint spelling of
+// one of those is a second spelling of a value that already has one, which is
+// exactly what emitted `===` may not be handed — `9007199254740990n` and
+// `9007199254740990` are one Integer and compare `false`. The body that keeps
+// its Integer is handed a `createInteger` that settles this; the body the box
+// was elided out of is handed this.
+//
+// NOTE: The escaped `const` is asked FIRST, so the walk that counts in numbers —
+// every walk over ordinary quantities — reads one loop-invariant `false` and
+// then the counter it already had. The call is on the arm no walk a Program can
+// finish takes more than a few turns of.
+function canonicalCounter(
+	held: string,
+	index: string,
+	escaped: string,
+): estree.Statement {
+	return loopDeclaration("const", held, {
+		type: "ConditionalExpression",
+		test: loopIdentifier(escaped),
+		consequent: {
+			type: "CallExpression",
+			optional: false,
+			callee: memberRead(loopIdentifier("Integer"), "canonical"),
+			arguments: [loopIdentifier(index)],
+		},
+		alternate: loopIdentifier(index),
+	})
 }
 
 function createdList(value: estree.Expression): estree.Expression {
