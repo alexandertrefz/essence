@@ -4,7 +4,14 @@ import {
 	squareRootOfRational,
 } from "./Algebraic"
 import type { BigRational } from "./bigRational"
-import { bigRationalOf, reduced } from "./bigRational"
+import {
+	addRationals,
+	bigRationalOf,
+	divideRationals,
+	multiplyRationals,
+	reduced,
+	subtractRationals,
+} from "./bigRational"
 import type { IntegerType } from "./Integer"
 import type { NumberFormatType } from "./NumberFormat"
 import type { OptionalType } from "./Optional"
@@ -107,6 +114,97 @@ function reducedParts(rational: RationalType): BigRational {
 
 	return parts
 }
+
+// NOTE: A Rational built FROM parts already in lowest terms — which is what the
+// four arithmetic entries below are handed, since the bigint-rational core
+// reduces what it answers. The parts are remembered as the read-side view right
+// away, so the first accessor, formatter or `raise` to ask pays no
+// greatest-common-divisor of its own: the answer is the value it was built
+// with.
+//
+// NOTE: `createRational` is still the gateway, and it changes nothing here —
+// `reduced` already puts the sign on the numerator and canonicalises zero as
+// `0/1`, which is exactly what it would otherwise do — so what is stored and
+// what is remembered are the same two bigints rather than two views that must
+// agree.
+function createReducedRational(parts: BigRational): RationalType {
+	let rational = createRational(
+		parts.numerator,
+		parts.denominator,
+	) as ReducedRational
+
+	rational[reducedPartsKey] = parts
+
+	return rational
+}
+
+// #region Arithmetic
+
+// NOTE: The four same-kind operations, each one cross-multiplication and one
+// reduction on the parts themselves. The Essence bodies they replace read
+// `numerator()` and `denominator()` off both operands — four Integers built
+// only to be unwrapped — did the same arithmetic through four more boxes, and
+// handed the parts to `Rational.of`, whose answer was UNREDUCED and charged its
+// next reader a greatest-common-divisor.
+//
+// NOTE: Same answers, and a smaller representation of them. `4/2` built by
+// `Rational.of` still HOLDS 4 and 2 — nothing here touches what construction
+// stores — but a SUM now holds its lowest terms rather than the products the
+// cross-multiplication left. Nothing can tell: every accessor and every
+// formatter already answered in lowest terms, and equality cross-multiplies the
+// raw parts, so `(1/2)::add(1/2)` equals `1` whether it holds `4/4` or `1/1`.
+//
+// NOTE: Through `reducedParts` rather than `bigRationalOf`, which is the same
+// answer off the remembered form — an operand that has been read, printed or
+// operated on before reduces once for all of them.
+export function add__overload$1(
+	rational: RationalType,
+	other: RationalType,
+): RationalType {
+	return createReducedRational(
+		addRationals(reducedParts(rational), reducedParts(other)),
+	)
+}
+
+export function subtract__overload$1(
+	rational: RationalType,
+	other: RationalType,
+): RationalType {
+	return createReducedRational(
+		subtractRationals(reducedParts(rational), reducedParts(other)),
+	)
+}
+
+export function multiply__overload$1(
+	rational: RationalType,
+	other: RationalType,
+): RationalType {
+	return createReducedRational(
+		multiplyRationals(reducedParts(rational), reducedParts(other)),
+	)
+}
+
+// NOTE: The one entry that can fail, and it answers the same Optional the
+// Essence body did: it multiplied with `other::reciprocal()`, which is empty
+// for zero, so a zero divisor was the whole of what came back empty. Asked
+// outright here — a Rational is zero exactly when its numerator is, in lowest
+// terms as in any other.
+export function divide__overload$1(
+	rational: RationalType,
+	other: RationalType,
+): OptionalType<RationalType> {
+	let divisor = reducedParts(other)
+
+	if (divisor.numerator === 0n) {
+		return createEmpty()
+	}
+
+	return createValue(
+		createReducedRational(divideRationals(reducedParts(rational), divisor)),
+	)
+}
+
+// #endregion
 
 // #region Everyday methods
 

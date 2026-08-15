@@ -144,8 +144,16 @@ export type RationalNatives = {
 	of__overload$1: (argument0: IntegerType, over: IntegerType) => OptionalType<RationalType>
 	// static of(_: Integer, over: NonZeroInteger) -> Rational
 	of__overload$2: (argument0: IntegerType, over: IntegerType) => RationalType
+	// add(_: Rational) -> Rational
+	add__overload$1: (self: RationalType, argument1: RationalType) => RationalType
+	// subtract(_: Rational) -> Rational
+	subtract__overload$1: (self: RationalType, argument1: RationalType) => RationalType
+	// divide(by: Rational) -> Optional<Rational>
+	divide__overload$1: (self: RationalType, by: RationalType) => OptionalType<RationalType>
 	// divide(by: Algebraic) -> Algebraic | Rational
 	divide__overload$3: (self: RationalType, by: AlgebraicType) => AlgebraicType | RationalType
+	// multiply(with: Rational) -> Rational
+	multiply__overload$1: (self: RationalType, argument1: RationalType) => RationalType
 	// squareRoot() -> Optional<Rational | Algebraic>
 	squareRoot: (self: RationalType) => OptionalType<RationalType | AlgebraicType>
 	// numerator() -> Integer
@@ -412,11 +420,15 @@ export const $NonZeroIntegerArity: AssertArities<typeof import("./NonZeroInteger
 
 declare const RationalModule: typeof import("./Rational")
 export const $Rational: RationalNatives = RationalModule
-export const $RationalAbsent: AssertNoEssenceExports<typeof import("./Rational"), "is" | "isNot" | "add__overload$1" | "add__overload$2" | "add__overload$3" | "add__overload$4" | "subtract__overload$1" | "subtract__overload$2" | "subtract__overload$3" | "subtract__overload$4" | "divide__overload$1" | "divide__overload$2" | "multiply__overload$1" | "multiply__overload$2" | "multiply__overload$3" | "multiply__overload$4" | "isLessThan__overload$1" | "isLessThan__overload$2" | "isLessThanOrEqualTo__overload$1" | "isLessThanOrEqualTo__overload$2" | "isGreaterThan__overload$1" | "isGreaterThan__overload$2" | "isGreaterThanOrEqualTo__overload$1" | "isGreaterThanOrEqualTo__overload$2" | "absolute" | "negate" | "reciprocal" | "isWholeNumber" | "round__overload$1" | "round__overload$2" | "parse" | "toString__overload$1"> = true
+export const $RationalAbsent: AssertNoEssenceExports<typeof import("./Rational"), "is" | "isNot" | "add__overload$2" | "add__overload$3" | "add__overload$4" | "subtract__overload$2" | "subtract__overload$3" | "subtract__overload$4" | "divide__overload$2" | "multiply__overload$2" | "multiply__overload$3" | "multiply__overload$4" | "isLessThan__overload$1" | "isLessThan__overload$2" | "isLessThanOrEqualTo__overload$1" | "isLessThanOrEqualTo__overload$2" | "isGreaterThan__overload$1" | "isGreaterThan__overload$2" | "isGreaterThanOrEqualTo__overload$1" | "isGreaterThanOrEqualTo__overload$2" | "absolute" | "negate" | "reciprocal" | "isWholeNumber" | "round__overload$1" | "round__overload$2" | "parse" | "toString__overload$1"> = true
 export const $RationalArity: AssertArities<typeof import("./Rational"), {
 	of__overload$1: 2
 	of__overload$2: 2
+	add__overload$1: 2
+	subtract__overload$1: 2
+	divide__overload$1: 2
 	divide__overload$3: 2
+	multiply__overload$1: 2
 	squareRoot: 1
 	numerator: 1
 	denominator: 1

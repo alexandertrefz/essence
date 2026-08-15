@@ -10,12 +10,18 @@ import { typeKeySymbol } from "./type"
 // zero has exactly one lowest-terms form, `0/1`.
 export type BigRational = { numerator: bigint; denominator: bigint }
 
+// NOTE: Euclid's, through a temporary rather than a destructured swap: the
+// swap allocated an Array per turn, and this loop is what every reduction runs
+// — several turns for every arithmetic operation on a Rational.
 function greatestCommonDivisor(first: bigint, second: bigint): bigint {
 	let a = first < 0n ? -first : first
 	let b = second < 0n ? -second : second
 
 	while (b !== 0n) {
-		;[a, b] = [b, a % b]
+		let remainder = a % b
+
+		a = b
+		b = remainder
 	}
 
 	return a

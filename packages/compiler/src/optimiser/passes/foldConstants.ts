@@ -1,5 +1,11 @@
 import type { common } from "@essence-lang/interfaces"
-import { reduced } from "@essence-lang/runtime/bigRational"
+import type { BigRational } from "@essence-lang/runtime/bigRational"
+import {
+	addRationals,
+	multiplyRationals,
+	reduced,
+	subtractRationals,
+} from "@essence-lang/runtime/bigRational"
 
 import type { OptimiserPass } from "../index"
 import {
@@ -28,10 +34,14 @@ import { rewriteExpressions } from "../walk"
 // NOTE: Which is the one thing about Rationals that has to be got exactly
 // right. A Rational holds the parts it was BUILT with and reduces only what it
 // ANSWERS with — `4/2` stores 4 and 2, prints `2/1` and answers 2 for its
-// numerator — so `1/2::add(1/4)` may not be folded to the `3/4` it is worth. The
-// Essence body reads both operands' lowest-terms parts, cross-multiplies them
-// and hands the result to `Rational.of`, which stores 6 and 8; that is what is
-// folded, and the value prints `3/4` exactly as the unfolded Program does.
+// numerator — so what a fold has to reproduce is what the operation STORES, not
+// only what it is worth. CONSTRUCTION stores what it was given, which is why
+// `4/2` is folded to a Rational holding 4 and 2. ARITHMETIC does not: the four
+// same-kind operations are natives on the bigint-rational core, which answers in
+// lowest terms, so `1/2::add(1/4)` folds to a Rational holding 3 and 4 — the
+// very parts the unfolded Program would have built. They are read through the
+// same functions the runtime calls, so there is one definition of the answer
+// rather than two that must agree.
 //
 // NOTE: Only LITERALS are folded, never a name a Program bound to a constant.
 // A binding is a place a debugger stops and a name a reader looks for, and
@@ -240,13 +250,14 @@ function foldInteger(
 // pair nobody writes as two literals — and mixed kinds are left to the general
 // path here for the same reason `lower-scalar-operations` leaves them there.
 //
-// NOTE: Each of these IS the Essence body, carried out. The arithmetic reads
-// both operands in LOWEST TERMS, because that is what `numerator()` and
-// `denominator()` answer, and hands the result to `Rational.of`, which stores it
-// as it is given — so the folded parts are the parts the Program would have
-// stored, unreduced, and print in lowest terms exactly as they would have.
-// The comparisons cross-multiply the STORED parts, which is what
-// `Rational.compare` does, and answer the same for either spelling of a value.
+// NOTE: Each of these IS what the Method does, carried out. The three
+// arithmetic entries are natives on the bigint-rational core and are folded
+// through the very functions those natives call, so the folded parts are the
+// parts the Program would have stored — in lowest terms, which is what that
+// core answers in. `negate` and `absolute` are Essence bodies still and are
+// followed statement for statement. The comparisons cross-multiply the STORED
+// parts, which is what `Rational.compare` does, and answer the same for either
+// spelling of a value.
 function foldRational(
 	node: common.typedSimple.MethodInvocationNode,
 	member: string,
@@ -293,14 +304,20 @@ function foldRational(
 
 	switch (member) {
 		case "add":
-			return rationalNode(addedRationals(left, right), node)
+			return rationalNode(
+				foldedRationalArithmetic(addRationals, left, right),
+				node,
+			)
 		case "subtract":
 			return rationalNode(
-				addedRationals(left, negatedRational(right)),
+				foldedRationalArithmetic(subtractRationals, left, right),
 				node,
 			)
 		case "multiply":
-			return rationalNode(multipliedRationals(left, right), node)
+			return rationalNode(
+				foldedRationalArithmetic(multiplyRationals, left, right),
+				node,
+			)
 		case "is":
 			return booleanNode(ordering === 0n, node)
 		case "isNot":
@@ -577,26 +594,27 @@ function storedRational(
 	return { numerator, denominator }
 }
 
-// NOTE: `Rational::add`, statement for statement — both operands' lowest-terms
-// parts cross-multiplied onto the shared denominator, handed to `Rational.of`.
-function addedRationals(
+// NOTE: The three same-kind arithmetic entries, through the very functions the
+// natives behind them call — one cross-multiplication and one reduction each,
+// on the operands' lowest-terms parts. Answering them any other way here would
+// be a second definition of Rational arithmetic that has to agree with the
+// first, which is what these three used to be.
+function foldedRationalArithmetic(
+	operation: (first: BigRational, second: BigRational) => BigRational,
 	left: { numerator: bigint; denominator: bigint },
 	right: { numerator: bigint; denominator: bigint },
 ): { numerator: bigint; denominator: bigint } {
-	let first = reduced(left.numerator, left.denominator)
-	let second = reduced(right.numerator, right.denominator)
-
-	return storedRational(
-		first.numerator * second.denominator +
-			second.numerator * first.denominator,
-		first.denominator * second.denominator,
+	let answer = operation(
+		reduced(left.numerator, left.denominator),
+		reduced(right.numerator, right.denominator),
 	)
+
+	return storedRational(answer.numerator, answer.denominator)
 }
 
-// NOTE: `Rational::subtract` is `@::add(other::negate())`, and `negate` is
-// `Rational.of` over the lowest-terms parts with the numerator flipped — so the
-// operand the addition above is given is this, and not the operand's own stored
-// parts.
+// NOTE: `Rational::negate` is still an Essence body — `Rational.of` over the
+// lowest-terms parts with the numerator flipped — so it is followed statement
+// for statement, as `absolute`'s negative branch is.
 function negatedRational(value: { numerator: bigint; denominator: bigint }): {
 	numerator: bigint
 	denominator: bigint
@@ -604,21 +622,6 @@ function negatedRational(value: { numerator: bigint; denominator: bigint }): {
 	let parts = reduced(value.numerator, value.denominator)
 
 	return storedRational(-parts.numerator, parts.denominator)
-}
-
-// NOTE: `Rational::multiply` — the lowest-terms numerators and denominators
-// multiplied, handed to `Rational.of`.
-function multipliedRationals(
-	left: { numerator: bigint; denominator: bigint },
-	right: { numerator: bigint; denominator: bigint },
-): { numerator: bigint; denominator: bigint } {
-	let first = reduced(left.numerator, left.denominator)
-	let second = reduced(right.numerator, right.denominator)
-
-	return storedRational(
-		first.numerator * second.numerator,
-		first.denominator * second.denominator,
-	)
 }
 
 function arithmeticOf(

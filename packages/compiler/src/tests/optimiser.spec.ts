@@ -3823,26 +3823,29 @@ describe("Optimiser", () => {
 			expect(generated).not.toContain("Integer.createInteger(60n)")
 		})
 
-		it("stores a folded Rational as the Essence body would", () => {
-			// NOTE: THE Rational question. `1/2 + 1/4` is worth `3/4` and a
-			// Rational holds the parts it was BUILT with — the Essence body
-			// cross-multiplies the lowest-terms parts and stores 6 over 8 — so a
-			// fold to `3/4` would be a value the unfolded Program never makes.
-			// The band says 6 and 8; the Program prints `3/4`.
+		it("stores a folded Rational as the operation would", () => {
+			// NOTE: THE Rational question — what a fold has to reproduce is
+			// what the operation STORES, not only what it is worth. The four
+			// same-kind arithmetic entries are natives on the bigint-rational
+			// core, which answers in lowest terms, so `1/2 + 1/4` stores 3 over
+			// 4 and the fold has to as well: the folded value is the very one
+			// the unfolded Program makes.
 			let generated = generate(constantFolding)
 
-			expect(generated).toContain("Rational.createRational(6n, 8n)")
-			expect(generated).toContain("Rational.createRational(2n, 8n)")
-			expect(generated).toContain("Rational.createRational(2n, 6n)")
-			// NOTE: `absolute` on a value that is not negative answers the
-			// Rational ITSELF, so `4/2` stays four over two.
+			expect(generated).toContain("Rational.createRational(3n, 4n)")
+			expect(generated).toContain("Rational.createRational(1n, 4n)")
+			expect(generated).toContain("Rational.createRational(1n, 3n)")
+			// NOTE: CONSTRUCTION is the other half, and it is untouched: a
+			// Rational holds the parts it was BUILT with, and `absolute` on a
+			// value that is not negative answers the Rational ITSELF — so `4/2`
+			// stays four over two.
 			expect(generated).toContain("Rational.createRational(4n, 2n)")
 			expect(generated).toContain("Rational.createRational(-1n, 2n)")
 			// NOTE: The Rational-beside-Rational entries, which are the ones
 			// folded. The entry taking an Integer is still emitted — the mixed
 			// sum at the end of the Program reaches it, and is left alone.
-			expect(generated).not.toContain("$es_Rational_add__overload$1")
-			expect(generated).not.toContain("$es_Rational_multiply")
+			expect(generated).not.toContain("Rational.add__overload$1")
+			expect(generated).not.toContain("Rational.multiply__overload$1")
 		})
 
 		it("renders an interpolation hole whose value is written out", () => {
@@ -3918,7 +3921,7 @@ describe("Optimiser", () => {
 			})
 
 			expect(generated).toContain("Integer.createInteger(60n)")
-			expect(generated).toContain("$es_Rational_add__overload$1(")
+			expect(generated).toContain("Rational.add__overload$1(")
 			expect(generated).toContain("String.append(")
 			expect(generated).not.toContain("Integer.createInteger(86400n)")
 		})
