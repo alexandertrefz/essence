@@ -2478,23 +2478,118 @@ function rawArithmetic(
 			heldAsNumber(rightValue),
 			...withinSafeRange(answer),
 		]),
-		consequent: {
-			type: "ObjectExpression",
-			properties: [
-				typeKeyProperty("Integer"),
-				{
-					type: "Property",
-					key: { type: "Identifier", name: "value" },
-					value: answer,
-					kind: "init",
-					computed: false,
-					method: false,
-					shorthand: false,
-				},
-			],
-		},
+		consequent: boxedInteger(answer),
 		alternate: escaped,
 	}
+}
+
+// NOTE: An Integer around a value, written as the object the runtime's own
+// constructor would have built. Reached only where the value is already
+// canonical — the guard above IS what establishes that — so nothing here
+// converts, and `Integer.createInteger` is what a value nothing is known about
+// goes through instead.
+function boxedInteger(value: estree.Expression): estree.ObjectExpression {
+	return {
+		type: "ObjectExpression",
+		properties: [
+			typeKeyProperty("Integer"),
+			{
+				type: "Property",
+				key: { type: "Identifier", name: "value" },
+				value,
+				kind: "init",
+				computed: false,
+				method: false,
+				shorthand: false,
+			},
+		],
+	}
+}
+
+// NOTE: The Integer a walk builds where it ANSWERS, remembered by identity so
+// that a walk nested in another does not build one only for the enclosing walk
+// to take it apart on the same line. Its argument is a value the raw slot's own
+// invariant has already made canonical, which is what makes taking it apart the
+// identity.
+//
+// NOTE: By IDENTITY and not by shape, which is the whole reason this exists.
+// `Integer.createInteger` is also how a counted walk boxes its index, and that
+// index is a bigint spelling of a value a double holds exactly wherever the
+// bounds straddle safe range — a call recognised by its shape would strip the
+// canonicalisation that site is there to perform.
+const exitBoxes = new WeakMap<estree.Expression, estree.Expression>()
+
+function exitBox(value: estree.Expression): estree.Expression {
+	let box = createdInteger(value)
+
+	exitBoxes.set(box, value)
+
+	return box
+}
+
+// NOTE: One Integer-valued Expression, read as the VALUE it holds. Written as a
+// rewrite of the finished JavaScript rather than as a second emission mode,
+// because what decides whether a slot is unboxed at all is a question about the
+// emitted body — see `heldRaw` — and the answer is not known until that body
+// exists. The text is the text either way.
+//
+// NOTE: A guarded arithmetic is read through both of its arms: the box the
+// guarded arm would have built is never written, and the escaped arm reads the
+// value off the Integer the runtime built. Both arms are values of one Integer,
+// so reading both is the same rewrite twice. Anything else — a name, a call, a
+// member — is read through as it stands.
+function unboxedInteger(value: estree.Expression): estree.Expression {
+	let held = exitBoxes.get(value)
+
+	if (held !== undefined) {
+		return held
+	}
+
+	if (value.type === "ConditionalExpression") {
+		let guarded = boxedValue(value.consequent)
+
+		if (guarded !== null) {
+			return {
+				type: "ConditionalExpression",
+				test: value.test,
+				consequent: guarded,
+				alternate: valueRead(value.alternate),
+			}
+		}
+	}
+
+	return valueRead(value)
+}
+
+// NOTE: The value an emitted Integer LITERAL holds, and null for everything
+// else. `boxedInteger` above is the one site that writes this shape, and the
+// test is what it wrote: the hidden Type key answering `"Integer"` and one
+// member named `value`. It can not answer yes for anything that is not an
+// Integer — nothing else in the language carries that Type key — so a caller
+// reading BOTH arms of a Conditional through it reads two Integers.
+function boxedValue(node: estree.Expression): estree.Expression | null {
+	if (node.type !== "ObjectExpression" || node.properties.length !== 2) {
+		return null
+	}
+
+	let [tag, held] = node.properties
+
+	if (
+		tag?.type !== "Property" ||
+		tag.value.type !== "Literal" ||
+		tag.value.value !== "Integer" ||
+		held?.type !== "Property" ||
+		held.computed ||
+		held.key.type !== "Identifier" ||
+		held.key.name !== "value"
+	) {
+		return null
+	}
+
+	// NOTE: A Property's value is an Expression or a Pattern, and only a
+	// destructuring writes the latter — this one was written by `boxedInteger`,
+	// three lines up, out of an Expression.
+	return held.value as estree.Expression
 }
 
 // NOTE: The runtime entry each operator escapes to. Each takes the two raw
@@ -4583,6 +4678,12 @@ function conditionWalk(
 	driver: Extract<common.typedSimple.InlineLoopDriver, { kind: "condition" }>,
 ): InlinedWalk {
 	let state = `${prefix}_state`
+	// NOTE: ONE State and two bodies — the predicate is handed it as well — so
+	// both are asked and the swap is taken for both or for neither.
+	let carried = carriedInteger(state, null, 0, [
+		driver.predicate,
+		driver.step,
+	])
 	// NOTE: What the call was given is written out before the bodies are, so
 	// that everything the emission collects on the way — a pooled constant above
 	// all — is collected in the order the Program says it.
@@ -4608,24 +4709,29 @@ function conditionWalk(
 				...breakOut(redirect),
 			],
 		},
+		null,
+		carried,
 	)
 	let step = inlinedCallback(
 		driver.step,
 		[loopIdentifier(state)],
 		`${prefix}_body`,
 		{ kind: "temporary", name: state },
+		null,
+		carried,
 	)
+	let statements: Array<estree.Statement> = [
+		seed,
+		labelled(prefix, {
+			type: "WhileStatement",
+			test: { type: "Literal", value: true },
+			body: loopBlock([check, step]),
+		}),
+	]
 
 	return {
-		statements: [
-			seed,
-			labelled(prefix, {
-				type: "WhileStatement",
-				test: { type: "Literal", value: true },
-				body: loopBlock([check, step]),
-			}),
-		],
-		answer: loopIdentifier(state),
+		statements,
+		answer: carriedAnswer(state, heldRaw(carried, statements)),
 	}
 }
 
@@ -4668,6 +4774,11 @@ function countedWalk(
 	// asks — the kind test, the two-kind step, the converting start, the per-turn
 	// view — is written at all.
 	let mayEscape = !(safeBound(driver.from) && safeBound(driver.through))
+	// NOTE: The State is the SECOND Argument here — the counter is the first —
+	// and the two elisions are independent: a body that counts into a Record
+	// still reads its counter raw, and one that hands its counter on still
+	// carries an Integer State raw.
+	let carried = carriedInteger(state, null, 1, [driver.step])
 	// NOTE: The bounds and the seed, in the order the call passed them and
 	// before the body is written, so that what the emission collects on the way
 	// is collected in the order the Program says it.
@@ -4696,100 +4807,103 @@ function countedWalk(
 		mayEscape
 			? { read: held, binding: [canonicalCounter(held, index, escaped)] }
 			: { read: index, binding: [] },
+		carried,
 	)
 
-	return {
-		statements: [
-			...bounds,
-			loopDeclaration("const", ascending, {
-				type: "BinaryExpression",
-				operator: "<=",
-				left: loopIdentifier(from),
-				right: loopIdentifier(to),
-			}),
-			// NOTE: Either bound being a bigint is what sends the counter to
-			// bigint, and by the canonical invariant that is the same question
-			// as either bound being outside safe range.
-			...(mayEscape
-				? [
-						loopDeclaration("const", escaped, {
-							type: "LogicalExpression",
-							operator: "||",
-							left: heldAsBigInt(loopIdentifier(from)),
-							right: heldAsBigInt(loopIdentifier(to)),
-						}),
-					]
-				: []),
-			loopDeclaration(
-				"const",
-				delta,
+	let statements: Array<estree.Statement> = [
+		...bounds,
+		loopDeclaration("const", ascending, {
+			type: "BinaryExpression",
+			operator: "<=",
+			left: loopIdentifier(from),
+			right: loopIdentifier(to),
+		}),
+		// NOTE: Either bound being a bigint is what sends the counter to
+		// bigint, and by the canonical invariant that is the same question
+		// as either bound being outside safe range.
+		...(mayEscape
+			? [
+					loopDeclaration("const", escaped, {
+						type: "LogicalExpression",
+						operator: "||",
+						left: heldAsBigInt(loopIdentifier(from)),
+						right: heldAsBigInt(loopIdentifier(to)),
+					}),
+				]
+			: []),
+		loopDeclaration(
+			"const",
+			delta,
+			mayEscape
+				? {
+						type: "ConditionalExpression",
+						test: loopIdentifier(escaped),
+						consequent: {
+							type: "ConditionalExpression",
+							test: loopIdentifier(ascending),
+							consequent: countLiteral(1n),
+							alternate: countLiteral(-1n),
+						},
+						alternate: steppedBy(ascending),
+					}
+				: steppedBy(ascending),
+		),
+		{
+			type: "ForStatement",
+			// NOTE: The start has to match the step's kind — a number
+			// counter stepped by a bigint throws — so a bigint walk whose
+			// lower bound happens to be a number converts it once here.
+			init: loopDeclaration(
+				"let",
+				index,
 				mayEscape
 					? {
 							type: "ConditionalExpression",
 							test: loopIdentifier(escaped),
 							consequent: {
-								type: "ConditionalExpression",
-								test: loopIdentifier(ascending),
-								consequent: countLiteral(1n),
-								alternate: countLiteral(-1n),
+								type: "CallExpression",
+								optional: false,
+								callee: loopIdentifier("BigInt"),
+								arguments: [loopIdentifier(from)],
 							},
-							alternate: steppedBy(ascending),
+							alternate: loopIdentifier(from),
 						}
-					: steppedBy(ascending),
+					: loopIdentifier(from),
 			),
-			{
-				type: "ForStatement",
-				// NOTE: The start has to match the step's kind — a number
-				// counter stepped by a bigint throws — so a bigint walk whose
-				// lower bound happens to be a number converts it once here.
-				init: loopDeclaration(
-					"let",
-					index,
-					mayEscape
-						? {
-								type: "ConditionalExpression",
-								test: loopIdentifier(escaped),
-								consequent: {
-									type: "CallExpression",
-									optional: false,
-									callee: loopIdentifier("BigInt"),
-									arguments: [loopIdentifier(from)],
-								},
-								alternate: loopIdentifier(from),
-							}
-						: loopIdentifier(from),
-				),
-				// NOTE: Counting up runs while the index has not passed the end
-				// from below and counting down while it has not passed it from
-				// above — the two predicates the Essence body writes, asked of
-				// the counter rather than through a closure and an Ordering.
-				// The comparison is exact whichever kind each side is holding.
-				test: {
-					type: "ConditionalExpression",
-					test: loopIdentifier(ascending),
-					consequent: {
-						type: "BinaryExpression",
-						operator: "<=",
-						left: loopIdentifier(index),
-						right: loopIdentifier(to),
-					},
-					alternate: {
-						type: "BinaryExpression",
-						operator: ">=",
-						left: loopIdentifier(index),
-						right: loopIdentifier(to),
-					},
-				},
-				update: {
-					type: "AssignmentExpression",
-					operator: "+=",
+			// NOTE: Counting up runs while the index has not passed the end
+			// from below and counting down while it has not passed it from
+			// above — the two predicates the Essence body writes, asked of
+			// the counter rather than through a closure and an Ordering.
+			// The comparison is exact whichever kind each side is holding.
+			test: {
+				type: "ConditionalExpression",
+				test: loopIdentifier(ascending),
+				consequent: {
+					type: "BinaryExpression",
+					operator: "<=",
 					left: loopIdentifier(index),
-					right: loopIdentifier(delta),
+					right: loopIdentifier(to),
 				},
-				body: loopBlock([body]),
+				alternate: {
+					type: "BinaryExpression",
+					operator: ">=",
+					left: loopIdentifier(index),
+					right: loopIdentifier(to),
+				},
 			},
-		],
-		answer: loopIdentifier(state),
+			update: {
+				type: "AssignmentExpression",
+				operator: "+=",
+				left: loopIdentifier(index),
+				right: loopIdentifier(delta),
+			},
+			body: loopBlock([body]),
+		},
+	]
+
+	return {
+		statements,
+		answer: carriedAnswer(state, heldRaw(carried, statements)),
 	}
 }
 
@@ -4804,6 +4918,7 @@ function generalWalk(
 	let state = `${prefix}_state`
 	let answer = `${prefix}_answer`
 	let stops = false
+	let carried = carriedInteger(state, answer, 0, [driver.step])
 	let seed = loopDeclaration("let", state, rewriteExpression(driver.seed))
 	let body = inlinedCallback(
 		driver.step,
@@ -4812,22 +4927,34 @@ function generalWalk(
 		steppedTarget(prefix, state, answer, () => {
 			stops = true
 		}),
+		null,
+		carried,
 	)
 	let walk: estree.Statement = {
 		type: "WhileStatement",
 		test: { type: "Literal", value: true },
 		body: loopBlock([body]),
 	}
+	let statements: Array<estree.Statement> = [
+		seed,
+		loopDeclaration("let", answer, null),
+		// NOTE: The label is emitted only where something leaves through it.
+		// A body that never answers `#Done` is a walk that never ends, which
+		// is exactly what the driver does with one.
+		stops ? labelled(prefix, walk) : walk,
+	]
+
+	// NOTE: Nothing to box at the exit: this walk answers with what a `#Done`
+	// carried, never with the State. A `#Done` handed the State ITSELF writes it
+	// into the answer slot, and the swap boxes that one write where it stands,
+	// which is why the answer this returns is the slot and never the State. What
+	// the State is written with — a `#Continue`'s value, or the `state` member of
+	// a `Step` the Compiler could not see being built — is unboxed like any other
+	// write.
+	heldRaw(carried, statements)
 
 	return {
-		statements: [
-			seed,
-			loopDeclaration("let", answer, null),
-			// NOTE: The label is emitted only where something leaves through it.
-			// A body that never answers `#Done` is a walk that never ends, which
-			// is exactly what the driver does with one.
-			stops ? labelled(prefix, walk) : walk,
-		],
+		statements,
 		answer: loopIdentifier(answer),
 	}
 }
@@ -4847,6 +4974,9 @@ function foldWalk(
 	let state = `${prefix}_state`
 	let answer = `${prefix}_answer`
 	let stops = false
+	let carried = carriedInteger(state, driver.stepped ? answer : null, 0, [
+		driver.step,
+	])
 	let target: RedirectTarget = driver.stepped
 		? steppedTarget(prefix, state, answer, () => {
 				stops = true
@@ -4868,17 +4998,25 @@ function foldWalk(
 		[loopIdentifier(state), itemAt(items, position)],
 		`${prefix}_body`,
 		target,
+		null,
+		carried,
 	)
 	let walk = itemsWalk(count, position, [body])
 
 	if (!driver.stepped) {
+		let statements = [...held, walk]
+
 		return {
-			statements: [...held, walk],
-			answer: loopIdentifier(state),
+			statements,
+			answer: carriedAnswer(state, heldRaw(carried, statements)),
 		}
 	}
 
-	let tail = [walk, loopAssignment(answer, loopIdentifier(state))]
+	// NOTE: Asked of the seed and the walk, which is everywhere the State is
+	// WRITTEN — the tail below only reads it, and how it reads it is what the
+	// answer decides.
+	let raw = heldRaw(carried, [...held, walk])
+	let tail = [walk, loopAssignment(answer, carriedAnswer(state, raw))]
 
 	return {
 		statements: [
@@ -5152,6 +5290,7 @@ function inlinedCallback(
 	label: string,
 	result: RedirectTarget,
 	unboxable: UnboxedArgument | null = null,
+	carried: CarriedState | null = null,
 ): estree.Statement {
 	let broke = false
 	let body = withNamespaceScope(() => [
@@ -5180,6 +5319,25 @@ function inlinedCallback(
 		}),
 	])
 	let first = callback.parameters[0]
+	// NOTE: Taken ONCE, before the swap below reshapes `body` — both questions
+	// are about the Statements the callback's own body emitted, and the Array
+	// holds the very Statements either swap rewrites in place.
+	let statements = body.slice(callback.parameters.length)
+
+	// NOTE: The State, handed to the walk that threads it rather than swapped
+	// here: a `while` driver hands one State to TWO bodies, and it is held raw
+	// for both of them or for neither. What this body contributes is the name it
+	// reads the State under and the Statements the fence is asked of.
+	if (carried !== null) {
+		let held = callback.parameters[carried.parameter]
+
+		if (held !== undefined) {
+			carried.bodies.push({
+				parameter: rewriteIdentifier(held).name,
+				statements,
+			})
+		}
+	}
 
 	// NOTE: The Integer the first Argument boxes, NEVER BUILT where the body
 	// only ever reads what it holds — which is what a counting body does, since
@@ -5198,7 +5356,6 @@ function inlinedCallback(
 	// exactly what capturing the Integer gave it.
 	if (unboxable !== null && first !== undefined) {
 		let name = rewriteIdentifier(first).name
-		let statements = body.slice(callback.parameters.length)
 
 		if (!mentionsBeyondValue(statements, name)) {
 			replaceValueReads(statements, name, unboxable.read)
@@ -5213,12 +5370,218 @@ function inlinedCallback(
 	return broke ? labelled(label, loopBlock(body)) : loopBlock(body)
 }
 
+// NOTE: A walk's loop-carried State, held as the number or bigint its Integer
+// boxes rather than as the Integer. The Integer is the walk's own — nobody
+// outside it can hold one — so a walk whose bodies only ever read what it holds
+// can carry the value itself and build the Integer once, where the walk answers.
+// It is one allocation a TURN against one a walk, and on the two-million turn
+// sum the walk's cost falls by roughly half again on top of the counter's.
+//
+// NOTE: It pays only together with the other half — a body whose arithmetic
+// still answers a boxed Integer that the slot then reads back through `.value`
+// is SLOWER than leaving the State alone, measured 23.65 ms against 22.06 on
+// that sum. So `unboxedInteger` reads the guarded arithmetic through both arms
+// and the box is never written at all.
+//
+// NOTE: `bodies` is what the fence is asked of: one entry per callback the State
+// is handed to, holding the name that callback reads it under and the Statements
+// it emitted. `answer` is the slot a `Step`-answering walk settles on, and null
+// for a walk that answers with the State itself — it is the second place the
+// State may be written WHOLE, and the place that write is boxed.
+type CarriedState = {
+	name: string
+	answer: string | null
+	parameter: number
+	bodies: Array<{ parameter: string; statements: Array<estree.Statement> }>
+}
+
+// NOTE: The State of a walk that may be held raw, and null for one that may not.
+// The Type has to be EXACTLY Integer in every body — not a Union it is a member
+// of, not a Type Parameter that could be one — because the whole swap is that the
+// slot holds what an Integer holds, and only an Integer is known to hold that. It
+// is the same exactness `lower-scalar-operations` rests on, and it is what leaves
+// a Record, a String or a Rational State untouched.
+//
+// NOTE: A Refinement over Integer IS carried, and there is nothing here that
+// says so because there is nothing here that could see one: `eraseRefinements`
+// runs at the head of every pipeline, before any pass, so a `NonZeroInteger`
+// State reaches this as the Integer it is. That is right — a refinement is a
+// promise the Validator kept, not a second representation.
+function carriedInteger(
+	name: string,
+	answer: string | null,
+	parameter: number,
+	callbacks: Array<common.typedSimple.InlineLoopCallback>,
+): CarriedState | null {
+	return callbacks.every(
+		(callback) => callback.parameters[parameter]?.type.type === "Integer",
+	)
+		? { name, answer, parameter, bodies: [] }
+		: null
+}
+
+// NOTE: The swap, asked and taken in one — it answers whether the State is held
+// raw, which is what decides how the walk answers with it.
+//
+// NOTE: The fence is `mentionsBeyondValue`, asked of every body: a body that
+// hands the State on, stores it, matches it, asks any Method of it, shadows the
+// name or reads a member of that name off something else keeps the box, and so
+// does every OTHER body of the same walk, because one State can not be two
+// things at once. Two mentions past `.value` are admitted, both of them the State
+// written WHOLE into a slot the walk owns and neither of them a value that
+// escapes: `<- carried`, which is what an arm that changes nothing writes, and
+// `<- #Done(carried)`, which is how a `Step`-answering body ordinarily finishes.
+// The first stands in a write that is unboxed with every other; the second stands
+// in a write that is BOXED, once, where the walk is leaving anyway.
+//
+// NOTE: What is rewritten is every WRITE of the State: the `let` its seed
+// declares and every assignment to it. They are found by NAME rather than
+// recorded as they are emitted, because the name is the Compiler's own and holds
+// a `_`, so no Essence Program can write it — and `mentionsBeyondWrites` is what
+// makes finding them by name enough. It refuses unless every mention of the slot
+// is one this understands, so a write `unboxWrites` would walk past can not be
+// there when it runs: the two halves fail closed together rather than the fence
+// refusing and the rewriter shrugging.
+//
+// NOTE: And the reads are redirected LAST, so that a write unboxed into
+// `<parameter>.value` is redirected along with the reads the body already had.
+function heldRaw(
+	state: CarriedState | null,
+	statements: Array<estree.Statement>,
+): boolean {
+	if (state === null) {
+		return false
+	}
+
+	let slots =
+		state.answer === null ? [state.name] : [state.name, state.answer]
+
+	for (let body of state.bodies) {
+		if (mentionsBeyondValue(body.statements, body.parameter, slots)) {
+			return false
+		}
+	}
+
+	if (
+		mentionsBeyondWrites(
+			statements,
+			state.name,
+			state.bodies.map((body) => body.parameter),
+		)
+	) {
+		return false
+	}
+
+	unboxWrites(statements, state.name)
+
+	for (let body of state.bodies) {
+		if (state.answer !== null) {
+			boxedAnswers(body.statements, state.answer, body.parameter)
+		}
+
+		replaceValueReads(body.statements, body.parameter, body.parameter)
+	}
+
+	return true
+}
+
+// NOTE: How a walk answers with its State: the Integer built once where the walk
+// is over, or the State itself where it was one all along. `createInteger` and
+// not the literal `boxedInteger` writes, even though every value the raw slot can
+// hold is canonical by the invariant below — it is one call at the END of a walk
+// rather than one a turn, and an exit that canonicalises does not have to be read
+// together with everything that writes the slot to be believed.
+//
+// NOTE: The invariant the slot holds to is the Integer's own: a value in safe
+// range is a number and a value outside it is a bigint. The seed enters as the
+// value of an Integer, which is canonical; a guarded arithmetic answers a number
+// it has just range-checked; an escaped one answers the value of an Integer the
+// runtime built. There is no fourth way into the slot.
+function carriedAnswer(state: string, raw: boolean): estree.Expression {
+	return raw ? exitBox(loopIdentifier(state)) : loopIdentifier(state)
+}
+
+// NOTE: Every write of a name, read as the value the Integer it was given holds.
+// Two shapes are written and no others: the `let` a seed is declared as, and the
+// plain assignments a walk threads the State with. Anything else standing under
+// that name is left alone — there is nothing else today, and a shape this does
+// not understand is one it must not rewrite.
+function unboxWrites(root: unknown, name: string): void {
+	function visit(node: unknown): void {
+		if (node === null || typeof node !== "object") {
+			return
+		}
+
+		let record = node as Record<string, unknown>
+		let written = writtenValue(record, name)
+
+		if (written !== null) {
+			record[written] = unboxedInteger(
+				record[written] as estree.Expression,
+			)
+		}
+
+		for (let value of Object.values(record)) {
+			visit(value)
+		}
+	}
+
+	visit(root)
+}
+
+// NOTE: Which key of a Node holds the value written to a name — `init` of the
+// declarator that binds it, `right` of the plain assignment that sets it — and
+// null for a Node that writes it some other way or not at all. A compound
+// assignment answers null and is therefore never unboxed: the walk emits none,
+// and one that appeared would mean something reads the slot this does not know
+// about.
+function writtenValue(
+	record: Record<string, unknown>,
+	name: string,
+): "init" | "right" | null {
+	let type = record["type"]
+
+	if (type === "VariableDeclarator") {
+		return isNamed(record["id"], name) && record["init"] !== null
+			? "init"
+			: null
+	}
+
+	return type === "AssignmentExpression" &&
+		record["operator"] === "=" &&
+		isNamed(record["left"], name)
+		? "right"
+		: null
+}
+
+function isNamed(node: unknown, name: string): boolean {
+	if (node === null || typeof node !== "object") {
+		return false
+	}
+
+	let record = node as Record<string, unknown>
+
+	return record["type"] === "Identifier" && record["name"] === name
+}
+
 // NOTE: Whether a name is mentioned anywhere in the emitted body OTHER than as
 // `<name>.value`. Every position is read — a property key and a member name
 // included, which no reference can be — so the answer is conservative in the one
 // direction that matters: a name this says nothing about is a name nothing may
 // be assumed of.
-function mentionsBeyondValue(root: unknown, name: string): boolean {
+//
+// NOTE: `slots` widens that by exactly one position per slot, and only for a
+// State: the name written WHOLE into a slot the walk owns. `<- carried` answers
+// the State unchanged and `<- #Done(carried)` finishes with it, and the writes
+// those two stand in are the two the caller rewrites — so each mention becomes a
+// value the slot wanted anyway. Nothing else about either write is admitted:
+// `<- carried::negate()` puts a call in that position and is a mention like any
+// other.
+function mentionsBeyondValue(
+	root: unknown,
+	name: string,
+	slots: ReadonlyArray<string> = [],
+): boolean {
 	let found = false
 
 	function visit(node: unknown): void {
@@ -5231,6 +5594,13 @@ function mentionsBeyondValue(root: unknown, name: string): boolean {
 		}
 
 		let record = node as Record<string, unknown>
+
+		if (
+			isNamed(record["right"], name) &&
+			slots.some((slot) => writtenValue(record, slot) === "right")
+		) {
+			return
+		}
 
 		if (record["type"] === "Identifier" && record["name"] === name) {
 			found = true
@@ -5248,11 +5618,105 @@ function mentionsBeyondValue(root: unknown, name: string): boolean {
 	return found
 }
 
+// NOTE: Whether the SLOT is mentioned anywhere the swap does not understand.
+// `mentionsBeyondValue` asks this of the Parameter a body reads the State under;
+// this asks it of the name the State is threaded through, and it is what holds
+// `unboxWrites` to the same standard the fence holds a body to. Three positions
+// are understood and no others: the two `writtenValue` rewrites — the `let` a
+// seed declares and the plain assignment an answer is written as — and the
+// `const` a turn binds a body's Parameter through, which is the one read of the
+// slot the swap is FOR.
+//
+// NOTE: It is what makes recognising the two admitted writes by their shape
+// enough. Every assignment to the slot is one this admitted and one
+// `unboxWrites` rewrites, so an assignment standing somewhere the walk did not
+// put it — inside a Function a later pass emitted, say — refuses the swap
+// instead of being read at a time nobody checked.
+function mentionsBeyondWrites(
+	root: unknown,
+	name: string,
+	parameters: ReadonlyArray<string>,
+): boolean {
+	let found = false
+
+	function visit(node: unknown): void {
+		if (found || node === null || typeof node !== "object") {
+			return
+		}
+
+		let record = node as Record<string, unknown>
+		let written = writtenValue(record, name)
+
+		if (written !== null) {
+			visit(record[written])
+
+			return
+		}
+
+		if (
+			record["type"] === "VariableDeclarator" &&
+			isNamed(record["init"], name) &&
+			parameters.some((parameter) => isNamed(record["id"], parameter))
+		) {
+			return
+		}
+
+		if (record["type"] === "Identifier" && record["name"] === name) {
+			found = true
+
+			return
+		}
+
+		for (let value of Object.values(record)) {
+			visit(value)
+		}
+	}
+
+	visit(root)
+
+	return found
+}
+
+// NOTE: The State written straight into the slot a walk ANSWERS with —
+// `<- #Done(carried)`, which is how a `Step`-answering body ordinarily finishes
+// — boxed where it is written. That slot holds Integers, because every other
+// `#Done` writes one into it, and this is the one write that would otherwise put
+// a value there. It is one Integer per WALK and not per turn: a `#Done` is what
+// leaves the walk.
+function boxedAnswers(root: unknown, answer: string, name: string): void {
+	function visit(node: unknown): void {
+		if (node === null || typeof node !== "object") {
+			return
+		}
+
+		let record = node as Record<string, unknown>
+
+		if (
+			writtenValue(record, answer) === "right" &&
+			isNamed(record["right"], name)
+		) {
+			record["right"] = createdInteger(
+				record["right"] as estree.Expression,
+			)
+
+			return
+		}
+
+		for (let value of Object.values(record)) {
+			visit(value)
+		}
+	}
+
+	visit(root)
+}
+
 // NOTE: The other half, run only once the question above has been answered:
-// every `<name>.value` becomes the raw counter, in place. Written as a walk over
-// the PARENT so the read can be replaced where it sits, since a node can not
-// turn itself into another kind.
-function replaceValueReads(root: unknown, name: string, counter: string): void {
+// every `<name>.value` becomes a read of the name holding that value, in place —
+// the counter itself for a counted walk's index, and the Parameter itself for a
+// State, which is bound to the raw slot and reads it. Written as a walk over the
+// PARENT so the read can be replaced where it sits, since a node can not turn
+// itself into another kind.
+function replaceValueReads(root: unknown, name: string, held: string): void {
 	function visit(node: unknown): void {
 		if (node === null || typeof node !== "object") {
 			return
@@ -5262,7 +5726,7 @@ function replaceValueReads(root: unknown, name: string, counter: string): void {
 
 		for (let [key, value] of Object.entries(record)) {
 			if (isValueRead(value, name)) {
-				record[key] = loopIdentifier(counter)
+				record[key] = loopIdentifier(held)
 			} else {
 				visit(value)
 			}

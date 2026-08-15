@@ -3560,7 +3560,7 @@ describe("Optimiser", () => {
 				"Integer.createInteger($loop_0_index)",
 			)
 			expect(generated).not.toContain("$loop_0_held")
-			expect(generated).toContain("total.value + $loop_0_index")
+			expect(generated).toContain("total + $loop_0_index")
 		})
 
 		it("keeps the counter's Integer where the body needs one", () => {
@@ -3588,6 +3588,104 @@ describe("Optimiser", () => {
 			).toEqual(["55", "6", "2"])
 		})
 
+		it("carries the State as the value its Integer boxes", () => {
+			// NOTE: The other allocation a turn, and the one that pays: the
+			// State is the walk's OWN Integer — nobody outside the walk can hold
+			// one — so a walk whose bodies only read what it holds carries the
+			// value and builds the Integer once, where the walk answers. It only
+			// pays together with the arithmetic answering a raw value, which is
+			// why the guarded operation below writes no literal.
+			let generated = generate(countedLoop)
+
+			expect(generated).toContain("let $loop_0_state = $pool_2.value;")
+			expect(generated).toContain(
+				'$loop_0_state = typeof total === "number" && typeof $loop_0_index === "number" && total + $loop_0_index >= -9007199254740991 && total + $loop_0_index <= 9007199254740991 ? total + $loop_0_index : Integer.sum(total, $loop_0_index).value;',
+			)
+			expect(generated).toContain(
+				"sum = Integer.createInteger($loop_0_state);",
+			)
+			// NOTE: The Parameter's `const` STAYS. The slot is one binding for
+			// the whole walk and the Parameter is bound per turn, so a closure
+			// the body builds captures the turn it was built in — exactly as
+			// capturing the Integer gave it.
+			expect(generated).toContain("const total = $loop_0_state;")
+		})
+
+		it("keeps the State's Integer where a body needs one", () => {
+			// NOTE: The same refusal the counter's swap makes, asked of the
+			// State: a body that hands it on keeps the box, and so does one
+			// whose State is not exactly an Integer. The Record walk is the
+			// second — `state.total` is a member read off a Record, and there is
+			// no value under a Record to carry.
+			let generated = generate(`implementation {
+	§§ Doubles a value.
+	§§
+	§§ @param value — the value
+	§§ @returns — twice the value.
+	function twice(_ value: Integer) -> Integer {
+		<- value::add(value)
+	}
+
+	constant handed = loop(from 1, through 3, startingWith 1, step (
+		_index,
+		carried,
+	) { <- twice(carried) })
+
+	constant built = loop(from 1, through 3, startingWith { total = 0 }, step (
+		index,
+		state,
+	) { <- { state with total = state.total::add(index) } })
+
+	Terminal.inspect(handed)
+	Terminal.inspect(built)
+}`)
+
+			expect(generated).toContain("let $loop_0_state = $pool_0;")
+			expect(generated).toContain("$loop_0_state = twice(carried);")
+			expect(generated).not.toContain("Integer.createInteger($loop_0_")
+			expect(generated).not.toContain("Integer.createInteger($loop_1_")
+		})
+
+		it("carries a State alike with any pass turned off", async () => {
+			// NOTE: The emission is a decision the Rewriter makes about what
+			// reached it, so a pass that leaves a different shape leaves one it
+			// simply does not act on. `inline-loops` off is the whole shape
+			// gone, and `lower-scalar-operations` off is the arithmetic still a
+			// call — with either off there is nothing to carry, and the walk
+			// answers what it always did.
+			let source = `implementation {
+	constant crossed = loop(from 1, through 3, startingWith 9007199254740990, step (
+		index,
+		carried,
+	) { <- carried::add(index) })
+
+	constant folded = [1, 2, 3]::reduce(startingWith 9007199254740990, (
+		carried,
+		item,
+	) { <- carried::add(item) })
+
+	Terminal.inspect(crossed)
+	Terminal.inspect(folded)
+	Terminal.inspect(crossed::is(9007199254740996))
+}`
+
+			for (let pass of [
+				"inline-loops",
+				"lower-scalar-operations",
+				"fold-constants",
+				"pool-constants",
+				"eliminate-dead-code",
+				"compile-type-tests",
+				"lower-matches-to-statements",
+			]) {
+				expect(await expectSamePrintedOutput(pass, source)).toEqual([
+					"9007199254740996",
+					"9007199254740996",
+					"true",
+				])
+			}
+		})
+
 		it("checks a while predicate before each step", () => {
 			// NOTE: The predicate is asked first and the walk is left where it
 			// answers false, which is the order and the meaning
@@ -3596,7 +3694,7 @@ describe("Optimiser", () => {
 			let generated = generate(conditionLoops)
 
 			expect(generated).toContain(
-				"$loop_0:\n\t\twhile (true) {\n\t\t\t{\n\t\t\t\tconst n = $loop_0_state;\n\t\t\t\tif (!(n.value < $pool_1.value))\n\t\t\t\t\tbreak $loop_0;\n\t\t\t}",
+				"$loop_0:\n\t\twhile (true) {\n\t\t\t{\n\t\t\t\tconst n = $loop_0_state;\n\t\t\t\tif (!(n < $pool_1.value))\n\t\t\t\t\tbreak $loop_0;\n\t\t\t}",
 			)
 			expect(generated).not.toContain("loop__overload$1")
 		})
@@ -3609,7 +3707,7 @@ describe("Optimiser", () => {
 			let generated = generate(conditionLoops)
 
 			expect(generated).toContain(
-				"if (n.value >= $pool_1.value)\n\t\t\t\t\tbreak $loop_1;",
+				"if (n >= $pool_1.value)\n\t\t\t\t\tbreak $loop_1;",
 			)
 			expect(generated).not.toContain("loop__overload$2")
 			expect(generated).not.toContain("Boolean.negate(")
@@ -3680,13 +3778,17 @@ describe("Optimiser", () => {
 			// NOTE: The two ways `reduce`'s early-stopping entry can finish, and
 			// the labelled block is what tells them apart: a `#Done` leaves
 			// through it, and falling out of the walk takes the accumulator.
+			//
+			// NOTE: The accumulator is an Integer here and the walk carries it
+			// raw, so the tail is where its Integer is built —
+			// `unboxed-loop-state`, whose exit this is.
 			let generated = generate(listWalks)
 
 			expect(generated).toMatch(
 				/\$loop_\d+: \{\n\t\tfor \(let \$loop_\d+_position/,
 			)
 			expect(generated).toMatch(
-				/\t\t\$loop_(\d+)_answer = \$loop_\1_state;\n\t\}/,
+				/\t\t\$loop_(\d+)_answer = Integer\.createInteger\(\$loop_\1_state\);\n\t\}/,
 			)
 		})
 
@@ -3820,7 +3922,9 @@ describe("Optimiser", () => {
 			expect(generated).toContain(
 				"Terminal.inspect((() => {\n\tlet $loop_0_state",
 			)
-			expect(generated).toContain("\treturn $loop_0_state;\n})())")
+			expect(generated).toContain(
+				"\treturn Integer.createInteger($loop_0_state);\n})())",
+			)
 		})
 
 		it("numbers a loop inside a loop apart from the one holding it", () => {
