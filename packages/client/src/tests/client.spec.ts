@@ -243,6 +243,27 @@ describe("The Runtime Bridge", () => {
 		expect(tagOf(escaped.bridge, userConstant)).toBe("Integer")
 		expect(fieldOf(userConstant, "value")).toBe(12n)
 	})
+
+	// NOTE: The runtime's `createList` TAKES OWNERSHIP of the Array it is given
+	// — a List may push onto it in place rather than copy it — and a host's
+	// Array is not the host's to give away by calling a Function. The bridge
+	// therefore hands out `createListFrom`, which copies, and this is the test
+	// that says so: `grown` prepends and appends, and neither may reach the
+	// Array the host still holds.
+	it("copies the Array a host builds a List out of", async () => {
+		let marshal = await loadModule(clientFixture("Marshal.es"), {
+			cacheDirectory,
+		})
+		let hostItems = [marshal.bridge.string("a"), marshal.bridge.string("b")]
+		let grown = marshal.raw.grown as (value: EssenceValue) => EssenceValue
+
+		grown(marshal.bridge.list(hostItems))
+
+		expect(hostItems.map((item) => fieldOf(item, "value"))).toEqual([
+			"a",
+			"b",
+		])
+	})
 })
 
 describe("A Module that does not compile", () => {

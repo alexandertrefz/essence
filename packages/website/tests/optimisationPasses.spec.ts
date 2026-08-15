@@ -61,6 +61,7 @@ describe("Optimisation Passes", () => {
 			"reflexive-equality-fast-path",
 			"grapheme-caching",
 			"rational-reduction-caching",
+			"list-tail-sharing",
 		])
 	})
 

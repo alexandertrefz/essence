@@ -85,6 +85,19 @@ implementation {
 		<- value
 	}
 
+	§ Not identities, and deliberately so. A List added to at both ends holds its
+	§ items in two runs, and a List another List was built from holds fewer items
+	§ than the Array under it does — so what crosses the boundary here is a value
+	§ whose items are not simply what it is stored as, which is the one thing a
+	§ round trip of a freshly built List can never ask about.
+	function grown(_ value: List<String>) -> List<String> {
+		<- value::prepend("first")::append("last")
+	}
+
+	function branched(_ value: List<String>) -> List<List<String>> {
+		<- [value::append("z"), value::prepend("a"), value]
+	}
+
 	function areaOf(_ value: Shape) -> Integer {
 		<- match value -> Integer {
 			case #Circle({ radius })      { <- radius::multiply(with radius) }
@@ -118,11 +131,13 @@ export {
 	blank
 	box
 	boxes
+	branched
 	card
 	circle
 	config
 	flag
 	greeting
+	grown
 	integer
 	labelled
 	maybe

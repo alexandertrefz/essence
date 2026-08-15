@@ -24,20 +24,30 @@ import {
 	append__overload$2,
 	createList,
 	type ListType,
+	materialise,
 	positionFromEnd,
+	viewOf,
 } from "./List"
 import type { AnyType } from "./type"
 
+// NOTE: The logical first and last item, which is one comparison away from
+// either run's end rather than position zero of the backing Array — a List that
+// has been prepended to holds its first items in a second run, stored reversed,
+// and its last item is the back run's when there is one at all.
 export function firstItem<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 ): ItemType {
-	return originalList.value[0]
+	let view = viewOf(originalList)
+
+	return view.frontCount > 0 ? view.front[view.frontCount - 1] : view.back[0]
 }
 
 export function lastItem<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 ): ItemType {
-	return originalList.value[originalList.value.length - 1]
+	let view = viewOf(originalList)
+
+	return view.backCount > 0 ? view.back[view.backCount - 1] : view.front[0]
 }
 
 // NOTE: Everything below CARRIES the proof rather than spending it — each is a
@@ -63,19 +73,34 @@ export function removeDuplicates<ItemType extends AnyType>(
 		is: (first: ItemType, second: ItemType) => BooleanType
 	},
 ): ListType<ItemType> {
+	let view = viewOf(originalList)
 	let kept: Array<ItemType> = []
 
-	for (let item of originalList.value) {
-		let isDuplicate = kept.some(
-			(candidate) => conformance.is(candidate, item).value,
-		)
+	for (let index = view.frontCount - 1; index >= 0; index--) {
+		keepWhenNew(view.front[index], kept, conformance)
+	}
 
-		if (!isDuplicate) {
-			kept.push(item)
-		}
+	for (let index = 0; index < view.backCount; index++) {
+		keepWhenNew(view.back[index], kept, conformance)
 	}
 
 	return createList(kept)
+}
+
+function keepWhenNew<ItemType extends AnyType>(
+	item: ItemType,
+	kept: Array<ItemType>,
+	conformance: {
+		is: (first: ItemType, second: ItemType) => BooleanType
+	},
+): void {
+	let isDuplicate = kept.some(
+		(candidate) => conformance.is(candidate, item).value,
+	)
+
+	if (!isDuplicate) {
+		kept.push(item)
+	}
 }
 
 // NOTE: `append(contentsOf:)` is `List`'s own second Overload entry under a name
@@ -121,14 +146,15 @@ export function replace<ItemType extends AnyType>(
 	item: ItemType,
 	at: IntegerType,
 ): ListType<ItemType> {
-	let length = BigInt(originalList.value.length)
+	let items = materialise(originalList)
+	let length = BigInt(items.length)
 	let position = positionFromEnd(at.value, length)
 
 	if (position < 0n || position >= length) {
 		return originalList
 	}
 
-	let replaced = originalList.value.slice(0)
+	let replaced = items.slice(0)
 
 	replaced[Number(position)] = item
 

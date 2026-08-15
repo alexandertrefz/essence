@@ -24,7 +24,11 @@ import { type CdpCallFrame, type PresentedFrame, presentFrames } from "./frames"
 import { launchProgram } from "./launcher"
 import { BundleMap } from "./maps"
 import { escapeNameForEvaluation } from "./names"
-import { type DescribedValue, DESCRIBE_BATCH_SOURCE } from "./render"
+import {
+	type DescribedValue,
+	DESCRIBE_BATCH_SOURCE,
+	LIST_ITEMS_SOURCE,
+} from "./render"
 import { blackboxPositions } from "./stepping"
 import {
 	fallbackDisplay,
@@ -102,8 +106,8 @@ type PausedParameters = {
 }
 
 // NOTE: What a `variablesReference` stands for: a scope's bindings, an
-// object's own members, or a List — whose items live one hop away, inside its
-// inner array.
+// object's own members, or a List — whose items are the ones its view holds,
+// which the debuggee has to be asked for.
 type VariableContainer = {
 	kind: "scope" | "members" | "list"
 	objectId: string
@@ -700,30 +704,48 @@ export class EssenceDebugSession extends DebugSession {
 			return
 		}
 
-		let entries = await this.ownProperties(container.objectId)
+		let entries: Array<{ name: string; value: RemoteObject }>
 
 		if (container.kind === "scope") {
-			entries = entries.flatMap((entry) => {
-				let name = presentScopeVariableName(entry.name)
+			entries = (await this.ownProperties(container.objectId)).flatMap(
+				(entry) => {
+					let name = presentScopeVariableName(entry.name)
 
-				return name === null ? [] : [{ ...entry, name }]
-			})
+					return name === null ? [] : [{ ...entry, name }]
+				},
+			)
 		} else if (container.kind === "members") {
 			// NOTE: The tag rides on a symbol — reported by `getProperties`
 			// as a `Symbol($type)` row — and the display already spelled it.
-			entries = entries.filter(
+			entries = (await this.ownProperties(container.objectId)).filter(
 				(entry) => !entry.name.startsWith("Symbol("),
 			)
 		} else {
-			// NOTE: A List holds its items one hop down, in its inner array.
-			let inner = entries.find((entry) => entry.name === "value")
+			// NOTE: A List's items are NOT its inner array's. That array is
+			// shared with the other boxes of its chain and can run past what
+			// this box views, and a box that was prepended to holds a second,
+			// reversed run in front of it — so the debuggee is asked for the
+			// logical items, in order, as an array of its own, and those are
+			// what the row expands to. A List that will not answer expands to
+			// nothing rather than to items it does not have. The box's own
+			// properties are never read here: the inner array is the one thing
+			// they hold that must not be shown.
+			let items = await this.listItems(container.objectId)
 
-			entries =
-				inner?.value.objectId === undefined
-					? []
-					: (await this.ownProperties(inner.value.objectId)).filter(
-							(entry) => /^\d+$/.test(entry.name),
-						)
+			if (items === null) {
+				entries = []
+			} else {
+				entries = (await this.ownProperties(items)).filter((entry) =>
+					/^\d+$/.test(entry.name),
+				)
+
+				// NOTE: The array was built for this one expansion and the
+				// items are held by their own handles now, so the debuggee is
+				// told to let it go. Nothing else here leaves an object behind
+				// — every other call answers by value — and a session that
+				// steps through list-heavy code expands rows without end.
+				await this.releaseObject(items)
+			}
 		}
 
 		let described = await this.describeValues(container.objectId, entries)
@@ -786,6 +808,47 @@ export class EssenceDebugSession extends DebugSession {
 			)
 		} catch {
 			return []
+		}
+	}
+
+	// NOTE: The List, handed to itself as the call's argument, answers a fresh
+	// array of the items its view holds — kept over there, by reference, so
+	// that every item is still the live value the row below it expands.
+	private async listItems(objectId: string): Promise<string | null> {
+		let debuggee = this.debuggee
+
+		if (debuggee === null) {
+			return null
+		}
+
+		try {
+			let result = await debuggee.cdp.send<{ result: RemoteObject }>(
+				"Runtime.callFunctionOn",
+				{
+					objectId,
+					functionDeclaration: LIST_ITEMS_SOURCE,
+					arguments: [{ objectId }],
+				},
+			)
+
+			return result.result.objectId ?? null
+		} catch {
+			return null
+		}
+	}
+
+	private async releaseObject(objectId: string): Promise<void> {
+		let debuggee = this.debuggee
+
+		if (debuggee === null) {
+			return
+		}
+
+		try {
+			await debuggee.cdp.send("Runtime.releaseObject", { objectId })
+		} catch {
+			// NOTE: A handle the debuggee has already dropped, or a session
+			// closing under us. Either way there is nothing left to release.
 		}
 	}
 

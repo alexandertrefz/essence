@@ -1105,33 +1105,49 @@ describe("Rewriter", () => {
 			// mixed `overload` block that are still native keep their tests below.
 
 			describe("append", () => {
+				// NOTE: Asked through the runtime's own `is` rather than of the
+				// boxes themselves. A List answers its ITEMS; how it holds them
+				// is the runtime's business, and `append` may answer a List
+				// sharing the Array its receiver holds, under a view of its own
+				// — so two Lists of the same items are not the same object and
+				// never were required to be.
 				it("appends contents of a list to another list correctly", () => {
 					expect(
-						list.append__overload$2(
-							list.createList([]),
+						list.is(
+							list.append__overload$2(
+								list.createList([]),
+								list.createList([integerOne()]),
+							),
 							list.createList([integerOne()]),
+							{ is: integerIs },
 						),
-					).toEqual(list.createList([integerOne()]))
+					).toEqual(booleanTrue())
 
 					expect(
-						list.append__overload$2(
-							list.createList([integerOne()]),
-							list.createList([integerTwo()]),
-						),
-					).toEqual(list.createList([integerOne(), integerTwo()]))
-
-					expect(
-						list.append__overload$2(
+						list.is(
+							list.append__overload$2(
+								list.createList([integerOne()]),
+								list.createList([integerTwo()]),
+							),
 							list.createList([integerOne(), integerTwo()]),
-							list.createList([integerHundred()]),
+							{ is: integerIs },
 						),
-					).toEqual(
-						list.createList([
-							integerOne(),
-							integerTwo(),
-							integerHundred(),
-						]),
-					)
+					).toEqual(booleanTrue())
+
+					expect(
+						list.is(
+							list.append__overload$2(
+								list.createList([integerOne(), integerTwo()]),
+								list.createList([integerHundred()]),
+							),
+							list.createList([
+								integerOne(),
+								integerTwo(),
+								integerHundred(),
+							]),
+							{ is: integerIs },
+						),
+					).toEqual(booleanTrue())
 				})
 			})
 

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "bun:test"
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import * as path from "node:path"
 
@@ -231,6 +231,101 @@ describe("a debug session", () => {
 			client.continueRequest({ threadId: 1 }),
 			client.waitForEvent("terminated"),
 		])
+	}, 60_000)
+
+	// NOTE: The three faces a List box wears once its runs are shared, all
+	// bound at one pause: `start` still names a box whose inner Array `held`'s
+	// first append grew past it, `held` was then prepended to and holds its
+	// first item in a second run stored backwards, and `grown` views the whole
+	// of the Array all three share. Reading any of them off its raw Array
+	// would draw the wrong items — which is what the Variables view is here to
+	// never do.
+	it("shows a List by the items it views, however it holds them", async () => {
+		client = await startedClient()
+
+		// NOTE: Canonicalised for the reason `prepareBundle` canonicalises its
+		// scratch directory — on macOS the temporary directory is a symlink,
+		// and a breakpoint addressed to the symlinked spelling of a file the
+		// map names by its real one binds to nothing.
+		let directory = realpathSync(
+			mkdtempSync(path.join(tmpdir(), "essence-dap-spec-")),
+		)
+		let programPath = path.join(directory, "Shared.es")
+
+		writeFileSync(
+			programPath,
+			"implementation {\n" +
+				"\n" +
+				"\tfunction grow(_ start: List<Integer>) -> Integer {\n" +
+				"\t\tvariable held = start::append(1)\n" +
+				"\t\tvariable grown = held::append(2)\n" +
+				"\n" +
+				"\t\theld = held::prepend(0)\n" +
+				"\n" +
+				'\t\tTerminal.print("paused")\n' +
+				"\n" +
+				"\t\t<- grown::length()\n" +
+				"\t}\n" +
+				"\n" +
+				'\tTerminal.print("{grow([])}")\n' +
+				"}\n",
+		)
+
+		try {
+			let initialized = client.waitForEvent("initialized")
+			let launched = client.launch({ program: programPath } as never)
+
+			await initialized
+
+			// NOTE: Line 9 is `Terminal.print("paused")`, the first statement
+			// after all three bindings have taken their final values.
+			await client.setBreakpointsRequest({
+				source: { path: programPath },
+				breakpoints: [{ line: 9 }],
+			})
+
+			let stopped = client.waitForEvent("stopped")
+
+			await client.configurationDoneRequest()
+			await launched
+			await stopped
+
+			let stack = await client.stackTraceRequest({ threadId: 1 })
+			let scopes = await client.scopesRequest({
+				frameId: stack.body.stackFrames[0]!.id,
+			})
+			let local = scopes.body.scopes.find(
+				(scope) => scope.name === "Local",
+			)!
+			let variables = (
+				await client.variablesRequest({
+					variablesReference: local.variablesReference,
+				})
+			).body.variables
+			let shown = (name: string) =>
+				variables.find((variable) => variable.name === name)!
+
+			expect(shown("start").value).toBe("[]")
+			expect(shown("held").value).toBe("[ 0, 1 ]")
+			expect(shown("grown").value).toBe("[ 1, 2 ]")
+
+			// NOTE: And expanding the row answers those same items, one live
+			// value per row — not the positions of the Array underneath.
+			let items = (
+				await client.variablesRequest({
+					variablesReference: shown("held").variablesReference,
+				})
+			).body.variables
+
+			expect(items.map((item) => item.value)).toEqual(["0", "1"])
+
+			await Promise.all([
+				client.continueRequest({ threadId: 1 }),
+				client.waitForEvent("terminated"),
+			])
+		} finally {
+			rmSync(directory, { recursive: true, force: true })
+		}
 	}, 60_000)
 
 	// NOTE: Exercised through the `artifact` door with a hand-built bundle: a

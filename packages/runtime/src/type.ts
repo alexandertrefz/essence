@@ -189,10 +189,37 @@ export function isValueOfType(value: AnyType, type: common.Type): boolean {
 		// at the items it happens to hold. Every item has to fit, so the
 		// empty List fits any List matcher, the same way an empty literal is
 		// assignable to any List.
+		//
+		// NOTE: A List is two runs with a view into each — `List.ts` holds
+		// that shape and the reasoning behind it — so the items are the front
+		// run walked backwards and then the back run, with both counts fixed
+		// before the walk. Read here rather than through `List.viewOf`
+		// because this Module is the one EVERY Program carries, and reaching
+		// into the List Module for it would tie the two together in a cycle;
+		// a type test also has no business allocating a view or collapsing
+		// the box it is asked about.
 		if (type.type === "List" && type.itemType.type !== "Unknown") {
-			return (value as ListType<AnyType>).value.every((item) =>
-				isValueOfType(item, type.itemType),
-			)
+			let list = value as ListType<AnyType>
+			let front = list.front
+
+			if (front !== undefined) {
+				let frontCount = list.frontLen ?? front.length
+
+				for (let index = frontCount - 1; index >= 0; index--) {
+					if (!isValueOfType(front[index], type.itemType)) {
+						return false
+					}
+				}
+			}
+
+			let back = list.value
+			let backCount = list.length ?? back.length
+
+			for (let index = 0; index < backCount; index++) {
+				if (!isValueOfType(back[index], type.itemType)) {
+					return false
+				}
+			}
 		}
 
 		return true

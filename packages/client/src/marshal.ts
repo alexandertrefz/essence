@@ -98,6 +98,29 @@ export type MarshallerOptions = {
 	entryPath: string
 }
 
+// NOTE: A List box as the runtime lays one out, and the only place this package
+// knows that layout. `packages/runtime/src/List.ts` is the authority: a List is
+// TWO runs and a view into each — the back run stored forward in `value`, the
+// front run stored REVERSED in `front` — because the runs are SHARED between the
+// boxes of one chain, and what tells those boxes apart is how much of each run
+// each one says is its own. So `length` absent means the back view is the whole
+// Array, `front` absent means the box never prepended, and reading `value` on
+// its own answers neither the right items nor the right number of them.
+//
+// NOTE: Read, never written back. The runtime's own `materialise` combines the
+// two runs and leaves the result ON the box, because the natives will read that
+// box again; marshalling reads it once and hands JavaScript an Array of its own,
+// so there is nothing here worth caching and no reason for this side of the
+// boundary to write into a bundle's values at all. It also may not hand the
+// combined Array over — that Array is the box's, and a host that pushed onto it
+// would be editing a value the Module still holds.
+type ListBox = {
+	value: Array<unknown>
+	length?: number
+	front?: Array<unknown>
+	frontLen?: number
+}
+
 export function createMarshaller(
 	bridge: RuntimeBridge,
 	options: MarshallerOptions,
@@ -159,14 +182,8 @@ export function createMarshaller(
 				return (value as { value: string }).value
 			case "Boolean":
 				return (value as { value: boolean }).value
-			case "List": {
-				let itemType = listItemOf(expected)
-
-				return (value as { value: Array<unknown> }).value.map(
-					(item, position) =>
-						toJS(item, index(at, position), itemType),
-				)
-			}
+			case "List":
+				return itemsOf(value, at, listItemOf(expected))
 			case "Record":
 				return fieldsOf(value, at, recordMembersOf(expected))
 			// NOTE: An Optional is transparent — `Optional<T>` IS `T | undefined`
@@ -230,6 +247,42 @@ export function createMarshaller(
 		let tag = (value as Record<symbol, unknown>)[bridge.typeKey]
 
 		return tag === "Optional#Value" || tag === "Optional#Empty"
+	}
+
+	// NOTE: The items a List holds, in the order it holds them — the front run
+	// backwards, then the back run — each marshalled against the item Type its
+	// position declared, into an Array of this side's own.
+	//
+	// NOTE: The counts are fixed before the first item crosses, which is the rule
+	// the runtime's natives are written under as well: a run Array is shared, and
+	// nothing may read its `length` again once a walk has started. Nothing here
+	// can grow one — `toJS` only reads — but a walk that asked twice would still
+	// be a walk that could be made to disagree with itself, and the one idiom is
+	// worth more than the branch it saves.
+	function itemsOf(
+		value: object,
+		at: Path,
+		itemType: common.Type | null,
+	): Array<unknown> {
+		let list = value as ListBox
+		let back = list.value
+		let backCount = list.length ?? back.length
+		let front = list.front
+		let frontCount =
+			front === undefined ? 0 : (list.frontLen ?? front.length)
+		let total = frontCount + backCount
+		let items: Array<unknown> = []
+
+		for (let position = 0; position < total; position++) {
+			let item =
+				position < frontCount
+					? front![frontCount - 1 - position]
+					: back[position - frontCount]
+
+			items.push(toJS(item, index(at, position), itemType))
+		}
+
+		return items
 	}
 
 	function fieldsOf(
@@ -400,6 +453,12 @@ export function createMarshaller(
 					throw mismatch(value, expected, at)
 				}
 
+				// NOTE: `bridge.list` copies what it is handed, so the Array
+				// `map` builds here is copied once more before a List holds it.
+				// The alternative was to bridge the runtime's own
+				// `createList`, which takes ownership — and then this call
+				// would be safe while a host's identical-looking one, on an
+				// Array the host kept, would silently share a run with Essence.
 				return bridge.list(
 					value.map((item, position) =>
 						fromJS(item, expected.itemType, index(at, position)),
