@@ -119,7 +119,7 @@ declarations {
 			<- @::is(other)::negate()
 		}
 
-		§ The arithmetic here is written on the lowest-terms accessors and
+		§ The Integer entries here are written on the lowest-terms accessors and
 		§ `Rational.of`, so every result passes through the one gateway a
 		§ Rational may be built by — and none of it launders an Optional any
 		§ more. `denominator` answers with a NonZeroInteger, a product of two of
@@ -130,20 +130,24 @@ declarations {
 		§ entries lean on commutativity: the other operand's own Namespace
 		§ already declares the sum with a Rational.
 
+		§ NATIVE, the four same-kind entries. The Essence bodies were the
+		§ schoolbook cross-multiplication written out, and each of them read
+		§ `numerator()` and `denominator()` off both operands — four Integers
+		§ built to be unwrapped again — did four bigint operations through four
+		§ more boxes, and handed the parts to `Rational.of`, whose answer was
+		§ UNREDUCED and charged its next reader a greatest-common-divisor. The
+		§ runtime's bigint-rational core already does each of them as one
+		§ cross-multiplication and one reduction, on the parts themselves. The
+		§ answers are the same values: what changes is that a result now HOLDS
+		§ its lowest terms, which every accessor and every formatter already
+		§ answered with, and which equality — a cross-multiplication of the raw
+		§ parts — is indifferent to.
+
 		§§ Adds a number to this Rational, staying exact for every member of the numeric tower.
 		overload add {
-			(_ other: Rational) -> Rational {
-				§ The schoolbook cross-multiplication — both numerators scaled
-				§ onto the shared denominator, then added.
-				<- Rational.of(
-					@::numerator()
-						::multiply(with other::denominator())
-						::add(
-							other::numerator()::multiply(with @::denominator()),
-						),
-					over @::denominator()::multiply(with other::denominator()),
-				)
-			}
+			§§ @param other — the Rational to add
+			§§ @returns — the sum.
+			(_ other: Rational) -> Rational
 
 			(_ other: Integer) -> Rational {
 				<- Rational.of(
@@ -163,9 +167,9 @@ declarations {
 
 		§§ Subtracts a number from this Rational, staying exact for every member of the numeric tower.
 		overload subtract {
-			(_ other: Rational) -> Rational {
-				<- @::add(other::negate())
-			}
+			§§ @param other — the Rational to subtract
+			§§ @returns — the difference.
+			(_ other: Rational) -> Rational
 
 			(_ other: Integer) -> Rational {
 				<- @::add(other::negate())
@@ -182,18 +186,14 @@ declarations {
 
 		§§ Divides this Rational by a number, exactly. Dividing by a possibly-zero Integer or Rational is empty for zero; dividing by an Algebraic can never fail — an irrational is never zero.
 		overload divide {
-			(by other: Rational) -> Optional<Rational> {
-				§ Division is multiplication by the reciprocal, and `reciprocal`
-				§ already comes back empty for zero — the same shape
-				§ `Integer::divide(by:)` has.
-				constant dividend = @
+			§ A zero divisor is the ONE thing this entry answers empty for,
+			§ which is what the Essence body said by multiplying with
+			§ `reciprocal()` — itself empty for zero — rather than by guarding.
+			§ The native asks it outright.
 
-				<- other
-					::reciprocal()
-					::map((reciprocal) {
-						<- dividend::multiply(with reciprocal)
-					})
-			}
+			§§ @param by — the Rational to divide by
+			§§ @returns — the quotient, or nothing when the divisor is zero.
+			(by other: Rational) -> Optional<Rational>
 
 			(by other: Integer) -> Optional<Rational> {
 				§ A zero divisor widens to the Rational `0/1`, whose reciprocal
@@ -209,12 +209,9 @@ declarations {
 
 		§§ Multiplies this Rational with a number, staying exact for every member of the numeric tower.
 		overload multiply {
-			(with other: Rational) -> Rational {
-				<- Rational.of(
-					@::numerator()::multiply(with other::numerator()),
-					over @::denominator()::multiply(with other::denominator()),
-				)
-			}
+			§§ @param with — the Rational to multiply with
+			§§ @returns — the product.
+			(with other: Rational) -> Rational
 
 			(with other: Integer) -> Rational {
 				<- Rational.of(

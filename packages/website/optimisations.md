@@ -637,13 +637,18 @@ Method it replaces carried out on the literals it was given. Where that body is
 a runtime native it is one bigint operation; where it is written in Essence it is
 followed statement by statement.
 
-**Which matters most for Rationals, and is the one place a shorter answer would
-be the wrong one.** A Rational holds the parts it was BUILT with and reduces only
-what it ANSWERS with: `4/2` stores 4 and 2, prints `2/1`, and answers 2 for its
-numerator. So `1/2::add(1/4)` is not folded to `3/4`. The Essence body reads both
-operands' lowest-terms parts, cross-multiplies them and hands the result to
-`Rational.of`, which stores 6 and 8 — and `Rational.createRational(6n, 8n)` is
-what is emitted, printing `3/4` exactly as the unfolded Program does.
+**Which matters most for Rationals, where what an operation STORES is a separate
+question from what it is worth.** A Rational holds the parts it was BUILT with
+and reduces only what it ANSWERS with: `4/2` stores 4 and 2, prints `2/1`, and
+answers 2 for its numerator — so a fold of `4/2` emits
+`Rational.createRational(4n, 2n)` and not the `2/1` it is worth. That claim is
+about CONSTRUCTION. ARITHMETIC is a different matter: `add`, `subtract`,
+`multiply` and `divide` between two Rationals are natives on the bigint-rational
+core, which answers in lowest terms, so `1/2::add(1/4)` stores 3 and 4 and
+`Rational.createRational(3n, 4n)` is what is emitted — the very value the
+unfolded Program builds. The fold calls those same core functions rather than
+spelling the arithmetic out a second time, so there is one definition of the
+answer instead of two that have to agree.
 
 Only LITERALS fold, never a name a Program bound a constant to: a binding is a
 place a debugger stops and a name a reader looks for, and what folding through
@@ -1080,6 +1085,22 @@ raw parts — which is what lets `4/2` equal `2` — while every accessor and ev
 formatter goes on answering in lowest terms, so `4/2` prints `2/1` and its
 `numerator` is 2, exactly as before. This is only the read side, computed once
 instead of once per question.
+
+**Arithmetic answers in lowest terms, and says so.** `add`, `subtract`,
+`multiply` and `divide` between two Rationals are natives on the bigint-rational
+core now, where they were Essence bodies reading `numerator()` and
+`denominator()` off both operands — four Integers built only to be unwrapped —
+doing the same arithmetic through four more boxes, and handing the parts to
+`Rational.of`, whose answer was UNREDUCED and charged its next reader a
+greatest-common-divisor of its own. Each is now one cross-multiplication and one
+reduction on the parts themselves, and the result is built holding its
+lowest-terms form, so the first accessor or formatter to ask reduces nothing.
+Nothing can tell the difference: every accessor and every formatter already
+answered in lowest terms, and equality cross-multiplies the raw parts, so
+`(1/2)::add(1/2)` equals `1` whether it holds `4/4` or `1/1`. Construction is
+untouched — `4/2` still holds 4 and 2 — and `fold-constants` folds these four
+through the same core functions, so a folded answer is the one the Program
+builds.
 
 ### `list-tail-sharing`
 
