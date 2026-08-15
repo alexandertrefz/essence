@@ -68,19 +68,6 @@ const createIsHelper = (tester: string | Array<string>) => {
 	return (input: string): boolean => candidates.has(input)
 }
 
-const orHelper = (
-	funcs: Array<(input: string) => boolean>,
-	input: string,
-): boolean => {
-	for (let func of funcs) {
-		if (func(input)) {
-			return true
-		}
-	}
-
-	return false
-}
-
 const linebreak = "\n"
 const stringLiteral = '"'
 const commentLiteral = "§"
@@ -146,6 +133,56 @@ const isBooleanLiteral = createIsHelper(booleans)
 const isStringLiteral = createIsHelper(stringLiteral)
 const isNumberLiteral = createIsHelper(numbers)
 const isCommentLiteral = createIsHelper(commentLiteral)
+
+// NOTE: The two questions the Identifier and Number loops ask of every single
+// character they read, answered by one table lookup instead of five calls
+// through an Array of closures. `endsWord` is what STOPS either Token —
+// whitespace, the line break, a Symbol, and the Comment and String sigils,
+// which end an Identifier exactly as a Symbol does — and `isDigit` is what a
+// Number keeps.
+//
+// NOTE: Built from the same Arrays the predicates above are, so the two
+// spellings of one character class can not drift apart.
+const endsWord = 1
+const isDigit = 2
+
+const characterClasses = new Uint8Array(128)
+// NOTE: Every character above 127 that belongs to a class, which is the two
+// that do: `§` opens a Comment, and the byte order mark is whitespace.
+// Everything else up there is a letter in a name — or half of a surrogate
+// pair, which is read as the two code units it is written in, exactly as the
+// cursor counts it.
+const wideEndsWord = new Set<string>()
+
+for (let character of [
+	...whitespaces,
+	linebreak,
+	...symbols,
+	commentLiteral,
+	stringLiteral,
+]) {
+	let code = character.charCodeAt(0)
+
+	if (code < 128) {
+		characterClasses[code] |= endsWord
+	} else {
+		wideEndsWord.add(character)
+	}
+}
+
+for (let character of numbers) {
+	characterClasses[character.charCodeAt(0)] |= isDigit
+}
+
+const classOf = (character: string): number => {
+	let code = character.charCodeAt(0)
+
+	if (code < 128) {
+		return characterClasses[code]!
+	}
+
+	return wideEndsWord.has(character) ? endsWord : 0
+}
 
 const getBooleanType = (value: string) => {
 	if (value === "true") {
@@ -441,7 +478,7 @@ const throwUnterminatedString = (cursor: Cursor, openedAt: Cursor): never => {
 const lexString = (
 	input: string,
 	cursor: Cursor,
-	ignoreList: Array<string>,
+	ignoreList: ReadonlySet<string>,
 ): SubLexingResult => {
 	let stringStart = cursor
 
@@ -665,24 +702,14 @@ const lexNumber = (input: string, cursor: Cursor): SubLexingResult => {
 
 	for (i = 0; i < input.length; i++) {
 		let currentChar = input[i]
+		let characterClass = classOf(currentChar)
 
-		if (
-			orHelper(
-				[
-					isLinebreak,
-					isSymbol,
-					isCommentLiteral,
-					isStringLiteral,
-					isWhitespace,
-				],
-				currentChar,
-			)
-		) {
+		if ((characterClass & endsWord) !== 0) {
 			i-- // Fix Index for the token slice
 			break
 		}
 
-		if (isNumberLiteral(currentChar)) {
+		if ((characterClass & isDigit) !== 0) {
 			if (!sawNonDigit) {
 				token.value += currentChar
 			}
@@ -739,18 +766,7 @@ const lexIdentifier = (input: string, cursor: Cursor): SubLexingResult => {
 		// NOTE: The Comment and String sigils end an Identifier exactly as a
 		// Symbol does — `name§ note` is a name and a Comment written flush
 		// against each other, not an Identifier called `name§`.
-		if (
-			orHelper(
-				[
-					isSymbol,
-					isLinebreak,
-					isWhitespace,
-					isCommentLiteral,
-					isStringLiteral,
-				],
-				currentChar,
-			)
-		) {
+		if ((classOf(currentChar) & endsWord) !== 0) {
 			i--
 			break
 		}
@@ -776,7 +792,7 @@ const lexIdentifier = (input: string, cursor: Cursor): SubLexingResult => {
 const lexToken = (
 	input: string,
 	cursor: Cursor,
-	ignoreList: Array<string>,
+	ignoreList: ReadonlySet<string>,
 ): LexingResult => {
 	let token: Token | undefined
 	let error: LexingError | undefined
@@ -828,7 +844,7 @@ const lexToken = (
 	// NOTE: A String's head Token can be an ignored type only never — the
 	// `Start`/`LiteralString` types are never on an ignore list — so its
 	// `extraTokens` never need the ignore filter here either.
-	if (ignoreList.includes(token.type)) {
+	if (ignoreList.has(token.type)) {
 		return lexToken(input, cursor, ignoreList)
 	}
 
@@ -846,7 +862,7 @@ export class Lexer {
 	protected data: string
 	protected index: number
 	protected state: Cursor
-	protected ignoreList: Array<string>
+	protected ignoreList: Set<string>
 	// NOTE: An interpolated String lexes into several Tokens at once — its head
 	// is returned, and its chunk and hole Tokens wait here to be handed out one
 	// per `next()` before any more input is read. Every other Token leaves this
@@ -861,7 +877,7 @@ export class Lexer {
 		this.data = ""
 		this.index = 0
 		this.state = { line: 1, column: 1 }
-		this.ignoreList = []
+		this.ignoreList = new Set()
 		this.pending = []
 		this.errors = []
 	}
@@ -912,6 +928,6 @@ export class Lexer {
 	}
 
 	ignore(name: lexer.TokenType) {
-		this.ignoreList.push(name)
+		this.ignoreList.add(name)
 	}
 }

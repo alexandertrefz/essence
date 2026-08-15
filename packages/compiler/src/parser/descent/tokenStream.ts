@@ -194,6 +194,17 @@ export class TokenStream {
 	protected index: number
 	protected braceDepth: number
 	public hadLexerError: boolean
+	// NOTE: Where the next `~` is, from every position. `Type ~> { … }` is the
+	// one construction in the grammar that a `~` can be part of, and it is the
+	// one the parser speculates on for every Identifier it reads in Expression
+	// position — a full Type parse, thrown away on the `~` that is not there.
+	// A speculation can only consume Tokens FORWARD from where it starts, so a
+	// position with no `~` after it is a position where that parse can not
+	// succeed, whatever else stands there. That is the whole test, and it is
+	// deliberately no sharper: neither the `>` following the `~` nor the two
+	// being written flush is required by `parseTypedRecordLiteral`, so a guard
+	// that asked for either would refuse a Program this parser accepts.
+	protected nextTilde: Int32Array
 	// NOTE: Documentation Comments are kept out of the Token array entirely
 	// and indexed by the line they sit on. The parser has many fixed offset
 	// lookaheads and backtracks by Token index, all of which would have to
@@ -331,6 +342,23 @@ export class TokenStream {
 				],
 			})
 		}
+
+		// NOTE: One backward pass, and one entry past the end so that a query at
+		// the end of the stream is answered without a bounds test.
+		this.nextTilde = new Int32Array(this.tokens.length + 1)
+		this.nextTilde[this.tokens.length] = this.tokens.length
+
+		for (let index = this.tokens.length - 1; index >= 0; index--) {
+			this.nextTilde[index] =
+				this.tokens[index]?.type === TokenType.SymbolTilde
+					? index
+					: this.nextTilde[index + 1]!
+		}
+	}
+
+	// NOTE: Whether a `Type ~> { … }` can begin here at all — see `nextTilde`.
+	hasTildeAhead(): boolean {
+		return this.nextTilde[this.index]! < this.tokens.length
 	}
 
 	get depth(): number {

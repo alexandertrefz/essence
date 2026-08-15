@@ -39,7 +39,11 @@ type NamespaceBodyNode = Parameters<
 // standard library already writes (`slice(from 1, to 3)`,
 // `normalize(as #ComposedCanonical)`), so they can only ever be Keywords where
 // a Module section is being read.
-const identifierTokenTypes = [
+//
+// NOTE: A Set rather than an Array, here and for the two lists below. Each is
+// asked of a Token, in a loop over every Token — a scan of ten strings per
+// question is what a membership test costs when it is written as one.
+const identifierTokenTypes = new Set([
 	TokenType.Identifier,
 	TokenType.KeywordWith,
 	TokenType.KeywordStatic,
@@ -50,10 +54,10 @@ const identifierTokenTypes = [
 	TokenType.KeywordExport,
 	TokenType.KeywordFrom,
 	TokenType.KeywordAs,
-]
+])
 
 function isIdentifierToken(token: Token | undefined): boolean {
-	return token !== undefined && identifierTokenTypes.includes(token.type)
+	return token !== undefined && identifierTokenTypes.has(token.type)
 }
 
 // NOTE: The Token types that begin a literal Matcher — `case 0`, `case 1/2`,
@@ -62,21 +66,21 @@ function isIdentifierToken(token: Token | undefined): boolean {
 // `parseLiteralMatcherValue`, which refuses it with a message about why a
 // String with holes can not be matched — rather than the generic "expected a
 // Type" a Type parse would give.
-const literalMatcherTokenTypes = [
+const literalMatcherTokenTypes = new Set([
 	TokenType.LiteralNumber,
 	TokenType.SymbolDash,
 	TokenType.LiteralString,
 	TokenType.LiteralStringStart,
 	TokenType.LiteralTrue,
 	TokenType.LiteralFalse,
-]
+])
 
 // NOTE: The Token types that can begin a Statement — these are the
 // resynchronisation points after a parse error. Every Keyword
 // `parseImplementationNode` dispatches on belongs here: one that is missing
 // is not a Statement start to the recovery, so the whole Declaration it opens
 // — braces and all — is skipped without a word.
-const statementStartTokenTypes = [
+const statementStartTokenTypes = new Set([
 	TokenType.KeywordConstant,
 	TokenType.KeywordVariable,
 	TokenType.KeywordFunction,
@@ -90,7 +94,7 @@ const statementStartTokenTypes = [
 	TokenType.KeywordOverload,
 	TokenType.KeywordStatic,
 	TokenType.KeywordChoice,
-]
+])
 
 // NOTE: Whether two Positions are written flush against each other, with
 // neither whitespace nor a line break between them. Some of the grammar reads
@@ -656,7 +660,7 @@ class DescentParser {
 	}
 
 	protected isStatementStart(token: Token): boolean {
-		if (statementStartTokenTypes.includes(token.type)) {
+		if (statementStartTokenTypes.has(token.type)) {
 			return true
 		}
 
@@ -1699,9 +1703,15 @@ class DescentParser {
 			}
 		}
 
+		// NOTE: `Type ~> { … }` — speculative, because a Type and an Identifier
+		// open the same way and only the `~>` behind the Type tells them apart.
+		// The stream is asked first whether a `~` stands anywhere ahead of here:
+		// the parse below can not succeed without consuming one, so a `~`-less
+		// tail turns a full Type parse and its throw into an integer compare.
 		if (
-			isIdentifierToken(token) ||
-			token.type === TokenType.SymbolLeftBrace
+			(isIdentifierToken(token) ||
+				token.type === TokenType.SymbolLeftBrace) &&
+			this.tokens.hasTildeAhead()
 		) {
 			let typedRecord = this.backtrack(() =>
 				this.parseTypedRecordLiteral(),
@@ -1882,10 +1892,7 @@ class DescentParser {
 			return generators.wildcardMatcher(token.position)
 		}
 
-		if (
-			token !== undefined &&
-			literalMatcherTokenTypes.includes(token.type)
-		) {
+		if (token !== undefined && literalMatcherTokenTypes.has(token.type)) {
 			let value = this.parseLiteralMatcherValue()
 
 			return generators.literalMatcher(value, value.position)
