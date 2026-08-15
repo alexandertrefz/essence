@@ -1,16 +1,15 @@
 import { createHash, type Hash } from "node:crypto"
-import {
-	existsSync,
-	readdirSync,
-	readFileSync,
-	rmSync,
-	statSync,
-} from "node:fs"
+import { readdirSync, readFileSync, rmSync, statSync } from "node:fs"
 import * as path from "node:path"
 import * as v8 from "node:v8"
 
 import { toolchainKey } from "../embed/hash"
-import { cacheDirectory, isCacheDisabled, writeAtomicSync } from "./index"
+import {
+	cacheDirectory,
+	compilerFingerprint,
+	isCacheDisabled,
+	writeAtomicSync,
+} from "./index"
 
 // NOTE: A snapshot is a whole in-memory value written to disk with
 // `v8.serialize`, so that a process which would otherwise BUILD it reads it
@@ -58,31 +57,12 @@ function mix(hash: Hash, text: string): void {
 // compiles from and by, what the Compiler's own code is, and whatever the kind
 // adds — the Optimiser Options, for the prelude.
 //
-// NOTE: `toolchainKey()` is deliberately not enough on its own, and this is the
-// one place in the toolchain where that matters. It mixes the Compiler's
-// VERSION, the standard library's `.es` text and the runtime's TypeScript — and
-// says so at its own definition, where it also says what it leaves out and why:
-// the Compiler's own sources, three megabytes re-read by every process, to
-// catch a case only somebody editing the Compiler is in. For a BUNDLE that
-// trade is right; the loser rebuilds a bundle by emptying a cache directory.
-//
-// For these snapshots it is not, because the Compiler's own sources are exactly
-// what SHAPES them. Edit the Enricher and the enriched standard library is a
-// different object; edit a pass and the prelude is different code — with no
-// version bump, no `.es` file touched, and therefore no change in
-// `toolchainKey()`. The snapshot would be read back, the edit would have no
-// effect, and the compiler developer would be debugging a compiler that is not
-// the one they are editing. That is the cache making the toolchain WRONG, and
-// no escape hatch is an acceptable answer to it: a hatch protects whoever
-// remembers, and this is a trap for whoever does not.
-//
-// So the Compiler's own code is fingerprinted here, by CONTENT. Measured at
-// about three milliseconds against the hundred and ten these snapshots save,
-// and paid on files the process has already read to be running at all — the
-// import graph reaches nearly every one of them, so the read is out of the page
-// cache. Content rather than size-and-modification-time, which would be five
-// times cheaper again, because the answer has to be exact in the one direction
-// that matters and because an edit reverted is then a HIT rather than a rebuild.
+// NOTE: `toolchainKey()` is deliberately not enough on its own — it says
+// nothing about the Compiler's own code, and a snapshot is SHAPED by it: edit
+// the Enricher and the enriched standard library is a different object, edit a
+// pass and the prelude is different code, with no version bump and no `.es`
+// file touched. `compilerFingerprint()` is the half that notices, and says at
+// its own definition what it costs and why there is no escape hatch from it.
 function snapshotKey(kind: string, variant: string): string {
 	let hash = createHash("sha256")
 
@@ -93,113 +73,6 @@ function snapshotKey(kind: string, variant: string): string {
 	mix(hash, variant)
 
 	return hash.digest("hex")
-}
-
-// NOTE: The Compiler's own module tree — `src/` in a workspace checkout,
-// `dist/` in a compiled package. This module sits in `cache/` inside it either
-// way, so the tree is its parent and nothing has to be told where the Compiler
-// is.
-const COMPILER_TREE = path.resolve(import.meta.dirname, "..")
-
-// NOTE: Two of the stage directories, as proof that the tree above IS the
-// Compiler's. Bundled into one file — the Language Server inside the VS Code
-// extension is — this module's directory is wherever that file was written, so
-// the "tree" is the extension itself; walking it would fingerprint an icon set
-// and a pair of `.vsix` archives, and would recurse through whatever else is
-// there. A bundle has neither directory beside it.
-const STAGE_DIRECTORIES = ["enricher", "rewriter"]
-
-// NOTE: Read once per process and kept, for the reason `toolchainKey` keeps
-// its own: nothing here can change under a running compile in a way this is
-// meant to notice.
-let fingerprint: string | null = null
-
-function compilerFingerprint(): string {
-	fingerprint ??= digestCompiler()
-
-	return fingerprint
-}
-
-function digestCompiler(): string {
-	let hash = createHash("sha256")
-	let files = compilerSources()
-
-	// NOTE: A Compiler with no tree to walk is one bundled into a single file,
-	// and a single file is an immutable artifact: its size and modification time
-	// name it exactly, because nothing edits a bundle in place — a bundle is
-	// replaced.
-	if (files.length === 0) {
-		try {
-			let bundle = statSync(import.meta.filename)
-
-			mix(hash, `${bundle.size}:${bundle.mtimeMs}`)
-		} catch {
-			// NOTE: Neither a tree nor a file to stat is a Compiler that can not
-			// say what it is, and a snapshot keyed on nothing is the stale one
-			// this whole function exists to refuse. The empty digest turns the
-			// cache off rather than answering under a key that means nothing.
-			return ""
-		}
-
-		return hash.digest("hex")
-	}
-
-	// NOTE: Named relative to the tree, so that the same Compiler installed
-	// under two prefixes fingerprints the same — the rule `toolchainKey` follows
-	// for the standard library's file names, for the same reason.
-	for (let filePath of files) {
-		mix(hash, path.relative(COMPILER_TREE, filePath))
-		mix(hash, readFileSync(filePath, "utf8"))
-	}
-
-	return hash.digest("hex")
-}
-
-// NOTE: Sorted, so the digest does not depend on the order a file system
-// happens to enumerate a directory in.
-//
-// NOTE: A `tests` directory anywhere in the tree is left out. A spec can not
-// shape what the Compiler produces — nothing outside a spec imports one — and a
-// session spent writing specs would otherwise invalidate the snapshot on every
-// save, which is the one way to make a cache cost more than it saves.
-function compilerSources(): Array<string> {
-	let found: Array<string> = []
-
-	try {
-		if (
-			!STAGE_DIRECTORIES.every((stage) =>
-				existsSync(path.join(COMPILER_TREE, stage)),
-			)
-		) {
-			return []
-		}
-
-		for (let entry of readdirSync(COMPILER_TREE, {
-			recursive: true,
-			withFileTypes: true,
-		})) {
-			if (!entry.isFile()) {
-				continue
-			}
-
-			if (!entry.name.endsWith(".ts") && !entry.name.endsWith(".js")) {
-				continue
-			}
-
-			let filePath = path.join(entry.parentPath, entry.name)
-			let segments = path
-				.relative(COMPILER_TREE, filePath)
-				.split(path.sep)
-
-			if (!segments.includes("tests")) {
-				found.push(filePath)
-			}
-		}
-	} catch {
-		return []
-	}
-
-	return found.sort()
 }
 
 function snapshotPath(kind: string, key: string): string {

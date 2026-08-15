@@ -1,9 +1,9 @@
-import { mkdir, rename, rm, stat, writeFile } from "node:fs/promises"
+import { stat } from "node:fs/promises"
 import * as path from "node:path"
 
 import {
 	cacheDirectory as cacheDirectoryFor,
-	temporaryPath,
+	writeAtomic,
 } from "@essence-lang/compiler/cache"
 
 // NOTE: A compiled bundle has to become a FILE before it can be imported —
@@ -52,18 +52,11 @@ export async function cachedBundle(
 }
 
 // NOTE: The bundle on disk, written if it is not there yet. Nothing is
-// overwritten: the name is the hash of everything it was compiled from and by,
-// so a file that exists holds this exact text already, and rewriting it would
-// only invalidate the Module every process that has already imported it is
-// holding. That rule is why this writes for itself rather than through the
-// Compiler's `writeAtomicSync`, which has no such thing to protect and swallows
-// what it can not write.
-//
-// NOTE: Written to a private temporary name and RENAMED into place, because
-// `import()` is going to read this file and several processes may be compiling
-// the same sources at once. `rename` is atomic within a directory, so a reader
-// sees either no file or the whole of one — never the half of a bundle another
-// process is still writing, which imports as a syntax error out of nowhere.
+// overwritten and the write is atomic — both are the Compiler's rule for a
+// content-addressed file, and both matter here in particular: `import()` is
+// going to read this file, several processes may be compiling the same sources
+// at once, and a Module another process has already imported must not be
+// replaced underneath it.
 export async function cacheBundle(
 	directory: string,
 	bundleHash: string,
@@ -71,29 +64,7 @@ export async function cacheBundle(
 ): Promise<string> {
 	let file = bundlePath(directory, bundleHash)
 
-	if (await exists(file)) {
-		return file
-	}
-
-	await mkdir(directory, { recursive: true })
-
-	let temporary = temporaryPath(file)
-
-	await writeFile(temporary, code)
-
-	try {
-		await rename(temporary, file)
-	} catch (error) {
-		// NOTE: Windows refuses a rename onto an existing file, and the loser of
-		// a race is exactly that case — the winner's file is the same bytes, so
-		// losing is success. Anything else is a real failure and is re-thrown
-		// once the temporary file is gone.
-		await rm(temporary, { force: true })
-
-		if (!(await exists(file))) {
-			throw error
-		}
-	}
+	await writeAtomic(file, code)
 
 	return file
 }

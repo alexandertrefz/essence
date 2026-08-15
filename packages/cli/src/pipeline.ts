@@ -1,6 +1,6 @@
 import { gzipSync } from "node:zlib"
 
-import { writeOutputs } from "@essence-lang/compiler/bundler"
+import type { BundleOutput } from "@essence-lang/compiler/bundler"
 import {
 	containsErrors,
 	placelessDiagnostic,
@@ -10,7 +10,6 @@ import {
 	isStdlibDocument,
 	parseDocument,
 } from "@essence-lang/compiler/documents"
-import { emitBundle } from "@essence-lang/compiler/embed"
 import {
 	defaultOptimiserOptions,
 	type OptimiserOptions,
@@ -18,7 +17,23 @@ import {
 import { validate } from "@essence-lang/compiler/validator"
 import type { common } from "@essence-lang/interfaces"
 
+import {
+	type Bundle,
+	bundleCacheDirectory,
+	bundleKey,
+	type CachedBundle,
+	readBundle,
+	scratchBundlePath,
+	writeBundle,
+	writeScratchBundle,
+} from "./cache"
 import { type CompileSession, createCompileSession } from "./session"
+
+// NOTE: The Bundler and the emit seam are imported where they are used and
+// nowhere else. `esc check` must not pay for an emitter it never calls — a
+// static import at the top of this module would load the Rewriter, a hundred
+// and seventy kilobytes of it, before the first file is even read. A build that
+// finds its bundle in the cache does not load it either.
 
 // NOTE: One description of the Compiler pipeline, used by both the in-process
 // path and the worker path. Everything the CLI reports — stage timings, output
@@ -58,7 +73,16 @@ export type StageTiming = {
 
 export type CompileRequest = {
 	inputFileName: string
+	// NOTE: Where the bundle is written, or null for a compile that emits
+	// nothing at all — which is what `check` is. `esc run` without `--out` names
+	// neither: what it wants is a file it can spawn rather than an artifact, and
+	// it asks for `cacheOutput` instead.
 	outputFileName: string | null
+	// NOTE: The bundle goes into the bundle cache under the name that means
+	// these exact sources, and the outcome reports where it landed. A repeat run
+	// of unchanged sources then writes nothing whatsoever: the file is already
+	// there, and it is already what would have been written.
+	cacheOutput?: boolean
 	minify: boolean
 	sourcemap: boolean
 	// NOTE: How the map reaches the output — `linked` beside it (the default),
@@ -104,6 +128,24 @@ export type CompileOutcome = {
 }
 
 export type ProgressReporter = (stage: StageName) => void
+
+// NOTE: A remembered bundle as the outputs of the compile that would have
+// produced it — the same two files under the same two names, so a build that
+// found its answer writes exactly what a build that emitted one writes. The map
+// is `<output>.map` because that is what the Bundler names it, and the bundle's
+// last line already says so.
+function bundleOutputs(
+	outputFileName: string,
+	cached: CachedBundle,
+): Array<BundleOutput> {
+	let outputs = [{ path: outputFileName, contents: cached.contents }]
+
+	if (cached.map !== null) {
+		outputs.push({ path: `${outputFileName}.map`, contents: cached.map })
+	}
+
+	return outputs
+}
 
 export function ownDiagnostics(
 	outcome: CompileOutcome,
@@ -441,8 +483,54 @@ export async function compileFile(
 
 		// NOTE: `check` stops here — everything past this point exists only to
 		// produce a file, and produces no further Diagnostics about the source.
-		if (request.outputFileName === null) {
+		if (request.outputFileName === null && request.cacheOutput !== true) {
 			return finish(true, null)
+		}
+
+		// NOTE: The key BEFORE the emit, which is the whole point of naming a
+		// bundle after what it was compiled from: where the file that names is
+		// already on disk, nothing is simplified, optimised, generated or
+		// bundled, because the answer was computed by whoever asked first.
+		// Running the pipeline to the end and only then discovering the output
+		// was already there would leave the name saving one `writeFile`.
+		//
+		// NOTE: Taken off the LINKED graph rather than the parsed one, so that
+		// everything a compile has to say about the source has already been said
+		// by the time a hit skips the rest. A hit is a shortcut through the
+		// emitter and never through the front half — which is also what keeps
+		// `esc watch` able to report the graph it is watching.
+		let store = bundleCacheDirectory()
+		let key = bundleKey(
+			request,
+			front.entryPath,
+			new Map(modules.map((module) => [module.fileName, module])),
+		)
+		// NOTE: Only a linked map is a second file. An inline one rides in the
+		// bundle, and there is nothing beside it to look for.
+		let hasMapFile =
+			request.sourcemap &&
+			request.sourcemapMode !== "inline" &&
+			request.outputFileName !== null
+		let cached =
+			store === null ? null : await readBundle(store, key, hasMapFile)
+
+		if (cached !== null) {
+			let target = request.outputFileName
+
+			if (target !== null) {
+				await timeline.run("write", async () => {
+					let { writeOutputs } =
+						await import("@essence-lang/compiler/bundler")
+
+					await writeOutputs(bundleOutputs(target, cached))
+				})
+			}
+
+			return finish(true, null, {
+				outputFileName: target ?? cached.path,
+				bytes: cached.contents.byteLength,
+				gzipBytes: gzipSync(cached.contents).byteLength,
+			})
 		}
 
 		// NOTE: Everything past validation is the emitter's, which `esc`
@@ -451,6 +539,12 @@ export async function compileFile(
 		// description, and it lives in the Compiler. What stays here is what is
 		// the CLI's own — the Session's caches, and the timings this file
 		// reports.
+		let { emitBundle } = await import("@essence-lang/compiler/embed")
+		// NOTE: `run` without `--out` has no name to emit under, and needs none
+		// until the key is known: what it asked for is a file to spawn. The
+		// scratch name is only ever the one it keeps, because a clean emit is
+		// spawned out of the cache entry it becomes.
+		let emitFileName = request.outputFileName ?? scratchBundlePath(key)
 		let bundled = await emitBundle(
 			{
 				modules: programs.map((program, index) => ({
@@ -460,10 +554,16 @@ export async function compileFile(
 				})),
 				entryPath: front.entryPath,
 				sourceFileName: request.inputFileName,
-				outputFileName: request.outputFileName,
+				outputFileName: emitFileName,
 				minify: request.minify,
 				sourcemap: request.sourcemap,
-				sourcemapMode: request.sourcemapMode,
+				// NOTE: A bundle with no name of its own has nowhere beside it to
+				// put a map, so it rides inside — which is also what keeps the name
+				// out of the key and the key out of the name.
+				sourcemapMode:
+					request.outputFileName === null
+						? "inline"
+						: request.sourcemapMode,
 				optimisation: request.optimisation ?? defaultOptimiserOptions,
 			},
 			{
@@ -479,16 +579,43 @@ export async function compileFile(
 			return finish(false, "bundle")
 		}
 
-		await timeline.run("write", () => writeOutputs(bundled.outputs))
+		let emitted: Bundle = {
+			contents:
+				bundled.outputs.find((output) => !output.path.endsWith(".map"))
+					?.contents ?? new Uint8Array(),
+			map:
+				bundled.outputs.find((output) => output.path.endsWith(".map"))
+					?.contents ?? null,
+		}
 
-		let primary = bundled.outputs.find(
-			(output) => !output.path.endsWith(".map"),
-		)
-		let bytes = primary?.contents.byteLength ?? 0
-		let gzipBytes =
-			primary === undefined ? null : gzipSync(primary.contents).byteLength
+		let outputFileName = await timeline.run("write", async () => {
+			if (request.outputFileName !== null) {
+				let { writeOutputs } =
+					await import("@essence-lang/compiler/bundler")
 
-		return finish(true, null, { bytes, gzipBytes })
+				await writeOutputs(bundled.outputs)
+			}
+
+			// NOTE: Remembered only where the emit had nothing of its own to
+			// say. A hit skips the stages that produce those Diagnostics, so an
+			// entry standing for a bundle that warned would answer with the
+			// bundle and swallow the warning.
+			if (store !== null && bundled.diagnostics.length === 0) {
+				let file = await writeBundle(store, key, emitted)
+
+				return request.outputFileName ?? file
+			}
+
+			return request.outputFileName === null
+				? await writeScratchBundle(key, emitted)
+				: request.outputFileName
+		})
+
+		return finish(true, null, {
+			outputFileName,
+			bytes: emitted.contents.byteLength,
+			gzipBytes: gzipSync(emitted.contents).byteLength,
+		})
 	} catch (error) {
 		// NOTE: A throw that reaches here is a Compiler bug rather than a
 		// problem with the source. It is reported as a Diagnostic so that a

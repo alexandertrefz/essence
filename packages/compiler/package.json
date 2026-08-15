@@ -22,6 +22,7 @@
 		"./bundler": "./src/bundler/index.ts",
 		"./cache": "./src/cache/index.ts",
 		"./embed": "./src/embed/index.ts",
+		"./embed/hash": "./src/embed/hash.ts",
 		"./diagnostics": "./src/diagnostics/index.ts",
 		"./diagnostics/render": "./src/diagnostics/render.ts",
 		"./documents": "./src/documents.ts",

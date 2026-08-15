@@ -47,16 +47,25 @@ export async function planCompilation(
 	context: CLIContext,
 	command: CommandSpec,
 	patterns: Array<string>,
-	options: { emit: boolean },
+	options: { emit: boolean; cacheOutput?: boolean },
 ): Promise<CompilationPlan> {
 	let inputFileNames = await resolveInputFiles(
 		patterns,
 		command,
 		context.programName,
 	)
-	let outputs = options.emit
-		? await resolveOutputFiles(inputFileNames, context.options.out, command)
-		: null
+	// NOTE: A compile that emits into the bundle cache has no output to
+	// resolve — the name is the hash of what it emits, which is not known
+	// until it has been emitted. Left to the default the source tree would
+	// collect a `.js` beside every file `esc run` was ever pointed at.
+	let outputs =
+		options.emit && options.cacheOutput !== true
+			? await resolveOutputFiles(
+					inputFileNames,
+					context.options.out,
+					command,
+				)
+			: null
 
 	let totalBytes = await totalSourceBytes(inputFileNames)
 	let useWorkers = shouldUseWorkers({
@@ -81,7 +90,7 @@ export async function planCompilation(
 export async function runCompilation(
 	context: CLIContext,
 	plan: CompilationPlan,
-	options?: { sourcemapMode?: "linked" | "inline" },
+	options?: { cacheOutput?: boolean; sourcemapMode?: "linked" | "inline" },
 ): Promise<CompilationResult> {
 	let started = performance.now()
 	let progress = new Progress({
@@ -117,6 +126,7 @@ export async function runCompilation(
 				{
 					inputFileName,
 					outputFileName: plan.outputs?.get(inputFileName) ?? null,
+					cacheOutput: options?.cacheOutput,
 					minify: context.options.minify,
 					sourcemap: context.options.sourcemap,
 					sourcemapMode: options?.sourcemapMode,

@@ -1,7 +1,3 @@
-import { mkdtemp, rm } from "node:fs/promises"
-import { tmpdir } from "node:os"
-import * as path from "node:path"
-
 import { UsageError } from "./args"
 import type { CommandSpec } from "./commands"
 import {
@@ -13,7 +9,6 @@ import {
 } from "./compile"
 import type { CLIContext } from "./context"
 import { execute } from "./execute"
-import { defaultOutputFor } from "./inputs"
 import { toJSONReport } from "./json"
 
 export const EXIT_SUCCESS = 0
@@ -42,14 +37,20 @@ async function compileAll(
 	context: CLIContext,
 	command: CommandSpec,
 	files: Array<string>,
-	options: { emit: boolean; sourcemapMode?: "linked" | "inline" },
+	options: {
+		emit: boolean
+		cacheOutput?: boolean
+		sourcemapMode?: "linked" | "inline"
+	},
 ): Promise<CompilationResult> {
 	let plan = await planCompilation(context, command, files, {
 		emit: options.emit,
+		cacheOutput: options.cacheOutput,
 	})
 
 	try {
 		return await runCompilation(context, plan, {
+			cacheOutput: options.cacheOutput,
 			sourcemapMode: options.sourcemapMode,
 		})
 	} finally {
@@ -130,69 +131,48 @@ export async function runRun(
 		)
 	}
 
-	// NOTE: Without --out the compiled file is scratch work, not a build
-	// artefact — it goes to a temporary directory that is removed once the
-	// program has finished, leaving the source tree untouched.
-	let temporaryDirectory: string | null = null
-	let outputFileName = context.options.out
+	// NOTE: Without --out the compiled file is scratch work rather than a build
+	// artefact, and it has no name of its own: it goes into the bundle cache,
+	// under the name that means these exact sources. That leaves the source tree
+	// untouched exactly as a temporary directory did, and it is what makes a
+	// second run of an unchanged Program write nothing and emit nothing — the
+	// file it would have produced is already sitting there.
+	let cacheOutput = context.options.out === undefined
 
-	if (outputFileName === undefined) {
-		temporaryDirectory = await mkdtemp(
-			path.join(tmpdir(), `${context.programName}-`),
-		)
-		outputFileName = path.join(
-			temporaryDirectory,
-			path.basename(defaultOutputFor(files[0] ?? "program.es")),
-		)
+	// NOTE: The bundle outlives the run and the directory it sits in is shared,
+	// so a map written beside it would be a second file nobody clears up — asked
+	// for a map, `run` rides it inside the bundle instead. `--out` names a place
+	// the user chose and keeps the linked default.
+	let result = await compileAll(context, command, files, {
+		emit: true,
+		cacheOutput,
+		sourcemapMode: cacheOutput ? "inline" : undefined,
+	})
+
+	printCompilationResult(context, result)
+
+	// NOTE: --json changes how the compilation is reported, not what `run`
+	// does — the program still executes, and the exit code is still its own,
+	// exactly as the command documents.
+	if (context.options.json) {
+		emitJSON(context, result, "run")
 	}
 
-	try {
-		// NOTE: The scratch directory is removed the moment the program exits,
-		// so a map written beside the bundle would be gone before anyone read a
-		// stack trace through it — asked for a map, `run` rides it inside the
-		// bundle instead. `--out` keeps the linked default.
-		let result = await compileAll(
-			{
-				...context,
-				options: { ...context.options, out: outputFileName },
-			},
-			command,
-			files,
-			{
-				emit: true,
-				sourcemapMode:
-					temporaryDirectory === null ? undefined : "inline",
-			},
-		)
-
-		printCompilationResult(context, result)
-
-		// NOTE: --json changes how the compilation is reported, not what `run`
-		// does — the program still executes, and the exit code is still its
-		// own, exactly as the command documents.
-		if (context.options.json) {
-			emitJSON(context, result, "run")
-		}
-
-		if (hasFailures(result)) {
-			return EXIT_FAILURE
-		}
-
-		// NOTE: `--out` may name a directory; what runs is the bundle the
-		// compiler actually wrote, resolved per file inside the plan.
-		let compiledFileName =
-			result.outcomes[0]?.outputFileName ?? outputFileName
-
-		let execution = await execute(
-			context,
-			compiledFileName,
-			programArguments,
-		)
-
-		return execution.code
-	} finally {
-		if (temporaryDirectory !== null) {
-			await rm(temporaryDirectory, { recursive: true, force: true })
-		}
+	if (hasFailures(result)) {
+		return EXIT_FAILURE
 	}
+
+	// NOTE: `--out` may name a directory, and without one the name is the
+	// cache's — so what runs is the bundle the Compiler actually wrote, which is
+	// what the outcome reports. An emit that succeeded always reports one, which
+	// is what the failures above have already established.
+	let compiledFileName = result.outcomes[0]?.outputFileName ?? null
+
+	if (compiledFileName === null) {
+		return EXIT_FAILURE
+	}
+
+	let execution = await execute(context, compiledFileName, programArguments)
+
+	return execution.code
 }
