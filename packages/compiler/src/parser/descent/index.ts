@@ -60,6 +60,31 @@ function isIdentifierToken(token: Token | undefined): boolean {
 	return token !== undefined && identifierTokenTypes.has(token.type)
 }
 
+// NOTE: Every Token type an Expression can begin with — exactly the cases
+// `parsePrimaryExpression` answers, and nothing else. A Token type added there
+// belongs here too; one that is here and not there would make
+// `parseArgument` read a label where the Expression reading was meant.
+const expressionStartTokenTypes = new Set([
+	...identifierTokenTypes,
+	TokenType.SymbolHash,
+	TokenType.SymbolAt,
+	TokenType.SymbolDash,
+	TokenType.SymbolLeftBracket,
+	TokenType.SymbolLeftParen,
+	TokenType.SymbolLeftAngle,
+	TokenType.SymbolLeftBrace,
+	TokenType.KeywordMatch,
+	TokenType.LiteralString,
+	TokenType.LiteralStringStart,
+	TokenType.LiteralNumber,
+	TokenType.LiteralTrue,
+	TokenType.LiteralFalse,
+])
+
+function startsExpression(token: Token | undefined): boolean {
+	return token !== undefined && expressionStartTokenTypes.has(token.type)
+}
+
 // NOTE: The Token types that begin a literal Matcher — `case 0`, `case 1/2`,
 // `case "a"`. Everything else in Matcher position is read as a Type.
 // `LiteralStringStart` is here only so an interpolated String reaches
@@ -2987,8 +3012,64 @@ class DescentParser {
 		}
 	}
 
+	// NOTE: Whether `label value` is what stands here, read off the Token AFTER
+	// the leading Identifier instead of by parsing an Expression and finding
+	// that it did not span the argument. Labelled arguments are the norm in
+	// Essence, and the speculation below costs three or four throws for each
+	// one of them — the label alone is an Expression, so the reading that is
+	// tried first always fails, after `parsePrimaryExpression` has itself
+	// speculated a typed Record literal and a Case construction on the way.
+	//
+	// This decides only what the speculation would have decided anyway, which
+	// is what keeps every Diagnostic where it was. The Expression reading takes
+	// the leading Identifier and continues it, and only three Token types
+	// continue one: `.`, `(`, and `::` — plus a `#` written FLUSH against the
+	// Identifier, which makes `Choice#Case`. Everything else that could stand
+	// there either begins a value of its own, and then the label reading is the
+	// only one that can span the argument, or ends the argument, and then the
+	// Expression is the Identifier alone. So: labelled exactly when the next
+	// Token begins an Expression, minus the two that continue the Identifier
+	// instead.
+	//
+	// NOTE: `#` is the parser's adjacency rule, and the standard library leans
+	// on it everywhere — `normalize(as #ComposedCanonical)` is a bare Case
+	// passed under the label `as`, and `Ordering#Less` is a Choice prefix. The
+	// space between them is the whole difference.
+	//
+	// NOTE: `<` stays speculative. It continues the Identifier as
+	// `Holder<Integer>#Full(…)` and it also opens a Generic Function literal
+	// that could be a labelled argument's value, and only a parse can tell
+	// which — `parsePrimaryExpression` says the same thing about the same `<`.
+	protected argumentIsLabelled(): boolean {
+		let following = this.tokens.peek(1)
+
+		if (
+			!startsExpression(following) ||
+			following!.type === TokenType.SymbolLeftParen ||
+			following!.type === TokenType.SymbolLeftAngle
+		) {
+			return false
+		}
+
+		if (following!.type === TokenType.SymbolHash) {
+			return !isAdjacent(
+				this.tokens.peek()!.position,
+				following!.position,
+			)
+		}
+
+		return true
+	}
+
 	protected parseArgument(): parser.ArgumentNode {
 		if (isIdentifierToken(this.tokens.peek())) {
+			if (this.argumentIsLabelled()) {
+				let name = this.parseIdentifier()
+				let value = this.parseExpression()
+
+				return generators.argument(name, value)
+			}
+
 			// NOTE: An Identifier can start both a plain Expression argument
 			// and a labelled argument, so we try the Expression reading first
 			// and fall back to the labelled reading — exactly one of the two
