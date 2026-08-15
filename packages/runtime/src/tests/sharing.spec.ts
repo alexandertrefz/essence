@@ -316,10 +316,12 @@ describe("stale views", () => {
 })
 
 describe("every native against an upgraded receiver", () => {
-	// NOTE: `removeFirst`, `removeLast`, `remove`, `partition` and the rest of
-	// that family are written in Essence on `slice`, `item(at:)` and `length`,
-	// so there is no native of their own to hold here — the three they are
-	// written on are held instead.
+	// NOTE: `removeFirst`, `removeLast`, `partition` and the rest of that family
+	// are written in Essence on `slice`, `item(at:)` and `length`, so there is
+	// no native of their own to hold here — the three they are written on are
+	// held instead. `remove(at:)` has a native again, and it and the three
+	// edits beside it are held in `edits.spec.ts`, against every shape a box can
+	// be in when one reaches it.
 	test("length and positions across the run boundary", () => {
 		let built = upgraded()
 

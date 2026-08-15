@@ -516,7 +516,6 @@ describe("Stdlib Call Graph", () => {
 			"List.lastItem",
 			"List.partition",
 			"List.prepend__overload$2",
-			"List.remove",
 			"List.removeDuplicates",
 			"List.removeEvery__overload$1",
 			"List.removeEvery__overload$2",

@@ -240,34 +240,24 @@ declarations {
 			}
 		}
 
+		§ Native, and for the reason `split` and `of` are: an Essence
+		§ composition can not avoid the intermediates, and here the
+		§ intermediates ARE the Method. The body was everything before the
+		§ position added to everything after it — `slice(from 0, to index)`
+		§ and `slice(from index + 1, to length)`, joined — which builds the
+		§ whole answer twice, once as two pieces and once as the joined List,
+		§ and reads the receiver twice to do it. The runtime fills one Array of
+		§ the answer's own size instead, and where the item is at an END it
+		§ fills nothing at all: dropping the first or last item is a shorter
+		§ view of the runs the receiver already holds. `partition` made the
+		§ opposite trade knowingly — two passes where the native made one —
+		§ because its cost is the two walks either way; this one's is not.
+
 		§§ A new List without the item at the given position, counting from zero — or, for a negative position, counting back from the end: -1 is the last item.
 		§§
 		§§ @param index — the position of the item to remove
 		§§ @returns — the List without that item, or unchanged when the position is outside it.
-		remove(at index: Integer) -> List<ItemType> {
-			constant length = @::length()
-
-			§ A position counting back from the end is resolved to its
-			§ counting-from-zero form BEFORE the slices below run, because the
-			§ two have to agree on one position and the second starts at
-			§ `index + 1` — which for -1 is 0, naming the FIRST position rather
-			§ than the end. Resolving it here is one step: the guard above
-			§ leaves nothing negative for the call to resolve again.
-			if index::isLessThan(0::subtract(length)) {
-				§ Reaching back past the first item names no position at all,
-				§ so there is nothing to remove.
-				<- @
-			} else if index::isLessThan(0) {
-				<- @::remove(at index::add(length))
-			} else {
-				§ Everything before the position, then everything after it. A
-				§ position at or past the end leaves the List unchanged without
-				§ a guard: the first slice fills with the whole List and the
-				§ second empties.
-				<- @::slice(from 0, to index)
-					::append(contentsOf @::slice(from index::add(1), to length))
-			}
-		}
+		remove(at index: Integer) -> List<ItemType>
 
 		§§ A new List without every item equal — by the items' own `is` — to the given one, or without every item the given check accepts. The by-value entry is available whenever the items conform to `Equatable`.
 		§§

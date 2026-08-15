@@ -23,9 +23,11 @@ import type { IntegerType } from "./Integer"
 import {
 	append__overload$2,
 	createList,
+	listRebuildingBack,
+	listRebuildingFront,
 	type ListType,
-	materialise,
 	positionFromEnd,
+	runsOf,
 	viewOf,
 } from "./List"
 import type { AnyType } from "./type"
@@ -141,22 +143,40 @@ export { reverse, sort__overload$1, sort__overload$2 } from "./List"
 // NOTE: The position is resolved from the end in bigint before it narrows,
 // exactly as `slice` and `insert` do and for the same reason — a position past
 // 2³¹ narrowed first would come out as an unrelated one.
+//
+// NOTE: One item changes, so only the RUN holding it is copied and the other
+// rides along by reference. A List built at both ends pays for the half the
+// position falls in rather than for the whole of itself, and the receiver keeps
+// the representation it arrived in — nothing here combines the runs, because
+// combining them would be the very copy this is avoiding.
 export function replace<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 	item: ItemType,
 	at: IntegerType,
 ): ListType<ItemType> {
-	let items = materialise(originalList)
-	let length = BigInt(items.length)
-	let position = positionFromEnd(at.value, length)
+	let view = runsOf(originalList)
+	let length = BigInt(view.total)
+	let requested = positionFromEnd(at.value, length)
 
-	if (position < 0n || position >= length) {
+	if (requested < 0n || requested >= length) {
 		return originalList
 	}
 
-	let replaced = items.slice(0)
+	let position = Number(requested)
 
-	replaced[Number(position)] = item
+	if (position < view.frontCount) {
+		let front = view.front.slice(0, view.frontCount)
 
-	return createList(replaced)
+		// NOTE: The front run is stored reversed, so the logical position counts
+		// back from its end.
+		front[view.frontCount - 1 - position] = item
+
+		return listRebuildingFront(front, originalList, view)
+	}
+
+	let back = view.back.slice(0, view.backCount)
+
+	back[position - view.frontCount] = item
+
+	return listRebuildingBack(back, originalList, view)
 }

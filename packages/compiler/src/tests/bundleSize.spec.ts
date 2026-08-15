@@ -242,8 +242,18 @@ describe("Bundle Size", () => {
 	// instead of asking for it each turn, which is the rule the rest of the
 	// file already kept. The ceiling stays where it is — the headroom was sized
 	// for moves of a different order than a `let`.
+	//
+	// NOTE: It now measures 62,436, up 1,279, and the ceiling moves to 63,500 to
+	// keep the same ~1 kB of headroom. All of it is the runtime's: the four List
+	// edits answer with a box over the runs they do not touch, `remove(at:)`
+	// came back from Essence as a native of its own, and `slice`, `insert` and
+	// `replace` each grew the run-aware fill that replaces their `materialise`.
+	// A little of it is paid back — the Essence `remove` body and its two-slice
+	// composition left the prelude — and Irrational.es, which edits no List at
+	// all, is unchanged to the byte, which is the shape to expect: what a
+	// Program carries is the runtime reach of what it calls.
 	it("keeps Everyday.es from dragging in the whole numeric tower", async () => {
-		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(62_200)
+		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(63_500)
 	})
 
 	// NOTE: Measured 42,719 bytes; a reintroduced `Number` spread was 54,849.
