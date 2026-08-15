@@ -1553,6 +1553,19 @@ export function startServer(options: { connection?: Connection } = {}) {
 		publishAnalysis(event.document.uri, new Map())
 		publish(event.document.uri, [])
 		publishedByEntry.delete(event.document.uri)
+
+		// NOTE: The file is a dependency again rather than a document, and its
+		// Diagnostics are now an importer's to publish — so an importer has to
+		// run. Nothing else will ask it to: no keystroke is going to land in a
+		// file the reader just closed, and without this a Module closed while
+		// broken keeps its squiggles cleared for as long as the session lasts.
+		for (let dependent of workspace.dependentsOf(filePath)) {
+			let openUri = openPaths.get(dependent)
+
+			if (openUri !== undefined) {
+				scheduleAnalysis(openUri)
+			}
+		}
 	})
 
 	documents.listen(connection)
