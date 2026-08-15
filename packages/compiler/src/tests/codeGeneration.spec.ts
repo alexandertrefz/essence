@@ -850,11 +850,13 @@ describe("Code Generation", () => {
 			`)
 
 			expect(generated).toContain("let $loop_0_state = $pool_")
-			// NOTE: `total::add(n)` on two Integers is lowered to the bigint
-			// addition inside the literal the runtime's constructor would have
-			// built — `lower-scalar-operations` — so what says the callback's
-			// body resolved is the operation rather than the call.
-			expect(generated).toContain("value: total.value + n.value")
+			// NOTE: `total::add(n)` on two Integers is lowered to the addition
+			// itself — `lower-scalar-operations` — so what says the callback's
+			// body resolved is the operation rather than the call. The
+			// accumulator is the walk's own, so it is carried as the value it
+			// holds and the addition answers one; the item is a List's and is
+			// read through.
+			expect(generated).toContain("total + n.value")
 		})
 
 		// NOTE: And the Method itself, which is reached exactly where the

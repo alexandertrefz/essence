@@ -601,6 +601,10 @@ spelling of a value that already has one, which `===` answers `false` for. Such 
 walk canonicalises the turn's counter; every other walk reads one loop-invariant
 `false` and the counter it already had.
 
+The State a walk threads is elided the same way and under the same fence, but it
+is the Rewriter's decision about what reached it rather than part of this pass —
+`unboxed-loop-state`, under Emitted shapes below.
+
 **A `Step` is read where it is built.** The general loop and `reduce`'s
 early-stopping entry both decide by a tag the body has just written — `#Done(x)`
 stops the walk with `x`, `#Continue(x)` carries `x` on. Where the answer IS such
@@ -1013,6 +1017,122 @@ shadows this one, which is harmless for the reason a nested dispatch's
 the twenty-eight fixture builds it is 613 bytes on 725 kB — 229 of them in
 StdlibExhaustive.es, which has the most chains. Nothing shrinks: a Program with
 no multi-tag chain is emitted unchanged.
+
+### `unboxed-loop-state`
+
+Carries a walk's loop-carried State as the number or bigint its Integer holds,
+and builds the Integer once, where the walk answers.
+
+```js
+let $loop_0_state = $pool_2;
+for (let $loop_0_index = $loop_0_from; …; $loop_0_index += $loop_0_delta) {
+	const total = $loop_0_state;
+	$loop_0_state = typeof total.value === "number" && typeof $loop_0_index === "number" && total.value + $loop_0_index >= -9007199254740991 && total.value + $loop_0_index <= 9007199254740991 ? {
+		[$type.typeKeySymbol]: "Integer",
+		value: total.value + $loop_0_index
+	} : Integer.sum(total.value, $loop_0_index);
+}
+sum = $loop_0_state;
+```
+
+```js
+let $loop_0_state = $pool_2.value;
+for (let $loop_0_index = $loop_0_from; …; $loop_0_index += $loop_0_delta) {
+	const total = $loop_0_state;
+	$loop_0_state = typeof total === "number" && typeof $loop_0_index === "number" && total + $loop_0_index >= -9007199254740991 && total + $loop_0_index <= 9007199254740991 ? total + $loop_0_index : Integer.sum(total, $loop_0_index).value;
+}
+sum = Integer.createInteger($loop_0_state);
+```
+
+**It is two halves that only pay together.** Holding the State raw while the
+arithmetic still answered a boxed Integer that the slot read back through
+`.value` measured 23.7 ms against the 22.1 ms of leaving it alone — the box was
+still built, and a read was added to it. So the guarded operation writing INTO a
+raw slot is read through both of its arms: the object literal the guarded arm
+used to write is never written, and the escaped arm reads the value off the
+Integer the runtime built. Everything else that answers an Integer into the slot
+is read through as it stands.
+
+**The fence**, in the order the tests state it — `hybridIntegers.spec.ts`,
+`describe("a walk's carried State")`:
+
+1. The State's Type is EXACTLY `Integer` in every body it reaches — not a Union
+   it belongs to, not a Type Parameter that could be one. A Record, a String or a
+   Rational State is untouched. A Refinement over Integer IS carried, because
+   `eraseRefinements` runs at the head of every pipeline and a `NonZeroInteger`
+   State reaches the Rewriter as the Integer it is.
+2. Every mention of the Parameter a body reads the State under is a read of
+   `.value`. Only the operations `lower-scalar-operations` writes out read the
+   value, which is the arithmetic and the comparisons — so a body that asks its
+   accumulator `isEven`, `absolute`, `remainder` or any other Method of Integer
+   keeps its box, as does one that hands the State to a Function, asks it for its
+   decimal spelling, puts it in a List, compares it through an `Ordering` or
+   shadows the name. The test does not try to tell those apart.
+3. A driver that hands ONE State to two bodies — `loop(startingWith:while:step:)`
+   and its `until` sibling — takes the swap for both or for neither.
+4. The Parameter's `const` is still bound each turn, now to the raw value. The
+   slot is one binding for the whole walk, so a closure reading it would answer
+   what the walk finished with; the Parameter is bound per turn, exactly as the
+   Integer it replaced was.
+5. Every WRITE of the State is unboxed: the `let` its seed declares, every
+   assignment an answer is written as, and the `state` member of a `Step` the
+   Compiler could not see being built. They are found by name, because the name
+   is the Compiler's own and holds a `_` — and finding them that way is enough
+   only because the SLOT has a fence of its own: the swap is refused unless every
+   mention of the slot is a write of it, the `const` a turn binds a Parameter
+   through, or the exit. A write nobody recognised would leave an Integer in a
+   slot holding values and say nothing, so the two halves fail closed together.
+6. Every exit boxes, through `Integer.createInteger`.
+7. The slot holds what a canonical Integer holds — a number in safe range, a
+   bigint outside it — at every turn and at the exit. There are three ways in and
+   no fourth: the value of the Integer the seed was, a guarded answer that has
+   just range-checked itself, and the value of an Integer the runtime built.
+8. Two mentions past `.value` are admitted, and both of them are the State
+   written WHOLE into a slot the walk owns. `<- carried` is what an arm that
+   changes nothing writes, and the write it stands in is unboxed with every
+   other. `<- #Done(carried)` is how a `Step`-answering body ordinarily
+   finishes, and the write it stands in goes to the slot the walk ANSWERS with —
+   which holds the Integers every other `#Done` writes into it — so that one
+   write is BOXED where it stands. Still one Integer per walk: a `#Done` is what
+   leaves the walk.
+
+**Every driver that threads a State takes it**: both condition entries, the
+counted walk, `loop(startingWith:step:)` and both `List.reduce` entries. `map`
+and `keepEvery` thread none.
+
+**A walk inside a walk carries both slots as one value.** The inner walk answers
+straight into the enclosing slot, so the Integer it builds at its exit would be
+taken apart on the line that built it; the exit is recognised where the enclosing
+write is unboxed and the two slots meet raw. By IDENTITY and not by shape:
+`Integer.createInteger` is also how a counted walk boxes its index, and that
+index is a bigint spelling of a value a double holds exactly wherever the bounds
+straddle safe range — a call recognised by its shape would strip the
+canonicalisation that site exists to perform.
+
+Measured on the two-million-turn sum in a fresh process, best of fifteen: **14.5
+ms to 6.4 ms on Bun and 24.1 ms to 6.7 ms on Node**. Against the module's own load
+— 0.9 ms on Bun, 0.5 ms on Node — the walk itself falls from 13.6 ms to 5.4 ms,
+**2.5×**, and from 23.5 ms to 6.2 ms, **3.8×**; at twenty million turns it is 111
+ms to 29 ms and 145 ms to 49 ms. A two-million-turn `loop(startingWith:step:)`
+finishing `#Done(carried)` falls 9.7 ms to 4.5 ms on Bun and 13.2 ms to 4.3 ms
+on Node, **2.1×** and **3.1×** — that shape is how such a walk is ordinarily
+written, and it declined the swap until the eighth rule admitted it. Two million
+turns of a walk nested in a walk fall 10.8 ms to 5.4 ms and 15.0 ms to 6.8 ms. A
+million-turn walk with a Match in its body falls 13.9 ms to 10.1 ms on Bun and
+19.7 to 13.0 on Node. A walk whose every turn is out of safe range is unchanged
+either way, which is what the escaped arm reading one more field predicts. A
+Record State, a String State and a Rational State are emitted BYTE FOR BYTE as
+they were, which is the point of the first rule.
+
+**It costs no bytes as emitted**: across the twenty-three fixture builds it is
+1,527 bytes LESS on 740 kB, and 822 bytes less minified, because the object
+literal it stops writing is bigger than the constructor call it adds. Nothing
+grows, on the default pass set — with `pool-constants` turned off the seed
+becomes a constructor call with no pooled literal to amortise, and a small walk
+grows by a few dozen bytes. Gzipped it is a wash and slightly the wrong way: 36
+bytes MORE across the same builds, because the literal that stops being written
+is long and repetitive and compresses to nearly nothing, while the constructor
+call and the extra `.value` add entropy at each site.
 
 ## Not done yet
 

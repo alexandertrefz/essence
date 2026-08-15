@@ -83,7 +83,10 @@ describe("Optimisation Passes", () => {
 		// the Rewriter makes while writing a Program out rather than values a
 		// Compiler holds. One that is renamed, dropped or added without the page
 		// following fails.
-		expect(headingsUnder("Emitted shapes")).toEqual(["tag-binding"])
+		expect(headingsUnder("Emitted shapes")).toEqual([
+			"tag-binding",
+			"unboxed-loop-state",
+		])
 	})
 
 	it("keeps the emitted shapes apart from the passes", () => {
