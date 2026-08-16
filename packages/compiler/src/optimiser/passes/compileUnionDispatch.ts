@@ -51,13 +51,23 @@ import { rewriteExpressions } from "../walk"
 // throw that names a Compiler bug: with the test elided, a receiver that
 // satisfies NO case — which can only happen where a runtime check and the
 // static Type part company — silently takes the last branch instead of saying
-// so. So the elision is taken only where that last check is decided by TAGS,
-// which is exactly where the two can not part company; a case that still needs
-// a descriptor keeps its test and the chain ends in
+// so. So the elision is taken only where that last check REDUCES TO a tag
+// comparison, which is what bounds the loss to a receiver whose TAG disagrees:
+// one carrying the right tag and disagreeing deeper answered that comparison
+// true and took the last branch before the elision too. A case that still needs
+// a descriptor reads into the receiver, so eliding it would swallow more than a
+// tag's worth of disagreement — it keeps its test and the chain ends in
 // `$type.noDispatchCaseMatched`, the same throw `dispatchMethod` ends with.
 // `--without-optimisation compile-union-dispatch` puts both the search and its
 // throw back, and is what a Compiler developer chasing a dispatch that answers
 // the wrong thing builds with.
+//
+// NOTE: A Record case is decided by that rule like any other: elided where one
+// member of the receiver's Union claims the Record tag and implies the case,
+// kept where two members claim it and their members are what tell them apart.
+// The tree `compile-record-members` may later write over a kept test changes
+// nothing here — it is what stands where the tag decided nothing, and this pass
+// runs before it and asks `residual.ts` rather than reading what it left.
 
 export const compileUnionDispatch: OptimiserPass = {
 	name: "compile-union-dispatch",
@@ -405,6 +415,7 @@ function testOf(
 			value,
 			tag: residual.tag,
 			negated: false,
+			optional: false,
 			type: { type: "Boolean" },
 		}
 	}

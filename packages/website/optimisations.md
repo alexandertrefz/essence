@@ -86,10 +86,26 @@ a Type Parameter or an `Unknown` among the members refuses the question outright
 because a value of one can be anything, including something carrying the very tag
 being asked about.
 
-Record Matchers keep their descriptor check for now. A Record's tag says only
-that the value is a Record, and a Match over Records distinguishes them by their
-MEMBERS — which is a decision tree over the discriminating members rather than a
-tag test, and a pass of its own that has not been written.
+**A Record Matcher is decided by the same rule, and it took an argument to see
+it.** A Record's tag says only that the value is a Record, so a Record Matcher
+used to be refused outright — but the rule above never needed the tag to name the
+Matcher's Type, only to decide it against what can arrive. Where exactly ONE
+member of the scrutinee's Union carries the Record tag and that member satisfies
+the Matcher, a value carrying the tag passes the whole check and a value carrying
+another fails it before a member is read, so `{ x: Integer, y: Integer } | String`
+compiles to `_self[$type.typeKeySymbol] === "Record"` and nothing more. That is
+the common shape — a Record beside Types of other kinds — and it is what
+`elide-final-match-test` and `compile-union-dispatch`'s last-case elision needed
+before they could act on such a Handler at all.
+
+Two Records in one Union are not that shape: both claim the tag, so the tag says
+nothing and their MEMBERS are what decide. That is `compile-record-members`, a
+pass of its own further down.
+
+Measured on a Match over `{ x: Integer, y: Integer } | String | Integer`, a
+million matches, min of eleven fresh processes: **3.6× faster on Bun and 3.4× on
+Node** than the descriptor walk it replaces. No fixture's bundle changes by a
+byte, because none of them writes a Record Matcher beside another kind.
 
 **A literal Matcher (`case 0`, `case "beta"`) has no Type check to replace — the
 comparison IS its test — so what is compiled is the comparison.** `anyIs(_self,
@@ -270,7 +286,11 @@ Each case's test is the same residual `compile-type-tests` computes for a Match
 Handler, asked of the case's member Type against the members of the Union — so
 a case a tag decides becomes a key comparison, and one where two members share
 a tag (`List<Alpha>` beside `List<Beta>`) keeps `isValueOfType` against a
-descriptor that `pool-constants` then builds once instead of per call.
+descriptor that `pool-constants` then builds once instead of per call. A Record
+case beside cases of other kinds is a key comparison too, which is what lets a
+LAST Record case be the untested `else`: that case used to forfeit the elision,
+because a Record Matcher was refused a tag outright. What two Record cases still
+keep is a check that reads their members, written by `compile-record-members`.
 
 The cases keep their order, which the Enricher chose most specific first
 because a check is open — `{ width: Integer }` accepts a value carrying a
@@ -936,18 +956,198 @@ emitted: **a Compiler developer chasing a Match that answers the wrong thing
 should build with `--without-optimisation elide-final-match-test`**, which puts
 every test and every fall-through back.
 
-The elision is therefore taken only where the last Handler's check is decided by
-TAGS — where it would be a key comparison, or where it asks nothing at all (a
-wildcard). That is deliberately narrower than exhaustiveness allows, and it is
-exactly where the disagreement above can not come from: a check that could not be
-reduced to a tag is one that walks a payload or a List's items, which is where
-erasure makes the runtime answer and the static Type part company. Those chains
-keep both their test and their fall-through.
+The elision is therefore taken only where the last Handler's check REDUCES TO a
+key comparison, or asks nothing at all (a wildcard). That is deliberately
+narrower than exhaustiveness allows, and it is what bounds the loss to one thing:
+the elided test compared a tag, so the only value that answered it differently is
+one whose TAG disagrees with the Type it was given. A value carrying the right tag
+and disagreeing deeper — a List whose items are not what the Matcher named, a
+Record whose members are not — answered that comparison true and took the last
+Handler before the elision too, so the fall-through was never what would have
+named it. A check that could NOT be reduced reads into the value, so eliding it
+would swallow more than a tag's worth of disagreement; those chains keep both
+their test and their fall-through.
+
+**A last Record Handler is elided where one member of the Union claims the Record
+tag**, which it was not before `lowerableTagOf` — the rule in `residual.ts` all
+three of these passes ask — stopped refusing a Record Matcher outright.
+`{ x: Integer } | String` ending in `case { x: Integer }` is one key comparison,
+so the fall-through after it can not be reached. (`--without-optimisation
+compile-type-tests` does not put it back: the question is asked of `residual.ts`
+directly, so only `--without-optimisation elide-final-match-test` restores the
+test.) Two Records in one
+Union still keep both: their members are what tell them apart, and a member test
+is exactly the place a runtime answer and a static Type can disagree, so the throw
+that would name it stays. The decision tree `compile-record-members` writes over
+that kept test changes nothing about it — a tree is cheaper to RUN than a walk and
+claims no more than one.
 
 A Guard, a literal Matcher (`case 0`) or member literals (`case { x = 0 }`) all
 leave a last Handler that can decline for reasons no exhaustiveness argument
 covers — a Guard is a Program's own Boolean — so a Handler carrying any of them
 is tested exactly as it was.
+
+### `compile-record-members`
+
+Replaces a Record Matcher's descriptor walk with a tree over the members that
+discriminate.
+
+`compile-type-tests` reduces a Matcher to a tag where the tag decides it, and for
+a Record it decides only where ONE member of what can arrive carries the Record
+tag. Two Records in one Union both carry it, so what tells them apart is their
+members — and until this pass the check was the general one, rebuilt as a call at
+every test:
+
+```js
+$type.isValueOfType(_self, $pool_0)
+```
+
+That call walks a ladder of kind comparisons to find its Record arm, asks
+`Object.entries` of the descriptor — an array of arrays, per test, per turn of
+whatever loop the Match sits in — and then asks the runtime about each member
+Type through a closure. What replaces it reads the members instead:
+
+```js
+_self.value[$type.typeKeySymbol] === "Integer"
+```
+
+and, where the members that decide are different NAMES rather than different
+Types, through an optional chain:
+
+```js
+_self.radius?.[$type.typeKeySymbol] === "Integer"
+```
+
+**The argument, because a Record Matcher is where erasure has the most to say.**
+`isValueOfType` against a Record descriptor is a conjunction of independent,
+total, side-effect-free questions: the value's tag is `"Record"`, and then, per
+member the Matcher names, `Object.hasOwn(value, name)` and
+`isValueOfType(value[name], <the member's Type>)`. A Record Matcher is structural
+and OPEN — it names some members, the value may carry more, and what it does not
+name is never looked at — so there is nothing else in the check. Every rule below
+drops one of those questions or replaces it with one that answers the same for
+every value that can arrive; where a rule can not be shown to hold, the whole plan
+is refused and the walk stays.
+
+*The tag* is dropped exactly where every member of what can arrive carries the
+Record tag, and kept where some member carries another. A member whose tag can not
+be named — a Type Parameter, an `Unknown` — refuses the plan outright rather than
+merely keeping the tag: a value of it may be anything, including a Record carrying
+none of the members below, and the rules that follow would then be reasoning about
+a value nothing is known about.
+
+*Presence* is what openness makes a real question. A Record Type's members are
+what a value of it MUST carry, and a value may carry more, so a member some
+arriving Record declares and another does not may or may not be there. Where EVERY
+arriving Record declares it, it is there, the read is made directly, and the Types
+those Records declare are what can stand at it. Where one does not, nothing at all
+is known about the member — not that it is absent, and not what it holds if it is
+present, because what openness adds it adds unconstrained. The requirement is then
+measured against `Unknown`, which leaves exactly the requirements the runtime
+answers with ONE tag comparison whatever it is handed — a scalar, a payload-less
+Case, a List whose items are not named — and the read is made through `?.`.
+`_self.radius?.[$type.typeKeySymbol] === "Integer"` is `Object.hasOwn(_self,
+"radius") && isValueOfType(_self.radius, Integer)` exactly: an absent member reads
+`undefined` and an inherited one (a Matcher may name `toString`) reads a Function,
+and neither holds a Type key. Any other requirement — a Record, a
+payload-carrying Case, a List of a named item Type — would need a walk of a value
+that may not be there, and the plan declines instead.
+
+*Which members are tested.* A declared one is dropped where the requirement is
+implied by every Type the member can declare among the arriving Records, which is
+the same implication the Matcher's own check is decided by, asked one level down.
+So the tree tests exactly the members the static Type does not already settle. An
+UNdeclared one is never dropped, even where the requirement is implied by
+everything — a Type Parameter is — because the runtime still asks whether the
+member is THERE, and for such a requirement that question is the whole of the
+test. What is left of it is a presence question with no tag to fold into, and the
+tree has no test for one: a test asks a tag or asks the walk, and neither is
+`Object.hasOwn` on its own. So the plan is refused there and the walk, which asks
+`hasOwn` itself, goes on asking it.
+
+*Type Parameters and `Unknown`* are therefore answered from both sides. As a
+REQUIREMENT one is implied by everything, because the runtime answers true for it
+without reading the value, so a declared member typed by one is dropped: two
+Records differing only in a generic member are told apart by nothing the runtime
+can read, and the tree says exactly that. As something that can ARRIVE one refuses
+the plan, because neither its tag nor its members can be named.
+
+*Refinements* are erased before any pass runs, so a refined Type arrives here as
+the Type it refines and is tested as that. There is no run-time notion of a
+predicate for either this or the walk to ask about — and a Matcher may not name a
+refinement at all, which the Compiler refuses outright for that reason.
+
+*Union-typed members* contribute every one of their members to both questions: the
+requirement must be implied by all of them to be dropped, and the residual over
+all of them is what the kept test becomes. A member Union that includes a
+non-Record is why a nested plan can still need a Record tag test of its own.
+
+*Nested Records* are the same argument applied to the value at a member, with that
+member's presence established by the level above it. A test is sound only when
+every test on a PREFIX of its spine has already passed, so the plan writes a
+level's own tag test before descending, and the order below never moves a test
+ahead of its prefix.
+
+*A Matcher whose member Types lead back into it* is a finite object graph with a
+back edge. The descent carries a guard by identity and stops there — the runtime's
+walk terminates because it walks a VALUE, which is finite, while this one walks a
+TYPE, which need not be.
+
+**The order is chosen, and it is invisible except in time.** Every test is a
+property read of an immutable value and a comparison, or a walk that reads only
+the value it is handed: none can fail, allocate or observe anything, so a
+conjunction of them answers the same however it is arranged. It is arranged by
+COST first — every tag comparison, then every walk — because a walk is the one
+test that can still cost a call, and over a List's items it costs one per item.
+The check it replaced asks the Matcher's members in the order they were written
+and stops at the first that declines, so a tree reaching its walk ahead of a
+comparison that would have declined is a tree that loses to the walk it replaced.
+
+That is also what keeps each test behind the tests that establish the spine it
+reads. A walk is a LEAF — the plan descends into a member or writes a walk for
+it, never both — so a test standing on a PREFIX of another's spine is always a tag
+comparison, cost puts every one of those ahead of every walk, and DEPTH orders
+them among themselves, a proper prefix being strictly shorter than what it guards.
+`&&` is what makes the short circuit carry the guarantee.
+
+**One Node in, three sites served.** The pass looks for exactly one shape — a
+compiled Type test whose descriptor is a Record — and that Node stands in three
+places by the time it runs: a Match Handler's own check, a Case Matcher's payload
+requirement, and a compiled Union dispatch's case. Each carries the Type of the
+value it asks about, which is the only thing the plan needs, so one rule retires
+the descriptor walk in all three — and the value has to be a name or a chain of
+names, because a tree reads it once per test, which is what stands at each of the
+three. Two passes leave that Node: `compile-type-tests` writes the first two and
+`compile-union-dispatch` builds its own, so turning either off still leaves the
+other's and only the whole phase off leaves none. At that point there is nothing
+here to do, which is cooperation rather than dependence: the general question is
+then asked the general way, and the Program answers the same.
+
+**What the tree does NOT claim is that the Matcher is decided by a tag.** A member
+test is exactly where a runtime answer and a static Type can part company, so
+`elide-final-match-test` and `compile-union-dispatch`'s last-case elision go on
+declining a Handler whose check this compiled, and the throw that names a Compiler
+bug stays.
+
+**A plan is taken whole or refused whole.** Past eight tests the descriptor is
+left alone, which is a size rule rather than a soundness one: the walk is one call
+against one pooled descriptor shared by every site naming the same Matcher, while a
+tree is written out at each of them. A truncated plan would ask less than the walk
+it replaced, so there is no partial answer. The ceiling counts a tree's tests and
+not the sites it is written at, so the two multiply: an eight-member Matcher
+tested at twenty sites trades roughly half again as many bytes for the speed. The
+largest tree the fixtures produce holds two tests, so eight is a ceiling on a
+Program nobody has written rather than a line this was tuned against.
+
+Measured, min of eleven fresh processes, against the same Program built with the
+pass off: a Match over five Record shapes, a million matches, runs **11.6× faster
+on Bun and 11.0× on Node**; a Method dispatched over three Record targets, a
+million calls, **7.4× and 6.8×**. A Match over a Choice and an Integer loop are
+byte-identical with the pass off and measure within 1%.
+
+On the fixtures the whole saving is this pass's: `Match.es` loses `isValueOfType`
+from its bundle entirely and falls 26,026 → 23,613 bytes, `Patterns.es` 29,261 →
+26,991, and the other twenty-two are byte-identical.
 
 ### `eliminate-dead-code`
 
@@ -1340,17 +1540,26 @@ bytes less, in the four that chain.
 
 ## Not done yet
 
-Six things the passes above deliberately leave undone. Each is written here
+Eight things the passes above deliberately leave undone. Each is written here
 rather than left for a reader to notice, because a rule that is missing and a
 rule that was decided against look the same from the outside.
 
-**A decision tree over a Record Matcher's members.** `compile-type-tests` reduces
-a Matcher to a tag where the tag decides, and a Record's tag says only that the
-value is a Record — so a Match that distinguishes Records keeps the full
-`isValueOfType` walk against a pooled descriptor. What would replace it is a tree
-over the members that actually discriminate, read in an order the Compiler picks,
-which is a pass of its own with its own argument to make about erasure. Nothing
-about the current emission is wrong; it is more work than it needs to be.
+**A decision tree over a Case Matcher's payload.** `compile-record-members` reads
+the members of a RECORD Matcher, and a Case payload bottoms out in the same
+descriptor walk for the same reason: `Box<Integer>#Holding` and
+`Box<String>#Holding` are one tag, and what tells them apart is the payload. The
+argument would be shorter than the Record one rather than longer — a payload is
+CLOSED, so the tag establishes every member and there is no presence question at
+all — but it changes what a `tag` residual means for a Case, which two passes
+remove checks on, and that is a soundness analysis of its own.
+
+**Binding a member the tree reads more than once.** `tag-binding` reads the
+matched value's key once for a chain that asks about it repeatedly; a chain of
+Record Handlers naming ONE member reads that member once per Handler. Hoisting it
+is not the same transform: a read the tree makes may be guarded by a test above it
+— the Record tag, or the presence of the member above it in a spine — so a `const`
+before the chain would perform a read the chain only performs conditionally, and
+what would have to be hoisted is the unguarded reads alone.
 
 **The derived-equality descriptor of a generic Choice, pooled.** `pool-constants`
 hoists every descriptor standing in an Expression position, and this one does

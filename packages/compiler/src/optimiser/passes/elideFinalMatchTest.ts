@@ -23,14 +23,31 @@ import { rewriteNodes } from "../walk"
 // `--without-optimisation elide-final-match-test` is what a Compiler developer
 // chasing one turns on.
 //
-// NOTE: So the elision is taken only where the last Handler's check is decided
-// by TAGS — where it would be `value[<Type key>] === "…"`, or where it asks
-// nothing at all (a wildcard). That is deliberately narrower than
-// exhaustiveness allows, and it is where the disagreement above can not come
-// from: a check the Compiler could not reduce to a tag is one that walks a
-// payload or a List's items, which is exactly where erasure makes the runtime
-// answer and the static Type part company. Leaving those chains ending in the
-// throw keeps the one shape that can go wrong reporting itself.
+// NOTE: So the elision is taken only where the last Handler's check REDUCES TO
+// a tag comparison — `value[<Type key>] === "…"` — or asks nothing at all (a
+// wildcard). That is deliberately narrower than exhaustiveness allows, and it
+// is what bounds what is given up, to one thing: the elided test compared a
+// tag, so the only value that answered it differently is one whose tag
+// disagrees with the Type it was given. A value carrying the right tag and
+// disagreeing DEEPER — a List whose items are not what the Matcher named, a
+// Record whose members are not — passed that comparison and took this Handler
+// before the elision too, so the throw was never the thing that would have
+// named it.
+//
+// NOTE: A check that could NOT be reduced is where that stops holding. It reads
+// into the value — the payload two Cases share, a List's items, the members of
+// two Records that both claim the Record tag — so eliding it would swallow
+// exactly the disagreements erasure makes possible, rather than only a tag's.
+// Those chains keep both their test and the throw after it.
+//
+// NOTE: The reduction may rest on what can ARRIVE rather than on the Matcher
+// alone — `residual.ts` answers `tag` where one member of the scrutinee's Union
+// carries the tag and implies the Matcher — so `List<Integer> | String` ending
+// in `case List<Integer>` and `{ x: Integer } | String` ending in
+// `case { x: Integer }` are both one comparison and both elided. The decision
+// tree `compile-record-members` writes is not: it is what is written where the
+// tag decided nothing, so a Handler carrying one is declined here and keeps its
+// fall-through.
 //
 // NOTE: A Guard, a literal Matcher (`case 0`) or member literals
 // (`case { x = 0 }`) all leave a Handler that can decline for reasons no

@@ -20,6 +20,7 @@ import { declaredNamespaces } from "../optimiser/namespaces"
 import { eliminateDeadCode } from "../optimiser/passes/eliminateDeadCode"
 import { poolConstants } from "../optimiser/passes/poolConstants"
 import { pruneDeadMatchArms } from "../optimiser/passes/pruneDeadMatchArms"
+import { recordMatcherTests } from "../optimiser/residual"
 import {
 	rewriteExpressions,
 	rewriteNodes,
@@ -196,9 +197,11 @@ async function expectSamePrintedOutput(
 
 // NOTE: One Match per rule `compile-type-tests` decides by: a scalar Matcher, a
 // Case Matcher, a List Matcher the scrutinee has one List member for, two List
-// members sharing the one tag, a Record Matcher, and a Type Parameter standing
-// where anything at all could arrive. The last two Matches are the ones that
-// must NOT be compiled to a tag.
+// members sharing the one tag, a Record Matcher beside a String, and a Type
+// Parameter standing where anything at all could arrive. The two List members
+// and the Type Parameter are the ones that must NOT be compiled to a tag; the
+// Record is compiled to one, because only one member of its Union can carry the
+// Record tag and a value carrying it passes the Matcher whole.
 const typeTests = `implementation {
 	choice Shape {
 		Circle { radius: Integer },
@@ -250,11 +253,80 @@ const typeTests = `implementation {
 	Terminal.inspect(label(["a"], or "b"))
 }`
 
+// NOTE: One Match per rule `compile-record-members` decides by, over Records
+// only their MEMBERS tell apart: two Records naming one member under two Types,
+// two naming different members (so a read may find nothing), the same two beside
+// a String (so the Record tag has to be asked first), a member that is a Type
+// Parameter on both sides (which the runtime answers without looking), and a
+// nested Record whose INNER member decides.
+const recordMembers = `implementation {
+	type Circle = { radius: Integer }
+	type Rect = { width: Integer, height: Integer }
+	type Horizontal = { at: { x: Integer }, name: String }
+	type Vertical = { at: { y: String }, name: String }
+
+	function which(_ boxed: { value: Integer } | { value: String }) -> String {
+		<- match boxed -> String {
+			case { value: Integer } { <- "integer" }
+			case { value: String }  { <- "string" }
+		}
+	}
+
+	function area(_ shape: Circle | Rect) -> String {
+		<- match shape -> String {
+			case { radius: Integer }                 { <- "circle" }
+			case { width: Integer, height: Integer } { <- "rect" }
+		}
+	}
+
+	function labelled(_ shape: Circle | Rect | String) -> String {
+		<- match shape -> String {
+			case { radius: Integer }                 { <- "radius" }
+			case { width: Integer, height: Integer } { <- "sides" }
+			case String                              { <- "text" }
+		}
+	}
+
+	function tagged<infer Item>(
+		_ value: { held: Item, mark: Integer } | { held: Item, mark: String },
+	) -> String {
+		<- match value -> String {
+			case { held: Item, mark: Integer } { <- "integer mark" }
+			case { held: Item, mark: String }  { <- "string mark" }
+		}
+	}
+
+	function axis(_ node: Horizontal | Vertical) -> String {
+		<- match node -> String {
+			case { at: { x: Integer } } { <- "horizontal" }
+			case { at: { y: String } }  { <- "vertical" }
+		}
+	}
+
+	Terminal.inspect(which({ value = 1 }))
+	Terminal.inspect(which({ value = "s" }))
+	Terminal.inspect(area({ radius = 1 }))
+	Terminal.inspect(area({ width = 2, height = 3 }))
+	Terminal.inspect(area({ radius = 1, width = 2, height = 3 }))
+	Terminal.inspect(tagged({ held = 1, mark = 2 }))
+	Terminal.inspect(tagged({ held = "s", mark = "m" }))
+	Terminal.inspect(axis({ at = { x = 1 }, name = "a" }))
+	Terminal.inspect(axis({ at = { y = "b" }, name = "c" }))
+	Terminal.inspect(labelled({ radius = 1 }))
+	Terminal.inspect(labelled("t"))
+}`
+
 // NOTE: One of each thing `pool-constants` declares once — a literal written
 // twice, a Rational, a payload-less Case, a Record Matcher's descriptor, a
 // conformance witness the standard library answers for, and a witness for a
 // Namespace this Program DECLARES, which is the one that must stay where it was
 // written. The Boolean is here to be left alone.
+//
+// NOTE: The Match is written over TWO Record members, and the second Handler
+// names a member only one of them declares whose Type is a Record — which is
+// where `compile-record-members` declines, so a descriptor is still there to
+// pool. A Record beside a String would not be: one claimant for the Record tag
+// makes the whole Matcher a tag test.
 //
 // NOTE: The witness that gets pooled is the one `sort` is PASSED, rather than
 // the one an interpolated hole reads: a hole's witness is consumed on the spot
@@ -276,7 +348,7 @@ const constants = `implementation {
 	choice Colour { Red, Green }
 
 	constant boxes: List<Box> = [{ value = 3 }, { value = 1 }]
-	constant shape: { x: Integer } | String = { x = 7 }
+	constant shape: { at: { x: Integer } } | { key: String } = { at = { x = 7 } }
 	constant chosen: Colour = #Red
 
 	Terminal.inspect(1::add(1))
@@ -287,8 +359,8 @@ const constants = `implementation {
 	Terminal.inspect([2, 1]::sort())
 	Terminal.inspect(boxes::sort())
 	Terminal.inspect(match shape -> String {
-		case String            { <- "text" }
-		case { x: Integer }    { <- "a Record" }
+		case { key: String }        { <- "text" }
+		case { at: { x: Integer } } { <- "a Record" }
 	})
 }`
 
@@ -2282,13 +2354,40 @@ describe("Optimiser", () => {
 			)
 		})
 
-		it("keeps the full check for a Record Matcher", () => {
-			// NOTE: A Record's tag says only that it is a Record. What picks
-			// this Handler is its MEMBERS, and reading those is a decision tree
-			// rather than a tag test.
+		it("compiles a Record Matcher to its tag where one Record can arrive", () => {
+			// NOTE: A Record's tag says only that it is a Record, so this needs
+			// the argument about what can arrive that a scalar does not: ONE
+			// member of `{ x: Integer, y: Integer } | String` carries the Record
+			// tag and it implies the Matcher, so a value carrying that tag
+			// passes the whole check and a value carrying another fails it
+			// before a member is read.
 			let generated = generate(typeTests)
 
-			expect(generated).toContain('type: "Record"')
+			expect(generated).toContain('=== "Record"')
+			expect(generated).not.toContain('x: { type: "Integer" }')
+		})
+
+		it("keeps the full check where two Records can arrive", () => {
+			// NOTE: Both members claim the one tag, so the tag says nothing —
+			// what tells them apart is their members, which is
+			// `compile-record-members`' business and is turned off here so that
+			// what THIS pass leaves can be read.
+			let generated = generate(
+				`implementation {
+					constant shape: { at: { x: Integer } } | { key: String } = { key = "k" }
+
+					Terminal.inspect(match shape -> String {
+						case { at: { x: Integer } } { <- "nested" }
+						case { key: String }        { <- "keyed" }
+					})
+				}`,
+				{
+					enabled: true,
+					disabledPasses: new Set(["compile-record-members"]),
+				},
+			)
+
+			expect(generated).toMatch(/isValueOfType\(_self, \$pool_\d+\)/)
 			expect(generated).toContain('x: { type: "Integer" }')
 		})
 
@@ -2368,8 +2467,26 @@ describe("Optimiser", () => {
 				// NOTE: The requirement reads the MEMBER, not `_self`, and the
 				// descriptor it is asked against is a pooled Constant rather
 				// than an object literal rebuilt on every turn.
-				expect(generate(payloadPattern)).toMatch(
-					/isValueOfType\(_self\.payload, \$pool_\d+\)/,
+				// `compile-record-members` is off, because it takes the
+				// descriptor away for this requirement altogether — the test
+				// below is where that is pinned.
+				expect(
+					generate(payloadPattern, {
+						enabled: true,
+						disabledPasses: new Set(["compile-record-members"]),
+					}),
+				).toMatch(/isValueOfType\(_self\.payload, \$pool_\d+\)/)
+			})
+
+			it("hands the requirement on to the decision tree", () => {
+				// NOTE: A requirement that is a Record Matcher goes through the
+				// same rules the Matcher's own check does, one level further
+				// down: the payload is `Click | KeyPress`, only `KeyPress`
+				// declares `key`, and a member one arriving Record does not
+				// declare is read through `?.` — which answers the `hasOwn` the
+				// walk asked first and the tag comparison after it at once.
+				expect(generate(payloadPattern)).toContain(
+					'_self.payload.key?.[$type.typeKeySymbol] === "String"',
 				)
 			})
 
@@ -2987,6 +3104,57 @@ describe("Optimiser", () => {
 			)
 			expect(generated).not.toContain('=== "Boolean"')
 			expect(generated).not.toContain("noDispatchCaseMatched")
+		})
+
+		it("takes a Record case as the else where one member claims the tag", () => {
+			// NOTE: What the Record residual unlocked here: one member of the
+			// receiver's Union carries the Record tag and satisfies the case, so
+			// the last case's check IS the Integer comparison in front of it and
+			// there is nothing for a fall-through to answer for.
+			let generated = generate(`implementation {
+				namespace Circles for { radius: Integer } {
+					weight() -> Integer { <- 1 }
+				}
+
+				namespace Counts for Integer {
+					weight() -> Integer { <- 2 }
+				}
+
+				variable shape: Integer | { radius: Integer } = 1
+
+				Terminal.inspect(shape::weight())
+			}`)
+
+			expect(generated).toContain(
+				'shape[$type.typeKeySymbol] === "Integer" ? Counts.weight(shape) : Circles.weight(shape)',
+			)
+			expect(generated).not.toContain("noDispatchCaseMatched()")
+		})
+
+		it("keeps the throw where two Record cases both claim the tag", () => {
+			// NOTE: The other side of the same rule. Two Records claim the tag,
+			// so what tells them apart is a member test — which is exactly where
+			// a runtime answer and a static Type can part company — and the
+			// throw that would name it stays, whether the test is the walk or
+			// the tree `compile-record-members` writes over it.
+			let generated = generate(`implementation {
+				namespace Circles for { radius: Integer } {
+					weight() -> Integer { <- 1 }
+				}
+
+				namespace Rects for { width: Integer } {
+					weight() -> Integer { <- 2 }
+				}
+
+				variable shape: { radius: Integer } | { width: Integer } = { radius = 1 }
+
+				Terminal.inspect(shape::weight())
+			}`)
+
+			expect(generated).toContain(
+				'shape.width?.[$type.typeKeySymbol] === "Integer"',
+			)
+			expect(generated).toContain("$type.noDispatchCaseMatched()")
 		})
 
 		it("keeps the full check where two member Types share a tag", () => {
@@ -4726,10 +4894,24 @@ describe("Optimiser", () => {
 		})
 
 		it("keeps a Record Handler beside a Record scrutinee", () => {
-			// NOTE: Every Record carries the one tag, so what tells two apart is
-			// their members — which is a walk of the value rather than a
-			// question about its Type.
-			expect(generate(deadMatchArms)).toContain('type: "Record"')
+			// NOTE: Every Record carries the one tag, so a Record Matcher is
+			// never refuted by a Record member of the scrutinee's Union —
+			// whatever their members say, which is a question about the value
+			// rather than about its Type. Read off the Handlers rather than the
+			// emission, because what a surviving Record Handler is COMPILED to
+			// is a different pass's business: `{ x: Integer } | String` has one
+			// claimant for the Record tag, so the Handler that survives here
+			// ends up as the chain's `else`.
+			let program = simplifiedSource(deadMatchArms)
+			let survivors = matchMatchers(
+				pruneDeadMatchArms.run(program, declaredNamespaces(program)),
+			)
+
+			expect(survivors[3]).toHaveLength(2)
+			expect(survivors[3]!.map((matcher) => matcher.type)).toEqual([
+				"String",
+				"Record",
+			])
 		})
 
 		it("leaves the survivors in the order they were written", () => {
@@ -4871,10 +5053,30 @@ describe("Optimiser", () => {
 		})
 
 		it("keeps the fall-through where no tag decides the last Handler", () => {
-			// NOTE: A Record Matcher asks about members, and the Compiler can
-			// not reduce that to a tag — which is exactly where a runtime
-			// check and a static Type can part company, so the throw that
-			// names it stays.
+			// NOTE: TWO Record members, so the Record tag is claimed by both and
+			// says nothing — what tells them apart is their members, which is
+			// exactly where a runtime check and a static Type can part company,
+			// so the throw that names it stays. A Record beside a String would
+			// NOT be this: one claimant makes the whole Matcher a tag test and
+			// the elision applies.
+			let generated = generate(`implementation {
+				constant scrutinee: { x: Integer } | { key: String } = { key = "k" }
+
+				Terminal.inspect(match scrutinee -> String {
+					case { key: String } { <- "a String" }
+					case { x: Integer }  { <- "a Record" }
+				})
+			}`)
+
+			expect(generated).toContain("$type.noCaseMatched(_self)")
+		})
+
+		it("elides a last Record Handler one member of the Union claims", () => {
+			// NOTE: The other side of the rule above, and the one this pass
+			// gained when `residual.ts` stopped refusing a Record Matcher
+			// outright: `{ x: Integer } | String` has one Record member, so the
+			// last Handler's check IS the tag comparison and the fall-through
+			// after it can not be reached.
 			let generated = generate(`implementation {
 				constant scrutinee: { x: Integer } | String = "text"
 
@@ -4884,7 +5086,7 @@ describe("Optimiser", () => {
 				})
 			}`)
 
-			expect(generated).toContain("$type.noCaseMatched(_self)")
+			expect(generated).not.toContain("$type.noCaseMatched(_self)")
 		})
 
 		// NOTE: The standard library reads every fallible answer back through
@@ -4911,9 +5113,12 @@ describe("Optimiser", () => {
 				disabledPasses: new Set(["elide-final-match-test"]),
 			})
 
-			expect(generated).toContain(
-				'_self[$type.typeKeySymbol] === "String"',
-			)
+			// NOTE: Read off the BOUND tag: the Record Matcher compiles to a
+			// tag comparison as well now, so that chain asks about the matched
+			// value's tag twice and binds it once — which is the emitted shape
+			// `tag-binding` describes, working on a chain it could not reach
+			// before.
+			expect(generated).toContain('$self_tag === "String"')
 			expect(generated).toContain("$type.noCaseMatched(_self)")
 		})
 
@@ -4955,6 +5160,360 @@ describe("Optimiser", () => {
 			)
 			expect(generated).not.toContain(
 				'$type.isValueOfType(_self, { type: "String" })',
+			)
+		})
+	})
+
+	describe("compile-record-members", () => {
+		it("reads the member that discriminates instead of walking a descriptor", () => {
+			// NOTE: Two Records in one Union both carry the Record tag, so the
+			// tag says nothing and the members are what decide. One property
+			// read and one comparison per member, in place of a call that
+			// walked a descriptor tree, asked `Object.entries` of it and asked
+			// the runtime about each member Type in turn.
+			let generated = generate(recordMembers)
+
+			expect(generated).toContain(
+				'_self.value[$type.typeKeySymbol] === "Integer"',
+			)
+			expect(generated).toContain(
+				'_self.value[$type.typeKeySymbol] === "String"',
+			)
+		})
+
+		it("reads a member that may not be there through an optional chain", () => {
+			// NOTE: A Record Matcher is OPEN, so a value whose Type does not
+			// declare `radius` may reach the test carrying one, or not carrying
+			// it — which is the `Object.hasOwn` the walk asks first. `?.`
+			// answers `undefined` for a member that is absent, and `undefined`
+			// holds no tag.
+			expect(generate(recordMembers)).toContain(
+				'_self.radius?.[$type.typeKeySymbol] === "Integer"',
+			)
+		})
+
+		it("drops a member the static Type already decides", () => {
+			// NOTE: `held` is a Type Parameter on both sides, so the runtime
+			// answers true for it without reading the value — the tree tests
+			// `mark`, which is what tells the two apart, and nothing else.
+			let generated = generate(recordMembers)
+
+			expect(generated).toContain(
+				'_self.mark[$type.typeKeySymbol] === "Integer"',
+			)
+			expect(generated).not.toContain("_self.held")
+		})
+
+		it("descends into a nested Record the inner member decides", () => {
+			expect(generate(recordMembers)).toContain(
+				'_self.at.x?.[$type.typeKeySymbol] === "Integer"',
+			)
+		})
+
+		it("keeps the Record tag test where something else can arrive", () => {
+			// NOTE: Two Records AND a String, so no member can be read until
+			// the value is known to be a Record at all — and the `&&` is what
+			// makes the reads after it safe rather than merely tidy.
+			expect(generate(recordMembers)).toContain(
+				'_self[$type.typeKeySymbol] === "Record" && _self.radius?.[$type.typeKeySymbol] === "Integer"',
+			)
+		})
+
+		it("reads a member found on Object.prototype through the optional chain too", () => {
+			// NOTE: A Matcher may name `toString`, and a members map is an
+			// ordinary JavaScript object — so the Compiler asks `Object.hasOwn`
+			// of it rather than reading it, and the emitted read goes through
+			// `?.` because no arriving Record declares the member. What the
+			// value inherits from `Object.prototype` is a function, which holds
+			// no Type key, so the comparison answers what `hasOwn` answers.
+			expect(
+				generate(`implementation {
+					function inherited(
+						_ thing: { toString: String } | { valueOf: Integer },
+					) -> String {
+						<- match thing -> String {
+							case { toString: String } { <- "toString" }
+							case { valueOf: Integer } { <- "valueOf" }
+						}
+					}
+
+					Terminal.inspect(inherited({ toString = "s" }))
+				}`),
+			).toContain('_self.toString?.[$type.typeKeySymbol] === "String"')
+		})
+
+		it("orders a tag comparison ahead of a walk", () => {
+			// NOTE: The Matcher writes the List member FIRST and the tree reads
+			// it LAST: a tag comparison goes ahead of a walk, so the one test
+			// that can still cost a call is reached only where the cheap tests
+			// have not already declined.
+			let generated = generate(`implementation {
+				type Wide = { items: List<Integer> | List<String>, tag: Integer }
+				type Narrow = { items: List<Integer>, tag: String }
+
+				function describe(_ thing: Wide | Narrow) -> String {
+					<- match thing -> String {
+						case { items: List<Integer>, tag: Integer } { <- "wide" }
+						case _ { <- "other" }
+					}
+				}
+
+				Terminal.inspect(describe({ items = [1], tag = 1 }))
+			}`)
+
+			expect(generated).toMatch(
+				/_self\.tag\[\$type\.typeKeySymbol\] === "Integer" && \$type\.isValueOfType\(_self\.items, \$pool_\d+\)/,
+			)
+		})
+
+		it("orders a comparison BELOW a walk ahead of it too", () => {
+			// NOTE: The comparison that decides is one level DOWN from the walk,
+			// and cost is what orders them — not depth, which would put the walk
+			// of a two-thousand-item List ahead of the read that declines in one
+			// comparison and lose to the check the tree replaced. It is safe
+			// because a walk is a leaf: the plan descends into a member or walks
+			// it, never both, so nothing a walk could guard stands below it.
+			let generated = generate(`implementation {
+				type Wide = { items: List<Integer> | List<String>, flag: { on: Integer } }
+				type Narrow = { items: List<Integer>, flag: { on: String } }
+
+				function describe(_ thing: Wide | Narrow) -> String {
+					<- match thing -> String {
+						case { items: List<Integer>, flag: { on: Integer } } { <- "wide" }
+						case _ { <- "other" }
+					}
+				}
+
+				Terminal.inspect(describe({ items = [1], flag = { on = 1 } }))
+			}`)
+
+			expect(generated).toMatch(
+				/_self\.flag\.on\[\$type\.typeKeySymbol\] === "Integer" && \$type\.isValueOfType\(_self\.items, \$pool_\d+\)/,
+			)
+		})
+
+		it("compiles a Union dispatch's case check", () => {
+			// NOTE: The same Node stands in three places by the time this runs,
+			// and a dispatch case is one of them — so the descriptor walk is
+			// retired there by the same rule, without this pass knowing a
+			// dispatch from a Match.
+			let generated = generate(`implementation {
+				namespace Circles for { radius: Integer } {
+					describe() -> String { <- "circle" }
+				}
+
+				namespace Rects for { width: Integer, height: Integer } {
+					describe() -> String { <- "rect" }
+				}
+
+				variable shape: { radius: Integer } | { width: Integer, height: Integer } = { radius = 1 }
+
+				Terminal.inspect(shape::describe())
+			}`)
+
+			expect(generated).toContain(
+				'shape.radius?.[$type.typeKeySymbol] === "Integer"',
+			)
+			expect(generated).not.toContain("isValueOfType")
+		})
+
+		it("declines where a value of any kind at all can arrive", () => {
+			// NOTE: A Type Parameter stands beside the Record, so a value
+			// reaching the test may be anything — including a Record carrying
+			// none of the members. Neither its tag nor what it declares can be
+			// named, so the walk, which asks `hasOwn` before every read, stays.
+			let generated = generate(`implementation {
+				function describe<infer Item>(
+					_ value: Item | { x: Integer },
+					like witness: Item,
+				) -> String {
+					<- match value -> String {
+						case { x: Integer } { <- "record" }
+						case _ { <- "other" }
+					}
+				}
+
+				Terminal.inspect(describe({ x = 1 }, like { x = 0 }))
+			}`)
+
+			expect(generated).toMatch(/isValueOfType\(_self, \$pool_\d+\)/)
+		})
+
+		it("declines where a member that may be absent needs a walk", () => {
+			// NOTE: Nothing is known about a member one arriving Record does not
+			// declare — not that it is absent, and not what it holds if it is
+			// there — so a requirement that is not answered by ONE tag
+			// comparison has nothing to be measured against, and the walk stays.
+			let generated = generate(`implementation {
+				function describe(
+					_ thing: { at: { x: Integer } } | { key: String },
+				) -> String {
+					<- match thing -> String {
+						case { at: { x: Integer } } { <- "nested" }
+						case { key: String } { <- "keyed" }
+					}
+				}
+
+				Terminal.inspect(describe({ key = "k" }))
+			}`)
+
+			expect(generated).toMatch(/isValueOfType\(_self, \$pool_\d+\)/)
+			expect(generated).toContain('x: { type: "Integer" }')
+		})
+
+		it("declines a tree larger than it is worth writing out", () => {
+			// NOTE: A size rule rather than a soundness one — the walk is one
+			// call against one pooled descriptor shared by every site naming the
+			// same Matcher, and a tree is written out at each of them. A plan is
+			// refused whole or taken whole; a truncated one would ask less than
+			// the walk it replaced.
+			let generated = generate(`implementation {
+				type Wide = { a: Integer, b: Integer, c: Integer, d: Integer, e: Integer, f: Integer, g: Integer, h: Integer, i: Integer }
+				type Other = { a: String, b: String, c: String, d: String, e: String, f: String, g: String, h: String, i: String }
+
+				function describe(_ thing: Wide | Other) -> String {
+					<- match thing -> String {
+						case { a: Integer, b: Integer, c: Integer, d: Integer, e: Integer, f: Integer, g: Integer, h: Integer, i: Integer } { <- "wide" }
+						case { a: String } { <- "other" }
+					}
+				}
+
+				Terminal.inspect(describe({ a = 1, b = 2, c = 3, d = 4, e = 5, f = 6, g = 7, h = 8, i = 9 }))
+			}`)
+
+			expect(generated).toMatch(/isValueOfType\(_self, \$pool_\d+\)/)
+		})
+
+		it("refuses a plan where all that is left is whether a member is there", () => {
+			// NOTE: A Type Parameter as the REQUIREMENT is implied by
+			// everything, so nothing about what the member holds is left to
+			// ask — but one arriving Record does not declare it, so whether it
+			// is THERE is still a question, and it is the whole of the test.
+			// The tree has no test for that on its own: a test asks a tag or
+			// asks the walk, and neither is `Object.hasOwn`. So the plan is
+			// refused and the walk goes on asking it.
+			let held: common.Type = { type: "GenericUse", name: "Item" }
+
+			expect(
+				recordMatcherTests(
+					{ type: "Record", members: { held } },
+					{
+						type: "UnionType",
+						types: [
+							{ type: "Record", members: { held } },
+							{
+								type: "Record",
+								members: { other: { type: "Integer" } },
+							},
+						],
+					},
+				),
+			).toBeNull()
+
+			// NOTE: The same shape with a requirement one comparison answers —
+			// which is what the refusal above is NOT, rather than the member
+			// being undeclared being refused on its own.
+			expect(
+				recordMatcherTests(
+					{ type: "Record", members: { held: { type: "Integer" } } },
+					{
+						type: "UnionType",
+						types: [
+							{ type: "Record", members: { held } },
+							{
+								type: "Record",
+								members: { other: { type: "Integer" } },
+							},
+						],
+					},
+				),
+			).toEqual([
+				{
+					path: ["held"],
+					check: { kind: "tag", tag: "Integer", optional: true },
+				},
+			])
+		})
+
+		// NOTE: A Type graph that leads back into itself is what every
+		// structural walker in this stage carries a guard for. No source-level
+		// Program builds one — recursive Type declarations are refused — so the
+		// pass is asked directly, exactly as `pool-constants`' key serialiser
+		// is.
+		it("stops descending where a Matcher leads back into itself", () => {
+			let outer: common.RecordType = {
+				type: "Record",
+				members: { x: { type: "Integer" } },
+			}
+			let inner: common.RecordType = {
+				type: "Record",
+				members: { back: outer },
+			}
+
+			outer.members["m"] = inner
+
+			let arrivingInner: common.RecordType = {
+				type: "Record",
+				members: { back: { type: "String" } },
+			}
+			let arriving: common.RecordType = {
+				type: "Record",
+				members: { m: arrivingInner, x: { type: "String" } },
+			}
+
+			let tests = recordMatcherTests(outer, arriving)
+
+			expect(tests).not.toBeNull()
+			expect(
+				tests!.map(
+					(test) => `${test.path.join(".")}:${test.check.kind}`,
+				),
+			).toEqual(["x:tag", "m.back:descriptor"])
+		})
+
+		it("walks the descriptor again when it is turned off", () => {
+			let generated = generate(recordMembers, {
+				enabled: true,
+				disabledPasses: new Set(["compile-record-members"]),
+			})
+
+			expect(generated).toMatch(/isValueOfType\(_self, \$pool_\d+\)/)
+			expect(generated).toContain('type: "Record"')
+		})
+
+		it("prints the same thing with the pass off", async () => {
+			expect(
+				await expectSamePrintedOutput(
+					"compile-record-members",
+					recordMembers,
+				),
+			).toEqual([
+				'"integer"',
+				'"string"',
+				'"circle"',
+				'"rect"',
+				'"circle"',
+				'"integer mark"',
+				'"string mark"',
+				'"horizontal"',
+				'"vertical"',
+				'"radius"',
+				'"text"',
+			])
+		})
+
+		it("prints the same thing with the pass off for every fixture shape", async () => {
+			await expectSamePrintedOutput(
+				"compile-record-members",
+				readFileSync(fixturePath("Match.es"), "utf8"),
+			)
+			await expectSamePrintedOutput(
+				"compile-record-members",
+				readFileSync(fixturePath("Patterns.es"), "utf8"),
+			)
+			await expectSamePrintedOutput(
+				"compile-record-members",
+				readFileSync(fixturePath("Event.es"), "utf8"),
 			)
 		})
 	})
