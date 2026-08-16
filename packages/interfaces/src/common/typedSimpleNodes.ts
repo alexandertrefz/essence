@@ -374,12 +374,30 @@ export type IntrinsicNode =
 //
 // NOTE: `negated` asks the opposite question rather than negating the answer:
 // the emission is `!==`, so `isNot` costs exactly what `is` does.
+//
+// NOTE: `optional` reads the value through `?.`, and it is what makes this
+// answer a question about a member that may not be THERE: a Record Matcher is
+// open, so a value can reach a test carrying no such member, and `undefined`
+// carries no Type key. `value?.[<Type key>] === "…"` is `Object.hasOwn(value,
+// name) && <the tag comparison>` exactly — a member that is absent, and one
+// found on `Object.prototype` rather than on the value, are both something that
+// holds no Type key and so answer false, which is what the runtime's own
+// `hasOwn` answers for them. `compile-record-members` is what sets it, and only
+// where it could not prove the member is carried.
+//
+// NOTE: The two compose rather than conflict. `negated` with `optional` is
+// `value?.[<Type key>] !== "…"`, which answers TRUE for a member that is not
+// there — and that is what "is not this tag" means for one, the negation of the
+// `hasOwn` and the comparison together, exactly as the affirmative form is their
+// conjunction. Nothing writes the pair today; it is stated so that a reader
+// reaching for it is not relying on an accident.
 export interface TagTestNode {
 	nodeType: "Intrinsic"
 	kind: "tag-test"
 	value: ExpressionNode
 	tag: string
 	negated: boolean
+	optional: boolean
 	type: BooleanType
 	position?: Position
 }

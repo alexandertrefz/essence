@@ -139,6 +139,7 @@ function tagTest(
 			value,
 			tag,
 			negated,
+			optional: false,
 			type,
 			position: node.position,
 		},

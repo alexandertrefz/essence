@@ -2096,11 +2096,17 @@ function rewriteIntrinsic(
 		// NOTE: The tag as the value carries it — through `renderIdentity`, like
 		// every other place a tag is written, so a Choice declared in a Module
 		// is asked about under the same spelling it was stamped with.
+		//
+		// NOTE: An OPTIONAL read is `?.[…]`, which answers `undefined` for a
+		// member that is not there — and `undefined` is not a tag, so the
+		// comparison answers false without the read throwing. That is the
+		// `Object.hasOwn` the runtime's own check asks first, folded into the
+		// comparison after it; `compile-record-members` says what it rests on.
 		case "tag-test":
 			return {
 				type: "BinaryExpression",
 				operator: node.negated ? "!==" : "===",
-				left: typeKeyRead(rewriteExpression(node.value)),
+				left: typeKeyRead(rewriteExpression(node.value), node.optional),
 				right: { type: "Literal", value: renderIdentity(node.tag) },
 			}
 		// NOTE: The general check, byte for byte what a Match Handler emitted
@@ -2784,14 +2790,31 @@ function typeKeyProperty(tag: string): estree.Property {
 
 // NOTE: The same key, read off a value — what the runtime's own Type checks ask
 // and what a `tag-test` is.
-function typeKeyRead(object: estree.Expression): estree.MemberExpression {
-	return {
+//
+// NOTE: `optional` makes it `?.[…]`, for the one reader that asks about a value
+// which may not be there at all: a Record Matcher is open, so a member it names
+// can be missing from a value that reaches the test, and a read of a missing
+// member is `undefined`. Optional chaining answers `undefined` for it instead of
+// throwing, and `undefined` equals no tag.
+//
+// NOTE: And it is WRAPPED, because an optional read is a `ChainExpression` in
+// ESTree and a bare `MemberExpression` carrying `optional` is not a tree the
+// grammar has — the chain is the Node that says where the short circuit stops.
+// It prints the same either way, so this is the shape being right rather than
+// the output changing.
+function typeKeyRead(
+	object: estree.Expression,
+	optional = false,
+): estree.Expression {
+	let read: estree.MemberExpression = {
 		type: "MemberExpression",
-		optional: false,
+		optional,
 		computed: true,
 		object,
 		property: typeKey(),
 	}
+
+	return optional ? { type: "ChainExpression", expression: read } : read
 }
 
 // NOTE: Member names go through the same `memberKey` quoting every other

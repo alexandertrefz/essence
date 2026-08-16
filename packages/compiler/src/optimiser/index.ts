@@ -5,6 +5,7 @@ import { type DeclaredNamespaces, declaredNamespaces } from "./namespaces"
 import { buildListsInPlace } from "./passes/buildListsInPlace"
 import { collapseCombinations } from "./passes/collapseCombinations"
 import { collapseConstruction } from "./passes/collapseConstruction"
+import { compileRecordMembers } from "./passes/compileRecordMembers"
 import { compileTypeTests } from "./passes/compileTypeTests"
 import { compileUnionDispatch } from "./passes/compileUnionDispatch"
 import { devirtualiseWitnesses } from "./passes/devirtualiseWitnesses"
@@ -110,6 +111,7 @@ export const optimiserPasses: ReadonlyArray<OptimiserPass> = [
 	foldConstants,
 	pruneDeadMatchArms,
 	elideFinalMatchTest,
+	compileRecordMembers,
 	eliminateDeadCode,
 	collapseConstruction,
 	collapseCombinations,

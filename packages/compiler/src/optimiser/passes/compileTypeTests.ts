@@ -1,6 +1,7 @@
 import type { common } from "@essence-lang/interfaces"
 
 import type { OptimiserPass } from "../index"
+import { memberReadOf, memberTypeAt } from "../reads"
 import {
 	matcherResidual,
 	matcherResidualOverMembers,
@@ -190,26 +191,14 @@ function compileMemberTests(
 }
 
 // NOTE: The read the requirement is asked of — `_self.payload.origin` — built
-// from the spine the Enricher keyed it by. A member name can hold no dot, so
-// splitting on one can not mistake anything else for a spine.
+// from the spine the Enricher keyed it by, through the same helper
+// `compile-record-members` builds its member reads with. A member name can hold
+// no dot, so splitting on one can not mistake anything else for a spine.
 function memberRead(
 	valueType: common.Type,
 	steps: Array<string>,
 ): common.typedSimple.ExpressionNode {
-	let node = matchedValue(valueType)
-	let type = valueType
-
-	for (let step of steps) {
-		type = memberTypeAt(type, step)
-		node = {
-			nodeType: "Lookup",
-			base: node,
-			member: { nodeType: "Identifier", name: step, type },
-			type,
-		}
-	}
-
-	return node
+	return memberReadOf(matchedValue(valueType), steps)
 }
 
 function declaredTypeAtPath(
@@ -217,19 +206,6 @@ function declaredTypeAtPath(
 	steps: Array<string>,
 ): common.Type {
 	return steps.reduce(memberTypeAt, valueType)
-}
-
-// NOTE: Silent, and `Unknown` where nothing carries the member — the Enricher
-// has already reported anything worth reporting about a Pattern's members, and
-// an Optimiser pass says nothing about a Program either way.
-function memberTypeAt(type: common.Type, name: string): common.Type {
-	let found = unionMembersOf(type).flatMap((member: common.Type) =>
-		member.type === "Record" || member.type === "Case"
-			? (member.members[name] ?? [])
-			: [],
-	)
-
-	return found.length === 1 ? found[0]! : { type: "Unknown" }
 }
 
 // NOTE: `_self` is the name the Rewriter binds the matched value to, and the
@@ -262,6 +238,7 @@ function tagTestOf(
 		value,
 		tag,
 		negated: false,
+		optional: false,
 		type: { type: "Boolean" },
 	}
 }

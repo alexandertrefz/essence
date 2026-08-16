@@ -227,14 +227,27 @@ describe("Match Lowering", () => {
 			).toEqual(['"flag"'])
 		})
 
-		// NOTE: The descriptor and the Record literal have to spell the name
-		// the same way — `isValueOfType` reads the member back off the value by
-		// the key the literal wrote — so the quoted form is pinned here rather
-		// than left to whichever of the two the emitted JavaScript happens to
-		// parse.
+		// NOTE: The check and the Record literal have to spell the name the
+		// same way — whichever of the two forms the check takes reads the
+		// member back off the value by the key the literal wrote — so the
+		// quoted form is pinned here rather than left to whichever of them the
+		// emitted JavaScript happens to parse.
 		it("writes the member as a quoted key in the emitted descriptor", () => {
+			expect(
+				generate(source(`{ ok? = true }`), {
+					enabled: true,
+					disabledPasses: new Set(["compile-record-members"]),
+				}),
+			).toContain('members: { "ok?":')
+		})
+
+		// NOTE: And the same invariant for the check the decision tree writes,
+		// which is what an ordinary build emits for this Match: the read has to
+		// spell the member the way the literal wrote it, and `ok?` is not
+		// something JavaScript can spell after a dot.
+		it("writes the member as a quoted read in the compiled check", () => {
 			expect(generate(source(`{ ok? = true }`))).toContain(
-				'members: { "ok?":',
+				'_self["ok?"]?.[$type.typeKeySymbol] === "Boolean"',
 			)
 		})
 	})
@@ -272,14 +285,15 @@ describe("Match Lowering", () => {
 		})
 
 		it("keeps the fallback where the last Handler can decline", () => {
-			// NOTE: A Record Matcher asks about members rather than a tag, so
-			// the elision does not apply and the chain ends where it always
-			// did — under the ordinary, fully optimised build.
+			// NOTE: TWO Record members, both carrying the one Record tag, so
+			// what tells them apart is their members — the elision does not
+			// apply and the chain ends where it always did, under the ordinary,
+			// fully optimised build.
 			let generated = generate(`implementation {
-				constant scrutinee: { x: Integer } | String = "text"
+				constant scrutinee: { x: Integer } | { key: String } = { key = "k" }
 
 				Terminal.inspect(match scrutinee -> String {
-					case String { <- "a String" }
+					case { key: String } { <- "a String" }
 					case { x: Integer } { <- "a Record" }
 				})
 			}`)
