@@ -243,12 +243,37 @@ export function createInterpreter(
 	// on calls the same way.
 	let typeKey = bridge.typeKey
 	let makeCase = bridge.case
+
+	// NOTE: A Record or a payload Case this reader BUILDS is tagged in place
+	// rather than handed to the bridge's constructor, which spreads what it is
+	// given into a second object — one allocation per value that this reader,
+	// having just built the first, has no reason to pay: a quarter of a tree of
+	// Cases crossing in was that spread. The shape written is the runtime's own,
+	// the members and the Type key on one object, and it is the shape the
+	// Rewriter already writes as a literal where a construction is static; this
+	// reader is the same kind of caller — inside the contract, building an
+	// object nothing else holds. Nothing here reaches a host: the bridge still
+	// hands a host the copying constructors, and every object tagged this way
+	// was made on this line's side of the boundary.
+	function ownRecord(fields: Record<string, EssenceValue>): EssenceValue {
+		;(fields as Record<symbol, unknown>)[typeKey] = "Record"
+
+		return fields
+	}
+
+	function ownCase(
+		tag: string,
+		payload: Record<string, EssenceValue>,
+	): EssenceValue {
+		;(payload as Record<symbol, unknown>)[typeKey] = tag
+
+		return payload
+	}
 	let makeInteger = bridge.integer
 	let makeRational = bridge.rational
 	let makeString = bridge.string
 	let makeBoolean = bridge.boolean
 	let makeList = bridge.list
-	let makeRecord = bridge.record
 	// NOTE: Every unit Choice Case the MODULE names, under the tag its values
 	// carry. Whether a Case crosses as a bare string is a fact about the Choice
 	// and a value carries nothing that says it, so the general walk — which
@@ -667,7 +692,7 @@ export function createInterpreter(
 							)
 						}
 
-						return makeRecord(fields)
+						return ownRecord(fields)
 					}
 
 					// NOTE: And every value the two lists did not settle, read
@@ -716,7 +741,7 @@ export function createInterpreter(
 						throw undeclaredMembers(shown, undeclared, at, step)
 					}
 
-					return makeRecord(fields)
+					return ownRecord(fields)
 				}
 			}
 			case "optional": {
@@ -1094,7 +1119,7 @@ export function createInterpreter(
 						)
 					}
 
-					return makeCase(tag, payload)
+					return ownCase(tag, payload)
 				}
 			}
 
@@ -1125,7 +1150,7 @@ export function createInterpreter(
 				)
 			}
 
-			return makeCase(tag, payload)
+			return ownCase(tag, payload)
 		}
 	}
 
