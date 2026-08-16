@@ -186,6 +186,56 @@ describe("an emitted operation", () => {
 		)
 		expect(generated).toContain("Integer.product(left.value, right.value)")
 	})
+
+	it("reads a chained operation through both of its arms", async () => {
+		// NOTE: An operand that is ITSELF a guarded operation used to build an
+		// Integer for the operation around it to read straight back — a box
+		// built and taken apart on one line, which is the half swap
+		// `unboxed-loop-state` measured as a LOSS. Every site that reads an
+		// Integer for its value reads it through both arms instead: the operands
+		// of an operation that escaped, both sides of a comparison, and the
+		// value a raw slot takes. It is not a walk's question — the Function
+		// below has no walk in it.
+		let source = program(`	§§ Triples a value.
+	§§
+	§§ @param value — the value
+	§§ @returns — three times the value.
+	function triple(_ value: Integer) -> Integer {
+		<- value::add(value)::add(value)
+	}
+
+	constant chained = loop(from 1, through 3, startingWith 9007199254740990, step (
+		index,
+		carried,
+	) { <- carried::add(index)::add(index) })
+
+	constant compared = loop(from 1, through 3, startingWith 0, step (
+		index,
+		carried,
+	) {
+		if carried::add(index)::isGreaterThan(2) { <- carried::add(10) } else { <- carried::add(index) }
+	})
+
+	Terminal.print(triple(9007199254740990))
+	Terminal.print(chained)
+	Terminal.print(chained::is(9007199254741002))
+	Terminal.print(compared)`)
+
+		// NOTE: Not one Integer is BUILT anywhere in this Program. Every
+		// operation here stands where its answer is read for its value — as the
+		// operand of another, as the side of a comparison, or as the value a raw
+		// slot takes — so the object literal has nowhere left to be written. The
+		// walks also cross 2⁵³, which is where an arm read wrongly would show.
+		expect(generate(source)).not.toContain(
+			'[$type.typeKeySymbol]: "Integer"',
+		)
+		expect(await outputOf(source)).toEqual([
+			"27021597764222970",
+			"9007199254741002",
+			"true",
+			"21",
+		])
+	})
 })
 
 describe("an emitted literal", () => {

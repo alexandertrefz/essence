@@ -2128,8 +2128,8 @@ function rewriteIntrinsic(
 			return {
 				type: "BinaryExpression",
 				operator: node.operator,
-				left: valueRead(rewriteExpression(node.left)),
-				right: valueRead(rewriteExpression(node.right)),
+				left: unboxedInteger(rewriteExpression(node.left)),
+				right: unboxedInteger(rewriteExpression(node.right)),
 			}
 		case "raw-equals":
 			return rawEquals(node)
@@ -2382,8 +2382,8 @@ function rawEquals(node: common.typedSimple.RawEqualsNode): estree.Expression {
 		return {
 			type: "BinaryExpression",
 			operator: node.negated ? "!==" : "===",
-			left: valueRead(rewriteExpression(node.left)),
-			right: valueRead(rewriteExpression(node.right)),
+			left: unboxedInteger(rewriteExpression(node.left)),
+			right: unboxedInteger(rewriteExpression(node.right)),
 		}
 	}
 
@@ -2439,6 +2439,10 @@ function rawEquals(node: common.typedSimple.RawEqualsNode): estree.Expression {
 // NOTE: The escape arm hands the two RAW values to the runtime, which redoes the
 // guard and falls to bigint. It is reached by an operation that left safe range
 // and by one whose operands had already left it, and both are cold.
+//
+// NOTE: Every operand here is read through `unboxedInteger` rather than through
+// `valueRead` — `unboxed-operand`, which is what keeps a CHAIN from building the
+// Integer its next operation immediately takes apart.
 function rawArithmetic(
 	node: common.typedSimple.RawArithmeticNode,
 ): estree.Expression {
@@ -2451,7 +2455,7 @@ function rawArithmetic(
 			{ type: "Identifier", name: "Integer" },
 			escapedArithmetic[node.operator],
 		),
-		arguments: [valueRead(left), valueRead(right)],
+		arguments: [unboxedInteger(left), unboxedInteger(right)],
 	}
 
 	// NOTE: The guard reads each operand twice and the answer three times, so
@@ -2538,6 +2542,12 @@ function exitBox(value: estree.Expression): estree.Expression {
 // value off the Integer the runtime built. Both arms are values of one Integer,
 // so reading both is the same rewrite twice. Anything else — a name, a call, a
 // member — is read through as it stands.
+//
+// NOTE: Every site that reads an Integer for its value reads it through here and
+// not through `valueRead`: the operands of an operation that escaped, the two
+// sides of a comparison, the two sides of an equality, and the value a raw slot
+// takes. `valueRead` is what is left where the Expression is not an Integer or
+// where the read is the runtime's own — a Boolean's, a List's count, a bound.
 function unboxedInteger(value: estree.Expression): estree.Expression {
 	let held = exitBoxes.get(value)
 

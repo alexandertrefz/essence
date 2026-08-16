@@ -1134,6 +1134,56 @@ bytes MORE across the same builds, because the literal that stops being written
 is long and repetitive and compresses to nearly nothing, while the constructor
 call and the extra `.value` add entropy at each site.
 
+### `unboxed-operand`
+
+Reads an Integer-valued Expression through the two arms of the guard that made
+it, wherever it is read for the value it holds, so that an operation standing
+inside another builds no Integer for that one to take apart.
+
+```js
+function blend(left, right) {
+	return Integer.difference(Integer.sum((typeof left.value === "number" && typeof right.value === "number" && left.value + right.value >= -9007199254740991 && left.value + right.value <= 9007199254740991 ? {
+		[$type.typeKeySymbol]: "Integer",
+		value: left.value + right.value
+	} : Integer.sum(left.value, right.value)).value, right.value).value, right.value);
+}
+```
+
+```js
+function blend(left, right) {
+	return Integer.difference(Integer.sum(typeof left.value === "number" && typeof right.value === "number" && left.value + right.value >= -9007199254740991 && left.value + right.value <= 9007199254740991 ? left.value + right.value : Integer.sum(left.value, right.value).value, right.value).value, right.value);
+}
+```
+
+`lower-scalar-operations` writes each exact operation out as a guard around a
+raw one, and the guarded arm builds the Integer the operation answers with. Where
+that answer is read for its VALUE — as the operand of the next operation in a
+chain, as a side of a comparison or an equality, or as what a walk's raw slot
+takes — the box is built and taken apart on one line. Both arms are values of one
+Integer, so both are read: the object literal is never written, and the escaped
+arm reads the value off the Integer the runtime built. Nothing is duplicated and
+nothing that was evaluated stops being.
+
+**It is `unboxed-loop-state`'s other half, applied where that one could not
+reach.** That shape reads the operation writing INTO a slot through both arms;
+this reads the operations standing inside it, and the operations in a Program
+with no walk in it at all. A Function chaining three operations is the plain
+case, and it pays whether or not it is ever called from a loop.
+
+**The read is only ever the value.** A site that takes the INTEGER — a Method of
+Integer that was not lowered, a Function's Argument, a List's item — is untouched,
+because the guarded arm's box is what such a site wants. This is why the fence
+`unboxed-loop-state` states as its second rule is the same fence: an accumulator
+handed to `isEven` keeps its box for the same reason.
+
+Measured in a fresh process, best of fifteen. A two-million-turn walk whose body
+chains two additions falls **27.3 ms to 19.3 ms on Bun** and 12.2 to 10.6 on Node;
+at twenty million turns it is 216 ms to 122 ms and 76 to 69. Two million calls to
+a Function chaining three operations — the loop's own State is handed to it, so
+that walk keeps its box and only this shape is measured — fall 36.8 ms to 28.8 ms
+on Bun and 22.8 to 19.8 on Node. Across the twenty-three fixture builds it is 371
+bytes less, in the four that chain.
+
 ## Not done yet
 
 Four things the passes above deliberately leave undone. Each is written here
