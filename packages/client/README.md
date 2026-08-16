@@ -70,6 +70,12 @@ lossless spelling at all the value is refused rather than approximated: an
 `Optional` inside an `Optional` would be `undefined` at both levels, and
 `#Value(#Empty)` is not `#Empty`.
 
+`Optional` is the one Choice spelled by ABSENCE rather than by a `$case`, and
+that holds however its Type was written down. An unannotated
+`constant present = #Value(3)` has one of `Optional`'s Cases alone for a Type
+rather than the Union an annotation would have named, and still crosses as
+`3n` — the last row of the table is every other Choice.
+
 A constant is marshalled when it is read, not when the Module is loaded, so an
 export the boundary has no mapping for — the numeric tower above `Rational`,
 today — throws where it is read instead of taking the whole Module with it.
