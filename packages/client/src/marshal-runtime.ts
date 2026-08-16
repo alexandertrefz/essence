@@ -1052,6 +1052,52 @@ export function createInterpreter(
 				throw collidingCase(at, step, true)
 			}
 
+			let payload: Record<string, EssenceValue> = {}
+			let inside: Path = { at, step }
+
+			// NOTE: The keys the value carries against the payload the Case
+			// declares, IN ORDER, with the tag at one end or the other — the
+			// two layouts a value of this Case is written in: `{ ...payload,
+			// $case }` is what a constructor and `toJS` build, `{ $case,
+			// ...payload }` is what a host writes by hand. Where the lists
+			// agree, both questions are already answered — every declared
+			// member is an own key and nothing undeclared is present — so the
+			// members are read straight off, as the Record branch reads its own.
+			let keys = Object.keys(given)
+
+			if (keys.length === count + 1) {
+				let offset = keys[0] === "$case" ? 1 : 0
+				let asDeclared = offset === 1 || keys[count] === "$case"
+
+				if (asDeclared) {
+					for (let position = 0; position < count; position++) {
+						if (keys[position + offset] !== names[position]) {
+							asDeclared = false
+
+							break
+						}
+					}
+				}
+
+				if (asDeclared) {
+					if (count === 0) {
+						return makeCase(tag)
+					}
+
+					for (let position = 0; position < count; position++) {
+						let name = names[position]!
+
+						payload[name] = readers[position]!(
+							given[name],
+							inside,
+							name,
+						)
+					}
+
+					return makeCase(tag, payload)
+				}
+			}
+
 			let undeclared = undeclaredOf(given, declared, true)
 
 			if (undeclared !== null) {
@@ -1065,9 +1111,6 @@ export function createInterpreter(
 				// Module's own `#Blank` is not.
 				return makeCase(tag)
 			}
-
-			let payload: Record<string, EssenceValue> = {}
-			let inside: Path = { at, step }
 
 			// NOTE: An absent key is read as `undefined` — through an OWN-key
 			// check, past what `Object.prototype` holds — and the member's own
