@@ -229,6 +229,25 @@ export const label = named(undefined)
 		expect(bundle.label).toBe("unnamed")
 	})
 
+	// NOTE: The Choice's own name is an export of the wrapper, though the bundle
+	// behind it binds nothing under it — the constructors are written out of the
+	// Descriptor the wrapper carries, which is where the tag came from in the
+	// first place.
+	it("serves a Choice as the constructors its Cases are spelled with", async () => {
+		let directory = project({
+			"Shapes.es": SHAPES_MODULE,
+			"entry.js": `import { areaOf, Shape } from "./Shapes.es"
+
+export const area = areaOf(Shape.Circle({ radius: 4n }))
+export const empty = Shape.Blank
+`,
+		})
+		let bundle = await built(directory, "entry.js", "shapes.mjs")
+
+		expect(bundle.area).toBe(16n)
+		expect(bundle.empty).toEqual({ $case: "Shape#Blank" })
+	})
+
 	// NOTE: The whole Essence graph, not the file that was named. Nothing about a
 	// dependency reaches the host bundler — the Bundler already inlined it, and
 	// the runtime with it, so what esbuild is handed resolves to nothing.

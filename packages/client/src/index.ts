@@ -43,6 +43,7 @@ export {
 // host has other plans for.
 export {
 	type CaseDescriptor,
+	type ChoiceDescriptor,
 	createMarshaller,
 	type DeclaredType,
 	type Descriptor,

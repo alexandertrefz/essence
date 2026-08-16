@@ -460,6 +460,11 @@ describe("The exports of a Module", () => {
 	it("hands back every Function as a JavaScript one", () => {
 		expect(typeof module.exports.integer).toBe("function")
 		expect(Object.keys(module.exports).sort()).toEqual([
+			// NOTE: The two Choices among them, which the bundle binds no name
+			// for — what is under those is one constructor per Case, spelled on
+			// this side.
+			"Shape",
+			"Styled",
 			"absent",
 			"answer",
 			"areaOf",

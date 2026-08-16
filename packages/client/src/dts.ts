@@ -170,6 +170,10 @@ function bundleBlocks(
 			continue
 		}
 
+		if (entry.kind === "choice") {
+			continue
+		}
+
 		declarations.push(walker.emittedDeclaration(name, entry))
 	}
 
@@ -307,10 +311,14 @@ function admitsAbsence(node: Descriptor): boolean {
 	}
 }
 
-// NOTE: An export the BUNDLE binds a name for. An Overload set is the one that
-// does not — each of its Overloads binds one instead — so the bundle view takes
-// them apart before it asks for a declaration.
-type BoundExport = Exclude<ExportDescriptor, { kind: "overloaded" }>
+// NOTE: An export the BUNDLE binds a name for. Two do not: an Overload set,
+// whose Overloads each bind one instead, and a Choice, which binds nothing at
+// all — so the bundle view takes the first apart and leaves the second out
+// before it asks for a declaration.
+type BoundExport = Exclude<
+	ExportDescriptor,
+	{ kind: "overloaded" } | { kind: "choice" }
+>
 
 type Walker = {
 	aliasDeclaration: (name: string, node: Descriptor) => string
@@ -546,6 +554,17 @@ function createWalker(
 			return `${OVERLOADED_NOTICE}${exported(name, "never")}`
 		}
 
+		// NOTE: A Choice is declared TWICE under one name, and TypeScript keeps
+		// both apart: the Type above, which is what a value of it is, and this,
+		// which is the object its Cases are spelled through. A host writes
+		// `Shape.Circle({ radius: 3n })` and annotates it `Shape`.
+		if (entry.kind === "choice") {
+			return braced(
+				`export declare const ${name}:`,
+				caseEntries(entry.cases),
+			)
+		}
+
 		if (entry.kind === "namespace") {
 			let entries = namespaceEntries(entry)
 
@@ -571,14 +590,34 @@ function createWalker(
 		return exported(name, print(entry.of, "out"))
 	}
 
+	// NOTE: One way to spell each Case, as a host reads it: a Case with a payload
+	// is a Function of that payload, and one without is the value itself. Both
+	// are printed in the IN direction, because what a constructor answers with is
+	// an object built to be handed to the Module — the same object, the same way
+	// round, at both ends.
+	function caseEntries(cases: ReadonlyArray<CaseDescriptor>): Array<string> {
+		return cases.map((node) => {
+			let built = printCase(node, "in")
+
+			return Object.keys(node.payload).length === 0
+				? `${memberName(node.name)}: ${built}`
+				: `${memberName(node.name)}(payload: ${inlined(
+						recordEntries(node.payload, "in"),
+					)}): ${built}`
+		})
+	}
+
 	// NOTE: A Namespace is an object of its statics on this side, so its Methods
 	// are members rather than declarations — and its constants come OUT whichever
 	// way the Namespace itself was reached, since there is no writing one.
 	function namespaceEntries(entry: NamespaceDescriptor): Array<string> {
-		let entries = Object.entries(entry.properties).map(
-			([name, property]) =>
-				`${memberName(name)}: ${print(property.of, "out")}`,
-		)
+		let entries = [
+			...caseEntries(entry.cases ?? []),
+			...Object.entries(entry.properties).map(
+				([name, property]) =>
+					`${memberName(name)}: ${print(property.of, "out")}`,
+			),
+		]
 
 		for (let [name, method] of Object.entries(entry.methods)) {
 			if (method.kind === "overloaded") {

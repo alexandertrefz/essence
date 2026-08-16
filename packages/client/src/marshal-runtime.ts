@@ -942,6 +942,15 @@ export function bind(
 			continue
 		}
 
+		// NOTE: And a Choice binds nothing at all — its Cases are Types, which
+		// are erased before a byte is emitted. What goes under the name is
+		// built here instead of read off the bundle.
+		if (entry.kind === "choice") {
+			exports[name] = caseConstructors(entry.cases)
+
+			continue
+		}
+
 		if (!Object.hasOwn(raw, name)) {
 			continue
 		}
@@ -1006,12 +1015,50 @@ function bindRaw(
 			continue
 		}
 
+		// NOTE: A Choice is not on `raw` under any name, because the bundle
+		// binds none: its constructors are this side's answer to a Type that was
+		// erased, and `raw` promises the bundle's own bindings and nothing else.
+		if (entry.kind === "choice") {
+			continue
+		}
+
 		if (entry.emitted in bundle) {
 			raw[name] = bundle[entry.emitted]
 		}
 	}
 
 	return Object.freeze(raw)
+}
+
+// NOTE: One way to spell each Case of a Choice, under the Case's own name. A
+// Case with a payload is a Function of it — `Shape.Circle({ radius: 3n })` — and
+// one without is the value itself: there is nothing to pass, and `Shape.Blank()`
+// would be a call whose only purpose is to look like the others.
+//
+// NOTE: Nothing here marshals or checks. What comes back is the plain object the
+// boundary already accepts, so a constructor is a SPELLING and the deciding
+// stays where every other decision is — at the crossing, once, with the path and
+// the Type to say it in. The tag is written last for the reason `toJS` writes it
+// last: which Case a value is is part of the value, and a payload member of that
+// name is refused where the value crosses rather than silently taking it over.
+function caseConstructors(
+	cases: Array<CaseDescriptor>,
+): Readonly<Record<string, unknown>> {
+	let constructors: Record<string, unknown> = {}
+
+	for (let descriptor of cases) {
+		let tag = `${descriptor.choice}#${descriptor.name}`
+
+		constructors[descriptor.name] =
+			Object.keys(descriptor.payload).length === 0
+				? Object.freeze({ $case: tag })
+				: (payload: Record<string, unknown>) => ({
+						...payload,
+						$case: tag,
+					})
+	}
+
+	return Object.freeze(constructors)
 }
 
 // NOTE: A constant is marshalled ON READ rather than at bind time, for two
@@ -1084,6 +1131,16 @@ function bindNamespace(
 ): Readonly<Record<string, unknown>> {
 	let namespace = value as Record<string, unknown>
 	let bound: Record<string, unknown> = {}
+
+	// NOTE: The constructors of the Choice this Namespace shares its name with,
+	// where there is one. They are written FIRST so that a Method or a static
+	// constant of the same name — which the bundle really does bind — wins:
+	// what a Module declares outranks what this side offers.
+	for (let [name, constructor] of Object.entries(
+		caseConstructors(descriptor.cases ?? []),
+	)) {
+		bound[name] = constructor
+	}
 
 	for (let [name, property] of Object.entries(descriptor.properties)) {
 		if (Object.hasOwn(namespace, property.emitted)) {
