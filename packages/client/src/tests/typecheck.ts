@@ -9,7 +9,7 @@ export const REPOSITORY = path.join(import.meta.dirname, "..", "..", "..", "..")
 // declaring what it is thought to be would typecheck a Module against a Rational
 // that does not exist. A path, because a temporary directory has no
 // `node_modules` above it to find the package name in.
-export const RATIONAL_MODULE = path.join(import.meta.dirname, "..", "rational")
+export const BORROWED_MODULE = path.join(import.meta.dirname, "..", "borrowed")
 
 // NOTE: `tsc` over a directory of its own, extending the repository's own
 // TypeScript settings — the point of the exercise is that a generated file

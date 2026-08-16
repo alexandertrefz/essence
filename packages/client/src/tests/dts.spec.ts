@@ -12,7 +12,7 @@ import {
 	type ModuleDescriptor,
 } from "../descriptor"
 import { type DeclarationView, generateDeclarations } from "../dts"
-import { RATIONAL_MODULE, typecheck } from "./typecheck"
+import { BORROWED_MODULE, typecheck } from "./typecheck"
 
 function clientFixture(name: string): string {
 	return path.join(import.meta.dirname, "files", name)
@@ -57,7 +57,7 @@ async function declarationsFor(entryPath: string): Promise<string> {
 	let { descriptor, types } = await describedModule(entryPath)
 
 	return generateDeclarations(descriptor, {
-		clientSpecifier: RATIONAL_MODULE,
+		clientSpecifier: BORROWED_MODULE,
 		types,
 	})
 }
@@ -74,7 +74,7 @@ describe("The JavaScript view", () => {
 import type { EssenceRational } from "@essence-lang/client"
 
 export declare const PI: EssenceRational
-export declare function square(p0: bigint): bigint
+export declare function square(p0: bigint | number): bigint
 `,
 		)
 	})
@@ -88,10 +88,16 @@ export declare function square(p0: bigint): bigint
 //
 // The Module as JavaScript — marshalled at every boundary.
 
+import type { Input } from "@essence-lang/client"
+
 export type Rectangle = { width: bigint; height: bigint }
 
-export declare function describe(p0: Rectangle): string
-export declare const Rectangle: { of(width: bigint, height: bigint): Rectangle }
+export declare function describe(p0: Input<Rectangle>): string
+
+export declare const Rectangle: {
+	of(width: bigint | number, height: bigint | number): Rectangle
+	of(labelled: { width: bigint | number; height: bigint | number }): Rectangle
+}
 `,
 		)
 	})
@@ -100,23 +106,30 @@ export declare const Rectangle: { of(width: bigint, height: bigint): Rectangle }
 	// to ONE Type and every mention of it is that same object. Spelling the shape
 	// out instead would read nothing like the source it came from, and would say
 	// nothing about two Parameters being the same Type.
+	//
+	// NOTE: Going IN, a Type holding an Integer is wider than its declaration —
+	// a safe number is taken there — so the name is kept and wrapped in the
+	// package's `Input<…>`, which widens exactly the leaves the interpreter does.
 	it("names an exported Type rather than spelling its shape", async () => {
 		let text = await declarationsOf(clientFixture("Marshal.es"))
 
 		expect(text).toContain(
 			"export type Box = { width: bigint; height: bigint }",
 		)
-		expect(text).toContain("export declare function box(p0: Box): Box")
 		expect(text).toContain(
-			"export declare function boxes(p0: Array<Box>): Array<Box>",
+			"export declare function box(p0: Input<Box>): Box",
 		)
+		expect(text).toContain(
+			"export declare function boxes(p0: Array<Input<Box>>): Array<Box>",
+		)
+		expect(text).toContain("export declare function card(p0: Card): Card")
 	})
 
 	it("collapses an Optional into `T | undefined`", async () => {
 		let text = await declarationsOf(clientFixture("Marshal.es"))
 
 		expect(text).toContain(
-			"export declare function maybe(p0: bigint | undefined): bigint | undefined",
+			"export declare function maybe(p0: bigint | number | undefined): bigint | undefined",
 		)
 		expect(text).toContain(
 			"export declare const present: bigint | undefined",
@@ -160,16 +173,17 @@ export declare const Rectangle: { of(width: bigint, height: bigint): Rectangle }
 
 	// NOTE: A callback Parameter is the Function the MODULE will call, so it is
 	// declared as the call the host has to be ready for: its Parameters are the
-	// Module's own values coming out, and its answer is a value going in. The
-	// direction turns around at the Function and nowhere else.
+	// Module's own values coming out — a `bigint`, always — and its answer is a
+	// value going in, which a safe number satisfies. The direction turns around
+	// at the Function and nowhere else.
 	it("declares a callback Parameter as the call the Module will make", async () => {
 		let text = await declarationsOf(clientFixture("Calls.es"))
 
 		expect(text).toContain(
-			"export declare function applied(p0: bigint, p1: (p0: bigint) => bigint): bigint",
+			"export declare function applied(p0: bigint | number, p1: (p0: bigint) => bigint | number): bigint",
 		)
 		expect(text).toContain(
-			"export declare function measured(box: Box, by: (p0: Box) => bigint): bigint",
+			"export declare function measured(box: Input<Box>, by: (p0: Box) => bigint | number): bigint",
 		)
 	})
 
@@ -180,7 +194,7 @@ export declare const Rectangle: { of(width: bigint, height: bigint): Rectangle }
 		let text = await declarationsOf(clientFixture("Calls.es"))
 
 		expect(text).toContain(
-			"export type Handler = { callback: (p0: bigint) => bigint }",
+			"export type Handler = { callback: (p0: bigint | number) => bigint }",
 		)
 		expect(text).toContain(
 			"export declare function invoke(p0: Handler): bigint",
@@ -209,10 +223,10 @@ export declare const Rectangle: { of(width: bigint, height: bigint): Rectangle }
 		let text = await declarationsOf(clientFixture("Calls.es"))
 
 		expect(text).toContain(
-			"export declare function makeAdder(p0: bigint): (p0: bigint) => bigint",
+			"export declare function makeAdder(p0: bigint | number): (p0: bigint | number) => bigint",
 		)
 		expect(text).toContain(
-			"export declare const handler: { callback: (p0: bigint) => bigint }",
+			"export declare const handler: { callback: (p0: bigint | number) => bigint }",
 		)
 	})
 
@@ -220,11 +234,17 @@ export declare const Rectangle: { of(width: bigint, height: bigint): Rectangle }
 	// two apart: the Type is what a value of it IS, and the const is how a host
 	// spells one. A Case with a payload is a call and one without is the value —
 	// there is nothing to pass to `Blank`.
+	//
+	// NOTE: A constructor is a spelling that marshals nothing — it writes the tag
+	// onto the payload it was handed — so it is declared as exactly that: any
+	// payload the boundary would take, answered with the tag on it and its own
+	// Types kept. `Shape.Circle({ radius: 3n })` is therefore a `Shape`, and
+	// `Shape.Circle({ radius: 3 })` an `Input<Shape>`.
 	it("declares a Choice's Cases as the constructors a host spells them with", async () => {
 		expect(await declarationsOf(clientFixture("Marshal.es"))).toContain(
 			`export declare const Shape: {
-	Circle(payload: { radius: bigint }): { $case: "Shape#Circle"; radius: bigint }
-	Rect(payload: { width: bigint; height: bigint }): { $case: "Shape#Rect"; width: bigint; height: bigint }
+	Circle<Payload_ extends { radius: bigint | number }>(payload: Payload_): Payload_ & { $case: "Shape#Circle" }
+	Rect<Payload_ extends { width: bigint | number; height: bigint | number }>(payload: Payload_): Payload_ & { $case: "Shape#Rect" }
 	Blank: { $case: "Shape#Blank" }
 }`,
 		)
@@ -237,7 +257,7 @@ export declare const Rectangle: { of(width: bigint, height: bigint): Rectangle }
 		expect(await declarationsOf(clientFixture("Calls.es"))).toContain(
 			`export declare const Colour: {
 	Red: { $case: "Colour#Red" }
-	Named(payload: { name: string }): { $case: "Colour#Named"; name: string }
+	Named<Payload_ extends { name: string }>(payload: Payload_): Payload_ & { $case: "Colour#Named" }
 	preferred(): Colour
 }`,
 		)
@@ -251,7 +271,7 @@ export declare const Rectangle: { of(width: bigint, height: bigint): Rectangle }
 		expect(await declarationsOf(clientFixture("Collisions.es"))).toContain(
 			`export declare const Shape: {
 	Blank: bigint
-	Circle(p0: bigint): bigint
+	Circle(p0: bigint | number): bigint
 	drawn(): Shape
 }`,
 		)
@@ -411,15 +431,83 @@ export let ratio: string = third.toString()
 			"Marshal.d.es.ts": declarations,
 			"consumer.ts": `import { box } from "./Marshal.es"
 
-export let wrong = box({ width: 3, height: 4 })
+export let wrong = box({ width: "3", height: 4n })
 `,
 		})
 
 		expect(run.code).not.toBe(0)
 		expect(run.output).toContain("consumer.ts")
 		expect(run.output).toContain(
-			"Type 'number' is not assignable to type 'bigint'",
+			"Type 'string' is not assignable to type 'number | bigint'",
 		)
+	})
+
+	// NOTE: The interpreter takes a safe `number` for an Integer going IN and
+	// hands it to the runtime's own canonicaliser, so a declaration that made a
+	// caller write `BigInt(3)` there would be refusing a call the Module answers.
+	// What comes OUT is a `bigint` at every size, and the declaration says that
+	// too — the same call is refused where its answer is annotated as a number.
+	it("takes a safe number for an Integer going in, and answers a bigint", async () => {
+		let declarations = await declarationsFor(clientFixture("Marshal.es"))
+		let accepted = typecheck({
+			"Marshal.d.es.ts": declarations,
+			"consumer.ts": `import { box, type Box } from "./Marshal.es"
+import type { Input } from "${BORROWED_MODULE}"
+
+export let built: Box = box({ width: 3, height: 4n })
+export let plain: Input<Box> = { width: 3, height: 4 }
+export let width: bigint = built.width
+`,
+		})
+
+		expect(accepted.output).toBe("")
+		expect(accepted.code).toBe(0)
+
+		let refused = typecheck({
+			"Marshal.d.es.ts": declarations,
+			"consumer.ts": `import { box } from "./Marshal.es"
+
+export let width: number = box({ width: 3, height: 4 }).width
+`,
+		})
+
+		expect(refused.code).not.toBe(0)
+		expect(refused.output).toContain(
+			"Type 'bigint' is not assignable to type 'number'",
+		)
+	})
+
+	// NOTE: The generic constructor keeps the caller's own Types, and the two
+	// annotations a host would reach for both hold: `Shape` where the payload was
+	// bigints, `Input<Shape>` where it was numbers — and a payload of the wrong
+	// shape is refused at the constructor rather than at the crossing.
+	it("types a Case constructor by the payload it was handed", async () => {
+		let declarations = await declarationsFor(clientFixture("Marshal.es"))
+		let accepted = typecheck({
+			"Marshal.d.es.ts": declarations,
+			"consumer.ts": `import { Shape, areaOf } from "./Marshal.es"
+import type { Input } from "${BORROWED_MODULE}"
+
+export let exact: Shape = Shape.Circle({ radius: 3n })
+export let loose: Input<Shape> = Shape.Circle({ radius: 3 })
+export let blank: Shape = Shape.Blank
+export let area: bigint = areaOf(Shape.Circle({ radius: 3 }))
+`,
+		})
+
+		expect(accepted.output).toBe("")
+		expect(accepted.code).toBe(0)
+
+		let refused = typecheck({
+			"Marshal.d.es.ts": declarations,
+			"consumer.ts": `import { Shape } from "./Marshal.es"
+
+export let wrong = Shape.Circle({ radius: "3" })
+`,
+		})
+
+		expect(refused.code).not.toBe(0)
+		expect(refused.output).toContain("consumer.ts")
 	})
 
 	it("reaches an export JavaScript can not spell", async () => {

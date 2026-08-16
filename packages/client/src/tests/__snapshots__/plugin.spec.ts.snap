@@ -5,6 +5,8 @@ exports[`The declarations a build writes writes the JavaScript view beside the s
 //
 // The Module as JavaScript — marshalled at every boundary.
 
+import type { Input } from "@essence-lang/client"
+
 export type Box = { width: bigint; height: bigint }
 
 export type Shape =
@@ -12,13 +14,15 @@ export type Shape =
 	| { $case: "Shape#Blank" }
 
 export declare const Shape: {
-	Circle(payload: { radius: bigint }): { $case: "Shape#Circle"; radius: bigint }
+	Circle<Payload_ extends { radius: bigint | number }>(payload: Payload_): Payload_ & { $case: "Shape#Circle" }
 	Blank: { $case: "Shape#Blank" }
 }
 
-export declare function areaOf(p0: Shape): bigint
+export declare function areaOf(p0: Input<Shape>): bigint
 export declare const blank: Shape
 export declare function named(p0: string | undefined): string
-export declare function widen(box: Box, by: bigint): Box
+
+export declare function widen(box: Input<Box>, by: bigint | number): Box
+export declare function widen(labelled: { box: Input<Box>; by: bigint | number }): Box
 "
 `;
