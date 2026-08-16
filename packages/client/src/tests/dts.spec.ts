@@ -243,6 +243,34 @@ export declare const Rectangle: { of(width: bigint, height: bigint): Rectangle }
 		)
 	})
 
+	// NOTE: And where the Namespace declares a member of a Case's own name, the
+	// Case is left out — `bindNamespace` writes the constructors first exactly so
+	// that what the Module declares overwrites them, so declaring both would name
+	// one member twice and promise a constructor nothing binds.
+	it("leaves out a Case the Namespace itself declares", async () => {
+		expect(await declarationsOf(clientFixture("Collisions.es"))).toContain(
+			`export declare const Shape: {
+	Blank: bigint
+	Circle(p0: bigint): bigint
+	drawn(): Shape
+}`,
+		)
+	})
+
+	// NOTE: `EssenceRational` is this package's name and a name a Module may
+	// export. Both spelled plainly, the import and the declaration are one name
+	// declared twice — which TypeScript refuses, taking the whole file with it —
+	// so the borrowed one steps aside.
+	it("steps a borrowed name around one the Module exports", async () => {
+		let text = await declarationsOf(clientFixture("Collisions.es"))
+
+		expect(text).toContain(
+			'import type { EssenceRational as $EssenceRational } from "@essence-lang/client"',
+		)
+		expect(text).toContain("export declare const EssenceRational: bigint")
+		expect(text).toContain("export declare const ratio: $EssenceRational")
+	})
+
 	// NOTE: `fromJS` refuses EVERY value for a nested Optional — both levels
 	// would be `undefined` — so the Parameter has to refuse every call, exactly
 	// as the callback and Type Parameter positions already do. Coming out, only
