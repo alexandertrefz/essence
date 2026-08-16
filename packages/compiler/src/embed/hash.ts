@@ -37,7 +37,7 @@ export type BundleHashParts = {
 export function hashGraph(parts: BundleHashParts): string {
 	let hash = createHash("sha256")
 
-	mix(hash, "essence-embed-2")
+	mix(hash, "essence-embed-3")
 	mix(hash, parts.toolchain ?? toolchainKey())
 	mix(hash, parts.emitterKey)
 	mix(hash, parts.entryPath)

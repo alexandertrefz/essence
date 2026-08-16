@@ -27,6 +27,31 @@ implementation {
 		Tagged { valueOf: Optional<String> },
 	}
 
+	§ A unit Choice — every Case payload-less — which is the shape that crosses
+	§ as a bare string rather than as a `$case` object.
+	choice Direction {
+		Up,
+		Down,
+	}
+
+	§ A second unit Choice sharing `#Up` with the one above, so that a Union of
+	§ the two has a position no string can be read into.
+	choice Vertical {
+		Up,
+		Down,
+	}
+
+	§ And a third sharing no Case name with either, so that the refusal above is
+	§ visibly per Case name rather than per pair of unit Choices.
+	choice Sign {
+		Plus,
+		Minus,
+	}
+
+	§ A bare Case where a Record member is what carries it — the position a
+	§ Descriptor is walked to rather than met at.
+	type Marker = { direction: Direction }
+
 	function integer(_ value: Integer) -> Integer {
 		<- value
 	}
@@ -98,6 +123,52 @@ implementation {
 		<- [value::append("z"), value::prepend("a"), value]
 	}
 
+	function direction(_ value: Direction) -> Direction {
+		<- value
+	}
+
+	function maybeDirection(
+		_ value: Optional<Direction>,
+	) -> Optional<Direction> {
+		<- value
+	}
+
+	function directions(_ value: List<Direction>) -> List<Direction> {
+		<- value
+	}
+
+	function marker(_ value: Marker) -> Marker {
+		<- value
+	}
+
+	function ordering(_ value: Ordering) -> Ordering {
+		<- value
+	}
+
+	§ The four Unions a bare Case can stand in. The first two have no
+	§ unambiguous JavaScript spelling — `"Up"` is a String too, and one `#Up` is
+	§ not the other's — and the last two do, so all four are here to be told
+	§ apart rather than to be marshalled alike.
+	function directionOrText(
+		_ value: Direction | String,
+	) -> Direction | String {
+		<- value
+	}
+
+	function directionOrVertical(
+		_ value: Direction | Vertical,
+	) -> Direction | Vertical {
+		<- value
+	}
+
+	function directionOrSign(_ value: Direction | Sign) -> Direction | Sign {
+		<- value
+	}
+
+	function directionOrShape(_ value: Direction | Shape) -> Direction | Shape {
+		<- value
+	}
+
 	function areaOf(_ value: Shape) -> Integer {
 		<- match value -> Integer {
 			case #Circle({ radius })      { <- radius::multiply(with radius) }
@@ -116,15 +187,27 @@ implementation {
 	constant circle: Shape = #Circle({ radius = 3 })
 	constant present: Optional<Integer> = #Value(7)
 	constant absent: Optional<Integer>  = #Empty
+
+	§ A constant typed by a unit Choice, which is read through a different door
+	§ than a Function's answer is — and a Case standing ALONE for a Type, which
+	§ is what an unannotated one is inferred as. `#Plus` rather than `#Up`
+	§ because the latter is declared by two Choices here and a lone one has
+	§ nothing to say which.
+	constant heading: Direction = #Up
+	constant plus = #Plus
 }
 
 export {
 	Box
 	Card
 	Config
+	Direction
 	Label
+	Marker
 	Shape
+	Sign
 	Styled
+	Vertical
 	absent
 	answer
 	areaOf
@@ -135,14 +218,25 @@ export {
 	card
 	circle
 	config
+	direction
+	directionOrShape
+	directionOrSign
+	directionOrText
+	directionOrVertical
+	directions
 	flag
 	greeting
 	grown
+	heading
 	integer
 	labelled
+	marker
 	maybe
+	maybeDirection
 	maybes
 	names
+	ordering
+	plus
 	point
 	present
 	rational

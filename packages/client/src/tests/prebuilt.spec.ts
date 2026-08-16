@@ -382,6 +382,80 @@ describe("`esc build --embed`", () => {
 		)
 		expect(readFileSync(bundle, "utf8")).not.toContain("export default")
 	})
+
+	// NOTE: A unit Choice through the whole toolchain, because it is the one
+	// rule of the boundary that no value carries: whether a Case crosses as its
+	// bare name is a fact about the CHOICE, and by the time a prebuilt Module is
+	// loaded the only thing left that could know it is the JSON beside the
+	// bundle. Read off disk first, so that a failure says whether `esc` wrote
+	// the fact or the loader lost it, and then crossed, which is the claim.
+	//
+	// NOTE: `Marshal.es` rather than the `Calls.es` above, because a fixture
+	// keeps to what its header says it is for and this one is the table of
+	// shapes that cross.
+	it("bakes which Choices cross as bare names", async () => {
+		let embedded = path.join(directory, "marshal")
+		let bundle = path.join(embedded, "Marshal.js")
+		let run = esc(
+			"build",
+			path.relative(REPOSITORY, clientFixture("Marshal.es")),
+			"-o",
+			bundle,
+			"--embed",
+			"--quiet",
+		)
+
+		expect(run.code).toBe(0)
+
+		let written = JSON.parse(
+			readFileSync(descriptorPath(bundle), "utf8"),
+		) as {
+			exports: Record<
+				string,
+				{ cases: Array<{ name: string; unitChoice: boolean }> }
+			>
+		}
+
+		function spellingOf(choice: string): Array<[string, boolean]> {
+			return written.exports[choice]!.cases.map((node) => [
+				node.name,
+				node.unitChoice,
+			])
+		}
+
+		expect(spellingOf("Direction")).toEqual([
+			["Up", true],
+			["Down", true],
+		])
+		// NOTE: The other half of the rule, in the same file and the same
+		// Descriptor: one payload anywhere and every Case of that Choice keeps
+		// the object form, its payload-less `Blank` included.
+		expect(spellingOf("Shape")).toEqual([
+			["Circle", false],
+			["Rect", false],
+			["Blank", false],
+		])
+
+		let module = await loadPrebuilt(bundle)
+		let called = (name: string, value: unknown) =>
+			(module.exports[name] as (value: unknown) => unknown)(value)
+
+		expect(called("direction", "Up")).toBe("Up")
+		expect(called("direction", "Direction#Down")).toBe("Down")
+		expect(called("directions", ["Up", "Down"])).toEqual(["Up", "Down"])
+		expect(called("marker", { direction: "Down" })).toEqual({
+			direction: "Down",
+		})
+		// NOTE: And the two doors a value that was never called for comes
+		// through — the constructors written out of the Descriptor, and a
+		// constant, which is marshalled when it is read.
+		expect(module.exports.Direction).toEqual({ Up: "Up", Down: "Down" })
+		expect(module.exports.heading).toBe("Up")
+		expect(module.exports.plus).toBe("Plus")
+		expect((module.exports.Shape as Record<string, unknown>).Blank).toEqual(
+			{ $case: "Shape#Blank" },
+		)
+	})
 })
 
 // NOTE: The rule this door exists for, checked as text because there is no other

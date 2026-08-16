@@ -12,7 +12,7 @@ import * as path from "node:path"
 import type { common } from "@essence-lang/interfaces"
 
 import type { EssenceValue } from "../bridge"
-import type { Marshaller } from "../descriptor"
+import { describeModule, type Marshaller } from "../descriptor"
 import { EssenceMarshalError } from "../errors"
 import { type EssenceModule, loadModule } from "../index"
 import { createInterpreter } from "../marshal-runtime"
@@ -51,6 +51,12 @@ function parameterType(name: string): common.Type {
 	return signature.parameterTypes[0]!.type as common.Type
 }
 
+function returnType(name: string): common.Type {
+	let signature = module.surface.values[name] as common.FunctionType
+
+	return signature.returnType as common.Type
+}
+
 function constantType(name: string): common.Type {
 	return module.surface.values[name] as common.Type
 }
@@ -67,6 +73,19 @@ function through(name: string, value: unknown): unknown {
 	return marshaller.toJS(
 		callee(marshaller.fromJS(value, parameterType(name), "argument 1")),
 		"return value",
+	)
+}
+
+// NOTE: The same round trip made the way a HOST makes one — through the door
+// `exports` binds, where the way out is compiled against the return the Module
+// DECLARED rather than left to the walk the value directs. The two answer alike
+// for every row of the table, `through` included; this exists because a unit
+// Choice is the shape where they answer alike for DIFFERENT reasons — the
+// declared door reads the Case off the position, the walk reads it off the
+// Module — and both are worth calling.
+function called(name: string, ...args: Array<unknown>): unknown {
+	return (module.exports[name] as (...args: Array<unknown>) => unknown)(
+		...args,
 	)
 }
 
@@ -211,7 +230,7 @@ describe("Round trips", () => {
 		)
 	})
 
-	it("carries a unit Case", () => {
+	it("carries a payload-less Case of a mixed Choice", () => {
 		expect(through("shape", { $case: "Shape#Blank" })).toEqual({
 			$case: "Shape#Blank",
 		})
@@ -316,6 +335,256 @@ describe("Round trips", () => {
 				areaOf(marshaller.fromJS({ $case: "Shape#Blank" }, shapeType)),
 			),
 		).toBe(0n)
+	})
+})
+
+// NOTE: A Choice whose every Case is payload-less crosses as the bare NAME of
+// the Case — `"Up"`, never `{ $case: 'Direction#Up' }` — in both directions. It
+// is the one shape whose JavaScript spelling was chosen for the HOST rather
+// than derived from the Essence value, and the whole of why is in what a
+// declaration then reads: `turn(direction: "Up" | "Down")` is an enumeration a
+// TypeScript reader already knows, where the object form was this Module's
+// bookkeeping made a caller's problem.
+describe("A unit Choice", () => {
+	it("carries each of its Cases as the bare name", () => {
+		expect(called("direction", "Up")).toBe("Up")
+		expect(called("direction", "Down")).toBe("Down")
+	})
+
+	// NOTE: The same pair of spellings every other Case answers to — the bare
+	// name the Essence source itself writes, and the qualified one a `$case`
+	// carries. What comes back is the bare one either way, because there is one
+	// spelling OUT.
+	it("takes a Case by its qualified name as well", () => {
+		expect(called("direction", "Direction#Up")).toBe("Up")
+	})
+
+	// NOTE: And the standard library's own, which is the Choice the whole rule
+	// was wanted for: every `compare` in the language answers one, and a host
+	// reading the answer should be reading `"Less"`.
+	it("carries the standard library's Ordering", () => {
+		expect(called("ordering", "Less")).toBe("Less")
+		expect(called("ordering", "Ordering#Greater")).toBe("Greater")
+	})
+
+	// NOTE: Beside an `Optional`, which is spelled by absence — so the two do
+	// not collide and there is nothing to decide: a string is a Case and
+	// `undefined` is the absence.
+	it("carries one held by an Optional as the name or nothing", () => {
+		expect(called("maybeDirection", "Up")).toBe("Up")
+		expect(called("maybeDirection", undefined)).toBeUndefined()
+		expect(called("maybeDirection", null)).toBeUndefined()
+	})
+
+	it("carries a List of them", () => {
+		expect(called("directions", ["Up", "Down"])).toEqual(["Up", "Down"])
+		expect(called("directions", [])).toEqual([])
+	})
+
+	it("carries one held by a Record member", () => {
+		expect(called("marker", { direction: "Up" })).toEqual({
+			direction: "Up",
+		})
+	})
+
+	// NOTE: All-or-nothing per Choice. `Shape` has `#Blank` beside `#Circle`,
+	// so every one of its Cases keeps the object form — a Choice half of whose
+	// Cases were strings is one no host could write a single `switch` over.
+	it("leaves a payload-less Case of a mixed Choice alone", () => {
+		expect(called("shape", { $case: "Shape#Blank" })).toEqual({
+			$case: "Shape#Blank",
+		})
+		expect(marshalError(() => called("shape", "Blank")).message).toBe(
+			'argument 1: expected Shape, got the string "Blank".',
+		)
+	})
+
+	// NOTE: One spelling per shape, so the object form is not kept as a second
+	// one: a position that took both would be a position two different
+	// JavaScript values cross into, while the way out can hand only one of them
+	// back. It is worth its own sentence because it is the one wrong value that
+	// is RIGHT about which Case it means — "expected Direction, got an object
+	// with '$case'" would be true and would not say what to write instead.
+	it("refuses the object form and says which string to write", () => {
+		expect(
+			marshalError(() => called("direction", { $case: "Direction#Up" }))
+				.message,
+		).toBe(
+			`argument 1: expected Direction#Up, which crosses as the string "Up" rather than as a '$case' object.`,
+		)
+		expect(
+			marshalError(() => called("direction", { $case: "Down" })).message,
+		).toBe(
+			`argument 1: expected Direction#Down, which crosses as the string "Down" rather than as a '$case' object.`,
+		)
+	})
+
+	it("names the Choice for a string that is no Case of it", () => {
+		expect(marshalError(() => called("direction", "Left")).message).toBe(
+			'argument 1: expected Direction, got the string "Left".',
+		)
+		expect(
+			marshalError(() => called("directions", ["Up", "Left"])).message,
+		).toBe('argument 1 → [1]: expected Direction, got the string "Left".')
+	})
+
+	// NOTE: And with NOTHING declared, which is the position the fact is hardest
+	// to answer from: a `Direction#Up` and a `Shape#Blank` are the same empty
+	// object under two tags, so the value itself can not say which of them
+	// crosses as a string. What answers is the Module — a door built from a
+	// Descriptor knows every Case that Descriptor names — and it has to, or
+	// `toJS` would hand a host a value `fromJS` then refuses.
+	it("crosses as the same string with nothing declared", () => {
+		let up = module.bridge.case("./Marshal.es#Direction#Up")
+
+		expect(marshaller.toJS(up)).toBe("Up")
+		expect(marshaller.toJS(up, "value", returnType("direction"))).toBe("Up")
+		expect(through("direction", marshaller.toJS(up))).toBe("Up")
+	})
+})
+
+// NOTE: Two shapes this boundary told apart by object-versus-string until a
+// unit Choice's Cases became strings, and now can not. Refused rather than
+// decided, which is the ONE place the Union rule "arms in declaration order,
+// first admitting arm wins" deliberately does not reach: deciding would hand a
+// String `"Up"` back out as a `Direction#Up`, and losing the value it was given
+// is the single thing this boundary may not do.
+describe("A position two spellings would collide in", () => {
+	// NOTE: The way OUT of a refused position, which is the only way it can be
+	// reached at all — the way in refuses the value before any Function is
+	// called, so nothing the Module answers with ever gets there through a
+	// round trip.
+	function refusedOut(name: string, value: unknown): EssenceMarshalError {
+		return marshalError(() =>
+			marshaller.toJS(value, "return value", returnType(name)),
+		)
+	}
+
+	function up(): EssenceValue {
+		return module.bridge.case("./Marshal.es#Direction#Up")
+	}
+
+	// NOTE: The collision the whole rule exists for, and the same sentence in
+	// both directions — the position has no spelling, which is a fact about the
+	// SHAPE rather than about any value of it, so it holds whichever way one is
+	// crossing.
+	it("refuses a bare Case standing beside a String", () => {
+		expect(
+			marshalError(() => called("directionOrText", "Up")).message,
+		).toBe(
+			`argument 1: 'Direction | String' has no unambiguous JavaScript spelling — a Direction#Up crosses as the string "Up", which a String is too. Wrap one side in a Record or give the Case a payload.`,
+		)
+		expect(refusedOut("directionOrText", up()).message).toBe(
+			`return value: 'Direction | String' has no unambiguous JavaScript spelling — a Direction#Up crosses as the string "Up", which a String is too. Wrap one side in a Record or give the Case a payload.`,
+		)
+	})
+
+	// NOTE: And the same collision without a String in it — one Choice's `#Up`
+	// is spelled exactly like another's, and neither the value nor the position
+	// says which was meant.
+	it("refuses two unit Choices sharing a Case name", () => {
+		expect(
+			marshalError(() => called("directionOrVertical", "Up")).message,
+		).toBe(
+			`argument 1: 'Direction | Vertical' has no unambiguous JavaScript spelling — a Direction#Up and a Vertical#Up both cross as the string "Up". Wrap one side in a Record or give the Case a payload.`,
+		)
+		expect(refusedOut("directionOrVertical", up()).message).toBe(
+			`return value: 'Direction | Vertical' has no unambiguous JavaScript spelling — a Direction#Up and a Vertical#Up both cross as the string "Up". Wrap one side in a Record or give the Case a payload.`,
+		)
+	})
+
+	// NOTE: Per Case NAME, not per pair of unit Choices. Two of them in one
+	// position are perfectly spellable while no name is written twice, and
+	// refusing the pair rather than the name would refuse a shape that works.
+	it("takes two unit Choices sharing no Case name", () => {
+		expect(called("directionOrSign", "Up")).toBe("Up")
+		expect(called("directionOrSign", "Minus")).toBe("Minus")
+	})
+
+	// NOTE: And per unit CASE. A Choice with a payload anywhere in it crosses
+	// as a `$case` object whatever its payload-less Cases are called, and an
+	// object is not a string.
+	it("takes a unit Choice beside one that keeps the object form", () => {
+		expect(called("directionOrShape", "Up")).toBe("Up")
+		expect(called("directionOrShape", { $case: "Shape#Blank" })).toEqual({
+			$case: "Shape#Blank",
+		})
+	})
+
+	// NOTE: The two places an `Optional` can stand between a position and a
+	// collision, and neither hides one. It is spelled by ABSENCE, so what it
+	// holds stands in the position beside everything else: `Optional<String> |
+	// Direction` collides through it, and `Optional<Direction | String>`
+	// collides inside it and keeps the sentence rather than being answered with
+	// its own Type. What `Optional` contributes of its own is `undefined`,
+	// which is nobody else's spelling and collides with nothing — which is why
+	// the `Optional<Direction>` above is ordinary.
+	//
+	// NOTE: A project of its own because `Marshal.es` is a table of the shapes
+	// that CROSS, and these two are here to be refused. One compile answers
+	// both.
+	it("refuses a collision an Optional stands in the way of", async () => {
+		await withProject(
+			{
+				"Main.es": `implementation {
+	choice Direction {
+		Up,
+		Down,
+	}
+
+	function noted(
+		_ value: Optional<String> | Direction,
+	) -> Optional<String> | Direction {
+		<- value
+	}
+
+	function wrapped(
+		_ value: Optional<Direction | String>,
+	) -> Optional<Direction | String> {
+		<- value
+	}
+}
+
+export {
+	Direction
+	noted
+	wrapped
+}
+`,
+			},
+			async (directory) => {
+				let project = await loadModule(
+					path.join(directory, "Main.es"),
+					{ cacheDirectory },
+				)
+				let noted = project.exports.noted as (value: unknown) => unknown
+				let wrapped = project.exports.wrapped as (
+					value: unknown,
+				) => unknown
+
+				expect(marshalError(() => noted("Up")).message).toBe(
+					`argument 1: 'Optional<String> | Direction' has no unambiguous JavaScript spelling — a Direction#Up crosses as the string "Up", which a String is too. Wrap one side in a Record or give the Case a payload.`,
+				)
+				expect(marshalError(() => wrapped("Up")).message).toBe(
+					`argument 1: 'Direction | String' has no unambiguous JavaScript spelling — a Direction#Up crosses as the string "Up", which a String is too. Wrap one side in a Record or give the Case a payload.`,
+				)
+				// NOTE: And the absence still crosses, because the position it
+				// crosses into is the one shape in there that has a spelling.
+				expect(wrapped(undefined)).toBeUndefined()
+			},
+		)
+	})
+
+	// NOTE: At VALUE time and never at bind time. A Module with one unspellable
+	// position in it is still a Module and every other name it exports still
+	// works — the same stance `nestedOptional` is refused under, and the reason
+	// the refusal is COMPILED into a reader rather than thrown while compiling
+	// one.
+	it("still binds the Module and every other name in it", () => {
+		expect(typeof module.exports.directionOrText).toBe("function")
+		expect(typeof module.exports.directionOrVertical).toBe("function")
+		expect(called("direction", "Up")).toBe("Up")
+		expect(module.exports.answer).toBe(42n)
 	})
 })
 
@@ -458,6 +727,13 @@ describe("The exports of a Module", () => {
 		})
 		expect(module.exports.present).toBe(7n)
 		expect(module.exports.absent).toBeUndefined()
+		// NOTE: A constant is read through a door of its own — compiled once
+		// against what was DECLARED, with no call around it — so a unit Choice
+		// reaches this side here without a Parameter or a return having named
+		// it. `plus` is the Case standing alone for a Type, which is what an
+		// unannotated one is inferred as, and it crosses by the same rule.
+		expect(module.exports.heading).toBe("Up")
+		expect(module.exports.plus).toBe("Plus")
 	})
 
 	// NOTE: And every Function beside them, marshalling both ways around the
@@ -466,11 +742,14 @@ describe("The exports of a Module", () => {
 	it("hands back every Function as a JavaScript one", () => {
 		expect(typeof module.exports.integer).toBe("function")
 		expect(Object.keys(module.exports).sort()).toEqual([
-			// NOTE: The two Choices among them, which the bundle binds no name
-			// for — what is under those is one constructor per Case, spelled on
+			// NOTE: The Choices among them, which the bundle binds no name for
+			// — what is under those is one constructor per Case, spelled on
 			// this side.
+			"Direction",
 			"Shape",
+			"Sign",
 			"Styled",
+			"Vertical",
 			"absent",
 			"answer",
 			"areaOf",
@@ -481,14 +760,25 @@ describe("The exports of a Module", () => {
 			"card",
 			"circle",
 			"config",
+			"direction",
+			"directionOrShape",
+			"directionOrSign",
+			"directionOrText",
+			"directionOrVertical",
+			"directions",
 			"flag",
 			"greeting",
 			"grown",
+			"heading",
 			"integer",
 			"labelled",
+			"marker",
 			"maybe",
+			"maybeDirection",
 			"maybes",
 			"names",
+			"ordering",
+			"plus",
 			"point",
 			"present",
 			"rational",
@@ -584,7 +874,10 @@ describe("Values built through the bridge", () => {
 	// by both: `null` out of a variable that holds no Descriptor is not a Type
 	// declaration of `null`.
 	it("reads a value against no Descriptor, however that is spelled", () => {
-		let interpreter = createInterpreter(module.bridge)
+		let interpreter = createInterpreter(
+			module.bridge,
+			describeModule(module.surface, module.entryPath),
+		)
 		let none = null as unknown as undefined
 
 		expect(interpreter.toJS(module.raw.answer, "answer")).toBe(42n)

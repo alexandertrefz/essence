@@ -7,7 +7,7 @@ import { fixturePath } from "@essence-lang/fixtures"
 import type { common } from "@essence-lang/interfaces"
 
 import type { EssenceValue } from "../bridge"
-import { describeSignature } from "../descriptor"
+import { describeModule, describeSignature } from "../descriptor"
 import { EssenceCallError, EssenceMarshalError } from "../errors"
 import { type EssenceModule, loadModule } from "../index"
 import { createInterpreter, type EssenceFunction } from "../marshal-runtime"
@@ -191,7 +191,10 @@ describe("Calling a Function", () => {
 	// Function, which is the position it was met at and not a property of the
 	// signature: two crossings of one signature have to keep their own.
 	it("names each crossing of one signature by where it was met", () => {
-		let interpreter = createInterpreter(calls.bridge)
+		let interpreter = createInterpreter(
+			calls.bridge,
+			describeModule(calls.surface, calls.entryPath),
+		)
 		let signature = describeSignature(
 			calls.surface.values.positional as common.BaseFunction,
 			{ entryPath: calls.entryPath },
@@ -301,8 +304,11 @@ describe("Calling a Function", () => {
 
 	it("binds every name the bundle binds, and the Choices beside them", () => {
 		expect(Object.keys(marshal.exports)).toEqual([
+			"Direction",
 			"Shape",
+			"Sign",
 			"Styled",
+			"Vertical",
 			...Object.keys(marshal.raw),
 		])
 
@@ -334,6 +340,22 @@ describe("A Choice", () => {
 		expect(
 			exported(marshal, "areaOf")(choice(marshal, "Shape").Blank),
 		).toBe(0n)
+	})
+
+	// NOTE: And a Case of a UNIT Choice as the string it crosses as, so the
+	// constructor and what a host would have written by hand are the very same
+	// value. What the name is worth there is a place to read the Cases off and
+	// a misspelling caught by the generated declaration, rather than a wrapper
+	// around anything: `Direction.Up` and `"Up"` are one value, not two
+	// spellings of one.
+	it("spells a Case of a unit Choice as the string it crosses as", () => {
+		expect(choice(marshal, "Direction")).toEqual({
+			Up: "Up",
+			Down: "Down",
+		})
+		expect(
+			exported(marshal, "direction")(choice(marshal, "Direction").Up),
+		).toBe("Up")
 	})
 
 	// NOTE: One name binds one thing, and `namespace Colour for Colour` is how a

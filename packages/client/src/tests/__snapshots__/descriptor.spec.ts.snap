@@ -3,6 +3,32 @@
 exports[`A Module described describes Marshal.es 1`] = `
 {
   "exports": {
+    "Direction": {
+      "cases": [
+        {
+          "choice": "Direction",
+          "kind": "case",
+          "name": "Up",
+          "optional": false,
+          "payload": {},
+          "shown": "Direction#Up",
+          "tag": "./Marshal.es#Direction#Up",
+          "unitChoice": true,
+        },
+        {
+          "choice": "Direction",
+          "kind": "case",
+          "name": "Down",
+          "optional": false,
+          "payload": {},
+          "shown": "Direction#Down",
+          "tag": "./Marshal.es#Direction#Down",
+          "unitChoice": true,
+        },
+      ],
+      "kind": "choice",
+      "name": "Direction",
+    },
     "Shape": {
       "cases": [
         {
@@ -18,6 +44,7 @@ exports[`A Module described describes Marshal.es 1`] = `
           },
           "shown": "Shape#Circle",
           "tag": "./Marshal.es#Shape#Circle",
+          "unitChoice": false,
         },
         {
           "choice": "Shape",
@@ -36,6 +63,7 @@ exports[`A Module described describes Marshal.es 1`] = `
           },
           "shown": "Shape#Rect",
           "tag": "./Marshal.es#Shape#Rect",
+          "unitChoice": false,
         },
         {
           "choice": "Shape",
@@ -45,10 +73,37 @@ exports[`A Module described describes Marshal.es 1`] = `
           "payload": {},
           "shown": "Shape#Blank",
           "tag": "./Marshal.es#Shape#Blank",
+          "unitChoice": false,
         },
       ],
       "kind": "choice",
       "name": "Shape",
+    },
+    "Sign": {
+      "cases": [
+        {
+          "choice": "Sign",
+          "kind": "case",
+          "name": "Plus",
+          "optional": false,
+          "payload": {},
+          "shown": "Sign#Plus",
+          "tag": "./Marshal.es#Sign#Plus",
+          "unitChoice": true,
+        },
+        {
+          "choice": "Sign",
+          "kind": "case",
+          "name": "Minus",
+          "optional": false,
+          "payload": {},
+          "shown": "Sign#Minus",
+          "tag": "./Marshal.es#Sign#Minus",
+          "unitChoice": true,
+        },
+      ],
+      "kind": "choice",
+      "name": "Sign",
     },
     "Styled": {
       "cases": [
@@ -69,10 +124,37 @@ exports[`A Module described describes Marshal.es 1`] = `
           },
           "shown": "Styled#Tagged",
           "tag": "./Marshal.es#Styled#Tagged",
+          "unitChoice": false,
         },
       ],
       "kind": "choice",
       "name": "Styled",
+    },
+    "Vertical": {
+      "cases": [
+        {
+          "choice": "Vertical",
+          "kind": "case",
+          "name": "Up",
+          "optional": false,
+          "payload": {},
+          "shown": "Vertical#Up",
+          "tag": "./Marshal.es#Vertical#Up",
+          "unitChoice": true,
+        },
+        {
+          "choice": "Vertical",
+          "kind": "case",
+          "name": "Down",
+          "optional": false,
+          "payload": {},
+          "shown": "Vertical#Down",
+          "tag": "./Marshal.es#Vertical#Down",
+          "unitChoice": true,
+        },
+      ],
+      "kind": "choice",
+      "name": "Vertical",
     },
     "absent": {
       "emitted": "absent",
@@ -117,6 +199,7 @@ exports[`A Module described describes Marshal.es 1`] = `
                   },
                   "shown": "Shape#Circle",
                   "tag": "./Marshal.es#Shape#Circle",
+                  "unitChoice": false,
                 },
                 {
                   "choice": "Shape",
@@ -135,6 +218,7 @@ exports[`A Module described describes Marshal.es 1`] = `
                   },
                   "shown": "Shape#Rect",
                   "tag": "./Marshal.es#Shape#Rect",
+                  "unitChoice": false,
                 },
                 {
                   "choice": "Shape",
@@ -144,6 +228,7 @@ exports[`A Module described describes Marshal.es 1`] = `
                   "payload": {},
                   "shown": "Shape#Blank",
                   "tag": "./Marshal.es#Shape#Blank",
+                  "unitChoice": false,
                 },
               ],
               "kind": "union",
@@ -176,6 +261,7 @@ exports[`A Module described describes Marshal.es 1`] = `
             },
             "shown": "Shape#Circle",
             "tag": "./Marshal.es#Shape#Circle",
+            "unitChoice": false,
           },
           {
             "choice": "Shape",
@@ -194,6 +280,7 @@ exports[`A Module described describes Marshal.es 1`] = `
             },
             "shown": "Shape#Rect",
             "tag": "./Marshal.es#Shape#Rect",
+            "unitChoice": false,
           },
           {
             "choice": "Shape",
@@ -203,6 +290,7 @@ exports[`A Module described describes Marshal.es 1`] = `
             "payload": {},
             "shown": "Shape#Blank",
             "tag": "./Marshal.es#Shape#Blank",
+            "unitChoice": false,
           },
         ],
         "kind": "union",
@@ -399,6 +487,7 @@ exports[`A Module described describes Marshal.es 1`] = `
             },
             "shown": "Shape#Circle",
             "tag": "./Marshal.es#Shape#Circle",
+            "unitChoice": false,
           },
           {
             "choice": "Shape",
@@ -417,6 +506,7 @@ exports[`A Module described describes Marshal.es 1`] = `
             },
             "shown": "Shape#Rect",
             "tag": "./Marshal.es#Shape#Rect",
+            "unitChoice": false,
           },
           {
             "choice": "Shape",
@@ -426,6 +516,7 @@ exports[`A Module described describes Marshal.es 1`] = `
             "payload": {},
             "shown": "Shape#Blank",
             "tag": "./Marshal.es#Shape#Blank",
+            "unitChoice": false,
           },
         ],
         "kind": "union",
@@ -471,6 +562,664 @@ exports[`A Module described describes Marshal.es 1`] = `
           "shown": "{ toString: Optional<String> }",
         },
         "shown": "(_ { toString: Optional<String> }) -> { toString: Optional<String> }",
+      },
+    },
+    "direction": {
+      "emitted": "direction",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "arms": [
+                {
+                  "choice": "Direction",
+                  "kind": "case",
+                  "name": "Up",
+                  "optional": false,
+                  "payload": {},
+                  "shown": "Direction#Up",
+                  "tag": "./Marshal.es#Direction#Up",
+                  "unitChoice": true,
+                },
+                {
+                  "choice": "Direction",
+                  "kind": "case",
+                  "name": "Down",
+                  "optional": false,
+                  "payload": {},
+                  "shown": "Direction#Down",
+                  "tag": "./Marshal.es#Direction#Down",
+                  "unitChoice": true,
+                },
+              ],
+              "kind": "union",
+              "shown": "Direction",
+            },
+          },
+        ],
+        "returns": {
+          "arms": [
+            {
+              "choice": "Direction",
+              "kind": "case",
+              "name": "Up",
+              "optional": false,
+              "payload": {},
+              "shown": "Direction#Up",
+              "tag": "./Marshal.es#Direction#Up",
+              "unitChoice": true,
+            },
+            {
+              "choice": "Direction",
+              "kind": "case",
+              "name": "Down",
+              "optional": false,
+              "payload": {},
+              "shown": "Direction#Down",
+              "tag": "./Marshal.es#Direction#Down",
+              "unitChoice": true,
+            },
+          ],
+          "kind": "union",
+          "shown": "Direction",
+        },
+        "shown": "(_ Direction) -> Direction",
+      },
+    },
+    "directionOrShape": {
+      "emitted": "directionOrShape",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "arms": [
+                {
+                  "arms": [
+                    {
+                      "choice": "Direction",
+                      "kind": "case",
+                      "name": "Up",
+                      "optional": false,
+                      "payload": {},
+                      "shown": "Direction#Up",
+                      "tag": "./Marshal.es#Direction#Up",
+                      "unitChoice": true,
+                    },
+                    {
+                      "choice": "Direction",
+                      "kind": "case",
+                      "name": "Down",
+                      "optional": false,
+                      "payload": {},
+                      "shown": "Direction#Down",
+                      "tag": "./Marshal.es#Direction#Down",
+                      "unitChoice": true,
+                    },
+                  ],
+                  "kind": "union",
+                  "shown": "Direction",
+                },
+                {
+                  "arms": [
+                    {
+                      "choice": "Shape",
+                      "kind": "case",
+                      "name": "Circle",
+                      "optional": false,
+                      "payload": {
+                        "radius": {
+                          "kind": "integer",
+                          "shown": "Integer",
+                        },
+                      },
+                      "shown": "Shape#Circle",
+                      "tag": "./Marshal.es#Shape#Circle",
+                      "unitChoice": false,
+                    },
+                    {
+                      "choice": "Shape",
+                      "kind": "case",
+                      "name": "Rect",
+                      "optional": false,
+                      "payload": {
+                        "height": {
+                          "kind": "integer",
+                          "shown": "Integer",
+                        },
+                        "width": {
+                          "kind": "integer",
+                          "shown": "Integer",
+                        },
+                      },
+                      "shown": "Shape#Rect",
+                      "tag": "./Marshal.es#Shape#Rect",
+                      "unitChoice": false,
+                    },
+                    {
+                      "choice": "Shape",
+                      "kind": "case",
+                      "name": "Blank",
+                      "optional": false,
+                      "payload": {},
+                      "shown": "Shape#Blank",
+                      "tag": "./Marshal.es#Shape#Blank",
+                      "unitChoice": false,
+                    },
+                  ],
+                  "kind": "union",
+                  "shown": "Shape",
+                },
+              ],
+              "kind": "union",
+              "shown": "Direction | Shape",
+            },
+          },
+        ],
+        "returns": {
+          "arms": [
+            {
+              "arms": [
+                {
+                  "choice": "Direction",
+                  "kind": "case",
+                  "name": "Up",
+                  "optional": false,
+                  "payload": {},
+                  "shown": "Direction#Up",
+                  "tag": "./Marshal.es#Direction#Up",
+                  "unitChoice": true,
+                },
+                {
+                  "choice": "Direction",
+                  "kind": "case",
+                  "name": "Down",
+                  "optional": false,
+                  "payload": {},
+                  "shown": "Direction#Down",
+                  "tag": "./Marshal.es#Direction#Down",
+                  "unitChoice": true,
+                },
+              ],
+              "kind": "union",
+              "shown": "Direction",
+            },
+            {
+              "arms": [
+                {
+                  "choice": "Shape",
+                  "kind": "case",
+                  "name": "Circle",
+                  "optional": false,
+                  "payload": {
+                    "radius": {
+                      "kind": "integer",
+                      "shown": "Integer",
+                    },
+                  },
+                  "shown": "Shape#Circle",
+                  "tag": "./Marshal.es#Shape#Circle",
+                  "unitChoice": false,
+                },
+                {
+                  "choice": "Shape",
+                  "kind": "case",
+                  "name": "Rect",
+                  "optional": false,
+                  "payload": {
+                    "height": {
+                      "kind": "integer",
+                      "shown": "Integer",
+                    },
+                    "width": {
+                      "kind": "integer",
+                      "shown": "Integer",
+                    },
+                  },
+                  "shown": "Shape#Rect",
+                  "tag": "./Marshal.es#Shape#Rect",
+                  "unitChoice": false,
+                },
+                {
+                  "choice": "Shape",
+                  "kind": "case",
+                  "name": "Blank",
+                  "optional": false,
+                  "payload": {},
+                  "shown": "Shape#Blank",
+                  "tag": "./Marshal.es#Shape#Blank",
+                  "unitChoice": false,
+                },
+              ],
+              "kind": "union",
+              "shown": "Shape",
+            },
+          ],
+          "kind": "union",
+          "shown": "Direction | Shape",
+        },
+        "shown": "(_ Direction | Shape) -> Direction | Shape",
+      },
+    },
+    "directionOrSign": {
+      "emitted": "directionOrSign",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "arms": [
+                {
+                  "arms": [
+                    {
+                      "choice": "Direction",
+                      "kind": "case",
+                      "name": "Up",
+                      "optional": false,
+                      "payload": {},
+                      "shown": "Direction#Up",
+                      "tag": "./Marshal.es#Direction#Up",
+                      "unitChoice": true,
+                    },
+                    {
+                      "choice": "Direction",
+                      "kind": "case",
+                      "name": "Down",
+                      "optional": false,
+                      "payload": {},
+                      "shown": "Direction#Down",
+                      "tag": "./Marshal.es#Direction#Down",
+                      "unitChoice": true,
+                    },
+                  ],
+                  "kind": "union",
+                  "shown": "Direction",
+                },
+                {
+                  "arms": [
+                    {
+                      "choice": "Sign",
+                      "kind": "case",
+                      "name": "Plus",
+                      "optional": false,
+                      "payload": {},
+                      "shown": "Sign#Plus",
+                      "tag": "./Marshal.es#Sign#Plus",
+                      "unitChoice": true,
+                    },
+                    {
+                      "choice": "Sign",
+                      "kind": "case",
+                      "name": "Minus",
+                      "optional": false,
+                      "payload": {},
+                      "shown": "Sign#Minus",
+                      "tag": "./Marshal.es#Sign#Minus",
+                      "unitChoice": true,
+                    },
+                  ],
+                  "kind": "union",
+                  "shown": "Sign",
+                },
+              ],
+              "kind": "union",
+              "shown": "Direction | Sign",
+            },
+          },
+        ],
+        "returns": {
+          "arms": [
+            {
+              "arms": [
+                {
+                  "choice": "Direction",
+                  "kind": "case",
+                  "name": "Up",
+                  "optional": false,
+                  "payload": {},
+                  "shown": "Direction#Up",
+                  "tag": "./Marshal.es#Direction#Up",
+                  "unitChoice": true,
+                },
+                {
+                  "choice": "Direction",
+                  "kind": "case",
+                  "name": "Down",
+                  "optional": false,
+                  "payload": {},
+                  "shown": "Direction#Down",
+                  "tag": "./Marshal.es#Direction#Down",
+                  "unitChoice": true,
+                },
+              ],
+              "kind": "union",
+              "shown": "Direction",
+            },
+            {
+              "arms": [
+                {
+                  "choice": "Sign",
+                  "kind": "case",
+                  "name": "Plus",
+                  "optional": false,
+                  "payload": {},
+                  "shown": "Sign#Plus",
+                  "tag": "./Marshal.es#Sign#Plus",
+                  "unitChoice": true,
+                },
+                {
+                  "choice": "Sign",
+                  "kind": "case",
+                  "name": "Minus",
+                  "optional": false,
+                  "payload": {},
+                  "shown": "Sign#Minus",
+                  "tag": "./Marshal.es#Sign#Minus",
+                  "unitChoice": true,
+                },
+              ],
+              "kind": "union",
+              "shown": "Sign",
+            },
+          ],
+          "kind": "union",
+          "shown": "Direction | Sign",
+        },
+        "shown": "(_ Direction | Sign) -> Direction | Sign",
+      },
+    },
+    "directionOrText": {
+      "emitted": "directionOrText",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "arms": [
+                {
+                  "arms": [
+                    {
+                      "choice": "Direction",
+                      "kind": "case",
+                      "name": "Up",
+                      "optional": false,
+                      "payload": {},
+                      "shown": "Direction#Up",
+                      "tag": "./Marshal.es#Direction#Up",
+                      "unitChoice": true,
+                    },
+                    {
+                      "choice": "Direction",
+                      "kind": "case",
+                      "name": "Down",
+                      "optional": false,
+                      "payload": {},
+                      "shown": "Direction#Down",
+                      "tag": "./Marshal.es#Direction#Down",
+                      "unitChoice": true,
+                    },
+                  ],
+                  "kind": "union",
+                  "shown": "Direction",
+                },
+                {
+                  "kind": "string",
+                  "shown": "String",
+                },
+              ],
+              "kind": "union",
+              "shown": "Direction | String",
+            },
+          },
+        ],
+        "returns": {
+          "arms": [
+            {
+              "arms": [
+                {
+                  "choice": "Direction",
+                  "kind": "case",
+                  "name": "Up",
+                  "optional": false,
+                  "payload": {},
+                  "shown": "Direction#Up",
+                  "tag": "./Marshal.es#Direction#Up",
+                  "unitChoice": true,
+                },
+                {
+                  "choice": "Direction",
+                  "kind": "case",
+                  "name": "Down",
+                  "optional": false,
+                  "payload": {},
+                  "shown": "Direction#Down",
+                  "tag": "./Marshal.es#Direction#Down",
+                  "unitChoice": true,
+                },
+              ],
+              "kind": "union",
+              "shown": "Direction",
+            },
+            {
+              "kind": "string",
+              "shown": "String",
+            },
+          ],
+          "kind": "union",
+          "shown": "Direction | String",
+        },
+        "shown": "(_ Direction | String) -> Direction | String",
+      },
+    },
+    "directionOrVertical": {
+      "emitted": "directionOrVertical",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "arms": [
+                {
+                  "arms": [
+                    {
+                      "choice": "Direction",
+                      "kind": "case",
+                      "name": "Up",
+                      "optional": false,
+                      "payload": {},
+                      "shown": "Direction#Up",
+                      "tag": "./Marshal.es#Direction#Up",
+                      "unitChoice": true,
+                    },
+                    {
+                      "choice": "Direction",
+                      "kind": "case",
+                      "name": "Down",
+                      "optional": false,
+                      "payload": {},
+                      "shown": "Direction#Down",
+                      "tag": "./Marshal.es#Direction#Down",
+                      "unitChoice": true,
+                    },
+                  ],
+                  "kind": "union",
+                  "shown": "Direction",
+                },
+                {
+                  "arms": [
+                    {
+                      "choice": "Vertical",
+                      "kind": "case",
+                      "name": "Up",
+                      "optional": false,
+                      "payload": {},
+                      "shown": "Vertical#Up",
+                      "tag": "./Marshal.es#Vertical#Up",
+                      "unitChoice": true,
+                    },
+                    {
+                      "choice": "Vertical",
+                      "kind": "case",
+                      "name": "Down",
+                      "optional": false,
+                      "payload": {},
+                      "shown": "Vertical#Down",
+                      "tag": "./Marshal.es#Vertical#Down",
+                      "unitChoice": true,
+                    },
+                  ],
+                  "kind": "union",
+                  "shown": "Vertical",
+                },
+              ],
+              "kind": "union",
+              "shown": "Direction | Vertical",
+            },
+          },
+        ],
+        "returns": {
+          "arms": [
+            {
+              "arms": [
+                {
+                  "choice": "Direction",
+                  "kind": "case",
+                  "name": "Up",
+                  "optional": false,
+                  "payload": {},
+                  "shown": "Direction#Up",
+                  "tag": "./Marshal.es#Direction#Up",
+                  "unitChoice": true,
+                },
+                {
+                  "choice": "Direction",
+                  "kind": "case",
+                  "name": "Down",
+                  "optional": false,
+                  "payload": {},
+                  "shown": "Direction#Down",
+                  "tag": "./Marshal.es#Direction#Down",
+                  "unitChoice": true,
+                },
+              ],
+              "kind": "union",
+              "shown": "Direction",
+            },
+            {
+              "arms": [
+                {
+                  "choice": "Vertical",
+                  "kind": "case",
+                  "name": "Up",
+                  "optional": false,
+                  "payload": {},
+                  "shown": "Vertical#Up",
+                  "tag": "./Marshal.es#Vertical#Up",
+                  "unitChoice": true,
+                },
+                {
+                  "choice": "Vertical",
+                  "kind": "case",
+                  "name": "Down",
+                  "optional": false,
+                  "payload": {},
+                  "shown": "Vertical#Down",
+                  "tag": "./Marshal.es#Vertical#Down",
+                  "unitChoice": true,
+                },
+              ],
+              "kind": "union",
+              "shown": "Vertical",
+            },
+          ],
+          "kind": "union",
+          "shown": "Direction | Vertical",
+        },
+        "shown": "(_ Direction | Vertical) -> Direction | Vertical",
+      },
+    },
+    "directions": {
+      "emitted": "directions",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "kind": "list",
+              "of": {
+                "arms": [
+                  {
+                    "choice": "Direction",
+                    "kind": "case",
+                    "name": "Up",
+                    "optional": false,
+                    "payload": {},
+                    "shown": "Direction#Up",
+                    "tag": "./Marshal.es#Direction#Up",
+                    "unitChoice": true,
+                  },
+                  {
+                    "choice": "Direction",
+                    "kind": "case",
+                    "name": "Down",
+                    "optional": false,
+                    "payload": {},
+                    "shown": "Direction#Down",
+                    "tag": "./Marshal.es#Direction#Down",
+                    "unitChoice": true,
+                  },
+                ],
+                "kind": "union",
+                "shown": "Direction",
+              },
+              "shown": "List<Direction>",
+            },
+          },
+        ],
+        "returns": {
+          "kind": "list",
+          "of": {
+            "arms": [
+              {
+                "choice": "Direction",
+                "kind": "case",
+                "name": "Up",
+                "optional": false,
+                "payload": {},
+                "shown": "Direction#Up",
+                "tag": "./Marshal.es#Direction#Up",
+                "unitChoice": true,
+              },
+              {
+                "choice": "Direction",
+                "kind": "case",
+                "name": "Down",
+                "optional": false,
+                "payload": {},
+                "shown": "Direction#Down",
+                "tag": "./Marshal.es#Direction#Down",
+                "unitChoice": true,
+              },
+            ],
+            "kind": "union",
+            "shown": "Direction",
+          },
+          "shown": "List<Direction>",
+        },
+        "shown": "(_ List<Direction>) -> List<Direction>",
       },
     },
     "flag": {
@@ -529,6 +1278,36 @@ exports[`A Module described describes Marshal.es 1`] = `
           "shown": "List<String>",
         },
         "shown": "(_ List<String>) -> List<String>",
+      },
+    },
+    "heading": {
+      "emitted": "heading",
+      "kind": "constant",
+      "of": {
+        "arms": [
+          {
+            "choice": "Direction",
+            "kind": "case",
+            "name": "Up",
+            "optional": false,
+            "payload": {},
+            "shown": "Direction#Up",
+            "tag": "./Marshal.es#Direction#Up",
+            "unitChoice": true,
+          },
+          {
+            "choice": "Direction",
+            "kind": "case",
+            "name": "Down",
+            "optional": false,
+            "payload": {},
+            "shown": "Direction#Down",
+            "tag": "./Marshal.es#Direction#Down",
+            "unitChoice": true,
+          },
+        ],
+        "kind": "union",
+        "shown": "Direction",
       },
     },
     "integer": {
@@ -593,6 +1372,83 @@ exports[`A Module described describes Marshal.es 1`] = `
         "shown": "(_ Label) -> Label",
       },
     },
+    "marker": {
+      "emitted": "marker",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "kind": "record",
+              "members": {
+                "direction": {
+                  "arms": [
+                    {
+                      "choice": "Direction",
+                      "kind": "case",
+                      "name": "Up",
+                      "optional": false,
+                      "payload": {},
+                      "shown": "Direction#Up",
+                      "tag": "./Marshal.es#Direction#Up",
+                      "unitChoice": true,
+                    },
+                    {
+                      "choice": "Direction",
+                      "kind": "case",
+                      "name": "Down",
+                      "optional": false,
+                      "payload": {},
+                      "shown": "Direction#Down",
+                      "tag": "./Marshal.es#Direction#Down",
+                      "unitChoice": true,
+                    },
+                  ],
+                  "kind": "union",
+                  "shown": "Direction",
+                },
+              },
+              "shown": "{ direction: Direction }",
+            },
+          },
+        ],
+        "returns": {
+          "kind": "record",
+          "members": {
+            "direction": {
+              "arms": [
+                {
+                  "choice": "Direction",
+                  "kind": "case",
+                  "name": "Up",
+                  "optional": false,
+                  "payload": {},
+                  "shown": "Direction#Up",
+                  "tag": "./Marshal.es#Direction#Up",
+                  "unitChoice": true,
+                },
+                {
+                  "choice": "Direction",
+                  "kind": "case",
+                  "name": "Down",
+                  "optional": false,
+                  "payload": {},
+                  "shown": "Direction#Down",
+                  "tag": "./Marshal.es#Direction#Down",
+                  "unitChoice": true,
+                },
+              ],
+              "kind": "union",
+              "shown": "Direction",
+            },
+          },
+          "shown": "{ direction: Direction }",
+        },
+        "shown": "(_ { direction: Direction }) -> { direction: Direction }",
+      },
+    },
     "maybe": {
       "emitted": "maybe",
       "kind": "function",
@@ -620,6 +1476,79 @@ exports[`A Module described describes Marshal.es 1`] = `
           "shown": "Optional<Integer>",
         },
         "shown": "(_ Optional<Integer>) -> Optional<Integer>",
+      },
+    },
+    "maybeDirection": {
+      "emitted": "maybeDirection",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "kind": "optional",
+              "of": {
+                "arms": [
+                  {
+                    "choice": "Direction",
+                    "kind": "case",
+                    "name": "Up",
+                    "optional": false,
+                    "payload": {},
+                    "shown": "Direction#Up",
+                    "tag": "./Marshal.es#Direction#Up",
+                    "unitChoice": true,
+                  },
+                  {
+                    "choice": "Direction",
+                    "kind": "case",
+                    "name": "Down",
+                    "optional": false,
+                    "payload": {},
+                    "shown": "Direction#Down",
+                    "tag": "./Marshal.es#Direction#Down",
+                    "unitChoice": true,
+                  },
+                ],
+                "kind": "union",
+                "shown": "Direction",
+              },
+              "shown": "Optional<Direction>",
+            },
+          },
+        ],
+        "returns": {
+          "kind": "optional",
+          "of": {
+            "arms": [
+              {
+                "choice": "Direction",
+                "kind": "case",
+                "name": "Up",
+                "optional": false,
+                "payload": {},
+                "shown": "Direction#Up",
+                "tag": "./Marshal.es#Direction#Up",
+                "unitChoice": true,
+              },
+              {
+                "choice": "Direction",
+                "kind": "case",
+                "name": "Down",
+                "optional": false,
+                "payload": {},
+                "shown": "Direction#Down",
+                "tag": "./Marshal.es#Direction#Down",
+                "unitChoice": true,
+              },
+            ],
+            "kind": "union",
+            "shown": "Direction",
+          },
+          "shown": "Optional<Direction>",
+        },
+        "shown": "(_ Optional<Direction>) -> Optional<Direction>",
       },
     },
     "maybes": {
@@ -669,6 +1598,105 @@ exports[`A Module described describes Marshal.es 1`] = `
           "shown": "String",
         },
         "shown": "List<String>",
+      },
+    },
+    "ordering": {
+      "emitted": "ordering",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "arms": [
+                {
+                  "choice": "Ordering",
+                  "kind": "case",
+                  "name": "Less",
+                  "optional": false,
+                  "payload": {},
+                  "shown": "Ordering#Less",
+                  "tag": "Ordering#Less",
+                  "unitChoice": true,
+                },
+                {
+                  "choice": "Ordering",
+                  "kind": "case",
+                  "name": "Equal",
+                  "optional": false,
+                  "payload": {},
+                  "shown": "Ordering#Equal",
+                  "tag": "Ordering#Equal",
+                  "unitChoice": true,
+                },
+                {
+                  "choice": "Ordering",
+                  "kind": "case",
+                  "name": "Greater",
+                  "optional": false,
+                  "payload": {},
+                  "shown": "Ordering#Greater",
+                  "tag": "Ordering#Greater",
+                  "unitChoice": true,
+                },
+              ],
+              "kind": "union",
+              "shown": "Ordering",
+            },
+          },
+        ],
+        "returns": {
+          "arms": [
+            {
+              "choice": "Ordering",
+              "kind": "case",
+              "name": "Less",
+              "optional": false,
+              "payload": {},
+              "shown": "Ordering#Less",
+              "tag": "Ordering#Less",
+              "unitChoice": true,
+            },
+            {
+              "choice": "Ordering",
+              "kind": "case",
+              "name": "Equal",
+              "optional": false,
+              "payload": {},
+              "shown": "Ordering#Equal",
+              "tag": "Ordering#Equal",
+              "unitChoice": true,
+            },
+            {
+              "choice": "Ordering",
+              "kind": "case",
+              "name": "Greater",
+              "optional": false,
+              "payload": {},
+              "shown": "Ordering#Greater",
+              "tag": "Ordering#Greater",
+              "unitChoice": true,
+            },
+          ],
+          "kind": "union",
+          "shown": "Ordering",
+        },
+        "shown": "(_ Ordering) -> Ordering",
+      },
+    },
+    "plus": {
+      "emitted": "plus",
+      "kind": "constant",
+      "of": {
+        "choice": "Sign",
+        "kind": "case",
+        "name": "Plus",
+        "optional": false,
+        "payload": {},
+        "shown": "Sign#Plus",
+        "tag": "./Marshal.es#Sign#Plus",
+        "unitChoice": true,
       },
     },
     "point": {
@@ -745,6 +1773,7 @@ exports[`A Module described describes Marshal.es 1`] = `
                   },
                   "shown": "Shape#Circle",
                   "tag": "./Marshal.es#Shape#Circle",
+                  "unitChoice": false,
                 },
                 {
                   "choice": "Shape",
@@ -763,6 +1792,7 @@ exports[`A Module described describes Marshal.es 1`] = `
                   },
                   "shown": "Shape#Rect",
                   "tag": "./Marshal.es#Shape#Rect",
+                  "unitChoice": false,
                 },
                 {
                   "choice": "Shape",
@@ -772,6 +1802,7 @@ exports[`A Module described describes Marshal.es 1`] = `
                   "payload": {},
                   "shown": "Shape#Blank",
                   "tag": "./Marshal.es#Shape#Blank",
+                  "unitChoice": false,
                 },
               ],
               "kind": "union",
@@ -794,6 +1825,7 @@ exports[`A Module described describes Marshal.es 1`] = `
               },
               "shown": "Shape#Circle",
               "tag": "./Marshal.es#Shape#Circle",
+              "unitChoice": false,
             },
             {
               "choice": "Shape",
@@ -812,6 +1844,7 @@ exports[`A Module described describes Marshal.es 1`] = `
               },
               "shown": "Shape#Rect",
               "tag": "./Marshal.es#Shape#Rect",
+              "unitChoice": false,
             },
             {
               "choice": "Shape",
@@ -821,6 +1854,7 @@ exports[`A Module described describes Marshal.es 1`] = `
               "payload": {},
               "shown": "Shape#Blank",
               "tag": "./Marshal.es#Shape#Blank",
+              "unitChoice": false,
             },
           ],
           "kind": "union",
@@ -856,6 +1890,7 @@ exports[`A Module described describes Marshal.es 1`] = `
                   },
                   "shown": "Styled#Tagged",
                   "tag": "./Marshal.es#Styled#Tagged",
+                  "unitChoice": false,
                 },
               ],
               "kind": "union",
@@ -882,6 +1917,7 @@ exports[`A Module described describes Marshal.es 1`] = `
               },
               "shown": "Styled#Tagged",
               "tag": "./Marshal.es#Styled#Tagged",
+              "unitChoice": false,
             },
           ],
           "kind": "union",
@@ -973,6 +2009,7 @@ exports[`A Module described describes Calls.es 1`] = `
           "payload": {},
           "shown": "Colour#Red",
           "tag": "./Calls.es#Colour#Red",
+          "unitChoice": false,
         },
         {
           "choice": "Colour",
@@ -987,6 +2024,7 @@ exports[`A Module described describes Calls.es 1`] = `
           },
           "shown": "Colour#Named",
           "tag": "./Calls.es#Colour#Named",
+          "unitChoice": false,
         },
       ],
       "emitted": "Colour",
@@ -1008,6 +2046,7 @@ exports[`A Module described describes Calls.es 1`] = `
                   "payload": {},
                   "shown": "Colour#Red",
                   "tag": "./Calls.es#Colour#Red",
+                  "unitChoice": false,
                 },
                 {
                   "choice": "Colour",
@@ -1022,6 +2061,7 @@ exports[`A Module described describes Calls.es 1`] = `
                   },
                   "shown": "Colour#Named",
                   "tag": "./Calls.es#Colour#Named",
+                  "unitChoice": false,
                 },
               ],
               "kind": "union",
@@ -1576,6 +2616,7 @@ exports[`A Module described describes Calls.es 1`] = `
               "payload": {},
               "shown": "Colour#Red",
               "tag": "./Calls.es#Colour#Red",
+              "unitChoice": false,
             },
             {
               "choice": "Colour",
@@ -1590,6 +2631,7 @@ exports[`A Module described describes Calls.es 1`] = `
               },
               "shown": "Colour#Named",
               "tag": "./Calls.es#Colour#Named",
+              "unitChoice": false,
             },
           ],
           "kind": "union",
@@ -2123,6 +3165,32 @@ exports[`A Module described describes Escaped.es 1`] = `
 exports[`A Module described describes Refused.es 1`] = `
 {
   "exports": {
+    "Direction": {
+      "cases": [
+        {
+          "choice": "Direction",
+          "kind": "case",
+          "name": "Up",
+          "optional": false,
+          "payload": {},
+          "shown": "Direction#Up",
+          "tag": "./Refused.es#Direction#Up",
+          "unitChoice": true,
+        },
+        {
+          "choice": "Direction",
+          "kind": "case",
+          "name": "Down",
+          "optional": false,
+          "payload": {},
+          "shown": "Direction#Down",
+          "tag": "./Refused.es#Direction#Down",
+          "unitChoice": true,
+        },
+      ],
+      "kind": "choice",
+      "name": "Direction",
+    },
     "Tagged": {
       "cases": [
         {
@@ -2138,6 +3206,7 @@ exports[`A Module described describes Refused.es 1`] = `
           },
           "shown": "Tagged#One",
           "tag": "./Refused.es#Tagged#One",
+          "unitChoice": false,
         },
         {
           "choice": "Tagged",
@@ -2147,6 +3216,7 @@ exports[`A Module described describes Refused.es 1`] = `
           "payload": {},
           "shown": "Tagged#Plain",
           "tag": "./Refused.es#Tagged#Plain",
+          "unitChoice": false,
         },
       ],
       "kind": "choice",
@@ -2220,6 +3290,7 @@ exports[`A Module described describes Refused.es 1`] = `
                   },
                   "shown": "Tagged#One",
                   "tag": "./Refused.es#Tagged#One",
+                  "unitChoice": false,
                 },
                 {
                   "choice": "Tagged",
@@ -2229,6 +3300,7 @@ exports[`A Module described describes Refused.es 1`] = `
                   "payload": {},
                   "shown": "Tagged#Plain",
                   "tag": "./Refused.es#Tagged#Plain",
+                  "unitChoice": false,
                 },
               ],
               "kind": "union",
@@ -2329,6 +3401,99 @@ exports[`A Module described describes Refused.es 1`] = `
         "shown": "(_ { level: Optional<Optional<Integer>> }) -> { level: Optional<Optional<Integer>> }",
       },
     },
+    "noted": {
+      "emitted": "noted",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "arms": [
+                {
+                  "kind": "optional",
+                  "of": {
+                    "kind": "string",
+                    "shown": "String",
+                  },
+                  "shown": "Optional<String>",
+                },
+                {
+                  "arms": [
+                    {
+                      "choice": "Direction",
+                      "kind": "case",
+                      "name": "Up",
+                      "optional": false,
+                      "payload": {},
+                      "shown": "Direction#Up",
+                      "tag": "./Refused.es#Direction#Up",
+                      "unitChoice": true,
+                    },
+                    {
+                      "choice": "Direction",
+                      "kind": "case",
+                      "name": "Down",
+                      "optional": false,
+                      "payload": {},
+                      "shown": "Direction#Down",
+                      "tag": "./Refused.es#Direction#Down",
+                      "unitChoice": true,
+                    },
+                  ],
+                  "kind": "union",
+                  "shown": "Direction",
+                },
+              ],
+              "kind": "union",
+              "shown": "Optional<String> | Direction",
+            },
+          },
+        ],
+        "returns": {
+          "arms": [
+            {
+              "kind": "optional",
+              "of": {
+                "kind": "string",
+                "shown": "String",
+              },
+              "shown": "Optional<String>",
+            },
+            {
+              "arms": [
+                {
+                  "choice": "Direction",
+                  "kind": "case",
+                  "name": "Up",
+                  "optional": false,
+                  "payload": {},
+                  "shown": "Direction#Up",
+                  "tag": "./Refused.es#Direction#Up",
+                  "unitChoice": true,
+                },
+                {
+                  "choice": "Direction",
+                  "kind": "case",
+                  "name": "Down",
+                  "optional": false,
+                  "payload": {},
+                  "shown": "Direction#Down",
+                  "tag": "./Refused.es#Direction#Down",
+                  "unitChoice": true,
+                },
+              ],
+              "kind": "union",
+              "shown": "Direction",
+            },
+          ],
+          "kind": "union",
+          "shown": "Optional<String> | Direction",
+        },
+        "shown": "(_ Optional<String> | Direction) -> Optional<String> | Direction",
+      },
+    },
     "root": {
       "emitted": "root",
       "kind": "constant",
@@ -2397,6 +3562,7 @@ exports[`A Module described describes Refused.es 1`] = `
               },
               "shown": "Tagged#One",
               "tag": "./Refused.es#Tagged#One",
+              "unitChoice": false,
             },
             {
               "choice": "Tagged",
@@ -2406,12 +3572,106 @@ exports[`A Module described describes Refused.es 1`] = `
               "payload": {},
               "shown": "Tagged#Plain",
               "tag": "./Refused.es#Tagged#Plain",
+              "unitChoice": false,
             },
           ],
           "kind": "union",
           "shown": "Tagged",
         },
         "shown": "(_ String) -> Tagged",
+      },
+    },
+    "wrapped": {
+      "emitted": "wrapped",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "kind": "optional",
+              "of": {
+                "arms": [
+                  {
+                    "arms": [
+                      {
+                        "choice": "Direction",
+                        "kind": "case",
+                        "name": "Up",
+                        "optional": false,
+                        "payload": {},
+                        "shown": "Direction#Up",
+                        "tag": "./Refused.es#Direction#Up",
+                        "unitChoice": true,
+                      },
+                      {
+                        "choice": "Direction",
+                        "kind": "case",
+                        "name": "Down",
+                        "optional": false,
+                        "payload": {},
+                        "shown": "Direction#Down",
+                        "tag": "./Refused.es#Direction#Down",
+                        "unitChoice": true,
+                      },
+                    ],
+                    "kind": "union",
+                    "shown": "Direction",
+                  },
+                  {
+                    "kind": "string",
+                    "shown": "String",
+                  },
+                ],
+                "kind": "union",
+                "shown": "Direction | String",
+              },
+              "shown": "Optional<Direction | String>",
+            },
+          },
+        ],
+        "returns": {
+          "kind": "optional",
+          "of": {
+            "arms": [
+              {
+                "arms": [
+                  {
+                    "choice": "Direction",
+                    "kind": "case",
+                    "name": "Up",
+                    "optional": false,
+                    "payload": {},
+                    "shown": "Direction#Up",
+                    "tag": "./Refused.es#Direction#Up",
+                    "unitChoice": true,
+                  },
+                  {
+                    "choice": "Direction",
+                    "kind": "case",
+                    "name": "Down",
+                    "optional": false,
+                    "payload": {},
+                    "shown": "Direction#Down",
+                    "tag": "./Refused.es#Direction#Down",
+                    "unitChoice": true,
+                  },
+                ],
+                "kind": "union",
+                "shown": "Direction",
+              },
+              {
+                "kind": "string",
+                "shown": "String",
+              },
+            ],
+            "kind": "union",
+            "shown": "Direction | String",
+          },
+          "shown": "Optional<Direction | String>",
+        },
+        "shown": "(_ Optional<Direction | String>) -> Optional<Direction | String>",
       },
     },
   },

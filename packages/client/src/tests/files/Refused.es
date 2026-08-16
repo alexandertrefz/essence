@@ -1,8 +1,9 @@
 § The shapes the boundary REFUSES, together in one Module — an Optional inside
-§ an Optional, a Case whose payload is named after the tag, and a value from the
-§ numeric tower above Rational. Each of them has to be refused where it is met
-§ rather than answered wrongly, and none of them may take the rest of the Module
-§ down with it.
+§ an Optional, a Case whose payload is named after the tag, a value from the
+§ numeric tower above Rational, and a bare Case an Optional stands between a
+§ String and. Each of them has to be refused where it is met rather than
+§ answered wrongly, and none of them may take the rest of the Module down with
+§ it.
 
 implementation {
 
@@ -34,6 +35,22 @@ implementation {
 		<- #One({ $case = value })
 	}
 
+	choice Direction {
+		Up,
+		Down,
+	}
+
+	§ The two places an Optional can stand between a bare Case and a String,
+	§ and neither hides the collision: `Optional` is spelled by absence, so what
+	§ it holds stands in the position beside everything else.
+	function noted(_ value: Optional<String> | Direction) -> Optional<String> | Direction {
+		<- value
+	}
+
+	function wrapped(_ value: Optional<Direction | String>) -> Optional<Direction | String> {
+		<- value
+	}
+
 	function doubled(_ value: Integer) -> Integer {
 		<- value::multiply(with 2)
 	}
@@ -51,6 +68,9 @@ export {
 	nesting
 	nameOf
 	tagged
+	Direction
+	noted
+	wrapped
 	doubled
 	deep
 	shallow

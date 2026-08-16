@@ -75,7 +75,7 @@ export async function loadPrebuilt(
 	return {
 		...bind(namespace, descriptor, { bridge }),
 		bridge,
-		interpreter: createInterpreter(bridge),
+		interpreter: createInterpreter(bridge, descriptor),
 		descriptor,
 	}
 }

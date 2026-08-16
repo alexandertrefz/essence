@@ -251,10 +251,16 @@ async function importModule(
 		unknown
 	>
 	let bridge = runtimeBridgeOf(namespace)
-	let marshaller = createMarshaller(bridge, { entryPath: entry })
-	let { exports, raw } = bind(namespace, describeModule(surface, entry), {
-		bridge,
+	// NOTE: Described ONCE and handed to both doors, which is what keeps them
+	// answering alike. The binding needs it to know what to bind; the Marshaller
+	// needs it for the Cases whose spelling no value carries — see
+	// `MarshallerOptions.module`.
+	let descriptor = describeModule(surface, entry)
+	let marshaller = createMarshaller(bridge, {
+		entryPath: entry,
+		module: descriptor,
 	})
+	let { exports, raw } = bind(namespace, descriptor, { bridge })
 
 	return { entryPath: entry, surface, exports, raw, bridge, marshaller }
 }

@@ -442,6 +442,27 @@ export function resolveChoiceDeclarationStatementType(
 		}
 	}
 
+	// NOTE: Stamped once every Case is resolved, because it is the one fact
+	// about a Case that can not be read off the Case: whether its SIBLINGS carry
+	// payloads. A Case reaches the embedding boundary on its own — `constant up
+	// = #Up` is inferred as the Case rather than as the Union an annotation
+	// would have named — and that boundary has no scope to ask. So the question
+	// is answered here, where the whole declaration is in hand, and carried.
+	//
+	// NOTE: A generic Choice none of whose Cases carry a payload is a unit
+	// Choice too. Its Generics are then unused by every Case, so nothing an
+	// application substitutes can give one a payload.
+	if (
+		caseTypes.length > 0 &&
+		caseTypes.every(
+			(caseType) => Object.keys(caseType.members).length === 0,
+		)
+	) {
+		for (let caseType of caseTypes) {
+			caseType.unitChoice = true
+		}
+	}
+
 	if (isGeneric) {
 		return {
 			type: "GenericAlias",
@@ -1737,6 +1758,18 @@ function orderClaims<Claim extends { tag: string | null; shape?: common.Type }>(
 // members or not at all. The members are shaped in turn, and the ones that are
 // still Type Parameters answer true at runtime, which is the tag-only check
 // back again where nothing more is known.
+//
+// NOTE: A Case does NOT keep its `unitChoice`. It says how the Case is spelled
+// on the far side of the EMBEDDING boundary, which `isValueOfType` has never
+// heard of, so it is no part of the shape — dropped for the same reason a
+// Union's alias is, and it buys the same bytes back.
+//
+// NOTE: What this does NOT claim is that the field never reaches an emitted
+// Program. A Match Handler's Matcher is serialised from the DECLARED Type
+// rather than from a shape — `typeDescriptorExpression` in the Rewriter, which
+// carries a Union's alias too — so a Program matching on a unit Choice ships
+// the field, inert. Only this descriptor is normalised, and only the shapes
+// that come through it are what the sentence above is about.
 function runtimeShapeOf(type: common.Type): common.Type {
 	switch (type.type) {
 		case "Record":
