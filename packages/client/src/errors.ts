@@ -1,46 +1,17 @@
-import {
-	displayPath,
-	renderDiagnostics,
-} from "@essence-lang/compiler/diagnostics/render"
-import type { DiagnosticGroup } from "@essence-lang/compiler/embed"
-import type { common } from "@essence-lang/interfaces"
-
 // NOTE: The four ways reaching an Essence Module can go wrong, told apart by
-// WHOSE mistake they are: the Essence source did not compile, a JavaScript value
-// does not fit the Essence Type it was handed to, a Function was called in a way
-// its signature does not allow, or the build itself was set up in a way that can
-// not work. A host catching one of these knows which of its own sides to look
-// at, which a bare `Error` never says.
-
-// NOTE: The message IS the report — the same Ariadne output `esc` prints, one
-// block per file against that file's own source. Rendering it here rather than
-// handing back a list is what makes a bare `throw` out of `loadModule` as
-// readable as the command line: a host that does nothing at all still shows the
-// excerpt, the underline and the Help.
-export class EssenceCompileError extends Error {
-	readonly entryPath: string
-	readonly diagnostics: Array<common.Diagnostic>
-	readonly diagnosticGroups: Array<DiagnosticGroup>
-
-	constructor(
-		entryPath: string,
-		diagnosticGroups: Array<DiagnosticGroup>,
-		// NOTE: Plain by default. An Error's message is read out of a log, a
-		// serialised crash report and a test assertion at least as often as it is
-		// read off a terminal, and escape codes are noise in all three. A host
-		// that knows it is writing to a terminal renders the groups again.
-		options: { color?: boolean } = {},
-	) {
-		super(renderGroups(diagnosticGroups, options.color ?? false))
-
-		this.name = "EssenceCompileError"
-		this.entryPath = entryPath
-		this.diagnosticGroups = diagnosticGroups
-		this.diagnostics = diagnosticGroups.flatMap(
-			(group) => group.diagnostics,
-		)
-	}
-}
+// WHOSE mistake they are: a JavaScript value does not fit the Essence Type it
+// was handed to, a Function was called in a way its signature does not allow,
+// the build itself was set up in a way that can not work, or the Essence source
+// did not compile. A host catching one of these knows which of its own sides to
+// look at, which a bare `Error` never says.
+//
+// NOTE: Three of the four are here and the fourth is in `compile-error.ts`,
+// because this file is imported by `marshal-runtime.ts` — the half of the
+// boundary that ships to a browser with no Compiler anywhere near it. Nothing
+// here may import one. An `EssenceCompileError` renders Diagnostics through the
+// Compiler's own renderer, which is exactly what that rule excludes, and it is
+// also the one failure that can not happen at run time: by then the sources
+// have long since compiled.
 
 // NOTE: A value that does not fit the Type on the other side of the boundary,
 // in either direction.
@@ -88,28 +59,4 @@ export class EssenceBuildError extends Error {
 
 		this.name = "EssenceBuildError"
 	}
-}
-
-// NOTE: The blocks run together with the trailing newline trimmed, because what
-// this becomes is a `message` — whatever prints it adds the line break, and a
-// message ending in one prints a blank line under every stack trace.
-//
-// NOTE: Both the renderer and the rule a file is NAMED under are the Compiler's
-// own, so a host reading this report reads the one `esc` prints, down to how the
-// path above each excerpt is spelled.
-export function renderGroups(
-	groups: Array<DiagnosticGroup>,
-	color = false,
-): string {
-	return groups
-		.map((group) =>
-			renderDiagnostics(
-				group.diagnostics,
-				group.sourceText,
-				displayPath(group.filePath),
-				{ color },
-			),
-		)
-		.join("")
-		.replace(/\n+$/, "")
 }

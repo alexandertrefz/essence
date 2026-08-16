@@ -20,7 +20,7 @@ import {
 	type EssenceValue,
 	type RuntimeBridge,
 } from "../bridge"
-import { EssenceCompileError } from "../errors"
+import { EssenceCompileError } from "../compile-error"
 import { type EssenceModule, loadModule } from "../index"
 import { EssenceRational } from "../rational"
 

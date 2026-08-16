@@ -17,7 +17,7 @@ import {
 	withRuntimeBridge,
 } from "./bridge"
 import { bundlePath, cacheBundle, cachedBundle, cacheDirectory } from "./cache"
-import { EssenceCompileError } from "./errors"
+import { EssenceCompileError } from "./compile-error"
 import { createMarshaller, type Marshaller } from "./marshal"
 
 export { bindModule, type ModuleBindings } from "./bind"
@@ -32,6 +32,13 @@ export {
 } from "./bridge"
 export { bundlePath, cacheBundle, cachedBundle, cacheDirectory } from "./cache"
 export {
+	EssenceCompileError,
+	// NOTE: The Diagnostic report an `EssenceCompileError` carries, rendered
+	// again — with colour, this time, for a host that knows it is writing to a
+	// terminal. It is on the root because that is where the Error is.
+	renderGroups,
+} from "./compile-error"
+export {
 	type DeclarationOptions,
 	type DeclarationView,
 	generateDeclarations,
@@ -39,12 +46,7 @@ export {
 export {
 	EssenceBuildError,
 	EssenceCallError,
-	EssenceCompileError,
 	EssenceMarshalError,
-	// NOTE: The Diagnostic report an `EssenceCompileError` carries, rendered
-	// again — with colour, this time, for a host that knows it is writing to a
-	// terminal. It is on the root because that is where the Error is.
-	renderGroups,
 } from "./errors"
 export {
 	createMarshaller,
