@@ -141,6 +141,16 @@ type Inbound = (value: unknown, at: Path | null, step: Step) => EssenceValue
 
 type Outbound = (value: unknown, at: Path | null, step: Step) => unknown
 
+// NOTE: The members of one Record or one Case's payload, compiled — the readers
+// under the names a value carries them under, and the same readers in the order
+// the Type declares them. Which of the two answers is asked first is the whole
+// of the difference between them; see `compiledMembers`.
+type Members = {
+	names: Array<string>
+	readers: Array<Outbound>
+	named: Map<string, Outbound>
+}
+
 export type Interpreter = {
 	// NOTE: An Essence value out, as the JavaScript it maps to. The optional name
 	// is what an Error calls the value, and everything below it is spelled
@@ -229,10 +239,13 @@ export function createInterpreter(bridge: RuntimeBridge): Interpreter {
 	// converter below it already built.
 	let inbound = new WeakMap<Descriptor, Inbound>()
 	let outbound = new WeakMap<Descriptor, Outbound>()
-	let outboundMembers = new WeakMap<
-		Record<string, Descriptor>,
-		Map<string, Outbound>
-	>()
+	let outboundMembers = new WeakMap<Record<string, Descriptor>, Members>()
+	// NOTE: What a position that declared nothing reads its members by — no
+	// names to guess with and no reader to find, so every member of it is read
+	// by the walk the VALUE directs. One of them rather than a `null` to branch
+	// on, because a Record nothing was declared for is read by the same loop as
+	// every other.
+	let noMembers: Members = { names: [], readers: [], named: new Map() }
 
 	function compileIn(expected: Descriptor): Inbound {
 		let compiled = inbound.get(expected)
@@ -268,22 +281,31 @@ export function createInterpreter(bridge: RuntimeBridge): Interpreter {
 		return toJS(value, at, step, null)
 	}
 
-	// NOTE: The members of a Record or the payload of a Case, each compiled and
-	// kept under the name a value carries it under — one lookup per member met
-	// rather than a walk of the Descriptor. Memoised against the members object
-	// itself, because the general walk below reaches for it per value.
-	function compiledMembers(
-		members: Record<string, Descriptor>,
-	): Map<string, Outbound> {
+	// NOTE: The members of a Record or the payload of a Case, each compiled —
+	// twice over, in the two ways a member is looked for. Memoised against the
+	// members object itself, because the general walk below reaches for it per
+	// value.
+	//
+	// NOTE: The names IN THE TYPE'S ORDER beside the readers, because a value the
+	// Module built against this Type carries its members in that order — so the
+	// reader a position wants is almost always the one standing at the same
+	// position, found by comparing two names rather than by hashing one. And the
+	// map for every other value: a Record of another shape entirely, a member the
+	// Type does not name, a payload written in another order. Both spellings
+	// answer the same thing, because they are built out of the same members.
+	function compiledMembers(members: Record<string, Descriptor>): Members {
 		let compiled = outboundMembers.get(members)
 
 		if (compiled === undefined) {
-			compiled = new Map()
+			let names = Object.keys(members)
+			let readers = names.map((name) => compileOut(members[name]!))
+			let named = new Map<string, Outbound>()
 
-			for (let [name, member] of Object.entries(members)) {
-				compiled.set(name, compileOut(member))
+			for (let position = 0; position < names.length; position++) {
+				named.set(names[position]!, readers[position]!)
 			}
 
+			compiled = { names, readers, named }
 			outboundMembers.set(members, compiled)
 		}
 
@@ -321,6 +343,13 @@ export function createInterpreter(bridge: RuntimeBridge): Interpreter {
 	// Its admission is three branches, a read of a double's bits and two
 	// allocations, and a call per item is a small part of that — where an
 	// Integer's is two type checks that the call itself outweighs.
+	//
+	// NOTE: A hole in an Array is read as the `undefined` it holds, and admitted
+	// only where the ITEM's shape admits absence. An Array with a gap in it is
+	// not a List with a gap: `[1, , 3]` is refused where the items are Integers,
+	// and crosses with `#Empty` in the middle where they are `Optional<Integer>`
+	// — because every position of a List holds a value, and the position a hole
+	// is at holds nothing.
 	function runIn(
 		item: Descriptor,
 	): (source: Array<unknown>, at: Path) => Array<EssenceValue> {
@@ -519,7 +548,49 @@ export function createInterpreter(bridge: RuntimeBridge): Interpreter {
 
 					let fields: Record<string, EssenceValue> = {}
 					let inside: Path = { at, step }
+					// NOTE: The keys the value carries against the members the
+					// Type names, IN ORDER — which answers both questions a
+					// Record asks at once, wherever the two lists agree. A host
+					// writing an object against a declaration writes the members
+					// it declares in the order it declares them, and two lists of
+					// the same length whose names match position by position name
+					// the same set: every declared member is an own key of the
+					// value, and the value carries no key the Type does not name.
+					// So the members below are read straight off, and neither the
+					// own-key check nor the search for an undeclared member has
+					// anything left to find.
+					let keys = Object.keys(given)
+					let asDeclared = keys.length === count
 
+					if (asDeclared) {
+						for (let position = 0; position < count; position++) {
+							if (keys[position] !== names[position]) {
+								asDeclared = false
+
+								break
+							}
+						}
+					}
+
+					if (asDeclared) {
+						for (let position = 0; position < count; position++) {
+							let name = names[position]!
+
+							fields[name] = readers[position]!(
+								given[name],
+								inside,
+								name,
+							)
+						}
+
+						return makeRecord(fields)
+					}
+
+					// NOTE: And every value the two lists did not settle, read
+					// the long way — a member left out, a member the Type does
+					// not name, or the very same members written in another
+					// order.
+					//
 					// NOTE: An absent key IS a value here — `undefined`, which is
 					// exactly what an `Optional` member is spelled as — so what
 					// the key holds is read and the member's own shape decides.
@@ -534,18 +605,13 @@ export function createInterpreter(bridge: RuntimeBridge): Interpreter {
 					// NOTE: An OWN key, because an absent `toString` read plainly
 					// finds `Object.prototype`'s — a function where the rule above
 					// promises `undefined`.
-					let present = 0
-
 					for (let position = 0; position < count; position++) {
 						let name = names[position]!
-						let own = Object.hasOwn(given, name)
-
-						if (own) {
-							present++
-						}
 
 						fields[name] = readers[position]!(
-							own ? given[name] : undefined,
+							Object.hasOwn(given, name)
+								? given[name]
+								: undefined,
 							inside,
 							name,
 						)
@@ -557,18 +623,13 @@ export function createInterpreter(bridge: RuntimeBridge): Interpreter {
 					// — and taking it silently drops it, which is how a `widht`
 					// gets as far as production.
 					//
-					// NOTE: COUNTED first, and only walked where the count says
-					// there is something to find: the members above were read
-					// through an own-key check already, so a value with as many
-					// keys as it had members has no room for one the Type does
-					// not name. Looking properly costs a fifth of what crossing
-					// a Record costs, and it finds nothing almost every time.
-					if (Object.keys(given).length !== present) {
-						let undeclared = undeclaredOf(given, declared, false)
+					// NOTE: Looked for AFTER the members are read, so that a
+					// value which is wrong in both ways is named by the member
+					// that is wrong rather than by the one that is extra.
+					let undeclared = undeclaredOf(given, declared, false)
 
-						if (undeclared !== null) {
-							throw undeclaredMembers(shown, undeclared, at, step)
-						}
+					if (undeclared !== null) {
+						throw undeclaredMembers(shown, undeclared, at, step)
 					}
 
 					return makeRecord(fields)
@@ -1150,7 +1211,7 @@ export function createInterpreter(bridge: RuntimeBridge): Interpreter {
 					value,
 					at,
 					step,
-					members === null ? null : compiledMembers(members),
+					members === null ? noMembers : compiledMembers(members),
 				)
 			}
 			case OPTIONAL_VALUE: {
@@ -1177,7 +1238,7 @@ export function createInterpreter(bridge: RuntimeBridge): Interpreter {
 				value,
 				at,
 				step,
-				members === null ? null : compiledMembers(members),
+				members === null ? noMembers : compiledMembers(members),
 				caseName(tag),
 			)
 		}
@@ -1267,22 +1328,36 @@ export function createInterpreter(bridge: RuntimeBridge): Interpreter {
 	// NOTE: Own, enumerable and string-keyed, which is exactly the members — the
 	// Type key is a Symbol, and is skipped here by the same rule that makes it
 	// hidden inside Essence.
+	//
+	// NOTE: Each member read by the reader its name was compiled to, looked for
+	// at the position it was DECLARED at first — see `compiledMembers`, which is
+	// where both ways of looking are built and why the first one almost always
+	// answers. A member no name of the shape matches is read by the walk the
+	// value itself directs, which is the whole of how a structural Record keeps
+	// the member its position never named.
 	function fieldsOf(
 		value: object,
 		at: Path | null,
 		step: Step,
-		members: Map<string, Outbound> | null,
+		members: Members,
 	): Record<string, unknown> {
 		let fields: Record<string, unknown> = {}
 		let held = value as Record<string, unknown>
-		let names = Object.keys(value)
+		let keys = Object.keys(value)
+		let count = keys.length
+		let declared = members.names
+		let readers = members.readers
+		let named = members.named
 		let inside: Path = { at, step }
 
-		for (let position = 0; position < names.length; position++) {
-			let name = names[position]!
-			let member = members === null ? undefined : members.get(name)
+		for (let position = 0; position < count; position++) {
+			let name = keys[position]!
+			let member =
+				name === declared[position]
+					? readers[position]!
+					: (named.get(name) ?? anyOut)
 
-			fields[name] = (member ?? anyOut)(held[name], inside, name)
+			fields[name] = member(held[name], inside, name)
 		}
 
 		return fields
@@ -1297,7 +1372,7 @@ export function createInterpreter(bridge: RuntimeBridge): Interpreter {
 		value: object,
 		at: Path | null,
 		step: Step,
-		members: Map<string, Outbound> | null,
+		members: Members,
 		name: string,
 	): Record<string, unknown> {
 		let fields = fieldsOf(value, at, step, members)
@@ -1587,9 +1662,9 @@ export function createInterpreter(bridge: RuntimeBridge): Interpreter {
 // `null` where there are none — the Array is built on the first of them, because
 // a value that fits declares nothing extra and should leave nothing behind.
 //
-// NOTE: Reached for a Record only where its keys can not already have been
-// counted — see the count the members are read under, which is what usually
-// answers this without a walk at all.
+// NOTE: Reached for a Record only where its keys were not the members
+// themselves — see the two lists compared where the members are read, which is
+// what answers this without a walk at all for a value written as its Type reads.
 function undeclaredOf(
 	given: Record<string, unknown>,
 	declared: Set<string>,
