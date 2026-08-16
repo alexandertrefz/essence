@@ -131,6 +131,7 @@ export async function runCompilation(
 					sourcemap: context.options.sourcemap,
 					sourcemapMode: options?.sourcemapMode,
 					optimisation: optimiserOptionsFor(context.options),
+					embed: context.options.embed,
 				},
 				(stage) => {
 					progress.update(inputFileName, {

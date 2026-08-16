@@ -158,6 +158,27 @@ const withoutOptimisationOption: OptionSpec = {
 		"Program, and turning one off is how a suspect is named.",
 }
 
+// NOTE: The one flag that changes what the OUTPUT IS rather than how it was
+// made: a bundle a JavaScript host can load and marshal, and the Descriptor that
+// says how. Off by default, because everything else `esc build` writes is a
+// program to run and this is a Module to import.
+//
+// NOTE: Not on `run`, which spawns what it built — a bundle for a host to import
+// is not a program to execute, and the two are asked for by different people.
+const embedOption: OptionSpec = {
+	name: "embed",
+	type: "boolean",
+	summary: "Build a bundle a JavaScript host can load and call",
+	details:
+		"The bundle exports the runtime's own Type key and value constructors " +
+		"beside the Module, and a <name>.descriptor.json is written next to " +
+		"it — the boundary between Essence and JavaScript, written down at " +
+		"build time. loadPrebuilt from @essence-lang/client reads the pair and " +
+		"answers with the Module as JavaScript, with no compiler in reach. " +
+		"Without this the output is a program, and a host importing it gets " +
+		"Essence's own values.",
+}
+
 const jobsOption: OptionSpec = {
 	name: "jobs",
 	short: "j",
@@ -210,6 +231,7 @@ export const commands: Array<CommandSpec> = [
 			},
 			sourcemapOption,
 			minifyOption,
+			embedOption,
 			noOptimiseOption,
 			withoutOptimisationOption,
 			jobsOption,
@@ -226,6 +248,10 @@ export const commands: Array<CommandSpec> = [
 			{
 				command: `${PROGRAM} build App.es -o build/app.js --minify`,
 				description: "Compile to an explicit path, minified",
+			},
+			{
+				command: `${PROGRAM} build App.es -o dist/app.js --embed`,
+				description: "Build a bundle JavaScript can load and call",
 			},
 		],
 	},
@@ -334,6 +360,7 @@ export const commands: Array<CommandSpec> = [
 			},
 			sourcemapOption,
 			minifyOption,
+			embedOption,
 			noOptimiseOption,
 			withoutOptimisationOption,
 			jobsOption,

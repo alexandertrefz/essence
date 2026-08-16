@@ -52,6 +52,9 @@ export type OptionValues = {
 	clear: boolean
 	sourcemap: boolean
 	minify: boolean
+	// NOTE: Whether the bundle carries a runtime bridge, with a Descriptor
+	// written beside it — see the Option's own details.
+	embed: boolean
 	noOptimise: boolean
 	// NOTE: The pass names `--without-optimisation` was given, already checked
 	// against the registry — an unknown one is a UsageError rather than a flag
@@ -89,6 +92,7 @@ export const emptyOptions: OptionValues = {
 	clear: false,
 	sourcemap: false,
 	minify: false,
+	embed: false,
 	noOptimise: false,
 	withoutOptimisation: [],
 	jobs: undefined,
@@ -360,6 +364,7 @@ export function parseArguments(
 			clear: values.clear === true,
 			sourcemap: values.sourcemap === true,
 			minify: values.minify === true,
+			embed: values.embed === true,
 			noOptimise: values["no-optimise"] === true,
 			withoutOptimisation: readDisabledPasses(
 				values["without-optimisation"] as Array<string> | undefined,
