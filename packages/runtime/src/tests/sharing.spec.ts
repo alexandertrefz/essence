@@ -25,6 +25,7 @@ import {
 	type ListType,
 	map,
 	materialise,
+	ownItemsOf,
 	pair,
 	prepend__overload$1 as prepend,
 	reduce__overload$1 as reduce,
@@ -94,6 +95,11 @@ const integerEquality = {
 }
 
 const integerOrder = { compare: compareIntegers }
+
+// NOTE: The same reading as `itemsOf`, for the Arrays a build is handed rather
+// than the boxes a native answers.
+const valuesOf = (items: Array<IntegerType>): Array<number> =>
+	items.map((value) => Number(value.value))
 
 const integerPrinting = {
 	toString: (value: IntegerType) => createString(String(value.value)),
@@ -560,5 +566,44 @@ describe("NonEmptyList against an upgraded receiver", () => {
 		expect(
 			itemsOf(sortByOwnOrder(reverse(upgraded()), integerOrder)),
 		).toEqual([1, 2, 3, 4, 5])
+	})
+})
+
+// NOTE: The Array a walk that builds its List in place enters with. Everything
+// about it is ownership: the walk pushes onto what it is handed, so what it is
+// handed may be shared with nothing — including a seed still under a trimmed
+// view, and one carrying a front run.
+describe("the Array a build enters with", () => {
+	test("answers the seed's logical items, flat", () => {
+		expect(valuesOf(ownItemsOf(integers(1, 2, 3)))).toEqual([1, 2, 3])
+		expect(valuesOf(ownItemsOf(upgraded()))).toEqual([1, 2, 3, 4, 5])
+		expect(valuesOf(ownItemsOf(integers()))).toEqual([])
+	})
+
+	test("shares no Array with the seed", () => {
+		let seed = integers(1, 2, 3)
+		let entered = ownItemsOf(seed)
+
+		expect(entered).not.toBe(seed.value)
+
+		entered.push(createInteger(4n))
+
+		expect(itemsOf(seed)).toEqual([1, 2, 3])
+		expect(itemsOf(createList(entered))).toEqual([1, 2, 3, 4])
+	})
+
+	test("answers a trimmed view's items and leaves the seed as it found it", () => {
+		// NOTE: A box whose view is SHORTER than the Array behind it, which is
+		// what an append beside a second one leaves. The copy must answer the
+		// view and not the Array, and it must not trim the seed on the way —
+		// the edits read a shrinking chain the same way, and trimming at every
+		// step is what makes a drain quadratic again.
+		let seed = integers(1, 2, 3)
+		let grown = append(seed, createInteger(4n))
+		let entered = ownItemsOf(seed)
+
+		expect(valuesOf(entered)).toEqual([1, 2, 3])
+		expect(seed.value.length).toBe(4)
+		expect(itemsOf(grown)).toEqual([1, 2, 3, 4])
 	})
 })

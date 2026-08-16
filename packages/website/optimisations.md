@@ -603,7 +603,10 @@ walk canonicalises the turn's counter; every other walk reads one loop-invariant
 
 The State a walk threads is elided the same way and under the same fence, but it
 is the Rewriter's decision about what reached it rather than part of this pass —
-`unboxed-loop-state`, under Emitted shapes below.
+`unboxed-loop-state`, under Emitted shapes below. A State that is a LIST is a
+third decision, taken by a pass of its own: `build-lists-in-place`, next. The
+three are independent — a counted walk may hand its body the raw counter and
+build its List in place at once, because they are three different Parameters.
 
 **A `Step` is read where it is built.** The general loop and `reduce`'s
 early-stopping entry both decide by a tag the body has just written — `#Done(x)`
@@ -658,6 +661,157 @@ Essence Method, which this pass does not do — it knows seven drivers, not
 inlining in general. What it does instead is inline the walk INSIDE each of them,
 once, in the prelude: a Program's call still calls `firstItem(where:)`, and what
 it calls is a `for` that no longer allocates a `Step` per item.
+
+### `build-lists-in-place`
+
+Pushes into one Array where a walk rebuilt a List every turn.
+
+`inline-loops` writes the driver out, but what it leaves in the body is still the
+call the Program wrote. This is the loop of an appending build, compiled with
+every other pass on:
+
+```js
+let $loop_0_state = { [typeKeySymbol]: "List", value: [$pool_2] };
+for (let $loop_0_index = $loop_0_from; …; $loop_0_index += $loop_0_delta) {
+	const index = Integer.createInteger($loop_0_index);
+	const list = $loop_0_state;
+	$loop_0_state = List.append__overload$1(list, index);
+}
+built = $loop_0_state;
+```
+
+`list-tail-sharing` took the copying out of that call, so what is left is a box
+and a native call per turn — both of them there only because the emission does
+not know the List is the walk's own. This pass proves that it is, and then emits
+for the Program's accumulator exactly what the Rewriter already emits for its
+own: `map` and `keepEvery` declare an empty Array, push each answer onto it and
+box it once at the end, which is what `pushed` and `createdList` do.
+
+```js
+const $loop_0_built = [$pool_2];
+for (let $loop_0_index = $loop_0_from; …; $loop_0_index += $loop_0_delta) {
+	$loop_0_built.push(Integer.createInteger($loop_0_index));
+}
+built = List.createList($loop_0_built);
+```
+
+There is no State slot left, and no `const` binding it either: every mention of
+the accumulator was a rebuilding chain and the pushes consumed all of them. Four
+walks can be rewritten this way — the counted one, the two condition ones, the
+general `Step` one and both folds. `map` and `keepEvery` build an Array already.
+
+The counter is not bound either, and that is a second decision. A turn whose
+whole body is that one push writes the Argument where the `const` stood: nothing
+at all comes between the binding and the read, so the only things the
+substitution moves ahead of the Argument are the read of the walk's own Array and
+of `push` on it, neither of which can run a Program's code. A turn that does
+anything more keeps its binding, because then there IS something in between and
+this does not try to say what. It is worth a whole allocation a turn on V8, which
+stops keeping a loop in optimised code once the item is bound before it is
+stored: a million-turn build of the counter measures 76 ms bound and 30 ms pushed
+where it stands, against 33 ms for the copying shape this pass replaces.
+JavaScriptCore measures the two the same, so nothing is traded for it.
+
+**The fence.** Pushing onto an Array is invisible only while nobody else can see
+the Array, so the previous State has to be dead the moment it is rebuilt. The
+counter-example is easy to write:
+
+```essence
+<- {
+	current = state.current::append(index),
+	snapshots = state.snapshots::append(state.current),
+}
+```
+
+The old `current` survives inside `snapshots`, and pushing onto its Array would
+rewrite history the Program already recorded. What declines it is visible in the
+body: `current` is read twice, once as the receiver being replaced and once as a
+value handed somewhere else.
+
+So the rule is drawn tight, in the spirit of `residual.ts` and deliberately
+narrower than a fuller analysis could admit. **The accumulator's name may stand
+as the receiver at the root of the rebuilding chain, and nowhere else.** A branch
+that changes nothing answers it bare, which is that chain with no appends on it,
+and a `#Done` may carry it or carry something else entirely. Every other mention
+declines the walk and it keeps the emission above: an Argument, a member of
+something built, a name a closure captured, a nested walk over it, the
+accumulator appended to itself, a read as innocent as `length`. So does a
+`prepend`, which grows the end a build does not push onto. Declining is always
+correct, which is what makes a tight fence safe to widen later.
+
+That rule costs the two condition walks almost everything, and the loss is worth
+stating: a `while` walk hands ONE State to TWO bodies, and its predicate answers
+a Boolean rather than the State — so every mention the predicate makes is a read,
+and a `while` walk over a List accumulator only qualifies when it decides by
+something else entirely. The general `Step` walk is the same shape for the same
+reason. The counted walk and the two folds are where this pays.
+
+**The seed decides one entry cost.** A seed written as a List literal hands its
+Array over outright: the literal is built where it stands and nobody has ever
+held it, which is the same licence `collapse-construction` inlines a Case payload
+under. So does a whole List added by `append(contentsOf:)` where the Program
+wrote that one as a literal too — its items are pushed directly rather than boxed
+and walked straight back out.
+
+Every other seed is copied ONCE, at entry, into an Array of the walk's own — a
+List the Program was holding before the walk is never pushed onto, and that copy
+is also what makes a walk of no turns answer exactly the seed's items and nothing
+more. The copy is `slice`, which is the copy `append` performed where it could
+not push in place, so entering a walk costs what rebuilding its first turn used
+to cost. That matters more than it sounds: pushing the items one at a time
+instead costs four times as much on JavaScriptCore and sixteen on V8, which a
+short walk over a long seed pays in full and nothing else pays back.
+
+Safe because the emitted walk is the one the Rewriter already writes for `map`:
+an Array held under a name spelled from the loop's prefix, which holds a `_` and
+is therefore a name no Essence Program can write, pushed to by the same
+Statements in the same order and wrapped by the same `createList` — which takes
+ownership of the Array it is handed, exactly as it does there. What the fence
+adds is the licence to extend that from an Array the Compiler conjured to one the
+Program seeded: no reference to any intermediate version of the List exists, so
+there is no observer that could tell one growing Array from the chain of copies
+it replaces. The box is built at every edge the State leaves through — the walk's
+own end, and each `#Done` that answers with it.
+
+**What it is worth, honestly, depends on what is being appended.** Measured
+against the same Programs compiled without this pass, on Bun 1.3.14 and Node
+24.19 on Apple Silicon, min of eleven fresh processes with process start
+subtracted:
+
+| walk | Bun | Node |
+| --- | --- | --- |
+| 40,000 appends of the counter | 1.22× | 1.29× |
+| 200,000 appends of the counter | 1.57× | 1.42× |
+| 1,000,000 appends of the counter | 1.42× | 1.15× |
+| 1,000,000 appends of a constant | 2.59× | 1.91× |
+| 1,000,000 items folded into a List | 1.40× | 1.21× |
+| 20,000 three-turn walks over a held List | 0.92× | 1.04× |
+
+The last row is the shape the seed's entry copy is paid on, and it reads as a
+draw because it is one: the copy is the copy the first `append` performed. The
+noise band is ±10% — three canary Programs whose emission this pass leaves
+byte-identical measure between 0.98× and 1.10× — so that row is inside it on
+both engines.
+
+One shape is worth writing down rather than leaving for a reader to hit. A walk
+of a few turns seeded with a List of a MILLION items copies that million once per
+walk. So did the emission it replaces, one turn later — but it copied a PREFIX of
+an Array it had already grown, where this copies one whole, and the two are not
+the same price to every engine. Three hundred such walks measure 0.82× on Node
+and 0.49× on Bun. It is the one shape where
+`--without-optimisation build-lists-in-place` is worth reaching for, and taking
+the seed's own Array the way `append` takes it is what would answer it properly —
+see "not done yet".
+
+What it costs otherwise is nothing measurable: a walk it declines is emitted
+exactly as it was, and the walks it does not read — `map`, `keepEvery`, and every
+walk threading anything but a List — are byte-identical with the pass on and off.
+
+**It fires nowhere in this repository's own Essence.** Every fixture bundle and
+the standard library are byte-identical with the pass on and off, because
+`removeDuplicates` — the one prelude fold that builds a List — declines on its
+`contains` read. So every figure above is measured on a Program written to
+measure it, and the first of the widenings below is what would change that.
 
 ### `fold-constants`
 
@@ -1186,7 +1340,7 @@ bytes less, in the four that chain.
 
 ## Not done yet
 
-Four things the passes above deliberately leave undone. Each is written here
+Six things the passes above deliberately leave undone. Each is written here
 rather than left for a reader to notice, because a rule that is missing and a
 rule that was decided against look the same from the outside.
 
@@ -1213,6 +1367,37 @@ Handler. A Handler in the middle that accepts everything makes every Handler
 after it dead — which the Validator reports as an unreachable Case — and the
 chain could end there, with its own test dropped as well.
 `compile-union-dispatch` does exactly this for dispatch cases; a Match does not.
+
+**Retention summaries for the standard library's own Functions.**
+`build-lists-in-place` declines every mention of an accumulator that is not a
+rebuilding chain, which includes reads that retain nothing at all —
+`removeDuplicates` is written as a fold that asks `accumulated::contains(item)`
+before appending, and its quadratic copying would go the way of the appending
+benchmark's if that read were admitted. What would admit it is one answer per
+prelude Function to "which Parameters can outlive this call?", computed once
+against the closed prelude the way the prelude is already optimised once per
+process. With `contains`, `length` and `item(at:)` summarised as retaining
+nothing, the accumulator qualifies.
+
+**Accumulators one Record member deep.** `{ state with items =
+state.items::append(x) }` threads a Record whose List member is rebuilt every
+turn, so the old Record dies with the old List and the List is as dead as one
+threaded bare — but the fence sees `state.items` as a member read of something
+built and declines. The reasoning about member provenance is the reasoning
+`collapse-combinations` already does over Record spreads, and this is where it
+would be asked for.
+
+**A seed's own Array, taken the way `append` takes one.** `build-lists-in-place`
+copies every seed that is not a literal, which is one copy at entry where the
+emission it replaces made the same copy one turn later — and where the seed OWNS
+its tip and carries no front run, `append` makes no copy at all: it pushes onto
+the seed's Array in place and stamps the seed's count closed, so the box the
+Program holds keeps viewing its own prefix. A build could enter through that same
+door, and then a walk of a few turns over a long seed would cost its turns and
+nothing else. What it needs beyond the stamp is the exit: `createList` claims the
+whole Array it is handed, so a build that started from a seed's Array has to
+answer with a box stamped to its own count instead, exactly as `append` answers
+with one.
 
 **Statement-form dispatch beyond what a lowered Match gives it.** A compiled
 Union dispatch that has to hold operands under names is written as the `const`s
@@ -1535,7 +1720,10 @@ rather than copying it, and a later append may push onto it in place, so no
 caller may keep the array it passed or hand the same one to two Lists. Every
 caller builds a fresh one — the natives here, and the JavaScript the Compiler
 emits, where an inlined walk fills its output array turn by turn and hands it
-over once at the end. Those are the callers that can be read and checked. A
+over once at the end. `build-lists-in-place` is that same door opened for an
+accumulator a Program wrote, and it is why a seed the Program was already
+holding is copied at entry: an array that is not the walk's to give away must
+not be the array it hands over. Those are the callers that can be read and checked. A
 host of the client package cannot be, so the door it builds Lists through is a
 second constructor that copies: an array a host keeps is never one Essence
 pushes onto, and no contract of ours reaches a published surface.

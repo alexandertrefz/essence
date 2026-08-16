@@ -219,7 +219,12 @@ export function itemOfView<ItemType extends AnyType>(
 
 // NOTE: The two-run walk written once, for the readers that want nothing more
 // of a List than its items added to an Array they are building.
-function pushItemsOf<ItemType extends AnyType>(
+//
+// NOTE: Exported for the walks the Rewriter writes out. A walk that builds its
+// List in place owns one Array and pushes onto it, and this is how a whole List
+// added by `append(contentsOf:)` reaches that Array. It can not reach for
+// `materialise`, which answers the receiver's OWN Array.
+export function pushItemsOf<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 	into: Array<ItemType>,
 ): void {
@@ -232,6 +237,42 @@ function pushItemsOf<ItemType extends AnyType>(
 	for (let index = 0; index < view.backCount; index++) {
 		into.push(view.back[index])
 	}
+}
+
+// NOTE: A FRESH Array of a List's logical items, which is what a walk that
+// builds its List in place enters with wherever its seed is not a literal: the
+// walk owns what it pushes onto, so a List the Program was holding is copied
+// rather than grown.
+//
+// NOTE: A flat box is copied by the same `slice` `append` performed where it
+// could not push in place, so entering a walk costs what rebuilding its first
+// turn cost before. Pushing the items one at a time instead costs four times as
+// much on JavaScriptCore and sixteen on V8, which a short walk over a long seed
+// pays in full and nothing else pays back.
+//
+// NOTE: Only a box carrying a front run has two runs to walk, and it is left
+// exactly as it was found: nothing of the receiver is shared with the answer, so
+// there is no count to stamp and no representation to trim.
+export function ownItemsOf<ItemType extends AnyType>(
+	originalList: ListType<ItemType>,
+): Array<ItemType> {
+	let view = runsOf(originalList)
+
+	if (view.frontCount === 0) {
+		return view.back.slice(0, view.backCount)
+	}
+
+	let items: Array<ItemType> = []
+
+	for (let index = view.frontCount - 1; index >= 0; index--) {
+		items.push(view.front[index])
+	}
+
+	for (let index = 0; index < view.backCount; index++) {
+		items.push(view.back[index])
+	}
+
+	return items
 }
 
 // NOTE: What a native owes the receiver before it hands one of the receiver's
