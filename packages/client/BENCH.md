@@ -106,3 +106,121 @@ marshalled door costs IS the door. And the per-value columns hold across three
 orders of magnitude, drifting up by about a fifth at the largest size when the
 values are bigints, which is the one place either door's cost is not purely
 per-value.
+
+## The Descriptor compiled
+
+Measured at **bb5bfb7d**, where every Descriptor node is compiled once into the
+closure that is its rule and a call runs closures rather than walking a shape.
+Three runs of the same command, on the same machine, Bun 1.3.14 — and each row
+below is the ONE run whose marshalled figure was the median of the three, rather
+than three medians laid side by side: the columns of a row are then a single
+real call, and its `×` is a ratio that was actually measured.
+
+```
+layout(_ rows: List<List<Integer>>, _ labels: List<String>) -> List<{ index: Integer, status: String }>
+
+shape  nodes      in  body µs  raw µs  marshalled µs      ×  raw ns/node  marshalled ns/node
+-----  -----  ------  -------  ------  -------------  -----  -----------  ------------------
+  2×4     21  bigint     0.09    0.31           0.35  1.13×         10.5                12.4
+30×29   1023  bigint     3.30   15.77          15.25  0.97×         12.2                11.7
+89×87   8191  bigint    27.68  128.96         128.81  1.00×         12.4                12.3
+  2×4     21  number     0.07    0.22           0.30  1.34×          7.1                10.8
+30×29   1023  number     3.61    9.39           9.55  1.02×          5.7                 5.8
+89×87   8191  number    29.90   77.54          67.12  0.87×          5.8                 4.5
+
+resize(_ panel: Panel, _ amount: Integer) -> Panel
+
+shape  nodes      in  body µs  raw µs  marshalled µs      ×  raw ns/node  marshalled ns/node
+-----  -----  ------  -------  ------  -------------  -----  -----------  ------------------
+panel     25  bigint     0.08    0.27           0.56  2.10×          7.6                19.3
+panel     25  number     0.08    0.24           0.50  2.13×          6.4                17.1
+```
+
+Run-to-run spread (marshalled µs, three runs):
+
+```
+  2×4   bigint: 0.35, 0.36, 0.34      2×4   number: 0.31, 0.27, 0.30
+  30×29 bigint: 15.82, 15.25, 14.46   30×29 number: 9.67, 8.12, 9.55
+  89×87 bigint: 129.75, 128.81, 117.91  89×87 number: 77.20, 65.99, 67.12
+  panel bigint: 0.56, 0.57, 0.53      panel number: 0.50, 0.47, 0.50
+```
+
+Run-to-run spread (raw µs, three runs):
+
+```
+  2×4   bigint: 0.31, 0.31, 0.29      2×4   number: 0.27, 0.22, 0.22
+  30×29 bigint: 15.82, 15.77, 14.57   30×29 number: 10.24, 8.82, 9.39
+  89×87 bigint: 125.55, 128.96, 125.42  89×87 number: 82.76, 74.19, 77.54
+  panel bigint: 0.27, 0.28, 0.25      panel number: 0.24, 0.23, 0.26
+```
+
+### The control
+
+The raw door has not changed a line, and it does not measure the same as it did
+on the baseline day: 125–129 µs at 8191 bigint values against the baseline's
+119–121. That is the machine, and a before/after read across it would be reading
+the machine as well as the work.
+
+So the boundary AS IT WAS at f72dbb85 was measured again in the same session,
+minutes before the table above — the two files the compile step touches put back
+and nothing else changed:
+
+```
+89×87  8191  bigint   307.82 µs  2.53×      89×87  8191  number   252.37 µs  3.37×
+89×87  8191  bigint   333.92 µs  2.63×      89×87  8191  number   249.94 µs  3.25×
+panel    25  bigint     1.35 µs  5.26×      panel    25  number     1.36 µs  5.93×
+panel    25  bigint     1.42 µs  5.40×      panel    25  number     1.35 µs  5.92×
+```
+
+Which is the baseline reproduced. Every comparison below is between two doors
+that were measured against the same machine within the hour.
+
+## Reading the second table
+
+The nested call is now AT the hand-built door rather than 2.5× behind it —
+**1.00× at 8191 bigint values and 0.87× with numbers**, 0.97× and 1.02× at a
+thousand, and 1.1–1.3× at 21, where a call is small enough that what a door does
+once weighs as much as what it does per value. Against the same door measured
+in the same session, the marshalled `layout` went from 308 and 334 µs to 129
+with bigints, and from 252 and 250 µs to 67 with numbers: **2.4–2.6× and 3.7×
+faster**, and it is the same marshaller, checking the same things and saying
+the same sentences when they are wrong.
+
+Below 1.00× wants a word, since a door that checks nothing ought to win. The
+hand-built door is a plausible one rather than a floor: it grows its Arrays with
+`push` where a compiled walk knows the length before it starts, and it reaches
+`bridge.integer` through the bridge object where the compiled walk holds the
+Function itself. Those are exactly the kind of thing a boundary compiled ONCE
+gets to do and a boundary written by hand at every call site does not.
+
+`marshalled ns/node` is the number the work was aimed at, and it fell from
+**30–34 ns to 11.7–12.4 ns** with bigints and from **21–28 ns to 4.5–10.8 ns**
+with numbers. Flat is no longer the point — what is left per value is the same
+order as the raw door's 5.7–12.4 ns, which is to say it is the values rather
+than the walk.
+
+The edit is the row still above the hand-built door: **2.1×**, down from
+5.3–5.9×. Half a microsecond for 25 values is not much room, and what is in it
+is worth naming precisely, so the two directions were timed apart:
+
+```
+exports.resize (whole)   0.507 µs
+  in:   fromJS(panel)    0.296 µs      the same Record built by hand: 0.111 µs
+  body: the Module       0.069 µs
+  out:  toJS(answer)     0.113 µs
+```
+
+The way IN carries the gap, and more than half of what it carries is the two
+promises the hand-built door does not make. Normalising the five Strings to NFC
+costs **66 ns** — String equality in Essence is normalised, so a door that
+skipped it would put two values into the Module that the Module insists are
+one. Reading the Record as CLOSED — the value's keys against the members the
+Type names — costs **40 ns**, and it is what turns a misspelled member into a
+refusal instead of a silently dropped one. The remaining ~80 ns is the per-leaf
+admission itself: a `typeof` per value, the `Optional`'s arm, and the Array a
+List is copied into. The 29 ns the three lines do not add up to is the call
+around them — the Integer beside the Panel, and the arity a call is read
+under.
+
+So the door is now the price of what the door PROMISES, at every size worth
+measuring. What is left to take is the promises, and they are not for sale.

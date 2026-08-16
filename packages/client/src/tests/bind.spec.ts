@@ -4,12 +4,14 @@ import { tmpdir } from "node:os"
 import * as path from "node:path"
 
 import { fixturePath } from "@essence-lang/fixtures"
+import type { common } from "@essence-lang/interfaces"
 
 import type { EssenceValue } from "../bridge"
 import { EssenceCallError, EssenceMarshalError } from "../errors"
 import { type EssenceModule, loadModule } from "../index"
 
 let cacheDirectory = ""
+let absence: EssenceModule
 let calls: EssenceModule
 let geometry: EssenceModule
 let main: EssenceModule
@@ -19,6 +21,10 @@ let math: EssenceModule
 beforeAll(async () => {
 	cacheDirectory = realpathSync.native(
 		mkdtempSync(path.join(tmpdir(), "essence-bind-")),
+	)
+	absence = await loadModule(
+		path.join(import.meta.dirname, "files", "Absence.es"),
+		{ cacheDirectory },
 	)
 	calls = await loadModule(
 		path.join(import.meta.dirname, "files", "Calls.es"),
@@ -326,6 +332,41 @@ describe("A Choice", () => {
 	// constructors reached through two names is a second thing to keep true.
 	it("is spelled under its own name alone", () => {
 		expect("Label" in marshal.exports).toBe(false)
+	})
+})
+
+// NOTE: `Optional` is the one Choice spelled by ABSENCE rather than by a
+// `$case`, and an unannotated `constant present = #Value(3)` is inferred as one
+// of its Cases ALONE rather than as the Union an annotation would have named —
+// so the lone Case is a shape the boundary meets, and it has to read as the
+// item itself in every position it appears in. The way in, the way out and the
+// generated declarations each carry that rule, and this is where they are held
+// to saying the same thing.
+describe("One of Optional's own Cases met alone", () => {
+	it("reads a lone #Value as the item and a lone #Empty as nothing", () => {
+		expect(absence.exports.present).toBe(3n)
+		expect(absence.exports.nought).toBeUndefined()
+	})
+
+	it("reads it the same way inside every shape it is nested in", () => {
+		expect(absence.exports.boxed).toEqual({ held: 3n })
+		expect(absence.exports.listed).toEqual([3n, 4n])
+	})
+
+	// NOTE: The two doors of one Marshaller, on the same value: the walk the
+	// VALUE directs, which has no Descriptor to consult, and the reader compiled
+	// out of the one the Module declared. A shape only one of them has a rule for
+	// is a shape a round trip can not survive.
+	it("reads the same with the Type declared and without it", () => {
+		let marshaller = absence.marshaller
+		let raw = absence.raw as Record<string, EssenceValue>
+		let declared = absence.surface.values.present as common.Type
+
+		expect(marshaller.toJS(raw.present, "present")).toBe(3n)
+		expect(marshaller.toJS(raw.present, "present", declared)).toBe(3n)
+		expect(
+			marshaller.toJS(marshaller.fromJS(3n, declared), "present"),
+		).toBe(3n)
 	})
 })
 

@@ -15,11 +15,13 @@ import type { EssenceValue } from "../bridge"
 import type { Marshaller } from "../descriptor"
 import { EssenceMarshalError } from "../errors"
 import { type EssenceModule, loadModule } from "../index"
+import { createInterpreter } from "../marshal-runtime"
 import { EssenceRational } from "../rational"
 
 let cacheDirectory = ""
 let module: EssenceModule
 let marshaller: Marshaller
+let leaves: EssenceModule
 
 beforeAll(async () => {
 	cacheDirectory = realpathSync.native(
@@ -30,6 +32,10 @@ beforeAll(async () => {
 		{ cacheDirectory },
 	)
 	marshaller = module.marshaller
+	leaves = await loadModule(
+		path.join(import.meta.dirname, "files", "Leaves.es"),
+		{ cacheDirectory },
+	)
 })
 
 afterAll(() => {
@@ -571,6 +577,19 @@ describe("Values built through the bridge", () => {
 	it("passes a Function through untouched", () => {
 		expect(marshaller.toJS(module.raw.integer)).toBe(module.raw.integer)
 	})
+
+	// NOTE: The interpreter is a door of its own — `prebuilt` hands one over,
+	// and a host reaching it holds Descriptors rather than Types. A host with
+	// none for the value in hand has two ways to say so and means the same thing
+	// by both: `null` out of a variable that holds no Descriptor is not a Type
+	// declaration of `null`.
+	it("reads a value against no Descriptor, however that is spelled", () => {
+		let interpreter = createInterpreter(module.bridge)
+		let none = null as unknown as undefined
+
+		expect(interpreter.toJS(module.raw.answer, "answer")).toBe(42n)
+		expect(interpreter.toJS(module.raw.answer, "answer", none)).toBe(42n)
+	})
 })
 
 describe("Errors", () => {
@@ -1037,5 +1056,175 @@ describe("What the boundary refuses", () => {
 		names.push("MUTATED")
 
 		expect(module.exports.names).toEqual(["a", "b"])
+	})
+})
+
+// NOTE: The item Type of a `Leaves.es` Parameter, read off ITS Surface — the
+// same rule the helpers above are written under, for the Module that has each
+// leaf twice.
+function leafType(name: string): common.Type {
+	let signature = leaves.surface.values[name] as common.FunctionType
+
+	return signature.parameterTypes[0]!.type as common.Type
+}
+
+// NOTE: What the boundary did with one value, as something two calls can be
+// compared by: the value it answered with, or the sentence it refused with —
+// minus the path, which is the one thing the two spellings below are SUPPOSED
+// to disagree about. Any other Error is compared whole, because a leaf that
+// stops refusing a value the boundary should have refused reaches the runtime's
+// own constructors instead, and that difference is the one most worth seeing.
+type Admission = { got: unknown } | { refused: string }
+
+function admission(work: () => unknown): Admission {
+	try {
+		return { got: work() }
+	} catch (error) {
+		let failure = error as Error
+
+		return {
+			refused:
+				failure instanceof EssenceMarshalError
+					? failure.message.slice(failure.path.length)
+					: failure.message,
+		}
+	}
+}
+
+function asLeaf(name: string, value: unknown): Admission {
+	return admission(() =>
+		leaves.marshaller.toJS(
+			leaves.marshaller.fromJS(value, leafType(name), "argument 1"),
+		),
+	)
+}
+
+function asItem(name: string, value: unknown): Admission {
+	return admission(() => {
+		let list = leaves.marshaller.toJS(
+			leaves.marshaller.fromJS([value], leafType(name), "argument 1"),
+		)
+
+		return (list as Array<unknown>)[0]
+	})
+}
+
+// NOTE: A hole is not a value, and an Array with one in it is not a List with
+// one in it: every position of a List holds something. `Array.prototype.map`
+// SKIPS a hole, so a walk written with it left the position holding a raw
+// JavaScript `undefined` — a value carrying no Type tag at all, which every
+// Method that reached it would find untyped. The loop reads the position
+// instead, and the item's own shape decides, which is the same rule an absent
+// Record member is read by.
+describe("An Array with a hole in it", () => {
+	// NOTE: A HOLE at position 1 rather than a written `undefined`, which is a
+	// different Array — `1 in [1, undefined, 3]` is true and `1 in [1, , 3]` is
+	// not. Spelled once, so the one place this has to be said is this one.
+	// oxlint-disable-next-line no-sparse-arrays -- the hole is the subject
+	let holed = (before: unknown, after: unknown) => [before, , after]
+
+	it("refuses the hole where the items are values", () => {
+		let refusal = marshalError(() =>
+			leaves.marshaller.fromJS(
+				holed(1n, 3n),
+				leafType("integers"),
+				"argument 1",
+			),
+		)
+
+		expect(refusal.message).toBe(
+			"argument 1 → [1]: expected Integer, got nothing.",
+		)
+		expect(refusal.path).toBe("argument 1 → [1]")
+		expect(
+			marshalError(() =>
+				leaves.marshaller.fromJS(
+					holed("a", "c"),
+					leafType("texts"),
+					"argument 1",
+				),
+			).message,
+		).toBe("argument 1 → [1]: expected String, got nothing.")
+	})
+
+	// NOTE: And crosses it where the items admit absence, because there the
+	// position holding nothing is a position holding `#Empty`.
+	it("carries the hole as nothing where the items admit it", () => {
+		expect(
+			leaves.marshaller.toJS(
+				leaves.marshaller.fromJS(
+					holed(1n, 3n),
+					leafType("maybes"),
+					"argument 1",
+				),
+			),
+		).toEqual([1n, undefined, 3n])
+	})
+})
+
+// NOTE: `runIn` spells the Integer, String and Boolean admissions a second time,
+// beside the `buildIn` branches that compile the same leaves alone — one rule in
+// two places, because a loop that calls a converter it was handed can not see
+// what it is calling, and the measurement that bought the duplication is in
+// `BENCH.md`. Two spellings of ONE rule, though: a value met on its own and the
+// same value met inside a List are the same value, so a difference between them
+// is a bug and never a decision. This is what checks that rather than promising
+// it — without it, a change to one spelling applies to values met alone and not
+// to the same values met inside a List, and every leaf test keeps passing.
+describe("A leaf met alone and met inside a List", () => {
+	// NOTE: Deliberately adversarial and deliberately not all valid — what the
+	// two spellings have to agree about is the REFUSALS as much as the values,
+	// and a corpus of things that fit would check the easy half.
+	const CORPUS: Array<unknown> = [
+		5,
+		5n,
+		0,
+		-0,
+		-7,
+		1.5,
+		2 ** 53,
+		9007199254740991,
+		9007199254740991n,
+		-9007199254740992n,
+		Number.NaN,
+		Number.POSITIVE_INFINITY,
+		"",
+		"hi",
+		// NOTE: The same String decomposed and composed — NFC is part of the
+		// admission, so both spellings have to normalise or neither does.
+		"é",
+		"é",
+		true,
+		false,
+		null,
+		undefined,
+		{},
+		{ $case: "Optional#Value", item: 1n },
+		[],
+		[1n],
+		new EssenceRational(1n, 3n),
+		Symbol("nope"),
+		() => 1n,
+	]
+
+	for (let name of ["integer", "text", "flag", "rational", "maybe"]) {
+		it(`admits and refuses ${name} the same way either way`, () => {
+			for (let value of CORPUS) {
+				expect({
+					value,
+					...asItem(`${name}s`, value),
+				}).toEqual({ value, ...asLeaf(name, value) })
+			}
+		})
+	}
+
+	// NOTE: And a value that came from the MODULE, which is the one kind of
+	// value neither spelling builds: a tagged Integer is a JavaScript object,
+	// and an object is not what any leaf admits.
+	it("refuses one of the Module's own values the same way either way", () => {
+		let tagged = leaves.bridge.integer(5n)
+
+		expect(asItem("integers", tagged)).toEqual(asLeaf("integer", tagged))
+		expect(asItem("texts", tagged)).toEqual(asLeaf("text", tagged))
 	})
 })

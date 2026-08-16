@@ -2,6 +2,7 @@ import {
 	describe,
 	describeSignature,
 	type DescribeContext,
+	type Descriptor,
 } from "@essence-lang/compiler/embed/describe"
 import type { common } from "@essence-lang/interfaces"
 
@@ -84,18 +85,35 @@ export function createMarshaller(
 ): Marshaller {
 	let interpreter = createInterpreter(bridge)
 	let context: DescribeContext = { entryPath: options.entryPath }
+	// NOTE: One Descriptor per Type, kept against the Type itself. Describing is
+	// the whole of what this door pays for having been spelled in the Compiler's
+	// vocabulary, and it answers the same thing every time it is asked about the
+	// same Type — a Surface is settled long before a value crosses against it.
+	// The interpreter keeps its compiled rules against the Descriptor NODE in the
+	// same way, so a door asked twice about one Type walks nothing the second
+	// time: the same object comes back, and the same closures with it.
+	let described = new WeakMap<common.Type, Descriptor>()
+
+	function describeOnce(type: common.Type): Descriptor {
+		let descriptor = described.get(type)
+
+		if (descriptor === undefined) {
+			descriptor = describe(type, context)
+			described.set(type, descriptor)
+		}
+
+		return descriptor
+	}
 
 	return {
 		toJS: (value, path, expected) =>
 			interpreter.toJS(
 				value,
 				path,
-				expected === undefined
-					? undefined
-					: describe(expected, context),
+				expected === undefined ? undefined : describeOnce(expected),
 			),
 		fromJS: (value, expected, path) =>
-			interpreter.fromJS(value, describe(expected, context), path),
+			interpreter.fromJS(value, describeOnce(expected), path),
 		wrapFunction: (target, signature, name) =>
 			interpreter.wrapFunction(
 				target,
