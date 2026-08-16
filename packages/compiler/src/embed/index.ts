@@ -36,6 +36,27 @@ export {
 // a host embedding the Compiler names its target and keys its own cache by it
 // through one entry rather than two.
 export { type EmitTarget, emitTargetKey } from "../rewriter/index"
+// NOTE: The boundary between an emitted Module and the JavaScript that calls
+// it, written down. A host marshalling values across it reads a Descriptor
+// rather than a Type, which is what lets the reading happen where no Compiler
+// is — see `./describe`. Reached through its own entry as well, so that
+// describing costs nothing more than describing.
+export {
+	type CaseDescriptor,
+	type DeclaredType,
+	describe,
+	type DescribeContext,
+	type Descriptor,
+	describeModule,
+	describeSignature,
+	describeTypes,
+	type ExportDescriptor,
+	type FunctionDescriptor,
+	type ModuleDescriptor,
+	type NamespaceDescriptor,
+	type NamespaceMethod,
+	type OverloadDescriptor,
+} from "./describe"
 // NOTE: Exported because a host that writes its own bundles somewhere shared
 // has the same question this seam answers — what is the toolchain that wrote
 // them — and no way to ask it otherwise.
