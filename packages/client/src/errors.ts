@@ -49,10 +49,11 @@ export class EssenceCallError extends Error {
 	}
 }
 
-// NOTE: A build the plugins can not serve — two `.es` entries out of one Module
-// graph, today. Not a compile failure: every source involved compiled, and
-// what is wrong is the shape of the build rather than anything in a file, so
-// there is no excerpt to show and nothing to underline.
+// NOTE: An invariant of the plugins broken while serving — a file that compiled
+// without emitting a Module of its own, the standard library's prelude asked for
+// before anything was compiled. Not a compile failure: every source involved
+// compiled, and what is wrong is a bug in the plugin rather than anything in a
+// file, so there is no excerpt to show and nothing to underline.
 export class EssenceBuildError extends Error {
 	constructor(message: string) {
 		super(message)

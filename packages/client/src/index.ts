@@ -110,6 +110,11 @@ export {
 	wrapperFor,
 	type WrapperOptions,
 } from "./plugin-core"
+// NOTE: The other way in, for a Module that was compiled already: a bundle and
+// the Descriptor beside it, bound without a Compiler. Reached through the root
+// like everything else, and importable on its own — `@essence-lang/client/prebuilt`
+// pulls in nothing but the interpreter.
+export { descriptorPath, loadPrebuilt, type PrebuiltModule } from "./prebuilt"
 export {
 	essence,
 	type PluginContext,

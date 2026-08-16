@@ -12,7 +12,9 @@ let math = await loadModule("./math/Math.es")
 
 In somebody else's build it is an ordinary import: the Vite and esbuild plugins
 serve a `.es` file as the same marshalled JavaScript — see
-[In a bundler](#in-a-bundler).
+[In a bundler](#in-a-bundler). Where the compiling happened at build time
+instead, `loadPrebuilt` reads a bundle and the Descriptor beside it with no
+compiler in reach at all — see [Prebuilt](#prebuilt).
 
 There is no build step and no artifact to manage. The whole Module graph is
 compiled in memory, the bundle is written under the hash of everything it was
@@ -71,7 +73,9 @@ lossless spelling at all the value is refused rather than approximated: an
 A constant is marshalled when it is read, not when the Module is loaded, so an
 export the boundary has no mapping for — the numeric tower above `Rational`,
 today — throws where it is read instead of taking the whole Module with it.
-Each read builds a fresh value, exactly as `marshaller.toJS(raw.…)` does.
+Each read builds a fresh value, exactly as `marshaller.toJS(raw.…)` does. Both
+of those are `loadModule`'s; a bundler's wrapper reads once instead, and
+[`In a bundler`](#in-a-bundler) says what that changes.
 
 Which direction a value is going decides how it is read. Coming out, a value
 says what it is — every Essence value but a Function carries its Type — so
@@ -297,6 +301,16 @@ your own dependencies.
 Descriptor. The boundary decides exactly the same way; its refusals stop naming
 the Type they refused.
 
+**A wrapper's constants are read once, not on every read.** A JavaScript
+module's exports are bindings and an emitted Module's are values, so every
+constant is marshalled at the wrapper's own evaluation — which is where the two
+doors differ from each other. An export the boundary can not map refuses the
+whole Module here rather than only itself, which in a build is the better half
+of the trade: the alternative is a page that renders and then throws somewhere
+else entirely. And a marshalled `List` or Record is **one object shared by every
+importer** — a host that pushes onto one changes what every other holder of that
+Module sees. Copy it if you mean to change it.
+
 **As many `.es` entries per build as you like.** Every file of every graph is
 served under one id, so two entries that reach a common source hold one copy of
 it, one prelude and one runtime — and a value built by one entry is recognised
@@ -356,6 +370,44 @@ let squared = math.surface.values.square
 
 toJS(math.raw.square(fromJS(12n, squared.parameterTypes[0].type))) // 144n
 ```
+
+## Prebuilt
+
+The third way in, for an application that ships rather than compiles: build the
+pair once with `esc`, and load it wherever it lands.
+
+```
+esc build App.es -o dist/app.js --embed
+```
+
+That writes `dist/app.js` — the bundle, with the runtime's own Type key and
+value constructors in it — and `dist/app.descriptor.json` beside it, which is
+the boundary between Essence and JavaScript written down.
+
+```js
+import { loadPrebuilt } from "@essence-lang/client/prebuilt"
+
+let app = await loadPrebuilt("./dist/app.js")
+
+app.exports.greet("world")
+```
+
+`loadPrebuilt` reads that JSON, imports that bundle and binds one to the other.
+It looks for the sidecar beside the bundle under the name `esc` wrote it as; a
+second argument names one somewhere else. What comes back is `exports`, `raw`,
+`bridge`, `interpreter` and the `descriptor` itself — everything `loadModule`
+answers with except the two things only a compile can produce, an Export
+Surface and a Marshaller over it.
+
+**Nothing on this path reaches the compiler.** `@essence-lang/client/prebuilt`
+imports the interpreter and `node:fs`/`node:path`/`node:url` — and no compiler,
+which is the whole point of a Descriptor being JSON: the describing happened at build time, and a shipped
+application does not need a toolchain installed to talk to the Essence inside
+it. Deploy the two files.
+
+Declarations for the pair come from the same Descriptor, so a build that wants
+them can call `generateDeclarations` where it has a compiler — during the build,
+not during the load.
 
 ## What this does not do yet
 
