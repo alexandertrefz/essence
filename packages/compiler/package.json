@@ -23,6 +23,7 @@
 		"./bundler": "./src/bundler/index.ts",
 		"./cache": "./src/cache/index.ts",
 		"./embed": "./src/embed/index.ts",
+		"./embed/bridge": "./src/embed/bridge.ts",
 		"./embed/describe": "./src/embed/describe.ts",
 		"./embed/hash": "./src/embed/hash.ts",
 		"./diagnostics": "./src/diagnostics/index.ts",

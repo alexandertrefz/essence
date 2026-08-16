@@ -10,16 +10,11 @@ import { readdir, stat } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import * as path from "node:path"
 
-import { linkToMemory } from "@essence-lang/compiler/embed"
+import { BRIDGE_KEY, linkToMemory } from "@essence-lang/compiler/embed"
 import { fixturePath } from "@essence-lang/fixtures"
 import { typeKeySymbol } from "@essence-lang/runtime/type"
 
-import {
-	BRIDGE_EXPORTS,
-	BRIDGE_KEY,
-	type EssenceValue,
-	type RuntimeBridge,
-} from "../bridge"
+import type { EssenceValue, RuntimeBridge } from "../bridge"
 import { EssenceCompileError } from "../compile-error"
 import { type EssenceModule, loadModule } from "../index"
 import { EssenceRational } from "../rational"
@@ -230,20 +225,16 @@ describe("The Runtime Bridge", () => {
 		expect(math.bridge.typeKey.description).toBe("$type")
 	})
 
-	// NOTE: `export * from` LOSES to an explicit export of the same name, so a
-	// bridge name a Module could also export would take that Module's binding
-	// away without a word. `$` is an ordinary Essence identifier character —
-	// `constant $$integer` compiles — and `_` is a Lexer Symbol, which is what
-	// makes the `$bridge_` names unreachable from Essence and this safe.
+	// NOTE: The bridge is the bundle's DEFAULT export, which is the one name it
+	// can not take from the Module: `export * from` never carries a default, and
+	// no Essence export is emitted as one — the Rewriter escapes every reserved
+	// word with a `_`. `Escaped.es` is the fixture that tries hardest to collide,
+	// down to a `constant $$integer`, and its own bindings are untouched.
 	it("names itself out of reach of an Essence export", async () => {
 		let escaped = await loadModule(clientFixture("Escaped.es"), {
 			cacheDirectory,
 		})
 		let userConstant = escaped.raw.$$integer as EssenceValue
-
-		for (let name of Object.values(BRIDGE_EXPORTS)) {
-			expect(name).toContain("_")
-		}
 
 		expect(tagOf(escaped.bridge, userConstant)).toBe("Integer")
 		expect(fieldOf(userConstant, "value")).toBe(12)

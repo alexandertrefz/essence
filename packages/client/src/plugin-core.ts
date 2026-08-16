@@ -6,12 +6,14 @@ import {
 	PRELUDE_SPECIFIER,
 } from "@essence-lang/compiler/bundler"
 import { containsErrors } from "@essence-lang/compiler/diagnostics"
-import { emitToMemory } from "@essence-lang/compiler/embed"
+import {
+	emitToMemory,
+	RUNTIME_BRIDGE_MODULES,
+} from "@essence-lang/compiler/embed"
 import { canonicalPath, type ModuleHost } from "@essence-lang/compiler/modules"
 import type { OptimiserOptions } from "@essence-lang/compiler/optimiser"
 import { RUNTIME_PACKAGE } from "@essence-lang/compiler/rewriter"
 
-import { RUNTIME_BRIDGE_MODULES } from "./bridge"
 import { EssenceCompileError } from "./compile-error"
 import {
 	type CaseDescriptor,

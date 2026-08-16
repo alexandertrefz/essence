@@ -1,7 +1,12 @@
 import { pathToFileURL } from "node:url"
 
 import { containsErrors } from "@essence-lang/compiler/diagnostics"
-import { compileToMemory, linkToMemory } from "@essence-lang/compiler/embed"
+import {
+	BRIDGE_KEY,
+	compileToMemory,
+	linkToMemory,
+	withRuntimeBridge,
+} from "@essence-lang/compiler/embed"
 import {
 	canonicalPath,
 	type ExportSurface,
@@ -9,26 +14,26 @@ import {
 } from "@essence-lang/compiler/modules"
 import type { OptimiserOptions } from "@essence-lang/compiler/optimiser"
 
-import {
-	BRIDGE_KEY,
-	type RuntimeBridge,
-	runtimeBridgeOf,
-	withRuntimeBridge,
-} from "./bridge"
+import { type RuntimeBridge, runtimeBridgeOf } from "./bridge"
 import { bundlePath, cacheBundle, cachedBundle, cacheDirectory } from "./cache"
 import { EssenceCompileError } from "./compile-error"
 import { createMarshaller, describeModule, type Marshaller } from "./descriptor"
 import { bind } from "./marshal-runtime"
 
 export {
-	BRIDGE_EXPORTS,
-	BRIDGE_KEY,
-	BRIDGE_SPECIFIER,
 	type EssenceValue,
 	type RuntimeBridge,
 	runtimeBridgeOf,
-	withRuntimeBridge,
 } from "./bridge"
+// NOTE: The other half of the bridge, re-exported from the Compiler, which is
+// where a bundle is BUILT with one. A host driving the emit itself — writing its
+// own bundles out of `compileToMemory` — needs exactly these, and should not
+// have to know that only one of the two halves needs a Compiler.
+export {
+	BRIDGE_KEY,
+	BRIDGE_SPECIFIER,
+	withRuntimeBridge,
+} from "@essence-lang/compiler/embed"
 export { bundlePath, cacheBundle, cachedBundle, cacheDirectory } from "./cache"
 export {
 	EssenceCompileError,
