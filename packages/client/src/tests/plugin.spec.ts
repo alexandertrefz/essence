@@ -16,9 +16,8 @@ import { fixturePath } from "@essence-lang/fixtures"
 import * as esbuild from "esbuild"
 
 import { EssenceCompileError } from "../compile-error"
-import { EssenceBuildError } from "../errors"
 import { essenceEsbuild } from "../esbuild-plugin"
-import { declarationsPath, rawSpecifier } from "../plugin-core"
+import { declarationsPath, PRELUDE_ID, rawSpecifier } from "../plugin-core"
 import { essence, type PluginContext } from "../vite-plugin"
 import { REPOSITORY, typecheck } from "./typecheck"
 
@@ -107,11 +106,18 @@ function project(files: Record<string, string>): string {
 	let scope = path.join(directory, "node_modules", "@essence-lang")
 
 	mkdirSync(scope, { recursive: true })
-	symlinkSync(
-		path.join(REPOSITORY, "packages", "client"),
-		path.join(scope, "client"),
-		"dir",
-	)
+
+	// NOTE: Both packages a served Module names: the client, which the wrapper
+	// imports the interpreter from, and the runtime, which every emitted Module
+	// imports by name. Symlinked rather than copied, so a project resolves them
+	// the way a real host does — out of `node_modules`, once for the build.
+	for (let name of ["client", "runtime"]) {
+		symlinkSync(
+			path.join(REPOSITORY, "packages", name),
+			path.join(scope, name),
+			"dir",
+		)
+	}
 
 	for (let [name, source] of Object.entries(files)) {
 		let filePath = path.join(directory, name)
@@ -253,17 +259,61 @@ export const answer = twice(5n)
 		expect(bundle.answer).toBe(50n)
 	})
 
+	// NOTE: A `.es` file that is not under the project at all — a shared source
+	// beside it, or a linked package, which is the layout per-file serving exists
+	// to make work. Everything a served Module imports is a package specifier, and
+	// the only directory that can resolve one is the ROOT of the build: a source
+	// outside the project has no `node_modules` chain leading to the runtime, and
+	// asking esbuild to resolve from beside it fails the build eight times over.
+	it("resolves what a Module imports from the build's own root", async () => {
+		let directory = project({
+			"entry.js": `import { square } from "../shared/Math.es"
+
+export const squared = square(12n)
+`,
+		})
+		let shared = path.join(directory, "..", "shared")
+
+		mkdirSync(shared, { recursive: true })
+		writeFileSync(path.join(shared, "Math.es"), MATH_MODULE)
+
+		let result = await esbuild.build({
+			entryPoints: [path.join(directory, "entry.js")],
+			bundle: true,
+			write: false,
+			format: "esm",
+			absWorkingDir: directory,
+			plugins: [essenceEsbuild()],
+		})
+
+		expect(result.errors).toEqual([])
+
+		let output = path.join(directory, "shared.mjs")
+
+		await writeFile(output, result.outputFiles![0]!.text)
+
+		let bundle = (await import(pathToFileURL(output).href)) as Record<
+			string,
+			unknown
+		>
+
+		expect(bundle.squared).toBe(144n)
+	})
+
 	// NOTE: The door the wrapper itself imports through, opened to a host. What
-	// is behind it is the emitted bundle: Essence's own values, under the names
-	// the Rewriter emitted them as, and the bridge that builds values they
-	// accept.
-	it("serves the emitted bundle behind `?raw`", async () => {
+	// is behind it is the emitted Module: Essence's own values, under the names
+	// the Rewriter emitted them as. Values for it are built out of
+	// `@essence-lang/runtime` — the same import the Module itself makes, so the
+	// build resolves both to the one copy whose Type key its values carry.
+	it("serves the emitted Module behind `?raw`", async () => {
 		let directory = project({
 			"Math.es": MATH_MODULE,
-			"entry.js": `import { square, $bridge_integer, $bridge_typeKey } from "./Math.es?raw"
+			"entry.js": `import { square } from "./Math.es?raw"
+import { createInteger } from "@essence-lang/runtime/Integer"
+import { typeKeySymbol } from "@essence-lang/runtime/type"
 
-export const squared = square($bridge_integer(12n))
-export const typeKey = $bridge_typeKey
+export const squared = square(createInteger(12))
+export const typeKey = typeKeySymbol
 `,
 		})
 		let bundle = await built(directory, "entry.js", "raw.mjs")
@@ -276,21 +326,23 @@ export const typeKey = $bridge_typeKey
 		expect(squared.value).toBe(144)
 	})
 
-	// NOTE: ONE bundle behind both doors, which is what makes them doors into one
-	// Module rather than two Programs. A value built through the raw bridge is
-	// tagged with the Symbol that bundle minted, and the marshalled door hands
-	// values to the very same Functions — a second copy would tag its values with
-	// a Symbol the first has never seen, and every `match` on one would take the
-	// wrong arm.
-	it("serves one bundle to the marshalled door and the raw one", async () => {
+	// NOTE: ONE Module behind both doors, which is what makes them doors into one
+	// Module rather than two Programs. A value built out of the runtime is tagged
+	// with the Symbol the build's one copy of it minted, and the marshalled door
+	// hands values to the very same Functions — a second copy would tag its
+	// values with a Symbol the first has never seen, and every `match` on one
+	// would take the wrong arm.
+	it("serves one Module to the marshalled door and the raw one", async () => {
 		let directory = project({
 			"Math.es": MATH_MODULE,
 			"entry.js": `import { square } from "./Math.es"
-import { square as rawSquare, $bridge_integer, $bridge_typeKey } from "./Math.es?raw"
+import { square as rawSquare } from "./Math.es?raw"
+import { createInteger } from "@essence-lang/runtime/Integer"
+import { typeKeySymbol } from "@essence-lang/runtime/type"
 
 export const marshalled = square(12n)
-export const raw = rawSquare($bridge_integer(12n))
-export const typeKey = $bridge_typeKey
+export const raw = rawSquare(createInteger(12))
+export const typeKey = typeKeySymbol
 `,
 		})
 		let result = await build(directory, "entry.js")
@@ -349,6 +401,42 @@ export const twelve = $$integer
 		expect(bundle.twelve).toBe(12n)
 	})
 
+	// NOTE: `bind`, `$raw` and `$module` are the wrapper's own names and
+	// perfectly ordinary Essence ones — `$` is a legal Essence identifier
+	// character, as `$$integer` above shows. Exported under their own names in
+	// the wrapper they would each be declared twice, and the host's build would
+	// fail on a line of a file whose source has no such line.
+	it("exports names the wrapper itself binds", async () => {
+		let directory = project({
+			"Collide.es": `implementation {
+
+	constant $module = 1
+
+	constant $raw = 2
+
+	function bind(_ value: Integer) -> Integer {
+		<- value::multiply(with 2)
+	}
+}
+
+export {
+	$module
+	$raw
+	bind
+}
+`,
+			"entry.js": `import { bind, $module, $raw } from "./Collide.es"
+
+export const doubled = bind(21n)
+export const values = [$module, $raw]
+`,
+		})
+		let bundle = await built(directory, "entry.js", "collide.mjs")
+
+		expect(bundle.doubled).toBe(42n)
+		expect(bundle.values).toEqual([1n, 2n])
+	})
+
 	it("reports a Module that does not compile as a build failure", async () => {
 		let directory = project({
 			"Broken.es": `implementation {
@@ -381,68 +469,70 @@ export {
 		)
 	})
 
-	// NOTE: The failure this refuses is SILENT otherwise: two entries out of one
-	// graph are two standalone bundles, each with a `typeKeySymbol` of its own, so
-	// a Circle built by one carries nothing the other can read. `areaOf` then
-	// matched `#Blank` and answered `0` — no error, no warning, a wrong number.
-	it("refuses two entries out of one Module graph", async () => {
+	// NOTE: The build this used to REFUSE. Two entries out of one graph were two
+	// standalone bundles, each with a `typeKeySymbol` of its own, so a Rectangle
+	// built by one carried nothing the other could read — `describe` would have
+	// dispatched off a value it did not recognise. Served per FILE they are one
+	// module graph inside the host's own: one `Geometry.es`, one prelude, one
+	// runtime, and a value crosses between the entries because there is nothing
+	// for it to cross.
+	it("passes a value between two entries of one Module graph", async () => {
+		let modules = fixturePath("modules")
 		let directory = project({
-			"Shapes.es": `implementation {
+			"entry.js": `import { describe } from ${JSON.stringify(
+				path.join(modules, "Main.es"),
+			)}
+import { Rectangle } from ${JSON.stringify(path.join(modules, "Geometry.es"))}
 
-	choice Shape {
-		Circle { radius: Integer },
-		Blank,
-	}
-
-	function circleOf(_ radius: Integer) -> Shape {
-		<- #Circle({ radius = radius })
-	}
-}
-
-export {
-	Shape
-	circleOf
-}
-`,
-			"Area.es": `import {
-	Shape from "./Shapes.es"
-}
-
-implementation {
-
-	function areaOf(_ value: Shape) -> Integer {
-		<- match value -> Integer {
-			case #Circle { <- @.radius::multiply(with @.radius) }
-			case #Blank  { <- 0 }
-		}
-	}
-}
-
-export {
-	areaOf
-}
-`,
-			"entry.js": `import { circleOf } from "./Shapes.es"
-import { areaOf } from "./Area.es"
-
-export { circleOf, areaOf }
+export const described = describe(Rectangle.of(3n, 4n))
 `,
 		})
-		let failure = await esbuild
-			.build({
-				entryPoints: [path.join(directory, "entry.js")],
-				bundle: true,
-				write: false,
-				format: "esm",
-				logLevel: "silent",
-				plugins: [essenceEsbuild()],
-			})
-			.catch((thrown: unknown) => thrown as esbuild.BuildFailure)
+		let result = await build(directory, "entry.js")
+		let text = result.outputFiles![0]!.text
 
-		expect(failure).toBeInstanceOf(Error)
-		expect((failure as esbuild.BuildFailure).errors[0]?.text).toContain(
-			"two Essence entries out of one Module graph",
-		)
+		expect(result.errors).toEqual([])
+		// NOTE: The Type key being MINTED, a sentence only the runtime's own
+		// Integer says, and a name only the prelude declares. Twice would be two
+		// runtimes and two preludes — which is what one bundle per entry
+		// produced. The Symbol is the one that matters: two of them are two
+		// vocabularies of Types, and a value tagged in one reads as untagged in
+		// the other.
+		expect(text.split('Symbol("$type")').length - 1).toBe(1)
+		expect(
+			text.split("is not an Integer a number can hold").length - 1,
+		).toBe(1)
+		expect(
+			text.split("$es_Integer_multiply__overload$2 =").length - 1,
+		).toBe(1)
+
+		let output = path.join(directory, "entries.mjs")
+
+		await writeFile(output, text)
+
+		// NOTE: Importing runs `Main.es`'s own top-level Statements, which
+		// print. The capture is what keeps three lines of a fixture out of the
+		// middle of a test report.
+		let printed = ""
+		let write = process.stdout.write
+
+		process.stdout.write = ((chunk: unknown) => {
+			printed += String(chunk)
+
+			return true
+		}) as typeof process.stdout.write
+
+		try {
+			let bundle = (await import(pathToFileURL(output).href)) as Record<
+				string,
+				unknown
+			>
+
+			expect(bundle.described).toBe("area: 12")
+		} finally {
+			process.stdout.write = write
+		}
+
+		expect(printed).toContain("area: 12")
 	})
 
 	// NOTE: Two Programs that share nothing are two Programs. They duplicate the
@@ -490,18 +580,26 @@ describe("The wrapper a build imports", () => {
 		return code ?? ""
 	}
 
-	// NOTE: The two imports and the Descriptor between them — the whole of what
+	// NOTE: The three imports and the Descriptor between them — the whole of what
 	// makes a build's `.es` import JavaScript rather than Essence's own values.
-	it("imports the bundle and the interpreter, and marshals between them", async () => {
+	// The runtime is one of the three, imported by the same name the Module
+	// behind the wrapper imports it by: that shared import is what makes the Type
+	// key the interpreter stamps values with the key the Module reads.
+	it("imports the Module, the interpreter and the runtime", async () => {
 		let code = await wrapper()
 
 		expect(code).toContain('import * as $raw from "essence-raw:')
 		expect(code).toContain(
 			'import { bind } from "@essence-lang/client/marshal-runtime"',
 		)
-		expect(code).toContain("typeKey: $raw.$bridge_typeKey,")
-		expect(code).toContain("export const PI = $module.PI")
-		expect(code).toContain("export const square = $module.square")
+		expect(code).toContain(
+			'import * as $runtime_type from "@essence-lang/runtime/type"',
+		)
+		expect(code).toContain("typeKey: $runtime_type.typeKeySymbol,")
+		expect(code).toContain("integer: $runtime_Integer.createIntegerFrom,")
+		expect(code).toContain('const $export_PI = $module["PI"]')
+		expect(code).toContain("export { $export_PI as PI }")
+		expect(code).toContain("export { $export_square as square }")
 	})
 
 	// NOTE: What a Descriptor carries beyond the decisions themselves: the Type
@@ -630,27 +728,69 @@ describe("The Vite plugin", () => {
 		).toBe(raw)
 	})
 
+	// NOTE: Every source of the GRAPH, not the entry alone — the file that
+	// changed is rarely the file that was asked for, and a host watching one
+	// would sit still through every edit to what it imports. Served per file,
+	// the same list has to arrive with each of them: the host asks for a
+	// sibling's text without ever having asked for the entry again.
 	it("answers with a wrapper, and watches every source it was built from", async () => {
-		let directory = project({ "Math.es": MATH_MODULE })
+		let directory = project({
+			"Main.es": `import {
+	square from "./Math.es"
+}
+
+implementation {
+	constant answer = square(5)
+}
+
+export {
+	answer
+}
+`,
+			"Math.es": MATH_MODULE,
+		})
 		let plugin = essence({ declarations: false })
 		let hook = context()
-		let code = await plugin.load.call(hook, path.join(directory, "Math.es"))
+		let entry = path.join(directory, "Main.es")
+		let sibling = path.join(directory, "Math.es")
+
+		plugin.configResolved({ command: "serve", root: directory })
+
+		let code = await plugin.load.call(hook, entry)
 
 		expect(code).toContain("bind($raw,")
-		expect(code).toContain("export const square = $module.square")
-		expect(hook.watched).toEqual([path.join(directory, "Math.es")])
+		expect(code).toContain("export { $export_answer as answer }")
+		expect(hook.watched.sort()).toEqual([entry, sibling])
+
+		let siblingHook = context()
+
+		await plugin.load.call(siblingHook, `\0${rawSpecifier(sibling)}`)
+
+		expect(siblingHook.watched.sort()).toEqual([entry, sibling])
 	})
 
-	it("answers with the emitted bundle behind the raw id", async () => {
+	it("answers with the emitted Module behind the raw id", async () => {
 		let directory = project({ "Math.es": MATH_MODULE })
 		let plugin = essence({ declarations: false })
+
+		plugin.configResolved({ command: "serve", root: directory })
+
 		let code = await plugin.load.call(
 			context(),
 			`\0${rawSpecifier(path.join(directory, "Math.es"))}`,
 		)
 
-		expect(code).toContain("$bridge_integer")
+		// NOTE: A Module rather than a bundle: it imports the runtime by name
+		// for the host to resolve — once for the whole build — rather than
+		// carrying a copy of it, which is what the emitted text used to be.
+		expect(code).toContain('from "@essence-lang/runtime/Integer"')
+		expect(code).not.toContain("typeKeySymbol = Symbol")
 		expect(code).toContain("export {")
+		// NOTE: And its map with it, inside the text, because that is the only
+		// place a module no filesystem holds can carry one — a host reads the
+		// comment off what it was served and composes it into its own map, so a
+		// stack trace names Essence rather than what Essence emitted.
+		expect(code).toContain("//# sourceMappingURL=data:application/json;")
 	})
 
 	// NOTE: A dev server asks for `/src/Main.es?import` and `?t=1730` as well.
@@ -696,6 +836,10 @@ export {
 	// folds one entry into the other's graph collided with the record of an
 	// entry that no longer is one, and refused a one-entry build until the
 	// server was restarted.
+	// NOTE: A dev server compiles a file where it is asked for, and an edit can
+	// turn two unrelated entries into one graph. Nothing here refuses that any
+	// more — what it has to do is stop answering with the JavaScript the OLD
+	// sources emitted, which is the whole of what `watchChange` is for.
 	it("lets an edit refactor one entry into the other's graph", async () => {
 		let shared = `implementation {
 
@@ -756,130 +900,92 @@ export {
 		).not.toBe(null)
 	})
 
-	// NOTE: The refusal itself stands: two entries BOTH loaded since the last
-	// change really are two halves of one Program, and the second load is
-	// where that is caught.
-	it("still refuses two live entries out of one Module graph", async () => {
+	// NOTE: The claim the whole shape of this rests on, at the plugin's own
+	// level: the text served for a file two entries share does not depend on
+	// which of them was compiled. The host holds ONE module under that path, so
+	// whichever compile answered first answers for both — and if the two ever
+	// disagreed, the Case tags inside would too, and a `match` on a value from
+	// the other entry would take the wrong arm.
+	it("serves one text for a file two entries share", async () => {
 		let directory = project({
-			"Shared.es": `implementation {
-
-	function shared() -> Integer {
-		<- 1
-	}
-}
-
-export {
-	shared
-}
-`,
-			"Entry.es": `import {
-	shared from "./Shared.es"
+			"lib/Shapes.es": SHAPES_MODULE,
+			"app/One.es": `import {
+	Shape  from "../lib/Shapes.es"
+	areaOf from "../lib/Shapes.es"
 }
 
 implementation {
-	constant value = shared()
+	constant one: Shape = #Circle({ radius = 2 })
 }
 
 export {
-	value
+	one
+}
+`,
+			"Two.es": `import {
+	Shape  from "./lib/Shapes.es"
+	areaOf from "./lib/Shapes.es"
+}
+
+implementation {
+	constant two: Shape = #Circle({ radius = 3 })
+}
+
+export {
+	two
 }
 `,
 		})
-		let plugin = essence({ declarations: false })
+		let shared = `\0${rawSpecifier(path.join(directory, "lib", "Shapes.es"))}`
 
-		plugin.configResolved({ command: "serve", root: directory })
-		plugin.buildStart()
+		let servedThrough = async (entry: string): Promise<string> => {
+			let plugin = essence({ declarations: false })
 
-		expect(
-			await plugin.load.call(
-				context(),
-				path.join(directory, "Shared.es"),
-			),
-		).not.toBe(null)
+			plugin.configResolved({ command: "serve", root: directory })
+			await plugin.load.call(context(), path.join(directory, entry))
 
-		let error = await plugin.load
-			.call(context(), path.join(directory, "Entry.es"))
-			.catch((thrown: unknown) => thrown)
+			return (await plugin.load.call(context(), shared)) ?? ""
+		}
 
-		expect(error).toBeInstanceOf(EssenceBuildError)
-		expect((error as EssenceBuildError).message).toContain(
-			"two Essence entries out of one Module graph",
-		)
+		let throughOne = await servedThrough(path.join("app", "One.es"))
+		let throughTwo = await servedThrough("Two.es")
+
+		expect(throughOne).toBe(throughTwo)
+		expect(throughOne).toContain('"./lib/Shapes.es#Shape#Circle"')
 	})
 
-	// NOTE: Regression test — a dev server re-transforms a module only when
-	// its OWN watched files change, so an edit to a file in neither graph (a
-	// stylesheet, say) staled the first entry's record, the second entry's
-	// load silently displaced it, and both duplicated-runtime bundles ran side
-	// by side undetected. Displacing the record now invalidates the entry's
-	// module too, so an entry the server still holds is loaded again — where
-	// it collides with the fresh record and refuses.
-	it("forces a displaced entry to load again, where a live one still refuses", async () => {
-		let entry = `import {
-	shared from "./Shared.es"
-}
-
-implementation {
-	constant value = shared()
-}
-
-export {
-	value
-}
-`
-		let directory = project({
-			"Shared.es": `implementation {
-
-	function shared() -> Integer {
-		<- 1
-	}
-}
-
-export {
-	shared
-}
-`,
-			"First.es": entry,
-			"Second.es": entry,
-		})
+	// NOTE: What one served Module imports another by, and the prelude beside
+	// it. Both are spelled against the ROOT rather than against the entry, which
+	// is what makes them resolve to one id however many entries the build has.
+	it("resolves what one served Module imports another by", () => {
+		let directory = fixturePath("modules")
 		let plugin = essence({ declarations: false })
-		let invalidated: Array<string> = []
+
+		plugin.configResolved({ command: "build", root: directory })
+
+		expect(
+			plugin.resolveId.call(
+				undefined,
+				"essence:./math/Math.es",
+				undefined,
+			),
+		).toBe(`\0${rawSpecifier(path.join(directory, "math", "Math.es"))}`)
+		expect(
+			plugin.resolveId.call(undefined, "essence:$prelude", undefined),
+		).toBe(`\0${PRELUDE_ID}`)
+	})
+
+	it("serves the standard library prelude under one id", async () => {
+		let directory = project({ "Math.es": MATH_MODULE })
+		let plugin = essence({ declarations: false })
 
 		plugin.configResolved({ command: "serve", root: directory })
-		plugin.configureServer({
-			moduleGraph: {
-				getModuleById: (id) => ({ id }),
-				invalidateModule(module) {
-					invalidated.push((module as { id: string }).id)
-				},
-			},
-		})
-		plugin.buildStart()
+		await plugin.load.call(context(), path.join(directory, "Math.es"))
 
-		expect(
-			await plugin.load.call(context(), path.join(directory, "First.es")),
-		).not.toBe(null)
+		let prelude = await plugin.load.call(context(), `\0${PRELUDE_ID}`)
 
-		plugin.watchChange(path.join(directory, "style.css"))
-
-		expect(
-			await plugin.load.call(
-				context(),
-				path.join(directory, "Second.es"),
-			),
-		).not.toBe(null)
-		expect(invalidated).toEqual([path.join(directory, "First.es")])
-
-		// NOTE: What Vite does with an invalidated module a page still uses —
-		// the next request loads it again.
-		let error = await plugin.load
-			.call(context(), path.join(directory, "First.es"))
-			.catch((thrown: unknown) => thrown)
-
-		expect(error).toBeInstanceOf(EssenceBuildError)
-		expect((error as EssenceBuildError).message).toContain(
-			"two Essence entries out of one Module graph",
-		)
+		expect(prelude).toContain("$es_Integer_multiply__overload$2")
+		expect(prelude).toContain('from "@essence-lang/runtime/Integer"')
 	})
 })
 
@@ -931,15 +1037,24 @@ export let label: string = named(undefined)
 	// NOTE: The raw door describes a different module, so it can not share the
 	// one file. `Math.raw.es` is the name that reaches this one, by the same
 	// rule `Math.es` reaches its own.
+	//
+	// NOTE: Written for a file the HOST asked for through `?raw` and for no
+	// other. Every file of a graph is served through the same door now — that is
+	// what makes a shared one a single module — and declaring each would leave a
+	// `.raw.d.es.ts` beside every source of the project. Which is why the
+	// specifier is resolved here first: resolution is where a host says what it
+	// asked for, and the two doors deliberately resolve to one id.
 	it("writes the bundle view for the raw door", async () => {
 		let directory = project({ "Math.es": MATH_MODULE })
 		let entry = path.join(directory, "Math.es")
 		let plugin = essence({ declarations: true })
+		let id = plugin.resolveId.call(undefined, "./Math.es?raw", entry)
 
-		await plugin.load.call(context(), `\0${rawSpecifier(entry)}`)
+		await plugin.load.call(context(), id ?? "")
 
 		let written = await readFile(declarationsPath(entry, "bundle"), "utf8")
 
+		expect(id).toBe(`\0${rawSpecifier(entry)}`)
 		expect(path.basename(declarationsPath(entry, "bundle"))).toBe(
 			"Math.raw.d.es.ts",
 		)
@@ -947,7 +1062,10 @@ export let label: string = named(undefined)
 		expect(written).toContain(
 			"export declare function square(p0: EssenceValue): EssenceValue",
 		)
-		expect(written).toContain("export declare const $bridge_integer:")
+		// NOTE: And no bridge beside them any more. The values these Functions
+		// take are built out of `@essence-lang/runtime`, which the build
+		// resolves to the same copy this Module was served against.
+		expect(written).not.toContain("$bridge_")
 	})
 
 	it("writes none in a build", async () => {

@@ -50,10 +50,15 @@ export const BRIDGE_EXPORTS = {
 	record: "$bridge_record",
 } as const
 
-// NOTE: What the bridge injects, as one table: the runtime module, the name
-// inside it, and the name the bundle exports it under. The Module below is
-// written OUT of this and `BRIDGE_KEY` is spelled out of it too, so what goes
-// into a bundle and what a bundle is named by can not drift apart.
+// NOTE: What a `RuntimeBridge` is MADE OF, as one table: the member, the
+// runtime module it comes from, and the name inside it. Everything that has to
+// know is written out of this one place — the injected Module below, the
+// `BRIDGE_KEY` that names a bundle carrying it, and the plugin's wrapper, which
+// imports these same seven modules by name instead of injecting anything. Two
+// paths, one statement of which Functions the boundary is built on.
+//
+// NOTE: The name a bundle EXPORTS each under is `BRIDGE_EXPORTS`, read through
+// the member rather than repeated here, so the two tables can not drift.
 //
 // NOTE: The List and Integer entries name `createListFrom` and
 // `createIntegerFrom`, the two places this table does not hand over the
@@ -64,21 +69,25 @@ export const BRIDGE_EXPORTS = {
 // the runtime is and a host is not. Every caller in here can be read and
 // checked; a host cannot, so the copy and the check are made on this side of
 // the door, and neither contract reaches a published surface at all.
-const BRIDGE_MODULES: Array<[string, Array<[string, string]>]> = [
+export const RUNTIME_BRIDGE_MODULES: Array<
+	[string, Array<[BridgeMember, string]>]
+> = [
 	[
 		"type",
 		[
-			["typeKeySymbol", BRIDGE_EXPORTS.typeKey],
-			["createCase", BRIDGE_EXPORTS.case],
+			["typeKey", "typeKeySymbol"],
+			["case", "createCase"],
 		],
 	],
-	["Integer", [["createIntegerFrom", BRIDGE_EXPORTS.integer]]],
-	["Rational", [["createRational", BRIDGE_EXPORTS.rational]]],
-	["String", [["createString", BRIDGE_EXPORTS.string]]],
-	["Boolean", [["createBoolean", BRIDGE_EXPORTS.boolean]]],
-	["List", [["createListFrom", BRIDGE_EXPORTS.list]]],
-	["Record", [["createRecord", BRIDGE_EXPORTS.record]]],
+	["Integer", [["integer", "createIntegerFrom"]]],
+	["Rational", [["rational", "createRational"]]],
+	["String", [["string", "createString"]]],
+	["Boolean", [["boolean", "createBoolean"]]],
+	["List", [["list", "createListFrom"]]],
+	["Record", [["record", "createRecord"]]],
 ]
+
+type BridgeMember = keyof typeof BRIDGE_EXPORTS
 
 // NOTE: This package's contribution to a bundle, named for the Compiler's
 // cache key. A bundle built through the bridge and one built without it are
@@ -86,10 +95,10 @@ const BRIDGE_MODULES: Array<[string, Array<[string, string]>]> = [
 // otherwise whichever was written first answers for both, and the loser is
 // either a plugin build handed exports it never asked for or a `loadModule`
 // told the bundle "was not built through the runtime bridge".
-export const BRIDGE_KEY = `essence-client-bridge-1:${BRIDGE_MODULES.map(
+export const BRIDGE_KEY = `essence-client-bridge-1:${RUNTIME_BRIDGE_MODULES.map(
 	([fileName, members]) =>
 		`${fileName}(${members
-			.map(([member, alias]) => `${member}->${alias}`)
+			.map(([member, name]) => `${name}->${BRIDGE_EXPORTS[member]}`)
 			.join(",")})`,
 ).join(";")}`
 
@@ -123,9 +132,12 @@ function runtimeModule(fileName: string): string {
 	return path.join(RUNTIME_DIRECTORY, `${fileName}.ts`)
 }
 
-function reExport(fileName: string, members: Array<[string, string]>): string {
+function reExport(
+	fileName: string,
+	members: Array<[BridgeMember, string]>,
+): string {
 	let names = members
-		.map(([member, alias]) => `${member} as ${alias}`)
+		.map(([member, name]) => `${name} as ${BRIDGE_EXPORTS[member]}`)
 		.join(", ")
 
 	return `export { ${names} } from "${runtimeModule(fileName)}"`
@@ -137,7 +149,7 @@ function reExport(fileName: string, members: Array<[string, string]>): string {
 export function withRuntimeBridge(sources: ModuleSources): ModuleSources {
 	let source = `${[
 		`export * from "${sources.entry}"`,
-		...BRIDGE_MODULES.map(([fileName, members]) =>
+		...RUNTIME_BRIDGE_MODULES.map(([fileName, members]) =>
 			reExport(fileName, members),
 		),
 	].join("\n")}\n`

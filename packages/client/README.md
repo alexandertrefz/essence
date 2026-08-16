@@ -203,31 +203,37 @@ PI.toString() // "157/50"
 The esbuild shape of the same plugin lives one door over, at
 `@essence-lang/client/esbuild-plugin`.
 
-What the import resolves to is a generated wrapper: it imports the emitted
-bundle — the whole Essence graph and the runtime it needs, already bundled, so
-the host bundler has nothing left to resolve — imports the interpreter from
-`@essence-lang/client/marshal-runtime`, and carries the **Descriptor** the
-compiler wrote for that Module. Everything the compiler had to know about the
-boundary was decided at build time and written down; what ships is the reading
-of it. No compiler reaches the browser.
+What the import resolves to is a generated wrapper: it imports the entry's
+compiled Module, imports the interpreter from
+`@essence-lang/client/marshal-runtime`, imports the runtime from
+`@essence-lang/runtime`, and carries the **Descriptor** the compiler wrote for
+that Module. Everything the compiler had to know about the boundary was decided
+at build time and written down; what ships is the reading of it. No compiler
+reaches the browser.
 
-Because the interpreter is imported by name, the host bundler resolves it —
-this package is already a dependency of any project that uses the plugin, and
-one copy of it is what keeps one `EssenceRational` in the build.
+Behind the wrapper the graph is served **one file at a time**: each `.es` file
+becomes one JavaScript module, importing its siblings, the standard library's
+prelude and the runtime by name, and your bundler resolves, shakes and splits
+all of it exactly as it does the rest of your code.
+
+Both bare specifiers — the interpreter and the runtime — are resolved by the
+host, which is what keeps one copy of each in the build: one `EssenceRational`,
+and one hidden Type key for every Essence value the app holds. Both packages
+are dependencies of this one, so an installer that hoists puts them within
+reach; under a strict layout (pnpm's default), add `@essence-lang/runtime` to
+your own dependencies.
 
 `diagnostics: "minimal"` strips the printed Types out of the embedded
 Descriptor. The boundary decides exactly the same way; its refusals stop naming
 the Type they refused.
 
-**One `.es` entry per build.** Each entry compiles to its own standalone
-bundle, with its own copy of the runtime and its own hidden Type key — minted
-while that bundle was evaluated — so a value built by one is not recognised by
-the other, and a `match` on it would take the wrong Case rather than fail.
-Importing two `.es` files that reach a common source is therefore refused with
-an `EssenceBuildError`: import one entry and reach the rest of the graph
-through it, or load the second with `loadModule`, which marshals to plain
-JavaScript at every boundary. Two entries that share no source at all are two
-unrelated Programs and are left alone.
+**As many `.es` entries per build as you like.** Every file of every graph is
+served under one id, so two entries that reach a common source hold one copy of
+it, one prelude and one runtime — and a value built by one entry is recognised
+by the other. It rests on how the Modules are emitted: under the plugin's
+target the Compiler spells every Module and every Case tag relative to the
+project root, so a shared file's JavaScript is the same text whichever entry
+compiled it.
 
 While a dev server is serving, a `<Name>.d.es.ts` is written beside each
 compiled file — the `javascript` view, which is what the import resolves to,
@@ -237,19 +243,22 @@ server.
 
 ### `?raw`
 
-The raw door, in a build: `?raw` serves the emitted bundle itself,
+The raw door, in a build: `?raw` serves the compiled Module itself,
 unmarshalled — Essence's own values, under the names the Rewriter emitted them
-as, and the bridge that builds values they accept.
+as. Build values for it out of `@essence-lang/runtime`, which your build
+resolves to the very copy those Modules were compiled against.
 
 ```js
-import { square, $bridge_integer, $bridge_typeKey } from "./math/Math.es?raw"
+import { square } from "./math/Math.es?raw"
+import { createInteger } from "@essence-lang/runtime/Integer"
+import { typeKeySymbol } from "@essence-lang/runtime/type"
 
-let squared = square($bridge_integer(12n))
+let squared = square(createInteger(12))
 
-squared[$bridge_typeKey] // "Integer"
+squared[typeKeySymbol] // "Integer"
 ```
 
-It is the same bundle the marshalled door is a wrapper around — one copy in the
+It is the same Module the marshalled door is a wrapper around — one copy in the
 build, one Type key — so values pass between the two doors freely. Where
 declarations are on, the `bundle` view is written beside the source as
 `<Name>.raw.d.es.ts`; TypeScript will not resolve a `?raw` specifier itself, so
@@ -264,7 +273,7 @@ Values there are Essence's own: an Integer is a tagged object holding a
 that, and the Symbol it is tagged with is minted when the bundle is evaluated,
 so the constructors come out of that bundle too, on `bridge`. Those constructors
 take the same numbers the marshalled door does and refuse the same ones —
-`$bridge_integer(1.5)` and `$bridge_integer(2 ** 53)` throw rather than tag a
+`bridge.integer(1.5)` and `bridge.integer(2 ** 53)` throw rather than tag a
 value that is not an Integer. The marshalled
 door does not show that split — `toJS` answers a `bigint` for every Integer, so
 that an export's Type does not change the day a value crosses 2^53.
@@ -294,8 +303,6 @@ toJS(math.raw.square(fromJS(12n, squared.parameterTypes[0].type))) // 144n
 - **Nested Optionals.** `Optional<T>` is `T | undefined`, and `undefined` does
   not nest. `Optional<Optional<T>>` is refused in both directions rather than
   collapsed into the one level JavaScript can spell.
-- **More than one `.es` entry per bundler build.** See above — the two bundles
-  would not recognise each other's values.
 - **Compiling in a browser.** The compiler reads files and shells out to
   esbuild. What a browser can run is the *output* — which is what the bundler
   plugins are for.

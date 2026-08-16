@@ -5,6 +5,7 @@ import {
 import type { ExportSurface } from "@essence-lang/compiler/modules"
 import { printSignature, printType } from "@essence-lang/compiler/printType"
 import {
+	type EmitTarget,
 	emittedIdentity,
 	escapeName,
 	namespaceMemberName,
@@ -69,9 +70,10 @@ export type Descriptor =
 
 export type CaseDescriptor = {
 	kind: "case"
-	// NOTE: The tag as the BUNDLE spells it — `./Geometry.es#Shape#Circle`,
-	// relative to the entry — which is the one spelling a value built for that
-	// bundle may carry.
+	// NOTE: The tag as the emitted JavaScript spells it —
+	// `./Geometry.es#Shape#Circle`, relative to the entry inside a bundle and to
+	// the root of a host's project inside one of those — which is the one
+	// spelling a value built for that JavaScript may carry.
 	tag: string
 	// NOTE: The Choice as it was DECLARED, which is what a host writes: a `$case`
 	// reads `Shape#Circle` or the bare `Circle`, never the Module path the tag
@@ -161,10 +163,12 @@ export type DeclaredType = {
 
 // #region Describing
 
-// NOTE: What a Descriptor is spelled against — the entry the bundle was emitted
-// for. A Case tag is entry-relative INSIDE a bundle, so a Descriptor is only good
-// for the bundle it was described alongside; see `emittedIdentity`.
-export type DescribeContext = { entryPath: string }
+// NOTE: What a Descriptor is spelled against — the entry the Modules were
+// emitted for, and the target they were emitted to. A Case tag is spelled
+// relative to one of the two directories those decide between, so a Descriptor
+// is only good beside the JavaScript it was described alongside; see
+// `emittedIdentity`, which is the same rule and the only one.
+export type DescribeContext = { entryPath: string; emit?: EmitTarget }
 
 export function describe(
 	type: common.Type,
@@ -338,7 +342,11 @@ function describeCase(
 		// NOTE: `emittedIdentity` is the Rewriter's own rule, so the tag a value
 		// is built with here and the tag the emitted `match` reads are the same
 		// string by construction rather than by agreement.
-		tag: `${emittedIdentity(context.entryPath, type.choice)}#${type.name}`,
+		tag: `${emittedIdentity(
+			context.entryPath,
+			type.choice,
+			context.emit,
+		)}#${type.name}`,
 		choice: displayChoiceName(type.choice),
 		name: type.name,
 		// NOTE: The identity is compared whole rather than by its display name,
@@ -400,8 +408,9 @@ function signatureWith(
 export function describeModule(
 	surface: ExportSurface,
 	entryPath: string,
+	emit?: EmitTarget,
 ): ModuleDescriptor {
-	let context: DescribeContext = { entryPath }
+	let context: DescribeContext = { entryPath, emit }
 	let exports: Record<string, ExportDescriptor> = {}
 
 	for (let [name, type] of Object.entries(surface.values)) {
@@ -460,8 +469,9 @@ export function describeModule(
 export function describeTypes(
 	surface: ExportSurface,
 	entryPath: string,
+	emit?: EmitTarget,
 ): Array<DeclaredType> {
-	let context: DescribeContext = { entryPath }
+	let context: DescribeContext = { entryPath, emit }
 	let declared: Array<DeclaredType> = []
 
 	for (let name of Object.keys(surface.kinds)) {
