@@ -1,3 +1,4 @@
+import { bareCaseCollision } from "./bare-cases"
 import type {
 	CaseDescriptor,
 	DeclaredType,
@@ -307,6 +308,29 @@ function inputRefusal(node: Descriptor): string | null {
 	return node.kind === "refused" ? `never /* ${node.why} */` : null
 }
 
+// NOTE: The one refusal that lands on BOTH directions at once, and the one this
+// file can not simply print the arms of. A unit Choice's Case crosses as its
+// bare name, so a Union holding one beside a `String` — or beside another
+// Choice's Case of the same name — has arms TypeScript would read as one:
+// `"Up" | string` collapses to `string`, and a declaration printed that way
+// would promise a position that takes any string at all while the interpreter
+// refuses every value there. `never` is the only spelling that admits exactly
+// the calls that work, which is none.
+//
+// NOTE: Inline, rather than hoisted above the declaration the way
+// `OVERLOADED_NOTICE` is. An Overload set is a refusal about the EXPORT and has
+// no position inside a Type to stand at; this is a refusal about one position,
+// and the Union is as likely to be a Record's member or a callback's answer as
+// it is to be the whole of a Parameter — so the reason goes where the mistake
+// is, exactly as the nested-Optional refusal already does.
+function unionRefusal(node: Descriptor): string | null {
+	let collision = bareCaseCollision(node)
+
+	return collision === null
+		? null
+		: `never /* '${node.shown}' has no unambiguous JavaScript spelling — ${collision}. Crossing one throws. */`
+}
+
 // NOTE: Whether this Descriptor's two directions are printed DIFFERENTLY. What it
 // decides is whether an in-position use may go by NAME: a Type Alias is declared
 // once, in its out-form, so naming it at a Parameter is the claim that a value
@@ -548,6 +572,18 @@ function createWalker(
 	// `undefined`. Every other Case carries which one it is as a member, under
 	// the `$case` the boundary writes — the Choice as it was DECLARED and the
 	// Case, never the path of the machine that compiled it.
+	//
+	// NOTE: Except a Case of a UNIT Choice — one all of whose Cases are
+	// payload-less — which crosses as its own bare name and is therefore that
+	// name's string literal here. An `Ordering` reads as the three words it can
+	// be, which is the whole ergonomic point of the spelling.
+	//
+	// NOTE: The bare name in BOTH directions, though the boundary also ACCEPTS
+	// the qualified `"Direction#Up"` on the way in. A declaration says what a
+	// value is, and printing the second spelling at every Parameter would offer
+	// a reader a choice where there is only one right answer — the qualified
+	// form is there for a host that already had the tag, not for one writing a
+	// call.
 	function printCase(node: CaseDescriptor, direction: Direction): string {
 		if (node.optional) {
 			let item = node.payload.item
@@ -555,6 +591,10 @@ function createWalker(
 			return node.name === "Empty" || item === undefined
 				? "undefined"
 				: print(item, direction)
+		}
+
+		if (node.unitChoice) {
+			return JSON.stringify(node.name)
 		}
 
 		return inlined([
@@ -573,6 +613,18 @@ function createWalker(
 		node: Extract<Descriptor, { kind: "optional" | "union" }>,
 		direction: Direction,
 	): Array<string> {
+		// NOTE: Ahead of the arms, because the whole position is what is being
+		// refused — printing them and then refusing would be printing a Union
+		// TypeScript reads as one arm. Asked here rather than in `print` so that
+		// a Type Alias declaring such a Union is refused in its own declaration
+		// too: `aliasDeclaration` lays a Union out itself and never asks `print`
+		// for one.
+		let refusal = unionRefusal(node)
+
+		if (refusal !== null) {
+			return [refusal]
+		}
+
 		let parts: Array<string> = []
 		let absent = false
 
@@ -738,10 +790,20 @@ function createWalker(
 	// what each really is, since one holds a bigint and the other a number until
 	// it crosses. A Type Parameter named with an `_`, which no Essence identifier
 	// contains, so it can shadow nothing a Module declared.
+	//
+	// NOTE: `readonly` on a bare Case and on nothing beside it. The table is
+	// frozen whichever Cases it holds — `caseConstructors` answers with an
+	// `Object.freeze`d object — so this is news about the value rather than
+	// about the slot: a bare Case is the one member spelled as a bare string,
+	// and a bare string is the one thing a reader might take for somewhere to
+	// keep one rather than a name to pass. Its neighbours are a constructor and
+	// a tagged object, which nobody mistakes for either.
 	function caseEntries(cases: ReadonlyArray<CaseDescriptor>): Array<string> {
 		return cases.map((node) => {
 			if (Object.keys(node.payload).length === 0) {
-				return `${memberName(node.name)}: ${printCase(node, "in")}`
+				let member = `${memberName(node.name)}: ${printCase(node, "in")}`
+
+				return node.unitChoice ? `readonly ${member}` : member
 			}
 
 			let tag = JSON.stringify(`${node.choice}#${node.name}`)
