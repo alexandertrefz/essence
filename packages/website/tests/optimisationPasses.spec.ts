@@ -86,6 +86,7 @@ describe("Optimisation Passes", () => {
 		expect(headingsUnder("Emitted shapes")).toEqual([
 			"tag-binding",
 			"unboxed-loop-state",
+			"unboxed-operand",
 		])
 	})
 
