@@ -277,6 +277,98 @@ export declare const Rectangle: {
 		)
 	})
 
+	// NOTE: A Choice all of whose Cases are payload-less crosses as the bare Case
+	// name, so its Type is the union of those names as string literals — which is
+	// what a TypeScript enumeration looks like, and the whole reason the spelling
+	// exists. `Ordering` says the same thing without being declared by the
+	// Module: nothing here is about a Choice being local, only about every Case
+	// being empty.
+	it("prints a unit Choice as the union of its Case names", async () => {
+		let text = await declarationsOf(clientFixture("Marshal.es"))
+
+		expect(text).toContain(`export type Direction = "Up" | "Down"`)
+		expect(text).toContain(`export type Sign = "Plus" | "Minus"`)
+		expect(text).toContain(
+			`export declare function ordering(p0: "Less" | "Equal" | "Greater"): "Less" | "Equal" | "Greater"`,
+		)
+		expect(text).not.toContain(`{ $case: "Direction#Up" }`)
+	})
+
+	// NOTE: And the const under the same name is the table of those strings, so
+	// that `Direction.Up` and `"Up"` are one value written two ways. `readonly`
+	// because the table is frozen and a bare string is the one member here a
+	// reader might take for somewhere to keep one.
+	it("declares a unit Choice's Cases as the names they cross as", async () => {
+		expect(await declarationsOf(clientFixture("Marshal.es"))).toContain(
+			`export declare const Direction: { readonly Up: "Up"; readonly Down: "Down" }`,
+		)
+	})
+
+	// NOTE: At every position a Descriptor is WALKED to rather than met at — an
+	// `Optional`'s item, a List's item, a Record's member — because the fact is
+	// on the Case and the walk is the same walk as ever.
+	//
+	// NOTE: And by NAME at a Parameter, unwrapped — a unit Choice carries no
+	// Integer, so it is not one of the Types whose in-form is wider than its
+	// declaration, and `Input<Direction>` would be the same Type spelled twice.
+	it("carries the spelling wherever a bare Case is reached", async () => {
+		let text = await declarationsOf(clientFixture("Marshal.es"))
+
+		expect(text).toContain(
+			"export declare function direction(p0: Direction): Direction",
+		)
+		expect(text).toContain(
+			"export declare function maybeDirection(p0: Direction | undefined): Direction | undefined",
+		)
+		expect(text).toContain(
+			"export declare function directions(p0: Array<Direction>): Array<Direction>",
+		)
+		expect(text).toContain("export type Marker = { direction: Direction }")
+	})
+
+	// NOTE: And where a constant is all that names it. `heading` was annotated,
+	// so it is the Choice by name; `plus` was not, so its Type is the one Case
+	// alone — which prints as that Case's own string and nothing else, the
+	// narrowest true thing to say about a value that can only ever be `"Plus"`.
+	it("declares a constant of a unit Choice by what it can be", async () => {
+		let text = await declarationsOf(clientFixture("Marshal.es"))
+
+		expect(text).toContain("export declare const heading: Direction")
+		expect(text).toContain(`export declare const plus: "Plus"`)
+	})
+
+	// NOTE: `never`, because printing the arms honestly is what can not be done:
+	// TypeScript reads `"Up" | string` as `string`, so a declaration that named
+	// both would promise a position taking any string at all while the
+	// interpreter refuses every value there. The refusal is the interpreter's own
+	// sentence, and it lands on both directions — a collision is not a thing a
+	// value can be built past on the way in and read past on the way out.
+	it("refuses a Union a bare Case has no unambiguous spelling in", async () => {
+		let text = await declarationsOf(clientFixture("Marshal.es"))
+
+		expect(text).toContain(
+			`export declare function directionOrText(p0: never /* 'Direction | String' has no unambiguous JavaScript spelling — a Direction#Up crosses as the string "Up", which a String is too. Crossing one throws. */): never /* 'Direction | String' has no unambiguous JavaScript spelling — a Direction#Up crosses as the string "Up", which a String is too. Crossing one throws. */`,
+		)
+		expect(text).toContain(
+			`export declare function directionOrVertical(p0: never /* 'Direction | Vertical' has no unambiguous JavaScript spelling — a Direction#Up and a Vertical#Up both cross as the string "Up". Crossing one throws. */): never /* 'Direction | Vertical' has no unambiguous JavaScript spelling — a Direction#Up and a Vertical#Up both cross as the string "Up". Crossing one throws. */`,
+		)
+	})
+
+	// NOTE: And spells the ones that do have one. The collision is per CASE NAME
+	// — `Direction | Sign` share none — and per bare Case: a Choice with a
+	// payload crosses as a `$case` object, which no string is, so `Shape` stands
+	// beside a bare name perfectly well.
+	it("spells a Union a bare Case can stand unambiguously in", async () => {
+		let text = await declarationsOf(clientFixture("Marshal.es"))
+
+		expect(text).toContain(
+			"export declare function directionOrSign(p0: Direction | Sign): Direction | Sign",
+		)
+		expect(text).toContain(
+			"export declare function directionOrShape(p0: Direction | Input<Shape>): Direction | Shape",
+		)
+	})
+
 	// NOTE: `EssenceRational` is this package's name and a name a Module may
 	// export. Both spelled plainly, the import and the declaration are one name
 	// declared twice — which TypeScript refuses, taking the whole file with it —
@@ -289,6 +381,26 @@ export declare const Rectangle: {
 		)
 		expect(text).toContain("export declare const EssenceRational: bigint")
 		expect(text).toContain("export declare const ratio: $EssenceRational")
+	})
+
+	// NOTE: An `Optional` standing between a bare Case and a String hides
+	// nothing, in either of the two places it can stand. Beside the pair, the
+	// collision is the Union's own and the whole position is `never`. Around
+	// the pair, `undefined` is still a spelling the position has — absence is
+	// nobody else's — so what is printed is `never | undefined`, which
+	// TypeScript reads as `undefined`: the one value that crosses, and the
+	// interpreter's own answer for that position (it lets the absence through
+	// and refuses every `"Up"`). Both halves are pinned here so that a change
+	// to one is a change the other has to be read against.
+	it("refuses a collision an Optional stands in the way of", async () => {
+		let text = await declarationsOf(clientFixture("Refused.es"))
+
+		expect(text).toContain(
+			`export declare function noted(p0: never /* 'Optional<String> | Direction' has no unambiguous JavaScript spelling — a Direction#Up crosses as the string "Up", which a String is too. Crossing one throws. */): never /* 'Optional<String> | Direction' has no unambiguous JavaScript spelling — a Direction#Up crosses as the string "Up", which a String is too. Crossing one throws. */`,
+		)
+		expect(text).toContain(
+			`export declare function wrapped(p0: never /* 'Direction | String' has no unambiguous JavaScript spelling — a Direction#Up crosses as the string "Up", which a String is too. Crossing one throws. */ | undefined): never /* 'Direction | String' has no unambiguous JavaScript spelling — a Direction#Up crosses as the string "Up", which a String is too. Crossing one throws. */ | undefined`,
+		)
 	})
 
 	// NOTE: `fromJS` refuses EVERY value for a nested Optional — both levels
@@ -396,6 +508,24 @@ export declare function square(p0: EssenceValue): EssenceValue
 		expect(await declarationsOf(clientFixture("Escaped.es"), "bundle"))
 			.toContain(`// 'ok?' as the Rewriter emits it.
 export declare function $user_ok_3f_(p0: EssenceValue): EssenceValue`)
+	})
+
+	// NOTE: A unit Choice's bare-name spelling is the MARSHALLED door's, and this
+	// view is the other one: behind the wrapper a `Direction` is the Essence Case
+	// object itself, which no string is. So nothing here changes — not the
+	// spelling, and not the refusal either, since a Union with no unambiguous
+	// JavaScript reading has a perfectly ordinary Essence value in it.
+	it("leaves a unit Choice opaque, spelling and refusal alike", async () => {
+		let text = await declarationsOf(clientFixture("Marshal.es"), "bundle")
+
+		expect(text).toContain(
+			"export declare function direction(p0: EssenceValue): EssenceValue",
+		)
+		expect(text).toContain(
+			"export declare function directionOrText(p0: EssenceValue): EssenceValue",
+		)
+		expect(text).not.toContain(`"Up"`)
+		expect(text).not.toContain("never")
 	})
 })
 
@@ -508,6 +638,60 @@ export let wrong = Shape.Circle({ radius: "3" })
 
 		expect(refused.code).not.toBe(0)
 		expect(refused.output).toContain("consumer.ts")
+	})
+
+	// NOTE: The two spellings a host reaches for, both of which have to hold: the
+	// bare string, which is what the boundary really carries, and the Case off
+	// the Choice, which is what a reader coming from the object form writes. They
+	// are one value — `Direction.Up` IS `"Up"` — so the declaration has to say so
+	// rather than only admit both.
+	//
+	// NOTE: And a name the Choice does not have is refused, which is the half
+	// that makes the rest worth having. A declaration printing `string` there
+	// would typecheck `"Left"` and throw at the crossing.
+	it("takes a bare Case as its own name or off the Choice", async () => {
+		let declarations = await declarationsFor(clientFixture("Marshal.es"))
+		let run = typecheck({
+			"Marshal.d.es.ts": declarations,
+			"consumer.ts": `import { Direction, direction, directions, marker, maybeDirection, ordering } from "./Marshal.es"
+import type { Marker } from "./Marshal.es"
+
+export let up: Direction = "Up"
+export let down: Direction = Direction.Down
+export let sameThing: "Up" = Direction.Up
+export let round: Direction = direction("Up")
+export let absent: Direction | undefined = maybeDirection(undefined)
+export let all: Array<Direction> = directions(["Up", Direction.Down])
+export let held: Marker = marker({ direction: "Up" })
+export let compared: "Less" | "Equal" | "Greater" = ordering("Less")
+
+// @ts-expect-error — 'Left' is not a Case of Direction
+export let wrong: Direction = "Left"
+`,
+		})
+
+		expect(run.output).toBe("")
+		expect(run.code).toBe(0)
+	})
+
+	// NOTE: And the refused positions refuse, at the call rather than at the
+	// crossing — which is the whole reason they are declared `never` instead of
+	// being spelled out as the arms they hold.
+	it("is refused a Union a bare Case has no spelling in", async () => {
+		let declarations = await declarationsFor(clientFixture("Marshal.es"))
+		let run = typecheck({
+			"Marshal.d.es.ts": declarations,
+			"consumer.ts": `import { directionOrText } from "./Marshal.es"
+
+export let ambiguous = directionOrText("Up")
+`,
+		})
+
+		expect(run.code).not.toBe(0)
+		expect(run.output).toContain("consumer.ts")
+		expect(run.output).toContain(
+			"Argument of type '\"Up\"' is not assignable to parameter of type 'never'",
+		)
 	})
 
 	it("reaches an export JavaScript can not spell", async () => {

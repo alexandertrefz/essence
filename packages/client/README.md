@@ -57,6 +57,7 @@ math.exports.square(12n) // 144n
 | `{ a: T }`        | a plain object, closed — an undeclared key is refused |
 | `Optional<T>`     | `T` or `undefined`                    |
 | a Case of a Choice | `{ $case: "Choice#Case", ...payload }` |
+| a Case of a Choice with no payloads at all | the bare Case name, `"Up"` |
 
 The mapping loses nothing in either direction. There is no JavaScript number
 for `1/3`, so a `Rational` crosses as its two `bigint` parts; a `number` handed
@@ -74,7 +75,7 @@ lossless spelling at all the value is refused rather than approximated: an
 that holds however its Type was written down. An unannotated
 `constant present = #Value(3)` has one of `Optional`'s Cases alone for a Type
 rather than the Union an annotation would have named, and still crosses as
-`3n` — the last row of the table is every other Choice.
+`3n` — the last two rows of the table are every other Choice.
 
 A constant is marshalled when it is read, not when the Module is loaded, so an
 export the boundary has no mapping for — the numeric tower above `Rational`,
@@ -133,8 +134,10 @@ value carries none, so each Overload is reached by its own name on `raw`.
 
 ## Choices
 
-A Case crosses as `{ $case: "Choice#Case", ...payload }`, and the Module hands
-back a way to spell one: every exported Choice is a value as well as a Type,
+A Case crosses as `{ $case: "Choice#Case", ...payload }`, unless its Choice
+carries no payloads at all — which is
+[a spelling of its own](#choices-with-no-payloads). Either way the Module hands
+back a way to write one: every exported Choice is a value as well as a Type,
 holding one constructor per Case.
 
 ```js
@@ -156,6 +159,48 @@ Choice is given its Methods — the constructors are members of that Namespace
 instead: one name binds one thing, and `Shape.Circle(…)` beside `Shape.area(…)`
 is the object a reader expects either way. A Method or a static constant of a
 Case's name wins, because the Module really does bind that one.
+
+### Choices with no payloads
+
+A Choice all of whose Cases are payload-less — `choice Direction { Up, Down }`,
+the standard library's `Ordering` — crosses as the **bare Case name** instead,
+in both directions. There is nothing for a `$case` object to carry that the
+name does not, and `turn("Up")` is what a JavaScript caller wanted to write.
+
+```js
+let compass = await loadModule("./Compass.es")
+let { Direction, turn } = compass.exports
+
+turn("Up") // the string itself
+turn(Direction.Up) // the same call — the constructor IS the string "Up"
+turn("Direction#Up") // accepted too, for a host that already had the tag
+```
+
+The name is verbatim: `"Up"`, never `"up"`, and never a casing of this
+package's choosing. It is all or nothing per Choice — one payload anywhere and
+every Case of that Choice keeps the object form, its payload-less ones
+included — and `Optional` is untouched, being spelled by absence already.
+
+Two shapes the object form keeps apart can collide here, because a bare string
+is what a `String` is too. Within one Union — read through nested Unions, and
+through an `Optional`, which puts its item in the same position — a payload-less
+Case beside a `String`, or beside a Case of the **same name** from another
+Choice, is a position with no unambiguous JavaScript spelling. The boundary
+refuses it rather than deciding it: deciding it would mean a String `"Up"`
+handed in coming back out as a `Direction`, and losing a value is the one thing
+this boundary may not do.
+
+```
+argument 1: 'Direction | String' has no unambiguous JavaScript spelling — a
+Direction#Up crosses as the string "Up", which a String is too. Wrap one side
+in a Record or give the Case a payload.
+```
+
+The Module still loads and every other export still works — only that position
+throws, and only when a value crosses it. The refusal is per Case **name**, so
+`Direction | Sign` sharing none is spelled out as usual, and per payload-less
+Case, so `Direction | Shape` is fine as well: a `Shape` crosses as an object,
+which no string is.
 
 ## Callbacks
 
@@ -217,8 +262,9 @@ export declare function square(p0: bigint | number): bigint
 ```
 
 A Type Alias is declared under the name it was written with and referred to by
-it everywhere else, a Choice becomes the union of its Cases, and `Optional<T>`
-is `T | undefined`. A Parameter is named by its label; a `_` Parameter by its
+it everywhere else, a Choice becomes the union of its Cases — of their bare
+names, where the Choice carries no payloads — and `Optional<T>` is
+`T | undefined`. A Parameter is named by its label; a `_` Parameter by its
 position.
 
 The declarations say what the boundary takes as well as what it gives. An
@@ -259,18 +305,34 @@ it, its own Types kept. `Shape.Circle({ radius: 3n })` is a `Shape`;
 `Shape.Circle({ radius: 3 })` is an `Input<Shape>`, which is what it holds until
 it crosses.
 
+A Choice with no payloads is the string-literal union of its Case names, which
+is what an enumeration looks like on this side. Its table is the same two
+declarations, holding the strings themselves — so `Direction.Up` typechecks
+everywhere `"Up"` does, being the same value.
+
+```ts
+export type Direction = "Up" | "Down"
+
+export declare const Direction: { readonly Up: "Up"; readonly Down: "Down" }
+export declare function turn(p0: Direction): Direction
+```
+
 What the boundary cannot carry is declared `never` rather than spelled out,
 because a declaration is only worth having if the calls it admits are the calls
 that work. An overloaded Method is `never` — which Overload a call means is
 decided by the Argument Types, which a JavaScript value does not carry. So is a
 nested `Optional` — both of its levels would be `undefined` — and so is a Type
 Parameter in an input position: a Type Parameter is a shape that has not been
-decided yet, and a value going *in* has to be built against a shape. A named
-Type whose members read differently going in — a refusal among them, or a
-callback, whose own directions turn around — is spelled out at that Parameter,
-with the difference on the member it belongs to. Each refusal is declared in the words the
-boundary would have thrown, so what a reader is shown and what a caller would
-have been told are one sentence.
+decided yet, and a value going *in* has to be built against a shape. So is a
+Union a bare Case name has no unambiguous spelling in — beside a `String`, or
+beside another Choice's Case of the same name — where TypeScript reads
+`"Up" | string` as `string`, and printing the arms honestly would promise a
+Parameter taking any string at all while the boundary refuses every value
+there. A named Type whose members read differently going in — a refusal among
+them, or a callback, whose own directions turn around — is spelled out at that
+Parameter, with the difference on the member it belongs to. Each refusal is
+declared in the words the boundary would have thrown, so what a reader is shown
+and what a caller would have been told are one sentence.
 
 ```ts
 export declare function firstOf(

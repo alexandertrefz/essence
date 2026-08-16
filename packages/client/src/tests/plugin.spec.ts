@@ -37,15 +37,20 @@ export {
 `
 
 // NOTE: The shapes a declaration file has to spell and a consumer has to be able
-// to write: a Choice, a Record under a name, a labelled call and an `Optional`.
-// Deliberately no Rational — a generated file borrows `EssenceRational` from this
-// package, and the point of this Module is that what is written beside it stands
-// on its own.
+// to write: a Choice, a unit Choice, a Record under a name, a labelled call and
+// an `Optional`. Deliberately no Rational — a generated file borrows
+// `EssenceRational` from this package, and the point of this Module is that what
+// is written beside it stands on its own.
 const SHAPES_MODULE = `implementation {
 
 	choice Shape {
 		Circle { radius: Integer },
 		Blank,
+	}
+
+	choice Direction {
+		Up,
+		Down,
 	}
 
 	type Box = { width: Integer, height: Integer }
@@ -65,15 +70,24 @@ const SHAPES_MODULE = `implementation {
 		<- value::value(withDefault "unnamed")
 	}
 
+	function turn(_ direction: Direction) -> Direction {
+		<- match direction -> Direction {
+			case #Up   { <- #Down }
+			case #Down { <- #Up }
+		}
+	}
+
 	constant blank: Shape = #Blank
 }
 
 export {
 	Box
+	Direction
 	Shape
 	areaOf
 	blank
 	named
+	turn
 	widen
 }
 `
@@ -246,6 +260,34 @@ export const empty = Shape.Blank
 
 		expect(bundle.area).toBe(16n)
 		expect(bundle.empty).toEqual({ $case: "Shape#Blank" })
+	})
+
+	// NOTE: The whole of the unit-Choice spelling through the path a host really
+	// takes: the plugin compiles the Module, bakes a Descriptor into the wrapper
+	// it serves, and the wrapper marshals by that baked copy alone. If
+	// `unitChoice` did not survive the baking, this entry would be handed
+	// `{ $case: "Direction#Up" }` and `turn` would be handed a string it refuses.
+	//
+	// NOTE: `turn` flips rather than returning what it was given, so the string
+	// that comes back is one the entry never wrote. An identity would pass on a
+	// boundary that quietly handed the Argument back untouched.
+	it("carries a unit Choice across as the bare Case name", async () => {
+		let directory = project({
+			"Shapes.es": SHAPES_MODULE,
+			"entry.js": `import { Direction, turn } from "./Shapes.es"
+
+export const down = turn("Up")
+export const up = turn(Direction.Down)
+export const qualified = turn("Direction#Down")
+export const table = Direction
+`,
+		})
+		let bundle = await built(directory, "entry.js", "compass.mjs")
+
+		expect(bundle.down).toBe("Down")
+		expect(bundle.up).toBe("Up")
+		expect(bundle.qualified).toBe("Up")
+		expect(bundle.table).toEqual({ Up: "Up", Down: "Down" })
 	})
 
 	// NOTE: The whole Essence graph, not the file that was named. Nothing about a
@@ -1039,13 +1081,17 @@ describe("The declarations a build writes", () => {
 
 		let run = typecheck({
 			"Shapes.d.es.ts": await readFile(declarationsPath(entry), "utf8"),
-			"consumer.ts": `import { areaOf, blank, named, widen } from "./Shapes.es"
+			"consumer.ts": `import { areaOf, blank, Direction, named, turn, widen } from "./Shapes.es"
 import type { Box, Shape } from "./Shapes.es"
 
 export let area: bigint = areaOf({ $case: "Shape#Circle", radius: 3n })
 export let empty: Shape = blank
 export let wider: Box = widen({ width: 1n, height: 2n }, 3n)
 export let label: string = named(undefined)
+export let flipped: Direction = turn("Up")
+export let same: Direction = turn(Direction.Down)
+// @ts-expect-error a Case the Choice does not declare
+export let wrong: Direction = turn("Left")
 `,
 		})
 

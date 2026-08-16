@@ -9,9 +9,13 @@ import type { Input } from "@essence-lang/client"
 
 export type Box = { width: bigint; height: bigint }
 
+export type Direction = "Up" | "Down"
+
 export type Shape =
 	| { $case: "Shape#Circle"; radius: bigint }
 	| { $case: "Shape#Blank" }
+
+export declare const Direction: { readonly Up: "Up"; readonly Down: "Down" }
 
 export declare const Shape: {
 	Circle<Payload_ extends { radius: bigint | number }>(payload: Payload_): Payload_ & { $case: "Shape#Circle" }
@@ -21,6 +25,7 @@ export declare const Shape: {
 export declare function areaOf(p0: Input<Shape>): bigint
 export declare const blank: Shape
 export declare function named(p0: string | undefined): string
+export declare function turn(p0: Direction): Direction
 
 export declare function widen(box: Input<Box>, by: bigint | number): Box
 export declare function widen(labelled: { box: Input<Box>; by: bigint | number }): Box
