@@ -1,32 +1,30 @@
-import {
-	displayChoiceName,
-	displayGenericName,
-	resolveOverloadedMethodName,
-} from "@essence-lang/compiler/helpers"
-import type { ExportSurface } from "@essence-lang/compiler/modules"
-import {
-	escapeName,
-	namespaceMemberName,
-} from "@essence-lang/compiler/rewriter"
-import type { common } from "@essence-lang/interfaces"
-
 import { BRIDGE_EXPORTS } from "./bridge"
-import { admitsAbsence, optionalItemOf } from "./descriptor"
+import type {
+	CaseDescriptor,
+	DeclaredType,
+	Descriptor,
+	ExportDescriptor,
+	FunctionDescriptor,
+	ModuleDescriptor,
+	NamespaceDescriptor,
+} from "./descriptor"
+import { isTypeName, isValueName, mangled, memberName } from "./names"
 
-// NOTE: An Export Surface as TypeScript — `printType`'s sibling, walking the
-// same `common.Type` vocabulary and printing the other language. Every rule the
-// Marshaller decides a value by is written here as a Type, which is what makes
-// the two one boundary rather than two: an Integer marshals to a `bigint` and
-// says `bigint`, an `Optional<T>` collapses to `T | undefined` in both.
+// NOTE: A Module as TypeScript, printed off the same Descriptor the interpreter
+// marshals by. That is the whole point of it being a Descriptor: every rule a
+// value is decided by was written down once, on the Compiler's side of the seam,
+// and a declaration file is that same writing read as the other language. An
+// Integer marshals to a `bigint` and says `bigint`; an `Optional<T>` collapses to
+// `T | undefined` in both, because there is only one node to collapse.
 //
-// NOTE: There are TWO views of a Module, because there are two doors into one.
-// `loadModule(…).exports` hands over JavaScript — that is the `javascript` view,
-// and the whole of the mapping table. The BUNDLE the plugin hands a build
-// exports Essence's own values, under the names the Rewriter emitted them as —
-// that is the `bundle` view, where every value is opaque and the bridge that
-// builds them is declared beside it. A generated declaration file has to
-// describe the module it sits next to, so which of the two is asked for is not a
-// matter of taste.
+// NOTE: There are TWO views of a Module, because a bundler serves two doors into
+// one. The wrapper the plugin emits hands over JavaScript — that is the
+// `javascript` view, and the whole of the mapping table. Behind it, `?raw` serves
+// the emitted bundle itself: Essence's own values, under the names the Rewriter
+// emitted them as — that is the `bundle` view, where every value is opaque and
+// the bridge that builds them is declared beside it. A generated declaration file
+// has to describe the module it sits next to, so which of the two is asked for is
+// not a matter of taste.
 
 export type DeclarationView = "javascript" | "bundle"
 
@@ -40,6 +38,11 @@ export type DeclarationOptions = {
 	// default; a path, where a generated file has to resolve from somewhere the
 	// package name does not reach.
 	clientSpecifier?: string
+	// NOTE: The Types the Module exports under names of their own, which a
+	// `ModuleDescriptor` deliberately does not carry — nothing at run time reads
+	// a Type Alias. Without them a declaration is still true, it just spells
+	// every shape out where the source had a name for it.
+	types?: ReadonlyArray<DeclaredType>
 }
 
 const DEFAULT_CLIENT_SPECIFIER = "@essence-lang/client"
@@ -51,16 +54,17 @@ const DEFAULT_CLIENT_SPECIFIER = "@essence-lang/client"
 const SINGLE_LINE_WIDTH = 80
 
 export function generateDeclarations(
-	surface: ExportSurface,
+	descriptor: ModuleDescriptor,
 	options: DeclarationOptions = {},
 ): string {
 	let view = options.view ?? "javascript"
 	let imports = new Set<string>()
-	let walker = createWalker(surface, imports)
+	let types = options.types ?? []
+	let walker = createWalker(types, imports)
 	let blocks =
 		view === "javascript"
-			? javascriptBlocks(surface, walker)
-			: bundleBlocks(surface, walker)
+			? javascriptBlocks(descriptor, types, walker)
+			: bundleBlocks(descriptor, walker)
 	let preamble = [header(view, options.moduleName)]
 
 	if (imports.size > 0) {
@@ -78,9 +82,7 @@ function header(view: DeclarationView, moduleName: string | undefined): string {
 	let from = moduleName === undefined ? "Essence" : moduleName
 	let what =
 		view === "javascript"
-			? [
-					"// The Module as JavaScript — what `loadModule(…).exports` answers with.",
-				]
+			? ["// The Module as JavaScript — marshalled at every boundary."]
 			: [
 					"// The bundle's own exports: Essence values, under the names the Rewriter",
 					"// emitted them as, beside the bridge that builds values they accept.",
@@ -99,39 +101,39 @@ function header(view: DeclarationView, moduleName: string | undefined): string {
 // order a hand written declaration file is written in. TypeScript hoists both,
 // so nothing here depends on it.
 function javascriptBlocks(
-	surface: ExportSurface,
+	descriptor: ModuleDescriptor,
+	types: ReadonlyArray<DeclaredType>,
 	walker: Walker,
 ): Array<string> {
 	let blocks: Array<string> = []
 
-	for (let name of Object.keys(surface.kinds)) {
-		if (!walker.declarable(name)) {
+	for (let declared of types) {
+		// NOTE: A Type Alias is reachable only under the name it was written
+		// with, and TypeScript has no spelling for one it can not write as an
+		// identifier.
+		if (!isTypeName(declared.name)) {
 			continue
 		}
 
-		if (surface.protocols[name] !== undefined) {
+		if (declared.of === null) {
 			blocks.push(
 				[
-					`// NOTE: '${name}' is a Protocol. A Namespace conforms to one, and no value`,
+					`// NOTE: '${declared.name}' is a Protocol. A Namespace conforms to one, and no value`,
 					"// is ever of one — there is nothing on this side to hold.",
-					`export type ${name} = unknown`,
+					`export type ${declared.name} = unknown`,
 				].join("\n"),
 			)
 
 			continue
 		}
 
-		let type = surface.types[name]
-
-		if (type !== undefined) {
-			blocks.push(walker.aliasDeclaration(name, type))
-		}
+		blocks.push(walker.aliasDeclaration(declared.name, declared.of))
 	}
 
 	blocks.push(
 		grouped(
-			Object.entries(surface.values).map(([name, type]) =>
-				walker.valueDeclaration(name, type),
+			Object.entries(descriptor.exports).map(([name, entry]) =>
+				walker.valueDeclaration(name, entry),
 			),
 		),
 	)
@@ -148,16 +150,20 @@ function javascriptBlocks(
 // for one would name an export that is not there. An Overload set binds no name
 // of its own either — each Overload is its own `name__overload$N`, and those are
 // the names a call can reach.
-function bundleBlocks(surface: ExportSurface, walker: Walker): Array<string> {
+function bundleBlocks(
+	descriptor: ModuleDescriptor,
+	walker: Walker,
+): Array<string> {
 	let declarations: Array<string> = []
 
-	for (let [name, type] of Object.entries(surface.values)) {
-		if (isOverloaded(type)) {
-			for (let [index, overload] of type.overloads.entries()) {
+	for (let [name, entry] of Object.entries(descriptor.exports)) {
+		if (entry.kind === "overloaded") {
+			for (let overload of entry.overloads) {
 				declarations.push(
 					walker.emittedFunction(
-						resolveOverloadedMethodName(name, index),
-						overload,
+						overload.name,
+						overload.emitted,
+						overload.of,
 					),
 				)
 			}
@@ -165,7 +171,7 @@ function bundleBlocks(surface: ExportSurface, walker: Walker): Array<string> {
 			continue
 		}
 
-		declarations.push(walker.emittedDeclaration(name, type))
+		declarations.push(walker.emittedDeclaration(name, entry))
 	}
 
 	return [
@@ -228,139 +234,155 @@ function bridgeDeclarations(): Array<string> {
 
 // #region The walker
 
-// NOTE: The Type Parameter names that are bound where a Type is being printed. A
-// `GenericUse` naming one that is not is printed as `unknown`: TypeScript would
-// refuse a name nothing declares, and a generated file that does not compile is
-// worth less than one that admits what it does not know.
-type Scope = ReadonlySet<string>
-
-const EMPTY_SCOPE: Scope = new Set<string>()
-
 // NOTE: Which way a value at this position CROSSES — into the Module as an
 // Argument, or out of it as a constant or an answer. The two are not the same
-// Type, because the Marshaller is not symmetric: coming out a value says what it
-// is, and going in it has to be BUILT against the Type the Module declared. What
-// `fromJS` has no way to build is therefore uninhabited on the way in and
+// Type, because the boundary is not symmetric: coming out a value says what it
+// is, and going in it has to be BUILT against what the Module declared. What the
+// interpreter has no way to build is therefore uninhabited on the way in and
 // perfectly ordinary on the way out — a Type Parameter is the clearest case, and
 // a Function the one a host is most likely to try.
 type Direction = "in" | "out"
 
-// NOTE: The Types `fromJS` refuses outright, as the one TypeScript Type nothing
-// is assignable to. `never` is not a shrug: it makes the call the Marshaller
-// would throw on fail to typecheck instead, which is the whole reason an
-// Overload set is already declared this way. The comment is what a reader can do
-// about it, so it travels with the Type.
-function inputRefusal(type: common.Type): string | null {
-	// NOTE: The refusal `fromJS` makes before any arm is tried — both levels of
-	// a nested `Optional` would be `undefined`, so no value at all is admitted.
-	// Asked through the Marshaller's own readers, so the two can not disagree.
-	let item = optionalItemOf(type)
+// NOTE: The Descriptors nothing may be passed to, as the one TypeScript Type
+// nothing is assignable to. `never` is not a shrug: it makes the call the
+// interpreter would throw on fail to typecheck instead, which is the whole reason
+// an Overload set is already declared this way.
+//
+// NOTE: A `refused` node carries the sentence the interpreter throws, so the
+// refusal a reader is shown and the refusal a caller would have been given are
+// one string. The two rules below are the interpreter's own, stated where the
+// Descriptor has a shape rather than a refusal to carry them.
+function inputRefusal(node: Descriptor): string | null {
+	let item = optionalItem(node)
 
 	if (item !== null && admitsAbsence(item)) {
 		return "never /* an Optional inside an Optional has no JavaScript spelling */"
 	}
 
-	switch (type.type) {
-		// NOTE: `fromJS` walks the declared Type to decide what to build, and an
-		// unapplied Type Parameter is a hole where that shape should be. An
-		// empty Array typechecks and works, which is why this hole was invisible.
-		case "GenericUse":
-			return "never /* a Type Parameter can not be marshalled */"
-		case "Function":
-		case "SimpleMethod":
-		case "StaticMethod":
+	switch (node.kind) {
+		case "refused":
+			return `never /* ${node.why} */`
+		case "function":
 			return "never /* callbacks are not supported yet */"
-		case "Namespace":
-			return "never /* a Namespace can not be built from a JavaScript value */"
 		default:
 			return null
 	}
 }
 
-// NOTE: Whether anything a value of this Type CARRIES would be refused on the
-// way in — a callback member three levels down means no value the declaration
-// admits can actually be built. What it decides is whether an in-position use
-// may go by name: a Type Alias is declared once, in its permissive out-form,
-// so a Parameter naming a tainted one would typecheck the call that always
-// throws. Spelling the shape out instead puts the `never` on the member that
-// is the mistake.
-function containsInputRefusal(
-	type: common.Type,
-	visited: Set<common.Type>,
-): boolean {
-	if (inputRefusal(type) !== null) {
+// NOTE: Whether anything a value of this Descriptor CARRIES would be refused on
+// the way in — a callback member three levels down means no value the declaration
+// admits can actually be built. What it decides is whether an in-position use may
+// go by name: a Type Alias is declared once, in its permissive out-form, so a
+// Parameter naming a tainted one would typecheck the call that always throws.
+// Spelling the shape out instead puts the `never` on the member that is the
+// mistake.
+function containsInputRefusal(node: Descriptor): boolean {
+	if (inputRefusal(node) !== null) {
 		return true
 	}
 
-	if (visited.has(type)) {
-		return false
-	}
-
-	visited.add(type)
-
-	switch (type.type) {
-		case "List":
-			return containsInputRefusal(type.itemType, visited)
-		case "Record":
-		case "Case":
-			return Object.values(type.members).some((memberType) =>
-				containsInputRefusal(memberType, visited),
-			)
-		case "UnionType":
-			return type.types.some((arm) => containsInputRefusal(arm, visited))
-		case "Refinement":
-			return containsInputRefusal(type.base, visited)
-		case "GenericAlias":
-			return containsInputRefusal(type.aliasedType, visited)
+	switch (node.kind) {
+		case "list":
+		case "optional":
+			return containsInputRefusal(node.of)
+		case "record":
+			return Object.values(node.members).some(containsInputRefusal)
+		case "case":
+			return Object.values(node.payload).some(containsInputRefusal)
+		case "union":
+			return node.arms.some(containsInputRefusal)
 		default:
 			return false
 	}
 }
 
-type Walker = {
-	// NOTE: Whether a name can be DECLARED as a Type. A Type Alias is reachable
-	// only under the name it was written with, and TypeScript has no spelling for
-	// one it can not write as an identifier.
-	declarable: (name: string) => boolean
-	aliasDeclaration: (name: string, type: common.Type) => string
-	valueDeclaration: (name: string, type: common.Type) => string
-	emittedDeclaration: (name: string, type: common.Type) => string
-	// NOTE: One Overload of a set, which is a signature and no Type at all — the
-	// set is the Type, and only its members are bound in the bundle.
-	emittedFunction: (name: string, signature: common.BaseFunction) => string
+// NOTE: What an `Optional` holds, or `null` where this is not one. The pair
+// collapses to a node of its own; a lone `#Value` is met where a `constant thing
+// = #Value(3)` was inferred as the Case rather than as the Union an annotation
+// would have named.
+function optionalItem(node: Descriptor): Descriptor | null {
+	switch (node.kind) {
+		case "optional":
+			return node.of
+		case "case":
+			return node.optional && node.name === "Value"
+				? (node.payload.item ?? null)
+				: null
+		case "union": {
+			for (let arm of node.arms) {
+				let item = optionalItem(arm)
+
+				if (item !== null) {
+					return item
+				}
+			}
+
+			return null
+		}
+		default:
+			return null
+	}
 }
 
-function createWalker(surface: ExportSurface, imports: Set<string>): Walker {
-	// NOTE: The Types this Module exports under a name of their own, by object
-	// identity — the Enricher resolves an Alias to ONE Type and every mention of
-	// it points at that same object, so a Parameter annotated `Rectangle` IS
-	// `surface.types.Rectangle`. Printing the name rather than the shape is what
-	// makes a generated file read like the source it came from.
-	let named = new Map<common.Type, string>()
+// NOTE: Whether `undefined` is a value of this Descriptor — which is exactly
+// whether an `Optional`'s `#Empty` is reachable in it. What it decides is whether
+// an `Optional` is about to be put inside another one, and both levels spelled as
+// nothing.
+function admitsAbsence(node: Descriptor): boolean {
+	switch (node.kind) {
+		case "optional":
+			return true
+		case "case":
+			return node.optional && node.name === "Empty"
+		case "union":
+			return node.arms.some(admitsAbsence)
+		default:
+			return false
+	}
+}
 
-	for (let [name, type] of Object.entries(surface.types)) {
-		if (isTypeName(name)) {
-			named.set(type, name)
+// NOTE: An export the BUNDLE binds a name for. An Overload set is the one that
+// does not — each of its Overloads binds one instead — so the bundle view takes
+// them apart before it asks for a declaration.
+type BoundExport = Exclude<ExportDescriptor, { kind: "overloaded" }>
+
+type Walker = {
+	aliasDeclaration: (name: string, node: Descriptor) => string
+	valueDeclaration: (name: string, entry: ExportDescriptor) => string
+	emittedDeclaration: (name: string, entry: BoundExport) => string
+	// NOTE: One Overload of a set, which is a signature and no export at all —
+	// the set is the export, and only its members are bound in the bundle.
+	emittedFunction: (
+		name: string,
+		emitted: string,
+		signature: FunctionDescriptor,
+	) => string
+}
+
+function createWalker(
+	types: ReadonlyArray<DeclaredType>,
+	imports: Set<string>,
+): Walker {
+	// NOTE: The Types this Module exports under a name of their own, keyed by
+	// the Type as the Compiler PRINTS it — which is the one identity that
+	// survives a Descriptor being written down. Printing the name rather than
+	// the shape is what makes a generated file read like the source it came
+	// from, and two Types that print alike are the same Type to TypeScript
+	// anyway, since it decides by shape.
+	let named = new Map<string, string>()
+
+	for (let declared of types) {
+		if (declared.of !== null && isTypeName(declared.name)) {
+			named.set(declared.of.shown, declared.name)
 		}
 	}
 
-	// NOTE: The Types currently being printed, so that one reaching itself is
-	// answered rather than followed. Nothing can spell such a Type today —
-	// `recursive-type-declaration` refuses a declaration that names itself — so
-	// this is what keeps the day they land from being the day this overflows its
-	// stack instead of saying what it does not know.
-	let printing = new Set<common.Type>()
-
-	function print(
-		type: common.Type,
-		scope: Scope,
-		direction: Direction,
-	): string {
+	function print(node: Descriptor, direction: Direction): string {
 		// NOTE: Ahead of the naming table, so that a Type Alias for a callback —
 		// `type Handler = (_ Integer) -> Integer` — is refused where it is passed
 		// IN rather than named there and declared callable somewhere else.
 		if (direction === "in") {
-			let refusal = inputRefusal(type)
+			let refusal = inputRefusal(node)
 
 			if (refusal !== null) {
 				return refusal
@@ -372,250 +394,136 @@ function createWalker(surface: ExportSurface, imports: Set<string>): Walker {
 		// callback among its members, a nested Optional — is spelled out at the
 		// Parameter instead, so the refusal lands on the member that is the
 		// mistake.
-		let alias = named.get(type)
+		let alias = named.get(node.shown)
 
 		if (
 			alias !== undefined &&
-			(direction === "out" || !containsInputRefusal(type, new Set()))
+			(direction === "out" || !containsInputRefusal(node))
 		) {
 			return alias
 		}
 
-		if (printing.has(type)) {
-			return "unknown /* this Type is defined in terms of itself */"
-		}
-
-		printing.add(type)
-
-		try {
-			return printBody(type, scope, direction)
-		} finally {
-			printing.delete(type)
-		}
+		return printBody(node, direction)
 	}
 
 	// NOTE: The shape itself, with the naming table skipped — what a Type Alias'
 	// own declaration prints, since looking the name up there would declare it as
 	// itself.
-	function printBody(
-		type: common.Type,
-		scope: Scope,
-		direction: Direction,
-	): string {
-		switch (type.type) {
-			case "Integer":
+	function printBody(node: Descriptor, direction: Direction): string {
+		switch (node.kind) {
+			case "integer":
 				return "bigint"
-			case "String":
+			case "string":
 				return "string"
-			case "Boolean":
+			case "boolean":
 				return "boolean"
-			case "Rational":
+			case "rational":
 				imports.add("EssenceRational")
 
 				return "EssenceRational"
-			// NOTE: The numeric tower above Rational has no JavaScript to be — a
-			// double is neither `√2` nor `π` — and the Marshaller refuses one
-			// rather than rounding it. The comment is the whole of what a reader
-			// can do about that, so it is carried into the declaration.
-			case "Algebraic":
-			case "Transcendental":
-				return `unknown /* ${type.type} values can not be marshalled yet */`
-			case "List":
-				return `Array<${print(type.itemType, scope, direction)}>`
-			case "GenericList":
-				return "Array<unknown>"
-			case "Record":
-			case "Namespace":
-				return inlined(objectEntries(type, scope, direction))
-			case "Case":
-				return printCase(type, scope, direction)
-			case "UnionType":
-				return unionMembers(type, scope, direction).join(" | ")
-			// TODO: A checked refinement prints as its base, because that is what
-			// the Marshaller builds — the predicate is not run at the boundary
-			// yet. When it is, this is where the proven Type gets a spelling of
-			// its own; TypeScript has no predicates, so a branded Alias is the
-			// most one could ever be.
-			case "Refinement":
-				return print(type.base, scope, direction)
-			case "GenericAlias":
-				return print(
-					type.aliasedType,
-					withGenerics(scope, type.generics),
-					direction,
-				)
-			case "GenericUse": {
-				let name = displayGenericName(type.name)
-
-				return scope.has(name)
-					? name
-					: `unknown /* the Type Parameter ${name} is not in scope here */`
-			}
-			// NOTE: Coming OUT only — `inputRefusal` has already answered for the
-			// other direction. A Function that comes back is wrapped by the
-			// Marshaller to marshal around its calls, so the signature printed
-			// here is the one a caller really calls — and its own Parameters
-			// are values that pass IN.
-			case "Function":
-			case "SimpleMethod":
-			case "StaticMethod": {
-				let inner = withGenerics(scope, type.generics)
-
-				return `${printGenerics(type.generics)}(${printParameters(
-					type.parameterTypes,
-					inner,
-				)}) => ${print(type.returnType, inner, "out")}`
-			}
-			// NOTE: Never callable, and deliberately not spelled as TypeScript
-			// Overloads — which Overload a call means is decided by the Argument
-			// Types, which a JavaScript value does not carry, so `exports` binds
-			// the name to a refusal. Declaring the signatures would typecheck a
-			// call that throws.
-			case "OverloadedMethod":
-			case "OverloadedStaticMethod":
-				return "never"
-			default:
-				return "unknown"
+			case "list":
+				return `Array<${print(node.of, direction)}>`
+			case "record":
+				return inlined(recordEntries(node.members, direction))
+			case "case":
+				return printCase(node, direction)
+			case "optional":
+			case "union":
+				return unionParts(node, direction).join(" | ")
+			// NOTE: Coming OUT only — `inputRefusal` has already answered for
+			// the other direction. A Function that comes back is wrapped to
+			// marshal around its calls, so the signature printed here is the one
+			// a caller really calls — and its own Parameters are values that
+			// pass IN.
+			case "function":
+				return `(${printParameters(node.parameters)}) => ${print(
+					node.returns,
+					"out",
+				)}`
+			// NOTE: The numeric tower above Rational, a Type Parameter nothing
+			// has applied, and whatever else arrives before its mapping does —
+			// each carrying the sentence the Compiler wrote while it still had
+			// the Type to name.
+			case "refused":
+				return `unknown /* ${node.why} */`
 		}
 	}
 
-	// NOTE: One member per entry rather than one printed object, because whether
-	// the object fits on a line is a question only its DECLARATION can answer —
-	// the head it hangs off is part of the width. Nested objects stay inline: a
-	// Record two levels down that breaks would take its parent's braces with it.
-	function objectEntries(
-		type: common.RecordType | common.NamespaceType,
-		scope: Scope,
+	function recordEntries(
+		members: Record<string, Descriptor>,
 		direction: Direction,
 	): Array<string> {
-		if (type.type === "Record") {
-			return Object.entries(type.members).map(
-				([name, memberType]) =>
-					`${memberName(name)}: ${print(memberType, scope, direction)}`,
-			)
-		}
-
-		// NOTE: A Namespace's static constants come OUT whichever way the
-		// Namespace itself was reached — there is no writing one.
-		let entries = Object.entries(type.properties).map(
-			([name, propertyType]) =>
-				`${memberName(name)}: ${print(propertyType, scope, "out")}`,
+		return Object.entries(members).map(
+			([name, member]) =>
+				`${memberName(name)}: ${print(member, direction)}`,
 		)
-
-		for (let [name, methodType] of Object.entries(type.methods)) {
-			if (isOverloaded(methodType)) {
-				entries.push(
-					`${memberName(name)}: never /* overloaded — calling it throws */`,
-				)
-
-				continue
-			}
-
-			// NOTE: A Namespace's own Type Parameters are hoisted onto every
-			// Method that could mention one, since an object Type has nowhere
-			// else to declare them.
-			let generics = [
-				...type.generics.filter(
-					(generic) =>
-						!methodType.generics.some(
-							(own) => own.name === generic.name,
-						),
-				),
-				...methodType.generics,
-			]
-			let inner = withGenerics(scope, generics)
-
-			entries.push(
-				`${memberName(name)}${printGenerics(generics)}(${printParameters(
-					methodType.parameterTypes,
-					inner,
-				)}): ${print(methodType.returnType, inner, "out")}`,
-			)
-		}
-
-		return entries
 	}
 
 	// NOTE: An `Optional` is spelled by its ABSENCE on this side, so its two
 	// Cases are not Cases here at all: `#Value` is its item and `#Empty` is
-	// `undefined`. Every other Case carries which one it is as a member, under the
-	// `$case` the Marshaller writes — the Choice as it was DECLARED and the Case,
-	// never the path of the machine that compiled it.
-	function printCase(
-		type: common.CaseType,
-		scope: Scope,
-		direction: Direction,
-	): string {
-		if (type.choice === "Optional") {
-			let item = type.members.item
+	// `undefined`. Every other Case carries which one it is as a member, under
+	// the `$case` the boundary writes — the Choice as it was DECLARED and the
+	// Case, never the path of the machine that compiled it.
+	function printCase(node: CaseDescriptor, direction: Direction): string {
+		if (node.optional) {
+			let item = node.payload.item
 
-			return type.name === "Empty" || item === undefined
+			return node.name === "Empty" || item === undefined
 				? "undefined"
-				: print(item, scope, direction)
+				: print(item, direction)
 		}
 
-		let tag = `${displayChoiceName(type.choice)}#${type.name}`
-
 		return inlined([
-			`$case: ${JSON.stringify(tag)}`,
-			...Object.entries(type.members).map(
-				([name, memberType]) =>
-					`${memberName(name)}: ${print(memberType, scope, direction)}`,
-			),
+			`$case: ${JSON.stringify(`${node.choice}#${node.name}`)}`,
+			...recordEntries(node.payload, direction),
 		])
 	}
 
 	// NOTE: The arms as they cross, in declaration order and deduplicated —
 	// `Optional<Integer> | Integer` is one `bigint` on this side, and printing it
-	// twice would only ask a reader what the difference was.
-	function unionMembers(
-		type: common.UnionType,
-		scope: Scope,
+	// twice would only ask a reader what the difference was. An `Optional` inside
+	// a Union contributes its item and one `undefined`, however deep it sits, so
+	// that `Optional<Optional<Integer>>` coming out reads `bigint | undefined`
+	// rather than spelling its absence twice.
+	function unionParts(
+		node: Extract<Descriptor, { kind: "optional" | "union" }>,
 		direction: Direction,
 	): Array<string> {
 		let parts: Array<string> = []
-		let optional = false
+		let absent = false
 
-		for (let arm of type.types) {
-			if (
-				arm.type === "Case" &&
-				arm.choice === "Optional" &&
-				arm.name === "Empty"
-			) {
-				optional = true
+		function add(arm: Descriptor): void {
+			if (arm.kind === "optional") {
+				add(arm.of)
+				absent = true
 
-				continue
+				return
 			}
 
-			// NOTE: A `#Value` holding a Union is that Union's own arms here —
-			// flattened, so that `Optional<Optional<Integer>>` coming out reads
-			// `bigint | undefined` rather than printing the inner Union as one
-			// arm and its `undefined` twice.
-			if (
-				arm.type === "Case" &&
-				arm.choice === "Optional" &&
-				arm.name === "Value" &&
-				arm.members.item?.type === "UnionType"
-			) {
-				for (let part of unionMembers(
-					arm.members.item,
-					scope,
-					direction,
-				)) {
-					if (part === "undefined") {
-						optional = true
-					} else {
-						parts.push(part)
-					}
+			if (arm.kind === "case" && arm.optional) {
+				let item = arm.payload.item
+
+				if (arm.name === "Empty" || item === undefined) {
+					absent = true
+				} else {
+					add(item)
 				}
 
-				continue
+				return
 			}
 
-			parts.push(print(arm, scope, direction))
+			parts.push(print(arm, direction))
 		}
 
-		if (optional) {
+		if (node.kind === "optional") {
+			add(node)
+		} else {
+			for (let arm of node.arms) {
+				add(arm)
+			}
+		}
+
+		if (absent) {
 			parts.push("undefined")
 		}
 
@@ -628,13 +536,12 @@ function createWalker(surface: ExportSurface, imports: Set<string>): Walker {
 	// under it goes in with it — the item Type of a List Parameter, the member
 	// Type of a Record one.
 	function printParameters(
-		parameters: Array<common.Parameter>,
-		scope: Scope,
+		parameters: FunctionDescriptor["parameters"],
 	): string {
 		return parameterNames(parameters)
 			.map(
 				(name, index) =>
-					`${name}: ${print(parameters[index]!.type, scope, "in")}`,
+					`${name}: ${print(parameters[index]!.of, "in")}`,
 			)
 			.join(", ")
 	}
@@ -647,55 +554,77 @@ function createWalker(surface: ExportSurface, imports: Set<string>): Walker {
 	// refusal on it, at the Parameter that would pass one — which is where the
 	// mistake actually is. `containsInputRefusal` is what keeps the name off
 	// such a Parameter.
-	function aliasDeclaration(name: string, type: common.Type): string {
-		let generic = type.type === "GenericAlias" ? type : null
-		let generics = generic === null ? [] : generic.generics
-		let scope = withGenerics(EMPTY_SCOPE, generics)
-		let head = `export type ${name}${printGenerics(generics)} =`
-		let body = generic === null ? type : generic.aliasedType
+	function aliasDeclaration(name: string, node: Descriptor): string {
+		let head = `export type ${name} =`
 
-		if (body.type === "UnionType") {
-			return unioned(head, unionMembers(body, scope, "out"))
+		if (node.kind === "union" || node.kind === "optional") {
+			return unioned(head, unionParts(node, "out"))
 		}
 
-		if (body.type === "Record" || body.type === "Namespace") {
-			return braced(head, objectEntries(body, scope, "out"))
+		if (node.kind === "record") {
+			return braced(head, recordEntries(node.members, "out"))
 		}
 
 		// NOTE: The body, never the name — this IS the declaration of that name,
 		// and asking the naming table here would declare it as itself.
-		return `${head} ${printBody(body, scope, "out")}`
+		return `${head} ${printBody(node, "out")}`
 	}
 
-	function valueDeclaration(name: string, type: common.Type): string {
-		let notice = isOverloaded(type)
-			? "// NOTE: Overloaded. Which Overload a call means is decided by the Argument\n" +
-				"// Types, which a JavaScript value does not carry — calling this throws.\n"
-			: ""
-
-		if (isCallable(type) && isValueName(name)) {
-			let scope = withGenerics(EMPTY_SCOPE, type.generics)
-
-			return `${notice}export declare function ${name}${printGenerics(
-				type.generics,
-			)}(${printParameters(
-				type.parameterTypes,
-				scope,
-			)}): ${print(type.returnType, scope, "out")}`
+	function valueDeclaration(name: string, entry: ExportDescriptor): string {
+		if (entry.kind === "overloaded") {
+			return `${OVERLOADED_NOTICE}${exported(name, "never")}`
 		}
 
-		if (type.type === "Record" || type.type === "Namespace") {
-			let entries = objectEntries(type, EMPTY_SCOPE, "out")
+		if (entry.kind === "namespace") {
+			let entries = namespaceEntries(entry)
 
-			if (isValueName(name)) {
-				return `${notice}${braced(
-					`export declare const ${name}:`,
-					entries,
-				)}`
+			return isValueName(name)
+				? braced(`export declare const ${name}:`, entries)
+				: exported(name, inlined(entries))
+		}
+
+		if (entry.kind === "function" && isValueName(name)) {
+			return `export declare function ${name}(${printParameters(
+				entry.of.parameters,
+			)}): ${print(entry.of.returns, "out")}`
+		}
+
+		if (entry.of.kind === "record" && isValueName(name)) {
+			return braced(
+				`export declare const ${name}:`,
+				recordEntries(entry.of.members, "out"),
+			)
+		}
+
+		return exported(name, print(entry.of, "out"))
+	}
+
+	// NOTE: A Namespace is an object of its statics on this side, so its Methods
+	// are members rather than declarations — and its constants come OUT whichever
+	// way the Namespace itself was reached, since there is no writing one.
+	function namespaceEntries(entry: NamespaceDescriptor): Array<string> {
+		let entries = Object.entries(entry.properties).map(
+			([name, property]) =>
+				`${memberName(name)}: ${print(property.of, "out")}`,
+		)
+
+		for (let [name, method] of Object.entries(entry.methods)) {
+			if (method.kind === "overloaded") {
+				entries.push(
+					`${memberName(name)}: never /* overloaded — calling it throws */`,
+				)
+
+				continue
 			}
+
+			entries.push(
+				`${memberName(name)}(${printParameters(
+					method.of.parameters,
+				)}): ${print(method.of.returns, "out")}`,
+			)
 		}
 
-		return `${notice}${exported(name, print(type, EMPTY_SCOPE, "out"))}`
+		return entries
 	}
 
 	// NOTE: The bundle's binding: the name the Rewriter emitted, and a Type that
@@ -703,32 +632,33 @@ function createWalker(surface: ExportSurface, imports: Set<string>): Walker {
 	// a tagged object holding a number or a bigint, keyed by a Symbol this side
 	// never sees, and every shape it might have is one the bridge builds rather
 	// than one TypeScript can check.
-	function emittedDeclaration(name: string, type: common.Type): string {
-		if (isCallable(type)) {
-			return emittedFunction(name, type)
+	function emittedDeclaration(name: string, entry: BoundExport): string {
+		if (entry.kind === "function") {
+			return emittedFunction(name, entry.emitted, entry.of)
 		}
 
-		let emitted = escapeName(name)
-		let notice = emittedNotice(name, emitted)
+		let notice = emittedNotice(name, entry.emitted)
 
-		if (type.type === "Namespace") {
+		if (entry.kind === "namespace") {
 			return `${notice}${braced(
-				`export declare const ${emitted}:`,
-				emittedMembers(type),
+				`export declare const ${entry.emitted}:`,
+				emittedMembers(entry),
 			)}`
 		}
 
-		return `${notice}export declare const ${emitted}: EssenceValue`
+		return `${notice}export declare const ${entry.emitted}: EssenceValue`
 	}
 
 	function emittedFunction(
 		name: string,
-		signature: common.BaseFunction,
+		emitted: string,
+		signature: FunctionDescriptor,
 	): string {
-		let emitted = escapeName(name)
-
-		return `${emittedNotice(name, emitted)}export declare function ${emitted}(${opaqueParameters(
-			signature.parameterTypes,
+		return `${emittedNotice(
+			name,
+			emitted,
+		)}export declare function ${emitted}(${opaqueParameters(
+			signature.parameters,
 		)}): EssenceValue`
 	}
 
@@ -738,29 +668,25 @@ function createWalker(surface: ExportSurface, imports: Set<string>): Walker {
 			: `// '${name}' as the Rewriter emits it.\n`
 	}
 
-	// NOTE: `namespaceMemberName`, because these are the CLASS's members — a
-	// member named `prototype` or `constructor` is bound under the mangled
-	// name, and a declaration spelling the written one would promise a member
-	// the bundle does not have.
-	function emittedMembers(type: common.NamespaceType): Array<string> {
-		let entries = Object.keys(type.properties).map(
-			(name) => `${memberName(namespaceMemberName(name))}: EssenceValue`,
+	// NOTE: The emitted member names, which are the CLASS's — a member named
+	// `prototype` or `constructor` is bound under a mangled one, and a
+	// declaration spelling the written name would promise a member the bundle
+	// does not have.
+	function emittedMembers(entry: NamespaceDescriptor): Array<string> {
+		let entries = Object.values(entry.properties).map(
+			(property) => `${memberName(property.emitted)}: EssenceValue`,
 		)
 
-		for (let [name, methodType] of Object.entries(type.methods)) {
-			let overloads: Array<[string, common.BaseFunction]> = isOverloaded(
-				methodType,
-			)
-				? methodType.overloads.map((overload, index) => [
-						resolveOverloadedMethodName(name, index),
-						overload,
-					])
-				: [[name, methodType]]
+		for (let method of Object.values(entry.methods)) {
+			let overloads =
+				method.kind === "overloaded"
+					? method.overloads
+					: [{ emitted: method.emitted, of: method.of }]
 
-			for (let [spelling, signature] of overloads) {
+			for (let overload of overloads) {
 				entries.push(
-					`${memberName(namespaceMemberName(spelling))}(${opaqueParameters(
-						signature.parameterTypes,
+					`${memberName(overload.emitted)}(${opaqueParameters(
+						overload.of.parameters,
 					)}): EssenceValue`,
 				)
 			}
@@ -772,13 +698,16 @@ function createWalker(surface: ExportSurface, imports: Set<string>): Walker {
 	// #endregion
 
 	return {
-		declarable: isTypeName,
 		aliasDeclaration,
 		valueDeclaration,
 		emittedDeclaration,
 		emittedFunction,
 	}
 }
+
+const OVERLOADED_NOTICE =
+	"// NOTE: Overloaded. Which Overload a call means is decided by the Argument\n" +
+	"// Types, which a JavaScript value does not carry — calling this throws.\n"
 
 // #endregion
 
@@ -855,26 +784,9 @@ function exported(name: string, type: string): string {
 	)} }`
 }
 
-function isOverloaded(
-	type: common.Type,
-): type is common.OverloadedMethodType | common.OverloadedStaticMethodType {
-	return (
-		type.type === "OverloadedMethod" ||
-		type.type === "OverloadedStaticMethod"
-	)
-}
-
-function isCallable(
-	type: common.Type,
-): type is common.Type & common.BaseFunction {
-	return (
-		type.type === "Function" ||
-		type.type === "SimpleMethod" ||
-		type.type === "StaticMethod"
-	)
-}
-
-function opaqueParameters(parameters: Array<common.Parameter>): string {
+function opaqueParameters(
+	parameters: FunctionDescriptor["parameters"],
+): string {
 	return parameterNames(parameters)
 		.map((name) => `${name}: EssenceValue`)
 		.join(", ")
@@ -885,18 +797,21 @@ function opaqueParameters(parameters: Array<common.Parameter>): string {
 // none, and a name TypeScript would read as something else (`first?` is an
 // OPTIONAL Parameter there, silently) is no better than none, so both fall back
 // to the position. The fallback is nudged until it is nobody else's name.
-function parameterNames(parameters: Array<common.Parameter>): Array<string> {
+function parameterNames(
+	parameters: FunctionDescriptor["parameters"],
+): Array<string> {
 	let taken = new Set(
 		parameters
-			.map((parameter) => parameter.name)
+			.map((parameter) => parameter.label)
 			.filter(
-				(name): name is string => name !== null && isValueName(name),
+				(label): label is string =>
+					label !== null && isValueName(label),
 			),
 	)
 
 	return parameters.map((parameter, index) => {
-		if (parameter.name !== null && isValueName(parameter.name)) {
-			return parameter.name
+		if (parameter.label !== null && isValueName(parameter.label)) {
+			return parameter.label
 		}
 
 		let name = `p${index}`
@@ -909,130 +824,6 @@ function parameterNames(parameters: Array<common.Parameter>): Array<string> {
 
 		return name
 	})
-}
-
-function withGenerics(
-	scope: Scope,
-	generics: ReadonlyArray<common.GenericDeclaration>,
-): Scope {
-	let names = genericNames(generics)
-
-	return names.length === 0 ? scope : new Set([...scope, ...names])
-}
-
-// NOTE: The bound is dropped. `<ItemType is Comparable>` says the Namespace
-// answering for the Type has a `compare`, which is a claim about a Namespace
-// rather than about the values — there is nothing for a TypeScript constraint to
-// be.
-function printGenerics(
-	generics: ReadonlyArray<common.GenericDeclaration>,
-): string {
-	let names = genericNames(generics)
-
-	return names.length === 0 ? "" : `<${names.join(", ")}>`
-}
-
-function genericNames(
-	generics: ReadonlyArray<common.GenericDeclaration>,
-): Array<string> {
-	return generics
-		.map((generic) => displayGenericName(generic.name))
-		.filter(isValueName)
-}
-
-function memberName(name: string): string {
-	return isValueName(name) ? name : JSON.stringify(name)
-}
-
-function mangled(name: string): string {
-	return [...name]
-		.map((character) =>
-			/[A-Za-z0-9_$]/.test(character)
-				? character
-				: `_${character.codePointAt(0)!.toString(16)}_`,
-		)
-		.join("")
-}
-
-const IDENTIFIER = /^[A-Za-z_$][A-Za-z0-9_$]*$/
-
-// NOTE: The words a declaration can not be named after. Deliberately the whole
-// reserved set rather than the subset that happens to be illegal in each
-// position — a generated file is read at least as often as it is compiled, and
-// `let let` is not worth the two names it saves.
-const RESERVED_WORDS = new Set([
-	"arguments",
-	"await",
-	"break",
-	"case",
-	"catch",
-	"class",
-	"const",
-	"continue",
-	"debugger",
-	"default",
-	"delete",
-	"do",
-	"else",
-	"enum",
-	"eval",
-	"export",
-	"extends",
-	"false",
-	"finally",
-	"for",
-	"function",
-	"if",
-	"implements",
-	"import",
-	"in",
-	"instanceof",
-	"interface",
-	"let",
-	"new",
-	"null",
-	"package",
-	"private",
-	"protected",
-	"public",
-	"return",
-	"static",
-	"super",
-	"switch",
-	"this",
-	"throw",
-	"true",
-	"try",
-	"typeof",
-	"var",
-	"void",
-	"while",
-	"with",
-	"yield",
-])
-
-// NOTE: TypeScript's own Type names on top of those. `type string = …` declares
-// a name nothing can refer to afterwards, so a Module exporting one is left
-// undeclared rather than declared unreachably.
-const TYPE_KEYWORDS = new Set([
-	"any",
-	"bigint",
-	"boolean",
-	"never",
-	"number",
-	"object",
-	"string",
-	"symbol",
-	"undefined",
-	"unknown",
-])
-
-function isValueName(name: string): boolean {
-	return IDENTIFIER.test(name) && !RESERVED_WORDS.has(name)
-}
-
-function isTypeName(name: string): boolean {
-	return isValueName(name) && !TYPE_KEYWORDS.has(name)
 }
 
 // #endregion

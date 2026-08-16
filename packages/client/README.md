@@ -10,6 +10,10 @@ import { loadModule } from "@essence-lang/client"
 let math = await loadModule("./math/Math.es")
 ```
 
+In somebody else's build it is an ordinary import: the Vite and esbuild plugins
+serve a `.es` file as the same marshalled JavaScript — see
+[In a bundler](#in-a-bundler).
+
 There is no build step and no artifact to manage. The whole Module graph is
 compiled in memory, the bundle is written under the hash of everything it was
 compiled from **and by** — every source, the compiler, the standard library,
@@ -119,15 +123,27 @@ value carries none, so each Overload is reached by its own name on `raw`.
 
 ## Types
 
-`generateDeclarations` turns a Module's export surface into a TypeScript
-declaration file — the same mapping as the table above, read as Types.
+`generateDeclarations` turns a Module's Descriptor into a TypeScript
+declaration file — the same mapping as the table above, read as Types, printed
+off the very object the boundary marshals by.
 
 ```ts
-import { generateDeclarations, loadModule } from "@essence-lang/client"
+import {
+	describeModule,
+	describeTypes,
+	generateDeclarations,
+	loadModule,
+} from "@essence-lang/client"
 
 let math = await loadModule("./math/Math.es")
 
-generateDeclarations(math.surface, { moduleName: "Math.es" })
+generateDeclarations(describeModule(math.surface, math.entryPath), {
+	moduleName: "Math.es",
+	// NOTE: The Types the Module names. A Descriptor does not carry them —
+	// nothing at run time reads a Type Alias — so a declaration file that wants
+	// them by name asks for them.
+	types: describeTypes(math.surface, math.entryPath),
+})
 ```
 
 ```ts
@@ -147,23 +163,29 @@ decided by the Argument Types, which a JavaScript value does not carry. So is a
 callback Parameter, so is a nested `Optional` — both of its levels would be
 `undefined` — and so is a Type Parameter in an input position: a Type
 Parameter is a shape that has not been decided yet, and a value going *in* has
-to be built against a shape. A Type Parameter in the *return* position is a
-TypeScript one, where it maps cleanly. A named Type whose members hit one of
+to be built against a shape. A named Type whose members hit one of
 these refusals going in is spelled out at that Parameter, with the `never` on
-the member that is the mistake.
+the member that is the mistake. Each refusal is declared in the words the
+boundary would have thrown, so what a reader is shown and what a caller would
+have been told are one sentence.
 
 ```ts
-export declare function firstOf<ItemType>(
-	p0: Array<never /* a Type Parameter can not be marshalled */>,
-): ItemType | undefined
+export declare function firstOf(
+	p0: Array<never /* ItemType is a Type Parameter — there is no shape to build a value against until it is applied. */>,
+): unknown /* ItemType is a Type Parameter — there is no shape to build a value against until it is applied. */ | undefined
 ```
+
+A generic Function is declared without its Type Parameters. A Descriptor
+carries the shapes a value crosses *as*, and a Type Parameter never is one —
+declaring `<ItemType>` would promise a caller a Type to apply on a call that
+can not be made.
 
 ## In a bundler
 
 `essence()` is a Vite plugin and `essenceEsbuild()` an esbuild one. Both compile
-an imported `.es` file where the bundler asks for its text, and hand back one
-standalone Module — the whole Essence graph and the runtime it needs, already
-bundled.
+an imported `.es` file where the bundler asks for its text, and serve it as
+**marshalled JavaScript** — the same values `loadModule` hands over, with no
+build step and no artifact to manage.
 
 ```js
 import { essence } from "@essence-lang/client/vite-plugin"
@@ -171,20 +193,31 @@ import { essence } from "@essence-lang/client/vite-plugin"
 export default { plugins: [essence()] }
 ```
 
+```js
+import { PI, square } from "./math/Math.es"
+
+square(12n) // 144n
+PI.toString() // "157/50"
+```
+
 The esbuild shape of the same plugin lives one door over, at
 `@essence-lang/client/esbuild-plugin`.
 
-What a build holds this way is the **bundle's** exports: Essence's own values,
-under the names the Rewriter emitted them as, and the bridge that builds values
-they accept. Not the marshalled ones — what the plugins serve is what the
-bundler emitted. Marshal at the edge, with `loadModule`, or reach for the
-bridge:
+What the import resolves to is a generated wrapper: it imports the emitted
+bundle — the whole Essence graph and the runtime it needs, already bundled, so
+the host bundler has nothing left to resolve — imports the interpreter from
+`@essence-lang/client/marshal-runtime`, and carries the **Descriptor** the
+compiler wrote for that Module. Everything the compiler had to know about the
+boundary was decided at build time and written down; what ships is the reading
+of it. No compiler reaches the browser.
 
-```js
-import { square, $bridge_integer } from "./math/Math.es"
+Because the interpreter is imported by name, the host bundler resolves it —
+this package is already a dependency of any project that uses the plugin, and
+one copy of it is what keeps one `EssenceRational` in the build.
 
-square($bridge_integer(12n)) // an Essence Integer
-```
+`diagnostics: "minimal"` strips the printed Types out of the embedded
+Descriptor. The boundary decides exactly the same way; its refusals stop naming
+the Type they refused.
 
 **One `.es` entry per build.** Each entry compiles to its own standalone
 bundle, with its own copy of the runtime and its own hidden Type key — minted
@@ -197,9 +230,31 @@ JavaScript at every boundary. Two entries that share no source at all are two
 unrelated Programs and are left alone.
 
 While a dev server is serving, a `<Name>.d.es.ts` is written beside each
-compiled file, describing exactly that — which is where TypeScript looks for the
-declarations of a `.es` import under `allowArbitraryExtensions`. `declarations`
-turns it on in a build or off in a server.
+compiled file — the `javascript` view, which is what the import resolves to,
+and where TypeScript looks for the declarations of a `.es` import under
+`allowArbitraryExtensions`. `declarations` turns it on in a build or off in a
+server.
+
+### `?raw`
+
+The raw door, in a build: `?raw` serves the emitted bundle itself,
+unmarshalled — Essence's own values, under the names the Rewriter emitted them
+as, and the bridge that builds values they accept.
+
+```js
+import { square, $bridge_integer, $bridge_typeKey } from "./math/Math.es?raw"
+
+let squared = square($bridge_integer(12n))
+
+squared[$bridge_typeKey] // "Integer"
+```
+
+It is the same bundle the marshalled door is a wrapper around — one copy in the
+build, one Type key — so values pass between the two doors freely. Where
+declarations are on, the `bundle` view is written beside the source as
+`<Name>.raw.d.es.ts`; TypeScript will not resolve a `?raw` specifier itself, so
+reach those declarations by name, as `./Math.raw.es`, or declare `*.es?raw` in
+your environment file.
 
 ## The raw door
 

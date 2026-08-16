@@ -134,6 +134,27 @@ export type OverloadDescriptor = {
 	// NOTE: The whole line a refusal lists it as, name and all. Rendered here
 	// because `printSignature` is the Compiler's.
 	signature: string
+	// NOTE: The signature itself, which nothing at run time reads — an Overload
+	// set binds to the refusal above rather than to a call. It is here because a
+	// DECLARATION file has to spell each Overload out under the name the bundle
+	// binds it as, and a Descriptor that could not answer that would send the
+	// generated declarations back to the Compiler for the one shape they could
+	// not describe.
+	of: FunctionDescriptor
+}
+
+// NOTE: A Type the Module exports under a name of its own — everything the
+// `type` and `choice` declarations put on an Export Surface, and the Protocols,
+// which are a name and nothing else: a Namespace conforms to one and no value is
+// ever of one, so there is no shape to describe and `of` is `null`.
+//
+// NOTE: Kept BESIDE a `ModuleDescriptor` rather than inside it. Nothing at run
+// time reads a Type Alias — every use of one is already substituted where a value
+// crosses — so carrying them in the Descriptor a wrapper embeds would ship a
+// browser the one part of the boundary that never runs.
+export type DeclaredType = {
+	name: string
+	of: Descriptor | null
 }
 
 // #endregion
@@ -387,7 +408,13 @@ export function describeModule(
 		if (isOverloaded(type)) {
 			exports[name] = {
 				kind: "overloaded",
-				overloads: describeOverloads(type, name, "", escapeName),
+				overloads: describeOverloads(
+					type,
+					name,
+					"",
+					escapeName,
+					context,
+				),
 			}
 
 			continue
@@ -419,6 +446,39 @@ export function describeModule(
 	}
 
 	return { exports }
+}
+
+// NOTE: The Types the Module declares, in the order it exported them — what a
+// declaration file names its shapes after, and the only part of a Module a
+// generated one can not read off the exports. A Protocol is described as a name
+// alone: a Namespace conforms to one, and no value is ever of one.
+//
+// NOTE: `surface.kinds` is the list here, rather than `surface.types`, because
+// the ORDER is the order the export block was written in — which is the order a
+// reader of the source already knows the Module by. A name with no Type behind it
+// is a value's, and is left to `describeModule`.
+export function describeTypes(
+	surface: ExportSurface,
+	entryPath: string,
+): Array<DeclaredType> {
+	let context: DescribeContext = { entryPath }
+	let declared: Array<DeclaredType> = []
+
+	for (let name of Object.keys(surface.kinds)) {
+		if (surface.protocols[name] !== undefined) {
+			declared.push({ name, of: null })
+
+			continue
+		}
+
+		let type = surface.types[name]
+
+		if (type !== undefined) {
+			declared.push({ name, of: describe(type, context) })
+		}
+	}
+
+	return declared
 }
 
 // NOTE: A Namespace's members are keyed by the name as it was WRITTEN —
@@ -456,6 +516,7 @@ function describeNamespace(
 						member,
 						`${type.name}.`,
 						namespaceMemberName,
+						context,
 					),
 				}
 			: {
@@ -489,6 +550,7 @@ function describeOverloads(
 	name: string,
 	qualifier: string,
 	emit: (name: string) => string,
+	context: DescribeContext,
 ): Array<OverloadDescriptor> {
 	return type.overloads.map((overload, index) => {
 		let overloadName = resolveOverloadedMethodName(name, index)
@@ -497,6 +559,7 @@ function describeOverloads(
 			name: overloadName,
 			emitted: emit(overloadName),
 			signature: printSignature(overload, `${qualifier}${overloadName}`),
+			of: describeSignature(overload, context),
 		}
 	})
 }

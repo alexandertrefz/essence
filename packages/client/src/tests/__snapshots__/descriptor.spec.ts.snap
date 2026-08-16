@@ -943,11 +943,72 @@ exports[`A Module described describes Calls.es 1`] = `
             {
               "emitted": "from__overload$1",
               "name": "from__overload$1",
+              "of": {
+                "kind": "function",
+                "parameters": [
+                  {
+                    "label": "x",
+                    "of": {
+                      "kind": "integer",
+                      "shown": "Integer",
+                    },
+                  },
+                ],
+                "returns": {
+                  "kind": "record",
+                  "members": {
+                    "x": {
+                      "kind": "integer",
+                      "shown": "Integer",
+                    },
+                    "y": {
+                      "kind": "integer",
+                      "shown": "Integer",
+                    },
+                  },
+                  "shown": "{ x: Integer, y: Integer }",
+                },
+                "shown": "(x: Integer) -> { x: Integer, y: Integer }",
+              },
               "signature": "Point.from__overload$1(x: Integer) -> { x: Integer, y: Integer }",
             },
             {
               "emitted": "from__overload$2",
               "name": "from__overload$2",
+              "of": {
+                "kind": "function",
+                "parameters": [
+                  {
+                    "label": "x",
+                    "of": {
+                      "kind": "integer",
+                      "shown": "Integer",
+                    },
+                  },
+                  {
+                    "label": "y",
+                    "of": {
+                      "kind": "integer",
+                      "shown": "Integer",
+                    },
+                  },
+                ],
+                "returns": {
+                  "kind": "record",
+                  "members": {
+                    "x": {
+                      "kind": "integer",
+                      "shown": "Integer",
+                    },
+                    "y": {
+                      "kind": "integer",
+                      "shown": "Integer",
+                    },
+                  },
+                  "shown": "{ x: Integer, y: Integer }",
+                },
+                "shown": "(x: Integer, y: Integer) -> { x: Integer, y: Integer }",
+              },
               "signature": "Point.from__overload$2(x: Integer, y: Integer) -> { x: Integer, y: Integer }",
             },
           ],
@@ -958,11 +1019,106 @@ exports[`A Module described describes Calls.es 1`] = `
             {
               "emitted": "grown__overload$1",
               "name": "grown__overload$1",
+              "of": {
+                "kind": "function",
+                "parameters": [
+                  {
+                    "label": null,
+                    "of": {
+                      "kind": "record",
+                      "members": {
+                        "x": {
+                          "kind": "integer",
+                          "shown": "Integer",
+                        },
+                        "y": {
+                          "kind": "integer",
+                          "shown": "Integer",
+                        },
+                      },
+                      "shown": "{ x: Integer, y: Integer }",
+                    },
+                  },
+                  {
+                    "label": null,
+                    "of": {
+                      "kind": "integer",
+                      "shown": "Integer",
+                    },
+                  },
+                ],
+                "returns": {
+                  "kind": "record",
+                  "members": {
+                    "x": {
+                      "kind": "integer",
+                      "shown": "Integer",
+                    },
+                    "y": {
+                      "kind": "integer",
+                      "shown": "Integer",
+                    },
+                  },
+                  "shown": "{ x: Integer, y: Integer }",
+                },
+                "shown": "(_ { x: Integer, y: Integer }, _ Integer) -> { x: Integer, y: Integer }",
+              },
               "signature": "Point.grown__overload$1(_ { x: Integer, y: Integer }, _ Integer) -> { x: Integer, y: Integer }",
             },
             {
               "emitted": "grown__overload$2",
               "name": "grown__overload$2",
+              "of": {
+                "kind": "function",
+                "parameters": [
+                  {
+                    "label": null,
+                    "of": {
+                      "kind": "record",
+                      "members": {
+                        "x": {
+                          "kind": "integer",
+                          "shown": "Integer",
+                        },
+                        "y": {
+                          "kind": "integer",
+                          "shown": "Integer",
+                        },
+                      },
+                      "shown": "{ x: Integer, y: Integer }",
+                    },
+                  },
+                  {
+                    "label": "by",
+                    "of": {
+                      "kind": "integer",
+                      "shown": "Integer",
+                    },
+                  },
+                  {
+                    "label": "and",
+                    "of": {
+                      "kind": "integer",
+                      "shown": "Integer",
+                    },
+                  },
+                ],
+                "returns": {
+                  "kind": "record",
+                  "members": {
+                    "x": {
+                      "kind": "integer",
+                      "shown": "Integer",
+                    },
+                    "y": {
+                      "kind": "integer",
+                      "shown": "Integer",
+                    },
+                  },
+                  "shown": "{ x: Integer, y: Integer }",
+                },
+                "shown": "(_ { x: Integer, y: Integer }, by: Integer, and: Integer) -> { x: Integer, y: Integer }",
+              },
               "signature": "Point.grown__overload$2(_ { x: Integer, y: Integer }, by: Integer, and: Integer) -> { x: Integer, y: Integer }",
             },
           ],
