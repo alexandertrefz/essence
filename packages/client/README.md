@@ -207,13 +207,29 @@ generateDeclarations(describeModule(math.surface, math.entryPath), {
 
 ```ts
 export declare const PI: EssenceRational
-export declare function square(p0: bigint): bigint
+export declare function square(p0: bigint | number): bigint
 ```
 
 A Type Alias is declared under the name it was written with and referred to by
 it everywhere else, a Choice becomes the union of its Cases, and `Optional<T>`
 is `T | undefined`. A Parameter is named by its label; a `_` Parameter by its
 position.
+
+The declarations say what the boundary takes as well as what it gives. An
+Integer comes *out* as a `bigint` and goes *in* as a `bigint` or a safe
+`number`, so a Parameter reads `bigint | number` and an answer reads `bigint`.
+A named Type holding an Integer keeps its name at a Parameter, wrapped in the
+package's `Input<T>` — a mapped Type that widens exactly the leaves the
+interpreter does, so `describe(shape: Input<Rectangle>)` hovers to
+`{ width: bigint | number; height: bigint | number }` while `Rectangle` itself
+stays what comes back. And a Function whose Parameters are all labelled is
+declared twice, because it may be called twice: positionally, and with one
+object whose keys are the labels.
+
+```ts
+export declare function widen(box: Input<Box>, by: bigint | number): Box
+export declare function widen(labelled: { box: Input<Box>; by: bigint | number }): Box
+```
 
 A Choice is declared twice under its one name — the Type a value of it *is*,
 and the constructors a host spells one *with* — which TypeScript keeps apart by
@@ -225,10 +241,17 @@ export type Shape =
 	| { $case: "Shape#Blank" }
 
 export declare const Shape: {
-	Circle(payload: { radius: bigint }): { $case: "Shape#Circle"; radius: bigint }
+	Circle<Payload_ extends { radius: bigint | number }>(payload: Payload_): Payload_ & { $case: "Shape#Circle" }
 	Blank: { $case: "Shape#Blank" }
 }
 ```
+
+A constructor is a spelling — it writes the tag onto the payload it was handed
+and marshals nothing — and its declaration says exactly that: it takes any
+payload the boundary would accept and answers *that* payload with the tag on
+it, its own Types kept. `Shape.Circle({ radius: 3n })` is a `Shape`;
+`Shape.Circle({ radius: 3 })` is an `Input<Shape>`, which is what it holds until
+it crosses.
 
 What the boundary cannot carry is declared `never` rather than spelled out,
 because a declaration is only worth having if the calls it admits are the calls

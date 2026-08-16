@@ -121,6 +121,7 @@ export {
 	type ResolvedConfig,
 	type VitePlugin,
 } from "./vite-plugin"
+export type { Input } from "./input"
 export { EssenceRational } from "./rational"
 // NOTE: Re-exported so a host can spell what `raw` holds — the JavaScript name
 // an Essence one is bound under — without importing the Compiler itself.

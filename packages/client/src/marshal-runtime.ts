@@ -1277,7 +1277,7 @@ function callShape(
 // `Optional` with a Record among what it admits reads the same way. This is the
 // whole of the ambiguity: with two Parameters or more the key set decides, since
 // a labelled call's keys are the labels and a positional call passes no object.
-function labelsOf(signature: FunctionDescriptor): Array<string> | null {
+export function labelsOf(signature: FunctionDescriptor): Array<string> | null {
 	let parameters = signature.parameters
 
 	if (parameters.length === 0) {
@@ -1436,7 +1436,7 @@ function admitsAbsence(descriptor: Descriptor): boolean {
 // its object spelling always carries `$case`, which no set of labels is. What it
 // decides is whether a single labelled Parameter's labelled call is ambiguous —
 // see `labelsOf`.
-function admitsRecord(descriptor: Descriptor): boolean {
+export function admitsRecord(descriptor: Descriptor): boolean {
 	switch (descriptor.kind) {
 		case "record":
 			return true

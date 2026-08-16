@@ -7,14 +7,16 @@ import type {
 	ModuleDescriptor,
 	NamespaceDescriptor,
 } from "./descriptor"
+import { labelsOf } from "./marshal-runtime"
 import { isTypeName, isValueName, mangled, memberName } from "./names"
 
 // NOTE: A Module as TypeScript, printed off the same Descriptor the interpreter
 // marshals by. That is the whole point of it being a Descriptor: every rule a
 // value is decided by was written down once, on the Compiler's side of the seam,
 // and a declaration file is that same writing read as the other language. An
-// Integer marshals to a `bigint` and says `bigint`; an `Optional<T>` collapses to
-// `T | undefined` in both, because there is only one node to collapse.
+// Integer comes out as a `bigint` and says `bigint`, and goes in as a `bigint`
+// or a safe `number` and says so; an `Optional<T>` collapses to `T | undefined`
+// in both, because there is only one node to collapse.
 //
 // NOTE: There are TWO views of a Module, because a bundler serves two doors into
 // one. The wrapper the plugin emits hands over JavaScript — that is the
@@ -342,6 +344,31 @@ function crossesDifferently(node: Descriptor): boolean {
 	}
 }
 
+// NOTE: Whether a Type's IN-form is wider than its declaration — which is so
+// exactly where an Integer is reachable without a Function in the way, since
+// that is the one leaf the interpreter takes more of than it gives back. A named
+// Type that widens is still spelled by its name at a Parameter, wrapped in the
+// package's own `Input<…>`, so the alias survives and the widening is stated
+// once, in a mapped Type, rather than spelled out at every place it is passed.
+// A Function does not widen: see `Input`.
+function widensOnInput(node: Descriptor): boolean {
+	switch (node.kind) {
+		case "integer":
+			return true
+		case "list":
+		case "optional":
+			return widensOnInput(node.of)
+		case "record":
+			return Object.values(node.members).some(widensOnInput)
+		case "case":
+			return Object.values(node.payload).some(widensOnInput)
+		case "union":
+			return node.arms.some(widensOnInput)
+		default:
+			return false
+	}
+}
+
 // NOTE: What an `Optional` holds, or `null` where this is not one. The pair
 // collapses to a node of its own; a lone `#Value` is met where a `constant thing
 // = #Value(3)` was inferred as the Case rather than as the Union an annotation
@@ -450,7 +477,9 @@ function createWalker(
 			alias !== undefined &&
 			(direction === "out" || !crossesDifferently(node))
 		) {
-			return alias
+			return direction === "in" && widensOnInput(node)
+				? `${borrow("Input")}<${alias}>`
+				: alias
 		}
 
 		return printBody(node, direction)
@@ -461,8 +490,12 @@ function createWalker(
 	// itself.
 	function printBody(node: Descriptor, direction: Direction): string {
 		switch (node.kind) {
+			// NOTE: One kind out — a `bigint` at every size, so a call's Type does
+			// not depend on how big its answer was — and either kind in, because
+			// the interpreter hands a safe `number` to the runtime's own
+			// canonicaliser as readily as a `bigint`. See `Input`.
 			case "integer":
-				return "bigint"
+				return direction === "in" ? "bigint | number" : "bigint"
 			case "string":
 				return "string"
 			case "boolean":
@@ -599,6 +632,30 @@ function createWalker(
 			.join(", ")
 	}
 
+	// NOTE: The second way a Function may be called, where the interpreter offers
+	// one: a single object whose keys are exactly the labels, in place of the
+	// positional Arguments. `labelsOf` is the interpreter's own rule for when
+	// that is offered — every Parameter labelled, and not a lone Record Parameter,
+	// where a plain object is the Argument itself — so a declaration promises a
+	// labelled call exactly where a call would be answered as one.
+	function labelledParameters(signature: FunctionDescriptor): string | null {
+		let labels = labelsOf(signature)
+
+		if (labels === null) {
+			return null
+		}
+
+		return `labelled: ${inlined(
+			labels.map(
+				(label, index) =>
+					`${memberName(label)}: ${print(
+						signature.parameters[index]!.of,
+						"in",
+					)}`,
+			),
+		)}`
+	}
+
 	// #region Declarations
 
 	// NOTE: Declared as it comes OUT. A Type Alias has one spelling and is used
@@ -648,10 +705,16 @@ function createWalker(
 		}
 
 		if (entry.kind === "function" && isValueName(name)) {
-			return `export declare function ${name}(${printParameters(
+			let returns = print(entry.of.returns, "out")
+			let positional = `export declare function ${name}(${printParameters(
 				entry.of.parameters,
 				"in",
-			)}): ${print(entry.of.returns, "out")}`
+			)}): ${returns}`
+			let labelled = labelledParameters(entry.of)
+
+			return labelled === null
+				? positional
+				: `${positional}\nexport declare function ${name}(${labelled}): ${returns}`
 		}
 
 		if (entry.of.kind === "record" && isValueName(name)) {
@@ -665,19 +728,27 @@ function createWalker(
 	}
 
 	// NOTE: One way to spell each Case, as a host reads it: a Case with a payload
-	// is a Function of that payload, and one without is the value itself. Both
-	// are printed in the IN direction, because what a constructor answers with is
-	// an object built to be handed to the Module — the same object, the same way
-	// round, at both ends.
+	// is a Function of that payload, and one without is the value itself. A
+	// constructor is a SPELLING — `caseConstructors` writes the tag onto the very
+	// object it was handed and marshals nothing — so its declaration says exactly
+	// that: it takes any payload the boundary would accept (the IN-form), and
+	// answers THAT payload with the tag on it. Written as a generic so that the
+	// answer keeps the caller's own Types: `Shape.Circle({ radius: 3n })` is a
+	// `Shape`, and `Shape.Circle({ radius: 3 })` is an `Input<Shape>` — which is
+	// what each really is, since one holds a bigint and the other a number until
+	// it crosses. A Type Parameter named with an `_`, which no Essence identifier
+	// contains, so it can shadow nothing a Module declared.
 	function caseEntries(cases: ReadonlyArray<CaseDescriptor>): Array<string> {
 		return cases.map((node) => {
-			let built = printCase(node, "in")
+			if (Object.keys(node.payload).length === 0) {
+				return `${memberName(node.name)}: ${printCase(node, "in")}`
+			}
 
-			return Object.keys(node.payload).length === 0
-				? `${memberName(node.name)}: ${built}`
-				: `${memberName(node.name)}(payload: ${inlined(
-						recordEntries(node.payload, "in"),
-					)}): ${built}`
+			let tag = JSON.stringify(`${node.choice}#${node.name}`)
+
+			return `${memberName(node.name)}<Payload_ extends ${inlined(
+				recordEntries(node.payload, "in"),
+			)}>(payload: Payload_): Payload_ & { $case: ${tag} }`
 		})
 	}
 
@@ -721,6 +792,17 @@ function createWalker(
 					"in",
 				)}): ${print(method.of.returns, "out")}`,
 			)
+
+			let labelled = labelledParameters(method.of)
+
+			if (labelled !== null) {
+				entries.push(
+					`${memberName(name)}(${labelled}): ${print(
+						method.of.returns,
+						"out",
+					)}`,
+				)
+			}
 		}
 
 		return entries
