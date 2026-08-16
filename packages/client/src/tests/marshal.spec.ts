@@ -733,12 +733,43 @@ describe("Errors", () => {
 		)
 	})
 
-	it("refuses a callback", () => {
+	// NOTE: The mirror of every other row of the table: a Function goes IN, and
+	// the values it is then handed come OUT. `integer` is `(Integer) -> Integer`,
+	// so the callback is called with one of the Module's Integers and answers
+	// with a `bigint` the boundary builds one back out of.
+	it("takes a Function where the Type declares one", () => {
+		let signature = module.surface.values.integer as common.Type
+		let callback = marshaller.fromJS(
+			(value: bigint) => value + 1n,
+			signature,
+		) as (...args: Array<EssenceValue>) => EssenceValue
+
+		expect(marshaller.toJS(callback(module.bridge.integer(41n)))).toBe(42n)
+	})
+
+	// NOTE: A refusal inside a callback is spelled from where the callback
+	// ARRIVED, because that is the Function a reader has to go and fix — the one
+	// they passed, not one of the Module's.
+	it("says where inside a callback a value did not fit", () => {
+		let signature = module.surface.values.integer as common.Type
+		let callback = marshaller.fromJS(
+			() => "four",
+			signature,
+			"argument 2",
+		) as (...args: Array<EssenceValue>) => EssenceValue
+		let error = marshalError(() => callback(module.bridge.integer(1n)))
+
+		expect(error.message).toBe(
+			'argument 2 → return value: expected Integer, got the string "four".',
+		)
+	})
+
+	it("refuses a value that is no Function where one is declared", () => {
 		let signature = module.surface.values.integer as common.Type
 
 		expect(
-			marshalError(() => marshaller.fromJS(() => 1, signature)).message,
-		).toContain("callbacks are not supported yet")
+			marshalError(() => marshaller.fromJS(12n, signature)).message,
+		).toBe("value: expected (_ Integer) -> Integer, got the bigint 12.")
 	})
 
 	// NOTE: A misspelled payload member has to be as findable as a misspelled

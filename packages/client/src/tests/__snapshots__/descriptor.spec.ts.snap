@@ -1316,6 +1316,47 @@ exports[`A Module described describes Calls.es 1`] = `
         "shown": "(_ Integer, with: (_ Integer) -> Integer) -> Integer",
       },
     },
+    "applyTwice": {
+      "emitted": "applyTwice",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "kind": "function",
+              "parameters": [
+                {
+                  "label": null,
+                  "of": {
+                    "kind": "integer",
+                    "shown": "Integer",
+                  },
+                },
+              ],
+              "returns": {
+                "kind": "integer",
+                "shown": "Integer",
+              },
+              "shown": "(_ Integer) -> Integer",
+            },
+          },
+          {
+            "label": null,
+            "of": {
+              "kind": "integer",
+              "shown": "Integer",
+            },
+          },
+        ],
+        "returns": {
+          "kind": "integer",
+          "shown": "Integer",
+        },
+        "shown": "(_ (_ Integer) -> Integer, _ Integer) -> Integer",
+      },
+    },
     "boxed": {
       "emitted": "boxed",
       "kind": "function",
@@ -1608,6 +1649,59 @@ exports[`A Module described describes Calls.es 1`] = `
           "shown": "Optional<{ box: Integer }>",
         },
         "shown": "(box: Optional<{ box: Integer }>) -> Optional<{ box: Integer }>",
+      },
+    },
+    "measured": {
+      "emitted": "measured",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": "box",
+            "of": {
+              "kind": "record",
+              "members": {
+                "box": {
+                  "kind": "integer",
+                  "shown": "Integer",
+                },
+              },
+              "shown": "{ box: Integer }",
+            },
+          },
+          {
+            "label": "by",
+            "of": {
+              "kind": "function",
+              "parameters": [
+                {
+                  "label": null,
+                  "of": {
+                    "kind": "record",
+                    "members": {
+                      "box": {
+                        "kind": "integer",
+                        "shown": "Integer",
+                      },
+                    },
+                    "shown": "{ box: Integer }",
+                  },
+                },
+              ],
+              "returns": {
+                "kind": "integer",
+                "shown": "Integer",
+              },
+              "shown": "(_ { box: Integer }) -> Integer",
+            },
+          },
+        ],
+        "returns": {
+          "kind": "integer",
+          "shown": "Integer",
+        },
+        "shown": "(box: { box: Integer }, by: (_ { box: Integer }) -> Integer) -> Integer",
       },
     },
     "mixed": {
@@ -2013,6 +2107,55 @@ exports[`A Module described describes Refused.es 1`] = `
           "shown": "Optional<Optional<Integer>>",
         },
         "shown": "(_ Optional<Optional<Integer>>) -> Optional<Optional<Integer>>",
+      },
+    },
+    "nesting": {
+      "emitted": "nesting",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "kind": "record",
+              "members": {
+                "level": {
+                  "kind": "optional",
+                  "of": {
+                    "kind": "optional",
+                    "of": {
+                      "kind": "integer",
+                      "shown": "Integer",
+                    },
+                    "shown": "Optional<Integer>",
+                  },
+                  "shown": "Optional<Optional<Integer>>",
+                },
+              },
+              "shown": "{ level: Optional<Optional<Integer>> }",
+            },
+          },
+        ],
+        "returns": {
+          "kind": "record",
+          "members": {
+            "level": {
+              "kind": "optional",
+              "of": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer",
+                  "shown": "Integer",
+                },
+                "shown": "Optional<Integer>",
+              },
+              "shown": "Optional<Optional<Integer>>",
+            },
+          },
+          "shown": "{ level: Optional<Optional<Integer>> }",
+        },
+        "shown": "(_ { level: Optional<Optional<Integer>> }) -> { level: Optional<Optional<Integer>> }",
       },
     },
     "root": {

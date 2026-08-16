@@ -15,6 +15,14 @@ implementation {
 		<- value
 	}
 
+	§ A Type Alias whose member is one of those. It comes OUT under its name and
+	§ can not go back IN under it, so a Parameter of it has to be spelled out.
+	type Nest = { level: Optional<Optional<Integer>> }
+
+	function nesting(_ nest: Nest) -> Nest {
+		<- nest
+	}
+
 	function nameOf(_ value: Tagged) -> String {
 		<- match value -> String {
 			case #One   { <- @.$case }
@@ -37,8 +45,10 @@ implementation {
 }
 
 export {
+	Nest
 	Tagged
 	nested
+	nesting
 	nameOf
 	tagged
 	doubled

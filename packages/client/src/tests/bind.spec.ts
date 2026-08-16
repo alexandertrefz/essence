@@ -164,6 +164,90 @@ describe("Calling a Function", () => {
 		expect(handler.callback(4n)).toBe(8n)
 	})
 
+	// NOTE: And a Function goes the other way as well. What the Module hands a
+	// callback are its own values, so they cross OUT to reach it; what the
+	// callback answers with is built against the declared return, so it crosses
+	// IN. Both halves of the boundary meet at a call site the host wrote.
+	it("takes a Function passed into a call", () => {
+		expect(
+			exported(calls, "applied")(3n, (value: bigint) => value * 2n),
+		).toBe(6n)
+	})
+
+	// NOTE: Called as many times as the Module calls it, each call its own
+	// crossing — a callback is not a value marshalled once and remembered.
+	it("takes a Function the Module calls more than once", () => {
+		expect(
+			exported(calls, "applyTwice")((value: bigint) => value * 3n, 2n),
+		).toBe(18n)
+	})
+
+	// NOTE: A labelled call passes one the same way it passes anything else.
+	it("takes a Function under its label", () => {
+		expect(
+			exported(
+				calls,
+				"measured",
+			)({
+				box: { box: 5n },
+				by: (box: { box: bigint }) => box.box + 1n,
+			}),
+		).toBe(6n)
+	})
+
+	it("takes a Function held by a Record member", () => {
+		expect(
+			exported(
+				calls,
+				"invoke",
+			)({
+				callback: (value: bigint) => value + 1n,
+			}),
+		).toBe(8n)
+	})
+
+	// NOTE: The Record the callback is handed is the MODULE's, so it arrives
+	// marshalled — a plain object with `bigint` members, not the tagged value the
+	// raw door would have passed.
+	it("hands a callback the Module's values as JavaScript", () => {
+		let seen: Array<unknown> = []
+
+		expect(
+			exported(calls, "measured")({ box: 6n }, (box: { box: bigint }) => {
+				seen.push(box)
+
+				return box.box * 2n
+			}),
+		).toBe(12n)
+		expect(seen).toEqual([{ box: 6n }])
+	})
+
+	// NOTE: Spelled from where the callback ARRIVED, because the Function that
+	// answered wrongly is the one the caller passed at that Argument rather than
+	// one of the Module's own.
+	it("says which callback of which Argument did not fit", () => {
+		expect(
+			marshalError(() => exported(calls, "applied")(3n, () => "twice"))
+				.message,
+		).toBe(
+			'argument 2 → return value: expected Integer, got the string "twice".',
+		)
+
+		expect(
+			marshalError(() =>
+				exported(calls, "invoke")({ callback: () => undefined }),
+			).message,
+		).toBe(
+			"argument 1 → .callback → return value: expected Integer, got nothing.",
+		)
+	})
+
+	it("refuses an Argument that is no Function where one is declared", () => {
+		expect(
+			marshalError(() => exported(calls, "applied")(3n, 4n)).message,
+		).toBe("argument 2: expected (_ Integer) -> Integer, got the bigint 4.")
+	})
+
 	// NOTE: A Choice is erased — it names Cases, and a Case is a value's Type
 	// rather than a value. Nothing binds it, so nothing is bound.
 	it("leaves a Choice off both doors", () => {

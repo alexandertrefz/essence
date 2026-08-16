@@ -32,14 +32,31 @@ implementation {
 		<- "nothing"
 	}
 
-	§ A Parameter nothing on the JavaScript side can fill: a Function can come
-	§ out of a Module, but one can not be built from a JavaScript value and
-	§ passed in.
+	§ A Function passed IN, and called once.
 	function applied(
 		_ value: Integer,
 		with transform: (_: Integer) -> Integer,
 	) -> Integer {
 		<- transform(value)
+	}
+
+	§ The same Parameter called TWICE, so that a value crosses out and back for
+	§ each call rather than once for the whole Argument.
+	function applyTwice(
+		_ transform: (_: Integer) -> Integer,
+		_ value: Integer,
+	) -> Integer {
+		<- transform(transform(value))
+	}
+
+	§ A callback handed a Record — which crosses OUT to reach it, the way round
+	§ the Function itself did not. Every Parameter carries a label, so it can be
+	§ called with one object as well.
+	function measured(
+		box: Box,
+		by measure: (_: Box) -> Integer,
+	) -> Integer {
+		<- measure(box)
 	}
 
 	function moved(_ point: Point) -> Point {
@@ -146,6 +163,7 @@ export {
 	Handler
 	Point
 	applied
+	applyTwice
 	boxed
 	coloured
 	evened
@@ -154,6 +172,7 @@ export {
 	labelled
 	makeAdder
 	measure
+	measured
 	mixed
 	moved
 	nothing

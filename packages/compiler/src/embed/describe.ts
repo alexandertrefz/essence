@@ -274,13 +274,19 @@ function describeBody(
 			return signatureWith(type, context, printing)
 		// NOTE: Callable and still described as a refusal, because neither has
 		// ONE signature a call could be marshalled against — an Overload set
-		// names several and a Namespace names none.
+		// names several and a Namespace names none. A Function with one is
+		// described above and crosses in both directions.
 		case "OverloadedMethod":
 		case "OverloadedStaticMethod":
+			return {
+				kind: "refused",
+				why: `a Function carries no Type of its own, and ${shown} declares more than one signature it could be — which of them to marshal a call against is undecidable.`,
+				shown,
+			}
 		case "Namespace":
 			return {
 				kind: "refused",
-				why: `callbacks are not supported yet — ${shown} can not be built from a JavaScript value.`,
+				why: `${shown} is a Namespace rather than a value — there is nothing on the JavaScript side to build one from.`,
 				shown,
 			}
 		// NOTE: The numeric tower above Rational, for now, and whatever else
