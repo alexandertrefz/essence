@@ -8,6 +8,15 @@ implementation {
 		Named { name: String },
 	}
 
+	§ A Namespace sharing a Choice's name, which is how a Choice is given its
+	§ Methods — one name, so the Cases have to be spelled through the same
+	§ object the Methods are.
+	namespace Colour for Colour {
+		static preferred() -> Colour {
+			<- #Red
+		}
+	}
+
 	type Point = { x: Integer, y: Integer }
 
 	type Box = { box: Integer }

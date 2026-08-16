@@ -13,6 +13,7 @@ let cacheDirectory = ""
 let calls: EssenceModule
 let geometry: EssenceModule
 let main: EssenceModule
+let marshal: EssenceModule
 let math: EssenceModule
 
 beforeAll(async () => {
@@ -31,6 +32,10 @@ beforeAll(async () => {
 	// the terminal held shut rather than into the middle of this run's output.
 	main = await withoutOutput(() =>
 		loadModule(fixturePath("modules", "Main.es"), { cacheDirectory }),
+	)
+	marshal = await loadModule(
+		path.join(import.meta.dirname, "files", "Marshal.es"),
+		{ cacheDirectory },
 	)
 	math = await loadModule(fixturePath("modules", "math", "Math.es"), {
 		cacheDirectory,
@@ -65,6 +70,13 @@ type AnyCall = (...args: Array<unknown>) => unknown
 // says what it expects of a name by using it.
 function exported(module: EssenceModule, name: string): AnyCall {
 	return module.exports[name] as AnyCall
+}
+
+// NOTE: A Choice reaches a host as an object of constructors — under a
+// Namespace's name where the Module wrote one, and under its own where it did
+// not. Both are read the same way.
+function choice(module: EssenceModule, name: string): Record<string, unknown> {
+	return module.exports[name] as Record<string, unknown>
 }
 
 function namespaceOf(
@@ -249,15 +261,71 @@ describe("Calling a Function", () => {
 	})
 
 	// NOTE: A Choice is erased — it names Cases, and a Case is a value's Type
-	// rather than a value. Nothing binds it, so nothing is bound.
-	it("leaves a Choice off both doors", () => {
-		expect(calls.surface.kinds.Colour).toBe("choice")
-		expect("Colour" in calls.exports).toBe(false)
-		expect("Colour" in calls.raw).toBe(false)
+	// rather than a value — so the bundle binds nothing under its name and the
+	// raw door has nothing to offer. What `exports` offers instead is spelling:
+	// one constructor per Case, written on this side.
+	it("leaves a Choice off the raw door", () => {
+		expect("Shape" in marshal.raw).toBe(false)
+		expect("Shape" in marshal.exports).toBe(true)
 	})
 
-	it("binds every name that has a runtime binding", () => {
+	it("binds every name the bundle binds, and the Choices beside them", () => {
+		expect(Object.keys(marshal.exports)).toEqual([
+			"Shape",
+			"Styled",
+			...Object.keys(marshal.raw),
+		])
+
+		// NOTE: `namespace Colour for Colour` binds a name of its own, so the
+		// two doors hold the same names and the Cases are members of that one.
 		expect(Object.keys(calls.exports)).toEqual(Object.keys(calls.raw))
+	})
+})
+
+describe("A Choice", () => {
+	// NOTE: The `$case` a constructor writes is the one `toJS` writes, so a
+	// value spelled here and a value that came back out of the Module are the
+	// same object — which is what makes `areaOf(Shape.Circle({ radius: 3n }))`
+	// work without a word about tags.
+	it("spells a Case with a payload as a call", () => {
+		let shape = choice(marshal, "Shape").Circle as AnyCall
+
+		expect(shape({ radius: 3n })).toEqual({
+			$case: "Shape#Circle",
+			radius: 3n,
+		})
+		expect(exported(marshal, "areaOf")(shape({ radius: 3n }))).toBe(9n)
+	})
+
+	// NOTE: And a Case with no payload as the value itself. There is nothing to
+	// pass, so a call would exist only to look like the others.
+	it("spells a Case with no payload as a value", () => {
+		expect(choice(marshal, "Shape").Blank).toEqual({ $case: "Shape#Blank" })
+		expect(
+			exported(marshal, "areaOf")(choice(marshal, "Shape").Blank),
+		).toBe(0n)
+	})
+
+	// NOTE: One name binds one thing, and `namespace Colour for Colour` is how a
+	// Choice is given its Methods — so the constructors ride on the Namespace
+	// rather than taking the name away from it.
+	it("hands its constructors to the Namespace of its own name", () => {
+		let colour = choice(calls, "Colour")
+
+		expect(colour.Red).toEqual({ $case: "Colour#Red" })
+		expect((colour.Named as AnyCall)({ name: "blue" })).toEqual({
+			$case: "Colour#Named",
+			name: "blue",
+		})
+		expect((colour.preferred as AnyCall)()).toEqual({ $case: "Colour#Red" })
+	})
+
+	// NOTE: A Type Alias for a Choice is the same Union, and gets no
+	// constructors of its own: a value built through one would say `Shape#Circle`
+	// while the name that offered it said something else, and one set of
+	// constructors reached through two names is a second thing to keep true.
+	it("is spelled under its own name alone", () => {
+		expect("Label" in marshal.exports).toBe(false)
 	})
 })
 

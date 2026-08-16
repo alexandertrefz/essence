@@ -11,6 +11,11 @@ export type Shape =
 	| { $case: "Shape#Circle"; radius: bigint }
 	| { $case: "Shape#Blank" }
 
+export declare const Shape: {
+	Circle(payload: { radius: bigint }): { $case: "Shape#Circle"; radius: bigint }
+	Blank: { $case: "Shape#Blank" }
+}
+
 export declare function areaOf(p0: Shape): bigint
 export declare const blank: Shape
 export declare function named(p0: string | undefined): string

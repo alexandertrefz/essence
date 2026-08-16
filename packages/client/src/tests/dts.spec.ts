@@ -216,6 +216,33 @@ export declare const Rectangle: { of(width: bigint, height: bigint): Rectangle }
 		)
 	})
 
+	// NOTE: A Choice is declared twice under one name, and TypeScript keeps the
+	// two apart: the Type is what a value of it IS, and the const is how a host
+	// spells one. A Case with a payload is a call and one without is the value —
+	// there is nothing to pass to `Blank`.
+	it("declares a Choice's Cases as the constructors a host spells them with", async () => {
+		expect(await declarationsOf(clientFixture("Marshal.es"))).toContain(
+			`export declare const Shape: {
+	Circle(payload: { radius: bigint }): { $case: "Shape#Circle"; radius: bigint }
+	Rect(payload: { width: bigint; height: bigint }): { $case: "Shape#Rect"; width: bigint; height: bigint }
+	Blank: { $case: "Shape#Blank" }
+}`,
+		)
+	})
+
+	// NOTE: And where a Namespace already holds the name, they are members of it
+	// — one name binds one thing, and `namespace Colour for Colour` is how a
+	// Choice is given its Methods.
+	it("declares them on the Namespace of the same name", async () => {
+		expect(await declarationsOf(clientFixture("Calls.es"))).toContain(
+			`export declare const Colour: {
+	Red: { $case: "Colour#Red" }
+	Named(payload: { name: string }): { $case: "Colour#Named"; name: string }
+	preferred(): Colour
+}`,
+		)
+	})
+
 	// NOTE: `fromJS` refuses EVERY value for a nested Optional — both levels
 	// would be `undefined` — so the Parameter has to refuse every call, exactly
 	// as the callback and Type Parameter positions already do. Coming out, only
@@ -329,10 +356,12 @@ describe("A consumer of the generated declarations", () => {
 		let declarations = await declarationsFor(clientFixture("Marshal.es"))
 		let run = typecheck({
 			"Marshal.d.es.ts": declarations,
-			"consumer.ts": `import { areaOf, box, boxes, greeting, maybe, present, shape, third } from "./Marshal.es"
-import type { Box, Label, Shape } from "./Marshal.es"
+			"consumer.ts": `import { areaOf, box, boxes, greeting, maybe, present, Shape, shape, third } from "./Marshal.es"
+import type { Box, Label } from "./Marshal.es"
 
 export let area: bigint = areaOf({ $case: "Shape#Circle", radius: 3n })
+export let built: bigint = areaOf(Shape.Circle({ radius: 3n }))
+export let blank: Shape = Shape.Blank
 export let circle: Shape = shape({ $case: "Shape#Blank" })
 export let one: Box = box({ width: 3n, height: 4n })
 export let many: Array<Box> = boxes([one])

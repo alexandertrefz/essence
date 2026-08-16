@@ -3,6 +3,77 @@
 exports[`A Module described describes Marshal.es 1`] = `
 {
   "exports": {
+    "Shape": {
+      "cases": [
+        {
+          "choice": "Shape",
+          "kind": "case",
+          "name": "Circle",
+          "optional": false,
+          "payload": {
+            "radius": {
+              "kind": "integer",
+              "shown": "Integer",
+            },
+          },
+          "shown": "Shape#Circle",
+          "tag": "./Marshal.es#Shape#Circle",
+        },
+        {
+          "choice": "Shape",
+          "kind": "case",
+          "name": "Rect",
+          "optional": false,
+          "payload": {
+            "height": {
+              "kind": "integer",
+              "shown": "Integer",
+            },
+            "width": {
+              "kind": "integer",
+              "shown": "Integer",
+            },
+          },
+          "shown": "Shape#Rect",
+          "tag": "./Marshal.es#Shape#Rect",
+        },
+        {
+          "choice": "Shape",
+          "kind": "case",
+          "name": "Blank",
+          "optional": false,
+          "payload": {},
+          "shown": "Shape#Blank",
+          "tag": "./Marshal.es#Shape#Blank",
+        },
+      ],
+      "kind": "choice",
+      "name": "Shape",
+    },
+    "Styled": {
+      "cases": [
+        {
+          "choice": "Styled",
+          "kind": "case",
+          "name": "Tagged",
+          "optional": false,
+          "payload": {
+            "valueOf": {
+              "kind": "optional",
+              "of": {
+                "kind": "string",
+                "shown": "String",
+              },
+              "shown": "Optional<String>",
+            },
+          },
+          "shown": "Styled#Tagged",
+          "tag": "./Marshal.es#Styled#Tagged",
+        },
+      ],
+      "kind": "choice",
+      "name": "Styled",
+    },
     "absent": {
       "emitted": "absent",
       "kind": "constant",
@@ -892,6 +963,77 @@ exports[`A Module described describes Marshal.es 1`] = `
 exports[`A Module described describes Calls.es 1`] = `
 {
   "exports": {
+    "Colour": {
+      "cases": [
+        {
+          "choice": "Colour",
+          "kind": "case",
+          "name": "Red",
+          "optional": false,
+          "payload": {},
+          "shown": "Colour#Red",
+          "tag": "./Calls.es#Colour#Red",
+        },
+        {
+          "choice": "Colour",
+          "kind": "case",
+          "name": "Named",
+          "optional": false,
+          "payload": {
+            "name": {
+              "kind": "string",
+              "shown": "String",
+            },
+          },
+          "shown": "Colour#Named",
+          "tag": "./Calls.es#Colour#Named",
+        },
+      ],
+      "emitted": "Colour",
+      "kind": "namespace",
+      "methods": {
+        "preferred": {
+          "emitted": "preferred",
+          "kind": "function",
+          "of": {
+            "kind": "function",
+            "parameters": [],
+            "returns": {
+              "arms": [
+                {
+                  "choice": "Colour",
+                  "kind": "case",
+                  "name": "Red",
+                  "optional": false,
+                  "payload": {},
+                  "shown": "Colour#Red",
+                  "tag": "./Calls.es#Colour#Red",
+                },
+                {
+                  "choice": "Colour",
+                  "kind": "case",
+                  "name": "Named",
+                  "optional": false,
+                  "payload": {
+                    "name": {
+                      "kind": "string",
+                      "shown": "String",
+                    },
+                  },
+                  "shown": "Colour#Named",
+                  "tag": "./Calls.es#Colour#Named",
+                },
+              ],
+              "kind": "union",
+              "shown": "Colour",
+            },
+            "shown": "() -> Colour",
+          },
+        },
+      },
+      "name": "Colour",
+      "properties": {},
+    },
     "Point": {
       "emitted": "Point",
       "kind": "namespace",
@@ -1981,6 +2123,35 @@ exports[`A Module described describes Escaped.es 1`] = `
 exports[`A Module described describes Refused.es 1`] = `
 {
   "exports": {
+    "Tagged": {
+      "cases": [
+        {
+          "choice": "Tagged",
+          "kind": "case",
+          "name": "One",
+          "optional": false,
+          "payload": {
+            "$case": {
+              "kind": "string",
+              "shown": "String",
+            },
+          },
+          "shown": "Tagged#One",
+          "tag": "./Refused.es#Tagged#One",
+        },
+        {
+          "choice": "Tagged",
+          "kind": "case",
+          "name": "Plain",
+          "optional": false,
+          "payload": {},
+          "shown": "Tagged#Plain",
+          "tag": "./Refused.es#Tagged#Plain",
+        },
+      ],
+      "kind": "choice",
+      "name": "Tagged",
+    },
     "answer": {
       "emitted": "answer",
       "kind": "constant",

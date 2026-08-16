@@ -121,6 +121,32 @@ signature and both ways of writing it. An overloaded Method throws one too:
 which Overload a call means is decided by the Argument Types, and a JavaScript
 value carries none, so each Overload is reached by its own name on `raw`.
 
+## Choices
+
+A Case crosses as `{ $case: "Choice#Case", ...payload }`, and the Module hands
+back a way to spell one: every exported Choice is a value as well as a Type,
+holding one constructor per Case.
+
+```js
+let shapes = await loadModule("./Shapes.es")
+let { Shape, areaOf } = shapes.exports
+
+areaOf(Shape.Circle({ radius: 3n })) // 9n
+areaOf(Shape.Blank) // 0n
+```
+
+A Case with a payload is a Function of it; a Case without one is the value
+itself, since there is nothing to pass. What comes back is the plain object the
+boundary already accepts — nothing is marshalled or checked there, so a
+constructor is a *spelling* and every refusal still happens once, at the
+crossing, with the path and the Type to say it in.
+
+Where the Module also writes `namespace Shape for Shape` — which is how a
+Choice is given its Methods — the constructors are members of that Namespace
+instead: one name binds one thing, and `Shape.Circle(…)` beside `Shape.area(…)`
+is the object a reader expects either way. A Method or a static constant of a
+Case's name wins, because the Module really does bind that one.
+
 ## Callbacks
 
 A Function goes in as well as out. Where a Parameter — or a member, or a list
@@ -184,6 +210,21 @@ A Type Alias is declared under the name it was written with and referred to by
 it everywhere else, a Choice becomes the union of its Cases, and `Optional<T>`
 is `T | undefined`. A Parameter is named by its label; a `_` Parameter by its
 position.
+
+A Choice is declared twice under its one name — the Type a value of it *is*,
+and the constructors a host spells one *with* — which TypeScript keeps apart by
+itself.
+
+```ts
+export type Shape =
+	| { $case: "Shape#Circle"; radius: bigint }
+	| { $case: "Shape#Blank" }
+
+export declare const Shape: {
+	Circle(payload: { radius: bigint }): { $case: "Shape#Circle"; radius: bigint }
+	Blank: { $case: "Shape#Blank" }
+}
+```
 
 What the boundary cannot carry is declared `never` rather than spelled out,
 because a declaration is only worth having if the calls it admits are the calls

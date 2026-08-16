@@ -117,7 +117,27 @@ export type ExportDescriptor =
 	// JavaScript value carries none. It has no `emitted` of its own: an Overload
 	// set binds no name, each of its Overloads binds one.
 	| { kind: "overloaded"; overloads: Array<OverloadDescriptor> }
+	| ChoiceDescriptor
 	| NamespaceDescriptor
+
+// NOTE: A Choice, which binds NOTHING at all — its Cases are Types, and a Type
+// is erased before a byte is emitted. What a host gets under the name is
+// therefore built rather than bound: one constructor per Case, which is the one
+// piece of a Module's surface this side writes instead of reading. Spelling
+// `{ $case: "Shape#Circle", radius: 3n }` by hand is spelling a string the
+// Compiler already knows, and a typo in it is a Union arm that quietly never
+// matches.
+//
+// NOTE: `emitted` is absent for the same reason: there is nothing to read it
+// off. Where the Module ALSO exports a Namespace of that name — `namespace
+// Shape for Shape`, which is the ordinary way to give a Choice its Methods —
+// the constructors ride on the Namespace instead and no entry of this kind is
+// written, because one name can only be bound once.
+export type ChoiceDescriptor = {
+	kind: "choice"
+	name: string
+	cases: Array<CaseDescriptor>
+}
 
 export type NamespaceDescriptor = {
 	kind: "namespace"
@@ -128,6 +148,11 @@ export type NamespaceDescriptor = {
 	name: string
 	properties: Record<string, { emitted: string; of: Descriptor }>
 	methods: Record<string, NamespaceMethod>
+	// NOTE: The Cases of the Choice this Namespace shares its name with, where
+	// there is one. They are constructors rather than members — see
+	// `ChoiceDescriptor` — and they are here because `Shape.Circle(…)` beside
+	// `Shape.area(…)` is one object either way.
+	cases?: Array<CaseDescriptor>
 }
 
 export type NamespaceMethod =
@@ -431,48 +456,110 @@ export function describeModule(
 	let context: DescribeContext = { entryPath, emit }
 	let exports: Record<string, ExportDescriptor> = {}
 
-	for (let [name, type] of Object.entries(surface.values)) {
-		if (isOverloaded(type)) {
-			exports[name] = {
-				kind: "overloaded",
-				overloads: describeOverloads(
-					type,
-					name,
-					"",
-					escapeName,
-					context,
-				),
+	for (let name of Object.keys(surface.kinds)) {
+		let type = surface.values[name]
+		let entry =
+			type === undefined ? undefined : describeValue(type, name, context)
+		let cases = choiceCasesOf(surface.types[name], name, context)
+
+		if (cases !== null) {
+			// NOTE: One name binds one thing. Where the Module exports a value
+			// of that name as well, the constructors join it if it is a
+			// Namespace — which is where a reader would look for them anyway —
+			// and lose to it otherwise: a value the Module actually binds is
+			// something a host asked for, and constructors it can still spell by
+			// hand are not worth taking one away.
+			if (entry === undefined) {
+				exports[name] = { kind: "choice", name, cases }
+
+				continue
 			}
 
-			continue
+			if (entry.kind === "namespace") {
+				exports[name] = { ...entry, cases }
+
+				continue
+			}
 		}
 
-		switch (type.type) {
-			case "Function":
-				exports[name] = {
-					kind: "function",
-					emitted: escapeName(name),
-					of: describeSignature(type, context),
-				}
-
-				break
-			case "Namespace":
-				exports[name] = describeNamespace(type, name, context)
-
-				break
-			// NOTE: Everything a value can be MADE of — a constant, and nothing
-			// else, since the Validator refuses to export a `variable` and a
-			// Method is only ever reached through the Namespace that holds it.
-			default:
-				exports[name] = {
-					kind: "constant",
-					emitted: escapeName(name),
-					of: describe(type, context),
-				}
+		if (entry !== undefined) {
+			exports[name] = entry
 		}
 	}
 
 	return { exports }
+}
+
+function describeValue(
+	type: common.Type,
+	name: string,
+	context: DescribeContext,
+): ExportDescriptor {
+	if (isOverloaded(type)) {
+		return {
+			kind: "overloaded",
+			overloads: describeOverloads(type, name, "", escapeName, context),
+		}
+	}
+
+	switch (type.type) {
+		case "Function":
+			return {
+				kind: "function",
+				emitted: escapeName(name),
+				of: describeSignature(type, context),
+			}
+		case "Namespace":
+			return describeNamespace(type, name, context)
+		// NOTE: Everything a value can be MADE of — a constant, and nothing
+		// else, since the Validator refuses to export a `variable` and a
+		// Method is only ever reached through the Namespace that holds it.
+		default:
+			return {
+				kind: "constant",
+				emitted: escapeName(name),
+				of: describe(type, context),
+			}
+	}
+}
+
+// NOTE: The Cases a name is the CHOICE of, or `null` where it names something
+// else. A Choice reaches an Export Surface as the Union of its Cases — and as a
+// lone Case where it declares exactly one — so what is asked is whether every
+// arm is a Case of one Choice, and whether that Choice is this very name.
+//
+// NOTE: The name has to match because a Type Alias for a Choice is the same
+// Union — `type Figure = Shape` is indistinguishable from `Shape` by shape
+// alone. Constructors under the Alias would build values that say `Shape#Circle`
+// while the name that offered them said `Figure`, and a second door onto one set
+// of constructors is a second thing to keep true. The same rule leaves a Choice
+// exported under an `as` name alone, for the same reason.
+function choiceCasesOf(
+	type: common.Type | undefined,
+	name: string,
+	context: DescribeContext,
+): Array<CaseDescriptor> | null {
+	if (type === undefined) {
+		return null
+	}
+
+	let described = describe(type, context)
+	let arms = described.kind === "union" ? described.arms : [described]
+	let cases: Array<CaseDescriptor> = []
+
+	for (let arm of arms) {
+		// NOTE: `Optional`'s own two Cases are spelled by absence rather than by
+		// a `$case`, so there is nothing for a constructor to build — and a
+		// Module declaring a `choice Optional` of its own is not one of them,
+		// which is what `optional` says.
+		if (arm.kind !== "case" || arm.optional || arm.choice !== name) {
+			return null
+		}
+
+		cases.push(arm)
+	}
+
+	return cases.length === 0 ? null : cases
 }
 
 // NOTE: The Types the Module declares, in the order it exported them — what a

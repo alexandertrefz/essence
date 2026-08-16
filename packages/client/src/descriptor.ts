@@ -22,6 +22,7 @@ import { createInterpreter, type EssenceFunction } from "./marshal-runtime"
 // can be followed to a toolchain.
 export {
 	type CaseDescriptor,
+	type ChoiceDescriptor,
 	type DeclaredType,
 	describe,
 	type DescribeContext,
