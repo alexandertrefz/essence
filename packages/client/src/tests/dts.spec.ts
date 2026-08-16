@@ -158,28 +158,48 @@ export declare const Rectangle: { of(width: bigint, height: bigint): Rectangle }
 		)
 	})
 
-	// NOTE: "Callbacks are not supported yet" is a decision the Marshaller makes
-	// and this file has to keep — a callable Parameter Type typechecks a call
-	// that always throws, which is what the Overload branch above already avoids.
-	it("refuses a callback in a Parameter position", async () => {
-		expect(await declarationsOf(clientFixture("Calls.es"))).toContain(
-			"export declare function applied(p0: bigint, p1: never /* callbacks are not supported yet */): bigint",
+	// NOTE: A callback Parameter is the Function the MODULE will call, so it is
+	// declared as the call the host has to be ready for: its Parameters are the
+	// Module's own values coming out, and its answer is a value going in. The
+	// direction turns around at the Function and nowhere else.
+	it("declares a callback Parameter as the call the Module will make", async () => {
+		let text = await declarationsOf(clientFixture("Calls.es"))
+
+		expect(text).toContain(
+			"export declare function applied(p0: bigint, p1: (p0: bigint) => bigint): bigint",
+		)
+		expect(text).toContain(
+			"export declare function measured(box: Box, by: (p0: Box) => bigint): bigint",
 		)
 	})
 
-	// NOTE: The same refusal where the callback hides behind a name. The Alias
-	// is declared once, in its out-form — a Function COMES BACK callable — so a
-	// Parameter naming it would typecheck the call that always throws; the
-	// shape is spelled out there instead, with the `never` on the member that
-	// is the mistake.
-	it("spells out a named Type whose member can not cross in", async () => {
+	// NOTE: A Type Alias holding a callback is named in BOTH directions, because
+	// what it holds reads the same either way — the Alias is declared once, and
+	// naming it at a Parameter is the claim that it does.
+	it("names a Type whose members cross the same way in both directions", async () => {
 		let text = await declarationsOf(clientFixture("Calls.es"))
 
 		expect(text).toContain(
 			"export type Handler = { callback: (p0: bigint) => bigint }",
 		)
 		expect(text).toContain(
-			"export declare function invoke(p0: { callback: never /* callbacks are not supported yet */ }): bigint",
+			"export declare function invoke(p0: Handler): bigint",
+		)
+	})
+
+	// NOTE: And spelled out where it does not. `Nest` holds an Optional inside
+	// an Optional: coming out that is `bigint | undefined`, and going in it is
+	// nothing at all — so a Parameter naming the Alias would typecheck the call
+	// that always throws, and the `never` goes on the member that is the
+	// mistake.
+	it("spells out a named Type whose member can not cross in", async () => {
+		let text = await declarationsOf(clientFixture("Refused.es"))
+
+		expect(text).toContain(
+			"export type Nest = { level: bigint | undefined }",
+		)
+		expect(text).toContain(
+			"export declare function nesting(p0: { level: never /* an Optional inside an Optional has no JavaScript spelling */ }): Nest",
 		)
 	})
 

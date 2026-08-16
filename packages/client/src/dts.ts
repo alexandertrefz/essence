@@ -198,8 +198,12 @@ function bundleBlocks(
 // Type, because the boundary is not symmetric: coming out a value says what it
 // is, and going in it has to be BUILT against what the Module declared. What the
 // interpreter has no way to build is therefore uninhabited on the way in and
-// perfectly ordinary on the way out — a Type Parameter is the clearest case, and
-// a Function the one a host is most likely to try.
+// perfectly ordinary on the way out — a Type Parameter is the clearest case.
+//
+// NOTE: It travels DOWN through everything a position carries, and a Function is
+// the one shape that turns it around: whoever holds a Function passes its
+// Parameters and reads its answer, so a callback going in is handed values that
+// are coming out.
 type Direction = "in" | "out"
 
 // NOTE: The Descriptors nothing may be passed to, as the one TypeScript Type
@@ -209,8 +213,8 @@ type Direction = "in" | "out"
 //
 // NOTE: A `refused` node carries the sentence the interpreter throws, so the
 // refusal a reader is shown and the refusal a caller would have been given are
-// one string. The two rules below are the interpreter's own, stated where the
-// Descriptor has a shape rather than a refusal to carry them.
+// one string. The rule below is the interpreter's own, stated where the
+// Descriptor has a shape rather than a refusal to carry it.
 function inputRefusal(node: Descriptor): string | null {
 	let item = optionalItem(node)
 
@@ -218,24 +222,17 @@ function inputRefusal(node: Descriptor): string | null {
 		return "never /* an Optional inside an Optional has no JavaScript spelling */"
 	}
 
-	switch (node.kind) {
-		case "refused":
-			return `never /* ${node.why} */`
-		case "function":
-			return "never /* callbacks are not supported yet */"
-		default:
-			return null
-	}
+	return node.kind === "refused" ? `never /* ${node.why} */` : null
 }
 
-// NOTE: Whether anything a value of this Descriptor CARRIES would be refused on
-// the way in — a callback member three levels down means no value the declaration
-// admits can actually be built. What it decides is whether an in-position use may
-// go by name: a Type Alias is declared once, in its permissive out-form, so a
-// Parameter naming a tainted one would typecheck the call that always throws.
-// Spelling the shape out instead puts the `never` on the member that is the
-// mistake.
-function containsInputRefusal(node: Descriptor): boolean {
+// NOTE: Whether this Descriptor's two directions are printed DIFFERENTLY. What it
+// decides is whether an in-position use may go by NAME: a Type Alias is declared
+// once, in its out-form, so naming it at a Parameter is the claim that a value
+// going in has the same shape as one coming out. Where that is false — a refusal
+// three levels down, a callback member, whose own directions turn around — the
+// shape is spelled out at the Parameter instead, which puts the difference on the
+// member it belongs to rather than on the name.
+function crossesDifferently(node: Descriptor): boolean {
 	if (inputRefusal(node) !== null) {
 		return true
 	}
@@ -243,13 +240,23 @@ function containsInputRefusal(node: Descriptor): boolean {
 	switch (node.kind) {
 		case "list":
 		case "optional":
-			return containsInputRefusal(node.of)
+			return crossesDifferently(node.of)
 		case "record":
-			return Object.values(node.members).some(containsInputRefusal)
+			return Object.values(node.members).some(crossesDifferently)
 		case "case":
-			return Object.values(node.payload).some(containsInputRefusal)
+			return Object.values(node.payload).some(crossesDifferently)
 		case "union":
-			return node.arms.some(containsInputRefusal)
+			return node.arms.some(crossesDifferently)
+		// NOTE: A Function turns its own directions around — whoever holds it
+		// passes its Parameters and reads its answer, and which side that is
+		// depends on which way the Function itself crossed. So it prints
+		// differently exactly where anything it carries does.
+		case "function":
+			return (
+				node.parameters.some((parameter) =>
+					crossesDifferently(parameter.of),
+				) || crossesDifferently(node.returns)
+			)
 		default:
 			return false
 	}
@@ -357,7 +364,7 @@ function createWalker(
 
 		if (
 			alias !== undefined &&
-			(direction === "out" || !containsInputRefusal(node))
+			(direction === "out" || !crossesDifferently(node))
 		) {
 			return alias
 		}
@@ -389,16 +396,19 @@ function createWalker(
 			case "optional":
 			case "union":
 				return unionParts(node, direction).join(" | ")
-			// NOTE: Coming OUT only — `inputRefusal` has already answered for
-			// the other direction. A Function that comes back is wrapped to
-			// marshal around its calls, so the signature printed here is the one
-			// a caller really calls — and its own Parameters are values that
-			// pass IN.
+			// NOTE: A Function crosses BOTH ways, and its own two directions are
+			// the reverse of whichever way it crossed. One coming out is called
+			// by the host, so its Parameters are values passing IN and its
+			// answer one coming OUT; one going in is called by the MODULE, so
+			// its Parameters are the Module's own values coming OUT and its
+			// answer is a value passing IN. Either way it is wrapped to marshal
+			// around its calls, so the signature printed here is the one whoever
+			// holds it really calls.
 			case "function":
-				return `(${printParameters(node.parameters)}) => ${print(
-					node.returns,
-					"out",
-				)}`
+				return `(${printParameters(
+					node.parameters,
+					direction === "out" ? "in" : "out",
+				)}) => ${print(node.returns, direction)}`
 			// NOTE: The numeric tower above Rational, a Type Parameter nothing
 			// has applied, and whatever else arrives before its mapping does —
 			// each carrying the sentence the Compiler wrote while it still had
@@ -491,16 +501,18 @@ function createWalker(
 		return unique.length === 0 ? ["never"] : unique
 	}
 
-	// NOTE: A Parameter is the one position a value goes IN at, and everything
-	// under it goes in with it — the item Type of a List Parameter, the member
-	// Type of a Record one.
+	// NOTE: Everything under a Parameter crosses the way the Parameter does —
+	// the item Type of a List Parameter, the member Type of a Record one. Which
+	// way that is belongs to the caller: the Module's own Parameters are values
+	// going IN, and a callback's are the Module's values coming OUT.
 	function printParameters(
 		parameters: FunctionDescriptor["parameters"],
+		direction: Direction,
 	): string {
 		return parameterNames(parameters)
 			.map(
 				(name, index) =>
-					`${name}: ${print(parameters[index]!.of, "in")}`,
+					`${name}: ${print(parameters[index]!.of, direction)}`,
 			)
 			.join(", ")
 	}
@@ -545,6 +557,7 @@ function createWalker(
 		if (entry.kind === "function" && isValueName(name)) {
 			return `export declare function ${name}(${printParameters(
 				entry.of.parameters,
+				"in",
 			)}): ${print(entry.of.returns, "out")}`
 		}
 
@@ -579,6 +592,7 @@ function createWalker(
 			entries.push(
 				`${memberName(name)}(${printParameters(
 					method.of.parameters,
+					"in",
 				)}): ${print(method.of.returns, "out")}`,
 			)
 		}

@@ -35,6 +35,12 @@ import { EssenceRational } from "./rational"
 // builds against it. That is what makes the boundary lossless in both directions
 // rather than merely plausible.
 //
+// A Function goes in as well as out, and it is the one value whose two directions
+// turn around inside it: a callback the Module calls is handed the Module's own
+// values, which cross OUT, and answers with one that crosses IN. So both
+// directions are reached from both, and every rule below is written once for both
+// callers.
+//
 // NOTE: Nothing here guesses at the runtime. The Symbol every tag is read through
 // and every constructor a value is built by come out of the BUNDLE, through the
 // bridge — a value built any other way carries a Symbol the Module has never seen,
@@ -78,6 +84,15 @@ function member(at: Path, name: string): Path {
 
 function index(at: Path, position: number): Path {
 	return { root: at.root, trail: `${at.trail}[${position}]` }
+}
+
+// NOTE: A place of its own INSIDE the value at this one — a callback's own
+// Arguments and its answer, which are not parts of the Function the way a member
+// is part of a Record. Everything reached from there is spelled below the whole
+// of where the callback was, so a refusal reads `argument 2 → return value →
+// .width` and names the Function the caller actually passed.
+function within(at: Path, what: string): Path {
+	return { root: `${spell(at)} → ${what}`, trail: "" }
 }
 
 // NOTE: How many names an Error spells out before it starts counting.
@@ -363,6 +378,52 @@ export function createInterpreter(bridge: RuntimeBridge): Interpreter {
 		}
 	}
 
+	// NOTE: One JavaScript Function as an Essence one — the mirror image of
+	// `wrapFunction`, and the only place the boundary is crossed by a call the
+	// MODULE makes. What the Module hands the callback are its own values, so
+	// they cross OUT; what the callback answers with is built against the
+	// declared return, so it crosses IN. Every rule of both directions is the
+	// same rule as everywhere else, applied at a call site the host wrote.
+	//
+	// NOTE: Positionally, and never by label. A labelled call is how Essence
+	// writes its own calls and how a host may write one INTO the Module; a
+	// JavaScript Function takes its Arguments in order, and handing one an
+	// object of labels would be this package inventing a calling convention
+	// for code it did not write.
+	//
+	// NOTE: The path a refusal inside the callback is spelled from is the path
+	// the callback itself arrived at — `argument 2 → return value` — because
+	// that is where a reader has to go to fix it. The Function that failed is
+	// the one they passed at `argument 2`, not one of the Module's.
+	function wrapCallback(
+		value: unknown,
+		signature: FunctionDescriptor,
+		at: Path,
+	): EssenceValue {
+		if (typeof value !== "function") {
+			throw mismatch(value, signature.shown, at)
+		}
+
+		let target = value as (...args: Array<unknown>) => unknown
+		let parameters = signature.parameters
+
+		return (...args: Array<EssenceValue>): EssenceValue => {
+			let given = parameters.map((parameter, position) =>
+				toJS(
+					args[position],
+					within(at, `argument ${position + 1}`),
+					parameter.of,
+				),
+			)
+
+			return fromJS(
+				target(...given),
+				signature.returns,
+				within(at, "return value"),
+			)
+		}
+	}
+
 	// #endregion
 
 	// #region In
@@ -539,12 +600,7 @@ export function createInterpreter(bridge: RuntimeBridge): Interpreter {
 				throw mismatch(value, expected.shown, at)
 			}
 			case "function":
-				throw new EssenceMarshalError(
-					`${spell(at)}: callbacks are not supported yet — ${
-						expected.shown
-					} can not be built from a JavaScript value.`,
-					spell(at),
-				)
+				return wrapCallback(value, expected, at)
 			// NOTE: Everything the boundary has no mapping for, refused in the
 			// words the Compiler wrote when it still had the Type to name.
 			case "refused":

@@ -121,6 +121,35 @@ signature and both ways of writing it. An overloaded Method throws one too:
 which Overload a call means is decided by the Argument Types, and a JavaScript
 value carries none, so each Overload is reached by its own name on `raw`.
 
+## Callbacks
+
+A Function goes in as well as out. Where a Parameter — or a member, or a list
+item — declares one, a JavaScript Function is accepted there and the Module
+calls it.
+
+```js
+let calls = await loadModule("./Calls.es")
+
+calls.exports.applied(3n, (value) => value * 2n) // 6n
+```
+
+Its own two directions are the reverse of the way it crossed: the Module hands
+a callback *its* values, which come **out**, and whatever the callback answers
+with is built against the declared return, so it goes **in**. Everything the
+mapping table says applies at both ends of that call, and a refusal inside one
+is spelled from where the callback arrived — the Function to go and fix is the
+one that was passed there.
+
+```
+argument 2 → return value: expected Integer, got the string "twice".
+```
+
+A callback is called positionally, whatever labels its declared signature
+carries: a JavaScript Function takes its Arguments in order, and this package
+does not invent a calling convention for code it did not write. It is called
+as many times as the Module calls it — a callback is not a value marshalled
+once and remembered.
+
 ## Types
 
 `generateDeclarations` turns a Module's Descriptor into a TypeScript
@@ -160,12 +189,12 @@ What the boundary cannot carry is declared `never` rather than spelled out,
 because a declaration is only worth having if the calls it admits are the calls
 that work. An overloaded Method is `never` — which Overload a call means is
 decided by the Argument Types, which a JavaScript value does not carry. So is a
-callback Parameter, so is a nested `Optional` — both of its levels would be
-`undefined` — and so is a Type Parameter in an input position: a Type
-Parameter is a shape that has not been decided yet, and a value going *in* has
-to be built against a shape. A named Type whose members hit one of
-these refusals going in is spelled out at that Parameter, with the `never` on
-the member that is the mistake. Each refusal is declared in the words the
+nested `Optional` — both of its levels would be `undefined` — and so is a Type
+Parameter in an input position: a Type Parameter is a shape that has not been
+decided yet, and a value going *in* has to be built against a shape. A named
+Type whose members read differently going in — a refusal among them, or a
+callback, whose own directions turn around — is spelled out at that Parameter,
+with the difference on the member it belongs to. Each refusal is declared in the words the
 boundary would have thrown, so what a reader is shown and what a caller would
 have been told are one sentence.
 
@@ -289,9 +318,6 @@ toJS(math.raw.square(fromJS(12n, squared.parameterTypes[0].type))) // 144n
 
 ## What this does not do yet
 
-- **Callbacks.** A Function comes out of a Module callable — wrapped against
-  the Type its position declared — but one can not be passed *in*. `fromJS`
-  against a Function Type says so.
 - **Generics.** A Type Parameter is a shape that has not been decided yet, and
   a value going in has to be built against a shape — so an Argument at a Type
   Parameter position is refused, and only an empty `List` gets through. A
