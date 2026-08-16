@@ -1,4 +1,3 @@
-import { BRIDGE_EXPORTS } from "./bridge"
 import type {
 	CaseDescriptor,
 	DeclaredType,
@@ -20,11 +19,10 @@ import { isTypeName, isValueName, mangled, memberName } from "./names"
 // NOTE: There are TWO views of a Module, because a bundler serves two doors into
 // one. The wrapper the plugin emits hands over JavaScript — that is the
 // `javascript` view, and the whole of the mapping table. Behind it, `?raw` serves
-// the emitted bundle itself: Essence's own values, under the names the Rewriter
-// emitted them as — that is the `bundle` view, where every value is opaque and
-// the bridge that builds them is declared beside it. A generated declaration file
-// has to describe the module it sits next to, so which of the two is asked for is
-// not a matter of taste.
+// the emitted Module itself: Essence's own values, under the names the Rewriter
+// emitted them as — that is the `bundle` view, where every value is opaque. A
+// generated declaration file has to describe the module it sits next to, so which
+// of the two is asked for is not a matter of taste.
 
 export type DeclarationView = "javascript" | "bundle"
 
@@ -84,8 +82,9 @@ function header(view: DeclarationView, moduleName: string | undefined): string {
 		view === "javascript"
 			? ["// The Module as JavaScript — marshalled at every boundary."]
 			: [
-					"// The bundle's own exports: Essence values, under the names the Rewriter",
-					"// emitted them as, beside the bridge that builds values they accept.",
+					"// The Module's own exports: Essence values, under the names the",
+					"// Rewriter emitted them as. Build one with `@essence-lang/runtime`,",
+					"// which the build resolves to the same copy these were built by.",
 				]
 
 	return [
@@ -145,7 +144,7 @@ function javascriptBlocks(
 
 // #region The bundle view
 
-// NOTE: What the emitted bundle actually binds, and nothing it does not: a Type,
+// NOTE: What the emitted Module actually binds, and nothing it does not: a Type,
 // a Choice and a Protocol are erased before a byte is emitted, so a declaration
 // for one would name an export that is not there. An Overload set binds no name
 // of its own either — each Overload is its own `name__overload$N`, and those are
@@ -182,52 +181,12 @@ function bundleBlocks(
 		// the plugin need not have installed.
 		[
 			"// NOTE: An Essence value as JavaScript holds it — deliberately opaque. It",
-			"// carries its Type on a Symbol minted while this bundle was evaluated, so",
-			"// nothing outside the bundle can read one apart or build one.",
+			"// carries its Type on a Symbol the runtime mints, and reading one apart",
+			"// or building one is `@essence-lang/runtime`'s to do.",
 			"type EssenceValue = object",
 		].join("\n"),
 		grouped(declarations),
-		[
-			"// NOTE: The bundle's own runtime. Every Essence value carries its Type on a",
-			"// Symbol minted while this bundle was evaluated, so these are the only",
-			"// constructors whose values its Functions recognise.",
-			...bridgeDeclarations(),
-		].join("\n"),
 	].filter((block) => block !== "")
-}
-
-function bridgeDeclarations(): Array<string> {
-	let signatures: Array<[string, string]> = [
-		[BRIDGE_EXPORTS.typeKey, "symbol"],
-		[
-			BRIDGE_EXPORTS.case,
-			"(tag: string, payload?: Record<string, EssenceValue>) => EssenceValue",
-		],
-		// NOTE: Both kinds in, because the door canonicalises — an Integer
-		// holds a number while its value fits one and a bigint beyond that, and
-		// a caller has no business knowing which side of 2⁵³ its value sits. A
-		// number that is not exactly an integer a double holds is refused
-		// rather than admitted, which is what the declared Type can not say.
-		// Out is always a `bigint`, which is what the marshalled Type below
-		// says, so that an export's declared Type does not depend on the SIZE
-		// of the answer.
-		[BRIDGE_EXPORTS.integer, "(value: number | bigint) => EssenceValue"],
-		[
-			BRIDGE_EXPORTS.rational,
-			"(numerator: bigint, denominator: bigint) => EssenceValue",
-		],
-		[BRIDGE_EXPORTS.string, "(value: string) => EssenceValue"],
-		[BRIDGE_EXPORTS.boolean, "(value: boolean) => EssenceValue"],
-		[BRIDGE_EXPORTS.list, "(items: Array<EssenceValue>) => EssenceValue"],
-		[
-			BRIDGE_EXPORTS.record,
-			"(fields: Record<string, EssenceValue>) => EssenceValue",
-		],
-	]
-
-	return signatures.map(
-		([name, signature]) => `export declare const ${name}: ${signature}`,
-	)
 }
 
 // #endregion

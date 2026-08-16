@@ -246,7 +246,7 @@ export declare const Rectangle: { of(width: bigint, height: bigint): Rectangle }
 })
 
 describe("The bundle view", () => {
-	it("describes what the emitted bundle binds, and the bridge beside it", async () => {
+	it("describes what the emitted Module binds", async () => {
 		expect(
 			await declarationsOf(
 				fixturePath("modules", "math", "Math.es"),
@@ -255,28 +255,17 @@ describe("The bundle view", () => {
 		).toBe(
 			`// Generated from Math.es by @essence-lang/client. Do not edit.
 //
-// The bundle's own exports: Essence values, under the names the Rewriter
-// emitted them as, beside the bridge that builds values they accept.
+// The Module's own exports: Essence values, under the names the
+// Rewriter emitted them as. Build one with \`@essence-lang/runtime\`,
+// which the build resolves to the same copy these were built by.
 
 // NOTE: An Essence value as JavaScript holds it — deliberately opaque. It
-// carries its Type on a Symbol minted while this bundle was evaluated, so
-// nothing outside the bundle can read one apart or build one.
+// carries its Type on a Symbol the runtime mints, and reading one apart
+// or building one is \`@essence-lang/runtime\`'s to do.
 type EssenceValue = object
 
 export declare const PI: EssenceValue
 export declare function square(p0: EssenceValue): EssenceValue
-
-// NOTE: The bundle's own runtime. Every Essence value carries its Type on a
-// Symbol minted while this bundle was evaluated, so these are the only
-// constructors whose values its Functions recognise.
-export declare const $bridge_typeKey: symbol
-export declare const $bridge_case: (tag: string, payload?: Record<string, EssenceValue>) => EssenceValue
-export declare const $bridge_integer: (value: number | bigint) => EssenceValue
-export declare const $bridge_rational: (numerator: bigint, denominator: bigint) => EssenceValue
-export declare const $bridge_string: (value: string) => EssenceValue
-export declare const $bridge_boolean: (value: boolean) => EssenceValue
-export declare const $bridge_list: (items: Array<EssenceValue>) => EssenceValue
-export declare const $bridge_record: (fields: Record<string, EssenceValue>) => EssenceValue
 `,
 		)
 	})
@@ -385,9 +374,14 @@ export let twelve: bigint = $$integer
 
 		let run = typecheck({
 			"Math.d.es.ts": declarations,
-			"consumer.ts": `import { $bridge_integer, square } from "./Math.es"
+			// NOTE: The value goes in as one of the Module's own — opaque, and
+			// built by the runtime the build resolved for both of them. What
+			// this view promises is that the names are there and that nothing
+			// but an Essence value fits, which is what a consumer can check
+			// without ever meeting a Type.
+			"consumer.ts": `import { PI, square } from "./Math.es"
 
-export let squared = square($bridge_integer(12n))
+export let squared = square(PI)
 `,
 		})
 

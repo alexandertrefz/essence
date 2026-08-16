@@ -259,6 +259,13 @@ export async function emitToMemory(
 		// NOTE: Named but never written — nothing here reaches the Bundler, and
 		// the maps are the Modules' own inline ones.
 		outputFileName: defaultOutputFileName(prepared.entry),
+		// NOTE: Always, for the reason `compileToMemory` always asks for one:
+		// there is no "beside" to write a map to when what a caller is handed is
+		// a string. A host bundler reads the `sourceMappingURL` comment off the
+		// text it is served and composes it into its own map, so a `.es` file
+		// opened in a debugger shows Essence rather than the JavaScript it
+		// emitted — and a host that is not emitting maps drops the comment.
+		sourcemap: true,
 		transformSources: options.transformSources,
 	})
 

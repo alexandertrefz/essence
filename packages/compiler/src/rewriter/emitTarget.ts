@@ -22,6 +22,14 @@ import * as path from "node:path"
 // take the wrong arm.
 export type EmitTarget = { mode: "bundle" } | { mode: "host"; root: string }
 
+// NOTE: The runtime as a HOST resolves it. The package's exports map turns
+// `@essence-lang/runtime/<File>` into its `src/<File>.ts` in a workspace and
+// into `dist/<File>.js` once published, so one specifier reaches the runtime
+// from either side of publishing. Every emitted Module of a host's build
+// imports it this way, and so does the wrapper the client writes in front of
+// them — one specifier, so one runtime and one Type key for the whole app.
+export const RUNTIME_PACKAGE = "@essence-lang/runtime"
+
 export const BUNDLE_TARGET: EmitTarget = { mode: "bundle" }
 
 // NOTE: A target as a cache key names it. Everything a cache of emitted bytes

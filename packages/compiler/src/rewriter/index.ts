@@ -20,6 +20,7 @@ import {
 	BUNDLE_TARGET,
 	type EmitTarget,
 	moduleSpelling,
+	RUNTIME_PACKAGE,
 	spelledFrom,
 } from "./emitTarget"
 import { runtimeNamespaceNames } from "./runtimeNamespaces"
@@ -49,13 +50,8 @@ export {
 	BUNDLE_TARGET,
 	type EmitTarget,
 	emitTargetKey,
+	RUNTIME_PACKAGE,
 } from "./emitTarget"
-
-// NOTE: The runtime as a HOST resolves it. The package's exports map turns
-// `@essence-lang/runtime/<File>` into its `src/<File>.ts` in a workspace and
-// into `dist/<File>.js` once published, so one specifier reaches the runtime
-// from either side of publishing.
-const RUNTIME_PACKAGE = "@essence-lang/runtime"
 
 // NOTE: The Rewriter is a typed simple Program in, JavaScript source text out —
 // no bundling, no minifying, nothing written to disk; that is the Bundler's job.

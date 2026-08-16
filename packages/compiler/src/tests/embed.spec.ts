@@ -522,6 +522,36 @@ export {
 			})
 		})
 
+		// NOTE: The map rides INSIDE each served Module, because a host bundler
+		// reads a `sourceMappingURL` comment off the text a plugin hands it and
+		// there is no file beside a module that never touches disk. Without it a
+		// host's own map still names the `.es` files — and shows the generated
+		// JavaScript under them, which is worse than no map at all.
+		it("carries each Module's source map inside its own text", async () => {
+			await withProject(SHARED, async (root) => {
+				let emitted = await emitToMemory(path.join(root, "Two.es"), {
+					emit: { mode: "host", root },
+				})
+				let shape = emitted.sources.sources.get(
+					"essence:./lib/Shape.es",
+				)!
+				let encoded =
+					/sourceMappingURL=data:application\/json;base64,(\S+)/.exec(
+						shape,
+					)?.[1] ?? ""
+				let map = JSON.parse(
+					Buffer.from(encoded, "base64").toString("utf8"),
+				) as { sources: Array<string>; sourcesContent: Array<string> }
+
+				expect(map.sources).toEqual([
+					path.join(root, "lib", "Shape.es"),
+				])
+				// NOTE: The Essence source, not the JavaScript it emitted — the
+				// one thing a map that names a `.es` file has to be showing.
+				expect(map.sourcesContent[0]).toContain("choice Shape {")
+			})
+		})
+
 		it("imports the runtime by name so a host resolves one of it", async () => {
 			await withProject(SHARED, async (root) => {
 				let bundled = await emitToMemory(path.join(root, "Two.es"))

@@ -7,10 +7,14 @@ import {
 	type CompiledModule,
 	createCompiler,
 	essenceFile,
+	type EssenceCompiler,
 	type PluginOptions,
+	PRELUDE_ID,
+	preludeRequested,
 	rawFile,
 	rawRequested,
 	rawSpecifier,
+	servedFile,
 	wrapperFor,
 } from "./plugin-core"
 
@@ -27,23 +31,10 @@ export type ResolvedConfig = {
 	root?: string
 }
 
-// NOTE: Only what `load` has to reach: the dev server's memory of which
-// modules it has served, so a superseded entry's cached bundle can be made to
-// load again. A module is an opaque token here — it is only ever handed back.
-export type ViteModule = object
-
-export type ViteDevServer = {
-	moduleGraph: {
-		getModuleById: (id: string) => ViteModule | undefined
-		invalidateModule: (module: ViteModule) => void
-	}
-}
-
 export type VitePlugin = {
 	name: string
 	enforce?: "pre" | "post"
 	configResolved: (config: ResolvedConfig) => void
-	configureServer: (server: ViteDevServer) => void
 	buildStart: () => void
 	watchChange: (id: string) => void
 	resolveId: (
@@ -61,40 +52,39 @@ export function essence(options: PluginOptions = {}): VitePlugin {
 	// NOTE: A build writes its output where it was asked to; a server is somebody
 	// sitting in an editor. Which one this is is not known until Vite says.
 	let serving = false
-	// NOTE: The project root Vite resolved, because a dev server spells its ids
-	// relative to it — `/src/Main.es` names a file under the root, not one at
-	// the root of the filesystem.
-	let root: string | null = null
+	// NOTE: The project root Vite resolved. Two things rest on it: a dev server
+	// spells its ids relative to it — `/src/Main.es` names a file under the
+	// root, not one at the root of the filesystem — and it is what every
+	// emitted Module of this build is spelled against, so that a file two
+	// entries share is one module rather than two.
+	let root = process.cwd()
 	// NOTE: Replaced when Vite resolves a configuration, which is once per build
-	// — so what a previous build compiled is not held against this one.
-	let compiler = createCompiler(options)
-	// NOTE: Present exactly while a dev server is serving — a build has no
-	// module cache to force anything out of.
-	let server: ViteDevServer | null = null
+	// — so what a previous build compiled is not held against this one, and the
+	// root it was compiled under is this build's.
+	let compiler: EssenceCompiler = createCompiler(options, root)
+	// NOTE: The files the HOST asked for through `?raw`, which is the only way
+	// to tell one of those from the wrapper's own import of the same Module —
+	// they resolve to one id on purpose, so that a build holds one copy. It is
+	// what decides whether a `bundle` view is written: a sibling served through
+	// the same door was reached by the graph rather than imported by anybody,
+	// and declaring it would leave a file beside every source of the project.
+	let rawDoors = new Set<string>()
 
-	// NOTE: A superseded entry may still be LIVE — the dev server re-transforms
-	// a module only when its OWN watched files change, so a page still serving
-	// one would keep its cached bundle and the collision would never be seen
-	// again. Invalidating the module is what makes the record's premise true: an
-	// entry anything still requests is loaded again, compiles, collides with the
-	// fresh record this compile just wrote, and refuses there — one nothing
-	// requests again was genuinely folded away, and stays gone.
 	function served(
 		context: PluginContext | undefined,
-		compiled: CompiledModule,
+		files: Array<string>,
 	): void {
-		if (server !== null) {
-			for (let entry of compiled.superseded) {
-				let module = server.moduleGraph.getModuleById(entry)
-
-				if (module !== undefined) {
-					server.moduleGraph.invalidateModule(module)
-				}
-			}
-		}
-
-		for (let source of compiled.files) {
+		for (let source of files) {
 			context?.addWatchFile?.(source)
+		}
+	}
+
+	async function declare(
+		compiled: CompiledModule,
+		view: "javascript" | "bundle",
+	): Promise<void> {
+		if (options.declarations ?? serving) {
+			await compiler.declare(compiled, view)
 		}
 	}
 
@@ -105,18 +95,14 @@ export function essence(options: PluginOptions = {}): VitePlugin {
 		enforce: "pre",
 		configResolved(config) {
 			serving = config.command === "serve"
-			root = config.root ?? null
-			compiler = createCompiler(options)
+			root = canonicalPath(config.root ?? process.cwd())
+			compiler = createCompiler(options, root)
 		},
-		configureServer(instance) {
-			server = instance
-		},
-		// NOTE: The two moments the shape of the build may have changed — a
-		// rebuild in watch mode starts, a file changes under a dev server — so
-		// what was an entry before may not be one now. The compiler is told
-		// rather than replaced: its memory of the graphs is what catches two
-		// entries sharing one, and only its confidence in WHO the entries are
-		// has expired.
+		// NOTE: The two moments what was emitted may no longer be what these
+		// sources emit — a rebuild in watch mode starts, a file changes under a
+		// dev server. Nothing else here has state to lose: what the compiler
+		// remembers is emitted TEXT, which outlives an edit to the source it
+		// came from unless it is told otherwise.
 		buildStart() {
 			compiler.invalidate()
 		},
@@ -126,10 +112,24 @@ export function essence(options: PluginOptions = {}): VitePlugin {
 		resolveId(source, importer) {
 			// NOTE: The wrapper's own import, coming back through resolution
 			// with the entry already spelled out. `\0` is Rollup's mark for a
-			// module no filesystem holds, which is exactly what the emitted
-			// bundle is — without it Vite would go looking for a file.
+			// module no filesystem holds, which is exactly what an emitted
+			// Module is — without it Vite would go looking for a file.
 			if (rawFile(source) !== null) {
 				return `\0${source}`
+			}
+
+			// NOTE: What one served Module imports another by. The Rewriter
+			// spelled it against the ROOT, so it resolves to the same id
+			// whichever entry emitted the importer — which is what leaves the
+			// build holding one module per file.
+			if (preludeRequested(source)) {
+				return `\0${PRELUDE_ID}`
+			}
+
+			let sibling = servedFile(source, root)
+
+			if (sibling !== null) {
+				return `\0${rawSpecifier(sibling)}`
 			}
 
 			let file = essenceFile(source)
@@ -146,11 +146,9 @@ export function essence(options: PluginOptions = {}): VitePlugin {
 			// what Vite itself would have read the id as; a path that resolves
 			// under the root to nothing is taken as the filesystem's.
 			if (path.isAbsolute(file)) {
-				let rooted = root === null ? null : path.join(root, file)
+				let rooted = path.join(root, file)
 
-				resolved = canonicalPath(
-					rooted !== null && existsSync(rooted) ? rooted : file,
-				)
+				resolved = canonicalPath(existsSync(rooted) ? rooted : file)
 			} else if (importer !== undefined) {
 				// NOTE: A relative id is resolved against the file that WROTE
 				// it, exactly as an Essence specifier is, rather than against
@@ -166,24 +164,32 @@ export function essence(options: PluginOptions = {}): VitePlugin {
 
 			// NOTE: `./Math.es?raw` is the raw door as a HOST writes it, and it
 			// resolves to the same id the wrapper's own import does — one
-			// module either way, rather than two copies of one bundle.
-			return rawRequested(source)
-				? `\0${rawSpecifier(resolved)}`
-				: resolved
+			// module either way, rather than two copies of one Module.
+			if (!rawRequested(source)) {
+				return resolved
+			}
+
+			rawDoors.add(resolved)
+
+			return `\0${rawSpecifier(resolved)}`
 		},
 		async load(id) {
+			if (id === `\0${PRELUDE_ID}`) {
+				return compiler.prelude()
+			}
+
 			let raw = rawFile(id)
 
 			if (raw !== null) {
-				let compiled = await compiler.compile(raw)
+				let module = await compiler.serve(raw)
 
-				if (options.declarations ?? serving) {
-					await compiler.declare(compiled, "bundle")
+				if (rawDoors.has(raw)) {
+					await declare(await compiler.compile(raw), "bundle")
 				}
 
-				served(this, compiled)
+				served(this, module.files)
 
-				return compiled.code
+				return module.code
 			}
 
 			let file = essenceFile(id)
@@ -194,11 +200,8 @@ export function essence(options: PluginOptions = {}): VitePlugin {
 
 			let compiled = await compiler.compile(file)
 
-			if (options.declarations ?? serving) {
-				await compiler.declare(compiled, "javascript")
-			}
-
-			served(this, compiled)
+			await declare(compiled, "javascript")
+			served(this, compiled.files)
 
 			return wrapperFor(compiled.entryPath, compiled.descriptor, options)
 		},

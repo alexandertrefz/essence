@@ -94,10 +94,13 @@ export {
 	declarationsPath,
 	type Diagnostics,
 	type PluginOptions,
+	PRELUDE_ID,
+	preludeRequested,
 	RAW_SCHEME,
 	rawFile,
 	rawRequested,
 	rawSpecifier,
+	servedFile,
 	wrapperFor,
 	type WrapperOptions,
 } from "./plugin-core"
@@ -105,8 +108,6 @@ export {
 	essence,
 	type PluginContext,
 	type ResolvedConfig,
-	type ViteDevServer,
-	type ViteModule,
 	type VitePlugin,
 } from "./vite-plugin"
 export { EssenceRational } from "./rational"
