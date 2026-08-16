@@ -7,8 +7,10 @@ import { fixturePath } from "@essence-lang/fixtures"
 import type { common } from "@essence-lang/interfaces"
 
 import type { EssenceValue } from "../bridge"
+import { describeSignature } from "../descriptor"
 import { EssenceCallError, EssenceMarshalError } from "../errors"
 import { type EssenceModule, loadModule } from "../index"
+import { createInterpreter, type EssenceFunction } from "../marshal-runtime"
 
 let cacheDirectory = ""
 let absence: EssenceModule
@@ -180,6 +182,28 @@ describe("Calling a Function", () => {
 		let handler = calls.exports.handler as { callback: AnyCall }
 
 		expect(handler.callback(4n)).toBe(8n)
+	})
+
+	// NOTE: A constant is marshalled where it is READ, so a constant holding a
+	// Function wraps a fresh one on every read — and everything a SIGNATURE
+	// settles about a call is compiled once against the Descriptor rather than
+	// again on each. What is left per crossing is the name an Error calls the
+	// Function, which is the position it was met at and not a property of the
+	// signature: two crossings of one signature have to keep their own.
+	it("names each crossing of one signature by where it was met", () => {
+		let interpreter = createInterpreter(calls.bridge)
+		let signature = describeSignature(
+			calls.surface.values.positional as common.BaseFunction,
+			{ entryPath: calls.entryPath },
+		)
+		let target = calls.raw.positional as EssenceFunction
+		let here = interpreter.wrapFunction(target, signature, "here")
+		let there = interpreter.wrapFunction(target, signature, "there")
+
+		expect(here(10n, 4n)).toBe(6n)
+		expect(there(10n, 4n)).toBe(6n)
+		expect(callError(() => here(1n)).message).toStartWith("here(")
+		expect(callError(() => there(1n)).message).toStartWith("there(")
 	})
 
 	// NOTE: And a Function goes the other way as well. What the Module hands a
