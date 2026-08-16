@@ -83,6 +83,7 @@ describe("A Module described", () => {
 			choice: "Optional",
 			name: "Value",
 			optional: true,
+			unitChoice: false,
 			payload: { item: { kind: "integer", shown: "Integer" } },
 			shown: "Optional#Value",
 		})
@@ -108,6 +109,7 @@ describe("A Module described", () => {
 			choice: "Optional",
 			name: "Value",
 			optional: false,
+			unitChoice: false,
 			payload: {},
 			shown: "Optional#Value",
 		})
@@ -155,20 +157,39 @@ describe("A Descriptor", () => {
 // import — and every specifier is checked against the three that can not be
 // followed anywhere but a machine with a toolchain on it.
 describe("The runtime half", () => {
-	const RUNTIME_SAFE = ["./errors", "./rational"]
-	const SOURCE = readFileSync(
-		path.join(import.meta.dirname, "..", "marshal-runtime.ts"),
-		"utf8",
-	)
+	const RUNTIME_SAFE = ["./bare-cases", "./errors", "./rational"]
+
+	function sourceOf(fileName: string): string {
+		return readFileSync(
+			path.join(import.meta.dirname, "..", fileName),
+			"utf8",
+		)
+	}
+
+	// NOTE: Both files a bundler would FOLLOW, rather than the marshaller
+	// alone. It imports `bare-cases.ts` for a VALUE — the one rule about a unit
+	// Choice, which the generated declarations read out of the same file — so a
+	// Compiler import added over there reaches a browser exactly as one added
+	// here would, and an assertion that only ever read one file would not say a
+	// word about it.
+	const MARSHALLER = sourceOf("marshal-runtime.ts")
+	const SHARED_RULE = sourceOf("bare-cases.ts")
+	const SOURCES = [MARSHALLER, SHARED_RULE]
 
 	// NOTE: `[^"']*?` spans lines, which is what a formatted import list needs,
 	// and can not run past the specifier of the import it is reading.
-	let imports = [
-		...SOURCE.matchAll(/^import\s+(type\s+)?[^"']*?from\s+"([^"]+)"/gm),
-	].map((match) => ({
-		specifier: match[2]!,
-		typeOnly: match[1] !== undefined,
-	}))
+	function importsOf(
+		source: string,
+	): Array<{ specifier: string; typeOnly: boolean }> {
+		return [
+			...source.matchAll(/^import\s+(type\s+)?[^"']*?from\s+"([^"]+)"/gm),
+		].map((match) => ({
+			specifier: match[2]!,
+			typeOnly: match[1] !== undefined,
+		}))
+	}
+
+	let imports = SOURCES.flatMap(importsOf)
 
 	it("reads its own imports", () => {
 		expect(imports.length).toBeGreaterThan(0)
@@ -188,17 +209,28 @@ describe("The runtime half", () => {
 	// of either would pull the Compiler in behind it.
 	it("imports values from the runtime-safe files alone", () => {
 		expect(
-			imports
+			importsOf(MARSHALLER)
 				.filter((entry) => !entry.typeOnly)
 				.map((entry) => entry.specifier)
 				.sort(),
 		).toEqual(RUNTIME_SAFE)
 	})
 
+	// NOTE: And the file it reaches for a rule in reaches for nothing at all —
+	// it names `./descriptor` to say what shape it reads and imports no value
+	// anywhere, which is what makes it safe to be imported for one.
+	it("leaves the shared rule with no value imports of its own", () => {
+		expect(
+			importsOf(SHARED_RULE).filter((entry) => !entry.typeOnly),
+		).toEqual([])
+	})
+
 	// NOTE: And nothing reaches around the import list. A dynamic import or a
 	// `require` would be invisible to every assertion above.
 	it("reaches for nothing at run time either", () => {
-		expect(SOURCE).not.toMatch(/\bimport\s*\(/)
-		expect(SOURCE).not.toMatch(/\brequire\s*\(/)
+		for (let source of SOURCES) {
+			expect(source).not.toMatch(/\bimport\s*\(/)
+			expect(source).not.toMatch(/\brequire\s*\(/)
+		}
 	})
 })

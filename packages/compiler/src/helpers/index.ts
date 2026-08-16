@@ -1203,6 +1203,15 @@ export function applyGenericBindings(
 								name: generic.name,
 							},
 					),
+					// NOTE: Carried, because it is a fact about the
+					// DECLARATION rather than about the instantiation — a
+					// generic Choice with no payloads has none whichever
+					// Arguments are bound into it. Every other branch of this
+					// case spreads the Case whole and keeps it for free; this
+					// is the one that rebuilds.
+					...(type.unitChoice === true
+						? { unitChoice: true as const }
+						: {}),
 				}
 			}
 

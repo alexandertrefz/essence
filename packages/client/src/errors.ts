@@ -27,6 +27,12 @@ export class EssenceMarshalError extends Error {
 	// than an arm that never took the value at all. A Union tries its arms in
 	// order and answers with one refusal, and this is how it tells "you meant
 	// this one and got a member wrong" from "this is not any of them".
+	//
+	// NOTE: And set by a refusal of the SHAPE rather than of the value — a
+	// position with no JavaScript spelling at all, which no value handed to it
+	// could have got right. Kept for the same reason the recognised ones are:
+	// what this flag is asked is "is this the refusal worth reporting", and a
+	// shape's own is always the answer.
 	readonly inside: boolean
 
 	constructor(message: string, path = "", inside = false) {

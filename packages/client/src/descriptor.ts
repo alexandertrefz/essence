@@ -3,6 +3,7 @@ import {
 	describeSignature,
 	type DescribeContext,
 	type Descriptor,
+	type ModuleDescriptor,
 } from "@essence-lang/compiler/embed/describe"
 import type { common } from "@essence-lang/interfaces"
 
@@ -77,13 +78,20 @@ export type MarshallerOptions = {
 	// A Case tag is spelled relative to the entry INSIDE a bundle, so building one
 	// takes the entry as well as the Type — see `emittedIdentity`.
 	entryPath: string
+	// NOTE: The whole Module. Nothing here reads it — it is handed straight to
+	// the interpreter, which needs it for the one question a value can not
+	// answer about itself: whether the Case it carries is a unit Choice's, and so
+	// crosses as a bare string. Required rather than optional, so that a `toJS`
+	// with no Type over it answers the same string a declared position would —
+	// a door that could be built without it would spell one Case two ways.
+	module: ModuleDescriptor
 }
 
 export function createMarshaller(
 	bridge: RuntimeBridge,
 	options: MarshallerOptions,
 ): Marshaller {
-	let interpreter = createInterpreter(bridge)
+	let interpreter = createInterpreter(bridge, options.module)
 	let context: DescribeContext = { entryPath: options.entryPath }
 	// NOTE: One Descriptor per Type, kept against the Type itself. Describing is
 	// the whole of what this door pays for having been spelled in the Compiler's

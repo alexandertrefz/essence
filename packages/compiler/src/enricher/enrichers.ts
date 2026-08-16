@@ -3135,6 +3135,9 @@ export function enrichChoiceDeclarationStatement(
 						member.type === "Case",
 				)
 			: []
+	let isUnitChoice =
+		caseTypes.length > 0 &&
+		caseTypes.every((member) => member.unitChoice === true)
 
 	return {
 		nodeType: "ChoiceDeclarationStatement",
@@ -3145,6 +3148,11 @@ export function enrichChoiceDeclarationStatement(
 		// NOTE: A duplicate Case was already diagnosed and dropped from the
 		// Union — its name Identifier borrows the surviving Case's Type so the
 		// typed tree stays complete.
+		//
+		// NOTE: The fallback stands for a Case of this same Choice, so it
+		// carries what the Choice was stamped with: where every Case that DID
+		// survive is payload-less, so is the one being stood in for, and a
+		// hovering reader gets the same Type either way.
 		cases: node.cases.map((choiceCase) => {
 			let caseType = caseTypes.find(
 				(candidate) => candidate.name === choiceCase.name.content,
@@ -3153,6 +3161,7 @@ export function enrichChoiceDeclarationStatement(
 				choice: choiceIdentity(modulePathOf(scope), node.name.content),
 				name: choiceCase.name.content,
 				members: {},
+				...(isUnitChoice ? { unitChoice: true as const } : {}),
 			}
 
 			return {
@@ -7299,6 +7308,12 @@ function joinCaseInstantiations(
 		choice: instantiations[0].choice,
 		name: instantiations[0].name,
 		members,
+		// NOTE: Whether the Choice's Cases all have empty payloads is a fact
+		// about the DECLARATION, which every instantiation being joined here
+		// shares — so it survives the join that `typeArguments` does not.
+		...(instantiations[0].unitChoice === true
+			? { unitChoice: true as const }
+			: {}),
 	}
 }
 

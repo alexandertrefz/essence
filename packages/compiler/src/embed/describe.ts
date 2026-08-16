@@ -91,6 +91,17 @@ export type CaseDescriptor = {
 	// `constant thing = #Value(3)` is inferred as the Case rather than as the
 	// Union an annotation would have named.
 	optional: boolean
+	// NOTE: Whether EVERY Case of this Case's Choice has an empty payload — a
+	// unit Choice, spelled on the JavaScript side by its bare Case name rather
+	// than by a `$case` object, in both directions. `payload` is then always
+	// `{}`, and `optional` is always false: `Optional` carries an `item`.
+	//
+	// NOTE: All-or-nothing per Choice, which is why the answer is not simply
+	// "this Case has no payload". A mixed Choice (`#Circle(radius)` beside
+	// `#Blank`) keeps the object form for every one of its Cases — one Choice
+	// with two JavaScript spellings would be a Union a host has to discriminate
+	// by `typeof` before it can read it.
+	unitChoice: boolean
 	payload: Record<string, Descriptor>
 	shown: string
 }
@@ -390,6 +401,15 @@ function describeCase(
 		// so a Module declaring a `choice Optional` of its own is a Choice like
 		// any other.
 		optional: type.choice === "Optional",
+		// NOTE: Read off the Case rather than worked out here, because the
+		// question is about the Case's SIBLINGS and this side is handed one
+		// Type with no scope behind it — the Enricher stamps the answer at the
+		// declaration. The builtin `Optional` is excluded by the same
+		// whole-identity comparison as above: it is spelled by absence, which
+		// is a spelling of its own and outranks this one. It carries a payload
+		// and so would never be stamped anyway; saying so here is what keeps
+		// the two rules from having to be read together.
+		unitChoice: type.unitChoice === true && type.choice !== "Optional",
 		payload: describeMembers(type.members, context, printing),
 		shown,
 	}

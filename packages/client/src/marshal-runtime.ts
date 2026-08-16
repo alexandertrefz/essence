@@ -1,3 +1,4 @@
+import { bareCaseCollision } from "./bare-cases"
 import type { EssenceValue, RuntimeBridge } from "./bridge"
 import type {
 	CaseDescriptor,
@@ -14,10 +15,16 @@ import { EssenceRational } from "./rational"
 // every call, over Descriptors rather than over Types. It knows nothing about the
 // Compiler and can not be made to: the two imports above that reach a file the
 // Compiler is in are `import type`, which is erased before anything runs, and
-// `descriptor.spec.ts` reads this file back to say so. That is the whole of what
-// "one marshaller" costs — a boundary that ships to a browser has to be a
-// boundary that does not bring a Compiler with it, and there is exactly one of
-// them either way.
+// `descriptor.spec.ts` reads this file back to say so. `bare-cases.ts` is the
+// one VALUE import that is not `errors` or `rational`, and it holds a RULE
+// rather than a tool — it reads a Descriptor's shape and names `./descriptor`
+// under an `import type` of its own, so nothing followable leads out of it
+// either. It is imported rather than written out here because the generated
+// declarations read the same rule, and a second copy is the only way the two
+// could come to disagree about which positions this boundary refuses. That is
+// the whole of what "one marshaller" costs — a boundary that ships to a browser
+// has to be a boundary that does not bring a Compiler with it, and there is
+// exactly one of them either way.
 //
 // NOTE: The two directions across the boundary, and they are not mirror images.
 //
@@ -224,7 +231,10 @@ type ListBox = {
 	frontLen?: number
 }
 
-export function createInterpreter(bridge: RuntimeBridge): Interpreter {
+export function createInterpreter(
+	bridge: RuntimeBridge,
+	module: ModuleDescriptor,
+): Interpreter {
 	// NOTE: The bundle's own Type key and constructors, read off the bridge ONCE.
 	// Every value that crosses reaches one of them, and a property load on the
 	// way to each call is exactly the sort of work the compile step exists to
@@ -239,6 +249,22 @@ export function createInterpreter(bridge: RuntimeBridge): Interpreter {
 	let makeBoolean = bridge.boolean
 	let makeList = bridge.list
 	let makeRecord = bridge.record
+	// NOTE: Every unit Choice Case the MODULE names, under the tag its values
+	// carry. Whether a Case crosses as a bare string is a fact about the Choice
+	// and a value carries nothing that says it, so the general walk — which
+	// reads a value by what it says it is — could otherwise only answer it
+	// where the position that was crossed declared the Case. This is the other
+	// place the answer can come from: the whole Descriptor, read once here, so
+	// that `toJS` with nothing declared hands back the same string a declared
+	// position would have and a host can hand it straight back.
+	//
+	// NOTE: Bounded by the Descriptor, and complete for what a host can reach:
+	// a value only leaves this boundary through an export, and an export names
+	// its Type. The Module is required for the same reason — an interpreter
+	// built without one would walk a Case into its object form at an undeclared
+	// position and into a string at a declared one, which is the disagreement
+	// this table exists to prevent.
+	let bareCases = bareCaseNames(module)
 
 	// #region Compiling
 
@@ -756,6 +782,28 @@ export function createInterpreter(bridge: RuntimeBridge): Interpreter {
 					}
 				}
 
+				// NOTE: And the second shape a Union can be in that no
+				// JavaScript value could be read into: a unit Choice's Case
+				// crosses as its bare name, so `"Up"` standing beside a String
+				// — or beside another Choice's `#Up` — is one string two arms
+				// would both take. Asked BEFORE the arms are compiled, for the
+				// reason the nested `Optional` above is: an arm that took the
+				// value would be an arm that had already decided, and what is
+				// wrong here is that there is nothing to decide it WITH.
+				//
+				// NOTE: Refused rather than decided, which is the one place the
+				// "first arm wins" stance the arms below are compiled under
+				// does not reach. Deciding would hand a String `"Up"` back out
+				// as a `Direction#Up`, and losing the value it was given is the
+				// single thing this boundary may not do.
+				let collision = bareCaseCollision(expected)
+
+				if (collision !== null) {
+					return (value, at, step) => {
+						throw ambiguousBareCase(shown, collision, at, step)
+					}
+				}
+
 				let arms = expected.arms.map((arm) => compileIn(arm))
 				let count = arms.length
 
@@ -860,6 +908,52 @@ export function createInterpreter(bridge: RuntimeBridge): Interpreter {
 				}
 
 				return makeCase(tag, { item: held(value, at, step) })
+			}
+		}
+
+		// NOTE: A Case of a unit Choice is the STRING of its own name and
+		// nothing else — `"Up"`, or the `"Direction#Up"` the source itself
+		// would write. Both spellings, exactly as the object form below takes
+		// both; the difference is that they are the value rather than a member
+		// on it, which is the whole ergonomic point of the rule.
+		//
+		// NOTE: The object form is not kept as a second spelling. One shape has
+		// one spelling here: a position that took `{ $case: 'Up' }` as well
+		// would be a position two different JavaScript values cross into, while
+		// the way out can only ever hand one of them back — so a round trip
+		// through it would silently rewrite what a host wrote.
+		if (expected.unitChoice) {
+			let named = expected.name
+			let spelled = `${expected.choice}#${expected.name}`
+
+			return (value, at, step) => {
+				if (value === named || value === spelled) {
+					// NOTE: No payload at all, for the reason the payload-less
+					// branch below gives — `createCase` hands out one shared
+					// instance per unit Case tag, and a fresh `{}` would not be
+					// the Module's own `#Up`.
+					return makeCase(tag)
+				}
+
+				// NOTE: The spelling this Case used to cross as, met where the
+				// string is now the only one. Worth a sentence of its own,
+				// because "expected Direction#Up, got an object with '$case'"
+				// is true and says nothing about what to write instead.
+				//
+				// NOTE: Marked as having reached INSIDE the value, so that a
+				// Union of the Choice's Cases answers with this sentence rather
+				// than with the Choice — exactly one arm can match a given
+				// `$case`, which is the condition that rule asks for.
+				let given = plainObject(value)
+
+				if (
+					given !== null &&
+					(given.$case === named || given.$case === spelled)
+				) {
+					throw objectSpelledCase(shown, named, at, step)
+				}
+
+				throw mismatch(value, shown, at, step)
 			}
 		}
 
@@ -1108,6 +1202,21 @@ export function createInterpreter(bridge: RuntimeBridge): Interpreter {
 				}
 
 				let tag = expected.tag
+
+				// NOTE: A unit Choice's Case IS its name on this side, so the
+				// whole of the way out is that name: no payload to read, no
+				// `$case` to write, nothing to walk. The tag still decides —
+				// a value carrying another one is handed to the general walk
+				// exactly as every other compiled reader hands it over.
+				if (expected.unitChoice) {
+					let named = expected.name
+
+					return (value, at, step) =>
+						tagged(value, tag)
+							? named
+							: toJS(value, at, step, expected)
+				}
+
 				// NOTE: The Case as a host spells it, cut out of the tag once
 				// here rather than out of every value that carries it.
 				let name = caseName(tag)
@@ -1119,6 +1228,27 @@ export function createInterpreter(bridge: RuntimeBridge): Interpreter {
 						: toJS(value, at, step, expected)
 			}
 			case "union": {
+				// NOTE: The same refusal the way in makes, in the same words
+				// and before anything else is compiled. It is a fact about the
+				// SHAPE rather than about any value of it — the position has no
+				// unambiguous JavaScript spelling — so it holds whichever
+				// direction the position is crossed in. Letting values out of a
+				// position the way in refuses would be worse than refusing
+				// both: a host would be handed `"Up"` and then told it can not
+				// hand it back.
+				let collision = bareCaseCollision(expected)
+
+				if (collision !== null) {
+					return (value, at, step) => {
+						throw ambiguousBareCase(
+							expected.shown,
+							collision,
+							at,
+							step,
+						)
+					}
+				}
+
 				// NOTE: A Union names more than one shape and the VALUE says
 				// which, so what is compiled is the CHOOSING: one reader per Case
 				// the Union offers, under the tag its values carry. That is how a
@@ -1169,9 +1299,9 @@ export function createInterpreter(bridge: RuntimeBridge): Interpreter {
 	}
 
 	// NOTE: Every Case a Union offers, under the tag its values carry — nested
-	// Unions walked in the order `caseMembersOf` reads them and the first one
-	// under a tag winning, so the compiled dispatch answers with the arm the
-	// general walk would have found.
+	// Unions walked in the order `caseFor` reads them and the first one under a
+	// tag winning, so the compiled dispatch answers with the arm the general
+	// walk would have found.
 	//
 	// NOTE: `Optional`'s own two Cases are left out. They are spelled by ABSENCE
 	// on this side rather than by a `$case`, which is a rule of the general walk
@@ -1290,15 +1420,41 @@ export function createInterpreter(bridge: RuntimeBridge): Interpreter {
 		}
 
 		if (tag.includes("#")) {
-			let members = caseMembersOf(expected, tag)
+			// NOTE: The one fact about a Case that its VALUE does not carry.
+			// A `Direction#Up` and a `Shape#Blank` are the same object with the
+			// same emptiness under two tags, and which of them crosses as a
+			// string is a property of the CHOICE — so it is asked of what was
+			// DECLARED here, and of the Module's own Descriptor below where the
+			// position declared nothing.
+			let described = caseFor(expected, tag)
 
-			return casedFields(
-				value,
-				at,
-				step,
-				members === null ? noMembers : compiledMembers(members),
-				caseName(tag),
-			)
+			if (described !== null) {
+				if (described.unitChoice) {
+					return described.name
+				}
+
+				return casedFields(
+					value,
+					at,
+					step,
+					compiledMembers(described.payload),
+					caseName(tag),
+				)
+			}
+
+			// NOTE: Nothing was declared, so the Module is asked instead — the
+			// table it was built with is the same Descriptor every declared
+			// position was cut out of, which is what keeps a value crossing
+			// with nothing over it and the same value crossing a Parameter
+			// spelled alike. A tag the table does not hold is a Case this
+			// Module never named, and it crosses as the object it is.
+			let named = bareCases.get(tag)
+
+			if (named !== undefined) {
+				return named
+			}
+
+			return casedFields(value, at, step, noMembers, caseName(tag))
 		}
 
 		// NOTE: A value that IS this Module's and still has no mapping — the
@@ -1580,6 +1736,59 @@ export function createInterpreter(bridge: RuntimeBridge): Interpreter {
 		)
 	}
 
+	// NOTE: The other shape with no JavaScript spelling, worded the way
+	// `nestedOptional` is and refused in both directions for the same reason.
+	// What COLLIDES is named by `bare-cases.ts`, which is the one copy of that
+	// rule and the one the generated declarations read too; the frame is here,
+	// because only the marshaller knows that a value was about to cross.
+	//
+	// NOTE: The way out of it is a change to the Essence source rather than to
+	// the JavaScript, so the sentence ends with the two that work: a Record
+	// around one side gives it a shape of its own, and a payload on the Case
+	// puts it back into the object form. Renaming the Case works as well and is
+	// left unsaid — it is the one fix a reader thinks of unprompted.
+	//
+	// NOTE: Marked as having reached INSIDE the value, which is what keeps the
+	// sentence where an `Optional` stands around the position — that branch
+	// answers with its own Type for anything a value could have got right, and
+	// this is a refusal no value could have avoided. `reachedInside` is the
+	// question "is this the useful Error", and a refusal of the SHAPE is always
+	// the useful one.
+	function ambiguousBareCase(
+		shown: string,
+		collision: string,
+		at: Path | null,
+		step: Step,
+	): EssenceMarshalError {
+		let where = spell(at, step)
+
+		return new EssenceMarshalError(
+			`${where}: '${shown}' has no unambiguous JavaScript spelling — ${collision}. Wrap one side in a Record or give the Case a payload.`,
+			where,
+			true,
+		)
+	}
+
+	// NOTE: The spelling a bare Case used to cross as, met on the way in. It is
+	// told apart from every other wrong value because it is the one that is
+	// RIGHT about which Case it means and wrong only about how to write it —
+	// so it is answered with the string to write instead, rather than with the
+	// Type it already named.
+	function objectSpelledCase(
+		shown: string,
+		named: string,
+		at: Path | null,
+		step: Step,
+	): EssenceMarshalError {
+		let where = spell(at, step)
+
+		return new EssenceMarshalError(
+			`${where}: expected ${shown}, which crosses as the string "${named}" rather than as a '$case' object.`,
+			where,
+			true,
+		)
+	}
+
 	function collidingCase(
 		at: Path | null,
 		step: Step,
@@ -1765,7 +1974,7 @@ export function bind(
 	descriptor: ModuleDescriptor,
 	options: BindOptions,
 ): ModuleBindings {
-	let interpreter = createInterpreter(options.bridge)
+	let interpreter = createInterpreter(options.bridge, descriptor)
 	let raw = bindRaw(bundle, descriptor)
 	let exports: Record<string, unknown> = {}
 
@@ -1872,6 +2081,13 @@ function bindRaw(
 // one without is the value itself: there is nothing to pass, and `Shape.Blank()`
 // would be a call whose only purpose is to look like the others.
 //
+// NOTE: And a Case of a unit Choice is the STRING it crosses as, so
+// `Direction.Up` and `"Up"` are the same value rather than two spellings of
+// one. A host that writes the constructor gets what it would have written by
+// hand, which is what makes the name worth offering at all: it is a place to
+// read the Cases off and to have a typo caught, not a wrapper around the
+// value.
+//
 // NOTE: Nothing here marshals or checks. What comes back is the plain object the
 // boundary already accepts, so a constructor is a SPELLING and the deciding
 // stays where every other decision is — at the crossing, once, with the path and
@@ -1886,8 +2102,9 @@ function caseConstructors(
 	for (let descriptor of cases) {
 		let tag = `${descriptor.choice}#${descriptor.name}`
 
-		constructors[descriptor.name] =
-			Object.keys(descriptor.payload).length === 0
+		constructors[descriptor.name] = descriptor.unitChoice
+			? descriptor.name
+			: Object.keys(descriptor.payload).length === 0
 				? Object.freeze({ $case: tag })
 				: (payload: Record<string, unknown>) => ({
 						...payload,
@@ -2267,9 +2484,10 @@ function admitsAbsence(descriptor: Descriptor): boolean {
 // NOTE: Whether a plain object could BE a value of this shape — a Record anywhere
 // it reaches without a tag in the way: itself, an arm of a Union, the item of an
 // `Optional`, which is transparent on this side. A Case does not count, because
-// its object spelling always carries `$case`, which no set of labels is. What it
-// decides is whether a single labelled Parameter's labelled call is ambiguous —
-// see `labelsOf`.
+// its object spelling always carries `$case`, which no set of labels is — and a
+// unit Choice's Case is not an object at all, being the string it crosses as.
+// What it decides is whether a single labelled Parameter's labelled call is
+// ambiguous — see `labelsOf`.
 export function admitsRecord(descriptor: Descriptor): boolean {
 	switch (descriptor.kind) {
 		case "record":
@@ -2360,27 +2578,28 @@ function recordMembersOf(
 	}
 }
 
-// NOTE: The payload of the Case a value's own tag names, where what was declared
-// carries that Case — so a Function inside a payload crosses out wrapped like any
-// other member. Both tags are the bundle's spelling, because a Descriptor bakes
-// the one `emittedIdentity` writes.
-function caseMembersOf(
+// NOTE: The Case a value's own tag names, where what was declared carries that
+// Case — its payload, so a Function inside one crosses out wrapped like any
+// other member, and whether it is a unit Choice's Case, which nothing but a
+// Descriptor knows. Both tags are the bundle's spelling, because a Descriptor
+// bakes the one `emittedIdentity` writes.
+function caseFor(
 	descriptor: Descriptor | null,
 	tag: string,
-): Record<string, Descriptor> | null {
+): CaseDescriptor | null {
 	if (descriptor === null) {
 		return null
 	}
 
 	switch (descriptor.kind) {
 		case "case":
-			return descriptor.tag === tag ? descriptor.payload : null
+			return descriptor.tag === tag ? descriptor : null
 		case "union": {
 			for (let arm of descriptor.arms) {
-				let members = caseMembersOf(arm, tag)
+				let found = caseFor(arm, tag)
 
-				if (members !== null) {
-					return members
+				if (found !== null) {
+					return found
 				}
 			}
 
@@ -2388,6 +2607,119 @@ function caseMembersOf(
 		}
 		default:
 			return null
+	}
+}
+
+// NOTE: Every Case of a unit Choice a whole Module names, under its tag and
+// answering the bare string it crosses as. Read ONCE, when an interpreter is
+// built, because it is a property of the declarations rather than of anything
+// that happens afterwards — and read at all because the general walk has no
+// other way to learn it: `caseFor` above can only answer where the position
+// being crossed declared the Case, and a `toJS` with nothing declared is the
+// door a host reaches for exactly when it has no Type to hand over.
+//
+// NOTE: The whole Descriptor rather than its Choice exports alone. A Choice a
+// Module does not export by name still reaches a host through the Type of
+// something it does — a Function's return, a Record's member, a Namespace's
+// property — and a table holding only the named ones would spell those Cases
+// one way at a declared position and another way at an undeclared one, which is
+// the disagreement this table exists to prevent.
+function bareCaseNames(module: ModuleDescriptor): Map<string, string> {
+	let found = new Map<string, string>()
+
+	for (let entry of Object.values(module.exports)) {
+		switch (entry.kind) {
+			case "constant":
+			case "function":
+				collectBareCases(entry.of, found)
+
+				break
+			case "overloaded":
+				for (let overload of entry.overloads) {
+					collectBareCases(overload.of, found)
+				}
+
+				break
+			case "choice":
+				for (let descriptor of entry.cases) {
+					collectBareCases(descriptor, found)
+				}
+
+				break
+			case "namespace":
+				for (let property of Object.values(entry.properties)) {
+					collectBareCases(property.of, found)
+				}
+
+				for (let method of Object.values(entry.methods)) {
+					if (method.kind === "function") {
+						collectBareCases(method.of, found)
+
+						continue
+					}
+
+					for (let overload of method.overloads) {
+						collectBareCases(overload.of, found)
+					}
+				}
+
+				for (let descriptor of entry.cases ?? []) {
+					collectBareCases(descriptor, found)
+				}
+
+				break
+		}
+	}
+
+	return found
+}
+
+// NOTE: No guard against walking a node twice, because a Descriptor is a TREE —
+// `describe` answers a Type that reaches itself with a `refused` node rather
+// than following it — which is the same reason compiling a node's children
+// while compiling the node terminates.
+function collectBareCases(
+	descriptor: Descriptor,
+	found: Map<string, string>,
+): void {
+	switch (descriptor.kind) {
+		case "list":
+		case "optional":
+			collectBareCases(descriptor.of, found)
+
+			return
+		case "record":
+			for (let member of Object.values(descriptor.members)) {
+				collectBareCases(member, found)
+			}
+
+			return
+		case "union":
+			for (let arm of descriptor.arms) {
+				collectBareCases(arm, found)
+			}
+
+			return
+		case "case":
+			if (descriptor.unitChoice) {
+				found.set(descriptor.tag, descriptor.name)
+			}
+
+			for (let member of Object.values(descriptor.payload)) {
+				collectBareCases(member, found)
+			}
+
+			return
+		case "function":
+			for (let parameter of descriptor.parameters) {
+				collectBareCases(parameter.of, found)
+			}
+
+			collectBareCases(descriptor.returns, found)
+
+			return
+		default:
+			return
 	}
 }
 

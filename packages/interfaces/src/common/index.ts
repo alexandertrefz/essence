@@ -333,6 +333,28 @@ export type CaseType = {
 	// and later substitutions rewrite the spelling alongside the members. The
 	// mirror of a Union alias' `typeArguments`.
 	typeArguments?: Array<Type>
+	// NOTE: Set on every Case of a Choice whose Cases ALL have empty payloads —
+	// `choice Direction { Up, Down }`, `Ordering`. The fact belongs to the
+	// Choice, but it is stamped on each Case because a Case is what survives on
+	// its own: `constant up = #Up` is inferred as the Case alone and never meets
+	// its siblings again, and the embedding boundary — the only reader — is
+	// handed a Type with no scope behind it. Nothing in the language reads it:
+	// it decides that such a Case crosses to JavaScript as its bare name rather
+	// than as a `$case` object, which makes it an embedding fact that happens to
+	// be decidable at declaration.
+	//
+	// NOTE: `unitChoice` and NOT `unit`, because "unit Case" already means
+	// something else here and means it everywhere — a Case with no payload,
+	// which is what `createCase`'s interning, `lower-unit-case-equality` and
+	// `collapseConstruction` are all written about. `Shape#Blank` is a unit Case
+	// by that reading and is not of a unit CHOICE, since `Shape#Circle` carries
+	// a radius; a field spelled `unit` would answer `false` for it and read as
+	// though it had answered the other question.
+	//
+	// NOTE: Absent rather than `false` everywhere else, so that a Case's
+	// identity through substitution and matchTypes' `lhs === rhs` fast path are
+	// undisturbed.
+	unitChoice?: true
 }
 
 export type GenericListType = {
