@@ -1352,20 +1352,23 @@ describe("Completion of a converted standard library Namespace", () => {
 
 		// NOTE: `flatten` sits after everything `Optional` declares because
 		// `NestedOptional` is listed after `Optional` — the extra a nested
-		// Optional has, offered as an extra. `is` and `isNot` come last
-		// because they are not declared anywhere: a Choice derives them, and
-		// the derived Namespace is only reached once no declared Namespace
-		// answers the name.
+		// Optional has, offered as an extra. `is` and `isNot` sit among the
+		// declared Methods, in declaration order, because `Optional` writes
+		// them: the derived Namespace a Choice would otherwise offer is only
+		// reached once no declared Namespace answers the name. Each is an
+		// Overload of two entries, and an Overload completes once per entry.
 		expect(labelsOf(source, { line: 3, column: 9 })).toEqual([
 			"toString",
-			"otherwise",
+			"value",
+			"is",
+			"is",
+			"isNot",
+			"isNot",
 			"hasValue",
 			"isEmpty",
 			"map",
 			"keep",
 			"flatten",
-			"is",
-			"isNot",
 		])
 	})
 })

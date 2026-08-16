@@ -314,11 +314,11 @@ describe("Inlay Hints", () => {
 			])
 		})
 
-		it("should resolve `otherwise` on an `Optional`-annotated value", () => {
+		it("should resolve `value(withDefault:)` on an `Optional`-annotated value", () => {
 			let source = [
 				"implementation {",
 				"\tconstant maybe: Optional<Integer> = #Empty",
-				"\tconstant certain = maybe::otherwise(0)",
+				"\tconstant certain = maybe::value(withDefault 0)",
 				"}",
 			].join("\n")
 
@@ -327,8 +327,8 @@ describe("Inlay Hints", () => {
 			)
 		})
 
-		it("should not resolve `otherwise` on a flat spelled-out Union", () => {
-			// NOTE: `Optional` is a nominal Choice, and `otherwise` is a Method
+		it("should not resolve `value(withDefault:)` on a flat spelled-out Union", () => {
+			// NOTE: `Optional` is a nominal Choice, and `value(withDefault:)` is a Method
 			// of that Choice and of nothing else. No SHAPE of Union reaches it:
 			// a Method called on a Union has to be a Method of every member,
 			// and neither `Integer` nor `Rational` has one — so `sure` is left
@@ -342,9 +342,9 @@ describe("Inlay Hints", () => {
 			let source = [
 				"implementation {",
 				"\tconstant flat: Integer | Rational = 1",
-				"\tconstant sure = flat::otherwise(0)",
+				"\tconstant sure = flat::value(withDefault 0)",
 				"\tconstant wrapped: Optional<Integer | Rational> = #Empty",
-				"\tconstant collapsed = wrapped::otherwise(0)",
+				"\tconstant collapsed = wrapped::value(withDefault 0)",
 				"}",
 			].join("\n")
 
@@ -357,17 +357,17 @@ describe("Inlay Hints", () => {
 			])
 		})
 
-		it("should not resolve `otherwise` on a named member of a wider Union", () => {
+		it("should not resolve `value(withDefault:)` on a named member of a wider Union", () => {
 			// NOTE: This test used to be about a `Nothing` BURIED inside a
 			// named Alias: `type MaybeInt = Integer | Nothing` as a member of
 			// `MaybeInt | Rational`, where a remainder fallback let the
-			// `Nothing` an `otherwise` expected claim the buried one and typed
+			// `Nothing` an `value(withDefault:)` expected claim the buried one and typed
 			// the payload as `Integer | Rational`. Neither the Type nor the
 			// fallback exists — there is no Union SHAPE that means "fallible"
 			// any more, only the Choice, and naming a Union does not make it
 			// one. What is left worth pinning is the half that outlived them:
 			// a named Alias keeps its name as a member of a wider Union, and
-			// `otherwise` finds nothing to resolve against there. The one Hint
+			// `value(withDefault:)` finds nothing to resolve against there. The one Hint
 			// says both — `mixed` enriches and reads back under its own alias,
 			// while `sure` gets none because the call did not resolve.
 			let source = [
@@ -375,7 +375,7 @@ describe("Inlay Hints", () => {
 				"\ttype MaybeInt = Integer | String",
 				"\tconstant mixed: MaybeInt | Rational = 1",
 				"\tconstant echoed = mixed",
-				"\tconstant sure = mixed::otherwise(0)",
+				"\tconstant sure = mixed::value(withDefault 0)",
 				"}",
 			].join("\n")
 
@@ -397,7 +397,7 @@ describe("Inlay Hints", () => {
 			// top level; a nominal Choice has no shape to dissolve INTO. That
 			// is what it buys: a Union cannot become fallible by accident, so
 			// `merged` reads back as `Optional<Rational> | Integer` and has no
-			// `otherwise` to call — `sure` gets no Type and no Hint. A value
+			// `value(withDefault:)` to call — `sure` gets no Type and no Hint. A value
 			// that is fallible has to say so by being an `Optional` the whole
 			// way out.
 			// NOTE: The divisor is COMPUTED (`0::add(2)`), deliberately — a
@@ -417,7 +417,7 @@ describe("Inlay Hints", () => {
 				"",
 				"\t\t<- value",
 				"\t})",
-				"\tconstant sure = merged::otherwise(0)",
+				"\tconstant sure = merged::value(withDefault 0)",
 				"}",
 			].join("\n")
 
@@ -440,14 +440,14 @@ describe("Inlay Hints", () => {
 			])
 		})
 
-		it("should keep a compound payload whole — and `otherwise` collapses it", () => {
+		it("should keep a compound payload whole — and `value(withDefault:)` collapses it", () => {
 			// NOTE: The stdlib spells mixed fallible results as one nested
 			// payload (`Optional<Integer | Rational>`), which is what lets
-			// `otherwise` bind the payload in one piece.
+			// `value(withDefault:)` bind the payload in one piece.
 			let source = [
 				"implementation {",
 				"\tconstant power = 2::raise(to -2)",
-				"\tconstant sure = power::otherwise(0)",
+				"\tconstant sure = power::value(withDefault 0)",
 				"}",
 			].join("\n")
 

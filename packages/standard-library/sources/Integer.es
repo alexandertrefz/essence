@@ -351,7 +351,7 @@ declarations {
 
 							case #Value(digit) {
 								<- #Continue(#Value(value
-									::otherwise(0)
+									::value(withDefault 0)
 									::multiply(with 10)
 									::add(digit)))
 							}

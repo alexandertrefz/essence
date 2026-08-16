@@ -339,7 +339,7 @@ declarations {
 					§ The first piece is everything before the first occurrence;
 					§ the rest rejoin on the ORIGINAL part, so only the first
 					§ separator is the one that becomes the replacement.
-					constant head = pieces::firstItem()::otherwise("")
+					constant head = pieces::firstItem()::value(withDefault "")
 
 					<- head
 						::append(replacement)
@@ -407,7 +407,10 @@ declarations {
 					§ fallback is unreachable; the first piece is everything
 					§ before the first occurrence, and its length is that
 					§ occurrence's position.
-					<- #Value(pieces::firstItem()::otherwise("")::length())
+					<- #Value(pieces
+						::firstItem()
+						::value(withDefault "")
+						::length())
 				}
 			}
 		}

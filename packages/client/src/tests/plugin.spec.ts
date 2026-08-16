@@ -62,7 +62,7 @@ const SHAPES_MODULE = `implementation {
 	}
 
 	function named(_ value: Optional<String>) -> String {
-		<- value::otherwise("unnamed")
+		<- value::value(withDefault "unnamed")
 	}
 
 	constant blank: Shape = #Blank

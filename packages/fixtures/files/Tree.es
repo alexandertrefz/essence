@@ -30,7 +30,7 @@ implementation {
 	function rendered(_ entry: String, within tree: List<String>) -> String {
 		constant segments = entry::split(on "/")
 		constant indent   = "  "::repeat(times segments::length()::subtract(1))
-		constant name     = segments::lastItem()::otherwise(entry)
+		constant name     = segments::lastItem()::value(withDefault entry)
 
 		if isDirectory(entry, within tree) {
 			<- "{indent}{name}/"

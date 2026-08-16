@@ -418,7 +418,7 @@ describe("Rationals", () => {
 					constant negativeOne = 0::subtract(1)
 					constant quotient = 1/2
 						::divide(by negativeThree)
-						::otherwise(0/1)
+						::value(withDefault 0/1)
 
 					Terminal.inspect(match Number.lowestNumber(
 						[quotient, negativeOne],

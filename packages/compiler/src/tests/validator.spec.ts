@@ -2979,7 +2979,7 @@ describe("Validator", () => {
 					type Filled<Item> = List<Item> where @::hasItems()
 
 					function firstOf(_ items: Filled<String>) -> String {
-						<- items::item(at 0)::otherwise("")
+						<- items::item(at 0)::value(withDefault "")
 					}
 
 					${body}

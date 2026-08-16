@@ -1,5 +1,6 @@
 import {
 	Boolean   from "./Boolean.es"
+	Equatable from "./Protocols.es"
 	Printable from "./Protocols.es"
 }
 
@@ -30,23 +31,29 @@ declarations {
 		Empty,
 	}
 
-	§ The Namespace every Optional reaches. `otherwise` collapses it back to a
-	§ bare value, `hasValue`/`isEmpty` ask without taking it apart, and `map`
-	§ and `keep` carry a value through a step that does not know it might be
-	§ missing. Matching is always available and always exhaustive — these are
-	§ the shorthands for the shapes worth a name.
+	§ The Namespace every Optional reaches. `value(withDefault:)` collapses it
+	§ back to a bare value, `hasValue`/`isEmpty` ask without taking it apart,
+	§ `is`/`isNot` ask against a value at either level, and `map` and `keep`
+	§ carry a value through a step that does not know it might be missing.
+	§ Matching is always available and always exhaustive — these are the
+	§ shorthands for the shapes worth a name.
 	§
 	§ The payload member is `item`, not `value`: `Value { value: … }` doubles
 	§ the word everywhere it is written, and `item` is what `List` already
-	§ calls the thing it holds.
+	§ calls the thing it holds. The Method that reads it out is still `value`,
+	§ because that is what `hasValue` already calls it, and a Method named
+	§ `value` doubles nothing.
 	§
-	§ `Equatable` is not declared here and is not missing: a Choice derives
-	§ equality from its tags and its payloads, so `#Value(1)::is(#Value(1))` is
-	§ answered without a line of Essence, conditionally on the payload's own
-	§ `is`. `Printable` can not be derived that way — what an Optional should
-	§ READ as is a decision — so it is written, and conditional for the same
-	§ reason `List`'s is.
+	§ `Equatable` is written here rather than derived, because `is` takes two
+	§ shapes: the whole (`#Value(1)::is(#Value(1))`, which is what a Choice
+	§ derives on its own) and the bare item (`#Value(1)::is(1)`), which no
+	§ derivation could offer. A Namespace that writes its own `is` stands in
+	§ for the derived one entirely, so the whole-Optional entry is spelled out
+	§ too, and FIRST — see the note on `is`. Both are conditional on the
+	§ payload's own `is`, exactly as `List`'s are. `Printable` is written for
+	§ the reason it always was: what an Optional should READ as is a decision.
 	namespace Optional<infer ItemType> for Optional<ItemType>
+		is Equatable where ItemType is Equatable,
 		is Printable where ItemType is Printable {
 		§§ Represents the Optional as `Value(…)` or `Empty`, the payload rendered by its own `toString`. Available whenever the payload conforms to `Printable`.
 		§§
@@ -63,14 +70,77 @@ declarations {
 			}
 		}
 
-		§§ The value itself — or, when there is none, the given fallback. Collapses an Optional back to a bare value: `list::firstItem()::otherwise(0)`.
+		§§ The value itself — or, when there is none, the given default. Collapses an Optional back to a bare value: `list::firstItem()::value(withDefault 0)`.
 		§§
-		§§ @param fallback — the value to fall back to
-		§§ @returns — the value, or the fallback in its place.
-		otherwise(_ fallback: ItemType) -> ItemType {
+		§§ @param withDefault — the value to answer with when there is none
+		§§ @returns — the value, or the default in its place.
+		value(withDefault fallback: ItemType) -> ItemType {
 			<- match @ -> ItemType {
 				case #Value(item) { <- item }
 				case #Empty       { <- fallback }
+			}
+		}
+
+		§ `is` reads at either level: against another Optional it is the equality
+		§ a Choice derives — same Case, equal payloads — and against a bare item
+		§ it asks whether the Optional IS that item, wrapped: `#Value(x)::is(y)`
+		§ is `x::is(y)`, and `#Empty::is(y)` is false for every `y`. Together they
+		§ let a lookup be tested in one breath — `codes::item(at index)::is(code)`
+		§ — where the only alternative was collapsing through a default the item
+		§ might genuinely equal.
+		§
+		§ The whole-Optional entry is declared FIRST, and that order is
+		§ load-bearing. An Overload is selected by the first entry the Arguments
+		§ match, and for an `Optional<Optional<Integer>>` the Argument `#Empty`
+		§ matches both. Whole first reads `#Empty::is(#Empty)` as "the receiver is
+		§ `#Empty`" — true — and `#Value(#Empty)::is(#Empty)` as false. Item first
+		§ would compare a MISSING payload against `#Empty` and answer the first of
+		§ those false, which is not what `is` says. `#Value(3)::is(#Value(3))` on
+		§ that receiver still lands on the item entry, because `#Value(3)` is no
+		§ `Optional<Optional<Integer>>` and the whole entry can not take it.
+
+		§§ Checks whether the Optional is the given one — the same Case, holding an equal value — or, given a bare value, whether it holds exactly that value. Available whenever the payload conforms to `Equatable`.
+		overload is {
+			§§ @param other — the Optional to compare against
+			§§ @returns — `true` when both are empty, or both hold equal values.
+			<infer ItemType is Equatable>(
+				_ other: Optional<ItemType>,
+			) -> Boolean {
+				<- match @ -> Boolean {
+					case #Value(item) {
+						<- match other -> Boolean {
+							case #Value(otherItem) { <- item::is(otherItem) }
+							case #Empty            { <- false }
+						}
+					}
+					case #Empty { <- other::isEmpty() }
+				}
+			}
+
+			§§ @param other — the bare value to compare against
+			§§ @returns — `true` when the Optional holds a value equal to it; `false` when it is empty.
+			<infer ItemType is Equatable>(_ other: ItemType) -> Boolean {
+				<- match @ -> Boolean {
+					case #Value(item) { <- item::is(other) }
+					case #Empty       { <- false }
+				}
+			}
+		}
+
+		§§ Checks whether the Optional differs from the given one, or, given a bare value, whether it does not hold exactly that value — which an empty Optional never does. Available whenever the payload conforms to `Equatable`.
+		overload isNot {
+			§§ @param other — the Optional to compare against
+			§§ @returns — `true` when the two differ in Case or in value.
+			<infer ItemType is Equatable>(
+				_ other: Optional<ItemType>,
+			) -> Boolean {
+				<- @::is(other)::negate()
+			}
+
+			§§ @param other — the bare value to compare against
+			§§ @returns — `true` when the Optional is empty or holds a different value.
+			<infer ItemType is Equatable>(_ other: ItemType) -> Boolean {
+				<- @::is(other)::negate()
 			}
 		}
 
@@ -142,7 +212,7 @@ declarations {
 	§ and spelling the two separately says which step is the transform and
 	§ which is the collapse. There is no `orElse` either — an Optional whose
 	§ payload is itself an Optional makes "or else what" genuinely ambiguous,
-	§ and `otherwise` already answers the unambiguous half.
+	§ and `value(withDefault:)` already answers the unambiguous half.
 	namespace NestedOptional<infer ItemType> for Optional<Optional<ItemType>> {
 		§§ Collapses a nested Optional by one level — the inner Optional, or an empty Optional when the outer one is empty.
 		§§

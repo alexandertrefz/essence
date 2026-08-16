@@ -145,7 +145,7 @@ describe("Optional", () => {
 			).toEqual([`"Value(3)"`, `"Empty"`, `"Value(3)"`])
 		})
 
-		it("derives equality through the payload's own is", async () => {
+		it("compares whole Optionals through the payload's own is", async () => {
 			expect(
 				await run(`implementation {
 					constant numbers = [3, 1]
@@ -155,8 +155,47 @@ describe("Optional", () => {
 					Terminal.inspect(numbers::firstItem()::is(#Value(1)))
 					Terminal.inspect(numbers::firstItem()::is(#Empty))
 					Terminal.inspect(none::firstItem()::is(#Empty))
+					Terminal.inspect(numbers::firstItem()::isNot(none::firstItem()))
 				}`),
-			).toEqual(["true", "false", "false", "true"])
+			).toEqual(["true", "false", "false", "true", "true"])
+		})
+
+		// NOTE: The second entry of `is`: against a bare item, an Optional IS
+		// that item wrapped, or it is not — and an empty one never is. This is
+		// what lets a lookup be tested without collapsing it through a
+		// default the item might genuinely equal.
+		it("compares against a bare item, which an empty Optional never is", async () => {
+			expect(
+				await run(`implementation {
+					constant codes = ["a", "b"]
+
+					Terminal.inspect(codes::item(at 1)::is("b"))
+					Terminal.inspect(codes::item(at 1)::is("a"))
+					Terminal.inspect(codes::item(at 9)::is("a"))
+					Terminal.inspect(codes::item(at 1)::isNot("b"))
+					Terminal.inspect(codes::item(at 9)::isNot("a"))
+				}`),
+			).toEqual(["true", "false", "false", "false", "true"])
+		})
+
+		// NOTE: On an `Optional<Optional<Integer>>` the Argument `#Empty` fits
+		// both entries, and the whole-Optional one is declared first so that
+		// it wins: `is(#Empty)` asks whether the RECEIVER is empty, never
+		// whether a missing payload is. `#Value(3)` fits only the item entry,
+		// so it reads at the inner level. Both are what the words say.
+		it("reads a nested Optional at the outer level first", async () => {
+			expect(
+				await run(`implementation {
+					constant stored: List<Optional<Integer>> = [#Empty, #Value(3)]
+
+					Terminal.inspect(stored::firstItem()::is(#Empty))
+					Terminal.inspect(stored::item(at 9)::is(#Empty))
+					Terminal.inspect(stored::firstItem()::is(#Value(#Empty)))
+					Terminal.inspect(stored::lastItem()::is(#Value(3)))
+					Terminal.inspect(stored::lastItem()::is(#Value(#Value(3))))
+					Terminal.inspect(stored::item(at 9)::isNot(#Empty))
+				}`),
+			).toEqual(["false", "true", "true", "true", "true", "false"])
 		})
 
 		it("is searchable by value in a List", async () => {
@@ -190,6 +229,18 @@ describe("Optional", () => {
 				"Optional#Value(3)",
 				"Optional#Empty",
 			])
+		})
+
+		it("collapses to a bare value with value(withDefault:)", async () => {
+			expect(
+				await run(`implementation {
+					constant numbers = [3]
+					constant none: List<Integer> = []
+
+					Terminal.inspect(numbers::firstItem()::value(withDefault 0))
+					Terminal.inspect(none::firstItem()::value(withDefault 0))
+				}`),
+			).toEqual(["3", "0"])
 		})
 
 		it("answers hasValue and isEmpty without a Match", async () => {
@@ -257,17 +308,17 @@ describe("Optional", () => {
 			let diagnostics = diagnosticsOf(`implementation {
 				constant maybe: Optional<Rational> = #Empty
 
-				Terminal.inspect(maybe::otherwise(0))
+				Terminal.inspect(maybe::value(withDefault 0))
 			}`)
 
 			expect(diagnostics.map(({ code }) => code)).toEqual([
 				"no-matching-overload",
 			])
 			expect(diagnostics[0]!.message).toBe(
-				"No overload of 'otherwise' accepts these Arguments",
+				"No overload of 'value' accepts these Arguments",
 			)
 			expect(diagnostics[0]!.notes).toEqual([
-				"'Optional::otherwise' takes 1 Argument: Parameter 1 is Rational.",
+				"'Optional::value' takes 1 Argument: Parameter 'withDefault' is Rational.",
 			])
 		})
 

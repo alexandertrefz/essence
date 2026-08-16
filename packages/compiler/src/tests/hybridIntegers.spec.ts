@@ -292,7 +292,7 @@ describe("a folded operation", () => {
 				program(`	Terminal.print(9007199254740991::add(1))
 	Terminal.print(9007199254740992::subtract(1))
 	Terminal.print(94906266::multiply(with 94906266))
-	Terminal.print(2::raise(to 200)::otherwise(0))`),
+	Terminal.print(2::raise(to 200)::value(withDefault 0))`),
 			),
 		).toEqual([
 			"9007199254740992",
@@ -546,18 +546,18 @@ describe("what a Program computes across the boundary", () => {
 		expect(
 			await outputOf(
 				program(`	function ratio(_ left: Integer, _ right: Integer) -> Integer {
-		<- left::quotient(dividingBy right)::otherwise(0)
+		<- left::quotient(dividingBy right)::value(withDefault 0)
 	}
 
 	function left(_ value: Integer, _ by: Integer) -> Integer {
-		<- value::remainder(dividingBy by)::otherwise(0)
+		<- value::remainder(dividingBy by)::value(withDefault 0)
 	}
 
 	Terminal.print(ratio(9007199254740992, 2))
 	Terminal.print(ratio(-9007199254740992, 3))
 	Terminal.print(left(9007199254740992, 3))
 	Terminal.print(left(-9007199254740993, 1000000007))
-	Terminal.print(2::raise(to 53)::otherwise(0))
+	Terminal.print(2::raise(to 53)::value(withDefault 0))
 	Terminal.print(1::divide(by 9007199254740992))`),
 			),
 		).toEqual([
@@ -576,11 +576,11 @@ describe("what a Program computes across the boundary", () => {
 				program(`	constant items = [10, 20, 30]
 
 	Terminal.print(items::length())
-	Terminal.print(items::item(at 9007199254740992)::otherwise(0))
-	Terminal.print(items::item(at -9007199254740992)::otherwise(0))
-	Terminal.print(items::item(at -1)::otherwise(0))
+	Terminal.print(items::item(at 9007199254740992)::value(withDefault 0))
+	Terminal.print(items::item(at -9007199254740992)::value(withDefault 0))
+	Terminal.print(items::item(at -1)::value(withDefault 0))
 	Terminal.print("abc"::length())
-	Terminal.print("abc"::character(at 9007199254740992)::otherwise("-"))`),
+	Terminal.print("abc"::character(at 9007199254740992)::value(withDefault "-"))`),
 			),
 		).toEqual(["3", "0", "0", "30", "3", "-"])
 	})
