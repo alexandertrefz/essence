@@ -36,6 +36,17 @@ export {
 // a host embedding the Compiler names its target and keys its own cache by it
 // through one entry rather than two.
 export { type EmitTarget, emitTargetKey } from "../rewriter/index"
+// NOTE: What a bundle carries so that a JavaScript host can build values it
+// accepts — the runtime's own Type key and constructors, injected as a Module
+// and handed over as the bundle's default export. See `./bridge`.
+export {
+	BRIDGE_KEY,
+	BRIDGE_SPECIFIER,
+	type EssenceValue,
+	RUNTIME_BRIDGE_MODULES,
+	type RuntimeBridge,
+	withRuntimeBridge,
+} from "./bridge"
 // NOTE: The boundary between an emitted Module and the JavaScript that calls
 // it, written down. A host marshalling values across it reads a Descriptor
 // rather than a Type, which is what lets the reading happen where no Compiler
