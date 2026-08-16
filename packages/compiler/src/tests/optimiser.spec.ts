@@ -2418,7 +2418,7 @@ describe("Optimiser", () => {
 		// every fallible answer in the library is read back by one of these.
 		it("compiles the standard library's own Matches", () => {
 			let generated = generate(`implementation {
-				Terminal.inspect(Integer.parse("7")::otherwise(0))
+				Terminal.inspect(Integer.parse("7")::value(withDefault 0))
 			}`)
 
 			expect(generated).toContain(
@@ -3645,12 +3645,12 @@ describe("Optimiser", () => {
 		// already and the Handlers' Returns are the Method's own.
 		it("takes the wrapper off the standard library's own Matches", () => {
 			let source = `implementation {
-				Terminal.inspect(Integer.parse("7")::otherwise(0))
+				Terminal.inspect(Integer.parse("7")::value(withDefault 0))
 			}`
-			let body = bodyOf(generate(source), "$es_Optional_otherwise")
+			let body = bodyOf(generate(source), "$es_Optional_value")
 
 			expect(body).toContain(
-				'const $es_Optional_otherwise = function (_self, fallback) {\n\tif (_self[$type.typeKeySymbol] === "Optional#Value") {',
+				'const $es_Optional_value = function (_self, fallback) {\n\tif (_self[$type.typeKeySymbol] === "Optional#Value") {',
 			)
 			expect(body).not.toContain("function (_self) {\n\t\tif")
 		})
@@ -5095,9 +5095,9 @@ describe("Optimiser", () => {
 		it("elides the standard library's own final tests", () => {
 			let body = bodyOf(
 				generate(`implementation {
-					Terminal.inspect(Integer.parse("7")::otherwise(0))
+					Terminal.inspect(Integer.parse("7")::value(withDefault 0))
 				}`),
-				"$es_Optional_otherwise",
+				"$es_Optional_value",
 			)
 
 			expect(body).toContain(

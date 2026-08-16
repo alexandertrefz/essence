@@ -6073,7 +6073,7 @@ function resolveUnionMethodDispatch(
 	// truth is "the receiver has this Method and the Arguments are wrong", so
 	// the report names the receiver as written; without one it is "no member
 	// provides this Method", and naming the member is the whole point. Reporting
-	// the member either way was how `firstItem()::otherwise(0)` on an
+	// the member either way was how `firstItem()::value(withDefault 0)` on an
 	// `Optional<Rational>` came to say `for Optional#Value` — a Case the writer
 	// never mentioned.
 	coveringNamespaces: Map<string, common.NamespaceType> = new Map(),

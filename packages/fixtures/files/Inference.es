@@ -41,7 +41,7 @@ implementation {
 			_ transform: (_ item: Item) -> Target,
 			fallback fallbackValue: Target,
 		) -> Target {
-			<- @::firstItem()::map(transform)::otherwise(fallbackValue)
+			<- @::firstItem()::map(transform)::value(withDefault fallbackValue)
 		}
 	}
 

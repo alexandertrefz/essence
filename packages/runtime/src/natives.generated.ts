@@ -491,7 +491,7 @@ export const $NumberArity: AssertArities<typeof import("./Number"), {
 
 declare const OptionalModule: typeof import("./Optional")
 export const $Optional: OptionalNatives = OptionalModule
-export const $OptionalAbsent: AssertNoEssenceExports<typeof import("./Optional"), "toString" | "otherwise" | "hasValue" | "isEmpty" | "map" | "keep"> = true
+export const $OptionalAbsent: AssertNoEssenceExports<typeof import("./Optional"), "toString" | "value" | "is__overload$1" | "is__overload$2" | "isNot__overload$1" | "isNot__overload$2" | "hasValue" | "isEmpty" | "map" | "keep"> = true
 
 declare const NestedOptionalModule: typeof import("./NestedOptional")
 export const $NestedOptional: NestedOptionalNatives = NestedOptionalModule

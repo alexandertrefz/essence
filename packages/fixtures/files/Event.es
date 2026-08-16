@@ -47,7 +47,9 @@ implementation {
 			(_ eventDescription: String) -> Event {
 				constant splitEvent = eventDescription::split(on ".")
 
-				constant eventName = splitEvent::firstItem()::otherwise("")
+				constant eventName = splitEvent
+					::firstItem()
+					::value(withDefault "")
 
 				constant namespaces = splitEvent
 					::removeFirst()

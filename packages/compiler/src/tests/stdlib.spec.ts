@@ -443,10 +443,10 @@ describe("Stdlib", () => {
 		// out of the Union the Alias stood for. `Optional` is a nominal Choice
 		// now, so what it is typed by is the Choice's own Type Argument — the
 		// `item` the `#Value` Case carries — and the fallback has to match that.
-		it("types otherwise by the Optional's item Type", () => {
+		it("types value(withDefault:) by the Optional's item Type", () => {
 			expect(
 				diagnosticsFor(`implementation {
-					constant fallback: Integer = [1]::firstItem()::otherwise(0)
+					constant fallback: Integer = [1]::firstItem()::value(withDefault 0)
 				}`),
 			).toEqual([])
 		})
@@ -454,16 +454,16 @@ describe("Stdlib", () => {
 		it("rejects a fallback of the wrong Type", () => {
 			expect(
 				diagnosticsFor(`implementation {
-					constant fallback = [1]::firstItem()::otherwise("zero")
+					constant fallback = [1]::firstItem()::value(withDefault "zero")
 				}`),
 			).not.toEqual([])
 		})
 
-		it("keeps otherwise off unbounded Type Parameters", () => {
+		it("keeps value(withDefault:) off unbounded Type Parameters", () => {
 			expect(
 				diagnosticsFor(`implementation {
 					function passThrough<Item>(_ item: Item) -> Item {
-						<- item::otherwise(item)
+						<- item::value(withDefault item)
 					}
 				}`),
 			).not.toEqual([])
@@ -535,7 +535,7 @@ describe("Stdlib", () => {
 		it("types the parse statics as fallible", () => {
 			expect(
 				diagnosticsFor(`implementation {
-					constant parsed: Integer = Integer.parse("42")::otherwise(0)
+					constant parsed: Integer = Integer.parse("42")::value(withDefault 0)
 				}`),
 			).toEqual([])
 		})

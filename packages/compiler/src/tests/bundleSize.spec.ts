@@ -181,7 +181,7 @@ describe("Bundle Size", () => {
 	// refinements themselves and went unrecorded here, the figure above staying at
 	// 52,781 while the measurement moved to 52,190: a total `divide`, `remainder`
 	// and `quotient` let the standard library stop laundering answers it had
-	// already proven, and the `::otherwise(…)` fallbacks that did the laundering
+	// already proven, and the `::value(withDefault …)` fallbacks that did the laundering
 	// left the bundle with them.
 	// NOTE: It now measures 51,987, down 166, and the ceiling STAYS at 53,200:
 	// 166 bytes is not a kilobyte, and the headroom is still the ~1 kB every

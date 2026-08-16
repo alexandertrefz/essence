@@ -1077,12 +1077,12 @@ third"::lines())
 		noNumbers::firstItem()::toString(),
 	)
 	show(
-		"Optional.otherwise<ItemType>(_ ItemType) [present]",
-		numbers::firstItem()::otherwise(0),
+		"Optional.value<ItemType>(withDefault: ItemType) [present]",
+		numbers::firstItem()::value(withDefault 0),
 	)
 	show(
-		"Optional.otherwise<ItemType>(_ ItemType) [empty]",
-		noNumbers::firstItem()::otherwise(42),
+		"Optional.value<ItemType>(withDefault: ItemType) [empty]",
+		noNumbers::firstItem()::value(withDefault 42),
 	)
 	show("Optional.hasValue<ItemType>()", numbers::firstItem()::hasValue())
 	show(
@@ -1111,27 +1111,48 @@ third"::lines())
 		numbers::firstItem()::keep(where (item) { <- item::isNegative() }),
 	)
 
-	§ Equality is DERIVED, not written — a Choice compares by tag and then by
-	§ payload, through the payload's own `is`.
+	§ Equality is written, in two shapes: against a whole Optional — same
+	§ Case, then the payloads through their own `is` — and against a bare
+	§ item, which an empty Optional never is.
 	show(
-		"Choice_Equatable.is(_ Optional<ItemType>)",
+		"Optional.is<ItemType is Equatable>(_ Optional<ItemType>)",
 		numbers::firstItem()::is(#Value(3)),
 	)
 	show(
-		"Choice_Equatable.is(_ Optional<ItemType>) [different payload]",
+		"Optional.is<ItemType is Equatable>(_ Optional<ItemType>) [different payload]",
 		numbers::firstItem()::is(#Value(1)),
 	)
 	show(
-		"Choice_Equatable.is(_ Optional<ItemType>) [empty against value]",
+		"Optional.is<ItemType is Equatable>(_ Optional<ItemType>) [empty against value]",
 		noNumbers::firstItem()::is(#Value(3)),
 	)
 	show(
-		"Choice_Equatable.is(_ Optional<ItemType>) [both empty]",
+		"Optional.is<ItemType is Equatable>(_ Optional<ItemType>) [both empty]",
 		noNumbers::firstItem()::is(#Empty),
 	)
 	show(
-		"Choice_Equatable.isNot(_ Optional<ItemType>)",
+		"Optional.isNot<ItemType is Equatable>(_ Optional<ItemType>)",
 		numbers::firstItem()::isNot(#Value(2)),
+	)
+	show(
+		"Optional.is<ItemType is Equatable>(_ ItemType)",
+		numbers::firstItem()::is(3),
+	)
+	show(
+		"Optional.is<ItemType is Equatable>(_ ItemType) [different item]",
+		numbers::firstItem()::is(1),
+	)
+	show(
+		"Optional.is<ItemType is Equatable>(_ ItemType) [empty]",
+		noNumbers::firstItem()::is(3),
+	)
+	show(
+		"Optional.isNot<ItemType is Equatable>(_ ItemType)",
+		numbers::firstItem()::isNot(2),
+	)
+	show(
+		"Optional.isNot<ItemType is Equatable>(_ ItemType) [empty]",
+		noNumbers::firstItem()::isNot(3),
 	)
 
 	§ The nesting a Union-shaped Optional could not represent: the outer

@@ -97,9 +97,9 @@ describe("Code Generation — Naming and Escaping", () => {
 	describe("A local named after a Namespace", () => {
 		const shadowedOptional = `implementation {
 			function f() -> Integer {
-				constant Optional = { otherwise = 5 }
+				constant Optional = { value = 5 }
 
-				<- Optional.otherwise
+				<- Optional.value
 			}
 
 			Terminal.inspect(f())
@@ -108,11 +108,11 @@ describe("Code Generation — Naming and Escaping", () => {
 		it("reads the Record field, not the standard library Method", () => {
 			let generated = generate(shadowedOptional)
 
-			// NOTE: The bug: `Optional.otherwise` became the prelude const for
-			// `Optional::otherwise`, so `f` answered with a JavaScript Function
+			// NOTE: The bug: `Optional.value` became the prelude const for
+			// `Optional::value`, so `f` answered with a JavaScript Function
 			// where an Integer was promised.
-			expect(generated).not.toContain("$es_Optional_otherwise")
-			expect(generated).toContain("$user_Optional.otherwise")
+			expect(generated).not.toContain("$es_Optional_value")
+			expect(generated).toContain("$user_Optional.value")
 		})
 
 		it("answers with the field's value at run time", async () => {
@@ -121,7 +121,7 @@ describe("Code Generation — Naming and Escaping", () => {
 
 		it("emits no const for a Method only the shadowing named", () => {
 			// NOTE: The reachability search reads the same Types, so the edge to
-			// `$es_Optional_otherwise` is not drawn either — a const nothing
+			// `$es_Optional_value` is not drawn either — a const nothing
 			// references would otherwise be emitted beside the correct read.
 			expect(generate(shadowedOptional)).not.toContain("$es_Optional_")
 		})
@@ -367,7 +367,7 @@ describe("Code Generation — Naming and Escaping", () => {
 				function g() -> Integer {
 					constant items = [1, 2]
 
-					<- items::firstItem()::otherwise(0)
+					<- items::firstItem()::value(withDefault 0)
 				}
 
 				Terminal.inspect(f())
@@ -404,7 +404,7 @@ describe("Code Generation — Naming and Escaping", () => {
 
 					constant items = [1, 2]
 
-					Terminal.inspect(items::firstItem()::otherwise(0))
+					Terminal.inspect(items::firstItem()::value(withDefault 0))
 
 					<- total
 				}
