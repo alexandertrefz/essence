@@ -176,10 +176,9 @@ The esbuild shape of the same plugin lives one door over, at
 
 What a build holds this way is the **bundle's** exports: Essence's own values,
 under the names the Rewriter emitted them as, and the bridge that builds values
-they accept. Not the marshalled ones — the Marshaller reads a Type out of an
-export surface and prints its errors with the compiler's own printer, so
-shipping it would ship the compiler. Marshal at the edge, with `loadModule`, or
-reach for the bridge:
+they accept. Not the marshalled ones — what the plugins serve is what the
+bundler emitted. Marshal at the edge, with `loadModule`, or reach for the
+bridge:
 
 ```js
 import { square, $bridge_integer } from "./math/Math.es"

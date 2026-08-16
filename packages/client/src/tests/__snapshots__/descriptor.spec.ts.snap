@@ -1,0 +1,1949 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`A Module described describes Marshal.es 1`] = `
+{
+  "exports": {
+    "absent": {
+      "emitted": "absent",
+      "kind": "constant",
+      "of": {
+        "kind": "optional",
+        "of": {
+          "kind": "integer",
+          "shown": "Integer",
+        },
+        "shown": "Optional<Integer>",
+      },
+    },
+    "answer": {
+      "emitted": "answer",
+      "kind": "constant",
+      "of": {
+        "kind": "integer",
+        "shown": "Integer",
+      },
+    },
+    "areaOf": {
+      "emitted": "areaOf",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "arms": [
+                {
+                  "choice": "Shape",
+                  "kind": "case",
+                  "name": "Circle",
+                  "optional": false,
+                  "payload": {
+                    "radius": {
+                      "kind": "integer",
+                      "shown": "Integer",
+                    },
+                  },
+                  "shown": "Shape#Circle",
+                  "tag": "./Marshal.es#Shape#Circle",
+                },
+                {
+                  "choice": "Shape",
+                  "kind": "case",
+                  "name": "Rect",
+                  "optional": false,
+                  "payload": {
+                    "height": {
+                      "kind": "integer",
+                      "shown": "Integer",
+                    },
+                    "width": {
+                      "kind": "integer",
+                      "shown": "Integer",
+                    },
+                  },
+                  "shown": "Shape#Rect",
+                  "tag": "./Marshal.es#Shape#Rect",
+                },
+                {
+                  "choice": "Shape",
+                  "kind": "case",
+                  "name": "Blank",
+                  "optional": false,
+                  "payload": {},
+                  "shown": "Shape#Blank",
+                  "tag": "./Marshal.es#Shape#Blank",
+                },
+              ],
+              "kind": "union",
+              "shown": "Shape",
+            },
+          },
+        ],
+        "returns": {
+          "kind": "integer",
+          "shown": "Integer",
+        },
+        "shown": "(_ Shape) -> Integer",
+      },
+    },
+    "blank": {
+      "emitted": "blank",
+      "kind": "constant",
+      "of": {
+        "arms": [
+          {
+            "choice": "Shape",
+            "kind": "case",
+            "name": "Circle",
+            "optional": false,
+            "payload": {
+              "radius": {
+                "kind": "integer",
+                "shown": "Integer",
+              },
+            },
+            "shown": "Shape#Circle",
+            "tag": "./Marshal.es#Shape#Circle",
+          },
+          {
+            "choice": "Shape",
+            "kind": "case",
+            "name": "Rect",
+            "optional": false,
+            "payload": {
+              "height": {
+                "kind": "integer",
+                "shown": "Integer",
+              },
+              "width": {
+                "kind": "integer",
+                "shown": "Integer",
+              },
+            },
+            "shown": "Shape#Rect",
+            "tag": "./Marshal.es#Shape#Rect",
+          },
+          {
+            "choice": "Shape",
+            "kind": "case",
+            "name": "Blank",
+            "optional": false,
+            "payload": {},
+            "shown": "Shape#Blank",
+            "tag": "./Marshal.es#Shape#Blank",
+          },
+        ],
+        "kind": "union",
+        "shown": "Shape",
+      },
+    },
+    "box": {
+      "emitted": "box",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "kind": "record",
+              "members": {
+                "height": {
+                  "kind": "integer",
+                  "shown": "Integer",
+                },
+                "width": {
+                  "kind": "integer",
+                  "shown": "Integer",
+                },
+              },
+              "shown": "{ width: Integer, height: Integer }",
+            },
+          },
+        ],
+        "returns": {
+          "kind": "record",
+          "members": {
+            "height": {
+              "kind": "integer",
+              "shown": "Integer",
+            },
+            "width": {
+              "kind": "integer",
+              "shown": "Integer",
+            },
+          },
+          "shown": "{ width: Integer, height: Integer }",
+        },
+        "shown": "(_ { width: Integer, height: Integer }) -> { width: Integer, height: Integer }",
+      },
+    },
+    "boxes": {
+      "emitted": "boxes",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "kind": "list",
+              "of": {
+                "kind": "record",
+                "members": {
+                  "height": {
+                    "kind": "integer",
+                    "shown": "Integer",
+                  },
+                  "width": {
+                    "kind": "integer",
+                    "shown": "Integer",
+                  },
+                },
+                "shown": "{ width: Integer, height: Integer }",
+              },
+              "shown": "List<{ width: Integer, height: Integer }>",
+            },
+          },
+        ],
+        "returns": {
+          "kind": "list",
+          "of": {
+            "kind": "record",
+            "members": {
+              "height": {
+                "kind": "integer",
+                "shown": "Integer",
+              },
+              "width": {
+                "kind": "integer",
+                "shown": "Integer",
+              },
+            },
+            "shown": "{ width: Integer, height: Integer }",
+          },
+          "shown": "List<{ width: Integer, height: Integer }>",
+        },
+        "shown": "(_ List<{ width: Integer, height: Integer }>) -> List<{ width: Integer, height: Integer }>",
+      },
+    },
+    "branched": {
+      "emitted": "branched",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "kind": "list",
+              "of": {
+                "kind": "string",
+                "shown": "String",
+              },
+              "shown": "List<String>",
+            },
+          },
+        ],
+        "returns": {
+          "kind": "list",
+          "of": {
+            "kind": "list",
+            "of": {
+              "kind": "string",
+              "shown": "String",
+            },
+            "shown": "List<String>",
+          },
+          "shown": "List<List<String>>",
+        },
+        "shown": "(_ List<String>) -> List<List<String>>",
+      },
+    },
+    "card": {
+      "emitted": "card",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "kind": "record",
+              "members": {
+                "note": {
+                  "kind": "optional",
+                  "of": {
+                    "kind": "string",
+                    "shown": "String",
+                  },
+                  "shown": "Optional<String>",
+                },
+                "title": {
+                  "kind": "string",
+                  "shown": "String",
+                },
+              },
+              "shown": "{ title: String, note: Optional<String> }",
+            },
+          },
+        ],
+        "returns": {
+          "kind": "record",
+          "members": {
+            "note": {
+              "kind": "optional",
+              "of": {
+                "kind": "string",
+                "shown": "String",
+              },
+              "shown": "Optional<String>",
+            },
+            "title": {
+              "kind": "string",
+              "shown": "String",
+            },
+          },
+          "shown": "{ title: String, note: Optional<String> }",
+        },
+        "shown": "(_ { title: String, note: Optional<String> }) -> { title: String, note: Optional<String> }",
+      },
+    },
+    "circle": {
+      "emitted": "circle",
+      "kind": "constant",
+      "of": {
+        "arms": [
+          {
+            "choice": "Shape",
+            "kind": "case",
+            "name": "Circle",
+            "optional": false,
+            "payload": {
+              "radius": {
+                "kind": "integer",
+                "shown": "Integer",
+              },
+            },
+            "shown": "Shape#Circle",
+            "tag": "./Marshal.es#Shape#Circle",
+          },
+          {
+            "choice": "Shape",
+            "kind": "case",
+            "name": "Rect",
+            "optional": false,
+            "payload": {
+              "height": {
+                "kind": "integer",
+                "shown": "Integer",
+              },
+              "width": {
+                "kind": "integer",
+                "shown": "Integer",
+              },
+            },
+            "shown": "Shape#Rect",
+            "tag": "./Marshal.es#Shape#Rect",
+          },
+          {
+            "choice": "Shape",
+            "kind": "case",
+            "name": "Blank",
+            "optional": false,
+            "payload": {},
+            "shown": "Shape#Blank",
+            "tag": "./Marshal.es#Shape#Blank",
+          },
+        ],
+        "kind": "union",
+        "shown": "Shape",
+      },
+    },
+    "config": {
+      "emitted": "config",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "kind": "record",
+              "members": {
+                "toString": {
+                  "kind": "optional",
+                  "of": {
+                    "kind": "string",
+                    "shown": "String",
+                  },
+                  "shown": "Optional<String>",
+                },
+              },
+              "shown": "{ toString: Optional<String> }",
+            },
+          },
+        ],
+        "returns": {
+          "kind": "record",
+          "members": {
+            "toString": {
+              "kind": "optional",
+              "of": {
+                "kind": "string",
+                "shown": "String",
+              },
+              "shown": "Optional<String>",
+            },
+          },
+          "shown": "{ toString: Optional<String> }",
+        },
+        "shown": "(_ { toString: Optional<String> }) -> { toString: Optional<String> }",
+      },
+    },
+    "flag": {
+      "emitted": "flag",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "kind": "boolean",
+              "shown": "Boolean",
+            },
+          },
+        ],
+        "returns": {
+          "kind": "boolean",
+          "shown": "Boolean",
+        },
+        "shown": "(_ Boolean) -> Boolean",
+      },
+    },
+    "greeting": {
+      "emitted": "greeting",
+      "kind": "constant",
+      "of": {
+        "kind": "string",
+        "shown": "String",
+      },
+    },
+    "grown": {
+      "emitted": "grown",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "kind": "list",
+              "of": {
+                "kind": "string",
+                "shown": "String",
+              },
+              "shown": "List<String>",
+            },
+          },
+        ],
+        "returns": {
+          "kind": "list",
+          "of": {
+            "kind": "string",
+            "shown": "String",
+          },
+          "shown": "List<String>",
+        },
+        "shown": "(_ List<String>) -> List<String>",
+      },
+    },
+    "integer": {
+      "emitted": "integer",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "kind": "integer",
+              "shown": "Integer",
+            },
+          },
+        ],
+        "returns": {
+          "kind": "integer",
+          "shown": "Integer",
+        },
+        "shown": "(_ Integer) -> Integer",
+      },
+    },
+    "labelled": {
+      "emitted": "labelled",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "arms": [
+                {
+                  "kind": "string",
+                  "shown": "String",
+                },
+                {
+                  "kind": "integer",
+                  "shown": "Integer",
+                },
+              ],
+              "kind": "union",
+              "shown": "Label",
+            },
+          },
+        ],
+        "returns": {
+          "arms": [
+            {
+              "kind": "string",
+              "shown": "String",
+            },
+            {
+              "kind": "integer",
+              "shown": "Integer",
+            },
+          ],
+          "kind": "union",
+          "shown": "Label",
+        },
+        "shown": "(_ Label) -> Label",
+      },
+    },
+    "maybe": {
+      "emitted": "maybe",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "kind": "optional",
+              "of": {
+                "kind": "integer",
+                "shown": "Integer",
+              },
+              "shown": "Optional<Integer>",
+            },
+          },
+        ],
+        "returns": {
+          "kind": "optional",
+          "of": {
+            "kind": "integer",
+            "shown": "Integer",
+          },
+          "shown": "Optional<Integer>",
+        },
+        "shown": "(_ Optional<Integer>) -> Optional<Integer>",
+      },
+    },
+    "maybes": {
+      "emitted": "maybes",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "kind": "list",
+              "of": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer",
+                  "shown": "Integer",
+                },
+                "shown": "Optional<Integer>",
+              },
+              "shown": "List<Optional<Integer>>",
+            },
+          },
+        ],
+        "returns": {
+          "kind": "list",
+          "of": {
+            "kind": "optional",
+            "of": {
+              "kind": "integer",
+              "shown": "Integer",
+            },
+            "shown": "Optional<Integer>",
+          },
+          "shown": "List<Optional<Integer>>",
+        },
+        "shown": "(_ List<Optional<Integer>>) -> List<Optional<Integer>>",
+      },
+    },
+    "names": {
+      "emitted": "names",
+      "kind": "constant",
+      "of": {
+        "kind": "list",
+        "of": {
+          "kind": "string",
+          "shown": "String",
+        },
+        "shown": "List<String>",
+      },
+    },
+    "point": {
+      "emitted": "point",
+      "kind": "constant",
+      "of": {
+        "kind": "record",
+        "members": {
+          "x": {
+            "kind": "integer",
+            "shown": "Integer",
+          },
+          "y": {
+            "kind": "integer",
+            "shown": "Integer",
+          },
+        },
+        "shown": "{ x: Integer, y: Integer }",
+      },
+    },
+    "present": {
+      "emitted": "present",
+      "kind": "constant",
+      "of": {
+        "kind": "optional",
+        "of": {
+          "kind": "integer",
+          "shown": "Integer",
+        },
+        "shown": "Optional<Integer>",
+      },
+    },
+    "rational": {
+      "emitted": "rational",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "kind": "rational",
+              "shown": "Rational",
+            },
+          },
+        ],
+        "returns": {
+          "kind": "rational",
+          "shown": "Rational",
+        },
+        "shown": "(_ Rational) -> Rational",
+      },
+    },
+    "shape": {
+      "emitted": "shape",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "arms": [
+                {
+                  "choice": "Shape",
+                  "kind": "case",
+                  "name": "Circle",
+                  "optional": false,
+                  "payload": {
+                    "radius": {
+                      "kind": "integer",
+                      "shown": "Integer",
+                    },
+                  },
+                  "shown": "Shape#Circle",
+                  "tag": "./Marshal.es#Shape#Circle",
+                },
+                {
+                  "choice": "Shape",
+                  "kind": "case",
+                  "name": "Rect",
+                  "optional": false,
+                  "payload": {
+                    "height": {
+                      "kind": "integer",
+                      "shown": "Integer",
+                    },
+                    "width": {
+                      "kind": "integer",
+                      "shown": "Integer",
+                    },
+                  },
+                  "shown": "Shape#Rect",
+                  "tag": "./Marshal.es#Shape#Rect",
+                },
+                {
+                  "choice": "Shape",
+                  "kind": "case",
+                  "name": "Blank",
+                  "optional": false,
+                  "payload": {},
+                  "shown": "Shape#Blank",
+                  "tag": "./Marshal.es#Shape#Blank",
+                },
+              ],
+              "kind": "union",
+              "shown": "Shape",
+            },
+          },
+        ],
+        "returns": {
+          "arms": [
+            {
+              "choice": "Shape",
+              "kind": "case",
+              "name": "Circle",
+              "optional": false,
+              "payload": {
+                "radius": {
+                  "kind": "integer",
+                  "shown": "Integer",
+                },
+              },
+              "shown": "Shape#Circle",
+              "tag": "./Marshal.es#Shape#Circle",
+            },
+            {
+              "choice": "Shape",
+              "kind": "case",
+              "name": "Rect",
+              "optional": false,
+              "payload": {
+                "height": {
+                  "kind": "integer",
+                  "shown": "Integer",
+                },
+                "width": {
+                  "kind": "integer",
+                  "shown": "Integer",
+                },
+              },
+              "shown": "Shape#Rect",
+              "tag": "./Marshal.es#Shape#Rect",
+            },
+            {
+              "choice": "Shape",
+              "kind": "case",
+              "name": "Blank",
+              "optional": false,
+              "payload": {},
+              "shown": "Shape#Blank",
+              "tag": "./Marshal.es#Shape#Blank",
+            },
+          ],
+          "kind": "union",
+          "shown": "Shape",
+        },
+        "shown": "(_ Shape) -> Shape",
+      },
+    },
+    "styled": {
+      "emitted": "styled",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "arms": [
+                {
+                  "choice": "Styled",
+                  "kind": "case",
+                  "name": "Tagged",
+                  "optional": false,
+                  "payload": {
+                    "valueOf": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "string",
+                        "shown": "String",
+                      },
+                      "shown": "Optional<String>",
+                    },
+                  },
+                  "shown": "Styled#Tagged",
+                  "tag": "./Marshal.es#Styled#Tagged",
+                },
+              ],
+              "kind": "union",
+              "shown": "Styled",
+            },
+          },
+        ],
+        "returns": {
+          "arms": [
+            {
+              "choice": "Styled",
+              "kind": "case",
+              "name": "Tagged",
+              "optional": false,
+              "payload": {
+                "valueOf": {
+                  "kind": "optional",
+                  "of": {
+                    "kind": "string",
+                    "shown": "String",
+                  },
+                  "shown": "Optional<String>",
+                },
+              },
+              "shown": "Styled#Tagged",
+              "tag": "./Marshal.es#Styled#Tagged",
+            },
+          ],
+          "kind": "union",
+          "shown": "Styled",
+        },
+        "shown": "(_ Styled) -> Styled",
+      },
+    },
+    "text": {
+      "emitted": "text",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "kind": "string",
+              "shown": "String",
+            },
+          },
+        ],
+        "returns": {
+          "kind": "string",
+          "shown": "String",
+        },
+        "shown": "(_ String) -> String",
+      },
+    },
+    "third": {
+      "emitted": "third",
+      "kind": "constant",
+      "of": {
+        "kind": "rational",
+        "shown": "Rational",
+      },
+    },
+    "words": {
+      "emitted": "words",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "kind": "list",
+              "of": {
+                "kind": "string",
+                "shown": "String",
+              },
+              "shown": "List<String>",
+            },
+          },
+        ],
+        "returns": {
+          "kind": "list",
+          "of": {
+            "kind": "string",
+            "shown": "String",
+          },
+          "shown": "List<String>",
+        },
+        "shown": "(_ List<String>) -> List<String>",
+      },
+    },
+    "yes": {
+      "emitted": "yes",
+      "kind": "constant",
+      "of": {
+        "kind": "boolean",
+        "shown": "Boolean",
+      },
+    },
+  },
+}
+`;
+
+exports[`A Module described describes Calls.es 1`] = `
+{
+  "exports": {
+    "Point": {
+      "emitted": "Point",
+      "kind": "namespace",
+      "methods": {
+        "flipped": {
+          "emitted": "flipped",
+          "kind": "function",
+          "of": {
+            "kind": "function",
+            "parameters": [
+              {
+                "label": null,
+                "of": {
+                  "kind": "record",
+                  "members": {
+                    "x": {
+                      "kind": "integer",
+                      "shown": "Integer",
+                    },
+                    "y": {
+                      "kind": "integer",
+                      "shown": "Integer",
+                    },
+                  },
+                  "shown": "{ x: Integer, y: Integer }",
+                },
+              },
+            ],
+            "returns": {
+              "kind": "record",
+              "members": {
+                "x": {
+                  "kind": "integer",
+                  "shown": "Integer",
+                },
+                "y": {
+                  "kind": "integer",
+                  "shown": "Integer",
+                },
+              },
+              "shown": "{ x: Integer, y: Integer }",
+            },
+            "shown": "(_ { x: Integer, y: Integer }) -> { x: Integer, y: Integer }",
+          },
+        },
+        "from": {
+          "kind": "overloaded",
+          "overloads": [
+            {
+              "emitted": "from__overload$1",
+              "name": "from__overload$1",
+              "signature": "Point.from__overload$1(x: Integer) -> { x: Integer, y: Integer }",
+            },
+            {
+              "emitted": "from__overload$2",
+              "name": "from__overload$2",
+              "signature": "Point.from__overload$2(x: Integer, y: Integer) -> { x: Integer, y: Integer }",
+            },
+          ],
+        },
+        "grown": {
+          "kind": "overloaded",
+          "overloads": [
+            {
+              "emitted": "grown__overload$1",
+              "name": "grown__overload$1",
+              "signature": "Point.grown__overload$1(_ { x: Integer, y: Integer }, _ Integer) -> { x: Integer, y: Integer }",
+            },
+            {
+              "emitted": "grown__overload$2",
+              "name": "grown__overload$2",
+              "signature": "Point.grown__overload$2(_ { x: Integer, y: Integer }, by: Integer, and: Integer) -> { x: Integer, y: Integer }",
+            },
+          ],
+        },
+        "of": {
+          "emitted": "of",
+          "kind": "function",
+          "of": {
+            "kind": "function",
+            "parameters": [
+              {
+                "label": "x",
+                "of": {
+                  "kind": "integer",
+                  "shown": "Integer",
+                },
+              },
+              {
+                "label": "y",
+                "of": {
+                  "kind": "integer",
+                  "shown": "Integer",
+                },
+              },
+            ],
+            "returns": {
+              "kind": "record",
+              "members": {
+                "x": {
+                  "kind": "integer",
+                  "shown": "Integer",
+                },
+                "y": {
+                  "kind": "integer",
+                  "shown": "Integer",
+                },
+              },
+              "shown": "{ x: Integer, y: Integer }",
+            },
+            "shown": "(x: Integer, y: Integer) -> { x: Integer, y: Integer }",
+          },
+        },
+        "origin": {
+          "emitted": "origin",
+          "kind": "function",
+          "of": {
+            "kind": "function",
+            "parameters": [],
+            "returns": {
+              "kind": "record",
+              "members": {
+                "x": {
+                  "kind": "integer",
+                  "shown": "Integer",
+                },
+                "y": {
+                  "kind": "integer",
+                  "shown": "Integer",
+                },
+              },
+              "shown": "{ x: Integer, y: Integer }",
+            },
+            "shown": "() -> { x: Integer, y: Integer }",
+          },
+        },
+        "prototype": {
+          "emitted": "$user_prototype",
+          "kind": "function",
+          "of": {
+            "kind": "function",
+            "parameters": [
+              {
+                "label": null,
+                "of": {
+                  "kind": "record",
+                  "members": {
+                    "x": {
+                      "kind": "integer",
+                      "shown": "Integer",
+                    },
+                    "y": {
+                      "kind": "integer",
+                      "shown": "Integer",
+                    },
+                  },
+                  "shown": "{ x: Integer, y: Integer }",
+                },
+              },
+            ],
+            "returns": {
+              "kind": "integer",
+              "shown": "Integer",
+            },
+            "shown": "(_ { x: Integer, y: Integer }) -> Integer",
+          },
+        },
+        "shifted": {
+          "emitted": "shifted",
+          "kind": "function",
+          "of": {
+            "kind": "function",
+            "parameters": [
+              {
+                "label": null,
+                "of": {
+                  "kind": "record",
+                  "members": {
+                    "x": {
+                      "kind": "integer",
+                      "shown": "Integer",
+                    },
+                    "y": {
+                      "kind": "integer",
+                      "shown": "Integer",
+                    },
+                  },
+                  "shown": "{ x: Integer, y: Integer }",
+                },
+              },
+              {
+                "label": "by",
+                "of": {
+                  "kind": "integer",
+                  "shown": "Integer",
+                },
+              },
+            ],
+            "returns": {
+              "kind": "record",
+              "members": {
+                "x": {
+                  "kind": "integer",
+                  "shown": "Integer",
+                },
+                "y": {
+                  "kind": "integer",
+                  "shown": "Integer",
+                },
+              },
+              "shown": "{ x: Integer, y: Integer }",
+            },
+            "shown": "(_ { x: Integer, y: Integer }, by: Integer) -> { x: Integer, y: Integer }",
+          },
+        },
+      },
+      "name": "Point",
+      "properties": {
+        "named": {
+          "emitted": "named",
+          "of": {
+            "kind": "string",
+            "shown": "String",
+          },
+        },
+      },
+    },
+    "applied": {
+      "emitted": "applied",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "kind": "integer",
+              "shown": "Integer",
+            },
+          },
+          {
+            "label": "with",
+            "of": {
+              "kind": "function",
+              "parameters": [
+                {
+                  "label": null,
+                  "of": {
+                    "kind": "integer",
+                    "shown": "Integer",
+                  },
+                },
+              ],
+              "returns": {
+                "kind": "integer",
+                "shown": "Integer",
+              },
+              "shown": "(_ Integer) -> Integer",
+            },
+          },
+        ],
+        "returns": {
+          "kind": "integer",
+          "shown": "Integer",
+        },
+        "shown": "(_ Integer, with: (_ Integer) -> Integer) -> Integer",
+      },
+    },
+    "boxed": {
+      "emitted": "boxed",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": "box",
+            "of": {
+              "arms": [
+                {
+                  "kind": "record",
+                  "members": {
+                    "box": {
+                      "kind": "integer",
+                      "shown": "Integer",
+                    },
+                  },
+                  "shown": "{ box: Integer }",
+                },
+                {
+                  "kind": "integer",
+                  "shown": "Integer",
+                },
+              ],
+              "kind": "union",
+              "shown": "{ box: Integer } | Integer",
+            },
+          },
+        ],
+        "returns": {
+          "arms": [
+            {
+              "kind": "record",
+              "members": {
+                "box": {
+                  "kind": "integer",
+                  "shown": "Integer",
+                },
+              },
+              "shown": "{ box: Integer }",
+            },
+            {
+              "kind": "integer",
+              "shown": "Integer",
+            },
+          ],
+          "kind": "union",
+          "shown": "{ box: Integer } | Integer",
+        },
+        "shown": "(box: { box: Integer } | Integer) -> { box: Integer } | Integer",
+      },
+    },
+    "coloured": {
+      "emitted": "coloured",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "kind": "string",
+              "shown": "String",
+            },
+          },
+        ],
+        "returns": {
+          "arms": [
+            {
+              "choice": "Colour",
+              "kind": "case",
+              "name": "Red",
+              "optional": false,
+              "payload": {},
+              "shown": "Colour#Red",
+              "tag": "./Calls.es#Colour#Red",
+            },
+            {
+              "choice": "Colour",
+              "kind": "case",
+              "name": "Named",
+              "optional": false,
+              "payload": {
+                "name": {
+                  "kind": "string",
+                  "shown": "String",
+                },
+              },
+              "shown": "Colour#Named",
+              "tag": "./Calls.es#Colour#Named",
+            },
+          ],
+          "kind": "union",
+          "shown": "Colour",
+        },
+        "shown": "(_ String) -> Colour",
+      },
+    },
+    "evened": {
+      "emitted": "evened",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "kind": "integer",
+              "shown": "Integer",
+            },
+          },
+        ],
+        "returns": {
+          "kind": "optional",
+          "of": {
+            "kind": "integer",
+            "shown": "Integer",
+          },
+          "shown": "Optional<Integer>",
+        },
+        "shown": "(_ Integer) -> Optional<Integer>",
+      },
+    },
+    "handler": {
+      "emitted": "handler",
+      "kind": "constant",
+      "of": {
+        "kind": "record",
+        "members": {
+          "callback": {
+            "kind": "function",
+            "parameters": [
+              {
+                "label": null,
+                "of": {
+                  "kind": "integer",
+                  "shown": "Integer",
+                },
+              },
+            ],
+            "returns": {
+              "kind": "integer",
+              "shown": "Integer",
+            },
+            "shown": "(_ Integer) -> Integer",
+          },
+        },
+        "shown": "{ callback: (_ Integer) -> Integer }",
+      },
+    },
+    "invoke": {
+      "emitted": "invoke",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "kind": "record",
+              "members": {
+                "callback": {
+                  "kind": "function",
+                  "parameters": [
+                    {
+                      "label": null,
+                      "of": {
+                        "kind": "integer",
+                        "shown": "Integer",
+                      },
+                    },
+                  ],
+                  "returns": {
+                    "kind": "integer",
+                    "shown": "Integer",
+                  },
+                  "shown": "(_ Integer) -> Integer",
+                },
+              },
+              "shown": "{ callback: (_ Integer) -> Integer }",
+            },
+          },
+        ],
+        "returns": {
+          "kind": "integer",
+          "shown": "Integer",
+        },
+        "shown": "(_ { callback: (_ Integer) -> Integer }) -> Integer",
+      },
+    },
+    "labelled": {
+      "emitted": "labelled",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": "first",
+            "of": {
+              "kind": "integer",
+              "shown": "Integer",
+            },
+          },
+          {
+            "label": "second",
+            "of": {
+              "kind": "integer",
+              "shown": "Integer",
+            },
+          },
+        ],
+        "returns": {
+          "kind": "integer",
+          "shown": "Integer",
+        },
+        "shown": "(first: Integer, second: Integer) -> Integer",
+      },
+    },
+    "makeAdder": {
+      "emitted": "makeAdder",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "kind": "integer",
+              "shown": "Integer",
+            },
+          },
+        ],
+        "returns": {
+          "kind": "function",
+          "parameters": [
+            {
+              "label": null,
+              "of": {
+                "kind": "integer",
+                "shown": "Integer",
+              },
+            },
+          ],
+          "returns": {
+            "kind": "integer",
+            "shown": "Integer",
+          },
+          "shown": "(_ Integer) -> Integer",
+        },
+        "shown": "(_ Integer) -> (_ Integer) -> Integer",
+      },
+    },
+    "measure": {
+      "emitted": "measure",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": "box",
+            "of": {
+              "kind": "optional",
+              "of": {
+                "kind": "record",
+                "members": {
+                  "box": {
+                    "kind": "integer",
+                    "shown": "Integer",
+                  },
+                },
+                "shown": "{ box: Integer }",
+              },
+              "shown": "Optional<{ box: Integer }>",
+            },
+          },
+        ],
+        "returns": {
+          "kind": "optional",
+          "of": {
+            "kind": "record",
+            "members": {
+              "box": {
+                "kind": "integer",
+                "shown": "Integer",
+              },
+            },
+            "shown": "{ box: Integer }",
+          },
+          "shown": "Optional<{ box: Integer }>",
+        },
+        "shown": "(box: Optional<{ box: Integer }>) -> Optional<{ box: Integer }>",
+      },
+    },
+    "mixed": {
+      "emitted": "mixed",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "kind": "integer",
+              "shown": "Integer",
+            },
+          },
+          {
+            "label": "second",
+            "of": {
+              "kind": "integer",
+              "shown": "Integer",
+            },
+          },
+        ],
+        "returns": {
+          "kind": "integer",
+          "shown": "Integer",
+        },
+        "shown": "(_ Integer, second: Integer) -> Integer",
+      },
+    },
+    "moved": {
+      "emitted": "moved",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "kind": "record",
+              "members": {
+                "x": {
+                  "kind": "integer",
+                  "shown": "Integer",
+                },
+                "y": {
+                  "kind": "integer",
+                  "shown": "Integer",
+                },
+              },
+              "shown": "{ x: Integer, y: Integer }",
+            },
+          },
+        ],
+        "returns": {
+          "kind": "record",
+          "members": {
+            "x": {
+              "kind": "integer",
+              "shown": "Integer",
+            },
+            "y": {
+              "kind": "integer",
+              "shown": "Integer",
+            },
+          },
+          "shown": "{ x: Integer, y: Integer }",
+        },
+        "shown": "(_ { x: Integer, y: Integer }) -> { x: Integer, y: Integer }",
+      },
+    },
+    "nothing": {
+      "emitted": "nothing",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [],
+        "returns": {
+          "kind": "string",
+          "shown": "String",
+        },
+        "shown": "() -> String",
+      },
+    },
+    "positional": {
+      "emitted": "positional",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "kind": "integer",
+              "shown": "Integer",
+            },
+          },
+          {
+            "label": null,
+            "of": {
+              "kind": "integer",
+              "shown": "Integer",
+            },
+          },
+        ],
+        "returns": {
+          "kind": "integer",
+          "shown": "Integer",
+        },
+        "shown": "(_ Integer, _ Integer) -> Integer",
+      },
+    },
+  },
+}
+`;
+
+exports[`A Module described describes Declarations.es 1`] = `
+{
+  "exports": {
+    "RectangleMeasurable": {
+      "emitted": "RectangleMeasurable",
+      "kind": "namespace",
+      "methods": {
+        "area": {
+          "emitted": "area",
+          "kind": "function",
+          "of": {
+            "kind": "function",
+            "parameters": [
+              {
+                "label": null,
+                "of": {
+                  "kind": "record",
+                  "members": {
+                    "height": {
+                      "kind": "integer",
+                      "shown": "Integer",
+                    },
+                    "width": {
+                      "kind": "integer",
+                      "shown": "Integer",
+                    },
+                  },
+                  "shown": "{ width: Integer, height: Integer }",
+                },
+              },
+            ],
+            "returns": {
+              "kind": "integer",
+              "shown": "Integer",
+            },
+            "shown": "(_ { width: Integer, height: Integer }) -> Integer",
+          },
+        },
+      },
+      "name": "RectangleMeasurable",
+      "properties": {},
+    },
+    "firstOf": {
+      "emitted": "firstOf",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "kind": "list",
+              "of": {
+                "kind": "refused",
+                "shown": "ItemType",
+                "why": "ItemType is a Type Parameter — there is no shape to build a value against until it is applied.",
+              },
+              "shown": "List<ItemType>",
+            },
+          },
+        ],
+        "returns": {
+          "kind": "optional",
+          "of": {
+            "kind": "refused",
+            "shown": "ItemType",
+            "why": "ItemType is a Type Parameter — there is no shape to build a value against until it is applied.",
+          },
+          "shown": "Optional<ItemType>",
+        },
+        "shown": "<ItemType>(_ List<ItemType>) -> Optional<ItemType>",
+      },
+    },
+    "ratio": {
+      "emitted": "ratio",
+      "kind": "constant",
+      "of": {
+        "kind": "rational",
+        "shown": "Rational",
+      },
+    },
+    "widths": {
+      "emitted": "widths",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "kind": "list",
+              "of": {
+                "kind": "record",
+                "members": {
+                  "height": {
+                    "kind": "integer",
+                    "shown": "Integer",
+                  },
+                  "width": {
+                    "kind": "integer",
+                    "shown": "Integer",
+                  },
+                },
+                "shown": "{ width: Integer, height: Integer }",
+              },
+              "shown": "List<{ width: Integer, height: Integer }>",
+            },
+          },
+        ],
+        "returns": {
+          "kind": "list",
+          "of": {
+            "kind": "integer",
+            "shown": "Integer",
+          },
+          "shown": "List<Integer>",
+        },
+        "shown": "(_ List<{ width: Integer, height: Integer }>) -> List<Integer>",
+      },
+    },
+  },
+}
+`;
+
+exports[`A Module described describes Escaped.es 1`] = `
+{
+  "exports": {
+    "$$integer": {
+      "emitted": "$$integer",
+      "kind": "constant",
+      "of": {
+        "kind": "integer",
+        "shown": "Integer",
+      },
+    },
+    "ok?": {
+      "emitted": "$user_ok_3f_",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "kind": "boolean",
+              "shown": "Boolean",
+            },
+          },
+        ],
+        "returns": {
+          "kind": "boolean",
+          "shown": "Boolean",
+        },
+        "shown": "(_ Boolean) -> Boolean",
+      },
+    },
+  },
+}
+`;
+
+exports[`A Module described describes Refused.es 1`] = `
+{
+  "exports": {
+    "answer": {
+      "emitted": "answer",
+      "kind": "constant",
+      "of": {
+        "kind": "integer",
+        "shown": "Integer",
+      },
+    },
+    "deep": {
+      "emitted": "deep",
+      "kind": "constant",
+      "of": {
+        "kind": "optional",
+        "of": {
+          "kind": "optional",
+          "of": {
+            "kind": "integer",
+            "shown": "Integer",
+          },
+          "shown": "Optional<Integer>",
+        },
+        "shown": "Optional<Optional<Integer>>",
+      },
+    },
+    "doubled": {
+      "emitted": "doubled",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "kind": "integer",
+              "shown": "Integer",
+            },
+          },
+        ],
+        "returns": {
+          "kind": "integer",
+          "shown": "Integer",
+        },
+        "shown": "(_ Integer) -> Integer",
+      },
+    },
+    "nameOf": {
+      "emitted": "nameOf",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "arms": [
+                {
+                  "choice": "Tagged",
+                  "kind": "case",
+                  "name": "One",
+                  "optional": false,
+                  "payload": {
+                    "$case": {
+                      "kind": "string",
+                      "shown": "String",
+                    },
+                  },
+                  "shown": "Tagged#One",
+                  "tag": "./Refused.es#Tagged#One",
+                },
+                {
+                  "choice": "Tagged",
+                  "kind": "case",
+                  "name": "Plain",
+                  "optional": false,
+                  "payload": {},
+                  "shown": "Tagged#Plain",
+                  "tag": "./Refused.es#Tagged#Plain",
+                },
+              ],
+              "kind": "union",
+              "shown": "Tagged",
+            },
+          },
+        ],
+        "returns": {
+          "kind": "string",
+          "shown": "String",
+        },
+        "shown": "(_ Tagged) -> String",
+      },
+    },
+    "nested": {
+      "emitted": "nested",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "kind": "optional",
+              "of": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer",
+                  "shown": "Integer",
+                },
+                "shown": "Optional<Integer>",
+              },
+              "shown": "Optional<Optional<Integer>>",
+            },
+          },
+        ],
+        "returns": {
+          "kind": "optional",
+          "of": {
+            "kind": "optional",
+            "of": {
+              "kind": "integer",
+              "shown": "Integer",
+            },
+            "shown": "Optional<Integer>",
+          },
+          "shown": "Optional<Optional<Integer>>",
+        },
+        "shown": "(_ Optional<Optional<Integer>>) -> Optional<Optional<Integer>>",
+      },
+    },
+    "root": {
+      "emitted": "root",
+      "kind": "constant",
+      "of": {
+        "kind": "optional",
+        "of": {
+          "arms": [
+            {
+              "kind": "integer",
+              "shown": "Integer",
+            },
+            {
+              "kind": "refused",
+              "shown": "Algebraic",
+              "why": "Algebraic can not be marshalled yet.",
+            },
+          ],
+          "kind": "union",
+          "shown": "Integer | Algebraic",
+        },
+        "shown": "Optional<Integer | Algebraic>",
+      },
+    },
+    "shallow": {
+      "emitted": "shallow",
+      "kind": "constant",
+      "of": {
+        "kind": "optional",
+        "of": {
+          "kind": "optional",
+          "of": {
+            "kind": "integer",
+            "shown": "Integer",
+          },
+          "shown": "Optional<Integer>",
+        },
+        "shown": "Optional<Optional<Integer>>",
+      },
+    },
+    "tagged": {
+      "emitted": "tagged",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "kind": "string",
+              "shown": "String",
+            },
+          },
+        ],
+        "returns": {
+          "arms": [
+            {
+              "choice": "Tagged",
+              "kind": "case",
+              "name": "One",
+              "optional": false,
+              "payload": {
+                "$case": {
+                  "kind": "string",
+                  "shown": "String",
+                },
+              },
+              "shown": "Tagged#One",
+              "tag": "./Refused.es#Tagged#One",
+            },
+            {
+              "choice": "Tagged",
+              "kind": "case",
+              "name": "Plain",
+              "optional": false,
+              "payload": {},
+              "shown": "Tagged#Plain",
+              "tag": "./Refused.es#Tagged#Plain",
+            },
+          ],
+          "kind": "union",
+          "shown": "Tagged",
+        },
+        "shown": "(_ String) -> Tagged",
+      },
+    },
+  },
+}
+`;

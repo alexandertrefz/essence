@@ -11,7 +11,7 @@ import {
 import type { common } from "@essence-lang/interfaces"
 
 import { BRIDGE_EXPORTS } from "./bridge"
-import { admitsAbsence, optionalItemOf } from "./marshal"
+import { admitsAbsence, optionalItemOf } from "./descriptor"
 
 // NOTE: An Export Surface as TypeScript — `printType`'s sibling, walking the
 // same `common.Type` vocabulary and printing the other language. Every rule the

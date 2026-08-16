@@ -9,7 +9,6 @@ import {
 } from "@essence-lang/compiler/modules"
 import type { OptimiserOptions } from "@essence-lang/compiler/optimiser"
 
-import { bindModule } from "./bind"
 import {
 	BRIDGE_KEY,
 	type RuntimeBridge,
@@ -18,9 +17,9 @@ import {
 } from "./bridge"
 import { bundlePath, cacheBundle, cachedBundle, cacheDirectory } from "./cache"
 import { EssenceCompileError } from "./compile-error"
-import { createMarshaller, type Marshaller } from "./marshal"
+import { createMarshaller, describeModule, type Marshaller } from "./descriptor"
+import { bind } from "./marshal-runtime"
 
-export { bindModule, type ModuleBindings } from "./bind"
 export {
 	BRIDGE_EXPORTS,
 	BRIDGE_KEY,
@@ -38,6 +37,24 @@ export {
 	// terminal. It is on the root because that is where the Error is.
 	renderGroups,
 } from "./compile-error"
+// NOTE: The Compiler-side half of the boundary. `describe` and its context are
+// NOT here: they are how a Descriptor is built one Type at a time, which is a
+// thing to reach for on the door it lives behind — and `describe` is a name a
+// host has other plans for.
+export {
+	type CaseDescriptor,
+	createMarshaller,
+	type Descriptor,
+	describeModule,
+	type ExportDescriptor,
+	type FunctionDescriptor,
+	type Marshaller,
+	type MarshallerOptions,
+	type ModuleDescriptor,
+	type NamespaceDescriptor,
+	type NamespaceMethod,
+	type OverloadDescriptor,
+} from "./descriptor"
 export {
 	type DeclarationOptions,
 	type DeclarationView,
@@ -48,11 +65,16 @@ export {
 	EssenceCallError,
 	EssenceMarshalError,
 } from "./errors"
+// NOTE: And the run-time half. A host holding a bundle and a Descriptor has
+// everything `loadModule` has, which is the whole point of there being one.
 export {
-	createMarshaller,
-	type Marshaller,
-	type MarshallerOptions,
-} from "./marshal"
+	bind,
+	type BindOptions,
+	createInterpreter,
+	type EssenceFunction,
+	type Interpreter,
+	type ModuleBindings,
+} from "./marshal-runtime"
 export {
 	essenceEsbuild,
 	type EsbuildBuild,
@@ -199,7 +221,9 @@ async function importModule(
 	>
 	let bridge = runtimeBridgeOf(namespace)
 	let marshaller = createMarshaller(bridge, { entryPath: entry })
-	let { exports, raw } = bindModule(namespace, surface, marshaller)
+	let { exports, raw } = bind(namespace, describeModule(surface, entry), {
+		bridge,
+	})
 
 	return { entryPath: entry, surface, exports, raw, bridge, marshaller }
 }
