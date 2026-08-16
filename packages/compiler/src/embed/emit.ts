@@ -6,7 +6,7 @@ import {
 	optimise,
 	type OptimiserOptions,
 } from "../optimiser/index"
-import { rewriteModules } from "../rewriter/index"
+import { type EmitTarget, rewriteModules } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 
 // NOTE: The back half of the pipeline — enriched Programs in, a bundle's bytes
@@ -36,7 +36,8 @@ export type EmitRequest = {
 	// the order the Module bodies run in.
 	modules: Array<EmitModule>
 	// NOTE: The canonical path of the entry Module, which every other Module's
-	// specifier in the bundle is spelled relative to.
+	// specifier in the bundle is spelled relative to — unless the target below
+	// says otherwise.
 	entryPath: string
 	// NOTE: What the bundle's own source is CALLED, as the caller spells it.
 	// Only a single-file compile reads it; a graph carries its own names.
@@ -46,6 +47,11 @@ export type EmitRequest = {
 	sourcemap?: boolean
 	sourcemapMode?: "linked" | "inline"
 	optimisation?: OptimiserOptions
+	// NOTE: Who the emitted Modules are for — see `EmitTarget`. Absent means a
+	// bundle, which is what `esc` and every embedder emitting one ask for; only
+	// a caller that stops at `generateModules` and serves the Modules to a host
+	// bundler names the other one.
+	emit?: EmitTarget
 	// NOTE: A last word on the rewritten Modules before esbuild reads them —
 	// the seam an embedder injects a synthetic Module through, entry included.
 	// It runs after rewriting because what it adds is JavaScript rather than
@@ -69,16 +75,16 @@ export type EmitHooks = {
 	) => Promise<Result>
 }
 
-export async function emitBundle(
+// NOTE: The pipeline down to JavaScript and no further: the Modules rewritten,
+// the prelude beside them, and whatever the caller injected. What a caller does
+// with them is the difference between a bundle and a host's build — the stages
+// above that seam are the same either way, which is why they are written here
+// once rather than in each caller.
+export async function generateModules(
 	request: EmitRequest,
 	hooks: EmitHooks = {},
-): Promise<BundleResult> {
-	let runStage =
-		hooks.stage ??
-		(async <Result>(
-			_name: EmitStage,
-			work: () => Result | Promise<Result>,
-		): Promise<Result> => work())
+): Promise<ModuleSources> {
+	let runStage = stageRunner(hooks)
 	let runSimplify = hooks.simplify ?? simplify
 	let runOptimise = hooks.optimise ?? optimise
 	let optimisation = request.optimisation ?? defaultOptimiserOptions
@@ -95,7 +101,7 @@ export async function emitBundle(
 	// standard library prelude between its Modules — rewriting them one at a
 	// time would put a copy of every reachable Essence Method into every Module
 	// that reaches it.
-	let generated = await runStage("generate", () => {
+	return runStage("generate", () => {
 		let sources = rewriteModules(
 			optimised.map((program, index) => ({
 				filePath: request.modules[index]!.filePath,
@@ -107,15 +113,26 @@ export async function emitBundle(
 			// Rewriter too: the standard library's bodies are optimised inside
 			// the prelude it builds, and a Program compiled with a pass off must
 			// not import one compiled with it on.
-			{ sourcemap: request.sourcemap, optimiser: optimisation },
+			{
+				sourcemap: request.sourcemap,
+				optimiser: optimisation,
+				emit: request.emit,
+			},
 		)
 
 		return request.transformSources === undefined
 			? sources
 			: request.transformSources(sources)
 	})
+}
 
-	return runStage("bundle", () =>
+export async function emitBundle(
+	request: EmitRequest,
+	hooks: EmitHooks = {},
+): Promise<BundleResult> {
+	let generated = await generateModules(request, hooks)
+
+	return stageRunner(hooks)("bundle", () =>
 		bundle(generated, {
 			sourceFileName: request.sourceFileName,
 			outputFileName: request.outputFileName,
@@ -123,5 +140,15 @@ export async function emitBundle(
 			sourcemap: request.sourcemap,
 			sourcemapMode: request.sourcemapMode,
 		}),
+	)
+}
+
+function stageRunner(hooks: EmitHooks): NonNullable<EmitHooks["stage"]> {
+	return (
+		hooks.stage ??
+		(async <Result>(
+			_name: EmitStage,
+			work: () => Result | Promise<Result>,
+		): Promise<Result> => work())
 	)
 }

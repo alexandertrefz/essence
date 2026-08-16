@@ -14,6 +14,7 @@ import {
 	defaultOptimiserOptions,
 	type OptimiserOptions,
 } from "@essence-lang/compiler/optimiser"
+import type { EmitTarget } from "@essence-lang/compiler/rewriter/emitTarget"
 import { validate } from "@essence-lang/compiler/validator"
 import type { common } from "@essence-lang/interfaces"
 
@@ -95,6 +96,12 @@ export type CompileRequest = {
 	// across threads compiles every file under the Options the command line
 	// asked for.
 	optimisation?: OptimiserOptions
+	// NOTE: Who the emitted Modules are for — see `EmitTarget`. Absent, and
+	// unspelled by any flag, means a bundle: `esc` writes a file to run, and
+	// every other target exists for a build that resolves Essence's Modules
+	// itself. It is here because it changes the emitted bytes without changing
+	// the sources, which is exactly what `bundleKey` has to name.
+	emit?: EmitTarget
 }
 
 // NOTE: One file of the compiled graph, with the text its Diagnostics are
@@ -565,6 +572,7 @@ export async function compileFile(
 						? "inline"
 						: request.sourcemapMode,
 				optimisation: request.optimisation ?? defaultOptimiserOptions,
+				emit: request.emit,
 			},
 			{
 				simplify: session.simplify,

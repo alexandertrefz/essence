@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test"
 import {
 	mkdirSync,
 	mkdtempSync,
+	readFileSync,
 	realpathSync,
 	rmSync,
 	writeFileSync,
@@ -11,9 +12,16 @@ import * as path from "node:path"
 import { pathToFileURL } from "node:url"
 
 import { fixturePath } from "@essence-lang/fixtures"
+import { RUNTIME_DIRECTORY } from "@essence-lang/runtime"
 
 import { hashGraph } from "../embed/hash"
-import { compileToMemory, linkToMemory, toolchainKey } from "../embed/index"
+import {
+	compileToMemory,
+	emitToMemory,
+	linkToMemory,
+	type MemoryEmitResult,
+	toolchainKey,
+} from "../embed/index"
 import { loadModuleGraph } from "../modules/graph"
 import { diskModuleHost } from "../modules/host"
 import { defaultOptimiserOptions, unoptimisedOptions } from "../optimiser/index"
@@ -397,6 +405,206 @@ export {
 						linked.diagnostics.map((diagnostic) => diagnostic.code),
 					).not.toEqual([])
 					expect(linked.diagnosticGroups.length).toBeGreaterThan(0)
+				},
+			)
+		})
+	})
+
+	// NOTE: The graph as Modules, which is what a host bundler embeds. Everything
+	// here is about ONE property: a file's emitted text must be a function of the
+	// file and the root, and of nothing else — least of all of which entry the
+	// build happened to compile it under.
+	describe("Emitting To Memory", () => {
+		// NOTE: One file two entries share, reached from two different depths, so
+		// that the entry-relative spelling and the root-relative one can not
+		// coincide: `../lib/Shape.es` from the one, `./lib/Shape.es` from the
+		// other.
+		const SHARED = {
+			"lib/Shape.es": `implementation {
+
+	choice Shape {
+		Circle { radius: Integer },
+		Blank,
+	}
+
+	function areaOf(_ value: Shape) -> Integer {
+		<- match value -> Integer {
+			case #Circle({ radius }) { <- radius::multiply(with radius) }
+			case #Blank              { <- 0 }
+		}
+	}
+}
+
+export {
+	Shape
+	areaOf
+}
+`,
+			"app/One.es": `import {
+	Shape  from "../lib/Shape.es"
+	areaOf from "../lib/Shape.es"
+}
+
+implementation {
+	constant one: Shape = #Circle({ radius = 2 })
+	constant area = areaOf(one)
+}
+
+export {
+	area
+}
+`,
+			"Two.es": `import {
+	Shape  from "./lib/Shape.es"
+	areaOf from "./lib/Shape.es"
+}
+
+implementation {
+	constant two: Shape = #Circle({ radius = 3 })
+	constant area = areaOf(two)
+}
+
+export {
+	area
+}
+`,
+		}
+
+		it("spells a shared Module the same however it was reached", async () => {
+			await withProject(SHARED, async (root) => {
+				let target = { mode: "host", root } as const
+				let one = await emitToMemory(path.join(root, "app", "One.es"), {
+					emit: target,
+				})
+				let two = await emitToMemory(path.join(root, "Two.es"), {
+					emit: target,
+				})
+
+				expect(one.diagnostics).toEqual([])
+				expect(two.diagnostics).toEqual([])
+				// NOTE: Byte for byte, which is the whole claim — the host holds
+				// ONE module per path, so the two compiles have to agree about
+				// every character of it. The Case tag inside is what makes this
+				// more than tidiness: `./lib/Shape.es#Shape#Circle` stamped by
+				// one entry and compared by the other is what a `match` reads.
+				expect(one.sources.sources.get("essence:./lib/Shape.es")).toBe(
+					two.sources.sources.get("essence:./lib/Shape.es")!,
+				)
+				expect(
+					one.sources.sources.get("essence:./lib/Shape.es"),
+				).toContain('"./lib/Shape.es#Shape#Circle"')
+				// NOTE: And the prelude with it, which is a different claim: its
+				// contents are the whole standard library rather than what this
+				// graph reaches, so two graphs that reach different halves of it
+				// still write the same Module under the one name a host holds it
+				// by.
+				expect(one.sources.sources.get("essence:$prelude")).toBe(
+					two.sources.sources.get("essence:$prelude")!,
+				)
+			})
+		})
+
+		// NOTE: The default emitting a bundle, where the same file is spelled
+		// against the entry — stated here because it is what the mode above exists
+		// to answer, and a change to it would otherwise only show up as a host
+		// build that silently takes the wrong arm.
+		it("spells a shared Module against the entry when it emits a bundle", async () => {
+			await withProject(SHARED, async (root) => {
+				let one = await emitToMemory(path.join(root, "app", "One.es"))
+				let two = await emitToMemory(path.join(root, "Two.es"))
+
+				expect(
+					one.sources.sources.get("essence:../lib/Shape.es"),
+				).toContain('"../lib/Shape.es#Shape#Circle"')
+				expect(
+					two.sources.sources.get("essence:./lib/Shape.es"),
+				).toContain('"./lib/Shape.es#Shape#Circle"')
+			})
+		})
+
+		it("imports the runtime by name so a host resolves one of it", async () => {
+			await withProject(SHARED, async (root) => {
+				let bundled = await emitToMemory(path.join(root, "Two.es"))
+				let hosted = await emitToMemory(path.join(root, "Two.es"), {
+					emit: { mode: "host", root },
+				})
+				let shape = (result: MemoryEmitResult): string =>
+					result.sources.sources.get("essence:./lib/Shape.es")!
+
+				expect(shape(hosted)).toContain(
+					'from "@essence-lang/runtime/Integer"',
+				)
+				expect(shape(hosted)).not.toContain(RUNTIME_DIRECTORY)
+				// NOTE: The other way round for a bundle, whose imports the
+				// Bundler resolves and inlines itself — a package specifier there
+				// would have to resolve against wherever the emitted text was
+				// handed to esbuild from.
+				expect(shape(bundled)).toContain(RUNTIME_DIRECTORY)
+			})
+		})
+
+		// NOTE: What the runtime's own package promises, checked rather than
+		// assumed: the specifier the Rewriter now writes has to resolve, in a
+		// workspace and once published alike, or a host's build fails at a
+		// specifier no Essence source wrote.
+		it("writes a runtime specifier the runtime's exports map answers", () => {
+			let manifest = JSON.parse(
+				readFileSync(
+					path.join(RUNTIME_DIRECTORY, "..", "package.json"),
+					"utf8",
+				),
+			) as { name: string; exports: Record<string, string> }
+
+			expect(manifest.name).toBe("@essence-lang/runtime")
+			// NOTE: A `./src/*.ts` wildcard is BOTH halves of the promise. It is
+			// what resolves in a workspace — checked below by resolving one for
+			// real — and it is the one shape `scripts/publishing/stage.ts`
+			// rewrites, into `./dist/*.js` beside a `./dist/*.d.ts`, so the same
+			// specifier answers out of a published package too.
+			expect(manifest.exports["./*"]).toBe("./src/*.ts")
+			expect(import.meta.resolve("@essence-lang/runtime/Integer")).toBe(
+				pathToFileURL(path.join(RUNTIME_DIRECTORY, "Integer.ts")).href,
+			)
+		})
+
+		it("names a host's Modules apart from a bundle's in the hash", async () => {
+			await withProject(SHARED, async (root) => {
+				let entry = path.join(root, "Two.es")
+				let bundled = await emitToMemory(entry)
+				let hosted = await emitToMemory(entry, {
+					emit: { mode: "host", root },
+				})
+				let elsewhere = await emitToMemory(entry, {
+					emit: { mode: "host", root: path.dirname(root) },
+				})
+
+				expect(hosted.bundleHash).not.toBe(bundled.bundleHash)
+				// NOTE: The root is in the key because it is what the Modules are
+				// spelled relative to — two roots are two different texts over one
+				// graph.
+				expect(elsewhere.bundleHash).not.toBe(hosted.bundleHash)
+			})
+		})
+
+		it("answers a Module that does not compile with Diagnostics and no Modules", async () => {
+			await withProject(
+				{
+					"Main.es": `implementation {
+	constant wrong: String = 1
+}
+`,
+				},
+				async (root) => {
+					let result = await emitToMemory(
+						path.join(root, "Main.es"),
+						{
+							emit: { mode: "host", root },
+						},
+					)
+
+					expect(result.diagnostics).not.toEqual([])
+					expect(result.sources.entry).toBe("")
+					expect([...result.sources.sources.keys()]).toEqual([])
 				},
 			)
 		})

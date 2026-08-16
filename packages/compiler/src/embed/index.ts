@@ -12,8 +12,13 @@ import {
 	defaultOptimiserOptions,
 	type OptimiserOptions,
 } from "../optimiser/index"
+import {
+	BUNDLE_TARGET,
+	type EmitTarget,
+	emitTargetKey,
+} from "../rewriter/index"
 import { validate } from "../validator/index"
-import { emitBundle } from "./emit"
+import { emitBundle, type EmitModule, generateModules } from "./emit"
 import { hashGraph } from "./hash"
 
 // NOTE: The back half of the pipeline is shared with `esc` rather than owned
@@ -25,7 +30,12 @@ export {
 	type EmitModule,
 	type EmitRequest,
 	type EmitStage,
+	generateModules,
 } from "./emit"
+// NOTE: Re-exported from the Rewriter, which owns what the modes MEAN, so that
+// a host embedding the Compiler names its target and keys its own cache by it
+// through one entry rather than two.
+export { type EmitTarget, emitTargetKey } from "../rewriter/index"
 // NOTE: Exported because a host that writes its own bundles somewhere shared
 // has the same question this seam answers — what is the toolchain that wrote
 // them — and no way to ask it otherwise.
@@ -56,6 +66,10 @@ export type EmbedOptions = {
 	// `bundleHash` tells the two bundles apart. Leaving it out is the claim
 	// that nothing was injected.
 	emitterKey?: string
+	// NOTE: Who the emitted Modules are for — see `EmitTarget`. It changes the
+	// bytes without changing the sources, so it joins `bundleHash` beside the
+	// `emitterKey` rather than being trusted to the caller.
+	emit?: EmitTarget
 	// NOTE: Nothing is written there — the name only decides what the source map
 	// spells its `.es` sources relative to. A host that goes on to write the
 	// bundle should name the place it is going to write it, or its map points at
@@ -125,6 +139,14 @@ export type MemoryLinkResult = {
 	bundleHash: string
 }
 
+// NOTE: The same answer a compile gives, with the graph as Modules where the
+// bundle's text would have been: every Module under the specifier the others
+// import it by, the shared prelude beside them, and which of them is the entry.
+// Empty exactly when the compile stopped, for the reason `code` is.
+export type MemoryEmitResult = MemoryLinkResult & {
+	sources: ModuleSources
+}
+
 export function linkToMemory(
 	entryPath: string,
 	options: EmbedOptions = {},
@@ -172,19 +194,109 @@ export async function compileToMemory(
 	entryPath: string,
 	options: EmbedOptions = {},
 ): Promise<MemoryCompileResult> {
+	let prepared = validateGraph(entryPath, options)
+
+	if ("stopped" in prepared) {
+		return { code: "", ...prepared.stopped }
+	}
+
+	let bundled = await emitBundle({
+		...prepared.request,
+		sourceFileName: entryPath,
+		outputFileName:
+			options.outputFileName ?? defaultOutputFileName(prepared.entry),
+		// NOTE: Inside the bundle rather than beside it, because there is no
+		// "beside": what a host is handed is one string, and a map it can not
+		// reach is a stack trace it can not read.
+		sourcemap: true,
+		sourcemapMode: "inline",
+		transformSources: options.transformSources,
+	})
+
+	// NOTE: A bundling failure is a Compiler bug rather than a file's, so it goes
+	// where the graph's own Diagnostics go: under the entry.
+	if (containsErrors(bundled.diagnostics)) {
+		return { code: "", ...prepared.answer(bundled.diagnostics) }
+	}
+
+	let primary = bundled.outputs.find(
+		(output) => !output.path.endsWith(".map"),
+	)
+
+	return {
+		code:
+			primary === undefined
+				? ""
+				: new TextDecoder().decode(primary.contents),
+		...prepared.answer(bundled.diagnostics),
+	}
+}
+
+// NOTE: The same compile, stopped one stage earlier: the graph as JavaScript
+// Modules, each under the specifier the others import it by, and nothing
+// bundled. This is what a HOST BUNDLER embeds — it has a module graph of its
+// own and wants Essence's Modules inside it rather than a finished bundle
+// beside it, so that one runtime, and therefore one hidden Type key, is shared
+// by every Essence file the build reaches.
+//
+// NOTE: Only worth asking for under `emit: { mode: "host", root }`. The default
+// spells every Module relative to the ENTRY, which makes a shared file's text a
+// function of which entry was compiled — fine inside one bundle, wrong the
+// moment a host holds one module per path.
+export async function emitToMemory(
+	entryPath: string,
+	options: EmbedOptions = {},
+): Promise<MemoryEmitResult> {
+	let prepared = validateGraph(entryPath, options)
+
+	if ("stopped" in prepared) {
+		return { sources: noSources(), ...prepared.stopped }
+	}
+
+	let sources = await generateModules({
+		...prepared.request,
+		sourceFileName: entryPath,
+		// NOTE: Named but never written — nothing here reaches the Bundler, and
+		// the maps are the Modules' own inline ones.
+		outputFileName: defaultOutputFileName(prepared.entry),
+		transformSources: options.transformSources,
+	})
+
+	return { sources, ...prepared.answer([]) }
+}
+
+// NOTE: Everything both emitting entries do before they part — read, parse,
+// link, validate — and the answer either of them gives when one of those had
+// something to say. `request` is the front half of an `EmitRequest`: what the
+// GRAPH decides, with what the caller decides left out.
+type PreparedGraph =
+	| { stopped: MemoryLinkResult }
+	| {
+			entry: string
+			request: {
+				modules: Array<EmitModule>
+				entryPath: string
+				optimisation: OptimiserOptions
+				emit: EmitTarget | undefined
+			}
+			// NOTE: The graph's own Diagnostics with whatever emitting added to
+			// them — a Bundler's complaint, or nothing at all.
+			answer: (own: Array<common.Diagnostic>) => MemoryLinkResult
+	  }
+
+function validateGraph(
+	entryPath: string,
+	options: EmbedOptions,
+): PreparedGraph {
 	let front = readSources(entryPath, options)
-	let entry = front.entry
-	let graph = front.graph
 	let answer = (
-		code: string,
 		surface: ExportSurface,
 		perModule: Array<ModuleDiagnostics>,
 		own: Array<common.Diagnostic>,
-	): MemoryCompileResult => {
+	): MemoryLinkResult => {
 		let diagnosticGroups = front.group(perModule, own)
 
 		return {
-			code,
 			surface,
 			files: front.files,
 			diagnostics: diagnosticGroups.flatMap((group) => group.diagnostics),
@@ -198,29 +310,28 @@ export async function compileToMemory(
 	// files, and linking a graph with a hole in it would report the same mistake
 	// again as a name that is not in scope.
 	let parsed = answer(
-		"",
 		emptySurface(),
-		[...graph.modules.values()],
-		graph.diagnostics,
+		[...front.graph.modules.values()],
+		front.graph.diagnostics,
 	)
 
 	if (containsErrors(parsed.diagnostics)) {
-		return parsed
+		return { stopped: parsed }
 	}
 
-	let linked = linkModuleGraph(graph)
+	let linked = linkModuleGraph(front.graph)
 	let modules = [...linked.modules.values()]
-	let surface = linked.modules.get(entry)?.surface ?? emptySurface()
+	let surface = linked.modules.get(front.entry)?.surface ?? emptySurface()
 	// NOTE: Copied rather than pointed at, because validation appends to these
 	// below and a LinkedModule's own collection is not this stage's to grow.
 	let perModule = modules.map((module) => ({
 		filePath: module.module.filePath,
 		diagnostics: [...module.diagnostics],
 	}))
-	let enriched = answer("", surface, perModule, linked.diagnostics)
+	let enriched = answer(surface, perModule, linked.diagnostics)
 
 	if (containsErrors(enriched.diagnostics)) {
-		return enriched
+		return { stopped: enriched }
 	}
 
 	// NOTE: Validation runs over the whole graph, and only once nothing in it has
@@ -231,48 +342,31 @@ export async function compileToMemory(
 		perModule[index]!.diagnostics.push(...validate(module.program))
 	}
 
-	let validated = answer("", surface, perModule, linked.diagnostics)
+	let validated = answer(surface, perModule, linked.diagnostics)
 
 	if (containsErrors(validated.diagnostics)) {
-		return validated
+		return { stopped: validated }
 	}
 
-	let bundled = await emitBundle({
-		modules: modules.map((module) => ({
-			filePath: module.module.filePath,
-			program: module.program,
-			sourceText: module.module.sourceText,
-		})),
-		entryPath: entry,
-		sourceFileName: entryPath,
-		outputFileName: options.outputFileName ?? defaultOutputFileName(entry),
-		// NOTE: Inside the bundle rather than beside it, because there is no
-		// "beside": what a host is handed is one string, and a map it can not
-		// reach is a stack trace it can not read.
-		sourcemap: true,
-		sourcemapMode: "inline",
-		optimisation: front.optimisation,
-		transformSources: options.transformSources,
-	})
-
-	// NOTE: A bundling failure is a Compiler bug rather than a file's, so it goes
-	// where the graph's own Diagnostics go: under the entry.
-	let own = [...linked.diagnostics, ...bundled.diagnostics]
-
-	if (containsErrors(bundled.diagnostics)) {
-		return answer("", surface, perModule, own)
+	return {
+		entry: front.entry,
+		request: {
+			modules: modules.map((module) => ({
+				filePath: module.module.filePath,
+				program: module.program,
+				sourceText: module.module.sourceText,
+			})),
+			entryPath: front.entry,
+			optimisation: front.optimisation,
+			emit: options.emit,
+		},
+		answer: (own) =>
+			answer(surface, perModule, [...linked.diagnostics, ...own]),
 	}
+}
 
-	let primary = bundled.outputs.find(
-		(output) => !output.path.endsWith(".map"),
-	)
-
-	return answer(
-		primary === undefined ? "" : new TextDecoder().decode(primary.contents),
-		surface,
-		perModule,
-		own,
-	)
+function noSources(): ModuleSources {
+	return { entry: "", sources: new Map() }
 }
 
 // NOTE: One Module's Diagnostics on their way to a group, before the source
@@ -317,7 +411,17 @@ function readSources(entryPath: string, options: EmbedOptions): ReadSources {
 			entryPath: entry,
 			modules: graph.modules,
 			optimisation,
-			emitterKey: options.emitterKey ?? "",
+			// NOTE: The target joins whatever the host named itself by, and
+			// contributes NOTHING where it is the default — so every hash
+			// spelled before there was a target to name still names the same
+			// bytes, and a host's Modules can never be served out of a cache
+			// under a bundle's name.
+			emitterKey: [
+				options.emitterKey ?? "",
+				emitTargetKey(options.emit ?? BUNDLE_TARGET),
+			]
+				.filter((part) => part !== "")
+				.join("|"),
 		}),
 		files: [...graph.modules.keys()].sort(),
 		group: (perModule, own) =>
