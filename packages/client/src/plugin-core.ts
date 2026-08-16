@@ -12,8 +12,9 @@ import {
 import type { OptimiserOptions } from "@essence-lang/compiler/optimiser"
 
 import { BRIDGE_KEY, withRuntimeBridge } from "./bridge"
+import { EssenceCompileError } from "./compile-error"
 import { generateDeclarations } from "./dts"
-import { EssenceBuildError, EssenceCompileError } from "./errors"
+import { EssenceBuildError } from "./errors"
 
 // NOTE: Essence inside somebody else's build. A `.es` file is compiled where the
 // bundler asks for its text, and what comes back is one standalone Module — the
