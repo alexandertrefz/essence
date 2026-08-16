@@ -390,6 +390,14 @@ async function writeDeclarations(
 // mapping for refuses the Module rather than the one export. In a build that is
 // the better half of the trade — the alternative is a page that renders and then
 // throws somewhere else entirely.
+//
+// NOTE: And the other half, which is a real cost rather than a preference: a
+// marshalled constant is ONE object for the whole build, where `defineConstant`
+// hands `loadModule` a fresh one per read for the reason stated there — a `List`
+// a host pushes onto changes what every other importer of that Module sees. The
+// two doors deliberately answer differently, and the README says so under "In a
+// bundler"; nothing here can close the gap, because a module's exports are the
+// one thing JavaScript will not let a getter stand behind.
 export function wrapperFor(
 	entryPath: string,
 	descriptor: ModuleDescriptor,

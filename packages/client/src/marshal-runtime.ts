@@ -1383,9 +1383,12 @@ function admitsCase(tag: unknown, expected: CaseDescriptor): boolean {
 }
 
 // NOTE: What an `Optional` holds, or `null` where the shape is not one. The
-// sibling of `descriptor.ts`'s `optionalItemOf`, which answers the same question
-// of a Type — the two are one rule met on two sides of the seam, and both are
-// asked it of a Union because a lone `#Value` arm can reach one.
+// sibling of `dts.ts`'s `optionalItem`, with `admitsAbsence` beside it — that is
+// the copy a change to the Optional rule has to be kept in step with, since it
+// decides what a DECLARATION says about the same shape. The Compiler's
+// `describeUnion` states the rule a third time, from the other side of the seam:
+// it is where the pair of Cases becomes the one node both of these read. All
+// three are asked of a Union because a lone `#Value` arm can reach one.
 function optionalItemOf(descriptor: Descriptor): Descriptor | null {
 	switch (descriptor.kind) {
 		case "optional":
