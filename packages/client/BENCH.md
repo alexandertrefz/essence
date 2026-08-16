@@ -172,8 +172,30 @@ panel    25  bigint     1.35 µs  5.26×      panel    25  number     1.36 µs  
 panel    25  bigint     1.42 µs  5.40×      panel    25  number     1.35 µs  5.92×
 ```
 
-Which is the baseline reproduced. Every comparison below is between two doors
-that were measured against the same machine within the hour.
+Which is the baseline reproduced — for the bigint rows. The number rows are not
+the baseline reproduced, and saying so is the point of a control: 250 and 252 µs
+here against the baseline table's 210 for the same configuration is **19%
+apart**, where the raw door's own drift is 5%. One of those two is the wrong
+number to divide by, and the file cannot say which.
+
+So the number row was measured again, properly: five rounds of old door and new
+alternating in ONE session, a fresh process for each, so that nothing between
+them is the machine.
+
+```
+old  243.03  273.61  250.69  262.11  228.33 µs
+new   66.74   71.65   67.95   67.09   67.80 µs
+```
+
+The old door's number row swings **228 to 274 µs**, which is why the baseline
+table caught it at 210 and the control at 250. Its bigint row does not do this —
+three runs in the same session gave 312.57, 311.13 and 307.71 µs against the
+baseline table's 297, the same 5% the raw door drifted. So the bigint win below
+is a figure and the number win is a range, and the range is the honest form of
+it rather than a hedge.
+
+Every comparison below is between two doors that were measured against the same
+machine within the hour.
 
 ## Reading the second table
 
@@ -182,9 +204,11 @@ The nested call is now AT the hand-built door rather than 2.5× behind it —
 thousand, and 1.1–1.3× at 21, where a call is small enough that what a door does
 once weighs as much as what it does per value. Against the same door measured
 in the same session, the marshalled `layout` went from 308 and 334 µs to 129
-with bigints, and from 252 and 250 µs to 67 with numbers: **2.4–2.6× and 3.7×
-faster**, and it is the same marshaller, checking the same things and saying
-the same sentences when they are wrong.
+with bigints, and from 228–274 µs to 67–72 with numbers: **2.4–2.6×** and
+**3.1–3.9×** faster, and it is the same marshaller, checking the same things and
+saying the same sentences when they are wrong. The number figure is a range
+because the door it is divided by is one — see the control above; 3.1× is the
+baseline table's 210 µs and 3.9× the slowest old run measured beside a new one.
 
 Below 1.00× wants a word, since a door that checks nothing ought to win. The
 hand-built door is a plausible one rather than a floor: it grows its Arrays with
@@ -224,3 +248,36 @@ under.
 
 So the door is now the price of what the door PROMISES, at every size worth
 measuring. What is left to take is the promises, and they are not for sale.
+
+## The node the tables do not reach
+
+`layout` and `resize` take and answer plain data, which is what an embedding's
+hot call usually is — so neither table above crosses a Function value, and a
+Function was the one node still interpreting after everything else was compiled.
+`wrapFunction` re-ran `labelsOf`, three `parameters.map` allocations and every
+`argument N` string on each crossing, though a signature settles all of it and a
+signature is fixed when the Module is declared.
+
+Measured at **46b3eaf1** against the commit before it, on the same machine, one
+process per figure: 20 000 warm-up turns, then the fastest of fifteen batches of
+20 000, over `Bun.nanoseconds()`.
+
+```
+                                        before     after
+a Record holding a Function, per read   57–65 ns   24–26 ns
+a Function answered by a call           75–77 ns   34–37 ns
+a call that crosses no Function         35–38 ns   35–38 ns
+```
+
+It is not in `tools/bench.ts` because there is nothing there to compare it
+against: the raw door hands a Module's Function over as the emitted one, which
+takes tagged values no host holds, so the two doors are not doing the same work.
+The comparison that means something is before against after.
+
+Paid per VALUE rather than per binding, which is what makes it worth a WeakMap:
+a constant is marshalled where it is READ, so a host reading `handler.callback`
+in a loop wraps a fresh callable every time round it, and a Module Function that
+answers with a closure wraps one on every call. The third row is the control — a
+call whose Arguments and answer are all plain data touches none of this, and
+does not move. The two tables above were re-run at the same commit for the same
+reason, and did not move either.

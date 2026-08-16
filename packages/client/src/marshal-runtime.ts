@@ -151,6 +151,21 @@ type Members = {
 	named: Map<string, Outbound>
 }
 
+// NOTE: Everything about a call that its SIGNATURE settles: which labels it may
+// be written with, the reader for every Parameter and for the answer, and what
+// an Error calls each Argument written either way. None of it depends on the
+// Function it wraps or on the name that Function was met under, so all of it is
+// settled once per FunctionDescriptor rather than once per value that crosses;
+// see `compiledCall`.
+type Call = {
+	arity: number
+	labels: Array<string> | null
+	readers: Array<Inbound>
+	answer: Outbound
+	positional: Array<string>
+	named: Array<string>
+}
+
 export type Interpreter = {
 	// NOTE: An Essence value out, as the JavaScript it maps to. The optional name
 	// is what an Error calls the value, and everything below it is spelled
@@ -240,6 +255,7 @@ export function createInterpreter(bridge: RuntimeBridge): Interpreter {
 	let inbound = new WeakMap<Descriptor, Inbound>()
 	let outbound = new WeakMap<Descriptor, Outbound>()
 	let outboundMembers = new WeakMap<Record<string, Descriptor>, Members>()
+	let calls = new WeakMap<FunctionDescriptor, Call>()
 	// NOTE: What a position that declared nothing reads its members by — no
 	// names to guess with and no reader to find, so every member of it is read
 	// by the walk the VALUE directs. One of them rather than a `null` to branch
@@ -307,6 +323,48 @@ export function createInterpreter(bridge: RuntimeBridge): Interpreter {
 
 			compiled = { names, readers, named }
 			outboundMembers.set(members, compiled)
+		}
+
+		return compiled
+	}
+
+	// NOTE: A signature's half of a call, compiled — the half that is fixed the
+	// moment the Module declares the Function, which is everything but the
+	// Function itself and the name an Error calls it. Memoised against the
+	// FunctionDescriptor, because a Function is the one Essence value whose
+	// crossing BUILDS something: a Module Function answering with a closure
+	// wraps a new one on every call, and a host reading a constant that holds
+	// one wraps a new one on every property read, since a constant is marshalled
+	// where it is read. Without this, that crossing walks the Parameters four
+	// times over and spells every `argument N` again for each.
+	function compiledCall(signature: FunctionDescriptor): Call {
+		let compiled = calls.get(signature)
+
+		if (compiled === undefined) {
+			let parameters = signature.parameters
+			let labels = labelsOf(signature)
+			let positional = parameters.map((parameter, position) =>
+				argumentPath(parameter.label, position, false),
+			)
+
+			compiled = {
+				arity: parameters.length,
+				labels,
+				readers: parameters.map((parameter) => compileIn(parameter.of)),
+				answer: compileOut(signature.returns),
+				positional,
+				// NOTE: The same Array where no labels may be written, rather
+				// than a second one holding the same strings — `readCall`
+				// answers the Arguments it was passed where it did not reorder
+				// them, and the two spellings are then told apart by identity.
+				named:
+					labels === null
+						? positional
+						: parameters.map((parameter, position) =>
+								argumentPath(parameter.label, position, true),
+							),
+			}
+			calls.set(signature, compiled)
 		}
 
 		return compiled
@@ -1399,29 +1457,19 @@ export function createInterpreter(bridge: RuntimeBridge): Interpreter {
 	// DECLARED return, so a Function a call answers with comes back callable too.
 	//
 	// NOTE: Everything about a call that does not depend on its Arguments is
-	// settled HERE rather than inside the Function it hands back: which labels the
-	// call may be written with, what an Error calls each Argument either way, the
-	// reader for every Parameter and the reader for the answer. What is left at
-	// call time is reading the Arguments and making the call.
+	// settled before it: which labels the call may be written with, what an Error
+	// calls each Argument either way, the reader for every Parameter and the
+	// reader for the answer. All of it is settled by the SIGNATURE alone, so
+	// `compiledCall` settles it once for every Function that will ever be wrapped
+	// against that signature, and what is left here is reading the Arguments and
+	// making the call.
 	function wrapFunction(
 		target: EssenceFunction,
 		signature: FunctionDescriptor,
 		name: string,
 	): (...args: Array<unknown>) => unknown {
-		let parameters = signature.parameters
-		let arity = parameters.length
-		let labels = labelsOf(signature)
-		let readers = parameters.map((parameter) => compileIn(parameter.of))
-		let answer = compileOut(signature.returns)
-		let positional = parameters.map((parameter, position) =>
-			argumentPath(parameter.label, position, false),
-		)
-		let named =
-			labels === null
-				? positional
-				: parameters.map((parameter, position) =>
-						argumentPath(parameter.label, position, true),
-					)
+		let { arity, labels, readers, answer, positional, named } =
+			compiledCall(signature)
 
 		return (...args: Array<unknown>): unknown => {
 			let ordered = readCall(args, signature, labels, name)
