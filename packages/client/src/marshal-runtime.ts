@@ -806,6 +806,34 @@ export function createInterpreter(
 
 				let arms = expected.arms.map((arm) => compileIn(arm))
 				let count = arms.length
+				// NOTE: Which JavaScript families each arm could take at all,
+				// so that an arm is only TRIED where it could succeed. An arm
+				// says no by throwing, and a thrown Error captures a stack —
+				// which is nothing against a value that fits the first arm and
+				// everything against a tree of ten thousand values whose fit is
+				// the third: two refusals built and discarded per value, and
+				// most of a call spent inside the Error constructor. Skipping
+				// an arm the family already rules out changes no answer: such
+				// an arm never recognised the value, so it could neither have
+				// taken it nor have been the one refusal worth reporting.
+				let families = expected.arms.map((arm) => familiesOf(arm))
+
+				// NOTE: A Union of bare Cases and nothing else — a unit Choice
+				// as a value of it is declared, which is the shape a status or
+				// a kind is — is a lookup and no search: every string it can
+				// take is known when the reader is compiled, under both of its
+				// spellings, and answers the one shared instance. What is not
+				// in the table falls through to the arms, so a miss is refused
+				// in exactly the words it always was.
+				let named = bareCaseTable(expected)
+
+				// NOTE: And the same for the Cases that cross as objects: which
+				// arm a `$case` names is known when the reader is compiled, so
+				// an object that names one is handed to that arm and no other.
+				// The arm's own refusal — a payload member wrong under a
+				// recognised tag — is then the ONE refusal, which is what the
+				// search below would have concluded after trying the rest.
+				let tagged = caseArmTable(expected)
 
 				// NOTE: In declaration order, and the first arm that admits the
 				// value is the one it becomes. Overlapping arms are therefore
@@ -813,12 +841,44 @@ export function createInterpreter(
 				// makes a String out of `"7"` because `Optional<String>` is
 				// written first, not because anything weighed the two.
 				return (value, at, step) => {
+					let family = typeof value
+
+					if (named !== null && family === "string") {
+						let tag = named.get(value as string)
+
+						if (tag !== undefined) {
+							return makeCase(tag)
+						}
+					}
+
+					if (
+						tagged !== null &&
+						family === "object" &&
+						value !== null
+					) {
+						let spelled = (value as Record<string, unknown>).$case
+
+						if (typeof spelled === "string") {
+							let position = tagged.get(spelled)
+
+							if (position !== undefined) {
+								return arms[position]!(value, at, step)
+							}
+						}
+					}
+
 					// NOTE: Built on the first refusal rather than before the
 					// first arm — an arm that takes the value is the whole of
 					// what usually happens, and it should leave nothing behind.
 					let refused: Array<EssenceMarshalError> | null = null
 
 					for (let position = 0; position < count; position++) {
+						let admits = families[position]!
+
+						if (admits !== null && !admits.has(family)) {
+							continue
+						}
+
 						try {
 							return arms[position]!(value, at, step)
 						} catch (thrown) {
@@ -2608,6 +2668,129 @@ function caseFor(
 		default:
 			return null
 	}
+}
+
+// NOTE: The `typeof` families a Descriptor's reader could take a value from,
+// or `null` for one that has to be tried to be known. Conservative on purpose:
+// a family named here is one the arm MIGHT take, and a family left out is one
+// it can not — a bare Case names `object` as well as `string`, because the
+// `$case` object it used to cross as is met there and refused in a sentence of
+// its own, and that sentence is the arm's to give.
+function familiesOf(descriptor: Descriptor): Set<string> | null {
+	switch (descriptor.kind) {
+		case "integer":
+			return new Set(["bigint", "number"])
+		case "rational":
+			return new Set(["bigint", "number", "object"])
+		case "string":
+			return new Set(["string"])
+		case "boolean":
+			return new Set(["boolean"])
+		case "list":
+		case "record":
+			return new Set(["object"])
+		case "case":
+			return descriptor.optional
+				? null
+				: descriptor.unitChoice
+					? new Set(["string", "object"])
+					: new Set(["object"])
+		case "optional": {
+			let inner = familiesOf(descriptor.of)
+
+			if (inner === null) {
+				return null
+			}
+
+			return new Set([...inner, "undefined", "object"])
+		}
+		case "union": {
+			let found = new Set<string>()
+
+			for (let arm of descriptor.arms) {
+				let inner = familiesOf(arm)
+
+				if (inner === null) {
+					return null
+				}
+
+				for (let family of inner) {
+					found.add(family)
+				}
+			}
+
+			return found
+		}
+		case "function":
+			return new Set(["function"])
+		case "refused":
+			return null
+	}
+}
+
+// NOTE: Every string a Union of bare Cases takes, under the tag it answers —
+// both spellings of every Case — or `null` where the Union holds anything
+// else, which is a Union that has to be searched. Nested Unions of bare Cases
+// are read through, since that is how a Choice's Cases reach a Union that
+// names the Choice beside another.
+function bareCaseTable(descriptor: Descriptor): Map<string, string> | null {
+	let table = new Map<string, string>()
+
+	return collectBareCaseTable(descriptor, table) ? table : null
+}
+
+function collectBareCaseTable(
+	descriptor: Descriptor,
+	table: Map<string, string>,
+): boolean {
+	switch (descriptor.kind) {
+		case "case":
+			if (!descriptor.unitChoice) {
+				return false
+			}
+
+			table.set(descriptor.name, descriptor.tag)
+			table.set(`${descriptor.choice}#${descriptor.name}`, descriptor.tag)
+
+			return true
+		case "union":
+			return descriptor.arms.every((arm) =>
+				collectBareCaseTable(arm, table),
+			)
+		default:
+			return false
+	}
+}
+
+// NOTE: Which arm of a Union of CASES each `$case` a host could write names —
+// both spellings of every Case that crosses as an object — or `null` where any
+// arm is something else. Cases only, because the search below lets the FIRST
+// arm that takes a value win, and an arm that is not a Case is one whose
+// answer for an object carrying a `$case` can not be read off the tag; a Choice
+// is the shape this is for, and a Choice is Cases and nothing else. A tag
+// written twice keeps its first arm, as the search would.
+function caseArmTable(descriptor: {
+	arms: Array<Descriptor>
+}): Map<string, number> | null {
+	let table = new Map<string, number>()
+
+	for (let [position, arm] of descriptor.arms.entries()) {
+		if (arm.kind !== "case" || arm.optional) {
+			return null
+		}
+
+		if (arm.unitChoice) {
+			continue
+		}
+
+		for (let spelling of [arm.name, `${arm.choice}#${arm.name}`]) {
+			if (!table.has(spelling)) {
+				table.set(spelling, position)
+			}
+		}
+	}
+
+	return table.size === 0 ? null : table
 }
 
 // NOTE: Every Case of a unit Choice a whole Module names, under its tag and
