@@ -12,9 +12,9 @@ import * as path from "node:path"
 import type { common } from "@essence-lang/interfaces"
 
 import type { EssenceValue } from "../bridge"
+import type { Marshaller } from "../descriptor"
 import { EssenceMarshalError } from "../errors"
 import { type EssenceModule, loadModule } from "../index"
-import type { Marshaller } from "../marshal"
 import { EssenceRational } from "../rational"
 
 let cacheDirectory = ""
