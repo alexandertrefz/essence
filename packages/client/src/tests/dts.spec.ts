@@ -1,97 +1,65 @@
 import { describe, expect, it } from "bun:test"
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
-import { tmpdir } from "node:os"
 import * as path from "node:path"
 
 import { compileToMemory } from "@essence-lang/compiler/embed"
-import type { ExportSurface } from "@essence-lang/compiler/modules"
+import { canonicalPath } from "@essence-lang/compiler/modules"
 import { fixturePath } from "@essence-lang/fixtures"
 
+import {
+	type DeclaredType,
+	describeModule,
+	describeTypes,
+	type ModuleDescriptor,
+} from "../descriptor"
 import { type DeclarationView, generateDeclarations } from "../dts"
-
-const REPOSITORY = path.join(import.meta.dirname, "..", "..", "..", "..")
-
-// NOTE: The real class rather than a copy of its shape. A consumer of a
-// generated file imports `EssenceRational` from this package, and a stub
-// declaring what it is thought to be would typecheck a Module against a Rational
-// that does not exist.
-const RATIONAL_MODULE = path.join(import.meta.dirname, "..", "rational")
+import { RATIONAL_MODULE, typecheck } from "./typecheck"
 
 function clientFixture(name: string): string {
 	return path.join(import.meta.dirname, "files", name)
 }
 
-async function surfaceOf(entryPath: string): Promise<ExportSurface> {
-	let compiled = await compileToMemory(entryPath)
+// NOTE: What a plugin hands `generateDeclarations`: the Descriptor the wrapper
+// marshals by, and the Types the Module named. Described against the entry, the
+// way the bundle beside it is emitted — a Case tag is entry-relative, and a
+// declaration file that disagreed with its own bundle would name Cases nothing
+// carries.
+async function describedModule(
+	entryPath: string,
+): Promise<{ descriptor: ModuleDescriptor; types: Array<DeclaredType> }> {
+	let entry = canonicalPath(entryPath)
+	let compiled = await compileToMemory(entry)
 
 	expect(compiled.diagnostics).toEqual([])
 
-	return compiled.surface
+	return {
+		descriptor: describeModule(compiled.surface, entry),
+		types: describeTypes(compiled.surface, entry),
+	}
 }
 
 async function declarationsOf(
 	entryPath: string,
 	view: DeclarationView = "javascript",
 ): Promise<string> {
-	return generateDeclarations(await surfaceOf(entryPath), {
+	let { descriptor, types } = await describedModule(entryPath)
+
+	return generateDeclarations(descriptor, {
 		moduleName: path.basename(entryPath),
+		types,
 		view,
 	})
 }
 
-// NOTE: `tsc` over a directory of its own, extending the repository's own
-// TypeScript settings — the point of the exercise is that a generated file
-// compiles where its reader's code compiles, and a laxer configuration invented
-// for the test would answer a question nobody asked. `typeRoots` is absolute
-// because a temporary directory has no `node_modules` above it.
-function typecheck(files: Record<string, string>): {
-	code: number
-	output: string
-} {
-	let directory = mkdtempSync(path.join(tmpdir(), "essence-dts-"))
+// NOTE: The declarations as a consumer reads them — the `javascript` view, with
+// `EssenceRational` imported by path. A temporary directory has no
+// `node_modules` above it, so the package name would not resolve there.
+async function declarationsFor(entryPath: string): Promise<string> {
+	let { descriptor, types } = await describedModule(entryPath)
 
-	try {
-		for (let [name, contents] of Object.entries(files)) {
-			writeFileSync(path.join(directory, name), contents)
-		}
-
-		writeFileSync(
-			path.join(directory, "tsconfig.json"),
-			JSON.stringify({
-				extends: path.join(REPOSITORY, "tsconfig.base.json"),
-				compilerOptions: {
-					// NOTE: What makes `./Math.es` resolve to `Math.d.es.ts`.
-					allowArbitraryExtensions: true,
-					types: ["bun"],
-					typeRoots: [
-						path.join(REPOSITORY, "node_modules", "@types"),
-					],
-				},
-				include: ["*.ts"],
-			}),
-		)
-
-		// NOTE: The repository's own `tsc`, by path. `bun x tsc` from a directory
-		// with no `node_modules` above it goes to the network for one, which
-		// makes the test both slow and a liar about which compiler it ran.
-		let run = Bun.spawnSync(
-			[
-				path.join(REPOSITORY, "node_modules", ".bin", "tsc"),
-				"--project",
-				directory,
-			],
-			{ cwd: directory },
-		)
-
-		return {
-			code: run.exitCode,
-			output: `${new TextDecoder().decode(
-				run.stdout,
-			)}${new TextDecoder().decode(run.stderr)}`,
-		}
-	} finally {
-		rmSync(directory, { recursive: true, force: true })
-	}
+	return generateDeclarations(descriptor, {
+		clientSpecifier: RATIONAL_MODULE,
+		types,
+	})
 }
 
 describe("The JavaScript view", () => {
@@ -101,7 +69,7 @@ describe("The JavaScript view", () => {
 		).toBe(
 			`// Generated from Math.es by @essence-lang/client. Do not edit.
 //
-// The Module as JavaScript — what \`loadModule(…).exports\` answers with.
+// The Module as JavaScript — marshalled at every boundary.
 
 import type { EssenceRational } from "@essence-lang/client"
 
@@ -118,7 +86,7 @@ export declare function square(p0: bigint): bigint
 		expect(await declarationsOf(fixturePath("modules", "Main.es"))).toBe(
 			`// Generated from Main.es by @essence-lang/client. Do not edit.
 //
-// The Module as JavaScript — what \`loadModule(…).exports\` answers with.
+// The Module as JavaScript — marshalled at every boundary.
 
 export type Rectangle = { width: bigint; height: bigint }
 
@@ -168,16 +136,25 @@ export declare const Rectangle: { of(width: bigint, height: bigint): Rectangle }
 		expect(text).not.toContain(clientFixture("Marshal.es"))
 	})
 
-	// NOTE: A Type Parameter is a shape that has not been decided yet, and
-	// `fromJS` builds a value AGAINST a shape — so there is nothing to build one
-	// against and the Marshaller says so. Declaring the Parameter `ItemType`
-	// would typecheck `firstOf([1n])`, which throws; `never` typechecks
-	// `firstOf([])`, which is exactly the call that works.
+	// NOTE: A Type Parameter is a shape that has not been decided yet, and a
+	// value going in has to be BUILT against a shape — so there is nothing to
+	// build one against and the boundary says so, in the words it would throw
+	// them in. Declaring the Parameter `ItemType` would typecheck
+	// `firstOf([1n])`, which throws; `never` typechecks `firstOf([])`, which is
+	// exactly the call that works.
+	//
+	// NOTE: And no `<ItemType>` on the Function either. A Descriptor carries the
+	// shapes a value crosses AS, and a Type Parameter never is one — a
+	// declaration that bound the name would promise a caller a Type to apply on
+	// a call that can not be made.
 	it("refuses a Type Parameter in a Parameter position", async () => {
+		let refusal =
+			"ItemType is a Type Parameter — there is no shape to build a value against until it is applied."
+
 		expect(
 			await declarationsOf(clientFixture("Declarations.es")),
 		).toContain(
-			"export declare function firstOf<ItemType>(p0: Array<never /* a Type Parameter can not be marshalled */>): ItemType | undefined",
+			`export declare function firstOf(p0: Array<never /* ${refusal} */>): unknown /* ${refusal} */ | undefined`,
 		)
 	})
 
@@ -340,10 +317,7 @@ export declare function $user_ok_3f_(p0: EssenceValue): EssenceValue`)
 
 describe("A consumer of the generated declarations", () => {
 	it("typechecks against them", async () => {
-		let declarations = generateDeclarations(
-			await surfaceOf(clientFixture("Marshal.es")),
-			{ clientSpecifier: RATIONAL_MODULE },
-		)
+		let declarations = await declarationsFor(clientFixture("Marshal.es"))
 		let run = typecheck({
 			"Marshal.d.es.ts": declarations,
 			"consumer.ts": `import { areaOf, box, boxes, greeting, maybe, present, shape, third } from "./Marshal.es"
@@ -366,10 +340,7 @@ export let ratio: string = third.toString()
 	// NOTE: The other half of the claim. Declarations that admit everything
 	// typecheck every consumer, so a passing consumer says nothing on its own.
 	it("is refused an Argument of the wrong Type", async () => {
-		let declarations = generateDeclarations(
-			await surfaceOf(clientFixture("Marshal.es")),
-			{ clientSpecifier: RATIONAL_MODULE },
-		)
+		let declarations = await declarationsFor(clientFixture("Marshal.es"))
 		let run = typecheck({
 			"Marshal.d.es.ts": declarations,
 			"consumer.ts": `import { box } from "./Marshal.es"
@@ -386,10 +357,7 @@ export let wrong = box({ width: 3, height: 4 })
 	})
 
 	it("reaches an export JavaScript can not spell", async () => {
-		let declarations = generateDeclarations(
-			await surfaceOf(clientFixture("Escaped.es")),
-			{ clientSpecifier: RATIONAL_MODULE },
-		)
+		let declarations = await declarationsFor(clientFixture("Escaped.es"))
 		let run = typecheck({
 			"Escaped.d.es.ts": declarations,
 			"consumer.ts": `import { "ok?" as ok, $$integer } from "./Escaped.es"

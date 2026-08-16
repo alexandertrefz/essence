@@ -1,0 +1,19 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`The declarations a build writes writes the JavaScript view beside the source while serving 1`] = `
+"// Generated from Shapes.es by @essence-lang/client. Do not edit.
+//
+// The Module as JavaScript — marshalled at every boundary.
+
+export type Box = { width: bigint; height: bigint }
+
+export type Shape =
+	| { $case: "Shape#Circle"; radius: bigint }
+	| { $case: "Shape#Blank" }
+
+export declare function areaOf(p0: Shape): bigint
+export declare const blank: Shape
+export declare function named(p0: string | undefined): string
+export declare function widen(box: Box, by: bigint): Box
+"
+`;

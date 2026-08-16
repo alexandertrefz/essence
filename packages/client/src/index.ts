@@ -44,8 +44,10 @@ export {
 export {
 	type CaseDescriptor,
 	createMarshaller,
+	type DeclaredType,
 	type Descriptor,
 	describeModule,
+	describeTypes,
 	type ExportDescriptor,
 	type FunctionDescriptor,
 	type Marshaller,
@@ -81,8 +83,24 @@ export {
 	type EsbuildLoadArguments,
 	type EsbuildLoadResult,
 	type EsbuildPlugin,
+	type EsbuildResolveArguments,
+	type EsbuildResolveResult,
 } from "./esbuild-plugin"
-export { declarationsPath, type PluginOptions } from "./plugin-core"
+// NOTE: `wrapperFor` is on the root because it is the whole of what a plugin
+// does that a host could not have written itself: the Module a build imports,
+// spelled out of a Descriptor. A host bundler neither of the two plugins fits
+// needs that and its own three hooks.
+export {
+	declarationsPath,
+	type Diagnostics,
+	type PluginOptions,
+	RAW_SCHEME,
+	rawFile,
+	rawRequested,
+	rawSpecifier,
+	wrapperFor,
+	type WrapperOptions,
+} from "./plugin-core"
 export {
 	essence,
 	type PluginContext,

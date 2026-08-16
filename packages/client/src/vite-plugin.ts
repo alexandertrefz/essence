@@ -3,7 +3,16 @@ import * as path from "node:path"
 
 import { canonicalPath } from "@essence-lang/compiler/modules"
 
-import { createCompiler, essenceFile, type PluginOptions } from "./plugin-core"
+import {
+	type CompiledModule,
+	createCompiler,
+	essenceFile,
+	type PluginOptions,
+	rawFile,
+	rawRequested,
+	rawSpecifier,
+	wrapperFor,
+} from "./plugin-core"
 
 // NOTE: Typed structurally rather than against Vite. A plugin object is the
 // whole of the contract, Vite is not a dependency of anything here, and adding
@@ -63,6 +72,32 @@ export function essence(options: PluginOptions = {}): VitePlugin {
 	// module cache to force anything out of.
 	let server: ViteDevServer | null = null
 
+	// NOTE: A superseded entry may still be LIVE — the dev server re-transforms
+	// a module only when its OWN watched files change, so a page still serving
+	// one would keep its cached bundle and the collision would never be seen
+	// again. Invalidating the module is what makes the record's premise true: an
+	// entry anything still requests is loaded again, compiles, collides with the
+	// fresh record this compile just wrote, and refuses there — one nothing
+	// requests again was genuinely folded away, and stays gone.
+	function served(
+		context: PluginContext | undefined,
+		compiled: CompiledModule,
+	): void {
+		if (server !== null) {
+			for (let entry of compiled.superseded) {
+				let module = server.moduleGraph.getModuleById(entry)
+
+				if (module !== undefined) {
+					server.moduleGraph.invalidateModule(module)
+				}
+			}
+		}
+
+		for (let source of compiled.files) {
+			context?.addWatchFile?.(source)
+		}
+	}
+
 	return {
 		name: "essence",
 		// NOTE: Ahead of Vite's own resolution, so that a `.es` id is claimed
@@ -89,11 +124,21 @@ export function essence(options: PluginOptions = {}): VitePlugin {
 			compiler.invalidate()
 		},
 		resolveId(source, importer) {
+			// NOTE: The wrapper's own import, coming back through resolution
+			// with the entry already spelled out. `\0` is Rollup's mark for a
+			// module no filesystem holds, which is exactly what the emitted
+			// bundle is — without it Vite would go looking for a file.
+			if (rawFile(source) !== null) {
+				return `\0${source}`
+			}
+
 			let file = essenceFile(source)
 
 			if (file === null) {
 				return null
 			}
+
+			let resolved: string | null = null
 
 			// NOTE: An absolute id is two things on a dev server: the
 			// root-relative URL an HTML entry writes — `/src/Main.es` — and a
@@ -101,60 +146,61 @@ export function essence(options: PluginOptions = {}): VitePlugin {
 			// what Vite itself would have read the id as; a path that resolves
 			// under the root to nothing is taken as the filesystem's.
 			if (path.isAbsolute(file)) {
-				if (root !== null) {
-					let rooted = path.join(root, file)
+				let rooted = root === null ? null : path.join(root, file)
 
-					if (existsSync(rooted)) {
-						return canonicalPath(rooted)
-					}
-				}
-
-				return canonicalPath(file)
+				resolved = canonicalPath(
+					rooted !== null && existsSync(rooted) ? rooted : file,
+				)
+			} else if (importer !== undefined) {
+				// NOTE: A relative id is resolved against the file that WROTE
+				// it, exactly as an Essence specifier is, rather than against
+				// the working directory.
+				resolved = canonicalPath(
+					path.resolve(path.dirname(importer), file),
+				)
 			}
 
-			// NOTE: A relative id is resolved against the file that WROTE it,
-			// exactly as an Essence specifier is, rather than against the
-			// working directory.
-			return importer === undefined
-				? null
-				: canonicalPath(path.resolve(path.dirname(importer), file))
+			if (resolved === null) {
+				return null
+			}
+
+			// NOTE: `./Math.es?raw` is the raw door as a HOST writes it, and it
+			// resolves to the same id the wrapper's own import does — one
+			// module either way, rather than two copies of one bundle.
+			return rawRequested(source)
+				? `\0${rawSpecifier(resolved)}`
+				: resolved
 		},
 		async load(id) {
+			let raw = rawFile(id)
+
+			if (raw !== null) {
+				let compiled = await compiler.compile(raw)
+
+				if (options.declarations ?? serving) {
+					await compiler.declare(compiled, "bundle")
+				}
+
+				served(this, compiled)
+
+				return compiled.code
+			}
+
 			let file = essenceFile(id)
 
 			if (file === null) {
 				return null
 			}
 
-			let compiled = await compiler.compile(
-				file,
-				options.declarations ?? serving,
-			)
+			let compiled = await compiler.compile(file)
 
-			// NOTE: A superseded entry may still be LIVE — the dev server
-			// re-transforms a module only when its OWN watched files change,
-			// so a page still serving one would keep its cached bundle and
-			// the collision would never be seen again. Invalidating the
-			// module is what makes the record's premise true: an entry
-			// anything still requests is loaded again, compiles, collides
-			// with the fresh record this compile just wrote, and refuses
-			// there — one nothing requests again was genuinely folded away,
-			// and stays gone.
-			if (server !== null) {
-				for (let entry of compiled.superseded) {
-					let module = server.moduleGraph.getModuleById(entry)
-
-					if (module !== undefined) {
-						server.moduleGraph.invalidateModule(module)
-					}
-				}
+			if (options.declarations ?? serving) {
+				await compiler.declare(compiled, "javascript")
 			}
 
-			for (let source of compiled.files) {
-				this?.addWatchFile?.(source)
-			}
+			served(this, compiled)
 
-			return compiled.code
+			return wrapperFor(compiled.entryPath, compiled.descriptor, options)
 		},
 	}
 }
