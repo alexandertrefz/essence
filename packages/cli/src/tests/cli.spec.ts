@@ -11,7 +11,7 @@ import {
 } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
-import { fileURLToPath } from "node:url"
+import { fileURLToPath, pathToFileURL } from "node:url"
 
 import { closestMatch } from "@essence-lang/compiler/helpers"
 import { optimiserPassNames } from "@essence-lang/compiler/optimiser"
@@ -47,6 +47,7 @@ import {
 	type CompileOutcome,
 	compileFile,
 	type CompileRequest,
+	descriptorFileName,
 } from "../pipeline"
 import { defaultWorkerCount, shouldUseWorkers, workerFileName } from "../pool"
 import {
@@ -247,6 +248,25 @@ describe("CLI", () => {
 				"collapse-combinations",
 			])
 			expect(invocation.files).toEqual(["a.es"])
+		})
+
+		// NOTE: The one flag that changes what the OUTPUT IS rather than how it
+		// was made, so it is on the two Commands that write an artifact and on
+		// neither of the two that do not.
+		it("reads --embed on the Commands that write a bundle", () => {
+			expect(parseArguments(["build", "a.es"]).options.embed).toBe(false)
+			expect(
+				parseArguments(["build", "--embed", "a.es"]).options.embed,
+			).toBe(true)
+			expect(
+				parseArguments(["watch", "--embed", "a.es"]).options.embed,
+			).toBe(true)
+
+			for (let command of ["run", "check"]) {
+				expect(() =>
+					parseArguments([command, "--embed", "a.es"]),
+				).toThrow(UsageError)
+			}
 		})
 
 		it("leaves every pass on when neither is given", () => {
@@ -1334,6 +1354,7 @@ function testOptions(overrides: Partial<OptionValues> = {}): OptionValues {
 		clear: false,
 		sourcemap: false,
 		minify: false,
+		embed: false,
 		noOptimise: false,
 		withoutOptimisation: [],
 		jobs: 1,
@@ -1845,6 +1866,176 @@ describe("source maps", () => {
 		} finally {
 			rmSync(directory, { recursive: true, force: true })
 		}
+	})
+})
+
+// NOTE: `--embed` builds a Module for a JavaScript host to LOAD rather than a
+// program to run: the runtime bridge goes into the bundle, and the boundary
+// between the two languages is written down beside it. `@essence-lang/client`'s
+// `loadPrebuilt` reads the pair, and its own spec loads what this writes —
+// what is asked here is only that `esc` leaves both halves behind.
+describe("essence build --embed", () => {
+	// NOTE: A Module of its own rather than a fixture, because every fixture is
+	// a program: importing one to read its bridge off would run it, and print
+	// into the middle of this run's output.
+	const embeddable = {
+		"Doubling.es": [
+			"implementation {",
+			"",
+			"\tfunction doubled(_ value: Integer) -> Integer {",
+			"\t\t<- value::multiply(with 2)",
+			"\t}",
+			"}",
+			"",
+			"export {",
+			"\tdoubled",
+			"}",
+			"",
+		].join("\n"),
+	}
+
+	// NOTE: The rule stated on this side. `descriptorPath` states it in the
+	// client, and its spec is where the two are held together — it asks `esc`
+	// for a pair and then finds the sidecar with the other spelling.
+	it("names the Descriptor after the bundle", () => {
+		expect(descriptorFileName("dist/app.js")).toBe(
+			"dist/app.descriptor.json",
+		)
+		expect(descriptorFileName("/build/app.mjs")).toBe(
+			"/build/app.descriptor.json",
+		)
+		// NOTE: A dot in a directory is not an extension, and a name that is
+		// nothing but one has nothing to replace.
+		expect(descriptorFileName("/opt/v1.2/app")).toBe(
+			"/opt/v1.2/app.descriptor.json",
+		)
+		expect(descriptorFileName("/build/.app")).toBe(
+			"/build/.app.descriptor.json",
+		)
+	})
+
+	it("writes the Descriptor beside a bundle carrying the bridge", async () => {
+		await withModules(embeddable, async (directory) => {
+			let outputFileName = path.join(directory, "out", "Doubling.mjs")
+			let outcome = await compileFile({
+				inputFileName: path.join(directory, "Doubling.es"),
+				outputFileName,
+				minify: false,
+				sourcemap: false,
+				embed: true,
+			})
+
+			expect(outcome.ok).toBe(true)
+			expect(readdirSync(path.dirname(outputFileName)).sort()).toEqual([
+				"Doubling.descriptor.json",
+				"Doubling.mjs",
+			])
+
+			let descriptor = JSON.parse(
+				readFileSync(descriptorFileName(outputFileName), "utf8"),
+			) as { exports: Record<string, { kind: string; emitted: string }> }
+
+			expect(descriptor.exports.doubled?.kind).toBe("function")
+
+			// NOTE: The bundle itself, imported — the bridge is its DEFAULT
+			// export, and what makes it one is a Type key no other kind of
+			// default export would carry.
+			let bundle = (await import(
+				pathToFileURL(outputFileName).href
+			)) as Record<string, { typeKey?: symbol }>
+
+			expect(typeof bundle.default?.typeKey).toBe("symbol")
+			expect(bundle.default?.typeKey?.description).toBe("$type")
+			expect(
+				bundle[descriptor.exports.doubled?.emitted ?? ""],
+			).toBeTypeOf("function")
+		})
+	})
+
+	// NOTE: A graph, so that the Descriptor is written for the ENTRY rather than
+	// for whichever Module the linked list happens to end with. A dependency's
+	// boundary would be a Module a host binds nothing of, and both files export
+	// a name here so that picking the wrong one is a passing compile with a
+	// wrong answer.
+	it("describes the entry rather than something it imports", async () => {
+		await withModules(
+			{
+				"Dep.es": [
+					"implementation {",
+					"",
+					"\tfunction halved(_ value: Integer) -> Integer {",
+					"\t\t<- value::divide(by 2)::round(toward #TowardZero)",
+					"\t}",
+					"}",
+					"",
+					"export {",
+					"\thalved",
+					"}",
+					"",
+				].join("\n"),
+				"Main.es": [
+					"import {",
+					'\thalved from "./Dep.es"',
+					"}",
+					"",
+					"implementation {",
+					"",
+					"\tfunction quartered(_ value: Integer) -> Integer {",
+					"\t\t<- halved(halved(value))",
+					"\t}",
+					"}",
+					"",
+					"export {",
+					"\tquartered",
+					"}",
+					"",
+				].join("\n"),
+			},
+			async (directory) => {
+				let outputFileName = path.join(directory, "out", "Main.mjs")
+				let outcome = await compileFile({
+					inputFileName: path.join(directory, "Main.es"),
+					outputFileName,
+					minify: false,
+					sourcemap: false,
+					embed: true,
+				})
+
+				expect(outcome.ok).toBe(true)
+
+				let descriptor = JSON.parse(
+					readFileSync(descriptorFileName(outputFileName), "utf8"),
+				) as { exports: Record<string, unknown> }
+
+				expect(Object.keys(descriptor.exports)).toEqual(["quartered"])
+			},
+		)
+	})
+
+	// NOTE: Off by default, and off means nothing extra written and nothing
+	// extra in the bundle — `esc build` builds a program until it is asked to
+	// build something else.
+	it("leaves a build that did not ask for it alone", async () => {
+		await withModules(embeddable, async (directory) => {
+			let outputFileName = path.join(directory, "out", "Doubling.mjs")
+			let outcome = await compileFile({
+				inputFileName: path.join(directory, "Doubling.es"),
+				outputFileName,
+				minify: false,
+				sourcemap: false,
+			})
+
+			expect(outcome.ok).toBe(true)
+			expect(readdirSync(path.dirname(outputFileName))).toEqual([
+				"Doubling.mjs",
+			])
+
+			let bundle = (await import(
+				pathToFileURL(outputFileName).href
+			)) as Record<string, unknown>
+
+			expect(bundle.default).toBeUndefined()
+		})
 	})
 })
 

@@ -7,6 +7,7 @@ import {
 	isCacheDisabled,
 	writeAtomic,
 } from "@essence-lang/compiler/cache"
+import { BRIDGE_KEY } from "@essence-lang/compiler/embed/bridge"
 import { hashGraph, toolchainKey } from "@essence-lang/compiler/embed/hash"
 import { defaultOptimiserOptions } from "@essence-lang/compiler/optimiser"
 import {
@@ -117,6 +118,16 @@ function emitterKey(request: CompileRequest): string {
 
 	if (target !== "") {
 		shape.push(target)
+	}
+
+	// NOTE: A bundle carrying the runtime bridge is different bytes over
+	// identical sources — one more Module goes in and it becomes the entry — so
+	// it can not share a name with the plain one. `BRIDGE_KEY` is what the
+	// Compiler names that contribution, and it changes whenever the bridge's own
+	// table does. An ordinary build pushes nothing, so every key spelled before
+	// there was an embed to ask for still names the same bytes.
+	if (request.embed === true) {
+		shape.push(BRIDGE_KEY)
 	}
 
 	if (!request.sourcemap) {

@@ -1,3 +1,4 @@
+import * as path from "node:path"
 import { gzipSync } from "node:zlib"
 
 import type { BundleOutput } from "@essence-lang/compiler/bundler"
@@ -10,6 +11,7 @@ import {
 	isStdlibDocument,
 	parseDocument,
 } from "@essence-lang/compiler/documents"
+import type { ExportSurface } from "@essence-lang/compiler/modules"
 import {
 	defaultOptimiserOptions,
 	type OptimiserOptions,
@@ -102,6 +104,11 @@ export type CompileRequest = {
 	// itself. It is here because it changes the emitted bytes without changing
 	// the sources, which is exactly what `bundleKey` has to name.
 	emit?: EmitTarget
+	// NOTE: Whether the bundle is built for a JavaScript host to LOAD rather
+	// than for anything to run: the runtime bridge goes into it and a Descriptor
+	// is written beside it. It changes the bytes as well, so it joins the key
+	// too.
+	embed?: boolean
 }
 
 // NOTE: One file of the compiled graph, with the text its Diagnostics are
@@ -135,6 +142,65 @@ export type CompileOutcome = {
 }
 
 export type ProgressReporter = (stage: StageName) => void
+
+// NOTE: What a Descriptor is written under beside its bundle: `app.js` and
+// `app.descriptor.json`. `@essence-lang/client`'s `loadPrebuilt` defaults to the
+// same rule from the other side — the two are pinned together by a test that
+// builds a pair here and loads it there, because a rule stated twice is one that
+// can only be kept by being checked.
+export function descriptorFileName(outputFileName: string): string {
+	// NOTE: The extension of the FILE NAME — `extname` reads the base name
+	// alone, so a dot in a directory above it is not one, and a name that is
+	// nothing but an extension has none to replace.
+	let extension = path.extname(outputFileName)
+
+	return `${outputFileName.slice(
+		0,
+		outputFileName.length - extension.length,
+	)}.descriptor.json`
+}
+
+// NOTE: The boundary between this Module and the JavaScript that will load it,
+// written beside the bundle — and written on the cached path as well as the
+// emitted one, because a build that found its bundle still has to leave the pair
+// behind wherever it was asked to put it.
+//
+// NOTE: Indented rather than packed. It is a build artifact that a host reads
+// once and a person reads when the boundary surprises them, and the second of
+// those is the one that is hard.
+async function writeDescriptor(
+	request: CompileRequest,
+	front: Front,
+): Promise<void> {
+	// NOTE: A standard library source is not a Module — it is one shared
+	// declaration space, and exports nothing — so there is no Surface, and
+	// nothing to write down.
+	if (
+		request.embed !== true ||
+		request.outputFileName === null ||
+		front.surface === null
+	) {
+		return
+	}
+
+	// NOTE: The describing door rather than the whole of `embed`, which reaches
+	// the emitter and esbuild behind it. This runs beside an emit that has
+	// loaded both already, but naming the smaller door is what keeps it true
+	// that only the emitting path pays for them.
+	let { describeModule } =
+		await import("@essence-lang/compiler/embed/describe")
+	let { writeFile } = await import("node:fs/promises")
+
+	await writeFile(
+		descriptorFileName(request.outputFileName),
+		`${JSON.stringify(
+			describeModule(front.surface, front.entryPath),
+			null,
+			"\t",
+		)}\n`,
+		"utf8",
+	)
+}
 
 // NOTE: A remembered bundle as the outputs of the compile that would have
 // produced it — the same two files under the same two names, so a build that
@@ -292,6 +358,11 @@ type Front = {
 	sourceText: string
 	modules: Array<CompiledModule>
 	programs: Array<common.typed.Program> | null
+	// NOTE: What the ENTRY offers, for a compile that has to write the boundary
+	// down beside its bundle. Null where there is nothing to offer: a standard
+	// library source is one shared declaration space rather than a Module, and
+	// a compile that stopped never got as far as a Surface.
+	surface: ExportSurface | null
 	diagnostics: Array<common.Diagnostic>
 	failedStage: StageName | null
 }
@@ -306,6 +377,7 @@ function unreadableFront(
 		sourceText: "",
 		modules: [],
 		programs: null,
+		surface: null,
 		diagnostics: [readError(error, request.inputFileName)],
 		failedStage: "read",
 	}
@@ -340,6 +412,7 @@ async function linkGraph(
 		sourceText: read.sourceText,
 		modules,
 		programs: null,
+		surface: null,
 		diagnostics: [],
 		failedStage: null,
 	}
@@ -366,7 +439,18 @@ async function linkGraph(
 		return { ...front, failedStage: "enrich" }
 	}
 
-	return { ...front, programs: linked.map((module) => module.program) }
+	// NOTE: The ENTRY's Surface, found by name rather than taken off the end of
+	// the list. The entry is last — everything ahead of it is something it
+	// depends on — but a Descriptor describing a dependency instead would be a
+	// Module a host binds nothing of, and reading the one thing that says which
+	// file this is costs nothing.
+	return {
+		...front,
+		programs: linked.map((module) => module.program),
+		surface:
+			linked.find((module) => module.module.filePath === read.filePath)
+				?.surface ?? null,
+	}
 }
 
 // NOTE: A standard library source, which is not a Module: it is one shared
@@ -404,6 +488,7 @@ async function enrichDeclarations(
 		sourceText: read.sourceText,
 		modules: [module],
 		programs: null,
+		surface: null,
 		diagnostics: [],
 		failedStage: null,
 	}
@@ -530,6 +615,7 @@ export async function compileFile(
 						await import("@essence-lang/compiler/bundler")
 
 					await writeOutputs(bundleOutputs(target, cached))
+					await writeDescriptor(request, front)
 				})
 			}
 
@@ -547,6 +633,11 @@ export async function compileFile(
 		// the CLI's own — the Session's caches, and the timings this file
 		// reports.
 		let { emitBundle } = await import("@essence-lang/compiler/embed")
+		let embedding =
+			request.embed === true
+				? (await import("@essence-lang/compiler/embed/bridge"))
+						.withRuntimeBridge
+				: undefined
 		// NOTE: `run` without `--out` has no name to emit under, and needs none
 		// until the key is known: what it asked for is a file to spawn. The
 		// scratch name is only ever the one it keeps, because a clean emit is
@@ -573,6 +664,11 @@ export async function compileFile(
 						: request.sourcemapMode,
 				optimisation: request.optimisation ?? defaultOptimiserOptions,
 				emit: request.emit,
+				// NOTE: What makes an embedded bundle one: the runtime's own
+				// Type key and value constructors go in beside the Module, as
+				// its default export. A host can not build a value this bundle
+				// accepts without them — see `withRuntimeBridge`.
+				transformSources: embedding,
 			},
 			{
 				simplify: session.simplify,
@@ -602,6 +698,7 @@ export async function compileFile(
 					await import("@essence-lang/compiler/bundler")
 
 				await writeOutputs(bundled.outputs)
+				await writeDescriptor(request, front)
 			}
 
 			// NOTE: Remembered only where the emit had nothing of its own to
