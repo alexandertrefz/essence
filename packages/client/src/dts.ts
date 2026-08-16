@@ -56,24 +56,100 @@ export function generateDeclarations(
 	options: DeclarationOptions = {},
 ): string {
 	let view = options.view ?? "javascript"
-	let imports = new Set<string>()
 	let types = options.types ?? []
-	let walker = createWalker(types, imports)
+	let borrowed = createBorrower(declaredNames(descriptor, types))
+	let walker = createWalker(types, borrowed.borrow)
 	let blocks =
 		view === "javascript"
 			? javascriptBlocks(descriptor, types, walker)
 			: bundleBlocks(descriptor, walker)
 	let preamble = [header(view, options.moduleName)]
+	let imports = borrowed.imports()
 
-	if (imports.size > 0) {
+	if (imports.length > 0) {
 		preamble.push(
-			`import type { ${[...imports].sort().join(", ")} } from "${
+			`import type { ${imports.join(", ")} } from "${
 				options.clientSpecifier ?? DEFAULT_CLIENT_SPECIFIER
 			}"`,
 		)
 	}
 
 	return `${[...preamble, ...blocks].join("\n\n")}\n`
+}
+
+// NOTE: The names this file declares of its own, which is what a name BORROWED
+// from this package has to stay clear of — a Module exporting `EssenceRational`
+// beside a Rational would otherwise be an import and a declaration of one name,
+// which TypeScript refuses outright and takes the whole declaration file with it.
+//
+// NOTE: Both views' names, gathered whichever one is being written. It costs a
+// walk of the exports and buys never having to remember which view declares
+// what, and a name that is free in one view and taken in the other is a name
+// worth stepping around in both.
+function declaredNames(
+	descriptor: ModuleDescriptor,
+	types: ReadonlyArray<DeclaredType>,
+): Set<string> {
+	let names = new Set<string>()
+
+	for (let declared of types) {
+		names.add(declared.name)
+	}
+
+	for (let [name, entry] of Object.entries(descriptor.exports)) {
+		names.add(name)
+
+		if (entry.kind === "overloaded") {
+			for (let overload of entry.overloads) {
+				names.add(overload.emitted)
+			}
+		} else if (entry.kind !== "choice") {
+			names.add(entry.emitted)
+		}
+	}
+
+	return names
+}
+
+// NOTE: How a name this package owns is spelled INSIDE a generated file: as
+// itself where nothing else claims it, and `$`-prefixed until it is free where
+// something does. Aliasing only on a collision is deliberate — a generated file
+// is read far more often than it is generated, and `EssenceRational` reads
+// better than `$EssenceRational` in every file that has no reason to avoid it.
+function createBorrower(declared: ReadonlySet<string>): {
+	borrow: (name: string) => string
+	imports: () => Array<string>
+} {
+	let taken = new Set(declared)
+	let spellings = new Map<string, string>()
+
+	return {
+		borrow(name) {
+			let spelling = spellings.get(name)
+
+			if (spelling !== undefined) {
+				return spelling
+			}
+
+			spelling = name
+
+			while (taken.has(spelling)) {
+				spelling = `$${spelling}`
+			}
+
+			taken.add(spelling)
+			spellings.set(name, spelling)
+
+			return spelling
+		},
+		imports() {
+			return [...spellings.entries()]
+				.sort(([one], [other]) => (one < other ? -1 : 1))
+				.map(([name, spelling]) =>
+					spelling === name ? name : `${name} as ${spelling}`,
+				)
+		},
+	}
 }
 
 function header(view: DeclarationView, moduleName: string | undefined): string {
@@ -335,7 +411,7 @@ type Walker = {
 
 function createWalker(
 	types: ReadonlyArray<DeclaredType>,
-	imports: Set<string>,
+	borrow: (name: string) => string,
 ): Walker {
 	// NOTE: The Types this Module exports under a name of their own, keyed by
 	// the Type as the Compiler PRINTS it — which is the one identity that
@@ -392,9 +468,7 @@ function createWalker(
 			case "boolean":
 				return "boolean"
 			case "rational":
-				imports.add("EssenceRational")
-
-				return "EssenceRational"
+				return borrow("EssenceRational")
 			case "list":
 				return `Array<${print(node.of, direction)}>`
 			case "record":
@@ -610,9 +684,22 @@ function createWalker(
 	// NOTE: A Namespace is an object of its statics on this side, so its Methods
 	// are members rather than declarations — and its constants come OUT whichever
 	// way the Namespace itself was reached, since there is no writing one.
+	//
+	// NOTE: A Case whose name the Namespace also declares is left out, because
+	// the Namespace's own member is what the binding puts there — see
+	// `bindNamespace`, which writes the constructors first exactly so that a
+	// Method or a static constant of that name overwrites one. Declared as well
+	// it would be a member named twice, which TypeScript refuses, and where it
+	// compiled it would promise a constructor the Module never binds.
 	function namespaceEntries(entry: NamespaceDescriptor): Array<string> {
+		let declared = new Set([
+			...Object.keys(entry.properties),
+			...Object.keys(entry.methods),
+		])
 		let entries = [
-			...caseEntries(entry.cases ?? []),
+			...caseEntries(
+				(entry.cases ?? []).filter((node) => !declared.has(node.name)),
+			),
 			...Object.entries(entry.properties).map(
 				([name, property]) =>
 					`${memberName(name)}: ${print(property.of, "out")}`,
