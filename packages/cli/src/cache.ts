@@ -9,6 +9,10 @@ import {
 } from "@essence-lang/compiler/cache"
 import { hashGraph, toolchainKey } from "@essence-lang/compiler/embed/hash"
 import { defaultOptimiserOptions } from "@essence-lang/compiler/optimiser"
+import {
+	BUNDLE_TARGET,
+	emitTargetKey,
+} from "@essence-lang/compiler/rewriter/emitTarget"
 
 import type { CompileRequest } from "./pipeline"
 
@@ -105,6 +109,15 @@ export function bundleKey(
 // which is announced by nothing, is one entry for every name.
 function emitterKey(request: CompileRequest): string {
 	let shape = [EMITTER, request.minify ? "minify" : "plain"]
+	// NOTE: Who the Modules were emitted for, which is the one thing in here
+	// that changes what the Rewriter WRITES rather than what is done to it
+	// afterwards. It is empty for a bundle — every `esc` build there is — so the
+	// keys spelled before there was a target to name still name the same bytes.
+	let target = emitTargetKey(request.emit ?? BUNDLE_TARGET)
+
+	if (target !== "") {
+		shape.push(target)
+	}
 
 	if (!request.sourcemap) {
 		shape.push("no-map")

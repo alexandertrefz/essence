@@ -19,6 +19,7 @@
 		"./simplifier": "./src/simplifier/index.ts",
 		"./optimiser": "./src/optimiser/index.ts",
 		"./rewriter": "./src/rewriter/index.ts",
+		"./rewriter/emitTarget": "./src/rewriter/emitTarget.ts",
 		"./bundler": "./src/bundler/index.ts",
 		"./cache": "./src/cache/index.ts",
 		"./embed": "./src/embed/index.ts",

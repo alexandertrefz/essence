@@ -16,6 +16,12 @@ import {
 	defaultOptimiserOptions,
 	type OptimiserOptions,
 } from "../optimiser/index"
+import {
+	BUNDLE_TARGET,
+	type EmitTarget,
+	moduleSpelling,
+	spelledFrom,
+} from "./emitTarget"
 import { runtimeNamespaceNames } from "./runtimeNamespaces"
 import {
 	ESSENCE_METHOD_PREFIX,
@@ -34,6 +40,22 @@ import {
 // that holds the list — every emission site here reads it, and so does
 // `pool-constants`, which may not reach this Module without closing a cycle.
 export { runtimeNamespaceNames }
+
+// NOTE: The emit target, re-exported from the file that holds it, because this
+// is where a caller with a graph to rewrite already is. `esc` keys its cache by
+// one before it has decided to emit anything at all, and reaches it through
+// `rewriter/emitTarget` instead — a name is not worth loading a Rewriter for.
+export {
+	BUNDLE_TARGET,
+	type EmitTarget,
+	emitTargetKey,
+} from "./emitTarget"
+
+// NOTE: The runtime as a HOST resolves it. The package's exports map turns
+// `@essence-lang/runtime/<File>` into its `src/<File>.ts` in a workspace and
+// into `dist/<File>.js` once published, so one specifier reaches the runtime
+// from either side of publishing.
+const RUNTIME_PACKAGE = "@essence-lang/runtime"
 
 // NOTE: The Rewriter is a typed simple Program in, JavaScript source text out —
 // no bundling, no minifying, nothing written to disk; that is the Bundler's job.
@@ -240,7 +262,11 @@ export type ModuleInput = {
 export function rewriteModules(
 	modules: Array<ModuleInput>,
 	entryPath: string,
-	options?: { sourcemap?: boolean; optimiser?: OptimiserOptions },
+	options?: {
+		sourcemap?: boolean
+		optimiser?: OptimiserOptions
+		emit?: EmitTarget
+	},
 ): ModuleSources {
 	return withOptimiserOptions(
 		options?.optimiser ?? defaultOptimiserOptions,
@@ -251,13 +277,14 @@ export function rewriteModules(
 function rewriteModuleGraph(
 	modules: Array<ModuleInput>,
 	entryPath: string,
-	options?: { sourcemap?: boolean },
+	options?: { sourcemap?: boolean; emit?: EmitTarget },
 ): ModuleSources {
-	let entryDirectory = path.dirname(entryPath)
+	let target = options?.emit ?? BUNDLE_TARGET
+	let spellingDirectory = spelledFrom(entryPath, target)
 	let spellings = new Map(
 		modules.map((module) => [
 			module.filePath,
-			moduleSpelling(entryDirectory, module.filePath),
+			moduleSpelling(spellingDirectory, module.filePath),
 		]),
 	)
 	let sourceTexts: ReadonlyMap<string, string> | null =
@@ -271,7 +298,7 @@ function rewriteModuleGraph(
 				)
 			: null
 
-	return withModuleSpellings(spellings, () => {
+	return withEmission({ spellings, target }, () => {
 		let prelude = stdlibPrelude()
 		let freeFunctions = stdlibFreeFunctions()
 		// NOTE: A pool per Module, because a Module's constants are declared in
@@ -296,6 +323,17 @@ function rewriteModuleGraph(
 					bodies.flatMap((rewritten) => rewritten.body),
 					freeFunctions,
 					bodies.map((rewritten) => rewritten.pool),
+					// NOTE: A host's prelude holds the WHOLE standard library,
+					// because what a graph reaches is a property of the graph
+					// and the prelude is served to the host under one name for
+					// every graph the build compiles. Two entries would
+					// otherwise agree on the name and disagree on what is in
+					// it, and whichever the host loaded first would answer for
+					// both — the other's Modules importing consts that are not
+					// there. Emitting all of them is what makes the answer a
+					// function of the standard library alone, and the host
+					// shakes away what its own build never names.
+					target.mode === "host" ? "whole" : "reached",
 				),
 			)
 
@@ -345,7 +383,7 @@ function rewriteModuleGraph(
 		return {
 			entry: moduleSpecifier(
 				spellings.get(entryPath) ??
-					moduleSpelling(entryDirectory, entryPath),
+					moduleSpelling(spellingDirectory, entryPath),
 			),
 			sources,
 		}
@@ -577,39 +615,29 @@ function namedExport(
 	}
 }
 
-// NOTE: How a Module's canonical path is spelled in emitted output — relative
-// to the ENTRY's directory, so a bundle names its own Modules the way the entry
-// would have written them and never the machine that compiled. Tags need to
-// agree within one bundle only: a bundle is standalone and can exchange no
-// value with another at run time.
-function moduleSpelling(entryDirectory: string, filePath: string): string {
-	let relative = path
-		.relative(entryDirectory, filePath)
-		.split(path.sep)
-		.join("/")
-
-	return relative.startsWith("../") ? relative : `./${relative}`
+// NOTE: What is being emitted, for the emission sites that can not be handed it
+// — the spellings of every Module of the graph, and the target they were
+// spelled for. Empty and `bundle` outside `rewriteModules`: a single-file
+// Program's Case tags and Type descriptors come out byte for byte as they did
+// before Modules, because a Choice identified by its bare name has no path in
+// it to render.
+type Emission = {
+	spellings: ReadonlyMap<string, string>
+	target: EmitTarget
 }
 
-// NOTE: The canonical path of every Module of the bundle being emitted, and how
-// each is spelled. Empty for a single-file Program — which is why its Case tags
-// and Type descriptors come out byte for byte as they did before Modules: a
-// Choice identified by its bare name has no path in it to render.
-let moduleSpellings: ReadonlyMap<string, string> = new Map()
+let emission: Emission = { spellings: new Map(), target: BUNDLE_TARGET }
 
 // NOTE: `finally`, for the same reason the Namespace scope stack has one: a
 // throw out of the emission of one bundle must not leave the next Program in
 // this process rendering its tags against a graph it is not part of.
-function withModuleSpellings<Value>(
-	spellings: ReadonlyMap<string, string>,
-	emit: () => Value,
-): Value {
-	moduleSpellings = spellings
+function withEmission<Value>(next: Emission, emit: () => Value): Value {
+	emission = next
 
 	try {
 		return emit()
 	} finally {
-		moduleSpellings = new Map()
+		emission = { spellings: new Map(), target: BUNDLE_TARGET }
 	}
 }
 
@@ -666,20 +694,20 @@ function locOf(
 	}
 }
 
-// NOTE: One nominal identity as the bundle spells it. A Case tag is
+// NOTE: One nominal identity as the emitted Modules spell it. A Case tag is
 // `<Choice identity>#<Case>` and a Choice identity is `<Module path>#<Choice>`,
 // so what arrives here carries the canonical path of the Module that declared
 // it — which is a place on the machine that compiled and must not be emitted.
-// The path is replaced by the entry-relative spelling and nothing else changes,
-// so the tag a value is stamped with and the tag a Type descriptor compares it
-// against are rendered by this one answer and can not disagree.
+// The path is replaced by the spelling the target decided and nothing else
+// changes, so the tag a value is stamped with and the tag a Type descriptor
+// compares it against are rendered by this one answer and can not disagree.
 //
 // NOTE: Every string of an emitted Type descriptor comes through here, not just
 // the ones known to be tags. Over-rendering is impossible rather than merely
 // unlikely: a Module path is absolute, and no other string a descriptor can
 // hold — a Type's `type`, a Namespace's name, a Record member — is.
 function renderIdentity(text: string): string {
-	for (let [modulePath, spelling] of moduleSpellings) {
+	for (let [modulePath, spelling] of emission.spellings) {
 		if (text.startsWith(`${modulePath}#`)) {
 			return `${spelling}${text.slice(modulePath.length)}`
 		}
@@ -688,10 +716,12 @@ function renderIdentity(text: string): string {
 	return text
 }
 
-// NOTE: The same answer for a caller that holds one identity and the entry it
+// NOTE: The same answer for a caller that holds one identity and the compile it
 // belongs to, and no graph — a host building a Case value has to stamp it with
-// the tag the bundle's own values carry, and that tag is entry-relative. The
-// rule is stated once, above; this reaches it from outside.
+// the tag the emitted values carry, and that tag is spelled relative to
+// something. The rule is stated once, above; this reaches it from outside, and
+// takes the target so that a descriptor written beside a host's Modules agrees
+// with the Modules rather than with a bundle nobody emitted.
 //
 // NOTE: Where a Module path ENDS is decided by the last `#` rather than by the
 // spellings map, because a Choice name can hold no `#` — the same split
@@ -699,7 +729,11 @@ function renderIdentity(text: string): string {
 // is a builtin Choice's bare name (`Optional`, `Ordering`), which is emitted
 // verbatim, and a prefix that is not absolute is not a Module path, so neither
 // is rewritten.
-export function emittedIdentity(entryPath: string, identity: string): string {
+export function emittedIdentity(
+	entryPath: string,
+	identity: string,
+	target: EmitTarget = BUNDLE_TARGET,
+): string {
 	let separator = identity.lastIndexOf("#")
 	let modulePath = identity.slice(0, separator)
 
@@ -708,7 +742,7 @@ export function emittedIdentity(entryPath: string, identity: string): string {
 	}
 
 	return `${moduleSpelling(
-		path.dirname(entryPath),
+		spelledFrom(entryPath, target),
 		modulePath,
 	)}${identity.slice(separator)}`
 }
@@ -1367,6 +1401,8 @@ function renamePooledReferences(
 // NOTE: Exported for the tests. The fixed point is the part of this that can
 // silently be wrong — a Method reached only through another one is exactly what
 // the standard library will produce more of as the conversion goes on.
+export type PreludeReach = "reached" | "whole"
+
 export function reachableEssenceMethods(
 	prelude: Array<PreludeNamespace>,
 	implementation: Array<estree.ModuleDeclaration | estree.Statement>,
@@ -1377,6 +1413,11 @@ export function reachableEssenceMethods(
 	// site the witness was hoisted out of, and a search seeded only by the body
 	// would lose that edge and emit a Module naming a const nobody declared.
 	poolRoots: unknown = null,
+	// NOTE: How much of the prelude to keep. `reached` is the search this
+	// Function is named for and what every bundle is emitted under; `whole`
+	// answers with every candidate and runs no search at all — see the seed
+	// below, and `rewriteModuleGraph` for why a host's build asks for it.
+	reach: PreludeReach = "reached",
 ): Map<string, EssenceMember> {
 	let reachable = new Map<string, EssenceMember>()
 
@@ -1517,8 +1558,16 @@ export function reachableEssenceMethods(
 
 	// NOTE: The seed is what the emitted user Program names — a plain call, a
 	// conformance witness and a `dispatchMethod` target are all bare `$es_…`
-	// Identifiers by now, so `referencedNames` finds them all alike.
-	include(referencedNames([implementation, poolRoots]))
+	// Identifiers by now, so `referencedNames` finds them all alike. Seeded with
+	// every candidate instead, the loop below has nothing left to find and the
+	// answer is the whole prelude in candidate order — which is the point: an
+	// order that is a property of the standard library rather than of the graph
+	// that happened to be compiled.
+	include(
+		reach === "whole"
+			? new Set(candidates.keys())
+			: referencedNames([implementation, poolRoots]),
+	)
 
 	while (pending.length > 0) {
 		include(candidates.get(pending.pop()!)!.references)
@@ -6082,11 +6131,22 @@ function internalImport(
 	>,
 	fileName: string,
 ): estree.ImportDeclaration {
-	// NOTE: An absolute path rather than `@essence-lang/runtime/<Name>`, because the
-	// emitted module is written to the user's directory and handed to esbuild
+	// NOTE: An absolute path rather than `@essence-lang/runtime/<Name>`, because
+	// the emitted module is written to the user's directory and handed to esbuild
 	// from there — a package specifier would have to resolve against wherever
 	// that is. The Bundler inlines these and they never reach the output.
-	const specifier = path.join(RUNTIME_DIRECTORY, `${fileName}.ts`)
+	//
+	// NOTE: A HOST's build is the other way around. Nothing is inlined there —
+	// the Modules are handed over one at a time and the host resolves what they
+	// import — and an absolute path into this Compiler's own installation is not
+	// something a host bundler will read, let alone transpile. The package
+	// specifier is: the runtime is a dependency of the client the host already
+	// installed, and every Module of every entry importing it BY NAME is what
+	// leaves one runtime, and therefore one Type key, in the finished app.
+	const specifier =
+		emission.target.mode === "host"
+			? `${RUNTIME_PACKAGE}/${fileName}`
+			: path.join(RUNTIME_DIRECTORY, `${fileName}.ts`)
 
 	return {
 		type: "ImportDeclaration",
