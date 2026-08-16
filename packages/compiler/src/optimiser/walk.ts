@@ -804,6 +804,21 @@ function walkIntrinsicChildren(
 
 			return values === node.values ? node : { ...node, values }
 		}
+		// NOTE: The items a turn adds to the Array a walk builds. They are the
+		// Expressions the `append` calls were given and are offered exactly as
+		// those Arguments were, which is what keeps `pool-constants` reaching a
+		// literal written inside a build and `fold-constants` folding one.
+		case "list-build": {
+			let additions = mapArray(node.additions, (addition) => {
+				let value = walkExpression(addition.value, rewrites)
+
+				return value === addition.value
+					? addition
+					: { ...addition, value }
+			})
+
+			return additions === node.additions ? node : { ...node, additions }
+		}
 		// NOTE: A compiled dispatch is walked in the order it evaluates: the
 		// Expressions it holds under a name, then the reads of them, then each
 		// branch's test and the Arguments that branch alone passes. The reads

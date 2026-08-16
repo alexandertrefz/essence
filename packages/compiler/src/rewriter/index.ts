@@ -2248,6 +2248,16 @@ function rewriteIntrinsic(
 		// above, and there is no arrow at all.
 		case "inline-loop":
 			return inlineLoopExpression(node)
+		// NOTE: A build is not an Expression that can stand anywhere: it names
+		// the Array a walk is filling, and there is no way to answer with one
+		// without saying whether the walk is finished with it. The walks that
+		// build read it where their answer is written and never reach here, so
+		// this names the Compiler rather than the reader — the Node exists only
+		// where `build-lists-in-place` put it, and it put one nowhere else.
+		case "list-build":
+			throw new Error(
+				"Internal Compiler Error: a list build reached an ordinary Expression position — a build may only stand where an inlined walk writes its answer.",
+			)
 		case "direct-list":
 			return {
 				type: "ObjectExpression",
@@ -4709,13 +4719,16 @@ function inlineLoopStatement(
 function inlinedLoop(loop: common.typedSimple.InlineLoop): InlinedWalk {
 	switch (loop.driver.kind) {
 		case "condition":
-			return conditionWalk(loop.name, loop.driver)
+			return conditionWalk(loop, loop.driver)
 		case "counted":
-			return countedWalk(loop.name, loop.driver)
+			return countedWalk(loop, loop.driver)
 		case "general":
-			return generalWalk(loop.name, loop.driver)
+			return generalWalk(loop, loop.driver)
 		case "fold":
-			return foldWalk(loop.name, loop.driver)
+			return foldWalk(loop, loop.driver)
+		// NOTE: The two walks that build an Array already — which is the
+		// emission `build-lists-in-place` extends to the four above, and there
+		// is nothing of theirs left to extend it to.
 		case "map":
 			return mapWalk(loop.name, loop.driver)
 		case "keep":
@@ -4729,20 +4742,26 @@ function inlinedLoop(loop: common.typedSimple.InlineLoop): InlinedWalk {
 // answer read the other way round, which is what its own Essence body does by
 // negating the Boolean; here the question is simply asked the other way.
 function conditionWalk(
-	prefix: string,
+	loop: common.typedSimple.InlineLoop,
 	driver: Extract<common.typedSimple.InlineLoopDriver, { kind: "condition" }>,
 ): InlinedWalk {
+	let prefix = loop.name
 	let state = `${prefix}_state`
+	let built = builtArray(loop)
+	let accumulator = loop.build?.parameter ?? null
 	// NOTE: ONE State and two bodies — the predicate is handed it as well — so
 	// both are asked and the swap is taken for both or for neither.
-	let carried = carriedInteger(state, null, 0, [
-		driver.predicate,
-		driver.step,
-	])
+	let carried =
+		built === null
+			? carriedInteger(state, null, 0, [driver.predicate, driver.step])
+			: null
 	// NOTE: What the call was given is written out before the bodies are, so
 	// that everything the emission collects on the way — a pooled constant above
 	// all — is collected in the order the Program says it.
-	let seed = loopDeclaration("let", state, rewriteExpression(driver.seed))
+	let seed =
+		built === null
+			? loopDeclaration("let", state, rewriteExpression(driver.seed))
+			: loopDeclaration("const", built, ownedItems(driver.seed))
 	let check = inlinedCallback(
 		driver.predicate,
 		[loopIdentifier(state)],
@@ -4766,14 +4785,18 @@ function conditionWalk(
 		},
 		null,
 		carried,
+		accumulator,
 	)
 	let step = inlinedCallback(
 		driver.step,
 		[loopIdentifier(state)],
 		`${prefix}_body`,
-		{ kind: "temporary", name: state },
+		built === null
+			? { kind: "temporary", name: state }
+			: builtTarget(built),
 		null,
 		carried,
+		accumulator,
 	)
 	let statements: Array<estree.Statement> = [
 		seed,
@@ -4786,7 +4809,10 @@ function conditionWalk(
 
 	return {
 		statements,
-		answer: carriedAnswer(state, heldRaw(carried, statements)),
+		answer:
+			built === null
+				? carriedAnswer(state, heldRaw(carried, statements))
+				: createdList(loopIdentifier(built)),
 	}
 }
 
@@ -4810,9 +4836,10 @@ function conditionWalk(
 // which way the count runs, and in which representation — reads the two bounds
 // and observes nothing.
 function countedWalk(
-	prefix: string,
+	loop: common.typedSimple.InlineLoop,
 	driver: Extract<common.typedSimple.InlineLoopDriver, { kind: "counted" }>,
 ): InlinedWalk {
+	let prefix = loop.name
 	let from = `${prefix}_from`
 	let to = `${prefix}_to`
 	let ascending = `${prefix}_up`
@@ -4829,11 +4856,15 @@ function countedWalk(
 	// asks — the kind test, the two-kind step, the converting start, the per-turn
 	// view — is written at all.
 	let mayEscape = !(safeBound(driver.from) && safeBound(driver.through))
+	let built = builtArray(loop)
 	// NOTE: The State is the SECOND Argument here — the counter is the first —
 	// and the two elisions are independent: a body that counts into a Record
 	// still reads its counter raw, and one that hands its counter on still
-	// carries an Integer State raw.
-	let carried = carriedInteger(state, null, 1, [driver.step])
+	// carries an Integer State raw. A List State is the third such decision, and
+	// it is a List rather than an Integer, so at most one of the two can be
+	// taken for the same slot.
+	let carried =
+		built === null ? carriedInteger(state, null, 1, [driver.step]) : null
 	// NOTE: The bounds and the seed, in the order the call passed them and
 	// before the body is written, so that what the emission collects on the way
 	// is collected in the order the Program says it.
@@ -4848,7 +4879,9 @@ function countedWalk(
 			to,
 			valueRead(rewriteExpression(driver.through)),
 		),
-		loopDeclaration("let", state, rewriteExpression(driver.seed)),
+		built === null
+			? loopDeclaration("let", state, rewriteExpression(driver.seed))
+			: loopDeclaration("const", built, ownedItems(driver.seed)),
 	]
 	let body = inlinedCallback(
 		driver.step,
@@ -4858,11 +4891,14 @@ function countedWalk(
 		// ever reads what the Integer holds.
 		[createdInteger(loopIdentifier(index)), loopIdentifier(state)],
 		`${prefix}_body`,
-		{ kind: "temporary", name: state },
+		built === null
+			? { kind: "temporary", name: state }
+			: builtTarget(built),
 		mayEscape
 			? { read: held, binding: [canonicalCounter(held, index, escaped)] }
 			: { read: index, binding: [] },
 		carried,
+		loop.build?.parameter ?? null,
 	)
 
 	let statements: Array<estree.Statement> = [
@@ -4958,7 +4994,10 @@ function countedWalk(
 
 	return {
 		statements,
-		answer: carriedAnswer(state, heldRaw(carried, statements)),
+		answer:
+			built === null
+				? carriedAnswer(state, heldRaw(carried, statements))
+				: createdList(loopIdentifier(built)),
 	}
 }
 
@@ -4967,23 +5006,33 @@ function countedWalk(
 // `#Continue` carries the next State, which is what `steppedTarget` writes where
 // the answer is written.
 function generalWalk(
-	prefix: string,
+	loop: common.typedSimple.InlineLoop,
 	driver: Extract<common.typedSimple.InlineLoopDriver, { kind: "general" }>,
 ): InlinedWalk {
+	let prefix = loop.name
 	let state = `${prefix}_state`
 	let answer = `${prefix}_answer`
 	let stops = false
-	let carried = carriedInteger(state, answer, 0, [driver.step])
-	let seed = loopDeclaration("let", state, rewriteExpression(driver.seed))
+	let built = builtArray(loop)
+	let carried =
+		built === null ? carriedInteger(state, answer, 0, [driver.step]) : null
+	let seed =
+		built === null
+			? loopDeclaration("let", state, rewriteExpression(driver.seed))
+			: loopDeclaration("const", built, ownedItems(driver.seed))
+	let stop = () => {
+		stops = true
+	}
 	let body = inlinedCallback(
 		driver.step,
 		[loopIdentifier(state)],
 		`${prefix}_body`,
-		steppedTarget(prefix, state, answer, () => {
-			stops = true
-		}),
+		built === null
+			? steppedTarget(prefix, state, answer, stop)
+			: steppedBuiltTarget(prefix, built, answer, stop),
 		null,
 		carried,
+		loop.build?.parameter ?? null,
 	)
 	let walk: estree.Statement = {
 		type: "WhileStatement",
@@ -5020,23 +5069,37 @@ function generalWalk(
 // is what "the accumulated value, or the value the first `#Done` carries" means
 // written out.
 function foldWalk(
-	prefix: string,
+	loop: common.typedSimple.InlineLoop,
 	driver: Extract<common.typedSimple.InlineLoopDriver, { kind: "fold" }>,
 ): InlinedWalk {
+	let prefix = loop.name
 	let items = `${prefix}_items`
 	let count = `${prefix}_count`
 	let position = `${prefix}_position`
 	let state = `${prefix}_state`
 	let answer = `${prefix}_answer`
 	let stops = false
-	let carried = carriedInteger(state, driver.stepped ? answer : null, 0, [
-		driver.step,
-	])
-	let target: RedirectTarget = driver.stepped
-		? steppedTarget(prefix, state, answer, () => {
-				stops = true
-			})
-		: { kind: "temporary", name: state }
+	// NOTE: A name of its own, and not the `items` above — the Array a fold
+	// WALKS and the Array it BUILDS stand in the same Scope, and a fold seeded
+	// with its own receiver holds both at once.
+	let built = builtArray(loop)
+	let carried =
+		built === null
+			? carriedInteger(state, driver.stepped ? answer : null, 0, [
+					driver.step,
+				])
+			: null
+	let stop = () => {
+		stops = true
+	}
+	let target: RedirectTarget =
+		built === null
+			? driver.stepped
+				? steppedTarget(prefix, state, answer, stop)
+				: { kind: "temporary", name: state }
+			: driver.stepped
+				? steppedBuiltTarget(prefix, built, answer, stop)
+				: builtTarget(built)
 	// NOTE: The receiver before the seed, which is the order the call evaluated
 	// them in — a Method's receiver is its first Argument — and both before the
 	// body, so that what the emission collects on the way is collected in the
@@ -5046,7 +5109,9 @@ function foldWalk(
 	// list::append(x), …)` — must not lengthen the walk.
 	let held = [
 		...heldItems(items, count, rewriteExpression(driver.items)),
-		loopDeclaration("let", state, rewriteExpression(driver.seed)),
+		built === null
+			? loopDeclaration("let", state, rewriteExpression(driver.seed))
+			: loopDeclaration("const", built, ownedItems(driver.seed)),
 	]
 	let body = inlinedCallback(
 		driver.step,
@@ -5055,6 +5120,7 @@ function foldWalk(
 		target,
 		null,
 		carried,
+		loop.build?.parameter ?? null,
 	)
 	let walk = itemsWalk(count, position, [body])
 
@@ -5063,15 +5129,26 @@ function foldWalk(
 
 		return {
 			statements,
-			answer: carriedAnswer(state, heldRaw(carried, statements)),
+			answer:
+				built === null
+					? carriedAnswer(state, heldRaw(carried, statements))
+					: createdList(loopIdentifier(built)),
 		}
 	}
 
 	// NOTE: Asked of the seed and the walk, which is everywhere the State is
 	// WRITTEN — the tail below only reads it, and how it reads it is what the
 	// answer decides.
-	let raw = heldRaw(carried, [...held, walk])
-	let tail = [walk, loopAssignment(answer, carriedAnswer(state, raw))]
+	let raw = built === null ? heldRaw(carried, [...held, walk]) : false
+	let tail = [
+		walk,
+		loopAssignment(
+			answer,
+			built === null
+				? carriedAnswer(state, raw)
+				: createdList(loopIdentifier(built)),
+		),
+	]
 
 	return {
 		statements: [
@@ -5167,6 +5244,304 @@ function keepWalk(
 		answer: createdList(loopIdentifier(kept)),
 	}
 }
+
+// #region Lists built in place
+
+// NOTE: The Array a walk that builds its List in place pushes into, and null for
+// every walk that threads its State the way it always did. The name is spelled
+// from the loop's own prefix like every other name a walk binds, and it is not
+// `<prefix>_items`: a fold walks one Array and builds another, and the two stand
+// in the same Scope.
+function builtArray(loop: common.typedSimple.InlineLoop): string | null {
+	return loop.build === undefined ? null : `${loop.name}_built`
+}
+
+// NOTE: The Array the walk enters with, and the one entry cost the seed decides.
+// A seed written as a List LITERAL hands its Array over outright — the literal
+// is built where it stands and nobody else has ever held it, which is the same
+// licence `collapse-construction` inlines a Case payload under. Every other seed
+// is copied ONCE, here, into an Array of the walk's own: a List the Program was
+// holding before the walk must never be pushed onto, and the copy is also what
+// makes a walk of no turns answer exactly the seed's items. `ownItemsOf` is the
+// runtime's copy for it, and it copies a flat box the way `append` did.
+function ownedItems(
+	seed: common.typedSimple.ExpressionNode,
+): estree.Expression {
+	let literal = listLiteral(seed)
+
+	if (literal !== null) {
+		return {
+			type: "ArrayExpression",
+			elements: literal.map((value) => rewriteExpression(value)),
+		}
+	}
+
+	return {
+		type: "CallExpression",
+		optional: false,
+		callee: memberRead(loopIdentifier("List"), "ownItemsOf"),
+		arguments: [rewriteExpression(seed)],
+	}
+}
+
+// NOTE: The items a List LITERAL wrote, for the seed above and for a whole List
+// added to a build — both of them Arrays the walk may take rather than box.
+//
+// NOTE: Read in BOTH of the literal's shapes, because `collapse-construction`
+// runs after the pass that asked for this and may be turned off — reading one
+// and not the other would make an emission depend on a pass being enabled.
+function listLiteral(
+	node: common.typedSimple.ExpressionNode,
+): Array<common.typedSimple.ExpressionNode> | null {
+	if (node.nodeType === "ListValue") {
+		return node.values
+	}
+
+	return node.nodeType === "Intrinsic" && node.kind === "direct-list"
+		? node.values
+		: null
+}
+
+// NOTE: A whole List's logical items pushed onto an Array the caller owns — the
+// runtime's own two-run walk, which is what `append(contentsOf:)` performed.
+function pushedItemsOf(
+	list: estree.Expression,
+	into: estree.Expression,
+): estree.CallExpression {
+	return {
+		type: "CallExpression",
+		optional: false,
+		callee: memberRead(loopIdentifier("List"), "pushItemsOf"),
+		arguments: [list, into],
+	}
+}
+
+// NOTE: Where a walk that builds its List writes an answer that rebuilt the
+// State: as the pushes the rebuilding performs, and nothing else. There is no
+// slot to assign — the Array IS the State — so a branch that changes nothing
+// writes no Statement at all beyond the way out of the body it stood in.
+function builtTarget(built: string): RedirectTarget {
+	return {
+		kind: "answer",
+		write: (written, redirect) => [
+			...builtAdditions(built, written.node),
+			...breakOut(redirect),
+		],
+	}
+}
+
+// NOTE: And the same for a walk whose body answers with a `Step`. `#Continue`
+// adds its items and goes round again, exactly as the plain target does;
+// `#Done` may finish with the List the walk built — which is where the Array is
+// boxed, once, at that exit edge — or with a value of its own, and then the
+// Array simply goes nowhere.
+function steppedBuiltTarget(
+	prefix: string,
+	built: string,
+	answer: string,
+	stop: () => void,
+): RedirectTarget {
+	return {
+		kind: "answer",
+		write: (written, redirect) => {
+			let step = stepConstruction(written.node)
+
+			// NOTE: A `Step` this can not see being BUILT would be one read
+			// through its tag, and reading one writes the State whole — which a
+			// walk holding an Array has no way to do. `build-lists-in-place`
+			// declines every such body, so nothing reaches here.
+			if (step === null) {
+				throw new Error(
+					"Internal Compiler Error: a walk that builds its List in place answered with a Step the Compiler can not see being built.",
+				)
+			}
+
+			if (!step.done) {
+				return [
+					...builtAdditions(built, step.value),
+					...breakOut(redirect),
+				]
+			}
+
+			stop()
+
+			if (!isListBuild(step.value)) {
+				return [
+					loopAssignment(answer, rewriteExpression(step.value)),
+					loopBreak(prefix),
+				]
+			}
+
+			return [
+				...builtAdditions(built, step.value),
+				loopAssignment(answer, createdList(loopIdentifier(built))),
+				loopBreak(prefix),
+			]
+		},
+	}
+}
+
+// NOTE: One turn's additions, in the order the chain performed them — the same
+// `push` the Compiler's own `map` walk writes, and the runtime's two-run walk
+// where a whole List was added.
+//
+// NOTE: A whole List written as a LITERAL is added as its items directly, for
+// the reason the seed reads one: the literal is built where it stands, so the
+// walk can push what it holds rather than box it and walk the box back out
+// again. `push` takes as many as the literal wrote, and an empty one adds
+// nothing at all.
+function builtAdditions(
+	built: string,
+	node: common.typedSimple.ExpressionNode | null,
+): Array<estree.Statement> {
+	if (node === null || !isListBuild(node)) {
+		throw new Error(
+			"Internal Compiler Error: a walk that builds its List in place answered with something other than a build.",
+		)
+	}
+
+	return node.additions.flatMap((addition): Array<estree.Statement> => {
+		if (!addition.contentsOf) {
+			return [pushed(built, rewriteExpression(addition.value))]
+		}
+
+		let literal = listLiteral(addition.value)
+
+		if (literal === null) {
+			return [
+				{
+					type: "ExpressionStatement",
+					expression: pushedItemsOf(
+						rewriteExpression(addition.value),
+						loopIdentifier(built),
+					),
+				},
+			]
+		}
+
+		return literal.length === 0
+			? []
+			: [
+					pushed(
+						built,
+						...literal.map((value) => rewriteExpression(value)),
+					),
+				]
+	})
+}
+
+function isListBuild(
+	node: common.typedSimple.ExpressionNode,
+): node is common.typedSimple.ListBuildNode {
+	return node.nodeType === "Intrinsic" && node.kind === "list-build"
+}
+
+// NOTE: A turn whose whole body is the one push a build performs pushes the
+// Argument itself, where the `const` binding it stood. It is the shape a walk
+// that only collects has — `<- accumulated::append(item)` and nothing else — and
+// with the accumulator's Parameter already elided the binding is the last thing
+// the turn writes before the push reads it back.
+//
+// NOTE: Nothing at all stands between the two, which is what makes this an
+// ordering the substitution can not change: the only reads it moves ahead of the
+// Argument are the Array the walk owns and `push` on it, and a plain Array the
+// Compiler declared has no member a Program could have written. Anything else in
+// the body — a second Statement, a pushed value that is more than the Parameter,
+// a second addition — keeps its binding, because then there IS something in
+// between and this does not try to say what.
+//
+// NOTE: It is worth a turn's allocation on V8, which stops keeping the loop in
+// optimised code once the item is bound before it is stored. A million-turn
+// build of the counter measures 76 ms bound and 30 ms pushed where it stands on
+// Node, against 33 ms for the copying shape this pass replaces; JavaScriptCore
+// measures the two the same, so nothing is traded for it.
+function pushedWhereBound(
+	body: Array<estree.Statement>,
+): Array<estree.Statement> {
+	let [binding, push] = body
+
+	if (body.length !== 2 || binding === undefined || push === undefined) {
+		return body
+	}
+
+	if (
+		binding.type !== "VariableDeclaration" ||
+		binding.declarations.length !== 1 ||
+		push.type !== "ExpressionStatement" ||
+		push.expression.type !== "CallExpression" ||
+		push.expression.arguments.length !== 1 ||
+		// NOTE: The Array under its own name, which is the only thing the
+		// substitution moves ahead of the Argument: a name read and `push` read
+		// off it, neither of which can run a Program's code.
+		push.expression.callee.type !== "MemberExpression" ||
+		push.expression.callee.object.type !== "Identifier"
+	) {
+		return body
+	}
+
+	let bound = binding.declarations[0]!
+	let argument = push.expression.arguments[0]!
+	let init = bound.init ?? null
+
+	if (
+		init === null ||
+		bound.id.type !== "Identifier" ||
+		argument.type !== "Identifier" ||
+		argument.name !== bound.id.name
+	) {
+		return body
+	}
+
+	return [
+		{
+			...push,
+			expression: { ...push.expression, arguments: [init] },
+		},
+	]
+}
+
+// NOTE: Whether a name is mentioned anywhere in the emitted body at all, which
+// is what an elided Parameter's `const` is held to. It is `mentionsBeyondValue`
+// with nothing admitted: a List accumulator has no read of its own the emission
+// understands, so any mention is one too many.
+function mentionsIdentifier(root: unknown, name: string): boolean {
+	let found = false
+	// NOTE: The emitted tree is a tree today, and this is what says so has to
+	// stay true of it: a Node the emission shared would otherwise be walked once
+	// per path that reaches it.
+	let seen = new Set<unknown>()
+
+	function visit(node: unknown): void {
+		if (
+			found ||
+			node === null ||
+			typeof node !== "object" ||
+			seen.has(node)
+		) {
+			return
+		}
+
+		seen.add(node)
+
+		let record = node as Record<string, unknown>
+
+		if (isNamed(record, name)) {
+			found = true
+
+			return
+		}
+
+		for (let value of Object.values(record)) {
+			visit(value)
+		}
+	}
+
+	visit(root)
+
+	return found
+}
+
+// #endregion
 
 // NOTE: What a `Step`-answering body's answer is written as, and the whole of
 // what makes the `Step` disappear. Where the Compiler can SEE the Case being
@@ -5346,21 +5721,27 @@ function inlinedCallback(
 	result: RedirectTarget,
 	unboxable: UnboxedArgument | null = null,
 	carried: CarriedState | null = null,
+	dropped: number | null = null,
 ): estree.Statement {
 	let broke = false
 	let body = withNamespaceScope(() => [
-		...callback.parameters.map(
-			(parameter, index): estree.Statement => ({
-				type: "VariableDeclaration",
-				kind: "const",
-				declarations: [
-					{
-						type: "VariableDeclarator",
-						id: rewriteIdentifier(parameter),
-						init: args[index]!,
-					},
-				],
-			}),
+		...callback.parameters.flatMap(
+			(parameter, index): Array<estree.Statement> =>
+				index === dropped
+					? []
+					: [
+							{
+								type: "VariableDeclaration",
+								kind: "const",
+								declarations: [
+									{
+										type: "VariableDeclarator",
+										id: rewriteIdentifier(parameter),
+										init: args[index]!,
+									},
+								],
+							},
+						],
 		),
 		...redirectedStatements(callback.body, {
 			result,
@@ -5374,10 +5755,33 @@ function inlinedCallback(
 		}),
 	])
 	let first = callback.parameters[0]
+	// NOTE: One `const` short where the accumulator's was elided, which is what
+	// the two slices below count in.
+	let bound = callback.parameters.length - (dropped === null ? 0 : 1)
 	// NOTE: Taken ONCE, before the swap below reshapes `body` — both questions
 	// are about the Statements the callback's own body emitted, and the Array
 	// holds the very Statements either swap rewrites in place.
-	let statements = body.slice(callback.parameters.length)
+	let statements = body.slice(bound)
+
+	// NOTE: The List the walk builds in place, whose Parameter is not bound at
+	// all: `build-lists-in-place` proved that every mention of it is a
+	// rebuilding chain, and the target above consumed every one of them as
+	// pushes. So a mention that survives is a mention the proof missed, and the
+	// `const` this elided would have been what made it read. It can not happen
+	// while the pass is right, and it is asked because the cost of it happening
+	// silently is an emission that names something nothing declared.
+	if (dropped !== null) {
+		let accumulator = callback.parameters[dropped]
+
+		if (
+			accumulator !== undefined &&
+			mentionsIdentifier(statements, rewriteIdentifier(accumulator).name)
+		) {
+			throw new Error(
+				`Internal Compiler Error: the accumulator '${accumulator.name}' of a walk that builds its List in place is still mentioned by the emitted body — every mention should have been a build.`,
+			)
+		}
+	}
 
 	// NOTE: The State, handed to the walk that threads it rather than swapped
 	// here: a `while` driver hands one State to TWO bodies, and it is held raw
@@ -5409,6 +5813,11 @@ function inlinedCallback(
 	// NOTE: The counter is a `for` head's `let`, so each turn binds a fresh one
 	// and a closure the body builds captures the turn it was built in — which is
 	// exactly what capturing the Integer gave it.
+	//
+	// NOTE: The two elisions are on DIFFERENT Parameters of the one callback
+	// that can have both — the counted walk hands the counter first and the
+	// State second — so the counter's `const` is still `body[0]` where the
+	// State's was dropped, and neither elision has to know about the other.
 	if (unboxable !== null && first !== undefined) {
 		let name = rewriteIdentifier(first).name
 
@@ -5416,10 +5825,18 @@ function inlinedCallback(
 			replaceValueReads(statements, name, unboxable.read)
 			body = [
 				...unboxable.binding,
-				...body.slice(1, callback.parameters.length),
+				...body.slice(1, bound),
 				...statements,
 			]
 		}
+	}
+
+	// NOTE: Asked LAST, of whatever the two elisions above left — a build whose
+	// turn is one push has neither of them to take, so the three never argue over
+	// the same `const`, and asking here means this reads the Statements as they
+	// will be emitted rather than as they were written.
+	if (dropped !== null) {
+		body = pushedWhereBound(body)
 	}
 
 	return broke ? labelled(label, loopBlock(body)) : loopBlock(body)
@@ -6011,14 +6428,17 @@ function materialisedRead(list: estree.Expression): estree.Expression {
 	}
 }
 
-function pushed(array: string, value: estree.Expression): estree.Statement {
+function pushed(
+	array: string,
+	...values: Array<estree.Expression>
+): estree.Statement {
 	return {
 		type: "ExpressionStatement",
 		expression: {
 			type: "CallExpression",
 			optional: false,
 			callee: memberRead(loopIdentifier(array), "push"),
-			arguments: [value],
+			arguments: values,
 		},
 	}
 }

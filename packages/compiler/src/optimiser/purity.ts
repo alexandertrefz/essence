@@ -248,6 +248,12 @@ function isPureIntrinsic(
 			)
 		case "direct-list":
 			return node.values.every(isPure)
+		// NOTE: A build stands only where an inlined walk's answer is written,
+		// and a walk is refused whole above — so nothing can ask this. It
+		// answers for what the Node MEANS anyway: the items are Expressions like
+		// any other, and adding them to an Array the walk owns observes nothing.
+		case "list-build":
+			return node.additions.every((addition) => isPure(addition.value))
 		case "spread-combination":
 			return (
 				isPure(node.lhs) &&

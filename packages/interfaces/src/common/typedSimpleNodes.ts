@@ -360,6 +360,7 @@ export type IntrinsicNode =
 	| PooledReferenceNode
 	| DispatchChainNode
 	| InlineLoopNode
+	| ListBuildNode
 
 // NOTE: Whether a value is a Case carrying this tag — `value[<Type key>] ===
 // "Ordering#Less"`, the whole of what the runtime asks when the answer can not
@@ -704,6 +705,47 @@ export interface InlineLoopNode extends InlineLoop {
 export type InlineLoop = {
 	name: string
 	driver: InlineLoopDriver
+	// NOTE: Set by `build-lists-in-place`, and absent on every walk that pass
+	// declined or never saw. It is a PROOF rather than a description: the walk
+	// threads a List no one but the walk can reach, so the walk may hold one
+	// Array and push onto it where it rebuilt a List per turn.
+	build?: ListBuild
+}
+
+// NOTE: What the proof says, which is the one thing the emission can not work
+// out for itself: WHICH Parameter of the step callback the accumulator arrives
+// under. The rest of the plan is in the body — every answer that writes the
+// State is a `list-build` by the time the pass is done, and there is no other
+// mention of the Parameter left for the emission to bind.
+export type ListBuild = {
+	parameter: number
+}
+
+// NOTE: The State of a walk that builds its List in place, rebuilt: the items
+// THIS turn adds to the Array the walk owns. It stands exactly where the
+// rebuilding chain stood — `state::append(x)::append(contentsOf ys)` is the two
+// additions in that order, and the bare `state` a branch that changes nothing
+// answers with is none of them.
+//
+// NOTE: It can only stand where an inlined walk's answer is WRITTEN, which is
+// the only position `build-lists-in-place` puts one in. The Rewriter reads it
+// there through the walk's own target and refuses it anywhere else: there is no
+// Expression that means "the Array so far" without saying whether the walk is
+// finished with it, and boxing one mid-walk would hand away an Array the next
+// turn still pushes onto.
+export interface ListBuildNode {
+	nodeType: "Intrinsic"
+	kind: "list-build"
+	additions: Array<ListBuildAddition>
+	type: Type
+	position?: Position
+}
+
+// NOTE: One `append`. `contentsOf` is which Overload it was — one item added,
+// or a whole List's items — and it decides which of the two pushes is emitted.
+export type ListBuildAddition = {
+	contentsOf: boolean
+	value: ExpressionNode
 }
 
 // NOTE: One callback, reduced to what inlining needs of it: the names its body

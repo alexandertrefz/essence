@@ -2,6 +2,7 @@ import type { common } from "@essence-lang/interfaces"
 
 import { eraseRefinements } from "../helpers/eraseRefinements"
 import { type DeclaredNamespaces, declaredNamespaces } from "./namespaces"
+import { buildListsInPlace } from "./passes/buildListsInPlace"
 import { collapseCombinations } from "./passes/collapseCombinations"
 import { collapseConstruction } from "./passes/collapseConstruction"
 import { compileTypeTests } from "./passes/compileTypeTests"
@@ -105,6 +106,7 @@ export const optimiserPasses: ReadonlyArray<OptimiserPass> = [
 	devirtualiseWitnesses,
 	lowerMatchesToStatements,
 	inlineLoops,
+	buildListsInPlace,
 	foldConstants,
 	pruneDeadMatchArms,
 	elideFinalMatchTest,

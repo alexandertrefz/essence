@@ -1377,6 +1377,228 @@ const bothEndsEdited = `implementation {
 	Terminal.inspect(window)
 }`
 
+// NOTE: The shape `build-lists-in-place` is FOR: a counted walk whose State is a
+// List and whose body only ever appends to it. Both `append` entries are here
+// and so is a chain of them, because a turn may add more than one thing, and the
+// second link of a chain resolves on `NonEmptyList` rather than on `List` — the
+// first `append` proved the receiver is not empty.
+const builtList = `implementation {
+	constant built = loop(from 1, through 4, startingWith [0], step (index, list) {
+		<- list::append(index)
+	})
+
+	constant batched = loop(from 1, through 3, startingWith [0], step (index, list) {
+		<- list::append(index)::append(contentsOf [index, index])
+	})
+
+	§ The other half of the addition: a List under a name, which nothing may
+	§ take the Array of, so its items are walked out of the box it is held in.
+	constant tail = [7, 8]
+	constant joined = loop(from 1, through 2, startingWith [0], step (index, list) {
+		<- list::append(contentsOf tail)
+	})
+
+	Terminal.inspect(built)
+	Terminal.inspect(batched)
+	Terminal.inspect(joined)
+}`
+
+// NOTE: The other three walks that thread a State, each writing its accumulator
+// a different way: a fold's plain entry, a fold that leaves early through
+// `#Done`, and the general `Step` walk — which is driven by a `variable` here
+// because a walk that read its own accumulator to decide when to stop would be
+// declined by the fence.
+const builtStates = `implementation {
+	constant folded = [1, 2, 3]::reduce(startingWith [0], (accumulated, item) {
+		<- accumulated::append(item)
+	})
+
+	constant stopped = [1, 2, 3, 4, 5]::reduce(startingWith [0], step (
+		accumulated,
+		item,
+	) {
+		if item::isGreaterThan(3) {
+			<- #Done(accumulated)
+		} else {
+			<- #Continue(accumulated::append(item))
+		}
+	})
+
+	variable turns = 0
+	constant stepped = loop(startingWith [0], step (list) {
+		turns = turns::add(1)
+
+		if turns::isGreaterThan(3) {
+			<- #Done(list)
+		} else {
+			<- #Continue(list::append(turns))
+		}
+	})
+
+	Terminal.inspect(folded)
+	Terminal.inspect(stopped)
+	Terminal.inspect(stepped)
+}`
+
+// NOTE: A branch that changes nothing answers the accumulator BARE, which is the
+// rebuilding chain with no appends on it — and a `#Done` that answers something
+// else entirely leaves with that value while the Array the walk built goes
+// nowhere.
+const builtBranches = `implementation {
+	constant sparse = loop(from 1, through 6, startingWith [0], step (index, list) {
+		if index::isGreaterThan(3) {
+			<- list
+		} else {
+			<- list::append(index)
+		}
+	})
+
+	constant elsewhere = [1, 2, 3, 4]::reduce(startingWith [0], step (
+		accumulated,
+		item,
+	) {
+		if item::isGreaterThan(2) {
+			<- #Done([99])
+		} else {
+			<- #Continue(accumulated::append(item))
+		}
+	})
+
+	Terminal.inspect(sparse)
+	Terminal.inspect(elsewhere)
+}`
+
+// NOTE: The two walks the elisions meet on. `paced` is a `while` walk that
+// qualifies — its predicate decides by a `variable` around the call rather than
+// by the accumulator — which is the one walk whose State Parameter is elided in
+// TWO callbacks. `doubled` takes both elisions at once: its body only ever reads
+// what the counter holds, so the counter's Integer is never built, and its
+// accumulator is a List built in place, so the State's `const` is never bound.
+const builtBesideElisions = `implementation {
+	variable turns = 0
+	constant paced = loop(startingWith [0], while (list) {
+		<- turns::isLessThan(3)
+	}, step (list) {
+		turns = turns::add(1)
+
+		<- list::append(turns)
+	})
+
+	constant doubled = loop(from 1, through 4, startingWith [0], step (
+		index,
+		list,
+	) {
+		<- list::append(index::add(1))
+	})
+
+	Terminal.inspect(paced)
+	Terminal.inspect(doubled)
+}`
+
+// NOTE: THE counter-example the fence is drawn for. The old `current` survives
+// inside `snapshots`, so pushing onto its Array would rewrite history the
+// Program already recorded — and what says so is visible in the body: `current`
+// is read twice, once as the receiver being replaced and once as a value handed
+// somewhere else.
+const retainedAccumulator = `implementation {
+	constant history: List<List<Integer>> = []
+	constant walked = loop(from 1, through 3, startingWith {
+		current = [0],
+		snapshots = history,
+	}, step (index, state) {
+		<- {
+			current = state.current::append(index),
+			snapshots = state.snapshots::append(state.current),
+		}
+	})
+
+	Terminal.inspect(walked.current)
+	Terminal.inspect(walked.snapshots)
+}`
+
+// NOTE: One Program per way of mentioning the accumulator that is not a
+// rebuilding chain: a read as innocent as `length`, a name a closure captured, a
+// nested walk over it, the accumulator added to ITSELF, and a `prepend`, which
+// grows the end a build does not push onto. Every one of them keeps the walk it
+// was written in, and the answers are what the copying emission answers.
+const declinedAccumulators = `implementation {
+	constant read = loop(from 1, through 3, startingWith [0], step (index, list) {
+		<- list::append(list::length())
+	})
+
+	constant captured = loop(from 1, through 3, startingWith [0], step (
+		index,
+		list,
+	) {
+		constant seen = [1]::map((item) { <- list::length() })
+
+		<- list::append(seen::length())
+	})
+
+	constant walked = loop(from 1, through 3, startingWith [0], step (
+		index,
+		list,
+	) {
+		<- list::append(list::reduce(startingWith 0, (total, item) {
+			<- total::add(item)
+		}))
+	})
+
+	constant doubled = loop(from 1, through 3, startingWith [0], step (
+		index,
+		list,
+	) {
+		<- list::append(contentsOf list)
+	})
+
+	constant fronted = loop(from 1, through 3, startingWith [0], step (
+		index,
+		list,
+	) {
+		<- list::prepend(index)
+	})
+
+	Terminal.inspect(read)
+	Terminal.inspect(captured)
+	Terminal.inspect(walked)
+	Terminal.inspect(doubled)
+	Terminal.inspect(fronted)
+}`
+
+// NOTE: THE seed rule, both halves. A seed the Program was holding before the
+// walk is COPIED at entry, so appending to it afterwards must answer the seed's
+// own items and the walk's answer must not have grown one — and a walk of no
+// turns at all must answer exactly what it was seeded with. The fold over the
+// empty List is the only walk here that runs no turns: the counted entry always
+// runs at least one, in whichever direction its bounds point.
+const seededBuilds = `implementation {
+	constant seed = [1, 2]
+	constant grown = loop(from 3, through 5, startingWith seed, step (
+		index,
+		list,
+	) {
+		<- list::append(index)
+	})
+
+	constant nothing: List<Integer> = []
+	constant untouched = nothing::reduce(startingWith seed, (accumulated, item) {
+		<- accumulated::append(item)
+	})
+
+	constant itself = seed::reduce(startingWith seed, (accumulated, item) {
+		<- accumulated::append(item)
+	})
+
+	Terminal.inspect(grown)
+	Terminal.inspect(untouched)
+	Terminal.inspect(itself)
+	Terminal.inspect(seed)
+	Terminal.inspect(seed::append(9))
+	Terminal.inspect(grown::append(9))
+	Terminal.inspect(untouched::append(9))
+	Terminal.inspect(seed)
+}`
+
 // NOTE: One of everything `fold-constants` works out, beside the operands it
 // must refuse: an Argument that PRINTS, which is the whole of what folding
 // through a call would cost, and a mixed-kind sum, which reaches a Method whose
@@ -3568,6 +3790,12 @@ describe("Optimiser", () => {
 			// through it needs the Integer, and the swap has to see that. The
 			// mention here is an Argument, which is every position that is not
 			// a read of the value.
+			//
+			// NOTE: The Integer is built where it is handed on rather than
+			// bound first, because this walk builds its List in place and its
+			// whole turn is that one push. What matters here is that the
+			// Integer is BUILT — `$loop_0_index` alone would be the swap taken
+			// where it must not be.
 			let generated = generate(`implementation {
 	constant seen = loop(from 1, through 3, startingWith [], step (
 		index,
@@ -3578,7 +3806,7 @@ describe("Optimiser", () => {
 }`)
 
 			expect(generated).toContain(
-				"const index = Integer.createInteger($loop_0_index);",
+				"$loop_0_built.push(Integer.createInteger($loop_0_index));",
 			)
 		})
 
@@ -3977,6 +4205,277 @@ describe("Optimiser", () => {
 			// own inlining is exercised.
 			await expectSamePrintedOutput(
 				"inline-loops",
+				readFileSync(fixturePath("List.es"), "utf8"),
+			)
+		})
+	})
+
+	describe("build-lists-in-place", () => {
+		it("pushes into one Array where the walk rebuilt a List per turn", () => {
+			// NOTE: The emission `map` and `keepEvery` already trust, written
+			// for an accumulator the Program declared: one Array, a `push` a
+			// turn, and the box built once at the exit. There is no State slot
+			// at all — the Array IS the State — so the `const` the turn bound
+			// the accumulator through is not emitted either.
+			let generated = generate(builtList)
+
+			expect(generated).toContain("const $loop_0_built = [$pool_")
+			expect(generated).toContain(
+				"$loop_0_built.push(Integer.createInteger($loop_0_index));",
+			)
+			expect(generated).toContain(
+				"built = List.createList($loop_0_built)",
+			)
+			expect(generated).not.toContain("$loop_0_state")
+			expect(generated).not.toContain("append__overload$1(list,")
+		})
+
+		it("pushes the Argument where the const binding it stood", () => {
+			// NOTE: A turn whose whole body is that one push writes the
+			// Argument there. Nothing stands between the binding and the read,
+			// so the only reads the substitution moves ahead of the Argument
+			// are the Array the walk owns and `push` on it. A turn that does
+			// anything more keeps its binding — the second walk pushes twice —
+			// because then there IS something in between and this does not try
+			// to say what.
+			//
+			// NOTE: It is worth a turn's allocation: V8 stops keeping the loop
+			// in optimised code once the item is bound before it is stored, and
+			// a million-turn build measures 76 ms bound against 30 ms pushed
+			// where it stands.
+			let generated = generate(builtList)
+
+			expect(generated).toContain(
+				"$loop_0_built.push(Integer.createInteger($loop_0_index));",
+			)
+			expect(generated).not.toContain(
+				"const index = Integer.createInteger($loop_0_index);",
+			)
+			expect(generated).toContain(
+				"const index = Integer.createInteger($loop_1_index);",
+			)
+		})
+
+		it("adds a whole List through the runtime's own two-run walk", () => {
+			// NOTE: `append(contentsOf:)` pushes the other List's logical items
+			// onto the Array being built, which is what the native did with the
+			// Array it was rebuilding. It can not reach for `materialise`: that
+			// answers the OTHER List's own Array.
+			let generated = generate(builtList)
+
+			expect(generated).toContain("List.pushItemsOf(tail, $loop_2_built)")
+			expect(generated).not.toContain("append__overload$2")
+		})
+
+		it("adds a whole List written as a literal as its items", () => {
+			// NOTE: The same licence the seed reads a literal under: it is
+			// built where it stands, so the walk pushes what it holds rather
+			// than boxing it and walking the box straight back out.
+			let generated = generate(builtList)
+
+			expect(generated).toContain(
+				"$loop_1_built.push(index);\n\t\t\t$loop_1_built.push(index, index);",
+			)
+		})
+
+		it("builds the box at every edge the State leaves through", () => {
+			// NOTE: A `#Done` that answers the accumulator is an exit like the
+			// walk's own end, and each one boxes the Array where it stands.
+			let generated = generate(builtStates)
+
+			expect(generated).toContain(
+				"$loop_1_answer = List.createList($loop_1_built);",
+			)
+			expect(generated).toContain(
+				"$loop_2_answer = List.createList($loop_2_built);",
+			)
+		})
+
+		it("writes nothing at all for a branch that changes nothing", () => {
+			// NOTE: A bare answer is the rebuilding chain with no appends on it,
+			// so there is nothing to push and nothing to assign — where the
+			// copying emission wrote `$loop_0_state = list`.
+			let generated = generate(builtBranches)
+
+			expect(generated).toContain(
+				"if (index.value > $pool_3.value) {\n\t\t\t} else {\n\t\t\t\t$loop_0_built.push(index);\n\t\t\t}",
+			)
+		})
+
+		it("leaves with a value of its own where the Done carries one", () => {
+			let generated = generate(builtBranches)
+
+			expect(generated).toContain(
+				'$loop_1_answer = {\n\t\t\t\t\t\t[$type.typeKeySymbol]: "List",\n\t\t\t\t\t\tvalue: [$pool_6]\n\t\t\t\t\t};\n\t\t\t\t\tbreak $loop_1;',
+			)
+			expect(generated).toContain(
+				"\t\t$loop_1_answer = List.createList($loop_1_built);",
+			)
+		})
+
+		it("copies a seed the Program was holding, once, at entry", () => {
+			// NOTE: The other direction of the same rule: a List the Program
+			// held before the walk is never pushed onto, so any seed that is not
+			// a literal is copied into an Array of the walk's own. A literal
+			// hands its Array over outright, which is what the first test above
+			// reads.
+			//
+			// NOTE: `ownItemsOf` and not `pushItemsOf(seed, [])` — the copy a
+			// short walk over a long seed pays in full is the copy `append`
+			// performed, and an element-wise loop is not it.
+			expect(generate(seededBuilds)).toContain(
+				"const $loop_0_built = List.ownItemsOf(seed);",
+			)
+		})
+
+		it("binds the State in neither body of a condition walk", () => {
+			// NOTE: A `while` walk hands ONE State to TWO callbacks, so the
+			// Parameter is elided in both or the walk is declined for both.
+			let generated = generate(builtBesideElisions)
+
+			expect(generated).toContain("const $loop_0_built = [$pool_")
+			expect(generated).toContain("$loop_0_built.push(turns);")
+			expect(generated).not.toContain("const list =")
+			expect(generated).not.toContain("$loop_0_state")
+		})
+
+		it("elides the counter's Integer and the accumulator at once", () => {
+			// NOTE: The two elisions on one callback, which is the only place
+			// they meet: the counter is Parameter one and the accumulator is
+			// Parameter two, so each is written where its own `const` stood.
+			let generated = generate(builtBesideElisions)
+
+			expect(generated).toContain(
+				'$loop_1_built.push(typeof $loop_1_index === "number"',
+			)
+			expect(generated).not.toContain("const index =")
+			expect(generated).not.toContain("$loop_1_state")
+		})
+
+		it("prints the same thing with the pass off beside the elisions", async () => {
+			expect(
+				await expectSamePrintedOutput(
+					"build-lists-in-place",
+					builtBesideElisions,
+				),
+			).toEqual(["[ 0, 1, 2, 3 ]", "[ 0, 2, 3, 4, 5 ]"])
+		})
+
+		it("declines a walk that retains what it replaced", () => {
+			// NOTE: THE counter-example. `current` stands as the receiver being
+			// replaced AND as a value written into `snapshots`, so the walk it
+			// is written in keeps the emission it always had.
+			let generated = generate(retainedAccumulator)
+
+			expect(generated).not.toContain("_built")
+			expect(generated).toContain("$loop_0_state")
+		})
+
+		it("declines every mention that is not a rebuilding chain", () => {
+			// NOTE: A read, a capture, a nested walk over the accumulator, the
+			// accumulator added to itself, and a `prepend`, which grows the end
+			// a build does not push onto.
+			expect(generate(declinedAccumulators)).not.toContain("_built")
+		})
+
+		it("declines a condition walk whose predicate reads the State", () => {
+			// NOTE: ONE State handed to TWO bodies, and the predicate has no
+			// rebuilding chain to stand in — so every mention it makes is a
+			// read. A `while` walk over a List accumulator is declined by that
+			// alone unless its predicate reads something else entirely.
+			let generated = generate(`implementation {
+				constant built = loop(startingWith [0], while (list) {
+					<- list::length()::isLessThan(4)
+				}, step (list) { <- list::append(1) })
+
+				Terminal.inspect(built)
+			}`)
+
+			expect(generated).not.toContain("_built")
+		})
+
+		it("rebuilds the List per turn again when it is turned off", () => {
+			expect(
+				generate(builtList, {
+					enabled: true,
+					disabledPasses: new Set(["build-lists-in-place"]),
+				}),
+			).toContain("$loop_0_state = List.append__overload$1(list,")
+		})
+
+		it("prints the same thing with the pass off", async () => {
+			expect(
+				await expectSamePrintedOutput(
+					"build-lists-in-place",
+					builtList,
+				),
+			).toEqual([
+				"[ 0, 1, 2, 3, 4 ]",
+				"[ 0, 1, 1, 1, 2, 2, 2, 3, 3, 3 ]",
+				"[ 0, 7, 8, 7, 8 ]",
+			])
+		})
+
+		it("prints the same thing with the pass off for every walk", async () => {
+			expect(
+				await expectSamePrintedOutput(
+					"build-lists-in-place",
+					builtStates,
+				),
+			).toEqual(["[ 0, 1, 2, 3 ]", "[ 0, 1, 2, 3 ]", "[ 0, 1, 2, 3 ]"])
+		})
+
+		it("prints the same thing with the pass off for either branch", async () => {
+			expect(
+				await expectSamePrintedOutput(
+					"build-lists-in-place",
+					builtBranches,
+				),
+			).toEqual(["[ 0, 1, 2, 3 ]", "[ 99 ]"])
+		})
+
+		it("prints the same thing with the pass off where it declines", async () => {
+			await expectSamePrintedOutput(
+				"build-lists-in-place",
+				retainedAccumulator,
+			)
+			await expectSamePrintedOutput(
+				"build-lists-in-place",
+				declinedAccumulators,
+			)
+		})
+
+		it("never mutates a seed the Program keeps reading", async () => {
+			// NOTE: The whole of the sharing question, printed. `seed` is read
+			// after two walks have been seeded with it — one that ran turns and
+			// one that ran none — and appended to afterwards, and each walk's
+			// answer is appended to as well. Every one of those has to answer
+			// its own items and no one else's, whichever Array they are stored
+			// in.
+			expect(
+				await expectSamePrintedOutput(
+					"build-lists-in-place",
+					seededBuilds,
+				),
+			).toEqual([
+				"[ 1, 2, 3, 4, 5 ]",
+				"[ 1, 2 ]",
+				"[ 1, 2, 1, 2 ]",
+				"[ 1, 2 ]",
+				"[ 1, 2, 9 ]",
+				"[ 1, 2, 3, 4, 5, 9 ]",
+				"[ 1, 2, 9 ]",
+				"[ 1, 2 ]",
+			])
+		})
+
+		it("prints the same thing with the pass off over a List Program", async () => {
+			// NOTE: The fixture that reaches every walking Method there is —
+			// nothing in it is a walk this pass admits, and the point of asking
+			// is that a pass which changed a Program it declines would be
+			// wrong twice over.
+			await expectSamePrintedOutput(
+				"build-lists-in-place",
 				readFileSync(fixturePath("List.es"), "utf8"),
 			)
 		})
