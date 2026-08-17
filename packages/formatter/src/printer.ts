@@ -1567,25 +1567,40 @@ export class Printer {
 	// written at its Position. A typed Record — `{ a with Point ~> { x = 1 } }`
 	// — always braces itself, and its `Type ~>` must be written back with it.
 	private printCombination(node: parser.CombinationNode): Doc {
-		let right: Doc
-
-		if (
+		let bare =
 			node.rhs.nodeType === "RecordValue" &&
 			node.rhs.type === null &&
 			!this.source.slice(node.rhs.position).trimStart().startsWith("{")
-		) {
-			right = this.printRecordMembers(node.rhs)
-		} else {
-			right = this.printExpression(node.rhs)
-		}
+
+		// NOTE: A Combination too wide for its line opens like a Record: the
+		// base on a line of its own, the members it overrides indented below
+		// the `with`, and the `}` back at the start. A braced right side
+		// brings its own braces and lays itself out after the `with`.
+		let right = bare
+			? indent(
+					concat([
+						line,
+						this.printRecordMembers(
+							node.rhs as parser.RecordValueNode,
+						),
+						ifBreak(text(","), EMPTY),
+					]),
+				)
+			: concat([text(" "), this.printExpression(node.rhs)])
 
 		return group(
 			concat([
-				text("{ "),
-				this.printExpression(node.lhs),
-				text(" with "),
-				right,
-				text(" }"),
+				text("{"),
+				indent(
+					concat([
+						line,
+						this.printExpression(node.lhs),
+						text(" with"),
+						right,
+					]),
+				),
+				line,
+				text("}"),
 			]),
 		)
 	}
