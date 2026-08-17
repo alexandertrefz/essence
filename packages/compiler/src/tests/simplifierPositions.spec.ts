@@ -65,6 +65,62 @@ describe("Simplifier Positions", () => {
 	// end, and the Simplifier appends the `<- {}` the Signature promised. That
 	// Return is the one node here no source was written for, so it is the one
 	// node that must carry no position.
+	// NOTE: A default is an Expression written where it stands, and it keeps the
+	// Position it was written at — so stepping into a call that took one stops
+	// on the `= …` in the source, which is where the work is happening. The
+	// filler an interior omission emits is the other half: no source wrote it,
+	// so it carries no Position and emits no mapping.
+	it("keeps a default's own position", () => {
+		let { typed, simplified } = simplifyWithTyped(`implementation {
+			function f(_ count: Integer = 1) -> Integer {
+				<- count
+			}
+		}`)
+
+		let typedStatement = typed.implementation.nodes[0]!
+		let simplifiedStatement = simplified.implementation.nodes[0]!
+
+		if (
+			typedStatement.nodeType !== "FunctionStatement" ||
+			simplifiedStatement.nodeType !== "FunctionStatement"
+		) {
+			throw new Error("Expected a FunctionStatement")
+		}
+
+		let typedDefault = typedStatement.value.parameters[0]!.defaultValue!
+		let simplifiedDefault =
+			simplifiedStatement.value.parameters[0]!.defaultValue!
+
+		expect(simplifiedDefault.position).toEqual(typedDefault.position)
+	})
+
+	it("leaves the filler an omission emits position-less", () => {
+		let { simplified } = simplifyWithTyped(`implementation {
+			function g(from a: Integer = 0, to b: Integer) -> Integer {
+				<- b
+			}
+
+			constant value = g(to 7)
+		}`)
+
+		let statement = simplified.implementation.nodes[1]!
+
+		if (statement.nodeType !== "VariableDeclarationStatement") {
+			throw new Error("Expected a VariableDeclarationStatement")
+		}
+
+		let call = statement.value
+
+		if (call.nodeType !== "FunctionInvocation") {
+			throw new Error("Expected a FunctionInvocation")
+		}
+
+		let filler = call.arguments[0]!.value
+
+		expect(filler.nodeType).toBe("Intrinsic")
+		expect(filler.position).toBeUndefined()
+	})
+
 	it("leaves the synthesised trailing Return position-less", () => {
 		let { simplified } = simplifyWithTyped(`implementation {
 			function noop () -> {} {

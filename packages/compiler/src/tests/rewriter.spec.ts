@@ -1849,6 +1849,46 @@ describe("Rewriter", () => {
 				)
 			})
 
+			// NOTE: A branch names the Parameters ITS callee takes defaults for,
+			// as a fifth case element, and the shared Argument list holds what
+			// the call WROTE — so the holes are opened per branch, here. The
+			// indices are over the callee's whole signature with the receiver at
+			// 0, and the receiver is passed separately, so a hole at `index`
+			// falls at `index - 1` among the Arguments.
+			it("opens the holes a branch's callee takes defaults for", () => {
+				let seen: Array<Array<unknown>> = []
+				let record = (
+					_receiver: unknown,
+					...args: Array<unknown>
+				): unknown => {
+					seen.push(args)
+
+					return string.createString("ok")
+				}
+
+				let cases: Parameters<typeof dispatchMethod>[2] = [
+					[
+						{ type: "Integer" },
+						record as (...args: Array<unknown>) => unknown,
+						[],
+						[],
+						[1, 3],
+					],
+				]
+
+				expect(
+					dispatchMethod(
+						integerTwo(),
+						[string.createString("written")],
+						cases,
+					),
+				).toEqual(string.createString("ok"))
+
+				expect(seen).toEqual([
+					[undefined, string.createString("written"), undefined],
+				])
+			})
+
 			// NOTE: The order the cases are walked in IS the dispatch's meaning
 			// — the Enricher writes them most specific first and the runtime
 			// answers with the first one that accepts, so a receiver two cases

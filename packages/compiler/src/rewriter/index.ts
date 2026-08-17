@@ -11,7 +11,7 @@ import {
 	PRELUDE_SPECIFIER,
 } from "../bundler/index"
 import { derivedEquatableNamespaceName } from "../enricher/resolvers"
-import { typeContainsRefinement } from "../helpers/index"
+import { openArgumentHoles, typeContainsRefinement } from "../helpers/index"
 import {
 	defaultOptimiserOptions,
 	type OptimiserOptions,
@@ -2248,6 +2248,13 @@ function rewriteIntrinsic(
 			}
 		case "dispatch-chain":
 			return dispatchChain(node)
+		// NOTE: The one place "no Argument given" is written into emitted code
+		// on purpose — the hole a call leaves where a Parameter took its
+		// default and something after it still has to be passed. It is consumed
+		// by the callee's parameter binding before the first Statement runs, so
+		// it never becomes a value.
+		case "omitted-argument":
+			return omittedArgument()
 		// NOTE: A walk written where it stands, wrapped in an arrow because an
 		// Expression position has nowhere to write a `while`. Where it stands in
 		// a Statement position the Optimiser lifted it to the Statement form
@@ -2376,6 +2383,16 @@ function dispatchCaseCall(
 		values[contextual.index] = contextual.value
 	}
 
+	// NOTE: The shared list is what the call WROTE — the branches need not agree
+	// on which Parameters they leave out — so the holes are opened here, in the
+	// branch that makes the call, and after the overrides above, which stand at
+	// the positions the call wrote.
+	let written = values.map((value) => rewriteExpression(value))
+	let receiver = rewriteExpression(node.receiver)
+	let conformances = dispatchCase.conformanceArguments.map((value) =>
+		rewriteExpression(value),
+	)
+
 	return {
 		type: "CallExpression",
 		optional: false,
@@ -2384,14 +2401,45 @@ function dispatchCaseCall(
 			dispatchCase.methodName,
 			dispatchCase.derivedDescriptor,
 		),
-		arguments: [
-			rewriteExpression(node.receiver),
-			...values.map((value) => rewriteExpression(value)),
-			...dispatchCase.conformanceArguments.map((value) =>
-				rewriteExpression(value),
-			),
-		],
+		arguments: openOmittedArguments(
+			[receiver],
+			written,
+			dispatchCase.omittedParameterIndices,
+			conformances,
+		),
 	}
+}
+
+// NOTE: `void 0` rather than the Identifier `undefined`, which is a name a
+// Program may bind: `constant undefined = 99` is legal Essence and emits a
+// `const undefined`, and every hole in that Module would then have been passed
+// its value. `void 0` is the same value under a spelling nothing can rebind.
+function omittedArgument(): estree.UnaryExpression {
+	return {
+		type: "UnaryExpression",
+		operator: "void",
+		prefix: true,
+		argument: { type: "Literal", value: 0 },
+	}
+}
+
+// NOTE: The emitted counterpart of the Simplifier's `expandOmittedArguments`,
+// for the one Argument list the Simplifier could not build: a dispatch branch's,
+// which is assembled here because the branches share one written list and each
+// takes its own defaults out of it. Both go through `openArgumentHoles`.
+function openOmittedArguments(
+	leading: Array<estree.Expression>,
+	written: Array<estree.Expression>,
+	omittedParameterIndices: Array<number>,
+	trailing: Array<estree.Expression>,
+): Array<estree.Expression> {
+	return openArgumentHoles<estree.Expression>(
+		leading,
+		written,
+		omittedParameterIndices,
+		trailing,
+		omittedArgument,
+	)
 }
 
 function noDispatchCaseMatched(): estree.CallExpression {
@@ -3122,12 +3170,38 @@ function rewriteUnionMethodInvocation(
 									(arg) => rewriteArgument(arg),
 								),
 							},
-							...(dispatchCase.contextualArguments.length === 0
+							...(dispatchCase.contextualArguments.length === 0 &&
+							dispatchCase.omittedParameterIndices.length === 0
 								? []
 								: [
 										contextualArgumentOverrides(
 											dispatchCase.contextualArguments,
 										),
+									]),
+							// NOTE: The Parameters THIS branch leaves out, as
+							// the runtime takes them — a fifth case element,
+							// emitted only where there are any, so a dispatch
+							// that omits nothing emits exactly what it always
+							// did. The fourth element has to stand for the
+							// fifth to be reachable, which is why an omission
+							// forces an (often empty) override array in front
+							// of it.
+							...(dispatchCase.omittedParameterIndices.length ===
+							0
+								? []
+								: [
+										{
+											type: "ArrayExpression" as const,
+											elements:
+												dispatchCase.omittedParameterIndices.map(
+													(
+														index,
+													): estree.Expression => ({
+														type: "Literal",
+														value: index,
+													}),
+												),
+										},
 									]),
 						],
 					}),
@@ -6539,10 +6613,26 @@ function rewriteBlockStatement(
 	}
 }
 
+// NOTE: A Parameter carrying a default becomes an `AssignmentPattern` — the
+// JavaScript default parameter, whose semantics are the ones the language
+// declares. `@` is `_self`, which is Parameter 0, so a default reading `@`
+// reads a BINDING rather than re-computing the receiver expression: that
+// property is exactly what filling a default in at the call site could not
+// offer, and it is why the language puts the default on the callee.
 function rewriteParameter(
 	parameter: common.typedSimple.ParameterNode,
 ): estree.Pattern {
-	return rewriteIdentifier(parameter.internalName)
+	let name = rewriteIdentifier(parameter.internalName)
+
+	if (parameter.defaultValue === null) {
+		return name
+	}
+
+	return {
+		type: "AssignmentPattern",
+		left: name,
+		right: rewriteExpression(parameter.defaultValue),
+	}
 }
 
 function rewriteFunctionExpression(

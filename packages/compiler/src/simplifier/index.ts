@@ -3,6 +3,7 @@ import type { common } from "@essence-lang/interfaces"
 import {
 	bodyDefinitelyReturns,
 	conformanceParameterName,
+	openArgumentHoles,
 	resolveOverloadedMethodName,
 } from "../helpers/index"
 
@@ -191,15 +192,18 @@ function simplifyMethodInvocation(
 			position: node.position,
 		},
 		member: { name: node.member.name },
-		arguments: [
-			{
-				nodeType: "Argument",
-				name: "@",
-				value: simplifyExpression(node.base),
-			},
-			...node.arguments.map((arg) => simplifyArgument(arg)),
-			...simplifyConformanceArguments(node.conformances),
-		],
+		arguments: expandOmittedArguments(
+			[
+				{
+					nodeType: "Argument",
+					name: "@",
+					value: simplifyExpression(node.base),
+				},
+			],
+			node.arguments.map((arg) => simplifyArgument(arg)),
+			node.omittedParameterIndices,
+			simplifyConformanceArguments(node.conformances),
+		),
 		derivedDescriptor: node.derivedDescriptor,
 		type: node.type,
 		position: node.position,
@@ -237,6 +241,7 @@ function simplifyUnionMethodInvocation(
 					argument: simplifyArgument(contextualArgument.argument),
 				}),
 			),
+			omittedParameterIndices: dispatchCase.omittedParameterIndices,
 			derivedDescriptor: dispatchCase.derivedDescriptor,
 		})),
 		arguments: node.arguments.map((arg) => simplifyArgument(arg)),
@@ -270,10 +275,12 @@ function simplifyFunctionInvocation(
 	return {
 		nodeType: "FunctionInvocation",
 		name: simplifyExpression(node.name),
-		arguments: [
-			...node.arguments.map((arg) => simplifyArgument(arg)),
-			...simplifyConformanceArguments(node.conformances),
-		],
+		arguments: expandOmittedArguments(
+			[],
+			node.arguments.map((arg) => simplifyArgument(arg)),
+			node.omittedParameterIndices,
+			simplifyConformanceArguments(node.conformances),
+		),
 		type: node.type,
 		position: node.position,
 	}
@@ -890,8 +897,43 @@ function simplifyParameter(
 					name: `_${index}`,
 					type: { type: "Unknown" },
 				},
-		defaultValue: null,
+		// NOTE: Lowered to a JavaScript default parameter by the Rewriter,
+		// whose semantics are the ones the language declares term for term:
+		// evaluated per call, only when the Argument came in `undefined`, left
+		// to right, able to read the Parameters before it, and a temporal
+		// dead-zone Error on one after it. We are not building an evaluation
+		// model; we are naming one the target already has.
+		defaultValue:
+			node.defaultValue === null
+				? null
+				: simplifyExpression(node.defaultValue),
 	}
+}
+
+// NOTE: The hole a call leaves where a Parameter took its default. See
+// `openArgumentHoles`, which is the walk this and the emitted dispatch branch
+// share, and `OmittedArgumentNode` for what a hole is.
+function expandOmittedArguments(
+	leading: Array<common.typedSimple.ArgumentNode>,
+	written: Array<common.typedSimple.ArgumentNode>,
+	omittedParameterIndices: Array<number>,
+	trailing: Array<common.typedSimple.ArgumentNode>,
+): Array<common.typedSimple.ArgumentNode> {
+	return openArgumentHoles(
+		leading,
+		written,
+		omittedParameterIndices,
+		trailing,
+		() => ({
+			nodeType: "Argument" as const,
+			name: null,
+			value: {
+				nodeType: "Intrinsic" as const,
+				kind: "omitted-argument" as const,
+				type: { type: "Unknown" as const },
+			},
+		}),
+	)
 }
 
 // NOTE: A body that can fall off its end is only legal when it promises unit —

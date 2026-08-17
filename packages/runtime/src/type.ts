@@ -36,6 +36,7 @@ export function dispatchMethod(
 			(...args: Array<unknown>) => unknown,
 			Array<unknown>,
 			Array<[number, unknown]>?,
+			Array<number>?,
 		]
 	>,
 ): unknown {
@@ -44,6 +45,7 @@ export function dispatchMethod(
 		method,
 		conformanceArguments,
 		contextualArguments,
+		omittedParameterIndices,
 	] of cases) {
 		if (isValueOfType(receiver, type)) {
 			let caseArguments = args
@@ -54,6 +56,42 @@ export function dispatchMethod(
 				for (let [index, argument] of contextualArguments) {
 					caseArguments[index] = argument
 				}
+			}
+
+			// NOTE: The Parameters THIS branch's Method takes its defaults for
+			// — opened as holes in the shared Argument list, which holds what
+			// the call WROTE. Every branch resolves to a different Method and
+			// they need not agree on what may be left out, so this is per branch
+			// and the shared list is left as it was written.
+			//
+			// The indices are over the callee's whole signature with the
+			// receiver at 0, and the receiver is passed separately, so a hole at
+			// `index` falls at `index - 1` here. Nothing is trimmed: the spread
+			// below puts the conformance Arguments after these, and a hole they
+			// follow has to be passed as the `undefined` a default parameter
+			// fires on.
+			if (omittedParameterIndices !== undefined) {
+				let total =
+					caseArguments.length + omittedParameterIndices.length
+				// oxlint-disable-next-line unicorn/no-new-array -- the length
+				let opened: Array<unknown> = new Array(total)
+				let next = 0
+				// NOTE: The indices arrive in Parameter order — they are
+				// collected by a left-to-right walk of the signature — so the
+				// next hole is always the one this cursor points at, and no
+				// Argument has to search the list to find out whether it is one.
+				let hole = 0
+
+				for (let index = 0; index < total; index++) {
+					if (omittedParameterIndices[hole] === index + 1) {
+						opened[index] = undefined
+						hole++
+					} else {
+						opened[index] = caseArguments[next++]
+					}
+				}
+
+				caseArguments = opened
 			}
 
 			return method(receiver, ...caseArguments, ...conformanceArguments)
