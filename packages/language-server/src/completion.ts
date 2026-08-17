@@ -297,17 +297,31 @@ function contextualCompletions(
 			}))
 	}
 
+	// NOTE: A label a call may leave out is offered like any other, marked as
+	// what it is and ranked below the ones the call still HAS to write — the
+	// writer is being shown what is missing, and a Parameter with a default is
+	// not missing in the same sense.
 	return context.parameters
 		.filter(
-			(parameter): parameter is { name: string; type: common.Type } =>
+			(
+				parameter,
+			): parameter is {
+				name: string
+				type: common.Type
+				hasDefault?: true
+			} =>
 				parameter.name !== null &&
 				!context.usedLabels.includes(parameter.name),
 		)
 		.map((parameter) => ({
 			label: parameter.name,
 			kind: "label" as const,
-			detail: printType(parameter.type),
-			tier: completionTiers.member,
+			detail: parameter.hasDefault
+				? `${printType(parameter.type)} (may be left out)`
+				: printType(parameter.type),
+			tier: parameter.hasDefault
+				? completionTiers.member + 1
+				: completionTiers.member,
 		}))
 }
 

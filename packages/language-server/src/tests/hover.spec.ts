@@ -967,3 +967,36 @@ describe("Hover of a Pattern", () => {
 		)
 	})
 })
+
+// NOTE: A default is an Expression written where it stands, so the cursor
+// inside one is answered by what it reads rather than by the Parameter the
+// `=` hangs off.
+describe("Default Parameter Values", () => {
+	it("should describe a call written inside a default", () => {
+		let source = [
+			"implementation {",
+			"\tnamespace Windows for List<Integer> {",
+			"\t\tupTo(_ end: Integer = @::length()) -> Integer {",
+			"\t\t\t<- end",
+			"\t\t}",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(hover(source, { line: 3, column: 30 })).toBe(
+			"length<ItemType>() -> Integer",
+		)
+	})
+
+	it("should still describe the Parameter itself", () => {
+		let source = [
+			"implementation {",
+			"\tfunction scaled(_ factor: Integer = 2) -> Integer {",
+			"\t\t<- factor",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(hover(source, { line: 2, column: 21 })).toBe("factor: Integer")
+	})
+})

@@ -305,4 +305,45 @@ describe("Signature Help for a standard library Method", () => {
 			"the Boolean to compare against",
 		)
 	})
+
+	// NOTE: `= expression` defaults. A Parameter a call may leave out reads as
+	// `at?: Side` — the FACT of a default, not its text — and the comma count
+	// stops being a Parameter index the moment a label steps over one.
+	describe("Default Parameter Values", () => {
+		it("should mark a Parameter a call may leave out", () => {
+			let source = [
+				"implementation {",
+				"\tfunction scaled (value: Integer, by factor: Integer = 2) -> Integer {",
+				"\t\t<- value",
+				"\t}",
+				"\tscaled(",
+				"}",
+			].join("\n")
+
+			let help = findSignatureHelp(source, { line: 5, column: 9 })
+
+			expect(help?.signatures[0].label).toBe(
+				"scaled(value: Integer, by?: Integer) -> Integer",
+			)
+			expect(help?.activeParameter).toBe(0)
+		})
+
+		it("should step the active Parameter over a default a label skipped", () => {
+			let source = [
+				"implementation {",
+				"\tfunction cut (from start: Integer = 0, to end: Integer) -> Integer {",
+				"\t\t<- end",
+				"\t}",
+				"\tcut(to 3, ",
+				"}",
+			].join("\n")
+
+			let help = findSignatureHelp(source, { line: 5, column: 12 })
+
+			// NOTE: One Argument written, and it is the SECOND Parameter — its
+			// label stepped over the first, which has a default. Counting
+			// commas alone would have said Parameter 1.
+			expect(help?.activeParameter).toBe(1)
+		})
+	})
 })

@@ -1,3 +1,8 @@
+import {
+	argumentPairingInverse,
+	pairArguments,
+	parameterDefaults,
+} from "@essence-lang/compiler/helpers"
 import type { common } from "@essence-lang/interfaces"
 
 import { typedHandlerExpressions } from "./matchHandlerChildren"
@@ -92,6 +97,7 @@ function visitNode(
 			visitNode(node.value, node.value.type, state)
 			return
 		case "FunctionStatement":
+			visitDefaults(node.value.parameters, state)
 			visitBody(node.value.body, null, state)
 			return
 		case "NamespaceDefinitionStatement":
@@ -107,8 +113,13 @@ function visitNode(
 						: [member.method]
 
 				for (let method of methods) {
+					visitDefaults(method.value.parameters, state)
 					visitBody(method.value.body, null, state)
 				}
+			}
+
+			for (let shim of node.nativeShims) {
+				visitDefaults(shim.parameters, state)
 			}
 
 			return
@@ -219,6 +230,7 @@ function visitNode(
 
 			return
 		case "FunctionValue":
+			visitDefaults(node.value.parameters, state)
 			visitBody(node.value.body, null, state)
 			return
 		case "CaseValue":
@@ -247,13 +259,36 @@ function visitNode(
 	}
 }
 
+// NOTE: A call written inside a Parameter's `= expression` default offers the
+// same labels and the same Record members a call in a body does — the walk below
+// reaches bodies, and a default is not one.
+function visitDefaults(
+	parameters: Array<common.typed.ParameterNode>,
+	state: State,
+) {
+	for (let defaultValue of parameterDefaults(parameters)) {
+		visitNode(defaultValue, null, state)
+	}
+}
+
+// NOTE: An Argument is paired with a Parameter by its LABEL once anything may be
+// left out — `f(to 3)` writes one Argument and it belongs to the SECOND
+// Parameter — so the Types a Record literal is read against are handed over
+// through that pairing rather than by index. `pairArguments` is the Compiler's
+// own walk, and using it here is what keeps Completion agreeing with what the
+// call will actually resolve to.
 function visitArguments(
 	nodeArguments: Array<common.typed.ArgumentNode>,
 	parameterTypes: common.BaseFunction["parameterTypes"] | null,
 	state: State,
 ) {
+	let parameterForArgument = pairedParameters(nodeArguments, parameterTypes)
+
 	nodeArguments.forEach((argument, argumentIndex) => {
-		let parameterType = parameterTypes?.[argumentIndex]?.type ?? null
+		let parameterType =
+			parameterTypes?.[
+				parameterForArgument[argumentIndex] ?? argumentIndex
+			]?.type ?? null
 
 		visitNode(
 			argument.value,
@@ -263,6 +298,32 @@ function visitArguments(
 			state,
 		)
 	})
+}
+
+function pairedParameters(
+	nodeArguments: Array<common.typed.ArgumentNode>,
+	parameterTypes: common.BaseFunction["parameterTypes"] | null,
+): Array<number | undefined> {
+	if (
+		parameterTypes === null ||
+		!parameterTypes.some((parameter) => parameter.hasDefault)
+	) {
+		return []
+	}
+
+	let pairing = pairArguments(
+		parameterTypes,
+		nodeArguments.map((argument) => ({
+			name: argument.name,
+			getType: () => argument.value.type,
+		})),
+	)
+
+	// NOTE: Inverted by the Compiler's own helper, which is the same inversion
+	// `matchArguments` performs to name the Parameter a mismatching Argument was
+	// held to — one walk, so the two can not disagree about which Parameter an
+	// Argument answers.
+	return pairing === null ? [] : argumentPairingInverse(pairing)
 }
 
 function asRecordType(type: common.Type | null): common.RecordType | null {
