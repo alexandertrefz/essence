@@ -881,6 +881,29 @@ function validateFunctionDefinition(
 	return node
 }
 
+// NOTE: A native Method has no body, and the frame the Compiler synthesizes for
+// its defaults is the only Essence it owns — so it is the only thing here to
+// check, and checking it is what keeps a `declarations { … }` Program held to
+// what every other Program is held to.
+function validateNativeShim(shim: common.typed.NativeShimNode): void {
+	let enclosingIndex = executingTopLevelIndex
+	let enclosingProperty = initialisingProperty
+
+	executingTopLevelIndex = null
+	initialisingProperty = null
+	witnessScopes.push(new Set())
+
+	try {
+		for (let defaultValue of parameterDefaults(shim.parameters)) {
+			validateExpression(defaultValue)
+		}
+	} finally {
+		executingTopLevelIndex = enclosingIndex
+		initialisingProperty = enclosingProperty
+		witnessScopes.pop()
+	}
+}
+
 function validateLookup(
 	node: common.typed.LookupNode,
 ): common.typed.LookupNode {
@@ -2356,6 +2379,10 @@ function validateNamespaceDefinitionStatement(
 				})
 			}
 		}
+	}
+
+	for (let shim of node.nativeShims) {
+		validateNativeShim(shim)
 	}
 
 	return node

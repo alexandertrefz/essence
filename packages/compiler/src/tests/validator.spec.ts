@@ -3434,3 +3434,49 @@ describe("A default's own Expression", () => {
 // its defaults is the only Essence it owns — so it is the only thing here to
 // check, and checking it is what holds a `declarations { … }` Program to what
 // every other Program is held to.
+describe("A default written on a native signature", () => {
+	// NOTE: The `declarations { … }` header the standard library's own sources
+	// are written with, which is the only place a native signature — and
+	// therefore a default on one — can appear at all.
+	function declarationDiagnosticsFor(
+		source: string,
+	): Array<common.Diagnostic> {
+		let { program, diagnostics } = enrich(
+			parse(source, { allowDeclarationsHeader: true }),
+		)
+
+		expect(diagnostics).toEqual([])
+
+		return validate(program)
+	}
+
+	it("should be checked like any other Expression", () => {
+		let diagnostics = declarationDiagnosticsFor(`declarations {
+			function twice(_ text: String) -> String {
+				<- text::append(text)
+			}
+
+			namespace Texts for String {
+				padded(with filler: String = twice("a", "b")) -> String
+			}
+		}`)
+
+		expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+			"argument-count-mismatch",
+		])
+	})
+
+	it("should accept one that fits", () => {
+		expect(
+			declarationDiagnosticsFor(`declarations {
+			function twice(_ text: String) -> String {
+				<- text::append(text)
+			}
+
+			namespace Texts for String {
+				padded(with filler: String = twice("a")) -> String
+			}
+		}`),
+		).toEqual([])
+	})
+})

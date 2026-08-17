@@ -142,7 +142,8 @@ function buildStdlibArtifacts(stdlib: Stdlib): StdlibArtifacts {
 			// is emitted, not when something calls it.
 			if (
 				Object.keys(node.methods).length === 0 &&
-				Object.keys(node.properties).length === 0
+				Object.keys(node.properties).length === 0 &&
+				node.nativeShims.length === 0
 			) {
 				continue
 			}
@@ -341,6 +342,36 @@ export function essenceMethodName(
 	memberName: string,
 ): string | null {
 	return essenceMethodNames().has(`${namespaceName}\u0000${memberName}`)
+		? essenceMethodIdentifier(namespaceName, memberName)
+		: null
+}
+
+// NOTE: The `(Namespace, member)` pairs that are NATIVE and declare a default —
+// the third answer this module gives about a Namespace member, beside
+// "Essence-implemented" and "native". A pair here is still native: a call that
+// writes every Argument reads it straight off the imported runtime module, as it
+// always did. Only a call that LEAVES ONE OUT names the shim, because only that
+// call needs the frame the default is evaluated in.
+//
+// Keyed like `essenceMethodNames`, and by the same already-mangled names: the
+// Simplifier mangled both the shim and every call site through the one
+// `resolveOverloadedMethodName`, so the two sides agree by construction.
+const nativeShimNames = derivedFromStdlib(
+	() =>
+		new Set(
+			stdlibPrelude().flatMap((namespace) =>
+				namespace.node.nativeShims.map(
+					(shim) => `${namespace.name}\u0000${shim.memberName}`,
+				),
+			),
+		),
+)
+
+export function nativeShimName(
+	namespaceName: string,
+	memberName: string,
+): string | null {
+	return nativeShimNames().has(`${namespaceName}\u0000${memberName}`)
 		? essenceMethodIdentifier(namespaceName, memberName)
 		: null
 }

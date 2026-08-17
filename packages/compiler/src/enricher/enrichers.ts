@@ -53,6 +53,7 @@ import {
 	admittedByEvaluation,
 	refinementDecidedBy,
 } from "../helpers/predicateEval"
+import { signaturesOf } from "../printType"
 import {
 	checkProtocolConformance,
 	type CheckedConformance,
@@ -1018,6 +1019,42 @@ export function enrichCombination(
 	}
 }
 
+// NOTE: The Scope a Method's Parameter list and body are read in: the Method's
+// own Generics as opaque Uses, and then either `@` bound to the receiver or the
+// barrier that refuses it.
+//
+// One function because a native Method's signature needs the very same Scope —
+// it has no body, but a default written on it is Essence and is enriched exactly
+// where a bodied Method's would be. Spelled twice they drifted: the shim's copy
+// bound `@` to the raw target Type, so a default on a Method that shadows a
+// Namespace Generic read `@` at the wrong Type. See `shadowSelfTypeGenerics`.
+function methodScope(
+	generics: Array<parser.GenericDeclarationNode>,
+	scope: enricher.Scope,
+	selfType: common.Type | null,
+	isStatic: boolean,
+): enricher.Scope {
+	let newScope = scopeWithGenerics(generics, scope)
+
+	if (isStatic) {
+		// NOTE: The Rewriter emits a static Method WITHOUT the `_self`
+		// Parameter `@` lowers to, so an `@` accepted here would compile to a
+		// name nothing binds. Marking the Scope refuses it outright — leaving
+		// it merely undeclared would let the enclosing Namespace's `@` (every
+		// instance Method beside it binds one) answer in its place.
+		newScope.isStaticMethodBody = true
+	} else if (selfType !== null) {
+		declareVariableInScope(
+			"@",
+			shadowSelfTypeGenerics(selfType, generics, newScope),
+			newScope,
+			true,
+		)
+	}
+
+	return newScope
+}
+
 export function enrichMethodFunctionDefinition(
 	method: parser.FunctionValueNode,
 	scope: enricher.Scope,
@@ -1040,23 +1077,7 @@ export function enrichMethodFunctionDefinition(
 	// so the body reads them consistently.
 	// The Method's own Generics are registered as GenericUses so that Parameter
 	// and Return Types as well as the body can reference them.
-	let newScope = scopeWithGenerics(method.value.generics, scope)
-
-	if (isStatic) {
-		// NOTE: The Rewriter emits a static Method WITHOUT the `_self`
-		// Parameter `@` lowers to, so an `@` accepted here would compile to a
-		// name nothing binds. Marking the Scope refuses it outright — leaving
-		// it merely undeclared would let the enclosing Namespace's `@` (every
-		// instance Method beside it binds one) answer in its place.
-		newScope.isStaticMethodBody = true
-	} else if (selfType !== null) {
-		declareVariableInScope(
-			"@",
-			shadowSelfTypeGenerics(selfType, method.value.generics, newScope),
-			newScope,
-			true,
-		)
-	}
+	let newScope = methodScope(method.value.generics, scope, selfType, isStatic)
 
 	// NOTE: Read from the signature before the body so that `<-` Expressions can
 	// consult it — a bare Case resolves against the declared return Type first.
@@ -2765,7 +2786,7 @@ export function enrichNamespaceDefinitionStatement(
 		})),
 		name: enrichIdentifier(node.name, scope),
 		properties: enrichProperties(node.properties, type, scope),
-		methods: enrichMethods(
+		...enrichMethods(
 			node.methods,
 			methodScope,
 			type.targetType,
@@ -3661,6 +3682,60 @@ function expectedRecordMembers(
 	)
 }
 
+// NOTE: The frame a native Method's default needs, built where the native
+// itself is skipped. A native has no body, so nothing else in the Enricher ever
+// looks at its Parameter list — but a default written on one is an Essence
+// Expression like any other and has to be enriched, checked and lowered, and
+// `NativeShimNode` says what the Compiler does with the result.
+//
+// The Scope is the one a BODIED Method of the same shape would have been
+// enriched in — the Method's own Generics as opaque Uses, `@` bound for an
+// instance Method and the static barrier set for a static one — so a default on
+// a native is scoped exactly as a default on a bodied Method is, and reads `@`
+// or refuses it for the same reason.
+function enrichNativeShim(
+	memberName: string,
+	overloadIndex: number | null,
+	signature: parser.NativeMethodSignatureNode,
+	scope: enricher.Scope,
+	selfType: common.Type | null,
+	methodType: common.Type | undefined,
+	isStatic: boolean,
+): common.typed.NativeShimNode | null {
+	if (
+		!signature.parameters.some(
+			(parameter) => parameter.defaultValue !== null,
+		)
+	) {
+		return null
+	}
+
+	let newScope = methodScope(signature.generics, scope, selfType, isStatic)
+
+	// NOTE: `signaturesOf` is the one answer to "which signatures does this
+	// Method Type stand for", and it has already dropped the receiver Parameter
+	// a non-static one is prefixed with — the source wrote the rest. An entry of
+	// an Overload block is the numbered slot; every other Method is the only
+	// entry there is.
+	let resolved = signaturesOf(methodType ?? { type: "Error" })?.[
+		overloadIndex ?? 0
+	]
+
+	let { parameters } = enrichParameterList(
+		signature.parameters,
+		newScope,
+		resolved?.parameterTypes,
+	)
+
+	return {
+		nodeType: "NativeShim",
+		memberName,
+		overloadIndex,
+		isStatic,
+		parameters,
+	}
+}
+
 function enrichMethods(
 	members: parser.NamespaceMethods,
 	scope: enricher.Scope,
@@ -3673,18 +3748,42 @@ function enrichMethods(
 		string,
 		Array<Array<common.typed.GenericDeclarationNode>>
 	> = new Map(),
-): common.typed.Methods {
+): {
+	methods: common.typed.Methods
+	nativeShims: Array<common.typed.NativeShimNode>
+} {
 	let result: common.typed.Methods = {}
+	let nativeShims: Array<common.typed.NativeShimNode> = []
+
+	let addShim = (shim: common.typed.NativeShimNode | null): void => {
+		if (shim !== null) {
+			nativeShims.push(shim)
+		}
+	}
 
 	for (let [memberKey, memberValue] of Object.entries(members)) {
 		// NOTE: A native Method has no body, so there is nothing to enrich and
 		// nothing for the Rewriter to emit — the runtime already implements
 		// it. It stays in the Namespace Type (which is what resolution,
-		// Completion and Hover read) and is simply absent here.
+		// Completion and Hover read) and is simply absent here. A default
+		// written on one is the exception: it IS Essence, and the frame it
+		// needs is synthesized rather than emitted by the runtime.
 		if (
 			memberValue.nodeType === "SimpleMethodSignature" ||
 			memberValue.nodeType === "StaticMethodSignature"
 		) {
+			addShim(
+				enrichNativeShim(
+					memberKey,
+					null,
+					memberValue.signature,
+					scope,
+					selfType,
+					methodTypes[memberKey],
+					memberValue.nodeType === "StaticMethodSignature",
+				),
+			)
+
 			continue
 		}
 
@@ -3769,8 +3868,23 @@ function enrichMethods(
 				Array<common.typed.GenericDeclarationNode>
 			> = []
 
+			let isStatic =
+				memberValue.nodeType === "OverloadedStaticMethodSignatures"
+
 			for (let [index, overload] of memberValue.methods.entries()) {
 				if (overload.nodeType === "NativeMethodSignature") {
+					addShim(
+						enrichNativeShim(
+							memberKey,
+							index,
+							overload,
+							scope,
+							selfType,
+							methodTypes[memberKey],
+							isStatic,
+						),
+					)
+
 					continue
 				}
 
@@ -3807,7 +3921,7 @@ function enrichMethods(
 		}
 	}
 
-	return result
+	return { methods: result, nativeShims }
 }
 
 // NOTE: A Parameter list and the Statements its Patterns desugar into, which

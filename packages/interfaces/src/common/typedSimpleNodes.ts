@@ -121,6 +121,9 @@ export interface FunctionInvocationNode {
 	nodeType: "FunctionInvocation"
 	name: ExpressionNode
 	arguments: Array<ArgumentNode>
+	// NOTE: As on a Method Invocation — set only when the call left an Argument
+	// out, and read only to route a native callee through its shim.
+	omitsArguments?: true
 	type: Type
 	position?: Position
 }
@@ -132,6 +135,12 @@ export interface MethodInvocationNode {
 		name: string
 	}
 	arguments: Array<ArgumentNode>
+	// NOTE: Present only when this call left an Argument out. It decides ONE
+	// thing at emission: whether a native callee is reached through the shim
+	// that holds its defaults or read straight off the runtime module. A call
+	// that writes every Argument carries nothing here and emits exactly what it
+	// always did.
+	omitsArguments?: true
 	// NOTE: Present only when this call is a *generic* Choice's derived
 	// Equatable — the Rewriter then emits `$helpers.boundChoiceIs(<descriptor>)`
 	// in place of the plain `choiceIs` member read.
@@ -176,6 +185,15 @@ export type UnionMethodDispatchCase = {
 	// derived Equatable — the Rewriter then emits
 	// `$helpers.boundChoiceIs(<descriptor>)` for the branch's Method.
 	derivedDescriptor?: DerivedEquatableDescriptor
+}
+
+// NOTE: The shim's whole body is one call handing every Parameter on to the
+// native, which the Rewriter writes out — there is nothing here for the
+// Optimiser or anything else to walk but the defaults themselves.
+export type NativeShimNode = {
+	memberName: string
+	isStatic: boolean
+	parameters: Array<ParameterNode>
 }
 
 export type ValueNode =
@@ -911,6 +929,12 @@ export interface NamespaceDefinitionStatementNode {
 	name: IdentifierNode
 	properties: Record<string, ExpressionNode>
 	methods: Methods
+	// NOTE: The native Methods that declare a default, each with the frame the
+	// Compiler synthesizes for it — see `NativeShimNode` on the typed side. The
+	// receiver `_self` is already unshifted onto an instance Method's
+	// Parameters, and the name is already `__overload$N`-mangled, exactly as a
+	// bodied Method's are.
+	nativeShims: Array<NativeShimNode>
 	type: NamespaceType
 	position?: Position
 }

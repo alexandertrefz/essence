@@ -3194,6 +3194,98 @@ declarations {
 			})
 		})
 
+		// NOTE: A native Method that declares a default. The native calling
+		// convention has nowhere to put a default — a native takes exactly the
+		// Parameters its declaration does, and a JavaScript default parameter
+		// would stop the `Function.length` `builtins.spec.ts` checks — so the
+		// Compiler synthesizes the frame instead, as a const beside the prelude,
+		// and the runtime never learns that defaults exist.
+		//
+		// The library's own `trim` is patched into that shape here rather than
+		// waited for, because the mechanism has to be pinned by what it emits
+		// and by what it RUNS, and the runtime `String.trim` this fronts is
+		// already there to be run.
+		describe("a native Method that declares a default", () => {
+			const written = "slice(from: Integer, to: Integer) -> String"
+			const defaulted =
+				"slice(from start: Integer = 0, to end: Integer = @::length()) -> String"
+
+			let replacedStdlib: Stdlib | null = null
+
+			beforeAll(() => {
+				let sources = readStdlibFiles().map(
+					({ filePath, sourceText }) => {
+						if (!filePath.endsWith("String.es")) {
+							return parseStdlibSource(filePath, sourceText)
+						}
+
+						expect(sourceText).toContain(written)
+
+						return parseStdlibSource(
+							filePath,
+							sourceText.replace(written, defaulted),
+						)
+					},
+				)
+
+				replacedStdlib = useStdlib(loadStdlibFrom(sources))
+			})
+
+			afterAll(() => {
+				useStdlib(replacedStdlib)
+			})
+
+			// NOTE: The whole of what the shim buys, and the whole of what it
+			// costs: a call that writes every Argument is byte for byte the
+			// direct runtime read it always was, and names no const at all.
+			it("emits a full call as the plain native read", () => {
+				let code = generate(`implementation {
+	Terminal.inspect("abcd"::slice(from 1, to 3))
+}`)
+
+				expect(code).toContain(
+					"String.slice($pool_0, $pool_1, $pool_2)",
+				)
+				expect(code).not.toContain("$es_String_slice")
+			})
+
+			it("fronts a call that omits an Argument with a shim", () => {
+				let code = generate(`implementation {
+	Terminal.inspect("abcd"::slice(from 1))
+}`)
+
+				expect(code).toContain(
+					"const $es_String_slice = (_self, start = ",
+				)
+				expect(code).toContain(") => String.slice(_self, start, end);")
+				expect(code).toContain("$es_String_slice($pool_0, $pool_1)")
+			})
+
+			// NOTE: `@` is `_self`, which is Parameter 0 — so a default reading
+			// the receiver reads a BINDING, and the receiver Expression is
+			// evaluated once however many defaults name it. That property is
+			// exactly what filling a default in at the call site could not
+			// offer, and it is why the shim exists rather than a substitution.
+			it("reads the receiver as a binding in the shim's own frame", () => {
+				expect(
+					generate(`implementation {
+	Terminal.inspect("abcd"::slice(from 1))
+}`),
+				).toContain("end = String.length(_self)")
+			})
+
+			it("runs every spelling", async () => {
+				expect(
+					await run(`implementation {
+	Terminal.inspect("abcd"::slice(from 1, to 3))
+	Terminal.inspect("abcd"::slice(from 1))
+	Terminal.inspect("abcd"::slice(to 2))
+	Terminal.inspect("abcd"::slice())
+}`),
+				).toEqual(['"bc"', '"bcd"', '"ab"', '"abcd"'])
+			})
+		})
+
 		// NOTE: A Namespace whose every member is native has nothing to merge —
 		// it keeps its plain import, and no const is emitted for it.
 		it("skips a Namespace with no Essence-implemented member", () => {
