@@ -448,16 +448,30 @@ function checkCommittedOverload(
 	}
 
 	let { parameterTypes, context } = createFreshenedInference(overload)
+	let matched = matchArguments(
+		parameterTypes,
+		matchableArgumentsFromTypedNodes(node.arguments),
+		{ inference: context },
+	)
 
-	if (
-		matchArguments(
-			parameterTypes,
-			matchableArgumentsFromTypedNodes(node.arguments),
-			{ inference: context },
-		).type !== "Match"
-	) {
+	if (matched.type !== "Match") {
 		throw new Error(
 			`${describeCallee()} was committed to the overload that ${describeSignature(overload.parameterTypes)}, which does not accept the Arguments it passes. This is a bug in the Compiler.`,
+		)
+	}
+
+	// NOTE: WHICH Parameters were left out is settled by the Enricher exactly as
+	// which Overload was, and for the same reason: the Simplifier builds the
+	// emitted Argument list from this list, so a re-match answering differently
+	// would emit the Arguments into the wrong positions. Re-matching reads only
+	// labels and `hasDefault`, so agreeing is not a coincidence — it is the
+	// invariant, and the same Error rail says so where it does not hold.
+	if (
+		matched.omittedParameterIndices.join() !==
+		node.omittedParameterIndices.join()
+	) {
+		throw new Error(
+			`${describeCallee()} was committed to the overload that ${describeSignature(overload.parameterTypes)}, leaving out different Parameters than a re-match of its Arguments does. This is a bug in the Compiler.`,
 		)
 	}
 }
@@ -805,7 +819,7 @@ function validateFunctionInvocation(
 				for (let i of matchResult.mismatchedArgumentIndices) {
 					reportArgumentMismatch(
 						functionType.parameterTypes,
-						i,
+						matchResult.parameterForArgument[i],
 						node.arguments[i],
 					)
 				}
@@ -2736,7 +2750,7 @@ function validateSimpleFunctionInvocation(
 		for (let i of matchResult.mismatchedArgumentIndices) {
 			reportArgumentMismatch(
 				functionType.parameterTypes,
-				i,
+				matchResult.parameterForArgument[i],
 				argumentNodes[i],
 			)
 		}

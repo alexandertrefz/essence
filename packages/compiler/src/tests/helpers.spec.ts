@@ -1846,7 +1846,7 @@ describe("Helpers", () => {
 						],
 						{ inference: context },
 					),
-				).toEqual({ type: "Match" })
+				).toEqual({ type: "Match", omittedParameterIndices: [] })
 				expect(context.bindings.get("T")).toEqual(integer)
 			})
 
@@ -1863,6 +1863,7 @@ describe("Helpers", () => {
 				).toEqual({
 					type: "ArgumentMismatch",
 					mismatchedArgumentIndices: [1],
+					parameterForArgument: [0, 1],
 				})
 			})
 
@@ -1889,7 +1890,7 @@ describe("Helpers", () => {
 						],
 						{ inference: inferContextFor(["T"]) },
 					),
-				).toEqual({ type: "Match" })
+				).toEqual({ type: "Match", omittedParameterIndices: [] })
 			})
 
 			// NOTE: A callback Parameter still waiting on an unbound Generic is
@@ -1931,7 +1932,7 @@ describe("Helpers", () => {
 							],
 							{ inference: context },
 						),
-					).toEqual({ type: "Match" })
+					).toEqual({ type: "Match", omittedParameterIndices: [] })
 
 					expect(context.bindings.get("T")).toEqual(integer)
 					// NOTE: The Type the literal was resolved against — the
@@ -1963,6 +1964,7 @@ describe("Helpers", () => {
 					).toEqual({
 						type: "ArgumentMismatch",
 						mismatchedArgumentIndices: [0, 1],
+						parameterForArgument: [0, 1],
 					})
 				})
 			})
@@ -3163,5 +3165,41 @@ describe("Helpers", () => {
 				expect(eraseRefinements(union)).toBe(union)
 			})
 		})
+	})
+})
+
+// NOTE: A Parameter the expected signature says may be left out has to be one
+// the actual signature can answer without: a call written against the expected
+// Type leaves the Argument out, and the emitted call passes nothing (or `void
+// 0`) in its place, which only a Parameter carrying a default of its own
+// consumes. Asked of `matchTypes` directly because nothing in a Program can
+// build the expected Type — a Function Type declares no default and a Function
+// taken as a value has none — which is exactly why the rule has to be written
+// down here rather than left to a source-level test.
+describe("Matching a signature that promises a default", () => {
+	let promising: common.FunctionType = {
+		type: "Function",
+		generics: [],
+		parameterTypes: [
+			{ name: null, type: { type: "Integer" }, hasDefault: true },
+		],
+		returnType: { type: "Integer" },
+	}
+	let plain: common.FunctionType = {
+		type: "Function",
+		generics: [],
+		parameterTypes: [{ name: null, type: { type: "Integer" } }],
+		returnType: { type: "Integer" },
+	}
+
+	it("should refuse an actual signature that carries no default", () => {
+		expect(matchesType(promising, plain)).toBe(false)
+	})
+
+	// NOTE: The other direction is safe and stays allowed — a call through a
+	// Type that promises nothing writes every Argument, and a Function that
+	// would have filled one in never has to.
+	it("should accept a defaulted signature where none was promised", () => {
+		expect(matchesType(plain, promising)).toBe(true)
 	})
 })

@@ -4995,6 +4995,113 @@ describe("Enricher", () => {
 			).toEqual([])
 		})
 
+		// NOTE: The call side. Pairing reads labels and `hasDefault` and never a
+		// Type, so a call's shape is settled before any Argument is typed —
+		// which is what every Overload candidate, the deferred-Argument order
+		// and Completion all depend on.
+		describe("calls that leave an Argument out", () => {
+			it("should type a call that omits a trailing default", () => {
+				expect(
+					printType(
+						lastConstantValue(`implementation {
+							function f(_ count: Integer = 1) -> Integer {
+								<- count
+							}
+
+							constant value = f()
+						}`).type,
+					),
+				).toBe("Integer")
+			})
+
+			it("should record which Parameters a call left out", () => {
+				let value = lastConstantFunctionInvocation(`implementation {
+					function f(_ count: Integer = 1) -> Integer {
+						<- count
+					}
+
+					constant value = f()
+				}`)
+
+				expect(value.omittedParameterIndices).toEqual([0])
+			})
+
+			it("should record nothing for a call that writes every Argument", () => {
+				let value = lastConstantFunctionInvocation(`implementation {
+					function f(_ count: Integer = 1) -> Integer {
+						<- count
+					}
+
+					constant value = f(3)
+				}`)
+
+				expect(value.omittedParameterIndices).toEqual([])
+			})
+
+			// NOTE: The case the trailing-run rule would have forbidden. `to 3`
+			// carries a label `from` does not, so the walk skips `from` and
+			// pairs `to` — decided from labels alone.
+			it("should skip an interior default the next label steps over", () => {
+				let value = lastConstantFunctionInvocation(`implementation {
+					function cut(from start: Integer = 0, to end: Integer) -> Integer {
+						<- end::subtract(start)
+					}
+
+					constant value = cut(to 3)
+				}`)
+
+				expect(value.omittedParameterIndices).toEqual([0])
+				expect(printType(value.type)).toBe("Integer")
+			})
+
+			it("should omit a Method's default and index over the receiver", () => {
+				let value = lastConstantMethodInvocation(`implementation {
+					namespace Slices for List<Integer> {
+						upTo(_ end: Integer = @::length()) -> Integer {
+							<- end
+						}
+					}
+
+					constant value = [1, 2, 3]::upTo()
+				}`)
+
+				// NOTE: Parameter 0 is the receiver `@` lowers to, so the one
+				// the source wrote is 1.
+				expect(value.omittedParameterIndices).toEqual([1])
+			})
+
+			// NOTE: An omitted Argument binds NOTHING — there is no Argument to
+			// read a Type off. A Type Parameter another Argument binds is bound
+			// all the same.
+			it("should bind a Type Parameter from the Argument that was written", () => {
+				expect(
+					printType(
+						lastConstantValue(`implementation {
+							function pick<infer T>(_ x: T, _ y: T = x) -> T {
+								<- y
+							}
+
+							constant value = pick(1)
+						}`).type,
+					),
+				).toBe("Integer")
+			})
+
+			it("should report a Type Parameter only an omitted Parameter could bind", () => {
+				let diagnostics = diagnosticsFor(`implementation {
+					function empty<infer T>(_ items: List<T> = []) -> List<T> {
+						<- items
+					}
+
+					constant value = empty()
+				}`)
+
+				expect(
+					diagnostics.map((diagnostic) => diagnostic.code),
+				).toContain("uninferable-type-parameter")
+			})
+		})
+
 		// NOTE: `hasDefault` is the whole of what a TYPE says about a default
 		// — the expression itself stays on the Declaration's Node, because a
 		// Type is compared, cached and serialized.

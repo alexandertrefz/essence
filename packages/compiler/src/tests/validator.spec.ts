@@ -2308,6 +2308,107 @@ describe("Validator", () => {
 	// hoisting-order hole), a witness forwarded out of a Function that declares no
 	// such Parameter (the declared-Case fallback hole). Each of those compiled
 	// green and failed at run time, which is what these turn into a Diagnostic.
+	// NOTE: The Validator's side of `= expression` defaults — what a call that
+	// leaves an Argument out is judged against, and what a signature that
+	// accepts a RANGE of Argument counts says about itself.
+	describe("Default Parameter Values", () => {
+		it("should accept a call that omits a default", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					function f(_ count: Integer = 1) -> Integer {
+						<- count
+					}
+
+					constant value = f()
+				}`),
+			).toEqual([])
+		})
+
+		it("should still refuse a call that omits a required Argument", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				function f(_ a: Integer, _ b: Integer = 1) -> Integer {
+					<- a
+				}
+
+				constant value = f()
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("argument-count-mismatch")
+		})
+
+		// NOTE: One string, read by `argument-count-mismatch`,
+		// `argument-label-mismatch`, `argument-type-mismatch` and every
+		// `no-matching-overload` note — so a signature reads the same way
+		// wherever a call is held to it.
+		it("should describe a signature by the range of counts it takes", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				function f(_ a: Integer, _ b: Integer = 1) -> Integer {
+					<- a
+				}
+
+				constant value = f(1, 2, 3)
+			}`)
+
+			expect(diagnostics[0].notes[0]).toBe(
+				"The signature takes 1 or 2 Arguments: Parameter 1 is Integer, Parameter 2 is Integer, which may be left out.",
+			)
+		})
+
+		it("should describe a wider range as a span", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				function f(_ a: Integer, to b: Integer = 1, by c: Integer = 2) -> Integer {
+					<- a
+				}
+
+				constant value = f(1, to 2, by 3, 4)
+			}`)
+
+			expect(diagnostics[0].notes[0]).toContain("takes 1 to 3 Arguments")
+		})
+
+		it("should name the Parameter an Argument was actually paired with", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				function cut(from start: Integer = 0, to end: String) -> String {
+					<- end
+				}
+
+				constant value = cut(to 3)
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("argument-type-mismatch")
+			expect(diagnostics[0].message).toBe(
+				"This Argument does not fit Parameter 'to'",
+			)
+		})
+
+		// NOTE: `checkCommittedOverload` re-matches a committed call's
+		// Arguments and throws "This is a bug in the Compiler" when the
+		// signature it was committed to does not accept them. A defaulted call
+		// writes fewer Arguments than the signature has Parameters, so without
+		// the pairing it threw on every one of them.
+		it("should not throw re-matching a committed defaulted Overload", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					namespace Sizes for Integer {
+						overload widen {
+							(_ by: Integer = 1) -> Integer {
+								<- @::add(by)
+							}
+
+							(_ by: String) -> Integer {
+								<- @
+							}
+						}
+					}
+
+					constant value = Sizes.widen(1)
+				}`),
+			).toEqual([])
+		})
+	})
+
 	describe("Compiler cross-checks", () => {
 		function enrichedProgram(source: string): common.typed.Program {
 			let { program, diagnostics } = enrich(parse(source))
