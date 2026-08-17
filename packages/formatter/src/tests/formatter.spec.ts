@@ -10,9 +10,9 @@ import { commentAnchors } from "../trivia"
 
 // NOTE: Every `.es` source in the repository, which is what a formatter has to
 // survive before it is allowed anywhere near a source tree. The Diagnostic
-// showcase files are included deliberately: all but two parse perfectly well
-// and only fail later, so a formatter must handle them like any other file,
-// and those two are the only files here that must be refused.
+// showcase files are included deliberately: all but the three in `REFUSED`
+// carry no Parser error at all and only fail later, so a formatter must handle
+// them like any other file.
 function corpus(): Array<{ name: string; filePath: string; source: string }> {
 	let files = readStdlibFiles().map((file) => ({
 		name: "stdlib/" + path.basename(file.filePath),
@@ -53,9 +53,16 @@ function essenceFilesUnder(directory: string): Array<string> {
 
 const CORPUS = corpus()
 
-const UNPARSEABLE = new Set([
+// NOTE: The showcase files the formatter must REFUSE — every one of them
+// carries an error the Parser itself reported, and formatting a file the Parser
+// could not read whole is exactly what the gate is there to prevent. Two of them
+// genuinely do not parse; the third parses and is refused all the same, because
+// a `default-on-function-literal` is an error like any other and the formatter
+// asks only whether there were any.
+const REFUSED = new Set([
 	"diagnostics/Syntax.es",
 	"diagnostics/UnclosedString.es",
+	"diagnostics/DefaultsSyntax.es",
 ])
 
 describe("formatter", () => {
@@ -73,7 +80,7 @@ describe("formatter", () => {
 					documentPath: file.filePath,
 				})
 
-				if (UNPARSEABLE.has(file.name)) {
+				if (REFUSED.has(file.name)) {
 					expect(result.refusal?.kind).toBe("syntax")
 					expect(result.text).toBe(file.source)
 
@@ -104,7 +111,7 @@ describe("formatter", () => {
 	describe("the repository is formatted", () => {
 		for (let file of CORPUS) {
 			if (
-				UNPARSEABLE.has(file.name) ||
+				REFUSED.has(file.name) ||
 				file.name.startsWith("diagnostics/")
 			) {
 				continue

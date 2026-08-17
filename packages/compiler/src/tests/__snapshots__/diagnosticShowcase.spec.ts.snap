@@ -955,3 +955,131 @@ Warning: This Statement runs in an order the cycle does not state
 ─── 1 warning
 "
 `;
+
+exports[`Diagnostic Showcase Defaults.es should render the same report every time 1`] = `
+"[default-type-mismatch]
+Error: This default does not fit Parameter 'factor'
+   ╭─┤ Defaults.es:9:38 │
+   │
+ 9 │     function scaled(_ factor: Integer = "twice") -> Integer {
+   │                                         ───┬───  
+   │                                            ╰───── this is a String
+   │ 
+   │ Help: Write a value of Type Integer.
+   │ 
+   │ Note: Parameter 'factor' is Integer.
+───╯
+
+[default-references-later-parameter]
+Error: 'end' is declared after the Parameter whose default reads it
+    ╭─┤ Defaults.es:15:37 │
+    │
+ 15 │     function cut(from start: Integer = end, to end: Integer) -> Integer {
+    │                                        ─┬─     ─┬─  
+    │                                         ╰───────│─── read here
+    │                                                 │   
+    │                                                 ╰─── declared here
+    │ 
+    │ Help: Move 'end' before the Parameter whose default reads it, or write the value out.
+    │ 
+    │ Note: A default may read \`@\`, the Parameters to its left, and anything the Declaration is written inside.
+────╯
+
+[default-references-own-parameter]
+Error: 'times' is the Parameter its own default is written on
+    ╭─┤ Defaults.es:21:39 │
+    │
+ 21 │     function repeated(_ times: Integer = times) -> Integer {
+    │                         ──┬──            ──┬──  
+    │                           ╰────────────────│──── this is the Parameter
+    │                                            │    
+    │                                            ╰──── read here
+    │ 
+    │ Help: Write the value out, or rename the Parameter so it does not spell what the default reads.
+    │ 
+    │ Note: A Parameter is bound to the value its default works out, so the default can not read it.
+────╯
+
+[default-references-pattern-binding]
+Error: 'x' is bound by a Pattern and can not be read by a default
+    ╭─┤ Defaults.es:29:59 │
+    │
+ 29 │     function shifted(_ { x, y }: Point, by amount: Integer = x) -> Integer {
+    │                          ▲                                   ▲  
+    │                          ╰───────────────────────────────────│── bound by this Pattern
+    │                                                              │  
+    │                                                              ╰── read here
+    │ 
+    │ Help: Read the member off the Parameter itself, or write the value out.
+    │ 
+    │ Note: A Pattern's bindings are Constants at the head of the body, and every default is worked out before the body runs.
+────╯
+
+[indistinguishable-default-parameter]
+Error: This default could not be told apart from the Parameter after it
+    ╭─┤ Defaults.es:35:35 │
+    │
+ 35 │     function pick(_ first: Integer = 1, _ second: String) -> String {
+    │                                      ▲  ────────┬───────  
+    │                                      ╰──────────│───────── this default
+    │                                                 │         
+    │                                                 ╰───────── and this Parameter carries no label either
+    │ 
+    │ Help: Give one of them a label, or move the default to the last of them.
+    │ 
+    │ Note: An Argument is matched to a Parameter by its label before its Type is read, so a call passing one of them could mean either.
+────╯
+
+[ambiguous-overload-default]
+Error: This default makes two Overloads accept the same call
+    ╭─┤ Defaults.es:47:24 │
+    │
+ 43 │ ╭─▶          () -> String {
+    ┆ ┆   
+ 45 │ ├─▶          }
+    │ │                
+    │ ╰──────────────── this entry takes no Arguments
+    │ 
+ 47 │              (at side: Integer = 1) -> String {
+    │                                  ▲  
+    │                                  ╰── leaving this out takes no Arguments
+    │ 
+    │ Help: Delete the entry the default already stands for, or give the Parameters labels that tell the two apart.
+    │ 
+    │ Note: An Overload is selected by the Arguments a call writes, so two entries that accept the same ones can not both be reached.
+────╯
+
+─── 6 errors
+"
+`;
+
+exports[`Diagnostic Showcase DefaultsSyntax.es should render the same report every time 1`] = `
+"[default-on-function-literal]
+Error: A Function literal can not carry a default
+   ╭─┤ DefaultsSyntax.es:8:41 │
+   │
+ 8 │     constant shorten = (_ count: Integer = 1) -> Integer {
+   │                                            ▲  
+   │                                            ╰── this default
+   │ 
+   │ Help: Write the default on the named Function or Method this value is passed to.
+   │ 
+   │ Note: A Function literal is called through the Function Type it was written for, which fixes how many Arguments every call passes, so a default here could never be reached.
+───╯
+
+[default-on-protocol-requirement]
+Error: A Protocol requirement can not carry a default
+    ╭─┤ DefaultsSyntax.es:15:27 │
+    │
+ 15 │        trim(at side: Integer = 1) -> Self
+    │                                ▲  
+    │                                ╰── this default
+    │ 
+    │ Help: Declare the requirement without the default, and write the default on the fulfilling Method.
+    │ 
+    │ Note: A requirement says which calls a conforming Type must answer; a default is part of how one of them answers, which is each Namespace's own.
+────╯
+
+─── 2 errors
+"
+`;
