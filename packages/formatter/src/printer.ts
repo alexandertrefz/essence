@@ -784,10 +784,16 @@ export class Printer {
 
 		let only = node.falseBody.length === 1 ? node.falseBody[0] : undefined
 
+		// NOTE: The Parser gives `else if …` and `else { if … }` the same
+		// AST, so which one was written is asked of the source: nothing but
+		// whitespace between the `else` and the `if` means the chained form.
+		// Rewriting the braced form drops two braces — a change the token
+		// gate refuses, so it used to leave every such file unformatted.
 		if (
 			only !== undefined &&
 			(only.nodeType === "IfStatement" ||
-				only.nodeType === "IfElseStatement")
+				only.nodeType === "IfElseStatement") &&
+			this.writtenAsElseIf(trueClose, only.position.start)
 		) {
 			this.trivia.takeBefore(only.position.start.line)
 			parts.push(this.printImplementationNode(only))
@@ -800,6 +806,16 @@ export class Printer {
 		)
 
 		return concat(parts)
+	}
+
+	private writtenAsElseIf(elseLine: number, ifStart: common.Cursor): boolean {
+		let between = this.source.slice({
+			start: { line: elseLine, column: 1 },
+			end: ifStart,
+		})
+		let keyword = between.lastIndexOf("else")
+
+		return keyword !== -1 && between.slice(keyword + 4).trim() === ""
 	}
 
 	private printChoice(node: parser.ChoiceDeclarationStatementNode): Doc {
