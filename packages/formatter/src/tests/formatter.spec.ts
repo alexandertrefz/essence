@@ -1542,6 +1542,41 @@ describe("formatter", () => {
 			)
 		})
 
+		// NOTE: The rule above is about a default that HOLDS hard breaks, not
+		// about its kind. `= []` is a List literal that renders flat, so a
+		// header that no longer fits because of it breaks one Parameter per
+		// line, exactly as the same header without the default would — and
+		// exactly as it does with `= [1, 2, 3]`.
+		it("breaks a header around a trailing flat literal default", () => {
+			let source =
+				"implementation {\n\ttype Shape = { width: Integer }\n\n\ttype StatusPair = { index: Integer, status: String }\n\n\tfunction aggregated(at index: Integer, in shape: Shape, given leafStatuses: List<String>, into pairs: List<StatusPair> = []) -> Integer {\n\t\t<- index\n\t}\n}\n"
+			let formatted = roundTrip(source)
+
+			expect(formatted).toContain("\tfunction aggregated(\n")
+			expect(formatted).toContain("\t\tat index: Integer,\n")
+			expect(formatted).toContain(
+				"\t\tinto pairs: List<StatusPair> = [],\n\t) -> Integer {",
+			)
+
+			let nonEmpty = roundTrip(source.replace("= []", "= [1, 2, 3]"))
+
+			expect(nonEmpty).toContain(
+				"\t\tinto pairs: List<StatusPair> = [1, 2, 3],\n\t) -> Integer {",
+			)
+		})
+
+		// NOTE: The other side of the same rule — a `match` default lays
+		// itself out over lines whatever the width, so it still hugs.
+		it("still hugs a trailing default that holds hard breaks", () => {
+			let formatted = roundTrip(
+				"implementation {\n\tfunction f(_ aVeryLongFirstParameterName: Integer, _ pick: Integer = match 1 -> Integer {\n\t\tcase 1 { <- 1 }\n\t\tcase Integer { <- 2 }\n\t}) -> Integer {\n\t\t<- pick\n\t}\n}\n",
+			)
+
+			expect(formatted).toContain(
+				"function f(_ aVeryLongFirstParameterName: Integer, _ pick: Integer = match 1 -> Integer {",
+			)
+		})
+
 		// NOTE: Pinning §6.1's decision rather than the behaviour we would
 		// prefer. `printExpression` never claims trivia, so a Comment written
 		// inside a multi-line default is re-emitted by the first body statement

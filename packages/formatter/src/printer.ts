@@ -1228,20 +1228,27 @@ export class Printer {
 			parts.push(one)
 		}
 
-		// NOTE: A trailing block-like default — `= match …`, `= { … }`, a
-		// Function literal — brings its own braces and its own hard breaks,
-		// which `propagateBreaks` would carry up through this group and use to
-		// shatter a header that otherwise fits on its line. Joined with plain
-		// commas instead, exactly as `printArgumentList` handles a trailing
-		// block. Nothing is done for a block-like default anywhere but last,
-		// for the same reason nothing is done for a block-like Argument
-		// anywhere but last: whatever follows it has to break around it.
+		// NOTE: A trailing default that lays itself out over lines of its own
+		// brings hard breaks, which `propagateBreaks` would carry up through
+		// this group and use to shatter a header that otherwise fits on its
+		// line. Joined with plain commas instead, as `printArgumentList` does
+		// for a trailing block. A `match` or a Function literal is such a
+		// default by kind — either opens a block of its own to give way in,
+		// which is what a trailing callback Argument does. A List or Record
+		// literal is one only when what it prints as can not be read on one
+		// line: `= []` and `= [1, 2, 3]` render flat, and a header that no
+		// longer fits because of one breaks one Parameter per line, exactly as
+		// it would without the default. Nothing is done for such a default
+		// anywhere but last, for the same reason nothing is done for a
+		// block-like Argument anywhere but last: whatever follows it has to
+		// break around it.
 		let last = parameters[parameters.length - 1] as parser.ParameterNode
+		let lastPrinted = printed[printed.length - 1] as Doc
 
 		if (
 			!documented &&
 			last.defaultValue !== null &&
-			isBlockLike(last.defaultValue)
+			(opensBlock(last.defaultValue) || renderFlat(lastPrinted) === null)
 		) {
 			return concat([
 				text("("),
@@ -2335,6 +2342,12 @@ function flattened(doc: Doc): Doc {
 	let written = renderFlat(doc)
 
 	return written === null ? doc : text(written)
+}
+
+// NOTE: An Expression that can open a block of its own to break inside —
+// the two kinds `printParameterList` hugs whatever width they print at.
+function opensBlock(node: parser.ExpressionNode): boolean {
+	return node.nodeType === "Match" || node.nodeType === "FunctionValue"
 }
 
 // NOTE: An Expression that lays itself out over several lines and closes with
