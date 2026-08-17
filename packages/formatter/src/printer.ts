@@ -2385,24 +2385,36 @@ export class Printer {
 					),
 				)
 
+			// NOTE: Laid out like a Parameter list — one Parameter per line
+			// when it does not fit, the `) -> Type` whole after the last.
 			case "FunctionTypeDeclaration":
-				return concat([
-					text("("),
-					join(
-						text(", "),
-						node.parameterTypes.map((parameter) =>
+				return group(
+					concat([
+						text("("),
+						indent(
 							concat([
-								text(
-									this.functionTypeParameterName(parameter) +
-										": ",
+								softline,
+								join(
+									concat([text(","), line]),
+									node.parameterTypes.map((parameter) =>
+										concat([
+											text(
+												this.functionTypeParameterName(
+													parameter,
+												) + ": ",
+											),
+											this.printType(parameter.type),
+										]),
+									),
 								),
-								this.printType(parameter.type),
+								ifBreak(text(","), EMPTY),
 							]),
 						),
-					),
-					text(") -> "),
-					this.printType(node.returnType),
-				])
+						softline,
+						text(") -> "),
+						this.printType(node.returnType),
+					]),
+				)
 
 			// NOTE: Never broken. A `<` that opens the line after its base Type
 			// begins a new declaration as far as the parser is concerned, so a
