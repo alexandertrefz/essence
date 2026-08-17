@@ -2926,6 +2926,7 @@ exports[`Parser Expressions Literals FunctionLiterals should parse FunctionLiter
           },
           "parameters": [
             {
+              "defaultValue": null,
               "documentation": null,
               "externalName": {
                 "content": "external",
@@ -3115,6 +3116,7 @@ exports[`Parser Expressions Literals FunctionLiterals should parse FunctionLiter
           },
           "parameters": [
             {
+              "defaultValue": null,
               "documentation": null,
               "externalName": {
                 "content": "internal",
@@ -3304,6 +3306,7 @@ exports[`Parser Expressions Literals FunctionLiterals should parse FunctionLiter
           },
           "parameters": [
             {
+              "defaultValue": null,
               "documentation": null,
               "externalName": null,
               "internalName": {
@@ -3480,6 +3483,7 @@ exports[`Parser Expressions Literals FunctionLiterals should parse FunctionLiter
           },
           "parameters": [
             {
+              "defaultValue": null,
               "documentation": null,
               "externalName": {
                 "content": "external",
@@ -3549,6 +3553,7 @@ exports[`Parser Expressions Literals FunctionLiterals should parse FunctionLiter
               },
             },
             {
+              "defaultValue": null,
               "documentation": null,
               "externalName": {
                 "content": "external2",
@@ -3891,6 +3896,7 @@ exports[`Parser Expressions Literals GenericFunctionLiterals should parse Generi
           },
           "parameters": [
             {
+              "defaultValue": null,
               "documentation": null,
               "externalName": {
                 "content": "external",
@@ -4111,6 +4117,7 @@ exports[`Parser Expressions Literals GenericFunctionLiterals should parse Generi
           },
           "parameters": [
             {
+              "defaultValue": null,
               "documentation": null,
               "externalName": {
                 "content": "internal",
@@ -4331,6 +4338,7 @@ exports[`Parser Expressions Literals GenericFunctionLiterals should parse Generi
           },
           "parameters": [
             {
+              "defaultValue": null,
               "documentation": null,
               "externalName": null,
               "internalName": {
@@ -4538,6 +4546,7 @@ exports[`Parser Expressions Literals GenericFunctionLiterals should parse Functi
           },
           "parameters": [
             {
+              "defaultValue": null,
               "documentation": null,
               "externalName": {
                 "content": "external",
@@ -4607,6 +4616,7 @@ exports[`Parser Expressions Literals GenericFunctionLiterals should parse Functi
               },
             },
             {
+              "defaultValue": null,
               "documentation": null,
               "externalName": {
                 "content": "external2",
@@ -9766,6 +9776,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                 },
                 "parameters": [
                   {
+                    "defaultValue": null,
                     "documentation": null,
                     "externalName": {
                       "content": "parameter",
@@ -10006,6 +10017,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                 },
                 "parameters": [
                   {
+                    "defaultValue": null,
                     "documentation": null,
                     "externalName": {
                       "content": "parameter",
@@ -10178,6 +10190,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                 },
                 "parameters": [
                   {
+                    "defaultValue": null,
                     "documentation": null,
                     "externalName": {
                       "content": "parameter",
@@ -10420,6 +10433,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                   },
                   "parameters": [
                     {
+                      "defaultValue": null,
                       "documentation": null,
                       "externalName": {
                         "content": "parameter",
@@ -10575,6 +10589,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                   },
                   "parameters": [
                     {
+                      "defaultValue": null,
                       "documentation": null,
                       "externalName": {
                         "content": "name",
@@ -10818,6 +10833,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                   },
                   "parameters": [
                     {
+                      "defaultValue": null,
                       "documentation": null,
                       "externalName": {
                         "content": "parameter",
@@ -10973,6 +10989,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                   },
                   "parameters": [
                     {
+                      "defaultValue": null,
                       "documentation": null,
                       "externalName": {
                         "content": "name",
@@ -11128,6 +11145,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                   },
                   "parameters": [
                     {
+                      "defaultValue": null,
                       "documentation": null,
                       "externalName": {
                         "content": "item",
@@ -11369,6 +11387,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                 },
                 "parameters": [
                   {
+                    "defaultValue": null,
                     "documentation": null,
                     "externalName": {
                       "content": "parameter",
@@ -12019,6 +12038,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                 },
                 "parameters": [
                   {
+                    "defaultValue": null,
                     "documentation": null,
                     "externalName": {
                       "content": "parameter",
@@ -12285,6 +12305,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                 },
                 "parameters": [
                   {
+                    "defaultValue": null,
                     "documentation": null,
                     "externalName": {
                       "content": "parameter",
@@ -12457,6 +12478,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                 },
                 "parameters": [
                   {
+                    "defaultValue": null,
                     "documentation": null,
                     "externalName": {
                       "content": "parameter",
@@ -12725,6 +12747,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                   },
                   "parameters": [
                     {
+                      "defaultValue": null,
                       "documentation": null,
                       "externalName": {
                         "content": "parameter",
@@ -12880,6 +12903,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                   },
                   "parameters": [
                     {
+                      "defaultValue": null,
                       "documentation": null,
                       "externalName": {
                         "content": "name",
@@ -13149,6 +13173,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                   },
                   "parameters": [
                     {
+                      "defaultValue": null,
                       "documentation": null,
                       "externalName": {
                         "content": "parameter",
@@ -13304,6 +13329,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                   },
                   "parameters": [
                     {
+                      "defaultValue": null,
                       "documentation": null,
                       "externalName": {
                         "content": "name",
@@ -13459,6 +13485,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                   },
                   "parameters": [
                     {
+                      "defaultValue": null,
                       "documentation": null,
                       "externalName": {
                         "content": "item",
@@ -13726,6 +13753,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                 },
                 "parameters": [
                   {
+                    "defaultValue": null,
                     "documentation": null,
                     "externalName": {
                       "content": "parameter",
@@ -14025,6 +14053,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                 },
                 "parameters": [
                   {
+                    "defaultValue": null,
                     "documentation": null,
                     "externalName": {
                       "content": "parameter",
@@ -14291,6 +14320,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                 },
                 "parameters": [
                   {
+                    "defaultValue": null,
                     "documentation": null,
                     "externalName": {
                       "content": "parameter",
@@ -14463,6 +14493,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                 },
                 "parameters": [
                   {
+                    "defaultValue": null,
                     "documentation": null,
                     "externalName": {
                       "content": "parameter",
@@ -14731,6 +14762,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                   },
                   "parameters": [
                     {
+                      "defaultValue": null,
                       "documentation": null,
                       "externalName": {
                         "content": "parameter",
@@ -14886,6 +14918,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                   },
                   "parameters": [
                     {
+                      "defaultValue": null,
                       "documentation": null,
                       "externalName": {
                         "content": "name",
@@ -15155,6 +15188,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                   },
                   "parameters": [
                     {
+                      "defaultValue": null,
                       "documentation": null,
                       "externalName": {
                         "content": "parameter",
@@ -15310,6 +15344,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                   },
                   "parameters": [
                     {
+                      "defaultValue": null,
                       "documentation": null,
                       "externalName": {
                         "content": "name",
@@ -15465,6 +15500,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                   },
                   "parameters": [
                     {
+                      "defaultValue": null,
                       "documentation": null,
                       "externalName": {
                         "content": "item",
@@ -15732,6 +15768,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                 },
                 "parameters": [
                   {
+                    "defaultValue": null,
                     "documentation": null,
                     "externalName": {
                       "content": "parameter",
@@ -16031,6 +16068,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                 },
                 "parameters": [
                   {
+                    "defaultValue": null,
                     "documentation": null,
                     "externalName": {
                       "content": "parameter",
@@ -16477,6 +16515,7 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse a Protocol
               "nodeType": "ProtocolMethodSignature",
               "parameters": [
                 {
+                  "defaultValue": null,
                   "documentation": null,
                   "externalName": null,
                   "internalName": {
@@ -16593,6 +16632,7 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse a Protocol
               "nodeType": "ProtocolMethodSignature",
               "parameters": [
                 {
+                  "defaultValue": null,
                   "documentation": null,
                   "externalName": null,
                   "internalName": {
@@ -16898,6 +16938,7 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse a Protocol
                 "nodeType": "ProtocolMethodSignature",
                 "parameters": [
                   {
+                    "defaultValue": null,
                     "documentation": null,
                     "externalName": null,
                     "internalName": {
@@ -16997,6 +17038,7 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse a Protocol
                 "nodeType": "ProtocolMethodSignature",
                 "parameters": [
                   {
+                    "defaultValue": null,
                     "documentation": null,
                     "externalName": null,
                     "internalName": {
@@ -17264,6 +17306,7 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse a Protocol
                 "nodeType": "ProtocolMethodSignature",
                 "parameters": [
                   {
+                    "defaultValue": null,
                     "documentation": null,
                     "externalName": null,
                     "internalName": {
@@ -17675,6 +17718,7 @@ exports[`Parser Statements ProtocolDeclarationStatements Contextual Function lit
                   },
                   "parameters": [
                     {
+                      "defaultValue": null,
                       "documentation": null,
                       "externalName": null,
                       "internalName": {
@@ -17891,6 +17935,7 @@ exports[`Parser Statements ProtocolDeclarationStatements Contextual Function lit
                   },
                   "parameters": [
                     {
+                      "defaultValue": null,
                       "documentation": null,
                       "externalName": null,
                       "internalName": {
@@ -18043,6 +18088,7 @@ exports[`Parser Statements ProtocolDeclarationStatements Contextual Function lit
                   },
                   "parameters": [
                     {
+                      "defaultValue": null,
                       "documentation": null,
                       "externalName": null,
                       "internalName": null,
@@ -18257,6 +18303,7 @@ exports[`Parser Statements ProtocolDeclarationStatements Generic Bounds should p
           },
           "parameters": [
             {
+              "defaultValue": null,
               "documentation": null,
               "externalName": null,
               "internalName": {
@@ -18601,6 +18648,7 @@ exports[`Parser Statements ProtocolDeclarationStatements Generic Bounds should p
           },
           "parameters": [
             {
+              "defaultValue": null,
               "documentation": null,
               "externalName": null,
               "internalName": {
@@ -19151,6 +19199,7 @@ exports[`Parser Statements ProtocolDeclarationStatements Conformance Clauses sho
                 },
                 "parameters": [
                   {
+                    "defaultValue": null,
                     "documentation": null,
                     "externalName": null,
                     "internalName": {
@@ -21070,6 +21119,7 @@ exports[`Parser Statements FunctionStatements should parse FunctionLiterals with
           },
           "parameters": [
             {
+              "defaultValue": null,
               "documentation": null,
               "externalName": {
                 "content": "external",
@@ -21273,6 +21323,7 @@ exports[`Parser Statements FunctionStatements should parse FunctionLiterals with
           },
           "parameters": [
             {
+              "defaultValue": null,
               "documentation": null,
               "externalName": {
                 "content": "internal",
@@ -21476,6 +21527,7 @@ exports[`Parser Statements FunctionStatements should parse FunctionLiterals with
           },
           "parameters": [
             {
+              "defaultValue": null,
               "documentation": null,
               "externalName": null,
               "internalName": {
@@ -21666,6 +21718,7 @@ exports[`Parser Statements FunctionStatements should parse FunctionLiterals with
           },
           "parameters": [
             {
+              "defaultValue": null,
               "documentation": null,
               "externalName": {
                 "content": "external",
@@ -21735,6 +21788,7 @@ exports[`Parser Statements FunctionStatements should parse FunctionLiterals with
               },
             },
             {
+              "defaultValue": null,
               "documentation": null,
               "externalName": {
                 "content": "external2",

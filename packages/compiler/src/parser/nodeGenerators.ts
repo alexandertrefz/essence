@@ -837,12 +837,14 @@ export function parameter(
 	type: parser.TypeDeclarationNode | null,
 	position: common.Position,
 	documentation: common.Documentation | null = null,
+	defaultValue: parser.ExpressionNode | null = null,
 ): parser.ParameterNode {
 	return {
 		nodeType: "Parameter",
 		externalName,
 		internalName,
 		type,
+		defaultValue,
 		position,
 		documentation,
 	}

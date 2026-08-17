@@ -760,11 +760,20 @@ export interface FunctionDefinitionNode {
 // are separate questions, and only the second one a Pattern answers.
 // `externalName` is never a Pattern, which is what lets the Parser keep
 // reusing ONE Identifier for both names in the `count: Integer` form.
+// NOTE: `defaultValue` is the `= expression` a caller may leave out, and is
+// null for a Parameter that must be written at every call. It is deliberately
+// NOT covered by `position`, which keeps spanning name-through-Type: three
+// consumers anchor off `position.end` — the Language Server's inferred-Type
+// Inlay Hint and the quick fix that applies it, and the Formatter's verbatim
+// source slice for an unannotated Parameter — and a widened span would have
+// the hint insert `: Integer` after the default, producing source that does
+// not parse. The default carries its own Expression's position instead.
 export interface ParameterNode {
 	nodeType: "Parameter"
 	externalName: IdentifierNode | null
 	internalName: IdentifierNode | PatternNode | null
 	type: TypeDeclarationNode | null
+	defaultValue: ExpressionNode | null
 	position: Position
 	documentation: Documentation | null
 }

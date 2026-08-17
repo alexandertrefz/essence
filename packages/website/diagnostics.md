@@ -88,6 +88,14 @@ label from the expected Function Type; write only its name.
 **Quick Fix — "Remove the label":** drops the external name and keeps the
 internal one.
 
+### `default-on-function-literal`
+
+A Parameter of a Function literal in expression position was given a
+`= expression` default. Such a literal is called through the Function Type it
+was written for, which fixes how many Arguments every call passes, so the
+default could never be reached. Write the default on the named Function or
+Method the value is passed to.
+
 ### `declarations-outside-stdlib`
 
 A file opened with `declarations { … }`, the standard library's private
@@ -855,6 +863,17 @@ Method carries a Protocol bound of its own that the conformance can not assume.
 ### `conformance-needs-target-type`
 
 Only a Namespace with a target Type (`for …`) can conform to a Protocol.
+
+### `default-on-protocol-requirement`
+
+A Parameter of a `protocol` requirement was given a `= expression` default. A
+requirement says which calls a conforming Type must answer; a default is part
+of how one of them answers, which is each Namespace's own. Declare the
+requirement without the default and write the default on the fulfilling Method.
+
+Note that in this version a fulfilling Method's signature must match its
+requirement exactly, defaulted Parameters included — a Method carrying a
+default can not fulfil a requirement that does not.
 
 ### `protocol-bound-function-value`
 
