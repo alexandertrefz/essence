@@ -1254,6 +1254,15 @@ describe("formatter", () => {
 			)
 		})
 
+		it("breaks a Function Type too wide for its line like a Parameter list", () => {
+			let source =
+				"implementation {\n\tfunction applyLong(_ transform: (_ value: Integer, with other: Integer, and another: Integer) -> Integer, to n: Integer) -> Integer { <- transform(n, with n, and n) }\n}\n"
+
+			expect(formatted(source)).toBe(
+				"implementation {\n\tfunction applyLong(\n\t\t_ transform: (\n\t\t\t_ value: Integer,\n\t\t\twith other: Integer,\n\t\t\tand another: Integer,\n\t\t) -> Integer,\n\t\tto n: Integer,\n\t) -> Integer {\n\t\t<- transform(n, with n, and n)\n\t}\n}\n",
+			)
+		})
+
 		it("adds a trailing comma to a broken argument list", () => {
 			let source =
 				'implementation {\n\tTerminal.inspect("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")\n}\n'
