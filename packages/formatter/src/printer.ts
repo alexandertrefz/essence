@@ -1206,6 +1206,7 @@ export class Printer {
 		}
 
 		let documented = false
+		let printed: Array<Doc> = []
 		let parts: Array<Doc> = []
 
 		for (let index = 0; index < parameters.length; index++) {
@@ -1221,7 +1222,33 @@ export class Printer {
 				parts.push(verbatim(comment.text), hardline)
 			}
 
-			parts.push(this.printParameter(parameter))
+			let one = this.printParameter(parameter)
+
+			printed.push(one)
+			parts.push(one)
+		}
+
+		// NOTE: A trailing block-like default — `= match …`, `= { … }`, a
+		// Function literal — brings its own braces and its own hard breaks,
+		// which `propagateBreaks` would carry up through this group and use to
+		// shatter a header that otherwise fits on its line. Joined with plain
+		// commas instead, exactly as `printArgumentList` handles a trailing
+		// block. Nothing is done for a block-like default anywhere but last,
+		// for the same reason nothing is done for a block-like Argument
+		// anywhere but last: whatever follows it has to break around it.
+		let last = parameters[parameters.length - 1] as parser.ParameterNode
+
+		if (
+			!documented &&
+			last.defaultValue !== null &&
+			isBlockLike(last.defaultValue)
+		) {
+			return concat([
+				text("("),
+				join(text(", "), printed),
+				text(")"),
+				suffix,
+			])
 		}
 
 		return group(
@@ -1279,6 +1306,8 @@ export class Printer {
 				parts.push(text(": "), this.printType(type))
 			}
 
+			this.printDefaultValueInto(parts, parameter)
+
 			return concat(parts)
 		}
 
@@ -1288,6 +1317,19 @@ export class Printer {
 		// node, so the written form is read back off the source rather than
 		// rebuilt, which would turn one spelling into the other.
 		if (type === null) {
+			// NOTE: A Parameter with no Type is a contextually typed literal's,
+			// and a Function literal is refused a default at the Parser
+			// (`default-on-function-literal`) — so there is never one to print
+			// here, and the verbatim slice, which stops at the Type, could not
+			// carry it if there were. Asserted rather than assumed: this branch
+			// silently losing a default is exactly the failure the AST-equality
+			// gate would have to catch afterwards.
+			if (parameter.defaultValue !== null) {
+				throw new Error(
+					"A Parameter with no Type can not carry a default",
+				)
+			}
+
 			return text(
 				this.source.slice(parameter.position).trim() ||
 					(internalName?.content ?? "_"),
@@ -1311,7 +1353,26 @@ export class Printer {
 					: external + " " + internalName.content
 		}
 
-		return concat([text(name + ": "), this.printType(type)])
+		let parts: Array<Doc> = [text(name + ": "), this.printType(type)]
+
+		this.printDefaultValueInto(parts, parameter)
+
+		return concat(parts)
+	}
+
+	// NOTE: `= expression`, appended after the Type — or after the Pattern's
+	// Type, which is the only other place a default can sit.
+	private printDefaultValueInto(
+		parts: Array<Doc>,
+		parameter: parser.ParameterNode,
+	): void {
+		let { defaultValue } = parameter
+
+		if (defaultValue === null) {
+			return
+		}
+
+		parts.push(text(" = "), this.printExpression(defaultValue))
 	}
 
 	private printGenericList(
