@@ -1759,22 +1759,33 @@ export function createInterpreter(
 			let ordered = readCall(args, signature, labels, name)
 			let places = ordered === args ? positional : named
 
+			// NOTE: A slot the call left out is handed on as `undefined`, which
+			// is precisely what fires the emitted JavaScript default parameter
+			// — and nothing is marshalled for it, because there is nothing to
+			// marshal. The unrolled arities below skip it the same way, which
+			// is why the reads go through one helper rather than being written
+			// out three times.
+			let read = (position: number): EssenceValue =>
+				ordered[position] === OMITTED
+					? (undefined as unknown as EssenceValue)
+					: readers[position]!(
+							ordered[position],
+							null,
+							places[position]!,
+						)
+
 			// NOTE: The Arguments a Function of this many Parameters takes,
 			// passed as that many Arguments. Everything below one line is the
 			// same call written out at the two arities almost every Function
 			// has, because handing an Array over to be spread builds a call
 			// frame out of it — which is most of what a small call costs.
 			if (arity === 1) {
-				return answer(
-					target(readers[0]!(ordered[0], null, places[0]!)),
-					null,
-					"return value",
-				)
+				return answer(target(read(0)), null, "return value")
 			}
 
 			if (arity === 2) {
-				let first = readers[0]!(ordered[0], null, places[0]!)
-				let second = readers[1]!(ordered[1], null, places[1]!)
+				let first = read(0)
+				let second = read(1)
 
 				return answer(target(first, second), null, "return value")
 			}
@@ -1783,11 +1794,7 @@ export function createInterpreter(
 			let marshalled: Array<EssenceValue> = new Array(arity)
 
 			for (let position = 0; position < arity; position++) {
-				marshalled[position] = readers[position]!(
-					ordered[position],
-					null,
-					places[position]!,
-				)
+				marshalled[position] = read(position)
 			}
 
 			return answer(target(...marshalled), null, "return value")
@@ -2396,13 +2403,27 @@ function readCall(
 		if (given !== null) {
 			let keys = Object.keys(given)
 
-			if (sameNames(keys, labels)) {
+			if (sameNames(keys, labels, signature.parameters)) {
 				let count = labels.length
 				// oxlint-disable-next-line unicorn/no-new-array -- the length, as above
 				let ordered: Array<unknown> = new Array(count)
 
 				for (let position = 0; position < count; position++) {
-					ordered[position] = given[labels[position]!]
+					let label = labels[position]!
+					let optional =
+						signature.parameters[position]?.optional === true
+
+					// NOTE: A key that is absent and a key written as
+					// `undefined` are the same call. The `.d.ts` this generator
+					// writes types an omittable label as `label?: T`, and
+					// TypeScript's `?` admits an explicit `undefined` — so
+					// refusing one here would refuse a call the declaration it
+					// was given says is legal.
+					ordered[position] =
+						Object.hasOwn(given, label) &&
+						!(optional && given[label] === undefined)
+							? given[label]
+							: OMITTED
 				}
 
 				return ordered
@@ -2422,7 +2443,15 @@ function readCall(
 		}
 	}
 
-	if (args.length !== signature.parameters.length) {
+	let total = signature.parameters.length
+
+	// NOTE: A positional call may stop early only where every Parameter it stops
+	// BEFORE carries a default. Counting the omittable ones instead would admit
+	// `cut(7n)` against `(from: Integer = 1, to: Integer)` — one Argument, one
+	// default, the count agrees — and pad the REQUIRED `to` with a hole, which
+	// the native then reads as `undefined`. Which Parameters are left out is the
+	// question, never how many.
+	if (args.length > total || !omittableFrom(signature, args.length)) {
 		throw new EssenceCallError(
 			`${callShape(signature, labels, name)}; ${count(
 				args.length,
@@ -2431,7 +2460,54 @@ function readCall(
 		)
 	}
 
-	return args
+	// NOTE: The holes are filled here so that the bridge below reads one Array of
+	// the signature's own length however the call was written — a Parameter the
+	// call stopped before, and one written as an explicit `undefined`, which the
+	// `.d.ts` admits for an omittable slot and which means the same thing.
+	let holes = args.length < total
+
+	for (let position = 0; !holes && position < total; position++) {
+		holes =
+			args[position] === undefined &&
+			signature.parameters[position]!.optional === true
+	}
+
+	if (!holes) {
+		return args
+	}
+
+	// oxlint-disable-next-line unicorn/no-new-array -- the signature's length
+	let filled: Array<unknown> = new Array(total)
+
+	for (let position = 0; position < total; position++) {
+		filled[position] =
+			position >= args.length ||
+			(args[position] === undefined &&
+				signature.parameters[position]!.optional === true)
+				? OMITTED
+				: args[position]
+	}
+
+	return filled
+}
+
+// NOTE: Whether a positional call that wrote `written` Arguments may stop there
+// — which is whether every Parameter from that position on carries a default.
+function omittableFrom(
+	signature: FunctionDescriptor,
+	written: number,
+): boolean {
+	for (
+		let position = written;
+		position < signature.parameters.length;
+		position++
+	) {
+		if (signature.parameters[position]!.optional !== true) {
+			return false
+		}
+	}
+
+	return true
 }
 
 // NOTE: How the Function may be called, as the first half of every refusal — the
@@ -2446,7 +2522,12 @@ function callShape(
 	labels: Array<string> | null,
 	name: string,
 ): string {
-	let positions = count(signature.parameters.length, "Argument")
+	let total = signature.parameters.length
+	let required = requiredCount(signature)
+	let positions =
+		required === total
+			? count(total, "Argument")
+			: `${required} to ${total} Arguments`
 
 	return labels === null
 		? `${name}${signature.shown} takes ${positions}`
@@ -2505,11 +2586,67 @@ function argumentPath(
 		: `argument ${position + 1}`
 }
 
-function sameNames(given: Array<string>, expected: Array<string>): boolean {
-	return (
-		given.length === expected.length &&
-		expected.every((name) => given.includes(name))
-	)
+// NOTE: Key-set equality is only right where every Parameter must be written.
+// Once one carries a default the rule becomes "every REQUIRED label present, no
+// key that is not a label" — which is exactly what an Essence call is held to,
+// and which is still key-set equality for every signature that has no default.
+function sameNames(
+	given: Array<string>,
+	expected: Array<string>,
+	parameters: FunctionDescriptor["parameters"],
+): boolean {
+	if (given.length > expected.length) {
+		return false
+	}
+
+	for (let name of given) {
+		if (!expected.includes(name)) {
+			return false
+		}
+	}
+
+	for (let [position, label] of expected.entries()) {
+		if (parameters[position]?.optional !== true && !given.includes(label)) {
+			return false
+		}
+	}
+
+	return true
+}
+
+// NOTE: The value standing where a call left an Argument out — a slot it stopped
+// before, or an omittable one written as an explicit `undefined`, which the
+// generated `.d.ts` admits and which means the same thing. On a REQUIRED slot an
+// `undefined` is a value the host passed and a Type error like any other, and
+// stays one. The bridge hands `undefined` on for a slot holding this, which is
+// precisely what fires the emitted JavaScript default parameter, and marshals
+// nothing for it: there is nothing to marshal.
+const OMITTED: unique symbol = Symbol("omitted")
+
+// NOTE: How many Arguments a call MUST write, which is where the range in
+// `callShape` starts. Exported because the declaration generator asks the same
+// question of the same Descriptor — see `lastRequiredIndex`.
+export function requiredCount(signature: FunctionDescriptor): number {
+	return signature.parameters.filter(
+		(parameter) => parameter.optional !== true,
+	).length
+}
+
+// NOTE: The last Parameter a call has to write, and `-1` when there is none —
+// where the TRAILING run a call may leave out entirely begins, and therefore the
+// only run TypeScript lets a `?` be written on.
+export function lastRequiredIndex(
+	parameters: FunctionDescriptor["parameters"],
+): number {
+	let last = -1
+
+	for (let [index, parameter] of parameters.entries()) {
+		if (parameter.optional !== true) {
+			last = index
+		}
+	}
+
+	return last
 }
 
 // #endregion

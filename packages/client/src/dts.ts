@@ -8,7 +8,7 @@ import type {
 	ModuleDescriptor,
 	NamespaceDescriptor,
 } from "./descriptor"
-import { labelsOf } from "./marshal-runtime"
+import { labelsOf, lastRequiredIndex } from "./marshal-runtime"
 import { isTypeName, isValueName, mangled, memberName } from "./names"
 
 // NOTE: A Module as TypeScript, printed off the same Descriptor the interpreter
@@ -676,11 +676,29 @@ function createWalker(
 		parameters: FunctionDescriptor["parameters"],
 		direction: Direction,
 	): string {
+		// NOTE: The FIRST place a `?` is ever written in this generator, and it
+		// can only be written on a TRAILING run: TypeScript forbids `a?: T, b:
+		// U`, which is weaker than what Essence allows — a Parameter with a
+		// default may be followed by a required one so long as the labels tell
+		// them apart. Where that happens the positional declaration keeps the
+		// Parameter required and widens it to `T | undefined`, which is exactly
+		// what a positional JavaScript call has to pass there. The labelled form
+		// below has no ordering constraint at all and marks it optional.
+		let lastRequired = lastRequiredIndex(parameters)
+
 		return parameterNames(parameters)
-			.map(
-				(name, index) =>
-					`${name}: ${print(parameters[index]!.of, direction)}`,
-			)
+			.map((name, index) => {
+				let parameter = parameters[index]!
+				let printed = print(parameter.of, direction)
+
+				if (parameter.optional !== true) {
+					return `${name}: ${printed}`
+				}
+
+				return index > lastRequired
+					? `${name}?: ${printed}`
+					: `${name}: ${printed} | undefined`
+			})
 			.join(", ")
 	}
 
@@ -698,13 +716,15 @@ function createWalker(
 		}
 
 		return `labelled: ${inlined(
-			labels.map(
-				(label, index) =>
-					`${memberName(label)}: ${print(
-						signature.parameters[index]!.of,
-						"in",
-					)}`,
-			),
+			labels.map((label, index) => {
+				let parameter = signature.parameters[index]!
+				let optional = parameter.optional === true ? "?" : ""
+
+				return `${memberName(label)}${optional}: ${print(
+					parameter.of,
+					"in",
+				)}`
+			}),
 		)}`
 	}
 

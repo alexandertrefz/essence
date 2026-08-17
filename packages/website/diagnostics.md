@@ -96,6 +96,19 @@ was written for, which fixes how many Arguments every call passes, so the
 default could never be reached. Write the default on the named Function or
 Method the value is passed to.
 
+A default may be written on a named `function` declaration, on a Namespace
+Method — instance or `static`, bodied or a body-less native signature — and on
+an entry of an `overload` block. It may not be written on a Function literal
+(this code), on a `protocol` requirement
+(`default-on-protocol-requirement`), or in a Function TYPE such as `(_ n:
+Integer) -> Boolean`, which has no expression slot and no frame to evaluate one
+in and so does not parse.
+
+A Case payload's members are not Parameters and take no defaults:
+`choice Shape { Circle { radius: Integer = 1 } }` is a Record-literal default,
+which is a different feature — Record construction is not a call — and is not
+part of this one.
+
 ### `declarations-outside-stdlib`
 
 A file opened with `declarations { … }`, the standard library's private

@@ -108,7 +108,17 @@ export type CaseDescriptor = {
 
 export type FunctionDescriptor = {
 	kind: "function"
-	parameters: Array<{ label: string | null; of: Descriptor }>
+	// NOTE: `optional` marks a Parameter the Essence side gave a default, which
+	// a JavaScript call may leave out. It is OPTIONAL on the wire and its
+	// absence reads as "required": this shape is written to
+	// `<output>.descriptor.json` and inlined as JSON into generated wrappers,
+	// so a sidecar written before defaults existed has to keep loading and
+	// meaning what it always meant.
+	parameters: Array<{
+		label: string | null
+		of: Descriptor
+		optional?: true
+	}>
 	returns: Descriptor
 	shown: string
 }
@@ -445,6 +455,7 @@ function signatureWith(
 		parameters: signature.parameterTypes.map((parameter) => ({
 			label: parameter.name,
 			of: describeWith(parameter.type, context, printing),
+			...(parameter.hasDefault ? { optional: true as const } : {}),
 		})),
 		returns: describeWith(signature.returnType, context, printing),
 		shown: printSignature(signature),
