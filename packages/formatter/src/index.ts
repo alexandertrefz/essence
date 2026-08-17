@@ -126,10 +126,16 @@ export function format(
 }
 
 function formatUnguarded(
-	source: string,
+	original: string,
 	options: { documentPath?: string; verify?: boolean },
 ): FormatResult {
 	let { documentPath, verify = true } = options
+
+	// NOTE: Line endings are normalised to `\n` before anything else looks at
+	// the source — the Lexer reads a `\r` as part of whatever Token it lands
+	// in, so a CRLF file otherwise parses as one syntax error after another
+	// and is refused. Formatting writes `\n`, and only that.
+	let source = original.replace(/\r\n?/g, "\n")
 
 	let { diagnostics } = parseDocument(source, documentPath)
 
@@ -138,7 +144,7 @@ function formatUnguarded(
 	// text it could not read.
 	if (diagnostics.some((diagnostic) => diagnostic.severity === "error")) {
 		return {
-			text: source,
+			text: original,
 			changed: false,
 			refusal: {
 				kind: "syntax",
@@ -151,7 +157,7 @@ function formatUnguarded(
 	let formatted = formatOnce(source, documentPath)
 
 	if (formatted === null) {
-		return unsafe(source, "The formatted output no longer parses.")
+		return unsafe(original, "The formatted output no longer parses.")
 	}
 
 	if (verify) {
@@ -159,12 +165,12 @@ function formatUnguarded(
 		let after = parsed(formatted, documentPath)
 
 		if (before === null || after === null) {
-			return unsafe(source, "The formatted output no longer parses.")
+			return unsafe(original, "The formatted output no longer parses.")
 		}
 
 		if (JSON.stringify(astOf(before)) !== JSON.stringify(astOf(after))) {
 			return unsafe(
-				source,
+				original,
 				"Formatting would have changed what this file means.",
 			)
 		}
@@ -179,7 +185,7 @@ function formatUnguarded(
 			commentAnchors(formatted, sectionSpans(after)).join("\n")
 		) {
 			return unsafe(
-				source,
+				original,
 				"Formatting would have moved or lost a comment.",
 			)
 		}
@@ -188,7 +194,7 @@ function formatUnguarded(
 
 		if (again !== formatted) {
 			return unsafe(
-				source,
+				original,
 				"Formatting is not stable — a second pass changes the result.",
 			)
 		}
@@ -196,7 +202,7 @@ function formatUnguarded(
 
 	return {
 		text: formatted,
-		changed: formatted !== source,
+		changed: formatted !== original,
 		refusal: null,
 	}
 }

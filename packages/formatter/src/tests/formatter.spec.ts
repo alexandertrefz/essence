@@ -891,6 +891,17 @@ describe("formatter", () => {
 			)
 		})
 
+		it("formats a file with CRLF line endings, writing LF", () => {
+			let source =
+				"implementation {\r\n\tconstant a = 1\r\n\tconstant bb = 2\r\n}\r\n"
+			let result = format(source)
+
+			expect(result.refusal).toBeNull()
+			expect(result.text).toBe(
+				"implementation {\n\tconstant a  = 1\n\tconstant bb = 2\n}\n",
+			)
+		})
+
 		it("keeps a blank line the author wrote", () => {
 			expect(
 				formatted(
@@ -1535,12 +1546,14 @@ describe("formatter", () => {
 			expect(format(once.text).text).toBe(once.text)
 		})
 
-		it("keeps a comment's trailing spaces", () => {
+		it("trims a comment's trailing spaces", () => {
 			let source = "implementation {\n\t§ note   \n\tconstant a = 1\n}\n"
 			let result = format(source)
 
 			expect(result.refusal).toBeNull()
-			expect(result.text).toBe(source)
+			expect(result.text).toBe(
+				"implementation {\n\t§ note\n\tconstant a = 1\n}\n",
+			)
 		})
 	})
 
