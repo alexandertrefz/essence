@@ -59,7 +59,5 @@ implementation {
 	Terminal.print(flight::duration()::<Clock>formatted()) § 01:01:12
 
 	Terminal.print(Clock.noon::<Clock>formatted()) § 12:00:00
-	Terminal.print(
-		flight.arrival::isGreaterThan(Clock.noon),
-	) § true — landing after noon
+	Terminal.print(flight.arrival::isGreaterThan(Clock.noon)) § true — landing after noon
 }

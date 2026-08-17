@@ -323,8 +323,7 @@ declarations {
 			§ everything after it has to be a digit, so a second sign falls to
 			§ the digit check below like any other stray character, and a sign
 			§ alone leaves no digits at all.
-			constant sign = text
-				::firstIndex(of "-")
+			constant sign = text::firstIndex(of "-")
 				::keep(where (position) { <- position::is(0) })
 
 			constant digitsText = match sign -> String {
@@ -350,10 +349,14 @@ declarations {
 							case #Empty        { <- #Done(#Empty) }
 
 							case #Value(digit) {
-								<- #Continue(#Value(value
-									::value(withDefault 0)
-									::multiply(with 10)
-									::add(digit)))
+								<- #Continue(
+									#Value(
+										value
+											::value(withDefault 0)
+											::multiply(with 10)
+											::add(digit)
+									)
+								)
 							}
 						}
 					})

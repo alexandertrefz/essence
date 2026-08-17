@@ -82,7 +82,5 @@ implementation {
 
 	constant command: EditorCommand = #Undo
 
-	Terminal.inspect(
-		command::isNot(#ClearAll),
-	) § true — EditorCommand's own ClearAll
+	Terminal.inspect(command::isNot(#ClearAll)) § true — EditorCommand's own ClearAll
 }

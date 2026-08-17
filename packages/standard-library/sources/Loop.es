@@ -108,31 +108,29 @@ declarations {
 			§ down while it has not passed it from above. `carried` is the caller's
 			§ State; `index` is the tally the body is handed each turn.
 			if start::isLessThanOrEqualTo(end) {
-				constant { carried } = loop(startingWith {
-					index = start,
-					carried = state,
-				}, while ({ index }) {
-					<- index::isLessThanOrEqualTo(end)
-				}, step ({ index, carried }) {
-					<- {
-						index = index::add(1),
-						carried = advance(index, carried),
-					}
-				})
+				constant { carried } = loop(
+					startingWith { index = start, carried = state },
+					while ({ index }) { <- index::isLessThanOrEqualTo(end) },
+					step ({ index, carried }) {
+						<- {
+							index = index::add(1),
+							carried = advance(index, carried),
+						}
+					},
+				)
 
 				<- carried
 			} else {
-				constant { carried } = loop(startingWith {
-					index = start,
-					carried = state,
-				}, while ({ index }) {
-					<- index::isGreaterThanOrEqualTo(end)
-				}, step ({ index, carried }) {
-					<- {
-						index = index::subtract(1),
-						carried = advance(index, carried),
-					}
-				})
+				constant { carried } = loop(
+					startingWith { index = start, carried = state },
+					while ({ index }) { <- index::isGreaterThanOrEqualTo(end) },
+					step ({ index, carried }) {
+						<- {
+							index = index::subtract(1),
+							carried = advance(index, carried),
+						}
+					},
+				)
 
 				<- carried
 			}

@@ -46,17 +46,20 @@ implementation {
 	§ stopping with the one-member `#Stopped` shorthand — `#Stopped(total)`
 	§ instead of `#Stopped({ value = total })`. The step names the State's
 	§ fields and, with `as`, the State itself.
-	constant summed: Integer = Loop.run(startingWith {
-		index = 1,
-		total = 0,
-	}, step ({ index, total } as state) {
-		if index::isGreaterThan(5) {
-			<- #Stopped(total)
-		}
+	constant summed: Integer = Loop.run(
+		startingWith { index = 1, total = 0 },
+		step ({ index, total } as state) {
+			if index::isGreaterThan(5) {
+				<- #Stopped(total)
+			}
 
-		<- #Going({ state with index = index::add(1),
-		total = total::add(index) })
-	})
+			<- #Going({
+				state with
+					index = index::add(1),
+					total = total::add(index),
+			})
+		},
+	)
 
 	Terminal.inspect(summed::toString()) § "15"
 

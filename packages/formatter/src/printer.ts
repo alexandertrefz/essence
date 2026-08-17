@@ -3,16 +3,21 @@ import type { common, parser } from "@essence-lang/interfaces"
 import {
 	breakParent,
 	concat,
+	conditionalGroup,
 	type Doc,
+	expand,
+	fill,
 	group,
 	hardline,
 	ifBreak,
 	indent,
 	join,
 	line,
+	lineSuffix,
 	renderFlat,
 	softline,
 	stringWidth,
+	TAB_WIDTH,
 	text,
 	type TextDoc,
 	verbatim,
@@ -127,9 +132,15 @@ export class Printer {
 			// NOTE: The Comment runs to the end of its line, so a block holding
 			// this entry can never render flat — the `}` would land inside the
 			// Comment. `breakParent` is what says so without spending a line
-			// break of its own.
+			// break of its own. And it is written as a line suffix, never
+			// measured: how long a Comment is must not be what breaks the code
+			// in front of it.
 			if (trailing !== null) {
-				doc = concat([doc, verbatim(" " + trailing.text), breakParent])
+				doc = concat([
+					doc,
+					lineSuffix(" " + trailing.text),
+					breakParent,
+				])
 			}
 
 			entries.push({ startLine, endLine, doc })
@@ -293,7 +304,10 @@ export class Printer {
 		opening: Comment | null = null,
 		prefix: Doc = EMPTY,
 	): Doc {
-		let brace = opening === null ? text("{") : verbatim("{ " + opening.text)
+		let brace =
+			opening === null
+				? text("{")
+				: concat([text("{"), lineSuffix(" " + opening.text)])
 
 		if (entries.length === 0) {
 			return opening === null
@@ -301,6 +315,8 @@ export class Printer {
 				: concat([prefix, brace, hardline, text("}")])
 		}
 
+		// NOTE: `expandable`, because this is the group that gives way when a
+		// Function literal is hugged as a call's last Argument.
 		if (allowFlat && opening === null && entries.length === 1) {
 			return group(
 				concat([
@@ -310,6 +326,7 @@ export class Printer {
 					line,
 					text("}"),
 				]),
+				{ expandable: true },
 			)
 		}
 
@@ -445,7 +462,7 @@ export class Printer {
 		let closing = this.trivia.claimTrailingOn(program.position.end.line)
 
 		if (closing !== null) {
-			parts.push(verbatim(" " + closing.text))
+			parts.push(lineSuffix(" " + closing.text))
 		}
 
 		if (program.exports !== null) {
@@ -585,7 +602,7 @@ export class Printer {
 			if (entry.trailing !== null) {
 				entryDoc = concat([
 					entryDoc,
-					verbatim(" " + entry.trailing.text),
+					lineSuffix(" " + entry.trailing.text),
 				])
 			}
 
@@ -633,9 +650,7 @@ export class Printer {
 
 			case "IfStatement":
 				return concat([
-					text("if "),
-					this.printExpression(node.condition),
-					text(" "),
+					this.printIfHead(node.condition),
 					this.bodyBlock(
 						node.body,
 						node.position.start.line,
@@ -772,9 +787,7 @@ export class Printer {
 					) ?? first.position.start.line - 1)
 
 		let parts: Array<Doc> = [
-			text("if "),
-			this.printExpression(node.condition),
-			text(" "),
+			this.printIfHead(node.condition),
 			this.bodyBlock(node.trueBody, node.position.start.line, trueClose),
 			text(" else "),
 		]
@@ -803,6 +816,26 @@ export class Printer {
 		)
 
 		return concat(parts)
+	}
+
+	// NOTE: `if condition {` — and when the condition is a chain that has to
+	// break, the `{` moves to a line of its own: the chain's links are indented
+	// one level, which is exactly where the body's Statements go, and a brace
+	// at the end of the last link would leave the two indistinguishable. The
+	// chain is asked to carry the decision, since it is the one group that
+	// knows whether it broke.
+	private printIfHead(condition: parser.ExpressionNode): Doc {
+		if (
+			condition.nodeType === "MethodInvocation" &&
+			chainLinks(condition).length > 1
+		) {
+			return concat([
+				text("if "),
+				this.printMethodChain(condition, ifBreak(hardline, text(" "))),
+			])
+		}
+
+		return concat([text("if "), this.printExpression(condition), text(" ")])
 	}
 
 	private writtenAsElseIf(elseLine: number, ifStart: common.Cursor): boolean {
@@ -1134,6 +1167,7 @@ export class Printer {
 		return this.printParameterList(
 			signature.parameters,
 			concat([text(" -> "), this.printType(signature.returnType)]),
+			signatureListPosition(signature),
 		)
 	}
 
@@ -1143,6 +1177,7 @@ export class Printer {
 			this.printParameterList(
 				signature.parameters,
 				concat([text(" -> "), this.printType(signature.returnType)]),
+				signatureListPosition(signature),
 			),
 		])
 	}
@@ -1205,6 +1240,7 @@ export class Printer {
 							text(" -> "),
 							this.printType(definition.returnType),
 						]),
+				definition.parameterListPosition,
 			),
 		)
 
@@ -1221,10 +1257,11 @@ export class Printer {
 		return concat(parts)
 	}
 
-	// NOTE: A Parameter carrying its own `§§` block forces the list to break,
-	// whatever the width. Collapsing it would put the block on the same line as
-	// the Parameter below it, and Documentation attaches by line adjacency —
-	// the docs would silently detach.
+	// NOTE: A Parameter carrying its own `§§` block, or any Comment written
+	// among the Parameters, forces the list to break whatever the width.
+	// Collapsing it would put a Comment on the same line as the Parameter
+	// after it, and Documentation attaches by line adjacency — the docs would
+	// silently detach.
 	//
 	// `suffix` is the return clause, and it lives INSIDE the group so that one
 	// fit decision covers the whole header. Left outside, the list measures
@@ -1232,36 +1269,41 @@ export class Printer {
 	// the Union is what gives way — split mid-Type, at the body's indent.
 	// Inside, a header that does not fit breaks its Parameters instead, and
 	// the return Type follows the `)` whole.
+	//
+	// `listPosition` is where the parentheses are, for a Comment written after
+	// the `(` — which belongs above the first Parameter — and the Comments
+	// written above the `)`.
 	private printParameterList(
 		parameters: Array<parser.ParameterNode>,
 		suffix: Doc = EMPTY,
+		listPosition: common.Position | null = null,
 	): Doc {
 		if (parameters.length === 0) {
 			return concat([text("()"), suffix])
 		}
 
-		let documented = false
-		let printed: Array<Doc> = []
-		let parts: Array<Doc> = []
+		let first = parameters[0] as parser.ParameterNode
+		let opening =
+			listPosition !== null &&
+			first.position.start.line > listPosition.start.line
+				? this.trivia.claimTrailingOn(listPosition.start.line)
+				: null
 
-		for (let index = 0; index < parameters.length; index++) {
-			let parameter = parameters[index] as parser.ParameterNode
-			let leading = this.trivia.takeBefore(parameter.position.start.line)
+		let items = this.listItems(
+			parameters,
+			(parameter) => parameter.position,
+			(parameter) => this.printParameter(parameter),
+		)
 
-			if (index > 0) {
-				parts.push(text(","), line)
-			}
-
-			for (let comment of leading) {
-				documented = true
-				parts.push(verbatim(comment.text), hardline)
-			}
-
-			let one = this.printParameter(parameter)
-
-			printed.push(one)
-			parts.push(one)
+		if (opening !== null) {
+			;(items[0] as ListItem).leading.unshift(opening)
 		}
+
+		let loose =
+			listPosition === null
+				? []
+				: this.trivia.takeBefore(listPosition.end.line)
+		let { interior, commented } = this.listInterior(items, loose)
 
 		// NOTE: A trailing default that lays itself out over lines of its own
 		// brings hard breaks, which `propagateBreaks` would carry up through
@@ -1278,16 +1320,19 @@ export class Printer {
 		// block-like Argument anywhere but last: whatever follows it has to
 		// break around it.
 		let last = parameters[parameters.length - 1] as parser.ParameterNode
-		let lastPrinted = printed[printed.length - 1] as Doc
+		let lastPrinted = (items[items.length - 1] as ListItem).doc
 
 		if (
-			!documented &&
+			!commented &&
 			last.defaultValue !== null &&
 			(opensBlock(last.defaultValue) || renderFlat(lastPrinted) === null)
 		) {
 			return concat([
 				text("("),
-				join(text(", "), printed),
+				join(
+					text(", "),
+					items.map((item) => item.doc),
+				),
 				text(")"),
 				suffix,
 			])
@@ -1296,19 +1341,89 @@ export class Printer {
 		return group(
 			concat([
 				text("("),
-				indent(
-					concat([
-						softline,
-						concat(parts),
-						ifBreak(text(","), EMPTY),
-					]),
-				),
+				indent(concat([softline, interior])),
 				softline,
 				text(")"),
 				suffix,
 			]),
-			{ shouldBreak: documented },
+			{ shouldBreak: commented },
 		)
+	}
+
+	// NOTE: The items of a bracketed, comma-separated list — Arguments,
+	// Parameters, List and Record members, the links of a chain — with the
+	// Comments written around each: the own-line ones above it and the one
+	// trailing it. Claimed here, in source order, before the item is printed,
+	// so that a Comment trailing an item is not taken by something inside it.
+	//
+	// An item claims the Comment at the end of its line only when it IS the
+	// end of its line, its comma aside. `(n) { § why` ends the Parameter `n`
+	// on that line too, and the Comment there trails the brace, which the
+	// body claims — an item that took it would carry it off into the list.
+	private listItems<Item>(
+		items: Array<Item>,
+		positionOf: (item: Item) => common.Position,
+		print: (item: Item) => Doc,
+	): Array<ListItem> {
+		return items.map((item) => {
+			let { start, end } = positionOf(item)
+			let leading = this.trivia.takeBefore(start.line)
+			let trailing = this.endsItsLine(end)
+				? this.trivia.claimTrailingOn(end.line)
+				: null
+
+			return { doc: print(item), leading, trailing }
+		})
+	}
+
+	private endsItsLine(end: common.Cursor): boolean {
+		let rest = this.source.lineAt(end.line).slice(end.column - 1)
+		let comment = rest.indexOf("§")
+		let code = comment === -1 ? rest : rest.slice(0, comment)
+
+		return code.trim() === "" || code.trim() === ","
+	}
+
+	// NOTE: The inside of the brackets: items separated by a comma and a
+	// `line`, a trailing comma when broken, and every Comment where it was
+	// written — an own-line Comment above its item, a trailing one after the
+	// comma, and `loose` ones (written below the last item) before the closing
+	// bracket. Any Comment at all means the list can not be on one line, and
+	// `commented` says so.
+	private listInterior(
+		items: Array<ListItem>,
+		loose: Array<Comment>,
+		separator: Doc = line,
+	): { interior: Doc; commented: boolean } {
+		let parts: Array<Doc> = []
+		let commented = loose.length > 0
+
+		for (let [index, item] of items.entries()) {
+			let last = index === items.length - 1
+
+			for (let comment of item.leading) {
+				commented = true
+				parts.push(verbatim(comment.text), hardline)
+			}
+
+			parts.push(item.doc)
+			parts.push(last ? ifBreak(text(","), EMPTY) : text(","))
+
+			if (item.trailing !== null) {
+				commented = true
+				parts.push(lineSuffix(" " + item.trailing.text), breakParent)
+			}
+
+			if (!last) {
+				parts.push(separator)
+			}
+		}
+
+		for (let comment of loose) {
+			parts.push(hardline, verbatim(comment.text))
+		}
+
+		return { interior: concat(parts), commented }
 	}
 
 	private printParameter(parameter: parser.ParameterNode): Doc {
@@ -1486,99 +1601,178 @@ export class Printer {
 
 	// NOTE: `a::b()::c()` nests to the left, so a chain has to be flattened
 	// before it can be laid out. Breaking is all-or-nothing: either the whole
-	// chain fits on its line, or every link gets one of its own.
-	private printMethodChain(node: parser.MethodInvocationNode): Doc {
-		let links: Array<parser.MethodInvocationNode> = []
-		let current: parser.ExpressionNode = node
-
-		while (current.nodeType === "MethodInvocation") {
-			links.unshift(current)
-			current = current.base
-		}
+	// chain fits on its line, or every link gets one of its own — except the
+	// first, which stays on the head's line when the head is too short to hold
+	// a line of its own: a bare `@`, a `0`, a name no wider than one indent —
+	// so that `xs` and `text` are never left dangling above their own links.
+	//
+	// `suffix` is written inside the group, after the last link, so that it
+	// can answer to whether the chain broke — an `if` puts its `{` on a line
+	// of its own then.
+	private printMethodChain(
+		node: parser.MethodInvocationNode,
+		suffix: Doc = EMPTY,
+	): Doc {
+		let links = chainLinks(node)
+		let current: parser.ExpressionNode = (
+			links[0] as parser.MethodInvocationNode
+		).base
 
 		let head = this.printExpression(current)
 
-		let linkDocs = links.map((link) => {
-			let specifier =
-				link.namespaceSpecifier === null
-					? ""
-					: "<" + link.namespaceSpecifier.content + ">"
+		let items = this.listItems(
+			links,
+			(link) => ({
+				start: link.member.position.start,
+				end: link.position.end,
+			}),
+			(link) => {
+				let specifier =
+					link.namespaceSpecifier === null
+						? ""
+						: "<" + link.namespaceSpecifier.content + ">"
 
-			return concat([
-				text("::" + specifier + link.member.content),
-				this.printArgumentList(link.arguments),
-			])
+				return concat([
+					text("::" + specifier + link.member.content),
+					this.printArgumentList(link.arguments),
+				])
+			},
+		)
+
+		let commented = items.some(
+			(item) => item.leading.length > 0 || item.trailing !== null,
+		)
+
+		if (items.length === 1 && !commented) {
+			return concat([head, (items[0] as ListItem).doc, suffix])
+		}
+
+		let first = items[0] as ListItem
+
+		let headWidth = renderFlat(head)
+
+		// NOTE: Not when the first link itself lays out over several lines —
+		// a callback with a body — since then the head is not left dangling
+		// above a ladder of links but above a block, and the ladder reads
+		// better starting from the head's own line. A bare `@` fuses
+		// regardless: it never holds a line of its own.
+		if (
+			first.leading.length === 0 &&
+			headWidth !== null &&
+			stringWidth(headWidth) <= TAB_WIDTH &&
+			(current.nodeType === "Self" || renderFlat(first.doc) !== null)
+		) {
+			head = concat([head, first.doc])
+
+			if (first.trailing !== null) {
+				head = concat([
+					head,
+					lineSuffix(" " + first.trailing.text),
+					breakParent,
+				])
+			}
+
+			items = items.slice(1)
+		}
+
+		let linkDocs = items.map((item) => {
+			let parts: Array<Doc> = [softline]
+
+			for (let comment of item.leading) {
+				parts.push(verbatim(comment.text), hardline)
+			}
+
+			parts.push(item.doc)
+
+			if (item.trailing !== null) {
+				parts.push(lineSuffix(" " + item.trailing.text), breakParent)
+			}
+
+			return concat(parts)
 		})
 
-		if (linkDocs.length === 1) {
-			return concat([head, linkDocs[0] as Doc])
-		}
-
-		// NOTE: A bare `@` is too small to hold a line of its own, so the
-		// first link stays fused to it and only the links after it break.
-		if (current.nodeType === "Self") {
-			head = concat([head, linkDocs[0] as Doc])
-			linkDocs = linkDocs.slice(1)
-		}
-
-		return group(
-			concat([
-				head,
-				indent(
-					concat(
-						linkDocs.map((linkDoc) => concat([softline, linkDoc])),
-					),
-				),
-			]),
-		)
+		return group(concat([head, indent(concat(linkDocs)), suffix]), {
+			shouldBreak: commented,
+		})
 	}
 
+	// NOTE: A call's Arguments, with one exception to breaking one per line: a
+	// trailing `match` or Function literal — or a Record or List that is the
+	// only Argument — is hugged, so its own block gives way rather than the
+	// list around it. Hugging is offered as the first of two layouts and taken
+	// only when everything up to the block's opening brace fits: the head and
+	// the earlier Arguments measured whole, the trailing block measured to
+	// its first line. Otherwise the list breaks around every Argument,
+	// which is what keeps a chain in the first Argument from shattering while
+	// the callback after it hangs on.
 	private printArgumentList(argumentNodes: Array<parser.ArgumentNode>): Doc {
 		if (argumentNodes.length === 0) {
 			return text("()")
 		}
 
-		let parts = argumentNodes.map((argument) => {
-			let value = this.printExpression(argument.value)
+		let items = this.listItems(
+			argumentNodes,
+			(argument) => ({
+				start: (argument.name ?? argument.value).position.start,
+				end: argument.value.position.end,
+			}),
+			(argument) => {
+				let value = this.printExpression(argument.value)
 
-			return argument.name === null
-				? value
-				: concat([text(argument.name.content + " "), value])
-		})
+				return argument.name === null
+					? value
+					: concat([text(argument.name.content + " "), value])
+			},
+		)
+		let { interior, commented } = this.listInterior(items, [])
 
-		// NOTE: A trailing `match` or Function literal brings its own braces and
-		// its own line breaks. Breaking the Argument list around it as well
-		// would push a one-line call head onto four lines and indent the block
-		// a level deeper than it was written.
+		let broken = group(
+			concat([
+				text("("),
+				indent(concat([softline, interior])),
+				softline,
+				text(")"),
+			]),
+			{ shouldBreak: commented },
+		)
+
 		let last = argumentNodes[
 			argumentNodes.length - 1
 		] as parser.ArgumentNode
 
-		if (isBlockLike(last.value)) {
-			return concat([text("("), join(text(", "), parts), text(")")])
+		if (
+			commented ||
+			!(
+				opensBlock(last.value) ||
+				(isBlockLike(last.value) && argumentNodes.length === 1)
+			)
+		) {
+			return broken
 		}
 
-		return group(
-			concat([
-				text("("),
-				indent(
-					concat([
-						softline,
-						join(concat([text(","), line]), parts),
-						ifBreak(text(","), EMPTY),
-					]),
-				),
-				softline,
-				text(")"),
-			]),
-		)
+		let docs = items.map((item) => item.doc)
+		let hugged = concat([
+			text("("),
+			join(text(", "), docs.slice(0, -1)),
+			docs.length > 1 ? text(", ") : EMPTY,
+			expand(docs[docs.length - 1] as Doc),
+			text(")"),
+		])
+
+		// NOTE: A hard break inside the hugged block does not reach the
+		// groups around this call on its own — a `conditional` stops it, so
+		// that the call is free to stay on its line. But a call whose Argument
+		// lays itself out over several lines is not one line of code, and
+		// whatever list holds THIS call has to break around it: written out
+		// as a `breakParent` beside the conditional, where it does propagate.
+		let breaks = docs.some((doc) => renderFlat(doc) === null)
+
+		return concat([
+			breaks ? breakParent : EMPTY,
+			conditionalGroup([hugged, broken]),
+		])
 	}
 
-	// NOTE: `{ a with x = 1 }` reaches the AST as a Combination whose right
-	// side is a Record the source never braced. A genuinely braced right side
-	// — `{ a with { x = 1 } }` — is only distinguishable by looking at what was
-	// written at its Position. A typed Record — `{ a with Point ~> { x = 1 } }`
-	// — always braces itself, and its `Type ~>` must be written back with it.
 	private printCombination(node: parser.CombinationNode): Doc {
 		let bare =
 			node.rhs.nodeType === "RecordValue" &&
@@ -1593,10 +1787,8 @@ export class Printer {
 			? indent(
 					concat([
 						line,
-						this.printRecordMembers(
-							node.rhs as parser.RecordValueNode,
-						),
-						ifBreak(text(","), EMPTY),
+						this.recordInterior(node.rhs as parser.RecordValueNode)
+							.interior,
 					]),
 				)
 			: concat([text(" "), this.printExpression(node.rhs)])
@@ -1704,7 +1896,7 @@ export class Printer {
 			let doc = concat([concat(head), text(" "), body])
 
 			if (trailing !== null) {
-				doc = concat([doc, verbatim(" " + trailing.text)])
+				doc = concat([doc, lineSuffix(" " + trailing.text)])
 			}
 
 			entries.push({ startLine, endLine: closeLine, doc })
@@ -1762,8 +1954,26 @@ export class Printer {
 
 		parts.push(text("#" + node.caseName.content))
 
+		// NOTE: The payload is hugged when it brings braces of its own —
+		// `#Rectangle({ … })` — and otherwise laid out like a one-Argument
+		// list without the trailing comma the grammar does not allow, so a
+		// chain in it breaks inside the parentheses rather than dangling out
+		// of them.
 		if (node.value !== null) {
-			parts.push(text("("), this.printExpression(node.value), text(")"))
+			let value = this.printExpression(node.value)
+
+			parts.push(
+				isBlockLike(node.value)
+					? concat([text("("), value, text(")")])
+					: group(
+							concat([
+								text("("),
+								indent(concat([softline, value])),
+								softline,
+								text(")"),
+							]),
+						),
+			)
 		}
 
 		return concat(parts)
@@ -1920,60 +2130,86 @@ export class Printer {
 			return concat([prefix, text("{}")])
 		}
 
+		let { interior, commented } = this.recordInterior(node)
+
 		return group(
 			concat([
 				prefix,
 				text("{"),
-				indent(
-					concat([
-						line,
-						this.printRecordMembers(node),
-						ifBreak(text(","), EMPTY),
-					]),
-				),
+				indent(concat([line, interior])),
 				line,
 				text("}"),
 			]),
+			{ shouldBreak: commented, expandable: true },
 		)
 	}
 
-	private printRecordMembers(node: parser.RecordValueNode): Doc {
-		let members = Object.values(node.members)
-
-		return join(
-			concat([text(","), line]),
-			members.map((member) =>
+	private recordInterior(node: parser.RecordValueNode): {
+		interior: Doc
+		commented: boolean
+	} {
+		let items = this.listItems(
+			Object.values(node.members),
+			(member) => ({
+				start: member.name.position.start,
+				end: member.value.position.end,
+			}),
+			(member) =>
 				concat([
 					text(member.name.content + " = "),
 					this.printExpression(member.value),
 				]),
-			),
+		)
+
+		return this.listInterior(
+			items,
+			this.trivia.takeBefore(node.position.end.line),
 		)
 	}
 
+	// NOTE: A List of nothing but Numbers is FILLED — as many items to a line
+	// as fit — rather than broken one per line: twenty Numbers are twenty
+	// Numbers, not twenty lines. Anything else — Strings read as a list of
+	// things, one to a line — or a Comment among the items, and it breaks one
+	// per line like every other list.
 	private printList(node: parser.ListValueNode): Doc {
 		if (node.values.length === 0) {
 			return text("[]")
 		}
 
+		let items = this.listItems(
+			node.values,
+			(value) => value.position,
+			(value) => this.printExpression(value),
+		)
+		let loose = this.trivia.takeBefore(node.position.end.line)
+		let { interior, commented } = this.listInterior(items, loose)
+
+		if (
+			!commented &&
+			node.values.every((value) => isNumberLiteral(value))
+		) {
+			let filled: Array<Doc> = []
+
+			for (let [index, item] of items.entries()) {
+				if (index > 0) {
+					filled.push(concat([text(","), line]))
+				}
+
+				filled.push(item.doc)
+			}
+
+			interior = concat([fill(filled), ifBreak(text(","), EMPTY)])
+		}
+
 		return group(
 			concat([
 				text("["),
-				indent(
-					concat([
-						softline,
-						join(
-							concat([text(","), line]),
-							node.values.map((value) =>
-								this.printExpression(value),
-							),
-						),
-						ifBreak(text(","), EMPTY),
-					]),
-				),
+				indent(concat([softline, interior])),
 				softline,
 				text("]"),
 			]),
+			{ shouldBreak: commented, expandable: true },
 		)
 	}
 
@@ -2211,27 +2447,31 @@ export class Printer {
 			return text("{}")
 		}
 
+		let items = this.listItems(
+			members,
+			(member) => ({
+				start: member.name.position.start,
+				end: member.type.position.end,
+			}),
+			(member) =>
+				concat([
+					text(member.name.content + ": "),
+					this.printType(member.type),
+				]),
+		)
+		let { interior, commented } = this.listInterior(
+			items,
+			this.trivia.takeBefore(node.position.end.line),
+		)
+
 		return group(
 			concat([
 				text("{"),
-				indent(
-					concat([
-						line,
-						join(
-							concat([text(","), line]),
-							members.map((member) =>
-								concat([
-									text(member.name.content + ": "),
-									this.printType(member.type),
-								]),
-							),
-						),
-						ifBreak(text(","), EMPTY),
-					]),
-				),
+				indent(concat([line, interior])),
 				line,
 				text("}"),
 			]),
+			{ shouldBreak: commented },
 		)
 	}
 
@@ -2251,6 +2491,46 @@ type AlignedHandler = {
 type AlignedAssignment = {
 	headWidth: number
 	padding: TextDoc
+}
+
+// NOTE: One item of a bracketed list with the Comments written around it.
+type ListItem = {
+	doc: Doc
+	leading: Array<Comment>
+	trailing: Comment | null
+}
+
+// NOTE: The links of `a::b()::c()`, outermost last — the AST nests them the
+// other way round.
+function chainLinks(
+	node: parser.MethodInvocationNode,
+): Array<parser.MethodInvocationNode> {
+	let links: Array<parser.MethodInvocationNode> = []
+	let current: parser.ExpressionNode = node
+
+	while (current.nodeType === "MethodInvocation") {
+		links.unshift(current)
+		current = current.base
+	}
+
+	return links
+}
+
+// NOTE: A signature carries no Position for its Parameter list; the `(` is
+// where the signature starts and the `)` is on the return Type's line.
+function signatureListPosition(
+	signature:
+		| parser.NativeMethodSignatureNode
+		| parser.ProtocolMethodSignatureNode,
+): common.Position {
+	return {
+		start: signature.position.start,
+		end: signature.returnType.position.start,
+	}
+}
+
+function isNumberLiteral(node: parser.ExpressionNode): boolean {
+	return node.nodeType === "IntegerValue" || node.nodeType === "RationalValue"
 }
 
 type AssignmentNode =
@@ -2414,7 +2694,8 @@ function isBlockLike(node: parser.ExpressionNode): boolean {
 		node.nodeType === "Match" ||
 		node.nodeType === "FunctionValue" ||
 		node.nodeType === "RecordValue" ||
-		node.nodeType === "ListValue"
+		node.nodeType === "ListValue" ||
+		node.nodeType === "Combination"
 	)
 }
 
