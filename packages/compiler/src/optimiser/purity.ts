@@ -214,9 +214,11 @@ function isPureIntrinsic(
 		case "type-test":
 			return isPure(node.value) && isPure(node.descriptor)
 		// NOTE: A descriptor is data, and a `direct-method` is a reference to a
-		// Function rather than a call of one.
+		// Function rather than a call of one. An omitted Argument is the
+		// JavaScript literal `undefined`, which is as pure as a value gets.
 		case "type-descriptor":
 		case "direct-method":
+		case "omitted-argument":
 			return true
 		// NOTE: A Method call with the search in front of it taken out, which is
 		// a Method call — refused exactly as the `UnionMethodInvocation` it was

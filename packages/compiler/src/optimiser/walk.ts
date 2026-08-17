@@ -742,9 +742,11 @@ function walkIntrinsicChildren(
 		}
 		// NOTE: The leaves. A Type is not an Expression, and the descriptor is
 		// the whole of what a `type-descriptor` holds; a `direct-method` holds
-		// two names and no Expression at all.
+		// two names and no Expression at all; an `omitted-argument` holds
+		// nothing whatever — it is a position held open, not a value.
 		case "type-descriptor":
 		case "direct-method":
+		case "omitted-argument":
 			return node
 		// NOTE: A lowered operation's operands are the Expressions the
 		// Invocation was given, in the order it was given them — so a pass

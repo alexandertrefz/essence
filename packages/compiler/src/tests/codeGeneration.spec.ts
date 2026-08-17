@@ -1119,6 +1119,176 @@ describe("Code Generation", () => {
 	// emitted names run 1, 2, 3 in written order — the same numbering the call
 	// site resolves against the Method Type. Only the Namespaces the standard
 	// library declares can leave a gap, where a native holds the slot.
+	// NOTE: A default is lowered to the JavaScript default parameter, whose
+	// semantics are the language's term for term. A call that leaves an Argument
+	// out therefore emits SHORT where nothing follows the hole, and passes
+	// `void 0` where something does — the one place "no Argument given" is
+	// deliberately introduced into emitted code, and spelled so that a Program
+	// binding the NAME `undefined` can not capture it.
+	describe("Default Parameter Values", () => {
+		// NOTE: Asked with `pool-constants` off, so what is read back is the
+		// default itself rather than the name the pool gave it — that pass
+		// reaches a default too, and what IT does is `optimiser.spec`'s.
+		it("should emit a default as the Parameter's own default", () => {
+			expect(
+				generate(
+					`implementation {
+					function f(_ count: Integer = 1) -> Integer {
+						<- count
+					}
+
+					Terminal.inspect(f())
+				}`,
+					undefined,
+					{
+						enabled: true,
+						disabledPasses: new Set(["pool-constants"]),
+					},
+				),
+			).toContain("function f(count = Integer.createInteger(1)) {")
+		})
+
+		it("should emit a short call for a trailing omission", () => {
+			expect(
+				generate(`implementation {
+					function f(_ count: Integer = 1) -> Integer {
+						<- count
+					}
+
+					Terminal.inspect(f())
+				}`),
+			).toContain("f()")
+		})
+
+		it("should emit void 0 for an interior omission", () => {
+			expect(
+				generate(`implementation {
+					function g(from a: Integer = 0, to b: Integer) -> Integer {
+						<- b::subtract(a)
+					}
+
+					Terminal.inspect(g(to 7))
+				}`),
+			).toMatch(/g\(void 0, \$pool_\d\)/)
+		})
+
+		// NOTE: The case a naive reading of "trailing omissions are simply not
+		// passed" breaks on — the hidden `__conformance` Argument a bounded
+		// Generic appends comes AFTER the hole, so the hole has to be passed.
+		it("should emit void 0 for an omission before a conformance Argument", () => {
+			expect(
+				generate(`implementation {
+					function show<infer Value is Printable>(_ value: Value, with prefix: String = "> ") -> String {
+						<- prefix::append(value::toString())
+					}
+
+					Terminal.inspect(show(1))
+				}`),
+			).toMatch(/show\(\$pool_\d, void 0, \$pool_\d\)/)
+		})
+
+		// NOTE: `undefined` is a NAME a Program may bind — `constant undefined =
+		// 99` is legal Essence and emits a `const undefined` — so the hole is
+		// spelled `void 0`, which is the same value under a spelling nothing can
+		// rebind. Written as the Identifier, every hole in that Module was
+		// passed the Program's own value.
+		it("should not let a Constant named undefined capture a hole", async () => {
+			let source = `implementation {
+				constant undefined = 99
+
+				function g(from a: Integer = 0, to b: Integer) -> Integer {
+					<- b::subtract(a)
+				}
+
+				Terminal.inspect(g(to 7))
+			}`
+
+			expect(generate(source)).not.toContain("g(undefined")
+			expect(await run(source)).toEqual(["7"])
+		})
+
+		it("should read @ as a binding rather than recompute the receiver", () => {
+			expect(
+				generate(`implementation {
+					namespace Slices for List<Integer> {
+						upTo(_ end: Integer = @::length()) -> Integer {
+							<- end
+						}
+					}
+
+					Terminal.inspect([1, 2]::upTo())
+				}`),
+			).toContain("static upTo(_self, end = List.length(_self)) {")
+		})
+
+		it("should run a defaulted call and its written twin", async () => {
+			expect(
+				await run(`implementation {
+					function f(_ count: Integer = 1) -> Integer {
+						<- count
+					}
+
+					function g(from a: Integer = 0, to b: Integer) -> Integer {
+						<- b::subtract(a)
+					}
+
+					namespace Slices for List<Integer> {
+						upTo(_ end: Integer = @::length()) -> Integer {
+							<- end
+						}
+					}
+
+					Terminal.inspect(f())
+					Terminal.inspect(f(5))
+					Terminal.inspect(g(to 7))
+					Terminal.inspect(g(from 2, to 7))
+					Terminal.inspect([1, 2, 3]::upTo())
+					Terminal.inspect([1, 2, 3]::upTo(9))
+				}`),
+			).toEqual(["1", "5", "7", "5", "3", "9"])
+		})
+
+		// NOTE: Every branch of a dispatch resolves to a DIFFERENT Method, so
+		// they need not agree on what may be left out — the shared Argument list
+		// holds what the call wrote and each branch opens its own holes.
+		const divergentDispatch = `implementation {
+			namespace Scaled for Integer {
+				measure(_ scale: Integer = 10, to limit: Integer) -> Integer {
+					<- scale::multiply(with limit)
+				}
+			}
+
+			namespace Plain for String {
+				measure(to limit: Integer) -> Integer {
+					<- limit
+				}
+			}
+
+			function measured(_ value: Integer | String) -> Integer {
+				<- value::measure(to 3)
+			}
+
+			Terminal.inspect(measured(1))
+			Terminal.inspect(measured("a"))
+		}`
+
+		it("should let dispatch branches omit different Parameters", async () => {
+			expect(await run(divergentDispatch)).toEqual(["30", "3"])
+		})
+
+		// NOTE: The same Program through the runtime's own search, which is
+		// what `--without-optimisation compile-union-dispatch` builds — the two
+		// have to agree, so the holes are opened in both.
+		it("should let the runtime search open a branch's holes too", () => {
+			expect(
+				generate(divergentDispatch, undefined, {
+					enabled: true,
+					disabledPasses: new Set(["compile-union-dispatch"]),
+				}),
+			).toContain("$type.dispatchMethod")
+		})
+	})
+
 	describe("Overload Numbering", () => {
 		it("should number a Namespace's own Overloads in written order", async () => {
 			const source = `implementation {

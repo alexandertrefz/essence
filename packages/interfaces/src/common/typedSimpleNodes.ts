@@ -164,6 +164,14 @@ export type UnionMethodDispatchCase = {
 	// them as `dispatchMethod`'s fourth case element, and only when there are
 	// any, so a dispatch passing no such literal emits what it always did.
 	contextualArguments: Array<{ index: number; argument: ArgumentNode }>
+	// NOTE: Which of THIS branch's Parameters the call wrote no Argument for,
+	// indexed over its callee's whole signature with the receiver at 0. Per
+	// branch because every branch resolves to a different Method and they need
+	// not agree: `v::m(to 3)` against a branch declaring `(_ a: Integer = 1, to
+	// b: Integer)` omits Parameter 1, and against a branch declaring `(to b:
+	// Integer)` omits nothing. The shared Argument list is therefore what the
+	// call WROTE, and the holes are opened per branch where the call is made.
+	omittedParameterIndices: Array<number>
 	// NOTE: Present only when this branch resolves to a *generic* Choice's
 	// derived Equatable — the Rewriter then emits
 	// `$helpers.boundChoiceIs(<descriptor>)` for the branch's Method.
@@ -361,6 +369,25 @@ export type IntrinsicNode =
 	| DispatchChainNode
 	| InlineLoopNode
 	| ListBuildNode
+	| OmittedArgumentNode
+
+// NOTE: The hole a call leaves where it wrote no Argument for a Parameter that
+// has a default and something follows it — a later written Argument, or a
+// hidden conformance Argument. It emits as the JavaScript literal `undefined`,
+// which is exactly what a JavaScript default parameter fires on, and it is the
+// one place `undefined` is deliberately introduced into emitted code.
+//
+// It never becomes a value: the parameter binding on the callee side consumes
+// it before the first Statement of the body runs. `simplifyBody` exists to keep
+// `undefined` from escaping as a RETURN value, and the same reasoning is why
+// this is safe going the other way — an omission with nothing after it is not
+// passed at all, so this Node stands only where a position has to be held open.
+export type OmittedArgumentNode = {
+	nodeType: "Intrinsic"
+	kind: "omitted-argument"
+	type: Type
+	position?: Position
+}
 
 // NOTE: Whether a value is a Case carrying this tag — `value[<Type key>] ===
 // "Ordering#Less"`, the whole of what the runtime asks when the answer can not
@@ -684,6 +711,10 @@ export type DispatchChainCase = {
 	// against THIS branch's Method, which means something different in every
 	// branch because its Parameter Types came from the branch.
 	contextualArguments: Array<{ index: number; value: ExpressionNode }>
+	// NOTE: As on the dispatch case this was built from — the Parameters THIS
+	// branch's callee takes its defaults for, opened as holes in the branch's
+	// own Argument list rather than in the shared one.
+	omittedParameterIndices: Array<number>
 	// NOTE: Present only when this branch resolves to a *generic* Choice's
 	// derived Equatable, exactly as it is on the dispatch case it was built
 	// from — the one function that spells a Method reference reads it.

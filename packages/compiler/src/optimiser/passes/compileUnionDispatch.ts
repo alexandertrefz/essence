@@ -175,6 +175,8 @@ function compile(
 					value: contextual.argument.value,
 				}),
 			),
+			omittedParameterIndices:
+				branch.dispatchCase.omittedParameterIndices,
 			derivedDescriptor: branch.dispatchCase.derivedDescriptor,
 		})),
 		type: node.type,
@@ -278,7 +280,12 @@ function collapsedIfUniform(
 			branch.dispatchCase.methodName === first.dispatchCase.methodName &&
 			branch.dispatchCase.derivedDescriptor === undefined &&
 			branch.dispatchCase.conformanceArguments.length === 0 &&
-			branch.dispatchCase.contextualArguments.length === 0,
+			branch.dispatchCase.contextualArguments.length === 0 &&
+			// NOTE: Two branches that leave different Parameters out make two
+			// different calls, exactly as two carrying different witnesses do —
+			// so they keep their tests.
+			branch.dispatchCase.omittedParameterIndices.join() ===
+				first.dispatchCase.omittedParameterIndices.join(),
 	)
 
 	if (!isUniform) {
