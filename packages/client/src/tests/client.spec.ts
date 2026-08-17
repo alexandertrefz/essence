@@ -16,7 +16,10 @@ import { typeKeySymbol } from "@essence-lang/runtime/type"
 
 import type { EssenceValue, RuntimeBridge } from "../bridge"
 import { EssenceCompileError } from "../compile-error"
+import { describeModule } from "../descriptor"
+import { EssenceCallError, EssenceMarshalError } from "../errors"
 import { type EssenceModule, loadModule } from "../index"
+import { createInterpreter } from "../marshal-runtime"
 import { EssenceRational } from "../rational"
 
 // NOTE: Every load in this file caches into a directory of its own, so that a
@@ -450,5 +453,155 @@ export {
 		let bridged = linkToMemory(entry, { emitterKey: BRIDGE_KEY })
 
 		expect(bridged.bundleHash).not.toBe(plain.bundleHash)
+	})
+})
+
+// NOTE: A JavaScript call may leave out what an Essence call may — the arity
+// gate is a range and the label gate asks for the REQUIRED labels, and the
+// emitted default parameter fills the rest.
+describe("Calling with an Argument left out", () => {
+	let defaults: EssenceModule
+
+	beforeAll(async () => {
+		defaults = await loadModule(clientFixture("Defaults.es"), {
+			cacheDirectory,
+		})
+	})
+
+	it("takes a positional call that stops before a trailing default", () => {
+		let scaled = defaults.exports.scaled as (
+			value: bigint,
+			factor?: bigint,
+		) => bigint
+
+		expect(scaled(21n)).toBe(42n)
+		expect(scaled(21n, 3n)).toBe(63n)
+	})
+
+	it("takes a labelled call that leaves an interior default out", () => {
+		let cut = defaults.exports.cut as (labelled: {
+			from?: bigint
+			to: bigint
+		}) => bigint
+
+		expect(cut({ to: 7n })).toBe(7n)
+		expect(cut({ from: 2n, to: 7n })).toBe(5n)
+	})
+
+	it("takes a call that writes nothing at all", () => {
+		let greeting = defaults.exports.greeting as (
+			prefix?: string,
+			name?: string,
+		) => string
+
+		expect(greeting()).toBe("hello world")
+		expect(greeting("hi")).toBe("hi world")
+		expect(greeting("hi", "there")).toBe("hi there")
+	})
+
+	// NOTE: A required Argument is still required, and the refusal names the
+	// RANGE the signature accepts rather than one count nobody has to pass.
+	it("still refuses a call that leaves a required Argument out", () => {
+		let cut = defaults.exports.cut as (...args: Array<unknown>) => bigint
+
+		expect(() => cut()).toThrow(/takes 1 to 2 Arguments/)
+	})
+
+	// NOTE: WHICH Parameters a positional call stops before is the question,
+	// never how many. `cut(7n)` writes as many Arguments as the range allows and
+	// still leaves the REQUIRED `to` out — counted, it was admitted and the hole
+	// was padded onto `to`, which reached the emitted Function as `undefined`
+	// and died inside it rather than at the boundary.
+	it("refuses a positional call that stops before a required Parameter", () => {
+		let cut = defaults.exports.cut as (...args: Array<unknown>) => bigint
+
+		expect(() => cut(7n)).toThrow(EssenceCallError)
+		expect(() => cut(7n)).toThrow(/takes 1 to 2 Arguments/)
+	})
+
+	// NOTE: The `.d.ts` types an omittable label as `label?: T` and an interior
+	// one as `T | undefined`, and TypeScript's `?` admits an explicit
+	// `undefined` — so a call writing one is a call the declaration says is
+	// legal, and it means the same as leaving the key out.
+	it("takes an explicit undefined where the declaration admits one", () => {
+		let cut = defaults.exports.cut as (labelled: {
+			from?: bigint
+			to: bigint
+		}) => bigint
+		let greeting = defaults.exports.greeting as (
+			prefix?: string,
+			name?: string,
+		) => string
+
+		expect(cut({ from: undefined, to: 7n })).toBe(7n)
+		expect(greeting(undefined, "there")).toBe("hello there")
+		expect(greeting("hi", undefined)).toBe("hi world")
+	})
+
+	// NOTE: And a required slot is untouched by that — `undefined` there is a
+	// value the host passed, and no Essence Type admits it.
+	it("still refuses an explicit undefined on a required Parameter", () => {
+		let cut = defaults.exports.cut as (labelled: {
+			from?: bigint
+			to?: bigint
+		}) => bigint
+
+		expect(() => cut({ from: 2n, to: undefined })).toThrow(
+			EssenceMarshalError,
+		)
+	})
+
+	it("still refuses a labelled call missing a required label", () => {
+		let cut = defaults.exports.cut as (...args: Array<unknown>) => bigint
+
+		expect(() => cut({ from: 2n })).toThrow(/'from', 'to'/)
+	})
+
+	it("still refuses an unknown label", () => {
+		let cut = defaults.exports.cut as (...args: Array<unknown>) => bigint
+
+		expect(() => cut({ to: 7n, around: 1n })).toThrow(/'from', 'to'/)
+	})
+
+	// NOTE: `optional` is a WIRE format field, written to `<output>.descriptor
+	// .json` and inlined as JSON into generated wrappers — so a sidecar written
+	// before defaults existed has to keep loading, and every Parameter in it has
+	// to keep meaning "required". Absence reads as required, which is what makes
+	// that true; this is the test that says so out loud.
+	it("reads a descriptor with no `optional` field as all required", async () => {
+		let defaults = await loadModule(clientFixture("Defaults.es"), {
+			cacheDirectory,
+		})
+		let described = describeModule(defaults.surface, defaults.entryPath)
+		let signature = described.exports["scaled"]
+
+		if (signature?.kind !== "function") {
+			throw new Error("Expected a function export")
+		}
+
+		// NOTE: The old sidecar, made by taking the field back out.
+		let older = {
+			exports: {
+				scaled: {
+					...signature,
+					of: {
+						...signature.of,
+						parameters: signature.of.parameters.map(
+							({ label, of }) => ({ label, of }),
+						),
+					},
+				},
+			},
+		}
+
+		let interpreter = createInterpreter(defaults.bridge, older)
+		let scaled = interpreter.wrapFunction(
+			defaults.raw.scaled as never,
+			older.exports.scaled.of,
+			"scaled",
+		) as (...args: Array<unknown>) => bigint
+
+		expect(scaled(21n, 3n)).toBe(63n)
+		expect(() => scaled(21n)).toThrow(/takes 2 Arguments/)
 	})
 })

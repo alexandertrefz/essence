@@ -310,3 +310,39 @@ a native is called positionally with every argument the convention passes. The
 runtime `.length` of each export is checked against the same count in
 `packages/compiler/src/tests/builtins.spec.ts`, the one place a default parameter
 can still be seen.
+
+### A native that declares a default
+
+A native signature may carry `= expression` on a Parameter — `trim(at side: Side
+= #BothEnds)`, `slice(from start: Integer = 0, to end: Integer = @::length())` —
+and **the native contract does not change at all**. The runtime never learns
+that defaults exist: it keeps taking exactly the Parameters the declaration
+lists, positionally, with no default and no rest parameter, and `nativeArity`
+counts them the way it always did.
+
+What the Compiler does instead is synthesize the frame the default needs, as a
+top-level const beside the prelude's Essence-implemented members:
+
+```js
+const $es_String_trim = (_self, side = $type.createCase("Side#BothEnds")) =>
+	String.trim(_self, side)
+```
+
+**Only a call site that actually leaves an Argument out names it.** A call that
+writes every Argument emits byte-identically to what it always did — a direct
+read off the imported runtime module, tree-shakeable exactly as before — and the
+shim, which nothing references, is dropped by the bundler.
+
+The invariant this rests on is worth writing down: **a native's declaration in
+`sources/` stays the single source of truth for its defaults.** Asking the
+runtime to implement one would spell the same default twice, once in `.es` as
+documentation and once in `.ts` as behaviour, with nothing checking that the two
+agree. The `.es` file says what the default is; the `.ts` file never mentions
+it.
+
+A default is refused where it could never fire: on a Protocol requirement
+(`default-on-protocol-requirement`), and on a Function literal in expression
+position (`default-on-function-literal`). And in this version a Method fulfilling
+a Protocol requirement must match it exactly, defaulted Parameters included —
+which is why `String.is` and `String.isNot` keep their `overload` block rather
+than collapsing into a defaulted `comparing:` Parameter.

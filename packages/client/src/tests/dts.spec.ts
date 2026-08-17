@@ -738,3 +738,26 @@ export let squared = square(PI)
 		expect(run.code).toBe(0)
 	})
 })
+
+// NOTE: `= expression` defaults, at the JavaScript boundary. `?` is the first
+// thing this generator ever writes that TypeScript restricts the ORDER of, and
+// the restriction is stricter than Essence's own rule — so the two forms of a
+// call say different things about the same Parameter.
+describe("A Parameter a call may leave out", () => {
+	it("declares it", async () => {
+		expect(await declarationsOf(clientFixture("Defaults.es"))).toBe(
+			`// Generated from Defaults.es by @essence-lang/client. Do not edit.
+//
+// The Module as JavaScript — marshalled at every boundary.
+
+export declare function cut(from: bigint | number | undefined, to: bigint | number): bigint
+export declare function cut(labelled: { from?: bigint | number; to: bigint | number }): bigint
+
+export declare function greeting(p0?: string, and?: string): string
+export declare function greeting(labelled: { "with"?: string; and?: string }): string
+
+export declare function scaled(p0: bigint | number, by?: bigint | number): bigint
+`,
+		)
+	})
+})
