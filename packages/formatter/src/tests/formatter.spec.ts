@@ -1594,6 +1594,66 @@ describe("formatter", () => {
 		})
 	})
 
+	// NOTE: A block's `{` is not on the line its owner starts on once a header
+	// breaks, and every one of these used to ask about the wrong line — an
+	// opening Comment left unclaimed and flushed out of the block, or a
+	// Namespace looking for its brace on the first member's `}`.
+	describe("the line a block opens on", () => {
+		it("keeps a comment trailing the brace of a broken header", () => {
+			let source =
+				"implementation {\n\tfunction foo(_ alpha: Integer, _ beta: Integer, _ gamma: Integer, _ delta: Integer) -> Integer { § note\n\t\t<- alpha\n\t}\n}\n"
+			let result = format(source)
+
+			expect(result.refusal).toBeNull()
+			expect(result.text).toContain(") -> Integer { § note\n\t\t<- alpha")
+		})
+
+		it("keeps a comment trailing a namespace's brace", () => {
+			let source =
+				"implementation {\n\ttype Box = { value: Integer }\n\tnamespace BoxOps for Box { § ops\n\t\tdouble() -> Box {\n\t\t\t<- { value = @.value::multiply(with 2) }\n\t\t}\n\t}\n}\n"
+			let result = format(source)
+
+			expect(result.refusal).toBeNull()
+			expect(result.text).toBe(source)
+		})
+
+		it("leaves a comment trailing the first member's brace where it is", () => {
+			let source =
+				"implementation {\n\ttype Box = { value: Integer }\n\tnamespace BoxOps for Box {\n\t\tdouble() -> Box {\n\t\t\t<- { value = @.value::multiply(with 2) }\n\t\t} § trailing on method close\n\t\ttriple() -> Box {\n\t\t\t<- { value = @.value::multiply(with 3) }\n\t\t}\n\t}\n}\n"
+			let result = format(source)
+
+			expect(result.refusal).toBeNull()
+			expect(result.text).toBe(source)
+		})
+
+		it("keeps a comment trailing a match's brace", () => {
+			let source =
+				"implementation {\n\tconstant x: Optional<Integer> = #Value(1)\n\tTerminal.inspect(match x -> Integer { § note on the header\n\t\tcase #Value(item) { <- item }\n\t\tcase #Empty       { <- 0 }\n\t})\n}\n"
+			let result = format(source)
+
+			expect(result.refusal).toBeNull()
+			expect(result.text).toBe(source)
+		})
+
+		it("does not read a blank line between two parameters as one after the brace", () => {
+			let source =
+				"implementation {\n\tfunction foo(\n\t\t_ a: Integer,\n\n\t\t_ b: Integer,\n\t) -> Integer {\n\t\t<- a\n\t}\n}\n"
+
+			expect(format(source).text).toBe(
+				"implementation {\n\tfunction foo(_ a: Integer, _ b: Integer) -> Integer {\n\t\t<- a\n\t}\n}\n",
+			)
+		})
+
+		it("drops a blank line written directly after a nested brace", () => {
+			let source =
+				'implementation {\n\n\tfunction double(_ n: Integer) -> Integer {\n\n\t\t<- n::multiply(with 2)\n\t}\n\n\tif true {\n\n\t\tTerminal.print("x")\n\t}\n}\n'
+
+			expect(format(source).text).toBe(
+				'implementation {\n\n\tfunction double(_ n: Integer) -> Integer {\n\t\t<- n::multiply(with 2)\n\t}\n\n\tif true {\n\t\tTerminal.print("x")\n\t}\n}\n',
+			)
+		})
+	})
+
 	describe("the safety gate", () => {
 		it("holds every comment in place among the tokens around it", () => {
 			let source =

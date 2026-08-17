@@ -52,6 +52,26 @@ export class SourceText {
 		return null
 	}
 
+	// NOTE: The line a block's own `{` is written on: the LAST line in the
+	// range whose code — a trailing Comment stripped — ends with the brace. A
+	// block's opening line is what a trailing Comment is claimed on and what
+	// the Statement inside it are laid out against, and it is NOT the line the
+	// Declaration starts on: a Parameter list, a conformance clause or a
+	// broken chain in an `if` condition can put the brace several lines below
+	// the keyword. The last such line, because a default value or a `match`
+	// value written before the brace can end a line with a `{` of its own.
+	openingBraceLine(from: number, to: number): number | null {
+		for (let line = to; line >= from; line--) {
+			let code = codeOf(this.lineAt(line)).trimEnd()
+
+			if (code.endsWith("{") || code.endsWith("{}")) {
+				return line
+			}
+		}
+
+		return null
+	}
+
 	// NOTE: `end` is exclusive of the character at `end.column`, matching the
 	// Lexer's cursor, which stops on the first character that is not part of
 	// the Token.
@@ -77,4 +97,24 @@ export class SourceText {
 
 		return parts.join("\n")
 	}
+}
+
+// NOTE: A line with its trailing Comment cut off. A `§` inside a String is
+// not a Comment, and the one way to tell without lexing is that an odd number
+// of quotes stands before it — good enough for a line whose only job is to say
+// whether it ends in a brace.
+function codeOf(line: string): string {
+	let quotes = 0
+
+	for (let index = 0; index < line.length; index++) {
+		let character = line[index]
+
+		if (character === '"' && line[index - 1] !== "\\") {
+			quotes++
+		} else if (character === "§" && quotes % 2 === 0) {
+			return line.slice(0, index)
+		}
+	}
+
+	return line
 }

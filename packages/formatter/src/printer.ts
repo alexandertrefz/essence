@@ -69,7 +69,10 @@ export class Printer {
 
 	// NOTE: Lays entries out one per line, keeping a single blank line wherever
 	// the author left one or more. `openLine` seeds the check so that the blank
-	// line the corpus writes after `implementation {` survives.
+	// line the corpus writes after `implementation {` survives; it is null for
+	// every nested block, which starts tight against its brace the way it
+	// already ends tight against the closing one — the corpus never writes a
+	// blank line after any brace but the Program's own.
 	//
 	// Whether a blank line was written is asked of the source text rather than
 	// worked out from the difference between two line numbers. A Declaration's
@@ -77,7 +80,7 @@ export class Printer {
 	// the `{` its body opens at once a Parameter list or a conformance clause
 	// breaks — and arithmetic on those numbers reads that header as a gap and
 	// invents a blank line, differently on each pass.
-	private layout(entries: Array<Entry>, openLine: number): Doc {
+	private layout(entries: Array<Entry>, openLine: number | null): Doc {
 		let parts: Array<Doc> = []
 		let previousEnd = openLine
 
@@ -86,7 +89,10 @@ export class Printer {
 				parts.push(hardline)
 			}
 
-			if (this.source.hasBlankLineBetween(previousEnd, entry.startLine)) {
+			if (
+				previousEnd !== null &&
+				this.source.hasBlankLineBetween(previousEnd, entry.startLine)
+			) {
 				parts.push(hardline)
 			}
 
@@ -282,8 +288,7 @@ export class Printer {
 	// Handler stops fitting on one line.
 	private block(
 		entries: Array<Entry>,
-		openLine: number,
-		closeLine: number,
+		openLine: number | null,
 		allowFlat = false,
 		opening: Comment | null = null,
 		prefix: Doc = EMPTY,
@@ -320,14 +325,21 @@ export class Printer {
 	// NOTE: `closeLine` is where the body's own `}` is, which is NOT the end of
 	// the Statement that owns it — an `if … else` Position runs past the true
 	// body's brace to the end of the false one, and flushing Comments against
-	// that would pull the `else` block's Comments into the `if`.
+	// that would pull the `else` block's Comments into the `if`. `headLine` is
+	// where the owning Statement starts; the `{` itself is looked for from
+	// there, since a header can put it several lines lower.
 	private bodyBlock(
 		body: Array<parser.ImplementationNode>,
-		openLine: number,
+		headLine: number,
 		closeLine: number,
 		allowFlat = false,
 		prefix: Doc = EMPTY,
 	): Doc {
+		let openLine = this.braceLine(
+			headLine,
+			body[0]?.position.start.line ?? null,
+			closeLine,
+		)
 		let opening = this.trivia.claimTrailingOn(openLine)
 
 		let entries = this.implementationEntries(body)
@@ -339,12 +351,41 @@ export class Printer {
 		// follows it — so the flat shape is off the table.
 		return this.block(
 			entries,
-			openLine,
-			closeLine,
+			null,
 			allowFlat && entries.length === body.length,
 			opening,
 			prefix,
 		)
+	}
+
+	// NOTE: The line a block's `{` is written on. It is looked for between the
+	// owner's first line and the line above the first thing inside the block —
+	// or, for an empty block, the line above its `}` — because nothing in the
+	// AST records it: a Declaration's Position starts at its keyword, and a
+	// Parameter list, a conformance clause or a broken `if` condition can put
+	// the brace several lines below that. Claiming the opening Comment on the
+	// keyword's line instead is what left `) -> Integer { § note` unstable and
+	// a `namespace`'s opening Comment unclaimed altogether.
+	private braceLine(
+		headLine: number,
+		firstInnerLine: number | null,
+		closeLine: number,
+	): number {
+		let to = (firstInnerLine ?? closeLine) - 1
+
+		if (firstInnerLine === null && closeLine > headLine) {
+			let found = this.source.openingBraceLine(closeLine, closeLine)
+
+			if (found !== null) {
+				return found
+			}
+		}
+
+		if (to < headLine) {
+			return headLine
+		}
+
+		return this.source.openingBraceLine(headLine, to) ?? headLine
 	}
 
 	// #endregion
@@ -407,13 +448,7 @@ export class Printer {
 		parts.push(
 			concat(heading),
 			text(keyword + " "),
-			this.block(
-				entries,
-				program.position.start.line,
-				program.position.end.line,
-				false,
-				opening,
-			),
+			this.block(entries, program.position.start.line, false, opening),
 		)
 
 		if (program.exports !== null) {
@@ -575,8 +610,7 @@ export class Printer {
 			text(keyword + " "),
 			this.block(
 				lines.map((doc): Entry => ({ startLine: 0, endLine: 0, doc })),
-				0,
-				0,
+				null,
 				false,
 				opening,
 			),
@@ -769,7 +803,13 @@ export class Printer {
 	}
 
 	private printChoice(node: parser.ChoiceDeclarationStatementNode): Doc {
-		let opening = this.trivia.claimTrailingOn(node.position.start.line)
+		let opening = this.trivia.claimTrailingOn(
+			this.braceLine(
+				node.position.start.line,
+				node.cases[0]?.name.position.start.line ?? null,
+				node.position.end.line,
+			),
+		)
 
 		let entries = this.entriesFor(
 			node.cases,
@@ -793,13 +833,7 @@ export class Printer {
 			text("choice " + node.name.content),
 			this.printGenericList(node.generics),
 			text(" "),
-			this.block(
-				entries,
-				node.position.start.line,
-				node.position.end.line,
-				false,
-				opening,
-			),
+			this.block(entries, null, false, opening),
 		])
 	}
 
@@ -860,10 +894,13 @@ export class Printer {
 		)
 
 		let opening = this.trivia.claimTrailingOn(
-			this.source.closingBraceLine(
+			this.braceLine(
 				node.position.start.line,
+				members[0] === undefined
+					? null
+					: memberName(members[0]).position.start.line,
 				node.position.end.line,
-			) ?? node.position.start.line,
+			),
 		)
 
 		let entries = this.entriesFor(
@@ -880,13 +917,7 @@ export class Printer {
 		return concat([
 			headDoc,
 			text(" "),
-			this.block(
-				entries,
-				node.position.start.line,
-				node.position.end.line,
-				false,
-				opening,
-			),
+			this.block(entries, null, false, opening),
 		])
 	}
 
@@ -1024,7 +1055,13 @@ export class Printer {
 				left.name.position.start.line - right.name.position.start.line,
 		)
 
-		let opening = this.trivia.claimTrailingOn(node.position.start.line)
+		let opening = this.trivia.claimTrailingOn(
+			this.braceLine(
+				node.position.start.line,
+				methods[0]?.name.position.start.line ?? null,
+				node.position.end.line,
+			),
+		)
 
 		let entries = this.entriesFor(
 			methods,
@@ -1039,13 +1076,7 @@ export class Printer {
 
 		return concat([
 			text("protocol " + node.name.content + " "),
-			this.block(
-				entries,
-				node.position.start.line,
-				node.position.end.line,
-				false,
-				opening,
-			),
+			this.block(entries, null, false, opening),
 		])
 	}
 
@@ -1076,18 +1107,9 @@ export class Printer {
 					(signature) => this.printProtocolSignature(signature),
 				)
 
-				let first = method.signatures[0]
-				let last = method.signatures[method.signatures.length - 1]
-
 				return concat([
 					text(keyword + method.name.content + " "),
-					this.block(
-						entries,
-						(first?.position.start.line ??
-							method.name.position.start.line) - 1,
-						(last?.position.end.line ??
-							method.name.position.end.line) + 1,
-					),
+					this.block(entries, null),
 				])
 			}
 		}
@@ -1121,7 +1143,13 @@ export class Printer {
 		>,
 		position: common.Position,
 	): Doc {
-		let opening = this.trivia.claimTrailingOn(position.start.line)
+		let opening = this.trivia.claimTrailingOn(
+			this.braceLine(
+				position.start.line,
+				entries[0]?.position.start.line ?? null,
+				position.end.line,
+			),
+		)
 
 		let laid = this.entriesFor(
 			entries,
@@ -1134,13 +1162,7 @@ export class Printer {
 
 		this.flushBefore(position.end.line, laid)
 
-		return this.block(
-			laid,
-			position.start.line,
-			position.end.line,
-			false,
-			opening,
-		)
+		return this.block(laid, null, false, opening)
 	}
 
 	// #endregion
@@ -1576,6 +1598,17 @@ export class Printer {
 		let entries: Array<Entry> = []
 		let run: Array<AlignedHandler> = []
 
+		// NOTE: A Comment trailing the `match`'s own `{` — claimed before the
+		// Handlers are walked, or the first Handler's `takeBefore` would stall
+		// on it and it would be flushed out below the whole `match`.
+		let opening = this.trivia.claimTrailingOn(
+			this.braceLine(
+				node.position.start.line,
+				node.handlers[0]?.matcher.position.start.line ?? null,
+				node.position.end.line,
+			),
+		)
+
 		// NOTE: Padding is only worth writing where it lines something up, so a
 		// run of one is left alone.
 		let closeRun = () => {
@@ -1671,11 +1704,7 @@ export class Printer {
 			text(" -> "),
 			this.printType(node.returnType),
 			text(" "),
-			this.block(
-				entries,
-				node.position.start.line,
-				node.position.end.line,
-			),
+			this.block(entries, null, false, opening),
 		])
 	}
 
