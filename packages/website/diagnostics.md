@@ -539,6 +539,22 @@ This is not a rule about defaults having to come last: `(_ a: Integer, _ b:
 Integer = 2, to x: Integer)` is legal, because `f(1, to 3)` skips `b` by the
 label the next Argument carries.
 
+### `ambiguous-overload-default`
+
+Two entries of one `overload` block accept the same call, because a default on
+one of them lets it be called with exactly the Arguments the other one takes.
+An Overload is selected by the Arguments a call writes, so two entries that
+accept the same ones can not both be reached.
+
+Only a shape reachable by LEAVING A DEFAULT OUT is refused. Entries of the same
+written shape that resolve by the Types of their Arguments — `Integer.add`'s
+four entries, all of shape `(_)` — are what an `overload` block is for and stay
+exactly as they are. The hazard is only ever a shape that did not exist before
+the default was written.
+
+Where a default was written to replace a shorter entry, delete the shorter
+entry: the default already means it.
+
 ## Choices
 
 ### `empty-choice`

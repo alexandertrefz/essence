@@ -4009,6 +4009,22 @@ function enrichParameterDefault(
 
 	let valueType = value.type
 
+	// NOTE: A default written down where a refinement stands is admitted by
+	// deciding the predicate here, exactly as an Argument written down there is
+	// — `1` really is a NonZeroInteger. The default IS the Argument a call that
+	// omits it passes, so the two questions have to be the same one; asking
+	// only about assignability would refuse the very literal every written call
+	// is admitted by.
+	if (
+		type.type === "Refinement" &&
+		admittedByEvaluation(
+			refinementDecidedBy(type, valueType) ?? type,
+			value,
+		)
+	) {
+		return value
+	}
+
 	if (
 		!typeContainsError(type) &&
 		!typeContainsError(valueType) &&

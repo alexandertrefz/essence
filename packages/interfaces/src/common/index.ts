@@ -203,6 +203,7 @@ export type DiagnosticCode =
 	| "static-method-on-value"
 	| "native-property-without-type"
 	| "indistinguishable-default-parameter"
+	| "ambiguous-overload-default"
 	// Choices and their Cases.
 	| "empty-choice"
 	| "unknown-case"
