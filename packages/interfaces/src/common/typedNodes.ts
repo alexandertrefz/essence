@@ -554,6 +554,12 @@ export interface ParameterNode {
 	// the expected signature. Null means the Type is written in the source,
 	// where showing it again would be noise.
 	inferredType: Type | null
+	// NOTE: The enriched `= expression`. It is here rather than only on the
+	// Parser's node because the Simplifier lowers it into a JavaScript default
+	// parameter, and because the Language Server's typed walkers — rename,
+	// call hierarchy — have to be able to reach a Method Invocation written
+	// inside one.
+	defaultValue: ExpressionNode | null
 }
 
 export interface GenericDeclarationNode {

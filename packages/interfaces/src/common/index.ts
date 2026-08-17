@@ -160,6 +160,9 @@ export type DiagnosticCode =
 	| "reserved-type-name"
 	| "use-before-declaration"
 	| "unknown-name"
+	| "default-references-later-parameter"
+	| "default-references-own-parameter"
+	| "default-references-pattern-binding"
 	| "unknown-type"
 	| "unknown-protocol"
 	| "unknown-member"
@@ -169,6 +172,7 @@ export type DiagnosticCode =
 	| "argument-type-mismatch"
 	| "argument-label-mismatch"
 	| "argument-count-mismatch"
+	| "default-type-mismatch"
 	| "return-type-mismatch"
 	| "condition-not-boolean"
 	| "constant-reassignment"
@@ -376,6 +380,17 @@ export type Parameter = {
 	// Signature Help can describe the Argument being typed rather than the
 	// call as a whole.
 	documentation?: string
+	// NOTE: Whether a call may leave this Argument out. The expression itself
+	// is deliberately not here: a Type is compared, cached and serialized, and
+	// it has no business carrying a Node. What a default IS lives on the
+	// Parameter Node the Declaration owns; what a caller may omit is all a
+	// Type needs to say.
+	//
+	// NOTE: Absent rather than `false`, like `UnionType.unitChoice`, so that
+	// every Type that has no default stays structurally what it was — which is
+	// what keeps `matchTypes`' `lhs === rhs` fast path and the snapshot cache
+	// undisturbed.
+	hasDefault?: true
 }
 
 // NOTE: `documentation` is optional in the type, but every builtin Namespace

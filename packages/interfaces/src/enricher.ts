@@ -54,6 +54,33 @@ export type Scope = {
 	// while a Match Handler nested inside still binds its own `@` and wins,
 	// because that binding sits closer to the use.
 	isStaticMethodBody?: boolean
+	// NOTE: The names a Parameter's `= expression` default may NOT read, and
+	// where each one is written. A default may read `@`, the Parameters to its
+	// left and everything the Declaration is written inside; what is barred is
+	// the Parameter it is written on, every Parameter after it, and every name a
+	// Pattern in the list binds.
+	//
+	// It is a BARRIER rather than a fallback for names that resolved to nothing,
+	// because an outer binding of the same name makes them resolve — and
+	// resolve to the wrong thing. `constant x = 5` above `function f(_ x:
+	// Integer = x)` types the default as the Constant and emits `(x = x)`, which
+	// is the Parameter reading itself out of its own temporal dead zone; the
+	// same holds for a Parameter one position to the right, and for a Pattern
+	// binding, which is a Constant at the head of the BODY and does not exist
+	// while the Parameter list is still being bound.
+	//
+	// Consulted at the Scope that carries it, ahead of that Scope's own members
+	// and behind every Scope inside it — so a Function literal written in a
+	// default still sees it, and a binding the literal declares of the same name
+	// still shadows it.
+	//
+	// Set only for the span of one default's enrichment. `index` is the
+	// Parameter that default belongs to, which is what tells "the Parameter this
+	// is written on" from "one that comes later".
+	parameterDefaultBarrier?: {
+		names: ReadonlyMap<string, BarredParameterName>
+		index: number
+	}
 	// NOTE: Names that stand for a member of `@` rather than for a binding of
 	// their own — what a Matcher's Pattern and payload bindings lend their
 	// Guard. A use resolves into the Lookup the author could have written
@@ -82,4 +109,15 @@ export type Scope = {
 			selfType: common.Type
 		}
 	>
+}
+
+// NOTE: One name a Parameter list binds, as a default is allowed to see it.
+// `kind` is what the report is about: a Parameter is declared at `index` and is
+// either the one the default is written on or one still to come, while a Pattern
+// binding is a Constant at the head of the body whatever position it was written
+// at.
+export type BarredParameterName = {
+	kind: "parameter" | "pattern"
+	index: number
+	position: common.Position
 }

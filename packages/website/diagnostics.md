@@ -191,6 +191,34 @@ closest name in Scope when there is a plausible one.
 **Quick Fix — "Change to 'X'":** replaces the name with the suggestion, when
 there is one.
 
+### `default-references-later-parameter`
+
+A Parameter's `= expression` default read a Parameter declared after it. A
+default may read `@`, the Parameters to its left, and anything the Declaration
+is written inside — that is the order the Parameters are declared in, and the
+order the values are worked out in at every call. Move the Parameter it reads
+in front of the one whose default reads it, or write the value out.
+
+The Parameters of a Declaration are barred from its defaults by NAME, so this is
+reported even where something outside the Declaration happens to spell the same
+name. It has to be: the value that would be read at run time is the Parameter,
+which has nothing in it yet, and not the Constant that shares its name.
+
+### `default-references-own-parameter`
+
+A Parameter's `= expression` default read the Parameter it is written on. The
+default is what that Parameter is bound to when a call leaves the Argument out,
+so it can not read the Parameter it is deciding. Write the value out, or rename
+the Parameter so it does not spell what the default reads.
+
+### `default-references-pattern-binding`
+
+A Parameter's `= expression` default read a name a Pattern in the same Parameter
+list binds. A Pattern desugars into Constants at the head of the BODY, and every
+default is worked out before the body's first Statement runs, so the name has
+nothing behind it there. Read the member off the Parameter itself, or write the
+value out.
+
 ### `unknown-type`
 
 A Type that was never declared, used in a Type position.
@@ -258,6 +286,17 @@ told the same thing by `no-matching-overload`, once per candidate.
 ### `argument-count-mismatch`
 
 More or fewer Arguments were passed than the signature declares.
+
+### `default-type-mismatch`
+
+A Parameter's `= expression` default is not a value of the Parameter's Type. A
+default stands in for an Argument nobody wrote, so it is held to the Type every
+written Argument is held to.
+
+A Parameter carrying a default must write its Type. The Type can not be read
+back off the default: `(_ count = 1)` and `(_ count: Number = 1)` accept
+different Arguments, and the Parameter's Type is what every caller is checked
+against.
 
 ### `return-type-mismatch`
 

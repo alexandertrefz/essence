@@ -613,12 +613,153 @@ export function lookupTypeOf(
 	}
 }
 
+// NOTE: The name lookup a Parameter's default is subject to — the ordinary
+// outward walk, with the Parameter list's own barrier consulted at the Scope
+// that carries it and AHEAD of that Scope's members. Ahead, because the barred
+// names are exactly the ones that are not bound yet; at that Scope rather than
+// at the start, because a Function literal written inside a default declares its
+// own Parameters in a Scope of its own and those shadow the barrier the way they
+// shadow everything else.
+//
+// A Program with no default anywhere never sets a barrier, so this is the same
+// walk `findVariableInScope` is, one `undefined` check per Scope longer.
+type BarredName = enricher.BarredParameterName & {
+	reads: "own" | "later" | "pattern"
+}
+
+// NOTE: What a default is told when it reads a name the Parameter list binds and
+// it may not see. Three shapes rather than one, because the fix differs: move
+// the Parameter, write the value out, or read what the Pattern reads.
+function reportBarredDefaultName(
+	node: parser.IdentifierNode,
+	barred: BarredName,
+): void {
+	let name = node.content
+
+	if (barred.reads === "later") {
+		reportError(
+			`'${name}' is declared after the Parameter whose default reads it`,
+			node.position,
+			{
+				code: "default-references-later-parameter",
+				labels: [
+					primary(node.position, "read here"),
+					secondary(barred.position, "declared here"),
+				],
+				notes: [
+					"A default may read `@`, the Parameters to its left, and anything the Declaration is written inside.",
+				],
+				helps: [
+					`Move '${name}' before the Parameter whose default reads it, or write the value out.`,
+				],
+			},
+		)
+
+		return
+	}
+
+	if (barred.reads === "own") {
+		reportError(
+			`'${name}' is the Parameter its own default is written on`,
+			node.position,
+			{
+				code: "default-references-own-parameter",
+				labels: [
+					primary(node.position, "read here"),
+					secondary(barred.position, "this is the Parameter"),
+				],
+				notes: [
+					"A Parameter is bound to the value its default works out, so the default can not read it.",
+				],
+				helps: [
+					`Write the value out, or rename the Parameter so it does not spell what the default reads.`,
+				],
+			},
+		)
+
+		return
+	}
+
+	reportError(
+		`'${name}' is bound by a Pattern and can not be read by a default`,
+		node.position,
+		{
+			code: "default-references-pattern-binding",
+			labels: [
+				primary(node.position, "read here"),
+				secondary(barred.position, "bound by this Pattern"),
+			],
+			notes: [
+				"A Pattern's bindings are Constants at the head of the body, and every default is worked out before the body runs.",
+			],
+			helps: [
+				"Read the member off the Parameter itself, or write the value out.",
+			],
+		},
+	)
+}
+
+function findVariableOrBarredName(
+	name: string,
+	scope: enricher.Scope,
+):
+	| { found: "variable"; type: common.Type }
+	| { found: "barred"; barred: BarredName }
+	| null {
+	let searchScope: enricher.Scope | null = scope
+
+	while (searchScope !== null) {
+		let barrier = searchScope.parameterDefaultBarrier
+		let barred = barrier?.names.get(name)
+
+		// NOTE: A Parameter to the LEFT is bound and is barred by nothing — it
+		// is in `names` because the map is built once for the whole list, and
+		// the index is what tells the two apart. A Pattern binding is barred
+		// wherever it was written.
+		if (barred !== undefined && barrier !== undefined) {
+			if (barred.kind === "pattern") {
+				return {
+					found: "barred",
+					barred: { ...barred, reads: "pattern" },
+				}
+			}
+
+			if (barred.index === barrier.index) {
+				return { found: "barred", barred: { ...barred, reads: "own" } }
+			}
+
+			if (barred.index > barrier.index) {
+				return {
+					found: "barred",
+					barred: { ...barred, reads: "later" },
+				}
+			}
+		}
+
+		if (Object.hasOwn(searchScope.members, name)) {
+			return { found: "variable", type: searchScope.members[name]! }
+		}
+
+		searchScope = searchScope.parent
+	}
+
+	return null
+}
+
 export function resolveIdentifierType(
 	node: parser.IdentifierNode,
 	scope: enricher.Scope,
 ): common.Type {
 	let name = node.content
-	let result = findVariableInScope(name, scope)
+	let resolved = findVariableOrBarredName(name, scope)
+
+	if (resolved?.found === "barred") {
+		reportBarredDefaultName(node, resolved.barred)
+
+		return { type: "Error" }
+	}
+
+	let result = resolved?.type ?? null
 
 	if (result === null) {
 		if (findProtocolInScope(name, scope) !== null) {
@@ -4311,6 +4452,11 @@ function resolveParameterTypes(
 		definition.parameters,
 	])
 
+	// NOTE: The single choke point through which every `common.Parameter` is
+	// built — the free-Function, Protocol-signature and Namespace-Method paths
+	// all route through here — which is why `hasDefault` is set only here. The
+	// expression itself stays on the Parameter Node; a Type only has to say
+	// what a caller may leave out.
 	return definition.parameters.map((parameter) => ({
 		name: parameter.externalName?.content ?? null,
 		type: resolveDeclaredType(parameter.type, scope),
@@ -4318,6 +4464,9 @@ function resolveParameterTypes(
 			parameter,
 			definition.documentation,
 		),
+		...(parameter.defaultValue === null
+			? {}
+			: { hasDefault: true as const }),
 	}))
 }
 

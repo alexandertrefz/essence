@@ -21,6 +21,7 @@ import {
 	type MatchableArgument,
 	matchArguments,
 	matchesType,
+	parameterDefaults,
 	typeContainsError,
 	withArticle,
 } from "../helpers/index"
@@ -843,6 +844,17 @@ function validateFunctionDefinition(
 	initialisingProperty = null
 
 	try {
+		// NOTE: A default runs when the Function is CALLED, in the frame the
+		// body runs in — so it is held to everything the body is held to, under
+		// the same suspended top-level index, and it is checked ahead of the
+		// body because that is where it stands. Nothing inside a `= expression`
+		// was checked at all while this walked only the body: a call with the
+		// wrong Arguments, a Match missing a Case, a name read above its
+		// Declaration.
+		for (let defaultValue of parameterDefaults(node.parameters)) {
+			validateExpression(defaultValue)
+		}
+
 		node.body.map((bodyNode) => validateImplementationNode(bodyNode, node))
 	} finally {
 		executingTopLevelIndex = enclosingIndex

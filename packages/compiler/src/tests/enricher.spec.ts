@@ -4771,6 +4771,256 @@ describe("Enricher", () => {
 	// the identity would find nothing — and answering nothing is not a
 	// Diagnostic anywhere, it is a Choice that silently stops deriving its
 	// equality or resolving its Cases.
+	// NOTE: `= expression` at the end of a Parameter. The scoping rule is one
+	// ordering — a default is enriched before its own Parameter is declared —
+	// and every case here is that ordering seen from a different side.
+	describe("Default Parameter Values", () => {
+		it("should accept a default that fits its Parameter", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					function f(_ count: Integer = 1) -> Integer {
+						<- count
+					}
+				}`),
+			).toEqual([])
+		})
+
+		it("should report a default that does not fit its Parameter", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				function f(_ count: Integer = "one") -> Integer {
+					<- count
+				}
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("default-type-mismatch")
+			expect(diagnostics[0].message).toBe(
+				"This default does not fit Parameter 'count'",
+			)
+		})
+
+		// NOTE: The default is enriched BEFORE its own Parameter is declared,
+		// which is what makes a self-reference impossible; the Parameter's name
+		// is BARRED there, which is what keeps it impossible when something
+		// outside the Declaration spells the same name.
+		it("should refuse a default that reads its own Parameter", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				function f(_ count: Integer = count) -> Integer {
+					<- count
+				}
+			}`)
+
+			expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+				"default-references-own-parameter",
+			])
+		})
+
+		it("should refuse a default that reads its own Parameter over an outer Constant of that name", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				constant count = 5
+
+				function f(_ count: Integer = count) -> Integer {
+					<- count
+				}
+			}`)
+
+			expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+				"default-references-own-parameter",
+			])
+		})
+
+		// NOTE: The whole reason the barred names are a barrier and not a
+		// fallback for names that resolved to nothing: this one RESOLVES, to the
+		// Constant above, and the emitted `(a = y, y)` reads the Parameter out of
+		// its own temporal dead zone rather than the Constant.
+		it("should refuse a default that reads a later Parameter shadowing an outer Constant", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				constant y = 7
+
+				function g(_ a: Integer = y, with y: Integer) -> Integer {
+					<- a::add(y)
+				}
+			}`)
+
+			expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+				"default-references-later-parameter",
+			])
+		})
+
+		// NOTE: A Pattern's bindings are Constants at the head of the BODY, and
+		// every default is worked out before the body's first Statement runs —
+		// so a default reading one would emit a read of a `const` that does not
+		// exist yet.
+		it("should refuse a default that reads a Pattern binding", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				type Point = { x: Integer, y: Integer }
+
+				function shift(_ { x, y }: Point, by amount: Integer = x) -> Integer {
+					<- y::add(amount)
+				}
+			}`)
+
+			expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+				"default-references-pattern-binding",
+			])
+		})
+
+		// NOTE: A Function literal written inside a default declares Parameters
+		// of its own, and they shadow the barrier exactly as they shadow
+		// everything else — the barred names belong to the list the default is
+		// written in, not to every list below it.
+		it("should let a Function literal inside a default bind the barred name itself", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					function apply(_ transform: (_ n: Integer) -> Integer, to value: Integer) -> Integer {
+						<- transform(value)
+					}
+
+					function f(_ a: Integer = apply((_ b: Integer) -> Integer {
+						<- b
+					}, to 1), with b: Integer) -> Integer {
+						<- a::add(b)
+					}
+				}`),
+			).toEqual([])
+		})
+
+		it("should accept a default that reads a Parameter to its left", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					function f(_ a: Integer, _ b: Integer = a) -> Integer {
+						<- a::add(b)
+					}
+				}`),
+			).toEqual([])
+		})
+
+		it("should report a default that reads a Parameter to its right", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				function f(_ a: Integer = b, _ b: Integer) -> Integer {
+					<- a::add(b)
+				}
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe(
+				"default-references-later-parameter",
+			)
+			expect(diagnostics[0].labels).toHaveLength(2)
+		})
+
+		it("should accept a default that reads @", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					namespace Slices for List<Integer> {
+						upTo(_ end: Integer = @::length()) -> Integer {
+							<- end
+						}
+					}
+				}`),
+			).toEqual([])
+		})
+
+		// NOTE: Nothing enforces this beyond the Scope a static Method's body
+		// already is — `enrichMethodFunctionDefinition` sets the `@` barrier
+		// before it walks the Parameter list, so a default reading `@` there
+		// is refused by the rule that was already there.
+		it("should refuse @ in a static Method's default", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				namespace Slices for List<Integer> {
+					static build(_ end: Integer = @::length()) -> Integer {
+						<- end
+					}
+				}
+			}`)
+
+			expect(diagnostics.map((diagnostic) => diagnostic.code)).toContain(
+				"at-in-static-method",
+			)
+		})
+
+		// NOTE: `hasDefault` is the whole of what a TYPE says about a default
+		// — the expression itself stays on the Declaration's Node, because a
+		// Type is compared, cached and serialized.
+		it("should carry hasDefault on a Function's Parameter Type", () => {
+			let { program, diagnostics } = enrichSource(`implementation {
+				function f(_ a: Integer, _ b: Integer = 1) -> Integer {
+					<- a
+				}
+			}`)
+
+			expect(diagnostics).toEqual([])
+
+			let statement = program.implementation.nodes[0]
+
+			if (statement.nodeType !== "FunctionStatement") {
+				throw new Error("Expected a FunctionStatement")
+			}
+
+			let type = statement.name.type
+
+			if (type.type !== "Function") {
+				throw new Error("Expected a Function Type")
+			}
+
+			expect(type.parameterTypes[0].hasDefault).toBeUndefined()
+			expect(type.parameterTypes[1].hasDefault).toBe(true)
+		})
+
+		it("should carry hasDefault on a Namespace Method's Parameter Type", () => {
+			let { program, diagnostics } = enrichSource(`implementation {
+				namespace Slices for List<Integer> {
+					upTo(_ end: Integer = 1) -> Integer {
+						<- end
+					}
+				}
+			}`)
+
+			expect(diagnostics).toEqual([])
+
+			let statement = program.implementation.nodes[0]
+
+			if (statement.nodeType !== "NamespaceDefinitionStatement") {
+				throw new Error("Expected a NamespaceDefinitionStatement")
+			}
+
+			let member = statement.type.methods["upTo"]
+
+			if (member?.type !== "SimpleMethod") {
+				throw new Error("Expected a SimpleMethod")
+			}
+
+			// NOTE: Parameter 0 is the receiver every non-static signature is
+			// prefixed with — `end` is the one the source wrote.
+			expect(member.parameterTypes[0].hasDefault).toBeUndefined()
+			expect(member.parameterTypes[1].hasDefault).toBe(true)
+		})
+
+		// NOTE: The typed tree carries the enriched Expression, because the
+		// Simplifier lowers it and the Language Server's typed walkers have to
+		// reach a call written inside one.
+		it("should carry the enriched default on the typed Parameter", () => {
+			let { program, diagnostics } = enrichSource(`implementation {
+				function f(_ count: Integer = 1) -> Integer {
+					<- count
+				}
+			}`)
+
+			expect(diagnostics).toEqual([])
+
+			let statement = program.implementation.nodes[0]
+
+			if (statement.nodeType !== "FunctionStatement") {
+				throw new Error("Expected a FunctionStatement")
+			}
+
+			let parameter = statement.value.parameters[0]
+
+			expect(parameter.defaultValue?.nodeType).toBe("IntegerValue")
+			expect(printType(parameter.defaultValue!.type)).toBe("Integer")
+		})
+	})
+
 	describe("Module Identity", () => {
 		function diagnosticsForModule(
 			source: string,

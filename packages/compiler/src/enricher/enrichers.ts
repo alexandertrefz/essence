@@ -210,7 +210,29 @@ export function enrichNode(
 // to be — a Declaration's annotation, an Assignment's target, the declared
 // return Type at a `<-`. Only bare Case Expressions consume it (they resolve
 // against it before scanning the scope); everything else infers bottom-up.
+// NOTE: Every Expression that stands where a VALUE is read. A Function or Method
+// taken as a value keeps its whole signature and loses its defaults: a default
+// is filled in by the callee's own frame, and only a DIRECT call reaches that
+// frame — `constant cut = List.slice` binds the native itself, and `constant
+// twice = double` binds an emitted Function whose arity is fixed by the
+// callbacks it may be handed to. So the Type has to say what the emission does,
+// and it says every Parameter is written.
+//
+// The callee of an Invocation is deliberately not read through here — see
+// `enrichCalleeExpression`.
 export function enrichExpression(
+	node: parser.ExpressionNode,
+	scope: enricher.Scope,
+	expectedType: common.Type | null = null,
+): common.typed.ExpressionNode {
+	return asValue(enrichCalleeExpression(node, scope, expectedType))
+}
+
+// NOTE: The same Expression read where it is CALLED rather than stored, which
+// is the one position a default still applies in. `Terminal.print("…")` is a
+// Lookup in exactly the shape `constant print = Terminal.print` is, and the
+// difference between them is which of these two the Invocation asked for.
+export function enrichCalleeExpression(
 	node: parser.ExpressionNode,
 	scope: enricher.Scope,
 	expectedType: common.Type | null = null,
@@ -249,6 +271,79 @@ export function enrichExpression(
 		case "CaseValue":
 			return enrichCaseValue(node, scope, expectedType)
 	}
+}
+
+// NOTE: The Type a signature has once it is a value — the same Parameters, none
+// of them omittable. Only a NAME can stand for a Function or a Method, so only
+// the two Expressions that are one are asked: everything else answers with a
+// Type some Declaration wrote down, and a Function Type written down carries no
+// default in the first place.
+//
+// Answers with the Node it was GIVEN wherever there is nothing to drop, which is
+// every Expression in a Program that declares no default.
+function asValue(
+	node: common.typed.ExpressionNode,
+): common.typed.ExpressionNode {
+	if (node.nodeType === "Identifier") {
+		let type = withoutParameterDefaults(node.type)
+
+		return type === node.type ? node : { ...node, type }
+	}
+
+	if (node.nodeType === "Lookup") {
+		let type = withoutParameterDefaults(node.type)
+
+		// NOTE: The Lookup and its member Identifier share one Type — see
+		// `enrichLookup` — so they go on sharing it here.
+		return type === node.type
+			? node
+			: { ...node, type, member: { ...node.member, type } }
+	}
+
+	return node
+}
+
+function withoutParameterDefaults(type: common.Type): common.Type {
+	switch (type.type) {
+		case "Function":
+		case "SimpleMethod":
+		case "StaticMethod": {
+			let parameterTypes = requiredParameters(type.parameterTypes)
+
+			return parameterTypes === type.parameterTypes
+				? type
+				: { ...type, parameterTypes }
+		}
+		case "OverloadedMethod":
+		case "OverloadedStaticMethod": {
+			let overloads = type.overloads.map((overload) => {
+				let parameterTypes = requiredParameters(overload.parameterTypes)
+
+				return parameterTypes === overload.parameterTypes
+					? overload
+					: { ...overload, parameterTypes }
+			})
+
+			return overloads.every(
+				(overload, index) => overload === type.overloads[index],
+			)
+				? type
+				: { ...type, overloads }
+		}
+		default:
+			return type
+	}
+}
+
+function requiredParameters(
+	parameters: Array<common.Parameter>,
+): Array<common.Parameter> {
+	if (!parameters.some((parameter) => parameter.hasDefault)) {
+		return parameters
+	}
+
+	// oxlint-disable-next-line eslint/no-unused-vars -- the key being dropped
+	return parameters.map(({ hasDefault, ...parameter }) => parameter)
 }
 
 export function enrichCaseValue(
@@ -877,7 +972,7 @@ export function enrichFunctionInvocation(
 ): common.typed.FunctionInvocationNode {
 	// NOTE: The callee and every Argument are enriched once — its Type drives
 	// resolution and the same typed Nodes build the final Invocation.
-	let name = enrichExpression(node.name, scope)
+	let name = enrichCalleeExpression(node.name, scope)
 	let typer = makeArgumentTyper(scope)
 	let { type, conformances, overloadedMethodIndex } =
 		resolveFunctionInvocation(node, name.type, scope, typer)
@@ -3726,12 +3821,20 @@ function enrichParameterList(
 } {
 	let parameters: Array<common.typed.ParameterNode> = []
 	let bindings: Array<common.typed.ImplementationNode> = []
+	// NOTE: Built once for the whole list rather than per Parameter — every
+	// default is barred from the same set of names, and which of them are "still
+	// to come" is a comparison against the index rather than a second walk. A
+	// list with no default anywhere builds nothing at all.
+	let barred = nodes.some((node) => node.defaultValue !== null)
+		? barredParameterNames(nodes)
+		: null
 
 	for (let [index, node] of nodes.entries()) {
 		let enriched = enrichParameter(
 			node,
 			scope,
 			contextualParameters?.[index],
+			barred === null ? null : { names: barred, index },
 		)
 
 		parameters.push(enriched.parameter)
@@ -3741,12 +3844,59 @@ function enrichParameterList(
 	return { parameters, bindings }
 }
 
+// NOTE: Every name this Parameter list binds, with what a default written in it
+// is allowed to make of each. A Parameter's own name is barred from its own
+// default and from every default before it — it is not bound yet — and a Pattern
+// binding is barred from all of them, since a Pattern desugars into Constants at
+// the head of the BODY and the Parameter list is bound before the body's first
+// Statement runs.
+function barredParameterNames(
+	nodes: Array<parser.ParameterNode>,
+): Map<string, enricher.BarredParameterName> {
+	let names = new Map<string, enricher.BarredParameterName>()
+
+	for (let [index, node] of nodes.entries()) {
+		let name = node.internalName
+
+		if (name === null) {
+			continue
+		}
+
+		if (name.nodeType === "Identifier") {
+			names.set(name.content, {
+				kind: "parameter",
+				index,
+				position: name.position,
+			})
+
+			continue
+		}
+
+		// NOTE: Exactly the bindings `declarePatternBindings` declares, asked
+		// the same way — a name that is going to be in Scope for the body is a
+		// name a default has to be told about.
+		for (let binding of irrefutablePatternBindings(name)) {
+			names.set(binding.name.content, {
+				kind: "pattern",
+				index,
+				position: binding.name.position,
+			})
+		}
+	}
+
+	return names
+}
+
 function enrichParameter(
 	node: parser.ParameterNode,
 	scope: enricher.Scope,
 	// NOTE: Set for an unannotated Parameter, whose Type and label both came
 	// from the expected signature rather than from anything written here.
 	contextualParameter?: common.Parameter,
+	// NOTE: The names this Parameter list binds and which Parameter this one is,
+	// so a default can be told what it may not read. Null for a list that
+	// declares no default at all.
+	barrier: enricher.Scope["parameterDefaultBarrier"] | null = null,
 ): {
 	parameter: common.typed.ParameterNode
 	bindings: Array<common.typed.ImplementationNode>
@@ -3756,6 +3906,8 @@ function enrichParameter(
 		(node.type === null
 			? { type: "Error" as const }
 			: resolveType(node.type, scope))
+
+	let defaultValue = enrichParameterDefault(node, type, scope, barrier)
 
 	// NOTE: A Pattern where the internal name goes. The Parameter still needs a
 	// name of its own — the desugared Constants read off it, and the Simplifier
@@ -3783,6 +3935,7 @@ function enrichParameter(
 				},
 				position: node.position,
 				inferredType: node.type === null ? type : null,
+				defaultValue,
 			},
 			bindings: declarePatternBindings(
 				pattern,
@@ -3812,9 +3965,81 @@ function enrichParameter(
 				: null,
 			position: node.position,
 			inferredType: node.type === null ? type : null,
+			defaultValue,
 		},
 		bindings: [],
 	}
+}
+
+// NOTE: The `= expression` a caller may leave out, enriched in the Parameter
+// list's own Scope and BEFORE this Parameter is declared into it. That one
+// ordering is most of the scoping rule: `@` is already bound — a Method's body
+// Scope binds it before the Parameter list is walked, and a static Method sets
+// the barrier that makes `@` there an `at-in-static-method` — and the Parameters
+// to the left are declared.
+//
+// The rest of it is `parameterDefaultBarrier`, which is what an outer binding of
+// the same name makes necessary: leaving this Parameter and the ones after it
+// merely UNDECLARED would let a module Constant called `x` answer for the
+// Parameter called `x`, and the emitted `(x = x)` would read the Parameter out
+// of its own temporal dead zone instead.
+//
+// Evaluated per call in the callee's frame, never here: it is checked for its
+// Type and lowered, and nothing about it is folded at the Declaration.
+function enrichParameterDefault(
+	node: parser.ParameterNode,
+	type: common.Type,
+	scope: enricher.Scope,
+	barrier: enricher.Scope["parameterDefaultBarrier"] | null,
+): common.typed.ExpressionNode | null {
+	if (node.defaultValue === null) {
+		return null
+	}
+
+	if (barrier !== null) {
+		scope.parameterDefaultBarrier = barrier
+	}
+
+	let value = enrichExpression(node.defaultValue, scope, type)
+
+	delete scope.parameterDefaultBarrier
+
+	let valueType = value.type
+
+	if (
+		!typeContainsError(type) &&
+		!typeContainsError(valueType) &&
+		!matchesType(type, valueType)
+	) {
+		let name =
+			parameterInternalName(node)?.content ??
+			node.externalName?.content ??
+			null
+
+		reportError(
+			name === null
+				? "This default does not fit its Parameter"
+				: `This default does not fit Parameter '${name}'`,
+			node.defaultValue.position,
+			{
+				code: "default-type-mismatch",
+				labels: [
+					primary(
+						node.defaultValue.position,
+						`this is ${withArticle(describeType(valueType))}`,
+					),
+				],
+				notes: [
+					name === null
+						? `The Parameter is ${describeType(type)}.`
+						: `Parameter '${name}' is ${describeType(type)}.`,
+				],
+				helps: [`Write a value of Type ${describeType(type)}.`],
+			},
+		)
+	}
+
+	return value
 }
 
 // #endregion

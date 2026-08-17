@@ -827,6 +827,7 @@ function simplifyMethods(
 							name: "_self",
 							type,
 						},
+						defaultValue: null,
 					})
 				}
 
@@ -854,6 +855,7 @@ function simplifyMethods(
 						name: "_self",
 						type,
 					},
+					defaultValue: null,
 				})
 			}
 
@@ -888,6 +890,7 @@ function simplifyParameter(
 					name: `_${index}`,
 					type: { type: "Unknown" },
 				},
+		defaultValue: null,
 	}
 }
 
@@ -938,6 +941,7 @@ function simplifyFunctionDefinition(
 					name: conformanceParameterName(generic.name),
 					type: { type: "Unknown" },
 				},
+				defaultValue: null,
 			}))
 
 	return {
