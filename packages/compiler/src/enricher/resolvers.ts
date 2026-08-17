@@ -4451,6 +4451,7 @@ function resolveParameterTypes(
 	reportUnknownDocumentationParameters(definition.documentation, [
 		definition.parameters,
 	])
+	refuseIndistinguishableDefaults(definition.parameters)
 
 	// NOTE: The single choke point through which every `common.Parameter` is
 	// built — the free-Function, Protocol-signature and Namespace-Method paths
@@ -4468,6 +4469,64 @@ function resolveParameterTypes(
 			? {}
 			: { hasDefault: true as const }),
 	}))
+}
+
+// NOTE: An Argument is paired with a Parameter by its LABEL, before any Type
+// is read — that is what lets a call's shape be worked out for every Overload
+// candidate before paying for Argument typing, and what keeps Completion able
+// to offer labels for a call that is still half written. Defaults turn that
+// exact pairing into a subsequence pairing: walk both lists left to right,
+// consume the Argument when the labels agree, skip the Parameter when it has a
+// default. That greedy walk finds a valid pairing whenever one exists exactly
+// when no defaulted Parameter is followed by a Parameter carrying the same
+// label — so this is the rule that makes it complete, and with it there is
+// nothing to search and nothing to backtrack.
+//
+// Every unlabelled Parameter carries the same label — none — so an unlabelled
+// Parameter with a default may not be followed by any other unlabelled one.
+// This is deliberately NOT the trailing-run rule: `(_ a: Integer, _ b: Integer
+// = 2, to x: Integer)` is perfectly unambiguous, and `(to a: Integer = 1, to b:
+// Integer)` is not, and the trailing-run rule gets both of those backwards.
+function refuseIndistinguishableDefaults(
+	parameters: Array<parser.ParameterNode>,
+): void {
+	for (let [index, parameter] of parameters.entries()) {
+		if (parameter.defaultValue === null) {
+			continue
+		}
+
+		let label = parameter.externalName?.content ?? null
+		let clash = parameters
+			.slice(index + 1)
+			.find((later) => (later.externalName?.content ?? null) === label)
+
+		if (clash === undefined) {
+			continue
+		}
+
+		reportError(
+			"This default could not be told apart from the Parameter after it",
+			parameter.defaultValue.position,
+			{
+				code: "indistinguishable-default-parameter",
+				labels: [
+					primary(parameter.defaultValue.position, "this default"),
+					secondary(
+						clash.position,
+						label === null
+							? "and this Parameter carries no label either"
+							: "and this Parameter carries the same label",
+					),
+				],
+				notes: [
+					"An Argument is matched to a Parameter by its label before its Type is read, so a call passing one of them could mean either.",
+				],
+				helps: [
+					"Give one of them a label, or move the default to the last of them.",
+				],
+			},
+		)
+	}
 }
 
 // NOTE: A `@param` naming neither the external nor the internal name of any

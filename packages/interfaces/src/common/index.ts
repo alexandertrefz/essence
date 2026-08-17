@@ -202,6 +202,7 @@ export type DiagnosticCode =
 	| "untyped-namespace-method"
 	| "static-method-on-value"
 	| "native-property-without-type"
+	| "indistinguishable-default-parameter"
 	// Choices and their Cases.
 	| "empty-choice"
 	| "unknown-case"

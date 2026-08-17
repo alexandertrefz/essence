@@ -520,6 +520,25 @@ A static Property in a `declarations { … }` Program declared neither a value
 nor a Type. A native Property is exactly its annotation — `static Pi:
 Transcendental` — so without one there is nothing to declare.
 
+### `indistinguishable-default-parameter`
+
+A Parameter carrying a `= expression` default is followed by another Parameter
+with the same label — and every unlabelled Parameter carries the same label,
+none, so an unlabelled default may not be followed by any other unlabelled
+Parameter.
+
+An Argument is matched to a Parameter by its label before its Type is read,
+which is what lets a call's shape be worked out for every Overload candidate
+before any Argument is typed, and what lets Completion offer labels for a call
+that is still half written. A default lets a Parameter be skipped, and a call
+writing one Argument where two Parameters answer to the same label could mean
+either of them. Give one of them a label, or make the defaulted one the last of
+them.
+
+This is not a rule about defaults having to come last: `(_ a: Integer, _ b:
+Integer = 2, to x: Integer)` is legal, because `f(1, to 3)` skips `b` by the
+label the next Argument carries.
+
 ## Choices
 
 ### `empty-choice`
