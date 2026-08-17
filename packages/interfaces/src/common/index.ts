@@ -683,6 +683,9 @@ export type DispatchCase = {
 	namespaceName: string
 	overloadedMethodIndex: number | null
 	conformances: Array<Conformance>
+	// NOTE: Per branch, because each branch resolves to a different Method and
+	// they need not agree on what may be left out.
+	omittedParameterIndices: Array<number>
 	// NOTE: The Arguments this branch alone is given, each under the position
 	// in the Invocation's own Argument list it stands in for. A Function
 	// literal that omitted its annotations takes them from the Method it is

@@ -140,6 +140,11 @@ export interface MethodInvocationNode {
 	type: Type
 	overloadedMethodIndex: number | null
 	conformances: Array<Conformance>
+	// NOTE: The Parameters this call wrote no Argument for, indexed over the
+	// callee's FULL signature — the receiver Parameter included, which is the
+	// list the Simplifier builds an Argument list against. Empty for every call
+	// that omits nothing.
+	omittedParameterIndices: Array<number>
 	// NOTE: Set only when this call resolves to a *generic* Choice's derived
 	// Equatable — the plan its widened runtime helper follows to compare
 	// generic payloads through the hidden conformance Arguments. Absent
@@ -159,6 +164,9 @@ export interface FunctionInvocationNode {
 	type: Type
 	overloadedMethodIndex: number | null
 	conformances: Array<Conformance>
+	// NOTE: As on a Method Invocation — the Parameters this call left out,
+	// indexed over the callee's full signature.
+	omittedParameterIndices: Array<number>
 }
 
 export type ValueNode =

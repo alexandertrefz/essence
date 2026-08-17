@@ -222,6 +222,49 @@ export function describeParameter(
 		: `Parameter ${index + 1}`
 }
 
+// NOTE: How many Arguments a call MUST write — the count a Parameter carrying a
+// default no longer adds to. Asked by every report of a call's shape and by
+// Signature Help, which is why it is one function rather than a `filter` spelled
+// out at each of them.
+export function requiredParameterCount(
+	parameters: ReadonlyArray<common.Parameter>,
+): number {
+	let required = 0
+
+	for (let parameter of parameters) {
+		if (parameter.hasDefault !== true) {
+			required++
+		}
+	}
+
+	return required
+}
+
+// NOTE: The last Parameter a call has to write, and `-1` when there is none —
+// which is where the TRAILING run a call may leave out entirely begins. A
+// defaulted Parameter with a required one AFTER it is not in that run: the
+// Argument following it still has to be written, and its own label is what
+// steps over the default.
+export function lastRequiredParameterIndex(
+	parameters: ReadonlyArray<common.Parameter>,
+): number {
+	let last = -1
+
+	for (let [index, parameter] of parameters.entries()) {
+		if (parameter.hasDefault !== true) {
+			last = index
+		}
+	}
+
+	return last
+}
+
+// NOTE: A signature with defaults accepts a RANGE of Argument counts — "takes 1
+// or 2 Arguments", "takes 2 to 4 Arguments" — and each Parameter that may be
+// left out says so in its own clause. This one string is what
+// `argument-count-mismatch`, `argument-label-mismatch`, `argument-type-mismatch`
+// and every `no-matching-overload` note read, so a signature reads the same way
+// wherever a call is judged against it.
 export function describeSignature(
 	parameterTypes: Array<common.Parameter>,
 ): string {
@@ -229,12 +272,29 @@ export function describeSignature(
 		return "takes no Arguments"
 	}
 
-	return `takes ${countOf(parameterTypes.length, "Argument")}: ${parameterTypes
+	let required = requiredParameterCount(parameterTypes)
+
+	return `takes ${describeArgumentCount(required, parameterTypes.length)}: ${parameterTypes
 		.map(
 			(parameter, index) =>
-				`${describeParameter(parameter, index)} is ${describeType(parameter.type)}`,
+				`${describeParameter(parameter, index)} is ${describeType(parameter.type)}${parameter.hasDefault ? ", which may be left out" : ""}`,
 		)
 		.join(", ")}`
+}
+
+// NOTE: "no Arguments" reads as an absence, so the low end of a range spells it
+// as the number it is — "0 to 2 Arguments" — and only an exact zero gets the
+// word.
+export function describeArgumentCount(required: number, total: number): string {
+	if (required === total) {
+		return countOf(total, "Argument")
+	}
+
+	if (required + 1 === total) {
+		return `${required} or ${total} Arguments`
+	}
+
+	return `${required} to ${total} Arguments`
 }
 
 // NOTE: For Diagnostics — "1 Argument", not "1 Arguments".
@@ -1421,6 +1481,20 @@ function signatureMatches(
 			return false
 		}
 
+		// NOTE: A Parameter the expected signature says may be left out has to
+		// be one the actual signature can answer without — a call written
+		// against the expected Type omits the Argument, and the emitted call
+		// passes `undefined` in its place, which only a Parameter that carries
+		// a default of its own consumes. The other direction is safe and is
+		// allowed: a call through a Type that promises nothing writes every
+		// Argument, and a Function that would have filled one in never has to.
+		if (
+			expected.parameterTypes[i].hasDefault === true &&
+			actual.parameterTypes[i].hasDefault !== true
+		) {
+			return false
+		}
+
 		if (
 			!matchTypes(
 				actual.parameterTypes[i].type,
@@ -2549,10 +2623,30 @@ export type MatchableArgument = {
 	bindsNothing?: boolean
 }
 
+// NOTE: Which Argument each Parameter was given. `forParameter[i]` is the
+// Argument index paired with Parameter `i`, or null when the Parameter took its
+// default; `omittedParameterIndices` is the same fact the other way round, and
+// is what rides out to the emission side. Both are indexed over the FULL
+// signature, receiver Parameter included, which is the list the Simplifier
+// emits an Argument list against.
+export type ArgumentPairing = {
+	forParameter: Array<number | null>
+	omittedParameterIndices: Array<number>
+}
+
 export type ArgumentMatchResult =
-	| { type: "Match" }
+	| { type: "Match"; omittedParameterIndices: Array<number> }
 	| { type: "ArityMismatch" }
-	| { type: "ArgumentMismatch"; mismatchedArgumentIndices: Array<number> }
+	| {
+			type: "ArgumentMismatch"
+			mismatchedArgumentIndices: Array<number>
+			// NOTE: For Argument `i`, the Parameter it was paired with — which
+			// is `i` itself for every call that omits nothing, and is not once
+			// a default has been skipped. The Validator reports one Diagnostic
+			// per mismatching Argument and names the Parameter it was held to,
+			// so it needs both halves of the pair.
+			parameterForArgument: Array<number>
+	  }
 
 // NOTE: Collects every Type Parameter of THIS invocation that `type` mentions
 // — a structural walk, so a Generic buried in a Record member, a List's items
@@ -2660,9 +2754,21 @@ function deferredArgumentOrder(
 	parameters: common.BaseFunction["parameterTypes"],
 	context: GenericInferenceContext | null,
 	matchableArguments: Array<MatchableArgument>,
+	// NOTE: Read through the pairing rather than by Parameter index. An omitted
+	// Parameter has no Argument at all, so it can neither bind nor wait — it is
+	// treated exactly like a Parameter whose Argument names nothing.
+	pairing: ArgumentPairing,
 ): Array<number> | null {
 	if (context === null || parameters.length < 2) {
 		return null
+	}
+
+	let argumentFor = (index: number): MatchableArgument | undefined => {
+		let argumentIndex = pairing.forParameter[index]
+
+		return argumentIndex === null || argumentIndex === undefined
+			? undefined
+			: matchableArguments[argumentIndex]
 	}
 
 	// NOTE: Only a Parameter that FOLLOWS one that waits has anything to gain
@@ -2672,7 +2778,7 @@ function deferredArgumentOrder(
 	let firstWaiting = parameters.findIndex(
 		(parameter, index) =>
 			parameter.type.type === "Function" ||
-			matchableArguments[index]?.bindsNothing === true,
+			argumentFor(index)?.bindsNothing === true,
 	)
 
 	if (firstWaiting === -1 || firstWaiting === parameters.length - 1) {
@@ -2701,7 +2807,7 @@ function deferredArgumentOrder(
 		}
 
 		if (
-			matchableArguments[index]?.bindsNothing === true &&
+			argumentFor(index)?.bindsNothing === true &&
 			parameterWaitsOnUnboundGeneric(parameter.type, boundSoFar, context)
 		) {
 			deferred.push(index)
@@ -2748,22 +2854,39 @@ export function matchArguments(
 		inference?: GenericInferenceContext
 	} = {},
 ): ArgumentMatchResult {
-	if (parameters.length !== matchableArguments.length) {
+	let pairing = pairArguments(parameters, matchableArguments)
+
+	if (pairing === null) {
 		return { type: "ArityMismatch" }
 	}
 
 	let inferenceContext = options.inference ?? null
 	let mismatchedArgumentIndices: Array<number> = []
+
 	let order = deferredArgumentOrder(
 		parameters,
 		inferenceContext,
 		matchableArguments,
+		pairing,
 	)
 
 	for (let position = 0; position < parameters.length; position++) {
 		let i = order === null ? position : order[position]
 		let parameter = parameters[i]
-		let argument = matchableArguments[i]
+		let argumentIndex = pairing.forParameter[i]
+
+		// NOTE: A Parameter nobody wrote an Argument for takes its default,
+		// which was checked against this Parameter's Type where it was written.
+		// It binds nothing either — there is no Argument to read a Type off, so
+		// a Type Parameter bound ONLY by an omitted Parameter stays unbound and
+		// is reported as `uninferable-type-parameter`, which is the honest
+		// answer: the writer either passes the Argument or writes the Type
+		// Argument.
+		if (argumentIndex === null) {
+			continue
+		}
+
+		let argument = matchableArguments[argumentIndex]
 
 		// NOTE: A callback is matched after the Arguments that bind, so the
 		// Generics its Parameters mention have been bound by then —
@@ -2792,11 +2915,12 @@ export function matchArguments(
 			if (!options.collectAllMismatches) {
 				return {
 					type: "ArgumentMismatch",
-					mismatchedArgumentIndices: [i],
+					mismatchedArgumentIndices: [argumentIndex],
+					parameterForArgument: argumentPairingInverse(pairing),
 				}
 			}
 
-			mismatchedArgumentIndices.push(i)
+			mismatchedArgumentIndices.push(argumentIndex)
 		}
 	}
 
@@ -2809,8 +2933,166 @@ export function matchArguments(
 			mismatchedArgumentIndices: mismatchedArgumentIndices.sort(
 				(left, right) => left - right,
 			),
+			parameterForArgument: argumentPairingInverse(pairing),
 		}
 	}
 
-	return { type: "Match" }
+	return {
+		type: "Match",
+		omittedParameterIndices: pairing.omittedParameterIndices,
+	}
+}
+
+// NOTE: Which Argument answers which Parameter, decided from LABELS and
+// `hasDefault` alone and never from a Type. That is what makes it cheap enough
+// to run once per Overload candidate, and it is also what keeps everything that
+// has to know a call's shape before its Arguments are typed working: overload
+// probing, the deferred-Argument order, and Completion offering labels into a
+// call that is still half written.
+//
+// The walk is greedy — take the Argument when the labels agree, skip the
+// Parameter when it has a default — and `indistinguishable-default-parameter`
+// is what makes greedy complete: with no defaulted Parameter followed by a
+// same-label one, an Argument has at most one Parameter it could be, so there
+// is nothing to search and nothing to backtrack.
+//
+// `null` is an arity mismatch. A Program that declares no default anywhere pays
+// one `some()` over the Parameter list and then answers with the identity
+// pairing it always had.
+export function pairArguments(
+	parameters: common.BaseFunction["parameterTypes"],
+	matchableArguments: Array<MatchableArgument>,
+): ArgumentPairing | null {
+	if (!parameters.some((parameter) => parameter.hasDefault)) {
+		return parameters.length === matchableArguments.length
+			? identityPairing(parameters.length)
+			: null
+	}
+
+	let forParameter: Array<number | null> = []
+	let omittedParameterIndices: Array<number> = []
+	let next = 0
+
+	for (let parameter of parameters) {
+		let argument = matchableArguments[next]
+
+		if (argument !== undefined && argument.name === parameter.name) {
+			forParameter.push(next)
+			next++
+		} else if (parameter.hasDefault) {
+			forParameter.push(null)
+			omittedParameterIndices.push(forParameter.length - 1)
+		} else if (argument !== undefined) {
+			// NOTE: A required Parameter and an Argument whose label disagrees
+			// — paired anyway, so that the loop above reports it as the label
+			// mismatch it is rather than as a count nobody miscounted.
+			forParameter.push(next)
+			next++
+		} else {
+			return null
+		}
+	}
+
+	// NOTE: Left-over Arguments mean the greedy walk skipped past a default
+	// that a wrongly labelled Argument was meant for. Where the counts agree
+	// after all, the identity pairing is what the writer wrote and reports the
+	// label mismatch against the Parameter they clearly meant; where they do
+	// not, the call really does pass the wrong number of Arguments.
+	if (next !== matchableArguments.length) {
+		return parameters.length === matchableArguments.length
+			? identityPairing(parameters.length)
+			: null
+	}
+
+	return { forParameter, omittedParameterIndices }
+}
+
+// NOTE: The answer for every signature that declares no default — Argument `i`
+// answers Parameter `i`, nothing left out. It is asked once per Overload
+// candidate of every call in the Program, so it is CACHED by arity rather than
+// built: nothing ever writes into a pairing, and one shared Array per arity is
+// indistinguishable from a fresh one that counts to the same number.
+const identityPairings: Array<ArgumentPairing> = []
+
+function identityPairing(length: number): ArgumentPairing {
+	let cached = identityPairings[length]
+
+	if (cached === undefined) {
+		cached = {
+			forParameter: Array.from({ length }, (_, index) => index),
+			omittedParameterIndices: [],
+		}
+		identityPairings[length] = cached
+	}
+
+	return cached
+}
+
+// NOTE: The pairing read the other way round — for Argument `i`, the Parameter
+// it answers. Built only where something has to NAME that Parameter: a
+// Diagnostic about a mismatching Argument, and Completion reading a Record
+// literal against the Type it will be held to. The forward direction is what
+// every call pays for, so the inverse is not built alongside it.
+export function argumentPairingInverse(
+	pairing: ArgumentPairing,
+): Array<number> {
+	let parameterForArgument: Array<number> = []
+
+	for (let [index, argumentIndex] of pairing.forParameter.entries()) {
+		if (argumentIndex !== null) {
+			parameterForArgument[argumentIndex] = index
+		}
+	}
+
+	return parameterForArgument
+}
+
+// NOTE: The Argument list a call passes, with a hole where a Parameter took its
+// default. `leading` is the receiver a Method Invocation passes first;
+// `omittedParameterIndices` is indexed over the whole list, receiver included,
+// which is the list the signature's Parameters line up with; `trailing` is the
+// hidden conformance Arguments a bounded signature appends.
+//
+// A hole with NOTHING after it is simply not passed, which is what makes a call
+// that omits a trailing default emit as the short call it reads as. A hole with
+// something after it is passed as `hole()` — the target's own "no Argument
+// given", which is precisely what fires a JavaScript default parameter.
+//
+// One walk for the three lists that need it: the Simplifier's, the emitted
+// dispatch branch's — which the Simplifier can not build, because the branches
+// share one written list and each takes its own defaults out of it — and the
+// tests' expectations of both.
+export function openArgumentHoles<Argument>(
+	leading: ReadonlyArray<Argument>,
+	written: ReadonlyArray<Argument>,
+	omittedParameterIndices: ReadonlyArray<number>,
+	trailing: ReadonlyArray<Argument>,
+	hole: () => Argument,
+): Array<Argument> {
+	if (omittedParameterIndices.length === 0) {
+		return [...leading, ...written, ...trailing]
+	}
+
+	let omitted = new Set(omittedParameterIndices)
+	let total = leading.length + written.length + omitted.size
+	let slots: Array<Argument | null> = []
+	let next = 0
+
+	for (let index = 0; index < total; index++) {
+		if (index < leading.length) {
+			slots.push(leading[index]!)
+		} else if (omitted.has(index)) {
+			slots.push(null)
+		} else {
+			slots.push(written[next++]!)
+		}
+	}
+
+	if (trailing.length === 0) {
+		while (slots.length > 0 && slots[slots.length - 1] === null) {
+			slots.pop()
+		}
+	}
+
+	return [...slots.map((slot) => slot ?? hole()), ...trailing]
 }

@@ -942,6 +942,7 @@ export function enrichMethodInvocation(
 		type,
 		overloadedMethodIndex,
 		conformances,
+		omittedParameterIndices,
 		derivedDescriptor,
 		dispatch,
 	} = resolveMethodInvocation(node, base.type, scope, typer)
@@ -961,6 +962,7 @@ export function enrichMethodInvocation(
 		type,
 		overloadedMethodIndex,
 		conformances,
+		omittedParameterIndices,
 		derivedDescriptor,
 		dispatch,
 	}
@@ -974,7 +976,7 @@ export function enrichFunctionInvocation(
 	// resolution and the same typed Nodes build the final Invocation.
 	let name = enrichCalleeExpression(node.name, scope)
 	let typer = makeArgumentTyper(scope)
-	let { type, conformances, overloadedMethodIndex } =
+	let { type, conformances, overloadedMethodIndex, omittedParameterIndices } =
 		resolveFunctionInvocation(node, name.type, scope, typer)
 
 	return {
@@ -987,6 +989,7 @@ export function enrichFunctionInvocation(
 		type,
 		overloadedMethodIndex,
 		conformances,
+		omittedParameterIndices,
 	}
 }
 
@@ -5261,6 +5264,11 @@ type InferredInvocation = {
 	// NOTE: What the invocation bound each Type Parameter to — conformance
 	// resolution for Protocol bounds reads the winning candidate's bindings.
 	bindings: GenericBindings
+	// NOTE: Which Parameters this call wrote no Argument for, indexed over the
+	// FULL signature — the receiver Parameter included, since that is the list
+	// the Simplifier emits an Argument list against. Empty for every call that
+	// omits nothing, which is every call in a Program that declares no default.
+	omittedParameterIndices: Array<number>
 }
 
 // NOTE: Matches an invocation's Arguments left to right against a signature,
@@ -5274,10 +5282,12 @@ function inferInvocation(
 	matchableArguments: Array<MatchableArgument>,
 ): InferredInvocation | undefined {
 	if (signature.generics.length === 0) {
-		if (
-			matchArguments(signature.parameterTypes, matchableArguments)
-				.type !== "Match"
-		) {
+		let matched = matchArguments(
+			signature.parameterTypes,
+			matchableArguments,
+		)
+
+		if (matched.type !== "Match") {
 			return undefined
 		}
 
@@ -5285,23 +5295,25 @@ function inferInvocation(
 			returnType: signature.returnType,
 			unboundGenerics: [],
 			bindings: new Map(),
+			omittedParameterIndices: matched.omittedParameterIndices,
 		}
 	}
 
 	let { parameterTypes, context, freshToOriginal } =
 		createFreshenedInference(signature)
 
-	if (
-		matchArguments(parameterTypes, matchableArguments, {
-			inference: context,
-		}).type !== "Match"
-	) {
+	let matched = matchArguments(parameterTypes, matchableArguments, {
+		inference: context,
+	})
+
+	if (matched.type !== "Match") {
 		return undefined
 	}
 
 	return substituteInferredReturnType(
 		signature,
 		unfreshenBindings(context.bindings, freshToOriginal),
+		matched.omittedParameterIndices,
 	)
 }
 
@@ -5311,6 +5323,7 @@ function inferInvocation(
 function substituteInferredReturnType(
 	signature: common.BaseFunction,
 	bindings: GenericBindings,
+	omittedParameterIndices: Array<number> = [],
 ): InferredInvocation {
 	let originalBindings = bindings
 	let unboundGenerics = signature.generics
@@ -5329,6 +5342,7 @@ function substituteInferredReturnType(
 		returnType: applyGenericBindings(signature.returnType, bindings),
 		unboundGenerics,
 		bindings: originalBindings,
+		omittedParameterIndices,
 	}
 }
 
@@ -5619,6 +5633,7 @@ function resolveInvokedMethodInNamespace(
 			overloadedMethodIndex: number | null
 			unboundGenerics: Array<string>
 			conformances: Array<common.Conformance>
+			omittedParameterIndices: Array<number>
 			// NOTE: What selecting this Overload reported, for the caller to
 			// replay once it commits to this Namespace — see `selectOverload`.
 			selectionDiagnostics: Array<common.Diagnostic>
@@ -5687,6 +5702,7 @@ function resolveInvokedMethodInNamespace(
 			methodType.type === "SimpleMethod" ? null : selected.index,
 		unboundGenerics: selected.inferred.unboundGenerics,
 		conformances: selected.conformances,
+		omittedParameterIndices: selected.inferred.omittedParameterIndices,
 		selectionDiagnostics: selected.diagnostics,
 	}
 }
@@ -5714,6 +5730,7 @@ type ResolvedMethodInvocation = {
 	type: common.Type
 	overloadedMethodIndex: number | null
 	conformances: Array<common.Conformance>
+	omittedParameterIndices: Array<number>
 	// NOTE: Set only for a *generic* Choice's derived `is`/`isNot` — the plan
 	// its widened runtime helper interprets. Absent for every other call, so a
 	// non-generic Choice emits the plain `choiceIs`.
@@ -5727,6 +5744,7 @@ function resolveFailedMethodInvocation(): ResolvedMethodInvocation {
 		type: { type: "Error" },
 		overloadedMethodIndex: null,
 		conformances: [],
+		omittedParameterIndices: [],
 		dispatch: null,
 	}
 }
@@ -6177,6 +6195,7 @@ function resolveMethodInvocation(
 				type: resolvedMethod.returnType,
 				unboundGenerics: resolvedMethod.unboundGenerics,
 				conformances: resolvedMethod.conformances,
+				omittedParameterIndices: resolvedMethod.omittedParameterIndices,
 				selectionDiagnostics: resolvedMethod.selectionDiagnostics,
 				recording,
 			})
@@ -6259,6 +6278,7 @@ function resolveMethodInvocation(
 			type: resolvedMethod.type,
 			overloadedMethodIndex: resolvedMethod.overloadedMethodIndex,
 			conformances: resolvedMethod.conformances,
+			omittedParameterIndices: resolvedMethod.omittedParameterIndices,
 			// NOTE: A direct `is`/`isNot` on a generic Choice widens at emission
 			// — the descriptor its runtime helper follows is recovered from the
 			// receiver's Choice, whose DECLARED Alias the applied receiver Type
@@ -6562,6 +6582,7 @@ function resolveUnionMethodDispatch(
 			namespaceName: resolvedMethod.namespaceName,
 			overloadedMethodIndex: resolvedMethod.overloadedMethodIndex,
 			conformances: resolvedMethod.conformances,
+			omittedParameterIndices: resolvedMethod.omittedParameterIndices,
 			contextualArguments: contextualArgumentsForBranch(
 				node,
 				scope,
@@ -6619,6 +6640,9 @@ function resolveUnionMethodDispatch(
 		type: buildUnion(mergeUnionMembers(caseReturnTypes)),
 		overloadedMethodIndex: null,
 		conformances: [],
+		// NOTE: Held on each branch instead — every branch resolves to a
+		// different Method, so there is no one answer here.
+		omittedParameterIndices: [],
 		dispatch: orderDispatchCasesBySpecificity(dispatchCases),
 	}
 }
@@ -6785,6 +6809,7 @@ function resolveFunctionInvocation(
 	// — for an Identifier callee (an overloaded free Function) as much as for a
 	// `Namespace.method` Lookup.
 	overloadedMethodIndex: number | null
+	omittedParameterIndices: Array<number>
 } {
 	const type = nameType
 
@@ -6833,6 +6858,8 @@ function resolveFunctionInvocation(
 				type: selected.inferred.returnType,
 				conformances: selected.conformances,
 				overloadedMethodIndex: null,
+				omittedParameterIndices:
+					selected.inferred.omittedParameterIndices,
 			}
 		}
 
@@ -6863,6 +6890,7 @@ function resolveFunctionInvocation(
 			).returnType,
 			conformances: [],
 			overloadedMethodIndex: null,
+			omittedParameterIndices: [],
 		}
 	} else if (
 		type.type === "OverloadedMethod" ||
@@ -6902,6 +6930,8 @@ function resolveFunctionInvocation(
 				type: selected.inferred.returnType,
 				conformances: selected.conformances,
 				overloadedMethodIndex: selected.index,
+				omittedParameterIndices:
+					selected.inferred.omittedParameterIndices,
 			}
 		}
 
@@ -6929,6 +6959,7 @@ function resolveFunctionInvocation(
 			type: { type: "Error" },
 			conformances: [],
 			overloadedMethodIndex: null,
+			omittedParameterIndices: [],
 		}
 	} else {
 		if (type.type !== "Error") {
@@ -6951,6 +6982,7 @@ function resolveFunctionInvocation(
 			type: { type: "Error" },
 			conformances: [],
 			overloadedMethodIndex: null,
+			omittedParameterIndices: [],
 		}
 	}
 }
