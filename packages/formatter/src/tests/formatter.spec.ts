@@ -1186,6 +1186,24 @@ describe("formatter", () => {
 			)
 		})
 
+		it("breaks a with-Combination like a Record", () => {
+			let source =
+				'implementation {\n\tconstant p = { x = 1, y = 2 }\n\tconstant q = { p with x = 100000000, y = 200000000, label = "somethingelse", description = "another" }\n}\n'
+
+			expect(formatted(source)).toBe(
+				'implementation {\n\tconstant p = { x = 1, y = 2 }\n\tconstant q = {\n\t\tp with\n\t\t\tx = 100000000,\n\t\t\ty = 200000000,\n\t\t\tlabel = "somethingelse",\n\t\t\tdescription = "another",\n\t}\n}\n',
+			)
+		})
+
+		it("lets a braced right side of a with lay itself out", () => {
+			let source =
+				"implementation {\n\ttype Point = { x: Integer, y: Integer }\n\tconstant p: Point = { x = 1, y = 2 }\n\tconstant r = { p with Point ~> { x = 100000000000000000000, y = 200000000000000000000000000000000000000000000 } }\n}\n"
+
+			expect(formatted(source)).toContain(
+				"= {\n\t\tp with Point ~> {\n\t\t\tx = 100000000000000000000,\n\t\t\ty = 200000000000000000000000000000000000000000000,\n\t\t}\n\t}\n",
+			)
+		})
+
 		it("adds a trailing comma to a broken argument list", () => {
 			let source =
 				'implementation {\n\tTerminal.inspect("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")\n}\n'
