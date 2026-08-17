@@ -1,6 +1,7 @@
 import {
 	filterMostSpecificByTarget,
 	flattenUnionMembers,
+	parameterDefaults,
 } from "@essence-lang/compiler/helpers"
 import {
 	printCaseWithPayload,
@@ -23,7 +24,7 @@ import { describe, documentationOf } from "./documentation"
 import { typedHandlerExpressions } from "./matchHandlerChildren"
 import { matchingNamespaces } from "./namespaces"
 import { contains, isAtOrBefore, isSmaller } from "./positions"
-import { buildProbeSource, stripNoise } from "./probe"
+import { probeSourcesFor, stripNoise } from "./probe"
 import {
 	type Declaration,
 	type DeclarationKind,
@@ -270,16 +271,22 @@ function contextualCompletions(
 
 	let context: ArgumentContext | null = null
 
-	try {
-		let { program } = parseDocument(
-			buildProbeSource(headText),
-			documentPath,
-		)
-		let { program: enrichedProgram } = enrichDocument(program, documentPath)
+	for (let probeSource of probeSourcesFor(headText)) {
+		try {
+			let { program } = parseDocument(probeSource, documentPath)
+			let { program: enrichedProgram } = enrichDocument(
+				program,
+				documentPath,
+			)
 
-		context = findArgumentContext(enrichedProgram, cursor)
-	} catch {
-		return []
+			context = findArgumentContext(enrichedProgram, cursor)
+		} catch {
+			continue
+		}
+
+		if (context !== null) {
+			break
+		}
 	}
 
 	if (context === null) {
@@ -342,21 +349,28 @@ function resolveProbedBase(
 	headText: string,
 	documentPath?: string,
 ): ProbedBase | null {
-	let probeSource = buildProbeSource(headText, `.${probeMemberName}`)
+	for (let probeSource of probeSourcesFor(headText, `.${probeMemberName}`)) {
+		try {
+			let { program } = parseDocument(probeSource, documentPath)
+			let { program: enrichedProgram } = enrichDocument(
+				program,
+				documentPath,
+			)
+			let baseType =
+				findProbeLookup(enrichedProgram.implementation.nodes)?.base
+					.type ?? null
 
-	try {
-		let { program } = parseDocument(probeSource, documentPath)
-		let { program: enrichedProgram } = enrichDocument(program, documentPath)
-		let baseType =
-			findProbeLookup(enrichedProgram.implementation.nodes)?.base.type ??
-			null
-
-		return baseType === null
-			? null
-			: { type: baseType, program: enrichedProgram }
-	} catch {
-		return null
+			if (baseType !== null) {
+				return { type: baseType, program: enrichedProgram }
+			}
+		} catch {
+			// NOTE: A reading that does not parse is simply not the reading —
+			// the next one is tried, and a cursor no reading explains answers
+			// with nothing, exactly as it did.
+		}
 	}
+
+	return null
 }
 
 function findProbeLookup(
@@ -364,6 +378,24 @@ function findProbeLookup(
 ): common.typed.LookupNode | null {
 	for (let node of nodes) {
 		let found = findProbeLookupInNode(node)
+
+		if (found !== null) {
+			return found
+		}
+	}
+
+	return null
+}
+
+// NOTE: A `= expression` default is an Expression position a writer types in, so
+// the probe has to be findable there — `= person.|` inside a Parameter list
+// asked for a member and got nothing at all, because this walk reached bodies
+// and a default is not one.
+function findProbeLookupInDefaults(
+	parameters: Array<common.typed.ParameterNode>,
+): common.typed.LookupNode | null {
+	for (let defaultValue of parameterDefaults(parameters)) {
+		let found = findProbeLookupInNode(defaultValue)
 
 		if (found !== null) {
 			return found
@@ -382,7 +414,10 @@ function findProbeLookupInNode(
 		case "VariableAssignmentStatement":
 			return findProbeLookupInNode(node.value)
 		case "FunctionStatement":
-			return findProbeLookup(node.value.body)
+			return (
+				findProbeLookupInDefaults(node.value.parameters) ??
+				findProbeLookup(node.value.body)
+			)
 		case "NamespaceDefinitionStatement": {
 			for (let property of Object.values(node.properties)) {
 				let found = findProbeLookupInNode(property.value)
@@ -400,11 +435,24 @@ function findProbeLookupInNode(
 						: [member.method]
 
 				for (let method of methods) {
-					let found = findProbeLookup(method.value.body)
+					let found =
+						findProbeLookupInDefaults(method.value.parameters) ??
+						findProbeLookup(method.value.body)
 
 					if (found !== null) {
 						return found
 					}
+				}
+			}
+
+			// NOTE: A native Method has no body, and the frame the Compiler
+			// synthesizes for its defaults is where its Expressions live — the
+			// standard library's own sources are edited through this Server.
+			for (let shim of node.nativeShims) {
+				let found = findProbeLookupInDefaults(shim.parameters)
+
+				if (found !== null) {
+					return found
 				}
 			}
 
@@ -515,7 +563,10 @@ function findProbeLookupInNode(
 			return null
 		}
 		case "FunctionValue":
-			return findProbeLookup(node.value.body)
+			return (
+				findProbeLookupInDefaults(node.value.parameters) ??
+				findProbeLookup(node.value.body)
+			)
 		case "CaseValue":
 			return node.value === null
 				? null
@@ -1005,8 +1056,26 @@ function analyseCaseProbe(program: common.typed.Program): {
 		}
 	}
 
+	// NOTE: A default is read against its own Parameter's Type, which is what
+	// makes `= #|` inside a Parameter list offer that Parameter's Choice. Walked
+	// per Parameter rather than through `parameterDefaults`, because the
+	// expected Type is the half of the pair the flat enumeration drops.
 	function visitFunction(definition: common.typed.FunctionDefinitionNode) {
+		visitDefaults(definition.parameters)
 		visitBody(definition.body, definition.returnType)
+	}
+
+	function visitDefaults(parameters: Array<common.typed.ParameterNode>) {
+		for (let parameter of parameters) {
+			if (parameter.defaultValue !== null) {
+				visitNode(
+					parameter.defaultValue,
+					parameter.internalName?.type ??
+						parameter.externalName?.type ??
+						null,
+				)
+			}
+		}
 	}
 
 	function visitArguments(
@@ -1082,6 +1151,10 @@ function analyseCaseProbe(program: common.typed.Program): {
 					for (let method of methods) {
 						visitFunction(method.value)
 					}
+				}
+
+				for (let shim of node.nativeShims) {
+					visitDefaults(shim.parameters)
 				}
 
 				return

@@ -132,3 +132,27 @@ describe("Selection Ranges", () => {
 		})
 	})
 })
+
+// NOTE: A default is a span of its own inside no body, so expanding from inside
+// one has to reach it — otherwise the selection jumps straight from the name to
+// the whole Declaration.
+describe("Selection Ranges inside a default", () => {
+	it("should widen from a name in a default out through the default", () => {
+		let source = [
+			"implementation {",
+			"\tconstant fallback = 1",
+			"",
+			"\tfunction scaled(_ factor: Integer = fallback) -> Integer {",
+			"\t\t<- factor",
+			"\t}",
+			"}",
+		].join("\n")
+
+		let ranges = selectionRangesOf(source, { line: 4, column: 40 })
+
+		expect(ranges[0]).toEqual({
+			start: { line: 4, column: 38 },
+			end: { line: 4, column: 46 },
+		})
+	})
+})

@@ -1,9 +1,11 @@
+import { parameterDefaults } from "@essence-lang/compiler/helpers"
 import type { common, parser } from "@essence-lang/interfaces"
 
 import { type Analysis, analyseDocument, documentFilePath } from "./analyse"
 import { insertImportEdit, relativeSpecifier } from "./autoImport"
 import { findInlayHints } from "./inlayHints"
 import { matcherValueExpressions } from "./matchHandlerChildren"
+import { methodsOf, nativeSignaturesOf } from "./namespaceMembers"
 import { isSamePosition } from "./positions"
 import type { Workspace } from "./workspace"
 
@@ -898,6 +900,19 @@ function walkBody(
 	}
 }
 
+// NOTE: A Parameter's `= expression` default holds Expressions the same Quick
+// Fixes apply to as any body's — an unknown name inside one has the same
+// suggestion, an auto-import the same edit. Silently missed otherwise: the walk
+// below descends into bodies, and a default is not one.
+function walkDefaults(
+	parameters: Array<parser.ParameterNode>,
+	visit: (node: parser.ImplementationNode) => void,
+) {
+	for (let defaultValue of parameterDefaults(parameters)) {
+		walkNode(defaultValue, visit)
+	}
+}
+
 function walkNode(
 	node: parser.ImplementationNode,
 	visit: (node: parser.ImplementationNode) => void,
@@ -911,6 +926,7 @@ function walkNode(
 			walkNode(node.value, visit)
 			return
 		case "FunctionStatement":
+			walkDefaults(node.value.parameters, visit)
 			walkBody(node.value.body, visit)
 			return
 		case "NamespaceDefinitionStatement": {
@@ -923,6 +939,13 @@ function walkNode(
 			for (let member of Object.values(node.methods)) {
 				for (let method of methodsOf(member)) {
 					walkNode(method, visit)
+				}
+
+				// NOTE: A native signature has no body, but it may carry a
+				// default, which is Essence written in a `declarations` Program
+				// like any other.
+				for (let signature of nativeSignaturesOf(member)) {
+					walkDefaults(signature.parameters, visit)
 				}
 			}
 
@@ -957,6 +980,7 @@ function walkNode(
 
 			return
 		case "FunctionValue":
+			walkDefaults(node.value.parameters, visit)
 			walkBody(node.value.body, visit)
 			return
 		case "RecordValue":
@@ -1001,36 +1025,6 @@ function walkNode(
 
 			return
 	}
-}
-
-function methodsOf(
-	member: parser.NamespaceMethods[string],
-): Array<parser.FunctionValueNode> {
-	if (
-		member.nodeType === "SimpleMethod" ||
-		member.nodeType === "StaticMethod"
-	) {
-		return [member.method]
-	}
-
-	if (
-		member.nodeType === "OverloadedMethod" ||
-		member.nodeType === "OverloadedStaticMethod"
-	) {
-		return member.methods
-	}
-
-	if (
-		member.nodeType === "OverloadedMethodSignatures" ||
-		member.nodeType === "OverloadedStaticMethodSignatures"
-	) {
-		return member.methods.filter(
-			(entry): entry is parser.FunctionValueNode =>
-				entry.nodeType === "FunctionValue",
-		)
-	}
-
-	return []
 }
 
 function walkArguments(

@@ -348,3 +348,24 @@ describe("Semantic Tokens in where clauses", () => {
 		expect(tokenAt(source, 6, 28)?.type).toBe("type")
 	})
 })
+
+// NOTE: A `= #Case` default would go uncoloured otherwise — the Case walk
+// descends into bodies, and a default is not one.
+describe("Semantic Tokens of a Case written in a default", () => {
+	it("should colour a bare Case as an enum member", () => {
+		let source = [
+			"implementation {",
+			"\tchoice Side {",
+			"\t\tStart,",
+			"\t\tEnd,",
+			"\t}",
+			"",
+			"\tfunction pick(at side: Side = #Start) -> Side {",
+			"\t\t<- side",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(tokenAt(source, 7, 33)?.type).toBe("enumMember")
+	})
+})

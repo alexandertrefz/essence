@@ -1,5 +1,7 @@
+import { parameterDefaults } from "@essence-lang/compiler/helpers"
 import type { common, parser } from "@essence-lang/interfaces"
 
+import { methodsOf, nativeSignaturesOf } from "./namespaceMembers"
 import { type DeclarationKind, indexProgram, type ProgramIndex } from "./rename"
 
 // NOTE: Semantic Tokens classify Identifiers by what they actually resolve
@@ -196,6 +198,26 @@ function collectCases(
 	}
 }
 
+// NOTE: A Parameter's `= expression` default holds Expressions like any body
+// does, and `= #None` is a Case that would otherwise go uncoloured — the walk
+// below descends into bodies, and a default is not one.
+function collectCasesFromDefinition(
+	definition: parser.FunctionDefinitionNode,
+	tokens: Array<SemanticToken>,
+) {
+	collectCasesFromDefaults(definition.parameters, tokens)
+	collectCases(definition.body, tokens)
+}
+
+function collectCasesFromDefaults(
+	parameters: Array<parser.ParameterNode>,
+	tokens: Array<SemanticToken>,
+) {
+	for (let defaultValue of parameterDefaults(parameters)) {
+		collectCasesFromNode(defaultValue, tokens)
+	}
+}
+
 function collectCasesFromNode(
 	node: parser.ImplementationNode,
 	tokens: Array<SemanticToken>,
@@ -246,47 +268,35 @@ function collectCasesFromNode(
 				}
 			}
 
+			// NOTE: An `overload` block in declarations mode mixes bodied
+			// Methods with body-less native signatures, so both questions are
+			// asked of every member — see `namespaceMembers`.
 			for (let member of Object.values(node.methods)) {
-				if (
-					member.nodeType === "SimpleMethod" ||
-					member.nodeType === "StaticMethod"
-				) {
-					collectCases(member.method.value.body, tokens)
-				} else if (
-					member.nodeType === "OverloadedMethod" ||
-					member.nodeType === "OverloadedStaticMethod"
-				) {
-					for (let method of member.methods) {
-						collectCases(method.value.body, tokens)
-					}
-				} else if (
-					member.nodeType === "OverloadedMethodSignatures" ||
-					member.nodeType === "OverloadedStaticMethodSignatures"
-				) {
-					// NOTE: An `overload` block in declarations mode mixes
-					// bodied Methods with body-less native signatures.
-					for (let method of member.methods) {
-						if (method.nodeType === "FunctionValue") {
-							collectCases(method.value.body, tokens)
-						}
-					}
+				for (let method of methodsOf(member)) {
+					collectCasesFromDefinition(method.value, tokens)
+				}
+
+				for (let signature of nativeSignaturesOf(member)) {
+					collectCasesFromDefaults(signature.parameters, tokens)
 				}
 			}
 
 			return
 		case "FunctionStatement":
-			collectCases(node.value.body, tokens)
+			collectCasesFromDefinition(node.value, tokens)
 			return
 		case "OverloadedFunctionStatement":
 			for (let method of node.methods) {
 				if (method.nodeType === "FunctionValue") {
-					collectCases(method.value.body, tokens)
+					collectCasesFromDefinition(method.value, tokens)
+				} else {
+					collectCasesFromDefaults(method.parameters, tokens)
 				}
 			}
 
 			return
 		case "FunctionValue":
-			collectCases(node.value.body, tokens)
+			collectCasesFromDefinition(node.value, tokens)
 			return
 		case "ConstantDeclarationStatement":
 		case "VariableDeclarationStatement":

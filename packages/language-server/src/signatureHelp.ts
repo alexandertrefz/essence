@@ -1,4 +1,8 @@
 import {
+	parameterDefaults,
+	requiredParameterCount,
+} from "@essence-lang/compiler/helpers"
+import {
 	describeSignature,
 	type ParameterRange,
 	signaturesOf,
@@ -11,7 +15,7 @@ import { describe, documentationOf } from "./documentation"
 import { typedHandlerExpressions } from "./matchHandlerChildren"
 import { matchingNamespaces } from "./namespaces"
 import { contains, isAtOrBefore, isSmaller } from "./positions"
-import { buildProbeSource, stripNoise } from "./probe"
+import { probeSourcesFor, stripNoise } from "./probe"
 
 // NOTE: Signature Help resolves the enclosing invocation the same way
 // Completion resolves a receiver: the document text up to the cursor is
@@ -64,8 +68,6 @@ export function findSignatureHelp(
 		(lines[cursor.line - 1] ?? "").slice(0, cursor.column - 1),
 	].join("\n")
 
-	let probeSource = buildProbeSource(headText)
-
 	// NOTE: The searched point is the end of `headText`, not the requested
 	// cursor — that is where the Probe's padding starts, and the two differ
 	// whenever the requested column runs past the end of its own line.
@@ -77,18 +79,29 @@ export function findSignatureHelp(
 	let cursorPoint: common.Position = { start: probeCursor, end: probeCursor }
 
 	let enrichedProgram: common.typed.Program | null = null
+	let invocation: Invocation | null = null
 
-	try {
-		let { program } = parseDocument(probeSource, documentPath)
-		enrichedProgram = enrichDocument(program, documentPath).program
-	} catch {
-		return null
+	// NOTE: A call written inside a Parameter's `= expression` default is one of
+	// the readings — see `probeSourcesFor`, which is what makes a Declaration
+	// whose head the cursor sits in parse at all.
+	for (let probeSource of probeSourcesFor(headText)) {
+		try {
+			let { program } = parseDocument(probeSource, documentPath)
+
+			enrichedProgram = enrichDocument(program, documentPath).program
+		} catch {
+			continue
+		}
+
+		invocation = findEnclosingInvocation(
+			enrichedProgram.implementation.nodes,
+			cursorPoint,
+		)
+
+		if (invocation !== null) {
+			break
+		}
 	}
-
-	let invocation = findEnclosingInvocation(
-		enrichedProgram.implementation.nodes,
-		cursorPoint,
-	)
 
 	if (invocation === null) {
 		return null
@@ -232,13 +245,6 @@ function help(
 	}
 }
 
-// NOTE: How many Arguments a call MUST write — the count a Parameter carrying a
-// default no longer adds to.
-function requiredCount(signature: common.BaseFunction): number {
-	return signature.parameterTypes.filter((parameter) => !parameter.hasDefault)
-		.length
-}
-
 // NOTE: A comma count is a Parameter index only while nothing may be left out.
 // Once a Parameter carries a default, the Nth Argument a call writes need not be
 // the Nth Parameter: `cut(to 3)` writes one Argument and it stands at the SECOND
@@ -344,7 +350,7 @@ function activeSignatureOf(
 	let fits = signatures.findIndex(
 		(signature) =>
 			signature.parameterTypes.length > activeParameter &&
-			requiredCount(signature) > activeParameter,
+			requiredParameterCount(signature.parameterTypes) > activeParameter,
 	)
 
 	if (fits !== -1) {
@@ -455,6 +461,15 @@ function findEnclosingInvocation(
 		}
 	}
 
+	// NOTE: `= cut(from 1` IS a call being written, so a cursor inside a
+	// Parameter's default has a signature to help with exactly as one in a body
+	// does.
+	function visitDefaults(parameters: Array<common.typed.ParameterNode>) {
+		for (let defaultValue of parameterDefaults(parameters)) {
+			visitNode(defaultValue)
+		}
+	}
+
 	function visitNode(node: common.typed.ImplementationNode) {
 		consider(node)
 
@@ -465,6 +480,7 @@ function findEnclosingInvocation(
 				visitNode(node.value)
 				return
 			case "FunctionStatement":
+				visitDefaults(node.value.parameters)
 				visitBody(node.value.body)
 				return
 			case "NamespaceDefinitionStatement":
@@ -480,8 +496,13 @@ function findEnclosingInvocation(
 							: [member.method]
 
 					for (let method of methods) {
+						visitDefaults(method.value.parameters)
 						visitBody(method.value.body)
 					}
+				}
+
+				for (let shim of node.nativeShims) {
+					visitDefaults(shim.parameters)
 				}
 
 				return
@@ -553,6 +574,7 @@ function findEnclosingInvocation(
 
 				return
 			case "FunctionValue":
+				visitDefaults(node.value.parameters)
 				visitBody(node.value.body)
 				return
 			case "CaseValue":

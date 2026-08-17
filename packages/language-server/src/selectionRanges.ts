@@ -1,3 +1,4 @@
+import { parameterDefaults } from "@essence-lang/compiler/helpers"
 import type { common, parser } from "@essence-lang/interfaces"
 
 import { matcherValueExpressions } from "./matchHandlerChildren"
@@ -54,6 +55,27 @@ function collectFromBody(
 	}
 }
 
+// NOTE: A Parameter's `= expression` default is a span of its own, inside no
+// body — so expanding a selection from inside `= @::length()` has to descend
+// here or it jumps straight to the whole Declaration. Answers whether the cursor
+// was in one, since a cursor inside a default is not in the body.
+function collectFromDefaults(
+	parameters: Array<parser.ParameterNode>,
+	cursor: common.Cursor,
+	chain: Array<common.Position>,
+): boolean {
+	for (let defaultValue of parameterDefaults(parameters)) {
+		if (contains(defaultValue.position, cursor)) {
+			chain.push(defaultValue.position)
+			collectFromNode(defaultValue, cursor, chain)
+
+			return true
+		}
+	}
+
+	return false
+}
+
 function collectFromNode(
 	node: parser.ImplementationNode,
 	cursor: common.Cursor,
@@ -66,6 +88,10 @@ function collectFromNode(
 			descend(node.value, cursor, chain)
 			return
 		case "FunctionStatement":
+			if (collectFromDefaults(node.value.parameters, cursor, chain)) {
+				return
+			}
+
 			collectFromBody(node.value.body, cursor, chain)
 			return
 		case "NamespaceDefinitionStatement": {
@@ -104,7 +130,17 @@ function collectFromNode(
 				for (let method of methods) {
 					if (contains(method.position, cursor)) {
 						chain.push(method.position)
-						collectFromBody(method.value.body, cursor, chain)
+
+						if (
+							!collectFromDefaults(
+								method.value.parameters,
+								cursor,
+								chain,
+							)
+						) {
+							collectFromBody(method.value.body, cursor, chain)
+						}
+
 						return
 					}
 				}
@@ -145,6 +181,10 @@ function collectFromNode(
 
 			return
 		case "FunctionValue":
+			if (collectFromDefaults(node.value.parameters, cursor, chain)) {
+				return
+			}
+
 			collectFromBody(node.value.body, cursor, chain)
 			return
 		case "RecordValue":

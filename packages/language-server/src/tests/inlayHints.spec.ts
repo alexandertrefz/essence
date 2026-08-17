@@ -534,3 +534,94 @@ describe("Inlay Hints", () => {
 		expect(hints[0].position.line).toBe(3)
 	})
 })
+
+// NOTE: The anchor an inferred-Type Hint sits at is the end of a Parameter's
+// Position, and that Position stops at the TYPE and never covers a default —
+// `codeActions` offers the same span as an APPLIED edit, so a Hint written after
+// `= 1` would produce source that does not parse. The two can not actually meet
+// today, because only a contextually typed Function literal omits a Type and
+// only a named Declaration may carry a default; these pin both halves of that.
+describe("Inlay Hints beside a default", () => {
+	it("writes no Parameter Hint where a Type and a default are both written", () => {
+		let source = [
+			"implementation {",
+			"\tfunction scaled(_ factor: Integer = 2) -> Integer {",
+			"\t\t<- factor",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(hintsOf(source)).toEqual([])
+	})
+
+	it("anchors a literal's Parameter Hint at the name, default or not", () => {
+		let source = [
+			"implementation {",
+			"\tfunction apply(_ transform: (_: Integer) -> Integer) -> Integer {",
+			"\t\t<- transform(1)",
+			"\t}",
+			"",
+			"\tconstant value = apply((item) { <- item })",
+			"}",
+		].join("\n")
+
+		expect(hintsOf(source)).toEqual([
+			{
+				position: { line: 6, column: 16 },
+				label: ": Integer",
+				kind: "type",
+			},
+			{
+				position: { line: 6, column: 30 },
+				label: ": Integer",
+				kind: "type",
+			},
+			{
+				position: { line: 6, column: 31 },
+				label: " -> Integer",
+				kind: "type",
+			},
+		])
+	})
+})
+
+// NOTE: A Hint IS an applied edit — `codeActions` offers every one of them as
+// "Add explicit Type annotation" — so its text has to parse back as the Type it
+// names. A Method taken as a value has no defaults to print (the Enricher drops
+// them: only a direct call reaches the frame that fills one in) and `printType`
+// writes no `?` in any case, which are the two halves of that guarantee.
+describe("An Inlay Hint for a defaulted signature read as a value", () => {
+	it("writes a Type that parses back as itself", () => {
+		let source = [
+			"implementation {",
+			"\tnamespace Scaling {",
+			"\t\tstatic scaled(of value: Integer, by factor: Integer = 2) -> Integer {",
+			"\t\t\t<- value::multiply(with factor)",
+			"\t\t}",
+			"\t}",
+			"",
+			"\tconstant scaled = Scaling.scaled",
+			"}",
+		].join("\n")
+
+		let hints = hintsOf(source)
+
+		expect(hints).toEqual([
+			{
+				position: { line: 8, column: 17 },
+				label: ": (of: Integer, by: Integer) -> Integer",
+				kind: "type",
+			},
+		])
+
+		// NOTE: Applied where it is offered, and parsed — the one thing a Hint
+		// that is also an edit has to survive. A `?` on `by` would parse as a
+		// Parameter LABELLED `by?` and then fail against the value it annotates.
+		let annotated = source.replace(
+			"constant scaled = ",
+			`constant scaled${hints[0]!.label} = `,
+		)
+
+		expect(parseWithDiagnostics(annotated).diagnostics).toEqual([])
+	})
+})
