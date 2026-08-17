@@ -17,6 +17,11 @@ implementation {
 	Terminal.inspect(greeting::reverse()) § "dlroW ,olleH"
 	Terminal.inspect(greeting::replaceEvery("o", with "0")) § "Hell0, W0rld"
 	Terminal.inspect(greeting::slice(from 0, to 5)) § "Hello"
+	§ Both ends of `slice` carry a default, so a head and a tail each name one
+	§ position. `to` defaults to `@::length()` — a default that reads the
+	§ receiver.
+	Terminal.inspect(greeting::slice(from 7)) § "World"
+	Terminal.inspect(greeting::slice(to 5)) § "Hello"
 	Terminal.inspect("ab"::repeat(times 3)) § "ababab"
 	Terminal.inspect("  spaced  "::trim()) § "spaced"
 
