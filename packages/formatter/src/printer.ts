@@ -2101,6 +2101,10 @@ export class Printer {
 	// way it would anywhere else — while one that fits on a line is offered a
 	// group, which spends the break only if the String around it has run out of
 	// room.
+	// NOTE: A hole is broken only when breaking it HELPS — when what follows
+	// its closing brace then fits on the line the brace opens. A String too
+	// long for any hole to save is left long, rather than torn open at every
+	// hole for nothing.
 	private printHole(expression: parser.ExpressionNode): Doc {
 		let doc = this.printExpression(expression)
 		let flat = renderFlat(doc)
@@ -2116,6 +2120,7 @@ export class Printer {
 				softline,
 				text("}"),
 			]),
+			{ breakIfTailFits: text("}") },
 		)
 	}
 
