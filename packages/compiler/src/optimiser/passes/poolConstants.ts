@@ -38,7 +38,15 @@ export const poolConstants: OptimiserPass = {
 		// standard library.
 		let declared = namespaces.all
 
-		return rewriteExpressions(program, (node) => pool(node, declared))
+		// NOTE: A Parameter's `= expression` default is walked too. It is the
+		// one Expression position that is evaluated per CALL without standing in
+		// anybody's body — `at side: Side = #BothEnds` built its Case at every
+		// call of `trim` before this reached it — and pooling reaches it safely
+		// for the same reason the band can stand where it does: a default runs
+		// when the Function is called, and every call is emitted below the band.
+		return rewriteExpressions(program, (node) => pool(node, declared), {
+			parameterDefaults: true,
+		})
 	},
 }
 

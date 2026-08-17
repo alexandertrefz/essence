@@ -61,7 +61,12 @@ export const foldConstants: OptimiserPass = {
 		// Scope — the Optimiser walks Expressions and not Scopes.
 		let shadowed = namespaces.nested
 
-		return rewriteExpressions(program, (node) => fold(node, shadowed))
+		// NOTE: A Parameter's `= expression` default is folded too — it answers
+		// an Expression with an Expression and never lifts anything, which is
+		// the whole of what a default's position asks of a pass.
+		return rewriteExpressions(program, (node) => fold(node, shadowed), {
+			parameterDefaults: true,
+		})
 	},
 }
 
