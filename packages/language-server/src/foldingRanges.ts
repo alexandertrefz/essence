@@ -1,3 +1,4 @@
+import { parameterDefaults } from "@essence-lang/compiler/helpers"
 import type { common, parser } from "@essence-lang/interfaces"
 
 // NOTE: Folding is derived from the Parser AST, so it keeps working while the
@@ -52,6 +53,17 @@ function collectFromBody(
 	}
 }
 
+// NOTE: A block-like default — `= match …`, `= { … }`, a Function literal —
+// lays itself out over lines of its own and folds like anything else that does.
+function collectFromDefaults(
+	parameters: Array<parser.ParameterNode>,
+	ranges: Array<FoldingRange>,
+) {
+	for (let defaultValue of parameterDefaults(parameters)) {
+		collectFromNode(defaultValue, ranges)
+	}
+}
+
 function collectFromNode(
 	node: parser.ImplementationNode,
 	ranges: Array<FoldingRange>,
@@ -59,6 +71,7 @@ function collectFromNode(
 	switch (node.nodeType) {
 		case "FunctionStatement":
 			addRange(ranges, node.position)
+			collectFromDefaults(node.value.parameters, ranges)
 			collectFromBody(node.value.body, ranges)
 			return
 		case "OverloadedFunctionStatement":
@@ -167,6 +180,7 @@ function collectFromNode(
 			return
 		case "FunctionValue":
 			addRange(ranges, node.position)
+			collectFromDefaults(node.value.parameters, ranges)
 			collectFromBody(node.value.body, ranges)
 			return
 		case "RecordValue":

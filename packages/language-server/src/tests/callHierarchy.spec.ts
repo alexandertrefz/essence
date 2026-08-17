@@ -373,3 +373,32 @@ describe("Call Hierarchy", () => {
 		expect(incoming(source, { line: 3, column: 3 })).toEqual([])
 	})
 })
+
+// NOTE: `= @::length()` IS a call, made by the Declaration the default is
+// written on — so it is an outgoing call of that Method exactly as one written
+// in the body is.
+describe("Call Hierarchy of a call written in a default", () => {
+	let source = [
+		"implementation {",
+		"\tfunction length() -> Integer {",
+		"\t\t<- 4",
+		"\t}",
+		"",
+		"\tfunction upTo(_ end: Integer = length()) -> Integer {",
+		"\t\t<- end",
+		"\t}",
+		"}",
+	].join("\n")
+
+	it("lists it among the caller's outgoing calls", () => {
+		expect(summarise(outgoing(source, { line: 6, column: 11 }))).toEqual([
+			{ name: "length", kind: "function", container: null, calls: 1 },
+		])
+	})
+
+	it("lists the caller among the callee's incoming calls", () => {
+		expect(summarise(incoming(source, { line: 2, column: 11 }))).toEqual([
+			{ name: "upTo", kind: "function", container: null, calls: 1 },
+		])
+	})
+})

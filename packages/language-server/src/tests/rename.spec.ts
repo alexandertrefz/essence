@@ -1600,3 +1600,55 @@ describe("Rename through the Module sections", () => {
 		)
 	})
 })
+
+// NOTE: The headline regression this feature could introduce: a default is an
+// Expression written outside every body, so a walker that only descends into
+// bodies leaves the occurrence inside `= …` behind — silently, and the rename
+// produces code that no longer compiles.
+describe("Rename of a name a default reads", () => {
+	it("renames a module Constant read by a default", () => {
+		let source = [
+			"implementation {",
+			"\tconstant fallback = 1",
+			"",
+			"\tfunction scaled(_ factor: Integer = fallback) -> Integer {",
+			"\t\t<- factor",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(rename(source, { line: 2, column: 11 }, "base")).toBe(
+			[
+				"implementation {",
+				"\tconstant base = 1",
+				"",
+				"\tfunction scaled(_ factor: Integer = base) -> Integer {",
+				"\t\t<- factor",
+				"\t}",
+				"}",
+			].join("\n"),
+		)
+	})
+
+	// NOTE: A default sees the Parameters to its LEFT, so one of them can be
+	// renamed from inside it — and the two occurrences are one symbol.
+	it("renames a Parameter a later default reads", () => {
+		let source = [
+			"implementation {",
+			"\tfunction pick(_ first: Integer, to second: Integer = first) -> Integer {",
+			"\t\t<- second",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(rename(source, { line: 2, column: 55 }, "start")).toBe(
+			[
+				"implementation {",
+				"\tfunction pick(_ start: Integer, to second: Integer = start) -> Integer {",
+				"\t\t<- second",
+				"\t}",
+				"}",
+			].join("\n"),
+		)
+	})
+})

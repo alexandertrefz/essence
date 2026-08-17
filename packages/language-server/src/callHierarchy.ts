@@ -1,3 +1,4 @@
+import { parameterDefaults } from "@essence-lang/compiler/helpers"
 import type { common, parser } from "@essence-lang/interfaces"
 
 import { typedHandlerExpressions } from "./matchHandlerChildren"
@@ -572,6 +573,20 @@ function recordCall(
 	sites.push({ caller, callee, range: position })
 }
 
+// NOTE: `= @::length()` IS a call, and it is made by the Declaration the default
+// is written on — so it is an outgoing call of that Function or Method, exactly
+// as one written in the body is.
+function visitDefaults(
+	parameters: Array<common.typed.ParameterNode>,
+	caller: CallHierarchyItem,
+	context: Context,
+	sites: Array<CallSite>,
+) {
+	for (let defaultValue of parameterDefaults(parameters)) {
+		visitNode(defaultValue, caller, context, sites)
+	}
+}
+
 function visitNode(
 	node: common.typed.ImplementationNode,
 	caller: CallHierarchyItem,
@@ -584,15 +599,14 @@ function visitNode(
 		case "VariableAssignmentStatement":
 			visitNode(node.value, caller, context, sites)
 			return
-		case "FunctionStatement":
-			visitBody(
-				node.value.body,
-				callerFor(node.name.position, caller, context),
-				context,
-				sites,
-			)
+		case "FunctionStatement": {
+			let functionCaller = callerFor(node.name.position, caller, context)
+
+			visitDefaults(node.value.parameters, functionCaller, context, sites)
+			visitBody(node.value.body, functionCaller, context, sites)
 
 			return
+		}
 		case "NamespaceDefinitionStatement":
 			for (let property of Object.values(node.properties)) {
 				visitNode(
@@ -618,8 +632,28 @@ function visitNode(
 				// `overloadedMethodIndex`, so splitting the set apart stays
 				// possible if it ever turns out to be what a reader wants.
 				for (let method of methods) {
-					visitBody(
-						method.value.body,
+					let methodCaller = callerFor(
+						member.name.position,
+						caller,
+						context,
+					)
+
+					visitDefaults(
+						method.value.parameters,
+						methodCaller,
+						context,
+						sites,
+					)
+					visitBody(method.value.body, methodCaller, context, sites)
+				}
+
+				// NOTE: A native Method has no body, and the frame the Compiler
+				// synthesizes for its defaults is where its calls live —
+				// `slice(from start: Integer = 0, to end: Integer =
+				// @::length())` calls `length`, and the hierarchy has to say so.
+				for (let shim of node.nativeShims) {
+					visitDefaults(
+						shim.parameters,
 						callerFor(member.name.position, caller, context),
 						context,
 						sites,

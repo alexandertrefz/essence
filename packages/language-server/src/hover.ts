@@ -1,6 +1,7 @@
 import { builtinProtocols } from "@essence-lang/compiler/enricher/builtins"
 import {
 	isSynthesizedName,
+	parameterDefaults,
 	parameterInternalName,
 } from "@essence-lang/compiler/helpers"
 import {
@@ -465,10 +466,8 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 			// IS Essence, and the only part a hover has anything to say about
 			// beyond what `visitNativeSignatures` reads off the parsed source.
 			for (let shim of node.nativeShims) {
-				for (let parameter of shim.parameters) {
-					if (parameter.defaultValue !== null) {
-						visitNode(parameter.defaultValue, state)
-					}
+				for (let defaultValue of parameterDefaults(shim.parameters)) {
+					visitNode(defaultValue, state)
 				}
 			}
 

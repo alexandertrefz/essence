@@ -240,6 +240,14 @@ function visitFunctionDefinition(
 	hints: Array<InlayHint>,
 ) {
 	for (let parameter of definition.parameters) {
+		// NOTE: `parameter.position` stops at the Type and does NOT cover a
+		// default — deliberately, and this is the reason it does not: the hint
+		// sits at that end, and `codeActions` offers the same span as an
+		// APPLIED edit, so a widened Position would write `: Integer` after
+		// `= 1` and produce source that does not parse. An unannotated
+		// Parameter is a Function literal's, which can not carry a default
+		// anyway, so the two never actually meet — the invariant is kept
+		// because the day they do is not the day to find out.
 		if (
 			parameter.inferredType !== null &&
 			parameter.inferredType.type !== "Error"
@@ -250,6 +258,10 @@ function visitFunctionDefinition(
 					`: ${printType(parameter.inferredType)}`,
 				),
 			)
+		}
+
+		if (parameter.defaultValue !== null) {
+			visitNode(parameter.defaultValue, hints)
 		}
 	}
 

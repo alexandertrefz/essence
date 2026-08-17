@@ -1439,3 +1439,79 @@ describe("Completion of a label a call may leave out", () => {
 		expect(from?.tier).toBeGreaterThan(to!.tier)
 	})
 })
+
+// NOTE: A `= expression` default is an Expression position a writer types in
+// like any other. The probe walkers reached bodies only, so completion inside a
+// default answered with nothing at all.
+describe("Completion inside a Parameter's default", () => {
+	it("should list a Record's members after a dot", () => {
+		let source = [
+			"implementation {",
+			'	constant person = { firstName = "Ada", lastName = "Lovelace" }',
+			"",
+			"	function greet(_ name: String = person.) -> String {",
+			"		<- name",
+			"	}",
+			"}",
+		].join("\n")
+
+		expect(labelsOf(source, { line: 4, column: 41 })).toEqual([
+			"firstName",
+			"lastName",
+		])
+	})
+
+	it("should list Methods after a ::", () => {
+		let source = [
+			"implementation {",
+			'	function greet(_ name: String = "x"::) -> String {',
+			"		<- name",
+			"	}",
+			"}",
+		].join("\n")
+
+		expect(labelsOf(source, { line: 2, column: 39 })).toContain("trim")
+	})
+
+	// NOTE: A default is read against its own Parameter's Type, which is what
+	// makes a bare Case offer that Parameter's Choice.
+	it("should offer the Parameter's own Choice for a bare Case", () => {
+		let source = [
+			"implementation {",
+			"	choice Edge {",
+			"		Front,",
+			"		Back,",
+			"	}",
+			"",
+			"	function edge(at side: Edge = #) -> Edge {",
+			"		<- side",
+			"	}",
+			"}",
+		].join("\n")
+
+		expect(labelsOf(source, { line: 7, column: 33 })).toEqual([
+			"Front",
+			"Back",
+		])
+	})
+})
+
+// NOTE: A call written inside a default is a call being written like any other,
+// and the labels it may still be given are the same ones.
+describe("Completion of a label inside a Parameter's default", () => {
+	it("should offer the labels of a call written in a default", () => {
+		let source = [
+			"implementation {",
+			"\tfunction cut(from start: Integer, to end: Integer) -> Integer {",
+			"\t\t<- end::subtract(start)",
+			"\t}",
+			"",
+			"\tfunction span(_ width: Integer = cut(from 0, ) -> Integer {",
+			"\t\t<- width",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(labelsOf(source, { line: 6, column: 46 })).toContain("to")
+	})
+})

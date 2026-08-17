@@ -5,12 +5,14 @@ import {
 	builtinTypes as builtinTypeTable,
 } from "@essence-lang/compiler/enricher/builtins"
 import {
+	parameterDefaults,
 	parameterInternalName,
 	patternBindings,
 } from "@essence-lang/compiler/helpers"
 import type { common, parser } from "@essence-lang/interfaces"
 
 import { typedHandlerExpressions } from "./matchHandlerChildren"
+import { methodsOf, nativeSignaturesOf } from "./namespaceMembers"
 
 // NOTE: Renaming is resolved on the Parser AST with a lexical Scope model
 // that mirrors the Enricher's binding rules — `values` corresponds to the
@@ -1314,6 +1316,16 @@ function walkFunctionDefinition(
 	for (let parameter of definition.parameters) {
 		walkTypeDeclaration(parameter.type, functionScope, context)
 
+		// NOTE: A default is walked BEFORE its own Parameter is declared, which
+		// reproduces the Enricher's scoping rule exactly: it sees `@`, the
+		// Parameters to its left and everything the Declaration is written
+		// inside, and nothing to its right. Without this, renaming a module
+		// Constant a default reads silently produces broken code — the
+		// occurrence inside the `= …` is simply never found.
+		if (parameter.defaultValue !== null) {
+			walkNode(parameter.defaultValue, functionScope, context)
+		}
+
 		// NOTE: `_: Type` declares neither a Parameter name nor a call site
 		// label, so it holds no symbol a rename could reach.
 		if (parameter.internalName === null) {
@@ -1587,51 +1599,12 @@ function walkNamespaceDefinition(
 		// `renameableOccurrenceAt` refuses outright inside a standard library
 		// source (see `server.ts`), which is the only place a native signature
 		// can appear. Indexing is what colours and highlights them.
-		let nativeSignatures: Array<parser.NativeMethodSignatureNode> = []
-
-		if (
-			member.nodeType === "SimpleMethodSignature" ||
-			member.nodeType === "StaticMethodSignature"
-		) {
-			nativeSignatures = [member.signature]
-		} else if (
-			member.nodeType === "OverloadedMethodSignatures" ||
-			member.nodeType === "OverloadedStaticMethodSignatures"
-		) {
-			nativeSignatures = member.methods.filter(
-				(entry): entry is parser.NativeMethodSignatureNode =>
-					entry.nodeType === "NativeMethodSignature",
-			)
-		}
-
-		for (let signature of nativeSignatures) {
+		for (let signature of nativeSignaturesOf(member)) {
 			walkNativeSignature(signature, genericScope, context)
 		}
 
 		// NOTE: Only bodied Methods have a Function definition to walk.
-		let methods: Array<parser.FunctionValueNode> = []
-
-		if (
-			member.nodeType === "SimpleMethod" ||
-			member.nodeType === "StaticMethod"
-		) {
-			methods = [member.method]
-		} else if (
-			member.nodeType === "OverloadedMethod" ||
-			member.nodeType === "OverloadedStaticMethod"
-		) {
-			methods = member.methods
-		} else if (
-			member.nodeType === "OverloadedMethodSignatures" ||
-			member.nodeType === "OverloadedStaticMethodSignatures"
-		) {
-			methods = member.methods.filter(
-				(entry): entry is parser.FunctionValueNode =>
-					entry.nodeType === "FunctionValue",
-			)
-		}
-
-		for (let method of methods) {
+		for (let method of methodsOf(member)) {
 			walkFunctionDefinition(
 				method.value,
 				genericScope,
@@ -1651,6 +1624,10 @@ function walkNativeSignature(
 
 	for (let parameter of signature.parameters) {
 		walkTypeDeclaration(parameter.type, signatureScope, context)
+
+		if (parameter.defaultValue !== null) {
+			walkNode(parameter.defaultValue, signatureScope, context)
+		}
 
 		// NOTE: A Parameter of a body-less signature binds nothing —
 		// there is no body to read it — so it is recorded as a
@@ -2092,6 +2069,19 @@ function walkTypedArguments(
 	}
 }
 
+// NOTE: A default is an Expression like any other, and the typed pass is what
+// finds a Method or a Namespace member NAMED inside one — the parser pass above
+// finds the plain names. Missing this is silent: a rename simply leaves the
+// occurrence inside the `= …` behind.
+function walkTypedParameterDefaults(
+	parameters: Array<common.typed.ParameterNode>,
+	context: WalkContext,
+) {
+	for (let defaultValue of parameterDefaults(parameters)) {
+		walkTypedNode(defaultValue, context)
+	}
+}
+
 function walkTypedNode(
 	node: common.typed.ImplementationNode,
 	context: WalkContext,
@@ -2103,6 +2093,7 @@ function walkTypedNode(
 			walkTypedNode(node.value, context)
 			return
 		case "FunctionStatement":
+			walkTypedParameterDefaults(node.value.parameters, context)
 			walkTypedBody(node.value.body, context)
 			return
 		case "NamespaceDefinitionStatement":
@@ -2118,8 +2109,17 @@ function walkTypedNode(
 						: [member.method]
 
 				for (let method of methods) {
+					walkTypedParameterDefaults(method.value.parameters, context)
 					walkTypedBody(method.value.body, context)
 				}
+			}
+
+			// NOTE: A native Method has no typed body, and the frame the
+			// Compiler synthesizes for its defaults is where its Expressions
+			// live — so a Method or member renamed inside `= @::length()` on a
+			// native is found here and nowhere else.
+			for (let shim of node.nativeShims) {
+				walkTypedParameterDefaults(shim.parameters, context)
 			}
 
 			return

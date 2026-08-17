@@ -55,8 +55,9 @@ export function stripNoise(text: string): string {
 	return stripped
 }
 
-function closingSuffixFor(text: string): string {
-	let closers: Record<string, string> = { "{": "}", "(": ")", "[": "]" }
+const closers: Record<string, string> = { "{": "}", "(": ")", "[": "]" }
+
+function openBrackets(text: string): Array<string> {
 	let stack: Array<string> = []
 
 	for (let character of text) {
@@ -72,13 +73,59 @@ function closingSuffixFor(text: string): string {
 	}
 
 	return stack
-		.reverse()
-		.map((opener) => closers[opener])
-		.join("")
+}
+
+// NOTE: `declarationIndex` names the one open `(` to close as a Declaration's
+// parameter list rather than as a call's Argument list — see `probeSourcesFor`.
+function closingSuffixFor(
+	stack: Array<string>,
+	declarationIndex: number = -1,
+): string {
+	let suffix = ""
+
+	for (let index = stack.length - 1; index >= 0; index--) {
+		suffix +=
+			index === declarationIndex ? ") -> {} {}" : closers[stack[index]!]
+	}
+
+	return suffix
 }
 
 // NOTE: `suffix` is inserted before the closing brackets — e.g. a synthetic
 // member access, or nothing at all when the head alone just needs closing.
 export function buildProbeSource(headText: string, suffix = ""): string {
-	return `${headText}${suffix}${closingSuffixFor(stripNoise(headText))}`
+	return `${headText}${suffix}${closingSuffixFor(openBrackets(stripNoise(headText)))}`
+}
+
+// NOTE: Closing brackets alone are not enough when one of the open ones is a
+// DECLARATION's parameter list, which is where a `= expression` default is
+// written: `function greet(_ name: String = person` closed with `)}` is a
+// `function` with no return Type and no body, and the Parser drops the whole
+// Statement — so a cursor inside a default resolved against nothing at all.
+//
+// A parameter list can not be told from a call's Argument list by looking at the
+// text, so these are offered as FURTHER readings rather than instead of the
+// plain one: each is tried in turn and the first that answers wins. `-> {} {}`
+// is the shortest complete tail there is — the unit Type, and a body that
+// returns it by falling off its end.
+//
+// The parameter list is the OUTERMOST open `(` whenever a default holds a call,
+// so the readings run outward-in; at most `MAXIMUM_DECLARATION_READINGS` of them,
+// since each costs a parse and an enrichment of the whole document and a cursor
+// four calls deep inside a default is not what this is for.
+const MAXIMUM_DECLARATION_READINGS = 2
+
+export function probeSourcesFor(headText: string, suffix = ""): Array<string> {
+	let stack = openBrackets(stripNoise(headText))
+	let sources = [`${headText}${suffix}${closingSuffixFor(stack)}`]
+
+	let parentheses = stack.flatMap((opener, index) =>
+		opener === "(" ? [index] : [],
+	)
+
+	for (let index of parentheses.slice(0, MAXIMUM_DECLARATION_READINGS)) {
+		sources.push(`${headText}${suffix}${closingSuffixFor(stack, index)}`)
+	}
+
+	return sources
 }
