@@ -232,7 +232,7 @@ declarations {
 			if count::isLessThan(0) {
 				<- @
 			} else {
-				<- @::slice(from count, to @::length())
+				<- @::slice(from count)
 			}
 		}
 
@@ -283,7 +283,7 @@ declarations {
 			} else if count::isGreaterThanOrEqualTo(@::length()) {
 				<- []
 			} else {
-				<- @::slice(from 0, to @::length()::subtract(count))
+				<- @::slice(to @::length()::subtract(count))
 			}
 		}
 
@@ -462,12 +462,22 @@ declarations {
 			}
 		}
 
-		§§ A new List of the items from one position up to, but not including, another. A negative position counts back from the end, so `slice(from 0, to -1)` drops the last item.
+		§ Both ends are defaulted, so `slice(from n)` is the tail from `n` and
+		§ `slice(to n)` is the head up to it. That is what every caller of this
+		§ Method in the library wanted to write, and what four of them spelled
+		§ as `slice(from n, to @::length())` instead. `@::length()` is a default
+		§ reading the RECEIVER, which is a binding by the time it runs — the
+		§ receiver Expression is evaluated once whatever the call leaves out.
+
+		§§ A new List of the items from one position up to, but not including, another. A negative position counts back from the end, so `slice(from 0, to -1)` drops the last item. Left out, `from` is the start and `to` is the end.
 		§§
-		§§ @param from — the first position to include, counting from zero, or back from the end when negative.
-		§§ @param to — the position to stop before, counting the same way.
+		§§ @param from — the first position to include, counting from zero, or back from the end when negative; zero when it is left out.
+		§§ @param to — the position to stop before, counting the same way; the length when it is left out.
 		§§ @returns — the List of items in that range — empty when the range is empty, inverted, or entirely outside the List.
-		slice(from: Integer, to: Integer) -> List<ItemType>
+		slice(
+			from start: Integer = 0,
+			to end: Integer = @::length(),
+		) -> List<ItemType>
 
 		§§ A new List with the items in the opposite order.
 		§§

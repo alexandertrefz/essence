@@ -328,7 +328,7 @@ declarations {
 				::keep(where (position) { <- position::is(0) })
 
 			constant digitsText = match sign -> String {
-				case #Value { <- text::slice(from 1, to text::length()) }
+				case #Value { <- text::slice(from 1) }
 
 				case #Empty { <- text }
 			}

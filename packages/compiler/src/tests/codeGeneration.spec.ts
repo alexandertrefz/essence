@@ -3195,46 +3195,14 @@ declarations {
 		})
 
 		// NOTE: A native Method that declares a default. The native calling
-		// convention has nowhere to put a default — a native takes exactly the
+		// convention has nowhere to put one — a native takes exactly the
 		// Parameters its declaration does, and a JavaScript default parameter
 		// would stop the `Function.length` `builtins.spec.ts` checks — so the
 		// Compiler synthesizes the frame instead, as a const beside the prelude,
-		// and the runtime never learns that defaults exist.
-		//
-		// The library's own `trim` is patched into that shape here rather than
-		// waited for, because the mechanism has to be pinned by what it emits
-		// and by what it RUNS, and the runtime `String.trim` this fronts is
-		// already there to be run.
+		// and the runtime never learns that defaults exist. `String.slice` is
+		// the library's own case: `slice(from start: Integer = 0, to end:
+		// Integer = @::length())`.
 		describe("a native Method that declares a default", () => {
-			const written = "slice(from: Integer, to: Integer) -> String"
-			const defaulted =
-				"slice(from start: Integer = 0, to end: Integer = @::length()) -> String"
-
-			let replacedStdlib: Stdlib | null = null
-
-			beforeAll(() => {
-				let sources = readStdlibFiles().map(
-					({ filePath, sourceText }) => {
-						if (!filePath.endsWith("String.es")) {
-							return parseStdlibSource(filePath, sourceText)
-						}
-
-						expect(sourceText).toContain(written)
-
-						return parseStdlibSource(
-							filePath,
-							sourceText.replace(written, defaulted),
-						)
-					},
-				)
-
-				replacedStdlib = useStdlib(loadStdlibFrom(sources))
-			})
-
-			afterAll(() => {
-				useStdlib(replacedStdlib)
-			})
-
 			// NOTE: The whole of what the shim buys, and the whole of what it
 			// costs: a call that writes every Argument is byte for byte the
 			// direct runtime read it always was, and names no const at all.
