@@ -1204,6 +1204,22 @@ describe("formatter", () => {
 			)
 		})
 
+		it("keeps an else block that holds a single if as a block", () => {
+			let source =
+				'implementation {\n\tconstant n = 1\n\tif n::isPositive() {\n\t\tTerminal.print("pos")\n\t} else {\n\t\tif n::is(0) {\n\t\t\tTerminal.print("zero")\n\t\t}\n\t}\n}\n'
+			let result = format(source)
+
+			expect(result.refusal).toBeNull()
+			expect(result.text).toBe(source)
+		})
+
+		it("keeps a written else if as a chain", () => {
+			let source =
+				'implementation {\n\tconstant n = 1\n\tif n::isPositive() {\n\t\tTerminal.print("pos")\n\t} else if n::is(0) {\n\t\tTerminal.print("zero")\n\t}\n}\n'
+
+			expect(formatted(source)).toBe(source)
+		})
+
 		it("adds a trailing comma to a broken argument list", () => {
 			let source =
 				'implementation {\n\tTerminal.inspect("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")\n}\n'
