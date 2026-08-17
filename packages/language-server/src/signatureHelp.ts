@@ -95,6 +95,11 @@ export function findSignatureHelp(
 	}
 
 	let activeParameter = countArguments(headText, invocation.arguments.length)
+	// NOTE: The labels the call has written so far — what tells a defaulted
+	// Parameter that was skipped from one that is being typed. A Method
+	// Invocation's receiver is not among them, which is exactly how
+	// `signaturesOf` hands the signature over.
+	let writtenLabels = invocation.arguments.map((argument) => argument.name)
 
 	// NOTE: A Static Method is invoked through a Lookup (`Thing.show(…)`), so
 	// the callee is not always a plain Function Type.
@@ -111,6 +116,7 @@ export function findSignatureHelp(
 			documentationOf(invocation.name.type),
 			invocation.overloadedMethodIndex,
 			activeParameter,
+			writtenLabels,
 		)
 	}
 
@@ -131,6 +137,7 @@ export function findSignatureHelp(
 					documentationOf(methodType),
 					invocation.overloadedMethodIndex,
 					activeParameter,
+					writtenLabels,
 				)
 			}
 		}
@@ -190,7 +197,11 @@ export function findSignatureHelp(
 			),
 		),
 		activeSignature: activeSignatureOf(signatures, null, activeParameter),
-		activeParameter,
+		activeParameter: activeParameterFor(
+			signatures[activeSignatureOf(signatures, null, activeParameter)],
+			writtenLabels,
+			activeParameter,
+		),
 	}
 }
 
@@ -199,19 +210,86 @@ function help(
 	name: string,
 	fallback: common.Documentation | null,
 	overloadedMethodIndex: number | null,
-	activeParameter: number,
+	activeArgument: number,
+	writtenLabels: Array<string | null>,
 ): SignatureHelpInfo {
+	let activeSignature = activeSignatureOf(
+		signatures,
+		overloadedMethodIndex,
+		activeArgument,
+	)
+
 	return {
 		signatures: signatures.map((signature) =>
 			signatureInfo(signature, name, fallback),
 		),
-		activeSignature: activeSignatureOf(
-			signatures,
-			overloadedMethodIndex,
-			activeParameter,
+		activeSignature,
+		activeParameter: activeParameterFor(
+			signatures[activeSignature],
+			writtenLabels,
+			activeArgument,
 		),
-		activeParameter,
 	}
+}
+
+// NOTE: How many Arguments a call MUST write — the count a Parameter carrying a
+// default no longer adds to.
+function requiredCount(signature: common.BaseFunction): number {
+	return signature.parameterTypes.filter((parameter) => !parameter.hasDefault)
+		.length
+}
+
+// NOTE: A comma count is a Parameter index only while nothing may be left out.
+// Once a Parameter carries a default, the Nth Argument a call writes need not be
+// the Nth Parameter: `cut(to 3)` writes one Argument and it stands at the SECOND
+// Parameter, because the label it wrote stepped over the first. So the count is
+// walked against the signature exactly the way the Compiler pairs Arguments —
+// take the Parameter when the labels agree, skip it when it has a default.
+//
+// A signature with no default anywhere answers with the count it was given,
+// which is every signature that existed before defaults did.
+function activeParameterFor(
+	signature: common.BaseFunction | undefined,
+	writtenLabels: Array<string | null>,
+	activeArgument: number,
+): number {
+	let parameters = signature?.parameterTypes
+
+	if (
+		parameters === undefined ||
+		!parameters.some((parameter) => parameter.hasDefault)
+	) {
+		return activeArgument
+	}
+
+	let index = 0
+
+	let stepOverDefaults = (label: string | null): void => {
+		while (
+			index < parameters.length &&
+			parameters[index]!.hasDefault === true &&
+			parameters[index]!.name !== label
+		) {
+			index++
+		}
+	}
+
+	for (let argument = 0; argument < activeArgument; argument++) {
+		stepOverDefaults(writtenLabels[argument] ?? null)
+		index++
+	}
+
+	// NOTE: And the Argument being typed steps over the defaults its OWN label
+	// rules out, which it can only do once one has been written — a call that
+	// has typed nothing but the comma stands at the next Parameter, whatever it
+	// turns out to be.
+	let active = writtenLabels[activeArgument]
+
+	if (active !== undefined) {
+		stepOverDefaults(active)
+	}
+
+	return Math.min(index, Math.max(parameters.length - 1, 0))
 }
 
 // NOTE: A Parameter's own text is shown next to that Parameter, so the
@@ -256,6 +334,21 @@ function activeSignatureOf(
 		) {
 			return overloadedMethodIndex
 		}
+	}
+
+	// NOTE: An arm whose REQUIRED count also reaches this Argument is preferred
+	// over one that only reaches it by counting Parameters a call may leave out
+	// — a call that has written this many Arguments has plainly not left those
+	// out. Falls back to the old test, so an Overload set with no default in it
+	// picks exactly what it always picked.
+	let fits = signatures.findIndex(
+		(signature) =>
+			signature.parameterTypes.length > activeParameter &&
+			requiredCount(signature) > activeParameter,
+	)
+
+	if (fits !== -1) {
+		return fits
 	}
 
 	let match = signatures.findIndex(

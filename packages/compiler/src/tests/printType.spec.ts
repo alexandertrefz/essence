@@ -282,4 +282,50 @@ describe("printType", () => {
 			})
 		})
 	})
+
+	// NOTE: The `?` marking a Parameter a call may leave out is written where a
+	// signature is READ and never where a Type could be written back into
+	// source. `?` is an ordinary letter to the Lexer, so `(from?: Integer, to:
+	// Integer) -> Integer` written back declares a Parameter labelled `from?` —
+	// and the Inlay Hint that shows an inferred Type is offered by `codeActions`
+	// as an applied edit, so what comes out of `printType` has to parse back as
+	// what it says.
+	describe("A Parameter a call may leave out", () => {
+		let defaulted: common.FunctionType = {
+			type: "Function",
+			generics: [],
+			parameterTypes: [
+				{ name: "from", type: integer, hasDefault: true },
+				{ name: "to", type: integer },
+			],
+			returnType: integer,
+		}
+
+		it("should be marked in a signature", () => {
+			expect(describeSignature(defaulted, "cut").label).toBe(
+				"cut(from?: Integer, to: Integer) -> Integer",
+			)
+		})
+
+		it("should be marked in an Overload summary", () => {
+			expect(printSignatureSummary([defaulted], "cut")).toBe(
+				"cut(from?: Integer, to: Integer) -> Integer",
+			)
+		})
+
+		it("should NOT be marked where a Type is printed", () => {
+			expect(printType(defaulted)).toBe(
+				"(from: Integer, to: Integer) -> Integer",
+			)
+		})
+
+		it("should not be marked in an Overloaded Method's Type either", () => {
+			expect(
+				printType({
+					type: "OverloadedStaticMethod",
+					overloads: [defaulted],
+				}),
+			).toBe("(from: Integer, to: Integer) -> Integer")
+		})
+	})
 })

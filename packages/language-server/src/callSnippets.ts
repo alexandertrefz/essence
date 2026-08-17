@@ -1,3 +1,4 @@
+import { lastRequiredParameterIndex } from "@essence-lang/compiler/helpers"
 import { printSignature, signaturesOf } from "@essence-lang/compiler/printType"
 import type { common } from "@essence-lang/interfaces"
 
@@ -17,13 +18,22 @@ export function buildCallSnippet(
 	name: string,
 	signature: common.BaseFunction,
 ): string {
-	let parameters = signature.parameterTypes.map((parameter, index) => {
-		let tabstop = `\${${index + 1}}`
+	// NOTE: The TRAILING run of Parameters a call may leave out is not written
+	// at all — accepting the Completion should insert the call the writer meant,
+	// and the shortest call a defaulted signature accepts is the one it was
+	// given defaults for. A defaulted Parameter with a required one after it
+	// stays: leaving it out there would leave the tabstops in the wrong places,
+	// since the Argument after it needs its own label written before it.
+	let lastRequired = lastRequiredParameterIndex(signature.parameterTypes)
+	let parameters = signature.parameterTypes
+		.slice(0, lastRequired + 1)
+		.map((parameter, index) => {
+			let tabstop = `\${${index + 1}}`
 
-		return parameter.name === null
-			? tabstop
-			: `${escapeSnippet(parameter.name)} ${tabstop}`
-	})
+			return parameter.name === null
+				? tabstop
+				: `${escapeSnippet(parameter.name)} ${tabstop}`
+		})
 
 	return `${escapeSnippet(name)}(${parameters.join(", ")})`
 }

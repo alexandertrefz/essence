@@ -956,6 +956,45 @@ describe("Completion", () => {
 			).toBe(null)
 		})
 
+		// NOTE: The shortest call a defaulted signature accepts is the one it
+		// was given defaults for, so a TRAILING run of omittable Parameters is
+		// left out of the snippet entirely. One with a required Parameter after
+		// it stays: leaving it out there would put the tabstops in the wrong
+		// places, since the Argument after it needs its own label written.
+		it("should leave a trailing default out of the snippet", () => {
+			expect(
+				buildCallSnippet("scaled", {
+					generics: [],
+					parameterTypes: [
+						{ name: null, type: { type: "Integer" } },
+						{
+							name: "by",
+							type: { type: "Integer" },
+							hasDefault: true,
+						},
+					],
+					returnType: { type: "Integer" },
+				}),
+			).toBe("scaled(${1})")
+		})
+
+		it("should keep a default a required Parameter follows", () => {
+			expect(
+				buildCallSnippet("cut", {
+					generics: [],
+					parameterTypes: [
+						{
+							name: "from",
+							type: { type: "Integer" },
+							hasDefault: true,
+						},
+						{ name: "to", type: { type: "Integer" } },
+					],
+					returnType: { type: "Integer" },
+				}),
+			).toBe("cut(from ${1}, to ${2})")
+		})
+
 		it("should escape the snippet syntax a name could contain", () => {
 			expect(
 				buildCallSnippet("call", {
@@ -1370,5 +1409,33 @@ describe("Completion of a converted standard library Namespace", () => {
 			"keep",
 			"flatten",
 		])
+	})
+})
+
+// NOTE: A label a call may leave out is still offered — the writer is being
+// shown what CAN be written — but it says so, and it sorts below the labels the
+// call still has to write.
+describe("Completion of a label a call may leave out", () => {
+	let source = [
+		"implementation {",
+		"\tfunction cut (from start: Integer = 0, to end: Integer) -> Integer {",
+		"\t\t<- end",
+		"\t}",
+		"\tcut(",
+		"}",
+	].join("\n")
+
+	it("should offer it, marked as omittable", () => {
+		expect(entryFor(source, { line: 5, column: 6 }, "from")?.detail).toBe(
+			"Integer (may be left out)",
+		)
+	})
+
+	it("should rank it below a label the call still needs", () => {
+		let entries = findCompletions(source, { line: 5, column: 6 })
+		let from = entries.find((entry) => entry.label === "from")
+		let to = entries.find((entry) => entry.label === "to")
+
+		expect(from?.tier).toBeGreaterThan(to!.tier)
 	})
 })

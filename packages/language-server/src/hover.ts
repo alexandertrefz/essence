@@ -459,6 +459,19 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 				}
 			}
 
+			// NOTE: A native Method has no typed body, so its Parameters are
+			// only ever reached through the frame the Compiler synthesizes for
+			// its defaults — which is the only part of a native signature that
+			// IS Essence, and the only part a hover has anything to say about
+			// beyond what `visitNativeSignatures` reads off the parsed source.
+			for (let shim of node.nativeShims) {
+				for (let parameter of shim.parameters) {
+					if (parameter.defaultValue !== null) {
+						visitNode(parameter.defaultValue, state)
+					}
+				}
+			}
+
 			return
 		case "TypeAliasStatement": {
 			// NOTE: A checked refinement reads back as what it REFINES on its
@@ -894,6 +907,14 @@ function visitFunctionDefinition(
 			!isSynthesizedName(parameter.internalName.content)
 		) {
 			visitIdentifier(parameter.internalName, state)
+		}
+
+		// NOTE: A default is an Expression written where it stands, so a hover
+		// inside `= @::length()` answers about THAT call rather than about the
+		// Parameter the call sits on. Visited after the Parameter itself, which
+		// is offered over the wider span and loses to anything narrower.
+		if (parameter.defaultValue !== null) {
+			visitNode(parameter.defaultValue, state)
 		}
 	}
 

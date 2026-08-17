@@ -9,6 +9,18 @@ import {
 // NOTE: A human-oriented Type printer for Hovers. The Validator's
 // `describeType` is its Diagnostics-oriented sibling — unlike it, this one
 // prints full Function signatures instead of collapsing them to "Function".
+//
+// NOTE: What this prints is a TYPE, and a Type is something an author can write
+// down: the Inlay Hint that shows a Declaration's inferred Type is offered by
+// `codeActions` as an applied edit, so whatever comes out of here has to parse
+// back as what it says. That is why a Parameter carrying a default prints here
+// WITHOUT the `?` `printSignature` marks it with — `?` is an ordinary letter to
+// the Lexer, so `(from?: Integer, to: Integer) -> Integer` written back into
+// source declares a Parameter labelled `from?` — and it is why nothing is lost
+// by leaving it out: a Function Type can not declare a default in the first
+// place, and a Function taken as a VALUE has none (see `asValue`). A Type with
+// a default in it is only ever a Declaration's own signature, which is what
+// `printSignature` prints.
 export function printType(type: common.Type): string {
 	switch (type.type) {
 		case "UnionType":
@@ -54,10 +66,12 @@ export function printType(type: common.Type): string {
 		case "Function":
 		case "SimpleMethod":
 		case "StaticMethod":
-			return printSignature(type)
+			return printSignature(type, "", { marksOmittable: false })
 		case "OverloadedMethod":
 		case "OverloadedStaticMethod":
-			return printSignatureSummary(type.overloads)
+			return printSignatureSummary(type.overloads, "", {
+				marksOmittable: false,
+			})
 		case "Namespace":
 			return type.name
 		// NOTE: Under the name the source wrote, never the one an invocation
@@ -180,6 +194,7 @@ export function signaturesOf(
 export function printSignatureSummary(
 	signatures: Array<common.BaseFunction>,
 	name: string = "",
+	printing: SignaturePrinting = {},
 ): string {
 	let [first, ...rest] = signatures
 
@@ -188,19 +203,25 @@ export function printSignatureSummary(
 	}
 
 	if (rest.length === 0) {
-		return printSignature(first, name)
+		return printSignature(first, name, printing)
 	}
 
-	return `${printSignature(first, name)} (+${rest.length} overload${
+	return `${printSignature(first, name, printing)} (+${rest.length} overload${
 		rest.length === 1 ? "" : "s"
 	})`
 }
 
+// NOTE: Whether a Parameter a call may leave out is MARKED. On for a signature
+// shown to a reader — a Hover, Signature Help, a Document Symbol — and off for a
+// Type printed where source could be written; see `printType`.
+export type SignaturePrinting = { marksOmittable?: boolean }
+
 export function printSignature(
 	functionType: common.BaseFunction,
 	name: string = "",
+	printing: SignaturePrinting = {},
 ): string {
-	return describeSignature(functionType, name).label
+	return describeSignature(functionType, name, printing).label
 }
 
 // NOTE: Offsets into a signature's label, in UTF-16 code units. Signature
@@ -217,6 +238,7 @@ export type SignatureDescription = {
 export function describeSignature(
 	functionType: common.BaseFunction,
 	name: string = "",
+	printing: SignaturePrinting = {},
 ): SignatureDescription {
 	let generics =
 		functionType.generics.length === 0
@@ -241,7 +263,7 @@ export function describeSignature(
 			label += ", "
 		}
 
-		let text = printParameter(parameter)
+		let text = printParameter(parameter, printing)
 
 		parameters.push([label.length, label.length + text.length])
 		label += text
@@ -252,10 +274,26 @@ export function describeSignature(
 	return { label, parameters }
 }
 
+// NOTE: A Parameter a call may leave out reads as `at?: Side` — the FACT of a
+// default, not its text. `common.Parameter` deliberately carries no Expression:
+// a Type is compared, cached and serialized, and it has no business carrying a
+// Node. Showing `at: Side = #Start` in a Hover would mean carrying the default's
+// source text on the Type, or a second lookup from the Type back to the
+// Declaration; neither is worth it for a mark the reader already knows.
+//
+// The `?` sits INSIDE the Parameter's own range, so Signature Help highlights it
+// with the rest of the Parameter it belongs to. And it is written only where the
+// result is READ rather than written back into source — `?` is an ordinary
+// letter to the Lexer, so a marked signature does not parse as itself. See
+// `printType`.
 function printParameter(
 	parameter: common.BaseFunction["parameterTypes"][number],
+	printing: SignaturePrinting,
 ): string {
+	let optional =
+		parameter.hasDefault && printing.marksOmittable !== false ? "?" : ""
+
 	return parameter.name === null
-		? `_ ${printType(parameter.type)}`
-		: `${parameter.name}: ${printType(parameter.type)}`
+		? `_${optional} ${printType(parameter.type)}`
+		: `${parameter.name}${optional}: ${printType(parameter.type)}`
 }
