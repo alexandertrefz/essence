@@ -184,20 +184,19 @@ export function getStringRepresentation(obj: AnyType, indentLevel = 0): string {
 // be a cost paid on every Program for one object literal.
 const unit: RecordType = { [typeKeySymbol]: "Record" }
 
-// NOTE: `write(_ text: String, to stream: Stream)` — the second Overload entry,
-// so the mangled name the Rewriter binds is `write__overload$2`. It is the ONE
-// primitive under everything a Program writes: no newline, no quotes, nothing
-// added. `print` puts the newline in the String it hands over, in Essence, which
-// is what keeps this honest about writing exactly what it was given.
+// NOTE: `write(_ text: String, to stream: Stream)` — one native, with the
+// Stream DEFAULTED in `Terminal.es` to `#Output`, so a call that leaves it out
+// reaches this same export through the frame the Compiler synthesizes for the
+// default. It is the ONE primitive under everything a Program writes: no
+// newline, no quotes, nothing added. `print` puts the newline in the String it
+// hands over, in Essence, which is what keeps this honest about writing exactly
+// what it was given.
 //
 // NOTE: `process.stdout.write`/`process.stderr.write` rather than
 // `console.log`/`console.error`, which both append a newline of their own —
 // there is no way to spell "no newline" through them, and a `write` that added
 // one would not be the primitive `print` is built on.
-export function write__overload$2(
-	text: StringType,
-	stream: StreamType,
-): RecordType {
+export function write(text: StringType, stream: StreamType): RecordType {
 	if (stream[typeKeySymbol] === "Stream#Error") {
 		process.stderr.write(text.value)
 	} else {

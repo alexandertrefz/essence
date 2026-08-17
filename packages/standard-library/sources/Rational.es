@@ -43,8 +43,9 @@ declarations {
 	§ keeps rounding ONE Method: `round`, `roundDown`, `roundUp` and `truncate`
 	§ were four names for one idea, which is exactly the shape
 	§ `trimmed`/`trimmedAtStart`/`trimmedAtEnd` had before `Side` collapsed it.
-	§ `Nearest` is the direction the no-Argument entry means, so it is a Case
-	§ like any other rather than a default hidden in a body.
+	§ `Nearest` is the direction a call that names none means, and it is written
+	§ as `round`'s default — a Case like any other, said once in the signature
+	§ rather than hidden in a body.
 	choice Rounding {
 		Nearest,
 		Down,
@@ -321,82 +322,70 @@ declarations {
 
 		§ ONE Method, not four. `round`, `roundDown`, `roundUp` and `truncate`
 		§ named the same idea four times, differing only in which Integer they
-		§ reach for — which is what a Choice says in one place. Every entry is
-		§ written on the FLOOR rather than on a sibling, so no branch depends
-		§ on another entry of this same Overload, which an Essence body can not
-		§ reach anyway.
+		§ reach for — which is what a Choice says in one place. Every branch is
+		§ written on the FLOOR rather than on a sibling. `Nearest` is what the
+		§ no-Argument call means, and it is a DEFAULT now rather than an entry
+		§ of its own: one body, one emitted Function, nothing to dispatch.
 
-		§§ The Rational as an Integer — the nearest one when no direction is named, or the one the given direction reaches.
+		§§ The Rational as an Integer — the nearest one when no direction is named, or the one the given direction reaches. `Nearest` rounds a value exactly halfway between two away from zero — `1/2` gives `1`, `0 - 1/2` gives `0 - 1` — `Down` is the floor, `Up` the ceiling, and `TowardZero` the Integer part with the fractional part cut off.
 		§§
+		§§ @param toward — which Integer to reach for; `#Nearest` when it is left out.
 		§§ @returns — the rounded Integer.
-		overload round {
-			§§ The nearest Integer. A value exactly halfway between two rounds away from zero — `1/2` gives `1`, `0 - 1/2` gives `0 - 1`.
-			§§
-			§§ @returns — the nearest Integer.
-			() -> Integer {
-				<- @::round(toward #Nearest)
-			}
+		round(toward direction: Rounding = #Nearest) -> Integer {
+			§ The denominator is positive in lowest terms, so the Euclidean
+			§ quotient is the FLOOR — `Down` outright, and the one Integer
+			§ the other three are placed against. A denominator is a
+			§ NonZeroInteger, so this is the total `quotient` entry and
+			§ there is no empty case to fall back from.
+			constant floored = @::numerator()
+				::quotient(dividingBy @::denominator())
 
-			§§ The Integer the given direction reaches — `Nearest` with halves rounding away from zero, `Down` the floor, `Up` the ceiling, `TowardZero` the Integer part with the fractional part cut off.
-			§§
-			§§ @param toward — which Integer to reach for
-			§§ @returns — the rounded Integer.
-			(toward direction: Rounding) -> Integer {
-				§ The denominator is positive in lowest terms, so the Euclidean
-				§ quotient is the FLOOR — `Down` outright, and the one Integer
-				§ the other three are placed against. A denominator is a
-				§ NonZeroInteger, so this is the total `quotient` entry and
-				§ there is no empty case to fall back from.
-				constant floored = @::numerator()
-					::quotient(dividingBy @::denominator())
+			constant isWhole = @::isWholeNumber()
 
-				constant isWhole = @::isWholeNumber()
+			§ `@` is the SCRUTINEE inside a match, not the receiver, so the
+			§ Rational is bound before the match to stay reachable in the
+			§ Case bodies.
+			constant value = @
 
-				§ `@` is the SCRUTINEE inside a match, not the receiver, so the
-				§ Rational is bound before the match to stay reachable in the
-				§ Case bodies.
-				constant value = @
+			<- match direction -> Integer {
+				case #Down { <- floored }
 
-				<- match direction -> Integer {
-					case #Down { <- floored }
-
-					case #Up {
-						§ A whole Rational is already its own ceiling; anything
-						§ else sits strictly above the floor.
-						if isWhole {
-							<- floored
-						} else {
-							<- floored::add(1)
-						}
+				case #Up {
+					§ A whole Rational is already its own ceiling; anything
+					§ else sits strictly above the floor.
+					if isWhole {
+						<- floored
+					} else {
+						<- floored::add(1)
 					}
+				}
 
-					case #TowardZero {
-						§ Cutting the fractional part off is the floor for a
-						§ non-negative value, and one step back up towards zero
-						§ for a negative one that is not already whole.
-						if value::isLessThan(0/1)::and(isWhole::negate()) {
-							<- floored::add(1)
-						} else {
-							<- floored
-						}
+				case #TowardZero {
+					§ Cutting the fractional part off is the floor for a
+					§ non-negative value, and one step back up towards zero
+					§ for a negative one that is not already whole.
+					if value::isLessThan(0/1)::and(isWhole::negate()) {
+						<- floored::add(1)
+					} else {
+						<- floored
 					}
+				}
 
-					case #Nearest {
-						§ How far the value sits above its floor. Past a half
-						§ the Integer above is nearer, below a half the floor
-						§ is — and exactly at a half the tie is broken AWAY
-						§ from zero, which for a negative value is the floor.
-						constant fractionalPart = value::subtract(floored)
+				case #Nearest {
+					§ How far the value sits above its floor. Past a half
+					§ the Integer above is nearer, below a half the floor
+					§ is — and exactly at a half the tie is broken AWAY
+					§ from zero, which for a negative value is the floor.
+					constant fractionalPart = value::subtract(floored)
 
-						if fractionalPart::isGreaterThan(1/2) {
-							<- floored::add(1)
-						} else if fractionalPart::isLessThan(1/2) {
-							<- floored
-						} else if value::isLessThan(0/1) {
-							<- floored
-						} else {
-							<- floored::add(1)
-						}
+					if fractionalPart::isGreaterThan(1/2) {
+						<- floored::add(1)
+					} else if fractionalPart::isLessThan(1/2) {
+						<- floored
+					} else if value::isLessThan(0/1) {
+						<- floored
+					} else {
+						<- floored::add(1)
 					}
 				}
 			}

@@ -219,24 +219,20 @@ declarations {
 
 		§§ A new List without the first item, or without the given number of leading items.
 		§§
+		§§ @param count — how many leading items to remove; one when it is left out.
 		§§ @returns — the shortened List — empty when more items were removed than it had.
-		overload removeFirst {
-			() -> List<ItemType> {
-				§ On the empty List this slices [1, 0), an inverted range, which
-				§ `slice` answers with the empty List.
-				<- @::slice(from 1, to @::length())
-			}
-
-			(_ count: Integer) -> List<ItemType> {
-				§ A COUNT, not a position — so a negative one removes nothing
-				§ rather than counting back from the end, which is what `slice`
-				§ would read it as. A count past the length clamps there and
-				§ leaves nothing, which is `slice`'s own clamping.
-				if count::isLessThan(0) {
-					<- @
-				} else {
-					<- @::slice(from count, to @::length())
-				}
+		removeFirst(_ count: Integer = 1) -> List<ItemType> {
+			§ A COUNT, not a position — so a negative one removes nothing
+			§ rather than counting back from the end, which is what `slice`
+			§ would read it as. A count past the length clamps there and
+			§ leaves nothing, which is `slice`'s own clamping.
+			§
+			§ On the empty List the default slices [1, 0), an inverted range,
+			§ which `slice` answers with the empty List.
+			if count::isLessThan(0) {
+				<- @
+			} else {
+				<- @::slice(from count, to @::length())
 			}
 		}
 
@@ -274,28 +270,20 @@ declarations {
 
 		§§ A new List without the last item, or without the given number of trailing items.
 		§§
+		§§ @param count — how many trailing items to remove; one when it is left out.
 		§§ @returns — the shortened List — empty when more items were removed than it had.
-		overload removeLast {
-			() -> List<ItemType> {
-				§ -1 is the last position, so the half-open range stops just
-				§ before it. The empty List has no last item and the range
-				§ collapses to nothing, leaving it unchanged.
-				<- @::slice(from 0, to -1)
-			}
-
-			(_ count: Integer) -> List<ItemType> {
-				§ A COUNT, not a position. A count below one keeps every item;
-				§ one at or past the length leaves nothing — and the
-				§ subtraction that says so goes negative, which `slice` would
-				§ read as a position counting back from the end, so both ends
-				§ are answered here rather than left to its clamping.
-				if count::isLessThan(1) {
-					<- @
-				} else if count::isGreaterThanOrEqualTo(@::length()) {
-					<- []
-				} else {
-					<- @::slice(from 0, to @::length()::subtract(count))
-				}
+		removeLast(_ count: Integer = 1) -> List<ItemType> {
+			§ A COUNT, not a position. A count below one keeps every item;
+			§ one at or past the length leaves nothing — and the subtraction
+			§ that says so goes negative, which `slice` would read as a
+			§ position counting back from the end, so both ends are answered
+			§ here rather than left to its clamping.
+			if count::isLessThan(1) {
+				<- @
+			} else if count::isGreaterThanOrEqualTo(@::length()) {
+				<- []
+			} else {
+				<- @::slice(from 0, to @::length()::subtract(count))
 			}
 		}
 

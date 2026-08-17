@@ -247,33 +247,19 @@ declarations {
 
 		§§ The String in the given Unicode normalization form, or Composed Canonical (NFC) when none is named — so two Strings that look identical can be made to compare and read the same.
 		§§
+		§§ @param as — the normalization form to produce; `#ComposedCanonical` when it is left out.
 		§§ @returns — the normalized String.
-		overload normalize {
-			() -> String {
-				<- @::normalize(as #ComposedCanonical)
-			}
-
-			§§ @param as — the normalization form to produce
-			§§ @returns — the String in that form.
-			(as form: NormalizationForm) -> String
-		}
+		normalize(as form: NormalizationForm = #ComposedCanonical) -> String
 
 		§ One Method, not three. `trim(at:)` is the single native — it reads
-		§ the Case and calls the matching JavaScript intrinsic — and the
-		§ no-Argument entry is written on top of it, naming the end it means.
-		§ `BothEnds` is the default because trimming usually means both.
+		§ the Case and calls the matching JavaScript intrinsic — and the end it
+		§ trims is defaulted, because trimming usually means both.
 
 		§§ The String without surrounding whitespace — at both ends when called with no Argument, or at the given end.
 		§§
+		§§ @param at — the end to trim; `#BothEnds` when it is left out.
 		§§ @returns — the trimmed String.
-		overload trim {
-			() -> String {
-				<- @::trim(at #BothEnds)
-			}
-
-			§§ @param at — the end to trim
-			(at side: Side) -> String
-		}
+		trim(at side: Side = #BothEnds) -> String
 
 		§§ Whether the String begins with the given one.
 		starts(with prefix: String) -> Boolean {
@@ -452,81 +438,71 @@ declarations {
 			}
 		}
 
-		§ The same collapse the trim family got, and for the same reason. The
-		§ `at:` entry answers for every `Side`, so nothing about the Choice is
-		§ left unhandled: `BothEnds` centres, which is what padding both ends
-		§ means. Both entries are Essence — the padding is built out of
-		§ `repeat` and `slice`, exactly as the two Methods here did before.
+		§ One Method, with the end it pads defaulted. The `at:` Parameter
+		§ answers for every `Side`, so nothing about the Choice is left
+		§ unhandled: `BothEnds` centres, which is what padding both ends means.
+		§ The padding is built out of `repeat` and `slice`.
 
 		§§ The String padded with the given String up to the given length — at the front when no end is named, or at the given end.
 		§§
 		§§ @param to — the length to reach.
 		§§ @param with — the String to pad with, repeated as needed.
+		§§ @param at — the end to pad; `#Start` when it is left out.
 		§§ @returns — the padded String; unchanged when it is already that long.
-		overload pad {
-			(to length: Integer, with padding: String) -> String {
-				<- @::pad(to length, with padding, at #Start)
+		pad(
+			to length: Integer,
+			with padding: String,
+			at side: Side = #Start,
+		) -> String {
+			§ An empty padding has nothing to repeat, and a String already
+			§ that long needs nothing — both leave it as it is.
+			if padding::isEmpty() {
+				<- @
 			}
 
-			§§ @param at — the end to pad
-			(
-				to length: Integer,
-				with padding: String,
-				at side: Side,
-			) -> String {
-				§ An empty padding has nothing to repeat, and a String already
-				§ that long needs nothing — both leave it as it is.
-				if padding::isEmpty() {
-					<- @
+			constant characterCount = @::length()
+
+			if length::isLessThanOrEqualTo(characterCount) {
+				<- @
+			}
+
+			constant needed = length::subtract(characterCount)
+
+			§ The padding has at least one character, so repeating it
+			§ `needed` times is at least `needed` characters long; slicing
+			§ cuts a partial repeat off the end, the way padding is built
+			§ character by character.
+			constant filler = padding::repeat(times needed)
+
+			§ `@` is the SCRUTINEE inside a match, not the receiver, so the
+			§ String has to be bound before the match to stay reachable in
+			§ the Case bodies.
+			constant text = @
+
+			<- match side -> String {
+				case #Start {
+					<- text::prepend(filler::slice(from 0, to needed))
 				}
 
-				constant characterCount = @::length()
-
-				if length::isLessThanOrEqualTo(characterCount) {
-					<- @
+				case #End   {
+					<- text::append(filler::slice(from 0, to needed))
 				}
 
-				constant needed = length::subtract(characterCount)
+				case #BothEnds {
+					§ Centring splits the padding between the two ends. An
+					§ odd count can not split evenly, so the extra
+					§ character goes to the END — the text sits one to the
+					§ left, which is what centring in a fixed width
+					§ conventionally does. The written `2` is its own proof
+					§ of not being zero, so this is the total `quotient`
+					§ entry and there is nothing to fall back from.
+					constant atStart = needed::quotient(dividingBy 2)
 
-				§ The padding has at least one character, so repeating it
-				§ `needed` times is at least `needed` characters long; slicing
-				§ cuts a partial repeat off the end, the way padding is built
-				§ character by character.
-				constant filler = padding::repeat(times needed)
-
-				§ `@` is the SCRUTINEE inside a match, not the receiver, so the
-				§ String has to be bound before the match to stay reachable in
-				§ the Case bodies.
-				constant text = @
-
-				<- match side -> String {
-					case #Start {
-						<- text::prepend(filler::slice(from 0, to needed))
-					}
-
-					case #End   {
-						<- text::append(filler::slice(from 0, to needed))
-					}
-
-					case #BothEnds {
-						§ Centring splits the padding between the two ends. An
-						§ odd count can not split evenly, so the extra
-						§ character goes to the END — the text sits one to the
-						§ left, which is what centring in a fixed width
-						§ conventionally does. The written `2` is its own proof
-						§ of not being zero, so this is the total `quotient`
-						§ entry and there is nothing to fall back from.
-						constant atStart = needed::quotient(dividingBy 2)
-
-						<- text
-							::prepend(filler::slice(from 0, to atStart))
-							::append(
-								filler::slice(
-									from 0,
-									to needed::subtract(atStart),
-								),
-							)
-					}
+					<- text
+						::prepend(filler::slice(from 0, to atStart))
+						::append(
+							filler::slice(from 0, to needed::subtract(atStart)),
+						)
 				}
 			}
 		}

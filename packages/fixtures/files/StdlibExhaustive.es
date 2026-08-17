@@ -142,10 +142,10 @@ third"::lines())
 	show("String.uppercase()", greeting::uppercase())
 	show("String.uppercase() [empty]", emptyText::uppercase())
 	show("String.lowercase()", greeting::lowercase())
-	show("String.trim()", "  spaced  "::trim())
-	show("String.trim() [nothing to trim]", greeting::trim())
-	show("String.trim(at: Side) [start]", "  spaced  "::trim(at Side#Start))
-	show("String.trim(at: Side) [end]", "  spaced  "::trim(at Side#End))
+	show("String.trim(at?: Side) [no Argument]", "  spaced  "::trim())
+	show("String.trim(at?: Side) [nothing to trim]", greeting::trim())
+	show("String.trim(at?: Side) [start]", "  spaced  "::trim(at Side#Start))
+	show("String.trim(at?: Side) [end]", "  spaced  "::trim(at Side#End))
 	show("String.starts(with: String)", greeting::starts(with "Hello"))
 	show("String.starts(with: String) [absent]", greeting::starts(with "World"))
 	show(
@@ -227,29 +227,32 @@ third"::lines())
 	)
 	show("String.lastIndex(of: String)", "a-b-a"::lastIndex(of "a"))
 	show("String.lastIndex(of: String) [absent]", greeting::lastIndex(of "zz"))
-	show("String.pad(to: Integer, with: String)", "7"::pad(to 3, with "0"))
 	show(
-		"String.pad(to: Integer, with: String) [already long enough]",
+		"String.pad(to: Integer, with: String, at?: Side) [no end named]",
+		"7"::pad(to 3, with "0"),
+	)
+	show(
+		"String.pad(to: Integer, with: String, at?: Side) [no end named, already long enough]",
 		greeting::pad(to 3, with "0"),
 	)
 	show(
-		"String.pad(to: Integer, with: String, at: Side) [end]",
+		"String.pad(to: Integer, with: String, at?: Side) [end]",
 		"7"::pad(to 3, with ".", at Side#End),
 	)
 	show(
-		"String.pad(to: Integer, with: String, at: Side) [end, already long enough]",
+		"String.pad(to: Integer, with: String, at?: Side) [end, already long enough]",
 		greeting::pad(to 3, with ".", at Side#End),
 	)
 	show(
-		"String.pad(to: Integer, with: String, at: Side) [both ends, even]",
+		"String.pad(to: Integer, with: String, at?: Side) [both ends, even]",
 		"7"::pad(to 5, with "-", at Side#BothEnds),
 	)
 	show(
-		"String.pad(to: Integer, with: String, at: Side) [both ends, odd]",
+		"String.pad(to: Integer, with: String, at?: Side) [both ends, odd]",
 		"7"::pad(to 4, with "-", at Side#BothEnds),
 	)
 	show(
-		"String.pad(to: Integer, with: String, at: Side) [both ends, multi-character]",
+		"String.pad(to: Integer, with: String, at?: Side) [both ends, multi-character]",
 		"ab"::pad(to 8, with "xy", at Side#BothEnds),
 	)
 	show("String.compare(to: String)", "app"::compare(to "apple"))
@@ -290,9 +293,12 @@ third"::lines())
 	)
 	show("String.reverse() [flag not torn]", flag::append("!")::reverse())
 	show("String.is(_ String) [NFC equals NFD]", accented::is(decomposed))
-	show("String.normalize()", accented::normalize())
 	show(
-		"String.normalize(as: NormalizationForm) [compatibility folds ligature]",
+		"String.normalize(as?: NormalizationForm) [no form named]",
+		accented::normalize(),
+	)
+	show(
+		"String.normalize(as?: NormalizationForm) [compatibility folds ligature]",
 		"ﬁle"::normalize(as NormalizationForm#ComposedCompatibility),
 	)
 
@@ -595,37 +601,40 @@ third"::lines())
 	show("Rational.reciprocal() [of zero]", 0/1::reciprocal())
 	show("Rational.isWholeNumber()", 4/2::isWholeNumber())
 	show("Rational.isWholeNumber() [fractional]", 3/4::isWholeNumber())
-	show("Rational.round()", 7/2::round())
-	show("Rational.round() [negative]", -7/2::round())
-	show("Rational.round(toward: Rounding)", 7/2::round(toward #Nearest))
+	show("Rational.round(toward?: Rounding) [no direction named]", 7/2::round())
 	show(
-		"Rational.round(toward: Rounding) [negative nearest]",
+		"Rational.round(toward?: Rounding) [negative, no direction named]",
+		-7/2::round(),
+	)
+	show("Rational.round(toward?: Rounding)", 7/2::round(toward #Nearest))
+	show(
+		"Rational.round(toward?: Rounding) [negative nearest]",
 		-7/2::round(toward #Nearest),
 	)
-	show("Rational.round(toward: Rounding) [down]", 7/2::round(toward #Down))
+	show("Rational.round(toward?: Rounding) [down]", 7/2::round(toward #Down))
 	show(
-		"Rational.round(toward: Rounding) [negative down]",
+		"Rational.round(toward?: Rounding) [negative down]",
 		-7/2::round(toward #Down),
 	)
-	show("Rational.round(toward: Rounding) [up]", 7/2::round(toward #Up))
+	show("Rational.round(toward?: Rounding) [up]", 7/2::round(toward #Up))
 	show(
-		"Rational.round(toward: Rounding) [negative up]",
+		"Rational.round(toward?: Rounding) [negative up]",
 		-7/2::round(toward #Up),
 	)
 	show(
-		"Rational.round(toward: Rounding) [toward zero]",
+		"Rational.round(toward?: Rounding) [toward zero]",
 		7/2::round(toward #TowardZero),
 	)
 	show(
-		"Rational.round(toward: Rounding) [negative toward zero]",
+		"Rational.round(toward?: Rounding) [negative toward zero]",
 		-7/2::round(toward #TowardZero),
 	)
 	show(
-		"Rational.round(toward: Rounding) [whole is its own ceiling]",
+		"Rational.round(toward?: Rounding) [whole is its own ceiling]",
 		4/2::round(toward #Up),
 	)
 	show(
-		"Rational.round(toward: Rounding) [below a half]",
+		"Rational.round(toward?: Rounding) [below a half]",
 		1/4::round(toward #Nearest),
 	)
 	show("Rational.raise(to: Integer)", 2/3::raise(to 2))
@@ -1382,19 +1391,25 @@ third"::lines())
 	show("List.lastItem<ItemType>()", numbers::lastItem())
 	show("List.lastItem<ItemType>() [empty]", noNumbers::lastItem())
 	show("List.lastItem<ItemType>() [single]", singleNumber::lastItem())
-	show("List.removeFirst<ItemType>()", numbers::removeFirst())
-	show("List.removeFirst<ItemType>() [empty]", noNumbers::removeFirst())
-	show("List.removeFirst<ItemType>(_ Integer)", numbers::removeFirst(2))
 	show(
-		"List.removeFirst<ItemType>(_ Integer) [zero]",
+		"List.removeFirst<ItemType>(_? Integer) [no count]",
+		numbers::removeFirst(),
+	)
+	show(
+		"List.removeFirst<ItemType>(_? Integer) [no count, empty]",
+		noNumbers::removeFirst(),
+	)
+	show("List.removeFirst<ItemType>(_? Integer)", numbers::removeFirst(2))
+	show(
+		"List.removeFirst<ItemType>(_? Integer) [zero]",
 		numbers::removeFirst(0),
 	)
 	show(
-		"List.removeFirst<ItemType>(_ Integer) [past the end]",
+		"List.removeFirst<ItemType>(_? Integer) [past the end]",
 		numbers::removeFirst(99),
 	)
 	show(
-		"List.removeFirst<ItemType>(_ Integer) [negative]",
+		"List.removeFirst<ItemType>(_? Integer) [negative]",
 		numbers::removeFirst(-1),
 	)
 	show("List.remove<ItemType>(at: Integer)", numbers::remove(at 2))
@@ -1431,12 +1446,18 @@ third"::lines())
 		"List.removeEvery<ItemType>(where: (_ ItemType) -> Boolean) [no match]",
 		numbers::removeEvery(where (item) { <- item::isGreaterThan(9) }),
 	)
-	show("List.removeLast<ItemType>()", numbers::removeLast())
-	show("List.removeLast<ItemType>() [empty]", noNumbers::removeLast())
-	show("List.removeLast<ItemType>(_ Integer)", numbers::removeLast(2))
-	show("List.removeLast<ItemType>(_ Integer) [zero]", numbers::removeLast(0))
 	show(
-		"List.removeLast<ItemType>(_ Integer) [past the end]",
+		"List.removeLast<ItemType>(_? Integer) [no count]",
+		numbers::removeLast(),
+	)
+	show(
+		"List.removeLast<ItemType>(_? Integer) [no count, empty]",
+		noNumbers::removeLast(),
+	)
+	show("List.removeLast<ItemType>(_? Integer)", numbers::removeLast(2))
+	show("List.removeLast<ItemType>(_? Integer) [zero]", numbers::removeLast(0))
+	show(
+		"List.removeLast<ItemType>(_? Integer) [past the end]",
 		numbers::removeLast(99),
 	)
 	show(
