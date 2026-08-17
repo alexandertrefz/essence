@@ -5,9 +5,10 @@ const TokenType = lexer.TokenType
 
 export type Comment = {
 	// NOTE: Verbatim, sigil included and line break excluded, exactly as the
-	// Lexer read it. Comments are never reflowed — the corpus contains divider
-	// rules and hand-wrapped prose that re-wrapping would destroy — so the text
-	// is only ever moved, never rewritten.
+	// Lexer read it — bar the whitespace at its end, which is trailing
+	// whitespace like any other. Comments are never reflowed — the corpus
+	// contains divider rules and hand-wrapped prose that re-wrapping would
+	// destroy — so the text is only ever moved, never rewritten.
 	text: string
 	startLine: number
 	endLine: number
@@ -39,7 +40,7 @@ export function collectComments(source: string): Array<Comment> {
 				token.type === TokenType.DocComment
 			) {
 				comments.push({
-					text: token.value,
+					text: token.value.trimEnd(),
 					startLine: token.position.start.line,
 					endLine: token.position.end.line,
 					ownLine: lastCodeLine !== token.position.start.line,
@@ -168,8 +169,10 @@ export function commentAnchors(
 			let isComment =
 				token.type === TokenType.Comment ||
 				token.type === TokenType.DocComment
+			// NOTE: A Comment's trailing whitespace is trimmed on the way out,
+			// so it is compared without it here too.
 			let anchor = isComment
-				? "§" + token.value
+				? "§" + token.value.trimEnd()
 				: token.type + " " + token.value
 
 			let chunk =
