@@ -1137,6 +1137,15 @@ describe("formatter", () => {
 				).toEqual([32, 32, 32])
 			})
 
+			it("lines up a run of static properties the same way", () => {
+				let source =
+					"implementation {\n\tnamespace Config {\n\t\tstatic a = 1\n\t\tstatic longerName = 2\n\t\tstatic x: Integer = 3\n\n\t\tstatic apart = 4\n\t\tdouble(_ n: Integer) -> Integer { <- n }\n\t\tstatic after = 5\n\t}\n}\n"
+
+				expect(formatted(source)).toBe(
+					"implementation {\n\tnamespace Config {\n\t\tstatic a          = 1\n\t\tstatic longerName = 2\n\t\tstatic x: Integer = 3\n\n\t\tstatic apart = 4\n\t\tdouble(_ n: Integer) -> Integer {\n\t\t\t<- n\n\t\t}\n\t\tstatic after = 5\n\t}\n}\n",
+				)
+			})
+
 			it("is stable under a second pass", () => {
 				let once = format(block("constant a = 1", "constant bbbb = 2"))
 
