@@ -168,12 +168,21 @@ class Inlining {
 	private driverOf(
 		node: common.typedSimple.ExpressionNode,
 	): common.typedSimple.InlineLoopDriver | null {
+		// NOTE: A call that left an Argument out is left alone. This pass writes
+		// the CALLEE'S BODY out where the call stands, and the callee's own
+		// default parameters are what would have filled the Argument in — there
+		// is no binding here for them to fill, and the Argument list this pass
+		// reads is the one the call WROTE. None of the seven callees it inlines
+		// carries a default today (`loop`'s entries and `reduce`'s are dispatched
+		// by their label sets, which is what an `overload` block is for), so this
+		// costs nothing; it is here so that a default written on one of them
+		// later is a missed optimisation rather than a wrong Program.
 		if (node.nodeType === "FunctionInvocation") {
-			return this.freeLoop(node)
+			return node.omitsArguments === true ? null : this.freeLoop(node)
 		}
 
 		if (node.nodeType === "MethodInvocation") {
-			return this.listWalk(node)
+			return node.omitsArguments === true ? null : this.listWalk(node)
 		}
 
 		return null
@@ -463,6 +472,19 @@ function callbackOf(
 	parameterCount: number,
 ): common.typedSimple.InlineLoopCallback | null {
 	if (value.nodeType !== "FunctionValue") {
+		return null
+	}
+
+	// NOTE: A callback's Parameter can not carry a default — a Function literal
+	// is refused one at the Parser, since its arity is fixed by the Function
+	// Type it was written for — and this pass binds each Parameter as a `const`,
+	// which has nowhere to put one. Asked rather than assumed, because what
+	// makes it true is a rule somewhere else.
+	if (
+		value.value.parameters.some(
+			(parameter) => parameter.defaultValue !== null,
+		)
+	) {
 		return null
 	}
 

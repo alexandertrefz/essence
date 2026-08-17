@@ -1,13 +1,20 @@
-import { describe, expect, it } from "bun:test"
+import { afterAll, beforeAll, describe, expect, it } from "bun:test"
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { fixturePath } from "@essence-lang/fixtures"
 import type { common } from "@essence-lang/interfaces"
+import { readStdlibFiles } from "@essence-lang/standard-library"
 
 import { containsErrors } from "../diagnostics/index"
 import { enrich } from "../enricher/index"
+import {
+	loadStdlibFrom,
+	parseStdlibSource,
+	type Stdlib,
+	useStdlib,
+} from "../enricher/stdlib"
 import {
 	defaultOptimiserOptions,
 	optimise,
@@ -3875,6 +3882,218 @@ describe("Optimiser", () => {
 					),
 				).toEqual(['"less"', '"yes"'])
 			})
+		})
+	})
+
+	// NOTE: `= expression` defaults, against the Optimiser's own contract — any
+	// subset of the passes is a correct Program, and a pass never changes what
+	// one does. A default is an Expression standing where no pass can lift work
+	// in front of it, so `walkFunctionDefinition` offers one only to the passes
+	// that ASK; what is asserted here is that the whole registry is undisturbed
+	// by calls that leave Arguments out, and that the three passes which do ask
+	// reach a default.
+	describe("default parameter values", () => {
+		const defaults = `implementation {
+	choice Edge {
+		Front,
+		Back,
+	}
+
+	function scaled(_ value: Integer, by factor: Integer = 2) -> Integer {
+		<- value::multiply(with factor)
+	}
+
+	function edge(at side: Edge = #Front, of items: List<Integer>) -> Integer {
+		<- match side -> Integer {
+			case Edge#Front { <- items::firstItem()::value(withDefault 0) }
+			case _ { <- items::lastItem()::value(withDefault 0) }
+		}
+	}
+
+	namespace Windows for List<Integer> {
+		upTo(_ end: Integer = @::length()) -> List<Integer> {
+			<- @::slice(from 0, to end)
+		}
+	}
+
+	constant items = [1, 2, 3, 4]
+
+	Terminal.inspect(scaled(21))
+	Terminal.inspect(scaled(21, by 3))
+	Terminal.inspect(edge(of items))
+	Terminal.inspect(edge(at #Back, of items))
+	Terminal.inspect(items::upTo())
+	Terminal.inspect(items::upTo(2))
+	Terminal.inspect(items::map((_ item: Integer) -> Integer { <- scaled(item) }))
+}`
+
+		it("prints the same thing with the whole registry off", async () => {
+			let all = await outputOf(generate(defaults))
+			let none = await outputOf(
+				generate(defaults, {
+					enabled: false,
+					disabledPasses: new Set(),
+				}),
+			)
+
+			expect(all).toEqual([
+				"42",
+				"63",
+				"1",
+				"4",
+				"[ 1, 2, 3, 4 ]",
+				"[ 1, 2 ]",
+				"[ 2, 4, 6, 8 ]",
+			])
+			expect(none).toEqual(all)
+		})
+
+		// NOTE: One case per pass, which is the shape every other pass here is
+		// held to — a Program full of defaulted calls, with each pass turned off
+		// on its own.
+		for (let passName of optimiserPassNames) {
+			it(`prints the same thing with ${passName} off`, async () => {
+				await expectSamePrintedOutput(passName, defaults)
+			})
+		}
+
+		// NOTE: `pool-constants` is the reason a default is walked at all. A
+		// unit-Case default is built by a `createCase` call otherwise — at every
+		// call that leaves the Argument out, which is every call of `trim`,
+		// `print`, `round` and `normalize` in every Program — where the
+		// `overload` block it replaces read a pooled const.
+		it("pools a unit-Case default", () => {
+			let source = `implementation {
+				choice Edge {
+					Front,
+					Back,
+				}
+
+				function edge(at side: Edge = #Front) -> Edge {
+					<- side
+				}
+
+				Terminal.inspect(edge())
+			}`
+
+			// NOTE: The `createCase` call moves OUT of the parameter list and
+			// into the band, which is the whole of what pooling buys here: a
+			// default is worked out per CALL, so a call left inside is a call
+			// per call.
+			expect(generate(source)).toMatch(
+				/function edge\(side = \$pool_\d\)/,
+			)
+			expect(
+				generate(source, {
+					enabled: true,
+					disabledPasses: new Set(["pool-constants"]),
+				}),
+			).toContain('function edge(side = $type.createCase("Edge#Front"))')
+		})
+
+		// NOTE: And a literal one is pooled the same way — the Integer `1` of
+		// `removeFirst` was `createInteger(1n)` at every call.
+		it("pools a literal default", () => {
+			expect(
+				generate(`implementation {
+					function f(_ count: Integer = 1) -> Integer {
+						<- count
+					}
+
+					Terminal.inspect(f())
+				}`),
+			).toContain("function f(count = $pool_0)")
+		})
+
+		// NOTE: `eliminate-dead-code` drops a Constant nothing READS, and a
+		// default is a read — the only one, for a Constant a Declaration names
+		// and no body does. Missed, the Constant went and the emitted default
+		// named nothing.
+		it("keeps a Constant that only a default reads", async () => {
+			let source = `implementation {
+				constant fallback = "world"
+
+				function greet(_ name: String = fallback) -> String {
+					<- name
+				}
+
+				Terminal.inspect(greet())
+			}`
+
+			expect(generate(source)).toContain("fallback")
+			expect(await outputOf(generate(source))).toEqual(['"world"'])
+		})
+
+		// NOTE: `inline-loops` writes a callee's BODY out where the call stands,
+		// and the callee's own default parameters are what would have filled the
+		// missing Argument in — there is no binding at the call site for them to
+		// fill. None of the seven callees it inlines carries a default today, so
+		// the guard is asserted against a Namespace that shadows one of them:
+		// with the guard, the call keeps its frame and answers correctly.
+		describe("a walk this pass inlines, given a default", () => {
+			const written =
+				"keepEvery(where check: (_: ItemType) -> Boolean) -> List<ItemType>"
+			const defaulted =
+				"keepEvery(where check: (_: ItemType) -> Boolean = (_ item: ItemType) -> Boolean { <- true }) -> List<ItemType>"
+
+			let replacedStdlib: Stdlib | null = null
+
+			beforeAll(() => {
+				let sources = readStdlibFiles().map(
+					({ filePath, sourceText }) => {
+						if (!filePath.endsWith("List.es")) {
+							return parseStdlibSource(filePath, sourceText)
+						}
+
+						expect(sourceText).toContain(written)
+
+						return parseStdlibSource(
+							filePath,
+							sourceText.replace(written, defaulted),
+						)
+					},
+				)
+
+				replacedStdlib = useStdlib(loadStdlibFrom(sources))
+			})
+
+			afterAll(() => {
+				useStdlib(replacedStdlib)
+			})
+
+			const folded = `implementation {
+	Terminal.inspect([1, 2, 3]::keepEvery(where (_ item: Integer) -> Boolean {
+		<- item::isGreaterThan(1)
+	}))
+}`
+			const omitted = `implementation {
+	Terminal.inspect([1, 2, 3]::keepEvery())
+}`
+
+			it("still inlines a call that writes every Argument", async () => {
+				expect(generate(folded)).not.toContain("List.keepEvery")
+				expect(await outputOf(generate(folded))).toEqual(["[ 2, 3 ]"])
+			})
+
+			// NOTE: The pass writes the CALLEE'S BODY out where the call stands,
+			// and the callee's own default parameter is what would have filled
+			// the missing Argument in — there is no binding at the call site for
+			// it to fill. So the call keeps its frame, which is a missed
+			// optimisation rather than a wrong Program.
+			it("refuses a call that left an Argument out", async () => {
+				expect(generate(omitted)).toContain("$es_List_keepEvery")
+				expect(await outputOf(generate(omitted))).toEqual([
+					"[ 1, 2, 3 ]",
+				])
+			})
+		})
+
+		// NOTE: A defaulted Integer Parameter is an ordinary binding by the time
+		// any Statement runs, so the arithmetic over it lowers exactly as it
+		// always did — the default changes the parameter list and nothing about
+		// the body.
+		it("still lowers arithmetic over a defaulted Integer Parameter", () => {
+			expect(generate(defaults)).toContain("value.value * factor.value")
 		})
 	})
 

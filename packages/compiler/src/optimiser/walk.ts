@@ -65,6 +65,21 @@ export type NodeRewrites = {
 	expression?: ExpressionRewrite
 	statement?: StatementRewrite
 	body?: BodyRewrite
+	// NOTE: Whether the walk descends into a Parameter's `= expression` default.
+	// OFF by default, and asked for by name, because a default stands in a
+	// position that has NO Statement before it: several passes answer an
+	// Expression by lifting work into Statements ahead of it —
+	// `lower-matches-to-statements` is the plain case, `inline-loops` and
+	// `build-lists-in-place` the ones that bind names — and there is nowhere in
+	// a Parameter list for any of that to go.
+	//
+	// A pass that only ever answers an Expression with another Expression has no
+	// such trouble, and three of them need to see a default: `fold-constants`
+	// and `pool-constants`, because a unit-Case default is built at every call
+	// otherwise, and `eliminate-dead-code`, whose reading of what the Program
+	// READS is not a rewrite at all — a Constant named only by a default was
+	// dropped out from under it.
+	parameterDefaults?: true
 }
 
 // NOTE: BOTTOM-UP for Statements as well: a Statement's children — its
@@ -91,8 +106,9 @@ export function rewriteNodes(
 export function rewriteExpressions(
 	program: common.typedSimple.Program,
 	rewrite: ExpressionRewrite,
+	options: { parameterDefaults?: true } = {},
 ): common.typedSimple.Program {
-	return rewriteNodes(program, { expression: rewrite })
+	return rewriteNodes(program, { ...options, expression: rewrite })
 }
 
 export function rewriteStatements(
@@ -227,11 +243,29 @@ function walkImplementationChildren(
 				return { ...entry, method: { ...entry.method, value } }
 			})
 
-			if (properties === node.properties && methods === node.methods) {
+			// NOTE: A native Method's shim is a Parameter list and nothing
+			// else — the Rewriter writes its one-call body out — so the
+			// defaults are the whole of what there is to walk here.
+			let nativeShims = mapArray(node.nativeShims, (shim) => {
+				let parameters = walkParameterDefaults(
+					shim.parameters,
+					rewrites,
+				)
+
+				return parameters === shim.parameters
+					? shim
+					: { ...shim, parameters }
+			})
+
+			if (
+				properties === node.properties &&
+				methods === node.methods &&
+				nativeShims === node.nativeShims
+			) {
 				return node
 			}
 
-			return { ...node, properties, methods }
+			return { ...node, properties, methods, nativeShims }
 		}
 		case "ConditionalStatement": {
 			let condition = walkExpression(node.condition, rewrites)
@@ -423,13 +457,46 @@ function walkInlineLoopCallback(
 	return body === callback.body ? callback : { ...callback, body }
 }
 
+// NOTE: The body, and the Parameter defaults for the passes that asked for them
+// — see `NodeRewrites.parameterDefaults` for which passes those are and why the
+// rest are kept out.
 function walkFunctionDefinition(
 	node: FunctionDefinitionNode,
 	rewrites: NodeRewrites,
 ): FunctionDefinitionNode {
+	let parameters = walkParameterDefaults(node.parameters, rewrites)
 	let body = walkBody(node.body, rewrites)
 
-	return body === node.body ? node : { ...node, body }
+	if (parameters === node.parameters && body === node.body) {
+		return node
+	}
+
+	return { ...node, parameters, body }
+}
+
+// NOTE: The one place a `= expression` default is walked, for every kind of
+// Declaration that can carry one — a Function, a Method, and the frame the
+// Compiler synthesizes for a native's defaults, which has no body at all and is
+// therefore nothing BUT this.
+function walkParameterDefaults(
+	parameters: Array<common.typedSimple.ParameterNode>,
+	rewrites: NodeRewrites,
+): Array<common.typedSimple.ParameterNode> {
+	if (rewrites.parameterDefaults === undefined) {
+		return parameters
+	}
+
+	return mapArray(parameters, (parameter) => {
+		if (parameter.defaultValue === null) {
+			return parameter
+		}
+
+		let defaultValue = walkExpression(parameter.defaultValue, rewrites)
+
+		return defaultValue === parameter.defaultValue
+			? parameter
+			: { ...parameter, defaultValue }
+	})
 }
 
 function walkArguments(

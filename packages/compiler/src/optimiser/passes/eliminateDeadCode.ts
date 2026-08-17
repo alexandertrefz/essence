@@ -75,6 +75,12 @@ function namesReadBy(program: common.typedSimple.Program): ReadonlySet<string> {
 	let read = new Set<string>()
 
 	rewriteNodes(program, {
+		// NOTE: A Parameter's `= expression` default is a READ like any other:
+		// `constant fallback = "world"` above `function greet(_ name: String =
+		// fallback)` is read exactly once in the Program, and the read is in the
+		// Parameter list. Missed, the Constant was dropped and the emitted
+		// default named nothing.
+		parameterDefaults: true,
 		expression: (node) => {
 			if (node.nodeType === "Identifier") {
 				read.add(node.name)

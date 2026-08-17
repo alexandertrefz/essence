@@ -675,6 +675,27 @@ by taking a shape away rather than by being a lever: after it there is no
 closure, no `Step` and no driver between a loop as written and the `for` a
 JavaScript author would have written.
 
+**A call that left an Argument out is not inlined.** This pass writes the
+CALLEE'S BODY out where the call stands, and a Parameter's `= expression`
+default is what would have filled the missing Argument in — there is no binding
+at the call site for it to fill, and the Argument list this pass reads is the one
+the call wrote. None of the seven callees it knows carries a default today —
+`loop`'s four entries and `reduce`'s two are told apart by their label sets,
+which is what an `overload` block is for — so the guard costs nothing; it is
+there so that a default written on one of them later is a missed optimisation
+rather than a wrong Program.
+
+A default is offered only to the passes that ASK for it, which is a distinction
+that belongs here as much as in `walk.ts`: a default stands in a position that
+has no Statement in front of it, and several passes answer an Expression by
+lifting work into Statements ahead of it — `lower-matches-to-statements` plainly,
+`inline-loops` and `build-lists-in-place` by binding names. Those never see one.
+A pass that only ever answers an Expression with another Expression is safe
+there, and three of them opt in: `fold-constants`, `pool-constants` — without
+which `at side: Side = #BothEnds` built its Case at every call of `trim` — and
+`eliminate-dead-code`, whose reading of what a Program READS has to count a
+Constant that only a default names.
+
 **`firstItem(where:)` and its siblings are reached through their own bodies, not
 at the call.** Inlining a call to one of them would mean inlining an ordinary
 Essence Method, which this pass does not do — it knows seven drivers, not
