@@ -1953,6 +1953,199 @@ describe("Parser", () => {
 		})
 	})
 
+	// NOTE: `= expression` at the end of a Parameter. Every case here is also a
+	// Formatter round-trip case in `formatter.spec.ts` — the two halves of "the
+	// source says what the AST says" are worth pinning apart.
+	describe("Default Parameter Values", () => {
+		function parameterOf(source: string): parser.ParameterNode {
+			let { program, diagnostics } = parseWithDiagnostics(
+				`implementation { function f ${source} -> Integer { <- 1 } }`,
+			)
+
+			expect(diagnostics).toEqual([])
+
+			let node = program.implementation.nodes[0]
+
+			if (node.nodeType !== "FunctionStatement") {
+				throw new Error("Expected a FunctionStatement")
+			}
+
+			return node.value.parameters[0]
+		}
+
+		it("should parse a Number literal default", () => {
+			let parameter = parameterOf("(_ count: Integer = 1)")
+
+			expect(parameter.defaultValue?.nodeType).toBe("IntegerValue")
+		})
+
+		// NOTE: The `position` of a Parameter still ends at its Type, never
+		// past the default — the Inlay Hint that offers to write an inferred
+		// Type sits at exactly that spot, and the Quick Fix applies it.
+		it("should not widen the Parameter's position over the default", () => {
+			let parameter = parameterOf("(_ count: Integer = 1)")
+
+			expect(parameter.position.end.column).toBe(
+				parameter.type!.position.end.column,
+			)
+			expect(
+				parameter.defaultValue!.position.start.column,
+			).toBeGreaterThan(parameter.position.end.column)
+		})
+
+		// NOTE: `#Start` written after `= ` is a bare Case, not the adjacency
+		// rule's `Choice#Case` — nothing precedes the `#` to continue.
+		it("should parse a bare Case default", () => {
+			let parameter = parameterOf("(at side: Side = #Start)")
+
+			expect(parameter.defaultValue?.nodeType).toBe("CaseValue")
+		})
+
+		it("should parse a default that calls a Method on @", () => {
+			let parameter = parameterOf("(to end: Integer = @::length())")
+
+			expect(parameter.defaultValue?.nodeType).toBe("MethodInvocation")
+		})
+
+		it("should parse a default on a Pattern Parameter", () => {
+			let parameter = parameterOf(
+				"(of { width, height }: Rectangle = origin)",
+			)
+
+			expect(parameter.internalName?.nodeType).toBe("Pattern")
+			expect(parameter.defaultValue?.nodeType).toBe("Identifier")
+		})
+
+		// NOTE: The two cases that prove §2.1's claim that there is nothing to
+		// disambiguate — a comma inside a default is always inside brackets the
+		// sub-parser balances, so the Parameter list's own comma is never in
+		// doubt.
+		it("should parse a List literal default", () => {
+			let parameter = parameterOf("(_ items: List<Integer> = [1, 2, 3])")
+
+			expect(parameter.defaultValue?.nodeType).toBe("ListValue")
+		})
+
+		it("should parse a default that is a call with its own commas", () => {
+			let { program, diagnostics } = parseWithDiagnostics(
+				`implementation {
+					function f (_ a: Integer = g(1, 2), _ b: Integer) -> Integer {
+						<- a
+					}
+				}`,
+			)
+
+			expect(diagnostics).toEqual([])
+
+			let node = program.implementation.nodes[0]
+
+			if (node.nodeType !== "FunctionStatement") {
+				throw new Error("Expected a FunctionStatement")
+			}
+
+			expect(node.value.parameters).toHaveLength(2)
+			expect(node.value.parameters[0].defaultValue?.nodeType).toBe(
+				"FunctionInvocation",
+			)
+			expect(node.value.parameters[1].defaultValue).toBeNull()
+		})
+
+		it("should parse a default on a native Method signature", () => {
+			let { diagnostics } = parseWithDiagnostics(
+				`declarations {
+					namespace String for String {
+						trim(at side: Side = #BothEnds) -> String
+					}
+				}`,
+				{ allowDeclarationsHeader: true },
+			)
+
+			expect(diagnostics).toEqual([])
+		})
+
+		// NOTE: The three positions a default is refused in. The first two are
+		// reported and the default dropped; the third never parses at all,
+		// because a Function TYPE has no expression slot to read one into.
+		it("should refuse a default on a Function literal", () => {
+			let { diagnostics } = parseWithDiagnostics(
+				"implementation { constant f = (item = 1) { <- item } }",
+			)
+
+			expect(diagnostics.map((diagnostic) => diagnostic.code)).toContain(
+				"default-on-function-literal",
+			)
+		})
+
+		it("should refuse a default on a Generic Function literal", () => {
+			let { diagnostics } = parseWithDiagnostics(
+				"implementation { constant f = <T>(_ item: Integer = 1) -> Integer { <- item } }",
+			)
+
+			expect(diagnostics.map((diagnostic) => diagnostic.code)).toContain(
+				"default-on-function-literal",
+			)
+		})
+
+		it("should refuse a default on a Protocol requirement", () => {
+			let { program, diagnostics } = parseWithDiagnostics(
+				`implementation {
+					protocol Trimmable {
+						trim(at side: Integer = 1) -> Self
+					}
+				}`,
+			)
+
+			expect(diagnostics.map((diagnostic) => diagnostic.code)).toContain(
+				"default-on-protocol-requirement",
+			)
+
+			let node = program.implementation.nodes[0]
+
+			if (node.nodeType !== "ProtocolDeclarationStatement") {
+				throw new Error("Expected a ProtocolDeclarationStatement")
+			}
+
+			let method = node.methods["trim"]
+
+			if (method.nodeType !== "SimpleProtocolMethod") {
+				throw new Error("Expected a SimpleProtocolMethod")
+			}
+
+			expect(method.signature.parameters[0].defaultValue).toBeNull()
+		})
+
+		it("should refuse a default in a Function Type", () => {
+			let { diagnostics } = parseWithDiagnostics(
+				"implementation { constant f: (_ n: Integer = 1) -> Integer = g }",
+			)
+
+			expect(containsErrors(diagnostics)).toBe(true)
+		})
+
+		// NOTE: A default needs a written Type to be checked against — the
+		// Type can not be read back off the default, because `(_ n = 1)` and
+		// `(_ n: Number = 1)` mean different things to every caller. Nothing
+		// special enforces this: outside a Function literal, a Parameter's `:`
+		// is already mandatory, so the `=` arrives where a `:` was expected.
+		it("should refuse a default with no Type", () => {
+			let { diagnostics } = parseWithDiagnostics(
+				"implementation { function f (_ count = 1) -> Integer { <- count } }",
+			)
+
+			expect(containsErrors(diagnostics)).toBe(true)
+		})
+
+		// NOTE: `_: Type` binds no name, so its default is unreachable from
+		// the body — but a caller may still leave the Argument out, which is
+		// the only thing a default has to mean. Allowed.
+		it("should allow a default on a nameless Parameter", () => {
+			let parameter = parameterOf("(_: Integer = 1)")
+
+			expect(parameter.internalName).toBeNull()
+			expect(parameter.defaultValue?.nodeType).toBe("IntegerValue")
+		})
+	})
+
 	describe("Declarations Programs", () => {
 		// NOTE: `declarations { … }` is the standard library's opt-in Program
 		// form — only reachable when the caller passes `allowDeclarationsHeader`.

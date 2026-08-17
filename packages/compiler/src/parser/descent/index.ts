@@ -1576,6 +1576,10 @@ class DescentParser {
 			parameterList.parameters,
 			"Protocol Method",
 		)
+		this.refuseDefaultValues(
+			parameterList.parameters,
+			"Protocol requirement",
+		)
 
 		return generators.protocolMethodSignature(
 			parameterList.parameters,
@@ -1771,14 +1775,30 @@ class DescentParser {
 				return generators.booleanValueNode(false, token.position)
 			case TokenType.SymbolLeftBracket:
 				return this.parseListLiteral()
-			case TokenType.SymbolLeftParen:
+			case TokenType.SymbolLeftParen: {
 				// NOTE: The only Function literal whose annotations may be
 				// omitted — in expression position there can be an expected
 				// signature to read them off. A Generic literal writes its own
 				// Generics, so it has nothing to infer them from.
-				return this.parseFunctionLiteral(true)
-			case TokenType.SymbolLeftAngle:
-				return this.parseGenericFunctionLiteral()
+				let literal = this.parseFunctionLiteral(true)
+
+				this.refuseDefaultValues(
+					literal.value.parameters,
+					"Function literal",
+				)
+
+				return literal
+			}
+			case TokenType.SymbolLeftAngle: {
+				let literal = this.parseGenericFunctionLiteral()
+
+				this.refuseDefaultValues(
+					literal.value.parameters,
+					"Function literal",
+				)
+
+				return literal
+			}
 			case TokenType.SymbolLeftBrace:
 				return this.parseRecordLiteralOrCombination()
 			case TokenType.Identifier:
@@ -2736,7 +2756,31 @@ class DescentParser {
 	// expression position, where an omitted annotation has an expected
 	// signature to be read off. Every Declaration parses its annotations, so a
 	// null Type can not reach a named Function or a Method.
+	// NOTE: The `= expression` a caller may leave out, read after everything
+	// else the Parameter writes. There is nothing to disambiguate here:
+	// Essence has no infix operators at all, so nothing continues an
+	// expression past a top-level `,` or `)`, and any comma inside the default
+	// sits within a `(…)`, `[…]`, `{…}` or `<…>` the sub-parser already
+	// balances.
+	//
+	// It is attached to the finished Parameter rather than threaded through
+	// the nine places one is built, and it deliberately leaves `position`
+	// alone — see the NOTE on `ParameterNode`.
 	protected parseParameter(
+		allowsInferredTypes = false,
+	): parser.ParameterNode {
+		let parameter = this.parseParameterHead(allowsInferredTypes)
+
+		if (this.tokens.peek()?.type === TokenType.SymbolEqual) {
+			this.tokens.next()
+
+			parameter.defaultValue = this.parseExpression()
+		}
+
+		return parameter
+	}
+
+	protected parseParameterHead(
 		allowsInferredTypes = false,
 	): parser.ParameterNode {
 		// NOTE: Only a Parameter written on a line of its own can carry a
@@ -2976,6 +3020,58 @@ class DescentParser {
 				],
 				helps: ["Write one name, and take it apart where it is used."],
 			})
+		}
+	}
+
+	// NOTE: The two positions where a Parameter is well-formed but a default on
+	// it could never fire, refused here for the same reason
+	// `refusePatternParameters` is: the Parameter parses, only its POSITION is
+	// wrong. The default is dropped once reported, so that one misplaced `=`
+	// does not cascade into everything downstream that reads it.
+	protected refuseDefaultValues(
+		parameters: Array<parser.ParameterNode>,
+		kind: "Function literal" | "Protocol requirement",
+	): void {
+		for (let parameter of parameters) {
+			if (parameter.defaultValue === null) {
+				continue
+			}
+
+			let position = parameter.defaultValue.position
+
+			if (kind === "Protocol requirement") {
+				reportError(
+					"A Protocol requirement can not carry a default",
+					position,
+					{
+						code: "default-on-protocol-requirement",
+						labels: [primary(position, "this default")],
+						notes: [
+							"A requirement says which calls a conforming Type must answer; a default is part of how one of them answers, which is each Namespace's own.",
+						],
+						helps: [
+							"Declare the requirement without the default, and write the default on the fulfilling Method.",
+						],
+					},
+				)
+			} else {
+				reportError(
+					"A Function literal can not carry a default",
+					position,
+					{
+						code: "default-on-function-literal",
+						labels: [primary(position, "this default")],
+						notes: [
+							"A Function literal is called through the Function Type it was written for, which fixes how many Arguments every call passes, so a default here could never be reached.",
+						],
+						helps: [
+							"Write the default on the named Function or Method this value is passed to.",
+						],
+					},
+				)
+			}
+
+			parameter.defaultValue = null
 		}
 	}
 
