@@ -170,63 +170,8 @@ export class Printer {
 		let kind: AssignmentKind | null = null
 		let previousEnd: number | null = null
 
-		// NOTE: The run is broken into blocks that each line up on their own `=`
-		// rather than forced to one column, so a long typed Declaration among
-		// short ones does not drag every sibling's `=` across the line to meet it.
-		// A block is a maximal stretch of adjacent assignments whose heads span no
-		// more than `MAX_ALIGNMENT_PADDING` — the widest minus the narrowest — so
-		// no member is ever padded further than that to reach its block's column.
-		// A block ends where the next head would widen that span past the budget,
-		// which is what splits a group of short Declarations from the wide typed
-		// ones written below them into their own lined-up blocks. A block of one
-		// is left unpadded.
-		//
-		// The span is measured widest-minus-narrowest rather than against the
-		// neighbour above, which would let a slow ramp of widths pad the first
-		// member of a block far past the budget. The walk is in source order and
-		// greedy rather than optimal — the corpus writes similar widths together,
-		// and a greedy left-to-right pass is stable under a second run, which an
-		// optimal partition need not be.
 		let closeRun = () => {
-			let start = 0
-			let narrowest = 0
-			let widest = 0
-
-			let flushBlock = (end: number) => {
-				if (end - start > 1) {
-					for (let index = start; index < end; index++) {
-						let assignment = run[index] as AlignedAssignment
-
-						assignment.padding.value = " ".repeat(
-							widest - assignment.headWidth,
-						)
-					}
-				}
-
-				start = end
-			}
-
-			for (let index = 0; index < run.length; index++) {
-				let width = (run[index] as AlignedAssignment).headWidth
-
-				if (
-					index > start &&
-					Math.max(widest, width) - Math.min(narrowest, width) >
-						MAX_ALIGNMENT_PADDING
-				) {
-					flushBlock(index)
-				}
-
-				if (index === start) {
-					narrowest = width
-					widest = width
-				} else {
-					narrowest = Math.min(narrowest, width)
-					widest = Math.max(widest, width)
-				}
-			}
-
-			flushBlock(run.length)
+			alignRun(run)
 
 			run = []
 			kind = null
@@ -949,14 +894,60 @@ export class Printer {
 			),
 		)
 
+		// NOTE: Adjacent `static` properties line their `=` up like a run of
+		// Declarations does, and the run ends where that one's does: at a
+		// Method, at a blank line, or at a value that can not be on one line.
+		let run: Array<AlignedAssignment> = []
+		let previousEnd: number | null = null
+
+		let closeRun = () => {
+			alignRun(run)
+			run = []
+		}
+
 		let entries = this.entriesFor(
 			members,
 			(member) => ({
 				startLine: memberName(member).position.start.line,
 				endLine: this.namespaceMemberEndLine(member),
 			}),
-			(member) => this.printNamespaceMember(member),
+			(member) => {
+				let startLine = memberName(member).position.start.line
+				let separated =
+					previousEnd !== null &&
+					this.source.hasBlankLineBetween(previousEnd, startLine)
+
+				previousEnd = this.namespaceMemberEndLine(member)
+
+				if (
+					member.kind !== "property" ||
+					member.property.value === null
+				) {
+					closeRun()
+
+					return this.printNamespaceMember(member)
+				}
+
+				if (separated) {
+					closeRun()
+				}
+
+				let padding = text("")
+				let printed = this.printProperty(member.property, padding)
+
+				if (printed.headWidth === null || !printed.flat) {
+					closeRun()
+
+					return printed.doc
+				}
+
+				run.push({ headWidth: printed.headWidth, padding })
+
+				return printed.doc
+			},
 		)
+
+		closeRun()
 
 		this.flushBefore(node.position.end.line, entries)
 
@@ -1022,20 +1013,35 @@ export class Printer {
 		}
 	}
 
+	// NOTE: A `static` property, with the same padding slot before its `=` a
+	// Declaration carries, so that a run of them can line up.
+	private printProperty(
+		property: parser.NamespacePropertyNode,
+		padding: Doc,
+	): { doc: Doc; headWidth: number | null; flat: boolean } {
+		let head: Array<Doc> = [text("static " + property.name.content)]
+
+		if (property.type !== null) {
+			head.push(text(": "), this.printType(property.type))
+		}
+
+		if (property.value === null) {
+			return { doc: concat(head), headWidth: null, flat: false }
+		}
+
+		let written = renderFlat(concat(head))
+		let value = this.printExpression(property.value)
+
+		return {
+			doc: concat([...head, padding, text(" = "), value]),
+			headWidth: written === null ? null : stringWidth(written),
+			flat: renderFlat(value) !== null,
+		}
+	}
+
 	private printNamespaceMember(member: NamespaceMember): Doc {
 		if (member.kind === "property") {
-			let property = member.property
-			let parts: Array<Doc> = [text("static " + property.name.content)]
-
-			if (property.type !== null) {
-				parts.push(text(": "), this.printType(property.type))
-			}
-
-			if (property.value !== null) {
-				parts.push(text(" = "), this.printExpression(property.value))
-			}
-
-			return concat(parts)
+			return this.printProperty(member.property, EMPTY).doc
 		}
 
 		let method = member.method
@@ -2537,6 +2543,59 @@ type AssignmentNode =
 	| parser.ConstantDeclarationStatementNode
 	| parser.VariableDeclarationStatementNode
 	| parser.VariableAssignmentStatementNode
+
+// NOTE: Writes the padding of a run of assignments — a Statement's or a
+// Namespace's `static` properties, which line up the same way. The run is
+// broken into blocks that each line up on their own `=`, so a long typed
+// Declaration among short ones does not drag every sibling's `=` across the
+// line to meet it: a block is a maximal stretch of adjacent members whose
+// heads span no more than `MAX_ALIGNMENT_PADDING` — the widest minus the
+// narrowest — measured that way rather than against the neighbour above,
+// which would let a slow ramp of widths pad the first member far past the
+// budget. Greedy left to right rather than optimal, because a greedy pass is
+// stable under a second run and an optimal partition need not be. A block of
+// one is left unpadded.
+function alignRun(run: Array<AlignedAssignment>): void {
+	let start = 0
+	let narrowest = 0
+	let widest = 0
+
+	let flushBlock = (end: number) => {
+		if (end - start > 1) {
+			for (let index = start; index < end; index++) {
+				let assignment = run[index] as AlignedAssignment
+
+				assignment.padding.value = " ".repeat(
+					widest - assignment.headWidth,
+				)
+			}
+		}
+
+		start = end
+	}
+
+	for (let index = 0; index < run.length; index++) {
+		let width = (run[index] as AlignedAssignment).headWidth
+
+		if (
+			index > start &&
+			Math.max(widest, width) - Math.min(narrowest, width) >
+				MAX_ALIGNMENT_PADDING
+		) {
+			flushBlock(index)
+		}
+
+		if (index === start) {
+			narrowest = width
+			widest = width
+		} else {
+			narrowest = Math.min(narrowest, width)
+			widest = Math.max(widest, width)
+		}
+	}
+
+	flushBlock(run.length)
+}
 
 // NOTE: The Statements written as `… = …`, which are the ones an alignment run
 // is made of. A `type` alias carries an `=` too, but it is a Declaration of a
