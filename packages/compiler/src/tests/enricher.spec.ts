@@ -4897,7 +4897,7 @@ describe("Enricher", () => {
 
 		it("should report a default that reads a Parameter to its right", () => {
 			let diagnostics = diagnosticsFor(`implementation {
-				function f(_ a: Integer = b, _ b: Integer) -> Integer {
+				function f(_ a: Integer = b, to b: Integer) -> Integer {
 					<- a::add(b)
 				}
 			}`)
@@ -4937,6 +4937,62 @@ describe("Enricher", () => {
 			expect(diagnostics.map((diagnostic) => diagnostic.code)).toContain(
 				"at-in-static-method",
 			)
+		})
+
+		// NOTE: The rule is about LABELS, not about position: a default may sit
+		// anywhere so long as nothing after it answers to the same label.
+		it("should refuse an unlabelled default followed by an unlabelled Parameter", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				function f(_ a: Integer = 1, _ b: String) -> String {
+					<- b
+				}
+			}`)
+
+			expect(
+				diagnostics.filter(
+					(diagnostic) =>
+						diagnostic.code ===
+						"indistinguishable-default-parameter",
+				),
+			).toHaveLength(1)
+		})
+
+		it("should refuse a default followed by the same label", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				function f(to a: Integer = 1, to b: String) -> String {
+					<- b
+				}
+			}`)
+
+			expect(
+				diagnostics.filter(
+					(diagnostic) =>
+						diagnostic.code ===
+						"indistinguishable-default-parameter",
+				),
+			).toHaveLength(1)
+		})
+
+		it("should accept a default followed by a differently labelled Parameter", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					function f(_ a: Integer, _ b: Integer = 2, to x: Integer) -> Integer {
+						<- x
+					}
+				}`),
+			).toEqual([])
+		})
+
+		it("should accept a Method's default followed by a labelled Parameter", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					namespace Slices for List<Integer> {
+						cut(_ start: Integer = 0, to end: Integer) -> Integer {
+							<- end
+						}
+					}
+				}`),
+			).toEqual([])
 		})
 
 		// NOTE: `hasDefault` is the whole of what a TYPE says about a default
