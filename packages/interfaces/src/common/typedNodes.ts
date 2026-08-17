@@ -461,10 +461,47 @@ export interface NamespaceDefinitionStatementNode {
 	}>
 	properties: Record<string, NamespaceProperty>
 	methods: Methods
+	// NOTE: The native Methods of this Namespace that declare a default, and
+	// nothing else — a native has no body to enrich, so these carry their
+	// Parameter list alone. See `NativeShimNode`.
+	nativeShims: Array<NativeShimNode>
 	position: Position
 	headPosition: Position
 	type: NamespaceType
 	documentation: Documentation | null
+}
+
+// NOTE: A native Method that declares a default needs a FRAME for the default to
+// be evaluated in, and the native calling convention has nowhere to put one: a
+// native takes exactly the Parameters its declaration does, with no default and
+// no rest Parameter, and `nativeArity` pins that under `tsc` while
+// `builtins.spec.ts` checks the runtime export's own `.length` against it — a
+// JavaScript default parameter stops `Function.length`, so the native can not
+// carry one. Asking the runtime to implement the default instead would spell one
+// default twice, once in `.es` as documentation and once in `.ts` as behaviour,
+// with nothing checking that they agree.
+//
+// So the Compiler synthesizes the frame: a top-level const beside the prelude's
+// Essence-implemented members that takes the default and hands everything on to
+// the native.
+//
+//   const $es_String_trim = (_self, side = "BothEnds") => String.trim(_self, side)
+//
+// ONLY a call site that actually leaves an Argument out names it. A call that
+// writes every Argument emits byte-identically to what it always did — a direct
+// read off the imported runtime module, tree-shakeable exactly as before — and
+// the generated native contract does not change at all. The Essence-side default
+// stays the single source of truth, and the runtime never learns that defaults
+// exist.
+export interface NativeShimNode {
+	nodeType: "NativeShim"
+	memberName: string
+	// NOTE: The entry's slot in an `overload` block, which is what the emitted
+	// name is mangled with — the Simplifier does the mangling, here as
+	// everywhere. Null for a Method that is not overloaded.
+	overloadIndex: number | null
+	isStatic: boolean
+	parameters: Array<ParameterNode>
 }
 
 export interface ProtocolDeclarationStatementNode {

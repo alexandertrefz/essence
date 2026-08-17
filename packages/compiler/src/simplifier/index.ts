@@ -192,6 +192,9 @@ function simplifyMethodInvocation(
 			position: node.position,
 		},
 		member: { name: node.member.name },
+		...(node.omittedParameterIndices.length === 0
+			? {}
+			: { omitsArguments: true as const }),
 		arguments: expandOmittedArguments(
 			[
 				{
@@ -275,6 +278,9 @@ function simplifyFunctionInvocation(
 	return {
 		nodeType: "FunctionInvocation",
 		name: simplifyExpression(node.name),
+		...(node.omittedParameterIndices.length === 0
+			? {}
+			: { omitsArguments: true as const }),
 		arguments: expandOmittedArguments(
 			[],
 			node.arguments.map((arg) => simplifyArgument(arg)),
@@ -670,8 +676,54 @@ function simplifyNamespaceDefinitionStatement(
 			}),
 		),
 		methods: simplifyMethods(node.methods, node.type),
+		nativeShims: node.nativeShims.map((shim) =>
+			simplifyNativeShim(
+				shim,
+				node.type.targetType ?? { type: "Unknown" },
+			),
+		),
 		type: node.type,
 		position: node.position,
+	}
+}
+
+// NOTE: The same two things `simplifyMethods` does to a bodied Method, done to
+// the frame a native's default needs: the name is mangled with the Overload slot
+// it was declared in, and the receiver `_self` is unshifted onto an instance
+// Method's Parameters. Both have to agree with what the call site resolved to,
+// and they do because both go through the one `resolveOverloadedMethodName` and
+// the one `_self`.
+function simplifyNativeShim(
+	shim: common.typed.NativeShimNode,
+	targetType: common.Type,
+): common.typedSimple.NativeShimNode {
+	let parameters = shim.parameters.map((parameter, index) =>
+		simplifyParameter(parameter, index),
+	)
+
+	if (!shim.isStatic) {
+		parameters.unshift({
+			nodeType: "Parameter",
+			externalName: null,
+			internalName: {
+				nodeType: "Identifier",
+				name: "_self",
+				type: targetType,
+			},
+			defaultValue: null,
+		})
+	}
+
+	return {
+		memberName:
+			shim.overloadIndex === null
+				? shim.memberName
+				: resolveOverloadedMethodName(
+						shim.memberName,
+						shim.overloadIndex,
+					),
+		isStatic: shim.isStatic,
+		parameters,
 	}
 }
 

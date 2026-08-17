@@ -30,6 +30,7 @@ import {
 	essenceMethodName,
 	essencePropertyName,
 	nativeFreeFunctionNames,
+	nativeShimName,
 	type PreludeFreeFunction,
 	type PreludeNamespace,
 	stdlibFreeFunctions,
@@ -917,6 +918,61 @@ function rewriteEssenceMethod(
 	}
 }
 
+// NOTE: The frame a native Method's default is evaluated in, emitted as its own
+// top-level const beside the Essence-implemented Methods:
+//
+//   const $es_String_trim = (_self, side = $type.createCase("Side#BothEnds")) =>
+//       String.trim(_self, side)
+//
+// It hands EVERY Parameter on, in order, so the native it fronts sees exactly
+// the Arguments its declaration takes — the generated native contract does not
+// change at all, which is the whole point of the shim. The callee is spelled by
+// hand rather than through `namespaceMember`, which would answer with this very
+// const and write the shim into itself.
+function rewriteNativeShim(
+	namespaceName: string,
+	shim: common.typedSimple.NativeShimNode,
+): estree.VariableDeclaration {
+	let native = memberRead(
+		{ type: "Identifier", name: namespaceIdentifierName(namespaceName) },
+		isBuiltinNamespaceReference(namespaceName)
+			? shim.memberName
+			: namespaceMemberName(shim.memberName),
+	)
+
+	return {
+		type: "VariableDeclaration",
+		kind: "const",
+		declarations: [
+			{
+				type: "VariableDeclarator",
+				id: {
+					type: "Identifier",
+					name: essenceMethodIdentifier(
+						namespaceName,
+						shim.memberName,
+					),
+				},
+				init: {
+					type: "ArrowFunctionExpression",
+					expression: true,
+					params: shim.parameters.map((parameter) =>
+						rewriteParameter(parameter),
+					),
+					body: {
+						type: "CallExpression",
+						optional: false,
+						callee: native,
+						arguments: shim.parameters.map((parameter) =>
+							rewriteIdentifier(parameter.internalName),
+						),
+					},
+				},
+			},
+		],
+	}
+}
+
 // NOTE: One Essence-implemented standard library Property, emitted as its own
 // top-level const — the value band's counterpart of `rewriteEssenceMethod`. A
 // `static EMPTY: String = ""` becomes:
@@ -1440,6 +1496,18 @@ export function reachableEssenceMethods(
 		freeFunctions.map((freeFunction) => freeFunction.name),
 	)
 
+	// NOTE: The native Methods this prelude carries a shim for — the fourth
+	// table, and the one that is only consulted where a call OMITS an Argument,
+	// exactly as `namespaceMember` only routes to a shim there. A native called
+	// at full arity is a plain member read and draws no edge at all.
+	let shimmed = new Set(
+		prelude.flatMap((namespace) =>
+			namespace.node.nativeShims.map(
+				(shim) => `${namespace.name} ${shim.memberName}`,
+			),
+		),
+	)
+
 	// NOTE: The static Properties this prelude gives a value to — the third
 	// table, keyed like `implemented` because a Property read is spelled exactly
 	// like a static Method reference and the two are told apart by which table
@@ -1476,6 +1544,7 @@ export function reachableEssenceMethods(
 							implemented,
 							implementedFreeFunctions,
 							implementedProperties,
+							shimmed,
 						),
 					},
 				],
@@ -1504,6 +1573,7 @@ export function reachableEssenceMethods(
 							implemented,
 							implementedFreeFunctions,
 							implementedProperties,
+							shimmed,
 						),
 					},
 				],
@@ -1527,14 +1597,40 @@ export function reachableEssenceMethods(
 					implemented,
 					implementedFreeFunctions,
 					implementedProperties,
+					shimmed,
 				),
 			},
 		])
+
+	// NOTE: A native Method that declares a default contributes a candidate of
+	// its own — the frame the default is evaluated in — reached exactly as an
+	// Essence Method's const is, and only from a call site that left an Argument
+	// out. It is Function-valued, so it sits in the same band and needs no
+	// ordering; its own edges are whatever its DEFAULTS reach, which is why the
+	// Parameter list is what is searched rather than a body it does not have.
+	let shimCandidates: Array<[string, EssenceMember]> = prelude.flatMap(
+		(namespace) =>
+			namespace.node.nativeShims.map((shim): [string, EssenceMember] => [
+				essenceMethodIdentifier(namespace.name, shim.memberName),
+				{
+					kind: "function",
+					declaration: rewriteNativeShim(namespace.name, shim),
+					...essenceMethodReferences(
+						shim.parameters,
+						implemented,
+						implementedFreeFunctions,
+						implementedProperties,
+						shimmed,
+					),
+				},
+			]),
+	)
 
 	let candidates = new Map<string, EssenceMember>([
 		...methodCandidates,
 		...propertyCandidates,
 		...freeFunctionCandidates,
+		...shimCandidates,
 	])
 
 	let pending: Array<string> = []
@@ -1629,6 +1725,11 @@ export function essenceMethodReferences(
 	implemented: Set<string>,
 	implementedFreeFunctions: Set<string> = new Set(),
 	implementedProperties: Set<string> = new Set(),
+	// NOTE: The native pairs that have a shim. Consulted only where the call
+	// says it left an Argument out, because that is the only call
+	// `namespaceMember` routes to a shim — a native called at full arity is a
+	// plain member read and draws no edge.
+	shimmed: Set<string> = new Set(),
 ): EssenceMemberReferences {
 	let references = new Set<string>()
 	let evaluatedReferences = new Set<string>()
@@ -1698,6 +1799,10 @@ export function essenceMethodReferences(
 			let member = record["member"] as Record<string, unknown> | undefined
 
 			consider(base?.["name"], member?.["name"], implemented, true)
+
+			if (record["omitsArguments"] === true) {
+				consider(base?.["name"], member?.["name"], shimmed, true)
+			}
 		} else if (record["nodeType"] === "UnionMethodInvocation") {
 			for (let dispatch of (record["cases"] as Array<
 				Record<string, unknown>
@@ -1708,6 +1813,18 @@ export function essenceMethodReferences(
 					implemented,
 					true,
 				)
+
+				if (
+					(dispatch["omittedParameterIndices"] as Array<number>)
+						?.length > 0
+				) {
+					consider(
+						dispatch["namespaceName"],
+						dispatch["methodName"],
+						shimmed,
+						true,
+					)
+				}
 			}
 		} else if (record["nodeType"] === "Intrinsic") {
 			// NOTE: The two intrinsics that name a Namespace member — a
@@ -1730,6 +1847,21 @@ export function essenceMethodReferences(
 						implemented,
 						true,
 					)
+
+					if (
+						(
+							dispatchCase[
+								"omittedParameterIndices"
+							] as Array<number>
+						)?.length > 0
+					) {
+						consider(
+							dispatchCase["namespaceName"],
+							dispatchCase["methodName"],
+							shimmed,
+							true,
+						)
+					}
 				}
 			} else if (record["kind"] === "direct-method") {
 				consider(
@@ -2400,6 +2532,7 @@ function dispatchCaseCall(
 			dispatchCase.namespaceName,
 			dispatchCase.methodName,
 			dispatchCase.derivedDescriptor,
+			dispatchCase.omittedParameterIndices.length > 0,
 		),
 		arguments: openOmittedArguments(
 			[receiver],
@@ -3037,6 +3170,14 @@ function namespaceMember(
 	namespaceName: string,
 	memberName: string,
 	derivedDescriptor?: common.DerivedEquatableDescriptor,
+	// NOTE: Set only where the CALL left an Argument out. A native Method that
+	// declares a default has a shim beside the prelude holding that default, and
+	// this is the one question that routes to it — so a call writing every
+	// Argument still emits the plain member read it always did, tree-shakeable
+	// exactly as before, and only the call that needs the frame pays for one.
+	// A conformance witness passes nothing here on purpose: a witness is called
+	// at the requirement's full arity, always.
+	omitsArguments: boolean = false,
 ): estree.Expression {
 	// NOTE: A Choice's derived equality names a Namespace that exists nowhere —
 	// the Enricher fabricates it per receiver and nothing is ever emitted for
@@ -3097,6 +3238,14 @@ function namespaceMember(
 		return { type: "Identifier", name: essenceName }
 	}
 
+	if (omitsArguments && !isShadowingUserNamespace(namespaceName)) {
+		let shimName = nativeShimName(namespaceName, memberName)
+
+		if (shimName !== null) {
+			return { type: "Identifier", name: shimName }
+		}
+	}
+
 	return memberRead(
 		{ type: "Identifier", name: namespaceIdentifierName(namespaceName) },
 		isBuiltinNamespaceReference(namespaceName)
@@ -3115,6 +3264,7 @@ function rewriteMethodInvocation(
 			node.base.name,
 			node.member.name,
 			node.derivedDescriptor,
+			node.omitsArguments === true,
 		),
 		arguments: node.arguments.map((arg) => rewriteArgument(arg)),
 	}
@@ -3163,6 +3313,7 @@ function rewriteUnionMethodInvocation(
 								dispatchCase.namespaceName,
 								dispatchCase.methodName,
 								dispatchCase.derivedDescriptor,
+								dispatchCase.omittedParameterIndices.length > 0,
 							),
 							{
 								type: "ArrayExpression",
