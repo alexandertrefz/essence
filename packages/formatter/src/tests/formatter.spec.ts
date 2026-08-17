@@ -857,6 +857,13 @@ describe("formatter", () => {
 		// NOTE: The hole that gives is the one the line runs out at, so the text
 		// before it — the part a reader starts on — keeps as much of the line as
 		// it can.
+		it("leaves a hole closed when breaking it would not help", () => {
+			let source =
+				'implementation {\n\tconstant name = "x"\n\tconstant long = "hello {name} this is a very long string that goes on and on and on and on and on and on past eighty {name} and then it keeps going and going and going for a while longer"\n}\n'
+
+			expect(format(source).text).toBe(source)
+		})
+
 		it("gives way at the hole the line runs out at", () => {
 			let result = format(
 				'implementation {\n\tconstant alpha = 1\n\tconstant beta = 2\n\tconstant sentence = "the quick brown fox {alpha} jumped over the very lazy dog {beta} and then away again"\n}\n',

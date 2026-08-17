@@ -28,11 +28,18 @@ export type Doc =
 	// a List's brackets. Measured inside an `expand`, such a group is taken to
 	// break, so the measure ends at its first line, while every other group
 	// in there is measured whole and flat.
+	//
+	// `breakIfTailFits` holds back the break unless it helps: when set, a group
+	// that does not fit flat still stays flat if the line it opens on is
+	// already past the width, or if the line its break would end on —
+	// `breakIfTailFits` itself, at the group's indent, followed by everything
+	// after the group — would not fit either.
 	| {
 			kind: "group"
 			contents: Doc
 			shouldBreak: boolean
 			expandable: boolean
+			breakIfTailFits: Doc | null
 	  }
 	| { kind: "indent"; contents: Doc }
 	| { kind: "ifBreak"; broken: Doc; flat: Doc }
@@ -103,13 +110,18 @@ export const breakParent: Doc = { kind: "breakParent" }
 
 export function group(
 	contents: Doc,
-	options?: { shouldBreak?: boolean; expandable?: boolean },
+	options?: {
+		shouldBreak?: boolean
+		expandable?: boolean
+		breakIfTailFits?: Doc
+	},
 ): Doc {
 	return {
 		kind: "group",
 		contents,
 		shouldBreak: options?.shouldBreak ?? false,
 		expandable: options?.expandable ?? false,
+		breakIfTailFits: options?.breakIfTailFits ?? null,
 	}
 }
 
@@ -508,7 +520,21 @@ export function printDoc(doc: Doc, width: number): string {
 
 				if (
 					!current.shouldBreak &&
-					(mode === "flat" || fits(flat, commands, width - column))
+					(mode === "flat" ||
+						fits(flat, commands, width - column) ||
+						(current.breakIfTailFits !== null &&
+							!(
+								column < width &&
+								fits(
+									[
+										commandIndent,
+										"flat",
+										current.breakIfTailFits,
+									],
+									commands,
+									width - commandIndent * TAB_WIDTH,
+								)
+							)))
 				) {
 					commands.push(flat)
 				} else {
