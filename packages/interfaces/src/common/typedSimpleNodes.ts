@@ -1053,6 +1053,11 @@ export interface ParameterNode {
 	nodeType: "Parameter"
 	externalName: IdentifierNode | null
 	internalName: IdentifierNode
+	// NOTE: The simplified `= expression`, lowered by the Rewriter into a
+	// JavaScript default parameter — whose semantics are, term for term, the
+	// ones the language declares: evaluated per call, only when the Argument
+	// was left out, left to right, able to read the Parameters before it.
+	defaultValue: ExpressionNode | null
 }
 
 export interface ArgumentNode {

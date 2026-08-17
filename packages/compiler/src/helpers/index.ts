@@ -452,6 +452,28 @@ export function parameterInternalName(
 		: null
 }
 
+// NOTE: The `= expression` defaults a Parameter list holds, in order — the one
+// enumeration of "the Expressions a Declaration owns that are not in its body".
+// A default was wired into the Validator, the Optimiser's walk and nine
+// Language Server walkers one `if (defaultValue !== null)` at a time, and each
+// site that forgot was a silent hole rather than a failure; this is the shape
+// that is added to a walk instead. Written over the field rather than over a
+// Node type because the Parser's Parameter, the typed one and the simplified
+// one all carry it and every walker reads exactly this much of it.
+export function parameterDefaults<ExpressionNode>(
+	parameters: ReadonlyArray<{ defaultValue: ExpressionNode | null }>,
+): Array<ExpressionNode> {
+	let defaults: Array<ExpressionNode> = []
+
+	for (let parameter of parameters) {
+		if (parameter.defaultValue !== null) {
+			defaults.push(parameter.defaultValue)
+		}
+	}
+
+	return defaults
+}
+
 // NOTE: The members that make a Pattern able to DECLINE a value — a member
 // constrained by a written value, at any depth. A Matcher may hold them,
 // because an arm that declines falls through to the next one; a Parameter and

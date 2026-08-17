@@ -254,6 +254,40 @@ describe("Type matching", () => {
 			).toEqual([])
 		})
 
+		// NOTE: A Method taken as a VALUE keeps every Parameter and loses every
+		// default: a default is filled in by the callee's own frame, and only a
+		// direct call reaches that frame. So the Type says what the emission
+		// does, and a call through the value has to write every Argument.
+		it("should require every Argument of a defaulted Method read as a value", () => {
+			expect(
+				errorsFor(`implementation {
+					namespace Doubler for Integer {
+						scaled(by factor: Integer = 2) -> Integer {
+							<- @::multiply(with factor)
+						}
+					}
+
+					constant scaled = Doubler.scaled
+					Terminal.inspect(scaled(21)::toString())
+				}`).map((error) => error.code),
+			).toEqual(["argument-count-mismatch"])
+		})
+
+		it("should accept the same value called with every Argument", () => {
+			expect(
+				errorsFor(`implementation {
+					namespace Doubler for Integer {
+						scaled(by factor: Integer = 2) -> Integer {
+							<- @::multiply(with factor)
+						}
+					}
+
+					constant scaled = Doubler.scaled
+					Terminal.inspect(scaled(21, by 3)::toString())
+				}`),
+			).toEqual([])
+		})
+
 		// NOTE: The receiver Parameter is the whole reason the Method below
 		// does not fit, so both sides of the Diagnostic spell their signature
 		// out. Both used to read the bare word "Function", which named the tag

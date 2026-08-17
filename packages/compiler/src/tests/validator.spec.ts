@@ -3270,3 +3270,66 @@ describe("Validator", () => {
 		})
 	})
 })
+
+// NOTE: A `= expression` default RUNS, in the frame the body runs in, so it is
+// held to everything the body is held to. Nothing inside one was checked at all
+// while `validateFunctionDefinition` walked the body alone — a call with the
+// wrong number of Arguments, one with the wrong Types, a Match missing a Case
+// and a name read above its Declaration all compiled green and died at run time.
+describe("A default's own Expression", () => {
+	it("should have its calls checked for how many Arguments they pass", () => {
+		let diagnostics = diagnosticsFor(`implementation {
+			function twice(_ text: String) -> String {
+				<- text::append(text)
+			}
+
+			function greet(_ name: String = twice("one", "two")) -> String {
+				<- name
+			}
+		}`)
+
+		expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+			"argument-count-mismatch",
+		])
+	})
+
+	it("should have its calls checked for the Types they pass", () => {
+		let diagnostics = diagnosticsFor(`implementation {
+			function twice(_ text: String) -> String {
+				<- text::append(text)
+			}
+
+			function greet(_ name: String = twice(1)) -> String {
+				<- name
+			}
+		}`)
+
+		expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+			"argument-type-mismatch",
+		])
+	})
+
+	it("should have a Match written in it checked for exhaustiveness", () => {
+		let diagnostics = diagnosticsFor(`implementation {
+			choice Edge {
+				Front,
+				Back,
+			}
+
+			function edge(at side: Edge, of fallback: Integer = match side -> Integer {
+				case Edge#Front { <- 0 }
+			}) -> Integer {
+				<- fallback
+			}
+		}`)
+
+		expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+			"missing-case",
+		])
+	})
+})
+
+// NOTE: A native Method has no body, and the frame the Compiler synthesizes for
+// its defaults is the only Essence it owns — so it is the only thing here to
+// check, and checking it is what holds a `declarations { … }` Program to what
+// every other Program is held to.
