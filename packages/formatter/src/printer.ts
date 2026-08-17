@@ -435,21 +435,18 @@ export class Printer {
 
 		this.flushBefore(program.position.end.line, entries)
 
-		// NOTE: Whatever is left has nowhere else to go — a Comment below the
-		// last Statement, or one the AST simply has no node near. With an
-		// `export { … }` block below, the block is still to be printed, so the
-		// leftovers are gathered after it instead.
-		if (program.exports === null) {
-			for (let comment of this.trivia.takeRemaining()) {
-				entries.push(this.commentEntry(comment))
-			}
-		}
-
 		parts.push(
 			concat(heading),
 			text(keyword + " "),
 			this.block(entries, program.position.start.line, false, opening),
 		)
+
+		// NOTE: A Comment trailing the Program's own `}` stays on it.
+		let closing = this.trivia.claimTrailingOn(program.position.end.line)
+
+		if (closing !== null) {
+			parts.push(verbatim(" " + closing.text))
+		}
 
 		if (program.exports !== null) {
 			parts.push(hardline)
@@ -472,24 +469,24 @@ export class Printer {
 					compareExportEntries,
 				),
 			)
+		}
 
-			let previousEnd = program.exports.position.end.line
+		// NOTE: Whatever is left was written below the last block, and is
+		// written back below it — never pulled inside the block above, which
+		// would move it across a brace and be refused.
+		let previousEnd = (program.exports ?? program).position.end.line
 
-			for (let comment of this.trivia.takeRemaining()) {
+		for (let comment of this.trivia.takeRemaining()) {
+			parts.push(hardline)
+
+			if (
+				this.source.hasBlankLineBetween(previousEnd, comment.startLine)
+			) {
 				parts.push(hardline)
-
-				if (
-					this.source.hasBlankLineBetween(
-						previousEnd,
-						comment.startLine,
-					)
-				) {
-					parts.push(hardline)
-				}
-
-				parts.push(verbatim(comment.text))
-				previousEnd = comment.endLine
 			}
+
+			parts.push(verbatim(comment.text))
+			previousEnd = comment.endLine
 		}
 
 		parts.push(hardline)

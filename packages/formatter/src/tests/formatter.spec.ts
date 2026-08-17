@@ -1428,6 +1428,15 @@ describe("formatter", () => {
 			expect(result.text).toContain("§ still here")
 		})
 
+		it("keeps a comment written below the program's closing brace", () => {
+			let source =
+				"implementation {\n\tconstant a = 1\n} § on the brace\n\n§ after everything\n§ and more\n"
+			let result = format(source)
+
+			expect(result.refusal).toBeNull()
+			expect(result.text).toBe(source)
+		})
+
 		it("keeps comments written above the program's own keyword", () => {
 			let source =
 				"§ about the file\n\nimplementation {\n\tconstant a = 1\n}\n"
