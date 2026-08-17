@@ -266,7 +266,7 @@ declarations {
 			§ A prefix longer than the String slices to the whole String, which
 			§ can not equal it — so the too-long case answers `false` without a
 			§ guard of its own.
-			<- @::slice(from 0, to prefix::length())::is(prefix)
+			<- @::slice(to prefix::length())::is(prefix)
 		}
 
 		§§ Whether the String does not begin with the given one.
@@ -366,12 +366,12 @@ declarations {
 		§ carries the clusters it was cut into, exactly as a piece of `split`
 		§ does.
 
-		§§ The characters from one position up to, but not including, another. A negative position counts back from the end, so `slice(from 0, to -1)` drops the last character.
+		§§ The characters from one position up to, but not including, another. A negative position counts back from the end, so `slice(from 0, to -1)` drops the last character. Left out, `from` is the start and `to` is the end.
 		§§
-		§§ @param from — the first position to include, counting from zero, or back from the end when negative.
-		§§ @param to — the position to stop before, counting the same way.
+		§§ @param from — the first position to include, counting from zero, or back from the end when negative; zero when it is left out.
+		§§ @param to — the position to stop before, counting the same way; the length when it is left out.
 		§§ @returns — the String of that range of characters.
-		slice(from: Integer, to: Integer) -> String
+		slice(from start: Integer = 0, to end: Integer = @::length()) -> String
 
 		§§ The position of the first occurrence of the given String.
 		§§
@@ -480,13 +480,9 @@ declarations {
 			constant text = @
 
 			<- match side -> String {
-				case #Start {
-					<- text::prepend(filler::slice(from 0, to needed))
-				}
+				case #Start { <- text::prepend(filler::slice(to needed)) }
 
-				case #End   {
-					<- text::append(filler::slice(from 0, to needed))
-				}
+				case #End   { <- text::append(filler::slice(to needed)) }
 
 				case #BothEnds {
 					§ Centring splits the padding between the two ends. An
@@ -499,10 +495,8 @@ declarations {
 					constant atStart = needed::quotient(dividingBy 2)
 
 					<- text
-						::prepend(filler::slice(from 0, to atStart))
-						::append(
-							filler::slice(from 0, to needed::subtract(atStart)),
-						)
+						::prepend(filler::slice(to atStart))
+						::append(filler::slice(to needed::subtract(atStart)))
 				}
 			}
 		}

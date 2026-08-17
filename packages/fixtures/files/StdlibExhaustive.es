@@ -193,32 +193,46 @@ third"::lines())
 	show("String.reverse()", greeting::reverse())
 	show("String.reverse() [astral]", "a😀b"::reverse())
 	show(
-		"String.slice(from: Integer, to: Integer)",
+		"String.slice(from?: Integer, to?: Integer)",
 		greeting::slice(from 0, to 5),
 	)
 	show(
-		"String.slice(from: Integer, to: Integer) [empty range]",
+		"String.slice(from?: Integer, to?: Integer) [empty range]",
 		greeting::slice(from 3, to 3),
 	)
 	show(
-		"String.slice(from: Integer, to: Integer) [past the end]",
+		"String.slice(from?: Integer, to?: Integer) [past the end]",
 		greeting::slice(from 7, to 99),
 	)
 	show(
-		"String.slice(from: Integer, to: Integer) [negative to]",
+		"String.slice(from?: Integer, to?: Integer) [negative to]",
 		greeting::slice(from 0, to -1),
 	)
 	show(
-		"String.slice(from: Integer, to: Integer) [negative from]",
+		"String.slice(from?: Integer, to?: Integer) [negative from]",
 		greeting::slice(from -5, to 12),
 	)
 	show(
-		"String.slice(from: Integer, to: Integer) [both negative]",
+		"String.slice(from?: Integer, to?: Integer) [both negative]",
 		greeting::slice(from -5, to -1),
 	)
 	show(
-		"String.slice(from: Integer, to: Integer) [negative past the start]",
+		"String.slice(from?: Integer, to?: Integer) [negative past the start]",
 		greeting::slice(from -99, to 5),
+	)
+	§ The three short spellings the defaults are for — a tail, a head, and the
+	§ whole String. `to` defaults to `@::length()`, which reads the receiver.
+	show(
+		"String.slice(from?: Integer, to?: Integer) [no to]",
+		greeting::slice(from 7),
+	)
+	show(
+		"String.slice(from?: Integer, to?: Integer) [no from]",
+		greeting::slice(to 5),
+	)
+	show(
+		"String.slice(from?: Integer, to?: Integer) [neither]",
+		greeting::slice(),
 	)
 	show("String.firstIndex(of: String)", greeting::firstIndex(of "World"))
 	show(
@@ -1559,32 +1573,44 @@ third"::lines())
 		numbers::firstIndex(of 9),
 	)
 	show(
-		"List.slice<ItemType>(from: Integer, to: Integer)",
+		"List.slice<ItemType>(from?: Integer, to?: Integer)",
 		numbers::slice(from 1, to 3),
 	)
 	show(
-		"List.slice<ItemType>(from: Integer, to: Integer) [empty range]",
+		"List.slice<ItemType>(from?: Integer, to?: Integer) [empty range]",
 		numbers::slice(from 2, to 2),
 	)
 	show(
-		"List.slice<ItemType>(from: Integer, to: Integer) [past the end]",
+		"List.slice<ItemType>(from?: Integer, to?: Integer) [past the end]",
 		numbers::slice(from 3, to 99),
 	)
 	show(
-		"List.slice<ItemType>(from: Integer, to: Integer) [negative to]",
+		"List.slice<ItemType>(from?: Integer, to?: Integer) [negative to]",
 		numbers::slice(from 0, to -1),
 	)
 	show(
-		"List.slice<ItemType>(from: Integer, to: Integer) [negative from]",
+		"List.slice<ItemType>(from?: Integer, to?: Integer) [negative from]",
 		numbers::slice(from -2, to 5),
 	)
 	show(
-		"List.slice<ItemType>(from: Integer, to: Integer) [both negative]",
+		"List.slice<ItemType>(from?: Integer, to?: Integer) [both negative]",
 		numbers::slice(from -3, to -1),
 	)
 	show(
-		"List.slice<ItemType>(from: Integer, to: Integer) [negative past the start]",
+		"List.slice<ItemType>(from?: Integer, to?: Integer) [negative past the start]",
 		numbers::slice(from -99, to 2),
+	)
+	show(
+		"List.slice<ItemType>(from?: Integer, to?: Integer) [no to]",
+		numbers::slice(from 2),
+	)
+	show(
+		"List.slice<ItemType>(from?: Integer, to?: Integer) [no from]",
+		numbers::slice(to 2),
+	)
+	show(
+		"List.slice<ItemType>(from?: Integer, to?: Integer) [neither]",
+		numbers::slice(),
 	)
 	show("List.reverse<ItemType>()", numbers::reverse())
 	show("List.reverse<ItemType>() [empty]", noNumbers::reverse())
