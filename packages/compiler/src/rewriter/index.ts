@@ -1930,6 +1930,21 @@ export function essenceMethodReferences(
 				references.add(callee["name"])
 				evaluatedReferences.add(callee["name"])
 			}
+
+			// NOTE: `Namespace.member(…)` that left an Argument out reaches the
+			// shim rather than the native — a fact the Lookup branch above can
+			// not see, because only the CALL knows what it wrote.
+			if (
+				record["omitsArguments"] === true &&
+				callee?.["nodeType"] === "Lookup"
+			) {
+				let base = callee["base"] as Record<string, unknown> | undefined
+				let member = callee["member"] as
+					| Record<string, unknown>
+					| undefined
+
+				consider(base?.["name"], member?.["name"], shimmed, true)
+			}
 		}
 
 		for (let value of Object.values(record)) {
@@ -3146,7 +3161,7 @@ function rewriteFunctionInvocation(
 		node.name.nodeType === "Identifier" &&
 		nativeFreeFunctionNames().has(node.name.name)
 			? functionsModuleMember(node.name.name)
-			: rewriteExpression(node.name)
+			: calleeExpression(node)
 
 	return {
 		type: "CallExpression",
@@ -3154,6 +3169,44 @@ function rewriteFunctionInvocation(
 		callee,
 		arguments: node.arguments.map((arg) => rewriteArgument(arg)),
 	}
+}
+
+// NOTE: `Namespace.member(…)` — a static Method, or an instance one reached
+// through its Namespace — is a Lookup, and a Lookup on its own has no call to
+// read. So the one thing a call knows and a Lookup does not is handed over
+// here: whether this call left an Argument out, which is what decides between
+// the native read and the shim holding its defaults.
+function calleeExpression(
+	node: common.typedSimple.FunctionInvocationNode,
+): estree.Expression {
+	if (
+		node.omitsArguments === true &&
+		node.name.nodeType === "Lookup" &&
+		node.name.base.nodeType === "Identifier" &&
+		node.name.base.type.type === "Namespace"
+	) {
+		let callee = namespaceMember(
+			node.name.base.name,
+			node.name.member.name,
+			undefined,
+			true,
+		)
+		// NOTE: The Position `rewriteExpression` would have attached, put back
+		// by hand — this is the one callee built without going through it, and
+		// the source map's segment for the head of the call is what it carries.
+		// Without it a `Namespace.member(…)` that omits an Argument emits a
+		// statement whose first column maps to nothing, and a debugger stepping
+		// into the entry runs straight past the line the author wrote.
+		let loc = locOf(node.name.position)
+
+		if (loc !== undefined) {
+			callee.loc = loc
+		}
+
+		return callee
+	}
+
+	return rewriteExpression(node.name)
 }
 
 // NOTE: One reference to a member of a standard library Namespace, in the one

@@ -443,11 +443,13 @@ export function lowercase(originalString: StringType): StringType {
 	return createString(originalString.value.toLowerCase())
 }
 
-// NOTE: `normalize()` with no Argument is the Composed Canonical (NFC) entry,
-// written in Essence on top of this one; this native names the form. The four
-// Cases are the four Unicode normalization forms, so the map to the JavaScript
+// NOTE: One native, and the `as:` Parameter is DEFAULTED in `String.es` to
+// `#ComposedCanonical` — so `normalize()` with no Argument reaches this same
+// export through the frame the Compiler synthesizes for the default, and this
+// module never learns that a default exists. The four Cases are the four
+// Unicode normalization forms, so the map to the JavaScript
 // `String.prototype.normalize` argument is direct.
-export function normalize__overload$2(
+export function normalize(
 	originalString: StringType,
 	form: NormalizationFormType,
 ): StringType {
@@ -475,13 +477,11 @@ export function words(originalString: StringType): ListType<StringType> {
 
 // NOTE: The one native behind the whole trim family, where there used to be
 // two — it reads the `Side` Case and calls the matching JavaScript intrinsic.
-// `String::trim()` is written in Essence on top of it, as
-// `trim(at Side#BothEnds)`, so it binds to Overload position 2. Whitespace is
-// whatever JavaScript calls whitespace, which is the Unicode definition.
-export function trim__overload$2(
-	originalString: StringType,
-	side: SideType,
-): StringType {
+// `String::trim()` with no Argument reaches it through the frame the Compiler
+// synthesizes for the `at:` Parameter's default, which is `#BothEnds`; nothing
+// here has to know that. Whitespace is whatever JavaScript calls whitespace,
+// which is the Unicode definition.
+export function trim(originalString: StringType, side: SideType): StringType {
 	switch (side[typeKeySymbol]) {
 		case "Side#Start":
 			return createString(originalString.value.trimStart())

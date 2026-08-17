@@ -1855,6 +1855,12 @@ const expressionKinds = new Set([
 	"Match",
 	"ConformanceValue",
 	"CaseValue",
+	// NOTE: The Simplifier produces exactly one intrinsic of its own, before
+	// any pass has run — the `omitted-argument` hole a call leaves where a
+	// Parameter took its default and something after it still has to be
+	// passed. Every other intrinsic is a pass's output and can not be in a
+	// Program this reads.
+	"Intrinsic",
 ])
 
 // NOTE: Every Expression the Program holds, found by reading the tree as plain

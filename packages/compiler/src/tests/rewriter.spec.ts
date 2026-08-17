@@ -790,22 +790,17 @@ describe("Rewriter", () => {
 				})
 
 				it("trims from either end", () => {
-					// NOTE: One native reads the `Side` Case; `trim()` is the Essence
-					// entry that passes `BothEnds`.
+					// NOTE: One native reads the `Side` Case; `trim()` with no
+					// Argument reaches it through the frame the Compiler
+					// synthesizes for the `at:` Parameter's default.
 					expect(
-						string.trim__overload$2(
-							string.createString("  hi  "),
-							side.start,
-						),
+						string.trim(string.createString("  hi  "), side.start),
 					).toEqual(string.createString("hi  "))
 					expect(
-						string.trim__overload$2(
-							string.createString("  hi  "),
-							side.end,
-						),
+						string.trim(string.createString("  hi  "), side.end),
 					).toEqual(string.createString("  hi"))
 					expect(
-						string.trim__overload$2(
+						string.trim(
 							string.createString("  hi  "),
 							side.bothEnds,
 						),

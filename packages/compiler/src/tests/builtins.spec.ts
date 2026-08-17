@@ -311,23 +311,23 @@ describe("Builtins", () => {
 		it("binds exactly the two native entries to the runtime", () => {
 			let bindings = loadStdlib().nativeBindings["Terminal"]
 
-			// NOTE: `print` is Essence both ways round, `write` is Essence for
-			// the stream-less entry and native for the one that names a Stream,
-			// and `inspect` is native. The position in each Array is the
-			// `__overload$N` index.
+			// NOTE: `print` is Essence, `write` and `inspect` are native — one
+			// Method each now that the Stream is a DEFAULT rather than an
+			// Overload entry, so each Array holds one flag and the runtime
+			// export wears the plain name.
 			expect(bindings?.methods).toEqual({
-				print: [false, false],
-				write: [false, true],
+				print: [false],
+				write: [true],
 				inspect: [true],
 			})
 
 			let runtime = terminal as Record<string, unknown>
 
-			expect(typeof runtime["write__overload$2"]).toBe("function")
+			expect(typeof runtime["write"]).toBe("function")
 			expect(typeof runtime["inspect"]).toBe("function")
-			expect(runtime["print__overload$1"]).toBeUndefined()
-			expect(runtime["print__overload$2"]).toBeUndefined()
+			expect(runtime["print"]).toBeUndefined()
 			expect(runtime["write__overload$1"]).toBeUndefined()
+			expect(runtime["write__overload$2"]).toBeUndefined()
 		})
 	})
 

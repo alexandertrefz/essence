@@ -64,7 +64,7 @@ type PrintableConformance<Self extends AnyType> = {
 
 export type TerminalNatives = {
 	// static write(_: String, to: Stream) -> Record
-	write__overload$2: (argument0: StringType, to: StreamType) => RecordType
+	write: (argument0: StringType, to: StreamType) => RecordType
 	// static inspect<Value>(_: Value) -> Value
 	inspect: <Value extends AnyType>(argument0: Value) => Value
 }
@@ -85,9 +85,9 @@ export type StringNatives = {
 	// lowercase() -> String
 	lowercase: (self: StringType) => StringType
 	// normalize(as: NormalizationForm) -> String
-	normalize__overload$2: (self: StringType, as: NormalizationFormType) => StringType
+	normalize: (self: StringType, as: NormalizationFormType) => StringType
 	// trim(at: Side) -> String
-	trim__overload$2: (self: StringType, at: SideType) => StringType
+	trim: (self: StringType, at: SideType) => StringType
 	// ends(with: String) -> Boolean
 	ends: (self: StringType, argument1: StringType) => BooleanType
 	// repeat(times: Integer) -> String
@@ -366,15 +366,15 @@ export type FunctionsNatives = {
 
 declare const TerminalModule: typeof import("./Terminal")
 export const $Terminal: TerminalNatives = TerminalModule
-export const $TerminalAbsent: AssertNoEssenceExports<typeof import("./Terminal"), "print__overload$1" | "print__overload$2" | "write__overload$1"> = true
+export const $TerminalAbsent: AssertNoEssenceExports<typeof import("./Terminal"), "print"> = true
 export const $TerminalArity: AssertArities<typeof import("./Terminal"), {
-	write__overload$2: 2
+	write: 2
 	inspect: 1
 }> = true
 
 declare const StringModule: typeof import("./String")
 export const $String: StringNatives = StringModule
-export const $StringAbsent: AssertNoEssenceExports<typeof import("./String"), "isEmpty" | "hasAnyContent" | "is__overload$1" | "is__overload$2" | "isNot" | "prepend" | "lines" | "contains" | "doesNotContain" | "characters" | "normalize__overload$1" | "trim__overload$1" | "starts" | "doesNotStart" | "doesNotEnd" | "replaceEvery" | "replaceFirst" | "firstIndex" | "lastIndex" | "pad__overload$1" | "pad__overload$2" | "compare__overload$2" | "toString"> = true
+export const $StringAbsent: AssertNoEssenceExports<typeof import("./String"), "isEmpty" | "hasAnyContent" | "is__overload$1" | "is__overload$2" | "isNot" | "prepend" | "lines" | "contains" | "doesNotContain" | "characters" | "starts" | "doesNotStart" | "doesNotEnd" | "replaceEvery" | "replaceFirst" | "firstIndex" | "lastIndex" | "pad" | "compare__overload$2" | "toString"> = true
 export const $StringArity: AssertArities<typeof import("./String"), {
 	append: 2
 	split: 2
@@ -383,8 +383,8 @@ export const $StringArity: AssertArities<typeof import("./String"), {
 	character: 2
 	uppercase: 1
 	lowercase: 1
-	normalize__overload$2: 2
-	trim__overload$2: 2
+	normalize: 2
+	trim: 2
 	ends: 2
 	repeat: 2
 	reverse: 1
@@ -429,7 +429,7 @@ export const $NonZeroIntegerArity: AssertArities<typeof import("./NonZeroInteger
 
 declare const RationalModule: typeof import("./Rational")
 export const $Rational: RationalNatives = RationalModule
-export const $RationalAbsent: AssertNoEssenceExports<typeof import("./Rational"), "is" | "isNot" | "add__overload$2" | "add__overload$3" | "add__overload$4" | "subtract__overload$2" | "subtract__overload$3" | "subtract__overload$4" | "divide__overload$2" | "multiply__overload$2" | "multiply__overload$3" | "multiply__overload$4" | "isLessThan__overload$1" | "isLessThan__overload$2" | "isLessThanOrEqualTo__overload$1" | "isLessThanOrEqualTo__overload$2" | "isGreaterThan__overload$1" | "isGreaterThan__overload$2" | "isGreaterThanOrEqualTo__overload$1" | "isGreaterThanOrEqualTo__overload$2" | "absolute" | "negate" | "reciprocal" | "isWholeNumber" | "round__overload$1" | "round__overload$2" | "parse" | "toString__overload$1"> = true
+export const $RationalAbsent: AssertNoEssenceExports<typeof import("./Rational"), "is" | "isNot" | "add__overload$2" | "add__overload$3" | "add__overload$4" | "subtract__overload$2" | "subtract__overload$3" | "subtract__overload$4" | "divide__overload$2" | "multiply__overload$2" | "multiply__overload$3" | "multiply__overload$4" | "isLessThan__overload$1" | "isLessThan__overload$2" | "isLessThanOrEqualTo__overload$1" | "isLessThanOrEqualTo__overload$2" | "isGreaterThan__overload$1" | "isGreaterThan__overload$2" | "isGreaterThanOrEqualTo__overload$1" | "isGreaterThanOrEqualTo__overload$2" | "absolute" | "negate" | "reciprocal" | "isWholeNumber" | "round" | "parse" | "toString__overload$1"> = true
 export const $RationalArity: AssertArities<typeof import("./Rational"), {
 	of__overload$1: 2
 	of__overload$2: 2
@@ -532,7 +532,7 @@ export const $RecordArity: AssertArities<typeof import("./Record"), {
 
 declare const ListModule: typeof import("./List")
 export const $List: ListNatives = ListModule
-export const $ListAbsent: AssertNoEssenceExports<typeof import("./List"), "isNot" | "hasItems" | "isEmpty" | "contains" | "doesNotContain" | "firstItem__overload$1" | "firstItem__overload$2" | "lastItem" | "removeFirst__overload$1" | "removeFirst__overload$2" | "removeEvery__overload$1" | "removeEvery__overload$2" | "removeLast__overload$1" | "removeLast__overload$2" | "removeDuplicates" | "prepend__overload$2" | "firstIndex" | "anyItem" | "everyItem" | "count__overload$1" | "count__overload$2" | "replace" | "lastIndex" | "partition" | "repeat"> = true
+export const $ListAbsent: AssertNoEssenceExports<typeof import("./List"), "isNot" | "hasItems" | "isEmpty" | "contains" | "doesNotContain" | "firstItem__overload$1" | "firstItem__overload$2" | "lastItem" | "removeFirst" | "removeEvery__overload$1" | "removeEvery__overload$2" | "removeLast" | "removeDuplicates" | "prepend__overload$2" | "firstIndex" | "anyItem" | "everyItem" | "count__overload$1" | "count__overload$2" | "replace" | "lastIndex" | "partition" | "repeat"> = true
 export const $ListArity: AssertArities<typeof import("./List"), {
 	is: 3
 	toString: 2
