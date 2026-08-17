@@ -23,11 +23,50 @@ export type Doc =
 	// all and forces every group enclosing it to break.
 	| { kind: "line"; soft: boolean; hard: boolean }
 	| { kind: "breakParent" }
-	| { kind: "group"; contents: Doc; shouldBreak: boolean }
+	// NOTE: `expandable` marks the one group of an Argument that gives way
+	// when the Argument is hugged — a Function literal's body, a Record's or
+	// a List's brackets. Measured inside an `expand`, such a group is taken to
+	// break, so the measure ends at its first line, while every other group
+	// in there is measured whole and flat.
+	| {
+			kind: "group"
+			contents: Doc
+			shouldBreak: boolean
+			expandable: boolean
+	  }
 	| { kind: "indent"; contents: Doc }
 	| { kind: "ifBreak"; broken: Doc; flat: Doc }
+	// NOTE: Several layouts for one thing, tried in order: the first is
+	// offered flat, every later one is taken if its FIRST line fits, and the
+	// last is the fallback. A hard break inside one state does not force the
+	// groups around it to break — that is the point of it: a trailing
+	// callback Argument brings its own block, and the call around it must
+	// still be free to stay on one line.
+	| { kind: "conditional"; states: Array<Doc> }
+	// NOTE: Contents laid out in their expanded form: printed in break mode
+	// (what is inside still fits itself flat where it can), and measured up
+	// to the first line of the first `expandable` group in them. This is how
+	// a hugged trailing Argument is measured — `xs::map((n) {` and no further
+	// — without deciding the enclosing call on what the body holds.
+	| { kind: "expand"; contents: Doc }
+	// NOTE: Text written at the end of the current line but never measured
+	// against the width — a trailing Comment. Its length is the author's
+	// business, not the layout's, so it must not be what tears the code in
+	// front of it apart.
+	| { kind: "lineSuffix"; value: string }
+	// NOTE: Items separated by `line`s that break one at a time rather than
+	// all at once: as many items as fit share a line, and only the separator
+	// after the item that runs out is broken. `parts` alternates item,
+	// separator, item, … — the separators are `line`s or things holding one.
+	| { kind: "fill"; parts: Array<Doc> }
 
-type Mode = "flat" | "break"
+// NOTE: `hug` and `expand` are measuring modes only, never modes the renderer
+// prints in. A `conditional` measures its first state in `hug` mode, which is
+// flat except that the `expand` inside it switches to `expand` mode: nested
+// groups are measured flat there unless they are `expandable`, which are taken
+// to break. Measured from outside — by a group around it asking whether IT
+// fits — the same state is plain flat, and an `expand` is transparent.
+type Mode = "flat" | "break" | "hug" | "expand"
 
 type Command = [indent: number, mode: Mode, doc: Doc]
 
@@ -62,12 +101,20 @@ export const hardline: Doc = { kind: "line", soft: false, hard: true }
 // carries a trailing Comment, without deciding where the break goes.
 export const breakParent: Doc = { kind: "breakParent" }
 
-export function group(contents: Doc, options?: { shouldBreak?: boolean }): Doc {
+export function group(
+	contents: Doc,
+	options?: { shouldBreak?: boolean; expandable?: boolean },
+): Doc {
 	return {
 		kind: "group",
 		contents,
 		shouldBreak: options?.shouldBreak ?? false,
+		expandable: options?.expandable ?? false,
 	}
+}
+
+export function expand(contents: Doc): Doc {
+	return { kind: "expand", contents }
 }
 
 export function indent(contents: Doc): Doc {
@@ -76,6 +123,18 @@ export function indent(contents: Doc): Doc {
 
 export function ifBreak(broken: Doc, flat: Doc): Doc {
 	return { kind: "ifBreak", broken, flat }
+}
+
+export function conditionalGroup(states: Array<Doc>): Doc {
+	return { kind: "conditional", states }
+}
+
+export function lineSuffix(value: string): Doc {
+	return { kind: "lineSuffix", value }
+}
+
+export function fill(parts: Array<Doc>): Doc {
+	return { kind: "fill", parts }
 }
 
 export function join(separator: Doc, parts: Array<Doc>): Doc {
@@ -160,6 +219,28 @@ export function renderFlat(doc: Doc): string | null {
 			case "ifBreak":
 				commands.push(current.flat)
 				break
+
+			case "conditional":
+				commands.push(current.states[0] as Doc)
+				break
+
+			case "expand":
+				commands.push(current.contents)
+				break
+
+			case "lineSuffix":
+				out.push(current.value)
+				break
+
+			case "fill":
+				for (
+					let index = current.parts.length - 1;
+					index >= 0;
+					index--
+				) {
+					commands.push(current.parts[index] as Doc)
+				}
+				break
 		}
 	}
 
@@ -213,6 +294,35 @@ function propagateBreaks(doc: Doc): boolean {
 
 			return doc.shouldBreak
 		}
+
+		// NOTE: Deliberately does not propagate either. Each state is marked
+		// up inside, but a block inside one state is that state's own affair;
+		// the whole point of offering states is that the enclosing layout is
+		// decided by what fits, not by a hard break three levels down.
+		case "conditional":
+			for (let state of doc.states) {
+				propagateBreaks(state)
+			}
+
+			return false
+
+		case "expand":
+			return propagateBreaks(doc.contents)
+
+		case "lineSuffix":
+			return false
+
+		case "fill": {
+			let broken = false
+
+			for (let part of doc.parts) {
+				if (propagateBreaks(part)) {
+					broken = true
+				}
+			}
+
+			return broken
+		}
 	}
 }
 
@@ -264,7 +374,19 @@ function fits(
 			case "group":
 				commands.push([
 					commandIndent,
-					doc.shouldBreak ? "break" : mode,
+					doc.shouldBreak || (mode === "expand" && doc.expandable)
+						? "break"
+						: mode === "expand"
+							? "flat"
+							: mode,
+					doc.contents,
+				])
+				break
+
+			case "expand":
+				commands.push([
+					commandIndent,
+					mode === "hug" ? "expand" : mode,
 					doc.contents,
 				])
 				break
@@ -272,7 +394,7 @@ function fits(
 			case "line":
 				// NOTE: A break ends the line, so everything measured so far
 				// is everything that had to fit.
-				if (mode === "break" || doc.hard) {
+				if (mode === "break" || mode === "expand" || doc.hard) {
 					return true
 				}
 
@@ -290,8 +412,37 @@ function fits(
 				commands.push([
 					commandIndent,
 					mode,
-					mode === "break" ? doc.broken : doc.flat,
+					mode === "flat" || mode === "hug" ? doc.flat : doc.broken,
 				])
+				break
+
+			// NOTE: Measured as its first state when flat and its last when
+			// broken — the two the renderer would print in those modes. Only
+			// the conditional's own decision measures in `hug` mode; from
+			// here it is a plain flat measure, so a nested `expand` does not
+			// cut an outer group's measure short.
+			case "conditional":
+				commands.push([
+					commandIndent,
+					mode === "break" ? "break" : "flat",
+					(mode === "break"
+						? doc.states[doc.states.length - 1]
+						: doc.states[0]) as Doc,
+				])
+				break
+
+			// NOTE: Zero width, by definition.
+			case "lineSuffix":
+				break
+
+			case "fill":
+				for (let index = doc.parts.length - 1; index >= 0; index--) {
+					commands.push([
+						commandIndent,
+						mode,
+						doc.parts[index] as Doc,
+					])
+				}
 				break
 		}
 	}
@@ -305,6 +456,19 @@ export function printDoc(doc: Doc, width: number): string {
 	let commands: Array<Command> = [[0, "break", doc]]
 	let out: Array<Segment> = []
 	let column = 0
+	// NOTE: Trailing Comments waiting for the end of the line they were
+	// written on. Flushed before the next line break is written, so they land
+	// after everything else on the line — including a comma the layout put
+	// after the thing they trail.
+	let suffixes: Array<string> = []
+
+	let flushSuffixes = () => {
+		for (let suffix of suffixes) {
+			out.push({ value: suffix, verbatim: true })
+		}
+
+		suffixes = []
+	}
 
 	while (commands.length > 0) {
 		let [commandIndent, mode, current] = commands.pop() as Command
@@ -333,12 +497,18 @@ export function printDoc(doc: Doc, width: number): string {
 				commands.push([commandIndent + 1, mode, current.contents])
 				break
 
+			// NOTE: Inside a group that fit flat, everything fits flat — the
+			// measure covered the whole of it — so a nested group is not asked
+			// again. Asking again is not just wasted: a `conditional`'s hugged
+			// state is printed flat past the point its own measure covered,
+			// and a group re-measured there against the rest of the line
+			// would break a Parameter list the hug had already placed.
 			case "group": {
 				let flat: Command = [commandIndent, "flat", current.contents]
 
 				if (
 					!current.shouldBreak &&
-					fits(flat, commands, width - column)
+					(mode === "flat" || fits(flat, commands, width - column))
 				) {
 					commands.push(flat)
 				} else {
@@ -357,6 +527,7 @@ export function printDoc(doc: Doc, width: number): string {
 					break
 				}
 
+				flushSuffixes()
 				out.push({
 					value: "\n" + "\t".repeat(commandIndent),
 					verbatim: false,
@@ -374,8 +545,122 @@ export function printDoc(doc: Doc, width: number): string {
 					mode === "break" ? current.broken : current.flat,
 				])
 				break
+
+			case "conditional": {
+				let states = current.states
+				let first: Command = [commandIndent, "flat", states[0] as Doc]
+
+				if (
+					fits(
+						[commandIndent, "hug", states[0] as Doc],
+						commands,
+						width - column,
+					)
+				) {
+					commands.push(first)
+					break
+				}
+
+				let chosen: Command = [
+					commandIndent,
+					"break",
+					states[states.length - 1] as Doc,
+				]
+
+				for (let index = 1; index < states.length - 1; index++) {
+					let candidate: Command = [
+						commandIndent,
+						"flat",
+						states[index] as Doc,
+					]
+
+					if (
+						fits(
+							[commandIndent, "hug", states[index] as Doc],
+							commands,
+							width - column,
+						)
+					) {
+						chosen = candidate
+						break
+					}
+				}
+
+				commands.push(chosen)
+				break
+			}
+
+			case "expand":
+				commands.push([commandIndent, "break", current.contents])
+				break
+
+			case "lineSuffix":
+				suffixes.push(current.value)
+				break
+
+			// NOTE: Each separator is decided on its own: the item after it is
+			// measured flat, and the separator breaks only if that item would
+			// not fit on the line as it stands. Everything the renderer already
+			// knows how to do; only the decision is made pairwise.
+			case "fill": {
+				let parts = current.parts
+
+				if (parts.length === 0) {
+					break
+				}
+
+				let [content, separator, ...rest] = parts as [
+					Doc,
+					Doc?,
+					...Array<Doc>,
+				]
+
+				let contentFlat: Command = [commandIndent, "flat", content]
+				let contentFits = fits(contentFlat, [], width - column)
+
+				if (separator === undefined) {
+					commands.push(
+						contentFits
+							? contentFlat
+							: [commandIndent, "break", content],
+					)
+					break
+				}
+
+				let remaining: Command = [commandIndent, mode, fill(rest)]
+				let next = rest[0]
+
+				// NOTE: Whether the separator breaks depends on whether the
+				// NEXT item, laid flat after a flat separator, would fit.
+				let pairFits =
+					next !== undefined &&
+					fits(
+						[
+							commandIndent,
+							"flat",
+							concat([content, separator, next]),
+						],
+						[],
+						width - column,
+					)
+
+				commands.push(remaining)
+				commands.push([
+					commandIndent,
+					pairFits ? "flat" : "break",
+					separator,
+				])
+				commands.push(
+					contentFits
+						? contentFlat
+						: [commandIndent, "break", content],
+				)
+				break
+			}
 		}
 	}
+
+	flushSuffixes()
 
 	// NOTE: A break followed by another break lays down the first line's
 	// indentation with nothing after it. Trimming line ends here costs one pass

@@ -1988,27 +1988,35 @@ third"::lines())
 	)
 	show(
 		"loop<State>(startingWith: State, until: (_ State) -> Boolean, step: (_ State) -> State)",
-		loop(startingWith 1, until (n) {
-			<- n::isGreaterThanOrEqualTo(100)
-		}, step (n) { <- n::multiply(with 2) }),
+		loop(
+			startingWith 1,
+			until (n) { <- n::isGreaterThanOrEqualTo(100) },
+			step (n) { <- n::multiply(with 2) },
+		),
 	)
 	show(
 		"loop<State>(startingWith: State, until: (_ State) -> Boolean, step: (_ State) -> State) [zero turns]",
-		loop(startingWith 500, until (n) {
-			<- n::isGreaterThanOrEqualTo(100)
-		}, step (n) { <- n::multiply(with 2) }),
+		loop(
+			startingWith 500,
+			until (n) { <- n::isGreaterThanOrEqualTo(100) },
+			step (n) { <- n::multiply(with 2) },
+		),
 	)
 	show(
 		"loop<State, Result>(startingWith: State, step: (_ State) -> Step<State, Result>)",
-		loop(startingWith { index = 1, total = 0 }, step (
-			{ index, total } as state,
-		) {
-			if index::isGreaterThan(5) {
-				<- #Done(total)
-			}
+		loop(
+			startingWith { index = 1, total = 0 },
+			step ({ index, total } as state) {
+				if index::isGreaterThan(5) {
+					<- #Done(total)
+				}
 
-			<- #Continue({ state with index = index::add(1),
-			total = total::add(index) })
-		}),
+				<- #Continue({
+					state with
+						index = index::add(1),
+						total = total::add(index),
+				})
+			},
+		),
 	)
 }

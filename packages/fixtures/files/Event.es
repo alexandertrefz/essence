@@ -69,13 +69,9 @@ implementation {
 	constant clicked = Event.createFrom("click.menu.navigation.menu")
 
 	Terminal.inspect(clicked.eventName) § "click"
-	Terminal.inspect(
-		clicked.namespaces,
-	) § [ "menu", "navigation" ] — the repeat dropped
+	Terminal.inspect(clicked.namespaces) § [ "menu", "navigation" ] — the repeat dropped
 	Terminal.inspect(clicked::hasNamespaces()) § true
-	Terminal.inspect(
-		Event.createFrom()::hasNamespaces(),
-	) § false — the blank event
+	Terminal.inspect(Event.createFrom()::hasNamespaces()) § false — the blank event
 
 	§ Records compare structurally — parsing the same description twice gives
 	§ the same Event, and `is` says so.

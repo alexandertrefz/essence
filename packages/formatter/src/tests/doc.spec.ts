@@ -3,13 +3,16 @@ import { describe, expect, it } from "bun:test"
 import {
 	breakParent,
 	concat,
+	conditionalGroup,
 	type Doc,
+	fill,
 	group,
 	hardline,
 	ifBreak,
 	indent,
 	join,
 	line,
+	lineSuffix,
 	printDoc,
 	softline,
 	text,
@@ -150,5 +153,120 @@ describe("doc", () => {
 
 		expect(printDoc(doc, 80)).toBe("x FLAT")
 		expect(printDoc(doc, 3)).toBe("x\nBROKEN")
+	})
+
+	describe("conditionalGroup", () => {
+		let block = concat([
+			text("{"),
+			indent(concat([hardline, text("body")])),
+			hardline,
+			text("}"),
+		])
+		let hug = concat([
+			text("f("),
+			text("aaaa"),
+			text(", "),
+			block,
+			text(")"),
+		])
+		let broken = concat([
+			text("f("),
+			indent(
+				concat([hardline, text("aaaa,"), hardline, block, text(",")]),
+			),
+			hardline,
+			text(")"),
+		])
+
+		it("takes the first state when its first line fits", () => {
+			expect(printDoc(conditionalGroup([hug, broken]), 20)).toBe(
+				"f(aaaa, {\n\tbody\n})",
+			)
+		})
+
+		it("falls through to the last state when nothing fits", () => {
+			expect(printDoc(conditionalGroup([hug, broken]), 8)).toBe(
+				"f(\n\taaaa,\n\t{\n\t\tbody\n\t},\n)",
+			)
+		})
+
+		it("does not force the group around it to break", () => {
+			let doc = group(
+				concat([
+					text("a"),
+					line,
+					conditionalGroup([hug, broken]),
+					line,
+					text("z"),
+				]),
+			)
+
+			expect(printDoc(doc, 40)).toBe("a f(aaaa, {\n\tbody\n}) z")
+		})
+	})
+
+	describe("lineSuffix", () => {
+		it("is written at the end of the line and never measured", () => {
+			let doc = concat([
+				bracketed(["a", "b"]),
+				lineSuffix(" § a comment far longer than the width"),
+				hardline,
+				text("next"),
+			])
+
+			expect(printDoc(doc, 10)).toBe(
+				"(a, b) § a comment far longer than the width\nnext",
+			)
+		})
+
+		it("lands after a comma the layout puts on its line", () => {
+			let doc = group(
+				concat([
+					text("["),
+					indent(
+						concat([
+							softline,
+							text("first"),
+							text(","),
+							lineSuffix(" § one"),
+							line,
+							text("second"),
+							ifBreak(text(","), text("")),
+						]),
+					),
+					softline,
+					text("]"),
+					breakParent,
+				]),
+			)
+
+			expect(printDoc(doc, 80)).toBe("[\n\tfirst, § one\n\tsecond,\n]")
+		})
+	})
+
+	describe("fill", () => {
+		let numbers = (count: number) => {
+			let parts: Array<Doc> = []
+
+			for (let index = 1; index <= count; index++) {
+				if (index > 1) {
+					parts.push(line)
+				}
+
+				parts.push(text(String(index) + ","))
+			}
+
+			return fill(parts)
+		}
+
+		it("keeps everything on one line when it fits", () => {
+			expect(printDoc(numbers(3), 80)).toBe("1, 2, 3,")
+		})
+
+		it("breaks only where the next item would not fit", () => {
+			expect(printDoc(indent(numbers(12)), 20)).toBe(
+				"1, 2, 3, 4, 5, 6, 7,\n\t8, 9, 10, 11,\n\t12,",
+			)
+		})
 	})
 })

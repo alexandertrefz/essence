@@ -134,16 +134,20 @@ implementation {
 	§ way they want to.
 	constant limit = 5
 
-	constant walked = loop(startingWith { index = 1, total = 0 }, step (
-		{ index, total } as state,
-	) {
-		if index::isGreaterThan(limit) {
-			<- #Done(total)
-		}
+	constant walked = loop(
+		startingWith { index = 1, total = 0 },
+		step ({ index, total } as state) {
+			if index::isGreaterThan(limit) {
+				<- #Done(total)
+			}
 
-		<- #Continue({ state with index = index::add(1),
-		total = total::add(index) })
-	})
+			<- #Continue({
+				state with
+					index = index::add(1),
+					total = total::add(index),
+			})
+		},
+	)
 
 	Terminal.print(walked) § 15
 

@@ -327,8 +327,7 @@ declarations {
 					§ separator is the one that becomes the replacement.
 					constant head = pieces::firstItem()::value(withDefault "")
 
-					<- head
-						::append(replacement)
+					<- head::append(replacement)
 						::append(pieces::removeFirst()::join(with part))
 				}
 			}
@@ -393,10 +392,9 @@ declarations {
 					§ fallback is unreachable; the first piece is everything
 					§ before the first occurrence, and its length is that
 					§ occurrence's position.
-					<- #Value(pieces
-						::firstItem()
-						::value(withDefault "")
-						::length())
+					<- #Value(
+						pieces::firstItem()::value(withDefault "")::length()
+					)
 				}
 			}
 		}
@@ -494,8 +492,7 @@ declarations {
 					§ entry and there is nothing to fall back from.
 					constant atStart = needed::quotient(dividingBy 2)
 
-					<- text
-						::prepend(filler::slice(to atStart))
+					<- text::prepend(filler::slice(to atStart))
 						::append(filler::slice(to needed::subtract(atStart)))
 				}
 			}

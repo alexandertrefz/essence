@@ -49,7 +49,5 @@ implementation {
 	}
 
 	Terminal.inspect(paired(1, with "one")) § { first = 1, second = "one" }
-	Terminal.inspect(
-		paired("half", with 1/2),
-	) § { first = "half", second = 1/2 }
+	Terminal.inspect(paired("half", with 1/2)) § { first = "half", second = 1/2 }
 }

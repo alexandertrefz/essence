@@ -1220,6 +1220,31 @@ describe("formatter", () => {
 			expect(formatted(source)).toBe(source)
 		})
 
+		it("does not let a long trailing comment break the code before it", () => {
+			let source =
+				"implementation {\n\tTerminal.inspect(2::raise(to 0::subtract(2))) § Optional#Value(1/4) — negative powers stay exact, and this comment is long\n}\n"
+
+			expect(formatted(source)).toBe(source)
+		})
+
+		it("fills a List of Numbers rather than breaking it one per line", () => {
+			let source =
+				"implementation {\n\tTerminal.inspect([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23])\n}\n"
+
+			expect(formatted(source)).toBe(
+				"implementation {\n\tTerminal.inspect([\n\t\t1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,\n\t\t21, 22, 23,\n\t])\n}\n",
+			)
+		})
+
+		it("breaks a List of Strings one per line", () => {
+			let source =
+				'implementation {\n\tTerminal.inspect(["alpha", "beta", "gamma", "delta", "epsilon", "zeta", "eta", "theta", "iota"])\n}\n'
+
+			expect(formatted(source)).toContain(
+				'[\n\t\t"alpha",\n\t\t"beta",\n',
+			)
+		})
+
 		it("adds a trailing comma to a broken argument list", () => {
 			let source =
 				'implementation {\n\tTerminal.inspect("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")\n}\n'
@@ -1620,19 +1645,15 @@ describe("formatter", () => {
 			)
 		})
 
-		// NOTE: Pinning §6.1's decision rather than the behaviour we would
-		// prefer. `printExpression` never claims trivia, so a Comment written
-		// inside a multi-line default is re-emitted by the first body statement
-		// that does claim it — a MOVED Comment, which the safety gate catches
-		// and refuses. Refusing leaves the file byte for byte as it was found,
-		// which is the correct thing to do about a Comment the printer can not
-		// place; corrupting one is not.
-		it("refuses a Comment written inside a default", () => {
+		// NOTE: A List literal keeps the Comments written among its items,
+		// so a default holding one is laid out like any other List — broken,
+		// with the Comment above the item it was written above.
+		it("keeps a Comment written inside a default", () => {
 			let source =
 				"implementation {\n\tfunction f(_ items: List<Integer> = [\n\t\t§ the first one\n\t\t1,\n\t\t2,\n\t]) -> List<Integer> {\n\t\t<- items\n\t}\n}\n"
 			let result = format(source)
 
-			expect(result.refusal?.kind).toBe("unsafe")
+			expect(result.refusal).toBeNull()
 			expect(result.text).toBe(source)
 		})
 	})
@@ -1693,6 +1714,156 @@ describe("formatter", () => {
 
 			expect(format(source).text).toBe(
 				'implementation {\n\n\tfunction double(_ n: Integer) -> Integer {\n\t\t<- n::multiply(with 2)\n\t}\n\n\tif true {\n\t\tTerminal.print("x")\n\t}\n}\n',
+			)
+		})
+	})
+
+	describe("comments among the items of a list", () => {
+		let stable = (source: string) => {
+			let result = format(source)
+
+			expect(result.refusal).toBeNull()
+			expect(result.text).toBe(source)
+		}
+
+		it("keeps a comment above and one trailing a List item", () => {
+			stable(
+				"implementation {\n\tconstant xs = [\n\t\t§ the first\n\t\t1, § first\n\t\t2,\n\t\t§ done\n\t]\n}\n",
+			)
+		})
+
+		it("keeps a comment among Record members", () => {
+			stable(
+				"implementation {\n\tconstant r = {\n\t\t§ the x\n\t\tx = 1,\n\t\ty = 2, § the y\n\t}\n}\n",
+			)
+		})
+
+		it("keeps a comment among the members of a Record Type", () => {
+			stable(
+				"implementation {\n\ttype P = {\n\t\t§ horizontal\n\t\tx: Integer,\n\t\ty: Integer,\n\t}\n}\n",
+			)
+		})
+
+		it("keeps a comment among Arguments", () => {
+			stable(
+				"implementation {\n\tTerminal.inspect(\n\t\t1::add(2), § one\n\t)\n}\n",
+			)
+		})
+
+		it("keeps a comment trailing a Parameter", () => {
+			stable(
+				"implementation {\n\tfunction area(\n\t\t_ width: Integer, § trailing\n\t\t_ height: Integer,\n\t) -> Integer {\n\t\t<- width::multiply(with height)\n\t}\n}\n",
+			)
+		})
+
+		it("moves a comment written after the opening paren above the first Parameter", () => {
+			expect(
+				format(
+					"implementation {\n\tfunction short(§§ w\n\t\t_ w: Integer) -> Integer { <- w }\n}\n",
+				).text,
+			).toBe(
+				"implementation {\n\tfunction short(\n\t\t§§ w\n\t\t_ w: Integer,\n\t) -> Integer {\n\t\t<- w\n\t}\n}\n",
+			)
+		})
+
+		it("keeps a comment above and one trailing a chain link", () => {
+			stable(
+				"implementation {\n\tconstant xs = [1, 2, 3]\n\tconstant ys = xs\n\t\t§ double\n\t\t::map((n) { <- n::multiply(with 2) })\n\t\t::sort() § then sort\n}\n",
+			)
+		})
+
+		it("still leaves the trailing comment of a brace to the brace", () => {
+			stable(
+				"implementation {\n\tconstant list = [1]\n\tTerminal.inspect(\n\t\tlist::map((n) { § why\n\t\t\t<- n\n\t\t}),\n\t)\n}\n",
+			)
+		})
+	})
+
+	describe("hugging a trailing block", () => {
+		let formatted = (source: string) => format(source).text
+
+		it("keeps a hugged callback when everything up to its brace fits", () => {
+			let source =
+				"implementation {\n\tconstant xs = [1, 2, 3]\n\tconstant ys = xs::map((n) { <- n::multiply(with 2)::add(1)::multiply(with 2)::add(1) })\n}\n"
+
+			expect(formatted(source)).toBe(
+				"implementation {\n\tconstant xs = [1, 2, 3]\n\tconstant ys = xs::map((n) {\n\t\t<- n::multiply(with 2)::add(1)::multiply(with 2)::add(1)\n\t})\n}\n",
+			)
+		})
+
+		it("breaks every argument when the head does not fit, instead of the first", () => {
+			let source =
+				"implementation {\n\tconstant xs = [1, 2, 3]\n\tconstant total = xs::reduce(0::add(0)::add(0)::add(0)::add(0)::add(0)::add(0), (sum, n) { <- sum::add(n) })\n}\n"
+
+			expect(formatted(source)).toBe(
+				"implementation {\n\tconstant xs    = [1, 2, 3]\n\tconstant total = xs::reduce(\n\t\t0::add(0)::add(0)::add(0)::add(0)::add(0)::add(0),\n\t\t(sum, n) { <- sum::add(n) },\n\t)\n}\n",
+			)
+		})
+
+		it("hugs a Record only when it is the sole argument", () => {
+			let source =
+				"implementation {\n\tTerminal.inspect(List.of(integersFrom 1000000000000000000000000000000000000000000000, through [5]))\n}\n"
+
+			expect(formatted(source)).toBe(
+				"implementation {\n\tTerminal.inspect(\n\t\tList.of(\n\t\t\tintegersFrom 1000000000000000000000000000000000000000000000,\n\t\t\tthrough [5],\n\t\t),\n\t)\n}\n",
+			)
+		})
+
+		it("breaks the list around a call whose block breaks", () => {
+			let source =
+				"implementation {\n\tconstant numbers = [1, 2, 3]\n\tTerminal.inspect(numbers::removeEvery(where (item) -> Boolean {\n\t\t<- item::isGreaterThan(2)\n\t}))\n}\n"
+
+			expect(formatted(source)).toBe(
+				"implementation {\n\tconstant numbers = [1, 2, 3]\n\tTerminal.inspect(\n\t\tnumbers::removeEvery(where (item) -> Boolean {\n\t\t\t<- item::isGreaterThan(2)\n\t\t}),\n\t)\n}\n",
+			)
+		})
+
+		it("lays a Case payload out inside its parentheses", () => {
+			let source =
+				"implementation {\n\tconstant value: Optional<Integer> = #Value(1)\n\tconstant digit = 1\n\tconstant next: Optional<Integer> = #Value(value::value(withDefault 0)::multiply(with 10)::add(digit))\n}\n"
+
+			expect(formatted(source)).toContain(
+				"= #Value(\n\t\tvalue::value(withDefault 0)::multiply(with 10)::add(digit)\n\t)\n",
+			)
+		})
+	})
+
+	describe("chains", () => {
+		let formatted = (source: string) => format(source).text
+
+		it("keeps the first link on a short head's line", () => {
+			let source =
+				"implementation {\n\tconstant xs = [1, 2, 3]\n\tconstant zs = xs::filter((n) { <- n::isGreaterThan(2) })::sort()::sort()::sort()::sort()::sort()\n}\n"
+
+			expect(formatted(source)).toContain(
+				"constant zs = xs::filter((n) { <- n::isGreaterThan(2) })\n\t\t::sort()\n",
+			)
+		})
+
+		it("leaves a long head on a line of its own", () => {
+			let source =
+				'implementation {\n\tconstant ys = List.repeat("x", times 3)::join(with ", ")::split(on ",")::join(with "")::split(on "")::firstItem()\n}\n'
+
+			expect(formatted(source)).toContain(
+				'constant ys = List.repeat("x", times 3)\n\t\t::join(with ", ")\n',
+			)
+		})
+
+		it("does not fuse a first link that breaks", () => {
+			let source =
+				"implementation {\n\tconstant xs = [1, 2, 3]\n\tconstant a = xs::map((n) {\n\t\tconstant m = n\n\t\t<- m\n\t})::filter((n) { <- true })\n}\n"
+
+			expect(formatted(source)).toContain(
+				"constant a = xs\n\t\t::map((n) {\n\t\t\tconstant m = n\n\t\t\t<- m\n\t\t})\n\t\t::filter((n) { <- true })\n",
+			)
+		})
+
+		it("puts the brace of an if on its own line when the condition breaks", () => {
+			let source =
+				'implementation {\n\tconstant a = 1\n\tif a::isGreaterThan(0)::and(a::isLessThan(10))::and(a::isEven())::and(a::isPositive()) {\n\t\tTerminal.print("ok")\n\t}\n}\n'
+
+			expect(formatted(source)).toBe(
+				'implementation {\n\tconstant a = 1\n\tif a::isGreaterThan(0)\n\t\t::and(a::isLessThan(10))\n\t\t::and(a::isEven())\n\t\t::and(a::isPositive())\n\t{\n\t\tTerminal.print("ok")\n\t}\n}\n',
 			)
 		})
 	})

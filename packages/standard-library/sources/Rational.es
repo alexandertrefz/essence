@@ -406,8 +406,7 @@ declarations {
 			§ `Integer.parse` carries it — `keep` discards a `-` standing
 			§ anywhere else, so what is left has a value exactly when the text
 			§ is negative.
-			constant sign = text
-				::firstIndex(of "-")
+			constant sign = text::firstIndex(of "-")
 				::keep(where (position) { <- position::is(0) })
 
 			constant unsignedText = match sign -> String {
@@ -511,10 +510,12 @@ declarations {
 								§ Over a denominator of `1`, written where it
 								§ stands — so this arm hands back a Rational rather
 								§ than an Optional, and has to say which it is.
-								<- #Value(Rational.of(
-									parsedWhole::multiply(with signFactor),
-									over 1,
-								))
+								<- #Value(
+									Rational.of(
+										parsedWhole::multiply(with signFactor),
+										over 1,
+									)
+								)
 							}
 						}
 					}

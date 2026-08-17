@@ -65,13 +65,16 @@ implementation {
 
 	§ Several `<-` Statements give the Union of what they return.
 	Terminal.inspect(
-		numbers::transformFirst((item) {
-			if item::isGreaterThan(0) {
-				<- item::multiply(with 2)
-			}
+		numbers::transformFirst(
+			(item) {
+				if item::isGreaterThan(0) {
+					<- item::multiply(with 2)
+				}
 
-			<- {}
-		}, fallback {}),
+				<- {}
+			},
+			fallback {},
+		),
 	)
 
 	§ A literal that is not an Argument has no expected signature anywhere, so

@@ -149,32 +149,40 @@ declarations {
 			(_ numbers: List<Integer | Rational>) -> Integer | Rational {
 				constant start: Integer | Rational = 0
 
-				constant total = numbers::reduce(startingWith start, (
-					accumulated,
-					number,
-				) {
-					<- match accumulated -> Integer | Rational {
-						case Integer {
-							constant accumulatedInteger = @
+				constant total = numbers::reduce(
+					startingWith start,
+					(accumulated, number) {
+						<- match accumulated -> Integer | Rational {
+							case Integer {
+								constant accumulatedInteger = @
 
-							<- match number -> Integer | Rational {
-								case Integer  { <- accumulatedInteger::add(@) }
+								<- match number -> Integer | Rational {
+									case Integer  {
+										<- accumulatedInteger::add(@)
+									}
 
-								case Rational { <- accumulatedInteger::add(@) }
+									case Rational {
+										<- accumulatedInteger::add(@)
+									}
+								}
+							}
+
+							case Rational {
+								constant accumulatedRational = @
+
+								<- match number -> Integer | Rational {
+									case Integer  {
+										<- accumulatedRational::add(@)
+									}
+
+									case Rational {
+										<- accumulatedRational::add(@)
+									}
+								}
 							}
 						}
-
-						case Rational {
-							constant accumulatedRational = @
-
-							<- match number -> Integer | Rational {
-								case Integer  { <- accumulatedRational::add(@) }
-
-								case Rational { <- accumulatedRational::add(@) }
-							}
-						}
-					}
-				})
+					},
+				)
 
 				<- match total -> Integer | Rational {
 					case Integer { <- @ }
@@ -209,40 +217,40 @@ declarations {
 			(_ numbers: List<Integer | Rational>) -> Integer | Rational {
 				constant start: Integer | Rational = 1
 
-				constant total = numbers::reduce(startingWith start, (
-					accumulated,
-					number,
-				) {
-					<- match accumulated -> Integer | Rational {
-						case Integer {
-							constant accumulatedInteger = @
+				constant total = numbers::reduce(
+					startingWith start,
+					(accumulated, number) {
+						<- match accumulated -> Integer | Rational {
+							case Integer {
+								constant accumulatedInteger = @
 
-							<- match number -> Integer | Rational {
-								case Integer  {
-									<- accumulatedInteger::multiply(with @)
+								<- match number -> Integer | Rational {
+									case Integer  {
+										<- accumulatedInteger::multiply(with @)
+									}
+
+									case Rational {
+										<- accumulatedInteger::multiply(with @)
+									}
 								}
+							}
 
-								case Rational {
-									<- accumulatedInteger::multiply(with @)
+							case Rational {
+								constant accumulatedRational = @
+
+								<- match number -> Integer | Rational {
+									case Integer  {
+										<- accumulatedRational::multiply(with @)
+									}
+
+									case Rational {
+										<- accumulatedRational::multiply(with @)
+									}
 								}
 							}
 						}
-
-						case Rational {
-							constant accumulatedRational = @
-
-							<- match number -> Integer | Rational {
-								case Integer  {
-									<- accumulatedRational::multiply(with @)
-								}
-
-								case Rational {
-									<- accumulatedRational::multiply(with @)
-								}
-							}
-						}
-					}
-				})
+					},
+				)
 
 				<- match total -> Integer | Rational {
 					case Integer { <- @ }

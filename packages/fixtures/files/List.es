@@ -44,9 +44,7 @@ implementation {
 	}
 
 	Terminal.inspect(readings::keepEvery(where isBelowFour)) § [ 3, 1, 1, 2 ]
-	Terminal.inspect(
-		[3, 7/2, 9/2, 4]::keepEvery(where isBelowFour),
-	) § [ 3, 7/2 ]
+	Terminal.inspect([3, 7/2, 9/2, 4]::keepEvery(where isBelowFour)) § [ 3, 7/2 ]
 
 	§ Existential and universal questions read as sentences.
 	Terminal.inspect(
@@ -66,9 +64,7 @@ implementation {
 	Terminal.inspect(readings::item(at 2)) § Optional#Value(4) — Wednesday
 	Terminal.inspect(readings::item(at 99)) § Optional#Empty
 	Terminal.inspect(readings::firstIndex(of 1)) § Optional#Value(1)
-	Terminal.inspect(
-		readings::slice(from 0, to 5),
-	) § [ 3, 1, 4, 1, 5 ] — the workweek
+	Terminal.inspect(readings::slice(from 0, to 5)) § [ 3, 1, 4, 1, 5 ] — the workweek
 	Terminal.inspect(readings::count(of 1)) § 2
 
 	§ Membership, spelled both ways round.
@@ -78,14 +74,10 @@ implementation {
 	§ Structural edits, each answering a corrected copy.
 	Terminal.inspect(readings::reverse()) § [ 2, 9, 5, 1, 4, 1, 3 ]
 	Terminal.inspect(readings::remove(at 0)) § the week without Monday
-	Terminal.inspect(
-		readings::insert(2, at 0),
-	) § a reading slipped in before Monday
+	Terminal.inspect(readings::insert(2, at 0)) § a reading slipped in before Monday
 	Terminal.inspect(readings::replace(8, at 5)) § Saturday's 9 was misread
 
 	§ Sorting — through Comparable, or by a comparator written out.
 	Terminal.inspect(readings::sort()) § [ 1, 1, 2, 3, 4, 5, 9 ]
-	Terminal.inspect(
-		readings::sort(by (a, b) { <- b::compare(to a) }),
-	) § [ 9, 5, 4, 3, 2, 1, 1 ] — warmest first
+	Terminal.inspect(readings::sort(by (a, b) { <- b::compare(to a) })) § [ 9, 5, 4, 3, 2, 1, 1 ] — warmest first
 }

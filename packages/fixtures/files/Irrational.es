@@ -74,9 +74,7 @@ implementation {
 	§ The golden ratio is Algebraic — `(1 + √5) / 2` — and satisfies its
 	§ defining identity exactly: φ² is φ + 1.
 	Terminal.inspect(Number.GoldenRatio)
-	Terminal.inspect(
-		Number.GoldenRatio::multiply(with Number.GoldenRatio),
-	) § φ² …
+	Terminal.inspect(Number.GoldenRatio::multiply(with Number.GoldenRatio)) § φ² …
 	Terminal.inspect(Number.GoldenRatio::add(1)) § … is φ + 1
 
 	§ An Integer against √2, through Number — √2 ≈ 1.414.
