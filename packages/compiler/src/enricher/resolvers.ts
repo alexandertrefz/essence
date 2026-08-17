@@ -1001,10 +1001,13 @@ export function resolveOverloadedFunctionStatementType(
 	node: parser.OverloadedFunctionStatementNode,
 	scope: enricher.Scope,
 ): common.OverloadedStaticMethodType {
+	let entries = node.methods.map((entry) => methodSignatureEntry(entry))
+
 	reportUnknownDocumentationParameters(
 		node.documentation,
-		node.methods.map((entry) => methodSignatureEntry(entry).parameters),
+		entries.map((entry) => entry.parameters),
 	)
+	refuseAmbiguousOverloadDefaults(entries)
 
 	return {
 		type: "OverloadedStaticMethod",
@@ -4471,6 +4474,184 @@ function resolveParameterTypes(
 	}))
 }
 
+// NOTE: Two entries of one `overload` block that accept the same call. An
+// entry's accepted shapes are the label sequences left when any subset of its
+// defaulted Parameters is dropped, and the clash is refused when a shape
+// reachable ONLY by omitting a default equals ANY shape of another entry.
+//
+// The "only by omitting" qualifier is what keeps every type-dispatched Overload
+// legal: `Integer.add` has four entries all of shape `(_)` and they resolve by
+// Type, exactly as they always did. The new hazard is only ever a shape that
+// did not exist before a default was written.
+//
+// Refused at the DECLARATION rather than tie-broken at the call. Selection is
+// first fit over an order that is already not source order — `overloadProbeOrder`
+// hoists the entries asking for a refinement — and layering specificity on top
+// of that produces a resolution story nobody can hold in their head. An
+// Overload's slot is also baked into its emitted name (`__overload$N`) and its
+// native binding is keyed by position, so the set is a stable enumerable thing
+// rather than a lattice. And the mistake is here: reported here it names both
+// entries and points at the `=` that caused it, reported at a call it names
+// neither.
+function refuseAmbiguousOverloadDefaults(
+	entries: Array<{
+		parameters: Array<parser.ParameterNode>
+		position: common.Position
+	}>,
+): void {
+	// NOTE: The hazard is a shape reachable ONLY by leaving something out, so an
+	// Overload block with no default anywhere has none — which is 43 of the
+	// standard library's 54 blocks and every block anybody wrote before this
+	// existed. Asked first, because everything below enumerates subsets.
+	if (
+		entries.length < 2 ||
+		!entries.some((entry) =>
+			entry.parameters.some(
+				(parameter) => parameter.defaultValue !== null,
+			),
+		)
+	) {
+		return
+	}
+
+	let shapes = entries.map((entry) => acceptedShapes(entry.parameters))
+	// NOTE: Which entries accept each shape, built once — the search below is
+	// "does any OTHER entry accept this shape", and asking it by scanning every
+	// other entry's shapes made the whole check quadratic in the number of
+	// shapes, which is itself exponential in the number of defaults.
+	let entriesByShape = new Map<string, Array<number>>()
+
+	for (let [index, entryShapes] of shapes.entries()) {
+		for (let shape of entryShapes) {
+			let accepting = entriesByShape.get(shape.key)
+
+			if (accepting === undefined) {
+				entriesByShape.set(shape.key, [index])
+			} else if (accepting[accepting.length - 1] !== index) {
+				accepting.push(index)
+			}
+		}
+	}
+
+	for (let [index, entryShapes] of shapes.entries()) {
+		let clash: {
+			omitted: parser.ParameterNode
+			other: number
+			shape: string
+		} | null = null
+
+		for (let shape of entryShapes) {
+			if (shape.omitted.length === 0) {
+				continue
+			}
+
+			let other =
+				entriesByShape
+					.get(shape.key)
+					?.find((accepting) => accepting !== index) ?? -1
+
+			if (other !== -1) {
+				clash = {
+					omitted: shape.omitted[0]!,
+					other,
+					shape: shape.key,
+				}
+
+				break
+			}
+		}
+
+		if (clash === null) {
+			continue
+		}
+
+		let position = clash.omitted.defaultValue!.position
+
+		reportError(
+			"This default makes two Overloads accept the same call",
+			position,
+			{
+				code: "ambiguous-overload-default",
+				labels: [
+					primary(
+						position,
+						`leaving this out ${describeAcceptedShape(clash.shape)}`,
+					),
+					secondary(
+						entries[clash.other]!.position,
+						`this entry ${describeAcceptedShape(clash.shape)}`,
+					),
+				],
+				notes: [
+					"An Overload is selected by the Arguments a call writes, so two entries that accept the same ones can not both be reached.",
+				],
+				helps: [
+					"Delete the entry the default already stands for, or give the Parameters labels that tell the two apart.",
+				],
+			},
+		)
+	}
+}
+
+// NOTE: Every label sequence a Parameter list accepts, keyed by the labels an
+// Argument list would carry, with the Parameters that had to be left out to
+// reach it. `2 ** defaults` sequences, which is a handful for anything anybody
+// writes; a signature carrying more defaults than the cap is left alone rather
+// than enumerated, since a set that large is not what this Diagnostic is about.
+const MAXIMUM_ENUMERATED_DEFAULTS = 10
+
+function acceptedShapes(
+	parameters: Array<parser.ParameterNode>,
+): Array<{ key: string; omitted: Array<parser.ParameterNode> }> {
+	let defaults = parameters.filter(
+		(parameter) => parameter.defaultValue !== null,
+	)
+
+	if (
+		defaults.length === 0 ||
+		defaults.length > MAXIMUM_ENUMERATED_DEFAULTS
+	) {
+		return [{ key: shapeKey(parameters), omitted: [] }]
+	}
+
+	let shapes: Array<{ key: string; omitted: Array<parser.ParameterNode> }> =
+		[]
+
+	for (let subset = 0; subset < 2 ** defaults.length; subset++) {
+		let omitted = defaults.filter(
+			(_, index) => (subset & (1 << index)) !== 0,
+		)
+		// NOTE: A Set, because `kept` is asked once per Parameter and the
+		// enumeration already costs `2 ** defaults` — an `includes` over the
+		// omitted list on top of that is the one part of this that grows with
+		// the signature for no reason.
+		let dropped = new Set(omitted)
+		let kept = parameters.filter((parameter) => !dropped.has(parameter))
+
+		shapes.push({ key: shapeKey(kept), omitted })
+	}
+
+	return shapes
+}
+
+function shapeKey(parameters: Array<parser.ParameterNode>): string {
+	return parameters
+		.map((parameter) => parameter.externalName?.content ?? "_")
+		.join(",")
+}
+
+function describeAcceptedShape(key: string): string {
+	if (key === "") {
+		return "takes no Arguments"
+	}
+
+	let labels = key.split(",")
+
+	return `takes ${countOf(labels.length, "Argument")}, ${labels
+		.map((label) => (label === "_" ? "one with no label" : `'${label}'`))
+		.join(" then ")}`
+}
+
 // NOTE: An Argument is paired with a Parameter by its LABEL, before any Type
 // is read — that is what lets a call's shape be worked out for every Overload
 // candidate before paying for Argument typing, and what keeps Completion able
@@ -4898,6 +5079,7 @@ export function resolveMethodType(
 		normalized.documentation,
 		normalized.entries.map((entry) => entry.parameters),
 	)
+	refuseAmbiguousOverloadDefaults(normalized.entries)
 
 	return {
 		type: normalized.kind,

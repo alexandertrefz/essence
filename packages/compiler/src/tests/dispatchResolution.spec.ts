@@ -820,6 +820,118 @@ describe("Dispatch and Resolution", () => {
 		})
 	})
 
+	// NOTE: An `overload` block resolves by the Arguments a call WRITES, so a
+	// default — which lets an entry be called with fewer — is the one thing that
+	// can make two entries answer the same call. Refused where it is written.
+	describe("Overloads a default makes identical", () => {
+		it("should refuse an entry a default reduces to another entry's shape", () => {
+			let source = `implementation {
+				namespace Texts for String {
+					overload trim {
+						() -> String {
+							<- @
+						}
+
+						(at side: Integer = 1) -> String {
+							<- @
+						}
+					}
+				}
+			}`
+			let diagnostics = diagnosticsFor(source)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("ambiguous-overload-default")
+			expect(underlinedText(source, diagnostics[0].labels[0]!)).toBe("1")
+		})
+
+		// NOTE: The `loop` shape — four entries told apart by their label sets
+		// alone. Defaulting `while` would give the first entry the fourth's
+		// written shape, and two entries resolved purely by label would have
+		// become indistinguishable.
+		it("should refuse a default that reduces one label set to another", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				namespace Counters for Integer {
+					overload step {
+						(startingWith start: Integer, while limit: Integer = 10, by amount: Integer) -> Integer {
+							<- start
+						}
+
+						(startingWith start: Integer, by amount: Integer) -> Integer {
+							<- start
+						}
+					}
+				}
+			}`)
+
+			expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+				"ambiguous-overload-default",
+			])
+		})
+
+		// NOTE: The regression guard the whole "only by omitting a default"
+		// qualifier exists for — the numeric tower's entries all have the same
+		// written shape and resolve by Type.
+		it("should leave entries of the same written shape alone", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					namespace Widths for Integer {
+						overload widen {
+							(_ by: Integer) -> Integer {
+								<- @
+							}
+
+							(_ by: String) -> Integer {
+								<- @
+							}
+						}
+					}
+				}`),
+			).toEqual([])
+		})
+
+		it("should let a defaulted entry sit beside a type-dispatched one", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					namespace Widths for Integer {
+						overload widen {
+							(_ by: Integer = 1, to limit: Integer) -> Integer {
+								<- @
+							}
+
+							(_ by: String) -> Integer {
+								<- @
+							}
+						}
+					}
+				}`),
+			).toEqual([])
+		})
+
+		// NOTE: Pinning what a default on a REFINED Parameter does rather than
+		// asserting what it ought to do. `overloadProbeOrder` hoists the entries
+		// asking for a refinement so a refined entry is probed before its base,
+		// and a default makes an entry accept more shapes — the two have not
+		// been worked through together, so this records where they stand.
+		it("should accept a default that is its own proof of a refinement", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					namespace Widths for Integer {
+						overload widen {
+							(_ by: NonZeroInteger = 1) -> Integer {
+								<- @
+							}
+
+							(_ by: String) -> Integer {
+								<- @
+							}
+						}
+					}
+				}`),
+			).toEqual([])
+		})
+	})
+
 	describe("Static Method bodies", () => {
 		// NOTE: A static Method is emitted without the `_self` Parameter `@`
 		// lowers to, so `@` in one used to compile to an unbound name and the
