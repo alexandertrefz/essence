@@ -1448,6 +1448,110 @@ describe("formatter", () => {
 	// caught was one the AST comparison and a plain comment-text comparison
 	// both passed: each Comment present, in order, and the code meaning the
 	// same thing — only the Comments had moved.
+	// NOTE: `= expression` at the end of a Parameter. Every case round-trips
+	// through `format`, which runs the AST-equality gate itself — a dropped
+	// default is a refusal here, not a silently shortened signature.
+	describe("Default Parameter Values", () => {
+		function roundTrip(source: string): string {
+			let result = format(source)
+
+			expect(result.refusal).toBeNull()
+			expect(format(result.text).text).toBe(result.text)
+
+			return result.text
+		}
+
+		it("keeps a Number literal default", () => {
+			expect(
+				roundTrip(
+					"implementation {\n\tfunction f(_ count: Integer = 1) -> Integer {\n\t\t<- count\n\t}\n}\n",
+				),
+			).toContain("(_ count: Integer = 1)")
+		})
+
+		it("keeps a bare Case default", () => {
+			expect(
+				roundTrip(
+					"implementation {\n\tchoice Side {\n\t\tStart,\n\t\tEnd,\n\t}\n\n\tfunction f(at side: Side = #Start) -> Side {\n\t\t<- side\n\t}\n}\n",
+				),
+			).toContain("(at side: Side = #Start)")
+		})
+
+		it("keeps a Method call default", () => {
+			expect(
+				roundTrip(
+					"implementation {\n\tnamespace Sizes for List<Integer> {\n\t\tupTo(_ end: Integer = @::length()) -> Integer {\n\t\t\t<- end\n\t\t}\n\t}\n}\n",
+				),
+			).toContain("(_ end: Integer = @::length())")
+		})
+
+		it("keeps a default on a Pattern Parameter", () => {
+			expect(
+				roundTrip(
+					"implementation {\n\ttype Rectangle = { width: Integer, height: Integer }\n\n\tconstant origin = { width = 0, height = 0 }\n\n\tfunction area(of { width, height }: Rectangle = origin) -> Integer {\n\t\t<- width::multiply(height)\n\t}\n}\n",
+				),
+			).toContain("(of { width, height }: Rectangle = origin)")
+		})
+
+		it("keeps a List literal default", () => {
+			expect(
+				roundTrip(
+					"implementation {\n\tfunction f(_ items: List<Integer> = [1, 2, 3]) -> List<Integer> {\n\t\t<- items\n\t}\n}\n",
+				),
+			).toContain("(_ items: List<Integer> = [1, 2, 3])")
+		})
+
+		it("keeps a call with its own commas as a default", () => {
+			expect(
+				roundTrip(
+					"implementation {\n\tfunction g(_ a: Integer, _ b: Integer) -> Integer {\n\t\t<- a\n\t}\n\n\tfunction f(_ a: Integer = g(1, 2), _ b: Integer) -> Integer {\n\t\t<- a\n\t}\n}\n",
+				),
+			).toContain("(_ a: Integer = g(1, 2), _ b: Integer)")
+		})
+
+		it("breaks a Parameter list that no longer fits, defaults and all", () => {
+			let formatted = roundTrip(
+				"implementation {\n\tfunction alongName(_ firstParameterName: Integer = 100, _ secondParameterName: Integer = 200) -> Integer {\n\t\t<- firstParameterName\n\t}\n}\n",
+			)
+
+			expect(formatted).toContain(
+				"\t\t_ firstParameterName: Integer = 100,\n",
+			)
+			expect(formatted).toContain(
+				"\t\t_ secondParameterName: Integer = 200,\n",
+			)
+		})
+
+		// NOTE: A trailing block-like default lays itself out over lines of its
+		// own. The header must not break around it — the Parameters before it
+		// stay on the line they were written on.
+		it("does not shatter the header for a trailing block-like default", () => {
+			let formatted = roundTrip(
+				"implementation {\n\tfunction f(_ a: Integer, _ pick: (_ n: Integer) -> Integer = (_ n: Integer) -> Integer {\n\t\t<- n\n\t}) -> Integer {\n\t\t<- a\n\t}\n}\n",
+			)
+
+			expect(formatted).toContain(
+				"function f(_ a: Integer, _ pick: (_ n: Integer) -> Integer = (",
+			)
+		})
+
+		// NOTE: Pinning §6.1's decision rather than the behaviour we would
+		// prefer. `printExpression` never claims trivia, so a Comment written
+		// inside a multi-line default is re-emitted by the first body statement
+		// that does claim it — a MOVED Comment, which the safety gate catches
+		// and refuses. Refusing leaves the file byte for byte as it was found,
+		// which is the correct thing to do about a Comment the printer can not
+		// place; corrupting one is not.
+		it("refuses a Comment written inside a default", () => {
+			let source =
+				"implementation {\n\tfunction f(_ items: List<Integer> = [\n\t\t§ the first one\n\t\t1,\n\t\t2,\n\t]) -> List<Integer> {\n\t\t<- items\n\t}\n}\n"
+			let result = format(source)
+
+			expect(result.refusal?.kind).toBe("unsafe")
+			expect(result.text).toBe(source)
+		})
+	})
+
 	describe("the safety gate", () => {
 		it("holds every comment in place among the tokens around it", () => {
 			let source =
