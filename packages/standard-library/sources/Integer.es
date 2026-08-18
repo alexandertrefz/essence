@@ -124,6 +124,24 @@ declarations {
 			§§ @param by — the divisor, proven not to be zero
 			§§ @returns — the exact quotient.
 			(by other: NonZeroInteger) -> Rational
+
+			§§ Divides by an Integer, and answers the given value when the divisor is zero.
+			§§
+			§§ @param by — the divisor
+			§§ @param defaultingTo — the value to answer with when there is no quotient
+			§§ @returns — the quotient, or the given value in its place.
+			(by other: Integer, defaultingTo fallback: Rational) -> Rational {
+				<- @::divide(by other)::value(defaultingTo fallback)
+			}
+
+			§§ Divides by a Rational, and answers the given value when the divisor is zero.
+			§§
+			§§ @param by — the divisor
+			§§ @param defaultingTo — the value to answer with when there is no quotient
+			§§ @returns — the quotient, or the given value in its place.
+			(by other: Rational, defaultingTo fallback: Rational) -> Rational {
+				<- @::divide(by other)::value(defaultingTo fallback)
+			}
 		}
 
 		§§ Multiplies this Integer with a number, staying exact for every member of the numeric tower.
@@ -208,7 +226,20 @@ declarations {
 		}
 
 		§§ The exact square root. A perfect square gives a Integer; any other non-negative value gives an exact Algebraic — and a negative is empty.
-		squareRoot() -> Optional<Integer | Algebraic>
+		overload squareRoot {
+			§§ @returns — the root, or nothing for a negative Integer.
+			() -> Optional<Integer | Algebraic>
+
+			§§ The exact square root, with a value to answer for a negative Integer.
+			§§
+			§§ @param defaultingTo — the value to answer with when there is no root
+			§§ @returns — the root, or the given value in its place.
+			(
+				defaultingTo fallback: Integer | Algebraic,
+			) -> Integer | Algebraic {
+				<- @::squareRoot()::value(defaultingTo fallback)
+			}
+		}
 
 		§§ The Integer without its sign — its distance from zero.
 		absolute() -> Integer {
@@ -267,6 +298,19 @@ declarations {
 			§§ @param dividingBy — the divisor, proven not to be zero
 			§§ @returns — the remainder.
 			(dividingBy divisor: NonZeroInteger) -> Integer
+
+			§§ The remainder over a divisor nothing is known about, with a value to answer when the divisor is zero.
+			§§
+			§§ @param dividingBy — the divisor
+			§§ @param defaultingTo — the value to answer with when there is no remainder
+			§§ @returns — the remainder, or the given value in its place.
+			(
+				dividingBy divisor: Integer,
+				defaultingTo fallback: Integer,
+			) -> Integer {
+				<- @::remainder(dividingBy divisor)
+					::value(defaultingTo fallback)
+			}
 		}
 
 		§§ How many whole divisors fit. `7::quotient(dividingBy 3)` is `2`.
@@ -284,13 +328,38 @@ declarations {
 			§§ @param dividingBy — the divisor, proven not to be zero
 			§§ @returns — the quotient.
 			(dividingBy divisor: NonZeroInteger) -> Integer
+
+			§§ The quotient over a divisor nothing is known about, with a value to answer when the divisor is zero.
+			§§
+			§§ @param dividingBy — the divisor
+			§§ @param defaultingTo — the value to answer with when there is no quotient
+			§§ @returns — the quotient, or the given value in its place.
+			(
+				dividingBy divisor: Integer,
+				defaultingTo fallback: Integer,
+			) -> Integer {
+				<- @::quotient(dividingBy divisor)::value(defaultingTo fallback)
+			}
 		}
 
 		§§ Raises the Integer to the given power. A non-negative exponent gives an Integer, a negative one the exact reciprocal as a Rational. Zero to the power of zero is one.
-		§§
-		§§ @param exponent — the exponent
-		§§ @returns — the power, or nothing when raising zero to a negative power.
-		raise(to exponent: Integer) -> Optional<Integer | Rational>
+		overload raise {
+			§§ @param to — the exponent
+			§§ @returns — the power, or nothing when raising zero to a negative power.
+			(to exponent: Integer) -> Optional<Integer | Rational>
+
+			§§ Raises the Integer to the given power, and answers the given value when there is no power.
+			§§
+			§§ @param to — the exponent
+			§§ @param defaultingTo — the value to answer with when there is no power
+			§§ @returns — the power, or the given value in its place.
+			(
+				to exponent: Integer,
+				defaultingTo fallback: Integer | Rational,
+			) -> Integer | Rational {
+				<- @::raise(to exponent)::value(defaultingTo fallback)
+			}
+		}
 
 		§§ The Integer, pulled into the given bounds. The answer is the lower bound when the Integer is below it, the upper bound when it is above it, and the Integer itself otherwise.
 		§§
@@ -323,61 +392,71 @@ declarations {
 		}
 
 		§§ Reads an Integer from its text form — an optional minus sign followed by digits, the same shape `toString` produces.
-		§§
-		§§ @param text — the text to read
-		§§ @returns — the Integer, or nothing when the text has any other shape.
-		static parse(_ text: String) -> Optional<Integer> {
-			§ The sign is carried as the position of a LEADING `-` — `keep`
-			§ discards a `-` found anywhere else, so what is left has a value
-			§ exactly when the text is negative. One leading sign at most:
-			§ everything after it has to be a digit, so a second sign falls to
-			§ the digit check below like any other stray character, and a sign
-			§ alone leaves no digits at all.
-			constant sign = text::firstIndex(of "-")
-				::keep(where (position) { <- position::is(0) })
+		overload static parse {
+			§§ @param text — the text to read
+			§§ @returns — the Integer, or nothing when the text has any other shape.
+			(_ text: String) -> Optional<Integer> {
+				§ The sign is carried as the position of a LEADING `-` — `keep`
+				§ discards a `-` found anywhere else, so what is left has a
+				§ value exactly when the text is negative. One leading sign at
+				§ most: everything after it has to be a digit, so a second sign
+				§ falls to the digit check below like any other stray
+				§ character, and a sign alone leaves no digits at all.
+				constant sign = text::firstIndex(of "-")
+					::keep(where (position) { <- position::is(0) })
 
-			constant digitsText = match sign -> String {
-				case #Value { <- text::slice(from 1) }
+				constant digitsText = match sign -> String {
+					case #Value { <- text::slice(from 1) }
 
-				case #Empty { <- text }
-			}
+					case #Empty { <- text }
+				}
 
-			if digitsText::isEmpty() {
-				<- #Empty
-			} else {
-				constant start: Optional<Integer> = #Value(0)
+				if digitsText::isEmpty() {
+					<- #Empty
+				} else {
+					constant start: Optional<Integer> = #Value(0)
 
-				constant magnitude = digitsText
-					::characters()
-					::reduce(startingWith start, step (value, character) {
-						§ A digit's value IS its position in the digit
-						§ line-up; a character that is not there refuses the
-						§ whole text at once.
-						<- match "0123456789"::firstIndex(
-							of character,
-						) -> Step<Optional<Integer>, Optional<Integer>> {
-							case #Empty        { <- #Done(#Empty) }
+					constant magnitude = digitsText
+						::characters()
+						::reduce(startingWith start, step (value, character) {
+							§ A digit's value IS its position in the digit
+							§ line-up; a character that is not there refuses
+							§ the whole text at once.
+							<- match "0123456789"::firstIndex(
+								of character,
+							) -> Step<Optional<Integer>, Optional<Integer>> {
+								case #Empty        { <- #Done(#Empty) }
 
-							case #Value(digit) {
-								<- #Continue(
-									#Value(
-										value
-											::value(defaultingTo 0)
-											::multiply(with 10)
-											::add(digit)
+								case #Value(digit) {
+									<- #Continue(
+										#Value(
+											value
+												::value(defaultingTo 0)
+												::multiply(with 10)
+												::add(digit)
+										)
 									)
-								)
+								}
 							}
+						})
+
+					<- magnitude::map((parsedMagnitude) {
+						<- match sign -> Integer {
+							case #Value { <- parsedMagnitude::negate() }
+
+							case #Empty { <- parsedMagnitude }
 						}
 					})
+				}
+			}
 
-				<- magnitude::map((parsedMagnitude) {
-					<- match sign -> Integer {
-						case #Value { <- parsedMagnitude::negate() }
-
-						case #Empty { <- parsedMagnitude }
-					}
-				})
+			§§ Reads an Integer from its text form, with a value to answer when the text has another shape.
+			§§
+			§§ @param text — the text to read
+			§§ @param defaultingTo — the value to answer with when the text is no Integer
+			§§ @returns — the Integer, or the given value in its place.
+			(_ text: String, defaultingTo fallback: Integer) -> Integer {
+				<- Integer.parse(text)::value(defaultingTo fallback)
 			}
 		}
 

@@ -374,7 +374,7 @@ export function divide__overload$4(
 // correctly-rounded argument the three inlined operations rest on does not
 // cover it, so a double power can not be checked after the fact the way a
 // product can.
-export function raise(
+export function raise__overload$1(
 	base: IntegerType,
 	exponent: IntegerType,
 ): OptionalType<IntegerType | RationalType> {
@@ -415,7 +415,7 @@ export function divide__overload$3(
 	return algebraicDividedInto(algebraic, integer)
 }
 
-export function squareRoot(
+export function squareRoot__overload$1(
 	integer: IntegerType,
 ): OptionalType<IntegerType | AlgebraicType> {
 	const root = squareRootOfRational({

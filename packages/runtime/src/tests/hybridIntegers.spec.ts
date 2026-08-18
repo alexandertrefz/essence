@@ -11,7 +11,7 @@ import {
 	negate,
 	product,
 	quotient__overload$2 as quotient,
-	raise,
+	raise__overload$1 as raise,
 	remainder__overload$2 as remainder,
 	sum,
 	toString,

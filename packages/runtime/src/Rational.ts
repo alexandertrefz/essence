@@ -224,7 +224,7 @@ export function denominator(rational: RationalType): IntegerType {
 	return createInteger(reducedParts(rational).denominator)
 }
 
-export function raise(
+export function raise__overload$1(
 	rational: RationalType,
 	exponent: IntegerType,
 ): OptionalType<RationalType> {
@@ -368,7 +368,7 @@ export function divide__overload$3(
 	return algebraicDividedInto(algebraic, rational)
 }
 
-export function squareRoot(
+export function squareRoot__overload$1(
 	rational: RationalType,
 ): OptionalType<RationalType | AlgebraicType> {
 	// NOTE: Handed straight on — `squareRootOfRational` already answers the

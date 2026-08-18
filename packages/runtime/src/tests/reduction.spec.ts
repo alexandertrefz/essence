@@ -8,7 +8,7 @@ import {
 	denominator,
 	formatAsRational,
 	numerator,
-	raise,
+	raise__overload$1 as raise,
 	toString__overload$2 as toStringAs,
 } from "../Rational"
 import { createRecord } from "../Record"

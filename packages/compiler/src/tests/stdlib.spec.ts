@@ -109,17 +109,25 @@ describe("Stdlib", () => {
 		})
 
 		it("raises to a power, exactly in both directions", () => {
-			expect(integer.raise(int(2n), int(10n))).toEqual(value(int(1024n)))
-			expect(integer.raise(int(0n), int(0n))).toEqual(value(int(1n)))
+			expect(integer.raise__overload$1(int(2n), int(10n))).toEqual(
+				value(int(1024n)),
+			)
+			expect(integer.raise__overload$1(int(0n), int(0n))).toEqual(
+				value(int(1n)),
+			)
 
 			// NOTE: A negative exponent widens the answer to a Rational, so the
 			// `#Value` payload here is not an Integer — the Type tag is read off
 			// the payload rather than off the Optional.
-			const reciprocalPower = unwrap(integer.raise(int(2n), int(-2n)))
+			const reciprocalPower = unwrap(
+				integer.raise__overload$1(int(2n), int(-2n)),
+			)
 			expect(reciprocalPower[typeKeySymbol]).toBe("Rational")
 			expect(ratIs(reciprocalPower as never, rat(1n, 4n))).toBe(true)
 
-			expect(integer.raise(int(0n), int(-1n))).toEqual(empty())
+			expect(integer.raise__overload$1(int(0n), int(-1n))).toEqual(
+				empty(),
+			)
 		})
 
 		it("negates a value", () => {
@@ -162,17 +170,19 @@ describe("Stdlib", () => {
 		it("raises to a power, exactly in both directions", () => {
 			expect(
 				ratIs(
-					unwrap(rational.raise(rat(2n, 3n), int(2n))),
+					unwrap(rational.raise__overload$1(rat(2n, 3n), int(2n))),
 					rat(4n, 9n),
 				),
 			).toBe(true)
 			expect(
 				ratIs(
-					unwrap(rational.raise(rat(2n, 3n), int(-2n))),
+					unwrap(rational.raise__overload$1(rat(2n, 3n), int(-2n))),
 					rat(9n, 4n),
 				),
 			).toBe(true)
-			expect(rational.raise(rat(0n, 1n), int(-1n))).toEqual(empty())
+			expect(rational.raise__overload$1(rat(0n, 1n), int(-1n))).toEqual(
+				empty(),
+			)
 		})
 
 		// NOTE: `parse` is written in Essence now

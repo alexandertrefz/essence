@@ -87,29 +87,37 @@ describe("Irrationals", () => {
 
 		it("computes exact square roots of Integers", () => {
 			expect(
-				unwrap(integer.squareRoot(integer.createInteger(9n))),
+				unwrap(
+					integer.squareRoot__overload$1(integer.createInteger(9n)),
+				),
 			).toEqual(integer.createInteger(3n))
 			expect(
-				unwrap(integer.squareRoot(integer.createInteger(2n)))[
-					typeKeySymbol
-				],
+				unwrap(
+					integer.squareRoot__overload$1(integer.createInteger(2n)),
+				)[typeKeySymbol],
 			).toBe("Algebraic")
 			// NOTE: A negative has no real root, so the root is missing rather
 			// than being some other kind of number.
 			expect(
-				integer.squareRoot(integer.createInteger(-1n))[typeKeySymbol],
+				integer.squareRoot__overload$1(integer.createInteger(-1n))[
+					typeKeySymbol
+				],
 			).toBe("Optional#Empty")
 		})
 
 		it("computes exact square roots of Rationals", () => {
 			const exact = unwrap(
-				rational.squareRoot(rational.createRational(9n, 4n)),
+				rational.squareRoot__overload$1(
+					rational.createRational(9n, 4n),
+				),
 			)
 
 			expect(exact[typeKeySymbol]).toBe("Rational")
 
 			const inexact = unwrap(
-				rational.squareRoot(rational.createRational(1n, 2n)),
+				rational.squareRoot__overload$1(
+					rational.createRational(1n, 2n),
+				),
 			)
 
 			expect(inexact[typeKeySymbol]).toBe("Algebraic")

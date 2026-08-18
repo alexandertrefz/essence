@@ -291,6 +291,42 @@ declarations {
 					case Rational { <- @::divide(by count) }
 				}
 			}
+
+			§§ The arithmetic mean of the Integers, with a value to answer for the empty List.
+			§§
+			§§ @param integers — the Integers to average
+			§§ @param defaultingTo — the value to answer with when there is no mean
+			§§ @returns — the mean, or the given value in its place.
+			(
+				_ integers: List<Integer>,
+				defaultingTo fallback: Rational,
+			) -> Rational {
+				<- Number.average(integers)::value(defaultingTo fallback)
+			}
+
+			§§ The arithmetic mean of the Rationals, with a value to answer for the empty List.
+			§§
+			§§ @param rationals — the Rationals to average
+			§§ @param defaultingTo — the value to answer with when there is no mean
+			§§ @returns — the mean, or the given value in its place.
+			(
+				_ rationals: List<Rational>,
+				defaultingTo fallback: Rational,
+			) -> Rational {
+				<- Number.average(rationals)::value(defaultingTo fallback)
+			}
+
+			§§ The arithmetic mean of the Numbers, with a value to answer for the empty List.
+			§§
+			§§ @param numbers — the Numbers to average
+			§§ @param defaultingTo — the value to answer with when there is no mean
+			§§ @returns — the mean, or the given value in its place.
+			(
+				_ numbers: List<Integer | Rational>,
+				defaultingTo fallback: Rational,
+			) -> Rational {
+				<- Number.average(numbers)::value(defaultingTo fallback)
+			}
 		}
 
 		§§ The lower of two Numbers, or the lowest in a List of them.
