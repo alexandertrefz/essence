@@ -2055,6 +2055,10 @@ third"::lines())
 		noNumbers::split(intoGroupsOf 2),
 	)
 	show(
+		"List.split<ItemType>(intoGroupsOf: Integer) [empty, zero]",
+		noNumbers::split(intoGroupsOf 0),
+	)
+	show(
 		"List.repeat<ItemType>(_ ItemType, times: Integer)",
 		List.repeat("x", times 3),
 	)

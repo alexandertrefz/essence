@@ -739,11 +739,13 @@ declarations {
 			with other: List<Other>,
 		) -> List<{ first: ItemType, second: Other }>
 
-		§§ Splits the List into groups of the given size, in order. The last group holds whatever remains, so it may be shorter.
+		§§ Splits the List into groups of the given size, in order. The last group holds whatever remains, so it can be shorter.
+		§§
+		§§ A size below one names no grouping, and the answer is one group holding every item. The empty List answers with no groups at all, whatever the size.
 		§§
 		§§ @param intoGroupsOf — how many items each group holds
-		§§ @returns — the List of groups, or nothing when the group size is below one.
-		split(intoGroupsOf size: Integer) -> Optional<List<List<ItemType>>>
+		§§ @returns — the List of groups.
+		split(intoGroupsOf size: Integer) -> List<List<ItemType>>
 
 		§§ A List holding the given item the given number of times. Zero or fewer times gives the empty List.
 		§§
