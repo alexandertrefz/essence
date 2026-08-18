@@ -42,19 +42,20 @@ declarations {
 
 	§ Whether a String comparison treats upper and lower case as the same. It
 	§ is a Choice rather than a `Boolean` flag for the reason every mode here
-	§ is: `is(other, comparing Case#Insensitive)` says at the call site what
-	§ `is(other, ignoringCase yes)` would leave to the reader to remember.
-	choice Case {
+	§ is: `is(other, comparing CaseSensitivity#Insensitive)` says at the call
+	§ site what `is(other, ignoringCase yes)` would leave to the reader to
+	§ remember.
+	choice CaseSensitivity {
 		Sensitive,
 		Insensitive,
 	}
 
 	§ The same unit-Case shape as `Side`; equality is derived, only `toString`
 	§ is written.
-	namespace Case for Case is Equatable, is Printable {
-		§§ Represents the Case as `Sensitive` or `Insensitive`.
+	namespace CaseSensitivity for CaseSensitivity is Equatable, is Printable {
+		§§ Represents the sensitivity as `Sensitive` or `Insensitive`.
 		§§
-		§§ @returns — the name of the Case variant.
+		§§ @returns — `Sensitive` or `Insensitive`.
 		toString() -> String {
 			<- match @ -> String {
 				case #Sensitive   { <- "Sensitive" }
@@ -119,11 +120,12 @@ declarations {
 			<- @::isEmpty()::negate()
 		}
 
-		§ Both entries are written on `compare`, so `Case#Insensitive` means
-		§ exactly what the case-insensitive `compare` below means, and both
-		§ inherit whatever `compare` decides about normalization.
+		§ Both entries are written on `compare`, so
+		§ `CaseSensitivity#Insensitive` means exactly what the case-insensitive
+		§ `compare` below means, and both inherit whatever `compare` decides
+		§ about normalization.
 
-		§§ Checks whether the String has the same characters as another — case-sensitively, or as the given `Case` asks.
+		§§ Checks whether the String has the same characters as another — case-sensitively, or as the given `CaseSensitivity` asks.
 		overload is {
 			§§ @param other — the String to compare against
 			§§ @returns — `true` when the Strings are equal.
@@ -133,8 +135,11 @@ declarations {
 
 			§§ @param other — the String to compare against
 			§§ @param comparing — whether case is significant
-			§§ @returns — `true` when the Strings are equal under the given `Case`.
-			(_ other: String, comparing sensitivity: Case) -> Boolean {
+			§§ @returns — `true` when the Strings are equal under the given `CaseSensitivity`.
+			(
+				_ other: String,
+				comparing sensitivity: CaseSensitivity,
+			) -> Boolean {
 				<- @::compare(to other, comparing sensitivity)::is(#Equal)
 			}
 		}
@@ -498,7 +503,7 @@ declarations {
 			}
 		}
 
-		§§ Orders the String against another — by character code point, or as the given `Case` asks.
+		§§ Orders the String against another — by character code point, or as the given `CaseSensitivity` asks.
 		overload compare {
 			§ NATIVE. Ordering by code point is what the Comparable conformance
 			§ names, and there is no Essence expression for a character's code
@@ -508,15 +513,18 @@ declarations {
 			§§ @returns — `Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.
 			(to other: String) -> Ordering
 
-			§ Case is folded by lower-casing both sides — a documented
+			§ Letter case is folded by lower-casing both sides — a documented
 			§ approximation of full Unicode case-folding, close enough for the
 			§ everyday comparison this is — then the code-point ordering above
-			§ decides. `Case#Sensitive` is that ordering unchanged.
+			§ decides. `CaseSensitivity#Sensitive` is that ordering unchanged.
 
 			§§ @param other — the String to order against
 			§§ @param comparing — whether case is significant
 			§§ @returns — `Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.
-			(to other: String, comparing sensitivity: Case) -> Ordering {
+			(
+				to other: String,
+				comparing sensitivity: CaseSensitivity,
+			) -> Ordering {
 				§ `@` is the SCRUTINEE inside a match, not the receiver, so the
 				§ String is bound before the match to stay reachable in the Case
 				§ bodies.
@@ -542,7 +550,7 @@ declarations {
 }
 
 export {
-	Case
+	CaseSensitivity
 	NormalizationForm
 	Side
 	String

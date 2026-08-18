@@ -32,7 +32,7 @@ export {
 	Rounding          from "./Rational.es"
 	Record            from "./Record.es"
 	Step              from "./Step.es"
-	Case              from "./String.es"
+	CaseSensitivity   from "./String.es"
 	NormalizationForm from "./String.es"
 	Side              from "./String.es"
 	String            from "./String.es"

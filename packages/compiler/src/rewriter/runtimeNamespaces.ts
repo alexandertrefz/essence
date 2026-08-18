@@ -28,7 +28,7 @@ export const runtimeNamespaceNames = [
 	"NestedOptional",
 	"Ordering",
 	"Side",
-	"Case",
+	"CaseSensitivity",
 	"NormalizationForm",
 	"NumberFormat",
 	"Rounding",
