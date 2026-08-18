@@ -1,12 +1,13 @@
 import {
-	Boolean    from "./Boolean.es"
-	Comparable from "./Comparable.es"
-	Integer    from "./Integer.es"
-	Optional   from "./Optional.es"
-	Ordering   from "./Ordering.es"
-	Equatable  from "./Protocols.es"
-	Printable  from "./Protocols.es"
-	Step       from "./Step.es"
+	Boolean        from "./Boolean.es"
+	Comparable     from "./Comparable.es"
+	Integer        from "./Integer.es"
+	NonZeroInteger from "./Integer.es"
+	Optional       from "./Optional.es"
+	Ordering       from "./Ordering.es"
+	Equatable      from "./Protocols.es"
+	Printable      from "./Protocols.es"
+	Step           from "./Step.es"
 }
 
 declarations {
@@ -982,6 +983,19 @@ declarations {
 		§§
 		§§ @returns — the last item.
 		lastItem() -> ItemType
+
+		§ Counting is `List`'s own count under a Type that says what the proof
+		§ already says: a List with something in it has at least one item.
+		§ Native, and it has to be — an Essence body could only write
+		§ `@::length()`, which is THIS Method on a receiver that still carries
+		§ the proof, and the Validator refuses it as `infinite-recursion`.
+		§ There is no way to reach `List`'s own entry from here and no way to
+		§ tell the language that an Integer is not zero.
+
+		§§ How many items the List has, which is at least one.
+		§§
+		§§ @returns — the number of items, which is never zero.
+		length() -> NonZeroInteger
 
 		§ Removing duplicates keeps the FIRST of every group of equal items, so
 		§ it keeps at least one of whatever it was handed. The bound is `List`'s

@@ -339,6 +339,8 @@ export type NonEmptyListNatives = {
 	firstItem: <ItemType extends AnyType>(self: ListType<ItemType>) => ItemType
 	// lastItem<ItemType>() -> ItemType
 	lastItem: <ItemType extends AnyType>(self: ListType<ItemType>) => ItemType
+	// length<ItemType>() -> NonZeroInteger
+	length: <ItemType extends AnyType>(self: ListType<ItemType>) => IntegerType
 	// removeDuplicates<ItemType is Equatable>() -> NonEmptyList
 	removeDuplicates: <ItemType extends AnyType>(self: ListType<ItemType>, ItemType__conformance: EquatableConformance<ItemType>) => ListType<ItemType>
 	// prepend<ItemType>(contentsOf: List<ItemType>) -> NonEmptyList
@@ -355,6 +357,30 @@ export type NonEmptyListNatives = {
 	sort__overload$2: <ItemType extends AnyType>(self: ListType<ItemType>, by: (argument0: ItemType, argument1: ItemType) => OrderingType) => ListType<ItemType>
 	// replace<ItemType>(_: ItemType, at: Integer) -> NonEmptyList
 	replace: <ItemType extends AnyType>(self: ListType<ItemType>, argument1: ItemType, at: IntegerType) => ListType<ItemType>
+}
+
+export type IntegerListNatives = {
+
+}
+
+export type RationalListNatives = {
+
+}
+
+export type NumberListNatives = {
+
+}
+
+export type NonEmptyIntegerListNatives = {
+
+}
+
+export type NonEmptyRationalListNatives = {
+
+}
+
+export type NonEmptyNumberListNatives = {
+
 }
 
 export type FunctionsNatives = {
@@ -569,6 +595,7 @@ export const $NonEmptyList: NonEmptyListNatives = NonEmptyListModule
 export const $NonEmptyListArity: AssertArities<typeof import("./NonEmptyList"), {
 	firstItem: 1
 	lastItem: 1
+	length: 1
 	removeDuplicates: 2
 	prepend: 2
 	append: 2
@@ -578,6 +605,30 @@ export const $NonEmptyListArity: AssertArities<typeof import("./NonEmptyList"), 
 	sort__overload$2: 2
 	replace: 3
 }> = true
+
+declare const IntegerListModule: typeof import("./IntegerList")
+export const $IntegerList: IntegerListNatives = IntegerListModule
+export const $IntegerListAbsent: AssertNoEssenceExports<typeof import("./IntegerList"), "sum" | "product" | "average__overload$1" | "average__overload$2" | "lowestNumber__overload$1" | "lowestNumber__overload$2" | "greatestNumber__overload$1" | "greatestNumber__overload$2"> = true
+
+declare const RationalListModule: typeof import("./RationalList")
+export const $RationalList: RationalListNatives = RationalListModule
+export const $RationalListAbsent: AssertNoEssenceExports<typeof import("./RationalList"), "sum" | "product" | "average__overload$1" | "average__overload$2" | "lowestNumber__overload$1" | "lowestNumber__overload$2" | "greatestNumber__overload$1" | "greatestNumber__overload$2"> = true
+
+declare const NumberListModule: typeof import("./NumberList")
+export const $NumberList: NumberListNatives = NumberListModule
+export const $NumberListAbsent: AssertNoEssenceExports<typeof import("./NumberList"), "sum" | "product" | "average__overload$1" | "average__overload$2" | "lowestNumber__overload$1" | "lowestNumber__overload$2" | "greatestNumber__overload$1" | "greatestNumber__overload$2"> = true
+
+declare const NonEmptyIntegerListModule: typeof import("./NonEmptyIntegerList")
+export const $NonEmptyIntegerList: NonEmptyIntegerListNatives = NonEmptyIntegerListModule
+export const $NonEmptyIntegerListAbsent: AssertNoEssenceExports<typeof import("./NonEmptyIntegerList"), "lowestNumber" | "greatestNumber" | "average"> = true
+
+declare const NonEmptyRationalListModule: typeof import("./NonEmptyRationalList")
+export const $NonEmptyRationalList: NonEmptyRationalListNatives = NonEmptyRationalListModule
+export const $NonEmptyRationalListAbsent: AssertNoEssenceExports<typeof import("./NonEmptyRationalList"), "lowestNumber" | "greatestNumber" | "average"> = true
+
+declare const NonEmptyNumberListModule: typeof import("./NonEmptyNumberList")
+export const $NonEmptyNumberList: NonEmptyNumberListNatives = NonEmptyNumberListModule
+export const $NonEmptyNumberListAbsent: AssertNoEssenceExports<typeof import("./NonEmptyNumberList"), "lowestNumber" | "greatestNumber" | "average"> = true
 
 declare const functionsModule: typeof import("./functions")
 export const $functions: FunctionsNatives = functionsModule

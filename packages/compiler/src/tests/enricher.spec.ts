@@ -4248,7 +4248,7 @@ describe("Enricher", () => {
 			// `List<ItemType>` — a Namespace naming the item Type outright is
 			// the more specific of the two and answers the call.
 			let invocation = lastConstantMethodInvocation(`implementation {
-				namespace IntegerList for List<Integer> {
+				namespace IntegerTally for List<Integer> {
 					firstItem() -> Integer {
 						<- 0
 					}
@@ -4257,7 +4257,7 @@ describe("Enricher", () => {
 				constant first = [1, 2, 3]::firstItem()
 			}`)
 
-			expect(invocation.namespace.name).toBe("IntegerList")
+			expect(invocation.namespace.name).toBe("IntegerTally")
 			expect(invocation.type).toEqual({ type: "Integer" })
 		})
 
@@ -4383,7 +4383,7 @@ describe("Enricher", () => {
 				// nothing to decide between — the call has the one Namespace to
 				// go to whatever the receiver turns out to hold.
 				let invocation = lastConstantMethodInvocation(`implementation {
-				namespace IntegerList for List<Integer> {
+				namespace IntegerTally for List<Integer> {
 					tag() -> String {
 						<- "integers"
 					}
@@ -4392,7 +4392,7 @@ describe("Enricher", () => {
 				constant tagged = []::tag()
 			}`)
 
-				expect(invocation.namespace.name).toBe("IntegerList")
+				expect(invocation.namespace.name).toBe("IntegerTally")
 				expect(invocation.type).toEqual({ type: "String" })
 			})
 

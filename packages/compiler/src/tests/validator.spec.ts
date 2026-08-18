@@ -1399,7 +1399,7 @@ describe("Validator", () => {
 
 		it("should warn about the branch an empty List never reaches", () => {
 			let diagnostics = diagnosticsFor(`implementation {
-				namespace IntegerList for List<Integer> {
+				namespace IntegerTally for List<Integer> {
 					describe() -> String {
 						<- "integers"
 					}
@@ -1424,7 +1424,7 @@ describe("Validator", () => {
 		it("should stay silent for branches a runtime check tells apart", () => {
 			expect(
 				diagnosticsFor(`implementation {
-					namespace IntegerList for List<Integer> {
+					namespace IntegerTally for List<Integer> {
 						describe() -> String {
 							<- "integers"
 						}

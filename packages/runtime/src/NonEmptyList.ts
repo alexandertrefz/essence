@@ -52,6 +52,13 @@ export function lastItem<ItemType extends AnyType>(
 	return view.backCount > 0 ? view.back[view.backCount - 1] : view.front[0]
 }
 
+// NOTE: The count, which is `List`'s own — a refinement erases before anything
+// runs, so what the Namespace's Type says about the answer is spent while
+// compiling and the walk that produces it is the same one. It is here at all
+// because an Essence body could not write it: `@::length()` on a proven
+// receiver is this Method, not `List`'s.
+export { length } from "./List"
+
 // NOTE: Everything below CARRIES the proof rather than spending it — each is a
 // transform that can not empty a List that was not empty, declared on this
 // Namespace so that it may say so. None of them is a new operation, and where

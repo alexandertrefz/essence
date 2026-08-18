@@ -6,17 +6,23 @@ import * as boolean from "@essence-lang/runtime/Boolean"
 import * as caseSensitivity from "@essence-lang/runtime/CaseSensitivity"
 import * as functions from "@essence-lang/runtime/functions"
 import * as integer from "@essence-lang/runtime/Integer"
+import * as integerList from "@essence-lang/runtime/IntegerList"
 import * as list from "@essence-lang/runtime/List"
 import * as nestedList from "@essence-lang/runtime/NestedList"
 import * as nestedOptional from "@essence-lang/runtime/NestedOptional"
+import * as nonEmptyIntegerList from "@essence-lang/runtime/NonEmptyIntegerList"
 import * as nonEmpty from "@essence-lang/runtime/NonEmptyList"
+import * as nonEmptyNumberList from "@essence-lang/runtime/NonEmptyNumberList"
+import * as nonEmptyRationalList from "@essence-lang/runtime/NonEmptyRationalList"
 import * as nonZeroInteger from "@essence-lang/runtime/NonZeroInteger"
 import * as normalizationForm from "@essence-lang/runtime/NormalizationForm"
 import * as number from "@essence-lang/runtime/Number"
 import * as numberFormat from "@essence-lang/runtime/NumberFormat"
+import * as numberList from "@essence-lang/runtime/NumberList"
 import * as optional from "@essence-lang/runtime/Optional"
 import * as ordering from "@essence-lang/runtime/Ordering"
 import * as rational from "@essence-lang/runtime/Rational"
+import * as rationalList from "@essence-lang/runtime/RationalList"
 import * as record from "@essence-lang/runtime/Record"
 import * as rounding from "@essence-lang/runtime/Rounding"
 import * as side from "@essence-lang/runtime/Side"
@@ -56,6 +62,12 @@ const runtimeModules: Record<string, Record<string, unknown>> = {
 	List: list,
 	NestedList: nestedList,
 	NonEmptyList: nonEmpty,
+	IntegerList: integerList,
+	RationalList: rationalList,
+	NumberList: numberList,
+	NonEmptyIntegerList: nonEmptyIntegerList,
+	NonEmptyRationalList: nonEmptyRationalList,
+	NonEmptyNumberList: nonEmptyNumberList,
 }
 
 // NOTE: What the Simplifier will emit for a declared Method — the bare name for

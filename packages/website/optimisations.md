@@ -662,7 +662,7 @@ falls by 793 bytes unminified and 741 minified.
 before it already took away.** Measured on Bun, best of five, process start
 subtracted: a three million turn counted loop is **1.24×** faster with this pass
 than with it alone turned off, a million turn `Step` loop threading a Record
-**1.04×**, and a `everyItem` into a `reduce` over two hundred thousand items
+**1.04×**, and an `everyItem` into a `reduce` over two hundred thousand items
 **1.04×**. The same three Programs with the WHOLE registry turned off are 3.40×,
 3.42× and 1.85× slower than with all of it on — so most of what a loop-heavy
 Program gains is `lower-scalar-operations`, `collapse-construction` and
