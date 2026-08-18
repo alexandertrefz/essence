@@ -287,8 +287,18 @@ describe("Bundle Size", () => {
 	// Minifying does not take the guard back — it shortens the names AROUND a
 	// pair of sixteen-digit literals it can not fold — so the figure this file
 	// measures is the one to read.
+	// NOTE: 70,766 now, up 2,286, and the ceiling moves to 71,800 to keep the
+	// same ~1 kB of headroom. The file gained the readability pass's surface,
+	// and one line of it is most of the figure: `hasItems(where:)` costs 1,459,
+	// because the quantifier is written on `reduce`'s early-stopping entry and
+	// brings that entry and the `Step` Choice into a Program that carried
+	// neither. The receiver-side aggregates (`scores::sum()` and its three
+	// siblings) cost 533, the two parsers asking for their own fallback 226,
+	// and the held-Optional collapse 108; the two `firstItem` chains that
+	// became `firstItem(defaultingTo:)` gave 40 back. Nothing here is the
+	// numeric tower arriving whole, which is what this ceiling watches for.
 	it("keeps Everyday.es from dragging in the whole numeric tower", async () => {
-		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(69_500)
+		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(71_800)
 	})
 
 	// NOTE: Measured 42,719 bytes; a reintroduced `Number` spread was 54,849.
