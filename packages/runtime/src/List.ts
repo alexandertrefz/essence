@@ -655,7 +655,7 @@ export function reduce__overload$2<
 	return accumulator
 }
 
-export function keepEvery<ItemType extends AnyType>(
+export function everyItem<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 	keepFunction: (item: ItemType) => BooleanType,
 ): ListType<ItemType> {
@@ -718,7 +718,7 @@ export function item<ItemType extends AnyType>(
 
 // NOTE: `firstItem(where:)` is no longer here — it is written in Essence now, on
 // `reduce`'s early-stopping entry, which `#Done`s at the first accepted item.
-// The eager `keepEvery` beside `reduce` is what it used to be compared against;
+// The eager `everyItem` beside `reduce` is what it used to be compared against;
 // the `Step` Choice is what let the short-circuiting version leave the native.
 
 // NOTE: `firstIndex`/`lastIndex` are no longer here — both are written in

@@ -14,7 +14,7 @@ import { validate } from "../validator/index"
 // NOTE: The full pipeline minus bundling, mirroring loop.spec — the searching
 // Methods below are only proven once the emitted JavaScript RUNS, because what
 // went wrong in them was never a Type error: a List that STORES an empty
-// Optional, a `List<Optional<Integer>>` walked by `anyItem` and
+// Optional, a `List<Optional<Integer>>` walked by `hasItems(where:)` and
 // `"aaa"::lastIndex(of "aa")` all compiled without a single Diagnostic and
 // answered the wrong value.
 function generate(source: string): string {
@@ -239,7 +239,8 @@ describe("Stdlib searching Methods", () => {
 		})
 	})
 
-	// NOTE: `anyItem`/`everyItem` used to be `firstItem(where:)::hasValue()`,
+	// NOTE: The quantified `hasItems` entries used to be
+	// `firstItem(where:)::hasValue()`,
 	// which reads the matching item back out — and while `Optional` collapsed
 	// when nested, a matching item that was itself empty came back as the very
 	// value the Method answers when nothing matched at all. That is no longer
@@ -248,7 +249,7 @@ describe("Stdlib searching Methods", () => {
 	// Boolean fold stays for the remaining reason — it carries the ANSWER
 	// through `reduce` and builds nothing, where reading builds an Optional
 	// per call only to throw it away.
-	describe("anyItem and everyItem decide on the check", () => {
+	describe("the quantified hasItems entries decide on the check", () => {
 		it("answers true when the matching item is itself empty", async () => {
 			expect(
 				await run(`implementation {
@@ -257,7 +258,7 @@ describe("Stdlib searching Methods", () => {
 						Integer.parse("5"),
 					]
 
-					Terminal.inspect(parsed::anyItem(where (value) {
+					Terminal.inspect(parsed::hasItems(where (value) {
 						<- value::isEmpty()
 					})::toString())
 				}`),
@@ -272,7 +273,7 @@ describe("Stdlib searching Methods", () => {
 						Integer.parse("5"),
 					]
 
-					Terminal.inspect(parsed::everyItem(where (value) {
+					Terminal.inspect(parsed::hasItems(onlyWhere (value) {
 						<- value::hasValue()
 					})::toString())
 				}`),
@@ -282,7 +283,8 @@ describe("Stdlib searching Methods", () => {
 		// NOTE: The claim the NOTE above makes, pinned: the Optional the
 		// reading formulation builds is `Value(Empty)` for the empty item it
 		// FOUND and `Empty` for the List that holds no empty item at all, so
-		// `hasValue` agrees with `anyItem` on both. Nothing depends on this —
+		// `hasValue` agrees with `hasItems(where:)` on both. Nothing depends on
+		// this —
 		// it is the evidence that the fold is now a cost decision rather than
 		// a correctness one.
 		it("agrees with the reading formulation now that Optionals nest", async () => {
@@ -305,7 +307,7 @@ describe("Stdlib searching Methods", () => {
 					Terminal.inspect(allValues::firstItem(where (value) {
 						<- value::isEmpty()
 					})::toString())
-					Terminal.inspect(allValues::anyItem(where (value) {
+					Terminal.inspect(allValues::hasItems(where (value) {
 						<- value::isEmpty()
 					})::toString())
 				}`),
@@ -318,22 +320,22 @@ describe("Stdlib searching Methods", () => {
 					constant numbers = [1, 2, 3]
 					constant none: List<Integer> = []
 
-					Terminal.inspect(numbers::anyItem(where (item) {
+					Terminal.inspect(numbers::hasItems(where (item) {
 						<- item::isGreaterThan(2)
 					})::toString())
-					Terminal.inspect(numbers::anyItem(where (item) {
+					Terminal.inspect(numbers::hasItems(where (item) {
 						<- item::isGreaterThan(9)
 					})::toString())
-					Terminal.inspect(none::anyItem(where (item) {
+					Terminal.inspect(none::hasItems(where (item) {
 						<- item::isGreaterThan(0)
 					})::toString())
-					Terminal.inspect(numbers::everyItem(where (item) {
+					Terminal.inspect(numbers::hasItems(onlyWhere (item) {
 						<- item::isGreaterThan(0)
 					})::toString())
-					Terminal.inspect(numbers::everyItem(where (item) {
+					Terminal.inspect(numbers::hasItems(onlyWhere (item) {
 						<- item::isGreaterThan(2)
 					})::toString())
-					Terminal.inspect(none::everyItem(where (item) {
+					Terminal.inspect(none::hasItems(onlyWhere (item) {
 						<- item::isGreaterThan(0)
 					})::toString())
 				}`),
@@ -354,10 +356,10 @@ describe("Stdlib searching Methods", () => {
 		it("still stops at the item that decides the answer", async () => {
 			expect(
 				await run(`implementation {
-					constant any = [1, 2, 3, 4]::anyItem(where (item) {
+					constant any = [1, 2, 3, 4]::hasItems(where (item) {
 						<- Terminal.inspect(item)::isGreaterThan(1)
 					})
-					constant every = [1, 2, 3, 4]::everyItem(where (item) {
+					constant every = [1, 2, 3, 4]::hasItems(onlyWhere (item) {
 						<- Terminal.inspect(item)::isLessThan(2)
 					})
 

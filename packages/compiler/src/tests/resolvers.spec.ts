@@ -1157,7 +1157,7 @@ describe("Resolvers", () => {
 					{
 						namespaceName: "List",
 						methodName: "hasItems",
-						overloadIndex: null,
+						overloadIndex: 0,
 						args: [],
 					},
 				],

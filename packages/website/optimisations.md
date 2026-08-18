@@ -550,7 +550,7 @@ $loop_0: while (true) {
 
 Seven entries are inlined: the four `loop` Overloads — `while`, `until`, the
 counted `from`/`through` one and the general `Step` one — and List's `map`,
-`keepEvery` and both `reduce` entries.
+`everyItem` and both `reduce` entries.
 
 **A List a Program has PROVEN something about walks the same way.** A checked
 refinement is erased before the first pass runs, so a `NonEmptyList` arrives here
@@ -558,7 +558,7 @@ as the ordinary List it always was — but `NonEmptyList` declares a `map` of it
 own, so that it may promise the answer is not empty either, and the call carries
 that Namespace's name. The Method behind the promise is List's own `map`
 re-exported, so it is inlined as List's is. `map` is the only walking Method the
-two share: `keepEvery` and both `reduce` entries can answer with fewer items than
+two share: `everyItem` and both `reduce` entries can answer with fewer items than
 they were handed, so a proven receiver reaches List's own entry by widening and
 arrives under List's own name. Everything else `NonEmptyList` declares is left
 alone — `reverse` and `sort` are re-exports this pass does not walk anyway, and
@@ -653,7 +653,7 @@ emitted at the call, in the Scope it closed over.
 What it costs is text. A walk written at three sites is three walks, where it was
 three calls to one driver, and the standard library's own derived Methods —
 `firstItem(where:)`, `firstIndex(of:)`, `count(where:)`, `removeEvery(where:)` —
-are each written on `reduce` or `keepEvery` with a literal callback, so each
+are each written on `reduce` or `everyItem` with a literal callback, so each
 carries its own. Measured on Everyday.es that is 1,854 bytes unminified and
 fifty-three minified; Loops.es, where the four drivers stop being reached at all,
 falls by 793 bytes unminified and 741 minified.
@@ -662,7 +662,7 @@ falls by 793 bytes unminified and 741 minified.
 before it already took away.** Measured on Bun, best of five, process start
 subtracted: a three million turn counted loop is **1.24×** faster with this pass
 than with it alone turned off, a million turn `Step` loop threading a Record
-**1.04×**, and a `keepEvery` into a `reduce` over two hundred thousand items
+**1.04×**, and a `everyItem` into a `reduce` over two hundred thousand items
 **1.04×**. The same three Programs with the WHOLE registry turned off are 3.40×,
 3.42× and 1.85× slower than with all of it on — so most of what a loop-heavy
 Program gains is `lower-scalar-operations`, `collapse-construction` and
@@ -725,7 +725,7 @@ built = $loop_0_state;
 and a native call per turn — both of them there only because the emission does
 not know the List is the walk's own. This pass proves that it is, and then emits
 for the Program's accumulator exactly what the Rewriter already emits for its
-own: `map` and `keepEvery` declare an empty Array, push each answer onto it and
+own: `map` and `everyItem` declare an empty Array, push each answer onto it and
 box it once at the end, which is what `pushed` and `createdList` do.
 
 ```js
@@ -739,7 +739,7 @@ built = List.createList($loop_0_built);
 There is no State slot left, and no `const` binding it either: every mention of
 the accumulator was a rebuilding chain and the pushes consumed all of them. Four
 walks can be rewritten this way — the counted one, the two condition ones, the
-general `Step` one and both folds. `map` and `keepEvery` build an Array already.
+general `Step` one and both folds. `map` and `everyItem` build an Array already.
 
 The counter is not bound either, and that is a second decision. A turn whose
 whole body is that one push writes the Argument where the `const` stood: nothing
@@ -845,7 +845,7 @@ the seed's own Array the way `append` takes it is what would answer it properly 
 see "not done yet".
 
 What it costs otherwise is nothing measurable: a walk it declines is emitted
-exactly as it was, and the walks it does not read — `map`, `keepEvery`, and every
+exactly as it was, and the walks it does not read — `map`, `everyItem`, and every
 walk threading anything but a List — are byte-identical with the pass on and off.
 
 **It fires nowhere in this repository's own Essence.** Every fixture bundle and
@@ -1473,7 +1473,7 @@ is read through as it stands.
 
 **Every driver that threads a State takes it**: both condition entries, the
 counted walk, `loop(startingWith:step:)` and both `List.reduce` entries. `map`
-and `keepEvery` thread none.
+and `everyItem` thread none.
 
 **A walk inside a walk carries both slots as one value.** The inner walk answers
 straight into the enclosing slot, so the Integer it builds at its exit would be
@@ -2019,7 +2019,7 @@ startup included in both figures, from 497 ms to 24 ms.
 **One qualification to what this section opened with.** These are improvements
 to the runtime rather than to the code the Compiler emits, and this one is an
 improvement to the runtime too — but it is the only one of them that also needed
-the emitted code to change. `inline-loops` writes `map`, `keepEvery` and both
+the emitted code to change. `inline-loops` writes `map`, `everyItem` and both
 `reduce` entries out where they are called, and what it wrote read the
 receiver's array directly and tested that array's length on every turn — the
 first of which now reads one run of two, while the second is exactly the live

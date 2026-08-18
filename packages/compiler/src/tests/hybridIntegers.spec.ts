@@ -1029,7 +1029,7 @@ describe("a walk's carried State", () => {
 	it("carries every walk that threads a State", async () => {
 		// NOTE: The five drivers that thread one — the `while` and `until`
 		// entries, the counted walk, the `Step` walk, and both `reduce` entries.
-		// `map` and `keepEvery` thread none, so there is nothing there to hold.
+		// `map` and `everyItem` thread none, so there is nothing there to hold.
 		let source =
 			program(`	constant conditioned = loop(startingWith 0, while (n) {
 		<- n::isLessThan(9007199254740993)

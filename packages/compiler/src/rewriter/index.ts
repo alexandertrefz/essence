@@ -5499,7 +5499,7 @@ function mapWalk(
 	}
 }
 
-// NOTE: `List.keepEvery` — the same walk, keeping the ITEM where the check
+// NOTE: `List.everyItem` — the same walk, keeping the ITEM where the check
 // accepts it. The item is bound first because two places read it: the check is
 // handed it, and the Array it is kept in is given the same value.
 function keepWalk(
@@ -6716,7 +6716,7 @@ function createdList(value: estree.Expression): estree.Expression {
 // NOTE: It is what the natives WRITTEN AGAINST ONE ARRAY reach for — `slice`,
 // `reverse`, `insert`, `sort`, `split`, `pair` — and what an inlined walk
 // reaches for because the `for` below indexes one Array rather than two. The
-// natives that WALK a List do the opposite deliberately: `map`, `keepEvery`,
+// natives that WALK a List do the opposite deliberately: `map`, `everyItem`,
 // both `reduce` entries, `is`, `compare`, `join` and the rest take a view and
 // read the two runs in turn, so that walking a List never collapses it. An
 // emitted walk cannot afford that shape, and pays one combining instead.

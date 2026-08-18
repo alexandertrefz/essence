@@ -1112,7 +1112,7 @@ describe("Rewriter", () => {
 			// NOTE: isEmpty / firstItem (both forms) / lastItem / removeFirst (both
 			// forms) / removeEvery (both forms) / removeLast (both forms) /
 			// removeDuplicates / prepend (both forms) / append(_:) / contains /
-			// anyItem / everyItem / count (both forms) / insert / replace /
+			// hasItems (all three) / count (both forms) / insert / replace /
 			// partition / sorted / repeat are implemented in Essence now
 			// (packages/standard-library/sources/List.es), so there is no runtime Function left to call
 			// here. The golden harness covers them end to end; the entries of a
@@ -1219,13 +1219,13 @@ describe("Rewriter", () => {
 				})
 			})
 
-			describe("keepEvery", () => {
+			describe("everyItem", () => {
 				it("keeps just the accepted items", () => {
 					const greaterThanOne = (item: integer.IntegerType) =>
 						boolean.createBoolean(item.value > 1n)
 
 					expect(
-						list.keepEvery(
+						list.everyItem(
 							list.createList([
 								integerOne(),
 								integerTwo(),

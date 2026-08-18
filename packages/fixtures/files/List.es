@@ -21,7 +21,7 @@ implementation {
 		}),
 	)
 	Terminal.inspect(
-		readings::keepEvery(where (degrees) { <- degrees::isGreaterThan(2) }),
+		readings::everyItem(where (degrees) { <- degrees::isGreaterThan(2) }),
 	) § [ 3, 4, 5, 9 ]
 	Terminal.inspect(
 		readings::firstItem(where (degrees) { <- degrees::isGreaterThan(4) }),
@@ -43,17 +43,17 @@ implementation {
 		}
 	}
 
-	Terminal.inspect(readings::keepEvery(where isBelowFour)) § [ 3, 1, 1, 2 ]
-	Terminal.inspect([3, 7/2, 9/2, 4]::keepEvery(where isBelowFour)) § [ 3, 7/2 ]
+	Terminal.inspect(readings::everyItem(where isBelowFour)) § [ 3, 1, 1, 2 ]
+	Terminal.inspect([3, 7/2, 9/2, 4]::everyItem(where isBelowFour)) § [ 3, 7/2 ]
 
 	§ Existential and universal questions read as sentences.
 	Terminal.inspect(
-		readings::anyItem(where (degrees) { § true — the 9
+		readings::hasItems(where (degrees) { § true — the 9
 			<- degrees::isGreaterThan(8)
 		}),
 	)
 	Terminal.inspect(
-		readings::everyItem(where (degrees) { § true — no frost all week
+		readings::hasItems(onlyWhere (degrees) { § true — no frost all week
 			<- degrees::isPositive()
 		}),
 	)

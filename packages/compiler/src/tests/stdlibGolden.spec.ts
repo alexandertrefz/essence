@@ -94,7 +94,7 @@ function compileProgram(source: string): CompiledProgram {
 // NOTE: Each line of the harness output is `"Label => value"`, printed as a
 // String — which the runtime renders with its quotes. The separator is ` => `
 // and not ` -> ` because a label spells Function Parameters with the arrow of
-// their own signature: `List.keepEvery<ItemType>(where: (_ ItemType) ->
+// their own signature: `List.everyItem<ItemType>(where: (_ ItemType) ->
 // Boolean)`.
 function labelOf(line: string): string {
 	let text = line.startsWith('"') ? line.slice(1, -1) : line

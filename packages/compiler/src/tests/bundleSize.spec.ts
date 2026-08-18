@@ -157,7 +157,7 @@ describe("Bundle Size", () => {
 	// ships: measured minified, where what ships is measured, the same change is
 	// 17,695 to 17,748 — fifty-three bytes, a third of a percent. The
 	// unminified figure is mostly the indentation escodegen puts a walk's body
-	// under. What the bytes buy is every `reduce`, `keepEvery` and `map` written
+	// under. What the bytes buy is every `reduce`, `everyItem` and `map` written
 	// with a literal callback — the standard library's own derived Methods
 	// among them — becoming a `for` with the callback's body in it, where each
 	// was a call per item into a native that called a closure per item. Loops.es
@@ -205,7 +205,7 @@ describe("Bundle Size", () => {
 	// is the pass paying text for work, which is the trade it exists to make:
 	// minified, where what ships is measured, the same change is 17,489 to
 	// 17,495 — six bytes. Only `map` moved, because it is the only walking Method
-	// the two Namespaces share; `keepEvery` and both `reduce` entries can answer
+	// the two Namespaces share; `everyItem` and both `reduce` entries can answer
 	// with fewer items than they were handed, are not declared on `NonEmptyList`
 	// at all, and were reaching `List`'s own entry by widening the whole time.
 	//
