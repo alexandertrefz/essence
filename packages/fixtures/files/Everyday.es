@@ -3,7 +3,7 @@ implementation {
 	§ The everyday Integer Methods. A divisor written down is its own proof of
 	§ not being zero, so this remainder can not fail and answers bare. A Method
 	§ that CAN fail answers an `Optional`, and `Terminal.inspect` shows it whole —
-	§ `Optional#Value(1024)` rather than `1024`. `value(withDefault:)` below is how a
+	§ `Optional#Value(1024)` rather than `1024`. `value(defaultingTo:)` below is how a
 	§ Program collapses one back to a bare value.
 	Terminal.inspect(0::subtract(7)::remainder(dividingBy 3)) § 2 — Euclidean, so a negative dividend still leaves a non-negative
 	§ remainder. `7::remainder(dividingBy 3)` is the plain `1`.
@@ -24,15 +24,15 @@ implementation {
 	Terminal.inspect(2/3::raise(to 2)) § Optional#Value(4/9)
 
 	§ Reading Numbers from text — the return trip of toString.
-	Terminal.inspect(Integer.parse("42")::value(withDefault 0)) § 42
-	Terminal.inspect(Integer.parse("nope")::value(withDefault 0)) § 0
-	Terminal.inspect(Rational.parse("0.75")::value(withDefault 0/1)) § 3/4
+	Terminal.inspect(Integer.parse("42")::value(defaultingTo 0)) § 42
+	Terminal.inspect(Integer.parse("nope")::value(defaultingTo 0)) § 0
+	Terminal.inspect(Rational.parse("0.75")::value(defaultingTo 0/1)) § 3/4
 
 	§ Exact aggregates over whole Lists.
 	Terminal.inspect(Number.sum([1, 2, 3])) § 6
 	Terminal.inspect(Number.sum([1, 1/2, 1/2])) § 2 — a whole mixed sum is an Integer
 	Terminal.inspect(Number.product([1/2, 2/3])) § 1/3
-	Terminal.inspect(Number.average([1, 2])::value(withDefault 0/1)) § 3/2
+	Terminal.inspect(Number.average([1, 2])::value(defaultingTo 0/1)) § 3/2
 
 	§ The sign Methods reach the whole tower.
 	Terminal.inspect(Number.Pi::negate()::absolute()) § π
@@ -45,9 +45,9 @@ implementation {
 	§ Splitting a String is no longer a one-way door.
 	Terminal.inspect("a,b,c"::split(on ",")::join(with " + ")) § "a + b + c"
 
-	§ value(withDefault:) collapses an Optional back to a bare value.
-	Terminal.inspect([1, 2, 3]::firstItem()::value(withDefault 0)) § 1
-	Terminal.inspect([1]::removeFirst()::firstItem()::value(withDefault 99)) § 99
+	§ value(defaultingTo:) collapses an Optional back to a bare value.
+	Terminal.inspect([1, 2, 3]::firstItem()::value(defaultingTo 0)) § 1
+	Terminal.inspect([1]::removeFirst()::firstItem()::value(defaultingTo 99)) § 99
 
 	§ Sorting through Comparable — no comparison to write.
 	Terminal.inspect([3, 1, 2]::sort()) § [ 1, 2, 3 ]

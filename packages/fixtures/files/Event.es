@@ -49,7 +49,7 @@ implementation {
 
 				constant eventName = splitEvent
 					::firstItem()
-					::value(withDefault "")
+					::value(defaultingTo "")
 
 				constant namespaces = splitEvent
 					::removeFirst()

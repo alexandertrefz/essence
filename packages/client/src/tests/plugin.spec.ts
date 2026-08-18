@@ -68,7 +68,7 @@ const SHAPES_MODULE = `implementation {
 	}
 
 	function named(_ value: Optional<String>) -> String {
-		<- value::value(withDefault "unnamed")
+		<- value::value(defaultingTo "unnamed")
 	}
 
 	function turn(_ direction: Direction) -> Direction {

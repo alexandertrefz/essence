@@ -45,7 +45,7 @@ implementation {
 				position = state.position::add(1),
 				cells = state.cells::append({
 					index = total,
-					status = labels::item(at state.position)::value(withDefault "none"),
+					status = labels::item(at state.position)::value(defaultingTo "none"),
 				}),
 			}
 		})

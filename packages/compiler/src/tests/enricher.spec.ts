@@ -6826,7 +6826,7 @@ describe("Enricher", () => {
 						${FILLED}
 
 						function firstOf(_ items: Filled<String>) -> String {
-							<- items::item(at 0)::value(withDefault "")
+							<- items::item(at 0)::value(defaultingTo "")
 						}
 
 						constant items = ["a", "b"]

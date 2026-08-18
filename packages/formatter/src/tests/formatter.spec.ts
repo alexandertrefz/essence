@@ -1858,10 +1858,10 @@ describe("formatter", () => {
 
 		it("lays a Case payload out inside its parentheses", () => {
 			let source =
-				"implementation {\n\tconstant value: Optional<Integer> = #Value(1)\n\tconstant digit = 1\n\tconstant next: Optional<Integer> = #Value(value::value(withDefault 0)::multiply(with 10)::add(digit))\n}\n"
+				"implementation {\n\tconstant value: Optional<Integer> = #Value(1)\n\tconstant digit = 1\n\tconstant next: Optional<Integer> = #Value(value::value(defaultingTo 0)::multiply(with 10)::add(digit))\n}\n"
 
 			expect(formatted(source)).toContain(
-				"= #Value(\n\t\tvalue::value(withDefault 0)::multiply(with 10)::add(digit)\n\t)\n",
+				"= #Value(\n\t\tvalue::value(defaultingTo 0)::multiply(with 10)::add(digit)\n\t)\n",
 			)
 		})
 	})

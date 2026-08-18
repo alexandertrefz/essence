@@ -1100,12 +1100,12 @@ third"::lines())
 		noNumbers::firstItem()::toString(),
 	)
 	show(
-		"Optional.value<ItemType>(withDefault: ItemType) [present]",
-		numbers::firstItem()::value(withDefault 0),
+		"Optional.value<ItemType>(defaultingTo: ItemType) [present]",
+		numbers::firstItem()::value(defaultingTo 0),
 	)
 	show(
-		"Optional.value<ItemType>(withDefault: ItemType) [empty]",
-		noNumbers::firstItem()::value(withDefault 42),
+		"Optional.value<ItemType>(defaultingTo: ItemType) [empty]",
+		noNumbers::firstItem()::value(defaultingTo 42),
 	)
 	show("Optional.hasValue<ItemType>()", numbers::firstItem()::hasValue())
 	show(

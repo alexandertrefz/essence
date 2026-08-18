@@ -352,7 +352,7 @@ declarations {
 								<- #Continue(
 									#Value(
 										value
-											::value(withDefault 0)
+											::value(defaultingTo 0)
 											::multiply(with 10)
 											::add(digit)
 									)

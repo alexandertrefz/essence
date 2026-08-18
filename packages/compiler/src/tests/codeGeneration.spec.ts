@@ -3590,7 +3590,7 @@ declarations {
 	§ The operation that can not fail, and says so — there is no first item of an
 	§ empty List, and no value of this Parameter's Type is empty.
 	function firstOf(_ items: Filled<String>) -> String {
-		<- items::item(at 0)::value(withDefault "")
+		<- items::item(at 0)::value(defaultingTo "")
 	}
 
 	§ The doorway: a bare List goes in, and the branch that proved the predicate
@@ -3619,7 +3619,7 @@ declarations {
 	type Filled<Item> = List<Item> where @::hasItems()
 
 	function firstOf(_ items: Filled<String>) -> String {
-		<- items::item(at 0)::value(withDefault "")
+		<- items::item(at 0)::value(defaultingTo "")
 	}
 
 	function firstOrEmpty(_ items: List<String>) -> String {
@@ -3637,7 +3637,7 @@ declarations {
 	type Filled<Item> = List<Item> where @::hasItems()
 
 	function firstOf(_ items: Filled<String>) -> String {
-		<- items::item(at 0)::value(withDefault "")
+		<- items::item(at 0)::value(defaultingTo "")
 	}
 
 	function firstOrEmpty(_ items: List<Integer>) -> String {
