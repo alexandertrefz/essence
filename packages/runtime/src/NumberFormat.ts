@@ -4,7 +4,7 @@ import { typeKeySymbol } from "./type"
 // values carry Case tags (`"NumberFormat#Fraction"`) exactly as user-declared
 // Cases do. `is`, `isNot` and `toString` are implemented in Essence
 // (`packages/standard-library/sources/Rational.es`, beside the Method that takes one), so nothing but
-// the tags lives here. `Rational::toString(formatAs:)` READS one, and it is a
+// the tags lives here. `Rational::toString(as:)` READS one, and it is a
 // Method of `Rational`, so its native is in `Rational.ts`.
 export type FractionType = { [typeKeySymbol]: "NumberFormat#Fraction" }
 export type DecimalType = { [typeKeySymbol]: "NumberFormat#Decimal" }

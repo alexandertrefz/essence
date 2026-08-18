@@ -508,7 +508,7 @@ declarations {
 			}
 		}
 
-		§ The format was a String — `toString(formatAs "decimal")` — which meant
+		§ The format was a String — `toString(as "decimal")` — which meant
 		§ every other spelling silently fell back to the fraction form, and
 		§ nothing told a caller which words were understood. `NumberFormat` is
 		§ a Choice, so the two forms are the only two that can be written and
@@ -521,7 +521,7 @@ declarations {
 		§§ @returns — the String representation of the Rational.
 		overload toString {
 			() -> String {
-				§ The fraction form off the accessors, NOT `formatAs #Fraction`
+				§ The fraction form off the accessors, NOT `as #Fraction` —
 				§ — deliberately. The entries of an Overload are separate
 				§ emitted Functions, so delegating would make every Program
 				§ that merely prints a Rational carry the whole long-division
@@ -537,8 +537,8 @@ declarations {
 				}
 			}
 
-			§§ @param formatAs — the form to represent the Rational in
-			(formatAs: NumberFormat) -> String
+			§§ @param as — the form to represent the Rational in
+			(as format: NumberFormat) -> String
 		}
 
 		§§ Orders the Rational against another Rational.

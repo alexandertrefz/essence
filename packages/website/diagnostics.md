@@ -924,7 +924,7 @@ hole renders its value through that same conformance, so `"{ count }"` and
 `"{ count::toString() }"` are the same String — write the shorter one.
 
 Only the bare, String-answering call is redundant. A `toString` given an
-Argument picks a form the hole would not — `"{ ratio::toString(formatAs
+Argument picks a form the hole would not — `"{ ratio::toString(as
 #Decimal) }"` — and a receiver that is not Printable on its own, a bare
 structural Union or an `Optional` whose payload is not Printable, has no
 conformance for the hole to reach at all.

@@ -730,11 +730,11 @@ describe("Enricher", () => {
 		})
 
 		it("should accept a 'toString' that takes an Argument", () => {
-			// NOTE: `Rational.toString(formatAs:)` picks a form the hole would
+			// NOTE: `Rational.toString(as:)` picks a form the hole would
 			// not have — dropping the call would change the String.
 			expect(
 				diagnosticsFor(`implementation {
-					constant message = "half: {1/2::toString(formatAs NumberFormat#Decimal)}"
+					constant message = "half: {1/2::toString(as NumberFormat#Decimal)}"
 				}`),
 			).toEqual([])
 		})

@@ -1469,7 +1469,7 @@ export function enrichInterpolatedStringValue(
 // this from flagging a call that means something:
 //
 // - An Argument makes it a different Method. `Rational`'s
-//   `toString(formatAs #Decimal)` picks a form the hole would not have.
+//   `toString(as #Decimal)` picks a form the hole would not have.
 // - A non-String answer is a `toString` that merely shares the name; dropping
 //   it would change what is interpolated.
 // - A receiver that is not itself Printable — an `Optional`, a bare structural

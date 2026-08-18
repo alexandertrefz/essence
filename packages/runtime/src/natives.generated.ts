@@ -168,8 +168,8 @@ export type RationalNatives = {
 	denominator: (self: RationalType) => IntegerType
 	// raise(to: Integer) -> Optional<Rational>
 	raise: (self: RationalType, to: IntegerType) => OptionalType<RationalType>
-	// toString(formatAs: NumberFormat) -> String
-	toString__overload$2: (self: RationalType, formatAs: NumberFormatType) => StringType
+	// toString(as: NumberFormat) -> String
+	toString__overload$2: (self: RationalType, as: NumberFormatType) => StringType
 	// compare(to: Rational) -> Ordering
 	compare: (self: RationalType, to: RationalType) => OrderingType
 }

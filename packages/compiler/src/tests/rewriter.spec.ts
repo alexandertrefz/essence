@@ -966,7 +966,7 @@ describe("Rewriter", () => {
 			// (`packages/standard-library/sources/Rational.es`), on the lowest-terms
 			// accessors and `Rational.of`, and the golden harness covers every
 			// one. Only `of`, the accessors, `raise`, `squareRoot`, `compare`,
-			// the decimal `toString(formatAs:)` and the Algebraic-operand
+			// the decimal `toString(as:)` and the Algebraic-operand
 			// `divide` stay native.
 		})
 
