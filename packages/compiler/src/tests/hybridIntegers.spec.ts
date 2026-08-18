@@ -198,7 +198,7 @@ describe("an emitted operation", () => {
 		// below has no walk in it.
 		let source = program(`	§§ Triples a value.
 	§§
-	§§ @param value — the value
+	§§ @param _ — the value
 	§§ @returns — three times the value.
 	function triple(_ value: Integer) -> Integer {
 		<- value::add(value)::add(value)
@@ -636,7 +636,7 @@ describe("a walk's carried State", () => {
 		// box, and there is no way to ask that and keep the swap.
 		let source = program(`	§§ Doubles a value.
 	§§
-	§§ @param value — the value
+	§§ @param _ — the value
 	§§ @returns — twice the value.
 	function twice(_ value: Integer) -> Integer {
 		<- value::add(value)
@@ -740,7 +740,7 @@ describe("a walk's carried State", () => {
 		let generated = generate(
 			program(`	§§ Answers the Step a value has earned.
 	§§
-	§§ @param value — the running State
+	§§ @param _ — the running State
 	§§ @returns — the Step.
 	function next(_ value: Integer) -> Step<Integer, Integer> {
 		if value::isLessThan(10) { <- #Continue(value::add(1)) } else { <- #Done(0) }

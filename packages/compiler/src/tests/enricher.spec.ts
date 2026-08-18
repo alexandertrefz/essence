@@ -4503,11 +4503,11 @@ describe("Enricher", () => {
 			])
 		})
 
-		it("should take the label, '_', or the internal name", () => {
-			// NOTE: A positional Parameter is documented as '_'. Its internal
-			// name is taken as well, which is what the standard library is
-			// written with until the documentation pass rewrites it —
-			// `documentationStrictness` is the one place that leniency lives.
+		it("should take the label, or '_' where there is none", () => {
+			// NOTE: A positional Parameter is documented as '_', and a
+			// labelled one as its label. Nothing else names it:
+			// `documentationStrictness` is `"strict"`, so the internal name a
+			// body reads a labelled Parameter under is not a second spelling.
 			expect(
 				diagnosticsFor(`implementation {
 					§§ Greets.
@@ -4519,41 +4519,53 @@ describe("Enricher", () => {
 			expect(
 				diagnosticsFor(`implementation {
 					§§ Greets.
-					§§ @param subject — who to greet
-					function greet(_ subject: String) -> String { <- subject }
-				}`),
-			).toEqual([])
-
-			expect(
-				diagnosticsFor(`implementation {
-					§§ Greets.
 					§§ @param to — who to greet
-					function greet(to subject: String) -> String { <- subject }
-				}`),
-			).toEqual([])
-
-			expect(
-				diagnosticsFor(`implementation {
-					§§ Greets.
-					§§ @param subject — who to greet
 					function greet(to subject: String) -> String { <- subject }
 				}`),
 			).toEqual([])
 		})
 
-		it("should leave a run that stops short of the last Parameter", () => {
-			// NOTE: Lenient, and the last thing to tighten: a block that
-			// documents no Parameter at all is the common case, and one that
-			// documents the first of two is on its way there.
-			expect(
-				diagnosticsFor(`implementation {
-					§§ Joins.
-					§§ @param left — the text to put first
-					function join(left: String, right: String) -> String {
-						<- left::append(right)
-					}
-				}`),
-			).toEqual([])
+		it("should report the internal name of a labelled Parameter", () => {
+			for (let source of [
+				`implementation {
+					§§ Greets.
+					§§ @param subject — who to greet
+					function greet(_ subject: String) -> String { <- subject }
+				}`,
+				`implementation {
+					§§ Greets.
+					§§ @param subject — who to greet
+					function greet(to subject: String) -> String { <- subject }
+				}`,
+			]) {
+				let diagnostics = diagnosticsFor(source)
+
+				expect(diagnostics).toHaveLength(1)
+				expect(diagnostics[0].code).toBe(
+					"misnamed-documentation-parameter",
+				)
+			}
+		})
+
+		it("should report a run that stops short of the last Parameter", () => {
+			// NOTE: One line per Parameter, so the Parameter no line reached
+			// is reported where it is declared rather than where the run ends.
+			let diagnostics = diagnosticsFor(`implementation {
+				§§ Joins.
+				§§ @param left — the text to put first
+				function join(left: String, right: String) -> String {
+					<- left::append(right)
+				}
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("undocumented-parameter")
+			expect(diagnostics[0].labels[0]?.message).toBe(
+				"Parameter 2 is undocumented",
+			)
+			expect(diagnostics[0].helps).toEqual([
+				"Write '@param right — …' as line 2 of the run.",
+			])
 		})
 
 		it("should let an overload block name a Parameter of any Overload", () => {

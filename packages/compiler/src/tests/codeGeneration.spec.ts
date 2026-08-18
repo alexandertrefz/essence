@@ -2065,7 +2065,7 @@ describe("Code Generation", () => {
 				const crossing = `declarations {
 	§§ Doubles the value.
 	§§
-	§§ @param value — the Integer to double.
+	§§ @param _ — the Integer to double.
 	§§ @returns — twice the value.
 	function double(_ value: Integer) -> Integer {
 		<- value::twice()
@@ -2073,7 +2073,7 @@ describe("Code Generation", () => {
 
 	§§ Quadruples the value.
 	§§
-	§§ @param value — the Integer to quadruple.
+	§§ @param _ — the Integer to quadruple.
 	§§ @returns — four times the value.
 	function quadruple(_ value: Integer) -> Integer {
 		<- double(double(value))

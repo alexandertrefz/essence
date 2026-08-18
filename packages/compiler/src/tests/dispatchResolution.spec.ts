@@ -748,7 +748,7 @@ describe("Dispatch and Resolution", () => {
 					overload apply {
 						§§ The base entry, written first.
 						§§
-						§§ @param transform — over Integers
+						§§ @param _ — over Integers
 						§§ @param with — any Integer
 						§§ @returns — the text
 						(_ transform: (_ item: Integer) -> String, with n: Integer) -> String {
@@ -757,7 +757,7 @@ describe("Dispatch and Resolution", () => {
 
 						§§ The entry appended after it.
 						§§
-						§§ @param transform — over Strings
+						§§ @param _ — over Strings
 						§§ @param with — ${refined}
 						§§ @returns — the text
 						(_ transform: (_ item: String) -> String, with n: ${refined}) -> String {

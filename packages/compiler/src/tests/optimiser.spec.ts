@@ -482,7 +482,7 @@ const shadowedArgument = `implementation {
 		namespace Integer for Integer {
 			§§ Always true, loudly.
 			§§
-			§§ @param other — ignored
+			§§ @param _ — ignored
 			§§ @returns — true
 			is(_ other: Integer) -> Boolean {
 				ran = true
@@ -520,7 +520,7 @@ const unionDispatch = `implementation {
 
 	§§ Answers what it is given, so that a dispatch's receiver is a call.
 	§§
-	§§ @param value — a member of the Union
+	§§ @param _ — a member of the Union
 	§§ @returns — the value.
 	function identity(_ value: Integer | Boolean) -> Integer | Boolean {
 		<- value
@@ -819,7 +819,7 @@ const statementMatches = `implementation {
 const nestedStatementMatches = `implementation {
 	§§ Names a value the long way round.
 	§§
-	§§ @param value — the value to name
+	§§ @param _ — the value to name
 	§§ @returns — the name.
 	function named(_ value: Integer | String) -> String {
 		constant name = match value -> String {
@@ -869,7 +869,7 @@ const shadowedAnswerNames = `implementation {
 		case Integer {
 			§§ Answers what it is given, plus one.
 			§§
-			§§ @param n — the Integer to answer for
+			§§ @param _ — the Integer to answer for
 			§§ @returns — one more than it.
 			function answerB(_ n: Integer) -> Integer {
 				<- n::add(1)
@@ -961,7 +961,7 @@ const shadowedDiscardedAnswer = `implementation {
 		namespace Integer for Integer {
 			§§ Nine, whatever it is given.
 			§§
-			§§ @param other — ignored
+			§§ @param _ — ignored
 			§§ @returns — nine.
 			add(_ other: Integer) -> Integer {
 				Terminal.inspect("the shadow ran")
@@ -994,7 +994,7 @@ const shadowedDeadCode = `implementation {
 		namespace Integer for Integer {
 			§§ Nine, whatever it is given.
 			§§
-			§§ @param other — ignored
+			§§ @param _ — ignored
 			§§ @returns — nine.
 			add(_ other: Integer) -> Integer {
 				Terminal.inspect("the shadow ran")
@@ -1040,7 +1040,7 @@ const heldDispatches = `implementation {
 
 	§§ Answers what it is given, so that a dispatch's receiver is a call.
 	§§
-	§§ @param value — a member of the Union
+	§§ @param _ — a member of the Union
 	§§ @returns — the value.
 	function identity(_ value: Integer | Boolean) -> Integer | Boolean {
 		<- value
@@ -1254,7 +1254,7 @@ const shadowedNonEmptyList = `implementation {
 		namespace NonEmptyList for Integer {
 			§§ The Integer, handed to the given transform.
 			§§
-			§§ @param transform — the transform to apply
+			§§ @param _ — the transform to apply
 			§§ @returns — whatever the transform answered.
 			map(_ transform: (_: Integer) -> Integer) -> Integer {
 				<- transform(@)
@@ -1729,7 +1729,7 @@ const shadowedArithmetic = `implementation {
 		namespace Integer for Integer {
 			§§ Nine, whatever it is given.
 			§§
-			§§ @param other — ignored
+			§§ @param _ — ignored
 			§§ @returns — nine.
 			add(_ other: Integer) -> Integer {
 				Terminal.inspect("the shadow ran")
@@ -2635,7 +2635,7 @@ describe("Optimiser", () => {
 				namespace Colour for Colour is Equatable {
 					§§ Every Colour is every other Colour.
 					§§
-					§§ @param other — the Colour to compare with
+					§§ @param _ — the Colour to compare with
 					§§ @returns — always true.
 					is(_ other: Colour) -> Boolean {
 						<- true
@@ -2643,7 +2643,7 @@ describe("Optimiser", () => {
 
 					§§ The negation.
 					§§
-					§§ @param other — the Colour to compare with
+					§§ @param _ — the Colour to compare with
 					§§ @returns — always false.
 					isNot(_ other: Colour) -> Boolean {
 						<- @::is(other)::negate()
@@ -2878,7 +2878,7 @@ describe("Optimiser", () => {
 					namespace Integer for Integer {
 						§§ Always true.
 						§§
-						§§ @param other — ignored
+						§§ @param _ — ignored
 						§§ @returns — true
 						isLessThan(_ other: Integer) -> Boolean {
 							<- true
@@ -4244,7 +4244,7 @@ describe("Optimiser", () => {
 			let generated = generate(`implementation {
 	§§ Doubles a value.
 	§§
-	§§ @param value — the value
+	§§ @param _ — the value
 	§§ @returns — twice the value.
 	function twice(_ value: Integer) -> Integer {
 		<- value::add(value)

@@ -3025,7 +3025,7 @@ describe("Choices", () => {
 					namespace Maybe<infer T> for Maybe<T> is Equatable {
 						§§ Every Maybe is the same Maybe.
 						§§
-						§§ @param other — the Maybe to compare with
+						§§ @param _ — the Maybe to compare with
 						§§ @returns — always true.
 						is(_ other: Maybe<T>) -> Boolean {
 							<- true
@@ -3033,7 +3033,7 @@ describe("Choices", () => {
 
 						§§ The negation.
 						§§
-						§§ @param other — the Maybe to compare with
+						§§ @param _ — the Maybe to compare with
 						§§ @returns — always false.
 						isNot(_ other: Maybe<T>) -> Boolean {
 							<- @::is(other)::negate()
@@ -3159,7 +3159,7 @@ describe("Choices", () => {
 					namespace Maybe<T> for Maybe<T> is Equatable {
 						§§ Every Maybe is the same Maybe.
 						§§
-						§§ @param other — the Maybe to compare with
+						§§ @param _ — the Maybe to compare with
 						§§ @returns — always true.
 						is(_ other: Maybe<T>) -> Boolean {
 							<- true
@@ -3167,7 +3167,7 @@ describe("Choices", () => {
 
 						§§ The negation.
 						§§
-						§§ @param other — the Maybe to compare with
+						§§ @param _ — the Maybe to compare with
 						§§ @returns — always false.
 						isNot(_ other: Maybe<T>) -> Boolean {
 							<- false
@@ -3343,7 +3343,7 @@ describe("Choices", () => {
 				namespace Colour for Colour is Equatable {
 					§§ Every Colour is the same Colour.
 					§§
-					§§ @param other — the Colour to compare with
+					§§ @param _ — the Colour to compare with
 					§§ @returns — always true.
 					is(_ other: Colour) -> Boolean {
 						<- true
@@ -3351,7 +3351,7 @@ describe("Choices", () => {
 
 					§§ The negation.
 					§§
-					§§ @param other — the Colour to compare with
+					§§ @param _ — the Colour to compare with
 					§§ @returns — always false.
 					isNot(_ other: Colour) -> Boolean {
 						<- @::is(other)::negate()

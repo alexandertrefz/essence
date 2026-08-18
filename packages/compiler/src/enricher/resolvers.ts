@@ -4766,10 +4766,11 @@ export function reportDocumentationParameters(
 // things besides — a run that stops before the last Parameter, and a line
 // naming a Parameter's INTERNAL name where the signature gives it a label.
 //
-// The standard library is written the older, name-matched way, and the docs
-// pass of `plans/2026-08-18-stdlib-readability.md` rewrites its tags. Flipping
-// this one constant to `"strict"` in that same change is what turns the rule
-// on; nothing else here has to move.
+// `"strict"` is what every Program is held to. The docs pass of
+// `plans/2026-08-18-stdlib-readability.md` rewrote the standard library's tags
+// to the label-or-`_` form and this constant went with it. `"lenient"` stays
+// as the named alternative `documentationParameterProblems` can be asked for,
+// which is how `documentation.spec.ts` reads each half of the rule on its own.
 //
 // A block writing NO `@param` at all is left alone in both modes. It documents
 // the Declaration as a whole, which is what most of them do; asking for a line
@@ -4777,7 +4778,7 @@ export function reportDocumentationParameters(
 // the `undocumented` walk below.
 export type DocumentationStrictness = "lenient" | "strict"
 
-export const documentationStrictness: DocumentationStrictness = "lenient"
+export const documentationStrictness: DocumentationStrictness = "strict"
 
 // NOTE: The two names a Parameter can be written under, as the rule sees them:
 // the label a call site writes, and the name the body reads it under. Either
