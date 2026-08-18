@@ -509,6 +509,10 @@ third"::lines())
 		"Integer.clamp(between: Integer, and: Integer) [inverted bounds]",
 		5::clamp(between 10, and 1),
 	)
+	show(
+		"Integer.clamp(between: Integer, and: Integer) [inverted bounds, above]",
+		15::clamp(between 10, and 1),
+	)
 	show("Integer.parse(_ String)", Integer.parse("42"))
 	show("Integer.parse(_ String) [negative]", Integer.parse("-42"))
 	show("Integer.parse(_ String) [not a number]", Integer.parse("nope"))

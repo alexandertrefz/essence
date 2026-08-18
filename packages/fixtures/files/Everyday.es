@@ -12,7 +12,7 @@ implementation {
 	Terminal.inspect(0::subtract(5)::absolute()) § 5
 	Terminal.inspect(4::isEven()) § true
 	Terminal.inspect(0::isPositive()) § false — zero is neither sign
-	Terminal.inspect(15::clamp(between 1, and 10)) § Optional#Value(10)
+	Terminal.inspect(15::clamp(between 1, and 10)) § 10 — the bounds may be written in either order
 
 	§ The everyday Rational Methods — and the way back to Integer.
 	constant sevenHalves = 7/2
