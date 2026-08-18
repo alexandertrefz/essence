@@ -99,7 +99,7 @@ declarations {
 
 		§§ Divides this Integer by a number, exactly.
 		§§
-		§§ Dividing by an Integer or a Rational answers empty for a zero divisor. Dividing by a NonZeroInteger or an Algebraic can not fail: the first is proven, and an Algebraic is irrational and so never zero.
+		§§ Dividing by an Integer or a Rational answers empty for a zero divisor. Dividing this Integer by a NonZeroInteger or by an Algebraic can not fail. The first divisor is proven, and an Algebraic is irrational and so never zero.
 		overload divide {
 			(by other: Integer) -> Optional<Rational> {
 				<- Rational.of(@, over other)

@@ -178,7 +178,7 @@ declarations {
 
 		§§ Divides the Rational by a number, exactly.
 		§§
-		§§ Dividing by an Integer or a Rational answers empty for a zero divisor. Dividing by an Algebraic always answers, because an irrational is never zero.
+		§§ Dividing by an Integer or a Rational answers empty for a zero divisor. Dividing this Rational by an Algebraic always answers, because an Algebraic is irrational and so never zero.
 		overload divide {
 			§§ @param by — the Rational to divide by
 			§§ @returns — the quotient, or nothing when the divisor is zero.
