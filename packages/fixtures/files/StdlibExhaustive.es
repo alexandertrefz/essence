@@ -119,6 +119,9 @@ third"::lines())
 		"String.doesNotContain(_ String) [present]",
 		greeting::doesNotContain("lo,"),
 	)
+	show("String.count(of: String)", "banana"::count(of "a"))
+	show("String.count(of: String) [empty part]", "banana"::count(of ""))
+	show("String.count(of: String) [absent]", "banana"::count(of "zz"))
 	show("String.length()", greeting::length())
 	show("String.length() [empty]", emptyText::length())
 	show("String.length() [astral]", "a😀b"::length())
