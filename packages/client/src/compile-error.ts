@@ -40,6 +40,15 @@ export class EssenceCompileError extends Error {
 		this.diagnostics = diagnosticGroups.flatMap(
 			(group) => group.diagnostics,
 		)
+
+		// NOTE: Readable, and not printed. Bun and Node print an uncaught
+		// Error's own enumerable properties under its message, and these three
+		// are the whole report a second time as objects — every Diagnostic and
+		// every source text — under the report as it was meant to be read. A
+		// host reads them off the Error the same as before.
+		for (let name of ["entryPath", "diagnostics", "diagnosticGroups"]) {
+			Object.defineProperty(this, name, { enumerable: false })
+		}
 	}
 }
 

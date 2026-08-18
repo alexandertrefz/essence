@@ -139,6 +139,45 @@ function within(at: string, what: string): string {
 // NOTE: How many names an Error spells out before it starts counting.
 const NAMES_SHOWN = 5
 
+// NOTE: Every Type key an interpreter in this process has been built over. A
+// value tagged with one of them and handed to an interpreter built over ANOTHER
+// is the failure that has no symptom of its own: it reads as a plain object, is
+// refused as "not from this Module", and the host is left staring at a value
+// that plainly is one. It happens in exactly two ways — a Module was loaded
+// AGAIN, after an edit, and a value from the load before is still in the host's
+// hands; or two bundles that never shared a runtime are exchanging values — and
+// both deserve to be named as what they are rather than as an object with the
+// wrong keys. The set is only ever read on the way to an Error.
+//
+// NOTE: The runtime describes its key as `$type`, and a copy of the runtime this
+// package never bound — a host that imported `@essence-lang/runtime` itself
+// beside a bundle — mints a Symbol under that description too. It is looked for
+// as well, so that the case is named the same way; a Symbol is a hidden key on
+// a value nobody else stamps, and reading its description is the whole of what
+// is done with it.
+const mintedTypeKeys = new Set<symbol>()
+const TYPE_KEY_DESCRIPTION = "$type"
+
+// NOTE: The tag a value carries under a Type key that is not the one being read
+// with — or `null` where it carries none such. Every own Symbol is examined:
+// there are never more than a few, and this runs only once a value has already
+// been refused.
+function foreignTag(value: object, own: symbol): string | null {
+	for (let key of Object.getOwnPropertySymbols(value)) {
+		if (
+			key !== own &&
+			(mintedTypeKeys.has(key) ||
+				key.description === TYPE_KEY_DESCRIPTION)
+		) {
+			let tag = (value as Record<symbol, unknown>)[key]
+
+			return typeof tag === "string" ? tag : null
+		}
+	}
+
+	return null
+}
+
 export type EssenceFunction = (...args: Array<EssenceValue>) => EssenceValue
 
 // NOTE: One shape's rule, compiled — the way in and the way out of a single
@@ -243,6 +282,8 @@ export function createInterpreter(
 	// on calls the same way.
 	let typeKey = bridge.typeKey
 	let makeCase = bridge.case
+
+	mintedTypeKeys.add(typeKey)
 
 	// NOTE: A Record or a payload Case this reader BUILDS is tagged in place
 	// rather than handed to the bridge's constructor, which spreads what it is
@@ -2013,6 +2054,16 @@ export function createInterpreter(
 
 		if (typeof tag === "string") {
 			return `an Essence ${tag} value`
+		}
+
+		// NOTE: Tagged, but by another copy of the runtime — see
+		// `mintedTypeKeys`. Named as the Essence value it is, and as one this
+		// Module can not accept, because "an object with 'value'" is true and
+		// sends the host looking in the wrong place entirely.
+		let foreign = foreignTag(value, typeKey)
+
+		if (foreign !== null) {
+			return `an Essence ${foreign} value from another copy of the runtime — a previous load of this Module, or a different bundle — which this Module can not recognise`
 		}
 
 		let keys = Object.keys(value)
