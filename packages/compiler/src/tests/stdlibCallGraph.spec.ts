@@ -732,7 +732,7 @@ describe("Stdlib Call Graph", () => {
 	namespace Boolean for Boolean {
 		§§ Whether the Boolean is not the other one.
 		§§
-		§§ @param other — the Boolean to compare with
+		§§ @param _ — the Boolean to compare with
 		§§ @returns — whether they differ.
 		isNot(_ other: Boolean) -> Boolean {
 			<- @::is(other)::negate()
@@ -740,7 +740,7 @@ describe("Stdlib Call Graph", () => {
 
 		§§ Whether both Booleans are the same.
 		§§
-		§§ @param other — the Boolean to compare with
+		§§ @param _ — the Boolean to compare with
 		§§ @returns — whether they match.
 		is(_ other: Boolean) -> Boolean {
 			<- @::and(other)
@@ -748,7 +748,7 @@ describe("Stdlib Call Graph", () => {
 
 		§§ Both Booleans at once.
 		§§
-		§§ @param other — the Boolean to combine with
+		§§ @param _ — the Boolean to combine with
 		§§ @returns — the conjunction.
 		and(_ other: Boolean) -> Boolean
 
@@ -773,7 +773,7 @@ describe("Stdlib Call Graph", () => {
 	namespace Boolean for Boolean {
 		§§ Whether the Boolean matches, the long way around.
 		§§
-		§§ @param other — the Boolean to compare with
+		§§ @param _ — the Boolean to compare with
 		§§ @returns — whether they match.
 		alpha(_ other: Boolean) -> Boolean {
 			<- Boolean.beta(other)
@@ -781,7 +781,7 @@ describe("Stdlib Call Graph", () => {
 
 		§§ A static helper that defers to another static.
 		§§
-		§§ @param value — the Boolean.
+		§§ @param _ — the Boolean.
 		§§ @returns — the Boolean unchanged.
 		static beta(_ value: Boolean) -> Boolean {
 			<- Boolean.gamma(value)
@@ -790,7 +790,7 @@ describe("Stdlib Call Graph", () => {
 		§§ A static helper that reads a Record field — a Lookup that is NOT
 		§§ a Method call and must not become an edge.
 		§§
-		§§ @param value — the Boolean.
+		§§ @param _ — the Boolean.
 		§§ @returns — the Boolean unchanged.
 		static gamma(_ value: Boolean) -> Boolean {
 			constant boxed = { field = value }
@@ -815,7 +815,7 @@ describe("Stdlib Call Graph", () => {
 	namespace Boolean for Boolean {
 		§§ Whether the Boolean is not the other one.
 		§§
-		§§ @param other — the Boolean to compare with
+		§§ @param _ — the Boolean to compare with
 		§§ @returns — whether they differ.
 		isNot(_ other: Boolean) -> Boolean {
 			<- @::is(other)
@@ -823,7 +823,7 @@ describe("Stdlib Call Graph", () => {
 
 		§§ Whether both Booleans are the same.
 		§§
-		§§ @param other — the Boolean to compare with
+		§§ @param _ — the Boolean to compare with
 		§§ @returns — whether they match.
 		is(_ other: Boolean) -> Boolean {
 			<- @::isNot(other)
@@ -844,7 +844,7 @@ describe("Stdlib Call Graph", () => {
 	namespace Boolean for Boolean {
 		§§ Beta defers to gamma.
 		§§
-		§§ @param value — the Boolean.
+		§§ @param _ — the Boolean.
 		§§ @returns — the Boolean.
 		static beta(_ value: Boolean) -> Boolean {
 			<- Boolean.gamma(value)
@@ -852,7 +852,7 @@ describe("Stdlib Call Graph", () => {
 
 		§§ Gamma defers back to beta.
 		§§
-		§§ @param value — the Boolean.
+		§§ @param _ — the Boolean.
 		§§ @returns — the Boolean.
 		static gamma(_ value: Boolean) -> Boolean {
 			<- Boolean.beta(value)
@@ -875,7 +875,7 @@ describe("Stdlib Call Graph", () => {
 	namespace Boolean for Boolean {
 		§§ Alpha defers to the static beta.
 		§§
-		§§ @param other — the Boolean.
+		§§ @param _ — the Boolean.
 		§§ @returns — the Boolean.
 		alpha(_ other: Boolean) -> Boolean {
 			<- Boolean.beta(other)
@@ -883,7 +883,7 @@ describe("Stdlib Call Graph", () => {
 
 		§§ Beta calls alpha back on its argument.
 		§§
-		§§ @param value — the Boolean.
+		§§ @param _ — the Boolean.
 		§§ @returns — the Boolean.
 		static beta(_ value: Boolean) -> Boolean {
 			<- value::alpha(value)
@@ -911,7 +911,7 @@ describe("Stdlib Call Graph", () => {
 			let graph = graphOf(`declarations {
 	§§ Doubles the value.
 	§§
-	§§ @param value — the Integer to double.
+	§§ @param _ — the Integer to double.
 	§§ @returns — twice the value.
 	function double(_ value: Integer) -> Integer {
 		<- value::twice()
@@ -952,7 +952,7 @@ describe("Stdlib Call Graph", () => {
 	overload function combine {
 		§§ The plain entry.
 		§§
-		§§ @param value — the Integer.
+		§§ @param first — the Integer.
 		§§ @returns — the Integer.
 		(first value: Integer) -> Integer {
 			<- value
@@ -960,7 +960,7 @@ describe("Stdlib Call Graph", () => {
 
 		§§ The entry written on the first.
 		§§
-		§§ @param value — the Integer.
+		§§ @param second — the Integer.
 		§§ @returns — the Integer.
 		(second value: Integer) -> Integer {
 			<- combine(first value)
@@ -979,7 +979,7 @@ describe("Stdlib Call Graph", () => {
 				graphOf(`declarations {
 	§§ Alpha defers to beta.
 	§§
-	§§ @param value — the Integer.
+	§§ @param _ — the Integer.
 	§§ @returns — the Integer.
 	function alpha(_ value: Integer) -> Integer {
 		<- beta(value)
@@ -987,7 +987,7 @@ describe("Stdlib Call Graph", () => {
 
 	§§ Beta defers back to alpha.
 	§§
-	§§ @param value — the Integer.
+	§§ @param _ — the Integer.
 	§§ @returns — the Integer.
 	function beta(_ value: Integer) -> Integer {
 		<- alpha(value)
@@ -1005,7 +1005,7 @@ describe("Stdlib Call Graph", () => {
 				graphOf(`declarations {
 	§§ Alpha calls the Method back on its argument.
 	§§
-	§§ @param value — the Integer.
+	§§ @param _ — the Integer.
 	§§ @returns — the Integer.
 	function alpha(_ value: Integer) -> Integer {
 		<- value::beta()
@@ -1195,7 +1195,7 @@ describe("Stdlib Call Graph", () => {
 	namespace Boolean for Boolean {
 		§§ Whether both Booleans are the same, the long way around.
 		§§
-		§§ @param other — the Boolean to compare with
+		§§ @param _ — the Boolean to compare with
 		§§ @returns — whether they match.
 		is(_ other: Boolean) -> Boolean {
 			if @ {

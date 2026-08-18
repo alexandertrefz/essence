@@ -278,9 +278,9 @@ describe("Documentation", () => {
 	})
 
 	// NOTE: The rule the Enricher reports against, read on its own. A Program
-	// exercises the lenient half, which is what the standard library and every
-	// user file are held to today; the strict half is turned on by
-	// `documentationStrictness`, and this is what it will then say.
+	// exercises the strict half, which is what `documentationStrictness` names
+	// and what the standard library and every user file are held to; the
+	// lenient half is read here and nowhere else.
 	describe("Parameter matching", () => {
 		let join: Array<DocumentedParameter> = [
 			{ label: "left", internalName: "left" },

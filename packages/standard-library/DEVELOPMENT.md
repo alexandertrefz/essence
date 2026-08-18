@@ -285,10 +285,16 @@ a line past the last Parameter is `unknown-documentation-parameter`. A block
 above an `overload` keyword documents the set as a whole, where a position means
 nothing, so a line there can name a Parameter of any entry.
 
-The internal name of a labelled Parameter is accepted for now, which is what
-these files are written with. `documentationStrictness`
-(`packages/compiler/src/enricher/resolvers.ts`) is the one place that leniency
-lives, and setting it to `"strict"` also asks for a line per Parameter.
+**A documented Parameter list is documented in full.** A block that writes any
+`@param` writes one per Parameter, and each names the label or `_` — the
+internal name a body reads a labelled Parameter under is not a second spelling
+for it, and a Parameter no line reached is `undocumented-parameter`. That is
+`documentationStrictness = "strict"`
+(`packages/compiler/src/enricher/resolvers.ts`), which is what every Program is
+held to. The `"lenient"` half of the rule — the internal name, and a run that
+stops before the last Parameter — survives only as the alternative
+`documentationParameterProblems` can be asked for, and only
+`documentation.spec.ts` asks.
 `packages/compiler/src/tests/stdlibProse.spec.ts` enforces the four writing
 rules over these sources, and every one of them is live: a sentence over 25
 words, an em-dash aside inside a `§§` sentence, a ` may ` or a ` should `, and
