@@ -1,0 +1,8 @@
+{
+	"extends": "../../tsconfig.base.json",
+	"compilerOptions": {
+		// NOTE: What makes `./rules/Pricing.es` resolve to `Pricing.d.es.ts`.
+		"allowArbitraryExtensions": true
+	},
+	"include": ["*.ts"]
+}

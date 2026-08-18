@@ -1,0 +1,3 @@
+# Registers the Essence plugin before anything runs, so that `server.ts` can
+# `import … from "./rules/Pricing.es"` and `bun --hot` reloads on an edit.
+preload = ["./essence.ts"]
