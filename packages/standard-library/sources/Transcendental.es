@@ -9,51 +9,55 @@ import {
 
 declarations {
 
-	§ A number that is provably not algebraic — for now the linear slice
-	§ `a + b·π + c·e` over the two constant bases, which is how Pi, Tau
-	§ and E stay exact. `is` means equality of canonical forms: reflexive
-	§ and sound, and for values on a single base it coincides with numeric
-	§ equality — whether a value mixing both bases can ever equal another
-	§ number is an open problem, which is why Transcendental deliberately
-	§ does NOT conform to Comparable. Every cross-kind comparison is still
-	§ total through the `Number` Namespace, whose covering `compare`
-	§ hand-writes those cells.
+	§ A number that is provably not algebraic. For now it is the linear
+	§ slice `a + b·π + c·e` over the bases Pi and E, which keeps Pi, Tau and
+	§ E exact. Whether a value over both bases can equal another number is
+	§ an open problem, so Transcendental does not conform to Comparable.
+	§ Comparison against another kind is still total, through the covering
+	§ `Number`.
 	namespace Transcendental for Transcendental is Equatable, is Printable {
-		§ `is` and `absolute` are native for one reason: neither can be
-		§ written on a primitive this Namespace has. Equality is the canonical
-		§ form's own — every component is held reduced, so agreement is
-		§ structural — and the sign of `a + b·π + c·e` needs an ordering the
-		§ deliberately-not-Comparable Transcendental declares nowhere. Both
-		§ once asked the covering `Number` instead, which put the entire
-		§ numeric tower behind an equality check and behind an absolute value.
+		§ `is` and `absolute` are native. Neither reaches a primitive this
+		§ Namespace declares. Equality is decided by the canonical form
+		§ itself, and the sign of `a + b·π + c·e` needs an ordering
+		§ Transcendental declares nowhere. Reading the covering `Number`
+		§ instead puts the whole numeric tower behind an equality check; see
+		§ DEVELOPMENT.md, Why bodies look the way they do.
 
-		§§ Whether both Transcendentals have the same canonical form.
+		§§ Answers whether both Transcendentals have the same canonical form.
 		§§
-		§§ For values on a single base this is exactly numeric equality.
+		§§ Every component is held reduced, so agreement is structural. On a single base that agreement is exactly numeric equality.
 		§§
-		§§ @param other — the Transcendental to compare with
+		§§ @param _ — the Transcendental to compare with
 		§§ @returns — `true` when the canonical forms agree.
 		is(_ other: Transcendental) -> Boolean
 
-		§§ Whether the Transcendentals have different canonical forms — on a single base, different numbers.
+		§§ Answers whether the Transcendentals have different canonical forms.
 		§§
-		§§ @param other — the Transcendental to compare with
+		§§ On a single base the two are then different numbers.
+		§§
+		§§ @param _ — the Transcendental to compare with
 		§§ @returns — `true` when the canonical forms differ.
 		isNot(_ other: Transcendental) -> Boolean {
 			<- @::is(other)::negate()
 		}
 
-		§§ Adds a number to this Transcendental, exactly. Two Transcendentals may cancel their π and e terms, leaving a Rational.
+		§§ Answers the exact sum of the Transcendental and a number.
+		§§
+		§§ Two Transcendentals can cancel their π and e terms, which leaves a Rational.
 		overload add {
 			(_ other: Integer) -> Transcendental
 
 			(_ other: Rational) -> Transcendental
 
-			§§ Adds another Transcendental — the π and e parts may cancel, collapsing the sum to a Rational.
+			§§ Answers the exact sum of the two Transcendentals.
+			§§
+			§§ The π and e parts can cancel, which leaves a Rational.
 			(_ other: Transcendental) -> Rational | Transcendental
 		}
 
-		§§ Subtracts a number from this Transcendental, exactly. Subtracting equal π and e terms leaves a Rational.
+		§§ Answers the exact difference of the Transcendental and a number.
+		§§
+		§§ Subtracting equal π and e terms leaves a Rational.
 		overload subtract {
 			(_ other: Integer) -> Transcendental {
 				<- @::add(other::negate())
@@ -68,23 +72,31 @@ declarations {
 			}
 		}
 
-		§§ Multiplies this Transcendental with an Integer or Rational, exactly — multiplying by zero collapses to zero. Two Transcendentals can not be multiplied: `π·π` or `π·e` would leave the linear grammar.
+		§§ Answers the exact product of the Transcendental and an Integer or a Rational.
+		§§
+		§§ Multiplying by zero answers zero. Two Transcendentals can not be multiplied: `π·π` and `π·e` leave the linear grammar.
 		overload multiply {
 			(with other: Integer) -> Transcendental | Rational
 
 			(with other: Rational) -> Transcendental | Rational
 		}
 
-		§§ Divides this Transcendental by a number, exactly. Dividing by an Integer or Rational is empty only for zero; dividing by another Transcendental succeeds exactly when the two are proportional — `Tau::divide(by Pi)` is `2` — and is empty otherwise.
+		§§ Answers the exact quotient of the Transcendental and a number.
+		§§
+		§§ Dividing by an Integer or a Rational is empty only for zero. Dividing by another Transcendental answers a Rational when the two are proportional: `Tau::divide(by Pi)` is `2`. Anything else is empty.
 		overload divide {
 			(by other: Integer) -> Optional<Transcendental>
 
 			(by other: Rational) -> Optional<Transcendental>
 
-			§§ Divides by another Transcendental. Proportional values give an exact Rational — Tau divided by Pi is exactly 2. Anything else — π divided by e most famously — is not representable yet and is empty.
+			§§ Answers the exact quotient of the two Transcendentals.
+			§§
+			§§ Proportional values answer a Rational: `Tau::divide(by Pi)` is `2`. Anything else is empty, including π divided by e.
 			(by other: Transcendental) -> Optional<Rational>
 
-			§§ Divides by an Integer, and answers the given value when the divisor is zero.
+			§§ Answers the exact quotient of the Transcendental and an Integer.
+			§§
+			§§ A zero divisor answers the given value.
 			§§
 			§§ @param by — the divisor
 			§§ @param defaultingTo — the value to answer with when there is no quotient
@@ -96,7 +108,9 @@ declarations {
 				<- @::divide(by other)::value(defaultingTo fallback)
 			}
 
-			§§ Divides by a Rational, and answers the given value when the divisor is zero.
+			§§ Answers the exact quotient of the Transcendental and a Rational.
+			§§
+			§§ A zero divisor answers the given value.
 			§§
 			§§ @param by — the divisor
 			§§ @param defaultingTo — the value to answer with when there is no quotient
@@ -108,7 +122,9 @@ declarations {
 				<- @::divide(by other)::value(defaultingTo fallback)
 			}
 
-			§§ Divides by another Transcendental, and answers the given value when the two are not proportional.
+			§§ Answers the exact quotient of the two Transcendentals.
+			§§
+			§§ Where the two are not proportional, the answer is the given value.
 			§§
 			§§ @param by — the divisor
 			§§ @param defaultingTo — the value to answer with when there is no quotient
@@ -121,13 +137,17 @@ declarations {
 			}
 		}
 
-		§§ The Transcendental without its sign — its distance from zero. A value on a single base can never equal a rational, so its sign is decidable; a value mixing π and e refines to a deep documented precision cutoff.
+		§§ Answers the Transcendental without its sign, which is its distance from zero.
+		§§
+		§§ A value on a single base can never equal a Rational, so its sign is exact. A value that mixes π and e decides its sign by refining an interval, down to a documented precision limit.
 		absolute() -> Transcendental
 
-		§§ The Transcendental with its sign flipped. At least one base term keeps its non-zero coefficient, so the result is again a Transcendental.
+		§§ Answers the Transcendental with its sign flipped.
+		§§
+		§§ At least one base term keeps its non-zero coefficient, so the answer is again a Transcendental.
 		negate() -> Transcendental
 
-		§§ The exact symbolic form — `π`, `2·π`, `e` or `1 + π + e`.
+		§§ Answers the exact symbolic form: `π`, `2·π`, `e` or `1 + π + e`.
 		toString() -> String
 	}
 }
