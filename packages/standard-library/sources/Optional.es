@@ -31,7 +31,7 @@ declarations {
 		Empty,
 	}
 
-	§ The Namespace every Optional reaches. `value(withDefault:)` collapses it
+	§ The Namespace every Optional reaches. `value(defaultingTo:)` collapses it
 	§ back to a bare value, `hasValue`/`isEmpty` ask without taking it apart,
 	§ `is`/`isNot` ask against a value at either level, and `map` and `keep`
 	§ carry a value through a step that does not know it might be missing.
@@ -70,11 +70,11 @@ declarations {
 			}
 		}
 
-		§§ The value itself — or, when there is none, the given default. Collapses an Optional back to a bare value: `list::firstItem()::value(withDefault 0)`.
+		§§ The value itself — or, when there is none, the given default. Collapses an Optional back to a bare value: `list::firstItem()::value(defaultingTo 0)`.
 		§§
-		§§ @param withDefault — the value to answer with when there is none
+		§§ @param defaultingTo — the value to answer with when there is none
 		§§ @returns — the value, or the default in its place.
-		value(withDefault fallback: ItemType) -> ItemType {
+		value(defaultingTo fallback: ItemType) -> ItemType {
 			<- match @ -> ItemType {
 				case #Value(item) { <- item }
 				case #Empty       { <- fallback }
@@ -212,7 +212,7 @@ declarations {
 	§ and spelling the two separately says which step is the transform and
 	§ which is the collapse. There is no `orElse` either — an Optional whose
 	§ payload is itself an Optional makes "or else what" genuinely ambiguous,
-	§ and `value(withDefault:)` already answers the unambiguous half.
+	§ and `value(defaultingTo:)` already answers the unambiguous half.
 	namespace NestedOptional<infer ItemType> for Optional<Optional<ItemType>> {
 		§§ Collapses a nested Optional by one level — the inner Optional, or an empty Optional when the outer one is empty.
 		§§

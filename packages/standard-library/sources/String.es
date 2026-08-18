@@ -325,7 +325,7 @@ declarations {
 					§ The first piece is everything before the first occurrence;
 					§ the rest rejoin on the ORIGINAL part, so only the first
 					§ separator is the one that becomes the replacement.
-					constant head = pieces::firstItem()::value(withDefault "")
+					constant head = pieces::firstItem()::value(defaultingTo "")
 
 					<- head::append(replacement)
 						::append(pieces::removeFirst()::join(with part))
@@ -393,7 +393,7 @@ declarations {
 					§ before the first occurrence, and its length is that
 					§ occurrence's position.
 					<- #Value(
-						pieces::firstItem()::value(withDefault "")::length()
+						pieces::firstItem()::value(defaultingTo "")::length()
 					)
 				}
 			}

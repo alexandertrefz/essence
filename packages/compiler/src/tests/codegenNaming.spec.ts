@@ -367,7 +367,7 @@ describe("Code Generation — Naming and Escaping", () => {
 				function g() -> Integer {
 					constant items = [1, 2]
 
-					<- items::firstItem()::value(withDefault 0)
+					<- items::firstItem()::value(defaultingTo 0)
 				}
 
 				Terminal.inspect(f())
@@ -404,7 +404,7 @@ describe("Code Generation — Naming and Escaping", () => {
 
 					constant items = [1, 2]
 
-					Terminal.inspect(items::firstItem()::value(withDefault 0))
+					Terminal.inspect(items::firstItem()::value(defaultingTo 0))
 
 					<- total
 				}

@@ -231,14 +231,14 @@ describe("Optional", () => {
 			])
 		})
 
-		it("collapses to a bare value with value(withDefault:)", async () => {
+		it("collapses to a bare value with value(defaultingTo:)", async () => {
 			expect(
 				await run(`implementation {
 					constant numbers = [3]
 					constant none: List<Integer> = []
 
-					Terminal.inspect(numbers::firstItem()::value(withDefault 0))
-					Terminal.inspect(none::firstItem()::value(withDefault 0))
+					Terminal.inspect(numbers::firstItem()::value(defaultingTo 0))
+					Terminal.inspect(none::firstItem()::value(defaultingTo 0))
 				}`),
 			).toEqual(["3", "0"])
 		})
@@ -308,7 +308,7 @@ describe("Optional", () => {
 			let diagnostics = diagnosticsOf(`implementation {
 				constant maybe: Optional<Rational> = #Empty
 
-				Terminal.inspect(maybe::value(withDefault 0))
+				Terminal.inspect(maybe::value(defaultingTo 0))
 			}`)
 
 			expect(diagnostics.map(({ code }) => code)).toEqual([
@@ -318,7 +318,7 @@ describe("Optional", () => {
 				"No overload of 'value' accepts these Arguments",
 			)
 			expect(diagnostics[0]!.notes).toEqual([
-				"'Optional::value' takes 1 Argument: Parameter 'withDefault' is Rational.",
+				"'Optional::value' takes 1 Argument: Parameter 'defaultingTo' is Rational.",
 			])
 		})
 

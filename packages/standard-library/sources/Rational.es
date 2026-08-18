@@ -126,7 +126,7 @@ declarations {
 		§ more. `denominator` answers with a NonZeroInteger, a product of two of
 		§ those is one as well, and `of` over one of those is a Rational: the
 		§ chain the answers travel is total from end to end, and every entry
-		§ below used to end in an `::value(withDefault 0/1)` for a case it could not
+		§ below used to end in an `::value(defaultingTo 0/1)` for a case it could not
 		§ reach, guarded by nothing but this paragraph saying so. The irrational
 		§ entries lean on commutativity: the other operand's own Namespace
 		§ already declares the sum with a Rational.
@@ -437,7 +437,7 @@ declarations {
 					§ answers the zero-denominator empty itself, so both arms
 					§ below hand back what it decided rather than wrapping it.
 					<- match Integer.parse(
-						fractionPieces::firstItem()::value(withDefault ""),
+						fractionPieces::firstItem()::value(defaultingTo ""),
 					) -> Optional<Rational> {
 						case #Empty { <- #Empty }
 
@@ -445,7 +445,7 @@ declarations {
 							<- match Integer.parse(
 								fractionPieces
 									::lastItem()
-									::value(withDefault ""),
+									::value(defaultingTo ""),
 							) -> Optional<Rational> {
 								case #Empty                    { <- #Empty }
 
@@ -470,10 +470,10 @@ declarations {
 						§ of ten, one factor per fractional digit.
 						constant wholeText      = decimalPieces
 							::firstItem()
-							::value(withDefault "")
+							::value(defaultingTo "")
 						constant fractionalText = decimalPieces
 							::lastItem()
-							::value(withDefault "")
+							::value(defaultingTo "")
 
 						if wholeText::isEmpty()::or(fractionalText::isEmpty()) {
 							<- #Empty

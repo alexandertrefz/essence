@@ -2431,7 +2431,7 @@ describe("Optimiser", () => {
 		// every fallible answer in the library is read back by one of these.
 		it("compiles the standard library's own Matches", () => {
 			let generated = generate(`implementation {
-				Terminal.inspect(Integer.parse("7")::value(withDefault 0))
+				Terminal.inspect(Integer.parse("7")::value(defaultingTo 0))
 			}`)
 
 			expect(generated).toContain(
@@ -3658,7 +3658,7 @@ describe("Optimiser", () => {
 		// already and the Handlers' Returns are the Method's own.
 		it("takes the wrapper off the standard library's own Matches", () => {
 			let source = `implementation {
-				Terminal.inspect(Integer.parse("7")::value(withDefault 0))
+				Terminal.inspect(Integer.parse("7")::value(defaultingTo 0))
 			}`
 			let body = bodyOf(generate(source), "$es_Optional_value")
 
@@ -3911,8 +3911,8 @@ describe("Optimiser", () => {
 
 	function edge(at side: Edge = #Front, of items: List<Integer>) -> Integer {
 		<- match side -> Integer {
-			case Edge#Front { <- items::firstItem()::value(withDefault 0) }
-			case _ { <- items::lastItem()::value(withDefault 0) }
+			case Edge#Front { <- items::firstItem()::value(defaultingTo 0) }
+			case _ { <- items::lastItem()::value(defaultingTo 0) }
 		}
 	}
 
@@ -5320,7 +5320,7 @@ describe("Optimiser", () => {
 		it("elides the standard library's own final tests", () => {
 			let body = bodyOf(
 				generate(`implementation {
-					Terminal.inspect(Integer.parse("7")::value(withDefault 0))
+					Terminal.inspect(Integer.parse("7")::value(defaultingTo 0))
 				}`),
 				"$es_Optional_value",
 			)
