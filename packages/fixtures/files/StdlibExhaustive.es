@@ -79,8 +79,8 @@ implementation {
 	§ ——— String ———————————————————————————————————————————————————————————
 	show("String.isEmpty()", greeting::isEmpty())
 	show("String.isEmpty() [empty]", emptyText::isEmpty())
-	show("String.hasAnyContent()", greeting::hasAnyContent())
-	show("String.hasAnyContent() [empty]", emptyText::hasAnyContent())
+	show("String.hasCharacters()", greeting::hasCharacters())
+	show("String.hasCharacters() [empty]", emptyText::hasCharacters())
 	show("String.is(_ String)", greeting::is("Hello, World"))
 	show("String.is(_ String) [differing]", greeting::is("nope"))
 	show("String.is(_ String) [both empty]", emptyText::is(""))

@@ -25,11 +25,11 @@ implementation {
 
 	§ invalid-refinement-predicate — the receiver is not '@'. A refinement is
 	§ evidence about the value being refined and about nothing else.
-	type Named = Integer where "essence"::hasAnyContent()
+	type Named = Integer where "essence"::hasCharacters()
 
 	§ invalid-refinement-predicate — a chain proves something about the
 	§ intermediate value, which nothing proved anything about.
-	type Trimmed = String where @::trim()::hasAnyContent()
+	type Trimmed = String where @::trim()::hasCharacters()
 
 	§ invalid-refinement-predicate — an Argument has to be written out, so that
 	§ two refinements proving the same thing are the same Type.

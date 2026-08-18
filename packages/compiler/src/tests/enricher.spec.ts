@@ -5394,7 +5394,7 @@ describe("Enricher", () => {
 		it("should refine a String and an applied List", () => {
 			expect(
 				refinementOf(
-					"implementation { type NonEmptyString = String where @::hasAnyContent() }",
+					"implementation { type NonEmptyString = String where @::hasCharacters() }",
 				).base,
 			).toEqual({ type: "String" })
 
@@ -5605,7 +5605,7 @@ describe("Enricher", () => {
 			it("should refuse a receiver that is not '@'", () => {
 				expect(
 					refusal(
-						`implementation { type Named = Integer where "essence"::hasAnyContent() }`,
+						`implementation { type Named = Integer where "essence"::hasCharacters() }`,
 					),
 				).toEqual({
 					code: "invalid-refinement-predicate",
@@ -5616,7 +5616,7 @@ describe("Enricher", () => {
 			it("should refuse a chained receiver", () => {
 				expect(
 					refusal(
-						"implementation { type Trimmed = String where @::trim()::hasAnyContent() }",
+						"implementation { type Trimmed = String where @::trim()::hasCharacters() }",
 					),
 				).toEqual({
 					code: "invalid-refinement-predicate",
@@ -5843,7 +5843,7 @@ describe("Enricher", () => {
 				let alias = "type Proper = String where @::isProper()"
 				let namespace = `namespace Naming for String {
 					isProper() -> Boolean {
-						<- @::hasAnyContent()
+						<- @::hasCharacters()
 					}
 
 					greet(_ name: Proper) -> String {
@@ -6262,12 +6262,12 @@ describe("Enricher", () => {
 		// of them narrows on its own.
 		it("should narrow both bindings a conjunction names", () => {
 			let source = `implementation {
-				type NonEmptyString = String where @::hasAnyContent()
+				type NonEmptyString = String where @::hasCharacters()
 
 				constant d = 3
 				constant s = "essence"
 
-				if d::isNot(0)::and(s::hasAnyContent()) {
+				if d::isNot(0)::and(s::hasCharacters()) {
 					Terminal.inspect(s)
 					Terminal.inspect(d)
 				}
@@ -6317,11 +6317,11 @@ describe("Enricher", () => {
 				).toBe("Zero")
 			})
 
-			it("should narrow a String through hasAnyContent", () => {
+			it("should narrow a String through hasCharacters", () => {
 				expect(
 					narrowedTypeOf(
 						`implementation {
-							type NonEmptyString = String where @::hasAnyContent()
+							type NonEmptyString = String where @::hasCharacters()
 
 							constant s = "essence"
 
@@ -6562,11 +6562,11 @@ describe("Enricher", () => {
 		})
 
 		// NOTE: A Guard proves things about the value a Handler NAMED exactly as it
-		// proves them about `@` — `case #Value(item) where item::hasAnyContent()` is
+		// proves them about `@` — `case #Value(item) where item::hasCharacters()` is
 		// one question about one value, and which of the two ways to spell that value
 		// it was asked of is no part of what it proved.
 		describe("a Match Handler's payload binding", () => {
-			const SHOUT = "type Shout = String where @::hasAnyContent()"
+			const SHOUT = "type Shout = String where @::hasCharacters()"
 
 			// NOTE: What the Handler's body reads under a name — navigated rather than
 			// searched, because a Handler holds the name three times over: the Guard's
@@ -6598,7 +6598,7 @@ describe("Enricher", () => {
 						constant value: Optional<String> = #Value("a")
 
 						constant narrowed = match value -> String {
-							case #Value(item) where item::hasAnyContent() {
+							case #Value(item) where item::hasCharacters() {
 								<- item
 							}
 
@@ -6642,7 +6642,7 @@ describe("Enricher", () => {
 						constant value: Optional<String> = #Value("a")
 
 						constant narrowed = match value -> String {
-							case #Value(item) where other::hasAnyContent() {
+							case #Value(item) where other::hasCharacters() {
 								<- item
 							}
 
@@ -6666,7 +6666,7 @@ describe("Enricher", () => {
 						constant value: Optional<String> = #Value("a")
 
 						constant narrowed = match value -> String {
-							case #Value(item) where other::hasAnyContent() {
+							case #Value(item) where other::hasCharacters() {
 								<- other
 							}
 
@@ -6690,7 +6690,7 @@ describe("Enricher", () => {
 						constant value: Optional<String> = #Value("a")
 
 						constant narrowed = match value -> String {
-							case #Value(item) where item::hasAnyContent() {
+							case #Value(item) where item::hasCharacters() {
 								constant item = "again"
 
 								<- item
@@ -6756,7 +6756,7 @@ describe("Enricher", () => {
 
 						constant text = "essence"
 
-						if text::hasAnyContent() {
+						if text::hasCharacters() {
 							Terminal.inspect(text)
 						}
 					}`,
@@ -7164,7 +7164,7 @@ describe("Enricher", () => {
 		it("should not narrow on a differently spelled predicate", () => {
 			expect(
 				selfTypesOf(`implementation {
-					type NonEmptyString = String where @::hasAnyContent()
+					type NonEmptyString = String where @::hasCharacters()
 
 					constant text = "essence"
 

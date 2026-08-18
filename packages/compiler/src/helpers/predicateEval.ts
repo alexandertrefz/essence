@@ -266,7 +266,7 @@ const STRING_PREDICATES: Record<string, PredicateEvaluator> = {
 	// clusters — a String has no clusters exactly when it has no code units, so
 	// the JavaScript length answers the emptiness question, and only that one.
 	isEmpty: stringQuestion((value) => value.length === 0),
-	hasAnyContent: stringQuestion((value) => value.length > 0),
+	hasCharacters: stringQuestion((value) => value.length > 0),
 }
 
 const LIST_PREDICATES: Record<string, PredicateEvaluator> = {

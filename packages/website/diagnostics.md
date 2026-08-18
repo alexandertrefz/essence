@@ -433,7 +433,7 @@ the text that was written. Four shapes are refused:
   `List<Item>`, never a bare `List`);
 - a receiver that is not `@` — the clause is a question about the value being
   refined and about nothing else;
-- a chained receiver (`@::trim()::hasAnyContent()`) — the evidence would be
+- a chained receiver (`@::trim()::hasCharacters()`) — the evidence would be
   about the intermediate value, which nothing proved anything about;
 - an Argument that is not written out as a literal.
 

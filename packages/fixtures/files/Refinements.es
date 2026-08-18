@@ -25,7 +25,7 @@ implementation {
 	§ those two are.
 
 	§ A String with something in it.
-	type NonEmptyString = String where @::hasAnyContent()
+	type NonEmptyString = String where @::hasCharacters()
 
 	§ A List with something in it. The base is an APPLIED List — `List<String>`,
 	§ never a bare `List`, whose item Type nothing has decided.
@@ -191,7 +191,7 @@ implementation {
 	§ The predicates themselves are ordinary Methods, answering here about
 	§ ordinary values.
 	Terminal.inspect(6::isNot(0))
-	Terminal.inspect("essence"::hasAnyContent())
+	Terminal.inspect("essence"::hasCharacters())
 	Terminal.inspect(["a", "b"]::hasItems())
 	Terminal.inspect(7::isBetween(0, and 9))
 	Terminal.inspect(7::isOdd()::and(7::isLessThan(10)))

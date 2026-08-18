@@ -374,7 +374,7 @@ export const $TerminalArity: AssertArities<typeof import("./Terminal"), {
 
 declare const StringModule: typeof import("./String")
 export const $String: StringNatives = StringModule
-export const $StringAbsent: AssertNoEssenceExports<typeof import("./String"), "isEmpty" | "hasAnyContent" | "is__overload$1" | "is__overload$2" | "isNot" | "prepend" | "lines" | "contains" | "doesNotContain" | "characters" | "starts" | "doesNotStart" | "doesNotEnd" | "replaceEvery" | "replaceFirst" | "firstIndex" | "lastIndex" | "pad" | "compare__overload$2" | "toString"> = true
+export const $StringAbsent: AssertNoEssenceExports<typeof import("./String"), "isEmpty" | "hasCharacters" | "is__overload$1" | "is__overload$2" | "isNot" | "prepend" | "lines" | "contains" | "doesNotContain" | "characters" | "starts" | "doesNotStart" | "doesNotEnd" | "replaceEvery" | "replaceFirst" | "firstIndex" | "lastIndex" | "pad" | "compare__overload$2" | "toString"> = true
 export const $StringArity: AssertArities<typeof import("./String"), {
 	append: 2
 	split: 2

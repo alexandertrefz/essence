@@ -150,7 +150,7 @@ declarations {
 		§ the use site, or to pick a fallback that can not occur and compare
 		§ against it — which is a lie whenever the payload can equal the
 		§ fallback. They spell the `isEmpty`/`has…` pair that every other
-		§ Namespace already has: `String::hasAnyContent`, `List::hasItems`.
+		§ Namespace already has: `String::hasCharacters`, `List::hasItems`.
 
 		§§ Whether the Optional holds a value.
 		§§
