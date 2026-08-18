@@ -14,31 +14,28 @@ import {
 
 declarations {
 
-	§ The whole numeric tower under one name. The `name` a use site sees is
-	§ display-only — Hovers, Inlay Hints and Diagnostics print this Union as
-	§ `Number` instead of spelling out all four members. Assignability
-	§ ignores Union names entirely.
+	§ The whole numeric tower under one name. Hovers, Inlay Hints and
+	§ Diagnostics print this Union as `Number`. Assignability ignores the name.
 	type Number = Integer | Rational | Irrational
 
-	§ `Irrational` is a transparent alias for `Algebraic | Transcendental`
-	§ — the pair are definitional complements (transcendental means "not
-	§ algebraic"), so the alias covers exactly the representable irrationals
-	§ and makes `π is Irrational` a true sentence.
+	§ `Algebraic` and `Transcendental` are complements: transcendental means
+	§ not algebraic. The alias covers exactly the irrationals the tower holds.
 	type Irrational = Algebraic | Transcendental
 
-	§ The two numeric kinds every aggregate below folds over. `Prelude.es` does
-	§ not re-export it, so it is a helper of this file rather than a name the
-	§ language grows.
+	§ The two numeric kinds the aggregates below fold over. `Prelude.es` does
+	§ not re-export it, so it stays a helper of this file.
 	type Exact = Integer | Rational
 
-	§ The one 2×2 dispatch in the file. Each aggregate below used to write it
-	§ out again — a match on the running total around a match on the item, four
-	§ arms deep, once per aggregate — and each of those was the same four cells
-	§ this Namespace holds. A Union-typed receiver reaches no member
-	§ Namespace's `add`, and `Number` deliberately declares none, so a
-	§ Namespace over the two kinds is what lets a fold read as a fold.
+	§ The one 2×2 dispatch in the file. A Union-typed receiver reaches no
+	§ member Namespace's `add`, and `Number` declares none, so the mixed
+	§ aggregates below fold on this Namespace instead.
+	§
+	§ `@` is rebound inside `match`, and `reduce` binds `Result` from
+	§ `startingWith`; see DEVELOPMENT.md, Why bodies look the way they do.
 	namespace Exact for Exact {
-		§§ Adds two exact numbers. Two Integers give an Integer; anything else gives a Rational.
+		§§ Adds two exact numbers.
+		§§
+		§§ The answer is an Integer for two Integers, and a Rational for every other pair.
 		§§
 		§§ @param _ — the number to add
 		§§ @returns — the exact sum.
@@ -66,7 +63,9 @@ declarations {
 			}
 		}
 
-		§§ Multiplies two exact numbers. Two Integers give an Integer; anything else gives a Rational.
+		§§ Multiplies two exact numbers.
+		§§
+		§§ The answer is an Integer for two Integers, and a Rational for every other pair.
 		§§
 		§§ @param with — the number to multiply with
 		§§ @returns — the exact product.
@@ -95,36 +94,32 @@ declarations {
 		}
 	}
 
-	§ The Union-level behaviour of `Number` — cross-member semantics only a
-	§ covering Namespace can define. `is` is numeric equality (`1 is 1/1` is
-	§ true), while the member Namespaces stay representational; Method target
-	§ specificity routes single-member receivers to those, so these Methods
-	§ only answer for Union-typed receivers and mixed-member Arguments.
+	§ The cross-member semantics of the tower. `is` is numeric equality here,
+	§ so `1 is 1/1` is true, while each member Namespace stays
+	§ representational. Specificity routes a single-member receiver to its own
+	§ Namespace, so these Methods answer for Union receivers.
 	§
-	§ `compare` hand-writes all sixteen member cells and keeps the
-	§ Comparable conformance even though Transcendental alone does not
-	§ conform: every cell touching a single-base Transcendental is total
-	§ because equality across kinds is impossible by definition, and only a
-	§ Transcendental carrying both π and e reaches the one documented
-	§ precision cutoff in the tower. The `isLessThan` family reads
-	§ that same order, so it lives here for the same reason and is the one
-	§ place two Transcendentals can be compared with a `<`.
+	§ `compare` is native and writes all sixteen member cells, which is what
+	§ keeps `Number`'s Comparable conformance total across kinds. The
+	§ `isLessThan` family reads that same order.
 	namespace Number for Number is Equatable, is Printable, is Comparable {
 		§§ The ratio of a circle's circumference to its diameter, exactly.
 		static Pi: Transcendental
 
-		§§ Twice `Pi` — the ratio of a circle's circumference to its radius.
+		§§ Twice `Pi`, which is the ratio of a circle's circumference to its radius.
 		static Tau: Transcendental
 
-		§§ Euler's number — the base of the natural logarithm, exactly.
+		§§ Euler's number, the base of the natural logarithm, exactly.
 		static E: Transcendental
 
-		§§ The golden ratio — `(1 + √5) / 2`, the positive solution of `x² = x + 1`, exactly.
+		§§ The golden ratio `(1 + √5) / 2`, the positive solution of `x² = x + 1`, exactly.
 		static GoldenRatio: Algebraic
 
-		§§ Checks whether the Number has the same numeric value as another Number — an Integer and a Rational are the same Number when their values are equal, so `1 is 1/1` holds.
+		§§ Checks whether the Number has the same numeric value as another Number.
 		§§
-		§§ @param other — the Number to compare against
+		§§ An Integer and a Rational are the same Number when their values are equal, so `1 is 1/1` holds.
+		§§
+		§§ @param _ — the Number to compare against
 		§§ @returns — `true` when both Numbers have the same numeric value.
 		is(_ other: Number) -> Boolean {
 			<- @::compare(to other)::is(#Equal)
@@ -132,13 +127,15 @@ declarations {
 
 		§§ Checks whether the Number has a different numeric value than another Number.
 		§§
-		§§ @param other — the Number to compare against
+		§§ @param _ — the Number to compare against
 		§§ @returns — `true` when the Numbers have different numeric values.
 		isNot(_ other: Number) -> Boolean {
 			<- @::is(other)::negate()
 		}
 
-		§§ Represents the Number as a String, in the notation of the member Type it currently holds.
+		§§ Represents the Number as a String, in the notation of the member Type it holds.
+		§§
+		§§ @returns — the String representation of the Number.
 		toString() -> String {
 			<- match @ -> String {
 				case Integer        { <- @::toString() }
@@ -148,43 +145,49 @@ declarations {
 			}
 		}
 
-		§§ Orders the Number against another Number by numeric value, across Integers and Rationals.
+		§§ Orders the Number against another Number by numeric value, across every member of the tower.
 		§§
-		§§ @param other — the Number to order against
+		§§ @param to — the Number to order against
 		§§ @returns — `Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.
 		compare(to other: Number) -> Ordering
 
-		§§ Whether this Number is strictly below the given one.
+		§§ Whether the Number is strictly below the given one.
 		§§
-		§§ @param other — the Number to compare against
+		§§ @param _ — the Number to compare against
+		§§ @returns — `true` when the Number is below the given one.
 		isLessThan(_ other: Number) -> Boolean {
 			<- @::compare(to other)::is(#Less)
 		}
 
-		§§ Whether this Number is below the given one, or equal to it.
+		§§ Whether the Number is below the given one, or equal to it.
 		§§
-		§§ @param other — the Number to compare against
+		§§ @param _ — the Number to compare against
+		§§ @returns — `true` when the Number is below the given one or equal to it.
 		isLessThanOrEqualTo(_ other: Number) -> Boolean {
 			<- @::isGreaterThan(other)::negate()
 		}
 
-		§§ Whether this Number is strictly above the given one.
+		§§ Whether the Number is strictly above the given one.
 		§§
-		§§ @param other — the Number to compare against
+		§§ @param _ — the Number to compare against
+		§§ @returns — `true` when the Number is above the given one.
 		isGreaterThan(_ other: Number) -> Boolean {
 			<- @::compare(to other)::is(#Greater)
 		}
 
-		§§ Whether this Number is above the given one, or equal to it.
+		§§ Whether the Number is above the given one, or equal to it.
 		§§
-		§§ @param other — the Number to compare against
+		§§ @param _ — the Number to compare against
+		§§ @returns — `true` when the Number is above the given one or equal to it.
 		isGreaterThanOrEqualTo(_ other: Number) -> Boolean {
 			<- @::isLessThan(other)::negate()
 		}
 
-		§§ Whether this Number lies between the two given ones, both included — across every member of the numeric tower, so `Number.Pi::isBetween(3, and 22/7)` holds. Bounds in the wrong order enclose no Number, so the answer is `false`.
+		§§ Whether the Number lies between the two given ones, both included.
 		§§
-		§§ @param lower — the lower bound, included
+		§§ The Number and the bounds can each be any member of the tower, so `Number.Pi::isBetween(3, and 22/7)` holds. Bounds in the wrong order enclose no Number, and the answer is `false`.
+		§§
+		§§ @param _ — the lower bound, included
 		§§ @param and — the upper bound, included
 		§§ @returns — `true` when the Number is within the bounds.
 		isBetween(_ lower: Number, and upper: Number) -> Boolean {
@@ -192,13 +195,12 @@ declarations {
 				::and(@::isLessThanOrEqualTo(upper))
 		}
 
-		§ The aggregates are folds over the members' own arithmetic. A
-		§ mixed-kind entry folds on `Exact` above, which holds the one 2×2
-		§ dispatch, and collapses a whole-number total back to an Integer at the
-		§ end — so a mixed List that happens to sum to a whole answers with the
-		§ simpler member.
+		§ Each aggregate is a fold over the members' own arithmetic. A mixed
+		§ entry folds on `Exact` above.
 
-		§§ Adds up every Number in the List. The empty List sums to zero.
+		§§ Adds up every Number in the List.
+		§§
+		§§ The empty List sums to zero. A mixed List answers an Integer when its total is whole, and a Rational otherwise.
 		§§
 		§§ @returns — the exact total.
 		overload static sum {
@@ -236,7 +238,9 @@ declarations {
 			}
 		}
 
-		§§ Multiplies every Number in the List together. The empty List multiplies to one.
+		§§ Multiplies every Number in the List together.
+		§§
+		§§ The empty List multiplies to one. A mixed List answers an Integer when its product is whole, and a Rational otherwise.
 		§§
 		§§ @returns — the exact product.
 		overload static product {
@@ -276,13 +280,14 @@ declarations {
 			}
 		}
 
-		§ The empty List needs no guard of its own in `average`: it sums to
-		§ zero and counts zero items, and dividing by the zero count is the
-		§ empty Optional the signature already answers with.
+		§ The empty List needs no guard here. It sums to zero, and dividing by
+		§ its zero count is the empty Optional the signature answers with.
 
-		§§ The arithmetic mean of the Numbers in the List — their sum divided by their count, as an exact Rational.
+		§§ The arithmetic mean of the Numbers in the List: their sum divided by their count, as an exact Rational.
 		§§
-		§§ @returns — the mean, or nothing for the empty List — no Numbers have no mean.
+		§§ The empty List has no mean.
+		§§
+		§§ @returns — the mean, or nothing for the empty List.
 		overload static average {
 			(_ integers: List<Integer>) -> Optional<Rational> {
 				<- Number.sum(integers)::divide(by integers::length())
@@ -341,7 +346,9 @@ declarations {
 
 		§§ The lower of two Numbers, or the lowest in a List of them.
 		§§
-		§§ @returns — the lowest Number — nothing for the empty List, which has none.
+		§§ The answer for two equal Numbers is the first of them. A List answers the earliest of its lowest items.
+		§§
+		§§ @returns — the lowest Number, or nothing for the empty List.
 		overload static lowestNumber {
 			(_ firstNumber: Integer, _ secondNumber: Integer) -> Integer {
 				if firstNumber::isLessThanOrEqualTo(secondNumber) {
@@ -381,11 +388,9 @@ declarations {
 				}
 			}
 
-			§ The List entries fold the pairwise ones over the items, seeded
-			§ empty so the first item becomes the running answer and the empty
-			§ List keeps the seed. On a tie the pairwise entries answer the
-			§ FIRST operand, so the earliest of equal items wins, exactly as
-			§ walking the List reads.
+			§ The List entries fold the pairwise ones over the items. The seed
+			§ is empty, so the first item becomes the running answer and the
+			§ empty List keeps it.
 
 			(_ integers: List<Integer>) -> Optional<Integer> {
 				constant start: Optional<Integer> = #Empty
@@ -415,9 +420,9 @@ declarations {
 				})
 			}
 
-			§ The mixed entry needs no dispatch of its own: the covering
-			§ `Number::isLessThanOrEqualTo` reads the cross-kind order, and an
-			§ `Integer | Rational` receiver reaches it.
+			§ The mixed entry needs no dispatch: an `Integer | Rational`
+			§ receiver reaches `Number::isLessThanOrEqualTo` for the
+			§ cross-kind order.
 			(
 				_ numbers: List<Integer | Rational>,
 			) -> Optional<Integer | Rational> {
@@ -477,7 +482,9 @@ declarations {
 
 		§§ The greater of two Numbers, or the greatest in a List of them.
 		§§
-		§§ @returns — the greatest Number — nothing for the empty List, which has none.
+		§§ The answer for two equal Numbers is the first of them. A List answers the earliest of its greatest items.
+		§§
+		§§ @returns — the greatest Number, or nothing for the empty List.
 		overload static greatestNumber {
 			(_ firstNumber: Integer, _ secondNumber: Integer) -> Integer {
 				if firstNumber::isGreaterThanOrEqualTo(secondNumber) {
@@ -517,9 +524,6 @@ declarations {
 				}
 			}
 
-			§ The same fold as `lowestNumber`'s List entries, over the greater
-			§ pairwise answer.
-
 			(_ integers: List<Integer>) -> Optional<Integer> {
 				constant start: Optional<Integer> = #Empty
 
@@ -548,8 +552,6 @@ declarations {
 				})
 			}
 
-			§ The same fold as `lowestNumber`'s mixed entry, over the covering
-			§ `Number::isGreaterThanOrEqualTo`.
 			(
 				_ numbers: List<Integer | Rational>,
 			) -> Optional<Integer | Rational> {
