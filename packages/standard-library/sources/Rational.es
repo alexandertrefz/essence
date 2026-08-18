@@ -508,12 +508,10 @@ declarations {
 						§ zero-denominator empty itself, so `andThen` carries all
 						§ three answers without a match of its own.
 						<- Integer.parse(
-							fractionPieces::firstItem()::value(defaultingTo ""),
+							fractionPieces::firstItem(defaultingTo ""),
 						)::andThen((parsedNumerator) {
 							<- Integer.parse(
-								fractionPieces
-									::lastItem()
-									::value(defaultingTo ""),
+								fractionPieces::lastItem(defaultingTo ""),
 							)::andThen((parsedDenominator) {
 								<- Rational.of(
 									parsedNumerator::multiply(with signFactor),
@@ -529,12 +527,12 @@ declarations {
 						if decimalPieces::length()::is(2) {
 							§ One dot — the digits on both sides of it over a power
 							§ of ten, one factor per fractional digit.
-							constant wholeText      = decimalPieces
-								::firstItem()
-								::value(defaultingTo "")
-							constant fractionalText = decimalPieces
-								::lastItem()
-								::value(defaultingTo "")
+							constant wholeText      = decimalPieces::firstItem(
+								defaultingTo "",
+							)
+							constant fractionalText = decimalPieces::lastItem(
+								defaultingTo "",
+							)
 
 							if wholeText
 								::isEmpty()
