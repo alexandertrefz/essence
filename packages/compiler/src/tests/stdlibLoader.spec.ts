@@ -198,7 +198,11 @@ describe("Standard Library Loader", () => {
 			// NOTE: A builtin has no file to point at — neither for the block
 			// as a whole nor for the `@param` lines inside it.
 			expect(firstItem.documentation?.position).toBeNull()
-			expect(firstItem.documentation?.parameterTags).toBeUndefined()
+			expect(
+				firstItem.documentation?.parameters.every(
+					(parameter) => parameter.tag === undefined,
+				),
+			).toBe(true)
 		}
 
 		let wrap = namespace.methods["wrap"]!
@@ -518,7 +522,7 @@ describe("Standard Library Loader", () => {
 			result.map((enriched) =>
 				enriched.diagnostics.map((diagnostic) => diagnostic.code),
 			),
-		).toEqual([[], ["unknown-documentation-parameter"]])
+		).toEqual([[], ["misnamed-documentation-parameter"]])
 
 		// NOTE: Positioned in the file it came from, which is the whole point
 		// of handing it over per Node.

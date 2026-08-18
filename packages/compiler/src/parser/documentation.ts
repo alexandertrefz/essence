@@ -11,6 +11,12 @@ import type { common } from "@essence-lang/interfaces"
 // known tag is left in the prose, so writing about an `@address` costs
 // nothing and a tag added later cannot retroactively break a comment.
 //
+// The `@param` lines are kept as a LIST, in the order they were written, and
+// each line opens an entry of its own. What a line documents is the Parameter
+// at its own position, so two lines carrying the same name are two Parameters
+// rather than one section written twice — which is also why nothing here has
+// to guard against a name like `toString` or `__proto__`.
+//
 // A tag carrying its text on its own line separates the two with an em-dash —
 // `@param other — the String to add` — which is where the reader's eye finds
 // the description, and how the Editor renders it back. A tag that leaves its
@@ -53,20 +59,20 @@ export type ParsedDocumentation = {
 	problems: Array<DocumentationProblem>
 }
 
+// NOTE: One `@param` while it is being collected — its text arrives line by
+// line, and is joined once the block ends.
+type ParameterSection = {
+	name: string
+	text: Array<string>
+	position: common.Position
+}
+
 export function parseDocumentation(
 	lines: Array<DocumentationLine>,
 	position: common.Position,
 ): ParsedDocumentation {
 	let description: Array<string> = []
-	// NOTE: Maps rather than Objects, because a Parameter may perfectly well be
-	// named after a member of `Object.prototype` — `toString`, `constructor`,
-	// `valueOf`. Looked up in an Object literal, `@param toString` finds the
-	// inherited function instead of nothing, and the section its text is
-	// appended to becomes that function. They are drained through
-	// `Object.fromEntries`, which defines rather than assigns, so what is handed
-	// out is an ordinary Object even for a Parameter named `__proto__`.
-	let parameters = new Map<string, Array<string>>()
-	let parameterTags = new Map<string, { position: common.Position }>()
+	let parameters: Array<ParameterSection> = []
 	let returns: Array<string> | null = null
 	let problems: Array<DocumentationProblem> = []
 	let fenced = false
@@ -105,19 +111,15 @@ export function parseDocumentation(
 
 			parameterName = tagged
 
-			let texts = parameters.get(parameterName)
-
-			// NOTE: A name written twice continues the section it opened, and
-			// keeps the Position of the tag that opened it.
-			if (texts === undefined) {
-				texts = []
-				parameters.set(parameterName, texts)
-				parameterTags.set(parameterName, {
-					position: spanIn(line, rest, tagged.length),
-				})
+			let entry: ParameterSection = {
+				name: parameterName,
+				text: [],
+				position: spanIn(line, rest, tagged.length),
 			}
 
-			section = texts
+			parameters.push(entry)
+
+			section = entry.text
 			rest = afterName
 		} else {
 			returns = []
@@ -145,20 +147,13 @@ export function parseDocumentation(
 	return {
 		documentation: {
 			description: joinSection(description),
-			parameters: Object.fromEntries(
-				[...parameters].map(([name, text]) => [
-					name,
-					joinSection(text),
-				]),
-			),
+			parameters: parameters.map((parameter) => ({
+				name: parameter.name,
+				text: joinSection(parameter.text),
+				tag: { position: parameter.position },
+			})),
 			returns: returns === null ? null : joinSection(returns),
 			position,
-			// NOTE: Left off entirely when the block writes no `@param`, so
-			// that the overwhelming majority of Documentation carries no empty
-			// Record around with it.
-			...(parameterTags.size === 0
-				? {}
-				: { parameterTags: Object.fromEntries(parameterTags) }),
 		},
 		problems,
 	}

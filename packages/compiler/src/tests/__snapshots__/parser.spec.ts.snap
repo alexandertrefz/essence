@@ -17467,7 +17467,7 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse a document
       {
         "documentation": {
           "description": "Anything that can represent itself as a String.",
-          "parameters": {},
+          "parameters": [],
           "position": {
             "end": {
               "column": 57,
@@ -17500,7 +17500,7 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse a document
             "signature": {
               "documentation": {
                 "description": "The String representation.",
-                "parameters": {},
+                "parameters": [],
                 "position": {
                   "end": {
                     "column": 37,

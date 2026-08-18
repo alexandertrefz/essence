@@ -364,10 +364,15 @@ function inBuiltinOrder<Entry>(
 function stripPosition(documentation: common.Documentation | undefined): void {
 	if (documentation != null) {
 		documentation.position = null
-		// NOTE: Every `@param` line carries a Position of its own, for the
-		// same reason and with the same problem — it points into a file no
-		// consumer of these tables has opened.
-		delete documentation.parameterTags
+
+		// NOTE: A `@param` line carries a Position of its own, for the same
+		// reason and with the same problem — it points into a file no consumer
+		// of these tables has opened. A signature's own Documentation is
+		// rebuilt as it resolves and carries none; an `overload` block's is
+		// handed on as it was written, so it is stripped here.
+		for (let parameter of documentation.parameters) {
+			delete parameter.tag
+		}
 	}
 }
 

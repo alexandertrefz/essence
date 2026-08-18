@@ -2210,9 +2210,13 @@ describe("Parser", () => {
 				let documentation = method.signature.documentation
 
 				expect(documentation?.description).toBe("Wraps a value.")
-				expect(documentation?.parameters).toEqual({
-					value: "the value to wrap",
-				})
+				expect(documentation?.parameters).toEqual([
+					{
+						name: "value",
+						text: "the value to wrap",
+						tag: { position: expect.anything() },
+					},
+				])
 				expect(documentation?.returns).toBe("the wrapped value")
 			}
 		})

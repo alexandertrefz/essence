@@ -1055,19 +1055,40 @@ add` — so that the name and its description stay legible in the source. A tag
 that leaves its text to the lines below it needs no separator. The text is
 lifted into the Documentation either way.
 
+A `@param` line documents the Parameter at its own position. The first line
+documents the first Parameter, the second the second, and each names its
+Parameter the way the signature names it: the label, or `_` where the Parameter
+carries none. A line naming the internal name of a labelled Parameter is
+accepted as well, for as long as the standard library is written that way.
+
 ### `unknown-documentation-parameter`
 
-A `@param` named something the Declaration below it does not take. Such a tag
-attaches to nothing, and is rendered into every Hover regardless — a
-description of a Parameter that the reader cannot find. A name is matched
-against each Parameter's external name first and then its internal one, and an
-`overload` block's own Documentation may name a Parameter of any of its
-Overloads.
+A `@param` line stands where the signature has no Parameter — past the last
+one, or above a Declaration that takes none at all. Such a line attaches to
+nothing, and is rendered into every Hover regardless: a description of a
+Parameter that the reader cannot find.
+
+A `§§` block above an `overload` keyword documents the set as a whole, where a
+position means nothing, so a line there may name a Parameter of any of the
+Overloads, under either of the names that Parameter is written with.
 
 A Declaration whose value is not written as a Function Literal is left
 unchecked: `constant alias = greet` is function-valued, but its Parameters
 survive only in a resolved Type, which keeps no internal names, so a `@param`
 there cannot be told from a typo.
+
+### `misnamed-documentation-parameter`
+
+A `@param` line names a Parameter other than the one at its position. The
+common cause is a line left out rather than a name misspelled: the lines then
+describe the second Parameter first, and the Diagnostic says which Parameter
+the written name belongs to.
+
+### `undocumented-parameter`
+
+A Parameter that no `@param` line reached. A block that writes no `@param` at
+all documents the Declaration as a whole and is left alone; once a block starts
+documenting Parameters, it documents every one of them.
 
 ## Modules
 

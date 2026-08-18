@@ -149,17 +149,18 @@ Warning: This '@returns' tag is not separated from its text
    │ Note 2: The text is lifted into the Documentation either way; what is missing is the separator, not the description.
 ───╯
 
-[unknown-documentation-parameter]
-Warning: This '@param' names a Parameter that does not exist
+[misnamed-documentation-parameter]
+Warning: This '@param' does not name the Parameter at its position
     ╭─┤ Documentation.es:15:12 │
     │
  15 │     §§ @param lft — the text to put first
     │               ─┬─  
-    │                ╰─── no Parameter is named 'lft'
+    │                ╰─── Parameter 1 is 'left'
     │ 
-    │ Help: Did you mean 'left'?
+    │ Help: Write '@param left'.
     │ 
-    │ Note: A '@param' is matched against each Parameter's external name first and then its internal one — 'startingWith initial: Result' is documented as '@param startingWith'.
+    │ Note 1: A '@param' line documents the Parameter at its own position — the first line the first Parameter — and names it the way the signature does: its label, or '_' where it carries none.
+    │ Note 2: The Parameters are 'left', 'right', in that order.
 ────╯
 
 [unknown-documentation-parameter]

@@ -18,20 +18,32 @@ export type Position = {
 // undifferentiated blob.
 export type Documentation = {
 	description: string
-	parameters: Record<string, string>
+	// NOTE: The `@param` lines in WRITTEN order. A line is matched to a
+	// Parameter by its POSITION — the first line documents the first Parameter
+	// — so the order is the meaning, and two lines can carry the same name.
+	parameters: Array<DocumentationParameter>
 	returns: string | null
 	// NOTE: Null for the hand written builtin Namespaces — they document
 	// themselves in TypeScript rather than in a `§§` block, so there is no
 	// Essence source to point back at.
 	position: Position | null
-	// NOTE: The `§§` line each `@param` was written on, keyed by the name it
-	// wrote — what lets the Enricher underline the tag itself rather than the
-	// whole block when the name matches no Parameter. Absent when the block
-	// writes no `@param`, and stripped for the standard library exactly as
-	// `position` is. The Position is nested under a field of that name so that
-	// the Formatter's AST comparison, which drops every `position`, keeps
-	// dropping this one too.
-	parameterTags?: Record<string, { position: Position }>
+}
+
+// NOTE: One `@param` line. The `name` is what the line wrote: the Parameter's
+// label, or `_` where the Parameter carries none. A Documentation attached to
+// a resolved signature carries the DISPLAY name instead — the label, or the
+// internal name in place of `_` — so that what a Hover shows is a name the
+// signature shows too.
+export type DocumentationParameter = {
+	name: string
+	text: string
+	// NOTE: The `§§` line the tag was written on, which lets the Enricher
+	// underline the tag itself rather than the whole block. Absent once the
+	// Documentation is attached to a resolved signature, and stripped for the
+	// standard library exactly as `position` is. The Position is nested under a
+	// field of that name so that the Formatter's AST comparison, which drops
+	// every `position`, keeps dropping this one too.
+	tag?: { position: Position }
 }
 
 // NOTE: One written Type annotation, paired with what it resolved to. The
@@ -253,6 +265,8 @@ export type DiagnosticCode =
 	// Documentation — the `§§` blocks above Declarations.
 	| "missing-documentation-separator"
 	| "unknown-documentation-parameter"
+	| "misnamed-documentation-parameter"
+	| "undocumented-parameter"
 	// Modules — the specifier, the file it names, and the graph they form.
 	| "invalid-module-specifier"
 	| "module-not-found"
