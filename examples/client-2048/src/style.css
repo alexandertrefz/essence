@@ -1,0 +1,281 @@
+:root {
+	color-scheme: light dark;
+	--ink: #3b3a33;
+	--paper: #faf8ef;
+	--board: #bbada0;
+	--empty: #cdc1b4;
+	font-family:
+		system-ui,
+		-apple-system,
+		"Segoe UI",
+		sans-serif;
+}
+
+body {
+	margin: 0;
+	background: var(--paper);
+	color: var(--ink);
+	display: grid;
+	place-items: center;
+	min-height: 100vh;
+}
+
+.game {
+	width: min(92vw, 420px);
+}
+
+.bar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+}
+
+h1 {
+	font-size: 3rem;
+	margin: 0;
+	letter-spacing: -0.03em;
+}
+
+.counters {
+	display: flex;
+	gap: 0.5rem;
+}
+
+.counter {
+	background: var(--board);
+	color: #f9f6f2;
+	border-radius: 6px;
+	padding: 0.4rem 0.9rem;
+	text-align: center;
+	min-width: 3.5rem;
+}
+
+.counter span {
+	display: block;
+	font-size: 0.7rem;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	opacity: 0.85;
+}
+
+.counter strong {
+	font-size: 1.3rem;
+}
+
+.hint {
+	margin: 0.75rem 0;
+	line-height: 1.4;
+}
+
+.controls {
+	display: flex;
+	gap: 0.5rem;
+	margin-bottom: 0.75rem;
+}
+
+button {
+	font: inherit;
+	border: 0;
+	border-radius: 6px;
+	padding: 0.5rem 1rem;
+	background: #8f7a66;
+	color: #f9f6f2;
+	cursor: pointer;
+}
+
+button:disabled {
+	opacity: 0.5;
+	cursor: default;
+}
+
+/* NOTE: A fixed 4×4 grid — both axes in equal fractions, so every square is
+   the same size whether it holds a tile, a four-digit tile, or nothing. */
+.board {
+	display: grid;
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+	grid-template-rows: repeat(4, minmax(0, 1fr));
+	gap: 10px;
+	padding: 10px;
+	background: var(--board);
+	border-radius: 8px;
+	aspect-ratio: 1;
+	box-sizing: border-box;
+	width: 100%;
+}
+
+.tile {
+	display: grid;
+	place-items: center;
+	min-width: 0;
+	min-height: 0;
+	overflow: hidden;
+	border-radius: 4px;
+	background: var(--empty);
+	font-weight: 700;
+	font-size: clamp(1.2rem, 6vw, 2rem);
+	color: #776e65;
+	transition: background 120ms ease;
+}
+
+/* NOTE: A tile that slid starts where it was — `--dx`/`--dy` squares away,
+   a square being its own width plus the gap — and travels to where it is
+   drawn. What happens once it lands (a merge swelling, a new tile popping in)
+   waits `--after-slide` for it. */
+.tile {
+	--dx: 0;
+	--dy: 0;
+	--after-slide: 0ms;
+}
+
+.tile.slid {
+	animation: slide 90ms ease-out;
+}
+
+.tile.slid.merged {
+	animation:
+		slide 90ms ease-out,
+		merge 180ms ease-out var(--after-slide);
+}
+
+.tile.appeared {
+	animation: appear 160ms ease-out var(--after-slide) backwards;
+}
+
+@keyframes slide {
+	from {
+		transform: translate(
+			calc(var(--dx) * (100% + 10px)),
+			calc(var(--dy) * (100% + 10px))
+		);
+	}
+
+	to {
+		transform: translate(0, 0);
+	}
+}
+
+@keyframes appear {
+	from {
+		transform: scale(0.4);
+		opacity: 0;
+	}
+
+	to {
+		transform: scale(1);
+		opacity: 1;
+	}
+}
+
+@keyframes merge {
+	0% {
+		transform: scale(1);
+	}
+
+	50% {
+		transform: scale(1.18);
+	}
+
+	100% {
+		transform: scale(1);
+	}
+}
+
+.counter strong.bumped {
+	animation: bump 220ms ease-out;
+	display: inline-block;
+}
+
+@keyframes bump {
+	0% {
+		transform: translateY(0);
+	}
+
+	40% {
+		transform: translateY(-4px) scale(1.12);
+	}
+
+	100% {
+		transform: translateY(0);
+	}
+}
+
+.board.shaken {
+	animation: shake 200ms ease-in-out;
+}
+
+@keyframes shake {
+	0%,
+	100% {
+		transform: translateX(0);
+	}
+	30% {
+		transform: translateX(-4px);
+	}
+	70% {
+		transform: translateX(4px);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.tile.appeared,
+	.tile.slid,
+	.tile.merged,
+	.counter strong.bumped,
+	.board.shaken {
+		animation: none;
+	}
+}
+
+.tile[data-value="2"] {
+	background: #eee4da;
+}
+.tile[data-value="4"] {
+	background: #ede0c8;
+}
+.tile[data-value="8"] {
+	background: #f2b179;
+	color: #f9f6f2;
+}
+.tile[data-value="16"] {
+	background: #f59563;
+	color: #f9f6f2;
+}
+.tile[data-value="32"] {
+	background: #f67c5f;
+	color: #f9f6f2;
+}
+.tile[data-value="64"] {
+	background: #f65e3b;
+	color: #f9f6f2;
+}
+.tile[data-value="128"] {
+	background: #edcf72;
+	color: #f9f6f2;
+	font-size: clamp(1rem, 5vw, 1.6rem);
+}
+.tile[data-value="256"] {
+	background: #edcc61;
+	color: #f9f6f2;
+	font-size: clamp(1rem, 5vw, 1.6rem);
+}
+.tile[data-value="512"] {
+	background: #edc850;
+	color: #f9f6f2;
+	font-size: clamp(1rem, 5vw, 1.6rem);
+}
+.tile[data-value="1024"] {
+	background: #edc53f;
+	color: #f9f6f2;
+	font-size: clamp(0.9rem, 4.5vw, 1.4rem);
+}
+.tile[data-value="2048"] {
+	background: #edc22e;
+	color: #f9f6f2;
+	font-size: clamp(0.9rem, 4.5vw, 1.4rem);
+}
+
+.status {
+	min-height: 1.5em;
+	font-weight: 600;
+	text-align: center;
+}

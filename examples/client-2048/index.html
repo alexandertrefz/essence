@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>2048 — in Essence</title>
+		<link rel="stylesheet" href="/src/style.css" />
+	</head>
+	<body>
+		<main class="game">
+			<header class="bar">
+				<h1>2048</h1>
+				<div class="counters">
+					<div class="counter">
+						<span>Score</span><strong id="score">0</strong>
+					</div>
+					<div class="counter">
+						<span>Moves</span><strong id="moves">0</strong>
+					</div>
+				</div>
+			</header>
+			<p class="hint">
+				Arrow keys to push. The game itself is <code>src/Game.es</code>;
+				this page only draws it and rolls the dice.
+			</p>
+			<div class="controls">
+				<button id="undo" type="button">Undo</button>
+				<button id="new" type="button">New game</button>
+			</div>
+			<div id="board" class="board" aria-live="polite"></div>
+			<p id="status" class="status"></p>
+		</main>
+		<script type="module" src="/src/main.ts"></script>
+	</body>
+</html>
