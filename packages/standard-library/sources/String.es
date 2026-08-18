@@ -353,11 +353,8 @@ declarations {
 		§§ @returns — the repeated String. A count below one answers the empty String.
 		repeat(times count: Integer) -> String
 
-		§ Native. `characters()::reverse()::join` loses the character view:
-		§ segmenting the joined text again can re-pair three regional
-		§ indicators into characters the original never had. The native
-		§ remembers the reversed view, which makes `reverse` its own inverse
-		§ and keeps the `lastIndex` derivation below sound.
+		§ Native, and the `lastIndex` derivation below rests on it; see
+		§ DEVELOPMENT.md, What to weigh before writing the next one.
 
 		§§ Answers the String with its characters in the opposite order.
 		reverse() -> String

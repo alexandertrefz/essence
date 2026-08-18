@@ -50,6 +50,11 @@ too — its empty part inserted at UTF-16 code-unit boundaries — but the empty
 part is now a no-op, so it is `split(on part)::join(with replacement)` in
 Essence.
 
+`Record` is the one Namespace with a native the library does not offer.
+`Record.keys` is declared and `entries` and `values` are not: both would answer
+a value of any Type, and there is no `Anything` Type to write that with. They
+exist in the runtime, and they arrive here with the JSON design.
+
 ## The voice
 
 The library is meant to be guessable: after a handful of Methods, a reader

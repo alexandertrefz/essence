@@ -14,8 +14,8 @@ import {
 
 declarations {
 
-	§ The whole numeric tower under one name. Hovers, Inlay Hints and
-	§ Diagnostics print this Union as `Number`. Assignability ignores the name.
+	§ The whole numeric tower under one name; see DEVELOPMENT.md, Editing
+	§ hazards, for what naming a Union does and does not do.
 	type Number = Integer | Rational | Irrational
 
 	§ `Algebraic` and `Transcendental` are complements: transcendental means
