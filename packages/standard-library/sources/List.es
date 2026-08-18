@@ -173,24 +173,31 @@ declarations {
 
 		§§ Answers the first item, or the first item the check accepts.
 		§§
-		§§ @returns — the matching item, or nothing when there is none.
+		§§ The empty List has no first item, and a check can accept none of the items. The `defaultingTo:` entries answer the given item in place of nothing.
 		overload firstItem {
+			§§ Answers the first item of the List.
+			§§
+			§§ @returns — the item, or nothing for the empty List.
 			() -> Optional<ItemType> {
 				§ `item(at:)` answers empty for a position outside the List, so
 				§ the empty List needs no guard here.
 				<- @::item(at 0)
 			}
 
-			§ Written on `reduce`'s early-stopping entry, so the fold finishes
-			§ at the first accepted item and never walks the rest.
-			§ `everyItem(where:)::firstItem()` walks every item.
-			§
-			§ On a `List<Optional<Item>>` the answer is an
-			§ `Optional<Optional<Item>>`, and the two levels say different
-			§ things. An `#Empty` answer means no item matched. A
-			§ `#Value(#Empty)` answer means the item that matched is itself
-			§ empty.
+			§§ Answers the first item the check accepts.
+			§§
+			§§ @param where — the check each item is offered to
+			§§ @returns — the matching item, or nothing when no item is accepted.
 			(where check: (_: ItemType) -> Boolean) -> Optional<ItemType> {
+				§ Written on `reduce`'s early-stopping entry, so the fold
+				§ finishes at the first accepted item and never walks the rest.
+				§ `everyItem(where:)::firstItem()` walks every item.
+				§
+				§ On a `List<Optional<Item>>` the answer is an
+				§ `Optional<Optional<Item>>`, and the two levels say different
+				§ things. An `#Empty` answer means no item matched. A
+				§ `#Value(#Empty)` answer means the item that matched is itself
+				§ empty.
 				constant start: Optional<ItemType> = #Empty
 
 				<- @::reduce(startingWith start, step (found, item) {
@@ -225,7 +232,7 @@ declarations {
 
 		§§ Answers the last item, or the last item the check accepts.
 		§§
-		§§ @returns — the matching item, or nothing when there is none.
+		§§ The empty List has no last item, and a check can accept none of the items. The `defaultingTo:` entries answer the given item in place of nothing.
 		overload lastItem {
 			§§ Answers the last item of the List.
 			§§
@@ -465,9 +472,7 @@ declarations {
 
 		§§ Answers the item at the given position.
 		§§
-		§§ The position counts from zero. A negative position counts back from the end: -1 is the last item. The furthest a negative position reaches back is the first item.
-		§§
-		§§ @returns — the item, or nothing when the position is outside the List.
+		§§ The position counts from zero. A negative position counts back from the end: -1 is the last item. A position outside the List answers nothing, and the `defaultingTo:` entry answers the given item instead.
 		overload item {
 			§§ Answers the item at the given position.
 			§§
@@ -493,7 +498,7 @@ declarations {
 
 		§§ Answers the position of the first item equal to the given one, or of the first item the check accepts.
 		§§
-		§§ @returns — the zero-based position, or nothing when there is no such item.
+		§§ A List without such an item answers nothing, and the `defaultingTo:` entries answer the given position instead.
 		overload firstIndex {
 			§§ Answers the position of the first item equal to the given one.
 			§§
@@ -694,7 +699,7 @@ declarations {
 		§§
 		§§ Equality is the items' own `is`. The Method is available whenever the items conform to `Equatable`.
 		§§
-		§§ @returns — the zero-based position, or nothing when the item is absent.
+		§§ A List without that item answers nothing, and the `defaultingTo:` entry answers the given position instead.
 		overload lastIndex {
 			§§ Answers the position of the last item equal to the given one.
 			§§
