@@ -87,16 +87,16 @@ implementation {
 	show("String.isNot(_ String)", greeting::isNot("nope"))
 	show("String.isNot(_ String) [equal]", greeting::isNot("Hello, World"))
 	show(
-		"String.is(_ String, comparing: Case) [sensitive]",
-		"Hello"::is("hello", comparing Case#Sensitive),
+		"String.is(_ String, comparing: CaseSensitivity) [sensitive]",
+		"Hello"::is("hello", comparing CaseSensitivity#Sensitive),
 	)
 	show(
-		"String.is(_ String, comparing: Case) [insensitive]",
-		"Hello"::is("hello", comparing Case#Insensitive),
+		"String.is(_ String, comparing: CaseSensitivity) [insensitive]",
+		"Hello"::is("hello", comparing CaseSensitivity#Insensitive),
 	)
 	show(
-		"String.is(_ String, comparing: Case) [insensitive, differing]",
-		"Hello"::is("world", comparing Case#Insensitive),
+		"String.is(_ String, comparing: CaseSensitivity) [insensitive, differing]",
+		"Hello"::is("world", comparing CaseSensitivity#Insensitive),
 	)
 	show("String.prepend(_ String)", greeting::prepend(">> "))
 	show("String.prepend(_ String) [empty]", greeting::prepend(emptyText))
@@ -276,16 +276,16 @@ third"::lines())
 	)
 	show("String.compare(to: String) [greater]", "b"::compare(to "a"))
 	show(
-		"String.compare(to: String, comparing: Case) [sensitive]",
-		"abc"::compare(to "ABC", comparing Case#Sensitive),
+		"String.compare(to: String, comparing: CaseSensitivity) [sensitive]",
+		"abc"::compare(to "ABC", comparing CaseSensitivity#Sensitive),
 	)
 	show(
-		"String.compare(to: String, comparing: Case) [insensitive, equal]",
-		"abc"::compare(to "ABC", comparing Case#Insensitive),
+		"String.compare(to: String, comparing: CaseSensitivity) [insensitive, equal]",
+		"abc"::compare(to "ABC", comparing CaseSensitivity#Insensitive),
 	)
 	show(
-		"String.compare(to: String, comparing: Case) [insensitive, less]",
-		"abc"::compare(to "ABD", comparing Case#Insensitive),
+		"String.compare(to: String, comparing: CaseSensitivity) [insensitive, less]",
+		"abc"::compare(to "ABD", comparing CaseSensitivity#Insensitive),
 	)
 	show("String.toString()", greeting::toString())
 	show("String.toString() [empty]", emptyText::toString())
@@ -1234,23 +1234,32 @@ third"::lines())
 	show("Side.toString() [End]", atEnd::toString())
 	show("Side.toString() [BothEnds]", atBothEnds::toString())
 
-	§ ——— Case —————————————————————————————————————————————————————————————
-	constant sensitive: Case   = #Sensitive
-	constant insensitive: Case = #Insensitive
+	§ ——— CaseSensitivity ——————————————————————————————————————————————————
+	constant sensitive: CaseSensitivity   = #Sensitive
+	constant insensitive: CaseSensitivity = #Insensitive
 
-	show("Choice_Equatable.is(_ Case) [Sensitive]", sensitive::is(#Sensitive))
 	show(
-		"Choice_Equatable.is(_ Case) [Insensitive]",
+		"Choice_Equatable.is(_ CaseSensitivity) [Sensitive]",
+		sensitive::is(#Sensitive),
+	)
+	show(
+		"Choice_Equatable.is(_ CaseSensitivity) [Insensitive]",
 		insensitive::is(#Insensitive),
 	)
-	show("Choice_Equatable.is(_ Case) [differing]", sensitive::is(#Insensitive))
 	show(
-		"Choice_Equatable.isNot(_ Case) [differing]",
+		"Choice_Equatable.is(_ CaseSensitivity) [differing]",
+		sensitive::is(#Insensitive),
+	)
+	show(
+		"Choice_Equatable.isNot(_ CaseSensitivity) [differing]",
 		sensitive::isNot(#Insensitive),
 	)
-	show("Choice_Equatable.isNot(_ Case) [same]", sensitive::isNot(#Sensitive))
-	show("Case.toString() [Sensitive]", sensitive::toString())
-	show("Case.toString() [Insensitive]", insensitive::toString())
+	show(
+		"Choice_Equatable.isNot(_ CaseSensitivity) [same]",
+		sensitive::isNot(#Sensitive),
+	)
+	show("CaseSensitivity.toString() [Sensitive]", sensitive::toString())
+	show("CaseSensitivity.toString() [Insensitive]", insensitive::toString())
 
 	§ ——— NormalizationForm ————————————————————————————————————————————————
 	constant composedCanonical: NormalizationForm   = #ComposedCanonical

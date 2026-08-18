@@ -469,7 +469,7 @@ describe("Stdlib Call Graph", () => {
 			"Boolean.exclusiveOr",
 			"Boolean.isNot",
 			"Boolean.toString",
-			"Case.toString",
+			"CaseSensitivity.toString",
 			"Integer.absolute",
 			"Integer.add__overload$2",
 			"Integer.add__overload$3",

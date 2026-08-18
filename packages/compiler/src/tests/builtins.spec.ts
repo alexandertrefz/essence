@@ -3,7 +3,7 @@ import { describe, expect, it } from "bun:test"
 import type { common } from "@essence-lang/interfaces"
 import * as algebraic from "@essence-lang/runtime/Algebraic"
 import * as boolean from "@essence-lang/runtime/Boolean"
-import * as caseModule from "@essence-lang/runtime/Case"
+import * as caseSensitivity from "@essence-lang/runtime/CaseSensitivity"
 import * as functions from "@essence-lang/runtime/functions"
 import * as integer from "@essence-lang/runtime/Integer"
 import * as list from "@essence-lang/runtime/List"
@@ -48,7 +48,7 @@ const runtimeModules: Record<string, Record<string, unknown>> = {
 	NestedOptional: nestedOptional,
 	Ordering: ordering,
 	Side: side,
-	Case: caseModule,
+	CaseSensitivity: caseSensitivity,
 	NormalizationForm: normalizationForm,
 	NumberFormat: numberFormat,
 	Rounding: rounding,

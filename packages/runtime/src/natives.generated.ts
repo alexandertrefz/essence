@@ -257,7 +257,7 @@ export type SideNatives = {
 
 }
 
-export type CaseNatives = {
+export type CaseSensitivityNatives = {
 
 }
 
@@ -505,9 +505,9 @@ declare const SideModule: typeof import("./Side")
 export const $Side: SideNatives = SideModule
 export const $SideAbsent: AssertNoEssenceExports<typeof import("./Side"), "toString"> = true
 
-declare const CaseModule: typeof import("./Case")
-export const $Case: CaseNatives = CaseModule
-export const $CaseAbsent: AssertNoEssenceExports<typeof import("./Case"), "toString"> = true
+declare const CaseSensitivityModule: typeof import("./CaseSensitivity")
+export const $CaseSensitivity: CaseSensitivityNatives = CaseSensitivityModule
+export const $CaseSensitivityAbsent: AssertNoEssenceExports<typeof import("./CaseSensitivity"), "toString"> = true
 
 declare const NormalizationFormModule: typeof import("./NormalizationForm")
 export const $NormalizationForm: NormalizationFormNatives = NormalizationFormModule
