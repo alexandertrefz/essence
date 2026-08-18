@@ -34,8 +34,13 @@ export function renderDocumentation(
 
 	let sections = [documentation.description]
 
-	for (let [name, text] of Object.entries(documentation.parameters)) {
-		sections.push(`**${name}** — ${text}`)
+	// NOTE: In the order the Parameters stand in, which is the order the
+	// `@param` lines were written in. The name is the one the signature shows —
+	// a Documentation attached to a resolved signature carries the internal
+	// name where the line wrote `_`, so a positional Parameter is named here
+	// rather than underlined.
+	for (let parameter of documentation.parameters) {
+		sections.push(`**${parameter.name}** — ${parameter.text}`)
 	}
 
 	if (documentation.returns !== null) {

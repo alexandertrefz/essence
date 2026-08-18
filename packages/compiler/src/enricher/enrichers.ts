@@ -70,7 +70,8 @@ import {
 	lookupTypeOf,
 	recordValueTypeOf,
 	parameterDocumentation,
-	reportUnknownDocumentationParameters,
+	reportDocumentationParameters,
+	resolvedDocumentation,
 	resolveAliasedType,
 	resolveChoiceDeclarationStatementType,
 	resolveConformances,
@@ -2228,7 +2229,7 @@ function reportUnknownDocumentationOfValue(
 	let parameters = heldParameters(value)
 
 	if (parameters !== null) {
-		reportUnknownDocumentationParameters(documentation, [parameters])
+		reportDocumentationParameters(documentation, [parameters])
 	}
 }
 
@@ -2607,7 +2608,7 @@ export function enrichNamespaceDefinitionStatement(
 ): common.typed.NamespaceDefinitionStatementNode {
 	// NOTE: The Namespace's own block. Its Methods and Properties each check
 	// their own, so this is only about a `@param` written above `namespace`.
-	reportUnknownDocumentationParameters(node.documentation, [])
+	reportDocumentationParameters(node.documentation, [])
 
 	function enrichProperties(
 		properties: Record<string, parser.NamespacePropertyNode>,
@@ -3102,7 +3103,7 @@ export function enrichProtocolDeclarationStatement(
 ): common.typed.ProtocolDeclarationStatementNode {
 	// NOTE: The Protocol's own block. Each Method signature it holds checks
 	// its own as its Parameter Types are resolved.
-	reportUnknownDocumentationParameters(node.documentation, [])
+	reportDocumentationParameters(node.documentation, [])
 
 	let protocolType =
 		hoistedType ?? resolveProtocolDeclarationStatementType(node, scope)
@@ -3168,7 +3169,7 @@ export function enrichTypeAliasStatement(
 	scope: enricher.Scope,
 	hoistedType?: common.Type,
 ): common.typed.TypeAliasStatementNode {
-	reportUnknownDocumentationParameters(node.documentation, [])
+	reportDocumentationParameters(node.documentation, [])
 	reportInferredTypeParameters(node.generics, "Type Alias")
 
 	let type = hoistedType ?? resolveTypeAliasStatementType(node, scope)
@@ -3235,7 +3236,7 @@ export function enrichChoiceDeclarationStatement(
 	scope: enricher.Scope,
 	hoistedType?: common.UnionType | common.GenericAliasType,
 ): common.typed.ChoiceDeclarationStatementNode {
-	reportUnknownDocumentationParameters(node.documentation, [])
+	reportDocumentationParameters(node.documentation, [])
 	reportInferredTypeParameters(node.generics, "Choice")
 
 	let type = hoistedType ?? resolveChoiceDeclarationStatementType(node, scope)
@@ -5372,7 +5373,10 @@ function resolveFunctionDefinitionType(
 			parameterTypes,
 			expectedFunction,
 		),
-		documentation: node.documentation ?? undefined,
+		documentation: resolvedDocumentation(
+			node.documentation,
+			node.parameters,
+		),
 	}
 
 	recordContextualFunctionType(node, {
@@ -8858,12 +8862,13 @@ function resolveContextualParameterTypes(
 	scope: enricher.Scope,
 	expectedFunction: common.FunctionType | null,
 ): Array<common.Parameter> {
-	reportUnknownDocumentationParameters(node.documentation, [node.parameters])
+	reportDocumentationParameters(node.documentation, [node.parameters])
 
 	return node.parameters.map((parameter, index) => {
 		let documentation = parameterDocumentation(
 			parameter,
 			node.documentation,
+			index,
 		)
 
 		if (parameter.type !== null) {

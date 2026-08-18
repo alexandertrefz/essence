@@ -969,7 +969,10 @@ export function resolveFunctionSignatureType(
 		generics: resolveGenericDeclarations(node.generics, scope),
 		parameterTypes: resolveParameterTypes(node, functionScope),
 		returnType: resolveDeclaredType(node.returnType, functionScope),
-		documentation: node.documentation ?? undefined,
+		documentation: resolvedDocumentation(
+			node.documentation,
+			node.parameters,
+		),
 	}
 }
 
@@ -989,7 +992,10 @@ function resolveFreeFunctionEntry(
 		generics: resolveGenericDeclarations(signature.generics, scope),
 		parameterTypes: resolveParameterTypes(signature, functionScope),
 		returnType: resolveDeclaredType(signature.returnType, functionScope),
-		documentation: signature.documentation ?? undefined,
+		documentation: resolvedDocumentation(
+			signature.documentation,
+			signature.parameters,
+		),
 	}
 }
 
@@ -1003,7 +1009,7 @@ export function resolveOverloadedFunctionStatementType(
 ): common.OverloadedStaticMethodType {
 	let entries = node.methods.map((entry) => methodSignatureEntry(entry))
 
-	reportUnknownDocumentationParameters(
+	reportDocumentationParameters(
 		node.documentation,
 		entries.map((entry) => entry.parameters),
 	)
@@ -1061,7 +1067,10 @@ function resolveProtocolSignature(
 		generics: [],
 		parameterTypes,
 		returnType: resolveType(signature.returnType, scope),
-		documentation: signature.documentation ?? undefined,
+		documentation: resolvedDocumentation(
+			signature.documentation,
+			signature.parameters,
+		),
 	}
 }
 
@@ -1081,7 +1090,7 @@ function resolveProtocolMethodType(
 			...resolveProtocolSignature(node.signature, scope, null),
 		}
 	} else if (node.nodeType === "OverloadedProtocolMethod") {
-		reportUnknownDocumentationParameters(
+		reportDocumentationParameters(
 			node.documentation,
 			node.signatures.map((signature) => signature.parameters),
 		)
@@ -1094,7 +1103,7 @@ function resolveProtocolMethodType(
 			documentation: node.documentation ?? undefined,
 		}
 	} else {
-		reportUnknownDocumentationParameters(
+		reportDocumentationParameters(
 			node.documentation,
 			node.signatures.map((signature) => signature.parameters),
 		)
@@ -2174,7 +2183,7 @@ export function derivedEquatableNamespaceForChoice(
 		returnType: { type: "Boolean" },
 		documentation: {
 			description,
-			parameters: { other: "the Choice to compare with" },
+			parameters: [{ name: "other", text: "the Choice to compare with" }],
 			returns,
 			position: null,
 		},
@@ -4441,9 +4450,7 @@ export function resolveMethodLookupNamespacesForReceiverType(
 // receiver Argument re-binds them on every invocation.
 // NOTE: The Parameter Types of a signature, carrying whatever documents each
 // Parameter. A Parameter is described either by a `§§` block of its own or by
-// an `@param` in the Declaration's — the tag is looked up under both names,
-// since a call site writes the external one and the body reads the internal
-// one.
+// the `@param` line standing at its position in the Declaration's.
 function resolveParameterTypes(
 	definition: {
 		parameters: Array<parser.ParameterNode>
@@ -4451,7 +4458,7 @@ function resolveParameterTypes(
 	},
 	scope: enricher.Scope,
 ): Array<common.Parameter> {
-	reportUnknownDocumentationParameters(definition.documentation, [
+	reportDocumentationParameters(definition.documentation, [
 		definition.parameters,
 	])
 	refuseIndistinguishableDefaults(definition.parameters)
@@ -4461,12 +4468,13 @@ function resolveParameterTypes(
 	// all route through here — which is why `hasDefault` is set only here. The
 	// expression itself stays on the Parameter Node; a Type only has to say
 	// what a caller may leave out.
-	return definition.parameters.map((parameter) => ({
+	return definition.parameters.map((parameter, index) => ({
 		name: parameter.externalName?.content ?? null,
 		type: resolveDeclaredType(parameter.type, scope),
 		documentation: parameterDocumentation(
 			parameter,
 			definition.documentation,
+			index,
 		),
 		...(parameter.defaultValue === null
 			? {}
@@ -4710,81 +4718,316 @@ function refuseIndistinguishableDefaults(
 	}
 }
 
-// NOTE: A `@param` naming neither the external nor the internal name of any
-// Parameter describes nothing. It attaches to nothing and is rendered into
-// every Hover regardless — a description of a Parameter the reader then goes
-// looking for and cannot find, which is the failure mode a rename leaves
-// behind. The Warning is what makes it visible; the rendering is unchanged,
-// since dropping the section would take the text away from the one person who
-// can still fix it.
+// NOTE: A `@param` line documents the Parameter at its OWN POSITION: the first
+// line documents the first Parameter, the second the second, and the name it
+// writes is the name the signature writes for that Parameter — its label, or
+// `_` where it carries none. A line that names something else describes a
+// Parameter the reader then goes looking for and cannot find, which is the
+// failure mode a rename leaves behind. The Warning is what makes it visible;
+// the rendering is unchanged, since dropping the section would take the text
+// away from the one person who can still fix it.
+//
+// Position rather than name, because a name is not enough to tell a `_` from
+// another `_`, and because the order of the lines is then the order of the
+// signature — the one arrangement a reader can check by looking.
 //
 // `signatures` is a list rather than one Parameter list because a `§§` block
-// above an `overload` keyword documents the set as a whole: a name any one of
-// its Overloads takes is a name that exists. Each Overload's own block is
-// checked against its own Parameters separately.
-export function reportUnknownDocumentationParameters(
+// above an `overload` keyword documents the set as a whole. Position means
+// nothing across a set whose entries take different Parameters, so such a block
+// is held to the older rule: a name any one of its Overloads takes is a name
+// that exists. Each Overload's own block is checked against its own Parameters,
+// by position.
+export function reportDocumentationParameters(
 	documentation: common.Documentation | null | undefined,
 	signatures: Array<Array<parser.ParameterNode>>,
 ): void {
-	let tags = documentation?.parameterTags
+	let tags = documentation?.parameters ?? []
 
-	// NOTE: Absent both when the block writes no `@param` and when there is no
-	// block to point at — a builtin Namespace documents itself in TypeScript,
-	// and the standard library's Positions are stripped as it loads.
-	if (tags === undefined) {
+	// NOTE: Nothing to point at: a block that writes no `@param`, a builtin
+	// Namespace that documents itself in TypeScript, or a Documentation already
+	// attached to a resolved signature, whose tag Positions are gone.
+	if (!tags.some((tag) => tag.tag !== undefined)) {
 		return
 	}
 
+	if (signatures.length === 1) {
+		reportPositionalDocumentation(tags, signatures[0]!)
+
+		return
+	}
+
+	reportUnknownDocumentationNames(tags, signatures)
+}
+
+// NOTE: How closely a `§§` block's `@param` lines are held to the signature.
+//
+// `"strict"` is the rule as written: one line per Parameter, in order, each
+// naming its Parameter the way the signature writes it. `"lenient"` accepts two
+// things besides — a run that stops before the last Parameter, and a line
+// naming a Parameter's INTERNAL name where the signature gives it a label.
+//
+// The standard library is written the older, name-matched way, and the docs
+// pass of `plans/2026-08-18-stdlib-readability.md` rewrites its tags. Flipping
+// this one constant to `"strict"` in that same change is what turns the rule
+// on; nothing else here has to move.
+//
+// A block writing NO `@param` at all is left alone in both modes. It documents
+// the Declaration as a whole, which is what most of them do; asking for a line
+// per Parameter everywhere is the next notch to tighten, and it belongs beside
+// the `undocumented` walk below.
+export type DocumentationStrictness = "lenient" | "strict"
+
+export const documentationStrictness: DocumentationStrictness = "lenient"
+
+// NOTE: The two names a Parameter can be written under, as the rule sees them:
+// the label a call site writes, and the name the body reads it under. Either
+// can be absent — a positional Parameter has no label, and a Parameter taken
+// apart by a Pattern has no single internal name.
+export type DocumentedParameter = {
+	label: string | null
+	internalName: string | null
+}
+
+export type DocumentationParameterProblem =
+	// NOTE: A line past the end of the Parameter list.
+	| { kind: "unknown"; index: number }
+	// NOTE: A line naming something other than the Parameter at its position.
+	| { kind: "misnamed"; index: number }
+	// NOTE: A Parameter no line reached. Strict only.
+	| { kind: "undocumented"; index: number }
+
+// NOTE: The rule itself, as a pure function of the two lists, so that both
+// strictnesses can be read and tested without a Program around them.
+export function documentationParameterProblems(
+	tags: Array<string>,
+	parameters: Array<DocumentedParameter>,
+	strictness: DocumentationStrictness = documentationStrictness,
+): Array<DocumentationParameterProblem> {
+	let problems: Array<DocumentationParameterProblem> = []
+
+	for (let [index, tag] of tags.entries()) {
+		let parameter = parameters[index]
+
+		if (parameter === undefined) {
+			problems.push({ kind: "unknown", index })
+		} else if (!namesParameter(tag, parameter, strictness)) {
+			problems.push({ kind: "misnamed", index })
+		}
+	}
+
+	if (strictness === "strict") {
+		for (let index = tags.length; index < parameters.length; index += 1) {
+			problems.push({ kind: "undocumented", index })
+		}
+	}
+
+	return problems
+}
+
+function namesParameter(
+	tag: string,
+	parameter: DocumentedParameter,
+	strictness: DocumentationStrictness,
+): boolean {
+	if (tag === writtenParameterName(parameter)) {
+		return true
+	}
+
+	return (
+		strictness === "lenient" &&
+		parameter.internalName !== null &&
+		tag === parameter.internalName
+	)
+}
+
+// NOTE: What the signature writes for a Parameter, which is what its `@param`
+// writes too — the label, or `_` where there is none.
+function writtenParameterName(parameter: DocumentedParameter): string {
+	return parameter.label ?? "_"
+}
+
+// NOTE: What a reader is shown in place of a bare `_`: the name the body reads
+// the Parameter under, which is the only name a positional Parameter has.
+function displayParameterName(parameter: DocumentedParameter): string {
+	return parameter.label ?? parameter.internalName ?? "_"
+}
+
+function documentedParameter(
+	parameter: parser.ParameterNode,
+): DocumentedParameter {
+	return {
+		label: parameter.externalName?.content ?? null,
+		internalName: parameterInternalName(parameter)?.content ?? null,
+	}
+}
+
+const positionalRule =
+	"A '@param' line documents the Parameter at its own position — the first line the first Parameter — and names it the way the signature does: its label, or '_' where it carries none."
+
+function reportPositionalDocumentation(
+	tags: Array<common.DocumentationParameter>,
+	signature: Array<parser.ParameterNode>,
+): void {
+	let parameters = signature.map(documentedParameter)
+	let written = parameters.map(writtenParameterName)
+	let problems = documentationParameterProblems(
+		tags.map((tag) => tag.name),
+		parameters,
+	)
+	let order =
+		parameters.length === 0
+			? []
+			: [`The Parameters are '${written.join("', '")}', in that order.`]
+
+	for (let problem of problems) {
+		if (problem.kind === "undocumented") {
+			let parameter = signature[problem.index]!
+
+			reportWarning(
+				"This Parameter has no '@param' line",
+				parameter.position,
+				{
+					code: "undocumented-parameter",
+					labels: [
+						primary(
+							parameter.position,
+							`Parameter ${problem.index + 1} is undocumented`,
+						),
+					],
+					notes: [positionalRule],
+					helps: [
+						`Write '@param ${written[problem.index]} — …' as line ${problem.index + 1} of the run.`,
+					],
+				},
+			)
+
+			continue
+		}
+
+		let tag = tags[problem.index]
+
+		// NOTE: A tag Position is what these two underline, so a block whose
+		// Positions were stripped is skipped rather than reported against the
+		// Declaration it documents.
+		if (tag?.tag === undefined) {
+			continue
+		}
+
+		if (problem.kind === "unknown") {
+			reportWarning(
+				"This '@param' names a Parameter that does not exist",
+				tag.tag.position,
+				{
+					code: "unknown-documentation-parameter",
+					labels: [
+						primary(
+							tag.tag.position,
+							parameters.length === 0
+								? "what this documents takes no Parameters"
+								: `there is no Parameter ${problem.index + 1}`,
+						),
+					],
+					notes:
+						parameters.length === 0
+							? [
+									"A '§§' block documents whatever is declared below it. A '@param' belongs above something that takes Parameters — a Function, a Method, or a Declaration holding a Function literal.",
+								]
+							: [positionalRule, ...order],
+					helps: [
+						parameters.length === 0
+							? "Remove the tag — there is no Parameter for it to describe."
+							: `Remove the tag — this signature takes ${countOf(parameters.length, "Parameter")}.`,
+					],
+				},
+			)
+
+			continue
+		}
+
+		let parameter = parameters[problem.index]!
+		let elsewhere = written.indexOf(tag.name)
+		let notes = [positionalRule, ...order]
+
+		// NOTE: The common shape of the mistake is a line left out rather than
+		// a name misspelled: the lines describe the second Parameter first,
+		// because the first one was never written about.
+		if (elsewhere !== -1 && elsewhere !== problem.index) {
+			notes.push(
+				`'${tag.name}' is Parameter ${elsewhere + 1}, so a line for each Parameter before it belongs above this one.`,
+			)
+		}
+
+		reportWarning(
+			"This '@param' does not name the Parameter at its position",
+			tag.tag.position,
+			{
+				code: "misnamed-documentation-parameter",
+				labels: [
+					primary(
+						tag.tag.position,
+						`Parameter ${problem.index + 1} is '${displayParameterName(parameter)}'`,
+					),
+				],
+				notes,
+				helps: [
+					parameter.label === null
+						? `Write '@param _' — Parameter ${problem.index + 1} carries no label.`
+						: `Write '@param ${parameter.label}'.`,
+				],
+			},
+		)
+	}
+}
+
+// NOTE: A `§§` block above an `overload` keyword, where position says nothing.
+// A name any Overload of the set takes is a name that exists; anything else is
+// a description of a Parameter no entry has.
+function reportUnknownDocumentationNames(
+	tags: Array<common.DocumentationParameter>,
+	signatures: Array<Array<parser.ParameterNode>>,
+): void {
 	let names: Array<string> = []
 
-	for (let parameters of signatures) {
-		for (let parameter of parameters) {
-			// NOTE: A `_` label leaves the external name null, so only the
-			// internal one can be written about. Both are collected in the
-			// order `parameterDocumentation` looks them up.
+	for (let signature of signatures) {
+		for (let parameter of signature) {
+			let parameterNames = documentedParameter(parameter)
+
 			for (let name of [
-				parameter.externalName,
-				parameterInternalName(parameter),
+				parameterNames.label,
+				parameterNames.internalName,
 			]) {
-				if (name !== null && !names.includes(name.content)) {
-					names.push(name.content)
+				if (name !== null && !names.includes(name)) {
+					names.push(name)
 				}
 			}
 		}
 	}
 
-	for (let [written, tag] of Object.entries(tags)) {
-		if (names.includes(written)) {
+	for (let tag of tags) {
+		if (tag.tag === undefined || names.includes(tag.name)) {
 			continue
 		}
 
-		let suggestion = closestMatch(written, names)
-		let notes = [
-			names.length === 0
-				? "A '§§' block documents whatever is declared below it. A '@param' belongs above something that takes Parameters — a Function, a Method, or a Declaration holding a Function literal."
-				: "A '@param' is matched against each Parameter's external name first and then its internal one — 'startingWith initial: Result' is documented as '@param startingWith'.",
-		]
-
-		if (signatures.length > 1) {
-			notes.push(
-				"An 'overload' block's own Documentation may name a Parameter of any of its Overloads.",
-			)
-		}
+		let suggestion = closestMatch(tag.name, names)
 
 		reportWarning(
 			"This '@param' names a Parameter that does not exist",
-			tag.position,
+			tag.tag.position,
 			{
 				code: "unknown-documentation-parameter",
 				labels: [
 					primary(
-						tag.position,
+						tag.tag.position,
 						names.length === 0
 							? "what this documents takes no Parameters"
-							: `no Parameter is named '${written}'`,
+							: `no Parameter is named '${tag.name}'`,
 					),
 				],
-				notes,
+				notes: [
+					names.length === 0
+						? "A '§§' block documents whatever is declared below it. A '@param' belongs above something that takes Parameters — a Function, a Method, or a Declaration holding a Function literal."
+						: "A '@param' above an 'overload' block may name a Parameter of any of its Overloads, under either of the names that Parameter is written with.",
+				],
 				helps: [
 					suggestion !== null
 						? `Did you mean '${suggestion}'?`
@@ -4797,34 +5040,54 @@ export function reportUnknownDocumentationParameters(
 	}
 }
 
+// NOTE: What documents ONE Parameter: its own `§§` block where it carries one,
+// and otherwise the `@param` line standing at its position in the enclosing
+// block.
 export function parameterDocumentation(
 	parameter: parser.ParameterNode,
 	documentation: common.Documentation | null,
+	index: number,
 ): string | undefined {
 	if (parameter.documentation !== null) {
 		return parameter.documentation.description
 	}
 
-	for (let name of [
-		parameter.externalName,
-		parameterInternalName(parameter),
-	]) {
-		let tagged = documentation?.parameters[name?.content ?? ""]
+	return documentation?.parameters[index]?.text
+}
 
-		// NOTE: An own property, because a Parameter may be named after a
-		// member of `Object.prototype` — `toString`, `valueOf`, `constructor`.
-		// Asked without the guard, a Parameter named `toString` is handed the
-		// inherited native function as its description, which then reaches an
-		// Editor as the Parameter's documentation.
-		if (
-			tagged !== undefined &&
-			Object.hasOwn(documentation?.parameters ?? {}, name?.content ?? "")
-		) {
-			return tagged
-		}
+// NOTE: The Documentation a resolved signature hands out. Each `@param` is
+// renamed to what the signature shows for the Parameter it stands at — the
+// label, or the internal name where the Parameter is positional — so that a
+// Hover reads `**other** — …` rather than the bare `_` the line was written
+// with.
+//
+// A COPY, because the Parser's Node keeps what was written: the Formatter
+// compares two ASTs for the one thing formatting may change, and a
+// Documentation rewritten in place would no longer be the one the file holds.
+// The tag Positions go with it — they exist to underline a line while it is
+// being reported, which has already happened by the time a signature resolves.
+export function resolvedDocumentation(
+	documentation: common.Documentation | null | undefined,
+	parameters: Array<parser.ParameterNode>,
+): common.Documentation | undefined {
+	if (documentation == null) {
+		return undefined
 	}
 
-	return undefined
+	return {
+		...documentation,
+		parameters: documentation.parameters.map((tag, index) => {
+			let parameter = parameters[index]
+
+			return {
+				name:
+					parameter === undefined
+						? tag.name
+						: displayParameterName(documentedParameter(parameter)),
+				text: tag.text,
+			}
+		}),
+	}
 }
 
 // NOTE: Which Namespace Generics belong on one Method signature, ahead of the
@@ -5063,7 +5326,10 @@ export function resolveMethodType(
 				signature,
 			),
 			...signature,
-			documentation: entry.documentation ?? undefined,
+			documentation: resolvedDocumentation(
+				entry.documentation,
+				entry.parameters,
+			),
 		}
 	}
 
@@ -5075,7 +5341,7 @@ export function resolveMethodType(
 		return { type: "StaticMethod", ...resolveEntry(normalized.entries[0]!) }
 	}
 
-	reportUnknownDocumentationParameters(
+	reportDocumentationParameters(
 		normalized.documentation,
 		normalized.entries.map((entry) => entry.parameters),
 	)

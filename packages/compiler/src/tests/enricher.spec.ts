@@ -4439,7 +4439,7 @@ describe("Enricher", () => {
 	// call passes only the written Arguments, and the definition is emitted
 	// without the `_self` Parameter `@` compiles to.
 	describe("Documentation", () => {
-		it("should report a '@param' naming no Parameter", () => {
+		it("should report a '@param' naming the wrong Parameter", () => {
 			let diagnostics = diagnosticsFor(`implementation {
 				§§ Greets.
 				§§ @param subjekt — who to greet
@@ -4448,11 +4448,11 @@ describe("Enricher", () => {
 
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].severity).toBe("warning")
-			expect(diagnostics[0].code).toBe("unknown-documentation-parameter")
+			expect(diagnostics[0].code).toBe("misnamed-documentation-parameter")
 			expect(diagnostics[0].labels[0]?.message).toBe(
-				"no Parameter is named 'subjekt'",
+				"Parameter 1 is 'subject'",
 			)
-			expect(diagnostics[0].helps).toEqual(["Did you mean 'subject'?"])
+			expect(diagnostics[0].helps).toEqual(["Write '@param subject'."])
 			// NOTE: The name alone is underlined, rather than the whole block
 			// or the whole Comment.
 			expect(diagnostics[0].position).toEqual({
@@ -4461,7 +4461,61 @@ describe("Enricher", () => {
 			})
 		})
 
-		it("should take either name a Parameter is written with", () => {
+		it("should match a '@param' to the Parameter at its position", () => {
+			// NOTE: Both lines name a Parameter that exists, and the first
+			// names the second one — which is what a line left out looks like.
+			let diagnostics = diagnosticsFor(`implementation {
+				§§ Joins.
+				§§ @param right — the text to put after
+				§§ @param left — the text to put first
+				function join(left: String, right: String) -> String {
+					<- left::append(right)
+				}
+			}`)
+
+			expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+				"misnamed-documentation-parameter",
+				"misnamed-documentation-parameter",
+			])
+			expect(diagnostics[0].notes).toContain(
+				"'right' is Parameter 2, so a line for each Parameter before it belongs above this one.",
+			)
+			expect(diagnostics[0].notes).toContain(
+				"The Parameters are 'left', 'right', in that order.",
+			)
+		})
+
+		it("should report a '@param' past the end of the Parameters", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				§§ Greets.
+				§§ @param subject — who to greet
+				§§ @param loudly — and how
+				function greet(subject: String) -> String { <- subject }
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("unknown-documentation-parameter")
+			expect(diagnostics[0].labels[0]?.message).toBe(
+				"there is no Parameter 2",
+			)
+			expect(diagnostics[0].helps).toEqual([
+				"Remove the tag — this signature takes 1 Parameter.",
+			])
+		})
+
+		it("should take the label, '_', or the internal name", () => {
+			// NOTE: A positional Parameter is documented as '_'. Its internal
+			// name is taken as well, which is what the standard library is
+			// written with until the documentation pass rewrites it —
+			// `documentationStrictness` is the one place that leniency lives.
+			expect(
+				diagnosticsFor(`implementation {
+					§§ Greets.
+					§§ @param _ — who to greet
+					function greet(_ subject: String) -> String { <- subject }
+				}`),
+			).toEqual([])
+
 			expect(
 				diagnosticsFor(`implementation {
 					§§ Greets.
@@ -4475,6 +4529,29 @@ describe("Enricher", () => {
 					§§ Greets.
 					§§ @param to — who to greet
 					function greet(to subject: String) -> String { <- subject }
+				}`),
+			).toEqual([])
+
+			expect(
+				diagnosticsFor(`implementation {
+					§§ Greets.
+					§§ @param subject — who to greet
+					function greet(to subject: String) -> String { <- subject }
+				}`),
+			).toEqual([])
+		})
+
+		it("should leave a run that stops short of the last Parameter", () => {
+			// NOTE: Lenient, and the last thing to tighten: a block that
+			// documents no Parameter at all is the common case, and one that
+			// documents the first of two is on its way there.
+			expect(
+				diagnosticsFor(`implementation {
+					§§ Joins.
+					§§ @param left — the text to put first
+					function join(left: String, right: String) -> String {
+						<- left::append(right)
+					}
 				}`),
 			).toEqual([])
 		})
@@ -4509,7 +4586,7 @@ describe("Enricher", () => {
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].code).toBe("unknown-documentation-parameter")
 			expect(diagnostics[0].helps).toEqual(["Did you mean 'height'?"])
-			expect(diagnostics[0].notes).toHaveLength(2)
+			expect(diagnostics[0].notes).toHaveLength(1)
 		})
 
 		it("should report a '@param' on a Declaration that holds no Function", () => {
@@ -4565,7 +4642,7 @@ describe("Enricher", () => {
 			}`)
 
 			expect(diagnostics).toHaveLength(1)
-			expect(diagnostics[0].code).toBe("unknown-documentation-parameter")
+			expect(diagnostics[0].code).toBe("misnamed-documentation-parameter")
 		})
 
 		it("should leave a Declaration whose Parameters it cannot see unchecked", () => {

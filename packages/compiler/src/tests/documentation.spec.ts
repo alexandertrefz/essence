@@ -1,5 +1,9 @@
 import { describe, expect, it } from "bun:test"
 
+import {
+	type DocumentedParameter,
+	documentationParameterProblems,
+} from "../enricher/resolvers"
 import { parseDocumentation } from "../parser/documentation"
 
 const position = {
@@ -28,6 +32,13 @@ function problemsOf(lines: Array<string>) {
 	return parseDocumentation(positioned(lines), position).problems
 }
 
+// NOTE: The `@param` lines as name and text alone, which is what every reader
+// of a Documentation asks for. Their Positions are checked on their own, in the
+// one test that is about them.
+function tagsOf(lines: Array<string>) {
+	return parse(lines).parameters.map(({ name, text }) => ({ name, text }))
+}
+
 describe("Documentation", () => {
 	it("should join prose lines into a description", () => {
 		let documentation = parse([
@@ -38,7 +49,7 @@ describe("Documentation", () => {
 		expect(documentation.description).toBe(
 			"Appends another String to this one.\nThe receiver is left untouched.",
 		)
-		expect(documentation.parameters).toEqual({})
+		expect(documentation.parameters).toEqual([])
 		expect(documentation.returns).toBeNull()
 	})
 
@@ -56,32 +67,47 @@ describe("Documentation", () => {
 	// NOTE: The un-separated form, which is reported but still lifted — a
 	// Hover must not lose a description while its source is being corrected.
 	it("should lift a tag written without a separator all the same", () => {
-		let documentation = parse([
+		let lines = [
 			"§§ Appends another String to this one.",
 			"§§",
 			"§§ @param other what to append",
 			"§§ @returns the joined String",
-		])
+		]
+		let documentation = parse(lines)
 
 		expect(documentation.description).toBe(
 			"Appends another String to this one.",
 		)
-		expect(documentation.parameters).toEqual({ other: "what to append" })
+		expect(tagsOf(lines)).toEqual([
+			{ name: "other", text: "what to append" },
+		])
 		expect(documentation.returns).toBe("the joined String")
 	})
 
 	it("should continue a tag across the lines below it", () => {
-		let documentation = parse([
+		let lines = [
 			"§§ @param other",
 			"§§ what to append —",
 			"§§ any String will do",
 			"§§ @returns the joined String",
-		])
+		]
 
-		expect(documentation.parameters).toEqual({
-			other: "what to append —\nany String will do",
-		})
-		expect(documentation.returns).toBe("the joined String")
+		expect(tagsOf(lines)).toEqual([
+			{ name: "other", text: "what to append —\nany String will do" },
+		])
+		expect(parse(lines).returns).toBe("the joined String")
+	})
+
+	it("should open a new Parameter for every line, name repeated or not", () => {
+		// NOTE: Two lines are two Parameters. A `_` is written once per
+		// positional Parameter, so a repeated name is the ordinary case rather
+		// than a section continued.
+		expect(
+			tagsOf(["§§ @param _ — the first", "§§ @param _ — the second"]),
+		).toEqual([
+			{ name: "_", text: "the first" },
+			{ name: "_", text: "the second" },
+		])
 	})
 
 	it("should leave an unknown tag in the prose", () => {
@@ -93,42 +119,44 @@ describe("Documentation", () => {
 		expect(documentation.description).toBe(
 			"Sends to an @address, which is not a tag.\n@notATag neither is this",
 		)
-		expect(documentation.parameters).toEqual({})
+		expect(documentation.parameters).toEqual([])
 	})
 
 	it("should leave a @param naming nothing in the prose", () => {
 		let documentation = parse(["§§ @param"])
 
 		expect(documentation.description).toBe("@param")
-		expect(documentation.parameters).toEqual({})
+		expect(documentation.parameters).toEqual([])
 	})
 
 	it("should separate a tag from its text with an em-dash", () => {
-		let documentation = parse([
+		let lines = [
 			"§§ @param other — what to append",
 			"§§ @returns — the joined String",
-		])
+		]
 
-		expect(documentation.parameters).toEqual({ other: "what to append" })
-		expect(documentation.returns).toBe("the joined String")
+		expect(tagsOf(lines)).toEqual([
+			{ name: "other", text: "what to append" },
+		])
+		expect(parse(lines).returns).toBe("the joined String")
 	})
 
 	it("should keep only the first em-dash as the separator", () => {
-		let documentation = parse(["§§ @param other — a String — any String"])
-
-		expect(documentation.parameters).toEqual({
-			other: "a String — any String",
-		})
+		expect(tagsOf(["§§ @param other — a String — any String"])).toEqual([
+			{ name: "other", text: "a String — any String" },
+		])
 	})
 
 	it("should end a Parameter name at the separator that follows it", () => {
-		let documentation = parse([
+		let lines = [
 			"§§ @param other—what to append",
 			"§§ @returns—the joined String",
-		])
+		]
 
-		expect(documentation.parameters).toEqual({ other: "what to append" })
-		expect(documentation.returns).toBe("the joined String")
+		expect(tagsOf(lines)).toEqual([
+			{ name: "other", text: "what to append" },
+		])
+		expect(parse(lines).returns).toBe("the joined String")
 	})
 
 	it("should report a tag whose text is not separated from it", () => {
@@ -188,44 +216,35 @@ describe("Documentation", () => {
 		])
 
 		// NOTE: The name alone — what a Diagnostic about it underlines.
-		expect(documentation.parameterTags).toEqual({
-			other: {
-				position: {
-					start: { line: 2, column: 11 },
-					end: { line: 2, column: 16 },
+		expect(documentation.parameters).toEqual([
+			{
+				name: "other",
+				text: "what to append",
+				tag: {
+					position: {
+						start: { line: 2, column: 11 },
+						end: { line: 2, column: 16 },
+					},
 				},
 			},
-		})
-	})
-
-	it("should leave the Parameter tags off a block that writes none", () => {
-		expect(
-			parse(["§§ Appends.", "§§ @returns — a String"]),
-		).not.toHaveProperty("parameterTags")
+		])
 	})
 
 	it("should take a Parameter named after a member of Object.prototype", () => {
-		// NOTE: Read out of an Object literal rather than a Map, '@param
-		// toString' finds the inherited function and the Parser dies on it —
-		// taking `esfmt` and the Language Server down with it.
-		let documentation = parse([
-			"§§ @param toString — what to append",
-			"§§ @param constructor — and this",
-			"§§ @param __proto__ — and this too",
-		])
-
-		// NOTE: Compared as entries, because writing `__proto__` in the
-		// expected literal would set its prototype rather than name a key —
-		// the same hazard on the reading side that this is here to pin.
-		expect(Object.entries(documentation.parameters)).toEqual([
-			["toString", "what to append"],
-			["constructor", "and this"],
-			["__proto__", "and this too"],
-		])
-		expect(Object.keys(documentation.parameterTags ?? {})).toEqual([
-			"toString",
-			"constructor",
-			"__proto__",
+		// NOTE: A list rather than an Object, so `@param toString` is a name
+		// like any other. Read out of an Object literal it found the inherited
+		// function and the Parser died on it, taking `esfmt` and the Language
+		// Server down with it.
+		expect(
+			tagsOf([
+				"§§ @param toString — what to append",
+				"§§ @param constructor — and this",
+				"§§ @param __proto__ — and this too",
+			]),
+		).toEqual([
+			{ name: "toString", text: "what to append" },
+			{ name: "constructor", text: "and this" },
+			{ name: "__proto__", text: "and this too" },
 		])
 	})
 
@@ -242,7 +261,7 @@ describe("Documentation", () => {
 			"§§ @returns — the greeting",
 		])
 
-		expect(documentation.parameters).toEqual({})
+		expect(documentation.parameters).toEqual([])
 		expect(documentation.returns).toBe("the greeting")
 		expect(documentation.description).toBe(
 			"Shows how to document:\n\n```\n@param x — the thing\n```",
@@ -256,5 +275,67 @@ describe("Documentation", () => {
 		let documentation = parse(["§§", "§§ First.", "§§", "§§ Second.", "§§"])
 
 		expect(documentation.description).toBe("First.\n\nSecond.")
+	})
+
+	// NOTE: The rule the Enricher reports against, read on its own. A Program
+	// exercises the lenient half, which is what the standard library and every
+	// user file are held to today; the strict half is turned on by
+	// `documentationStrictness`, and this is what it will then say.
+	describe("Parameter matching", () => {
+		let join: Array<DocumentedParameter> = [
+			{ label: "left", internalName: "left" },
+			{ label: null, internalName: "right" },
+		]
+
+		it("should accept a line per Parameter, named as the signature names it", () => {
+			expect(
+				documentationParameterProblems(["left", "_"], join, "strict"),
+			).toEqual([])
+			expect(
+				documentationParameterProblems(["left", "_"], join, "lenient"),
+			).toEqual([])
+		})
+
+		it("should report a line naming another Parameter", () => {
+			expect(
+				documentationParameterProblems(["right", "_"], join, "strict"),
+			).toEqual([{ kind: "misnamed", index: 0 }])
+		})
+
+		it("should report a line past the last Parameter", () => {
+			expect(
+				documentationParameterProblems(
+					["left", "_", "loudly"],
+					join,
+					"lenient",
+				),
+			).toEqual([{ kind: "unknown", index: 2 }])
+		})
+
+		it("should report an undocumented Parameter only when strict", () => {
+			expect(
+				documentationParameterProblems(["left"], join, "strict"),
+			).toEqual([{ kind: "undocumented", index: 1 }])
+			expect(
+				documentationParameterProblems(["left"], join, "lenient"),
+			).toEqual([])
+		})
+
+		it("should take an internal name only while lenient", () => {
+			expect(
+				documentationParameterProblems(
+					["left", "right"],
+					join,
+					"lenient",
+				),
+			).toEqual([])
+			expect(
+				documentationParameterProblems(
+					["left", "right"],
+					join,
+					"strict",
+				),
+			).toEqual([{ kind: "misnamed", index: 1 }])
+		})
 	})
 })

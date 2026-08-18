@@ -100,6 +100,68 @@ describe("Documentation Comments", () => {
 		)
 	})
 
+	it("should show a positional Parameter under the name its body reads", () => {
+		// NOTE: The line is written `_`, the way the signature writes the
+		// Parameter. What a reader is shown is the name the signature shows
+		// next to it, since `_` names nothing on its own.
+		let source = [
+			"implementation {",
+			"\t§§ Greets a subject.",
+			"\t§§ @param _ — who to greet",
+			"\tfunction greet (_ subject: String) -> String {",
+			"\t\t<- subject",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(hover(source, { line: 4, column: 11 })?.documentation).toBe(
+			"Greets a subject.\n\n**subject** — who to greet",
+		)
+	})
+
+	it("should show a labelled Parameter under its label", () => {
+		// NOTE: Written with the internal name, which the lenient rule still
+		// takes. The label is what a call site writes, so the label is what the
+		// Hover shows.
+		let source = [
+			"implementation {",
+			"\t§§ Greets a subject.",
+			"\t§§ @param subject — who to greet",
+			"\tfunction greet (to subject: String) -> String {",
+			"\t\t<- subject",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(hover(source, { line: 4, column: 11 })?.documentation).toBe(
+			"Greets a subject.\n\n**to** — who to greet",
+		)
+	})
+
+	it("should match `@param` lines to Parameters by position", () => {
+		let source = [
+			"implementation {",
+			"\t§§ Joins two Strings.",
+			"\t§§ @param _ — the text to put first",
+			"\t§§ @param _ — the text to put after it",
+			"\tfunction join (_ left: String, _ right: String) -> String {",
+			"\t\t<- left::append(right)",
+			"\t}",
+			"\tjoin(",
+			"}",
+		].join("\n")
+
+		let signature = findSignatureHelp(source, { line: 8, column: 7 })
+			?.signatures[0]
+
+		expect(signature?.parameters[0].documentation).toBe(
+			"the text to put first",
+		)
+		expect(signature?.parameters[1].documentation).toBe(
+			"the text to put after it",
+		)
+	})
+
 	it("should show a `@param` next to the Parameter in Signature Help", () => {
 		let source = [
 			"implementation {",

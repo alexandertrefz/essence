@@ -1446,21 +1446,16 @@ function describeDeclarations(
 		definition: common.typed.FunctionDefinitionNode,
 		documentation: common.Documentation | null,
 	) {
-		for (let parameter of definition.parameters) {
-			let name =
-				parameter.externalName?.content ??
-				parameter.internalName?.content
+		for (let [index, parameter] of definition.parameters.entries()) {
 			let info: DeclarationInfo = {
 				type:
 					parameter.internalName?.type ??
 					parameter.externalName?.type ??
 					null,
 				// NOTE: A Parameter's `@param` text lives on the enclosing
-				// callable's `§§` block, under the name the call site writes.
-				documentation:
-					name === undefined
-						? null
-						: (documentation?.parameters[name] ?? null),
+				// callable's `§§` block, on the line standing at the
+				// Parameter's own position.
+				documentation: documentation?.parameters[index]?.text ?? null,
 			}
 
 			if (parameter.externalName !== null) {
