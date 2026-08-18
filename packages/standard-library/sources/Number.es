@@ -40,7 +40,7 @@ declarations {
 	namespace Exact for Exact {
 		§§ Adds two exact numbers. Two Integers give an Integer; anything else gives a Rational.
 		§§
-		§§ @param other — the number to add
+		§§ @param _ — the number to add
 		§§ @returns — the exact sum.
 		add(_ other: Exact) -> Exact {
 			<- match @ -> Exact {
@@ -304,7 +304,7 @@ declarations {
 
 			§§ The arithmetic mean of the Integers, with a value to answer for the empty List.
 			§§
-			§§ @param integers — the Integers to average
+			§§ @param _ — the Integers to average
 			§§ @param defaultingTo — the value to answer with when there is no mean
 			§§ @returns — the mean, or the given value in its place.
 			(
@@ -316,7 +316,7 @@ declarations {
 
 			§§ The arithmetic mean of the Rationals, with a value to answer for the empty List.
 			§§
-			§§ @param rationals — the Rationals to average
+			§§ @param _ — the Rationals to average
 			§§ @param defaultingTo — the value to answer with when there is no mean
 			§§ @returns — the mean, or the given value in its place.
 			(
@@ -328,7 +328,7 @@ declarations {
 
 			§§ The arithmetic mean of the Numbers, with a value to answer for the empty List.
 			§§
-			§§ @param numbers — the Numbers to average
+			§§ @param _ — the Numbers to average
 			§§ @param defaultingTo — the value to answer with when there is no mean
 			§§ @returns — the mean, or the given value in its place.
 			(

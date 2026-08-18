@@ -393,7 +393,7 @@ declarations {
 
 		§§ Reads an Integer from its text form — an optional minus sign followed by digits, the same shape `toString` produces.
 		overload static parse {
-			§§ @param text — the text to read
+			§§ @param _ — the text to read
 			§§ @returns — the Integer, or nothing when the text has any other shape.
 			(_ text: String) -> Optional<Integer> {
 				§ The sign is carried as the position of a LEADING `-` — `keep`
@@ -452,7 +452,7 @@ declarations {
 
 			§§ Reads an Integer from its text form, with a value to answer when the text has another shape.
 			§§
-			§§ @param text — the text to read
+			§§ @param _ — the text to read
 			§§ @param defaultingTo — the value to answer with when the text is no Integer
 			§§ @returns — the Integer, or the given value in its place.
 			(_ text: String, defaultingTo fallback: Integer) -> Integer {
