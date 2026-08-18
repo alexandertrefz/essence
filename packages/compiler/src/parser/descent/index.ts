@@ -818,6 +818,22 @@ class DescentParser {
 		return this.parseExpression()
 	}
 
+	// NOTE: A `§§` block above a Declaration documents whatever the Declaration
+	// holds, so a Function literal written as the value is handed the block —
+	// the Enricher already reads the block's `@param` lines against that
+	// literal's Parameters. It is handed down rather than picked up, because a
+	// literal in expression position owns no block of its own: reading one off
+	// the line above it made this work only where the literal shared the
+	// Declaration's line.
+	protected handDocumentationDown(
+		value: parser.ExpressionNode,
+		documentation: common.Documentation | null,
+	): void {
+		if (documentation !== null && value.nodeType === "FunctionValue") {
+			value.value.documentation = documentation
+		}
+	}
+
 	protected parseConstantDeclarationStatement(): parser.ConstantDeclarationStatementNode {
 		let keyword = this.tokens.expect(TokenType.KeywordConstant)
 		let name = this.parseDeclaredName()
@@ -826,13 +842,18 @@ class DescentParser {
 		this.tokens.expect(TokenType.SymbolEqual)
 
 		let value = this.parseExpression()
+		let documentation = this.tokens.documentationAbove(
+			keyword.position.start.line,
+		)
+
+		this.handDocumentationDown(value, documentation)
 
 		return generators.constantDeclarationStatement(
 			name,
 			type,
 			value,
 			{ start: keyword.position.start, end: value.position.end },
-			this.tokens.documentationAbove(keyword.position.start.line),
+			documentation,
 		)
 	}
 
@@ -844,13 +865,18 @@ class DescentParser {
 		this.tokens.expect(TokenType.SymbolEqual)
 
 		let value = this.parseExpression()
+		let documentation = this.tokens.documentationAbove(
+			keyword.position.start.line,
+		)
+
+		this.handDocumentationDown(value, documentation)
 
 		return generators.variableDeclarationStatement(
 			name,
 			type,
 			value,
 			{ start: keyword.position.start, end: value.position.end },
-			this.tokens.documentationAbove(keyword.position.start.line),
+			documentation,
 		)
 	}
 
@@ -1780,7 +1806,7 @@ class DescentParser {
 				// omitted — in expression position there can be an expected
 				// signature to read them off. A Generic literal writes its own
 				// Generics, so it has nothing to infer them from.
-				let literal = this.parseFunctionLiteral(true)
+				let literal = this.parseFunctionLiteral(true, false)
 
 				this.refuseDefaultValues(
 					literal.value.parameters,
@@ -1790,7 +1816,7 @@ class DescentParser {
 				return literal
 			}
 			case TokenType.SymbolLeftAngle: {
-				let literal = this.parseGenericFunctionLiteral()
+				let literal = this.parseGenericFunctionLiteral(false)
 
 				this.refuseDefaultValues(
 					literal.value.parameters,
@@ -2547,10 +2573,20 @@ class DescentParser {
 		})
 	}
 
+	// NOTE: `ownsDocumentation` is false for a literal in EXPRESSION position.
+	// Such a literal is anonymous: it declares nothing, so no `§§` block is
+	// written about it, and the block above it belongs to whatever Declaration
+	// the expression sits inside. `documentationHere` is keyed by line alone,
+	// so a literal sharing that Declaration's line would otherwise claim it —
+	// which is how a Parameter's default `(_ item: ItemType) -> Boolean { … }`
+	// took the Method's block, and had the Method's `@param` lines checked
+	// against the literal's own Parameters. `parseParameterHead` keeps the same
+	// rule off a Parameter, through `startsLine`.
 	protected parseFunctionLiteral(
 		allowsInferredTypes = false,
+		ownsDocumentation = true,
 	): parser.FunctionValueNode {
-		let documentation = this.documentationHere()
+		let documentation = ownsDocumentation ? this.documentationHere() : null
 		let parameterList = this.parseParameterList(allowsInferredTypes)
 		let returnType = this.parseOptionalReturnType(allowsInferredTypes)
 		let block = this.parseBlock()
@@ -2570,8 +2606,10 @@ class DescentParser {
 		)
 	}
 
-	protected parseGenericFunctionLiteral(): parser.FunctionValueNode {
-		let documentation = this.documentationHere()
+	protected parseGenericFunctionLiteral(
+		ownsDocumentation = true,
+	): parser.FunctionValueNode {
+		let documentation = ownsDocumentation ? this.documentationHere() : null
 		let genericList = this.parseGenericList()
 		let parameterList = this.parseParameterList()
 		let returnType = this.parseReturnType()
