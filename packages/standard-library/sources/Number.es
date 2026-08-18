@@ -285,9 +285,7 @@ declarations {
 
 		§§ The arithmetic mean of the Numbers in the List: their sum divided by their count, as an exact Rational.
 		§§
-		§§ The empty List has no mean.
-		§§
-		§§ @returns — the mean, or nothing for the empty List.
+		§§ The empty List has no mean, and the `defaultingTo:` entries answer the given Rational in place of nothing.
 		overload static average {
 			(_ integers: List<Integer>) -> Optional<Rational> {
 				<- Number.sum(integers)::divide(by integers::length())
@@ -346,9 +344,7 @@ declarations {
 
 		§§ The lower of two Numbers, or the lowest in a List of them.
 		§§
-		§§ The answer for two equal Numbers is the first of them. A List answers the earliest of its lowest items.
-		§§
-		§§ @returns — the lowest Number, or nothing for the empty List.
+		§§ The answer for two equal Numbers is the first of them. A List answers the earliest of its lowest items. The empty List has none, and the `defaultingTo:` entries answer the given Number in place of nothing.
 		overload static lowestNumber {
 			(_ firstNumber: Integer, _ secondNumber: Integer) -> Integer {
 				if firstNumber::isLessThanOrEqualTo(secondNumber) {
@@ -482,9 +478,7 @@ declarations {
 
 		§§ The greater of two Numbers, or the greatest in a List of them.
 		§§
-		§§ The answer for two equal Numbers is the first of them. A List answers the earliest of its greatest items.
-		§§
-		§§ @returns — the greatest Number, or nothing for the empty List.
+		§§ The answer for two equal Numbers is the first of them. A List answers the earliest of its greatest items. The empty List has none, and the `defaultingTo:` entries answer the given Number in place of nothing.
 		overload static greatestNumber {
 			(_ firstNumber: Integer, _ secondNumber: Integer) -> Integer {
 				if firstNumber::isGreaterThanOrEqualTo(secondNumber) {

@@ -41,7 +41,7 @@ declarations {
 
 		§§ The mean of the items: their total divided by their count.
 		§§
-		§§ @returns — the mean, or nothing for the empty List.
+		§§ The empty List has no mean, and the `defaultingTo:` entry answers the given Rational in place of nothing.
 		overload average {
 			§§ The mean of the items.
 			§§
@@ -61,7 +61,7 @@ declarations {
 
 		§§ The lowest item.
 		§§
-		§§ @returns — the lowest item, or nothing for the empty List.
+		§§ The empty List has no lowest item, and the `defaultingTo:` entry answers the given item in place of nothing.
 		overload lowestNumber {
 			§§ The lowest item.
 			§§
@@ -81,7 +81,7 @@ declarations {
 
 		§§ The greatest item.
 		§§
-		§§ @returns — the greatest item, or nothing for the empty List.
+		§§ The empty List has no greatest item, and the `defaultingTo:` entry answers the given item in place of nothing.
 		overload greatestNumber {
 			§§ The greatest item.
 			§§
@@ -121,7 +121,7 @@ declarations {
 
 		§§ The mean of the items: their total divided by their count.
 		§§
-		§§ @returns — the mean, or nothing for the empty List.
+		§§ The empty List has no mean, and the `defaultingTo:` entry answers the given Rational in place of nothing.
 		overload average {
 			§§ The mean of the items.
 			§§
@@ -141,7 +141,7 @@ declarations {
 
 		§§ The lowest item.
 		§§
-		§§ @returns — the lowest item, or nothing for the empty List.
+		§§ The empty List has no lowest item, and the `defaultingTo:` entry answers the given item in place of nothing.
 		overload lowestNumber {
 			§§ The lowest item.
 			§§
@@ -161,7 +161,7 @@ declarations {
 
 		§§ The greatest item.
 		§§
-		§§ @returns — the greatest item, or nothing for the empty List.
+		§§ The empty List has no greatest item, and the `defaultingTo:` entry answers the given item in place of nothing.
 		overload greatestNumber {
 			§§ The greatest item.
 			§§
@@ -201,7 +201,7 @@ declarations {
 
 		§§ The mean of the items: their total divided by their count.
 		§§
-		§§ @returns — the mean, or nothing for the empty List.
+		§§ The empty List has no mean, and the `defaultingTo:` entry answers the given Rational in place of nothing.
 		overload average {
 			§§ The mean of the items.
 			§§
@@ -221,7 +221,7 @@ declarations {
 
 		§§ The lowest item.
 		§§
-		§§ @returns — the lowest item, or nothing for the empty List.
+		§§ The empty List has no lowest item, and the `defaultingTo:` entry answers the given item in place of nothing.
 		overload lowestNumber {
 			§§ The lowest item.
 			§§
@@ -241,7 +241,7 @@ declarations {
 
 		§§ The greatest item.
 		§§
-		§§ @returns — the greatest item, or nothing for the empty List.
+		§§ The empty List has no greatest item, and the `defaultingTo:` entry answers the given item in place of nothing.
 		overload greatestNumber {
 			§§ The greatest item.
 			§§
