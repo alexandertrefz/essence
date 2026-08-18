@@ -62,6 +62,16 @@ export {
 	type ModuleBindings,
 } from "./marshal-runtime"
 export {
+	type BunBuild,
+	type BunLoadArguments,
+	type BunLoadResult,
+	type BunPlugin,
+	type BunPluginOptions,
+	type BunResolveArguments,
+	type BunResolveResult,
+	essenceBun,
+} from "./bun-plugin"
+export {
 	essenceEsbuild,
 	type EsbuildBuild,
 	type EsbuildLoadArguments,
