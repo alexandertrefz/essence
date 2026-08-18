@@ -178,15 +178,126 @@ Composition is not free, and three costs are easy to miss because no test fails:
 - **A body can change complexity class.** `String.length` written as
   `@::characters()::length()` is correct, but builds a List of every character
   to count them, and pulls `List`'s whole import graph in behind it. It is
-  native too. `List.anyItem`/`everyItem` ARE written in Essence, but on the
-  native short-circuiting `firstItem(where:)` rather than the eager `keepEvery`,
-  so they stop at the item that decides the answer — the earlier `keepEvery`
-  form lost that and measured ~0 ms → ~180 ms over 2000 calls when the first
-  item decides it. `count(where:)` is still on `keepEvery`, which is right:
-  counting has to see every item.
+  native too. `List.hasItems(where:)` and `hasItems(onlyWhere:)` ARE written in
+  Essence, but on the native short-circuiting `firstItem(where:)` rather than on
+  the eager `everyItem(where:)`, so they stop at the item that decides the
+  answer — the earlier filtering form lost that and measured ~0 ms → ~180 ms
+  over 2000 calls when the first item decides it. `count(where:)` is still on
+  `everyItem(where:)`, which is right: counting has to see every item.
 
 Prefer a body that reaches only its own Namespace's primitives. `packages/compiler/src/tests/bundleSize.spec.ts`
 guards two files, but it is a floor, not a substitute for measuring.
+
+## Why bodies look the way they do
+
+Seven mechanics account for most of what looks odd in these files. Each is
+explained once, here. A body that leans on one carries a one line pointer to
+this section, and the bodies beside it carry nothing.
+
+**`@` is the scrutinee inside a `match`, not the receiver.** A Case body reads
+`@` as the value the `match` is over. Bind the receiver to a Constant above the
+`match` where a Case body needs it — `constant text = @` — as `String::pad`,
+`String::compare(to:comparing:)` and `Rational::round` do.
+
+**A Method Generic has to be written `infer`.** A Generic without it never
+enters `bindableNames`, and inference then leaves it unbound. Every Method
+level Generic here is written `<infer Result>` or
+`<infer ItemType is Equatable>`.
+
+**A written literal is its own refinement proof.** The Compiler reads the value
+of a literal, so `2` is a NonZeroInteger. `@::remainder(dividingBy 2)` answers a
+bare Integer, and there is no Optional to take apart. A value the Program is
+handed carries no such proof and goes through the predicate instead.
+
+**`Equatable` is derived for a Choice.** The conformance is declared and the
+Methods are left out: a Choice compares by tag, and by payload where a Case
+carries one. A Namespace over a Choice of unit Cases writes `toString` and
+nothing else. `Ordering`, `Side` and `CaseSensitivity` are all that shape.
+`Optional` is the exception, and says why at its own declaration: its `is`
+takes a bare item as well as another Optional, which no derived conformance
+offers.
+
+**An Overload is selected by the first entry the Arguments match.** Two orders
+are in play. The order the entries are WRITTEN numbers them, and that number is
+in the emitted name (`divide__overload$3`) and in the native binding, so
+inserting an entry rebinds every entry after it. The order they are READ hoists
+the entries that ask for a refinement, so a call that can prove what a refined
+entry asks for reaches it wherever it stands. Two consequences are worth
+knowing: `Optional::is` declares the whole Optional entry FIRST, so
+`#Empty::is(#Empty)` asks whether the receiver is empty; `Rational.of` appends
+its refined entry LAST, where it is numbered after the others and still read
+before them.
+
+**A body pulls its whole transitive reach into every bundle.** A Method is
+emitted into a Program that reaches it, and so is everything its body calls.
+`Integer::isLessThan` is written on Integer's own `compare` for that reason:
+routing it through the covering `Number::compare` reaches the whole numeric
+tower, and nearly doubled a Program that only compares two Integers.
+`packages/compiler/src/tests/bundleSize.spec.ts` is the guard.
+
+**`reduce` binds `Result` from `startingWith`.** The seed decides the Type the
+fold carries, and it is read before the callback is checked. So a seed that is
+an empty List or an empty Optional is bound to an annotated Constant first,
+and the Constant is what `startingWith` is given:
+`constant kept: List<ItemType> = []` in `removeDuplicates`,
+`constant start: Optional<ItemType> = #Empty` in `firstItem(where:)`. A bare
+`[]` has no items to read the item Type from, and a bare `#Empty` fixes the fold
+to the empty Case alone.
+
+## Writing the docs and notes
+
+A `§§` block is what a reader of the LANGUAGE sees, in a Hover and in a
+Completion list. A `§` note is what the next person editing this file sees.
+They answer different questions and are held to different rules.
+
+### `§§` blocks
+
+The writing rules are ASD-STE100's — the writing rules, not the dictionary,
+since the language's own terms are technical names:
+
+- The first sentence says what the Method answers, in 25 words or fewer.
+- Edge cases are their own sentences, in a SECOND paragraph, separated by a
+  blank `§§` line. The first paragraph is the answer; everything after it is a
+  case.
+- One topic per sentence. No sentence over 25 words.
+- No em-dash aside inside a sentence. A colon that introduces an example is
+  fine.
+- Active voice, present tense. `can`, never `may`. No `should`.
+- No metaphor, no idiom, no aside. Those belong to the README.
+- One term for one thing: item, character, position, answers.
+- `@returns` is a noun phrase, and a second sentence after it where one is
+  needed.
+
+**A `@param` line documents the Parameter at its own position.** The first line
+documents the first Parameter, the second the second, and each names its
+Parameter the way the signature names it: the label, or `_` where the Parameter
+carries none. `insert(_ item, at index)` is documented `@param _` and
+`@param at`. A line naming something else is `misnamed-documentation-parameter`;
+a line past the last Parameter is `unknown-documentation-parameter`. A block
+above an `overload` keyword documents the set as a whole, where a position means
+nothing, so a line there can name a Parameter of any entry.
+
+The internal name of a labelled Parameter is accepted for now, which is what
+these files are written with. `documentationStrictness`
+(`packages/compiler/src/enricher/resolvers.ts`) is the one place that leniency
+lives, and setting it to `"strict"` also asks for a line per Parameter.
+`packages/compiler/src/tests/stdlibProse.spec.ts` measures the four writing
+rules over these sources; each of its rules is `it.todo` until the pass that
+makes it pass.
+
+### `§` notes
+
+A note says why the code is what it is. It holds three things: the decision,
+the alternative it was taken over, and the number that decided it — a measured
+bundle size, a measured time. Nothing else earns the lines.
+
+History does not: what a body used to be, and what was tried before it, are in
+git. Neither do metaphor, ALL-CAPS emphasis and asides. A note that a reader has
+to read twice is a note to shorten.
+
+A mechanic that several bodies share is explained once, in
+[Why bodies look the way they do](#why-bodies-look-the-way-they-do). The site
+that leans on it carries the pointer; the sites beside it carry nothing.
 
 ## Editing hazards
 
@@ -206,13 +317,13 @@ guards two files, but it is a floor, not a substitute for measuring.
   String`. A tag head alone takes its text from the lines below it and needs no
   separator; one that runs its text on without either is reported as
   `missing-documentation-separator`, and still lifted.
-- **A `@param` is matched against the Parameter's external and then internal
-  name.** One naming neither attaches to nothing, and is rendered into every
-  Hover regardless — a description of a Parameter the reader cannot find. It is
-  now reported as `unknown-documentation-parameter`, which is what caught
-  `split(intoGroupsOf size:)` being documented as `@param groupsOf`. A
-  `§§` block above an `overload` keyword may name a Parameter of any Overload
-  in the set.
+- **A `@param` is matched to a Parameter by POSITION**, and names it the way
+  the signature does — see [Writing the docs and
+  notes](#writing-the-docs-and-notes). A line that names something else, or
+  that stands past the last Parameter, attaches to nothing and is rendered into
+  every Hover regardless — a description of a Parameter the reader cannot find.
+  Both are reported, which is what caught `split(intoGroupsOf size:)` being
+  documented as `@param groupsOf`.
 - **Every Method of a Namespace answers for the Namespace's target Type.**
   There is no per-Method receiver, and a Method that only some values of the
   target Type can answer does not belong there. Reach for a **bounded Method
@@ -223,10 +334,14 @@ guards two files, but it is a floor, not a substitute for measuring.
   conformance arrives as a hidden trailing Argument, so the runtime
   implementation gains a `conformance` Parameter.
 - **A narrower receiver needs a Namespace of its own — and only when no bound
-  can express it.** `flatten` is the one such Method: its items have to be
+  can express it.** `flatten` is the clearest case: its items have to be
   Lists AND it names the inner item Type, which no Protocol bound can do. It is
   declared as `NestedList<infer ItemType> for List<List<ItemType>>` in
-  `List.es`, beside the Namespace it left. A receiver matches every Namespace
+  `List.es`, beside the Namespace it left. The numeric aggregates are the same
+  shape for a plainer reason — `sum` is about numbers rather than about any item
+  — so `IntegerList`, `RationalList` and `NumberList` (`NumberList.es`) each
+  target the List of one numeric kind, and a List of Strings reaches none of
+  them. A receiver matches every Namespace
   whose target Type it unifies with, so `[[1]]::` reaches both `List` and
   `NestedList`, and `[1]::flatten()` finds no Namespace to search. When two such
   Namespaces declare the SAME Method name, the narrower target wins —
