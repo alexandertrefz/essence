@@ -677,7 +677,7 @@ describe("Type matching", () => {
 			conjunct("isPositive"),
 		])
 		const nonEmpty = refinement("NonEmptyString", string, [
-			conjunct("hasAnyContent", [], "String"),
+			conjunct("hasCharacters", [], "String"),
 		])
 
 		it("should accept a refinement where its base is expected", () => {

@@ -3390,7 +3390,7 @@ declarations {
 	describe("an admitted literal", () => {
 		const SOURCE = `implementation {
 	type NonZero = Integer where @::isNot(0)
-	type NonEmptyString = String where @::hasAnyContent()
+	type NonEmptyString = String where @::hasCharacters()
 
 	function doubled(_ d: NonZero) -> Integer {
 		<- d::multiply(with 2)
@@ -3444,7 +3444,7 @@ declarations {
 	// someone would have written with no refinement anywhere.
 	describe("a Guard over the value a Handler named", () => {
 		const SOURCE = `implementation {
-	type Shout = String where @::hasAnyContent()
+	type Shout = String where @::hasCharacters()
 
 	§ The operation that can not fail, and says so — there is nothing to shout
 	§ where there is nothing written.
@@ -3456,7 +3456,7 @@ declarations {
 	§ the body reaches the total operation with the value it named.
 	function shoutedOr(_ value: Optional<String>) -> String {
 		<- match value -> String {
-			case #Value(item) where item::hasAnyContent() {
+			case #Value(item) where item::hasCharacters() {
 				<- shouted(item)
 			}
 
@@ -3475,7 +3475,7 @@ declarations {
 		// that makes the run above mean anything — without it the test would pass
 		// just as well with no narrowing and no refinement at all.
 		const UNGUARDED = `implementation {
-	type Shout = String where @::hasAnyContent()
+	type Shout = String where @::hasCharacters()
 
 	function shouted(_ text: Shout) -> String {
 		<- text::uppercase()

@@ -671,7 +671,7 @@ describe("Rewriter", () => {
 			// `character`, `trimmed`, `startsWith`, `endsWith`, `repeat`,
 			// `reverse`, `slice`, `firstIndex`, `pad`,
 			// and `toString`, alongside the negations
-			// (`hasAnyContent`, `isNot`, `doesNotContain`, `doesNotStart`,
+			// (`hasCharacters`, `isNot`, `doesNotContain`, `doesNotStart`,
 			// `doesNotEnd`) that moved earlier. What is left below is the
 			// native floor those Essence bodies stand on, and it is where the
 			// code-point behaviour is actually decided.

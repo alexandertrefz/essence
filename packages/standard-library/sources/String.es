@@ -115,7 +115,7 @@ declarations {
 		§§ Whether this String has at least one character — the opposite of `isEmpty`.
 		§§
 		§§ @returns — `true` when the String is not empty.
-		hasAnyContent() -> Boolean {
+		hasCharacters() -> Boolean {
 			<- @::isEmpty()::negate()
 		}
 

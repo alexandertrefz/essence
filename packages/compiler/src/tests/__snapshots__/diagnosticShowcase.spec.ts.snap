@@ -558,7 +558,7 @@ Error: A 'where' clause can not refine List
 Error: This is not a predicate a refinement can be checked by
     ╭─┤ Refinements.es:28:29 │
     │
- 28 │     type Named = Integer where "essence"::hasAnyContent()
+ 28 │     type Named = Integer where "essence"::hasCharacters()
     │                                ────┬────  
     │                                    ╰────── this is not '@'
     │ 
@@ -571,7 +571,7 @@ Error: This is not a predicate a refinement can be checked by
 Error: This is not a predicate a refinement can be checked by
     ╭─┤ Refinements.es:32:30 │
     │
- 32 │     type Trimmed = String where @::trim()::hasAnyContent()
+ 32 │     type Trimmed = String where @::trim()::hasCharacters()
     │                                 ────┬────  
     │                                     ╰────── this is not '@'
     │ 

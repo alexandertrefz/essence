@@ -2771,7 +2771,7 @@ describe("Validator", () => {
 		function withRefinements(body: string): string {
 			return `implementation {
 				type NonZero = Integer where @::isNot(0)
-				type NonEmptyString = String where @::hasAnyContent()
+				type NonEmptyString = String where @::hasCharacters()
 				type NonEmptyStrings = List<String> where @::hasItems()
 				type Digit = Integer where @::isBetween(0, and 9)
 				type SmallOdd = Integer where @::isOdd()::and(@::isLessThan(10))

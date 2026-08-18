@@ -4728,8 +4728,8 @@ function complementEvidence(
 // answers the negation of another, so a table someone can read is honest where an
 // inference from names would be a guess.
 const predicateOpposites = new Map<string, string>([
-	["String::isEmpty", "hasAnyContent"],
-	["String::hasAnyContent", "isEmpty"],
+	["String::isEmpty", "hasCharacters"],
+	["String::hasCharacters", "isEmpty"],
 	["List::isEmpty", "hasItems"],
 	["List::hasItems", "isEmpty"],
 ])
@@ -9272,7 +9272,7 @@ function describeRefinementBase(type: common.Type): string {
 // is two conjuncts and so is the mirror image of it, which is what makes
 // assignability set inclusion rather than Expression comparison. Everything else
 // is one leaf, and a leaf is a single Method call directly on `@` with literal
-// Arguments — a chain (`@::trim()::hasAnyContent()`) would need the intermediate
+// Arguments — a chain (`@::trim()::hasCharacters()`) would need the intermediate
 // value's evidence, and a computed Argument would need evaluating.
 function extractPredicateConjuncts(
 	predicate: common.typed.ExpressionNode,

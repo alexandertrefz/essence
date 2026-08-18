@@ -611,7 +611,7 @@ describe("Stdlib Call Graph", () => {
 			"String.doesNotEnd",
 			"String.doesNotStart",
 			"String.firstIndex",
-			"String.hasAnyContent",
+			"String.hasCharacters",
 			"String.isEmpty",
 			"String.isNot",
 			"String.is__overload$1",
