@@ -184,6 +184,8 @@ describe("Completion", () => {
 			expect(entries.map((entry) => entry.detail)).toEqual([
 				"<ItemType>() -> Optional<ItemType>",
 				"<ItemType>(where: (_ ItemType) -> Boolean) -> Optional<ItemType>",
+				"<ItemType>(defaultingTo: ItemType) -> ItemType",
+				"<ItemType>(where: (_ ItemType) -> Boolean, defaultingTo: ItemType) -> ItemType",
 			])
 		})
 

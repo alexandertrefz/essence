@@ -17,7 +17,13 @@ import {
 	toString,
 } from "../Integer"
 import { anyIs } from "../internalHelpers"
-import { createList, item, length, of, slice } from "../List"
+import {
+	createList,
+	item__overload$1 as item,
+	length,
+	of,
+	slice,
+} from "../List"
 import { createRational, formatAsRational } from "../Rational"
 import {
 	character__overload$1 as character,

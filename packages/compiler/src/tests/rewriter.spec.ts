@@ -1247,7 +1247,7 @@ describe("Rewriter", () => {
 			describe("item", () => {
 				it("returns the item at a position inside the list", () => {
 					expect(
-						list.item(
+						list.item__overload$1(
 							list.createList([integerOne(), integerTwo()]),
 							integerOne(),
 						),
@@ -1256,7 +1256,7 @@ describe("Rewriter", () => {
 
 				it("is empty for a position outside the list", () => {
 					expect(
-						list.item(
+						list.item__overload$1(
 							list.createList([integerOne()]),
 							integerTwo(),
 						),
@@ -1264,7 +1264,7 @@ describe("Rewriter", () => {
 					// NOTE: -1 names the last item, so the position that falls
 					// outside a one-item List from below is -2.
 					expect(
-						list.item(
+						list.item__overload$1(
 							list.createList([integerOne()]),
 							integer.createInteger(-2n),
 						),
@@ -1273,13 +1273,13 @@ describe("Rewriter", () => {
 
 				it("counts a negative position back from the end", () => {
 					expect(
-						list.item(
+						list.item__overload$1(
 							list.createList([integerOne(), integerTwo()]),
 							integer.createInteger(-1n),
 						),
 					).toEqual(optional.createValue(integerTwo()))
 					expect(
-						list.item(
+						list.item__overload$1(
 							list.createList([integerOne(), integerTwo()]),
 							integer.createInteger(-2n),
 						),

@@ -18,7 +18,7 @@ import {
 	createList,
 	insert,
 	is,
-	item,
+	item__overload$1 as item,
 	join,
 	everyItem,
 	length,

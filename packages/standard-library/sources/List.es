@@ -211,6 +211,14 @@ declarations {
 			<- @::contains(item)::negate()
 		}
 
+		§ A Method that can answer empty offers a `defaultingTo:` entry beside
+		§ each entry that can, answering the bare Type. The caller says at the
+		§ call what stands in for the missing answer, so nothing downstream has
+		§ to take an Optional apart. `Optional::value(defaultingTo:)` stays the
+		§ collapse for an Optional held in data, and each entry here is written
+		§ on it. Every Method below with an Optional answer is written the same
+		§ way, and this is the only note that says so.
+
 		§§ The first item, or the first item the given check accepts.
 		§§
 		§§ @returns — the matching item, or nothing when there is none.
@@ -252,6 +260,26 @@ declarations {
 					}
 				})
 			}
+
+			§§ The first item, or the given fallback for the empty List.
+			§§
+			§§ @param defaultingTo — the item to answer with when there is none
+			§§ @returns — the first item, or the fallback in its place.
+			(defaultingTo fallback: ItemType) -> ItemType {
+				<- @::firstItem()::value(defaultingTo fallback)
+			}
+
+			§§ The first item the given check accepts, or the given fallback when it accepts none.
+			§§
+			§§ @param where — the check each item is offered to
+			§§ @param defaultingTo — the item to answer with when there is none
+			§§ @returns — the matching item, or the fallback in its place.
+			(
+				where check: (_: ItemType) -> Boolean,
+				defaultingTo fallback: ItemType,
+			) -> ItemType {
+				<- @::firstItem(where check)::value(defaultingTo fallback)
+			}
 		}
 
 		§§ The last item, or the last item the given check accepts.
@@ -276,6 +304,26 @@ declarations {
 				§ reversed List, so `firstItem(where:)` answers this one too and
 				§ stops at the item that decides it, exactly as it does there.
 				<- @::reverse()::firstItem(where check)
+			}
+
+			§§ The last item, or the given fallback for the empty List.
+			§§
+			§§ @param defaultingTo — the item to answer with when there is none
+			§§ @returns — the last item, or the fallback in its place.
+			(defaultingTo fallback: ItemType) -> ItemType {
+				<- @::lastItem()::value(defaultingTo fallback)
+			}
+
+			§§ The last item the given check accepts, or the given fallback when it accepts none.
+			§§
+			§§ @param where — the check each item is offered to
+			§§ @param defaultingTo — the item to answer with when there is none
+			§§ @returns — the matching item, or the fallback in its place.
+			(
+				where check: (_: ItemType) -> Boolean,
+				defaultingTo fallback: ItemType,
+			) -> ItemType {
+				<- @::lastItem(where check)::value(defaultingTo fallback)
 			}
 		}
 
@@ -477,7 +525,21 @@ declarations {
 		§§ The item at the given position, counting from zero — or, for a negative position, counting back from the end: -1 is the last item and -length the first.
 		§§
 		§§ @returns — the item, or nothing when the position is outside the List.
-		item(at index: Integer) -> Optional<ItemType>
+		overload item {
+			§§ The item at the given position.
+			§§
+			§§ @returns — the item, or nothing when the position is outside the List.
+			(at index: Integer) -> Optional<ItemType>
+
+			§§ The item at the given position, or the given fallback when the position is outside the List.
+			§§
+			§§ @param at — the position of the item
+			§§ @param defaultingTo — the item to answer with when the position names none
+			§§ @returns — the item at that position, or the fallback in its place.
+			(at index: Integer, defaultingTo fallback: ItemType) -> ItemType {
+				<- @::item(at index)::value(defaultingTo fallback)
+			}
+		}
 
 		§ `firstIndex` and `lastIndex` COUNT their way through the items, stopping
 		§ at the first match — the walk-and-stop the native did, now that the
@@ -538,6 +600,30 @@ declarations {
 				} else {
 					<- #Empty
 				}
+			}
+
+			§§ The position of the first item equal — by the items' own `is` — to the given one, or the given fallback when the item is absent. Available whenever the items conform to `Equatable`.
+			§§
+			§§ @param of — the item to look for
+			§§ @param defaultingTo — the position to answer with when the item is absent
+			§§ @returns — the zero-based position, or the fallback in its place.
+			<infer ItemType is Equatable>(
+				of item: ItemType,
+				defaultingTo fallback: Integer,
+			) -> Integer {
+				<- @::firstIndex(of item)::value(defaultingTo fallback)
+			}
+
+			§§ The position of the first item the given check accepts, or the given fallback when it accepts none.
+			§§
+			§§ @param where — the check each item is offered to
+			§§ @param defaultingTo — the position to answer with when no item is accepted
+			§§ @returns — the zero-based position, or the fallback in its place.
+			(
+				where check: (_: ItemType) -> Boolean,
+				defaultingTo fallback: Integer,
+			) -> Integer {
+				<- @::firstIndex(where check)::value(defaultingTo fallback)
 			}
 		}
 
@@ -674,24 +760,42 @@ declarations {
 		§§ The position of the last item equal — by the items' own `is` — to the given one. Available whenever the items conform to `Equatable`.
 		§§
 		§§ @returns — the zero-based position, or nothing when the item is absent.
-		lastIndex<infer ItemType is Equatable>(
-			of item: ItemType,
-		) -> Optional<Integer> {
-			§ The LAST occurrence is the FIRST occurrence of the reversed List, so
-			§ `firstIndex` answers this one too and only the position has to be
-			§ counted back from the end. Counting down from the last position
-			§ instead would read each one with `item(at:)` and take an Optional
-			§ apart per item — see the note above `firstIndex`.
-			§
-			§ The empty List reverses to itself and holds no item to find, so it
-			§ comes back empty without a guard of its own — the -1 that
-			§ `lastPosition` holds for it never reaches the subtraction, because
-			§ `map` does not run on an empty Optional.
-			constant lastPosition = @::length()::subtract(1)
+		overload lastIndex {
+			§§ The position of the last item equal — by the items' own `is` — to the given one. Available whenever the items conform to `Equatable`.
+			§§
+			§§ @returns — the zero-based position, or nothing when the item is absent.
+			<infer ItemType is Equatable>(
+				of item: ItemType,
+			) -> Optional<Integer> {
+				§ The LAST occurrence is the FIRST occurrence of the reversed
+				§ List, so `firstIndex` answers this one too and only the
+				§ position has to be counted back from the end. Counting down
+				§ from the last position instead would read each one with
+				§ `item(at:)` and take an Optional apart per item — see the note
+				§ above `firstIndex`.
+				§
+				§ The empty List reverses to itself and holds no item to find,
+				§ so it comes back empty without a guard of its own — the -1
+				§ that `lastPosition` holds for it never reaches the
+				§ subtraction, because `map` does not run on an empty Optional.
+				constant lastPosition = @::length()::subtract(1)
 
-			<- @::reverse()
-				::firstIndex(of item)
-				::map((position) { <- lastPosition::subtract(position) })
+				<- @::reverse()
+					::firstIndex(of item)
+					::map((position) { <- lastPosition::subtract(position) })
+			}
+
+			§§ The position of the last item equal — by the items' own `is` — to the given one, or the given fallback when the item is absent. Available whenever the items conform to `Equatable`.
+			§§
+			§§ @param of — the item to look for
+			§§ @param defaultingTo — the position to answer with when the item is absent
+			§§ @returns — the zero-based position, or the fallback in its place.
+			<infer ItemType is Equatable>(
+				of item: ItemType,
+				defaultingTo fallback: Integer,
+			) -> Integer {
+				<- @::lastIndex(of item)::value(defaultingTo fallback)
+			}
 		}
 
 		§ The one bounded Method whose bound does real work rather than

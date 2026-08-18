@@ -701,7 +701,7 @@ export function positionFromEnd(
 // NOTE: Reading a position does NOT combine the runs — an upgraded List has to
 // stay O(1) to index — so the view decides which run holds the item and the
 // item is read straight out of it.
-export function item<ItemType extends AnyType>(
+export function item__overload$1<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 	index: IntegerType,
 ): OptionalType<ItemType> {
