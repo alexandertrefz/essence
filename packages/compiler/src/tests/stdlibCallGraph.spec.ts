@@ -562,6 +562,7 @@ describe("Stdlib Call Graph", () => {
 			"Number.sum__overload$3",
 			"Number.toString",
 			"NumberFormat.toString",
+			"Optional.andThen",
 			"Optional.hasValue",
 			"Optional.isEmpty",
 			"Optional.isNot__overload$1",

@@ -31,10 +31,11 @@ declarations {
 		Empty,
 	}
 
-	§ The Namespace every Optional reaches. `value(defaultingTo:)` collapses it
-	§ back to a bare value, `hasValue`/`isEmpty` ask without taking it apart,
-	§ `is`/`isNot` ask against a value at either level, and `map` and `keep`
-	§ carry a value through a step that does not know it might be missing.
+	§ The Namespace every Optional reaches. `value(defaultingTo:)` collapses
+	§ it back to a bare value, `hasValue`/`isEmpty` ask without taking it
+	§ apart, `is`/`isNot` ask against a value at either level, `map` and
+	§ `keep` carry a value through a step that does not know it might be
+	§ missing, and `andThen` through one that can answer empty itself.
 	§ Matching is always available and always exhaustive — these are the
 	§ shorthands for the shapes worth a name.
 	§
@@ -181,6 +182,21 @@ declarations {
 			}
 		}
 
+		§§ Runs a step that can itself answer empty, without nesting.
+		§§
+		§§ An empty Optional answers empty, and the step does not run.
+		§§
+		§§ @param step — the step to run on the value
+		§§ @returns — the Optional the step answers, or an empty Optional.
+		andThen<infer ResultType>(
+			_ step: (_: ItemType) -> Optional<ResultType>,
+		) -> Optional<ResultType> {
+			<- match @ -> Optional<ResultType> {
+				case #Value(item) { <- step(item) }
+				case #Empty       { <- #Empty }
+			}
+		}
+
 		§§ Keeps the value only when it passes the check — `List::keepEvery(where:)` for the at-most-one case.
 		§§
 		§§ @param check — the question asked of the value
@@ -208,11 +224,12 @@ declarations {
 	§ `Optional<Integer>` rather than the `Optional<Optional<Integer>>` it
 	§ started as.
 	§
-	§ There is deliberately no `andThen`: it is `map` followed by `flatten`,
-	§ and spelling the two separately says which step is the transform and
-	§ which is the collapse. There is no `orElse` either — an Optional whose
-	§ payload is itself an Optional makes "or else what" genuinely ambiguous,
-	§ and `value(defaultingTo:)` already answers the unambiguous half.
+	§ `andThen` is on every Optional and needs no Namespace of its own: a
+	§ step that answers an Optional never manufactures a nested one, so
+	§ `flatten`'s ambiguity does not arise. There is no `orElse` — an
+	§ Optional whose payload is itself an Optional makes "or else what"
+	§ genuinely ambiguous, and `value(defaultingTo:)` already answers the
+	§ unambiguous half.
 	namespace NestedOptional<infer ItemType> for Optional<Optional<ItemType>> {
 		§§ Collapses a nested Optional by one level — the inner Optional, or an empty Optional when the outer one is empty.
 		§§

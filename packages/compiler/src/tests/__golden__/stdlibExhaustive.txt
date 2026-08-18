@@ -447,6 +447,8 @@
 "Optional.isEmpty<ItemType>() [present] => false"
 "Optional.map<ItemType, ResultType>(_ (_ ItemType) -> ResultType) => Value(30)"
 "Optional.map<ItemType, ResultType>(_ (_ ItemType) -> ResultType) [empty] => Empty"
+"Optional.andThen<ItemType, ResultType>(_ (_ ItemType) -> Optional<ResultType>) => Value(1)"
+"Optional.andThen<ItemType, ResultType>(_ (_ ItemType) -> Optional<ResultType>) [empty] => Empty"
 "Optional.keep<ItemType>(where: (_ ItemType) -> Boolean) => Value(3)"
 "Optional.keep<ItemType>(where: (_ ItemType) -> Boolean) [rejected] => Empty"
 "Optional.is<ItemType is Equatable>(_ Optional<ItemType>) => true"
