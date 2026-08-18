@@ -862,7 +862,7 @@ export type InlineLoopDriver =
 			seed: ExpressionNode
 			step: InlineLoopCallback
 	  }
-	// NOTE: `List.map` and `List.keepEvery` — a walk that builds an Array and
+	// NOTE: `List.map` and `List.everyItem` — a walk that builds an Array and
 	// wraps it, with the callback deciding what goes in it.
 	| { kind: "map"; items: ExpressionNode; transform: InlineLoopCallback }
 	| { kind: "keep"; items: ExpressionNode; check: InlineLoopCallback }

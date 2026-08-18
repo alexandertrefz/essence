@@ -1796,12 +1796,12 @@ third"::lines())
 		}),
 	)
 	show(
-		"List.keepEvery<ItemType>(where: (_ ItemType) -> Boolean)",
-		numbers::keepEvery(where (item) { <- item::isGreaterThan(1) }),
+		"List.everyItem<ItemType>(where: (_ ItemType) -> Boolean)",
+		numbers::everyItem(where (item) { <- item::isGreaterThan(1) }),
 	)
 	show(
-		"List.keepEvery<ItemType>(where: (_ ItemType) -> Boolean) [no match]",
-		numbers::keepEvery(where (item) { <- item::isGreaterThan(9) }),
+		"List.everyItem<ItemType>(where: (_ ItemType) -> Boolean) [no match]",
+		numbers::everyItem(where (item) { <- item::isGreaterThan(9) }),
 	)
 	show("List.item<ItemType>(at: Integer)", numbers::item(at 2))
 	show("List.item<ItemType>(at: Integer) [zero]", numbers::item(at 0))
@@ -1900,28 +1900,28 @@ third"::lines())
 		noNumbers::compare(to []),
 	)
 	show(
-		"List.anyItem<ItemType>(where: (_ ItemType) -> Boolean)",
-		numbers::anyItem(where (item) { <- item::isGreaterThan(3) }),
+		"List.hasItems<ItemType>(where: (_ ItemType) -> Boolean)",
+		numbers::hasItems(where (item) { <- item::isGreaterThan(3) }),
 	)
 	show(
-		"List.anyItem<ItemType>(where: (_ ItemType) -> Boolean) [no match]",
-		numbers::anyItem(where (item) { <- item::isGreaterThan(9) }),
+		"List.hasItems<ItemType>(where: (_ ItemType) -> Boolean) [no match]",
+		numbers::hasItems(where (item) { <- item::isGreaterThan(9) }),
 	)
 	show(
-		"List.anyItem<ItemType>(where: (_ ItemType) -> Boolean) [empty]",
-		noNumbers::anyItem(where (item) { <- item::isGreaterThan(0) }),
+		"List.hasItems<ItemType>(where: (_ ItemType) -> Boolean) [empty]",
+		noNumbers::hasItems(where (item) { <- item::isGreaterThan(0) }),
 	)
 	show(
-		"List.everyItem<ItemType>(where: (_ ItemType) -> Boolean)",
-		numbers::everyItem(where (item) { <- item::isGreaterThan(0) }),
+		"List.hasItems<ItemType>(onlyWhere: (_ ItemType) -> Boolean)",
+		numbers::hasItems(onlyWhere (item) { <- item::isGreaterThan(0) }),
 	)
 	show(
-		"List.everyItem<ItemType>(where: (_ ItemType) -> Boolean) [no match]",
-		numbers::everyItem(where (item) { <- item::isGreaterThan(3) }),
+		"List.hasItems<ItemType>(onlyWhere: (_ ItemType) -> Boolean) [no match]",
+		numbers::hasItems(onlyWhere (item) { <- item::isGreaterThan(3) }),
 	)
 	show(
-		"List.everyItem<ItemType>(where: (_ ItemType) -> Boolean) [empty]",
-		noNumbers::everyItem(where (item) { <- item::isGreaterThan(0) }),
+		"List.hasItems<ItemType>(onlyWhere: (_ ItemType) -> Boolean) [empty]",
+		noNumbers::hasItems(onlyWhere (item) { <- item::isGreaterThan(0) }),
 	)
 	show(
 		"List.count<ItemType is Equatable>(of: ItemType)",

@@ -44,7 +44,7 @@ import { rewriteNodes } from "../walk"
 // which is a value this pass can not read, so the call stays exactly what it
 // was. That is also why the standard library's own walks inline: `firstItem
 // (where:)`, `firstIndex(of:)`, `count(where:)` and the rest are written on
-// `reduce` and `keepEvery` with literal callbacks, so the loop inside each of
+// `reduce` and `everyItem` with literal callbacks, so the loop inside each of
 // THEM is written out, once, in the prelude — the Program's own call still calls
 // that Method, and what it calls no longer allocates a `Step` per item.
 
@@ -323,7 +323,7 @@ class Inlining {
 		// would have run.
 		//
 		// NOTE: Per Method rather than per Namespace, and `map` is the only one
-		// the two share. `keepEvery` and both `reduce` entries are not declared
+		// the two share. `everyItem` and both `reduce` entries are not declared
 		// on `NonEmptyList` at all — each can answer with fewer items than it
 		// was handed — so a proven receiver reaches `List`'s own entry by
 		// widening and is emitted under `List`'s own name, which is why they
@@ -342,7 +342,7 @@ class Inlining {
 		switch (node.member.name) {
 			case "map":
 				return this.mapWalk(node)
-			case "keepEvery":
+			case "everyItem":
 				return this.keepWalk(node)
 			case "reduce__overload$1":
 				return this.foldWalk(node, false)

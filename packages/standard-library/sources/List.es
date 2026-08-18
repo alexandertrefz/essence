@@ -79,13 +79,13 @@ declarations {
 		is Equatable where ItemType is Equatable,
 		is Comparable where ItemType is Comparable {
 		§ NOTE: This would read better in Essence — length equality AND
-		§ `pair(with other)::everyItem(where (pair) { … })` — and it can not
+		§ `pair(with other)::hasItems(onlyWhere (pair) { … })` — and it can not
 		§ be written that way yet. Binding a List Method's own `ItemType` to a
 		§ Type that MENTIONS `ItemType` (the pair Record) makes inference
 		§ substitute the name into itself and recurse until the stack runs out.
 		§ The bound has nothing to do with it: a plain
 		§ `function f<ItemType>(_ a: List<ItemType>, _ b: List<ItemType>) { <-
-		§ a::pair(with b)::everyItem(…) }` overflows the same way, and did
+		§ a::pair(with b)::hasItems(…) }` overflows the same way, and did
 		§ before any of this. So `is` stays native and takes the witness — it
 		§ compares each pair with the items' own `is` rather than structurally,
 		§ exactly as `compare` below does with their `compare`.
@@ -126,11 +126,58 @@ declarations {
 		§§ @returns — the number of items.
 		length() -> Integer
 
-		§§ Whether the List has at least one item — the opposite of `isEmpty`.
+		§ The existential and the universal, under the name the no-Argument
+		§ question already has. `hasItems()` asks whether there is an item,
+		§ `hasItems(where:)` whether there is one the check accepts, and
+		§ `hasItems(onlyWhere:)` whether the check accepts every item.
+		§
+		§ The two quantified entries stop at the item that decides the answer,
+		§ on `reduce`'s early-stopping entry, and carry the ANSWER rather than
+		§ the item. `firstItem(where:)::hasValue()` answers the same question
+		§ correctly — a nested Optional keeps "no match" and "an empty match"
+		§ apart — and it builds an Optional per call to throw it away. A
+		§ Boolean accumulator builds nothing. `count(where:)` below stays on
+		§ `everyItem` — counting has to see every item, so there is no walk to
+		§ leave early.
+
+		§§ Whether the List has at least one item, one the given check accepts, or only items the check accepts.
 		§§
-		§§ @returns — `true` when the List is not empty.
-		hasItems() -> Boolean {
-			<- @::isEmpty()::negate()
+		§§ @returns — `true` when the List answers the question that was asked.
+		overload hasItems {
+			§§ Whether the List has at least one item — the opposite of `isEmpty`.
+			§§
+			§§ @returns — `true` when the List is not empty.
+			() -> Boolean {
+				<- @::isEmpty()::negate()
+			}
+
+			§§ Whether the given check accepts at least one item.
+			§§
+			§§ @returns — `true` when some item is accepted.
+			(where check: (_: ItemType) -> Boolean) -> Boolean {
+				§ The accumulator is the answer so far, which stays `false`
+				§ until an item is accepted and `#Done` finishes the fold with
+				§ `true`. The empty List has no item to accept and keeps the
+				§ seed.
+				<- @::reduce(startingWith false, step (found, item) {
+					if check(item) {
+						<- #Done(true)
+					} else {
+						<- #Continue(found)
+					}
+				})
+			}
+
+			§§ Whether the given check accepts every item.
+			§§
+			§§ The empty List has no item to fail the check, so it answers `true`.
+			§§
+			§§ @returns — `true` when every item is accepted.
+			(onlyWhere check: (_: ItemType) -> Boolean) -> Boolean {
+				§ No item fails the check.
+				<- @::hasItems(where (item) { <- check(item)::negate() })
+					::negate()
+			}
 		}
 
 		§§ Whether the List has no items at all.
@@ -148,10 +195,10 @@ declarations {
 		§§ @param item — the item to look for
 		§§ @returns — `true` when the item occurs.
 		contains<infer ItemType is Equatable>(_ item: ItemType) -> Boolean {
-			§ The bound is the whole of the difference from `anyItem`: the
-			§ conforming Namespace's `is` arrives as the hidden conformance
+			§ The bound is the whole of the difference from `hasItems(where:)`:
+			§ the conforming Namespace's `is` arrives as the hidden conformance
 			§ Argument, and this hands it straight on as the check.
-			<- @::anyItem(where (candidate) { <- candidate::is(item) })
+			<- @::hasItems(where (candidate) { <- candidate::is(item) })
 		}
 
 		§§ Whether no item equal to the given one is in the List. Available whenever the items conform to `Equatable`.
@@ -177,7 +224,7 @@ declarations {
 			§ Written on `reduce`'s early-stopping entry — the fold `#Done`s at
 			§ the first accepted item and never walks the rest. Stopping at the
 			§ first match is the whole of the difference from
-			§ `keepEvery(where:)::firstItem()`, and leaving a walk before its end is
+			§ `everyItem(where:)::firstItem()`, and leaving a walk before its end is
 			§ what the `Step` Choice made an Essence expression able to do — this
 			§ Method was native until it existed.
 			§
@@ -187,7 +234,7 @@ declarations {
 			§ item that matched is itself empty". An Optional that was a Union
 			§ could not tell them apart, and every Method below that wants only
 			§ the DECISION was written to route around the ambiguity. They stay
-			§ written that way for a smaller reason — see `anyItem`.
+			§ written that way for a smaller reason — see `hasItems`.
 			(where check: (_: ItemType) -> Boolean) -> Optional<ItemType> {
 				§ `reduce` binds its `Result` from the `startingWith` value, and
 				§ a bare `#Empty` would fix it to the empty Case alone — so the
@@ -264,7 +311,7 @@ declarations {
 			}
 
 			(where check: (_: ItemType) -> Boolean) -> List<ItemType> {
-				<- @::keepEvery(where (item) { <- check(item)::negate() })
+				<- @::everyItem(where (item) { <- check(item)::negate() })
 			}
 		}
 
@@ -407,10 +454,10 @@ declarations {
 		§ form, since keeping just the items equal to a given value is what
 		§ `contains` already answers.
 
-		§§ A new List of just the items the given check accepts.
+		§§ A new List of every item the given check accepts.
 		§§
 		§§ @returns — the List of accepted items.
-		keepEvery(where check: (_: ItemType) -> Boolean) -> List<ItemType>
+		everyItem(where check: (_: ItemType) -> Boolean) -> List<ItemType>
 
 		§§ The item at the given position, counting from zero — or, for a negative position, counting back from the end: -1 is the last item and -length the first.
 		§§
@@ -433,7 +480,7 @@ declarations {
 		§
 		§ The bound is the whole of the search: the item Type's own `is` decides
 		§ which position is found, arriving as the hidden conformance Argument
-		§ exactly as `contains` hands it to `anyItem`.
+		§ exactly as `contains` hands it to `hasItems(where:)`.
 
 		§§ The position of the first item equal — by the items' own `is` — to the given one. Available whenever the items conform to `Equatable`.
 		§§
@@ -532,47 +579,6 @@ declarations {
 			to other: List<ItemType>,
 		) -> Ordering
 
-		§ `anyItem`/`everyItem` are the existential and universal checks over a
-		§ predicate. The no-argument existential is `hasItems`. Their predicate
-		§ is labelled `where`, like every other predicate Parameter here —
-		§ `matches` read as a sentence ("any item matches …") and was the one
-		§ pair a reader could not guess from the other five.
-		§
-		§ Both stop at the first item that decides the answer — `anyItem` at the
-		§ first match, `everyItem` at the first failure — and both stop on
-		§ `reduce`'s early-stopping entry, carrying the ANSWER rather than the
-		§ item. `firstItem(where:)::hasValue()` answers the same question
-		§ correctly — a nested Optional keeps "no match" and "an empty match"
-		§ apart, which is what once made it wrong — and it builds an Optional
-		§ per call to throw it away. A Boolean accumulator builds nothing.
-		§ `count(where:)` below stays on `keepEvery` — counting has to see every
-		§ item, so there is no walk to leave early.
-
-		§§ Whether the given check accepts at least one item.
-		§§
-		§§ @returns — `true` when some item is accepted.
-		anyItem(where check: (_: ItemType) -> Boolean) -> Boolean {
-			§ The accumulator is the answer so far, which stays `false` until an
-			§ item is accepted and `#Done` finishes the fold with `true`. The
-			§ empty List has no item to accept and keeps the seed.
-			<- @::reduce(startingWith false, step (found, item) {
-				if check(item) {
-					<- #Done(true)
-				} else {
-					<- #Continue(found)
-				}
-			})
-		}
-
-		§§ Whether the given check accepts every item.
-		§§
-		§§ @returns — `true` when all items are accepted, including the empty List.
-		everyItem(where check: (_: ItemType) -> Boolean) -> Boolean {
-			§ No item fails the check. The empty List has none to fail, so it
-			§ answers `true`, as it should.
-			<- @::anyItem(where (item) { <- check(item)::negate() })::negate()
-		}
-
 		§§ How many items equal the given one — by the items' own `is` — or are accepted by the given check. The by-value entry is available whenever the items conform to `Equatable`.
 		§§
 		§§ @returns — the count.
@@ -583,9 +589,9 @@ declarations {
 
 			(where check: (_: ItemType) -> Boolean) -> Integer {
 				§ The filtered List is built only to be measured. Counting has to
-				§ see every item, so unlike `anyItem`/`everyItem` there is no
-				§ short circuit to keep here.
-				<- @::keepEvery(where check)::length()
+				§ see every item, so unlike the quantified `hasItems` entries
+				§ there is no short circuit to keep here.
+				<- @::everyItem(where check)::length()
 			}
 		}
 
@@ -688,7 +694,7 @@ declarations {
 			§ Two passes where the native made one, each keeping the original
 			§ order — which is what the halves are specified to do.
 			<- {
-				matching = @::keepEvery(where check),
+				matching = @::everyItem(where check),
 				rest = @::removeEvery(where check),
 			}
 		}
@@ -810,7 +816,7 @@ declarations {
 	§ the harness calls both entries over the same inputs so that the two can
 	§ not drift.
 	§
-	§ What is not here is everything the proof does not survive. `keepEvery`,
+	§ What is not here is everything the proof does not survive. `everyItem`,
 	§ `removeEvery`, `slice`, `remove`, `removeFirst` and `removeLast` can all
 	§ answer empty from a receiver that was not; `flatten` empties on a List of
 	§ empty Lists; `firstItem(where:)` may find nothing; `partition`, `pair` and

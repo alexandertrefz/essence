@@ -20,7 +20,7 @@ import {
 	is,
 	item,
 	join,
-	keepEvery,
+	everyItem,
 	length,
 	type ListType,
 	map,
@@ -421,14 +421,14 @@ describe("every native against an upgraded receiver", () => {
 		])
 	})
 
-	test("map, keepEvery and both folds", () => {
+	test("map, everyItem and both folds", () => {
 		expect(
 			itemsOf(map(upgraded(), (each) => product(each.value, each.value))),
 		).toEqual([1, 4, 9, 16, 25])
 
 		expect(
 			itemsOf(
-				keepEvery(upgraded(), (each) =>
+				everyItem(upgraded(), (each) =>
 					createBoolean(Number(each.value) % 2 === 0),
 				),
 			),

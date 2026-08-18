@@ -303,8 +303,8 @@ export type ListNatives = {
 	reduce__overload$1: <ItemType extends AnyType, Result extends AnyType>(self: ListType<ItemType>, startingWith: Result, argument2: (argument0: Result, argument1: ItemType) => Result) => Result
 	// reduce<ItemType, Result>(startingWith: Result, step: (_: Result, _: ItemType) -> Step<Result, Result>) -> Result
 	reduce__overload$2: <ItemType extends AnyType, Result extends AnyType>(self: ListType<ItemType>, startingWith: Result, step: (argument0: Result, argument1: ItemType) => StepType<Result, Result>) => Result
-	// keepEvery<ItemType>(where: (_: ItemType) -> Boolean) -> List<ItemType>
-	keepEvery: <ItemType extends AnyType>(self: ListType<ItemType>, where: (argument0: ItemType) => BooleanType) => ListType<ItemType>
+	// everyItem<ItemType>(where: (_: ItemType) -> Boolean) -> List<ItemType>
+	everyItem: <ItemType extends AnyType>(self: ListType<ItemType>, where: (argument0: ItemType) => BooleanType) => ListType<ItemType>
 	// item<ItemType>(at: Integer) -> Optional<ItemType>
 	item: <ItemType extends AnyType>(self: ListType<ItemType>, at: IntegerType) => OptionalType<ItemType>
 	// slice<ItemType>(from: Integer, to: Integer) -> List<ItemType>
@@ -532,7 +532,7 @@ export const $RecordArity: AssertArities<typeof import("./Record"), {
 
 declare const ListModule: typeof import("./List")
 export const $List: ListNatives = ListModule
-export const $ListAbsent: AssertNoEssenceExports<typeof import("./List"), "isNot" | "hasItems" | "isEmpty" | "contains" | "doesNotContain" | "firstItem__overload$1" | "firstItem__overload$2" | "lastItem" | "removeFirst" | "removeEvery__overload$1" | "removeEvery__overload$2" | "removeLast" | "removeDuplicates" | "prepend__overload$2" | "firstIndex" | "anyItem" | "everyItem" | "count__overload$1" | "count__overload$2" | "replace" | "lastIndex" | "partition" | "repeat"> = true
+export const $ListAbsent: AssertNoEssenceExports<typeof import("./List"), "isNot" | "hasItems__overload$1" | "hasItems__overload$2" | "hasItems__overload$3" | "isEmpty" | "contains" | "doesNotContain" | "firstItem__overload$1" | "firstItem__overload$2" | "lastItem" | "removeFirst" | "removeEvery__overload$1" | "removeEvery__overload$2" | "removeLast" | "removeDuplicates" | "prepend__overload$2" | "firstIndex" | "count__overload$1" | "count__overload$2" | "replace" | "lastIndex" | "partition" | "repeat"> = true
 export const $ListArity: AssertArities<typeof import("./List"), {
 	is: 3
 	toString: 2
@@ -544,7 +544,7 @@ export const $ListArity: AssertArities<typeof import("./List"), {
 	map: 2
 	reduce__overload$1: 3
 	reduce__overload$2: 3
-	keepEvery: 2
+	everyItem: 2
 	item: 2
 	slice: 3
 	reverse: 1

@@ -20,7 +20,7 @@ implementation {
 		_ entry: String,
 		within tree: List<String>,
 	) -> Boolean {
-		<- tree::anyItem(where (other) {
+		<- tree::hasItems(where (other) {
 			<- other::starts(with entry::append("/"))
 		})
 	}

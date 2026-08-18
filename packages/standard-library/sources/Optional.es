@@ -197,13 +197,11 @@ declarations {
 			}
 		}
 
-		§§ Keeps the value only when it passes the check — `List::keepEvery(where:)` for the at-most-one case.
+		§§ Keeps the value only when it passes the check — `List::everyItem(where:)` for the at-most-one case.
 		§§
 		§§ @param check — the question asked of the value
 		§§ @returns — the Optional unchanged when the value passes, an empty Optional otherwise.
 		keep(where check: (_: ItemType) -> Boolean) -> Optional<ItemType> {
-			§ Named `keep` rather than `keepEvery`: there is no "every" here,
-			§ and the plural would promise a traversal that can not happen.
 			<- match @ -> Optional<ItemType> {
 				case #Value(item) {
 					if check(item) {

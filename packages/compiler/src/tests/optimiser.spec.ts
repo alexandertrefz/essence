@@ -1191,7 +1191,7 @@ const listWalks = `implementation {
 	})::toString())
 
 	Terminal.inspect(items::map((item) { <- item::multiply(with 2) })::length())
-	Terminal.inspect(items::keepEvery(where (item) {
+	Terminal.inspect(items::everyItem(where (item) {
 		<- item::isGreaterThan(1)
 	})::length())
 
@@ -1205,7 +1205,7 @@ const listWalks = `implementation {
 // same callbacks, the same answers. A refinement is erased before the first pass
 // runs, so what both hold is one \`List\`; what differs is the Namespace the
 // Simplifier named. \`NonEmptyList\` declares a \`map\` of its own, so a proven
-// receiver's map is emitted under THAT name, while \`keepEvery\` and both
+// receiver's map is emitted under THAT name, while \`everyItem\` and both
 // \`reduce\` entries have no entry there and are reached by widening, so they
 // arrive as \`List\`'s own and were never affected — which is why the gate is
 // per-Method rather than per-Namespace.
@@ -1221,7 +1221,7 @@ const provenWalks = `implementation {
 	Terminal.inspect(proven::map((item) { <- item::multiply(with 2) })::length())
 	Terminal.inspect(written::map((item) { <- item::multiply(with 2) })::length())
 
-	Terminal.inspect(proven::keepEvery(where (item) {
+	Terminal.inspect(proven::everyItem(where (item) {
 		<- item::isGreaterThan(1)
 	})::length())
 
@@ -1329,7 +1329,7 @@ const shadowedParameter = `implementation {
 
 	constant items = [1, 2, 3]
 
-	Terminal.inspect(items::keepEvery(where (items) {
+	Terminal.inspect(items::everyItem(where (items) {
 		<- items::isGreaterThan(1)
 	})::length())
 	Terminal.inspect(items::map((total) { <- total::add(1) })::length())
@@ -1377,7 +1377,7 @@ const bothEnds = `implementation {
 	Terminal.inspect(more::slice(from 1, to 4))
 	Terminal.inspect(more::reverse())
 	Terminal.inspect(more::map((item) { <- item::multiply(with 2) }))
-	Terminal.inspect(more::keepEvery(where (item) { <- item::isGreaterThan(3) }))
+	Terminal.inspect(more::everyItem(where (item) { <- item::isGreaterThan(3) }))
 	Terminal.inspect(more::reduce(startingWith 0, (total, item) { <- total::add(item) }))
 	Terminal.inspect(front::is([1, 2, 3, 4]))
 
@@ -4038,9 +4038,9 @@ describe("Optimiser", () => {
 		// with the guard, the call keeps its frame and answers correctly.
 		describe("a walk this pass inlines, given a default", () => {
 			const written =
-				"keepEvery(where check: (_: ItemType) -> Boolean) -> List<ItemType>"
+				"everyItem(where check: (_: ItemType) -> Boolean) -> List<ItemType>"
 			const defaulted =
-				"keepEvery(where check: (_: ItemType) -> Boolean = (_ item: ItemType) -> Boolean { <- true }) -> List<ItemType>"
+				"everyItem(where check: (_: ItemType) -> Boolean = (_ item: ItemType) -> Boolean { <- true }) -> List<ItemType>"
 
 			let replacedStdlib: Stdlib | null = null
 
@@ -4068,16 +4068,16 @@ describe("Optimiser", () => {
 			})
 
 			const folded = `implementation {
-	Terminal.inspect([1, 2, 3]::keepEvery(where (_ item: Integer) -> Boolean {
+	Terminal.inspect([1, 2, 3]::everyItem(where (_ item: Integer) -> Boolean {
 		<- item::isGreaterThan(1)
 	}))
 }`
 			const omitted = `implementation {
-	Terminal.inspect([1, 2, 3]::keepEvery())
+	Terminal.inspect([1, 2, 3]::everyItem())
 }`
 
 			it("still inlines a call that writes every Argument", async () => {
-				expect(generate(folded)).not.toContain("List.keepEvery")
+				expect(generate(folded)).not.toContain("List.everyItem")
 				expect(await outputOf(generate(folded))).toEqual(["[ 2, 3 ]"])
 			})
 
@@ -4087,7 +4087,7 @@ describe("Optimiser", () => {
 			// it to fill. So the call keeps its frame, which is a missed
 			// optimisation rather than a wrong Program.
 			it("refuses a call that left an Argument out", async () => {
-				expect(generate(omitted)).toContain("$es_List_keepEvery")
+				expect(generate(omitted)).toContain("$es_List_everyItem")
 				expect(await outputOf(generate(omitted))).toEqual([
 					"[ 1, 2, 3 ]",
 				])
@@ -4368,7 +4368,7 @@ describe("Optimiser", () => {
 				"for (let $loop_0_position = 0; $loop_0_position < $loop_0_count; $loop_0_position++)",
 			)
 			expect(generated).not.toContain("List.reduce__overload$1(")
-			expect(generated).not.toContain("List.keepEvery(")
+			expect(generated).not.toContain("List.everyItem(")
 		})
 
 		it("holds the items and their count before the first turn", () => {
@@ -4455,7 +4455,7 @@ describe("Optimiser", () => {
 		})
 
 		it("reaches a proven receiver's other walks by widening", () => {
-			// NOTE: `keepEvery` and both `reduce` entries were never affected,
+			// NOTE: `everyItem` and both `reduce` entries were never affected,
 			// and it is worth saying why rather than assuming it: none of the
 			// three is declared on `NonEmptyList` — each can answer with fewer
 			// items than it was handed, or with no List at all — so a proven
@@ -4466,7 +4466,7 @@ describe("Optimiser", () => {
 				disabledPasses: new Set(),
 			})
 
-			expect(unoptimised).toContain("List.keepEvery(proven,")
+			expect(unoptimised).toContain("List.everyItem(proven,")
 			expect(unoptimised).toContain("List.reduce__overload$1(proven,")
 			expect(unoptimised).toContain("List.reduce__overload$2(proven,")
 		})
@@ -4594,7 +4594,7 @@ describe("Optimiser", () => {
 		it("prints the same thing with the pass off over a List Program", async () => {
 			// NOTE: The fixture that reaches every walking Method there is, and
 			// the standard library's own — which are written on `reduce` and
-			// `keepEvery` with literal callbacks, so this is where the prelude's
+			// `everyItem` with literal callbacks, so this is where the prelude's
 			// own inlining is exercised.
 			await expectSamePrintedOutput(
 				"inline-loops",
@@ -4605,7 +4605,7 @@ describe("Optimiser", () => {
 
 	describe("build-lists-in-place", () => {
 		it("pushes into one Array where the walk rebuilt a List per turn", () => {
-			// NOTE: The emission `map` and `keepEvery` already trust, written
+			// NOTE: The emission `map` and `everyItem` already trust, written
 			// for an accumulator the Program declared: one Array, a `push` a
 			// turn, and the box built once at the exit. There is no State slot
 			// at all — the Array IS the State — so the `const` the turn bound

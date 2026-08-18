@@ -10,7 +10,7 @@ import { rewriteNodes } from "../walk"
 // what is left is a box and a native call per turn, and both of them are there
 // only because the emission does not know the List is the walk's own.
 //
-// NOTE: It already knows for its OWN walks. `map` and `keepEvery` declare an
+// NOTE: It already knows for its OWN walks. `map` and `everyItem` declare an
 // empty Array, push each answer onto it and box it once at the end — the
 // `pushed` and `createdList` helpers in the Rewriter — because the Array they
 // build is the Compiler's, and nothing else can reach it. This pass extends

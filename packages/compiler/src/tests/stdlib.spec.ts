@@ -334,7 +334,7 @@ describe("Stdlib", () => {
 		})
 
 		// NOTE: `List.partition` is implemented in Essence now
-		// (`packages/standard-library/sources/List.es`), as `keepEvery` beside `removeEvery(where:)`
+		// (`packages/standard-library/sources/List.es`), as `everyItem` beside `removeEvery(where:)`
 		// — the golden harness covers both halves and the empty List, so the
 		// runtime-direct test that lived here is retired.
 

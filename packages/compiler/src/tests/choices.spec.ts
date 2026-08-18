@@ -3866,7 +3866,7 @@ describe("Choices", () => {
 					constant drawn: Shape = #Circle(3)
 
 					Terminal.inspect(match drawn -> String {
-						case #Circle(radius) where [10, 20]::anyItem(where (radius) {
+						case #Circle(radius) where [10, 20]::hasItems(where (radius) {
 							<- radius::isGreaterThan(15)
 						}) {
 							<- "guarded {radius}"
