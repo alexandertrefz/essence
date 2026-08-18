@@ -852,7 +852,7 @@ describe("Hover of a standard library Method", () => {
 			"negate() -> Boolean",
 		)
 		expect(hoverDocumentation(source, { line: 2, column: 26 })).toBe(
-			"The opposite truth value — `false` for `true`, `true` for `false`.",
+			"Answers the opposite truth value: `false` for `true`, and `true` for `false`.",
 		)
 	})
 

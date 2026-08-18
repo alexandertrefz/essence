@@ -7,25 +7,27 @@ import {
 declarations {
 
 	namespace Record for Record is Equatable, is Printable {
-		§§ Checks whether the Records are structurally equal — the same members with equal values, in any order.
+		§§ Checks whether the Record has the same members and values as another.
 		§§
-		§§ @param other — the Record to compare against
+		§§ The order the members stand in does not matter.
+		§§
+		§§ @param _ — the Record to compare against
 		§§ @returns — `true` when the Records are equal.
 		is(_ other: Record) -> Boolean
 
-		§§ Checks whether the Records differ structurally — in their members or any member's value.
+		§§ Checks whether the Record has different members than another, or a different value under one of them.
 		§§
-		§§ @param other — the Record to compare against
+		§§ @param _ — the Record to compare against
 		§§ @returns — `true` when the Records are not equal.
 		isNot(_ other: Record) -> Boolean {
 			<- @::is(other)::negate()
 		}
 
-		§ `entries` and `values` exist in the runtime but stay undeclared —
-		§ their honest return Types need an `Anything` Type, which arrives with
-		§ the JSON design.
+		§ `entries` and `values` exist in the runtime and stay undeclared:
+		§ their return Types need an `Anything` Type, which arrives with the
+		§ JSON design.
 
-		§§ The names of the Record's members.
+		§§ Answers the names of the Record's members.
 		§§
 		§§ @returns — the member names, as a List of Strings.
 		keys() -> List<String>
