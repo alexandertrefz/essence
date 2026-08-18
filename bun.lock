@@ -11,6 +11,26 @@
         "typescript": "7.0.2",
       },
     },
+    "examples/client-2048": {
+      "name": "@essence-lang/example-client-2048",
+      "version": "0.0.0",
+      "dependencies": {
+        "@essence-lang/client": "workspace:*",
+        "@essence-lang/runtime": "workspace:*",
+      },
+      "devDependencies": {
+        "typescript": "7.0.2",
+        "vite": "8.1.5",
+      },
+    },
+    "examples/quote-server": {
+      "name": "@essence-lang/example-quote-server",
+      "version": "0.0.0",
+      "dependencies": {
+        "@essence-lang/client": "workspace:*",
+        "@essence-lang/runtime": "workspace:*",
+      },
+    },
     "packages/ariadne": {
       "name": "@essence-lang/ariadne",
       "version": "0.2.0",
@@ -333,6 +353,10 @@
     "@essence-lang/debug-adapter": ["@essence-lang/debug-adapter@workspace:packages/debug-adapter"],
 
     "@essence-lang/escodegen": ["@essence-lang/escodegen@workspace:packages/escodegen"],
+
+    "@essence-lang/example-client-2048": ["@essence-lang/example-client-2048@workspace:examples/client-2048"],
+
+    "@essence-lang/example-quote-server": ["@essence-lang/example-quote-server@workspace:examples/quote-server"],
 
     "@essence-lang/fixtures": ["@essence-lang/fixtures@workspace:packages/fixtures"],
 

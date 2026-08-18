@@ -17,3 +17,6 @@ packages/fixtures/files/*.js
 # `astro sync`, never by hand.
 packages/website/dist
 packages/website/.astro
+
+examples/**/*.d.es.ts
+examples/**/dist
