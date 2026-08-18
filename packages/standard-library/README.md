@@ -7,7 +7,13 @@ Protocols (`Equatable`, `Printable`, `Comparable`), `Boolean`,
 `Optional`, `Ordering`, `Record`, `String`, the whole numeric tower (`Integer`,
 `Rational`, `Algebraic`, `Transcendental` and the covering `Number`, which
 brings the `Number` and `Irrational` Union Types with it), and `List` together
-with `NestedList` and `NonEmptyList`.
+with `NestedList` and `NonEmptyList`. The aggregates a List of numbers answers
+are reachable from the List itself, through six Namespaces of their own in
+`NumberList.es` — `IntegerList`, `RationalList` and `NumberList`, and the
+`NonEmptyIntegerList`, `NonEmptyRationalList` and `NonEmptyNumberList` a proof
+of non-emptiness reaches instead, whose answers are bare rather than Optional.
+The modes a Method takes are Choices declared beside it: `Side`, `Rounding`,
+`NumberFormat`, `CaseSensitivity`, `NormalizationForm`, `Stream` and `Step`.
 
 The only things NOT declared here are the ones no declaration could produce:
 the bare Type tags — `Boolean`, `String`, `Integer`, `Rational`, `Algebraic`,
@@ -27,12 +33,13 @@ deliberate line, not a backlog: the primitives everything else is composed from
 (`String.uppercase`, `String.trim(at:)`, `String.normalize(as:)`,
 `String.lines`/`words`, `Record`'s reflective Methods, `String.compare` —
 there is no way to name a character's code point), and the iteration primitives
-the rest rest on (`List.reduce`, `item(at:)`, `slice`, `keepEvery`,
+the rest rest on (`List.reduce`, `item(at:)`, `slice`, `everyItem(where:)`,
 `append(contentsOf:)`, `static of`, `firstItem(where:)` — the short-circuiting
-find beside the eager `keepEvery` — and `String.split(on:)`, which is also the
-one native that decides what a "character" is: it segments into Unicode grapheme
-clusters (see `graphemesOf` in `String.ts`), so `length`, `slice`, `reverse`,
-`firstIndex` and the rest, all written on top of it, count and cut by grapheme).
+find beside the eager `everyItem(where:)` — and `String.split(on:)`, which is
+also the one native that decides what a "character" is: it segments into Unicode
+grapheme clusters (see `graphemesOf` in `String.ts`), so `length`, `slice`,
+`reverse`, `firstIndex` and the rest, all written on top of it, count and cut by
+grapheme).
 
 One Method is native for a reason worth reading before assuming otherwise:
 `List.is`, because the pairwise form trips an infinite recursion in generic
@@ -60,10 +67,11 @@ better (`1::add(2)`, not `1::added(2)`).
 
 **2. A preposition is a label, never fused into the verb.** When an Argument is
 reached through a preposition — *of* a thing, *on* a separator, *with* a prefix,
-*by* a comparison, *at* an index — the preposition is that Argument's label and
-the verb stem stays bare: `text::firstIndex(of ",")`, `text::split(on ",")`,
-`text::starts(with "x")`, `list::sort(by compare)`, `list::item(at 0)`,
-`2::raise(to 10)`, `1::divide(by 2)`.
+*by* a comparison, *at* an index, *as* a form — the preposition is that
+Argument's label and the verb stem stays bare: `text::firstIndex(of ",")`,
+`text::split(on ",")`, `text::starts(with "x")`, `list::sort(by compare)`,
+`list::item(at 0)`, `2::raise(to 10)`, `1::divide(by 2)`,
+`half::toString(as #Decimal)`.
 
 **3. Direct object positional, everything prepositional labelled.** A verb's
 direct object — what it acts on, with no preposition between — stays positional
@@ -78,8 +86,11 @@ at `index`" — the item is the direct object, the index is reached through *at*
 `at:` Overload, not `trimmed`/`trimmedAtStart`/`trimmedAtEnd`; one `sort`, not
 `sorted`/`sortedBy`; one `round` with a `toward:` Overload, not
 `round`/`roundDown`/`roundUp`/`truncate`. And a fixed set of modes is a
-`choice`, never a `String` — `trim(at Side#Start)`, not `trim("start")`, and
-`round(toward Rounding#Down)`, not a Method name per direction. The default is
+`choice`, never a `String` or a `Boolean` — `trim(at Side#Start)`, not
+`trim("start")`; `round(toward Rounding#Down)`, not a Method name per
+direction; `is(other, comparing CaseSensitivity#Insensitive)`, not
+`is(other, ignoringCase true)`, which leaves the reader of the call to remember
+which way round the flag goes. The default is
 a Case of that `choice` too, not a value hidden in a body: `trim()` IS
 `trim(at #BothEnds)` and `round()` IS `round(toward #Nearest)`.
 
@@ -107,23 +118,50 @@ Three name SHAPES, so rule 1 is not misapplied:
 | Shape | Form | Examples |
 |---|---|---|
 | **Transformation** — does something, returns the result | imperative command | `sort`, `reverse`, `trim`, `negate`, `pad`, `clamp`, `raise(to:)`, `join(with:)` |
-| **Predicate** — returns a `Boolean` | `is…`/`has…`/`doesNot…` prefix, or a direct verb | `isEmpty`, `isEven`, `hasItems`, `contains`, `starts(with:)` |
+| **Predicate** — returns a `Boolean` | `is…`/`has…`/`doesNot…` prefix, or a direct verb | `isEmpty`, `isEven`, `hasItems`, `hasCharacters`, `contains`, `starts(with:)` |
 | **Accessor** — returns an intrinsic part | noun or adjective; no verb to force | `length`, `numerator`, `reciprocal`, `absolute`, `keys`, `firstItem`, `item(at:)`, `firstIndex(of:)` |
 
 Rules 2 and 3 do NOT apply to the `is…`/`has…`/`doesNot…` prefixes — those are
 predicate naming, not prepositional Arguments, so `isGreaterThan`, `isBetween`
 and `doesNotContain` keep their fused word. Quantifiers and adjectives are not
-prepositions either: `removeEvery`, `keepEvery`, `removeFirst`,
-`removeDuplicates`, `firstItem`/`lastItem` keep theirs.
+prepositions either: `removeEvery`, `everyItem`, `removeFirst`,
+`removeDuplicates`, `firstItem`/`lastItem` keep theirs. So do
+`lowestNumber`/`greatestNumber`, which name the same question on `Number` and on
+a List of them.
 
-Two more conventions worth stating because they are already consistent and easy
-to break:
+A few more conventions worth stating because they are already consistent and
+easy to break:
 
-- **A predicate Parameter is always labelled `where`** — `keepEvery(where:)`,
-  `count(where:)`, `anyItem(where:)`.
+- **A predicate Parameter is always labelled `where`** — `everyItem(where:)`,
+  `count(where:)`, `removeEvery(where:)`, `hasItems(where:)`. The universal
+  quantifier is the one variant of that label, and it is spelled out:
+  `hasItems(where:)` asks whether ANY item passes, `hasItems(onlyWhere:)`
+  whether EVERY item does. The filter is `everyItem(where:)`, which answers the
+  items themselves.
+- **An aggregate is reachable from the value it is about** —
+  `[3, 1, 2]::sum()`, `::average()`, `::lowestNumber()`. `Number.sum` and its
+  four siblings stay as the statics that implement them; what a List answers is
+  a Namespace over that List — `IntegerList`, `RationalList` or `NumberList` by
+  the item Type — delegating to the static. A List proven non-empty reaches the
+  narrowed Namespace beside it, where `average`, `lowestNumber` and
+  `greatestNumber` answer a number rather than an Optional.
+- **A Method that can answer empty offers a `defaultingTo:` entry** — beside
+  every entry answering an `Optional` stands one taking the fallback and
+  answering the bare Type: `list::firstItem(defaultingTo 0)`,
+  `text::firstIndex(of ",", defaultingTo 0)`, `1::divide(by n, defaultingTo 0)`,
+  `Integer.parse(text, defaultingTo 0)`. The label is what makes the decision
+  visible where it is taken, so defaulting a division by zero is something the
+  call site has said rather than something a Method decided.
+  `Optional::value(defaultingTo:)` stays, and is for an Optional held in data
+  rather than one a call has just produced.
 - **Count-like nonsense is lenient; value-like failure returns an `Optional`** —
-  `List.repeat(_, times 0)` is the empty List, while `clamp` with inverted
-  bounds is `#Empty`.
+  `List.repeat(_, times 0)` is the empty List, `list::split(intoGroupsOf 0)` is
+  one group holding every item, and `7::clamp(between 10, and 1)` takes the
+  bounds in either order and answers `7`. Nothing is dropped and nothing comes
+  back empty for a count that makes no sense. A value that is genuinely not
+  there is what an `Optional` is for — `[]::firstItem()`,
+  `"abc"::character(at 9)` — and each of those offers `defaultingTo:` beside
+  it.
 - **Keep return Types tight.** Add Overloads rather than widening one signature:
   `Integer::add(Integer) -> Integer` beside `add(Rational) -> Rational`, never a
   single `add(Number) -> Number`.
