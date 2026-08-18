@@ -11,48 +11,57 @@ import {
 
 declarations {
 
-	§ A real algebraic irrational — for now the quadratic slice `a + b·√d`.
-	§ Every guarantee is exact: equality and ordering are decided
-	§ symbolically, never by approximation, which is why Algebraic conforms
-	§ to Comparable while Transcendental does not.
+	§ A real algebraic irrational, for now the quadratic slice `a + b·√d`.
+	§ Equality and ordering are symbolic and exact, which is why Algebraic
+	§ conforms to Comparable and Transcendental does not.
 	namespace Algebraic for Algebraic
 		is Equatable,
 		is Printable,
 		is Comparable {
-		§§ Whether both Algebraics are the same number.
+		§§ Answers whether both Algebraics are the same number.
 		§§
-		§§ Normal forms make this exact — no approximation is consulted.
+		§§ Normal forms decide the answer exactly. No approximation is consulted.
 		§§
-		§§ @param other — the Algebraic to compare with
+		§§ @param _ — the Algebraic to compare with
 		§§ @returns — `true` when the numbers are equal.
 		is(_ other: Algebraic) -> Boolean {
 			<- @::compare(to other)::is(#Equal)
 		}
 
-		§§ Whether the Algebraics are different numbers — exactly, no approximation is consulted.
+		§§ Answers whether the Algebraics are different numbers.
 		§§
-		§§ @param other — the Algebraic to compare with
+		§§ Normal forms decide the answer exactly. No approximation is consulted.
+		§§
+		§§ @param _ — the Algebraic to compare with
 		§§ @returns — `true` when the numbers differ.
 		isNot(_ other: Algebraic) -> Boolean {
 			<- @::is(other)::negate()
 		}
 
-		§§ Orders the Algebraic against another Algebraic — exactly, by symbolic comparison.
+		§§ Orders the Algebraic against another Algebraic.
 		§§
-		§§ @param other — the Algebraic to order against
+		§§ The comparison is symbolic, so it is exact.
+		§§
+		§§ @param to — the Algebraic to order against
 		§§ @returns — `Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.
 		compare(to other: Algebraic) -> Ordering
 
-		§§ Adds a number to this Algebraic, exactly. Two Algebraics over the same radical stay in the slice; the radical parts may also cancel, leaving a Rational.
+		§§ Answers the exact sum of the Algebraic and a number.
+		§§
+		§§ Two Algebraics over the same radical stay in the slice. Their radical parts can also cancel, which leaves a Rational.
 		overload add {
 			(_ other: Integer) -> Algebraic
 
 			(_ other: Rational) -> Algebraic
 
-			§§ Adds another Algebraic. Over the same radical the sum stays exact — and may collapse to a Rational. Over different radicals the sum is not representable yet and is empty.
+			§§ Answers the exact sum of the two Algebraics.
+			§§
+			§§ Over the same radical the sum stays in the slice, and can collapse to a Rational. Over different radicals there is no sum yet, and the answer is empty.
 			(_ other: Algebraic) -> Optional<Rational | Algebraic>
 
-			§§ Adds another Algebraic, and answers the given value when the radicals differ.
+			§§ Answers the exact sum of the two Algebraics.
+			§§
+			§§ Over different radicals there is no sum, and the answer is the given value.
 			§§
 			§§ @param _ — the Algebraic to add
 			§§ @param defaultingTo — the value to answer with when there is no sum
@@ -65,7 +74,9 @@ declarations {
 			}
 		}
 
-		§§ Subtracts a number from this Algebraic, exactly. Subtracting an equal radical part leaves a Rational.
+		§§ Answers the exact difference of the Algebraic and a number.
+		§§
+		§§ Subtracting an equal radical part leaves a Rational.
 		overload subtract {
 			(_ other: Integer) -> Algebraic {
 				<- @::add(other::negate())
@@ -79,7 +90,9 @@ declarations {
 				<- @::add(other::negate())
 			}
 
-			§§ Subtracts another Algebraic, and answers the given value when the radicals differ.
+			§§ Answers the exact difference of the two Algebraics.
+			§§
+			§§ Over different radicals there is no difference, and the answer is the given value.
 			§§
 			§§ @param _ — the Algebraic to subtract
 			§§ @param defaultingTo — the value to answer with when there is no difference
@@ -92,16 +105,22 @@ declarations {
 			}
 		}
 
-		§§ Multiplies this Algebraic with a number, exactly. A radical times itself turns rational — `√2 · √2` is `2` — and multiplying by zero collapses to zero.
+		§§ Answers the exact product of the Algebraic and a number.
+		§§
+		§§ A radical times itself turns rational: `√2 · √2` is `2`. Multiplying by zero answers zero.
 		overload multiply {
 			(with other: Integer) -> Algebraic | Rational
 
 			(with other: Rational) -> Algebraic | Rational
 
-			§§ Multiplies with another Algebraic. Over the same radical the product stays exact — √2·√2 is exactly 2. Products of pure radicals combine across radicals (√2·√3 is √6); anything else is empty.
+			§§ Answers the exact product of the two Algebraics.
+			§§
+			§§ Over the same radical the product stays exact: `√2 · √2` is `2`. Two pure radicals combine across radicals: `√2 · √3` is `√6`. Anything else is empty.
 			(with other: Algebraic) -> Optional<Rational | Algebraic>
 
-			§§ Multiplies with another Algebraic, and answers the given value when the product is not representable.
+			§§ Answers the exact product of the two Algebraics.
+			§§
+			§§ Where there is no product, the answer is the given value.
 			§§
 			§§ @param with — the Algebraic to multiply with
 			§§ @param defaultingTo — the value to answer with when there is no product
@@ -114,7 +133,9 @@ declarations {
 			}
 		}
 
-		§§ Divides this Algebraic by a number, exactly — via the conjugate, so dividing by an Algebraic itself can never fail. Dividing by an Integer or Rational is empty only for zero.
+		§§ Answers the exact quotient of the Algebraic and a number.
+		§§
+		§§ Dividing by an Integer or a Rational is empty only for zero. Dividing by an Algebraic multiplies by its reciprocal, which the conjugate always gives. That quotient is empty wherever the matching product is empty.
 		overload divide {
 			(by other: Integer) -> Optional<Algebraic>
 
@@ -122,7 +143,9 @@ declarations {
 
 			(by other: Algebraic) -> Optional<Rational | Algebraic>
 
-			§§ Divides by an Integer, and answers the given value when the divisor is zero.
+			§§ Answers the exact quotient of the Algebraic and an Integer.
+			§§
+			§§ A zero divisor answers the given value.
 			§§
 			§§ @param by — the divisor
 			§§ @param defaultingTo — the value to answer with when there is no quotient
@@ -131,7 +154,9 @@ declarations {
 				<- @::divide(by other)::value(defaultingTo fallback)
 			}
 
-			§§ Divides by a Rational, and answers the given value when the divisor is zero.
+			§§ Answers the exact quotient of the Algebraic and a Rational.
+			§§
+			§§ A zero divisor answers the given value.
 			§§
 			§§ @param by — the divisor
 			§§ @param defaultingTo — the value to answer with when there is no quotient
@@ -143,7 +168,9 @@ declarations {
 				<- @::divide(by other)::value(defaultingTo fallback)
 			}
 
-			§§ Divides by another Algebraic, and answers the given value when the quotient is not representable.
+			§§ Answers the exact quotient of the two Algebraics.
+			§§
+			§§ Where there is no quotient, the answer is the given value.
 			§§
 			§§ @param by — the divisor
 			§§ @param defaultingTo — the value to answer with when there is no quotient
@@ -156,14 +183,15 @@ declarations {
 			}
 		}
 
-		§§ The Algebraic without its sign — its distance from zero. The sign of `a + b·√d` is exactly decidable, so no approximation is consulted.
+		§§ Answers the Algebraic without its sign, which is its distance from zero.
+		§§
+		§§ The sign of `a + b·√d` is exactly decidable. No approximation is consulted.
 		absolute() -> Algebraic {
-			§ An Algebraic is never zero — a value whose radical cancels comes
-			§ back a Rational instead — so it is below its own negation exactly
-			§ when it is negative, which this Namespace's own `compare`
-			§ decides. The covering `Number`'s `isLessThan(0)` says the same
-			§ thing and reads better; what it costs is the whole numeric tower,
-			§ in every Program that takes an absolute value.
+			§ An Algebraic is never zero, so it is below its own negation
+			§ exactly when it is negative. This Namespace's own `compare`
+			§ decides that. The covering `Number`'s `isLessThan(0)` says the
+			§ same and reaches the whole numeric tower; see DEVELOPMENT.md,
+			§ Why bodies look the way they do.
 			if @::compare(to @::negate())::is(#Less) {
 				<- @::negate()
 			} else {
@@ -171,10 +199,12 @@ declarations {
 			}
 		}
 
-		§§ The Algebraic with its sign flipped. Negating an irrational leaves it irrational, so the result is again an Algebraic.
+		§§ Answers the Algebraic with its sign flipped.
+		§§
+		§§ Negating an irrational leaves it irrational, so the answer is again an Algebraic.
 		negate() -> Algebraic
 
-		§§ The exact symbolic form — `√2`, `3·√2` or `1 + √2`.
+		§§ Answers the exact symbolic form: `√2`, `3·√2` or `1 + √2`.
 		toString() -> String
 	}
 }
