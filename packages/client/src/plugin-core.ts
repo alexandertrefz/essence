@@ -227,10 +227,23 @@ export type EssenceCompiler = {
 	// NOTE: The one thing a build has to be told rather than asked. What is
 	// remembered here is EMITTED TEXT, and a dev server outlives every edit to
 	// the sources it was emitted from — so a watcher saying a file changed is
-	// what makes the memory stale. A build that only ever compiles once calls it
-	// at the start and never again.
-	invalidate: () => void
+	// what makes the memory stale. Told WHICH file, only what was compiled out
+	// of a graph that reaches it is forgotten: an app with several entries
+	// recompiles the ones the edit can have changed and keeps the rest. Told
+	// nothing, everything is — a rebuild in watch mode has no file to name, and
+	// a build that only ever compiles once calls it at the start and never
+	// again.
+	invalidate: (filePath?: string) => void
 }
+
+// NOTE: What was compiled, and WHEN — as a count of invalidations, not a clock.
+// A compile that started before an edit landed read the sources from before
+// it, however long it took, and what it emitted is stale the moment the edit is
+// reported. It can not be stopped, and it can not be trusted either: it is let
+// finish, its answer is handed to whoever was already waiting on it, and it is
+// remembered nowhere — the next request compiles again.
+type Compiled = CompiledModule & { startedAt: number }
+type Served = ServedModule & { startedAt: number }
 
 export function createCompiler(
 	options: PluginOptions,
@@ -249,14 +262,36 @@ export function createCompiler(
 	let target = { mode: "host", root: directory } as const
 	// NOTE: Keyed by canonical path, so that the same file reached under two
 	// spellings is one module.
-	let served = new Map<string, ServedModule>()
+	let served = new Map<string, Served>()
 	let prelude: string | null = null
 	// NOTE: The compile itself, held as the PROMISE rather than as its answer,
 	// so that a wrapper and its raw door asked for at the same time wait on one
 	// compile instead of racing into two.
-	let pending = new Map<string, Promise<CompiledModule>>()
+	let pending = new Map<string, Promise<Compiled>>()
+	// NOTE: One count, stepped by every invalidation, and the step each file was
+	// last invalidated at — or every file at once. A compile remembers the count
+	// it started at, and is stale where any source it read was invalidated
+	// after that.
+	let invalidations = 0
+	let allInvalidatedAt = 0
+	let invalidatedAt = new Map<string, number>()
 
-	async function compileEntry(entry: string): Promise<CompiledModule> {
+	function stale(startedAt: number, files: Array<string>): boolean {
+		if (allInvalidatedAt > startedAt) {
+			return true
+		}
+
+		for (let file of files) {
+			if ((invalidatedAt.get(file) ?? 0) > startedAt) {
+				return true
+			}
+		}
+
+		return false
+	}
+
+	async function compileEntry(entry: string): Promise<Compiled> {
+		let startedAt = invalidations
 		let result = await emitToMemory(entry, {
 			host: options.host,
 			optimisation: options.optimisation,
@@ -271,6 +306,10 @@ export function createCompiler(
 			throw new EssenceCompileError(entry, result.diagnosticGroups)
 		}
 
+		// NOTE: Written down only where nothing it read was edited meanwhile.
+		// The prelude is a function of the Compiler alone and stands.
+		let fresh = !stale(startedAt, result.files)
+
 		for (let [specifier, code] of result.sources.sources) {
 			if (preludeRequested(specifier)) {
 				prelude = code
@@ -280,8 +319,8 @@ export function createCompiler(
 
 			let file = servedFile(specifier, directory)
 
-			if (file !== null) {
-				served.set(file, { code, files: result.files })
+			if (file !== null && fresh) {
+				served.set(file, { code, files: result.files, startedAt })
 			}
 		}
 
@@ -290,20 +329,48 @@ export function createCompiler(
 			descriptor: describeModule(result.surface, entry, target),
 			types: describeTypes(result.surface, entry, target),
 			files: result.files,
+			startedAt,
 		}
 	}
 
-	function compile(entryPath: string): Promise<CompiledModule> {
+	// NOTE: The compile this build holds for the entry, unless what it holds
+	// went stale — before it finished, or since — in which case one more, and
+	// the same question of that. An edit that lands during a compile is not
+	// missed: the compile is awaited, found stale, and replaced.
+	async function compile(entryPath: string): Promise<CompiledModule> {
 		let entry = canonicalPath(entryPath)
-		let started = pending.get(entry)
 
-		if (started === undefined) {
-			started = compileEntry(entry)
+		for (;;) {
+			let started = pending.get(entry)
 
-			pending.set(entry, started)
+			if (started === undefined) {
+				started = compileEntry(entry)
+
+				pending.set(entry, started)
+			}
+
+			let compiled: Compiled
+
+			try {
+				compiled = await started
+			} catch (error) {
+				// NOTE: A compile that failed is not held against the next
+				// request — the sources it read may have been fixed since.
+				if (pending.get(entry) === started) {
+					pending.delete(entry)
+				}
+
+				throw error
+			}
+
+			if (!stale(compiled.startedAt, compiled.files)) {
+				return compiled
+			}
+
+			if (pending.get(entry) === started) {
+				pending.delete(entry)
+			}
 		}
-
-		return started
 	}
 
 	return {
@@ -311,14 +378,17 @@ export function createCompiler(
 		async serve(filePath) {
 			let file = canonicalPath(filePath)
 
-			if (!served.has(file)) {
-				await compile(file)
-			}
-
-			// NOTE: A compile always emits its own entry, so the second look
-			// can only miss where the first one asked for something that is not
-			// a Module of the graph it names.
 			let module = served.get(file)
+
+			if (module === undefined || stale(module.startedAt, module.files)) {
+				// NOTE: `compile` answers only with a compile nothing has
+				// invalidated, and such a compile wrote its own entry down —
+				// so the second look can only miss where the first one asked
+				// for something that is not a Module of the graph it names.
+				await compile(file)
+
+				module = served.get(file)
+			}
 
 			if (module === undefined) {
 				throw new EssenceBuildError(
@@ -326,7 +396,7 @@ export function createCompiler(
 				)
 			}
 
-			return module
+			return { code: module.code, files: module.files }
 		},
 		prelude() {
 			if (prelude === null) {
@@ -340,9 +410,14 @@ export function createCompiler(
 			return prelude
 		},
 		declare: writeDeclarations,
-		invalidate() {
-			pending.clear()
-			served.clear()
+		invalidate(filePath) {
+			invalidations += 1
+
+			if (filePath === undefined) {
+				allInvalidatedAt = invalidations
+			} else {
+				invalidatedAt.set(canonicalPath(filePath), invalidations)
+			}
 		},
 	}
 }

@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "bun:test"
 import {
 	mkdirSync,
 	mkdtempSync,
+	readFileSync,
 	realpathSync,
 	rmSync,
 	symlinkSync,
@@ -959,6 +960,78 @@ export {
 		expect(
 			await plugin.load.call(context(), path.join(directory, "Entry.es")),
 		).not.toBe(null)
+	})
+
+	// NOTE: An edit names its file, and a dev server has many entries — only
+	// the ones whose graph reaches the file are compiled again. The host is
+	// what counts the reads: a graph that was not forgotten is not read.
+	it("forgets only what an edit can have changed", async () => {
+		let directory = project({
+			"One.es": MATH_MODULE,
+			"Two.es": SHAPES_MODULE,
+		})
+		let reads: Array<string> = []
+		let host = {
+			readFile(filePath: string): string | undefined {
+				reads.push(path.basename(filePath))
+
+				return readFileSync(filePath, "utf8")
+			},
+		}
+		let plugin = essence({ declarations: false, host })
+		let one = path.join(directory, "One.es")
+		let two = path.join(directory, "Two.es")
+
+		plugin.configResolved({ command: "serve", root: directory })
+		await plugin.load.call(context(), one)
+		await plugin.load.call(context(), two)
+		reads.length = 0
+
+		plugin.watchChange(two)
+		await plugin.load.call(context(), one)
+		await plugin.load.call(context(), `\0${rawSpecifier(one)}`)
+
+		expect(reads).toEqual([])
+
+		await plugin.load.call(context(), two)
+
+		expect(reads).toEqual(["Two.es"])
+		reads.length = 0
+
+		// NOTE: And named nothing, everything is forgotten.
+		plugin.buildStart()
+		await plugin.load.call(context(), one)
+
+		expect(reads).toEqual(["One.es"])
+	})
+
+	// NOTE: An edit that lands WHILE a compile is running is not lost to it.
+	// The compile read the sources from before the edit; its answer is handed
+	// to whoever was waiting, and the next request compiles again rather than
+	// being answered out of what it emitted. The sources are read synchronously
+	// at the start of a compile, so an edit written after `load` is called and
+	// before it is awaited is exactly one the compile did not see.
+	it("does not remember a compile an edit overtook", async () => {
+		let directory = project({ "Slow.es": MATH_MODULE })
+		let plugin = essence({ declarations: false })
+		let entry = path.join(directory, "Slow.es")
+
+		plugin.configResolved({ command: "serve", root: directory })
+
+		let first = plugin.load.call(context(), entry)
+
+		writeFileSync(entry, MATH_MODULE.replace("314/100", "22/7"))
+		plugin.watchChange(entry)
+
+		expect(await first).toContain("bind($raw,")
+
+		let second = await plugin.load.call(
+			context(),
+			`\0${rawSpecifier(entry)}`,
+		)
+
+		expect(second).toContain("22n")
+		expect(second).not.toContain("314n")
 	})
 
 	// NOTE: The claim the whole shape of this rests on, at the plugin's own
