@@ -556,7 +556,9 @@ declarations {
 				§ than calling `as #Fraction`. The entries of an Overload are
 				§ separate emitted Functions, so delegating would pull the decimal
 				§ formatter into every Program that prints a Rational. The
-				§ whole-number rule is repeated in `Rational.ts`.
+				§ whole-number rule is repeated wherever a Rational is rendered
+				§ for a reader: `Rational.ts`, the Optimiser's folded
+				§ interpolation hole and the client package.
 				if @::isWholeNumber() {
 					<- @::numerator()::toString()
 				} else {

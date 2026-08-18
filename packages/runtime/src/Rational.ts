@@ -255,7 +255,9 @@ export function raise__overload$1(
 // NOTE: Exported for `getStringRepresentation` in `Terminal.ts` — the
 // no-Argument `toString` is written in Essence now, so the universal printer
 // renders a Rational off this helper rather than calling a native that no
-// longer exists.
+// longer exists. This is the STRUCTURAL form, and `Terminal.inspect` is the one
+// reader that asks for it: a whole Rational shows as `5/1`, because what
+// `inspect` shows is what a value IS.
 export function formatAsRational(rational: RationalType): string {
 	let parts = reducedParts(rational)
 
@@ -264,11 +266,11 @@ export function formatAsRational(rational: RationalType): string {
 
 // NOTE: The fraction form a CALLER asks for, which is not the structural form
 // above: a whole Rational prints its numerator alone, so `5/1` reads as `5`.
-// The Essence `toString()` entry beside this one applies the same rule, and the
-// two have to agree — `toString(as #Fraction)` is the same question written out.
-// `formatAsRational` stays structural because `Terminal.inspect` shows what a
-// value IS.
-function formatAsFraction(rational: RationalType): string {
+// Every `Printable` rendering answers this one, and they have to agree — the
+// Essence `toString()` entry beside this one, `toString(as #Fraction)` here,
+// the Optimiser's folded interpolation hole (`renderedHole` in
+// `foldConstants.ts`), and `Record.toString`, which is why this is exported.
+export function formatAsFraction(rational: RationalType): string {
 	let parts = reducedParts(rational)
 
 	if (parts.denominator === 1n) {
