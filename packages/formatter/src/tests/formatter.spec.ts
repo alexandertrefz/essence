@@ -32,14 +32,38 @@ function corpus(): Array<{ name: string; filePath: string; source: string }> {
 		})
 	}
 
+	// NOTE: The showcase programs under `examples/` are Essence a reader is
+	// meant to copy from, so they are held to the same standard as the
+	// fixtures — walked the same way, for the same reason.
+	for (let filePath of essenceFilesUnder(EXAMPLES_DIRECTORY)) {
+		files.push({
+			name: "examples/" + path.relative(EXAMPLES_DIRECTORY, filePath),
+			filePath,
+			source: readFileSync(filePath, "utf8"),
+		})
+	}
+
 	return files
 }
+
+const EXAMPLES_DIRECTORY = path.join(
+	import.meta.dirname,
+	"..",
+	"..",
+	"..",
+	"..",
+	"examples",
+)
 
 function essenceFilesUnder(directory: string): Array<string> {
 	let files: Array<string> = []
 
 	for (let entry of readdirSync(directory).sort()) {
 		let filePath = path.join(directory, entry)
+
+		if (entry === "node_modules" || entry === "dist") {
+			continue
+		}
 
 		if (statSync(filePath).isDirectory()) {
 			files.push(...essenceFilesUnder(filePath))
