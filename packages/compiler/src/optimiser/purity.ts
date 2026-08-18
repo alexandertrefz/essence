@@ -298,7 +298,9 @@ function isPureIntrinsic(
 // interpolated String is a call of exactly that Method and is weighed here.
 // `Integer`'s is its value's decimal spelling, `Boolean`'s is the Conditional
 // that answers one of two literals, `Rational`'s is its numerator and
-// denominator with a slash between them. `Rational` is otherwise absent: its
+// denominator with a slash between them — or its numerator alone when the
+// Rational is whole, which is one more read of the same two. `Rational` is
+// otherwise absent: its
 // arithmetic reduces through a gcd on every operation, which is a decision
 // somebody should take on its own merits rather than get for free here.
 //
