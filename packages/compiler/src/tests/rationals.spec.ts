@@ -151,11 +151,15 @@ describe("Rationals", () => {
 			).toBe(1)
 		})
 
-		it("prints every zero as 0/1", () => {
+		// NOTE: The structural form and the form a caller asks for differ on a
+		// whole value. `formatAsRational` is what `Terminal.inspect` shows, so
+		// it says what a Rational IS; `toString(as #Fraction)` prints the
+		// numerator alone, exactly as the no-Argument `toString` does.
+		it("prints every zero as 0/1 structurally, and as 0 to a caller", () => {
 			expect(rational.formatAsRational(cancelled())).toBe("0/1")
 			expect(
 				rational.toString__overload$2(cancelled(), fraction).value,
-			).toBe("0/1")
+			).toBe("0")
 			expect(
 				rational.formatAsRational(rational.createRational(0n, 6n)),
 			).toBe("0/1")
@@ -444,7 +448,7 @@ describe("Rationals", () => {
 					Terminal.inspect(cancelled::denominator()::toString())
 					Terminal.inspect(cancelled::isWholeNumber()::toString())
 				}`),
-			).toEqual(['"0/1"', '"1"', '"true"'])
+			).toEqual(['"0"', '"1"', '"true"'])
 		})
 
 		it("prints a whole-valued Rational as a decimal a caller can read back", async () => {
@@ -457,7 +461,7 @@ describe("Rationals", () => {
 						case #Empty         { <- "Empty" }
 					})
 				}`),
-			).toEqual(['"2"', '"0"', '"2/1"'])
+			).toEqual(['"2"', '"0"', '"2"'])
 		})
 
 		it("takes the root of zero as an Integer, not an Algebraic", async () => {
@@ -483,7 +487,7 @@ describe("Rationals", () => {
 						case #Empty { <- "Empty" }
 					})
 				}`),
-			).toEqual(['"0"', '"0/1"'])
+			).toEqual(['"0"', '"0"'])
 		})
 	})
 })

@@ -262,6 +262,22 @@ export function formatAsRational(rational: RationalType): string {
 	return `${parts.numerator}/${parts.denominator}`
 }
 
+// NOTE: The fraction form a CALLER asks for, which is not the structural form
+// above: a whole Rational prints its numerator alone, so `5/1` reads as `5`.
+// The Essence `toString()` entry beside this one applies the same rule, and the
+// two have to agree — `toString(as #Fraction)` is the same question written out.
+// `formatAsRational` stays structural because `Terminal.inspect` shows what a
+// value IS.
+function formatAsFraction(rational: RationalType): string {
+	let parts = reducedParts(rational)
+
+	if (parts.denominator === 1n) {
+		return `${parts.numerator}`
+	}
+
+	return `${parts.numerator}/${parts.denominator}`
+}
+
 // NOTE: A deliberate cap, not a technical one: a non-terminating expansion is
 // cut after this many fractional digits, with the last kept digit rounded.
 const DECIMAL_DIGIT_LIMIT = 80
@@ -337,7 +353,7 @@ export function toString__overload$2(
 	if (formatAs[typeKeySymbol] === "NumberFormat#Decimal") {
 		return createString(formatAsDecimal(rational))
 	} else {
-		return createString(formatAsRational(rational))
+		return createString(formatAsFraction(rational))
 	}
 }
 

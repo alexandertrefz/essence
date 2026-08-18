@@ -721,6 +721,10 @@ third"::lines())
 		"Rational.toString(formatAs: NumberFormat) [fraction]",
 		1/2::toString(formatAs NumberFormat#Fraction),
 	)
+	show(
+		"Rational.toString(formatAs: NumberFormat) [fraction, whole]",
+		4/2::toString(formatAs NumberFormat#Fraction),
+	)
 	show("Rational.compare(to: Rational)", 1/2::compare(to 2/3))
 	show("Rational.compare(to: Rational) [equal]", 1/2::compare(to 2/4))
 	show("Rational.compare(to: Rational) [greater]", 2/3::compare(to 1/2))

@@ -85,7 +85,10 @@ describe("remembered lowest terms", () => {
 		expect(getStringRepresentation(printedFirst)).toBe("2/1")
 		expect(getStringRepresentation(readFirst)).toBe("2/1")
 
-		expect(toStringAs(printedFirst, fraction).value).toBe("2/1")
+		// NOTE: The two formatters part company on a whole value: the
+		// structural one above says what a Rational IS, while the two a caller
+		// asks for print `2`, which is text `Rational.parse` reads back.
+		expect(toStringAs(printedFirst, fraction).value).toBe("2")
 		expect(toStringAs(printedFirst, decimal).value).toBe("2")
 		expect(toStringAs(createRational(1n, 3n), decimal).value).toBe(
 			`0.${"3".repeat(80)}`,

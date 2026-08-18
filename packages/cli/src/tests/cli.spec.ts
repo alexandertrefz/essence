@@ -1528,7 +1528,7 @@ describe("CLI on a Module graph", () => {
 			expect(await runBundle(outputFileName)).toEqual([
 				"area: 12",
 				"25",
-				"157/1",
+				"157",
 			])
 		} finally {
 			rmSync(directory, { recursive: true, force: true })

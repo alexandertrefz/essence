@@ -2039,7 +2039,7 @@ describe("Module Code Generation", () => {
 			expect(await runBundle(sources, directory)).toEqual([
 				"area: 12",
 				"25",
-				"157/1",
+				"157",
 			])
 		})
 	})
