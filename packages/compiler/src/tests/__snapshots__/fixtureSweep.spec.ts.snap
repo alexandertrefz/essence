@@ -79,7 +79,7 @@ Optional#Value(3)
     { first = "a", second = 1 },
     { first = "b", second = 2 }
 ]
-Optional#Value([ [ 1, 2 ], [ 3, 4 ], [ 5 ] ])
+[ [ 1, 2 ], [ 3, 4 ], [ 5 ] ]
 [ 1, 2, 3, 4, 5 ]
 [ "x", "x", "x" ]"
 `;

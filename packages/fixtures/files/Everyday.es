@@ -59,7 +59,7 @@ implementation {
 	Terminal.inspect([1, 2, 3, 2]::lastIndex(of 2)) § Optional#Value(3)
 	Terminal.inspect([1, 2, 3, 4]::partition(where (n) { <- n::isEven() }))
 	Terminal.inspect(["a", "b"]::pair(with [1, 2, 3])) § pairs stop with the shorter List
-	Terminal.inspect([1, 2, 3, 4, 5]::split(intoGroupsOf 2)) § Optional#Value([ [ 1, 2 ], [ 3, 4 ], [ 5 ] ])
+	Terminal.inspect([1, 2, 3, 4, 5]::split(intoGroupsOf 2)) § [ [ 1, 2 ], [ 3, 4 ], [ 5 ] ]
 
 	§ Loop fuel — Essence has no Range Type by design.
 	Terminal.inspect(List.of(integersFrom 1, through 5)) § [ 1, 2, 3, 4, 5 ]

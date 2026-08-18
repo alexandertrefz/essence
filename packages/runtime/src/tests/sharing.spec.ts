@@ -397,15 +397,7 @@ describe("every native against an upgraded receiver", () => {
 	test("split and pair", () => {
 		let groups = split(upgraded(), createInteger(2n))
 
-		expect(groups[typeKeySymbol]).toBe("Optional#Value")
-
-		if (groups[typeKeySymbol] === "Optional#Value") {
-			expect(materialise(groups.item).map(itemsOf)).toEqual([
-				[1, 2],
-				[3, 4],
-				[5],
-			])
-		}
+		expect(materialise(groups).map(itemsOf)).toEqual([[1, 2], [3, 4], [5]])
 
 		let paired = materialise(pair(upgraded(), integers(9, 8, 7)))
 
