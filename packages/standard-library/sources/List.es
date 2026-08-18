@@ -272,6 +272,7 @@ declarations {
 
 			§§ The first item the given check accepts, or the given fallback when it accepts none.
 			§§
+			§§ @param where — the check each item is offered to
 			§§ @param defaultingTo — the item to answer with when there is none
 			§§ @returns — the matching item, or the fallback in its place.
 			(
@@ -316,6 +317,7 @@ declarations {
 
 			§§ The last item the given check accepts, or the given fallback when it accepts none.
 			§§
+			§§ @param where — the check each item is offered to
 			§§ @param defaultingTo — the item to answer with when there is none
 			§§ @returns — the matching item, or the fallback in its place.
 			(
@@ -532,6 +534,7 @@ declarations {
 
 			§§ The item at the given position, or the given fallback when the position is outside the List.
 			§§
+			§§ @param at — the position of the item
 			§§ @param defaultingTo — the item to answer with when the position names none
 			§§ @returns — the item at that position, or the fallback in its place.
 			(at index: Integer, defaultingTo fallback: ItemType) -> ItemType {
@@ -602,6 +605,7 @@ declarations {
 
 			§§ The position of the first item equal — by the items' own `is` — to the given one, or the given fallback when the item is absent. Available whenever the items conform to `Equatable`.
 			§§
+			§§ @param of — the item to look for
 			§§ @param defaultingTo — the position to answer with when the item is absent
 			§§ @returns — the zero-based position, or the fallback in its place.
 			<infer ItemType is Equatable>(
@@ -613,6 +617,7 @@ declarations {
 
 			§§ The position of the first item the given check accepts, or the given fallback when it accepts none.
 			§§
+			§§ @param where — the check each item is offered to
 			§§ @param defaultingTo — the position to answer with when no item is accepted
 			§§ @returns — the zero-based position, or the fallback in its place.
 			(
@@ -783,6 +788,7 @@ declarations {
 
 			§§ The position of the last item equal — by the items' own `is` — to the given one, or the given fallback when the item is absent. Available whenever the items conform to `Equatable`.
 			§§
+			§§ @param of — the item to look for
 			§§ @param defaultingTo — the position to answer with when the item is absent
 			§§ @returns — the zero-based position, or the fallback in its place.
 			<infer ItemType is Equatable>(
