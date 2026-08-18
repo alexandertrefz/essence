@@ -54,6 +54,19 @@ syntax is meant to be viewed with a font with code ligatures, like FiraCode.
 The standard library is written in Essence and lives in [packages/standard-library/sources](packages/standard-library/sources); its
 [README](packages/standard-library/README.md) is the most substantial writing about the language there is.
 
+# Examples
+Three larger programs, each with a README saying what it shows and a test keeping it honest:
+
+* [examples/league](examples/league) — a league table, in pure Essence: a season as data, standings through a
+  `Comparable` conformance, exact points-per-game, and a "what if" computed beside the real table.
+  `bun packages/cli/bin/essence run examples/league/Main.es`
+* [examples/quote-server](examples/quote-server) — a Bun HTTP API whose pricing rules are Essence, imported
+  through the Bun plugin: the boundary is the validation, unit Choices are the JSON's strings, `bun --hot`
+  reloads an edited rule. `cd examples/quote-server && bun start`
+* [examples/client-2048](examples/client-2048) — 2048 in the browser: the game is Essence, the page is
+  TypeScript, Vite serves both; undo falls out of immutability, `.d.es.ts` types the import.
+  `cd examples/client-2048 && bun run dev`
+
 # Modules
 A file is a module. Everything it declares is private until its `export { … }` block lists it, and an
 `import { … }` block above the implementation names what it takes from other files. A specifier is a relative
