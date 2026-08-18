@@ -193,7 +193,7 @@ export {
 			expect(written.trimEnd().split("\n")).toEqual([
 				"area: 12",
 				"25",
-				"157/1",
+				"157",
 			])
 			expect(typeof module.describe).toBe("function")
 		})

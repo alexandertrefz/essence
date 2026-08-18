@@ -514,7 +514,9 @@ declarations {
 		§ a Choice, so the two forms are the only two that can be written and
 		§ a typo is a Diagnostic rather than a wrong answer.
 
-		§§ Represents the Rational as a String — `"3/4"` in lowest terms when no format is named, or in the named format.
+		§§ Represents the Rational as a String, in lowest terms — `3/4` when no format is named, or in the named format.
+		§§
+		§§ A whole Rational prints its numerator alone, so `1/2::add(1/2)` is `1` and `10::divide(by 2)` is `5`. `Rational.parse` reads every one of these back.
 		§§
 		§§ @returns — the String representation of the Rational.
 		overload toString {
@@ -523,11 +525,16 @@ declarations {
 				§ — deliberately. The entries of an Overload are separate
 				§ emitted Functions, so delegating would make every Program
 				§ that merely prints a Rational carry the whole long-division
-				§ decimal formatter behind the other entry.
-				<- @::numerator()
-					::toString()
-					::append("/")
-					::append(@::denominator()::toString())
+				§ decimal formatter behind the other entry. The whole-number
+				§ rule is written in both, and `Rational.ts` says so.
+				if @::isWholeNumber() {
+					<- @::numerator()::toString()
+				} else {
+					<- @::numerator()
+						::toString()
+						::append("/")
+						::append(@::denominator()::toString())
+				}
 			}
 
 			§§ @param formatAs — the form to represent the Rational in

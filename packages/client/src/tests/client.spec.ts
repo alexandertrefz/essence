@@ -166,11 +166,7 @@ describe("Loading a Module", () => {
 
 		// NOTE: The fixture's own body runs as the bundle is imported, which is
 		// what a Module being a Program rather than a header means.
-		expect(written.trimEnd().split("\n")).toEqual([
-			"area: 12",
-			"25",
-			"157/1",
-		])
+		expect(written.trimEnd().split("\n")).toEqual(["area: 12", "25", "157"])
 
 		let described = call(
 			main,

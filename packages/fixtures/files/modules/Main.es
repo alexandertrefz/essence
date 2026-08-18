@@ -21,7 +21,7 @@ implementation {
 
 	Terminal.print(describe(Rectangle.of(width 3, height 4))) § area: 12
 	Terminal.print(square(5)) § 25
-	Terminal.print(scaled(averaged({ cents = 50 }))) § 157/1
+	Terminal.print(scaled(averaged({ cents = 50 }))) § 157
 }
 
 export {
