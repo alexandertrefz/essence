@@ -650,8 +650,9 @@ third"::lines())
 	show("Rational.subtract(_ Transcendental)", 1/2::subtract(Number.Pi))
 	show("Rational.divide(by: Rational)", 1/2::divide(by 1/6))
 	show("Rational.divide(by: Rational) [by zero]", 1/2::divide(by 0/1))
-	show("Rational.divide(by: Integer)", 1/2::divide(by 2))
+	show("Rational.divide(by: Integer)", 1/2::divide(by computedTwo))
 	show("Rational.divide(by: Integer) [by zero]", 1/2::divide(by 0))
+	show("Rational.divide(by: NonZeroInteger)", 1/2::divide(by 2))
 	show(
 		"Rational.divide(by: Rational, defaultingTo: Rational)",
 		1/2::divide(by 1/6, defaultingTo 0/1),

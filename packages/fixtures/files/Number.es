@@ -23,7 +23,8 @@ implementation {
 	§ Integers are arbitrarily large — IEEE 754 puts no ceiling here.
 	Terminal.inspect(9_007_199_254_740_991::multiply(with 500)) § 4503599627370495500
 
-	§ Rationals stay exact through every step.
+	§ Rationals stay exact through every step. A written divisor proves itself
+	§ here too, so the second line answers a Rational rather than an Optional.
 	Terminal.inspect(1/2::divide(by 1/6)) § Optional#Value(3/1)
-	Terminal.inspect(1/2::multiply(with 2)::divide(by 6)) § Optional#Value(1/6)
+	Terminal.inspect(1/2::multiply(with 2)::divide(by 6)) § 1/6
 }

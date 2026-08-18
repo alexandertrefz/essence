@@ -308,11 +308,7 @@ declarations {
 		§§
 		§§ @returns — the mean.
 		average() -> Rational {
-			§ `Rational::divide` has no NonZeroInteger entry, so dividing by
-			§ the count outright answers an Optional. The body multiplies by
-			§ the count's reciprocal instead: `Rational.of` over a
-			§ NonZeroInteger is total, and so is the product.
-			<- Number.sum(@)::multiply(with Rational.of(1, over @::length()))
+			<- Number.sum(@)::divide(by @::length())
 		}
 	}
 
@@ -335,19 +331,16 @@ declarations {
 		§§
 		§§ @returns — the mean.
 		average() -> Rational {
-			§ Each arm divides by the NonZeroInteger count the way its own
-			§ Namespace can: the Integer through `divide`, the Rational
-			§ through the reciprocal. Both are total over a proven divisor.
-			§ The count is bound above the `match`, because `@` is rebound
-			§ inside one; see DEVELOPMENT.md, Why bodies look the way they do.
+			§ Each arm divides by the NonZeroInteger count in its own
+			§ Namespace, and both entries are total over a proven divisor. The
+			§ count is bound above the `match`, because `@` is rebound inside
+			§ one; see DEVELOPMENT.md, Why bodies look the way they do.
 			constant count = @::length()
 
 			<- match Number.sum(@) -> Rational {
 				case Integer  { <- @::divide(by count) }
 
-				case Rational {
-					<- @::multiply(with Rational.of(1, over count))
-				}
+				case Rational { <- @::divide(by count) }
 			}
 		}
 	}
