@@ -80,6 +80,17 @@ export const builtinMemberOrder: Array<string> = [
 	// Namespace a call RESOLVES to is not decided here either: the refined target
 	// beats the base one regardless of this order.
 	"NonEmptyList",
+	// NOTE: And after all three, for the same reason a fourth time. Each of
+	// these targets a List of a particular Number Type — `List<Integer>`,
+	// `List<Rational>`, the mixed `List<Integer | Rational>` and the proven
+	// forms of the three — so `List` has to be met FIRST, and each general one
+	// before the proven one it narrows.
+	"IntegerList",
+	"RationalList",
+	"NumberList",
+	"NonEmptyIntegerList",
+	"NonEmptyRationalList",
+	"NonEmptyNumberList",
 ]
 
 // NOTE: The same rule for the Type table, and for the same reason — a Type's

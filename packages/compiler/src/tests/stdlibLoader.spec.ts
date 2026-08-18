@@ -1357,6 +1357,15 @@ describe("Standard Library Loader", () => {
 			// one, so that the narrow Namespace reads as the extra it is.
 			"NestedList",
 			"NonEmptyList",
+			// NOTE: The six Namespaces a List of Numbers reaches besides
+			// `List`, listed after it for the same reason — see
+			// `builtinMemberOrder`.
+			"IntegerList",
+			"RationalList",
+			"NumberList",
+			"NonEmptyIntegerList",
+			"NonEmptyRationalList",
+			"NonEmptyNumberList",
 		])
 	})
 

@@ -148,7 +148,7 @@ describe("Completion", () => {
 		it("should show the signature of the Namespace the call resolves to", () => {
 			let source = [
 				"implementation {",
-				"\tnamespace IntegerList for List<Integer> {",
+				"\tnamespace IntegerTally for List<Integer> {",
 				"\t\tfirstItem() -> Integer {",
 				"\t\t\t<- 0",
 				"\t\t}",

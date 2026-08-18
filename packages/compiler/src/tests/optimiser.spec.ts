@@ -4047,7 +4047,10 @@ describe("Optimiser", () => {
 			beforeAll(() => {
 				let sources = readStdlibFiles().map(
 					({ filePath, sourceText }) => {
-						if (!filePath.endsWith("List.es")) {
+						// NOTE: The separator is part of the suffix, because
+						// `NumberList.es` ends with `List.es` too and is not
+						// the file this shadows.
+						if (!filePath.endsWith("/List.es")) {
 							return parseStdlibSource(filePath, sourceText)
 						}
 

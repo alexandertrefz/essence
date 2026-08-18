@@ -2184,6 +2184,8 @@ third"::lines())
 	show("NonEmptyList.lastItem<ItemType>()", provenWords::lastItem())
 	show("NonEmptyList.firstItem<ItemType>() [single]", provenOne::firstItem())
 	show("NonEmptyList.lastItem<ItemType>() [single]", provenOne::lastItem())
+	show("NonEmptyList.length<ItemType>()", provenNumbers::length())
+	show("NonEmptyList.length<ItemType>() [single]", provenOne::length())
 
 	§ The transforms that CARRY the proof rather than spending it. Each is shown
 	§ twice: once for the value, which has to be the one `List`'s own entry gives
@@ -2313,6 +2315,177 @@ third"::lines())
 	show(
 		"NonEmptyList.firstItem<ItemType>() [from List.insert]",
 		noNumbers::insert(5, at -99)::firstItem(),
+	)
+
+	§ ——— IntegerList, RationalList, NumberList ———————————————————————————
+	§ The aggregates reached from the List itself. Each item Type has a
+	§ Namespace of its own, so the receiver decides which one answers: a written
+	§ List of Integers reaches `IntegerList`, one of Rationals `RationalList`,
+	§ and a mixed one `NumberList`. Every entry delegates to the `Number` static
+	§ of the same name, and the labels below are what says which Namespace the
+	§ call landed in.
+	constant rationals    = [3/2, 1/2, 5/2]
+	constant mixedNumbers = [3, 1/2, 2]
+
+	show("IntegerList.sum()", numbers::sum())
+	show("IntegerList.sum() [empty]", noNumbers::sum())
+	show("IntegerList.product()", numbers::product())
+	show("IntegerList.product() [empty]", noNumbers::product())
+	show("IntegerList.average()", numbers::average())
+	show("IntegerList.average() [empty]", noNumbers::average())
+	show(
+		"IntegerList.average(defaultingTo: Rational)",
+		numbers::average(defaultingTo 0/1),
+	)
+	show(
+		"IntegerList.average(defaultingTo: Rational) [empty]",
+		noNumbers::average(defaultingTo 0/1),
+	)
+	show("IntegerList.lowestNumber()", numbers::lowestNumber())
+	show("IntegerList.lowestNumber() [empty]", noNumbers::lowestNumber())
+	show(
+		"IntegerList.lowestNumber(defaultingTo: Integer)",
+		numbers::lowestNumber(defaultingTo 0),
+	)
+	show(
+		"IntegerList.lowestNumber(defaultingTo: Integer) [empty]",
+		noNumbers::lowestNumber(defaultingTo 0),
+	)
+	show("IntegerList.greatestNumber()", numbers::greatestNumber())
+	show("IntegerList.greatestNumber() [empty]", noNumbers::greatestNumber())
+	show(
+		"IntegerList.greatestNumber(defaultingTo: Integer)",
+		numbers::greatestNumber(defaultingTo 0),
+	)
+	show(
+		"IntegerList.greatestNumber(defaultingTo: Integer) [empty]",
+		noNumbers::greatestNumber(defaultingTo 0),
+	)
+
+	show("RationalList.sum()", rationals::sum())
+	show("RationalList.sum() [empty]", noRationals::sum())
+	show("RationalList.product()", rationals::product())
+	show("RationalList.product() [empty]", noRationals::product())
+	show("RationalList.average()", rationals::average())
+	show("RationalList.average() [empty]", noRationals::average())
+	show(
+		"RationalList.average(defaultingTo: Rational)",
+		rationals::average(defaultingTo 0/1),
+	)
+	show(
+		"RationalList.average(defaultingTo: Rational) [empty]",
+		noRationals::average(defaultingTo 0/1),
+	)
+	show("RationalList.lowestNumber()", rationals::lowestNumber())
+	show("RationalList.lowestNumber() [empty]", noRationals::lowestNumber())
+	show(
+		"RationalList.lowestNumber(defaultingTo: Rational)",
+		rationals::lowestNumber(defaultingTo 0/1),
+	)
+	show(
+		"RationalList.lowestNumber(defaultingTo: Rational) [empty]",
+		noRationals::lowestNumber(defaultingTo 0/1),
+	)
+	show("RationalList.greatestNumber()", rationals::greatestNumber())
+	show("RationalList.greatestNumber() [empty]", noRationals::greatestNumber())
+	show(
+		"RationalList.greatestNumber(defaultingTo: Rational)",
+		rationals::greatestNumber(defaultingTo 0/1),
+	)
+	show(
+		"RationalList.greatestNumber(defaultingTo: Rational) [empty]",
+		noRationals::greatestNumber(defaultingTo 0/1),
+	)
+
+	show("NumberList.sum()", mixedNumbers::sum())
+	show("NumberList.sum() [empty]", noMixedNumbers::sum())
+	show("NumberList.product()", mixedNumbers::product())
+	show("NumberList.product() [empty]", noMixedNumbers::product())
+	show("NumberList.average()", mixedNumbers::average())
+	show("NumberList.average() [empty]", noMixedNumbers::average())
+	show(
+		"NumberList.average(defaultingTo: Rational)",
+		mixedNumbers::average(defaultingTo 0/1),
+	)
+	show(
+		"NumberList.average(defaultingTo: Rational) [empty]",
+		noMixedNumbers::average(defaultingTo 0/1),
+	)
+	show("NumberList.lowestNumber()", mixedNumbers::lowestNumber())
+	show("NumberList.lowestNumber() [empty]", noMixedNumbers::lowestNumber())
+	show(
+		"NumberList.lowestNumber(defaultingTo: Integer | Rational)",
+		mixedNumbers::lowestNumber(defaultingTo 0),
+	)
+	show(
+		"NumberList.lowestNumber(defaultingTo: Integer | Rational) [empty]",
+		noMixedNumbers::lowestNumber(defaultingTo 0),
+	)
+	show("NumberList.greatestNumber()", mixedNumbers::greatestNumber())
+	show(
+		"NumberList.greatestNumber() [empty]",
+		noMixedNumbers::greatestNumber(),
+	)
+	show(
+		"NumberList.greatestNumber(defaultingTo: Integer | Rational)",
+		mixedNumbers::greatestNumber(defaultingTo 0),
+	)
+	show(
+		"NumberList.greatestNumber(defaultingTo: Integer | Rational) [empty]",
+		noMixedNumbers::greatestNumber(defaultingTo 0),
+	)
+
+	§ ——— NonEmptyIntegerList, NonEmptyRationalList, NonEmptyNumberList ————
+	§ The same three questions answered BARE, which is what the proof buys. A
+	§ written List in receiver position has been proven nothing, so each
+	§ receiver here is built by a Method that says what it builds is not empty
+	§ — `append` and `List.of` — and the label is what says the call landed in
+	§ the proven Namespace rather than the general one.
+	show(
+		"NonEmptyIntegerList.lowestNumber()",
+		noNumbers::append(5)::append(2)::lowestNumber(),
+	)
+	show(
+		"NonEmptyIntegerList.greatestNumber()",
+		noNumbers::append(5)::append(2)::greatestNumber(),
+	)
+	show(
+		"NonEmptyIntegerList.average()",
+		List.of(integersFrom 1, through 4)::average(),
+	)
+	show(
+		"NonEmptyIntegerList.average() [single]",
+		noNumbers::append(5)::average(),
+	)
+	show(
+		"NonEmptyRationalList.lowestNumber()",
+		noRationals::append(3/2)::append(1/2)::lowestNumber(),
+	)
+	show(
+		"NonEmptyRationalList.greatestNumber()",
+		noRationals::append(3/2)::append(1/2)::greatestNumber(),
+	)
+	show(
+		"NonEmptyRationalList.average()",
+		noRationals::append(3/2)::append(1/2)::average(),
+	)
+	show(
+		"NonEmptyNumberList.lowestNumber()",
+		noMixedNumbers::append(3)::append(1/2)::lowestNumber(),
+	)
+	show(
+		"NonEmptyNumberList.greatestNumber()",
+		noMixedNumbers::append(3)::append(1/2)::greatestNumber(),
+	)
+	§ The total is an Integer here and a Rational in the call below it, so both
+	§ arms of the match are walked.
+	show(
+		"NonEmptyNumberList.average()",
+		noMixedNumbers::append(3)::append(1)::average(),
+	)
+	show(
+		"NonEmptyNumberList.average() [rational total]",
+		noMixedNumbers::append(3)::append(1/2)::average(),
 	)
 
 	§ ——— loop ————————————————————————————————————————————————————————————
