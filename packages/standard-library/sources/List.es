@@ -12,154 +12,107 @@ import {
 
 declarations {
 
-	§ The Lists that have something in them. It is a checked refinement, so the
-	§ predicate is not a comment about the values — it is what a value has to
-	§ have been proven to satisfy before it may be called one, and the proof is
-	§ what the Type carries. A List written DOWN with items in it is its own
-	§ proof; a List a Program is handed goes through an `if` asking `hasItems`.
+	§ The Lists that have something in them. It is a checked refinement: the
+	§ predicate is what a value has to be proven to satisfy, and the proof is
+	§ what the Type carries.
 	§
-	§ And a List a Method BUILT may arrive already proven, with nothing asked
-	§ of it at all: `append(_:)`, `prepend(_:)`, `insert(_:at:)` and
-	§ `of(integersFrom:through:)` each put something in whatever they were
-	§ given, so each of them answers with this Type rather than with `List`.
-	§ That is the third route to the proof, and the only one that costs the
-	§ Program nothing to take.
+	§ Three routes reach the proof. A List written down with items in it is its
+	§ own proof. A List a Program is handed goes through an `if` asking
+	§ `hasItems`. And `append(_:)`, `prepend(_:)`, `insert(_:at:)` and
+	§ `of(integersFrom:through:)` each put something in what they were given,
+	§ so each answers with this Type.
 	§
-	§ It is generic, and the predicate is why that costs nothing: whether a List
-	§ has items is not a question about WHAT it holds, so one predicate serves
-	§ every item Type and the Type Argument lives in the base — a
-	§ `NonEmptyList<String>` and a `NonEmptyList<Integer>` are told apart by
-	§ `List<String>` against `List<Integer>`, exactly as their bases are.
-	§
-	§ This is what lets `firstItem` and `lastItem` answer with an ITEM rather
-	§ than with an Optional — and it is a fourth route as well as an answer,
-	§ because a proof SURVIVES a Method that can not spend it. `NonEmptyList`
-	§ below holds the transforms that carry one through: the answer of each is
-	§ as long as the receiver, or longer, so what goes in comes out and a chain
-	§ of them asks nothing again. Everything a proof does not survive stays on
-	§ `List`, which already answers for the empty one.
+	§ The predicate asks nothing about the item Type, so one predicate serves
+	§ every List and the Type Argument stays in the base.
 	type NonEmptyList<ItemType> = List<ItemType> where @::hasItems()
 
 	§ The ordered sequence, and everything that reads or rebuilds one. Every
-	§ Method here is a Query — a List is never changed in place, a new List is
-	§ returned.
+	§ Method here is a Query: a List is never changed in place, and a new List
+	§ is answered.
 	§
-	§ `ItemType` is the Namespace's own Type Parameter, and it is merged into a
-	§ Method's signature exactly when that signature mentions it. `of` fixes
-	§ its Types outright (an Integer-only result), so it does not carry it; the
-	§ bounded Methods below declare their own `ItemType`, bounded by the
-	§ Protocol each of them needs, which shadows the Namespace's outright.
+	§ `ItemType` is the Namespace's own Type Parameter, and it merges into a
+	§ signature that mentions it. `of` fixes its Types outright, so it carries
+	§ nothing. A bounded Method declares an `ItemType` of its own, which shadows
+	§ the Namespace's.
 	§
-	§ A Method that asks something of the items asks for it with a BOUND, not
-	§ with a narrower receiver — the Method stays here, on the Namespace that
-	§ targets every List, and the bound is what a use site has to satisfy. One
-	§ Method can not be written that way and is NOT here: `NestedList` below
-	§ holds `flatten`, because no bound can say "the items are themselves
-	§ Lists" and still name the inner item Type.
+	§ Every conformance here is conditional. A List is printable, equatable and
+	§ comparable exactly when its items are. A use site solving
+	§ `List<ItemType> is Equatable` solves `ItemType is Equatable` too, so a
+	§ `List<List<Integer>>` compares through Integer's own `is`, one nesting
+	§ level at a time.
 	§
-	§ Every conformance here is conditional — a List is printable exactly when
-	§ its items are, equatable exactly when its items are, and orderable
-	§ exactly when its items are. `toString`, `is` and `compare` carry the
-	§ same bound as their own Method Generic, so a use site solving
-	§ `List<ItemType> is Equatable` recursively solves `ItemType is Equatable`
-	§ and hands the item equality in as the hidden conformance Argument. That
-	§ recursion is what makes a `List<List<Integer>>` compare through
-	§ Integer's own `is`, one nesting level at a time — and print through
-	§ Integer's own `toString` the same way.
-	§
-	§ Every Method that asks whether two ITEMS are equal — `is`, `contains`,
-	§ `firstIndex`, `lastIndex`, `count(of:)`, `removeEvery(_:)` and
-	§ `removeDuplicates` — carries that bound, for the same reason `sort`
-	§ carries `Comparable`: equality is the item Type's own `is`, and a List
-	§ whose items can not answer it can not be searched by value. The universal
-	§ structural comparison that stood in for it before was not a Type the
-	§ language could name, and gave `1/2` and `2/4` whatever answer the runtime
+	§ Every Method that asks whether two items are equal carries the `Equatable`
+	§ bound. The structural comparison it replaced was not a Type the language
+	§ could name. It gave `1/2` and `2/4` whatever answer the runtime
 	§ representation happened to give.
 	namespace List<infer ItemType> for List<ItemType>
 		is Printable where ItemType is Printable,
 		is Equatable where ItemType is Equatable,
 		is Comparable where ItemType is Comparable {
-		§ NOTE: This would read better in Essence — length equality AND
-		§ `pair(with other)::hasItems(onlyWhere (pair) { … })` — and it can not
-		§ be written that way yet. Binding a List Method's own `ItemType` to a
-		§ Type that MENTIONS `ItemType` (the pair Record) makes inference
-		§ substitute the name into itself and recurse until the stack runs out.
-		§ The bound has nothing to do with it: a plain
-		§ `function f<ItemType>(_ a: List<ItemType>, _ b: List<ItemType>) { <-
-		§ a::pair(with b)::hasItems(…) }` overflows the same way, and did
-		§ before any of this. So `is` stays native and takes the witness — it
-		§ compares each pair with the items' own `is` rather than structurally,
-		§ exactly as `compare` below does with their `compare`.
+		§ An Essence body would be length equality and
+		§ `pair(with other)::hasItems(onlyWhere …)`, and it can not be written
+		§ that way yet. The pair Record mentions `ItemType`. Binding a List
+		§ Method's own `ItemType` to a Type that mentions it makes inference
+		§ substitute the name into itself until the stack runs out. The bound is
+		§ not the cause: a plain generic Function doing the same overflows too.
+		§ So `is` is native and takes the witness, comparing each pair of items
+		§ with the items' own `is`.
 
-		§§ Checks whether the Lists are structurally equal — the same items in the same order, each pair compared with the items' own `is`. Available whenever the items conform to `Equatable`.
+		§§ Answers whether the two Lists hold the same items in the same order.
 		§§
-		§§ @param other — the value to compare with
+		§§ Each pair of items is compared with the items' own `is`. The Method is available whenever the items conform to `Equatable`.
+		§§
+		§§ @param _ — the List to compare with
 		§§ @returns — `true` when the Lists are equal.
 		is<infer ItemType is Equatable>(_ other: List<ItemType>) -> Boolean
 
-		§§ Checks whether the Lists differ — in any item or in their order. Available whenever the items conform to `Equatable`.
+		§§ Answers whether the two Lists differ in any item or in their order.
 		§§
-		§§ @param other — the value to compare with
+		§§ The Method is available whenever the items conform to `Equatable`.
+		§§
+		§§ @param _ — the List to compare with
 		§§ @returns — `true` when the Lists are not equal.
 		isNot<infer ItemType is Equatable>(_ other: List<ItemType>) -> Boolean {
 			<- @::is(other)::negate()
 		}
 
-		§ NOTE: The items' own representations, joined and wrapped in brackets
-		§ — and native, because the wrapping is String concatenation and no
-		§ Method here can do it. `"[ "::append(…)` was the ONE call this file
-		§ made into `String`'s Namespace, and `String` is written on `List`
-		§ throughout — `lines`, `repeat` and `replaceFirst` all route through
-		§ it — so dropping it leaves one edge pointing one way instead of two
-		§ pointing at each other. Interpolating the joined String is that same
-		§ edge under another name: a hole renders through its value's
-		§ `Printable` conformance, and for a String that is `String::toString`.
-		§ The empty List still prints as `[]` rather than `[  ]`, having no
-		§ items to space.
-
-		§§ Represents the List and its items as a String — `[ 1, 2, 3 ]`, each item as its own `toString`. Available whenever the items conform to `Printable`.
+		§§ Answers the List and its items as a String, in the form `[ 1, 2, 3 ]`.
+		§§
+		§§ Each item is rendered by its own `toString`. The empty List answers `[]`. The Method is available whenever the items conform to `Printable`.
 		§§
 		§§ @returns — the String representation of the List.
 		toString<infer ItemType is Printable>() -> String
 
-		§§ How many items the List has.
+		§§ Answers how many items the List has.
 		§§
 		§§ @returns — the number of items.
 		length() -> Integer
 
-		§ The existential and the universal, under the name the no-Argument
-		§ question already has. `hasItems()` asks whether there is an item,
-		§ `hasItems(where:)` whether there is one the check accepts, and
-		§ `hasItems(onlyWhere:)` whether the check accepts every item.
-		§
-		§ The two quantified entries stop at the item that decides the answer,
-		§ on `reduce`'s early-stopping entry, and carry the ANSWER rather than
-		§ the item. `firstItem(where:)::hasValue()` answers the same question
-		§ correctly — a nested Optional keeps "no match" and "an empty match"
-		§ apart — and it builds an Optional per call to throw it away. A
-		§ Boolean accumulator builds nothing. `count(where:)` below stays on
-		§ `everyItem` — counting has to see every item, so there is no walk to
-		§ leave early.
+		§ Both quantified entries fold a Boolean. The alternative is
+		§ `firstItem(where:)::hasValue()`, which answers the same question and
+		§ builds an Optional per call to throw away. So the accumulator carries
+		§ the answer rather than the item.
 
-		§§ Whether the List has at least one item, one the given check accepts, or only items the check accepts.
+		§§ Answers whether the List has an item, has an item the check accepts, or holds only items the check accepts.
 		§§
 		§§ @returns — `true` when the List answers the question that was asked.
 		overload hasItems {
-			§§ Whether the List has at least one item — the opposite of `isEmpty`.
+			§§ Answers whether the List has at least one item.
+			§§
+			§§ It is the opposite of `isEmpty`.
 			§§
 			§§ @returns — `true` when the List is not empty.
 			() -> Boolean {
 				<- @::isEmpty()::negate()
 			}
 
-			§§ Whether the given check accepts at least one item.
+			§§ Answers whether the check accepts at least one item.
 			§§
-			§§ @returns — `true` when some item is accepted.
+			§§ The walk stops at the first accepted item. The empty List has no item to accept, so it answers `false`.
+			§§
+			§§ @param where — the check each item is offered to
+			§§ @returns — `true` when the check accepts an item.
 			(where check: (_: ItemType) -> Boolean) -> Boolean {
-				§ The accumulator is the answer so far, which stays `false`
-				§ until an item is accepted and `#Done` finishes the fold with
-				§ `true`. The empty List has no item to accept and keeps the
-				§ seed.
 				<- @::reduce(startingWith false, step (found, item) {
 					if check(item) {
 						<- #Done(true)
@@ -169,42 +122,44 @@ declarations {
 				})
 			}
 
-			§§ Whether the given check accepts every item.
+			§§ Answers whether the check accepts every item.
 			§§
-			§§ The empty List has no item to fail the check, so it answers `true`.
+			§§ The walk stops at the first item the check refuses. The empty List has no item to fail the check, so it answers `true`.
 			§§
-			§§ @returns — `true` when every item is accepted.
+			§§ @param onlyWhere — the check each item is offered to
+			§§ @returns — `true` when the check accepts every item.
 			(onlyWhere check: (_: ItemType) -> Boolean) -> Boolean {
-				§ No item fails the check.
 				<- @::hasItems(where (item) { <- check(item)::negate() })
 					::negate()
 			}
 		}
 
-		§§ Whether the List has no items at all.
+		§§ Answers whether the List has no items at all.
 		§§
 		§§ @returns — `true` for the empty List.
 		isEmpty() -> Boolean {
-			§ `List.length` is native and O(1) — it reads the underlying array's
-			§ length — so asking for it costs nothing. `String.isEmpty` is
-			§ written the same way, but there `length` walks the characters.
+			§ Asking for `List.length` costs nothing: it is native and O(1),
+			§ reading the underlying array's length. The body of
+			§ `String.isEmpty` is the same, but there `length` walks the
+			§ characters.
 			<- @::length()::is(0)
 		}
 
-		§§ Whether an item equal to the given one — by the items' own `is` — is in the List. Available whenever the items conform to `Equatable`.
+		§§ Answers whether an item equal to the given one is in the List.
 		§§
-		§§ @param item — the item to look for
+		§§ Equality is the items' own `is`. The Method is available whenever the items conform to `Equatable`.
+		§§
+		§§ @param _ — the item to look for
 		§§ @returns — `true` when the item occurs.
 		contains<infer ItemType is Equatable>(_ item: ItemType) -> Boolean {
-			§ The bound is the whole of the difference from `hasItems(where:)`:
-			§ the conforming Namespace's `is` arrives as the hidden conformance
-			§ Argument, and this hands it straight on as the check.
 			<- @::hasItems(where (candidate) { <- candidate::is(item) })
 		}
 
-		§§ Whether no item equal to the given one is in the List. Available whenever the items conform to `Equatable`.
+		§§ Answers whether no item equal to the given one is in the List.
 		§§
-		§§ @param item — the item to look for
+		§§ Equality is the items' own `is`. The Method is available whenever the items conform to `Equatable`.
+		§§
+		§§ @param _ — the item to look for
 		§§ @returns — `true` when the item does not occur.
 		doesNotContain<infer ItemType is Equatable>(
 			_ item: ItemType,
@@ -212,45 +167,30 @@ declarations {
 			<- @::contains(item)::negate()
 		}
 
-		§ A Method that can answer empty offers a `defaultingTo:` entry beside
-		§ each entry that can, answering the bare Type. The caller says at the
-		§ call what stands in for the missing answer, so nothing downstream has
-		§ to take an Optional apart. `Optional::value(defaultingTo:)` stays the
-		§ collapse for an Optional held in data, and each entry here is written
-		§ on it. Every Method below with an Optional answer is written the same
-		§ way, and this is the only note that says so.
+		§ Every Method below that can answer empty offers a `defaultingTo:`
+		§ entry beside it, answering the bare Type. Each of those entries is
+		§ written on `Optional::value(defaultingTo:)`.
 
-		§§ The first item, or the first item the given check accepts.
+		§§ Answers the first item, or the first item the check accepts.
 		§§
 		§§ @returns — the matching item, or nothing when there is none.
 		overload firstItem {
 			() -> Optional<ItemType> {
-				§ `item(at:)` comes back empty for a position outside the List,
-				§ so the empty case needs no guard of its own.
+				§ `item(at:)` answers empty for a position outside the List, so
+				§ the empty List needs no guard here.
 				<- @::item(at 0)
 			}
 
-			§ Written on `reduce`'s early-stopping entry — the fold `#Done`s at
-			§ the first accepted item and never walks the rest. Stopping at the
-			§ first match is the whole of the difference from
-			§ `everyItem(where:)::firstItem()`, and leaving a walk before its end is
-			§ what the `Step` Choice made an Essence expression able to do — this
-			§ Method was native until it existed.
+			§ Written on `reduce`'s early-stopping entry, so the fold finishes
+			§ at the first accepted item and never walks the rest.
+			§ `everyItem(where:)::firstItem()` walks every item.
 			§
 			§ On a `List<Optional<Item>>` the answer is an
 			§ `Optional<Optional<Item>>`, and the two levels say different
-			§ things: `#Empty` is "no item matched", `#Value(#Empty)` is "the
-			§ item that matched is itself empty". An Optional that was a Union
-			§ could not tell them apart, and every Method below that wants only
-			§ the DECISION was written to route around the ambiguity. They stay
-			§ written that way for a smaller reason — see `hasItems`.
+			§ things. An `#Empty` answer means no item matched. A
+			§ `#Value(#Empty)` answer means the item that matched is itself
+			§ empty.
 			(where check: (_: ItemType) -> Boolean) -> Optional<ItemType> {
-				§ `reduce` binds its `Result` from the `startingWith` value, and
-				§ a bare `#Empty` would fix it to the empty Case alone — so the
-				§ seed is annotated to the `Optional` the accumulator and the
-				§ answer share. The accumulator is only ever empty: it is
-				§ carried untouched until a match `#Done`s the whole fold with
-				§ the item itself.
 				constant start: Optional<ItemType> = #Empty
 
 				<- @::reduce(startingWith start, step (found, item) {
@@ -262,7 +202,7 @@ declarations {
 				})
 			}
 
-			§§ The first item, or the given fallback for the empty List.
+			§§ Answers the first item, or the given fallback for the empty List.
 			§§
 			§§ @param defaultingTo — the item to answer with when there is none
 			§§ @returns — the first item, or the fallback in its place.
@@ -270,7 +210,7 @@ declarations {
 				<- @::firstItem()::value(defaultingTo fallback)
 			}
 
-			§§ The first item the given check accepts, or the given fallback when it accepts none.
+			§§ Answers the first item the check accepts, or the given fallback when it accepts none.
 			§§
 			§§ @param where — the check each item is offered to
 			§§ @param defaultingTo — the item to answer with when there is none
@@ -283,31 +223,32 @@ declarations {
 			}
 		}
 
-		§§ The last item, or the last item the given check accepts.
+		§§ Answers the last item, or the last item the check accepts.
 		§§
 		§§ @returns — the matching item, or nothing when there is none.
 		overload lastItem {
-			§§ The last item of the List.
+			§§ Answers the last item of the List.
 			§§
 			§§ @returns — the item, or nothing for the empty List.
 			() -> Optional<ItemType> {
-				§ -1 is the last position, and the empty List has no such item
-				§ — the position resolves to -1 there and lands outside the
-				§ List, so `item(at:)` comes back empty without a guard here.
+				§ -1 is the last position. The empty List has no such item: the
+				§ position lands outside the List, so `item(at:)` answers empty
+				§ without a guard here.
 				<- @::item(at -1)
 			}
 
-			§§ The last item the given check accepts.
+			§§ Answers the last item the check accepts.
 			§§
+			§§ @param where — the check each item is offered to
 			§§ @returns — the matching item, or nothing when no item is accepted.
 			(where check: (_: ItemType) -> Boolean) -> Optional<ItemType> {
-				§ The LAST accepted item is the FIRST accepted item of the
-				§ reversed List, so `firstItem(where:)` answers this one too and
-				§ stops at the item that decides it, exactly as it does there.
+				§ The last accepted item is the first accepted item of the
+				§ reversed List. So `firstItem(where:)` answers this one too,
+				§ and stops at the item that decides it.
 				<- @::reverse()::firstItem(where check)
 			}
 
-			§§ The last item, or the given fallback for the empty List.
+			§§ Answers the last item, or the given fallback for the empty List.
 			§§
 			§§ @param defaultingTo — the item to answer with when there is none
 			§§ @returns — the last item, or the fallback in its place.
@@ -315,7 +256,7 @@ declarations {
 				<- @::lastItem()::value(defaultingTo fallback)
 			}
 
-			§§ The last item the given check accepts, or the given fallback when it accepts none.
+			§§ Answers the last item the check accepts, or the given fallback when it accepts none.
 			§§
 			§§ @param where — the check each item is offered to
 			§§ @param defaultingTo — the item to answer with when there is none
@@ -328,18 +269,20 @@ declarations {
 			}
 		}
 
-		§§ A new List without the first item, or without the given number of leading items.
+		§§ Answers a new List without the first item, or without the given number of leading items.
 		§§
-		§§ @param count — how many leading items to remove; one when it is left out.
-		§§ @returns — the shortened List — empty when more items were removed than it had.
+		§§ The answer is empty when more items are removed than the List has. A count below one removes nothing.
+		§§
+		§§ @param _ — how many leading items to remove, which is one when it is left out
+		§§ @returns — the shortened List.
 		removeFirst(_ count: Integer = 1) -> List<ItemType> {
-			§ A COUNT, not a position — so a negative one removes nothing
-			§ rather than counting back from the end, which is what `slice`
-			§ would read it as. A count past the length clamps there and
-			§ leaves nothing, which is `slice`'s own clamping.
+			§ The Parameter is a count, not a position. A negative count would
+			§ reach `slice` as a position counting back from the end, so the
+			§ guard answers the receiver instead. A count past the length
+			§ reaches `slice`'s own clamping and leaves nothing.
 			§
-			§ On the empty List the default slices [1, 0), an inverted range,
-			§ which `slice` answers with the empty List.
+			§ On the empty List the default slices `[1, 0)`, an inverted range,
+			§ which `slice` answers empty.
 			if count::isLessThan(0) {
 				<- @
 			} else {
@@ -347,26 +290,24 @@ declarations {
 			}
 		}
 
-		§ Native, and for the reason `split` and `of` are: an Essence
-		§ composition can not avoid the intermediates, and here the
-		§ intermediates ARE the Method. The body was everything before the
-		§ position added to everything after it — `slice(from 0, to index)`
-		§ and `slice(from index + 1, to length)`, joined — which builds the
-		§ whole answer twice, once as two pieces and once as the joined List,
-		§ and reads the receiver twice to do it. The runtime fills one Array of
-		§ the answer's own size instead, and where the item is at an END it
-		§ fills nothing at all: dropping the first or last item is a shorter
-		§ view of the runs the receiver already holds. `partition` made the
-		§ opposite trade knowingly — two passes where the native made one —
-		§ because its cost is the two walks either way; this one's is not.
+		§ Native, because an Essence composition can not avoid its
+		§ intermediates and here the intermediates are the whole Method. The
+		§ body was `slice(from 0, to index)` joined to
+		§ `slice(from index::add(1), to length)`, which builds the answer twice
+		§ and reads the receiver twice. The runtime fills one Array of the
+		§ answer's own size, and none at all where the item is at an end.
 
-		§§ A new List without the item at the given position, counting from zero — or, for a negative position, counting back from the end: -1 is the last item.
+		§§ Answers a new List without the item at the given position.
 		§§
-		§§ @param index — the position of the item to remove
-		§§ @returns — the List without that item, or unchanged when the position is outside it.
+		§§ The position counts from zero. A negative position counts back from the end: -1 is the last item. A position outside the List leaves it unchanged.
+		§§
+		§§ @param at — the position of the item to remove
+		§§ @returns — the List without that item.
 		remove(at index: Integer) -> List<ItemType>
 
-		§§ A new List without every item equal — by the items' own `is` — to the given one, or without every item the given check accepts. The by-value entry is available whenever the items conform to `Equatable`.
+		§§ Answers a new List without every item equal to the given one, or without every item the check accepts.
+		§§
+		§§ Equality is the items' own `is`. The by-value entry is available whenever the items conform to `Equatable`.
 		§§
 		§§ @returns — the List of remaining items.
 		overload removeEvery {
@@ -379,16 +320,17 @@ declarations {
 			}
 		}
 
-		§§ A new List without the last item, or without the given number of trailing items.
+		§§ Answers a new List without the last item, or without the given number of trailing items.
 		§§
-		§§ @param count — how many trailing items to remove; one when it is left out.
-		§§ @returns — the shortened List — empty when more items were removed than it had.
+		§§ The answer is empty when more items are removed than the List has. A count below one removes nothing.
+		§§
+		§§ @param _ — how many trailing items to remove, which is one when it is left out
+		§§ @returns — the shortened List.
 		removeLast(_ count: Integer = 1) -> List<ItemType> {
-			§ A COUNT, not a position. A count below one keeps every item;
-			§ one at or past the length leaves nothing — and the subtraction
-			§ that says so goes negative, which `slice` would read as a
-			§ position counting back from the end, so both ends are answered
-			§ here rather than left to its clamping.
+			§ The Parameter is a count, not a position. A count at or past the
+			§ length makes the subtraction go negative, and `slice` would read
+			§ that as a position counting back from the end. Both ends are
+			§ answered here instead.
 			if count::isLessThan(1) {
 				<- @
 			} else if count::isGreaterThanOrEqualTo(@::length()) {
@@ -398,15 +340,14 @@ declarations {
 			}
 		}
 
-		§§ A new List keeping only the first occurrence of each item — by the items' own `is` — in the original order. Available whenever the items conform to `Equatable`.
+		§§ Answers a new List keeping only the first occurrence of each item, in the original order.
+		§§
+		§§ Equality is the items' own `is`. The Method is available whenever the items conform to `Equatable`.
 		§§
 		§§ @returns — the List without duplicates.
 		removeDuplicates<infer ItemType is Equatable>() -> List<ItemType> {
-			§ NOTE: Quadratic, as the native was — each item is looked for among
-			§ the ones kept so far. The empty List the fold starts from is
-			§ annotated: `reduce` binds `Result` from the `startingWith` value
-			§ before the callback is even checked, and a bare `[]` has no items
-			§ to read the item Type from.
+			§ Quadratic, as the native was: each item is looked for among the
+			§ ones kept so far.
 			constant kept: List<ItemType> = []
 
 			<- @::reduce(startingWith kept, (accumulated, item) {
@@ -418,20 +359,21 @@ declarations {
 			})
 		}
 
-		§§ A new List with the given item — or the contents of the given List — added at the front.
+		§§ Answers a new List with the given item, or with the contents of the given List, added at the front.
 		overload prepend {
 			§ Native for the reason `append`'s single-item entry is, and with
-			§ the same proof behind it: an item is ADDED, so the answer holds
-			§ one thing more than the receiver did and can not come back
-			§ empty. Which END it is added at has nothing to do with it.
+			§ the same proof behind it. Which end an item is added at has
+			§ nothing to do with the proof.
 
-			§§ A new List with the given item added at the front, which is a List that certainly has something in it.
+			§§ Answers a new List with the given item added at the front.
 			§§
-			§§ @param item — the item to add
-			§§ @returns — the extended List, never empty.
+			§§ The item is never dropped, so the answer certainly has something in it.
+			§§
+			§§ @param _ — the item to add
+			§§ @returns — the extended List, which is never empty.
 			(_ item: ItemType) -> NonEmptyList<ItemType>
 
-			§§ A new List with the contents of the given List added at the front.
+			§§ Answers a new List with the contents of the given List added at the front.
 			§§
 			§§ @param contentsOf — the List whose items to add
 			§§ @returns — the extended List.
@@ -440,99 +382,99 @@ declarations {
 			}
 		}
 
-		§§ A new List with the given item — or the contents of the given List — added at the end.
+		§§ Answers a new List with the given item, or with the contents of the given List, added at the end.
 		overload append {
-			§ An item is ADDED, so whatever the receiver held the answer holds
-			§ one thing more than that — a List built this way is never empty,
-			§ whether or not the one it was built from was. Adding a whole
-			§ List proves nothing of the kind, because the List added may be
-			§ the empty one, so only THIS entry says so.
+			§ An item is added, so the answer holds one thing more than the
+			§ receiver and is never empty. Adding a whole List proves nothing of
+			§ the kind, because the List added can be the empty one.
 			§
-			§ Native, and this is why: written in Essence the body would be
-			§ `@::append(contentsOf [item])`, whose answer is the OTHER entry's
-			§ `List` — an expression that is not empty is not the same as one
-			§ the language can be told is not empty, and Essence has no way to
-			§ be told. The proof is spent here, exactly as `firstItem`'s is.
+			§ The single-item entry is native. In Essence its body would be
+			§ `@::append(contentsOf [item])`, whose answer is the other entry's
+			§ `List`. An expression that is not empty is not the same as one
+			§ the language can be told is not empty.
 
-			§§ A new List with the given item added at the end, which is a List that certainly has something in it.
+			§§ Answers a new List with the given item added at the end.
 			§§
-			§§ @param item — the item to add
-			§§ @returns — the extended List, never empty.
+			§§ The item is never dropped, so the answer certainly has something in it.
+			§§
+			§§ @param _ — the item to add
+			§§ @returns — the extended List, which is never empty.
 			(_ item: ItemType) -> NonEmptyList<ItemType>
 
-			§§ A new List with the contents of the given List added at the end.
+			§§ Answers a new List with the contents of the given List added at the end.
 			§§
 			§§ @param contentsOf — the List whose items to add
 			§§ @returns — the extended List.
 			(contentsOf other: List<ItemType>) -> List<ItemType>
 		}
 
-		§ `map` and `reduce` are the first builtins to carry a Method-level
-		§ Generic. `Result` must be inferred, or it never enters `bindableNames`
-		§ and inference silently leaves it unbound. It is bound from the
-		§ callback: for `map` from the callback's return Type, for `reduce` from
-		§ the `startingWith` value before the callback is even checked. The
-		§ Namespace's `ItemType` merges in ahead of it, so each ends up generic
-		§ in `[ItemType, Result]`.
+		§ `map` and `reduce` each carry a Method level Generic, and `reduce`
+		§ reads its `Result` from `startingWith`; see DEVELOPMENT.md, Why bodies
+		§ look the way they do. The Namespace's `ItemType` merges in ahead of
+		§ that Generic, so each Method is generic in `[ItemType, Result]`.
 
-		§§ A new List with the given transform applied to every item.
+		§§ Answers a new List with the given transform applied to every item.
 		§§
+		§§ @param _ — the transform each item is handed to
 		§§ @returns — the List of transformed items.
 		map<infer Result>(_ transform: (_: ItemType) -> Result) -> List<Result>
 
-		§ `reduce` is one Method with two Overloads. The first folds every item
-		§ in, always to the end; the second may stop early, because its combiner
-		§ answers with a `Step` rather than with the accumulator outright —
-		§ `#Continue` carries the accumulator on, `#Done` finishes at once. It is
-		§ the fold a search or a running total that has already found its answer
-		§ can leave, which no Essence expression walking the List could do on its
-		§ own. Both bind `Result` from the `startingWith` value, so both are
-		§ generic in `[ItemType, Result]` exactly as the single Method was.
+		§ The second entry can stop early, because its combiner answers with a
+		§ `Step`, which is what lets an Essence expression leave a walk early.
 
-		§§ Combines every item into a single value, starting from the given one —
-		§§ folding to the end, or stopping early when the combiner says to.
+		§§ Answers the items combined into a single value, starting from the given one.
+		§§
+		§§ The fold runs to the end, or stops early when the combiner says to.
 		§§
 		§§ @returns — the combined value.
 		overload reduce {
-			§§ Combines every item into a single value, starting from the given one.
+			§§ Answers the items combined into a single value, starting from the given one.
 			§§
-			§§ @param startingWith — the value the first combination builds on.
+			§§ @param startingWith — the value the first combination builds on
+			§§ @param _ — the combiner, handed the value so far and each item
 			§§ @returns — the combined value.
 			<infer Result>(
 				startingWith initial: Result,
 				_ combine: (_: Result, _: ItemType) -> Result,
 			) -> Result
 
-			§§ Combines the items into a single value, starting from the given one, and may stop before the end: the `step` combiner answers with a `Step` — `#Continue` carries the accumulator forward, `#Done` finishes at once with its value. An empty List returns the starting value untouched.
+			§§ Answers the items combined into a single value, starting from the given one, and can stop before the end.
 			§§
-			§§ @param startingWith — the value the first combination builds on.
-			§§ @param step — the combiner, handed the accumulator and each item, answering with a `Step` — `#Continue` to fold on, `#Done` to finish now.
-			§§ @returns — the accumulated value, or the value the first `#Done` carries.
+			§§ The `step` combiner answers with a `Step`: `#Continue` carries the value forward, and `#Done` finishes at once with its own value. The empty List answers the starting value untouched.
+			§§
+			§§ @param startingWith — the value the first combination builds on
+			§§ @param step — the combiner, handed the value so far and each item, answering with a `Step`
+			§§ @returns — the combined value, or the value the first `#Done` carries.
 			<infer Result>(
 				startingWith initial: Result,
 				step combine: (_: Result, _: ItemType) -> Step<Result, Result>,
 			) -> Result
 		}
 
-		§ The complement of `removeEvery(where:)` — the filter. Only the `where`
-		§ form, since keeping just the items equal to a given value is what
+		§ The filter, and the complement of `removeEvery(where:)`. There is no
+		§ by-value entry: keeping the items equal to a given value is what
 		§ `contains` already answers.
 
-		§§ A new List of every item the given check accepts.
+		§§ Answers a new List of every item the check accepts.
+		§§
+		§§ Each item is offered to the check, and the accepted items keep their order.
 		§§
 		§§ @returns — the List of accepted items.
 		everyItem(where check: (_: ItemType) -> Boolean) -> List<ItemType>
 
-		§§ The item at the given position, counting from zero — or, for a negative position, counting back from the end: -1 is the last item and -length the first.
+		§§ Answers the item at the given position.
+		§§
+		§§ The position counts from zero. A negative position counts back from the end: -1 is the last item. The furthest a negative position reaches back is the first item.
 		§§
 		§§ @returns — the item, or nothing when the position is outside the List.
 		overload item {
-			§§ The item at the given position.
+			§§ Answers the item at the given position.
 			§§
+			§§ @param at — the position of the item
 			§§ @returns — the item, or nothing when the position is outside the List.
 			(at index: Integer) -> Optional<ItemType>
 
-			§§ The item at the given position, or the given fallback when the position is outside the List.
+			§§ Answers the item at the given position, or the given fallback when the position is outside the List.
 			§§
 			§§ @param at — the position of the item
 			§§ @param defaultingTo — the item to answer with when the position names none
@@ -542,31 +484,21 @@ declarations {
 			}
 		}
 
-		§ `firstIndex` and `lastIndex` COUNT their way through the items, stopping
-		§ at the first match — the walk-and-stop the native did, now that the
-		§ `Step` Choice lets an Essence expression leave a walk before its end.
-		§ The old objection — that Essence would have to pair every item with its
-		§ position, build that whole List of Records and read one member back out —
-		§ was about a `pair(with:)` formulation; the fold threads the position as
-		§ its accumulator and never builds a List.
-		§
-		§ The counting is what makes them right for EVERY item Type. Walking the
-		§ positions with `item(at:)` reads better and costs a wrapper per item:
-		§ `item(at:)` answers `Optional<ItemType>`, which every comparison would
-		§ then have to take apart. `reduce` hands the item ITSELF, so every item
-		§ reaches the comparison as it stands.
-		§
-		§ The `of:` entry is the `where:` entry with the items' own `is` as the
-		§ check. The bound is the whole of the difference: the item Type's `is`
-		§ arrives as the hidden conformance Argument, exactly as `contains`
-		§ hands it to `hasItems(where:)`.
+		§ Both entries count their way through the items and stop at the first
+		§ match. The fold threads the position as its accumulator and builds no
+		§ List. Walking the positions with `item(at:)` reads better and costs an
+		§ Optional per item. The `of:` entry is the `where:` entry with the
+		§ items' own `is` as the check.
 
-		§§ The position of the first item equal to the given one, or of the first item the given check accepts.
+		§§ Answers the position of the first item equal to the given one, or of the first item the check accepts.
 		§§
 		§§ @returns — the zero-based position, or nothing when there is no such item.
 		overload firstIndex {
-			§§ The position of the first item equal — by the items' own `is` — to the given one. Available whenever the items conform to `Equatable`.
+			§§ Answers the position of the first item equal to the given one.
 			§§
+			§§ Equality is the items' own `is`. The entry is available whenever the items conform to `Equatable`.
+			§§
+			§§ @param of — the item to look for
 			§§ @returns — the zero-based position, or nothing when the item is absent.
 			<infer ItemType is Equatable>(
 				of item: ItemType,
@@ -574,17 +506,16 @@ declarations {
 				<- @::firstIndex(where (candidate) { <- candidate::is(item) })
 			}
 
-			§§ The position of the first item the given check accepts.
+			§§ Answers the position of the first item the check accepts.
 			§§
+			§§ @param where — the check each item is offered to
 			§§ @returns — the zero-based position, or nothing when no item is accepted.
 			(where check: (_: ItemType) -> Boolean) -> Optional<Integer> {
-				§ The accumulator is the position under test: `#Done` leaves the
-				§ fold at the first match, carrying that position, and a fold
-				§ that reaches the end settles on the position AFTER the last
-				§ item — the length, which is the one Integer no match can
-				§ answer. So "absent" needs no sentinel of its own, and the fold
-				§ carries a bare Integer rather than an Optional it would have
-				§ to unwrap each turn.
+				§ The accumulator is the position under test. A `#Done` leaves
+				§ the fold at the first match. A fold that reaches the end
+				§ settles on the length, which is the one position no match can
+				§ answer. So an absent item needs no sentinel, and the fold
+				§ carries a bare Integer rather than an Optional.
 				constant found = @::reduce(
 					startingWith 0,
 					step (index, candidate) {
@@ -603,7 +534,9 @@ declarations {
 				}
 			}
 
-			§§ The position of the first item equal — by the items' own `is` — to the given one, or the given fallback when the item is absent. Available whenever the items conform to `Equatable`.
+			§§ Answers the position of the first item equal to the given one, or the given fallback when the item is absent.
+			§§
+			§§ Equality is the items' own `is`. The entry is available whenever the items conform to `Equatable`.
 			§§
 			§§ @param of — the item to look for
 			§§ @param defaultingTo — the position to answer with when the item is absent
@@ -615,7 +548,7 @@ declarations {
 				<- @::firstIndex(of item)::value(defaultingTo fallback)
 			}
 
-			§§ The position of the first item the given check accepts, or the given fallback when it accepts none.
+			§§ Answers the position of the first item the check accepts, or the given fallback when it accepts none.
 			§§
 			§§ @param where — the check each item is offered to
 			§§ @param defaultingTo — the position to answer with when no item is accepted
@@ -629,54 +562,53 @@ declarations {
 		}
 
 		§ Both ends are defaulted, so `slice(from n)` is the tail from `n` and
-		§ `slice(to n)` is the head up to it. That is what every caller of this
-		§ Method in the library wanted to write, and what four of them spelled
-		§ as `slice(from n, to @::length())` instead. `@::length()` is a default
-		§ reading the RECEIVER, which is a binding by the time it runs — the
-		§ receiver Expression is evaluated once whatever the call leaves out.
+		§ `slice(to n)` is the head up to it. Four callers in the library spelled
+		§ `slice(from n, to @::length())` before that. The `to` default reads the
+		§ receiver, which is a binding by the time it runs. The receiver
+		§ Expression is evaluated once, whatever the call leaves out.
 
-		§§ A new List of the items from one position up to, but not including, another. A negative position counts back from the end, so `slice(from 0, to -1)` drops the last item. Left out, `from` is the start and `to` is the end.
+		§§ Answers a new List of the items from one position up to, but not including, another.
 		§§
-		§§ @param from — the first position to include, counting from zero, or back from the end when negative; zero when it is left out.
-		§§ @param to — the position to stop before, counting the same way; the length when it is left out.
-		§§ @returns — the List of items in that range — empty when the range is empty, inverted, or entirely outside the List.
+		§§ A negative position counts back from the end, so `slice(from 0, to -1)` drops the last item.
+		§§
+		§§ @param from — the first position to include, counting from zero, or back from the end when negative. It is zero when the call leaves it out.
+		§§ @param to — the position to stop before, counting the same way. It is the length when the call leaves it out.
+		§§ @returns — the List of items in that range. It is empty when the range is empty, inverted, or entirely outside the List.
 		slice(
 			from start: Integer = 0,
 			to end: Integer = @::length(),
 		) -> List<ItemType>
 
-		§§ A new List with the items in the opposite order.
+		§§ Answers a new List with the items in the opposite order.
 		§§
 		§§ @returns — the reversed List.
 		reverse() -> List<ItemType>
 
-		§ The `Comparable` bound works exactly as the `Equatable` one above
-		§ does. It resolves the conforming Namespace at the call site —
-		§ `Integer` for a `List<Integer>`, the covering `Number` for a mixed
-		§ numeric List — and its `compare` arrives as a hidden trailing
-		§ Argument. Its own bounded `ItemType` shadows the Namespace's.
+		§ The `Comparable` bound resolves the conforming Namespace at the call
+		§ site: `Integer` for a `List<Integer>`, and the covering `Number` for a
+		§ mixed numeric List.
 		§
-		§ BOTH entries are native, and the no-Argument one is native for a
-		§ reason worth keeping: written in Essence its body would be
-		§ `@::sort(by …)`, a call that has to pick between the two entries
-		§ HERE. Picking one is what would give the comparison's Parameters
-		§ their Types, so they can not be inferred; and annotating them does
-		§ not rescue it either, because this entry's bounded `ItemType`
-		§ shadows the Namespace's, so the annotated Function is typed in a
-		§ DIFFERENT `ItemType` than the `by:` entry expects and no Overload
-		§ matches. A sibling Overload is not reachable from an Essence body
-		§ the way a separately named Method was.
+		§ Both entries are native. In Essence the no-Argument body would be
+		§ `@::sort(by …)`, a call that has to pick between the two entries here.
+		§ Picking one is what would give the comparison's Parameters their
+		§ Types. Annotating them does not rescue it either. This entry's bounded
+		§ `ItemType` shadows the Namespace's, so the annotated Function is typed
+		§ in a different `ItemType` than the `by:` entry expects.
 
-		§§ A new List in order — by the items' own ordering when called with no Argument, available whenever they conform to `Comparable`, or by the given comparison.
+		§§ Answers a new List in order, by the items' own ordering or by the given comparison.
+		§§
+		§§ The no-Argument entry is available whenever the items conform to `Comparable`.
 		§§
 		§§ @returns — the ordered List.
 		overload sort {
-			§§ A new List in ascending order — the items' own ordering, available whenever they conform to `Comparable`. For any other order, use the `by:` entry.
+			§§ Answers a new List in ascending order, by the items' own ordering.
+			§§
+			§§ The entry is available whenever the items conform to `Comparable`. For any other order, use the `by:` entry.
 			§§
 			§§ @returns — the ordered List.
 			<infer ItemType is Comparable>() -> List<ItemType>
 
-			§§ A new List ordered by the given comparison, applied to each pair of items.
+			§§ Answers a new List ordered by the given comparison, applied to each pair of items.
 			§§
 			§§ @param by — the comparison to order the items with
 			§§ @returns — the ordered List.
@@ -685,20 +617,21 @@ declarations {
 			) -> List<ItemType>
 		}
 
-		§ The witness behind List's conditional Comparable conformance —
-		§ lexicographic ordering, available whenever the items are `Comparable`.
-		§ Its own bounded `ItemType` shadows the Namespace's, exactly as
-		§ `sort`'s does.
+		§ The witness behind List's conditional `Comparable` conformance.
 
-		§§ Orders the List against another one lexicographically — the first differing pair of items decides, and on an equal prefix the shorter List comes first. Available whenever the items conform to `Comparable`.
+		§§ Answers how the List orders against another one, comparing them lexicographically.
 		§§
-		§§ @param other — the List to compare with
+		§§ The first differing pair of items decides. On an equal prefix the shorter List comes first. The Method is available whenever the items conform to `Comparable`.
+		§§
+		§§ @param to — the List to compare with
 		§§ @returns — `Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.
 		compare<infer ItemType is Comparable>(
 			to other: List<ItemType>,
 		) -> Ordering
 
-		§§ How many items equal the given one — by the items' own `is` — or are accepted by the given check. The by-value entry is available whenever the items conform to `Equatable`.
+		§§ Answers how many items equal the given one, or how many items the check accepts.
+		§§
+		§§ Equality is the items' own `is`. The by-value entry is available whenever the items conform to `Equatable`.
 		§§
 		§§ @returns — the count.
 		overload count {
@@ -707,46 +640,44 @@ declarations {
 			}
 
 			(where check: (_: ItemType) -> Boolean) -> Integer {
-				§ The filtered List is built only to be measured. Counting has to
-				§ see every item, so unlike the quantified `hasItems` entries
-				§ there is no short circuit to keep here.
 				<- @::everyItem(where check)::length()
 			}
 		}
 
-		§ The clamping is what makes this a creator rather than a Method that
-		§ might do nothing: a position outside the List settles on the nearer
-		§ end and the item goes THERE, so there is no position, however far
-		§ out or however negative, that drops it. Insertion always inserts —
-		§ which is exactly the promise the return Type makes.
+		§ A position outside the List settles on the nearer end, so no position
+		§ drops the item, however far out or however negative it stands.
 		§
 		§ Native for the reason `append`'s and `prepend`'s single-item entries
-		§ are. The body it had was the three-part `slice`/`append`/`append`
-		§ the runtime NOTE now describes, and every part of it answered a
-		§ `List` — the item was certainly in there, and Essence had no way to
-		§ say so.
+		§ are. The body it had was a `slice`, an `append` and an `append`, and
+		§ every part of it answered a `List`.
 
-		§§ A new List with the given item inserted before the given position. A negative position counts back from the end, so `insert(_, at -1)` puts the item before the last one; a position outside the List clamps to the nearer end, so insertion never drops the item — and the List it answers with therefore certainly has something in it.
+		§§ Answers a new List with the given item inserted before the given position.
 		§§
-		§§ @param item — the item to insert
+		§§ A negative position counts back from the end, so `insert(_, at -1)` puts the item before the last one. A position outside the List clamps to the nearer end. The item is never dropped, so the answer certainly has something in it.
+		§§
+		§§ @param _ — the item to insert
 		§§ @param at — the position to insert the item before
-		§§ @returns — the List with the item inserted, never empty.
+		§§ @returns — the List with the item inserted. It is never empty.
 		insert(_ item: ItemType, at index: Integer) -> NonEmptyList<ItemType>
 
-		§§ A new List with the item at the given position replaced. A negative position counts back from the end: -1 is the last item.
+		§§ Answers a new List with the item at the given position replaced.
 		§§
-		§§ @returns — the List with the item replaced, or unchanged when the position is outside it.
+		§§ A negative position counts back from the end: -1 is the last item. A position outside the List leaves it unchanged.
+		§§
+		§§ @param _ — the item to put at that position
+		§§ @param at — the position of the item to replace
+		§§ @returns — the List with the item replaced.
 		replace(_ item: ItemType, at index: Integer) -> List<ItemType> {
 			constant length = @::length()
 
-			§ A position outside the List leaves it unchanged. The guard is
-			§ needed: `remove(at:)` would ignore such a position but `insert(_:at:)`
-			§ clamps it, so without this the item would be added at an end.
+			§ The guard is needed, because `remove(at:)` ignores a position
+			§ outside the List but `insert(_:at:)` clamps it. Without it the
+			§ item would be added at an end.
 			§
-			§ A position counting back from the end is resolved first, because
-			§ `remove(at:)` shortens the List before `insert(_:at:)` reads the
-			§ position again — and the same negative position names a different
-			§ place in the shorter List.
+			§ A negative position is resolved first, because `remove(at:)`
+			§ shortens the List before `insert(_:at:)` reads the position again.
+			§ The same negative position names a different place in the shorter
+			§ List.
 			if index::isLessThan(0::subtract(length)) {
 				<- @
 			} else if index::isLessThan(0) {
@@ -758,27 +689,29 @@ declarations {
 			}
 		}
 
-		§§ The position of the last item equal — by the items' own `is` — to the given one. Available whenever the items conform to `Equatable`.
+		§§ Answers the position of the last item equal to the given one.
+		§§
+		§§ Equality is the items' own `is`. The Method is available whenever the items conform to `Equatable`.
 		§§
 		§§ @returns — the zero-based position, or nothing when the item is absent.
 		overload lastIndex {
-			§§ The position of the last item equal — by the items' own `is` — to the given one. Available whenever the items conform to `Equatable`.
+			§§ Answers the position of the last item equal to the given one.
 			§§
+			§§ Equality is the items' own `is`. The entry is available whenever the items conform to `Equatable`.
+			§§
+			§§ @param of — the item to look for
 			§§ @returns — the zero-based position, or nothing when the item is absent.
 			<infer ItemType is Equatable>(
 				of item: ItemType,
 			) -> Optional<Integer> {
-				§ The LAST occurrence is the FIRST occurrence of the reversed
-				§ List, so `firstIndex` answers this one too and only the
-				§ position has to be counted back from the end. Counting down
-				§ from the last position instead would read each one with
-				§ `item(at:)` and take an Optional apart per item — see the note
-				§ above `firstIndex`.
+				§ The last occurrence is the first occurrence of the reversed
+				§ List. So `firstIndex` answers this one too, and only the
+				§ position is counted back from the end.
 				§
-				§ The empty List reverses to itself and holds no item to find,
-				§ so it comes back empty without a guard of its own — the -1
-				§ that `lastPosition` holds for it never reaches the
-				§ subtraction, because `map` does not run on an empty Optional.
+				§ The empty List reverses to itself and finds nothing, so it
+				§ needs no guard. The -1 that `lastPosition` holds never reaches
+				§ the subtraction, because `map` does not run on an empty
+				§ Optional.
 				constant lastPosition = @::length()::subtract(1)
 
 				<- @::reverse()
@@ -786,7 +719,9 @@ declarations {
 					::map((position) { <- lastPosition::subtract(position) })
 			}
 
-			§§ The position of the last item equal — by the items' own `is` — to the given one, or the given fallback when the item is absent. Available whenever the items conform to `Equatable`.
+			§§ Answers the position of the last item equal to the given one, or the given fallback when the item is absent.
+			§§
+			§§ Equality is the items' own `is`. The entry is available whenever the items conform to `Equatable`.
 			§§
 			§§ @param of — the item to look for
 			§§ @param defaultingTo — the position to answer with when the item is absent
@@ -799,271 +734,206 @@ declarations {
 			}
 		}
 
-		§ The one bounded Method whose bound does real work rather than
-		§ restating a conformance of List's own: joining needs nothing of the
-		§ items but that each can say what it is, so the bound is `Printable`
-		§ and the conforming Namespace's `toString` arrives as the hidden
-		§ Argument, exactly as `sort`'s `compare` does. Bounding the METHOD
-		§ is what keeps it here — a Namespace targeting `List<String>` would
-		§ have answered for Strings only, and every builtin worth joining is
-		§ Printable, Lists included. `[1, 2, 3]::join(with ", ")` is `"1, 2, 3"`.
-		§ Items with no `Printable` conformance to hand in — an unbounded Type
-		§ Parameter, a Function — are refused AT the bound, which names the
-		§ Protocol that is missing, rather than by leaving the Method unfound.
+		§ The bound does real work here rather than restating a conformance of
+		§ List's own. An item with no `Printable` conformance is refused at the
+		§ bound, which names the Protocol that is missing.
 
-		§§ Joins the items into one String, each item as its own `toString`, with the given separator between them — the return trip of `String::split(on:)` for a List of Strings.
+		§§ Answers the items joined into one String, with the given separator between them.
 		§§
-		§§ @param separator — the separator to place between the items
-		§§ @returns — the joined String, or the empty String for the empty List.
+		§§ Each item is rendered by its own `toString`: `[1, 2, 3]::join(with ", ")` is `"1, 2, 3"`. For a List of Strings the Method undoes `String::split(on:)`. It is available whenever the items conform to `Printable`.
+		§§
+		§§ @param with — the separator to place between the items
+		§§ @returns — the joined String. The empty List answers the empty String.
 		join<infer ItemType is Printable>(with separator: String) -> String
 
-		§ `flatten` would read naturally here too, and it is not here: it is
-		§ not available on every List, and every Method of this Namespace is.
-		§ It is declared in `NestedList` below, which says what its receiver has
-		§ to be.
+		§ `flatten` is not here: it is not available on every List, and every
+		§ Method of this Namespace is. `NestedList` below holds it.
 
-		§§ Splits the List in two by the given check — the accepted items and the rest, each in their original order.
+		§§ Answers the List split in two by the check: the accepted items, and the rest.
 		§§
-		§§ @returns — a Record with the accepted items under `matching` and the others under `rest`.
+		§§ Both halves keep the original order.
+		§§
+		§§ @param where — the check each item is offered to
+		§§ @returns — a Record holding the accepted items under `matching` and the others under `rest`.
 		partition(
 			where check: (_: ItemType) -> Boolean,
 		) -> { matching: List<ItemType>, rest: List<ItemType> } {
-			§ Two passes where the native made one, each keeping the original
-			§ order — which is what the halves are specified to do.
+			§ Two passes where the native made one. The cost is the two walks
+			§ either way.
 			<- {
 				matching = @::everyItem(where check),
 				rest = @::removeEvery(where check),
 			}
 		}
 
-		§§ Pairs the items of the two Lists position by position. The pairing stops with the shorter List.
+		§§ Answers the items of the two Lists paired position by position.
 		§§
-		§§ @param other — the List to pair the items with
+		§§ The pairing stops with the shorter List.
+		§§
+		§§ @param with — the List to pair the items with
 		§§ @returns — a List of Records, each holding one item of this List under `first` and its counterpart under `second`.
 		pair<infer Other>(
 			with other: List<Other>,
 		) -> List<{ first: ItemType, second: Other }>
 
-		§§ Splits the List into groups of the given size, in order. The last group holds whatever remains, so it can be shorter.
+		§§ Answers the List split into groups of the given size, in order.
 		§§
-		§§ A size below one names no grouping, and the answer is one group holding every item. The empty List answers with no groups at all, whatever the size.
+		§§ The last group holds whatever remains, so it can be shorter. A size below one names no grouping, and the answer is one group holding every item. The empty List answers no groups at all, whatever the size.
 		§§
 		§§ @param intoGroupsOf — how many items each group holds
 		§§ @returns — the List of groups.
 		split(intoGroupsOf size: Integer) -> List<List<ItemType>>
 
-		§§ A List holding the given item the given number of times. Zero or fewer times gives the empty List.
+		§§ Answers a List holding the given item the given number of times.
 		§§
-		§§ @param item — the item to repeat
+		§§ A count of zero or less answers the empty List.
+		§§
+		§§ @param _ — the item to repeat
 		§§ @param times — how many copies the List holds
 		§§ @returns — the List of repeated items.
 		static repeat(
 			_ item: ItemType,
 			times count: Integer,
 		) -> List<ItemType> {
-			§ `of` counts DOWN when the first Integer is the greater, so a count
-			§ below one would give `[1]` rather than nothing — hence the guard.
+			§ `of` counts down when the first Integer is the greater, so a count
+			§ below one would answer `[1]` rather than nothing. The guard
+			§ answers the empty List instead.
 			if count::isLessThan(1) {
 				<- []
 			} else {
-				§ The Integers are only the tally; each is replaced by the item.
+				§ The Integers are only the tally. Each is replaced by the item.
 				<- List.of(integersFrom 1, through count)::map((_) { <- item })
 			}
 		}
 
-		§ The loop-fuel constructor — Essence has no Range Type by design, so
-		§ counting loops write `List.of(integersFrom 1, through 10)::map(...)`.
-		§ Fixed to Integers, so the Namespace's `ItemType` has nothing to merge
-		§ into.
+		§ Essence has no Range Type, so a counting loop writes
+		§ `List.of(integersFrom 1, through 10)::map(…)`. The Method is fixed to
+		§ Integers, so the Namespace's `ItemType` has nothing to merge into.
 		§
-		§ Both ends are INCLUDED, so the shortest List it can build is the
-		§ one-item `[start]` that `of(integersFrom n, through n)` gives — and
-		§ counting down covers the rest, so there is no pair of Integers it
-		§ answers empty for. That is a proof, and it is written into the return
-		§ Type: a counting loop's List is one nothing has to ask `hasItems`
-		§ about.
+		§ Both ends are included, so the shortest List it builds is the one-item
+		§ `[start]`, and counting down covers the rest. No pair of Integers
+		§ answers empty, and the return Type is where that is written down.
 
-		§§ The Integers from one value through another, both included — counting down when the first is the greater. There is always at least the first one.
+		§§ Answers the Integers from one value through another, both included.
+		§§
+		§§ The count runs down when the first value is the greater. There is always at least the first value, so the answer certainly has something in it.
 		§§
 		§§ @param integersFrom — the first Integer of the List
-		§§ @param through — the last Integer of the List, included
-		§§ @returns — the List of Integers, which certainly has something in it.
+		§§ @param through — the last Integer of the List, which is included
+		§§ @returns — the List of Integers, which is never empty.
 		static of(
 			integersFrom start: Integer,
 			through end: Integer,
 		) -> NonEmptyList<Integer>
 	}
 
-	§ A List of Lists, and the one Method that only such a List can answer. It
-	§ is a Namespace of its own because a Namespace targets ONE Type and every
-	§ Method in it answers for that Type: `List` targets `List<ItemType>` —
-	§ every List there is — and `flatten` is not available on every List. A
-	§ Namespace targeting `List<List<ItemType>>` says exactly that, and says it
-	§ in the one place the compiler already looks.
-	§
-	§ A bound could not have kept it on `List`, the way `join(with:)`'s does: the
-	§ depth is the point. `ItemType` here binds to the INNER List's item Type,
-	§ so `[[1, 2], [3]]::flatten()` is a `List<Integer>` rather than a
-	§ `List<List<Integer>>`. Written as a Method of `List` it could only ever
-	§ have named the OUTER item Type, which is the List it is removing, and no
-	§ Protocol bound can name a Type that is not in the signature.
-	§
-	§ `[1, 2]::flatten()` matches no Namespace holding `flatten` and is
-	§ refused, which is the whole of what "flattening needs something to
-	§ flatten" means.
-	§
-	§ The name reads as what the receiver IS — a Nested List — and it is
-	§ visible: it is what a Hover names, what `::<NestedList>flatten()`
-	§ disambiguates with, and what a "searched Namespaces" Diagnostic lists.
+	§ A List of Lists, and the one Method only such a List can answer. Its
+	§ `ItemType` binds to the inner List's item Type, so
+	§ `[[1, 2], [3]]::flatten()` answers a `List<Integer>`. No Protocol bound
+	§ can name a Type that is not in the signature, which is why `flatten` is
+	§ not a Method of `List`.
 	namespace NestedList<infer ItemType> for List<List<ItemType>> {
-		§§ Flattens a List of Lists by one level — every inner List's items, in order, in a single List.
+		§§ Answers the inner Lists flattened by one level, into a single List.
+		§§
+		§§ Every inner List's items keep their order.
 		§§
 		§§ @returns — the flattened List.
 		flatten() -> List<ItemType>
 	}
 
-	§ The Methods the proof changes. Evidence ADDS to a Type and takes nothing
-	§ away, so a NonEmptyList already answers every Method of `List` above; what a
-	§ Namespace of its own is for is the Methods that answer BETTER for having the
-	§ proof, and there are two ways to do that.
+	§ The Methods the proof changes. A NonEmptyList already answers every
+	§ Method of `List`. A Namespace of its own is for the Methods that answer
+	§ better for having the proof.
 	§
-	§ `firstItem` and `lastItem` SPEND it: a List with items in it has a first one
-	§ and a last one, so there is no case left over for an Optional to stand for.
-	§ Neither can be written in Essence — every way to reach an item answers the
-	§ Optional that a position outside the List needs, and taking the item out of
-	§ it would want the very fallback the proof was gathered to remove. That is
-	§ the point rather than a gap, and a native is what spending a proof looks
-	§ like.
+	§ Three Methods spend the proof: `firstItem`, `lastItem` and `length`.
+	§ Everything else here carries it forward. Each answers with one item for
+	§ every item it was handed, or with those items and more besides. So none
+	§ of them can empty a List that was not empty. They are declared in the
+	§ order `List` declares them, so the two can be read side by side.
 	§
-	§ Everything below them CARRIES it. Each is a transform that answers with one
-	§ item for every item it was handed — or one for every DISTINCT item, or those
-	§ items and more besides — so none of them can empty a List that was not
-	§ empty, and each says so with a `NonEmptyList` where `List`'s own entry says
-	§ `List`. That is what keeps a chain of them from asking `hasItems` again at
-	§ every step. They are declared in the order `List` declares them, so the two
-	§ can be read side by side.
+	§ Every entry is native, because the promise can not be said in Essence:
+	§ `<- @::map(transform)` is the right answer and its Type is
+	§ `List<Result>`. Only three of them are written in Essence on `List`:
+	§ `prepend(contentsOf:)`, `removeDuplicates` and `replace`. For those the
+	§ runtime writes the same operation out beside it. The harness calls both
+	§ entries over the same inputs, so that the two can not drift.
 	§
-	§ They are native too, and for a different reason than the first two: nothing
-	§ here is unwritable, it is unSAYABLE. `<- @::map(transform)` is the right
-	§ answer and its Type is `List<Result>` — an expression that can not come back
-	§ empty is not the same as one the language can be TOLD can not, which is the
-	§ wall `List::append(_:)` meets from the other side. So each of these adds
-	§ nothing to what `List` already does but the promise: where `List` answers
-	§ with a native, that native IS the answer, under this Namespace's name;
-	§ where it answers in Essence — `prepend(contentsOf:)`, `removeDuplicates`
-	§ and `replace` — the runtime writes the same operation out beside it, and
-	§ the harness calls both entries over the same inputs so that the two can
-	§ not drift.
-	§
-	§ What is not here is everything the proof does not survive. `everyItem`,
-	§ `removeEvery`, `slice`, `remove`, `removeFirst` and `removeLast` can all
-	§ answer empty from a receiver that was not; `flatten` empties on a List of
-	§ empty Lists; `firstItem(where:)` may find nothing; `partition`, `pair` and
-	§ `split` build Lists nobody has proven anything about. Each of those keeps
-	§ `List`'s own entry, and reaching one costs the proof — which is what a
-	§ later `hasItems` is for.
-	§
-	§ The single-item growers are not here either, for the opposite reason:
-	§ `append(_:)`, `prepend(_:)` and `insert(_:at:)` answer with a
-	§ `NonEmptyList` on `List` itself, whatever they were handed, so a receiver
-	§ that has been proven something reaches them by forgetting the proof and is
-	§ given the same answer back. A second copy here would say nothing new.
-	§
-	§ The target is the refinement, which is what makes these reachable only from
-	§ a List something has proven something about. A List a Program merely wrote
-	§ down in receiver position has been proven nothing and answers `List`'s own
-	§ `firstItem`, with the Optional it always had.
+	§ What the proof does not survive stays on `List`, from `everyItem` and
+	§ `slice` to `partition` and `split`. The single-item growers are absent
+	§ for the opposite reason: `append(_:)`, `prepend(_:)` and `insert(_:at:)`
+	§ answer a `NonEmptyList` on `List` itself, whatever they were handed.
 	namespace NonEmptyList<infer ItemType> for NonEmptyList<ItemType> {
-		§§ The first item of the List, which there certainly is one of.
+		§§ Answers the first item of the List, which certainly has one.
 		§§
 		§§ @returns — the first item.
 		firstItem() -> ItemType
 
-		§§ The last item of the List, which there certainly is one of.
+		§§ Answers the last item of the List, which certainly has one.
 		§§
 		§§ @returns — the last item.
 		lastItem() -> ItemType
 
-		§ Counting is `List`'s own count under a Type that says what the proof
-		§ already says: a List with something in it has at least one item.
-		§ Native, and it has to be — an Essence body could only write
-		§ `@::length()`, which is THIS Method on a receiver that still carries
-		§ the proof, and the Validator refuses it as `infinite-recursion`.
-		§ There is no way to reach `List`'s own entry from here and no way to
-		§ tell the language that an Integer is not zero.
-
-		§§ How many items the List has, which is at least one.
+		§§ Answers how many items the List has, which is at least one.
 		§§
 		§§ @returns — the number of items, which is never zero.
 		length() -> NonZeroInteger
 
-		§ Removing duplicates keeps the FIRST of every group of equal items, so
-		§ it keeps at least one of whatever it was handed. The bound is `List`'s
-		§ own: equality is the item Type's, and the conforming Namespace's `is`
-		§ arrives as the hidden Argument here exactly as it does there.
+		§ Removing duplicates keeps the first of every group of equal items, so
+		§ it keeps at least one of whatever it was handed.
 
-		§§ A new List keeping only the first occurrence of each item — by the items' own `is` — in the original order. Available whenever the items conform to `Equatable`.
+		§§ Answers a new List keeping only the first occurrence of each item, in the original order.
+		§§
+		§§ Equality is the items' own `is`. The Method is available whenever the items conform to `Equatable`.
 		§§
 		§§ @returns — the List without duplicates, which certainly has something in it.
 		removeDuplicates<infer ItemType is Equatable>() -> NonEmptyList<ItemType>
 
 		§ Adding a whole List proves nothing on `List`, because the List added
-		§ may be the empty one — and proves everything here, where the RECEIVER
-		§ is the proof and what is added to it is beside the point. Both ends
-		§ say so, since which end an item is added at never had anything to do
-		§ with it.
+		§ can be the empty one. Here the receiver is the proof, and what is
+		§ added to it is beside the point.
 
-		§§ A new List with the contents of the given List added at the front.
+		§§ Answers a new List with the contents of the given List added at the front.
 		§§
 		§§ @param contentsOf — the List whose items to add
-		§§ @returns — the extended List, never empty.
+		§§ @returns — the extended List, which is never empty.
 		prepend(contentsOf other: List<ItemType>) -> NonEmptyList<ItemType>
 
-		§§ A new List with the contents of the given List added at the end.
+		§§ Answers a new List with the contents of the given List added at the end.
 		§§
 		§§ @param contentsOf — the List whose items to add
-		§§ @returns — the extended List, never empty.
+		§§ @returns — the extended List, which is never empty.
 		append(contentsOf other: List<ItemType>) -> NonEmptyList<ItemType>
 
-		§ One transformed item for every item, so the answer is exactly as long
-		§ as the receiver whatever the transform makes of them — and the item
-		§ Type it makes has nothing to do with the promise, which is about the
-		§ LENGTH. `Result` is the Method's own Generic and must be INFERRED for
-		§ the reason `List::map`'s must: a Type Parameter that is not inferred
-		§ never enters `bindableNames`, and inference would leave it unbound.
-
-		§§ A new List with the given transform applied to every item.
+		§§ Answers a new List with the given transform applied to every item.
 		§§
+		§§ @param _ — the transform each item is handed to
 		§§ @returns — the List of transformed items, which certainly has something in it.
 		map<infer Result>(
 			_ transform: (_: ItemType) -> Result,
 		) -> NonEmptyList<Result>
 
-		§ The two that only move items about. Neither adds an item and neither
-		§ drops one, so the answer is the receiver's own items in another
-		§ order — which is as good a proof as there is that it is not empty.
+		§ Neither `reverse` nor `sort` adds an item or drops one, so the answer
+		§ is the receiver's own items in another order.
 
-		§§ A new List with the items in the opposite order.
+		§§ Answers a new List with the items in the opposite order.
 		§§
 		§§ @returns — the reversed List, which certainly has something in it.
 		reverse() -> NonEmptyList<ItemType>
 
-		§ Both entries carry `List`'s own bounds and for `List`'s own reasons:
-		§ the no-Argument one orders by the items' `compare`, arriving as the
-		§ hidden conformance Argument, and the other takes the comparison
-		§ outright. Its bounded `ItemType` shadows the Namespace's, exactly as
-		§ `removeDuplicates`' does.
-
-		§§ A new List in order — by the items' own ordering when called with no Argument, available whenever they conform to `Comparable`, or by the given comparison.
+		§§ Answers a new List in order, by the items' own ordering or by the given comparison.
+		§§
+		§§ The no-Argument entry is available whenever the items conform to `Comparable`.
 		§§
 		§§ @returns — the ordered List, which certainly has something in it.
 		overload sort {
-			§§ A new List in ascending order — the items' own ordering, available whenever they conform to `Comparable`. For any other order, use the `by:` entry.
+			§§ Answers a new List in ascending order, by the items' own ordering.
+			§§
+			§§ The entry is available whenever the items conform to `Comparable`. For any other order, use the `by:` entry.
 			§§
 			§§ @returns — the ordered List, which certainly has something in it.
 			<infer ItemType is Comparable>() -> NonEmptyList<ItemType>
 
-			§§ A new List ordered by the given comparison, applied to each pair of items.
+			§§ Answers a new List ordered by the given comparison, applied to each pair of items.
 			§§
 			§§ @param by — the comparison to order the items with
 			§§ @returns — the ordered List, which certainly has something in it.
@@ -1073,15 +943,16 @@ declarations {
 		}
 
 		§ Replacing keeps the length in both of the cases `List`'s own entry
-		§ has: a position inside the List swaps one item for one item, and a
-		§ position outside it — reaching back past the first, or standing at or
-		§ past the end — answers with the receiver untouched. Neither can take
-		§ the last item away, so the proof that came in is still good for what
-		§ goes out.
+		§ has. A position inside the List swaps one item for one item, and a
+		§ position outside it answers the receiver untouched.
 
-		§§ A new List with the item at the given position replaced. A negative position counts back from the end: -1 is the last item.
+		§§ Answers a new List with the item at the given position replaced.
 		§§
-		§§ @returns — the List with the item replaced, or unchanged when the position is outside it — never empty either way.
+		§§ A negative position counts back from the end: -1 is the last item. A position outside the List leaves it unchanged. Neither case can empty the List.
+		§§
+		§§ @param _ — the item to put at that position
+		§§ @param at — the position of the item to replace
+		§§ @returns — the List with the item replaced, which is never empty.
 		replace(_ item: ItemType, at index: Integer) -> NonEmptyList<ItemType>
 	}
 }
