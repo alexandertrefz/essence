@@ -292,23 +292,33 @@ declarations {
 		§§ @returns — the power, or nothing when raising zero to a negative power.
 		raise(to exponent: Integer) -> Optional<Integer | Rational>
 
-		§§ The Integer, pulled into the given bounds — the lower bound when below it, the upper when above it, itself otherwise.
+		§§ The Integer, pulled into the given bounds. The answer is the lower bound when the Integer is below it, the upper bound when it is above it, and the Integer itself otherwise.
 		§§
-		§§ @param lowest — the lowest allowed value
-		§§ @param and — the highest allowed value
-		§§ @returns — the clamped Integer, or nothing when the bounds are in the wrong order.
-		clamp(
-			between lowest: Integer,
-			and highest: Integer,
-		) -> Optional<Integer> {
+		§§ The two bounds name the same range in either order, so `7::clamp(between 10, and 1)` is `7` and `15::clamp(between 10, and 1)` is `10`.
+		§§
+		§§ @param between — one bound of the range
+		§§ @param and — the other bound of the range
+		§§ @returns — the clamped Integer.
+		clamp(between lowest: Integer, and highest: Integer) -> Integer {
+			§ A pair in either order encloses one range, as
+			§ `List.of(integersFrom:through:)` counts down for one written
+			§ that way. The two ladders below are the one ladder with the
+			§ bounds exchanged; a call that swapped them instead would be a
+			§ recursion, which the standard library's own bodies can not have.
 			if lowest::isGreaterThan(highest) {
-				<- #Empty
+				if @::isLessThan(highest) {
+					<- highest
+				} else if @::isGreaterThan(lowest) {
+					<- lowest
+				} else {
+					<- @
+				}
 			} else if @::isLessThan(lowest) {
-				<- #Value(lowest)
+				<- lowest
 			} else if @::isGreaterThan(highest) {
-				<- #Value(highest)
+				<- highest
 			} else {
-				<- #Value(@)
+				<- @
 			}
 		}
 
