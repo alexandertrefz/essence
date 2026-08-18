@@ -15,21 +15,19 @@ import {
 
 declarations {
 
-	§ The forms a Rational can be written in. `Fraction` is `"3/4"`, the
-	§ lowest-terms form `toString` gives with no Argument; `Decimal` is
-	§ `"0.75"`. It lives here because `Rational::toString` is its only user.
+	§ The forms `Rational::toString` writes: `Fraction` is `"3/4"` and
+	§ `Decimal` is `"0.75"`. The Choice is declared beside its only user.
 	choice NumberFormat {
 		Fraction,
 		Decimal,
 	}
 
-	§ The same shape as `Ordering`'s and `Side`'s Namespaces — unit Cases
-	§ compared and printed by tag, with the `Equatable` conformance declared
-	§ and derived rather than written.
+	§ `Equatable` is derived for a Choice; see DEVELOPMENT.md, Why bodies look
+	§ the way they do.
 	namespace NumberFormat for NumberFormat is Equatable, is Printable {
 		§§ Represents the NumberFormat as `Fraction` or `Decimal`.
 		§§
-		§§ @returns — the name of the NumberFormat variant.
+		§§ @returns — the name of the NumberFormat's Case.
 		toString() -> String {
 			<- match @ -> String {
 				case #Fraction { <- "Fraction" }
@@ -38,14 +36,8 @@ declarations {
 		}
 	}
 
-	§ Which Integer `round` reaches for a Rational that is not already whole.
-	§ It lives here because `Rational::round` is its only user, and it is what
-	§ keeps rounding ONE Method: `round`, `roundDown`, `roundUp` and `truncate`
-	§ were four names for one idea, which is exactly the shape
-	§ `trimmed`/`trimmedAtStart`/`trimmedAtEnd` had before `Side` collapsed it.
-	§ `Nearest` is the direction a call that names none means, and it is written
-	§ as `round`'s default — a Case like any other, said once in the signature
-	§ rather than hidden in a body.
+	§ Which Integer `round` reaches for a Rational that is not whole. The
+	§ Choice is declared beside its only user, and `#Nearest` is the default.
 	choice Rounding {
 		Nearest,
 		Down,
@@ -53,13 +45,10 @@ declarations {
 		TowardZero,
 	}
 
-	§ The same unit-Case shape as `NumberFormat` above — compared and printed
-	§ by tag, with the `Equatable` conformance declared and derived rather than
-	§ written.
 	namespace Rounding for Rounding is Equatable, is Printable {
 		§§ Represents the Rounding as `Nearest`, `Down`, `Up` or `TowardZero`.
 		§§
-		§§ @returns — the name of the Rounding variant.
+		§§ @returns — the name of the Rounding's Case.
 		toString() -> String {
 			<- match @ -> String {
 				case #Nearest    { <- "Nearest" }
@@ -71,21 +60,17 @@ declarations {
 	}
 
 	§ Exact ratios of Integers, kept in lowest terms with the sign on the
-	§ numerator. The literal form is `3/4`; `Rational.of` builds one from two
-	§ computed Integers. Arithmetic never rounds — an operation that leaves
-	§ the Rationals widens into the Type that can still say the answer.
+	§ numerator. The literal form is `3/4`, and `Rational.of` builds one from
+	§ two computed Integers. Arithmetic never rounds: an operation that leaves
+	§ the Rationals widens into the Type that states the answer exactly.
 	namespace Rational for Rational is Equatable, is Printable, is Comparable {
-		§ The one gateway a Rational is built through. Which entry a call reaches
-		§ is decided by what it knows about the DENOMINATOR: a bare Integer might
-		§ be zero, so the answer is an Optional, while a denominator already
-		§ proven not to be zero leaves nothing to answer empty for. The refined
-		§ entry stands AFTER the general one because an Overload's entries are
-		§ numbered in the order they are written and a native binding is named by
-		§ that number — but it is READ first, so a call that can prove its
-		§ denominator gets the total answer rather than an Optional it would only
-		§ unwrap. The `defaultingTo` entry is written last for the same reason.
+		§ The one gateway a Rational is built through. Overload entries are read
+		§ refined-first, so a call that can prove its denominator reaches the
+		§ total entry. See DEVELOPMENT.md, Why bodies look the way they do.
 
-		§§ Builds the Rational one Integer over another — the way to write a ratio of computed values, where the literal form `3/4` is not available.
+		§§ Builds a Rational from one Integer over another.
+		§§
+		§§ This is the way to write a ratio of computed values, where the literal form `3/4` is not available.
 		overload static of {
 			§§ Builds the Rational from two Integers, with nothing known about either.
 			§§
@@ -97,7 +82,9 @@ declarations {
 				over denominator: Integer,
 			) -> Optional<Rational>
 
-			§§ Builds the Rational over a denominator already proven not to be zero. There is no failure left to report, so the Rational itself is the answer.
+			§§ Builds the Rational over a denominator proven not to be zero.
+			§§
+			§§ There is no failure to report, so the Rational itself is the answer.
 			§§
 			§§ @param _ — the numerator
 			§§ @param over — the denominator, proven not to be zero
@@ -121,9 +108,11 @@ declarations {
 			}
 		}
 
-		§§ Checks whether the Rational has the same value as another — compared in lowest terms, so `1/2 is 2/4` holds.
+		§§ Checks whether the Rational has the same value as another Rational.
 		§§
-		§§ @param other — the Rational to compare against
+		§§ The comparison is in lowest terms, so `1/2` equals `2/4`.
+		§§
+		§§ @param _ — the Rational to compare against
 		§§ @returns — `true` when both are equal.
 		is(_ other: Rational) -> Boolean {
 			<- @::compare(to other)::is(#Equal)
@@ -131,39 +120,24 @@ declarations {
 
 		§§ Checks whether the Rational has a different value than another.
 		§§
-		§§ @param other — the Rational to compare against
+		§§ @param _ — the Rational to compare against
 		§§ @returns — `true` when the two differ.
 		isNot(_ other: Rational) -> Boolean {
 			<- @::is(other)::negate()
 		}
 
-		§ The Integer entries here are written on the lowest-terms accessors and
-		§ `Rational.of`, so every result passes through the one gateway a
-		§ Rational may be built by — and none of it launders an Optional any
-		§ more. `denominator` answers with a NonZeroInteger, a product of two of
-		§ those is one as well, and `of` over one of those is a Rational: the
-		§ chain the answers travel is total from end to end, and every entry
-		§ below used to end in an `::value(defaultingTo 0/1)` for a case it could not
-		§ reach, guarded by nothing but this paragraph saying so. The irrational
-		§ entries lean on commutativity: the other operand's own Namespace
-		§ already declares the sum with a Rational.
+		§ The Integer entries are written on the accessors and `Rational.of`, so
+		§ every answer passes through the one gateway. The irrational entries
+		§ call the other operand, because addition and multiplication commute.
 
-		§ NATIVE, the four same-kind entries. The Essence bodies were the
-		§ schoolbook cross-multiplication written out, and each of them read
-		§ `numerator()` and `denominator()` off both operands — four Integers
-		§ built to be unwrapped again — did four bigint operations through four
-		§ more boxes, and handed the parts to `Rational.of`, whose answer was
-		§ UNREDUCED and charged its next reader a greatest-common-divisor. The
-		§ runtime's bigint-rational core already does each of them as one
-		§ cross-multiplication and one reduction, on the parts themselves. The
-		§ answers are the same values: what changes is that a result now HOLDS
-		§ its lowest terms, which every accessor and every formatter already
-		§ answered with, and which equality — a cross-multiplication of the raw
-		§ parts — is indifferent to.
+		§ The four same-kind entries are native. An Essence body would read both
+		§ parts of both operands and hand them to `Rational.of`, whose answer is
+		§ not reduced. The runtime's bigint core does each one as one
+		§ cross-multiplication and one reduction.
 
-		§§ Adds a number to this Rational, staying exact for every member of the numeric tower.
+		§§ Adds a number to the Rational, and stays exact for every member of the numeric tower.
 		overload add {
-			§§ @param other — the Rational to add
+			§§ @param _ — the Rational to add
 			§§ @returns — the sum.
 			(_ other: Rational) -> Rational
 
@@ -183,9 +157,9 @@ declarations {
 			}
 		}
 
-		§§ Subtracts a number from this Rational, staying exact for every member of the numeric tower.
+		§§ Subtracts a number from the Rational, and stays exact for every member of the numeric tower.
 		overload subtract {
-			§§ @param other — the Rational to subtract
+			§§ @param _ — the Rational to subtract
 			§§ @returns — the difference.
 			(_ other: Rational) -> Rational
 
@@ -202,23 +176,18 @@ declarations {
 			}
 		}
 
-		§§ Divides this Rational by a number, exactly. Dividing by a possibly-zero Integer or Rational is empty for zero; dividing by an Algebraic can never fail — an irrational is never zero.
+		§§ Divides the Rational by a number, exactly.
+		§§
+		§§ Dividing by an Integer or a Rational answers empty for a zero divisor. Dividing by an Algebraic always answers, because an irrational is never zero.
 		overload divide {
-			§ A zero divisor is the ONE thing this entry answers empty for,
-			§ which is what the Essence body said by multiplying with
-			§ `reciprocal()` — itself empty for zero — rather than by guarding.
-			§ The native asks it outright.
-
 			§§ @param by — the Rational to divide by
 			§§ @returns — the quotient, or nothing when the divisor is zero.
 			(by other: Rational) -> Optional<Rational>
 
 			(by other: Integer) -> Optional<Rational> {
-				§ A zero divisor widens to the Rational `0/1`, whose reciprocal
-				§ the entry above already refuses — so the zero case needs no
-				§ guard of its own. Widening it can not fail either: the `1` is
-				§ written where it stands, and a value written down is its own
-				§ proof.
+				§ A zero divisor widens to `0/1`, which the entry above
+				§ refuses. A written literal is its own refinement proof;
+				§ see DEVELOPMENT.md, Why bodies look the way they do.
 				<- @::divide(by Rational.of(other, over 1))
 			}
 
@@ -243,7 +212,7 @@ declarations {
 			}
 		}
 
-		§§ Multiplies this Rational with a number, staying exact for every member of the numeric tower.
+		§§ Multiplies the Rational with a number, and stays exact for every member of the numeric tower.
 		overload multiply {
 			§§ @param with — the Rational to multiply with
 			§§ @returns — the product.
@@ -265,16 +234,13 @@ declarations {
 			}
 		}
 
-		§ These four are not a copy of `Number`'s — see the note above
-		§ `Integer::isLessThan`. The same-kind entry is written on Rational's
-		§ OWN `compare`, a cross-multiplication, so that comparing two
-		§ Rationals does not reach the sixteen-cell cross-kind table and drag
-		§ the Algebraic and Transcendental machinery in behind it. The
-		§ Integer entries cross-multiply the same way, in Integer arithmetic:
-		§ the denominator is positive in lowest terms, so scaling the Integer
-		§ by it leaves both sides ordered as the values are.
+		§ The same-kind entry is written on Rational's own `compare`, so
+		§ comparing two Rationals does not reach the cross-kind table in
+		§ `Number`. A body pulls its transitive reach into every bundle; see
+		§ DEVELOPMENT.md, Why bodies look the way they do. The Integer entries
+		§ scale by the denominator, which is positive and keeps the order.
 
-		§§ Whether this Rational is strictly below the given number.
+		§§ Checks whether the Rational is strictly below the given number.
 		overload isLessThan {
 			(_ other: Rational) -> Boolean {
 				<- @::compare(to other)::is(#Less)
@@ -286,7 +252,7 @@ declarations {
 			}
 		}
 
-		§§ Whether this Rational is below the given number, or equal to it.
+		§§ Checks whether the Rational is below the given number, or equal to it.
 		overload isLessThanOrEqualTo {
 			(_ other: Rational) -> Boolean {
 				<- @::isGreaterThan(other)::negate()
@@ -297,7 +263,7 @@ declarations {
 			}
 		}
 
-		§§ Whether this Rational is strictly above the given number.
+		§§ Checks whether the Rational is strictly above the given number.
 		overload isGreaterThan {
 			(_ other: Rational) -> Boolean {
 				<- @::compare(to other)::is(#Greater)
@@ -309,7 +275,7 @@ declarations {
 			}
 		}
 
-		§§ Whether this Rational is above the given number, or equal to it.
+		§§ Checks whether the Rational is above the given number, or equal to it.
 		overload isGreaterThanOrEqualTo {
 			(_ other: Rational) -> Boolean {
 				<- @::isLessThan(other)::negate()
@@ -320,12 +286,14 @@ declarations {
 			}
 		}
 
-		§§ The exact square root. A perfect square gives a Rational; any other non-negative value gives an exact Algebraic — and a negative is empty.
+		§§ Answers the exact square root of the Rational.
+		§§
+		§§ A perfect square answers a Rational. Any other value that is not negative answers an exact Algebraic. A negative Rational answers empty.
 		overload squareRoot {
 			§§ @returns — the root, or nothing for a negative Rational.
 			() -> Optional<Rational | Algebraic>
 
-			§§ The exact square root, with a value to answer for a negative Rational.
+			§§ Answers the exact square root, with a value to answer for a negative Rational.
 			§§
 			§§ @param defaultingTo — the value to answer with when there is no root
 			§§ @returns — the root, or the given value in its place.
@@ -336,13 +304,17 @@ declarations {
 			}
 		}
 
-		§§ The numerator of the Rational in lowest terms. The sign of the Rational lives here — the denominator is always positive.
+		§§ Answers the numerator of the Rational in lowest terms.
+		§§
+		§§ The numerator carries the sign, because the denominator is always positive.
 		numerator() -> Integer
 
-		§§ The denominator of the Rational in lowest terms — always positive, and never zero.
+		§§ Answers the denominator of the Rational in lowest terms.
+		§§
+		§§ The denominator is always positive, and never zero.
 		denominator() -> NonZeroInteger
 
-		§§ The Rational without its sign — its distance from zero.
+		§§ Answers the Rational without its sign, which is its distance from zero.
 		absolute() -> Rational {
 			if @::isLessThan(0/1) {
 				<- @::negate()
@@ -351,19 +323,21 @@ declarations {
 			}
 		}
 
-		§§ The Rational with its sign flipped.
+		§§ Answers the Rational with its sign flipped.
 		negate() -> Rational {
 			<- Rational.of(@::numerator()::negate(), over @::denominator())
 		}
 
-		§§ The Rational flipped upside down — the numerator and denominator exchanged.
+		§§ Answers the reciprocal of the Rational.
+		§§
+		§§ The reciprocal exchanges the numerator and the denominator. Zero has no reciprocal.
 		overload reciprocal {
 			§§ @returns — the reciprocal, or nothing for zero.
 			() -> Optional<Rational> {
 				<- Rational.of(@::denominator(), over @::numerator())
 			}
 
-			§§ The Rational flipped upside down, with a value to answer for zero.
+			§§ Answers the reciprocal, with a value to answer for zero.
 			§§
 			§§ @param defaultingTo — the value to answer with when there is no reciprocal
 			§§ @returns — the reciprocal, or the given value in its place.
@@ -372,44 +346,37 @@ declarations {
 			}
 		}
 
-		§§ Whether the Rational is a whole number — its denominator in lowest terms is one.
+		§§ Checks whether the Rational is a whole number.
+		§§
+		§§ A whole number has the denominator one in lowest terms.
 		isWholeNumber() -> Boolean {
 			<- @::denominator()::is(1)
 		}
 
-		§ ONE Method, not four. `round`, `roundDown`, `roundUp` and `truncate`
-		§ named the same idea four times, differing only in which Integer they
-		§ reach for — which is what a Choice says in one place. Every branch is
-		§ written on the FLOOR rather than on a sibling. `Nearest` is what the
-		§ no-Argument call means, and it is a DEFAULT now rather than an entry
-		§ of its own: one body, one emitted Function, nothing to dispatch.
-
-		§§ The Rational as an Integer — the nearest one when no direction is named, or the one the given direction reaches. `Nearest` rounds a value exactly halfway between two away from zero — `1/2` gives `1`, `0 - 1/2` gives `0 - 1` — `Down` is the floor, `Up` the ceiling, and `TowardZero` the Integer part with the fractional part cut off.
+		§§ Answers the Rational as an Integer, rounded in the named direction.
 		§§
-		§§ @param toward — which Integer to reach for; `#Nearest` when it is left out.
+		§§ The direction is `#Nearest` when a call names none. A value exactly halfway between two Integers rounds away from zero, so `1/2` answers `1` and `-1/2` answers `-1`. The other directions answer the floor for `#Down`, the ceiling for `#Up`, and the Integer part for `#TowardZero`.
+		§§
+		§§ @param toward — the direction to round in, `#Nearest` when it is left out
 		§§ @returns — the rounded Integer.
 		round(toward direction: Rounding = #Nearest) -> Integer {
 			§ The denominator is positive in lowest terms, so the Euclidean
-			§ quotient is the FLOOR — `Down` outright, and the one Integer
-			§ the other three are placed against. A denominator is a
-			§ NonZeroInteger, so this is the total `quotient` entry and
-			§ there is no empty case to fall back from.
+			§ quotient is the floor, and every branch below is written on it.
+			§ A NonZeroInteger divisor makes `quotient` total.
 			constant floored = @::numerator()
 				::quotient(dividingBy @::denominator())
 
 			constant isWhole = @::isWholeNumber()
 
-			§ `@` is the SCRUTINEE inside a match, not the receiver, so the
-			§ Rational is bound before the match to stay reachable in the
-			§ Case bodies.
+			§ `@` is rebound inside `match`; see DEVELOPMENT.md, Why bodies
+			§ look the way they do.
 			constant value = @
 
 			<- match direction -> Integer {
 				case #Down { <- floored }
 
 				case #Up {
-					§ A whole Rational is already its own ceiling; anything
-					§ else sits strictly above the floor.
+					§ A whole Rational is its own ceiling.
 					if isWhole {
 						<- floored
 					} else {
@@ -418,9 +385,9 @@ declarations {
 				}
 
 				case #TowardZero {
-					§ Cutting the fractional part off is the floor for a
-					§ non-negative value, and one step back up towards zero
-					§ for a negative one that is not already whole.
+					§ Cutting the fractional part off is the floor, except
+					§ for a negative value that is not whole, which takes
+					§ one step back towards zero.
 					if value::isLessThan(0/1)::and(isWhole::negate()) {
 						<- floored::add(1)
 					} else {
@@ -429,10 +396,9 @@ declarations {
 				}
 
 				case #Nearest {
-					§ How far the value sits above its floor. Past a half
-					§ the Integer above is nearer, below a half the floor
-					§ is — and exactly at a half the tie is broken AWAY
-					§ from zero, which for a negative value is the floor.
+					§ Above a half the Integer above is nearer, and below
+					§ a half the floor is. A tie breaks away from zero,
+					§ which for a negative value is the floor.
 					constant fractionalPart = value::subtract(floored)
 
 					if fractionalPart::isGreaterThan(1/2) {
@@ -448,7 +414,9 @@ declarations {
 			}
 		}
 
-		§§ Raises the Rational to the given power. A negative exponent gives the exact reciprocal power. Zero to the power of zero is one.
+		§§ Raises the Rational to the given power.
+		§§
+		§§ A negative exponent answers the exact reciprocal power. Zero raised to the power of zero is one.
 		overload raise {
 			§§ @param to — the exponent
 			§§ @returns — the power, or nothing when raising zero to a negative power.
@@ -467,15 +435,16 @@ declarations {
 			}
 		}
 
-		§§ Reads a Rational from its text form — a fraction like `3/4`, a decimal like `0.75`, or a whole number like `3`, each with an optional minus sign.
+		§§ Reads a Rational from its text form.
+		§§
+		§§ The text is a fraction like `3/4`, a decimal like `0.75`, or a whole number like `3`. Each form takes an optional minus sign in front.
 		overload static parse {
 			§§ @param _ — the text to read
 			§§ @returns — the Rational, or nothing when the text has any other shape or divides by zero.
 			(_ text: String) -> Optional<Rational> {
-				§ The sign is carried as the position of a LEADING `-`, exactly as
-				§ `Integer.parse` carries it — `keep` discards a `-` standing
-				§ anywhere else, so what is left has a value exactly when the text
-				§ is negative.
+				§ The sign is the position of a leading `-`. The `keep` step
+				§ drops a `-` standing anywhere else, so what is left has a
+				§ value only for a negative text.
 				constant sign = text::firstIndex(of "-")
 					::keep(where (position) { <- position::is(0) })
 
@@ -485,15 +454,13 @@ declarations {
 					case #Empty { <- text }
 				}
 
-				§ The leading sign was the ONE place a `-` may stand — the pieces
-				§ below are plain digit runs, so `1/-2` and `--1/2` are refused
-				§ here rather than read as signed pieces.
+				§ A `-` stands only at the front. The pieces below are plain
+				§ digit runs, so `1/-2` and `--1/2` are refused here.
 				if unsignedText::contains("-") {
 					<- #Empty
 				} else {
-					§ The sign folds back in as a factor on the numerator — the pieces
-					§ below are unsigned, so multiplying the parsed numerator by this
-					§ is the whole of what the leading `-` means.
+					§ The pieces below are unsigned, so the sign returns as
+					§ a factor on the numerator.
 					constant signFactor = match sign -> Integer {
 						case #Value { <- -1 }
 
@@ -503,10 +470,8 @@ declarations {
 					constant fractionPieces = unsignedText::split(on "/")
 
 					if fractionPieces::length()::is(2) {
-						§ One slash — a numerator over a denominator. Each piece
-						§ can refuse the text, and `Rational.of` answers the
-						§ zero-denominator empty itself, so `andThen` carries all
-						§ three answers without a match of its own.
+						§ One slash means a numerator over a denominator, and
+						§ `andThen` carries the three answers that can refuse.
 						<- Integer.parse(
 							fractionPieces::firstItem(defaultingTo ""),
 						)::andThen((parsedNumerator) {
@@ -525,8 +490,8 @@ declarations {
 						constant decimalPieces = unsignedText::split(on ".")
 
 						if decimalPieces::length()::is(2) {
-							§ One dot — the digits on both sides of it over a power
-							§ of ten, one factor per fractional digit.
+							§ One dot means the digits on both sides over
+							§ a power of ten.
 							constant wholeText      = decimalPieces::firstItem(
 								defaultingTo "",
 							)
@@ -558,13 +523,8 @@ declarations {
 						} else if decimalPieces::length()::isNot(1) {
 							<- #Empty
 						} else {
-							§ No slash and no dot — a whole number. `map` runs
-							§ the step only on a parsed Integer and carries the
-							§ empty text through, so the arm answers what the
-							§ step answers, wrapped.
+							§ No slash and no dot means a whole number.
 							<- Integer.parse(unsignedText)::map((parsedWhole) {
-								§ `1` is a literal, so it is a NonZeroInteger and
-								§ `Rational.of` answers a bare Rational.
 								<- Rational.of(
 									parsedWhole::multiply(with signFactor),
 									over 1,
@@ -585,25 +545,18 @@ declarations {
 			}
 		}
 
-		§ The format was a String — `toString(as "decimal")` — which meant
-		§ every other spelling silently fell back to the fraction form, and
-		§ nothing told a caller which words were understood. `NumberFormat` is
-		§ a Choice, so the two forms are the only two that can be written and
-		§ a typo is a Diagnostic rather than a wrong answer.
-
-		§§ Represents the Rational as a String, in lowest terms — `3/4` when no format is named, or in the named format.
+		§§ Represents the Rational as a String, in lowest terms.
 		§§
-		§§ A whole Rational prints its numerator alone, so `1/2::add(1/2)` is `1` and `10::divide(by 2)` is `5`. `Rational.parse` reads every one of these back.
+		§§ The form is `3/4` when no format is named, and the named format otherwise. A whole Rational prints its numerator alone, so `1/2::add(1/2)` prints `1` and `10::divide(by 2)` prints `5`. The `Rational.parse` Method reads every one of these forms back.
 		§§
 		§§ @returns — the String representation of the Rational.
 		overload toString {
 			() -> String {
-				§ The fraction form off the accessors, NOT `as #Fraction` —
-				§ — deliberately. The entries of an Overload are separate
-				§ emitted Functions, so delegating would make every Program
-				§ that merely prints a Rational carry the whole long-division
-				§ decimal formatter behind the other entry. The whole-number
-				§ rule is written in both, and `Rational.ts` says so.
+				§ This entry builds the fraction form from the accessors rather
+				§ than calling `as #Fraction`. The entries of an Overload are
+				§ separate emitted Functions, so delegating would pull the decimal
+				§ formatter into every Program that prints a Rational. The
+				§ whole-number rule is repeated in `Rational.ts`.
 				if @::isWholeNumber() {
 					<- @::numerator()::toString()
 				} else {
@@ -620,7 +573,7 @@ declarations {
 
 		§§ Orders the Rational against another Rational.
 		§§
-		§§ @param other — the Rational to order against
+		§§ @param to — the Rational to order against
 		§§ @returns — `Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.
 		compare(to other: Rational) -> Ordering
 	}
