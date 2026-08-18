@@ -491,9 +491,10 @@ function renderedHole(
 					? "true"
 					: "false"
 				: null
-		// NOTE: The no-Argument `Rational::toString` is the numerator, a slash
-		// and the denominator — the lowest-terms accessors, which is why a
-		// Rational storing 4 and 2 renders `2/1`.
+		// NOTE: The no-Argument `Rational::toString` reads the lowest-terms
+		// accessors and answers the numerator alone where the denominator is
+		// one, so a Rational storing 4 and 2 renders `2`. `Terminal.inspect`
+		// keeps the structural `2/1`, and it is not this Method.
 		case "Rational": {
 			let rational = rationalOf(value)
 
@@ -503,7 +504,9 @@ function renderedHole(
 
 			let parts = reduced(rational.numerator, rational.denominator)
 
-			return `${parts.numerator}/${parts.denominator}`
+			return parts.denominator === 1n
+				? `${parts.numerator}`
+				: `${parts.numerator}/${parts.denominator}`
 		}
 		default:
 			return null

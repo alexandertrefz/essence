@@ -1717,6 +1717,15 @@ const constantFolding = `implementation {
 	Terminal.inspect(1::add(1/2))
 }`
 
+// NOTE: The whole-Rational rule, on the one path that reproduces `toString`
+// without calling it: a hole renders through `Printable`, and
+// `Rational::toString` answers the numerator alone where the lowest-terms
+// denominator is one. `4/2` is stored as it was written and reduces to the same
+// whole value, so both holes render `2`.
+const wholeRationalHoles = `implementation {
+	Terminal.inspect("{2/1}, {4/2}, {1/2}")
+}`
+
 // NOTE: A Program that declares a Namespace named after a builtin, whose `add`
 // answers something no arithmetic would — the shape that decides whether the
 // enumeration a fold rests on may be read by NAME.
@@ -4923,6 +4932,25 @@ describe("Optimiser", () => {
 			)
 			expect(generated).not.toContain("$es_Rational_toString")
 			expect(generated).not.toContain("$es_Boolean_toString")
+		})
+
+		it("renders a whole Rational hole as its numerator alone", () => {
+			// NOTE: The rule `Rational::toString` is written by, reproduced
+			// here rather than called. A hole whose value is whole renders the
+			// numerator alone, so the folded text and the text the unfolded
+			// Program builds are the same one.
+			expect(generate(wholeRationalHoles)).toContain(
+				'String.createString("2, 2, 1/2")',
+			)
+		})
+
+		it("prints the same whole Rational hole with the pass off", async () => {
+			expect(
+				await expectSamePrintedOutput(
+					"fold-constants",
+					wholeRationalHoles,
+				),
+			).toEqual(['"2, 2, 1/2"'])
 		})
 
 		it("concatenates two Strings that were written out", () => {
