@@ -56,6 +56,14 @@ from its surface alone, so there are three levels of visibility:
 Adding a name to `Prelude.es` adds it to the language. A helper the library needs
 and the language should not grow simply stays off the list.
 
+A Namespace private to its own file — `Exact` in `Number.es`, which holds the
+one mixed-kind dispatch `Number.sum` and `Number.product` fold over — needs no
+loader change and no registration at all: the builtin tables are built from
+`Prelude.es`'s surface, so a name that is not on it reaches none of them. It is
+still a Namespace of the library like any other, its bodies are emitted and
+reached the same way, and it is a call-graph Node, so it is listed in
+`packages/compiler/src/tests/stdlibCallGraph.spec.ts` with the rest.
+
 ### The shape of the graph is frozen
 
 One cycle is allowed — `Algebraic`, `Integer`, `List`, `Rational`, `String`,
@@ -93,7 +101,7 @@ inside `packages/standard-library/sources` works normally.
 
 ## Native and Essence in one Namespace
 
-Every Namespace here is half native and half Essence — about half of all
+Every Namespace here is part native and part Essence — seven of every ten
 declared Method entries are written in Essence — and emitted user code can not
 tell the two apart. `packages/compiler/src/rewriter/stdlibPrelude.ts` simplifies the enriched
 sources once per process, and the Rewriter emits each Essence-implemented
@@ -146,8 +154,8 @@ Typed `Transcendental | Rational` (`Number.Pi::multiply(with 2)`,
 `Number.Pi::add(Number.Pi)`), because a zero factor and a cancelled π term
 collapse the value to a Rational, and the declared `Transcendental` refuses the
 Union. `Number.GoldenRatio` alone has an Essence spelling — a half plus half of
-`5::squareRoot()` — but `squareRoot` answers an `Optional` the `Algebraic`
-annotation refuses, so it stays value-less with the others. So the band is
+`5::squareRoot()` — but `squareRoot`'s no-Argument entry answers an
+`Optional` the `Algebraic` annotation refuses, so it stays value-less with the others. So the band is
 exercised through `useStdlib`
 (`packages/compiler/src/enricher/stdlib.ts`), the seam that swaps the
 process-wide library for one a test wrote, until a Property that can carry a
@@ -179,10 +187,10 @@ Composition is not free, and three costs are easy to miss because no test fails:
   `@::characters()::length()` is correct, but builds a List of every character
   to count them, and pulls `List`'s whole import graph in behind it. It is
   native too. `List.hasItems(where:)` and `hasItems(onlyWhere:)` ARE written in
-  Essence, but on the native short-circuiting `firstItem(where:)` rather than on
-  the eager `everyItem(where:)`, so they stop at the item that decides the
-  answer — the earlier filtering form lost that and measured ~0 ms → ~180 ms
-  over 2000 calls when the first item decides it. `count(where:)` is still on
+  Essence, but on `reduce`'s early-stopping entry rather than on the eager
+  `everyItem(where:)`, so they stop at the item that decides the answer — the
+  earlier filtering form lost that and measured ~0 ms → ~180 ms over 2000 calls
+  when the first item decides it. `count(where:)` is still on
   `everyItem(where:)`, which is right: counting has to see every item.
 
 Prefer a body that reaches only its own Namespace's primitives. `packages/compiler/src/tests/bundleSize.spec.ts`
@@ -353,14 +361,20 @@ that leans on it carries the pointer; the sites beside it carry nothing.
   says.
 - **A receiver narrowed by EVIDENCE is the same rule with a refinement as the
   target.** `NonEmptyList<ItemType>` is a checked refinement of `List<ItemType>`,
-  and `namespace NonEmptyList<infer ItemType> for NonEmptyList<ItemType>` holds the two
-  Methods the proof makes total — `firstItem` and `lastItem`, answering an item
-  where `List`'s own answer an Optional. A refined receiver reaches every
+  and `namespace NonEmptyList<infer ItemType> for NonEmptyList<ItemType>` holds the three
+  Methods the proof changes the answer of — `firstItem` and `lastItem` answer an
+  item where `List`'s own answer an Optional, and `length` answers a
+  `NonZeroInteger` where `List`'s answers an Integer. The rest of that Namespace
+  carries the proof forward instead: a `map` or a `reverse` of a List with
+  something in it still has something in it. A refined receiver reaches every
   Namespace its base reaches and this one besides, so the refined target beats
   the base target for a Method both declare; a List nothing proved anything
-  about does not reach it at all. Neither Method can be written in Essence,
+  about does not reach it at all. None of the three can be written in Essence,
   which is the point rather than a gap: a refinement erases before anything
-  runs, so a native is what spending the evidence looks like.
+  runs, so a native is what spending the evidence looks like. `length` is the
+  plainest case — an Essence body could only write `@::length()`, which is that
+  same Method on a receiver that still carries the proof, and the Validator
+  refuses it as `infinite-recursion`.
 - **A Type and the Namespace that targets it belong in one file.** `Optional`
   and `Ordering` each declare their Choice and the Namespace over it together;
   splitting them across files works, but leaves the two halves of one idea
@@ -376,8 +390,10 @@ A new Namespace is a new runtime module. The Simplifier emits
 1. an entry in `runtimeNamespaceNames` (`packages/compiler/src/rewriter/index.ts`),
 2. a a `@essence-lang/runtime` module — a re-export of the implementation is
    enough,
-3. a place in `builtinMemberOrder` (`packages/compiler/src/enricher/builtins.ts`), and
-4. a row in `builtins.spec.ts`'s `runtimeModules`.
+3. a place in `builtinMemberOrder` (`packages/compiler/src/enricher/builtins.ts`),
+4. a row in `builtins.spec.ts`'s `runtimeModules`, and
+5. a place in the Namespace order `packages/compiler/src/tests/stdlibLoader.spec.ts`
+   asserts, which reads the same list back.
 
 A Namespace that also declares a **Type** — a `choice`, as `Ordering` and `Side`
 do — needs a fifth: a place in `builtinTypeOrder`, beside `builtinMemberOrder`.
