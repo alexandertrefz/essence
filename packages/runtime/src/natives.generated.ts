@@ -79,7 +79,7 @@ export type StringNatives = {
 	// length() -> Integer
 	length: (self: StringType) => IntegerType
 	// character(at: Integer) -> Optional<String>
-	character: (self: StringType, at: IntegerType) => OptionalType<StringType>
+	character__overload$1: (self: StringType, at: IntegerType) => OptionalType<StringType>
 	// uppercase() -> String
 	uppercase: (self: StringType) => StringType
 	// lowercase() -> String
@@ -374,13 +374,13 @@ export const $TerminalArity: AssertArities<typeof import("./Terminal"), {
 
 declare const StringModule: typeof import("./String")
 export const $String: StringNatives = StringModule
-export const $StringAbsent: AssertNoEssenceExports<typeof import("./String"), "isEmpty" | "hasCharacters" | "is__overload$1" | "is__overload$2" | "isNot" | "prepend" | "lines" | "contains" | "doesNotContain" | "count" | "characters" | "starts" | "doesNotStart" | "doesNotEnd" | "replaceEvery" | "replaceFirst" | "firstIndex" | "lastIndex" | "pad" | "compare__overload$2" | "toString"> = true
+export const $StringAbsent: AssertNoEssenceExports<typeof import("./String"), "isEmpty" | "hasCharacters" | "is__overload$1" | "is__overload$2" | "isNot" | "prepend" | "lines" | "contains" | "doesNotContain" | "count" | "characters" | "character__overload$2" | "starts" | "doesNotStart" | "doesNotEnd" | "replaceEvery" | "replaceFirst" | "firstIndex__overload$1" | "firstIndex__overload$2" | "lastIndex__overload$1" | "lastIndex__overload$2" | "pad" | "compare__overload$2" | "toString"> = true
 export const $StringArity: AssertArities<typeof import("./String"), {
 	append: 2
 	split: 2
 	words: 1
 	length: 1
-	character: 2
+	character__overload$1: 2
 	uppercase: 1
 	lowercase: 1
 	normalize: 2

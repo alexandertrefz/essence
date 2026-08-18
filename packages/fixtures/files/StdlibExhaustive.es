@@ -142,6 +142,14 @@ third"::lines())
 		"String.character(at: Integer) [before the start]",
 		greeting::character(at -99),
 	)
+	show(
+		"String.character(at: Integer, defaultingTo: String)",
+		greeting::character(at 1, defaultingTo "?"),
+	)
+	show(
+		"String.character(at: Integer, defaultingTo: String) [outside]",
+		greeting::character(at 99, defaultingTo "?"),
+	)
 	show("String.uppercase()", greeting::uppercase())
 	show("String.uppercase() [empty]", emptyText::uppercase())
 	show("String.lowercase()", greeting::lowercase())
@@ -242,8 +250,24 @@ third"::lines())
 		"String.firstIndex(of: String) [absent]",
 		greeting::firstIndex(of "zz"),
 	)
+	show(
+		"String.firstIndex(of: String, defaultingTo: Integer)",
+		greeting::firstIndex(of "World", defaultingTo -1),
+	)
+	show(
+		"String.firstIndex(of: String, defaultingTo: Integer) [absent]",
+		greeting::firstIndex(of "zz", defaultingTo -1),
+	)
 	show("String.lastIndex(of: String)", "a-b-a"::lastIndex(of "a"))
 	show("String.lastIndex(of: String) [absent]", greeting::lastIndex(of "zz"))
+	show(
+		"String.lastIndex(of: String, defaultingTo: Integer)",
+		"a-b-a"::lastIndex(of "a", defaultingTo -1),
+	)
+	show(
+		"String.lastIndex(of: String, defaultingTo: Integer) [absent]",
+		greeting::lastIndex(of "zz", defaultingTo -1),
+	)
 	show(
 		"String.pad(to: Integer, with: String, at?: Side) [no end named]",
 		"7"::pad(to 3, with "0"),

@@ -247,16 +247,28 @@ declarations {
 			<- @::split(on "")
 		}
 
-		§ NATIVE. The Essence body — `@::characters()::item(at index)` — built a
-		§ String for every character of the receiver and a List to hold them, in
-		§ order to hand back one of them: reading a character of a ten thousand
-		§ character String allocated ten thousand and one values. The native is
-		§ one read out of the grapheme view `characters()` is made of.
+		§ The first entry is NATIVE. The Essence body —
+		§ `@::characters()::item(at index)` — built a String for every character
+		§ of the receiver and a List to hold them, in order to hand back one of
+		§ them: reading a character of a ten thousand character String allocated
+		§ ten thousand and one values. The native is one read out of the grapheme
+		§ view `characters()` is made of.
 
 		§§ The character at the given position, counting from zero — or, for a negative position, counting back from the end: -1 is the last character and -length the first.
 		§§
-		§§ @returns — the character, or nothing when the position is outside the String.
-		character(at index: Integer) -> Optional<String>
+		§§ The `defaultingTo:` entry answers the given character when the position is outside the String.
+		overload character {
+			§§ @param at — the position to read
+			§§ @returns — the character, or nothing when the position is outside the String.
+			(at index: Integer) -> Optional<String>
+
+			§§ @param at — the position to read
+			§§ @param defaultingTo — the character to answer with when the position is outside the String
+			§§ @returns — the character, or the given one in its place.
+			(at index: Integer, defaultingTo fallback: String) -> String {
+				<- @::character(at index)::value(defaultingTo fallback)
+			}
+		}
 
 		§§ The String with every character in upper case.
 		uppercase() -> String
@@ -398,65 +410,91 @@ declarations {
 
 		§§ The position of the first occurrence of the given String.
 		§§
-		§§ @returns — the zero-based position, or nothing when it does not occur.
-		firstIndex(of part: String) -> Optional<Integer> {
-			§ The empty part occurs at the very start of every String, the
-			§ empty String included — and splitting on it would answer the
-			§ length of the first CHARACTER instead, so it is answered here.
-			if part::isEmpty() {
-				<- #Value(0)
-			} else {
-				constant pieces = @::split(on part)
-
-				§ One piece means the separator was never found.
-				if pieces::length()::is(1) {
-					<- #Empty
+		§§ The `defaultingTo:` entry answers the given position when the String does not occur.
+		overload firstIndex {
+			§§ @param of — the String to look for
+			§§ @returns — the zero-based position, or nothing when it does not occur.
+			(of part: String) -> Optional<Integer> {
+				§ The empty part occurs at the very start of every String, the
+				§ empty String included — and splitting on it would answer the
+				§ length of the first CHARACTER instead, so it is answered here.
+				if part::isEmpty() {
+					<- #Value(0)
 				} else {
-					§ Splitting always yields at least one piece, so the
-					§ fallback is unreachable; the first piece is everything
-					§ before the first occurrence, and its length is that
-					§ occurrence's position.
-					<- #Value(
-						pieces::firstItem()::value(defaultingTo "")::length()
-					)
+					constant pieces = @::split(on part)
+
+					§ One piece means the separator was never found.
+					if pieces::length()::is(1) {
+						<- #Empty
+					} else {
+						§ Splitting always yields at least one piece, so the
+						§ fallback is unreachable; the first piece is everything
+						§ before the first occurrence, and its length is that
+						§ occurrence's position.
+						<- #Value(
+							pieces
+								::firstItem()
+								::value(defaultingTo "")
+								::length()
+						)
+					}
 				}
+			}
+
+			§§ @param of — the String to look for
+			§§ @param defaultingTo — the position to answer with when the String does not occur
+			§§ @returns — the zero-based position, or the given one in its place.
+			(of part: String, defaultingTo fallback: Integer) -> Integer {
+				<- @::firstIndex(of part)::value(defaultingTo fallback)
 			}
 		}
 
 		§§ The position of the last occurrence of the given String.
 		§§
-		§§ @returns — the zero-based position, or nothing when it does not occur.
-		lastIndex(of part: String) -> Optional<Integer> {
-			§ The empty part occurs after the very last character too, so its
-			§ last position is the length — the mirror of `firstIndex`, whose
-			§ empty part is at position zero.
-			if part::isEmpty() {
-				<- #Value(@::length())
-			} else {
-				§ The LAST occurrence of the part is the FIRST occurrence of the
-				§ reversed part in the reversed String, so `firstIndex` answers
-				§ this one too and only the position has to be counted back from
-				§ the end: a match that far into the reversal is that far from the
-				§ right, so the occurrence ENDS there and begins one part-length
-				§ before that.
-				§
-				§ Deriving it from `split(on:)` instead — the whole String less
-				§ the last piece and the part — answers the last NON-OVERLAPPING
-				§ match, because splitting scans left to right and consumes each
-				§ match it finds: "aaa" split on "aa" consumes the match at 0 and
-				§ leaves "a", giving 0, while the last occurrence of "aa" really
-				§ begins at 1.
-				constant length     = @::length()
-				constant partLength = part::length()
+		§§ The `defaultingTo:` entry answers the given position when the String does not occur.
+		overload lastIndex {
+			§§ @param of — the String to look for
+			§§ @returns — the zero-based position, or nothing when it does not occur.
+			(of part: String) -> Optional<Integer> {
+				§ The empty part occurs after the very last character too, so
+				§ its last position is the length — the mirror of `firstIndex`,
+				§ whose empty part is at position zero.
+				if part::isEmpty() {
+					<- #Value(@::length())
+				} else {
+					§ The LAST occurrence of the part is the FIRST occurrence of
+					§ the reversed part in the reversed String, so `firstIndex`
+					§ answers this one too and only the position has to be
+					§ counted back from the end: a match that far into the
+					§ reversal is that far from the right, so the occurrence ENDS
+					§ there and begins one part-length before that.
+					§
+					§ Deriving it from `split(on:)` instead — the whole String
+					§ less the last piece and the part — answers the last
+					§ NON-OVERLAPPING match, because splitting scans left to
+					§ right and consumes each match it finds: "aaa" split on
+					§ "aa" consumes the match at 0 and leaves "a", giving 0,
+					§ while the last occurrence of "aa" really begins at 1.
+					constant length     = @::length()
+					constant partLength = part::length()
 
-				§ `@` is the RECEIVER of the `map` callback's enclosing Method,
-				§ and the callback names its own Parameter — so both lengths are
-				§ bound before the call to stay reachable inside it.
-				<- @::reverse()
-					::firstIndex(of part::reverse())
-					::map((position) {
-						<- length::subtract(position)::subtract(partLength)
-					})
+					§ `@` is the RECEIVER of the `map` callback's enclosing
+					§ Method, and the callback names its own Parameter — so both
+					§ lengths are bound before the call to stay reachable inside
+					§ it.
+					<- @::reverse()
+						::firstIndex(of part::reverse())
+						::map((position) {
+							<- length::subtract(position)::subtract(partLength)
+						})
+				}
+			}
+
+			§§ @param of — the String to look for
+			§§ @param defaultingTo — the position to answer with when the String does not occur
+			§§ @returns — the zero-based position, or the given one in its place.
+			(of part: String, defaultingTo fallback: Integer) -> Integer {
+				<- @::lastIndex(of part)::value(defaultingTo fallback)
 			}
 		}
 
