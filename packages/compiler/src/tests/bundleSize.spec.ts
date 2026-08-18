@@ -297,6 +297,14 @@ describe("Bundle Size", () => {
 	// and the held-Optional collapse 108; the two `firstItem` chains that
 	// became `firstItem(defaultingTo:)` gave 40 back. Nothing here is the
 	// numeric tower arriving whole, which is what this ceiling watches for.
+	//
+	// NOTE: 70,905 now, up 139, and the ceiling stays. `Record::toString` asks
+	// the shared renderer for the printable form of a Rational, and every
+	// recursive call carries the renderer it was asked for; the second
+	// formatter itself stays out of a Program that prints no Record. The figure
+	// the line above rose FROM is 68,653 rather than the 68,858 recorded, so
+	// the readability pass is up 2,113 rather than 2,286 — the same unrecorded
+	// drift this file has caught twice before.
 	it("keeps Everyday.es from dragging in the whole numeric tower", async () => {
 		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(71_800)
 	})
@@ -346,8 +354,17 @@ describe("Bundle Size", () => {
 	// inlines no List walk, and that is the honest shape of the split: what
 	// every Program pays is the runtime a List now needs, and what a walking
 	// Program pays on top is a call and a const per walk.
+	//
+	// NOTE: It now measures 34,295, and the ceiling moves to 35,200 to put back
+	// the order of headroom the rest of this file keeps. Two figures make the
+	// rise, and only one of them is a change: the readability pass measured
+	// 34,156, up 72 from the 34,084 the base commit measured, and the 449
+	// between that and the 33,635 recorded above is drift that arrived on
+	// master without a NOTE. The 139 on top are `Record::toString` asking the
+	// shared renderer for the printable form of a Rational, which every
+	// recursive call now carries.
 	it("keeps Irrational.es from dragging in the whole numeric tower", async () => {
-		expect(await bundleSizeOf("Irrational.es")).toBeLessThan(34_400)
+		expect(await bundleSizeOf("Irrational.es")).toBeLessThan(35_200)
 	})
 
 	// NOTE: The same claim for a bundle of several Modules, where it is far
