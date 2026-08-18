@@ -1,7 +1,7 @@
 import { toString as algebraicToString } from "./Algebraic"
 import { toString as integerToString } from "./Integer"
 import { materialise } from "./List"
-import { formatAsRational } from "./Rational"
+import { formatAsRational, type RationalType } from "./Rational"
 import type { RecordType } from "./Record"
 import type { StreamType } from "./Stream"
 import type { StringType } from "./String"
@@ -17,9 +17,9 @@ import { type AnyType, typeKeySymbol } from "./type"
 // NOTE: `getStringRepresentation` lives here rather than in `functions.ts`
 // because `inspect` is its only caller in the language — `functions.ts` keeps
 // the `loop` drivers and nothing else now. It stays EXPORTED because two other
-// readers ask it the same question outside a Program: `Record.toString`, which
-// is the structural rendering of a Record, and the Debug Adapter, whose
-// variables pane shows a value the way a `Terminal.inspect` would.
+// readers ask it a question of the same shape outside a Program:
+// `Record.toString`, which asks for the printable form, and the Debug Adapter,
+// whose variables pane shows a value the way a `Terminal.inspect` would.
 
 const singleLineMaxLength = 60
 
@@ -47,7 +47,24 @@ function escapeStringContents(value: string): string {
 	)
 }
 
-export function getStringRepresentation(obj: AnyType, indentLevel = 0): string {
+// NOTE: Two readers, one walk. `Terminal.inspect` asks for the STRUCTURAL
+// rendering — what a value IS — and `Record.toString` asks for the PRINTABLE
+// one, since a Record conforms to `Printable` and `Terminal.print` goes through
+// it. The two differ in one place, the Rational, so that is the one piece a
+// caller hands in: `Record.toString` passes `formatAsFraction`, where a whole
+// Rational prints its numerator alone. The rest of the rendering is the same
+// for both, quoted Strings included, and `Record.es` says so at its own
+// `toString`.
+//
+// NOTE: A Function rather than a mode, so that a Program which never prints a
+// Record never carries the second formatter. Naming `formatAsFraction` inside
+// this walk puts it in every Program that prints anything at all, and measured
+// 331 bytes of `Irrational.es` against the 139 the handed-in Function costs.
+export function getStringRepresentation(
+	obj: AnyType,
+	indentLevel = 0,
+	rationalForm: (rational: RationalType) => string = formatAsRational,
+): string {
 	const baseIndent = " ".repeat(4 * indentLevel)
 	const contentIndent = " ".repeat(4 * (indentLevel + 1))
 
@@ -76,7 +93,7 @@ export function getStringRepresentation(obj: AnyType, indentLevel = 0): string {
 			let singleLineString = `{ ${entries
 				.map(
 					([key, value]) =>
-						`${key} = ${getStringRepresentation(value, 0)}`,
+						`${key} = ${getStringRepresentation(value, 0, rationalForm)}`,
 				)
 				.join(", ")} }`
 
@@ -89,6 +106,7 @@ export function getStringRepresentation(obj: AnyType, indentLevel = 0): string {
 							`${key} = ${getStringRepresentation(
 								value,
 								indentLevel + 1,
+								rationalForm,
 							)}`,
 					)
 					.join(`,\n${contentIndent}`)}\n${baseIndent}}`
@@ -105,7 +123,7 @@ export function getStringRepresentation(obj: AnyType, indentLevel = 0): string {
 
 		if (items.length > 0) {
 			let singleLineString = `[ ${items
-				.map((value) => getStringRepresentation(value, 0))
+				.map((value) => getStringRepresentation(value, 0, rationalForm))
 				.join(", ")} ]`
 
 			if (singleLineString.length < singleLineMaxLength) {
@@ -113,7 +131,11 @@ export function getStringRepresentation(obj: AnyType, indentLevel = 0): string {
 			} else {
 				return `[\n${contentIndent}${items
 					.map((value) =>
-						getStringRepresentation(value, indentLevel + 1),
+						getStringRepresentation(
+							value,
+							indentLevel + 1,
+							rationalForm,
+						),
 					)
 					.join(`,\n${contentIndent}`)}\n${baseIndent}]`
 			}
@@ -121,9 +143,11 @@ export function getStringRepresentation(obj: AnyType, indentLevel = 0): string {
 			return "[]"
 		}
 	} else if (obj[typeKeySymbol] === "Rational") {
-		// NOTE: `Rational.toString` is implemented in Essence now — this is
-		// the same lowest-terms fraction form it answers with.
-		return formatAsRational(obj)
+		// NOTE: The one value the two renderings disagree about. The
+		// structural one keeps the lowest-terms pair; the printable one
+		// answers what `Rational::toString` answers, where a whole Rational is
+		// its numerator alone.
+		return rationalForm(obj)
 	} else if (obj[typeKeySymbol] === "Algebraic") {
 		return algebraicToString(obj).value
 	} else if (obj[typeKeySymbol] === "Transcendental") {
@@ -156,6 +180,7 @@ export function getStringRepresentation(obj: AnyType, indentLevel = 0): string {
 			return `${obj[typeKeySymbol]}(${getStringRepresentation(
 				payloadEntries[0]![1] as never,
 				indentLevel,
+				rationalForm,
 			)})`
 		}
 
@@ -167,6 +192,7 @@ export function getStringRepresentation(obj: AnyType, indentLevel = 0): string {
 		return `${obj[typeKeySymbol]} ${getStringRepresentation(
 			payload as never,
 			indentLevel,
+			rationalForm,
 		)}`
 	} else {
 		// NOTE: Unreachable for any value the Compiler emits — every Essence

@@ -3,6 +3,7 @@ import { createBoolean } from "./Boolean"
 import { anyIs } from "./internalHelpers"
 import type { ListType } from "./List"
 import { createList } from "./List"
+import { formatAsFraction } from "./Rational"
 import type { StringType } from "./String"
 import { createString } from "./String"
 import { getStringRepresentation } from "./Terminal"
@@ -82,7 +83,17 @@ export function is(
 	return createBoolean(true)
 }
 
+// NOTE: The PRINTABLE rendering rather than the structural one
+// `Terminal.inspect` shows: a Record conforms to `Printable`, so a whole
+// Rational member prints its numerator alone, exactly as it does everywhere
+// else a value is rendered for a reader. `formatAsFraction` is what says so,
+// and it is handed in rather than named inside the walk, so a Program that
+// prints no Record does not carry it. The layout is still the structural one —
+// members as `name = value`, a String member quoted — which is what `Record.es`
+// promises.
 // biome-ignore lint/suspicious/noShadowRestrictedNames: This is a runtime function
 export function toString(recordInstance: RecordType): StringType {
-	return createString(getStringRepresentation(recordInstance))
+	return createString(
+		getStringRepresentation(recordInstance, 0, formatAsFraction),
+	)
 }

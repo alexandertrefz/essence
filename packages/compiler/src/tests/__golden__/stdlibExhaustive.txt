@@ -593,6 +593,7 @@
 "Record.is(_ {}) [differing Functions] => false"
 "Record.keys() => [ x, y ]"
 "Record.toString() => { x = 1, y = 2 }"
+"Record.toString() [whole Rational member] => { ratio = 1 }"
 "List.is<ItemType is Equatable>(_ List<ItemType>) => true"
 "List.is<ItemType is Equatable>(_ List<ItemType>) [differing] => false"
 "List.is<ItemType is Equatable>(_ List<ItemType>) [both empty] => true"

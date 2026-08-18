@@ -1651,6 +1651,14 @@ third"::lines())
 	show("Record.keys()", point::keys())
 	show("Record.toString()", point::toString())
 
+	§ A Record renders each member for a reader, so a whole Rational member
+	§ prints its numerator alone. `Terminal.inspect` keeps the structural
+	§ `1/1`, and this line is what holds the two apart.
+	show(
+		"Record.toString() [whole Rational member]",
+		{ ratio = 1/2::add(1/2) }::toString(),
+	)
+
 	§ ——— List —————————————————————————————————————————————————————————————
 	show(
 		"List.is<ItemType is Equatable>(_ List<ItemType>)",

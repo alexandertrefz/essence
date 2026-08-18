@@ -33,6 +33,8 @@ declarations {
 
 		§§ Represents the Record and its members as a String.
 		§§
+		§§ Each member is written as `name = value`. The value is written the way it prints, so a whole Rational member prints its numerator alone. A String member keeps its quotation marks. A Record too long for one line is written over several lines.
+		§§
 		§§ @returns — the String representation of the Record.
 		toString() -> String
 	}
