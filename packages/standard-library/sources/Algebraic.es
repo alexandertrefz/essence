@@ -51,6 +51,18 @@ declarations {
 
 			§§ Adds another Algebraic. Over the same radical the sum stays exact — and may collapse to a Rational. Over different radicals the sum is not representable yet and is empty.
 			(_ other: Algebraic) -> Optional<Rational | Algebraic>
+
+			§§ Adds another Algebraic, and answers the given value when the radicals differ.
+			§§
+			§§ @param other — the Algebraic to add
+			§§ @param defaultingTo — the value to answer with when there is no sum
+			§§ @returns — the sum, or the given value in its place.
+			(
+				_ other: Algebraic,
+				defaultingTo fallback: Rational | Algebraic,
+			) -> Rational | Algebraic {
+				<- @::add(other)::value(defaultingTo fallback)
+			}
 		}
 
 		§§ Subtracts a number from this Algebraic, exactly. Subtracting an equal radical part leaves a Rational.
@@ -76,6 +88,18 @@ declarations {
 
 			§§ Multiplies with another Algebraic. Over the same radical the product stays exact — √2·√2 is exactly 2. Products of pure radicals combine across radicals (√2·√3 is √6); anything else is empty.
 			(with other: Algebraic) -> Optional<Rational | Algebraic>
+
+			§§ Multiplies with another Algebraic, and answers the given value when the product is not representable.
+			§§
+			§§ @param with — the Algebraic to multiply with
+			§§ @param defaultingTo — the value to answer with when there is no product
+			§§ @returns — the product, or the given value in its place.
+			(
+				with other: Algebraic,
+				defaultingTo fallback: Rational | Algebraic,
+			) -> Rational | Algebraic {
+				<- @::multiply(with other)::value(defaultingTo fallback)
+			}
 		}
 
 		§§ Divides this Algebraic by a number, exactly — via the conjugate, so dividing by an Algebraic itself can never fail. Dividing by an Integer or Rational is empty only for zero.
@@ -85,6 +109,39 @@ declarations {
 			(by other: Rational) -> Optional<Algebraic>
 
 			(by other: Algebraic) -> Optional<Rational | Algebraic>
+
+			§§ Divides by an Integer, and answers the given value when the divisor is zero.
+			§§
+			§§ @param by — the divisor
+			§§ @param defaultingTo — the value to answer with when there is no quotient
+			§§ @returns — the quotient, or the given value in its place.
+			(by other: Integer, defaultingTo fallback: Algebraic) -> Algebraic {
+				<- @::divide(by other)::value(defaultingTo fallback)
+			}
+
+			§§ Divides by a Rational, and answers the given value when the divisor is zero.
+			§§
+			§§ @param by — the divisor
+			§§ @param defaultingTo — the value to answer with when there is no quotient
+			§§ @returns — the quotient, or the given value in its place.
+			(
+				by other: Rational,
+				defaultingTo fallback: Algebraic,
+			) -> Algebraic {
+				<- @::divide(by other)::value(defaultingTo fallback)
+			}
+
+			§§ Divides by another Algebraic, and answers the given value when the quotient is not representable.
+			§§
+			§§ @param by — the divisor
+			§§ @param defaultingTo — the value to answer with when there is no quotient
+			§§ @returns — the quotient, or the given value in its place.
+			(
+				by other: Algebraic,
+				defaultingTo fallback: Rational | Algebraic,
+			) -> Rational | Algebraic {
+				<- @::divide(by other)::value(defaultingTo fallback)
+			}
 		}
 
 		§§ The Algebraic without its sign — its distance from zero. The sign of `a + b·√d` is exactly decidable, so no approximation is consulted.

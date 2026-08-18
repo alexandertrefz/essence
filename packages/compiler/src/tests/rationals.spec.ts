@@ -277,14 +277,16 @@ describe("Rationals", () => {
 
 	describe("The square root of zero", () => {
 		it("gives the exact Integer zero", () => {
-			expect(integer.squareRoot(integer.createInteger(0n))).toEqual(
-				optional.createValue(integer.createInteger(0n)),
-			)
+			expect(
+				integer.squareRoot__overload$1(integer.createInteger(0n)),
+			).toEqual(optional.createValue(integer.createInteger(0n)))
 		})
 
 		it("gives the exact Rational zero", () => {
 			const root = valueOf(
-				rational.squareRoot(rational.createRational(0n, 5n)),
+				rational.squareRoot__overload$1(
+					rational.createRational(0n, 5n),
+				),
 			)
 
 			expect(root[typeKeySymbol]).toBe("Rational")

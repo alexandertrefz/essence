@@ -83,6 +83,42 @@ declarations {
 
 			§§ Divides by another Transcendental. Proportional values give an exact Rational — Tau divided by Pi is exactly 2. Anything else — π divided by e most famously — is not representable yet and is empty.
 			(by other: Transcendental) -> Optional<Rational>
+
+			§§ Divides by an Integer, and answers the given value when the divisor is zero.
+			§§
+			§§ @param by — the divisor
+			§§ @param defaultingTo — the value to answer with when there is no quotient
+			§§ @returns — the quotient, or the given value in its place.
+			(
+				by other: Integer,
+				defaultingTo fallback: Transcendental,
+			) -> Transcendental {
+				<- @::divide(by other)::value(defaultingTo fallback)
+			}
+
+			§§ Divides by a Rational, and answers the given value when the divisor is zero.
+			§§
+			§§ @param by — the divisor
+			§§ @param defaultingTo — the value to answer with when there is no quotient
+			§§ @returns — the quotient, or the given value in its place.
+			(
+				by other: Rational,
+				defaultingTo fallback: Transcendental,
+			) -> Transcendental {
+				<- @::divide(by other)::value(defaultingTo fallback)
+			}
+
+			§§ Divides by another Transcendental, and answers the given value when the two are not proportional.
+			§§
+			§§ @param by — the divisor
+			§§ @param defaultingTo — the value to answer with when there is no quotient
+			§§ @returns — the quotient, or the given value in its place.
+			(
+				by other: Transcendental,
+				defaultingTo fallback: Rational,
+			) -> Rational {
+				<- @::divide(by other)::value(defaultingTo fallback)
+			}
 		}
 
 		§§ The Transcendental without its sign — its distance from zero. A value on a single base can never equal a rational, so its sign is decidable; a value mixing π and e refines to a deep documented precision cutoff.

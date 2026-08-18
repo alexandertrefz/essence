@@ -387,6 +387,22 @@ third"::lines())
 	show("Integer.divide(by: Rational)", 1::divide(by 1/2))
 	show("Integer.divide(by: Rational) [by zero]", 1::divide(by 0/1))
 	show("Integer.divide(by: NonZeroInteger)", 1110::divide(by 2))
+	show(
+		"Integer.divide(by: Integer, defaultingTo: Rational)",
+		1110::divide(by computedTwo, defaultingTo 0/1),
+	)
+	show(
+		"Integer.divide(by: Integer, defaultingTo: Rational) [by zero]",
+		1::divide(by 0, defaultingTo 0/1),
+	)
+	show(
+		"Integer.divide(by: Rational, defaultingTo: Rational)",
+		1::divide(by 1/2, defaultingTo 0/1),
+	)
+	show(
+		"Integer.divide(by: Rational, defaultingTo: Rational) [by zero]",
+		1::divide(by 0/1, defaultingTo 0/1),
+	)
 	show("Integer.multiply(with: Integer)", 100::multiply(with 1000))
 	show(
 		"Integer.multiply(with: Integer) [beyond IEEE 754]",
@@ -436,6 +452,14 @@ third"::lines())
 	show("Integer.squareRoot() [irrational]", 2::squareRoot())
 	show("Integer.squareRoot() [zero]", 0::squareRoot())
 	show("Integer.squareRoot() [negative]", -1::squareRoot())
+	show(
+		"Integer.squareRoot(defaultingTo: Integer | Algebraic)",
+		9::squareRoot(defaultingTo 0),
+	)
+	show(
+		"Integer.squareRoot(defaultingTo: Integer | Algebraic) [negative]",
+		-1::squareRoot(defaultingTo 0),
+	)
 	show("Integer.absolute()", -5::absolute())
 	show("Integer.absolute() [positive]", 5::absolute())
 	show("Integer.negate()", 5::negate())
@@ -467,6 +491,14 @@ third"::lines())
 		7::remainder(dividingBy 3),
 	)
 	show(
+		"Integer.remainder(dividingBy: Integer, defaultingTo: Integer)",
+		7::remainder(dividingBy computedThree, defaultingTo 0),
+	)
+	show(
+		"Integer.remainder(dividingBy: Integer, defaultingTo: Integer) [by zero]",
+		7::remainder(dividingBy 0, defaultingTo 0),
+	)
+	show(
 		"Integer.quotient(dividingBy: Integer)",
 		7::quotient(dividingBy computedThree),
 	)
@@ -486,12 +518,28 @@ third"::lines())
 		"Integer.quotient(dividingBy: NonZeroInteger)",
 		7::quotient(dividingBy 3),
 	)
+	show(
+		"Integer.quotient(dividingBy: Integer, defaultingTo: Integer)",
+		7::quotient(dividingBy computedThree, defaultingTo 0),
+	)
+	show(
+		"Integer.quotient(dividingBy: Integer, defaultingTo: Integer) [by zero]",
+		7::quotient(dividingBy 0, defaultingTo 0),
+	)
 	show("Integer.raise(to: Integer)", 2::raise(to 10))
 	show("Integer.raise(to: Integer) [zero exponent]", 2::raise(to 0))
 	show("Integer.raise(to: Integer) [negative exponent]", 2::raise(to -2))
 	show(
 		"Integer.raise(to: Integer) [zero to a negative power]",
 		0::raise(to -1),
+	)
+	show(
+		"Integer.raise(to: Integer, defaultingTo: Integer | Rational)",
+		2::raise(to 10, defaultingTo 0),
+	)
+	show(
+		"Integer.raise(to: Integer, defaultingTo: Integer | Rational) [zero to a negative power]",
+		0::raise(to -1, defaultingTo 0),
 	)
 	show(
 		"Integer.clamp(between: Integer, and: Integer) [above]",
@@ -523,6 +571,14 @@ third"::lines())
 	show("Integer.parse(_ String) [double sign]", Integer.parse("--42"))
 	show("Integer.parse(_ String) [sign alone]", Integer.parse("-"))
 	show("Integer.parse(_ String) [inner sign]", Integer.parse("4-2"))
+	show(
+		"Integer.parse(_ String, defaultingTo: Integer)",
+		Integer.parse("42", defaultingTo 0),
+	)
+	show(
+		"Integer.parse(_ String, defaultingTo: Integer) [not a number]",
+		Integer.parse("nope", defaultingTo 0),
+	)
 	show("Integer.toString()", 42::toString())
 	show("Integer.toString() [negative]", -42::toString())
 	show("Integer.compare(to: Integer)", 1::compare(to 2))
@@ -573,6 +629,14 @@ third"::lines())
 		"Rational.of(_ Integer, over: NonZeroInteger) [not reduced]",
 		Rational.of(4, over 8),
 	)
+	show(
+		"Rational.of(_ Integer, over: Integer, defaultingTo: Rational)",
+		Rational.of(1, over computedTwo, defaultingTo 0/1),
+	)
+	show(
+		"Rational.of(_ Integer, over: Integer, defaultingTo: Rational) [over zero]",
+		Rational.of(1, over 0, defaultingTo 0/1),
+	)
 	show("Rational.is(_ Rational)", 1/2::is(2/4))
 	show("Rational.is(_ Rational) [differing]", 1/2::is(1/3))
 	show("Rational.isNot(_ Rational)", 1/2::isNot(1/3))
@@ -588,6 +652,22 @@ third"::lines())
 	show("Rational.divide(by: Rational) [by zero]", 1/2::divide(by 0/1))
 	show("Rational.divide(by: Integer)", 1/2::divide(by 2))
 	show("Rational.divide(by: Integer) [by zero]", 1/2::divide(by 0))
+	show(
+		"Rational.divide(by: Rational, defaultingTo: Rational)",
+		1/2::divide(by 1/6, defaultingTo 0/1),
+	)
+	show(
+		"Rational.divide(by: Rational, defaultingTo: Rational) [by zero]",
+		1/2::divide(by 0/1, defaultingTo 0/1),
+	)
+	show(
+		"Rational.divide(by: Integer, defaultingTo: Rational)",
+		1/2::divide(by 2, defaultingTo 0/1),
+	)
+	show(
+		"Rational.divide(by: Integer, defaultingTo: Rational) [by zero]",
+		1/2::divide(by 0, defaultingTo 0/1),
+	)
 	show("Rational.multiply(with: Rational)", 1/2::multiply(with 2/3))
 	show("Rational.multiply(with: Integer)", 1/2::multiply(with 2))
 	show(
@@ -638,12 +718,28 @@ third"::lines())
 	show("Rational.squareRoot() [perfect square]", 1/4::squareRoot())
 	show("Rational.squareRoot() [irrational]", 1/2::squareRoot())
 	show("Rational.squareRoot() [negative]", -1/2::squareRoot())
+	show(
+		"Rational.squareRoot(defaultingTo: Rational | Algebraic)",
+		1/4::squareRoot(defaultingTo 0/1),
+	)
+	show(
+		"Rational.squareRoot(defaultingTo: Rational | Algebraic) [negative]",
+		-1/2::squareRoot(defaultingTo 0/1),
+	)
 	show("Rational.numerator()", 3/4::numerator())
 	show("Rational.denominator()", 3/4::denominator())
 	show("Rational.absolute()", -3/4::absolute())
 	show("Rational.negate()", 3/4::negate())
 	show("Rational.reciprocal()", 3/4::reciprocal())
 	show("Rational.reciprocal() [of zero]", 0/1::reciprocal())
+	show(
+		"Rational.reciprocal(defaultingTo: Rational)",
+		3/4::reciprocal(defaultingTo 0/1),
+	)
+	show(
+		"Rational.reciprocal(defaultingTo: Rational) [of zero]",
+		0/1::reciprocal(defaultingTo 0/1),
+	)
 	show("Rational.isWholeNumber()", 4/2::isWholeNumber())
 	show("Rational.isWholeNumber() [fractional]", 3/4::isWholeNumber())
 	show("Rational.round(toward?: Rounding) [no direction named]", 7/2::round())
@@ -689,6 +785,14 @@ third"::lines())
 		"Rational.raise(to: Integer) [zero to a negative power]",
 		0/1::raise(to -1),
 	)
+	show(
+		"Rational.raise(to: Integer, defaultingTo: Rational)",
+		2/3::raise(to 2, defaultingTo 0/1),
+	)
+	show(
+		"Rational.raise(to: Integer, defaultingTo: Rational) [zero to a negative power]",
+		0/1::raise(to -1, defaultingTo 0/1),
+	)
 	show("Rational.parse(_ String)", Rational.parse("0.75"))
 	show("Rational.parse(_ String) [not a number]", Rational.parse("nope"))
 	show("Rational.parse(_ String) [fraction]", Rational.parse("3/4"))
@@ -711,6 +815,14 @@ third"::lines())
 	show("Rational.parse(_ String) [two dots]", Rational.parse("1.2.3"))
 	show("Rational.parse(_ String) [trailing zeroes]", Rational.parse("0.750"))
 	show("Rational.parse(_ String) [empty]", Rational.parse(emptyText))
+	show(
+		"Rational.parse(_ String, defaultingTo: Rational)",
+		Rational.parse("0.75", defaultingTo 0/1),
+	)
+	show(
+		"Rational.parse(_ String, defaultingTo: Rational) [not a number]",
+		Rational.parse("nope", defaultingTo 0/1),
+	)
 	show("Rational.toString()", 3/4::toString())
 	show("Rational.toString() [whole]", 4/2::toString())
 	show(
@@ -805,6 +917,49 @@ third"::lines())
 			"Algebraic.divide(by: Algebraic) [differing radicals]",
 			rootTwo::divide(by rootThree),
 		)
+		§ The fallback entries. A sum over differing radicals leaves the
+		§ quadratic slice, and so does a product of two values that are not
+		§ pure radicals — those are the two shapes the fallback answers for.
+		show(
+			"Algebraic.add(_ Algebraic, defaultingTo: Rational | Algebraic)",
+			rootTwo::add(rootTwo, defaultingTo 0/1),
+		)
+		show(
+			"Algebraic.add(_ Algebraic, defaultingTo: Rational | Algebraic) [differing radicals]",
+			rootTwo::add(rootThree, defaultingTo 0/1),
+		)
+		show(
+			"Algebraic.multiply(with: Algebraic, defaultingTo: Rational | Algebraic)",
+			rootTwo::multiply(with rootTwo, defaultingTo 0/1),
+		)
+		show(
+			"Algebraic.multiply(with: Algebraic, defaultingTo: Rational | Algebraic) [not pure radicals]",
+			rootTwo::add(1)::multiply(with rootThree::add(1), defaultingTo 0/1),
+		)
+		show(
+			"Algebraic.divide(by: Integer, defaultingTo: Algebraic)",
+			rootTwo::divide(by 2, defaultingTo rootTwo),
+		)
+		show(
+			"Algebraic.divide(by: Integer, defaultingTo: Algebraic) [by zero]",
+			rootTwo::divide(by 0, defaultingTo rootTwo),
+		)
+		show(
+			"Algebraic.divide(by: Rational, defaultingTo: Algebraic)",
+			rootTwo::divide(by 1/2, defaultingTo rootTwo),
+		)
+		show(
+			"Algebraic.divide(by: Rational, defaultingTo: Algebraic) [by zero]",
+			rootTwo::divide(by 0/1, defaultingTo rootTwo),
+		)
+		show(
+			"Algebraic.divide(by: Algebraic, defaultingTo: Rational | Algebraic)",
+			rootTwo::divide(by rootTwo, defaultingTo 0/1),
+		)
+		show(
+			"Algebraic.divide(by: Algebraic, defaultingTo: Rational | Algebraic) [differing radicals]",
+			rootTwo::divide(by rootThree, defaultingTo 0/1),
+		)
 		show("Algebraic.absolute()", rootTwo::absolute())
 		show("Algebraic.absolute() [negative]", rootTwo::negate()::absolute())
 		show("Algebraic.negate()", rootTwo::negate())
@@ -862,6 +1017,30 @@ third"::lines())
 	show(
 		"Transcendental.divide(by: Transcendental) [π by e]",
 		Number.Pi::divide(by Number.E),
+	)
+	show(
+		"Transcendental.divide(by: Integer, defaultingTo: Transcendental)",
+		Number.Pi::divide(by 2, defaultingTo Number.E),
+	)
+	show(
+		"Transcendental.divide(by: Integer, defaultingTo: Transcendental) [by zero]",
+		Number.Pi::divide(by 0, defaultingTo Number.E),
+	)
+	show(
+		"Transcendental.divide(by: Rational, defaultingTo: Transcendental)",
+		Number.Pi::divide(by 1/2, defaultingTo Number.E),
+	)
+	show(
+		"Transcendental.divide(by: Rational, defaultingTo: Transcendental) [by zero]",
+		Number.Pi::divide(by 0/1, defaultingTo Number.E),
+	)
+	show(
+		"Transcendental.divide(by: Transcendental, defaultingTo: Rational)",
+		Number.Tau::divide(by Number.Pi, defaultingTo 0/1),
+	)
+	show(
+		"Transcendental.divide(by: Transcendental, defaultingTo: Rational) [π by e]",
+		Number.Pi::divide(by Number.E, defaultingTo 0/1),
 	)
 	show(
 		"Transcendental.add(_ Transcendental) [mixed bases]",
@@ -1049,6 +1228,30 @@ third"::lines())
 	show(
 		"Number.average(_ List<Integer | Rational>) [empty]",
 		Number.average(noMixedNumbers),
+	)
+	show(
+		"Number.average(_ List<Integer>, defaultingTo: Rational)",
+		Number.average([1, 2], defaultingTo 0/1),
+	)
+	show(
+		"Number.average(_ List<Integer>, defaultingTo: Rational) [empty]",
+		Number.average(noNumbers, defaultingTo 0/1),
+	)
+	show(
+		"Number.average(_ List<Rational>, defaultingTo: Rational)",
+		Number.average([1/2, 1/3], defaultingTo 0/1),
+	)
+	show(
+		"Number.average(_ List<Rational>, defaultingTo: Rational) [empty]",
+		Number.average(noRationals, defaultingTo 0/1),
+	)
+	show(
+		"Number.average(_ List<Integer | Rational>, defaultingTo: Rational)",
+		Number.average([1, 1/2], defaultingTo 0/1),
+	)
+	show(
+		"Number.average(_ List<Integer | Rational>, defaultingTo: Rational) [empty]",
+		Number.average(noMixedNumbers, defaultingTo 0/1),
 	)
 	show("Number.lowestNumber(_ Integer, _ Integer)", Number.lowestNumber(3, 2))
 	show(
