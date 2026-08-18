@@ -261,7 +261,7 @@ describe("Rationals", () => {
 
 					values::map((value) {
 						constant text = value
-							::toString(formatAs NumberFormat#Decimal)
+							::toString(as NumberFormat#Decimal)
 
 						<- Terminal.inspect(match Rational.parse(text) -> String {
 							case #Value(parsed) {
@@ -454,9 +454,9 @@ describe("Rationals", () => {
 		it("prints a whole-valued Rational as a decimal a caller can read back", async () => {
 			expect(
 				await run(`implementation {
-					Terminal.inspect(4/2::toString(formatAs NumberFormat#Decimal))
-					Terminal.inspect(1/2::subtract(1/2)::toString(formatAs NumberFormat#Decimal))
-					Terminal.inspect(match Rational.parse(4/2::toString(formatAs NumberFormat#Decimal)) -> String {
+					Terminal.inspect(4/2::toString(as NumberFormat#Decimal))
+					Terminal.inspect(1/2::subtract(1/2)::toString(as NumberFormat#Decimal))
+					Terminal.inspect(match Rational.parse(4/2::toString(as NumberFormat#Decimal)) -> String {
 						case #Value(parsed) { <- parsed::toString() }
 						case #Empty         { <- "Empty" }
 					})

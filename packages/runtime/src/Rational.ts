@@ -348,9 +348,9 @@ function formatAsDecimal(rational: RationalType): string {
 // only two a caller can write.
 export function toString__overload$2(
 	rational: RationalType,
-	formatAs: NumberFormatType,
+	format: NumberFormatType,
 ): StringType {
-	if (formatAs[typeKeySymbol] === "NumberFormat#Decimal") {
+	if (format[typeKeySymbol] === "NumberFormat#Decimal") {
 		return createString(formatAsDecimal(rational))
 	} else {
 		return createString(formatAsFraction(rational))

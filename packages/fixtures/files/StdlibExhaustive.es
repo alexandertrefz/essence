@@ -714,16 +714,16 @@ third"::lines())
 	show("Rational.toString()", 3/4::toString())
 	show("Rational.toString() [whole]", 4/2::toString())
 	show(
-		"Rational.toString(formatAs: NumberFormat) [decimal]",
-		1/2::toString(formatAs NumberFormat#Decimal),
+		"Rational.toString(as: NumberFormat) [decimal]",
+		1/2::toString(as NumberFormat#Decimal),
 	)
 	show(
-		"Rational.toString(formatAs: NumberFormat) [fraction]",
-		1/2::toString(formatAs NumberFormat#Fraction),
+		"Rational.toString(as: NumberFormat) [fraction]",
+		1/2::toString(as NumberFormat#Fraction),
 	)
 	show(
-		"Rational.toString(formatAs: NumberFormat) [fraction, whole]",
-		4/2::toString(formatAs NumberFormat#Fraction),
+		"Rational.toString(as: NumberFormat) [fraction, whole]",
+		4/2::toString(as NumberFormat#Fraction),
 	)
 	show("Rational.compare(to: Rational)", 1/2::compare(to 2/3))
 	show("Rational.compare(to: Rational) [equal]", 1/2::compare(to 2/4))
