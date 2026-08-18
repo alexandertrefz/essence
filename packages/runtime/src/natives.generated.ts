@@ -532,7 +532,7 @@ export const $RecordArity: AssertArities<typeof import("./Record"), {
 
 declare const ListModule: typeof import("./List")
 export const $List: ListNatives = ListModule
-export const $ListAbsent: AssertNoEssenceExports<typeof import("./List"), "isNot" | "hasItems__overload$1" | "hasItems__overload$2" | "hasItems__overload$3" | "isEmpty" | "contains" | "doesNotContain" | "firstItem__overload$1" | "firstItem__overload$2" | "lastItem" | "removeFirst" | "removeEvery__overload$1" | "removeEvery__overload$2" | "removeLast" | "removeDuplicates" | "prepend__overload$2" | "firstIndex" | "count__overload$1" | "count__overload$2" | "replace" | "lastIndex" | "partition" | "repeat"> = true
+export const $ListAbsent: AssertNoEssenceExports<typeof import("./List"), "isNot" | "hasItems__overload$1" | "hasItems__overload$2" | "hasItems__overload$3" | "isEmpty" | "contains" | "doesNotContain" | "firstItem__overload$1" | "firstItem__overload$2" | "lastItem__overload$1" | "lastItem__overload$2" | "removeFirst" | "removeEvery__overload$1" | "removeEvery__overload$2" | "removeLast" | "removeDuplicates" | "prepend__overload$2" | "firstIndex__overload$1" | "firstIndex__overload$2" | "count__overload$1" | "count__overload$2" | "replace" | "lastIndex" | "partition" | "repeat"> = true
 export const $ListArity: AssertArities<typeof import("./List"), {
 	is: 3
 	toString: 2

@@ -254,14 +254,29 @@ declarations {
 			}
 		}
 
-		§§ The last item of the List.
+		§§ The last item, or the last item the given check accepts.
 		§§
-		§§ @returns — the item, or nothing for the empty List.
-		lastItem() -> Optional<ItemType> {
-			§ -1 is the last position, and the empty List has no such item —
-			§ the position resolves to -1 there and lands outside the List, so
-			§ `item(at:)` comes back empty without a guard here.
-			<- @::item(at -1)
+		§§ @returns — the matching item, or nothing when there is none.
+		overload lastItem {
+			§§ The last item of the List.
+			§§
+			§§ @returns — the item, or nothing for the empty List.
+			() -> Optional<ItemType> {
+				§ -1 is the last position, and the empty List has no such item
+				§ — the position resolves to -1 there and lands outside the
+				§ List, so `item(at:)` comes back empty without a guard here.
+				<- @::item(at -1)
+			}
+
+			§§ The last item the given check accepts.
+			§§
+			§§ @returns — the matching item, or nothing when no item is accepted.
+			(where check: (_: ItemType) -> Boolean) -> Optional<ItemType> {
+				§ The LAST accepted item is the FIRST accepted item of the
+				§ reversed List, so `firstItem(where:)` answers this one too and
+				§ stops at the item that decides it, exactly as it does there.
+				<- @::reverse()::firstItem(where check)
+			}
 		}
 
 		§§ A new List without the first item, or without the given number of leading items.
@@ -478,34 +493,51 @@ declarations {
 		§ then have to take apart. `reduce` hands the item ITSELF, so every item
 		§ reaches the comparison as it stands.
 		§
-		§ The bound is the whole of the search: the item Type's own `is` decides
-		§ which position is found, arriving as the hidden conformance Argument
-		§ exactly as `contains` hands it to `hasItems(where:)`.
+		§ The `of:` entry is the `where:` entry with the items' own `is` as the
+		§ check. The bound is the whole of the difference: the item Type's `is`
+		§ arrives as the hidden conformance Argument, exactly as `contains`
+		§ hands it to `hasItems(where:)`.
 
-		§§ The position of the first item equal — by the items' own `is` — to the given one. Available whenever the items conform to `Equatable`.
+		§§ The position of the first item equal to the given one, or of the first item the given check accepts.
 		§§
-		§§ @returns — the zero-based position, or nothing when the item is absent.
-		firstIndex<infer ItemType is Equatable>(
-			of item: ItemType,
-		) -> Optional<Integer> {
-			§ The accumulator is the position under test: `#Done` leaves the fold
-			§ at the first match, carrying that position, and a fold that reaches
-			§ the end settles on the position AFTER the last item — the length,
-			§ which is the one Integer no match can answer. So "absent" needs no
-			§ sentinel of its own, and the fold carries a bare Integer rather
-			§ than an Optional it would have to unwrap each turn.
-			constant found = @::reduce(startingWith 0, step (index, candidate) {
-				if candidate::is(item) {
-					<- #Done(index)
-				} else {
-					<- #Continue(index::add(1))
-				}
-			})
+		§§ @returns — the zero-based position, or nothing when there is no such item.
+		overload firstIndex {
+			§§ The position of the first item equal — by the items' own `is` — to the given one. Available whenever the items conform to `Equatable`.
+			§§
+			§§ @returns — the zero-based position, or nothing when the item is absent.
+			<infer ItemType is Equatable>(
+				of item: ItemType,
+			) -> Optional<Integer> {
+				<- @::firstIndex(where (candidate) { <- candidate::is(item) })
+			}
 
-			if found::isLessThan(@::length()) {
-				<- #Value(found)
-			} else {
-				<- #Empty
+			§§ The position of the first item the given check accepts.
+			§§
+			§§ @returns — the zero-based position, or nothing when no item is accepted.
+			(where check: (_: ItemType) -> Boolean) -> Optional<Integer> {
+				§ The accumulator is the position under test: `#Done` leaves the
+				§ fold at the first match, carrying that position, and a fold
+				§ that reaches the end settles on the position AFTER the last
+				§ item — the length, which is the one Integer no match can
+				§ answer. So "absent" needs no sentinel of its own, and the fold
+				§ carries a bare Integer rather than an Optional it would have
+				§ to unwrap each turn.
+				constant found = @::reduce(
+					startingWith 0,
+					step (index, candidate) {
+						if check(candidate) {
+							<- #Done(index)
+						} else {
+							<- #Continue(index::add(1))
+						}
+					},
+				)
+
+				if found::isLessThan(@::length()) {
+					<- #Value(found)
+				} else {
+					<- #Empty
+				}
 			}
 		}
 

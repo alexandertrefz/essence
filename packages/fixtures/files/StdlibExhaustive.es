@@ -1661,6 +1661,14 @@ third"::lines())
 	show("List.lastItem<ItemType>() [empty]", noNumbers::lastItem())
 	show("List.lastItem<ItemType>() [single]", singleNumber::lastItem())
 	show(
+		"List.lastItem<ItemType>(where: (_ ItemType) -> Boolean)",
+		numbers::lastItem(where (item) { <- item::isGreaterThan(2) }),
+	)
+	show(
+		"List.lastItem<ItemType>(where: (_ ItemType) -> Boolean) [no match]",
+		numbers::lastItem(where (item) { <- item::isGreaterThan(9) }),
+	)
+	show(
 		"List.removeFirst<ItemType>(_? Integer) [no count]",
 		numbers::removeFirst(),
 	)
@@ -1826,6 +1834,14 @@ third"::lines())
 	show(
 		"List.firstIndex<ItemType is Equatable>(of: ItemType) [absent]",
 		numbers::firstIndex(of 9),
+	)
+	show(
+		"List.firstIndex<ItemType>(where: (_ ItemType) -> Boolean)",
+		numbers::firstIndex(where (item) { <- item::isGreaterThan(2) }),
+	)
+	show(
+		"List.firstIndex<ItemType>(where: (_ ItemType) -> Boolean) [no match]",
+		numbers::firstIndex(where (item) { <- item::isGreaterThan(9) }),
 	)
 	show(
 		"List.slice<ItemType>(from?: Integer, to?: Integer)",
