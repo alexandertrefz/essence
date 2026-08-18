@@ -10,8 +10,8 @@ import { loadModule } from "@essence-lang/client"
 let math = await loadModule("./math/Math.es")
 ```
 
-In somebody else's build it is an ordinary import: the Vite and esbuild plugins
-serve a `.es` file as the same marshalled JavaScript — see
+In somebody else's build it is an ordinary import: the Vite, esbuild and Bun
+plugins serve a `.es` file as the same marshalled JavaScript — see
 [In a bundler](#in-a-bundler). Where the compiling happened at build time
 instead, `loadPrebuilt` reads a bundle and the Descriptor beside it with no
 compiler in reach at all — see [Prebuilt](#prebuilt).
@@ -34,6 +34,10 @@ with its own build output.
 Source that does not compile throws an `EssenceCompileError` whose message is
 the report `esc` prints: the excerpt, the underline, the Notes and the Helps,
 one block per file.
+
+`files` on what comes back is every `.es` source the Module was compiled from —
+the whole graph, not the entry alone — and `watchModule` is `loadModule` kept up
+to date with them; see [Following the editor](#following-the-editor).
 
 ## Values
 
@@ -347,10 +351,10 @@ can not be made.
 
 ## In a bundler
 
-`essence()` is a Vite plugin and `essenceEsbuild()` an esbuild one. Both compile
-an imported `.es` file where the bundler asks for its text, and serve it as
-**marshalled JavaScript** — the same values `loadModule` hands over, with no
-build step and no artifact to manage.
+`essence()` is a Vite plugin, `essenceEsbuild()` an esbuild one and
+`essenceBun()` a Bun one. All three compile an imported `.es` file where the
+bundler asks for its text, and serve it as **marshalled JavaScript** — the same
+values `loadModule` hands over, with no build step and no artifact to manage.
 
 ```js
 import { essence } from "@essence-lang/client/vite-plugin"
@@ -366,7 +370,9 @@ PI.toString() // "157/50"
 ```
 
 The esbuild shape of the same plugin lives one door over, at
-`@essence-lang/client/esbuild-plugin`.
+`@essence-lang/client/esbuild-plugin`, and the Bun shape at
+`@essence-lang/client/bun-plugin` — which serves `Bun.build` and Bun's runtime
+alike; see [Under Bun](#under-bun).
 
 What the import resolves to is a generated wrapper: it imports the entry's
 compiled Module, imports the interpreter from
@@ -439,6 +445,110 @@ declarations are on, the `bundle` view is written beside the source as
 `<Name>.raw.d.es.ts`; TypeScript will not resolve a `?raw` specifier itself, so
 reach those declarations by name, as `./Math.raw.es`, or declare `*.es?raw` in
 your environment file.
+
+### Under Bun
+
+`essenceBun()` is a plugin for `Bun.build` and for Bun's runtime both. In a
+build it is handed over like any other plugin. At the runtime it is registered
+once for the process, from a file `bunfig.toml` preloads — and from then on
+every `import "./Math.es"` in a script, under `bun test` and under `bun --hot`
+is compiled where it is asked for.
+
+```toml
+# bunfig.toml
+preload = ["./essence.ts"]
+```
+
+```js
+// essence.ts
+import { plugin } from "bun"
+import { essenceBun } from "@essence-lang/client/bun-plugin"
+
+plugin(essenceBun())
+```
+
+The `root` option is the directory everything served is spelled against and the
+two packages are resolved from. `Bun.build` says which; the runtime does not,
+and takes the working directory — right for `bun run` at the root of a project,
+and `root` is the override for anything else.
+
+## Following the editor
+
+Every door has a way to see an edit without a restart.
+
+**Under Vite**, nothing has to be set up. Every source a served Module was
+compiled from is a watch file of it, and Vite turns a watch file into an edge of
+its module graph — so an edit propagates from the changed file through the
+Modules that import it, along the Essence import graph exactly, up to the
+nearest module that accepts. A Module a change reaches is compiled again; one it
+does not reach is not. Compile errors arrive as Vite's overlay, and what the
+page was running keeps running until the edit that fixes them.
+
+Accept in the module that imports the Essence, not inside it: an emitted Module
+holds constants and Functions and nothing to preserve, and its wrapper is what
+re-reads them.
+
+```js
+import * as game from "./Game.es"
+
+let state = game.initial
+
+if (import.meta.hot) {
+	import.meta.hot.accept("./Game.es", (fresh) => {
+		// The state was plain JavaScript all along; hand it to the new Module.
+		state = fresh.resume(state)
+	})
+}
+```
+
+The one runtime and one Type key a build holds are what make that sound: a
+value built before the edit is still a value the Module after it recognises,
+and what a host keeps across the swap it keeps as the plain JavaScript the
+boundary handed over.
+
+**Under Bun**, `bun --hot` reloads on an edit to any `.es` source of a graph the
+script imports — the Module, its wrapper and the script that imports it are
+evaluated again, and a value built before the reload is a value after it, for
+the same reason. `bun --watch` restarts on the same edits. An edit that does not
+compile is reported and the process stays up; the edit that fixes it is the next
+reload.
+
+**Under `loadModule`**, `watchModule` is the same call kept up to date: the
+sources are watched, and every edit that compiles arrives as a new Module — the
+one `loadModule` would have answered with, had it been called after the edit.
+
+```js
+import { watchModule } from "@essence-lang/client"
+
+let watcher = await watchModule("./math/Math.es", {
+	onModule(math) {
+		routes.set("/square", math.exports.square)
+	},
+	onError(error) {
+		console.error(error.message)
+	},
+})
+
+// … later
+watcher.close()
+```
+
+The Module before an edit that does not compile stays live — it is not replaced
+and not closed — and the Error is reported; the fix is the next thing
+`onModule` hears. A first load that fails is reported the same way, and
+`watcher.module` is `null` until something compiles. A save that changes nothing
+is not reported: it compiles to the bundle already held.
+
+What survives a reload here, and what does not: every load evaluates a bundle
+of its own with a Type key of its own, so a **marshalled** value — the plain
+JavaScript `exports` hand over — is as good after the swap as before, and a
+**raw** one is not. It is tagged by the load that built it, and the next load's
+Functions refuse it by name — "an Essence Integer value from another copy of the
+runtime — a previous load of this Module, or a different bundle" — rather than
+as the plain object it looks like. Keep state across reloads on the JavaScript
+side of the boundary. And a Module once evaluated can not be unloaded, so every
+reload leaves the one before it to the garbage collector, which collects it once
+nothing holds a value from it any more.
 
 ## The raw door
 
