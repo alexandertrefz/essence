@@ -89,7 +89,7 @@ declarations {
 		overload static of {
 			§§ Builds the Rational from two Integers, with nothing known about either.
 			§§
-			§§ @param numerator — the numerator
+			§§ @param _ — the numerator
 			§§ @param over — the denominator
 			§§ @returns — the Rational, or nothing when the denominator is zero.
 			(
@@ -99,14 +99,14 @@ declarations {
 
 			§§ Builds the Rational over a denominator already proven not to be zero. There is no failure left to report, so the Rational itself is the answer.
 			§§
-			§§ @param numerator — the numerator
+			§§ @param _ — the numerator
 			§§ @param over — the denominator, proven not to be zero
 			§§ @returns — the Rational.
 			(_ numerator: Integer, over denominator: NonZeroInteger) -> Rational
 
 			§§ Builds the Rational from two Integers, with a value to answer when the denominator is zero.
 			§§
-			§§ @param numerator — the numerator
+			§§ @param _ — the numerator
 			§§ @param over — the denominator
 			§§ @param defaultingTo — the value to answer with when there is no Rational
 			§§ @returns — the Rational, or the given value in its place.
@@ -469,7 +469,7 @@ declarations {
 
 		§§ Reads a Rational from its text form — a fraction like `3/4`, a decimal like `0.75`, or a whole number like `3`, each with an optional minus sign.
 		overload static parse {
-			§§ @param text — the text to read
+			§§ @param _ — the text to read
 			§§ @returns — the Rational, or nothing when the text has any other shape or divides by zero.
 			(_ text: String) -> Optional<Rational> {
 				§ The sign is carried as the position of a LEADING `-`, exactly as
@@ -587,7 +587,7 @@ declarations {
 
 			§§ Reads a Rational from its text form, with a value to answer when the text has another shape.
 			§§
-			§§ @param text — the text to read
+			§§ @param _ — the text to read
 			§§ @param defaultingTo — the value to answer with when the text is no Rational
 			§§ @returns — the Rational, or the given value in its place.
 			(_ text: String, defaultingTo fallback: Rational) -> Rational {

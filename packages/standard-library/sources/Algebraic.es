@@ -54,7 +54,7 @@ declarations {
 
 			§§ Adds another Algebraic, and answers the given value when the radicals differ.
 			§§
-			§§ @param other — the Algebraic to add
+			§§ @param _ — the Algebraic to add
 			§§ @param defaultingTo — the value to answer with when there is no sum
 			§§ @returns — the sum, or the given value in its place.
 			(
