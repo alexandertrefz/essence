@@ -475,6 +475,12 @@ describe("Stdlib Call Graph", () => {
 			"Boolean.isNot",
 			"Boolean.toString",
 			"CaseSensitivity.toString",
+			// NOTE: `Exact` is a helper Namespace of `Number.es` that
+			// `Prelude.es` does not re-export, so it is no builtin — but it is
+			// a Namespace of the standard library like any other, and its two
+			// bodies are emitted and reached exactly as the rest are.
+			"Exact.add",
+			"Exact.multiply",
 			"Integer.absolute",
 			"Integer.add__overload$2",
 			"Integer.add__overload$3",
