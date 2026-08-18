@@ -433,33 +433,22 @@ declarations {
 				constant fractionPieces = unsignedText::split(on "/")
 
 				if fractionPieces::length()::is(2) {
-					§ One slash — a numerator over a denominator. `Rational.of`
-					§ answers the zero-denominator empty itself, so both arms
-					§ below hand back what it decided rather than wrapping it.
-					<- match Integer.parse(
+					§ One slash — a numerator over a denominator. Each piece
+					§ can refuse the text, and `Rational.of` answers the
+					§ zero-denominator empty itself, so `andThen` carries all
+					§ three answers without a match of its own.
+					<- Integer.parse(
 						fractionPieces::firstItem()::value(defaultingTo ""),
-					) -> Optional<Rational> {
-						case #Empty { <- #Empty }
-
-						case #Value(parsedNumerator) {
-							<- match Integer.parse(
-								fractionPieces
-									::lastItem()
-									::value(defaultingTo ""),
-							) -> Optional<Rational> {
-								case #Empty                    { <- #Empty }
-
-								case #Value(parsedDenominator) {
-									<- Rational.of(
-										parsedNumerator::multiply(
-											with signFactor,
-										),
-										over parsedDenominator,
-									)
-								}
-							}
-						}
-					}
+					)::andThen((parsedNumerator) {
+						<- Integer.parse(
+							fractionPieces::lastItem()::value(defaultingTo ""),
+						)::andThen((parsedDenominator) {
+							<- Rational.of(
+								parsedNumerator::multiply(with signFactor),
+								over parsedDenominator,
+							)
+						})
+					})
 				} else if fractionPieces::length()::isNot(1) {
 					<- #Empty
 				} else {
@@ -478,24 +467,20 @@ declarations {
 						if wholeText::isEmpty()::or(fractionalText::isEmpty()) {
 							<- #Empty
 						} else {
-							<- match Integer.parse(
+							<- Integer.parse(
 								wholeText::append(fractionalText),
-							) -> Optional<Rational> {
-								case #Empty { <- #Empty }
+							)::andThen((digitsValue) {
+								constant scale = fractionalText
+									::characters()
+									::reduce(startingWith 1, (scaled, _) {
+										<- scaled::multiply(with 10)
+									})
 
-								case #Value(digitsValue) {
-									constant scale = fractionalText
-										::characters()
-										::reduce(startingWith 1, (scaled, _) {
-											<- scaled::multiply(with 10)
-										})
-
-									<- Rational.of(
-										digitsValue::multiply(with signFactor),
-										over scale,
-									)
-								}
-							}
+								<- Rational.of(
+									digitsValue::multiply(with signFactor),
+									over scale,
+								)
+							})
 						}
 					} else if decimalPieces::length()::isNot(1) {
 						<- #Empty
