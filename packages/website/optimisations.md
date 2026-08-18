@@ -888,8 +888,8 @@ been.
 
 **Which matters most for Rationals, where what an operation STORES is a separate
 question from what it is worth.** A Rational holds the parts it was BUILT with
-and reduces only what it ANSWERS with: `4/2` stores 4 and 2, prints `2/1`, and
-answers 2 for its numerator — so a fold of `4/2` emits
+and reduces only what it ANSWERS with: `4/2` stores 4 and 2, shows as `2/1`
+under `Terminal.inspect`, and answers 2 for its numerator — so a fold of `4/2` emits
 `Rational.createRational(4n, 2n)` and not the `2/1` it is worth. That claim is
 about CONSTRUCTION. ARITHMETIC is a different matter: `add`, `subtract`,
 `multiply` and `divide` between two Rationals are natives on the bigint-rational
@@ -1732,8 +1732,8 @@ A Rational's lowest-terms form is remembered on the value, under a Symbol key.
 What is STORED is untouched, and so is every answer given from it: a Rational
 built from 4 and 2 still HOLDS 4 and 2, equality still cross-multiplies those
 raw parts — which is what lets `4/2` equal `2` — while every accessor and every
-formatter goes on answering in lowest terms, so `4/2` prints `2/1` and its
-`numerator` is 2, exactly as before. This is only the read side, computed once
+formatter goes on answering in lowest terms, so `4/2` shows as `2/1` under
+`Terminal.inspect` and its `numerator` is 2, exactly as before. This is only the read side, computed once
 instead of once per question.
 
 **Arithmetic answers in lowest terms, and says so.** `add`, `subtract`,
