@@ -151,7 +151,7 @@ describe("Round trips", () => {
 			).toString(),
 		).toBe("-1/2")
 		expect((through("rational", 5n) as EssenceRational).toString()).toBe(
-			"5/1",
+			"5",
 		)
 	})
 
@@ -597,8 +597,11 @@ describe("Numbers", () => {
 		)
 		expect(EssenceRational.fromNumber(0.5).toString()).toBe("1/2")
 		expect(EssenceRational.fromNumber(-0.75).toString()).toBe("-3/4")
-		expect(EssenceRational.fromNumber(0).toString()).toBe("0/1")
-		expect(EssenceRational.fromNumber(3).toString()).toBe("3/1")
+		// NOTE: A whole value prints its numerator alone, the way
+		// `Rational::toString` answers. The parts are still the pair below.
+		expect(EssenceRational.fromNumber(0).toString()).toBe("0")
+		expect(EssenceRational.fromNumber(3).toString()).toBe("3")
+		expect(EssenceRational.fromNumber(3).denominator).toBe(1n)
 	})
 
 	// NOTE: A subnormal carries no implicit leading bit and shares the smallest

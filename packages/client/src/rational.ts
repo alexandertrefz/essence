@@ -83,10 +83,14 @@ export class EssenceRational {
 		return negative ? -magnitude : magnitude
 	}
 
-	// NOTE: How Essence itself prints a Rational — `1/3`, and a whole one as
-	// `2/1` rather than as `2`, because the Type is what the spelling says.
+	// NOTE: How Essence itself prints a Rational, which is what
+	// `Rational::toString` answers: `1/3`, and a whole one as its numerator
+	// alone. The parts are still the pair — `Terminal.inspect` is the one
+	// reader that shows the structural `2/1`, and it is a different question.
 	toString(): string {
-		return `${this.numerator}/${this.denominator}`
+		return this.denominator === 1n
+			? `${this.numerator}`
+			: `${this.numerator}/${this.denominator}`
 	}
 
 	// NOTE: Both sides are in lowest terms with the sign on the numerator, so
