@@ -14,14 +14,12 @@ import { readStdlibFiles } from "@essence-lang/standard-library"
 // - No ALL-CAPS emphasis. An acronym is written in capitals and is allowed;
 //   a Type or Namespace name is CamelCase and never matches.
 //
-// EVERY RULE HERE IS `it.todo`, and that is the point: the current sources
-// break all four, and the documentation pass (Phase 3 of the plan) is what
-// rewrites them. Turning a rule on is deleting `.todo` from its `it`, in the
-// commit that makes it pass.
+// All four rules are live. The documentation pass (Phase 3 of the plan) took
+// every source to zero findings, and a source that breaks one of them again
+// fails here.
 //
-// The counts are what that pass works down. `ESSENCE_PROSE_REPORT=1 bun test
-// stdlibProse` prints them, per rule and per file, with the line each finding
-// sits on.
+// `ESSENCE_PROSE_REPORT=1 bun test stdlibProse` prints what each rule finds,
+// per rule and per file, with the line each finding sits on.
 
 const REPORTING = process.env.ESSENCE_PROSE_REPORT !== undefined
 
@@ -321,11 +319,18 @@ describe("Standard Library Prose", () => {
 	})
 
 	it("should find prose to read", () => {
-		// NOTE: A guard on the reading above. Every rule below is `todo`, so a
-		// collector that silently found nothing would make the whole file a
-		// no-op that nobody notices until the pass it is meant to measure.
-		expect(readStdlibFiles().length).toBeGreaterThan(10)
-		expect(proseFindings().length).toBeGreaterThan(0)
+		// NOTE: A guard on the reading above. Every rule below passes on an
+		// empty report, so a collector that read no file, or that found no
+		// Comment in the files it read, would make the whole file a no-op that
+		// nobody notices. The sources hold hundreds of blocks.
+		let files = readStdlibFiles()
+
+		expect(files.length).toBeGreaterThan(10)
+		expect(
+			files.flatMap(({ filePath, sourceText }) =>
+				blocksOf(path.basename(filePath), sourceText),
+			).length,
+		).toBeGreaterThan(100)
 	})
 
 	it.skipIf(!REPORTING)("should print what each rule finds", () => {
@@ -343,21 +348,19 @@ describe("Standard Library Prose", () => {
 		}
 	})
 
-	// NOTE: Each of the four is turned on by deleting `.todo`, in the commit
-	// that makes it pass.
-	it.todo("should keep every sentence to 25 words", () => {
+	it("should keep every sentence to 25 words", () => {
 		expect(report(findingsFor("sentence-length"))).toBe("")
 	})
 
-	it.todo("should keep em-dash asides out of a '§§' sentence", () => {
+	it("should keep em-dash asides out of a '§§' sentence", () => {
 		expect(report(findingsFor("em-dash"))).toBe("")
 	})
 
-	it.todo("should write 'can' rather than 'may', and never 'should'", () => {
+	it("should write 'can' rather than 'may', and never 'should'", () => {
 		expect(report(findingsFor("may-should"))).toBe("")
 	})
 
-	it.todo("should spend no ALL-CAPS on emphasis", () => {
+	it("should spend no ALL-CAPS on emphasis", () => {
 		expect(report(findingsFor("all-caps"))).toBe("")
 	})
 })
