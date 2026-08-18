@@ -929,6 +929,14 @@ third"::lines())
 			rootTwo::add(rootThree, defaultingTo 0/1),
 		)
 		show(
+			"Algebraic.subtract(_ Algebraic, defaultingTo: Rational | Algebraic)",
+			rootTwo::subtract(rootTwo, defaultingTo 1/2),
+		)
+		show(
+			"Algebraic.subtract(_ Algebraic, defaultingTo: Rational | Algebraic) [differing radicals]",
+			rootTwo::subtract(rootThree, defaultingTo 1/2),
+		)
+		show(
 			"Algebraic.multiply(with: Algebraic, defaultingTo: Rational | Algebraic)",
 			rootTwo::multiply(with rootTwo, defaultingTo 0/1),
 		)
@@ -1288,6 +1296,30 @@ third"::lines())
 		Number.lowestNumber(noMixedNumbers),
 	)
 	show(
+		"Number.lowestNumber(_ List<Integer>, defaultingTo: Integer)",
+		Number.lowestNumber([3, 1, 2], defaultingTo 0),
+	)
+	show(
+		"Number.lowestNumber(_ List<Integer>, defaultingTo: Integer) [empty]",
+		Number.lowestNumber(noNumbers, defaultingTo 0),
+	)
+	show(
+		"Number.lowestNumber(_ List<Rational>, defaultingTo: Rational)",
+		Number.lowestNumber([1/2, 1/3], defaultingTo 0/1),
+	)
+	show(
+		"Number.lowestNumber(_ List<Rational>, defaultingTo: Rational) [empty]",
+		Number.lowestNumber(noRationals, defaultingTo 0/1),
+	)
+	show(
+		"Number.lowestNumber(_ List<Integer | Rational>, defaultingTo: Integer | Rational)",
+		Number.lowestNumber([1, 1/2], defaultingTo 0),
+	)
+	show(
+		"Number.lowestNumber(_ List<Integer | Rational>, defaultingTo: Integer | Rational) [empty]",
+		Number.lowestNumber(noMixedNumbers, defaultingTo 0),
+	)
+	show(
 		"Number.greatestNumber(_ Integer, _ Integer)",
 		Number.greatestNumber(3, 2),
 	)
@@ -1326,6 +1358,30 @@ third"::lines())
 	show(
 		"Number.greatestNumber(_ List<Integer | Rational>) [empty]",
 		Number.greatestNumber(noMixedNumbers),
+	)
+	show(
+		"Number.greatestNumber(_ List<Integer>, defaultingTo: Integer)",
+		Number.greatestNumber([3, 1, 2], defaultingTo 0),
+	)
+	show(
+		"Number.greatestNumber(_ List<Integer>, defaultingTo: Integer) [empty]",
+		Number.greatestNumber(noNumbers, defaultingTo 0),
+	)
+	show(
+		"Number.greatestNumber(_ List<Rational>, defaultingTo: Rational)",
+		Number.greatestNumber([1/2, 1/3], defaultingTo 0/1),
+	)
+	show(
+		"Number.greatestNumber(_ List<Rational>, defaultingTo: Rational) [empty]",
+		Number.greatestNumber(noRationals, defaultingTo 0/1),
+	)
+	show(
+		"Number.greatestNumber(_ List<Integer | Rational>, defaultingTo: Integer | Rational)",
+		Number.greatestNumber([1, 1/2], defaultingTo 0),
+	)
+	show(
+		"Number.greatestNumber(_ List<Integer | Rational>, defaultingTo: Integer | Rational) [empty]",
+		Number.greatestNumber(noMixedNumbers, defaultingTo 0),
 	)
 
 	§ ——— Optional —————————————————————————————————————————————————————————

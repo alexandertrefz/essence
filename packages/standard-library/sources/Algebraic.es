@@ -78,6 +78,18 @@ declarations {
 			(_ other: Algebraic) -> Optional<Rational | Algebraic> {
 				<- @::add(other::negate())
 			}
+
+			§§ Subtracts another Algebraic, and answers the given value when the radicals differ.
+			§§
+			§§ @param _ — the Algebraic to subtract
+			§§ @param defaultingTo — the value to answer with when there is no difference
+			§§ @returns — the difference, or the given value in its place.
+			(
+				_ other: Algebraic,
+				defaultingTo fallback: Rational | Algebraic,
+			) -> Rational | Algebraic {
+				<- @::subtract(other)::value(defaultingTo fallback)
+			}
 		}
 
 		§§ Multiplies this Algebraic with a number, exactly. A radical times itself turns rational — `√2 · √2` is `2` — and multiplying by zero collapses to zero.

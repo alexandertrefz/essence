@@ -437,6 +437,42 @@ declarations {
 					}
 				})
 			}
+
+			§§ The lowest of the Integers, with a value to answer for the empty List.
+			§§
+			§§ @param _ — the Integers to compare
+			§§ @param defaultingTo — the value to answer with when there is no lowest
+			§§ @returns — the lowest Integer, or the given value in its place.
+			(
+				_ integers: List<Integer>,
+				defaultingTo fallback: Integer,
+			) -> Integer {
+				<- Number.lowestNumber(integers)::value(defaultingTo fallback)
+			}
+
+			§§ The lowest of the Rationals, with a value to answer for the empty List.
+			§§
+			§§ @param _ — the Rationals to compare
+			§§ @param defaultingTo — the value to answer with when there is no lowest
+			§§ @returns — the lowest Rational, or the given value in its place.
+			(
+				_ rationals: List<Rational>,
+				defaultingTo fallback: Rational,
+			) -> Rational {
+				<- Number.lowestNumber(rationals)::value(defaultingTo fallback)
+			}
+
+			§§ The lowest of the Numbers, with a value to answer for the empty List.
+			§§
+			§§ @param _ — the Numbers to compare
+			§§ @param defaultingTo — the value to answer with when there is no lowest
+			§§ @returns — the lowest Number, or the given value in its place.
+			(
+				_ numbers: List<Integer | Rational>,
+				defaultingTo fallback: Integer | Rational,
+			) -> Integer | Rational {
+				<- Number.lowestNumber(numbers)::value(defaultingTo fallback)
+			}
 		}
 
 		§§ The greater of two Numbers, or the greatest in a List of them.
@@ -532,6 +568,44 @@ declarations {
 						}
 					}
 				})
+			}
+
+			§§ The greatest of the Integers, with a value to answer for the empty List.
+			§§
+			§§ @param _ — the Integers to compare
+			§§ @param defaultingTo — the value to answer with when there is no greatest
+			§§ @returns — the greatest Integer, or the given value in its place.
+			(
+				_ integers: List<Integer>,
+				defaultingTo fallback: Integer,
+			) -> Integer {
+				<- Number.greatestNumber(integers)::value(defaultingTo fallback)
+			}
+
+			§§ The greatest of the Rationals, with a value to answer for the empty List.
+			§§
+			§§ @param _ — the Rationals to compare
+			§§ @param defaultingTo — the value to answer with when there is no greatest
+			§§ @returns — the greatest Rational, or the given value in its place.
+			(
+				_ rationals: List<Rational>,
+				defaultingTo fallback: Rational,
+			) -> Rational {
+				<- Number.greatestNumber(rationals)::value(
+					defaultingTo fallback,
+				)
+			}
+
+			§§ The greatest of the Numbers, with a value to answer for the empty List.
+			§§
+			§§ @param _ — the Numbers to compare
+			§§ @param defaultingTo — the value to answer with when there is no greatest
+			§§ @returns — the greatest Number, or the given value in its place.
+			(
+				_ numbers: List<Integer | Rational>,
+				defaultingTo fallback: Integer | Rational,
+			) -> Integer | Rational {
+				<- Number.greatestNumber(numbers)::value(defaultingTo fallback)
 			}
 		}
 	}

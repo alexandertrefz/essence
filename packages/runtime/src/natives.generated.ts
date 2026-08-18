@@ -474,7 +474,7 @@ export const $RationalArity: AssertArities<typeof import("./Rational"), {
 
 declare const AlgebraicModule: typeof import("./Algebraic")
 export const $Algebraic: AlgebraicNatives = AlgebraicModule
-export const $AlgebraicAbsent: AssertNoEssenceExports<typeof import("./Algebraic"), "is" | "isNot" | "add__overload$4" | "subtract__overload$1" | "subtract__overload$2" | "subtract__overload$3" | "multiply__overload$4" | "divide__overload$4" | "divide__overload$5" | "divide__overload$6" | "absolute"> = true
+export const $AlgebraicAbsent: AssertNoEssenceExports<typeof import("./Algebraic"), "is" | "isNot" | "add__overload$4" | "subtract__overload$1" | "subtract__overload$2" | "subtract__overload$3" | "subtract__overload$4" | "multiply__overload$4" | "divide__overload$4" | "divide__overload$5" | "divide__overload$6" | "absolute"> = true
 export const $AlgebraicArity: AssertArities<typeof import("./Algebraic"), {
 	compare: 2
 	add__overload$1: 2
@@ -510,7 +510,7 @@ export const $TranscendentalArity: AssertArities<typeof import("./Transcendental
 
 declare const NumberModule: typeof import("./Number")
 export const $Number: NumberNatives = NumberModule
-export const $NumberAbsent: AssertNoEssenceExports<typeof import("./Number"), "is" | "isNot" | "toString" | "isLessThan" | "isLessThanOrEqualTo" | "isGreaterThan" | "isGreaterThanOrEqualTo" | "isBetween" | "sum__overload$1" | "sum__overload$2" | "sum__overload$3" | "product__overload$1" | "product__overload$2" | "product__overload$3" | "average__overload$1" | "average__overload$2" | "average__overload$3" | "average__overload$4" | "average__overload$5" | "average__overload$6" | "lowestNumber__overload$1" | "lowestNumber__overload$2" | "lowestNumber__overload$3" | "lowestNumber__overload$4" | "lowestNumber__overload$5" | "lowestNumber__overload$6" | "lowestNumber__overload$7" | "greatestNumber__overload$1" | "greatestNumber__overload$2" | "greatestNumber__overload$3" | "greatestNumber__overload$4" | "greatestNumber__overload$5" | "greatestNumber__overload$6" | "greatestNumber__overload$7"> = true
+export const $NumberAbsent: AssertNoEssenceExports<typeof import("./Number"), "is" | "isNot" | "toString" | "isLessThan" | "isLessThanOrEqualTo" | "isGreaterThan" | "isGreaterThanOrEqualTo" | "isBetween" | "sum__overload$1" | "sum__overload$2" | "sum__overload$3" | "product__overload$1" | "product__overload$2" | "product__overload$3" | "average__overload$1" | "average__overload$2" | "average__overload$3" | "average__overload$4" | "average__overload$5" | "average__overload$6" | "lowestNumber__overload$1" | "lowestNumber__overload$2" | "lowestNumber__overload$3" | "lowestNumber__overload$4" | "lowestNumber__overload$5" | "lowestNumber__overload$6" | "lowestNumber__overload$7" | "lowestNumber__overload$8" | "lowestNumber__overload$9" | "lowestNumber__overload$10" | "greatestNumber__overload$1" | "greatestNumber__overload$2" | "greatestNumber__overload$3" | "greatestNumber__overload$4" | "greatestNumber__overload$5" | "greatestNumber__overload$6" | "greatestNumber__overload$7" | "greatestNumber__overload$8" | "greatestNumber__overload$9" | "greatestNumber__overload$10"> = true
 export const $NumberArity: AssertArities<typeof import("./Number"), {
 	compare: 2
 }> = true
