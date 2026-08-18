@@ -289,9 +289,12 @@ The internal name of a labelled Parameter is accepted for now, which is what
 these files are written with. `documentationStrictness`
 (`packages/compiler/src/enricher/resolvers.ts`) is the one place that leniency
 lives, and setting it to `"strict"` also asks for a line per Parameter.
-`packages/compiler/src/tests/stdlibProse.spec.ts` measures the four writing
-rules over these sources; each of its rules is `it.todo` until the pass that
-makes it pass.
+`packages/compiler/src/tests/stdlibProse.spec.ts` enforces the four writing
+rules over these sources, and every one of them is live: a sentence over 25
+words, an em-dash aside inside a `§§` sentence, a ` may ` or a ` should `, and
+an ALL-CAPS word that is not an acronym each fail it.
+`ESSENCE_PROSE_REPORT=1 bun test stdlibProse` prints what they find, per rule
+and per file.
 
 ### `§` notes
 
