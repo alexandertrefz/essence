@@ -558,26 +558,18 @@ declarations {
 						} else if decimalPieces::length()::isNot(1) {
 							<- #Empty
 						} else {
-							§ No slash and no dot — a whole number.
-							<- match Integer.parse(
-								unsignedText,
-							) -> Optional<Rational> {
-								case #Empty { <- #Empty }
-
-								case #Value(parsedWhole) {
-									§ Over a denominator of `1`, written where it
-									§ stands — so this arm hands back a Rational rather
-									§ than an Optional, and has to say which it is.
-									<- #Value(
-										Rational.of(
-											parsedWhole::multiply(
-												with signFactor,
-											),
-											over 1,
-										)
-									)
-								}
-							}
+							§ No slash and no dot — a whole number. `map` runs
+							§ the step only on a parsed Integer and carries the
+							§ empty text through, so the arm answers what the
+							§ step answers, wrapped.
+							<- Integer.parse(unsignedText)::map((parsedWhole) {
+								§ `1` is a literal, so it is a NonZeroInteger and
+								§ `Rational.of` answers a bare Rational.
+								<- Rational.of(
+									parsedWhole::multiply(with signFactor),
+									over 1,
+								)
+							})
 						}
 					}
 				}
