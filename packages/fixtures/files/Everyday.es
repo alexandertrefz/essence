@@ -6,11 +6,11 @@ implementation {
 	§ `Optional#Value(1024)` rather than `1024`. A Method that can answer empty
 	§ also offers a `defaultingTo:` entry, and an Optional already held in data
 	§ collapses with `value(defaultingTo:)`. Both are shown below.
-	Terminal.inspect(0::subtract(7)::remainder(dividingBy 3)) § 2 — Euclidean, so a negative dividend still leaves a non-negative
+	Terminal.inspect(-7::remainder(dividingBy 3)) § 2 — Euclidean, so a negative dividend still leaves a non-negative
 	§ remainder. `7::remainder(dividingBy 3)` is the plain `1`.
 	Terminal.inspect(2::raise(to 10)) § Optional#Value(1024)
-	Terminal.inspect(2::raise(to 0::subtract(2))) § Optional#Value(1/4) — negative powers stay exact
-	Terminal.inspect(0::subtract(5)::absolute()) § 5
+	Terminal.inspect(2::raise(to -2)) § Optional#Value(1/4) — negative powers stay exact
+	Terminal.inspect(-5::absolute()) § 5
 	Terminal.inspect(4::isEven()) § true
 	Terminal.inspect(0::isPositive()) § false — zero is neither sign
 	Terminal.inspect(15::clamp(between 1, and 10)) § 10 — the bounds may be written in either order
