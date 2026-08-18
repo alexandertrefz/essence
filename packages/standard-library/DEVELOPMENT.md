@@ -125,6 +125,17 @@ go through it, so every one works for both kinds.
 implemented in BOTH — delete the TypeScript in the same commit that writes the
 Essence.
 
+**`NonEmptyList` is the one place the same operation is written twice, on
+purpose.** Every entry of that Namespace is native, because a refinement erases
+before anything runs and the promise can not be said in Essence. Three of them
+— `prepend(contentsOf:)`, `removeDuplicates` and `replace` — are written in
+Essence on `List`, so the runtime writes the same operation out beside the
+Essence body rather than instead of it. That is the exception the rule above
+allows, and it is only safe because `StdlibExhaustive.es` calls both entries
+over the same inputs: the golden capture is what stops the two from drifting.
+Adding a Method to `NonEmptyList` that `List` implements in Essence means
+adding those lines too.
+
 A const is emitted only into Programs that reach it. The reachability search
 reads each Method's TYPED body, so it follows a Method reached only through
 another Essence Method's body, including through a conformance witness.
@@ -163,7 +174,7 @@ value is written here.
 
 ### What to weigh before writing the next one
 
-Composition is not free, and three costs are easy to miss because no test fails:
+Composition is not free, and four costs are easy to miss because no test fails:
 
 - **A body pulls in everything it transitively reaches.** `Integer.compare`
   once delegated to the covering `Number.compare`; that made comparing two
@@ -192,6 +203,17 @@ Composition is not free, and three costs are easy to miss because no test fails:
   earlier filtering form lost that and measured ~0 ms → ~180 ms over 2000 calls
   when the first item decides it. `count(where:)` is still on
   `everyItem(where:)`, which is right: counting has to see every item.
+- **A body can lose an invariant only the runtime holds.** `String::reverse` is
+  native, and `@::characters()::reverse()::join(with "")` is not the same
+  Method. A String carries the grapheme view `createSegmentedString`
+  (`packages/runtime/src/String.ts`) built for it; joining the reversed
+  characters throws that view away, and segmenting the joined text again can
+  re-pair three regional indicators into characters the original never had. The
+  native reverses the view instead, which is what makes `reverse` its own
+  inverse — and `String::lastIndex(of:)`, which reverses the receiver and the
+  part and reads a `firstIndex` off the result, is only correct because it is.
+  Nothing in `String.es` says the view exists, so a body written from the
+  Essence side alone looks equivalent and is not.
 
 Prefer a body that reaches only its own Namespace's primitives. `packages/compiler/src/tests/bundleSize.spec.ts`
 guards two files, but it is a floor, not a substitute for measuring.
@@ -326,6 +348,13 @@ that leans on it carries the pointer; the sites beside it carry nothing.
   `__overload$N` name the Simplifier emits and therefore the runtime export it
   binds to, natives included. Reordering an `overload` block silently rebinds
   every Overload in it.
+- **A named Union is only NAMED.** `type Number = Integer | Rational |
+  Irrational` gives the Union a name, and Hovers, Inlay Hints and Diagnostics
+  print it — `Number`, not the three members spelled out. Assignability ignores
+  the name entirely: anything that unifies with the members is a `Number`,
+  whether or not it was written as one, and two Unions of the same members are
+  the same Type under different names. So a Union alias is worth adding for the
+  reading and is never worth adding for the checking.
 - **Wrap Documentation lines only where the text should wrap.** The lines of a
   `§§` block are joined with a newline, so re-flowing a description to fit the
   margin changes the string an Editor renders.

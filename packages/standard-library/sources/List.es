@@ -854,10 +854,9 @@ declarations {
 	§
 	§ Every entry is native, because the promise can not be said in Essence:
 	§ `<- @::map(transform)` is the right answer and its Type is
-	§ `List<Result>`. Only three of them are written in Essence on `List`:
-	§ `prepend(contentsOf:)`, `removeDuplicates` and `replace`. For those the
-	§ runtime writes the same operation out beside it. The harness calls both
-	§ entries over the same inputs, so that the two can not drift.
+	§ `List<Result>`. Three of them are written in Essence on `List`, and the
+	§ runtime writes those out twice; see DEVELOPMENT.md, Native and Essence in
+	§ one Namespace.
 	§
 	§ What the proof does not survive stays on `List`, from `everyItem` and
 	§ `slice` to `partition` and `split`. The single-item growers are absent

@@ -23,9 +23,8 @@ declarations {
 			<- @::is(other)::negate()
 		}
 
-		§ `entries` and `values` exist in the runtime and stay undeclared:
-		§ their return Types need an `Anything` Type, which arrives with the
-		§ JSON design.
+		§ `entries` and `values` stay undeclared until there is an `Anything`
+		§ Type to answer with; see README.md.
 
 		§§ Answers the names of the Record's members.
 		§§
