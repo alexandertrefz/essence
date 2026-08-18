@@ -25,21 +25,23 @@ all, in `Loop.es`, as ordinary free Functions. Printing is a Namespace:
 `Terminal.inspect` shows a value's structure and answers with it unchanged, and
 `Terminal.write` is the raw primitive both are built on (`Terminal.es`).
 
-About half of the declared Method entries are also IMPLEMENTED here, in
-Essence; the rest bind to `@essence-lang/runtime`. What stays native is a
+Seven of every ten declared Method entries are also IMPLEMENTED here, in
+Essence — 243 of 352 as this is written; the rest bind to
+`@essence-lang/runtime`. What stays native is a
 deliberate line, not a backlog: the primitives everything else is composed from
 (`Boolean.negate`/`is`/`and`/`or`, integer and rational arithmetic, same-kind
 `compare`), the JavaScript intrinsics Essence has no expression for
 (`String.uppercase`, `String.trim(at:)`, `String.normalize(as:)`,
 `String.lines`/`words`, `Record`'s reflective Methods, `String.compare` —
 there is no way to name a character's code point), and the iteration primitives
-the rest rest on (`List.reduce`, `item(at:)`, `slice`, `everyItem(where:)`,
-`append(contentsOf:)`, `static of`, `firstItem(where:)` — the short-circuiting
-find beside the eager `everyItem(where:)` — and `String.split(on:)`, which is
-also the one native that decides what a "character" is: it segments into Unicode
-grapheme clusters (see `graphemesOf` in `String.ts`), so `length`, `slice`,
-`reverse`, `firstIndex` and the rest, all written on top of it, count and cut by
-grapheme).
+the rest rest on (`List.reduce`, `item(at:)`, `slice`, the eager filter
+`everyItem(where:)`, `append(contentsOf:)`, `static of`, and
+`String.split(on:)`, which is also the one native that decides what a
+"character" is: it segments into Unicode grapheme clusters (see `graphemesOf` in
+`String.ts`), so `length`, `slice`, `reverse`, `firstIndex` and the rest, all
+written on top of it, count and cut by grapheme). The short-circuiting
+`firstItem(where:)` is not among them: it is written in Essence on `reduce`'s
+early-stopping entry, and leaves the walk at the item that decides the answer.
 
 One Method is native for a reason worth reading before assuming otherwise:
 `List.is`, because the pairwise form trips an infinite recursion in generic
@@ -148,7 +150,7 @@ easy to break:
 - **A Method that can answer empty offers a `defaultingTo:` entry** — beside
   every entry answering an `Optional` stands one taking the fallback and
   answering the bare Type: `list::firstItem(defaultingTo 0)`,
-  `text::firstIndex(of ",", defaultingTo 0)`, `1::divide(by n, defaultingTo 0)`,
+  `text::firstIndex(of ",", defaultingTo 0)`, `1::divide(by n, defaultingTo 0/1)`,
   `Integer.parse(text, defaultingTo 0)`. The label is what makes the decision
   visible where it is taken, so defaulting a division by zero is something the
   call site has said rather than something a Method decided.
@@ -158,10 +160,10 @@ easy to break:
   `List.repeat(_, times 0)` is the empty List, `list::split(intoGroupsOf 0)` is
   one group holding every item, and `7::clamp(between 10, and 1)` takes the
   bounds in either order and answers `7`. Nothing is dropped and nothing comes
-  back empty for a count that makes no sense. A value that is genuinely not
-  there is what an `Optional` is for — `[]::firstItem()`,
-  `"abc"::character(at 9)` — and each of those offers `defaultingTo:` beside
-  it.
+  back empty for a count that makes no sense. An answer that genuinely is not
+  there is what an `Optional` is for — `Rational.of(1, over 0)` is no
+  Rational, `[]::firstItem()` is no item, `"abc"::character(at 9)` is no
+  character — and each of those offers `defaultingTo:` beside it.
 - **Keep return Types tight.** Add Overloads rather than widening one signature:
   `Integer::add(Integer) -> Integer` beside `add(Rational) -> Rational`, never a
   single `add(Number) -> Number`.
