@@ -178,7 +178,7 @@ declarations {
 
 		§§ Divides the Rational by a number, exactly.
 		§§
-		§§ Dividing by an Integer or a Rational answers empty for a zero divisor. Dividing this Rational by an Algebraic always answers, because an Algebraic is irrational and so never zero.
+		§§ Dividing by an Integer or a Rational answers empty for a zero divisor. With `defaultingTo`, the given value stands in place of empty. Dividing by an Algebraic always answers, because an Algebraic is irrational and so never zero. Dividing by an Integer proven not to be zero always answers too.
 		overload divide {
 			§§ @param by — the Rational to divide by
 			§§ @returns — the quotient, or nothing when the divisor is zero.
@@ -209,6 +209,21 @@ declarations {
 			§§ @returns — the quotient, or the given value in its place.
 			(by other: Integer, defaultingTo fallback: Rational) -> Rational {
 				<- @::divide(by other)::value(defaultingTo fallback)
+			}
+
+			§§ Divides by an Integer proven not to be zero.
+			§§
+			§§ There is no failure to report, so the quotient itself is the answer.
+			§§
+			§§ @param by — the divisor, proven not to be zero
+			§§ @returns — the quotient.
+			(by other: NonZeroInteger) -> Rational {
+				§ Dividing by a whole number scales the denominator, which
+				§ stays proven: the product of two NonZeroIntegers is one.
+				<- Rational.of(
+					@::numerator(),
+					over @::denominator()::multiply(with other),
+				)
 			}
 		}
 

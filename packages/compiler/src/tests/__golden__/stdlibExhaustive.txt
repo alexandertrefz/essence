@@ -252,6 +252,7 @@
 "Rational.divide(by: Rational) [by zero] => Empty"
 "Rational.divide(by: Integer) => Value(1/4)"
 "Rational.divide(by: Integer) [by zero] => Empty"
+"Rational.divide(by: NonZeroInteger) => 1/4"
 "Rational.divide(by: Rational, defaultingTo: Rational) => 3"
 "Rational.divide(by: Rational, defaultingTo: Rational) [by zero] => 0"
 "Rational.divide(by: Integer, defaultingTo: Rational) => 1/4"

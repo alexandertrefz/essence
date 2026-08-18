@@ -644,6 +644,7 @@ describe("Stdlib Call Graph", () => {
 			"Rational.divide__overload$2",
 			"Rational.divide__overload$4",
 			"Rational.divide__overload$5",
+			"Rational.divide__overload$6",
 			"Rational.is",
 			"Rational.isGreaterThanOrEqualTo__overload$1",
 			"Rational.isGreaterThanOrEqualTo__overload$2",
