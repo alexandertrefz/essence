@@ -8,7 +8,7 @@ import { createRational } from "../Rational"
 import { createRecord } from "../Record"
 import {
 	append,
-	character,
+	character__overload$1 as character,
 	compare__overload$1 as compare,
 	createString,
 	length,

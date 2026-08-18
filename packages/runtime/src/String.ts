@@ -361,7 +361,11 @@ function positionFromEnd(index: number | bigint, count: number): number {
 // cluster taken out of the view segments to itself, so there is nothing for
 // remembering to protect. `split` hands its pieces their clusters because a
 // piece is SEVERAL of them and re-segmenting could pair them differently.
-export function character(
+//
+// NOTE: The first of two entries — the second takes a `defaultingTo:` fallback
+// and is written in Essence on this one, so this export carries the Overload
+// suffix its position gives it.
+export function character__overload$1(
 	originalString: StringType,
 	index: IntegerType,
 ): OptionalType<StringType> {

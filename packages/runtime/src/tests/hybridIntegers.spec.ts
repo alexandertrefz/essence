@@ -20,7 +20,7 @@ import { anyIs } from "../internalHelpers"
 import { createList, item, length, of, slice } from "../List"
 import { createRational, formatAsRational } from "../Rational"
 import {
-	character,
+	character__overload$1 as character,
 	createString,
 	length as stringLength,
 	slice as stringSlice,
