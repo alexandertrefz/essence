@@ -1,12 +1,8 @@
-§ The public surface of the language.
-§
-§ Every name a Program can use without asking for it is re-exported here, and
-§ ONLY the names listed here. A file may export something this list leaves out —
-§ that name is reachable by the standard library's own files, through an ordinary
-§ import, and by nothing else. That is what makes an internal helper possible: a
-§ Namespace or Type the library needs and the language does not have to grow.
-§
-§ Adding a name here adds it to the language. Removing one takes it away.
+§ The public surface of the language. Every name a Program can use without
+§ asking for it is re-exported here, and only those names. A file can export
+§ something this list leaves out: that name reaches the standard library's own
+§ files through an ordinary import, and nothing else. Adding a name here adds
+§ it to the language, and removing one takes it away.
 
 declarations {}
 
