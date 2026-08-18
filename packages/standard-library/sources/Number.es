@@ -26,6 +26,75 @@ declarations {
 	§ and makes `π is Irrational` a true sentence.
 	type Irrational = Algebraic | Transcendental
 
+	§ The two numeric kinds every aggregate below folds over. `Prelude.es` does
+	§ not re-export it, so it is a helper of this file rather than a name the
+	§ language grows.
+	type Exact = Integer | Rational
+
+	§ The one 2×2 dispatch in the file. Each aggregate below used to write it
+	§ out again — a match on the running total around a match on the item, four
+	§ arms deep, once per aggregate — and each of those was the same four cells
+	§ this Namespace holds. A Union-typed receiver reaches no member
+	§ Namespace's `add`, and `Number` deliberately declares none, so a
+	§ Namespace over the two kinds is what lets a fold read as a fold.
+	namespace Exact for Exact {
+		§§ Adds two exact numbers. Two Integers give an Integer; anything else gives a Rational.
+		§§
+		§§ @param other — the number to add
+		§§ @returns — the exact sum.
+		add(_ other: Exact) -> Exact {
+			<- match @ -> Exact {
+				case Integer {
+					constant integer = @
+
+					<- match other -> Exact {
+						case Integer  { <- integer::add(@) }
+
+						case Rational { <- integer::add(@) }
+					}
+				}
+
+				case Rational {
+					constant rational = @
+
+					<- match other -> Exact {
+						case Integer  { <- rational::add(@) }
+
+						case Rational { <- rational::add(@) }
+					}
+				}
+			}
+		}
+
+		§§ Multiplies two exact numbers. Two Integers give an Integer; anything else gives a Rational.
+		§§
+		§§ @param with — the number to multiply with
+		§§ @returns — the exact product.
+		multiply(with other: Exact) -> Exact {
+			<- match @ -> Exact {
+				case Integer {
+					constant integer = @
+
+					<- match other -> Exact {
+						case Integer  { <- integer::multiply(with @) }
+
+						case Rational { <- integer::multiply(with @) }
+					}
+				}
+
+				case Rational {
+					constant rational = @
+
+					<- match other -> Exact {
+						case Integer  { <- rational::multiply(with @) }
+
+						case Rational { <- rational::multiply(with @) }
+					}
+				}
+			}
+		}
+	}
+
 	§ The Union-level behaviour of `Number` — cross-member semantics only a
 	§ covering Namespace can define. `is` is numeric equality (`1 is 1/1` is
 	§ true), while the member Namespaces stay representational; Method target
@@ -123,12 +192,11 @@ declarations {
 				::and(@::isLessThanOrEqualTo(upper))
 		}
 
-		§ The aggregates are folds over the members' own arithmetic. The
-		§ mixed-kind entries dispatch each step by matching BOTH operands
-		§ apart — a Union-typed receiver reaches no member Namespace's `add`,
-		§ and the covering Namespace deliberately declares none — and collapse
-		§ a whole-number total back to an Integer at the end, so a mixed List
-		§ that happens to sum to a whole answers with the simpler member.
+		§ The aggregates are folds over the members' own arithmetic. A
+		§ mixed-kind entry folds on `Exact` above, which holds the one 2×2
+		§ dispatch, and collapses a whole-number total back to an Integer at the
+		§ end — so a mixed List that happens to sum to a whole answers with the
+		§ simpler member.
 
 		§§ Adds up every Number in the List. The empty List sums to zero.
 		§§
@@ -151,37 +219,7 @@ declarations {
 
 				constant total = numbers::reduce(
 					startingWith start,
-					(accumulated, number) {
-						<- match accumulated -> Integer | Rational {
-							case Integer {
-								constant accumulatedInteger = @
-
-								<- match number -> Integer | Rational {
-									case Integer  {
-										<- accumulatedInteger::add(@)
-									}
-
-									case Rational {
-										<- accumulatedInteger::add(@)
-									}
-								}
-							}
-
-							case Rational {
-								constant accumulatedRational = @
-
-								<- match number -> Integer | Rational {
-									case Integer  {
-										<- accumulatedRational::add(@)
-									}
-
-									case Rational {
-										<- accumulatedRational::add(@)
-									}
-								}
-							}
-						}
-					},
+					(accumulated, number) { <- accumulated::add(number) },
 				)
 
 				<- match total -> Integer | Rational {
@@ -220,35 +258,7 @@ declarations {
 				constant total = numbers::reduce(
 					startingWith start,
 					(accumulated, number) {
-						<- match accumulated -> Integer | Rational {
-							case Integer {
-								constant accumulatedInteger = @
-
-								<- match number -> Integer | Rational {
-									case Integer  {
-										<- accumulatedInteger::multiply(with @)
-									}
-
-									case Rational {
-										<- accumulatedInteger::multiply(with @)
-									}
-								}
-							}
-
-							case Rational {
-								constant accumulatedRational = @
-
-								<- match number -> Integer | Rational {
-									case Integer  {
-										<- accumulatedRational::multiply(with @)
-									}
-
-									case Rational {
-										<- accumulatedRational::multiply(with @)
-									}
-								}
-							}
-						}
+						<- accumulated::multiply(with number)
 					},
 				)
 
@@ -373,11 +383,9 @@ declarations {
 
 			§ The List entries fold the pairwise ones over the items, seeded
 			§ empty so the first item becomes the running answer and the empty
-			§ List keeps the seed. On a tie the pairwise entries
-			§ answer the FIRST operand, so the earliest of equal items wins,
-			§ exactly as walking the List reads. The mixed entry matches both
-			§ operands apart to reach a pairwise entry, as the aggregates
-			§ above do.
+			§ List keeps the seed. On a tie the pairwise entries answer the
+			§ FIRST operand, so the earliest of equal items wins, exactly as
+			§ walking the List reads.
 
 			(_ integers: List<Integer>) -> Optional<Integer> {
 				constant start: Optional<Integer> = #Empty
@@ -407,6 +415,9 @@ declarations {
 				})
 			}
 
+			§ The mixed entry needs no dispatch of its own: the covering
+			§ `Number::isLessThanOrEqualTo` reads the cross-kind order, and an
+			§ `Integer | Rational` receiver reaches it.
 			(
 				_ numbers: List<Integer | Rational>,
 			) -> Optional<Integer | Rational> {
@@ -417,47 +428,11 @@ declarations {
 						case #Empty { <- #Value(number) }
 
 						case #Value(running) {
-							<- #Value(match running -> Integer | Rational {
-								case Integer {
-									constant lowestInteger = @
-
-									<- match number -> Integer | Rational {
-										case Integer  {
-											<- Number.lowestNumber(
-												lowestInteger,
-												@,
-											)
-										}
-
-										case Rational {
-											<- Number.lowestNumber(
-												lowestInteger,
-												@,
-											)
-										}
-									}
-								}
-
-								case Rational {
-									constant lowestRational = @
-
-									<- match number -> Integer | Rational {
-										case Integer  {
-											<- Number.lowestNumber(
-												lowestRational,
-												@,
-											)
-										}
-
-										case Rational {
-											<- Number.lowestNumber(
-												lowestRational,
-												@,
-											)
-										}
-									}
-								}
-							})
+							if running::isLessThanOrEqualTo(number) {
+								<- #Value(running)
+							} else {
+								<- #Value(number)
+							}
 						}
 					}
 				})
@@ -537,6 +512,8 @@ declarations {
 				})
 			}
 
+			§ The same fold as `lowestNumber`'s mixed entry, over the covering
+			§ `Number::isGreaterThanOrEqualTo`.
 			(
 				_ numbers: List<Integer | Rational>,
 			) -> Optional<Integer | Rational> {
@@ -547,47 +524,11 @@ declarations {
 						case #Empty { <- #Value(number) }
 
 						case #Value(running) {
-							<- #Value(match running -> Integer | Rational {
-								case Integer {
-									constant greatestInteger = @
-
-									<- match number -> Integer | Rational {
-										case Integer  {
-											<- Number.greatestNumber(
-												greatestInteger,
-												@,
-											)
-										}
-
-										case Rational {
-											<- Number.greatestNumber(
-												greatestInteger,
-												@,
-											)
-										}
-									}
-								}
-
-								case Rational {
-									constant greatestRational = @
-
-									<- match number -> Integer | Rational {
-										case Integer  {
-											<- Number.greatestNumber(
-												greatestRational,
-												@,
-											)
-										}
-
-										case Rational {
-											<- Number.greatestNumber(
-												greatestRational,
-												@,
-											)
-										}
-									}
-								}
-							})
+							if running::isGreaterThanOrEqualTo(number) {
+								<- #Value(running)
+							} else {
+								<- #Value(number)
+							}
 						}
 					}
 				})
