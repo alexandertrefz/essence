@@ -1406,6 +1406,7 @@ describe("Completion of a converted standard library Namespace", () => {
 			"hasValue",
 			"isEmpty",
 			"map",
+			"andThen",
 			"keep",
 			"flatten",
 		])

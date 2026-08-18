@@ -1126,6 +1126,14 @@ third"::lines())
 		noNumbers::firstItem()::map((item) { <- item::multiply(with 10) }),
 	)
 	show(
+		"Optional.andThen<ItemType, ResultType>(_ (_ ItemType) -> Optional<ResultType>)",
+		numbers::firstItem()::andThen((item) { <- numbers::item(at item) }),
+	)
+	show(
+		"Optional.andThen<ItemType, ResultType>(_ (_ ItemType) -> Optional<ResultType>) [empty]",
+		noNumbers::firstItem()::andThen((item) { <- numbers::item(at item) }),
+	)
+	show(
 		"Optional.keep<ItemType>(where: (_ ItemType) -> Boolean)",
 		numbers::firstItem()::keep(where (item) { <- item::isPositive() }),
 	)
