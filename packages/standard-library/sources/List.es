@@ -459,6 +459,7 @@ declarations {
 		§§
 		§§ Each item is offered to the check, and the accepted items keep their order.
 		§§
+		§§ @param where — the check each item is offered to
 		§§ @returns — the List of accepted items.
 		everyItem(where check: (_: ItemType) -> Boolean) -> List<ItemType>
 

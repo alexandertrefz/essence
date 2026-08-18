@@ -4661,6 +4661,93 @@ describe("Enricher", () => {
 			).toEqual([])
 		})
 
+		it("should leave a Function literal in expression position undocumented", () => {
+			// NOTE: A literal in expression position is anonymous — it
+			// declares nothing, so no `§§` block is written about it, and the
+			// block above the line belongs to the Declaration the expression
+			// sits inside. The Parser reads Documentation by line alone, so a
+			// literal sharing that Declaration's line used to claim it: the
+			// block's `@param` lines were then read against the LITERAL's
+			// Parameters, and `@param where` was reported as naming '_'.
+			//
+			// A Parameter's default is where this bites hardest, because a
+			// signature and its default are one line by construction.
+			expect(
+				diagnosticsFor(`implementation {
+					namespace Walker for List<Integer> {
+						§§ Answers a new List of every item the check accepts.
+						§§ @param where — the check each item is offered to
+						keep(where check: (_: Integer) -> Boolean = (_ item: Integer) -> Boolean { <- true }) -> List<Integer> { <- @ }
+					}
+				}`),
+			).toEqual([])
+
+			expect(
+				diagnosticsFor(`implementation {
+					§§ Counts.
+					§§ @param where — the check each item is offered to
+					function count (where check: (_: Integer) -> Boolean = (_ item: Integer) -> Boolean { <- true }) -> Integer { <- 1 }
+				}`),
+			).toEqual([])
+
+			// NOTE: An Argument's callback is the same shape without a default
+			// in sight.
+			expect(
+				diagnosticsFor(`implementation {
+					§§ The kept items.
+					§§ @param where — the check each item is offered to
+					constant kept = [1, 2]::everyItem(where (_ item: Integer) -> Boolean { <- true })
+				}`),
+			).toEqual([])
+		})
+
+		it("should read a block against the signature the default is on", () => {
+			// NOTE: The other half of the rule above: the block is still
+			// checked, and it is checked against the Method whose Parameter
+			// carries the default.
+			let diagnostics = diagnosticsFor(`implementation {
+				§§ Counts.
+				§§ @param wehre — the check each item is offered to
+				function count (where check: (_: Integer) -> Boolean = (_ item: Integer) -> Boolean { <- true }) -> Integer { <- 1 }
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("misnamed-documentation-parameter")
+			expect(diagnostics[0].labels[0]?.message).toBe(
+				"Parameter 1 is 'where'",
+			)
+		})
+
+		it("should hand a Declaration's block to the Function it holds", () => {
+			// NOTE: The block documents what the Declaration holds, so the
+			// literal is HANDED it rather than reading it off the line above —
+			// which is what makes the two layouts agree. Signature Help reads
+			// the Function's own Type, and used to find the description only
+			// where the literal shared the `constant`'s line.
+			let sameLine = `implementation {
+				§§ Greets.
+				§§ @param subject — who to greet
+				constant greet = (subject: String) -> String { <- subject }
+			}`
+			let ownLine = `implementation {
+				§§ Greets.
+				§§ @param subject — who to greet
+				constant greet =
+					(subject: String) -> String { <- subject }
+			}`
+
+			for (let source of [sameLine, ownLine]) {
+				let type = lastConstantValue(source).type
+
+				expect(type.type).toBe("Function")
+				expect(
+					type.type === "Function"
+						? type.documentation?.description
+						: null,
+				).toBe("Greets.")
+			}
+		})
+
 		it("should report nothing for the Documentation of a builtin", () => {
 			// NOTE: A builtin Namespace documents itself in TypeScript and the
 			// standard library's Positions are stripped as it loads, so there
