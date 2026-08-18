@@ -102,12 +102,22 @@ export function essence(options: PluginOptions = {}): VitePlugin {
 		// sources emit — a rebuild in watch mode starts, a file changes under a
 		// dev server. Nothing else here has state to lose: what the compiler
 		// remembers is emitted TEXT, which outlives an edit to the source it
-		// came from unless it is told otherwise.
+		// came from unless it is told otherwise. A dev server names the file,
+		// and only what was compiled out of a graph reaching it is forgotten;
+		// a rebuild names nothing and forgets everything.
+		//
+		// NOTE: And that is the whole of what hot reloading asks of this
+		// plugin. Every source a served module was compiled from is a watch
+		// file of it, and Vite turns a watch file into an edge of its module
+		// graph — so an edit propagates from the changed file through the
+		// modules that import it, exactly along the Essence import graph, up
+		// to the nearest module that accepts. Nothing here filters or
+		// re-orders that: the graph is already the right one.
 		buildStart() {
 			compiler.invalidate()
 		},
-		watchChange() {
-			compiler.invalidate()
+		watchChange(id) {
+			compiler.invalidate(id)
 		},
 		resolveId(source, importer) {
 			// NOTE: The wrapper's own import, coming back through resolution
