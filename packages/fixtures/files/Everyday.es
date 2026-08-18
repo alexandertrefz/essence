@@ -3,8 +3,9 @@ implementation {
 	§ The everyday Integer Methods. A divisor written down is its own proof of
 	§ not being zero, so this remainder can not fail and answers bare. A Method
 	§ that CAN fail answers an `Optional`, and `Terminal.inspect` shows it whole —
-	§ `Optional#Value(1024)` rather than `1024`. `value(defaultingTo:)` below is how a
-	§ Program collapses one back to a bare value.
+	§ `Optional#Value(1024)` rather than `1024`. A Method that can answer empty
+	§ also offers a `defaultingTo:` entry, and an Optional already held in data
+	§ collapses with `value(defaultingTo:)`. Both are shown below.
 	Terminal.inspect(0::subtract(7)::remainder(dividingBy 3)) § 2 — Euclidean, so a negative dividend still leaves a non-negative
 	§ remainder. `7::remainder(dividingBy 3)` is the plain `1`.
 	Terminal.inspect(2::raise(to 10)) § Optional#Value(1024)
@@ -24,15 +25,16 @@ implementation {
 	Terminal.inspect(2/3::raise(to 2)) § Optional#Value(4/9)
 
 	§ Reading Numbers from text — the return trip of toString.
-	Terminal.inspect(Integer.parse("42")::value(defaultingTo 0)) § 42
-	Terminal.inspect(Integer.parse("nope")::value(defaultingTo 0)) § 0
-	Terminal.inspect(Rational.parse("0.75")::value(defaultingTo 0/1)) § 3/4
+	Terminal.inspect(Integer.parse("42", defaultingTo 0)) § 42
+	Terminal.inspect(Integer.parse("nope", defaultingTo 0)) § 0
+	Terminal.inspect(Rational.parse("0.75", defaultingTo 0/1)) § 3/4
 
-	§ Exact aggregates over whole Lists.
-	Terminal.inspect(Number.sum([1, 2, 3])) § 6
-	Terminal.inspect(Number.sum([1, 1/2, 1/2])) § 2 — a whole mixed sum is an Integer
-	Terminal.inspect(Number.product([1/2, 2/3])) § 1/3
-	Terminal.inspect(Number.average([1, 2])::value(defaultingTo 0/1)) § 3/2
+	§ Exact aggregates, asked of the List that holds the Numbers.
+	constant scores = [1, 2, 3]
+	Terminal.inspect(scores::sum()) § 6
+	Terminal.inspect([1, 1/2, 1/2]::sum()) § 2 — a whole mixed sum is an Integer
+	Terminal.inspect([1/2, 2/3]::product()) § 1/3
+	Terminal.inspect([1, 2]::average(defaultingTo 0/1)) § 3/2
 
 	§ The sign Methods reach the whole tower.
 	Terminal.inspect(Number.Pi::negate()::absolute()) § π
@@ -45,9 +47,13 @@ implementation {
 	§ Splitting a String is no longer a one-way door.
 	Terminal.inspect("a,b,c"::split(on ",")::join(with " + ")) § "a + b + c"
 
-	§ value(defaultingTo:) collapses an Optional back to a bare value.
-	Terminal.inspect([1, 2, 3]::firstItem()::value(defaultingTo 0)) § 1
-	Terminal.inspect([1]::removeFirst()::firstItem()::value(defaultingTo 99)) § 99
+	§ A Method that can answer empty takes the fallback itself.
+	Terminal.inspect([1, 2, 3]::firstItem(defaultingTo 0)) § 1
+	Terminal.inspect([1]::removeFirst()::firstItem(defaultingTo 99)) § 99
+
+	§ An Optional already held in data collapses with value(defaultingTo:).
+	constant power = 2::raise(to 10)
+	Terminal.inspect(power::value(defaultingTo 0)) § 1024
 
 	§ Sorting through Comparable — no comparison to write.
 	Terminal.inspect([3, 1, 2]::sort()) § [ 1, 2, 3 ]
@@ -57,6 +63,8 @@ implementation {
 	§ The new List shapes.
 	Terminal.inspect([[1, 2], [3]]::flatten()) § [ 1, 2, 3 ]
 	Terminal.inspect([1, 2, 3, 2]::lastIndex(of 2)) § Optional#Value(3)
+	Terminal.inspect([1, 2, 3, 4]::hasItems(where (n) { <- n::isEven() })) § true
+	Terminal.inspect([1, 2, 3, 4]::everyItem(where (n) { <- n::isEven() })) § [ 2, 4 ] — the filter
 	Terminal.inspect([1, 2, 3, 4]::partition(where (n) { <- n::isEven() }))
 	Terminal.inspect(["a", "b"]::pair(with [1, 2, 3])) § pairs stop with the shorter List
 	Terminal.inspect([1, 2, 3, 4, 5]::split(intoGroupsOf 2)) § [ [ 1, 2 ], [ 3, 4 ], [ 5 ] ]
