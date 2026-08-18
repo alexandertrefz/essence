@@ -1,0 +1,15 @@
+{
+	"name": "@essence-lang/example-quote-server",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"description": "An HTTP quoting API whose pricing rules are Essence, served by Bun.",
+	"scripts": {
+		"start": "bun --hot server.ts",
+		"typecheck": "tsc --noEmit"
+	},
+	"dependencies": {
+		"@essence-lang/client": "workspace:*",
+		"@essence-lang/runtime": "workspace:*"
+	}
+}
