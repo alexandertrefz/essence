@@ -5,15 +5,15 @@ declarations {
 
 	§§ Anything that can be compared for equality.
 	protocol Equatable {
-		§§ Answers whether both values are equal.
+		§§ Checks whether both values are equal.
 		§§
-		§§ @param other — the value to compare with
+		§§ @param _ — the value to compare with
 		§§ @returns — `true` when the values are equal.
 		is(_ other: Self) -> Boolean
 
-		§§ Answers whether the values differ.
+		§§ Checks whether the values differ.
 		§§
-		§§ @param other — the value to compare with
+		§§ @param _ — the value to compare with
 		§§ @returns — `true` when the values differ.
 		isNot(_ other: Self) -> Boolean
 	}
