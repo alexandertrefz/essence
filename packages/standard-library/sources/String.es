@@ -214,6 +214,25 @@ declarations {
 			<- @::contains(other)::negate()
 		}
 
+		§§ How many times the given String occurs in this one.
+		§§
+		§§ The occurrences do not overlap: `"aaa"::count(of "aa")` is 1. The
+		§§ empty part answers 0.
+		§§
+		§§ @param of — the String to count
+		§§ @returns — the number of occurrences.
+		count(of part: String) -> Integer {
+			§ Splitting on the part cuts the String at every occurrence, so
+			§ there is one more piece than there are occurrences. The empty
+			§ part is answered here, because splitting on it cuts between the
+			§ characters and would count those instead.
+			if part::isEmpty() {
+				<- 0
+			} else {
+				<- @::split(on part)::length()::subtract(1)
+			}
+		}
+
 		§§ How many characters the String has.
 		§§
 		§§ @returns — the number of characters.
