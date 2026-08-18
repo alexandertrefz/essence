@@ -6,75 +6,54 @@ import {
 
 declarations {
 
-	§ The global spelling of fallibility — the answer of every Method that can
-	§ come back empty. It is a nominal Choice rather than a Union with
-	§ `Nothing` in it, which buys three things a Union could not:
-	§
-	§ Nesting. `Optional<Optional<Integer>>` is a value with two levels, and
-	§ `#Value(#Empty)` is not `#Empty`. A Union flattened them together, so a
-	§ `List<Optional<Integer>>` could not say whether `firstItem()` had found
-	§ an empty Optional or had found nothing at all.
-	§
-	§ Conformance. An `Integer | Nothing` belonged to no Namespace, so an
-	§ Optional could not be printed, compared, or held by anything asking for a
-	§ bound. `Optional<ItemType>` is one Type with a Namespace of its own, and
-	§ conforms exactly when its payload does.
-	§
-	§ One spelling. There is no second way to write "maybe an Integer" —
-	§ `Nothing` does not exist, and no Union can be Optional-shaped by accident.
-	§
-	§ The cost is that widening is gone: a Method answering `Optional<Integer>`
-	§ writes `<- #Value(0)`, not `<- 0`. That is the price of the value saying
-	§ what it is, and it is paid at every site that produces one.
+	§ Optional is what every Method that can come back empty answers. It is a
+	§ nominal Choice, not a Union holding a `Nothing` Type. A Choice nests, so
+	§ `#Value(#Empty)` is not `#Empty` and a `List<Optional<Integer>>` can say
+	§ whether `firstItem()` found an empty Optional or found nothing. A Choice
+	§ conforms: `Optional<ItemType>` is one Type with a Namespace, and it
+	§ conforms exactly when its payload does. An `Integer | Nothing` belongs to
+	§ no Namespace at all. A Choice has one spelling, because `Nothing` does
+	§ not exist. The cost is that widening is gone: a Method answering
+	§ `Optional<Integer>` writes `<- #Value(0)`, not `<- 0`.
 	choice Optional<ItemType> {
 		Value { item: ItemType },
 		Empty,
 	}
 
-	§ The Namespace every Optional reaches. `value(defaultingTo:)` collapses
-	§ it back to a bare value, `hasValue`/`isEmpty` ask without taking it
-	§ apart, `is`/`isNot` ask against a value at either level, `map` and
-	§ `keep` carry a value through a step that does not know it might be
-	§ missing, and `andThen` through one that can answer empty itself.
-	§ Matching is always available and always exhaustive — these are the
-	§ shorthands for the shapes worth a name.
+	§ The payload member is `item`, not `value`, because `Value { value: … }`
+	§ doubles the word at every site that writes it. The Method that reads the
+	§ payload out is still `value`, which doubles nothing.
 	§
-	§ The payload member is `item`, not `value`: `Value { value: … }` doubles
-	§ the word everywhere it is written, and `item` is what `List` already
-	§ calls the thing it holds. The Method that reads it out is still `value`,
-	§ because that is what `hasValue` already calls it, and a Method named
-	§ `value` doubles nothing.
-	§
-	§ `Equatable` is written here rather than derived, because `is` takes two
-	§ shapes: the whole (`#Value(1)::is(#Value(1))`, which is what a Choice
-	§ derives on its own) and the bare item (`#Value(1)::is(1)`), which no
-	§ derivation could offer. A Namespace that writes its own `is` stands in
-	§ for the derived one entirely, so the whole-Optional entry is spelled out
-	§ too, and FIRST — see the note on `is`. Both are conditional on the
-	§ payload's own `is`, exactly as `List`'s are. `Printable` is written for
-	§ the reason it always was: what an Optional should READ as is a decision.
+	§ `Equatable` is written here rather than derived, because `is` takes a
+	§ bare item as well as another Optional, and no derivation offers that. A
+	§ Namespace that writes its own `is` replaces the derived conformance, so
+	§ the whole-Optional entry is spelled out too. The `Printable` conformance
+	§ is written because what an Optional reads as is a decision.
 	namespace Optional<infer ItemType> for Optional<ItemType>
 		is Equatable where ItemType is Equatable,
 		is Printable where ItemType is Printable {
-		§§ Represents the Optional as `Value(…)` or `Empty`, the payload rendered by its own `toString`. Available whenever the payload conforms to `Printable`.
+		§§ Answers the Optional written as `Value(…)` or `Empty`.
 		§§
-		§§ @returns — `Value(…)` around the payload, or `Empty`.
+		§§ The payload renders through its own `toString`. The Method is available whenever the payload conforms to `Printable`.
+		§§
+		§§ @returns — the text `Value(…)` around the payload, or `Empty`.
 		toString<infer ItemType is Printable>() -> String {
-			§ Spelled without the `#` sigil, exactly as `Ordering` prints
-			§ `Less` rather than `#Less` — a rendering names the Case, it does
-			§ not quote the Expression that would build it. The parentheses
-			§ stay: without them `#Value("Empty")` and `#Empty` would read
-			§ alike.
+			§ The `#` sigil is left out, as `Ordering` prints `Less`. A
+			§ rendering names the Case; it does not quote the Expression that
+			§ builds it. The parentheses stay: without them `#Value("Empty")`
+			§ and `#Empty` read alike.
 			<- match @ -> String {
 				case #Value(item) { <- "Value({item})" }
 				case #Empty       { <- "Empty" }
 			}
 		}
 
-		§§ The value itself — or, when there is none, the given default. Collapses an Optional back to a bare value: `list::firstItem()::value(defaultingTo 0)`.
+		§§ Answers the value, or the given fallback when there is none.
+		§§
+		§§ The call collapses an Optional back to a bare value: `list::firstItem()::value(defaultingTo 0)`.
 		§§
 		§§ @param defaultingTo — the value to answer with when there is none
-		§§ @returns — the value, or the default in its place.
+		§§ @returns — the value, or the fallback in its place.
 		value(defaultingTo fallback: ItemType) -> ItemType {
 			<- match @ -> ItemType {
 				case #Value(item) { <- item }
@@ -82,27 +61,20 @@ declarations {
 			}
 		}
 
-		§ `is` reads at either level: against another Optional it is the equality
-		§ a Choice derives — same Case, equal payloads — and against a bare item
-		§ it asks whether the Optional IS that item, wrapped: `#Value(x)::is(y)`
-		§ is `x::is(y)`, and `#Empty::is(y)` is false for every `y`. Together they
-		§ let a lookup be tested in one breath — `codes::item(at index)::is(code)`
-		§ — where the only alternative was collapsing through a default the item
-		§ might genuinely equal.
-		§
-		§ The whole-Optional entry is declared FIRST, and that order is
-		§ load-bearing. An Overload is selected by the first entry the Arguments
-		§ match, and for an `Optional<Optional<Integer>>` the Argument `#Empty`
-		§ matches both. Whole first reads `#Empty::is(#Empty)` as "the receiver is
-		§ `#Empty`" — true — and `#Value(#Empty)::is(#Empty)` as false. Item first
-		§ would compare a MISSING payload against `#Empty` and answer the first of
-		§ those false, which is not what `is` says. `#Value(3)::is(#Value(3))` on
-		§ that receiver still lands on the item entry, because `#Value(3)` is no
-		§ `Optional<Optional<Integer>>` and the whole entry can not take it.
+		§ `is` reads at either level. Against another Optional it compares Case
+		§ and payload. Against a bare item it asks whether the Optional holds
+		§ that item: `#Value(x)::is(y)` is `x::is(y)`, and `#Empty::is(y)` is
+		§ false. One Expression then tests a lookup,
+		§ `codes::item(at index)::is(code)`. The alternative was collapsing
+		§ through a default the item can genuinely equal. The whole-Optional
+		§ entry stands first, and the order decides `#Empty::is(#Empty)`; see
+		§ DEVELOPMENT.md, Why bodies look the way they do.
 
-		§§ Checks whether the Optional is the given one — the same Case, holding an equal value — or, given a bare value, whether it holds exactly that value. Available whenever the payload conforms to `Equatable`.
+		§§ Answers whether the Optional is the given one, or whether it holds the given bare value.
+		§§
+		§§ Two Optionals are equal when they are the same Case and hold equal values. An empty Optional is never equal to a bare value. The Method is available whenever the payload conforms to `Equatable`.
 		overload is {
-			§§ @param other — the Optional to compare against
+			§§ @param _ — the Optional to compare against
 			§§ @returns — `true` when both are empty, or both hold equal values.
 			<infer ItemType is Equatable>(
 				_ other: Optional<ItemType>,
@@ -118,7 +90,7 @@ declarations {
 				}
 			}
 
-			§§ @param other — the bare value to compare against
+			§§ @param _ — the bare value to compare against
 			§§ @returns — `true` when the Optional holds a value equal to it; `false` when it is empty.
 			<infer ItemType is Equatable>(_ other: ItemType) -> Boolean {
 				<- match @ -> Boolean {
@@ -128,9 +100,11 @@ declarations {
 			}
 		}
 
-		§§ Checks whether the Optional differs from the given one, or, given a bare value, whether it does not hold exactly that value — which an empty Optional never does. Available whenever the payload conforms to `Equatable`.
+		§§ Answers whether the Optional differs from the given one, or whether it does not hold the given bare value.
+		§§
+		§§ An empty Optional holds no bare value, so it always differs from one. The Method is available whenever the payload conforms to `Equatable`.
 		overload isNot {
-			§§ @param other — the Optional to compare against
+			§§ @param _ — the Optional to compare against
 			§§ @returns — `true` when the two differ in Case or in value.
 			<infer ItemType is Equatable>(
 				_ other: Optional<ItemType>,
@@ -138,21 +112,19 @@ declarations {
 				<- @::is(other)::negate()
 			}
 
-			§§ @param other — the bare value to compare against
+			§§ @param _ — the bare value to compare against
 			§§ @returns — `true` when the Optional is empty or holds a different value.
 			<infer ItemType is Equatable>(_ other: ItemType) -> Boolean {
 				<- @::is(other)::negate()
 			}
 		}
 
-		§ The two Methods that let a Program ASK, rather than only collapse.
-		§ Without them the only way to test an Optional is to match it apart at
-		§ the use site, or to pick a fallback that can not occur and compare
-		§ against it — which is a lie whenever the payload can equal the
-		§ fallback. They spell the `isEmpty`/`has…` pair that every other
-		§ Namespace already has: `String::hasCharacters`, `List::hasItems`.
+		§ These two let a Program ask, rather than only collapse. The
+		§ alternative is to match the Optional apart at the use site, or to
+		§ pick a fallback that cannot occur and compare against it. That
+		§ fallback is wrong whenever the payload can equal it.
 
-		§§ Whether the Optional holds a value.
+		§§ Answers whether the Optional holds a value.
 		§§
 		§§ @returns — `true` when there is a value.
 		hasValue() -> Boolean {
@@ -162,16 +134,18 @@ declarations {
 			}
 		}
 
-		§§ Whether the Optional holds no value — the opposite of `hasValue`.
+		§§ Answers whether the Optional holds no value, the opposite of `hasValue`.
 		§§
 		§§ @returns — `true` when there is no value.
 		isEmpty() -> Boolean {
 			<- @::hasValue()::negate()
 		}
 
-		§§ Transforms the value, if there is one, and leaves an empty Optional empty — `List::map` for the at-most-one case.
+		§§ Answers the value transformed, wrapped in an Optional.
 		§§
-		§§ @param transform — the step to run on the value
+		§§ An empty Optional answers empty, and the transform does not run. This is `List::map` for the at-most-one case.
+		§§
+		§§ @param _ — the transform to run on the value
 		§§ @returns — the transformed value in an Optional, or an empty Optional.
 		map<infer ResultType>(
 			_ transform: (_: ItemType) -> ResultType,
@@ -182,11 +156,11 @@ declarations {
 			}
 		}
 
-		§§ Runs a step that can itself answer empty, without nesting.
+		§§ Answers with the Optional the step answers for the value.
 		§§
-		§§ An empty Optional answers empty, and the step does not run.
+		§§ The two Optionals do not nest: the answer has one level. An empty Optional answers empty, and the step does not run.
 		§§
-		§§ @param step — the step to run on the value
+		§§ @param _ — the step to run on the value
 		§§ @returns — the Optional the step answers, or an empty Optional.
 		andThen<infer ResultType>(
 			_ step: (_: ItemType) -> Optional<ResultType>,
@@ -197,9 +171,11 @@ declarations {
 			}
 		}
 
-		§§ Keeps the value only when it passes the check — `List::everyItem(where:)` for the at-most-one case.
+		§§ Answers the Optional when its value passes the check, and empty otherwise.
 		§§
-		§§ @param check — the question asked of the value
+		§§ An empty Optional answers empty, and the check does not run. This is `List::everyItem(where:)` for the at-most-one case.
+		§§
+		§§ @param where — the question asked of the value
 		§§ @returns — the Optional unchanged when the value passes, an empty Optional otherwise.
 		keep(where check: (_: ItemType) -> Boolean) -> Optional<ItemType> {
 			<- match @ -> Optional<ItemType> {
@@ -215,21 +191,18 @@ declarations {
 		}
 	}
 
-	§ `flatten` is not available on every Optional, and every Method of
-	§ `Optional` above is — so it lives in a Namespace that says what its
-	§ receiver has to be, exactly as `NestedList::flatten` does. `ItemType`
-	§ here binds to the INNER payload, which is what lets the result be an
-	§ `Optional<Integer>` rather than the `Optional<Optional<Integer>>` it
-	§ started as.
-	§
-	§ `andThen` is on every Optional and needs no Namespace of its own: a
-	§ step that answers an Optional never manufactures a nested one, so
-	§ `flatten`'s ambiguity does not arise. There is no `orElse` — an
-	§ Optional whose payload is itself an Optional makes "or else what"
-	§ genuinely ambiguous, and `value(defaultingTo:)` already answers the
-	§ unambiguous half.
+	§ `flatten` needs a receiver that not every Optional is, so it lives in a
+	§ Namespace that states one, as `NestedList::flatten` does. Here `ItemType`
+	§ binds to the inner payload, which makes the answer an `Optional<Integer>`
+	§ rather than the `Optional<Optional<Integer>>` it started as. The
+	§ `andThen` Method needs no such Namespace: a step that answers an Optional
+	§ never builds a nested one. There is no `orElse`, because an Optional
+	§ whose payload is an Optional makes "or else what" ambiguous, and
+	§ `value(defaultingTo:)` answers the unambiguous half.
 	namespace NestedOptional<infer ItemType> for Optional<Optional<ItemType>> {
-		§§ Collapses a nested Optional by one level — the inner Optional, or an empty Optional when the outer one is empty.
+		§§ Answers the inner Optional, one level down.
+		§§
+		§§ An empty outer Optional answers empty.
 		§§
 		§§ @returns — the flattened Optional.
 		flatten() -> Optional<ItemType> {
