@@ -18,7 +18,7 @@ import type { EssenceValue, RuntimeBridge } from "../bridge"
 import { EssenceCompileError } from "../compile-error"
 import { describeModule } from "../descriptor"
 import { EssenceCallError, EssenceMarshalError } from "../errors"
-import { type EssenceModule, loadModule } from "../index"
+import { type EssenceModule, loadModule, watchModule } from "../index"
 import { createInterpreter } from "../marshal-runtime"
 import { EssenceRational } from "../rational"
 
@@ -265,6 +265,50 @@ describe("The Runtime Bridge", () => {
 	})
 })
 
+describe("A value from another copy of the runtime", () => {
+	// NOTE: The failure the bridge exists to prevent, named where it can not
+	// be prevented: a value built by one bundle handed to another. Nothing on
+	// the value says it is wrong — it IS an Integer, tagged as one, by a Symbol
+	// this Module has never seen — so it would be refused as "an object with
+	// 'value'", which is true and sends a host looking in the wrong place. The
+	// two ways it happens are a Module loaded AGAIN after an edit with a value
+	// from the load before still in hand, and two Modules that never shared a
+	// runtime; the interpreter remembers every Type key it was built over and
+	// names the value as what it is.
+	it("is refused as one, not as a plain object", async () => {
+		let math = await loadModule(fixturePath("modules", "math", "Math.es"), {
+			cacheDirectory,
+		})
+		let marshal = await loadModule(clientFixture("Marshal.es"), {
+			cacheDirectory,
+		})
+		let foreign = marshal.bridge.integer(12n)
+		let square = math.exports.square as (value: unknown) => unknown
+
+		expect(() => square(foreign)).toThrow(
+			/an Essence Integer value from another copy of the runtime — a previous load of this Module, or a different bundle/,
+		)
+		expect(() => math.marshaller.toJS(foreign, "value")).toThrow(
+			/did not come from this Module — an Essence Integer value from another copy of the runtime/,
+		)
+	})
+
+	// NOTE: This process's own runtime as well — the copy a host reaches by
+	// importing `@essence-lang/runtime` itself, which no interpreter was ever
+	// built over. Its key is recognised by its description, so a host that
+	// built a value the direct way is told the same thing.
+	it("names a value this process's own runtime built", async () => {
+		let math = await loadModule(fixturePath("modules", "math", "Math.es"), {
+			cacheDirectory,
+		})
+		let own = { value: 12, [typeKeySymbol]: "Integer" }
+
+		expect(() => math.marshaller.toJS(own, "value")).toThrow(
+			/an Essence Integer value from another copy of the runtime/,
+		)
+	})
+})
+
 describe("A Module that does not compile", () => {
 	it("throws the report `esc` would have printed", async () => {
 		let entry = clientFixture("Broken.es")
@@ -343,6 +387,340 @@ export {
 					),
 				).toEqual(["Dep.es"])
 				expect(compileError.message).toContain("<- 1")
+			},
+		)
+	})
+})
+
+// NOTE: The listeners a watcher is given, with a way to WAIT for the next of
+// each — a test that edited a file has nothing else to do until the watcher has
+// seen it, and a watcher that never does should fail the test rather than hang
+// it.
+function listeners(): {
+	modules: Array<EssenceModule>
+	errors: Array<EssenceCompileError>
+	onModule: (module: EssenceModule) => void
+	onError: (error: EssenceCompileError) => void
+	nextModule: () => Promise<EssenceModule>
+	nextError: () => Promise<EssenceCompileError>
+	settle: (milliseconds?: number) => Promise<void>
+} {
+	let modules: Array<EssenceModule> = []
+	let errors: Array<EssenceCompileError> = []
+	let waitingForModule: Array<(module: EssenceModule) => void> = []
+	let waitingForError: Array<(error: EssenceCompileError) => void> = []
+	let awaited = <Value>(
+		waiting: Array<(value: Value) => void>,
+		what: string,
+	): Promise<Value> =>
+		new Promise((resolve, reject) => {
+			let timeout = setTimeout(
+				() => reject(new Error(`No ${what} arrived within 5 seconds.`)),
+				5000,
+			)
+
+			waiting.push((value) => {
+				clearTimeout(timeout)
+				resolve(value)
+			})
+		})
+
+	return {
+		modules,
+		errors,
+		onModule(module) {
+			modules.push(module)
+
+			for (let resolve of waitingForModule.splice(0)) {
+				resolve(module)
+			}
+		},
+		onError(error) {
+			errors.push(error)
+
+			for (let resolve of waitingForError.splice(0)) {
+				resolve(error)
+			}
+		},
+		nextModule: () => awaited(waitingForModule, "Module"),
+		nextError: () => awaited(waitingForError, "Error"),
+		settle: (milliseconds = 300) =>
+			new Promise((resolve) => setTimeout(resolve, milliseconds)),
+	}
+}
+
+const COUNTED_MODULE = (answer: number) => `import {
+	square from "./Math.es"
+}
+
+implementation {
+	constant answer = square(${answer})
+}
+
+export {
+	answer
+}
+`
+
+const MATH_SOURCE = `implementation {
+
+	function squared(_ value: Integer) -> Integer {
+		<- value::multiply(with value)
+	}
+}
+
+export {
+	squared as square
+}
+`
+
+describe("Watching a Module", () => {
+	it("hands over the first Module, and another after every edit that compiles", async () => {
+		await withProject(
+			{ "Main.es": COUNTED_MODULE(2), "Math.es": MATH_SOURCE },
+			async (directory) => {
+				let heard = listeners()
+				let watcher = await watchModule(
+					path.join(directory, "Main.es"),
+					{
+						cacheDirectory,
+						onModule: heard.onModule,
+						onError: heard.onError,
+					},
+				)
+
+				try {
+					// NOTE: The first load arrives BEFORE `watchModule` answers,
+					// which is what lets a host read `module` straight away.
+					expect(heard.modules).toHaveLength(1)
+					expect(watcher.module).toBe(heard.modules[0]!)
+					expect(watcher.module!.exports.answer).toBe(4n)
+					expect(watcher.files).toEqual(
+						[
+							path.join(directory, "Main.es"),
+							path.join(directory, "Math.es"),
+						].sort(),
+					)
+
+					// NOTE: An edit to what the entry IMPORTS, not to the entry
+					// — the file that changes is rarely the one that was asked
+					// for, and a watcher on the entry alone would sit still.
+					let next = heard.nextModule()
+
+					writeFileSync(
+						path.join(directory, "Math.es"),
+						MATH_SOURCE.replace(
+							"value::multiply(with value)",
+							"value::multiply(with value)::add(1)",
+						),
+					)
+
+					let second = await next
+
+					expect(second).not.toBe(heard.modules[0]!)
+					expect(watcher.module).toBe(second)
+					expect(second.exports.answer).toBe(5n)
+					// NOTE: The Module before the edit is untouched — a host
+					// still holding it holds a working Module.
+					expect(heard.modules[0]!.exports.answer).toBe(4n)
+				} finally {
+					watcher.close()
+				}
+			},
+		)
+	})
+
+	it("keeps the Module before an edit that does not compile", async () => {
+		await withProject(
+			{ "Main.es": COUNTED_MODULE(3), "Math.es": MATH_SOURCE },
+			async (directory) => {
+				let heard = listeners()
+				let watcher = await watchModule(
+					path.join(directory, "Main.es"),
+					{
+						cacheDirectory,
+						onModule: heard.onModule,
+						onError: heard.onError,
+					},
+				)
+
+				try {
+					let first = watcher.module!
+					let failure = heard.nextError()
+
+					writeFileSync(
+						path.join(directory, "Main.es"),
+						COUNTED_MODULE(3).replace(
+							"square(3)",
+							'square("three")',
+						),
+					)
+
+					let error = await failure
+
+					expect(error).toBeInstanceOf(EssenceCompileError)
+					expect(error.message).toContain("Main.es")
+					expect(watcher.module).toBe(first)
+					expect(heard.modules).toHaveLength(1)
+
+					// NOTE: And the fix is the next thing heard.
+					let fixed = heard.nextModule()
+
+					writeFileSync(
+						path.join(directory, "Main.es"),
+						COUNTED_MODULE(4),
+					)
+
+					expect((await fixed).exports.answer).toBe(16n)
+				} finally {
+					watcher.close()
+				}
+			},
+		)
+	})
+
+	// NOTE: A save that changes nothing — the same text written again — moves
+	// the file's time and nothing else. It is loaded, because only the load can
+	// tell, and NOT reported, because what it loaded is the bundle already held.
+	it("does not report a save that changes nothing", async () => {
+		await withProject(
+			{ "Main.es": COUNTED_MODULE(5), "Math.es": MATH_SOURCE },
+			async (directory) => {
+				let heard = listeners()
+				let watcher = await watchModule(
+					path.join(directory, "Main.es"),
+					{
+						cacheDirectory,
+						onModule: heard.onModule,
+						onError: heard.onError,
+					},
+				)
+
+				try {
+					writeFileSync(path.join(directory, "Math.es"), MATH_SOURCE)
+					await heard.settle()
+
+					expect(heard.modules).toHaveLength(1)
+					expect(heard.errors).toHaveLength(0)
+				} finally {
+					watcher.close()
+				}
+			},
+		)
+	})
+
+	it("reports a first load that does not compile, and waits for the fix", async () => {
+		await withProject(
+			{
+				"Main.es": COUNTED_MODULE(2).replace("square(2)", "square()"),
+				"Math.es": MATH_SOURCE,
+			},
+			async (directory) => {
+				let heard = listeners()
+				let watcher = await watchModule(
+					path.join(directory, "Main.es"),
+					{
+						cacheDirectory,
+						onModule: heard.onModule,
+						onError: heard.onError,
+					},
+				)
+
+				try {
+					expect(watcher.module).toBe(null)
+					expect(heard.errors).toHaveLength(1)
+					// NOTE: Watched even though nothing compiled — the graph as
+					// far as it was read is what the fix will land in.
+					expect(watcher.files).toContain(
+						path.join(directory, "Math.es"),
+					)
+
+					let fixed = heard.nextModule()
+
+					writeFileSync(
+						path.join(directory, "Main.es"),
+						COUNTED_MODULE(2),
+					)
+
+					expect((await fixed).exports.answer).toBe(4n)
+					expect(watcher.module).not.toBe(null)
+				} finally {
+					watcher.close()
+				}
+			},
+		)
+	})
+
+	it("hears nothing once closed", async () => {
+		await withProject(
+			{ "Main.es": COUNTED_MODULE(6), "Math.es": MATH_SOURCE },
+			async (directory) => {
+				let heard = listeners()
+				let watcher = await watchModule(
+					path.join(directory, "Main.es"),
+					{
+						cacheDirectory,
+						onModule: heard.onModule,
+						onError: heard.onError,
+					},
+				)
+
+				watcher.close()
+				writeFileSync(
+					path.join(directory, "Main.es"),
+					COUNTED_MODULE(7),
+				)
+				await heard.settle()
+
+				expect(heard.modules).toHaveLength(1)
+				expect(watcher.module!.exports.answer).toBe(36n)
+			},
+		)
+	})
+
+	// NOTE: The one thing a reload can not carry over, named. A raw value from
+	// the load before the edit is tagged by THAT bundle's key; the load after
+	// has a key of its own, and refuses the value as what it is rather than as a
+	// plain object — see "A value from another copy of the runtime".
+	it("refuses a raw value from the load before, by name", async () => {
+		await withProject(
+			{ "Main.es": COUNTED_MODULE(2), "Math.es": MATH_SOURCE },
+			async (directory) => {
+				let heard = listeners()
+				let watcher = await watchModule(
+					path.join(directory, "Main.es"),
+					{
+						cacheDirectory,
+						onModule: heard.onModule,
+						onError: heard.onError,
+					},
+				)
+
+				try {
+					let before = watcher.module!
+					let stale = before.bridge.integer(3n)
+					let next = heard.nextModule()
+
+					writeFileSync(
+						path.join(directory, "Main.es"),
+						COUNTED_MODULE(2).replace(
+							"export {\n\tanswer",
+							'export {\n\tsquare from "./Math.es"\n\tanswer',
+						),
+					)
+
+					let after = await next
+					let square = after.exports.square as (
+						value: unknown,
+					) => unknown
+
+					expect(square(3n)).toBe(9n)
+					expect(() => square(stale)).toThrow(
+						/from another copy of the runtime — a previous load of this Module/,
+					)
+				} finally {
+					watcher.close()
+				}
 			},
 		)
 	})
