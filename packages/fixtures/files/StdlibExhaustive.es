@@ -1657,6 +1657,28 @@ third"::lines())
 		"List.firstItem<ItemType>(where: (_ ItemType) -> Boolean) [no match]",
 		numbers::firstItem(where (item) { <- item::isGreaterThan(9) }),
 	)
+	show(
+		"List.firstItem<ItemType>(defaultingTo: ItemType)",
+		numbers::firstItem(defaultingTo 0),
+	)
+	show(
+		"List.firstItem<ItemType>(defaultingTo: ItemType) [empty]",
+		noNumbers::firstItem(defaultingTo 0),
+	)
+	show(
+		"List.firstItem<ItemType>(where: (_ ItemType) -> Boolean, defaultingTo: ItemType)",
+		numbers::firstItem(
+			where (item) { <- item::isGreaterThan(2) },
+			defaultingTo 0,
+		),
+	)
+	show(
+		"List.firstItem<ItemType>(where: (_ ItemType) -> Boolean, defaultingTo: ItemType) [no match]",
+		numbers::firstItem(
+			where (item) { <- item::isGreaterThan(9) },
+			defaultingTo 0,
+		),
+	)
 	show("List.lastItem<ItemType>()", numbers::lastItem())
 	show("List.lastItem<ItemType>() [empty]", noNumbers::lastItem())
 	show("List.lastItem<ItemType>() [single]", singleNumber::lastItem())
@@ -1667,6 +1689,28 @@ third"::lines())
 	show(
 		"List.lastItem<ItemType>(where: (_ ItemType) -> Boolean) [no match]",
 		numbers::lastItem(where (item) { <- item::isGreaterThan(9) }),
+	)
+	show(
+		"List.lastItem<ItemType>(defaultingTo: ItemType)",
+		numbers::lastItem(defaultingTo 0),
+	)
+	show(
+		"List.lastItem<ItemType>(defaultingTo: ItemType) [empty]",
+		noNumbers::lastItem(defaultingTo 0),
+	)
+	show(
+		"List.lastItem<ItemType>(where: (_ ItemType) -> Boolean, defaultingTo: ItemType)",
+		numbers::lastItem(
+			where (item) { <- item::isGreaterThan(2) },
+			defaultingTo 0,
+		),
+	)
+	show(
+		"List.lastItem<ItemType>(where: (_ ItemType) -> Boolean, defaultingTo: ItemType) [no match]",
+		numbers::lastItem(
+			where (item) { <- item::isGreaterThan(9) },
+			defaultingTo 0,
+		),
 	)
 	show(
 		"List.removeFirst<ItemType>(_? Integer) [no count]",
@@ -1828,6 +1872,14 @@ third"::lines())
 		numbers::item(at -99),
 	)
 	show(
+		"List.item<ItemType>(at: Integer, defaultingTo: ItemType)",
+		numbers::item(at 2, defaultingTo 0),
+	)
+	show(
+		"List.item<ItemType>(at: Integer, defaultingTo: ItemType) [outside]",
+		numbers::item(at 99, defaultingTo 0),
+	)
+	show(
 		"List.firstIndex<ItemType is Equatable>(of: ItemType)",
 		numbers::firstIndex(of 1),
 	)
@@ -1842,6 +1894,28 @@ third"::lines())
 	show(
 		"List.firstIndex<ItemType>(where: (_ ItemType) -> Boolean) [no match]",
 		numbers::firstIndex(where (item) { <- item::isGreaterThan(9) }),
+	)
+	show(
+		"List.firstIndex<ItemType is Equatable>(of: ItemType, defaultingTo: Integer)",
+		numbers::firstIndex(of 1, defaultingTo -1),
+	)
+	show(
+		"List.firstIndex<ItemType is Equatable>(of: ItemType, defaultingTo: Integer) [absent]",
+		numbers::firstIndex(of 9, defaultingTo -1),
+	)
+	show(
+		"List.firstIndex<ItemType>(where: (_ ItemType) -> Boolean, defaultingTo: Integer)",
+		numbers::firstIndex(
+			where (item) { <- item::isGreaterThan(2) },
+			defaultingTo -1,
+		),
+	)
+	show(
+		"List.firstIndex<ItemType>(where: (_ ItemType) -> Boolean, defaultingTo: Integer) [no match]",
+		numbers::firstIndex(
+			where (item) { <- item::isGreaterThan(9) },
+			defaultingTo -1,
+		),
 	)
 	show(
 		"List.slice<ItemType>(from?: Integer, to?: Integer)",
@@ -2002,6 +2076,14 @@ third"::lines())
 	show(
 		"List.lastIndex<ItemType is Equatable>(of: ItemType) [absent]",
 		numbers::lastIndex(of 9),
+	)
+	show(
+		"List.lastIndex<ItemType is Equatable>(of: ItemType, defaultingTo: Integer)",
+		numbers::lastIndex(of 1, defaultingTo -1),
+	)
+	show(
+		"List.lastIndex<ItemType is Equatable>(of: ItemType, defaultingTo: Integer) [absent]",
+		numbers::lastIndex(of 9, defaultingTo -1),
 	)
 	show(
 		"List.join<ItemType is Printable>(with: String)",
