@@ -1,0 +1,14 @@
+{
+	"extends": "../../tsconfig.base.json",
+	"compilerOptions": {
+		"lib": ["ESNext", "DOM", "DOM.Iterable"],
+		// NOTE: `bun-types` because `@essence-lang/client`'s index reaches its Bun
+		// plugin, whose types name the `Bun` global; nothing in this page runs
+		// under Bun.
+		"types": ["vite/client", "bun-types"],
+		// NOTE: What makes `./Game.es` resolve to `Game.d.es.ts`, which the
+		// plugin writes beside the source while the dev server runs.
+		"allowArbitraryExtensions": true
+	},
+	"include": ["src/**/*", "vite.config.ts"]
+}
