@@ -39,7 +39,7 @@ Two rules the loader enforces, both by throwing:
 
 Writing an import is not optional for a Namespace you only DISPATCH through:
 `length::subtract(…)` needs `Integer` imported even though the call never spells
-it. Naming `Integer` as a *Type* needs no import — the nine bare Type tags live
+it. Naming `Integer` as a *Type* needs no import — the eight bare Type tags live
 one Scope out, and are the only names that do.
 
 ### The prelude
@@ -222,7 +222,9 @@ guards two files, but it is a floor, not a substitute for measuring.
 
 Seven mechanics account for most of what looks odd in these files. Each is
 explained once, here. A body that leans on one carries a one line pointer to
-this section, and the bodies beside it carry nothing.
+this section, and the bodies beside it carry nothing. One file names a mechanic
+once: a reader who opens `Algebraic.es` alone finds the pointer there, and does
+not have to know that `Integer.es` carries the same one.
 
 **`@` is the scrutinee inside a `match`, not the receiver.** A Case body reads
 `@` as the value the `match` is over. Bind the receiver to a Constant above the
@@ -254,9 +256,10 @@ inserting an entry rebinds every entry after it. The order they are READ hoists
 the entries that ask for a refinement, so a call that can prove what a refined
 entry asks for reaches it wherever it stands. Two consequences are worth
 knowing: `Optional::is` declares the whole Optional entry FIRST, so
-`#Empty::is(#Empty)` asks whether the receiver is empty; `Rational.of` appends
-its refined entry LAST, where it is numbered after the others and still read
-before them.
+`#Empty::is(#Empty)` asks whether the receiver is empty; `Rational.of` declares
+its refined entry after the general one, so it is numbered second of the three
+and still read first. The `defaultingTo:` entry stands last, where a new entry
+goes — appending is what leaves every earlier number alone.
 
 **A body pulls its whole transitive reach into every bundle.** A Method is
 emitted into a Program that reaches it, and so is everything its body calls.
@@ -335,8 +338,8 @@ git. Neither do metaphor, ALL-CAPS emphasis and asides. A note that a reader has
 to read twice is a note to shorten.
 
 A mechanic that several bodies share is explained once, in
-[Why bodies look the way they do](#why-bodies-look-the-way-they-do). The site
-that leans on it carries the pointer; the sites beside it carry nothing.
+[Why bodies look the way they do](#why-bodies-look-the-way-they-do), under the
+rule stated there.
 
 ## Editing hazards
 
@@ -426,7 +429,7 @@ A new Namespace is a new runtime module. The Simplifier emits
 `<Namespace>.<method>(…)`, so each name needs
 
 1. an entry in `runtimeNamespaceNames` (`packages/compiler/src/rewriter/index.ts`),
-2. a a `@essence-lang/runtime` module — a re-export of the implementation is
+2. a `@essence-lang/runtime` module — a re-export of the implementation is
    enough,
 3. a place in `builtinMemberOrder` (`packages/compiler/src/enricher/builtins.ts`),
 4. a row in `builtins.spec.ts`'s `runtimeModules`, and
@@ -434,7 +437,7 @@ A new Namespace is a new runtime module. The Simplifier emits
    asserts, which reads the same list back.
 
 A Namespace that also declares a **Type** — a `choice`, as `Ordering` and `Side`
-do — needs a fifth: a place in `builtinTypeOrder`, beside `builtinMemberOrder`.
+do — needs a sixth: a place in `builtinTypeOrder`, beside `builtinMemberOrder`.
 
 `builtins.spec.ts` cross-checks the first, third and fourth against each other
 and against the Namespaces declared here, so a missing registration is a failing
@@ -513,5 +516,7 @@ A default is refused where it could never fire: on a Protocol requirement
 (`default-on-protocol-requirement`), and on a Function literal in expression
 position (`default-on-function-literal`). And in this version a Method fulfilling
 a Protocol requirement must match it exactly, defaulted Parameters included —
-which is why `String.is` and `String.isNot` keep their `overload` block rather
-than collapsing into a defaulted `comparing:` Parameter.
+which is why `String.is` keeps its `overload` block rather than collapsing into
+a defaulted `comparing:` Parameter. `String.isNot` declares only the
+one-Parameter form the Protocol asks for, and has no `comparing:` entry to
+collapse.
