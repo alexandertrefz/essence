@@ -103,7 +103,7 @@ declarations {
 
 		§§ Divides this Integer by a number, exactly.
 		§§
-		§§ Dividing by an Integer or a Rational answers empty for a zero divisor. Dividing this Integer by a NonZeroInteger or by an Algebraic can not fail. The first divisor is proven, and an Algebraic is irrational and so never zero.
+		§§ Dividing by an Integer or a Rational answers empty for a zero divisor. Dividing this Integer by a NonZeroInteger or by an Algebraic can not fail. The first divisor is proven, and an Algebraic is irrational and so never zero. The `defaultingTo:` entries answer the given value in place of empty.
 		overload divide {
 			(by other: Integer) -> Optional<Rational> {
 				<- Rational.of(@, over other)
@@ -219,7 +219,7 @@ declarations {
 
 		§§ Answers the exact square root.
 		§§
-		§§ A perfect square answers an Integer, and any other non-negative Integer answers an exact Algebraic. A negative Integer answers empty.
+		§§ A perfect square answers an Integer, and any other non-negative Integer answers an exact Algebraic. A negative Integer answers empty, and the `defaultingTo:` entry answers the given value instead.
 		overload squareRoot {
 			§§ @returns — the root, or nothing for a negative Integer.
 			() -> Optional<Integer | Algebraic>
@@ -282,7 +282,7 @@ declarations {
 
 		§§ Answers what is left over after taking out every whole divisor that fits.
 		§§
-		§§ The division is Euclidean, so the remainder is never negative and always below the divisor's magnitude. For example, `7::remainder(dividingBy 3)` is `1`, and `-7::remainder(dividingBy 3)` is `2` rather than the `-1` truncating division leaves.
+		§§ The division is Euclidean, so the remainder is never negative and always below the divisor's magnitude. For example, `7::remainder(dividingBy 3)` is `1`, and `-7::remainder(dividingBy 3)` is `2` rather than the `-1` truncating division leaves. A zero divisor answers empty, and the `defaultingTo:` entry answers the given Integer instead.
 		overload remainder {
 			§§ Answers the remainder over a divisor nothing is known about.
 			§§
@@ -314,7 +314,7 @@ declarations {
 
 		§§ Answers how many whole divisors fit.
 		§§
-		§§ This is the other half of the same Euclidean division as `remainder`, and the two agree: `quotient · divisor + remainder` is the original Integer. The remainder is never negative, so the quotient floors towards negative infinity rather than truncating towards zero. For example, `7::quotient(dividingBy 3)` is `2`, and `-7::quotient(dividingBy 3)` is `-3`, leaving a remainder of `2`.
+		§§ This is the other half of the same Euclidean division as `remainder`, and the two agree: `quotient · divisor + remainder` is the original Integer. The remainder is never negative, so the quotient floors towards negative infinity rather than truncating towards zero. For example, `7::quotient(dividingBy 3)` is `2`, and `-7::quotient(dividingBy 3)` is `-3`, leaving a remainder of `2`. A zero divisor answers empty, and the `defaultingTo:` entry answers the given Integer instead.
 		overload quotient {
 			§§ Answers the quotient over a divisor nothing is known about.
 			§§
@@ -345,7 +345,7 @@ declarations {
 
 		§§ Raises the Integer to the given power.
 		§§
-		§§ A non-negative exponent answers an Integer, and a negative one answers the exact reciprocal as a Rational. Zero to the power of zero is one.
+		§§ A non-negative exponent answers an Integer, and a negative one answers the exact reciprocal as a Rational. Zero to the power of zero is one. Zero raised to a negative power answers empty, and the `defaultingTo:` entry answers the given value instead.
 		overload raise {
 			§§ @param to — the exponent
 			§§ @returns — the power, or nothing when raising zero to a negative power.
@@ -395,7 +395,7 @@ declarations {
 
 		§§ Reads an Integer from its text form.
 		§§
-		§§ The text form is an optional minus sign followed by digits, the shape `toString` produces.
+		§§ The text form is an optional minus sign followed by digits, the shape `toString` produces. Text of any other shape answers empty, and the `defaultingTo:` entry answers the given Integer instead.
 		overload static parse {
 			§§ @param _ — the text to read
 			§§ @returns — the Integer, or nothing when the text has any other shape.

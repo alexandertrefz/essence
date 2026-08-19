@@ -83,7 +83,7 @@ declarations {
 
 		§§ Answers the exact quotient of the Transcendental and a number.
 		§§
-		§§ Dividing by an Integer or a Rational is empty only for zero. Dividing by another Transcendental answers a Rational when the two are proportional: `Tau::divide(by Pi)` is `2`. Anything else is empty.
+		§§ Dividing by an Integer or a Rational is empty only for zero. Dividing by another Transcendental answers a Rational when the two are proportional: `Tau::divide(by Pi)` is `2`. Anything else is empty. The `defaultingTo:` entries answer the given value in place of empty.
 		overload divide {
 			(by other: Integer) -> Optional<Transcendental>
 

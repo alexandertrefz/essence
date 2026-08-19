@@ -70,7 +70,7 @@ declarations {
 
 		§§ Builds a Rational from one Integer over another.
 		§§
-		§§ This is the way to write a ratio of computed values, where the literal form `3/4` is not available.
+		§§ This is the way to write a ratio of computed values, where the literal form `3/4` is not available. A zero denominator answers empty, and the `defaultingTo:` entry answers the given Rational instead.
 		overload static of {
 			§§ Builds the Rational from two Integers, with nothing known about either.
 			§§
@@ -303,7 +303,7 @@ declarations {
 
 		§§ Answers the exact square root of the Rational.
 		§§
-		§§ A perfect square answers a Rational. Any other value that is not negative answers an exact Algebraic. A negative Rational answers empty.
+		§§ A perfect square answers a Rational. Any other value that is not negative answers an exact Algebraic. A negative Rational answers empty, and the `defaultingTo:` entry answers the given value instead.
 		overload squareRoot {
 			§§ @returns — the root, or nothing for a negative Rational.
 			() -> Optional<Rational | Algebraic>
@@ -345,7 +345,7 @@ declarations {
 
 		§§ Answers the reciprocal of the Rational.
 		§§
-		§§ The reciprocal exchanges the numerator and the denominator. Zero has no reciprocal.
+		§§ The reciprocal exchanges the numerator and the denominator. Zero has no reciprocal, and the `defaultingTo:` entry answers the given Rational instead.
 		overload reciprocal {
 			§§ @returns — the reciprocal, or nothing for zero.
 			() -> Optional<Rational> {
@@ -431,7 +431,7 @@ declarations {
 
 		§§ Raises the Rational to the given power.
 		§§
-		§§ A negative exponent answers the exact reciprocal power. Zero raised to the power of zero is one.
+		§§ A negative exponent answers the exact reciprocal power. Zero raised to the power of zero is one. Zero raised to a negative power answers empty, and the `defaultingTo:` entry answers the given Rational instead.
 		overload raise {
 			§§ @param to — the exponent
 			§§ @returns — the power, or nothing when raising zero to a negative power.
@@ -452,7 +452,7 @@ declarations {
 
 		§§ Reads a Rational from its text form.
 		§§
-		§§ The text is a fraction like `3/4`, a decimal like `0.75`, or a whole number like `3`. Each form takes an optional minus sign in front.
+		§§ The text is a fraction like `3/4`, a decimal like `0.75`, or a whole number like `3`. Each form takes an optional minus sign in front. Text of another shape, or a fraction over zero, answers empty, and the `defaultingTo:` entry answers the given Rational instead.
 		overload static parse {
 			§§ @param _ — the text to read
 			§§ @returns — the Rational, or nothing when the text has any other shape or divides by zero.
