@@ -25,7 +25,7 @@ declarations {
 	§ Nothing here rounds. An operation that leaves the Integers widens into
 	§ a Rational, an Algebraic or a Transcendental instead.
 	namespace Integer for Integer is Equatable, is Printable, is Comparable {
-		§§ Checks whether the Integer has the same value as another.
+		§§ Answers whether the Integer has the same value as another.
 		§§
 		§§ @param _ — the Integer to compare against
 		§§ @returns — `true` when both are equal.
@@ -33,7 +33,7 @@ declarations {
 			<- @::compare(to other)::is(#Equal)
 		}
 
-		§§ Checks whether the Integer has a different value than another.
+		§§ Answers whether the Integer has a different value than another.
 		§§
 		§§ @param _ — the Integer to compare against
 		§§ @returns — `true` when the two differ.
@@ -169,7 +169,7 @@ declarations {
 		§ Why bodies look the way they do. Each Rational entry is the flipped
 		§ call: `@` is below a Rational exactly when that Rational is above `@`.
 
-		§§ Checks whether this Integer is strictly below the given number.
+		§§ Answers whether this Integer is strictly below the given number.
 		overload isLessThan {
 			(_ other: Integer) -> Boolean {
 				<- @::compare(to other)::is(#Less)
@@ -180,7 +180,7 @@ declarations {
 			}
 		}
 
-		§§ Checks whether this Integer is below the given number, or equal to it.
+		§§ Answers whether this Integer is below the given number, or equal to it.
 		overload isLessThanOrEqualTo {
 			(_ other: Integer) -> Boolean {
 				<- @::isGreaterThan(other)::negate()
@@ -191,7 +191,7 @@ declarations {
 			}
 		}
 
-		§§ Checks whether this Integer is strictly above the given number.
+		§§ Answers whether this Integer is strictly above the given number.
 		overload isGreaterThan {
 			(_ other: Integer) -> Boolean {
 				<- @::compare(to other)::is(#Greater)
@@ -202,7 +202,7 @@ declarations {
 			}
 		}
 
-		§§ Checks whether this Integer is above the given number, or equal to it.
+		§§ Answers whether this Integer is above the given number, or equal to it.
 		overload isGreaterThanOrEqualTo {
 			(_ other: Integer) -> Boolean {
 				<- @::isLessThan(other)::negate()
@@ -243,7 +243,7 @@ declarations {
 		§§ Answers the Integer with its sign flipped.
 		negate() -> Integer
 
-		§§ Checks whether the Integer is divisible by two.
+		§§ Answers whether the Integer is divisible by two.
 		§§
 		§§ Zero is even.
 		isEven() -> Boolean {
@@ -252,26 +252,26 @@ declarations {
 			<- @::remainder(dividingBy 2)::is(0)
 		}
 
-		§§ Checks whether the Integer is not divisible by two.
+		§§ Answers whether the Integer is not divisible by two.
 		isOdd() -> Boolean {
 			<- @::isEven()::negate()
 		}
 
-		§§ Checks whether the Integer is above zero.
+		§§ Answers whether the Integer is above zero.
 		§§
 		§§ Zero is neither positive nor negative.
 		isPositive() -> Boolean {
 			<- @::isGreaterThan(0)
 		}
 
-		§§ Checks whether the Integer is below zero.
+		§§ Answers whether the Integer is below zero.
 		§§
 		§§ Zero is neither positive nor negative.
 		isNegative() -> Boolean {
 			<- @::isLessThan(0)
 		}
 
-		§§ Checks whether the Integer is exactly zero.
+		§§ Answers whether the Integer is exactly zero.
 		isZero() -> Boolean {
 			<- @::is(0)
 		}
@@ -457,7 +457,7 @@ declarations {
 			}
 		}
 
-		§§ Represents the Integer as a String, in decimal digits.
+		§§ Answers the Integer as a String, in decimal digits.
 		toString() -> String
 
 		§§ Orders the Integer against another Integer.

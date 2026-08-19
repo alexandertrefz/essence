@@ -299,7 +299,7 @@ describe("Signature Help for a standard library Method", () => {
 
 		expect(signature?.label).toBe("is(_ Boolean) -> Boolean")
 		expect(signature?.documentation).toBe(
-			"Checks whether the Boolean has the same truth value as another.",
+			"Answers whether the Boolean has the same truth value as another.",
 		)
 		expect(signature?.parameters[0]?.documentation).toBe(
 			"the Boolean to compare against",

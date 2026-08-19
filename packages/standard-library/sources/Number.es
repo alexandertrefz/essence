@@ -115,7 +115,7 @@ declarations {
 		§§ The golden ratio `(1 + √5) / 2`, the positive solution of `x² = x + 1`, exactly.
 		static GoldenRatio: Algebraic
 
-		§§ Checks whether the Number has the same numeric value as another Number.
+		§§ Answers whether the Number has the same numeric value as another Number.
 		§§
 		§§ An Integer and a Rational are the same Number when their values are equal, so `1 is 1/1` holds.
 		§§
@@ -125,7 +125,7 @@ declarations {
 			<- @::compare(to other)::is(#Equal)
 		}
 
-		§§ Checks whether the Number has a different numeric value than another Number.
+		§§ Answers whether the Number has a different numeric value than another Number.
 		§§
 		§§ @param _ — the Number to compare against
 		§§ @returns — `true` when the Numbers have different numeric values.
@@ -133,7 +133,7 @@ declarations {
 			<- @::is(other)::negate()
 		}
 
-		§§ Represents the Number as a String, in the notation of the member Type it holds.
+		§§ Answers the Number as a String, in the notation of the member Type it holds.
 		§§
 		§§ @returns — the String representation of the Number.
 		toString() -> String {
@@ -151,7 +151,7 @@ declarations {
 		§§ @returns — `Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.
 		compare(to other: Number) -> Ordering
 
-		§§ Whether the Number is strictly below the given one.
+		§§ Answers whether the Number is strictly below the given one.
 		§§
 		§§ @param _ — the Number to compare against
 		§§ @returns — `true` when the Number is below the given one.
@@ -159,7 +159,7 @@ declarations {
 			<- @::compare(to other)::is(#Less)
 		}
 
-		§§ Whether the Number is below the given one, or equal to it.
+		§§ Answers whether the Number is below the given one, or equal to it.
 		§§
 		§§ @param _ — the Number to compare against
 		§§ @returns — `true` when the Number is below the given one or equal to it.
@@ -167,7 +167,7 @@ declarations {
 			<- @::isGreaterThan(other)::negate()
 		}
 
-		§§ Whether the Number is strictly above the given one.
+		§§ Answers whether the Number is strictly above the given one.
 		§§
 		§§ @param _ — the Number to compare against
 		§§ @returns — `true` when the Number is above the given one.
@@ -175,7 +175,7 @@ declarations {
 			<- @::compare(to other)::is(#Greater)
 		}
 
-		§§ Whether the Number is above the given one, or equal to it.
+		§§ Answers whether the Number is above the given one, or equal to it.
 		§§
 		§§ @param _ — the Number to compare against
 		§§ @returns — `true` when the Number is above the given one or equal to it.
@@ -183,7 +183,7 @@ declarations {
 			<- @::isLessThan(other)::negate()
 		}
 
-		§§ Whether the Number lies between the two given ones, both included.
+		§§ Answers whether the Number lies between the two given ones, both included.
 		§§
 		§§ The Number and the bounds can each be any member of the tower, so `Number.Pi::isBetween(3, and 22/7)` holds. Bounds in the wrong order enclose no Number, and the answer is `false`.
 		§§

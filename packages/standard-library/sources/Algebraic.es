@@ -204,7 +204,7 @@ declarations {
 		§§ Negating an irrational leaves it irrational, so the answer is again an Algebraic.
 		negate() -> Algebraic
 
-		§§ Answers the exact symbolic form: `√2`, `3·√2` or `1 + √2`.
+		§§ Answers the Algebraic as a String, in the exact symbolic form: `√2`, `3·√2` or `1 + √2`.
 		toString() -> String
 	}
 }

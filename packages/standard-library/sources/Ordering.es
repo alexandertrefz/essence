@@ -17,7 +17,7 @@ declarations {
 	§ `Equatable` is derived for a Choice; see DEVELOPMENT.md, Why bodies look
 	§ the way they do.
 	namespace Ordering for Ordering is Equatable, is Printable {
-		§§ Represents the Ordering as `Less`, `Equal` or `Greater`.
+		§§ Answers the Ordering as a String: `Less`, `Equal` or `Greater`.
 		§§
 		§§ @returns — the name of the Ordering's Case.
 		toString() -> String {
