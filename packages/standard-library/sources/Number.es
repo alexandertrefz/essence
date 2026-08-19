@@ -115,86 +115,6 @@ declarations {
 		§§ The golden ratio `(1 + √5) / 2`, the positive solution of `x² = x + 1`, exactly.
 		static GoldenRatio: Algebraic
 
-		§§ Answers whether the Number has the same numeric value as another Number.
-		§§
-		§§ An Integer and a Rational are the same Number when their values are equal, so `1 is 1/1` holds.
-		§§
-		§§ @param _ — the Number to compare against
-		§§ @returns — `true` when both Numbers have the same numeric value.
-		is(_ other: Number) -> Boolean {
-			<- @::compare(to other)::is(#Equal)
-		}
-
-		§§ Answers whether the Number has a different numeric value than another Number.
-		§§
-		§§ @param _ — the Number to compare against
-		§§ @returns — `true` when the Numbers have different numeric values.
-		isNot(_ other: Number) -> Boolean {
-			<- @::is(other)::negate()
-		}
-
-		§§ Answers the Number as a String, in the notation of the member Type it holds.
-		§§
-		§§ @returns — the String representation of the Number.
-		toString() -> String {
-			<- match @ -> String {
-				case Integer        { <- @::toString() }
-				case Rational       { <- @::toString() }
-				case Algebraic      { <- @::toString() }
-				case Transcendental { <- @::toString() }
-			}
-		}
-
-		§§ Orders the Number against another Number by numeric value, across every member of the tower.
-		§§
-		§§ @param to — the Number to order against
-		§§ @returns — `Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.
-		compare(to other: Number) -> Ordering
-
-		§§ Answers whether the Number is strictly below the given one.
-		§§
-		§§ @param _ — the Number to compare against
-		§§ @returns — `true` when the Number is below the given one.
-		isLessThan(_ other: Number) -> Boolean {
-			<- @::compare(to other)::is(#Less)
-		}
-
-		§§ Answers whether the Number is below the given one, or equal to it.
-		§§
-		§§ @param _ — the Number to compare against
-		§§ @returns — `true` when the Number is below the given one or equal to it.
-		isLessThanOrEqualTo(_ other: Number) -> Boolean {
-			<- @::isGreaterThan(other)::negate()
-		}
-
-		§§ Answers whether the Number is strictly above the given one.
-		§§
-		§§ @param _ — the Number to compare against
-		§§ @returns — `true` when the Number is above the given one.
-		isGreaterThan(_ other: Number) -> Boolean {
-			<- @::compare(to other)::is(#Greater)
-		}
-
-		§§ Answers whether the Number is above the given one, or equal to it.
-		§§
-		§§ @param _ — the Number to compare against
-		§§ @returns — `true` when the Number is above the given one or equal to it.
-		isGreaterThanOrEqualTo(_ other: Number) -> Boolean {
-			<- @::isLessThan(other)::negate()
-		}
-
-		§§ Answers whether the Number lies between the two given ones, both included.
-		§§
-		§§ The Number and the bounds can each be any member of the tower, so `Number.Pi::isBetween(3, and 22/7)` holds. Bounds in the wrong order enclose no Number, and the answer is `false`.
-		§§
-		§§ @param _ — the lower bound, included
-		§§ @param and — the upper bound, included
-		§§ @returns — `true` when the Number is within the bounds.
-		isBetween(_ lower: Number, and upper: Number) -> Boolean {
-			<- @::isGreaterThanOrEqualTo(lower)
-				::and(@::isLessThanOrEqualTo(upper))
-		}
-
 		§ Each aggregate is a fold over the members' own arithmetic. A mixed
 		§ entry folds on `Exact` above.
 
@@ -603,6 +523,86 @@ declarations {
 			) -> Integer | Rational {
 				<- Number.greatestNumber(numbers)::value(defaultingTo fallback)
 			}
+		}
+
+		§§ Answers whether the Number has the same numeric value as another Number.
+		§§
+		§§ An Integer and a Rational are the same Number when their values are equal, so `1 is 1/1` holds.
+		§§
+		§§ @param _ — the Number to compare against
+		§§ @returns — `true` when both Numbers have the same numeric value.
+		is(_ other: Number) -> Boolean {
+			<- @::compare(to other)::is(#Equal)
+		}
+
+		§§ Answers whether the Number has a different numeric value than another Number.
+		§§
+		§§ @param _ — the Number to compare against
+		§§ @returns — `true` when the Numbers have different numeric values.
+		isNot(_ other: Number) -> Boolean {
+			<- @::is(other)::negate()
+		}
+
+		§§ Orders the Number against another Number by numeric value, across every member of the tower.
+		§§
+		§§ @param to — the Number to order against
+		§§ @returns — `Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.
+		compare(to other: Number) -> Ordering
+
+		§§ Answers the Number as a String, in the notation of the member Type it holds.
+		§§
+		§§ @returns — the String representation of the Number.
+		toString() -> String {
+			<- match @ -> String {
+				case Integer        { <- @::toString() }
+				case Rational       { <- @::toString() }
+				case Algebraic      { <- @::toString() }
+				case Transcendental { <- @::toString() }
+			}
+		}
+
+		§§ Answers whether the Number is strictly below the given one.
+		§§
+		§§ @param _ — the Number to compare against
+		§§ @returns — `true` when the Number is below the given one.
+		isLessThan(_ other: Number) -> Boolean {
+			<- @::compare(to other)::is(#Less)
+		}
+
+		§§ Answers whether the Number is below the given one, or equal to it.
+		§§
+		§§ @param _ — the Number to compare against
+		§§ @returns — `true` when the Number is below the given one or equal to it.
+		isLessThanOrEqualTo(_ other: Number) -> Boolean {
+			<- @::isGreaterThan(other)::negate()
+		}
+
+		§§ Answers whether the Number is strictly above the given one.
+		§§
+		§§ @param _ — the Number to compare against
+		§§ @returns — `true` when the Number is above the given one.
+		isGreaterThan(_ other: Number) -> Boolean {
+			<- @::compare(to other)::is(#Greater)
+		}
+
+		§§ Answers whether the Number is above the given one, or equal to it.
+		§§
+		§§ @param _ — the Number to compare against
+		§§ @returns — `true` when the Number is above the given one or equal to it.
+		isGreaterThanOrEqualTo(_ other: Number) -> Boolean {
+			<- @::isLessThan(other)::negate()
+		}
+
+		§§ Answers whether the Number lies between the two given ones, both included.
+		§§
+		§§ The Number and the bounds can each be any member of the tower, so `Number.Pi::isBetween(3, and 22/7)` holds. Bounds in the wrong order enclose no Number, and the answer is `false`.
+		§§
+		§§ @param _ — the lower bound, included
+		§§ @param and — the upper bound, included
+		§§ @returns — `true` when the Number is within the bounds.
+		isBetween(_ lower: Number, and upper: Number) -> Boolean {
+			<- @::isGreaterThanOrEqualTo(lower)
+				::and(@::isLessThanOrEqualTo(upper))
 		}
 	}
 }

@@ -25,6 +25,75 @@ declarations {
 	§ Nothing here rounds. An operation that leaves the Integers widens into
 	§ a Rational, an Algebraic or a Transcendental instead.
 	namespace Integer for Integer is Equatable, is Printable, is Comparable {
+		§§ Reads an Integer from its text form.
+		§§
+		§§ The text form is an optional minus sign followed by digits, the shape `toString` produces. Text of any other shape answers empty, and the `defaultingTo:` entry answers the given Integer instead.
+		overload static parse {
+			§§ @param _ — the text to read
+			§§ @returns — the Integer, or nothing when the text has any other shape.
+			(_ text: String) -> Optional<Integer> {
+				§ The sign is the position of a leading `-`. The `keep` call
+				§ discards a `-` found anywhere else, so `sign` has a value
+				§ exactly when the text is negative. A second sign falls to
+				§ the digit check below, and a sign alone leaves no digits.
+				constant sign = text::firstIndex(of "-")
+					::keep(where (position) { <- position::is(0) })
+
+				constant digitsText = match sign -> String {
+					case #Value { <- text::slice(from 1) }
+
+					case #Empty { <- text }
+				}
+
+				if digitsText::isEmpty() {
+					<- #Empty
+				} else {
+					constant start: Optional<Integer> = #Value(0)
+
+					constant magnitude = digitsText
+						::characters()
+						::reduce(startingWith start, step (value, character) {
+							§ A digit's value is its position in the
+							§ digit list, and any other character
+							§ refuses the text.
+							<- match "0123456789"::firstIndex(
+								of character,
+							) -> Step<Optional<Integer>, Optional<Integer>> {
+								case #Empty        { <- #Done(#Empty) }
+
+								case #Value(digit) {
+									<- #Continue(
+										#Value(
+											value
+												::value(defaultingTo 0)
+												::multiply(with 10)
+												::add(digit)
+										)
+									)
+								}
+							}
+						})
+
+					<- magnitude::map((parsedMagnitude) {
+						<- match sign -> Integer {
+							case #Value { <- parsedMagnitude::negate() }
+
+							case #Empty { <- parsedMagnitude }
+						}
+					})
+				}
+			}
+
+			§§ Reads an Integer from its text form, with a value to answer when the text has another shape.
+			§§
+			§§ @param _ — the text to read
+			§§ @param defaultingTo — the value to answer with when the text is no Integer
+			§§ @returns — the Integer, or the given value in its place.
+			(_ text: String, defaultingTo fallback: Integer) -> Integer {
+				<- Integer.parse(text)::value(defaultingTo fallback)
+			}
+		}
+
 		§§ Answers whether the Integer has the same value as another.
 		§§
 		§§ @param _ — the Integer to compare against
@@ -40,6 +109,15 @@ declarations {
 		isNot(_ other: Integer) -> Boolean {
 			<- @::is(other)::negate()
 		}
+
+		§§ Orders the Integer against another Integer.
+		§§
+		§§ @param to — the Integer to order against
+		§§ @returns — `Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.
+		compare(to other: Integer) -> Ordering
+
+		§§ Answers the Integer as a String, in decimal digits.
+		toString() -> String
 
 		§ The mixed-kind entries of `add` and `multiply` are flipped calls.
 		§ The other operand's Namespace already declares the same sum or
@@ -101,6 +179,23 @@ declarations {
 			}
 		}
 
+		§§ Multiplies this Integer with a number, staying exact for every member of the numeric tower.
+		overload multiply {
+			(with other: Integer) -> Integer
+
+			(with other: Rational) -> Rational {
+				<- other::multiply(with @)
+			}
+
+			(with other: Algebraic) -> Algebraic | Rational {
+				<- other::multiply(with @)
+			}
+
+			(with other: Transcendental) -> Transcendental | Rational {
+				<- other::multiply(with @)
+			}
+		}
+
 		§§ Divides this Integer by a number, exactly.
 		§§
 		§§ Dividing by an Integer or a Rational answers empty for a zero divisor. Dividing this Integer by a NonZeroInteger or by an Algebraic can not fail. The first divisor is proven, and an Algebraic is irrational and so never zero. The `defaultingTo:` entries answer the given value in place of empty.
@@ -146,138 +241,6 @@ declarations {
 			(by other: Rational, defaultingTo fallback: Rational) -> Rational {
 				<- @::divide(by other)::value(defaultingTo fallback)
 			}
-		}
-
-		§§ Multiplies this Integer with a number, staying exact for every member of the numeric tower.
-		overload multiply {
-			(with other: Integer) -> Integer
-
-			(with other: Rational) -> Rational {
-				<- other::multiply(with @)
-			}
-
-			(with other: Algebraic) -> Algebraic | Rational {
-				<- other::multiply(with @)
-			}
-
-			(with other: Transcendental) -> Transcendental | Rational {
-				<- other::multiply(with @)
-			}
-		}
-
-		§ These four are not a copy of `Number`'s. Integer's own `compare` is
-		§ a bigint comparison, while `Number::compare` is the sixteen-cell
-		§ cross-kind table. Deleting these entries routed every Integer
-		§ comparison through that table and grew `HelloWorld.es` from 18,271
-		§ to 35,729 bytes, the regression `eb27756` fixed. See DEVELOPMENT.md,
-		§ Why bodies look the way they do. Each Rational entry is the flipped
-		§ call: `@` is below a Rational exactly when that Rational is above `@`.
-
-		§§ Answers whether this Integer is strictly below the given number.
-		overload isLessThan {
-			(_ other: Integer) -> Boolean {
-				<- @::compare(to other)::is(#Less)
-			}
-
-			(_ other: Rational) -> Boolean {
-				<- other::isGreaterThan(@)
-			}
-		}
-
-		§§ Answers whether this Integer is below the given number, or equal to it.
-		overload isLessThanOrEqualTo {
-			(_ other: Integer) -> Boolean {
-				<- @::isGreaterThan(other)::negate()
-			}
-
-			(_ other: Rational) -> Boolean {
-				<- other::isGreaterThanOrEqualTo(@)
-			}
-		}
-
-		§§ Answers whether this Integer is strictly above the given number.
-		overload isGreaterThan {
-			(_ other: Integer) -> Boolean {
-				<- @::compare(to other)::is(#Greater)
-			}
-
-			(_ other: Rational) -> Boolean {
-				<- other::isLessThan(@)
-			}
-		}
-
-		§§ Answers whether this Integer is above the given number, or equal to it.
-		overload isGreaterThanOrEqualTo {
-			(_ other: Integer) -> Boolean {
-				<- @::isLessThan(other)::negate()
-			}
-
-			(_ other: Rational) -> Boolean {
-				<- other::isLessThanOrEqualTo(@)
-			}
-		}
-
-		§§ Answers the exact square root.
-		§§
-		§§ A perfect square answers an Integer, and any other non-negative Integer answers an exact Algebraic. A negative Integer answers empty, and the `defaultingTo:` entry answers the given value instead.
-		overload squareRoot {
-			§§ @returns — the root, or nothing for a negative Integer.
-			() -> Optional<Integer | Algebraic>
-
-			§§ Answers the exact square root, with a value to answer for a negative Integer.
-			§§
-			§§ @param defaultingTo — the value to answer with when there is no root
-			§§ @returns — the root, or the given value in its place.
-			(
-				defaultingTo fallback: Integer | Algebraic,
-			) -> Integer | Algebraic {
-				<- @::squareRoot()::value(defaultingTo fallback)
-			}
-		}
-
-		§§ Answers the Integer without its sign, which is its distance from zero.
-		absolute() -> Integer {
-			if @::isNegative() {
-				<- @::negate()
-			} else {
-				<- @
-			}
-		}
-
-		§§ Answers the Integer with its sign flipped.
-		negate() -> Integer
-
-		§§ Answers whether the Integer is divisible by two.
-		§§
-		§§ Zero is even.
-		isEven() -> Boolean {
-			§ `2` is a literal, so it is a NonZeroInteger and `remainder`
-			§ answers a bare Integer.
-			<- @::remainder(dividingBy 2)::is(0)
-		}
-
-		§§ Answers whether the Integer is not divisible by two.
-		isOdd() -> Boolean {
-			<- @::isEven()::negate()
-		}
-
-		§§ Answers whether the Integer is above zero.
-		§§
-		§§ Zero is neither positive nor negative.
-		isPositive() -> Boolean {
-			<- @::isGreaterThan(0)
-		}
-
-		§§ Answers whether the Integer is below zero.
-		§§
-		§§ Zero is neither positive nor negative.
-		isNegative() -> Boolean {
-			<- @::isLessThan(0)
-		}
-
-		§§ Answers whether the Integer is exactly zero.
-		isZero() -> Boolean {
-			<- @::is(0)
 		}
 
 		§§ Answers what is left over after taking out every whole divisor that fits.
@@ -364,6 +327,121 @@ declarations {
 			}
 		}
 
+		§§ Answers the exact square root.
+		§§
+		§§ A perfect square answers an Integer, and any other non-negative Integer answers an exact Algebraic. A negative Integer answers empty, and the `defaultingTo:` entry answers the given value instead.
+		overload squareRoot {
+			§§ @returns — the root, or nothing for a negative Integer.
+			() -> Optional<Integer | Algebraic>
+
+			§§ Answers the exact square root, with a value to answer for a negative Integer.
+			§§
+			§§ @param defaultingTo — the value to answer with when there is no root
+			§§ @returns — the root, or the given value in its place.
+			(
+				defaultingTo fallback: Integer | Algebraic,
+			) -> Integer | Algebraic {
+				<- @::squareRoot()::value(defaultingTo fallback)
+			}
+		}
+
+		§ These four are not a copy of `Number`'s. Integer's own `compare` is
+		§ a bigint comparison, while `Number::compare` is the sixteen-cell
+		§ cross-kind table. Deleting these entries routed every Integer
+		§ comparison through that table and grew `HelloWorld.es` from 18,271
+		§ to 35,729 bytes, the regression `eb27756` fixed. See DEVELOPMENT.md,
+		§ Why bodies look the way they do. Each Rational entry is the flipped
+		§ call: `@` is below a Rational exactly when that Rational is above `@`.
+
+		§§ Answers whether this Integer is strictly below the given number.
+		overload isLessThan {
+			(_ other: Integer) -> Boolean {
+				<- @::compare(to other)::is(#Less)
+			}
+
+			(_ other: Rational) -> Boolean {
+				<- other::isGreaterThan(@)
+			}
+		}
+
+		§§ Answers whether this Integer is below the given number, or equal to it.
+		overload isLessThanOrEqualTo {
+			(_ other: Integer) -> Boolean {
+				<- @::isGreaterThan(other)::negate()
+			}
+
+			(_ other: Rational) -> Boolean {
+				<- other::isGreaterThanOrEqualTo(@)
+			}
+		}
+
+		§§ Answers whether this Integer is strictly above the given number.
+		overload isGreaterThan {
+			(_ other: Integer) -> Boolean {
+				<- @::compare(to other)::is(#Greater)
+			}
+
+			(_ other: Rational) -> Boolean {
+				<- other::isLessThan(@)
+			}
+		}
+
+		§§ Answers whether this Integer is above the given number, or equal to it.
+		overload isGreaterThanOrEqualTo {
+			(_ other: Integer) -> Boolean {
+				<- @::isLessThan(other)::negate()
+			}
+
+			(_ other: Rational) -> Boolean {
+				<- other::isLessThanOrEqualTo(@)
+			}
+		}
+
+		§§ Answers whether the Integer is divisible by two.
+		§§
+		§§ Zero is even.
+		isEven() -> Boolean {
+			§ `2` is a literal, so it is a NonZeroInteger and `remainder`
+			§ answers a bare Integer.
+			<- @::remainder(dividingBy 2)::is(0)
+		}
+
+		§§ Answers whether the Integer is not divisible by two.
+		isOdd() -> Boolean {
+			<- @::isEven()::negate()
+		}
+
+		§§ Answers whether the Integer is above zero.
+		§§
+		§§ Zero is neither positive nor negative.
+		isPositive() -> Boolean {
+			<- @::isGreaterThan(0)
+		}
+
+		§§ Answers whether the Integer is below zero.
+		§§
+		§§ Zero is neither positive nor negative.
+		isNegative() -> Boolean {
+			<- @::isLessThan(0)
+		}
+
+		§§ Answers whether the Integer is exactly zero.
+		isZero() -> Boolean {
+			<- @::is(0)
+		}
+
+		§§ Answers the Integer without its sign, which is its distance from zero.
+		absolute() -> Integer {
+			if @::isNegative() {
+				<- @::negate()
+			} else {
+				<- @
+			}
+		}
+
+		§§ Answers the Integer with its sign flipped.
+		negate() -> Integer
+
 		§§ Answers the Integer, pulled into the given bounds.
 		§§
 		§§ The answer is the lower bound when the Integer is below it. It is the upper bound when the Integer is above it, and the Integer itself otherwise. The two bounds name the same range in either order: `7::clamp(between 10, and 1)` is `7`, and `15::clamp(between 10, and 1)` is `10`.
@@ -392,84 +470,6 @@ declarations {
 				<- @
 			}
 		}
-
-		§§ Reads an Integer from its text form.
-		§§
-		§§ The text form is an optional minus sign followed by digits, the shape `toString` produces. Text of any other shape answers empty, and the `defaultingTo:` entry answers the given Integer instead.
-		overload static parse {
-			§§ @param _ — the text to read
-			§§ @returns — the Integer, or nothing when the text has any other shape.
-			(_ text: String) -> Optional<Integer> {
-				§ The sign is the position of a leading `-`. The `keep` call
-				§ discards a `-` found anywhere else, so `sign` has a value
-				§ exactly when the text is negative. A second sign falls to
-				§ the digit check below, and a sign alone leaves no digits.
-				constant sign = text::firstIndex(of "-")
-					::keep(where (position) { <- position::is(0) })
-
-				constant digitsText = match sign -> String {
-					case #Value { <- text::slice(from 1) }
-
-					case #Empty { <- text }
-				}
-
-				if digitsText::isEmpty() {
-					<- #Empty
-				} else {
-					constant start: Optional<Integer> = #Value(0)
-
-					constant magnitude = digitsText
-						::characters()
-						::reduce(startingWith start, step (value, character) {
-							§ A digit's value is its position in the
-							§ digit list, and any other character
-							§ refuses the text.
-							<- match "0123456789"::firstIndex(
-								of character,
-							) -> Step<Optional<Integer>, Optional<Integer>> {
-								case #Empty        { <- #Done(#Empty) }
-
-								case #Value(digit) {
-									<- #Continue(
-										#Value(
-											value
-												::value(defaultingTo 0)
-												::multiply(with 10)
-												::add(digit)
-										)
-									)
-								}
-							}
-						})
-
-					<- magnitude::map((parsedMagnitude) {
-						<- match sign -> Integer {
-							case #Value { <- parsedMagnitude::negate() }
-
-							case #Empty { <- parsedMagnitude }
-						}
-					})
-				}
-			}
-
-			§§ Reads an Integer from its text form, with a value to answer when the text has another shape.
-			§§
-			§§ @param _ — the text to read
-			§§ @param defaultingTo — the value to answer with when the text is no Integer
-			§§ @returns — the Integer, or the given value in its place.
-			(_ text: String, defaultingTo fallback: Integer) -> Integer {
-				<- Integer.parse(text)::value(defaultingTo fallback)
-			}
-		}
-
-		§§ Answers the Integer as a String, in decimal digits.
-		toString() -> String
-
-		§§ Orders the Integer against another Integer.
-		§§
-		§§ @param to — the Integer to order against
-		§§ @returns — `Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.
-		compare(to other: Integer) -> Ordering
 	}
 
 	§ A refinement adds Methods and takes none away, so a NonZeroInteger

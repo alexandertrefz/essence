@@ -46,6 +46,9 @@ declarations {
 		§§ @returns — `Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.
 		compare(to other: Algebraic) -> Ordering
 
+		§§ Answers the Algebraic as a String, in the exact symbolic form: `√2`, `3·√2` or `1 + √2`.
+		toString() -> String
+
 		§§ Answers the exact sum of the Algebraic and a number.
 		§§
 		§§ Two Algebraics over the same radical stay in the slice. Their radical parts can also cancel, which leaves a Rational. The `defaultingTo:` entry answers the given value in place of empty.
@@ -203,9 +206,6 @@ declarations {
 		§§
 		§§ Negating an irrational leaves it irrational, so the answer is again an Algebraic.
 		negate() -> Algebraic
-
-		§§ Answers the Algebraic as a String, in the exact symbolic form: `√2`, `3·√2` or `1 + √2`.
-		toString() -> String
 	}
 }
 

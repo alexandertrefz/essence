@@ -33,35 +33,6 @@ declarations {
 	namespace Optional<infer ItemType> for Optional<ItemType>
 		is Equatable where ItemType is Equatable,
 		is Printable where ItemType is Printable {
-		§§ Answers the Optional as a String, written `Value(…)` or `Empty`.
-		§§
-		§§ The payload renders through its own `toString`. The Method is available whenever the payload conforms to `Printable`.
-		§§
-		§§ @returns — the text `Value(…)` around the payload, or `Empty`.
-		toString<infer ItemType is Printable>() -> String {
-			§ The `#` sigil is left out, as `Ordering` prints `Less`. A
-			§ rendering names the Case; it does not quote the Expression that
-			§ builds it. The parentheses stay: without them `#Value("Empty")`
-			§ and `#Empty` read alike.
-			<- match @ -> String {
-				case #Value(item) { <- "Value({item})" }
-				case #Empty       { <- "Empty" }
-			}
-		}
-
-		§§ Answers the value, or the given fallback when there is none.
-		§§
-		§§ The call collapses an Optional back to a bare value: `list::firstItem()::value(defaultingTo 0)`.
-		§§
-		§§ @param defaultingTo — the value to answer with when there is none
-		§§ @returns — the value, or the fallback in its place.
-		value(defaultingTo fallback: ItemType) -> ItemType {
-			<- match @ -> ItemType {
-				case #Value(item) { <- item }
-				case #Empty       { <- fallback }
-			}
-		}
-
 		§ `is` reads at either level. Against another Optional it compares Case
 		§ and payload. Against a bare item it asks whether the Optional holds
 		§ that item: `#Value(x)::is(y)` is `x::is(y)`, and `#Empty::is(y)` is
@@ -120,6 +91,22 @@ declarations {
 			}
 		}
 
+		§§ Answers the Optional as a String, written `Value(…)` or `Empty`.
+		§§
+		§§ The payload renders through its own `toString`. The Method is available whenever the payload conforms to `Printable`.
+		§§
+		§§ @returns — the text `Value(…)` around the payload, or `Empty`.
+		toString<infer ItemType is Printable>() -> String {
+			§ The `#` sigil is left out, as `Ordering` prints `Less`. A
+			§ rendering names the Case; it does not quote the Expression that
+			§ builds it. The parentheses stay: without them `#Value("Empty")`
+			§ and `#Empty` read alike.
+			<- match @ -> String {
+				case #Value(item) { <- "Value({item})" }
+				case #Empty       { <- "Empty" }
+			}
+		}
+
 		§ These two let a Program ask, rather than only collapse. The
 		§ alternative is to match the Optional apart at the use site, or to
 		§ pick a fallback that can not occur and compare against it. That
@@ -140,6 +127,19 @@ declarations {
 		§§ @returns — `true` when there is no value.
 		isEmpty() -> Boolean {
 			<- @::hasValue()::negate()
+		}
+
+		§§ Answers the value, or the given fallback when there is none.
+		§§
+		§§ The call collapses an Optional back to a bare value: `list::firstItem()::value(defaultingTo 0)`.
+		§§
+		§§ @param defaultingTo — the value to answer with when there is none
+		§§ @returns — the value, or the fallback in its place.
+		value(defaultingTo fallback: ItemType) -> ItemType {
+			<- match @ -> ItemType {
+				case #Value(item) { <- item }
+				case #Empty       { <- fallback }
+			}
 		}
 
 		§§ Answers the value transformed, wrapped in an Optional.
