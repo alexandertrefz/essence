@@ -66,6 +66,10 @@ function labelsOf(source: string): Array<string> {
 	)
 }
 
+function notesOf(source: string): Array<string> {
+	return diagnosticsOf(source).flatMap((diagnostic) => diagnostic.notes)
+}
+
 function generate(source: string): string {
 	let parsed = parseWithDiagnostics(source)
 
@@ -806,6 +810,80 @@ describe("Protocol-provided Methods", () => {
 			expect(codesOf(source)).toEqual(["nonconforming-namespace"])
 			expect(labelsOf(source)).toEqual([
 				"Method 'describe' does not match the Protocol's signature",
+			])
+		})
+
+		// NOTE: The override rule reads the NAME and nothing else, so a
+		// Namespace that declares no conformance and means something else
+		// entirely by the name still replaces the provided Method. That is the
+		// Program's decision to make and is not refused — but a reader told only
+		// what `Extras::isEmpty` takes can not see that `Sized`'s was in reach,
+		// so the report says which Protocol lost the name.
+		it("should name the Protocol a shadowing Namespace replaced", () => {
+			let source = [
+				"implementation {",
+				"\tprotocol Sized {",
+				"\t\tsize() -> Integer",
+				"",
+				"\t\tisEmpty() -> Boolean {",
+				"\t\t\t<- @::size()::is(0)",
+				"\t\t}",
+				"\t}",
+				"",
+				"\ttype Bag = { n: Integer }",
+				"",
+				"\tnamespace Bags for Bag is Sized {",
+				"\t\tsize() -> Integer {",
+				"\t\t\t<- @.n",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tnamespace Extras for Bag {",
+				"\t\tisEmpty(_ tag: String) -> String {",
+				"\t\t\t<- tag",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tconstant bag: Bag = { n = 0 }",
+				"\tTerminal.inspect(bag::isEmpty())",
+				"}",
+			].join("\n")
+
+			expect(codesOf(source)).toEqual(["no-matching-overload"])
+			expect(notesOf(source)).toEqual([
+				"'Extras::isEmpty' takes 1 Argument: Parameter 1 is String.",
+				"'Sized' provides 'isEmpty', and a Namespace declaring the name replaces it.",
+			])
+		})
+
+		// NOTE: A DERIVE answers ahead of a provided Method, so the note names
+		// the derive alone. Naming `Equatable` beside it would name something
+		// the call could not have reached even with `Extras` gone.
+		it("should name the derive a shadowing Namespace replaced", () => {
+			let source = [
+				"implementation {",
+				"\tchoice Colour {",
+				"\t\tRed,",
+				"\t\tGreen,",
+				"\t}",
+				"",
+				"\tnamespace Colours for Colour is Equatable {}",
+				"",
+				"\tnamespace Extras for Colour {",
+				"\t\tisNot(_ tag: String) -> String {",
+				"\t\t\t<- tag",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tconstant colour = Colour#Red",
+				"\tTerminal.inspect(colour::isNot(Colour#Green))",
+				"}",
+			].join("\n")
+
+			expect(codesOf(source)).toEqual(["no-matching-overload"])
+			expect(notesOf(source)).toEqual([
+				"'Extras::isNot' takes 1 Argument: Parameter 1 is String.",
+				"Colour#Red derives 'isNot', and a Namespace declaring the name replaces it.",
 			])
 		})
 

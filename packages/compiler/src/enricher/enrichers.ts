@@ -6316,10 +6316,78 @@ function describeCandidateSignatures(
 	)
 }
 
+// NOTE: A DERIVE and a Protocol's provided Method are both fallbacks: they
+// answer only where no written Namespace declares the name, which is the
+// override rule. So a Namespace declaring the name takes the whole name — even
+// one that declares no conformance and means something else entirely by it —
+// and a reader looking at `'Extras::isEmpty' takes 1 Argument` has no way to
+// see that `Sized::isEmpty` was in reach and was replaced. These notes say so.
+//
+// Said as a note rather than refused. Which Namespace answers a name is the
+// Program's to decide, and tying the two candidates together would refuse
+// Programs that mean nothing by the shared name at all.
+//
+// The receiver's Namespaces are looked up again rather than taken from the
+// caller, because what arrives there is the subset that DECLARES the name and
+// the two fallbacks read the whole set: a conformance is evidenced by a
+// Namespace that need not declare the Method, and in the shape worth reporting
+// it never does.
+//
+// Only `no-matching-overload` wants them. `unknown-method` is raised where no
+// Namespace declared the name at all, so no fallback was passed over — the
+// door itself would have answered.
+function replacedFallbackNotes(
+	methodName: string,
+	baseType: common.Type,
+	scope: enricher.Scope,
+	position: common.Position,
+): Array<string> {
+	let notes: Array<string> = []
+	let namespaces = resolveMethodLookupNamespacesForReceiverType(
+		baseType,
+		null,
+		scope,
+	)
+	let derived = derivedEquatableNamespace(baseType, scope)
+	let printable = derivedPrintableNamespace(
+		baseType,
+		namespaces.values(),
+		scope,
+	)
+
+	// NOTE: The derive alone where there is one, in the resolution order's own
+	// words: a derive answers ahead of a provided Method, so naming both would
+	// name one the call could not have reached even with the written Namespace
+	// gone.
+	if (
+		(derived !== null && Object.hasOwn(derived.methods, methodName)) ||
+		(printable !== null && Object.hasOwn(printable.methods, methodName))
+	) {
+		return [
+			`${describeType(baseType)} derives '${methodName}', and a Namespace declaring the name replaces it.`,
+		]
+	}
+
+	for (let protocolName of providedMethodNamespaces(
+		methodName,
+		baseType,
+		namespaces.values(),
+		scope,
+		position,
+	).keys()) {
+		notes.push(
+			`'${protocolName}' provides '${methodName}', and a Namespace declaring the name replaces it.`,
+		)
+	}
+
+	return notes
+}
+
 function reportNoMatchingOverload(
 	node: parser.MethodInvocationNode,
 	namespaces: Map<string, common.NamespaceType>,
 	baseType: common.Type,
+	scope: enricher.Scope,
 ): void {
 	reportError(
 		`No overload of '${node.member.content}' accepts these Arguments`,
@@ -6332,7 +6400,15 @@ function reportNoMatchingOverload(
 					`this call passes ${countOf(node.arguments.length, "Argument")}`,
 				),
 			],
-			notes: describeCandidateSignatures(node, namespaces, baseType),
+			notes: [
+				...describeCandidateSignatures(node, namespaces, baseType),
+				...replacedFallbackNotes(
+					node.member.content,
+					baseType,
+					scope,
+					node.position,
+				),
+			],
 		},
 	)
 }
@@ -6723,7 +6799,7 @@ function resolveMethodInvocation(
 		// the Diagnostic below.
 		commitContextualFunctionTypes(lastRecording)
 
-		reportNoMatchingOverload(node, matchingNamespaces, baseType)
+		reportNoMatchingOverload(node, matchingNamespaces, baseType, scope)
 
 		return resolveFailedMethodInvocation()
 	} else if (resolvedMethods.length === 1) {
@@ -6850,7 +6926,12 @@ function resolveUnionMethodDispatch(
 			// the Arguments, and the receiver they were passed to is the Union
 			// as written.
 			if (coveringNamespaces.size > 0) {
-				reportNoMatchingOverload(node, coveringNamespaces, unionType)
+				reportNoMatchingOverload(
+					node,
+					coveringNamespaces,
+					unionType,
+					scope,
+				)
 
 				return resolveFailedMethodInvocation()
 			}
@@ -6964,7 +7045,12 @@ function resolveUnionMethodDispatch(
 			// worth reporting, since it is the receiver the call was written
 			// against.
 			if (coveringNamespaces.size > 0) {
-				reportNoMatchingOverload(node, coveringNamespaces, unionType)
+				reportNoMatchingOverload(
+					node,
+					coveringNamespaces,
+					unionType,
+					scope,
+				)
 
 				return resolveFailedMethodInvocation()
 			}
