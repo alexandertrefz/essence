@@ -704,6 +704,72 @@ describe("Workspace", () => {
 			)
 			expect(renamed?.["Main.es"]).toContain("<- shape::surface()")
 		})
+
+		// NOTE: A provided Method's call names the PROTOCOL, not a Namespace,
+		// so the join reads the importing file's Type space and the declaring
+		// file's Protocol members — two tables over from the Namespace case,
+		// and the same join between them.
+		it("should rename a provided Method across the files that call it", () => {
+			let sizable = [
+				"implementation {",
+				"",
+				"\tprotocol Sizable {",
+				"\t\tsize() -> Integer",
+				"",
+				"\t\tisEmpty() -> Boolean {",
+				"\t\t\t<- @::size()::is(0)",
+				"\t\t}",
+				"\t}",
+				"",
+				"\ttype Bag = { count: Integer }",
+				"",
+				"\tnamespace Bags for Bag is Sizable {",
+				"\t\tsize() -> Integer {",
+				"\t\t\t<- @.count",
+				"\t\t}",
+				"\t}",
+				"}",
+				"",
+				"export {",
+				"\tSizable",
+				"\tBag",
+				"\tBags",
+				"}",
+				"",
+			].join("\n")
+
+			let { workspace, pathOf } = makeWorkspace({
+				"Sizable.es": sizable,
+				"Main.es": [
+					"import {",
+					'\tSizable from "./Sizable.es"',
+					'\tBag from "./Sizable.es"',
+					'\tBags from "./Sizable.es"',
+					"}",
+					"",
+					"implementation {",
+					"\tfunction report(_ bag: Bag) -> Boolean {",
+					"\t\t<- bag::isEmpty()",
+					"\t}",
+					"}",
+					"",
+				].join("\n"),
+			})
+
+			let renamed = renameAcross(
+				workspace,
+				pathOf("Sizable.es"),
+				cursorAt(sizable, 6, "isEmpty"),
+				"vacant",
+			)
+
+			expect(Object.keys(renamed ?? {}).sort()).toEqual([
+				"Main.es",
+				"Sizable.es",
+			])
+			expect(renamed?.["Sizable.es"]).toContain("\t\tvacant() -> Boolean")
+			expect(renamed?.["Main.es"]).toContain("<- bag::vacant()")
+		})
 	})
 
 	describe("workspace symbols", () => {
