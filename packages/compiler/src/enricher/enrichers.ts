@@ -6991,6 +6991,14 @@ function resolveUnionMethodDispatch(
 		dispatchCases.push({
 			memberType,
 			namespaceName: resolvedMethod.namespaceName,
+			// NOTE: Read off the Namespace this branch resolved to, exactly as
+			// the single-receiver path reads it off `node.namespace.type` —
+			// the Protocol's pseudo Namespace carries the Protocol's name in
+			// both fields, and a real Namespace may be spelled the same, so
+			// the name alone can not tell the Rewriter which one to emit.
+			// Without it a branch answering with a provided Method emits a
+			// member read on the Protocol, which binds nothing at runtime.
+			providedBy: resolvedMethod.namespaceType.providedBy,
 			overloadedMethodIndex: resolvedMethod.overloadedMethodIndex,
 			conformances: resolvedMethod.conformances,
 			omittedParameterIndices: resolvedMethod.omittedParameterIndices,
