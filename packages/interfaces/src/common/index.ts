@@ -198,6 +198,7 @@ export type DiagnosticCode =
 	| "top-level-return"
 	| "not-a-function"
 	| "record-annotation-not-record"
+	| "path-step-not-a-record"
 	| "uncombinable-types"
 	| "partial-type-mismatch"
 	| "wrong-type-argument-count"

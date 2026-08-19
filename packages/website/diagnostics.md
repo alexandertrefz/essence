@@ -484,6 +484,19 @@ A call on an Expression that is not a Function.
 
 A Record Literal was annotated with a Type that is not a Record Type.
 
+### `path-step-not-a-record`
+
+A step of a member path is read off something that has no members to read —
+`.tags.length`, where `tags` is a List, or `.nickname.length`, where `nickname`
+is an `Optional`. Only a Record or a Case, which is a Record with a nominal
+identity, has members a path can step through.
+
+The label sits on the step that could not be read, and the note names what its
+base actually is. An Optional, a Union, a Choice and a List are all values that
+are DECIDED before they are read, and deciding one is a Match rather than a
+dot — so there is no path spelling for them at all. Write the Function literal
+the path would have stood for and decide the value inside it.
+
 ### `uncombinable-types`
 
 The `<>` combination operator was given something it can not combine — both
@@ -1277,6 +1290,10 @@ Constant or Variable with such an annotation, an Assignment, a `<-` under such a
 return Type, an item of an annotated List, and a member of an annotated Record.
 Everywhere else, write the Function literal the path would have stood for:
 `(_ item: Product) { <- item.price }`.
+
+A Function of two Parameters is refused here too, and the note says so: a path
+reads its members off one Argument, and a comparison — `sort(by:)` — is handed
+two. `sort(on .price)` is the keyed spelling for that.
 
 ### `uninferable-item-type`
 

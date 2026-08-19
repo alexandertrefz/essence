@@ -1253,6 +1253,149 @@ describe("Code Generation", () => {
 		})
 	})
 
+	describe("Member paths", () => {
+		let product = `
+			type Product = { name: String, price: Integer, maker: Maker }
+			type Maker = { town: String }
+			constant products: List<Product> = [
+				{ name = "b", price = 2, maker = { town = "Ulm" } },
+				{ name = "a", price = 1, maker = { town = "Kiel" } },
+			]
+		`
+
+		it("reads the member the path names", async () => {
+			expect(
+				await run(`implementation {
+					${product}
+					Terminal.inspect(products::map(.price))
+				}`),
+			).toEqual(["[ 2, 1 ]"])
+		})
+
+		it("reads every step of the path", async () => {
+			expect(
+				await run(`implementation {
+					${product}
+					Terminal.inspect(products::map(.maker.town))
+				}`),
+			).toEqual(['[ "Ulm", "Kiel" ]'])
+		})
+
+		// NOTE: The desugar is the Enricher's, so what the Optimiser inlines is
+		// an ordinary Function literal — the emitted body reads the Parameter
+		// `simplifyParameter` names for a Parameter the source left unnamed.
+		it("emits the Function literal it stands for", () => {
+			expect(
+				generate(`implementation {
+					${product}
+					Terminal.inspect(products::map(.maker.town))
+				}`),
+			).toContain("_0.maker.town")
+		})
+
+		it("reads a path off an annotation", async () => {
+			expect(
+				await run(`implementation {
+					${product}
+					constant priceOf: (_: Product) -> Integer = .price
+					Terminal.inspect(priceOf({
+						name = "a",
+						price = 7,
+						maker = { town = "Kiel" },
+					}))
+				}`),
+			).toEqual(["7"])
+		})
+
+		// NOTE: The riskiest interaction in the feature — the path's own return
+		// Type is what binds `Key`, and the path is only readable once `Item` is
+		// bound. `deferredArgumentOrder` already holds a Function Parameter back
+		// until the Arguments that name its Types have been matched, and this is
+		// what proves a path rides it.
+		it("binds a Type Parameter from what the path reads", async () => {
+			expect(
+				await run(`implementation {
+					${product}
+					function keyed<infer Item, infer Key>(
+						_ items: List<Item>,
+						on key: (_: Item) -> Key,
+					) -> List<Key> {
+						<- items::map(key)
+					}
+
+					Terminal.inspect(keyed(products, on .maker.town))
+				}`),
+			).toEqual(['[ "Ulm", "Kiel" ]'])
+		})
+
+		it("refuses a path where no Function is expected", () => {
+			let diagnostics = diagnosticsOf(`implementation {
+				${product}
+				constant price = .price
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("path-without-context")
+		})
+
+		it("refuses a path where a Function of two Parameters is expected", () => {
+			let diagnostics = diagnosticsOf(`implementation {
+				${product}
+				constant order: (_: Product, _: Product) -> Ordering = .price
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("path-without-context")
+		})
+
+		it("refuses a step read off a List", () => {
+			let diagnostics = diagnosticsOf(`implementation {
+				type Basket = { lines: List<Integer> }
+				constant baskets: List<Basket> = []
+				constant counts = baskets::map(.lines.length)
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("path-step-not-a-record")
+			expect(diagnostics[0].labels[0]?.message).toBe(
+				"read off a List<Integer>",
+			)
+		})
+
+		it("refuses a step read off an Optional", () => {
+			let diagnostics = diagnosticsOf(`implementation {
+				type Person = { nickname: Optional<String> }
+				constant people: List<Person> = []
+				constant lengths = people::map(.nickname.length)
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("path-step-not-a-record")
+		})
+
+		// NOTE: The step that is not there is an unknown MEMBER, not a step off
+		// something with no members — the Record is right, the name is not.
+		it("names a member the Record does not declare", () => {
+			let diagnostics = diagnosticsOf(`implementation {
+				${product}
+				constant towns = products::map(.makr)
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("unknown-member")
+		})
+
+		it("refuses a call written on a path", () => {
+			let diagnostics = diagnosticsOf(`implementation {
+				${product}
+				constant towns = products::map(.price::toString())
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("path-is-members-only")
+		})
+	})
+
 	describe("Protocols", () => {
 		it("should erase Protocol declarations from the emitted JavaScript", () => {
 			const code = generate(`implementation {
