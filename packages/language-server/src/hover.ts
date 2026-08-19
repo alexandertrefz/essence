@@ -1,5 +1,6 @@
 import { builtinProtocols } from "@essence-lang/compiler/enricher/builtins"
 import {
+	caseDefaults,
 	isSynthesizedName,
 	parameterDefaults,
 	parameterInternalName,
@@ -796,6 +797,13 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 						documentation: null,
 					}
 				}
+			}
+
+			// NOTE: A payload's `= { … }` holds Expressions of its own, and the
+			// cursor in one wants what it would get anywhere else — the Type of
+			// the value under it, not the Choice it is written inside.
+			for (let defaultValue of caseDefaults(node.cases)) {
+				visitNode(defaultValue, state)
 			}
 
 			return

@@ -160,9 +160,9 @@ Error: This default makes two Overloads accept the same Record
 exports[`Diagnostic Showcase DefaultsSyntax.es should render the same report every time 1`] = `
 "[default-on-function-literal]
 Error: A Function literal can not carry a default
-   ╭─┤ DefaultsSyntax.es:8:41 │
+   ╭─┤ DefaultsSyntax.es:9:41 │
    │
- 8 │     constant shorten = (_ count: Integer = 1) -> Integer {
+ 9 │     constant shorten = (_ count: Integer = 1) -> Integer {
    │                                            ▲  
    │                                            ╰── this default
    │ 
@@ -173,9 +173,9 @@ Error: A Function literal can not carry a default
 
 [default-on-protocol-requirement]
 Error: A Protocol requirement can not carry a default
-    ╭─┤ DefaultsSyntax.es:15:27 │
+    ╭─┤ DefaultsSyntax.es:16:27 │
     │
- 15 │        trim(at side: Integer = 1) -> Self
+ 16 │        trim(at side: Integer = 1) -> Self
     │                                ▲  
     │                                ╰── this default
     │ 
@@ -184,7 +184,20 @@ Error: A Protocol requirement can not carry a default
     │ Note: A requirement says which calls a conforming Type must answer; a default is part of how one of them answers, which is each Namespace's own.
 ────╯
 
-─── 2 errors
+[case-default-without-payload]
+Error: Case '#Up' carries no payload to default
+    ╭─┤ DefaultsSyntax.es:22:8 │
+    │
+ 22 │        Up = { degrees = 0 },
+    │             ───────┬───────  
+    │                    ╰───────── this default
+    │ 
+    │ Help: Give '#Up' a payload shape, or write it on its own.
+    │ 
+    │ Note: A default fills members in for a construction that left them out, and a Case with no payload shape has none.
+────╯
+
+─── 3 errors
 "
 `;
 

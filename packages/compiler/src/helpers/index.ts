@@ -523,11 +523,29 @@ export function parameterInternalName(
 export function parameterDefaults<ExpressionNode>(
 	parameters: ReadonlyArray<{ defaultValue: ExpressionNode | null }>,
 ): Array<ExpressionNode> {
+	return writtenDefaults(parameters)
+}
+
+// NOTE: The `= { … }` defaults a Choice's Case list holds, in order — the
+// second position an Expression stands in outside every body, and reached by
+// the same shape rather than by another round of `if (defaultValue !== null)`
+// per walker. Named apart from `parameterDefaults` so a call site says which
+// Declaration it is walking, and sharing its implementation so the two can not
+// come to answer differently.
+export function caseDefaults<ExpressionNode>(
+	cases: ReadonlyArray<{ defaultValue: ExpressionNode | null }>,
+): Array<ExpressionNode> {
+	return writtenDefaults(cases)
+}
+
+function writtenDefaults<ExpressionNode>(
+	written: ReadonlyArray<{ defaultValue: ExpressionNode | null }>,
+): Array<ExpressionNode> {
 	let defaults: Array<ExpressionNode> = []
 
-	for (let parameter of parameters) {
-		if (parameter.defaultValue !== null) {
-			defaults.push(parameter.defaultValue)
+	for (let entry of written) {
+		if (entry.defaultValue !== null) {
+			defaults.push(entry.defaultValue)
 		}
 	}
 

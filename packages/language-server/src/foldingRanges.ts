@@ -1,4 +1,4 @@
-import { parameterDefaults } from "@essence-lang/compiler/helpers"
+import { caseDefaults, parameterDefaults } from "@essence-lang/compiler/helpers"
 import type { common, parser } from "@essence-lang/interfaces"
 
 // NOTE: Folding is derived from the Parser AST, so it keeps working while the
@@ -137,6 +137,13 @@ function collectFromNode(
 			return
 		case "ChoiceDeclarationStatement":
 			addRange(ranges, node.position)
+
+			// NOTE: A payload default may itself be a Record or a List written
+			// across lines, which folds the way one written in a body does.
+			for (let defaultValue of caseDefaults(node.cases)) {
+				collectFromNode(defaultValue, ranges)
+			}
+
 			return
 		case "ProtocolDeclarationStatement":
 			addRange(ranges, node.position)

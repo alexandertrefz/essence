@@ -1835,3 +1835,28 @@ describe("Completion of a label inside a Parameter's default", () => {
 		expect(labelsOf(source, { line: 6, column: 46 })).toContain("to")
 	})
 })
+
+// NOTE: A `#` inside a Case payload's default has an expected Type just as one
+// inside a Parameter's does — the member of the payload it is filling in — and
+// without the walk reaching there it has none at all.
+describe("Case completion inside a Case payload default", () => {
+	it("should offer the member's own Choice after a bare #", () => {
+		let source = [
+			"implementation {",
+			"\tchoice Edge {",
+			"\t\tStart,",
+			"\t\tEnd,",
+			"\t}",
+			"",
+			"\tchoice Move {",
+			"\t\tStep { at: Edge, by: Integer } = { at = # },",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(labelsOf(source, { line: 8, column: 44 })).toEqual([
+			"Start",
+			"End",
+		])
+	})
+})

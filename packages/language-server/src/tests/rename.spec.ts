@@ -1911,3 +1911,59 @@ describe("Rename of a name a default reads", () => {
 		)
 	})
 })
+
+// NOTE: The same hole one level over: a Case payload's `= { … }` is written
+// outside every body too, so a walk that stops at bodies leaves the occurrence
+// inside it behind and the rename produces a Choice that no longer compiles.
+describe("Rename of a name a Case payload default reads", () => {
+	it("renames a module Constant read by a payload default", () => {
+		let source = [
+			"implementation {",
+			"\tconstant none = 0",
+			"",
+			"\tchoice Fetch {",
+			"\t\tGet { url: String, retries: Integer } = { retries = none },",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(rename(source, { line: 2, column: 11 }, "zero")).toBe(
+			[
+				"implementation {",
+				"\tconstant zero = 0",
+				"",
+				"\tchoice Fetch {",
+				"\t\tGet { url: String, retries: Integer } = { retries = zero },",
+				"\t}",
+				"}",
+			].join("\n"),
+		)
+	})
+
+	// NOTE: Renamed FROM inside the default, which is the direction that only
+	// works if the walk bound the occurrence there rather than merely skipping
+	// over it.
+	it("renames from the occurrence inside the default", () => {
+		let source = [
+			"implementation {",
+			"\tconstant none = 0",
+			"",
+			"\tchoice Fetch {",
+			"\t\tGet { url: String, retries: Integer } = { retries = none },",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(rename(source, { line: 5, column: 56 }, "zero")).toBe(
+			[
+				"implementation {",
+				"\tconstant zero = 0",
+				"",
+				"\tchoice Fetch {",
+				"\t\tGet { url: String, retries: Integer } = { retries = zero },",
+				"\t}",
+				"}",
+			].join("\n"),
+		)
+	})
+})

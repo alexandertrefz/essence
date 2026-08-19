@@ -598,6 +598,16 @@ export interface ProtocolDeclarationStatementNode {
 export interface ChoiceCaseNode {
 	name: IdentifierNode
 	type: RecordTypeDeclarationNode | null
+	// NOTE: The `= { … }` a payload shape may be followed by — the Record a
+	// construction's own payload is filled out of, which may name only some of
+	// the payload's members. Null where none was written, and null on a Case
+	// with no payload shape at all: there is nothing there to default, which
+	// the Parser refuses as `case-default-without-payload`.
+	//
+	// NOTE: An arbitrary Expression here, as a Parameter's default is, so that
+	// what a default may SAY is one question the Enricher answers rather than
+	// two the grammar answers differently.
+	defaultValue: ExpressionNode | null
 }
 
 export interface ChoiceDeclarationStatementNode {

@@ -1,4 +1,4 @@
-import { parameterDefaults } from "@essence-lang/compiler/helpers"
+import { caseDefaults, parameterDefaults } from "@essence-lang/compiler/helpers"
 import type { common, parser } from "@essence-lang/interfaces"
 
 import { type Analysis, analyseDocument, documentFilePath } from "./analyse"
@@ -1025,6 +1025,15 @@ function walkNode(
 		case "FunctionStatement":
 			walkDefaults(node.value.parameters, visit)
 			walkBody(node.value.body, visit)
+			return
+		case "ChoiceDeclarationStatement":
+			// NOTE: A Case payload's default holds the Expressions the same
+			// Quick Fixes apply to as any body's — an unknown name in one takes
+			// the same suggestion, an auto-import the same edit.
+			for (let defaultValue of caseDefaults(node.cases)) {
+				walkNode(defaultValue, visit)
+			}
+
 			return
 		case "NamespaceDefinitionStatement": {
 			for (let property of Object.values(node.properties)) {

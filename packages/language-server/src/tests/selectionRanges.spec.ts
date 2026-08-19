@@ -156,3 +156,26 @@ describe("Selection Ranges inside a default", () => {
 		})
 	})
 })
+
+// NOTE: A Case payload's default is a span inside no body either — without the
+// descent the selection jumps from the name straight to the whole Choice.
+describe("Selection Ranges inside a Case payload default", () => {
+	it("should widen from a name in a payload default out through the default", () => {
+		let source = [
+			"implementation {",
+			"\tconstant none = 0",
+			"",
+			"\tchoice Fetch {",
+			"\t\tGet { retries: Integer } = { retries = none },",
+			"\t}",
+			"}",
+		].join("\n")
+
+		let ranges = selectionRangesOf(source, { line: 5, column: 42 })
+
+		expect(ranges[0]).toEqual({
+			start: { line: 5, column: 42 },
+			end: { line: 5, column: 46 },
+		})
+	})
+})

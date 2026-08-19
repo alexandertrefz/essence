@@ -1,4 +1,4 @@
-import { parameterDefaults } from "@essence-lang/compiler/helpers"
+import { caseDefaults, parameterDefaults } from "@essence-lang/compiler/helpers"
 import type { common, parser } from "@essence-lang/interfaces"
 
 import { typedHandlerExpressions } from "./matchHandlerChildren"
@@ -391,8 +391,16 @@ function collectItemsFromNode(
 			}
 
 			return
-		case "ProtocolDeclarationStatement":
 		case "ChoiceDeclarationStatement":
+			// NOTE: A Case payload's default may CALL something — a static that
+			// builds the Record it fills in — so the call it makes is an
+			// incoming edge like any other.
+			for (let defaultValue of caseDefaults(node.cases)) {
+				collectItemsFromNode(defaultValue, container, items)
+			}
+
+			return
+		case "ProtocolDeclarationStatement":
 		case "TypeAliasStatement":
 		case "Identifier":
 		case "Self":
@@ -766,8 +774,13 @@ function visitNode(
 			}
 
 			return
-		case "ProtocolDeclarationStatement":
 		case "ChoiceDeclarationStatement":
+			for (let defaultValue of caseDefaults(node.cases)) {
+				visitNode(defaultValue, caller, context, sites)
+			}
+
+			return
+		case "ProtocolDeclarationStatement":
 		case "TypeAliasStatement":
 		case "Identifier":
 		case "Self":

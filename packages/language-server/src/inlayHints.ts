@@ -1,3 +1,4 @@
+import { caseDefaults } from "@essence-lang/compiler/helpers"
 import { printType } from "@essence-lang/compiler/printType"
 import type { common } from "@essence-lang/interfaces"
 
@@ -198,8 +199,16 @@ function visitNode(
 			}
 
 			return
-		case "TypeAliasStatement":
 		case "ChoiceDeclarationStatement":
+			// NOTE: A Function literal written inside a Case payload's default
+			// takes its Types from the member it fills in, so it shows them
+			// nowhere in the source — exactly the case a hint answers.
+			for (let defaultValue of caseDefaults(node.cases)) {
+				visitNode(defaultValue, hints)
+			}
+
+			return
+		case "TypeAliasStatement":
 		case "Identifier":
 		case "Self":
 		case "StringValue":

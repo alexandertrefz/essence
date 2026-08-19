@@ -1184,3 +1184,20 @@ describe("A Record Parameter with a default", () => {
 		expect(hoverDocumentation(scalar, { line: 2, column: 18 })).toBeNull()
 	})
 })
+
+// NOTE: A Case payload's `= { … }` is written outside every body, so a walk
+// that stops at bodies answers the cursor inside one with the whole Choice
+// declaration instead of with what is actually under it.
+describe("Hover inside a Case payload default", () => {
+	it("should describe the value under the cursor rather than the Choice", () => {
+		let source = [
+			"implementation {",
+			"\tchoice Fetch {",
+			"\t\tGet { url: String, retries: Integer } = { retries = 0 },",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(hover(source, { line: 3, column: 55 })).toBe("Integer")
+	})
+})

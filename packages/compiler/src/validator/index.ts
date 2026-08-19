@@ -23,6 +23,7 @@ import {
 	matchArguments,
 	matchesType,
 	missingRecordMembers,
+	caseDefaults,
 	parameterDefaults,
 	typeContainsError,
 	withArticle,
@@ -2072,8 +2073,9 @@ function validateStatement(
 		case "VariableAssignmentStatement":
 			return validateVariableAssignmentStatement(node)
 		case "TypeAliasStatement":
-		case "ChoiceDeclarationStatement":
 			return node
+		case "ChoiceDeclarationStatement":
+			return validateChoiceDeclarationStatement(node)
 		case "ProtocolDeclarationStatement":
 			return validateProtocolDeclarationStatement(node)
 		case "NamespaceDefinitionStatement":
@@ -2309,6 +2311,21 @@ function checkInfiniteRecursion(
 			],
 		},
 	)
+}
+
+// NOTE: A Choice declaration is Types, with one Expression in it: the `= { … }`
+// a payload shape may carry. It is held to what every other Expression is held
+// to — an Argument that does not fit, a bound Method handed on as a value —
+// which is what keeps a default from being the one place those go unchecked.
+function validateChoiceDeclarationStatement(
+	node: common.typed.ChoiceDeclarationStatementNode,
+): common.typed.ChoiceDeclarationStatementNode {
+	for (let defaultValue of caseDefaults(node.cases)) {
+		validateExpression(defaultValue)
+		validateNoBoundFunctionValue(defaultValue)
+	}
+
+	return node
 }
 
 // NOTE: A Protocol's requirements are signatures and carry nothing to check.
