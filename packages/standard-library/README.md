@@ -34,8 +34,8 @@ Essence — 223 of 332 as this is written; the rest bind to
 Namespace, once for every conformer: `Equatable.isNot`, and `Orderable`'s four
 inequalities, `isBetween` and `clamp`. A conformer answers each without writing
 anything, and a Namespace that writes a Method of the name replaces the provided
-one whole — which is what `Optional::isNot` and `Integer::isLessThan` do, each
-for a reason its own declaration gives. What stays native is a
+one on its own rung — which is what `Optional::isNot` and `Integer::isLessThan`
+do, each for a reason its own declaration gives. What stays native is a
 deliberate line, not a backlog: the primitives everything else is composed from
 (`Boolean.negate`/`is`/`and`/`or`, integer and rational arithmetic, same-kind
 `compare`), the JavaScript intrinsics Essence has no expression for
@@ -132,22 +132,21 @@ offer. The reasoning is written above `Integer::isLessThan`, and
 Before collapsing anything that looks repeated here, check whether the repeat
 is what keeps a body reaching only its own Namespace's primitives.
 
-**Ordering across two kinds asks for a `Number`.** `Orderable`'s Methods take
-`Self`, which is the receiver's own Type, so `Number.Pi::isBetween(3, and 22/7)`
-does not resolve: π is a Transcendental, and `3` is not. The written entries
-widen no further than the other kind — `Integer::isLessThan` holds an entry for
-a Rational and for nothing else — so `3::isLessThan(Number.Pi)` does not resolve
-either. Bind the receiver as the covering Type first — `constant pi: Number =
-Number.Pi` — and every member of the tower is a bound it accepts.
-`Number.compare(3, to Number.Pi)` answers the same question without a Constant.
+**Ordering across two kinds falls to `Number`.** `Orderable`'s Methods take
+`Self`, which is the target of the Namespace whose conformance offers them —
+and both `Integer` and the covering `Number` conform, so each of the six has two
+rungs on a numeric receiver. A same-kind question is answered within the kind,
+and one across two kinds falls to `Number`'s rung and is answered there:
+`3::isLessThan(Number.Pi)` and `Number.Pi::isBetween(3, and 22/7)` both resolve,
+and both compare as Numbers. `Number.compare(3, to Number.Pi)` answers the same
+question written the other way.
 
-**A provided Method has no Namespace spelling.** It belongs to the Protocol
-rather than to a Namespace, so `::` is the only way to reach it. There is no
-`Number.isLessThan(a, b)` and no `Number.isNot(a, b)`, while `Number.is(a, b)`
-and `Number.compare(a, to b)` stay, because `Number` writes those two itself.
-Naming the Protocol instead is not a way round it: `Orderable.isLessThan(a, b)`
-is `protocol-as-value`, since a Protocol is a bound and never a value. Where a
-Namespace spelling is what a call wants, the Method has to be written.
+**A provided Method has the same two spellings a written one has.**
+`Number.isLessThan(a, b)` and `Number.isNot(a, b)` name the Namespace whose
+conformance puts the Method in reach and pass the receiver, exactly as
+`Number.compare(a, to b)` does. Naming the PROTOCOL is not a spelling:
+`Orderable.isLessThan(a, b)` is `protocol-as-value`, since a Protocol is a bound
+and never a value.
 
 Three name SHAPES, so rule 1 is not misapplied:
 

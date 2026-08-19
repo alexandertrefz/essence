@@ -150,11 +150,13 @@ export interface MethodInvocationNode {
 	// in place of the plain `choiceIs` member read.
 	derivedDescriptor?: DerivedEquatableDescriptor
 	// NOTE: The Protocol that PROVIDED this Method, when one did. `base`/
-	// `namespaceName` is that Protocol's name too, and a Namespace may be
-	// spelled exactly like it — a user Program declaring `protocol Integer`
-	// beside the standard library's `Integer` Namespace is the case that made
-	// this necessary — so this is what tells a provided Method from a written
-	// one at emission, where a name alone can not.
+	// `namespaceName` is the Namespace whose conformance put the Method in
+	// reach — `Integer` for `5::isNot(3)` — and that Namespace declares no
+	// Method of the name, so this is what sends the emission to the one const
+	// every conformer shares. It is a flag rather than a name comparison
+	// because a Program may declare `protocol Integer` beside the standard
+	// library's `Integer` Namespace, and a name alone can not say which
+	// answered.
 	providedBy?: string
 	type: Type
 	position?: Position
@@ -197,11 +199,13 @@ export type UnionMethodDispatchCase = {
 	// `$helpers.boundChoiceIs(<descriptor>)` for the branch's Method.
 	derivedDescriptor?: DerivedEquatableDescriptor
 	// NOTE: The Protocol that PROVIDED this Method, when one did. `base`/
-	// `namespaceName` is that Protocol's name too, and a Namespace may be
-	// spelled exactly like it — a user Program declaring `protocol Integer`
-	// beside the standard library's `Integer` Namespace is the case that made
-	// this necessary — so this is what tells a provided Method from a written
-	// one at emission, where a name alone can not.
+	// `namespaceName` is the Namespace whose conformance put the Method in
+	// reach — `Integer` for `5::isNot(3)` — and that Namespace declares no
+	// Method of the name, so this is what sends the emission to the one const
+	// every conformer shares. It is a flag rather than a name comparison
+	// because a Program may declare `protocol Integer` beside the standard
+	// library's `Integer` Namespace, and a name alone can not say which
+	// answered.
 	providedBy?: string
 }
 
@@ -760,10 +764,10 @@ export type DispatchChainCase = {
 	// from — the one function that spells a Method reference reads it.
 	derivedDescriptor?: DerivedEquatableDescriptor
 	// NOTE: The Protocol that PROVIDED this branch's Method, carried over from
-	// the dispatch case this branch was built from. `namespaceName` is that
-	// Protocol's name too, so it is this that tells the two apart — and the
-	// tree-shaking walk reads it here to draw the edge to the provided const,
-	// which nothing else in a compiled chain names.
+	// the dispatch case this branch was built from. `namespaceName` is the
+	// Namespace whose conformance offered it, so it is this that names the
+	// const — and the tree-shaking walk reads it here to draw the edge to that
+	// const, which nothing else in a compiled chain names.
 	providedBy?: string
 }
 

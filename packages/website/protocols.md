@@ -64,11 +64,12 @@ conforming Type all the same: it resolves at a call, Hover shows the Protocol's
 `§§` above it, Completion lists it beside the written members, and Signature Help
 answers for it.
 
-It is reached through `::` and through nothing else. A written Method also has a
-Namespace spelling — `Integer.isLessThan(a, b)` names the Namespace and passes
-the receiver — and a provided Method has none, because no Namespace declares it.
-The Protocol's own name is not one either: `Equatable.isNot(a, b)` is
-`protocol-as-value`, since a Protocol is a bound and never a value.
+It is reached the two ways a written Method is. `5::isNot(3)` is one; the
+Namespace spelling is the other — `Integer.isNot(3, 4)` names the Namespace whose
+conformance puts the Method in reach and passes the receiver, exactly as
+`Integer.compare(3, to 4)` does. The Protocol's own name is not a spelling:
+`Equatable.isNot(a, b)` is `protocol-as-value`, since a Protocol is a bound and
+never a value.
 
 ### What a provided body may say
 
@@ -127,9 +128,41 @@ something: `nonconforming-namespace` lists requirements only.
 
 A DERIVED Method replaces a provided one on the same terms, without anybody
 writing it. Every `choice` derives its equality, so `Ordering#Less::isNot(#Equal)`
-runs the derive rather than `Equatable`'s provided body — the derive is
-fabricated for that receiver and takes the whole Choice, where a provided Method
-takes `Self`, which a receiver narrowed to one Case binds to that Case alone.
+runs the derive rather than `Equatable`'s provided body. A derive is fabricated
+FOR the receiver and answers the same question, so where one exists it is what
+answers — and its entry is what the witness carries, so a bounded call reaches it
+too.
+
+### Where a provided Method stands
+
+A provided Method belongs to every Namespace whose conformance puts it in reach,
+and it is ranked with the Methods that Namespace WRITES. A receiver often has
+more than one such Namespace — its own and one covering a Union it belongs to —
+and then the provided Method is a rung on the same ladder a written Overload
+climbs: the narrowest Namespace that ACCEPTS the Arguments answers, and a call it
+rejects falls to the next one out.
+
+```essence
+§ Integer's own `isLessThan` takes an Integer or a Rational and rejects a
+§ Transcendental — so the covering `Number`'s provided `isLessThan(_ Number)`
+§ answers, and π is compared as a Number.
+Terminal.print(3::isLessThan(Number.Pi))
+
+§ Integer writes no `isBetween`, so both rungs are provided. Integer's takes
+§ Integers and rejects `3/2`; Number's takes Numbers and answers.
+Terminal.print(5::isBetween(1, and 3/2))
+
+§ And where the narrow rung matches, it is the one that answers.
+Terminal.print(5::isLessThan(3))
+```
+
+`Self` in a provided Method is the target of the Namespace whose conformance
+offered it, not the receiver's own Type — which is what lets the covering
+Namespace's rung take two different kinds at once.
+
+The override rule reads that way too. A Namespace writing the name replaces the
+provided Method on ITS OWN rung and on nobody else's: another Namespace's
+conformance still offers it, and a call the writer rejects still falls through.
 
 ### Naming the Protocol at the call
 
@@ -148,37 +181,30 @@ by a Namespace, and that Namespace is what a specifier names.
 
 ### Where the override is honoured
 
-An override answers every call written on a value of the Namespace's own target
-Type. A call written on a Protocol-bounded Type Parameter dispatches through the
-Protocol instead — the bound is all that is known there, so the provided body is
-what runs:
+Everywhere. A call written on a value of the Namespace's own target Type reaches
+the override, and so does a call written on a Protocol-bounded Type Parameter:
 
 ```essence
 function differ<infer Item is Equatable>(_ a: Item, _ b: Item) -> Boolean {
-	§ Equatable's own `isNot`, whatever `Item` turns out to be.
+	§ Whatever `Item`'s Namespace wrote, where it wrote one — and Equatable's
+	§ own body where it did not.
 	<- a::isNot(b)
 }
 ```
 
-**Write an override to say the same thing faster, never to say something
-different.** Nothing checks that it does. `differ(weight, other)` and
-`weight::isNot(other)` are the same question written twice, and an override that
-disagrees answers them differently — with no Diagnostic, because the two calls
-resolve in two places and each is right about its own.
+`differ(weight, other)` and `weight::isNot(other)` are the same question written
+twice and answer the same way, so an override is free to say something DIFFERENT
+rather than only the same thing faster. This is the rule Rust and Swift follow
+for a requirement with a default: the override enters the witness and is what
+generic code calls, and the default body runs only where the conformer wrote
+none. Swift's statically dispatched member — one declared in a protocol
+EXTENSION and not in the protocol — is the case where the two disagree, and a
+provided Method is not that: it is declared in the Protocol.
 
-It falls out of how a conformance is compiled: a witness names one Method per
-requirement, and a provided Method's body is one const every conformer shares,
-so there is nothing per-conformer for a witness to name. The standard library
-writes overrides on exactly those terms — `Integer`'s four inequalities read its
-own `compare` rather than the cross-kind table, and answer what `Orderable`'s
-provided bodies answer.
-
-This is NOT the rule Rust and Swift follow for a defaulted requirement. In both,
-an override enters the witness and is what generic code calls; the default body
-runs only where the conformer wrote none. Swift's statically dispatched member —
-one declared in a protocol EXTENSION and not in the protocol — is the closer
-cousin, and a provided Method is neither, since it is declared in the Protocol
-and inherited by every conformer.
+The standard library still writes its overrides to say the same thing faster.
+`Integer`'s four inequalities read its own `compare` rather than the cross-kind
+table, and answer what `Orderable`'s provided bodies answer — which is now a
+promise about performance alone, not one the language leans on.
 
 ## Extension
 
@@ -253,15 +279,15 @@ they sit on a number line, and `isBetween` and `clamp` mean what they say there.
 `String` and `List` stay `Comparable`: they are sortable, and that is a different
 claim.
 
-Every one of the six takes `Self`, which is the RECEIVER's own Type — so they
-answer within one kind, and a question across two names the covering `Number`
-Type on the receiver:
+Every one of the six takes `Self`, which is the target of the Namespace whose
+conformance offered it. `Integer` conforms and so does the covering `Number`, so
+each of the six has two rungs on a numeric receiver: a same-kind question is
+answered within the kind, and a question across two kinds falls to `Number`'s
+rung and is answered there.
 
 ```essence
-constant pi: Number = Number.Pi
-
-§ Now the bounds may be an Integer and a Rational.
-Terminal.print(pi::isBetween(3, and 22/7))
+Terminal.print(3::isLessThan(Number.Pi))
+Terminal.print(Number.Pi::isBetween(3, and 22/7))
 ```
 
 `Integer` and `Rational` write four of the six themselves, and each says at its
@@ -291,9 +317,12 @@ shared prelude Module, so it is one const for the whole graph. A provided Method
 nothing reaches is not emitted at all, exactly as an unreferenced standard
 library Method is not.
 
-A provided Method is never part of the witness itself. One body answers for every
-conformer, so there is nothing per-conformer for a witness to name — which is
-also why an override is not visible through a bound.
+A witness names every Method the Protocol declares, provided ones included: the
+conformer's override where it wrote one, and this shared const where it did not.
+The const takes the witness it was read off, which an object literal can not name
+while it is being written, so a witness with a provided half is built by
+`$type.providedConformance`, which closes each provided entry over the finished
+map. That is what makes a bounded call and a direct call one answer.
 
 The const is named `$es_<Protocol>__<member>`, with a DOUBLE separator. A
 Namespace member's const joins with one, and no member name can begin with `_`,

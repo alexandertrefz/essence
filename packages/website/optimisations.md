@@ -185,9 +185,9 @@ What is lowered, and nothing else:
   `isLessThan`, `isGreaterThan`, `isLessThanOrEqualTo`,
   `isGreaterThanOrEqualTo`, `is`, `isNot`, and `add`, `subtract`, `multiply`.
   `isNot` is `Equatable`'s provided Method rather than Integer's own, so its
-  Invocation names the PROTOCOL and carries the conformance witness behind the
-  Argument; the witness goes with the call, because a method map is built rather
-  than run.
+  Invocation carries the conformance witness behind the Argument and says which
+  Protocol wrote the body; the witness goes with the call, because a method map
+  is built rather than run.
   The comparisons become JavaScript's own operators, which decide the
   mathematical order across both of a hybrid Integer's representations without
   converting either side. The arithmetic becomes the operation inside the
