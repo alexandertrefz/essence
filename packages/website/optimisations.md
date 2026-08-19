@@ -184,6 +184,10 @@ What is lowered, and nothing else:
 - **Integer**, where the receiver AND the Argument are exactly `Integer`:
   `isLessThan`, `isGreaterThan`, `isLessThanOrEqualTo`,
   `isGreaterThanOrEqualTo`, `is`, `isNot`, and `add`, `subtract`, `multiply`.
+  `isNot` is `Equatable`'s provided Method rather than Integer's own, so its
+  Invocation names the PROTOCOL and carries the conformance witness behind the
+  Argument; the witness goes with the call, because a method map is built rather
+  than run.
   The comparisons become JavaScript's own operators, which decide the
   mathematical order across both of a hybrid Integer's representations without
   converting either side. The arithmetic becomes the operation inside the
@@ -200,8 +204,8 @@ What is lowered, and nothing else:
   Namespace's name. Same operator, same operands, same answer: the evidence was
   spent while compiling and there is nothing left of it to run.
 - **Boolean**: `negate`, `and`, `or`, which become `!`, `&&` and `||`.
-- **String**: `is` and `isNot`, which become one call to the runtime's
-  `stringEquals`. Two Strings are equal when their CHARACTERS are — the same
+- **String**: `is` and the provided `isNot`, which become one call to the
+  runtime's `stringEquals`. Two Strings are equal when their CHARACTERS are — the same
   accent written as one code point and as two is one String — so this is not
   `===`, and the normalising comparison stays in the one place that has always
   performed it rather than being written out per site.
@@ -243,10 +247,12 @@ Program that wrote such a Namespace, because `Integer` there is that Program's
 and `&&` would skip it.
 
 This one runs inside the standard library as well, and that is where most of it
-lands: the bodies of `isLessThanOrEqualTo`, `subtract` and `isNot` are written
-in Essence on the ones below them, and the receiver there is typed exactly
-`Integer` — so they lower like any other site, and a Program that reaches the
-comparison family stops carrying those bodies at all.
+lands: the bodies of `isLessThanOrEqualTo` and `subtract` are written in Essence
+on the ones below them, and the receiver there is typed exactly `Integer` — so
+they lower like any other site, and a Program that reaches the comparison family
+stops carrying those bodies at all. `Orderable`'s provided bodies are the
+exception, and have to be: their receiver is `Self`, which is no kind in
+particular until a conformance says so, so they stay calls and lower nothing.
 
 A lowered Boolean used as the Program's own `if` is not read back off the
 Boolean it builds — `(a.value < b.value ? Boolean.trueInstance :

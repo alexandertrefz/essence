@@ -102,6 +102,12 @@ Namespace, not extra ways of answering the Protocol.
 A Namespace that writes nothing of the name is never told it is missing
 something: `nonconforming-namespace` lists requirements only.
 
+A DERIVED Method replaces a provided one on the same terms, without anybody
+writing it. Every `choice` derives its equality, so `Ordering#Less::isNot(#Equal)`
+runs the derive rather than `Equatable`'s provided body — the derive is
+fabricated for that receiver and takes the whole Choice, where a provided Method
+takes `Self`, which a receiver narrowed to one Case binds to that Case alone.
+
 ### Where the override is honoured
 
 An override answers every call written on a value of the Namespace's own target
@@ -195,6 +201,22 @@ convenient. `Integer`, `Rational`, `Algebraic` and `Number` are `Orderable` —
 they sit on a number line, and `isBetween` and `clamp` mean what they say there.
 `String` and `List` stay `Comparable`: they are sortable, and that is a different
 claim.
+
+Every one of the six takes `Self`, which is the RECEIVER's own Type — so they
+answer within one kind, and a question across two names the covering `Number`
+Type on the receiver:
+
+```essence
+constant pi: Number = Number.Pi
+
+§ Now the bounds may be an Integer and a Rational.
+Terminal.print(pi::isBetween(3, and 22/7))
+```
+
+`Integer` and `Rational` write four of the six themselves, and each says at its
+own declaration why: the written Overload holds an entry for the other numeric
+kind, and it reads its own `compare` rather than the cross-kind table, so a
+Program that compares two Integers reaches nothing else.
 
 ## How it is compiled
 
