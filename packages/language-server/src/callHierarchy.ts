@@ -400,6 +400,9 @@ function collectItemsFromNode(
 			}
 
 			return
+		// NOTE: A path reads members and calls nothing, so it names no edge —
+		// `path-is-members-only` is what makes that true rather than a guess.
+		case "MemberPath":
 		case "ProtocolDeclarationStatement":
 		case "TypeAliasStatement":
 		case "Identifier":

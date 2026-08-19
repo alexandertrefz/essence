@@ -1200,4 +1200,38 @@ describe("Hover inside a Case payload default", () => {
 
 		expect(hover(source, { line: 3, column: 55 })).toBe("Integer")
 	})
+
+	// NOTE: A member path is a Function literal the Compiler wrote. What a
+	// reader may point at is the path as a whole and each step it spells; the
+	// Parameter the Compiler named is never an answer, and a test that let it
+	// become one would be a test that let `_0` reach a tooltip.
+	describe("member paths", () => {
+		let source = [
+			"implementation {",
+			"\ttype Maker = { town: String }",
+			"\ttype Product = { name: String, maker: Maker }",
+			"\tconstant products: List<Product> = []",
+			"\tconstant towns = products::map(.maker.town)",
+			"}",
+		].join("\n")
+
+		it("describes the path as the Function it stands for", () => {
+			expect(hover(source, { line: 5, column: 33 })).toBe(
+				"(_ { name: String, maker: { town: String } }) -> String",
+			)
+		})
+
+		it("describes each step as the member it reads", () => {
+			expect(hover(source, { line: 5, column: 36 })).toBe(
+				"maker: { town: String }",
+			)
+			expect(hover(source, { line: 5, column: 41 })).toBe("town: String")
+		})
+
+		it("never answers with the name the Compiler gave the Parameter", () => {
+			for (let column = 33; column <= 44; column++) {
+				expect(hover(source, { line: 5, column })).not.toContain("_0")
+			}
+		})
+	})
 })

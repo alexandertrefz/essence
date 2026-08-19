@@ -1291,6 +1291,12 @@ function walkNode(
 		case "FunctionValue":
 			walkFunctionDefinition(node.value, scope, context, node.position)
 			return
+		// NOTE: A path's steps are MEMBER occurrences, and a member is indexed
+		// off the Type it is read from — which this lexical walk does not know.
+		// They are recorded by the typed pass instead, off the Lookups the
+		// Enricher synthesizes for them, each standing at the span of the step
+		// that spelled it.
+		case "MemberPath":
 		case "Self":
 		case "StringValue":
 		case "IntegerValue":

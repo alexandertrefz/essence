@@ -1130,6 +1130,10 @@ function walkNode(
 			}
 
 			return
+		// NOTE: A path holds no Expression of its own — its steps are member
+		// names, and the Function it stands for is the Enricher's.
+		case "MemberPath":
+			return
 	}
 }
 
