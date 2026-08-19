@@ -1058,8 +1058,10 @@ lifted into the Documentation either way.
 A `@param` line documents the Parameter at its own position. The first line
 documents the first Parameter, the second the second, and each names its
 Parameter the way the signature names it: the label, or `_` where the Parameter
-carries none. A line naming the internal name of a labelled Parameter is
-accepted as well, for as long as the standard library is written that way.
+carries none. The internal name a body reads a labelled Parameter under is not
+a second spelling for it — a line naming that is
+`misnamed-documentation-parameter`, and a Parameter no line reached is
+`undocumented-parameter`.
 
 ### `unknown-documentation-parameter`
 
