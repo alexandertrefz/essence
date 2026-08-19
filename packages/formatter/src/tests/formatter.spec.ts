@@ -632,6 +632,120 @@ describe("formatter", () => {
 		})
 	})
 
+	// NOTE: A Protocol carries two things the printer had no shape for until
+	// provided Methods existed — an extension list, which is the very clause a
+	// Namespace conformance writes, and a Method body, which is the very
+	// Definition a Namespace Method writes. Both are printed by the code that
+	// already prints them, so what these hold is that the Protocol reaches it.
+	describe("Protocols", () => {
+		it("round-trips a provided Method", () => {
+			let source = [
+				"implementation {",
+				"	protocol Shape {",
+				"		area() -> Rational",
+				"",
+				"		describe() -> String {",
+				'			<- "area {@::area()}"',
+				"		}",
+				"	}",
+				"}",
+				"",
+			].join("\n")
+
+			let result = format(source)
+
+			expect(result.refusal).toBeNull()
+			expect(result.text).toBe(source)
+		})
+
+		it("round-trips an extension list", () => {
+			let source = [
+				"implementation {",
+				"	protocol Orderable is Comparable, is Equatable {",
+				"		isLessThan(_ other: Self) -> Boolean",
+				"	}",
+				"}",
+				"",
+			].join("\n")
+
+			let result = format(source)
+
+			expect(result.refusal).toBeNull()
+			expect(result.text).toBe(source)
+		})
+
+		it("is idempotent over a provided Method written loosely", () => {
+			let source = [
+				"implementation {",
+				"	protocol   Shape   is   Printable   {",
+				"		area() -> Rational",
+				"		describe()   ->   String   {   <-   @::area()::toString()   }",
+				"	}",
+				"}",
+				"",
+			].join("\n")
+
+			let once = format(source)
+			let twice = format(once.text)
+
+			expect(once.refusal).toBeNull()
+			expect(once.text).toBe(
+				[
+					"implementation {",
+					"	protocol Shape is Printable {",
+					"		area() -> Rational",
+					"		describe() -> String {",
+					"			<- @::area()::toString()",
+					"		}",
+					"	}",
+					"}",
+					"",
+				].join("\n"),
+			)
+			expect(twice.text).toBe(once.text)
+		})
+
+		it("keeps a Comment written inside a provided body", () => {
+			let source = [
+				"implementation {",
+				"	protocol Shape {",
+				"		area() -> Rational",
+				"",
+				"		describe() -> String {",
+				"			§ The area is the whole of what there is to say.",
+				"			<- @::area()::toString()",
+				"		}",
+				"	}",
+				"}",
+				"",
+			].join("\n")
+
+			let result = format(source)
+
+			expect(result.refusal).toBeNull()
+			expect(result.text).toBe(source)
+		})
+
+		// NOTE: A Protocol of requirements alone prints exactly as it always
+		// did — the body and the extension list are the only things the printer
+		// learned, so nothing else may move.
+		it("leaves a Protocol of requirements alone", () => {
+			let source = [
+				"implementation {",
+				"	protocol Printable {",
+				"		toString() -> String",
+				"	}",
+				"}",
+				"",
+			].join("\n")
+
+			let result = format(source)
+
+			expect(result.refusal).toBeNull()
+			expect(result.text).toBe(source)
+		})
+	})
+
 	describe("Comments above the Program", () => {
 		// NOTE: The blank line that separates a file's header from its
 		// `implementation {` used to be found under EVERY line of that header,
