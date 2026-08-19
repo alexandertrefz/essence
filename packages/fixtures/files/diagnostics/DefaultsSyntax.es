@@ -1,5 +1,6 @@
-§ Deliberately broken: the two places a `= expression` default is refused by
-§ the Parser, because a call could never reach it there.
+§ Deliberately broken: the three places a `= expression` default is refused by
+§ the Parser — twice because a call could never reach it, once because there is
+§ nothing there to fill in.
 
 implementation {
 
@@ -13,5 +14,12 @@ implementation {
 	§ is part of how one of them answers.
 	protocol Trimmable {
 		trim(at side: Integer = 1) -> Self
+	}
+
+	§ A Case default fills in the members a construction left out, and a Case
+	§ with no payload shape carries none to fill.
+	choice Direction {
+		Up = { degrees = 0 },
+		Down,
 	}
 }

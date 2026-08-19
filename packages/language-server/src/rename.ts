@@ -5,6 +5,7 @@ import {
 	builtinTypes as builtinTypeTable,
 } from "@essence-lang/compiler/enricher/builtins"
 import {
+	caseDefaults,
 	parameterDefaults,
 	parameterInternalName,
 	patternBindings,
@@ -1037,6 +1038,15 @@ function walkNode(
 				if (choiceCase.type !== null) {
 					walkTypeDeclaration(choiceCase.type, choiceScope, context)
 				}
+			}
+
+			// NOTE: A payload default names values, not Types, and it names
+			// them in the Module's own Scope — a Choice declaration opens no
+			// frame, so the Type Parameters a generic Choice binds are not
+			// what a value in there could mean. Missing this is silent: a
+			// rename would leave the occurrence inside the `= …` behind.
+			for (let defaultValue of caseDefaults(node.cases)) {
+				walkNode(defaultValue, scope, context)
 			}
 
 			return
@@ -2221,6 +2231,15 @@ function walkTypedArguments(
 // finds a Method or a Namespace member NAMED inside one — the parser pass above
 // finds the plain names. Missing this is silent: a rename simply leaves the
 // occurrence inside the `= …` behind.
+function walkTypedCaseDefaults(
+	cases: common.typed.ChoiceDeclarationStatementNode["cases"],
+	context: WalkContext,
+) {
+	for (let defaultValue of caseDefaults(cases)) {
+		walkTypedNode(defaultValue, context)
+	}
+}
+
 function walkTypedParameterDefaults(
 	parameters: Array<common.typed.ParameterNode>,
 	context: WalkContext,
@@ -2370,6 +2389,9 @@ function walkTypedNode(
 			return
 		case "FunctionValue":
 			walkTypedBody(node.value.body, context)
+			return
+		case "ChoiceDeclarationStatement":
+			walkTypedCaseDefaults(node.cases, context)
 			return
 		case "TypeAliasStatement":
 		case "Identifier":

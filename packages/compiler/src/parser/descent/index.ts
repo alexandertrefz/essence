@@ -999,6 +999,11 @@ class DescentParser {
 		)
 	}
 
+	// NOTE: A payload shape may be followed by `= { … }`, the Record a
+	// construction is filled out of. Nothing else may ever follow a Case, so
+	// the `=` is read unconditionally and refused where there is no payload to
+	// default — which says what is wrong instead of leaving the Expression to
+	// fail as a Case name the list never closed.
 	protected parseChoiceCase(): parser.ChoiceCaseNode {
 		let name = this.parseIdentifier()
 		let type: parser.RecordTypeDeclarationNode | null = null
@@ -1007,7 +1012,36 @@ class DescentParser {
 			type = this.parseRecordType()
 		}
 
-		return { name, type }
+		let defaultValue: parser.ExpressionNode | null = null
+
+		if (this.tokens.peek()?.type === TokenType.SymbolEqual) {
+			this.tokens.next()
+
+			defaultValue = this.parseExpression()
+
+			if (type === null) {
+				reportError(
+					`Case '#${name.content}' carries no payload to default`,
+					defaultValue.position,
+					{
+						code: "case-default-without-payload",
+						labels: [
+							primary(defaultValue.position, "this default"),
+						],
+						notes: [
+							"A default fills members in for a construction that left them out, and a Case with no payload shape has none.",
+						],
+						helps: [
+							`Give '#${name.content}' a payload shape, or write it on its own.`,
+						],
+					},
+				)
+
+				defaultValue = null
+			}
+		}
+
+		return { name, type, defaultValue }
 	}
 
 	// NOTE: A free `function` always carries a body, in every mode. A native

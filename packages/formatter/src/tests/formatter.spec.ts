@@ -1755,6 +1755,47 @@ describe("formatter", () => {
 	// caught was one the AST comparison and a plain comment-text comparison
 	// both passed: each Comment present, in order, and the code meaning the
 	// same thing — only the Comments had moved.
+	// NOTE: `= { … }` at the end of a Case's payload shape — the second place a
+	// default is written, and the same gate protects it: the AST comparison
+	// carries `defaultValue`, so a printer that dropped one would refuse rather
+	// than quietly shorten the declaration.
+	describe("Case payload defaults", () => {
+		function roundTrip(source: string): string {
+			let result = format(source)
+
+			expect(result.refusal).toBeNull()
+			expect(format(result.text).text).toBe(result.text)
+
+			return result.text
+		}
+
+		it("keeps a partial payload default", () => {
+			expect(
+				roundTrip(
+					"implementation {\n\tchoice Fetch {\n\t\tGet { url: String, retries: Integer } = { retries = 0 },\n\t}\n}\n",
+				),
+			).toContain(
+				"\t\tGet { url: String, retries: Integer } = { retries = 0 },\n",
+			)
+		})
+
+		it("keeps a default written on the only Case of a one-line Choice", () => {
+			expect(
+				roundTrip(
+					"implementation {\n\tchoice Held { Item { value: Integer } = { value = 0 } }\n}\n",
+				),
+			).toContain("Item { value: Integer } = { value = 0 }")
+		})
+
+		it("keeps a default that is not a Record literal", () => {
+			expect(
+				roundTrip(
+					"implementation {\n\ttype Page = { size: Integer }\n\n\tconstant blank: Page = { size = 0 }\n\n\tchoice Fetch {\n\t\tGet { size: Integer } = blank,\n\t}\n}\n",
+				),
+			).toContain("\t\tGet { size: Integer } = blank,\n")
+		})
+	})
+
 	// NOTE: `= expression` at the end of a Parameter. Every case round-trips
 	// through `format`, which runs the AST-equality gate itself — a dropped
 	// default is a refusal here, not a silently shortened signature.

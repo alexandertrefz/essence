@@ -1,4 +1,4 @@
-import { parameterDefaults } from "@essence-lang/compiler/helpers"
+import { caseDefaults, parameterDefaults } from "@essence-lang/compiler/helpers"
 import type { common, parser } from "@essence-lang/interfaces"
 
 import { matcherValueExpressions } from "./matchHandlerChildren"
@@ -148,6 +148,15 @@ function collectFromNode(
 
 			return
 		}
+		case "ChoiceDeclarationStatement":
+			// NOTE: A Case payload's `= { … }` is a span inside no body, like a
+			// Parameter's — without this, expanding a selection from inside one
+			// jumps straight to the whole Choice.
+			for (let defaultValue of caseDefaults(node.cases)) {
+				descend(defaultValue, cursor, chain)
+			}
+
+			return
 		case "IfStatement":
 			descend(node.condition, cursor, chain)
 			collectFromBody(node.body, cursor, chain)

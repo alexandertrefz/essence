@@ -1,4 +1,4 @@
-import { parameterDefaults } from "@essence-lang/compiler/helpers"
+import { caseDefaults, parameterDefaults } from "@essence-lang/compiler/helpers"
 import type { common, parser } from "@essence-lang/interfaces"
 
 import { methodsOf, nativeSignaturesOf } from "./namespaceMembers"
@@ -228,6 +228,13 @@ function collectCasesFromNode(
 				pushToken(tokens, choiceCase.name.position, "enumMember", [
 					"declaration",
 				])
+			}
+
+			// NOTE: A payload's `= { … }` holds Case values like any other
+			// Expression — `#Empty` written there colours as a Case, not as a
+			// name.
+			for (let defaultValue of caseDefaults(node.cases)) {
+				collectCasesFromNode(defaultValue, tokens)
 			}
 
 			return

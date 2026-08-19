@@ -159,6 +159,7 @@ export type DiagnosticCode =
 	| "redundant-parameter-label"
 	| "shorthand-in-combination"
 	| "default-on-function-literal"
+	| "case-default-without-payload"
 	| "declarations-outside-stdlib"
 	| "overload-function-outside-stdlib"
 	| "misplaced-module-section"

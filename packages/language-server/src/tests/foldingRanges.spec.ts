@@ -192,3 +192,26 @@ describe("Folding the Module sections", () => {
 		expect(ranges).toEqual([{ startLine: 1, endLine: 2 }])
 	})
 })
+
+// NOTE: A payload default may itself be written across lines, and it folds the
+// way the same literal folds inside a body.
+describe("Folding Ranges inside a Case payload default", () => {
+	it("should fold a List literal written as a payload default's member", () => {
+		let source = [
+			"implementation {",
+			"\tchoice Fetch {",
+			"\t\tGet { tags: List<String> } = {",
+			"\t\t\ttags = [",
+			'\t\t\t\t"a",',
+			"\t\t\t],",
+			"\t\t},",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(foldingRangesOf(source)).toContainEqual({
+			startLine: 4,
+			endLine: 5,
+		})
+	})
+})

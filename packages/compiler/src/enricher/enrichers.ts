@@ -3466,6 +3466,11 @@ export function enrichChoiceDeclarationStatement(
 					type: caseType,
 				},
 				type: caseType,
+				defaultValue: enrichCasePayloadDefault(
+					choiceCase,
+					caseType,
+					scope,
+				),
 			}
 		}),
 		type,
@@ -3476,6 +3481,24 @@ export function enrichChoiceDeclarationStatement(
 		]),
 		documentation: node.documentation,
 	}
+}
+
+// NOTE: A Case payload's `= { … }`, enriched against the payload shape it
+// fills — the Module's own Scope, since a Choice declaration stands in no frame
+// and `@` names nothing here.
+function enrichCasePayloadDefault(
+	choiceCase: parser.ChoiceCaseNode,
+	caseType: common.CaseType,
+	scope: enricher.Scope,
+): common.typed.ExpressionNode | null {
+	if (choiceCase.defaultValue === null) {
+		return null
+	}
+
+	return enrichExpression(choiceCase.defaultValue, scope, {
+		type: "Record",
+		members: caseType.members,
+	})
 }
 
 // NOTE: The condition is enriched BEFORE the branch Scopes exist, which is the

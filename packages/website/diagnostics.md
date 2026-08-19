@@ -126,10 +126,28 @@ an entry of an `overload` block. It may not be written on a Function literal
 Integer) -> Boolean`, which has no expression slot and no frame to evaluate one
 in and so does not parse.
 
-A Case payload's members are not Parameters and take no defaults:
-`choice Shape { Circle { radius: Integer = 1 } }` is a Record-literal default,
-which is a different feature — Record construction is not a call — and is not
-part of this one.
+A Case payload's individual members are not Parameters and take no defaults:
+`choice Shape { Circle { radius: Integer = 1 } }` does not parse. What a Case
+may carry is one default for the payload as a WHOLE, written after the shape —
+`Circle { radius: Integer } = { radius = 1 }` — which is a Record-literal
+default rather than a Parameter one, because Record construction is not a call.
+See `case-default-without-payload` and `default-type-mismatch`.
+
+### `case-default-without-payload`
+
+A Case with no payload shape was given a `= { … }` default. A default fills
+members in for a construction that left them out, and a Case that carries
+nothing has no members to fill:
+
+```essence
+choice Direction {
+	Up = { degrees = 0 },
+	Down,
+}
+```
+
+Give the Case a payload shape — `Up { degrees: Integer } = { degrees = 0 }` —
+or write it on its own.
 
 ### `declarations-outside-stdlib`
 

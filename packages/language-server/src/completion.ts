@@ -1,4 +1,5 @@
 import {
+	caseDefaults,
 	filterMostSpecificByTarget,
 	flattenUnionMembers,
 	parameterDefaults,
@@ -635,8 +636,21 @@ function findProbeLookupInNode(
 			return node.value === null
 				? null
 				: findProbeLookupInNode(node.value)
+		case "ChoiceDeclarationStatement": {
+			// NOTE: A `.` inside a Case payload's default probes the same way
+			// one inside a Parameter's does — the member list of whatever the
+			// dot follows, wherever the dot was typed.
+			for (let defaultValue of caseDefaults(node.cases)) {
+				let found = findProbeLookupInNode(defaultValue)
+
+				if (found !== null) {
+					return found
+				}
+			}
+
+			return null
+		}
 		case "TypeAliasStatement":
-		case "ChoiceDeclarationStatement":
 		case "Identifier":
 		case "Self":
 		case "StringValue":
@@ -1171,6 +1185,19 @@ function analyseCaseProbe(program: common.typed.Program): {
 					)
 				}
 
+				// NOTE: Read against the payload it fills, which is what makes
+				// `= { item = #| }` inside a Case offer that member's Choice.
+				// Walked per Case rather than through `caseDefaults`, because
+				// the expected Type is the half the flat enumeration drops.
+				for (let choiceCase of node.cases) {
+					if (choiceCase.defaultValue !== null) {
+						visitNode(choiceCase.defaultValue, {
+							type: "Record",
+							members: choiceCase.type.members,
+						})
+					}
+				}
+
 				return
 			case "CaseValue":
 				if (node.caseName.content === probeCaseName) {
@@ -1270,8 +1297,19 @@ function analyseCaseProbe(program: common.typed.Program): {
 
 				return
 			case "RecordValue":
-				for (let member of Object.values(node.members)) {
-					visitNode(member, null)
+				// NOTE: Each member is read against the Type the position
+				// EXPECTS of it, exactly as a List's items are just above —
+				// the literal's own Type says what was written, which for a
+				// half-typed `#Sta` is an Error and no Choice at all. It is
+				// what gives a `#` standing as a member's value a Choice to
+				// offer, in a Case payload's default and in a body alike.
+				for (let [name, member] of Object.entries(node.members)) {
+					visitNode(
+						member,
+						expectedType?.type === "Record"
+							? (expectedType.members[name] ?? null)
+							: null,
+					)
 				}
 
 				return

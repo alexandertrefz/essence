@@ -1,4 +1,5 @@
 import {
+	caseDefaults,
 	parameterDefaults,
 	requiredParameterCount,
 } from "@essence-lang/compiler/helpers"
@@ -605,8 +606,16 @@ function findEnclosingInvocation(
 				}
 
 				return
-			case "TypeAliasStatement":
 			case "ChoiceDeclarationStatement":
+				// NOTE: A Case payload's default may hold a call, and the
+				// cursor inside its Arguments wants the same Signature Help a
+				// call in a body gets.
+				for (let defaultValue of caseDefaults(node.cases)) {
+					visitNode(defaultValue)
+				}
+
+				return
+			case "TypeAliasStatement":
 			case "Identifier":
 			case "Self":
 			case "StringValue":

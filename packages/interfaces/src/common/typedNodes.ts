@@ -561,7 +561,14 @@ export interface ChoiceDeclarationStatementNode {
 	// NOTE: As on a Namespace — the Type Parameters as typed Nodes, so the
 	// cursor can land on one. `type` carries them without Positions.
 	generics: Array<GenericDeclarationNode>
-	cases: Array<{ name: IdentifierNode; type: CaseType }>
+	// NOTE: `defaultValue` is the enriched `= { … }` a Case's payload shape may
+	// carry — the Expression itself, so the Validator walks it and a Language
+	// Server that reads the typed tree finds it where the Parser's is.
+	cases: Array<{
+		name: IdentifierNode
+		type: CaseType
+		defaultValue: ExpressionNode | null
+	}>
 	type: UnionType | GenericAliasType
 	position: Position
 	headPosition: Position

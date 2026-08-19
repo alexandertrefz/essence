@@ -812,6 +812,8 @@ export class Printer {
 					parts.push(text(" "), this.printRecordType(choiceCase.type))
 				}
 
+				this.printDefaultValueInto(parts, choiceCase)
+
 				parts.push(text(","))
 
 				return concat(parts)
@@ -1564,12 +1566,13 @@ export class Printer {
 	}
 
 	// NOTE: `= expression`, appended after the Type — or after the Pattern's
-	// Type, which is the only other place a default can sit.
+	// Type, or after a Case's payload shape, which are the only other places a
+	// default can sit.
 	private printDefaultValueInto(
 		parts: Array<Doc>,
-		parameter: parser.ParameterNode,
+		written: { defaultValue: parser.ExpressionNode | null },
 	): void {
-		let { defaultValue } = parameter
+		let { defaultValue } = written
 
 		if (defaultValue === null) {
 			return

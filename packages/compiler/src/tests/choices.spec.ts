@@ -205,6 +205,66 @@ describe("Choices", () => {
 			expect(choice.cases[2].type).toBeNull()
 		})
 
+		it("parses a payload default written after the payload shape", () => {
+			let program = parse(`implementation {
+				choice Fetch {
+					Get { url: String, retries: Integer } = { retries = 0 },
+					Head,
+				}
+			}`)
+			let choice = program.implementation
+				.nodes[0] as parser.ChoiceDeclarationStatementNode
+
+			expect(choice.cases[0].defaultValue?.nodeType).toBe("RecordValue")
+			expect(
+				Object.keys(
+					(choice.cases[0].defaultValue as parser.RecordValueNode)
+						.members,
+				),
+			).toEqual(["retries"])
+			expect(choice.cases[1].defaultValue).toBeNull()
+		})
+
+		it("parses a payload default that is not a Record literal", () => {
+			let program = parse(`implementation {
+				choice Fetch {
+					Get { url: String } = blank,
+				}
+			}`)
+			let choice = program.implementation
+				.nodes[0] as parser.ChoiceDeclarationStatementNode
+
+			expect(choice.cases[0].defaultValue?.nodeType).toBe("Identifier")
+		})
+
+		it("refuses a default on a Case that carries no payload", () => {
+			expect(
+				codesOf(`implementation {
+					choice Direction {
+						Up = { degrees = 0 },
+						Down,
+					}
+				}`),
+			).toContain("case-default-without-payload")
+		})
+
+		it("keeps reading the Case list after refusing a payload-less default", () => {
+			let { program } = parseWithDiagnostics(`implementation {
+				choice Direction {
+					Up = { degrees = 0 },
+					Down,
+				}
+			}`)
+			let choice = program.implementation
+				.nodes[0] as parser.ChoiceDeclarationStatementNode
+
+			expect(choice.cases.map((entry) => entry.name.content)).toEqual([
+				"Up",
+				"Down",
+			])
+			expect(choice.cases[0].defaultValue).toBeNull()
+		})
+
 		it("parses a Choice Declaration with a Generic clause", () => {
 			let program = parse(`implementation {
 				choice Progress<State, Result> {

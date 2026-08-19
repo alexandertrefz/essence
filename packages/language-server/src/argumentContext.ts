@@ -278,8 +278,22 @@ function visitNode(
 			}
 
 			return
-		case "TypeAliasStatement":
 		case "ChoiceDeclarationStatement":
+			// NOTE: A payload default fills the payload in, so the payload's
+			// own Record is what a member name inside it is expected against —
+			// the same answer a construction's payload gets just above.
+			for (let choiceCase of node.cases) {
+				if (choiceCase.defaultValue !== null) {
+					visitNode(
+						choiceCase.defaultValue,
+						{ type: "Record", members: choiceCase.type.members },
+						state,
+					)
+				}
+			}
+
+			return
+		case "TypeAliasStatement":
 		case "Identifier":
 		case "Self":
 		case "StringValue":

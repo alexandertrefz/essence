@@ -439,3 +439,24 @@ describe("Semantic Tokens of a Record Literal's shorthand member", () => {
 		).toHaveLength(1)
 	})
 })
+
+// NOTE: A `#Case` written into a Case payload's default would go uncoloured
+// otherwise, for the same reason a Parameter default's would.
+describe("Semantic Tokens of a Case written in a payload default", () => {
+	it("should colour a bare Case as an enum member", () => {
+		let source = [
+			"implementation {",
+			"\tchoice Side {",
+			"\t\tStart,",
+			"\t\tEnd,",
+			"\t}",
+			"",
+			"\tchoice Move {",
+			"\t\tStep { at: Side, by: Integer } = { at = #Start },",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(tokenAt(source, 8, 44)?.type).toBe("enumMember")
+	})
+})
