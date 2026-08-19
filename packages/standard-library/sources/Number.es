@@ -1,10 +1,10 @@
 import {
 	Algebraic      from "./Algebraic.es"
 	Boolean        from "./Boolean.es"
-	Comparable     from "./Comparable.es"
 	Integer        from "./Integer.es"
 	List           from "./List.es"
 	Optional       from "./Optional.es"
+	Orderable      from "./Orderable.es"
 	Ordering       from "./Ordering.es"
 	Equatable      from "./Protocols.es"
 	Printable      from "./Protocols.es"
@@ -102,7 +102,7 @@ declarations {
 	§ `compare` is native and writes all sixteen member cells, which is what
 	§ keeps `Number`'s Comparable conformance total across kinds. The
 	§ `isLessThan` family reads that same order.
-	namespace Number for Number is Equatable, is Printable, is Comparable {
+	namespace Number for Number is Equatable, is Printable, is Orderable {
 		§§ The ratio of a circle's circumference to its diameter, exactly.
 		static Pi: Transcendental
 
@@ -553,49 +553,10 @@ declarations {
 			}
 		}
 
-		§§ Answers whether the Number is strictly below the given one.
-		§§
-		§§ @param _ — the Number to compare against
-		§§ @returns — `true` when the Number is below the given one.
-		isLessThan(_ other: Number) -> Boolean {
-			<- @::compare(to other)::is(#Less)
-		}
-
-		§§ Answers whether the Number is below the given one, or equal to it.
-		§§
-		§§ @param _ — the Number to compare against
-		§§ @returns — `true` when the Number is below the given one or equal to it.
-		isLessThanOrEqualTo(_ other: Number) -> Boolean {
-			<- @::isGreaterThan(other)::negate()
-		}
-
-		§§ Answers whether the Number is strictly above the given one.
-		§§
-		§§ @param _ — the Number to compare against
-		§§ @returns — `true` when the Number is above the given one.
-		isGreaterThan(_ other: Number) -> Boolean {
-			<- @::compare(to other)::is(#Greater)
-		}
-
-		§§ Answers whether the Number is above the given one, or equal to it.
-		§§
-		§§ @param _ — the Number to compare against
-		§§ @returns — `true` when the Number is above the given one or equal to it.
-		isGreaterThanOrEqualTo(_ other: Number) -> Boolean {
-			<- @::isLessThan(other)::negate()
-		}
-
-		§§ Answers whether the Number lies between the two given ones, both included.
-		§§
-		§§ The Number and the bounds can each be any member of the tower, so `Number.Pi::isBetween(3, and 22/7)` holds. Bounds in the wrong order enclose no Number, and the answer is `false`.
-		§§
-		§§ @param _ — the lower bound, included
-		§§ @param and — the upper bound, included
-		§§ @returns — `true` when the Number is within the bounds.
-		isBetween(_ lower: Number, and upper: Number) -> Boolean {
-			<- @::isGreaterThanOrEqualTo(lower)
-				::and(@::isLessThanOrEqualTo(upper))
-		}
+		§ The four inequalities, `isBetween` and `clamp` are `Orderable`'s
+		§ provided Methods, written once on `compare`. This Namespace wrote
+		§ five of them itself, in the same words. The conformance above is
+		§ what a Number receiver reaches them through.
 	}
 }
 

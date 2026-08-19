@@ -1,11 +1,11 @@
 import {
 	Algebraic      from "./Algebraic.es"
 	Boolean        from "./Boolean.es"
-	Comparable     from "./Comparable.es"
 	Integer        from "./Integer.es"
 	NonZeroInteger from "./Integer.es"
 	List           from "./List.es"
 	Optional       from "./Optional.es"
+	Orderable      from "./Orderable.es"
 	Ordering       from "./Ordering.es"
 	Equatable      from "./Protocols.es"
 	Printable      from "./Protocols.es"
@@ -42,7 +42,7 @@ declarations {
 	§ numerator. The literal form is `3/4`, and `Rational.of` builds one from
 	§ two computed Integers. Arithmetic never rounds: an operation that leaves
 	§ the Rationals widens into the Type that states the answer exactly.
-	namespace Rational for Rational is Equatable, is Printable, is Comparable {
+	namespace Rational for Rational is Equatable, is Printable, is Orderable {
 		§ The one gateway a Rational is built through. Overload entries are read
 		§ refined-first, so a call that can prove its denominator reaches the
 		§ total entry. See DEVELOPMENT.md, Why bodies look the way they do.
@@ -403,11 +403,18 @@ declarations {
 			}
 		}
 
-		§ The same-kind entry is written on Rational's own `compare`, so
-		§ comparing two Rationals does not reach the cross-kind table in
-		§ `Number`. A body pulls its transitive reach into every bundle; see
+		§ These four override `Orderable`'s provided Methods of the same
+		§ names, for the two reasons Integer's do. Each holds an Integer
+		§ entry, which a provided Method over `Self` can not offer. And the
+		§ same-kind entry is written on Rational's own `compare`, so comparing
+		§ two Rationals does not reach the cross-kind table in `Number`. A
+		§ body pulls its transitive reach into every bundle; see
 		§ DEVELOPMENT.md, Why bodies look the way they do. The Integer entries
 		§ scale by the denominator, which is positive and keeps the order.
+		§
+		§ The same-kind entries answer what the provided Methods answer, and
+		§ they must: a bounded `<Item is Orderable>` runs the provided body
+		§ where `1/2::isLessThan(2/3)` runs this one. Both read `compare`.
 
 		§§ Answers whether the Rational is strictly below the given number.
 		overload isLessThan {

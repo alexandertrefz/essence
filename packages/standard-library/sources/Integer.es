@@ -1,9 +1,9 @@
 import {
 	Algebraic      from "./Algebraic.es"
 	Boolean        from "./Boolean.es"
-	Comparable     from "./Comparable.es"
 	List           from "./List.es"
 	Optional       from "./Optional.es"
+	Orderable      from "./Orderable.es"
 	Ordering       from "./Ordering.es"
 	Equatable      from "./Protocols.es"
 	Printable      from "./Protocols.es"
@@ -24,7 +24,7 @@ declarations {
 	§ Whole numbers of arbitrary size, and the exact arithmetic over them.
 	§ Nothing here rounds. An operation that leaves the Integers widens into
 	§ a Rational, an Algebraic or a Transcendental instead.
-	namespace Integer for Integer is Equatable, is Printable, is Comparable {
+	namespace Integer for Integer is Equatable, is Printable, is Orderable {
 		§§ Reads an Integer from its text form.
 		§§
 		§§ The text form is an optional minus sign followed by digits, the shape `toString` produces. Text of any other shape answers empty, and the `defaultingTo:` entry answers the given Integer instead.
@@ -337,13 +337,22 @@ declarations {
 			}
 		}
 
-		§ These four are not a copy of `Number`'s. Integer's own `compare` is
-		§ a bigint comparison, while `Number::compare` is the sixteen-cell
-		§ cross-kind table. Deleting these entries routed every Integer
+		§ These four override `Orderable`'s provided Methods of the same
+		§ names, and are kept for two reasons the provided ones can not
+		§ answer. Each holds a Rational entry, and a provided Method takes
+		§ `Self`, which is an Integer here. And Integer's own `compare` is a
+		§ bigint comparison, while `Number::compare` is the sixteen-cell
+		§ cross-kind table. A Program that only compares two Integers must
+		§ reach the first. Deleting these entries once routed every Integer
 		§ comparison through that table and grew `HelloWorld.es` from 18,271
 		§ to 35,729 bytes, the regression `eb27756` fixed. See DEVELOPMENT.md,
 		§ Why bodies look the way they do. Each Rational entry is the flipped
 		§ call: `@` is below a Rational exactly when that Rational is above `@`.
+		§
+		§ The same-kind entries have to answer what the provided Methods
+		§ answer, because a bounded `<Item is Orderable>` runs the provided
+		§ body while `1::isLessThan(2)` runs this one. Both read `compare`, so
+		§ they agree by construction.
 
 		§§ Answers whether this Integer is strictly below the given number.
 		overload isLessThan {
@@ -434,34 +443,10 @@ declarations {
 		§§ Answers the Integer with its sign flipped.
 		negate() -> Integer
 
-		§§ Answers the Integer, pulled into the given bounds.
-		§§
-		§§ The answer is the lower bound when the Integer is below it. It is the upper bound when the Integer is above it, and the Integer itself otherwise. The two bounds name the same range in either order: `7::clamp(between 10, and 1)` is `7`, and `15::clamp(between 10, and 1)` is `10`.
-		§§
-		§§ @param between — one bound of the range
-		§§ @param and — the other bound of the range
-		§§ @returns — the clamped Integer.
-		clamp(between lowest: Integer, and highest: Integer) -> Integer {
-			§ The two ladders below are one ladder with the bounds exchanged.
-			§ Swapping the bounds and calling `clamp` again answers the same
-			§ Integer, one call deeper. The ladder is written out instead, so
-			§ the Method answers without calling itself.
-			if lowest::isGreaterThan(highest) {
-				if @::isLessThan(highest) {
-					<- highest
-				} else if @::isGreaterThan(lowest) {
-					<- lowest
-				} else {
-					<- @
-				}
-			} else if @::isLessThan(lowest) {
-				<- lowest
-			} else if @::isGreaterThan(highest) {
-				<- highest
-			} else {
-				<- @
-			}
-		}
+		§ `clamp` and `isBetween` are `Orderable`'s provided Methods now. Both
+		§ are written on that Protocol's own inequalities, which read
+		§ `compare` through the conformance, so an Integer receiver reaches
+		§ Integer's `compare` and no other kind.
 	}
 
 	§ A refinement adds Methods and takes none away, so a NonZeroInteger

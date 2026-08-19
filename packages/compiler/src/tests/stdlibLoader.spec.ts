@@ -1453,14 +1453,15 @@ describe("Standard Library Loader", () => {
 
 	// NOTE: The Protocol table is the one of the three with no order list to
 	// cross-check it against, so this states the order outright. It is read in
-	// order wherever a conformance is searched, and `Comparable` must stay last
-	// — it is the only one whose signature names a Type (`Ordering`) rather
-	// than only primitives.
+	// order wherever a conformance is searched, and the two ordering Protocols
+	// must stay last — `Comparable` is the first whose signature names a Type
+	// (`Ordering`) rather than only primitives, and `Orderable` extends it.
 	it("orders the builtin Protocols", () => {
 		expect(Object.keys(loadStdlib().protocols)).toEqual([
 			"Equatable",
 			"Printable",
 			"Comparable",
+			"Orderable",
 		])
 	})
 

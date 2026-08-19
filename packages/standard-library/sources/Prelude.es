@@ -26,6 +26,7 @@ export {
 	RationalList         from "./NumberList.es"
 	NestedOptional       from "./Optional.es"
 	Optional             from "./Optional.es"
+	Orderable            from "./Orderable.es"
 	Ordering             from "./Ordering.es"
 	Equatable            from "./Protocols.es"
 	Printable            from "./Protocols.es"

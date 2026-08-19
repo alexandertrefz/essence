@@ -1,12 +1,12 @@
 import {
-	Boolean    from "./Boolean.es"
-	Comparable from "./Comparable.es"
-	Integer    from "./Integer.es"
-	Optional   from "./Optional.es"
-	Ordering   from "./Ordering.es"
-	Equatable  from "./Protocols.es"
-	Printable  from "./Protocols.es"
-	Rational   from "./Rational.es"
+	Boolean   from "./Boolean.es"
+	Integer   from "./Integer.es"
+	Optional  from "./Optional.es"
+	Orderable from "./Orderable.es"
+	Ordering  from "./Ordering.es"
+	Equatable from "./Protocols.es"
+	Printable from "./Protocols.es"
+	Rational  from "./Rational.es"
 }
 
 declarations {
@@ -14,10 +14,7 @@ declarations {
 	§ A real algebraic irrational, for now the quadratic slice `a + b·√d`.
 	§ Equality and ordering are symbolic and exact, which is why Algebraic
 	§ conforms to Comparable and Transcendental does not.
-	namespace Algebraic for Algebraic
-		is Equatable,
-		is Printable,
-		is Comparable {
+	namespace Algebraic for Algebraic is Equatable, is Printable, is Orderable {
 		§§ Answers whether both Algebraics are the same number.
 		§§
 		§§ Normal forms decide the answer exactly. No approximation is consulted.

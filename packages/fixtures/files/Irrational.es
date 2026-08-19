@@ -51,10 +51,14 @@ implementation {
 	Terminal.inspect(Number.Pi::compare(to 22/7)::toString())
 
 	§ The whole tower is comparable through Number, across any two kinds.
-	§ An Integer against π, a Rational against π, two Transcendentals.
-	Terminal.inspect(3::isLessThan(Number.Pi)) § true  (3 < π)
-	Terminal.inspect(4::isLessThan(Number.Pi)) § false (4 > π)
-	constant piBound = 22/7
+	§ An Integer against π, a Rational against π, two Transcendentals. The
+	§ four inequalities are `Orderable`'s, and each takes the receiver's own
+	§ Type, so a question across two kinds names `Number` on the receiver.
+	constant three: Number   = 3
+	constant four: Number    = 4
+	constant piBound: Number = 22/7
+	Terminal.inspect(three::isLessThan(Number.Pi)) § true  (3 < π)
+	Terminal.inspect(four::isLessThan(Number.Pi)) § false (4 > π)
 	Terminal.inspect(piBound::isGreaterThan(Number.Pi)) § true  (22/7 > π)
 	Terminal.inspect(Number.Pi::isLessThan(Number.Tau)) § true  (π < 2·π)
 	Terminal.inspect(Number.Tau::isGreaterThanOrEqualTo(Number.Pi))
@@ -82,11 +86,14 @@ implementation {
 		case #Value(root) {
 			<- match root -> String {
 				case Algebraic {
-					<- "1 < √2: {1::isLessThan(@)}, 2 > √2: {
-						2::isGreaterThan(@)
+					constant one: Number = 1
+					constant two: Number = 2
+
+					<- "1 < √2: {one::isLessThan(@)}, 2 > √2: {
+						two::isGreaterThan(@)
 					}, 1 + √2 = {1::add(@)}"
 				}
-				case Integer   { <- "collapsed" }
+				case Integer { <- "collapsed" }
 			}
 		}
 		case #Empty { <- "none" }

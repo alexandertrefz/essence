@@ -39,10 +39,13 @@ implementation {
 	§ The sign Methods reach the whole tower.
 	Terminal.inspect(Number.Pi::negate()::absolute()) § π
 
-	§ `isBetween` reads the tower's one order, and includes both bounds.
+	§ `isBetween` reads the tower's one order, and includes both bounds. It
+	§ is `Orderable`'s, over the receiver's own Type, so a question that
+	§ mixes kinds binds the receiver as a `Number` first.
 	Terminal.inspect(5::isBetween(1, and 10)) § true
-	Terminal.inspect(Number.Pi::isBetween(3, and 22/7)) § true — π is above 3 and below 22/7
-	Terminal.inspect(Number.Pi::isBetween(22/7, and 4)) § false — π is below 22/7
+	constant pi: Number = Number.Pi
+	Terminal.inspect(pi::isBetween(3, and 22/7)) § true — π is above 3 and below 22/7
+	Terminal.inspect(pi::isBetween(22/7, and 4)) § false — π is below 22/7
 
 	§ Splitting a String answers a List, and joining that List answers a String.
 	Terminal.inspect("a,b,c"::split(on ",")::join(with " + ")) § "a + b + c"

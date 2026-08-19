@@ -146,11 +146,17 @@ export const builtinTypeOrder: Array<string> = [
 // were merged in makes an editor's list reorder itself for reasons no one
 // editing `packages/standard-library/sources` would think to control. It is the order they
 // are declared in, which is also the order they build on each other: `Comparable`
-// is the only one whose signature names a Type rather than only bare tags.
+// is the first whose signature names a Type rather than only bare tags, and
+// `Orderable` extends it.
+//
+// NOTE: It is the order a receiver's PROVIDED Methods are offered in as well —
+// they belong to no Namespace, so a listing appends them per Protocol, and this
+// is that per-Protocol order.
 export const builtinProtocolOrder: Array<string> = [
 	"Equatable",
 	"Printable",
 	"Comparable",
+	"Orderable",
 ]
 
 // NOTE: Accessors rather than consts, because what they answer with is read

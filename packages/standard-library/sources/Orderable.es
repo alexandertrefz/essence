@@ -1,0 +1,105 @@
+import {
+	Boolean    from "./Boolean.es"
+	Comparable from "./Comparable.es"
+	Ordering   from "./Ordering.es"
+}
+
+declarations {
+
+	§ `Orderable` extends `Comparable` and adds no requirement: the six
+	§ Methods below are all written on `compare`. It sits after
+	§ `Comparable.es` in the file chain for that reason, and imports
+	§ `Boolean` and `Ordering` because its bodies name both. The two Cases
+	§ are written out rather than left bare. A bare `#Less` needs the Choice
+	§ in Scope to resolve, and the loader then reports the import that put it
+	§ there as unread.
+	§
+	§ The split is what `sort` needs against what a number line offers. A
+	§ String or a List keeps the smaller promise, `Comparable`. Only
+	§ `Orderable` makes `isBetween` and `clamp` mean something, so the
+	§ numeric kinds declare it and nothing else does.
+	§
+	§ A provided Method takes `Self`, which is the receiver's own Type. So
+	§ the six answer within one kind, and a question across two kinds asks
+	§ `Number.compare` or widens the receiver to `Number` first.
+
+	§§ Anything on a line, where a value can be below another, between two others or pulled into a range.
+	protocol Orderable is Comparable {
+		§§ Answers whether the value is strictly below another.
+		§§
+		§§ @param _ — the value to compare with
+		§§ @returns — `true` when the value is below the given one.
+		isLessThan(_ other: Self) -> Boolean {
+			<- @::compare(to other)::is(Ordering#Less)
+		}
+
+		§§ Answers whether the value is below another, or equal to it.
+		§§
+		§§ @param _ — the value to compare with
+		§§ @returns — `true` when the value is below the given one or equal to it.
+		isLessThanOrEqualTo(_ other: Self) -> Boolean {
+			<- @::isGreaterThan(other)::negate()
+		}
+
+		§§ Answers whether the value is strictly above another.
+		§§
+		§§ @param _ — the value to compare with
+		§§ @returns — `true` when the value is above the given one.
+		isGreaterThan(_ other: Self) -> Boolean {
+			<- @::compare(to other)::is(Ordering#Greater)
+		}
+
+		§§ Answers whether the value is above another, or equal to it.
+		§§
+		§§ @param _ — the value to compare with
+		§§ @returns — `true` when the value is above the given one or equal to it.
+		isGreaterThanOrEqualTo(_ other: Self) -> Boolean {
+			<- @::isLessThan(other)::negate()
+		}
+
+		§§ Answers whether the value lies between the two given ones, both included.
+		§§
+		§§ Bounds in the wrong order enclose no value, and the answer is `false`.
+		§§
+		§§ @param _ — the lower bound, included
+		§§ @param and — the upper bound, included
+		§§ @returns — `true` when the value is within the bounds.
+		isBetween(_ lower: Self, and upper: Self) -> Boolean {
+			<- @::isGreaterThanOrEqualTo(lower)
+				::and(@::isLessThanOrEqualTo(upper))
+		}
+
+		§§ Answers the value, pulled into the given bounds.
+		§§
+		§§ The answer is the lower bound when the value is below it. It is the upper bound when the value is above it, and the value itself otherwise. The two bounds name the same range in either order: `7::clamp(between 10, and 1)` is `7`, and `15::clamp(between 10, and 1)` is `10`.
+		§§
+		§§ @param between — one bound of the range
+		§§ @param and — the other bound of the range
+		§§ @returns — the clamped value.
+		clamp(between lowest: Self, and highest: Self) -> Self {
+			§ The two ladders below are one ladder with the bounds exchanged.
+			§ Swapping the bounds and calling `clamp` again answers the same
+			§ value, one call deeper. The ladder is written out instead, so
+			§ the Method answers without calling itself.
+			if lowest::isGreaterThan(highest) {
+				if @::isLessThan(highest) {
+					<- highest
+				} else if @::isGreaterThan(lowest) {
+					<- lowest
+				} else {
+					<- @
+				}
+			} else if @::isLessThan(lowest) {
+				<- lowest
+			} else if @::isGreaterThan(highest) {
+				<- highest
+			} else {
+				<- @
+			}
+		}
+	}
+}
+
+export {
+	Orderable
+}

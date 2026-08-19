@@ -2232,11 +2232,11 @@ describe("Enricher", () => {
 
 		it("should report a Method that needs a condition", () => {
 			let diagnostics = diagnosticsFor(`implementation {
-				protocol Orderable {
+				protocol Rankable {
 					compare(to other: Self) -> Ordering
 				}
 
-				namespace ListOrderable<infer Item> for List<Item> is Orderable {
+				namespace ListRankable<infer Item> for List<Item> is Rankable {
 					compare <infer Item is Comparable>(to other: List<Item>) -> Ordering {
 						<- Ordering#Equal
 					}
@@ -2307,11 +2307,11 @@ describe("Enricher", () => {
 
 		it("should help toward a where clause on a needs-condition Method", () => {
 			let diagnostics = diagnosticsFor(`implementation {
-				protocol Orderable {
+				protocol Rankable {
 					compare(to other: Self) -> Ordering
 				}
 
-				namespace ListOrderable<infer Item> for List<Item> is Orderable {
+				namespace ListRankable<infer Item> for List<Item> is Rankable {
 					compare <infer Item is Comparable>(to other: List<Item>) -> Ordering {
 						<- Ordering#Equal
 					}
@@ -3791,9 +3791,12 @@ describe("Enricher", () => {
 			).toEqual([])
 		})
 
-		// NOTE: The ordering family lives only on the covering Number
-		// Namespace, so a mixed-kind comparison resolves through it — the
-		// member Namespaces declare no cross-kind `isLessThan` of their own.
+		// NOTE: The ordering family is `Orderable`'s, provided over `Self` —
+		// the receiver's own Type — so a comparison across two kinds names
+		// the covering `Number` on the receiver and the bounds stay written.
+		// Two Transcendentals need no widening: `Self` is Transcendental for
+		// both, and the conformance the covering Namespace declares is what
+		// answers.
 		//
 		// NOTE: `squareRoot` answers an `Optional<Integer | Algebraic>`, which
 		// takes two matches to take apart rather than one: the outer one names
@@ -3803,13 +3806,18 @@ describe("Enricher", () => {
 		it("should compare across Number kinds through the Number Namespace", () => {
 			expect(
 				diagnosticsFor(`implementation {
-					constant belowPi: Boolean = 3::isLessThan(Number.Pi)
+					constant three: Number = 3
+					constant belowPi: Boolean = three::isLessThan(Number.Pi)
 					constant orderedPis: Boolean = Number.Pi::isGreaterThan(Number.Tau)
 					constant rootVsHalf = match 2::squareRoot() -> Boolean {
 						case #Value(root) {
 							<- match root -> Boolean {
-								case Algebraic { <- @::isLessThanOrEqualTo(3/2) }
-								case Integer   { <- false }
+								case Algebraic {
+									constant half: Number = 3/2
+
+									<- half::isGreaterThanOrEqualTo(@)
+								}
+								case Integer { <- false }
 							}
 						}
 						case #Empty { <- false }
@@ -3841,12 +3849,13 @@ describe("Enricher", () => {
 			).toEqual([])
 		})
 
-		// NOTE: Cross-kind comparison lives only on Number. Integer and
-		// Rational keep the same-kind `isLessThan` they always had, but it was
-		// deliberately not widened to the irrationals, and the irrationals
-		// declare no comparison of their own — deciding a Transcendental
-		// ordering in general is undecidable, so the claim is made once by
-		// Number. This guards against a well-meaning re-addition to a member.
+		// NOTE: NO Namespace writes `isLessThan` for a kind other than its
+		// own. Integer and Rational keep the same-kind entry they always had,
+		// and each holds one entry for the other kind, but neither was widened
+		// to the irrationals — deciding a Transcendental ordering in general
+		// is undecidable, so the claim is made once by `Number.compare`, which
+		// `Orderable` provides the whole family on top of. This guards against
+		// a well-meaning re-addition to a member.
 		it("keeps cross-kind comparison off the member Namespaces", () => {
 			// NOTE: The argument Types Integer::isLessThan accepts — no
 			// Algebraic or Transcendental among them.
@@ -3865,7 +3874,15 @@ describe("Enricher", () => {
 			expect(
 				builtinNamespace("Transcendental").methods.isLessThan,
 			).toBeUndefined()
-			expect(builtinNamespace("Number").methods.isLessThan).toBeDefined()
+			// NOTE: And `Number` writes none either. The covering Namespace
+			// declares `is Orderable`, whose provided `isLessThan` reads its
+			// cross-kind `compare` — so a receiver of the covering Type
+			// compares against any member of the tower without a body here.
+			expect(
+				builtinNamespace("Number").methods.isLessThan,
+			).toBeUndefined()
+			expect(builtinNamespace("Number").methods.compare).toBeDefined()
+			expect(builtinNamespace("Number").conformsTo).toContain("Orderable")
 		})
 
 		it("should not allow redeclaring a builtin Protocol", () => {
@@ -5674,10 +5691,10 @@ describe("Enricher", () => {
 			expect(printType(applied)).toBe("Filled<String>")
 		})
 
-		// NOTE: `isBetween` is declared once over the whole numeric tower, so an
-		// Integer's is answered by `Number` — and the conjunct records the
-		// Namespace that ANSWERED, because that is what makes two conjuncts the
-		// same question.
+		// NOTE: `isBetween` is written once, as `Orderable`'s provided Method,
+		// so an Integer's is answered by the PROTOCOL rather than by any
+		// Namespace — and the conjunct records what answered, because that is
+		// what makes two conjuncts the same question.
 		it("should key a conjunct by the Namespace that answered it", () => {
 			expect(
 				refinementOf(
@@ -5685,7 +5702,7 @@ describe("Enricher", () => {
 				).conjuncts,
 			).toEqual([
 				{
-					namespaceName: "Number",
+					namespaceName: "Orderable",
 					methodName: "isBetween",
 					overloadIndex: null,
 					args: ["0", "9"],
