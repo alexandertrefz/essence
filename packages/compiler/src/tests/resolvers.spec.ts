@@ -1061,13 +1061,19 @@ describe("Resolvers", () => {
 	describe("Refined receivers", () => {
 		const integer: common.Type = { type: "Integer" }
 
+		// NOTE: The conjunct names `Equatable` and not `Integer`, because that is
+		// what `Integer.es`'s own `NonZeroInteger` carries: `isNot` is a
+		// Protocol's PROVIDED Method, answered under the name of the Protocol
+		// that wrote the one body every conformer shares. A conjunct spelled the
+		// other way is a different refinement, and the Namespace written for
+		// this one would not be found for it.
 		const nonZeroInteger: common.Type = {
 			type: "Refinement",
 			name: "NonZeroInteger",
 			base: integer,
 			conjuncts: [
 				{
-					namespaceName: "Integer",
+					namespaceName: "Equatable",
 					methodName: "isNot",
 					overloadIndex: null,
 					args: ["0"],

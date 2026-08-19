@@ -11,11 +11,23 @@ declarations {
 		§§ @returns — `true` when the values are equal.
 		is(_ other: Self) -> Boolean
 
+		§ Provided, so a conformer writes `is` alone and answers both. The
+		§ body is an `if` rather than `@::is(other)::negate()`. Reaching
+		§ `Boolean::negate` would need `Boolean` imported here, and
+		§ `Boolean.es` imports this file. That is a second cycle in a graph
+		§ that has one; see DEVELOPMENT.md, The shape of the graph is frozen.
+
 		§§ Answers whether the values differ.
 		§§
 		§§ @param _ — the value to compare with
 		§§ @returns — `true` when the values differ.
-		isNot(_ other: Self) -> Boolean
+		isNot(_ other: Self) -> Boolean {
+			if @::is(other) {
+				<- false
+			} else {
+				<- true
+			}
+		}
 	}
 
 	§§ Anything that can represent itself as a String.

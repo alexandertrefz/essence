@@ -93,9 +93,43 @@ function lower(
 			return lowerBoolean(node, member, shadowed)
 		case "String":
 			return lowerString(node, member)
+		case "Equatable":
+			return lowerProvidedEquatable(node, member)
 		default:
 			return node
 	}
+}
+
+// NOTE: `isNot` is a Protocol's PROVIDED Method — one body over `Self`, shared
+// by every conformer — so its Invocation names `Equatable` rather than the
+// Namespace the receiver belongs to, and carries the conformance witness as a
+// trailing Argument. Everything the lowering rests on is unchanged: the
+// receiver's Type is still exactly an Integer or exactly a String, and what the
+// body does with the witness is call the `is` that Type's Namespace wrote,
+// which is the Method lowered here. The witness goes with the call, and
+// dropping it observes nothing — it is a method map, built rather than run.
+//
+// `providedBy` and not the name alone: a Namespace may be spelled exactly like a
+// Protocol, and only the flag the Simplifier set tells the two apart.
+function lowerProvidedEquatable(
+	node: common.typedSimple.MethodInvocationNode,
+	member: string,
+): common.typedSimple.ExpressionNode {
+	if (member !== "isNot" || node.providedBy !== "Equatable") {
+		return node
+	}
+
+	let kind = node.arguments[0]?.value.type.type
+
+	if (kind !== "Integer" && kind !== "String") {
+		return node
+	}
+
+	let operands = scalarOperands(node, kind, 3)
+
+	return operands === null
+		? node
+		: equality(node, kind, operands[0], operands[1], true)
 }
 
 // NOTE: The comparison family, equality, and the three exact operations.
@@ -248,13 +282,19 @@ function lowerBoolean(
 // Parameter (`is(_ other, comparing sensitivity)` is a different Method) or an
 // Invocation shape the Simplifier did not produce all answer null and are left
 // to the Namespace that understands them.
+//
+// NOTE: `arity` is the whole Argument count the Invocation must have, and it is
+// asked rather than assumed: a Protocol's provided Method carries the
+// conformance witness behind the declared Parameters, so its `isNot` is three
+// Arguments where the written one was two.
 function scalarOperands(
 	node: common.typedSimple.MethodInvocationNode,
 	kind: "Integer" | "String" | "Boolean",
+	arity: number = 2,
 ):
 	| [common.typedSimple.ExpressionNode, common.typedSimple.ExpressionNode]
 	| null {
-	if (node.arguments.length !== 2) {
+	if (node.arguments.length !== arity) {
 		return null
 	}
 

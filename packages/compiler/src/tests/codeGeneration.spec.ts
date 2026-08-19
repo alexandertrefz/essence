@@ -1463,16 +1463,16 @@ describe("Code Generation", () => {
 	// The prelude is what hides that from everything downstream: the runtime
 	// module is imported under `$native_<Name>` and spread into a const that
 	// carries the Namespace's own name, with the Essence-implemented Methods on
-	// top. `Boolean.isNot` is the first Method to have made the trip.
+	// top. `Boolean.isNot` was the first Method to have made the trip; it is
+	// `Equatable`'s provided Method now, and `Boolean.exclusiveOr` — the same
+	// `@::is(other)::negate()` under another name — stands for it here.
 	describe("Essence Method Names", () => {
 		it("names a Method the standard library implements in Essence", () => {
-			// NOTE: `Boolean.isNot` and `Number.isBetween` are the two Methods
-			// with an Essence body today.
-			expect(essenceMethodName("Boolean", "isNot")).toBe(
-				"$es_Boolean_isNot",
+			expect(essenceMethodName("Boolean", "exclusiveOr")).toBe(
+				"$es_Boolean_exclusiveOr",
 			)
-			expect(essenceMethodName("Number", "isBetween")).toBe(
-				"$es_Number_isBetween",
+			expect(essenceMethodName("Number", "toString")).toBe(
+				"$es_Number_toString",
 			)
 		})
 
@@ -1505,9 +1505,9 @@ describe("Code Generation", () => {
 		})
 
 		it("keeps a Method out of the Property table", () => {
-			expect(essencePropertyName("Boolean", "isNot")).toBeNull()
-			expect(essenceMethodName("Boolean", "isNot")).toBe(
-				"$es_Boolean_isNot",
+			expect(essencePropertyName("Boolean", "exclusiveOr")).toBeNull()
+			expect(essenceMethodName("Boolean", "exclusiveOr")).toBe(
+				"$es_Boolean_exclusiveOr",
 			)
 		})
 	})
@@ -1592,7 +1592,7 @@ describe("Code Generation", () => {
 
 		it("emits an Essence-implemented Method as its own const", () => {
 			const code = generate(`implementation {
-				Terminal.inspect(true::isNot(false))
+				Terminal.inspect(true::exclusiveOr(false))
 			}`)
 
 			// NOTE: The Namespace is imported under its own name — no `$native_`
@@ -1603,7 +1603,7 @@ describe("Code Generation", () => {
 			expect(code).not.toContain("$native_Boolean")
 			expect(code).not.toContain("const Boolean = {")
 			expect(code).toContain(
-				"const $es_Boolean_isNot = function (_self, other) {",
+				"const $es_Boolean_exclusiveOr = function (_self, other) {",
 			)
 
 			// NOTE: Every other Namespace is wholly native, so it keeps the plain
@@ -1612,14 +1612,14 @@ describe("Code Generation", () => {
 			expect(code).not.toContain("$es_String_")
 		})
 
-		// NOTE: The const's body names another Namespace — `isNot` is
+		// NOTE: The const's body names another Namespace — `exclusiveOr` is
 		// `@::is(other)::negate()`, and `Boolean.is` is a native, so it is a
 		// plain member read off the runtime module the plain import binds. The
 		// `negate` around it is not a call any more: `lower-scalar-operations`
 		// writes it out as JavaScript's own `!`.
 		it("emits a body that reads the natives off the runtime module", () => {
 			const code = generate(`implementation {
-				Terminal.inspect(true::isNot(false))
+				Terminal.inspect(true::exclusiveOr(false))
 			}`)
 
 			expect(code).toContain("!Boolean.is(_self, other).value")
@@ -1635,7 +1635,7 @@ describe("Code Generation", () => {
 				Terminal.inspect("hello")
 			}`)
 
-			expect(code).not.toContain("$es_Boolean_isNot")
+			expect(code).not.toContain("$es_Boolean_exclusiveOr")
 			expect(code).toContain('import * as Boolean from "')
 		})
 
@@ -1645,17 +1645,17 @@ describe("Code Generation", () => {
 		// the source would have to know every one of those shapes.
 		it("finds a Method named only through a conformance witness", () => {
 			const code = generate(`implementation {
-				function differ <infer Value is Equatable>(_ a: Value, _ b: Value) -> String {
-					<- a::isNot(b)::toString()
+				function describe <infer Value is Printable>(_ a: Value) -> String {
+					<- a::toString()
 				}
 
 				constant yes = true
 
-				Terminal.inspect(differ(yes, yes))
+				Terminal.inspect(describe(yes))
 			}`)
 
-			expect(code).toContain("isNot: $es_Boolean_isNot")
-			expect(code).toContain("const $es_Boolean_isNot")
+			expect(code).toContain("toString: $es_Boolean_toString")
+			expect(code).toContain("const $es_Boolean_toString")
 		})
 
 		// NOTE: A dotted member name is text, not a reference — a Record whose
@@ -1691,47 +1691,51 @@ describe("Code Generation", () => {
 		})
 
 		// NOTE: The `$es_` prefix can not collide with a user identifier because
-		// `_` is a Lexer Symbol — no user name contains one. `$esBooleanisNot` is
-		// the closest a user can write, and it must survive as its own distinct
-		// binding alongside the Rewriter's `$es_Boolean_isNot`.
+		// `_` is a Lexer Symbol — no user name contains one.
+		// `$esBooleanexclusiveOr` is the closest a user can write, and it must
+		// survive as its own distinct binding alongside the Rewriter's
+		// `$es_Boolean_exclusiveOr`.
 		it("keeps a user identifier near the prefix distinct", async () => {
 			const source = `implementation {
-				constant $esBooleanisNot = "mine"
+				constant $esBooleanexclusiveOr = "mine"
 
-				Terminal.inspect($esBooleanisNot::append(true::isNot(false)::toString()))
+				Terminal.inspect($esBooleanexclusiveOr::append(true::exclusiveOr(false)::toString()))
 			}`
 
 			const code = generate(source)
 
-			expect(code).toContain("$esBooleanisNot")
-			expect(code).toContain("$es_Boolean_isNot")
+			expect(code).toContain("$esBooleanexclusiveOr")
+			expect(code).toContain("$es_Boolean_exclusiveOr")
 			expect(await run(source)).toEqual(['"minetrue"'])
 		})
 
-		it("runs isNot from its const", async () => {
+		it("runs exclusiveOr from its const", async () => {
 			expect(
 				await run(`implementation {
-					Terminal.inspect(false::isNot(true)::toString())
-					Terminal.inspect(true::isNot(true)::toString())
-					Terminal.inspect(false::isNot(false)::toString())
+					Terminal.inspect(false::exclusiveOr(true)::toString())
+					Terminal.inspect(true::exclusiveOr(true)::toString())
+					Terminal.inspect(false::exclusiveOr(false)::toString())
 				}`),
 			).toEqual(['"true"', '"false"', '"false"'])
 		})
 
 		// NOTE: The conformance witness reads the Essence Method as the bare
-		// `$es_Boolean_isNot` const rather than off the runtime module, so a
-		// Boolean that reaches a bounded generic finds the Essence implementation.
-		it("witnesses Equatable with the Essence Method", async () => {
+		// `$es_Boolean_toString` const rather than off the runtime module, so a
+		// Boolean that reaches a bounded generic finds the Essence
+		// implementation. `Printable` and not `Equatable`, because Equatable's
+		// one requirement — `is` — is a native on every conformer; `isNot` is
+		// PROVIDED and so is never in a witness at all.
+		it("witnesses Printable with the Essence Method", async () => {
 			const source = `implementation {
-				function differ <infer Value is Equatable>(_ a: Value, _ b: Value) -> Boolean {
-					<- a::isNot(b)
+				function describe <infer Value is Printable>(_ a: Value) -> String {
+					<- a::toString()
 				}
 
-				Terminal.inspect(differ(true, false)::toString())
-				Terminal.inspect(differ(true, true)::toString())
+				Terminal.inspect(describe(true))
+				Terminal.inspect(describe(false))
 			}`
 
-			expect(generate(source)).toContain("isNot: $es_Boolean_isNot")
+			expect(generate(source)).toContain("toString: $es_Boolean_toString")
 			expect(await run(source)).toEqual(['"true"', '"false"'])
 		})
 
@@ -1805,19 +1809,19 @@ describe("Code Generation", () => {
 		// const in with it, and the per-Method gate is precise enough not to.
 		it("emits each Essence Method's const only where it is reached", () => {
 			const both = generate(`implementation {
-				Terminal.inspect(5::isBetween(1, and 10)::isNot(false))
+				Terminal.inspect(5::isBetween(1, and 10)::exclusiveOr(false))
 			}`)
 
 			expect(both).toContain("const $es_Number_isBetween")
-			expect(both).toContain("const $es_Boolean_isNot")
+			expect(both).toContain("const $es_Boolean_exclusiveOr")
 
-			// NOTE: `isNot` alone — a Program that never names a Number.
+			// NOTE: `exclusiveOr` alone — a Program that never names a Number.
 			const booleanOnly = generate(`implementation {
-				Terminal.inspect(true::isNot(false))
+				Terminal.inspect(true::exclusiveOr(false))
 			}`)
 
 			expect(booleanOnly).not.toContain("$es_Number_isBetween")
-			expect(booleanOnly).toContain("const $es_Boolean_isNot")
+			expect(booleanOnly).toContain("const $es_Boolean_exclusiveOr")
 
 			// NOTE: `isBetween` alone reaches only natives, so its const stands
 			// alone.
@@ -1828,7 +1832,7 @@ describe("Code Generation", () => {
 			expect(numberReached).toContain(
 				"const $es_Number_isBetween = function (_self, lower, upper) {",
 			)
-			expect(numberReached).not.toContain("$es_Boolean_isNot")
+			expect(numberReached).not.toContain("$es_Boolean_exclusiveOr")
 
 			// NOTE: Neither. A String-only Program names no Essence Method at all
 			// and gets no const.
@@ -1837,7 +1841,7 @@ describe("Code Generation", () => {
 			}`)
 
 			expect(neither).not.toContain("$es_Number_isBetween")
-			expect(neither).not.toContain("$es_Boolean_isNot")
+			expect(neither).not.toContain("$es_Boolean_exclusiveOr")
 		})
 
 		// NOTE: A value-LESS `static PI: Transcendental` is a native — it reaches

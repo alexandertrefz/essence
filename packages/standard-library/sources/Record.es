@@ -15,14 +15,6 @@ declarations {
 		§§ @returns — `true` when the Records are equal.
 		is(_ other: Record) -> Boolean
 
-		§§ Answers whether the Record has different members than another, or a different value under one of them.
-		§§
-		§§ @param _ — the Record to compare against
-		§§ @returns — `true` when the Records are not equal.
-		isNot(_ other: Record) -> Boolean {
-			<- @::is(other)::negate()
-		}
-
 		§§ Answers the Record and its members as a String.
 		§§
 		§§ Each member is written as `name = value`. The value is written the way it prints, so a whole Rational member prints its numerator alone. A String member keeps its quotation marks. A Record too long for one line is written over several lines.

@@ -67,6 +67,16 @@ implementation {
 		})
 	}
 
+	§ A written number reaches its own kind's Namespace — `2::isNot(2/1)` asks
+	§ Integer, which has no Rational entry — so the Methods the covering
+	§ `Number` answers for need a receiver of the covering Type. This widens
+	§ one and hands it straight back. It stands where `Number.isNot(2, 2/1)`
+	§ once did: a Protocol's provided Method is reached through the receiver,
+	§ never through the Namespace spelling.
+	function asNumber(_ value: Number) -> Number {
+		<- value
+	}
+
 	constant greeting     = "Hello, World"
 	constant emptyText    = ""
 	constant numbers      = [3, 1, 2, 1, 4]
@@ -84,8 +94,8 @@ implementation {
 	show("String.is(_ String)", greeting::is("Hello, World"))
 	show("String.is(_ String) [differing]", greeting::is("nope"))
 	show("String.is(_ String) [both empty]", emptyText::is(""))
-	show("String.isNot(_ String)", greeting::isNot("nope"))
-	show("String.isNot(_ String) [equal]", greeting::isNot("Hello, World"))
+	show("Equatable.isNot(_ String)", greeting::isNot("nope"))
+	show("Equatable.isNot(_ String) [equal]", greeting::isNot("Hello, World"))
 	show(
 		"String.is(_ String, comparing: CaseSensitivity) [sensitive]",
 		"Hello"::is("hello", comparing CaseSensitivity#Sensitive),
@@ -348,8 +358,8 @@ third"::lines())
 	show("Boolean.negate() [false]", false::negate())
 	show("Boolean.is(_ Boolean)", true::is(true))
 	show("Boolean.is(_ Boolean) [differing]", true::is(false))
-	show("Boolean.isNot(_ Boolean)", true::isNot(false))
-	show("Boolean.isNot(_ Boolean) [equal]", false::isNot(false))
+	show("Equatable.isNot(_ Boolean)", true::isNot(false))
+	show("Equatable.isNot(_ Boolean) [equal]", false::isNot(false))
 	show("Boolean.and(_ Boolean)", true::and(true))
 	show("Boolean.and(_ Boolean) [false]", true::and(false))
 	show("Boolean.or(_ Boolean)", false::or(true))
@@ -373,8 +383,8 @@ third"::lines())
 
 	show("Integer.is(_ Integer)", 7::is(7))
 	show("Integer.is(_ Integer) [differing]", 7::is(8))
-	show("Integer.isNot(_ Integer)", 7::isNot(8))
-	show("Integer.isNot(_ Integer) [equal]", 7::isNot(7))
+	show("Equatable.isNot(_ Integer)", 7::isNot(8))
+	show("Equatable.isNot(_ Integer) [equal]", 7::isNot(7))
 	show("Integer.add(_ Integer)", 66::add(34))
 	show("Integer.add(_ Integer) [negative]", 66::add(-100))
 	show("Integer.add(_ Rational)", 1::add(1/2))
@@ -639,8 +649,8 @@ third"::lines())
 	)
 	show("Rational.is(_ Rational)", 1/2::is(2/4))
 	show("Rational.is(_ Rational) [differing]", 1/2::is(1/3))
-	show("Rational.isNot(_ Rational)", 1/2::isNot(1/3))
-	show("Rational.isNot(_ Rational) [equal]", 1/2::isNot(2/4))
+	show("Equatable.isNot(_ Rational)", 1/2::isNot(1/3))
+	show("Equatable.isNot(_ Rational) [equal]", 1/2::isNot(2/4))
 	show("Rational.add(_ Rational)", 1/2::add(1/3))
 	show("Rational.add(_ Rational) [collapses to a whole]", 1/2::add(1/2))
 	show("Rational.add(_ Integer)", 1/2::add(1))
@@ -861,8 +871,8 @@ third"::lines())
 			"Algebraic.is(_ Algebraic) [differing radicals]",
 			rootTwo::is(rootThree),
 		)
-		show("Algebraic.isNot(_ Algebraic)", rootTwo::isNot(rootThree))
-		show("Algebraic.isNot(_ Algebraic) [equal]", rootTwo::isNot(rootTwo))
+		show("Equatable.isNot(_ Algebraic)", rootTwo::isNot(rootThree))
+		show("Equatable.isNot(_ Algebraic) [equal]", rootTwo::isNot(rootTwo))
 		show("Algebraic.compare(to: Algebraic)", rootTwo::compare(to rootThree))
 		show(
 			"Algebraic.compare(to: Algebraic) [equal]",
@@ -982,9 +992,9 @@ third"::lines())
 		"Transcendental.is(_ Transcendental) [differing]",
 		Number.Pi::is(Number.Tau),
 	)
-	show("Transcendental.isNot(_ Transcendental)", Number.Pi::isNot(Number.Tau))
+	show("Equatable.isNot(_ Transcendental)", Number.Pi::isNot(Number.Tau))
 	show(
-		"Transcendental.isNot(_ Transcendental) [equal]",
+		"Equatable.isNot(_ Transcendental) [equal]",
 		Number.Pi::isNot(Number.Pi),
 	)
 	show("Transcendental.add(_ Integer)", Number.Pi::add(1))
@@ -1084,12 +1094,15 @@ third"::lines())
 			"Number.is(_ Number) [Transcendental]",
 			Number.is(Number.Pi::multiply(with 2), Number.Tau),
 		)
-		show("Number.isNot(_ Number) [Integer]", Number.isNot(2, 2/1))
-		show("Number.isNot(_ Number) [Rational]", Number.isNot(1/2, 1))
-		show("Number.isNot(_ Number) [Algebraic]", Number.isNot(rootTwo, 2))
+		show("Equatable.isNot(_ Number) [Integer]", asNumber(2)::isNot(2/1))
+		show("Equatable.isNot(_ Number) [Rational]", asNumber(1/2)::isNot(1))
 		show(
-			"Number.isNot(_ Number) [Transcendental]",
-			Number.isNot(Number.Pi, Number.Tau),
+			"Equatable.isNot(_ Number) [Algebraic]",
+			asNumber(rootTwo)::isNot(2),
+		)
+		show(
+			"Equatable.isNot(_ Number) [Transcendental]",
+			asNumber(Number.Pi)::isNot(Number.Tau),
 		)
 		show("Number.toString() [Integer]", Number.toString(42))
 		show("Number.toString() [Rational]", Number.toString(3/4))
@@ -1646,8 +1659,8 @@ third"::lines())
 
 	show("Record.is(_ \{\})", point::is({ x = 1, y = 2 }))
 	show("Record.is(_ \{\}) [differing]", point::is({ x = 1, y = 3 }))
-	show("Record.isNot(_ \{\})", point::isNot({ x = 1, y = 3 }))
-	show("Record.isNot(_ \{\}) [equal]", point::isNot({ x = 1, y = 2 }))
+	show("Equatable.isNot(_ \{\})", point::isNot({ x = 1, y = 3 }))
+	show("Equatable.isNot(_ \{\}) [equal]", point::isNot({ x = 1, y = 2 }))
 
 	§ A Function is the one value with no Type tag on it, and reading that
 	§ missing tag used to THROW here rather than answer — a Record holding a
@@ -1691,12 +1704,9 @@ third"::lines())
 		"List.is<ItemType is Equatable>(_ List<ItemType>) [both empty]",
 		noNumbers::is([]),
 	)
+	show("Equatable.isNot(_ List<ItemType>)", numbers::isNot(singleNumber))
 	show(
-		"List.isNot<ItemType is Equatable>(_ List<ItemType>)",
-		numbers::isNot(singleNumber),
-	)
-	show(
-		"List.isNot<ItemType is Equatable>(_ List<ItemType>) [equal]",
+		"Equatable.isNot(_ List<ItemType>) [equal]",
 		numbers::isNot([3, 1, 2, 1, 4]),
 	)
 	show("List.toString<ItemType is Printable>()", numbers::toString())

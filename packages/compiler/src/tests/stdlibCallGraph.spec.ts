@@ -430,13 +430,20 @@ function propertyGraphOf(source: string): CallGraph {
 }
 
 describe("Stdlib Call Graph", () => {
-	// NOTE: This now guards real edges — `String.isNot` calls `String.is`,
-	// `Rational.isNot` calls `Rational.is`, and the conversion adds more
-	// Methods written in terms of each other every commit. An accidental cycle
-	// among them is a stack overflow at run time with no Diagnostic, which is
-	// exactly what this catches before it ships. A Choice's `is`/`isNot` are
-	// no longer among them: they are derived, so they are not written in
-	// Essence and have no edges to cycle through.
+	// NOTE: This now guards real edges — `Integer.isEven` calls
+	// `Integer.remainder`, `Boolean.exclusiveOr` calls `Boolean.is`, and the
+	// conversion adds more Methods written in terms of each other every commit.
+	// An accidental cycle among them is a stack overflow at run time with no
+	// Diagnostic, which is exactly what this catches before it ships. A Choice's
+	// `is`/`isNot` are no longer among them: they are derived, so they are not
+	// written in Essence and have no edges to cycle through.
+	//
+	// NOTE: A Protocol's PROVIDED Methods are Nodes on the same footing, under
+	// the Protocol's own name — the prelude carries them exactly as it carries a
+	// Namespace's, and `Equatable.isNot` is one body every conformer runs. What
+	// they call THROUGH the conformance witness is no edge here: a Method
+	// reached off a witness is chosen by the receiver, not by the body, so it is
+	// no more a static call than a Function-typed Parameter's is.
 	//
 	// NOTE: The free Functions are in the same graph, which is what makes `loop`'s
 	// two bodied entries answerable for: each is written on the native primitive
@@ -466,15 +473,14 @@ describe("Stdlib Call Graph", () => {
 			"Algebraic.divide__overload$5",
 			"Algebraic.divide__overload$6",
 			"Algebraic.is",
-			"Algebraic.isNot",
 			"Algebraic.multiply__overload$4",
 			"Algebraic.subtract__overload$1",
 			"Algebraic.subtract__overload$2",
 			"Algebraic.subtract__overload$3",
 			"Algebraic.subtract__overload$4",
 			"Boolean.exclusiveOr",
-			"Boolean.isNot",
 			"Boolean.toString",
+			"Equatable.isNot",
 			// NOTE: `Exact` is a helper Namespace of `Number.es` that
 			// `Prelude.es` does not re-export, so it is no builtin — but it is
 			// a Namespace of the standard library like any other, and its two
@@ -501,7 +507,6 @@ describe("Stdlib Call Graph", () => {
 			"Integer.isLessThan__overload$1",
 			"Integer.isLessThan__overload$2",
 			"Integer.isNegative",
-			"Integer.isNot",
 			"Integer.isOdd",
 			"Integer.isPositive",
 			"Integer.isZero",
@@ -542,7 +547,6 @@ describe("Stdlib Call Graph", () => {
 			"List.hasItems__overload$2",
 			"List.hasItems__overload$3",
 			"List.isEmpty",
-			"List.isNot",
 			"List.item__overload$2",
 			"List.lastIndex__overload$1",
 			"List.lastIndex__overload$2",
@@ -596,7 +600,6 @@ describe("Stdlib Call Graph", () => {
 			"Number.isGreaterThanOrEqualTo",
 			"Number.isLessThan",
 			"Number.isLessThanOrEqualTo",
-			"Number.isNot",
 			"Number.lowestNumber__overload$1",
 			"Number.lowestNumber__overload$10",
 			"Number.lowestNumber__overload$2",
@@ -650,7 +653,6 @@ describe("Stdlib Call Graph", () => {
 			"Rational.isLessThanOrEqualTo__overload$2",
 			"Rational.isLessThan__overload$1",
 			"Rational.isLessThan__overload$2",
-			"Rational.isNot",
 			"Rational.isWholeNumber",
 			"Rational.multiply__overload$2",
 			"Rational.multiply__overload$3",
@@ -676,7 +678,6 @@ describe("Stdlib Call Graph", () => {
 			"RationalList.lowestNumber__overload$2",
 			"RationalList.product",
 			"RationalList.sum",
-			"Record.isNot",
 			"String.character__overload$2",
 			"String.characters",
 			"String.compare__overload$2",
@@ -689,7 +690,6 @@ describe("Stdlib Call Graph", () => {
 			"String.firstIndex__overload$2",
 			"String.hasCharacters",
 			"String.isEmpty",
-			"String.isNot",
 			"String.is__overload$1",
 			"String.is__overload$2",
 			"String.lastIndex__overload$1",
@@ -710,7 +710,6 @@ describe("Stdlib Call Graph", () => {
 			"Transcendental.divide__overload$4",
 			"Transcendental.divide__overload$5",
 			"Transcendental.divide__overload$6",
-			"Transcendental.isNot",
 			"Transcendental.subtract__overload$1",
 			"Transcendental.subtract__overload$2",
 			"Transcendental.subtract__overload$3",

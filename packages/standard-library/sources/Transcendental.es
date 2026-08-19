@@ -31,16 +31,6 @@ declarations {
 		§§ @returns — `true` when the canonical forms agree.
 		is(_ other: Transcendental) -> Boolean
 
-		§§ Answers whether the Transcendentals have different canonical forms.
-		§§
-		§§ On a single base the two are then different numbers.
-		§§
-		§§ @param _ — the Transcendental to compare with
-		§§ @returns — `true` when the canonical forms differ.
-		isNot(_ other: Transcendental) -> Boolean {
-			<- @::is(other)::negate()
-		}
-
 		§§ Answers the Transcendental as a String, in the exact symbolic form: `π`, `2·π`, `e` or `1 + π + e`.
 		toString() -> String
 

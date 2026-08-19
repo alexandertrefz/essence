@@ -76,14 +76,6 @@ declarations {
 			}
 		}
 
-		§§ Answers whether the String differs from another in any character.
-		§§
-		§§ @param _ — the String to compare against
-		§§ @returns — `true` when the Strings are not equal.
-		isNot(_ other: String) -> Boolean {
-			<- @::is(other)::negate()
-		}
-
 		§§ Orders the String against another one, by character code point.
 		§§
 		§§ A `CaseSensitivity` of `#Insensitive` folds the case first.
