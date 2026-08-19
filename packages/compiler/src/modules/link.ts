@@ -1217,6 +1217,15 @@ function usedNames(module: Module, program: common.typed.Program): Set<string> {
 			names.add(record["namespaceName"])
 		}
 
+		// NOTE: A PROVIDED Method reads the Protocol that wrote its body, and
+		// the Invocation is named after the NAMESPACE whose conformance put it
+		// in reach — so `square::describe()` spells neither `Shape` nor
+		// `describe`'s declaration anywhere else. Reaching a provided Method
+		// needs the Protocol in Scope, so an import that carries it is used.
+		if (typeof record["providedBy"] === "string") {
+			names.add(record["providedBy"])
+		}
+
 		if (
 			record["kind"] === "namespace" &&
 			typeof record["name"] === "string"

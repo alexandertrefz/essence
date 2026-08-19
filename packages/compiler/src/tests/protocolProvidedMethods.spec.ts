@@ -813,13 +813,14 @@ describe("Protocol-provided Methods", () => {
 			])
 		})
 
-		// NOTE: The override rule reads the NAME and nothing else, so a
-		// Namespace that declares no conformance and means something else
-		// entirely by the name still replaces the provided Method. That is the
-		// Program's decision to make and is not refused — but a reader told only
-		// what `Extras::isEmpty` takes can not see that `Sized`'s was in reach,
-		// so the report says which Protocol lost the name.
-		it("should name the Protocol a shadowing Namespace replaced", () => {
+		// NOTE: The override rule is about the NAMESPACE, not about the name.
+		// `Extras` writes `isEmpty` for the same Type and declares no
+		// conformance at all — that replaces the provided Method on Extras' own
+		// rung of the ladder and on nobody else's, so `Bags`'s conformance still
+		// answers the call `Extras` rejects. This is the same continuation a
+		// written Overload gets, and it is why a Program is free to mean
+		// something else by a name a Protocol in Scope happens to provide.
+		it("should keep another Namespace's provided Method on the ladder", async () => {
 			let source = [
 				"implementation {",
 				"\tprotocol Sized {",
@@ -846,21 +847,18 @@ describe("Protocol-provided Methods", () => {
 				"",
 				"\tconstant bag: Bag = { n = 0 }",
 				"\tTerminal.inspect(bag::isEmpty())",
+				'\tTerminal.inspect(bag::isEmpty("tag"))',
 				"}",
 			].join("\n")
 
-			expect(codesOf(source)).toEqual(["no-matching-overload"])
-			expect(notesOf(source)).toEqual([
-				"'Extras::isEmpty' takes 1 Argument: Parameter 1 is String.",
-				"'Sized' provides 'isEmpty', and a Namespace declaring the name replaces it.",
-			])
+			expect(codesOf(source)).toEqual([])
+			expect(await run(source)).toEqual(["true", '"tag"'])
 		})
 
-		// NOTE: Nothing replaced a fallback the call actually REACHED, so the
-		// note stays off. `bag::isEmpty(1)` misses on the Arguments alone, and
-		// `Sized`'s provided Method is what it missed on — the same shape as
-		// `Number.Pi::isLessThan(4)` missing on `Self`.
-		it("should not name a provided Method the call reached", () => {
+		// NOTE: A provided Method is named by the Namespace whose conformance
+		// put it in reach, with the Protocol that wrote the body said beside it
+		// — a reader who never wrote `isEmpty` anywhere needs both halves.
+		it("should name a provided candidate by its Namespace and its Protocol", () => {
 			let source = [
 				"implementation {",
 				"\tprotocol Sized {",
@@ -886,13 +884,14 @@ describe("Protocol-provided Methods", () => {
 
 			expect(codesOf(source)).toEqual(["no-matching-overload"])
 			expect(notesOf(source)).toEqual([
-				"'Sized::isEmpty' takes no Arguments.",
+				"'Bags::isEmpty' (provided by Sized) takes no Arguments.",
 			])
 		})
 
-		// NOTE: A DERIVE answers ahead of a provided Method, so the note names
-		// the derive alone. Naming `Equatable` beside it would name something
-		// the call could not have reached even with `Extras` gone.
+		// NOTE: A DERIVE answers only where nothing WRITTEN does, and where it
+		// answers it answers alone — so the note names the derive and never a
+		// provided Method beside it. `Extras` takes the name from the derive,
+		// and the Argument here is of a Type nothing on the ladder accepts.
 		it("should name the derive a shadowing Namespace replaced", () => {
 			let source = [
 				"implementation {",
@@ -901,8 +900,6 @@ describe("Protocol-provided Methods", () => {
 				"\t\tGreen,",
 				"\t}",
 				"",
-				"\tnamespace Colours for Colour is Equatable {}",
-				"",
 				"\tnamespace Extras for Colour {",
 				"\t\tisNot(_ tag: String) -> String {",
 				"\t\t\t<- tag",
@@ -910,13 +907,14 @@ describe("Protocol-provided Methods", () => {
 				"\t}",
 				"",
 				"\tconstant colour = Colour#Red",
-				"\tTerminal.inspect(colour::isNot(Colour#Green))",
+				"\tTerminal.inspect(colour::isNot(1))",
 				"}",
 			].join("\n")
 
 			expect(codesOf(source)).toEqual(["no-matching-overload"])
 			expect(notesOf(source)).toEqual([
 				"'Extras::isNot' takes 1 Argument: Parameter 1 is String.",
+				"'Equatable::isNot' (provided by Equatable) takes 1 Argument: Parameter 1 is Colour.",
 				"Colour#Red derives 'isNot', and a Namespace declaring the name replaces it.",
 			])
 		})
@@ -955,6 +953,144 @@ describe("Protocol-provided Methods", () => {
 					].join("\n"),
 				),
 			).toEqual([])
+		})
+	})
+
+	// NOTE: A provided Method is a candidate of EVERY Namespace that declares
+	// the conformance, ranked by that Namespace's target exactly as a written
+	// Method is — so a question the narrow Namespace's rung rejects falls to the
+	// covering one's, which is the continuation `5::compare(1/2)` has always
+	// had. The standard library is where the ladder has more than one rung:
+	// `Integer`, `Rational` and `Algebraic` each conform to `Orderable`, and the
+	// covering `Number` conforms too.
+	describe("the specificity ladder", () => {
+		it("should fall from a narrow Namespace's rung to the covering one", async () => {
+			expect(
+				await run(
+					[
+						"implementation {",
+						"\tTerminal.inspect(3::isLessThan(Number.Pi))",
+						"\tTerminal.inspect(Number.Pi::isLessThan(4))",
+						"\tTerminal.inspect(5::isBetween(1, and 3/2))",
+						"\tTerminal.inspect(Number.Pi::isBetween(3, and 22/7))",
+						"}",
+					].join("\n"),
+				),
+			).toEqual(["true", "true", "false", "true"])
+		})
+
+		// NOTE: The narrow rung still wins where it matches, and the emitted text
+		// is what says which rung answered: `Integer`'s own written entry is a
+		// Namespace Method the Optimiser knows how to lower, and the provided one
+		// would stand in the output as a const of its own.
+		it("should keep the narrowest rung that matches", async () => {
+			let source = [
+				"implementation {",
+				"\tTerminal.inspect(5::isLessThan(3))",
+				"}",
+			].join("\n")
+
+			expect(await run(source)).toEqual(["false"])
+			expect(generate(source)).not.toContain("$es_Orderable__isLessThan")
+		})
+
+		// NOTE: `Integer` writes `isBetween` nowhere, so both rungs are provided
+		// — and the one that answers is Integer's, whose witness is Integer's own
+		// `compare` rather than the covering Namespace's sixteen-cell table.
+		it("should answer a same-kind question on the narrow rung's witness", () => {
+			expect(
+				generate(
+					[
+						"implementation {",
+						"\tTerminal.inspect(5::isBetween(1, and 10))",
+						"}",
+					].join("\n"),
+				),
+			).toContain("compare: Integer.compare")
+		})
+
+		it("should fall through for an Algebraic asked about an Integer", async () => {
+			expect(
+				await run(
+					[
+						"implementation {",
+						"\tconstant rootTwo = 2::squareRoot()",
+						"",
+						"\tTerminal.inspect(match rootTwo -> Boolean {",
+						"\t\tcase #Value(root) {",
+						"\t\t\t<- match root -> Boolean {",
+						"\t\t\t\tcase Algebraic { <- @::isLessThan(2) }",
+						"\t\t\t\tcase Integer   { <- @::isLessThan(2) }",
+						"\t\t\t}",
+						"\t\t}",
+						"",
+						"\t\tcase #Empty { <- false }",
+						"\t})",
+						"}",
+					].join("\n"),
+				),
+			).toEqual(["true"])
+		})
+
+		// NOTE: Naming the Protocol narrows the ladder to that Protocol's rungs
+		// and leaves the ladder — the fall from Integer's rung to the covering
+		// Number's still happens.
+		it("should keep the ladder under a Protocol specifier", async () => {
+			expect(
+				await run(
+					[
+						"implementation {",
+						"\tTerminal.inspect(5::<Orderable>isBetween(1, and 3/2))",
+						"\tTerminal.inspect(3::<Orderable>isLessThan(Number.Pi))",
+						"}",
+					].join("\n"),
+				),
+			).toEqual(["false", "true"])
+		})
+
+		// NOTE: A user's own Namespaces climb the same ladder. `Wide` covers both
+		// Types and `Narrow` covers one, so the call `Narrow`'s rung rejects is
+		// answered by `Wide`'s — with `Self` bound to the Union `Wide` targets.
+		it("should rank a user's Namespaces by their own targets", async () => {
+			expect(
+				await run(
+					[
+						"implementation {",
+						"\tprotocol Sized {",
+						"\t\tsize() -> Integer",
+						"",
+						"\t\tisBigger(_ other: Self) -> Boolean {",
+						"\t\t\t<- @::size()::isGreaterThan(other::size())",
+						"\t\t}",
+						"\t}",
+						"",
+						"\ttype Box = { n: Integer }",
+						"\ttype Bag = { m: Integer }",
+						"",
+						"\tnamespace Boxes for Box is Sized {",
+						"\t\tsize() -> Integer {",
+						"\t\t\t<- @.n",
+						"\t\t}",
+						"\t}",
+						"",
+						"\tnamespace Anything for Box | Bag is Sized {",
+						"\t\tsize() -> Integer {",
+						"\t\t\t<- match @ -> Integer {",
+						"\t\t\t\tcase Box { <- @.n }",
+						"\t\t\t\tcase Bag { <- @.m }",
+						"\t\t\t}",
+						"\t\t}",
+						"\t}",
+						"",
+						"\tconstant box: Box = { n = 3 }",
+						"\tconstant bag: Bag = { m = 1 }",
+						"",
+						"\tTerminal.inspect(box::isBigger(box))",
+						"\tTerminal.inspect(box::isBigger(bag))",
+						"}",
+					].join("\n"),
+				),
+			).toEqual(["false", "true"])
 		})
 	})
 

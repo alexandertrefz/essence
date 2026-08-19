@@ -94,8 +94,8 @@ implementation {
 	show("String.is(_ String)", greeting::is("Hello, World"))
 	show("String.is(_ String) [differing]", greeting::is("nope"))
 	show("String.is(_ String) [both empty]", emptyText::is(""))
-	show("Equatable.isNot(_ String)", greeting::isNot("nope"))
-	show("Equatable.isNot(_ String) [equal]", greeting::isNot("Hello, World"))
+	show("String.isNot(_ String)", greeting::isNot("nope"))
+	show("String.isNot(_ String) [equal]", greeting::isNot("Hello, World"))
 	show(
 		"String.is(_ String, comparing: CaseSensitivity) [sensitive]",
 		"Hello"::is("hello", comparing CaseSensitivity#Sensitive),
@@ -358,8 +358,8 @@ third"::lines())
 	show("Boolean.negate() [false]", false::negate())
 	show("Boolean.is(_ Boolean)", true::is(true))
 	show("Boolean.is(_ Boolean) [differing]", true::is(false))
-	show("Equatable.isNot(_ Boolean)", true::isNot(false))
-	show("Equatable.isNot(_ Boolean) [equal]", false::isNot(false))
+	show("Boolean.isNot(_ Boolean)", true::isNot(false))
+	show("Boolean.isNot(_ Boolean) [equal]", false::isNot(false))
 	show("Boolean.and(_ Boolean)", true::and(true))
 	show("Boolean.and(_ Boolean) [false]", true::and(false))
 	show("Boolean.or(_ Boolean)", false::or(true))
@@ -383,8 +383,8 @@ third"::lines())
 
 	show("Integer.is(_ Integer)", 7::is(7))
 	show("Integer.is(_ Integer) [differing]", 7::is(8))
-	show("Equatable.isNot(_ Integer)", 7::isNot(8))
-	show("Equatable.isNot(_ Integer) [equal]", 7::isNot(7))
+	show("Integer.isNot(_ Integer)", 7::isNot(8))
+	show("Integer.isNot(_ Integer) [equal]", 7::isNot(7))
 	show("Integer.add(_ Integer)", 66::add(34))
 	show("Integer.add(_ Integer) [negative]", 66::add(-100))
 	show("Integer.add(_ Rational)", 1::add(1/2))
@@ -552,35 +552,32 @@ third"::lines())
 		0::raise(to -1, defaultingTo 0),
 	)
 	show(
-		"Orderable.clamp(between: Integer, and: Integer) [above]",
+		"Integer.clamp(between: Integer, and: Integer) [above]",
 		15::clamp(between 1, and 10),
 	)
 	show(
-		"Orderable.clamp(between: Integer, and: Integer) [below]",
+		"Integer.clamp(between: Integer, and: Integer) [below]",
 		-2::clamp(between 1, and 10),
 	)
 	show(
-		"Orderable.clamp(between: Integer, and: Integer) [within]",
+		"Integer.clamp(between: Integer, and: Integer) [within]",
 		5::clamp(between 1, and 10),
 	)
 	show(
-		"Orderable.clamp(between: Integer, and: Integer) [inverted bounds]",
+		"Integer.clamp(between: Integer, and: Integer) [inverted bounds]",
 		5::clamp(between 10, and 1),
 	)
 	show(
-		"Orderable.clamp(between: Integer, and: Integer) [inverted bounds, above]",
+		"Integer.clamp(between: Integer, and: Integer) [inverted bounds, above]",
 		15::clamp(between 10, and 1),
 	)
+	show("Integer.isBetween(_ Integer, and: Integer)", 5::isBetween(1, and 10))
 	show(
-		"Orderable.isBetween(_ Integer, and: Integer)",
-		5::isBetween(1, and 10),
-	)
-	show(
-		"Orderable.isBetween(_ Integer, and: Integer) [outside]",
+		"Integer.isBetween(_ Integer, and: Integer) [outside]",
 		15::isBetween(1, and 10),
 	)
 	show(
-		"Orderable.isBetween(_ Integer, and: Integer) [on the bound]",
+		"Integer.isBetween(_ Integer, and: Integer) [on the bound]",
 		10::isBetween(1, and 10),
 	)
 	show("Integer.parse(_ String)", Integer.parse("42"))
@@ -661,8 +658,8 @@ third"::lines())
 	)
 	show("Rational.is(_ Rational)", 1/2::is(2/4))
 	show("Rational.is(_ Rational) [differing]", 1/2::is(1/3))
-	show("Equatable.isNot(_ Rational)", 1/2::isNot(1/3))
-	show("Equatable.isNot(_ Rational) [equal]", 1/2::isNot(2/4))
+	show("Rational.isNot(_ Rational)", 1/2::isNot(1/3))
+	show("Rational.isNot(_ Rational) [equal]", 1/2::isNot(2/4))
 	show("Rational.add(_ Rational)", 1/2::add(1/3))
 	show("Rational.add(_ Rational) [collapses to a whole]", 1/2::add(1/2))
 	show("Rational.add(_ Integer)", 1/2::add(1))
@@ -739,27 +736,27 @@ third"::lines())
 		1/2::isGreaterThanOrEqualTo(1),
 	)
 	show(
-		"Orderable.isBetween(_ Rational, and: Rational)",
+		"Rational.isBetween(_ Rational, and: Rational)",
 		1/2::isBetween(1/3, and 2/3),
 	)
 	show(
-		"Orderable.isBetween(_ Rational, and: Rational) [outside]",
+		"Rational.isBetween(_ Rational, and: Rational) [outside]",
 		1/2::isBetween(2/3, and 3/4),
 	)
 	show(
-		"Orderable.clamp(between: Rational, and: Rational) [above]",
+		"Rational.clamp(between: Rational, and: Rational) [above]",
 		3/4::clamp(between 1/3, and 2/3),
 	)
 	show(
-		"Orderable.clamp(between: Rational, and: Rational) [below]",
+		"Rational.clamp(between: Rational, and: Rational) [below]",
 		1/4::clamp(between 1/3, and 2/3),
 	)
 	show(
-		"Orderable.clamp(between: Rational, and: Rational) [within]",
+		"Rational.clamp(between: Rational, and: Rational) [within]",
 		1/2::clamp(between 1/3, and 2/3),
 	)
 	show(
-		"Orderable.clamp(between: Rational, and: Rational) [inverted bounds]",
+		"Rational.clamp(between: Rational, and: Rational) [inverted bounds]",
 		1/2::clamp(between 2/3, and 1/3),
 	)
 	show("Rational.squareRoot() [perfect square]", 1/4::squareRoot())
@@ -907,8 +904,8 @@ third"::lines())
 			"Algebraic.is(_ Algebraic) [differing radicals]",
 			rootTwo::is(rootThree),
 		)
-		show("Equatable.isNot(_ Algebraic)", rootTwo::isNot(rootThree))
-		show("Equatable.isNot(_ Algebraic) [equal]", rootTwo::isNot(rootTwo))
+		show("Algebraic.isNot(_ Algebraic)", rootTwo::isNot(rootThree))
+		show("Algebraic.isNot(_ Algebraic) [equal]", rootTwo::isNot(rootTwo))
 		show("Algebraic.compare(to: Algebraic)", rootTwo::compare(to rootThree))
 		show(
 			"Algebraic.compare(to: Algebraic) [equal]",
@@ -919,51 +916,51 @@ third"::lines())
 			rootThree::compare(to rootTwo),
 		)
 		show(
-			"Orderable.isLessThan(_ Algebraic)",
+			"Algebraic.isLessThan(_ Algebraic)",
 			rootTwo::isLessThan(rootThree),
 		)
 		show(
-			"Orderable.isLessThan(_ Algebraic) [greater]",
+			"Algebraic.isLessThan(_ Algebraic) [greater]",
 			rootThree::isLessThan(rootTwo),
 		)
 		show(
-			"Orderable.isLessThanOrEqualTo(_ Algebraic)",
+			"Algebraic.isLessThanOrEqualTo(_ Algebraic)",
 			rootTwo::isLessThanOrEqualTo(rootTwo),
 		)
 		show(
-			"Orderable.isLessThanOrEqualTo(_ Algebraic) [greater]",
+			"Algebraic.isLessThanOrEqualTo(_ Algebraic) [greater]",
 			rootThree::isLessThanOrEqualTo(rootTwo),
 		)
 		show(
-			"Orderable.isGreaterThan(_ Algebraic)",
+			"Algebraic.isGreaterThan(_ Algebraic)",
 			rootThree::isGreaterThan(rootTwo),
 		)
 		show(
-			"Orderable.isGreaterThan(_ Algebraic) [less]",
+			"Algebraic.isGreaterThan(_ Algebraic) [less]",
 			rootTwo::isGreaterThan(rootThree),
 		)
 		show(
-			"Orderable.isGreaterThanOrEqualTo(_ Algebraic)",
+			"Algebraic.isGreaterThanOrEqualTo(_ Algebraic)",
 			rootTwo::isGreaterThanOrEqualTo(rootTwo),
 		)
 		show(
-			"Orderable.isGreaterThanOrEqualTo(_ Algebraic) [less]",
+			"Algebraic.isGreaterThanOrEqualTo(_ Algebraic) [less]",
 			rootTwo::isGreaterThanOrEqualTo(rootThree),
 		)
 		show(
-			"Orderable.isBetween(_ Algebraic, and: Algebraic)",
+			"Algebraic.isBetween(_ Algebraic, and: Algebraic)",
 			rootTwo::isBetween(rootTwo, and rootThree),
 		)
 		show(
-			"Orderable.isBetween(_ Algebraic, and: Algebraic) [outside]",
+			"Algebraic.isBetween(_ Algebraic, and: Algebraic) [outside]",
 			rootThree::isBetween(rootTwo, and rootTwo),
 		)
 		show(
-			"Orderable.clamp(between: Algebraic, and: Algebraic) [above]",
+			"Algebraic.clamp(between: Algebraic, and: Algebraic) [above]",
 			rootThree::clamp(between rootTwo, and rootTwo),
 		)
 		show(
-			"Orderable.clamp(between: Algebraic, and: Algebraic) [within]",
+			"Algebraic.clamp(between: Algebraic, and: Algebraic) [within]",
 			rootTwo::clamp(between rootTwo, and rootThree),
 		)
 		show("Algebraic.add(_ Integer)", rootTwo::add(1))
@@ -1076,9 +1073,9 @@ third"::lines())
 		"Transcendental.is(_ Transcendental) [differing]",
 		Number.Pi::is(Number.Tau),
 	)
-	show("Equatable.isNot(_ Transcendental)", Number.Pi::isNot(Number.Tau))
+	show("Transcendental.isNot(_ Transcendental)", Number.Pi::isNot(Number.Tau))
 	show(
-		"Equatable.isNot(_ Transcendental) [equal]",
+		"Transcendental.isNot(_ Transcendental) [equal]",
 		Number.Pi::isNot(Number.Pi),
 	)
 	show("Transcendental.add(_ Integer)", Number.Pi::add(1))
@@ -1178,14 +1175,11 @@ third"::lines())
 			"Number.is(_ Number) [Transcendental]",
 			Number.is(Number.Pi::multiply(with 2), Number.Tau),
 		)
-		show("Equatable.isNot(_ Number) [Integer]", asNumber(2)::isNot(2/1))
-		show("Equatable.isNot(_ Number) [Rational]", asNumber(1/2)::isNot(1))
+		show("Number.isNot(_ Number) [Integer]", asNumber(2)::isNot(2/1))
+		show("Number.isNot(_ Number) [Rational]", asNumber(1/2)::isNot(1))
+		show("Number.isNot(_ Number) [Algebraic]", asNumber(rootTwo)::isNot(2))
 		show(
-			"Equatable.isNot(_ Number) [Algebraic]",
-			asNumber(rootTwo)::isNot(2),
-		)
-		show(
-			"Equatable.isNot(_ Number) [Transcendental]",
+			"Number.isNot(_ Number) [Transcendental]",
 			asNumber(Number.Pi)::isNot(Number.Tau),
 		)
 		show("Number.toString() [Integer]", Number.toString(42))
@@ -1213,107 +1207,107 @@ third"::lines())
 		§ `Self` to Transcendental and takes no Integer bound, so the
 		§ cross-kind calls widen the RECEIVER and let the bounds stay written.
 		show(
-			"Orderable.isLessThan(_ Number) [Integer]",
+			"Number.isLessThan(_ Number) [Integer]",
 			asNumber(3)::isLessThan(Number.Pi),
 		)
 		show(
-			"Orderable.isLessThan(_ Number) [Rational]",
+			"Number.isLessThan(_ Number) [Rational]",
 			asNumber(22/7)::isLessThan(Number.Pi),
 		)
 		show(
-			"Orderable.isLessThan(_ Number) [Algebraic]",
+			"Number.isLessThan(_ Number) [Algebraic]",
 			asNumber(rootTwo)::isLessThan(3/2),
 		)
 		show(
-			"Orderable.isLessThan(_ Number) [Transcendental]",
+			"Number.isLessThan(_ Number) [Transcendental]",
 			asNumber(Number.Pi)::isLessThan(Number.Tau),
 		)
 		show(
-			"Orderable.isLessThanOrEqualTo(_ Number) [Integer]",
+			"Number.isLessThanOrEqualTo(_ Number) [Integer]",
 			asNumber(4)::isLessThanOrEqualTo(Number.Pi),
 		)
 		show(
-			"Orderable.isLessThanOrEqualTo(_ Number) [Rational]",
+			"Number.isLessThanOrEqualTo(_ Number) [Rational]",
 			asNumber(22/7)::isLessThanOrEqualTo(Number.Pi),
 		)
 		show(
-			"Orderable.isLessThanOrEqualTo(_ Number) [Algebraic]",
+			"Number.isLessThanOrEqualTo(_ Number) [Algebraic]",
 			asNumber(rootTwo)::isLessThanOrEqualTo(rootTwo),
 		)
 		show(
-			"Orderable.isLessThanOrEqualTo(_ Number) [Transcendental]",
+			"Number.isLessThanOrEqualTo(_ Number) [Transcendental]",
 			asNumber(Number.Pi)::isLessThanOrEqualTo(Number.Pi),
 		)
 		show(
-			"Orderable.isGreaterThan(_ Number) [Integer]",
+			"Number.isGreaterThan(_ Number) [Integer]",
 			asNumber(4)::isGreaterThan(Number.Pi),
 		)
 		show(
-			"Orderable.isGreaterThan(_ Number) [Rational]",
+			"Number.isGreaterThan(_ Number) [Rational]",
 			asNumber(22/7)::isGreaterThan(Number.Pi),
 		)
 		show(
-			"Orderable.isGreaterThan(_ Number) [Algebraic]",
+			"Number.isGreaterThan(_ Number) [Algebraic]",
 			asNumber(rootTwo)::isGreaterThan(3/2),
 		)
 		show(
-			"Orderable.isGreaterThan(_ Number) [Transcendental]",
+			"Number.isGreaterThan(_ Number) [Transcendental]",
 			asNumber(Number.Tau)::isGreaterThan(Number.Pi),
 		)
 		show(
-			"Orderable.isGreaterThanOrEqualTo(_ Number) [Integer]",
+			"Number.isGreaterThanOrEqualTo(_ Number) [Integer]",
 			asNumber(3)::isGreaterThanOrEqualTo(Number.Pi),
 		)
 		show(
-			"Orderable.isGreaterThanOrEqualTo(_ Number) [Rational]",
+			"Number.isGreaterThanOrEqualTo(_ Number) [Rational]",
 			asNumber(22/7)::isGreaterThanOrEqualTo(Number.Pi),
 		)
 		show(
-			"Orderable.isGreaterThanOrEqualTo(_ Number) [Algebraic]",
+			"Number.isGreaterThanOrEqualTo(_ Number) [Algebraic]",
 			asNumber(rootTwo)::isGreaterThanOrEqualTo(rootTwo),
 		)
 		show(
-			"Orderable.isGreaterThanOrEqualTo(_ Number) [Transcendental]",
+			"Number.isGreaterThanOrEqualTo(_ Number) [Transcendental]",
 			asNumber(Number.Tau)::isGreaterThanOrEqualTo(Number.Pi),
 		)
 		show(
-			"Orderable.isBetween(_ Number, and: Number) [Integer]",
+			"Number.isBetween(_ Number, and: Number) [Integer]",
 			asNumber(5)::isBetween(1, and 10),
 		)
 		show(
-			"Orderable.isBetween(_ Number, and: Number) [Rational]",
+			"Number.isBetween(_ Number, and: Number) [Rational]",
 			asNumber(22/7)::isBetween(3, and 4),
 		)
 		show(
-			"Orderable.isBetween(_ Number, and: Number) [Algebraic]",
+			"Number.isBetween(_ Number, and: Number) [Algebraic]",
 			asNumber(rootTwo)::isBetween(1, and 2),
 		)
 		show(
-			"Orderable.isBetween(_ Number, and: Number) [Transcendental]",
+			"Number.isBetween(_ Number, and: Number) [Transcendental]",
 			asNumber(Number.Pi)::isBetween(3, and 22/7),
 		)
 		show(
-			"Orderable.isBetween(_ Number, and: Number) [outside]",
+			"Number.isBetween(_ Number, and: Number) [outside]",
 			asNumber(Number.Pi)::isBetween(22/7, and 4),
 		)
 		show(
-			"Orderable.isBetween(_ Number, and: Number) [on the bound]",
+			"Number.isBetween(_ Number, and: Number) [on the bound]",
 			asNumber(5)::isBetween(5, and 5),
 		)
 		show(
-			"Orderable.clamp(between: Number, and: Number) [above]",
+			"Number.clamp(between: Number, and: Number) [above]",
 			asNumber(Number.Pi)::clamp(between 1, and 3),
 		)
 		show(
-			"Orderable.clamp(between: Number, and: Number) [below]",
+			"Number.clamp(between: Number, and: Number) [below]",
 			asNumber(rootTwo)::clamp(between 22/7, and 4),
 		)
 		show(
-			"Orderable.clamp(between: Number, and: Number) [within]",
+			"Number.clamp(between: Number, and: Number) [within]",
 			asNumber(22/7)::clamp(between 3, and 4),
 		)
 		show(
-			"Orderable.clamp(between: Number, and: Number) [inverted bounds]",
+			"Number.clamp(between: Number, and: Number) [inverted bounds]",
 			asNumber(22/7)::clamp(between 4, and 3),
 		)
 		<- {}
@@ -1763,8 +1757,8 @@ third"::lines())
 
 	show("Record.is(_ \{\})", point::is({ x = 1, y = 2 }))
 	show("Record.is(_ \{\}) [differing]", point::is({ x = 1, y = 3 }))
-	show("Equatable.isNot(_ \{\})", point::isNot({ x = 1, y = 3 }))
-	show("Equatable.isNot(_ \{\}) [equal]", point::isNot({ x = 1, y = 2 }))
+	show("Record.isNot(_ \{\})", point::isNot({ x = 1, y = 3 }))
+	show("Record.isNot(_ \{\}) [equal]", point::isNot({ x = 1, y = 2 }))
 
 	§ A Function is the one value with no Type tag on it, and reading that
 	§ missing tag used to THROW here rather than answer — a Record holding a
@@ -1808,9 +1802,9 @@ third"::lines())
 		"List.is<ItemType is Equatable>(_ List<ItemType>) [both empty]",
 		noNumbers::is([]),
 	)
-	show("Equatable.isNot(_ List<ItemType>)", numbers::isNot(singleNumber))
+	show("List.isNot(_ List<ItemType>)", numbers::isNot(singleNumber))
 	show(
-		"Equatable.isNot(_ List<ItemType>) [equal]",
+		"List.isNot(_ List<ItemType>) [equal]",
 		numbers::isNot([3, 1, 2, 1, 4]),
 	)
 	show("List.toString<ItemType is Printable>()", numbers::toString())

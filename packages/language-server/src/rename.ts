@@ -2086,13 +2086,15 @@ function bindNamespaceMember(
 	memberName: string,
 	position: common.Position,
 	context: WalkContext,
-	// NOTE: Set where a PROTOCOL answered the call rather than a Namespace, in
-	// which case `namespaceName` is the Protocol's. The two are told apart
-	// here for the same reason the emitter tells them apart: they may be
-	// spelled alike, and the name alone can not say which table holds the
-	// declaration.
+	// NOTE: Set where a PROTOCOL wrote the body the call reached. The
+	// Invocation is named after the NAMESPACE whose conformance put the Method
+	// in reach — `Integer` for `5::isNot(3)` — so the declaration is looked up
+	// under the Protocol instead, which is where the one body every conformer
+	// shares is written.
 	providedBy: string | undefined = undefined,
 ) {
+	let declaringName = providedBy ?? namespaceName
+
 	// NOTE: Builtin Namespaces and Protocols have no source declaration —
 	// their members stay unbound and are therefore not renameable.
 	let declaration = (
@@ -2100,7 +2102,7 @@ function bindNamespaceMember(
 			? context.namespaceMembers
 			: context.protocolMembers
 	)
-		.get(namespaceName)
+		.get(declaringName)
 		?.get(memberName)
 
 	if (declaration !== undefined) {
@@ -2114,7 +2116,7 @@ function bindNamespaceMember(
 	// workspace index can bind it there; a single file's index has no way to
 	// tell the two apart and does not have to.
 	context.externalMembers.push({
-		namespaceName,
+		namespaceName: declaringName,
 		memberName,
 		position,
 		...(providedBy === undefined ? {} : { protocol: true as const }),
