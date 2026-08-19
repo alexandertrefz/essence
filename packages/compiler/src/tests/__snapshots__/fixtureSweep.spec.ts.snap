@@ -8,7 +8,11 @@ exports[`Fixture Sweep Choice.es should print what it printed before 1`] = `
 √9 = 3
 √2 = √2
 AC — cleared
-true"
+true
+Entry#Typed { text = "a", repeats = 1 }
+Entry#Typed { text = "b", repeats = 3 }
+Entry#Held { key = "shift", seconds = 1, silent = false }
+Entry#Held { key = "escape", seconds = 2, silent = true }"
 `;
 
 exports[`Fixture Sweep ConditionalConformance.es should print what it printed before 1`] = `
