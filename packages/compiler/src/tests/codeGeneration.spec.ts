@@ -1790,11 +1790,12 @@ describe("Code Generation", () => {
 		})
 
 		// NOTE: `isBetween` is `Orderable`'s provided Method, over `Self` — the
-		// receiver's own Type — so a receiver of the covering `Number` Type is
-		// what compares against a bound of any other kind, through the one
-		// conformance `Number` declares. π against an Integer and a Rational
-		// bound is that; a Rational against Rational bounds is the same Method
-		// through Rational's own conformance, and its `compare` alone.
+		// target of the Namespace whose conformance offered it — so a bound of
+		// another kind is compared on the covering `Number`'s rung, through the
+		// one conformance `Number` declares. π against an Integer and a
+		// Rational bound is that; a Rational against Rational bounds is the
+		// same Method through Rational's own conformance, and its `compare`
+		// alone.
 		it("runs isBetween across the whole numeric tower", async () => {
 			expect(
 				await run(`implementation {
