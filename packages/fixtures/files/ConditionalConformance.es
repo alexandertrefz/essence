@@ -12,10 +12,10 @@ implementation {
 
 	constant boxes = [{ value = 3 }, { value = 1 }, { value = 2 }]
 
-	§ A Function literal takes its Parameter apart the same way a Matcher does,
-	§ so the transform names the member it wants rather than naming the Box and
-	§ reaching into it.
-	Terminal.inspect(boxes::sort()::map(({ value }) { <- value })) § [ 1, 2, 3 ]
+	§ A member path is the transform that reads one member, so the map names
+	§ the member it wants and nothing else. It is the Function literal the
+	§ Compiler writes: `(_ box: { value: Integer }) { <- box.value }`.
+	Terminal.inspect(boxes::sort()::map(.value)) § [ 1, 2, 3 ]
 
 	§ List conforms the same way — `is Comparable where ItemType is
 	§ Comparable` — so Lists of Lists sort, the witnesses composing all the
