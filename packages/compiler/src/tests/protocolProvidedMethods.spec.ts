@@ -1190,6 +1190,55 @@ describe("Protocol-provided Methods", () => {
 				),
 			).toEqual(["true"])
 		})
+
+		// NOTE: A GENERIC Namespace has no receiver to specialize its target
+		// with when it is NAMED, so `Self` is pinned to `List<ItemType>` and
+		// the Arguments are what say what the items are. `List`'s conformance
+		// is conditional on top of that, so the witness this solves is the one
+		// whose own condition has to be solved with it.
+		it("should answer the spelling on a generic Namespace", async () => {
+			expect(
+				await run(
+					[
+						"implementation {",
+						"\tconstant a = [1, 2]",
+						"\tconstant b = [1, 3]",
+						"\tTerminal.inspect(List.isNot(a, b))",
+						'\tTerminal.inspect(List.isNot(["x"], ["x"]))',
+						"}",
+					].join("\n"),
+				),
+			).toEqual(["true", "false"])
+		})
+
+		it("should answer the spelling on a user generic Namespace", async () => {
+			expect(
+				await run(
+					[
+						"implementation {",
+						"\tprotocol Measurable {",
+						"\t\tsize() -> Integer",
+						"",
+						"\t\tisBlank() -> Boolean {",
+						"\t\t\t<- @::size()::is(0)",
+						"\t\t}",
+						"\t}",
+						"",
+						"\ttype Box<ItemType> = { items: List<ItemType> }",
+						"",
+						"\tnamespace Boxes<infer ItemType> for Box<ItemType> is Measurable {",
+						"\t\tsize() -> Integer {",
+						"\t\t\t<- @.items::length()",
+						"\t\t}",
+						"\t}",
+						"",
+						"\tconstant box: Box<Integer> = { items = [1, 2] }",
+						"\tTerminal.inspect(Boxes.isBlank(box))",
+						"}",
+					].join("\n"),
+				),
+			).toEqual(["false"])
+		})
 	})
 
 	describe("the specificity ladder", () => {
