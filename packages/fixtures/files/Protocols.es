@@ -90,6 +90,9 @@ implementation {
 	§ Printable for all of them, and Comparable for the ordered ones:
 	§ Integer, Rational, Algebraic and String. (Transcendentals order only
 	§ through Number, so they carry no Comparable conformance of their own.)
+	§ The numeric ones say `is Orderable`, which extends Comparable and
+	§ provides the four inequalities, `isBetween` and `clamp` on top of it —
+	§ so the bound below is satisfied by a conformance that never names it.
 
 	function smallerOf<infer Item is Comparable>(_ a: Item, _ b: Item) -> Item {
 		<- match a::compare(to b) -> Item {
