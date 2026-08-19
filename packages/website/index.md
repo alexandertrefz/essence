@@ -56,5 +56,10 @@ That one executable carries the whole toolchain — `build`, `run`, `check`, `wa
 
 The current runtime implementation is rudimentary however. There are many features missing from the standard library. Various langauge features are only partially implemented.
 
+# Documentation
+* [Protocols](protocols.html) — conformance, provided Methods, extension
+* [Diagnostics](diagnostics.html) — every Diagnostic code
+* [Optimisations](optimisations.html) — every Optimiser pass
+
 # Disclaimer
 This language is still a work in progress. It is not ready for use yet and there is no documentation as most things are in flux. Generally: Here be dragons!

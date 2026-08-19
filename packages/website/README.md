@@ -13,6 +13,7 @@ this directory and deploys it, so the URLs are unchanged.
 | | |
 |---|---|
 | `index.md` | the language's pitch — goals, principles, `essence` usage |
+| `protocols.md` | conformance, provided Methods, extension, and what each compiles to |
 | `diagnostics.md` | every Diagnostic code, one section each |
 | `optimisations.md` | every Optimiser pass, one section each, plus the runtime improvements |
 | `tests/` | what keeps both pages honest, see below |
