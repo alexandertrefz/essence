@@ -208,6 +208,11 @@ function simplifyMethodInvocation(
 			simplifyConformanceArguments(node.conformances),
 		),
 		derivedDescriptor: node.derivedDescriptor,
+		// NOTE: Read off the resolved Namespace, which is the Protocol's pseudo
+		// Namespace for a provided Method and carries the Protocol's name. The
+		// Rewriter needs it because the Namespace NAME does not say whether a
+		// Protocol or a Namespace answered.
+		providedBy: node.namespace.type.providedBy,
 		type: node.type,
 		position: node.position,
 	}
@@ -246,6 +251,7 @@ function simplifyUnionMethodInvocation(
 			),
 			omittedParameterIndices: dispatchCase.omittedParameterIndices,
 			derivedDescriptor: dispatchCase.derivedDescriptor,
+			providedBy: dispatchCase.providedBy,
 		})),
 		arguments: node.arguments.map((arg) => simplifyArgument(arg)),
 		type: node.type,

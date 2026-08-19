@@ -118,6 +118,11 @@ function differ<infer Item is Equatable>(_ a: Item, _ b: Item) -> Boolean {
 
 Write an override to say the same thing faster, never to say something different.
 
+This is the same rule Rust and Swift follow for a default method, and it falls
+out of how a conformance is compiled: a witness names one Method per
+requirement, and a provided Method's body is one const every conformer shares,
+so there is nothing per-conformer for a witness to name.
+
 ## Extension
 
 A Protocol may extend one or more others, in the `is A, is B` list a Namespace
@@ -150,6 +155,16 @@ function lowestOf<infer Item is Orderable>(_ items: List<Item>) -> Optional<Item
 	<- items::sort()::firstItem()
 }
 ```
+
+A descendant may re-provide a Method its ancestor provides. The descendant's
+body is the one that answers, at a call and through a bound alike — the same
+"replace, whole name" rule a Namespace's own Method follows.
+
+Two clauses may reach one ancestor, and the WEAKEST grant wins: a Protocol some
+clause grants outright does not carry another clause's `where`. Note that a
+Method fulfilling a conditional clause carries that clause's bound, so it can
+not also fulfil an unconditional one — writing the same condition on both
+clauses is what a Namespace in that shape wants.
 
 A `where` clause can not stand on an extension
 (`where-on-protocol-extension`): a condition bounds one of the declaring
@@ -206,3 +221,11 @@ library Method is not.
 A provided Method is never part of the witness itself. One body answers for every
 conformer, so there is nothing per-conformer for a witness to name — which is
 also why an override is not visible through a bound.
+
+The const is named `$es_<Protocol>__<member>`, with a DOUBLE separator. A
+Namespace member's const joins with one, and no member name can begin with `_`,
+so a Protocol named after a Namespace can never reach the Namespace's const.
+
+One Protocol name means one set of consts, so two Protocols of the same name
+with provided Methods can not be compiled together — declare the Protocol once
+and import it where it is needed.

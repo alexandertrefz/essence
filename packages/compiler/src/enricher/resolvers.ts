@@ -2673,6 +2673,10 @@ function reachesConformance(
 export function providedMethodNamespaceForProtocol(
 	protocol: common.ProtocolType,
 	baseType: common.Type,
+	// NOTE: The Method names a more derived Protocol, reached by the same
+	// receiver, re-provided — left out here so exactly one Protocol answers each
+	// name.
+	overridden: ReadonlySet<string> = new Set(),
 ): common.NamespaceType | null {
 	let boundSelf: common.GenericUse = {
 		type: "GenericUse",
@@ -2687,7 +2691,11 @@ export function providedMethodNamespaceForProtocol(
 	)) {
 		let method = protocol.methods[methodName]
 
-		if (writtenBy !== protocol.name || method?.type !== "SimpleMethod") {
+		if (
+			writtenBy !== protocol.name ||
+			method?.type !== "SimpleMethod" ||
+			overridden.has(methodName)
+		) {
 			continue
 		}
 
@@ -2736,7 +2744,7 @@ export function providedMethodNamespaces(
 	scope: enricher.Scope,
 	position: common.Position,
 ): Map<string, common.NamespaceType> {
-	let found = new Map<string, common.NamespaceType>()
+	let reached: Array<common.ProtocolType> = []
 	let listed = [...namespaces]
 
 	for (let protocol of allProtocolsInScope(scope)) {
@@ -2761,14 +2769,10 @@ export function providedMethodNamespaces(
 			continue
 		}
 
-		let namespace = providedMethodNamespaceForProtocol(protocol, baseType)
-
-		if (namespace !== null) {
-			found.set(protocol.name, namespace)
-		}
+		reached.push(protocol)
 	}
 
-	return found
+	return namespacesForProviders(reached, baseType)
 }
 
 // NOTE: The same, for a receiver whose Type is a Protocol-bounded Type
@@ -2779,20 +2783,57 @@ export function providedMethodNamespacesForBound(
 	baseType: common.Type,
 	scope: enricher.Scope,
 ): Map<string, common.NamespaceType> {
-	let found = new Map<string, common.NamespaceType>()
+	let reached: Array<common.ProtocolType> = []
 
 	for (let name of [protocol.name, ...(protocol.conformsTo ?? [])]) {
 		let ancestor =
 			name === protocol.name ? protocol : findProtocolInScope(name, scope)
 
-		if (ancestor === null) {
-			continue
+		if (ancestor !== null) {
+			reached.push(ancestor)
+		}
+	}
+
+	return namespacesForProviders(reached, baseType)
+}
+
+// NOTE: The pseudo Namespaces a set of REACHED Protocols offer between them,
+// with a Method a descendant re-provided answered by the descendant alone. The
+// declaration already reads it that way — a Protocol's own entries overwrite an
+// ancestor's — and without the same rule here both would answer and every call
+// would be ambiguous.
+function namespacesForProviders(
+	reached: Array<common.ProtocolType>,
+	baseType: common.Type,
+): Map<string, common.NamespaceType> {
+	let found = new Map<string, common.NamespaceType>()
+
+	for (let protocol of reached) {
+		let overridden = new Set<string>()
+
+		for (let other of reached) {
+			// NOTE: `other` extends `protocol`, so it is the more derived of the
+			// two — every Method it provides under a name `protocol` also
+			// provides is the one that stands.
+			if (other.conformsTo?.includes(protocol.name) !== true) {
+				continue
+			}
+
+			for (let methodName of Object.keys(other.providedMethods ?? {})) {
+				if (providedMethodProtocol(other, methodName) === other.name) {
+					overridden.add(methodName)
+				}
+			}
 		}
 
-		let namespace = providedMethodNamespaceForProtocol(ancestor, baseType)
+		let namespace = providedMethodNamespaceForProtocol(
+			protocol,
+			baseType,
+			overridden,
+		)
 
 		if (namespace !== null) {
-			found.set(ancestor.name, namespace)
+			found.set(protocol.name, namespace)
 		}
 	}
 
