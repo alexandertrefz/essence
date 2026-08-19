@@ -83,4 +83,30 @@ implementation {
 	constant command: EditorCommand = #Undo
 
 	Terminal.inspect(command::isNot(#ClearAll)) § true — EditorCommand's own ClearAll
+
+	§ A payload shape may carry a `= { … }` the construction is filled out of,
+	§ so a Case with a near-constant member is written without it. What may be
+	§ written there is a literal and nothing else — a payload default is spliced
+	§ into every construction of its Case, and one of those may stand in a
+	§ Module that never named the Choice.
+	choice Entry {
+		Typed { text: String, repeats: Integer } = { repeats = 1 },
+		Held { key: String, seconds: Integer, silent: Boolean } = {
+			seconds = 1,
+			silent = false,
+		},
+	}
+
+	§ The members the default fills in may be left out of the payload; every
+	§ other one is written as it always was. A Case that fills every member in
+	§ is still constructed with a payload — a bare `#Case` is a unit Case's
+	§ spelling and stays one.
+	constant entries: List<Entry> = [
+		#Typed({ text = "a" }),
+		#Typed({ text = "b", repeats = 3 }),
+		#Held({ key = "shift" }),
+		#Held({ key = "escape", seconds = 2, silent = true }),
+	]
+
+	entries::map((entry) { <- Terminal.inspect(entry) })
 }
