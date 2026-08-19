@@ -43,6 +43,17 @@ function underlinedText(source: string, diagnostic: common.Diagnostic): string {
 		)
 }
 
+// NOTE: The characters one Position covers, for a test that means to say WHERE
+// a synthesized Node stands rather than which columns it happens to have.
+function spanOf(source: string, position: common.Position): string {
+	return source
+		.split("\n")
+		[position.start.line - 1].slice(
+			position.start.column - 1,
+			position.end.column - 1,
+		)
+}
+
 // NOTE: The typed Expression a Program's LAST Constant was declared from —
 // which is how a test asks what a call resolved to: which Namespace won, which
 // Overload, which dispatch branches, and what the Arguments were typed as. The
@@ -471,6 +482,185 @@ describe("Enricher", () => {
 					constant updated = { c with partial }
 				}`),
 			).toEqual([])
+		})
+
+		// NOTE: `{ config with server.port = 1 }` IS
+		// `{ config with server = { config.server with port = 1 } }`, and the
+		// Enricher is where the one becomes the other — so the Type it answers
+		// is the Type the value updated already had.
+		describe("path keys", () => {
+			const config = `type Tls = { enabled: Boolean }
+				type Server = { host: String, port: Integer, tls: Tls }
+				type Config = { name: String, server: Server }
+
+				constant config: Config = {
+					name = "api",
+					server = {
+						host = "localhost",
+						port = 80,
+						tls = { enabled = false },
+					},
+				}`
+
+			it("should accept a key that reaches one level in", () => {
+				expect(
+					diagnosticsFor(`implementation {
+						${config}
+						constant moved = { config with server.port = 8080 }
+					}`),
+				).toEqual([])
+			})
+
+			it("should accept a key that reaches two levels in", () => {
+				expect(
+					diagnosticsFor(`implementation {
+						${config}
+						constant deep = { config with server.tls.enabled = true }
+					}`),
+				).toEqual([])
+			})
+
+			it("should gather keys that share a prefix into one level", () => {
+				expect(
+					diagnosticsFor(`implementation {
+						${config}
+						constant both = {
+							config with
+								server.port = 1,
+								server.tls.enabled = true,
+						}
+					}`),
+				).toEqual([])
+			})
+
+			it("should accept a path key beside a plain one", () => {
+				expect(
+					diagnosticsFor(`implementation {
+						${config}
+						constant mixed = {
+							config with name = "b", server.port = 1
+						}
+					}`),
+				).toEqual([])
+			})
+
+			it("should answer the Type of the value updated", () => {
+				let value = lastConstantValue(`implementation {
+					${config}
+					constant moved = { config with server.port = 8080 }
+				}`)
+
+				expect(value.type).toEqual({
+					type: "Record",
+					members: {
+						name: { type: "String" },
+						server: {
+							type: "Record",
+							members: {
+								host: { type: "String" },
+								port: { type: "Integer" },
+								tls: {
+									type: "Record",
+									members: { enabled: { type: "Boolean" } },
+								},
+							},
+						},
+					},
+				})
+			})
+
+			// NOTE: The invariant the Language Server is built on: the member
+			// Identifier of every synthesized Lookup stands where the step that
+			// spelled it stands, so a rename, a Hover and a semantic token all
+			// answer for a step with no code of their own.
+			it("should stand each synthesized Lookup at the step that spelled it", () => {
+				let source = `implementation {
+					${config}
+					constant deep = { config with server.tls.enabled = true }
+				}`
+				let outer = lastConstantValue(
+					source,
+				) as common.typed.CombinationNode
+				let level = outer.rhs as common.typed.RecordValueNode
+				let server = level.members[
+					"server"
+				] as common.typed.CombinationNode
+				let serverLookup = server.lhs as common.typed.LookupNode
+				let tls = (server.rhs as common.typed.RecordValueNode).members[
+					"tls"
+				] as common.typed.CombinationNode
+				let tlsLookup = tls.lhs as common.typed.LookupNode
+
+				expect(spanOf(source, serverLookup.member.position)).toBe(
+					"server",
+				)
+				expect(spanOf(source, tlsLookup.member.position)).toBe("tls")
+				expect(spanOf(source, serverLookup.position)).toBe("server")
+			})
+
+			it("should refuse a step that is not a Record", () => {
+				let diagnostics = diagnosticsFor(`implementation {
+					${config}
+					constant renamed = { config with name.length = 1 }
+				}`)
+
+				expect(diagnostics).toHaveLength(1)
+				expect(diagnostics[0].code).toBe("path-step-not-a-record")
+			})
+
+			it("should refuse a step that names no member", () => {
+				let diagnostics = diagnosticsFor(`implementation {
+					${config}
+					constant missing = { config with nope.port = 1 }
+				}`)
+
+				expect(diagnostics).toHaveLength(1)
+				expect(diagnostics[0].code).toBe("unknown-member")
+			})
+
+			it("should refuse a path key on a value that is worked out", () => {
+				let diagnostics = diagnosticsFor(`implementation {
+					${config}
+
+					function load() -> Config {
+						<- config
+					}
+
+					constant loaded = { load() with server.port = 1 }
+				}`)
+
+				expect(diagnostics).toHaveLength(1)
+				expect(diagnostics[0].code).toBe("path-on-computed-value")
+			})
+
+			// NOTE: `@` is a place, and the one a Method's nested update is
+			// written on.
+			it("should accept a path key on '@'", () => {
+				expect(
+					diagnosticsFor(`implementation {
+						${config}
+
+						namespace Configs for Config {
+							§§ Answers this Config listening on a port.
+							§§
+							§§ @param _ — the port to listen on.
+							§§ @returns — the moved Config.
+							movedTo(_ port: Integer) -> Config {
+								<- { @ with server.port = port }
+							}
+						}
+					}`),
+				).toEqual([])
+			})
+
+			it("should refuse a path key in a plain Record Literal", () => {
+				let diagnostics = diagnosticsFor(`implementation {
+					constant blank = { server.port = 8080 }
+				}`)
+
+				expect(diagnostics).toHaveLength(1)
+				expect(diagnostics[0].code).toBe("path-key-outside-combination")
+			})
 		})
 
 		it("should resolve a bare Case in an update against the declared member", () => {

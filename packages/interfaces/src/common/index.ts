@@ -201,6 +201,7 @@ export type DiagnosticCode =
 	| "record-annotation-not-record"
 	| "path-step-not-a-record"
 	| "path-key-outside-combination"
+	| "path-on-computed-value"
 	| "uncombinable-types"
 	| "partial-type-mismatch"
 	| "wrong-type-argument-count"
