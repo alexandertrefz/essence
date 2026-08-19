@@ -49,4 +49,21 @@ implementation {
 			}
 		}
 	}
+
+	§ A partial Record default adds no accepted SHAPE — its Argument is still
+	§ written — but it widens the Records an entry accepts, which is the same
+	§ mistake one level down.
+	type Options = { host: String, retries: Integer }
+
+	namespace Links for String {
+		overload open {
+			(using options: Options = { retries = 3 }) -> String {
+				<- options.host
+			}
+
+			(using options: { host: String }) -> String {
+				<- options.host
+			}
+		}
+	}
 }

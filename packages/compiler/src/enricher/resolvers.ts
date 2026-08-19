@@ -1092,11 +1092,15 @@ export function resolveOverloadedFunctionStatementType(
 	)
 	refuseAmbiguousOverloadDefaults(entries)
 
+	let overloads = node.methods.map((entry) =>
+		resolveFreeFunctionEntry(entry, scope),
+	)
+
+	refuseAmbiguousPartialDefaults(entries, overloads)
+
 	return {
 		type: "OverloadedStaticMethod",
-		overloads: node.methods.map((entry) =>
-			resolveFreeFunctionEntry(entry, scope),
-		),
+		overloads,
 		documentation: node.documentation ?? undefined,
 	}
 }
@@ -5490,6 +5494,206 @@ function refuseAmbiguousOverloadDefaults(
 	}
 }
 
+// NOTE: The other half of the same hazard, and the one a PARTIAL Record default
+// opens. A partial default adds no accepted SHAPE — its Argument is still
+// written, so the label sequence is unchanged — but it widens the set of
+// Argument VALUES an entry accepts, because a Record written without the
+// members the default fills in now fits a Parameter it did not fit before. Two
+// entries of one shape that resolved by the Types of their Records can
+// therefore both come to accept one call.
+//
+// NOTE: Refused on the same terms as the shape clash above: only where a value
+// is reachable ONLY by leaving a member out. Entries that already overlapped by
+// Type stay exactly as they were, which is what keeps `Integer.add`'s four
+// same-shaped entries legal — none of them carries a Record default at all.
+//
+// NOTE: Asked of the RESOLVED signatures rather than of the Parameter Nodes,
+// because what a Record Parameter accepts is a question about Types. The two
+// lists are aligned from the END: a non-static Method's resolved signature is
+// prefixed with the receiver, which the source did not write.
+function refuseAmbiguousPartialDefaults(
+	entries: Array<{
+		parameters: Array<parser.ParameterNode>
+		position: common.Position
+	}>,
+	signatures: Array<{ parameterTypes: Array<common.Parameter> }>,
+): void {
+	if (
+		entries.length < 2 ||
+		!signatures.some((signature) =>
+			signature.parameterTypes.some(
+				(parameter) => parameter.defaultMembers !== undefined,
+			),
+		)
+	) {
+		return
+	}
+
+	for (let [index, signature] of signatures.entries()) {
+		for (let [other, against] of signatures.entries()) {
+			if (other === index) {
+				continue
+			}
+
+			let clash = partialDefaultClash(
+				signature.parameterTypes,
+				against.parameterTypes,
+			)
+
+			if (clash === null) {
+				continue
+			}
+
+			let entry = entries[index]!
+			let offset =
+				signature.parameterTypes.length - entry.parameters.length
+			let written = entry.parameters[clash.index - offset]
+			let position = written?.defaultValue?.position ?? entry.position
+			let parameter = signature.parameterTypes[clash.index]!
+
+			reportError(
+				"This default makes two Overloads accept the same Record",
+				position,
+				{
+					code: "ambiguous-overload-default",
+					labels: [
+						primary(
+							position,
+							`a Record written without ${quotedMemberNames(parameter.defaultMembers ?? [])} still fits ${describeType(parameter.type)}`,
+						),
+						secondary(
+							entries[other]!.position,
+							`and fits this entry's ${describeType(against.parameterTypes[clash.index]!.type)}`,
+						),
+					],
+					notes: [
+						"An Overload is selected by the Arguments a call writes, so two entries that accept the same ones can not both be reached.",
+					],
+					helps: [
+						"Give the two Parameters labels that tell them apart, or delete the entry the default already stands for.",
+					],
+				},
+			)
+
+			break
+		}
+	}
+}
+
+// NOTE: The Parameter position at which `left` accepts a Record it could only
+// accept through its default and `right` accepts the same one — null where no
+// single Argument list satisfies both, which is every pair that was already
+// telling itself apart.
+function partialDefaultClash(
+	left: Array<common.Parameter>,
+	right: Array<common.Parameter>,
+): { index: number } | null {
+	if (left.length !== right.length) {
+		return null
+	}
+
+	let needsDefault: number | null = null
+
+	for (let index = 0; index < left.length; index++) {
+		if (left[index]!.name !== right[index]!.name) {
+			return null
+		}
+
+		let overlap = parameterOverlap(left[index]!, right[index]!)
+
+		if (overlap === null) {
+			return null
+		}
+
+		if (overlap.leftNeedsDefault && needsDefault === null) {
+			needsDefault = index
+		}
+	}
+
+	return needsDefault === null ? null : { index: needsDefault }
+}
+
+// NOTE: Whether one Argument can answer both Parameters, and whether the LEFT
+// one needs its own default to take it.
+//
+// The candidate is the union of what each side REQUIRES — every member of a
+// Parameter with no Record default, and the members a default does not fill in
+// where there is one. Nothing smaller satisfies both, and nothing larger helps:
+// a Parameter reading a Record partially admits only members it declares, so a
+// candidate that grows past what one of them declares is refused by it.
+function parameterOverlap(
+	left: common.Parameter,
+	right: common.Parameter,
+): { leftNeedsDefault: boolean } | null {
+	if (left.type.type !== "Record" || right.type.type !== "Record") {
+		// NOTE: Anything else is the type dispatch an `overload` block is FOR,
+		// and is weighed only for whether some value fits both — which is what
+		// makes this pair of entries reachable by one call at all.
+		return matchesType(left.type, right.type) ||
+			matchesType(right.type, left.type)
+			? { leftNeedsDefault: false }
+			: null
+	}
+
+	let leftMembers = left.type.members
+	let rightMembers = right.type.members
+	let candidate = new Set([
+		...requiredRecordMembers(left),
+		...requiredRecordMembers(right),
+	])
+
+	for (let member of candidate) {
+		let inLeft = Object.hasOwn(leftMembers, member)
+		let inRight = Object.hasOwn(rightMembers, member)
+
+		// NOTE: A member one side declares and the other reads partially can
+		// not be written at all — a partial Argument may only name members its
+		// Parameter declares — so there is no candidate and no clash.
+		if (
+			(!inLeft && left.defaultMembers !== undefined) ||
+			(!inRight && right.defaultMembers !== undefined)
+		) {
+			return null
+		}
+
+		if (
+			inLeft &&
+			inRight &&
+			!matchesType(leftMembers[member]!, rightMembers[member]!) &&
+			!matchesType(rightMembers[member]!, leftMembers[member]!)
+		) {
+			return null
+		}
+	}
+
+	return {
+		leftNeedsDefault:
+			left.defaultMembers !== undefined &&
+			candidate.size < Object.keys(leftMembers).length,
+	}
+}
+
+// NOTE: The members a call has to write into a Record Argument — every one
+// where the Parameter has no Record default, and the ones the default does not
+// fill in where it has.
+function requiredRecordMembers(parameter: common.Parameter): Array<string> {
+	let members = Object.keys((parameter.type as common.RecordType).members)
+
+	if (parameter.defaultMembers === undefined) {
+		return members
+	}
+
+	let filled = new Set(parameter.defaultMembers)
+
+	return members.filter((member) => !filled.has(member))
+}
+
+// NOTE: "'host', 'retries'" — the spelling every Diagnostic that lists members
+// uses.
+function quotedMemberNames(names: ReadonlyArray<string>): string {
+	return names.map((name) => `'${name}'`).join(", ")
+}
+
 // NOTE: Every label sequence a Parameter list accepts, keyed by the labels an
 // Argument list would carry, with the Parameters that had to be left out to
 // reach it. `2 ** defaults` sequences, which is a handful for anything anybody
@@ -6237,9 +6441,13 @@ export function resolveMethodType(
 	)
 	refuseAmbiguousOverloadDefaults(normalized.entries)
 
+	let overloads = normalized.entries.map(resolveEntry)
+
+	refuseAmbiguousPartialDefaults(normalized.entries, overloads)
+
 	return {
 		type: normalized.kind,
-		overloads: normalized.entries.map(resolveEntry),
+		overloads,
 		documentation: normalized.documentation ?? undefined,
 	}
 }
