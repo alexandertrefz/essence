@@ -1166,6 +1166,42 @@ describe("identifierPattern", () => {
 			)
 		})
 
+		it("should rename a Protocol through an extension list", () => {
+			let source = [
+				"implementation {",
+				"\tprotocol Sizable {",
+				"\t\tsize() -> Integer",
+				"\t}",
+				"\tprotocol Listed is Sizable {",
+				"\t\tfirst() -> Integer",
+				"\t}",
+				"}",
+			].join("\n")
+
+			expect(rename(source, { line: 5, column: 22 }, "Measurable")).toBe(
+				source.replaceAll("Sizable", "Measurable"),
+			)
+		})
+
+		it("should rename a Constant a provided Method's body reads", () => {
+			let source = [
+				"implementation {",
+				"\tconstant unit = 2",
+				"\tprotocol Sizable {",
+				"\t\tsize() -> Integer",
+				"",
+				"\t\tdoubled() -> Integer {",
+				"\t\t\t<- @::size()::multiply(with unit)",
+				"\t\t}",
+				"\t}",
+				"}",
+			].join("\n")
+
+			expect(rename(source, { line: 2, column: 11 }, "step")).toBe(
+				source.replaceAll("unit", "step"),
+			)
+		})
+
 		it("should not rename a builtin Protocol", () => {
 			let source = [
 				"implementation {",

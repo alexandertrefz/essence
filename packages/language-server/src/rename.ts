@@ -1432,6 +1432,12 @@ function walkProtocolDeclaration(
 ) {
 	declareInScope(scope, "types", node.name, "protocol", context)
 
+	// NOTE: An extension names a Protocol declared elsewhere, so renaming that
+	// Protocol has to move this spelling of it too.
+	for (let clause of node.conformsTo) {
+		reference(scope, "types", clause.protocol, context)
+	}
+
 	// NOTE: `Self` is visible inside the signatures — builtin, so it colours
 	// like a Type Parameter but can not be renamed.
 	let selfScope = createScope(scope)
@@ -1475,6 +1481,23 @@ function walkProtocolDeclaration(
 				: [member.signature]
 
 		for (let signature of signatures) {
+			// NOTE: A PROVIDED Method is a Function Definition over the very
+			// Parameters this signature holds, so it is walked as one — its
+			// Parameters declare, its body's names resolve, and every rename
+			// inside it reaches what it should. The requirement branch below
+			// walks the annotations alone, because a requirement has nothing
+			// else to walk.
+			if (signature.body !== null) {
+				walkFunctionDefinition(
+					signature.body.value,
+					selfScope,
+					context,
+					signature.body.position,
+				)
+
+				continue
+			}
+
 			for (let parameter of signature.parameters) {
 				walkTypeDeclaration(parameter.type, selfScope, context)
 			}

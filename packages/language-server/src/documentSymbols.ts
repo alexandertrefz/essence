@@ -363,7 +363,13 @@ function protocolMembers(
 		let range = member.name.position
 
 		for (let signature of signatures) {
-			range = unionOfPositions(range, signature.position)
+			// NOTE: A PROVIDED Method's symbol spans its block as well — the
+			// body is part of what was written, and an outline that stopped at
+			// the return Type would not select it.
+			range = unionOfPositions(
+				range,
+				signature.body?.position ?? signature.position,
+			)
 		}
 
 		members.push({

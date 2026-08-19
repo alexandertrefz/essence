@@ -240,10 +240,19 @@ export function describeSignature(
 	name: string = "",
 	printing: SignaturePrinting = {},
 ): SignatureDescription {
+	// NOTE: `Self` is never shown. A Protocol's PROVIDED Method is a bounded
+	// generic Function over `Self` — that is how one body answers for every
+	// conformer — but nobody wrote that Parameter and no call site binds it by
+	// hand: it is the receiver's own Type, worked out from the receiver. Shown,
+	// it would put `describe<Self is Shape>()` in front of a reader who wrote
+	// `describe() -> String`.
+	let declaredGenerics = functionType.generics.filter(
+		(generic) => generic.name !== "Self",
+	)
 	let generics =
-		functionType.generics.length === 0
+		declaredGenerics.length === 0
 			? ""
-			: `<${functionType.generics
+			: `<${declaredGenerics
 					.map((generic) =>
 						// NOTE: A Protocol-bounded Type Parameter reads back as it
 						// is written — `ItemType is Comparable` — so a Hover or

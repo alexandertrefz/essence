@@ -488,6 +488,13 @@ export type NamespaceType = {
 		string,
 		Array<{ generic: string; protocol: string }>
 	>
+	// NOTE: Set only on the pseudo Namespace a Protocol's PROVIDED Methods are
+	// reached through, to the Protocol that wrote them — which is also this
+	// Namespace's `name`, because that name is what the emitted const is
+	// spelled with. It is what tells a reader where a Method they did not write
+	// came from, and nothing but a Hover reads it: resolution and emission are
+	// decided by the name.
+	providedBy?: string
 }
 
 // NOTE: Deliberately NOT part of `Type` — a Protocol is not a Type. It is

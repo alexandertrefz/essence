@@ -140,6 +140,26 @@ function collectFromNode(
 			return
 		case "ProtocolDeclarationStatement":
 			addRange(ranges, node.position)
+
+			// NOTE: A PROVIDED Method's block folds on its own, exactly as a
+			// Namespace Method's does — it is a body like any other.
+			for (let member of Object.values(node.methods)) {
+				let signatures =
+					member.nodeType === "OverloadedProtocolMethod" ||
+					member.nodeType === "OverloadedStaticProtocolMethod"
+						? member.signatures
+						: [member.signature]
+
+				for (let signature of signatures) {
+					if (signature.body === null) {
+						continue
+					}
+
+					addRange(ranges, signature.body.position)
+					collectFromBody(signature.body.value.body, ranges)
+				}
+			}
+
 			return
 		case "IfStatement":
 			addRange(ranges, node.position)

@@ -141,6 +141,137 @@ describe("Completion", () => {
 			expect(labels).toContain("add")
 		})
 
+		// NOTE: A Protocol's PROVIDED Methods are Methods of every conformer,
+		// so they are offered beside the written ones — and withheld where the
+		// Namespace wrote one of the name, which is the override rule.
+		it("should list a Protocol's provided Methods beside the written ones", () => {
+			let source = [
+				"implementation {",
+				"\tprotocol Shape {",
+				"\t\tarea() -> Rational",
+				"",
+				"\t\tdescribe() -> String {",
+				'\t\t\t<- "area {@::area()}"',
+				"\t\t}",
+				"\t}",
+				"",
+				"\ttype Square = { side: Rational }",
+				"",
+				"\tnamespace Squares for Square is Shape {",
+				"\t\tarea() -> Rational {",
+				"\t\t\t<- @.side",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tconstant square: Square = { side = 3/1 }",
+				"\tsquare::",
+				"}",
+			].join("\n")
+
+			let labels = labelsOf(source, { line: 19, column: 10 })
+
+			expect(labels).toContain("area")
+			expect(labels).toContain("describe")
+		})
+
+		it("should list a provided Method inherited from an extended Protocol", () => {
+			let source = [
+				"implementation {",
+				"\tprotocol Sized {",
+				"\t\tsize() -> Integer",
+				"",
+				"\t\tisEmpty() -> Boolean {",
+				"\t\t\t<- @::size()::is(0)",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tprotocol Listed is Sized {",
+				"\t\tfirst() -> Integer",
+				"\t}",
+				"",
+				"\ttype Bag = { count: Integer }",
+				"",
+				"\tnamespace Bags for Bag is Listed {",
+				"\t\tsize() -> Integer {",
+				"\t\t\t<- @.count",
+				"\t\t}",
+				"",
+				"\t\tfirst() -> Integer {",
+				"\t\t\t<- 0",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tconstant bag: Bag = { count = 2 }",
+				"\tbag::",
+				"}",
+			].join("\n")
+
+			let labels = labelsOf(source, { line: 27, column: 7 })
+
+			expect(labels).toContain("size")
+			expect(labels).toContain("first")
+			expect(labels).toContain("isEmpty")
+		})
+
+		it("should offer the written Method where a Namespace overrode a provided one", () => {
+			let source = [
+				"implementation {",
+				"\tprotocol Shape {",
+				"\t\tarea() -> Rational",
+				"",
+				"\t\tdescribe() -> String {",
+				'\t\t\t<- "area {@::area()}"',
+				"\t\t}",
+				"\t}",
+				"",
+				"\ttype Square = { side: Rational }",
+				"",
+				"\tnamespace Squares for Square is Shape {",
+				"\t\tarea() -> Rational {",
+				"\t\t\t<- @.side",
+				"\t\t}",
+				"",
+				"\t\tdescribe() -> String {",
+				'\t\t\t<- "a square"',
+				"\t\t}",
+				"\t}",
+				"",
+				"\tconstant square: Square = { side = 3/1 }",
+				"\tsquare::",
+				"}",
+			].join("\n")
+
+			let entries = findCompletions(source, {
+				line: 23,
+				column: 10,
+			}).filter((entry) => entry.label === "describe")
+
+			expect(entries.length).toBe(1)
+		})
+
+		it("should list the provided Methods of a bounded Type Parameter", () => {
+			let source = [
+				"implementation {",
+				"\tprotocol Shape {",
+				"\t\tarea() -> Rational",
+				"",
+				"\t\tdescribe() -> String {",
+				'\t\t\t<- "area {@::area()}"',
+				"\t\t}",
+				"\t}",
+				"",
+				"\tfunction say<infer Item is Shape>(_ item: Item) -> String {",
+				"\t\t<- item::",
+				"\t}",
+				"}",
+			].join("\n")
+
+			let labels = labelsOf(source, { line: 11, column: 12 })
+
+			expect(labels).toContain("area")
+			expect(labels).toContain("describe")
+		})
+
 		// NOTE: The builtin `for List<ItemType>` is listed first, but the call
 		// dispatches to the narrower `for List<Integer>` — so listing the
 		// builtin's `Optional<ItemType>` signature would describe a Method
