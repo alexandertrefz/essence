@@ -234,6 +234,20 @@ export function findCompletions(
 	let headText = [...lines.slice(0, cursor.line - 1), beforeCursor].join("\n")
 	let space = detectSymbolSpace(headText)
 
+	// NOTE: Built before the contextual list rather than beside it, because a
+	// Record member that a binding of the same name is in reach of is a whole
+	// member on its own — `{ port }` is `{ port = port }` — and this list is
+	// already exactly the names in reach. Deriving it twice would be the same
+	// walk done twice.
+	let scopeEntries = scopeCompletions(
+		documentText,
+		cursor,
+		space,
+		documentPath,
+		workspace.offers,
+		document,
+	)
+
 	// NOTE: Record member names and Argument labels are offered *alongside*
 	// the names in Scope — both are valid at those positions, since a member
 	// is written `name = value` and a labelled Argument `label value`.
@@ -242,17 +256,39 @@ export function findCompletions(
 	// or a `#` the language allows nothing but a name — and only in the value
 	// space, since no Keyword names a Type.
 	return [
-		...contextualCompletions(lines, cursor, documentPath),
-		...scopeCompletions(
-			documentText,
+		...contextualCompletions(
+			lines,
 			cursor,
-			space,
 			documentPath,
-			workspace.offers,
-			document,
+			space === "values" ? bindingsInReach(scopeEntries) : new Set(),
 		),
+		...scopeEntries,
 		...(space === "values" ? keywordCompletions(headText) : []),
 	]
+}
+
+// NOTE: The names a bare Identifier resolves to where the cursor is. Only the
+// kinds that name a VALUE, since that is what a shorthand member reads, and
+// only the ones already in reach — a workspace offer is not, and accepting one
+// writes an `import` entry the shorthand would not.
+function bindingsInReach(entries: Array<CompletionEntry>): Set<string> {
+	let bindingKinds = new Set<CompletionKind>([
+		"constant",
+		"variable",
+		"parameter",
+		"function",
+		"import",
+	])
+
+	return new Set(
+		entries
+			.filter(
+				(entry) =>
+					bindingKinds.has(entry.kind) &&
+					entry.tier !== completionTiers.workspace,
+			)
+			.map((entry) => entry.label),
+	)
 }
 
 /*******************************/
@@ -263,6 +299,10 @@ function contextualCompletions(
 	lines: Array<string>,
 	cursor: common.Cursor,
 	documentPath?: string,
+	// NOTE: See `bindingsInReach`. Empty is not "nothing is in reach" but "do
+	// not say anything about the shorthand" — the offers themselves are the
+	// same either way.
+	bindings: Set<string> = new Set(),
 ): Array<CompletionEntry> {
 	let headText = [
 		...lines.slice(0, cursor.line - 1),
@@ -279,7 +319,7 @@ function contextualCompletions(
 				documentPath,
 			)
 
-			context = findArgumentContext(enrichedProgram, cursor)
+			context = findArgumentContext(enrichedProgram, cursor, lines)
 		} catch {
 			continue
 		}
@@ -294,12 +334,23 @@ function contextualCompletions(
 	}
 
 	if (context.kind === "record") {
+		// NOTE: A member a binding of the same name is in reach of says so,
+		// rather than being offered a second time: the two would insert the
+		// very same characters, since a bare name IS the whole member. What is
+		// new is the sentence, which is the only place the reader learns that
+		// stopping after the name finishes the member.
+		//
+		// `context.shorthand` is false inside an update's key list, where a
+		// bare name is refused outright — see `shorthand-in-combination`.
 		return Object.entries(context.memberTypes)
 			.filter(([name]) => !context.presentMembers.includes(name))
 			.map(([name, type]) => ({
 				label: name,
 				kind: "member" as const,
-				detail: printType(type),
+				detail:
+					context.shorthand && bindings.has(name)
+						? `${printType(type)} (or '${name}' alone)`
+						: printType(type),
 				tier: completionTiers.member,
 			}))
 	}

@@ -17,8 +17,9 @@ import { contains, isSmaller } from "./positions"
 //
 // Both are found by walking the enriched Program while carrying the Type
 // each Expression is expected to have — a Record literal picks it up from
-// its own annotation, from the declaration it is assigned to, or from the
-// Parameter it is passed as. The innermost construct containing the cursor
+// its own annotation, from the declaration it is assigned to, from the
+// Parameter it is passed as, or, on the right-hand side of an update, from
+// the LEFT side's Type. The innermost construct containing the cursor
 // wins, so `greet({ … })` offers Record members inside the braces and
 // Argument labels outside them.
 
@@ -27,6 +28,12 @@ export type ArgumentContext =
 			kind: "record"
 			memberTypes: Record<string, common.Type>
 			presentMembers: Array<string>
+			// NOTE: Whether a bare member name is a whole member in these
+			// braces. True in a Record Literal, where `{ x }` is `{ x = x }`,
+			// and false in an update's key list, which is the one member list
+			// that is not a Literal — a bare name after `with` is already the
+			// whole value being merged in.
+			shorthand: boolean
 	  }
 	| {
 			kind: "arguments"
@@ -38,13 +45,28 @@ type State = {
 	cursor: common.Cursor
 	best: ArgumentContext | null
 	bestPosition: common.Position | null
+	// NOTE: The document's own lines. An update's key list and a braced Literal
+	// on its right-hand side are the SAME Node with the same shape — the
+	// Compiler reads `{ base with a = 1 }` and `{ base with { a = 1 } }` into
+	// one `Combination` over one `RecordValue` — so the only thing that tells
+	// them apart is the character the member list opens on, which is the
+	// reading the Formatter and the Code Actions make too. Empty where the
+	// caller has no source in hand: the shorthand is then simply not offered,
+	// which is the half of the answer that can not be wrong.
+	lines: Array<string>
 }
 
 export function findArgumentContext(
 	program: common.typed.Program,
 	cursor: common.Cursor,
+	lines: Array<string> = [],
 ): ArgumentContext | null {
-	let state: State = { cursor, best: null, bestPosition: null }
+	let state: State = {
+		cursor,
+		best: null,
+		bestPosition: null,
+		lines,
+	}
 
 	visitBody(program.implementation.nodes, null, state)
 
@@ -135,26 +157,9 @@ function visitNode(
 		case "ReturnStatement":
 			visitNode(node.expression, expected, state)
 			return
-		case "RecordValue": {
-			let recordType =
-				node.declaredType ?? asRecordType(expected) ?? node.type
-
-			consider(
-				node.position,
-				{
-					kind: "record",
-					memberTypes: recordType.members,
-					presentMembers: Object.keys(node.members),
-				},
-				state,
-			)
-
-			for (let [name, member] of Object.entries(node.members)) {
-				visitNode(member, recordType.members[name] ?? null, state)
-			}
-
+		case "RecordValue":
+			visitRecordValue(node, expected, state, true)
 			return
-		}
 		case "FunctionInvocation": {
 			let calleeType = node.name.type
 
@@ -193,10 +198,31 @@ function visitNode(
 		case "Lookup":
 			visitNode(node.base, null, state)
 			return
-		case "Combination":
+		case "Combination": {
 			visitNode(node.lhs, expected, state)
-			visitNode(node.rhs, expected, state)
+
+			// NOTE: What an update's right-hand side is held to is the LEFT
+			// side's Type, not the Type the update as a whole answers with:
+			// every member it names has to be one the left side already has,
+			// and `{ base with … }` written into an unannotated Constant has
+			// no expected Type at all otherwise. That is the only spelling the
+			// shorthand merge has, so this is what makes it complete.
+			let base = asRecordType(node.lhs.type) ?? expected
+
+			if (node.rhs.nodeType === "RecordValue") {
+				visitRecordValue(
+					node.rhs,
+					base,
+					state,
+					opensOnBrace(node.rhs, state),
+				)
+
+				return
+			}
+
+			visitNode(node.rhs, base, state)
 			return
+		}
 		case "Match":
 			visitNode(node.value, null, state)
 
@@ -257,6 +283,56 @@ function visitNode(
 		case "BooleanValue":
 			return
 	}
+}
+
+// NOTE: One member list, whether it was written as a Record Literal or as an
+// update's key list. `shorthand` is the one thing the two do not share, and it
+// is decided by the caller — a Literal reaches here from anywhere and always
+// takes it; a key list reaches here from a `Combination` and never does.
+function visitRecordValue(
+	node: common.typed.RecordValueNode,
+	expected: common.Type | null,
+	state: State,
+	shorthand: boolean,
+) {
+	let recordType = node.declaredType ?? asRecordType(expected) ?? node.type
+
+	consider(
+		node.position,
+		{
+			kind: "record",
+			memberTypes: recordType.members,
+			presentMembers: Object.keys(node.members),
+			shorthand,
+		},
+		state,
+	)
+
+	for (let [name, member] of Object.entries(node.members)) {
+		visitNode(member, recordType.members[name] ?? null, state)
+	}
+}
+
+// NOTE: Whether a member list is its own Record Literal — which is what makes
+// it take the shorthand — read the only way it can be: off the character its
+// Position opens on. A Literal's opens on its own `{`; an update's key list
+// opens on its first key, because it has no braces of its own. A TYPED Literal
+// opens on the Type it names, and is a Literal by that alone.
+//
+// The cursor is inside these braces and the Position is left of it, so the
+// document's own lines answer for the probe source as well: the two agree on
+// every character before the cursor.
+function opensOnBrace(
+	node: common.typed.RecordValueNode,
+	state: State,
+): boolean {
+	if (node.declaredType !== null) {
+		return true
+	}
+
+	let line = state.lines[node.position.start.line - 1]
+
+	return line?.[node.position.start.column - 1] === "{"
 }
 
 // NOTE: A call written inside a Parameter's `= expression` default offers the
