@@ -690,6 +690,16 @@ export function createInterpreter(
 				let readers = names.map((name) =>
 					compileIn(expected.members[name]!.of),
 				)
+				// NOTE: The members the callee's own default fills in, which a
+				// host may therefore leave out. Absence has to reach the built
+				// Record as a MISSING KEY rather than as an `undefined` one: the
+				// callee reads `options.retries ?? 3`, and a key holding
+				// `undefined` is exactly as absent to that as no key at all —
+				// but `ownRecord` would carry it, and everything downstream
+				// reads a Record's own keys.
+				let defaulted = names.map(
+					(name) => expected.members[name]!.optional === true,
+				)
 				let count = names.length
 				let declared = new Set(names)
 
@@ -759,13 +769,23 @@ export function createInterpreter(
 					// NOTE: An OWN key, because an absent `toString` read plainly
 					// finds `Object.prototype`'s — a function where the rule above
 					// promises `undefined`.
+					//
+					// NOTE: Unless the member is one the callee fills in, whose
+					// absence is not a value at all — it is the caller saying
+					// nothing, which is what the default is for. A key that IS
+					// written goes to the reader like any other, `undefined` and
+					// all: writing a member is writing it, and an Optional
+					// member written `undefined` is `#Empty` exactly as it was.
 					for (let position = 0; position < count; position++) {
 						let name = names[position]!
+						let written = Object.hasOwn(given, name)
+
+						if (!written && defaulted[position]) {
+							continue
+						}
 
 						fields[name] = readers[position]!(
-							Object.hasOwn(given, name)
-								? given[name]
-								: undefined,
+							written ? given[name] : undefined,
 							inside,
 							name,
 						)

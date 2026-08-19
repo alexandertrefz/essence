@@ -979,3 +979,142 @@ describe("Calling with an Argument left out", () => {
 		expect(() => scaled(21n)).toThrow(/takes 2 Arguments/)
 	})
 })
+
+// NOTE: A Record Parameter whose default fills SOME of its members in. The
+// Argument is still required and every member the default does not fill in has
+// to be written — what a host gains is the right to leave the rest out, and the
+// callee's own prologue is what puts them back.
+describe("Leaving out a member the callee fills in", () => {
+	let defaults: EssenceModule
+
+	beforeAll(async () => {
+		defaults = await loadModule(clientFixture("Defaults.es"), {
+			cacheDirectory,
+		})
+	})
+
+	type Connect = (
+		url: string,
+		options: { host: string; retries?: bigint; secure: boolean },
+	) => string
+
+	it("takes a Record the default completes", () => {
+		let connect = defaults.exports.connect as Connect
+
+		expect(connect("a", { host: "h", secure: true })).toBe("a|h|3|true")
+	})
+
+	it("takes a Record that writes every member", () => {
+		let connect = defaults.exports.connect as Connect
+
+		expect(connect("a", { host: "h", retries: 9n, secure: false })).toBe(
+			"a|h|9|false",
+		)
+	})
+
+	// NOTE: A member written `undefined` is a member WRITTEN — the default is
+	// for a caller that said nothing, and this caller said something no Integer
+	// admits.
+	it("refuses a member written as undefined", () => {
+		let connect = defaults.exports.connect as (
+			...args: Array<unknown>
+		) => string
+
+		expect(() =>
+			connect("a", { host: "h", retries: undefined, secure: true }),
+		).toThrow(EssenceMarshalError)
+	})
+
+	it("still refuses a member the default does not fill in", () => {
+		let connect = defaults.exports.connect as (
+			...args: Array<unknown>
+		) => string
+
+		expect(() => connect("a", { host: "h" })).toThrow(EssenceMarshalError)
+	})
+
+	// NOTE: The Record is still CLOSED — a member the Type does not name is a
+	// misspelling in the making, and leaving one out is not permission to add
+	// another.
+	it("still refuses a member the Type does not name", () => {
+		let connect = defaults.exports.connect as (
+			...args: Array<unknown>
+		) => string
+
+		expect(() =>
+			connect("a", { host: "h", secure: true, timeout: 30n }),
+		).toThrow(/timeout/)
+	})
+
+	// NOTE: The whole Argument is NOT omittable — a partial default fills in
+	// members, never a value — so the arity gate is unmoved.
+	it("still requires the Argument itself", () => {
+		let connect = defaults.exports.connect as (
+			...args: Array<unknown>
+		) => string
+
+		expect(() => connect("a")).toThrow(/takes 2 Arguments/)
+	})
+
+	// NOTE: `optional` is a WIRE format field on a member exactly as it is on a
+	// Parameter, and absence reads as required there too — a sidecar written
+	// before Record defaults existed has to keep loading and keep meaning what
+	// it always meant.
+	it("reads a member with no `optional` field as required", async () => {
+		let described = describeModule(defaults.surface, defaults.entryPath)
+		let signature = described.exports["connect"]
+
+		if (signature?.kind !== "function") {
+			throw new Error("Expected a function export")
+		}
+
+		let options = signature.of.parameters[1]!.of
+
+		if (options.kind !== "record") {
+			throw new Error("Expected a Record Parameter")
+		}
+
+		// NOTE: The old sidecar, made by taking the field back out.
+		let older = {
+			exports: {
+				connect: {
+					...signature,
+					of: {
+						...signature.of,
+						parameters: [
+							signature.of.parameters[0]!,
+							{
+								...signature.of.parameters[1]!,
+								of: {
+									...options,
+									members: Object.fromEntries(
+										Object.entries(options.members).map(
+											([name, member]) => [
+												name,
+												{ of: member.of },
+											],
+										),
+									),
+								},
+							},
+						],
+					},
+				},
+			},
+		}
+
+		let interpreter = createInterpreter(defaults.bridge, older)
+		let connect = interpreter.wrapFunction(
+			defaults.raw.connect as never,
+			older.exports.connect.of,
+			"connect",
+		) as (...args: Array<unknown>) => string
+
+		expect(connect("a", { host: "h", retries: 9n, secure: true })).toBe(
+			"a|h|9|true",
+		)
+		expect(() => connect("a", { host: "h", secure: true })).toThrow(
+			EssenceMarshalError,
+		)
+	})
+})

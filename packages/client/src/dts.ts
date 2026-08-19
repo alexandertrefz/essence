@@ -348,13 +348,21 @@ function crossesDifferently(node: Descriptor): boolean {
 		case "list":
 		case "optional":
 			return crossesDifferently(node.of)
+		// NOTE: A member the callee fills in is the plainest case there is of a
+		// Type whose two directions differ — one going in may leave it out, one
+		// coming out never lacks it — so the Record is spelled out where it is
+		// passed instead of going by the name it is declared under, and the `?`
+		// lands on the member rather than on the declaration every other use of
+		// that Type shares.
 		case "record":
-			return Object.values(node.members).some((member) =>
-				crossesDifferently(member.of),
+			return Object.values(node.members).some(
+				(member) =>
+					member.optional === true || crossesDifferently(member.of),
 			)
 		case "case":
-			return Object.values(node.payload).some((member) =>
-				crossesDifferently(member.of),
+			return Object.values(node.payload).some(
+				(member) =>
+					member.optional === true || crossesDifferently(member.of),
 			)
 		case "union":
 			return node.arms.some(crossesDifferently)
@@ -566,14 +574,23 @@ function createWalker(
 		}
 	}
 
+	// NOTE: `?` on a member the callee's own default fills in — and IN only,
+	// because that is the whole of what it says: a value written for this
+	// position may leave the member out, and a value that comes out of one never
+	// does. Unlike a positional Parameter's `?`, whose legality is a rule about
+	// the trailing run, a member has no order to respect.
 	function recordEntries(
 		members: Members,
 		direction: Direction,
 	): Array<string> {
-		return Object.entries(members).map(
-			([name, member]) =>
-				`${memberName(name)}: ${print(member.of, direction)}`,
-		)
+		return Object.entries(members).map(([name, member]) => {
+			let omittable = direction === "in" && member.optional === true
+
+			return `${memberName(name)}${omittable ? "?" : ""}: ${print(
+				member.of,
+				direction,
+			)}`
+		})
 	}
 
 	// NOTE: An `Optional` is spelled by its ABSENCE on this side, so its two
