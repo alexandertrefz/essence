@@ -65,7 +65,10 @@ import {
 	derivedEquatableNamespaceName,
 	derivedPrintableNamespace,
 	derivedPrintableNamespaceName,
+	findProtocolInScope,
+	protocolMethodBody,
 	invalidateNamespacesInScope,
+	providedMethodNamespaces,
 	namespacesTargeting,
 	specializedNamespacesFor,
 	listItemTypeOf,
@@ -3120,10 +3123,127 @@ export function enrichProtocolDeclarationStatement(
 		// own — Unknown, rather than misleadingly borrowing one.
 		name: enrichIdentifier(node.name, scope, { type: "Unknown" }),
 		protocolType,
+		conformsTo: node.conformsTo.map((clause) => ({
+			name: clause.protocol.content,
+			position: clause.protocol.position,
+		})),
+		methods: enrichProvidedMethods(node, protocolType, scope),
 		position: node.position,
-		headPosition: headPositionOf(node.position, [node.name.position]),
+		headPosition: headPositionOf(node.position, [
+			node.name.position,
+			...node.conformsTo.map((clause) => clause.position),
+		]),
 		documentation: node.documentation,
 	}
+}
+
+// NOTE: The bodies of a Protocol's own provided Methods. `@` is `Self` BOUNDED
+// by this Protocol, which is the whole of the design: a provided Method is a
+// bounded generic Function over `Self`, so the body may call the Protocol's
+// surface and nothing else, and the hidden conformance Parameter the bound
+// already emits is what those calls dispatch through at run time. Nothing new
+// is invented for it in the Simplifier or the Rewriter.
+//
+// Only the Methods THIS Protocol wrote — an inherited one is emitted where it
+// was written, once, and reached from here through the ancestor.
+function enrichProvidedMethods(
+	node: parser.ProtocolDeclarationStatementNode,
+	protocolType: common.ProtocolType,
+	scope: enricher.Scope,
+): common.typed.Methods {
+	let methods: common.typed.Methods = {}
+
+	for (let [methodName, methodValue] of Object.entries(node.methods)) {
+		let body = protocolMethodBody(methodValue)
+
+		if (body === null) {
+			refuseUnwritableProvidedMethod(methodValue)
+
+			continue
+		}
+
+		if (protocolType.providedMethods?.[methodName] !== node.name.content) {
+			continue
+		}
+
+		let selfDeclaration: common.typed.GenericDeclarationNode = {
+			nodeType: "GenericDeclaration",
+			name: "Self",
+			inferred: true,
+			defaultType: null,
+			constraint: node.name.content,
+			position: node.name.position,
+		}
+		let boundSelf: common.GenericUse = {
+			type: "GenericUse",
+			name: "Self",
+			constraint: node.name.content,
+		}
+		let bodyScope = childScope(scope, { types: { Self: boundSelf } })
+		let type = resolveFunctionValueType(body, bodyScope)
+
+		methods[methodName] = {
+			nodeType: "SimpleMethod",
+			name: enrichIdentifier(methodValue.name, scope, {
+				type: "Unknown",
+			}),
+			method: {
+				nodeType: "FunctionValue",
+				value: enrichMethodFunctionDefinition(
+					body,
+					bodyScope,
+					boundSelf,
+					type,
+					[selfDeclaration],
+					false,
+				),
+				position: body.position,
+				type,
+			},
+		}
+	}
+
+	return methods
+}
+
+// NOTE: A body on a `static` or an `overload` entry. Both would need a rail of
+// their own — a static Method takes no receiver for `Self` to be read off, and
+// an Overload's const is named for its slot in a Method Type this side of the
+// Protocol has no conformer to resolve against — so both are refused outright
+// rather than half supported. The signatures still stand as requirements, which
+// is why this reports and returns instead of dropping the Method.
+function refuseUnwritableProvidedMethod(
+	method: parser.ProtocolMethods[string],
+): void {
+	let bodied =
+		method.nodeType === "StaticProtocolMethod"
+			? method.signature.body === null
+				? null
+				: method.signature
+			: ((method.nodeType === "OverloadedProtocolMethod" ||
+				method.nodeType === "OverloadedStaticProtocolMethod"
+					? method.signatures
+					: []
+				).find((signature) => signature.body !== null) ?? null)
+
+	if (bodied === null) {
+		return
+	}
+
+	let position = bodied.body?.position ?? bodied.position
+	let kind =
+		method.nodeType === "StaticProtocolMethod" ? "static" : "overloaded"
+
+	reportError(`A ${kind} Protocol Method can not carry a body`, position, {
+		code: "unwritable-provided-method",
+		labels: [primary(position, "this body has no receiver to run on")],
+		notes: [
+			"A provided Method is written on '@', the conforming value, and is emitted once for every conformer.",
+		],
+		helps: [
+			`Write '${method.name.content}' as a requirement, and give each conforming Namespace a body of its own.`,
+		],
+	})
 }
 
 // NOTE: `infer` marks a Type Parameter a USE works out for itself, from the
@@ -5957,6 +6077,51 @@ function reportUnknownMethod(
 	)
 	let namespaceNames = [...namespaces.keys()]
 
+	// NOTE: A Protocol-bounded receiver — the `@` of a provided Method, or a
+	// value of a bounded Type Parameter — is known by its bound and by nothing
+	// else, and saying so is far more use than listing the pseudo Namespaces the
+	// bound was searched through. It is the Diagnostic a provided Method's body
+	// meets whenever it reaches past the Protocol's surface.
+	if (baseType.type === "GenericUse" && baseType.constraint !== undefined) {
+		let protocol = findProtocolInScope(baseType.constraint, scope)
+		let surface = Object.keys(protocol?.methods ?? {}).sort()
+
+		reportError(
+			`'${baseType.constraint}' has no Method named '${node.member.content}'`,
+			node.member.position,
+			{
+				code: "method-not-on-protocol",
+				labels: [
+					primary(
+						node.member.position,
+						`'${baseType.constraint}' does not declare this Method`,
+					),
+					secondary(
+						node.base.position,
+						`'${baseType.name}' is only known to conform to '${baseType.constraint}'`,
+					),
+				],
+				notes:
+					surface.length === 0
+						? [`'${baseType.constraint}' declares no Methods.`]
+						: [
+								`'${baseType.constraint}' declares ${surface
+									.map((name) => `'${name}'`)
+									.join(", ")}.`,
+							],
+				helps: [
+					...(suggestion === null
+						? []
+						: [`Did you mean '${suggestion}'?`]),
+					`Declare '${node.member.content}' on '${baseType.constraint}', or bound '${baseType.name}' by a Protocol that has it.`,
+				],
+				...suggestionData(suggestion),
+			},
+		)
+
+		return
+	}
+
 	reportError(
 		`No Method named '${node.member.content}' for this value`,
 		node.member.position,
@@ -6197,10 +6362,31 @@ function namespacesDeclaringMethod(
 	namespaces: Map<string, common.NamespaceType>,
 	baseType: common.Type,
 	scope: enricher.Scope,
+	position: common.Position,
 ): Map<string, common.NamespaceType> {
 	let matchingNamespaces = new Map<string, common.NamespaceType>()
 
 	for (let [name, namespace] of namespaces) {
+		if (Object.hasOwn(namespace.methods, methodName)) {
+			matchingNamespaces.set(name, namespace)
+		}
+	}
+
+	if (matchingNamespaces.size > 0) {
+		return matchingNamespaces
+	}
+
+	// NOTE: A Protocol's PROVIDED Methods come through the same door the
+	// derives do, and for the same reason: a Namespace that writes a Method of
+	// the name has replaced it, whole, so nothing here can ever be tied against
+	// something written. This IS the override rule — the fallback is only
+	// reached once the written Namespaces have come up empty.
+	for (let [name, namespace] of providedMethodNamespaces(
+		baseType,
+		namespaces.values(),
+		scope,
+		position,
+	)) {
 		if (Object.hasOwn(namespace.methods, methodName)) {
 			matchingNamespaces.set(name, namespace)
 		}
@@ -6253,6 +6439,7 @@ function resolveMethodInvocation(
 				namespaces,
 				baseType,
 				scope,
+				node.position,
 			),
 		)
 
@@ -6501,6 +6688,7 @@ function resolveUnionMethodDispatch(
 					namespaces,
 					memberType,
 					scope,
+					node.position,
 				),
 			)
 
@@ -9431,14 +9619,42 @@ export function resolveNamespaceDefinitionStatementType(
 		string,
 		Array<{ generic: string; protocol: string }>
 	> = {}
+	// NOTE: The Protocols this Namespace conforms to, EXPANDED through every
+	// extension: `is Orderable` also says `is Comparable`, because a Protocol
+	// extension is a promise about its conformers. Written flat here rather
+	// than walked at every use site, so that the one question everything else
+	// asks — does this Namespace conform to that Protocol — stays a lookup.
+	//
+	// A conditional clause's conditions ride along to each granted name: the
+	// conditions are what makes the conformance hold at all, and they hold the
+	// ancestor's exactly as they hold the descendant's.
+	let conformsTo: Array<string> = []
 
 	for (let clause of node.conformsTo) {
-		if (clause.conditions.length > 0) {
-			conformanceConditions[clause.protocol.content] =
-				clause.conditions.map((condition) => ({
-					generic: condition.generic.content,
-					protocol: condition.protocol.content,
-				}))
+		let conditions =
+			clause.conditions.length === 0
+				? null
+				: clause.conditions.map((condition) => ({
+						generic: condition.generic.content,
+						protocol: condition.protocol.content,
+					}))
+
+		let protocol = findProtocolInScope(clause.protocol.content, scope)
+
+		for (let name of [
+			clause.protocol.content,
+			...(protocol?.conformsTo ?? []),
+		]) {
+			if (!conformsTo.includes(name)) {
+				conformsTo.push(name)
+			}
+
+			if (
+				conditions !== null &&
+				conformanceConditions[name] === undefined
+			) {
+				conformanceConditions[name] = conditions
+			}
 		}
 	}
 
@@ -9459,7 +9675,7 @@ export function resolveNamespaceDefinitionStatementType(
 		generics: resolveGenericDeclarations(node.generics, scope),
 		properties,
 		methods,
-		conformsTo: node.conformsTo.map((clause) => clause.protocol.content),
+		conformsTo,
 		conformanceConditions,
 	}
 

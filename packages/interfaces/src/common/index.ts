@@ -256,6 +256,10 @@ export type DiagnosticCode =
 	| "conflicting-where-condition"
 	| "unwitnessable-where-condition"
 	| "unsatisfied-conformance-condition"
+	| "where-on-protocol-extension"
+	| "unwritable-provided-method"
+	| "recursive-protocol"
+	| "method-not-on-protocol"
 	// Inference — what the Compiler could not work out on its own.
 	| "uninferable-type-parameter"
 	| "uninferable-parameter-type"
@@ -494,7 +498,23 @@ export type NamespaceType = {
 export type ProtocolType = {
 	type: "Protocol"
 	name: string
+	// NOTE: Every Method the Protocol's surface holds — its own requirements,
+	// its own provided Methods, and both of those from every Protocol it
+	// extends, merged in at declaration. One record, because everything that
+	// asks a Protocol what it can do (the conformance check, a bounded
+	// receiver's pseudo Namespace, Completion) means the whole surface.
 	methods: Record<string, MethodType>
+	// NOTE: Which of `methods` carry a BODY, and the Protocol that wrote it —
+	// this one, or an ancestor. A name in here is not a requirement: a
+	// conformer that writes nothing still answers it, and
+	// `nonconforming-namespace` never asks for it. Optional so the hand
+	// written builtin Protocol tables stay valid.
+	providedMethods?: Record<string, string>
+	// NOTE: The Protocols this one extends, TRANSITIVELY — `Orderable` carries
+	// `Comparable`, and a Protocol extending `Orderable` carries both. Written
+	// flat because every reader asks "does conforming to this grant that", and
+	// a flat list answers it without walking. Optional, as on a Namespace.
+	conformsTo?: Array<string>
 	documentation?: Documentation
 }
 

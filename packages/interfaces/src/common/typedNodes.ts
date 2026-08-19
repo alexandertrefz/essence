@@ -508,6 +508,16 @@ export interface ProtocolDeclarationStatementNode {
 	nodeType: "ProtocolDeclarationStatement"
 	name: IdentifierNode
 	protocolType: ProtocolType
+	// NOTE: The Protocols this one extends, as written — one entry per `is`
+	// clause, so the cursor can land on an ancestor's name. `protocolType`
+	// carries the transitive set without Positions.
+	conformsTo: Array<{ name: string; position: Position }>
+	// NOTE: The PROVIDED Methods' bodies, enriched. `@` is typed as `Self`
+	// bounded by this Protocol, so the body may only call what the Protocol's
+	// own surface holds, and the hidden conformance Parameter the bound emits
+	// is what the calls inside dispatch through. A Protocol with no provided
+	// Method carries an empty record and emits nothing at all.
+	methods: Methods
 	position: Position
 	headPosition: Position
 	documentation: Documentation | null

@@ -2066,8 +2066,9 @@ function validateStatement(
 			return validateVariableAssignmentStatement(node)
 		case "TypeAliasStatement":
 		case "ChoiceDeclarationStatement":
-		case "ProtocolDeclarationStatement":
 			return node
+		case "ProtocolDeclarationStatement":
+			return validateProtocolDeclarationStatement(node)
 		case "NamespaceDefinitionStatement":
 			return validateNamespaceDefinitionStatement(node)
 		case "IfElseStatement":
@@ -2301,6 +2302,34 @@ function checkInfiniteRecursion(
 			],
 		},
 	)
+}
+
+// NOTE: A Protocol's requirements are signatures and carry nothing to check.
+// Its PROVIDED Methods are bodies, held to what a Namespace's Methods are held
+// to — every returning path fits the declared return Type, and a Method whose
+// every path calls itself is the same mistake wherever it is written.
+function validateProtocolDeclarationStatement(
+	node: common.typed.ProtocolDeclarationStatementNode,
+): common.typed.ProtocolDeclarationStatementNode {
+	for (let methodName in node.methods) {
+		let method = node.methods[methodName]
+
+		if (
+			method.nodeType !== "SimpleMethod" &&
+			method.nodeType !== "StaticMethod"
+		) {
+			continue
+		}
+
+		validateFunctionDefinition(method.method.value, method.method.position)
+		checkInfiniteRecursion(method.name, method.method.value, {
+			namespaceName: node.name.content,
+			methodName: method.name.content,
+			overloadIndex: null,
+		})
+	}
+
+	return node
 }
 
 function validateNamespaceDefinitionStatement(

@@ -1027,6 +1027,21 @@ export function resolveOverloadedFunctionStatementType(
 export function resolveProtocolDeclarationStatementType(
 	node: parser.ProtocolDeclarationStatementNode,
 	scope: enricher.Scope,
+	options: {
+		// NOTE: The Protocol names still waiting to hoist. An extension naming
+		// one can not be read yet — the ancestor's Methods are part of THIS
+		// Protocol's surface, so resolving without it would put half a surface
+		// in Scope for every use site above the declaration to solve against.
+		// Thrown back to the hoist loop, which retries a round later, exactly
+		// as a Namespace conforming to a pending Protocol is.
+		deferOnPendingProtocols?: ReadonlySet<string>
+		// NOTE: Set for a Protocol the extension-cycle pre-pass named. Its
+		// ancestors are unreadable by construction — each waits on the next —
+		// so the list is skipped and the Protocol resolves to its OWN surface,
+		// which is enough for the rest of the Program to be read against. The
+		// cycle itself was reported where it was found.
+		ignoreExtensions?: boolean
+	} = {},
 ): common.ProtocolType {
 	// NOTE: `Self` stands for the conforming Namespace's target Type — inside
 	// the signatures it is an ordinary GenericUse, substituted wherever the
@@ -1035,6 +1050,37 @@ export function resolveProtocolDeclarationStatementType(
 	let signatureScope = childScope(scope, { types: { Self: selfType } })
 
 	let methods: Record<string, common.MethodType> = {}
+	// NOTE: Which Methods carry a body, and which Protocol wrote it — an
+	// ancestor's entries arrive naming the ancestor, so a provided Method is
+	// emitted once under the name of the Protocol that WROTE it, however far
+	// down the chain it is reached from.
+	let providedMethods: Record<string, string> = {}
+	let conformsTo: Array<string> = []
+
+	// NOTE: The ancestors first, so the Protocol's own entries below overwrite
+	// them — writing a Method of an inherited name replaces it here exactly as
+	// a Namespace writing one replaces a provided Method at a call site.
+	if (options.ignoreExtensions !== true) {
+		for (let clause of node.conformsTo) {
+			let ancestor = resolveExtendedProtocol(clause, scope, options)
+
+			if (ancestor === null) {
+				continue
+			}
+
+			for (let name of [
+				clause.protocol.content,
+				...(ancestor.conformsTo ?? []),
+			]) {
+				if (!conformsTo.includes(name)) {
+					conformsTo.push(name)
+				}
+			}
+
+			Object.assign(methods, ancestor.methods)
+			Object.assign(providedMethods, ancestor.providedMethods ?? {})
+		}
+	}
 
 	for (let [methodName, methodValue] of Object.entries(node.methods)) {
 		methods[methodName] = resolveProtocolMethodType(
@@ -1042,14 +1088,99 @@ export function resolveProtocolDeclarationStatementType(
 			signatureScope,
 			selfType,
 		)
+
+		if (protocolMethodBody(methodValue) === null) {
+			// NOTE: A REQUIREMENT of this Protocol's own, standing where an
+			// ancestor provided a body — the body goes with the entry it
+			// belonged to, and conformers owe the Method again.
+			delete providedMethods[methodName]
+		} else {
+			providedMethods[methodName] = node.name.content
+		}
 	}
 
 	return {
 		type: "Protocol",
 		name: node.name.content,
 		methods,
+		...(Object.keys(providedMethods).length === 0
+			? {}
+			: { providedMethods }),
+		...(conformsTo.length === 0 ? {} : { conformsTo }),
 		documentation: node.documentation ?? undefined,
 	}
+}
+
+// NOTE: One `is X` of a Protocol's extension list, resolved — or null where it
+// names nothing, which is reported here. A `where` clause is refused rather
+// than read: a Protocol declares no Type Parameters, so there is nothing for a
+// condition to bound and nothing at a use site to prove it with.
+function resolveExtendedProtocol(
+	clause: parser.ConformanceClauseNode,
+	scope: enricher.Scope,
+	options: { deferOnPendingProtocols?: ReadonlySet<string> },
+): common.ProtocolType | null {
+	let identifier = clause.protocol
+	let ancestor = findProtocolInScope(identifier.content, scope)
+
+	if (ancestor === null) {
+		if (options.deferOnPendingProtocols?.has(identifier.content) === true) {
+			throw new Error(
+				`Protocol '${identifier.content}' has not been hoisted yet`,
+			)
+		}
+
+		reportError(
+			`Protocol '${identifier.content}' is not declared`,
+			identifier.position,
+			{
+				code: "unknown-protocol",
+				labels: [primary(identifier.position, "no such Protocol")],
+				helps: suggestionHelps(identifier.content, scope, "protocols"),
+				...suggestionData(
+					suggestionInScope(identifier.content, scope, "protocols"),
+				),
+			},
+		)
+
+		return null
+	}
+
+	for (let condition of clause.conditions) {
+		reportError(
+			"A Protocol extension can not carry a 'where' clause",
+			condition.position,
+			{
+				code: "where-on-protocol-extension",
+				labels: [
+					primary(
+						condition.position,
+						"this condition has nothing to bound",
+					),
+				],
+				notes: [
+					"A 'where' condition bounds one of the declaring Namespace's Type Parameters, and a Protocol declares none.",
+				],
+				helps: [
+					`Write 'is ${identifier.content}' on its own, and bound the Type Parameter where the conforming Namespace is declared.`,
+				],
+			},
+		)
+	}
+
+	return ancestor
+}
+
+// NOTE: The body a Protocol Method carries, or null for a requirement. A static
+// or overloaded entry answers null whatever it was written with — both are
+// refused at the declaration, and reading them as requirements is what keeps
+// the refusal from breaking the surface as well.
+export function protocolMethodBody(
+	method: parser.ProtocolMethods[string],
+): parser.FunctionValueNode | null {
+	return method.nodeType === "SimpleProtocolMethod"
+		? method.signature.body
+		: null
 }
 
 function resolveProtocolSignature(
@@ -2373,6 +2504,7 @@ function derivedConformanceSource(
 		derived,
 		binding,
 		new Map(),
+		conformanceGrantsIn(scope),
 	)
 
 	if (result.kind !== "conforms") {
@@ -2452,6 +2584,205 @@ function derivedConformanceSource(
 	}
 }
 
+// NOTE: Does conforming to `declared` also make a value conform to `wanted`?
+// A Protocol extension is a promise about its conformers, so `is Orderable`
+// answers an `is Comparable` bound — the transitive ancestor list a Protocol
+// carries is exactly this question, written flat.
+export function protocolGrants(
+	declared: string,
+	wanted: string,
+	scope: enricher.Scope,
+): boolean {
+	if (declared === wanted) {
+		return true
+	}
+
+	return (
+		findProtocolInScope(declared, scope)?.conformsTo?.includes(wanted) ===
+		true
+	)
+}
+
+// NOTE: The `grants` question `computeConformanceMethodMap` asks about a
+// fulfilling Method's own bound, bound to a Scope. The helper is Scope-free by
+// design, so the one place that knows how Protocols extend each other hands the
+// answer in rather than the helper reaching for it.
+export function conformanceGrantsIn(
+	scope: enricher.Scope,
+): (declared: string, wanted: string) => boolean {
+	return (declared, wanted) => protocolGrants(declared, wanted, scope)
+}
+
+// NOTE: The Protocols a receiver's Namespaces, or a derive, say it conforms to
+// — asked per provided Method, and only once nothing WRITTEN has answered the
+// call. A Namespace's `conformsTo` is already transitive, so `is Orderable`
+// reaches Comparable's provided Methods without another walk.
+function reachesConformance(
+	baseType: common.Type,
+	protocolName: string,
+	namespaces: Iterable<common.NamespaceType>,
+	scope: enricher.Scope,
+	position: common.Position,
+): boolean {
+	for (let namespace of namespaces) {
+		if (namespace.conformsTo?.includes(protocolName) === true) {
+			return true
+		}
+	}
+
+	// NOTE: The derives conform without a Namespace saying so — every Choice is
+	// Equatable — so a derived conformance reaches the provided Methods on the
+	// same terms a written one does. Asked through the very Function the witness
+	// is solved by, so the two can not disagree about which receivers conform.
+	return (
+		derivedConformanceSource(
+			baseType,
+			protocolName,
+			null,
+			scope,
+			position,
+		) !== null
+	)
+}
+
+// NOTE: The pseudo Namespace a Protocol's OWN provided Methods are reached
+// through — named after the Protocol, because that name is what the emitted
+// const is spelled with (`$es_<Protocol>_<member>`) and one const answers for
+// every conformer.
+//
+// Each Method is a bounded generic Function over `Self`: `<infer Self is P>(@:
+// Self, …)`. That is not a trick, it is what a provided Method IS — a body
+// written against the Protocol's surface and nothing else — and it means the
+// existing bounded-Generic rail carries the whole feature. Invocation inference
+// binds `Self` from the receiver, `resolveConformances` solves the witness for
+// it, and the Simplifier appends that witness as the hidden `Self__conformance`
+// Argument the body dispatches its own calls through.
+//
+// NOTE: Only the Methods THIS Protocol wrote. An inherited provided Method is
+// offered by the Protocol that wrote it, reached through the same walk, so a
+// Method is never offered twice and never emitted twice.
+export function providedMethodNamespaceForProtocol(
+	protocol: common.ProtocolType,
+	baseType: common.Type,
+): common.NamespaceType | null {
+	let boundSelf: common.GenericUse = {
+		type: "GenericUse",
+		name: "Self",
+		constraint: protocol.name,
+	}
+	let bindings: GenericBindings = new Map([["Self", boundSelf]])
+	let methods: Record<string, common.MethodType> = {}
+
+	for (let [methodName, writtenBy] of Object.entries(
+		protocol.providedMethods ?? {},
+	)) {
+		let method = protocol.methods[methodName]
+
+		if (writtenBy !== protocol.name || method?.type !== "SimpleMethod") {
+			continue
+		}
+
+		methods[methodName] = {
+			...(applyGenericBindings(
+				method,
+				bindings,
+			) as common.SimpleMethodType),
+			// NOTE: A fresh Declaration per Method rather than one shared
+			// object — R4, the same rule the derived equality's bounds follow.
+			generics: [
+				{
+					name: "Self",
+					infer: true,
+					defaultType: null,
+					constraint: protocol.name,
+				},
+			],
+		}
+	}
+
+	if (Object.keys(methods).length === 0) {
+		return null
+	}
+
+	return {
+		type: "Namespace",
+		name: protocol.name,
+		targetType: baseType,
+		generics: [],
+		properties: {},
+		methods,
+		conformsTo: [protocol.name],
+	}
+}
+
+// NOTE: Every Protocol whose provided Methods this receiver reaches, keyed by
+// the Protocol that WROTE each — the concrete-receiver door, walked only once
+// no written Namespace has answered, which is what makes a written Method
+// replace a provided one entirely rather than compete with it.
+export function providedMethodNamespaces(
+	baseType: common.Type,
+	namespaces: Iterable<common.NamespaceType>,
+	scope: enricher.Scope,
+	position: common.Position,
+): Map<string, common.NamespaceType> {
+	let found = new Map<string, common.NamespaceType>()
+	let listed = [...namespaces]
+
+	for (let protocol of allProtocolsInScope(scope)) {
+		if (protocol.providedMethods === undefined) {
+			continue
+		}
+
+		if (
+			!reachesConformance(
+				baseType,
+				protocol.name,
+				listed,
+				scope,
+				position,
+			)
+		) {
+			continue
+		}
+
+		let namespace = providedMethodNamespaceForProtocol(protocol, baseType)
+
+		if (namespace !== null) {
+			found.set(protocol.name, namespace)
+		}
+	}
+
+	return found
+}
+
+// NOTE: The same, for a receiver whose Type is a Protocol-bounded Type
+// Parameter. Conformance is not asked about at all — the bound IS the promise —
+// so the walk is over the Protocol and every Protocol it extends.
+export function providedMethodNamespacesForBound(
+	protocol: common.ProtocolType,
+	baseType: common.Type,
+	scope: enricher.Scope,
+): Map<string, common.NamespaceType> {
+	let found = new Map<string, common.NamespaceType>()
+
+	for (let name of [protocol.name, ...(protocol.conformsTo ?? [])]) {
+		let ancestor =
+			name === protocol.name ? protocol : findProtocolInScope(name, scope)
+
+		if (ancestor === null) {
+			continue
+		}
+
+		let namespace = providedMethodNamespaceForProtocol(ancestor, baseType)
+
+		if (namespace !== null) {
+			found.set(ancestor.name, namespace)
+		}
+	}
+
+	return found
+}
+
 // NOTE: Solves whether `binding` conforms to `protocolName` in `scope`,
 // producing the witness the codegen needs. A GenericUse forwards the enclosing
 // bounded Function's own conformance parameter; a concrete Type selects the one
@@ -2464,7 +2795,15 @@ export function solveConformance(
 	position: common.Position,
 ): ConformanceSolveResult {
 	if (binding.type === "GenericUse") {
-		if (binding.constraint === protocolName) {
+		// NOTE: The bound answers for every Protocol it EXTENDS as well as for
+		// itself — one witness serves both, because a descendant's method map
+		// holds the ancestor's requirements too. That is what lets a body
+		// bounded by `Orderable` hand its own conformance Argument on to
+		// something asking for a `Comparable`.
+		if (
+			binding.constraint !== undefined &&
+			protocolGrants(binding.constraint, protocolName, scope)
+		) {
 			return {
 				ok: true,
 				source: {
@@ -2684,6 +3023,7 @@ function solveNamespaceConformance(
 		candidate.type,
 		binding,
 		assumptions,
+		conformanceGrantsIn(scope),
 	)
 
 	if (result.kind !== "conforms") {
@@ -2842,7 +3182,12 @@ export function resolveConformances(
 		// bound was carried by an unbounded Type Parameter, which is a distinct
 		// mistake from a Type that simply has no conforming Namespace.
 		if (binding.type === "GenericUse") {
-			if (binding.constraint === generic.constraint) {
+			// NOTE: As in `solveConformance` — a bound Protocol answers for the
+			// Protocols it extends, and the one witness serves them all.
+			if (
+				binding.constraint !== undefined &&
+				protocolGrants(binding.constraint, generic.constraint, scope)
+			) {
 				conformances.push({
 					genericName: generic.name,
 					protocolName: generic.constraint,
@@ -3075,6 +3420,7 @@ export function silentCheckedConformances(
 			namespaceType,
 			namespaceType.targetType,
 			assumptions,
+			conformanceGrantsIn(scope),
 		)
 
 		if (result.kind === "conforms") {
@@ -3273,6 +3619,7 @@ export function checkProtocolConformance(
 			namespaceType,
 			namespaceType.targetType,
 			assumptions,
+			conformanceGrantsIn(scope),
 		)
 
 		// NOTE: `namespace Colour for Colour is Equatable { }` writes no `is`
@@ -3856,6 +4203,29 @@ export function findProtocolInScope(
 			searchScope = searchScope.parent
 		}
 	}
+}
+
+// NOTE: Every Protocol a Scope can see, the nearest declaration of a name
+// winning — the shadowing rule the Namespace enumeration follows. Asked only
+// where a Method call found nothing written, so that a Protocol's provided
+// Methods can be offered as the fallback they are.
+export function allProtocolsInScope(
+	scope: enricher.Scope,
+): Array<common.ProtocolType> {
+	let found = new Map<string, common.ProtocolType>()
+	let searchScope: enricher.Scope | null = scope
+
+	while (searchScope !== null) {
+		for (let name in searchScope.protocols) {
+			if (!found.has(name)) {
+				found.set(name, searchScope.protocols[name])
+			}
+		}
+
+		searchScope = searchScope.parent
+	}
+
+	return [...found.values()]
 }
 
 // NOTE: Method resolution asks which Namespaces a Scope can see once per
@@ -4521,6 +4891,17 @@ export function resolveMethodLookupNamespacesForReceiverType(
 			let methods: Record<string, common.MethodType> = {}
 
 			for (let [methodName, method] of Object.entries(protocol.methods)) {
+				// NOTE: The REQUIREMENTS alone. A provided Method is not in the
+				// witness map — its body is one const shared by every conformer
+				// and there is nothing per-conformer to put there — so offering
+				// it here would emit `T__conformance.isNot(…)`, a read off a
+				// witness that carries no such entry. It is offered below
+				// instead, through the Protocol that wrote it, where the bound
+				// itself becomes the conformance Argument the const takes.
+				if (protocol.providedMethods?.[methodName] !== undefined) {
+					continue
+				}
+
 				methods[methodName] = applyGenericBindings(
 					method,
 					selfBindings,
@@ -4535,6 +4916,18 @@ export function resolveMethodLookupNamespacesForReceiverType(
 				properties: {},
 				methods,
 			})
+
+			// NOTE: The provided Methods of the bound and of every Protocol it
+			// extends — `<Item is Orderable>` reaches Comparable's and
+			// Equatable's alike, because extending one is a promise to conform
+			// to it.
+			for (let [name, namespace] of providedMethodNamespacesForBound(
+				protocol,
+				baseType,
+				scope,
+			)) {
+				matchingNamespaces.set(name, namespace)
+			}
 		}
 
 		return matchingNamespaces

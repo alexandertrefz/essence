@@ -16306,6 +16306,7 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse an empty P
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "conformsTo": [],
         "documentation": null,
         "methods": {},
         "name": {
@@ -16369,6 +16370,7 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse a Protocol
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "conformsTo": [],
         "documentation": null,
         "methods": {
           "toString": {
@@ -16388,6 +16390,7 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse a Protocol
             },
             "nodeType": "SimpleProtocolMethod",
             "signature": {
+              "body": null,
               "documentation": null,
               "nodeType": "ProtocolMethodSignature",
               "parameters": [],
@@ -16492,6 +16495,7 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse a Protocol
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "conformsTo": [],
         "documentation": null,
         "methods": {
           "is": {
@@ -16511,6 +16515,7 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse a Protocol
             },
             "nodeType": "SimpleProtocolMethod",
             "signature": {
+              "body": null,
               "documentation": null,
               "nodeType": "ProtocolMethodSignature",
               "parameters": [
@@ -16628,6 +16633,7 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse a Protocol
             },
             "nodeType": "SimpleProtocolMethod",
             "signature": {
+              "body": null,
               "documentation": null,
               "nodeType": "ProtocolMethodSignature",
               "parameters": [
@@ -16790,6 +16796,7 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse a Protocol
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "conformsTo": [],
         "documentation": null,
         "methods": {
           "create": {
@@ -16809,6 +16816,7 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse a Protocol
             },
             "nodeType": "StaticProtocolMethod",
             "signature": {
+              "body": null,
               "documentation": null,
               "nodeType": "ProtocolMethodSignature",
               "parameters": [],
@@ -16913,6 +16921,7 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse a Protocol
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "conformsTo": [],
         "documentation": null,
         "methods": {
           "combine": {
@@ -16934,6 +16943,7 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse a Protocol
             "nodeType": "OverloadedProtocolMethod",
             "signatures": [
               {
+                "body": null,
                 "documentation": null,
                 "nodeType": "ProtocolMethodSignature",
                 "parameters": [
@@ -17034,6 +17044,7 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse a Protocol
                 },
               },
               {
+                "body": null,
                 "documentation": null,
                 "nodeType": "ProtocolMethodSignature",
                 "parameters": [
@@ -17239,6 +17250,7 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse a Protocol
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "conformsTo": [],
         "documentation": null,
         "methods": {
           "create": {
@@ -17260,6 +17272,7 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse a Protocol
             "nodeType": "OverloadedStaticProtocolMethod",
             "signatures": [
               {
+                "body": null,
                 "documentation": null,
                 "nodeType": "ProtocolMethodSignature",
                 "parameters": [],
@@ -17302,6 +17315,7 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse a Protocol
                 },
               },
               {
+                "body": null,
                 "documentation": null,
                 "nodeType": "ProtocolMethodSignature",
                 "parameters": [
@@ -17465,6 +17479,7 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse a document
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "conformsTo": [],
         "documentation": {
           "description": "Anything that can represent itself as a String.",
           "parameters": [],
@@ -17498,6 +17513,7 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse a document
             },
             "nodeType": "SimpleProtocolMethod",
             "signature": {
+              "body": null,
               "documentation": {
                 "description": "The String representation.",
                 "parameters": [],
@@ -17600,6 +17616,455 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse a document
     "end": {
       "column": 7,
       "line": 7,
+    },
+    "start": {
+      "column": 1,
+      "line": 1,
+    },
+  },
+}
+`;
+
+exports[`Parser Statements ProtocolDeclarationStatements should parse a Protocol Method with a body 1`] = `
+{
+  "exports": null,
+  "implementation": {
+    "nodeType": "ImplementationSection",
+    "nodes": [
+      {
+        "conformsTo": [],
+        "documentation": null,
+        "methods": {
+          "toString": {
+            "name": {
+              "content": "toString",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 16,
+                  "line": 3,
+                },
+                "start": {
+                  "column": 8,
+                  "line": 3,
+                },
+              },
+            },
+            "nodeType": "SimpleProtocolMethod",
+            "signature": {
+              "body": {
+                "nodeType": "FunctionValue",
+                "position": {
+                  "end": {
+                    "column": 38,
+                    "line": 3,
+                  },
+                  "start": {
+                    "column": 16,
+                    "line": 3,
+                  },
+                },
+                "value": {
+                  "body": [
+                    {
+                      "expression": {
+                        "nodeType": "StringValue",
+                        "position": {
+                          "end": {
+                            "column": 36,
+                            "line": 3,
+                          },
+                          "start": {
+                            "column": 34,
+                            "line": 3,
+                          },
+                        },
+                        "value": "",
+                      },
+                      "nodeType": "ReturnStatement",
+                      "position": {
+                        "end": {
+                          "column": 36,
+                          "line": 3,
+                        },
+                        "start": {
+                          "column": 31,
+                          "line": 3,
+                        },
+                      },
+                    },
+                  ],
+                  "documentation": null,
+                  "generics": [],
+                  "nodeType": "FunctionDefinition",
+                  "parameterListPosition": {
+                    "end": {
+                      "column": 18,
+                      "line": 3,
+                    },
+                    "start": {
+                      "column": 16,
+                      "line": 3,
+                    },
+                  },
+                  "parameters": [],
+                  "returnType": {
+                    "nodeType": "IdentifierTypeDeclaration",
+                    "position": {
+                      "end": {
+                        "column": 28,
+                        "line": 3,
+                      },
+                      "start": {
+                        "column": 22,
+                        "line": 3,
+                      },
+                    },
+                    "type": {
+                      "content": "String",
+                      "nodeType": "Identifier",
+                      "position": {
+                        "end": {
+                          "column": 28,
+                          "line": 3,
+                        },
+                        "start": {
+                          "column": 22,
+                          "line": 3,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+              "documentation": null,
+              "nodeType": "ProtocolMethodSignature",
+              "parameters": [],
+              "position": {
+                "end": {
+                  "column": 28,
+                  "line": 3,
+                },
+                "start": {
+                  "column": 16,
+                  "line": 3,
+                },
+              },
+              "returnType": {
+                "nodeType": "IdentifierTypeDeclaration",
+                "position": {
+                  "end": {
+                    "column": 28,
+                    "line": 3,
+                  },
+                  "start": {
+                    "column": 22,
+                    "line": 3,
+                  },
+                },
+                "type": {
+                  "content": "String",
+                  "nodeType": "Identifier",
+                  "position": {
+                    "end": {
+                      "column": 28,
+                      "line": 3,
+                    },
+                    "start": {
+                      "column": 22,
+                      "line": 3,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        "name": {
+          "content": "Printable",
+          "nodeType": "Identifier",
+          "position": {
+            "end": {
+              "column": 25,
+              "line": 2,
+            },
+            "start": {
+              "column": 16,
+              "line": 2,
+            },
+          },
+        },
+        "nodeType": "ProtocolDeclarationStatement",
+        "position": {
+          "end": {
+            "column": 8,
+            "line": 4,
+          },
+          "start": {
+            "column": 7,
+            "line": 2,
+          },
+        },
+      },
+    ],
+    "position": {
+      "end": {
+        "column": 7,
+        "line": 5,
+      },
+      "start": {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "imports": null,
+  "kind": "implementation",
+  "nodeType": "Program",
+  "position": {
+    "end": {
+      "column": 7,
+      "line": 5,
+    },
+    "start": {
+      "column": 1,
+      "line": 1,
+    },
+  },
+}
+`;
+
+exports[`Parser Statements ProtocolDeclarationStatements should parse a Protocol that extends other Protocols 1`] = `
+{
+  "exports": null,
+  "implementation": {
+    "nodeType": "ImplementationSection",
+    "nodes": [
+      {
+        "conformsTo": [
+          {
+            "conditions": [],
+            "nodeType": "ConformanceClause",
+            "position": {
+              "end": {
+                "column": 39,
+                "line": 2,
+              },
+              "start": {
+                "column": 26,
+                "line": 2,
+              },
+            },
+            "protocol": {
+              "content": "Comparable",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 39,
+                  "line": 2,
+                },
+                "start": {
+                  "column": 29,
+                  "line": 2,
+                },
+              },
+            },
+          },
+          {
+            "conditions": [],
+            "nodeType": "ConformanceClause",
+            "position": {
+              "end": {
+                "column": 53,
+                "line": 2,
+              },
+              "start": {
+                "column": 41,
+                "line": 2,
+              },
+            },
+            "protocol": {
+              "content": "Equatable",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 53,
+                  "line": 2,
+                },
+                "start": {
+                  "column": 44,
+                  "line": 2,
+                },
+              },
+            },
+          },
+        ],
+        "documentation": null,
+        "methods": {
+          "isLessThan": {
+            "name": {
+              "content": "isLessThan",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 18,
+                  "line": 3,
+                },
+                "start": {
+                  "column": 8,
+                  "line": 3,
+                },
+              },
+            },
+            "nodeType": "SimpleProtocolMethod",
+            "signature": {
+              "body": null,
+              "documentation": null,
+              "nodeType": "ProtocolMethodSignature",
+              "parameters": [
+                {
+                  "defaultValue": null,
+                  "documentation": null,
+                  "externalName": null,
+                  "internalName": {
+                    "content": "other",
+                    "nodeType": "Identifier",
+                    "position": {
+                      "end": {
+                        "column": 26,
+                        "line": 3,
+                      },
+                      "start": {
+                        "column": 21,
+                        "line": 3,
+                      },
+                    },
+                  },
+                  "nodeType": "Parameter",
+                  "position": {
+                    "end": {
+                      "column": 32,
+                      "line": 3,
+                    },
+                    "start": {
+                      "column": 19,
+                      "line": 3,
+                    },
+                  },
+                  "type": {
+                    "nodeType": "IdentifierTypeDeclaration",
+                    "position": {
+                      "end": {
+                        "column": 32,
+                        "line": 3,
+                      },
+                      "start": {
+                        "column": 28,
+                        "line": 3,
+                      },
+                    },
+                    "type": {
+                      "content": "Self",
+                      "nodeType": "Identifier",
+                      "position": {
+                        "end": {
+                          "column": 32,
+                          "line": 3,
+                        },
+                        "start": {
+                          "column": 28,
+                          "line": 3,
+                        },
+                      },
+                    },
+                  },
+                },
+              ],
+              "position": {
+                "end": {
+                  "column": 44,
+                  "line": 3,
+                },
+                "start": {
+                  "column": 18,
+                  "line": 3,
+                },
+              },
+              "returnType": {
+                "nodeType": "IdentifierTypeDeclaration",
+                "position": {
+                  "end": {
+                    "column": 44,
+                    "line": 3,
+                  },
+                  "start": {
+                    "column": 37,
+                    "line": 3,
+                  },
+                },
+                "type": {
+                  "content": "Boolean",
+                  "nodeType": "Identifier",
+                  "position": {
+                    "end": {
+                      "column": 44,
+                      "line": 3,
+                    },
+                    "start": {
+                      "column": 37,
+                      "line": 3,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        "name": {
+          "content": "Orderable",
+          "nodeType": "Identifier",
+          "position": {
+            "end": {
+              "column": 25,
+              "line": 2,
+            },
+            "start": {
+              "column": 16,
+              "line": 2,
+            },
+          },
+        },
+        "nodeType": "ProtocolDeclarationStatement",
+        "position": {
+          "end": {
+            "column": 8,
+            "line": 4,
+          },
+          "start": {
+            "column": 7,
+            "line": 2,
+          },
+        },
+      },
+    ],
+    "position": {
+      "end": {
+        "column": 7,
+        "line": 5,
+      },
+      "start": {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "imports": null,
+  "kind": "implementation",
+  "nodeType": "Program",
+  "position": {
+    "end": {
+      "column": 7,
+      "line": 5,
     },
     "start": {
       "column": 1,

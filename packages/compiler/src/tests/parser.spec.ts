@@ -1374,12 +1374,34 @@ describe("Parser", () => {
 				expect(input).toMatchSnapshot()
 			})
 
-			it("should not parse a Protocol Method Signature with a body", () => {
-				let { diagnostics } = parseWithDiagnostics(
+			it("should parse a Protocol Method with a body", () => {
+				let input: parser.Program = parse(
 					`implementation {
 						protocol Printable {
 							toString() -> String { <- "" }
 						}
+					}`,
+				)
+
+				expect(input).toMatchSnapshot()
+			})
+
+			it("should parse a Protocol that extends other Protocols", () => {
+				let input: parser.Program = parse(
+					`implementation {
+						protocol Orderable is Comparable, is Equatable {
+							isLessThan(_ other: Self) -> Boolean
+						}
+					}`,
+				)
+
+				expect(input).toMatchSnapshot()
+			})
+
+			it("should not parse an extension list without its own 'is'", () => {
+				let { diagnostics } = parseWithDiagnostics(
+					`implementation {
+						protocol Orderable is Comparable, Equatable {}
 					}`,
 				)
 

@@ -296,10 +296,25 @@ function walkImplementationChildren(
 		}
 		case "IntrinsicStatement":
 			return walkIntrinsicStatementChildren(node, rewrites)
-		// NOTE: A Protocol declaration and a Type Alias carry nothing but names
-		// and Types by this point — the Rewriter emits nothing at all for
-		// either.
-		case "ProtocolDeclarationStatement":
+		// NOTE: A Protocol's PROVIDED Methods are bodies, walked exactly as a
+		// Namespace's are — same rule, same reason: the Rewriter emits each as a
+		// const of its own, so there is no position there for another kind of
+		// Expression to stand in, and only the body is offered to a pass.
+		case "ProtocolDeclarationStatement": {
+			let methods = mapRecord(node.methods, (entry) => {
+				let value = walkFunctionDefinition(entry.method.value, rewrites)
+
+				if (value === entry.method.value) {
+					return entry
+				}
+
+				return { ...entry, method: { ...entry.method, value } }
+			})
+
+			return methods === node.methods ? node : { ...node, methods }
+		}
+		// NOTE: A Type Alias carries nothing but a name and a Type by this
+		// point — the Rewriter emits nothing at all for it.
 		case "TypeAliasStatement":
 			return node
 		default:

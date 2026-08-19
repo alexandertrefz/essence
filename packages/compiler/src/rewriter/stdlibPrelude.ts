@@ -100,6 +100,39 @@ function buildStdlibArtifacts(stdlib: Stdlib): StdlibArtifacts {
 				continue
 			}
 
+			// NOTE: A Protocol's PROVIDED Methods are prelude entries like any
+			// other — one `$es_<Protocol>_<member>` const each, shared by every
+			// conformer. It stands in for a Namespace here because everything
+			// downstream wants from one is a name and a record of bodied
+			// Methods, and a Protocol with provided Methods has both. A
+			// Protocol of requirements alone has nothing to contribute and is
+			// dropped, exactly as a wholly native Namespace is.
+			if (node.nodeType === "ProtocolDeclarationStatement") {
+				if (Object.keys(node.methods).length > 0) {
+					namespaces.push({
+						name: node.name.name,
+						node: {
+							nodeType: "NamespaceDefinitionStatement",
+							name: node.name,
+							properties: {},
+							methods: node.methods,
+							nativeShims: [],
+							type: {
+								type: "Namespace",
+								name: node.name.name,
+								targetType: null,
+								generics: [],
+								properties: {},
+								methods: {},
+							},
+							position: node.position,
+						},
+					})
+				}
+
+				continue
+			}
+
 			if (node.nodeType !== "NamespaceDefinitionStatement") {
 				continue
 			}
