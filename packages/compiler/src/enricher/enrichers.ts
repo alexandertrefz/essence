@@ -6327,17 +6327,23 @@ function describeCandidateSignatures(
 // Program's to decide, and tying the two candidates together would refuse
 // Programs that mean nothing by the shared name at all.
 //
-// The receiver's Namespaces are looked up again rather than taken from the
-// caller, because what arrives there is the subset that DECLARES the name and
-// the two fallbacks read the whole set: a conformance is evidenced by a
-// Namespace that need not declare the Method, and in the shape worth reporting
-// it never does.
+// `answered` is the set the Diagnostic is already describing, and a fallback in
+// it was replaced by nothing: it IS what the call reached, and only the
+// Arguments were wrong. `Number.Pi::isLessThan(4)` reaches `Orderable`'s own
+// provided Method and misses on `Self`, which is a different report entirely
+// from one a Namespace took the name for.
 //
-// Only `no-matching-overload` wants them. `unknown-method` is raised where no
+// The receiver's Namespaces are looked up again rather than taken from the
+// caller, because `answered` is the subset that DECLARES the name and the two
+// fallbacks read the whole set: a conformance is evidenced by a Namespace that
+// need not declare the Method, and in the shape worth reporting it never does.
+//
+// Only `no-matching-overload` wants these. `unknown-method` is raised where no
 // Namespace declared the name at all, so no fallback was passed over — the
 // door itself would have answered.
 function replacedFallbackNotes(
 	methodName: string,
+	answered: Map<string, common.NamespaceType>,
 	baseType: common.Type,
 	scope: enricher.Scope,
 	position: common.Position,
@@ -6363,9 +6369,12 @@ function replacedFallbackNotes(
 		(derived !== null && Object.hasOwn(derived.methods, methodName)) ||
 		(printable !== null && Object.hasOwn(printable.methods, methodName))
 	) {
-		return [
-			`${describeType(baseType)} derives '${methodName}', and a Namespace declaring the name replaces it.`,
-		]
+		return answered.has(derivedEquatableNamespaceName) ||
+			answered.has(derivedPrintableNamespaceName)
+			? []
+			: [
+					`${describeType(baseType)} derives '${methodName}', and a Namespace declaring the name replaces it.`,
+				]
 	}
 
 	for (let protocolName of providedMethodNamespaces(
@@ -6375,6 +6384,10 @@ function replacedFallbackNotes(
 		scope,
 		position,
 	).keys()) {
+		if (answered.has(protocolName)) {
+			continue
+		}
+
 		notes.push(
 			`'${protocolName}' provides '${methodName}', and a Namespace declaring the name replaces it.`,
 		)
@@ -6404,6 +6417,7 @@ function reportNoMatchingOverload(
 				...describeCandidateSignatures(node, namespaces, baseType),
 				...replacedFallbackNotes(
 					node.member.content,
+					namespaces,
 					baseType,
 					scope,
 					node.position,

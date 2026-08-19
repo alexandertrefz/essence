@@ -856,6 +856,40 @@ describe("Protocol-provided Methods", () => {
 			])
 		})
 
+		// NOTE: Nothing replaced a fallback the call actually REACHED, so the
+		// note stays off. `bag::isEmpty(1)` misses on the Arguments alone, and
+		// `Sized`'s provided Method is what it missed on — the same shape as
+		// `Number.Pi::isLessThan(4)` missing on `Self`.
+		it("should not name a provided Method the call reached", () => {
+			let source = [
+				"implementation {",
+				"\tprotocol Sized {",
+				"\t\tsize() -> Integer",
+				"",
+				"\t\tisEmpty() -> Boolean {",
+				"\t\t\t<- @::size()::is(0)",
+				"\t\t}",
+				"\t}",
+				"",
+				"\ttype Bag = { n: Integer }",
+				"",
+				"\tnamespace Bags for Bag is Sized {",
+				"\t\tsize() -> Integer {",
+				"\t\t\t<- @.n",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tconstant bag: Bag = { n = 0 }",
+				"\tTerminal.inspect(bag::isEmpty(1))",
+				"}",
+			].join("\n")
+
+			expect(codesOf(source)).toEqual(["no-matching-overload"])
+			expect(notesOf(source)).toEqual([
+				"'Sized::isEmpty' takes no Arguments.",
+			])
+		})
+
 		// NOTE: A DERIVE answers ahead of a provided Method, so the note names
 		// the derive alone. Naming `Equatable` beside it would name something
 		// the call could not have reached even with `Extras` gone.
