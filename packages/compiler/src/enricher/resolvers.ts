@@ -2593,6 +2593,7 @@ function derivedConformanceSource(
 		binding,
 		new Map(),
 		conformanceGrantsIn(scope),
+		conformanceProvidersIn(derived.conformsTo ?? [], scope),
 	)
 
 	if (result.kind !== "conforms") {
@@ -2713,6 +2714,39 @@ export function conformanceGrantsIn(
 	scope: enricher.Scope,
 ): (declared: string, wanted: string) => boolean {
 	return (declared, wanted) => protocolGrants(declared, wanted, scope)
+}
+
+// NOTE: The `providerOf` question `computeConformanceMethodMap` asks about a
+// name, bound to a Scope and to everything the conformer conforms to. The
+// Protocol a witness is being solved for answers with the body IT knows about,
+// which is the ancestor's where a descendant re-provided the name — and the
+// descendant's is what a direct call runs. The most DERIVED provider among the
+// conformer's Protocols is the one both spellings then agree on, which is the
+// same descendant-wins rule the two call-side walks already run.
+export function conformanceProvidersIn(
+	protocolNames: Iterable<string>,
+	scope: enricher.Scope,
+): (methodName: string) => string | null {
+	let reached = [...protocolNames]
+		.map((name) => findProtocolInScope(name, scope))
+		.filter((protocol) => protocol !== null)
+
+	return (methodName) => {
+		let winner: string | null = null
+
+		for (let protocol of reached) {
+			let candidate = providedMethodProtocol(protocol, methodName)
+
+			if (
+				candidate !== null &&
+				(winner === null || protocolGrants(candidate, winner, scope))
+			) {
+				winner = candidate
+			}
+		}
+
+		return winner
+	}
 }
 
 // NOTE: One place a receiver's conformance to a Protocol comes from — a
@@ -3305,6 +3339,7 @@ function solveNamespaceConformance(
 		binding,
 		assumptions,
 		conformanceGrantsIn(scope),
+		conformanceProvidersIn(candidate.type.conformsTo ?? [], scope),
 	)
 
 	if (result.kind !== "conforms") {
@@ -3649,6 +3684,13 @@ export function silentCheckedConformances(
 	let declaredGenerics = new Set(
 		node.generics.map((generic) => generic.name.content),
 	)
+	// NOTE: Every clause, for every clause — a Method one clause's Protocol
+	// only REQUIRES may be provided by another's, and then the Namespace owes
+	// nothing for it.
+	let providers = conformanceProvidersIn(
+		node.conformsTo.map((clause) => clause.protocol.content),
+		scope,
+	)
 
 	for (let clause of node.conformsTo) {
 		for (let name of [
@@ -3703,6 +3745,7 @@ export function silentCheckedConformances(
 			namespaceType.targetType,
 			assumptions,
 			conformanceGrantsIn(scope),
+			providers,
 		)
 
 		if (result.kind === "conforms") {
@@ -3732,6 +3775,12 @@ export function checkProtocolConformance(
 	let checked: Array<CheckedConformance> = []
 	let declaredGenerics = new Set(
 		node.generics.map((generic) => generic.name.content),
+	)
+	// NOTE: As in the silent twin — a name one clause's Protocol requires may
+	// be provided by another's, and the Namespace owes nothing for it then.
+	let providers = conformanceProvidersIn(
+		node.conformsTo.map((clause) => clause.protocol.content),
+		scope,
 	)
 
 	for (let clause of node.conformsTo) {
@@ -3902,6 +3951,7 @@ export function checkProtocolConformance(
 			namespaceType.targetType,
 			assumptions,
 			conformanceGrantsIn(scope),
+			providers,
 		)
 
 		// NOTE: `namespace Colour for Colour is Equatable { }` writes no `is`
