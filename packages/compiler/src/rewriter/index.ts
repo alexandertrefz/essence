@@ -118,11 +118,11 @@ function rewriteProgram(program: common.typedSimple.Program): string {
 		}
 	})
 	const bands = essenceMemberBands(rewritten.essenceMembers)
-	const constantPool = constantPoolBand(pool, [
-		bands.functions,
-		bands.values,
+	const constantPool = constantPoolBand(
+		pool,
+		[bands.functions, bands.values, rewritten.implementation],
 		rewritten.implementation,
-	])
+	)
 	const essenceMembers = rewritten.essenceMembers
 
 	const rewrittenProgram: estree.Program = {
@@ -327,7 +327,7 @@ function rewriteModuleGraph(
 				),
 			)
 
-			return { module, body, pool: constantPoolBand(pool, body) }
+			return { module, body, pool: constantPoolBand(pool, body, body) }
 		})
 
 		let { value: essenceMembers, pool: preludePool } =
@@ -1277,11 +1277,12 @@ function pooledReference(
 
 	if (known === undefined) {
 		// NOTE: The value is emitted at MODULE scope, which is where its const
-		// stands — a user Namespace shadowing a builtin does so for its own
-		// block, and a constant hoisted out of that block is no longer in it.
-		// `pool-constants` refuses to pool anything that could read such a name
-		// in the first place; this is the other half of the same answer, so
-		// that the two can not disagree.
+		// stands — even a deferred one, which stands below a Statement of the
+		// Module and not inside a block. A user Namespace shadowing a builtin
+		// does so for its own block, and a constant hoisted out of that block
+		// is no longer in it. `pool-constants` refuses to pool anything that
+		// could read such a name in the first place; this is the other half of
+		// the same answer, so that the two can not disagree.
 		//
 		// NOTE: Rewritten BEFORE it is recorded, because the value may itself
 		// hold a pooled reference — a conditional conformance's witnesses are
@@ -1335,6 +1336,12 @@ function atModuleScope<Value>(emit: () => Value): Value {
 function constantPoolBand(
 	pool: Map<string, PooledConstant>,
 	roots: unknown,
+	// NOTE: The Module's own Statements, where a constant that can not stand in
+	// the band goes instead — see `deferredPoolPositions`. Spliced IN PLACE, so
+	// that `roots` (which holds this same array) still reaches every reference
+	// when the markers are renamed below. Null where there is no such body to
+	// splice into: the shared prelude Module declares no Namespace of its own.
+	body: Array<estree.ModuleDeclaration | estree.Statement> | null = null,
 ): Array<estree.VariableDeclaration> {
 	if (pool.size === 0) {
 		return []
@@ -1367,6 +1374,8 @@ function constantPoolBand(
 
 	let names = new Map<string, string>()
 	let band: Array<estree.VariableDeclaration> = []
+	let deferred = deferredPoolPositions(constants, used, body)
+	let deferredBands = new Map<number, Array<estree.VariableDeclaration>>()
 
 	for (let constant of constants) {
 		if (!used.has(constant.marker)) {
@@ -1376,7 +1385,8 @@ function constantPoolBand(
 		let name = `${POOL_NAME_PREFIX}${names.size}`
 
 		names.set(constant.marker, name)
-		band.push({
+
+		let declaration: estree.VariableDeclaration = {
 			type: "VariableDeclaration",
 			kind: "const",
 			declarations: [
@@ -1386,13 +1396,118 @@ function constantPoolBand(
 					init: constant.value,
 				},
 			],
-		})
+		}
+
+		let after = deferred.get(constant.marker)
+
+		if (after === undefined) {
+			band.push(declaration)
+
+			continue
+		}
+
+		let standing = deferredBands.get(after)
+
+		if (standing === undefined) {
+			standing = []
+			deferredBands.set(after, standing)
+		}
+
+		standing.push(declaration)
+	}
+
+	// NOTE: Back to front, so that an index computed over the original body is
+	// still the index of the same Statement when the splice happens.
+	if (body !== null) {
+		for (let index of [...deferredBands.keys()].sort((a, b) => b - a)) {
+			body.splice(index + 1, 0, ...deferredBands.get(index)!)
+		}
 	}
 
 	renamePooledReferences(roots, names)
 	renamePooledReferences(band, names)
 
 	return band
+}
+
+// NOTE: Which constants can NOT stand in the band, and which Statement each has
+// to stand below instead. A witness naming a top-level Namespace the Program
+// declares is the one shape this is about: the Namespace is emitted as
+// `var X = class …`, which is not hoisted, so a const above it reads
+// `undefined`. Its const goes directly below that Statement, where every read
+// of it is below too — a top-level use above the declaration is
+// `use-before-declaration`, and a body's use runs when the body is CALLED,
+// which for a Program that runs at all is below as well.
+//
+// A constant reading a DEFERRED constant is deferred with it, below whichever
+// of the two stands lower. The recording order puts an inner constant before
+// the constant that reads it, so one pass in that order settles both.
+function deferredPoolPositions(
+	constants: Array<PooledConstant>,
+	used: ReadonlySet<string>,
+	body: Array<estree.ModuleDeclaration | estree.Statement> | null,
+): Map<string, number> {
+	let deferred = new Map<string, number>()
+
+	if (body === null) {
+		return deferred
+	}
+
+	let declaredAt = topLevelDeclarationIndices(body)
+
+	if (declaredAt.size === 0) {
+		return deferred
+	}
+
+	for (let constant of constants) {
+		if (!used.has(constant.marker)) {
+			continue
+		}
+
+		let below: number | null = null
+
+		for (let name of referencedNames(constant.value)) {
+			let index = declaredAt.get(name) ?? deferred.get(name) ?? null
+
+			if (index !== null && (below === null || index > below)) {
+				below = index
+			}
+		}
+
+		if (below !== null) {
+			deferred.set(constant.marker, below)
+		}
+	}
+
+	return deferred
+}
+
+// NOTE: What each top-level Statement of the emitted Module BINDS, by index.
+// Read structurally rather than from the Program the Module came from: what a
+// constant can read is a name in the emitted JavaScript, and this is the one
+// place that says where such a name comes into being.
+function topLevelDeclarationIndices(
+	body: Array<estree.ModuleDeclaration | estree.Statement>,
+): Map<string, number> {
+	let declaredAt = new Map<string, number>()
+
+	for (let [index, statement] of body.entries()) {
+		if (statement.type === "VariableDeclaration") {
+			for (let declarator of statement.declarations) {
+				if (declarator.id.type === "Identifier") {
+					declaredAt.set(declarator.id.name, index)
+				}
+			}
+		} else if (
+			(statement.type === "FunctionDeclaration" ||
+				statement.type === "ClassDeclaration") &&
+			statement.id !== null
+		) {
+			declaredAt.set(statement.id.name, index)
+		}
+	}
+
+	return declaredAt
 }
 
 // NOTE: The markers replaced by the names the band declares, in place. A marker

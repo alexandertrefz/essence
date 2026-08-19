@@ -3437,15 +3437,22 @@ describe("Optimiser", () => {
 			// so a Namespace the Program declares is named as it is named
 			// everywhere else. Nothing MOVES: the call stands where the witness
 			// stood, so a class that is not hoisted is no more of a problem
-			// than it was — which is why this can be taken where
-			// `pool-constants` refuses the same witness.
+			// than it was.
+			//
+			// With the pass off, `pool-constants` declares the same witness as
+			// a const of its own — below the class, which is where a witness
+			// naming a top-level Namespace the Program declares stands.
 			expect(generate(witnesses)).toContain("Boxes.toString(box).value")
-			expect(
-				generate(witnesses, {
-					enabled: true,
-					disabledPasses: new Set(["devirtualise-witnesses"]),
-				}),
-			).toContain("{ toString: Boxes.toString }.toString(box)")
+
+			let pooled = generate(witnesses, {
+				enabled: true,
+				disabledPasses: new Set(["devirtualise-witnesses"]),
+			})
+
+			expect(pooled).toMatch(
+				/class Boxes \{[^]*?\n\}\nconst (\$pool_\d+) = \{ toString: Boxes\.toString \};/,
+			)
+			expect(pooled).toMatch(/\$pool_\d+\.toString\(box\)/)
 		})
 
 		it("leaves a conditional conformance's witness alone", () => {
@@ -6161,11 +6168,64 @@ describe("Optimiser", () => {
 			])
 		})
 
-		it("leaves a witness naming a Namespace the Program declares", () => {
+		it("declares a witness naming a Namespace below that Namespace", () => {
 			// NOTE: `class Boxes` is emitted below the band and a class is not
-			// hoisted, so a const reading one would be a `ReferenceError` at
-			// import. The witness stays where it was written.
-			expect(generate(constants)).toContain("{ compare: Boxes.compare }")
+			// hoisted, so a const IN the band reading one would be a
+			// `ReferenceError` at import. The const stands below the class
+			// instead — one witness for however many sites read it, where the
+			// witness used to be rebuilt at each of them.
+			expect(generate(constants)).toMatch(
+				/class Boxes \{[^]*?\n\}\nconst \$pool_\d+ = \{ compare: Boxes\.compare \};/,
+			)
+		})
+
+		it("refuses a witness naming a Namespace declared in a block", () => {
+			// NOTE: Two blocks may each declare a Namespace of the same name.
+			// Their witnesses emit byte-identical text and so key alike, while
+			// meaning two different classes — and neither class is in scope
+			// where a const of the band would stand. Both stay where they were
+			// written.
+			let generated = generate(`implementation {
+				type Box = { value: Integer }
+
+				function first(_ boxes: List<Box>) -> List<Box> {
+					namespace Boxes for Box is Comparable {
+						§§ Compares two Boxes by the value each holds.
+						§§
+						§§ @param other — the Box to compare with
+						§§ @returns — how this Box orders against it.
+						compare(to other: Box) -> Ordering {
+							<- @.value::compare(to other.value)
+						}
+					}
+
+					<- boxes::sort()
+				}
+
+				function second(_ boxes: List<Box>) -> List<Box> {
+					namespace Boxes for Box is Comparable {
+						§§ Compares two Boxes by the value each holds.
+						§§
+						§§ @param other — the Box to compare with
+						§§ @returns — how this Box orders against it.
+						compare(to other: Box) -> Ordering {
+							<- other.value::compare(to @.value)
+						}
+					}
+
+					<- boxes::sort()
+				}
+
+				Terminal.inspect(first([{ value = 3 }, { value = 1 }]))
+				Terminal.inspect(second([{ value = 3 }, { value = 1 }]))
+			}`)
+
+			expect([
+				...generated.matchAll(/\{ compare: Boxes\.compare \}/g),
+			]).toHaveLength(2)
+			expect(generated).not.toMatch(
+				/const \$pool_\d+ = \{ compare: Boxes\.compare \}/,
+			)
 		})
 
 		it("leaves Booleans alone", () => {
