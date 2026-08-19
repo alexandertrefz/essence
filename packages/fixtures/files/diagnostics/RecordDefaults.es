@@ -1,5 +1,6 @@
 § Deliberately broken: what the Validator says about an Argument written for a
-§ Record Parameter whose default fills only some of its members in.
+§ Record Parameter whose default fills only some of its members in — and about
+§ the payload of a Case whose default does the same.
 
 implementation {
 	type Options = { host: String, retries: Integer, tls: Boolean }
@@ -32,4 +33,19 @@ implementation {
 	}
 
 	Terminal.print(connect("essence.lang", using partial))
+
+	§ A Case payload's default says the same thing about a construction: the
+	§ members it fills in are the ones a payload may leave out, and every other
+	§ one still has to be written.
+	choice Fetch {
+		Get { url: String, retries: Integer } = { retries = 0 },
+		Blank { tags: List<String>, title: String } = { tags = [], title = "" },
+	}
+
+	constant incomplete: Fetch = #Get({})
+
+	§ A bare Case name is a UNIT Case's spelling and stays one, however much of
+	§ a payload is defaulted — so a Case that fills every member in is still
+	§ constructed with a payload, and the empty Record is what to write.
+	constant bare: Fetch = #Blank
 }

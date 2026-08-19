@@ -2353,4 +2353,75 @@ export {
 			},
 		)
 	})
+
+	// NOTE: The reason a Case payload's default travels on the Case Type, and the
+	// reason it is held to a literal: the merge happens where the Case is BUILT,
+	// and that may be a Module that never named the Choice — `Main.es` below
+	// imports one Function and no Type at all. There is no import to hang a value
+	// off, so a default that read a name would read one that is not there.
+	it("fills a payload default in a Module that never named the Choice", async () => {
+		await withBuiltProject(
+			{
+				"Main.es": `import {
+	describe from "./Fetching.es"
+}
+
+implementation {
+	Terminal.inspect(describe(#Get({ url = "/a" })))
+	Terminal.inspect(describe(#Get({ url = "/b", retries = 3 })))
+	Terminal.inspect(describe(#Blank({})))
+}
+`,
+				"Fetching.es": `implementation {
+	choice Fetch {
+		Get { url: String, retries: Integer } = { retries = 0 },
+		Blank { tags: List<String> } = { tags = [] },
+	}
+
+	function describe(_ fetch: Fetch) -> String {
+		<- match fetch -> String {
+			case #Get({ url, retries }) { <- "{url} after {retries}" }
+			case #Blank({ tags })       { <- "blank {tags::length()}" }
+		}
+	}
+}
+
+export {
+	describe
+}
+`,
+			},
+			async (directory) => {
+				let linked = linkModuleGraph(
+					loadModuleGraph(
+						path.join(directory, "Main.es"),
+						diskModuleHost,
+					),
+				)
+				let sources = generateModules(linked)
+
+				// NOTE: The filled member is emitted INTO the construction, in
+				// the Module that wrote it — the only import is the Function,
+				// and the default's `0` is pooled with `Main.es`'s own
+				// constants, which is what a copy per site buys.
+				let main = sources.sources.get("essence:./Main.es") as string
+
+				expect(main).toContain(
+					'import { describe } from "essence:./Fetching.es"',
+				)
+				expect(main).toContain(
+					"const $pool_1 = Integer.createInteger(0)",
+				)
+				expect(main).toContain(
+					'[$type.typeKeySymbol]: "./Fetching.es#Fetch#Get",\n\turl: $pool_0,\n\tretries: $pool_1',
+				)
+
+				expect(await runBundle(sources, directory)).toEqual([
+					'"/a after 0"',
+					'"/b after 3"',
+					'"blank 0"',
+				])
+			},
+		)
+	})
 })

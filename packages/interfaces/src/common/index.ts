@@ -227,6 +227,8 @@ export type DiagnosticCode =
 	| "unexpected-payload"
 	| "payload-type-mismatch"
 	| "unbindable-case-payload"
+	| "case-default-not-a-literal"
+	| "case-default-on-generic-choice"
 	| "recursive-generic-choice"
 	| "indistinguishable-union-arms"
 	| "undecided-type-arguments"
@@ -344,6 +346,30 @@ export type RecordType = {
 	members: Record<string, Type>
 }
 
+// NOTE: The `= { … }` a Case's payload shape may carry — which of the payload's
+// members a construction is allowed to leave out, and the value each of them is
+// then filled with.
+//
+// NOTE: `members` is read off what the default WRITES, so it is known at
+// resolution, where a Case Type is built. `values` are Expressions, and only the
+// Enricher types one — so they are written into this object IN PLACE afterwards,
+// the way a Refinement's conjuncts are. The object is registered once and shared
+// by reference, which is what keeps a Case Type copied before the fill pointing
+// at the same answer; nothing reads `values` before every Module has been
+// enriched, because the only reader is the Simplifier.
+//
+// NOTE: Expressions on a Type, which every other Type field is deliberately
+// written to avoid. They are admitted HERE because the merge happens at the
+// CONSTRUCTION rather than at a callee, and a construction may stand in a Module
+// that never named the Choice — there is no import to hang a value off, so what
+// the value IS has to travel with the Type. What makes that sound is the rule
+// the Enricher holds a payload default to: every member is a literal, closed
+// over nothing, and evaluates to itself wherever it is written.
+export type CasePayloadDefault = {
+	members: ReadonlyArray<string>
+	values: Record<string, typed.ExpressionNode> | null
+}
+
 // NOTE: One Case of a Choice — a *nominal* Record Type: its members are
 // accessed like any Record's, but assignability goes by (choice, name)
 // identity rather than by structure. A `choice` declaration manufactures one
@@ -386,6 +412,11 @@ export type CaseType = {
 	// identity through substitution and matchTypes' `lhs === rhs` fast path are
 	// undisturbed.
 	unitChoice?: true
+	// NOTE: Set on a Case whose payload shape carries a `= { … }`. Absent
+	// everywhere else, for the same reason `unitChoice` is. Never set on a Case
+	// of a GENERIC Choice: a default can not bind the Choice's Type Parameters,
+	// so there is nothing a value written there could be checked against.
+	payloadDefault?: CasePayloadDefault
 }
 
 export type GenericListType = {

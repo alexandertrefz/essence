@@ -1,5 +1,77 @@
 // Bun Snapshot v1, https://bun.sh/docs/test/snapshots
 
+exports[`Diagnostic Showcase CaseDefaults.es should render the same report every time 1`] = `
+"[case-default-not-a-literal]
+Error: The default for Case '#Get' is not a Record Literal
+    ╭─┤ CaseDefaults.es:12:48 │
+    │
+ 12 │        Get { url: String, headers: List<String> } = standardHeaders,
+    │                                                     ───────┬───────  
+    │                                                            ╰───────── this names a value rather than writing one
+    │ 
+    │ Help: Write the members out: '= { … }'.
+    │ 
+    │ Note: A payload default is spliced into every construction of its Case, and a construction may stand in a Module that never named the Choice — so a default that read a name would read one that is not there.
+────╯
+
+[case-default-not-a-literal]
+Error: This default member is not a literal
+    ╭─┤ CaseDefaults.es:20:55 │
+    │
+ 20 │        Get { url: String, retries: Integer } = { retries = none },
+    │                                                            ──┬─  
+    │                                                              ╰─── this is worked out rather than written down
+    │ 
+    │ Help: Write a literal — a Number, a String, a Boolean, or a List, Record or Case value built out of those.
+    │ 
+    │ Note: A payload default is spliced into every construction of its Case, and a construction may stand in a Module that never named the Choice — so a default that read a name would read one that is not there.
+────╯
+
+[default-type-mismatch]
+Error: This default does not fit Case '#Get'
+    ╭─┤ CaseDefaults.es:26:25 │
+    │
+ 26 │        Get { url: String } = { retries = 0 },
+    │                              ───────┬───────  
+    │                                     ╰───────── this is a { retries: Integer }
+    │ 
+    │ Help: Write the members of { url: String } this default means to fill in.
+    │ 
+    │ Note 1: '#Get' carries a { url: String }.
+    │ Note 2: A payload default may fill in only some of those members; it may not name one the payload does not declare, nor give one a value of another Type.
+────╯
+
+[default-type-mismatch]
+Error: This default does not fit Case '#Get'
+    ╭─┤ CaseDefaults.es:32:43 │
+    │
+ 32 │        Get { url: String, retries: Integer } = { retries = "none" },
+    │                                                ──────────┬─────────  
+    │                                                          ╰─────────── this is a { retries: String }
+    │ 
+    │ Help: Write the members of { url: String, retries: Integer } this default means to fill in.
+    │ 
+    │ Note 1: '#Get' carries a { url: String, retries: Integer }.
+    │ Note 2: A payload default may fill in only some of those members; it may not name one the payload does not declare, nor give one a value of another Type.
+────╯
+
+[case-default-on-generic-choice]
+Error: A generic Choice can not default a payload
+    ╭─┤ CaseDefaults.es:39:42 │
+    │
+ 39 │        Full { value: Value, seen: Integer } = { seen = 0 },
+    │                                               ──────┬─────  
+    │                                                     ╰─────── this default
+    │ 
+    │ Help: Write the member at each construction, or declare a Choice for the Type this default is a value of.
+    │ 
+    │ Note: 'Box' abstracts over 1 Type Parameter, and a value written here can bind none of them — every use site decides them, and each would want a default of its own.
+────╯
+
+─── 5 errors
+"
+`;
+
 exports[`Diagnostic Showcase Conformance.es should render the same report every time 1`] = `
 "[unknown-where-generic]
 Error: 'Other' is not a Type Parameter of this Namespace
@@ -752,9 +824,9 @@ Error: An overloaded Protocol Method can not carry a body
 exports[`Diagnostic Showcase RecordDefaults.es should render the same report every time 1`] = `
 "[incomplete-record-argument]
 Error: This Argument is missing 2 members the default does not fill in
-    ╭─┤ RecordDefaults.es:13:47 │
+    ╭─┤ RecordDefaults.es:14:47 │
     │
- 13 │     Terminal.print(connect("essence.lang", using { retries = 1 }))
+ 14 │     Terminal.print(connect("essence.lang", using { retries = 1 }))
     │                                                  ───────┬───────  
     │                                                         ╰───────── 'host', 'tls' not written here
     │ 
@@ -766,9 +838,9 @@ Error: This Argument is missing 2 members the default does not fill in
 
 [argument-type-mismatch]
 Error: This Argument does not fit Parameter 'using'
-    ╭─┤ RecordDefaults.es:17:47 │
+    ╭─┤ RecordDefaults.es:18:47 │
     │
- 17 │     Terminal.print(connect("essence.lang", using { host = 1, tls = true }))
+ 18 │     Terminal.print(connect("essence.lang", using { host = 1, tls = true }))
     │                                                  ────────────┬───────────  
     │                                                              ╰───────────── this is a { host: Integer, tls: Boolean }
     │ 
@@ -777,9 +849,9 @@ Error: This Argument does not fit Parameter 'using'
 
 [argument-type-mismatch]
 Error: This Argument does not fit Parameter 'using'
-    ╭─┤ RecordDefaults.es:21:33 │
+    ╭─┤ RecordDefaults.es:22:33 │
     │
- 21 │        connect("essence.lang", using { host = "h", tls = true, timeout = 30 }),
+ 22 │        connect("essence.lang", using { host = "h", tls = true, timeout = 30 }),
     │                                      ────────────────────┬───────────────────  
     │                                                          ╰───────────────────── this is a { host: String, tls: Boolean, timeout: Integer }
     │ 
@@ -788,9 +860,9 @@ Error: This Argument does not fit Parameter 'using'
 
 [argument-type-mismatch]
 Error: This Argument does not fit Parameter 'using'
-    ╭─┤ RecordDefaults.es:34:47 │
+    ╭─┤ RecordDefaults.es:35:47 │
     │
- 34 │     Terminal.print(connect("essence.lang", using partial))
+ 35 │     Terminal.print(connect("essence.lang", using partial))
     │                                                  ───┬───  
     │                                                     ╰───── this is a { host: String, tls: Boolean }
     │ 
@@ -800,7 +872,34 @@ Error: This Argument does not fit Parameter 'using'
     │ Note 2: Its default fills in 'retries', which only an Argument WRITTEN as a Record literal may leave out — every other Record carries whatever its value holds, not only what its Type names.
 ────╯
 
-─── 4 errors
+[incomplete-record-argument]
+Error: This payload is missing 1 member the default does not fill in
+    ╭─┤ RecordDefaults.es:45:36 │
+    │
+ 45 │     constant incomplete: Fetch = #Get({})
+    │                                       ─┐  
+    │                                        ╰── 'url' not written here
+    │ 
+    │ Help: Write 'url' into this payload.
+    │ 
+    │ Note 1: '#Get' carries a { url: String, retries: Integer }.
+    │ Note 2: Its default fills in 'retries'; every other member must be written.
+────╯
+
+[missing-payload]
+Error: Case '#Blank' requires a payload
+    ╭─┤ RecordDefaults.es:50:25 │
+    │
+ 50 │     constant bare: Fetch = #Blank
+    │                            ───┬──  
+    │                               ╰──── no payload was given
+    │ 
+    │ Help: Its default fills every member in — write '#Blank({})'.
+    │ 
+    │ Note: '#Blank' carries a { tags: List<String>, title: String }.
+────╯
+
+─── 6 errors
 "
 `;
 

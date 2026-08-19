@@ -1944,8 +1944,30 @@ function validateCaseValue(
 				notes: [
 					`'#${node.type.name}' carries ${withArticle(describeType(payloadType))}.`,
 				],
+				// NOTE: A bare `#Case` is a UNIT Case's spelling and stays one,
+				// however much of a payload is defaulted — which is what keeps
+				// a bare Case name meaning exactly one thing on both sides of
+				// the JavaScript boundary. So a fully defaulted Case has an
+				// empty payload to write, and this is where to say so.
+				helps:
+					node.type.payloadDefault?.members.length ===
+					Object.keys(node.type.members).length
+						? [
+								`Its default fills every member in — write '#${node.type.name}({})'.`,
+							]
+						: [],
 			},
 		)
+	} else if (casePayloadIsPartial(node.type, node.value)) {
+		let missing = missingRecordMembers(
+			payloadType,
+			node.type.payloadDefault!.members,
+			node.value.type as common.RecordType,
+		)
+
+		if (missing.length > 0) {
+			reportIncompleteCasePayload(node.type, missing, node.value)
+		}
 	} else if (!matchesType(payloadType, node.value.type)) {
 		reportError(
 			`This payload does not fit Case '#${node.type.name}'`,
@@ -1975,6 +1997,54 @@ function validateCaseValue(
 	}
 
 	return node
+}
+
+// NOTE: A payload written as a Record Literal for a Case that defaults its
+// payload is measured as a PARTIAL — every member it writes is one the payload
+// declares, carrying a value that member's Type admits — and what is left is
+// only ever the question of which members it should have written. A payload that
+// is not a Literal carries whatever its value holds, which width subtyping lets
+// be more than its Type names, so it is held to the payload whole: the same
+// split, for the same reason, that a Record Argument is held to.
+function casePayloadIsPartial(
+	caseType: common.CaseType,
+	value: common.typed.ExpressionNode,
+): boolean {
+	return (
+		caseType.payloadDefault !== undefined &&
+		value.nodeType === "RecordValue" &&
+		value.type.type === "Record" &&
+		isPartialOf({ type: "Record", members: caseType.members }, value.type)
+	)
+}
+
+function reportIncompleteCasePayload(
+	caseType: common.CaseType,
+	missing: Array<string>,
+	value: common.typed.ExpressionNode,
+): void {
+	let filled = caseType.payloadDefault?.members ?? []
+
+	reportError(
+		`This payload is missing ${countOf(missing.length, "member")} the default does not fill in`,
+		value.position,
+		{
+			code: "incomplete-record-argument",
+			labels: [
+				primary(
+					value.position,
+					`${quotedNames(missing)} not written here`,
+				),
+			],
+			notes: [
+				`'#${caseType.name}' carries ${withArticle(describeType({ type: "Record", members: caseType.members }))}.`,
+				filled.length === 0
+					? "Its default fills in nothing; every member must be written."
+					: `Its default fills in ${quotedNames(filled)}; every other member must be written.`,
+			],
+			helps: [`Write ${quotedNames(missing)} into this payload.`],
+		},
+	)
 }
 
 function validateFunctionValue(

@@ -757,6 +757,21 @@ function wrapSingleMemberShorthand(
 		return value
 	}
 
+	// NOTE: A Case that DEFAULTS its payload is fitted as a partial, because
+	// `#Post({})` and `#Post({ url = "/x" })` are payloads it fills the rest of
+	// in — and neither fits the one-member Record whole. Record interpretation
+	// still wins the ambiguity, and a value that is not a Record Literal is
+	// wrapped exactly as before: `#Post(5)` is the member's value, whatever the
+	// default says.
+	if (
+		caseType.payloadDefault !== undefined &&
+		value.nodeType === "RecordValue" &&
+		value.type.type === "Record" &&
+		isPartialOf(recordShape as common.RecordType, value.type)
+	) {
+		return value
+	}
+
 	let [memberName] = memberNames
 
 	return {
@@ -3483,9 +3498,17 @@ export function enrichChoiceDeclarationStatement(
 	}
 }
 
-// NOTE: A Case payload's `= { … }`, enriched against the payload shape it
-// fills — the Module's own Scope, since a Choice declaration stands in no frame
-// and `@` names nothing here.
+// NOTE: A Case payload's `= { … }`, enriched against the payload shape it fills
+// — in the Module's own Scope, since a Choice declaration stands in no frame and
+// `@` names nothing here.
+//
+// Where a Parameter's default is evaluated in the CALLEE, a payload's is spliced
+// into every construction, and a construction may stand in a Module that never
+// named the Choice — so a default that read a name would read one that is not
+// there. What a default may say is therefore exactly what says itself: literals,
+// and the Lists, Records and Case values built out of them. That is the whole of
+// the census this feature was built for (`{ headers = [] }`, `{ retries = 0 }`),
+// and it is the rule that lets the value travel on the Case Type.
 function enrichCasePayloadDefault(
 	choiceCase: parser.ChoiceCaseNode,
 	caseType: common.CaseType,
@@ -3495,10 +3518,127 @@ function enrichCasePayloadDefault(
 		return null
 	}
 
-	return enrichExpression(choiceCase.defaultValue, scope, {
+	let payloadType: common.RecordType = {
 		type: "Record",
 		members: caseType.members,
-	})
+	}
+	let value = enrichExpression(choiceCase.defaultValue, scope, payloadType)
+
+	// NOTE: Already reported — on a generic Choice by the Resolver, which is
+	// where the Type Parameters are in hand. The value is enriched all the same,
+	// so the Language Server answers inside it either way.
+	if (caseType.choiceGenerics !== undefined) {
+		return value
+	}
+
+	// NOTE: The Resolver registers nothing for a default that is not a Record
+	// Literal — what a partial fills in is what it spells — so this is where
+	// that spelling is refused, and `payloadDefault` is present below by
+	// construction.
+	if (
+		value.nodeType !== "RecordValue" ||
+		value.type.type !== "Record" ||
+		caseType.payloadDefault === undefined
+	) {
+		reportCaseDefaultNotALiteral(value, caseType, "whole")
+
+		return value
+	}
+
+	if (!isPartialOf(payloadType, value.type)) {
+		reportError(
+			`This default does not fit Case '#${caseType.name}'`,
+			choiceCase.defaultValue.position,
+			{
+				code: "default-type-mismatch",
+				labels: [
+					primary(
+						choiceCase.defaultValue.position,
+						`this is ${withArticle(describeType(value.type))}`,
+					),
+				],
+				notes: [
+					`'#${caseType.name}' carries ${withArticle(describeType(payloadType))}.`,
+					"A payload default may fill in only some of those members; it may not name one the payload does not declare, nor give one a value of another Type.",
+				],
+				helps: [
+					`Write the members of ${describeType(payloadType)} this default means to fill in.`,
+				],
+			},
+		)
+
+		return value
+	}
+
+	let literal = true
+
+	for (let member of Object.values(value.members)) {
+		if (!isSelfContainedValue(member)) {
+			reportCaseDefaultNotALiteral(member, caseType, "member")
+
+			literal = false
+		}
+	}
+
+	if (literal) {
+		caseType.payloadDefault.values = value.members
+	}
+
+	return value
+}
+
+function reportCaseDefaultNotALiteral(
+	node: common.typed.ExpressionNode,
+	caseType: common.CaseType,
+	kind: "whole" | "member",
+): void {
+	reportError(
+		kind === "whole"
+			? `The default for Case '#${caseType.name}' is not a Record Literal`
+			: `This default member is not a literal`,
+		node.position,
+		{
+			code: "case-default-not-a-literal",
+			labels: [
+				primary(
+					node.position,
+					kind === "whole"
+						? "this names a value rather than writing one"
+						: "this is worked out rather than written down",
+				),
+			],
+			notes: [
+				"A payload default is spliced into every construction of its Case, and a construction may stand in a Module that never named the Choice — so a default that read a name would read one that is not there.",
+			],
+			helps: [
+				kind === "whole"
+					? `Write the members out: '= { … }'.`
+					: "Write a literal — a Number, a String, a Boolean, or a List, Record or Case value built out of those.",
+			],
+		},
+	)
+}
+
+// NOTE: A value that says itself: it names nothing, so it means the same thing
+// in every Module and needs nothing around it to be evaluated. An interpolated
+// String is deliberately NOT one — it holds Expressions — while a plain String
+// is, and a bare `#Case` is a Case value with no payload.
+function isSelfContainedValue(node: common.typed.ExpressionNode): boolean {
+	switch (node.nodeType) {
+		case "IntegerValue":
+		case "RationalValue":
+		case "StringValue":
+		case "BooleanValue":
+			return true
+		case "ListValue":
+			return node.values.every(isSelfContainedValue)
+		case "RecordValue":
+			return Object.values(node.members).every(isSelfContainedValue)
+		case "CaseValue":
+			return node.value === null || isSelfContainedValue(node.value)
+		default:
+			return false
+	}
 }
 
 // NOTE: The condition is enriched BEFORE the branch Scopes exist, which is the
@@ -8232,6 +8372,20 @@ function payloadFitsCase(
 	}
 
 	if (matchesType(recordShape, payloadType)) {
+		return true
+	}
+
+	// NOTE: A Case that DEFAULTS its payload is fitted as a partial — the
+	// members it leaves out are the ones the default writes, so a payload that
+	// says only things the Case declares is one this Case can stand for. Judged
+	// on the payload's TYPE rather than on how it was written, because this
+	// decides which Case a construction IS; whether the spelling was allowed to
+	// be partial is `casePayloadIsPartial`'s question, one stage later.
+	if (
+		caseType.payloadDefault !== undefined &&
+		payloadType.type === "Record" &&
+		isPartialOf(recordShape, payloadType)
+	) {
 		return true
 	}
 
