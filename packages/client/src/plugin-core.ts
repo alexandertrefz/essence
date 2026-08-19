@@ -23,6 +23,7 @@ import {
 	type Descriptor,
 	type ExportDescriptor,
 	type FunctionDescriptor,
+	type Members,
 	type ModuleDescriptor,
 	type NamespaceMethod,
 	type OverloadDescriptor,
@@ -615,7 +616,7 @@ function signatureWithoutShown(
 function caseWithoutShown(node: CaseDescriptor): CaseDescriptor {
 	return {
 		...node,
-		payload: eachOf(node.payload, nodeWithoutShown),
+		payload: memberWithoutShown(node.payload),
 		shown: "",
 	}
 }
@@ -629,7 +630,7 @@ function nodeWithoutShown(node: Descriptor): Descriptor {
 		case "record":
 			return {
 				...node,
-				members: eachOf(node.members, nodeWithoutShown),
+				members: memberWithoutShown(node.members),
 				shown: "",
 			}
 		case "union":
@@ -641,6 +642,16 @@ function nodeWithoutShown(node: Descriptor): Descriptor {
 		default:
 			return { ...node, shown: "" }
 	}
+}
+
+// NOTE: A member carries the flag saying whether the boundary may leave it out
+// beside the Descriptor it holds, so the walk goes through the `of` and the flag
+// rides along untouched.
+function memberWithoutShown(members: Members): Members {
+	return eachOf(members, (member) => ({
+		...member,
+		of: nodeWithoutShown(member.of),
+	}))
 }
 
 function eachOf<Value>(

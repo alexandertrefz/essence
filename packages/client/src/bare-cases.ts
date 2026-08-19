@@ -116,7 +116,7 @@ function flatten(descriptor: Descriptor, into: Array<Descriptor>): void {
 			let item = descriptor.payload.item
 
 			if (descriptor.name === "Value" && item !== undefined) {
-				flatten(item, into)
+				flatten(item.of, into)
 			}
 
 			return

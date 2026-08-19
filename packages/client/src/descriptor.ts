@@ -34,6 +34,7 @@ export {
 	describeTypes,
 	type ExportDescriptor,
 	type FunctionDescriptor,
+	type Members,
 	type ModuleDescriptor,
 	type NamespaceDescriptor,
 	type NamespaceMethod,

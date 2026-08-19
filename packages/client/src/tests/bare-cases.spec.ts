@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test"
 
 import { bareCaseCollision } from "../bare-cases"
-import type { CaseDescriptor, Descriptor } from "../descriptor"
+import type { CaseDescriptor, Descriptor, Members } from "../descriptor"
 
 // NOTE: Hand-written Descriptors rather than described Types, because what is
 // under test is the RULE and not the describing — every shape below is one a
@@ -19,7 +19,7 @@ function caseOf(
 		module = "./Marshal.es",
 	}: {
 		unitChoice?: boolean
-		payload?: Record<string, Descriptor>
+		payload?: Members
 		module?: string
 	} = {},
 ): CaseDescriptor {
@@ -43,7 +43,7 @@ function optionalCase(name: "Empty" | "Value", item?: Descriptor): Descriptor {
 		name,
 		optional: true,
 		unitChoice: false,
-		payload: item === undefined ? {} : { item },
+		payload: item === undefined ? {} : { item: { of: item } },
 		shown: `Optional#${name}`,
 	}
 }
@@ -65,7 +65,7 @@ const SIGN = [caseOf("Sign", "Plus"), caseOf("Sign", "Minus")]
 const SHAPE = [
 	caseOf("Shape", "Circle", {
 		unitChoice: false,
-		payload: { radius: INTEGER },
+		payload: { radius: { of: INTEGER } },
 	}),
 	caseOf("Shape", "Blank", { unitChoice: false }),
 ]
@@ -216,7 +216,7 @@ describe("A shape that is not a Union", () => {
 		expect(
 			bareCaseCollision({
 				kind: "record",
-				members: { direction: union(...DIRECTION) },
+				members: { direction: { of: union(...DIRECTION) } },
 				shown: "{ direction: Direction }",
 			}),
 		).toBeNull()
