@@ -3,6 +3,7 @@ import { isDeepStrictEqual } from "node:util"
 import type { common, enricher, parser } from "@essence-lang/interfaces"
 
 import {
+	collectDiagnostics,
 	primary,
 	reportError,
 	reportWarning,
@@ -2635,14 +2636,21 @@ function reachesConformance(
 	// Equatable — so a derived conformance reaches the provided Methods on the
 	// same terms a written one does. Asked through the very Function the witness
 	// is solved by, so the two can not disagree about which receivers conform.
+	// SILENT. This is a speculative question asked of every Method call that no
+	// written Namespace answered, and solving a generic Choice's conformance
+	// reports when one of its payloads does not conform — a Diagnostic about a
+	// conformance nobody asked for, standing where a reader mistyped a Method
+	// name. The call site solves the witness again, and reports there.
 	return (
-		derivedConformanceSource(
-			baseType,
-			protocolName,
-			null,
-			scope,
-			position,
-		) !== null
+		collectDiagnostics(() =>
+			derivedConformanceSource(
+				baseType,
+				protocolName,
+				null,
+				scope,
+				position,
+			),
+		).result !== null
 	)
 }
 
@@ -2722,6 +2730,7 @@ export function providedMethodNamespaceForProtocol(
 // no written Namespace has answered, which is what makes a written Method
 // replace a provided one entirely rather than compete with it.
 export function providedMethodNamespaces(
+	methodName: string,
 	baseType: common.Type,
 	namespaces: Iterable<common.NamespaceType>,
 	scope: enricher.Scope,
@@ -2731,7 +2740,12 @@ export function providedMethodNamespaces(
 	let listed = [...namespaces]
 
 	for (let protocol of allProtocolsInScope(scope)) {
-		if (protocol.providedMethods === undefined) {
+		// NOTE: The NAME first, before anything is asked about conformance.
+		// This runs for every Method call no written Namespace answered, and
+		// solving a conformance is not what a misspelled Method name should
+		// cost. A Protocol that INHERITED the name offers nothing here — it is
+		// offered by the Protocol that wrote it, reached in this same walk.
+		if (providedMethodProtocol(protocol, methodName) !== protocol.name) {
 			continue
 		}
 

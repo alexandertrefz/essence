@@ -6398,11 +6398,16 @@ function namespacesDeclaringMethod(
 	// something written. This IS the override rule — the fallback is only
 	// reached once the written Namespaces have come up empty.
 	for (let [name, namespace] of providedMethodNamespaces(
+		methodName,
 		baseType,
 		namespaces.values(),
 		scope,
 		position,
 	)) {
+		// NOTE: The walk was gated on the name, so this holds for every
+		// Protocol it answered with — asked anyway, because a Namespace that
+		// declares the Method is what every candidate here is, and a probe
+		// against one that does not would fail somewhere further in.
 		if (Object.hasOwn(namespace.methods, methodName)) {
 			matchingNamespaces.set(name, namespace)
 		}
