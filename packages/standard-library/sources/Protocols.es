@@ -5,13 +5,13 @@ declarations {
 
 	§§ Anything that can be compared for equality.
 	protocol Equatable {
-		§§ Checks whether both values are equal.
+		§§ Answers whether both values are equal.
 		§§
 		§§ @param _ — the value to compare with
 		§§ @returns — `true` when the values are equal.
 		is(_ other: Self) -> Boolean
 
-		§§ Checks whether the values differ.
+		§§ Answers whether the values differ.
 		§§
 		§§ @param _ — the value to compare with
 		§§ @returns — `true` when the values differ.
@@ -20,7 +20,7 @@ declarations {
 
 	§§ Anything that can represent itself as a String.
 	protocol Printable {
-		§§ Represents the value as a String.
+		§§ Answers the value as a String.
 		§§
 		§§ @returns — the String representation of the value.
 		toString() -> String

@@ -22,7 +22,7 @@ declarations {
 	§ Equality is derived for a Choice, so only `toString` is written; see
 	§ DEVELOPMENT.md, Why bodies look the way they do.
 	namespace Side for Side is Equatable, is Printable {
-		§§ Answers the name of the Side.
+		§§ Answers the Side as a String.
 		§§
 		§§ @returns — `Start`, `End` or `BothEnds`.
 		toString() -> String {
@@ -41,7 +41,7 @@ declarations {
 	}
 
 	namespace CaseSensitivity for CaseSensitivity is Equatable, is Printable {
-		§§ Answers the name of the CaseSensitivity.
+		§§ Answers the CaseSensitivity as a String.
 		§§
 		§§ @returns — `Sensitive` or `Insensitive`.
 		toString() -> String {
@@ -66,7 +66,7 @@ declarations {
 	namespace NormalizationForm for NormalizationForm
 		is Equatable,
 		is Printable {
-		§§ Answers the name of the NormalizationForm.
+		§§ Answers the NormalizationForm as a String.
 		§§
 		§§ @returns — the name of the form, such as `ComposedCanonical`.
 		toString() -> String {

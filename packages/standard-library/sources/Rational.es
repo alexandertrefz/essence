@@ -25,7 +25,7 @@ declarations {
 	§ `Equatable` is derived for a Choice; see DEVELOPMENT.md, Why bodies look
 	§ the way they do.
 	namespace NumberFormat for NumberFormat is Equatable, is Printable {
-		§§ Represents the NumberFormat as `Fraction` or `Decimal`.
+		§§ Answers the NumberFormat as a String: `Fraction` or `Decimal`.
 		§§
 		§§ @returns — the name of the NumberFormat's Case.
 		toString() -> String {
@@ -46,7 +46,7 @@ declarations {
 	}
 
 	namespace Rounding for Rounding is Equatable, is Printable {
-		§§ Represents the Rounding as `Nearest`, `Down`, `Up` or `TowardZero`.
+		§§ Answers the Rounding as a String: `Nearest`, `Down`, `Up` or `TowardZero`.
 		§§
 		§§ @returns — the name of the Rounding's Case.
 		toString() -> String {
@@ -108,7 +108,7 @@ declarations {
 			}
 		}
 
-		§§ Checks whether the Rational has the same value as another Rational.
+		§§ Answers whether the Rational has the same value as another Rational.
 		§§
 		§§ The comparison is in lowest terms, so `1/2` equals `2/4`.
 		§§
@@ -118,7 +118,7 @@ declarations {
 			<- @::compare(to other)::is(#Equal)
 		}
 
-		§§ Checks whether the Rational has a different value than another.
+		§§ Answers whether the Rational has a different value than another.
 		§§
 		§§ @param _ — the Rational to compare against
 		§§ @returns — `true` when the two differ.
@@ -255,7 +255,7 @@ declarations {
 		§ DEVELOPMENT.md, Why bodies look the way they do. The Integer entries
 		§ scale by the denominator, which is positive and keeps the order.
 
-		§§ Checks whether the Rational is strictly below the given number.
+		§§ Answers whether the Rational is strictly below the given number.
 		overload isLessThan {
 			(_ other: Rational) -> Boolean {
 				<- @::compare(to other)::is(#Less)
@@ -267,7 +267,7 @@ declarations {
 			}
 		}
 
-		§§ Checks whether the Rational is below the given number, or equal to it.
+		§§ Answers whether the Rational is below the given number, or equal to it.
 		overload isLessThanOrEqualTo {
 			(_ other: Rational) -> Boolean {
 				<- @::isGreaterThan(other)::negate()
@@ -278,7 +278,7 @@ declarations {
 			}
 		}
 
-		§§ Checks whether the Rational is strictly above the given number.
+		§§ Answers whether the Rational is strictly above the given number.
 		overload isGreaterThan {
 			(_ other: Rational) -> Boolean {
 				<- @::compare(to other)::is(#Greater)
@@ -290,7 +290,7 @@ declarations {
 			}
 		}
 
-		§§ Checks whether the Rational is above the given number, or equal to it.
+		§§ Answers whether the Rational is above the given number, or equal to it.
 		overload isGreaterThanOrEqualTo {
 			(_ other: Rational) -> Boolean {
 				<- @::isLessThan(other)::negate()
@@ -361,7 +361,7 @@ declarations {
 			}
 		}
 
-		§§ Checks whether the Rational is a whole number.
+		§§ Answers whether the Rational is a whole number.
 		§§
 		§§ A whole number has the denominator one in lowest terms.
 		isWholeNumber() -> Boolean {
@@ -560,7 +560,7 @@ declarations {
 			}
 		}
 
-		§§ Represents the Rational as a String, in lowest terms.
+		§§ Answers the Rational as a String, in lowest terms.
 		§§
 		§§ The form is `3/4` when no format is named, and the named format otherwise. A whole Rational prints its numerator alone, so `1/2::add(1/2)` prints `1` and `10::divide(by 2)` prints `5`. The `Rational.parse` Method reads every one of these forms back.
 		§§

@@ -32,7 +32,7 @@ declarations {
 	namespace Optional<infer ItemType> for Optional<ItemType>
 		is Equatable where ItemType is Equatable,
 		is Printable where ItemType is Printable {
-		§§ Answers the Optional written as `Value(…)` or `Empty`.
+		§§ Answers the Optional as a String, written `Value(…)` or `Empty`.
 		§§
 		§§ The payload renders through its own `toString`. The Method is available whenever the payload conforms to `Printable`.
 		§§

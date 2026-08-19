@@ -10,13 +10,13 @@ declarations {
 		§§ Answers the opposite truth value: `false` for `true`, and `true` for `false`.
 		negate() -> Boolean
 
-		§§ Checks whether the Boolean has the same truth value as another.
+		§§ Answers whether the Boolean has the same truth value as another.
 		§§
 		§§ @param _ — the Boolean to compare against
 		§§ @returns — `true` when both are equal.
 		is(_ other: Boolean) -> Boolean
 
-		§§ Checks whether the Boolean has a different truth value than another.
+		§§ Answers whether the Boolean has a different truth value than another.
 		§§
 		§§ @param _ — the Boolean to compare against
 		§§ @returns — `true` when the two differ.
@@ -45,7 +45,7 @@ declarations {
 			<- @::is(other)::negate()
 		}
 
-		§§ Represents the Boolean as a String: `"true"` or `"false"`.
+		§§ Answers the Boolean as a String: `"true"` or `"false"`.
 		toString() -> String {
 			if @ {
 				<- "true"

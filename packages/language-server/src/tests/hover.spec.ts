@@ -870,7 +870,7 @@ describe("Hover of a standard library Method", () => {
 	it("should show a Parameter's text and the return text", () => {
 		expect(hoverDocumentation(source, { line: 3, column: 26 })).toBe(
 			[
-				"Checks whether the Boolean has the same truth value as another.",
+				"Answers whether the Boolean has the same truth value as another.",
 				"**other** — the Boolean to compare against",
 				"**Returns** — `true` when both are equal.",
 			].join("\n\n"),

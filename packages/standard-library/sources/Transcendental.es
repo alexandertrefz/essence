@@ -147,7 +147,7 @@ declarations {
 		§§ At least one base term keeps its non-zero coefficient, so the answer is again a Transcendental.
 		negate() -> Transcendental
 
-		§§ Answers the exact symbolic form: `π`, `2·π`, `e` or `1 + π + e`.
+		§§ Answers the Transcendental as a String, in the exact symbolic form: `π`, `2·π`, `e` or `1 + π + e`.
 		toString() -> String
 	}
 }
