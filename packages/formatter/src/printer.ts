@@ -2195,6 +2195,12 @@ export class Printer {
 		)
 	}
 
+	// NOTE: A member written as a bare name is printed as one, and a member
+	// that spelled its value keeps the spelling — the Formatter never collapses
+	// `a = a` into `a` and never expands `a` into `a = a`. `{ base with a = a }`
+	// and `{ base with { a } }` are not even the same parse, so a rewrite
+	// between them would be a rewrite of what the file means; the AST gate
+	// catches one already, and the rule is the same for both.
 	private recordInterior(node: parser.RecordValueNode): {
 		interior: Doc
 		commented: boolean
@@ -2206,10 +2212,12 @@ export class Printer {
 				end: member.value.position.end,
 			}),
 			(member) =>
-				concat([
-					text(member.name.content + " = "),
-					this.printExpression(member.value),
-				]),
+				member.shorthand === true
+					? text(member.name.content)
+					: concat([
+							text(member.name.content + " = "),
+							this.printExpression(member.value),
+						]),
 		)
 
 		return this.listInterior(

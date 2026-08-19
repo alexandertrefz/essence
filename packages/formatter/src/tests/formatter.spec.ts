@@ -558,6 +558,85 @@ describe("formatter", () => {
 		})
 	})
 
+	// NOTE: `{ a }` and `{ a = a }` mean the same thing and are written
+	// differently, and `{ base with { a } }` and `{ base with a = a }` are not
+	// even the same parse. The Formatter keeps whichever was written, in both
+	// directions — the AST gate catches a dropped or invented `shorthand`
+	// already, and these pin the layout it comes out in.
+	describe("Property shorthand", () => {
+		let block = (...lines: Array<string>) =>
+			["implementation {", ...lines, "}", ""].join("\n")
+
+		let roundTrips = (source: string) => {
+			let result = format(source)
+
+			expect(result.refusal).toBeNull()
+			expect(result.text).toBe(source)
+		}
+
+		it("keeps a bare member name bare", () => {
+			roundTrips(block("\tconstant point = { x, y }"))
+		})
+
+		it("keeps a member that spelled its value spelled out", () => {
+			roundTrips(block("\tconstant point = { x = x, y = y }"))
+		})
+
+		it("keeps the two spellings side by side", () => {
+			roundTrips(block("\tconstant point = { x, y = 2 }"))
+		})
+
+		it("keeps a bare member name in a typed Record Literal", () => {
+			roundTrips(block("\tconstant point = Point ~> { x, y }"))
+		})
+
+		it("keeps a bare member name in a Case payload", () => {
+			roundTrips(
+				block("\tconstant shape = #Rectangle({ width, height })"),
+			)
+		})
+
+		// NOTE: The braced right-hand side is the one shape
+		// `printCombination` decides by re-slicing the source, and it is
+		// exactly the shape the shorthand merge is written in — so it is
+		// pinned here rather than left to the AST gate, which does not see it.
+		it("keeps a Literal merged by an update braced", () => {
+			roundTrips(
+				block("\tconstant server = { base with { port, host } }"),
+			)
+		})
+
+		it("keeps an update's key list spelled out", () => {
+			roundTrips(block("\tconstant server = { base with port = port }"))
+		})
+
+		it("keeps a whole value merged in as a whole value", () => {
+			roundTrips(block("\tconstant server = { base with other }"))
+		})
+
+		it("breaks a long member list one bare name to a line", () => {
+			roundTrips(
+				block(
+					"\tconstant wide = {",
+					"\t\taaaaaaaaaaaaaaaa,",
+					"\t\tbbbbbbbbbbbbbbbb,",
+					"\t\tcccccccccccccccc,",
+					"\t\tdddddddddddddddd,",
+					"\t\teeeeeeeeeeeeeeee,",
+					"\t}",
+				),
+			)
+		})
+
+		it("is idempotent over the shorthand", () => {
+			let source = block("\tconstant point = { x, y = 2 }")
+			let once = format(source)
+			let twice = format(once.text)
+
+			expect(twice.text).toBe(once.text)
+		})
+	})
+
 	// NOTE: A checked refinement's `where` clause has to come back on the Type's
 	// own line, because that is the only line the Parser reads it on — a clause
 	// broken onto the next one would be a Statement beginning with the name

@@ -681,6 +681,112 @@ describe("Code Actions", () => {
 		})
 	})
 
+	// NOTE: The Formatter refuses to move between the two spellings, so this is
+	// where a reader gets to. Both directions, and neither of them inside an
+	// update's key list, where the two spellings do not mean the same thing.
+	describe("Property shorthand", () => {
+		let shorthandTitles = (
+			lines: Array<string>,
+			range?: common.Position,
+		): Array<string> =>
+			titles(
+				actionsOf(lines, range).filter(
+					(entry) =>
+						entry.title.startsWith("Shorten to") ||
+						entry.title.startsWith("Expand to"),
+				),
+			)
+
+		it("should offer to shorten a member that repeats its own name", () => {
+			let lines = [
+				"implementation {",
+				"\tconstant x = 1",
+				"\tconstant point = { x = x }",
+				"}",
+			]
+
+			let refactor = actionsOf(lines).find((entry) =>
+				entry.title.startsWith("Shorten to"),
+			) as CodeActionEntry
+
+			expect(refactor.title).toBe("Shorten to 'x'")
+			expect(refactor.kind).toBe("refactor.rewrite")
+			expect(applied(lines, refactor)[2]).toBe("\tconstant point = { x }")
+		})
+
+		it("should offer to expand a bare member name", () => {
+			let lines = [
+				"implementation {",
+				"\tconstant x = 1",
+				"\tconstant point = { x }",
+				"}",
+			]
+
+			let refactor = actionsOf(lines).find((entry) =>
+				entry.title.startsWith("Expand to"),
+			) as CodeActionEntry
+
+			expect(refactor.title).toBe("Expand to 'x = x'")
+			expect(applied(lines, refactor)[2]).toBe(
+				"\tconstant point = { x = x }",
+			)
+		})
+
+		it("should offer nothing on a member that names another value", () => {
+			expect(
+				shorthandTitles([
+					"implementation {",
+					"\tconstant y = 1",
+					"\tconstant point = { x = y }",
+					"}",
+				]),
+			).toEqual([])
+		})
+
+		// NOTE: `{ base with x }` merges the VALUE `x`, so shortening the key
+		// list would be a rewrite of what the file means.
+		it("should offer nothing inside an update's key list", () => {
+			expect(
+				shorthandTitles([
+					"implementation {",
+					"\tconstant x = 1",
+					"\tconstant base = { x = 0 }",
+					"\tconstant moved = { base with x = x }",
+					"}",
+				]),
+			).toEqual([])
+		})
+
+		it("should offer inside a Literal an update merges", () => {
+			expect(
+				shorthandTitles([
+					"implementation {",
+					"\tconstant x = 1",
+					"\tconstant base = { x = 0 }",
+					"\tconstant moved = { base with { x = x } }",
+					"}",
+				]),
+			).toEqual(["Shorten to 'x'"])
+		})
+
+		it("should only offer what the requested range touches", () => {
+			let lines = [
+				"implementation {",
+				"\tconstant x = 1",
+				"\tconstant y = 2",
+				"\tconstant point = { x = x, y = y }",
+				"}",
+			]
+
+			expect(
+				shorthandTitles(lines, {
+					start: { line: 4, column: 21 },
+					end: { line: 4, column: 22 },
+				}),
+			).toEqual(["Shorten to 'x'"])
+		})
+	})
+
 	describe("selection", () => {
 		it("should find nothing in a Program with nothing to fix", () => {
 			let lines = [
