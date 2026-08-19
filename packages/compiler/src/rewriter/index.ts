@@ -4162,8 +4162,14 @@ function protocolPreludeNamespaces(
 			}
 		}
 
-		for (let entry of Object.values(node)) {
-			visit(entry)
+		// NOTE: A `type` or `returnType` holds a Type, and a Type holds no
+		// Statements — so the whole of the Type graph, which is most of what a
+		// simplified Program weighs, is stepped over rather than walked. This
+		// runs once per emission, and the walk is what it costs.
+		for (let [key, entry] of Object.entries(node)) {
+			if (key !== "type" && key !== "returnType") {
+				visit(entry)
+			}
 		}
 	}
 
