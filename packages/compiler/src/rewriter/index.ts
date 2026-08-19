@@ -4227,26 +4227,39 @@ function protocolPreludeNamespaces(
 	return found
 }
 
-// NOTE: One const per Protocol NAME, which holds only while no two Protocol
-// declarations share one. Two Modules of a graph each declaring `protocol
-// Tagged`, or a Program declaring one the standard library already has, would
-// both emit `$es_Tagged_…` and the second would answer for the first — a
-// Program that compiles green and runs the wrong body. Refused here rather than
-// emitted, because the alternative is silence.
+// NOTE: One const per Protocol name AND Method name, which holds only while no
+// two Protocol declarations provide the same pair. Two Modules of a graph each
+// declaring `protocol Tagged` with a `shout` of its own would both emit
+// `$es_Tagged__shout` and the second would answer for the first — a Program
+// that compiles green and runs the wrong body.
+//
+// The pair rather than the Protocol name alone: two same-named Protocols
+// providing DIFFERENT Methods emit different consts and tread on nothing, and
+// refusing those refused Programs that are perfectly well formed.
+//
+// `clashing-provided-method` reports the pair over the Module graph, with both
+// declarations to point at, so nothing a compile can meet reaches this. It
+// stays as the emitter's own last word: emitting the second const over the
+// first is the one outcome worse than stopping.
 //
 // A Protocol identity carrying the declaring Module — what a Choice takes — is
-// what would lift this, and it is a naming decision rather than a check.
+// what would lift the restriction, and it is a naming decision rather than a
+// check.
 function refuseProtocolNameClashes(protocols: Array<PreludeNamespace>): void {
 	let seen = new Set<string>()
 
 	for (let entry of protocols) {
-		if (seen.has(entry.name)) {
-			throw new Error(
-				`Two Protocols named '${entry.name}' declare provided Methods in one compilation, and both would be emitted under the same names — declare the Protocol once and import it where it is needed`,
-			)
-		}
+		for (let memberName of Object.keys(entry.node.methods)) {
+			let pair = `${entry.name} ${memberName}`
 
-		seen.add(entry.name)
+			if (seen.has(pair)) {
+				throw new Error(
+					`Two Protocols named '${entry.name}' provide a Method named '${memberName}', and both would be emitted under the same name — declare the Protocol once and import it where it is needed`,
+				)
+			}
+
+			seen.add(pair)
+		}
 	}
 }
 

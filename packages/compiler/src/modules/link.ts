@@ -554,10 +554,142 @@ export function linkModuleGraph(
 		}
 	}
 
+	reportClashingProvidedMethods(linked)
+
 	return {
 		entryPath: graph.entryPath,
 		modules: linked,
 		diagnostics: graph.diagnostics,
+	}
+}
+
+// NOTE: Every Protocol declaration in a Module that provides at least one
+// Method, wherever it stands — a Protocol is a Statement and may be written
+// inside a body, and the emitter hoists all of them into the one prelude band
+// alike. The walk steps over `type`, `returnType` and `protocolType`, which
+// hold Types and no Statements and are most of what a typed Program weighs.
+function providedMethodDeclarations(
+	program: common.typed.Program,
+): Array<{ name: string; position: common.Position; members: Array<string> }> {
+	let found: Array<{
+		name: string
+		position: common.Position
+		members: Array<string>
+	}> = []
+	let visited = new Set<unknown>()
+
+	let visit = (value: unknown): void => {
+		if (value === null || typeof value !== "object" || visited.has(value)) {
+			return
+		}
+
+		visited.add(value)
+
+		if (Array.isArray(value)) {
+			for (let entry of value) {
+				visit(entry)
+			}
+
+			return
+		}
+
+		let node = value as Record<string, unknown>
+
+		if (node["nodeType"] === "ProtocolDeclarationStatement") {
+			let protocol =
+				value as common.typed.ProtocolDeclarationStatementNode
+			let members = Object.keys(protocol.methods)
+
+			if (members.length > 0) {
+				found.push({
+					name: protocol.name.content,
+					position: protocol.name.position,
+					members,
+				})
+			}
+		}
+
+		for (let [key, entry] of Object.entries(node)) {
+			if (
+				key !== "type" &&
+				key !== "returnType" &&
+				key !== "protocolType"
+			) {
+				visit(entry)
+			}
+		}
+	}
+
+	visit(program.implementation.nodes)
+
+	return found
+}
+
+// NOTE: A provided Method is emitted ONCE, as a const named for the Protocol
+// and the Method — `$es_Tagged__shout` — shared by every conformer in the
+// graph. Two Modules each declaring a `Tagged` that provides `shout` therefore
+// name one const twice, and the second body would answer for the first.
+//
+// Neither Module is wrong on its own, and neither can see the other's
+// Protocol, so this is asked of the whole graph once it is linked, where both
+// declarations are known. Reported on the SECOND Module, whose Protocol is the
+// one a rename can be asked of; the first is named by file rather than pointed
+// at, since a Position carries no file to render it against.
+//
+// Only a shared Method NAME is refused. Two same-named Protocols providing
+// different Methods emit different consts and tread on nothing.
+function reportClashingProvidedMethods(
+	linked: Map<string, LinkedModule>,
+): void {
+	let claimed = new Map<string, string>()
+
+	for (let [filePath, module] of linked) {
+		for (let protocol of providedMethodDeclarations(module.program)) {
+			for (let memberName of protocol.members) {
+				let pair = `${protocol.name} ${memberName}`
+				let firstPath = claimed.get(pair)
+
+				if (firstPath === undefined) {
+					claimed.set(pair, filePath)
+
+					continue
+				}
+
+				// NOTE: One Module declaring the name twice is
+				// `duplicate-protocol`, which the Enricher already reported
+				// against the Scope both declarations are in.
+				if (firstPath === filePath) {
+					continue
+				}
+
+				module.diagnostics.push(
+					...collectDiagnostics(() =>
+						reportError(
+							`Two Protocols named '${protocol.name}' provide a Method named '${memberName}'`,
+							protocol.position,
+							{
+								code: "clashing-provided-method",
+								labels: [
+									primary(
+										protocol.position,
+										`this provides '${memberName}' too`,
+									),
+								],
+								notes: [
+									`A provided Method is emitted once, under the Protocol's name and the Method's, and shared by every conformer — so only one '${protocol.name}' in a compilation may provide '${memberName}'.`,
+									`The other '${protocol.name}' is declared in ${path.basename(firstPath)}.`,
+								],
+								helps: [
+									`Declare '${protocol.name}' once and import it where it is needed, or rename one of the two.`,
+								],
+							},
+						),
+					).diagnostics,
+				)
+
+				break
+			}
+		}
 	}
 }
 

@@ -261,6 +261,7 @@ export type DiagnosticCode =
 	| "recursive-protocol"
 	| "method-not-on-protocol"
 	| "provided-method-out-of-reach"
+	| "clashing-provided-method"
 	// Inference — what the Compiler could not work out on its own.
 	| "uninferable-type-parameter"
 	| "uninferable-parameter-type"

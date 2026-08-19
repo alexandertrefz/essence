@@ -17,6 +17,9 @@ import {
 	type Stdlib,
 	useStdlib,
 } from "../enricher/stdlib"
+import { loadModuleGraph } from "../modules/graph"
+import { diskModuleHost } from "../modules/host"
+import { linkModuleGraph } from "../modules/link"
 import { optimise } from "../optimiser/index"
 import { parseWithDiagnostics } from "../parser/index"
 import { rewrite, rewriteModules } from "../rewriter/index"
@@ -1378,12 +1381,14 @@ describe("Protocol-provided Methods", () => {
 	})
 })
 
-// NOTE: One const per Protocol NAME, which holds only while no two Protocol
-// declarations share one. Two Modules of a graph each declaring `protocol
-// Tagged` would both emit `$es_Tagged__…` and the second would answer for the
-// first — a Program that compiles green and runs the wrong body. Refused, until
-// a Protocol carries the identity of the Module that declared it, as a Choice
-// does.
+// NOTE: One const per Protocol name AND Method name, which holds only while no
+// two Protocol declarations provide the same pair. Two Modules of a graph each
+// declaring a `Tagged` that provides `describe` would both emit
+// `$es_Tagged__describe` and the second would answer for the first — a Program
+// that compiles green and runs the wrong body. The graph is asked once it is
+// linked, where both declarations are known; the emitter keeps its own throw
+// as a last word, and both are asked about the PAIR, so two same-named
+// Protocols providing different Methods still emit.
 describe("two Protocols of one name", () => {
 	function programWith(body: string): common.typedSimple.Program {
 		let parsed = parseWithDiagnostics(body)
@@ -1394,28 +1399,148 @@ describe("two Protocols of one name", () => {
 		return optimise(simplify(enriched.program))
 	}
 
-	it("should refuse to emit two declarations under one name", () => {
-		let tagged = [
+	// NOTE: A conformer and a call, because an unreached const is shaken away
+	// and the question here is what the emitted text HOLDS.
+	function taggedProviding(memberName: string): string {
+		return [
 			"implementation {",
 			"\tprotocol Tagged {",
 			"\t\ttag() -> String",
 			"",
-			"\t\tdescribe() -> String {",
+			`\t\t${memberName}() -> String {`,
 			"\t\t\t<- @::tag()",
 			"\t\t}",
 			"\t}",
+			"",
+			"\ttype Dog = { name: String }",
+			"",
+			"\tnamespace Dogs for Dog is Tagged {",
+			"\t\ttag() -> String {",
+			"\t\t\t<- @.name",
+			"\t\t}",
+			"\t}",
+			"",
+			`\tTerminal.print({ name = "x" }::${memberName}())`,
 			"}",
 		].join("\n")
+	}
 
+	function moduleAt(filePath: string, source: string) {
+		return { filePath, program: programWith(source) }
+	}
+
+	it("should refuse to emit two declarations of one provided Method", () => {
 		expect(() =>
 			rewriteModules(
 				[
-					{ filePath: "/a.es", program: programWith(tagged) },
-					{ filePath: "/b.es", program: programWith(tagged) },
+					moduleAt("/a.es", taggedProviding("describe")),
+					moduleAt("/b.es", taggedProviding("describe")),
 				],
 				"/a.es",
 			),
 		).toThrow(/Two Protocols named 'Tagged'/)
+	})
+
+	it("should emit two declarations that provide different Methods", () => {
+		let emitted = [
+			...rewriteModules(
+				[
+					moduleAt("/a.es", taggedProviding("describe")),
+					moduleAt("/b.es", taggedProviding("announce")),
+				],
+				"/a.es",
+			).sources.values(),
+		].join("\n")
+
+		expect(emitted).toContain("$es_Tagged__describe")
+		expect(emitted).toContain("$es_Tagged__announce")
+	})
+
+	// NOTE: What a compile actually meets — the linker, which has both
+	// declarations and a Position for each, so the report names a file and a
+	// line instead of arriving as a Compiler bug with neither.
+	it("should report the clash on the second Module, positioned", () => {
+		let directory = mkdtempSync(join(tmpdir(), "essence-protocol-clash-"))
+
+		// NOTE: Each Module keeps its Protocol to itself and exports a
+		// Function — neither can see the other's `Tagged`, and each compiles
+		// on its own, which is what makes the clash the graph's and not
+		// either file's.
+		function taggedModule(
+			typeName: string,
+			memberName: string,
+			functionName: string,
+		): string {
+			return [
+				"implementation {",
+				"\tprotocol Tagged {",
+				"\t\ttag() -> String",
+				"",
+				"\t\tdescribe() -> String {",
+				"\t\t\t<- @::tag()",
+				"\t\t}",
+				"\t}",
+				"",
+				`\ttype ${typeName} = { ${memberName}: String }`,
+				"",
+				`\tnamespace ${typeName}s for ${typeName} is Tagged {`,
+				"\t\ttag() -> String {",
+				`\t\t\t<- @.${memberName}`,
+				"\t\t}",
+				"\t}",
+				"",
+				`\tfunction ${functionName}() -> String {`,
+				`\t\t<- { ${memberName} = "x" }::describe()`,
+				"\t}",
+				"}",
+				"",
+				"export {",
+				`\t${functionName}`,
+				"}",
+			].join("\n")
+		}
+
+		try {
+			writeFileSync(
+				join(directory, "A.es"),
+				taggedModule("Dog", "name", "loud"),
+			)
+			writeFileSync(
+				join(directory, "B.es"),
+				taggedModule("Mouse", "title", "quiet"),
+			)
+			writeFileSync(
+				join(directory, "Main.es"),
+				[
+					"import {",
+					'\tloud  from "./A.es"',
+					'\tquiet from "./B.es"',
+					"}",
+					"",
+					"implementation {",
+					"\tTerminal.print(loud())",
+					"\tTerminal.print(quiet())",
+					"}",
+				].join("\n"),
+			)
+
+			let linked = linkModuleGraph(
+				loadModuleGraph(join(directory, "Main.es"), diskModuleHost),
+			)
+			let reported = [...linked.modules.values()].flatMap(
+				(module) => module.diagnostics,
+			)
+
+			expect(reported.map((diagnostic) => diagnostic.code)).toEqual([
+				"clashing-provided-method",
+			])
+			expect(reported[0]!.message).toBe(
+				"Two Protocols named 'Tagged' provide a Method named 'describe'",
+			)
+			expect(reported[0]!.position).not.toBeNull()
+		} finally {
+			rmSync(directory, { recursive: true, force: true })
+		}
 	})
 })
 
