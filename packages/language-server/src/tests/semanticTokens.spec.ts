@@ -53,6 +53,33 @@ describe("Semantic Tokens", () => {
 		expect(use?.modifiers).not.toContain("declaration")
 	})
 
+	// NOTE: A PROVIDED Method's body is walked as the Function Definition it is,
+	// so the names inside it colour like the names inside any other body — a
+	// Parameter is a Parameter, and the Protocol an extension names is a Type.
+	it("should colour the names inside a provided Protocol Method", () => {
+		let source = [
+			"implementation {",
+			"\tprotocol Sized is Comparable {",
+			"\t\tsize() -> Integer",
+			"",
+			"\t\tsmallerThan(_ other: Integer) -> Boolean {",
+			"\t\t\t<- @::size()::isLessThan(other)",
+			"\t\t}",
+			"\t}",
+			"}",
+		].join("\n")
+
+		let ancestor = tokenAt(source, 2, 20)
+		let parameter = tokenAt(source, 5, 17)
+		let use = tokenAt(source, 6, 29)
+
+		expect(ancestor?.type).toBe("type")
+		expect(parameter?.type).toBe("parameter")
+		expect(parameter?.modifiers).toContain("declaration")
+		expect(use?.type).toBe("parameter")
+		expect(use?.modifiers).not.toContain("declaration")
+	})
+
 	it("should distinguish Namespaces, Types and Generics", () => {
 		let source = [
 			"implementation {",
