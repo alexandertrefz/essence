@@ -1100,6 +1100,31 @@ export class Printer {
 	}
 
 	private printProtocol(node: parser.ProtocolDeclarationStatementNode): Doc {
+		let head: Array<Doc> = [text("protocol " + node.name.content)]
+		// NOTE: The extension list lays out exactly as a Namespace's
+		// conformance list does — one group, breaking to a line per clause when
+		// the head does not fit — because it is the same list, printed by the
+		// same clause printer.
+		let headDoc =
+			node.conformsTo.length > 0
+				? group(
+						concat([
+							concat(head),
+							indent(
+								concat([
+									line,
+									join(
+										concat([text(","), line]),
+										node.conformsTo.map((clause) =>
+											this.printConformanceClause(clause),
+										),
+									),
+								]),
+							),
+						]),
+					)
+				: concat(head)
+
 		let methods = Object.values(node.methods)
 
 		methods.sort(
@@ -1127,7 +1152,8 @@ export class Printer {
 		this.flushBefore(node.position.end.line, entries)
 
 		return concat([
-			text("protocol " + node.name.content + " "),
+			headDoc,
+			text(" "),
 			this.block(entries, null, false, opening),
 		])
 	}
@@ -1155,7 +1181,10 @@ export class Printer {
 
 				let entries = this.entriesFor(
 					method.signatures,
-					(signature) => positionLines(signature.position),
+					(signature) => ({
+						startLine: signature.position.start.line,
+						endLine: protocolSignatureEndLine(signature),
+					}),
 					(signature) => this.printProtocolSignature(signature),
 				)
 
@@ -1167,9 +1196,20 @@ export class Printer {
 		}
 	}
 
+	// NOTE: A PROVIDED Method prints as the Function Definition it is — the
+	// Parser built one over the very Parameter and return Type Nodes this
+	// signature holds, so the body, its Comments and its layout are all
+	// reached by the printer every other bodied Method goes through.
 	private printProtocolSignature(
 		signature: parser.ProtocolMethodSignatureNode,
 	): Doc {
+		if (signature.body !== null) {
+			return this.printFunctionDefinition(
+				signature.body.value,
+				signature.body.position,
+			)
+		}
+
 		return this.printParameterList(
 			signature.parameters,
 			concat([text(" -> "), this.printType(signature.returnType)]),
@@ -2715,16 +2755,25 @@ function protocolMethodEndLine(method: parser.ProtocolMethods[string]): number {
 	switch (method.nodeType) {
 		case "SimpleProtocolMethod":
 		case "StaticProtocolMethod":
-			return method.signature.position.end.line
+			// NOTE: A provided Method ends at its closing brace, not at its
+			// return Type — the block is part of what was written, and the
+			// Comments inside it are claimed against these lines.
+			return protocolSignatureEndLine(method.signature)
 
 		default: {
 			let last = method.signatures[method.signatures.length - 1]
 
 			return last === undefined
 				? method.name.position.end.line
-				: last.position.end.line
+				: protocolSignatureEndLine(last)
 		}
 	}
+}
+
+function protocolSignatureEndLine(
+	signature: parser.ProtocolMethodSignatureNode,
+): number {
+	return signature.body?.position.end.line ?? signature.position.end.line
 }
 
 // NOTE: An `overload` block carries no Position of its own — only its entries
