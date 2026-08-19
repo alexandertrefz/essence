@@ -2113,6 +2113,95 @@ describe("Helpers", () => {
 		})
 	})
 
+	// NOTE: The second reading a Record Parameter's default buys — an Argument
+	// that writes some of the members and leaves the rest to the default. The
+	// Argument is still an Argument: it is paired by label, it is still
+	// required, and everything the default does NOT fill in still has to be
+	// there.
+	describe("matchArguments against a partial default", () => {
+		const options: RecordType = {
+			type: "Record",
+			members: {
+				host: { type: "String" },
+				retries: { type: "Integer" },
+			},
+		}
+
+		const parameters: Array<common.Parameter> = [
+			{ name: "using", type: options, defaultMembers: ["retries"] },
+		]
+
+		function record(members: RecordType["members"]): RecordType {
+			return { type: "Record", members }
+		}
+
+		function matching(argumentType: Type) {
+			return matchArguments(parameters, [
+				{ name: "using", getType: () => argumentType },
+			])
+		}
+
+		it("should admit an Argument writing what the default leaves out", () => {
+			expect(matching(record({ host: { type: "String" } }))).toEqual({
+				type: "Match",
+				omittedParameterIndices: [],
+			})
+		})
+
+		it("should admit a whole Argument, exactly as before", () => {
+			expect(matching(options)).toEqual({
+				type: "Match",
+				omittedParameterIndices: [],
+			})
+		})
+
+		it("should refuse an Argument missing a member the default has not", () => {
+			expect(
+				matching(record({ retries: { type: "Integer" } })).type,
+			).toBe("ArgumentMismatch")
+		})
+
+		it("should refuse a member of the wrong Type", () => {
+			expect(matching(record({ host: { type: "Integer" } })).type).toBe(
+				"ArgumentMismatch",
+			)
+		})
+
+		it("should refuse a member the Parameter does not declare", () => {
+			expect(
+				matching(
+					record({
+						host: { type: "String" },
+						timeout: { type: "Integer" },
+					}),
+				).type,
+			).toBe("ArgumentMismatch")
+		})
+
+		// NOTE: A partial default leaves `hasDefault` unset, so `pairArguments`
+		// still says the Argument is required — the whole reason the Type layer
+		// carries two keys rather than one.
+		it("should still require the Argument", () => {
+			expect(matchArguments(parameters, []).type).toBe("ArityMismatch")
+		})
+
+		// NOTE: Without a default the Argument is measured whole, and a partial
+		// is simply the wrong Type.
+		it("should refuse a partial where the Parameter has no default", () => {
+			expect(
+				matchArguments(
+					[{ name: "using", type: options }],
+					[
+						{
+							name: "using",
+							getType: () => record({ host: { type: "String" } }),
+						},
+					],
+				).type,
+			).toBe("ArgumentMismatch")
+		})
+	})
+
 	describe("computeConformanceMethodMap", () => {
 		const self: GenericUse = { type: "GenericUse", name: "Self" }
 		const integer: Type = { type: "Integer" }

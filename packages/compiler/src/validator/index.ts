@@ -18,9 +18,11 @@ import {
 	describeSignature,
 	describeType,
 	flattenUnionMembers,
+	isPartialOf,
 	type MatchableArgument,
 	matchArguments,
 	matchesType,
+	missingRecordMembers,
 	parameterDefaults,
 	typeContainsError,
 	withArticle,
@@ -466,6 +468,11 @@ function checkCommittedOverload(
 	// would emit the Arguments into the wrong positions. Re-matching reads only
 	// labels and `hasDefault`, so agreeing is not a coincidence — it is the
 	// invariant, and the same Error rail says so where it does not hold.
+	//
+	// NOTE: `defaultMembers` does not enter into it. A Parameter carrying one is
+	// answered by an Argument that is WRITTEN, whole or partial, so nothing it
+	// says can move a position in this list — which is exactly why a partial
+	// default leaves `hasDefault` unset instead of widening what it means.
 	if (
 		matched.omittedParameterIndices.join() !==
 		node.omittedParameterIndices.join()
@@ -2730,6 +2737,71 @@ function reportArgumentLabelMismatch(
 	)
 }
 
+// NOTE: A Record Argument written against a Parameter whose default fills some
+// of its members in, missing members the default does NOT fill in — and missing
+// nothing else. Null where the Argument failed for any other reason: a member
+// with the wrong Type, a member the Parameter does not declare, a Parameter
+// that is not a Record, or no default at all. Each of those is
+// `argument-type-mismatch`, which names the whole Type, and this one names the
+// members instead.
+function missingMembersOf(
+	parameter: common.Parameter,
+	argumentType: common.Type,
+): Array<string> | null {
+	if (
+		parameter.defaultMembers === undefined ||
+		parameter.type.type !== "Record" ||
+		argumentType.type !== "Record" ||
+		!isPartialOf(parameter.type, argumentType)
+	) {
+		return null
+	}
+
+	let missing = missingRecordMembers(
+		parameter.type,
+		parameter.defaultMembers,
+		argumentType,
+	)
+
+	return missing.length === 0 ? null : missing
+}
+
+function reportIncompleteRecordArgument(
+	parameter: common.Parameter,
+	name: string,
+	missing: Array<string>,
+	argumentNode: common.typed.ArgumentNode,
+): void {
+	let filled = parameter.defaultMembers ?? []
+
+	reportError(
+		`This Argument is missing ${countOf(missing.length, "member")} the default does not fill in`,
+		argumentNode.value.position,
+		{
+			code: "incomplete-record-argument",
+			labels: [
+				primary(
+					argumentNode.value.position,
+					`${quotedNames(missing)} not written here`,
+				),
+			],
+			notes: [
+				`${name} is ${describeType(parameter.type)}.`,
+				filled.length === 0
+					? "Its default fills in nothing; every member must be written."
+					: `Its default fills in ${quotedNames(filled)}; every other member must be written.`,
+			],
+			helps: [`Write ${quotedNames(missing)} into this Record.`],
+		},
+	)
+}
+
+// NOTE: "'host', 'retries'" — the spelling every Diagnostic that lists names
+// uses, so a reader meets one shape wherever a set of members is named.
+function quotedNames(names: ReadonlyArray<string>): string {
+	return names.map((name) => `'${name}'`).join(", ")
+}
+
 function reportArgumentMismatch(
 	parameterTypes: Array<common.Parameter>,
 	index: number,
@@ -2749,6 +2821,22 @@ function reportArgumentMismatch(
 	}
 
 	let name = describeParameter(parameter, index)
+
+	if (parameter !== undefined) {
+		let missing = missingMembersOf(parameter, argumentNode.value.type)
+
+		if (missing !== null) {
+			reportIncompleteRecordArgument(
+				parameter,
+				name,
+				missing,
+				argumentNode,
+			)
+
+			return
+		}
+	}
+
 	let evidence = refinementEvidence(parameter?.type)
 
 	reportError(

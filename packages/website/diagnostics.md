@@ -313,6 +313,27 @@ Error: This value does not fit Variable 'count'
 An Argument does not match its Parameter's declared Type. The message names
 the Parameter, the Type it wants, and the Type it got.
 
+### `incomplete-record-argument`
+
+A Record Argument leaves out a member its Parameter's default does not fill in.
+A partial default (`using options: Options = { retries = 3 }`) says which
+members a call may leave out of the Record it writes; every OTHER member of the
+Parameter's Type still has to be written, because the value the callee builds is
+the default merged with the Argument and nothing else would fill those members
+in. The label names the missing members and the notes name the ones the default
+supplies.
+
+Only a missing member is reported this way. A member with the wrong Type, or one
+the Parameter's Type does not declare at all, is `argument-type-mismatch` — the
+Argument is then not a partial of the Parameter at all, and naming the whole
+Type says more than naming a member would. Extra members are not refused as
+such: Record assignability is width subtyping, so a value that carries more than
+it was asked for is admitted wherever a whole Argument would be, and only a name
+the Parameter never declares makes the Argument stop being a partial.
+
+Where the Parameter has no default, a Record Argument is measured whole and a
+missing member reports `argument-type-mismatch`.
+
 ### `argument-label-mismatch`
 
 An Argument carries a label its Parameter does not — a different one, none

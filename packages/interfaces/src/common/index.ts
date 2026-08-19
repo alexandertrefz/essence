@@ -183,6 +183,7 @@ export type DiagnosticCode =
 	// Types — a value that does not fit where it was put.
 	| "assignment-type-mismatch"
 	| "argument-type-mismatch"
+	| "incomplete-record-argument"
 	| "argument-label-mismatch"
 	| "argument-count-mismatch"
 	| "default-type-mismatch"
