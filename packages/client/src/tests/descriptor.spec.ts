@@ -84,7 +84,7 @@ describe("A Module described", () => {
 			name: "Value",
 			optional: true,
 			unitChoice: false,
-			payload: { item: { kind: "integer", shown: "Integer" } },
+			payload: { item: { of: { kind: "integer", shown: "Integer" } } },
 			shown: "Optional#Value",
 		})
 	})

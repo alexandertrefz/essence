@@ -5,6 +5,7 @@ import type {
 	Descriptor,
 	ExportDescriptor,
 	FunctionDescriptor,
+	Members,
 	ModuleDescriptor,
 	NamespaceDescriptor,
 } from "./descriptor"
@@ -348,9 +349,13 @@ function crossesDifferently(node: Descriptor): boolean {
 		case "optional":
 			return crossesDifferently(node.of)
 		case "record":
-			return Object.values(node.members).some(crossesDifferently)
+			return Object.values(node.members).some((member) =>
+				crossesDifferently(member.of),
+			)
 		case "case":
-			return Object.values(node.payload).some(crossesDifferently)
+			return Object.values(node.payload).some((member) =>
+				crossesDifferently(member.of),
+			)
 		case "union":
 			return node.arms.some(crossesDifferently)
 		// NOTE: A Function turns its own directions around — whoever holds it
@@ -383,9 +388,13 @@ function widensOnInput(node: Descriptor): boolean {
 		case "optional":
 			return widensOnInput(node.of)
 		case "record":
-			return Object.values(node.members).some(widensOnInput)
+			return Object.values(node.members).some((member) =>
+				widensOnInput(member.of),
+			)
 		case "case":
-			return Object.values(node.payload).some(widensOnInput)
+			return Object.values(node.payload).some((member) =>
+				widensOnInput(member.of),
+			)
 		case "union":
 			return node.arms.some(widensOnInput)
 		default:
@@ -403,7 +412,7 @@ function optionalItem(node: Descriptor): Descriptor | null {
 			return node.of
 		case "case":
 			return node.optional && node.name === "Value"
-				? (node.payload.item ?? null)
+				? (node.payload.item?.of ?? null)
 				: null
 		case "union": {
 			for (let arm of node.arms) {
@@ -558,12 +567,12 @@ function createWalker(
 	}
 
 	function recordEntries(
-		members: Record<string, Descriptor>,
+		members: Members,
 		direction: Direction,
 	): Array<string> {
 		return Object.entries(members).map(
 			([name, member]) =>
-				`${memberName(name)}: ${print(member, direction)}`,
+				`${memberName(name)}: ${print(member.of, direction)}`,
 		)
 	}
 
@@ -590,7 +599,7 @@ function createWalker(
 
 			return node.name === "Empty" || item === undefined
 				? "undefined"
-				: print(item, direction)
+				: print(item.of, direction)
 		}
 
 		if (node.unitChoice) {
@@ -642,7 +651,7 @@ function createWalker(
 				if (arm.name === "Empty" || item === undefined) {
 					absent = true
 				} else {
-					add(item)
+					add(item.of)
 				}
 
 				return

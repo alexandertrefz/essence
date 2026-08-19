@@ -61,7 +61,7 @@ export type Descriptor =
 	| { kind: "string"; shown: string }
 	| { kind: "boolean"; shown: string }
 	| { kind: "list"; of: Descriptor; shown: string }
-	| { kind: "record"; members: Record<string, Descriptor>; shown: string }
+	| { kind: "record"; members: Members; shown: string }
 	// NOTE: The one Union with a JavaScript spelling of its own — `T |
 	// undefined`. It reaches a Surface as the Union of `Optional`'s two Cases and
 	// is collapsed here, because every rule about it is a rule about the pair.
@@ -102,9 +102,23 @@ export type CaseDescriptor = {
 	// with two JavaScript spellings would be a Union a host has to discriminate
 	// by `typeof` before it can read it.
 	unitChoice: boolean
-	payload: Record<string, Descriptor>
+	payload: Members
 	shown: string
 }
+
+// NOTE: The members of a Record or of a Case's payload, each with the Type it
+// holds and whether the boundary may leave it out.
+//
+// NOTE: `optional` is OPTIONAL on the wire and its absence reads as
+// "required" — the same rule, for the same reason, as a Function Descriptor's
+// Parameter: this shape is written to `<output>.descriptor.json` and inlined as
+// JSON into generated wrappers, so a sidecar written before Record defaults
+// existed has to keep loading and meaning what it always meant.
+//
+// NOTE: A member is a Node of its own rather than a bare Descriptor because
+// there was nowhere else to put the flag — a Descriptor describes a TYPE, and
+// whether a member may be left out is a fact about the place it stands in.
+export type Members = Record<string, { of: Descriptor; optional?: true }>
 
 export type FunctionDescriptor = {
 	kind: "function"
@@ -429,11 +443,11 @@ function describeMembers(
 	members: Record<string, common.Type>,
 	context: DescribeContext,
 	printing: Set<common.Type>,
-): Record<string, Descriptor> {
-	let described: Record<string, Descriptor> = {}
+): Members {
+	let described: Members = {}
 
 	for (let [name, member] of Object.entries(members)) {
-		described[name] = describeWith(member, context, printing)
+		described[name] = { of: describeWith(member, context, printing) }
 	}
 
 	return described

@@ -4,6 +4,10 @@ import type {
 	CaseDescriptor,
 	Descriptor,
 	FunctionDescriptor,
+	// NOTE: Renamed on the way in, because `Members` is already the name of the
+	// COMPILED members below — the readers a shape was turned into. This is the
+	// shape itself, as the Descriptor states it.
+	Members as DescribedMembers,
 	ModuleDescriptor,
 	NamespaceDescriptor,
 	OverloadDescriptor,
@@ -346,7 +350,7 @@ export function createInterpreter(
 	// converter below it already built.
 	let inbound = new WeakMap<Descriptor, Inbound>()
 	let outbound = new WeakMap<Descriptor, Outbound>()
-	let outboundMembers = new WeakMap<Record<string, Descriptor>, Members>()
+	let outboundMembers = new WeakMap<DescribedMembers, Members>()
 	let calls = new WeakMap<FunctionDescriptor, Call>()
 	// NOTE: What a position that declared nothing reads its members by — no
 	// names to guess with and no reader to find, so every member of it is read
@@ -401,12 +405,12 @@ export function createInterpreter(
 	// map for every other value: a Record of another shape entirely, a member the
 	// Type does not name, a payload written in another order. Both spellings
 	// answer the same thing, because they are built out of the same members.
-	function compiledMembers(members: Record<string, Descriptor>): Members {
+	function compiledMembers(members: DescribedMembers): Members {
 		let compiled = outboundMembers.get(members)
 
 		if (compiled === undefined) {
 			let names = Object.keys(members)
-			let readers = names.map((name) => compileOut(members[name]!))
+			let readers = names.map((name) => compileOut(members[name]!.of))
 			let named = new Map<string, Outbound>()
 
 			for (let position = 0; position < names.length; position++) {
@@ -684,7 +688,7 @@ export function createInterpreter(
 			case "record": {
 				let names = Object.keys(expected.members)
 				let readers = names.map((name) =>
-					compileIn(expected.members[name]!),
+					compileIn(expected.members[name]!.of),
 				)
 				let count = names.length
 				let declared = new Set(names)
@@ -1020,13 +1024,13 @@ export function createInterpreter(
 				}
 			}
 
-			if (admitsAbsence(item)) {
+			if (admitsAbsence(item.of)) {
 				return (value, at, step) => {
 					throw nestedOptional(at, step)
 				}
 			}
 
-			let held = compileIn(item)
+			let held = compileIn(item.of)
 
 			return (value, at, step) => {
 				if (value === undefined || value === null) {
@@ -1091,7 +1095,7 @@ export function createInterpreter(
 		let qualified = `${expected.choice}#${expected.name}`
 		let colliding = Object.hasOwn(expected.payload, "$case")
 		let names = Object.keys(expected.payload)
-		let readers = names.map((name) => compileIn(expected.payload[name]!))
+		let readers = names.map((name) => compileIn(expected.payload[name]!.of))
 		let count = names.length
 		let declared = new Set(names)
 
@@ -2762,7 +2766,7 @@ function optionalItemOf(descriptor: Descriptor): Descriptor | null {
 			return descriptor.of
 		case "case":
 			return descriptor.optional && descriptor.name === "Value"
-				? (descriptor.payload.item ?? null)
+				? (descriptor.payload.item?.of ?? null)
 				: null
 		case "union": {
 			for (let arm of descriptor.arms) {
@@ -2815,7 +2819,7 @@ export function admitsRecord(descriptor: Descriptor): boolean {
 				descriptor.optional &&
 				descriptor.name === "Value" &&
 				descriptor.payload.item !== undefined &&
-				admitsRecord(descriptor.payload.item)
+				admitsRecord(descriptor.payload.item.of)
 			)
 		case "union":
 			return descriptor.arms.some(admitsRecord)
@@ -2871,7 +2875,7 @@ function listItemOf(descriptor: Descriptor | null): Descriptor | null {
 
 function recordMembersOf(
 	descriptor: Descriptor | null,
-): Record<string, Descriptor> | null {
+): DescribedMembers | null {
 	if (descriptor === null) {
 		return null
 	}
@@ -2883,8 +2887,7 @@ function recordMembersOf(
 			let candidates = descriptor.arms
 				.map(recordMembersOf)
 				.filter(
-					(members): members is Record<string, Descriptor> =>
-						members !== null,
+					(members): members is DescribedMembers => members !== null,
 				)
 
 			return candidates.length === 1 ? candidates[0]! : null
@@ -3129,7 +3132,7 @@ function collectBareCases(
 			return
 		case "record":
 			for (let member of Object.values(descriptor.members)) {
-				collectBareCases(member, found)
+				collectBareCases(member.of, found)
 			}
 
 			return
@@ -3145,7 +3148,7 @@ function collectBareCases(
 			}
 
 			for (let member of Object.values(descriptor.payload)) {
-				collectBareCases(member, found)
+				collectBareCases(member.of, found)
 			}
 
 			return
