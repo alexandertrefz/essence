@@ -396,3 +396,46 @@ describe("Semantic Tokens of a Case written in a default", () => {
 		expect(tokenAt(source, 7, 33)?.type).toBe("enumMember")
 	})
 })
+
+// NOTE: A Record Literal's bare member is two symbols at ONE Position — the
+// member it writes and the value it reads — and the protocol forbids
+// overlapping Tokens, so `sortTokens` keeps exactly one of them. Which one is
+// not a coin toss: the value is recorded by the lexical walk and the member by
+// the Record-shape pass that follows it, so the value wins, the same way a
+// Pattern's bare binder colours as the local it binds rather than as the member
+// it names. The two shorthands read alike, which is the point.
+describe("Semantic Tokens of a Record Literal's shorthand member", () => {
+	let source = [
+		"implementation {",
+		"\ttype Point = { x: Integer, y: Integer }",
+		"",
+		"\tconstant x = 1",
+		"",
+		"\tconstant point: Point = { x, y = 2 }",
+		"}",
+	].join("\n")
+
+	it("colours a bare member as the value it reads", () => {
+		expect(tokenAt(source, 6, 28)).toEqual({
+			line: 6,
+			column: 28,
+			length: 1,
+			type: "variable",
+			modifiers: ["readonly"],
+		})
+	})
+
+	it("colours a member that spelled its value as a property", () => {
+		expect(tokenAt(source, 6, 31)?.type).toBe("property")
+	})
+
+	// NOTE: One Token, not two — an overlapping pair would corrupt every
+	// Token after it, since the encoding is a chain of deltas.
+	it("writes one Token at the bare member, not two", () => {
+		expect(
+			tokensOf(source).filter(
+				(token) => token.line === 6 && token.column === 28,
+			),
+		).toHaveLength(1)
+	})
+})
