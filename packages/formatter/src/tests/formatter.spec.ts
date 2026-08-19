@@ -639,6 +639,88 @@ describe("formatter", () => {
 			expect(twice.text).toBe(once.text)
 		})
 	})
+	// NOTE: A dotted key is printed step by step, as it was written. The
+	// Formatter never normalises between the spellings of a nested update —
+	// `a.b = 1, a.c = 2` is never gathered up and a gathering is never taken
+	// apart — because the two are different Programs to read even where they
+	// mean the same thing.
+	describe("Path keys", () => {
+		let block = (...lines: Array<string>) =>
+			["implementation {", ...lines, "}", ""].join("\n")
+
+		let roundTrips = (source: string) => {
+			let result = format(source)
+
+			expect(result.refusal).toBeNull()
+			expect(result.text).toBe(source)
+		}
+
+		it("keeps a dotted key dotted", () => {
+			roundTrips(
+				block("\tconstant moved = { config with server.port = 1 }"),
+			)
+		})
+
+		it("keeps every step of a longer path", () => {
+			roundTrips(
+				block(
+					"\tconstant deep = { config with server.tls.enabled = true }",
+				),
+			)
+		})
+
+		it("keeps a path key beside a plain one", () => {
+			roundTrips(
+				block(
+					'\tconstant mixed = { config with name = "b", server.port = 1 }',
+				),
+			)
+		})
+
+		it("keeps two paths that share a prefix apart", () => {
+			roundTrips(
+				block(
+					"\tconstant both = { config with server.port = 1, server.tls.enabled = true }",
+				),
+			)
+		})
+
+		it("breaks a long key list one path to a line", () => {
+			roundTrips(
+				block(
+					"\tconstant wide = {",
+					"\t\tconfiguration with",
+					"\t\t\tserver.aaaaaaaaaaaaaaaa = 1,",
+					"\t\t\tserver.bbbbbbbbbbbbbbbb = 2,",
+					"\t\t\tserver.cccccccccccccccc = 3,",
+					"\t\t\tserver.dddddddddddddddd = 4,",
+					"\t}",
+				),
+			)
+		})
+
+		// NOTE: The one shape `printCombination` decides by re-slicing the
+		// source, which the AST gate does not see. A path key in the list must
+		// not make a bare key list look braced.
+		it("keeps a key list with a path in it bare", () => {
+			let result = format(
+				block("\tconstant moved = { config with server.port = 1 }"),
+			)
+
+			expect(result.text).not.toContain("with {")
+		})
+
+		it("is idempotent over a path key", () => {
+			let source = block(
+				'\tconstant mixed = { config with name = "b", server.port = 1 }',
+			)
+			let once = format(source)
+			let twice = format(once.text)
+
+			expect(once.refusal).toBeNull()
+			expect(twice.text).toBe(once.text)
+		})
+	})
 
 	describe("Member paths", () => {
 		let block = (...lines: Array<string>) =>
