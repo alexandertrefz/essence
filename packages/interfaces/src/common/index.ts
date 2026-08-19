@@ -762,9 +762,9 @@ export type DispatchCase = {
 	// `choiceIs` unchanged.
 	derivedDescriptor?: DerivedEquatableDescriptor
 	// NOTE: The Protocol that PROVIDED this branch's Method, when one did.
-	// `namespaceName` is that Protocol's name too, and a Namespace may be
-	// spelled exactly like it — so this is what tells the two apart at
-	// emission, where a name alone can not.
+	// `namespaceName` is the Namespace whose conformance put the Method in
+	// reach, which declares no Method of that name — so this is what sends the
+	// emission to the shared const, and what a name alone can not say.
 	providedBy?: string
 }
 

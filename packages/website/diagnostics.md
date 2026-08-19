@@ -465,7 +465,11 @@ Boolean, the way an `if` condition does.
 ### `no-matching-overload`
 
 The passed Arguments match none of the overloads of the called Method or
-Function. Each candidate signature is listed as a note.
+Function. Each candidate signature is listed as a note. A candidate a Protocol
+PROVIDED is named by the Namespace whose conformance put it in reach, with the
+Protocol said beside it — `'Number::isLessThan' (provided by Orderable)`. Where a
+DERIVED Method was in reach and a Namespace declaring the name replaced it, a
+note says so, because nothing in the listed candidates would show it.
 
 ### `ambiguous-namespace`
 

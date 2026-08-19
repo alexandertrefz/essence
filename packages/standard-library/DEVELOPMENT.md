@@ -135,9 +135,10 @@ A PROTOCOL's provided Method is emitted the same way, under a DOUBLE separator
 — `$es_Orderable__isBetween` — and once for every conformer rather than once per
 Namespace. Its last Parameter is the conformance of `Self`, which the
 bounded-generic machinery already passes, and that is what the body's own calls
-dispatch through: `Self__conformance.compare(_self, other)`. So a Program that
-compares two Integers carries one const and `{ compare: Integer.compare }`, and
-reaches no other kind.
+dispatch through: `Self__conformance.compare(_self, other)`. The witness names
+the Protocol's provided Methods too — the conformer's override where it wrote
+one, and this same const where it did not — so a Program that compares two
+Integers reaches `Integer.compare` and no other kind.
 
 `packages/compiler/src/tests/builtins.spec.ts` and the generated contract both fail on a Method
 implemented in BOTH — delete the TypeScript in the same commit that writes the
@@ -320,28 +321,34 @@ of a literal, so `2` is a NonZeroInteger. `@::remainder(dividingBy 2)` answers a
 bare Integer, and there is no Optional to take apart. A value the Program is
 handed carries no such proof and goes through the predicate instead.
 
-**A written Method REPLACES a Protocol's provided one, whole.** `Equatable`
-writes `isNot` and `Orderable` writes six Methods, and every conformer answers
-them without declaring anything. A Namespace that declares a Method of the same
-name replaces the provided one entirely — no entry is merged in — and it has to
-hold an entry the provided signature accepts, which is the same check a
-requirement gets. Three declarations here do it, and each says why at its own
-site: `Optional::isNot` takes a bare item as well as an Optional,
-`Integer::isLessThan` and `Rational::isLessThan` hold an entry for the other
-numeric kind and are written on their own `compare` rather than on the
-cross-kind table.
+**A written Method REPLACES a Protocol's provided one on that Namespace's own
+rung.** `Equatable` writes `isNot` and `Orderable` writes six Methods, and every
+conformer answers them without declaring anything. A Namespace that declares a
+Method of the same name replaces the provided one entirely for its own target —
+no entry is merged in — and it has to hold an entry the provided signature
+accepts, which is the same check a requirement gets. Three declarations here do
+it, and each says why at its own site: `Optional::isNot` takes a bare item as
+well as an Optional, `Integer::isLessThan` and `Rational::isLessThan` hold an
+entry for the other numeric kind and are written on their own `compare` rather
+than on the cross-kind table.
 
-The rule has a consequence worth stating, because nothing checks it: an override
-answers a call on the Namespace's own target Type, while a call through a bound
-— `<Item is Orderable>` — runs the PROVIDED body, because a provided Method is
-never in the conformance witness. So the two must AGREE. `1::isLessThan(2)` runs
-Integer's and a bounded Method runs `Orderable`'s, and both read `compare`, which
-is what makes them the same answer.
+It replaces nothing on another Namespace's rung. A provided Method is a candidate
+of every Namespace whose conformance offers it, ranked by that Namespace's target
+exactly as a written Method is — so `Integer` and the covering `Number` each
+offer all six, and a call Integer's rung rejects falls to Number's.
+`3::isLessThan(Number.Pi)` is that fall, and so is `5::isBetween(1, and 3/2)`.
+
+An override answers a bounded call too. The witness a `<Item is Orderable>` bound
+is handed names the conformer's override where it wrote one and the Protocol's
+shared const where it did not, so `1::isLessThan(2)` and the same call inside a
+bounded Function run the same Method. The library's three overrides are written
+to say the same thing FASTER, which is now a promise about performance rather
+than one the language leans on.
 
 And a DERIVE answers ahead of a provided Method. A Choice's `isNot` is
-`Choice_Equatable`'s, fabricated for that receiver and taking the whole Choice,
-so `Ordering#Less::isNot(#Equal)` compares against a sibling Case — which a
-Method over `Self` bound to one Case could not.
+`Choice_Equatable`'s, fabricated for that receiver, and it is what the witness
+carries as well — so `Ordering#Less::isNot(#Equal)` compares against a sibling
+Case by tag, directly and through a bound alike.
 
 **`Equatable` and `Printable` are both derived for a Choice.** The
 conformance is declared and the Methods are left out. Equality is derived for
