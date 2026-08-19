@@ -154,12 +154,25 @@ function differ<infer Item is Equatable>(_ a: Item, _ b: Item) -> Boolean {
 }
 ```
 
-Write an override to say the same thing faster, never to say something different.
+**Write an override to say the same thing faster, never to say something
+different.** Nothing checks that it does. `differ(weight, other)` and
+`weight::isNot(other)` are the same question written twice, and an override that
+disagrees answers them differently — with no Diagnostic, because the two calls
+resolve in two places and each is right about its own.
 
-This is the same rule Rust and Swift follow for a default method, and it falls
-out of how a conformance is compiled: a witness names one Method per
+It falls out of how a conformance is compiled: a witness names one Method per
 requirement, and a provided Method's body is one const every conformer shares,
-so there is nothing per-conformer for a witness to name.
+so there is nothing per-conformer for a witness to name. The standard library
+writes overrides on exactly those terms — `Integer`'s four inequalities read its
+own `compare` rather than the cross-kind table, and answer what `Orderable`'s
+provided bodies answer.
+
+This is NOT the rule Rust and Swift follow for a defaulted requirement. In both,
+an override enters the witness and is what generic code calls; the default body
+runs only where the conformer wrote none. Swift's statically dispatched member —
+one declared in a protocol EXTENSION and not in the protocol — is the closer
+cousin, and a provided Method is neither, since it is declared in the Protocol
+and inherited by every conformer.
 
 ## Extension
 
