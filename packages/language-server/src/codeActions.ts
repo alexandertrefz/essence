@@ -96,6 +96,8 @@ export function findCodeActions(
 		entries.push(...annotationActions(enrichedProgram, range))
 	}
 
+	entries.push(...shorthandActions(program, lines, range))
+
 	return entries
 }
 
@@ -627,6 +629,101 @@ function annotationActions(
 			},
 		],
 	}))
+}
+
+// NOTE: The Formatter never rewrites between `{ x }` and `{ x = x }` — the
+// spelling is the author's — so the rewrite is offered here instead, in both
+// directions, on a Record LITERAL's members only.
+//
+// An update's key list is excluded, because there the two spellings are not the
+// same thing: `{ base with x }` merges the VALUE `x`, and a shorthand there is
+// refused outright. The key list is told apart from a braced right-hand side
+// the one way it can be — a Literal's Position opens on its own `{`, and a key
+// list's opens on its first key — which is the same reading `printCombination`
+// makes.
+function shorthandActions(
+	program: parser.Program,
+	lines: Array<string>,
+	range: common.Position,
+): Array<CodeActionEntry> {
+	let literals: Array<parser.RecordValueNode> = []
+	let keyLists = new Set<parser.RecordValueNode>()
+
+	walk(program, (node) => {
+		if (node.nodeType === "RecordValue") {
+			literals.push(node)
+
+			return
+		}
+
+		if (
+			node.nodeType === "Combination" &&
+			node.rhs.nodeType === "RecordValue" &&
+			sliceOf(lines, {
+				start: node.rhs.position.start,
+				end: {
+					line: node.rhs.position.start.line,
+					column: node.rhs.position.start.column + 1,
+				},
+			}) !== "{"
+		) {
+			keyLists.add(node.rhs)
+		}
+	})
+
+	let entries: Array<CodeActionEntry> = []
+
+	for (let literal of literals) {
+		if (keyLists.has(literal)) {
+			continue
+		}
+
+		for (let member of Object.values(literal.members)) {
+			let name = member.name.content
+			let span = {
+				start: member.name.position.start,
+				end: member.value.position.end,
+			}
+
+			if (!overlaps(span, range)) {
+				continue
+			}
+
+			if (member.shorthand === true) {
+				entries.push(
+					shorthandAction(
+						`Expand to '${name} = ${name}'`,
+						member.name.position,
+						`${name} = ${name}`,
+					),
+				)
+			} else if (
+				member.value.nodeType === "Identifier" &&
+				member.value.content === name
+			) {
+				entries.push(
+					shorthandAction(`Shorten to '${name}'`, span, name),
+				)
+			}
+		}
+	}
+
+	return entries
+}
+
+function shorthandAction(
+	title: string,
+	range: common.Position,
+	newText: string,
+): CodeActionEntry {
+	return {
+		title,
+		kind: "refactor.rewrite",
+		diagnosticCode: null,
+		diagnosticPosition: null,
+		isPreferred: false,
+		edits: [{ range, newText }],
+	}
 }
 
 // #endregion
