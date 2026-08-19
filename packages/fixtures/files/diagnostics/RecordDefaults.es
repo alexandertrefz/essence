@@ -20,4 +20,16 @@ implementation {
 	Terminal.print(
 		connect("essence.lang", using { host = "h", tls = true, timeout = 30 }),
 	)
+
+	§ Only an Argument WRITTEN as a Record literal may leave a member out. Any
+	§ other Record carries whatever its value holds — width subtyping admits a
+	§ value with more members than its Type names — and the members the callee
+	§ fills in are exactly the ones it would read off it.
+	constant partial: { host: String, tls: Boolean } = {
+		host = "h",
+		tls = true,
+		retries = 1,
+	}
+
+	Terminal.print(connect("essence.lang", using partial))
 }

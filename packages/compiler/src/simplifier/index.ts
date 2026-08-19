@@ -739,6 +739,38 @@ function simplifyNativeShim(
 					),
 		isStatic: shim.isStatic,
 		parameters,
+		// NOTE: The frame a native's default is evaluated in is a Function like
+		// any other, so a Record default is merged in it the same way — and the
+		// native still receives a whole Record, which is the whole point of the
+		// shim. `_self` is unshifted above, so the Parameter list this is built
+		// against is the one the shim emits.
+		prologue: recordDefaultPrologue(
+			shim.isStatic
+				? shim.parameters
+				: [receiverPlaceholder(targetType), ...shim.parameters],
+			parameters,
+		),
+	}
+}
+
+// NOTE: The typed counterpart of the `_self` Parameter unshifted above — the
+// prologue reads a Parameter's Type and its default off the TYPED list and its
+// emitted name off the simplified one, so the two lists have to line up. A
+// receiver carries no default and so contributes nothing.
+function receiverPlaceholder(
+	targetType: common.Type,
+): common.typed.ParameterNode {
+	return {
+		nodeType: "Parameter",
+		externalName: null,
+		internalName: null,
+		position: {
+			start: { line: 0, column: 0 },
+			end: { line: 0, column: 0 },
+		},
+		type: targetType,
+		inferredType: null,
+		defaultValue: null,
 	}
 }
 
@@ -980,11 +1012,168 @@ function simplifyParameter(
 		// to right, able to read the Parameters before it, and a temporal
 		// dead-zone Error on one after it. We are not building an evaluation
 		// model; we are naming one the target already has.
+		//
+		// NOTE: A RECORD default is the one that model can not name. A
+		// JavaScript default fires only where the Argument came in `undefined`,
+		// and what a Record default has to do is fill in the MEMBERS a caller
+		// left out of an Argument it did write. So it carries no JavaScript
+		// default at all and is rebuilt by the prologue `recordDefaultPrologue`
+		// puts at the head of the body.
 		defaultValue:
-			node.defaultValue === null
+			node.defaultValue === null || hasRecordDefault(node)
 				? null
 				: simplifyExpression(node.defaultValue),
 	}
+}
+
+// NOTE: A Parameter whose Argument is merged into its default at the callee's
+// entry rather than replaced by it. Asked of the Parameter's TYPE and not of
+// what the default supplies: a COMPLETE Record default is merged too, because
+// the Argument a caller writes against one may itself be partial, and because
+// the merge is also what projects a whole Argument to the members the Type
+// declares — the same soundness Step 0 buys a `with`, at the one other place a
+// value of one Record Type is built out of another.
+function hasRecordDefault(node: common.typed.ParameterNode): boolean {
+	return node.defaultValue !== null && node.type.type === "Record"
+}
+
+// NOTE: The Statements a body opens with, one Parameter at a time:
+//
+//   options = Record.createRecord({
+//     host: options.host,
+//     retries: options.retries ?? 3,
+//   })
+//
+// The Record is built fresh rather than merged into the Argument, which is what
+// makes the whole thing sound in the other direction too: a caller reaching this
+// Function through a VALUE dropped its defaults and wrote a whole Record, and
+// width subtyping means that Record may carry members of its own. Reading the
+// members the TYPE declares takes exactly what was promised and nothing else.
+//
+// NOTE: One allocation per call — the very allocation a caller writing the whole
+// Record would have made — so there is nothing here for the Optimiser to skip.
+// `collapse-construction` turns the `RecordValue` into a `direct-record` like
+// any other.
+//
+// NOTE: A default written as a LITERAL is taken apart, so each member's
+// expression is evaluated only where the caller left THAT member out. Any other
+// expression is hoisted into one `const` and read per member, which evaluates it
+// once per call, unconditionally — there is no way to take an expression apart
+// without evaluating it.
+function recordDefaultPrologue(
+	parameters: Array<common.typed.ParameterNode>,
+	simplified: Array<common.typedSimple.ParameterNode>,
+): Array<common.typedSimple.ImplementationNode> {
+	if (!parameters.some(hasRecordDefault)) {
+		return []
+	}
+
+	let prologue: Array<common.typedSimple.ImplementationNode> = []
+
+	for (let [index, parameter] of parameters.entries()) {
+		if (!hasRecordDefault(parameter)) {
+			continue
+		}
+
+		let recordType = parameter.type as common.RecordType
+		let defaultValue = parameter.defaultValue!
+		let declared = Object.keys(recordType.members)
+		let position = parameter.position
+		let read = (member: string): common.typedSimple.ExpressionNode => ({
+			nodeType: "Lookup",
+			base: {
+				nodeType: "Identifier",
+				name: simplified[index]!.internalName.name,
+				type: recordType,
+			},
+			member: {
+				nodeType: "Identifier",
+				name: member,
+				type: recordType.members[member]!,
+			},
+			type: recordType.members[member]!,
+		})
+
+		let supplied: Set<string>
+		let fallbackFor: (member: string) => common.typedSimple.ExpressionNode
+
+		if (defaultValue.nodeType === "RecordValue") {
+			supplied = new Set(Object.keys(defaultValue.members))
+			fallbackFor = (member) =>
+				simplifyExpression(defaultValue.members[member]!)
+		} else {
+			// NOTE: Every member, because a default that is not a literal is
+			// held to the Parameter's whole Type — `recordDefaultMembers` is
+			// what decides that, and this is the emission half of the same rule.
+			supplied = new Set(declared)
+
+			let hoisted: common.typedSimple.IdentifierNode = {
+				nodeType: "Identifier",
+				name: `_default${index}`,
+				type: defaultValue.type,
+			}
+
+			prologue.push({
+				nodeType: "VariableDeclarationStatement",
+				name: hoisted,
+				value: simplifyExpression(defaultValue),
+				type: defaultValue.type,
+				isConstant: true,
+				position,
+			})
+
+			fallbackFor = (member) => ({
+				nodeType: "Lookup",
+				base: { ...hoisted },
+				member: {
+					nodeType: "Identifier",
+					name: member,
+					type: recordType.members[member]!,
+				},
+				type: recordType.members[member]!,
+			})
+		}
+
+		// NOTE: The base may be `undefined` exactly where the whole Argument
+		// may be left out, which is where the default supplies every member —
+		// the same answer `hasDefault` carries on the Parameter's Type.
+		let optional = supplied.size === declared.length
+
+		prologue.push({
+			nodeType: "VariableAssignmentStatement",
+			name: { ...simplified[index]!.internalName },
+			value: {
+				nodeType: "RecordValue",
+				type: recordType,
+				members: Object.fromEntries(
+					declared.map((member) => [
+						member,
+						supplied.has(member)
+							? ({
+									nodeType: "Intrinsic",
+									kind: "member-or-default",
+									base: {
+										nodeType: "Identifier",
+										name: simplified[index]!.internalName
+											.name,
+										type: recordType,
+									},
+									member,
+									fallback: fallbackFor(member),
+									optional,
+									type: recordType.members[member]!,
+									position,
+								} satisfies common.typedSimple.MemberOrDefaultNode)
+							: read(member),
+					]),
+				),
+				position,
+			},
+			position,
+		})
+	}
+
+	return prologue
 }
 
 // NOTE: The hole a call leaves where a Parameter took its default. See
@@ -1063,15 +1252,20 @@ function simplifyFunctionDefinition(
 				defaultValue: null,
 			}))
 
+	let parameters = node.parameters.map((param, index) =>
+		simplifyParameter(param, index),
+	)
+
 	return {
 		nodeType: "FunctionDefinition",
-		parameters: [
-			...node.parameters.map((param, index) =>
-				simplifyParameter(param, index),
-			),
-			...conformanceParameters,
+		parameters: [...parameters, ...conformanceParameters],
+		// NOTE: The prologue goes before the body and not inside `simplifyBody`,
+		// because what `simplifyBody` adds is a Return at the END — the two are
+		// the two ends of the same Function and neither knows about the other.
+		body: [
+			...recordDefaultPrologue(node.parameters, parameters),
+			...simplifyBody(node.body),
 		],
-		body: simplifyBody(node.body),
 		returnType: node.returnType,
 	}
 }

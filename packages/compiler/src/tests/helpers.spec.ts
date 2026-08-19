@@ -2135,9 +2135,13 @@ describe("Helpers", () => {
 			return { type: "Record", members }
 		}
 
-		function matching(argumentType: Type) {
+		function matching(argumentType: Type, spellsItsMembers = true) {
 			return matchArguments(parameters, [
-				{ name: "using", getType: () => argumentType },
+				{
+					name: "using",
+					getType: () => argumentType,
+					spellsItsMembers,
+				},
 			])
 		}
 
@@ -2195,10 +2199,28 @@ describe("Helpers", () => {
 						{
 							name: "using",
 							getType: () => record({ host: { type: "String" } }),
+							spellsItsMembers: true,
 						},
 					],
 				).type,
 			).toBe("ArgumentMismatch")
+		})
+
+		// NOTE: A value typed `{ host: String }` may carry a `retries` of any
+		// Type at all, and the callee's `options.retries ?? 3` would take it —
+		// so only a literal, whose Type is its text, may be a partial. A WHOLE
+		// Record is admitted from any expression, exactly as before.
+		it("should refuse a partial that is not written as a literal", () => {
+			expect(
+				matching(record({ host: { type: "String" } }), false).type,
+			).toBe("ArgumentMismatch")
+		})
+
+		it("should admit a whole Argument that is not a literal", () => {
+			expect(matching(options, false)).toEqual({
+				type: "Match",
+				omittedParameterIndices: [],
+			})
 		})
 	})
 

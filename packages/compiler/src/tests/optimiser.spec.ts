@@ -6026,6 +6026,30 @@ describe("Optimiser", () => {
 				readFileSync(fixturePath("Everyday.es"), "utf8"),
 			)
 		})
+
+		// NOTE: The prologue a Record default puts at the head of a callee is a
+		// `RecordValue` like any other, so it collapses like any other — there
+		// is no pass for the merge itself, and no need of one: it allocates the
+		// very Record a caller writing every member would have allocated.
+		it("collapses the Record a default is merged into", async () => {
+			const merged = `implementation {
+	type Options = { host: String, retries: Integer }
+
+	function connect(using settings: Options = { retries = 3 }) -> String {
+		<- settings.host
+	}
+
+	Terminal.inspect(connect(using { host = "h" }))
+}`
+
+			let generated = generate(merged)
+
+			expect(generated).toContain('[$type.typeKeySymbol]: "Record"')
+			expect(generated).not.toContain("Record.createRecord(")
+			expect(
+				await expectSamePrintedOutput("collapse-construction", merged),
+			).toEqual(['"h"'])
+		})
 	})
 
 	describe("pool-constants", () => {

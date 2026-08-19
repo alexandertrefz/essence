@@ -859,6 +859,20 @@ function walkIntrinsicChildren(
 
 			return { ...node, left, right }
 		}
+		// NOTE: Both are ordinary positions — the base is the Parameter being
+		// rebuilt, and the fallback is the default's own Expression, which is
+		// where `pool-constants` finds a literal a default wrote and
+		// `fold-constants` folds one. `member` is a name, not a Node.
+		case "member-or-default": {
+			let base = walkExpression(node.base, rewrites)
+			let fallback = walkExpression(node.fallback, rewrites)
+
+			if (base === node.base && fallback === node.fallback) {
+				return node
+			}
+
+			return { ...node, base, fallback }
+		}
 		case "direct-record": {
 			let members = mapRecord(node.members, (value) =>
 				walkExpression(value, rewrites),

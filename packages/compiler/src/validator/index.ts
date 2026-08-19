@@ -2671,6 +2671,7 @@ function matchableArgumentsFromTypedNodes(
 ): Array<MatchableArgument> {
 	return argumentNodes.map((argumentNode) => ({
 		name: argumentNode.name,
+		spellsItsMembers: argumentNode.value.nodeType === "RecordValue",
 		getType: (expectedType) => {
 			let asked =
 				expectedType.type === "Refinement"
@@ -2744,14 +2745,22 @@ function reportArgumentLabelMismatch(
 // that is not a Record, or no default at all. Each of those is
 // `argument-type-mismatch`, which names the whole Type, and this one names the
 // members instead.
+//
+// NOTE: And null for an Argument that is not WRITTEN as a Record literal, which
+// may not be a partial at all: naming the members it is missing would be advice
+// it can not take, since writing them means writing a literal. That refusal is
+// `argument-type-mismatch` with `partialSpellingEvidence`'s note.
 function missingMembersOf(
 	parameter: common.Parameter,
-	argumentType: common.Type,
+	argumentNode: common.typed.ArgumentNode,
 ): Array<string> | null {
+	let argumentType = argumentNode.value.type
+
 	if (
 		parameter.defaultMembers === undefined ||
 		parameter.type.type !== "Record" ||
 		argumentType.type !== "Record" ||
+		argumentNode.value.nodeType !== "RecordValue" ||
 		!isPartialOf(parameter.type, argumentType)
 	) {
 		return null
@@ -2823,7 +2832,7 @@ function reportArgumentMismatch(
 	let name = describeParameter(parameter, index)
 
 	if (parameter !== undefined) {
-		let missing = missingMembersOf(parameter, argumentNode.value.type)
+		let missing = missingMembersOf(parameter, argumentNode)
 
 		if (missing !== null) {
 			reportIncompleteRecordArgument(
@@ -2838,6 +2847,7 @@ function reportArgumentMismatch(
 	}
 
 	let evidence = refinementEvidence(parameter?.type)
+	let spelling = partialSpellingEvidence(parameter, argumentNode)
 
 	reportError(
 		`This Argument does not fit ${name}`,
@@ -2854,11 +2864,47 @@ function reportArgumentMismatch(
 				...(parameter === undefined
 					? []
 					: [`${name} is ${describeType(parameter.type)}.`]),
+				...spelling.notes,
 				...evidence.notes,
 			],
-			helps: evidence.helps,
+			helps: [...spelling.helps, ...evidence.helps],
 		},
 	)
+}
+
+// NOTE: An Argument the default's members WOULD have covered, refused only for
+// being written as something other than a Record literal. Its Type reads like a
+// perfectly good partial, so nothing the Diagnostic says about Types can explain
+// the refusal — the rule has to be named.
+function partialSpellingEvidence(
+	parameter: common.Parameter | undefined,
+	argumentNode: common.typed.ArgumentNode,
+): { notes: Array<string>; helps: Array<string> } {
+	let argumentType = argumentNode.value.type
+
+	if (
+		parameter?.defaultMembers === undefined ||
+		parameter.type.type !== "Record" ||
+		argumentType.type !== "Record" ||
+		argumentNode.value.nodeType === "RecordValue" ||
+		!isPartialOf(parameter.type, argumentType) ||
+		missingRecordMembers(
+			parameter.type,
+			parameter.defaultMembers,
+			argumentType,
+		).length !== 0
+	) {
+		return { notes: [], helps: [] }
+	}
+
+	return {
+		notes: [
+			`Its default fills in ${quotedNames(parameter.defaultMembers)}, which only an Argument WRITTEN as a Record literal may leave out — every other Record carries whatever its value holds, not only what its Type names.`,
+		],
+		helps: [
+			`Write the Record at the call, or pass a value of Type ${describeType(parameter.type)}.`,
+		],
+	}
 }
 
 function validateSimpleFunctionInvocation(

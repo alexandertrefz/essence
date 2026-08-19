@@ -611,6 +611,11 @@ export interface ParameterNode {
 	externalName: IdentifierNode | null
 	internalName: IdentifierNode | null
 	position: Position
+	// NOTE: What the Parameter is bound to. `internalName` carries it too, but
+	// only where the source wrote one — `_: Options` binds no name and still has
+	// a Type, and the Simplifier needs it to rebuild a Record-defaulted
+	// Parameter member by member at the callee's entry.
+	type: Type
 	// NOTE: Set only when the Parameter wrote no `: Type` and took one from
 	// the expected signature. Null means the Type is written in the source,
 	// where showing it again would be noise.

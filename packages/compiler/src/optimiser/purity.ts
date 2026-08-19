@@ -241,6 +241,13 @@ function isPureIntrinsic(
 		case "raw-equals":
 		case "raw-arithmetic":
 			return isPure(node.left) && isPure(node.right)
+		// NOTE: A member read and a `??`, over two Expressions. The read
+		// observes nothing — a Record is a value — so this is as pure as the
+		// two it holds, and the fallback's purity counts even though it may not
+		// be evaluated: what is asked here is whether MOVING this observes
+		// anything, and a fallback that prints would.
+		case "member-or-default":
+			return isPure(node.base) && isPure(node.fallback)
 		case "direct-record":
 			return Object.values(node.members).every(isPure)
 		case "direct-case":

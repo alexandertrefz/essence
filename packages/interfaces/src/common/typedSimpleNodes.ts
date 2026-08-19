@@ -212,10 +212,16 @@ export type UnionMethodDispatchCase = {
 // NOTE: The shim's whole body is one call handing every Parameter on to the
 // native, which the Rewriter writes out — there is nothing here for the
 // Optimiser or anything else to walk but the defaults themselves.
+//
+// NOTE: Except where a Parameter's default is a RECORD, which is merged into the
+// Argument rather than replacing it: the merge is a Statement, so the shim's
+// arrow grows a block and returns the call. Empty for every other shim, which is
+// every shim there is today.
 export type NativeShimNode = {
 	memberName: string
 	isStatic: boolean
 	parameters: Array<ParameterNode>
+	prologue: Array<ImplementationNode>
 }
 
 export type ValueNode =
@@ -409,6 +415,7 @@ export type IntrinsicNode =
 	| DirectCaseNode
 	| DirectListNode
 	| SpreadCombinationNode
+	| MemberOrDefaultNode
 	| PooledReferenceNode
 	| DispatchChainNode
 	| InlineLoopNode
@@ -929,6 +936,39 @@ export interface SpreadCombinationNode {
 	// right-hand side Expression (`pool-constants` does), and what is projected
 	// has to stay the set the Enricher checked.
 	rhsMembers: Array<string> | null
+	type: Type
+	position?: Position
+}
+
+// NOTE: One member of the Record a callee rebuilds a Record-defaulted Parameter
+// into — the Argument's own value where the caller wrote it, and the default's
+// where it did not:
+//
+//   options.retries ?? 3
+//
+// `??` is the absence test because `undefined` is never an Essence value:
+// `Optional` is a Choice whose `#Empty` is a Case instance, and the one place
+// `undefined` is deliberately written into emitted code is the hole a call
+// leaves for an omitted Argument. So the only way a member can be missing is
+// that nobody wrote it.
+//
+// `optional` reads the BASE through `?.` and is set exactly where the whole
+// Argument may be absent — a COMPLETE default, whose Parameter carries
+// `hasDefault` and whose omitted Argument arrives as `undefined`. A PARTIAL
+// default leaves the Argument required, so the base is always a Record and the
+// read is plain.
+//
+// NOTE: The fallback is evaluated only where the caller left THAT member out,
+// which is the per-call, only-when-needed semantics the language promises a
+// default — and it is why a Record default written as a literal is lowered
+// member by member rather than built whole and merged.
+export interface MemberOrDefaultNode {
+	nodeType: "Intrinsic"
+	kind: "member-or-default"
+	base: ExpressionNode
+	member: string
+	fallback: ExpressionNode
+	optional: boolean
 	type: Type
 	position?: Position
 }
