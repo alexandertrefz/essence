@@ -560,6 +560,24 @@ describe("Protocol-provided Methods", () => {
 			).toEqual(["true"])
 		})
 
+		// NOTE: `List::sort()` asks for `ItemType is Comparable`, and the bound
+		// here names only the descendant — the one witness answers both, which
+		// is the whole point of an extension being a promise about conformers.
+		it("should satisfy a standard library bound through the extension", async () => {
+			expect(
+				await run(
+					orderedProgram(
+						"\tfunction ordered<infer Item is Ordered>(_ items: List<Item>) -> List<Item> {",
+						"\t\t<- items::sort()",
+						"\t}",
+						"",
+						"\tconstant weights: List<Weight> = [{ grams = 3 }, { grams = 1 }]",
+						"\tTerminal.inspect(ordered(weights)::firstItem()::value(defaultingTo { grams = 0 }).grams)",
+					),
+				),
+			).toEqual(["1"])
+		})
+
 		it("should reach an ancestor's provided Method through the descendant bound", async () => {
 			expect(
 				await run(
