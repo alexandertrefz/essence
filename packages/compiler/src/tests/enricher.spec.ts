@@ -5392,6 +5392,221 @@ describe("Enricher", () => {
 			expect(member.parameterTypes[1].hasDefault).toBe(true)
 		})
 
+		// NOTE: `defaultMembers` is the second half of what a Type says about
+		// a default, and it says it about a Record Parameter alone: which
+		// members a call may leave out of an Argument it still has to write.
+		it("should carry defaultMembers for a partial Record default", () => {
+			let { program, diagnostics } = enrichSource(`implementation {
+				type Options = { host: String, retries: Integer }
+
+				function connect(using options: Options = { retries = 3 }) -> String {
+					<- options.host
+				}
+			}`)
+
+			expect(diagnostics).toEqual([])
+
+			let statement = program.implementation.nodes[1]
+
+			if (statement.nodeType !== "FunctionStatement") {
+				throw new Error("Expected a FunctionStatement")
+			}
+
+			let type = statement.name.type
+
+			if (type.type !== "Function") {
+				throw new Error("Expected a Function Type")
+			}
+
+			expect(type.parameterTypes[0].defaultMembers).toEqual(["retries"])
+			// NOTE: The Argument is still required — a partial default fills in
+			// members, never the whole value.
+			expect(type.parameterTypes[0].hasDefault).toBeUndefined()
+		})
+
+		it("should carry both keys for a complete Record default", () => {
+			let { program, diagnostics } = enrichSource(`implementation {
+				type Options = { host: String, retries: Integer }
+
+				function connect(using options: Options = { host = "h", retries = 3 }) -> String {
+					<- options.host
+				}
+			}`)
+
+			expect(diagnostics).toEqual([])
+
+			let statement = program.implementation.nodes[1]
+
+			if (statement.nodeType !== "FunctionStatement") {
+				throw new Error("Expected a FunctionStatement")
+			}
+
+			let type = statement.name.type
+
+			if (type.type !== "Function") {
+				throw new Error("Expected a Function Type")
+			}
+
+			expect(type.parameterTypes[0].defaultMembers).toEqual([
+				"host",
+				"retries",
+			])
+			expect(type.parameterTypes[0].hasDefault).toBe(true)
+		})
+
+		// NOTE: What a default that is not written as a literal supplies can not
+		// be read off its text, so it is held to the Parameter's Type as it
+		// always was — complete, and every member omittable.
+		it("should carry every member for a default that is not a literal", () => {
+			let { program, diagnostics } = enrichSource(`implementation {
+				type Options = { host: String, retries: Integer }
+
+				constant fallback: Options = { host = "h", retries = 3 }
+
+				function connect(using options: Options = fallback) -> String {
+					<- options.host
+				}
+			}`)
+
+			expect(diagnostics).toEqual([])
+
+			let statement = program.implementation.nodes[2]
+
+			if (statement.nodeType !== "FunctionStatement") {
+				throw new Error("Expected a FunctionStatement")
+			}
+
+			let type = statement.name.type
+
+			if (type.type !== "Function") {
+				throw new Error("Expected a Function Type")
+			}
+
+			expect(type.parameterTypes[0].defaultMembers).toEqual([
+				"host",
+				"retries",
+			])
+			expect(type.parameterTypes[0].hasDefault).toBe(true)
+		})
+
+		it("should carry defaultMembers on a Namespace Method's Parameter", () => {
+			let { program, diagnostics } = enrichSource(`implementation {
+				type Options = { host: String, retries: Integer }
+
+				namespace Links for String {
+					open(using options: Options = { retries = 3 }) -> String {
+						<- options.host
+					}
+				}
+			}`)
+
+			expect(diagnostics).toEqual([])
+
+			let statement = program.implementation.nodes[1]
+
+			if (statement.nodeType !== "NamespaceDefinitionStatement") {
+				throw new Error("Expected a NamespaceDefinitionStatement")
+			}
+
+			let member = statement.type.methods["open"]
+
+			if (member?.type !== "SimpleMethod") {
+				throw new Error("Expected a SimpleMethod")
+			}
+
+			expect(member.parameterTypes[0].defaultMembers).toBeUndefined()
+			expect(member.parameterTypes[1].defaultMembers).toEqual(["retries"])
+		})
+
+		it("should carry no defaultMembers for a scalar default", () => {
+			let { program, diagnostics } = enrichSource(`implementation {
+				function f(_ a: Integer = 1) -> Integer {
+					<- a
+				}
+			}`)
+
+			expect(diagnostics).toEqual([])
+
+			let statement = program.implementation.nodes[0]
+
+			if (statement.nodeType !== "FunctionStatement") {
+				throw new Error("Expected a FunctionStatement")
+			}
+
+			let type = statement.name.type
+
+			if (type.type !== "Function") {
+				throw new Error("Expected a Function Type")
+			}
+
+			expect(type.parameterTypes[0].defaultMembers).toBeUndefined()
+		})
+
+		// NOTE: A Function taken as a VALUE drops its defaults, and both keys go
+		// with them — nothing a default was going to fill in is filled in any
+		// more, neither a whole Argument nor one member of one.
+		it("should drop defaultMembers where the Function is taken as a value", () => {
+			let { program, diagnostics } = enrichSource(`implementation {
+				type Options = { host: String, retries: Integer }
+
+				function connect(using options: Options = { retries = 3 }) -> String {
+					<- options.host
+				}
+
+				constant taken = connect
+			}`)
+
+			expect(diagnostics).toEqual([])
+
+			let statement = program.implementation.nodes[2]
+
+			if (statement.nodeType !== "ConstantDeclarationStatement") {
+				throw new Error("Expected a ConstantDeclarationStatement")
+			}
+
+			let type = statement.type
+
+			if (type.type !== "Function") {
+				throw new Error("Expected a Function Type")
+			}
+
+			expect(type.parameterTypes[0].defaultMembers).toBeUndefined()
+			expect(type.parameterTypes[0].hasDefault).toBeUndefined()
+		})
+
+		// NOTE: A partial default is admitted only where its members really are
+		// the Parameter's, and only where they are written out — the two things
+		// `recordDefaultMembers` reads.
+		it("should refuse a Record default naming a member the Type has not", () => {
+			let { diagnostics } = enrichSource(`implementation {
+				type Options = { host: String, retries: Integer }
+
+				function connect(using options: Options = { retires = 3 }) -> String {
+					<- options.host
+				}
+			}`)
+
+			expect(diagnostics.map((diagnostic) => diagnostic.code)).toContain(
+				"default-type-mismatch",
+			)
+		})
+
+		it("should refuse a partial default that is not a Record literal", () => {
+			let { diagnostics } = enrichSource(`implementation {
+				type Options = { host: String, retries: Integer }
+
+				constant some = { retries = 3 }
+
+				function connect(using options: Options = some) -> String {
+					<- options.host
+				}
+			}`)
+
+			expect(diagnostics.map((diagnostic) => diagnostic.code)).toContain(
+				"default-type-mismatch",
+			)
+		})
+
 		// NOTE: The typed tree carries the enriched Expression, because the
 		// Simplifier lowers it and the Language Server's typed walkers have to
 		// reach a call written inside one.

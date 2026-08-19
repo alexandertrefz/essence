@@ -1445,6 +1445,55 @@ describe("Helpers", () => {
 				expect(matchesType(genericOrString, genericU)).toBe(false)
 			})
 		})
+
+		// NOTE: The `hasDefault` rule one level down. A call written against the
+		// expected Type leaves the members it names out of its Record Argument,
+		// and only a Function whose own default fills those members in can be
+		// substituted for it.
+		describe("Omittable Record members", () => {
+			const options: RecordType = {
+				type: "Record",
+				members: { host: stringPrimitive, retries: integerPrimitive },
+			}
+
+			function taking(defaultMembers?: Array<string>): FunctionType {
+				return {
+					type: "Function",
+					generics: [],
+					parameterTypes: [
+						{
+							name: "using",
+							type: options,
+							...(defaultMembers === undefined
+								? {}
+								: { defaultMembers }),
+						},
+					],
+					returnType: { type: "String" },
+				}
+			}
+
+			it("should refuse an actual that fills in fewer members", () => {
+				expect(
+					matchesType(taking(["host", "retries"]), taking(["host"])),
+				).toBe(false)
+				expect(matchesType(taking(["host"]), taking())).toBe(false)
+			})
+
+			it("should accept an actual that fills in more", () => {
+				expect(
+					matchesType(taking(["host"]), taking(["host", "retries"])),
+				).toBe(true)
+				expect(matchesType(taking(), taking(["host"]))).toBe(true)
+			})
+
+			it("should accept two signatures that agree", () => {
+				expect(matchesType(taking(["host"]), taking(["host"]))).toBe(
+					true,
+				)
+				expect(matchesType(taking(), taking())).toBe(true)
+			})
+		})
 	})
 
 	// NOTE: What a `with` right-hand side has to be, and — once a Record

@@ -338,6 +338,18 @@ back off the default: `(_ count = 1)` and `(_ count: Number = 1)` accept
 different Arguments, and the Parameter's Type is what every caller is checked
 against.
 
+A Record Parameter is the one exception, and it is deliberate: its default may
+fill in only SOME of the Type's members. `using options: Options = { retries =
+3 }` is admitted, and every call then writes an Argument that spells the members
+the default left out — `connect(url, using { host = "example.com" })`. Which
+members those are is `incomplete-record-argument`'s business.
+
+The partial reading is offered to a Record LITERAL alone. `= someOptions` and
+`= { base with pool = 8 }` are held to the Parameter's Type exactly as any other
+default is, because what a partial default supplies is read off what it writes.
+A complete default keeps its whole meaning as well — the Argument may be left
+out entirely, and an Argument that IS written may still be partial.
+
 ### `return-type-mismatch`
 
 A `<-` yields a value that does not match the declared return Type.

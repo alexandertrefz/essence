@@ -31,6 +31,7 @@ import {
 	matchesTypeWithBindings,
 	type NamespaceTarget,
 	parameterInternalName,
+	recordDefaultMembers,
 	refinementWithTypeArguments,
 	typeContainsError,
 	typeMentionsGeneric,
@@ -5337,21 +5338,37 @@ function resolveParameterTypes(
 
 	// NOTE: The single choke point through which every `common.Parameter` is
 	// built — the free-Function, Protocol-signature and Namespace-Method paths
-	// all route through here — which is why `hasDefault` is set only here. The
-	// expression itself stays on the Parameter Node; a Type only has to say
-	// what a caller may leave out.
-	return definition.parameters.map((parameter, index) => ({
-		name: parameter.externalName?.content ?? null,
-		type: resolveDeclaredType(parameter.type, scope),
-		documentation: parameterDocumentation(
-			parameter,
-			definition.documentation,
-			index,
-		),
-		...(parameter.defaultValue === null
-			? {}
-			: { hasDefault: true as const }),
-	}))
+	// all route through here — which is why `hasDefault` and `defaultMembers`
+	// are set only here. The expression itself stays on the Parameter Node; a
+	// Type only has to say what a caller may leave out.
+	return definition.parameters.map((parameter, index) => {
+		let type = resolveDeclaredType(parameter.type, scope)
+		let defaultMembers = recordDefaultMembers(type, parameter.defaultValue)
+		// NOTE: A PARTIAL Record default fills in some of its Parameter's
+		// members and leaves the rest to every caller, so the Argument is still
+		// required — which is exactly `hasDefault` being unset, and is why
+		// `pairArguments` needs no change at all: it reads labels and
+		// `hasDefault`, and `hasDefault` still means only "this Argument may be
+		// absent".
+		let isPartial =
+			defaultMembers !== null &&
+			type.type === "Record" &&
+			defaultMembers.length < Object.keys(type.members).length
+
+		return {
+			name: parameter.externalName?.content ?? null,
+			type,
+			documentation: parameterDocumentation(
+				parameter,
+				definition.documentation,
+				index,
+			),
+			...(parameter.defaultValue === null || isPartial
+				? {}
+				: { hasDefault: true as const }),
+			...(defaultMembers === null ? {} : { defaultMembers }),
+		}
+	})
 }
 
 // NOTE: Two entries of one `overload` block that accept the same call. An
