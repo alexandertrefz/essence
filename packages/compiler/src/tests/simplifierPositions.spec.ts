@@ -153,6 +153,62 @@ describe("Simplifier Positions", () => {
 		expect(filler.position).toBeUndefined()
 	})
 
+	// NOTE: A member path's Function is synthesized, but every span in it was
+	// WRITTEN — the step's own for the Lookup that reads it, the path's for the
+	// Parameter and the Return. That is what a step into the callback stops on,
+	// and what the Language Server renames and colours.
+	it("keeps the span each step of a member path was written at", () => {
+		let { simplified } = simplifyWithTyped(`implementation {
+			type Maker = { town: String }
+			type Product = { maker: Maker }
+			constant products: List<Product> = []
+			constant towns = products::map(.maker.town)
+		}`)
+
+		let statement = simplified.implementation.nodes[3]!
+
+		if (statement.nodeType !== "VariableDeclarationStatement") {
+			throw new Error("The declaration did not simplify as expected")
+		}
+
+		let call = statement.value
+
+		if (call.nodeType !== "MethodInvocation") {
+			throw new Error("Expected a MethodInvocation")
+		}
+
+		let path = call.arguments[1]!.value
+
+		if (path.nodeType !== "FunctionValue") {
+			throw new Error("The path did not desugar to a Function literal")
+		}
+
+		let returned = path.value.body[0]!
+
+		if (returned.nodeType !== "ReturnStatement") {
+			throw new Error("Expected a ReturnStatement")
+		}
+
+		let town = returned.expression
+
+		if (town.nodeType !== "Lookup" || town.base.nodeType !== "Lookup") {
+			throw new Error("Expected a Lookup over a Lookup")
+		}
+
+		expect(path.position).toEqual({
+			start: { line: 5, column: 35 },
+			end: { line: 5, column: 46 },
+		})
+		expect(town.base.member.position).toEqual({
+			start: { line: 5, column: 36 },
+			end: { line: 5, column: 41 },
+		})
+		expect(town.member.position).toEqual({
+			start: { line: 5, column: 42 },
+			end: { line: 5, column: 46 },
+		})
+	})
+
 	it("leaves the synthesised trailing Return position-less", () => {
 		let { simplified } = simplifyWithTyped(`implementation {
 			function noop () -> {} {

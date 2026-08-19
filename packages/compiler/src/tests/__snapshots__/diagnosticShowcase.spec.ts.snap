@@ -640,44 +640,73 @@ Error: A member path reads members and nothing else
 exports[`Diagnostic Showcase MemberPaths.es should render the same report every time 1`] = `
 "[path-without-context]
 Error: A member path stands where no Function is expected
-   ╭─┤ MemberPaths.es:8:19 │
-   │
- 8 │     constant price = .price
-   │                      ───┬──  
-   │                         ╰──── this path names no value
-   │ 
-   │ Help: Write the Function literal instead: '(_ item: SomeType) { <- item.price }'.
-   │ 
-   │ Note: A member path is a Function the Compiler writes for you, so it needs a Parameter Type to read the members off — and only a position expecting a Function of one Parameter names one.
-───╯
+    ╭─┤ MemberPaths.es:18:19 │
+    │
+ 18 │     constant price = .price
+    │                      ───┬──  
+    │                         ╰──── this path names no value
+    │ 
+    │ Help: Write the Function literal instead: '(_ item: SomeType) { <- item.price }'.
+    │ 
+    │ Note 1: A member path is a Function the Compiler writes for you, so it needs a Parameter Type to read the members off — and only a position expecting a Function of one Parameter names one.
+    │ Note 2: This position expects no particular Type.
+────╯
 
 [path-without-context]
 Error: A member path stands where no Function is expected
-    ╭─┤ MemberPaths.es:12:26 │
+    ╭─┤ MemberPaths.es:22:26 │
     │
- 12 │     constant name: String = .name
+ 22 │     constant name: String = .name
     │                             ──┬──  
     │                               ╰──── this path names no value
     │ 
     │ Help: Write the Function literal instead: '(_ item: SomeType) { <- item.name }'.
     │ 
-    │ Note: A member path is a Function the Compiler writes for you, so it needs a Parameter Type to read the members off — and only a position expecting a Function of one Parameter names one.
+    │ Note 1: A member path is a Function the Compiler writes for you, so it needs a Parameter Type to read the members off — and only a position expecting a Function of one Parameter names one.
+    │ Note 2: This position expects a String.
 ────╯
 
 [path-without-context]
 Error: A member path stands where no Function is expected
-    ╭─┤ MemberPaths.es:15:57 │
+    ╭─┤ MemberPaths.es:25:57 │
     │
- 15 │     constant order: (_: Product, _: Product) -> Ordering = .price
+ 25 │     constant order: (_: Product, _: Product) -> Ordering = .price
     │                                                            ───┬──  
     │                                                               ╰──── this path names no value
     │ 
     │ Help: Write the Function literal instead: '(_ item: SomeType) { <- item.price }'.
     │ 
-    │ Note: A member path is a Function the Compiler writes for you, so it needs a Parameter Type to read the members off — and only a position expecting a Function of one Parameter names one.
+    │ Note 1: A member path is a Function the Compiler writes for you, so it needs a Parameter Type to read the members off — and only a position expecting a Function of one Parameter names one.
+    │ Note 2: This position expects a Function of 2 Parameters, and a path reads its members off exactly one.
 ────╯
 
-─── 3 errors
+[path-step-not-a-record]
+Error: A member path steps through Records only
+    ╭─┤ MemberPaths.es:28:43 │
+    │
+ 28 │     constant tagCounts = products::map(.tags.length)
+    │                                              ───┬──  
+    │                                                 ╰──── read off a List<String>
+    │ 
+    │ Help: Write the Function literal instead, and decide the value the way its Type asks to be decided.
+    │ 
+    │ Note: Only a Record or a Case has members a path can step through. An Optional, a Union, a Choice or a List is decided before it is read, and deciding it is a Match rather than a dot.
+────╯
+
+[path-step-not-a-record]
+Error: A member path steps through Records only
+    ╭─┤ MemberPaths.es:31:47 │
+    │
+ 31 │     constant nicknames = products::map(.nickname.length)
+    │                                                  ───┬──  
+    │                                                     ╰──── read off an Optional<String>
+    │ 
+    │ Help: Write the Function literal instead, and decide the value the way its Type asks to be decided.
+    │ 
+    │ Note: Only a Record or a Case has members a path can step through. An Optional, a Union, a Choice or a List is decided before it is read, and deciding it is a Match rather than a dot.
+────╯
+
+─── 5 errors
 "
 `;
 

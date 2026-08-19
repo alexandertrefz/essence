@@ -274,7 +274,7 @@ export function enrichCalleeExpression(
 		case "Lookup":
 			return enrichLookup(node, scope)
 		case "MemberPath":
-			return enrichMemberPath(node, scope)
+			return enrichMemberPath(node, scope, expectedType)
 		case "Identifier":
 			return enrichIdentifierExpression(node, scope)
 		case "Self":
@@ -1796,14 +1796,115 @@ export function enrichLookup(
 export function enrichMemberPath(
 	node: parser.MemberPathNode,
 	_scope: enricher.Scope,
+	expectedType: common.Type | null = null,
 ): common.typed.FunctionValueNode {
-	reportPathWithoutContext(node)
+	// NOTE: An Argument is matched in one pass and enriched in another, and only
+	// the first has a position to read — so a path matched as an Argument reads
+	// back what that pass recorded, and a path anywhere else is handed its
+	// position outright. Exactly the split a prefixed Case construction lives by.
+	let expected = expectedType ?? recordedMemberPathType(node)
+	let rootType = memberPathRootType(expected)
+
+	if (rootType === null) {
+		reportPathWithoutContext(node, expected)
+
+		return memberPathFunction(
+			node,
+			{ type: "Error" },
+			node.steps.map(() => ({ type: "Error" })),
+		)
+	}
 
 	return memberPathFunction(
 		node,
-		{ type: "Error" },
-		node.steps.map(() => ({ type: "Error" })),
+		rootType,
+		memberPathStepTypes(node, rootType),
 	)
+}
+
+// NOTE: What a path reads its first member off — the one Parameter of the
+// Function the position expects, and nothing else. A Function of two Parameters
+// names no single Argument to read off, and a position that expects no Function
+// at all names nothing: a structural language can not invent a Root Type out of
+// a member name, which is the rule a bare `#Case` lives by for the same reason.
+function memberPathRootType(expected: common.Type | null): common.Type | null {
+	if (
+		expected === null ||
+		expected.type !== "Function" ||
+		expected.parameterTypes.length !== 1
+	) {
+		return null
+	}
+
+	return expected.parameterTypes[0].type
+}
+
+// NOTE: The Type each step reads, in written order, so the last is what the
+// synthesized Function returns. Members only: a step is read off a Record or a
+// Case — which is a Record with a nominal identity — and off nothing else. An
+// Optional, a Union, a Choice or a List is DECIDED before it is read, and the
+// deciding is a Match rather than a dot.
+function memberPathStepTypes(
+	node: parser.MemberPathNode,
+	rootType: common.Type,
+): Array<common.Type> {
+	let stepTypes: Array<common.Type> = []
+	let baseType = rootType
+	let basePosition = node.position
+
+	for (let step of node.steps) {
+		let stepType = memberPathStepType(step, baseType, basePosition)
+
+		stepTypes.push(stepType)
+		baseType = stepType
+		basePosition = step.position
+	}
+
+	return stepTypes
+}
+
+function memberPathStepType(
+	step: parser.IdentifierNode,
+	baseType: common.Type,
+	basePosition: common.Position,
+): common.Type {
+	if (baseType.type === "Record" || baseType.type === "Case") {
+		return lookupTypeOf(baseType, step.content, {
+			member: step.position,
+			base: basePosition,
+		})
+	}
+
+	// NOTE: Silent. An Error is a Diagnostic somebody has already reported, and
+	// a Type Parameter nothing has bound yet is a position the call has not
+	// finished deciding — the Invocation reports that for itself, and a path
+	// saying the Root "is not a Record" would name a Type the author never
+	// wrote.
+	if (
+		baseType.type === "Error" ||
+		baseType.type === "Unknown" ||
+		baseType.type === "GenericUse"
+	) {
+		return { type: "Error" }
+	}
+
+	reportError("A member path steps through Records only", step.position, {
+		code: "path-step-not-a-record",
+		labels: [
+			primary(
+				step.position,
+				`read off ${withArticle(describeType(baseType))}`,
+			),
+		],
+		notes: [
+			"Only a Record or a Case has members a path can step through. An Optional, a Union, a Choice or a List is decided before it is read, and deciding it is a Match rather than a dot.",
+		],
+		helps: [
+			"Write the Function literal instead, and decide the value the way its Type asks to be decided.",
+		],
+	})
+
+	return { type: "Error" }
 }
 
 // NOTE: How a path is WRITTEN, for the Diagnostics that quote it back.
@@ -1811,7 +1912,10 @@ export function memberPathSpelling(node: parser.MemberPathNode): string {
 	return `.${node.steps.map((step) => step.content).join(".")}`
 }
 
-function reportPathWithoutContext(node: parser.MemberPathNode): void {
+function reportPathWithoutContext(
+	node: parser.MemberPathNode,
+	expected: common.Type | null,
+): void {
 	reportError(
 		"A member path stands where no Function is expected",
 		node.position,
@@ -1820,12 +1924,29 @@ function reportPathWithoutContext(node: parser.MemberPathNode): void {
 			labels: [primary(node.position, "this path names no value")],
 			notes: [
 				"A member path is a Function the Compiler writes for you, so it needs a Parameter Type to read the members off — and only a position expecting a Function of one Parameter names one.",
+				pathContextNote(expected),
 			],
 			helps: [
 				`Write the Function literal instead: '(_ item: SomeType) { <- item${memberPathSpelling(node)} }'.`,
 			],
 		},
 	)
+}
+
+// NOTE: What the position DOES ask for, which is the half of the refusal that
+// says what to change. A Function of the wrong arity is called out as such —
+// the Type is right, the number of Arguments it takes is what a path can not
+// answer — rather than printed in full twice over.
+function pathContextNote(expected: common.Type | null): string {
+	if (expected === null) {
+		return "This position expects no particular Type."
+	}
+
+	if (expected.type === "Function") {
+		return `This position expects a Function of ${countOf(expected.parameterTypes.length, "Parameter")}, and a path reads its members off exactly one.`
+	}
+
+	return `This position expects ${withArticle(describeType(expected))}.`
 }
 
 // NOTE: The one Parameter the synthesized Function takes. `_` is a Symbol in
@@ -1908,12 +2029,23 @@ function memberPathFunction(
 			headPosition: node.position,
 		},
 		position: node.position,
-		type: {
-			type: "Function",
-			generics: [],
-			parameterTypes: [{ name: null, type: rootType }],
-			returnType,
-		},
+		type: memberPathSignature(rootType, returnType),
+	}
+}
+
+// NOTE: The Type of the Function a path stands for — one unlabelled Parameter
+// of the Root, answering whatever the last step reads. Built here rather than
+// off the synthesized Node, because the Argument match asks for it long before
+// there is a Node to build.
+function memberPathSignature(
+	rootType: common.Type,
+	returnType: common.Type,
+): common.FunctionType {
+	return {
+		type: "Function",
+		generics: [],
+		parameterTypes: [{ name: null, type: rootType }],
+		returnType,
 	}
 }
 
@@ -5711,6 +5843,44 @@ function makeArgumentTyper(scope: enricher.Scope): ArgumentTyper {
 		return declared
 	}
 
+	// NOTE: What one candidate's Parameter Type makes of a member path. The
+	// position is RECORDED wherever it names a Function of one Parameter, even
+	// where the steps do not read against it — the enrichment pass reads the
+	// recording back to report, and a path left with no recording at all would
+	// be told it stands where no Function is expected, which would be a message
+	// about the wrong thing. The same reason a prefixed Case construction
+	// records a position its payload does not fit.
+	//
+	// A path whose steps do not read answers Error rather than a Function with
+	// an Error inside it: an Error matches every Parameter there is, so the
+	// candidate is decided by the Arguments that ARE readable, and the one
+	// Diagnostic reported is the path's own rather than a cascade about the call
+	// it stood in.
+	function probedMemberPathType(
+		node: parser.MemberPathNode,
+		expectedType: common.Type,
+		bindings: GenericBindings | null,
+	): common.Type {
+		let rootType = memberPathRootType(expectedType)
+
+		if (rootType === null) {
+			return { type: "Error" }
+		}
+
+		recordContextualMemberPathType(node, { expectedType, bindings })
+
+		let { result: stepTypes } = collectDiagnostics(() =>
+			memberPathStepTypes(node, rootType),
+		)
+		let returnType = stepTypes[stepTypes.length - 1] ?? { type: "Error" }
+
+		if (stepTypes.some((stepType) => stepType.type === "Error")) {
+			return { type: "Error" }
+		}
+
+		return memberPathSignature(rootType, returnType)
+	}
+
 	// NOTE: What the payload ALONE makes of a bare construction — the fallback for
 	// the candidate whose position decided nothing. Read here, silently and kept
 	// nowhere, rather than by enriching the construction for real: that enrichment
@@ -5789,6 +5959,17 @@ function makeArgumentTyper(scope: enricher.Scope): ArgumentTyper {
 			if (value.nodeType === "CaseValue") {
 				return noteErrors(
 					probedCaseValueType(value, expectedType, bindings),
+				)
+			}
+
+			// NOTE: And the third — a member path IS the Function the position
+			// asks for, so the position is the only thing that says what it
+			// reads its members off. Asked silently: the enrichment pass reads
+			// the very recording this leaves behind and reports there, once,
+			// under whichever candidate the call committed to.
+			if (value.nodeType === "MemberPath") {
+				return noteErrors(
+					probedMemberPathType(value, expectedType, bindings),
 				)
 			}
 
@@ -7689,10 +7870,17 @@ function contextualArgumentsForBranch(
 	let contextualArguments: common.DispatchCase["contextualArguments"] = []
 
 	for (let [index, argument] of node.arguments.entries()) {
-		if (
-			argument.value.nodeType !== "FunctionValue" ||
-			!needsContext(argument.value.value)
-		) {
+		// NOTE: The Arguments that react to the position they stand in — an
+		// unannotated Function literal and a member path, which is one the
+		// Compiler wrote. Each branch matches with its own receiver Type, so
+		// each needs its own typed copy of them; every other Argument means the
+		// same thing in all of them.
+		let readsItsPosition =
+			argument.value.nodeType === "MemberPath" ||
+			(argument.value.nodeType === "FunctionValue" &&
+				needsContext(argument.value.value))
+
+		if (!readsItsPosition) {
 			continue
 		}
 
@@ -9600,6 +9788,17 @@ const contextualCaseValueTypes = new WeakMap<
 	RecordedCaseValueContext
 >()
 
+// NOTE: The position a member path was matched against — the Parameter Type
+// whose one Parameter says what the path reads its members off. Kept and read
+// back exactly as a prefixed Case construction's is, and for exactly the same
+// reason: a path is matched while the call is still binding its Type
+// Parameters, and what it finally stands under is only settled once the call has
+// decided them.
+const contextualMemberPathTypes = new WeakMap<
+	parser.MemberPathNode,
+	RecordedCaseValueContext
+>()
+
 // NOTE: What ONE probe of a candidate resolved for the Nodes that react to an
 // expected Type — a contextually typed Function literal's signature, and the
 // Parameter Type a prefixed Case construction reads its Type Arguments off.
@@ -9611,6 +9810,7 @@ type ContextualFunctionTypeRecording = {
 		RecordedContextualFunctionType
 	>
 	cases: Map<parser.CaseValueNode, RecordedCaseValueContext>
+	paths: Map<parser.MemberPathNode, RecordedCaseValueContext>
 }
 
 // NOTE: The recordings of the probes currently running, innermost last. An
@@ -9669,6 +9869,45 @@ function recordContextualCaseValueType(
 	}
 }
 
+function recordContextualMemberPathType(
+	node: parser.MemberPathNode,
+	recorded: RecordedCaseValueContext,
+): void {
+	let innermost = probeRecordings[probeRecordings.length - 1]
+
+	if (innermost === undefined) {
+		contextualMemberPathTypes.set(node, recorded)
+	} else {
+		innermost.paths.set(node, recorded)
+	}
+}
+
+// NOTE: The recorded position with the call's bindings substituted in — the
+// Function the finished call decided the path stands for. A Type Parameter
+// nothing ever bound is left standing, and the step walk answers Error for it
+// in silence: the call reports the unbound Parameter for itself.
+function recordedMemberPathType(
+	node: parser.MemberPathNode,
+): common.Type | null {
+	for (let index = probeRecordings.length - 1; index >= 0; index--) {
+		let recorded = probeRecordings[index].paths.get(node)
+
+		if (recorded !== undefined) {
+			return decidedContext(recorded)
+		}
+	}
+
+	let recorded = contextualMemberPathTypes.get(node)
+
+	return recorded === undefined ? null : decidedContext(recorded)
+}
+
+function decidedContext(recorded: RecordedCaseValueContext): common.Type {
+	return recorded.bindings === null
+		? recorded.expectedType
+		: applyGenericBindings(recorded.expectedType, recorded.bindings)
+}
+
 // NOTE: The recorded Parameter Type with the call's bindings substituted in —
 // the position as the finished call decided it. A Type Parameter that nothing
 // ever bound is left standing, which is the undecided state
@@ -9708,6 +9947,7 @@ function probeContextualFunctionTypes<Result>(probe: () => Result): {
 	let recording: ContextualFunctionTypeRecording = {
 		functions: new Map(),
 		cases: new Map(),
+		paths: new Map(),
 	}
 
 	probeRecordings.push(recording)
@@ -9733,6 +9973,10 @@ function commitContextualFunctionTypes(
 	for (let [node, recorded] of recording.cases) {
 		recordContextualCaseValueType(node, recorded)
 	}
+
+	for (let [node, recorded] of recording.paths) {
+		recordContextualMemberPathType(node, recorded)
+	}
 }
 
 // NOTE: Enriches under a recording that is NOT the committed one — how a
@@ -9748,6 +9992,7 @@ function withContextualFunctionTypes<Result>(
 	probeRecordings.push({
 		functions: new Map(recording.functions),
 		cases: new Map(recording.cases),
+		paths: new Map(recording.paths),
 	})
 
 	try {
