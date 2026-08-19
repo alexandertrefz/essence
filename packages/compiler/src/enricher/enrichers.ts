@@ -74,6 +74,7 @@ import {
 	specializedNamespacesFor,
 	listItemTypeOf,
 	lookupTypeOf,
+	providedNamespaceMember,
 	recordValueTypeOf,
 	parameterDocumentation,
 	reportDocumentationParameters,
@@ -1713,12 +1714,25 @@ export function enrichLookup(
 	scope: enricher.Scope,
 ): common.typed.LookupNode {
 	let base = enrichExpression(node.base, scope)
+	// NOTE: A Method a conformance put in reach is read off the Namespace it is
+	// in reach through, exactly as a written one is — `Number.isLessThan(a, b)`
+	// beside `Number.compare(a, to b)`. Asked before `lookupTypeOf`, which would
+	// report `unknown-member` for a name the Namespace does not declare, and
+	// asked only for such a name so that nothing a Namespace writes is affected.
+	let provided =
+		base.type.type === "Namespace" &&
+		!Object.hasOwn(base.type.properties, node.member.content) &&
+		!Object.hasOwn(base.type.methods, node.member.content)
+			? providedNamespaceMember(base.type, node.member.content, scope)
+			: null
 	// NOTE: The Lookup and its member Identifier share one Type — the member's
 	// Type *is* the Lookup's Type, so it is resolved once and handed to both.
-	let type = lookupTypeOf(base.type, node.member.content, {
-		member: node.member.position,
-		base: node.base.position,
-	})
+	let type =
+		provided?.type ??
+		lookupTypeOf(base.type, node.member.content, {
+			member: node.member.position,
+			base: node.base.position,
+		})
 
 	return {
 		nodeType: "Lookup",
@@ -1731,6 +1745,7 @@ export function enrichLookup(
 		},
 		position: node.position,
 		type,
+		...(provided === null ? {} : { providedBy: provided.providedBy }),
 	}
 }
 

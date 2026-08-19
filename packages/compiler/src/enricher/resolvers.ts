@@ -2998,6 +2998,58 @@ export function providedMethodNamespaces(
 	return found
 }
 
+// NOTE: A Protocol's provided Method read off the NAMESPACE it is in reach
+// through — the `Number.isLessThan(a, b)` spelling, which a written instance
+// Method already answers and which a provided one has to answer the same way.
+// `Self` is pinned to the Namespace's own target, so the signature is the one
+// that Namespace's rung of the ladder offers.
+//
+// Null where the Namespace declares no conformance that provides the name,
+// which is what leaves `unknown-member` to be reported as it always was.
+export function providedNamespaceMember(
+	namespace: common.NamespaceType,
+	memberName: string,
+	scope: enricher.Scope,
+): { type: common.MethodType; providedBy: string } | null {
+	let reached = protocolsProviding(memberName, scope).filter(
+		(protocol) => namespace.conformsTo?.includes(protocol.name) === true,
+	)
+
+	for (let protocol of reached) {
+		// NOTE: A Method a DESCENDANT Protocol re-provided is the descendant's
+		// to answer, exactly as it is at a `::` call.
+		if (
+			reached.some(
+				(other) =>
+					other !== protocol &&
+					other.conformsTo?.includes(protocol.name) === true,
+			)
+		) {
+			continue
+		}
+
+		let provided = providedMethodNamespaceFor(protocol, memberName, {
+			name: namespace.name,
+			selfType: namespace.targetType ?? { type: "Unknown" },
+			targetType: namespace.targetType ?? { type: "Unknown" },
+			generics: namespace.generics,
+			// NOTE: Empty rather than the Namespace's own names — the caller
+			// asks only for a name the Namespace does NOT declare, so there is
+			// nothing here for an override to take away.
+			writes: new Set(),
+		})
+
+		if (provided !== null) {
+			return {
+				type: provided.methods[memberName]!,
+				providedBy: protocol.name,
+			}
+		}
+	}
+
+	return null
+}
+
 // NOTE: The same, for a receiver whose Type is a Protocol-bounded Type
 // Parameter. Conformance is not asked about at all — the bound IS the promise —
 // so the walk is over the Protocol and every Protocol it extends.

@@ -296,6 +296,10 @@ export interface LookupNode {
 	member: IdentifierNode
 	type: Type
 	position?: Position
+	// NOTE: As on the typed Node — the Protocol that provided a member read off
+	// a Namespace, which is what sends the emission to the shared const rather
+	// than to a member of that Namespace.
+	providedBy?: string
 }
 
 export interface IdentifierNode {

@@ -963,6 +963,77 @@ describe("Protocol-provided Methods", () => {
 	// had. The standard library is where the ladder has more than one rung:
 	// `Integer`, `Rational` and `Algebraic` each conform to `Orderable`, and the
 	// covering `Number` conforms too.
+	// NOTE: `Namespace.method(receiver, …)` is how an instance Method is called
+	// on its Namespace — `Number.compare(3, to 4)` — and a provided Method is a
+	// Method of that Namespace, so it answers the same spelling. `Self` is the
+	// Namespace's own target, which is what the receiver Argument is held to.
+	describe("the Namespace spelling", () => {
+		it("should answer a provided Method read off the Namespace", async () => {
+			expect(
+				await run(
+					[
+						"implementation {",
+						"\tTerminal.inspect(Integer.isNot(3, 4))",
+						'\tTerminal.inspect(String.isNot("a", "b"))',
+						"\tTerminal.inspect(Number.isLessThan(3, Number.Pi))",
+						"\tTerminal.inspect(Integer.clamp(15, between 1, and 10))",
+						"}",
+					].join("\n"),
+				),
+			).toEqual(["true", "true", "true", "10"])
+		})
+
+		it("should read the shared const rather than a member of the Namespace", () => {
+			expect(
+				generate(
+					[
+						"implementation {",
+						"\tTerminal.inspect(Number.isBetween(Number.Pi, 3, and 22/7))",
+						"}",
+					].join("\n"),
+				),
+			).toContain("$es_Orderable__isBetween(")
+		})
+
+		it("should still refuse a name no conformance provides", () => {
+			let source = [
+				"implementation {",
+				"\tTerminal.inspect(Integer.isBigger(3, 4))",
+				"}",
+			].join("\n")
+
+			expect(codesOf(source)).toEqual(["unknown-member"])
+		})
+
+		it("should answer a user Protocol's provided Method on its Namespace", async () => {
+			expect(
+				await run(
+					[
+						"implementation {",
+						"\tprotocol Sized {",
+						"\t\tsize() -> Integer",
+						"",
+						"\t\tisEmpty() -> Boolean {",
+						"\t\t\t<- @::size()::is(0)",
+						"\t\t}",
+						"\t}",
+						"",
+						"\ttype Bag = { n: Integer }",
+						"",
+						"\tnamespace Bags for Bag is Sized {",
+						"\t\tsize() -> Integer {",
+						"\t\t\t<- @.n",
+						"\t\t}",
+						"\t}",
+						"",
+						"\tTerminal.inspect(Bags.isEmpty({ n = 0 }))",
+						"}",
+					].join("\n"),
+				),
+			).toEqual(["true"])
+		})
+	})
+
 	describe("the specificity ladder", () => {
 		it("should fall from a narrow Namespace's rung to the covering one", async () => {
 			expect(
