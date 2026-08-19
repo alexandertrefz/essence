@@ -710,6 +710,86 @@ Error: A member path steps through Records only
 "
 `;
 
+exports[`Diagnostic Showcase PathKeySyntax.es should render the same report every time 1`] = `
+"[shorthand-on-path-key]
+Error: A path key names no binding
+    ╭─┤ PathKeySyntax.es:18:32 │
+    │
+ 18 │     constant bare = { config with server.port, name = "api" }
+    │                                   ─────┬─────  
+    │                                        ╰─────── this reaches into a value to set
+    │ 
+    │ Help: Write 'server.port = port'.
+    │ 
+    │ Note: A bare name is a member and its own value; a path is neither, because the value it would set is not the name it reaches through.
+────╯
+
+[duplicate-member]
+Error: Member 'server.port' and 'server' both write 'server'
+    ╭─┤ PathKeySyntax.es:25:4 │
+    │
+ 24 │          server = { host = "db", port = 5432, tls = { enabled = true } },
+    │          ───┬──  
+    │             ╰──── and so does this
+ 25 │          server.port = port,
+    │          ─────┬─────  
+    │               ╰─────── this writes 'server'
+    │ 
+    │ Help: Set 'server' as a whole, or reach into it with paths — not both.
+    │ 
+    │ Note: An update writes each member once, so a key that sets a whole Record and a path that reaches into it can not both stand.
+────╯
+
+─── 2 errors
+"
+`;
+
+exports[`Diagnostic Showcase PathKeys.es should render the same report every time 1`] = `
+"[path-key-outside-combination]
+Error: A path key updates nothing here
+    ╭─┤ PathKeys.es:23:3 │
+    │
+ 23 │        server.port = 8080,
+    │        ─────┬─────  
+    │             ╰─────── this reaches into a value
+    │ 
+    │ Help 1: Write the whole member: 'server = { … }'.
+    │ Help 2: Or update a value that already has it: '{ original with server.port = … }'.
+    │ 
+    │ Note: A Record Literal writes its members from nothing, so there is no value under this key to reach into.
+────╯
+
+[path-step-not-a-record]
+Error: A path key steps through Records only
+    ╭─┤ PathKeys.es:28:35 │
+    │
+ 28 │     constant renamed = { config with name.length = 1 }
+    │                                      ──┬─  
+    │                                        ╰─── this is a String
+    │ 
+    │ Help: Set 'name' as a whole instead.
+    │ 
+    │ Note: Every step but the last names the value the step after it updates, and only a Record can be updated.
+────╯
+
+[path-on-computed-value]
+Error: A path key updates a value it can name
+    ╭─┤ PathKeys.es:32:22 │
+    │
+ 32 │     constant loaded = { load() with server.port = 8080 }
+    │                         ───┬──  
+    │                            ╰──── this is worked out here, not named
+    │ 
+    │ Help 1: Bind it to a Constant first, and update the Constant.
+    │ Help 2: Or write the nesting out by hand, so the value is worked out once.
+    │ 
+    │ Note: A path reaches into the value one level at a time, so the value is read once for each level it reaches through. A name, '@', or a chain of member reads over one of those reads the same value every time; anything worked out on the spot would be worked out again for each level.
+────╯
+
+─── 3 errors
+"
+`;
+
 exports[`Diagnostic Showcase Patterns.es should render the same report every time 1`] = `
 "[refutable-pattern]
 Error: A Declaration can not match a value against a Pattern
@@ -1540,58 +1620,5 @@ Warning: This Statement runs in an order the cycle does not state
 ───╯
 
 ─── 1 warning
-"
-`;
-
-exports[`Diagnostic Showcase PathKeySyntax.es should render the same report every time 1`] = `
-"[shorthand-on-path-key]
-Error: A path key names no binding
-    ╭─┤ PathKeySyntax.es:18:32 │
-    │
- 18 │     constant bare = { config with server.port, name = "api" }
-    │                                   ─────┬─────  
-    │                                        ╰─────── this reaches into a value to set
-    │ 
-    │ Help: Write 'server.port = port'.
-    │ 
-    │ Note: A bare name is a member and its own value; a path is neither, because the value it would set is not the name it reaches through.
-────╯
-
-[duplicate-member]
-Error: Member 'server.port' and 'server' both write 'server'
-    ╭─┤ PathKeySyntax.es:25:4 │
-    │
- 24 │          server = { host = "db", port = 5432, tls = { enabled = true } },
-    │          ───┬──  
-    │             ╰──── and so does this
- 25 │          server.port = port,
-    │          ─────┬─────  
-    │               ╰─────── this writes 'server'
-    │ 
-    │ Help: Set 'server' as a whole, or reach into it with paths — not both.
-    │ 
-    │ Note: An update writes each member once, so a key that sets a whole Record and a path that reaches into it can not both stand.
-────╯
-
-─── 2 errors
-"
-`;
-
-exports[`Diagnostic Showcase PathKeys.es should render the same report every time 1`] = `
-"[path-key-outside-combination]
-Error: A path key updates nothing here
-    ╭─┤ PathKeys.es:13:3 │
-    │
- 13 │        server.port = 8080,
-    │        ─────┬─────  
-    │             ╰─────── this reaches into a value
-    │ 
-    │ Help 1: Write the whole member: 'server = { … }'.
-    │ Help 2: Or update a value that already has it: '{ original with server.port = … }'.
-    │ 
-    │ Note: A Record Literal writes its members from nothing, so there is no value under this key to reach into.
-────╯
-
-─── 1 error
 "
 `;

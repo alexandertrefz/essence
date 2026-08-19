@@ -531,6 +531,20 @@ is not yet legal in a partial Argument, which is a Record Literal standing where
 a Record Parameter is expected; that is a follow-up, and until it lands the
 Literal has to be written whole.
 
+### `path-on-computed-value`
+
+An update with a dotted key was written on a value that is worked out on the
+spot — `{ load() with server.port = 8080 }`. A path reaches into the value one
+level at a time, and the compiled form reads the value once for each level it
+reaches through, so the value has to be one that reads the same every time: a
+name, `@`, or a chain of member reads over one of those.
+
+Bind it to a Constant and update the Constant, or write the nesting out by hand
+so the value is worked out once.
+
+The restriction is on path keys alone. `{ load() with port = 8080 }` needs no
+level below it and is unaffected.
+
 ### `uncombinable-types`
 
 The `<>` combination operator was given something it can not combine — both

@@ -1038,11 +1038,24 @@ export function enrichCombination(
 	scope: enricher.Scope,
 ): common.typed.CombinationNode {
 	let lhs = enrichExpression(node.lhs, scope)
+	let keys = node.rhs
+
+	if (keys.nodeType === "RecordValue" && hasPathKeys(keys)) {
+		if (updatableThroughPaths(node.lhs, lhs)) {
+			return enrichPathCombination(node, lhs, keys, scope)
+		}
+
+		// NOTE: The path keys are dropped rather than read under their dotted
+		// spelling, which would put a member called `server.port` into the
+		// update and report a second Diagnostic about a member nobody wrote.
+		keys = { ...keys, members: withoutPathKeys(keys.members) }
+	}
+
 	// NOTE: The update is enriched with the value it updates as its expected
 	// Type, so each updated member is read against the Type the original
 	// declared for it — a bare Case resolves, and one arm of a Union-typed
 	// member is enough, exactly as it is at the Declaration.
-	let rhs = enrichExpression(node.rhs, scope, lhs.type)
+	let rhs = enrichExpression(keys, scope, lhs.type)
 
 	return {
 		nodeType: "Combination",
@@ -1056,6 +1069,281 @@ export function enrichCombination(
 			node.rhs.position,
 		),
 	}
+}
+
+function hasPathKeys(record: parser.RecordValueNode): boolean {
+	return Object.values(record.members).some(
+		(member) => member.steps !== undefined,
+	)
+}
+
+function withoutPathKeys(
+	members: Record<string, parser.RecordValueMemberNode>,
+): Record<string, parser.RecordValueMemberNode> {
+	return Object.fromEntries(
+		Object.entries(members).filter(
+			([, member]) => member.steps === undefined,
+		),
+	)
+}
+
+// NOTE: The desugar writes the value being updated once per level it reaches
+// into — `{ c with server.tls.enabled = true }` mentions `c.server` to build
+// the level below it — so the value has to be safe to mention more than once.
+// A PLACE is: `@`, a name, or a chain of member reads over one of those.
+// Anything else is refused rather than bound to a hidden temporary: every
+// nested update anybody writes is on a place, and the escape hatch — one arrow
+// that binds it, as a computed right-hand side already emits — can be added
+// later without a syntax change.
+//
+// A left-hand side that is not a Record at all, or whose Type is already an
+// Error, is left to the ordinary reading: `uncombinable-types` says the same
+// thing better, and an Error has been reported once already.
+function updatableThroughPaths(
+	node: parser.ExpressionNode,
+	lhs: common.typed.ExpressionNode,
+): boolean {
+	if (lhs.type.type !== "Record") {
+		return false
+	}
+
+	if (isPlace(node)) {
+		return true
+	}
+
+	reportError("A path key updates a value it can name", node.position, {
+		code: "path-on-computed-value",
+		labels: [primary(node.position, "this is worked out here, not named")],
+		notes: [
+			"A path reaches into the value one level at a time, so the value is read once for each level it reaches through. A name, '@', or a chain of member reads over one of those reads the same value every time; anything worked out on the spot would be worked out again for each level.",
+		],
+		helps: [
+			"Bind it to a Constant first, and update the Constant.",
+			"Or write the nesting out by hand, so the value is worked out once.",
+		],
+	})
+
+	return false
+}
+
+function isPlace(node: parser.ExpressionNode): boolean {
+	switch (node.nodeType) {
+		case "Identifier":
+		case "Self":
+			return true
+		case "Lookup":
+			return isPlace(node.base)
+		default:
+			return false
+	}
+}
+
+// NOTE: A dotted key IS a nested update, and this is where the one becomes the
+// other: `{ config with server.port = 8080 }` is enriched as
+// `{ config with server = { config.server with port = 8080 } }`. Keys sharing a
+// first step are gathered into ONE level, so `server.port` and `server.tls.enabled`
+// build a single `config.server` update rather than two that overwrite each
+// other. Everything downstream — the Validator, the Optimiser's collapse, the
+// Rewriter — sees the nesting an author could have written by hand, which is
+// the whole reason this shape was chosen over an implicit deep merge: `server =
+// { … }` always REPLACES and `server.port = …` always merges, and a Type may
+// grow a member without either of them changing meaning.
+//
+// Each synthesized Lookup's member Identifier takes the POSITION of the step
+// that spelled it, which is what makes Hover, the rename index and the semantic
+// tokens answer for a step with no code of their own — the same invariant a
+// member path is built on.
+function enrichPathCombination(
+	node: parser.CombinationNode,
+	lhs: common.typed.ExpressionNode,
+	keys: parser.RecordValueNode,
+	scope: enricher.Scope,
+): common.typed.CombinationNode {
+	let rhs = pathUpdate(
+		lhs,
+		lhs.type as common.RecordType,
+		Object.values(keys.members).map((member) => ({
+			steps: member.steps ?? [member.name],
+			member,
+		})),
+		keys.position,
+		scope,
+	)
+
+	return {
+		nodeType: "Combination",
+		lhs,
+		rhs,
+		position: node.position,
+		type: combinationTypeOf(
+			lhs.type,
+			rhs.type,
+			node.lhs.position,
+			node.rhs.position,
+		),
+	}
+}
+
+type PathKeyEntry = {
+	// NOTE: The steps still to be walked, the first of them the member this
+	// level writes. Never empty.
+	steps: Array<parser.IdentifierNode>
+	member: parser.RecordValueMemberNode
+}
+
+function pathUpdate(
+	base: common.typed.ExpressionNode,
+	baseType: common.RecordType,
+	entries: Array<PathKeyEntry>,
+	position: common.Position,
+	scope: enricher.Scope,
+): common.typed.RecordValueNode {
+	let groups = new Map<string, Array<PathKeyEntry>>()
+
+	for (let entry of entries) {
+		let group = groups.get(entry.steps[0].content)
+
+		if (group === undefined) {
+			groups.set(entry.steps[0].content, [entry])
+		} else {
+			group.push(entry)
+		}
+	}
+
+	let members: Record<string, common.typed.ExpressionNode> = {}
+
+	for (let [name, group] of groups) {
+		// NOTE: A group holding both a whole member and a path into it is a
+		// clash the Parser already refused. The whole member is the one that
+		// can stand on its own, so it does.
+		let whole = group.find((entry) => entry.steps.length === 1)
+
+		if (whole !== undefined) {
+			members[name] = enrichMember(
+				whole.member,
+				scope,
+				baseType.members[name] ?? null,
+			)
+
+			continue
+		}
+
+		let step = group[0].steps[0]
+		let stepType = pathKeyStepType(step, baseType, base.position)
+
+		if (stepType.type !== "Record") {
+			continue
+		}
+
+		let lookup: common.typed.LookupNode = {
+			nodeType: "Lookup",
+			base: clonePlace(base),
+			member: {
+				nodeType: "Identifier",
+				content: step.content,
+				position: step.position,
+				type: stepType,
+			},
+			position: step.position,
+			type: stepType,
+		}
+		let inner = pathUpdate(
+			lookup,
+			stepType,
+			group.map((entry) => ({
+				steps: entry.steps.slice(1),
+				member: entry.member,
+			})),
+			groupPosition(group),
+			scope,
+		)
+
+		members[name] = {
+			nodeType: "Combination",
+			lhs: lookup,
+			rhs: inner,
+			position: inner.position,
+			type: combinationTypeOf(
+				stepType,
+				inner.type,
+				step.position,
+				inner.position,
+			),
+		}
+	}
+
+	let memberTypes: Record<string, common.Type> = {}
+
+	for (let [name, member] of Object.entries(members)) {
+		memberTypes[name] = member.type
+	}
+
+	return {
+		nodeType: "RecordValue",
+		members,
+		position,
+		type: recordValueTypeOf(null, memberTypes, null),
+		declaredType: null,
+	}
+}
+
+// NOTE: A step a path key reaches THROUGH must be a Record: it is the value the
+// level below it updates, and only a Record can be updated. A Case is a Record
+// with a nominal identity and is read through by a member path, but it can not
+// be updated — rebuilding one is a construction, not an update — so it is
+// turned away here too. Silent on an Error, which somebody has reported once
+// already.
+function pathKeyStepType(
+	step: parser.IdentifierNode,
+	baseType: common.RecordType,
+	basePosition: common.Position,
+): common.Type {
+	let stepType = lookupTypeOf(baseType, step.content, {
+		member: step.position,
+		base: basePosition,
+	})
+
+	if (stepType.type === "Record" || stepType.type === "Error") {
+		return stepType
+	}
+
+	reportError("A path key steps through Records only", step.position, {
+		code: "path-step-not-a-record",
+		labels: [
+			primary(
+				step.position,
+				`this is ${withArticle(describeType(stepType))}`,
+			),
+		],
+		notes: [
+			"Every step but the last names the value the step after it updates, and only a Record can be updated.",
+		],
+		helps: [`Set '${step.content}' as a whole instead.`],
+	})
+
+	return { type: "Error" }
+}
+
+// NOTE: The span the keys of one level were written across, so a Diagnostic
+// about the level points at every key that built it.
+function groupPosition(group: Array<PathKeyEntry>): common.Position {
+	return {
+		start: group[0].steps[0].position.start,
+		end: group[group.length - 1].member.value.position.end,
+	}
+}
+
+// NOTE: The same place, as a Node of its own. The desugar mentions the value
+// being updated once per level, and one Node standing in several places is a
+// Node the Optimiser would walk and rewrite more than once.
+function clonePlace(
+	node: common.typed.ExpressionNode,
+): common.typed.ExpressionNode {
+	if (node.nodeType === "Lookup") {
+		return { ...node, base: clonePlace(node.base) }
+	}
+
+	return { ...node }
 }
 
 // NOTE: The Scope a Method's Parameter list and body are read in: the Method's
@@ -4276,31 +4564,35 @@ function enrichMembers(
 	let result: Record<string, common.typed.ExpressionNode> = {}
 
 	for (let [memberKey, memberValue] of Object.entries(members)) {
-		// NOTE: A shorthand member's value is the member's own name, and a name
-		// that names nothing is the one Diagnostic the spelling can produce —
-		// so it is read through the two steps `enrichExpression` takes for an
-		// Identifier, with the flag that says the name stands in both
-		// positions. `asValue` is one of those steps: a Function read as a
-		// value drops its Parameter defaults here as it does anywhere else.
-		if (
-			memberValue.shorthand === true &&
-			memberValue.value.nodeType === "Identifier"
-		) {
-			result[memberKey] = asValue(
-				enrichIdentifierExpression(memberValue.value, scope, true),
-			)
-
-			continue
-		}
-
-		result[memberKey] = enrichExpression(
-			memberValue.value,
+		result[memberKey] = enrichMember(
+			memberValue,
 			scope,
 			expectedMemberTypes?.[memberKey] ?? null,
 		)
 	}
 
 	return result
+}
+
+// NOTE: A shorthand member's value is the member's own name, and a name that
+// names nothing is the one Diagnostic the spelling can produce — so it is read
+// through the two steps `enrichExpression` takes for an Identifier, with the
+// flag that says the name stands in both positions. `asValue` is one of those
+// steps: a Function read as a value drops its Parameter defaults here as it
+// does anywhere else.
+//
+// One function, because a path key's leaf is a member like any other and is
+// read a level down from where `enrichMembers` walks.
+function enrichMember(
+	member: parser.RecordValueMemberNode,
+	scope: enricher.Scope,
+	expectedType: common.Type | null,
+): common.typed.ExpressionNode {
+	if (member.shorthand === true && member.value.nodeType === "Identifier") {
+		return asValue(enrichIdentifierExpression(member.value, scope, true))
+	}
+
+	return enrichExpression(member.value, scope, expectedType)
 }
 
 // NOTE: What the item position of an expected Type wants, for the Expressions

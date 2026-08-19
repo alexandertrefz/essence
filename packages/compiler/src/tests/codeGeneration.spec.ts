@@ -870,6 +870,45 @@ describe("Code Generation", () => {
 			expect(await run(counted)).toEqual(["{ x = 9, y = 8 }", "1"])
 		})
 
+		// NOTE: A dotted key is enriched into the nesting an author could have
+		// written by hand, so nothing below the Enricher knows about it at all
+		// — and what is emitted has to be exactly the nesting, spread for
+		// spread. Run as well as read: the value updated must come out
+		// untouched, which is what says the nesting copies rather than writes.
+		it("nests a dotted key into the update it stands for", async () => {
+			const nested = `implementation {
+	type Tls = { enabled: Boolean, name: String }
+	type Server = { host: String, port: Integer, tls: Tls }
+	type Config = { name: String, server: Server }
+
+	constant config: Config = {
+		name = "api",
+		server = {
+			host = "localhost",
+			port = 80,
+			tls = { enabled = false, name = "a" },
+		},
+	}
+
+	constant moved = { config with server.tls.enabled = true, server.port = 1 }
+
+	Terminal.inspect(moved.server.tls.enabled)
+	Terminal.inspect(moved.server.port)
+	Terminal.inspect(moved.server.host)
+	Terminal.inspect(config.server.port)
+}`
+			let generated = generate(nested)
+
+			expect(generated).toContain("...config.server")
+			expect(generated).toContain("...config.server.tls")
+			expect(await run(nested)).toEqual([
+				"true",
+				"1",
+				`"localhost"`,
+				"80",
+			])
+		})
+
 		// NOTE: `?` is a legal Essence identifier character and not a legal
 		// JavaScript one, so a projected member is a quoted key on the way in
 		// and a bracketed read on the way out. Written as an identifier either
