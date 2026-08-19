@@ -965,7 +965,7 @@ export interface ProtocolDeclarationStatementNode {
 	// NOTE: The provided Methods, with `_self` already unshifted onto each and
 	// the hidden `Self__conformance` Parameter already appended by the bounded
 	// Generic rail — exactly the shape a Namespace's Methods arrive in, which
-	// is what lets the Rewriter emit one `$es_<Protocol>_<member>` const per
+	// is what lets the Rewriter emit one `$es_<Protocol>__<member>` const per
 	// provided Method through the very code that emits an Essence Method.
 	methods: Methods
 	position?: Position
