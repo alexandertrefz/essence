@@ -95,7 +95,7 @@ declarations {
 
 		§§ Answers whether the List has an item, has an item the check accepts, or holds only items the check accepts.
 		§§
-		§§ @returns — `true` when the List answers the question that was asked.
+		§§ @returns — `true` when the List has an item, when the check accepts an item, or when the check accepts every item.
 		overload hasItems {
 			§§ Answers whether the List has at least one item.
 			§§
