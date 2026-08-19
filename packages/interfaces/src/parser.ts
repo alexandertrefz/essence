@@ -86,6 +86,7 @@ export type ExpressionNode =
 	| FunctionInvocationNode
 	| ValueNode
 	| LookupNode
+	| MemberPathNode
 	| SelfNode
 	| IdentifierNode
 	| CombinationNode
@@ -218,6 +219,20 @@ export interface LookupNode {
 	nodeType: "Lookup"
 	base: ExpressionNode
 	member: IdentifierNode
+	position: Position
+}
+
+// NOTE: `.price`, `.address.city` — a leading dot and the members that follow
+// it, written where a Function of one Parameter is expected. It stands for the
+// Function that reads those members off its Argument, and the Enricher is where
+// it becomes one: nothing downstream of enrichment ever sees a MemberPath.
+//
+// The steps are Identifiers rather than one dotted string so that the Language
+// Server can rename, colour and complete each of them where it was written —
+// the synthesized Lookups take these very Positions.
+export interface MemberPathNode {
+	nodeType: "MemberPath"
+	steps: Array<IdentifierNode>
 	position: Position
 }
 

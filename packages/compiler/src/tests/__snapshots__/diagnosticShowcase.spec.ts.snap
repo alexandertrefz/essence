@@ -619,6 +619,68 @@ Error: This Match has no Case for the rest of the values
 "
 `;
 
+exports[`Diagnostic Showcase MemberPathSyntax.es should render the same report every time 1`] = `
+"[path-is-members-only]
+Error: A member path reads members and nothing else
+    ╭─┤ MemberPathSyntax.es:10:38 │
+    │
+ 10 │     constant rounded = lines::map(.total::rounded())
+    │                                         ▲  
+    │                                         ╰── '::' can not follow a path
+    │ 
+    │ Help: Write the Function literal instead: '(_ item: SomeType) { <- item.price::rounded() }'.
+    │ 
+    │ Note: A path is the Function that reads those members off its Argument, so there is nothing here for a call to be made on.
+────╯
+
+─── 1 error
+"
+`;
+
+exports[`Diagnostic Showcase MemberPaths.es should render the same report every time 1`] = `
+"[path-without-context]
+Error: A member path stands where no Function is expected
+   ╭─┤ MemberPaths.es:8:19 │
+   │
+ 8 │     constant price = .price
+   │                      ───┬──  
+   │                         ╰──── this path names no value
+   │ 
+   │ Help: Write the Function literal instead: '(_ item: SomeType) { <- item.price }'.
+   │ 
+   │ Note: A member path is a Function the Compiler writes for you, so it needs a Parameter Type to read the members off — and only a position expecting a Function of one Parameter names one.
+───╯
+
+[path-without-context]
+Error: A member path stands where no Function is expected
+    ╭─┤ MemberPaths.es:12:26 │
+    │
+ 12 │     constant name: String = .name
+    │                             ──┬──  
+    │                               ╰──── this path names no value
+    │ 
+    │ Help: Write the Function literal instead: '(_ item: SomeType) { <- item.name }'.
+    │ 
+    │ Note: A member path is a Function the Compiler writes for you, so it needs a Parameter Type to read the members off — and only a position expecting a Function of one Parameter names one.
+────╯
+
+[path-without-context]
+Error: A member path stands where no Function is expected
+    ╭─┤ MemberPaths.es:15:57 │
+    │
+ 15 │     constant order: (_: Product, _: Product) -> Ordering = .price
+    │                                                            ───┬──  
+    │                                                               ╰──── this path names no value
+    │ 
+    │ Help: Write the Function literal instead: '(_ item: SomeType) { <- item.price }'.
+    │ 
+    │ Note: A member path is a Function the Compiler writes for you, so it needs a Parameter Type to read the members off — and only a position expecting a Function of one Parameter names one.
+────╯
+
+─── 3 errors
+"
+`;
+
 exports[`Diagnostic Showcase Patterns.es should render the same report every time 1`] = `
 "[refutable-pattern]
 Error: A Declaration can not match a value against a Pattern
