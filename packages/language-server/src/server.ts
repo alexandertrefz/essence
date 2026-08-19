@@ -687,10 +687,11 @@ export function startServer(options: { connection?: Connection } = {}) {
 			}
 
 			// NOTE: Most sites are the new name written over the Identifier
-			// that was found. A Pattern's shorthand binder is not: `{ width }`
-			// names the Record's member and the local it binds with ONE
-			// Identifier, so renaming either end has to spell the other out
-			// beside it — `renameEdits` is where that is decided, once, for
+			// that was found. The two shorthands are not: `{ width }` names
+			// two things with ONE Identifier — a Pattern's binds the Record's
+			// member and a local, a Record Literal's writes the member and
+			// reads a value — so renaming either end has to spell the other out
+			// beside it. `renameEdits` is where that is decided, once, for
 			// every caller.
 			edits.push(
 				...renameEdits(

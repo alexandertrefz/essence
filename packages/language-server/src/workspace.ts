@@ -73,10 +73,11 @@ export type WorkspaceOccurrence = {
 	position: common.Position
 	access: OccurrenceAccess
 	// NOTE: How renaming THROUGH this occurrence is written — see
-	// `RenameSite.edits`. Absent everywhere but a Pattern's shorthand binder,
-	// which is the one site whose name can not simply be overwritten; an entry
-	// of an `import`/`export` block never has any, because a Module's own
-	// grammar already writes the two names apart.
+	// `RenameSite.edits`. Absent everywhere but the two shorthands — a
+	// Pattern's binder and a Record Literal's member — which are the sites
+	// whose name can not simply be overwritten; an entry of an
+	// `import`/`export` block never has any, because a Module's own grammar
+	// already writes the two names apart.
 	edits?: Array<RenameEdit> | null
 }
 
