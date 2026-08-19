@@ -6434,10 +6434,12 @@ function namespacesDeclaringMethod(
 		scope,
 		position,
 	)) {
-		// NOTE: The walk was gated on the name, so this holds for every
-		// Protocol it answered with — asked anyway, because a Namespace that
-		// declares the Method is what every candidate here is, and a probe
-		// against one that does not would fail somewhere further in.
+		// NOTE: LOAD-BEARING, not a belt beside a brace. The walk answers with
+		// one pseudo Namespace per Protocol that WROTE a provided Method of this
+		// name — and an ancestor whose Method a descendant re-provided is still
+		// among them when it provides some OTHER Method too, carrying that other
+		// Method and not this one. Dropping the guard would tie the ancestor
+		// against the descendant and make the call ambiguous.
 		if (Object.hasOwn(namespace.methods, methodName)) {
 			matchingNamespaces.set(name, namespace)
 		}
