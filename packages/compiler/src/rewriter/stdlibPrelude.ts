@@ -36,6 +36,13 @@ import { simplify } from "../simplifier/index"
 export type PreludeNamespace = {
 	name: string
 	node: common.typedSimple.NamespaceDefinitionStatementNode
+	// NOTE: Set for a PROTOCOL's provided Methods, which ride here because
+	// everything the emission wants from a Namespace is a name and a record of
+	// bodied Methods. It decides the const's NAME — see
+	// `protocolMemberIdentifier` — and it is a separate flag rather than a
+	// guess off the name, because a Protocol and a Namespace may be spelled
+	// exactly alike.
+	protocol?: true
 }
 
 // NOTE: The Simplifier is the stage that turns `is__overload$1` into a name and
@@ -111,6 +118,7 @@ function buildStdlibArtifacts(stdlib: Stdlib): StdlibArtifacts {
 				if (Object.keys(node.methods).length > 0) {
 					namespaces.push({
 						name: node.name.name,
+						protocol: true,
 						node: {
 							nodeType: "NamespaceDefinitionStatement",
 							name: node.name,
@@ -348,6 +356,21 @@ export function essenceMethodIdentifier(
 	return `${ESSENCE_METHOD_PREFIX}${namespaceName}_${memberName}`
 }
 
+// NOTE: The emitted name of a Protocol's PROVIDED Method. The DOUBLE separator
+// is what keeps it out of the Namespace scheme's way: `essenceMethodIdentifier`
+// joins with one `_`, and no member name can begin with one — `_` lexes as a
+// Symbol, so no user identifier holds one — which makes `$es_Integer__toString`
+// a name no Namespace member's const can ever wear. A user Program declaring
+// `protocol Integer` beside the standard library's `Integer` Namespace is the
+// case that made it necessary: without it the Protocol's body was emitted under
+// the Namespace's const and `42::toString()` ran the Protocol's.
+export function protocolMemberIdentifier(
+	protocolName: string,
+	memberName: string,
+): string {
+	return `${ESSENCE_METHOD_PREFIX}${protocolName}__${memberName}`
+}
+
 // NOTE: The set of `(Namespace, member)` pairs the prelude implements in
 // Essence, memoised. Both halves of a lookup are ALREADY overload-mangled by
 // the Simplifier before they reach here — the prelude's keys through
@@ -360,11 +383,17 @@ export function essenceMethodIdentifier(
 const essenceMethodNames = derivedFromStdlib(
 	() =>
 		new Set(
-			stdlibPrelude().flatMap((namespace) =>
-				Object.keys(namespace.node.methods).map(
-					(name) => `${namespace.name}\u0000${name}`,
+			stdlibPrelude()
+				// NOTE: A Protocol's provided Methods are reached through the
+				// Invocation's `providedBy`, never through a Namespace lookup —
+				// answering here would route a Namespace call of the same name
+				// to the Protocol's const.
+				.filter((namespace) => namespace.protocol !== true)
+				.flatMap((namespace) =>
+					Object.keys(namespace.node.methods).map(
+						(name) => `${namespace.name}\u0000${name}`,
+					),
 				),
-			),
 		),
 )
 

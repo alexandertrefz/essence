@@ -6167,10 +6167,40 @@ function reportUnknownMethod(
 					baseType,
 					scope,
 				),
+				...undeclaredProtocolHelps(namespaces, scope),
 			],
 			...suggestionData(suggestion),
 		},
 	)
+}
+
+// NOTE: A Protocol's PROVIDED Methods are reached through the Protocol, exactly
+// as a Namespace's Methods are reached through the Namespace — so a Module that
+// imported the conforming Namespace and not the Protocol sees the written
+// Methods and none of the provided ones. Nothing else in the report says so:
+// the Namespaces were searched and the name was not among them, which is true
+// and unhelpful. Named here, once per Protocol, on the Namespaces that DECLARE
+// the conformance.
+function undeclaredProtocolHelps(
+	namespaces: Map<string, common.NamespaceType>,
+	scope: enricher.Scope,
+): Array<string> {
+	let missing = new Set<string>()
+
+	for (let namespace of namespaces.values()) {
+		for (let protocolName of namespace.conformsTo ?? []) {
+			if (findProtocolInScope(protocolName, scope) === null) {
+				missing.add(protocolName)
+			}
+		}
+	}
+
+	return [...missing]
+		.sort()
+		.map(
+			(protocolName) =>
+				`Import '${protocolName}' — this value conforms to it, and a Protocol's provided Methods are only reachable where the Protocol is.`,
+		)
 }
 
 // NOTE: The Method is there, it is simply not called this way — which is a
@@ -9650,6 +9680,9 @@ export function resolveNamespaceDefinitionStatementType(
 	// conditions are what makes the conformance hold at all, and they hold the
 	// ancestor's exactly as they hold the descendant's.
 	let conformsTo: Array<string> = []
+	// NOTE: The Protocols some clause grants outright, so a later conditional
+	// clause reaching the same one can not put conditions back on it.
+	let unconditional = new Set<string>()
 
 	for (let clause of node.conformsTo) {
 		let conditions =
@@ -9670,8 +9703,17 @@ export function resolveNamespaceDefinitionStatementType(
 				conformsTo.push(name)
 			}
 
-			if (
-				conditions !== null &&
+			// NOTE: The WEAKEST grant wins. Two clauses may reach one Protocol —
+			// `is Ordered where Item is Ordered, is Ranked`, where both extend
+			// `Named` — and if either grants it without conditions then the
+			// Namespace conforms without them. Keeping the first clause's
+			// conditions would refuse a receiver the second clause conforms for,
+			// with a `where` the reader never wrote about that Protocol.
+			if (conditions === null) {
+				unconditional.add(name)
+				delete conformanceConditions[name]
+			} else if (
+				!unconditional.has(name) &&
 				conformanceConditions[name] === undefined
 			) {
 				conformanceConditions[name] = conditions

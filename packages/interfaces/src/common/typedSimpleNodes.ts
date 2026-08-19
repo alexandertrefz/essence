@@ -145,6 +145,13 @@ export interface MethodInvocationNode {
 	// Equatable — the Rewriter then emits `$helpers.boundChoiceIs(<descriptor>)`
 	// in place of the plain `choiceIs` member read.
 	derivedDescriptor?: DerivedEquatableDescriptor
+	// NOTE: The Protocol that PROVIDED this Method, when one did. `base`/
+	// `namespaceName` is that Protocol's name too, and a Namespace may be
+	// spelled exactly like it — a user Program declaring `protocol Integer`
+	// beside the standard library's `Integer` Namespace is the case that made
+	// this necessary — so this is what tells a provided Method from a written
+	// one at emission, where a name alone can not.
+	providedBy?: string
 	type: Type
 	position?: Position
 }
@@ -185,6 +192,13 @@ export type UnionMethodDispatchCase = {
 	// derived Equatable — the Rewriter then emits
 	// `$helpers.boundChoiceIs(<descriptor>)` for the branch's Method.
 	derivedDescriptor?: DerivedEquatableDescriptor
+	// NOTE: The Protocol that PROVIDED this Method, when one did. `base`/
+	// `namespaceName` is that Protocol's name too, and a Namespace may be
+	// spelled exactly like it — a user Program declaring `protocol Integer`
+	// beside the standard library's `Integer` Namespace is the case that made
+	// this necessary — so this is what tells a provided Method from a written
+	// one at emission, where a name alone can not.
+	providedBy?: string
 }
 
 // NOTE: The shim's whole body is one call handing every Parameter on to the

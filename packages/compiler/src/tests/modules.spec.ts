@@ -2183,12 +2183,12 @@ export {
 				)
 				let sources = generateModules(linked)
 				let declarations = [...sources.sources.values()].filter(
-					(source) => source.includes("$es_Shape_describe ="),
+					(source) => source.includes("$es_Shape__describe ="),
 				)
 
 				expect(declarations).toHaveLength(1)
 				expect(sources.sources.get("essence:./Main.es")).toContain(
-					"$es_Shape_describe",
+					"$es_Shape__describe",
 				)
 				expect(await runBundle(sources, directory)).toEqual([
 					'"area 9"',
