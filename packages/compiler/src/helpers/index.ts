@@ -2869,6 +2869,19 @@ export type MatchableArgument = {
 	// `Box<Item>` Parameter is a Parameter like any other: what can not decide is
 	// this way of writing the value, not the place it is written in.
 	bindsNothing?: boolean
+	// NOTE: Set on an Argument written as a Record LITERAL, whose emitted value
+	// therefore carries exactly the members its Type names and no others.
+	//
+	// NOTE: Which is what a PARTIAL Argument has to promise, and why only a
+	// literal may be one. Record assignability is width subtyping, so a value
+	// typed `{ host: String }` may carry a `retries` of any Type at all — and a
+	// callee filling in the members a caller left out reads
+	// `options.retries ?? 3`, which would take that foreign value for the member
+	// it is missing, exactly as spreading a `with`'s right-hand side whole did.
+	// A literal has nothing to hide: its Type is its text. Every OTHER
+	// expression still passes a WHOLE Record, where every member the callee
+	// reads is one the Type declares and the fallback can not fire at all.
+	spellsItsMembers?: boolean
 }
 
 // NOTE: Which Argument each Parameter was given. `forParameter[i]` is the
@@ -3101,6 +3114,7 @@ function deferredArgumentOrder(
 function argumentFits(
 	parameter: common.Parameter,
 	expectedType: common.Type | common.GenericUse,
+	argument: MatchableArgument,
 	argumentType: common.Type,
 	inferenceContext: GenericInferenceContext | null,
 ): boolean {
@@ -3110,6 +3124,7 @@ function argumentFits(
 
 	return (
 		parameter.defaultMembers !== undefined &&
+		argument.spellsItsMembers === true &&
 		expectedType.type === "Record" &&
 		argumentType.type === "Record" &&
 		isPartialOf(expectedType, argumentType, inferenceContext) &&
@@ -3212,6 +3227,7 @@ export function matchArguments(
 			!argumentFits(
 				parameter,
 				expectedType,
+				argument,
 				argument.getType(
 					expectedType,
 					inferenceContext?.bindings ?? null,

@@ -4243,6 +4243,7 @@ function enrichParameter(
 					type,
 				},
 				position: node.position,
+				type,
 				inferredType: node.type === null ? type : null,
 				defaultValue,
 			},
@@ -4273,6 +4274,7 @@ function enrichParameter(
 				? enrichIdentifier(node.internalName, scope)
 				: null,
 			position: node.position,
+			type,
 			inferredType: node.type === null ? type : null,
 			defaultValue,
 		},
@@ -6013,6 +6015,7 @@ function resolveInvokedMethodInNamespace(
 			getType: (expectedType, bindings) =>
 				typer.getType(argument.value, expectedType, bindings),
 			bindsNothing: bindsNoTypeParameter(argument),
+			spellsItsMembers: argument.value.nodeType === "RecordValue",
 		}),
 	)
 
@@ -7534,6 +7537,7 @@ function resolveFunctionInvocation(
 				getType: (expectedType, bindings) =>
 					typer.getType(argument.value, expectedType, bindings),
 				bindsNothing: bindsNoTypeParameter(argument),
+				spellsItsMembers: argument.value.nodeType === "RecordValue",
 			}),
 		)
 
@@ -7625,6 +7629,7 @@ function resolveFunctionInvocation(
 				getType: (expectedType, bindings) =>
 					typer.getType(argument.value, expectedType, bindings),
 				bindsNothing: bindsNoTypeParameter(argument),
+				spellsItsMembers: argument.value.nodeType === "RecordValue",
 			}),
 		)
 

@@ -94,6 +94,38 @@ describe("Simplifier Positions", () => {
 		expect(simplifiedDefault.position).toEqual(typedDefault.position)
 	})
 
+	// NOTE: A Record default carries no JavaScript default at all — it opens the
+	// body with a merge instead — and that Statement takes the Parameter's own
+	// Position, so a step into the Function stops on the Parameter that was
+	// defaulted rather than on Compiler glue the Debug Adapter would step out
+	// of.
+	it("gives a Record default's merge the Parameter's position", () => {
+		let { typed, simplified } = simplifyWithTyped(`implementation {
+			type Options = { host: String, retries: Integer }
+
+			function connect(using settings: Options = { retries = 3 }) -> String {
+				<- settings.host
+			}
+		}`)
+
+		let typedStatement = typed.implementation.nodes[1]!
+		let simplifiedStatement = simplified.implementation.nodes[1]!
+
+		if (
+			typedStatement.nodeType !== "FunctionStatement" ||
+			simplifiedStatement.nodeType !== "FunctionStatement"
+		) {
+			throw new Error("Expected a FunctionStatement")
+		}
+
+		let parameter = typedStatement.value.parameters[0]!
+		let merge = simplifiedStatement.value.body[0]!
+
+		expect(simplifiedStatement.value.parameters[0]!.defaultValue).toBeNull()
+		expect(merge.nodeType).toBe("VariableAssignmentStatement")
+		expect(merge.position).toEqual(parameter.position)
+	})
+
 	it("leaves the filler an omission emits position-less", () => {
 		let { simplified } = simplifyWithTyped(`implementation {
 			function g(from a: Integer = 0, to b: Integer) -> Integer {

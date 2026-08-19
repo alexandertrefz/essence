@@ -331,6 +331,15 @@ such: Record assignability is width subtyping, so a value that carries more than
 it was asked for is admitted wherever a whole Argument would be, and only a name
 the Parameter never declares makes the Argument stop being a partial.
 
+Only an Argument WRITTEN as a Record literal may be a partial. Every other
+expression passes a whole Record, and is measured against the Parameter's whole
+Type as it always was. That is not a style rule: Record assignability is width
+subtyping, so a value typed `{ host: String }` may carry a `retries` of any Type
+at all, and the callee filling in the members a caller left out would take that
+foreign value for the member it is missing. A literal has nothing to hide — its
+Type is its text. The refusal is `argument-type-mismatch`, and it names the rule
+in a note.
+
 Where the Parameter has no default, a Record Argument is measured whole and a
 missing member reports `argument-type-mismatch`.
 
@@ -367,7 +376,9 @@ members those are is `incomplete-record-argument`'s business.
 
 The partial reading is offered to a Record LITERAL alone. `= someOptions` and
 `= { base with pool = 8 }` are held to the Parameter's Type exactly as any other
-default is, because what a partial default supplies is read off what it writes.
+default is, because what a partial default supplies is read off what it writes —
+the same rule an Argument lives by, for its own reason (see
+`incomplete-record-argument`).
 A complete default keeps its whole meaning as well — the Argument may be left
 out entirely, and an Argument that IS written may still be partial.
 

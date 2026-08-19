@@ -953,6 +953,15 @@ function rewriteNativeShim(
 			: namespaceMemberName(shim.memberName),
 	)
 
+	let call: estree.CallExpression = {
+		type: "CallExpression",
+		optional: false,
+		callee: native,
+		arguments: shim.parameters.map((parameter) =>
+			rewriteIdentifier(parameter.internalName),
+		),
+	}
+
 	return {
 		type: "VariableDeclaration",
 		kind: "const",
@@ -968,18 +977,29 @@ function rewriteNativeShim(
 				},
 				init: {
 					type: "ArrowFunctionExpression",
-					expression: true,
+					// NOTE: A block only where a Record default has to be merged
+					// in before the native is called; every other shim is the
+					// one-expression arrow it has always been, and emits
+					// byte-identically.
+					expression: shim.prologue.length === 0,
 					params: shim.parameters.map((parameter) =>
 						rewriteParameter(parameter),
 					),
-					body: {
-						type: "CallExpression",
-						optional: false,
-						callee: native,
-						arguments: shim.parameters.map((parameter) =>
-							rewriteIdentifier(parameter.internalName),
-						),
-					},
+					body:
+						shim.prologue.length === 0
+							? call
+							: {
+									type: "BlockStatement",
+									body: [
+										...shim.prologue.flatMap((statement) =>
+											rewriteStatements(statement),
+										),
+										{
+											type: "ReturnStatement",
+											argument: call,
+										},
+									],
+								},
 				},
 			},
 		],
@@ -1766,7 +1786,10 @@ export function reachableEssenceMethods(
 					kind: "function",
 					declaration: rewriteNativeShim(namespace.name, shim),
 					...essenceMethodReferences(
-						shim.parameters,
+						// NOTE: Both, because a Record default's Expression
+						// moved out of the Parameter list and into the prologue
+						// — the edges a default draws are the same either way.
+						[shim.parameters, shim.prologue],
 						implemented,
 						implementedFreeFunctions,
 						implementedProperties,
@@ -2634,6 +2657,22 @@ function rewriteIntrinsic(
 						],
 					}
 				: projectedCombination(node.lhs, node.rhs, node.rhsMembers)
+		// NOTE: `options.retries ?? 3` — one member of the Record a callee
+		// rebuilds a Record-defaulted Parameter into. `??` and not `||`: `false`
+		// and `0` are values a member may legitimately hold, and only absence
+		// may reach the default.
+		case "member-or-default":
+			return {
+				type: "LogicalExpression",
+				operator: "??",
+				left: node.optional
+					? optionalMemberRead(
+							rewriteExpression(node.base),
+							node.member,
+						)
+					: memberRead(rewriteExpression(node.base), node.member),
+				right: rewriteExpression(node.fallback),
+			}
 		case "dispatch-chain":
 			return dispatchChain(node)
 		// NOTE: The one place "no Argument given" is written into emitted code
@@ -4628,6 +4667,30 @@ function memberRead(
 		object,
 		property: memberKey(name),
 		computed: !isJavaScriptIdentifierName(name),
+	}
+}
+
+// NOTE: `base?.member` — the read a callee makes of a Parameter whose whole
+// Argument may have been left out, where the base really can be `undefined`.
+// The one member read in an emitted Program that short circuits; every other
+// one is of a value that exists.
+//
+// NOTE: Wrapped in a `ChainExpression` for the reason `typeKeyRead` gives — a
+// bare `MemberExpression` carrying `optional` is not a tree the ESTree grammar
+// has, and the chain is the Node that says where the short circuit stops.
+function optionalMemberRead(
+	object: estree.Expression,
+	name: string,
+): estree.ChainExpression {
+	return {
+		type: "ChainExpression",
+		expression: {
+			type: "MemberExpression",
+			optional: true,
+			object,
+			property: memberKey(name),
+			computed: !isJavaScriptIdentifierName(name),
+		},
 	}
 }
 

@@ -983,6 +983,156 @@ describe("Code Generation", () => {
 		})
 	})
 
+	// NOTE: A Record default is not a JavaScript default parameter — it fills in
+	// the MEMBERS a caller left out of an Argument it did write, which a
+	// JavaScript default, firing only on `undefined`, can not do. The callee
+	// opens by rebuilding the Parameter member by member.
+	describe("Record defaults", () => {
+		const options = `type Options = { host: String, retries: Integer }`
+
+		it("fills in the members a partial Argument left out", async () => {
+			const source = `implementation {
+	${options}
+
+	function connect(_ url: String, using settings: Options = { retries = 3 }) -> String {
+		<- "{url}|{settings.host}|{settings.retries}"
+	}
+
+	Terminal.inspect(connect("a", using { host = "h" }))
+	Terminal.inspect(connect("a", using { host = "h", retries = 9 }))
+}`
+
+			expect(generate(source)).toContain("retries: settings.retries ??")
+			expect(await run(source)).toEqual(['"a|h|3"', '"a|h|9"'])
+		})
+
+		// NOTE: A complete default keeps its old meaning — the whole Argument
+		// may be left out — AND takes a partial Argument, so every member is
+		// read through `?.`, the one short-circuiting read an emitted Program
+		// has.
+		it("takes a whole Argument, a partial one, or none", async () => {
+			const source = `implementation {
+	${options}
+
+	function connect(using settings: Options = { host = "d", retries = 3 }) -> String {
+		<- "{settings.host}|{settings.retries}"
+	}
+
+	Terminal.inspect(connect())
+	Terminal.inspect(connect(using { retries = 1 }))
+	Terminal.inspect(connect(using { host = "h", retries = 9 }))
+}`
+
+			expect(generate(source)).toContain("settings?.host ??")
+			expect(await run(source)).toEqual(['"d|3"', '"d|1"', '"h|9"'])
+		})
+
+		// NOTE: Each member's expression is evaluated only where the caller left
+		// THAT member out — the per-call, only-when-needed semantics the
+		// language promises a default, kept member by member.
+		it("evaluates only the members the caller left out", async () => {
+			const source = `implementation {
+	${options}
+
+	variable calls = 0
+
+	function counted() -> Integer {
+		calls = calls::add(1)
+		<- 3
+	}
+
+	function connect(using settings: Options = { retries = counted() }) -> String {
+		<- settings.host
+	}
+
+	Terminal.inspect(connect(using { host = "a" }))
+	Terminal.inspect(connect(using { host = "b", retries = 7 }))
+	Terminal.inspect(calls)
+}`
+
+			expect(await run(source)).toEqual(['"a"', '"b"', "1"])
+		})
+
+		// NOTE: A default that is not a literal can not be taken apart without
+		// being evaluated, so it is hoisted into one `const` and read per member
+		// — once per call, unconditionally.
+		it("hoists a default that is not a literal", async () => {
+			const source = `implementation {
+	${options}
+
+	constant fallback: Options = { host = "f", retries = 7 }
+
+	function connect(using settings: Options = fallback) -> String {
+		<- "{settings.host}|{settings.retries}"
+	}
+
+	Terminal.inspect(connect())
+	Terminal.inspect(connect(using { retries = 1 }))
+}`
+
+			expect(generate(source)).toContain("const _default0 = fallback")
+			expect(await run(source)).toEqual(['"f|7"', '"f|1"'])
+		})
+
+		it("reads @ in a Method's default", async () => {
+			expect(
+				await run(`implementation {
+	${options}
+
+	namespace Links for String {
+		§§ Answers a description of this link.
+		§§
+		§§ @param settings — how to open it.
+		§§ @returns — the description.
+		open(using settings: Options = { host = @ }) -> String {
+			<- "{settings.host}|{settings.retries}"
+		}
+	}
+
+	Terminal.inspect("self"::open(using { retries = 2 }))
+	Terminal.inspect("self"::open(using { host = "over", retries = 5 }))
+}`),
+			).toEqual(['"self|2"', '"over|5"'])
+		})
+
+		// NOTE: A Function taken as a value drops its defaults, so every
+		// Argument is written — and the entry merge still runs, which is what
+		// projects a whole Record to the members the Parameter's Type declares.
+		it("merges an Argument passed through a Function value", async () => {
+			expect(
+				await run(`implementation {
+	${options}
+
+	function connect(using settings: Options = { retries = 3 }) -> String {
+		<- "{settings.host}|{settings.retries}"
+	}
+
+	constant taken: (using: Options) -> String = connect
+
+	Terminal.inspect(taken(using { host = "v", retries = 4 }))
+}`),
+			).toEqual(['"v|4"'])
+		})
+
+		// NOTE: A member name JavaScript can not spell reaches the merge as a
+		// quoted key and a bracketed read, exactly as a projected Combination's
+		// does.
+		it("merges a member JavaScript can not spell", async () => {
+			const source = `implementation {
+	type Flags = { ok?: Boolean, count: Integer }
+
+	function show(using flags: Flags = { ok? = true }) -> String {
+		<- "{flags.ok?}|{flags.count}"
+	}
+
+	Terminal.inspect(show(using { count = 1 }))
+}`
+
+			expect(generate(source)).toContain(`"ok?": flags["ok?"] ??`)
+			expect(await run(source)).toEqual(['"true|1"'])
+		})
+	})
+
 	describe("String Methods", () => {
 		// NOTE: String gained Comparable, so a List of Strings sorts with a
 		// real comparator — this pins that `compare` resolves on the String
