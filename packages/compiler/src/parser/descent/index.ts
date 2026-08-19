@@ -2748,6 +2748,21 @@ class DescentParser {
 	protected parseKeyGroup(
 		steps: Array<parser.IdentifierNode>,
 	): parser.RecordValueNode {
+		// NOTE: Counted, because a descend holding a descend recurs through
+		// the key list rather than through an Expression — so without this the
+		// only nesting in the language the depth guard did not bound.
+		this.enterNesting()
+
+		try {
+			return this.parseKeyGroupInterior(steps)
+		} finally {
+			this.nestingDepth--
+		}
+	}
+
+	protected parseKeyGroupInterior(
+		steps: Array<parser.IdentifierNode>,
+	): parser.RecordValueNode {
 		let leftBrace = this.tokens.expect(TokenType.SymbolLeftBrace)
 
 		if (this.tokens.peek()?.type === TokenType.SymbolRightBrace) {
@@ -4057,8 +4072,9 @@ class DescentParser {
 
 	// NOTE: Called on the way into every parsing method that recurs once per
 	// written nesting level — `parseExpression`, `parseType` and `parseBlock`
-	// reach each other through everything between them, so counting the three
-	// bounds the whole descent. The caller decrements in a `finally`: a throw
+	// reach each other through everything between them, and a key list's braced
+	// descend is the one nesting that reaches none of the three. Counting the
+	// four bounds the whole descent. The caller decrements in a `finally`: a throw
 	// unwinds any number of levels at once, and the count has to unwind with
 	// them.
 	protected enterNesting(): void {

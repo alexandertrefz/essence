@@ -1352,13 +1352,16 @@ function pathKeyStepType(
 	return { type: "Error" }
 }
 
-// NOTE: The span the keys of one level were written across, so a Diagnostic
-// about the level points at every key that built it.
+// NOTE: The span the keys of ONE level were written across — from where the
+// first of them carries on past the step that opened the level, so it never
+// overlaps that step: two labels on one span read as neither. `server.port = 1`
+// gives `port = 1`, and `server.{ port = 1 }` gives the braces.
 function groupPosition(group: Array<PathKeyEntry>): common.Position {
+	let first = group[0]
 	let last = group[group.length - 1].member
 
 	return {
-		start: group[0].steps[0].position.start,
+		start: (first.steps[1] ?? first.member.group!).position.start,
 		end: (last.value ?? last.group!).position.end,
 	}
 }
@@ -1697,7 +1700,7 @@ export function enrichRecordValue(
 	// literal is expected to be — its own annotation first, since that is the
 	// Type it will HAVE, and the surrounding position otherwise.
 	let members = enrichMembers(
-		refusePathKeys(node.members),
+		hasPathKeys(node) ? refusePathKeys(node.members) : node.members,
 		scope,
 		expectedRecordMembers(resolvedAnnotation ?? expectedType),
 	)
@@ -4549,6 +4552,8 @@ function declareProtocolInScope(
 // spelling, which would put a member named `server.port` into the literal's
 // Type and report a second Diagnostic about a Record nobody wrote. A key the Parser
 // already refused as a bare path is left alone: it has its message.
+// NOTE: Asked only where `hasPathKeys` said there is one, so the Literal every
+// Program is made of neither rebuilds its member Record nor walks it twice.
 function refusePathKeys(
 	members: Record<string, parser.RecordValueMemberNode>,
 ): Record<string, parser.RecordValueMemberNode> {

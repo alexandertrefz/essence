@@ -909,6 +909,30 @@ describe("Code Generation", () => {
 			])
 		})
 
+		// NOTE: A path key is a nesting the Enricher wrote, so the Optimiser
+		// sees exactly what a hand-written nesting gives it — including with
+		// every pass off, where the Rewriter's own path emits the merge.
+		it("nests a dotted key with the Optimiser off", () => {
+			const nested = `implementation {
+	type Tls = { enabled: Boolean }
+	type Server = { host: String, port: Integer, tls: Tls }
+	type Config = { name: String, server: Server }
+
+	constant config: Config = {
+		name = "api",
+		server = { host = "localhost", port = 80, tls = { enabled = false } },
+	}
+
+	constant moved = { config with server.tls.enabled = true }
+
+	Terminal.inspect(moved.server.tls.enabled)
+}`
+			let generated = generate(nested, undefined, unoptimisedOptions)
+
+			expect(generated).toContain("config.server")
+			expect(generated).toContain("config.server.tls")
+		})
+
 		// NOTE: `?` is a legal Essence identifier character and not a legal
 		// JavaScript one, so a projected member is a quoted key on the way in
 		// and a bracketed read on the way out. Written as an identifier either
