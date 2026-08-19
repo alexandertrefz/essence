@@ -14,6 +14,7 @@ import {
 	flattenUnionMembers,
 	type GenericBindings,
 	matchesTypeWithBindings,
+	providedMethodProtocol,
 } from "@essence-lang/compiler/helpers"
 import type { common } from "@essence-lang/interfaces"
 
@@ -105,7 +106,7 @@ export function matchingNamespaces(
 			// where a Method a reader never wrote came from — and so a Hover on
 			// one reads "Provided by …" here exactly as it does on a concrete
 			// receiver.
-			if (protocol.providedMethods?.[methodName] !== undefined) {
+			if (providedMethodProtocol(protocol, methodName) !== null) {
 				continue
 			}
 

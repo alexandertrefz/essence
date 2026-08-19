@@ -47,6 +47,7 @@ import {
 	typeMentionsGeneric,
 	unfreshenBindings,
 	unionMembersKeepingNames,
+	providedMethodProtocol,
 	withArticle,
 } from "../helpers/index"
 import {
@@ -3162,7 +3163,10 @@ function enrichProvidedMethods(
 			continue
 		}
 
-		if (protocolType.providedMethods?.[methodName] !== node.name.content) {
+		if (
+			providedMethodProtocol(protocolType, methodName) !==
+			node.name.content
+		) {
 			continue
 		}
 
