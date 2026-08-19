@@ -462,6 +462,12 @@ function simplifyLookup(
 		member: simplifyIdentifier(node.member),
 		type: node.type,
 		position: node.position,
+		// NOTE: Carried for the same reason a Method Invocation carries it: the
+		// member name alone can not say whether the Namespace declares it or a
+		// Protocol provided it.
+		...(node.providedBy === undefined
+			? {}
+			: { providedBy: node.providedBy }),
 	}
 }
 

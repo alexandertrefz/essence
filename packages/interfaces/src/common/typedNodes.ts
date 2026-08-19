@@ -256,6 +256,12 @@ export interface LookupNode {
 	member: IdentifierNode
 	position: Position
 	type: Type
+	// NOTE: The Protocol that PROVIDED this member, where the base is a
+	// Namespace and the name is one a conformance put in reach rather than one
+	// the Namespace declares. `Number.isLessThan(a, b)` reads the one const
+	// every conformer shares, so the Rewriter has to be told that the member is
+	// not a member of the Namespace it is written on.
+	providedBy?: string
 }
 
 export interface IdentifierNode {

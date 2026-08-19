@@ -1995,16 +1995,28 @@ export function essenceMethodReferences(
 					"type"
 				] === "Namespace"
 			) {
-				// NOTE: A static Method is evaluated where it is CALLED, a
-				// Property wherever it is named at all — reading its const is what
-				// yields the value, so there is no handing it on.
-				consider(base["name"], member?.["name"], implemented, !isStored)
-				consider(
-					base["name"],
-					member?.["name"],
-					implementedProperties,
-					true,
-				)
+				// NOTE: A member a Protocol PROVIDED is a const of its own and
+				// no member of the Namespace it is written on, so the edge goes
+				// where the emission goes.
+				if (record["providedBy"] !== undefined) {
+					considerProvided(record["providedBy"], member?.["name"])
+				} else {
+					// NOTE: A static Method is evaluated where it is CALLED, a
+					// Property wherever it is named at all — reading its const is
+					// what yields the value, so there is no handing it on.
+					consider(
+						base["name"],
+						member?.["name"],
+						implemented,
+						!isStored,
+					)
+					consider(
+						base["name"],
+						member?.["name"],
+						implementedProperties,
+						true,
+					)
+				}
 			}
 		} else if (record["nodeType"] === "ConformanceValue") {
 			let methodMap = record["methodMap"] as
@@ -3910,7 +3922,13 @@ function rewriteLookup(node: common.typedSimple.LookupNode): estree.Expression {
 		node.base.nodeType === "Identifier" &&
 		node.base.type.type === "Namespace"
 	) {
-		return namespaceMember(node.base.name, node.member.name)
+		return namespaceMember(
+			node.base.name,
+			node.member.name,
+			undefined,
+			false,
+			node.providedBy,
+		)
 	}
 
 	return memberRead(rewriteExpression(node.base), node.member.name)
