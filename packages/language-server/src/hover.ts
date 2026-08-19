@@ -600,11 +600,33 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 			visitNode(node.name, state)
 			visitArguments(node.arguments, state)
 			return
-		case "Lookup":
+		case "Lookup": {
 			consider(state, node.position, node.type, null)
 			visitNode(node.base, state)
-			visitIdentifier(node.member, state)
+
+			// NOTE: As in the MethodInvocation — a Method nobody wrote on the
+			// Namespace it is read off still has to say where it came from, so
+			// `Integer.isNot` names `Equatable` the way `5::isNot(3)` does.
+			let signatures =
+				node.providedBy === undefined
+					? null
+					: signaturesOf(node.member.type)
+
+			if (node.providedBy !== undefined && signatures !== null) {
+				considerSignatures(
+					state,
+					node.member.position,
+					signatures,
+					node.member.content,
+					documentationOf(node.member.type),
+					node.providedBy,
+				)
+			} else {
+				visitIdentifier(node.member, state)
+			}
+
 			return
+		}
 		case "Combination":
 			consider(state, node.position, node.type, null)
 			visitNode(node.lhs, state)

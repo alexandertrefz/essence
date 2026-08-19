@@ -2237,6 +2237,14 @@ function walkTypedNode(
 					node.member.content,
 					node.member.position,
 					context,
+					// NOTE: As in the MethodInvocation — `Number.isLessThan` is
+					// written on the Namespace whose conformance put the Method
+					// in reach, and the declaration a rename has to reach is the
+					// Protocol's. Without this the site is indexed under a
+					// Namespace that declares no such member, so renaming the
+					// declaration left this spelling behind and broke the
+					// Program it was renamed in.
+					node.providedBy,
 				)
 			} else if (baseType.type === "Record") {
 				context.recordLookups.push({

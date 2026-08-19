@@ -1099,4 +1099,36 @@ describe("Hover of a Protocol-provided Method", () => {
 			"Provided by `Shape`.",
 		)
 	})
+
+	// NOTE: The Namespace spelling reads the same Method off the Namespace
+	// whose conformance put it in reach, so the reader still needs the Protocol
+	// named — the Namespace it is written on declares nothing of the sort.
+	it("should say which Protocol provided it on the Namespace spelling", () => {
+		let spelled = [
+			"implementation {",
+			"\tprotocol Shape {",
+			"\t\tarea() -> Rational",
+			"",
+			"\t\tdescribe() -> String {",
+			'\t\t\t<- "area {@::area()}"',
+			"\t\t}",
+			"\t}",
+			"",
+			"\ttype Square = { side: Rational }",
+			"",
+			"\tnamespace Squares for Square is Shape {",
+			"\t\tarea() -> Rational {",
+			"\t\t\t<- @.side",
+			"\t\t}",
+			"\t}",
+			"",
+			"\tconstant square: Square = { side = 3/1 }",
+			"\tTerminal.inspect(Squares.describe(square))",
+			"}",
+		].join("\n")
+
+		expect(hoverDocumentation(spelled, { line: 19, column: 28 })).toBe(
+			"Provided by `Shape`.",
+		)
+	})
 })

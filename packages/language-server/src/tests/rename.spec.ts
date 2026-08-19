@@ -1232,6 +1232,7 @@ describe("identifierPattern", () => {
 			"\tconstant bag: Bag = { count = 0 }",
 			"",
 			"\tTerminal.inspect(bag::isEmpty())",
+			"\tTerminal.inspect(Bags.isEmpty(bag))",
 			"}",
 		].join("\n")
 
@@ -1243,6 +1244,16 @@ describe("identifierPattern", () => {
 
 		it("should rename a provided Method from a call site", () => {
 			expect(rename(SIZABLE, { line: 20, column: 24 }, "vacant")).toBe(
+				SIZABLE.replaceAll("isEmpty", "vacant"),
+			)
+		})
+
+		// NOTE: The Namespace spelling reads the same Method off the Namespace
+		// whose conformance put it in reach, so it has to move with the rest —
+		// left behind, it names a member the Namespace does not declare and the
+		// renamed Program no longer compiles.
+		it("should rename a provided Method from its Namespace spelling", () => {
+			expect(rename(SIZABLE, { line: 21, column: 24 }, "vacant")).toBe(
 				SIZABLE.replaceAll("isEmpty", "vacant"),
 			)
 		})
