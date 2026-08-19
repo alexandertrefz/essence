@@ -12,6 +12,17 @@ implementation {
 		isPropagationStopped: Boolean,
 	}
 
+	§ The event before anything has been said about it. Every construction
+	§ starts here, and `createFrom` writes the two members a description names
+	§ over it.
+	constant blankEvent: Event = {
+		eventName = "",
+		namespaces = [],
+		isDefaultPrevented = false,
+		isCancelled = false,
+		isPropagationStopped = false,
+	}
+
 	namespace Event for Event {
 		preventDefault() -> Event {
 			<- { @ with isDefaultPrevented = true }
@@ -29,40 +40,18 @@ implementation {
 			<- @.namespaces::hasItems()
 		}
 
-		§ The Overloads share a name and differ by their Parameters — no
-		§ Arguments for the blank event, a description to parse otherwise.
-		overload static createFrom {
-			() -> Event {
-				<- {
-					eventName = "",
-					namespaces = [],
-					isDefaultPrevented = false,
-					isCancelled = false,
-					isPropagationStopped = false,
-				}
-			}
+		§ "click.menu.navigation" names the event and its namespaces, the way
+		§ jQuery spells them; a namespace listed twice counts once. The empty
+		§ description names nothing and answers the blank event, which is what
+		§ the second Overload this used to have was for.
+		static createFrom(_ eventDescription: String = "") -> Event {
+			constant splitEvent = eventDescription::split(on ".")
 
-			§ "click.menu.navigation" names the event and its namespaces, the
-			§ way jQuery spells them; a namespace listed twice counts once.
-			(_ eventDescription: String) -> Event {
-				constant splitEvent = eventDescription::split(on ".")
+			constant eventName = splitEvent::firstItem()::value(defaultingTo "")
 
-				constant eventName = splitEvent
-					::firstItem()
-					::value(defaultingTo "")
+			constant namespaces = splitEvent::removeFirst()::removeDuplicates()
 
-				constant namespaces = splitEvent
-					::removeFirst()
-					::removeDuplicates()
-
-				<- {
-					eventName,
-					namespaces,
-					isDefaultPrevented = false,
-					isCancelled = false,
-					isPropagationStopped = false,
-				}
-			}
+			<- { blankEvent with { eventName, namespaces } }
 		}
 	}
 
