@@ -750,10 +750,29 @@ describe("A Parameter a call may leave out", () => {
 //
 // The Module as JavaScript — marshalled at every boundary.
 
+export type Fetch =
+	| { $case: "Fetch#Get"; url: string; retries: bigint; tags: Array<string>; limits: { calls: bigint }; mode: Method }
+	| { $case: "Fetch#Ping" }
+
+export type Method = "Verbose" | "Quiet"
+
+export declare const Fetch: {
+	Get<Payload_ extends { url: string; retries?: bigint | number; tags?: Array<string>; limits?: { calls: bigint | number }; mode?: Method }>(payload: Payload_): Payload_ & { $case: "Fetch#Get" }
+	Ping: { $case: "Fetch#Ping" }
+}
+
+export declare const Method: {
+	readonly Verbose: "Verbose"
+	readonly Quiet: "Quiet"
+}
+
+export declare function blank(): Fetch
 export declare function connect(p0: string, using: { host: string; retries?: bigint | number; secure: boolean }): string
 
 export declare function cut(from: bigint | number | undefined, to: bigint | number): bigint
 export declare function cut(labelled: { from?: bigint | number; to: bigint | number }): bigint
+
+export declare function fetched(p0: { $case: "Fetch#Get"; url: string; retries?: bigint | number; tags?: Array<string>; limits?: { calls: bigint | number }; mode?: Method } | { $case: "Fetch#Ping" }): string
 
 export declare function greeting(p0?: string, and?: string): string
 export declare function greeting(labelled: { "with"?: string; and?: string }): string

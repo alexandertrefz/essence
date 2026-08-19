@@ -33,6 +33,7 @@ export {
 	describeSignature,
 	describeTypes,
 	type ExportDescriptor,
+	type Fill,
 	type FunctionDescriptor,
 	type Members,
 	type ModuleDescriptor,

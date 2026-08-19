@@ -3867,3 +3867,550 @@ exports[`A Module described describes Refused.es 1`] = `
   },
 }
 `;
+
+exports[`A Module described describes Defaults.es 1`] = `
+{
+  "exports": {
+    "Fetch": {
+      "cases": [
+        {
+          "choice": "Fetch",
+          "kind": "case",
+          "name": "Get",
+          "optional": false,
+          "payload": {
+            "limits": {
+              "fill": {
+                "kind": "record",
+                "members": {
+                  "calls": {
+                    "kind": "integer",
+                    "value": "10",
+                  },
+                },
+              },
+              "of": {
+                "kind": "record",
+                "members": {
+                  "calls": {
+                    "of": {
+                      "kind": "integer",
+                      "shown": "Integer",
+                    },
+                  },
+                },
+                "shown": "{ calls: Integer }",
+              },
+              "optional": true,
+            },
+            "mode": {
+              "fill": {
+                "kind": "case",
+                "payload": null,
+                "tag": "./Defaults.es#Method#Quiet",
+              },
+              "of": {
+                "arms": [
+                  {
+                    "choice": "Method",
+                    "kind": "case",
+                    "name": "Verbose",
+                    "optional": false,
+                    "payload": {},
+                    "shown": "Method#Verbose",
+                    "tag": "./Defaults.es#Method#Verbose",
+                    "unitChoice": true,
+                  },
+                  {
+                    "choice": "Method",
+                    "kind": "case",
+                    "name": "Quiet",
+                    "optional": false,
+                    "payload": {},
+                    "shown": "Method#Quiet",
+                    "tag": "./Defaults.es#Method#Quiet",
+                    "unitChoice": true,
+                  },
+                ],
+                "kind": "union",
+                "shown": "Method",
+              },
+              "optional": true,
+            },
+            "retries": {
+              "fill": {
+                "kind": "integer",
+                "value": "0",
+              },
+              "of": {
+                "kind": "integer",
+                "shown": "Integer",
+              },
+              "optional": true,
+            },
+            "tags": {
+              "fill": {
+                "items": [],
+                "kind": "list",
+              },
+              "of": {
+                "kind": "list",
+                "of": {
+                  "kind": "string",
+                  "shown": "String",
+                },
+                "shown": "List<String>",
+              },
+              "optional": true,
+            },
+            "url": {
+              "of": {
+                "kind": "string",
+                "shown": "String",
+              },
+            },
+          },
+          "shown": "Fetch#Get",
+          "tag": "./Defaults.es#Fetch#Get",
+          "unitChoice": false,
+        },
+        {
+          "choice": "Fetch",
+          "kind": "case",
+          "name": "Ping",
+          "optional": false,
+          "payload": {},
+          "shown": "Fetch#Ping",
+          "tag": "./Defaults.es#Fetch#Ping",
+          "unitChoice": false,
+        },
+      ],
+      "kind": "choice",
+      "name": "Fetch",
+    },
+    "Method": {
+      "cases": [
+        {
+          "choice": "Method",
+          "kind": "case",
+          "name": "Verbose",
+          "optional": false,
+          "payload": {},
+          "shown": "Method#Verbose",
+          "tag": "./Defaults.es#Method#Verbose",
+          "unitChoice": true,
+        },
+        {
+          "choice": "Method",
+          "kind": "case",
+          "name": "Quiet",
+          "optional": false,
+          "payload": {},
+          "shown": "Method#Quiet",
+          "tag": "./Defaults.es#Method#Quiet",
+          "unitChoice": true,
+        },
+      ],
+      "kind": "choice",
+      "name": "Method",
+    },
+    "blank": {
+      "emitted": "blank",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [],
+        "returns": {
+          "arms": [
+            {
+              "choice": "Fetch",
+              "kind": "case",
+              "name": "Get",
+              "optional": false,
+              "payload": {
+                "limits": {
+                  "fill": {
+                    "kind": "record",
+                    "members": {
+                      "calls": {
+                        "kind": "integer",
+                        "value": "10",
+                      },
+                    },
+                  },
+                  "of": {
+                    "kind": "record",
+                    "members": {
+                      "calls": {
+                        "of": {
+                          "kind": "integer",
+                          "shown": "Integer",
+                        },
+                      },
+                    },
+                    "shown": "{ calls: Integer }",
+                  },
+                  "optional": true,
+                },
+                "mode": {
+                  "fill": {
+                    "kind": "case",
+                    "payload": null,
+                    "tag": "./Defaults.es#Method#Quiet",
+                  },
+                  "of": {
+                    "arms": [
+                      {
+                        "choice": "Method",
+                        "kind": "case",
+                        "name": "Verbose",
+                        "optional": false,
+                        "payload": {},
+                        "shown": "Method#Verbose",
+                        "tag": "./Defaults.es#Method#Verbose",
+                        "unitChoice": true,
+                      },
+                      {
+                        "choice": "Method",
+                        "kind": "case",
+                        "name": "Quiet",
+                        "optional": false,
+                        "payload": {},
+                        "shown": "Method#Quiet",
+                        "tag": "./Defaults.es#Method#Quiet",
+                        "unitChoice": true,
+                      },
+                    ],
+                    "kind": "union",
+                    "shown": "Method",
+                  },
+                  "optional": true,
+                },
+                "retries": {
+                  "fill": {
+                    "kind": "integer",
+                    "value": "0",
+                  },
+                  "of": {
+                    "kind": "integer",
+                    "shown": "Integer",
+                  },
+                  "optional": true,
+                },
+                "tags": {
+                  "fill": {
+                    "items": [],
+                    "kind": "list",
+                  },
+                  "of": {
+                    "kind": "list",
+                    "of": {
+                      "kind": "string",
+                      "shown": "String",
+                    },
+                    "shown": "List<String>",
+                  },
+                  "optional": true,
+                },
+                "url": {
+                  "of": {
+                    "kind": "string",
+                    "shown": "String",
+                  },
+                },
+              },
+              "shown": "Fetch#Get",
+              "tag": "./Defaults.es#Fetch#Get",
+              "unitChoice": false,
+            },
+            {
+              "choice": "Fetch",
+              "kind": "case",
+              "name": "Ping",
+              "optional": false,
+              "payload": {},
+              "shown": "Fetch#Ping",
+              "tag": "./Defaults.es#Fetch#Ping",
+              "unitChoice": false,
+            },
+          ],
+          "kind": "union",
+          "shown": "Fetch",
+        },
+        "shown": "() -> Fetch",
+      },
+    },
+    "connect": {
+      "emitted": "connect",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "kind": "string",
+              "shown": "String",
+            },
+          },
+          {
+            "label": "using",
+            "of": {
+              "kind": "record",
+              "members": {
+                "host": {
+                  "of": {
+                    "kind": "string",
+                    "shown": "String",
+                  },
+                },
+                "retries": {
+                  "of": {
+                    "kind": "integer",
+                    "shown": "Integer",
+                  },
+                  "optional": true,
+                },
+                "secure": {
+                  "of": {
+                    "kind": "boolean",
+                    "shown": "Boolean",
+                  },
+                },
+              },
+              "shown": "{ host: String, retries: Integer, secure: Boolean }",
+            },
+          },
+        ],
+        "returns": {
+          "kind": "string",
+          "shown": "String",
+        },
+        "shown": "(_ String, using: { host: String, retries: Integer, secure: Boolean }) -> String",
+      },
+    },
+    "cut": {
+      "emitted": "cut",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": "from",
+            "of": {
+              "kind": "integer",
+              "shown": "Integer",
+            },
+            "optional": true,
+          },
+          {
+            "label": "to",
+            "of": {
+              "kind": "integer",
+              "shown": "Integer",
+            },
+          },
+        ],
+        "returns": {
+          "kind": "integer",
+          "shown": "Integer",
+        },
+        "shown": "(from?: Integer, to: Integer) -> Integer",
+      },
+    },
+    "fetched": {
+      "emitted": "fetched",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "arms": [
+                {
+                  "choice": "Fetch",
+                  "kind": "case",
+                  "name": "Get",
+                  "optional": false,
+                  "payload": {
+                    "limits": {
+                      "fill": {
+                        "kind": "record",
+                        "members": {
+                          "calls": {
+                            "kind": "integer",
+                            "value": "10",
+                          },
+                        },
+                      },
+                      "of": {
+                        "kind": "record",
+                        "members": {
+                          "calls": {
+                            "of": {
+                              "kind": "integer",
+                              "shown": "Integer",
+                            },
+                          },
+                        },
+                        "shown": "{ calls: Integer }",
+                      },
+                      "optional": true,
+                    },
+                    "mode": {
+                      "fill": {
+                        "kind": "case",
+                        "payload": null,
+                        "tag": "./Defaults.es#Method#Quiet",
+                      },
+                      "of": {
+                        "arms": [
+                          {
+                            "choice": "Method",
+                            "kind": "case",
+                            "name": "Verbose",
+                            "optional": false,
+                            "payload": {},
+                            "shown": "Method#Verbose",
+                            "tag": "./Defaults.es#Method#Verbose",
+                            "unitChoice": true,
+                          },
+                          {
+                            "choice": "Method",
+                            "kind": "case",
+                            "name": "Quiet",
+                            "optional": false,
+                            "payload": {},
+                            "shown": "Method#Quiet",
+                            "tag": "./Defaults.es#Method#Quiet",
+                            "unitChoice": true,
+                          },
+                        ],
+                        "kind": "union",
+                        "shown": "Method",
+                      },
+                      "optional": true,
+                    },
+                    "retries": {
+                      "fill": {
+                        "kind": "integer",
+                        "value": "0",
+                      },
+                      "of": {
+                        "kind": "integer",
+                        "shown": "Integer",
+                      },
+                      "optional": true,
+                    },
+                    "tags": {
+                      "fill": {
+                        "items": [],
+                        "kind": "list",
+                      },
+                      "of": {
+                        "kind": "list",
+                        "of": {
+                          "kind": "string",
+                          "shown": "String",
+                        },
+                        "shown": "List<String>",
+                      },
+                      "optional": true,
+                    },
+                    "url": {
+                      "of": {
+                        "kind": "string",
+                        "shown": "String",
+                      },
+                    },
+                  },
+                  "shown": "Fetch#Get",
+                  "tag": "./Defaults.es#Fetch#Get",
+                  "unitChoice": false,
+                },
+                {
+                  "choice": "Fetch",
+                  "kind": "case",
+                  "name": "Ping",
+                  "optional": false,
+                  "payload": {},
+                  "shown": "Fetch#Ping",
+                  "tag": "./Defaults.es#Fetch#Ping",
+                  "unitChoice": false,
+                },
+              ],
+              "kind": "union",
+              "shown": "Fetch",
+            },
+          },
+        ],
+        "returns": {
+          "kind": "string",
+          "shown": "String",
+        },
+        "shown": "(_ Fetch) -> String",
+      },
+    },
+    "greeting": {
+      "emitted": "greeting",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": "with",
+            "of": {
+              "kind": "string",
+              "shown": "String",
+            },
+            "optional": true,
+          },
+          {
+            "label": "and",
+            "of": {
+              "kind": "string",
+              "shown": "String",
+            },
+            "optional": true,
+          },
+        ],
+        "returns": {
+          "kind": "string",
+          "shown": "String",
+        },
+        "shown": "(with?: String, and?: String) -> String",
+      },
+    },
+    "scaled": {
+      "emitted": "scaled",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "kind": "integer",
+              "shown": "Integer",
+            },
+          },
+          {
+            "label": "by",
+            "of": {
+              "kind": "integer",
+              "shown": "Integer",
+            },
+            "optional": true,
+          },
+        ],
+        "returns": {
+          "kind": "integer",
+          "shown": "Integer",
+        },
+        "shown": "(_ Integer, by?: Integer) -> Integer",
+      },
+    },
+  },
+}
+`;

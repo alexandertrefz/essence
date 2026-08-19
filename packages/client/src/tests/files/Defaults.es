@@ -35,11 +35,60 @@ implementation {
 	) -> String {
 		<- "{url}|{options.host}|{options.retries}|{options.secure}"
 	}
+
+	§ A unit Choice, so that a Case value standing as a payload default's member
+	§ crosses as a bare string on the way back out.
+	choice Method {
+		Verbose,
+		Quiet,
+	}
+
+	§ A Case whose payload shape carries a default. Unlike a Record Parameter's
+	§ there is no callee to fill it in at — a Case is built where it is written,
+	§ and a host writing one is where it is written — so the boundary itself
+	§ fills the members a host left out, out of the values the Case declared.
+	choice Fetch {
+		Get {
+			url: String,
+			retries: Integer,
+			tags: List<String>,
+			limits: { calls: Integer },
+			mode: Method,
+		} = { retries = 0, tags = [], limits = { calls = 10 }, mode = #Quiet },
+		Ping,
+	}
+
+	function spelled(_ mode: Method) -> String {
+		<- match mode -> String {
+			case #Verbose { <- "loud" }
+			case #Quiet   { <- "quiet" }
+		}
+	}
+
+	function fetched(_ request: Fetch) -> String {
+		<- match request -> String {
+			case #Get({ url, retries, tags, limits, mode }) {
+				<- "{url}|{retries}|{tags::length()}|{limits.calls}|{
+					spelled(mode)
+				}"
+			}
+			case #Ping                                      { <- "ping" }
+		}
+	}
+
+	§ The same Case coming back OUT, which always carries every member.
+	function blank() -> Fetch {
+		<- #Get({ url = "/" })
+	}
 }
 
 export {
+	Fetch
+	Method
+	blank
 	connect
 	cut
+	fetched
 	greeting
 	scaled
 }
