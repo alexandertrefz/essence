@@ -866,6 +866,12 @@ type KeyValuePair = {
 	value: parser.ExpressionNode
 	position: common.Position
 	shorthand: boolean
+	// NOTE: Null on an ordinary key. A path key carries every step it was
+	// written with, the first of them the same Node `name` points at, and is
+	// keyed under the dotted spelling so `server` and `server.port` stay two
+	// entries — which is what lets the Parser refuse them as a clash instead of
+	// silently dropping one.
+	steps: Array<parser.IdentifierNode> | null
 }
 
 type KeyValuePairObject = {
@@ -878,8 +884,21 @@ export function keyValuePair(
 	value: parser.ExpressionNode,
 	position: common.Position,
 	shorthand = false,
+	steps: Array<parser.IdentifierNode> | null = null,
 ): KeyValuePair {
-	return { name, value, position, shorthand }
+	return { name, value, position, shorthand, steps }
+}
+
+// NOTE: The dotted spelling a path key is stored under, and the plain name of
+// every other key. One function so the Parser's clash check and the key of the
+// entry it checks can never drift apart.
+export function keyOf(pair: {
+	name: parser.IdentifierNode
+	steps: Array<parser.IdentifierNode> | null
+}): string {
+	return pair.steps === null
+		? pair.name.content
+		: pair.steps.map((step) => step.content).join(".")
 }
 
 export function buildKeyValuePairList(
@@ -891,16 +910,24 @@ export function buildKeyValuePairList(
 	return {
 		data: keyValuePairList.reduce<KeyValuePairObject["data"]>(
 			(prev, curr) => {
-				// NOTE: `shorthand` is written only where it is true, so a
-				// member that spelled its value keeps exactly the shape it
-				// has always had — the Formatter compares two ASTs key by key.
-				prev[curr.name.content] = curr.shorthand
-					? {
-							name: curr.name,
-							value: curr.value,
-							shorthand: true,
-						}
-					: { name: curr.name, value: curr.value }
+				// NOTE: `shorthand` and `steps` are written only where they
+				// are there to be written, so a member that spelled its value
+				// under a plain name keeps exactly the shape it has always
+				// had — the Formatter compares two ASTs key by key.
+				let member: parser.RecordValueMemberNode = {
+					name: curr.name,
+					value: curr.value,
+				}
+
+				if (curr.shorthand) {
+					member.shorthand = true
+				}
+
+				if (curr.steps !== null) {
+					member.steps = curr.steps
+				}
+
+				prev[keyOf(curr)] = member
 				return prev
 			},
 			{},

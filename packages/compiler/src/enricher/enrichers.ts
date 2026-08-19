@@ -1379,7 +1379,7 @@ export function enrichRecordValue(
 	// literal is expected to be — its own annotation first, since that is the
 	// Type it will HAVE, and the surrounding position otherwise.
 	let members = enrichMembers(
-		node.members,
+		refusePathKeys(node.members),
 		scope,
 		expectedRecordMembers(resolvedAnnotation ?? expectedType),
 	)
@@ -4223,6 +4223,49 @@ function declareProtocolInScope(
 	scope.protocols[identifier.content] = protocolType
 
 	return scope
+}
+
+// NOTE: A dotted key reaches into a value that is already there, so it only
+// means anything against one — and a Record Literal writes its members from
+// nothing. The path members are dropped rather than read under their dotted
+// spelling, which would put a member named `server.port` into the literal's
+// Type and report a second Diagnostic about a Record nobody wrote. A key the Parser
+// already refused as a bare path is left alone: it has its message.
+function refusePathKeys(
+	members: Record<string, parser.RecordValueMemberNode>,
+): Record<string, parser.RecordValueMemberNode> {
+	let plain: Record<string, parser.RecordValueMemberNode> = {}
+
+	for (let [key, member] of Object.entries(members)) {
+		if (member.steps === undefined) {
+			plain[key] = member
+
+			continue
+		}
+
+		if (member.shorthand === true) {
+			continue
+		}
+
+		let position = {
+			start: member.steps[0].position.start,
+			end: member.steps[member.steps.length - 1].position.end,
+		}
+
+		reportError("A path key updates nothing here", position, {
+			code: "path-key-outside-combination",
+			labels: [primary(position, "this reaches into a value")],
+			notes: [
+				"A Record Literal writes its members from nothing, so there is no value under this key to reach into.",
+			],
+			helps: [
+				`Write the whole member: '${member.steps[0].content} = { … }'.`,
+				`Or update a value that already has it: '{ original with ${key} = … }'.`,
+			],
+		})
+	}
+
+	return plain
 }
 
 function enrichMembers(

@@ -126,6 +126,35 @@ const statementStartTokenTypes = new Set([
 // neither whitespace nor a line break between them. Some of the grammar reads
 // several Tokens as one lexeme — `1_000`, `1/2` — and only their adjacency
 // tells that apart from the same Tokens written as separate things.
+// NOTE: The span a key was written across — the whole path where it is one,
+// and the name alone where it is not.
+function keyPosition(pair: {
+	name: parser.IdentifierNode
+	steps: Array<parser.IdentifierNode> | null
+}): common.Position {
+	if (pair.steps === null) {
+		return pair.name.position
+	}
+
+	return {
+		start: pair.steps[0].position.start,
+		end: pair.steps[pair.steps.length - 1].position.end,
+	}
+}
+
+// NOTE: Whether two written keys write the same member — the same spelling, or
+// one a prefix of the other at a step boundary.
+function keysClash(left: string, right: string): boolean {
+	if (left === right) {
+		return true
+	}
+
+	let [shorter, longer] =
+		left.length < right.length ? [left, right] : [right, left]
+
+	return longer.startsWith(`${shorter}.`)
+}
+
 function isAdjacent(left: common.Position, right: common.Position): boolean {
 	return (
 		left.end.line === right.start.line &&
@@ -2570,7 +2599,10 @@ class DescentParser {
 		}
 
 		for (let member of Object.values(combination.rhs.members)) {
-			if (member.shorthand !== true) {
+			// NOTE: A bare PATH key was already refused as it was read, with
+			// the message that explains why no reading rescues it — there is
+			// no `a.b = a.b` for it to have meant.
+			if (member.shorthand !== true || member.steps !== undefined) {
 				continue
 			}
 
@@ -2619,7 +2651,7 @@ class DescentParser {
 			pairs.push(this.parseKeyValuePair(allowShorthand))
 		}
 
-		this.reportDuplicateNames(pairs, "Member", "duplicate-member")
+		this.reportClashingMemberKeys(pairs)
 
 		return generators.buildKeyValuePairList(
 			pairs.slice(0, -1),
@@ -2631,6 +2663,11 @@ class DescentParser {
 		allowShorthand: boolean,
 	): ReturnType<typeof generators.keyValuePair> {
 		let name = this.parseIdentifier()
+		let steps = this.parseKeyPathSteps(name)
+
+		if (steps !== null) {
+			return this.parsePathKeyValue(name, steps, allowShorthand)
+		}
 
 		// NOTE: The value is a Node of its own at the name's Position rather
 		// than the name Node itself — two Declarations at one Position is
@@ -2656,6 +2693,157 @@ class DescentParser {
 			start: name.position.start,
 			end: value.position.end,
 		})
+	}
+
+	// NOTE: The steps after a key's first Identifier, or null where the key is
+	// a plain name — which is what tells the two apart everywhere below. Every
+	// key position reads a path, a plain Record Literal's included: refusing it
+	// here would put the refusal inside the speculative first reading of
+	// `parseRecordLiteralOrCombination`, where it is rewound, and the author
+	// would be told 'Expected with' instead of what a path key is.
+	protected parseKeyPathSteps(
+		name: parser.IdentifierNode,
+	): Array<parser.IdentifierNode> | null {
+		if (this.tokens.peek()?.type !== TokenType.SymbolDot) {
+			return null
+		}
+
+		let steps = [name]
+
+		while (this.tokens.peek()?.type === TokenType.SymbolDot) {
+			this.tokens.next()
+			steps.push(this.parseIdentifier())
+		}
+
+		return steps
+	}
+
+	// NOTE: A path key always spells its value. Where the key ENDED without
+	// one — a `,` or the closing brace stands where the `=` was — the member is
+	// recovered under the name of its last step so the rest of the list can be
+	// read, and refused with the one message that fits: no reading rescues a
+	// bare path, since there is no `a.b = a.b` for it to have meant. Anything
+	// else after the key falls through to the `=` this expects, whose failure
+	// is what lets `{ config.server with … }` be read as the Combination it is.
+	protected parsePathKeyValue(
+		name: parser.IdentifierNode,
+		steps: Array<parser.IdentifierNode>,
+		allowShorthand: boolean,
+	): ReturnType<typeof generators.keyValuePair> {
+		let last = steps[steps.length - 1]
+		let following = this.tokens.peek()?.type
+
+		if (
+			allowShorthand &&
+			(following === TokenType.SymbolComma ||
+				following === TokenType.SymbolRightBrace)
+		) {
+			this.reportShorthandOnPathKey(steps)
+
+			return generators.keyValuePair(
+				name,
+				generators.identifier(last.content, last.position),
+				{ start: name.position.start, end: last.position.end },
+				true,
+				steps,
+			)
+		}
+
+		this.tokens.expect(TokenType.SymbolEqual)
+
+		let value = this.parseExpression()
+
+		return generators.keyValuePair(
+			name,
+			value,
+			{ start: name.position.start, end: value.position.end },
+			false,
+			steps,
+		)
+	}
+
+	protected reportShorthandOnPathKey(
+		steps: Array<parser.IdentifierNode>,
+	): void {
+		if (this.suppressDiagnostics) {
+			return
+		}
+
+		let last = steps[steps.length - 1]
+		let position = {
+			start: steps[0].position.start,
+			end: last.position.end,
+		}
+		let spelling = steps.map((step) => step.content).join(".")
+
+		reportError("A path key names no binding", position, {
+			code: "shorthand-on-path-key",
+			labels: [primary(position, "this reaches into a value to set")],
+			notes: [
+				"A bare name is a member and its own value; a path is neither, because the value it would set is not the name it reaches through.",
+			],
+			helps: [`Write '${spelling} = ${last.content}'.`],
+		})
+	}
+
+	// NOTE: Two keys clash when they are the same, or when one is a PREFIX of
+	// the other at a step boundary: `server = s` sets the whole Record and
+	// `server.port = 1` reaches into it, so writing both says two things about
+	// `server` and only one of them can survive a Record keyed by name.
+	// `serverPort` is not a prefix of `server` — the boundary is the dot, not
+	// the characters.
+	protected reportClashingMemberKeys(
+		pairs: Array<ReturnType<typeof generators.keyValuePair>>,
+	): void {
+		if (this.suppressDiagnostics) {
+			return
+		}
+
+		let seen: Array<{ key: string; position: common.Position }> = []
+
+		for (let pair of pairs) {
+			let key = generators.keyOf(pair)
+			let position = keyPosition(pair)
+			let clash = seen.find((entry) => keysClash(entry.key, key))
+
+			if (clash === undefined) {
+				seen.push({ key, position })
+
+				continue
+			}
+
+			if (clash.key === key) {
+				reportError(`Member '${key}' is already defined`, position, {
+					code: "duplicate-member",
+					labels: [
+						primary(position, "defined a second time here"),
+						secondary(clash.position, "first defined here"),
+					],
+				})
+
+				continue
+			}
+
+			let shared = clash.key.length < key.length ? clash.key : key
+
+			reportError(
+				`Member '${key}' and '${clash.key}' both write '${shared}'`,
+				position,
+				{
+					code: "duplicate-member",
+					labels: [
+						primary(position, `this writes '${shared}'`),
+						secondary(clash.position, "and so does this"),
+					],
+					notes: [
+						"An update writes each member once, so a key that sets a whole Record and a path that reaches into it can not both stand.",
+					],
+					helps: [
+						`Set '${shared}' as a whole, or reach into it with paths — not both.`,
+					],
+				},
+			)
+		}
 	}
 
 	// NOTE: The Lexer has already split the interpolated String into its chunk

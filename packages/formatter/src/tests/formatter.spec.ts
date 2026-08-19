@@ -57,14 +57,16 @@ const CORPUS = corpus()
 // carries an error the Parser itself reported, and formatting a file the Parser
 // could not read whole is exactly what the gate is there to prevent. Three of
 // them genuinely do not parse; the other two parse and are refused all the same,
-// because a `default-on-function-literal` and a `shorthand-in-combination` are
-// errors like any other and the formatter asks only whether there were any.
+// because a `default-on-function-literal`, a `shorthand-in-combination` and a
+// `shorthand-on-path-key` are errors like any other and the formatter asks only
+// whether there were any.
 const REFUSED = new Set([
 	"diagnostics/Syntax.es",
 	"diagnostics/UnclosedString.es",
 	"diagnostics/DefaultsSyntax.es",
 	"diagnostics/MemberPathSyntax.es",
 	"diagnostics/RecordShorthand.es",
+	"diagnostics/PathKeySyntax.es",
 ])
 
 describe("formatter", () => {

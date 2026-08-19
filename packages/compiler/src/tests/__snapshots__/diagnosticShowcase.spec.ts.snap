@@ -1542,3 +1542,56 @@ Warning: This Statement runs in an order the cycle does not state
 ─── 1 warning
 "
 `;
+
+exports[`Diagnostic Showcase PathKeySyntax.es should render the same report every time 1`] = `
+"[shorthand-on-path-key]
+Error: A path key names no binding
+    ╭─┤ PathKeySyntax.es:18:32 │
+    │
+ 18 │     constant bare = { config with server.port, name = "api" }
+    │                                   ─────┬─────  
+    │                                        ╰─────── this reaches into a value to set
+    │ 
+    │ Help: Write 'server.port = port'.
+    │ 
+    │ Note: A bare name is a member and its own value; a path is neither, because the value it would set is not the name it reaches through.
+────╯
+
+[duplicate-member]
+Error: Member 'server.port' and 'server' both write 'server'
+    ╭─┤ PathKeySyntax.es:25:4 │
+    │
+ 24 │          server = { host = "db", port = 5432, tls = { enabled = true } },
+    │          ───┬──  
+    │             ╰──── and so does this
+ 25 │          server.port = port,
+    │          ─────┬─────  
+    │               ╰─────── this writes 'server'
+    │ 
+    │ Help: Set 'server' as a whole, or reach into it with paths — not both.
+    │ 
+    │ Note: An update writes each member once, so a key that sets a whole Record and a path that reaches into it can not both stand.
+────╯
+
+─── 2 errors
+"
+`;
+
+exports[`Diagnostic Showcase PathKeys.es should render the same report every time 1`] = `
+"[path-key-outside-combination]
+Error: A path key updates nothing here
+    ╭─┤ PathKeys.es:13:3 │
+    │
+ 13 │        server.port = 8080,
+    │        ─────┬─────  
+    │             ╰─────── this reaches into a value
+    │ 
+    │ Help 1: Write the whole member: 'server = { … }'.
+    │ Help 2: Or update a value that already has it: '{ original with server.port = … }'.
+    │ 
+    │ Note: A Record Literal writes its members from nothing, so there is no value under this key to reach into.
+────╯
+
+─── 1 error
+"
+`;

@@ -153,6 +153,12 @@ export interface RecordValueMemberNode {
 	// spelled its value, so nothing that compares two ASTs — the Formatter's
 	// safety gate above all — sees a key appear where it was not written.
 	shorthand?: true
+	// NOTE: Every step of a dotted key — `server.tls.enabled = true` — INCLUDING
+	// the first, which `name` also points at, so nothing that reads `name` moves
+	// for one. The member is keyed in `members` by its dotted spelling, because
+	// two paths sharing a prefix would otherwise collide under one name. Absent
+	// on an ordinary key, which is every key that is not a path.
+	steps?: Array<IdentifierNode>
 }
 
 export type RecordValueNode = {

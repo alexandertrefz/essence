@@ -2209,6 +2209,10 @@ export class Printer {
 	// and `{ base with { a } }` are not even the same parse, so a rewrite
 	// between them would be a rewrite of what the file means; the AST gate
 	// catches one already, and the rule is the same for both.
+	//
+	// A dotted key is printed as it was written, step by step. The Formatter
+	// never normalises between the spellings of a nested update either —
+	// `a.b = 1, a.c = 2` stays two path keys and is never gathered up.
 	private recordInterior(node: parser.RecordValueNode): {
 		interior: Doc
 		commented: boolean
@@ -2221,9 +2225,9 @@ export class Printer {
 			}),
 			(member) =>
 				member.shorthand === true
-					? text(member.name.content)
+					? text(memberKey(member))
 					: concat([
-							text(member.name.content + " = "),
+							text(memberKey(member) + " = "),
 							this.printExpression(member.value),
 						]),
 		)
@@ -2820,6 +2824,14 @@ function flattened(doc: Doc): Doc {
 	let written = renderFlat(doc)
 
 	return written === null ? doc : text(written)
+}
+
+// NOTE: How a Record Literal's key was spelled — the dotted path where it is
+// one, and the plain name everywhere else.
+function memberKey(member: parser.RecordValueMemberNode): string {
+	return member.steps === undefined
+		? member.name.content
+		: member.steps.map((step) => step.content).join(".")
 }
 
 // NOTE: An Expression that can open a block of its own to break inside —

@@ -110,6 +110,26 @@ not. An update takes either a key list or one Expression and never both, so a
 list that also carries a computed key — `{ game with board = board, history =
 game.history::removeLast() }` — has no shorthand spelling at all.
 
+### `shorthand-on-path-key`
+
+A dotted key in an update was written with no value — `{ config with
+server.port }`. A bare NAME is a member and its own value, which is what the
+shorthand is; a path is neither, because the value it would set is not the name
+it reaches through. `server.port` names a member of `config.server` and a local
+called `port`, and nothing says the two are the same thing.
+
+Write the value: `{ config with server.port = port }`.
+
+The refusal is reported even where the list is a Record Literal's, which does
+take shorthand, and it is reported instead of `shorthand-in-combination` and
+`path-key-outside-combination` — no reading rescues a bare path, so the message
+that says why is the one to give.
+
+`{ config with server.port }` alone is NOT this Diagnostic. An update takes
+either a key list or one Expression, and one path is an Expression: it merges
+the members of the value `config.server.port` into `config`, exactly as
+`{ config with other }` merges `other`'s.
+
 ### `path-is-members-only`
 
 A `::` or a `(` was written after a member path — `.price::rounded()`,
@@ -496,6 +516,20 @@ base actually is. An Optional, a Union, a Choice and a List are all values that
 are DECIDED before they are read, and deciding one is a Match rather than a
 dot — so there is no path spelling for them at all. Write the Function literal
 the path would have stood for and decide the value inside it.
+
+### `path-key-outside-combination`
+
+A dotted key was written in a Record Literal — `{ server.port = 8080 }`. A path
+reaches into a value that is already there, and a Literal writes its members
+from nothing, so there is no `server` under the key to reach into.
+
+Either write the whole member — `{ server = { port = 8080, host = "db" } }` —
+or update a value that already has one: `{ config with server.port = 8080 }`.
+
+A path key is legal in an update's key list and nowhere else. In particular it
+is not yet legal in a partial Argument, which is a Record Literal standing where
+a Record Parameter is expected; that is a follow-up, and until it lands the
+Literal has to be written whole.
 
 ### `uncombinable-types`
 
