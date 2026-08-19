@@ -2773,6 +2773,14 @@ type ConformanceSourceNamespace = {
 	// the provided one FOR THIS SOURCE and for no other: it is this Namespace's
 	// answer to the name, and it takes this Namespace's place on the ladder.
 	writes: ReadonlySet<string>
+	// NOTE: The Type Parameters `selfType` still MENTIONS, which the call has to
+	// bind. Empty at a `::` call, where the receiver already specialized the
+	// target — and the generic Namespace's own, spelled `infer`, where the
+	// Namespace is NAMED and there is no receiver yet to specialize it with.
+	// Declared unbounded whatever the Namespace bounds them with: `Self`'s
+	// witness is the one this Method takes, and solving it is what proves a
+	// conditional conformance's own conditions.
+	openGenerics: Array<common.GenericDeclaration>
 }
 
 // NOTE: The Protocols in scope that WROTE a body for this name. Asked first and
@@ -2849,6 +2857,9 @@ function conformanceSourcesFor(
 			targetType: namespace.targetType ?? baseType,
 			generics: namespace.generics,
 			writes: new Set(Object.keys(namespace.methods)),
+			// NOTE: `specializedTargetFor` bound them against the receiver, so
+			// the pin below names concrete Types and the call binds nothing.
+			openGenerics: [],
 		})
 	}
 
@@ -2883,6 +2894,7 @@ function conformanceSourcesFor(
 			targetType: derivedSelf,
 			generics: [],
 			writes: new Set(),
+			openGenerics: [],
 		},
 	]
 }
@@ -2929,7 +2941,15 @@ function providedMethodNamespaceFor(
 				) as common.SimpleMethodType),
 				// NOTE: A fresh Declaration per Method rather than one shared
 				// object — R4, the same rule the derived equality's bounds follow.
+				//
+				// The source's OPEN Parameters stand before the pin, so that a
+				// pin naming one (`List<ItemType>`, where no receiver has said
+				// what the items are) is a Type the Arguments can still settle.
+				// They carry no bound of their own: one witness rides on this
+				// signature, `Self`'s, and its own conditions are what say what
+				// the items owe.
 				generics: [
+					...source.openGenerics,
 					{
 						name: "Self",
 						infer: false,
@@ -3085,6 +3105,18 @@ export function providedNamespaceMember(
 			// asks only for a name the Namespace does NOT declare, so there is
 			// nothing here for an override to take away.
 			writes: new Set(),
+			// NOTE: A generic Namespace NAMED at the call has no receiver to
+			// specialize its target with — `List.isNot(a, b)` pins `Self` to
+			// `List<ItemType>`, and what the items are is the first Argument's
+			// to say. Declared `infer` here, and unbounded whatever the
+			// Namespace bounds them with, so exactly one witness rides on the
+			// signature.
+			openGenerics: namespace.generics.map((generic) => ({
+				name: generic.name,
+				infer: true,
+				defaultType: null,
+				constraint: null,
+			})),
 		})
 
 		if (provided !== null) {
@@ -3482,13 +3514,21 @@ export function resolveConformances(
 			continue
 		}
 
-		let binding = bindings.get(generic.name)
+		let bound = bindings.get(generic.name)
 
 		// NOTE: An unbound Type Parameter or an Error binding has already
 		// been diagnosed — stay silent to avoid cascades.
-		if (binding === undefined || binding.type === "Error") {
+		if (bound === undefined || bound.type === "Error") {
 			continue
 		}
+
+		// NOTE: A binding is read in the invocation's OWN names, and a PINNED
+		// Parameter's may still name a sibling the Arguments bind: a generic
+		// Namespace's `Self` is pinned to `List<ItemType>`, and what the
+		// Arguments made of `ItemType` is what the witness has to be solved
+		// for. Every other binding is a Type the Arguments produced, which
+		// names no Parameter of this invocation and comes back unchanged.
+		let binding = applyGenericBindings(bound, bindings)
 
 		// NOTE: An unknown Protocol was already diagnosed at the declaration.
 		if (findProtocolInScope(generic.constraint, scope) === null) {
