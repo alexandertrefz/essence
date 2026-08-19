@@ -22,19 +22,10 @@ declarations {
 		Decimal,
 	}
 
-	§ `Equatable` is derived for a Choice; see DEVELOPMENT.md, Why bodies look
-	§ the way they do.
-	namespace NumberFormat for NumberFormat is Equatable, is Printable {
-		§§ Answers the NumberFormat as a String: `Fraction` or `Decimal`.
-		§§
-		§§ @returns — the name of the NumberFormat's Case.
-		toString() -> String {
-			<- match @ -> String {
-				case #Fraction { <- "Fraction" }
-				case #Decimal  { <- "Decimal" }
-			}
-		}
-	}
+	§ `Equatable` and `Printable` are both derived for a Choice of Cases that
+	§ carry no payload. This Namespace declares the two and writes neither; see
+	§ DEVELOPMENT.md, Why bodies look the way they do.
+	namespace NumberFormat for NumberFormat is Equatable, is Printable {}
 
 	§ Which Integer `round` reaches for a Rational that is not whole. The
 	§ Choice is declared beside its only user, and `#Nearest` is the default.
@@ -45,19 +36,7 @@ declarations {
 		TowardZero,
 	}
 
-	namespace Rounding for Rounding is Equatable, is Printable {
-		§§ Answers the Rounding as a String: `Nearest`, `Down`, `Up` or `TowardZero`.
-		§§
-		§§ @returns — the name of the Rounding's Case.
-		toString() -> String {
-			<- match @ -> String {
-				case #Nearest    { <- "Nearest" }
-				case #Down       { <- "Down" }
-				case #Up         { <- "Up" }
-				case #TowardZero { <- "TowardZero" }
-			}
-		}
-	}
+	namespace Rounding for Rounding is Equatable, is Printable {}
 
 	§ Exact ratios of Integers, kept in lowest terms with the sign on the
 	§ numerator. The literal form is `3/4`, and `Rational.of` builds one from

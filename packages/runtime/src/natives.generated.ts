@@ -525,27 +525,21 @@ export const $NestedOptionalAbsent: AssertNoEssenceExports<typeof import("./Nest
 
 declare const OrderingModule: typeof import("./Ordering")
 export const $Ordering: OrderingNatives = OrderingModule
-export const $OrderingAbsent: AssertNoEssenceExports<typeof import("./Ordering"), "toString"> = true
 
 declare const SideModule: typeof import("./Side")
 export const $Side: SideNatives = SideModule
-export const $SideAbsent: AssertNoEssenceExports<typeof import("./Side"), "toString"> = true
 
 declare const CaseSensitivityModule: typeof import("./CaseSensitivity")
 export const $CaseSensitivity: CaseSensitivityNatives = CaseSensitivityModule
-export const $CaseSensitivityAbsent: AssertNoEssenceExports<typeof import("./CaseSensitivity"), "toString"> = true
 
 declare const NormalizationFormModule: typeof import("./NormalizationForm")
 export const $NormalizationForm: NormalizationFormNatives = NormalizationFormModule
-export const $NormalizationFormAbsent: AssertNoEssenceExports<typeof import("./NormalizationForm"), "toString"> = true
 
 declare const NumberFormatModule: typeof import("./NumberFormat")
 export const $NumberFormat: NumberFormatNatives = NumberFormatModule
-export const $NumberFormatAbsent: AssertNoEssenceExports<typeof import("./NumberFormat"), "toString"> = true
 
 declare const RoundingModule: typeof import("./Rounding")
 export const $Rounding: RoundingNatives = RoundingModule
-export const $RoundingAbsent: AssertNoEssenceExports<typeof import("./Rounding"), "toString"> = true
 
 declare const RecordModule: typeof import("./Record")
 export const $Record: RecordNatives = RecordModule

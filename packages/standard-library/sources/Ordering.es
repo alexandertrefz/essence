@@ -14,20 +14,10 @@ declarations {
 		Greater,
 	}
 
-	§ `Equatable` is derived for a Choice; see DEVELOPMENT.md, Why bodies look
-	§ the way they do.
-	namespace Ordering for Ordering is Equatable, is Printable {
-		§§ Answers the Ordering as a String: `Less`, `Equal` or `Greater`.
-		§§
-		§§ @returns — the name of the Ordering's Case.
-		toString() -> String {
-			<- match @ -> String {
-				case #Less    { <- "Less" }
-				case #Equal   { <- "Equal" }
-				case #Greater { <- "Greater" }
-			}
-		}
-	}
+	§ `Equatable` and `Printable` are both derived for a Choice of Cases that
+	§ carry no payload. This Namespace declares the two and writes neither; see
+	§ DEVELOPMENT.md, Why bodies look the way they do.
+	namespace Ordering for Ordering is Equatable, is Printable {}
 }
 
 export {

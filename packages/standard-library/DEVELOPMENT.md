@@ -241,13 +241,24 @@ of a literal, so `2` is a NonZeroInteger. `@::remainder(dividingBy 2)` answers a
 bare Integer, and there is no Optional to take apart. A value the Program is
 handed carries no such proof and goes through the predicate instead.
 
-**`Equatable` is derived for a Choice.** The conformance is declared and the
-Methods are left out: a Choice compares by tag, and by payload where a Case
-carries one. A Namespace over a Choice of unit Cases writes `toString` and
-nothing else. `Ordering`, `Side` and `CaseSensitivity` are all that shape.
-`Optional` is the exception, and says why at its own declaration: its `is`
-takes a bare item as well as another Optional, which no derived conformance
-offers.
+**`Equatable` and `Printable` are both derived for a Choice.** The
+conformance is declared and the Methods are left out. Equality is derived for
+EVERY Choice: it compares by tag, and by payload where a Case carries one.
+Printing is derived for a Choice whose Cases all carry no payload, and answers
+the Case's own name — `#Less` prints `Less`. So a Namespace over a Choice of
+unit Cases declares `is Equatable, is Printable` and has an empty body:
+`Ordering`, `Side`, `CaseSensitivity`, `NormalizationForm`, `NumberFormat` and
+`Rounding` are all that shape.
+
+Printing is DECLARED where equality is not — a Choice compares by its tags
+whatever anyone says, but how it READS is a decision, so a Choice whose
+Namespace does not say `is Printable` prints through nothing. A Choice that
+carries a payload anywhere writes its own `toString` or conforms to nothing:
+there is no name to answer with, and a Namespace declaring `is Printable`
+without writing one is a `nonconforming-namespace` error. `Optional` is that
+case, and it is the exception for equality too, as it says at its own
+declaration: its `is` takes a bare item as well as another Optional, which no
+derived conformance offers.
 
 **An Overload is selected by the first entry the Arguments match.** Two orders
 are in play. The order the entries are WRITTEN numbers them, and that number is

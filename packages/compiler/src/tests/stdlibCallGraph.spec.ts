@@ -475,7 +475,6 @@ describe("Stdlib Call Graph", () => {
 			"Boolean.exclusiveOr",
 			"Boolean.isNot",
 			"Boolean.toString",
-			"CaseSensitivity.toString",
 			// NOTE: `Exact` is a helper Namespace of `Number.es` that
 			// `Prelude.es` does not re-export, so it is no builtin — but it is
 			// a Namespace of the standard library like any other, and its two
@@ -575,7 +574,6 @@ describe("Stdlib Call Graph", () => {
 			"NonEmptyRationalList.average",
 			"NonEmptyRationalList.greatestNumber",
 			"NonEmptyRationalList.lowestNumber",
-			"NormalizationForm.toString",
 			"Number.average__overload$1",
 			"Number.average__overload$2",
 			"Number.average__overload$3",
@@ -616,7 +614,6 @@ describe("Stdlib Call Graph", () => {
 			"Number.sum__overload$2",
 			"Number.sum__overload$3",
 			"Number.toString",
-			"NumberFormat.toString",
 			"NumberList.average__overload$1",
 			"NumberList.average__overload$2",
 			"NumberList.greatestNumber__overload$1",
@@ -636,7 +633,6 @@ describe("Stdlib Call Graph", () => {
 			"Optional.map",
 			"Optional.toString",
 			"Optional.value",
-			"Ordering.toString",
 			"Rational.absolute",
 			"Rational.add__overload$2",
 			"Rational.add__overload$3",
@@ -681,8 +677,6 @@ describe("Stdlib Call Graph", () => {
 			"RationalList.product",
 			"RationalList.sum",
 			"Record.isNot",
-			"Rounding.toString",
-			"Side.toString",
 			"String.character__overload$2",
 			"String.characters",
 			"String.compare__overload$2",

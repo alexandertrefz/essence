@@ -305,6 +305,11 @@ describe("Bundle Size", () => {
 	// the line above rose FROM is 68,653 rather than the 68,858 recorded, so
 	// the readability pass is up 2,113 rather than 2,286 — the same unrecorded
 	// drift this file has caught twice before.
+	// NOTE: Byte-identical at 70,953 across the derived `Printable` for a
+	// Choice of payload-free Cases: this file rounds a Rational and never
+	// prints a Case, so it reached none of the six `toString` bodies that left
+	// and does not carry the helper that replaced them. The 48 between 70,905
+	// and 70,953 is drift that arrived on master without a NOTE, again.
 	it("keeps Everyday.es from dragging in the whole numeric tower", async () => {
 		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(71_800)
 	})
@@ -363,6 +368,13 @@ describe("Bundle Size", () => {
 	// master without a NOTE. The 139 on top are `Record::toString` asking the
 	// shared renderer for the printable form of a Rational, which every
 	// recursive call now carries.
+	// NOTE: It now measures 34,083, down 260, and the ceiling STAYS at 35,200 —
+	// a fall of this size leaves the same order of headroom. This file prints
+	// what `compare` answers, twice, so it carried `Ordering`'s written
+	// `toString`: a three-armed Match and the three String Literals under it.
+	// A Choice of payload-free Cases derives that Method now, and what arrived
+	// instead is the one `choiceName` helper reading the Case out of the tag —
+	// which is what every Program that prints any such Choice pays, once.
 	it("keeps Irrational.es from dragging in the whole numeric tower", async () => {
 		expect(await bundleSizeOf("Irrational.es")).toBeLessThan(35_200)
 	})

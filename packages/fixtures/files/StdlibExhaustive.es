@@ -1510,9 +1510,9 @@ third"::lines())
 	show("Choice_Equatable.isNot(_ Ordering) [Less]", less::isNot(#Equal))
 	show("Choice_Equatable.isNot(_ Ordering) [Equal]", equal::isNot(#Equal))
 	show("Choice_Equatable.isNot(_ Ordering) [Greater]", greater::isNot(#Less))
-	show("Ordering.toString() [Less]", less::toString())
-	show("Ordering.toString() [Equal]", equal::toString())
-	show("Ordering.toString() [Greater]", greater::toString())
+	show("Choice_Printable.toString() [Ordering#Less]", less::toString())
+	show("Choice_Printable.toString() [Ordering#Equal]", equal::toString())
+	show("Choice_Printable.toString() [Ordering#Greater]", greater::toString())
 
 	§ ——— Side —————————————————————————————————————————————————————————————
 	constant atStart: Side    = #Start
@@ -1525,9 +1525,9 @@ third"::lines())
 	show("Choice_Equatable.is(_ Side) [differing]", atStart::is(#End))
 	show("Choice_Equatable.isNot(_ Side) [differing]", atStart::isNot(#End))
 	show("Choice_Equatable.isNot(_ Side) [same]", atStart::isNot(#Start))
-	show("Side.toString() [Start]", atStart::toString())
-	show("Side.toString() [End]", atEnd::toString())
-	show("Side.toString() [BothEnds]", atBothEnds::toString())
+	show("Choice_Printable.toString() [Side#Start]", atStart::toString())
+	show("Choice_Printable.toString() [Side#End]", atEnd::toString())
+	show("Choice_Printable.toString() [Side#BothEnds]", atBothEnds::toString())
 
 	§ ——— CaseSensitivity ——————————————————————————————————————————————————
 	constant sensitive: CaseSensitivity   = #Sensitive
@@ -1553,8 +1553,14 @@ third"::lines())
 		"Choice_Equatable.isNot(_ CaseSensitivity) [same]",
 		sensitive::isNot(#Sensitive),
 	)
-	show("CaseSensitivity.toString() [Sensitive]", sensitive::toString())
-	show("CaseSensitivity.toString() [Insensitive]", insensitive::toString())
+	show(
+		"Choice_Printable.toString() [CaseSensitivity#Sensitive]",
+		sensitive::toString(),
+	)
+	show(
+		"Choice_Printable.toString() [CaseSensitivity#Insensitive]",
+		insensitive::toString(),
+	)
 
 	§ ——— NormalizationForm ————————————————————————————————————————————————
 	constant composedCanonical: NormalizationForm   = #ComposedCanonical
@@ -1577,11 +1583,11 @@ third"::lines())
 		decomposedCanonical::isNot(#DecomposedCanonical),
 	)
 	show(
-		"NormalizationForm.toString() [ComposedCanonical]",
+		"Choice_Printable.toString() [NormalizationForm#ComposedCanonical]",
 		composedCanonical::toString(),
 	)
 	show(
-		"NormalizationForm.toString() [DecomposedCanonical]",
+		"Choice_Printable.toString() [NormalizationForm#DecomposedCanonical]",
 		decomposedCanonical::toString(),
 	)
 
@@ -1599,8 +1605,14 @@ third"::lines())
 		"Choice_Equatable.isNot(_ NumberFormat) [same]",
 		asDecimal::isNot(#Decimal),
 	)
-	show("NumberFormat.toString() [Fraction]", asFraction::toString())
-	show("NumberFormat.toString() [Decimal]", asDecimal::toString())
+	show(
+		"Choice_Printable.toString() [NumberFormat#Fraction]",
+		asFraction::toString(),
+	)
+	show(
+		"Choice_Printable.toString() [NumberFormat#Decimal]",
+		asDecimal::toString(),
+	)
 
 	§ ——— Rounding —————————————————————————————————————————————————————————
 	constant toNearest: Rounding    = #Nearest
@@ -1612,10 +1624,16 @@ third"::lines())
 	show("Choice_Equatable.is(_ Rounding) [differing]", toNearest::is(#Down))
 	show("Choice_Equatable.isNot(_ Rounding)", toNearest::isNot(#Down))
 	show("Choice_Equatable.isNot(_ Rounding) [same]", toDown::isNot(#Down))
-	show("Rounding.toString() [Nearest]", toNearest::toString())
-	show("Rounding.toString() [Down]", toDown::toString())
-	show("Rounding.toString() [Up]", toUp::toString())
-	show("Rounding.toString() [TowardZero]", toTowardZero::toString())
+	show(
+		"Choice_Printable.toString() [Rounding#Nearest]",
+		toNearest::toString(),
+	)
+	show("Choice_Printable.toString() [Rounding#Down]", toDown::toString())
+	show("Choice_Printable.toString() [Rounding#Up]", toUp::toString())
+	show(
+		"Choice_Printable.toString() [Rounding#TowardZero]",
+		toTowardZero::toString(),
+	)
 
 	§ ——— Record ———————————————————————————————————————————————————————————
 	§ LOAD-BEARING: `point` prints as `{ x = 1, y = 2 }`, well under sixty
