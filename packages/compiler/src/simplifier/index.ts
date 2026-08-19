@@ -331,6 +331,9 @@ function conformanceExpression(
 		nodeType: "ConformanceValue",
 		namespaceName: conformance.source.name,
 		methodMap: conformance.source.methodMap,
+		...(conformance.source.providedMethods === undefined
+			? {}
+			: { providedMethods: conformance.source.providedMethods }),
 		conditions: conformance.source.conditions.map(conformanceExpression),
 		derivedDescriptor: conformance.source.derivedDescriptor,
 		type: { type: "Unknown" },

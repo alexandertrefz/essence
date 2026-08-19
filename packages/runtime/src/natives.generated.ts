@@ -55,6 +55,7 @@ type ComparableConformance<Self extends AnyType> = {
 
 type EquatableConformance<Self extends AnyType> = {
 	is: (self: Self, argument1: Self) => BooleanType
+	isNot: (self: Self, argument1: Self) => BooleanType
 }
 
 type PrintableConformance<Self extends AnyType> = {

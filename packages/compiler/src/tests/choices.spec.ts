@@ -3495,12 +3495,12 @@ describe("Choices", () => {
 
 			expect(generated).toContain("Colour.is(red,")
 			expect(generated).toContain("is: Colour.is")
-			// NOTE: `isNot` is not in the witness, and belongs in none: it is
-			// `Equatable`'s PROVIDED Method, so a bounded Method reaches the one
-			// shared body rather than an entry of the map. The written `isNot`
-			// above still answers a direct call — that is the override rule —
-			// and the two agree because the body is the same expression.
-			expect(generated).not.toContain("isNot: Colour.isNot")
+			// NOTE: And `isNot` with it, though it is `Equatable`'s PROVIDED
+			// Method: a Namespace that writes one has replaced it, and the
+			// witness is what a bounded call reads — an override that stayed out
+			// of the map would answer a bounded call with the Protocol's body
+			// while a direct call answered with this one.
+			expect(generated).toContain("isNot: Colour.isNot")
 		})
 
 		// NOTE: One helper for every Choice of every Program — the whole cost of

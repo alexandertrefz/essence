@@ -135,6 +135,36 @@ export function boundConformance(
 	return bound
 }
 
+// NOTE: The other runtime half of a witness — the Protocol's PROVIDED Methods,
+// which are one const each for the whole Program and take the witness they were
+// read off as their own trailing conformance Argument. That Argument is the
+// finished map, this one, which is why they can not simply stand in the object
+// literal: an object can not name itself while it is being written.
+//
+// So the map is built first, and each provided entry is a closure over it. A
+// conformer that OVERRIDES a provided Method is already in `methods` and never
+// reaches here, which is what makes a bounded call answer with the override.
+//
+// The Rewriter emits this only where a Protocol provides something the conformer
+// does not override; every other witness is the plain object literal it has
+// always been, and a conditional one is `boundConformance`'s answer handed in
+// here so the conditions are curried on before the provided Methods close over
+// it.
+export function providedConformance(
+	methods: Record<string, (...args: Array<any>) => unknown>,
+	provided: Record<string, (...args: Array<any>) => unknown>,
+): Record<string, (...args: Array<any>) => unknown> {
+	let witness: Record<string, (...args: Array<any>) => unknown> = {
+		...methods,
+	}
+
+	for (let [name, method] of Object.entries(provided)) {
+		witness[name] = (...args: Array<unknown>) => method(...args, witness)
+	}
+
+	return witness
+}
+
 // NOTE: The runtime shape of a constructed Choice Case — the payload's
 // members with the Case's tag (`"CalculatorOperation#Add"`) on the hidden
 // Type key. Unit Cases simply carry no further members.

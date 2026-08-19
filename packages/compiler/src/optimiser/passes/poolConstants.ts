@@ -223,6 +223,7 @@ function conformanceKeyOf(
 	return `conformance:${serializeKey({
 		namespace: node.namespaceName,
 		methods: node.methodMap,
+		provided: node.providedMethods ?? null,
 		descriptor: node.derivedDescriptor ?? null,
 		conditions,
 	})}`

@@ -2607,6 +2607,7 @@ function derivedConformanceSource(
 			kind: "namespace",
 			name: derivedPrintableNamespaceName,
 			methodMap: result.methodMap,
+			...providedMethodsOf(result),
 			conditions: [],
 		}
 	}
@@ -2621,6 +2622,7 @@ function derivedConformanceSource(
 			kind: "namespace",
 			name: derivedEquatableNamespaceName,
 			methodMap: result.methodMap,
+			...providedMethodsOf(result),
 			conditions: [],
 		}
 	}
@@ -2660,6 +2662,7 @@ function derivedConformanceSource(
 		kind: "namespace",
 		name: derivedEquatableNamespaceName,
 		methodMap: result.methodMap,
+		...providedMethodsOf(result),
 		conditions,
 		// NOTE: Silent — this is the witness a bounded call is handed, solved
 		// speculatively and memoised, so the call site is where a payload that
@@ -2670,6 +2673,17 @@ function derivedConformanceSource(
 			null,
 		),
 	}
+}
+
+// NOTE: The provided half of a conformance, left OUT entirely where the Protocol
+// provides nothing or the conformer overrides everything it provides — so a
+// witness with none emits the plain object literal it always did, byte for byte.
+function providedMethodsOf(result: {
+	providedMethods: Record<string, string>
+}): { providedMethods?: Record<string, string> } {
+	return Object.keys(result.providedMethods).length === 0
+		? {}
+		: { providedMethods: result.providedMethods }
 }
 
 // NOTE: Does conforming to `declared` also make a value conform to `wanted`?
@@ -3050,140 +3064,6 @@ export function providedNamespaceMember(
 	return null
 }
 
-// NOTE: The same, for a receiver whose Type is a Protocol-bounded Type
-// Parameter. Conformance is not asked about at all — the bound IS the promise —
-// so the walk is over the Protocol and every Protocol it extends.
-//
-// `Self` stays INFERRED here, where a concrete receiver pins it. There is
-// nothing to pin it to: the bound is the only thing known about the receiver,
-// and the receiver's Type is what `Self` is. Inside a Protocol's own provided
-// body that Type is literally spelled `Self`, so a pin would bind the name to
-// itself and match nothing.
-export function providedMethodNamespacesForBound(
-	protocol: common.ProtocolType,
-	baseType: common.Type,
-	scope: enricher.Scope,
-): Map<string, common.NamespaceType> {
-	let reached: Array<common.ProtocolType> = []
-
-	for (let name of [protocol.name, ...(protocol.conformsTo ?? [])]) {
-		let ancestor =
-			name === protocol.name ? protocol : findProtocolInScope(name, scope)
-
-		if (ancestor !== null) {
-			reached.push(ancestor)
-		}
-	}
-
-	let found = new Map<string, common.NamespaceType>()
-
-	for (let candidate of reached) {
-		let overridden = new Set<string>()
-
-		for (let other of reached) {
-			// NOTE: `other` extends `candidate`, so it is the more derived of
-			// the two — every Method it provides under a name `candidate` also
-			// provides is the one that stands.
-			if (other.conformsTo?.includes(candidate.name) !== true) {
-				continue
-			}
-
-			for (let methodName of Object.keys(other.providedMethods ?? {})) {
-				if (providedMethodProtocol(other, methodName) === other.name) {
-					overridden.add(methodName)
-				}
-			}
-		}
-
-		let namespace = boundProvidedMethodNamespace(
-			candidate,
-			baseType,
-			overridden,
-		)
-
-		if (namespace !== null) {
-			found.set(candidate.name, namespace)
-		}
-	}
-
-	return found
-}
-
-// NOTE: A Protocol's own provided Methods as the pseudo Namespace a BOUND
-// receiver reaches them through — named after the Protocol, because that name is
-// what the emitted const is spelled with (`$es_<Protocol>__<member>`) and one
-// const answers for every conformer.
-//
-// Each Method is a bounded generic Function over `Self`: `<infer Self is P>(@:
-// Self, …)`. That is not a trick, it is what a provided Method IS — a body
-// written against the Protocol's surface and nothing else — and it means the
-// existing bounded-Generic rail carries the whole feature. Invocation inference
-// binds `Self` from the receiver, `resolveConformances` solves the witness for
-// it, and the Simplifier appends that witness as the hidden `Self__conformance`
-// Argument the body dispatches its own calls through.
-function boundProvidedMethodNamespace(
-	protocol: common.ProtocolType,
-	baseType: common.Type,
-	// NOTE: The Method names a more derived Protocol, reached by the same
-	// receiver, re-provided — left out here so exactly one Protocol answers each
-	// name.
-	overridden: ReadonlySet<string>,
-): common.NamespaceType | null {
-	let boundSelf: common.GenericUse = {
-		type: "GenericUse",
-		name: "Self",
-		constraint: protocol.name,
-	}
-	let bindings: GenericBindings = new Map([["Self", boundSelf]])
-	let methods: Record<string, common.MethodType> = {}
-
-	for (let [methodName, writtenBy] of Object.entries(
-		protocol.providedMethods ?? {},
-	)) {
-		let method = protocol.methods[methodName]
-
-		if (
-			writtenBy !== protocol.name ||
-			method?.type !== "SimpleMethod" ||
-			overridden.has(methodName)
-		) {
-			continue
-		}
-
-		methods[methodName] = {
-			...(applyGenericBindings(
-				method,
-				bindings,
-			) as common.SimpleMethodType),
-			// NOTE: A fresh Declaration per Method rather than one shared
-			// object — R4, the same rule the derived equality's bounds follow.
-			generics: [
-				{
-					name: "Self",
-					infer: true,
-					defaultType: null,
-					constraint: protocol.name,
-				},
-			],
-		}
-	}
-
-	if (Object.keys(methods).length === 0) {
-		return null
-	}
-
-	return {
-		type: "Namespace",
-		name: protocol.name,
-		targetType: baseType,
-		generics: [],
-		properties: {},
-		methods,
-		conformsTo: [protocol.name],
-		providedBy: protocol.name,
-	}
-}
-
 // NOTE: Solves whether `binding` conforms to `protocolName` in `scope`,
 // producing the witness the codegen needs. A GenericUse forwards the enclosing
 // bounded Function's own conformance parameter; a concrete Type selects the one
@@ -3530,6 +3410,7 @@ function solveNamespaceConformance(
 			kind: "namespace",
 			name: candidate.name,
 			methodMap: result.methodMap,
+			...providedMethodsOf(result),
 			conditions,
 		},
 	}
@@ -5291,22 +5172,28 @@ export function resolveMethodLookupNamespacesForReceiverType(
 			let selfBindings: GenericBindings = new Map([["Self", baseType]])
 			let methods: Record<string, common.MethodType> = {}
 
-			for (let [methodName, method] of Object.entries(protocol.methods)) {
-				// NOTE: The REQUIREMENTS alone. A provided Method is not in the
-				// witness map — its body is one const shared by every conformer
-				// and there is nothing per-conformer to put there — so offering
-				// it here would emit `T__conformance.isNot(…)`, a read off a
-				// witness that carries no such entry. It is offered below
-				// instead, through the Protocol that wrote it, where the bound
-				// itself becomes the conformance Argument the const takes.
-				if (providedMethodProtocol(protocol, methodName) !== null) {
-					continue
-				}
+			// NOTE: The whole Protocol surface, requirements and PROVIDED
+			// Methods alike — a witness carries an entry for every one of them,
+			// which is what makes a bounded call reach the conformer's override
+			// where it wrote one and the shared const where it did not. A
+			// Protocol's ancestors are in `protocol.methods` already, so one
+			// pseudo Namespace answers for the whole chain.
+			let providedMembers: Record<string, string> = {}
 
+			for (let [methodName, method] of Object.entries(protocol.methods)) {
 				methods[methodName] = applyGenericBindings(
 					method,
 					selfBindings,
 				) as common.MethodType
+
+				let providingProtocol = providedMethodProtocol(
+					protocol,
+					methodName,
+				)
+
+				if (providingProtocol !== null) {
+					providedMembers[methodName] = providingProtocol
+				}
 			}
 
 			matchingNamespaces.set(conformanceName, {
@@ -5316,19 +5203,10 @@ export function resolveMethodLookupNamespacesForReceiverType(
 				generics: [],
 				properties: {},
 				methods,
+				...(Object.keys(providedMembers).length === 0
+					? {}
+					: { providedMembers }),
 			})
-
-			// NOTE: The provided Methods of the bound and of every Protocol it
-			// extends — `<Item is Orderable>` reaches Comparable's and
-			// Equatable's alike, because extending one is a promise to conform
-			// to it.
-			for (let [name, namespace] of providedMethodNamespacesForBound(
-				protocol,
-				baseType,
-				scope,
-			)) {
-				matchingNamespaces.set(name, namespace)
-			}
 		}
 
 		return matchingNamespaces

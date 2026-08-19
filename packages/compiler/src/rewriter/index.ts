@@ -2031,6 +2031,20 @@ export function essenceMethodReferences(
 					!isStored,
 				)
 			}
+
+			// NOTE: A witness names the Protocol's provided Methods too, each
+			// under the Protocol that WROTE it rather than under the conforming
+			// Namespace — so the edge goes to the shared const, exactly as it
+			// does from a call.
+			let providedMethods = record["providedMethods"] as
+				| Record<string, unknown>
+				| undefined
+
+			for (let [memberName, protocolName] of Object.entries(
+				providedMethods ?? {},
+			)) {
+				considerProvided(protocolName, memberName)
+			}
 		} else if (record["nodeType"] === "FunctionInvocation") {
 			// NOTE: A bare free-Function call — `loop__overload$2(…)` by now,
 			// the Simplifier having mangled the overloaded callee — is an edge
@@ -3206,15 +3220,47 @@ function rewriteConformanceValue(
 		),
 	}
 
-	// NOTE: An unconditional conformance is exactly the plain method-map object
-	// literal — kept byte-identical so its emit snapshots do not churn. A
-	// conditional one wraps it in `$type.boundConformance(<map>, [<witnesses>])`,
-	// which curries each `where` condition's witness onto every Method so the
-	// bounded runtime helpers receive them as hidden trailing Arguments.
-	if (node.conditions.length === 0) {
-		return methodMap
+	// NOTE: An unconditional conformance with nothing provided is exactly the
+	// plain method-map object literal — kept byte-identical so its emit
+	// snapshots do not churn. A conditional one wraps it in
+	// `$type.boundConformance(<map>, [<witnesses>])`, which curries each `where`
+	// condition's witness onto every Method so the bounded runtime helpers
+	// receive them as hidden trailing Arguments.
+	let witness: estree.Expression = methodMap
+
+	if (node.conditions.length > 0) {
+		witness = {
+			type: "CallExpression",
+			optional: false,
+			callee: {
+				type: "MemberExpression",
+				optional: false,
+				object: { type: "Identifier", name: "$type" },
+				property: { type: "Identifier", name: "boundConformance" },
+				computed: false,
+			},
+			arguments: [
+				methodMap,
+				{
+					type: "ArrayExpression",
+					elements: node.conditions.map((condition) =>
+						rewriteExpression(condition),
+					),
+				},
+			],
+		}
 	}
 
+	let provided = Object.entries(node.providedMethods ?? {})
+
+	if (provided.length === 0) {
+		return witness
+	}
+
+	// NOTE: OUTSIDE `boundConformance`, never inside it: a provided const takes
+	// the witness of `Self` alone, and the conditions belong to the Methods the
+	// Namespace WROTE. Wrapping the other way round would curry a `where`
+	// condition's witness onto a body that never declared one.
 	return {
 		type: "CallExpression",
 		optional: false,
@@ -3222,15 +3268,29 @@ function rewriteConformanceValue(
 			type: "MemberExpression",
 			optional: false,
 			object: { type: "Identifier", name: "$type" },
-			property: { type: "Identifier", name: "boundConformance" },
+			property: { type: "Identifier", name: "providedConformance" },
 			computed: false,
 		},
 		arguments: [
-			methodMap,
+			witness,
 			{
-				type: "ArrayExpression",
-				elements: node.conditions.map((condition) =>
-					rewriteExpression(condition),
+				type: "ObjectExpression",
+				properties: provided.map(
+					([memberName, protocolName]): estree.Property => ({
+						type: "Property",
+						key: memberKey(memberName),
+						value: {
+							type: "Identifier",
+							name: protocolMemberIdentifier(
+								protocolName,
+								memberName,
+							),
+						},
+						kind: "init",
+						method: false,
+						shorthand: false,
+						computed: false,
+					}),
 				),
 			},
 		],
