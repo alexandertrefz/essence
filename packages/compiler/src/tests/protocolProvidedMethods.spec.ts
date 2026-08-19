@@ -443,9 +443,41 @@ describe("Protocol-provided Methods", () => {
 			)
 
 			expect(codesOf(source)).toEqual(["ambiguous-namespace"])
-			expect(
-				diagnosticsOf(source).flatMap((diagnostic) => diagnostic.helps),
-			).toEqual(["Name it at the call, e.g. 'value::<Left>label(…)'."])
+			expect(helpsOf(source)).toEqual([
+				"Name it at the call, e.g. 'value::<Left>label(…)'.",
+			])
+			// NOTE: The Namespace alone is the same word twice here, and
+			// neither time true — `Boxes` declares no `label`. Each note names
+			// the Protocol that wrote the body, which is also what the
+			// specifier has to write, so `Right` is discoverable at all.
+			expect(notesOf(source)).toEqual([
+				"'Left' provides 'label' for 'Boxes'.",
+				"'Right' provides 'label' for 'Boxes'.",
+			])
+		})
+
+		// NOTE: A Namespace declaring the name ties with the provided Method it
+		// did not replace — its own rung is not the rung the provided one
+		// stands on. The note must not say `Integer` declares `isBetween`:
+		// nothing in `Integer.es` does, and a reader sent there finds nothing.
+		it("should name the Protocol beside a Namespace that ties with it", () => {
+			let source = [
+				"implementation {",
+				"\tnamespace Extras for Integer {",
+				"\t\tisBetween(_ lower: Integer, and upper: Integer) -> Boolean {",
+				"\t\t\t<- false",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tTerminal.inspect(5::isBetween(1, and 9))",
+				"}",
+			].join("\n")
+
+			expect(codesOf(source)).toEqual(["ambiguous-namespace"])
+			expect(notesOf(source)).toEqual([
+				"'Extras' declares 'isBetween'.",
+				"'Orderable' provides 'isBetween' for 'Integer'.",
+			])
 		})
 
 		it("should answer a specifier naming the Protocol that provides it", async () => {

@@ -6364,6 +6364,23 @@ function candidateSpecifierName(
 	return namespaceType.providedBy ?? key
 }
 
+// NOTE: What one candidate DECLARES, as a note. A written Method is the
+// Namespace's own and is said so; a provided one is a Protocol's body reached
+// THROUGH the Namespace, and both halves have to be said. Naming the Namespace
+// alone claimed a declaration a reader would not find in that file, and it
+// printed one line twice where two Protocols provide one name through one
+// Namespace — which is exactly the ambiguity being reported. The Protocol named
+// here is also what a `value::<Name>method(…)` specifier has to write.
+function describeCandidateDeclaration(
+	key: string,
+	namespaceType: common.NamespaceType,
+	methodName: string,
+): string {
+	return namespaceType.providedBy === undefined
+		? `'${key}' declares '${methodName}'.`
+		: `'${namespaceType.providedBy}' provides '${methodName}' for '${namespaceType.name}'.`
+}
+
 // NOTE: A DERIVE is a fallback: it answers only where no written Namespace
 // declares the name, which a Namespace declaring it takes away. So a Namespace
 // declaring the name takes the whole name — even one that declares no
@@ -6455,13 +6472,13 @@ function reportNoMatchingOverload(
 	)
 }
 
-// NOTE: Each candidate as a pair — what it is CALLED and what a call would have
-// to WRITE to pick it. The two differ for a provided Method: it is named by the
-// Namespace whose conformance put it in reach, and it is written by naming the
-// Protocol that offers it.
+// NOTE: Each candidate as a pair — what it DECLARES and what a call would have
+// to WRITE to pick it. The two differ for a provided Method: it is declared by
+// the Protocol that wrote the body and reached through the Namespace whose
+// conformance offered it, and it is written by naming the Protocol.
 function reportAmbiguousNamespace(
 	node: parser.MethodInvocationNode,
-	candidates: Array<{ display: string; specifier: string }>,
+	candidates: Array<{ declaration: string; specifier: string }>,
 ): void {
 	reportError(
 		`'${node.member.content}' is provided by more than one Namespace`,
@@ -6474,10 +6491,7 @@ function reportAmbiguousNamespace(
 					"these Arguments match all of them",
 				),
 			],
-			notes: candidates.map(
-				(candidate) =>
-					`'${candidate.display}' declares '${node.member.content}'.`,
-			),
+			notes: candidates.map((candidate) => candidate.declaration),
 			helps: [
 				`Name it at the call, e.g. 'value::<${candidates[0]?.specifier}>${node.member.content}(…)'.`,
 			],
@@ -6908,9 +6922,10 @@ function resolveMethodInvocation(
 		reportAmbiguousNamespace(
 			node,
 			resolvedMethods.map((method) => ({
-				display: candidateNamespaceName(
+				declaration: describeCandidateDeclaration(
 					method.namespace.name,
 					method.namespace.type,
+					node.member.content,
 				),
 				specifier: candidateSpecifierName(
 					method.namespace.name,
@@ -7166,9 +7181,12 @@ function resolveUnionMethodDispatch(
 							"these Arguments match all of them",
 						),
 					],
-					notes: resolvedMethods.map(
-						(method) =>
-							`'${candidateNamespaceName(method.namespaceName, method.namespaceType)}' declares '${node.member.content}'.`,
+					notes: resolvedMethods.map((method) =>
+						describeCandidateDeclaration(
+							method.namespaceName,
+							method.namespaceType,
+							node.member.content,
+						),
 					),
 					helps: [
 						`Name it at the call, e.g. 'value::<${candidateSpecifierName(resolvedMethods[0].namespaceName, resolvedMethods[0].namespaceType)}>${node.member.content}(…)'.`,

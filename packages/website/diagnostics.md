@@ -482,9 +482,11 @@ same target twice is one such tie; so is a pair that does not compare at all.
 `for List<Integer> | String` and `for List<ItemType>` are both matched by a
 List of Integers, yet the Union is no case of the generic List and the generic
 List is no case of the Union, which leaves that receiver with nothing to pick
-by. The matching Namespaces are listed; qualify the call to pick one —
-`value::<Name>method(…)`, where `Name` is either a Namespace or a Protocol whose
-provided Method is one of the candidates.
+by. Each candidate is listed by what DECLARES it: a Namespace for a Method it
+wrote, and a Protocol beside the Namespace it was reached through for a provided
+one — `'Orderable' provides 'isBetween' for 'Integer'.` Qualify the call to pick
+one — `value::<Name>method(…)`, where `Name` is either a Namespace or a Protocol
+whose provided Method is one of the candidates.
 
 ### `undecided-receiver-type`
 
