@@ -29,7 +29,8 @@ Essence compiles to modern ECMAScript, allowing execution in Bun, Node.js as wel
 * Protocols
 * Generics
 * Named Parameters
-* Default Parameter Values
+* Default Parameter Values, whole or partial
+* Property Shorthand, Member Paths & Nested Updates
 * Arbitrary Precision Numbers
 * First-Class Functions
 
@@ -57,6 +58,7 @@ That one executable carries the whole toolchain — `build`, `run`, `check`, `wa
 The current runtime implementation is rudimentary however. There are many features missing from the standard library. Various langauge features are only partially implemented.
 
 # Documentation
+* [Records](records.html) — shorthand, defaults, paths and nested updates
 * [Protocols](protocols.html) — conformance, provided Methods, extension
 * [Diagnostics](diagnostics.html) — every Diagnostic code
 * [Optimisations](optimisations.html) — every Optimiser pass

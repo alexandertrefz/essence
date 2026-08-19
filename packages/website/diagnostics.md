@@ -113,10 +113,11 @@ game.history::removeLast() }` — has no shorthand spelling at all.
 ### `shorthand-on-path-key`
 
 A dotted key in an update was written with no value — `{ config with
-server.port }`, or `{ config with server.{ tls.enabled } }`. A bare NAME is a member and its own value, which is what the
-shorthand is; a path is neither, because the value it would set is not the name
-it reaches through. `server.port` names a member of `config.server` and a local
-called `port`, and nothing says the two are the same thing.
+server.port }`, or `{ config with server.{ tls.enabled } }`. A bare NAME is a
+member and its own value, which is what the shorthand is; a path is neither,
+because the value it would set is not the name it reaches through.
+`server.port` names a member of `config.server` and a local called `port`, and
+nothing says the two are the same thing.
 
 Write the value: `{ config with server.port = port }`.
 
@@ -561,7 +562,24 @@ sides must be Records or Namespaces.
 
 ### `partial-type-mismatch`
 
-The right hand side of a combination is not a Partial of the left hand side.
+The right hand side of a combination is not a Partial of the left hand side. An
+update may only set members the original already has, with the Types it declared
+for them.
+
+A member whose Type is itself a Record is set as a WHOLE by a plain key:
+`{ config with server = { … } }` replaces `server`, and every member of the new
+`server` has to be written. That is deliberate, and it is why a nested literal
+is never quietly merged into the one beneath it. Under such a merge, adding a
+member to a Type would silently turn an old full replacement into a merge that
+keeps the old value, with no Diagnostic anywhere — the Program would change
+meaning because a Type it does not name grew a member.
+
+Reaching INTO a member is spelled instead, and says so: `{ config with
+server.port = 8080 }` merges, and `{ config with server.{ port = 8080 } }`
+merges. So `server = { … }` always replaces, `server.port = …` always merges,
+and a Type may grow a member without either of them changing meaning. See
+`path-key-outside-combination`, `path-step-not-a-record`,
+`path-on-computed-value` and `empty-path-group`.
 
 ### `wrong-type-argument-count`
 
