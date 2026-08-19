@@ -750,6 +750,8 @@ describe("A Parameter a call may leave out", () => {
 //
 // The Module as JavaScript — marshalled at every boundary.
 
+export declare function connect(p0: string, using: { host: string; retries?: bigint | number; secure: boolean }): string
+
 export declare function cut(from: bigint | number | undefined, to: bigint | number): bigint
 export declare function cut(labelled: { from?: bigint | number; to: bigint | number }): bigint
 
@@ -759,5 +761,23 @@ export declare function greeting(labelled: { "with"?: string; and?: string }): s
 export declare function scaled(p0: bigint | number, by?: bigint | number): bigint
 `,
 		)
+	})
+
+	// NOTE: A Record Parameter whose default fills SOME of its members in. The
+	// Argument itself is required — `using` carries no `?` — and the members the
+	// default supplies carry one each.
+	//
+	// NOTE: Spelled out at the Parameter rather than by the name `Options` is
+	// declared under, which is the rule a Type whose two directions differ
+	// already lives by: one going IN may leave `retries` out, one coming out
+	// never lacks it, and the `?` belongs on this position rather than on every
+	// use of that Type.
+	it("marks the members a default fills in", async () => {
+		let declarations = await declarationsOf(clientFixture("Defaults.es"))
+
+		expect(declarations).toContain(
+			"using: { host: string; retries?: bigint | number; secure: boolean }",
+		)
+		expect(declarations).not.toContain("using?:")
 	})
 })

@@ -468,12 +468,40 @@ function signatureWith(
 		kind: "function",
 		parameters: signature.parameterTypes.map((parameter) => ({
 			label: parameter.name,
-			of: describeWith(parameter.type, context, printing),
+			of: withOmittableMembers(
+				describeWith(parameter.type, context, printing),
+				parameter.defaultMembers,
+			),
 			...(parameter.hasDefault ? { optional: true as const } : {}),
 		})),
 		returns: describeWith(signature.returnType, context, printing),
 		shown: printSignature(signature),
 	}
+}
+
+// NOTE: The members a Record Parameter's default fills in, marked on the
+// Parameter's OWN Descriptor — which is where the fact lives, because it is one
+// about the place the Record stands in and not about the Record Type. Every
+// other position describing that same Type gets an unmarked Descriptor, and a
+// value coming OUT of one carries every member, since the callee filled them in.
+function withOmittableMembers(
+	descriptor: Descriptor,
+	defaultMembers: ReadonlyArray<string> | undefined,
+): Descriptor {
+	if (defaultMembers === undefined || descriptor.kind !== "record") {
+		return descriptor
+	}
+
+	let filled = new Set(defaultMembers)
+	let members: Members = {}
+
+	for (let [name, member] of Object.entries(descriptor.members)) {
+		members[name] = filled.has(name)
+			? { ...member, optional: true as const }
+			: member
+	}
+
+	return { ...descriptor, members }
 }
 
 function isOptionalCase(type: common.Type, name: string): boolean {

@@ -23,9 +23,22 @@ implementation {
 	) -> String {
 		<- "{prefix} {name}"
 	}
+
+	type Options = { host: String, retries: Integer, secure: Boolean }
+
+	§ A PARTIAL Record default. The Argument is still required — the members
+	§ the default does not fill in have to be written — but `retries` may be
+	§ left out of it, which is what the declaration marks `?`.
+	function connect(
+		_ url: String,
+		using options: Options = { retries = 3 },
+	) -> String {
+		<- "{url}|{options.host}|{options.retries}|{options.secure}"
+	}
 }
 
 export {
+	connect
 	cut
 	greeting
 	scaled
