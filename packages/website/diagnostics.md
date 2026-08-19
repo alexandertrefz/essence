@@ -947,6 +947,14 @@ A Namespace declares conformance to a Protocol but does not satisfy it — a
 Method is missing, its signature does not match the Protocol's, or a fulfilling
 Method carries a Protocol bound of its own that the conformance can not assume.
 
+A Choice is the exception, and writing nothing is right there. `is Equatable`
+on a Namespace over any Choice is derived from the Cases' tags, and
+`is Printable` on one over a Choice whose Cases all carry no payload is derived
+too — its `toString` answers the Case's own name, so `#Less` prints `Less`.
+Neither derive is offered where the Namespace writes the Method itself. A Case
+that carries a payload has no name to print on its own, so `is Printable` there
+still needs a written `toString` and reports this without one.
+
 ### `conformance-needs-target-type`
 
 Only a Namespace with a target Type (`for …`) can conform to a Protocol.

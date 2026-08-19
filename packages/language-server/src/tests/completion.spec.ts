@@ -256,6 +256,47 @@ describe("Completion", () => {
 			expect(labels).toContain("isNot")
 		})
 
+		// NOTE: Printing is derived on narrower terms than equality — the
+		// Namespace has to declare `is Printable` — so Completion has to mirror
+		// both halves of the rule or it offers a Method no call site can reach.
+		it("should list a Choice's derived 'toString' where a Namespace declares 'is Printable'", () => {
+			let source = [
+				"implementation {",
+				"\tchoice Colour {",
+				"\t\tRed,",
+				"\t\tGreen,",
+				"\t}",
+				"",
+				"\tnamespace Colour for Colour is Printable { }",
+				"",
+				"\tconstant red: Colour = #Red",
+				"\tred::",
+				"}",
+			].join("\n")
+
+			expect(labelsOf(source, { line: 10, column: 7 })).toContain(
+				"toString",
+			)
+		})
+
+		it("should not list 'toString' where no Namespace declares it Printable", () => {
+			let source = [
+				"implementation {",
+				"\tchoice Colour {",
+				"\t\tRed,",
+				"\t\tGreen,",
+				"\t}",
+				"",
+				"\tconstant red: Colour = #Red",
+				"\tred::",
+				"}",
+			].join("\n")
+
+			expect(labelsOf(source, { line: 8, column: 7 })).not.toContain(
+				"toString",
+			)
+		})
+
 		it("should list a written 'is' once, not beside the derived one", () => {
 			let source = [
 				"implementation {",

@@ -10,7 +10,10 @@ import {
 	moduleSpecifier,
 	PRELUDE_SPECIFIER,
 } from "../bundler/index"
-import { derivedEquatableNamespaceName } from "../enricher/resolvers"
+import {
+	derivedEquatableNamespaceName,
+	derivedPrintableNamespaceName,
+} from "../enricher/resolvers"
 import { openArgumentHoles, typeContainsRefinement } from "../helpers/index"
 import {
 	defaultOptimiserOptions,
@@ -3273,6 +3276,19 @@ function namespaceMember(
 				type: "Identifier",
 				name: memberName === "isNot" ? "choiceIsNot" : "choiceIs",
 			},
+		}
+	}
+
+	// NOTE: And the printing derive, which is the same redirect with nothing to
+	// widen: every Case of the Choice carries no payload, so one helper reading
+	// the tag answers for all of them and no descriptor is ever curried on.
+	if (namespaceName === derivedPrintableNamespaceName) {
+		return {
+			type: "MemberExpression",
+			optional: false,
+			computed: false,
+			object: { type: "Identifier", name: "$helpers" },
+			property: { type: "Identifier", name: "choiceName" },
 		}
 	}
 

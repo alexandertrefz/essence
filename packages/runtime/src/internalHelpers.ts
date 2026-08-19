@@ -10,7 +10,7 @@ import type { RationalType } from "./Rational"
 import type { RecordType } from "./Record"
 import { is as recordIs } from "./Record"
 import type { StringType } from "./String"
-import { normalisedFormOf } from "./String"
+import { createString, normalisedFormOf } from "./String"
 import type { TranscendentalType } from "./Transcendental"
 import type { AnyType } from "./type"
 import { isValueOfType, typeKeySymbol } from "./type"
@@ -280,6 +280,26 @@ export function choiceIs(a: AnyType, b: AnyType): BooleanType {
 
 export function choiceIsNot(a: AnyType, b: AnyType): BooleanType {
 	return createBoolean(!anyIs(a, b))
+}
+
+// NOTE: The runtime half of a Choice's derived `Printable` conformance — what
+// `Ordering::toString` compiles to when no Namespace writes one. Every Case of
+// such a Choice carries no payload, so the tag holds everything there is to
+// say: `"Ordering#Less"` answers `"Less"`. One helper serves every Choice of
+// every Program, which is the whole of what the derive costs — a `match` over
+// the Case names would cost one of those per Choice.
+//
+// NOTE: Read from the LAST `#`, not the first. A Choice a Program declares is
+// identified by its Module as well as its name, so its Cases are tagged
+// `"./Colours.es#Colour#Red"`, and only the last part is the Case. A Case name
+// can hold no `#` of its own, so the last one is always the right one. A value
+// with no `#` at all is no Case; `lastIndexOf` answers -1 for it and the whole
+// tag is read, which keeps a Program that somehow reaches here answering a
+// String.
+export function choiceName(value: AnyType): StringType {
+	let tag = String(value[typeKeySymbol])
+
+	return createString(tag.slice(tag.lastIndexOf("#") + 1))
 }
 
 // NOTE: The compile-time plan a *generic* Choice's derived equality follows —
