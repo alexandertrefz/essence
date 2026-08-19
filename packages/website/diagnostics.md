@@ -478,7 +478,9 @@ same target twice is one such tie; so is a pair that does not compare at all.
 `for List<Integer> | String` and `for List<ItemType>` are both matched by a
 List of Integers, yet the Union is no case of the generic List and the generic
 List is no case of the Union, which leaves that receiver with nothing to pick
-by. The matching Namespaces are listed; qualify the call to pick one.
+by. The matching Namespaces are listed; qualify the call to pick one —
+`value::<Name>method(…)`, where `Name` is either a Namespace or a Protocol whose
+provided Method is one of the candidates.
 
 ### `undecided-receiver-type`
 
@@ -509,6 +511,11 @@ The name in a Namespace specifier — the `Name` of `value::<Name>method()` —
 means something other than a Namespace where the call is written. A Namespace
 of that name further out is shadowed, and shadowed is what the emitted code
 sees.
+
+A Protocol's name is accepted there too, and reaches that Protocol's provided
+Methods — which is what tells two Protocols providing one name apart. A
+requirement is not reachable that way: it is written by a Namespace, and that
+Namespace is what the specifier names.
 
 ### `undispatchable-method`
 
