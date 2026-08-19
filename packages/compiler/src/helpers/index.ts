@@ -1904,6 +1904,20 @@ export function computeConformanceMethodMap(
 		declared,
 		wanted,
 	) => declared === wanted,
+	// NOTE: WHOSE body this conformer runs for a name — asked of everything the
+	// conformer conforms to, not of the Protocol this witness is being solved
+	// for. A DESCENDANT that re-provided an ancestor's Method is the one a
+	// direct call reaches, so the witness an ANCESTOR bound is handed has to
+	// name it too; asking the ancestor alone made the same expression answer
+	// differently depending on which bound it was written under. It also
+	// answers for a body a descendant wrote where the ancestor only REQUIRED
+	// one: the conformer owes nothing, because the descendant provides it.
+	//
+	// The default is the plain question a caller without a Scope means. This
+	// module can not walk the extension graph, so the callers that can hand
+	// the answer in, exactly as they hand `grants` in.
+	providerOf: (methodName: string) => string | null = (methodName) =>
+		providedMethodProtocol(protocol, methodName),
 ): ConformanceCheckResult {
 	let methodMap: ConformanceMethodMap = {}
 	let providedMethods: ConformanceMethodMap = {}
@@ -1933,7 +1947,7 @@ export function computeConformanceMethodMap(
 		//
 		// A Namespace that writes none is entered as the PROVIDED const, which
 		// takes the witness it is read off as its own trailing Argument.
-		let providingProtocol = providedMethodProtocol(protocol, methodName)
+		let providingProtocol = providerOf(methodName)
 
 		if (providingProtocol !== null) {
 			if (!written) {

@@ -1512,6 +1512,86 @@ describe("Protocol-provided Methods", () => {
 			expect(await run(source)).toEqual(['"*Ada*"', '"*Ada*"'])
 		})
 
+		// NOTE: The same Program, asked through the ANCESTOR bound. The witness
+		// is solved for `Named`, whose own table answers with `Named`'s body —
+		// and the descendant's is what a direct call runs, so both spellings
+		// have to name it or one expression means two things.
+		it("should reach the descendant's body through an ancestor bound", async () => {
+			let source = [
+				"implementation {",
+				"\tprotocol Named {",
+				"\t\tname() -> String",
+				"",
+				"\t\tdescribe() -> String {",
+				"\t\t\t<- @::name()",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tprotocol Fancy is Named {",
+				"\t\tdescribe() -> String {",
+				'\t\t\t<- "*{@::name()}*"',
+				"\t\t}",
+				"\t}",
+				"",
+				"\ttype Person = { who: String }",
+				"",
+				"\tnamespace People for Person is Fancy {",
+				"\t\tname() -> String {",
+				"\t\t\t<- @.who",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tfunction say<infer Item is Named>(_ item: Item) -> String {",
+				"\t\t<- item::describe()",
+				"\t}",
+				"",
+				'\tconstant person: Person = { who = "Ada" }',
+				"\tTerminal.inspect(person::describe())",
+				"\tTerminal.inspect(say(person))",
+				"}",
+			].join("\n")
+
+			expect(await run(source)).toEqual(['"*Ada*"', '"*Ada*"'])
+		})
+
+		// NOTE: An ancestor that only REQUIRES what a descendant provides is
+		// owed nothing by the conformer — the descendant's body is what answers
+		// it, through either bound.
+		it("should let a descendant provide what its ancestor requires", async () => {
+			let source = [
+				"implementation {",
+				"\tprotocol Named {",
+				"\t\tname() -> String",
+				"\t\tdescribe() -> String",
+				"\t}",
+				"",
+				"\tprotocol Fancy is Named {",
+				"\t\tdescribe() -> String {",
+				'\t\t\t<- "*{@::name()}*"',
+				"\t\t}",
+				"\t}",
+				"",
+				"\ttype Person = { who: String }",
+				"",
+				"\tnamespace People for Person is Fancy {",
+				"\t\tname() -> String {",
+				"\t\t\t<- @.who",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tfunction say<infer Item is Named>(_ item: Item) -> String {",
+				"\t\t<- item::describe()",
+				"\t}",
+				"",
+				'\tconstant person: Person = { who = "Ada" }',
+				"\tTerminal.inspect(person::describe())",
+				"\tTerminal.inspect(say(person))",
+				"}",
+			].join("\n")
+
+			expect(await run(source)).toEqual(['"*Ada*"', '"*Ada*"'])
+		})
+
 		// NOTE: The ancestor is still REACHED when it provides a second Method
 		// the descendant did not re-provide — it answers that one and not this
 		// one, and only the per-name guard at the call keeps the two apart.
