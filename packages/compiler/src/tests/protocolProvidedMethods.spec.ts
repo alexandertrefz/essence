@@ -755,6 +755,49 @@ describe("Protocol-provided Methods", () => {
 			expect(await run(source)).toEqual(['"*Ada*"', '"*Ada*"'])
 		})
 
+		// NOTE: The ancestor is still REACHED when it provides a second Method
+		// the descendant did not re-provide — it answers that one and not this
+		// one, and only the per-name guard at the call keeps the two apart.
+		it("should keep an ancestor answering the Method it still provides", async () => {
+			expect(
+				await run(
+					[
+						"implementation {",
+						"\tprotocol Named {",
+						"\t\tname() -> String",
+						"",
+						"\t\tdescribe() -> String {",
+						"\t\t\t<- @::name()",
+						"\t\t}",
+						"",
+						"\t\tshout() -> String {",
+						'\t\t\t<- "{@::name()}!"',
+						"\t\t}",
+						"\t}",
+						"",
+						"\tprotocol Fancy is Named {",
+						"\t\tdescribe() -> String {",
+						'\t\t\t<- "*{@::name()}*"',
+						"\t\t}",
+						"\t}",
+						"",
+						"\ttype Person = { who: String }",
+						"",
+						"\tnamespace People for Person is Fancy {",
+						"\t\tname() -> String {",
+						"\t\t\t<- @.who",
+						"\t\t}",
+						"\t}",
+						"",
+						'\tconstant person: Person = { who = "Ada" }',
+						"\tTerminal.inspect(person::describe())",
+						"\tTerminal.inspect(person::shout())",
+						"}",
+					].join("\n"),
+				),
+			).toEqual(['"*Ada*"', '"Ada!"'])
+		})
+
 		// NOTE: Two clauses may reach one ancestor, and the WEAKEST grant wins:
 		// a Protocol granted outright by one clause does not carry the other
 		// clause's `where`. What is left is the refusal that is TRUE — a Method
