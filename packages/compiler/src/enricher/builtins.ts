@@ -26,7 +26,11 @@ import { loadStdlib } from "./stdlib"
 //
 // NOTE: This is the order BETWEEN Namespaces. The order WITHIN one — its
 // Methods and Properties — is a property of the declaration itself, and is
-// simply the order the `.es` file writes them in.
+// simply the order the `.es` file writes them in. Which is not left to
+// whoever wrote it either: `packages/standard-library/DEVELOPMENT.md`, Member
+// order, states the six groups every Namespace declares its members in, and
+// `packages/compiler/src/tests/stdlibMemberOrder.spec.ts` holds the sources to
+// them.
 //
 // A name missing from this list is appended in the order it was declared, so
 // a genuinely new builtin costs nothing until it needs a place of its own.

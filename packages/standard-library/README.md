@@ -202,6 +202,7 @@ Diagnostic says which bound to add. `List` conforms
 ## Development
 
 Editing the library itself — the `declarations { … }` form, how the loader
-reads these files, the native contract, the emission model, the editing
-hazards, and what registering a new Namespace takes — is covered in
+reads these files, the native contract, the emission model, the order a
+Namespace declares its members in, the editing hazards, and what registering a
+new Namespace takes — is covered in
 [DEVELOPMENT.md](https://github.com/alexandertrefz/essence/blob/master/packages/standard-library/DEVELOPMENT.md).
