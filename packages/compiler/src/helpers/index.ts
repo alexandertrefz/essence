@@ -2270,9 +2270,19 @@ export function isPartialOf(
 // expression once per call — and the two agree on purpose.
 //
 // Sorted, so two structurally equal signatures carry equal member lists.
+//
+// NOTE: Written over the two fields it reads rather than over a Node type,
+// because the Parser's Record Literal, the typed one and the simplified one all
+// carry them — the Resolver asks this of the first, the Simplifier of the second
+// and Hover of the second again, and one answer is what keeps a Type, an
+// emission and a sentence from ever disagreeing about which members a call may
+// leave out.
 export function recordDefaultMembers(
 	type: common.Type,
-	defaultValue: parser.ExpressionNode | null,
+	defaultValue: {
+		nodeType: string
+		members?: Record<string, unknown>
+	} | null,
 ): Array<string> | null {
 	if (defaultValue === null || type.type !== "Record") {
 		return null
@@ -2280,7 +2290,9 @@ export function recordDefaultMembers(
 
 	let declared = Object.keys(type.members)
 
-	if (defaultValue.nodeType !== "RecordValue") {
+	let written = defaultValue.members
+
+	if (defaultValue.nodeType !== "RecordValue" || written === undefined) {
 		return declared.sort()
 	}
 
@@ -2288,9 +2300,7 @@ export function recordDefaultMembers(
 	// the literal — a literal that writes a member the Parameter's Type does not
 	// declare is refused as `default-type-mismatch`, and until it is, what this
 	// answers has to stay a subset of the Type it describes.
-	return declared
-		.filter((name) => Object.hasOwn(defaultValue.members, name))
-		.sort()
+	return declared.filter((name) => Object.hasOwn(written, name)).sort()
 }
 
 // NOTE: The subsumption order Union building dedupes by — whether `member`

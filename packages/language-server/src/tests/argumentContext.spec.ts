@@ -46,6 +46,7 @@ describe("Argument context inside a Match Guard", () => {
 			kind: "record",
 			memberTypes: { x: { type: "Integer" }, y: { type: "Integer" } },
 			presentMembers: ["x", "y"],
+			omittableMembers: [],
 			shorthand: true,
 		})
 	})
@@ -76,6 +77,7 @@ describe("Argument context inside an update", () => {
 				port: { type: "Integer" },
 			},
 			presentMembers: ["port"],
+			omittableMembers: [],
 			shorthand: false,
 		})
 	})
@@ -90,6 +92,7 @@ describe("Argument context inside an update", () => {
 				port: { type: "Integer" },
 			},
 			presentMembers: ["port"],
+			omittableMembers: [],
 			shorthand: true,
 		})
 	})

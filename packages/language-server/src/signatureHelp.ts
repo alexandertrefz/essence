@@ -315,10 +315,32 @@ function signatureInfo(
 		documentation: describe(documentation) || null,
 		parameters: described.parameters.map((range, index) => ({
 			range,
-			documentation:
-				signature.parameterTypes[index]?.documentation ?? null,
+			documentation: withOmittableMembers(
+				signature.parameterTypes[index],
+			),
 		})),
 	}
+}
+
+// NOTE: A Record Parameter whose default fills some of its members in says so
+// beside the Argument being typed, which is the moment the writer needs it. The
+// `?` in the signature label is untouched: it marks a Parameter the whole
+// Argument may be left out of, and a partial default grants nothing of the sort.
+function withOmittableMembers(
+	parameter: common.Parameter | undefined,
+): string | null {
+	let documentation = parameter?.documentation ?? null
+	let members = parameter?.defaultMembers
+
+	if (members === undefined || members.length === 0) {
+		return documentation
+	}
+
+	let sentence = `A call may leave ${members
+		.map((name) => `'${name}'`)
+		.join(", ")} out of this Record.`
+
+	return documentation === null ? sentence : `${documentation}\n\n${sentence}`
 }
 
 // NOTE: An Overload the Arguments already resolved to stays active, but only
