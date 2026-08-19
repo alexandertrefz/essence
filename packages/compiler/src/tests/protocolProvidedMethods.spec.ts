@@ -388,6 +388,82 @@ describe("Protocol-provided Methods", () => {
 				),
 			).toEqual(["true"])
 		})
+
+		// NOTE: Two Protocols providing one name leave the call ambiguous, and
+		// `ambiguous-namespace` answers it with "name it at the call" — so the
+		// specifier has to reach a Protocol, or the Help names a spelling the
+		// Program can not write and the only way out is a rename.
+		const TWO_PROVIDERS = [
+			"implementation {",
+			"\tprotocol Left {",
+			"\t\tsize() -> Integer",
+			"",
+			"\t\tlabel() -> String {",
+			'\t\t\t<- "left"',
+			"\t\t}",
+			"\t}",
+			"",
+			"\tprotocol Right {",
+			"\t\tweight() -> Integer",
+			"",
+			"\t\tlabel() -> String {",
+			'\t\t\t<- "right"',
+			"\t\t}",
+			"\t}",
+			"",
+			"\ttype Box = { v: Integer }",
+			"",
+			"\tnamespace Boxes for Box is Left, is Right {",
+			"\t\tsize() -> Integer {",
+			"\t\t\t<- @.v",
+			"\t\t}",
+			"",
+			"\t\tweight() -> Integer {",
+			"\t\t\t<- @.v",
+			"\t\t}",
+			"\t}",
+		].join("\n")
+
+		function twoProviderProgram(...lines: Array<string>): string {
+			return [TWO_PROVIDERS, "", ...lines, "}"].join("\n")
+		}
+
+		it("should tie two Protocols providing one name", () => {
+			let source = twoProviderProgram(
+				"\tconstant box: Box = { v = 1 }",
+				"\tTerminal.inspect(box::label())",
+			)
+
+			expect(codesOf(source)).toEqual(["ambiguous-namespace"])
+			expect(
+				diagnosticsOf(source).flatMap((diagnostic) => diagnostic.helps),
+			).toEqual(["Name it at the call, e.g. 'value::<Left>label(…)'."])
+		})
+
+		it("should answer a specifier naming the Protocol that provides it", async () => {
+			expect(
+				await run(
+					twoProviderProgram(
+						"\tconstant box: Box = { v = 1 }",
+						"\tTerminal.inspect(box::<Left>label())",
+						"\tTerminal.inspect(box::<Right>label())",
+					),
+				),
+			).toEqual(['"left"', '"right"'])
+		})
+
+		it("should answer a specifier naming a standard library Protocol", async () => {
+			expect(
+				await run(
+					[
+						"implementation {",
+						"\tTerminal.inspect(5::<Equatable>isNot(3))",
+						"\tTerminal.inspect(5::<Orderable>isBetween(1, and 10))",
+						"}",
+					].join("\n"),
+				),
+			).toEqual(["true", "true"])
+		})
 	})
 
 	describe("the body's surface", () => {

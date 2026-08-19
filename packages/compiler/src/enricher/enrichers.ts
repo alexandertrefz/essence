@@ -6356,7 +6356,7 @@ function reportAmbiguousNamespace(
 				(name) => `'${name}' declares '${node.member.content}'.`,
 			),
 			helps: [
-				`Name the Namespace at the call, e.g. '${namespaceNames[0]}::${node.member.content}(…)'.`,
+				`Name it at the call, e.g. 'value::<${namespaceNames[0]}>${node.member.content}(…)'.`,
 			],
 		},
 	)
@@ -6413,6 +6413,51 @@ function reportUndecidedReceiverType(
 	)
 }
 
+// NOTE: A `value::<Name>method()` whose Name is a PROTOCOL, which is how the
+// `ambiguous-namespace` report is answered when the two candidates are two
+// Protocols providing one name — `Name the Namespace` has to name something a
+// call can write, and a written Namespace is not what either of them is.
+//
+// The receiver's own Namespaces are looked up again, unspecified, because they
+// are the evidence the conformance is read from: the specifier's lookup came
+// back empty (a Protocol is not in the members table), and asking the door with
+// nothing would leave a Namespace-declared conformance unseen.
+//
+// A REQUIREMENT is not reachable this way. It is written by a Namespace, and
+// that Namespace is what a specifier names; only a provided Method is the
+// Protocol's own to offer.
+function providedMethodNamespacesNamed(
+	specifierName: string,
+	methodName: string,
+	baseType: common.Type,
+	scope: enricher.Scope,
+	position: common.Position,
+): Map<string, common.NamespaceType> {
+	let named = new Map<string, common.NamespaceType>()
+
+	if (findProtocolInScope(specifierName, scope) === null) {
+		return named
+	}
+
+	let provided = providedMethodNamespaces(
+		methodName,
+		baseType,
+		resolveMethodLookupNamespacesForReceiverType(
+			baseType,
+			null,
+			scope,
+		).values(),
+		scope,
+		position,
+	).get(specifierName)
+
+	if (provided !== undefined) {
+		named.set(specifierName, provided)
+	}
+
+	return named
+}
+
 // NOTE: Which of the Namespaces found for a receiver actually declare the
 // Method — and the ONE door the derived Namespaces come through, for both the
 // whole-Union lookup and the per-member one. They are consulted only when the
@@ -6425,7 +6470,22 @@ function namespacesDeclaringMethod(
 	baseType: common.Type,
 	scope: enricher.Scope,
 	position: common.Position,
+	// NOTE: The name a `value::<Name>method()` wrote, when it wrote one. Only
+	// the provided-Method door reads it: `namespaces` is already the answer to
+	// the specifier for every WRITTEN Namespace, and comes back empty where the
+	// name is a Protocol's, which lives in another table entirely.
+	specifier: parser.IdentifierNode | null = null,
 ): Map<string, common.NamespaceType> {
+	if (specifier !== null && namespaces.size === 0) {
+		return providedMethodNamespacesNamed(
+			specifier.content,
+			methodName,
+			baseType,
+			scope,
+			position,
+		)
+	}
+
 	let matchingNamespaces = new Map<string, common.NamespaceType>()
 
 	for (let [name, namespace] of namespaces) {
@@ -6516,6 +6576,7 @@ function resolveMethodInvocation(
 				baseType,
 				scope,
 				node.position,
+				node.namespaceSpecifier,
 			),
 		)
 
@@ -6765,6 +6826,7 @@ function resolveUnionMethodDispatch(
 					memberType,
 					scope,
 					node.position,
+					node.namespaceSpecifier,
 				),
 			)
 
@@ -6952,7 +7014,7 @@ function resolveUnionMethodDispatch(
 							`'${method.namespaceName}' declares '${node.member.content}'.`,
 					),
 					helps: [
-						`Name the Namespace at the call, e.g. '${resolvedMethods[0].namespaceName}::${node.member.content}(…)'.`,
+						`Name it at the call, e.g. 'value::<${resolvedMethods[0].namespaceName}>${node.member.content}(…)'.`,
 					],
 				},
 			)

@@ -108,6 +108,21 @@ runs the derive rather than `Equatable`'s provided body — the derive is
 fabricated for that receiver and takes the whole Choice, where a provided Method
 takes `Self`, which a receiver narrowed to one Case binds to that Case alone.
 
+### Naming the Protocol at the call
+
+Two Protocols may provide a Method of the same name, and a Namespace may conform
+to both. The call is then a tie — `ambiguous-namespace` — and the way out is the
+Namespace specifier, with the Protocol's name in it:
+
+```essence
+Terminal.print(box::<Left>label())  § Left's provided body
+Terminal.print(box::<Right>label()) § Right's
+```
+
+The same spelling reaches the standard library's:
+`5::<Equatable>isNot(3)`. A REQUIREMENT is not reachable that way — it is written
+by a Namespace, and that Namespace is what a specifier names.
+
 ### Where the override is honoured
 
 An override answers every call written on a value of the Namespace's own target
