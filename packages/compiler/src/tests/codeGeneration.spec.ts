@@ -760,6 +760,135 @@ describe("Code Generation", () => {
 		})
 	})
 
+	// NOTE: Record assignability is WIDTH subtyping — every member the expected
+	// Type names has to exist, and a value is free to carry more. So the Type of
+	// a Combination's right-hand side says which members it updates and says
+	// NOTHING about which members it holds, and an update copied whole put
+	// members of other Types into the answer. The projection is what closes
+	// that, and it is not an optimisation: all three of the Optimiser on, the
+	// pass off and the whole Optimiser off have to answer the same.
+	describe("a Record Combination's expression right-hand side", () => {
+		// NOTE: The Program the hole was found with. `partial`'s Type names
+		// `port` alone; the value beside it also carries a `tls` of the wrong
+		// Type, which a whole copy wrote over the Boolean the answer declares —
+		// so `merged.tls::negate()` computed on a String and printed `false`
+		// out of a Program that compiled clean.
+		const widened = `implementation {
+	type Server = { port: Integer, tls: Boolean }
+
+	constant server: Server = { port = 80, tls = true }
+	constant partial: { port: Integer } = { port = 8080, tls = "nope" }
+	constant merged: Server = { server with partial }
+
+	Terminal.inspect(merged)
+	Terminal.inspect(merged.tls::negate())
+}`
+
+		it("takes only the members the right-hand side's Type names", async () => {
+			expect(await run(widened)).toEqual([
+				"{ port = 8080, tls = true }",
+				"false",
+			])
+		})
+
+		it("takes only those members with the Optimiser off", async () => {
+			let js = generate(widened, undefined, unoptimisedOptions)
+
+			expect(js).toContain("port: partial.port")
+			expect(js).not.toContain("Object.assign({}, server, partial)")
+		})
+
+		it("takes only those members with the collapse off", () => {
+			expect(
+				generate(widened, undefined, {
+					enabled: true,
+					disabledPasses: new Set(["collapse-combinations"]),
+				}),
+			).toContain("port: partial.port")
+		})
+
+		// NOTE: A bare name is read once per member and needs no temporary —
+		// `_self`, which is what `@` lowers to, is one of those names.
+		it("reads a bare name and `@` in place", () => {
+			let generated = generate(`
+				implementation {
+					type Point = { x: Integer, y: Integer }
+
+					namespace Points for Point {
+						§§ Answers this Point with an update applied.
+						§§
+						§§ @param update — the members to set.
+						§§ @returns — the updated Point.
+						updated(with update: { x: Integer }) -> Point {
+							<- { @ with update }
+						}
+
+						§§ Answers this Point widened onto a base.
+						§§
+						§§ @param base — the Point to widen onto.
+						§§ @returns — the widened Point.
+						onto(_ base: Point) -> Point {
+							<- { base with @ }
+						}
+					}
+
+					constant point: Point = { x = 1, y = 2 }
+
+					Terminal.inspect(point::updated(with { x = 9 }))
+					Terminal.inspect(point::onto({ x = 0, y = 0 }))
+				}
+			`)
+
+			expect(generated).toContain("x: update.x")
+			expect(generated).toContain("x: _self.x")
+			expect(generated).toContain("y: _self.y")
+			expect(generated).not.toContain("=> ({")
+		})
+
+		// NOTE: Anything that has to be COMPUTED is bound by an arrow first, so
+		// that a right-hand side with two members does not call its call twice —
+		// and so that both operands are still evaluated exactly once, in the
+		// order they were written.
+		it("binds a computed right-hand side once", async () => {
+			const counted = `implementation {
+	type Point = { x: Integer, y: Integer }
+
+	variable calls = 0
+
+	function update() -> { x: Integer, y: Integer } {
+		calls = calls::add(1)
+		<- { x = 9, y = 8 }
+	}
+
+	constant point: Point = { x = 1, y = 2 }
+
+	Terminal.inspect({ point with update() })
+	Terminal.inspect(calls)
+}`
+
+			expect(generate(counted)).toContain("(_lhs, _rhs) => ({")
+			expect(await run(counted)).toEqual(["{ x = 9, y = 8 }", "1"])
+		})
+
+		// NOTE: `?` is a legal Essence identifier character and not a legal
+		// JavaScript one, so a projected member is a quoted key on the way in
+		// and a bracketed read on the way out. Written as an identifier either
+		// side, the bundle dies on generated text.
+		it("projects a member JavaScript can not spell", async () => {
+			const spelling = `implementation {
+	type Flags = { ok?: Boolean, count: Integer }
+
+	constant flags: Flags = { ok? = true, count = 1 }
+	constant update: { ok?: Boolean } = { ok? = false }
+
+	Terminal.inspect({ flags with update })
+}`
+
+			expect(generate(spelling)).toContain(`"ok?": update["ok?"]`)
+			expect(await run(spelling)).toEqual(["{ ok? = false, count = 1 }"])
+		})
+	})
+
 	describe("Nameless Parameters", () => {
 		it("gives every nameless Parameter its own emitted name", () => {
 			let generated = generate(`

@@ -2622,24 +2622,18 @@ function rewriteIntrinsic(
 		case "spread-combination":
 			// NOTE: No brand of its own — the hidden Type key rides along on the
 			// spread of the left-hand side, which is a Record and carries it.
-			return {
-				type: "ObjectExpression",
-				properties: [
-					{
-						type: "SpreadElement",
-						argument: rewriteExpression(node.lhs),
-					},
-					...(node.rhs === null
-						? []
-						: [
-								{
-									type: "SpreadElement" as const,
-									argument: rewriteExpression(node.rhs),
-								},
-							]),
-					...memberProperties(node.members),
-				],
-			}
+			return node.rhs === null
+				? {
+						type: "ObjectExpression",
+						properties: [
+							{
+								type: "SpreadElement",
+								argument: rewriteExpression(node.lhs),
+							},
+							...memberProperties(node.members),
+						],
+					}
+				: projectedCombination(node.lhs, node.rhs, node.rhsMembers)
 		case "dispatch-chain":
 			return dispatchChain(node)
 		// NOTE: The one place "no Argument given" is written into emitted code
@@ -3760,9 +3754,27 @@ function contextualArgumentOverrides(
 	}
 }
 
+// NOTE: The un-optimised emission of `{ base with … }` — what a Program built
+// with `collapse-combinations` off, or with the whole Optimiser off, runs.
+//
+// A right-hand side written as a Record literal is exactly the members its Type
+// names, so `Object.assign({}, lhs, rhs)` copies the update and nothing else,
+// and it stays: writing the literal out member by member here would be
+// `collapse-combinations` performed by a stage that is not allowed to optimise.
+// Any OTHER right-hand side is projected, because that is not an optimisation —
+// spreading it whole is unsound, for the reason `projectedCombination` gives,
+// and a pass being off may not change what a Program means.
 function rewriteCombination(
 	node: common.typedSimple.CombinationNode,
-): estree.CallExpression {
+): estree.Expression {
+	if (!isRecordLiteral(node.rhs) && node.rhs.type.type === "Record") {
+		return projectedCombination(
+			node.lhs,
+			node.rhs,
+			Object.keys(node.rhs.type.members),
+		)
+	}
+
 	return {
 		type: "CallExpression",
 		optional: false,
@@ -3786,6 +3798,101 @@ function rewriteCombination(
 			},
 			rewriteExpression(node.lhs),
 			rewriteExpression(node.rhs),
+		],
+	}
+}
+
+// NOTE: A Record literal, in either of the two spellings a Combination's
+// right-hand side can reach emission in — the Simplifier's own `RecordValue`
+// and the `direct-record` `collapse-construction` leaves. The same pair
+// `collapse-combinations` recognises, asked here for the opposite reason: there
+// to write the members out, here to leave them alone.
+function isRecordLiteral(node: common.typedSimple.ExpressionNode): boolean {
+	return (
+		node.nodeType === "RecordValue" ||
+		(node.nodeType === "Intrinsic" && node.kind === "direct-record")
+	)
+}
+
+// NOTE: `{ base with update }`, where `update` is not a literal — one member
+// read per member the right-hand side's TYPE declares, over a spread of the
+// left-hand side, which is where the answer's hidden Type key comes from.
+//
+// NOTE: Projected rather than spread whole because Record assignability is
+// width subtyping: `constant partial: { port: Integer } = { port = 8080, tls =
+// "nope" }` is a legal Declaration, and `{ server with partial }` spread whole
+// copied that `tls` over the Boolean the answer's Type declares — a String in a
+// Boolean member, out of a Program that compiled clean. The Type says which
+// members an update carries; nothing says it carries no others.
+//
+// NOTE: A bare name — a Constant, a Parameter, or `_self`, which is what `@`
+// lowers to — is read once per member and no temporary is needed. Anything else
+// is a value that has to be COMPUTED, and computing it once per member would
+// call a call as many times as the update has members, so it is bound by an
+// arrow whose Arguments evaluate both operands exactly once, in written order.
+// The arrow has precedent in `inlineLoopExpression`, and its two names hold `_`,
+// which the Lexer reads as a Symbol — so neither can be an Essence identifier,
+// and neither can be the name of anything the operands read.
+function projectedCombination(
+	lhs: common.typedSimple.ExpressionNode,
+	rhs: common.typedSimple.ExpressionNode,
+	rhsMembers: Array<string> | null,
+): estree.Expression {
+	if (rhsMembers === null) {
+		throw new Error(
+			"Internal Compiler Error: a Combination's right-hand side reached emission without the members its Type declares.",
+		)
+	}
+
+	if (rhs.nodeType === "Identifier") {
+		return combinedObject(
+			rewriteExpression(lhs),
+			rewriteIdentifier(rhs),
+			rhsMembers,
+		)
+	}
+
+	let lhsName: estree.Identifier = { type: "Identifier", name: "_lhs" }
+	let rhsName: estree.Identifier = { type: "Identifier", name: "_rhs" }
+
+	return {
+		type: "CallExpression",
+		optional: false,
+		callee: {
+			type: "ArrowFunctionExpression",
+			expression: true,
+			params: [lhsName, rhsName],
+			body: combinedObject(lhsName, rhsName, rhsMembers),
+		},
+		arguments: [rewriteExpression(lhs), rewriteExpression(rhs)],
+	}
+}
+
+// NOTE: `{ ...lhs, member: rhs.member, … }` — the spread and one read per
+// member, both operands already reduced to something that can be named twice.
+// The keys go through `memberKey` and the reads through `memberRead`, which is
+// what carries an Essence name JavaScript can not spell as an identifier
+// (`ok?`) into a quoted key on the one side and a bracketed read on the other.
+function combinedObject(
+	lhs: estree.Expression,
+	rhs: estree.Expression,
+	rhsMembers: Array<string>,
+): estree.ObjectExpression {
+	return {
+		type: "ObjectExpression",
+		properties: [
+			{ type: "SpreadElement", argument: lhs },
+			...rhsMembers.map(
+				(name): estree.Property => ({
+					type: "Property",
+					key: memberKey(name),
+					value: memberRead(rhs, name),
+					kind: "init",
+					computed: false,
+					method: false,
+					shorthand: false,
+				}),
+			),
 		],
 	}
 }
