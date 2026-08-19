@@ -1174,8 +1174,13 @@ describe("Resolvers", () => {
 			]
 			let base = [...namespacesTargeting(namespaces, strings).keys()]
 
-			expect(base).toEqual(["List"])
-			expect(refined).toEqual(["List", "NonEmptyList"])
+			// NOTE: `KeyedNumberList` targets `List<ItemType>` too, so every
+			// List reaches it — what makes its aggregates keyed is the
+			// Function they take, not the items. It is offered on both halves
+			// for that reason, and says nothing about the refinement either
+			// way.
+			expect(base).toEqual(["List", "KeyedNumberList"])
+			expect(refined).toEqual(["List", "NonEmptyList", "KeyedNumberList"])
 		})
 
 		// NOTE: Conformance is found through the same widening rule, which is why

@@ -710,6 +710,32 @@ declarations {
 			(
 				by comparison: (_: ItemType, _: ItemType) -> Ordering,
 			) -> List<ItemType>
+
+			§ Written on the `by:` entry, and able to be. The bound is on the
+			§ key, so `ItemType` is still the Namespace's. The comparison this
+			§ hands over is therefore typed in the one the entry expects. That
+			§ is the difference from the no-Argument entry above.
+			§
+			§ `on` is the label for a key-reading Function everywhere one is
+			§ taken: here, on `lowestItem`, `greatestItem`, `sum` and
+			§ `average`. A member path then reads the same way at each of
+			§ them. `by` is not reused, because it already means a comparison
+			§ one entry up. Two same-labelled entries told apart by arity
+			§ alone would be a trap.
+
+			§§ Answers a new List in ascending order of what the key reads off each item.
+			§§
+			§§ The key is read once per comparison, and the entry is available whenever what it answers conforms to `Comparable`.
+			§§
+			§§ @param on — the key each item is ordered by
+			§§ @returns — the ordered List.
+			<infer Key is Comparable>(
+				on key: (_: ItemType) -> Key,
+			) -> List<ItemType> {
+				<- @::sort(by (first, second) {
+					<- key(first)::compare(to key(second))
+				})
+			}
 		}
 
 		§§ Answers how many items equal the given one, or how many items the check accepts.
@@ -821,6 +847,103 @@ declarations {
 		§§ @param intoGroupsOf — how many items each group holds
 		§§ @returns — the List of groups.
 		split(intoGroupsOf size: Integer) -> List<List<ItemType>>
+
+		§ The item a key is lowest or greatest at. That is a different
+		§ question from `lowestNumber`, which answers a number the List holds.
+		§ This one answers the item a number was read off. The return Type is
+		§ what tells them apart, so rule 4 does not make these Overloads of it.
+		§
+		§ Both walk once. They are written on `reduce` rather than on
+		§ `sort(on key)::firstItem()`, which answers the same item for n log n
+		§ comparisons instead of n.
+
+		§§ Answers the item whose key is lowest.
+		§§
+		§§ Ties keep the earlier item. The empty List has no such item, and the `defaultingTo:` entry answers the given item in place of nothing.
+		overload lowestItem {
+			§§ Answers the item whose key is lowest.
+			§§
+			§§ @param on — the key the items are ordered by
+			§§ @returns — the item, or nothing for the empty List.
+			<infer Key is Comparable>(
+				on key: (_: ItemType) -> Key,
+			) -> Optional<ItemType> {
+				constant start: Optional<ItemType> = #Empty
+
+				<- @::reduce(startingWith start, (lowest, item) {
+					<- match lowest -> Optional<ItemType> {
+						case #Empty { <- #Value(item) }
+
+						case #Value(found) {
+							if key(item)
+								::compare(to key(found))
+								::is(Ordering#Less)
+							{
+								<- #Value(item)
+							} else {
+								<- lowest
+							}
+						}
+					}
+				})
+			}
+
+			§§ Answers the item whose key is lowest, or the given fallback for the empty List.
+			§§
+			§§ @param on — the key the items are ordered by
+			§§ @param defaultingTo — the item to answer with when there is none
+			§§ @returns — the item, or the fallback in its place.
+			<infer Key is Comparable>(
+				on key: (_: ItemType) -> Key,
+				defaultingTo fallback: ItemType,
+			) -> ItemType {
+				<- @::lowestItem(on key)::value(defaultingTo fallback)
+			}
+		}
+
+		§§ Answers the item whose key is greatest.
+		§§
+		§§ Ties keep the earlier item. The empty List has no such item, and the `defaultingTo:` entry answers the given item in place of nothing.
+		overload greatestItem {
+			§§ Answers the item whose key is greatest.
+			§§
+			§§ @param on — the key the items are ordered by
+			§§ @returns — the item, or nothing for the empty List.
+			<infer Key is Comparable>(
+				on key: (_: ItemType) -> Key,
+			) -> Optional<ItemType> {
+				constant start: Optional<ItemType> = #Empty
+
+				<- @::reduce(startingWith start, (greatest, item) {
+					<- match greatest -> Optional<ItemType> {
+						case #Empty { <- #Value(item) }
+
+						case #Value(found) {
+							if key(item)
+								::compare(to key(found))
+								::is(Ordering#Greater)
+							{
+								<- #Value(item)
+							} else {
+								<- greatest
+							}
+						}
+					}
+				})
+			}
+
+			§§ Answers the item whose key is greatest, or the given fallback for the empty List.
+			§§
+			§§ @param on — the key the items are ordered by
+			§§ @param defaultingTo — the item to answer with when there is none
+			§§ @returns — the item, or the fallback in its place.
+			<infer Key is Comparable>(
+				on key: (_: ItemType) -> Key,
+				defaultingTo fallback: ItemType,
+			) -> ItemType {
+				<- @::greatestItem(on key)::value(defaultingTo fallback)
+			}
+		}
 	}
 
 	§ A List of Lists, and the one Method only such a List can answer. Its
@@ -935,6 +1058,25 @@ declarations {
 			(
 				by comparison: (_: ItemType, _: ItemType) -> Ordering,
 			) -> NonEmptyList<ItemType>
+
+			§ The one entry here with a body. It hands the `by:` entry above a
+			§ comparison built out of the key. That entry is native and carries
+			§ the proof, so this one carries it too — without having to say in
+			§ Essence what `sort` promises.
+
+			§§ Answers a new List in ascending order of what the key reads off each item.
+			§§
+			§§ The key is read once per comparison, and the entry is available whenever what it answers conforms to `Comparable`.
+			§§
+			§§ @param on — the key each item is ordered by
+			§§ @returns — the ordered List, which certainly has something in it.
+			<infer Key is Comparable>(
+				on key: (_: ItemType) -> Key,
+			) -> NonEmptyList<ItemType> {
+				<- @::sort(by (first, second) {
+					<- key(first)::compare(to key(second))
+				})
+			}
 		}
 
 		§ Replacing keeps the length in both of the cases `List`'s own entry
@@ -949,6 +1091,35 @@ declarations {
 		§§ @param at — the position of the item to replace
 		§§ @returns — the List with the item replaced, which is never empty.
 		replace(_ item: ItemType, at index: Integer) -> NonEmptyList<ItemType>
+
+		§ The proof spent again. A List with something in it has an item its
+		§ key is lowest at, so these answer the item rather than an Optional.
+		§ The fallback is the first item, which the proof also affords. It is
+		§ never the answer unless it is itself the lowest.
+
+		§§ Answers the item whose key is lowest, which a non-empty List always has.
+		§§
+		§§ Ties keep the earlier item.
+		§§
+		§§ @param on — the key the items are ordered by
+		§§ @returns — the item.
+		lowestItem<infer Key is Comparable>(
+			on key: (_: ItemType) -> Key,
+		) -> ItemType {
+			<- @::lowestItem(on key, defaultingTo @::firstItem())
+		}
+
+		§§ Answers the item whose key is greatest, which a non-empty List always has.
+		§§
+		§§ Ties keep the earlier item.
+		§§
+		§§ @param on — the key the items are ordered by
+		§§ @returns — the item.
+		greatestItem<infer Key is Comparable>(
+			on key: (_: ItemType) -> Key,
+		) -> ItemType {
+			<- @::greatestItem(on key, defaultingTo @::firstItem())
+		}
 	}
 }
 

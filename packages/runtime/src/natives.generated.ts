@@ -383,6 +383,10 @@ export type NonEmptyNumberListNatives = {
 
 }
 
+export type KeyedNumberListNatives = {
+
+}
+
 export type FunctionsNatives = {
 	// static loop<State>(startingWith: State, while: (_: State) -> Boolean, step: (_: State) -> State) -> State
 	loop__overload$1: <State extends AnyType>(startingWith: State, argument1: (argument0: State) => BooleanType, step: (argument0: State) => State) => State
@@ -551,7 +555,7 @@ export const $RecordArity: AssertArities<typeof import("./Record"), {
 
 declare const ListModule: typeof import("./List")
 export const $List: ListNatives = ListModule
-export const $ListAbsent: AssertNoEssenceExports<typeof import("./List"), "repeat" | "hasItems__overload$1" | "hasItems__overload$2" | "hasItems__overload$3" | "isEmpty" | "contains" | "doesNotContain" | "firstItem__overload$1" | "firstItem__overload$2" | "firstItem__overload$3" | "firstItem__overload$4" | "lastItem__overload$1" | "lastItem__overload$2" | "lastItem__overload$3" | "lastItem__overload$4" | "item__overload$2" | "firstIndex__overload$1" | "firstIndex__overload$2" | "firstIndex__overload$3" | "firstIndex__overload$4" | "lastIndex__overload$1" | "lastIndex__overload$2" | "removeFirst" | "removeEvery__overload$1" | "removeEvery__overload$2" | "removeLast" | "removeDuplicates" | "prepend__overload$2" | "count__overload$1" | "count__overload$2" | "replace" | "partition"> = true
+export const $ListAbsent: AssertNoEssenceExports<typeof import("./List"), "repeat" | "hasItems__overload$1" | "hasItems__overload$2" | "hasItems__overload$3" | "isEmpty" | "contains" | "doesNotContain" | "firstItem__overload$1" | "firstItem__overload$2" | "firstItem__overload$3" | "firstItem__overload$4" | "lastItem__overload$1" | "lastItem__overload$2" | "lastItem__overload$3" | "lastItem__overload$4" | "item__overload$2" | "firstIndex__overload$1" | "firstIndex__overload$2" | "firstIndex__overload$3" | "firstIndex__overload$4" | "lastIndex__overload$1" | "lastIndex__overload$2" | "removeFirst" | "removeEvery__overload$1" | "removeEvery__overload$2" | "removeLast" | "removeDuplicates" | "prepend__overload$2" | "sort__overload$3" | "count__overload$1" | "count__overload$2" | "replace" | "partition" | "lowestItem__overload$1" | "lowestItem__overload$2" | "greatestItem__overload$1" | "greatestItem__overload$2"> = true
 export const $ListArity: AssertArities<typeof import("./List"), {
 	of: 2
 	is: 3
@@ -585,6 +589,7 @@ export const $NestedListArity: AssertArities<typeof import("./NestedList"), {
 
 declare const NonEmptyListModule: typeof import("./NonEmptyList")
 export const $NonEmptyList: NonEmptyListNatives = NonEmptyListModule
+export const $NonEmptyListAbsent: AssertNoEssenceExports<typeof import("./NonEmptyList"), "sort__overload$3" | "lowestItem" | "greatestItem"> = true
 export const $NonEmptyListArity: AssertArities<typeof import("./NonEmptyList"), {
 	firstItem: 1
 	lastItem: 1
@@ -622,6 +627,10 @@ export const $NonEmptyRationalListAbsent: AssertNoEssenceExports<typeof import("
 declare const NonEmptyNumberListModule: typeof import("./NonEmptyNumberList")
 export const $NonEmptyNumberList: NonEmptyNumberListNatives = NonEmptyNumberListModule
 export const $NonEmptyNumberListAbsent: AssertNoEssenceExports<typeof import("./NonEmptyNumberList"), "lowestNumber" | "greatestNumber" | "average"> = true
+
+declare const KeyedNumberListModule: typeof import("./KeyedNumberList")
+export const $KeyedNumberList: KeyedNumberListNatives = KeyedNumberListModule
+export const $KeyedNumberListAbsent: AssertNoEssenceExports<typeof import("./KeyedNumberList"), "sum__overload$1" | "sum__overload$2" | "sum__overload$3" | "average__overload$1" | "average__overload$2"> = true
 
 declare const functionsModule: typeof import("./functions")
 export const $functions: FunctionsNatives = functionsModule

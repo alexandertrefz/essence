@@ -173,6 +173,16 @@ easy to break:
   `hasItems(where:)` asks whether ANY item passes, `hasItems(onlyWhere:)`
   whether EVERY item does. The filter is `everyItem(where:)`, which answers the
   items themselves.
+- **A key-reading Function is always labelled `on`** — `sort(on:)`,
+  `lowestItem(on:)`, `greatestItem(on:)`, `sum(on:)`, `average(on:)`. Each
+  takes a Function of one Parameter answering the value the Method is really
+  about, and a member path is what makes them read as one family:
+  `products::sort(on .price)`, `orders::sum(on .total)`. `by` is not reused for
+  this, because `sort(by:)` already means a COMPARISON, and two same-labelled
+  entries told apart by arity alone would be a trap; `of` is not either,
+  because `count(of item)` already means "of this VALUE". Write the path where
+  the body is a pure read, and the Function literal where it is anything else —
+  `sort(on (_ line: Line) { <- line.total::rounded() })`.
 - **An aggregate is reachable from the value it is about** —
   `[3, 1, 2]::sum()`, `::average()`, `::lowestNumber()`. `Number.sum` and its
   four siblings stay as the statics that implement them; what a List answers is
@@ -215,6 +225,11 @@ deliberately wider than a reader might expect: joining asks nothing of the items
 but that each can say what it is, so `[1, 2, 3]::join(with ", ")` is `"1, 2, 3"`,
 not a type error. `sort<infer ItemType is Comparable>()` is the same shape for
 ordering.
+
+`sort(on:)`, `lowestItem(on:)` and `greatestItem(on:)` bound the KEY rather
+than the item — `<infer Key is Comparable>` — so a List of anything can be
+ordered by anything comparable read off it. The key is what has to be ordered,
+and the item never is.
 
 `is`, `contains`, `doesNotContain`, `firstIndex(of:)`, `lastIndex(of:)`,
 `count(of:)`, `removeEvery(_ item:)` and `removeDuplicates` are bounded

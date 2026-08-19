@@ -7,6 +7,7 @@ import * as caseSensitivity from "@essence-lang/runtime/CaseSensitivity"
 import * as functions from "@essence-lang/runtime/functions"
 import * as integer from "@essence-lang/runtime/Integer"
 import * as integerList from "@essence-lang/runtime/IntegerList"
+import * as keyedNumberList from "@essence-lang/runtime/KeyedNumberList"
 import * as list from "@essence-lang/runtime/List"
 import * as nestedList from "@essence-lang/runtime/NestedList"
 import * as nestedOptional from "@essence-lang/runtime/NestedOptional"
@@ -68,6 +69,7 @@ const runtimeModules: Record<string, Record<string, unknown>> = {
 	NonEmptyIntegerList: nonEmptyIntegerList,
 	NonEmptyRationalList: nonEmptyRationalList,
 	NonEmptyNumberList: nonEmptyNumberList,
+	KeyedNumberList: keyedNumberList,
 }
 
 // NOTE: What the Simplifier will emit for a declared Method — the bare name for

@@ -262,6 +262,86 @@ declarations {
 		}
 	}
 
+	§ The same aggregates over a List of anything, reached through a key. The
+	§ key reads a number off each item. `orders::sum(on .total)` is what this
+	§ is for, and a member path is what makes it read that way.
+	§
+	§ It is a Namespace of its own rather than entries on the three above. The
+	§ receiver here is any List at all: what has to be a number is what the key
+	§ answers, not the item. Its target is therefore the widest one there is,
+	§ and a `List<Integer>` reaches both. Such a List still resolves a bare
+	§ `sum()` to `IntegerList`, because that entry is the only one the call's
+	§ Arguments match. It reaches this Namespace for a keyed one, for the same
+	§ reason.
+	§
+	§ `sum` keeps one entry per kind of key, so each answers the tightest Type
+	§ it can. `average` needs no such split. It divides, so it answers a
+	§ Rational whatever the key reads, and one entry over the widest key serves
+	§ every one of them.
+	namespace KeyedNumberList<infer ItemType> for List<ItemType> {
+		§§ Adds together what the key reads off every item.
+		§§
+		§§ The empty List totals zero.
+		§§
+		§§ @returns — the total.
+		overload sum {
+			§§ Adds together the Integers the key reads off the items.
+			§§
+			§§ @param on — the key read off each item
+			§§ @returns — the total.
+			(on key: (_: ItemType) -> Integer) -> Integer {
+				<- Number.sum(@::map(key))
+			}
+
+			§§ Adds together the Rationals the key reads off the items.
+			§§
+			§§ @param on — the key read off each item
+			§§ @returns — the total.
+			(on key: (_: ItemType) -> Rational) -> Rational {
+				<- Number.sum(@::map(key))
+			}
+
+			§§ Adds together the Numbers the key reads off the items.
+			§§
+			§§ A whole total answers as an Integer, and a fractional one as a Rational.
+			§§
+			§§ @param on — the key read off each item
+			§§ @returns — the total.
+			(
+				on key: (_: ItemType) -> Integer | Rational,
+			) -> Integer | Rational {
+				<- Number.sum(@::map(key))
+			}
+		}
+
+		§§ The mean of what the key reads off every item: their total divided by their count.
+		§§
+		§§ The empty List has no mean, and the `defaultingTo:` entry answers the given Rational in place of nothing.
+		overload average {
+			§§ The mean of what the key reads off the items.
+			§§
+			§§ @param on — the key read off each item
+			§§ @returns — the mean, or nothing for the empty List.
+			(
+				on key: (_: ItemType) -> Integer | Rational,
+			) -> Optional<Rational> {
+				<- Number.average(@::map(key))
+			}
+
+			§§ The mean of what the key reads off the items, or the given fallback for the empty List.
+			§§
+			§§ @param on — the key read off each item
+			§§ @param defaultingTo — the mean to answer with when there is none
+			§§ @returns — the mean, or the fallback in its place.
+			(
+				on key: (_: ItemType) -> Integer | Rational,
+				defaultingTo fallback: Rational,
+			) -> Rational {
+				<- @::average(on key)::value(defaultingTo fallback)
+			}
+		}
+	}
+
 	§ A List with an item in it has a lowest item, a greatest item and a mean,
 	§ so these three answer bare. Every other question the Namespaces above
 	§ answer is already total, and is not repeated here. The lowest and the
@@ -352,6 +432,7 @@ declarations {
 
 export {
 	IntegerList
+	KeyedNumberList
 	NonEmptyIntegerList
 	NonEmptyNumberList
 	NonEmptyRationalList

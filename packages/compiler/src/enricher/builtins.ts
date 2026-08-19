@@ -95,6 +95,12 @@ export const builtinMemberOrder: Array<string> = [
 	"NonEmptyIntegerList",
 	"NonEmptyRationalList",
 	"NonEmptyNumberList",
+	// NOTE: Last of the List Namespaces, though its target is the widest of
+	// them all. It narrows nothing and nothing narrows it — what makes a List
+	// reach it is the KEY its two aggregates take, not the items — so the order
+	// is free, and met last it reads as the extra it is: a List's own members
+	// are `List`'s, and these come after them.
+	"KeyedNumberList",
 ]
 
 // NOTE: The same rule for the Type table, and for the same reason — a Type's
