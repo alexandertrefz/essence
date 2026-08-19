@@ -1028,10 +1028,10 @@ own, and bound the Type Parameter where the conforming Namespace is declared.
 
 A `static` or `overload` Protocol Method was given a body. A provided Method is
 written on `@`, the conforming value, and is emitted once for every conformer —
-a static Method has no receiver for `@` to stand for, and an `overload` entry's
-const is named for a slot in a Method Type the Protocol has no conformer to
-resolve against. Write the Method as a requirement, and give each conforming
-Namespace a body of its own.
+a static Method has no receiver for `@` to stand for, and an entry of an
+`overload` block is named for its slot in a Method Type the Protocol has no
+conformer to resolve against. Write the Method as a requirement, and give each
+conforming Namespace a body of its own.
 
 ### `recursive-protocol`
 

@@ -3215,39 +3215,51 @@ function enrichProvidedMethods(
 // an Overload's const is named for its slot in a Method Type this side of the
 // Protocol has no conformer to resolve against — so both are refused outright
 // rather than half supported. The signatures still stand as requirements, which
-// is why this reports and returns instead of dropping the Method.
+// is why this reports and returns rather than dropping the Method.
 function refuseUnwritableProvidedMethod(
 	method: parser.ProtocolMethods[string],
 ): void {
-	let bodied =
+	let isStatic = method.nodeType === "StaticProtocolMethod"
+	let signatures =
 		method.nodeType === "StaticProtocolMethod"
-			? method.signature.body === null
-				? null
-				: method.signature
-			: ((method.nodeType === "OverloadedProtocolMethod" ||
-				method.nodeType === "OverloadedStaticProtocolMethod"
-					? method.signatures
-					: []
-				).find((signature) => signature.body !== null) ?? null)
+			? [method.signature]
+			: method.nodeType === "OverloadedProtocolMethod" ||
+				  method.nodeType === "OverloadedStaticProtocolMethod"
+				? method.signatures
+				: []
+	let bodied = signatures.find((signature) => signature.body !== null)
 
-	if (bodied === null) {
+	if (bodied === undefined) {
 		return
 	}
 
 	let position = bodied.body?.position ?? bodied.position
-	let kind =
-		method.nodeType === "StaticProtocolMethod" ? "static" : "overloaded"
 
-	reportError(`A ${kind} Protocol Method can not carry a body`, position, {
-		code: "unwritable-provided-method",
-		labels: [primary(position, "this body has no receiver to run on")],
-		notes: [
-			"A provided Method is written on '@', the conforming value, and is emitted once for every conformer.",
-		],
-		helps: [
-			`Write '${method.name.content}' as a requirement, and give each conforming Namespace a body of its own.`,
-		],
-	})
+	reportError(
+		isStatic
+			? "A static Protocol Method can not carry a body"
+			: "An overloaded Protocol Method can not carry a body",
+		position,
+		{
+			code: "unwritable-provided-method",
+			labels: [
+				primary(
+					position,
+					isStatic
+						? "this body has no receiver to run on"
+						: "this body has no name of its own to be emitted under",
+				),
+			],
+			notes: [
+				isStatic
+					? "A provided Method is written on '@', the conforming value, and a static Method is called on the Namespace instead."
+					: "A provided Method is emitted once, under the Protocol's name and the Method's — and an entry of an 'overload' block is named for its slot in a Method Type the Protocol has no conformer to resolve against.",
+			],
+			helps: [
+				`Write '${method.name.content}' as a requirement, and give each conforming Namespace a body of its own.`,
+			],
+		},
+	)
 }
 
 // NOTE: `infer` marks a Type Parameter a USE works out for itself, from the
