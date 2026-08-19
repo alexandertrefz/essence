@@ -1071,6 +1071,20 @@ Program would compile and then fail at run time.
 Give the Protocol a requirement the body calls on `@`, and let each conforming
 Namespace reach the name instead.
 
+### `clashing-provided-method`
+
+Two Modules of one compilation each declare a Protocol of the same name, and
+both provide a Method of the same name.
+
+A provided Method is emitted once, as a const named for the Protocol and the
+Method, shared by every conformer in the graph — so the second declaration would
+name the same const and its body would answer for the first. Two same-named
+Protocols providing *different* Methods are fine; only a shared Method name
+clashes.
+
+Declare the Protocol once and import it where it is needed, or rename one of the
+two.
+
 ## Inference
 
 ### `uninferable-type-parameter`
