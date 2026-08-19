@@ -3,6 +3,7 @@ import type { common } from "@essence-lang/interfaces"
 import { derivedEquatableNamespaceName } from "../../enricher/resolvers"
 import { runtimeNamespaceNames } from "../../rewriter/runtimeNamespaces"
 import type { OptimiserPass } from "../index"
+import type { DeclaredNamespaces } from "../namespaces"
 import { rewriteExpressions } from "../walk"
 
 // NOTE: A constant written in a Program is BUILT at every site it is written
@@ -30,13 +31,10 @@ import { rewriteExpressions } from "../walk"
 export const poolConstants: OptimiserPass = {
 	name: "pool-constants",
 	run: (program, namespaces) => {
-		// NOTE: A Namespace a Program DECLARES is a `class` in the emitted
-		// Module, and a class is not hoisted — so a const band above it can not
-		// read one. The witnesses below name a Namespace, so this is what they
-		// are checked against, and a Namespace name a Program declares is
-		// refused whether the name is the Program's own or one it took from the
-		// standard library.
-		let declared = namespaces.all
+		// NOTE: Which Namespaces a witness may name and still be pooled — see
+		// `poolableNamespace`. Both sets are needed, so the whole answer is
+		// handed down rather than one of them.
+		let declared = namespaces
 
 		// NOTE: A Parameter's `= expression` default is walked too. It is the
 		// one Expression position that is evaluated per CALL without standing in
@@ -52,7 +50,7 @@ export const poolConstants: OptimiserPass = {
 
 function pool(
 	node: common.typedSimple.ExpressionNode,
-	declaredNamespaces: ReadonlySet<string>,
+	declaredNamespaces: DeclaredNamespaces,
 ): common.typedSimple.ExpressionNode {
 	let key = poolKeyOf(node, declaredNamespaces)
 
@@ -84,7 +82,7 @@ function pool(
 // left alone rather than silently hoisted out of the order it was written in.
 function poolKeyOf(
 	node: common.typedSimple.ExpressionNode,
-	declaredNamespaces: ReadonlySet<string>,
+	declaredNamespaces: DeclaredNamespaces,
 ): string | null {
 	switch (node.nodeType) {
 		case "IntegerValue":
@@ -170,12 +168,8 @@ function serializeKey(value: unknown, visiting: Array<object> = []): string {
 // condition is not a constant at all — it is the enclosing Function's own
 // conformance Argument, a different value per call — and the Simplifier leaves
 // it as an Identifier, so a witness carrying one stays where it was written.
-// And a Namespace the Program declares is a `class` in the emitted Module,
-// which is not hoisted: a const above it reading one is a `ReferenceError` at
-// import. Every other Namespace a witness can name is either a runtime Module,
-// bound by an `import * as` before any Statement runs, or the fabricated
-// Namespace a Choice's derived equality names, which is emitted as a read off
-// the runtime helpers.
+// The other is a Namespace whose name the band can not read, which
+// `poolableNamespace` answers.
 //
 // NOTE: The key and the refusals are ONE function on purpose. They answer the
 // same question — what of this witness reaches the emitted JavaScript — and two
@@ -183,16 +177,9 @@ function serializeKey(value: unknown, visiting: Array<object> = []): string {
 // that does not say which witness it is.
 function conformanceKeyOf(
 	node: common.typedSimple.ConformanceValueNode,
-	declaredNamespaces: ReadonlySet<string>,
+	declaredNamespaces: DeclaredNamespaces,
 ): string | null {
-	if (
-		node.namespaceName !== derivedEquatableNamespaceName &&
-		!runtimeNamespaces.has(node.namespaceName)
-	) {
-		return null
-	}
-
-	if (declaredNamespaces.has(node.namespaceName)) {
+	if (!poolableNamespace(node.namespaceName, declaredNamespaces)) {
 		return null
 	}
 
@@ -240,7 +227,7 @@ function conformanceKeyOf(
 // `parameter`-sourced condition, which is not a constant at all.
 function conditionKeyOf(
 	condition: common.typedSimple.ExpressionNode,
-	declaredNamespaces: ReadonlySet<string>,
+	declaredNamespaces: DeclaredNamespaces,
 ): string | null {
 	if (
 		condition.nodeType === "Intrinsic" &&
@@ -255,3 +242,37 @@ function conditionKeyOf(
 }
 
 const runtimeNamespaces = new Set<string>(runtimeNamespaceNames)
+
+// NOTE: Whether the band can read the name a witness names.
+//
+// A NESTED Namespace it can not. The class is declared inside the block that
+// wrote it, so a const at Module scope is not in that block — and two blocks
+// may each declare a Namespace of the SAME name, whose witnesses then emit
+// byte-identical text and so key alike while meaning two different classes. A
+// key that can not tell them apart would declare one const and hand it to both.
+//
+// A runtime Module it can: `import * as Integer` binds before any Statement
+// runs, and so does the fabricated Namespace a Choice's derived equality names,
+// which is emitted as a read off the runtime helpers. That holds even where the
+// Program IS the standard library and declares the name itself — what the
+// emitted Module reads there is still the import.
+//
+// A TOP-LEVEL Namespace the Program declares it can too, with one condition on
+// WHERE the const stands. The Enricher refuses a second declaration of the
+// name, so there is exactly one of it and it is at Module scope; but it is
+// emitted as `var X = class …`, and a class is not hoisted. So its const stands
+// below that Statement rather than in the band — see `constantPoolBand`.
+function poolableNamespace(
+	name: string,
+	declared: DeclaredNamespaces,
+): boolean {
+	if (declared.nested.has(name)) {
+		return false
+	}
+
+	return (
+		name === derivedEquatableNamespaceName ||
+		runtimeNamespaces.has(name) ||
+		declared.all.has(name)
+	)
+}
