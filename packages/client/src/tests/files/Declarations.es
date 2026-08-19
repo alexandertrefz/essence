@@ -21,7 +21,7 @@ implementation {
 	}
 
 	function widths(_ rectangles: List<Rectangle>) -> List<Integer> {
-		<- rectangles::map(({ width }) { <- width })
+		<- rectangles::map(.width)
 	}
 
 	constant ratio = 22/7
