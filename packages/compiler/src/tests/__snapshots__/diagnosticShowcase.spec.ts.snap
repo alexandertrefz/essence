@@ -134,7 +134,26 @@ Error: This default makes two Overloads accept the same call
     │ Note: An Overload is selected by the Arguments a call writes, so two entries that accept the same ones can not both be reached.
 ────╯
 
-─── 6 errors
+[ambiguous-overload-default]
+Error: This default makes two Overloads accept the same Record
+    ╭─┤ Defaults.es:60:30 │
+    │
+ 60 │              (using options: Options = { retries = 3 }) -> String {
+    │                                        ───────┬───────  
+    │                                               ╰───────── a Record written without 'retries' still fits { host: String, retries: Integer }
+    │ 
+ 64 │ ╭─▶          (using options: { host: String }) -> String {
+    ┆ ┆   
+ 66 │ ├─▶          }
+    │ │                
+    │ ╰──────────────── and fits this entry's { host: String }
+    │ 
+    │ Help: Give the two Parameters labels that tell them apart, or delete the entry the default already stands for.
+    │ 
+    │ Note: An Overload is selected by the Arguments a call writes, so two entries that accept the same ones can not both be reached.
+────╯
+
+─── 7 errors
 "
 `;
 

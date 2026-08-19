@@ -649,6 +649,14 @@ four entries, all of shape `(_)` — are what an `overload` block is for and sta
 exactly as they are. The hazard is only ever a shape that did not exist before
 the default was written.
 
+A PARTIAL Record default is refused on the same terms one level down. It adds
+no accepted shape — its Argument is still written — but it widens the Records an
+entry accepts, because a Record written without the members the default fills in
+now fits a Parameter it did not fit before. Two entries that told their Record
+Parameters apart by Type can therefore both come to accept one call. Only a
+Record reachable ONLY by leaving a member out is weighed; entries that already
+overlapped by Type stay exactly as they were.
+
 Where a default was written to replace a shorter entry, delete the shorter
 entry: the default already means it.
 

@@ -930,6 +930,104 @@ describe("Dispatch and Resolution", () => {
 				}`),
 			).toEqual([])
 		})
+
+		// NOTE: A PARTIAL Record default adds no accepted shape — its Argument
+		// is still written — but it widens the RECORDS an entry accepts, which
+		// is the same mistake one level down.
+		describe("a partial Record default", () => {
+			it("should refuse a Record the default makes fit both entries", () => {
+				let source = `implementation {
+					type Options = { host: String, retries: Integer }
+
+					namespace Links for String {
+						overload open {
+							(using options: Options = { retries = 3 }) -> String {
+								<- options.host
+							}
+
+							(using options: { host: String }) -> String {
+								<- options.host
+							}
+						}
+					}
+				}`
+				let diagnostics = diagnosticsFor(source)
+
+				expect(
+					diagnostics.map((diagnostic) => diagnostic.code),
+				).toEqual(["ambiguous-overload-default"])
+				expect(underlinedText(source, diagnostics[0]!.labels[0]!)).toBe(
+					"{ retries = 3 }",
+				)
+			})
+
+			// NOTE: The two Records still tell themselves apart: nothing a call
+			// writes satisfies both, because each declares a member the other
+			// requires and does not declare.
+			it("should leave two Records that share no Argument alone", () => {
+				expect(
+					diagnosticsFor(`implementation {
+						type Options = { host: String, retries: Integer }
+
+						namespace Links for String {
+							overload open {
+								(using options: Options = { retries = 3 }) -> String {
+									<- options.host
+								}
+
+								(using options: { port: Integer }) -> String {
+									<- options.port::toString()
+								}
+							}
+						}
+					}`),
+				).toEqual([])
+			})
+
+			// NOTE: A member of the same name and a different Type is what
+			// keeps the two apart, so the default changes nothing.
+			it("should leave two Records that disagree on a member alone", () => {
+				expect(
+					diagnosticsFor(`implementation {
+						type Options = { host: String, retries: Integer }
+
+						namespace Links for String {
+							overload open {
+								(using options: Options = { retries = 3 }) -> String {
+									<- options.host
+								}
+
+								(using options: { host: Integer }) -> String {
+									<- options.host::toString()
+								}
+							}
+						}
+					}`),
+				).toEqual([])
+			})
+
+			// NOTE: Labels are read before Types, so an entry a call can not
+			// even address is not a clash.
+			it("should leave entries told apart by their labels alone", () => {
+				expect(
+					diagnosticsFor(`implementation {
+						type Options = { host: String, retries: Integer }
+
+						namespace Links for String {
+							overload open {
+								(using options: Options = { retries = 3 }) -> String {
+									<- options.host
+								}
+
+								(with options: { host: String }) -> String {
+									<- options.host
+								}
+							}
+						}
+					}`),
+				).toEqual([])
+			})
+		})
 	})
 
 	describe("Static Method bodies", () => {
