@@ -1942,18 +1942,6 @@ export function computeConformanceMethodMap(
 				continue
 			}
 
-			if (
-				!fulfills(
-					methodName,
-					substituted,
-					namespace.methods[methodName],
-					assumptions,
-					grants,
-				)
-			) {
-				return { kind: "mismatched", methodName }
-			}
-
 			// NOTE: A provided signature is always Simple — a body on an
 			// `overload` entry is refused at the declaration — so the override
 			// is entered under the one entry that fulfills it.
@@ -1966,6 +1954,22 @@ export function computeConformanceMethodMap(
 
 			if (overriding === null) {
 				return { kind: "mismatched", methodName }
+			}
+
+			// NOTE: Asked separately from the match above, and in the
+			// requirement path's order, because the two are different news: an
+			// override whose own Generic carries a bound the conformance was
+			// not told to assume MATCHES the signature, and needs a `where`
+			// clause rather than a different signature. Collapsing them told
+			// the writer the signature was wrong when it was not.
+			let bound = firstUnassumedBound(
+				overriding.method,
+				assumptions,
+				grants,
+			)
+
+			if (bound !== null) {
+				return { kind: "needs-condition", methodName, ...bound }
 			}
 
 			methodMap[methodName] = overriding.name
@@ -2061,45 +2065,6 @@ function firstUnassumedBound(
 	}
 
 	return null
-}
-
-// NOTE: Whether a written Method answers a Protocol signature at all — every
-// entry of an Overloaded signature, each by the rule one entry follows. Used
-// for a PROVIDED Method a Namespace overrode, which owes the signature without
-// owing the method map an entry.
-function fulfills(
-	methodName: string,
-	substituted: common.MethodType,
-	implementation: common.MethodType,
-	assumptions: ReadonlyMap<string, string>,
-	grants: (declared: string, wanted: string) => boolean,
-): boolean {
-	let entries =
-		substituted.type === "SimpleMethod" ||
-		substituted.type === "StaticMethod"
-			? [substituted as common.BaseFunction]
-			: substituted.overloads
-	let requiresStatic =
-		substituted.type === "StaticMethod" ||
-		substituted.type === "OverloadedStaticMethod"
-
-	for (let entry of entries) {
-		let fulfilling = findFulfillingMethod(
-			methodName,
-			entry,
-			requiresStatic,
-			implementation,
-		)
-
-		if (
-			fulfilling === null ||
-			firstUnassumedBound(fulfilling.method, assumptions, grants) !== null
-		) {
-			return false
-		}
-	}
-
-	return true
 }
 
 // NOTE: A Simple requirement is fulfilled by a Simple Method or by the first
