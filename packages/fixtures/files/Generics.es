@@ -45,7 +45,7 @@ implementation {
 		_ first: First,
 		with second: Second,
 	) -> { first: First, second: Second } {
-		<- { first = first, second = second }
+		<- { first, second }
 	}
 
 	Terminal.inspect(paired(1, with "one")) § { first = 1, second = "one" }

@@ -6,7 +6,7 @@ implementation {
 
 	namespace Rectangle for Rectangle {
 		static of(width: Integer, height: Integer) -> Rectangle {
-			<- { width = width, height = height }
+			<- { width, height }
 		}
 	}
 

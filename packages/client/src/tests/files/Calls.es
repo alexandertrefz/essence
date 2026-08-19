@@ -113,13 +113,13 @@ implementation {
 		if name::is("red") {
 			<- #Red
 		} else {
-			<- #Named({ name = name })
+			<- #Named({ name })
 		}
 	}
 
 	namespace Point for Point {
 		static of(x: Integer, y: Integer) -> Point {
-			<- { x = x, y = y }
+			<- { x, y }
 		}
 
 		static origin() -> Point {
@@ -138,11 +138,11 @@ implementation {
 
 		overload static from {
 			(x: Integer) -> Point {
-				<- { x = x, y = 0 }
+				<- { x, y = 0 }
 			}
 
 			(x: Integer, y: Integer) -> Point {
-				<- { x = x, y = y }
+				<- { x, y }
 			}
 		}
 
