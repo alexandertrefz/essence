@@ -2096,6 +2096,108 @@ export {
 		)
 	})
 
+	// NOTE: A Protocol's PROVIDED Method is one const for the whole graph, and
+	// it belongs in the shared prelude Module for the reason a standard library
+	// Method does: a copy per Module would be a bundle carrying as many
+	// `describe` bodies as there are Modules that reach it. Two Modules conform
+	// here and a third calls, so the const is reached from two files and
+	// declared in neither.
+	it("emits one const for a provided Method the whole graph shares", async () => {
+		await withBuiltProject(
+			{
+				"Main.es": `import {
+	Shape   from "./Shape.es"
+	Square  from "./Square.es"
+	Squares from "./Square.es"
+	Disc    from "./Disc.es"
+	Discs   from "./Disc.es"
+}
+
+implementation {
+	constant square: Square = { side = 3/1 }
+	constant disc: Disc = { radius = 2/1 }
+
+	Terminal.inspect(square::describe())
+	Terminal.inspect(disc::describe())
+}
+`,
+				"Shape.es": `implementation {
+	protocol Shape {
+		area() -> Rational
+
+		describe() -> String {
+			<- "area {@::area()}"
+		}
+	}
+}
+
+export {
+	Shape
+}
+`,
+				"Square.es": `import {
+	Shape from "./Shape.es"
+}
+
+implementation {
+	type Square = { side: Rational }
+
+	namespace Squares for Square is Shape {
+		area() -> Rational {
+			<- @.side::multiply(with @.side)
+		}
+	}
+}
+
+export {
+	Square
+	Squares
+}
+`,
+				"Disc.es": `import {
+	Shape from "./Shape.es"
+}
+
+implementation {
+	type Disc = { radius: Rational }
+
+	namespace Discs for Disc is Shape {
+		area() -> Rational {
+			<- @.radius::multiply(with @.radius)
+		}
+	}
+}
+
+export {
+	Disc
+	Discs
+}
+`,
+			},
+			async (directory) => {
+				let linked = linkModuleGraph(
+					loadModuleGraph(
+						path.join(directory, "Main.es"),
+						diskModuleHost,
+					),
+				)
+				let sources = generateModules(linked)
+				let declarations = [...sources.sources.values()].filter(
+					(source) => source.includes("$es_Shape_describe ="),
+				)
+
+				expect(declarations).toHaveLength(1)
+				expect(sources.sources.get("essence:./Main.es")).toContain(
+					"$es_Shape_describe",
+				)
+				expect(await runBundle(sources, directory)).toEqual([
+					'"area 9"',
+					'"area 4"',
+				])
+			},
+		)
+	})
+
 	// NOTE: A Module body runs ONCE, on first import, however many Modules
 	// reach it — which is what an emitted ESM graph gives for free and a
 	// concatenation of the bodies would not. The diamond is what makes it
