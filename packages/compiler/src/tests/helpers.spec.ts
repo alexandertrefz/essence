@@ -2020,6 +2020,7 @@ describe("Helpers", () => {
 			expect(result).toEqual({
 				kind: "conforms",
 				methodMap: { toString: "toString" },
+				providedMethods: {},
 			})
 		})
 
@@ -2052,6 +2053,7 @@ describe("Helpers", () => {
 			expect(result).toEqual({
 				kind: "conforms",
 				methodMap: { toString: "toString__overload$2" },
+				providedMethods: {},
 			})
 		})
 
@@ -2168,6 +2170,7 @@ describe("Helpers", () => {
 					combine__overload$1: "combine__overload$2",
 					combine__overload$2: "combine__overload$1",
 				},
+				providedMethods: {},
 			})
 		})
 	})

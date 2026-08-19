@@ -491,12 +491,19 @@ export type NamespaceType = {
 		Array<{ generic: string; protocol: string }>
 	>
 	// NOTE: Set only on the pseudo Namespace a Protocol's PROVIDED Methods are
-	// reached through, to the Protocol that wrote them — which is also this
-	// Namespace's `name`, because that name is what the emitted const is
-	// spelled with. It is what tells a reader where a Method they did not write
-	// came from, and nothing but a Hover reads it: resolution and emission are
-	// decided by the name.
+	// reached through on a CONCRETE receiver, to the Protocol that wrote them.
+	// The Namespace's own `name` is the conformance source's — the Namespace
+	// whose conformance put the Method in reach — so this is what tells a
+	// Protocol from a Namespace at emission, and what tells a reader where a
+	// Method they did not write came from.
 	providedBy?: string
+	// NOTE: Which members of the pseudo Namespace a Protocol-BOUNDED receiver
+	// resolves through were provided rather than required, each under the
+	// Protocol that wrote the body. That Namespace is the hidden conformance
+	// Parameter and every member of it is reached through the witness, provided
+	// or required alike — so this decides nothing about emission and is read
+	// only where a reader has to be told whose Method they are looking at.
+	providedMembers?: Record<string, string>
 }
 
 // NOTE: Deliberately NOT part of `Type` — a Protocol is not a Type. It is
@@ -698,6 +705,16 @@ export type ConformanceSource =
 			kind: "namespace"
 			name: string
 			methodMap: Record<string, string>
+			// NOTE: The Protocol's PROVIDED Methods this conformer does not
+			// override, each under the Protocol that WROTE the body. They are in
+			// the witness so that a bounded call reaches the same Method a
+			// direct one does, but they are no Methods of the Namespace — the
+			// emitted const takes the finished witness as its own trailing
+			// Argument, which is why they are kept apart from `methodMap`.
+			// Absent where the Protocol provides nothing, which keeps every
+			// witness that has none emitting the plain object literal it always
+			// did.
+			providedMethods?: Record<string, string>
 			// NOTE: The recursively solved conformances for this Namespace's
 			// own `where` conditions, ordered by its Generic declaration order
 			// so they line up with the fulfilling Methods' hidden trailing

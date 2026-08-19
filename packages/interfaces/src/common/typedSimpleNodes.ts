@@ -105,6 +105,10 @@ export interface ConformanceValueNode {
 	nodeType: "ConformanceValue"
 	namespaceName: string
 	methodMap: Record<string, string>
+	// NOTE: As on the ConformanceSource — the Protocol's provided Methods this
+	// conformer does not override, each under the Protocol that wrote the body.
+	// The Rewriter curries the finished witness onto each of them.
+	providedMethods?: Record<string, string>
 	// NOTE: The witness values for this Namespace's own `where` conditions, in
 	// Generic declaration order. Empty for an unconditional conformance, which
 	// the Rewriter emits as a plain method-map object literal.

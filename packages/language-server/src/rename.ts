@@ -2213,7 +2213,11 @@ function walkTypedNode(
 				node.member.name,
 				node.member.position,
 				context,
-				node.namespace.type.providedBy,
+				// NOTE: As in the Hover — a bounded receiver resolves through
+				// the witness, whose members are provided and required alike, so
+				// which Protocol wrote the body is a per member answer there.
+				node.namespace.type.providedBy ??
+					node.namespace.type.providedMembers?.[node.member.name],
 			)
 			walkTypedNode(node.base, context)
 			walkTypedArguments(node.arguments, context)

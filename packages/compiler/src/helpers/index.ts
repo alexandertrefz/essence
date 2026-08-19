@@ -1859,7 +1859,18 @@ export function providedMethodProtocol(
 }
 
 export type ConformanceCheckResult =
-	| { kind: "conforms"; methodMap: ConformanceMethodMap }
+	| {
+			kind: "conforms"
+			methodMap: ConformanceMethodMap
+			// NOTE: The Protocol's PROVIDED Methods this conformer does NOT
+			// override, each under the Protocol that wrote the body. They are in
+			// the witness like everything else — a bounded call must reach the
+			// same Method a direct one does — but they are not Methods of the
+			// Namespace, so they are kept apart from the map that names its
+			// Methods and are emitted as the shared const, curried with the
+			// finished witness.
+			providedMethods: ConformanceMethodMap
+	  }
 	| { kind: "missing"; methodName: string }
 	| { kind: "mismatched"; methodName: string }
 	// NOTE: The fulfilling Method matches the Protocol's signature, but carries
@@ -1895,6 +1906,7 @@ export function computeConformanceMethodMap(
 	) => declared === wanted,
 ): ConformanceCheckResult {
 	let methodMap: ConformanceMethodMap = {}
+	let providedMethods: ConformanceMethodMap = {}
 	let selfBindings: GenericBindings = new Map([["Self", target]])
 
 	for (let [methodName, requirement] of Object.entries(protocol.methods)) {
@@ -1907,19 +1919,30 @@ export function computeConformanceMethodMap(
 		// would otherwise find Object.prototype.toString on the record.
 		let written = Object.hasOwn(namespace.methods, methodName)
 
-		// NOTE: A PROVIDED Method is not owed. A Namespace that writes none
-		// still answers it — the Protocol's body does — so it can not be
-		// missing, and it never enters the method map: the map is the witness a
-		// bounded call is handed, and a provided Method's body is ONE const
-		// every conformer shares rather than anything a witness could name.
+		// NOTE: A PROVIDED Method is not owed — a Namespace that writes none
+		// still answers it, because the Protocol's body does — but it IS in the
+		// witness, under one of two entries.
 		//
-		// A Namespace that DOES write one has replaced it, whole, and the
-		// replacement is held to the provided signature by exactly the check a
-		// requirement gets — hence the same `mismatched` answer, and hence
-		// checking it here rather than in a pass of its own.
-		if (providedMethodProtocol(protocol, methodName) !== null) {
+		// A Namespace that writes one has REPLACED it, whole, and the
+		// replacement goes in the method map exactly as a requirement's
+		// fulfiller does: the witness is what a bounded call reads, so an
+		// override that stayed out of it would make `t::isLessThan(x)` inside a
+		// `<T is Orderable>` answer differently from the same call on the
+		// Namespace's own Type. It is held to the provided signature by exactly
+		// the check a requirement gets — hence the same `mismatched` answer.
+		//
+		// A Namespace that writes none is entered as the PROVIDED const, which
+		// takes the witness it is read off as its own trailing Argument.
+		let providingProtocol = providedMethodProtocol(protocol, methodName)
+
+		if (providingProtocol !== null) {
+			if (!written) {
+				providedMethods[methodName] = providingProtocol
+
+				continue
+			}
+
 			if (
-				written &&
 				!fulfills(
 					methodName,
 					substituted,
@@ -1930,6 +1953,22 @@ export function computeConformanceMethodMap(
 			) {
 				return { kind: "mismatched", methodName }
 			}
+
+			// NOTE: A provided signature is always Simple — a body on an
+			// `overload` entry is refused at the declaration — so the override
+			// is entered under the one entry that fulfills it.
+			let overriding = findFulfillingMethod(
+				methodName,
+				substituted as common.BaseFunction,
+				false,
+				namespace.methods[methodName],
+			)
+
+			if (overriding === null) {
+				return { kind: "mismatched", methodName }
+			}
+
+			methodMap[methodName] = overriding.name
 
 			continue
 		}
@@ -1997,7 +2036,7 @@ export function computeConformanceMethodMap(
 		}
 	}
 
-	return { kind: "conforms", methodMap }
+	return { kind: "conforms", methodMap, providedMethods }
 }
 
 // NOTE: The first bound the fulfilling Method carries that the conformance was

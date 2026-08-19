@@ -319,8 +319,19 @@ describe("Bundle Size", () => {
 	// carrying is the reason the trade is worth taking: `5::isBetween(1, and
 	// 10)` reached `Number::compare` and the sixteen-cell cross-kind table
 	// behind it, and now reaches `Integer.compare` alone.
+	// NOTE: 73,032 now, up 1,695, and the ceiling moves to 74,100 to keep the
+	// kilobyte of headroom the rest of this file keeps. A conformance witness
+	// carries an entry for every Method the Protocol declares, PROVIDED ones
+	// included, so that a bounded call reaches the conformer's override where it
+	// wrote one — and `Integer` writes four of `Orderable`'s six. This file asks
+	// `clamp` and `isBetween` and never asks an inequality, so those four bodies
+	// are new here, and `$es_Equatable__isNot` and the `providedConformance`
+	// helper arrive with them. What the rise buys is the one thing an override
+	// is for: `5::isLessThan(3)` and the same call inside `<Item is Orderable>`
+	// now run the same Method, so an override may say something different rather
+	// than only the same thing faster.
 	it("keeps Everyday.es from dragging in the whole numeric tower", async () => {
-		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(72_400)
+		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(74_100)
 	})
 
 	// NOTE: Measured 42,719 bytes; a reintroduced `Number` spread was 54,849.
@@ -390,8 +401,14 @@ describe("Bundle Size", () => {
 	// Methods. This file asks three of them, so it carries three consts and a
 	// method map where it carried three Methods of `Number`; the cross-kind
 	// `compare` it reaches through the witness is the one it always reached.
+	// NOTE: It now measures 36,102, up 1,664, and the ceiling moves to 37,000 —
+	// the same order of headroom, and the same reason Everyday's figure rose.
+	// This file compares Integers as well as Irrationals, so `Integer`'s written
+	// inequalities enter its witness whether or not the file calls them; the
+	// cross-kind `compare` it reaches through the covering Namespace's witness is
+	// the one it always reached.
 	it("keeps Irrational.es from dragging in the whole numeric tower", async () => {
-		expect(await bundleSizeOf("Irrational.es")).toBeLessThan(35_200)
+		expect(await bundleSizeOf("Irrational.es")).toBeLessThan(37_000)
 	})
 
 	// NOTE: The same claim for a bundle of several Modules, where it is far
@@ -508,6 +525,12 @@ describe("Bundle Size", () => {
 		// NOTE: Byte-identical at 14,890 across `Equatable`'s and `Orderable`'s
 		// provided Methods. These Modules ask none of the six, and the one
 		// `isNot` they would have reached is `Optional`'s, which is written.
+		//
+		// NOTE: And byte-identical again at 14,890 across a witness carrying its
+		// Protocol's provided Methods. A witness only grows where the Protocol
+		// provides something, and the ones these Modules build are `Printable`'s
+		// and `Comparable`'s, which provide nothing at all. `HelloWorld.es` is
+		// unmoved at 6,241 for the same reason.
 		expect(result.outputs[0]!.contents.byteLength).toBeLessThan(15_500)
 	})
 })

@@ -726,25 +726,20 @@ describe("Protocol-provided Methods", () => {
 		})
 
 		// NOTE: A DECISION, pinned here so it can not drift by accident. An
-		// override answers every call written on the Namespace's own target
-		// Type. A call written on a Protocol-bounded Type Parameter dispatches
-		// through the Protocol instead, and the provided body is what runs —
-		// because the bound is all that is known there, and a provided Method is
-		// not in the conformance witness: its body is ONE const every conformer
-		// shares, so there is nothing per-conformer for a witness to name.
+		// override answers every call, written on the Namespace's own target
+		// Type or on a Protocol-bounded Type Parameter alike — the witness a
+		// bounded call reads carries the override where the conformer wrote one
+		// and the Protocol's shared const where it did not. These are Rust's and
+		// Swift's semantics for a requirement with a default, and they are why
+		// an override may say something DIFFERENT rather than only the same
+		// thing faster.
 		//
-		// The consequence for the standard library to come: `Integer`'s written
-		// `isLessThan` answers `5::isLessThan(3)`, and `Orderable`'s provided
-		// body answers the same call inside `<Item is Orderable>`. The two must
-		// therefore AGREE — an override is for saying the same thing faster,
-		// never for saying something else.
-		//
-		// Putting the provided Methods in the witness is what would change this,
-		// and it can not be done by naming a const: a conformer that overrides
-		// nothing would have to name the Protocol's const curried with the very
-		// witness being built. It would take a runtime helper that closes each
-		// provided entry over the finished witness.
-		it("should answer a bounded call with the provided body, not the override", async () => {
+		// The provided const can not simply be named in a witness: a conformer
+		// that overrides nothing would have to name a const curried with the
+		// very witness being built. `$type.providedConformance` closes each
+		// provided entry over the finished map, which is what makes the two
+		// spellings one.
+		it("should answer a bounded call with the override", async () => {
 			expect(
 				await run(
 					[
@@ -758,6 +753,7 @@ describe("Protocol-provided Methods", () => {
 						"\t}",
 						"",
 						"\ttype Person = { who: String }",
+						"\ttype Place = { where: String }",
 						"",
 						"\tnamespace People for Person is Named {",
 						"\t\tname() -> String {",
@@ -769,17 +765,136 @@ describe("Protocol-provided Methods", () => {
 						"\t\t}",
 						"\t}",
 						"",
+						"\tnamespace Places for Place is Named {",
+						"\t\tname() -> String {",
+						"\t\t\t<- @.where",
+						"\t\t}",
+						"\t}",
+						"",
 						"\tfunction say<infer Item is Named>(_ item: Item) -> String {",
 						"\t\t<- item::describe()",
 						"\t}",
 						"",
 						'\tconstant person: Person = { who = "Ada" }',
+						'\tconstant place: Place = { where = "Bath" }',
 						"\tTerminal.inspect(person::describe())",
 						"\tTerminal.inspect(say(person))",
+						"\tTerminal.inspect(place::describe())",
+						"\tTerminal.inspect(say(place))",
 						"}",
 					].join("\n"),
 				),
-			).toEqual(['"override"', '"Ada"'])
+			).toEqual(['"override"', '"override"', '"Bath"', '"Bath"'])
+		})
+
+		// NOTE: The standard library's own override, both ways round.
+		// `Integer::isLessThan` is written for the performance stratification
+		// the library explains at length, and a `<Item is Orderable>` bound has
+		// to reach it — not the Protocol's body on `compare`.
+		it("should answer a bounded call with the library's own override", () => {
+			expect(
+				generate(
+					[
+						"implementation {",
+						"\tfunction below<infer Item is Orderable>(",
+						"\t\t_ value: Item,",
+						"\t\t_ other: Item,",
+						"\t) -> Boolean {",
+						"\t\t<- value::isLessThan(other)",
+						"\t}",
+						"",
+						"\tTerminal.inspect(below(5, 3))",
+						"}",
+					].join("\n"),
+				),
+			).toContain("isLessThan: $es_Integer_isLessThan")
+		})
+
+		// NOTE: A conditional conformance carries its own `where` witnesses, and
+		// the provided half closes over the map those were curried onto — so a
+		// `<Item is Equatable>` bound over a List reaches `Equatable`'s `isNot`
+		// with the List's Equatable witness and the item's witness both in place.
+		it("should answer a bounded call through a conditional conformance", async () => {
+			expect(
+				await run(
+					[
+						"implementation {",
+						"\tfunction differs<infer Item is Equatable>(",
+						"\t\t_ value: Item,",
+						"\t\t_ other: Item,",
+						"\t) -> Boolean {",
+						"\t\t<- value::isNot(other)",
+						"\t}",
+						"",
+						"\tTerminal.inspect(differs([1, 2], [1, 3]))",
+						"\tTerminal.inspect(differs([1, 2], [1, 2]))",
+						"}",
+					].join("\n"),
+				),
+			).toEqual(["true", "false"])
+		})
+
+		// NOTE: A derived conformance writes its own `isNot`, so the witness
+		// names the derive's helper rather than the Protocol's const — the same
+		// rule an override follows, applied to the Method a Choice derives.
+		it("should answer a bounded call with a Choice's derived equality", async () => {
+			expect(
+				await run(
+					[
+						"implementation {",
+						"\tchoice Colour {",
+						"\t\tRed,",
+						"\t\tGreen,",
+						"\t}",
+						"",
+						"\tfunction differs<infer Item is Equatable>(",
+						"\t\t_ value: Item,",
+						"\t\t_ other: Item,",
+						"\t) -> Boolean {",
+						"\t\t<- value::isNot(other)",
+						"\t}",
+						"",
+						"\tconstant red: Colour = #Red",
+						"\tconstant green: Colour = #Green",
+						"",
+						"\tTerminal.inspect(differs(red, green))",
+						"\tTerminal.inspect(differs(red, red))",
+						"}",
+					].join("\n"),
+				),
+			).toEqual(["true", "false"])
+		})
+
+		// NOTE: An extension chain through one bound — `Orderable` grants
+		// `Comparable`, so a body bounded by the descendant reaches the
+		// ancestor's requirement and the descendant's provided Method off the
+		// one witness it was handed.
+		it("should answer both halves of an extension through one bound", async () => {
+			expect(
+				await run(
+					[
+						"implementation {",
+						"\tfunction spread<infer Item is Orderable>(",
+						"\t\t_ low: Item,",
+						"\t\t_ high: Item,",
+						"\t) -> String {",
+						"\t\t<- match low::compare(to high) -> String {",
+						"\t\t\tcase Ordering#Less {",
+						"\t\t\t\t<- low::isBetween(low, and high)::toString()",
+						"\t\t\t}",
+						"",
+						"\t\t\tcase _ {",
+						'\t\t\t\t<- "not below"',
+						"\t\t\t}",
+						"\t\t}",
+						"\t}",
+						"",
+						"\tTerminal.inspect(spread(1, 5))",
+						"\tTerminal.inspect(spread(5, 1))",
+						"}",
+					].join("\n"),
+				),
+			).toEqual(['"true"', '"not below"'])
 		})
 
 		it("should hold the written Method to the provided signature", () => {
@@ -2005,15 +2120,22 @@ describe("a provided Method in the standard library", () => {
 	})
 
 	// NOTE: A Protocol body is Essence, and the generated native contract is
-	// about the RUNTIME's exports — so a Protocol growing one must not move a
-	// line of it. Compared against the file on disk, which is the contract the
+	// about the RUNTIME's exports — so a Protocol growing one moves exactly one
+	// line of it: the witness type gains the provided Method, because a witness
+	// carries one, and a native handed the witness may call it. Nothing else
+	// moves. Compared against the file on disk, which is the contract the
 	// runtime is written against.
-	it("should leave the generated native contract untouched", () => {
-		expect(renderNativesModule(loadStdlib())).toBe(
-			readFileSync(
-				path.join(RUNTIME_DIRECTORY, "natives.generated.ts"),
-				"utf-8",
-			),
+	it("should add the provided Method to the witness contract and nothing else", () => {
+		let onDisk = readFileSync(
+			path.join(RUNTIME_DIRECTORY, "natives.generated.ts"),
+			"utf-8",
+		)
+		let rendered = renderNativesModule(loadStdlib())
+		let added = "\tdescribe: (self: Self) => StringType"
+
+		expect(rendered).toContain(`${added}\n`)
+		expect(rendered.split("\n").filter((line) => line !== added)).toEqual(
+			onDisk.split("\n"),
 		)
 	})
 

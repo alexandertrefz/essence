@@ -580,8 +580,15 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 					),
 					// NOTE: A Method nobody wrote on the receiver's Namespace
 					// still has to say where it came from — a reader looking one
-					// up needs the Protocol's name to find its declaration.
-					node.namespace.type.providedBy ?? null,
+					// up needs the Protocol's name to find its declaration. On a
+					// bounded receiver the Namespace is the witness, whose
+					// members are provided and required alike, so the answer is
+					// per member there.
+					node.namespace.type.providedBy ??
+						node.namespace.type.providedMembers?.[
+							node.member.name
+						] ??
+						null,
 				)
 			}
 
