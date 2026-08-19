@@ -1071,6 +1071,9 @@ export function enrichCombination(
 	}
 }
 
+// NOTE: A braced descend is a path key too — `server.{ port = 1 }` reaches one
+// step in exactly as `server.port = 1` does, and carries its steps the same
+// way.
 function hasPathKeys(record: parser.RecordValueNode): boolean {
 	return Object.values(record.members).some(
 		(member) => member.steps !== undefined,
@@ -1162,10 +1165,7 @@ function enrichPathCombination(
 	let rhs = pathUpdate(
 		lhs,
 		lhs.type as common.RecordType,
-		Object.values(keys.members).map((member) => ({
-			steps: member.steps ?? [member.name],
-			member,
-		})),
+		pathKeyEntries(keys),
 		keys.position,
 		scope,
 	)
@@ -1189,6 +1189,26 @@ type PathKeyEntry = {
 	// level writes. Never empty.
 	steps: Array<parser.IdentifierNode>
 	member: parser.RecordValueMemberNode
+}
+
+function pathKeyEntries(record: parser.RecordValueNode): Array<PathKeyEntry> {
+	return Object.values(record.members).map((member) => ({
+		steps: member.steps ?? [member.name],
+		member,
+	}))
+}
+
+// NOTE: What an entry writes one step further in — the rest of its path where
+// it has one, and the whole member list of its braced descend where the step it
+// ends on is the one just consumed. A descend is where a key stops being one
+// key and becomes a list, so this is the only place the two spellings differ at
+// all: below it they are the same entries.
+function stepInto(entry: PathKeyEntry): Array<PathKeyEntry> {
+	if (entry.steps.length > 1) {
+		return [{ steps: entry.steps.slice(1), member: entry.member }]
+	}
+
+	return pathKeyEntries(entry.member.group!)
 }
 
 function pathUpdate(
@@ -1223,7 +1243,10 @@ function pathUpdate(
 		// NOTE: A group holding both a whole member and a path into it is a
 		// clash the Parser already refused. The whole member is the one that
 		// can stand on its own, so it does.
-		let whole = group.find((entry) => entry.steps.length === 1)
+		let whole = group.find(
+			(entry) =>
+				entry.steps.length === 1 && entry.member.group === undefined,
+		)
 
 		if (whole !== undefined) {
 			members[name] = enrichMember(
@@ -1257,10 +1280,7 @@ function pathUpdate(
 		let inner = pathUpdate(
 			lookup,
 			stepType,
-			group.map((entry) => ({
-				steps: entry.steps.slice(1),
-				member: entry.member,
-			})),
+			group.flatMap(stepInto),
 			groupPosition(group),
 			scope,
 		)
@@ -1335,9 +1355,11 @@ function pathKeyStepType(
 // NOTE: The span the keys of one level were written across, so a Diagnostic
 // about the level points at every key that built it.
 function groupPosition(group: Array<PathKeyEntry>): common.Position {
+	let last = group[group.length - 1].member
+
 	return {
 		start: group[0].steps[0].position.start,
-		end: group[group.length - 1].member.value.position.end,
+		end: (last.value ?? last.group!).position.end,
 	}
 }
 
@@ -4556,7 +4578,7 @@ function refusePathKeys(
 			],
 			helps: [
 				`Write the whole member: '${member.steps[0].content} = { … }'.`,
-				`Or update a value that already has it: '{ original with ${key} = … }'.`,
+				`Or update a value that already has it: '{ original with ${key}${member.group === undefined ? " = …" : ".{ … }"} }'.`,
 			],
 		})
 	}
@@ -4596,11 +4618,16 @@ function enrichMember(
 	scope: enricher.Scope,
 	expectedType: common.Type | null,
 ): common.typed.ExpressionNode {
-	if (member.shorthand === true && member.value.nodeType === "Identifier") {
-		return asValue(enrichIdentifierExpression(member.value, scope, true))
+	// NOTE: A member with no value at all is a braced descend, and a descend is
+	// a LEVEL rather than a member — `pathUpdate` reaches it through `stepInto`
+	// and never asks for it here.
+	let value = member.value!
+
+	if (member.shorthand === true && value.nodeType === "Identifier") {
+		return asValue(enrichIdentifierExpression(value, scope, true))
 	}
 
-	return enrichExpression(member.value, scope, expectedType)
+	return enrichExpression(value, scope, expectedType)
 }
 
 // NOTE: What the item position of an expected Type wants, for the Expressions

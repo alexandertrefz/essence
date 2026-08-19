@@ -1,4 +1,7 @@
-import { patternBindings } from "@essence-lang/compiler/helpers"
+import {
+	memberExpression,
+	patternBindings,
+} from "@essence-lang/compiler/helpers"
 import {
 	printCaseWithPayload,
 	printSignatureSummary,
@@ -171,7 +174,7 @@ function symbolsOfNode(
 			return [...symbolsOfNode(node.lhs), ...symbolsOfNode(node.rhs)]
 		case "RecordValue":
 			return Object.values(node.members).flatMap((member) =>
-				symbolsOfNode(member.value),
+				symbolsOfNode(memberExpression(member)),
 			)
 		case "ListValue":
 			return node.values.flatMap(symbolsOfNode)

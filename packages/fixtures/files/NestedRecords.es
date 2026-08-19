@@ -45,6 +45,22 @@ implementation {
 			},
 	}
 
+	§ The braced descend, which writes a whole member list one level down. Its
+	§ plain keys take the Record shorthand, because there is no `with` inside it
+	§ for a bare name to be the whole value merged in.
+	constant descended = { config with server.{ port = 8443, host = "api" } }
+
+	§ A nested descend, and the shorthand a descend's plain keys may use.
+	constant port     = 4433
+	constant borrowed = { config with server.{ tls.{ enabled = true }, port } }
+
+	§ A descend beside a plain key, and a path that reaches past one.
+	constant both = {
+		config with
+			name = "edge",
+			server.{ port = port, tls.authority = "internal" },
+	}
+
 	namespace Configs for Config {
 		§§ Answers this Config listening on another port.
 		§§
@@ -62,6 +78,11 @@ implementation {
 	Terminal.inspect(renamed.server.port)
 	Terminal.inspect(blanked.server.tls.authority)
 	Terminal.inspect(config::movedTo(9000).server.port)
+	Terminal.inspect(descended.server.host)
+	Terminal.inspect(borrowed.server.tls.enabled)
+	Terminal.inspect(borrowed.server.port)
+	Terminal.inspect(both.name)
+	Terminal.inspect(both.server.tls.authority)
 
 	§ The value updated is never touched.
 	Terminal.inspect(config.server.port)

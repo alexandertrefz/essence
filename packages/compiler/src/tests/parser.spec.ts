@@ -397,9 +397,9 @@ describe("Parser", () => {
 			): Array<[string, string, boolean]> =>
 				Object.entries(record.members).map(([key, member]) => [
 					key,
-					member.value.nodeType === "Identifier"
-						? member.value.content
-						: member.value.nodeType,
+					member.value!.nodeType === "Identifier"
+						? member.value!.content
+						: member.value!.nodeType,
 					member.shorthand === true,
 				])
 
@@ -422,7 +422,7 @@ describe("Parser", () => {
 			it("should give the name and the value one Position", () => {
 				let member = recordOf("{ x }").members["x"]!
 
-				expect(member.value.position).toEqual(member.name.position)
+				expect(member.value!.position).toEqual(member.name.position)
 			})
 
 			it("should read a bare name in a typed Record Literal", () => {
@@ -701,6 +701,96 @@ describe("Parser", () => {
 				expect(diagnostics[0]!.message).toBe(
 					"Member 'server.port' is already defined",
 				)
+			})
+
+			// NOTE: `server.{ … }` — one Token of lookahead after a step's dot
+			// settles it: a `{` opens a descend, an Identifier continues the
+			// path, and a member name is never `{`.
+			it("should read a braced descend as a member list one level down", () => {
+				let combination = combinationOf(
+					"{ config with server.{ port = 1, host = 'db' } }",
+				)
+				let member = (combination.rhs as parser.RecordValueNode)
+					.members["server"]!
+
+				expect(member.value).toBeNull()
+				expect(member.steps?.map((step) => step.content)).toEqual([
+					"server",
+				])
+				expect(Object.keys(member.group!.members)).toEqual([
+					"port",
+					"host",
+				])
+			})
+
+			it("should read a descend after a longer path", () => {
+				let combination = combinationOf(
+					"{ config with server.tls.{ enabled = true } }",
+				)
+				let member = (combination.rhs as parser.RecordValueNode)
+					.members["server.tls"]!
+
+				expect(member.steps?.map((step) => step.content)).toEqual([
+					"server",
+					"tls",
+				])
+				expect(Object.keys(member.group!.members)).toEqual(["enabled"])
+			})
+
+			it("should read a descend inside a descend", () => {
+				let combination = combinationOf(
+					"{ config with server.{ tls.{ enabled = true } } }",
+				)
+				let outer = (combination.rhs as parser.RecordValueNode).members[
+					"server"
+				]!
+				let inner = outer.group!.members["tls"]!
+
+				expect(Object.keys(inner.group!.members)).toEqual(["enabled"])
+			})
+
+			// NOTE: Shorthand is allowed inside a descend and refused after a
+			// `with`: a bare name there could be the whole value being merged,
+			// and inside a descend there is no such reading to lose.
+			it("should read a bare name inside a descend as its own value", () => {
+				let combination = combinationOf(
+					"{ config with server.{ port } }",
+				)
+				let member = (combination.rhs as parser.RecordValueNode)
+					.members["server"]!
+				let inner = member.group!.members["port"]!
+
+				expect(inner.shorthand).toBe(true)
+				expect((inner.value as parser.IdentifierNode).content).toBe(
+					"port",
+				)
+			})
+
+			it("should refuse a descend with nothing in it", () => {
+				let { diagnostics } = parseWithDiagnostics(
+					"implementation { constant value = { config with server.{} } }",
+				)
+
+				expect(diagnostics).toHaveLength(1)
+				expect(diagnostics[0]!.code).toBe("empty-path-group")
+			})
+
+			it("should refuse a key a descend already writes", () => {
+				let { diagnostics } = parseWithDiagnostics(
+					"implementation { constant value = { config with server.{ port = 1 }, server.host = 'd' } }",
+				)
+
+				expect(diagnostics).toHaveLength(1)
+				expect(diagnostics[0]!.code).toBe("duplicate-member")
+			})
+
+			it("should refuse a bare path inside a descend", () => {
+				let { diagnostics } = parseWithDiagnostics(
+					"implementation { constant value = { config with server.{ tls.enabled } } }",
+				)
+
+				expect(diagnostics).toHaveLength(1)
+				expect(diagnostics[0]!.code).toBe("shorthand-on-path-key")
 			})
 
 			// NOTE: The boundary is the dot, not the characters — `serverPort`

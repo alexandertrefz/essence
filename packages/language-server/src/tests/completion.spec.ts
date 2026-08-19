@@ -86,6 +86,32 @@ describe("Completion", () => {
 			])
 		})
 
+		it("should list the members inside a braced descend", () => {
+			let source = [
+				...config,
+				"\tconstant deep = { config with server.{ tls. } }",
+				"}",
+			].join("\n")
+
+			expect(labelsOf(source, { line: 10, column: 45 })).toEqual([
+				"enabled",
+			])
+		})
+
+		it("should list the members a descend is about to open on", () => {
+			let source = [
+				...config,
+				"\tconstant deep = { config with server. }",
+				"}",
+			].join("\n")
+
+			expect(labelsOf(source, { line: 10, column: 39 })).toEqual([
+				"host",
+				"port",
+				"tls",
+			])
+		})
+
 		it("should leave an ordinary member access alone", () => {
 			let source = [
 				...config,

@@ -2048,5 +2048,28 @@ describe("Rename of a name a Case payload default reads", () => {
 				source.replaceAll("enabled", "on"),
 			)
 		})
+
+		// NOTE: A braced descend reaches its members the same way — its own
+		// keys are a written list the lexical walk sees, and a path inside it
+		// carries on through the Lookups the desugar wrote.
+		it("renames a member a braced descend writes", () => {
+			let descended = [
+				"implementation {",
+				"\ttype Tls = { enabled: Boolean }",
+				"\ttype Server = { host: String, port: Integer, tls: Tls }",
+				"\ttype Config = { name: String, server: Server }",
+				"",
+				"\tconstant config: Config = {",
+				'\t\tname = "api",',
+				'\t\tserver = { host = "h", port = 80, tls = { enabled = false } },',
+				"\t}",
+				"\tconstant deep = { config with server.{ tls.{ enabled = true } } }",
+				"}",
+			].join("\n")
+
+			expect(rename(descended, { line: 10, column: 47 }, "on")).toBe(
+				descended.replaceAll("enabled", "on"),
+			)
+		})
 	})
 })

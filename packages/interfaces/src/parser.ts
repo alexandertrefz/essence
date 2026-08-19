@@ -145,7 +145,9 @@ export type ValueNode =
 // Language Server needs the name's Position for renaming.
 export interface RecordValueMemberNode {
 	name: IdentifierNode
-	value: ExpressionNode
+	// NOTE: Null exactly where `group` is set — a braced descend writes a whole
+	// member list one level down instead of one value.
+	value: ExpressionNode | null
 	// NOTE: Set where the member was written as a bare name — `{ x }`, which
 	// is `{ x = x }`. The name and the value are then two Nodes at ONE
 	// Position, which is what lets a rename of either one expand the member
@@ -159,6 +161,10 @@ export interface RecordValueMemberNode {
 	// two paths sharing a prefix would otherwise collide under one name. Absent
 	// on an ordinary key, which is every key that is not a path.
 	steps?: Array<IdentifierNode>
+	// NOTE: A braced descend — `server.{ port = 1, host = "db" }` — which is a
+	// whole member list written against the value `steps` reaches. Absent
+	// wherever the key spelled a value instead, which is everywhere else.
+	group?: RecordValueNode
 }
 
 export type RecordValueNode = {

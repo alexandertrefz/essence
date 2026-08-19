@@ -863,9 +863,13 @@ export function parameter(
 
 type KeyValuePair = {
 	name: parser.IdentifierNode
-	value: parser.ExpressionNode
+	// NOTE: Null exactly where `group` is set.
+	value: parser.ExpressionNode | null
 	position: common.Position
 	shorthand: boolean
+	// NOTE: A braced descend — a whole member list one level down, written in
+	// place of a value.
+	group: parser.RecordValueNode | null
 	// NOTE: Null on an ordinary key. A path key carries every step it was
 	// written with, the first of them the same Node `name` points at, and is
 	// keyed under the dotted spelling so `server` and `server.port` stay two
@@ -886,7 +890,16 @@ export function keyValuePair(
 	shorthand = false,
 	steps: Array<parser.IdentifierNode> | null = null,
 ): KeyValuePair {
-	return { name, value, position, shorthand, steps }
+	return { name, value, position, shorthand, steps, group: null }
+}
+
+export function keyGroupPair(
+	name: parser.IdentifierNode,
+	group: parser.RecordValueNode,
+	position: common.Position,
+	steps: Array<parser.IdentifierNode>,
+): KeyValuePair {
+	return { name, value: null, position, shorthand: false, steps, group }
 }
 
 // NOTE: The dotted spelling a path key is stored under, and the plain name of
@@ -925,6 +938,10 @@ export function buildKeyValuePairList(
 
 				if (curr.steps !== null) {
 					member.steps = curr.steps
+				}
+
+				if (curr.group !== null) {
+					member.group = curr.group
 				}
 
 				prev[keyOf(curr)] = member

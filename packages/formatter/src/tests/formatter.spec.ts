@@ -710,6 +710,54 @@ describe("formatter", () => {
 			expect(result.text).not.toContain("with {")
 		})
 
+		it("keeps a braced descend braced", () => {
+			roundTrips(
+				block(
+					'\tconstant a = { config with server.{ port = 1, host = "db" } }',
+				),
+			)
+		})
+
+		it("keeps a descend inside a descend", () => {
+			roundTrips(
+				block(
+					"\tconstant b = { config with server.{ tls.{ enabled = true } } }",
+				),
+			)
+		})
+
+		it("keeps a bare name inside a descend bare", () => {
+			roundTrips(
+				block("\tconstant c = { config with server.{ port, host } }"),
+			)
+		})
+
+		it("breaks a wide descend one member to a line", () => {
+			roundTrips(
+				block(
+					"\tconstant wide = {",
+					"\t\tconfiguration with",
+					"\t\t\tserver.{",
+					"\t\t\t\taaaaaaaaaaaaaaaaaa = 1,",
+					"\t\t\t\tbbbbbbbbbbbbbbbbbb = 2,",
+					"\t\t\t\tcccccccccccccccccc = 3,",
+					"\t\t\t},",
+					"\t}",
+				),
+			)
+		})
+
+		it("is idempotent over a braced descend", () => {
+			let source = block(
+				"\tconstant b = { config with server.{ tls.{ enabled = true }, port } }",
+			)
+			let once = format(source)
+			let twice = format(once.text)
+
+			expect(once.refusal).toBeNull()
+			expect(twice.text).toBe(once.text)
+		})
+
 		it("is idempotent over a path key", () => {
 			let source = block(
 				'\tconstant mixed = { config with name = "b", server.port = 1 }',

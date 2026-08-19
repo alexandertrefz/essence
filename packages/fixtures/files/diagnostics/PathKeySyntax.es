@@ -24,4 +24,8 @@ implementation {
 			server = { host = "db", port = 5432, tls = { enabled = true } },
 			server.port = port,
 	}
+
+	§ A descend with nothing in it says to leave `server` exactly as it was,
+	§ which is a half-written key rather than an intent.
+	constant blank = { config with server.{} }
 }

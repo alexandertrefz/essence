@@ -2221,21 +2221,51 @@ export class Printer {
 			Object.values(node.members),
 			(member) => ({
 				start: member.name.position.start,
-				end: member.value.position.end,
+				end: (member.value ?? member.group!).position.end,
 			}),
-			(member) =>
-				member.shorthand === true
-					? text(memberKey(member))
-					: concat([
-							text(memberKey(member) + " = "),
-							this.printExpression(member.value),
-						]),
+			(member) => this.printRecordMember(member),
 		)
 
 		return this.listInterior(
 			items,
 			this.trivia.takeBefore(node.position.end.line),
 		)
+	}
+
+	// NOTE: A member of a Record Literal, in whichever of the three spellings it
+	// was written in: a bare name, `key = value`, and a braced descend, whose
+	// interior lays itself out exactly as a Record's does — one member to a
+	// line once it is too wide, with the closing brace back at the key's
+	// indentation.
+	private printRecordMember(member: parser.RecordValueMemberNode): Doc {
+		if (member.group !== undefined) {
+			let descend = member.group
+
+			if (Object.keys(descend.members).length === 0) {
+				return text(memberKey(member) + ".{}")
+			}
+
+			let { interior, commented } = this.recordInterior(descend)
+
+			return group(
+				concat([
+					text(memberKey(member) + ".{"),
+					indent(concat([line, interior])),
+					line,
+					text("}"),
+				]),
+				{ shouldBreak: commented, expandable: true },
+			)
+		}
+
+		if (member.shorthand === true) {
+			return text(memberKey(member))
+		}
+
+		return concat([
+			text(memberKey(member) + " = "),
+			this.printExpression(member.value!),
+		])
 	}
 
 	// NOTE: A List of nothing but Numbers is FILLED — as many items to a line
@@ -2827,7 +2857,8 @@ function flattened(doc: Doc): Doc {
 }
 
 // NOTE: How a Record Literal's key was spelled — the dotted path where it is
-// one, and the plain name everywhere else.
+// one, and the plain name everywhere else. A braced descend's key is its
+// steps: the braces come after it, printed as a Record of their own.
 function memberKey(member: parser.RecordValueMemberNode): string {
 	return member.steps === undefined
 		? member.name.content

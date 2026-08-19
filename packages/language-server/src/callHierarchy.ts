@@ -1,4 +1,8 @@
-import { caseDefaults, parameterDefaults } from "@essence-lang/compiler/helpers"
+import {
+	caseDefaults,
+	memberExpression,
+	parameterDefaults,
+} from "@essence-lang/compiler/helpers"
 import type { common, parser } from "@essence-lang/interfaces"
 
 import { typedHandlerExpressions } from "./matchHandlerChildren"
@@ -367,7 +371,7 @@ function collectItemsFromNode(
 			return
 		case "RecordValue":
 			for (let member of Object.values(node.members)) {
-				collectItemsFromNode(member.value, container, items)
+				collectItemsFromNode(memberExpression(member), container, items)
 			}
 
 			return

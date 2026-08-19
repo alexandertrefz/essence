@@ -1,4 +1,8 @@
-import { caseDefaults, parameterDefaults } from "@essence-lang/compiler/helpers"
+import {
+	caseDefaults,
+	memberExpression,
+	parameterDefaults,
+} from "@essence-lang/compiler/helpers"
 import type { common, parser } from "@essence-lang/interfaces"
 
 import { methodsOf, nativeSignaturesOf } from "./namespaceMembers"
@@ -332,7 +336,7 @@ function collectCasesFromNode(
 			return
 		case "RecordValue":
 			for (let member of Object.values(node.members)) {
-				collectCasesFromNode(member.value, tokens)
+				collectCasesFromNode(memberExpression(member), tokens)
 			}
 
 			return

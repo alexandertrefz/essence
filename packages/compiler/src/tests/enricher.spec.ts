@@ -653,6 +653,64 @@ describe("Enricher", () => {
 				).toEqual([])
 			})
 
+			// NOTE: A braced descend reaches one step in exactly as a dotted key
+			// does, and is desugared into the very same nesting.
+			it("should accept a braced descend", () => {
+				expect(
+					diagnosticsFor(`implementation {
+						${config}
+						constant a = {
+							config with server.{ port = 1, host = "db" }
+						}
+					}`),
+				).toEqual([])
+			})
+
+			it("should accept a descend inside a descend", () => {
+				expect(
+					diagnosticsFor(`implementation {
+						${config}
+						constant a = {
+							config with server.{ tls.{ enabled = true } }
+						}
+					}`),
+				).toEqual([])
+			})
+
+			it("should accept a descend after a longer path", () => {
+				expect(
+					diagnosticsFor(`implementation {
+						${config}
+						constant a = {
+							config with server.tls.{ enabled = true }
+						}
+					}`),
+				).toEqual([])
+			})
+
+			it("should read a descend and a dotted key to the same Type", () => {
+				let descended = lastConstantValue(`implementation {
+					${config}
+					constant a = { config with server.{ port = 1 } }
+				}`)
+				let dotted = lastConstantValue(`implementation {
+					${config}
+					constant a = { config with server.port = 1 }
+				}`)
+
+				expect(descended.type).toEqual(dotted.type)
+			})
+
+			it("should refuse a descend through a step that is not a Record", () => {
+				let diagnostics = diagnosticsFor(`implementation {
+					${config}
+					constant a = { config with name.{ length = 1 } }
+				}`)
+
+				expect(diagnostics).toHaveLength(1)
+				expect(diagnostics[0].code).toBe("path-step-not-a-record")
+			})
+
 			it("should refuse a path key in a plain Record Literal", () => {
 				let diagnostics = diagnosticsFor(`implementation {
 					constant blank = { server.port = 8080 }

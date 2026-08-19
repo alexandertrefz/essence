@@ -113,22 +113,31 @@ game.history::removeLast() }` — has no shorthand spelling at all.
 ### `shorthand-on-path-key`
 
 A dotted key in an update was written with no value — `{ config with
-server.port }`. A bare NAME is a member and its own value, which is what the
+server.port }`, or `{ config with server.{ tls.enabled } }`. A bare NAME is a member and its own value, which is what the
 shorthand is; a path is neither, because the value it would set is not the name
 it reaches through. `server.port` names a member of `config.server` and a local
 called `port`, and nothing says the two are the same thing.
 
 Write the value: `{ config with server.port = port }`.
 
-The refusal is reported even where the list is a Record Literal's, which does
-take shorthand, and it is reported instead of `shorthand-in-combination` and
-`path-key-outside-combination` — no reading rescues a bare path, so the message
-that says why is the one to give.
+The refusal is reported even where the list is a Record Literal's or a braced
+descend's, both of which do take shorthand, and it is reported instead of
+`shorthand-in-combination` and `path-key-outside-combination` — no reading
+rescues a bare path, so the message that says why is the one to give.
 
 `{ config with server.port }` alone is NOT this Diagnostic. An update takes
 either a key list or one Expression, and one path is an Expression: it merges
 the members of the value `config.server.port` into `config`, exactly as
 `{ config with other }` merges `other`'s.
+
+### `empty-path-group`
+
+A braced descend was written with no members in it — `{ config with
+server.{ } }`. An update writes the members it names, so a descend with none in
+it says to leave `server` exactly as it was, which is a half-written key rather
+than an intent.
+
+Write the members to update inside it, or drop the key.
 
 ### `path-is-members-only`
 
