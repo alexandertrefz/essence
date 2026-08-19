@@ -2742,7 +2742,7 @@ function reachesConformance(
 
 // NOTE: The pseudo Namespace a Protocol's OWN provided Methods are reached
 // through — named after the Protocol, because that name is what the emitted
-// const is spelled with (`$es_<Protocol>_<member>`) and one const answers for
+// const is spelled with (`$es_<Protocol>__<member>`) and one const answers for
 // every conformer.
 //
 // Each Method is a bounded generic Function over `Self`: `<infer Self is P>(@:

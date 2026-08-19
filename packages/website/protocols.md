@@ -44,10 +44,20 @@ protocol Equatable {
 	§§ @param _ — the value to compare with
 	§§ @returns — `true` when the values differ.
 	isNot(_ other: Self) -> Boolean {
-		<- @::is(other)::negate()
+		if @::is(other) {
+			<- false
+		} else {
+			<- true
+		}
 	}
 }
 ```
+
+That is the standard library's own `Equatable`, body included. The `if` reads
+long where `<- @::is(other)::negate()` would say the same thing — reaching
+`Boolean::negate` would need `Boolean` imported into the file the Protocols are
+declared in, and `Boolean.es` imports that file back. Your own Protocols are
+under no such constraint.
 
 A conformer owes `is` and nothing else. `isNot` is a real Method of every
 conforming Type all the same: it resolves at a call, Hover shows the Protocol's
@@ -68,6 +78,13 @@ Anything else is a `method-not-on-protocol` error at the Protocol itself, rather
 than at whichever conformer happened to be missing it. That is the point of the
 restriction: a provided body is checked ONCE, and it is right for every Type that
 will ever conform.
+
+The body may also name the standard library — `Integer.parse(…)`, `Terminal` —
+and nothing the Program declares: not a Constant, not a Variable, not a Function,
+not a Namespace (`provided-method-out-of-reach`). A provided Method is emitted
+once, in the band ABOVE every Program that reaches it, and everything the Program
+declares is emitted below that. Give the Protocol a requirement the body calls on
+`@`, and let each conforming Namespace reach the name.
 
 `static` and `overload` Methods can not carry a body
 (`unwritable-provided-method`). A static Method has no receiver for `@` to stand
@@ -244,7 +261,7 @@ A provided Method is emitted **once**, as a top-level const of its own, taking
 the witness as its trailing Argument:
 
 ```js
-const $es_Shape_describe = function (_self, Self__conformance) {
+const $es_Shape__describe = function (_self, Self__conformance) {
 	return /* … */ Self__conformance.area(_self) /* … */;
 };
 ```
@@ -263,6 +280,8 @@ The const is named `$es_<Protocol>__<member>`, with a DOUBLE separator. A
 Namespace member's const joins with one, and no member name can begin with `_`,
 so a Protocol named after a Namespace can never reach the Namespace's const.
 
-One Protocol name means one set of consts, so two Protocols of the same name
-with provided Methods can not be compiled together — declare the Protocol once
-and import it where it is needed.
+One Protocol name and one Method name mean one const, so two Protocols of the
+same name may not both provide a Method of the same name in one compilation
+(`clashing-provided-method`) — declare the Protocol once and import it where it
+is needed, or rename one of the two. Two same-named Protocols providing
+DIFFERENT Methods name different consts and compile fine.

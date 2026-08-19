@@ -108,7 +108,7 @@ function buildStdlibArtifacts(stdlib: Stdlib): StdlibArtifacts {
 			}
 
 			// NOTE: A Protocol's PROVIDED Methods are prelude entries like any
-			// other — one `$es_<Protocol>_<member>` const each, shared by every
+			// other — one `$es_<Protocol>__<member>` const each, shared by every
 			// conformer. It stands in for a Namespace here because everything
 			// downstream wants from one is a name and a record of bodied
 			// Methods, and a Protocol with provided Methods has both. A
