@@ -185,6 +185,16 @@ export type RecordValueNode = {
 	type: RecordType
 	members: Record<string, ExpressionNode>
 	position: Position
+	// NOTE: Where each member's NAME was written, on the levels a dotted key
+	// was desugared into and on those alone. `{ c with server.port = 1 }` is
+	// enriched as `{ c with server = { c.server with port = 1 } }`, and `port`
+	// was spelled at the path's second step — a list the Language Server's
+	// lexical walk never sees, since it reads the written AST, where that list
+	// does not exist. Absent on a Record somebody wrote, whose keys that walk
+	// already carries: a typed member is keyed by name and holds no Position of
+	// its own, and inventing one for every Literal would move the shape every
+	// snapshot of a typed Program compares.
+	memberPositions?: Record<string, Position>
 }
 
 export type StringValueNode = {

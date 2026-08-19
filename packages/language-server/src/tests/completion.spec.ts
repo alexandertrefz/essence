@@ -28,6 +28,79 @@ function keywordsOf(source: string, cursor: { line: number; column: number }) {
 }
 
 describe("Completion", () => {
+	// NOTE: A dotted key names members of the value being UPDATED, one level
+	// at a time — which is a different question from what a name in Scope
+	// happens to hold, and has to be asked as its own reading.
+	describe("Path keys", () => {
+		const config = [
+			"implementation {",
+			"\ttype Tls = { enabled: Boolean }",
+			"\ttype Server = { host: String, port: Integer, tls: Tls }",
+			"\ttype Config = { name: String, server: Server }",
+			"",
+			"\tconstant config: Config = {",
+			'\t\tname = "api",',
+			'\t\tserver = { host = "h", port = 80, tls = { enabled = false } },',
+			"\t}",
+		]
+
+		let after = (key: string) =>
+			[...config, `\tconstant deep = { config with ${key} }`, "}"].join(
+				"\n",
+			)
+
+		it("should list the members one step in", () => {
+			expect(
+				labelsOf(after("server."), { line: 10, column: 39 }),
+			).toEqual(["host", "port", "tls"])
+		})
+
+		it("should list the members two steps in", () => {
+			expect(
+				labelsOf(after("server.tls."), { line: 10, column: 43 }),
+			).toEqual(["enabled"])
+		})
+
+		it("should list them with a step already half typed", () => {
+			expect(
+				labelsOf(after("server.po"), { line: 10, column: 41 }),
+			).toEqual(["host", "port", "tls"])
+		})
+
+		// NOTE: The reading that makes the key reading necessary rather than
+		// merely nicer — read as an ordinary member access, `server.` here
+		// answers the Constant's members, which have nothing to do with the
+		// update.
+		it("should read the value updated rather than a name in Scope", () => {
+			let source = [
+				...config,
+				"\tconstant server = { unrelated = 1 }",
+				"\tconstant deep = { config with server. }",
+				"}",
+			].join("\n")
+
+			expect(labelsOf(source, { line: 11, column: 39 })).toEqual([
+				"host",
+				"port",
+				"tls",
+			])
+		})
+
+		it("should leave an ordinary member access alone", () => {
+			let source = [
+				...config,
+				"\tconstant port = config.server.",
+				"}",
+			].join("\n")
+
+			expect(labelsOf(source, { line: 10, column: 32 })).toEqual([
+				"host",
+				"port",
+				"tls",
+			])
+		})
+	})
+
 	describe("Record members", () => {
 		it("should list members after a bare dot", () => {
 			let source = [

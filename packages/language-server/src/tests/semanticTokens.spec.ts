@@ -24,6 +24,29 @@ function tokenAt(source: string, line: number, column: number) {
 }
 
 describe("Semantic Tokens", () => {
+	// NOTE: Every step of a dotted key colours as the member it names —
+	// the first because the key list was written, the rest because the Lookups
+	// the Enricher synthesized stand exactly where the steps do.
+	it("should classify every step of a path key as a property", () => {
+		let source = [
+			"implementation {",
+			"\ttype Tls = { enabled: Boolean }",
+			"\ttype Server = { host: String, port: Integer, tls: Tls }",
+			"\ttype Config = { name: String, server: Server }",
+			"",
+			"\tconstant config: Config = {",
+			'\t\tname = "api",',
+			'\t\tserver = { host = "h", port = 80, tls = { enabled = false } },',
+			"\t}",
+			"\tconstant deep = { config with server.tls.enabled = true }",
+			"}",
+		].join("\n")
+
+		expect(tokenAt(source, 10, 32)?.type).toBe("property")
+		expect(tokenAt(source, 10, 39)?.type).toBe("property")
+		expect(tokenAt(source, 10, 43)?.type).toBe("property")
+	})
+
 	it("should classify a Constant as a readonly variable declaration", () => {
 		let source = ["implementation {", "\tconstant value = 1", "}"].join(
 			"\n",

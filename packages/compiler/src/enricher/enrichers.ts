@@ -1211,8 +1211,15 @@ function pathUpdate(
 	}
 
 	let members: Record<string, common.typed.ExpressionNode> = {}
+	// NOTE: Where each key of this level was written — the step that spelled
+	// it, which is the only record of it anywhere: this list exists nowhere in
+	// the written AST, so the Language Server has nothing else to read a step
+	// off. See `typed.RecordValueNode.memberPositions`.
+	let memberPositions: Record<string, common.Position> = {}
 
 	for (let [name, group] of groups) {
+		memberPositions[name] = group[0].steps[0].position
+
 		// NOTE: A group holding both a whole member and a path into it is a
 		// clash the Parser already refused. The whole member is the one that
 		// can stand on its own, so it does.
@@ -1284,6 +1291,7 @@ function pathUpdate(
 		position,
 		type: recordValueTypeOf(null, memberTypes, null),
 		declaredType: null,
+		memberPositions,
 	}
 }
 

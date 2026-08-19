@@ -117,6 +117,14 @@ export type WorkspaceCompletions = {
 // Lexer never puts inside a name, so a plain camelCase name is used.
 const probeMemberName = "lspProbeMember"
 
+// NOTE: The name the dotted-KEY reading writes, kept apart from the member
+// probe's on purpose: `{ config with server.<cursor> }` has to be read as the
+// key it is, and the SAME text read as an ordinary member access — a Lookup on
+// whatever `server` happens to name in Scope — would answer a Record that has
+// nothing to do with the update. Two names means a key reading can only ever be
+// answered by a key.
+const probeKeyName = "lspProbeKey"
+
 // NOTE: Mirrors `forbiddenIdentifierCharacters` in rename.ts — anything the
 // Lexer would not produce as part of a single Identifier Token.
 const identifierTail = /[^\s"§(){}[\]<>|/@,.:=~_-]*$/
@@ -188,7 +196,20 @@ export function findCompletions(
 			beforeCursor.slice(0, match.index),
 		].join("\n")
 
-		let base = resolveProbedBase(headText, documentPath)
+		// NOTE: The dotted-KEY reading is tried first, and only where a `.`
+		// triggered this: `{ config with server.<cursor> }` names a member of
+		// the value being UPDATED, and reading `server` as a name in Scope
+		// would answer whatever else happens to be called that. It answers only
+		// where the Enricher really wrote a nested update out, so every other
+		// cursor falls through to the reading it always had.
+		let base =
+			(memberMatch === null
+				? null
+				: resolveProbedBase(
+						headText,
+						documentPath,
+						`.${probeKeyName} = 0`,
+					)) ?? resolveProbedBase(headText, documentPath)
 
 		if (base === null) {
 			return []
@@ -413,17 +434,18 @@ type ProbedBase = {
 function resolveProbedBase(
 	headText: string,
 	documentPath?: string,
+	suffix: string = `.${probeMemberName}`,
 ): ProbedBase | null {
-	for (let probeSource of probeSourcesFor(headText, `.${probeMemberName}`)) {
+	for (let probeSource of probeSourcesFor(headText, suffix)) {
 		try {
 			let { program } = parseDocument(probeSource, documentPath)
 			let { program: enrichedProgram } = enrichDocument(
 				program,
 				documentPath,
 			)
-			let baseType =
-				findProbeLookup(enrichedProgram.implementation.nodes)?.base
-					.type ?? null
+			let baseType = findProbeReceiver(
+				enrichedProgram.implementation.nodes,
+			)
 
 			if (baseType !== null) {
 				return { type: baseType, program: enrichedProgram }
@@ -438,11 +460,11 @@ function resolveProbedBase(
 	return null
 }
 
-function findProbeLookup(
+function findProbeReceiver(
 	nodes: Array<common.typed.ImplementationNode>,
-): common.typed.LookupNode | null {
+): common.Type | null {
 	for (let node of nodes) {
-		let found = findProbeLookupInNode(node)
+		let found = findProbeReceiverInNode(node)
 
 		if (found !== null) {
 			return found
@@ -456,11 +478,11 @@ function findProbeLookup(
 // the probe has to be findable there — `= person.|` inside a Parameter list
 // asked for a member and got nothing at all, because this walk reached bodies
 // and a default is not one.
-function findProbeLookupInDefaults(
+function findProbeReceiverInDefaults(
 	parameters: Array<common.typed.ParameterNode>,
-): common.typed.LookupNode | null {
+): common.Type | null {
 	for (let defaultValue of parameterDefaults(parameters)) {
-		let found = findProbeLookupInNode(defaultValue)
+		let found = findProbeReceiverInNode(defaultValue)
 
 		if (found !== null) {
 			return found
@@ -470,22 +492,22 @@ function findProbeLookupInDefaults(
 	return null
 }
 
-function findProbeLookupInNode(
+function findProbeReceiverInNode(
 	node: common.typed.ImplementationNode,
-): common.typed.LookupNode | null {
+): common.Type | null {
 	switch (node.nodeType) {
 		case "ConstantDeclarationStatement":
 		case "VariableDeclarationStatement":
 		case "VariableAssignmentStatement":
-			return findProbeLookupInNode(node.value)
+			return findProbeReceiverInNode(node.value)
 		case "FunctionStatement":
 			return (
-				findProbeLookupInDefaults(node.value.parameters) ??
-				findProbeLookup(node.value.body)
+				findProbeReceiverInDefaults(node.value.parameters) ??
+				findProbeReceiver(node.value.body)
 			)
 		case "NamespaceDefinitionStatement": {
 			for (let property of Object.values(node.properties)) {
-				let found = findProbeLookupInNode(property.value)
+				let found = findProbeReceiverInNode(property.value)
 
 				if (found !== null) {
 					return found
@@ -501,8 +523,8 @@ function findProbeLookupInNode(
 
 				for (let method of methods) {
 					let found =
-						findProbeLookupInDefaults(method.value.parameters) ??
-						findProbeLookup(method.value.body)
+						findProbeReceiverInDefaults(method.value.parameters) ??
+						findProbeReceiver(method.value.body)
 
 					if (found !== null) {
 						return found
@@ -514,7 +536,7 @@ function findProbeLookupInNode(
 			// synthesizes for its defaults is where its Expressions live — the
 			// standard library's own sources are edited through this Server.
 			for (let shim of node.nativeShims) {
-				let found = findProbeLookupInDefaults(shim.parameters)
+				let found = findProbeReceiverInDefaults(shim.parameters)
 
 				if (found !== null) {
 					return found
@@ -524,46 +546,59 @@ function findProbeLookupInNode(
 			return null
 		}
 		case "IfStatement": {
-			let found = findProbeLookupInNode(node.condition)
+			let found = findProbeReceiverInNode(node.condition)
 
-			return found ?? findProbeLookup(node.body)
+			return found ?? findProbeReceiver(node.body)
 		}
 		case "IfElseStatement": {
-			let found = findProbeLookupInNode(node.condition)
+			let found = findProbeReceiverInNode(node.condition)
 
 			return (
 				found ??
-				findProbeLookup(node.trueBody) ??
-				findProbeLookup(node.falseBody)
+				findProbeReceiver(node.trueBody) ??
+				findProbeReceiver(node.falseBody)
 			)
 		}
 		case "ReturnStatement":
-			return findProbeLookupInNode(node.expression)
+			return findProbeReceiverInNode(node.expression)
 		case "ProtocolDeclarationStatement":
 			return null
 		case "MethodInvocation":
 			return (
-				findProbeLookupInNode(node.base) ??
-				findProbeLookupInArguments(node.arguments)
+				findProbeReceiverInNode(node.base) ??
+				findProbeReceiverInArguments(node.arguments)
 			)
 		case "FunctionInvocation":
 			return (
-				findProbeLookupInNode(node.name) ??
-				findProbeLookupInArguments(node.arguments)
+				findProbeReceiverInNode(node.name) ??
+				findProbeReceiverInArguments(node.arguments)
 			)
 		case "Lookup":
 			if (node.member.content === probeMemberName) {
-				return node
+				return node.base.type
 			}
 
-			return findProbeLookupInNode(node.base)
+			return findProbeReceiverInNode(node.base)
 		case "Combination":
+			// NOTE: A dotted KEY carries no Lookup of its own to find — the
+			// probe stands as a KEY of the level the Enricher wrote out, and
+			// the value that level updates is what its members belong to. Read
+			// before the operands, and under a name of its own so that a
+			// reading which happened to land as an ordinary member access can
+			// not answer in its place.
+			if (
+				node.rhs.nodeType === "RecordValue" &&
+				node.rhs.memberPositions?.[probeKeyName] !== undefined
+			) {
+				return node.lhs.type
+			}
+
 			return (
-				findProbeLookupInNode(node.lhs) ??
-				findProbeLookupInNode(node.rhs)
+				findProbeReceiverInNode(node.lhs) ??
+				findProbeReceiverInNode(node.rhs)
 			)
 		case "Match": {
-			let found = findProbeLookupInNode(node.value)
+			let found = findProbeReceiverInNode(node.value)
 
 			if (found !== null) {
 				return found
@@ -574,14 +609,14 @@ function findProbeLookupInNode(
 				// source, so they are searched first — the probe is looked for
 				// where it was typed.
 				for (let expression of typedHandlerExpressions(handler)) {
-					let expressionFound = findProbeLookupInNode(expression)
+					let expressionFound = findProbeReceiverInNode(expression)
 
 					if (expressionFound !== null) {
 						return expressionFound
 					}
 				}
 
-				let handlerFound = findProbeLookup(handler.body)
+				let handlerFound = findProbeReceiver(handler.body)
 
 				if (handlerFound !== null) {
 					return handlerFound
@@ -592,7 +627,7 @@ function findProbeLookupInNode(
 		}
 		case "RecordValue": {
 			for (let member of Object.values(node.members)) {
-				let found = findProbeLookupInNode(member)
+				let found = findProbeReceiverInNode(member)
 
 				if (found !== null) {
 					return found
@@ -603,7 +638,7 @@ function findProbeLookupInNode(
 		}
 		case "ListValue": {
 			for (let value of node.values) {
-				let found = findProbeLookupInNode(value)
+				let found = findProbeReceiverInNode(value)
 
 				if (found !== null) {
 					return found
@@ -618,7 +653,7 @@ function findProbeLookupInNode(
 					continue
 				}
 
-				let found = findProbeLookupInNode(segment.expression)
+				let found = findProbeReceiverInNode(segment.expression)
 
 				if (found !== null) {
 					return found
@@ -636,19 +671,19 @@ function findProbeLookupInNode(
 		// that true, so the two are pinned together.
 		case "FunctionValue":
 			return (
-				findProbeLookupInDefaults(node.value.parameters) ??
-				findProbeLookup(node.value.body)
+				findProbeReceiverInDefaults(node.value.parameters) ??
+				findProbeReceiver(node.value.body)
 			)
 		case "CaseValue":
 			return node.value === null
 				? null
-				: findProbeLookupInNode(node.value)
+				: findProbeReceiverInNode(node.value)
 		case "ChoiceDeclarationStatement": {
 			// NOTE: A `.` inside a Case payload's default probes the same way
 			// one inside a Parameter's does — the member list of whatever the
 			// dot follows, wherever the dot was typed.
 			for (let defaultValue of caseDefaults(node.cases)) {
-				let found = findProbeLookupInNode(defaultValue)
+				let found = findProbeReceiverInNode(defaultValue)
 
 				if (found !== null) {
 					return found
@@ -668,11 +703,11 @@ function findProbeLookupInNode(
 	}
 }
 
-function findProbeLookupInArguments(
+function findProbeReceiverInArguments(
 	nodeArguments: Array<common.typed.ArgumentNode>,
-): common.typed.LookupNode | null {
+): common.Type | null {
 	for (let argument of nodeArguments) {
-		let found = findProbeLookupInNode(argument.value)
+		let found = findProbeReceiverInNode(argument.value)
 
 		if (found !== null) {
 			return found
