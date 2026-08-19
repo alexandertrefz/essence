@@ -404,17 +404,17 @@ declarations {
 		}
 
 		§ These four override `Orderable`'s provided Methods of the same
-		§ names, for the two reasons Integer's do. Each holds an Integer
-		§ entry, which a provided Method over `Self` can not offer. And the
-		§ same-kind entry is written on Rational's own `compare`, so comparing
-		§ two Rationals does not reach the cross-kind table in `Number`. A
-		§ body pulls its transitive reach into every bundle; see
-		§ DEVELOPMENT.md, Why bodies look the way they do. The Integer entries
-		§ scale by the denominator, which is positive and keeps the order.
+		§ names, for the reason Integer's do. The same-kind entry is written
+		§ on Rational's own `compare`, so comparing two Rationals does not
+		§ reach the cross-kind table in `Number`. A body pulls its transitive
+		§ reach into every bundle; see DEVELOPMENT.md, Why bodies look the way
+		§ they do. The Integer entries answer here what the covering `Number`'s
+		§ rung would otherwise be reached for. Each scales by the denominator,
+		§ which is positive and keeps the order.
 		§
-		§ The same-kind entries answer what the provided Methods answer, and
-		§ they must: a bounded `<Item is Orderable>` runs the provided body
-		§ where `1/2::isLessThan(2/3)` runs this one. Both read `compare`.
+		§ An override is in the conformance witness, so a bounded
+		§ `<Item is Orderable>` runs these entries where
+		§ `1/2::isLessThan(2/3)` runs them. Both read `compare` either way.
 
 		§§ Answers whether the Rational is strictly below the given number.
 		overload isLessThan {
