@@ -119,10 +119,12 @@ describe("Documentation Comments", () => {
 		)
 	})
 
-	it("should show a labelled Parameter under its label", () => {
-		// NOTE: Written with the internal name, which the lenient rule still
-		// takes. The label is what a call site writes, so the label is what the
-		// Hover shows.
+	it("should render a positionally matched Parameter under its label", () => {
+		// NOTE: The line names the internal name, which the strict rule reports
+		// as `misnamed-documentation-parameter`. Rendering is the separate
+		// question asked here: a tag documents the Parameter at its position
+		// whatever it names, and what a Hover shows is the label a call site
+		// writes.
 		let source = [
 			"implementation {",
 			"\t§§ Greets a subject.",

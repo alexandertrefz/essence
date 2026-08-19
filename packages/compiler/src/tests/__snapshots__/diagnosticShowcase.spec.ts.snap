@@ -165,6 +165,33 @@ Warning: This '@param' does not name the Parameter at its position
 
 [unknown-documentation-parameter]
 Warning: This '@param' names a Parameter that does not exist
+    ╭─┤ Documentation.es:30:12 │
+    │
+ 30 │     §§ @param loudly — how loud to shout it
+    │               ───┬──  
+    │                  ╰──── there is no Parameter 2
+    │ 
+    │ Help: Remove the tag — this signature takes 1 Parameter.
+    │ 
+    │ Note 1: A '@param' line documents the Parameter at its own position — the first line the first Parameter — and names it the way the signature does: its label, or '_' where it carries none.
+    │ Note 2: The Parameters are '_', in that order.
+────╯
+
+[undocumented-parameter]
+Warning: This Parameter has no '@param' line
+    ╭─┤ Documentation.es:40:33 │
+    │
+ 40 │     function pair(_ first: String, and second: String) -> String {
+    │                                    ─────────┬────────  
+    │                                             ╰────────── Parameter 2 is undocumented
+    │ 
+    │ Help: Write '@param and — …' as line 2 of the run.
+    │ 
+    │ Note: A '@param' line documents the Parameter at its own position — the first line the first Parameter — and names it the way the signature does: its label, or '_' where it carries none.
+────╯
+
+[unknown-documentation-parameter]
+Warning: This '@param' names a Parameter that does not exist
     ╭─┤ Documentation.es:24:12 │
     │
  24 │     §§ @param subject — who to greet
@@ -176,7 +203,7 @@ Warning: This '@param' names a Parameter that does not exist
     │ Note: A '§§' block documents whatever is declared below it. A '@param' belongs above something that takes Parameters — a Function, a Method, or a Declaration holding a Function literal.
 ────╯
 
-─── 4 warnings
+─── 6 warnings
 "
 `;
 
