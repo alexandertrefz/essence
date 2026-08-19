@@ -1595,6 +1595,163 @@ describe("Rename with Patterns", () => {
 	})
 })
 
+// NOTE: A Record Literal's bare member is the Pattern's shorthand read the
+// other way round — `{ width }` WRITES the member and READS a value, with one
+// Identifier for both — so renaming either end has to spell the other out
+// beside the new name. The expansion is what the author would have written by
+// hand, and it is the only way to rename one end at all: the two names are the
+// same characters.
+describe("Rename with Record shorthand", () => {
+	const source = [
+		"implementation {",
+		"\ttype Point = { x: Integer, y: Integer }",
+		"",
+		"\tconstant x = 1",
+		"\tconstant y = 2",
+		"",
+		"\tconstant point: Point = { x, y }",
+		"",
+		"\tTerminal.print(point.x::add(point.y))",
+		"}",
+	].join("\n")
+
+	it("expands a shorthand member when the VALUE is renamed", () => {
+		expect(rename(source, { line: 7, column: 28 }, "across")).toBe(
+			[
+				"implementation {",
+				"\ttype Point = { x: Integer, y: Integer }",
+				"",
+				"\tconstant across = 1",
+				"\tconstant y = 2",
+				"",
+				"\tconstant point: Point = { x = across, y }",
+				"",
+				"\tTerminal.print(point.x::add(point.y))",
+				"}",
+			].join("\n"),
+		)
+	})
+
+	it("expands a shorthand member the other way when the MEMBER is renamed", () => {
+		// NOTE: Started from the Type, because a cursor ON the member always
+		// finds the value first — exactly as it finds a Pattern's local first.
+		// The member half is reached from any site that writes the member.
+		expect(rename(source, { line: 2, column: 17 }, "across")).toBe(
+			[
+				"implementation {",
+				"\ttype Point = { across: Integer, y: Integer }",
+				"",
+				"\tconstant x = 1",
+				"\tconstant y = 2",
+				"",
+				"\tconstant point: Point = { across = x, y }",
+				"",
+				"\tTerminal.print(point.across::add(point.y))",
+				"}",
+			].join("\n"),
+		)
+	})
+
+	// NOTE: The value is renamed from a site of its own here, so the rename
+	// starts nowhere near the shorthand — the expansion still has to happen,
+	// because the member's braces are where the name is written.
+	it("expands from a use of the value elsewhere in the file", () => {
+		let elsewhere = [
+			"implementation {",
+			"\tconstant width = 1",
+			"",
+			"\tconstant box = { width }",
+			"",
+			"\tTerminal.print(width::add(box.width))",
+			"}",
+		].join("\n")
+
+		expect(rename(elsewhere, { line: 6, column: 17 }, "measure")).toBe(
+			[
+				"implementation {",
+				"\tconstant measure = 1",
+				"",
+				"\tconstant box = { width = measure }",
+				"",
+				"\tTerminal.print(measure::add(box.width))",
+				"}",
+			].join("\n"),
+		)
+	})
+
+	it("renames a member that spelled its value without expanding anything", () => {
+		let written = [
+			"implementation {",
+			"\tconstant width = 1",
+			"",
+			"\tconstant box = { width = width }",
+			"",
+			"\tTerminal.print(box.width)",
+			"}",
+		].join("\n")
+
+		expect(rename(written, { line: 4, column: 27 }, "measure")).toBe(
+			[
+				"implementation {",
+				"\tconstant measure = 1",
+				"",
+				"\tconstant box = { width = measure }",
+				"",
+				"\tTerminal.print(box.width)",
+				"}",
+			].join("\n"),
+		)
+	})
+
+	// NOTE: The two ends stay two symbols at one Position. Highlighting the
+	// value must not light up the member's other sites, or the shorthand would
+	// read as one name meaning one thing — which is the very confusion the
+	// expansion exists to prevent.
+	it("keeps the member and the value apart in Document Highlight", () => {
+		let { program } = parseWithDiagnostics(source)
+		let { program: enrichedProgram } = enrich(program)
+
+		let occurrences = findOccurrences(
+			program,
+			{ line: 7, column: 28 },
+			enrichedProgram,
+		)
+
+		expect(
+			occurrences.map((occurrence) => occurrence.position.start.line),
+		).toEqual([4, 7])
+	})
+
+	// NOTE: A shorthand inside an update's braced right-hand side is a Record
+	// Literal like any other — the key list is the one place it can not be
+	// written, and the rename index must not confuse the two.
+	it("expands a shorthand inside an update's braced right-hand side", () => {
+		let merged = [
+			"implementation {",
+			"\tconstant port = 8080",
+			"",
+			'\tconstant base = { host = "local", port = 80 }',
+			"\tconstant moved = { base with { port } }",
+			"",
+			"\tTerminal.print(moved.port)",
+			"}",
+		].join("\n")
+
+		expect(rename(merged, { line: 2, column: 11 }, "chosen")).toBe(
+			[
+				"implementation {",
+				"\tconstant chosen = 8080",
+				"",
+				'\tconstant base = { host = "local", port = 80 }',
+				"\tconstant moved = { base with { port = chosen } }",
+				"",
+				"\tTerminal.print(moved.port)",
+				"}",
+			].join("\n"),
+		)
+	})
+})
+
 // NOTE: One file's own view of the two Module sections. What crosses a file
 // boundary is the workspace index's business — `workspace.spec.ts` — and what
 // is asserted here is the half that has to hold without one: an entry binds a

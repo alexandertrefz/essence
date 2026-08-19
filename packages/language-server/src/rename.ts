@@ -57,7 +57,8 @@ export type DeclarationKind =
 // NOTE: The text ONE edit of a rename writes, in parts: a String stands as it
 // is written, and `null` is where the new name goes. Renaming an ordinary
 // occurrence writes `[null]` over the Identifier it was found at, which is why
-// nothing but a Pattern's shorthand binder carries any of this.
+// nothing but a shorthand — a Pattern's binder and a Record Literal's member —
+// carries any of this.
 export type RenameText = Array<string | null>
 
 export type RenameEdit = {
@@ -70,14 +71,22 @@ export type RenameEdit = {
 
 // NOTE: Where one occurrence is written, and what renaming THROUGH it writes.
 //
-// `edits` is what a bare Pattern binder needs and nothing else does: `{ width }`
-// names two things with one Identifier — the Record's member and the local it
-// binds — so renaming either end has to spell the other one out beside it.
-// Renaming the local gives `{ width as w }`, renaming the member `{ w as width }`,
-// and an annotated member takes its binder after the Type (`{ width: Integer as
-// w }`), which is why an edit carries a Position of its own instead of reusing
-// this one. Null — every other site in the index — means the new name over
-// `position`.
+// `edits` is what the two shorthands need and nothing else does. Both write
+// `{ width }` and both mean two names by it, so renaming either end has to
+// spell the other one out beside it.
+//
+// A PATTERN's binder names the Record's member and the local it binds. Renaming
+// the local gives `{ width as w }`, renaming the member `{ w as width }`, and an
+// annotated member takes its binder after the Type (`{ width: Integer as w }`),
+// which is why an edit carries a Position of its own instead of reusing this
+// one.
+//
+// A Record LITERAL's member names the member it writes and the value it reads.
+// Renaming the value gives `{ width = w }`, renaming the member `{ w = width }`
+// — the same two directions, expanded to the spelling the author could have
+// written by hand.
+//
+// Null — every other site in the index — means the new name over `position`.
 //
 // `position` is deliberately NOT widened to cover the expansion: it is the
 // cursor hit test, the Document Highlight span and the Semantic Token span as
@@ -762,6 +771,9 @@ function reference(
 	identifier: parser.IdentifierNode,
 	context: WalkContext,
 	access: OccurrenceAccess = "read",
+	// NOTE: See `RenameSite.edits` — null is "write the new name here", which
+	// is what every reference but a Record Literal's shorthand member means.
+	edits: Array<RenameEdit> | null = null,
 ): Declaration | null {
 	let declaration = lookup(scope, space, identifier.content)
 
@@ -773,6 +785,7 @@ function reference(
 			identifier.position,
 			context.index,
 			access,
+			edits,
 		)
 	}
 
@@ -1225,6 +1238,28 @@ function walkNode(
 			registerRecordSite(Object.values(node.members), context)
 
 			for (let member of Object.values(node.members)) {
+				// NOTE: A shorthand member's value is an Identifier the Parser
+				// wrote at the member's own Position, so it can not simply be
+				// overwritten — renaming it has to spell the member out beside
+				// the new name. It is referenced here rather than walked so
+				// that it carries those edits; `walkNode` would record it as
+				// the ordinary Identifier it looks like.
+				if (
+					member.shorthand === true &&
+					member.value.nodeType === "Identifier"
+				) {
+					reference(
+						scope,
+						"values",
+						member.value,
+						context,
+						"read",
+						shorthandValueEdits(member),
+					)
+
+					continue
+				}
+
 				walkNode(member.value, scope, context)
 			}
 
@@ -1782,9 +1817,50 @@ function registerRecordSite(
 		members: members.map((member) => ({
 			name: member.name.content,
 			position: member.name.position,
-			edits: null,
+			edits: shorthandMemberEdits(member),
 		})),
 	})
+}
+
+// NOTE: What renaming the MEMBER writes at a Record Literal's member — the
+// mirror of a Pattern's `memberRenameEdits`, and needed for the same reason:
+// `{ width }` is `{ width = width }`, so the one Identifier is the member AND
+// the value, and renaming the member has to leave the value behind. A member
+// that spelled its value needs nothing; a Record TYPE's member never can, since
+// there is no value in it to leave.
+function shorthandMemberEdits(
+	member: parser.RecordValueMemberNode | parser.RecordTypeMemberNode,
+): Array<RenameEdit> | null {
+	if (!("shorthand" in member) || member.shorthand !== true) {
+		return null
+	}
+
+	return [
+		{
+			position: member.name.position,
+			text: [null, ` = ${member.name.content}`],
+		},
+	]
+}
+
+// NOTE: What renaming the VALUE writes at a Record Literal's member. The other
+// half of the same fact: `{ width }` becomes `{ width = newName }`, so the
+// member the Record declares keeps the name every reader of the Record knows it
+// by. The span is the member's name — the value has no span of its own, which
+// is exactly what the shorthand is.
+function shorthandValueEdits(
+	member: parser.RecordValueMemberNode,
+): Array<RenameEdit> | null {
+	if (member.shorthand !== true) {
+		return null
+	}
+
+	return [
+		{
+			position: member.name.position,
+			text: [`${member.name.content} = `, null],
+		},
+	]
 }
 
 // NOTE: A Pattern NAMES members that something else declares — the Type of
