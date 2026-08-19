@@ -711,6 +711,19 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 
 			return
 		case "FunctionValue":
+			// NOTE: A member path is a Function literal the Compiler wrote, and
+			// its Parameter is not a thing the author can point at: it stands
+			// at the first step, where the member the step reads is the answer.
+			// So the path answers as a whole with the signature it stands for,
+			// each step answers with the member it reads, and the name the body
+			// reads the Parameter under — `_0` — is never offered at all.
+			if (node.synthesized === "path") {
+				consider(state, node.position, node.type, null)
+				visitMemberPathSteps(node, state)
+
+				return
+			}
+
 			consider(state, node.value.headPosition, node.type, null)
 			visitFunctionDefinition(node.value, state)
 			return
@@ -945,6 +958,30 @@ function visitArguments(
 ) {
 	for (let argument of nodeArguments) {
 		visitNode(argument.value, state)
+	}
+}
+
+// NOTE: Outwards in, so each step is offered before the steps it is read off —
+// they nest, and the innermost one containing the cursor is the narrowest span
+// there is. The Lookups are the only Nodes of this literal a cursor may land
+// on; its Parameter and its body's root Identifier are the Compiler's own.
+function visitMemberPathSteps(
+	node: common.typed.FunctionValueNode,
+	state: State,
+) {
+	let returned = node.value.body[0]
+
+	if (returned?.nodeType !== "ReturnStatement") {
+		return
+	}
+
+	let expression: common.typed.ExpressionNode = returned.expression
+
+	while (expression.nodeType === "Lookup") {
+		consider(state, expression.position, expression.type, null)
+		visitIdentifier(expression.member, state)
+
+		expression = expression.base
 	}
 }
 

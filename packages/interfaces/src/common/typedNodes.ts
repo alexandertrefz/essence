@@ -236,11 +236,18 @@ export type BooleanValueNode = {
 	type: BooleanType
 }
 
+// NOTE: `synthesized` marks a Function literal no source wrote — a member path
+// (`.price`), which the Enricher desugars into exactly the literal an author
+// could have written instead. Everything downstream of enrichment is meant to
+// see an ordinary literal and does; what asks is the Language Server, because
+// the Parameter and the name the body reads it under stand at spans the author
+// filled with a path and answering over them would name `_0`.
 export type FunctionValueNode = {
 	nodeType: "FunctionValue"
 	value: FunctionDefinitionNode
 	position: Position
 	type: FunctionType
+	synthesized?: "path"
 }
 
 export type ListValueNode = {

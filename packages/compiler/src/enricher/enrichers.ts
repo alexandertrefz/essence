@@ -1967,10 +1967,17 @@ function memberPathFunction(
 	stepTypes: Array<common.Type>,
 ): common.typed.FunctionValueNode {
 	let returnType = stepTypes[stepTypes.length - 1] ?? rootType
+	// NOTE: The Parameter and the name the body reads it under stand at the
+	// FIRST STEP rather than at the path, which leaves the leading dot inside
+	// the Function's span and nothing else's — so that is where the path
+	// answers as the Function it stands for. Nothing the author can spell
+	// stands there, and `_0` is never the answer anywhere: the Language Server
+	// asks `synthesized` before it reads a name off this literal.
+	let rootPosition = node.steps[0].position
 	let expression: common.typed.ExpressionNode = {
 		nodeType: "Identifier",
 		content: memberPathParameterName,
-		position: node.position,
+		position: rootPosition,
 		type: rootType,
 	}
 
@@ -1986,7 +1993,7 @@ function memberPathFunction(
 				position: step.position,
 				type: stepType,
 			},
-			position: { start: node.position.start, end: step.position.end },
+			position: { start: rootPosition.start, end: step.position.end },
 			type: stepType,
 		}
 	}
@@ -2003,10 +2010,10 @@ function memberPathFunction(
 					internalName: {
 						nodeType: "Identifier",
 						content: memberPathParameterName,
-						position: node.position,
+						position: rootPosition,
 						type: rootType,
 					},
-					position: node.position,
+					position: rootPosition,
 					type: rootType,
 					// NOTE: Null although nothing here was written — an
 					// `inferredType` is what an Inlay Hint draws, and a path has
@@ -2030,6 +2037,7 @@ function memberPathFunction(
 		},
 		position: node.position,
 		type: memberPathSignature(rootType, returnType),
+		synthesized: "path",
 	}
 }
 

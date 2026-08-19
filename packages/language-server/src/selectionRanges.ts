@@ -237,6 +237,19 @@ function collectFromNode(
 			}
 
 			return
+		// NOTE: The path itself was pushed by whoever descended into it; what
+		// is left is the one step the cursor stands on, so expanding a
+		// selection from `city` reaches `.address.city` and then the Argument.
+		case "MemberPath":
+			for (let step of node.steps) {
+				if (contains(step.position, cursor)) {
+					chain.push(step.position)
+
+					return
+				}
+			}
+
+			return
 		case "Identifier":
 		case "Self":
 		case "StringValue":

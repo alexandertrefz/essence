@@ -259,6 +259,10 @@ function collectFromNode(
 		case "Lookup":
 			collectFromNode(node.base, ranges)
 			return
+		// NOTE: A path is written on one line and folds nothing, but it has to
+		// be named here all the same — this switch has no `default`, so a
+		// nodeType it does not list is a hole nothing reports.
+		case "MemberPath":
 		case "Identifier":
 		case "Self":
 		case "StringValue":

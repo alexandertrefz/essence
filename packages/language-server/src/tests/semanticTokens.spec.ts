@@ -459,4 +459,27 @@ describe("Semantic Tokens of a Case written in a payload default", () => {
 
 		expect(tokenAt(source, 8, 44)?.type).toBe("enumMember")
 	})
+
+	// NOTE: A path's steps carry no code of their own here — they colour
+	// because the rename index records them off the Lookups the Enricher
+	// synthesizes, each standing at the span of the step that spelled it.
+	it("should colour every step of a member path as a property", () => {
+		let source = [
+			"implementation {",
+			"\ttype Maker = { town: String }",
+			"\ttype Product = { name: String, maker: Maker }",
+			"\tconstant products: List<Product> = []",
+			"\tconstant towns = products::map(.maker.town)",
+			"}",
+		].join("\n")
+
+		expect(tokenAt(source, 5, 34)).toMatchObject({
+			type: "property",
+			length: 5,
+		})
+		expect(tokenAt(source, 5, 40)).toMatchObject({
+			type: "property",
+			length: 4,
+		})
+	})
 })

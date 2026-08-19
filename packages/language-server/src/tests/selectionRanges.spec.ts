@@ -178,4 +178,26 @@ describe("Selection Ranges inside a Case payload default", () => {
 			end: { line: 5, column: 46 },
 		})
 	})
+
+	it("should widen from a path's step to the whole path", () => {
+		let source = [
+			"implementation {",
+			"\ttype Maker = { town: String }",
+			"\ttype Product = { maker: Maker }",
+			"\tconstant products: List<Product> = []",
+			"\tconstant towns = products::map(.maker.town)",
+			"}",
+		].join("\n")
+
+		let ranges = selectionRangesOf(source, { line: 5, column: 41 })
+
+		expect(ranges[0]).toEqual({
+			start: { line: 5, column: 40 },
+			end: { line: 5, column: 44 },
+		})
+		expect(ranges[1]).toEqual({
+			start: { line: 5, column: 33 },
+			end: { line: 5, column: 44 },
+		})
+	})
 })

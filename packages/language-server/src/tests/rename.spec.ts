@@ -1966,4 +1966,38 @@ describe("Rename of a name a Case payload default reads", () => {
 			].join("\n"),
 		)
 	})
+
+	// NOTE: A path spells member names and nothing else, and it is indexed off
+	// the Lookups the Enricher synthesizes for it — each standing at the span of
+	// the step that spelled it. That invariant is what earns rename here with no
+	// code of its own, so it is pinned from both ends.
+	describe("member paths", () => {
+		let source = [
+			"implementation {",
+			"\ttype Product = { name: String, price: Integer }",
+			"\tconstant products: List<Product> = []",
+			"\tconstant prices = products::map(.price)",
+			"}",
+		].join("\n")
+
+		let renamed = [
+			"implementation {",
+			"\ttype Product = { name: String, cost: Integer }",
+			"\tconstant products: List<Product> = []",
+			"\tconstant prices = products::map(.cost)",
+			"}",
+		].join("\n")
+
+		it("renames the member a path spells", () => {
+			expect(rename(source, { line: 4, column: 35 }, "cost")).toBe(
+				renamed,
+			)
+		})
+
+		it("reaches a path from the member's declaration", () => {
+			expect(rename(source, { line: 2, column: 33 }, "cost")).toBe(
+				renamed,
+			)
+		})
+	})
 })
