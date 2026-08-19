@@ -2169,6 +2169,43 @@ export function matchesType(lhs: common.Type, rhs: common.Type): boolean {
 	return matchTypes(lhs, rhs, null)
 }
 
+// NOTE: Whether `part` says only things `whole` already declares — every member
+// of `part` is a member of `whole`, carrying a value the member's declared Type
+// admits. It is what a `with` right-hand side has to be, and it is not
+// assignability in either direction: `matchesType(whole, part)` asks the
+// opposite question (does `part` answer everything `whole` promises), and
+// `matchesType(part, whole)` reads the member Types the wrong way round.
+//
+// NOTE: Judged by assignability, not by identity — an update sets a member
+// to a VALUE, and a value of one arm is enough for a Union-typed member,
+// exactly as it is at the Declaration. Deep equality refused `{ c with
+// n = 5 }` against a declared `Integer | String`, and told two spellings
+// of one Union apart.
+//
+// NOTE: `context` is threaded to the member comparisons so a caller that is
+// INFERRING can ask this — the partial fit of an Argument against a Parameter
+// whose Type is still binding Generics. A caller with nothing to bind passes
+// nothing, which is `matchesType`'s own `null`.
+export function isPartialOf(
+	whole: common.RecordType,
+	part: common.RecordType,
+	context: GenericInferenceContext | null = null,
+): boolean {
+	for (let [partName, partMemberType] of Object.entries(part.members)) {
+		// NOTE: `Object.hasOwn` before the read — a member named after one
+		// of `Object.prototype`'s would otherwise be compared against a
+		// JavaScript function the Record does not have.
+		if (
+			!Object.hasOwn(whole.members, partName) ||
+			!matchTypes(whole.members[partName], partMemberType, context)
+		) {
+			return false
+		}
+	}
+
+	return true
+}
+
 // NOTE: The subsumption order Union building dedupes by — whether `member`
 // says nothing `existing` does not already cover. Assignability alone can not
 // answer that: the Unknown item Type an empty List Literal carries is a

@@ -33,6 +33,7 @@ import {
 	describeType,
 	first,
 	flatten,
+	isPartialOf,
 	matchArguments,
 	matchesType,
 	matchesTypeWithBindings,
@@ -1443,6 +1444,98 @@ describe("Helpers", () => {
 				expect(matchesType(genericOrString, stringPrimitive)).toBe(true)
 				expect(matchesType(genericOrString, genericU)).toBe(false)
 			})
+		})
+	})
+
+	// NOTE: What a `with` right-hand side has to be, and — once a Record
+	// Parameter can carry a default — what a partial Argument has to be. It is
+	// not assignability in either direction: `matchesType(whole, part)` asks
+	// whether the part answers everything the whole promises, and
+	// `matchesType(part, whole)` reads the member Types the wrong way round.
+	describe("isPartialOf", () => {
+		const integer: Type = { type: "Integer" }
+		const string: Type = { type: "String" }
+
+		const point: RecordType = {
+			type: "Record",
+			members: { x: integer, y: integer },
+		}
+
+		it("accepts a subset of the members", () => {
+			expect(
+				isPartialOf(point, { type: "Record", members: { x: integer } }),
+			).toBe(true)
+		})
+
+		it("accepts the whole itself, and the empty Record", () => {
+			expect(isPartialOf(point, point)).toBe(true)
+			expect(isPartialOf(point, { type: "Record", members: {} })).toBe(
+				true,
+			)
+		})
+
+		it("refuses a member the whole does not declare", () => {
+			expect(
+				isPartialOf(point, { type: "Record", members: { z: integer } }),
+			).toBe(false)
+		})
+
+		it("refuses a member the whole declares at another Type", () => {
+			expect(
+				isPartialOf(point, { type: "Record", members: { x: string } }),
+			).toBe(false)
+		})
+
+		// NOTE: Assignability, not identity — one arm of a Union-typed member
+		// is a value that member admits, exactly as it is at the Declaration.
+		it("admits one arm of a Union-typed member", () => {
+			const held: RecordType = {
+				type: "Record",
+				members: {
+					value: { type: "UnionType", types: [integer, string] },
+				},
+			}
+
+			expect(
+				isPartialOf(held, {
+					type: "Record",
+					members: { value: integer },
+				}),
+			).toBe(true)
+		})
+
+		// NOTE: A member named after one of `Object.prototype`'s is a member
+		// like any other, and the read that answers for it must not find a
+		// JavaScript function instead.
+		it("refuses a member named after one of Object.prototype's", () => {
+			expect(
+				isPartialOf(point, {
+					type: "Record",
+					members: { toString: string },
+				}),
+			).toBe(false)
+		})
+
+		// NOTE: The reason the context is threaded at all — a caller that is
+		// still INFERRING can ask this, and the first occurrence of a bindable
+		// Generic binds off the member it is compared with.
+		it("binds a Generic through a member comparison", () => {
+			let context = createInferenceContext([
+				{ name: "T", infer: true, defaultType: null },
+			])
+
+			expect(
+				isPartialOf(
+					{
+						type: "Record",
+						members: { value: { type: "GenericUse", name: "T" } },
+					},
+					{ type: "Record", members: { value: integer } },
+					context,
+				),
+			).toBe(true)
+
+			expect(context.bindings.get("T")).toEqual(integer)
 		})
 	})
 

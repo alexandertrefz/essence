@@ -26,6 +26,7 @@ import {
 	filterMostSpecificByTarget,
 	flattenUnionMembers,
 	type GenericBindings,
+	isPartialOf,
 	matchesType,
 	matchesTypeWithBindings,
 	type NamespaceTarget,
@@ -150,30 +151,6 @@ export function combinationTypeOf(
 	lhsPosition: common.Position,
 	rhsPosition: common.Position,
 ): common.Type {
-	// NOTE: Judged by assignability, not by identity — an update sets a member
-	// to a VALUE, and a value of one arm is enough for a Union-typed member,
-	// exactly as it is at the Declaration. Deep equality refused `{ c with
-	// n = 5 }` against a declared `Integer | String`, and told two spellings
-	// of one Union apart.
-	function isPartialOf(
-		lhs: common.RecordType,
-		rhs: common.RecordType,
-	): boolean {
-		for (let [rhsName, rhsMemberType] of Object.entries(rhs.members)) {
-			// NOTE: `Object.hasOwn` before the read — a member named after one
-			// of `Object.prototype`'s would otherwise be compared against a
-			// JavaScript function the Record does not have.
-			if (
-				!Object.hasOwn(lhs.members, rhsName) ||
-				!matchesType(lhs.members[rhsName], rhsMemberType)
-			) {
-				return false
-			}
-		}
-
-		return true
-	}
-
 	if (lhsType.type === "Error" || rhsType.type === "Error") {
 		return { type: "Error" }
 	}
