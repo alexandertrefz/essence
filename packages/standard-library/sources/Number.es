@@ -556,10 +556,10 @@ declarations {
 		§ The four inequalities, `isBetween` and `clamp` are `Orderable`'s
 		§ provided Methods, written once on `compare`. The conformance above
 		§ is what a Number receiver reaches them through, and this Namespace
-		§ declares none of the six itself. So there is no
-		§ `Number.isLessThan(a, b)` to call. A provided Method belongs to the
-		§ Protocol, and `::` is the only way to one; see README.md, Ordering
-		§ across two kinds asks for a Number.
+		§ declares none of the six itself. Reaching one through it is spelled
+		§ both ways a written Method is, so `Number.isLessThan(a, b)` stands
+		§ beside `Number.compare(a, to b)`. See README.md, Ordering across
+		§ two kinds falls to Number.
 	}
 }
 
