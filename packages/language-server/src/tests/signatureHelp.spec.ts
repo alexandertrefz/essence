@@ -285,6 +285,53 @@ describe("Signature Help for bounded Methods", () => {
 	})
 })
 
+// NOTE: A provided Method's `Self` is never shown. It is the receiver's own
+// Type, worked out from the receiver, and nobody writes it — a reader who wrote
+// `describe(_ prefix: String)` must not be shown `describe<Self is Shape>`.
+describe("Signature Help for a Protocol-provided Method", () => {
+	let source = [
+		"implementation {",
+		"\tprotocol Shape {",
+		"\t\tarea() -> Rational",
+		"",
+		"\t\t§§ Answers a sentence about the Shape.",
+		"\t\t§§",
+		"\t\t§§ @param _ — what to say first",
+		"\t\t§§ @returns — the sentence.",
+		"\t\tdescribe(_ prefix: String) -> String {",
+		'\t\t\t<- "{prefix} {@::area()}"',
+		"\t\t}",
+		"\t}",
+		"",
+		"\ttype Square = { side: Rational }",
+		"",
+		"\tnamespace Squares for Square is Shape {",
+		"\t\tarea() -> Rational {",
+		"\t\t\t<- @.side",
+		"\t\t}",
+		"\t}",
+		"",
+		"\tconstant square: Square = { side = 3/1 }",
+		"\tsquare::describe(",
+		"}",
+	].join("\n")
+
+	it("should show the Protocol's signature without its hidden Self", () => {
+		let help = findSignatureHelp(source, { line: 23, column: 19 })
+		let signature = help?.signatures[0]
+
+		expect(signature?.label).toBe("describe(_ String) -> String")
+		expect(help?.activeParameter).toBe(0)
+	})
+
+	it("should describe the Parameter from the Protocol's own documentation", () => {
+		let help = findSignatureHelp(source, { line: 23, column: 19 })
+		let parameter = help?.signatures[0].parameters[0]
+
+		expect(parameter?.documentation).toBe("what to say first")
+	})
+})
+
 // NOTE: Boolean stands in for the standard library as a whole here
 // (`packages/standard-library/sources/Boolean.es`). Signature Help reads a Parameter's text off the
 // Parameter itself, so the `@param other` tag in the source has to be split out

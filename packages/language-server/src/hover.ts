@@ -166,17 +166,29 @@ function considerSignatures(
 	signatures: Array<common.BaseFunction>,
 	label: string,
 	fallback: common.Documentation | null,
+	// NOTE: The Protocol that PROVIDED this Method, when one did — appended
+	// under whatever documents it, because the two answer different questions:
+	// the `§§` says what the Method does, this says whose Method it is.
+	providedBy: string | null = null,
 ) {
 	if (!wins(state, position)) {
 		return
 	}
 
+	let documentation = renderDocumentation(
+		documentationFor(signatures, fallback),
+	)
+	let provided = providedBy === null ? null : `Provided by \`${providedBy}\`.`
+
 	state.best = {
 		position,
 		content: describeSignatures(signatures, label),
-		documentation: renderDocumentation(
-			documentationFor(signatures, fallback),
-		),
+		documentation:
+			provided === null
+				? documentation
+				: documentation === null
+					? provided
+					: `${documentation}\n\n${provided}`,
 	}
 }
 
@@ -566,6 +578,10 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 					documentationOf(
 						node.namespace.type.methods[node.member.name],
 					),
+					// NOTE: A Method nobody wrote on the receiver's Namespace
+					// still has to say where it came from — a reader looking one
+					// up needs the Protocol's name to find its declaration.
+					node.namespace.type.providedBy ?? null,
 				)
 			}
 

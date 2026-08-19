@@ -1034,3 +1034,69 @@ describe("Hover of a Choice's derived 'toString'", () => {
 		)
 	})
 })
+
+describe("Hover of a Protocol-provided Method", () => {
+	let source = [
+		"implementation {",
+		"\tprotocol Shape {",
+		"\t\tarea() -> Rational",
+		"",
+		"\t\t§§ Answers a sentence about the Shape.",
+		"\t\t§§",
+		"\t\t§§ @returns — the sentence.",
+		"\t\tdescribe() -> String {",
+		'\t\t\t<- "area {@::area()}"',
+		"\t\t}",
+		"\t}",
+		"",
+		"\ttype Square = { side: Rational }",
+		"",
+		"\tnamespace Squares for Square is Shape {",
+		"\t\tarea() -> Rational {",
+		"\t\t\t<- @.side",
+		"\t\t}",
+		"\t}",
+		"",
+		"\tconstant square: Square = { side = 3/1 }",
+		"\tTerminal.inspect(square::describe())",
+		"}",
+	].join("\n")
+
+	it("should describe it with the signature the Protocol declares", () => {
+		expect(hover(source, { line: 22, column: 28 })).toBe(
+			"describe() -> String",
+		)
+	})
+
+	it("should describe it with the Protocol's own documentation", () => {
+		expect(hoverDocumentation(source, { line: 22, column: 28 })).toBe(
+			[
+				"Answers a sentence about the Shape.",
+				"**Returns** — the sentence.",
+				"Provided by `Shape`.",
+			].join("\n\n"),
+		)
+	})
+
+	it("should say which Protocol provided it on a bounded receiver", () => {
+		let bounded = [
+			"implementation {",
+			"\tprotocol Shape {",
+			"\t\tarea() -> Rational",
+			"",
+			"\t\tdescribe() -> String {",
+			'\t\t\t<- "area {@::area()}"',
+			"\t\t}",
+			"\t}",
+			"",
+			"\tfunction say<infer Item is Shape>(_ item: Item) -> String {",
+			"\t\t<- item::describe()",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(hoverDocumentation(bounded, { line: 11, column: 16 })).toBe(
+			"Provided by `Shape`.",
+		)
+	})
+})

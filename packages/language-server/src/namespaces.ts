@@ -84,10 +84,13 @@ export function matchingNamespaces(
 	// resolution, but named after the Protocol for readable listings.
 	if (baseType.type === "GenericUse" && baseType.constraint !== undefined) {
 		let constraint = baseType.constraint
-		let protocol = [
+		let allProtocols = [
 			...builtinProtocols(),
 			...collectProtocolTypes(documentText, documentPath, document),
-		].find((candidate) => candidate.name === constraint)
+		]
+		let protocol = allProtocols.find(
+			(candidate) => candidate.name === constraint,
+		)
 
 		if (protocol === undefined) {
 			return []
@@ -97,6 +100,15 @@ export function matchingNamespaces(
 		let methods: Record<string, common.MethodType> = {}
 
 		for (let [methodName, method] of Object.entries(protocol.methods)) {
+			// NOTE: The requirements under the bound's own name; the PROVIDED
+			// Methods under the Protocol that wrote each, so a listing says
+			// where a Method a reader never wrote came from — and so a Hover on
+			// one reads "Provided by …" here exactly as it does on a concrete
+			// receiver.
+			if (protocol.providedMethods?.[methodName] !== undefined) {
+				continue
+			}
+
 			methods[methodName] = applyGenericBindings(
 				method,
 				selfBindings,
@@ -112,6 +124,12 @@ export function matchingNamespaces(
 				properties: {},
 				methods,
 			},
+			...providedNamespacesOf(
+				protocol,
+				baseType,
+				allProtocols,
+				() => false,
+			),
 		]
 	}
 
@@ -156,9 +174,118 @@ export function matchingNamespaces(
 		...derivedNamespacesFor(baseType, namespaces, allNamespaces),
 	]
 
+	// NOTE: A Protocol's provided Methods are Methods of every conformer, so
+	// they belong in the listing beside the written ones — offered on the same
+	// terms the Enricher resolves them on: only where a listed Namespace
+	// declares the conformance, and only for a name nothing written already
+	// answers, which is the override rule.
+	let written = (methodName: string): boolean =>
+		namespaces.some((namespace) =>
+			Object.hasOwn(namespace.methods, methodName),
+		)
+
+	for (let protocol of [
+		...builtinProtocols(),
+		...collectProtocolTypes(documentText, documentPath, document),
+	]) {
+		if (
+			protocol.providedMethods === undefined ||
+			!namespaces.some(
+				(namespace) =>
+					namespace.conformsTo?.includes(protocol.name) === true,
+			)
+		) {
+			continue
+		}
+
+		let provided = providedNamespaceOf(protocol, baseType, written)
+
+		if (provided !== null) {
+			namespaces.push(provided)
+		}
+	}
+
 	return specifierName === null
 		? namespaces
 		: namespaces.filter((namespace) => namespace.name === specifierName)
+}
+
+// NOTE: One Protocol's OWN provided Methods, as the Namespace a listing shows
+// them under — named after the Protocol that wrote them, which is what a Hover
+// reads back as "Provided by …". `written` withholds a Method some listed
+// Namespace already answers, so nothing is offered twice and an override is
+// never shadowed by the Method it replaced.
+function providedNamespaceOf(
+	protocol: common.ProtocolType,
+	baseType: common.Type,
+	written: (methodName: string) => boolean,
+): common.NamespaceType | null {
+	let selfBindings: GenericBindings = new Map([["Self", baseType]])
+	let methods: Record<string, common.MethodType> = {}
+
+	for (let [methodName, writtenBy] of Object.entries(
+		protocol.providedMethods ?? {},
+	)) {
+		let method = protocol.methods[methodName]
+
+		if (
+			writtenBy !== protocol.name ||
+			method === undefined ||
+			written(methodName)
+		) {
+			continue
+		}
+
+		methods[methodName] = applyGenericBindings(
+			method,
+			selfBindings,
+		) as common.MethodType
+	}
+
+	if (Object.keys(methods).length === 0) {
+		return null
+	}
+
+	return {
+		type: "Namespace",
+		name: protocol.name,
+		targetType: baseType,
+		generics: [],
+		properties: {},
+		methods,
+		conformsTo: [protocol.name],
+		providedBy: protocol.name,
+	}
+}
+
+// NOTE: The same, for a bound — the Protocol and every Protocol it extends,
+// because extending one is a promise to conform to it.
+function providedNamespacesOf(
+	protocol: common.ProtocolType,
+	baseType: common.Type,
+	allProtocols: Array<common.ProtocolType>,
+	written: (methodName: string) => boolean,
+): Array<common.NamespaceType> {
+	let namespaces: Array<common.NamespaceType> = []
+
+	for (let name of [protocol.name, ...(protocol.conformsTo ?? [])]) {
+		let ancestor =
+			name === protocol.name
+				? protocol
+				: allProtocols.find((candidate) => candidate.name === name)
+
+		if (ancestor === undefined) {
+			continue
+		}
+
+		let provided = providedNamespaceOf(ancestor, baseType, written)
+
+		if (provided !== null) {
+			namespaces.push(provided)
+		}
+	}
+
+	return namespaces
 }
 
 // NOTE: The Language Server's mirror of the Enricher's derives. Equality is

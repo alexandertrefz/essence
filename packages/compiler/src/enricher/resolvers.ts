@@ -2712,6 +2712,7 @@ export function providedMethodNamespaceForProtocol(
 		properties: {},
 		methods,
 		conformsTo: [protocol.name],
+		providedBy: protocol.name,
 	}
 }
 
