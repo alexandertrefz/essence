@@ -118,7 +118,33 @@ export type CaseDescriptor = {
 // NOTE: A member is a Node of its own rather than a bare Descriptor because
 // there was nowhere else to put the flag — a Descriptor describes a TYPE, and
 // whether a member may be left out is a fact about the place it stands in.
-export type Members = Record<string, { of: Descriptor; optional?: true }>
+//
+// NOTE: `fill` is carried by a Case payload's members and by nothing else, and
+// it is the difference between the two positions a member may be left out at. A
+// Record Parameter's is filled by the CALLEE — the boundary omits the key and the
+// Function's own prologue writes it — while a Case is BUILT where it is written,
+// and a host writing one is where it is written, so the value has to cross with
+// the Type. It is only ever a literal, which is the rule a payload default lives
+// by for its own reason: the merge is spliced per construction, and a Module that
+// never named the Choice has no name of the declaring one's to read.
+export type Members = Record<
+	string,
+	{ of: Descriptor; optional?: true; fill?: Fill }
+>
+
+// NOTE: A payload default's value as data — the shape of the literal the Case
+// declared, so the boundary can build it without an Expression to evaluate.
+// Integers and Rationals are decimal TEXT for the same reason a predicate's
+// Arguments are: this is written to `<output>.descriptor.json`, and JSON holds
+// no bigint.
+export type Fill =
+	| { kind: "integer"; value: string }
+	| { kind: "rational"; numerator: string; denominator: string }
+	| { kind: "string"; value: string }
+	| { kind: "boolean"; value: boolean }
+	| { kind: "list"; items: Array<Fill> }
+	| { kind: "record"; members: Record<string, Fill> }
+	| { kind: "case"; tag: string; payload: Record<string, Fill> | null }
 
 export type FunctionDescriptor = {
 	kind: "function"
@@ -434,9 +460,123 @@ function describeCase(
 		// and so would never be stamped anyway; saying so here is what keeps
 		// the two rules from having to be read together.
 		unitChoice: type.unitChoice === true && type.choice !== "Optional",
-		payload: describeMembers(type.members, context, printing),
+		payload: withPayloadDefault(
+			describeMembers(type.members, context, printing),
+			type.payloadDefault,
+			context,
+		),
 		shown,
 	}
+}
+
+// NOTE: The members a Case payload's default fills in, marked on the payload
+// with the value each is filled WITH. Unlike a Record Parameter, whose default
+// the callee writes in, there is nothing between a host's object and the Case it
+// becomes — a Case constructor writes the tag onto what it was handed and
+// marshals nothing — so the boundary is where the fill has to happen, and the
+// value has to be here for it to happen with.
+function withPayloadDefault(
+	members: Members,
+	payloadDefault: common.CasePayloadDefault | undefined,
+	context: DescribeContext,
+): Members {
+	if (payloadDefault?.values == null) {
+		return members
+	}
+
+	let marked: Members = {}
+
+	for (let [name, member] of Object.entries(members)) {
+		let value = payloadDefault.values[name]
+		let fill = value === undefined ? null : fillOf(value, context)
+
+		marked[name] =
+			fill === null
+				? member
+				: { ...member, optional: true as const, fill }
+	}
+
+	return marked
+}
+
+// NOTE: A payload default's typed literal as data. Every shape the Enricher
+// admits is here and nothing else is, so `null` is unreachable for a default
+// that was accepted — it is the answer for one that was not, whose Module is
+// already reporting.
+function fillOf(
+	node: common.typed.ExpressionNode,
+	context: DescribeContext,
+): Fill | null {
+	switch (node.nodeType) {
+		case "IntegerValue":
+			return { kind: "integer", value: node.value }
+		case "RationalValue":
+			return {
+				kind: "rational",
+				numerator: node.numerator,
+				denominator: node.denominator,
+			}
+		case "StringValue":
+			return { kind: "string", value: node.value }
+		case "BooleanValue":
+			return { kind: "boolean", value: node.value }
+		case "ListValue": {
+			let items = node.values.map((value) => fillOf(value, context))
+
+			return items.every((item) => item !== null)
+				? { kind: "list", items: items as Array<Fill> }
+				: null
+		}
+		case "RecordValue": {
+			let members = fillMembers(node.members, context)
+
+			return members === null ? null : { kind: "record", members }
+		}
+		case "CaseValue": {
+			if (node.type.type !== "Case") {
+				return null
+			}
+
+			let tag = `${emittedIdentity(
+				context.entryPath,
+				node.type.choice,
+				context.emit,
+			)}#${node.type.name}`
+
+			if (node.value === null) {
+				return { kind: "case", tag, payload: null }
+			}
+
+			if (node.value.nodeType !== "RecordValue") {
+				return null
+			}
+
+			let payload = fillMembers(node.value.members, context)
+
+			return payload === null ? null : { kind: "case", tag, payload }
+		}
+		default:
+			return null
+	}
+}
+
+function fillMembers(
+	members: Record<string, common.typed.ExpressionNode>,
+	context: DescribeContext,
+): Record<string, Fill> | null {
+	let filled: Record<string, Fill> = {}
+
+	for (let [name, member] of Object.entries(members)) {
+		let fill = fillOf(member, context)
+
+		if (fill === null) {
+			return null
+		}
+
+		filled[name] = fill
+	}
+
+	return filled
 }
 
 function describeMembers(

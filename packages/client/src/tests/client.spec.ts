@@ -1118,3 +1118,85 @@ describe("Leaving out a member the callee fills in", () => {
 		)
 	})
 })
+
+// NOTE: The other position a member may be left out at, and the one that has to
+// carry its own values across: a Record Parameter's default is written in by the
+// CALLEE, while a Case is BUILT where it is written — a constructor writes the
+// tag onto what it was handed and marshals nothing — so the boundary itself is
+// where a Case payload's default is filled in.
+describe("Leaving out a member a Case payload's default fills in", () => {
+	let defaults: EssenceModule
+
+	beforeAll(async () => {
+		defaults = await loadModule(clientFixture("Defaults.es"), {
+			cacheDirectory,
+		})
+	})
+
+	let fetched = () =>
+		defaults.exports.fetched as (...args: Array<unknown>) => string
+
+	it("fills every member the payload left out", () => {
+		expect(fetched()({ $case: "Fetch#Get", url: "/a" })).toBe(
+			"/a|0|0|10|quiet",
+		)
+	})
+
+	it("leaves a member the payload wrote alone", () => {
+		expect(
+			fetched()({
+				$case: "Fetch#Get",
+				url: "/a",
+				retries: 3n,
+				tags: ["x", "y"],
+				limits: { calls: 1n },
+				mode: "Verbose",
+			}),
+		).toBe("/a|3|2|1|loud")
+	})
+
+	it("takes a payload built by the Case constructor", () => {
+		let Fetch = defaults.exports.Fetch as {
+			Get: (payload: { url: string }) => unknown
+		}
+
+		expect(fetched()(Fetch.Get({ url: "/b" }))).toBe("/b|0|0|10|quiet")
+	})
+
+	// NOTE: A member written `undefined` is a member WRITTEN, exactly as at a
+	// Record Parameter — the default is for a host that said nothing.
+	it("refuses a member written as undefined", () => {
+		expect(() =>
+			fetched()({ $case: "Fetch#Get", url: "/a", retries: undefined }),
+		).toThrow(EssenceMarshalError)
+	})
+
+	it("still refuses a member the default does not fill in", () => {
+		expect(() => fetched()({ $case: "Fetch#Get" })).toThrow(
+			EssenceMarshalError,
+		)
+	})
+
+	// NOTE: The payload is still CLOSED — leaving a member out is not
+	// permission to add another.
+	it("still refuses a member the payload does not name", () => {
+		expect(() =>
+			fetched()({ $case: "Fetch#Get", url: "/a", timeout: 30n }),
+		).toThrow(/timeout/)
+	})
+
+	// NOTE: The filled members are the Module's own values, so a Case coming
+	// back OUT carries all of them whether a host wrote them or not.
+	it("hands every member back out", () => {
+		let blank = defaults.exports.blank as () => Record<string, unknown>
+
+		expect(blank()).toEqual({
+			$case: "Fetch#Get",
+			url: "/",
+			retries: 0n,
+			tags: [],
+			limits: { calls: 10n },
+			mode: "Quiet",
+		})
+	})
+})

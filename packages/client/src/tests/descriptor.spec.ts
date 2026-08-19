@@ -8,6 +8,7 @@ import { canonicalPath } from "@essence-lang/compiler/modules"
 import {
 	describe as describeType,
 	describeModule,
+	type Descriptor,
 	type ModuleDescriptor,
 } from "../descriptor"
 
@@ -19,6 +20,7 @@ const FIXTURES = [
 	"Marshal.es",
 	"Calls.es",
 	"Declarations.es",
+	"Defaults.es",
 	"Escaped.es",
 	"Refused.es",
 ]
@@ -118,6 +120,83 @@ describe("A Module described", () => {
 	// NOTE: `Optional<T>` is the one Union with a JavaScript spelling of its
 	// own, and the only one that collapses. A Union that merely CONTAINS an
 	// Optional still decides arm by arm.
+	// NOTE: The invariant the two halves of a payload default rest on: a Case
+	// payload member marked omittable carries the VALUE it is filled with, since
+	// nothing stands between a host's object and the Case for a callee to fill
+	// it in at. `optional` without a `fill` would be a declaration promising a
+	// call the marshaller then refuses.
+	it("carries a fill beside every omittable payload member", () => {
+		let described = moduleDescriptor("Defaults.es")
+		let seen = 0
+
+		let walk = (node: Descriptor): void => {
+			switch (node.kind) {
+				case "case":
+					for (let member of Object.values(node.payload)) {
+						if (member.optional === true) {
+							seen += 1
+
+							expect(member.fill).toBeDefined()
+						}
+
+						walk(member.of)
+					}
+
+					return
+				case "record":
+					for (let member of Object.values(node.members)) {
+						walk(member.of)
+					}
+
+					return
+				case "list":
+				case "optional":
+					walk(node.of)
+
+					return
+				case "union":
+					node.arms.forEach(walk)
+
+					return
+				case "function":
+					for (let parameter of node.parameters) {
+						walk(parameter.of)
+					}
+
+					walk(node.returns)
+
+					return
+				default:
+					return
+			}
+		}
+
+		for (let entry of Object.values(described.exports)) {
+			switch (entry.kind) {
+				case "constant":
+					walk(entry.of)
+					break
+				case "function":
+					walk(entry.of)
+					break
+				case "overloaded":
+					entry.overloads.forEach((overload) => walk(overload.of))
+					break
+				case "choice":
+					entry.cases.forEach(walk)
+					break
+				default:
+					break
+			}
+		}
+
+		// NOTE: Four members, at each of the three positions the Case is
+		// described from — the Choice's own entry, the Parameter that takes one
+		// and the return that hands one back. The mark is on the payload rather
+		// than on a direction; which direction prints a `?` is `dts.ts`'s.
+		expect(seen).toBe(12)
+	})
+
 	it("collapses an Optional and leaves every other Union alone", () => {
 		let calls = moduleDescriptor("Calls.es")
 

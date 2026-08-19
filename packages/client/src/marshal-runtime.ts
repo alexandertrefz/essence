@@ -3,6 +3,7 @@ import type { EssenceValue, RuntimeBridge } from "./bridge"
 import type {
 	CaseDescriptor,
 	Descriptor,
+	Fill,
 	FunctionDescriptor,
 	// NOTE: Renamed on the way in, because `Members` is already the name of the
 	// COMPILED members below — the readers a shape was turned into. This is the
@@ -313,6 +314,53 @@ export function createInterpreter(
 		;(payload as Record<symbol, unknown>)[typeKey] = tag
 
 		return payload
+	}
+
+	// NOTE: A Case payload default's value, built. It is the one value this side
+	// makes out of nothing a host handed over — every other one is read off
+	// something — because a Case is BUILT where it is written and a host writing
+	// one is where it is written: there is no callee between the object and the
+	// Case for a default to be filled in at, the way there is for a Record
+	// Parameter.
+	//
+	// NOTE: Built once, when the reader is compiled, and handed to every value
+	// that leaves the member out. Essence values are immutable, and the Compiler
+	// shares a literal across its own construction sites for the same reason —
+	// `pool-constants` is that very sharing.
+	function buildFill(fill: Fill): EssenceValue {
+		switch (fill.kind) {
+			case "integer":
+				return makeInteger(BigInt(fill.value))
+			case "rational":
+				return makeRational(
+					BigInt(fill.numerator),
+					BigInt(fill.denominator),
+				)
+			case "string":
+				return makeString(fill.value)
+			case "boolean":
+				return makeBoolean(fill.value)
+			case "list":
+				return makeList(fill.items.map(buildFill))
+			case "record":
+				return ownRecord(buildFillMembers(fill.members))
+			case "case":
+				return fill.payload === null
+					? makeCase(fill.tag)
+					: ownCase(fill.tag, buildFillMembers(fill.payload))
+		}
+	}
+
+	function buildFillMembers(
+		members: Record<string, Fill>,
+	): Record<string, EssenceValue> {
+		let built: Record<string, EssenceValue> = {}
+
+		for (let [name, fill] of Object.entries(members)) {
+			built[name] = buildFill(fill)
+		}
+
+		return built
 	}
 	let makeInteger = bridge.integer
 	let makeRational = bridge.rational
@@ -1116,6 +1164,17 @@ export function createInterpreter(
 		let colliding = Object.hasOwn(expected.payload, "$case")
 		let names = Object.keys(expected.payload)
 		let readers = names.map((name) => compileIn(expected.payload[name]!.of))
+		// NOTE: The value each member the Case's own default fills in is filled
+		// WITH, built once here. Where a Record Parameter's default is written in
+		// by the callee — the boundary leaves the key out and the Function's
+		// prologue writes it — a Case has no callee: a constructor writes the tag
+		// onto what it was handed and marshals nothing, so this is the only place
+		// between a host's object and the Case it becomes.
+		let fills = names.map((name) => {
+			let fill = expected.payload[name]!.fill
+
+			return fill === undefined ? null : buildFill(fill)
+		})
 		let count = names.length
 		let declared = new Set(names)
 
@@ -1205,11 +1264,25 @@ export function createInterpreter(
 			// NOTE: An absent key is read as `undefined` — through an OWN-key
 			// check, past what `Object.prototype` holds — and the member's own
 			// shape decides, for the reasons the Record branch above states.
+			//
+			// NOTE: Unless the Case's own default fills that member in, whose
+			// absence is not a value at all but the host saying nothing, which
+			// is what the default is for. A key that IS written goes to the
+			// reader like any other, `undefined` and all — writing a member is
+			// writing it — exactly as at a Record Parameter.
 			for (let position = 0; position < count; position++) {
 				let name = names[position]!
+				let written = Object.hasOwn(given, name)
+				let fill = fills[position]
+
+				if (!written && fill !== null) {
+					payload[name] = fill
+
+					continue
+				}
 
 				payload[name] = readers[position]!(
-					Object.hasOwn(given, name) ? given[name] : undefined,
+					written ? given[name] : undefined,
 					inside,
 					name,
 				)
