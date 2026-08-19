@@ -400,6 +400,12 @@ the same rule an Argument lives by, for its own reason (see
 A complete default keeps its whole meaning as well — the Argument may be left
 out entirely, and an Argument that IS written may still be partial.
 
+A Case payload's `= { … }` is held to the same rule, and this code reports it
+too: the default may fill in some of the payload's members, and may not name a
+member the payload does not declare or give one a value of another Type. What it
+may SAY is narrower than what a Parameter's default may say — see
+`case-default-not-a-literal`.
+
 ### `return-type-mismatch`
 
 A `<-` yields a value that does not match the declared return Type.
@@ -707,7 +713,10 @@ its Choice's name — `Colour#Red`.
 
 ### `missing-payload`
 
-A Case that carries a payload was written without one.
+A Case that carries a payload was written without one. A bare `#Case` is a UNIT
+Case's spelling and nothing else — a Case whose payload is defaulted in full is
+still constructed `#Case({})`, so that a Case name standing on its own goes on
+meaning exactly one thing, on both sides of the JavaScript boundary.
 
 ### `unexpected-payload`
 
@@ -716,6 +725,41 @@ A Case that carries no payload was given one.
 ### `payload-type-mismatch`
 
 The payload does not match the Type the Case declares.
+
+A payload written as a Record Literal for a Case that DEFAULTS its payload may
+leave the defaulted members out — `#Get({ url = "/x" })` against
+`Get { url: String, headers: List<Header> } = { headers = [] }`. Which members
+were left out and should not have been is `incomplete-record-argument`'s
+business; anything else about the payload is still this code.
+
+### `case-default-not-a-literal`
+
+A Case payload's `= { … }` default is not a Record Literal, or one of its
+members is worked out rather than written down:
+
+```essence
+choice Fetch {
+	Get { headers: List<Header> } = standardHeaders,
+	Head { headers: List<Header> } = { headers = defaults() },
+}
+```
+
+Where a Parameter's default is evaluated in the callee — one place, the Module
+that declares it — a payload default is spliced into every construction of its
+Case, and a construction may stand in a Module that never named the Choice at
+all. A default that read a name would read one that is not there.
+
+So a payload default says what says itself: a Number, a String without holes, a
+Boolean, and the Lists, Records and Case values built out of those.
+`{ headers = [] }`, `{ retries = 0 }` and `{ at = #Empty }` are all defaults;
+`{ retries = fallback }` is not.
+
+### `case-default-on-generic-choice`
+
+A Case of a generic Choice was given a payload default. A generic Choice's
+payload members are written in terms of Type Parameters every use site decides,
+and a value written at the declaration can bind none of them — each use would
+want a default of its own. Write the member at each construction instead.
 
 ### `unbindable-case-payload`
 

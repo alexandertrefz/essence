@@ -4125,4 +4125,219 @@ describe("Choices", () => {
 			).toContain("unknown-name")
 		})
 	})
+
+	// NOTE: A payload shape may carry a `= { … }` the construction is filled out
+	// of. Unlike a Parameter's default there is no callee to fill it in at — a
+	// Case is built where it is written, and that may be a Module that never
+	// named the Choice — so the value travels on the Case Type and is spliced
+	// per site, which is what the rules below are all about.
+	describe("Case payload defaults", () => {
+		let fetchChoice = `choice Fetch {
+			Get { url: String, retries: Integer } = { retries = 0 },
+			Blank { tags: List<String>, title: String } = { tags = [], title = "" },
+		}`
+
+		it("carries the members the default fills in on the Case Type", () => {
+			let union = declaredTypeOf(
+				`implementation { ${fetchChoice} }`,
+				"Fetch",
+			) as common.UnionType
+			let cases = union.types as Array<common.CaseType>
+
+			expect(cases[0].payloadDefault?.members).toEqual(["retries"])
+			expect(cases[1].payloadDefault?.members).toEqual(["tags", "title"])
+		})
+
+		it("accepts a payload that leaves the defaulted members out", () => {
+			expect(
+				messagesOf(`implementation { ${fetchChoice}
+					constant call: Fetch = #Get({ url = "/x" })
+				}`),
+			).toEqual([])
+		})
+
+		it("fills the members the payload left out", async () => {
+			expect(
+				await run(`implementation { ${fetchChoice}
+					constant call: Fetch = #Get({ url = "/x" })
+
+					Terminal.inspect(call)
+				}`),
+			).toEqual(['Fetch#Get { url = "/x", retries = 0 }'])
+		})
+
+		it("leaves a member the payload wrote alone", async () => {
+			expect(
+				await run(`implementation { ${fetchChoice}
+					constant call: Fetch = #Get({ url = "/x", retries = 3 })
+
+					Terminal.inspect(call)
+				}`),
+			).toEqual(['Fetch#Get { url = "/x", retries = 3 }'])
+		})
+
+		it("builds a wholly defaulted payload from an empty Record", async () => {
+			expect(
+				await run(`implementation { ${fetchChoice}
+					constant call: Fetch = #Blank({})
+
+					Terminal.inspect(call)
+				}`),
+			).toEqual(['Fetch#Blank { tags = [], title = "" }'])
+		})
+
+		// NOTE: A bare `#Case` stays a UNIT Case's spelling however much of a
+		// payload is defaulted — the rule the marshaller's bare-Case strings
+		// live by, and the reason `#Blank({})` above is the spelling.
+		it("still refuses a bare Case whose payload is defaulted in full", () => {
+			expect(
+				codesOf(`implementation { ${fetchChoice}
+					constant call: Fetch = #Blank
+				}`),
+			).toContain("missing-payload")
+		})
+
+		it("names the members a payload had to write and did not", () => {
+			let reported = diagnosticsOf(`implementation { ${fetchChoice}
+				constant call: Fetch = #Get({})
+			}`)
+
+			expect(reported.map(({ code }) => code)).toEqual([
+				"incomplete-record-argument",
+			])
+			expect(reported[0].message).toBe(
+				"This payload is missing 1 member the default does not fill in",
+			)
+		})
+
+		// NOTE: A member with the wrong Type is not a partial of the payload at
+		// all, so the payload is measured whole and named whole.
+		it("keeps payload-type-mismatch for a member of the wrong Type", () => {
+			expect(
+				codesOf(`implementation { ${fetchChoice}
+					constant call: Fetch = #Get({ url = 1 })
+				}`),
+			).toContain("payload-type-mismatch")
+		})
+
+		// NOTE: Only a payload WRITTEN as a Record Literal may leave a member
+		// out: width subtyping lets any other value carry more members than its
+		// Type names, and the members the splice fills in are exactly the ones
+		// its Type left it without.
+		it("refuses a partial payload that is not a Record Literal", () => {
+			expect(
+				codesOf(`implementation { ${fetchChoice}
+					constant partial = { url = "/x" }
+					constant call: Fetch = #Get(partial)
+				}`),
+			).toContain("payload-type-mismatch")
+		})
+
+		it("refuses a default that names a member the payload does not declare", () => {
+			expect(
+				codesOf(`implementation {
+					choice Fetch {
+						Get { url: String } = { retries = 0 },
+					}
+				}`),
+			).toContain("default-type-mismatch")
+		})
+
+		it("refuses a default whose member is of another Type", () => {
+			expect(
+				codesOf(`implementation {
+					choice Fetch {
+						Get { url: String, retries: Integer } = { retries = "none" },
+					}
+				}`),
+			).toContain("default-type-mismatch")
+		})
+
+		it("refuses a default that is not a Record Literal", () => {
+			expect(
+				codesOf(`implementation {
+					constant blank = { retries = 0 }
+
+					choice Fetch {
+						Get { url: String, retries: Integer } = blank,
+					}
+				}`),
+			).toContain("case-default-not-a-literal")
+		})
+
+		it("refuses a default member that names a value", () => {
+			expect(
+				codesOf(`implementation {
+					constant none = 0
+
+					choice Fetch {
+						Get { url: String, retries: Integer } = { retries = none },
+					}
+				}`),
+			).toContain("case-default-not-a-literal")
+		})
+
+		it("takes a List, a Record and a Case value as literals", () => {
+			expect(
+				messagesOf(`implementation {
+					type Header = { name: String, value: String }
+
+					choice Fetch {
+						Get {
+							headers: List<Header>,
+							proxy: Optional<String>,
+							limits: { calls: Integer },
+						} = {
+							headers = [{ name = "Accept", value = "*/*" }],
+							proxy = #Empty,
+							limits = { calls = 10 },
+						},
+					}
+
+					constant call: Fetch = #Get({})
+				}`),
+			).toEqual([])
+		})
+
+		it("refuses a payload default on a generic Choice", () => {
+			expect(
+				codesOf(`implementation {
+					choice Box<Value> {
+						Full { value: Value, seen: Integer } = { seen = 0 },
+						Empty,
+					}
+				}`),
+			).toContain("case-default-on-generic-choice")
+		})
+
+		// NOTE: The one-member shorthand asks whether the payload fits the
+		// payload Record; with a default it asks whether it is a PARTIAL of one,
+		// so `#Only({})` is a payload and not the member's value. Everything
+		// that is not a Record Literal is wrapped exactly as before.
+		describe("against the one-member shorthand", () => {
+			let wrapChoice = `choice Wrap {
+				Only { inner: { a: Integer } } = { inner = { a = 1 } },
+			}`
+
+			it("reads an empty Record as the payload", async () => {
+				expect(
+					await run(`implementation { ${wrapChoice}
+						constant wrapped: Wrap = #Only({})
+
+						Terminal.inspect(wrapped)
+					}`),
+				).toEqual(["Wrap#Only({ a = 1 })"])
+			})
+
+			it("still wraps a Record that only fits the member Type", async () => {
+				expect(
+					await run(`implementation { ${wrapChoice}
+						constant wrapped: Wrap = #Only({ a = 2 })
+
+						Terminal.inspect(wrapped)
+					}`),
+				).toEqual(["Wrap#Only({ a = 2 })"])
+			})
+		})
+	})
 })

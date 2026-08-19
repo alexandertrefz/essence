@@ -162,10 +162,93 @@ function simplifyCaseValue(
 			node.type.type === "Case"
 				? `${node.type.choice}#${node.type.name}`
 				: "",
-		value: node.value === null ? null : simplifyExpression(node.value),
+		value:
+			node.value === null
+				? null
+				: fillCasePayloadDefault(
+						simplifyExpression(node.value),
+						node.type,
+						node.position,
+					),
 		type: node.type,
 		position: node.position,
 	}
+}
+
+// NOTE: The members a payload left out, written into the Record the
+// construction builds. Unlike a Parameter's default there is no callee to fill
+// them in at — a Case is built where it is written — so the merge is spliced per
+// site, and it allocates exactly the Record the author would have written out.
+//
+// A payload that is not a Record Literal is complete by rule (see
+// `casePayloadIsPartial`), so this only ever meets one that is.
+//
+// NOTE: The values are COPIED per site. One default Node standing in several
+// constructions — in several Modules, even — is one object several Optimiser
+// passes would rewrite in place, and the copy is what keeps each site's Record
+// its own. It carries the construction's Position while it is at it: the value
+// appears where the Case is built, which is where a step and a source map should
+// stop, and the declaration it was written at may be in another file entirely.
+function fillCasePayloadDefault(
+	value: common.typedSimple.ExpressionNode,
+	caseType: common.Type,
+	position: common.Position,
+): common.typedSimple.ExpressionNode {
+	if (caseType.type !== "Case" || value.nodeType !== "RecordValue") {
+		return value
+	}
+
+	let values = caseType.payloadDefault?.values
+
+	if (values === undefined || values === null) {
+		return value
+	}
+
+	let members = { ...value.members }
+	let filled = false
+
+	for (let [name, member] of Object.entries(values)) {
+		if (!Object.hasOwn(members, name)) {
+			members[name] = writtenAt(simplifyExpression(member), position)
+			filled = true
+		}
+	}
+
+	return filled
+		? {
+				...value,
+				members,
+				type: { type: "Record", members: caseType.members },
+			}
+		: value
+}
+
+// NOTE: A deep copy of a simplified Expression with one Position stamped
+// throughout. `type` is stepped over rather than walked — a Type holds no
+// Positions and is shared by reference everywhere else too — and nothing else in
+// a payload default is anything but a literal, so the walk is over a value the
+// author wrote by hand.
+function writtenAt<Node>(node: Node, position: common.Position): Node {
+	if (Array.isArray(node)) {
+		return node.map((entry) => writtenAt(entry, position)) as Node
+	}
+
+	if (node === null || typeof node !== "object") {
+		return node
+	}
+
+	let copy: Record<string, unknown> = {}
+
+	for (let [key, entry] of Object.entries(node)) {
+		copy[key] =
+			key === "position"
+				? position
+				: key === "type"
+					? entry
+					: writtenAt(entry, position)
+	}
+
+	return copy as Node
 }
 
 function simplifyMethodInvocation(

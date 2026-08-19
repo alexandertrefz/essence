@@ -395,6 +395,28 @@ export function resolveChoiceDeclarationStatementType(
 		}
 
 		if (isGeneric) {
+			if (choiceCase.defaultValue !== null) {
+				reportError(
+					"A generic Choice can not default a payload",
+					choiceCase.defaultValue.position,
+					{
+						code: "case-default-on-generic-choice",
+						labels: [
+							primary(
+								choiceCase.defaultValue.position,
+								"this default",
+							),
+						],
+						notes: [
+							`'${node.name.content}' abstracts over ${countOf(node.generics.length, "Type Parameter")}, and a value written here can bind none of them — every use site decides them, and each would want a default of its own.`,
+						],
+						helps: [
+							"Write the member at each construction, or declare a Choice for the Type this default is a value of.",
+						],
+					},
+				)
+			}
+
 			caseTypes.push({
 				type: "Case",
 				choice: identity,
@@ -407,18 +429,53 @@ export function resolveChoiceDeclarationStatementType(
 				choiceGenerics: generics,
 			})
 		} else {
+			let members =
+				choiceCase.type === null
+					? {}
+					: resolveRecordTypeDeclarationType(choiceCase.type, scope)
+							.members
+
 			caseTypes.push({
 				type: "Case",
 				choice: identity,
 				name: choiceCase.name.content,
-				members:
-					choiceCase.type === null
-						? {}
-						: resolveRecordTypeDeclarationType(
-								choiceCase.type,
-								scope,
-							).members,
+				members,
+				...casePayloadDefaultOf(choiceCase, members),
 			})
+		}
+	}
+
+	// NOTE: Which members a Case's `= { … }` fills in, registered on the Case Type
+	// as an object the Enricher writes the VALUES into later. Read off what the
+	// default writes — the same answer, and through the same helper, that a Record
+	// Parameter's `defaultMembers` is read off — so a payload and a Record Argument
+	// can not come to disagree about which members a caller may leave out.
+	//
+	// A default that is not a Record Literal registers nothing: what a partial fills
+	// in is what it spells, and the Enricher refuses every other spelling with
+	// `case-default-not-a-literal`. Nothing here reports, because a Choice Type is
+	// resolved wherever it is first needed and a Diagnostic reported here would be
+	// reported against whichever Module got there first.
+	function casePayloadDefaultOf(
+		choiceCase: parser.ChoiceCaseNode,
+		members: Record<string, common.Type>,
+	): { payloadDefault?: common.CasePayloadDefault } {
+		if (
+			choiceCase.defaultValue === null ||
+			choiceCase.defaultValue.nodeType !== "RecordValue"
+		) {
+			return {}
+		}
+
+		return {
+			payloadDefault: {
+				members:
+					recordDefaultMembers(
+						{ type: "Record", members },
+						choiceCase.defaultValue,
+					) ?? [],
+				values: null,
+			},
 		}
 	}
 
