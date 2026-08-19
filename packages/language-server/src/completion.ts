@@ -627,6 +627,13 @@ function findProbeLookupInNode(
 
 			return null
 		}
+		// NOTE: And this is what a leading dot completes through. `.|` probes as
+		// `.lspProbeMember`, which the Enricher desugars into the Function that
+		// path stands for — a Lookup chain whose base is the Parameter Type the
+		// position named. So the probe finds an ordinary member Lookup off an
+		// ordinary Record, and `.maker.|` finds the one a step further in, with
+		// no branch of its own anywhere. Reaching a literal's body is what makes
+		// that true, so the two are pinned together.
 		case "FunctionValue":
 			return (
 				findProbeLookupInDefaults(node.value.parameters) ??

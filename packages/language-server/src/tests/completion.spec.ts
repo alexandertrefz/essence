@@ -1859,4 +1859,91 @@ describe("Case completion inside a Case payload default", () => {
 			"End",
 		])
 	})
+
+	// NOTE: A leading dot needs nothing of Completion's own. It probes as
+	// `.lspProbeMember` like every other dot, and the Enricher desugars the
+	// path into the Function it stands for — so the probe meets an ordinary
+	// member Lookup off the Parameter Type the position named. What each of
+	// these pins is that the desugar keeps standing.
+	describe("member paths", () => {
+		let head = [
+			"implementation {",
+			"\ttype Maker = { town: String, founded: Integer }",
+			"\ttype Product = { name: String, maker: Maker, tags: List<String> }",
+			"\tconstant products: List<Product> = []",
+		]
+
+		let after = (line: string) =>
+			labelsOf([...head, line, "}"].join("\n"), {
+				line: head.length + 1,
+				column: line.length + 1,
+			})
+
+		it("lists the members a leading dot can name", () => {
+			expect(after("\tconstant x = products::map(.")).toEqual([
+				"name",
+				"maker",
+				"tags",
+			])
+		})
+
+		it("lists the members a step further in", () => {
+			expect(after("\tconstant x = products::map(.maker.")).toEqual([
+				"town",
+				"founded",
+			])
+		})
+
+		it("lists them for a path being typed", () => {
+			expect(after("\tconstant x = products::map(.ma")).toEqual([
+				"name",
+				"maker",
+				"tags",
+			])
+		})
+
+		it("lists them behind a label", () => {
+			expect(after("\tconstant x = products::everyItem(where .")).toEqual(
+				["name", "maker", "tags"],
+			)
+		})
+
+		it("lists them under an annotation", () => {
+			expect(after("\tconstant f: (_: Product) -> String = .")).toEqual([
+				"name",
+				"maker",
+				"tags",
+			])
+		})
+
+		it("lists them where the Parameter Type is still being inferred", () => {
+			let source = [
+				...head,
+				"\tfunction keyed<infer Item, infer Key>(",
+				"\t\t_ items: List<Item>,",
+				"\t\ton key: (_: Item) -> Key,",
+				"\t) -> List<Key> {",
+				"\t\t<- items::map(key)",
+				"\t}",
+				"\tconstant x = keyed(products, on .",
+				"}",
+			]
+
+			expect(
+				labelsOf(source.join("\n"), {
+					line: source.length - 1,
+					column: (source[source.length - 2] ?? "").length + 1,
+				}),
+			).toEqual(["name", "maker", "tags"])
+		})
+
+		it("offers nothing where the position names no Function", () => {
+			expect(after("\tconstant x = .")).toEqual([])
+			expect(after("\tconstant x = products::sort(by .")).toEqual([])
+		})
+
+		it("offers nothing off a step that has no members", () => {
+			expect(after("\tconstant x = products::map(.tags.")).toEqual([])
+		})
+	})
 })
