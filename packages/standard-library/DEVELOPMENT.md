@@ -218,6 +218,64 @@ Composition is not free, and four costs are easy to miss because no test fails:
 Prefer a body that reaches only its own Namespace's primitives. `packages/compiler/src/tests/bundleSize.spec.ts`
 guards two files, but it is a floor, not a substitute for measuring.
 
+## Member order
+
+Every Namespace here declares its members in one order, so that a reader who
+has found their way around `String` has found their way around `List`. Six
+groups, in this order:
+
+1. **Static creators and constants** — every `static` Method and every static
+   Property. `List.of`, `Integer.parse`, `Number.Pi`, `Terminal.print`.
+2. **Protocol witnesses** — `is`, `isNot`, `compare`, `toString`, in that
+   order.
+3. **Arithmetic** — `add`, `subtract`, `multiply`, `divide`, in that order,
+   then `remainder`, `quotient`, `raise`, `squareRoot`.
+4. **Predicates** — every Method whose answer is a `Boolean`. `isEmpty`,
+   `hasItems`, `isEven`, `isLessThan`, `contains`, `starts(with:)`,
+   `doesNotContain`.
+5. **Accessors** — the Methods that answer a named part of the receiver:
+   `length`, `numerator`, `denominator`, `absolute`, `item(at:)`, `firstItem`,
+   `lastItem`, `firstIndex`, `lastIndex`, `keys`, `characters`, `words`,
+   `lines`, `character(at:)`, `value(defaultingTo:)`.
+6. **Transforms, and everything else** — `negate`, `round`, `clamp`,
+   `reciprocal`, `map`, `reduce`, `everyItem`, `sort`, `slice`, `append`,
+   `join`, `split`, `trim`, `pad`, `flatten`, `andThen`.
+
+**Inside a group the order is whatever the file already had**, apart from the
+two groups that state one. A new Method joins the END of the group it belongs
+to, which is the position that moves nothing else. The only decision writing one
+costs is which group it is in.
+
+`packages/compiler/src/tests/stdlibMemberOrder.spec.ts` holds every Namespace to
+this. It reads the sources, gives each member a group by the classifier below,
+and fails on a member whose group is lower than one declared above it — naming
+the file, the line, the member and both groups. It checks the two stated
+internal orders as well.
+
+The classifier is mechanical, so that placing a member is a lookup rather than a
+judgement:
+
+- a `static` Method, or a static Property → group 1
+- named `is`, `isNot`, `compare` or `toString` → group 2
+- named `add`, `subtract`, `multiply`, `divide`, `remainder`, `quotient`,
+  `raise` or `squareRoot` → group 3
+- every declared entry answers a `Boolean` → group 4
+- named in the accessor list, which the spec spells out → group 5
+- everything else → group 6
+
+Two consequences are worth stating, because both look like exceptions and
+neither is. **An answer of `Boolean` makes a Method a predicate wherever it
+stands**, so `Boolean`'s own `negate`, `and`, `or` and `exclusiveOr` sit in
+group 4 rather than among the transforms. And **`reciprocal` is a transform**:
+it BUILDS a Rational out of the receiver rather than reading a part of one,
+which is what an accessor does. An Overload counts as a predicate only when
+every one of its entries answers a `Boolean`.
+
+The order is visible to a reader of the LANGUAGE too. Completion offers a
+Namespace's members in the order the file declares them, so
+`packages/language-server/src/tests/completion.spec.ts` spells two of these lists
+out and moving a member moves them.
+
 ## Why bodies look the way they do
 
 Seven mechanics account for most of what looks odd in these files. Each is
@@ -449,6 +507,9 @@ A new Namespace is a new runtime module. The Simplifier emits
 
 A Namespace that also declares a **Type** — a `choice`, as `Ordering` and `Side`
 do — needs a sixth: a place in `builtinTypeOrder`, beside `builtinMemberOrder`.
+
+Its own members go in the order every Namespace here declares them — see
+[Member order](#member-order).
 
 `builtins.spec.ts` cross-checks the first, third and fourth against each other
 and against the Namespaces declared here, so a missing registration is a failing
