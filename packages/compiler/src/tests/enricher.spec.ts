@@ -3792,11 +3792,11 @@ describe("Enricher", () => {
 		})
 
 		// NOTE: The ordering family is `Orderable`'s, provided over `Self` —
-		// the receiver's own Type — so a comparison across two kinds names
-		// the covering `Number` on the receiver and the bounds stay written.
-		// Two Transcendentals need no widening: `Self` is Transcendental for
-		// both, and the conformance the covering Namespace declares is what
-		// answers.
+		// the target of the Namespace whose conformance offered it, which is
+		// the covering `Number` as much as it is `Integer`. So a comparison
+		// across two kinds falls to `Number`'s rung and is answered there,
+		// with nothing widened at the call. The annotation below says what the
+		// Constant holds and no more; every bound stays written.
 		//
 		// NOTE: `squareRoot` answers an `Optional<Integer | Algebraic>`, which
 		// takes two matches to take apart rather than one: the outer one names

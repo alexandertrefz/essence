@@ -19,9 +19,11 @@ declarations {
 	§ `Orderable` makes `isBetween` and `clamp` mean something, so the
 	§ numeric kinds declare it and nothing else does.
 	§
-	§ A provided Method takes `Self`, which is the receiver's own Type. So
-	§ the six answer within one kind, and a question across two kinds asks
-	§ `Number.compare` or widens the receiver to `Number` first.
+	§ A provided Method takes `Self`, which is the target of the Namespace
+	§ whose conformance offered it. Both `Integer` and the covering `Number`
+	§ conform, so each of the six has two rungs on a numeric receiver. A
+	§ same-kind question is answered within the kind, and one across two
+	§ kinds falls to `Number`'s rung, with nothing widened at the call.
 
 	§§ Anything on a line, where a value can be below another, between two others or pulled into a range.
 	protocol Orderable is Comparable {
