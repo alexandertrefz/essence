@@ -24,6 +24,25 @@ implementation {
 	§§ @param subject — who to greet
 	constant defaultSubject = "World"
 
+	§§ Shouts a String.
+	§§
+	§§ @param _ — the text to shout
+	§§ @param loudly — how loud to shout it
+	§§ @returns — the shouted text
+	function shout(_ text: String) -> String {
+		<- text::append("!!!")
+	}
+
+	§§ Puts two Strings side by side.
+	§§
+	§§ @param _ — the text to put first
+	§§ @returns — the two, side by side
+	function pair(_ first: String, and second: String) -> String {
+		<- first::append(second)
+	}
+
 	Terminal.inspect(greet(subject defaultSubject))
 	Terminal.inspect(join(left "Hello, ", right "Essence!"))
+	Terminal.inspect(shout("Hello"))
+	Terminal.inspect(pair("Hello, ", and "Essence!"))
 }
