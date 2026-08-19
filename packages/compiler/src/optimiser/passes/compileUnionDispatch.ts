@@ -178,6 +178,7 @@ function compile(
 			omittedParameterIndices:
 				branch.dispatchCase.omittedParameterIndices,
 			derivedDescriptor: branch.dispatchCase.derivedDescriptor,
+			providedBy: branch.dispatchCase.providedBy,
 		})),
 		type: node.type,
 		position: node.position,
@@ -278,6 +279,10 @@ function collapsedIfUniform(
 			branch.dispatchCase.namespaceName ===
 				first.dispatchCase.namespaceName &&
 			branch.dispatchCase.methodName === first.dispatchCase.methodName &&
+			// NOTE: A Protocol's provided Method and a Namespace's written one
+			// can be spelled alike, so agreeing on the two names above is not
+			// yet agreeing on the Method — this is the rest of that question.
+			branch.dispatchCase.providedBy === first.dispatchCase.providedBy &&
 			branch.dispatchCase.derivedDescriptor === undefined &&
 			branch.dispatchCase.conformanceArguments.length === 0 &&
 			branch.dispatchCase.contextualArguments.length === 0 &&

@@ -2654,6 +2654,7 @@ function dispatchCaseCall(
 			dispatchCase.methodName,
 			dispatchCase.derivedDescriptor,
 			dispatchCase.omittedParameterIndices.length > 0,
+			dispatchCase.providedBy,
 		),
 		arguments: openOmittedArguments(
 			[receiver],

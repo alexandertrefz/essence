@@ -751,6 +751,12 @@ export type DispatchChainCase = {
 	// derived Equatable, exactly as it is on the dispatch case it was built
 	// from — the one function that spells a Method reference reads it.
 	derivedDescriptor?: DerivedEquatableDescriptor
+	// NOTE: The Protocol that PROVIDED this branch's Method, carried over from
+	// the dispatch case this branch was built from. `namespaceName` is that
+	// Protocol's name too, so it is this that tells the two apart — and the
+	// tree-shaking walk reads it here to draw the edge to the provided const,
+	// which nothing else in a compiled chain names.
+	providedBy?: string
 }
 
 // NOTE: A call of the `loop` family or of one of List's walking Methods, with

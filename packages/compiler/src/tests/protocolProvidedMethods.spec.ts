@@ -266,6 +266,89 @@ describe("Protocol-provided Methods", () => {
 			).toEqual(["true"])
 		})
 
+		// NOTE: No COVERING Namespace here, so the Union is resolved member by
+		// member and each branch answers with the provided Method — the one
+		// dispatch shape whose emitted call names the provided const rather
+		// than a Namespace. A Protocol binds nothing at runtime, so a branch
+		// that lost track of which of the two answered emits a member read on
+		// a name that is not there.
+		const UNION_MEMBERS = [
+			"implementation {",
+			"\tprotocol Sized {",
+			"\t\tsize() -> Integer",
+			"",
+			"\t\tisEmpty() -> Boolean {",
+			"\t\t\t<- @::size()::is(0)",
+			"\t\t}",
+			"\t}",
+			"",
+			"\ttype Bag = { count: Integer }",
+			"\ttype Crate = { weight: Integer }",
+			"",
+			"\tnamespace Bags for Bag is Sized {",
+			"\t\tsize() -> Integer {",
+			"\t\t\t<- @.count",
+			"\t\t}",
+			"\t}",
+		].join("\n")
+
+		function unionProgram(...lines: Array<string>): string {
+			return [
+				UNION_MEMBERS,
+				"",
+				...lines,
+				"",
+				"\tfunction isItEmpty(_ value: Bag | Crate) -> Boolean {",
+				"\t\t<- value::isEmpty()",
+				"\t}",
+				"",
+				"\tTerminal.inspect(isItEmpty({ count = 0 }))",
+				"\tTerminal.inspect(isItEmpty({ weight = 7 }))",
+				"}",
+			].join("\n")
+		}
+
+		const PROVIDED_CRATE = [
+			"\tnamespace Crates for Crate is Sized {",
+			"\t\tsize() -> Integer {",
+			"\t\t\t<- @.weight",
+			"\t\t}",
+			"\t}",
+		]
+
+		it("should answer on every member of a Union no Namespace covers", async () => {
+			expect(await run(unionProgram(...PROVIDED_CRATE))).toEqual([
+				"true",
+				"false",
+			])
+		})
+
+		it("should name the provided const in a Union's dispatch branches", () => {
+			let javaScript = generate(unionProgram(...PROVIDED_CRATE))
+
+			expect(javaScript).toContain("$es_Sized__isEmpty(")
+			expect(declarationsOf(javaScript, "$es_Sized__isEmpty")).toBe(1)
+			expect(javaScript).not.toContain("Sized.isEmpty")
+		})
+
+		it("should answer a Union branch that writes the name with its own Method", async () => {
+			expect(
+				await run(
+					unionProgram(
+						"\tnamespace Crates for Crate is Sized {",
+						"\t\tsize() -> Integer {",
+						"\t\t\t<- @.weight",
+						"\t\t}",
+						"",
+						"\t\tisEmpty() -> Boolean {",
+						"\t\t\t<- true",
+						"\t\t}",
+						"\t}",
+					),
+				),
+			).toEqual(["true", "true"])
+		})
+
 		it("should answer through a conditional conformance on a generic Namespace", async () => {
 			expect(
 				await run(
