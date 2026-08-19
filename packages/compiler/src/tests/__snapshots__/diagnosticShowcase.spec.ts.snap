@@ -1265,3 +1265,44 @@ Error: A bare member name is not a key in an update
 ─── 2 errors
 "
 `;
+
+exports[`Diagnostic Showcase RecordDefaults.es should render the same report every time 1`] = `
+"[incomplete-record-argument]
+Error: This Argument is missing 2 members the default does not fill in
+    ╭─┤ RecordDefaults.es:13:47 │
+    │
+ 13 │     Terminal.print(connect("essence.lang", using { retries = 1 }))
+    │                                                  ───────┬───────  
+    │                                                         ╰───────── 'host', 'tls' not written here
+    │ 
+    │ Help: Write 'host', 'tls' into this Record.
+    │ 
+    │ Note 1: Parameter 'using' is { host: String, retries: Integer, tls: Boolean }.
+    │ Note 2: Its default fills in 'retries'; every other member must be written.
+────╯
+
+[argument-type-mismatch]
+Error: This Argument does not fit Parameter 'using'
+    ╭─┤ RecordDefaults.es:17:47 │
+    │
+ 17 │     Terminal.print(connect("essence.lang", using { host = 1, tls = true }))
+    │                                                  ────────────┬───────────  
+    │                                                              ╰───────────── this is a { host: Integer, tls: Boolean }
+    │ 
+    │ Note: Parameter 'using' is { host: String, retries: Integer, tls: Boolean }.
+────╯
+
+[argument-type-mismatch]
+Error: This Argument does not fit Parameter 'using'
+    ╭─┤ RecordDefaults.es:21:33 │
+    │
+ 21 │        connect("essence.lang", using { host = "h", tls = true, timeout = 30 }),
+    │                                      ────────────────────┬───────────────────  
+    │                                                          ╰───────────────────── this is a { host: String, tls: Boolean, timeout: Integer }
+    │ 
+    │ Note: Parameter 'using' is { host: String, retries: Integer, tls: Boolean }.
+────╯
+
+─── 3 errors
+"
+`;

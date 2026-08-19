@@ -3080,6 +3080,64 @@ function deferredArgumentOrder(
 	return order
 }
 
+// NOTE: Whether one Argument answers one Parameter — assignability, or, for a
+// Record Parameter carrying a Record default, the partial reading that default
+// buys: an Argument that writes SOME of the members and leaves the rest to the
+// default. Two things have to hold for that, and `matchesType` answers neither
+// on its own — every member written has to be one the Parameter declares and to
+// fit it, which is `isPartialOf`, and every member the default does NOT fill in
+// has to be written, which is what makes the merged value complete.
+//
+// NOTE: Asked of the SUBSTITUTED Parameter Type, unlike the assignability check
+// beside it: `matchTypes` is handed the unsubstituted Type so that a Generic's
+// first occurrence binds off the Argument, and by the time this is reached that
+// has either happened or the Generic is still open — in which case the member
+// comparisons bind it, through the very inference context they are given.
+//
+// NOTE: Extras are not refused here, because Record assignability is width
+// subtyping and refusing them would make a partial Argument stricter than a
+// whole one. `{ port = 1, extra = 2 }` fails `isPartialOf` all the same, since
+// `extra` is not a member the Parameter declares.
+function argumentFits(
+	parameter: common.Parameter,
+	expectedType: common.Type | common.GenericUse,
+	argumentType: common.Type,
+	inferenceContext: GenericInferenceContext | null,
+): boolean {
+	if (matchTypes(parameter.type, argumentType, inferenceContext)) {
+		return true
+	}
+
+	return (
+		parameter.defaultMembers !== undefined &&
+		expectedType.type === "Record" &&
+		argumentType.type === "Record" &&
+		isPartialOf(expectedType, argumentType, inferenceContext) &&
+		missingRecordMembers(
+			expectedType,
+			parameter.defaultMembers,
+			argumentType,
+		).length === 0
+	)
+}
+
+// NOTE: The members a Record Argument had to write and did not — the ones its
+// Parameter declares, the default does not fill in, and the Argument does not
+// carry. The Validator reports them by name, which is why this answers a list
+// rather than a boolean.
+export function missingRecordMembers(
+	parameterType: common.RecordType,
+	defaultMembers: ReadonlyArray<string>,
+	argumentType: common.RecordType,
+): Array<string> {
+	let filled = new Set(defaultMembers)
+
+	return Object.keys(parameterType.members).filter(
+		(name) =>
+			!filled.has(name) && !Object.hasOwn(argumentType.members, name),
+	)
+}
+
 // NOTE: Checks whether passed Arguments match a parameter list — arity,
 // labels (matched by name equality; a labelless Argument only matches a
 // labelless parameter), and per-Argument `matchesType`.
@@ -3151,8 +3209,9 @@ export function matchArguments(
 
 		if (
 			parameter.name !== argument.name ||
-			!matchTypes(
-				parameter.type,
+			!argumentFits(
+				parameter,
+				expectedType,
 				argument.getType(
 					expectedType,
 					inferenceContext?.bindings ?? null,
