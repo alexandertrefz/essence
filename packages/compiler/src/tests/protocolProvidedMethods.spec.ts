@@ -1239,6 +1239,77 @@ describe("Protocol-provided Methods", () => {
 				),
 			).toEqual(["false"])
 		})
+
+		// NOTE: The Arguments are matched against the Namespace's own rung, so
+		// a call that misses is the ordinary Argument mismatch the `::`
+		// spelling reports — never the Compiler's own bug channel, which is
+		// where a bounded Signature's missing witness used to send it.
+		it("should report the Arguments the pinned signature rejects", () => {
+			expect(
+				codesOf(
+					[
+						"implementation {",
+						'\tTerminal.inspect(Integer.isNot(3, "x"))',
+						"}",
+					].join("\n"),
+				),
+			).toEqual(["argument-type-mismatch"])
+
+			expect(
+				codesOf(
+					[
+						"implementation {",
+						"\tTerminal.inspect(Integer.isNot(3))",
+						"}",
+					].join("\n"),
+				),
+			).toEqual(["argument-count-mismatch"])
+
+			expect(
+				codesOf(
+					[
+						"implementation {",
+						'\tTerminal.inspect(Integer.isNot("y", "x"))',
+						"}",
+					].join("\n"),
+				),
+			).toEqual(["argument-type-mismatch", "argument-type-mismatch"])
+		})
+
+		// NOTE: The same hole, on the shape it was always reachable through —
+		// a bounded free Function nothing selected. A `<Item is Equatable>` is
+		// a Signature with a witness to solve like any other, and its Arguments
+		// missing is the Program's mistake, not the Compiler's.
+		it("should report the Arguments a bounded Function rejects", () => {
+			let bounded = [
+				"implementation {",
+				"\tfunction differs<infer Item is Equatable>(",
+				"\t\t_ value: Item,",
+				"\t\t_ other: Item",
+				"\t) -> Boolean {",
+				"\t\t<- value::isNot(other)",
+				"\t}",
+				"",
+			]
+
+			expect(
+				codesOf(
+					[
+						...bounded,
+						'\tTerminal.inspect(differs(3, "x"))',
+						"}",
+					].join("\n"),
+				),
+			).toEqual(["argument-type-mismatch"])
+
+			expect(
+				codesOf(
+					[...bounded, "\tTerminal.inspect(differs(3))", "}"].join(
+						"\n",
+					),
+				),
+			).toEqual(["argument-count-mismatch"])
+		})
 	})
 
 	describe("the specificity ladder", () => {

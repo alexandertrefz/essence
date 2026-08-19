@@ -7524,11 +7524,24 @@ function resolveFunctionInvocation(
 			inference: context,
 		})
 
+		// NOTE: A signature with a Protocol-bounded Type Parameter is only
+		// well formed with a witness per bound, and a call that did not select
+		// has none — nothing bound the Parameter, so there was nothing to solve
+		// one for. Saying the call's own Type is an Error is what says it never
+		// resolved: the Validator reports the Argument mismatch, which is the
+		// real news, instead of asserting the missing witness and reporting the
+		// Compiler's own bug channel over a Program that is simply wrong.
+		let unresolvedBound = type.generics.some(
+			(generic) => generic.constraint != null,
+		)
+
 		return {
-			type: substituteInferredReturnType(
-				type,
-				unfreshenBindings(context.bindings, freshToOriginal),
-			).returnType,
+			type: unresolvedBound
+				? { type: "Error" }
+				: substituteInferredReturnType(
+						type,
+						unfreshenBindings(context.bindings, freshToOriginal),
+					).returnType,
 			conformances: [],
 			overloadedMethodIndex: null,
 			omittedParameterIndices: [],
