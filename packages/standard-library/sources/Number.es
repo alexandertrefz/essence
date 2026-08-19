@@ -535,14 +535,6 @@ declarations {
 			<- @::compare(to other)::is(#Equal)
 		}
 
-		§§ Answers whether the Number has a different numeric value than another Number.
-		§§
-		§§ @param _ — the Number to compare against
-		§§ @returns — `true` when the Numbers have different numeric values.
-		isNot(_ other: Number) -> Boolean {
-			<- @::is(other)::negate()
-		}
-
 		§§ Orders the Number against another Number by numeric value, across every member of the tower.
 		§§
 		§§ @param to — the Number to order against

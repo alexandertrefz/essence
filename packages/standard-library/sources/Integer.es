@@ -102,14 +102,6 @@ declarations {
 			<- @::compare(to other)::is(#Equal)
 		}
 
-		§§ Answers whether the Integer has a different value than another.
-		§§
-		§§ @param _ — the Integer to compare against
-		§§ @returns — `true` when the two differ.
-		isNot(_ other: Integer) -> Boolean {
-			<- @::is(other)::negate()
-		}
-
 		§§ Orders the Integer against another Integer.
 		§§
 		§§ @param to — the Integer to order against

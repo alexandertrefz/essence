@@ -108,16 +108,6 @@ declarations {
 		§§ @returns — `true` when the Lists are equal.
 		is<infer ItemType is Equatable>(_ other: List<ItemType>) -> Boolean
 
-		§§ Answers whether the two Lists differ in any item or in their order.
-		§§
-		§§ The Method is available whenever the items conform to `Equatable`.
-		§§
-		§§ @param _ — the List to compare with
-		§§ @returns — `true` when the Lists are not equal.
-		isNot<infer ItemType is Equatable>(_ other: List<ItemType>) -> Boolean {
-			<- @::is(other)::negate()
-		}
-
 		§ The witness behind List's conditional `Comparable` conformance.
 
 		§§ Answers how the List orders against another one, comparing them lexicographically.

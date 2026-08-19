@@ -3495,7 +3495,12 @@ describe("Choices", () => {
 
 			expect(generated).toContain("Colour.is(red,")
 			expect(generated).toContain("is: Colour.is")
-			expect(generated).toContain("isNot: Colour.isNot")
+			// NOTE: `isNot` is not in the witness, and belongs in none: it is
+			// `Equatable`'s PROVIDED Method, so a bounded Method reaches the one
+			// shared body rather than an entry of the map. The written `isNot`
+			// above still answers a direct call — that is the override rule —
+			// and the two agree because the body is the same expression.
+			expect(generated).not.toContain("isNot: Colour.isNot")
 		})
 
 		// NOTE: One helper for every Choice of every Program — the whole cost of

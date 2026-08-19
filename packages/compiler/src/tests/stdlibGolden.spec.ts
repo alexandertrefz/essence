@@ -13,6 +13,7 @@ import {
 	derivedPrintableNamespace,
 } from "../enricher/resolvers"
 import { loadStdlib } from "../enricher/stdlib"
+import { applyGenericBindings } from "../helpers/index"
 import { optimise } from "../optimiser/index"
 import { parseWithDiagnostics } from "../parser/index"
 import { printSignature, signaturesOf } from "../printType"
@@ -131,8 +132,18 @@ function declaredSignatures(): Array<string> {
 	// Choice as a Parameter and are distinct already.
 	let derivedSignatures = new Set<string>()
 
+	// NOTE: The names a derive answers for the Namespace being walked — filled
+	// as the derives are collected, and read by the provided-Method pass below.
+	// A derive answers AHEAD of a Protocol's provided Method of the same name
+	// (`namespacesDeclaringMethod` in the Enricher), so a Choice's `isNot` is
+	// `Choice_Equatable`'s and not `Equatable`'s, and listing both would ask the
+	// harness for a call nothing can make.
+	let derivedNames = new Set<string>()
+
 	let collectDerived = (namespace: common.NamespaceType): void => {
 		for (let [methodName, method] of Object.entries(namespace.methods)) {
+			derivedNames.add(methodName)
+
 			for (let signature of signaturesOf(method) ?? []) {
 				let label = printSignature(
 					signature,
@@ -179,6 +190,8 @@ function declaredSignatures(): Array<string> {
 			continue
 		}
 
+		derivedNames.clear()
+
 		let scope: enricher.Scope = {
 			parent: null,
 			members: {},
@@ -204,6 +217,63 @@ function declaredSignatures(): Array<string> {
 
 		if (printable !== null && !Object.hasOwn(member.methods, "toString")) {
 			collectDerived(printable)
+		}
+
+		// NOTE: A Protocol's PROVIDED Methods are Methods of every conformer,
+		// and no Namespace declares them either — so the loop above never sees
+		// them and the harness could quietly stop calling one.
+		//
+		// They are enumerated PER CONFORMER, with `Self` bound to that
+		// conformer's target Type: `Equatable.isNot(_ Integer)` beside
+		// `Equatable.isNot(_ String)`. That is the signature a call site
+		// reaches, and it is what keeps the coverage this feature INHERITED —
+		// each of these replaced a body that was called on its own Namespace.
+		// Listing the Protocol's `isNot(_ Self)` once instead would let a single
+		// call stand for every conformer.
+		//
+		// The label names the PROTOCOL, because that is the Namespace the
+		// Invocation carries and the const it is emitted under. The two ways a
+		// conformer can answer a name itself are mirrored from the Enricher: a
+		// Method it WRITES replaces the provided one whole, and a DERIVE answers
+		// ahead of one.
+		for (let protocol of Object.values(loadStdlib().protocols)) {
+			if (member.conformsTo?.includes(protocol.name) !== true) {
+				continue
+			}
+
+			for (let [methodName, writtenBy] of Object.entries(
+				protocol.providedMethods ?? {},
+			)) {
+				let method = protocol.methods[methodName]
+
+				if (
+					// NOTE: Only the Methods this Protocol WROTE. An inherited
+					// one is listed under the Protocol that wrote it, which
+					// this same walk reaches.
+					writtenBy !== protocol.name ||
+					method === undefined ||
+					Object.hasOwn(member.methods, methodName) ||
+					derivedNames.has(methodName)
+				) {
+					continue
+				}
+
+				let bound = applyGenericBindings(
+					method,
+					new Map([["Self", member.targetType]]),
+				) as common.MethodType
+
+				for (let signature of signaturesOf(bound) ?? []) {
+					let label = printSignature(
+						signature,
+						`${protocol.name}.${methodName}`,
+					)
+
+					signatures.push(
+						label.slice(0, label.lastIndexOf(") -> ") + 1),
+					)
+				}
+			}
 		}
 	}
 

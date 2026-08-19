@@ -28,16 +28,6 @@ declarations {
 			<- @::compare(to other)::is(#Equal)
 		}
 
-		§§ Answers whether the Algebraics are different numbers.
-		§§
-		§§ Normal forms decide the answer exactly. No approximation is consulted.
-		§§
-		§§ @param _ — the Algebraic to compare with
-		§§ @returns — `true` when the numbers differ.
-		isNot(_ other: Algebraic) -> Boolean {
-			<- @::is(other)::negate()
-		}
-
 		§§ Orders the Algebraic against another Algebraic.
 		§§
 		§§ The comparison is symbolic, so it is exact.

@@ -13,14 +13,6 @@ declarations {
 		§§ @returns — `true` when both are equal.
 		is(_ other: Boolean) -> Boolean
 
-		§§ Answers whether the Boolean has a different truth value than another.
-		§§
-		§§ @param _ — the Boolean to compare against
-		§§ @returns — `true` when the two differ.
-		isNot(_ other: Boolean) -> Boolean {
-			<- @::is(other)::negate()
-		}
-
 		§§ Answers the Boolean as a String: `"true"` or `"false"`.
 		toString() -> String {
 			if @ {

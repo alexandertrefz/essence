@@ -205,12 +205,13 @@ type PredicateEvaluator = (
 	args: Array<string | boolean>,
 ) => boolean | null
 
-// NOTE: The comparisons are declared once over the whole numeric tower and AGAIN
-// on Integer, where the same-kind entry is written on the same-kind native — a
-// performance stratification the standard library explains at length — so an
-// Integer receiver's `isLessThan` is answered by Integer while its `isBetween`,
-// which Integer does not declare, is answered by Number. Both spellings are the
-// same question about the same two integers, so both are keyed to these.
+// NOTE: The comparisons are declared once by `Orderable`, which provides them
+// for every numeric kind, and AGAIN on Integer, where the same-kind entry is
+// written on the same-kind native — a performance stratification the standard
+// library explains at length — so an Integer receiver's `isLessThan` is answered
+// by Integer while its `isBetween`, which Integer does not write, is answered by
+// the Protocol. Both spellings are the same question about the same two
+// integers, so both are keyed to these.
 const NUMERIC_COMPARISONS: Record<string, PredicateEvaluator> = {
 	is: integerComparison((value, other) => value === other),
 	isNot: integerComparison((value, other) => value !== other),
@@ -274,6 +275,37 @@ const LIST_PREDICATES: Record<string, PredicateEvaluator> = {
 	hasItems: listQuestion((items) => items.length > 0),
 }
 
+// NOTE: A PROVIDED Method answers under the PROTOCOL's name — `Equatable` writes
+// one `isNot` for every conformer, so `@::isNot(0)` in `NonZeroInteger`'s
+// predicate is `Equatable::isNot` rather than `Integer::isNot`. The question is
+// the same question, so the answer is the same answer; what one key can not do
+// is stand for one kind, because a Protocol answers for every conformer at once.
+// So this entry asks the VALUE which of the tables above decides it, and the
+// String one has to be reachable: String equality is canonical equivalence, and
+// comparing the code units as written would prove a difference the Program does
+// not see. A Boolean, a List and everything else fall through to a numeric
+// entry that refuses a value of the wrong kind, which is the same `null` a key
+// nothing names produces.
+const EQUATABLE_PREDICATES: Record<string, PredicateEvaluator> = {
+	isNot: (value, args) =>
+		value.kind === "String"
+			? STRING_PREDICATES["isNot"]!(value, args)
+			: NUMERIC_COMPARISONS["isNot"]!(value, args),
+}
+
+// NOTE: The five `Orderable` provides, over the numeric tower alone — `String`
+// and `List` order through `Comparable`, which provides nothing. An Integer is
+// the one written value any of them can decide, so the numeric table answers
+// them unchanged. `clamp` is no predicate: it answers an ordered value rather
+// than a Boolean.
+const ORDERABLE_PREDICATES: Record<string, PredicateEvaluator> = {
+	isLessThan: NUMERIC_COMPARISONS["isLessThan"]!,
+	isLessThanOrEqualTo: NUMERIC_COMPARISONS["isLessThanOrEqualTo"]!,
+	isGreaterThan: NUMERIC_COMPARISONS["isGreaterThan"]!,
+	isGreaterThanOrEqualTo: NUMERIC_COMPARISONS["isGreaterThanOrEqualTo"]!,
+	isBetween: NUMERIC_COMPARISONS["isBetween"]!,
+}
+
 // NOTE: One flat table, keyed the way a conjunct is: the Namespace, a COLON, the
 // Method. The Lexer reads `:` as a Symbol so no name a Program can write holds
 // one — which is also what keeps every key here away from the property names an
@@ -284,6 +316,8 @@ const PREDICATES: Record<string, PredicateEvaluator> = {
 	...keyedByNamespace("Integer", INTEGER_QUESTIONS),
 	...keyedByNamespace("String", STRING_PREDICATES),
 	...keyedByNamespace("List", LIST_PREDICATES),
+	...keyedByNamespace("Equatable", EQUATABLE_PREDICATES),
+	...keyedByNamespace("Orderable", ORDERABLE_PREDICATES),
 }
 
 function keyedByNamespace(

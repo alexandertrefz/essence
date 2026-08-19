@@ -4901,10 +4901,23 @@ function complementConjunct(
 // `String::isNot` is not, so either spelling of the pair would be wrong for the
 // other half. Two Overloads of one Method taking literals that spell the same are
 // conflated by this, which no Namespace in the standard library declares.
+//
+// NOTE: And WITHOUT the Namespace for that one pair, because its two halves no
+// longer share one: `is` is written on each conforming Namespace, while `isNot`
+// is provided by `Equatable` for all of them at once, so the opposite of
+// `Integer::is` is spelled `Equatable::isNot`. Naming the Namespace here would
+// stop the pair pairing, which is the whole of what this key is for. It costs
+// nothing: a candidate refinement has already been held to a base the receiver's
+// Type flows into, and the only Namespaces answering `is` on such a receiver are
+// the one that owns it and the covering `Number` — which ask the same question of
+// the same two values.
 function predicateShapeKey(conjunct: common.PredicateConjunct): string {
-	return `${conjunct.namespaceName}::${conjunct.methodName}${JSON.stringify(
-		conjunct.args,
-	)}`
+	let namespace =
+		conjunct.methodName === "is" || conjunct.methodName === "isNot"
+			? ""
+			: `${conjunct.namespaceName}::`
+
+	return `${namespace}${conjunct.methodName}${JSON.stringify(conjunct.args)}`
 }
 
 // NOTE: The Type `@` is bound to inside a Match Handler — the Matcher's own,
@@ -6422,6 +6435,37 @@ function namespacesDeclaringMethod(
 		return matchingNamespaces
 	}
 
+	let derived = derivedEquatableNamespace(baseType, scope)
+
+	if (derived !== null && Object.hasOwn(derived.methods, methodName)) {
+		matchingNamespaces.set(derivedEquatableNamespaceName, derived)
+	}
+
+	// NOTE: The printing derive reads the Namespaces already found for the
+	// receiver, because it answers only where one of them declared
+	// `is Printable` — which is the difference between the two derives, and the
+	// reason this one takes them and the one above does not.
+	let printable = derivedPrintableNamespace(
+		baseType,
+		namespaces.values(),
+		scope,
+	)
+
+	if (printable !== null && Object.hasOwn(printable.methods, methodName)) {
+		matchingNamespaces.set(derivedPrintableNamespaceName, printable)
+	}
+
+	// NOTE: A DERIVE beats a Protocol's provided Method of the same name, and
+	// the order is what says so. A derive is fabricated FOR this receiver — its
+	// `isNot` takes the whole Choice, so `Ordering#Less::isNot(#Equal)` answers
+	// — while a provided Method is one body over `Self`, which a receiver
+	// narrowed to a single Case binds to that Case, leaving no sibling Case
+	// assignable to it. Both answer the same question, so the one that answers
+	// it for every receiver goes first.
+	if (matchingNamespaces.size > 0) {
+		return matchingNamespaces
+	}
+
 	// NOTE: A Protocol's PROVIDED Methods come through the same door the
 	// derives do, and for the same reason: a Namespace that writes a Method of
 	// the name has replaced it, whole, so nothing here can ever be tied against
@@ -6443,30 +6487,6 @@ function namespacesDeclaringMethod(
 		if (Object.hasOwn(namespace.methods, methodName)) {
 			matchingNamespaces.set(name, namespace)
 		}
-	}
-
-	if (matchingNamespaces.size > 0) {
-		return matchingNamespaces
-	}
-
-	let derived = derivedEquatableNamespace(baseType, scope)
-
-	if (derived !== null && Object.hasOwn(derived.methods, methodName)) {
-		matchingNamespaces.set(derivedEquatableNamespaceName, derived)
-	}
-
-	// NOTE: The printing derive reads the Namespaces already found for the
-	// receiver, because it answers only where one of them declared
-	// `is Printable` — which is the difference between the two derives, and the
-	// reason this one takes them and the one above does not.
-	let printable = derivedPrintableNamespace(
-		baseType,
-		namespaces.values(),
-		scope,
-	)
-
-	if (printable !== null && Object.hasOwn(printable.methods, methodName)) {
-		matchingNamespaces.set(derivedPrintableNamespaceName, printable)
 	}
 
 	return matchingNamespaces

@@ -207,14 +207,6 @@ declarations {
 			<- @::compare(to other)::is(#Equal)
 		}
 
-		§§ Answers whether the Rational has a different value than another.
-		§§
-		§§ @param _ — the Rational to compare against
-		§§ @returns — `true` when the two differ.
-		isNot(_ other: Rational) -> Boolean {
-			<- @::is(other)::negate()
-		}
-
 		§§ Orders the Rational against another Rational.
 		§§
 		§§ @param to — the Rational to order against

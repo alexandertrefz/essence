@@ -5572,9 +5572,12 @@ describe("Enricher", () => {
 
 			expect(refinement.name).toBe("NonZero")
 			expect(refinement.base).toEqual({ type: "Integer" })
+			// NOTE: `Equatable`, not `Integer` — `isNot` is a Protocol's
+			// PROVIDED Method, so the Namespace that answers it is the Protocol
+			// that wrote the one body every conformer shares.
 			expect(refinement.conjuncts).toEqual([
 				{
-					namespaceName: "Integer",
+					namespaceName: "Equatable",
 					methodName: "isNot",
 					overloadIndex: null,
 					args: ["0"],

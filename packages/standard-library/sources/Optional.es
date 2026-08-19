@@ -72,6 +72,10 @@ declarations {
 			}
 		}
 
+		§ This is the one written `isNot` in the library. A Protocol provides a
+		§ body every conformer answers with, and a written Method replaces a
+		§ provided one whole. Optional's takes a bare item as well as another
+		§ Optional, and a provided Method over `Self` can not offer that entry.
 		§§ Answers whether the Optional differs from the given one, or whether it does not hold the given bare value.
 		§§
 		§§ An empty Optional holds no bare value, so it always differs from one. The Method is available whenever the payload conforms to `Equatable`.
