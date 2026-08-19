@@ -6357,10 +6357,21 @@ describe("Optimiser", () => {
 			expect(generated).not.toContain("Object.assign(")
 		})
 
-		it("spreads a right-hand side that is not a literal", () => {
-			expect(generate(combinations)).toContain("...changes")
+		// NOTE: `changes` is typed `{ x: Integer }`, so `x` is the one member
+		// the update carries and the one member that is read. Spread whole it
+		// would also have copied whatever else the value happened to hold,
+		// which is what `codeGeneration.spec.ts` pins as a soundness hole
+		// rather than as a shape.
+		it("projects a right-hand side that is not a literal", () => {
+			let generated = generate(combinations)
+
+			expect(generated).toContain("x: changes.x")
+			expect(generated).not.toContain("...changes")
 		})
 
+		// NOTE: `Object.assign` comes back for the LITERAL right-hand sides,
+		// which is all the pass took away: writing a literal out member by
+		// member is the optimisation. The projection is not, so it stays.
 		it("assigns again when it is turned off", () => {
 			let generated = generate(combinations, {
 				enabled: true,
@@ -6368,6 +6379,7 @@ describe("Optimiser", () => {
 			})
 
 			expect(generated).toContain("Object.assign(")
+			expect(generated).toContain("x: changes.x")
 		})
 
 		// NOTE: The two collapses meet on `{ base with x = 1 }`, whose

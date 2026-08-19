@@ -18,6 +18,14 @@ import { rewriteExpressions } from "../walk"
 // chain, and the target is a fresh object literal in both forms. So the
 // combined Record holds the same members, keyed in the same order.
 //
+// NOTE: What neither form may do is copy the right-hand side WHOLE when it is
+// not a literal. Record assignability is width subtyping, so a value the
+// checker admitted as `{ port: Integer }` may carry members of its own that the
+// answer's Type does not declare — and copying those in put a value of the
+// wrong Type into a member the rest of the Program reads at the declared one.
+// The names its Type does declare ride along on the Node instead, and the
+// Rewriter reads exactly those off it.
+//
 // NOTE: What the two forms do NOT share is where the hidden Type key comes
 // from. `Object.assign({}, lhs, rhs)` copied it from whichever source carried
 // it last — the right-hand side, a Record built for the occasion — so the
@@ -55,12 +63,36 @@ function collapse(
 	// form.
 	let members = membersOf(node.rhs)
 
+	if (members !== null) {
+		return {
+			nodeType: "Intrinsic",
+			kind: "spread-combination",
+			lhs: node.lhs,
+			members,
+			rhs: null,
+			rhsMembers: null,
+			type: node.type,
+			position: node.position,
+		}
+	}
+
+	// NOTE: Every other right-hand side is projected to the members its Type
+	// names, so the Type has to be a Record to name them. The Enricher refuses
+	// a Combination whose right-hand side is anything else
+	// ('uncombinable-types'), so this is the same kind of guard as the one
+	// above — a day on which that stops being true costs an optimisation rather
+	// than a projection of nothing.
+	if (node.rhs.type.type !== "Record") {
+		return node
+	}
+
 	return {
 		nodeType: "Intrinsic",
 		kind: "spread-combination",
 		lhs: node.lhs,
-		members: members ?? {},
-		rhs: members === null ? node.rhs : null,
+		members: {},
+		rhs: node.rhs,
+		rhsMembers: Object.keys(node.rhs.type.members),
 		type: node.type,
 		position: node.position,
 	}

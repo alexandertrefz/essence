@@ -907,13 +907,28 @@ export type InlineLoopDriver =
 // The right-hand side is written out MEMBER BY MEMBER when it is a Record
 // literal, which is what `{ base with x = 1 }` spells and the Record it would
 // have built never exists. Any other right-hand side — a name, a call — is
-// spread as a whole. As with a Case's payload, exactly one of the two is set.
+// PROJECTED to the members its static Type names, one read each. As with a
+// Case's payload, exactly one of `members` and `rhs` is set.
+//
+// NOTE: Projected rather than spread whole, because Record assignability is
+// WIDTH subtyping: a value typed `{ port: Integer }` is admitted wherever that
+// shape is asked for, and nothing says it does not also carry a `tls` of its
+// own. Spread whole, `{ server with partial }` copied that `tls` over the one
+// the answer's Type declares — a String sitting in a Boolean member, past the
+// checker and into a value the rest of the Program computes on. A read per
+// declared member takes exactly what the Type promised and nothing else.
 export interface SpreadCombinationNode {
 	nodeType: "Intrinsic"
 	kind: "spread-combination"
 	lhs: ExpressionNode
 	members: Record<string, ExpressionNode>
 	rhs: ExpressionNode | null
+	// NOTE: The members of `rhs`'s Type, in declaration order — non-null
+	// exactly when `rhs` is. Names, read off the Type once here, rather than a
+	// Type the emitter reads again later: a pass after this one may replace the
+	// right-hand side Expression (`pool-constants` does), and what is projected
+	// has to stay the set the Enricher checked.
+	rhsMembers: Array<string> | null
 	type: Type
 	position?: Position
 }
