@@ -5,6 +5,12 @@ implementation {
 	§ into every position that takes a value apart, with one member form added:
 	§ a bare `name`, which BINDS. Every member binds except `name = value`,
 	§ which constrains without binding because the value is written right there.
+
+	§ The mirror holds when the braces BUILD a value instead of taking one
+	§ apart: in a Record Literal a bare `name` PUTS the binding of that name
+	§ into the member of that name, so `{ x }` is `{ x = x }`. An update's key
+	§ list is the one set of braces that is not a Literal — `{ point with x }`
+	§ already means "merge the value `x`" — and it takes no bare name at all.
 	type Click = { x: Integer, y: Integer }
 	type KeyPress = { key: String }
 

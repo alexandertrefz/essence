@@ -56,8 +56,8 @@ implementation {
 					::removeDuplicates()
 
 				<- {
-					eventName = eventName,
-					namespaces = namespaces,
+					eventName,
+					namespaces,
 					isDefaultPrevented = false,
 					isCancelled = false,
 					isPropagationStopped = false,
