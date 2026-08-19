@@ -54,6 +54,30 @@ export type Scope = {
 	// while a Match Handler nested inside still binds its own `@` and wins,
 	// because that binding sits closer to the use.
 	isStaticMethodBody?: boolean
+	// NOTE: The Protocol whose provided Method this Scope is the body of. A
+	// provided Method is emitted ONCE, above every Program that reaches it, so
+	// a name the Program itself declares — a Constant, a Function, a Namespace
+	// — is not in scope where the body lands however plainly it is in scope
+	// where the body is written. It is a BARRIER rather than a missing
+	// binding: the name resolves, and resolves to something the emitted const
+	// can not see, so the walk has to notice that it CROSSED this Scope.
+	//
+	// Read by the name walk only, and only to report — the Type the name
+	// resolves to still stands, so one out-of-reach name reports once instead
+	// of cascading through everything written around it.
+	providedMethodOf?: string
+	// NOTE: The names the emitted PRELUDE binds — every builtin and every
+	// standard library Namespace — set on the top level Scope, where they are
+	// seeded, and read by nothing but the check above. It has to be recorded
+	// separately because the Program's own declarations land in the same
+	// `members` table, by design, and a hoisted one leaves no entry in
+	// `declarations` to be told apart by.
+	//
+	// Absent throughout the standard library's OWN load, which is what says
+	// "this compilation IS the prelude" — there, a provided Method's body may
+	// name whatever its file imports, because all of it is emitted above the
+	// Program too.
+	preludeNames?: ReadonlySet<string>
 	// NOTE: The names a Parameter's `= expression` default may NOT read, and
 	// where each one is written. A default may read `@`, the Parameters to its
 	// left and everything the Declaration is written inside; what is barred is

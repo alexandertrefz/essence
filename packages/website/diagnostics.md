@@ -1057,6 +1057,20 @@ Method `Orderable` declares, and everything the Protocols it extends declare,
 and nothing else at all. Declare the Method on the Protocol, or bound the Type
 Parameter by a Protocol that has it.
 
+### `provided-method-out-of-reach`
+
+A provided Method's body named something the Program declares — a Constant, a
+Variable, a Function or a Namespace.
+
+A provided Method is emitted once, as a single const in the band above every
+Program that reaches the Protocol, so what the body can name is what that band
+holds: the builtins and the standard library. A name written beside the Protocol
+is in scope where the body is written and gone where the body lands, so the
+Program would compile and then fail at run time.
+
+Give the Protocol a requirement the body calls on `@`, and let each conforming
+Namespace reach the name instead.
+
 ## Inference
 
 ### `uninferable-type-parameter`

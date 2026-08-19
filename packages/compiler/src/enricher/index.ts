@@ -87,6 +87,11 @@ export function topLevelScope(
 		modulePath: options.modulePath,
 		unimportedNamespaces: options.unimportedNamespaces,
 		members,
+		// NOTE: Taken HERE, where `members` holds the builtins and nothing
+		// else — the Program's own declarations are written into this same
+		// table afterwards, which is what makes the snapshot the only way to
+		// tell the two apart later.
+		preludeNames: new Set(Object.keys(members)),
 		// NOTE: The builtins are declared in TypeScript, not in Essence —
 		// there is no source Position to point a Diagnostic at.
 		declarations: scopeMap(),

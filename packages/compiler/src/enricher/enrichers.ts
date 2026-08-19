@@ -3183,7 +3183,10 @@ function enrichProvidedMethods(
 			name: "Self",
 			constraint: node.name.content,
 		}
-		let bodyScope = childScope(scope, { types: { Self: boundSelf } })
+		let bodyScope = childScope(scope, {
+			types: { Self: boundSelf },
+			providedMethodOf: node.name.content,
+		})
 		let type = resolveFunctionValueType(body, bodyScope)
 
 		methods[methodName] = {
