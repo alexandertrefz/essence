@@ -103,8 +103,7 @@ declarations {
 
 		§§ Answers whether the String has the same characters as another one.
 		§§
-		§§ The comparison is case-sensitive unless a `CaseSensitivity` says
-		§§ otherwise.
+		§§ The comparison is case-sensitive unless a `CaseSensitivity` says otherwise.
 		overload is {
 			§§ @param _ — the String to compare against
 			§§ @returns — `true` when the Strings are equal.
@@ -155,8 +154,7 @@ declarations {
 
 		§§ Answers the lines of the String, split at every line break.
 		§§
-		§§ A line break is `\n`, `\r` or `\r\n`. A trailing break leaves a
-		§§ final empty line. The empty String is one empty line.
+		§§ A line break is `\n`, `\r` or `\r\n`. A trailing break leaves a final empty line. The empty String is one empty line.
 		§§
 		§§ @returns — the List of lines, without the line breaks.
 		lines() -> List<String> {
@@ -173,8 +171,7 @@ declarations {
 
 		§§ Answers the words of the String.
 		§§
-		§§ A word is a run of characters that are not whitespace. The
-		§§ whitespace between the words is dropped.
+		§§ A word is a run of characters that are not whitespace. The whitespace between the words is dropped.
 		§§
 		§§ @returns — the List of words, empty when the String is only whitespace.
 		words() -> List<String>
@@ -197,8 +194,7 @@ declarations {
 
 		§§ Answers how many times the given String occurs in this one.
 		§§
-		§§ The occurrences do not overlap: `"aaa"::count(of "aa")` is 1. The
-		§§ empty part answers 0.
+		§§ The occurrences do not overlap: `"aaa"::count(of "aa")` is 1. The empty part answers 0.
 		§§
 		§§ @param of — the String to count
 		§§ @returns — the number of occurrences.
@@ -231,9 +227,7 @@ declarations {
 
 		§§ Answers the character at the given position, counting from zero.
 		§§
-		§§ A negative position counts back from the end: -1 is the last
-		§§ character. A position outside the String answers nothing, and the
-		§§ `defaultingTo:` entry answers the given character instead.
+		§§ A negative position counts back from the end: -1 is the last character. A position outside the String answers nothing, and the `defaultingTo:` entry answers the given character instead.
 		overload character {
 			§§ @param at — the position to read
 			§§ @returns — the character, or nothing when the position is outside the String.
@@ -255,8 +249,7 @@ declarations {
 
 		§§ Answers the String in the given Unicode normalization form.
 		§§
-		§§ Two Strings that look the same can then compare and read the same.
-		§§ The default form is the one `is` and `compare` already work in.
+		§§ Two Strings that look the same can then compare and read the same. The default form is the one `is` and `compare` already work in.
 		§§
 		§§ @param as — the normalization form to produce; `#ComposedCanonical` when it is left out.
 		§§ @returns — the normalized String.
@@ -295,8 +288,7 @@ declarations {
 			<- @::ends(with suffix)::negate()
 		}
 
-		§§ Answers the String with every occurrence of one part replaced by
-		§§ another.
+		§§ Answers the String with every occurrence of one part replaced by another.
 		§§
 		§§ An empty part matches nothing and leaves the String unchanged.
 		§§
@@ -314,11 +306,9 @@ declarations {
 			}
 		}
 
-		§§ Answers the String with the first occurrence of one part replaced
-		§§ by another.
+		§§ Answers the String with the first occurrence of one part replaced by another.
 		§§
-		§§ An empty part, or a part that does not occur, leaves the String
-		§§ unchanged.
+		§§ An empty part, or a part that does not occur, leaves the String unchanged.
 		§§
 		§§ @param _ — the String to look for
 		§§ @param with — the String to put in its place
@@ -363,12 +353,9 @@ declarations {
 		§ allocates a String per character, two Lists and a join. The native
 		§ cuts the window out of the grapheme view and keeps what it cut.
 
-		§§ Answers the characters from one position up to, but not including,
-		§§ another.
+		§§ Answers the characters from one position up to, but not including, another.
 		§§
-		§§ A negative position counts back from the end, so
-		§§ `slice(from 0, to -1)` drops the last character. An empty or
-		§§ inverted range answers the empty String.
+		§§ A negative position counts back from the end, so `slice(from 0, to -1)` drops the last character. An empty or inverted range answers the empty String.
 		§§
 		§§ @param from — the first position to include; zero when it is left out.
 		§§ @param to — the position to stop before; the length when it is left out.
@@ -377,9 +364,7 @@ declarations {
 
 		§§ Answers the position of the first occurrence of the given String.
 		§§
-		§§ The empty String occurs at position 0. A String that does not
-		§§ occur answers nothing, and the `defaultingTo:` entry answers the
-		§§ given position instead.
+		§§ The empty String occurs at position 0. A String that does not occur answers nothing, and the `defaultingTo:` entry answers the given position instead.
 		overload firstIndex {
 			§§ @param of — the String to look for
 			§§ @returns — the zero-based position, or nothing when it does not occur.
@@ -413,9 +398,7 @@ declarations {
 
 		§§ Answers the position of the last occurrence of the given String.
 		§§
-		§§ The empty String occurs at the length. A String that does not
-		§§ occur answers nothing, and the `defaultingTo:` entry answers the
-		§§ given position instead.
+		§§ The empty String occurs at the length. A String that does not occur answers nothing, and the `defaultingTo:` entry answers the given position instead.
 		overload lastIndex {
 			§§ @param of — the String to look for
 			§§ @returns — the zero-based position, or nothing when it does not occur.
@@ -452,11 +435,9 @@ declarations {
 			}
 		}
 
-		§§ Answers the String padded with the given String up to the given
-		§§ length.
+		§§ Answers the String padded with the given String up to the given length.
 		§§
-		§§ The padding goes at the front when no end is named. `#BothEnds`
-		§§ centres the String.
+		§§ The padding goes at the front when no end is named. `#BothEnds` centres the String.
 		§§
 		§§ @param to — the length to reach
 		§§ @param with — the String to pad with, repeated as needed
