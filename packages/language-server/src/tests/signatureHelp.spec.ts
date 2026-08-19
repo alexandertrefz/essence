@@ -392,5 +392,38 @@ describe("Signature Help for a standard library Method", () => {
 			// commas alone would have said Parameter 1.
 			expect(help?.activeParameter).toBe(1)
 		})
+
+		// NOTE: A partial Record default marks nothing in the label — the `?`
+		// there says the whole Argument may go, which it may not — so the
+		// sentence beside the Argument being typed is where a writer is told
+		// what stopping short would leave to the callee.
+		describe("a Record Parameter with a partial default", () => {
+			let source = [
+				"implementation {",
+				"	type Options = { host: String, retries: Integer }",
+				"",
+				"	function connect(using options: Options = { retries = 3 }) -> String {",
+				"		<- options.host",
+				"	}",
+				"	connect(",
+				"}",
+			].join("\n")
+
+			it("should say which members a call may leave out", () => {
+				let help = findSignatureHelp(source, { line: 7, column: 10 })
+
+				expect(help?.signatures[0].parameters[0]?.documentation).toBe(
+					"A call may leave 'retries' out of this Record.",
+				)
+			})
+
+			it("should leave the Parameter itself unmarked", () => {
+				let help = findSignatureHelp(source, { line: 7, column: 10 })
+
+				expect(help?.signatures[0].label).toBe(
+					"connect(using: { host: String, retries: Integer }) -> String",
+				)
+			})
+		})
 	})
 })

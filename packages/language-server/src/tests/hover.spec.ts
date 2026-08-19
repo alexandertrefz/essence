@@ -1132,3 +1132,55 @@ describe("Hover of a Protocol-provided Method", () => {
 		)
 	})
 })
+
+// NOTE: The signature line marks a Parameter `?` only where the WHOLE Argument
+// may be left out, so a partial Record default has nowhere to say what it fills
+// in — the prose under the Parameter is the one place a reader is told.
+describe("A Record Parameter with a default", () => {
+	let source = [
+		"implementation {",
+		"\ttype Options = { host: String, retries: Integer }",
+		"",
+		"\tfunction connect(using options: Options = { retries = 3 }) -> String {",
+		"\t\t<- options.host",
+		"\t}",
+		"",
+		'\tTerminal.inspect(connect(using { host = "h" }))',
+		"}",
+	].join("\n")
+
+	it("should say which members a call may leave out", () => {
+		expect(hoverDocumentation(source, { line: 4, column: 19 })).toBe(
+			"A call may leave `retries` out of this Record.",
+		)
+	})
+
+	it("should print the Parameter's Type as it always did", () => {
+		expect(hover(source, { line: 4, column: 19 })).toBe(
+			"using: { host: String, retries: Integer }",
+		)
+	})
+
+	// NOTE: Whichever of the three offers a Parameter makes is under the
+	// cursor — the span as written, the label, or the name the body reads it
+	// under — the sentence is the same.
+	it("should say it under the internal name too", () => {
+		expect(hoverDocumentation(source, { line: 4, column: 26 })).toBe(
+			"A call may leave `retries` out of this Record.",
+		)
+	})
+
+	it("should say nothing about a Parameter with a scalar default", () => {
+		let scalar = [
+			"implementation {",
+			"\tfunction scaled(_ value: Integer = 1) -> Integer {",
+			"\t\t<- value",
+			"\t}",
+			"",
+			"\tTerminal.inspect(scaled())",
+			"}",
+		].join("\n")
+
+		expect(hoverDocumentation(scalar, { line: 2, column: 18 })).toBeNull()
+	})
+})

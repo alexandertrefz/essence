@@ -28,6 +28,11 @@ export type ArgumentContext =
 			kind: "record"
 			memberTypes: Record<string, common.Type>
 			presentMembers: Array<string>
+			// NOTE: The members the Parameter this Record answers fills in from
+			// its own default, so Completion can say which ones stopping now
+			// would leave to it. Empty everywhere else — a Record Literal
+			// written outside a call has nobody filling anything in.
+			omittableMembers: ReadonlyArray<string>
 			// NOTE: Whether a bare member name is a whole member in these
 			// braces. True in a Record Literal, where `{ x }` is `{ x = x }`,
 			// and false in an update's key list, which is the one member list
@@ -294,6 +299,7 @@ function visitRecordValue(
 	expected: common.Type | null,
 	state: State,
 	shorthand: boolean,
+	omittableMembers: ReadonlyArray<string> = [],
 ) {
 	let recordType = node.declaredType ?? asRecordType(expected) ?? node.type
 
@@ -304,6 +310,7 @@ function visitRecordValue(
 			memberTypes: recordType.members,
 			presentMembers: Object.keys(node.members),
 			shorthand,
+			omittableMembers,
 		},
 		state,
 	)
@@ -361,18 +368,33 @@ function visitArguments(
 	let parameterForArgument = pairedParameters(nodeArguments, parameterTypes)
 
 	nodeArguments.forEach((argument, argumentIndex) => {
-		let parameterType =
+		let parameter =
 			parameterTypes?.[
 				parameterForArgument[argumentIndex] ?? argumentIndex
-			]?.type ?? null
-
-		visitNode(
-			argument.value,
+			]
+		let parameterType = parameter?.type ?? null
+		let expected =
 			parameterType !== null && parameterType.type !== "GenericUse"
 				? parameterType
-				: null,
-			state,
-		)
+				: null
+
+		// NOTE: The one place a Record Literal knows which members somebody
+		// else would fill in — the Argument's own Parameter. Nothing nested
+		// inside it does: a member's Type is a Type, and a default belongs to a
+		// Parameter.
+		if (argument.value.nodeType === "RecordValue") {
+			visitRecordValue(
+				argument.value,
+				expected,
+				state,
+				true,
+				parameter?.defaultMembers ?? [],
+			)
+
+			return
+		}
+
+		visitNode(argument.value, expected, state)
 	})
 }
 

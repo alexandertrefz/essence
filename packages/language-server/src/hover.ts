@@ -3,6 +3,7 @@ import {
 	isSynthesizedName,
 	parameterDefaults,
 	parameterInternalName,
+	recordDefaultMembers,
 } from "@essence-lang/compiler/helpers"
 import {
 	printCaseWithPayload,
@@ -133,6 +134,11 @@ function consider(
 	type: common.Type,
 	label: string | null,
 	declared: common.Documentation | null = null,
+	// NOTE: One more sentence under whatever documents this. The `§§` says what
+	// a thing DOES; this says what a call may leave out of it, which is a fact
+	// about the Declaration rather than about the Type — the signature line
+	// itself is unchanged, because `?` there means the whole Argument may go.
+	note: string | null = null,
 ) {
 	if (!wins(state, position)) {
 		return
@@ -144,8 +150,14 @@ function consider(
 		state.best = {
 			position,
 			content: describeSignatures(signatures, label ?? ""),
-			documentation: renderDocumentation(
-				documentationFor(signatures, documentationOf(type) ?? declared),
+			documentation: withNote(
+				renderDocumentation(
+					documentationFor(
+						signatures,
+						documentationOf(type) ?? declared,
+					),
+				),
+				note,
 			),
 		}
 
@@ -156,8 +168,19 @@ function consider(
 		position,
 		content:
 			label === null ? printType(type) : `${label}: ${printType(type)}`,
-		documentation: renderDocumentation(declared),
+		documentation: withNote(renderDocumentation(declared), note),
 	}
+}
+
+function withNote(
+	documentation: string | null,
+	note: string | null,
+): string | null {
+	if (note === null) {
+		return documentation
+	}
+
+	return documentation === null ? note : `${documentation}\n\n${note}`
 }
 
 function considerSignatures(
@@ -882,8 +905,9 @@ function visitIdentifier(
 	state: State,
 	label: string = node.content,
 	declared: common.Documentation | null = null,
+	note: string | null = null,
 ) {
-	consider(state, node.position, node.type, label, declared)
+	consider(state, node.position, node.type, label, declared, note)
 }
 
 // NOTE: A place that NAMES a Protocol rather than declaring one. An unknown
@@ -929,16 +953,27 @@ function visitFunctionDefinition(
 		// names it contains, which are narrower and win on their own spans.
 		let declaredType =
 			parameter.internalName?.type ?? parameter.externalName?.type ?? null
+		// NOTE: On every offer this Parameter makes — the span as written, its
+		// label and the name its body reads it under — because a reader hovers
+		// whichever of the three is under the cursor, and each of them wins on
+		// its own span.
+		let note = omittableMembersNote(parameter)
 
 		if (declaredType !== null) {
-			consider(state, parameter.position, declaredType, null)
+			consider(state, parameter.position, declaredType, null, null, note)
 		}
 
 		if (
 			parameter.externalName !== null &&
 			parameter.externalName !== parameter.internalName
 		) {
-			visitIdentifier(parameter.externalName, state)
+			visitIdentifier(
+				parameter.externalName,
+				state,
+				parameter.externalName.content,
+				null,
+				note,
+			)
 		}
 
 		// NOTE: A Parameter taken apart by a Pattern has a Compiler-made
@@ -950,7 +985,13 @@ function visitFunctionDefinition(
 			parameter.internalName !== null &&
 			!isSynthesizedName(parameter.internalName.content)
 		) {
-			visitIdentifier(parameter.internalName, state)
+			visitIdentifier(
+				parameter.internalName,
+				state,
+				parameter.internalName.content,
+				null,
+				note,
+			)
 		}
 
 		// NOTE: A default is an Expression written where it stands, so a hover
@@ -963,6 +1004,26 @@ function visitFunctionDefinition(
 	}
 
 	visitBody(definition.body, state)
+}
+
+// NOTE: The members a Record Parameter's default fills in, said in one sentence
+// — the only place a reader is told, since the signature line marks a Parameter
+// `?` only where the WHOLE Argument may be left out and a partial default grants
+// nothing of the sort.
+//
+// NOTE: Read through the Compiler's own `recordDefaultMembers`, which is the one
+// answer the Parameter's Type carries and the callee's prologue fills in. A
+// second reading here would be a second answer.
+function omittableMembersNote(
+	parameter: common.typed.ParameterNode,
+): string | null {
+	let members = recordDefaultMembers(parameter.type, parameter.defaultValue)
+
+	if (members === null || members.length === 0) {
+		return null
+	}
+
+	return `A call may leave ${members.map((name) => `\`${name}\``).join(", ")} out of this Record.`
 }
 
 function invokedSignatures(

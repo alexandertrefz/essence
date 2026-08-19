@@ -4,6 +4,7 @@ import {
 	bodyDefinitelyReturns,
 	conformanceParameterName,
 	openArgumentHoles,
+	recordDefaultMembers,
 	resolveOverloadedMethodName,
 } from "../helpers/index"
 
@@ -1094,19 +1095,19 @@ function recordDefaultPrologue(
 			type: recordType.members[member]!,
 		})
 
-		let supplied: Set<string>
+		// NOTE: `recordDefaultMembers` and nothing local, because this has to be
+		// the very set the Parameter's TYPE carries as `defaultMembers` — what a
+		// call may leave out and what the prologue fills in are one answer, and
+		// two spellings of it would be two answers waiting to disagree.
+		let supplied = new Set(
+			recordDefaultMembers(recordType, defaultValue) ?? [],
+		)
 		let fallbackFor: (member: string) => common.typedSimple.ExpressionNode
 
 		if (defaultValue.nodeType === "RecordValue") {
-			supplied = new Set(Object.keys(defaultValue.members))
 			fallbackFor = (member) =>
 				simplifyExpression(defaultValue.members[member]!)
 		} else {
-			// NOTE: Every member, because a default that is not a literal is
-			// held to the Parameter's whole Type — `recordDefaultMembers` is
-			// what decides that, and this is the emission half of the same rule.
-			supplied = new Set(declared)
-
 			let hoisted: common.typedSimple.IdentifierNode = {
 				nodeType: "Identifier",
 				name: `_default${index}`,

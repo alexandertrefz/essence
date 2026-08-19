@@ -342,17 +342,30 @@ function contextualCompletions(
 		//
 		// `context.shorthand` is false inside an update's key list, where a
 		// bare name is refused outright — see `shorthand-in-combination`.
+		//
+		// NOTE: A member the callee's own default fills in says so instead, and
+		// ranks below the ones the call still HAS to write — the writer is being
+		// shown what is missing, and a member somebody else supplies is not
+		// missing in the same sense. The same wording and the same demotion a
+		// label a call may leave out already gets, one level down.
 		return Object.entries(context.memberTypes)
 			.filter(([name]) => !context.presentMembers.includes(name))
-			.map(([name, type]) => ({
-				label: name,
-				kind: "member" as const,
-				detail:
-					context.shorthand && bindings.has(name)
-						? `${printType(type)} (or '${name}' alone)`
-						: printType(type),
-				tier: completionTiers.member,
-			}))
+			.map(([name, type]) => {
+				let omittable = context.omittableMembers.includes(name)
+
+				return {
+					label: name,
+					kind: "member" as const,
+					detail: omittable
+						? `${printType(type)} (may be left out)`
+						: context.shorthand && bindings.has(name)
+							? `${printType(type)} (or '${name}' alone)`
+							: printType(type),
+					tier: omittable
+						? completionTiers.member + 1
+						: completionTiers.member,
+				}
+			})
 	}
 
 	// NOTE: A label a call may leave out is offered like any other, marked as

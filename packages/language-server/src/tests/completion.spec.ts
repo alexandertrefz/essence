@@ -1723,6 +1723,43 @@ describe("Completion of a label a call may leave out", () => {
 	})
 })
 
+// NOTE: The same thing one level down. A member the Parameter's own default
+// fills in is offered like any other, says so, and ranks below the members the
+// Argument still has to write.
+describe("Completion of a member a default fills in", () => {
+	let source = [
+		"implementation {",
+		"	type Options = { host: String, retries: Integer }",
+		"",
+		"	function connect(using options: Options = { retries = 3 }) -> String {",
+		"		<- options.host",
+		"	}",
+		"",
+		"	constant open = connect(using { ",
+		"}",
+	].join("\n")
+
+	it("should offer it, marked as omittable", () => {
+		expect(
+			entryFor(source, { line: 8, column: 34 }, "retries")?.detail,
+		).toBe("Integer (may be left out)")
+	})
+
+	it("should leave a member the default does not fill in alone", () => {
+		expect(entryFor(source, { line: 8, column: 34 }, "host")?.detail).toBe(
+			"String",
+		)
+	})
+
+	it("should rank it below a member the Argument still needs", () => {
+		let entries = findCompletions(source, { line: 8, column: 34 })
+		let retries = entries.find((entry) => entry.label === "retries")
+		let host = entries.find((entry) => entry.label === "host")
+
+		expect(retries?.tier).toBeGreaterThan(host!.tier)
+	})
+})
+
 // NOTE: A `= expression` default is an Expression position a writer types in
 // like any other. The probe walkers reached bodies only, so completion inside a
 // default answered with nothing at all.
