@@ -528,6 +528,12 @@ export interface ProtocolMethodSignatureNode {
 	nodeType: "ProtocolMethodSignature"
 	parameters: Array<ParameterNode>
 	returnType: TypeDeclarationNode
+	// NOTE: The block a PROVIDED Method carries, and null for a requirement —
+	// which is the whole of the difference between the two. It holds the SAME
+	// Parameter and return Type Nodes this signature does, so the two views of
+	// one Method can not drift: the Enricher resolves the signature off the
+	// fields above and enriches the body off this, and both read one Node.
+	body: FunctionValueNode | null
 	position: Position
 	documentation: Documentation | null
 }
@@ -569,6 +575,11 @@ export type ProtocolMethods = Record<
 export interface ProtocolDeclarationStatementNode {
 	nodeType: "ProtocolDeclarationStatement"
 	name: IdentifierNode
+	// NOTE: The Protocols this one EXTENDS, written in the `is A, is B` list a
+	// Namespace conformance uses — the same Node, so the two spellings can not
+	// drift. A `where` clause is refused at the Enricher: a Protocol has no
+	// Type Parameters for one to bound.
+	conformsTo: Array<ConformanceClauseNode>
 	methods: ProtocolMethods
 	position: Position
 	documentation: Documentation | null

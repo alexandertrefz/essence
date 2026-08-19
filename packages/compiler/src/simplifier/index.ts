@@ -727,15 +727,25 @@ function simplifyNativeShim(
 	}
 }
 
-// NOTE: Protocols are contracts only — they are erased here and emit no
-// JavaScript. Conformance values passed at call sites are their only runtime
-// footprint.
+// NOTE: A Protocol's REQUIREMENTS are a contract only — they are erased here
+// and emit no JavaScript, and the conformance values passed at call sites are
+// their whole runtime footprint. Its PROVIDED Methods are bodies, and go
+// through the very `simplifyMethods` a Namespace's do: `_self` unshifted onto
+// each, and the hidden `Self__conformance` Parameter appended by the bounded
+// Generic rail, because `Self` is a bounded Type Parameter of every one of them.
 function simplifyProtocolDeclarationStatement(
 	node: common.typed.ProtocolDeclarationStatementNode,
 ): common.typedSimple.ProtocolDeclarationStatementNode {
 	return {
 		nodeType: "ProtocolDeclarationStatement",
 		name: simplifyIdentifier(node.name),
+		// NOTE: `_self` is typed as the bounded `Self` — the receiver of a
+		// provided Method is not one Type but whichever conformer called it.
+		methods: simplifyMethods(node.methods, {
+			type: "GenericUse",
+			name: "Self",
+			constraint: node.name.content,
+		}),
 		position: node.position,
 	}
 }

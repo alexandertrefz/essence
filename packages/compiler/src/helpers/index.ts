@@ -1866,6 +1866,14 @@ export function computeConformanceMethodMap(
 	namespace: common.NamespaceType,
 	target: common.Type,
 	assumptions: ReadonlyMap<string, string> = new Map(),
+	// NOTE: Whether conforming to one Protocol grants conformance to another —
+	// a Protocol extension. This module knows nothing about a Scope, so the one
+	// caller that does hands the answer in; the default is the plain equality
+	// every caller without a Scope means.
+	grants: (declared: string, wanted: string) => boolean = (
+		declared,
+		wanted,
+	) => declared === wanted,
 ): ConformanceCheckResult {
 	let methodMap: ConformanceMethodMap = {}
 	let selfBindings: GenericBindings = new Map([["Self", target]])
@@ -1878,7 +1886,36 @@ export function computeConformanceMethodMap(
 
 		// NOTE: Object.hasOwn, not a plain index — a Method named `toString`
 		// would otherwise find Object.prototype.toString on the record.
-		if (!Object.hasOwn(namespace.methods, methodName)) {
+		let written = Object.hasOwn(namespace.methods, methodName)
+
+		// NOTE: A PROVIDED Method is not owed. A Namespace that writes none
+		// still answers it — the Protocol's body does — so it can not be
+		// missing, and it never enters the method map: the map is the witness a
+		// bounded call is handed, and a provided Method's body is ONE const
+		// every conformer shares rather than anything a witness could name.
+		//
+		// A Namespace that DOES write one has replaced it, whole, and the
+		// replacement is held to the provided signature by exactly the check a
+		// requirement gets — hence the same `mismatched` answer, and hence
+		// checking it here rather than in a pass of its own.
+		if (protocol.providedMethods?.[methodName] !== undefined) {
+			if (
+				written &&
+				!fulfills(
+					methodName,
+					substituted,
+					namespace.methods[methodName],
+					assumptions,
+					grants,
+				)
+			) {
+				return { kind: "mismatched", methodName }
+			}
+
+			continue
+		}
+
+		if (!written) {
 			return { kind: "missing", methodName }
 		}
 
@@ -1899,7 +1936,11 @@ export function computeConformanceMethodMap(
 				return { kind: "mismatched", methodName }
 			}
 
-			let bound = firstUnassumedBound(fulfilling.method, assumptions)
+			let bound = firstUnassumedBound(
+				fulfilling.method,
+				assumptions,
+				grants,
+			)
 
 			if (bound !== null) {
 				return { kind: "needs-condition", methodName, ...bound }
@@ -1921,7 +1962,11 @@ export function computeConformanceMethodMap(
 					return { kind: "mismatched", methodName }
 				}
 
-				let bound = firstUnassumedBound(fulfilling.method, assumptions)
+				let bound = firstUnassumedBound(
+					fulfilling.method,
+					assumptions,
+					grants,
+				)
 
 				if (bound !== null) {
 					return { kind: "needs-condition", methodName, ...bound }
@@ -1941,11 +1986,14 @@ export function computeConformanceMethodMap(
 function firstUnassumedBound(
 	method: common.BaseFunction,
 	assumptions: ReadonlyMap<string, string>,
+	grants: (declared: string, wanted: string) => boolean,
 ): { genericName: string; protocolName: string } | null {
 	for (let generic of method.generics) {
+		let assumed = assumptions.get(generic.name)
+
 		if (
 			generic.constraint != null &&
-			assumptions.get(generic.name) !== generic.constraint
+			(assumed === undefined || !grants(assumed, generic.constraint))
 		) {
 			return {
 				genericName: generic.name,
@@ -1955,6 +2003,45 @@ function firstUnassumedBound(
 	}
 
 	return null
+}
+
+// NOTE: Whether a written Method answers a Protocol signature at all — every
+// entry of an Overloaded signature, each by the rule one entry follows. Used
+// for a PROVIDED Method a Namespace overrode, which owes the signature without
+// owing the method map an entry.
+function fulfills(
+	methodName: string,
+	substituted: common.MethodType,
+	implementation: common.MethodType,
+	assumptions: ReadonlyMap<string, string>,
+	grants: (declared: string, wanted: string) => boolean,
+): boolean {
+	let entries =
+		substituted.type === "SimpleMethod" ||
+		substituted.type === "StaticMethod"
+			? [substituted as common.BaseFunction]
+			: substituted.overloads
+	let requiresStatic =
+		substituted.type === "StaticMethod" ||
+		substituted.type === "OverloadedStaticMethod"
+
+	for (let entry of entries) {
+		let fulfilling = findFulfillingMethod(
+			methodName,
+			entry,
+			requiresStatic,
+			implementation,
+		)
+
+		if (
+			fulfilling === null ||
+			firstUnassumedBound(fulfilling.method, assumptions, grants) !== null
+		) {
+			return false
+		}
+	}
+
+	return true
 }
 
 // NOTE: A Simple requirement is fulfilled by a Simple Method or by the first

@@ -81,7 +81,13 @@ export function rewrite(
 }
 
 function rewriteProgram(program: common.typedSimple.Program): string {
-	const prelude = stdlibPrelude()
+	// NOTE: The Program's own Protocol-provided Methods join the standard
+	// library's prelude rather than being emitted where they were written. That
+	// is what makes ONE const answer for every conformer: the reachability fixed
+	// point below already emits each candidate at most once, and the band it
+	// emits into is the one every reference resolves in.
+	const protocolMembers = protocolPreludeNamespaces([program])
+	const prelude = [...stdlibPrelude(), ...protocolMembers]
 
 	// NOTE: The user Program is rewritten FIRST, so that which merged Namespaces
 	// it needs can be answered from the finished tree rather than guessed at from
@@ -95,21 +101,25 @@ function rewriteProgram(program: common.typedSimple.Program): string {
 	// NOTE: One pool for the whole file, because a lone Program is one emitted
 	// Module: the standard library's pooled constants and the Program's own are
 	// declared side by side and a constant both of them want is declared once.
-	const { value: rewritten, pool } = collectingConstantPool(() => {
-		let implementation = rewriteImplementationSection(
-			program.implementation,
-		)
+	const { value: rewritten, pool } = withProvidedProtocolMembers(
+		providedProtocolMemberNames(protocolMembers),
+		() =>
+			collectingConstantPool(() => {
+				let implementation = rewriteImplementationSection(
+					program.implementation,
+				)
 
-		return {
-			implementation,
-			essenceMembers: reachableEssenceMethods(
-				prelude,
-				implementation,
-				freeFunctions,
-				[...pooledConstants.values()],
-			),
-		}
-	})
+				return {
+					implementation,
+					essenceMembers: reachableEssenceMethods(
+						prelude,
+						implementation,
+						freeFunctions,
+						[...pooledConstants.values()],
+					),
+				}
+			}),
+	)
 	const bands = essenceMemberBands(rewritten.essenceMembers)
 	const constantPool = constantPoolBand(pool, [
 		bands.functions,
@@ -298,96 +308,113 @@ function rewriteModuleGraph(
 				)
 			: null
 
-	return withEmission({ spellings, target }, () => {
-		let prelude = stdlibPrelude()
-		let freeFunctions = stdlibFreeFunctions()
-		// NOTE: A pool per Module, because a Module's constants are declared in
-		// it and a name declared in one Module is not in scope in another. The
-		// band is built here, before anything is asked of the Module's names:
-		// what a Module READS includes what its pooled constants read, and the
-		// runtime imports and the prelude import are both decided by that.
-		let bodies = modules.map((module) => {
-			let { value: body, pool } = collectingConstantPool(() =>
-				withSourcePath(module.filePath, () =>
-					rewriteImplementationSection(module.program.implementation),
-				),
-			)
+	// NOTE: One table for the whole graph — a Protocol declared in one Module
+	// and reached from another names ONE const, which the shared prelude Module
+	// below holds and every Module that names it imports.
+	let protocolMembers = protocolPreludeNamespaces(
+		modules.map((module) => module.program),
+	)
 
-			return { module, body, pool: constantPoolBand(pool, body) }
-		})
+	return withEmission({ spellings, target }, () =>
+		withProvidedProtocolMembers(
+			providedProtocolMemberNames(protocolMembers),
+			() => {
+				let prelude = [...stdlibPrelude(), ...protocolMembers]
+				let freeFunctions = stdlibFreeFunctions()
+				// NOTE: A pool per Module, because a Module's constants are declared in
+				// it and a name declared in one Module is not in scope in another. The
+				// band is built here, before anything is asked of the Module's names:
+				// what a Module READS includes what its pooled constants read, and the
+				// runtime imports and the prelude import are both decided by that.
+				let bodies = modules.map((module) => {
+					let { value: body, pool } = collectingConstantPool(() =>
+						withSourcePath(module.filePath, () =>
+							rewriteImplementationSection(
+								module.program.implementation,
+							),
+						),
+					)
 
-		let { value: essenceMembers, pool: preludePool } =
-			collectingConstantPool(() =>
-				reachableEssenceMethods(
-					prelude,
-					bodies.flatMap((rewritten) => rewritten.body),
-					freeFunctions,
-					bodies.map((rewritten) => rewritten.pool),
-					// NOTE: A host's prelude holds the WHOLE standard library,
-					// because what a graph reaches is a property of the graph
-					// and the prelude is served to the host under one name for
-					// every graph the build compiles. Two entries would
-					// otherwise agree on the name and disagree on what is in
-					// it, and whichever the host loaded first would answer for
-					// both — the other's Modules importing consts that are not
-					// there. Emitting all of them is what makes the answer a
-					// function of the standard library alone, and the host
-					// shakes away what its own build never names.
-					target.mode === "host" ? "whole" : "reached",
-				),
-			)
+					return { module, body, pool: constantPoolBand(pool, body) }
+				})
 
-		let declared = new Set(essenceMembers.keys())
-		let sources = new Map<string, string>()
-		let preludeProgram = preludeModule(essenceMembers, preludePool)
+				let { value: essenceMembers, pool: preludePool } =
+					collectingConstantPool(() =>
+						reachableEssenceMethods(
+							prelude,
+							bodies.flatMap((rewritten) => rewritten.body),
+							freeFunctions,
+							bodies.map((rewritten) => rewritten.pool),
+							// NOTE: A host's prelude holds the WHOLE standard library,
+							// because what a graph reaches is a property of the graph
+							// and the prelude is served to the host under one name for
+							// every graph the build compiles. Two entries would
+							// otherwise agree on the name and disagree on what is in
+							// it, and whichever the host loaded first would answer for
+							// both — the other's Modules importing consts that are not
+							// there. Emitting all of them is what makes the answer a
+							// function of the standard library alone, and the host
+							// shakes away what its own build never names.
+							target.mode === "host" ? "whole" : "reached",
+						),
+					)
 
-		checkEssenceMethodsAreDeclared(preludeProgram, declared)
-		sources.set(PRELUDE_SPECIFIER, generateProgram(preludeProgram))
+				let declared = new Set(essenceMembers.keys())
+				let sources = new Map<string, string>()
+				let preludeProgram = preludeModule(essenceMembers, preludePool)
 
-		for (let { module, body, pool } of bodies) {
-			let names = referencedNames([body, pool])
-			let preludeNames = [...essenceMembers.keys()].filter((name) =>
-				names.has(name),
-			)
+				checkEssenceMethodsAreDeclared(preludeProgram, declared)
+				sources.set(PRELUDE_SPECIFIER, generateProgram(preludeProgram))
 
-			let moduleProgram: estree.Program = {
-				type: "Program",
-				sourceType: "module",
-				body: [
-					...runtimeImports(names),
-					...(preludeNames.length === 0
-						? []
-						: [
-								namedImport(
-									preludeNames.map((name) => [name, name]),
-									PRELUDE_SPECIFIER,
-								),
-							]),
-					...moduleImports(module.program, spellings),
-					...pool,
-					...body,
-					...moduleExports(module.program, spellings),
-				],
-			}
+				for (let { module, body, pool } of bodies) {
+					let names = referencedNames([body, pool])
+					let preludeNames = [...essenceMembers.keys()].filter(
+						(name) => names.has(name),
+					)
 
-			checkEssenceMethodsAreDeclared(moduleProgram, declared)
-			sources.set(
-				moduleSpecifier(spellings.get(module.filePath)!),
-				generateProgram(
-					moduleProgram,
-					sourceTexts === null ? undefined : { sourceTexts },
-				),
-			)
-		}
+					let moduleProgram: estree.Program = {
+						type: "Program",
+						sourceType: "module",
+						body: [
+							...runtimeImports(names),
+							...(preludeNames.length === 0
+								? []
+								: [
+										namedImport(
+											preludeNames.map((name) => [
+												name,
+												name,
+											]),
+											PRELUDE_SPECIFIER,
+										),
+									]),
+							...moduleImports(module.program, spellings),
+							...pool,
+							...body,
+							...moduleExports(module.program, spellings),
+						],
+					}
 
-		return {
-			entry: moduleSpecifier(
-				spellings.get(entryPath) ??
-					moduleSpelling(spellingDirectory, entryPath),
-			),
-			sources,
-		}
-	})
+					checkEssenceMethodsAreDeclared(moduleProgram, declared)
+					sources.set(
+						moduleSpecifier(spellings.get(module.filePath)!),
+						generateProgram(
+							moduleProgram,
+							sourceTexts === null ? undefined : { sourceTexts },
+						),
+					)
+				}
+
+				return {
+					entry: moduleSpecifier(
+						spellings.get(entryPath) ??
+							moduleSpelling(spellingDirectory, entryPath),
+					),
+					sources,
+				}
+			},
+		),
+	)
 }
 
 // NOTE: The shared prelude, as its own Module: the runtime imports its consts
@@ -3292,6 +3319,17 @@ function namespaceMember(
 		}
 	}
 
+	// NOTE: A user Program's Protocol-provided Method, whose const this
+	// compilation emits. The standard library's own are answered by
+	// `essenceMethodName` below — they are in the prelude like every other
+	// Essence-implemented member — so only the Program's own need saying here.
+	if (isProvidedProtocolMember(namespaceName, memberName)) {
+		return {
+			type: "Identifier",
+			name: essenceMethodIdentifier(namespaceName, memberName),
+		}
+	}
+
 	// NOTE: The `$es_<Namespace>_<member>` const belongs to the STANDARD LIBRARY's
 	// Namespace of that name, so a user Namespace shadowing it must not be routed
 	// to one: `namespace List for Integer { contains(…) }` emitted
@@ -4027,6 +4065,125 @@ function withNamespaceScope<Value>(rewriteScope: () => Value): Value {
 	} finally {
 		shadowingNamespaceScopes.pop()
 	}
+}
+
+// NOTE: A Protocol's PROVIDED Methods are emitted exactly as the standard
+// library's Essence-implemented Methods are — one `$es_<Protocol>_<member>`
+// const each, reached by a bare Identifier, tree-shaken by the same fixed point
+// — which is what makes ONE const answer for every conformer. The standard
+// library's own reach the Rewriter through `stdlibPrelude`; a user Program's
+// come from the Program being emitted, and this is the table that says so.
+//
+// Ambient for the reason the emission and the Namespace scope stack are: every
+// reference routes through `namespaceMember`, several of them from deep inside
+// emission, and threading one per-compilation table through all of them would
+// say nothing the scope around the whole rewrite does not.
+let providedProtocolMembers: ReadonlySet<string> = new Set()
+
+function withProvidedProtocolMembers<Value>(
+	members: ReadonlySet<string>,
+	emit: () => Value,
+): Value {
+	let previous = providedProtocolMembers
+	providedProtocolMembers = members
+
+	try {
+		return emit()
+	} finally {
+		providedProtocolMembers = previous
+	}
+}
+
+// NOTE: The `\u0000` join can not occur inside either name, exactly as in
+// `stdlibPrelude` — the pair is keyed without an escape.
+function isProvidedProtocolMember(
+	protocolName: string,
+	memberName: string,
+): boolean {
+	return providedProtocolMembers.has(`${protocolName}\u0000${memberName}`)
+}
+
+// NOTE: The provided Methods a Program (or a whole graph) declares, as prelude
+// entries — a Protocol stands in for a Namespace here because everything the
+// emission needs from one is a name and a record of bodied Methods, and a
+// Protocol with provided Methods has both.
+//
+// The walk is the general one because a Protocol may be declared anywhere a
+// Statement may. A Method its const is never reached from costs nothing: the
+// same fixed point that shakes an unused standard library Method away shakes it
+// away too.
+function protocolPreludeNamespaces(
+	programs: Array<common.typedSimple.Program>,
+): Array<PreludeNamespace> {
+	let found: Array<PreludeNamespace> = []
+	let visited = new Set<unknown>()
+
+	let visit = (value: unknown): void => {
+		if (value === null || typeof value !== "object" || visited.has(value)) {
+			return
+		}
+
+		visited.add(value)
+
+		if (Array.isArray(value)) {
+			for (let entry of value) {
+				visit(entry)
+			}
+
+			return
+		}
+
+		let node = value as Record<string, unknown>
+
+		if (node["nodeType"] === "ProtocolDeclarationStatement") {
+			let protocol =
+				value as common.typedSimple.ProtocolDeclarationStatementNode
+
+			if (Object.keys(protocol.methods).length > 0) {
+				found.push({
+					name: protocol.name.name,
+					node: {
+						nodeType: "NamespaceDefinitionStatement",
+						name: protocol.name,
+						properties: {},
+						methods: protocol.methods,
+						nativeShims: [],
+						type: {
+							type: "Namespace",
+							name: protocol.name.name,
+							targetType: null,
+							generics: [],
+							properties: {},
+							methods: {},
+						},
+						position: protocol.position,
+					},
+				})
+			}
+		}
+
+		for (let entry of Object.values(node)) {
+			visit(entry)
+		}
+	}
+
+	for (let program of programs) {
+		visit(program.implementation.nodes)
+	}
+
+	return found
+}
+
+function providedProtocolMemberNames(
+	namespaces: Array<PreludeNamespace>,
+): Set<string> {
+	return new Set(
+		namespaces.flatMap((namespace) =>
+			Object.keys(namespace.node.methods).map(
+				(memberName) => `${namespace.name}\u0000${memberName}`,
+			),
+		),
+	)
 }
 
 function declareUserNamespace(namespaceName: string): void {

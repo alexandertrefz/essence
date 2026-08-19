@@ -1497,6 +1497,13 @@ class DescentParser {
 	protected parseProtocolDeclarationStatement(): parser.ProtocolDeclarationStatementNode {
 		let keyword = this.tokens.expect(TokenType.KeywordProtocol)
 		let name = this.parseIdentifier()
+		// NOTE: The extension list reads exactly as a Namespace's conformance
+		// list does, through the very same parse — `protocol Orderable is
+		// Comparable` says of the Protocol what a conformance clause says of a
+		// Type. A `where` clause parses here and is refused at the Enricher,
+		// which is where the Diagnostic can say that a Protocol has no Type
+		// Parameters for one to bound.
+		let conformsTo = this.parseConformanceClauses()
 
 		let leftBrace = this.tokens.expect(TokenType.SymbolLeftBrace)
 
@@ -1511,6 +1518,7 @@ class DescentParser {
 
 		return generators.protocolDeclarationStatement(
 			name,
+			conformsTo,
 			body,
 			{
 				start: keyword.position.start,
@@ -1593,10 +1601,36 @@ class DescentParser {
 		}
 	}
 
+	// NOTE: A Protocol Method is a requirement or a PROVIDED one, and the brace
+	// after the return Type is the whole of the difference. The provided branch
+	// builds the same Function Definition the bodied `declarations` Method form
+	// builds, over the very Parameter and return Type Nodes the signature keeps
+	// — so a provided Method is enriched and emitted by the code every other
+	// bodied Method goes through.
 	protected parseProtocolMethodSignature(): parser.ProtocolMethodSignatureNode {
 		let documentation = this.documentationHere()
 		let parameterList = this.parseParameterList()
 		let returnType = this.parseReturnType()
+
+		let body: parser.FunctionValueNode | null = null
+
+		if (this.tokens.peek()?.type === TokenType.SymbolLeftBrace) {
+			let block = this.parseBlock()
+
+			body = generators.functionValueNode(
+				generators.functionDefinition(
+					parameterList.parameters,
+					returnType,
+					block.body,
+					parameterList.position,
+					documentation,
+				),
+				{
+					start: parameterList.position.start,
+					end: block.position.end,
+				},
+			)
+		}
 
 		this.refusePatternParameters(
 			parameterList.parameters,
@@ -1610,6 +1644,7 @@ class DescentParser {
 		return generators.protocolMethodSignature(
 			parameterList.parameters,
 			returnType,
+			body,
 			{
 				start: parameterList.position.start,
 				end: returnType.position.end,

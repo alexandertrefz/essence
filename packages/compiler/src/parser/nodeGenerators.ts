@@ -515,6 +515,7 @@ export function namespaceDefinitionStatement(
 
 export function protocolDeclarationStatement(
 	name: parser.IdentifierNode,
+	conformsTo: Array<parser.ConformanceClauseNode>,
 	body: Array<parser.ProtocolMethods[string]>,
 	position: common.Position,
 	documentation: common.Documentation | null = null,
@@ -528,6 +529,7 @@ export function protocolDeclarationStatement(
 	return {
 		nodeType: "ProtocolDeclarationStatement",
 		name,
+		conformsTo,
 		methods,
 		position,
 		documentation,
@@ -537,6 +539,7 @@ export function protocolDeclarationStatement(
 export function protocolMethodSignature(
 	parameters: Array<parser.ParameterNode>,
 	returnType: parser.TypeDeclarationNode,
+	body: parser.FunctionValueNode | null,
 	position: common.Position,
 	documentation: common.Documentation | null = null,
 ): parser.ProtocolMethodSignatureNode {
@@ -544,6 +547,7 @@ export function protocolMethodSignature(
 		nodeType: "ProtocolMethodSignature",
 		parameters,
 		returnType,
+		body,
 		position,
 		documentation,
 	}

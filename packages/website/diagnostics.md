@@ -1016,6 +1016,47 @@ is about the empty Lists' item Type, and an empty List Literal leaves that
 unknown. Annotate the List (`constant items: List<Integer> = []`) to say what
 its items are.
 
+### `where-on-protocol-extension`
+
+A Protocol extension (`protocol Orderable is Comparable`) carries a `where`
+clause. A condition bounds one of the declaring Namespace's Type Parameters,
+and a Protocol declares none — there is nothing for the condition to speak
+about, and nothing at a use site to prove it with. Write `is Comparable` on its
+own, and bound the Type Parameter where the conforming Namespace is declared.
+
+### `unwritable-provided-method`
+
+A `static` or `overload` Protocol Method was given a body. A provided Method is
+written on `@`, the conforming value, and is emitted once for every conformer —
+a static Method has no receiver for `@` to stand for, and an `overload` entry's
+const is named for a slot in a Method Type the Protocol has no conformer to
+resolve against. Write the Method as a requirement, and give each conforming
+Namespace a body of its own.
+
+### `recursive-protocol`
+
+A Protocol extends itself, directly or through a chain of other Protocols. A
+Protocol's surface is its own Methods together with every ancestor's, so one
+that extends itself would never finish resolving. The Diagnostic names the way
+back round; break the cycle by dropping one of the extensions.
+
+The Protocol still resolves to its own Methods, so everything conforming to it
+keeps reporting about itself rather than about a Protocol that "is not
+declared".
+
+### `method-not-on-protocol`
+
+A Method was called on a value whose Type is a Protocol-bounded Type Parameter,
+and the Protocol does not declare it. Such a value is known by its bound and by
+nothing else — whatever the Type Argument turns out to be at a call site, only
+the Protocol's surface is there to be relied on.
+
+This is what a provided Method's body meets when it reaches past its own
+Protocol: the body of `Orderable.isLessThan` may call `compare`, every other
+Method `Orderable` declares, and everything the Protocols it extends declare,
+and nothing else at all. Declare the Method on the Protocol, or bound the Type
+Parameter by a Protocol that has it.
+
 ## Inference
 
 ### `uninferable-type-parameter`

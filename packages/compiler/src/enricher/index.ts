@@ -805,6 +805,137 @@ function reportRecursiveTypeDeclarations(
 	return recursiveNodes
 }
 
+// NOTE: A Protocol extension is a promise about conformers, and a Protocol that
+// (transitively) extends itself promises nothing that can ever be checked: its
+// surface is its ancestors' Methods plus its own, so reading it would never
+// finish. Reported before the hoist rounds, exactly as a recursive Type
+// declaration is, and for the same reason — the rounds would simply never
+// resolve any member of the cycle, and the in-order pass would then report each
+// ancestor as a Protocol that "is not declared", cascading Diagnostics about
+// names the Program does declare.
+//
+// The members are handed back so the hoist can resolve each to its OWN surface,
+// with the extension list skipped. That is enough for the rest of the Program to
+// be read against, and keeps every use site about itself.
+function reportRecursiveProtocolDeclarations(
+	nodes: Array<parser.ProtocolDeclarationStatementNode>,
+	scope: enricher.Scope,
+	sink: HoistDiagnosticSink,
+): Set<parser.ProtocolDeclarationStatementNode> {
+	let declarations = new Map<
+		string,
+		parser.ProtocolDeclarationStatementNode
+	>()
+
+	for (let node of nodes) {
+		if (
+			scope.protocols[node.name.content] == null &&
+			!declarations.has(node.name.content)
+		) {
+			declarations.set(node.name.content, node)
+		}
+	}
+
+	// NOTE: The shortest way from a Protocol back to itself, as the names it
+	// passes — empty where it extends itself outright. A plain breadth-first
+	// walk: an extension list is a handful of names, and this runs only for a
+	// Program that is already broken.
+	let pathBackTo = (start: string): Array<string> | null => {
+		let previous = new Map<string, string>()
+		let queue = [start]
+
+		while (queue.length > 0) {
+			let current = queue.shift()!
+
+			for (let clause of declarations.get(current)?.conformsTo ?? []) {
+				let target = clause.protocol.content
+
+				if (!declarations.has(target)) {
+					continue
+				}
+
+				if (target === start) {
+					let path: Array<string> = []
+
+					for (
+						let step = current;
+						step !== start;
+						step = previous.get(step)!
+					) {
+						path.unshift(step)
+					}
+
+					return path
+				}
+
+				if (!previous.has(target)) {
+					previous.set(target, current)
+					queue.push(target)
+				}
+			}
+		}
+
+		return null
+	}
+
+	let recursive = new Set<parser.ProtocolDeclarationStatementNode>()
+
+	for (let [name, node] of declarations) {
+		let through = pathBackTo(name)
+
+		if (through === null) {
+			continue
+		}
+
+		let reference = node.conformsTo.find(
+			(clause) =>
+				clause.protocol.content ===
+				(through.length === 0 ? name : through[0]),
+		)!.protocol
+		let notes = [
+			"A Protocol's surface is its own Methods together with every ancestor's, so one that extends itself would never finish resolving.",
+		]
+
+		if (through.length > 0) {
+			let path = [name, ...through, name]
+			let sentence = `'${path[0]}' extends '${path[1]}'`
+
+			for (let step = 2; step < path.length; step += 1) {
+				sentence += `, which extends '${path[step]}'`
+			}
+
+			notes.unshift(`${sentence} again.`)
+		}
+
+		let { diagnostics } = collectDiagnostics((): void => {
+			reportError(
+				through.length === 0
+					? `Protocol '${name}' extends itself`
+					: `Protocol '${name}' extends itself through '${through[0]}'`,
+				reference.position,
+				{
+					code: "recursive-protocol",
+					labels: [
+						primary(
+							reference.position,
+							through.length === 0
+								? "this names the Protocol being declared"
+								: `this leads back to '${name}'`,
+						),
+					],
+					notes,
+					helps: ["Break the cycle — drop one of the extensions."],
+				},
+			)
+		})
+
+		sink(node, diagnostics)
+		recursive.add(node)
+	}
+
+	return recursive
+}
+
 // NOTE: Type Aliases, Functions & Namespaces are order-independent — their
 // Types are hoisted into scope before the statement-by-statement enrichment,
 // so that top level declarations can reference each other regardless of
@@ -899,6 +1030,32 @@ function hoistDeclarationsInner(
 		)
 	}
 
+	// NOTE: The extension cycles, found once per Scope for the reason the Type
+	// cycles are: the graph is over Protocol NAMES, and two Modules each
+	// declaring `protocol Foo` declare two Protocols. Unlike a recursive Type
+	// these stay in the rounds — a Protocol in a cycle still has a surface of
+	// its own, and reading it is what keeps every conforming Namespace about
+	// itself.
+	let cyclicProtocols = new Set<parser.ProtocolDeclarationStatementNode>()
+
+	for (let scope of new Set(units.map((unit) => unit.scope))) {
+		let scopedProtocolNodes = pendingNodes
+			.filter((pending) => pending.scope === scope)
+			.map((pending) => pending.node)
+			.filter(
+				(node): node is parser.ProtocolDeclarationStatementNode =>
+					node.nodeType === "ProtocolDeclarationStatement",
+			)
+
+		for (let node of reportRecursiveProtocolDeclarations(
+			scopedProtocolNodes,
+			scope,
+			sink,
+		)) {
+			cyclicProtocols.add(node)
+		}
+	}
+
 	while (pendingNodes.length > 0) {
 		// NOTE: Before the resolution rounds rather than after, so a Module whose
 		// import became bindable by the previous round has it in Scope while its
@@ -980,6 +1137,12 @@ function hoistDeclarationsInner(
 							return resolveProtocolDeclarationStatementType(
 								node,
 								scope,
+								{
+									deferOnPendingProtocols:
+										pendingProtocols.get(scope) ??
+										new Set(),
+									ignoreExtensions: cyclicProtocols.has(node),
+								},
 							)
 						} else {
 							return resolveNamespaceDefinitionStatementType(
