@@ -550,6 +550,170 @@ describe("Parser", () => {
 			})
 		})
 
+		// NOTE: `server.port = 8080` — a key that reaches one step into the
+		// value being updated. The Parser reads one in EVERY key position and
+		// leaves the refusals to whoever knows what the braces are.
+		describe("Path keys", () => {
+			let combinationOf = (source: string): parser.CombinationNode => {
+				let node = parse(
+					`implementation { constant value = ${source} }`,
+				).implementation
+					.nodes[0] as parser.ConstantDeclarationStatementNode
+
+				return node.value as parser.CombinationNode
+			}
+
+			let keysOf = (
+				record: parser.RecordValueNode,
+			): Array<[string, Array<string> | null]> =>
+				Object.entries(record.members).map(([key, member]) => [
+					key,
+					member.steps?.map((step) => step.content) ?? null,
+				])
+
+			it("should key a path member by its dotted spelling", () => {
+				let combination = combinationOf(
+					"{ config with server.port = 8080 }",
+				)
+
+				expect(
+					keysOf(combination.rhs as parser.RecordValueNode),
+				).toEqual([["server.port", ["server", "port"]]])
+			})
+
+			it("should read every step of a longer path", () => {
+				let combination = combinationOf(
+					"{ config with server.tls.enabled = true }",
+				)
+
+				expect(
+					keysOf(combination.rhs as parser.RecordValueNode),
+				).toEqual([
+					["server.tls.enabled", ["server", "tls", "enabled"]],
+				])
+			})
+
+			// NOTE: `name` points at the FIRST step, so everything that reads
+			// a member's name without knowing about paths keeps working.
+			it("should point a path member's name at its first step", () => {
+				let combination = combinationOf(
+					"{ config with server.port = 8080 }",
+				)
+				let member = (combination.rhs as parser.RecordValueNode)
+					.members["server.port"]!
+
+				expect(member.name.content).toBe("server")
+				expect(member.name).toBe(member.steps![0]!)
+			})
+
+			it("should leave a plain key with no steps at all", () => {
+				let combination = combinationOf("{ config with name = 'a' }")
+
+				expect(
+					keysOf(combination.rhs as parser.RecordValueNode),
+				).toEqual([["name", null]])
+			})
+
+			it("should keep two paths that share a prefix apart", () => {
+				let combination = combinationOf(
+					"{ config with server.port = 1, server.host = 'db' }",
+				)
+
+				expect(
+					keysOf(combination.rhs as parser.RecordValueNode),
+				).toEqual([
+					["server.port", ["server", "port"]],
+					["server.host", ["server", "host"]],
+				])
+			})
+
+			it("should read a path key in a plain Record Literal", () => {
+				let node = parse(
+					"implementation { constant value = { server.port = 1 } }",
+				).implementation
+					.nodes[0] as parser.ConstantDeclarationStatementNode
+
+				expect(keysOf(node.value as parser.RecordValueNode)).toEqual([
+					["server.port", ["server", "port"]],
+				])
+			})
+
+			// NOTE: The one reading a path key must never take away: the left
+			// hand side of an update is an Expression, and a Lookup chain is
+			// one.
+			it("should leave a Lookup chain before 'with' as the value updated", () => {
+				let combination = combinationOf(
+					"{ config.server with port = 1 }",
+				)
+
+				expect(combination.lhs.nodeType).toBe("Lookup")
+			})
+
+			// NOTE: An update takes either a key list or one Expression, and
+			// one path is an Expression — so this merges the VALUE, exactly as
+			// `{ base with other }` does.
+			it("should read a lone path after 'with' as the value merged", () => {
+				let combination = combinationOf("{ config with server.tls }")
+
+				expect(combination.rhs.nodeType).toBe("Lookup")
+			})
+
+			it("should refuse a path key written with no value", () => {
+				let { diagnostics } = parseWithDiagnostics(
+					"implementation { constant value = { config with server.port, name = 'a' } }",
+				)
+
+				expect(diagnostics).toHaveLength(1)
+				expect(diagnostics[0]!.code).toBe("shorthand-on-path-key")
+				expect(diagnostics[0]!.helps).toEqual([
+					"Write 'server.port = port'.",
+				])
+			})
+
+			it("should refuse a bare path rather than a bare name", () => {
+				let { diagnostics } = parseWithDiagnostics(
+					"implementation { constant value = { config with server.port, host } }",
+				)
+
+				expect(
+					diagnostics.map((diagnostic) => diagnostic.code),
+				).toEqual(["shorthand-on-path-key", "shorthand-in-combination"])
+			})
+
+			it("should refuse a key that a path already writes", () => {
+				let { diagnostics } = parseWithDiagnostics(
+					"implementation { constant value = { config with server = s, server.port = 1 } }",
+				)
+
+				expect(diagnostics).toHaveLength(1)
+				expect(diagnostics[0]!.code).toBe("duplicate-member")
+				expect(diagnostics[0]!.message).toBe(
+					"Member 'server.port' and 'server' both write 'server'",
+				)
+			})
+
+			it("should refuse the same path written twice", () => {
+				let { diagnostics } = parseWithDiagnostics(
+					"implementation { constant value = { config with server.port = 1, server.port = 2 } }",
+				)
+
+				expect(diagnostics).toHaveLength(1)
+				expect(diagnostics[0]!.message).toBe(
+					"Member 'server.port' is already defined",
+				)
+			})
+
+			// NOTE: The boundary is the dot, not the characters — `serverPort`
+			// is no part of `server`.
+			it("should leave a key that merely starts the same alone", () => {
+				let { diagnostics } = parseWithDiagnostics(
+					"implementation { constant value = { config with server = s, serverPort = 1 } }",
+				)
+
+				expect(diagnostics).toEqual([])
+			})
+		})
+
 		describe("Literals", () => {
 			describe("StringInterpolation", () => {
 				let onlyExpression = (
