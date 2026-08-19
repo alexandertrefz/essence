@@ -42,4 +42,5 @@ export const runtimeNamespaceNames = [
 	"NonEmptyIntegerList",
 	"NonEmptyRationalList",
 	"NonEmptyNumberList",
+	"KeyedNumberList",
 ]

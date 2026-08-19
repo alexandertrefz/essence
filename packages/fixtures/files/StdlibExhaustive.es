@@ -2164,6 +2164,77 @@ third"::lines())
 		"List.sort<ItemType>(by: (_ ItemType, _ ItemType) -> Ordering) [empty]",
 		noNumbers::sort(by (first, second) { <- first::compare(to second) }),
 	)
+
+	§ The keyed entries, which is what a member path was built for. Every one
+	§ of them reads its key with one, so the calls below are also what says the
+	§ desugar reaches an Argument position. Each printed Record is kept short
+	§ for the reason `point` is.
+	§ Each `m` is annotated where it is bound rather than inside the literal:
+	§ a List literal takes its item Type from the items, so three Records
+	§ holding an Integer, a Rational and an Integer answer three shapes rather
+	§ than one holding the Union.
+	constant mixedTwo: Integer | Rational   = 2
+	constant mixedHalf: Integer | Rational  = 1/2
+	constant mixedThree: Integer | Rational = 3
+
+	constant rows: List<{
+		tag: String,
+		n: Integer,
+		r: Rational,
+		m: Integer | Rational,
+	}>   = [
+		{ tag = "b", n = 2, r = 3/2, m = mixedTwo },
+		{ tag = "a", n = 1, r = 1/2, m = mixedHalf },
+		{ tag = "c", n = 3, r = 5/2, m = mixedThree },
+	]
+	constant noRows: List<{
+		tag: String,
+		n: Integer,
+		r: Rational,
+		m: Integer | Rational,
+	}> = []
+	constant fallbackRow = { tag = "z", n = 0, r = 0/1, m = 0 }
+
+	show(
+		"List.sort<ItemType, Key is Comparable>(on: (_ ItemType) -> Key)",
+		rows::sort(on .tag)::map(.n),
+	)
+	show(
+		"List.sort<ItemType, Key is Comparable>(on: (_ ItemType) -> Key) [empty]",
+		noRows::sort(on .tag)::map(.n),
+	)
+	show(
+		"List.lowestItem<ItemType, Key is Comparable>(on: (_ ItemType) -> Key)",
+		rows::lowestItem(on .n),
+	)
+	show(
+		"List.lowestItem<ItemType, Key is Comparable>(on: (_ ItemType) -> Key) [empty]",
+		noRows::lowestItem(on .n),
+	)
+	show(
+		"List.lowestItem<ItemType, Key is Comparable>(on: (_ ItemType) -> Key, defaultingTo: ItemType)",
+		rows::lowestItem(on .n, defaultingTo fallbackRow),
+	)
+	show(
+		"List.lowestItem<ItemType, Key is Comparable>(on: (_ ItemType) -> Key, defaultingTo: ItemType) [empty]",
+		noRows::lowestItem(on .n, defaultingTo fallbackRow),
+	)
+	show(
+		"List.greatestItem<ItemType, Key is Comparable>(on: (_ ItemType) -> Key)",
+		rows::greatestItem(on .n),
+	)
+	show(
+		"List.greatestItem<ItemType, Key is Comparable>(on: (_ ItemType) -> Key) [empty]",
+		noRows::greatestItem(on .n),
+	)
+	show(
+		"List.greatestItem<ItemType, Key is Comparable>(on: (_ ItemType) -> Key, defaultingTo: ItemType)",
+		rows::greatestItem(on .n, defaultingTo fallbackRow),
+	)
+	show(
+		"List.greatestItem<ItemType, Key is Comparable>(on: (_ ItemType) -> Key, defaultingTo: ItemType) [empty]",
+		noRows::greatestItem(on .n, defaultingTo fallbackRow),
+	)
 	show(
 		"List.compare<ItemType is Comparable>(to: List<ItemType>)",
 		[1, 2]::compare(to [1, 3]),
@@ -2452,6 +2523,32 @@ third"::lines())
 			::sort(by (first, second) { <- second::compare(to first) })
 			::firstItem(),
 	)
+
+	§ The keyed entries here spend the proof twice over: the sorted List is
+	§ still proven, and the lowest and greatest answer an item rather than an
+	§ Optional.
+	constant provenRows: NonEmptyList<{ tag: String, n: Integer }> = [
+		{ tag = "b", n = 2 },
+		{ tag = "a", n = 1 },
+		{ tag = "c", n = 3 },
+	]
+
+	show(
+		"NonEmptyList.sort<ItemType, Key is Comparable>(on: (_ ItemType) -> Key)",
+		provenRows::sort(on .tag)::map(.n),
+	)
+	show(
+		"NonEmptyList.sort<ItemType, Key is Comparable>(on: (_ ItemType) -> Key) [proof carried]",
+		provenRows::sort(on .tag)::firstItem(),
+	)
+	show(
+		"NonEmptyList.lowestItem<ItemType, Key is Comparable>(on: (_ ItemType) -> Key)",
+		provenRows::lowestItem(on .n),
+	)
+	show(
+		"NonEmptyList.greatestItem<ItemType, Key is Comparable>(on: (_ ItemType) -> Key)",
+		provenRows::greatestItem(on .n),
+	)
 	show(
 		"NonEmptyList.replace<ItemType>(_ ItemType, at: Integer)",
 		provenNumbers::replace(99, at 0),
@@ -2677,6 +2774,43 @@ third"::lines())
 	show(
 		"NonEmptyNumberList.average() [rational total]",
 		noMixedNumbers::append(3)::append(1/2)::average(),
+	)
+
+	§ ——— KeyedNumberList —————————————————————————————————————————————————
+	§ The same aggregates over a List of anything, reached through a key. What
+	§ has to be a number is what the key answers, so the receiver here is a
+	§ List of Records and the label says which entry the key picked.
+	show(
+		"KeyedNumberList.sum<ItemType>(on: (_ ItemType) -> Integer)",
+		rows::sum(on .n),
+	)
+	show(
+		"KeyedNumberList.sum<ItemType>(on: (_ ItemType) -> Integer) [empty]",
+		noRows::sum(on .n),
+	)
+	show(
+		"KeyedNumberList.sum<ItemType>(on: (_ ItemType) -> Rational)",
+		rows::sum(on .r),
+	)
+	show(
+		"KeyedNumberList.sum<ItemType>(on: (_ ItemType) -> Integer | Rational)",
+		rows::sum(on .m),
+	)
+	show(
+		"KeyedNumberList.average<ItemType>(on: (_ ItemType) -> Integer | Rational)",
+		rows::average(on .n),
+	)
+	show(
+		"KeyedNumberList.average<ItemType>(on: (_ ItemType) -> Integer | Rational) [empty]",
+		noRows::average(on .n),
+	)
+	show(
+		"KeyedNumberList.average<ItemType>(on: (_ ItemType) -> Integer | Rational, defaultingTo: Rational)",
+		rows::average(on .r, defaultingTo 0/1),
+	)
+	show(
+		"KeyedNumberList.average<ItemType>(on: (_ ItemType) -> Integer | Rational, defaultingTo: Rational) [empty]",
+		noRows::average(on .r, defaultingTo 0/1),
 	)
 
 	§ ——— loop ————————————————————————————————————————————————————————————

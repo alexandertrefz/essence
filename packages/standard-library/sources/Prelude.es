@@ -19,6 +19,7 @@ export {
 	Irrational           from "./Number.es"
 	Number               from "./Number.es"
 	IntegerList          from "./NumberList.es"
+	KeyedNumberList      from "./NumberList.es"
 	NonEmptyIntegerList  from "./NumberList.es"
 	NonEmptyNumberList   from "./NumberList.es"
 	NonEmptyRationalList from "./NumberList.es"
