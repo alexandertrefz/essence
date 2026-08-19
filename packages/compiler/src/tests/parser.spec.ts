@@ -285,6 +285,177 @@ describe("Parser", () => {
 			})
 		})
 
+		// NOTE: `{ x }` is `{ x = x }`, and it is a feature of a Record
+		// LITERAL's member list — never of an update's key list, where a bare
+		// name is already the whole value being merged in.
+		describe("Property shorthand", () => {
+			let recordOf = (source: string): parser.RecordValueNode => {
+				let node = parse(
+					`implementation { constant value = ${source} }`,
+				).implementation
+					.nodes[0] as parser.ConstantDeclarationStatementNode
+
+				return node.value as parser.RecordValueNode
+			}
+
+			let membersOf = (
+				record: parser.RecordValueNode,
+			): Array<[string, string, boolean]> =>
+				Object.entries(record.members).map(([key, member]) => [
+					key,
+					member.value.nodeType === "Identifier"
+						? member.value.content
+						: member.value.nodeType,
+					member.shorthand === true,
+				])
+
+			it("should read a bare name as its own value", () => {
+				expect(membersOf(recordOf("{ x, y }"))).toEqual([
+					["x", "x", true],
+					["y", "y", true],
+				])
+			})
+
+			it("should mark only the members that were written bare", () => {
+				expect(membersOf(recordOf("{ x, y = 2 }"))).toEqual([
+					["x", "x", true],
+					["y", "IntegerValue", false],
+				])
+			})
+
+			// NOTE: The name and the value share one Position on purpose —
+			// that is what a rename of either one expands the member from.
+			it("should give the name and the value one Position", () => {
+				let member = recordOf("{ x }").members["x"]!
+
+				expect(member.value.position).toEqual(member.name.position)
+			})
+
+			it("should read a bare name in a typed Record Literal", () => {
+				let node = parse(
+					"implementation { constant value = Point ~> { x, y } }",
+				).implementation
+					.nodes[0] as parser.ConstantDeclarationStatementNode
+				let record = node.value as parser.RecordValueNode
+
+				expect(membersOf(record)).toEqual([
+					["x", "x", true],
+					["y", "y", true],
+				])
+			})
+
+			it("should read a bare name in a Case payload", () => {
+				let node = parse(
+					"implementation { constant value = #Rectangle({ width, height }) }",
+				).implementation
+					.nodes[0] as parser.ConstantDeclarationStatementNode
+				let payload = (node.value as parser.CaseValueNode)
+					.value as parser.RecordValueNode
+
+				expect(membersOf(payload)).toEqual([
+					["width", "width", true],
+					["height", "height", true],
+				])
+			})
+
+			it("should read a bare name in a Literal that is a member's value", () => {
+				let outer = recordOf("{ server = { port, host } }")
+				let inner = outer.members["server"]!
+					.value as parser.RecordValueNode
+
+				expect(membersOf(inner)).toEqual([
+					["port", "port", true],
+					["host", "host", true],
+				])
+			})
+
+			it("should read a bare name in a Literal merged by an update", () => {
+				let node = parse(
+					"implementation { constant value = { base with { port, host } } }",
+				).implementation
+					.nodes[0] as parser.ConstantDeclarationStatementNode
+				let combination = node.value as parser.CombinationNode
+
+				expect(
+					membersOf(combination.rhs as parser.RecordValueNode),
+				).toEqual([
+					["port", "port", true],
+					["host", "host", true],
+				])
+			})
+
+			// NOTE: The reading that keeps `{ base with other }` meaning what
+			// it has always meant — a whole value merged in, not a member set.
+			it("should keep a bare name after 'with' as the value being merged", () => {
+				let node = parse(
+					"implementation { constant value = { base with other } }",
+				).implementation
+					.nodes[0] as parser.ConstantDeclarationStatementNode
+				let combination = node.value as parser.CombinationNode
+
+				expect(combination.rhs.nodeType).toBe("Identifier")
+			})
+
+			it("should refuse a bare name in an update's key list", () => {
+				let { diagnostics } = parseWithDiagnostics(
+					"implementation { constant value = { base with port, host } }",
+				)
+
+				expect(
+					diagnostics.map((diagnostic) => diagnostic.code),
+				).toEqual([
+					"shorthand-in-combination",
+					"shorthand-in-combination",
+				])
+			})
+
+			it("should refuse only the bare names in an update's key list", () => {
+				let { diagnostics } = parseWithDiagnostics(
+					"implementation { constant value = { base with a = 1, host } }",
+				)
+
+				expect(diagnostics).toHaveLength(1)
+				expect(diagnostics[0]!.code).toBe("shorthand-in-combination")
+				expect(diagnostics[0]!.helps).toEqual([
+					"Write 'host = host'.",
+					"Or merge a whole Record: '{ base with { host } }'.",
+				])
+			})
+
+			// NOTE: The third reading exists to explain a bare name, and a list
+			// that is broken for some other reason must not be explained by it.
+			it("should leave a list broken for another reason to the Parser", () => {
+				let { diagnostics } = parseWithDiagnostics(
+					"implementation { constant value = { base with a = , } }",
+				)
+
+				expect(
+					diagnostics.map((diagnostic) => diagnostic.code),
+				).toEqual(["syntax-error"])
+			})
+
+			// NOTE: The speculative Literal reading of `{ base with … }` reads
+			// `base` as a shorthand member before it meets `with`, reports
+			// nothing on the way out, and leaves the Combination reading to it.
+			it("should leave nothing behind when the Literal reading is thrown away", () => {
+				let { diagnostics } = parseWithDiagnostics(
+					"implementation { constant value = { base with base = 1 } }",
+				)
+
+				expect(diagnostics).toEqual([])
+			})
+
+			it("should still report a member written twice", () => {
+				let { diagnostics } = parseWithDiagnostics(
+					"implementation { constant value = { x, x } }",
+				)
+
+				expect(
+					diagnostics.map((diagnostic) => diagnostic.code),
+				).toEqual(["duplicate-member"])
+			})
+		})
+
 		describe("Literals", () => {
 			describe("StringInterpolation", () => {
 				let onlyExpression = (

@@ -145,6 +145,13 @@ export type ValueNode =
 export interface RecordValueMemberNode {
 	name: IdentifierNode
 	value: ExpressionNode
+	// NOTE: Set where the member was written as a bare name — `{ x }`, which
+	// is `{ x = x }`. The name and the value are then two Nodes at ONE
+	// Position, which is what lets a rename of either one expand the member
+	// back to its written-out form. Absent rather than false on a member that
+	// spelled its value, so nothing that compares two ASTs — the Formatter's
+	// safety gate above all — sees a key appear where it was not written.
+	shorthand?: true
 }
 
 export type RecordValueNode = {

@@ -56,13 +56,14 @@ const CORPUS = corpus()
 // NOTE: The showcase files the formatter must REFUSE — every one of them
 // carries an error the Parser itself reported, and formatting a file the Parser
 // could not read whole is exactly what the gate is there to prevent. Two of them
-// genuinely do not parse; the third parses and is refused all the same, because
-// a `default-on-function-literal` is an error like any other and the formatter
-// asks only whether there were any.
+// genuinely do not parse; the other two parse and are refused all the same,
+// because a `default-on-function-literal` and a `shorthand-in-combination` are
+// errors like any other and the formatter asks only whether there were any.
 const REFUSED = new Set([
 	"diagnostics/Syntax.es",
 	"diagnostics/UnclosedString.es",
 	"diagnostics/DefaultsSyntax.es",
+	"diagnostics/RecordShorthand.es",
 ])
 
 describe("formatter", () => {

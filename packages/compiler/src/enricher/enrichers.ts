@@ -1771,12 +1771,17 @@ export function enrichIdentifier(
 function enrichIdentifierExpression(
 	node: parser.IdentifierNode,
 	scope: enricher.Scope,
+	shorthandMember = false,
 ): common.typed.ExpressionNode {
 	let declaringScope = findDeclaringScope(node.content, scope)
 	let alias = declaringScope?.selfMemberAliases?.[node.content]
 
 	if (declaringScope === null || alias === undefined) {
-		return enrichIdentifier(node, scope)
+		return enrichIdentifier(
+			node,
+			scope,
+			resolveIdentifierType(node, scope, shorthandMember),
+		)
 	}
 
 	return selfPathLookup(
@@ -3772,6 +3777,23 @@ function enrichMembers(
 	let result: Record<string, common.typed.ExpressionNode> = {}
 
 	for (let [memberKey, memberValue] of Object.entries(members)) {
+		// NOTE: A shorthand member's value is the member's own name, and a name
+		// that names nothing is the one Diagnostic the spelling can produce —
+		// so it is read through the two steps `enrichExpression` takes for an
+		// Identifier, with the flag that says the name stands in both
+		// positions. `asValue` is one of those steps: a Function read as a
+		// value drops its Parameter defaults here as it does anywhere else.
+		if (
+			memberValue.shorthand === true &&
+			memberValue.value.nodeType === "Identifier"
+		) {
+			result[memberKey] = asValue(
+				enrichIdentifierExpression(memberValue.value, scope, true),
+			)
+
+			continue
+		}
+
 		result[memberKey] = enrichExpression(
 			memberValue.value,
 			scope,

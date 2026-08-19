@@ -574,6 +574,31 @@ describe("Enricher", () => {
 			).toEqual(["unknown-member"])
 		})
 
+		// NOTE: A bare member name is read as well as written, and a reader who
+		// did not know the spelling was a shorthand would otherwise be told
+		// that a name they never meant to read is not declared.
+		it("should say a bare member name is read as its own value", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				constant point = { x }
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("unknown-name")
+			expect(diagnostics[0].notes).toEqual([
+				"A bare member name in a Record Literal is the member AND its value, so 'x' is read here as well as written.",
+			])
+		})
+
+		it("should not say it of a member that spelled its value", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				constant point = { x = y }
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("unknown-name")
+			expect(diagnostics[0].notes ?? []).toEqual([])
+		})
+
 		it("should report all independent errors of a Program", () => {
 			let diagnostics = diagnosticsFor(`implementation {
 				constant a = undeclaredVariable

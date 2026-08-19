@@ -157,6 +157,7 @@ export type DiagnosticCode =
 	| "comment-in-hole"
 	| "nesting-too-deep"
 	| "redundant-parameter-label"
+	| "shorthand-in-combination"
 	| "default-on-function-literal"
 	| "declarations-outside-stdlib"
 	| "overload-function-outside-stdlib"
