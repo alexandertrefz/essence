@@ -70,6 +70,10 @@ function notesOf(source: string): Array<string> {
 	return diagnosticsOf(source).flatMap((diagnostic) => diagnostic.notes)
 }
 
+function helpsOf(source: string): Array<string> {
+	return diagnosticsOf(source).flatMap((diagnostic) => diagnostic.helps)
+}
+
 function generate(source: string): string {
 	let parsed = parseWithDiagnostics(source)
 
@@ -925,6 +929,45 @@ describe("Protocol-provided Methods", () => {
 			expect(codesOf(source)).toEqual(["nonconforming-namespace"])
 			expect(labelsOf(source)).toEqual([
 				"Method 'describe' does not match the Protocol's signature",
+			])
+		})
+
+		// NOTE: An override that carries a bound of its own MATCHES the
+		// provided signature — what it lacks is the `where` clause letting the
+		// conformance assume the bound, which is the requirement path's own
+		// answer and its own actionable help. Reporting a signature mismatch
+		// here told the writer the one thing that was not wrong.
+		it("should ask for the condition an override's own bound needs", () => {
+			let source = [
+				"implementation {",
+				"\tprotocol Rankable {",
+				"\t\trank() -> Integer",
+				"",
+				"\t\tspread(to other: Self) -> Ordering {",
+				"\t\t\t<- Ordering#Equal",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tnamespace Ranks<infer Item> for List<Item> is Rankable {",
+				"\t\trank() -> Integer {",
+				"\t\t\t<- @::length()",
+				"\t\t}",
+				"",
+				"\t\tspread<infer Item is Comparable>(",
+				"\t\t\tto other: List<Item>",
+				"\t\t) -> Ordering {",
+				"\t\t\t<- Ordering#Greater",
+				"\t\t}",
+				"\t}",
+				"}",
+			].join("\n")
+
+			expect(codesOf(source)).toEqual(["nonconforming-namespace"])
+			expect(labelsOf(source)).toEqual([
+				"Method 'spread' needs 'Item is Comparable'",
+			])
+			expect(helpsOf(source)).toEqual([
+				"Add 'where Item is Comparable' to this conformance.",
 			])
 		})
 
