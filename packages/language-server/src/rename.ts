@@ -186,6 +186,14 @@ type WalkContext = {
 	// NOTE: Property and Method Declarations per Namespace name — the typed
 	// AST identifies resolved Namespaces by name.
 	namespaceMembers: Map<string, Map<string, Declaration>>
+	// NOTE: The same, per PROTOCOL name, for the Methods a Protocol PROVIDES.
+	// A separate table because a Protocol and a Namespace may be spelled alike
+	// and their members are different declarations — which is the distinction
+	// `providedBy` draws on the resolved Invocation, and the one this reads.
+	//
+	// Only provided Methods bind through it. A requirement's use site resolves
+	// to the Namespace that WROTE the Method, and is bound there.
+	protocolMembers: Map<string, Map<string, Declaration>>
 	// NOTE: Every Method and Property reference whose Namespace this file does
 	// not declare, by the name the reference resolved through. A Namespace an
 	// `import { … }` entry brought in has its Methods declared in another file
@@ -209,6 +217,11 @@ export type ExternalMemberReference = {
 	namespaceName: string
 	memberName: string
 	position: common.Position
+	// NOTE: Set where the name is a PROTOCOL's — a provided Method reached
+	// through an imported Protocol. The workspace index then looks the name up
+	// among the Types an importing file binds rather than among its values, and
+	// the member among the declaring file's Protocol members.
+	protocol?: true
 }
 
 // NOTE: These ARE the top level Scope the Enricher starts from — derived
@@ -400,6 +413,9 @@ export type ProgramIndex = {
 	// Namespaces sharing a name is a duplicate the Enricher rejects, and an
 	// import may not shadow a declaration either.
 	namespaceMembers: Map<string, Map<string, Declaration>>
+	// NOTE: The same, for the Methods a Protocol PROVIDES — reached from an
+	// importing file through the entry that brought the Protocol in.
+	protocolMembers: Map<string, Map<string, Declaration>>
 	externalMembers: Array<ExternalMemberReference>
 }
 
@@ -413,6 +429,7 @@ export function indexProgram(
 		labels: new Map(),
 		pendingLabelReferences: [],
 		namespaceMembers: new Map(),
+		protocolMembers: new Map(),
 		externalMembers: [],
 		recordSites: [],
 		recordLookups: [],
@@ -499,6 +516,7 @@ export function indexProgram(
 		index: context.index,
 		scopes: context.scopes,
 		namespaceMembers: context.namespaceMembers,
+		protocolMembers: context.protocolMembers,
 		externalMembers: context.externalMembers,
 	}
 }
@@ -1450,20 +1468,34 @@ function walkProtocolDeclaration(
 		occurrences: [],
 	})
 
+	// NOTE: Declared under the Protocol's name, in the table that answers a
+	// call whose Invocation said a Protocol provided the Method — which is how
+	// a PROVIDED Method's use sites reach this declaration and move with it.
+	// A REQUIREMENT's use sites still do not: they resolve to the Namespace
+	// that wrote the Method, and are bound to that Namespace's declaration.
+	let memberDeclarations = context.protocolMembers.get(node.name.content)
+
+	if (memberDeclarations === undefined) {
+		memberDeclarations = new Map()
+		context.protocolMembers.set(node.name.content, memberDeclarations)
+	}
+
 	for (let member of Object.values(node.methods)) {
-		// NOTE: Standalone Declarations — a Protocol Method's use sites
-		// resolve through conformance values, which the index does not link
-		// (yet); the name still declares, colours and folds like a Method.
-		let declaration: Declaration = {
-			builtin: false,
-			kind:
-				member.nodeType === "StaticProtocolMethod" ||
-				member.nodeType === "OverloadedStaticProtocolMethod"
-					? "staticMethod"
-					: "method",
-			definition: member.name.position,
-			visibleFrom: null,
-			occurrences: [],
+		let declaration = memberDeclarations.get(member.name.content)
+
+		if (declaration === undefined) {
+			declaration = {
+				builtin: false,
+				kind:
+					member.nodeType === "StaticProtocolMethod" ||
+					member.nodeType === "OverloadedStaticProtocolMethod"
+						? "staticMethod"
+						: "method",
+				definition: member.name.position,
+				visibleFrom: null,
+				occurrences: [],
+			}
+			memberDeclarations.set(member.name.content, declaration)
 		}
 
 		record(
@@ -2054,10 +2086,20 @@ function bindNamespaceMember(
 	memberName: string,
 	position: common.Position,
 	context: WalkContext,
+	// NOTE: Set where a PROTOCOL answered the call rather than a Namespace, in
+	// which case `namespaceName` is the Protocol's. The two are told apart
+	// here for the same reason the emitter tells them apart: they may be
+	// spelled alike, and the name alone can not say which table holds the
+	// declaration.
+	providedBy: string | undefined = undefined,
 ) {
-	// NOTE: Builtin Namespaces have no source declaration — their members
-	// stay unbound and are therefore not renameable.
-	let declaration = context.namespaceMembers
+	// NOTE: Builtin Namespaces and Protocols have no source declaration —
+	// their members stay unbound and are therefore not renameable.
+	let declaration = (
+		providedBy === undefined
+			? context.namespaceMembers
+			: context.protocolMembers
+	)
 		.get(namespaceName)
 		?.get(memberName)
 
@@ -2071,7 +2113,12 @@ function bindNamespaceMember(
 	// have a source declaration — in the Module that wrote it. Kept so the
 	// workspace index can bind it there; a single file's index has no way to
 	// tell the two apart and does not have to.
-	context.externalMembers.push({ namespaceName, memberName, position })
+	context.externalMembers.push({
+		namespaceName,
+		memberName,
+		position,
+		...(providedBy === undefined ? {} : { protocol: true as const }),
+	})
 }
 
 function walkTypedBody(
@@ -2164,6 +2211,7 @@ function walkTypedNode(
 				node.member.name,
 				node.member.position,
 				context,
+				node.namespace.type.providedBy,
 			)
 			walkTypedNode(node.base, context)
 			walkTypedArguments(node.arguments, context)

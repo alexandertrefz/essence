@@ -1575,7 +1575,14 @@ function joinComponent(
 		let topLevel = index.scopes.find((entry) => entry.range === null)?.scope
 
 		for (let reference of index.externalMembers) {
-			let binding = topLevel?.values.get(reference.namespaceName)
+			// NOTE: A Protocol's name binds among the TYPES an entry brings
+			// in, not among the values — a Protocol is not a value — and its
+			// provided Methods are declared in their own table on the far
+			// side. Everything between is the same join.
+			let binding =
+				reference.protocol === true
+					? topLevel?.types.get(reference.namespaceName)
+					: topLevel?.values.get(reference.namespaceName)
 			let localKey =
 				binding === undefined
 					? undefined
@@ -1591,9 +1598,13 @@ function joinComponent(
 				continue
 			}
 
-			let member = indices
-				.get(declaring.filePath)
-				?.namespaceMembers.get(declaring.name)
+			let declaringIndex = indices.get(declaring.filePath)
+			let member = (
+				reference.protocol === true
+					? declaringIndex?.protocolMembers
+					: declaringIndex?.namespaceMembers
+			)
+				?.get(declaring.name)
 				?.get(reference.memberName)
 			let memberKey =
 				member === undefined

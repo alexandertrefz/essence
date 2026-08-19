@@ -1183,23 +1183,78 @@ describe("identifierPattern", () => {
 			)
 		})
 
+		// NOTE: Declared INSIDE the body. A provided Method may not read what
+		// the Program declares around it — it is emitted above the Program —
+		// so a Constant of its own is the only one a body can hold.
 		it("should rename a Constant a provided Method's body reads", () => {
 			let source = [
 				"implementation {",
-				"\tconstant unit = 2",
 				"\tprotocol Sizable {",
 				"\t\tsize() -> Integer",
 				"",
 				"\t\tdoubled() -> Integer {",
+				"\t\t\tconstant unit = 2",
+				"",
 				"\t\t\t<- @::size()::multiply(with unit)",
 				"\t\t}",
 				"\t}",
 				"}",
 			].join("\n")
 
-			expect(rename(source, { line: 2, column: 11 }, "step")).toBe(
+			expect(rename(source, { line: 6, column: 13 }, "step")).toBe(
 				source.replaceAll("unit", "step"),
 			)
+		})
+
+		// NOTE: A provided Method is a Method of every conformer, so a rename
+		// asked at a call has to move the Protocol's declaration and every
+		// other call with it. The call resolves through the PROTOCOL — the
+		// Namespace it names is the Protocol's pseudo one — which is why the
+		// index keeps a table of Protocol members beside the Namespace one.
+		const SIZABLE = [
+			"implementation {",
+			"\tprotocol Sizable {",
+			"\t\tsize() -> Integer",
+			"",
+			"\t\tisEmpty() -> Boolean {",
+			"\t\t\t<- @::size()::is(0)",
+			"\t\t}",
+			"\t}",
+			"",
+			"\ttype Bag = { count: Integer }",
+			"",
+			"\tnamespace Bags for Bag is Sizable {",
+			"\t\tsize() -> Integer {",
+			"\t\t\t<- @.count",
+			"\t\t}",
+			"\t}",
+			"",
+			"\tconstant bag: Bag = { count = 0 }",
+			"",
+			"\tTerminal.inspect(bag::isEmpty())",
+			"}",
+		].join("\n")
+
+		it("should rename a provided Method from its declaration", () => {
+			expect(rename(SIZABLE, { line: 5, column: 3 }, "vacant")).toBe(
+				SIZABLE.replaceAll("isEmpty", "vacant"),
+			)
+		})
+
+		it("should rename a provided Method from a call site", () => {
+			expect(rename(SIZABLE, { line: 20, column: 24 }, "vacant")).toBe(
+				SIZABLE.replaceAll("isEmpty", "vacant"),
+			)
+		})
+
+		it("should not rename a builtin Protocol's provided Method", () => {
+			let source = [
+				"implementation {",
+				"\tTerminal.inspect(1::isNot(2))",
+				"}",
+			].join("\n")
+
+			expect(findOccurrence(source, { line: 2, column: 21 })).toBeNull()
 		})
 
 		it("should not rename a builtin Protocol", () => {
