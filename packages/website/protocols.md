@@ -64,6 +64,12 @@ conforming Type all the same: it resolves at a call, Hover shows the Protocol's
 `§§` above it, Completion lists it beside the written members, and Signature Help
 answers for it.
 
+It is reached through `::` and through nothing else. A written Method also has a
+Namespace spelling — `Integer.isLessThan(a, b)` names the Namespace and passes
+the receiver — and a provided Method has none, because no Namespace declares it.
+The Protocol's own name is not one either: `Equatable.isNot(a, b)` is
+`protocol-as-value`, since a Protocol is a bound and never a value.
+
 ### What a provided body may say
 
 A provided Method's body is written on `@`, the conforming value. `@` is known

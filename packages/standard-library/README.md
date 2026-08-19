@@ -134,10 +134,20 @@ is what keeps a body reaching only its own Namespace's primitives.
 
 **Ordering across two kinds asks for a `Number`.** `Orderable`'s Methods take
 `Self`, which is the receiver's own Type, so `Number.Pi::isBetween(3, and 22/7)`
-does not resolve: π is a Transcendental, and `3` is not. Bind the receiver as
-the covering Type first — `constant pi: Number = Number.Pi` — and every member of
-the tower is a bound it accepts. `Number.compare(3, to Number.Pi)` answers the
-same question without a Constant.
+does not resolve: π is a Transcendental, and `3` is not. The written entries
+widen no further than the other kind — `Integer::isLessThan` holds an entry for
+a Rational and for nothing else — so `3::isLessThan(Number.Pi)` does not resolve
+either. Bind the receiver as the covering Type first — `constant pi: Number =
+Number.Pi` — and every member of the tower is a bound it accepts.
+`Number.compare(3, to Number.Pi)` answers the same question without a Constant.
+
+**A provided Method has no Namespace spelling.** It belongs to the Protocol
+rather than to a Namespace, so `::` is the only way to reach it. There is no
+`Number.isLessThan(a, b)` and no `Number.isNot(a, b)`, while `Number.is(a, b)`
+and `Number.compare(a, to b)` stay, because `Number` writes those two itself.
+Naming the Protocol instead is not a way round it: `Orderable.isLessThan(a, b)`
+is `protocol-as-value`, since a Protocol is a bound and never a value. Where a
+Namespace spelling is what a call wants, the Method has to be written.
 
 Three name SHAPES, so rule 1 is not misapplied:
 
