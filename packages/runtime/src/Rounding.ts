@@ -2,9 +2,9 @@ import { typeKeySymbol } from "./type"
 
 // NOTE: `Rounding` is a builtin Choice, like `Side` and `NumberFormat` — its
 // values carry Case tags (`"Rounding#Nearest"`) exactly as user-declared Cases
-// do. `is`, `isNot` and `toString` are implemented in Essence
-// (`packages/standard-library/sources/Rational.es`, beside the Method that takes one), so
-// nothing but the tags lives here. `Rational::round(toward:)` READS one, and it
+// do. `is`, `isNot` and `toString` are all derived from the Choice
+// (`packages/standard-library/sources/Rational.es` declares the conformances beside the Method
+// that takes one), so nothing but the tags lives here. `Rational::round(toward:)` READS one, and it
 // is written in Essence too — this Choice reaches no native at all, unlike
 // `Side`, whose `String::trim(at:)` is one.
 export type NearestType = { [typeKeySymbol]: "Rounding#Nearest" }

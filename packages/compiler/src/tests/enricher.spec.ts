@@ -4,7 +4,10 @@ import type { common } from "@essence-lang/interfaces"
 
 import { builtinNamespaces, builtinProtocols } from "../enricher/builtins"
 import { enrich } from "../enricher/index"
-import { derivedEquatableNamespace } from "../enricher/resolvers"
+import {
+	derivedEquatableNamespace,
+	derivedPrintableNamespace,
+} from "../enricher/resolvers"
 import { computeConformanceMethodMap } from "../helpers/index"
 import { parse } from "../parser/index"
 import { printType } from "../printType"
@@ -3595,27 +3598,37 @@ describe("Enricher", () => {
 							assumptions,
 						)
 
-						// NOTE: A Choice DECLARES `is Equatable` and writes
-						// neither Method — the derive fulfills it. Checking the
-						// derived Namespace instead of accepting the miss is
-						// the point: the conformance still has to hold, it just
-						// holds through Methods nobody wrote. The Scope only
-						// has to resolve the Choice's name back to the Choice,
-						// which is the target Type itself.
+						// NOTE: A Choice DECLARES `is Equatable` and
+						// `is Printable` and writes neither Method — the
+						// derives fulfill both. Checking the derived Namespace
+						// instead of accepting the miss is the point: the
+						// conformance still has to hold, it just holds through
+						// Methods nobody wrote. The Scope only has to resolve
+						// the Choice's name back to the Choice, which is the
+						// target Type itself.
 						if (result.kind !== "conforms") {
-							const derived = derivedEquatableNamespace(
-								namespace.targetType!,
-								{
-									parent: null,
-									members: {},
-									declarations: {},
-									constants: new Set(),
-									types: {
-										[namespace.name]: namespace.targetType!,
-									},
-									protocols: {},
+							const scope = {
+								parent: null,
+								members: {},
+								declarations: {},
+								constants: new Set<string>(),
+								types: {
+									[namespace.name]: namespace.targetType!,
 								},
-							)
+								protocols: {},
+							}
+
+							const derived =
+								protocolName === "Printable"
+									? derivedPrintableNamespace(
+											namespace.targetType!,
+											[namespace],
+											scope,
+										)
+									: derivedEquatableNamespace(
+											namespace.targetType!,
+											scope,
+										)
 
 							expect(derived).not.toBeNull()
 
@@ -3904,17 +3917,19 @@ describe("Enricher", () => {
 			expect(invocation.type).toEqual({ type: "String" })
 		})
 
-		// NOTE: `toString` rather than `is` — `Ordering` no longer WRITES an
-		// `is`, it derives one, and a derived Method would make this pass for
-		// the wrong reason. `toString` is a Method the covering Namespace
-		// actually declares, which is what this is about.
+		// NOTE: `Number` rather than `Ordering` — `Ordering` writes no Method
+		// at all now, deriving `is`, `isNot` and `toString` alike, and a
+		// derived Method would make this pass for the wrong reason. `Number`
+		// covers the whole numeric Union and WRITES `toString`, while each of
+		// its members writes one too, so there is a dispatch here for the
+		// covering Namespace to be kept ahead of.
 		it("should keep a Namespace covering the whole Union ahead of dispatch", () => {
 			let invocation = lastConstantMethodInvocation(`implementation {
-				constant ordering = 5::compare(to 7)
-				constant text = ordering::toString()
+				constant value: Number = 5
+				constant text = value::toString()
 			}`)
 
-			expect(invocation.namespace.name).toBe("Ordering")
+			expect(invocation.namespace.name).toBe("Number")
 			expect(invocation.dispatch).toBeNull()
 			expect(invocation.type).toEqual({ type: "String" })
 		})

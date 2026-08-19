@@ -28,7 +28,8 @@ declarations {
 	§ bare item as well as another Optional, and no derivation offers that. A
 	§ Namespace that writes its own `is` replaces the derived conformance, so
 	§ the whole-Optional entry is spelled out too. The `Printable` conformance
-	§ is written because what an Optional reads as is a decision.
+	§ is written here because `#Value` carries a payload, and only a Choice of
+	§ Cases that carry none derives a `toString`.
 	namespace Optional<infer ItemType> for Optional<ItemType>
 		is Equatable where ItemType is Equatable,
 		is Printable where ItemType is Printable {

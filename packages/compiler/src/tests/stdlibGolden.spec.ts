@@ -4,11 +4,14 @@ import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 
 import { fixturePath } from "@essence-lang/fixtures"
-import type { common } from "@essence-lang/interfaces"
+import type { common, enricher } from "@essence-lang/interfaces"
 
 import { containsErrors } from "../diagnostics/index"
 import { enrich } from "../enricher/index"
-import { derivedEquatableNamespace } from "../enricher/resolvers"
+import {
+	derivedEquatableNamespace,
+	derivedPrintableNamespace,
+} from "../enricher/resolvers"
 import { loadStdlib } from "../enricher/stdlib"
 import { optimise } from "../optimiser/index"
 import { parseWithDiagnostics } from "../parser/index"
@@ -120,6 +123,29 @@ const COVERED_ELSEWHERE = new Set(["Terminal"])
 function declaredSignatures(): Array<string> {
 	let signatures: Array<string> = []
 
+	// NOTE: A Set, because a derived Method with no Parameter of its own prints
+	// the same signature for every Choice that derives it —
+	// `Choice_Printable.toString()` is one Method of one fabricated Namespace,
+	// however many Choices reach it, and listing it once is what keeps the
+	// uniqueness check below meaningful. The derived `is` and `isNot` take the
+	// Choice as a Parameter and are distinct already.
+	let derivedSignatures = new Set<string>()
+
+	let collectDerived = (namespace: common.NamespaceType): void => {
+		for (let [methodName, method] of Object.entries(namespace.methods)) {
+			for (let signature of signaturesOf(method) ?? []) {
+				let label = printSignature(
+					signature,
+					`${namespace.name}.${methodName}`,
+				)
+
+				derivedSignatures.add(
+					label.slice(0, label.lastIndexOf(") -> ") + 1),
+				)
+			}
+		}
+	}
+
 	for (let [namespaceName, member] of Object.entries(loadStdlib().members)) {
 		if (
 			member.type !== "Namespace" ||
@@ -143,39 +169,45 @@ function declaredSignatures(): Array<string> {
 			}
 		}
 
-		// NOTE: A Choice's `is` and `isNot` are DERIVED — no Namespace declares
-		// them, so the loop above never sees them, and without this the harness
-		// could quietly stop calling them. They are listed under the Namespace
-		// that answers at runtime, which is the one the labels name. The Scope
-		// only has to resolve the Choice's name back to the Choice, which the
-		// target Type already is.
-		let derived =
-			member.targetType === null
-				? null
-				: derivedEquatableNamespace(member.targetType, {
-						parent: null,
-						members: {},
-						declarations: {},
-						constants: new Set(),
-						types: { [namespaceName]: member.targetType },
-						protocols: {},
-					})
+		// NOTE: A Choice's `is`, `isNot` and `toString` are DERIVED — no
+		// Namespace declares them, so the loop above never sees them, and
+		// without this the harness could quietly stop calling them. They are
+		// listed under the Namespace that answers at runtime, which is the one
+		// the labels name. The Scope only has to resolve the Choice's name back
+		// to the Choice, which the target Type already is.
+		if (member.targetType === null) {
+			continue
+		}
 
-		if (derived !== null && !Object.hasOwn(member.methods, "is")) {
-			for (let [methodName, method] of Object.entries(derived.methods)) {
-				for (let signature of signaturesOf(method) ?? []) {
-					let label = printSignature(
-						signature,
-						`${derived.name}.${methodName}`,
-					)
+		let scope: enricher.Scope = {
+			parent: null,
+			members: {},
+			declarations: {},
+			constants: new Set(),
+			types: { [namespaceName]: member.targetType },
+			protocols: {},
+		}
 
-					signatures.push(
-						label.slice(0, label.lastIndexOf(") -> ") + 1),
-					)
-				}
-			}
+		let equatable = derivedEquatableNamespace(member.targetType, scope)
+
+		if (equatable !== null && !Object.hasOwn(member.methods, "is")) {
+			collectDerived(equatable)
+		}
+
+		// NOTE: The printing derive answers only where the Namespace declared
+		// `is Printable`, so the Namespace itself is what it is asked about.
+		let printable = derivedPrintableNamespace(
+			member.targetType,
+			[member],
+			scope,
+		)
+
+		if (printable !== null && !Object.hasOwn(member.methods, "toString")) {
+			collectDerived(printable)
 		}
 	}
+
+	signatures.push(...derivedSignatures)
 
 	// NOTE: The free Functions that belong to no Namespace — `loop` is the only
 	// one, and it has several entries. Only the OVERLOADED free Functions are

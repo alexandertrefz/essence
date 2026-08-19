@@ -14,6 +14,9 @@ are reachable from the List itself, through six Namespaces of their own in
 of non-emptiness reaches instead, whose answers are bare rather than Optional.
 The modes a Method takes are Choices declared beside it: `Side`, `Rounding`,
 `NumberFormat`, `CaseSensitivity`, `NormalizationForm`, `Stream` and `Step`.
+A Choice whose Cases all carry no payload derives both its `Equatable` and its
+`Printable` conformance, so six of those Namespaces declare the two and hold no
+body at all: `#Less` prints `Less` without anybody writing that down.
 
 The only things NOT declared here are the ones no declaration could produce:
 the bare Type tags — `Boolean`, `String`, `Integer`, `Rational`, `Algebraic`,
@@ -26,7 +29,7 @@ all, in `Loop.es`, as ordinary free Functions. Printing is a Namespace:
 `Terminal.write` is the raw primitive both are built on (`Terminal.es`).
 
 Seven of every ten declared Method entries are also IMPLEMENTED here, in
-Essence — 243 of 352 as this is written; the rest bind to
+Essence — 237 of 346 as this is written; the rest bind to
 `@essence-lang/runtime`. What stays native is a
 deliberate line, not a backlog: the primitives everything else is composed from
 (`Boolean.negate`/`is`/`and`/`or`, integer and rational arithmetic, same-kind

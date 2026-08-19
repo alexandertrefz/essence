@@ -19,20 +19,10 @@ declarations {
 		BothEnds,
 	}
 
-	§ Equality is derived for a Choice, so only `toString` is written; see
+	§ Equality and printing are both derived for a Choice of Cases that carry
+	§ no payload. This Namespace declares the two and writes neither; see
 	§ DEVELOPMENT.md, Why bodies look the way they do.
-	namespace Side for Side is Equatable, is Printable {
-		§§ Answers the Side as a String.
-		§§
-		§§ @returns — `Start`, `End` or `BothEnds`.
-		toString() -> String {
-			<- match @ -> String {
-				case #Start    { <- "Start" }
-				case #End      { <- "End" }
-				case #BothEnds { <- "BothEnds" }
-			}
-		}
-	}
+	namespace Side for Side is Equatable, is Printable {}
 
 	§ Whether a String comparison treats upper and lower case as the same.
 	choice CaseSensitivity {
@@ -40,17 +30,7 @@ declarations {
 		Insensitive,
 	}
 
-	namespace CaseSensitivity for CaseSensitivity is Equatable, is Printable {
-		§§ Answers the CaseSensitivity as a String.
-		§§
-		§§ @returns — `Sensitive` or `Insensitive`.
-		toString() -> String {
-			<- match @ -> String {
-				case #Sensitive   { <- "Sensitive" }
-				case #Insensitive { <- "Insensitive" }
-			}
-		}
-	}
+	namespace CaseSensitivity for CaseSensitivity is Equatable, is Printable {}
 
 	§ Which Unicode normalization form `normalize(as:)` produces. Canonical
 	§ (NFC and NFD) keeps the text as it reads, and Compatibility (NFKC and
@@ -65,19 +45,7 @@ declarations {
 
 	namespace NormalizationForm for NormalizationForm
 		is Equatable,
-		is Printable {
-		§§ Answers the NormalizationForm as a String.
-		§§
-		§§ @returns — the name of the form, such as `ComposedCanonical`.
-		toString() -> String {
-			<- match @ -> String {
-				case #ComposedCanonical       { <- "ComposedCanonical" }
-				case #DecomposedCanonical     { <- "DecomposedCanonical" }
-				case #ComposedCompatibility   { <- "ComposedCompatibility" }
-				case #DecomposedCompatibility { <- "DecomposedCompatibility" }
-			}
-		}
-	}
+		is Printable {}
 
 	§ A character here is a Unicode grapheme cluster: a base with its
 	§ combining marks, a ZWJ emoji sequence, a flag's two regional
