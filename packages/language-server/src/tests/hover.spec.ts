@@ -29,6 +29,32 @@ function hoverDocumentation(
 }
 
 describe("Hover", () => {
+	// NOTE: A step a dotted key reaches THROUGH answers as the member it names,
+	// which is the invariant the desugar carries: the synthesized Lookup's
+	// member Identifier stands where the step was written.
+	it("should answer a path key's step with the member it names", () => {
+		let source = [
+			"implementation {",
+			"\ttype Tls = { enabled: Boolean }",
+			"\ttype Server = { host: String, port: Integer, tls: Tls }",
+			"\ttype Config = { name: String, server: Server }",
+			"",
+			"\tconstant config: Config = {",
+			'\t\tname = "api",',
+			'\t\tserver = { host = "h", port = 80, tls = { enabled = false } },',
+			"\t}",
+			"\tconstant deep = { config with server.tls.enabled = true }",
+			"}",
+		].join("\n")
+
+		expect(hover(source, { line: 10, column: 32 })).toBe(
+			"server: { host: String, port: Integer, tls: { enabled: Boolean } }",
+		)
+		expect(hover(source, { line: 10, column: 39 })).toBe(
+			"tls: { enabled: Boolean }",
+		)
+	})
+
 	it("should describe Identifiers with their inferred Type", () => {
 		let source = [
 			"implementation {",

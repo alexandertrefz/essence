@@ -1256,6 +1256,7 @@ function walkNode(
 				// the ordinary Identifier it looks like.
 				if (
 					member.shorthand === true &&
+					member.steps === undefined &&
 					member.value.nodeType === "Identifier"
 				) {
 					reference(
@@ -1838,6 +1839,50 @@ function registerRecordSite(
 	})
 }
 
+// NOTE: The keys of an update the Enricher wrote out of a dotted key. A path
+// key's LAST step is a key of a list that exists nowhere in the written AST —
+// `{ c with server.port = 1 }` is enriched as
+// `{ c with server = { c.server with port = 1 } }`, and `port` is a key of the
+// inner list — so the lexical walk, which reads what was written, never reaches
+// it. Every step before the last is a synthesized Lookup and is carried by the
+// Lookup arm already.
+//
+// The shape is the WHOLE Record being updated, which is what the level's own
+// Type does not say: an update writes some of the members, and the union-find
+// resolves a site by the set of names it holds. A key list somebody wrote is
+// registered here a second time, at the very Position the lexical walk already
+// gave it — `record` keeps one occurrence per Position, and the site that knows
+// how to rewrite itself is the one already there.
+function registerPathKeySite(
+	node: common.typed.CombinationNode,
+	context: WalkContext,
+) {
+	if (
+		node.rhs.nodeType !== "RecordValue" ||
+		node.rhs.memberPositions === undefined ||
+		node.lhs.type.type !== "Record"
+	) {
+		return
+	}
+
+	let positions = node.rhs.memberPositions
+	let members = Object.keys(positions)
+
+	if (members.length === 0) {
+		return
+	}
+
+	context.recordSites.push({
+		names: Object.keys(node.lhs.type.members),
+		declares: false,
+		members: members.map((name) => ({
+			name,
+			position: positions[name],
+			edits: null,
+		})),
+	})
+}
+
 // NOTE: What renaming the MEMBER writes at a Record Literal's member — the
 // mirror of a Pattern's `memberRenameEdits`, and needed for the same reason:
 // `{ width }` is `{ width = width }`, so the one Identifier is the member AND
@@ -1848,6 +1893,13 @@ function shorthandMemberEdits(
 	member: parser.RecordValueMemberNode | parser.RecordTypeMemberNode,
 ): Array<RenameEdit> | null {
 	if (!("shorthand" in member) || member.shorthand !== true) {
+		return null
+	}
+
+	// NOTE: A PATH key marked shorthand is one the Parser recovered from
+	// `{ c with server.port }` after refusing it — it names no binding, which
+	// is exactly what it was refused for, so there is nothing to leave behind.
+	if ("steps" in member && member.steps !== undefined) {
 		return null
 	}
 
@@ -2358,6 +2410,7 @@ function walkTypedNode(
 			return
 		}
 		case "Combination":
+			registerPathKeySite(node, context)
 			walkTypedNode(node.lhs, context)
 			walkTypedNode(node.rhs, context)
 			return

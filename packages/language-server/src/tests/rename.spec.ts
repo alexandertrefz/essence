@@ -2000,4 +2000,53 @@ describe("Rename of a name a Case payload default reads", () => {
 			)
 		})
 	})
+
+	// NOTE: Every step of a dotted key is a member occurrence, and no two of
+	// them are reached the same way. The first is a key of the list that was
+	// written; the ones after it are the member Identifiers of the Lookups the
+	// Enricher synthesized, which stand exactly where the steps do; the LAST is
+	// a key of a list that exists nowhere in the written source at all, and is
+	// carried by `memberPositions`.
+	describe("path keys", () => {
+		let source = [
+			"implementation {",
+			"\ttype Tls = { enabled: Boolean }",
+			"\ttype Server = { host: String, port: Integer, tls: Tls }",
+			"\ttype Config = { name: String, server: Server }",
+			"",
+			"\tconstant config: Config = {",
+			'\t\tname = "api",',
+			'\t\tserver = { host = "h", port = 80, tls = { enabled = false } },',
+			"\t}",
+			"\tconstant deep = { config with server.tls.enabled = true }",
+			"}",
+		].join("\n")
+
+		it("renames the first step", () => {
+			expect(rename(source, { line: 10, column: 32 }, "listener")).toBe(
+				source.replaceAll("server", "listener"),
+			)
+		})
+
+		it("renames a step in the middle", () => {
+			expect(rename(source, { line: 10, column: 39 }, "security")).toBe(
+				source
+					.replace("tls: Tls }", "security: Tls }")
+					.replace("tls = { enabled", "security = { enabled")
+					.replace("server.tls.enabled", "server.security.enabled"),
+			)
+		})
+
+		it("renames the last step", () => {
+			expect(rename(source, { line: 10, column: 43 }, "on")).toBe(
+				source.replaceAll("enabled", "on"),
+			)
+		})
+
+		it("reaches a path key from the member's declaration", () => {
+			expect(rename(source, { line: 2, column: 15 }, "on")).toBe(
+				source.replaceAll("enabled", "on"),
+			)
+		})
+	})
 })
