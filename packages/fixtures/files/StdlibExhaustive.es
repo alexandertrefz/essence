@@ -67,12 +67,12 @@ implementation {
 		})
 	}
 
-	§ A written number reaches its own kind's Namespace — `2::isNot(2/1)` asks
-	§ Integer, which has no Rational entry — so the Methods the covering
-	§ `Number` answers for need a receiver of the covering Type. This widens
-	§ one and hands it straight back. It stands where `Number.isNot(2, 2/1)`
-	§ once did: a Protocol's provided Method is reached through the receiver,
-	§ never through the Namespace spelling.
+	§ Which rung of the ladder answers is the receiver's Type to decide, and
+	§ the labels below name it. A bare `5::isBetween(1, and 10)` is Integer's
+	§ rung, and `asNumber(5)::isBetween(1, and 10)` is the covering
+	§ `Number`'s. Both resolve. The coverage gate counts a provided Method
+	§ once per conformer, so reaching `Number`'s rung takes a receiver of the
+	§ covering Type. This widens one and hands it straight back.
 	function asNumber(_ value: Number) -> Number {
 		<- value
 	}
@@ -1203,9 +1203,9 @@ third"::lines())
 			Number.compare(Number.Pi, to Number.Tau),
 		)
 		§ The four inequalities, `isBetween` and `clamp` are `Orderable`'s
-		§ provided Methods, over `Self`. A Transcendental receiver binds
-		§ `Self` to Transcendental and takes no Integer bound, so the
-		§ cross-kind calls widen the RECEIVER and let the bounds stay written.
+		§ provided Methods, and every conformer has a rung of its own. These
+		§ lines exercise the covering `Number`'s rung. That is what `asNumber`
+		§ reaches: a bare receiver would be asked of its own kind's rung first.
 		show(
 			"Number.isLessThan(_ Number) [Integer]",
 			asNumber(3)::isLessThan(Number.Pi),
