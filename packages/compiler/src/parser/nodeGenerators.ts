@@ -858,6 +858,7 @@ type KeyValuePair = {
 	name: parser.IdentifierNode
 	value: parser.ExpressionNode
 	position: common.Position
+	shorthand: boolean
 }
 
 type KeyValuePairObject = {
@@ -869,8 +870,9 @@ export function keyValuePair(
 	name: parser.IdentifierNode,
 	value: parser.ExpressionNode,
 	position: common.Position,
+	shorthand = false,
 ): KeyValuePair {
-	return { name, value, position }
+	return { name, value, position, shorthand }
 }
 
 export function buildKeyValuePairList(
@@ -882,7 +884,16 @@ export function buildKeyValuePairList(
 	return {
 		data: keyValuePairList.reduce<KeyValuePairObject["data"]>(
 			(prev, curr) => {
-				prev[curr.name.content] = { name: curr.name, value: curr.value }
+				// NOTE: `shorthand` is written only where it is true, so a
+				// member that spelled its value keeps exactly the shape it
+				// has always had — the Formatter compares two ASTs key by key.
+				prev[curr.name.content] = curr.shorthand
+					? {
+							name: curr.name,
+							value: curr.value,
+							shorthand: true,
+						}
+					: { name: curr.name, value: curr.value }
 				return prev
 			},
 			{},

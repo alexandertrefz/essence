@@ -889,6 +889,62 @@ describe("Code Generation", () => {
 		})
 	})
 
+	// NOTE: The shorthand desugars in the Parser, so everything from the
+	// Enricher down sees `{ x = x }` — these pin that there is nothing else to
+	// it, in each of the four places a Record Literal stands.
+	describe("Property shorthand", () => {
+		it("reads a bare member name as its own value", async () => {
+			expect(
+				await run(`implementation {
+	type Point = { x: Integer, y: Integer }
+
+	constant x = 1
+	constant y = 2
+	constant point: Point = { x, y }
+
+	Terminal.inspect(point)
+}`),
+			).toEqual(["{ x = 1, y = 2 }"])
+		})
+
+		it("emits exactly what the written-out spelling emits", () => {
+			const written = `implementation {
+	constant x = 1
+	constant y = 2
+	constant point = { x = x, y = y }
+
+	Terminal.inspect(point)
+}`
+
+			expect(
+				generate(written.replace("{ x = x, y = y }", "{ x, y }")),
+			).toBe(generate(written))
+		})
+
+		it("reads a bare member name in a Case payload and in a merged Literal", async () => {
+			expect(
+				await run(`implementation {
+	choice Shape {
+		Rectangle { width: Integer, height: Integer },
+	}
+
+	type Server = { host: String, port: Integer }
+
+	constant width = 3
+	constant height = 4
+	constant port = 8080
+	constant base: Server = { host = "localhost", port = 80 }
+
+	Terminal.inspect(Shape#Rectangle({ width, height }))
+	Terminal.inspect({ base with { port } })
+}`),
+			).toEqual([
+				"Shape#Rectangle { width = 3, height = 4 }",
+				'{ host = "localhost", port = 8080 }',
+			])
+		})
+	})
+
 	describe("Nameless Parameters", () => {
 		it("gives every nameless Parameter its own emitted name", () => {
 			let generated = generate(`

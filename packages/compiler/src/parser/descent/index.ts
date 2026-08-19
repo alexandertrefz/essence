@@ -2339,7 +2339,7 @@ class DescentParser {
 			)
 		}
 
-		let keyValuePairList = this.parseKeyValuePairList()
+		let keyValuePairList = this.parseKeyValuePairList(true)
 		let rightBrace = this.tokens.expect(TokenType.SymbolRightBrace)
 
 		return generators.recordValueNode(null, keyValuePairList.data, {
@@ -2367,7 +2367,7 @@ class DescentParser {
 		}
 
 		let record = this.backtrack(() => {
-			let keyValuePairList = this.parseKeyValuePairList()
+			let keyValuePairList = this.parseKeyValuePairList(true)
 			let rightBrace = this.tokens.expect(TokenType.SymbolRightBrace)
 
 			return generators.recordValueNode(null, keyValuePairList.data, {
@@ -2384,26 +2384,64 @@ class DescentParser {
 
 		this.tokens.expect(TokenType.KeywordWith)
 
-		let keyValuePairCombination = this.backtrack(() => {
-			let keyValuePairList = this.parseKeyValuePairList()
-			let rightBrace = this.tokens.expect(TokenType.SymbolRightBrace)
+		let combinationOfKeys = (allowShorthand: boolean) =>
+			this.backtrack(() => {
+				let keyValuePairList =
+					this.parseKeyValuePairList(allowShorthand)
+				let rightBrace = this.tokens.expect(TokenType.SymbolRightBrace)
 
-			return generators.combination(
-				lhs,
-				generators.recordValueNode(
-					null,
-					keyValuePairList.data,
-					keyValuePairList.position,
-				),
-				{
-					start: leftBrace.position.start,
-					end: rightBrace.position.end,
-				},
-			)
-		})
+				return generators.combination(
+					lhs,
+					generators.recordValueNode(
+						null,
+						keyValuePairList.data,
+						keyValuePairList.position,
+					),
+					{
+						start: leftBrace.position.start,
+						end: rightBrace.position.end,
+					},
+				)
+			})
+
+		let keyValuePairCombination = combinationOfKeys(false)
 
 		if (keyValuePairCombination !== null) {
 			return keyValuePairCombination
+		}
+
+		// NOTE: The Expression reading is speculated too, so the key list can
+		// be read ONE more time below when it fails. Order is what keeps
+		// `{ base with other }` meaning what it has always meant — a whole
+		// value merged in — because a bare name reads as an Expression here
+		// before it is ever offered the shorthand.
+		let expressionCombination = this.backtrack(() => {
+			let rhs = this.parseExpression()
+			let rightBrace = this.tokens.expect(TokenType.SymbolRightBrace)
+
+			return generators.combination(lhs, rhs, {
+				start: leftBrace.position.start,
+				end: rightBrace.position.end,
+			})
+		})
+
+		if (expressionCombination !== null) {
+			return expressionCombination
+		}
+
+		// NOTE: Neither reading spans this. `{ base with port, host }` is the
+		// shape that lands here, and left alone it reports
+		// `Expected '}' but found ','` — a message about the comma rather than
+		// about the rule the author was tripped by. Reading the key list once
+		// more WITH shorthand says which rule that is; it costs nothing a user
+		// can measure, since it runs only where two readings have already been
+		// thrown away.
+		let shorthandCombination = combinationOfKeys(true)
+
+		if (shorthandCombination !== null) {
+			this.reportShorthandInCombination(shorthandCombination)
+
+			return shorthandCombination
 		}
 
 		let rhs = this.parseExpression()
@@ -2415,10 +2453,59 @@ class DescentParser {
 		})
 	}
 
-	protected parseKeyValuePairList(): ReturnType<
-		typeof generators.buildKeyValuePairList
-	> {
-		let pairs = [this.parseKeyValuePair()]
+	// NOTE: One Diagnostic per bare name, on a Combination the third reading
+	// recovered. The recovered key list is kept — it is what the author meant,
+	// and the Language Server goes on offering completions and colour inside a
+	// file the Compiler has already refused.
+	protected reportShorthandInCombination(
+		combination: parser.CombinationNode,
+	): void {
+		if (
+			this.suppressDiagnostics ||
+			combination.rhs.nodeType !== "RecordValue"
+		) {
+			return
+		}
+
+		for (let member of Object.values(combination.rhs.members)) {
+			if (member.shorthand !== true) {
+				continue
+			}
+
+			let name = member.name.content
+
+			reportError(
+				"A bare member name is not a key in an update",
+				member.name.position,
+				{
+					code: "shorthand-in-combination",
+					labels: [
+						primary(
+							member.name.position,
+							"this names no value to set",
+						),
+					],
+					notes: [
+						"An update's key list always spells its values, because a bare name after 'with' is already the value being merged in.",
+					],
+					helps: [
+						`Write '${name} = ${name}'.`,
+						`Or merge a whole Record: '{ base with { ${name} } }'.`,
+					],
+				},
+			)
+		}
+	}
+
+	// NOTE: `allowShorthand` is a property of the BRACES, not of the member —
+	// a Record literal's member list takes `{ x }` for `{ x = x }`, and a
+	// Combination's key list does not, because a bare name after `with` is
+	// already the whole value being merged in. The one flag is what keeps
+	// `{ base with other }` from silently turning into "set member `other`".
+	protected parseKeyValuePairList(
+		allowShorthand: boolean,
+	): ReturnType<typeof generators.buildKeyValuePairList> {
+		let pairs = [this.parseKeyValuePair(allowShorthand)]
 
 		while (this.tokens.peek()?.type === TokenType.SymbolComma) {
 			this.tokens.next()
@@ -2427,7 +2514,7 @@ class DescentParser {
 				break
 			}
 
-			pairs.push(this.parseKeyValuePair())
+			pairs.push(this.parseKeyValuePair(allowShorthand))
 		}
 
 		this.reportDuplicateNames(pairs, "Member", "duplicate-member")
@@ -2438,8 +2525,26 @@ class DescentParser {
 		)
 	}
 
-	protected parseKeyValuePair(): ReturnType<typeof generators.keyValuePair> {
+	protected parseKeyValuePair(
+		allowShorthand: boolean,
+	): ReturnType<typeof generators.keyValuePair> {
 		let name = this.parseIdentifier()
+
+		// NOTE: The value is a Node of its own at the name's Position rather
+		// than the name Node itself — two Declarations at one Position is
+		// exactly what the shorthand is, and the rename index is built to
+		// carry both.
+		if (
+			allowShorthand &&
+			this.tokens.peek()?.type !== TokenType.SymbolEqual
+		) {
+			return generators.keyValuePair(
+				name,
+				generators.identifier(name.content, name.position),
+				name.position,
+				true,
+			)
+		}
 
 		this.tokens.expect(TokenType.SymbolEqual)
 

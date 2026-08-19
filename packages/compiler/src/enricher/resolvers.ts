@@ -809,9 +809,15 @@ function reportProvidedMethodOutOfReach(
 	)
 }
 
+// NOTE: `shorthandMember` is set where the name was written as a Record
+// literal's whole member — `{ x }` — and is used for nothing but the extra
+// sentence on `unknown-name`: a reader who wrote the shorthand without knowing
+// it was one otherwise gets told that a name they never meant to read is not
+// declared.
 export function resolveIdentifierType(
 	node: parser.IdentifierNode,
 	scope: enricher.Scope,
+	shorthandMember = false,
 ): common.Type {
 	let name = node.content
 	let resolved = findVariableOrBarredName(name, scope)
@@ -843,6 +849,11 @@ export function resolveIdentifierType(
 				labels: [
 					primary(node.position, "no such Variable or Constant"),
 				],
+				notes: shorthandMember
+					? [
+							`A bare member name in a Record Literal is the member AND its value, so '${name}' is read here as well as written.`,
+						]
+					: [],
 				helps: suggestionHelps(name, scope, "members"),
 				...suggestionData(suggestionInScope(name, scope, "members")),
 			})

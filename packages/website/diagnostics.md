@@ -88,6 +88,28 @@ label from the expected Function Type; write only its name.
 **Quick Fix — "Remove the label":** drops the external name and keeps the
 internal one.
 
+### `shorthand-in-combination`
+
+A bare member name was written in the key list of an update —
+`{ base with port, host }`. Shorthand belongs to a Record Literal's member
+list, where `{ port, host }` is `{ port = port, host = host }`; an update's key
+list is not one, because a bare name after `with` is already the whole value
+being merged in. `{ base with other }` means "merge `other`'s members", and it
+has always meant that.
+
+Two spellings say what the bare name was after. `{ base with port = port }`
+sets the one member. `{ base with { port, host } }` merges a Record Literal
+that uses the shorthand — the same nesting a computed right-hand side is
+written in, and the only form of the shorthand merge there is.
+
+The rule holds wherever the braces do: a plain Literal, a typed Literal
+(`Point ~> { x, y }`), a Case payload (`#Rectangle({ width, height })`), a
+Literal standing as a member's value, and a Literal standing as an update's
+whole right-hand side all take shorthand. Only the key list after `with` does
+not. An update takes either a key list or one Expression and never both, so a
+list that also carries a computed key — `{ game with board = board, history =
+game.history::removeLast() }` — has no shorthand spelling at all.
+
 ### `default-on-function-literal`
 
 A Parameter of a Function literal in expression position was given a
@@ -200,6 +222,11 @@ literal written in an initialiser, whose body runs when it is called.
 
 A Variable or Constant that was never declared. The Diagnostic suggests the
 closest name in Scope when there is a plausible one.
+
+A bare member name in a Record Literal — `{ port }`, which is
+`{ port = port }` — is reported here as well, with a note saying the name is
+read as the member's value. There is no way to write a member and leave its
+value out.
 
 **Quick Fix — "Change to 'X'":** replaces the name with the suggestion, when
 there is one.
