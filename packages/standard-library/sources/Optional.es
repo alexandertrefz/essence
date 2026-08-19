@@ -121,7 +121,7 @@ declarations {
 
 		§ These two let a Program ask, rather than only collapse. The
 		§ alternative is to match the Optional apart at the use site, or to
-		§ pick a fallback that cannot occur and compare against it. That
+		§ pick a fallback that can not occur and compare against it. That
 		§ fallback is wrong whenever the payload can equal it.
 
 		§§ Answers whether the Optional holds a value.

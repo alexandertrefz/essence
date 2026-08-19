@@ -12,7 +12,7 @@ import * as path from "node:path"
 // in `packages/standard-library/src/` and the sources are its sibling. Run from a BUNDLE
 // it does not: the Language Server inside the VS Code extension is one file,
 // `import.meta.dirname` is wherever that file was written, and the sources have
-// to have been copied next to it. They cannot be inlined instead — the loader
+// to have been copied next to it. They can not be inlined instead — the loader
 // finds them with `readdirSync`, and no bundler can see through that.
 //
 // This is what the extension shipped broken. `../sources` resolved to a

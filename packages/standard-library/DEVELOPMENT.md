@@ -370,7 +370,7 @@ rule stated there.
   the signature does — see [Writing the docs and
   notes](#writing-the-docs-and-notes). A line that names something else, or
   that stands past the last Parameter, attaches to nothing and is rendered into
-  every Hover regardless — a description of a Parameter the reader cannot find.
+  every Hover regardless — a description of a Parameter the reader can not find.
   Both are reported, which is what caught `split(intoGroupsOf size:)` being
   documented as `@param groupsOf`.
 - **Every Method of a Namespace answers for the Namespace's target Type.**

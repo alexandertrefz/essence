@@ -13,7 +13,7 @@ declarations {
 	§
 	§ Two of the four are native, because only a native can loop where the one
 	§ recursion is not stack-safe. They are `while` and the general
-	§ `step -> Step` loop. The general loop cannot be written on `while`, which
+	§ `step -> Step` loop. The general loop can not be written on `while`, which
 	§ only ever answers with its State: no Expression names the Result where
 	§ the loop stops. The other two entries are written in Essence on `while`,
 	§ and need no `Step`, because the predicate is the whole of their stopping.
