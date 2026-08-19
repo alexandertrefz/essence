@@ -41,6 +41,9 @@ declarations {
 			<- @::is(other)::negate()
 		}
 
+		§§ Answers the Transcendental as a String, in the exact symbolic form: `π`, `2·π`, `e` or `1 + π + e`.
+		toString() -> String
+
 		§§ Answers the exact sum of the Transcendental and a number.
 		§§
 		§§ Two Transcendentals can cancel their π and e terms, which leaves a Rational.
@@ -146,9 +149,6 @@ declarations {
 		§§
 		§§ At least one base term keeps its non-zero coefficient, so the answer is again a Transcendental.
 		negate() -> Transcendental
-
-		§§ Answers the Transcendental as a String, in the exact symbolic form: `π`, `2·π`, `e` or `1 + π + e`.
-		toString() -> String
 	}
 }
 

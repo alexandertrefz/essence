@@ -49,6 +49,48 @@ declarations {
 		is Printable where ItemType is Printable,
 		is Equatable where ItemType is Equatable,
 		is Comparable where ItemType is Comparable {
+		§§ Answers a List holding the given item the given number of times.
+		§§
+		§§ A count of zero or less answers the empty List.
+		§§
+		§§ @param _ — the item to repeat
+		§§ @param times — how many copies the List holds
+		§§ @returns — the List of repeated items.
+		static repeat(
+			_ item: ItemType,
+			times count: Integer,
+		) -> List<ItemType> {
+			§ `of` counts down when the first Integer is the greater, so a count
+			§ below one would answer `[1]` rather than nothing. The guard
+			§ answers the empty List instead.
+			if count::isLessThan(1) {
+				<- []
+			} else {
+				§ The Integers are only the tally. Each is replaced by the item.
+				<- List.of(integersFrom 1, through count)::map((_) { <- item })
+			}
+		}
+
+		§ Essence has no Range Type, so a counting loop writes
+		§ `List.of(integersFrom 1, through 10)::map(…)`. The Method is fixed to
+		§ Integers, so the Namespace's `ItemType` has nothing to merge into.
+		§
+		§ Both ends are included, so the shortest List it builds is the one-item
+		§ `[start]`, and counting down covers the rest. No pair of Integers
+		§ answers empty, and the return Type is where that is written down.
+
+		§§ Answers the Integers from one value through another, both included.
+		§§
+		§§ The count runs down when the first value is the greater. There is always at least the first value, so the answer certainly has something in it.
+		§§
+		§§ @param integersFrom — the first Integer of the List
+		§§ @param through — the last Integer of the List, which is included
+		§§ @returns — the List of Integers, which is never empty.
+		static of(
+			integersFrom start: Integer,
+			through end: Integer,
+		) -> NonEmptyList<Integer>
+
 		§ An Essence body would be length equality and
 		§ `pair(with other)::hasItems(onlyWhere …)`, and it can not be written
 		§ that way yet. The pair Record mentions `ItemType`. Binding a List
@@ -76,17 +118,24 @@ declarations {
 			<- @::is(other)::negate()
 		}
 
+		§ The witness behind List's conditional `Comparable` conformance.
+
+		§§ Answers how the List orders against another one, comparing them lexicographically.
+		§§
+		§§ The first differing pair of items decides. On an equal prefix the shorter List comes first. The Method is available whenever the items conform to `Comparable`.
+		§§
+		§§ @param to — the List to compare with
+		§§ @returns — `Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.
+		compare<infer ItemType is Comparable>(
+			to other: List<ItemType>,
+		) -> Ordering
+
 		§§ Answers the List and its items as a String, in the form `[ 1, 2, 3 ]`.
 		§§
 		§§ Each item is rendered by its own `toString`. The empty List answers `[]`. The Method is available whenever the items conform to `Printable`.
 		§§
 		§§ @returns — the String representation of the List.
 		toString<infer ItemType is Printable>() -> String
-
-		§§ Answers how many items the List has.
-		§§
-		§§ @returns — the number of items.
-		length() -> Integer
 
 		§ Both quantified entries fold a Boolean. The alternative is
 		§ `firstItem(where:)::hasValue()`, which answers the same question and
@@ -166,6 +215,11 @@ declarations {
 		) -> Boolean {
 			<- @::contains(item)::negate()
 		}
+
+		§§ Answers how many items the List has.
+		§§
+		§§ @returns — the number of items.
+		length() -> Integer
 
 		§ Every Method below that can answer empty offers a `defaultingTo:`
 		§ entry beside it, answering the bare Type. Each of those entries is
@@ -273,6 +327,148 @@ declarations {
 				defaultingTo fallback: ItemType,
 			) -> ItemType {
 				<- @::lastItem(where check)::value(defaultingTo fallback)
+			}
+		}
+
+		§§ Answers the item at the given position.
+		§§
+		§§ The position counts from zero. A negative position counts back from the end: -1 is the last item. A position outside the List answers nothing, and the `defaultingTo:` entry answers the given item instead.
+		overload item {
+			§§ Answers the item at the given position.
+			§§
+			§§ @param at — the position of the item
+			§§ @returns — the item, or nothing when the position is outside the List.
+			(at index: Integer) -> Optional<ItemType>
+
+			§§ Answers the item at the given position, or the given fallback when the position is outside the List.
+			§§
+			§§ @param at — the position of the item
+			§§ @param defaultingTo — the item to answer with when the position names none
+			§§ @returns — the item at that position, or the fallback in its place.
+			(at index: Integer, defaultingTo fallback: ItemType) -> ItemType {
+				<- @::item(at index)::value(defaultingTo fallback)
+			}
+		}
+
+		§ Both entries count their way through the items and stop at the first
+		§ match. The fold threads the position as its accumulator and builds no
+		§ List. Walking the positions with `item(at:)` reads better and costs an
+		§ Optional per item. The `of:` entry is the `where:` entry with the
+		§ items' own `is` as the check.
+
+		§§ Answers the position of the first item equal to the given one, or of the first item the check accepts.
+		§§
+		§§ A List without such an item answers nothing, and the `defaultingTo:` entries answer the given position instead.
+		overload firstIndex {
+			§§ Answers the position of the first item equal to the given one.
+			§§
+			§§ Equality is the items' own `is`. The entry is available whenever the items conform to `Equatable`.
+			§§
+			§§ @param of — the item to look for
+			§§ @returns — the zero-based position, or nothing when the item is absent.
+			<infer ItemType is Equatable>(
+				of item: ItemType,
+			) -> Optional<Integer> {
+				<- @::firstIndex(where (candidate) { <- candidate::is(item) })
+			}
+
+			§§ Answers the position of the first item the check accepts.
+			§§
+			§§ @param where — the check each item is offered to
+			§§ @returns — the zero-based position, or nothing when no item is accepted.
+			(where check: (_: ItemType) -> Boolean) -> Optional<Integer> {
+				§ The accumulator is the position under test. A `#Done` leaves
+				§ the fold at the first match. A fold that reaches the end
+				§ settles on the length, which is the one position no match can
+				§ answer. So an absent item needs no sentinel, and the fold
+				§ carries a bare Integer rather than an Optional.
+				constant found = @::reduce(
+					startingWith 0,
+					step (index, candidate) {
+						if check(candidate) {
+							<- #Done(index)
+						} else {
+							<- #Continue(index::add(1))
+						}
+					},
+				)
+
+				if found::isLessThan(@::length()) {
+					<- #Value(found)
+				} else {
+					<- #Empty
+				}
+			}
+
+			§§ Answers the position of the first item equal to the given one, or the given fallback when the item is absent.
+			§§
+			§§ Equality is the items' own `is`. The entry is available whenever the items conform to `Equatable`.
+			§§
+			§§ @param of — the item to look for
+			§§ @param defaultingTo — the position to answer with when the item is absent
+			§§ @returns — the zero-based position, or the fallback in its place.
+			<infer ItemType is Equatable>(
+				of item: ItemType,
+				defaultingTo fallback: Integer,
+			) -> Integer {
+				<- @::firstIndex(of item)::value(defaultingTo fallback)
+			}
+
+			§§ Answers the position of the first item the check accepts, or the given fallback when it accepts none.
+			§§
+			§§ @param where — the check each item is offered to
+			§§ @param defaultingTo — the position to answer with when no item is accepted
+			§§ @returns — the zero-based position, or the fallback in its place.
+			(
+				where check: (_: ItemType) -> Boolean,
+				defaultingTo fallback: Integer,
+			) -> Integer {
+				<- @::firstIndex(where check)::value(defaultingTo fallback)
+			}
+		}
+
+		§§ Answers the position of the last item equal to the given one.
+		§§
+		§§ Equality is the items' own `is`. The Method is available whenever the items conform to `Equatable`.
+		§§
+		§§ A List without that item answers nothing, and the `defaultingTo:` entry answers the given position instead.
+		overload lastIndex {
+			§§ Answers the position of the last item equal to the given one.
+			§§
+			§§ Equality is the items' own `is`. The entry is available whenever the items conform to `Equatable`.
+			§§
+			§§ @param of — the item to look for
+			§§ @returns — the zero-based position, or nothing when the item is absent.
+			<infer ItemType is Equatable>(
+				of item: ItemType,
+			) -> Optional<Integer> {
+				§ The last occurrence is the first occurrence of the reversed
+				§ List. So `firstIndex` answers this one too, and only the
+				§ position is counted back from the end.
+				§
+				§ The empty List reverses to itself and finds nothing, so it
+				§ needs no guard. The -1 that `lastPosition` holds never reaches
+				§ the subtraction, because `map` does not run on an empty
+				§ Optional.
+				constant lastPosition = @::length()::subtract(1)
+
+				<- @::reverse()
+					::firstIndex(of item)
+					::map((position) { <- lastPosition::subtract(position) })
+			}
+
+			§§ Answers the position of the last item equal to the given one, or the given fallback when the item is absent.
+			§§
+			§§ Equality is the items' own `is`. The entry is available whenever the items conform to `Equatable`.
+			§§
+			§§ @param of — the item to look for
+			§§ @param defaultingTo — the position to answer with when the item is absent
+			§§ @returns — the zero-based position, or the fallback in its place.
+			<infer ItemType is Equatable>(
+				of item: ItemType,
+				defaultingTo fallback: Integer,
+			) -> Integer {
+				<- @::lastIndex(of item)::value(defaultingTo fallback)
 			}
 		}
 
@@ -470,103 +666,6 @@ declarations {
 		§§ @returns — the List of accepted items.
 		everyItem(where check: (_: ItemType) -> Boolean) -> List<ItemType>
 
-		§§ Answers the item at the given position.
-		§§
-		§§ The position counts from zero. A negative position counts back from the end: -1 is the last item. A position outside the List answers nothing, and the `defaultingTo:` entry answers the given item instead.
-		overload item {
-			§§ Answers the item at the given position.
-			§§
-			§§ @param at — the position of the item
-			§§ @returns — the item, or nothing when the position is outside the List.
-			(at index: Integer) -> Optional<ItemType>
-
-			§§ Answers the item at the given position, or the given fallback when the position is outside the List.
-			§§
-			§§ @param at — the position of the item
-			§§ @param defaultingTo — the item to answer with when the position names none
-			§§ @returns — the item at that position, or the fallback in its place.
-			(at index: Integer, defaultingTo fallback: ItemType) -> ItemType {
-				<- @::item(at index)::value(defaultingTo fallback)
-			}
-		}
-
-		§ Both entries count their way through the items and stop at the first
-		§ match. The fold threads the position as its accumulator and builds no
-		§ List. Walking the positions with `item(at:)` reads better and costs an
-		§ Optional per item. The `of:` entry is the `where:` entry with the
-		§ items' own `is` as the check.
-
-		§§ Answers the position of the first item equal to the given one, or of the first item the check accepts.
-		§§
-		§§ A List without such an item answers nothing, and the `defaultingTo:` entries answer the given position instead.
-		overload firstIndex {
-			§§ Answers the position of the first item equal to the given one.
-			§§
-			§§ Equality is the items' own `is`. The entry is available whenever the items conform to `Equatable`.
-			§§
-			§§ @param of — the item to look for
-			§§ @returns — the zero-based position, or nothing when the item is absent.
-			<infer ItemType is Equatable>(
-				of item: ItemType,
-			) -> Optional<Integer> {
-				<- @::firstIndex(where (candidate) { <- candidate::is(item) })
-			}
-
-			§§ Answers the position of the first item the check accepts.
-			§§
-			§§ @param where — the check each item is offered to
-			§§ @returns — the zero-based position, or nothing when no item is accepted.
-			(where check: (_: ItemType) -> Boolean) -> Optional<Integer> {
-				§ The accumulator is the position under test. A `#Done` leaves
-				§ the fold at the first match. A fold that reaches the end
-				§ settles on the length, which is the one position no match can
-				§ answer. So an absent item needs no sentinel, and the fold
-				§ carries a bare Integer rather than an Optional.
-				constant found = @::reduce(
-					startingWith 0,
-					step (index, candidate) {
-						if check(candidate) {
-							<- #Done(index)
-						} else {
-							<- #Continue(index::add(1))
-						}
-					},
-				)
-
-				if found::isLessThan(@::length()) {
-					<- #Value(found)
-				} else {
-					<- #Empty
-				}
-			}
-
-			§§ Answers the position of the first item equal to the given one, or the given fallback when the item is absent.
-			§§
-			§§ Equality is the items' own `is`. The entry is available whenever the items conform to `Equatable`.
-			§§
-			§§ @param of — the item to look for
-			§§ @param defaultingTo — the position to answer with when the item is absent
-			§§ @returns — the zero-based position, or the fallback in its place.
-			<infer ItemType is Equatable>(
-				of item: ItemType,
-				defaultingTo fallback: Integer,
-			) -> Integer {
-				<- @::firstIndex(of item)::value(defaultingTo fallback)
-			}
-
-			§§ Answers the position of the first item the check accepts, or the given fallback when it accepts none.
-			§§
-			§§ @param where — the check each item is offered to
-			§§ @param defaultingTo — the position to answer with when no item is accepted
-			§§ @returns — the zero-based position, or the fallback in its place.
-			(
-				where check: (_: ItemType) -> Boolean,
-				defaultingTo fallback: Integer,
-			) -> Integer {
-				<- @::firstIndex(where check)::value(defaultingTo fallback)
-			}
-		}
-
 		§ Both ends are defaulted, so `slice(from n)` is the tail from `n` and
 		§ `slice(to n)` is the head up to it. Four callers in the library spelled
 		§ `slice(from n, to @::length())` before that. The `to` default reads the
@@ -622,18 +721,6 @@ declarations {
 				by comparison: (_: ItemType, _: ItemType) -> Ordering,
 			) -> List<ItemType>
 		}
-
-		§ The witness behind List's conditional `Comparable` conformance.
-
-		§§ Answers how the List orders against another one, comparing them lexicographically.
-		§§
-		§§ The first differing pair of items decides. On an equal prefix the shorter List comes first. The Method is available whenever the items conform to `Comparable`.
-		§§
-		§§ @param to — the List to compare with
-		§§ @returns — `Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.
-		compare<infer ItemType is Comparable>(
-			to other: List<ItemType>,
-		) -> Ordering
 
 		§§ Answers how many items equal the given one, or how many items the check accepts.
 		§§
@@ -695,51 +782,6 @@ declarations {
 			}
 		}
 
-		§§ Answers the position of the last item equal to the given one.
-		§§
-		§§ Equality is the items' own `is`. The Method is available whenever the items conform to `Equatable`.
-		§§
-		§§ A List without that item answers nothing, and the `defaultingTo:` entry answers the given position instead.
-		overload lastIndex {
-			§§ Answers the position of the last item equal to the given one.
-			§§
-			§§ Equality is the items' own `is`. The entry is available whenever the items conform to `Equatable`.
-			§§
-			§§ @param of — the item to look for
-			§§ @returns — the zero-based position, or nothing when the item is absent.
-			<infer ItemType is Equatable>(
-				of item: ItemType,
-			) -> Optional<Integer> {
-				§ The last occurrence is the first occurrence of the reversed
-				§ List. So `firstIndex` answers this one too, and only the
-				§ position is counted back from the end.
-				§
-				§ The empty List reverses to itself and finds nothing, so it
-				§ needs no guard. The -1 that `lastPosition` holds never reaches
-				§ the subtraction, because `map` does not run on an empty
-				§ Optional.
-				constant lastPosition = @::length()::subtract(1)
-
-				<- @::reverse()
-					::firstIndex(of item)
-					::map((position) { <- lastPosition::subtract(position) })
-			}
-
-			§§ Answers the position of the last item equal to the given one, or the given fallback when the item is absent.
-			§§
-			§§ Equality is the items' own `is`. The entry is available whenever the items conform to `Equatable`.
-			§§
-			§§ @param of — the item to look for
-			§§ @param defaultingTo — the position to answer with when the item is absent
-			§§ @returns — the zero-based position, or the fallback in its place.
-			<infer ItemType is Equatable>(
-				of item: ItemType,
-				defaultingTo fallback: Integer,
-			) -> Integer {
-				<- @::lastIndex(of item)::value(defaultingTo fallback)
-			}
-		}
-
 		§ The bound does real work here rather than restating a conformance of
 		§ List's own. An item with no `Printable` conformance is refused at the
 		§ bound, which names the Protocol that is missing.
@@ -789,48 +831,6 @@ declarations {
 		§§ @param intoGroupsOf — how many items each group holds
 		§§ @returns — the List of groups.
 		split(intoGroupsOf size: Integer) -> List<List<ItemType>>
-
-		§§ Answers a List holding the given item the given number of times.
-		§§
-		§§ A count of zero or less answers the empty List.
-		§§
-		§§ @param _ — the item to repeat
-		§§ @param times — how many copies the List holds
-		§§ @returns — the List of repeated items.
-		static repeat(
-			_ item: ItemType,
-			times count: Integer,
-		) -> List<ItemType> {
-			§ `of` counts down when the first Integer is the greater, so a count
-			§ below one would answer `[1]` rather than nothing. The guard
-			§ answers the empty List instead.
-			if count::isLessThan(1) {
-				<- []
-			} else {
-				§ The Integers are only the tally. Each is replaced by the item.
-				<- List.of(integersFrom 1, through count)::map((_) { <- item })
-			}
-		}
-
-		§ Essence has no Range Type, so a counting loop writes
-		§ `List.of(integersFrom 1, through 10)::map(…)`. The Method is fixed to
-		§ Integers, so the Namespace's `ItemType` has nothing to merge into.
-		§
-		§ Both ends are included, so the shortest List it builds is the one-item
-		§ `[start]`, and counting down covers the rest. No pair of Integers
-		§ answers empty, and the return Type is where that is written down.
-
-		§§ Answers the Integers from one value through another, both included.
-		§§
-		§§ The count runs down when the first value is the greater. There is always at least the first value, so the answer certainly has something in it.
-		§§
-		§§ @param integersFrom — the first Integer of the List
-		§§ @param through — the last Integer of the List, which is included
-		§§ @returns — the List of Integers, which is never empty.
-		static of(
-			integersFrom start: Integer,
-			through end: Integer,
-		) -> NonEmptyList<Integer>
 	}
 
 	§ A List of Lists, and the one Method only such a List can answer. Its

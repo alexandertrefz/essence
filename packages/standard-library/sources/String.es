@@ -55,20 +55,6 @@ declarations {
 	§ half. Both sides of a comparison are normalized to NFC first, so an
 	§ accent composed and one decomposed count, order and compare the same.
 	namespace String for String is Equatable, is Printable, is Comparable {
-		§§ Answers whether the String has no characters.
-		§§
-		§§ @returns — `true` for the empty String, and `false` otherwise.
-		isEmpty() -> Boolean {
-			<- @::length()::is(0)
-		}
-
-		§§ Answers whether the String has at least one character.
-		§§
-		§§ @returns — `true` when the String is not empty.
-		hasCharacters() -> Boolean {
-			<- @::isEmpty()::negate()
-		}
-
 		§§ Answers whether the String has the same characters as another one.
 		§§
 		§§ The comparison is case-sensitive unless a `CaseSensitivity` says otherwise.
@@ -98,27 +84,99 @@ declarations {
 			<- @::is(other)::negate()
 		}
 
-		§§ Joins another String onto the front of this one.
+		§§ Orders the String against another one, by character code point.
 		§§
-		§§ @param _ — the String to add to the front
-		§§ @returns — the two Strings joined together.
-		prepend(_ other: String) -> String {
-			<- other::append(@)
+		§§ A `CaseSensitivity` of `#Insensitive` folds the case first.
+		overload compare {
+			§ Native. No Essence expression names a character's code point.
+
+			§§ @param to — the String to order against
+			§§ @returns — `Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.
+			(to other: String) -> Ordering
+
+			§ Case is folded by lower-casing both sides, which approximates
+			§ full Unicode case folding. The ordering above then decides.
+
+			§§ @param to — the String to order against
+			§§ @param comparing — whether case is significant
+			§§ @returns — `Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.
+			(
+				to other: String,
+				comparing sensitivity: CaseSensitivity,
+			) -> Ordering {
+				constant text = @
+
+				<- match sensitivity -> Ordering {
+					case #Sensitive   { <- text::compare(to other) }
+
+					case #Insensitive {
+						<- text::lowercase()::compare(to other::lowercase())
+					}
+				}
+			}
 		}
 
-		§§ Joins another String onto the end of this one.
+		§§ Answers the String itself.
 		§§
-		§§ @param _ — the String to add to the end
-		§§ @returns — the two Strings joined together.
-		append(_ other: String) -> String
+		§§ @returns — the String, unchanged.
+		toString() -> String {
+			<- @
+		}
 
-		§§ Splits the String at every occurrence of the given separator.
+		§§ Answers whether the String has no characters.
 		§§
-		§§ `join(with:)` on the answer rebuilds the String.
+		§§ @returns — `true` for the empty String, and `false` otherwise.
+		isEmpty() -> Boolean {
+			<- @::length()::is(0)
+		}
+
+		§§ Answers whether the String has at least one character.
 		§§
-		§§ @param on — the separator to split at
-		§§ @returns — the List of pieces, without the separator.
-		split(on separator: String) -> List<String>
+		§§ @returns — `true` when the String is not empty.
+		hasCharacters() -> Boolean {
+			<- @::isEmpty()::negate()
+		}
+
+		§§ Answers whether the given String occurs anywhere in this one.
+		§§
+		§§ @param _ — the String to look for
+		§§ @returns — `true` when it occurs.
+		contains(_ other: String) -> Boolean {
+			<- @::firstIndex(of other)::hasValue()
+		}
+
+		§§ Answers whether the given String occurs nowhere in this one.
+		§§
+		§§ @param _ — the String to look for
+		§§ @returns — `true` when it does not occur.
+		doesNotContain(_ other: String) -> Boolean {
+			<- @::contains(other)::negate()
+		}
+
+		§§ Answers whether the String begins with the given one.
+		starts(with prefix: String) -> Boolean {
+			§ A prefix longer than the String slices to the whole String,
+			§ which can not equal the prefix, so it needs no guard.
+			<- @::slice(to prefix::length())::is(prefix)
+		}
+
+		§§ Answers whether the String does not begin with the given one.
+		doesNotStart(with prefix: String) -> Boolean {
+			<- @::starts(with prefix)::negate()
+		}
+
+		§ Native. The Essence body slices the last `suffix::length()`
+		§ characters and compares them: four walks where the intrinsic is
+		§ one. The slice in `starts(with:)` needs no `length`, so that one
+		§ stays in Essence.
+
+		§§ Answers whether the String ends with the given one.
+		ends(with suffix: String) -> Boolean
+
+		§§ Answers whether the String does not end with the given one.
+		doesNotEnd(with suffix: String) -> Boolean {
+			<- @::ends(with suffix)::negate()
+		}
 
 		§§ Answers the lines of the String, split at every line break.
 		§§
@@ -143,39 +201,6 @@ declarations {
 		§§
 		§§ @returns — the List of words, empty when the String is only whitespace.
 		words() -> List<String>
-
-		§§ Answers whether the given String occurs anywhere in this one.
-		§§
-		§§ @param _ — the String to look for
-		§§ @returns — `true` when it occurs.
-		contains(_ other: String) -> Boolean {
-			<- @::firstIndex(of other)::hasValue()
-		}
-
-		§§ Answers whether the given String occurs nowhere in this one.
-		§§
-		§§ @param _ — the String to look for
-		§§ @returns — `true` when it does not occur.
-		doesNotContain(_ other: String) -> Boolean {
-			<- @::contains(other)::negate()
-		}
-
-		§§ Answers how many times the given String occurs in this one.
-		§§
-		§§ The occurrences do not overlap: `"aaa"::count(of "aa")` is 1. The empty part answers 0.
-		§§
-		§§ @param of — the String to count
-		§§ @returns — the number of occurrences.
-		count(of part: String) -> Integer {
-			§ Splitting on the part cuts at every occurrence, so there is
-			§ one more piece than occurrences. The empty part would cut
-			§ between the characters instead.
-			if part::isEmpty() {
-				<- 0
-			} else {
-				<- @::split(on part)::length()::subtract(1)
-			}
-		}
 
 		§§ Answers how many characters the String has.
 		§§
@@ -208,127 +233,6 @@ declarations {
 				<- @::character(at index)::value(defaultingTo fallback)
 			}
 		}
-
-		§§ Answers the String with every character in upper case.
-		uppercase() -> String
-
-		§§ Answers the String with every character in lower case.
-		lowercase() -> String
-
-		§§ Answers the String in the given Unicode normalization form.
-		§§
-		§§ Two Strings that look the same can then compare and read the same. The default form is the one `is` and `compare` already work in.
-		§§
-		§§ @param as — the normalization form to produce; `#ComposedCanonical` when it is left out.
-		§§ @returns — the normalized String.
-		normalize(as form: NormalizationForm = #ComposedCanonical) -> String
-
-		§§ Answers the String without the whitespace around it.
-		§§
-		§§ The whitespace goes from both ends when no end is named.
-		§§
-		§§ @param at — the end to trim; `#BothEnds` when it is left out.
-		§§ @returns — the trimmed String.
-		trim(at side: Side = #BothEnds) -> String
-
-		§§ Answers whether the String begins with the given one.
-		starts(with prefix: String) -> Boolean {
-			§ A prefix longer than the String slices to the whole String,
-			§ which can not equal the prefix, so it needs no guard.
-			<- @::slice(to prefix::length())::is(prefix)
-		}
-
-		§§ Answers whether the String does not begin with the given one.
-		doesNotStart(with prefix: String) -> Boolean {
-			<- @::starts(with prefix)::negate()
-		}
-
-		§ Native. The Essence body slices the last `suffix::length()`
-		§ characters and compares them: four walks where the intrinsic is
-		§ one. The slice in `starts(with:)` needs no `length`, so that one
-		§ stays in Essence.
-
-		§§ Answers whether the String ends with the given one.
-		ends(with suffix: String) -> Boolean
-
-		§§ Answers whether the String does not end with the given one.
-		doesNotEnd(with suffix: String) -> Boolean {
-			<- @::ends(with suffix)::negate()
-		}
-
-		§§ Answers the String with every occurrence of one part replaced by another.
-		§§
-		§§ An empty part matches nothing and leaves the String unchanged.
-		§§
-		§§ @param _ — the String to look for
-		§§ @param with — the String to put in its place
-		§§ @returns — the String with the replacements made.
-		replaceEvery(_ part: String, with replacement: String) -> String {
-			§ The empty part occurs at every position, and
-			§ `split(on "")::join` would put the replacement between the
-			§ characters. That is a different String, so nothing is replaced.
-			if part::isEmpty() {
-				<- @
-			} else {
-				<- @::split(on part)::join(with replacement)
-			}
-		}
-
-		§§ Answers the String with the first occurrence of one part replaced by another.
-		§§
-		§§ An empty part, or a part that does not occur, leaves the String unchanged.
-		§§
-		§§ @param _ — the String to look for
-		§§ @param with — the String to put in its place
-		§§ @returns — the String with the first replacement made.
-		replaceFirst(_ part: String, with replacement: String) -> String {
-			§ The empty part is a no-op, as in `replaceEvery`.
-			if part::isEmpty() {
-				<- @
-			} else {
-				constant pieces = @::split(on part)
-
-				§ One piece means the part never occurs.
-				if pieces::length()::is(1) {
-					<- @
-				} else {
-					§ The first piece is everything before the first
-					§ occurrence, and the rest rejoin on the original part.
-					constant head = pieces::firstItem(defaultingTo "")
-
-					<- head::append(replacement)
-						::append(pieces::removeFirst()::join(with part))
-				}
-			}
-		}
-
-		§ Native. The Essence body builds a List of `count` copies with
-		§ `List.repeat` and joins it back into one String.
-
-		§§ Answers the String joined to itself the given number of times.
-		§§
-		§§ @param times — how many copies to join
-		§§ @returns — the repeated String. A count below one answers the empty String.
-		repeat(times count: Integer) -> String
-
-		§ Native, and the `lastIndex` derivation below rests on it; see
-		§ DEVELOPMENT.md, What to weigh before writing the next one.
-
-		§§ Answers the String with its characters in the opposite order.
-		reverse() -> String
-
-		§ Native. The Essence body, `characters()::slice(…)::join(with "")`,
-		§ allocates a String per character, two Lists and a join. The native
-		§ cuts the window out of the grapheme view and keeps what it cut.
-
-		§§ Answers the characters from one position up to, but not including, another.
-		§§
-		§§ A negative position counts back from the end, so `slice(from 0, to -1)` drops the last character. An empty or inverted range answers the empty String.
-		§§
-		§§ @param from — the first position to include; zero when it is left out.
-		§§ @param to — the position to stop before; the length when it is left out.
-		§§ @returns — the String of that range of characters.
-		slice(from start: Integer = 0, to end: Integer = @::length()) -> String
 
 		§§ Answers the position of the first occurrence of the given String.
 		§§
@@ -403,6 +307,141 @@ declarations {
 			}
 		}
 
+		§§ Joins another String onto the front of this one.
+		§§
+		§§ @param _ — the String to add to the front
+		§§ @returns — the two Strings joined together.
+		prepend(_ other: String) -> String {
+			<- other::append(@)
+		}
+
+		§§ Joins another String onto the end of this one.
+		§§
+		§§ @param _ — the String to add to the end
+		§§ @returns — the two Strings joined together.
+		append(_ other: String) -> String
+
+		§§ Splits the String at every occurrence of the given separator.
+		§§
+		§§ `join(with:)` on the answer rebuilds the String.
+		§§
+		§§ @param on — the separator to split at
+		§§ @returns — the List of pieces, without the separator.
+		split(on separator: String) -> List<String>
+
+		§§ Answers how many times the given String occurs in this one.
+		§§
+		§§ The occurrences do not overlap: `"aaa"::count(of "aa")` is 1. The empty part answers 0.
+		§§
+		§§ @param of — the String to count
+		§§ @returns — the number of occurrences.
+		count(of part: String) -> Integer {
+			§ Splitting on the part cuts at every occurrence, so there is
+			§ one more piece than occurrences. The empty part would cut
+			§ between the characters instead.
+			if part::isEmpty() {
+				<- 0
+			} else {
+				<- @::split(on part)::length()::subtract(1)
+			}
+		}
+
+		§§ Answers the String with every character in upper case.
+		uppercase() -> String
+
+		§§ Answers the String with every character in lower case.
+		lowercase() -> String
+
+		§§ Answers the String in the given Unicode normalization form.
+		§§
+		§§ Two Strings that look the same can then compare and read the same. The default form is the one `is` and `compare` already work in.
+		§§
+		§§ @param as — the normalization form to produce; `#ComposedCanonical` when it is left out.
+		§§ @returns — the normalized String.
+		normalize(as form: NormalizationForm = #ComposedCanonical) -> String
+
+		§§ Answers the String without the whitespace around it.
+		§§
+		§§ The whitespace goes from both ends when no end is named.
+		§§
+		§§ @param at — the end to trim; `#BothEnds` when it is left out.
+		§§ @returns — the trimmed String.
+		trim(at side: Side = #BothEnds) -> String
+
+		§§ Answers the String with every occurrence of one part replaced by another.
+		§§
+		§§ An empty part matches nothing and leaves the String unchanged.
+		§§
+		§§ @param _ — the String to look for
+		§§ @param with — the String to put in its place
+		§§ @returns — the String with the replacements made.
+		replaceEvery(_ part: String, with replacement: String) -> String {
+			§ The empty part occurs at every position, and
+			§ `split(on "")::join` would put the replacement between the
+			§ characters. That is a different String, so nothing is replaced.
+			if part::isEmpty() {
+				<- @
+			} else {
+				<- @::split(on part)::join(with replacement)
+			}
+		}
+
+		§§ Answers the String with the first occurrence of one part replaced by another.
+		§§
+		§§ An empty part, or a part that does not occur, leaves the String unchanged.
+		§§
+		§§ @param _ — the String to look for
+		§§ @param with — the String to put in its place
+		§§ @returns — the String with the first replacement made.
+		replaceFirst(_ part: String, with replacement: String) -> String {
+			§ The empty part is a no-op, as in `replaceEvery`.
+			if part::isEmpty() {
+				<- @
+			} else {
+				constant pieces = @::split(on part)
+
+				§ One piece means the part never occurs.
+				if pieces::length()::is(1) {
+					<- @
+				} else {
+					§ The first piece is everything before the first
+					§ occurrence, and the rest rejoin on the original part.
+					constant head = pieces::firstItem(defaultingTo "")
+
+					<- head::append(replacement)
+						::append(pieces::removeFirst()::join(with part))
+				}
+			}
+		}
+
+		§ Native. The Essence body builds a List of `count` copies with
+		§ `List.repeat` and joins it back into one String.
+
+		§§ Answers the String joined to itself the given number of times.
+		§§
+		§§ @param times — how many copies to join
+		§§ @returns — the repeated String. A count below one answers the empty String.
+		repeat(times count: Integer) -> String
+
+		§ Native, and the `lastIndex` derivation above rests on it; see
+		§ DEVELOPMENT.md, What to weigh before writing the next one.
+
+		§§ Answers the String with its characters in the opposite order.
+		reverse() -> String
+
+		§ Native. The Essence body, `characters()::slice(…)::join(with "")`,
+		§ allocates a String per character, two Lists and a join. The native
+		§ cuts the window out of the grapheme view and keeps what it cut.
+
+		§§ Answers the characters from one position up to, but not including, another.
+		§§
+		§§ A negative position counts back from the end, so `slice(from 0, to -1)` drops the last character. An empty or inverted range answers the empty String.
+		§§
+		§§ @param from — the first position to include; zero when it is left out.
+		§§ @param to — the position to stop before; the length when it is left out.
+		§§ @returns — the String of that range of characters.
+		slice(from start: Integer = 0, to end: Integer = @::length()) -> String
+
 		§§ Answers the String padded with the given String up to the given length.
 		§§
 		§§ The padding goes at the front when no end is named. `#BothEnds` centres the String.
@@ -452,45 +491,6 @@ declarations {
 						::append(filler::slice(to needed::subtract(atStart)))
 				}
 			}
-		}
-
-		§§ Orders the String against another one, by character code point.
-		§§
-		§§ A `CaseSensitivity` of `#Insensitive` folds the case first.
-		overload compare {
-			§ Native. No Essence expression names a character's code point.
-
-			§§ @param to — the String to order against
-			§§ @returns — `Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.
-			(to other: String) -> Ordering
-
-			§ Case is folded by lower-casing both sides, which approximates
-			§ full Unicode case folding. The ordering above then decides.
-
-			§§ @param to — the String to order against
-			§§ @param comparing — whether case is significant
-			§§ @returns — `Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.
-			(
-				to other: String,
-				comparing sensitivity: CaseSensitivity,
-			) -> Ordering {
-				constant text = @
-
-				<- match sensitivity -> Ordering {
-					case #Sensitive   { <- text::compare(to other) }
-
-					case #Insensitive {
-						<- text::lowercase()::compare(to other::lowercase())
-					}
-				}
-			}
-		}
-
-		§§ Answers the String itself.
-		§§
-		§§ @returns — the String, unchanged.
-		toString() -> String {
-			<- @
 		}
 	}
 }

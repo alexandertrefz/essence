@@ -7,9 +7,6 @@ declarations {
 
 	§§ The two truth values, `true` and `false`, and the logic that combines them.
 	namespace Boolean for Boolean is Equatable, is Printable {
-		§§ Answers the opposite truth value: `false` for `true`, and `true` for `false`.
-		negate() -> Boolean
-
 		§§ Answers whether the Boolean has the same truth value as another.
 		§§
 		§§ @param _ — the Boolean to compare against
@@ -23,6 +20,18 @@ declarations {
 		isNot(_ other: Boolean) -> Boolean {
 			<- @::is(other)::negate()
 		}
+
+		§§ Answers the Boolean as a String: `"true"` or `"false"`.
+		toString() -> String {
+			if @ {
+				<- "true"
+			} else {
+				<- "false"
+			}
+		}
+
+		§§ Answers the opposite truth value: `false` for `true`, and `true` for `false`.
+		negate() -> Boolean
 
 		§§ Answers the logical conjunction: `true` only when both Booleans are `true`.
 		§§
@@ -43,15 +52,6 @@ declarations {
 		§§ @param _ — the other Boolean
 		exclusiveOr(_ other: Boolean) -> Boolean {
 			<- @::is(other)::negate()
-		}
-
-		§§ Answers the Boolean as a String: `"true"` or `"false"`.
-		toString() -> String {
-			if @ {
-				<- "true"
-			} else {
-				<- "false"
-			}
 		}
 	}
 }

@@ -1413,14 +1413,19 @@ describe("Completion of a converted standard library Namespace", () => {
 	it("should offer Boolean's own Methods in the order it declares them", () => {
 		let source = ["implementation {", "\ttrue::", "}"].join("\n")
 
+		// NOTE: The canonical member order — `packages/standard-library/DEVELOPMENT.md`,
+		// Member order — puts the Protocol witnesses first and the Methods
+		// answering a Boolean after them, so this list is `is`, `isNot`,
+		// `toString` and then the four operations. `packages/compiler/src/tests/stdlibMemberOrder.spec.ts`
+		// is what holds the sources to it.
 		expect(labelsOf(source, { line: 2, column: 8 })).toEqual([
-			"negate",
 			"is",
 			"isNot",
+			"toString",
+			"negate",
 			"and",
 			"or",
 			"exclusiveOr",
-			"toString",
 		])
 	})
 
@@ -1440,14 +1445,14 @@ describe("Completion of a converted standard library Namespace", () => {
 		// reached once no declared Namespace answers the name. Each is an
 		// Overload of two entries, and an Overload completes once per entry.
 		expect(labelsOf(source, { line: 3, column: 9 })).toEqual([
+			"is",
+			"is",
+			"isNot",
+			"isNot",
 			"toString",
-			"value",
-			"is",
-			"is",
-			"isNot",
-			"isNot",
 			"hasValue",
 			"isEmpty",
+			"value",
 			"map",
 			"andThen",
 			"keep",
