@@ -74,6 +74,16 @@ anywhere, or a seventh file joining that one, means an import closed a circle
 nobody decided on. `EXPECTED_CYCLE` in `packages/compiler/src/enricher/stdlib.ts`
 is where it is stated.
 
+Two files sit on a line for the same reason `Comparable` does. `Orderable.es`
+extends `Comparable` and is written on `compare`, so it follows `Comparable.es`,
+which follows `Ordering.es`, which follows `Protocols.es`. And `Protocols.es`
+imports NOTHING, which is what keeps the frozen shape at one cycle:
+`Boolean.es` conforms to `Equatable`, so a `Boolean` import here would close a
+second circle. That is why `Equatable.isNot`'s body is an `if` rather than
+`@::is(other)::negate()` — a body that reaches no Namespace needs no import.
+`Orderable.es` is under no such rule and imports `Boolean` and `Ordering` freely,
+because nothing imports it back.
+
 ### The rest
 
 A single Diagnostic anywhere in here is a compiler-developer error and throws,
@@ -110,7 +120,7 @@ Method as its OWN top-level const:
 ```js
 import * as Boolean from "…/runtime/src/Boolean.ts";
 
-const $es_Boolean_isNot = function (_self, other) { … };
+const $es_Boolean_exclusiveOr = function (_self, other) { … };
 ```
 
 A native stays a member read off the plain import (`Boolean.negate(…)`), which
@@ -120,6 +130,14 @@ materialise the module namespace object. `namespaceMember` in
 `packages/compiler/src/rewriter/index.ts` picks the spelling, and all four emission sites — a
 plain call, a conformance witness, a Union dispatch target, a static Lookup —
 go through it, so every one works for both kinds.
+
+A PROTOCOL's provided Method is emitted the same way, under a DOUBLE separator
+— `$es_Orderable__isBetween` — and once for every conformer rather than once per
+Namespace. Its last Parameter is the conformance of `Self`, which the
+bounded-generic machinery already passes, and that is what the body's own calls
+dispatch through: `Self__conformance.compare(_self, other)`. So a Program that
+compares two Integers carries one const and `{ compare: Integer.compare }`, and
+reaches no other kind.
 
 `packages/compiler/src/tests/builtins.spec.ts` and the generated contract both fail on a Method
 implemented in BOTH — delete the TypeScript in the same commit that writes the
@@ -149,8 +167,8 @@ order that happens to run. That order follows a Property THROUGH the Methods and
 free Functions it calls: a Method called from inside a Property's value runs in
 the band, so the Properties it reads are read there too, and a Property that a
 Method it calls reads back is refused like any other cycle. A Method the value
-only hands on — `static F = Boolean.isNot`, or a conformance witness — is not
-followed, since its body runs whenever it is eventually called. A Property's value
+only hands on — `static F = Boolean.exclusiveOr`, or a conformance witness — is
+not followed, since its body runs whenever it is eventually called. A Property's value
 can only name a Namespace declared above its own, so backwards is the only
 direction an edge points. A value-LESS
 `static Pi: Transcendental` stays a native and reaches a call site as the plain
@@ -227,7 +245,10 @@ groups, in this order:
 1. **Static creators and constants** — every `static` Method and every static
    Property. `List.of`, `Integer.parse`, `Number.Pi`, `Terminal.print`.
 2. **Protocol witnesses** — `is`, `isNot`, `compare`, `toString`, in that
-   order.
+   order. A Method a Protocol PROVIDES is in no group: the Namespace does not
+   declare it, so there is no line in the file to place. A listing appends the
+   provided Methods after everything written, one Protocol at a time, in
+   `builtinProtocolOrder`.
 3. **Arithmetic** — `add`, `subtract`, `multiply`, `divide`, in that order,
    then `remainder`, `quotient`, `raise`, `squareRoot`.
 4. **Predicates** — every Method whose answer is a `Boolean`. `isEmpty`,
@@ -278,7 +299,7 @@ out and moving a member moves them.
 
 ## Why bodies look the way they do
 
-Seven mechanics account for most of what looks odd in these files. Each is
+Eight mechanics account for most of what looks odd in these files. Each is
 explained once, here. A body that leans on one carries a one line pointer to
 this section, and the bodies beside it carry nothing. One file names a mechanic
 once: a reader who opens `Algebraic.es` alone finds the pointer there, and does
@@ -298,6 +319,29 @@ level Generic here is written `<infer Result>` or
 of a literal, so `2` is a NonZeroInteger. `@::remainder(dividingBy 2)` answers a
 bare Integer, and there is no Optional to take apart. A value the Program is
 handed carries no such proof and goes through the predicate instead.
+
+**A written Method REPLACES a Protocol's provided one, whole.** `Equatable`
+writes `isNot` and `Orderable` writes six Methods, and every conformer answers
+them without declaring anything. A Namespace that declares a Method of the same
+name replaces the provided one entirely — no entry is merged in — and it has to
+hold an entry the provided signature accepts, which is the same check a
+requirement gets. Three declarations here do it, and each says why at its own
+site: `Optional::isNot` takes a bare item as well as an Optional,
+`Integer::isLessThan` and `Rational::isLessThan` hold an entry for the other
+numeric kind and are written on their own `compare` rather than on the
+cross-kind table.
+
+The rule has a consequence worth stating, because nothing checks it: an override
+answers a call on the Namespace's own target Type, while a call through a bound
+— `<Item is Orderable>` — runs the PROVIDED body, because a provided Method is
+never in the conformance witness. So the two must AGREE. `1::isLessThan(2)` runs
+Integer's and a bounded Method runs `Orderable`'s, and both read `compare`, which
+is what makes them the same answer.
+
+And a DERIVE answers ahead of a provided Method. A Choice's `isNot` is
+`Choice_Equatable`'s, fabricated for that receiver and taking the whole Choice,
+so `Ordering#Less::isNot(#Equal)` compares against a sibling Case — which a
+Method over `Self` bound to one Case could not.
 
 **`Equatable` and `Printable` are both derived for a Choice.** The
 conformance is declared and the Methods are left out. Equality is derived for
@@ -511,6 +555,13 @@ do — needs a sixth: a place in `builtinTypeOrder`, beside `builtinMemberOrder`
 Its own members go in the order every Namespace here declares them — see
 [Member order](#member-order).
 
+A new **Protocol** is far less: it is no runtime module and has no natives, so
+it needs a file, a line in `Prelude.es`, and a place in `builtinProtocolOrder`
+(which `stdlibLoader.spec.ts` asserts outright, because that table has no
+second list to cross-check against). A Method it PROVIDES is emitted like any
+other Essence body, so it is also a call-graph Node — `Orderable.clamp` — and
+belongs in `stdlibCallGraph.spec.ts`'s list with the rest.
+
 `builtins.spec.ts` cross-checks the first, third and fourth against each other
 and against the Namespaces declared here, so a missing registration is a failing
 test rather than a call to `undefined`.
@@ -589,6 +640,6 @@ A default is refused where it could never fire: on a Protocol requirement
 position (`default-on-function-literal`). And in this version a Method fulfilling
 a Protocol requirement must match it exactly, defaulted Parameters included —
 which is why `String.is` keeps its `overload` block rather than collapsing into
-a defaulted `comparing:` Parameter. `String.isNot` declares only the
-one-Parameter form the Protocol asks for, and has no `comparing:` entry to
+a defaulted `comparing:` Parameter. Its `isNot` is `Equatable`'s provided one,
+which asks for the one-Parameter form and has no `comparing:` entry to
 collapse.

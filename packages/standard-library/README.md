@@ -3,7 +3,7 @@
 Essence's standard library, written in Essence.
 
 Everything a Program can reach before its first line is declared here: the core
-Protocols (`Equatable`, `Printable`, `Comparable`), `Boolean`,
+Protocols (`Equatable`, `Printable`, `Comparable`, `Orderable`), `Boolean`,
 `Optional`, `Ordering`, `Record`, `String`, the whole numeric tower (`Integer`,
 `Rational`, `Algebraic`, `Transcendental` and the covering `Number`, which
 brings the `Number` and `Irrational` Union Types with it), and `List` together
@@ -29,8 +29,13 @@ all, in `Loop.es`, as ordinary free Functions. Printing is a Namespace:
 `Terminal.write` is the raw primitive both are built on (`Terminal.es`).
 
 Seven of every ten declared Method entries are also IMPLEMENTED here, in
-Essence — 237 of 346 as this is written; the rest bind to
-`@essence-lang/runtime`. What stays native is a
+Essence — 223 of 332 as this is written; the rest bind to
+`@essence-lang/runtime`. Seven more are written on a PROTOCOL rather than on a
+Namespace, once for every conformer: `Equatable.isNot`, and `Orderable`'s four
+inequalities, `isBetween` and `clamp`. A conformer answers each without writing
+anything, and a Namespace that writes a Method of the name replaces the provided
+one whole — which is what `Optional::isNot` and `Integer::isLessThan` do, each
+for a reason its own declaration gives. What stays native is a
 deliberate line, not a backlog: the primitives everything else is composed from
 (`Boolean.negate`/`is`/`and`/`or`, integer and rational arithmetic, same-kind
 `compare`), the JavaScript intrinsics Essence has no expression for
@@ -112,16 +117,27 @@ A quantifier or a position spelled into the name is NOT one: `removeFirst`
 as a different question rather than as the same question answered differently.
 Those keep their own names.
 
-**The one thing rule 4 does NOT license.** The numeric tower declares the four
-inequalities on `Integer` and `Rational` AND on the covering `Number`, and that
-is not duplication to collapse — it is a performance stratification. The
-same-kind entry is written on the member's own `compare`; `Number`'s is the
-sixteen-cell cross-kind table that reaches the whole numeric tower. Deleting
-the member entries would route two Integers through it and
-nearly double a Program that only prints a greeting. The reasoning is written
-above `Integer::isLessThan`, and `packages/compiler/src/tests/bundleSize.spec.ts` is the guard.
+**The one thing rule 4 does NOT license.** `Integer` and `Rational` each declare
+the four inequalities that `Orderable` already provides, and that is not
+duplication to collapse — it is a performance stratification, and a widening
+besides. The written entry is on the member's own `compare`, a bigint or a
+cross-multiplication; the provided one reads whatever `compare` the conformance
+names, and for a receiver of the covering `Number` Type that is the sixteen-cell
+cross-kind table that reaches the whole numeric tower. Deleting the member
+entries would route two Integers through it and nearly double a Program that
+only prints a greeting. Each written Overload also holds an entry for the OTHER
+kind — `Integer::isLessThan(_ Rational)` — which a Method over `Self` can not
+offer. The reasoning is written above `Integer::isLessThan`, and
+`packages/compiler/src/tests/bundleSize.spec.ts` is the guard.
 Before collapsing anything that looks repeated here, check whether the repeat
 is what keeps a body reaching only its own Namespace's primitives.
+
+**Ordering across two kinds asks for a `Number`.** `Orderable`'s Methods take
+`Self`, which is the receiver's own Type, so `Number.Pi::isBetween(3, and 22/7)`
+does not resolve: π is a Transcendental, and `3` is not. Bind the receiver as
+the covering Type first — `constant pi: Number = Number.Pi` — and every member of
+the tower is a bound it accepts. `Number.compare(3, to Number.Pi)` answers the
+same question without a Constant.
 
 Three name SHAPES, so rule 1 is not misapplied:
 
@@ -191,13 +207,15 @@ but that each can say what it is, so `[1, 2, 3]::join(with ", ")` is `"1, 2, 3"`
 not a type error. `sort<infer ItemType is Comparable>()` is the same shape for
 ordering.
 
-`is`, `isNot`, `contains`, `doesNotContain`, `firstIndex(of:)`, `lastIndex(of:)`,
+`is`, `contains`, `doesNotContain`, `firstIndex(of:)`, `lastIndex(of:)`,
 `count(of:)`, `removeEvery(_ item:)` and `removeDuplicates` are bounded
 `is Equatable`, so equality between items means the item Type's OWN `is` rather
 than a structural comparison the language can not express. That is a narrowing:
 a Method holding an UNBOUNDED `List<ItemType>` can no longer call them, and the
 Diagnostic says which bound to add. `List` conforms
-`is Equatable where ItemType is Equatable`, so nested Lists still have a witness.
+`is Equatable where ItemType is Equatable`, so nested Lists still have a witness
+— and that conditional conformance is also what `[1, 2]::isNot([1, 3])` runs on:
+`isNot` is `Equatable`'s provided Method, and the item witness flows into it.
 
 ## Development
 
