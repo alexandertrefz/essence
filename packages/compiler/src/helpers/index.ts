@@ -1839,6 +1839,25 @@ export function resolveUnknownSlots(
 	return resolve(stored, value)
 }
 
+// NOTE: The Protocol that PROVIDED a Method a body for, or null where the name
+// is a requirement — or no Method of the Protocol at all.
+//
+// `Object.hasOwn`, never a plain index: a Method named `toString` finds
+// `Object.prototype.toString` on the record and reads as provided by a Protocol
+// called "function toString() { [native code] }". That is not a hypothetical —
+// `Printable.toString` is the standard library's, and a plain index quietly
+// stopped requiring it of every conformer.
+export function providedMethodProtocol(
+	protocol: common.ProtocolType,
+	methodName: string,
+): string | null {
+	let provided = protocol.providedMethods
+
+	return provided !== undefined && Object.hasOwn(provided, methodName)
+		? provided[methodName]
+		: null
+}
+
 export type ConformanceCheckResult =
 	| { kind: "conforms"; methodMap: ConformanceMethodMap }
 	| { kind: "missing"; methodName: string }
@@ -1898,7 +1917,7 @@ export function computeConformanceMethodMap(
 		// replacement is held to the provided signature by exactly the check a
 		// requirement gets — hence the same `mismatched` answer, and hence
 		// checking it here rather than in a pass of its own.
-		if (protocol.providedMethods?.[methodName] !== undefined) {
+		if (providedMethodProtocol(protocol, methodName) !== null) {
 			if (
 				written &&
 				!fulfills(

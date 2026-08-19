@@ -14,6 +14,7 @@ import {
 	buildUnion,
 	choiceIdentity,
 	computeConformanceMethodMap,
+	providedMethodProtocol,
 	closestMatch,
 	conformanceKey,
 	conformanceParameterName,
@@ -4899,7 +4900,7 @@ export function resolveMethodLookupNamespacesForReceiverType(
 				// witness that carries no such entry. It is offered below
 				// instead, through the Protocol that wrote it, where the bound
 				// itself becomes the conformance Argument the const takes.
-				if (protocol.providedMethods?.[methodName] !== undefined) {
+				if (providedMethodProtocol(protocol, methodName) !== null) {
 					continue
 				}
 
