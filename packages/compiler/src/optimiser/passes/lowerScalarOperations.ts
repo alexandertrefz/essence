@@ -75,6 +75,17 @@ function lower(
 
 	let member = withoutOverloadSuffix(node.member.name)
 
+	// NOTE: A PROVIDED Method is named by the Namespace whose conformance put it
+	// in reach — `Integer` for `5::isNot(3)`, `String` for two Strings — so the
+	// Protocol that WROTE the body is the only thing that says which lowering
+	// applies. Asked before the Namespace name, which would otherwise send an
+	// `Equatable::isNot` and its trailing witness into `Integer`'s own `isNot`.
+	if (node.providedBy !== undefined) {
+		return node.providedBy === "Equatable"
+			? lowerProvidedEquatable(node, member)
+			: node
+	}
+
 	switch (node.base.name) {
 		case "Integer":
 			return lowerInteger(node, member)
@@ -93,24 +104,22 @@ function lower(
 			return lowerBoolean(node, member, shadowed)
 		case "String":
 			return lowerString(node, member)
-		case "Equatable":
-			return lowerProvidedEquatable(node, member)
 		default:
 			return node
 	}
 }
 
 // NOTE: `isNot` is a Protocol's PROVIDED Method — one body over `Self`, shared
-// by every conformer — so its Invocation names `Equatable` rather than the
-// Namespace the receiver belongs to, and carries the conformance witness as a
+// by every conformer — so its Invocation carries the conformance witness as a
 // trailing Argument. Everything the lowering rests on is unchanged: the
 // receiver's Type is still exactly an Integer or exactly a String, and what the
 // body does with the witness is call the `is` that Type's Namespace wrote,
 // which is the Method lowered here. The witness goes with the call, and
 // dropping it observes nothing — it is a method map, built rather than run.
 //
-// `providedBy` and not the name alone: a Namespace may be spelled exactly like a
-// Protocol, and only the flag the Simplifier set tells the two apart.
+// `providedBy` and not the Namespace name: the Invocation is named after the
+// Namespace whose conformance offered the Method, and only the flag the
+// Simplifier set says a Protocol wrote the body.
 function lowerProvidedEquatable(
 	node: common.typedSimple.MethodInvocationNode,
 	member: string,

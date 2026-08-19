@@ -224,18 +224,21 @@ function declaredSignatures(): Array<string> {
 		// them and the harness could quietly stop calling one.
 		//
 		// They are enumerated PER CONFORMER, with `Self` bound to that
-		// conformer's target Type: `Equatable.isNot(_ Integer)` beside
-		// `Equatable.isNot(_ String)`. That is the signature a call site
-		// reaches, and it is what keeps the coverage this feature INHERITED —
-		// each of these replaced a body that was called on its own Namespace.
-		// Listing the Protocol's `isNot(_ Self)` once instead would let a single
-		// call stand for every conformer.
+		// conformer's target Type: `Integer.isNot(_ Integer)` beside
+		// `String.isNot(_ String)`. That is the signature a call site reaches,
+		// and it is what keeps the coverage this feature INHERITED — each of
+		// these replaced a body that was called on its own Namespace. Listing
+		// the Protocol's `isNot(_ Self)` once instead would let a single call
+		// stand for every conformer.
 		//
-		// The label names the PROTOCOL, because that is the Namespace the
-		// Invocation carries and the const it is emitted under. The two ways a
+		// The label names the NAMESPACE, not the Protocol. A provided Method
+		// stands on the specificity ladder under the Namespace whose conformance
+		// put it in reach, and that Namespace is what the Invocation carries —
+		// so `7::isNot(8)` is `Integer.isNot` and `asNumber(2)::isNot(2/1)`,
+		// which Integer's rung rejects, is `Number.isNot`. The two ways a
 		// conformer can answer a name itself are mirrored from the Enricher: a
-		// Method it WRITES replaces the provided one whole, and a DERIVE answers
-		// ahead of one.
+		// Method it WRITES replaces the provided one on its own rung, and a
+		// DERIVE answers ahead of one.
 		for (let protocol of Object.values(loadStdlib().protocols)) {
 			if (member.conformsTo?.includes(protocol.name) !== true) {
 				continue
@@ -266,7 +269,7 @@ function declaredSignatures(): Array<string> {
 				for (let signature of signaturesOf(bound) ?? []) {
 					let label = printSignature(
 						signature,
-						`${protocol.name}.${methodName}`,
+						`${namespaceName}.${methodName}`,
 					)
 
 					signatures.push(

@@ -5589,12 +5589,13 @@ describe("Enricher", () => {
 
 			expect(refinement.name).toBe("NonZero")
 			expect(refinement.base).toEqual({ type: "Integer" })
-			// NOTE: `Equatable`, not `Integer` — `isNot` is a Protocol's
-			// PROVIDED Method, so the Namespace that answers it is the Protocol
-			// that wrote the one body every conformer shares.
+			// NOTE: `Integer`, though `isNot` is a Protocol's PROVIDED Method —
+			// the one body every conformer shares stands on the ladder under
+			// the Namespace whose conformance put it in reach, which for an
+			// Integer receiver is Integer's own.
 			expect(refinement.conjuncts).toEqual([
 				{
-					namespaceName: "Equatable",
+					namespaceName: "Integer",
 					methodName: "isNot",
 					overloadIndex: null,
 					args: ["0"],
@@ -5692,9 +5693,10 @@ describe("Enricher", () => {
 		})
 
 		// NOTE: `isBetween` is written once, as `Orderable`'s provided Method,
-		// so an Integer's is answered by the PROTOCOL rather than by any
-		// Namespace — and the conjunct records what answered, because that is
-		// what makes two conjuncts the same question.
+		// and it stands on the ladder under the Namespace whose conformance put
+		// it in reach — `Integer` for an Integer receiver, which is also what
+		// answers `isOdd` beside it. The conjunct records what answered, because
+		// that is what makes two conjuncts the same question.
 		it("should key a conjunct by the Namespace that answered it", () => {
 			expect(
 				refinementOf(
@@ -5702,7 +5704,7 @@ describe("Enricher", () => {
 				).conjuncts,
 			).toEqual([
 				{
-					namespaceName: "Orderable",
+					namespaceName: "Integer",
 					methodName: "isBetween",
 					overloadIndex: null,
 					args: ["0", "9"],
