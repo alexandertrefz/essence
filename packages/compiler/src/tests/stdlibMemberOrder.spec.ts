@@ -32,6 +32,11 @@ const GROUP_NAMES: Record<number, string> = {
 
 // NOTE: The Methods a Protocol asks for, in the order a reader meets the
 // Protocols themselves: equality, then ordering, then printing.
+//
+// NOTE: A Method a Protocol PROVIDES never reaches this file, and can not: the
+// order checked here is the order of the DECLARATIONS a Namespace body holds,
+// and a conformer declares nothing for a provided Method. `isNot` is still
+// listed because a Namespace may override one, and `Optional` does.
 const WITNESS_ORDER = ["is", "isNot", "compare", "toString"]
 
 // NOTE: The four operations in the order arithmetic is taught, then the four
