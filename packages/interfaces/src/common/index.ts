@@ -414,6 +414,19 @@ export type Parameter = {
 	// what keeps `matchTypes`' `lhs === rhs` fast path and the snapshot cache
 	// undisturbed.
 	hasDefault?: true
+	// NOTE: The members a Record default supplies, sorted, so a call may leave
+	// exactly these out of a Record Argument. Absent where there is no default
+	// or the Parameter is not a Record — for the same reason `hasDefault` is
+	// absent rather than false. Names, never Expressions: a Type is compared,
+	// cached and serialized.
+	//
+	// NOTE: Set beside `hasDefault` and not instead of it, because the two
+	// answer different questions and `pairArguments` only ever asks the first.
+	// A COMPLETE default carries both: the whole Argument may be left out, and
+	// so may any member of one that is written. A PARTIAL default carries this
+	// alone: the Argument is required, and the members it does not fill in have
+	// to be written into it.
+	defaultMembers?: ReadonlyArray<string>
 }
 
 // NOTE: `documentation` is optional in the type, but every builtin Namespace

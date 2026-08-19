@@ -327,5 +327,31 @@ describe("printType", () => {
 				}),
 			).toBe("(from: Integer, to: Integer) -> Integer")
 		})
+
+		// NOTE: `?` says the whole Argument may be left out, which a PARTIAL
+		// Record default does not grant — the Argument is still written, and
+		// which of its MEMBERS may be left out is Hover's prose to give, not a
+		// mark in a one-line signature.
+		it("should not be marked for a partial Record default", () => {
+			let partial: common.FunctionType = {
+				type: "Function",
+				generics: [],
+				parameterTypes: [
+					{
+						name: "using",
+						type: {
+							type: "Record",
+							members: { host: string, retries: integer },
+						},
+						defaultMembers: ["retries"],
+					},
+				],
+				returnType: integer,
+			}
+
+			expect(describeSignature(partial, "connect").label).toBe(
+				"connect(using: { host: String, retries: Integer }) -> Integer",
+			)
+		})
 	})
 })

@@ -1460,6 +1460,39 @@ function orderUnionMembersForMatching(
 
 // #endregion
 
+// NOTE: Whether every member `promised` says a call may leave out is one
+// `supplied` fills in. Both lists are sorted, so this is a merge rather than a
+// lookup per name — and the overwhelmingly common answer, two Parameters that
+// carry no Record default at all, costs one comparison.
+function defaultMembersCover(
+	supplied: ReadonlyArray<string> | undefined,
+	promised: ReadonlyArray<string> | undefined,
+): boolean {
+	if (promised === undefined || promised.length === 0) {
+		return true
+	}
+
+	if (supplied === undefined) {
+		return false
+	}
+
+	let index = 0
+
+	for (let name of promised) {
+		while (index < supplied.length && supplied[index] < name) {
+			index++
+		}
+
+		if (index === supplied.length || supplied[index] !== name) {
+			return false
+		}
+
+		index++
+	}
+
+	return true
+}
+
 // NOTE: A signature is substitutable when the actual signature accepts at
 // least what the expected signature promises to feed it (contravariant
 // parameter types) and returns no more than the expected signature promises
@@ -1491,6 +1524,21 @@ function signatureMatches(
 		if (
 			expected.parameterTypes[i].hasDefault === true &&
 			actual.parameterTypes[i].hasDefault !== true
+		) {
+			return false
+		}
+
+		// NOTE: The same rule one level down. A call written against the
+		// expected Type may leave the members the expected Parameter names out
+		// of its Record Argument, and only a Parameter whose own default fills
+		// those members in can answer it — so every member the expected side
+		// promises has to be one the actual side supplies. The other direction
+		// is safe and is allowed, exactly as it is for `hasDefault`.
+		if (
+			!defaultMembersCover(
+				actual.parameterTypes[i].defaultMembers,
+				expected.parameterTypes[i].defaultMembers,
+			)
 		) {
 			return false
 		}
@@ -2204,6 +2252,45 @@ export function isPartialOf(
 	}
 
 	return true
+}
+
+// NOTE: The members a Record Parameter's default fills in — what
+// `Parameter.defaultMembers` carries, and what `enrichParameterDefault` decides
+// a partial default by. Null where the question does not arise: a Parameter
+// with no default, or one whose Type is not a Record.
+//
+// NOTE: Read off what was WRITTEN and not off the default's Type, because a
+// Parameter's Type is built by the resolver while a default is an expression
+// only the enricher ever types — two passes, and the Type is what every call
+// site is checked against. A Record LITERAL says in its own text which members
+// it supplies, and may therefore supply only some of them; every OTHER
+// expression is held to the Parameter's Type as it always was, so it supplies
+// all of them. That is the same split the callee prologue makes for a different
+// reason — a literal is evaluated member by member on demand, any other
+// expression once per call — and the two agree on purpose.
+//
+// Sorted, so two structurally equal signatures carry equal member lists.
+export function recordDefaultMembers(
+	type: common.Type,
+	defaultValue: parser.ExpressionNode | null,
+): Array<string> | null {
+	if (defaultValue === null || type.type !== "Record") {
+		return null
+	}
+
+	let declared = Object.keys(type.members)
+
+	if (defaultValue.nodeType !== "RecordValue") {
+		return declared.sort()
+	}
+
+	// NOTE: Filtered through the declared members rather than read straight off
+	// the literal — a literal that writes a member the Parameter's Type does not
+	// declare is refused as `default-type-mismatch`, and until it is, what this
+	// answers has to stay a subset of the Type it describes.
+	return declared
+		.filter((name) => Object.hasOwn(defaultValue.members, name))
+		.sort()
 }
 
 // NOTE: The subsumption order Union building dedupes by — whether `member`

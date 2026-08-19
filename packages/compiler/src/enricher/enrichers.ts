@@ -25,6 +25,7 @@ import {
 	filterMostSpecificByTarget,
 	flattenUnionMembers,
 	type GenericBindings,
+	isPartialOf,
 	type MatchableArgument,
 	matchArguments,
 	matchesType,
@@ -344,15 +345,27 @@ function withoutParameterDefaults(type: common.Type): common.Type {
 	}
 }
 
+// NOTE: Both keys go, and for one reason: a Function taken as a VALUE drops its
+// defaults, so nothing a default was going to fill in is filled in any more —
+// neither a whole Argument nor a single member of one. A partial default leaves
+// `hasDefault` unset and `defaultMembers` set, which is exactly why the second
+// key can not ride along on the first's `some`.
 function requiredParameters(
 	parameters: Array<common.Parameter>,
 ): Array<common.Parameter> {
-	if (!parameters.some((parameter) => parameter.hasDefault)) {
+	if (
+		!parameters.some(
+			(parameter) =>
+				parameter.hasDefault || parameter.defaultMembers !== undefined,
+		)
+	) {
 		return parameters
 	}
 
-	// oxlint-disable-next-line eslint/no-unused-vars -- the key being dropped
-	return parameters.map(({ hasDefault, ...parameter }) => parameter)
+	return parameters.map(
+		// oxlint-disable-next-line eslint/no-unused-vars -- the keys being dropped
+		({ hasDefault, defaultMembers, ...parameter }) => parameter,
+	)
 }
 
 export function enrichCaseValue(
@@ -4314,6 +4327,22 @@ function enrichParameterDefault(
 			refinementDecidedBy(type, valueType) ?? type,
 			value,
 		)
+	) {
+		return value
+	}
+
+	// NOTE: THE one deliberate exception to "a default is a value of its
+	// Parameter's Type". A Record default may fill in only SOME of the
+	// Parameter's members; the members it leaves out are the ones every call
+	// has to write, and `Parameter.defaultMembers` is what says which those
+	// are. Admitted for a Record LITERAL alone, because what a partial default
+	// supplies is read off what it writes — see `recordDefaultMembers`, which
+	// this has to agree with member for member.
+	if (
+		type.type === "Record" &&
+		valueType.type === "Record" &&
+		node.defaultValue.nodeType === "RecordValue" &&
+		isPartialOf(type, valueType)
 	) {
 		return value
 	}
