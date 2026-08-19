@@ -458,6 +458,124 @@ describe("Protocol-provided Methods", () => {
 			).toEqual([])
 		})
 
+		// NOTE: One const above every Program, so the body's reach ends at the
+		// prelude — the standard library and the builtins. Everything the
+		// Program declares is emitted BELOW it, under names the const can not
+		// see, which is a `ReferenceError` and not a Diagnostic without this.
+		it("should refuse a read of a Constant the Program declares", () => {
+			let source = [
+				"implementation {",
+				'\tconstant unit = "m"',
+				"",
+				"\tprotocol Measured {",
+				"\t\tamount() -> Integer",
+				"",
+				"\t\tspell() -> String {",
+				'\t\t\t<- "{@::amount()}{unit}"',
+				"\t\t}",
+				"\t}",
+				"}",
+			].join("\n")
+
+			expect(codesOf(source)).toEqual(["provided-method-out-of-reach"])
+			expect(messagesOf(source)).toEqual([
+				"'unit' can not be read from a provided Method",
+			])
+		})
+
+		it("should refuse a call of a Function the Program declares", () => {
+			expect(
+				codesOf(
+					[
+						"implementation {",
+						"\tfunction shout(_ text: String) -> String {",
+						"\t\t<- text::uppercase()",
+						"\t}",
+						"",
+						"\tprotocol Tagged {",
+						"\t\ttag() -> String",
+						"",
+						"\t\tloudly() -> String {",
+						"\t\t\t<- shout(@::tag())",
+						"\t\t}",
+						"\t}",
+						"}",
+					].join("\n"),
+				),
+			).toEqual(["provided-method-out-of-reach"])
+		})
+
+		it("should refuse a read of a Namespace the Program declares", () => {
+			expect(
+				codesOf(
+					[
+						"implementation {",
+						"\tnamespace Sizes for Integer {",
+						'\t\tstatic suffix() -> String { <- "!" }',
+						"\t}",
+						"",
+						"\tprotocol Measured {",
+						"\t\tamount() -> Integer",
+						"",
+						"\t\tspell() -> String {",
+						"\t\t\t<- Sizes.suffix()",
+						"\t\t}",
+						"\t}",
+						"}",
+					].join("\n"),
+				),
+			).toEqual(["provided-method-out-of-reach"])
+		})
+
+		it("should accept a read of the standard library, which is emitted above it too", () => {
+			expect(
+				diagnosticsOf(
+					[
+						"implementation {",
+						"\tprotocol Tagged {",
+						"\t\ttag() -> String",
+						"",
+						"\t\tcounted() -> String {",
+						"\t\t\t<- Integer.parse(@::tag(), defaultingTo 0)::toString()",
+						"\t\t}",
+						"\t}",
+						"}",
+					].join("\n"),
+				),
+			).toEqual([])
+		})
+
+		it("should accept what the body itself binds", async () => {
+			expect(
+				await run(
+					[
+						"implementation {",
+						"\tprotocol Sized {",
+						"\t\tsize() -> Integer",
+						"",
+						"\t\tdoubled() -> Integer {",
+						"\t\t\tconstant own = @::size()",
+						"",
+						"\t\t\t<- own::multiply(with 2)",
+						"\t\t}",
+						"\t}",
+						"",
+						"\ttype Tally = { count: Integer }",
+						"",
+						"\tnamespace Tallies for Tally is Sized {",
+						"\t\tsize() -> Integer {",
+						"\t\t\t<- @.count",
+						"\t\t}",
+						"\t}",
+						"",
+						"\tconstant tally: Tally = { count = 3 }",
+						"\tTerminal.inspect(tally::doubled())",
+						"}",
+					].join("\n"),
+				),
+			).toEqual(["6"])
+		})
+
 		it("should refuse a body on a static Protocol Method", () => {
 			expect(
 				codesOf(

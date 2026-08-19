@@ -20,6 +20,26 @@ implementation {
 		}
 	}
 
+	§ provided-method-out-of-reach — a provided Method is emitted once, above
+	§ every Program that reaches the Protocol, so a name the Program declares
+	§ is gone by the time the body runs. The Constant and the Namespace below
+	§ are both in scope where the body is written.
+	constant unit = " unit"
+
+	protocol Measured {
+		amount() -> Integer
+
+		spell() -> String {
+			<- "{@::amount()}{unit}{Sizes.suffix()}"
+		}
+	}
+
+	namespace Sizes for Integer {
+		static suffix() -> String {
+			<- "!"
+		}
+	}
+
 	§ where-on-protocol-extension — a Protocol declares no Type Parameters, so
 	§ a condition has nothing to bound.
 	protocol Ordered is Comparable where Item is Comparable {

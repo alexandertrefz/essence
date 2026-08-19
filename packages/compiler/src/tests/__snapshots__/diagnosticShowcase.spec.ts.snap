@@ -599,9 +599,9 @@ Error: 'Shape#Rectangle' has no single value to bind
 exports[`Diagnostic Showcase Protocols.es should render the same report every time 1`] = `
 "[recursive-protocol]
 Error: Protocol 'Listed' extends itself through 'Sorted'
-    ╭─┤ Protocols.es:50:21 │
+    ╭─┤ Protocols.es:70:21 │
     │
- 50 │     protocol Listed is Sorted {
+ 70 │     protocol Listed is Sorted {
     │                        ───┬──  
     │                           ╰──── this leads back to 'Listed'
     │ 
@@ -613,9 +613,9 @@ Error: Protocol 'Listed' extends itself through 'Sorted'
 
 [recursive-protocol]
 Error: Protocol 'Sorted' extends itself through 'Listed'
-    ╭─┤ Protocols.es:54:21 │
+    ╭─┤ Protocols.es:74:21 │
     │
- 54 │     protocol Sorted is Listed {
+ 74 │     protocol Sorted is Listed {
     │                        ───┬──  
     │                           ╰──── this leads back to 'Sorted'
     │ 
@@ -640,11 +640,41 @@ Error: 'Sized' has no Method named 'toString'
     │ Note: 'Sized' declares 'describe', 'size'.
 ────╯
 
+[provided-method-out-of-reach]
+Error: 'unit' can not be read from a provided Method
+    ╭─┤ Protocols.es:33:22 │
+    │
+ 27 │     constant unit = " unit"
+    │              ──┬─  
+    │                ╰─── 'unit' is declared here
+    │ 
+ 33 │          <- "{@::amount()}{unit}{Sizes.suffix()}"
+    │                            ──┬─  
+    │                              ╰─── this is declared outside the Protocol
+    │ 
+    │ Help: Give 'Measured' a requirement the body calls on '@' instead, and let each conforming Namespace reach 'unit'.
+    │ 
+    │ Note: A provided Method is emitted once, above every Program that reaches 'Measured' — so its body can name the standard library and nothing the Program declares.
+────╯
+
+[provided-method-out-of-reach]
+Error: 'Sizes' can not be read from a provided Method
+    ╭─┤ Protocols.es:33:28 │
+    │
+ 33 │          <- "{@::amount()}{unit}{Sizes.suffix()}"
+    │                                  ──┬──  
+    │                                    ╰──── this is declared outside the Protocol
+    │ 
+    │ Help: Give 'Measured' a requirement the body calls on '@' instead, and let each conforming Namespace reach 'Sizes'.
+    │ 
+    │ Note: A provided Method is emitted once, above every Program that reaches 'Measured' — so its body can name the standard library and nothing the Program declares.
+────╯
+
 [where-on-protocol-extension]
 Error: A Protocol extension can not carry a 'where' clause
-    ╭─┤ Protocols.es:25:39 │
+    ╭─┤ Protocols.es:45:39 │
     │
- 25 │     protocol Ordered is Comparable where Item is Comparable {
+ 45 │     protocol Ordered is Comparable where Item is Comparable {
     │                                          ─────────┬────────  
     │                                                   ╰────────── this condition has nothing to bound
     │ 
@@ -655,11 +685,11 @@ Error: A Protocol extension can not carry a 'where' clause
 
 [unwritable-provided-method]
 Error: A static Protocol Method can not carry a body
-    ╭─┤ Protocols.es:33:16 │
+    ╭─┤ Protocols.es:53:16 │
     │
- 33 │ ╭─▶        static create() -> Self {
+ 53 │ ╭─▶        static create() -> Self {
     ┆ ┆   
- 35 │ ├─▶        }
+ 55 │ ├─▶        }
     │ │              
     │ ╰────────────── this body has no receiver to run on
     │ 
@@ -670,11 +700,11 @@ Error: A static Protocol Method can not carry a body
 
 [unwritable-provided-method]
 Error: An overloaded Protocol Method can not carry a body
-    ╭─┤ Protocols.es:38:4 │
+    ╭─┤ Protocols.es:58:4 │
     │
- 38 │ ╭─▶          (_ other: Self) -> Self {
+ 58 │ ╭─▶          (_ other: Self) -> Self {
     ┆ ┆   
- 40 │ ├─▶          }
+ 60 │ ├─▶          }
     │ │                
     │ ╰──────────────── this body has no name of its own to be emitted under
     │ 
@@ -683,7 +713,7 @@ Error: An overloaded Protocol Method can not carry a body
     │ Note: A provided Method is emitted once, under the Protocol's name and the Method's — and an entry of an 'overload' block is named for its slot in a Method Type the Protocol has no conformer to resolve against.
 ────╯
 
-─── 6 errors
+─── 8 errors
 "
 `;
 

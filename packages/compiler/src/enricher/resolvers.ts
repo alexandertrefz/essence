@@ -748,6 +748,90 @@ function findVariableOrBarredName(
 	return null
 }
 
+// NOTE: A provided Method is emitted ONCE, as a const in the band ABOVE every
+// Program that reaches it — so its body may name what that band holds, which is
+// the standard library and the builtins, and nothing the Program declares. A
+// Constant, a Function or a Namespace written beside the Protocol is in Scope
+// where the body is WRITTEN and gone where the body LANDS, and without this the
+// Program compiles clean and dies at run time on a bare `ReferenceError`.
+//
+// The prelude's names are snapshotted on the top level Scope, because the
+// Program's own land in that same table and a HOISTED declaration — every
+// Function, every Namespace — writes no `declarations` entry to be told apart
+// by. A chain with no snapshot in it is the standard library's own load, which
+// IS the prelude, and nothing is out of reach there.
+function reportProvidedMethodOutOfReach(
+	node: parser.IdentifierNode,
+	scope: enricher.Scope,
+): void {
+	let name = node.content
+	let protocolName: string | null = null
+	let declaringScope: enricher.Scope | null = null
+	let preludeNames: ReadonlySet<string> | null = null
+
+	for (
+		let searchScope: enricher.Scope | null = scope;
+		searchScope !== null;
+		searchScope = searchScope.parent
+	) {
+		if (
+			declaringScope === null &&
+			Object.hasOwn(searchScope.members, name)
+		) {
+			// NOTE: Bound at or inside the body — a Parameter, a Constant the
+			// body declares, a Function literal's own binding — so the walk
+			// never crossed the Protocol and the name is emitted with the body.
+			if (protocolName === null) {
+				return
+			}
+
+			declaringScope = searchScope
+		}
+
+		if (
+			declaringScope === null &&
+			searchScope.providedMethodOf !== undefined
+		) {
+			protocolName = searchScope.providedMethodOf
+		}
+
+		if (searchScope.preludeNames !== undefined) {
+			preludeNames = searchScope.preludeNames
+		}
+	}
+
+	if (
+		declaringScope === null ||
+		protocolName === null ||
+		preludeNames === null ||
+		declaringScope.preludeNames?.has(name) === true
+	) {
+		return
+	}
+
+	let declaration = declaringScope.declarations[name]
+
+	reportError(
+		`'${name}' can not be read from a provided Method`,
+		node.position,
+		{
+			code: "provided-method-out-of-reach",
+			labels: [
+				primary(node.position, "this is declared outside the Protocol"),
+				...(declaration === undefined
+					? []
+					: [secondary(declaration, `'${name}' is declared here`)]),
+			],
+			notes: [
+				`A provided Method is emitted once, above every Program that reaches '${protocolName}' — so its body can name the standard library and nothing the Program declares.`,
+			],
+			helps: [
+				`Give '${protocolName}' a requirement the body calls on '@' instead, and let each conforming Namespace reach '${name}'.`,
+			],
+		},
+	)
+}
+
 export function resolveIdentifierType(
 	node: parser.IdentifierNode,
 	scope: enricher.Scope,
@@ -789,6 +873,8 @@ export function resolveIdentifierType(
 
 		return { type: "Error" }
 	} else {
+		reportProvidedMethodOutOfReach(node, scope)
+
 		return result
 	}
 }
