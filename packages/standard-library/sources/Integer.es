@@ -338,21 +338,22 @@ declarations {
 		}
 
 		§ These four override `Orderable`'s provided Methods of the same
-		§ names, and are kept for two reasons the provided ones can not
-		§ answer. Each holds a Rational entry, and a provided Method takes
-		§ `Self`, which is an Integer here. And Integer's own `compare` is a
-		§ bigint comparison, while `Number::compare` is the sixteen-cell
-		§ cross-kind table. A Program that only compares two Integers must
-		§ reach the first. Deleting these entries once routed every Integer
-		§ comparison through that table and grew `HelloWorld.es` from 18,271
-		§ to 35,729 bytes, the regression `eb27756` fixed. See DEVELOPMENT.md,
-		§ Why bodies look the way they do. Each Rational entry is the flipped
-		§ call: `@` is below a Rational exactly when that Rational is above `@`.
+		§ names, and are kept to answer an Integer question on this Namespace's
+		§ own rung. Integer's `compare` is a bigint comparison, while
+		§ `Number::compare` is the sixteen-cell cross-kind table, and a Program
+		§ that only compares two Integers must reach the first. Deleting these
+		§ entries once routed every Integer comparison through that table and
+		§ grew `HelloWorld.es` from 18,271 to 35,729 bytes, the regression
+		§ `eb27756` fixed. See DEVELOPMENT.md, Why bodies look the way they
+		§ do. The Rational entries answer here what the covering `Number`'s
+		§ rung would otherwise be reached for. Each is the flipped call, since
+		§ `@` is below a Rational exactly when that Rational is above `@`.
 		§
-		§ The same-kind entries have to answer what the provided Methods
-		§ answer, because a bounded `<Item is Orderable>` runs the provided
-		§ body while `1::isLessThan(2)` runs this one. Both read `compare`, so
-		§ they agree by construction.
+		§ An override is in the conformance witness, so a bounded
+		§ `<Item is Orderable>` runs these entries where `1::isLessThan(2)`
+		§ runs them. Agreeing with `Orderable`'s bodies is a promise about
+		§ speed rather than one the language leans on, and both read `compare`
+		§ either way.
 
 		§§ Answers whether this Integer is strictly below the given number.
 		overload isLessThan {
