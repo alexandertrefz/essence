@@ -2663,10 +2663,22 @@ class DescentParser {
 		allowShorthand: boolean,
 	): ReturnType<typeof generators.keyValuePair> {
 		let name = this.parseIdentifier()
-		let steps = this.parseKeyPathSteps(name)
+		let path = this.parseKeyPath(name)
 
-		if (steps !== null) {
-			return this.parsePathKeyValue(name, steps, allowShorthand)
+		if (path !== null) {
+			if (path.group !== null) {
+				return generators.keyGroupPair(
+					name,
+					path.group,
+					{
+						start: name.position.start,
+						end: path.group.position.end,
+					},
+					path.steps,
+				)
+			}
+
+			return this.parsePathKeyValue(name, path.steps, allowShorthand)
 		}
 
 		// NOTE: The value is a Node of its own at the name's Position rather
@@ -2701,9 +2713,15 @@ class DescentParser {
 	// here would put the refusal inside the speculative first reading of
 	// `parseRecordLiteralOrCombination`, where it is rewound, and the author
 	// would be told 'Expected with' instead of what a path key is.
-	protected parseKeyPathSteps(
-		name: parser.IdentifierNode,
-	): Array<parser.IdentifierNode> | null {
+	//
+	// One Token of lookahead settles `.{`: after a step's dot, a `{` opens a
+	// braced descend and an Identifier continues the path. A member name is
+	// never `{`, so there is nothing to be ambiguous about — and a descend ends
+	// the key, since it already writes every member the key reaches.
+	protected parseKeyPath(name: parser.IdentifierNode): {
+		steps: Array<parser.IdentifierNode>
+		group: parser.RecordValueNode | null
+	} | null {
 		if (this.tokens.peek()?.type !== TokenType.SymbolDot) {
 			return null
 		}
@@ -2712,10 +2730,74 @@ class DescentParser {
 
 		while (this.tokens.peek()?.type === TokenType.SymbolDot) {
 			this.tokens.next()
+
+			if (this.tokens.peek()?.type === TokenType.SymbolLeftBrace) {
+				return { steps, group: this.parseKeyGroup(steps) }
+			}
+
 			steps.push(this.parseIdentifier())
 		}
 
-		return steps
+		return { steps, group: null }
+	}
+
+	// NOTE: `server.{ port = 1, host }` — the member list of an update written
+	// one level down. Shorthand is allowed inside it, where it is refused after
+	// a `with`: a bare name there could be the whole value being merged, and
+	// inside a descend there is no such reading to lose.
+	protected parseKeyGroup(
+		steps: Array<parser.IdentifierNode>,
+	): parser.RecordValueNode {
+		let leftBrace = this.tokens.expect(TokenType.SymbolLeftBrace)
+
+		if (this.tokens.peek()?.type === TokenType.SymbolRightBrace) {
+			let rightBrace = this.tokens.next()
+			let position = {
+				start: steps[0].position.start,
+				end: rightBrace.position.end,
+			}
+
+			this.reportEmptyPathGroup(steps, position)
+
+			return generators.recordValueNode(
+				null,
+				{},
+				{
+					start: leftBrace.position.start,
+					end: rightBrace.position.end,
+				},
+			)
+		}
+
+		let keyValuePairList = this.parseKeyValuePairList(true)
+		let rightBrace = this.tokens.expect(TokenType.SymbolRightBrace)
+
+		return generators.recordValueNode(null, keyValuePairList.data, {
+			start: leftBrace.position.start,
+			end: rightBrace.position.end,
+		})
+	}
+
+	// NOTE: Reported and recovered rather than failed on: an empty descend is a
+	// half-written one, and the rest of the list is still worth reading.
+	protected reportEmptyPathGroup(
+		steps: Array<parser.IdentifierNode>,
+		position: common.Position,
+	): void {
+		if (this.suppressDiagnostics) {
+			return
+		}
+
+		let spelling = steps.map((step) => step.content).join(".")
+
+		reportError("This descend updates nothing", position, {
+			code: "empty-path-group",
+			labels: [primary(position, "no member is written here")],
+			notes: [
+				`An update writes the members it names, so a descend with none in it says to leave '${spelling}' exactly as it is.`,
+			],
+			helps: ["Write the members to update inside it, or drop the key."],
+		})
 	}
 
 	// NOTE: A path key always spells its value. Where the key ENDED without

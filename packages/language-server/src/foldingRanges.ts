@@ -1,4 +1,8 @@
-import { caseDefaults, parameterDefaults } from "@essence-lang/compiler/helpers"
+import {
+	caseDefaults,
+	memberExpression,
+	parameterDefaults,
+} from "@essence-lang/compiler/helpers"
 import type { common, parser } from "@essence-lang/interfaces"
 
 // NOTE: Folding is derived from the Parser AST, so it keeps working while the
@@ -214,7 +218,7 @@ function collectFromNode(
 			addRange(ranges, node.position)
 
 			for (let member of Object.values(node.members)) {
-				collectFromNode(member.value, ranges)
+				collectFromNode(memberExpression(member), ranges)
 			}
 
 			return

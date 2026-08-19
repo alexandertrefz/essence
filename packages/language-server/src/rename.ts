@@ -6,6 +6,7 @@ import {
 } from "@essence-lang/compiler/enricher/builtins"
 import {
 	caseDefaults,
+	memberExpression,
 	parameterDefaults,
 	parameterInternalName,
 	patternBindings,
@@ -1257,7 +1258,7 @@ function walkNode(
 				if (
 					member.shorthand === true &&
 					member.steps === undefined &&
-					member.value.nodeType === "Identifier"
+					member.value?.nodeType === "Identifier"
 				) {
 					reference(
 						scope,
@@ -1271,7 +1272,7 @@ function walkNode(
 					continue
 				}
 
-				walkNode(member.value, scope, context)
+				walkNode(memberExpression(member), scope, context)
 			}
 
 			return

@@ -526,6 +526,19 @@ export function parameterDefaults<ExpressionNode>(
 	return writtenDefaults(parameters)
 }
 
+// NOTE: The one Node a Record Literal's member holds — the value it was
+// written with, or the braced descend that stands in place of one. Exactly one
+// of the two is always there, and a descend is a Record Literal in its own
+// right, so every walk over a Literal's members asks this instead of choosing
+// between them: a walker that forgot the descend would silently skip a whole
+// member list, which is the failure mode a shared enumeration exists to make
+// impossible.
+export function memberExpression(
+	member: parser.RecordValueMemberNode,
+): parser.ExpressionNode {
+	return member.value ?? member.group!
+}
+
 // NOTE: The `= { … }` defaults a Choice's Case list holds, in order — the
 // second position an Expression stands in outside every body, and reached by
 // the same shape rather than by another round of `if (defaultValue !== null)`

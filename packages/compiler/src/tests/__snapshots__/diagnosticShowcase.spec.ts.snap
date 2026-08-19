@@ -740,7 +740,20 @@ Error: Member 'server.port' and 'server' both write 'server'
     │ Note: An update writes each member once, so a key that sets a whole Record and a path that reaches into it can not both stand.
 ────╯
 
-─── 2 errors
+[empty-path-group]
+Error: This descend updates nothing
+    ╭─┤ PathKeySyntax.es:30:33 │
+    │
+ 30 │     constant blank = { config with server.{} }
+    │                                    ────┬────  
+    │                                        ╰────── no member is written here
+    │ 
+    │ Help: Write the members to update inside it, or drop the key.
+    │ 
+    │ Note: An update writes the members it names, so a descend with none in it says to leave 'server' exactly as it is.
+────╯
+
+─── 3 errors
 "
 `;
 

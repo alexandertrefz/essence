@@ -159,6 +159,7 @@ export type DiagnosticCode =
 	| "redundant-parameter-label"
 	| "shorthand-in-combination"
 	| "shorthand-on-path-key"
+	| "empty-path-group"
 	| "path-is-members-only"
 	| "default-on-function-literal"
 	| "case-default-without-payload"

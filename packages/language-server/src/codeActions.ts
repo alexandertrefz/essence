@@ -1,4 +1,8 @@
-import { caseDefaults, parameterDefaults } from "@essence-lang/compiler/helpers"
+import {
+	caseDefaults,
+	memberExpression,
+	parameterDefaults,
+} from "@essence-lang/compiler/helpers"
 import type { common, parser } from "@essence-lang/interfaces"
 
 import { type Analysis, analyseDocument, documentFilePath } from "./analyse"
@@ -679,6 +683,12 @@ function shorthandActions(
 		}
 
 		for (let member of Object.values(literal.members)) {
+			// NOTE: A path key names no binding and a braced descend holds no
+			// value at all, so neither has a shorthand to offer or to expand.
+			if (member.value === null || member.steps !== undefined) {
+				continue
+			}
+
 			let name = member.name.content
 			let span = {
 				start: member.name.position.start,
@@ -1091,7 +1101,7 @@ function walkNode(
 			return
 		case "RecordValue":
 			for (let member of Object.values(node.members)) {
-				walkNode(member.value, visit)
+				walkNode(memberExpression(member), visit)
 			}
 
 			return

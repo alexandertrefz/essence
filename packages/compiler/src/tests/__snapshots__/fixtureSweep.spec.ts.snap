@@ -232,6 +232,23 @@ exports[`Fixture Sweep Namespace.es should print what it printed before 1`] = `
 true"
 `;
 
+exports[`Fixture Sweep NestedRecords.es should print what it printed before 1`] = `
+"8080
+"letsencrypt"
+"api.example.com"
+"gateway"
+443
+"none"
+9000
+"api"
+true
+4433
+"edge"
+"internal"
+80
+false"
+`;
+
 exports[`Fixture Sweep Number.es should print what it printed before 1`] = `
 "100
 100
@@ -351,16 +368,4 @@ sources/
 tests/
   Lexer.es
 4 files, 2 directories"
-`;
-
-exports[`Fixture Sweep NestedRecords.es should print what it printed before 1`] = `
-"8080
-"letsencrypt"
-"api.example.com"
-"gateway"
-443
-"none"
-9000
-80
-false"
 `;
