@@ -1073,23 +1073,27 @@ describe("Completion", () => {
 			)
 		})
 
-		// NOTE: `Number.isBetween(5, 1, and 10)` — reached through the
+		// NOTE: `Number.compare(3, to Number.Pi)` — reached through the
 		// Namespace the receiver rides along as the first Argument, so the
 		// Self Parameter a `::` call site never writes is written here.
+		//
+		// NOTE: A WRITTEN Method, deliberately. A Protocol's provided Method
+		// is reached through the receiver and never through the Namespace
+		// spelling, so it is offered under neither name here.
 		it("should keep the receiver Parameter when a Method is reached through the Namespace", () => {
 			let source = ["implementation {", "\tNumber.", "}"].join("\n")
 
 			expect(
-				entryFor(source, { line: 2, column: 9 }, "isBetween")?.snippet,
-			).toBe("isBetween(${1}, ${2}, and ${3})")
+				entryFor(source, { line: 2, column: 9 }, "compare")?.snippet,
+			).toBe("compare(${1}, to ${2})")
 		})
 
 		it("should strip the receiver Parameter for the same Method through ::", () => {
 			let source = ["implementation {", "\t5::", "}"].join("\n")
 
 			expect(
-				entryFor(source, { line: 2, column: 5 }, "isBetween")?.snippet,
-			).toBe("isBetween(${1}, and ${2})")
+				entryFor(source, { line: 2, column: 5 }, "compare")?.snippet,
+			).toBe("compare(to ${1})")
 		})
 
 		it("should write the labels of a Function in Scope", () => {

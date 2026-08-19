@@ -540,10 +540,15 @@ describe("Stdlib", () => {
 			).toEqual([])
 		})
 
+		// NOTE: `isBetween` is `Orderable`'s provided Method, and its
+		// Parameters are `Self` — the RECEIVER's own Type. So a question
+		// across two kinds names the covering `Number` on the receiver, and
+		// one within a kind writes the receiver as it stands.
 		it("types isBetween across the tower", () => {
 			expect(
 				diagnosticsFor(`implementation {
-					constant inRange: Boolean = Number.Pi::isBetween(3, and 22/7)
+					constant pi: Number = Number.Pi
+					constant inRange: Boolean = pi::isBetween(3, and 22/7)
 					constant plain: Boolean = 5::isBetween(1, and 10)
 				}`),
 			).toEqual([])

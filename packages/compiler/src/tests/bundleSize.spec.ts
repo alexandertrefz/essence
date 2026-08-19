@@ -310,8 +310,17 @@ describe("Bundle Size", () => {
 	// prints a Case, so it reached none of the six `toString` bodies that left
 	// and does not carry the helper that replaced them. The 48 between 70,905
 	// and 70,953 is drift that arrived on master without a NOTE, again.
+	// NOTE: 71,337 now, up 384, and the ceiling moves to 72,400 to keep the
+	// kilobyte of headroom the rest of this file keeps. `isBetween` and `clamp`
+	// are `Orderable`'s provided Methods, and each is written on that
+	// Protocol's own inequalities rather than on a native: this file reaches
+	// `isBetween` and `clamp`, so it now carries five consts where it carried
+	// two, each a line long, plus a method map per call site. What it stopped
+	// carrying is the reason the trade is worth taking: `5::isBetween(1, and
+	// 10)` reached `Number::compare` and the sixteen-cell cross-kind table
+	// behind it, and now reaches `Integer.compare` alone.
 	it("keeps Everyday.es from dragging in the whole numeric tower", async () => {
-		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(71_800)
+		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(72_400)
 	})
 
 	// NOTE: Measured 42,719 bytes; a reintroduced `Number` spread was 54,849.
@@ -375,6 +384,12 @@ describe("Bundle Size", () => {
 	// A Choice of payload-free Cases derives that Method now, and what arrived
 	// instead is the one `choiceName` helper reading the Case out of the tag —
 	// which is what every Program that prints any such Choice pays, once.
+	// NOTE: It now measures 34,438, up 355, and the ceiling STAYS at 35,200 —
+	// the same 762 bytes of headroom this file has kept before, and a rise of
+	// this size is the four inequalities becoming `Orderable`'s provided
+	// Methods. This file asks three of them, so it carries three consts and a
+	// method map where it carried three Methods of `Number`; the cross-kind
+	// `compare` it reaches through the witness is the one it always reached.
 	it("keeps Irrational.es from dragging in the whole numeric tower", async () => {
 		expect(await bundleSizeOf("Irrational.es")).toBeLessThan(35_200)
 	})
@@ -489,6 +504,10 @@ describe("Bundle Size", () => {
 		// figure rose: the prelude carries the standard library's own
 		// arithmetic, and each site it can guard in line is a guard wider than
 		// the operation it wraps.
+		//
+		// NOTE: Byte-identical at 14,890 across `Equatable`'s and `Orderable`'s
+		// provided Methods. These Modules ask none of the six, and the one
+		// `isNot` they would have reached is `Optional`'s, which is written.
 		expect(result.outputs[0]!.contents.byteLength).toBeLessThan(15_500)
 	})
 })

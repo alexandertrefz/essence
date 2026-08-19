@@ -1789,30 +1789,36 @@ describe("Code Generation", () => {
 			])
 		})
 
-		// NOTE: The covering order is the whole point of putting `isBetween` on
-		// `Number` rather than on each member — π against an Integer and a
-		// Rational bound is a comparison no member Namespace offers.
+		// NOTE: `isBetween` is `Orderable`'s provided Method, over `Self` — the
+		// receiver's own Type — so a receiver of the covering `Number` Type is
+		// what compares against a bound of any other kind, through the one
+		// conformance `Number` declares. π against an Integer and a Rational
+		// bound is that; a Rational against Rational bounds is the same Method
+		// through Rational's own conformance, and its `compare` alone.
 		it("runs isBetween across the whole numeric tower", async () => {
 			expect(
 				await run(`implementation {
-					Terminal.inspect(Number.Pi::isBetween(3, and 22/7)::toString())
-					Terminal.inspect(Number.Pi::isBetween(22/7, and 4)::toString())
-					Terminal.inspect(3/2::isBetween(1, and 2)::toString())
+					constant pi: Number = Number.Pi
+					constant half: Number = 3/2
+					Terminal.inspect(pi::isBetween(3, and 22/7)::toString())
+					Terminal.inspect(pi::isBetween(22/7, and 4)::toString())
+					Terminal.inspect(half::isBetween(1, and 2)::toString())
+					Terminal.inspect(3/2::isBetween(1/1, and 2/1)::toString())
 				}`),
-			).toEqual(['"true"', '"false"', '"true"'])
+			).toEqual(['"true"', '"false"', '"true"', '"true"'])
 		})
 
 		// NOTE: Each Essence Method's const is emitted exactly where the Program
-		// reaches it. `isBetween`'s body calls `Number.isGreaterThanOrEqualTo`
-		// and `Boolean.and`, both NATIVE, so it drags in no other const — under
-		// the old per-Namespace gate reaching `Number` pulled the whole `Boolean`
-		// const in with it, and the per-Method gate is precise enough not to.
+		// reaches it. `Orderable.isBetween` reaches three more provided consts
+		// and the conformance's own `compare`, and nothing else — under the old
+		// per-Namespace gate reaching `Number` pulled the whole `Boolean` const
+		// in with it, and the per-Method gate is precise enough not to.
 		it("emits each Essence Method's const only where it is reached", () => {
 			const both = generate(`implementation {
 				Terminal.inspect(5::isBetween(1, and 10)::exclusiveOr(false))
 			}`)
 
-			expect(both).toContain("const $es_Number_isBetween")
+			expect(both).toContain("const $es_Orderable__isBetween")
 			expect(both).toContain("const $es_Boolean_exclusiveOr")
 
 			// NOTE: `exclusiveOr` alone — a Program that never names a Number.
@@ -1820,7 +1826,7 @@ describe("Code Generation", () => {
 				Terminal.inspect(true::exclusiveOr(false))
 			}`)
 
-			expect(booleanOnly).not.toContain("$es_Number_isBetween")
+			expect(booleanOnly).not.toContain("$es_Orderable__isBetween")
 			expect(booleanOnly).toContain("const $es_Boolean_exclusiveOr")
 
 			// NOTE: `isBetween` alone reaches only natives, so its const stands
@@ -1830,7 +1836,7 @@ describe("Code Generation", () => {
 			}`)
 
 			expect(numberReached).toContain(
-				"const $es_Number_isBetween = function (_self, lower, upper) {",
+				"const $es_Orderable__isBetween = function (_self, lower, upper, Self__conformance) {",
 			)
 			expect(numberReached).not.toContain("$es_Boolean_exclusiveOr")
 
@@ -1840,7 +1846,7 @@ describe("Code Generation", () => {
 				Terminal.inspect("hello")
 			}`)
 
-			expect(neither).not.toContain("$es_Number_isBetween")
+			expect(neither).not.toContain("$es_Orderable__isBetween")
 			expect(neither).not.toContain("$es_Boolean_exclusiveOr")
 		})
 
@@ -1849,9 +1855,10 @@ describe("Code Generation", () => {
 		// plain member read off the runtime module, `Number.Pi`, like every native.
 		it("reads Pi and Tau as native member reads", async () => {
 			const source = `implementation {
+				constant pi: Number = Number.Pi
 				Terminal.inspect(Number.Pi::toString())
 				Terminal.inspect(Number.Tau::toString())
-				Terminal.inspect(Number.Pi::isBetween(3, and 22/7)::toString())
+				Terminal.inspect(pi::isBetween(3, and 22/7)::toString())
 			}`
 
 			expect(generate(source)).toContain("Number.Pi")
