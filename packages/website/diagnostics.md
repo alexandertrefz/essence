@@ -110,6 +110,18 @@ not. An update takes either a key list or one Expression and never both, so a
 list that also carries a computed key — `{ game with board = board, history =
 game.history::removeLast() }` — has no shorthand spelling at all.
 
+### `path-is-members-only`
+
+A `::` or a `(` was written after a member path — `.price::rounded()`,
+`.total()`. A path stands for the Function that READS those members off its
+Argument, so there is nothing there for a call to be made on.
+
+The refusal is the Parser's rather than a later stage's on purpose: letting the
+postfix loop attach the call and refusing afterwards gives a message about the
+call, when what is wrong is that the path can not carry one. Write the Function
+literal wherever more than a read is wanted — `(_ line: Line) { <-
+line.total::rounded() }`.
+
 ### `default-on-function-literal`
 
 A Parameter of a Function literal in expression position was given a
@@ -1250,6 +1262,21 @@ A Type Parameter could not be inferred from the Arguments.
 A Parameter of a Function Literal has no Type and nothing to infer one from —
 only a Function passed as an Argument takes its Types from the surrounding
 context.
+
+### `path-without-context`
+
+A member path — `.price`, `.address.city` — was written where no Function of
+one Parameter is expected. A path is a Function the Compiler writes for you, so
+it needs a Parameter Type to read the members off, and only the position it
+stands in can name one. This is the rule a bare `#Case` lives by, for the same
+reason: a structural language can not invent a Root Type out of a member name.
+
+A path is read wherever a Function Type of exactly one Parameter is expected —
+an Argument matched against such a Parameter (`products::sort(on .price)`), a
+Constant or Variable with such an annotation, an Assignment, a `<-` under such a
+return Type, an item of an annotated List, and a member of an annotated Record.
+Everywhere else, write the Function literal the path would have stood for:
+`(_ item: Product) { <- item.price }`.
 
 ### `uninferable-item-type`
 

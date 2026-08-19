@@ -192,6 +192,7 @@ export function enrichNode(
 		case "FunctionValue":
 		case "ListValue":
 		case "Lookup":
+		case "MemberPath":
 		case "Identifier":
 		case "Self":
 		case "Match":
@@ -272,6 +273,8 @@ export function enrichCalleeExpression(
 			return enrichListValue(node, scope, expectedType)
 		case "Lookup":
 			return enrichLookup(node, scope)
+		case "MemberPath":
+			return enrichMemberPath(node, scope)
 		case "Identifier":
 			return enrichIdentifierExpression(node, scope)
 		case "Self":
@@ -1774,6 +1777,143 @@ export function enrichLookup(
 		position: node.position,
 		type,
 		...(provided === null ? {} : { providedBy: provided.providedBy }),
+	}
+}
+
+// NOTE: `.price`, `.address.city` — the Function the Compiler writes for the
+// position the path stands in. The desugar happens HERE, into typed Nodes, so
+// that nothing downstream of enrichment ever meets a shape of its own: the
+// Validator, the Optimiser's inliner, the source maps and the debugger all see
+// the Function literal the author could have written instead.
+//
+// INVARIANT: every synthesized Node takes a span the author WROTE — each
+// Lookup's member Identifier takes the span of the step that spelled it, and
+// the Parameter, the Return and the Function take the path's own. That one rule
+// is what earns rename, hover, semantic tokens and completion on a path without
+// a line of code in any of them, so a refactor that handed every Node the
+// path's span would break four features at once and no test of this file would
+// notice.
+export function enrichMemberPath(
+	node: parser.MemberPathNode,
+	_scope: enricher.Scope,
+): common.typed.FunctionValueNode {
+	reportPathWithoutContext(node)
+
+	return memberPathFunction(
+		node,
+		{ type: "Error" },
+		node.steps.map(() => ({ type: "Error" })),
+	)
+}
+
+// NOTE: How a path is WRITTEN, for the Diagnostics that quote it back.
+export function memberPathSpelling(node: parser.MemberPathNode): string {
+	return `.${node.steps.map((step) => step.content).join(".")}`
+}
+
+function reportPathWithoutContext(node: parser.MemberPathNode): void {
+	reportError(
+		"A member path stands where no Function is expected",
+		node.position,
+		{
+			code: "path-without-context",
+			labels: [primary(node.position, "this path names no value")],
+			notes: [
+				"A member path is a Function the Compiler writes for you, so it needs a Parameter Type to read the members off — and only a position expecting a Function of one Parameter names one.",
+			],
+			helps: [
+				`Write the Function literal instead: '(_ item: SomeType) { <- item${memberPathSpelling(node)} }'.`,
+			],
+		},
+	)
+}
+
+// NOTE: The one Parameter the synthesized Function takes. `_` is a Symbol in
+// the grammar rather than the start of a word, so `_0` is a name no source can
+// spell and no binding of the author's can capture — and it is the name
+// `simplifyParameter` already gives a Parameter the source left unnamed, so the
+// emission is the one an author writing `(_ item: T) { <- item.price }` gets.
+const memberPathParameterName = "_0"
+
+// NOTE: `stepTypes[i]` is the Type of the Lookup that reads `steps[i]`, so its
+// last entry is the Function's return Type. A refused path passes Error the
+// whole way down rather than answering a Node of another shape: the Language
+// Server goes on renaming, colouring and completing inside a path the Compiler
+// has already refused, which is the state a file is in while it is being typed.
+function memberPathFunction(
+	node: parser.MemberPathNode,
+	rootType: common.Type,
+	stepTypes: Array<common.Type>,
+): common.typed.FunctionValueNode {
+	let returnType = stepTypes[stepTypes.length - 1] ?? rootType
+	let expression: common.typed.ExpressionNode = {
+		nodeType: "Identifier",
+		content: memberPathParameterName,
+		position: node.position,
+		type: rootType,
+	}
+
+	for (let [index, step] of node.steps.entries()) {
+		let stepType = stepTypes[index] ?? { type: "Error" }
+
+		expression = {
+			nodeType: "Lookup",
+			base: expression,
+			member: {
+				nodeType: "Identifier",
+				content: step.content,
+				position: step.position,
+				type: stepType,
+			},
+			position: { start: node.position.start, end: step.position.end },
+			type: stepType,
+		}
+	}
+
+	return {
+		nodeType: "FunctionValue",
+		value: {
+			nodeType: "FunctionDefinition",
+			generics: [],
+			parameters: [
+				{
+					nodeType: "Parameter",
+					externalName: null,
+					internalName: {
+						nodeType: "Identifier",
+						content: memberPathParameterName,
+						position: node.position,
+						type: rootType,
+					},
+					position: node.position,
+					type: rootType,
+					// NOTE: Null although nothing here was written — an
+					// `inferredType` is what an Inlay Hint draws, and a path has
+					// no annotation slot to draw one into. The same goes for the
+					// return Type: a path is shorter than the hint would be.
+					inferredType: null,
+					defaultValue: null,
+				},
+			],
+			body: [
+				{
+					nodeType: "ReturnStatement",
+					expression,
+					position: node.position,
+				},
+			],
+			returnType,
+			inferredReturnType: null,
+			parameterListPosition: node.position,
+			headPosition: node.position,
+		},
+		position: node.position,
+		type: {
+			type: "Function",
+			generics: [],
+			parameterTypes: [{ name: null, type: rootType }],
+			returnType,
+		},
 	}
 }
 

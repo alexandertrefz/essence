@@ -674,6 +674,62 @@ describe("Parser AST", () => {
 		})
 	})
 
+	describe("Member paths", () => {
+		it("should refuse a Method call after a path", () => {
+			let { diagnostics } = parseWithDiagnostics(
+				"implementation { call(.total::rounded()) }",
+			)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("path-is-members-only")
+			expect(diagnostics[0].labels[0]?.message).toBe(
+				"'::' can not follow a path",
+			)
+			expect(diagnostics[0].labels[0]?.position).toEqual({
+				start: { line: 1, column: 29 },
+				end: { line: 1, column: 30 },
+			})
+		})
+
+		it("should refuse an invocation after a path", () => {
+			let { diagnostics } = parseWithDiagnostics(
+				"implementation { call(.total()) }",
+			)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("path-is-members-only")
+			expect(diagnostics[0].labels[0]?.message).toBe(
+				"'(' can not follow a path",
+			)
+		})
+
+		// NOTE: Two colons written apart are not a `::` anywhere else in the
+		// grammar, and they are not one here either — the refusal reads the
+		// lexeme, not the Token.
+		it("should leave a spaced colon pair to the rest of the grammar", () => {
+			let { diagnostics } = parseWithDiagnostics(
+				"implementation { call(.total : :rounded()) }",
+			)
+
+			expect(
+				diagnostics.some(
+					(diagnostic) => diagnostic.code === "path-is-members-only",
+				),
+			).toBe(false)
+		})
+
+		it("should refuse a brace where a step was expected", () => {
+			let { diagnostics } = parseWithDiagnostics(
+				"implementation { call(.total.{ a = 1 }) }",
+			)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].message).toBe(
+				"Expected an Identifier but found '{'.",
+			)
+		})
+	})
+
 	it("should span an Expression Combination from brace to brace", () => {
 		let node = declaredValue(
 			firstNode("implementation { constant a = { base with other } }"),

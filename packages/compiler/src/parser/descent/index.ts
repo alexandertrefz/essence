@@ -67,6 +67,7 @@ function isIdentifierToken(token: Token | undefined): boolean {
 const expressionStartTokenTypes = new Set([
 	...identifierTokenTypes,
 	TokenType.SymbolHash,
+	TokenType.SymbolDot,
 	TokenType.SymbolAt,
 	TokenType.SymbolDash,
 	TokenType.SymbolLeftBracket,
@@ -1896,6 +1897,8 @@ class DescentParser {
 			}
 			case TokenType.SymbolLeftBrace:
 				return this.parseRecordLiteralOrCombination()
+			case TokenType.SymbolDot:
+				return this.parseMemberPath()
 			case TokenType.Identifier:
 			case TokenType.KeywordWith:
 			case TokenType.KeywordStatic:
@@ -1913,6 +1916,71 @@ class DescentParser {
 					token.position,
 				)
 		}
+	}
+
+	// NOTE: `.price`, `.address.city` — the whole chain is consumed here rather
+	// than left to the postfix loop, which would otherwise read the second step
+	// as a Lookup over the path and build a Node the language has no meaning
+	// for. Nothing but a member name may follow a step's '.', so the loop needs
+	// no adjacency rule of its own: a path reads its tail exactly the way a
+	// Lookup chain reads its own.
+	protected parseMemberPath(): parser.MemberPathNode {
+		let dot = this.tokens.expect(TokenType.SymbolDot)
+		let steps = [this.parseIdentifier()]
+
+		while (this.tokens.peek()?.type === TokenType.SymbolDot) {
+			this.tokens.next()
+			steps.push(this.parseIdentifier())
+		}
+
+		this.refusePathPostfix()
+
+		return generators.memberPath(steps, {
+			start: dot.position.start,
+			end: steps[steps.length - 1].position.end,
+		})
+	}
+
+	// NOTE: A path stands for a Function that READS members, so a call attached
+	// to it has nothing to attach to. Refused here rather than left to the
+	// postfix loop: the loop would build an Invocation over the path and every
+	// message from there on would be about the call rather than about the path
+	// that can not carry one.
+	protected refusePathPostfix(): void {
+		let token = this.tokens.peek()
+
+		if (token === undefined) {
+			return
+		}
+
+		let following = this.tokens.peek(1)
+		let spelling =
+			token.type === TokenType.SymbolLeftParen
+				? "("
+				: token.type === TokenType.SymbolColon &&
+					  following?.type === TokenType.SymbolColon &&
+					  isAdjacent(token.position, following.position)
+					? "::"
+					: null
+
+		if (spelling === null) {
+			return
+		}
+
+		throw new ParseError(
+			"A member path reads members and nothing else",
+			token.position,
+			`'${spelling}' can not follow a path`,
+			{
+				code: "path-is-members-only",
+				notes: [
+					"A path is the Function that reads those members off its Argument, so there is nothing here for a call to be made on.",
+				],
+				helps: [
+					"Write the Function literal instead: '(_ item: SomeType) { <- item.price::rounded() }'.",
+				],
+			},
+		)
 	}
 
 	// NOTE: The payload parens are part of the construction syntax — they are
@@ -3359,7 +3427,16 @@ class DescentParser {
 			return false
 		}
 
-		if (following!.type === TokenType.SymbolHash) {
+		// NOTE: '#' and '.' both continue the Identifier when they are written
+		// flush against it — `Choice#Case` and `order.isPaid` — and both open an
+		// Expression of their own when a space stands between: `label #Case`
+		// passes a bare Case, `label .price` passes a member path. The space is
+		// the whole difference, and it is the same rule the prefixed Case
+		// construction is read by.
+		if (
+			following!.type === TokenType.SymbolHash ||
+			following!.type === TokenType.SymbolDot
+		) {
 			return !isAdjacent(
 				this.tokens.peek()!.position,
 				following!.position,

@@ -222,6 +222,13 @@ export function lookup(
 	return { nodeType: "Lookup", base, member, position }
 }
 
+export function memberPath(
+	steps: Array<parser.IdentifierNode>,
+	position: common.Position,
+): parser.MemberPathNode {
+	return { nodeType: "MemberPath", steps, position }
+}
+
 export function self(position: common.Position): parser.SelfNode {
 	return {
 		nodeType: "Self",

@@ -1643,6 +1643,11 @@ export class Printer {
 			case "CaseValue":
 				return this.printCaseValue(node)
 
+			case "MemberPath":
+				return text(
+					"." + node.steps.map((step) => step.content).join("."),
+				)
+
 			default:
 				return this.printValue(node)
 		}

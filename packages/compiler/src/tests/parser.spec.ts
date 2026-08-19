@@ -215,6 +215,100 @@ describe("Parser", () => {
 			})
 		})
 
+		describe("Member paths", () => {
+			let pathOf = (source: string): parser.ExpressionNode => {
+				let node = parse(
+					`implementation { constant value = ${source} }`,
+				).implementation
+					.nodes[0] as parser.ConstantDeclarationStatementNode
+
+				return node.value
+			}
+
+			let stepsOf = (node: parser.ExpressionNode): Array<string> =>
+				node.nodeType === "MemberPath"
+					? node.steps.map((step) => step.content)
+					: []
+
+			it("should read a leading dot as a path", () => {
+				expect(stepsOf(pathOf(".price"))).toEqual(["price"])
+			})
+
+			// NOTE: The whole chain belongs to the path — a step left to the
+			// postfix loop would come back as a Lookup OVER the path, which is
+			// a shape nothing downstream has a meaning for.
+			it("should read every step of a path", () => {
+				expect(stepsOf(pathOf(".address.city.name"))).toEqual([
+					"address",
+					"city",
+					"name",
+				])
+			})
+
+			it("should span the path from its dot to its last step", () => {
+				expect(pathOf(".address.city").position).toEqual({
+					start: { line: 1, column: 35 },
+					end: { line: 1, column: 48 },
+				})
+			})
+
+			it("should give each step the span it was written at", () => {
+				let node = pathOf(".address.city")
+
+				expect(
+					node.nodeType === "MemberPath"
+						? node.steps.map((step) => step.position)
+						: [],
+				).toEqual([
+					{
+						start: { line: 1, column: 36 },
+						end: { line: 1, column: 43 },
+					},
+					{
+						start: { line: 1, column: 44 },
+						end: { line: 1, column: 48 },
+					},
+				])
+			})
+
+			// NOTE: The adjacency rule, from both sides. A dot written flush
+			// against a name continues that name; a dot with a space in front
+			// of it opens a path, and the name before it is a label.
+			it("should read an adjacent dot as a Lookup", () => {
+				let node = parse("implementation { call(order.isPaid) }")
+					.implementation.nodes[0] as parser.FunctionInvocationNode
+
+				expect(node.arguments[0]?.name).toBeNull()
+				expect(node.arguments[0]?.value.nodeType).toBe("Lookup")
+			})
+
+			it("should read a spaced dot as a labelled path", () => {
+				let node = parse("implementation { call(where .isPaid) }")
+					.implementation.nodes[0] as parser.FunctionInvocationNode
+
+				expect(node.arguments[0]?.name?.content).toBe("where")
+				expect(stepsOf(node.arguments[0]!.value)).toEqual(["isPaid"])
+			})
+
+			it("should read an unlabelled path", () => {
+				let node = parse("implementation { call(.isPaid) }")
+					.implementation.nodes[0] as parser.FunctionInvocationNode
+
+				expect(node.arguments[0]?.name).toBeNull()
+				expect(stepsOf(node.arguments[0]!.value)).toEqual(["isPaid"])
+			})
+
+			it("should read a path in a List Literal", () => {
+				let node = pathOf("[.price, .name]")
+
+				expect(
+					node.nodeType === "ListValue"
+						? node.values.map((value) => stepsOf(value))
+						: [],
+				).toEqual([["price"], ["name"]])
+			})
+		})
+
 		describe("Identifiers", () => {
 			it("should parse Identifiers", () => {
 				let input: parser.Program = parse(

@@ -55,14 +55,15 @@ const CORPUS = corpus()
 
 // NOTE: The showcase files the formatter must REFUSE — every one of them
 // carries an error the Parser itself reported, and formatting a file the Parser
-// could not read whole is exactly what the gate is there to prevent. Two of them
-// genuinely do not parse; the other two parse and are refused all the same,
+// could not read whole is exactly what the gate is there to prevent. Three of
+// them genuinely do not parse; the other two parse and are refused all the same,
 // because a `default-on-function-literal` and a `shorthand-in-combination` are
 // errors like any other and the formatter asks only whether there were any.
 const REFUSED = new Set([
 	"diagnostics/Syntax.es",
 	"diagnostics/UnclosedString.es",
 	"diagnostics/DefaultsSyntax.es",
+	"diagnostics/MemberPathSyntax.es",
 	"diagnostics/RecordShorthand.es",
 ])
 
@@ -630,6 +631,50 @@ describe("formatter", () => {
 
 		it("is idempotent over the shorthand", () => {
 			let source = block("\tconstant point = { x, y = 2 }")
+			let once = format(source)
+			let twice = format(once.text)
+
+			expect(twice.text).toBe(once.text)
+		})
+	})
+
+	describe("Member paths", () => {
+		let block = (...lines: Array<string>) =>
+			["implementation {", ...lines, "}", ""].join("\n")
+
+		let roundTrips = (source: string) => {
+			let result = format(source)
+
+			expect(result.refusal).toBeNull()
+			expect(result.text).toBe(source)
+		}
+
+		it("keeps a path as it was written", () => {
+			roundTrips(block("\tconstant sorted = products::sort(on .price)"))
+		})
+
+		it("keeps every step of a path", () => {
+			roundTrips(block("\tconstant cities = people::map(.address.city)"))
+		})
+
+		// NOTE: Never rewritten into a literal, and never the reverse — the
+		// spelling is the author's, and the two are not the same Node.
+		it("keeps a Function literal a literal", () => {
+			roundTrips(
+				block(
+					"\tconstant prices = products::map((_ item: Product) { <- item.price })",
+				),
+			)
+		})
+
+		it("keeps the space that makes an Argument labelled", () => {
+			roundTrips(
+				block("\tconstant first = items::firstItem(where .isPaid)"),
+			)
+		})
+
+		it("is idempotent over a path", () => {
+			let source = block("\tconstant sorted = products::sort(on .price)")
 			let once = format(source)
 			let twice = format(once.text)
 
