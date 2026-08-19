@@ -3,7 +3,11 @@ import {
 	builtinNamespaces,
 	builtinProtocols as builtinProtocolTable,
 } from "@essence-lang/compiler/enricher/builtins"
-import { derivedEquatableNamespaceForChoice } from "@essence-lang/compiler/enricher/resolvers"
+import {
+	derivedEquatableNamespaceForChoice,
+	derivedPrintableNamespaceForChoice,
+	printableProtocolName,
+} from "@essence-lang/compiler/enricher/resolvers"
 import {
 	applyGenericBindings,
 	createInferenceContext,
@@ -142,41 +146,70 @@ export function matchingNamespaces(
 					targetTypeMatches(namespace, baseType),
 				)
 
-	// NOTE: A Choice's `is` and `isNot` are derived — no Namespace declares
-	// them, so nothing above finds them, and without this they would work
-	// everywhere but never be OFFERED. Appended on the same terms the Enricher
-	// resolves them on: only when no listed Namespace already declares one.
-	let derived = derivedNamespaceFor(baseType, namespaces, allNamespaces)
-
-	if (derived !== null) {
-		namespaces = [...namespaces, derived]
-	}
+	// NOTE: A Choice's `is`, `isNot` and `toString` can each be derived — no
+	// Namespace declares them, so nothing above finds them, and without this
+	// they would work everywhere but never be OFFERED. Appended on the same
+	// terms the Enricher resolves them on: only where no listed Namespace
+	// already declares one.
+	namespaces = [
+		...namespaces,
+		...derivedNamespacesFor(baseType, namespaces, allNamespaces),
+	]
 
 	return specifierName === null
 		? namespaces
 		: namespaces.filter((namespace) => namespace.name === specifierName)
 }
 
-// NOTE: The Language Server's mirror of the Enricher's derived equality. It
-// has no Scope to resolve a Case's Choice in, so the Choice is recovered from
-// the Namespaces already gathered — every Choice with a Namespace is reachable
-// that way, and a Choice with none is only ever met as the whole Union, which
-// IS the Choice.
-function derivedNamespaceFor(
+// NOTE: The Language Server's mirror of the Enricher's derives. Equality is
+// derived for every Choice; printing only for a Choice whose Cases all carry no
+// payload and whose Namespace declared `is Printable`, which is the rule the
+// Enricher applies. Each is withheld where a listed Namespace writes the Method
+// itself, so nothing is offered twice.
+function derivedNamespacesFor(
 	baseType: common.Type,
 	listed: Array<common.NamespaceType>,
 	allNamespaces: Array<common.NamespaceType>,
-): common.NamespaceType | null {
-	if (
-		listed.some(
-			(namespace) =>
-				Object.hasOwn(namespace.methods, "is") ||
-				Object.hasOwn(namespace.methods, "isNot"),
-		)
-	) {
-		return null
+): Array<common.NamespaceType> {
+	let choiceType = choiceTypeFor(baseType, allNamespaces)
+
+	if (choiceType === null) {
+		return []
 	}
 
+	let writes = (methodName: string): boolean =>
+		listed.some((namespace) => Object.hasOwn(namespace.methods, methodName))
+
+	let derived: Array<common.NamespaceType> = []
+
+	if (!writes("is") && !writes("isNot")) {
+		derived.push(derivedEquatableNamespaceForChoice(choiceType))
+	}
+
+	let declaresPrintable = listed.some((namespace) =>
+		namespace.conformsTo?.includes(printableProtocolName),
+	)
+
+	if (declaresPrintable && !writes("toString")) {
+		let printable = derivedPrintableNamespaceForChoice(choiceType)
+
+		if (printable !== null) {
+			derived.push(printable)
+		}
+	}
+
+	return derived
+}
+
+// NOTE: The whole Choice a receiver belongs to, or null when it belongs to
+// none. The Language Server has no Scope to resolve a Case's Choice in, so the
+// Choice is recovered from the Namespaces already gathered — every Choice with
+// a Namespace is reachable that way, and a Choice with none is only ever met as
+// the whole Union, which IS the Choice.
+function choiceTypeFor(
+	baseType: common.Type,
+	allNamespaces: Array<common.NamespaceType>,
+): common.Type | null {
 	// NOTE: Recovered by the Cases' identity, which is what the Enricher matches
 	// them by — two Modules declaring the same Choice name declare two Choices,
 	// and a Union of one of them is not the other's.
@@ -194,9 +227,7 @@ function derivedNamespaceFor(
 			return null
 		}
 
-		return isChoiceOf(baseType, first.choice)
-			? derivedEquatableNamespaceForChoice(baseType)
-			: null
+		return isChoiceOf(baseType, first.choice) ? baseType : null
 	}
 
 	if (baseType.type !== "Case") {
@@ -204,16 +235,15 @@ function derivedNamespaceFor(
 	}
 
 	let identity = baseType.choice
-	let choiceType = allNamespaces
-		.map((namespace) => namespace.targetType)
-		.find(
-			(targetType): targetType is common.Type =>
-				targetType != null && isChoiceOf(targetType, identity),
-		)
 
-	return choiceType === undefined
-		? null
-		: derivedEquatableNamespaceForChoice(choiceType)
+	return (
+		allNamespaces
+			.map((namespace) => namespace.targetType)
+			.find(
+				(targetType): targetType is common.Type =>
+					targetType != null && isChoiceOf(targetType, identity),
+			) ?? null
+	)
 }
 
 // NOTE: A Union-typed receiver reaches a Method either through a Namespace

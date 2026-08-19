@@ -63,6 +63,8 @@ import {
 	derivedEquatableDescriptorFor,
 	derivedEquatableNamespace,
 	derivedEquatableNamespaceName,
+	derivedPrintableNamespace,
+	derivedPrintableNamespaceName,
 	invalidateNamespacesInScope,
 	namespacesTargeting,
 	specializedNamespacesFor,
@@ -6185,11 +6187,11 @@ function reportUndecidedReceiverType(
 }
 
 // NOTE: Which of the Namespaces found for a receiver actually declare the
-// Method — and the ONE door the derived Equatable Namespace comes through, for
-// both the whole-Union lookup and the per-member one. It is consulted only when
-// the written Namespaces have already come up empty, which is what makes the
-// derived equality a fallback rather than a competitor: a Namespace that writes
-// its own `is` is never tied against it, so it can not be made ambiguous by it.
+// Method — and the ONE door the derived Namespaces come through, for both the
+// whole-Union lookup and the per-member one. They are consulted only when the
+// written Namespaces have already come up empty, which is what makes a derive a
+// fallback rather than a competitor: a Namespace that writes its own `is` or
+// `toString` is never tied against one, so it can not be made ambiguous by it.
 function namespacesDeclaringMethod(
 	methodName: string,
 	namespaces: Map<string, common.NamespaceType>,
@@ -6212,6 +6214,20 @@ function namespacesDeclaringMethod(
 
 	if (derived !== null && Object.hasOwn(derived.methods, methodName)) {
 		matchingNamespaces.set(derivedEquatableNamespaceName, derived)
+	}
+
+	// NOTE: The printing derive reads the Namespaces already found for the
+	// receiver, because it answers only where one of them declared
+	// `is Printable` — which is the difference between the two derives, and the
+	// reason this one takes them and the one above does not.
+	let printable = derivedPrintableNamespace(
+		baseType,
+		namespaces.values(),
+		scope,
+	)
+
+	if (printable !== null && Object.hasOwn(printable.methods, methodName)) {
+		matchingNamespaces.set(derivedPrintableNamespaceName, printable)
 	}
 
 	return matchingNamespaces

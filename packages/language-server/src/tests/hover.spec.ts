@@ -1000,3 +1000,37 @@ describe("Default Parameter Values", () => {
 		expect(hover(source, { line: 2, column: 21 })).toBe("factor: Integer")
 	})
 })
+
+// NOTE: A derived Method carries documentation nobody wrote — the Compiler
+// fabricates the Namespace and the `§§` text with it. Hover is where that text
+// has to arrive, or a reader meets a Method with nothing said about it at all.
+describe("Hover of a Choice's derived 'toString'", () => {
+	let source = [
+		"implementation {",
+		"\tchoice Colour {",
+		"\t\tRed,",
+		"\t\tGreen,",
+		"\t}",
+		"",
+		"\tnamespace Colour for Colour is Printable { }",
+		"",
+		"\tconstant red: Colour = #Red",
+		"\tTerminal.inspect(red::toString())",
+		"}",
+	].join("\n")
+
+	it("should describe it with the signature the derive carries", () => {
+		expect(hover(source, { line: 10, column: 26 })).toBe(
+			"toString() -> String",
+		)
+	})
+
+	it("should describe it with the documentation the derive carries", () => {
+		expect(hoverDocumentation(source, { line: 10, column: 26 })).toBe(
+			[
+				"Answers the Case's name as a String.",
+				"**Returns** — the name of the Case, without its `#`.",
+			].join("\n\n"),
+		)
+	})
+})

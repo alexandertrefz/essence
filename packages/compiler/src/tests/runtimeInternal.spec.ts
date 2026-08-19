@@ -8,6 +8,7 @@ import {
 	anyIsNot,
 	boundChoiceIs,
 	choiceIs,
+	choiceName,
 } from "@essence-lang/runtime/internalHelpers"
 import * as list from "@essence-lang/runtime/List"
 import * as number from "@essence-lang/runtime/Number"
@@ -407,6 +408,41 @@ describe("Runtime Internals", () => {
 					{ is: (a, b) => createBoolean(anyIs(a, b)) },
 				),
 			).toThrow("This is a bug in the Compiler.")
+		})
+	})
+
+	// NOTE: The runtime half of a Choice's derived `Printable` conformance.
+	// The Compiler emits exactly one reference to it per printed Case, so what
+	// it reads out of the tag is the whole of the derive's behaviour.
+	describe("choiceName", () => {
+		it("answers the Case's name for a builtin Choice", () => {
+			expect(choiceName(createCase("Ordering#Less") as never).value).toBe(
+				"Less",
+			)
+			expect(choiceName(createCase("Side#BothEnds") as never).value).toBe(
+				"BothEnds",
+			)
+		})
+
+		// NOTE: A Choice a Program declares is identified by its Module as well
+		// as its name, so its tags carry two `#`s and only the last part is the
+		// Case. Reading from the FIRST one answered `Direction#Up`.
+		it("answers the Case's name for a Choice a Module declares", () => {
+			expect(
+				choiceName(createCase("./Compass.es#Direction#Up") as never)
+					.value,
+			).toBe("Up")
+		})
+
+		// NOTE: Only a Choice of payload-free Cases derives printing, so a
+		// payload never reaches here — but the tag is all this reads, and it
+		// says so by answering the same name either way.
+		it("reads the tag alone, whatever the Case carries", () => {
+			expect(
+				choiceName(
+					createCase("Wrapper#Text", { value: text("x") }) as never,
+				).value,
+			).toBe("Text")
 		})
 	})
 })

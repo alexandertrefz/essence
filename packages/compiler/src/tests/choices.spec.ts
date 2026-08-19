@@ -2796,6 +2796,135 @@ describe("Choices", () => {
 		})
 	})
 
+	// NOTE: Printing is derived on narrower terms than equality. A Choice
+	// compares by its tags whatever anyone says, but how it READS is a
+	// decision — so the Namespace has to declare `is Printable`, and every Case
+	// has to carry no payload, because a Case with one has more to say than its
+	// name.
+	describe("Derived Printing", () => {
+		const colourChoice = `
+			choice Colour {
+				Red,
+				Green,
+			}
+		`
+
+		it("answers 'toString' for a Namespace that declares only the conformance", () => {
+			expect(
+				messagesOf(`implementation { ${colourChoice}
+					namespace Colour for Colour is Printable { }
+
+					constant red: Colour = #Red
+
+					Terminal.inspect(red::toString())
+				}`),
+			).toEqual([])
+		})
+
+		// NOTE: `inspect` rather than `print`, because that is the write this
+		// harness captures. It renders a String with the quotes a Literal is
+		// written with, which is why every expectation below carries them.
+		it("answers the Case's name, without the sigil", async () => {
+			expect(
+				await run(`implementation { ${colourChoice}
+					namespace Colour for Colour is Equatable, is Printable { }
+
+					constant red: Colour = #Red
+
+					Terminal.inspect(red::toString())
+					Terminal.inspect("a {red} one")
+				}`),
+			).toEqual(['"Red"', '"a Red one"'])
+		})
+
+		// NOTE: The witness a bounded Method is handed has to be the derived
+		// Method too, or `Terminal.print` would refuse what a direct call
+		// answers.
+		it("hands the derived Method over as a Printable witness", async () => {
+			expect(
+				await run(`implementation { ${colourChoice}
+					namespace Colour for Colour is Printable { }
+
+					function label <infer Value is Printable>(_ value: Value) -> String {
+						<- "{value}"
+					}
+
+					constant red: Colour = #Red
+
+					Terminal.inspect(label(red))
+				}`),
+			).toEqual(['"Red"'])
+		})
+
+		it("answers for a receiver narrowed to a single Case", async () => {
+			expect(
+				await run(`implementation { ${colourChoice}
+					namespace Colour for Colour is Printable { }
+
+					constant red: Colour = #Red
+
+					Terminal.inspect(match red -> String {
+						case #Red { <- @::toString() }
+						case _ { <- "other" }
+					})
+				}`),
+			).toEqual(['"Red"'])
+		})
+
+		// NOTE: The Namespace is what makes the decision, so a Choice nobody
+		// declared `is Printable` for prints through nothing — the same Choice,
+		// the same Cases, and no conformance for a hole or `print` to reach.
+		it("derives nothing for a Choice no Namespace declares Printable", () => {
+			expect(
+				messagesOf(`implementation { ${colourChoice}
+					constant red: Colour = #Red
+
+					Terminal.print(red)
+				}`),
+			).not.toEqual([])
+		})
+
+		// NOTE: A Case carrying a payload has no name that stands for it, so
+		// the declaration is refused rather than half-answered.
+		it("refuses a declared 'is Printable' on a Choice with a payload", () => {
+			expect(
+				codesOf(`implementation { ${calculatorChoice}
+					namespace CalculatorOperation for CalculatorOperation is Printable { }
+
+					constant sum: CalculatorOperation = #Add({ left = 1, right = 1 })
+
+					Terminal.print(sum)
+				}`),
+			).toContain("nonconforming-namespace")
+		})
+
+		// NOTE: The derive is a fallback, never an override — a Namespace that
+		// writes `toString` keeps it, at the call AND in the witness a bounded
+		// Method is handed.
+		it("keeps a written 'toString' at the call and in the witness", async () => {
+			expect(
+				await run(`implementation { ${colourChoice}
+					namespace Colour for Colour is Printable {
+						§§ The Colour's initial.
+						§§
+						§§ @returns — one character.
+						toString() -> String {
+							<- match @ -> String {
+								case #Red   { <- "R" }
+								case #Green { <- "G" }
+							}
+						}
+					}
+
+					constant red: Colour = #Red
+
+					Terminal.inspect(red::toString())
+					Terminal.inspect("{red}")
+				}`),
+			).toEqual(['"R"', '"R"'])
+		})
+	})
+
 	// NOTE: A *generic* Choice can only derive Equatable CONDITIONALLY — its
 	// payloads may be Type Parameters, which are equal exactly when the Types
 	// they bind to say so. The derive gains a `where <each payload Parameter> is
@@ -3367,6 +3496,26 @@ describe("Choices", () => {
 			expect(generated).toContain("Colour.is(red,")
 			expect(generated).toContain("is: Colour.is")
 			expect(generated).toContain("isNot: Colour.isNot")
+		})
+
+		// NOTE: One helper for every Choice of every Program — the whole cost of
+		// the printing derive. A per Choice `match` over the Case names is what
+		// this asserts is NOT emitted.
+		it("emits the runtime helper for a derived 'toString'", () => {
+			let generated = generate(`implementation {
+				choice Colour { Red, Green }
+
+				namespace Colour for Colour is Printable { }
+
+				constant red: Colour = #Red
+
+				Terminal.print(red::toString())
+				Terminal.print(red)
+			}`)
+
+			expect(generated).toContain("$helpers.choiceName(")
+			expect(generated).toContain("toString: $helpers.choiceName")
+			expect(generated).not.toContain('"Red"')
 		})
 
 		it("emits tagged Case constructions", () => {

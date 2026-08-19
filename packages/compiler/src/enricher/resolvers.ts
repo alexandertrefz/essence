@@ -1245,6 +1245,17 @@ function conformanceStateFor(scope: enricher.Scope): ScopeConformanceState {
 // of a member read — there is no object anywhere with this name.
 export const derivedEquatableNamespaceName = "Choice_Equatable"
 
+// NOTE: The Namespace name the derived printing answers to, under the same rule
+// as the one above: the `_` keeps it unspellable from Essence, and the Rewriter
+// turns the one reference to it into the runtime helper.
+export const derivedPrintableNamespaceName = "Choice_Printable"
+
+// NOTE: The Protocol printing is derived for. Named once and exported, because
+// three places ask whether a conformance is that one — the two below and the
+// Language Server's mirror of them — and a typo in any of them would silently
+// derive nothing.
+export const printableProtocolName = "Printable"
+
 // NOTE: The identity of the Choice a receiver belongs to, or null when it
 // belongs to none — a single Case names its own Choice, and a Union names one
 // only when every member is a Case of it. The IDENTITY rather than the written
@@ -2209,15 +2220,103 @@ export function derivedEquatableNamespaceForChoice(
 	}
 }
 
-// NOTE: The witness the derived equality provides for a Choice, or null when
-// it provides none. `written` is the Namespace that claimed the conformance, if
-// one did — the derive fills in for it only when it declares NONE of the
-// Protocol's Methods. All or nothing, because a witness names ONE Namespace:
-// half-written equality can not be half-derived, and a Namespace writing its
-// own `is` beside a derived `isNot` would answer the same question two
-// different ways. Written through the same method map as any other candidate,
-// so the derived Methods are checked against the Protocol rather than assumed
-// to fit it.
+// NOTE: Whether every Case of a Choice carries no payload. Such a Choice is
+// its Case names and nothing else, so the name is the whole of what there is to
+// print — which is what makes printing derivable at all. A Case with a payload
+// has something more to say, and only the Namespace knows how it should read.
+function choiceCasesArePayloadFree(choiceType: common.Type): boolean {
+	let cases =
+		choiceType.type === "UnionType"
+			? flattenUnionMembers(choiceType)
+			: [choiceType]
+
+	return (
+		cases.length > 0 &&
+		cases.every(
+			(caseType) =>
+				caseType.type === "Case" &&
+				Object.keys(caseType.members).length === 0,
+		)
+	)
+}
+
+// NOTE: The Namespace a Choice of payload-free Cases prints through, or null
+// for one that carries a payload anywhere. Fabricated on demand exactly as the
+// derived equality above is, and holding the one Method the `Printable`
+// Protocol asks for.
+//
+// NOTE: The Generics are left out even for a generic Choice. No payload names a
+// Type Parameter — there are no payloads — so the answer is the Case name
+// whatever the Type Arguments are, and there is nothing for a witness to
+// decide.
+export function derivedPrintableNamespaceForChoice(
+	choiceType: common.Type,
+): common.NamespaceType | null {
+	if (!choiceCasesArePayloadFree(choiceType)) {
+		return null
+	}
+
+	let toString: common.SimpleMethodType = {
+		type: "SimpleMethod",
+		generics: [],
+		parameterTypes: [{ name: null, type: choiceType }],
+		returnType: { type: "String" },
+		documentation: {
+			description: "Answers the Case's name as a String.",
+			parameters: [],
+			returns: "the name of the Case, without its `#`.",
+			position: null,
+		},
+	}
+
+	return {
+		type: "Namespace",
+		name: derivedPrintableNamespaceName,
+		targetType: choiceType,
+		generics: [],
+		properties: {},
+		methods: { toString },
+		conformsTo: [printableProtocolName],
+	}
+}
+
+// NOTE: The derived printing a receiver can reach, or null when it reaches
+// none. Printing is DECLARED where equality is not: a Choice compares by its
+// tags whatever anyone says, but how it READS is a decision, so this answers
+// only where a Namespace over the Choice has stated `is Printable`. The
+// Namespaces are the ones already found for the receiver, so a Choice with no
+// Namespace at all reaches nothing here, exactly as it did before.
+export function derivedPrintableNamespace(
+	baseType: common.Type,
+	namespaces: Iterable<common.NamespaceType>,
+	scope: enricher.Scope,
+): common.NamespaceType | null {
+	let choiceType = choiceTypeOf(baseType, scope)
+
+	if (choiceType === null) {
+		return null
+	}
+
+	let declared = false
+
+	for (let namespace of namespaces) {
+		if (namespace.conformsTo?.includes(printableProtocolName)) {
+			declared = true
+			break
+		}
+	}
+
+	return declared ? derivedPrintableNamespaceForChoice(choiceType) : null
+}
+
+// NOTE: The witness a derive provides for a Choice, or null when none does.
+// `written` is the Namespace that claimed the conformance, if one did — the
+// derive fills in for it only when it declares NONE of the Protocol's Methods.
+// All or nothing, because a witness names ONE Namespace: half-written equality
+// can not be half-derived, and a Namespace writing its own `is` beside a
+// derived `isNot` would answer the same question two different ways. Written
+// through the same method map as any other candidate, so the derived Methods
+// are checked against the Protocol rather than assumed to fit it.
 function derivedConformanceSource(
 	binding: common.Type,
 	protocolName: string,
@@ -2231,15 +2330,26 @@ function derivedConformanceSource(
 		return null
 	}
 
+	// NOTE: One derived Namespace per Protocol a Choice answers without being
+	// written. Equality is derived for EVERY Choice; printing only where a
+	// Namespace has said `is Printable`, which is what `written` being a
+	// Namespace means here — both callers pass the Namespace that DECLARED the
+	// conformance, and pass null when none did.
+	//
 	// NOTE: The conformance is CHECKED against the flat Methods — their
 	// Parameters are the applied Choice, so they line up with the Protocol's
 	// `Self` under plain assignability. The bounded Methods
 	// `derivedEquatableNamespace` builds are for the direct-call rail, where
 	// invocation inference binds their Parameters; here the witnesses are solved
 	// by hand below instead.
-	let derived = derivedEquatableNamespaceForChoice(choiceType)
+	let derived =
+		protocolName === printableProtocolName
+			? written === null
+				? null
+				: derivedPrintableNamespaceForChoice(choiceType)
+			: derivedEquatableNamespaceForChoice(choiceType)
 
-	if (!derived.conformsTo?.includes(protocolName)) {
+	if (derived === null || !derived.conformsTo?.includes(protocolName)) {
 		return null
 	}
 
@@ -2267,6 +2377,18 @@ function derivedConformanceSource(
 
 	if (result.kind !== "conforms") {
 		return null
+	}
+
+	// NOTE: Printing needs no witness and no descriptor, whether the Choice is
+	// generic or not: a payload-free Case names itself, and a Type Parameter no
+	// payload mentions decides nothing about how it reads.
+	if (derived.name === derivedPrintableNamespaceName) {
+		return {
+			kind: "namespace",
+			name: derivedPrintableNamespaceName,
+			methodMap: result.methodMap,
+			conditions: [],
+		}
 	}
 
 	// NOTE: A non-generic Choice derives unconditionally — no witnesses, no
