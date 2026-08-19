@@ -971,6 +971,97 @@ describe("Completion", () => {
 		})
 	})
 
+	// NOTE: A member and a binding of the same name are ONE offer, not two —
+	// both insert the same characters, because a bare name in a Record Literal
+	// is the whole member. What the shorthand adds is the sentence saying so.
+	describe("Record literal members that a binding can fill", () => {
+		it("says a member can be written as its name alone", () => {
+			let source = [
+				"implementation {",
+				"\ttype Person = { firstName: String, lastName: String }",
+				'\tconstant firstName = "Ada"',
+				"\tconstant person: Person = {  }",
+				"}",
+			].join("\n")
+
+			let entries = findCompletions(source, { line: 4, column: 29 })
+
+			expect(
+				entries.find((entry) => entry.label === "firstName")?.detail,
+			).toBe("String (or 'firstName' alone)")
+			expect(
+				entries.find(
+					(entry) =>
+						entry.label === "lastName" && entry.kind === "member",
+				)?.detail,
+			).toBe("String")
+		})
+
+		it("offers the member exactly once", () => {
+			let source = [
+				"implementation {",
+				"\ttype Person = { firstName: String }",
+				'\tconstant firstName = "Ada"',
+				"\tconstant person: Person = {  }",
+				"}",
+			].join("\n")
+
+			let entries = findCompletions(source, { line: 4, column: 29 })
+
+			expect(
+				entries.filter(
+					(entry) =>
+						entry.label === "firstName" && entry.kind === "member",
+				),
+			).toHaveLength(1)
+		})
+
+		// NOTE: The braces of an update's key list are the one member list the
+		// shorthand does not reach, so the sentence must not appear there —
+		// `{ base with firstName }` is refused outright. A key still being
+		// typed is exactly the shape the third reading recovers, which is what
+		// puts a cursor inside the list at all: the list's own span ends at its
+		// last value, since it has no braces of its own to end at.
+		it("says nothing of the sort inside an update's key list", () => {
+			let source = [
+				"implementation {",
+				'\tconstant person = { firstName = "Ada", lastName = "L" }',
+				'\tconstant firstName = "Grace"',
+				'\tconstant renamed = { person with lastName = "M", first }',
+				"}",
+			].join("\n")
+
+			let entries = findCompletions(source, { line: 4, column: 55 })
+
+			expect(
+				entries.find(
+					(entry) =>
+						entry.label === "firstName" && entry.kind === "member",
+				)?.detail,
+			).toBe("String")
+		})
+
+		// NOTE: The braced right-hand side IS a Record Literal — it is the only
+		// spelling the shorthand merge has — and its members come from the LEFT
+		// side's Type, which nothing else in the update supplies.
+		it("offers the left side's members inside a braced right-hand side", () => {
+			let source = [
+				"implementation {",
+				'\tconstant person = { firstName = "Ada", lastName = "L" }',
+				'\tconstant firstName = "Grace"',
+				"\tconstant renamed = { person with {  } }",
+				"}",
+			].join("\n")
+
+			let entries = findCompletions(source, { line: 4, column: 37 })
+
+			expect(
+				entries.find((entry) => entry.label === "firstName")?.detail,
+			).toBe("String (or 'firstName' alone)")
+			expect(entries.map((entry) => entry.label)).toContain("lastName")
+		})
+	})
+
 	describe("Namespace specifiers after ::<", () => {
 		it("should offer Namespaces matching the receiver, not Types", () => {
 			let source = [

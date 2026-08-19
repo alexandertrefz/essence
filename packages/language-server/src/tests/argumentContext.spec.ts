@@ -10,7 +10,7 @@ function contextAt(source: string, cursor: common.Cursor) {
 	let { program } = parseWithDiagnostics(source)
 	let { program: enrichedProgram } = enrich(program)
 
-	return findArgumentContext(enrichedProgram, cursor)
+	return findArgumentContext(enrichedProgram, cursor, source.split("\n"))
 }
 
 // NOTE: Completion reaches this walker through a probe, which cannot close an
@@ -46,6 +46,51 @@ describe("Argument context inside a Match Guard", () => {
 			kind: "record",
 			memberTypes: { x: { type: "Integer" }, y: { type: "Integer" } },
 			presentMembers: ["x", "y"],
+			shorthand: true,
+		})
+	})
+})
+
+// NOTE: An update's right-hand side is held to the LEFT side's Type — every
+// member it may name is one the left side already has — and an unannotated
+// `{ base with … }` has no other expected Type at all. Both spellings of the
+// right-hand side are covered here, because they are one Node with one shape
+// and only the braces tell them apart.
+describe("Argument context inside an update", () => {
+	let source = [
+		"implementation {",
+		'\tconstant base = { host = "local", port = 80 }',
+		"",
+		"\tconstant keys = { base with port = 8080 }",
+		"\tconstant merged = { base with { port = 8080 } }",
+		"}",
+	].join("\n")
+
+	it("offers the left side's members in the key list", () => {
+		let context = contextAt(source, { line: 4, column: 32 })
+
+		expect(context).toEqual({
+			kind: "record",
+			memberTypes: {
+				host: { type: "String" },
+				port: { type: "Integer" },
+			},
+			presentMembers: ["port"],
+			shorthand: false,
+		})
+	})
+
+	it("offers them in a braced right-hand side, where a bare name is legal", () => {
+		let context = contextAt(source, { line: 5, column: 35 })
+
+		expect(context).toEqual({
+			kind: "record",
+			memberTypes: {
+				host: { type: "String" },
+				port: { type: "Integer" },
+			},
+			presentMembers: ["port"],
+			shorthand: true,
 		})
 	})
 })
