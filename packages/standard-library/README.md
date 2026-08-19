@@ -191,7 +191,7 @@ ordering.
 `is`, `isNot`, `contains`, `doesNotContain`, `firstIndex(of:)`, `lastIndex(of:)`,
 `count(of:)`, `removeEvery(_ item:)` and `removeDuplicates` are bounded
 `is Equatable`, so equality between items means the item Type's OWN `is` rather
-than a structural comparison the language cannot express. That is a narrowing:
+than a structural comparison the language can not express. That is a narrowing:
 a Method holding an UNBOUNDED `List<ItemType>` can no longer call them, and the
 Diagnostic says which bound to add. `List` conforms
 `is Equatable where ItemType is Equatable`, so nested Lists still have a witness.
