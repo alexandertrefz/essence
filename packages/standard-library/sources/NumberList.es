@@ -10,8 +10,10 @@ import {
 declarations {
 
 	§ The aggregates a List of Numbers answers, reached from the List itself.
-	§ Every entry here delegates to `Number.sum` or one of its four
-	§ siblings, which stay the implementation.
+	§ `Number.sum` and its four siblings stay the implementation. Every entry
+	§ that answers an Optional calls one of them, and the `defaultingTo:` entry
+	§ beside it collapses that answer. The narrowed Namespaces at the end call
+	§ the same statics, and spend the proof of non-emptiness on the fallback.
 	§
 	§ A Namespace targets one Type, so `List<Integer>`, `List<Rational>` and
 	§ `List<Integer | Rational>` each need their own, and a receiver reaches
@@ -262,21 +264,23 @@ declarations {
 
 	§ A List with an item in it has a lowest item, a greatest item and a mean,
 	§ so these three answer bare. Every other question the Namespaces above
-	§ answer is already total, and is not repeated here. Each body collapses
-	§ the Optional against `firstItem()`, which the receiver certainly holds.
+	§ answer is already total, and is not repeated here. The lowest and the
+	§ greatest hand the static its own `defaultingTo:` entry, with
+	§ `firstItem()` as the fallback the receiver certainly holds. The mean
+	§ divides by the length, which is a NonZeroInteger here.
 	namespace NonEmptyIntegerList for NonEmptyList<Integer> {
 		§§ The lowest item, which a non-empty List always has.
 		§§
 		§§ @returns — the lowest item.
 		lowestNumber() -> Integer {
-			<- Number.lowestNumber(@)::value(defaultingTo @::firstItem())
+			<- Number.lowestNumber(@, defaultingTo @::firstItem())
 		}
 
 		§§ The greatest item, which a non-empty List always has.
 		§§
 		§§ @returns — the greatest item.
 		greatestNumber() -> Integer {
-			<- Number.greatestNumber(@)::value(defaultingTo @::firstItem())
+			<- Number.greatestNumber(@, defaultingTo @::firstItem())
 		}
 
 		§§ The mean of the items: their total divided by their count.
@@ -294,14 +298,14 @@ declarations {
 		§§
 		§§ @returns — the lowest item.
 		lowestNumber() -> Rational {
-			<- Number.lowestNumber(@)::value(defaultingTo @::firstItem())
+			<- Number.lowestNumber(@, defaultingTo @::firstItem())
 		}
 
 		§§ The greatest item, which a non-empty List always has.
 		§§
 		§§ @returns — the greatest item.
 		greatestNumber() -> Rational {
-			<- Number.greatestNumber(@)::value(defaultingTo @::firstItem())
+			<- Number.greatestNumber(@, defaultingTo @::firstItem())
 		}
 
 		§§ The mean of the items: their total divided by their count.
@@ -317,14 +321,14 @@ declarations {
 		§§
 		§§ @returns — the lowest item.
 		lowestNumber() -> Integer | Rational {
-			<- Number.lowestNumber(@)::value(defaultingTo @::firstItem())
+			<- Number.lowestNumber(@, defaultingTo @::firstItem())
 		}
 
 		§§ The greatest item, which a non-empty List always has.
 		§§
 		§§ @returns — the greatest item.
 		greatestNumber() -> Integer | Rational {
-			<- Number.greatestNumber(@)::value(defaultingTo @::firstItem())
+			<- Number.greatestNumber(@, defaultingTo @::firstItem())
 		}
 
 		§§ The mean of the items: their total divided by their count.

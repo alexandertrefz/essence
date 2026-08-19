@@ -47,30 +47,34 @@ declarations {
 
 		§§ Adds a number to this Integer.
 		overload add {
-			§§ Adds an Integer to this Integer. The sum is an Integer.
+			§§ Adds an Integer to this Integer.
+			§§
+			§§ The sum is an Integer.
 			§§
 			§§ @param _ — the Integer to add
 			(_ other: Integer) -> Integer
 
-			§§ Adds a Rational to this Integer. The sum is a Rational, since it need not be whole.
+			§§ Adds a Rational to this Integer.
+			§§
+			§§ The sum is a Rational, since it need not be whole.
 			§§
 			§§ @param _ — the Rational to add
 			(_ other: Rational) -> Rational {
 				<- other::add(@)
 			}
 
-			§§ Adds an Algebraic to this Integer. The sum stays exact.
+			§§ Adds an Algebraic to this Integer.
 			§§
-			§§ Shifting the rational part of `a + b·√d` leaves the radical untouched.
+			§§ The sum stays exact. Shifting the rational part of `a + b·√d` leaves the radical untouched.
 			§§
 			§§ @param _ — the Algebraic to add
 			(_ other: Algebraic) -> Algebraic {
 				<- other::add(@)
 			}
 
-			§§ Adds a Transcendental to this Integer. The sum stays exact.
+			§§ Adds a Transcendental to this Integer.
 			§§
-			§§ Shifting the rational part of `a + b·π + c·e` leaves the base terms untouched.
+			§§ The sum stays exact. Shifting the rational part of `a + b·π + c·e` leaves the base terms untouched.
 			§§
 			§§ @param _ — the Transcendental to add
 			(_ other: Transcendental) -> Transcendental {
@@ -369,8 +373,9 @@ declarations {
 		§§ @returns — the clamped Integer.
 		clamp(between lowest: Integer, and highest: Integer) -> Integer {
 			§ The two ladders below are one ladder with the bounds exchanged.
-			§ Swapping the bounds and calling `clamp` again would be a
-			§ recursion, which a standard library body can not have.
+			§ Swapping the bounds and calling `clamp` again answers the same
+			§ Integer, one call deeper. The ladder is written out instead, so
+			§ the Method answers without calling itself.
 			if lowest::isGreaterThan(highest) {
 				if @::isLessThan(highest) {
 					<- highest

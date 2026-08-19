@@ -562,7 +562,7 @@ declarations {
 
 		§§ Answers the Rational as a String, in lowest terms.
 		§§
-		§§ The form is `3/4` when no format is named, and the named format otherwise. A whole Rational prints its numerator alone, so `1/2::add(1/2)` prints `1` and `10::divide(by 2)` prints `5`. The `Rational.parse` Method reads every one of these forms back.
+		§§ The form is `3/4` when no format is named, and the named format otherwise. A whole Rational prints its numerator alone, so `1/2::add(1/2)` prints `1` and `10::divide(by 2)` prints `5`. The `Rational.parse` Method reads every one of these forms. The fraction form reads back as the same Rational. A decimal form does too when its expansion ends within 80 digits, and reads back as the rounded value otherwise.
 		§§
 		§§ @returns — the String representation of the Rational.
 		overload toString {

@@ -17,9 +17,10 @@ declarations {
 	§ Three Methods, because the audiences are three. The `print` Method is for
 	§ the Program's reader, `inspect` is for its author, and `write` is the
 	§ primitive both are built on. The natives are `write` and `inspect`, and
-	§ `print` is written in Essence on `write`. The Stream is a default on each
-	§ of them, rather than an entry of its own. A native carries a default
-	§ exactly as a bodied Method does.
+	§ `print` is written in Essence on `write`. The Stream is a default on
+	§ `print` and `write`, rather than an entry of its own. A native carries a
+	§ default exactly as a bodied Method does. The `inspect` Method takes no
+	§ Stream: what it writes is for whoever started the Program.
 	namespace Terminal {
 		§§ Prints a value and a newline, for the reader of the Program.
 		§§
