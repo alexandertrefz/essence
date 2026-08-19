@@ -7,6 +7,7 @@ import { RUNTIME_DIRECTORY } from "@essence-lang/runtime"
 import { loadStdlib, type Stdlib } from "../enricher/stdlib"
 import {
 	conformanceParameterName,
+	providedMethodProtocol,
 	resolveOverloadedMethodName,
 } from "../helpers/index"
 
@@ -721,16 +722,27 @@ function renderFunctionsAssertion(section: NativesSection): string {
 }
 
 // NOTE: The witness object a bounded Type Parameter is fulfilled with — the
-// Protocol's Methods with `Self` bound to the Parameter. Throws on the shapes
-// the witness can not transcribe (an overloaded Protocol Method, or a Protocol
-// Method with its own bounded Generic); none occur in the current Protocols.
+// Protocol's REQUIREMENTS with `Self` bound to the Parameter. Throws on the
+// shapes the witness can not transcribe (an overloaded Protocol Method, or a
+// Protocol Method with its own bounded Generic); none occur in the current
+// Protocols.
+//
+// NOTE: A PROVIDED Method is not in a witness. Its body is one const the whole
+// Program shares, taking the witness as an Argument, so there is nothing
+// per-conformer for a witness to name — and a native handed one would be asked
+// for a Method nobody ever puts there. What the Compiler emits and what this
+// declares have to agree, and this is where the agreement is written down.
 function renderConformanceType(
 	protocol: common.ProtocolType,
 	ctx: RenderContext,
 ): string {
 	ctx.used.add("AnyType")
 
-	let members = Object.entries(protocol.methods).map(([name, method]) => {
+	let requirements = Object.entries(protocol.methods).filter(
+		([name]) => providedMethodProtocol(protocol, name) === null,
+	)
+
+	let members = requirements.map(([name, method]) => {
 		if (
 			method.type === "OverloadedMethod" ||
 			method.type === "OverloadedStaticMethod"

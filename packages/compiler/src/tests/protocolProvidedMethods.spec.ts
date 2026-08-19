@@ -1,14 +1,17 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test"
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import * as path from "node:path"
 
 import type { common } from "@essence-lang/interfaces"
+import { RUNTIME_DIRECTORY } from "@essence-lang/runtime"
 import { readStdlibFiles } from "@essence-lang/standard-library"
 
 import { containsErrors } from "../diagnostics/index"
 import { enrich } from "../enricher/index"
 import {
+	loadStdlib,
 	loadStdlibFrom,
 	parseStdlibSource,
 	type Stdlib,
@@ -19,6 +22,7 @@ import { parseWithDiagnostics } from "../parser/index"
 import { rewrite } from "../rewriter/index"
 import { essenceMethodName } from "../rewriter/stdlibPrelude"
 import { simplify } from "../simplifier/index"
+import { renderNativesModule } from "../tools/generateNatives"
 import { validate } from "../validator/index"
 
 // NOTE: A Protocol Method written with a block is PROVIDED: every conformer
@@ -910,6 +914,19 @@ describe("a provided Method in the standard library", () => {
 
 	afterAll(() => {
 		useStdlib(replacedStdlib)
+	})
+
+	// NOTE: A Protocol body is Essence, and the generated native contract is
+	// about the RUNTIME's exports — so a Protocol growing one must not move a
+	// line of it. Compared against the file on disk, which is the contract the
+	// runtime is written against.
+	it("should leave the generated native contract untouched", () => {
+		expect(renderNativesModule(loadStdlib())).toBe(
+			readFileSync(
+				path.join(RUNTIME_DIRECTORY, "natives.generated.ts"),
+				"utf-8",
+			),
+		)
 	})
 
 	it("should load a provided body out of a declarations Program", () => {
