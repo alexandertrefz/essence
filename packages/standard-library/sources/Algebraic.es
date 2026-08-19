@@ -48,7 +48,7 @@ declarations {
 
 		§§ Answers the exact sum of the Algebraic and a number.
 		§§
-		§§ Two Algebraics over the same radical stay in the slice. Their radical parts can also cancel, which leaves a Rational.
+		§§ Two Algebraics over the same radical stay in the slice. Their radical parts can also cancel, which leaves a Rational. The `defaultingTo:` entry answers the given value in place of empty.
 		overload add {
 			(_ other: Integer) -> Algebraic
 
@@ -76,7 +76,7 @@ declarations {
 
 		§§ Answers the exact difference of the Algebraic and a number.
 		§§
-		§§ Subtracting an equal radical part leaves a Rational.
+		§§ Subtracting an equal radical part leaves a Rational. The `defaultingTo:` entry answers the given value in place of empty.
 		overload subtract {
 			(_ other: Integer) -> Algebraic {
 				<- @::add(other::negate())
@@ -107,7 +107,7 @@ declarations {
 
 		§§ Answers the exact product of the Algebraic and a number.
 		§§
-		§§ A radical times itself turns rational: `√2 · √2` is `2`. Multiplying by zero answers zero.
+		§§ A radical times itself turns rational: `√2 · √2` is `2`. Multiplying by zero answers zero. The `defaultingTo:` entry answers the given value in place of empty.
 		overload multiply {
 			(with other: Integer) -> Algebraic | Rational
 
@@ -135,7 +135,7 @@ declarations {
 
 		§§ Answers the exact quotient of the Algebraic and a number.
 		§§
-		§§ Dividing by an Integer or a Rational is empty only for zero. Dividing by an Algebraic multiplies by its reciprocal, which the conjugate always gives. That quotient is empty wherever the matching product is empty.
+		§§ Dividing by an Integer or a Rational is empty only for zero. Dividing by an Algebraic multiplies by its reciprocal, which the conjugate always gives. That quotient is empty wherever the matching product is empty. The `defaultingTo:` entries answer the given value in place of empty.
 		overload divide {
 			(by other: Integer) -> Optional<Algebraic>
 
