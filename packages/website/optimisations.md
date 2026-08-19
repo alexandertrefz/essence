@@ -899,6 +899,12 @@ unfolded Program builds. The fold calls those same core functions rather than
 spelling the arithmetic out a second time, so there is one definition of the
 answer instead of two that have to agree.
 
+RENDERING a Rational is a third question again, and the one an interpolation
+hole asks. A hole folds to what `Rational::toString` answers, which is the
+numerator alone where the lowest-terms denominator is one: `"{4/2}"` folds to
+`"2"`, exactly what the unfolded Program prints, while `Terminal.inspect` of
+that same value goes on showing the structural `2/1`.
+
 Only LITERALS fold, never a name a Program bound a constant to: a binding is a
 place a debugger stops and a name a reader looks for, and what folding through
 one would save is an allocation `pool-constants` already removes. Mixed-kind
