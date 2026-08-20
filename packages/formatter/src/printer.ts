@@ -649,9 +649,34 @@ export class Printer {
 					this.printOverloadEntries(node.methods, node.position),
 				])
 
+			case "ExpectStatement":
+			case "RequireStatement":
+				return this.printAssertion(node)
+
 			default:
 				return this.printExpression(node)
 		}
+	}
+
+	// NOTE: `expect value` and `require value is #Value(item)`. The Matcher
+	// rides on the assertion's own line, as a Handler's does — what is being
+	// taken apart and what it is taken apart into read as one thing.
+	private printAssertion(
+		node: parser.ExpectStatementNode | parser.RequireStatementNode,
+	): Doc {
+		let keyword =
+			node.nodeType === "ExpectStatement" ? "expect " : "require "
+
+		let parts: Array<Doc> = [
+			text(keyword),
+			this.printExpression(node.value),
+		]
+
+		if (node.matcher !== null) {
+			parts.push(text(" is "), this.printMatcher(node.matcher))
+		}
+
+		return concat(parts)
 	}
 
 	// NOTE: `padding` is written between the head and the `=`, and is the slot an

@@ -202,6 +202,15 @@ export function enrichNode(
 		case "ConstantDeclarationStatement":
 		case "VariableDeclarationStatement":
 			return enrichDeclarationStatement(node, scope)
+		// NOTE: An assertion is only ever written in a test's body, and the
+		// tests section is not enriched yet — the Parser refuses every `expect`
+		// and `require` written anywhere else, so nothing that reaches an
+		// implementation block here is anything but already-reported. It
+		// answers with no typed Node at all rather than with a second
+		// Diagnostic about the same Statement.
+		case "ExpectStatement":
+		case "RequireStatement":
+			return []
 		case "VariableAssignmentStatement":
 		case "NamespaceDefinitionStatement":
 		case "ProtocolDeclarationStatement":
@@ -2906,6 +2915,8 @@ export function enrichStatement(
 		parser.StatementNode,
 		| parser.ConstantDeclarationStatementNode
 		| parser.VariableDeclarationStatementNode
+		| parser.ExpectStatementNode
+		| parser.RequireStatementNode
 	>,
 	scope: enricher.Scope,
 	hoistedTypes?: HoistedTypes,

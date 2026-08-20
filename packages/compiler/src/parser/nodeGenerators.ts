@@ -8,12 +8,14 @@ export function program(
 	kind: parser.Program["kind"] = "implementation",
 	imports: parser.ImportSectionNode | null = null,
 	exports: parser.ExportSectionNode | null = null,
+	tests: parser.TestsSectionNode | null = null,
 ): parser.Program {
 	return {
 		nodeType: "Program",
 		kind,
 		imports,
 		implementation,
+		tests,
 		exports,
 		position,
 	}
@@ -26,6 +28,64 @@ export function implementationSection(
 	return {
 		nodeType: "ImplementationSection",
 		nodes: nodes ?? [],
+		position,
+	}
+}
+
+export function testsSection(
+	nodes: Array<parser.TestsNode>,
+	position: common.Position,
+): parser.TestsSectionNode {
+	return {
+		nodeType: "TestsSection",
+		nodes,
+		position,
+	}
+}
+
+export function test(
+	name: parser.TestNode["name"],
+	modifiers: Array<parser.TestModifierNode>,
+	body: Array<parser.ImplementationNode>,
+	keywordPosition: common.Position,
+	position: common.Position,
+): parser.TestNode {
+	return {
+		nodeType: "Test",
+		name,
+		modifiers,
+		body,
+		keywordPosition,
+		position,
+	}
+}
+
+export function suite(
+	name: parser.SuiteNode["name"],
+	modifiers: Array<parser.TestModifierNode>,
+	nodes: Array<parser.TestsNode>,
+	keywordPosition: common.Position,
+	position: common.Position,
+): parser.SuiteNode {
+	return {
+		nodeType: "Suite",
+		name,
+		modifiers,
+		nodes,
+		keywordPosition,
+		position,
+	}
+}
+
+export function testModifier(
+	name: parser.IdentifierNode,
+	modifierArguments: Array<parser.TestModifierArgumentNode>,
+	position: common.Position,
+): parser.TestModifierNode {
+	return {
+		nodeType: "TestModifier",
+		name,
+		arguments: modifierArguments,
 		position,
 	}
 }
@@ -604,6 +664,22 @@ export function ifStatement(
 	position: common.Position,
 ): parser.IfStatementNode {
 	return { nodeType: "IfStatement", condition, body, position }
+}
+
+export function expectStatement(
+	value: parser.ExpressionNode,
+	matcher: parser.MatcherNode | null,
+	position: common.Position,
+): parser.ExpectStatementNode {
+	return { nodeType: "ExpectStatement", value, matcher, position }
+}
+
+export function requireStatement(
+	value: parser.ExpressionNode,
+	matcher: parser.MatcherNode | null,
+	position: common.Position,
+): parser.RequireStatementNode {
+	return { nodeType: "RequireStatement", value, matcher, position }
 }
 
 export function returnStatement(

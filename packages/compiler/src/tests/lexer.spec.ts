@@ -794,6 +794,86 @@ describe("Lexer", () => {
 			expect(stripPosition(lexer.next())).toEqual(output)
 		})
 
+		it("should lex tests", () => {
+			let lexer = new Lexer()
+			let input: string
+			let output: SimpleToken
+
+			input = "tests"
+			output = {
+				value: "tests",
+				type: TokenType.KeywordTests,
+			}
+
+			lexer.reset(input)
+
+			expect(stripPosition(lexer.next())).toEqual(output)
+		})
+
+		it("should lex test", () => {
+			let lexer = new Lexer()
+			let input: string
+			let output: SimpleToken
+
+			input = "test"
+			output = {
+				value: "test",
+				type: TokenType.KeywordTest,
+			}
+
+			lexer.reset(input)
+
+			expect(stripPosition(lexer.next())).toEqual(output)
+		})
+
+		it("should lex suite", () => {
+			let lexer = new Lexer()
+			let input: string
+			let output: SimpleToken
+
+			input = "suite"
+			output = {
+				value: "suite",
+				type: TokenType.KeywordSuite,
+			}
+
+			lexer.reset(input)
+
+			expect(stripPosition(lexer.next())).toEqual(output)
+		})
+
+		it("should lex expect", () => {
+			let lexer = new Lexer()
+			let input: string
+			let output: SimpleToken
+
+			input = "expect"
+			output = {
+				value: "expect",
+				type: TokenType.KeywordExpect,
+			}
+
+			lexer.reset(input)
+
+			expect(stripPosition(lexer.next())).toEqual(output)
+		})
+
+		it("should lex require", () => {
+			let lexer = new Lexer()
+			let input: string
+			let output: SimpleToken
+
+			input = "require"
+			output = {
+				value: "require",
+				type: TokenType.KeywordRequire,
+			}
+
+			lexer.reset(input)
+
+			expect(stripPosition(lexer.next())).toEqual(output)
+		})
+
 		// NOTE: The four Module Keywords are contextual — `from` and `as` are
 		// Argument labels the standard library writes, so the Lexer hands them
 		// over as Keywords and the Parser reads them as Identifiers everywhere a

@@ -1747,6 +1747,7 @@ function unreadableProgram(sourceText: string): parser.Program {
 			nodes: [],
 			position,
 		},
+		tests: null,
 		exports: null,
 		position,
 	}

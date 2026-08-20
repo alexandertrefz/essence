@@ -60,6 +60,11 @@ const keywords = [
 	"export",
 	"from",
 	"as",
+	"tests",
+	"test",
+	"suite",
+	"expect",
+	"require",
 ]
 const symbols = [
 	"(",
@@ -211,6 +216,11 @@ const wordTypes = new Map<string, lexer.TokenType>([
 	["from", TokenType.KeywordFrom],
 	["as", TokenType.KeywordAs],
 	["static", TokenType.KeywordStatic],
+	["tests", TokenType.KeywordTests],
+	["test", TokenType.KeywordTest],
+	["suite", TokenType.KeywordSuite],
+	["expect", TokenType.KeywordExpect],
+	["require", TokenType.KeywordRequire],
 	["true", TokenType.LiteralTrue],
 	["false", TokenType.LiteralFalse],
 ])
