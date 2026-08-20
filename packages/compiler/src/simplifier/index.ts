@@ -3,8 +3,8 @@ import type { common } from "@essence-lang/interfaces"
 import {
 	bodyDefinitelyReturns,
 	conformanceParameterName,
-	openArgumentHoles,
 	isMergedLevel,
+	openArgumentHoles,
 	recordDefaultMembers,
 	recordDefaultNesting,
 	resolveOverloadedMethodName,
