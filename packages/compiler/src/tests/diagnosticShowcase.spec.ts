@@ -30,8 +30,15 @@ function analyse(source: string): Array<common.Diagnostic> {
 		return parserDiagnostics
 	}
 
-	let { program: enriched, diagnostics: enricherDiagnostics } =
-		enrich(program)
+	// NOTE: Enriched WITH the tests, which is what `essence test` asks for and
+	// no other command does — a showcase of what a tests section may not say
+	// needs the one compile mode that reads one. Every file that writes no
+	// `tests { … }` block is unaffected: the flag decides whether a section is
+	// enriched, and there is nothing to enrich.
+	let { program: enriched, diagnostics: enricherDiagnostics } = enrich(
+		program,
+		{ tests: true },
+	)
 	let diagnostics = [...parserDiagnostics, ...enricherDiagnostics]
 
 	if (containsErrors(enricherDiagnostics)) {

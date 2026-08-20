@@ -135,13 +135,15 @@ tests {
 
 		§ A Match Handler refuses `} as name` because `@` already names the
 		§ whole value. An assertion has no `@`, so here the binder is how a
-		§ test holds onto the whole of what it took apart.
+		§ test holds onto the whole of what it took apart — which is what the
+		§ Pattern PROVED, the members it named and no others, exactly as `@` is
+		§ inside a Handler.
 		test "names the whole of what it takes apart" {
 			require { team, points } as standing = lions
 
 			expect team::is("Lions")
 			expect points::is(0)
-			expect standing.played::is(0)
+			expect standing.points::is(0)
 		}
 
 		§ Every kind of Matcher a `require` takes a value apart with, and what
