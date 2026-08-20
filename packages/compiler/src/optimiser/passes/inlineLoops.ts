@@ -135,6 +135,10 @@ class Inlining {
 			case "TypeAliasStatement":
 			case "FunctionStatement":
 			case "ConditionalStatement":
+			// NOTE: An assertion holds an Expression that has to be tested
+			// where it stands — lifting it into a Statement above would put
+			// the recording somewhere the assertion is not.
+			case "TestAssertionStatement":
 			case "IntrinsicStatement":
 				return node
 			default:

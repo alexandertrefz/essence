@@ -100,5 +100,11 @@ export function declaredNamespaces(
 		visitNested(node)
 	}
 
+	// NOTE: A tests section is a Scope of its own, below the top level, so
+	// everything it declares is NESTED however it was written — a `namespace
+	// List` there shadows the runtime's for the tests and for nothing else.
+	// The walk is the general one for that reason.
+	visitNested(program.tests)
+
 	return { all, nested }
 }

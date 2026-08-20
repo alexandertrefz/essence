@@ -126,6 +126,10 @@ class Lowering {
 			case "ProtocolDeclarationStatement":
 			case "TypeAliasStatement":
 			case "FunctionStatement":
+			// NOTE: An assertion holds an Expression that has to be tested
+			// where it stands, and a Match inside one is written out by the
+			// walk rather than lifted above it.
+			case "TestAssertionStatement":
 			case "IntrinsicStatement":
 				return node
 			default:

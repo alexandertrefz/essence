@@ -16,7 +16,10 @@ import {
 	type OptimiserOptions,
 	optimiserOptionsKey,
 } from "@essence-lang/compiler/optimiser"
-import { simplify } from "@essence-lang/compiler/simplifier"
+import {
+	simplify,
+	type SimplifyOptions,
+} from "@essence-lang/compiler/simplifier"
 import type { common } from "@essence-lang/interfaces"
 
 // NOTE: One invocation's Modules, read once, parsed once and linked once.
@@ -60,7 +63,10 @@ export type CompileSession = {
 	// call names a Method nothing declares. One typed Program is reached by
 	// every entry that imports it, so each is put through once — keyed by the
 	// Program itself, because that is what may not be simplified twice.
-	simplify: (program: common.typed.Program) => common.typedSimple.Program
+	simplify: (
+		program: common.typed.Program,
+		options?: SimplifyOptions,
+	) => common.typedSimple.Program
 	// NOTE: Optimising is safe to repeat — a pass is a pure function of its
 	// input — so this cache is only about not paying twice for one answer. It is
 	// keyed by the Options as well as by the Program: what the passes make of a
@@ -355,13 +361,18 @@ export function createCompileSession(
 			})
 		},
 
+		// NOTE: Keyed by Program identity alone, Options and all: one Program
+		// is one Module's, and the Options say what that Module's text is —
+		// which can not change while a compile holds the Program parsed from
+		// it.
 		simplify: (
 			program: common.typed.Program,
+			options?: SimplifyOptions,
 		): common.typedSimple.Program => {
 			let result = simplified.get(program)
 
 			if (result === undefined) {
-				result = simplify(program)
+				result = simplify(program, options)
 				simplified.set(program, result)
 			}
 

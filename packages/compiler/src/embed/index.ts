@@ -90,6 +90,13 @@ export type EmbedOptions = {
 	// holding unsaved text answers out of memory, exactly as the Language
 	// Server does.
 	host?: ModuleHost
+	// NOTE: Whether this compile asked for the `tests { … }` blocks. Off is
+	// what a build and a run mean, and the section is then left unenriched and
+	// unemitted, so a test costs a shipped Program nothing. On is what
+	// `essence test` and the Language Server's test session mean — and it
+	// changes the emitted bytes, so it joins `bundleHash` rather than being
+	// trusted to the caller.
+	tests?: boolean
 	optimisation?: OptimiserOptions
 	transformSources?: (sources: ModuleSources) => ModuleSources
 	// NOTE: What the HOST puts into the bundle beyond the sources, named. A
@@ -210,7 +217,7 @@ export function linkToMemory(
 		return parsed
 	}
 
-	let linked = linkModuleGraph(front.graph)
+	let linked = linkModuleGraph(front.graph, { tests: options.tests })
 
 	return answer(
 		linked.modules.get(front.entry)?.surface ?? emptySurface(),
@@ -358,7 +365,7 @@ function validateGraph(
 		return { stopped: parsed }
 	}
 
-	let linked = linkModuleGraph(front.graph)
+	let linked = linkModuleGraph(front.graph, { tests: options.tests })
 	let modules = [...linked.modules.values()]
 	let surface = linked.modules.get(front.entry)?.surface ?? emptySurface()
 	// NOTE: Copied rather than pointed at, because validation appends to these
@@ -455,9 +462,16 @@ function readSources(entryPath: string, options: EmbedOptions): ReadSources {
 			// spelled before there was a target to name still names the same
 			// bytes, and a host's Modules can never be served out of a cache
 			// under a bundle's name.
+			// NOTE: And the compile MODE, for the same reason: a test compile
+			// emits the `tests` blocks and a build does not, off the very same
+			// sources — so the two must never be served to each other out of a
+			// cache. It contributes nothing where it is off, which is what
+			// keeps every hash spelled before there were tests naming the same
+			// bytes.
 			emitterKey: [
 				options.emitterKey ?? "",
 				emitTargetKey(options.emit ?? BUNDLE_TARGET),
+				options.tests === true ? "tests" : "",
 			]
 				.filter((part) => part !== "")
 				.join("|"),

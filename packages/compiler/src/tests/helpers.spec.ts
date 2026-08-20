@@ -3408,6 +3408,7 @@ describe("Helpers", () => {
 				let program: common.typedSimple.Program = {
 					nodeType: "Program",
 					imports: null,
+					tests: null,
 					exports: null,
 					implementation: {
 						nodeType: "ImplementationSection",
@@ -3468,6 +3469,7 @@ describe("Helpers", () => {
 				let program: common.typedSimple.Program = {
 					nodeType: "Program",
 					imports: null,
+					tests: null,
 					exports: null,
 					implementation: {
 						nodeType: "ImplementationSection",

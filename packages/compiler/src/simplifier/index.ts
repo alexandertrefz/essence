@@ -1,5 +1,6 @@
 import type { common } from "@essence-lang/interfaces"
 
+import { testIdentityKey } from "../enricher/tests"
 import {
 	bodyDefinitelyReturns,
 	conformanceParameterName,
@@ -10,18 +11,29 @@ import {
 	resolveOverloadedMethodName,
 } from "../helpers/index"
 
-// NOTE: `program.tests` is deliberately not carried. A simplified Program is
-// what the Optimiser and the Rewriter read, and neither has anything to do with
-// a test until the test lowering turns one into the Functions a runner
-// registers — which is what phase 1c adds, in front of this stage. Until then a
-// test compile enriches and validates its tests and emits none of them.
+// NOTE: What the Simplifier needs to know beyond the Program, which today is
+// one thing and only for a test compile: the Module's own text. The span table
+// a test lowering emits carries the SOURCE of every instrumented point, so that
+// a reader of an event — a `--json` consumer, an editor showing a value beside
+// a line — can say what was recorded without going back to the file. Slicing it
+// here rather than once per reader is what keeps the readers from disagreeing
+// about what was recorded.
+export type SimplifyOptions = {
+	source?: string
+}
+
 export const simplify = (
 	program: common.typed.Program,
+	options: SimplifyOptions = {},
 ): common.typedSimple.Program => {
 	return {
 		nodeType: "Program",
 		imports: simplifyImportSection(program.imports),
 		implementation: simplifyImplementationSection(program.implementation),
+		tests:
+			program.tests === null
+				? null
+				: simplifyTestsSection(program.tests, options),
 		exports: simplifyExportSection(program.exports),
 	}
 }
@@ -112,18 +124,13 @@ function simplifyImplementationNode(
 		case "ReturnStatement":
 		case "FunctionStatement":
 			return simplifyStatement(node)
-		// NOTE: An assertion carries no lowering yet, so what survives it is
-		// what it asserted — the Expression, evaluated and its answer dropped.
-		// Recording that answer against the test is what the test lowering
-		// adds, and this is the seam it replaces; until then a test compile
-		// type-checks and runs its bodies without judging them.
-		//
-		// An assertion can only be written in a test body, and a test body only
-		// reaches here through a `tests` section that `simplify` does not carry
-		// — so nothing an `essence build` emits comes through this case.
+		// NOTE: An assertion can only be written in a test body, and a test
+		// body only reaches here through a `tests` section, which no build
+		// carries — so nothing an `essence build` emits comes through this
+		// case.
 		case "ExpectStatement":
 		case "RequireStatement":
-			return simplifyExpression(node.value)
+			return simplifyAssertion(node)
 	}
 }
 
@@ -1522,4 +1529,461 @@ function simplifyArgument(
 		value: simplifyExpression(node.value),
 	}
 }
+// #endregion
+
+// #region Tests
+
+// NOTE: The lowering of a `tests { … }` block, and the one place instrumented
+// points are handed out. It is Simplifier work rather than a stage of its own
+// because what a test IS by the time it is emitted is Statements: the setup
+// where it was written, the suites as nested Scopes, and each test as a closure
+// registered from inside whatever setup it can see.
+//
+// NOTE: The state below stands for one Module's lowering and is installed for
+// the length of `simplifyTestsSection` — the same discipline the Rewriter's
+// `withEmission` keeps, and for the same reason: a throw out of one Module's
+// lowering must not leave the next one handing out points against a span table
+// it is not part of.
+type TestLowering = {
+	spans: Array<common.typedSimple.TestSpan>
+	lines: Array<string>
+}
+
+let testLowering: TestLowering | null = null
+
+function simplifyTestsSection(
+	section: common.typed.TestsSectionNode,
+	options: SimplifyOptions,
+): common.typedSimple.TestsSectionNode {
+	let previous = testLowering
+	let lowering: TestLowering = {
+		spans: [],
+		lines: options.source === undefined ? [] : options.source.split("\n"),
+	}
+
+	testLowering = lowering
+
+	try {
+		let tests: Array<common.typedSimple.TestManifestEntry> = []
+		let nodes = simplifyTestsNodes(section.nodes, tests)
+
+		return {
+			nodeType: "TestsSection",
+			module: modulePathOfTests(section.nodes),
+			spans: lowering.spans,
+			tests,
+			nodes,
+		}
+	} finally {
+		testLowering = previous
+	}
+}
+
+// NOTE: The path every identity in the section is spelled against, read off the
+// first item rather than threaded in — the Enricher put it on every one of them
+// and they can not disagree, since one section is one Module. Null where the
+// section holds no item at all, and where the Program is no Module.
+function modulePathOfTests(
+	nodes: Array<common.typed.TestsNode>,
+): string | null {
+	for (let node of nodes) {
+		if (node.nodeType === "Test") {
+			return node.identity.modulePath
+		}
+
+		if (node.nodeType === "Suite") {
+			return node.identity.modulePath
+		}
+	}
+
+	return null
+}
+
+// NOTE: One Scope's run of Nodes. A test becomes an entry — numbered by its
+// place in the manifest, which is the number the context selects by — and a
+// suite becomes a Scope holding its own, so that what a suite declares is gone
+// outside it and may shadow what the section declares. Everything else is an
+// ordinary Statement and is simplified as one.
+function simplifyTestsNodes(
+	nodes: Array<common.typed.TestsNode>,
+	tests: Array<common.typedSimple.TestManifestEntry>,
+): Array<common.typedSimple.TestsNode> {
+	return nodes.map((node) => {
+		if (node.nodeType === "Test") {
+			let index = tests.length
+			let interpolated = node.name.nodeType === "InterpolatedStringValue"
+
+			tests.push({
+				id: testIdentityKey(node.identity),
+				name: node.identity.name,
+				interpolated,
+				suitePath: node.identity.suitePath,
+				tags: node.tags,
+				focused: node.focused !== null,
+				skipped: node.skipped === null ? null : node.skipped.reason,
+				position: node.position,
+				keywordPosition: node.keywordPosition,
+			})
+
+			return {
+				nodeType: "TestEntry" as const,
+				index,
+				// NOTE: Only where the name INTERPOLATES. A plain one is in the
+				// manifest already, and emitting it a second time would be two
+				// spellings of one thing that could come to disagree.
+				name: interpolated ? simplifyExpression(node.name) : null,
+				body: node.body.map((child) =>
+					simplifyImplementationNode(child),
+				),
+				position: node.position,
+			}
+		}
+
+		if (node.nodeType === "Suite") {
+			return {
+				nodeType: "TestScope" as const,
+				nodes: simplifyTestsNodes(node.nodes, tests),
+				position: node.position,
+			}
+		}
+
+		return simplifyImplementationNode(node)
+	})
+}
+
+// NOTE: One instrumented point, handed out against the Module's span table. The
+// source is sliced HERE, where the text is, so that everything downstream of
+// the Compiler can say what stood at a point without reading the file again.
+function testPoint(position: common.Position): number {
+	let lowering = testLowering
+
+	// NOTE: Unreachable — an assertion only reaches this file through a tests
+	// section — and answered rather than thrown so that a Compiler bug costs a
+	// point with no span instead of the whole compile.
+	if (lowering === null) {
+		return -1
+	}
+
+	lowering.spans.push({
+		position,
+		source: sourceOfSpan(lowering.lines, position),
+	})
+
+	return lowering.spans.length - 1
+}
+
+// NOTE: Essence Positions are 1-based on both axes and the end column stands
+// one PAST the last character, which is what makes a single-line slice the
+// plain `slice(start - 1, end - 1)` below.
+function sourceOfSpan(lines: Array<string>, position: common.Position): string {
+	let { start, end } = position
+
+	if (start.line === end.line) {
+		return (lines[start.line - 1] ?? "").slice(
+			start.column - 1,
+			end.column - 1,
+		)
+	}
+
+	return [
+		(lines[start.line - 1] ?? "").slice(start.column - 1),
+		...lines.slice(start.line, end.line - 1),
+		(lines[end.line - 1] ?? "").slice(0, end.column - 1),
+	].join("\n")
+}
+
+// NOTE: `expect EXPR` / `require EXPR`, and both `is MATCHER` forms.
+//
+// The Boolean form is INSTRUMENTED: every sub-expression that computes
+// something — a call, a member read — is wrapped in a point that records what
+// stood there, so a failure explains itself out of the values it was built
+// from rather than out of a re-run. `require MATCHER = EXPR` is not: what it
+// asserts is a Matcher's test over a value the Statement in front of it
+// already holds under a name, and there is no expression tree there to take
+// apart.
+function simplifyAssertion(
+	node: common.typed.ExpectStatementNode | common.typed.RequireStatementNode,
+): common.typedSimple.TestAssertionStatementNode {
+	let form =
+		node.nodeType === "ExpectStatement"
+			? ("expect" as const)
+			: ("require" as const)
+	// NOTE: Asked of the TYPED Node, before anything is simplified: the
+	// Simplifier mangles an overloaded Method's name in place, so `is` is only
+	// called `is` on this side of it.
+	let operands = comparedOperands(node.value)
+	// NOTE: What a failure UNDERLINES. For the Boolean form that is the whole
+	// asserted Expression; for `require MATCHER = EXPR` it runs from the
+	// Matcher to the end of the value — the value alone would leave a reader
+	// looking at `lions` and wondering what it was supposed to be. The value's
+	// Position is the one the written Expression had, because the Constant the
+	// Enricher put in front of the assertion carries it.
+	let point = testPoint(
+		node.matcher === null
+			? node.value.position
+			: {
+					start: node.matcher.matcherPosition.start,
+					end: node.value.position.end,
+				},
+	)
+
+	if (node.matcher !== null) {
+		return {
+			nodeType: "TestAssertionStatement",
+			form,
+			point,
+			value: simplifyExpression(node.value),
+			matcher: assertionHandler(node.matcher),
+			comparison: null,
+			position: node.position,
+		}
+	}
+
+	let instrumented = instrumentAssertion(
+		simplifyExpression(node.value),
+		operands,
+	)
+
+	return {
+		nodeType: "TestAssertionStatement",
+		form,
+		point,
+		value: instrumented.value,
+		matcher: null,
+		comparison: instrumented.comparison,
+		position: node.position,
+	}
+}
+
+// NOTE: The test half of one `match` Handler, built from an assertion's Matcher
+// — the same shape, so the same emission answers both. `typeTest` and
+// `memberTests` are what `compile-type-tests` leaves where it has found
+// something cheaper, and are null here for the same reason they are null on a
+// Handler: the Simplifier states what the Program says and nothing about how it
+// is tested.
+function assertionHandler(
+	matcher: common.typed.AssertionMatcherNode,
+): common.typedSimple.MatchHandler {
+	return {
+		matcher: matcher.matcher,
+		typeTest: null,
+		literal:
+			matcher.literal === null
+				? null
+				: simplifyExpression(matcher.literal),
+		memberLiterals:
+			matcher.memberLiterals === null
+				? null
+				: Object.fromEntries(
+						Object.entries(matcher.memberLiterals).map(
+							([name, literal]) => [
+								name,
+								simplifyExpression(literal),
+							],
+						),
+					),
+		memberTypes: matcher.memberTypes,
+		memberTests: null,
+		guard: null,
+		body: [],
+	}
+}
+
+// NOTE: Whether the asserted Expression IS a comparison of two values, and
+// where each of them was written. `is` and `isNot` are `Equatable`'s, and a
+// one-Argument call of either answering a Boolean is one wherever it came
+// from: a Namespace that declares an `is` of its own with that shape is
+// declaring an equality, and a report that diffs its two operands is right
+// about it.
+function comparedOperands(
+	node: common.typed.ExpressionNode,
+): TestOperands | null {
+	if (
+		node.nodeType !== "MethodInvocation" ||
+		(node.member.name !== "is" && node.member.name !== "isNot") ||
+		node.type.type !== "Boolean" ||
+		node.arguments.length !== 1
+	) {
+		return null
+	}
+
+	return {
+		kind: node.member.name,
+		left: node.base.position,
+		right: node.arguments[0]!.value.position,
+	}
+}
+
+type TestOperands = {
+	kind: "is" | "isNot"
+	left: common.Position
+	right: common.Position
+}
+
+// NOTE: The power-assert half. Every sub-expression that COMPUTES — a call and
+// a member read — is wrapped in a point, so the report can say what each part
+// of the assertion answered. A literal and a bare name are left alone: what
+// they hold is what the source says they hold.
+//
+// NOTE: The outermost Expression is not wrapped. Its value is the assertion's
+// own answer, which the assertion records — a point there would say the same
+// thing twice.
+//
+// NOTE: The two operands of a comparison ARE wrapped, whatever kind they are,
+// because a structural difference needs both values and one of them is often a
+// literal Record. That is the whole of what the diff costs: no second capture,
+// no second traversal, two points off the same table everything else uses.
+function instrumentAssertion(
+	value: common.typedSimple.ExpressionNode,
+	operands: TestOperands | null,
+): {
+	value: common.typedSimple.ExpressionNode
+	comparison: common.typedSimple.TestComparison | null
+} {
+	let left: number | null = null
+	let right: number | null = null
+
+	let walk = (
+		node: common.typedSimple.ExpressionNode,
+		isRoot: boolean,
+	): common.typedSimple.ExpressionNode => {
+		let walked = instrumentChildren(node, (child) => walk(child, false))
+		let side =
+			operands === null || node.position === undefined
+				? null
+				: samePosition(node.position, operands.left)
+					? "left"
+					: samePosition(node.position, operands.right)
+						? "right"
+						: null
+
+		if (side === null && (isRoot || !isTraceable(node))) {
+			return walked
+		}
+
+		let point = testPoint(node.position ?? emptyPosition)
+
+		if (side === "left") {
+			left = point
+		} else if (side === "right") {
+			right = point
+		}
+
+		return {
+			nodeType: "TestTrace",
+			point,
+			value: walked,
+			type: node.type,
+			position: node.position,
+		}
+	}
+
+	let instrumented = walk(value, true)
+
+	return {
+		value: instrumented,
+		comparison:
+			operands === null || left === null || right === null
+				? null
+				: { kind: operands.kind, left, right },
+	}
+}
+
+const emptyPosition: common.Position = {
+	start: { line: 0, column: 0 },
+	end: { line: 0, column: 0 },
+}
+
+function samePosition(left: common.Position, right: common.Position): boolean {
+	return (
+		left.start.line === right.start.line &&
+		left.start.column === right.start.column &&
+		left.end.line === right.end.line &&
+		left.end.column === right.end.column
+	)
+}
+
+// NOTE: What is worth recording: a call's answer and a member read. A literal
+// holds what the source says, a bare name is a binding the reader can see, and
+// neither tells anybody anything a report does not already show.
+function isTraceable(node: common.typedSimple.ExpressionNode): boolean {
+	return (
+		node.nodeType === "MethodInvocation" ||
+		node.nodeType === "UnionMethodInvocation" ||
+		node.nodeType === "FunctionInvocation" ||
+		node.nodeType === "Lookup"
+	)
+}
+
+// NOTE: The Expression positions an asserted Expression EVALUATES, and only
+// those. A Function literal's body is not among them — it is a closure the
+// assertion builds and does not run — and neither is a Match Handler's, which
+// is Statements. A witness is references to Methods and never a call of one.
+function instrumentChildren(
+	node: common.typedSimple.ExpressionNode,
+	walk: (
+		child: common.typedSimple.ExpressionNode,
+	) => common.typedSimple.ExpressionNode,
+): common.typedSimple.ExpressionNode {
+	switch (node.nodeType) {
+		case "MethodInvocation":
+			return { ...node, arguments: walkArguments(node.arguments, walk) }
+		case "UnionMethodInvocation":
+			return {
+				...node,
+				base: walk(node.base),
+				arguments: walkArguments(node.arguments, walk),
+			}
+		case "FunctionInvocation":
+			return {
+				...node,
+				name: walk(node.name),
+				arguments: walkArguments(node.arguments, walk),
+			}
+		case "Lookup":
+			return { ...node, base: walk(node.base) }
+		case "Combination":
+			return { ...node, lhs: walk(node.lhs), rhs: walk(node.rhs) }
+		case "RecordValue":
+			return {
+				...node,
+				members: Object.fromEntries(
+					Object.entries(node.members).map(([name, member]) => [
+						name,
+						walk(member),
+					]),
+				),
+			}
+		case "ListValue":
+			return { ...node, values: node.values.map((value) => walk(value)) }
+		case "CaseValue":
+			return node.value === null
+				? node
+				: { ...node, value: walk(node.value) }
+		case "InterpolatedStringValue":
+			return {
+				...node,
+				segments: node.segments.map((segment) =>
+					segment.kind === "expression"
+						? { ...segment, expression: walk(segment.expression) }
+						: segment,
+				),
+			}
+		default:
+			return node
+	}
+}
+
+function walkArguments(
+	args: Array<common.typedSimple.ArgumentNode>,
+	walk: (
+		child: common.typedSimple.ExpressionNode,
+	) => common.typedSimple.ExpressionNode,
+): Array<common.typedSimple.ArgumentNode> {
+	return args.map((argument) => ({
+		...argument,
+		value: walk(argument.value),
+	}))
+}
+
 // #endregion

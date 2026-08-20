@@ -838,11 +838,18 @@ describe("Tests Section Semantics", () => {
 			expect(analyse(broken, { tests: false }).diagnostics).toEqual([])
 		})
 
-		it("should leave nothing of the section in a simplified Program", () => {
+		it("should leave nothing of the section in the implementation", () => {
 			let simplified = simplify(analyse(source).program)
 
-			expect(JSON.stringify(simplified)).not.toContain("Test")
+			// NOTE: The section is carried BESIDE the implementation rather
+			// than folded into it — a build's implementation is byte for byte
+			// what it would have been with no `tests` block written at all,
+			// which is what the golden below proves the whole way down.
 			expect(simplified.implementation.nodes.length).toBe(1)
+			expect(simplified.tests).not.toBeNull()
+			expect(
+				simplify(analyse(source, { tests: false }).program).tests,
+			).toBeNull()
 		})
 
 		// NOTE: The claim "a test costs a shipped Program nothing", stated as

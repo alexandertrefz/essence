@@ -20,6 +20,11 @@ export type Program = {
 	nodeType: "Program"
 	imports: ImportSectionNode | null
 	implementation: ImplementationSectionNode
+	// NOTE: Null in every compile that did not ask for the tests — which is
+	// every build and every run. The lowering that fills it is what turns a
+	// typed `tests { … }` block into the Statements a runner registers; see
+	// `TestsSectionNode`.
+	tests: TestsSectionNode | null
 	exports: ExportSectionNode | null
 }
 
@@ -66,6 +71,92 @@ export type ImplementationNode = ExpressionNode | StatementNode
 
 // #endregion
 
+// #region Tests
+
+// NOTE: The `tests { … }` block, lowered. A suite is gone as a THING by this
+// point — what it contributed to a test's identity is folded into the manifest
+// entry, and what it contributed as a Scope is a `TestScope` around the entries
+// it held. So the tree below is a Scope tree, and the flat `tests` array beside
+// it is what a runner reads.
+//
+// NOTE: `nodes` is emitted as ONE Function taking the per-test context. The
+// setup Statements stand in it where they were written, so running it evaluates
+// exactly the setup the selected test can see, afresh, every time — which is
+// what "a tests-section constant is indistinguishable from fresh evaluation per
+// test" says. Nothing is hoisted out and nothing is shared between two runs.
+export type TestsSectionNode = {
+	nodeType: "TestsSection"
+	// NOTE: The canonical path of the Module the section was written in, as the
+	// identities on the entries below spell it. Null where the Program is no
+	// Module, which is every single-file compile.
+	module: string | null
+	// NOTE: The instrumented points of this Module, indexed by point id. Every
+	// `TestTraceNode` and every assertion names one.
+	spans: Array<TestSpan>
+	tests: Array<TestManifestEntry>
+	nodes: Array<TestsNode>
+}
+
+// NOTE: Where an instrumented point stands, and the source text that stands
+// there. The text is sliced at lowering time because the reader of an event may
+// be nowhere near the file — a `--json` consumer, an editor rendering a value
+// beside a line — and slicing it twice is two chances to disagree about what
+// was recorded.
+export type TestSpan = {
+	position: Position
+	source: string
+}
+
+// NOTE: What a runner can say about a test without running it. Every Modifier
+// is EFFECTIVE here — a suite's `skipped` reaches its tests — because what a
+// suite MEANT was settled by the Enricher and nothing downstream knows the
+// vocabulary.
+export type TestManifestEntry = {
+	id: string
+	// NOTE: The name TEMPLATE, never the rendering: `"{scored}–{conceded} is a
+	// win"`. The rendering is worked out where the test stands and reaches the
+	// runner through the context.
+	name: string
+	// NOTE: Whether that template has a hole in it, which is the only reason a
+	// runner ever evaluates a section without running a test. It is recorded
+	// rather than read back off the name because a plain name may perfectly
+	// well hold a brace of its own.
+	interpolated: boolean
+	suitePath: Array<string>
+	tags: Array<string>
+	focused: boolean
+	skipped: string | null
+	position: Position
+	keywordPosition: Position
+}
+
+export type TestsNode = ImplementationNode | TestEntryNode | TestScopeNode
+
+// NOTE: One test, standing where it was written — inside whatever setup it can
+// see. `index` is its place in the section's `tests` array, which is how the
+// context says which one to run.
+export interface TestEntryNode {
+	nodeType: "TestEntry"
+	index: number
+	// NOTE: The name as an Expression, and only where it INTERPOLATES: a plain
+	// String Literal is in the manifest already, and emitting it a second time
+	// would be two spellings of one thing.
+	name: ExpressionNode | null
+	body: Array<ImplementationNode>
+	position?: Position
+}
+
+// NOTE: What a `suite` leaves behind: a Scope, so that what a suite declares is
+// gone outside it and may shadow what the section declares. It is emitted as a
+// block, which is what JavaScript's own scoping needs to keep the shadow.
+export interface TestScopeNode {
+	nodeType: "TestScope"
+	nodes: Array<TestsNode>
+	position?: Position
+}
+
+// #endregion
+
 // #region Expressions
 
 // NOTE: Every Expression and Statement carries the `position` of the typed
@@ -85,7 +176,27 @@ export type ExpressionNode =
 	| MatchNode
 	| ConformanceValueNode
 	| CaseValueNode
+	| TestTraceNode
 	| IntrinsicNode
+
+// NOTE: An instrumented point: record what stands here, then answer with it.
+// Wrapping an Expression in one changes nothing about what the Expression
+// evaluates to, which is the whole discipline — the recording is a side effect
+// on the per-test context and never a value anything reads.
+//
+// NOTE: It is a Node of the Simplifier's own rather than an intrinsic, because
+// intrinsics stand for shapes an Optimiser pass DECIDED and this stands for
+// something the source asked for. `expect` and `require` are its first
+// consumers; the `§?` value comment and coverage counters are the next two, and
+// they record at points of their own against the same table.
+export interface TestTraceNode {
+	nodeType: "TestTrace"
+	// NOTE: Indexes the Module's span table — see `TestsSectionNode.spans`.
+	point: number
+	value: ExpressionNode
+	type: Type
+	position?: Position
+}
 
 // NOTE: A Case construction, reduced to its runtime essentials — the tag the
 // value carries (`"CalculatorOperation#Add"`) and the payload Record it is
@@ -992,7 +1103,44 @@ export type StatementNode =
 	| ConditionalStatementNode
 	| ReturnStatementNode
 	| FunctionStatementNode
+	| TestAssertionStatementNode
 	| IntrinsicStatementNode
+
+// NOTE: `expect EXPR` / `require EXPR`, and both `is MATCHER` forms. What
+// differs between the two words is one thing: a failed `require` ends the test
+// where it stands, which is emitted as an early return in front of the
+// Constants its Matcher binds.
+//
+// NOTE: `value` is what has to hold. It is a RAW JavaScript boolean where a
+// Matcher was written — a Matcher's test is a chain of `&&`s, not an Essence
+// value — and an Essence Boolean otherwise, which the Rewriter unwraps. The
+// `matcher` says which of the two it is looking at.
+export interface TestAssertionStatementNode {
+	nodeType: "TestAssertionStatement"
+	form: "expect" | "require"
+	// NOTE: The point the whole asserted Expression stands at, so a failure
+	// underlines what was written rather than the keyword.
+	point: number
+	value: ExpressionNode
+	// NOTE: The test half of one `match` Handler — the same shape, so the same
+	// emission answers both. `guard` is always null and `body` always empty: an
+	// assertion has no arm to fall through to, and what a Guard would say is
+	// another `expect` on the next line.
+	matcher: MatchHandler | null
+	comparison: TestComparison | null
+	position?: Position
+}
+
+// NOTE: What the lowering noticed about an assertion whose top-level call is
+// `Equatable::is`/`::isNot` — the two operands, named by the points they were
+// traced at. The runtime resolves them out of the trace buffer and diffs them,
+// so the structural difference is a consequence of the general trace mechanism
+// rather than a second capture beside it.
+export type TestComparison = {
+	kind: "is" | "isNot"
+	left: number
+	right: number
+}
 
 export interface VariableDeclarationStatementNode {
 	nodeType: "VariableDeclarationStatement"
