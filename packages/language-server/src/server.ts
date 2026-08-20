@@ -1624,6 +1624,8 @@ const symbolKinds: Record<DocumentSymbolEntry["kind"], SymbolKind> = {
 	staticMethod: SymbolKind.Method,
 	property: SymbolKind.Property,
 	export: SymbolKind.Key,
+	test: SymbolKind.Event,
+	suite: SymbolKind.Module,
 }
 
 function toLspDocumentSymbol(entry: DocumentSymbolEntry): DocumentSymbol {
