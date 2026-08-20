@@ -122,10 +122,15 @@ export function parseDocument(
 	})
 }
 
+// NOTE: `tests` is the compile MODE, and the only way a `tests { … }` block
+// becomes anything but parsed text. `essence build`, `essence run` and the
+// Editor's ordinary analysis leave it off, so the block is read — a syntax
+// error in it is still reported — and then dropped before enrichment, which is
+// the whole of what "a test costs a shipped Program nothing" means.
 export function enrichDocument(
 	program: parser.Program,
 	documentPath?: string,
-	options: { annotations?: boolean } = {},
+	options: { annotations?: boolean; tests?: boolean } = {},
 ): {
 	program: common.typed.Program
 	diagnostics: Array<common.Diagnostic>

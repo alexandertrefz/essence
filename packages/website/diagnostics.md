@@ -265,6 +265,26 @@ tests {
 
 Return the value from the Function and assert on it in the test's own block.
 
+### `expect-not-boolean`
+
+An `expect` or a `require` was written over a value that is not a Boolean.
+Essence has no truthiness, so there is nothing an assertion over a Standing
+could mean. An assertion is an ordinary Boolean Expression, and the standard
+library's own Methods are the vocabulary it is written in — there is no
+`toEqual`, no `toBeGreaterThan`, no `toContain`:
+
+```essence
+tests {
+	test "the leader is two points clear" {
+		§ this asserts a Standing
+		expect Standings.leader(of table)
+	}
+}
+```
+
+Ask a question of the value — `::is(…)`, `::isGreaterThan(…)`, `::hasItems()`
+— or take it apart with `require MATCHER = EXPR` and the Matchers `match` uses.
+
 ### `matcher-on-expect`
 
 A Matcher was written left of `=` on an `expect`. Taking a value apart is
@@ -344,6 +364,91 @@ equal, and that is what `Equatable::is` answers. Write `require points::is(3)`.
 A Pattern MEMBER constrained by a written value is a different thing and is
 allowed — `require { points = 3 } = standing` asks the question of one member
 of a shape the Pattern is naming.
+
+### `unknown-modifier`
+
+A `test` or a `suite` carries a Modifier that is not one. The Modifiers are
+`focused`, `skipped` and `tagged`:
+
+```essence
+tests {
+	test "ranks the table" slowly {}
+}
+```
+
+A Modifier is what the runner reads, never what the test does — so anything the
+runner does not know goes in the body, or goes away.
+
+### `duplicate-modifier`
+
+One `test` or `suite` carries the same Modifier twice. A Modifier says something
+about the whole item, so saying it twice can only repeat it or contradict it:
+
+```essence
+tests {
+	test "ranks the table" tagged slow tagged network {}
+}
+```
+
+Write every tag on one `tagged`, separated by commas.
+
+### `malformed-modifier`
+
+A Modifier carries the wrong arguments — `focused` takes none, `skipped` takes
+one String, and `tagged` takes at least one bare lower-case name:
+
+```essence
+tests {
+	test "ranks the table" focused "why" tagged "slow" {}
+}
+```
+
+A tag is matched exactly by `--tag` and `--skip-tag`, which is why it is a bare
+name and why it is lower case: two spellings of one tag are two tags, and the
+one nobody selects is the one that quietly stops running.
+
+### `skipped-without-reason`
+
+A `test` or a `suite` is `skipped` with no reason given:
+
+```essence
+tests {
+	test "renders a forfeit as 3–0" skipped {}
+}
+```
+
+The reason is mandatory. A skip with no reason rots silently; a skip with one is
+a note the report repeats on every run, until somebody acts on it. Write it as a
+String: `skipped "waiting on the Table redesign"`.
+
+### `contradictory-modifiers`
+
+One `test` or `suite` is both `skipped` and `focused`:
+
+```essence
+tests {
+	test "ranks the table" focused skipped "flaky" {}
+}
+```
+
+`focused` asks for this one to run and for the rest not to; `skipped` asks for
+it never to run. Which was meant is not something the source says, so neither
+wins — say what you mean.
+
+### `duplicate-test-name`
+
+Two tests, or two suites, of one scope are called the same thing:
+
+```essence
+tests {
+	test "ranks the table" {}
+	test "ranks the table" {}
+}
+```
+
+What a test is called, together with the suites around it, is what identifies it
+— to a stored snapshot, to a stored counterexample, and to the editor. Say what
+each of them proves, so that a report names the one that failed.
 
 ## Names
 

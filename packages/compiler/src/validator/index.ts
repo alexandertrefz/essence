@@ -103,26 +103,59 @@ export const validate = (
 			try {
 				validateImplementationNode(node, null)
 			} catch (error) {
-				reportError(
-					`Internal Compiler Error: ${
-						error instanceof Error ? error.message : String(error)
-					}`,
-					node.position,
-					{
-						code: "internal-error",
-						labels: [
-							primary(node.position, "the Compiler threw here"),
-						],
-						notes: [
-							"This is a bug in the Compiler, not in the Program.",
-						],
-					},
-				)
+				reportInternalError(error, node.position)
+			}
+		}
+
+		// NOTE: Only a compile that ASKED for the tests carries a section here
+		// — a build leaves the block parsed and never enriches it. A test's
+		// body is checked exactly as the implementation's Statements are: it is
+		// a block standing in no Function, so a `<-` in it is the
+		// `top-level-return` it would be anywhere else outside one.
+		for (let node of program.tests?.nodes ?? []) {
+			try {
+				validateTestsNode(node)
+			} catch (error) {
+				reportInternalError(error, node.position)
 			}
 		}
 	})
 
 	return diagnostics
+}
+
+function reportInternalError(error: unknown, position: common.Position): void {
+	reportError(
+		`Internal Compiler Error: ${
+			error instanceof Error ? error.message : String(error)
+		}`,
+		position,
+		{
+			code: "internal-error",
+			labels: [primary(position, "the Compiler threw here")],
+			notes: ["This is a bug in the Compiler, not in the Program."],
+		},
+	)
+}
+
+function validateTestsNode(node: common.typed.TestsNode): void {
+	if (node.nodeType === "Test") {
+		for (let child of node.body) {
+			validateImplementationNode(child, null)
+		}
+
+		return
+	}
+
+	if (node.nodeType === "Suite") {
+		for (let child of node.nodes) {
+			validateTestsNode(child)
+		}
+
+		return
+	}
+
+	validateImplementationNode(node, null)
 }
 
 function collectTopLevelNamespaces(
@@ -185,6 +218,9 @@ function validateImplementationNode(
 		case "ReturnStatement":
 		case "FunctionStatement":
 			return validateStatement(node, currentFunctionContext)
+		case "ExpectStatement":
+		case "RequireStatement":
+			return validateAssertion(node)
 	}
 }
 
@@ -2161,8 +2197,16 @@ function validateCombination(
 
 // #region Statements
 
+// NOTE: The two assertions are NOT among these — nothing about them depends on
+// the Function they stand in, so `validateImplementationNode` answers for them
+// before they get here. Excluding them from the parameter Type rather than
+// leaving unreachable cases in the switch is what keeps that routing a fact
+// TypeScript checks.
 function validateStatement(
-	node: common.typed.StatementNode,
+	node: Exclude<
+		common.typed.StatementNode,
+		common.typed.ExpectStatementNode | common.typed.RequireStatementNode
+	>,
 	currentFunctionContext: CurrentFunctionContext,
 ): common.typed.StatementNode {
 	switch (node.nodeType) {
@@ -2670,6 +2714,54 @@ function checkNamespaceIsDeclared(
 			helps: ["Move the use below the Declaration."],
 		},
 	)
+}
+
+// NOTE: `expect EXPR` asks the same question an `if` does — is this true — and
+// is refused for the same reason where the answer is not a Boolean: Essence has
+// no truthiness, so there is nothing for an assertion over a Standing to mean.
+//
+// `require MATCHER = EXPR` asks a different question and is not checked here:
+// what a Matcher may be written against was settled where it was resolved,
+// exactly as a Match Handler's is.
+function validateAssertion(
+	node: common.typed.ExpectStatementNode | common.typed.RequireStatementNode,
+): common.typed.ImplementationNode {
+	if (
+		node.matcher === null &&
+		node.value.type.type !== "Boolean" &&
+		node.value.type.type !== "Error"
+	) {
+		reportError("An assertion has to be a Boolean", node.value.position, {
+			code: "expect-not-boolean",
+			labels: [
+				primary(
+					node.value.position,
+					`this is ${withArticle(describeType(node.value.type))}`,
+				),
+			],
+			notes: [
+				"Essence has no truthiness — an assertion is a Boolean Expression, and the standard library's own Methods are the vocabulary it is written in.",
+			],
+			helps: [
+				"Ask a question of it: '::is(…)', '::isGreaterThan(…)', '::hasItems()'.",
+				"Or take it apart instead: 'require #Value(item) = value'.",
+			],
+		})
+	}
+
+	validateExpression(node.value)
+
+	if (node.matcher !== null) {
+		if (node.matcher.literal !== null) {
+			validateExpression(node.matcher.literal)
+		}
+
+		for (let literal of Object.values(node.matcher.memberLiterals ?? {})) {
+			validateExpression(literal)
+		}
+	}
+
+	return node
 }
 
 // NOTE: An `if`, an `else if` and a Match Handler's Guard all pick a path from

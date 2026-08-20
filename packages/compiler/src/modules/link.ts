@@ -511,22 +511,28 @@ function reportMissingExport(
 	)
 }
 
+export type LinkOptions = {
+	// NOTE: The canonical path of the one Module whose written annotations
+	// are wanted alongside its typed Program — the Hover seam.
+	annotationsFor?: string
+	// NOTE: The Scope each Module is linked into, when the default is wrong.
+	// Two things make it wrong for the standard library. It must carry NO
+	// `modulePath`, because that is what names a Choice
+	// `<modulePath>#<Name>` — and a builtin Choice is named by its bare name,
+	// which the runtime switches on. And it must not start from
+	// `builtinMembers()`, which `topLevelScope` reads: the standard library
+	// IS the builtins, and asking for them while loading them is unbounded
+	// recursion, since the cache is only filled once the load returns.
+	scopeFor?: (module: Module) => enricher.Scope
+	// NOTE: Whether this compile ASKED for the tests — see `enrich`. `essence
+	// test` and the Editor's test session set it; a build and a run leave every
+	// `tests { … }` block in the graph parsed and unenriched.
+	tests?: boolean
+}
+
 export function linkModuleGraph(
 	graph: ModuleGraph,
-	options: {
-		// NOTE: The canonical path of the one Module whose written annotations
-		// are wanted alongside its typed Program — the Hover seam.
-		annotationsFor?: string
-		// NOTE: The Scope each Module is linked into, when the default is wrong.
-		// Two things make it wrong for the standard library. It must carry NO
-		// `modulePath`, because that is what names a Choice
-		// `<modulePath>#<Name>` — and a builtin Choice is named by its bare name,
-		// which the runtime switches on. And it must not start from
-		// `builtinMembers()`, which `topLevelScope` reads: the standard library
-		// IS the builtins, and asking for them while loading them is unbounded
-		// recursion, since the cache is only filled once the load returns.
-		scopeFor?: (module: Module) => enricher.Scope
-	} = {},
+	options: LinkOptions = {},
 ): LinkedGraph {
 	// NOTE: Every Module's declarations up front, because a Diagnostic about an
 	// entry has to tell "that Module does not export this" from "that Module has
@@ -542,13 +548,7 @@ export function linkModuleGraph(
 	let linked = new Map<string, LinkedModule>()
 
 	for (let group of graph.groups) {
-		for (let result of linkGroup(
-			group,
-			declarations,
-			surfaces,
-			options.annotationsFor,
-			options.scopeFor,
-		)) {
+		for (let result of linkGroup(group, declarations, surfaces, options)) {
 			surfaces.set(result.module.filePath, result.surface)
 			linked.set(result.module.filePath, result)
 		}
@@ -703,8 +703,7 @@ function linkGroup(
 	group: Array<Module>,
 	declarations: Map<string, Map<string, Declaration>>,
 	surfaces: Map<string, ExportSurface>,
-	annotationsFor?: string,
-	scopeFor?: (module: Module) => enricher.Scope,
+	options: LinkOptions,
 ): Array<LinkedModule> {
 	let states = new Map<string, ModuleState>()
 	let declares = (filePath: string, name: string): boolean =>
@@ -714,7 +713,7 @@ function linkGroup(
 		let state: ModuleState = {
 			module,
 			scope:
-				scopeFor?.(module) ??
+				options.scopeFor?.(module) ??
 				topLevelScope({ modulePath: module.filePath }),
 			declarations: declarations.get(module.filePath) ?? new Map(),
 			exports: exportedEntries(module.program),
@@ -769,7 +768,7 @@ function linkGroup(
 	seedRound(false)
 
 	let annotationsIndex = [...states.values()].findIndex(
-		(state) => state.module.filePath === annotationsFor,
+		(state) => state.module.filePath === options.annotationsFor,
 	)
 
 	let enriched = enrichPrograms(
@@ -781,6 +780,7 @@ function linkGroup(
 			seedRound,
 			annotationsFor:
 				annotationsIndex === -1 ? undefined : annotationsIndex,
+			tests: options.tests,
 		},
 	)
 
@@ -1239,6 +1239,13 @@ function usedNames(module: Module, program: common.typed.Program): Set<string> {
 	}
 
 	visit(module.program.implementation)
+	// NOTE: The PARSER's tests section, whatever the compile asked for. An
+	// import a file uses only in its tests is used — the block is written, and
+	// a build stripping it is not the file changing its mind about needing the
+	// name. Read off the Parser's tree because that is the one that carries the
+	// section in every mode; the typed one below carries it only in a test
+	// compile.
+	visit(module.program.tests)
 	visit(program)
 
 	return names

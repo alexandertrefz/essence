@@ -10,6 +10,11 @@ import {
 	resolveOverloadedMethodName,
 } from "../helpers/index"
 
+// NOTE: `program.tests` is deliberately not carried. A simplified Program is
+// what the Optimiser and the Rewriter read, and neither has anything to do with
+// a test until the test lowering turns one into the Functions a runner
+// registers — which is what phase 1c adds, in front of this stage. Until then a
+// test compile enriches and validates its tests and emits none of them.
 export const simplify = (
 	program: common.typed.Program,
 ): common.typedSimple.Program => {
@@ -107,6 +112,18 @@ function simplifyImplementationNode(
 		case "ReturnStatement":
 		case "FunctionStatement":
 			return simplifyStatement(node)
+		// NOTE: An assertion carries no lowering yet, so what survives it is
+		// what it asserted — the Expression, evaluated and its answer dropped.
+		// Recording that answer against the test is what the test lowering
+		// adds, and this is the seam it replaces; until then a test compile
+		// type-checks and runs its bodies without judging them.
+		//
+		// An assertion can only be written in a test body, and a test body only
+		// reaches here through a `tests` section that `simplify` does not carry
+		// — so nothing an `essence build` emits comes through this case.
+		case "ExpectStatement":
+		case "RequireStatement":
+			return simplifyExpression(node.value)
 	}
 }
 
@@ -734,8 +751,16 @@ function simplifyMatch(
 
 // #region Statements
 
+// NOTE: The two assertions are NOT among these — an `expect` is no Statement
+// once it is lowered, it is what it asserted — so `simplifyImplementationNode`
+// answers for them before they get here. Excluding them from the parameter Type
+// rather than leaving unreachable cases in the switch is what keeps that
+// routing a fact TypeScript checks.
 function simplifyStatement(
-	node: common.typed.StatementNode,
+	node: Exclude<
+		common.typed.StatementNode,
+		common.typed.ExpectStatementNode | common.typed.RequireStatementNode
+	>,
 ): common.typedSimple.StatementNode {
 	switch (node.nodeType) {
 		case "ConstantDeclarationStatement":

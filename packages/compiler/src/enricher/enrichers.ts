@@ -202,15 +202,14 @@ export function enrichNode(
 		case "ConstantDeclarationStatement":
 		case "VariableDeclarationStatement":
 			return enrichDeclarationStatement(node, scope)
-		// NOTE: An assertion is only ever written in a test's body, and the
-		// tests section is not enriched yet — the Parser refuses every `expect`
-		// and `require` written anywhere else, so nothing that reaches an
-		// implementation block here is anything but already-reported. It
-		// answers with no typed Node at all rather than with a second
-		// Diagnostic about the same Statement.
+		// NOTE: An assertion is only ever written in a test's body — the Parser
+		// reports `expect-outside-test` for every other place one can stand.
+		// It is typed wherever it is found all the same, because a Statement
+		// reported as misplaced is still a Statement somebody is editing, and
+		// a Hover over what it asserts should answer.
 		case "ExpectStatement":
 		case "RequireStatement":
-			return []
+			return enrichAssertionStatement(node, scope)
 		case "VariableAssignmentStatement":
 		case "NamespaceDefinitionStatement":
 		case "ProtocolDeclarationStatement":
@@ -2676,6 +2675,103 @@ function refuseRefinementMatcher(
 	return { type: "Error" }
 }
 
+// NOTE: Everything a Matcher establishes about the value it is written
+// against, worked out once. A `match` Handler and an assertion ask exactly the
+// same question of a Matcher — what does the value have to BE, and what can
+// still make this decline a value of that Type — so they ask it here, and an
+// assertion can never drift from the arm it is spelled like.
+type ResolvedMatcher = {
+	matcher: common.Type
+	literal: common.typed.ExpressionNode | null
+	memberLiterals: Record<string, common.typed.ExpressionNode> | null
+	memberTypes: Record<string, common.Type> | null
+	// NOTE: What a Case Matcher's payload Pattern requires and proved, which is
+	// what its bindings are read at. Null for every other Matcher, and for a
+	// Case Matcher whose payload is a plain name.
+	payload: PayloadRequirements | null
+}
+
+// NOTE: `handledMatchers` is what the arms ABOVE retired, which is what a
+// wildcard stands for. An assertion has no arms above it and hands an empty
+// list, so `is _` stands for the whole of what was asserted.
+function resolveMatcher(
+	node: parser.MatcherNode,
+	valueType: common.Type,
+	handledMatchers: Array<common.Type>,
+	scope: enricher.Scope,
+): ResolvedMatcher {
+	if (node.nodeType === "LiteralMatcher") {
+		// NOTE: A literal Matcher binds `@` to the literal's own Type — inside
+		// `case 0` the value is known to be an Integer.
+		let literal = enrichExpression(node.value, scope)
+
+		return {
+			matcher: literal.type,
+			literal,
+			memberLiterals: null,
+			memberTypes: null,
+			payload: null,
+		}
+	}
+
+	if (node.nodeType === "WildcardMatcher") {
+		return {
+			matcher: resolveWildcardMatcherType(valueType, handledMatchers),
+			literal: null,
+			memberLiterals: null,
+			memberTypes: null,
+			payload: null,
+		}
+	}
+
+	if (node.nodeType === "CaseMatcher") {
+		let literals: Record<string, common.typed.ExpressionNode> = {}
+		let matcher = resolveCaseMatcherType(node, valueType, scope)
+		// NOTE: What the payload Pattern requires — beside the Matcher rather
+		// than inside it, so the Case stays the arm it is and only the Handler
+		// becomes conditional. It also says what the arm PROVED, which is what
+		// its bindings are read at.
+		let payload = resolvePayloadRequirements(node, matcher, scope, literals)
+
+		return {
+			matcher,
+			literal: null,
+			memberLiterals: Object.keys(literals).length > 0 ? literals : null,
+			memberTypes: payload.memberTypes,
+			payload,
+		}
+	}
+
+	if (node.nodeType === "Pattern") {
+		let literals: Record<string, common.typed.ExpressionNode> = {}
+		let matcher = resolvePatternMatcherType(
+			node,
+			valueType,
+			scope,
+			literals,
+		)
+
+		return {
+			matcher,
+			literal: null,
+			memberLiterals: Object.keys(literals).length > 0 ? literals : null,
+			memberTypes: null,
+			payload: null,
+		}
+	}
+
+	return {
+		matcher: refuseRefinementMatcher(
+			resolveType(node, scope),
+			node.position,
+		),
+		literal: null,
+		memberLiterals: null,
+		memberTypes: null,
+		payload: null,
+	}
+}
+
 export function enrichMatch(
 	node: parser.MatchNode,
 	scope: enricher.Scope,
@@ -2699,66 +2795,13 @@ export function enrichMatch(
 				expectedReturnType: returnType,
 			})
 
-			let literal: common.typed.ExpressionNode | null = null
-			let memberLiterals: Record<
-				string,
-				common.typed.ExpressionNode
-			> | null = null
-			let memberTypes: Record<string, common.Type> | null = null
-			let payload: PayloadRequirements | null = null
-			let matcher: common.Type
-
-			if (handler.matcher.nodeType === "LiteralMatcher") {
-				// NOTE: A literal Matcher binds `@` to the literal's own Type —
-				// inside `case 0` the value is known to be an Integer.
-				literal = enrichExpression(handler.matcher.value, scope)
-				matcher = literal.type
-			} else if (handler.matcher.nodeType === "WildcardMatcher") {
-				matcher = resolveWildcardMatcherType(
+			let { matcher, literal, memberLiterals, memberTypes, payload } =
+				resolveMatcher(
+					handler.matcher,
 					value.type,
 					handledMatchers,
-				)
-			} else if (handler.matcher.nodeType === "CaseMatcher") {
-				let literals: Record<string, common.typed.ExpressionNode> = {}
-
-				matcher = resolveCaseMatcherType(
-					handler.matcher,
-					value.type,
 					scope,
 				)
-
-				// NOTE: What the payload Pattern requires — beside the Matcher
-				// rather than inside it, so the Case stays the arm it is and
-				// only the Handler becomes conditional. It also says what the
-				// arm PROVED, which is what its bindings are read at.
-				payload = resolvePayloadRequirements(
-					handler.matcher,
-					matcher,
-					scope,
-					literals,
-				)
-
-				memberTypes = payload.memberTypes
-				memberLiterals =
-					Object.keys(literals).length > 0 ? literals : null
-			} else if (handler.matcher.nodeType === "Pattern") {
-				let literals: Record<string, common.typed.ExpressionNode> = {}
-
-				matcher = resolvePatternMatcherType(
-					handler.matcher,
-					value.type,
-					scope,
-					literals,
-				)
-
-				memberLiterals =
-					Object.keys(literals).length > 0 ? literals : null
-			} else {
-				matcher = refuseRefinementMatcher(
-					resolveType(handler.matcher, scope),
-					handler.matcher.position,
-				)
-			}
 
 			// NOTE: Only an unconditional Handler retires a Type. A literal
 			// Matcher, a value-constrained Record member, a payload Pattern
@@ -2898,6 +2941,187 @@ export function enrichMatch(
 		}),
 		position: node.position,
 		type: returnType,
+	}
+}
+
+// #endregion
+
+// #region Assertions
+
+// NOTE: `expect` and `require`, which differ in exactly two things: what a
+// failure does to the rest of the test, and whether either may take a value
+// apart. Both are typed here, together, because everything else about them is
+// one thing.
+//
+// It answers with a LIST because `require MATCHER = EXPR` is three Statements:
+// the Constant holding what was asserted, the assertion itself, and one
+// Constant per name the Matcher binds. That is the same desugar a Pattern
+// Declaration does, and for the same reason: what the Matcher binds has to be
+// a name the rest of the block reads, and the value it is read off has to be
+// evaluated once.
+// NOTE: One builder for the two, because a Node whose `nodeType` is a UNION of
+// the two spellings fits neither of them — the two Statements have identical
+// fields and TypeScript still has to be told which one is being made.
+function assertionNode(
+	nodeType: "ExpectStatement" | "RequireStatement",
+	value: common.typed.ExpressionNode,
+	matcher: common.typed.AssertionMatcherNode | null,
+	position: common.Position,
+): common.typed.ImplementationNode {
+	return nodeType === "ExpectStatement"
+		? { nodeType, value, matcher, position }
+		: { nodeType, value, matcher, position }
+}
+
+export function enrichAssertionStatement(
+	node: parser.ExpectStatementNode | parser.RequireStatementNode,
+	scope: enricher.Scope,
+): Array<common.typed.ImplementationNode> {
+	// NOTE: The Boolean form asserts an Expression and reads it once, so there
+	// is nothing to hold and nothing to bind. The Validator is what refuses a
+	// value that is no Boolean, where `condition-not-boolean` is refused, so
+	// that the two questions are answered in one place and read alike.
+	if (node.matcher === null) {
+		return [
+			assertionNode(
+				node.nodeType,
+				enrichExpression(node.value, scope),
+				null,
+				node.position,
+			),
+		]
+	}
+
+	// NOTE: Everything below here is `require MATCHER = EXPR`. A Matcher is
+	// written on no other assertion: `expect MATCHER = EXPR` is refused where
+	// it is read, because an `expect` carries on past a miss and so can
+	// introduce no names, and the Parser writes none on an `expect` at all.
+	let value = enrichExpression(node.value, scope)
+	let resolved = resolveMatcher(node.matcher, value.type, [], scope)
+	let baseName = synthesizedName("assertion", node.value.position)
+
+	declareVariableInScope(baseName, value.type, scope, true)
+
+	let base: common.typed.ConstantDeclarationStatementNode = {
+		nodeType: "ConstantDeclarationStatement",
+		name: {
+			nodeType: "Identifier",
+			content: baseName,
+			position: node.value.position,
+			type: value.type,
+		},
+		value,
+		position: node.value.position,
+		headPosition: node.value.position,
+		declaredType: null,
+		type: value.type,
+		documentation: null,
+		synthesized: "base",
+	}
+
+	recordConstantValue(baseName, value, scope)
+
+	let assertion = assertionNode(
+		node.nodeType,
+		// NOTE: The NAME rather than the Expression. A Matcher reads the value
+		// as many times as it has parts, and what was asserted may be a Method
+		// Invocation, which has to run once.
+		{
+			nodeType: "Identifier",
+			content: baseName,
+			position: node.value.position,
+			type: value.type,
+		},
+		{
+			matcher: resolved.matcher,
+			matcherPosition: node.matcher.position,
+			literal: resolved.literal,
+			memberLiterals: resolved.memberLiterals,
+			memberTypes: resolved.memberTypes,
+		},
+		node.position,
+	)
+
+	let bindings = resolveMatcherBindings(
+		node.matcher,
+		resolved.matcher,
+		resolved.payload,
+	)
+
+	return [
+		base,
+		assertion,
+		...bindings.map((binding) =>
+			declareAssertionBinding(binding, baseName, resolved.matcher, scope),
+		),
+	]
+}
+
+// NOTE: The Constant a `require`’s Matcher binds — `constant row = $assertion.value`
+// — declared in the block the assertion stands in, because everything below it
+// reads it. It is the Constant an author could have written, exactly as a Match
+// Handler’s bindings are, so nothing downstream meets a new shape.
+//
+// The base is read AT THE MATCHER’S Type rather than at what it was declared
+// as: a `require` only lets the block below it run where the Matcher matched,
+// so below it the value IS the Case the Matcher named. That is the same claim
+// `declareMatcherBindings` makes by typing its `@` as the Matcher.
+function declareAssertionBinding(
+	binding: MatcherBinding,
+	baseName: string,
+	matcher: common.Type,
+	scope: enricher.Scope,
+): common.typed.ConstantDeclarationStatementNode {
+	declareVariableInScope(binding.name, binding.type, scope, true)
+
+	let base: common.typed.ExpressionNode = {
+		nodeType: "Identifier",
+		content: baseName,
+		position: binding.name.position,
+		type: matcher,
+	}
+
+	let baseType = matcher
+
+	for (let [index, step] of binding.path.entries()) {
+		let isLast = index === binding.path.length - 1
+		let stepType = isLast ? binding.type : memberTypeOf(baseType, step)
+
+		base = {
+			nodeType: "Lookup",
+			base,
+			member: {
+				nodeType: "Identifier",
+				content: step,
+				// NOTE: Where the step was WRITTEN, every step of the way — the
+				// Language Server joins a Pattern member to the Record member
+				// it reads off this tree, and a shared span would make renaming
+				// the member rewrite the binder instead.
+				position: binding.stepPositions[index] ?? binding.name.position,
+				type: stepType,
+			},
+			position: binding.name.position,
+			type: stepType,
+		}
+
+		baseType = stepType
+	}
+
+	return {
+		nodeType: "ConstantDeclarationStatement",
+		name: {
+			nodeType: "Identifier",
+			content: binding.name.content,
+			position: binding.name.position,
+			type: binding.type,
+		},
+		value: base,
+		position: binding.name.position,
+		headPosition: binding.name.position,
+		declaredType: null,
+		type: binding.type,
+		documentation: null,
+		synthesized: "binding",
 	}
 }
 

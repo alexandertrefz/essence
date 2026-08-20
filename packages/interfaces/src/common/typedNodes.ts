@@ -31,6 +31,11 @@ export type Program = {
 	// dependency's export surface holds, and enrichment never sees one of those.
 	imports: ImportSectionNode | null
 	implementation: ImplementationSectionNode
+	// NOTE: Null in every compile that did not ASK for the tests — a build and a
+	// run leave the parsed section behind rather than enriching it, so a test
+	// costs a shipped Program nothing. Null is therefore no claim that the file
+	// wrote none: the Parser's Program is what says that.
+	tests: TestsSectionNode | null
 	exports: ExportSectionNode | null
 	position: Position
 }
@@ -38,6 +43,84 @@ export type Program = {
 export type ImplementationSectionNode = {
 	nodeType: "ImplementationSection"
 	nodes: Array<ImplementationNode>
+	position: Position
+}
+
+// NOTE: The enriched `tests { … }` block. It is a section of its own rather
+// than more Statements of the implementation because only a section can be
+// dropped whole — and because what stands in it is graded: an ordinary
+// Statement is setup, and the two items are the things a runner registers.
+export type TestsSectionNode = {
+	nodeType: "TestsSection"
+	nodes: Array<TestsNode>
+	position: Position
+}
+
+export type TestsNode = TestNode | SuiteNode | ImplementationNode
+
+// NOTE: What a test IS, independently of what it is called when it runs. The
+// rendered name is worked out per run — an interpolated name says which row it
+// ran for — so nothing durable may be keyed on it: a snapshot, a stored
+// counterexample, a timing baseline and the Editor's own focus all have to
+// survive a name that renders differently every time.
+//
+// `name` is the TEMPLATE rather than the rendering: the text as written, with
+// every interpolation reduced to `{name}` where it names something and `{}`
+// where it is worked out. `suitePath` holds the same for every enclosing suite,
+// outermost first. A table test appends its row index to this in phase 4.
+export type TestIdentity = {
+	// NOTE: Null where the Program is no Module, which is every single file
+	// compile — two files compiled apart have no path to tell them apart by.
+	modulePath: string | null
+	suitePath: Array<string>
+	name: string
+}
+
+// NOTE: `skipped "reason"`, on the item itself or on a suite that covers it.
+// The reason is mandatory, so a skip is a TODO the report repeats rather than
+// something that rots quietly, and `position` is the Modifier it came from —
+// which is an enclosing suite's wherever the test itself wrote none.
+export type TestSkip = {
+	reason: string
+	position: Position
+}
+
+// NOTE: `test "name" MODIFIER* { … }`, with the Modifiers already read: what
+// they MEAN is settled here so that nothing downstream has to know the
+// vocabulary. Every one of them is EFFECTIVE — a suite's covers every test
+// inside it — so `focused` and `skipped` and `tags` answer for the item as it
+// will run.
+export type TestNode = {
+	nodeType: "Test"
+	identity: TestIdentity
+	// NOTE: The name as an Expression, because an interpolated one is worked
+	// out where the test runs. `identity.name` is what it was WRITTEN as.
+	name: StringValueNode | InterpolatedStringValueNode
+	// NOTE: Its own tags and every enclosing suite's, outermost first and
+	// without repeats. Where each was written stays in the Parser's tree, which
+	// is what the workspace-wide tag Diagnostics read.
+	tags: Array<string>
+	skipped: TestSkip | null
+	// NOTE: Where `focused` was written, on this item or on a suite covering
+	// it, and null where it was not.
+	focused: Position | null
+	body: Array<ImplementationNode>
+	keywordPosition: Position
+	position: Position
+}
+
+// NOTE: `suite "name" MODIFIER* { … }`. It carries the same read Modifiers its
+// tests do, so that an Editor can show a whole suite as skipped without
+// walking into it.
+export type SuiteNode = {
+	nodeType: "Suite"
+	identity: TestIdentity
+	name: StringValueNode | InterpolatedStringValueNode
+	tags: Array<string>
+	skipped: TestSkip | null
+	focused: Position | null
+	nodes: Array<TestsNode>
+	keywordPosition: Position
 	position: Position
 }
 
@@ -371,6 +454,55 @@ export type StatementNode =
 	| IfStatementNode
 	| ReturnStatementNode
 	| FunctionStatementNode
+	| ExpectStatementNode
+	| RequireStatementNode
+
+// NOTE: The test half of one `match` Handler, field for field — `matcher` is
+// what the value has to BE, and everything that can still decline a value of
+// that Type stands beside it. Written out here rather than shared with
+// `MatchNode` because an assertion has no arm to fall through to and no body of
+// its own, and because a Handler's `guard` has no spelling in an assertion:
+// what a Guard would say is another `expect` on the next line.
+export interface AssertionMatcherNode {
+	matcher: Type
+	// NOTE: Where the Matcher was written — the `#Value(row)` of
+	// `require #Value(row) = rows::firstItem()`, not the whole assertion —
+	// which is what a Diagnostic about the Matcher underlines.
+	matcherPosition: Position
+	literal: ExpressionNode | null
+	memberLiterals: Record<string, ExpressionNode> | null
+	// NOTE: What a Case Matcher's payload Pattern requires OF a member, keyed
+	// by the dotted spine that reaches it from the asserted value.
+	memberTypes: Record<string, Type> | null
+}
+
+// NOTE: `expect EXPR`. An `expect` records its result and the test carries on,
+// so one test can report several failures at once — and so it can introduce no
+// names, which is why `matcher` is always null here and written only by
+// `require MATCHER = EXPR`.
+export interface ExpectStatementNode {
+	nodeType: "ExpectStatement"
+	value: ExpressionNode
+	matcher: AssertionMatcherNode | null
+	position: Position
+}
+
+// NOTE: The same shape as `expect` — what differs is what a failure does: a
+// `require` ends the test where it stands. That is what makes it the way a
+// test takes an Optional or a Choice apart, so the Constants its Matcher binds
+// ARE written after it, and everything below reads them.
+//
+// `value` is a name rather than the asserted Expression wherever a Matcher was
+// written: the Matcher's test reads the value as many times as it has parts,
+// and a Method Invocation taken apart must run once. The synthesized Constant
+// holding it is the Statement written in front of this one, exactly as a
+// Pattern Declaration's base is.
+export interface RequireStatementNode {
+	nodeType: "RequireStatement"
+	value: ExpressionNode
+	matcher: AssertionMatcherNode | null
+	position: Position
+}
 
 // NOTE: `synthesized` marks a Constant no source wrote — the base a Pattern
 // Declaration reads its members off, and the Constants a Pattern's bindings

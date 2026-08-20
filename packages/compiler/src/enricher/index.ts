@@ -15,6 +15,7 @@ import {
 import { collectAnnotations } from "./annotations"
 import { builtinMembers, builtinProtocols, builtinTypes } from "./builtins"
 import {
+	enrichExpression,
 	enrichNode,
 	enrichOverloadedFunctionStatement,
 	type HoistedTypes,
@@ -33,7 +34,15 @@ import {
 	resolveOverloadedFunctionStatementType,
 	resolveProtocolDeclarationStatementType,
 } from "./resolvers"
-import { scopeMap } from "./scope"
+import { childScope, modulePathOf, scopeMap } from "./scope"
+import {
+	mergedModifiers,
+	nameTemplate,
+	noModifiers,
+	refuseDuplicateNames,
+	resolveTestModifiers,
+	type TestModifiers,
+} from "./tests"
 
 // NOTE: Names to leave OUT of the top level Scope, per table. Exactly one
 // caller needs this: the Language Server, editing a standard library source.
@@ -126,6 +135,12 @@ export const enrich = (
 		// that came back. The standard library's Choices are the canonical ones
 		// and stay unqualified, tags included.
 		modulePath?: string
+		// NOTE: Whether this compile ASKED for the tests. Only `essence test`
+		// and the Editor's test session do; a build and a run leave the parsed
+		// `tests { … }` block behind untouched, which is the whole of what
+		// "stripped from every build" means — the Program that comes out has
+		// never heard of it. See `common.typed.Program.tests`.
+		tests?: boolean
 	} = {},
 ): {
 	program: common.typed.Program
@@ -138,14 +153,27 @@ export const enrich = (
 		(): common.typed.Program => {
 			let scope = topLevelScope(options)
 
-			let enrichSection = () =>
-				enrichImplementation(program.implementation, scope)
+			// NOTE: The tests section is enriched AFTER the implementation and
+			// against the Scope the implementation filled, because that is the
+			// order the two are written in and the order they run in: a test
+			// names what the file declares, and nothing the file declares names
+			// a test.
+			let enrichSections = (): {
+				implementation: common.typed.ImplementationSectionNode
+				tests: common.typed.TestsSectionNode | null
+			} => ({
+				implementation: enrichImplementation(
+					program.implementation,
+					scope,
+				),
+				tests: testsSectionOf(program, scope, options.tests),
+			})
 
 			if (options.annotations !== true) {
 				return {
 					nodeType: "Program",
 					imports: null,
-					implementation: enrichSection(),
+					...enrichSections(),
 					exports: null,
 					position: program.position,
 				}
@@ -157,14 +185,14 @@ export const enrich = (
 			// load enriches ~20 OTHER files — every annotation in every one of
 			// them would land in THIS document's index, at Positions that mean
 			// nothing here.
-			let collected = collectAnnotations(enrichSection)
+			let collected = collectAnnotations(enrichSections)
 
 			annotations = collected.annotations
 
 			return {
 				nodeType: "Program",
 				imports: null,
-				implementation: collected.result,
+				...collected.result,
 				exports: null,
 				position: program.position,
 			}
@@ -172,6 +200,20 @@ export const enrich = (
 	)
 
 	return { program: result, diagnostics, annotations }
+}
+
+// NOTE: The one place the mode flag is read. A compile that did not ask for the
+// tests answers null, and a file that wrote none answers null as well — which
+// is why nothing downstream may read a null `tests` as "this file has no
+// tests": the Parser's Program is what says that.
+function testsSectionOf(
+	program: parser.Program,
+	scope: enricher.Scope,
+	tests: boolean | undefined,
+): common.typed.TestsSectionNode | null {
+	return tests === true && program.tests !== null
+		? enrichTestsSection(program.tests, scope)
+		: null
 }
 
 // NOTE: One Program and the Scope its top level is enriched in. The standard
@@ -192,6 +234,9 @@ export type EnrichedProgramInput = {
 // can be resolved before the rest of it. Diagnostics are collected per Program,
 // so each stays attributable to the file it came from.
 export type EnrichProgramsOptions = {
+	// NOTE: Whether this compile asked for the tests — see `enrich`. It covers
+	// every Program of the group: one compile is one mode.
+	tests?: boolean
 	// NOTE: Called at the top of every hoist round, and once more after the
 	// last one, to bind whatever became bindable since — the seam a cycle of
 	// Modules needs: an import across an SCC can only be seeded once the
@@ -302,6 +347,7 @@ const enrichProgramsInner = (
 						scope,
 						hoistedTypes,
 					),
+					tests: testsSectionOf(program, scope, options.tests),
 					exports: null,
 					position: program.position,
 				}
@@ -1348,48 +1394,215 @@ const enrichImplementation = (
 ): common.typed.ImplementationSectionNode => {
 	return {
 		nodeType: "ImplementationSection",
-		nodes: implementation.nodes.flatMap((node) => {
-			// NOTE: Expected errors are reported as Diagnostics and recovered
-			// from in place — anything thrown past this point is a Compiler
-			// bug. It is reported as a Diagnostic as well, so that a single
-			// broken statement can not take down the enrichment of the
-			// remaining Program.
-			try {
-				// NOTE: An `overload function` block is not one Node but one
-				// per BODIED entry — each becomes a top-level Function named
-				// `<name>__overload$N` for its slot in the hoisted Type, the
-				// native entries carrying none. The body enrich sits inside
-				// this try so a broken entry becomes an `internal-error`
-				// Diagnostic like any other, rather than aborting the file.
-				if (node.nodeType === "OverloadedFunctionStatement") {
-					return enrichOverloadedFunctionStatement(
-						node,
-						scope,
-						hoistedTypes.get(node),
-					)
-				}
-
-				return enrichNode(node, scope, hoistedTypes)
-			} catch (error) {
-				reportError(
-					`Internal Compiler Error: ${
-						error instanceof Error ? error.message : String(error)
-					}`,
-					node.position,
-					{
-						code: "internal-error",
-						labels: [
-							primary(node.position, "the Compiler threw here"),
-						],
-						notes: [
-							"This is a bug in the Compiler, not in the Program.",
-						],
-					},
-				)
-
-				return []
-			}
-		}),
+		nodes: implementation.nodes.flatMap((node) =>
+			// NOTE: An `overload function` block is not one Node but one per
+			// BODIED entry — each becomes a top-level Function named
+			// `<name>__overload$N` for its slot in the hoisted Type, the native
+			// entries carrying none. The body enrich sits inside the guard so a
+			// broken entry becomes an `internal-error` Diagnostic like any
+			// other, rather than aborting the file.
+			guarded(node.position, () =>
+				node.nodeType === "OverloadedFunctionStatement"
+					? enrichOverloadedFunctionStatement(
+							node,
+							scope,
+							hoistedTypes.get(node),
+						)
+					: enrichNode(node, scope, hoistedTypes),
+			),
+		),
 		position: implementation.position,
 	}
+}
+
+// NOTE: Expected errors are reported as Diagnostics and recovered from in
+// place — anything thrown past this point is a Compiler bug. It is reported as
+// a Diagnostic as well, so that a single broken statement can not take down the
+// enrichment of the remaining Program.
+const guarded = <NodeType>(
+	position: common.Position,
+	enrich: () => Array<NodeType>,
+): Array<NodeType> => {
+	try {
+		return enrich()
+	} catch (error) {
+		reportError(
+			`Internal Compiler Error: ${
+				error instanceof Error ? error.message : String(error)
+			}`,
+			position,
+			{
+				code: "internal-error",
+				labels: [primary(position, "the Compiler threw here")],
+				notes: ["This is a bug in the Compiler, not in the Program."],
+			},
+		)
+
+		return []
+	}
+}
+
+// NOTE: What every item of a tests section is read against — where it sits and
+// what covers it. `suitePath` is what a test's identity is built from, and
+// `covering` holds the Modifiers of the suites around it, because a Modifier
+// written on a suite covers every test inside it.
+type TestsContext = {
+	suitePath: Array<string>
+	covering: TestModifiers
+}
+
+// NOTE: The `tests { … }` block, enriched only where the compile ASKED for it —
+// `essence build` and `essence run` leave it parsed and never come here, which
+// is what makes a test cost a shipped Program nothing.
+//
+// It opens a Scope of its own BELOW the top level rather than sharing it. What
+// the section needs is to SEE everything the file declares, private Functions
+// and Types included, and a child Scope gives it that. Sharing the very Scope
+// would go further than that in two directions nobody asked for: a helper
+// declared for the tests would be in reach of the implementation, and a name
+// the tests re-use — `constant table = …` beside the implementation's own —
+// would be a redeclaration rather than the shadow every other nested block
+// makes it.
+//
+// NOTE: A Constant written here is setup, and is specified as indistinguishable
+// from fresh evaluation for every test that can see it. Nothing in enrichment
+// decides that — it is what the lowering emits — but it is why nothing here
+// treats these Statements as a shared, once-evaluated preamble.
+export const enrichTestsSection = (
+	section: parser.TestsSectionNode,
+	scope: enricher.Scope,
+): common.typed.TestsSectionNode => {
+	return {
+		nodeType: "TestsSection",
+		nodes: enrichTestsNodes(section.nodes, childScope(scope), {
+			suitePath: [],
+			covering: noModifiers,
+		}),
+		position: section.position,
+	}
+}
+
+const enrichTestsNodes = (
+	nodes: Array<parser.TestsNode>,
+	scope: enricher.Scope,
+	context: TestsContext,
+): Array<common.typed.TestsNode> => {
+	refuseDuplicateNames(nodes)
+
+	// NOTE: Only the ordinary Statements hoist. A test and a suite declare no
+	// name — what they are called is a String, not an Identifier — so there is
+	// nothing about either one for a Statement above it to resolve against.
+	let hoistedTypes = hoistDeclarations([
+		{
+			nodes: nodes.filter(isStatementOfTests),
+			scope,
+		},
+	])
+
+	return nodes.flatMap((node) =>
+		guarded<common.typed.TestsNode>(node.position, () => {
+			if (node.nodeType === "Test") {
+				return [enrichTest(node, scope, context)]
+			}
+
+			if (node.nodeType === "Suite") {
+				return [enrichSuite(node, scope, context)]
+			}
+
+			if (node.nodeType === "OverloadedFunctionStatement") {
+				return enrichOverloadedFunctionStatement(
+					node,
+					scope,
+					hoistedTypes.get(node),
+				)
+			}
+
+			return enrichNode(node, scope, hoistedTypes)
+		}),
+	)
+}
+
+function isStatementOfTests(
+	node: parser.TestsNode,
+): node is parser.ImplementationNode {
+	return node.nodeType !== "Test" && node.nodeType !== "Suite"
+}
+
+const enrichTest = (
+	node: parser.TestNode,
+	scope: enricher.Scope,
+	context: TestsContext,
+): common.typed.TestNode => {
+	let modifiers = mergedModifiers(
+		resolveTestModifiers(node.modifiers, "test"),
+		context.covering,
+	)
+	// NOTE: A body of its own, so that what one test declares is gone by the
+	// next one — the Scope is what says two tests share nothing but the setup
+	// above them.
+	let bodyScope = childScope(scope)
+
+	return {
+		nodeType: "Test",
+		identity: {
+			modulePath: modulePathOf(scope),
+			suitePath: context.suitePath,
+			name: nameTemplate(node.name),
+		},
+		name: enrichTestName(node.name, scope),
+		tags: modifiers.tags,
+		skipped: modifiers.skipped,
+		focused: modifiers.focused,
+		body: node.body.flatMap((child) =>
+			guarded(child.position, () => enrichNode(child, bodyScope)),
+		),
+		keywordPosition: node.keywordPosition,
+		position: node.position,
+	}
+}
+
+const enrichSuite = (
+	node: parser.SuiteNode,
+	scope: enricher.Scope,
+	context: TestsContext,
+): common.typed.SuiteNode => {
+	let modifiers = mergedModifiers(
+		resolveTestModifiers(node.modifiers, "suite"),
+		context.covering,
+	)
+	let name = nameTemplate(node.name)
+	// NOTE: A suite is a group AND a Scope: what it declares is the setup its
+	// own tests share, and is gone outside it.
+	let bodyScope = childScope(scope)
+
+	return {
+		nodeType: "Suite",
+		identity: {
+			modulePath: modulePathOf(scope),
+			suitePath: context.suitePath,
+			name,
+		},
+		name: enrichTestName(node.name, scope),
+		tags: modifiers.tags,
+		skipped: modifiers.skipped,
+		focused: modifiers.focused,
+		nodes: enrichTestsNodes(node.nodes, bodyScope, {
+			suitePath: [...context.suitePath, name],
+			covering: modifiers,
+		}),
+		keywordPosition: node.keywordPosition,
+		position: node.position,
+	}
+}
+
+// NOTE: The cast holds because the Parser puts nothing else there — a name is a
+// String Literal or an interpolated one — and enriching either answers with the
+// Node of the same kind.
+const enrichTestName = (
+	node: parser.StringValueNode | parser.InterpolatedStringValueNode,
+	scope: enricher.Scope,
+): common.typed.StringValueNode | common.typed.InterpolatedStringValueNode => {
+	return enrichExpression(node, scope) as
+		| common.typed.StringValueNode
+		| common.typed.InterpolatedStringValueNode
 }
