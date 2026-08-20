@@ -3867,7 +3867,6 @@ exports[`A Module described describes Refused.es 1`] = `
   },
 }
 `;
-
 exports[`A Module described describes Defaults.es 1`] = `
 {
   "exports": {
@@ -3879,6 +3878,26 @@ exports[`A Module described describes Defaults.es 1`] = `
           "name": "Get",
           "optional": false,
           "payload": {
+            "headers": {
+              "fill": {
+                "items": [
+                  {
+                    "kind": "string",
+                    "value": "Accept",
+                  },
+                ],
+                "kind": "list",
+              },
+              "of": {
+                "kind": "list",
+                "of": {
+                  "kind": "string",
+                  "shown": "String",
+                },
+                "shown": "List<String>",
+              },
+              "optional": true,
+            },
             "limits": {
               "fill": {
                 "kind": "record",
@@ -4028,6 +4047,26 @@ exports[`A Module described describes Defaults.es 1`] = `
               "name": "Get",
               "optional": false,
               "payload": {
+                "headers": {
+                  "fill": {
+                    "items": [
+                      {
+                        "kind": "string",
+                        "value": "Accept",
+                      },
+                    ],
+                    "kind": "list",
+                  },
+                  "of": {
+                    "kind": "list",
+                    "of": {
+                      "kind": "string",
+                      "shown": "String",
+                    },
+                    "shown": "List<String>",
+                  },
+                  "optional": true,
+                },
                 "limits": {
                   "fill": {
                     "kind": "record",
@@ -4234,6 +4273,26 @@ exports[`A Module described describes Defaults.es 1`] = `
                   "name": "Get",
                   "optional": false,
                   "payload": {
+                    "headers": {
+                      "fill": {
+                        "items": [
+                          {
+                            "kind": "string",
+                            "value": "Accept",
+                          },
+                        ],
+                        "kind": "list",
+                      },
+                      "of": {
+                        "kind": "list",
+                        "of": {
+                          "kind": "string",
+                          "shown": "String",
+                        },
+                        "shown": "List<String>",
+                      },
+                      "optional": true,
+                    },
                     "limits": {
                       "fill": {
                         "kind": "record",
@@ -4414,3 +4473,4 @@ exports[`A Module described describes Defaults.es 1`] = `
   },
 }
 `;
+
