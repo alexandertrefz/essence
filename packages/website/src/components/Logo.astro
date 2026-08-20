@@ -1,0 +1,121 @@
+---
+/*
+ * The mark, drawn once: the master from brand/ at the repo root, a 4 × 5
+ * square grid at unit 10 (viewBox 40 × 50), every fold at exactly 45°. The
+ * previous version kept one absolute coordinate set per size because
+ * `clip-path: path()` cannot scale; a viewBox can, so the sizes reduce to a
+ * height — and the crease shadows and rim highlights the clip-path layers
+ * could not draw are back.
+ *
+ * Only the band's top stop is themed (via `--logo-band-top`); the under-fold
+ * facets and the black/white overlays never move, which is what keeps the
+ * mark recognisable when the accent darkens for light mode.
+ *
+ * The offset seats the mark half a grid row high against the wordmark — the
+ * flat bottom and pointed apex put its visual centre below its geometric one.
+ */
+
+interface Props {
+	size?: "lg" | "md" | "sm"
+	class?: string
+}
+
+const HEIGHTS = {
+	// 1a / 1d marketing header
+	lg: 32,
+	// 1e–1h docs header, 1d footer
+	md: 27,
+	// 1j–1m mobile
+	sm: 25,
+} as const
+
+let { size = "lg", class: className } = Astro.props
+let height = HEIGHTS[size]
+let width = height * 0.8
+let offset = -height / 10
+
+// The same mark appears up to twice per page (header rows, mobile menu), and
+// SVG gradient ids are document-global — each instance gets its own.
+let uid = Math.random().toString(36).slice(2, 8)
+---
+
+<svg
+	class:list={["logo", className]}
+	width={width}
+	height={height}
+	viewBox="0 0 40 50"
+	style={`top:${offset}px`}
+	aria-hidden="true"
+>
+	<defs>
+		<linearGradient
+			id={`band-${uid}`}
+			x1="20"
+			y1="0"
+			x2="20"
+			y2="50"
+			gradientUnits="userSpaceOnUse"
+		>
+			<stop class="logo__band-top" offset="0"></stop>
+			<stop offset="1" stop-color="#9F041B"></stop>
+		</linearGradient>
+		<linearGradient
+			id={`fold-${uid}`}
+			x1="10"
+			y1="0"
+			x2="-10"
+			y2="40"
+			gradientUnits="userSpaceOnUse"
+		>
+			<stop offset="0" stop-color="#A3363F"></stop>
+			<stop offset="1" stop-color="#59020F"></stop>
+		</linearGradient>
+		<linearGradient
+			id={`shine-${uid}`}
+			x1="0"
+			y1="0"
+			x2="0"
+			y2="50"
+			gradientUnits="userSpaceOnUse"
+		>
+			<stop offset="0" stop-color="#ffffff" stop-opacity="0.5"></stop>
+			<stop offset="1" stop-color="#ffffff" stop-opacity="0.2"></stop>
+		</linearGradient>
+	</defs>
+	<path
+		fill={`url(#band-${uid})`}
+		d="M 30 10 L 20 0 L 0 20 L 0 40 Z M 40 40 L 40 20 L 10 50 L 30 50 Z"
+	></path>
+	<path
+		fill={`url(#fold-${uid})`}
+		d="M 40 20 L 30 10 L 20 20 L 30 30 Z M 20 40 L 10 30 L 0 40 L 10 50 Z"
+	></path>
+	<path fill="#000000" fill-opacity="0.2" d="M 30 10 L 20 19.74 L 21 20.71 Z"
+	></path>
+	<path
+		fill="#000000"
+		fill-opacity="0.2"
+		d="M 9.74 30 L 0 39.74 L 0.97 40.71 L 10.71 30.97 Z"
+	></path>
+	<path
+		fill={`url(#shine-${uid})`}
+		fill-opacity="0.75"
+		d="M 40 20.2 L 40 20 L 10 50 L 10.2 50 Z"
+	></path>
+	<path
+		fill={`url(#shine-${uid})`}
+		d="M 20 0 L 30 9.9 L 29.9 10 L 20 0.2 L 0 20 L 0 19.8 Z"
+	></path>
+</svg>
+
+<style>
+	.logo {
+		position: relative;
+		display: block;
+		flex: none;
+	}
+
+	.logo__band-top {
+		stop-color: var(--logo-band-top);
+	}
+</style>

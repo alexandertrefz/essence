@@ -6,5 +6,11 @@
 	// source rather than against a declaration file that would have to be
 	// generated first.
 	"extends": "./tsconfig.base.json",
-	"include": ["packages/*/src/**/*", "packages/*/tests/**/*", "scripts/**/*"]
+	"include": ["packages/*/src/**/*", "packages/*/tests/**/*", "scripts/**/*"],
+	// NOTE: The website's `src/` is checked by its own `tsconfig.json`, not
+	// here. Its modules import `astro:content` and `astro:assets` — virtual
+	// modules whose types only exist once `astro sync` has written
+	// `packages/website/.astro/types.d.ts`. This gate has to pass on a fresh
+	// clone, so it cannot depend on a file a build step generates.
+	"exclude": ["packages/website/src"]
 }

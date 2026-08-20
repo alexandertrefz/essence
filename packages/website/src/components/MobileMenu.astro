@@ -1,0 +1,522 @@
+---
+/*
+ * The full-screen menus behind the header's hamburger — screens 1l (marketing)
+ * and 1m (docs). No framework: a hidden panel, one delegated click listener,
+ * and `data-menu-open` on `<html>` to lock the page behind it.
+ *
+ * The docs variant leaves its middle to a `tree` slot so the sidebar the docs
+ * pages already build is the same tree here, rather than a second copy that
+ * can drift.
+ */
+
+import Logo from "./Logo.astro"
+import {
+	GITHUB_COMMITS_URL,
+	GITHUB_URL,
+	ROUTES,
+} from "../lib/site.ts"
+
+interface Props {
+	variant?: "marketing" | "docs"
+}
+
+let { variant = "marketing" } = Astro.props
+
+// The same current-page test the header bar uses — see `SiteHeader`. A built
+// page's path carries a trailing slash the route constants do not.
+let path = Astro.url.pathname.replace(/\/+$/, "") || "/"
+
+function current(href: string): "page" | undefined {
+	let target = href.replace(/\/+$/, "") || "/"
+	let isCurrent =
+		target === ROUTES.docs
+			? path === target || path.startsWith(`${target}/`)
+			: path === target
+
+	return isCurrent ? "page" : undefined
+}
+---
+
+<div id="mobile-menu" class="menu" data-variant={variant} hidden>
+	<div class="menu__bar">
+		<a class="menu__brand" href={ROUTES.home}>
+			<Logo size="sm" />
+			<span class="menu__wordmark">essence</span>
+		</a>
+		{
+			variant === "docs" && (
+				<>
+					<span class="menu__divider" />
+					<span class="menu__section">Docs</span>
+				</>
+			)
+		}
+		<span class="menu__spacer"></span>
+		{
+			variant === "docs" && (
+				<button
+					class="menu__icon"
+					type="button"
+					data-search-trigger
+					aria-controls="search-palette"
+					aria-label="Search documentation"
+				>
+					<svg
+						width="20"
+						height="20"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="1.5"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					>
+						<path d="M10 10m-7 0a7 7 0 1 0 14 0a7 7 0 1 0 -14 0" />
+						<path d="M21 21l-6 -6" />
+					</svg>
+				</button>
+			)
+		}
+		<button
+			class="menu__icon menu__icon--close"
+			type="button"
+			data-menu-close
+			aria-label="Close menu"
+		>
+			<svg
+				width="20"
+				height="20"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="1.5"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+			>
+				<path d="M18 6l-12 12"></path>
+				<path d="M6 6l12 12"></path>
+			</svg>
+		</button>
+	</div>
+
+	<div class="menu__body">
+		{
+			variant === "marketing" ? (
+				<>
+					<nav class="menu__group">
+						<a
+							class="menu__item"
+							href={ROUTES.principles}
+							aria-current={current(ROUTES.principles)}
+						>
+							Principles
+							<svg
+								class="menu__chevron"
+								width="16"
+								height="16"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="1.5"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							>
+								<path d="M9 6l6 6l-6 6" />
+							</svg>
+						</a>
+						<a
+							class="menu__item"
+							href={ROUTES.goals}
+							aria-current={current(ROUTES.goals)}
+						>
+							Goals
+							<svg
+								class="menu__chevron"
+								width="16"
+								height="16"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="1.5"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							>
+								<path d="M9 6l6 6l-6 6" />
+							</svg>
+						</a>
+						<a
+							class="menu__item"
+							href={ROUTES.docs}
+							aria-current={current(ROUTES.docs)}
+						>
+							Documentation
+							<svg
+								class="menu__chevron"
+								width="16"
+								height="16"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="1.5"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							>
+								<path d="M9 6l6 6l-6 6" />
+							</svg>
+						</a>
+					</nav>
+					<div class="menu__eyebrow">Community</div>
+					<nav class="menu__group">
+						<a class="menu__item menu__item--minor" href={GITHUB_URL}>
+							GitHub
+						</a>
+						<a class="menu__item menu__item--minor" href={GITHUB_COMMITS_URL}>
+							Changelog
+						</a>
+					</nav>
+					<span class="menu__spacer" />
+					<div class="menu__foot">
+						<a class="menu__cta" href={ROUTES.getStarted}>
+							Get started
+							<svg
+								width="17"
+								height="17"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="var(--accent)"
+								stroke-width="2"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							>
+								<path d="M5 12l14 0" />
+								<path d="M13 18l6 -6" />
+								<path d="M13 6l6 6" />
+							</svg>
+						</a>
+					</div>
+				</>
+			) : (
+				<>
+					<button
+						class="menu__field"
+						type="button"
+						data-search-trigger
+						aria-controls="search-palette"
+					>
+						<svg
+							width="16"
+							height="16"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="1.5"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+						>
+							<path d="M10 10m-7 0a7 7 0 1 0 14 0a7 7 0 1 0 -14 0" />
+							<path d="M21 21l-6 -6" />
+						</svg>
+						<span>Search documentation</span>
+					</button>
+					<div class="menu__tree">
+						<slot name="tree" />
+					</div>
+					<span class="menu__spacer" />
+					<div class="menu__foot menu__foot--docs">
+						<a class="menu__version-link" href={GITHUB_URL}>
+							GitHub
+						</a>
+					</div>
+				</>
+			)
+		}
+	</div>
+</div>
+
+<style>
+	.menu {
+		position: fixed;
+		inset: 0;
+		z-index: 80;
+		display: flex;
+		flex-direction: column;
+		background: var(--bg);
+		color: var(--text-strong);
+	}
+
+	.menu[hidden] {
+		display: none;
+	}
+
+	.menu__bar {
+		flex: none;
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		height: var(--header-height-mobile);
+		padding: 0 var(--gutter-mobile);
+		background: var(--header-bg-mobile);
+		-webkit-backdrop-filter: blur(28px) saturate(150%);
+		backdrop-filter: blur(28px) saturate(150%);
+		border-bottom: 1px solid var(--border);
+	}
+
+	.menu__brand {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+	}
+
+	.menu__wordmark {
+		font-family: var(--font-wordmark);
+		font-size: 19px;
+		line-height: 1;
+		margin-top: -2px;
+		color: var(--text-hero);
+	}
+
+	.menu[data-variant="docs"] .menu__wordmark {
+		font-size: 18px;
+	}
+
+	.menu__divider {
+		width: 1px;
+		height: 16px;
+		margin: 0 2px;
+		background: var(--divider);
+	}
+
+	.menu__section {
+		font-family: var(--font-heading);
+		font-weight: 500;
+		font-size: 14px;
+		color: var(--text-muted);
+	}
+
+	.menu__spacer {
+		flex: 1;
+	}
+
+	.menu__icon {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 4px;
+		margin: -4px;
+		background: none;
+		border: 0;
+		color: var(--text-body);
+		cursor: pointer;
+	}
+
+	.menu__icon--close {
+		color: var(--text-heading);
+	}
+
+	.menu__body {
+		flex: 1;
+		display: flex;
+		flex-direction: column;
+		padding: 8px 8px 0;
+		overflow-y: auto;
+	}
+
+	.menu[data-variant="docs"] .menu__body {
+		padding-top: 14px;
+	}
+
+	.menu__group {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+	}
+
+	.menu__item {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 13px 12px;
+		border-radius: 8px;
+		font-family: var(--font-heading);
+		font-weight: 500;
+		font-size: 17px;
+		color: var(--text-strong);
+	}
+
+	/*
+	 * The page you are on. A filled row rather than the bar's underline: these
+	 * are full-width tap targets, so the whole row is the thing being marked.
+	 * Same `aria-current` source as the header, so the two cannot disagree.
+	 */
+	.menu__item[aria-current="page"] {
+		background: var(--accent-soft-bg);
+		color: var(--accent-on-soft);
+	}
+
+	.menu__item--minor {
+		padding: 11px 12px;
+		font-size: 15px;
+		color: var(--text-muted);
+	}
+
+	.menu__item:hover {
+		background: var(--surface-hover);
+		color: var(--text-hero);
+	}
+
+	.menu__chevron {
+		flex: none;
+		color: var(--text-faintest);
+	}
+
+	.menu__eyebrow {
+		font-family: var(--font-mono);
+		font-size: 11px;
+		letter-spacing: 0.12em;
+		text-transform: uppercase;
+		color: var(--text-faintest);
+		padding: 18px 12px 6px;
+	}
+
+	.menu__field {
+		display: flex;
+		align-items: center;
+		gap: 9px;
+		height: 38px;
+		margin: 0 12px 4px;
+		padding: 0 11px;
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		background: var(--field-bg);
+		font-family: var(--font-body);
+		font-size: 14px;
+		color: var(--text-placeholder);
+		text-align: left;
+		cursor: pointer;
+	}
+
+	.menu__field span {
+		flex: 1;
+	}
+
+	.menu__tree {
+		display: flex;
+		flex-direction: column;
+	}
+
+	.menu__foot {
+		display: flex;
+		align-items: center;
+		gap: 24px;
+		padding: 0 12px 22px;
+	}
+
+	.menu__foot--docs {
+		justify-content: space-between;
+		font-family: var(--font-mono);
+		font-size: 11.5px;
+		color: var(--text-faintest);
+	}
+
+	.menu__cta {
+		position: relative;
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		padding: 10px 2px;
+		font-family: var(--font-heading);
+		font-weight: 500;
+		font-size: 14px;
+		letter-spacing: 0.005em;
+		color: var(--text-hero);
+	}
+
+	.menu__cta::after {
+		content: "";
+		position: absolute;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		height: 2px;
+		border-radius: 1px;
+		background: var(--accent-strong);
+	}
+
+
+
+	.menu__version-link {
+		color: var(--text-dimmer);
+	}
+
+	/* The menu is a small-screen affordance only. */
+	@media (min-width: 801px) {
+		.menu {
+			display: none;
+		}
+	}
+</style>
+
+<script>
+	// NOTE: Delegated rather than bound per-button — the header renders its
+	// hamburger twice (desktop row and mobile row are the same markup at
+	// different breakpoints), and a page may mount more than one trigger.
+	let panel = document.getElementById("mobile-menu")
+	let root = document.documentElement
+
+	if (panel !== null) {
+		let menu = panel
+
+		let openMenu = () => {
+			menu.hidden = false
+			root.dataset.menuOpen = "true"
+			menu.querySelector<HTMLElement>("[data-menu-close]")?.focus()
+		}
+
+		let closeMenu = () => {
+			menu.hidden = true
+			delete root.dataset.menuOpen
+		}
+
+		document.addEventListener("click", (event) => {
+			let target = event.target as HTMLElement | null
+
+			if (target?.closest("[data-menu-toggle]") != null) {
+				event.preventDefault()
+				openMenu()
+
+				return
+			}
+
+			if (target?.closest("[data-menu-close]") != null) {
+				event.preventDefault()
+				closeMenu()
+
+				return
+			}
+
+			// Any navigation out of the menu closes it — the panel would
+			// otherwise outlive a same-page anchor jump and cover the target.
+			if (!menu.hidden && target?.closest("a") != null) {
+				closeMenu()
+			}
+		})
+
+		document.addEventListener("keydown", (event) => {
+			// NOTE: The search palette sets `data-search-open` and owns Escape
+			// while it is up, so the menu underneath must not also swallow it.
+			if (
+				event.key === "Escape" &&
+				!menu.hidden &&
+				root.dataset.searchOpen === undefined
+			) {
+				closeMenu()
+			}
+		})
+	}
+</script>
+
+<style is:global>
+	html[data-menu-open] body {
+		overflow: hidden;
+	}
+</style>

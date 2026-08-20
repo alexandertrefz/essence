@@ -1,0 +1,24 @@
+---
+/*
+ * A frontmatter string displayed as prose, with `backticked` spans promoted to
+ * inline code.
+ *
+ * NOTE: A page's `description` is displayed in three places and also written
+ * raw into <meta name="description"> and the search index, so it is stored as
+ * a plain string rather than Markdown. Only the places that show it to a
+ * reader promote the backticks — which is what puts the accent pill on `match`
+ * in the lede of screen 1f. Without this the reader sees the backticks.
+ *
+ * Split with a capturing group, so odd indices are exactly the code spans and
+ * the text parts stay text nodes — nothing is ever set as HTML.
+ */
+
+interface Props {
+	text: string
+}
+
+let { text } = Astro.props
+let parts = text.split(/`([^`]+)`/)
+---
+
+{parts.map((part, index) => (index % 2 === 1 ? <code>{part}</code> : part))}

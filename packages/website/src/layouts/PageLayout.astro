@@ -1,0 +1,131 @@
+---
+/*
+ * A standalone page that is neither the landing page nor documentation —
+ * Principles and Goals.
+ *
+ * It wears the marketing chrome and the landing page's two decorative layers,
+ * and owns the title block so those pages carry one shape. As on the landing
+ * page, `.page__backdrop` deliberately has no `overflow` of its own: an
+ * overflow on an ancestor of the sticky header would make it stick to that box
+ * instead of the viewport.
+ */
+
+import SiteFooter from "../components/SiteFooter.astro"
+import SiteHeader from "../components/SiteHeader.astro"
+import BaseLayout from "./BaseLayout.astro"
+
+interface Props {
+	/** The document title; the " — essence" suffix is added for it. */
+	title: string
+	description: string
+	eyebrow: string
+	heading: string
+	lede: string
+}
+
+let { title, description, eyebrow, heading, lede } = Astro.props
+---
+
+<BaseLayout title={title} description={description}>
+	<div class="page">
+		<div class="page__backdrop" aria-hidden="true">
+			<div class="hatch"></div>
+			<div class="glow glow--docs"></div>
+		</div>
+
+		<SiteHeader variant="marketing" />
+
+		<main class="main">
+			<header class="head">
+				<p class="head__eyebrow">
+					<span class="head__dot"></span>
+					{eyebrow}
+				</p>
+				<h1 class="head__title">{heading}</h1>
+				<p class="head__lede">{lede}</p>
+			</header>
+
+			<slot />
+		</main>
+	</div>
+
+	<SiteFooter />
+</BaseLayout>
+
+<style>
+	.page {
+		position: relative;
+	}
+
+	.page__backdrop {
+		position: absolute;
+		inset: 0;
+		pointer-events: none;
+		z-index: 0;
+	}
+
+	/*
+	 * The gutter alone sets the measure, exactly as the landing page's sections
+	 * do. Adding `max-width: var(--content-max)` on top would subtract the
+	 * gutter from the 1200 rather than from the viewport, leaving 960 — narrow
+	 * enough that a code sample inside a two-column card clips.
+	 */
+	.main {
+		position: relative;
+		z-index: 1;
+		padding: 88px var(--gutter) 104px;
+	}
+
+	.head {
+		max-width: 720px;
+	}
+
+	.head__eyebrow {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		font-family: var(--font-mono);
+		font-size: 12px;
+		letter-spacing: 0.12em;
+		text-transform: uppercase;
+		color: var(--accent-eyebrow);
+	}
+
+	.head__dot {
+		width: 5px;
+		height: 5px;
+		border-radius: 50%;
+		background: var(--accent);
+	}
+
+	.head__title {
+		margin-top: 18px;
+		font-size: 48px;
+		line-height: 1.04;
+		letter-spacing: -0.015em;
+		color: var(--text-hero);
+	}
+
+	.head__lede {
+		margin-top: 20px;
+		font-size: 19px;
+		line-height: 1.6;
+		color: var(--text-body);
+		text-wrap: pretty;
+	}
+
+	@media (max-width: 800px) {
+		.main {
+			padding: 44px var(--gutter) 56px;
+		}
+
+		.head__title {
+			font-size: 34px;
+		}
+
+		.head__lede {
+			margin-top: 16px;
+			font-size: 17px;
+		}
+	}
+</style>

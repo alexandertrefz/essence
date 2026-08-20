@@ -1,0 +1,161 @@
+---
+/*
+ * The landing footer — screen 1d / 7a.
+ *
+ * Every link goes somewhere that exists, and the footer only carries the ones
+ * a reader would come down here to look for: the way in, and the repository.
+ * The design's Discord, roadmap and changelog entries have no counterpart in
+ * this project and are gone rather than parked on a dead anchor. Documentation,
+ * Principles and Goals are in the header on every page, so repeating them here
+ * only made the column longer.
+ *
+ * The blurb is one sentence. It carried a second — "Built in the open, versioned
+ * in public" — which said the same thing twice, and every replacement for it
+ * only repeated what the GitHub link and the licence line below already say.
+ */
+
+import Logo from "./Logo.astro"
+import { GITHUB_CONTRIBUTING_URL, GITHUB_URL, ROUTES } from "../lib/site.ts"
+---
+
+<footer class="footer">
+	<div class="footer__columns">
+		<div class="footer__brand">
+			<a class="footer__mark" href={ROUTES.home}>
+				<Logo size="md" />
+				<span class="footer__wordmark">essence</span>
+			</a>
+			<p class="footer__blurb">An open-source language for the web.</p>
+		</div>
+
+		<nav class="footer__column" aria-label="Learn">
+			<h2 class="footer__heading">Learn</h2>
+			<a href={ROUTES.getStarted}>Installation</a>
+			<a href={ROUTES.firstProgram}>First program</a>
+			<a href={ROUTES.projectLayout}>Project layout</a>
+		</nav>
+
+		<nav class="footer__column" aria-label="Community">
+			<h2 class="footer__heading">Community</h2>
+			<a href={GITHUB_URL}>GitHub</a>
+			<a href={GITHUB_CONTRIBUTING_URL}>Contributing</a>
+		</nav>
+	</div>
+
+	<div class="footer__bottom">
+		<span>© 2026 essence — MIT licensed</span>
+	</div>
+</footer>
+
+<style>
+	.footer {
+		position: relative;
+		z-index: 1;
+		padding: 64px var(--gutter) 34px;
+		border-top: 1px solid var(--hairline-soft);
+		background: var(--footer-bg);
+	}
+
+	/*
+	 * The brand takes the wide first track and every nav column after it takes
+	 * an equal one — a count the children decide rather than the rule. A
+	 * hardcoded four left an empty track behind the moment a column came out,
+	 * and would need editing again when one goes back in.
+	 */
+	.footer__columns {
+		display: grid;
+		grid-template-columns: 1.4fr;
+		grid-auto-flow: column;
+		grid-auto-columns: 1fr;
+		gap: 48px;
+	}
+
+	.footer__brand {
+		display: flex;
+		flex-direction: column;
+		gap: 14px;
+	}
+
+	.footer__mark {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+	}
+
+	.footer__wordmark {
+		font-family: var(--font-wordmark);
+		font-size: 21px;
+		line-height: 1;
+		margin-top: -2px;
+		color: var(--text-strong);
+	}
+
+	.footer__blurb {
+		max-width: 250px;
+		font-size: 14px;
+		line-height: 1.55;
+		color: var(--text-faint);
+	}
+
+	.footer__column {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+	}
+
+	.footer__heading {
+		font-family: var(--font-mono);
+		font-weight: 400;
+		font-size: 11px;
+		letter-spacing: 0.12em;
+		text-transform: uppercase;
+		color: var(--text-faintest);
+		margin: 0;
+	}
+
+	.footer__column a {
+		font-size: 14px;
+		color: var(--text-body);
+	}
+
+	.footer__column a:hover {
+		color: var(--accent);
+	}
+
+	.footer__bottom {
+		display: flex;
+		justify-content: space-between;
+		gap: 16px;
+		margin-top: 44px;
+		padding-top: 20px;
+		border-top: 1px solid var(--hairline-softest);
+		font-family: var(--font-mono);
+		font-size: 12px;
+		color: var(--text-legal);
+	}
+
+	@media (max-width: 900px) {
+		.footer__columns {
+			grid-template-columns: 1fr 1fr;
+			grid-auto-flow: row;
+			gap: 36px;
+		}
+	}
+
+	@media (max-width: 560px) {
+		.footer {
+			padding-top: 44px;
+		}
+
+		.footer__columns {
+			grid-template-columns: 1fr;
+			grid-auto-flow: row;
+		}
+
+		.footer__bottom {
+			flex-direction: column;
+			gap: 8px;
+			margin-top: 32px;
+		}
+	}
+</style>

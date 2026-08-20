@@ -1,0 +1,209 @@
+{
+	"name": "essence-dark",
+	"displayName": "Essence Dark",
+	"type": "dark",
+	"colors": {
+		"editor.background": "#1a1a1a",
+		"editor.foreground": "#e6e6e6"
+	},
+	"fg": "#e6e6e6",
+	"bg": "#1a1a1a",
+	"tokenColors": [
+		{
+			"settings": {
+				"foreground": "#e6e6e6"
+			}
+		},
+		{
+			"scope": [
+				"comment",
+				"comment.line",
+				"comment.block",
+				"comment.block.documentation",
+				"punctuation.definition.comment",
+				"punctuation.separator.documentation"
+			],
+			"settings": {
+				"foreground": "#696466"
+			}
+		},
+		{
+			"scope": ["keyword.other.documentation"],
+			"settings": {
+				"foreground": "#8c888a",
+				"fontStyle": "bold"
+			}
+		},
+		{
+			"scope": [
+				"comment variable.parameter",
+				"markup.inline.raw",
+				"markup.inline.raw.string"
+			],
+			"settings": {
+				"foreground": "#8c888a"
+			}
+		},
+		{
+			"scope": [
+				"keyword",
+				"keyword.control",
+				"keyword.control.return",
+				"keyword.other",
+				"storage",
+				"storage.type",
+				"storage.modifier",
+				"entity.name.tag",
+				"constant.character.escape",
+				"invalid",
+				"invalid.illegal"
+			],
+			"settings": {
+				"foreground": "#f5515f"
+			}
+		},
+		{
+			"scope": [
+				"entity.name.function",
+				"entity.name.type",
+				"entity.name.type.namespace",
+				"entity.name.class",
+				"entity.other.attribute-name",
+				"entity.other.inherited-class",
+				"support.function",
+				"support.function.native",
+				"support.class",
+				"support.type",
+				"support.type.property-name",
+				"support.constant",
+				"variable.other.enummember",
+				"markup.underline.link",
+				"string.other.link"
+			],
+			"settings": {
+				"foreground": "#3399ff"
+			}
+		},
+		{
+			"scope": [
+				"string",
+				"string.quoted",
+				"string.quoted.double",
+				"string.quoted.single",
+				"string.template",
+				"string.unquoted",
+				"punctuation.definition.string",
+				"punctuation.definition.string.begin",
+				"punctuation.definition.string.end"
+			],
+			"settings": {
+				"foreground": "#fc618d"
+			}
+		},
+		{
+			"scope": [
+				"constant",
+				"constant.numeric",
+				"constant.numeric.integer",
+				"constant.numeric.fraction",
+				"constant.language",
+				"constant.other",
+				"constant.character"
+			],
+			"settings": {
+				"foreground": "#dbd7d8"
+			}
+		},
+		{
+			"scope": [
+				"variable",
+				"variable.other",
+				"variable.other.property",
+				"variable.other.constant",
+				"variable.parameter",
+				"variable.language",
+				"variable.language.self",
+				"entity.name.label"
+			],
+			"settings": {
+				"foreground": "#e6e6e6"
+			}
+		},
+		{
+			"scope": [
+				"keyword.operator",
+				"keyword.operator.method",
+				"keyword.operator.arrow",
+				"keyword.operator.assignment",
+				"keyword.operator.union",
+				"punctuation",
+				"punctuation.definition.block",
+				"punctuation.definition.case",
+				"punctuation.definition.typeparameters",
+				"punctuation.definition.variable",
+				"punctuation.separator",
+				"punctuation.terminator",
+				"punctuation.accessor",
+				"punctuation.section",
+				"meta.brace",
+				"meta.brace.round",
+				"meta.brace.square",
+				"variable.language.wildcard"
+			],
+			"settings": {
+				"foreground": "#8c888a"
+			}
+		},
+		{
+			"scope": [
+				"entity.name.command",
+				"source.shell entity.name.function.call",
+				"source.shell support.function.builtin"
+			],
+			"settings": {
+				"foreground": "#e6e6e6"
+			}
+		},
+		{
+			"scope": ["string.unquoted.argument", "meta.argument"],
+			"settings": {
+				"foreground": "#dbd7d8"
+			}
+		},
+		{
+			"scope": ["constant.other.option"],
+			"settings": {
+				"foreground": "#8c888a"
+			}
+		},
+		{
+			"scope": ["markup.heading", "markup.bold"],
+			"settings": {
+				"foreground": "#f5515f",
+				"fontStyle": "bold"
+			}
+		},
+		{
+			"scope": ["markup.inserted"],
+			"settings": {
+				"foreground": "#78dca0"
+			}
+		},
+		{
+			"scope": ["markup.deleted"],
+			"settings": {
+				"foreground": "#f5515f"
+			}
+		},
+		{
+			"name": "What is inside an interpolation hole is code, not string. Without this the whole scope stack ends at string.quoted.double and the expression comes out string-coloured, which reads as though the braces were literal text. The braces themselves are already punctuation, by punctuation.section above. Anything with a scope of its own inside the hole — an operator, a method — still wins over this, being the deeper match.",
+			"scope": [
+				"meta.embedded.interpolation",
+				"meta.embedded.interpolation.essence"
+			],
+			"settings": {
+				"foreground": "#e6e6e6"
+			}
+		}
+	]
+}

@@ -1,0 +1,245 @@
+/*
+ * The design's two themes, as one set of names.
+ *
+ * Light sits on `:root`, dark under a single `prefers-color-scheme` block, and
+ * there is no toggle — the browser decides. Every value that differs between
+ * the two is a token here, so no component ever has to branch on the scheme:
+ * the card's inset darkening becomes a lift, the crimson glow drops to a blush,
+ * the hatch only changes alpha. Values are lifted from the design file (Turn 1
+ * for dark, Turn 7 for light) rather than derived.
+ */
+
+:root {
+	color-scheme: light dark;
+
+	/* Page and surfaces */
+	--bg: rgb(250, 248, 248);
+	--surface: rgb(255, 255, 255);
+	--surface-sunken: rgb(245, 242, 242);
+	--surface-raised: rgba(0, 0, 0, 0.02);
+	--surface-hover: rgba(0, 0, 0, 0.035);
+	--strip-bg: rgba(0, 0, 0, 0.03);
+	--footer-bg: rgb(245, 242, 242);
+
+	/* Code surfaces */
+	--code-bg: rgb(245, 242, 242);
+	--code-border: rgb(228, 223, 224);
+	--code-chrome-bg: rgba(0, 0, 0, 0.02);
+	--code-window-bg: rgb(255, 255, 255);
+	--code-output-bg: rgb(240, 237, 237);
+	--code-text: rgb(45, 43, 44);
+
+	/* Borders and hairlines, strongest to faintest */
+	--border: rgb(226, 221, 222);
+	--hairline: rgb(231, 226, 227);
+	--hairline-soft: rgb(233, 228, 229);
+	--hairline-softest: rgb(236, 231, 232);
+	--divider: rgb(214, 208, 209);
+
+	/* Text ramp, strongest to faintest */
+	--text-hero: rgb(20, 18, 19);
+	--text-heading: rgb(30, 28, 29);
+	--text-subheading: rgb(38, 36, 37);
+	--text-strong: rgb(45, 43, 44);
+	--text-lede: rgb(95, 91, 92);
+	--text-body: rgb(102, 98, 99);
+	--text-body-soft: rgb(106, 102, 103);
+	--text-muted: rgb(110, 106, 107);
+	--text-dim: rgb(120, 116, 117);
+	--text-dimmer: rgb(128, 124, 125);
+	--text-faint: rgb(136, 132, 133);
+	--text-faintest: rgb(142, 138, 139);
+	--text-placeholder: rgb(134, 130, 131);
+	--text-legal: rgb(152, 148, 149);
+
+	/* Accent */
+	--accent: rgb(196, 30, 52);
+	--accent-strong: rgb(176, 24, 46);
+	--accent-eyebrow: rgb(168, 26, 48);
+	--accent-pill-text: rgb(160, 32, 52);
+	--accent-note-label: rgb(150, 26, 46);
+	--accent-on-soft: rgb(120, 20, 40);
+	/* The alpha surfaces are all mixed from one crimson, in both themes. */
+	--accent-rgb: 173, 31, 54;
+	--accent-soft-bg: rgba(173, 31, 54, 0.12);
+	--accent-soft-bg-strong: rgba(173, 31, 54, 0.18);
+	--accent-note-bg: rgba(173, 31, 54, 0.08);
+	--accent-note-border: rgba(173, 31, 54, 0.28);
+	--accent-pill-border: rgba(176, 24, 46, 0.3);
+	--accent-active-border: rgba(176, 24, 46, 0.26);
+	--accent-hover-border: rgba(176, 24, 46, 0.4);
+	--accent-focus-glow: 0 0 18px -9px rgba(173, 31, 54, 0.3);
+	--accent-underline: rgba(176, 24, 46, 0.5);
+
+	/* Hero glow and hatch */
+	--glow-inner: rgba(173, 31, 54, 0.13);
+	--glow-mid: rgba(173, 31, 54, 0.05);
+	--glow-outer: rgba(173, 31, 54, 0);
+	/* How hard the noise that dithers the glow's falloff is laid on — see the
+	   `.glow::after` note in `base.css`. It wants to be worth a little over one
+	   8-bit level: less and the rings it exists to break up survive, more and the
+	   noise becomes a texture you can see.
+	   One value serves both themes, which is a property of the tile being full-
+	   range: its own spread is what sets the amplitude, so the number means the
+	   same thing over a near-black page as over a near-white one. Measured at
+	   0.01: σ 1.5 levels on dark, 1.2 on light, and the bloom's mean moves by
+	   half a level up and under two down. */
+	--glow-dither: 0.01;
+	/* Black lines on a near-white page read much harder than the same alpha
+	   does on the dark theme, so light is pulled back from the design's 0.07. */
+	--hatch-alpha: 0.045;
+
+	/* Elevation. Light lifts a card off the page; dark presses it in. */
+	--card-shadow:
+		0 0 0 1px rgb(226, 221, 222), 0 1px 2px 0 rgba(20, 16, 17, 0.04);
+	--code-window-shadow:
+		0 24px 48px -28px rgba(20, 16, 17, 0.22), 0 0 0 1px rgb(226, 221, 222);
+	--palette-shadow:
+		0 32px 64px -24px rgba(20, 16, 17, 0.3), 0 0 0 1px rgb(226, 221, 222);
+
+	/* Header and overlays */
+	--header-bg: rgba(255, 255, 255, 0.72);
+	--header-bg-docs: rgba(255, 255, 255, 0.78);
+	--header-bg-mobile: rgba(255, 255, 255, 0.92);
+	--overlay-bg: rgba(244, 241, 241, 0.72);
+	--palette-bg: rgba(255, 255, 255, 0.98);
+	--palette-border: rgba(0, 0, 0, 0.08);
+	--field-bg: rgba(0, 0, 0, 0.025);
+	--kbd-bg: rgba(0, 0, 0, 0.04);
+	--kbd-border: rgb(214, 208, 209);
+
+	/* The logo band's top stop tracks the accent; every other colour in the
+	   mark is fixed and lives in Logo.astro's gradients. */
+	--logo-band-top: rgb(196, 30, 52);
+
+	/* Layout */
+	--content-max: 1200px;
+	--gutter: 120px;
+	--gutter-docs: 48px;
+	--gutter-mobile: 20px;
+	--header-height: 72px;
+	/* The same height as the marketing header, so the two do not jump against
+	   each other across a navigation. Kept as its own name because the heading
+	   scroll offsets and the sticky table of contents are measured from it. */
+	--header-height-docs: var(--header-height);
+	--header-height-mobile: 56px;
+
+	/* Type */
+	--font-heading: "General Sans", ui-sans-serif, system-ui, sans-serif;
+	--font-body: "Supreme", ui-sans-serif, system-ui, sans-serif;
+	--font-mono: "Fira Code", ui-monospace, "SF Mono", Menlo, monospace;
+	--font-wordmark: "Izoard", var(--font-heading);
+}
+
+@media (prefers-color-scheme: dark) {
+	:root {
+		--bg: rgb(13, 13, 13);
+		--surface: rgb(14, 11, 12);
+		--surface-sunken: rgb(11, 10, 10);
+		--surface-raised: rgba(255, 255, 255, 0.02);
+		--surface-hover: rgba(255, 255, 255, 0.045);
+		--strip-bg: rgba(0, 0, 0, 0.25);
+		--footer-bg: rgb(11, 10, 10);
+
+		--code-bg: rgb(26, 26, 26);
+		--code-border: rgb(34, 34, 34);
+		--code-chrome-bg: rgba(255, 255, 255, 0.02);
+		--code-window-bg: rgb(14, 11, 12);
+		--code-output-bg: rgb(20, 18, 18);
+		--code-text: rgb(230, 230, 230);
+
+		--border: rgb(38, 38, 38);
+		--hairline: rgb(32, 30, 31);
+		--hairline-soft: rgb(30, 28, 29);
+		--hairline-softest: rgb(26, 25, 25);
+		--divider: rgb(45, 42, 43);
+
+		--text-hero: rgb(255, 255, 255);
+		--text-heading: rgb(240, 238, 238);
+		--text-subheading: rgb(235, 233, 233);
+		--text-strong: rgb(230, 228, 229);
+		--text-lede: rgb(170, 165, 167);
+		--text-body: rgb(160, 155, 157);
+		--text-body-soft: rgb(155, 150, 152);
+		--text-muted: rgb(150, 145, 147);
+		--text-dim: rgb(140, 136, 138);
+		--text-dimmer: rgb(130, 126, 128);
+		--text-faint: rgb(120, 116, 118);
+		--text-faintest: rgb(110, 106, 108);
+		--text-placeholder: rgb(122, 118, 120);
+		--text-legal: rgb(96, 92, 94);
+
+		--accent: rgb(245, 81, 95);
+		--accent-strong: rgb(197, 38, 62);
+		--accent-eyebrow: rgb(215, 86, 99);
+		--accent-pill-text: rgb(201, 94, 105);
+		--accent-note-label: rgb(232, 125, 136);
+		--accent-on-soft: rgb(240, 200, 206);
+		--accent-pill-border: rgba(245, 81, 95, 0.28);
+		--accent-active-border: rgba(245, 81, 95, 0.22);
+		--accent-hover-border: rgba(245, 81, 95, 0.4);
+		--accent-focus-glow: 0 0 18px -9px rgba(197, 38, 62, 0.38);
+		--accent-underline: rgba(245, 81, 95, 0.55);
+
+		--glow-inner: rgba(173, 31, 54, 0.32);
+		--glow-mid: rgba(173, 31, 54, 0.07);
+		--hatch-alpha: 0.5;
+
+		--card-shadow:
+			0 0 0 1px rgb(38, 38, 38), inset 2px 2px 5px 0 rgb(0, 0, 0);
+		/* The ring is what the near-black window bg cannot give it: the body
+		   surface (14,11,12) all but matches the page (13,13,13), so without a
+		   1px edge the card has none, and the drop shadow is invisible on black.
+		   Light carries the same ring; only this one had dropped it. */
+		--code-window-shadow:
+			0 40px 80px -40px rgb(0, 0, 0), 0 0 0 1px rgb(38, 38, 38),
+			inset 0 1px 0 rgba(255, 255, 255, 0.04);
+		--palette-shadow:
+			0 40px 90px -30px rgb(0, 0, 0),
+			inset 0 1px 0 rgba(255, 255, 255, 0.05);
+
+		--header-bg: rgba(14, 11, 12, 0.55);
+		--header-bg-docs: rgba(14, 11, 12, 0.58);
+		--header-bg-mobile: rgba(14, 11, 12, 0.85);
+		--overlay-bg: rgba(4, 3, 3, 0.72);
+		--palette-bg: rgba(22, 19, 20, 0.98);
+		--palette-border: rgba(255, 255, 255, 0.09);
+		--field-bg: rgba(255, 255, 255, 0.03);
+		--kbd-bg: rgba(0, 0, 0, 0.4);
+		--kbd-border: rgb(45, 45, 45);
+
+		--logo-band-top: rgb(245, 81, 95);
+	}
+}
+
+/*
+ * The gutter steps down before the mobile layout arrives.
+ *
+ * It used to hold 120px all the way to 800px, which put 240px of padding on a
+ * 900px viewport — a quarter of the screen — and left the marketing header's
+ * own content (brand, nav, search, call to action) needing 961px in a box that
+ * had 660px. The row overflowed, the document became wider than the viewport,
+ * and the whole page scrolled sideways between 801 and 960. It also meant the
+ * content column got *wider* as the viewport got narrower, at the 800px jump.
+ *
+ * These two steps keep the header inside the viewport the whole way down. Order
+ * matters: the mobile block has to stay last, so it wins where all three match.
+ */
+@media (max-width: 1180px) {
+	:root {
+		--gutter: 72px;
+	}
+}
+
+@media (max-width: 960px) {
+	:root {
+		--gutter: 32px;
+	}
+}
+
+@media (max-width: 800px) {
+	:root {
+		--gutter: var(--gutter-mobile);
+		--gutter-docs: var(--gutter-mobile);
+	}
+}

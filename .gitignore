@@ -11,3 +11,9 @@ build
 
 packages/fixtures/files/local
 packages/fixtures/files/*.js
+
+# The website's build output and Astro's generated types — `.astro/types.d.ts`
+# is what makes `astro:content` resolve in an editor, and it is written by
+# `astro sync`, never by hand.
+packages/website/dist
+packages/website/.astro
