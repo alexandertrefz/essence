@@ -1,0 +1,558 @@
+---
+/*
+ * The Goals page.
+ *
+ * The page opens with the four primary goals — reliable bug-free code, code that
+ * is a joy to maintain, easy integration into existing TypeScript codebases, and
+ * no runtime errors. Four rules hold
+ * this page honest:
+ *
+ *   - The maintenance goal has been wrong twice, in the same way. It was "a
+ *     batteries-included standard library" (a tool, not an end) and then
+ *     "productive from the first file" (a first impression, not a goal). What
+ *     the other three miss is the code you already have: they are about writing
+ *     it, running it and adopting it, and none of them is about the year after.
+ *     Hence maintenance, which is what immutability, structural types,
+ *     inference, exhaustive matching and workspace rename are all for.
+ *   - JavaScript is not named beside TypeScript anywhere it would only be
+ *     saying the same thing twice. It stays where it means the language or the
+ *     engine rather than the codebase you are integrating with.
+ *   - Everything under "What should be easy" exists today, and nothing planned
+ *     is described in the present tense. The arithmetic sample is the single
+ *     exception, and the same one the landing page takes: it is written in
+ *     decimal literals, which are planned and not in the language yet, so
+ *     `essence check` answers `Expected an Identifier but found '1'` at the
+ *     `0.1` — `0.` starts a member access today. Only the spelling is ahead of
+ *     the compiler; a literal receiver already takes a Method, so the same
+ *     sample passes as `1/10::add(2/10)::is(3/10)`, which is how it was written
+ *     until the literals were decided on.
+ *   - The non-goals are not invented for this page: each one is grounded in
+ *     something the language already does or in the compile target it chose.
+ *     They are deliberately not framed as consequences of the
+ *     Principles, which are a separate statement and not a spec this page
+ *     derives from.
+ *
+ * The page used to end on a status block — an "Early preview" note, the pre-1.0
+ * caveat, and beside it the Readme's "Features" list as a card of fourteen
+ * shipped rows. All of it is gone: the page argues for the language and then
+ * stops, rather than closing on a spec sheet and a disclaimer. Getting started
+ * is the header's job, on this page as on every other.
+ */
+
+import CodeWindow from "../components/CodeWindow.astro";
+import PageLayout from "../layouts/PageLayout.astro";
+
+/*
+ * The four goals everything else on this page serves. Stated as intent where
+ * they are intent: "meant to" is doing real work in these sentences, because
+ * the language is an early preview and this page does not describe a promise
+ * as a property.
+ */
+let primaryGoals = [
+	{
+		title: "Reliable, bug-free code",
+		body: "The language is arranged so that the mistakes worth worrying about cannot be written: there is no null, no mutation, no implicit conversion, and no floating-point surprise. What cannot be ruled out by construction is reported before the program runs, with the span that caused it and often the fix. Reliability is the default output of writing Essence, not a discipline practiced on top of it.",
+	},
+	{
+		title: "Code that is a joy to maintain",
+		body: "Most of a codebase's life is maintenance, and that is where a language is really judged. Reshaping what you wrote a year ago should be an afternoon's work rather than something you schedule: nothing shares mutable state behind your back, a type is the shape it has rather than a name you registered, and a case added to a union stops every match that does not answer for it.",
+	},
+	{
+		title: "Easy integration into existing TypeScript codebases",
+		body: "Essence is meant to be able to join a codebase you already have, not demand a new one. A compiled module is one self-contained ES module with no runtime dependency, so TypeScript can import it like any other file.",
+	},
+	{
+		title: "No runtime errors",
+		body: "A program that compiles is meant to have nothing left to throw. Absence is a case in a union and every match must answer for it; arithmetic is exact and has no width to overflow; failure is a value handed back, not an exception fired past you.",
+	},
+];
+
+/*
+ * Each entry is a goal of everyday ease and, separately, the piece of the
+ * language that enables it — the `goal` is what should be true of a working
+ * day, the `enabler` is what makes it true. Kept as two fields so the page
+ * cannot drift back into listing features and calling them goals.
+ *
+ * Every card used to end on a link, five of the six pointing at the docs index
+ * rather than at anything about the card. A link that lands somewhere generic
+ * teaches the reader not to trust the next one, so they are gone; the header
+ * carries Documentation on every page.
+ */
+let easy = [
+	{
+		title: "Getting the arithmetic right",
+		goal: "Money, ratios and measurements should add up to exactly what they should — on the first attempt, with nothing imported.",
+		enabler:
+			"Integer and Rational are exact and arbitrary-precision, and they are the default rather than a library you had to remember. There is no floating point to fall into: a tenth is a tenth, and money comes out to the cent.",
+		code: `implementation {
+	§ The classic floating-point trap, absent.
+	Terminal.print(0.1::add(0.2)::is(0.3)) § true
+
+	§ Money to the cent: 21 cents, three times.
+	constant total = 0.19::add(0.02)::multiply(with 3)
+	Terminal.print(total::toString(as #Decimal)) § "0.63"
+}
+`,
+	},
+	{
+		title: "Handling uncertainty",
+		goal: "An absent value should be impossible to overlook, and dealt with where it appears — not in tomorrow's stack trace.",
+		enabler:
+			"There is no null and nothing to dereference. Absence is the #Empty case of an Optional, and a match over one does not compile until it answers for that case — the check you would have forgotten is the one the compiler insists on.",
+		code: `import {
+	Order        from "./receipts.es"
+	emailReceipt from "./receipts.es"
+	printReceipt from "./receipts.es"
+}
+
+implementation {
+	§ Some orders have an address to send to, and some do not.
+	function deliver(_ order: Order) -> String {
+		<- match order.email -> String {
+			case #Value(address) { <- emailReceipt(order, to address) }
+			case #Empty          { <- printReceipt(order) }
+		}
+	}
+}
+`,
+	},
+	{
+		title: "Handling state",
+		goal: "Changing one field deep in a structure should be one expression — and should leave the value you already had alone.",
+		enabler:
+			"Records are structural, so a shape is a type with nothing to declare or register first. Every value is immutable, and an update names the path it changes: what comes back is a new record, and what you were holding is untouched.",
+		code: `implementation {
+	type Filters = { search: String, page: Integer }
+	type State = { filters: Filters, loading: Boolean }
+
+	constant state: State = {
+		filters = { search = "cats", page = 3 },
+		loading = false,
+	}
+
+	§ An update names the path it changes.
+	constant next = { state with { filters.search = "essence" } }
+
+	Terminal.print(next.filters.search) § "essence"
+	Terminal.print(state.filters.search) § "cats"
+}
+`,
+	},
+	{
+		title: "Changing your mind",
+		goal: "Renaming, reshaping and rethinking should be routine work, not a rewrite you schedule.",
+		enabler:
+			"Inference means a first draft compiles without being annotated into place. A rename reaches every file in the workspace, and the compiler names whatever stopped fitting, with the span that stopped fitting it.",
+	},
+	{
+		title: "Understanding what went wrong",
+		goal: "Finding out what is wrong should take one read of the message — not a print statement, a bisect, or a search for the wording online.",
+		enabler:
+			"Every diagnostic labels the span that caused it and shows what the compiler understood there, so the message is about your code rather than the compiler's internals. Where the repair is obvious, the editor offers to make it.",
+	},
+];
+
+// Each is grounded in what the language already does or in what the compile
+// target allows, rather than being a preference invented for this page.
+let nonGoals = [
+	{
+		title: "Being a superset of JavaScript",
+		body: "This is its own language with its own semantics, not a way of describing JavaScript as already written. It shares an output format with TypeScript and almost nothing else.",
+	},
+	{
+		title: "Replacing a systems language",
+		body: "Essence spends performance on correctness: immutable data, exact numbers by default, a garbage-collected runtime. Those are trades a systems language cannot make.",
+	},
+];
+
+/*
+ * The reveal's running index — see `.reveal` in `base.css`, and the same counter
+ * the Principles page uses. Every block after the title and the lede gets one, in
+ * the order it is written, which is the order it is read in.
+ *
+ * The unit is a block and not a section on purpose: the first section is the
+ * whole of what is above the fold, so staggering by section would have meant one
+ * fade for everything anybody sees on arrival.
+ *
+ * `reveal(WITH_PREVIOUS)` hands back the step just given out instead of the next
+ * one, which is how a heading and the lede under it arrive as one thing — they
+ * are one thing to read, and a section title landing a whole step before its own
+ * sentence is a title with nothing to say.
+ */
+let blocks = 0;
+const WITH_PREVIOUS = true;
+let reveal = (withPrevious = false) =>
+	`--reveal-index: ${withPrevious ? blocks - 1 : blocks++}`;
+---
+
+<PageLayout
+	title="Goals"
+	description="The four goals Essence is built toward, what they make easy, and what it deliberately leaves alone."
+	eyebrow="Goals"
+	heading="What Essence is for"
+	lede="Every language is a set of bets about what matters. These are the ones Essence makes: what it is built for, what that should make easy, and what it deliberately leaves alone."
+>
+	{
+		/*
+		 * No heading and no lede: the page's own lede says these are the bets the
+		 * language makes, and a section title repeating that in other words was
+		 * two sentences between the reader and the goals themselves. The landmark
+		 * keeps a name in `aria-label` so the section is still announced.
+		 */
+	}
+	<section class="section" aria-label="The four goals">
+		<ul class="goals">
+			{
+				primaryGoals.map((item) => (
+					<li class="goal reveal" style={reveal()}>
+						<h3 class="goal__title">{item.title}</h3>
+						<p class="goal__body">{item.body}</p>
+					</li>
+				))
+			}
+		</ul>
+	</section>
+
+	<section class="section" aria-labelledby="easy">
+		<h2 class="section__title reveal" id="easy" style={reveal()}>
+			What should be easy
+		</h2>
+		<p class="section__lede reveal" style={reveal(WITH_PREVIOUS)}>
+			What the goals above amount to on an ordinary day: a piece of work,
+			what should be easy about it, and what the language does to make it
+			so. Every one of these works today.
+		</p>
+
+		{
+			/*
+			 * Two shapes of box, decided by whether a goal can be demonstrated. The
+			 * three with a program to show get a full-width box each, claim beside
+			 * proof; the two whose enablers are tooling get a compact row. One
+			 * grid of six stretched every text-only box around the tallest code
+			 * sample in its row, and a box that is mostly empty reads as a goal
+			 * with nothing behind it.
+			 */
+		}
+		<div class="showcases">
+			{
+				easy
+					.filter((item) => item.code)
+					.map((item) => (
+						<article
+							class="card card--showcase reveal"
+							style={reveal()}
+						>
+							<div class="card__text">
+								<h3 class="card__title">{item.title}</h3>
+								<p class="card__goal">{item.goal}</p>
+								<p class="card__body">{item.enabler}</p>
+							</div>
+
+							<div class="card__sample">
+								<CodeWindow
+									chrome={false}
+									compact
+									code={item.code}
+								/>
+							</div>
+						</article>
+					))
+			}
+		</div>
+
+		<div class="quicks">
+			{
+				easy
+					.filter((item) => !item.code)
+					.map((item) => (
+						<article
+							class="card card--quick reveal"
+							style={reveal()}
+						>
+							<h3 class="card__title">{item.title}</h3>
+							<p class="card__goal">{item.goal}</p>
+							<p class="card__body">{item.enabler}</p>
+						</article>
+					))
+			}
+		</div>
+	</section>
+
+	<section class="section" aria-labelledby="non-goals">
+		<h2 class="section__title reveal" id="non-goals" style={reveal()}>
+			Non-goals
+		</h2>
+		<p class="section__lede reveal" style={reveal(WITH_PREVIOUS)}>
+			What Essence is not trying to be.
+		</p>
+
+		<ul class="nongoals">
+			{
+				nonGoals.map((item) => (
+					<li class="nongoal reveal" style={reveal()}>
+						<h3 class="nongoal__title">{item.title}</h3>
+						<p class="nongoal__body">{item.body}</p>
+					</li>
+				))
+			}
+		</ul>
+	</section>
+</PageLayout>
+
+<style>
+	.section {
+		margin-top: 72px;
+	}
+
+	.section__title {
+		font-size: 27px;
+		letter-spacing: -0.01em;
+		color: var(--text-heading);
+	}
+
+	.section__lede {
+		margin-top: 12px;
+		max-width: 660px;
+		font-size: 16.5px;
+		line-height: 1.6;
+		color: var(--text-muted);
+		text-wrap: pretty;
+	}
+
+	/*
+	 * The primary goals. The same divider-row shape as the non-goals at the
+	 * other end of the page — the two sections are one statement read from both
+	 * sides — but a step larger and a step darker, because this end is the point.
+	 *
+	 * Each row is a title column and a body column, so the list spans the page
+	 * instead of hugging its left edge; the body still caps its own measure so a
+	 * wide screen widens the whitespace, not the line.
+	 */
+
+	.goals {
+		list-style: none;
+		margin-top: 28px;
+		border-top: 1px solid var(--hairline);
+	}
+
+	/* `align-content: start` because a row of this grid is as tall as its taller
+	   card, and a stretched card hands the slack to its own auto rows — which
+	   pushed the title of the shorter one a whole line clear of its body. The
+	   slack belongs at the bottom of the card, where nobody reads it. */
+	.goal {
+		display: grid;
+		grid-template-columns: minmax(0, 300px) minmax(0, 1fr);
+		align-content: start;
+		gap: 8px 56px;
+		padding: 26px 0 28px;
+		border-bottom: 1px solid var(--hairline);
+	}
+
+	.goal__title {
+		font-family: var(--font-heading);
+		font-weight: 500;
+		font-size: 20px;
+		line-height: 1.35;
+		color: var(--text-heading);
+		text-wrap: pretty;
+	}
+
+	.goal__body {
+		max-width: 720px;
+		font-size: 16px;
+		line-height: 1.65;
+		color: var(--text-body);
+		text-wrap: pretty;
+	}
+
+	/*
+	 * On a wide viewport the four goals pair up two-by-two instead of stacking
+	 * as four rows: the count is what makes the shape — a 2×2 says "these four
+	 * belong together" where a long ledger says "and another thing". Inside a
+	 * half-width cell the title goes back above its body; the label column only
+	 * earns its keep when the row has the whole page to spend.
+	 */
+	@media (min-width: 1240px) {
+		.goals {
+			display: grid;
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+			column-gap: 64px;
+		}
+
+		.goal {
+			grid-template-columns: minmax(0, 1fr);
+			gap: 10px;
+			padding: 28px 0 30px;
+		}
+
+		.goal__body {
+			max-width: none;
+		}
+	}
+
+	/* What should be easy */
+
+	.showcases {
+		display: flex;
+		flex-direction: column;
+		gap: 20px;
+		margin-top: 32px;
+	}
+
+	.quicks {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 20px;
+		margin-top: 20px;
+	}
+
+	.card {
+		padding: 24px 26px 22px;
+		border-radius: 10px;
+		background: var(--surface);
+		box-shadow: var(--card-shadow);
+		min-width: 0;
+	}
+
+	/* Claim on the left, the program that proves it on the right. */
+	.card--showcase {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) minmax(0, 620px);
+		gap: 24px 48px;
+	}
+
+	.card__text {
+		display: flex;
+		flex-direction: column;
+		min-width: 0;
+	}
+
+	.card__sample {
+		align-self: center;
+		min-width: 0;
+	}
+
+	.card--quick {
+		display: flex;
+		flex-direction: column;
+	}
+
+	.card__title {
+		font-family: var(--font-heading);
+		font-weight: 500;
+		font-size: 19px;
+		color: var(--text-heading);
+		text-wrap: pretty;
+	}
+
+	/* The goal reads first and darkest; the enabler under it steps back, so
+	   the card says "this should be easy — and here is why it is". */
+	.card__goal {
+		margin-top: 10px;
+		font-size: 15px;
+		line-height: 1.6;
+		color: var(--text-body);
+		text-wrap: pretty;
+	}
+
+	.card__body {
+		margin-top: 8px;
+		font-size: 15px;
+		line-height: 1.6;
+		color: var(--text-body-soft);
+		text-wrap: pretty;
+	}
+
+	/* Non-goals */
+
+	.nongoals {
+		list-style: none;
+		margin-top: 28px;
+		border-top: 1px solid var(--hairline);
+	}
+
+	/* The goals' row shape, a step smaller and quieter. Same title column, so
+	   the two lists' rules line up when the page is scrolled between them. */
+	.nongoal {
+		display: grid;
+		grid-template-columns: minmax(0, 300px) minmax(0, 1fr);
+		gap: 8px 56px;
+		padding: 22px 0 24px;
+		border-bottom: 1px solid var(--hairline);
+	}
+
+	.nongoal__title {
+		font-family: var(--font-heading);
+		font-weight: 500;
+		font-size: 18px;
+		line-height: 1.35;
+		color: var(--text-subheading);
+		text-wrap: pretty;
+	}
+
+	.nongoal__body {
+		max-width: 720px;
+		font-size: 15.5px;
+		line-height: 1.65;
+		color: var(--text-muted);
+		text-wrap: pretty;
+	}
+
+	@media (max-width: 1180px) {
+		.showcases,
+		.quicks {
+			gap: 16px;
+		}
+
+		.card--showcase {
+			grid-template-columns: minmax(0, 1fr) minmax(0, 520px);
+			gap: 20px 36px;
+		}
+	}
+
+	@media (max-width: 960px) {
+		/* The sample tucks under its claim, and the quick boxes stack. */
+		.card--showcase {
+			grid-template-columns: minmax(0, 1fr);
+		}
+
+		.quicks {
+			grid-template-columns: minmax(0, 1fr);
+		}
+
+		.goal,
+		.nongoal {
+			grid-template-columns: minmax(0, 1fr);
+		}
+	}
+
+	@media (max-width: 800px) {
+		.section {
+			margin-top: 48px;
+		}
+
+		.section__title {
+			font-size: 23px;
+		}
+
+		.section__lede {
+			font-size: 15.5px;
+		}
+
+		.goal__title {
+			font-size: 18px;
+		}
+
+		.goal__body {
+			font-size: 15.5px;
+		}
+
+		.showcases {
+			margin-top: 24px;
+		}
+
+		.card {
+			padding: 20px;
+		}
+	}
+</style>
