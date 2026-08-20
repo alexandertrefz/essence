@@ -210,6 +210,49 @@ export function getStringRepresentation(
 // be a cost paid on every Program for one object literal.
 const unit: RecordType = { [typeKeySymbol]: "Record" }
 
+// NOTE: Which of the two streams a piece of output was written to, as the one
+// word every reader outside this module names it by — the runtime's Stream
+// Cases are tags on a value, and a capture is not holding one.
+export type OutputStream = "output" | "error"
+
+// NOTE: Where a Program's output goes when something other than the terminal is
+// asking for it. There is exactly one such caller today — the test runtime,
+// which shows what a test wrote WITH that test's report rather than
+// interleaved with the reporter's own lines — and this is the seam it reaches
+// through, so that `Terminal` stays the one place that knows how a Program
+// writes anything.
+export type OutputSink = (text: string, stream: OutputStream) => void
+
+// NOTE: A dynamically scoped binding, installed for the length of ONE
+// synchronous call and restored by the `finally` below — not a mode something
+// switches on and leaves on. That is what makes it safe to say a Program's
+// output belongs to whatever `withOutputSink` was wrapped around: nothing
+// outside that call can observe it, because nothing else runs during it. Tests
+// are synchronous and run one at a time in phase 1, so one test's output can
+// not reach another's capture.
+//
+// The day tasks land, or the runner runs tests in parallel inside one realm,
+// this becomes an `AsyncLocalStorage` — the SHAPE stays what it is here, a
+// capability resolved where the writing happens rather than a parameter
+// threaded through every Method that might print. Workers need nothing: a
+// worker is its own realm and holds its own binding.
+let outputSink: OutputSink | null = null
+
+export function withOutputSink<Value>(
+	sink: OutputSink | null,
+	run: () => Value,
+): Value {
+	let previous = outputSink
+
+	outputSink = sink
+
+	try {
+		return run()
+	} finally {
+		outputSink = previous
+	}
+}
+
 // NOTE: `write(_ text: String, to stream: Stream)` — one native, with the
 // Stream DEFAULTED in `Terminal.es` to `#Output`, so a call that leaves it out
 // reaches this same export through the frame the Compiler synthesizes for the
@@ -233,6 +276,15 @@ const unit: RecordType = { [typeKeySymbol]: "Record" }
 // not one a Program pays on any host that has them.
 export function write(text: StringType, stream: StreamType): RecordType {
 	let toError = stream[typeKeySymbol] === "Stream#Error"
+
+	// A sink takes the bytes before any host does: what a Program under test
+	// writes belongs to the capture, on a host with streams and on one without.
+	if (outputSink !== null) {
+		outputSink(text.value, toError ? "error" : "output")
+
+		return unit
+	}
+
 	let host = hostStream(toError)
 
 	if (host !== undefined) {
@@ -288,8 +340,18 @@ function asConsoleLine(text: string): string {
 // whole line by construction — it is never continued — and going through
 // `console.log` is what a value inspected in a Program under test still arrives
 // through, which is how the golden and sweep harnesses capture it.
+//
+// NOTE: A sink is offered the newline `console.log` would have appended, so
+// that a capture holds the bytes a terminal would have shown and a `write` and
+// an `inspect` compose into one text.
 export function inspect<Value extends AnyType>(value: Value): Value {
-	console.log(getStringRepresentation(value))
+	let rendering = getStringRepresentation(value)
+
+	if (outputSink !== null) {
+		outputSink(`${rendering}\n`, "output")
+	} else {
+		console.log(rendering)
+	}
 
 	return value
 }
