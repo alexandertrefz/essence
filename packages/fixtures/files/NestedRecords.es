@@ -61,6 +61,48 @@ implementation {
 			server.{ port = port, tls.authority = "internal" },
 	}
 
+	§ The other two Literals a path key reaches into are an ARGUMENT written for
+	§ a defaulted Record Parameter and the payload of a defaulting Case. Both are
+	§ merged into a default rather than into a value written beside them, and a
+	§ path key means the same thing in all three: `server = { … }` replaces and
+	§ `server.port = …` merges.
+
+	§§ Answers the address a Config listens on.
+	§§
+	§§ @param using — how to listen.
+	§§ @returns — the address.
+	function listen(
+		using settings: Config = {
+			name = "api",
+			retries = 1,
+			server = {
+				host = "localhost",
+				port = 80,
+				tls = { enabled = false, authority = "self" },
+			},
+		},
+	) -> String {
+		<- "{settings.server.host}:{settings.server.port} {settings.name}"
+	}
+
+	constant listening = listen(using { server.port = 8443 })
+	constant relisted  = listen(using {
+		name = "edge",
+		server.{ host = "api.example.com", tls.authority = "internal" },
+	})
+
+	choice Endpoint {
+		Bound { label: String, server: Server } = {
+			server = {
+				host = "0.0.0.0",
+				port = 443,
+				tls = { enabled = true, authority = "letsencrypt" },
+			},
+		},
+	}
+
+	constant bound: Endpoint = #Bound({ label = "public", server.port = 8080 })
+
 	namespace Configs for Config {
 		§§ Answers this Config listening on another port.
 		§§
@@ -83,6 +125,10 @@ implementation {
 	Terminal.inspect(borrowed.server.port)
 	Terminal.inspect(both.name)
 	Terminal.inspect(both.server.tls.authority)
+
+	Terminal.inspect(listening)
+	Terminal.inspect(relisted)
+	Terminal.inspect(bound)
 
 	§ The value updated is never touched.
 	Terminal.inspect(config.server.port)
