@@ -35,9 +35,11 @@
 			"supported": "limited",
 			"restrictedConfigurations": [
 				"essence.server.path",
-				"essence.cli.path"
+				"essence.cli.path",
+				"essence.bun.path",
+				"essence.node.path"
 			],
-			"description": "The bundled Language Server only reads and analyses text, and diagnostics and navigation are exactly what is wanted while auditing an unfamiliar repository, so they stay on. The trust-sensitive settings are 'essence.server.path' and 'essence.cli.path': each names an executable to spawn, which a workspace could point at a program it ships itself, so workspace-scoped values of them are ignored here. Debugging itself is unavailable in Restricted Mode either way — VS Code blocks debug sessions there."
+			"description": "The bundled Language Server only reads and analyses text, and diagnostics and navigation are exactly what is wanted while auditing an unfamiliar repository, so they stay on. The trust-sensitive settings are 'essence.server.path', 'essence.cli.path', 'essence.bun.path' and 'essence.node.path': each names an executable to spawn, which a workspace could point at a program it ships itself, so workspace-scoped values of them are ignored here. Debugging itself is unavailable in Restricted Mode either way — VS Code blocks debug sessions there."
 		}
 	},
 	"main": "./dist/extension.js",
@@ -119,7 +121,17 @@
 				"essence.server.path": {
 					"type": "string",
 					"default": "",
-					"markdownDescription": "Absolute path to a Language Server to run instead of the bundled one. A built `.js` bundle is run with `node`; anything else — a `.ts` entry point, or `packages/language-server/bin/esls` — is run with `bun`. Useful for developing against a checkout of the Essence monorepo without rebuilding the bundle."
+					"markdownDescription": "Use a different Language Server than the one bundled with this extension. Leave empty to use the bundled one."
+				},
+				"essence.bun.path": {
+					"type": "string",
+					"default": "",
+					"markdownDescription": "Where to find Bun, if the extension cannot find it on its own. Only needed when `#essence.server.path#` or `#essence.cli.path#` points at source rather than a `.js` bundle."
+				},
+				"essence.node.path": {
+					"type": "string",
+					"default": "",
+					"markdownDescription": "Which Node the debugger runs your programs on, if it cannot find one on its own or you want a specific version. A launch configuration's `runtimeExecutable` overrides this."
 				},
 				"essence.inlayHints.enabled": {
 					"type": "boolean",
@@ -134,12 +146,12 @@
 						"verbose"
 					],
 					"default": "off",
-					"description": "Log the traffic between VS Code and the Essence Language Server."
+					"description": "Log the traffic between VS Code and the Essence Language Server to the Essence output channel, for diagnosing problems with the server."
 				},
 				"essence.cli.path": {
 					"type": "string",
 					"default": "",
-					"markdownDescription": "Absolute path to the `essence` CLI the debugger compiles with. A built `.js` bundle is run with `node`; anything else — a checkout's `packages/cli/bin/essence` — is run with `bun`. Left empty, a checkout open in the workspace is used if one is found, and `essence` on PATH otherwise."
+					"markdownDescription": "Use a specific `essence` CLI for debugging. Leave empty to use the one installed on this machine."
 				}
 			}
 		},

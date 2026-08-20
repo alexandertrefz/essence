@@ -49,20 +49,31 @@ describe("the debugger contribution", () => {
 		expect(manifest.activationEvents).toEqual(["onLanguage:essence"])
 	})
 
-	// NOTE: Both settings name an executable to spawn, so both are ignored in
-	// untrusted workspaces — a workspace could point either at a program it
-	// ships itself.
+	// NOTE: Every one of these settings names an executable to spawn, so every
+	// one is ignored in untrusted workspaces — a workspace could point any of
+	// them at a program it ships itself.
 	it("restricts every executable-path setting", () => {
 		let restricted =
 			manifest.capabilities.untrustedWorkspaces.restrictedConfigurations
 
-		expect(restricted).toContain("essence.server.path")
-		expect(restricted).toContain("essence.cli.path")
+		expect(restricted).toEqual([
+			"essence.server.path",
+			"essence.cli.path",
+			"essence.bun.path",
+			"essence.node.path",
+		])
 	})
 
-	it("documents the CLI setting it reads", () => {
-		expect(
-			manifest.contributes.configuration.properties["essence.cli.path"],
-		).toBeDefined()
+	it("documents every path setting it reads", () => {
+		let properties = manifest.contributes.configuration.properties
+
+		for (let setting of [
+			"essence.server.path",
+			"essence.cli.path",
+			"essence.bun.path",
+			"essence.node.path",
+		]) {
+			expect(properties[setting as keyof typeof properties]).toBeDefined()
+		}
 	})
 })

@@ -14,7 +14,9 @@ Parser, Enricher and Validator diagnostics appear as you type, debounced by
 roughly 200ms. Each carries a stable code (`missing-case`, `unreachable-case`,
 `missing-return`, …) so it can be filtered independently of its wording. A
 Match case that can never match is greyed out rather than underlined — it is
-dead, not wrong.
+dead, not wrong. A file is analysed together with the Modules it imports, so
+an edit is checked against what its dependencies actually export, and a
+problem inside an imported file is reported there even when it is not open.
 
 ### Quick Fixes
 
@@ -28,6 +30,11 @@ offer it under the lightbulb (`Ctrl+.`):
 - `unreachable-case` removes the Case that can never match.
 - The "did you mean" Diagnostics — an unknown name, Type, Protocol, member,
   Method or Case — take the suggested spelling.
+- An unknown name, Type or Protocol that another Module in the workspace
+  exports offers to import it, writing the `import { … }` block or adding to
+  the one already there; an unknown Method offers the Namespace that declares
+  it the same way.
+- `unused-import` removes the import nothing uses.
 - `constant-reassignment` turns the Constant into a Variable.
 - `redundant-parameter-label` drops the label.
 - `redundant-interpolation-to-string` drops a `::toString()` a String
@@ -41,10 +48,14 @@ sits, and an inlay hint can be double-clicked to the same end.
 
 Go-to-definition (`F12`), Find All References (`Shift+F12`) and document
 highlight work on every name that resolves, including Methods, Namespace
-properties and Record members. Highlighting distinguishes the occurrences that
-bind a name from those that read it. The outline (`Ctrl+Shift+O`) lists
-declarations with their Types, reaching the ones nested inside Functions and
-`if` blocks, and Namespaces expand to their Properties and Methods.
+properties and Record members, and they follow imports: definition on an
+imported name lands in the Module that declares it, and references are
+collected from every file in the workspace that uses it. Highlighting
+distinguishes the occurrences that bind a name from those that read it. The
+outline (`Ctrl+Shift+O`) lists declarations with their Types, reaching the
+ones nested inside Functions and `if` blocks, and Namespaces expand to their
+Properties and Methods; Go to Symbol in Workspace (`Ctrl+T`) searches the
+declarations of every file at once.
 
 Call hierarchy (`Shift+Alt+H`) shows what calls a Function or Method and what
 it calls, within the file. Overloads aggregate under the name they share.
@@ -56,7 +67,9 @@ Functions, Parameters, Namespaces, Type Aliases and Generic Type Parameters —
 as well as names that resolve through Types: Methods, properties and Record
 members. Argument labels rename together with the Parameter declaring them.
 Record Types are structural, so member occurrences are grouped across every
-subset-related Record shape in the file. Builtins are rejected.
+subset-related Record shape in the workspace. A rename crosses Module
+boundaries — an exported name changes in every file that imports it, the
+import entries included. Builtins and the standard library are rejected.
 
 Editing a name also updates its other occurrences as you type, without
 invoking rename at all.
@@ -68,7 +81,8 @@ properties after `.`, Methods after `::`, Namespaces after `::<`, Cases after
 `#`, keywords, argument labels, and the members of the Record Type a literal is
 being written for. Names are only offered where they actually resolve —
 Constants and Variables do not hoist, so they appear only after their declaring
-Statement.
+Statement. Names another Module in the workspace exports are offered too, and
+accepting one adds the import.
 
 Accepting a Function or Method writes the whole call, argument labels and all,
 with a stop at each value: `replaceFirst` inserts as
@@ -84,7 +98,8 @@ Hovering shows the inferred Type of any Expression, with full signatures for
 Functions and Methods. Semantic tokens classify each Identifier by what it
 resolves to, which a grammar alone cannot determine — including which names
 come from the standard library. Inlay hints annotate declarations written
-without a Type annotation, and double-clicking one writes it into the source.
+without a Type annotation, and double-clicking one writes it into the source;
+`essence.inlayHints.enabled` turns them off.
 
 ### Editing
 
@@ -94,9 +109,8 @@ Parameter, and backtick spans read as code. Pressing Enter inside a `§§` block
 continues it; a `§` note is left alone, since most of them are one line.
 
 Format Document runs the same formatter as `essence format`, in the Language
-Server rather than as a second process. Essence files default to tabs, a ruler
-at column 80 and this extension as their formatter, which is what the formatter
-itself assumes.
+Server rather than as a second process. Essence files default to tabs and this
+extension as their formatter, which is what the formatter itself assumes.
 
 Snippets cover the language: `namespace`, `protocol`, `choice`, `overload`,
 `match`, `doc` and the rest.
@@ -118,28 +132,38 @@ inlined runtime; `stopOnEntry` pauses on the first statement the author
 wrote, not on the bundle's bootstrap.
 
 A launch configuration takes `program` (the `.es` file), `args`, `cwd`,
-`env`, `stopOnEntry`, `glueFrames: "subtle"` to see the hidden frames greyed
-out, `keepArtifacts` to keep the compiled JavaScript for reading, and
-`artifact` to debug a precompiled bundle without compiling at all. "Uncaught
+`env`, `stopOnEntry`, `runtimeExecutable` to run the program on a particular
+Node, `glueFrames: "subtle"` to see the hidden frames greyed out,
+`keepArtifacts` to keep the compiled JavaScript for reading, and `artifact` to
+debug a precompiled bundle without compiling at all. "Uncaught
 Exceptions" under Breakpoints pauses runtime failures on the mapped line with
 the failure's own message. The Debug Console evaluates JavaScript in the
 compiled frame — documented rather than hidden — though results render as
 Essence values, and a lone identifier like `ok?` or `new` is retried under
 its compiled name.
 
-Debugging needs the `essence` CLI: `essence.cli.path` names it explicitly, a
-checkout open in the workspace is found on its own, and PATH is the fallback.
+Debugging needs the `essence` CLI: `essence.cli.path` names it explicitly,
+and otherwise the installed `essence` is used.
 
 ## Requirements
 
 None for the language features. The Language Server is bundled and runs on the
-Node that ships with VS Code.
+Node that ships with VS Code — it is forked from the extension host itself, so
+it needs nothing on PATH and cannot be broken by a PATH VS Code failed to read.
 
-Debugging additionally needs the `essence` CLI (see above) and a `node` on
-PATH to run the compiled program.
+Debugging additionally needs the `essence` CLI (see above) and a Node to run
+the compiled program on. Neither has to be on PATH: each is looked for on PATH
+first, then where its installer puts it (`~/.bun/bin`, Homebrew, volta, fnm,
+nvm), then by asking the login shell — the question VS Code asks at launch,
+and sometimes gives up on. `essence.bun.path` and `essence.node.path` name
+either outright. `essence.server.path` and `essence.cli.path` accept
+`${workspaceFolder}`, `~` and paths relative to the workspace.
 
 The status bar shows whether the server is running; clicking it restarts it.
-`Essence` in the Output panel carries the server's log and any startup failure.
+`Essence` in the Output panel carries the server's log, which runtime was used
+and where it was found, and any startup failure — including the PATH the
+extension host saw and every directory searched. When a configured server
+cannot run, the bundled one runs instead and a warning says so.
 
 ## Development
 
