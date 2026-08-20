@@ -164,7 +164,7 @@ export class Printer {
 	// does not end a run — it is written between two Statements the author kept
 	// together, and the run is what they wrote.
 	private implementationEntries(
-		nodes: Array<parser.ImplementationNode>,
+		nodes: Array<parser.TestsNode>,
 	): Array<Entry> {
 		let run: Array<AlignedAssignment> = []
 		let kind: AssignmentKind | null = null
@@ -195,7 +195,7 @@ export class Printer {
 				if (assignment === null) {
 					closeRun()
 
-					return this.printImplementationNode(node)
+					return this.printTestsNode(node)
 				}
 
 				if (separated || assignmentKind(assignment) !== kind) {
@@ -291,7 +291,7 @@ export class Printer {
 	// where the owning Statement starts; the `{` itself is looked for from
 	// there, since a header can put it several lines lower.
 	private bodyBlock(
-		body: Array<parser.ImplementationNode>,
+		body: Array<parser.TestsNode>,
 		headLine: number,
 		closeLine: number,
 		allowFlat = false,
@@ -387,27 +387,69 @@ export class Printer {
 			}
 		}
 
-		// NOTE: A file may open with Comments above its `implementation {` —
-		// they are outside the Program's own Position, so they have to be
-		// written before the keyword rather than flushed into the block.
-		let heading = this.headingComments(program.position)
-		let opening = this.trivia.claimTrailingOn(program.position.start.line)
+		// NOTE: A file that is nothing but tests wrote no implementation block,
+		// and one is not written for it — its Program Position IS the tests
+		// block's, so everything below reads the same either way.
+		if (program.kind !== "tests") {
+			// NOTE: A file may open with Comments above its `implementation {` —
+			// they are outside the Program's own Position, so they have to be
+			// written before the keyword rather than flushed into the block.
+			let heading = this.headingComments(program.position)
+			let opening = this.trivia.claimTrailingOn(
+				program.position.start.line,
+			)
 
-		let entries = this.implementationEntries(program.implementation.nodes)
+			let entries = this.implementationEntries(
+				program.implementation.nodes,
+			)
 
-		this.flushBefore(program.position.end.line, entries)
+			this.flushBefore(program.position.end.line, entries)
 
-		parts.push(
-			concat(heading),
-			text(keyword + " "),
-			this.block(entries, program.position.start.line, false, opening),
-		)
+			parts.push(
+				concat(heading),
+				text(keyword + " "),
+				this.block(
+					entries,
+					program.position.start.line,
+					false,
+					opening,
+				),
+			)
 
-		// NOTE: A Comment trailing the Program's own `}` stays on it.
-		let closing = this.trivia.claimTrailingOn(program.position.end.line)
+			// NOTE: A Comment trailing the Program's own `}` stays on it.
+			let closing = this.trivia.claimTrailingOn(program.position.end.line)
 
-		if (closing !== null) {
-			parts.push(lineSuffix(" " + closing.text))
+			if (closing !== null) {
+				parts.push(lineSuffix(" " + closing.text))
+			}
+		}
+
+		if (program.tests !== null) {
+			// NOTE: The block above wrote no separator of its own — except the
+			// `import { … }` block, which does, and which is what stands above
+			// this one in a file that is nothing but tests.
+			if (program.kind !== "tests") {
+				parts.push(hardline)
+
+				if (
+					this.source.hasBlankLineBetween(
+						program.position.end.line,
+						program.tests.position.start.line,
+					)
+				) {
+					parts.push(hardline)
+				}
+			}
+
+			parts.push(this.printTestsSection(program.tests))
+
+			let closing = this.trivia.claimTrailingOn(
+				program.tests.position.end.line,
+			)
+
+			if (closing !== null) {
+				parts.push(lineSuffix(" " + closing.text))
+			}
 		}
 
 		if (program.exports !== null) {
@@ -415,7 +457,7 @@ export class Printer {
 
 			if (
 				this.source.hasBlankLineBetween(
-					program.position.end.line,
+					(program.tests ?? program).position.end.line,
 					program.exports.position.start.line,
 				)
 			) {
@@ -436,7 +478,8 @@ export class Printer {
 		// NOTE: Whatever is left was written below the last block, and is
 		// written back below it — never pulled inside the block above, which
 		// would move it across a brace and be refused.
-		let previousEnd = (program.exports ?? program).position.end.line
+		let previousEnd = (program.exports ?? program.tests ?? program).position
+			.end.line
 
 		for (let comment of this.trivia.takeRemaining()) {
 			parts.push(hardline)
@@ -454,6 +497,101 @@ export class Printer {
 		parts.push(hardline)
 
 		return concat(parts)
+	}
+
+	// NOTE: The `tests { … }` block, written exactly the way the implementation
+	// block is — the section is a block of Statements that happens to admit two
+	// more kinds of item.
+	private printTestsSection(node: parser.TestsSectionNode): Doc {
+		let heading = this.headingComments(node.position)
+		let opening = this.trivia.claimTrailingOn(node.position.start.line)
+
+		let entries = this.implementationEntries(node.nodes)
+
+		this.flushBefore(node.position.end.line, entries)
+
+		return concat([
+			concat(heading),
+			text("tests "),
+			this.block(entries, node.position.start.line, false, opening),
+		])
+	}
+
+	private printTestsNode(node: parser.TestsNode): Doc {
+		switch (node.nodeType) {
+			case "Test":
+				return concat([
+					this.printItemHead("test", node.name, node.modifiers),
+					this.bodyBlock(
+						node.body,
+						node.position.start.line,
+						node.position.end.line,
+					),
+				])
+
+			case "Suite":
+				return concat([
+					this.printItemHead("suite", node.name, node.modifiers),
+					this.bodyBlock(
+						node.nodes,
+						node.position.start.line,
+						node.position.end.line,
+					),
+				])
+
+			default:
+				return this.printImplementationNode(node)
+		}
+	}
+
+	// NOTE: `test "name" skipped "reason"` and the block that follows it. The
+	// Modifiers hang off the name one per line when the head stops fitting, and
+	// the `{` then goes back to the item's own column — which is why the space
+	// before it is part of THIS group rather than of the block: the block holds
+	// a hard break, and a group holding one can never be written flat.
+	private printItemHead(
+		keyword: string,
+		name: parser.TestNode["name"],
+		modifiers: Array<parser.TestModifierNode>,
+	): Doc {
+		let head: Array<Doc> = [text(keyword + " "), this.printValue(name)]
+
+		if (modifiers.length === 0) {
+			return concat([...head, text(" ")])
+		}
+
+		return group(
+			concat([
+				...head,
+				indent(
+					concat(
+						modifiers.flatMap((modifier) => [
+							line,
+							this.printTestModifier(modifier),
+						]),
+					),
+				),
+				line,
+			]),
+		)
+	}
+
+	private printTestModifier(node: parser.TestModifierNode): Doc {
+		if (node.arguments.length === 0) {
+			return text(node.name.content)
+		}
+
+		return concat([
+			text(node.name.content + " "),
+			join(
+				text(", "),
+				node.arguments.map((argument) =>
+					argument.nodeType === "Identifier"
+						? text(argument.content)
+						: this.printValue(argument),
+				),
+			),
+		])
 	}
 
 	// NOTE: The Comments written above a block's own keyword. They sit outside
@@ -658,25 +796,27 @@ export class Printer {
 		}
 	}
 
-	// NOTE: `expect value` and `require value is #Value(item)`. The Matcher
-	// rides on the assertion's own line, as a Handler's does — what is being
-	// taken apart and what it is taken apart into read as one thing.
+	// NOTE: `expect value` and `require #Value(item) = value`. A Matcher is
+	// written on no assertion but a `require`, and it stands where a
+	// Declaration's name stands — the whole of it on the assertion's own line,
+	// as a Handler's is, so what is taken apart and what it is taken apart into
+	// read as one thing.
 	private printAssertion(
 		node: parser.ExpectStatementNode | parser.RequireStatementNode,
 	): Doc {
 		let keyword =
 			node.nodeType === "ExpectStatement" ? "expect " : "require "
 
-		let parts: Array<Doc> = [
-			text(keyword),
-			this.printExpression(node.value),
-		]
-
 		if (node.matcher !== null) {
-			parts.push(text(" is "), this.printMatcher(node.matcher))
+			return concat([
+				text(keyword),
+				this.printMatcher(node.matcher),
+				text(" = "),
+				this.printExpression(node.value),
+			])
 		}
 
-		return concat(parts)
+		return concat([text(keyword), this.printExpression(node.value)])
 	}
 
 	// NOTE: `padding` is written between the head and the `=`, and is the slot an
@@ -2733,7 +2873,7 @@ function alignRun(run: Array<AlignedAssignment>): void {
 // is made of. A `type` alias carries an `=` too, but it is a Declaration of a
 // different kind written among Declarations of this one, and lining the two up
 // would put a Type's name in the same column as a value's.
-function assignmentOf(node: parser.ImplementationNode): AssignmentNode | null {
+function assignmentOf(node: parser.TestsNode): AssignmentNode | null {
 	switch (node.nodeType) {
 		case "ConstantDeclarationStatement":
 		case "VariableDeclarationStatement":
