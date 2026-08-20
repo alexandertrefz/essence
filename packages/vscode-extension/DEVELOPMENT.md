@@ -19,14 +19,28 @@ Press `F5` ("Extension") to open an Extension Development Host.
 
 `server/server.js` is generated and not committed — rebuild it after changing
 the Language Server. To skip the bundling step entirely while working on the
-server, point `essence.server.path` at `packages/language-server/bin/esls`: a
-built `.js` bundle is run with Node, and anything else is treated as source and
-run with Bun. The setting spawns what it names with `--stdio` and nothing else,
-so it wants that entry point rather than the `essence lsp` command a terminal
-would use. That is the better loop of the two — `esls` runs the server's
-TypeScript directly, so a change needs no rebuild at all, just
+server, point `essence.server.path` at `packages/language-server/bin/esls` —
+as `${workspaceFolder}/packages/language-server/bin/esls` in a workspace
+`.vscode/settings.json`, which then works from any checkout. A built `.js` bundle
+is forked on the Node VS Code ships, and anything else is treated as source
+and run with Bun. The setting spawns what it names with `--stdio` and nothing
+else, so it wants that entry point rather than the `essence lsp` command a
+terminal would use. That is the better loop of the two — `esls` runs the
+server's TypeScript directly, so a change needs no rebuild at all, just
 `Essence: Restart Language Server`, which picks it up without reloading the
 window.
+
+Bun is found on PATH, then in its usual install locations, then by asking the
+login shell (`$SHELL -ilc 'command -v bun'`, bounded to five seconds) —
+`essence.bun.path` names it outright. When VS Code launched without the
+shell's PATH, the Essence output channel says so and says to relaunch. If Bun
+cannot be found at all the bundled server runs instead, with a warning: keep
+an eye on that warning, because a bundle built last week silently serving a
+checkout's diagnostics is the confusing failure this is meant to avoid.
+
+All of that resolution is `launch.js`, pure functions of their arguments with
+the file system, environment and shell handed in; `tests/launch.spec.ts`
+covers every branch without an extension host.
 
 ## The debugging walkthrough
 

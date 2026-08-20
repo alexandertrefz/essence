@@ -1,5 +1,26 @@
 # Change Log
 
+## [Unreleased]
+
+- The Language Server no longer depends on PATH. The bundled server — and a
+  configured `.js` bundle — is forked on the Node VS Code itself ships; it
+  was previously spawned as `node`, which failed whenever VS Code had
+  launched without the shell's PATH. The same goes for a `.js` CLI bundle
+  the debugger runs.
+- Bun, Node and an installed `essence` are found even when PATH has none
+  of them: on PATH first, then where each installer puts it (`~/.bun/bin`,
+  Homebrew, volta, fnm, nvm), then by asking the login shell. New
+  `essence.bun.path` and `essence.node.path` settings name either outright.
+- `essence.server.path` and `essence.cli.path` accept `${workspaceFolder}`,
+  `~` and paths relative to the workspace, so a checkout can commit a
+  working `.vscode/settings.json`.
+- When the configured Language Server cannot run, the bundled one runs
+  instead, with a warning that says so.
+- A startup failure now writes the PATH the extension host saw and every
+  directory searched to the Essence output channel, and recognises the bare
+  launchd PATH on macOS — VS Code having given up on reading the shell
+  environment — which only a full relaunch fixes.
+
 ## [0.4.0]
 
 The language moved: destructuring, checked refinements, Optional as a
@@ -75,6 +96,14 @@ does, and the standard library ships from `@essence-lang/standard-library` the s
   identifier like `ok?` is retried under its compiled name.
 - `keepArtifacts` keeps the compiled bundle for reading; `artifact` debugs a
   precompiled one without compiling at all.
+- Modules. A file is analysed with the Modules it imports, and Diagnostics
+  in an imported file are reported there even when it is not open. Go to
+  definition follows an import to the Module that declares the name, Find
+  All References and renaming reach every file in the workspace, and Go to
+  Symbol in Workspace searches them all. Completion offers what other Modules
+  export and adds the import on accept; an unknown name, Type, Protocol or
+  Method offers the import as a Quick Fix, and an unused import offers its
+  removal.
 - The CLI is found through `essence.cli.path`, a checkout open in the
   workspace, or PATH — in that order. The setting joins
   `essence.server.path` in being ignored in untrusted workspaces, for the

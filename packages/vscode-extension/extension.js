@@ -1,13 +1,25 @@
+import { spawn } from "node:child_process"
 import fs from "node:fs"
+import os from "node:os"
 import path from "node:path"
 
 import * as vscode from "vscode"
 // NOTE: The explicit `.js` is required — under native ESM resolution an
 // extensionless specifier is not resolved, and vscode-languageclient ships no
 // `exports` map that would map one.
-import { LanguageClient, State } from "vscode-languageclient/node.js"
+import {
+	LanguageClient,
+	State,
+	TransportKind,
+} from "vscode-languageclient/node.js"
 
-import { resolveCli } from "./debug.js"
+import {
+	describeEnvironment,
+	describeServer,
+	resolveCli,
+	resolveRuntime,
+	resolveServer,
+} from "./launch.js"
 
 let client
 // NOTE: `onDidChangeState` belongs to the client, and a restart builds a new
@@ -24,60 +36,136 @@ let currentServer = null
 // notification has been dismissed. Cleared by the next start.
 let failure = null
 
-// NOTE: The Language Server is bundled into `server/server.js` by `bun run
-// build`, which compiles it out of the compiler repository. That bundle runs
-// on the Node that ships with VS Code, so neither Bun nor a compiler checkout
-// is needed to use the extension.
-//
-// `essence.server.path` overrides it, which is how the compiler is developed
-// against: point it at `bin/esls` and every edit takes effect on the next
-// restart, with no bundling step.
-//
-// NOTE: Answered as a description rather than as `ServerOptions`, because the
-// startup line in the output channel, the status bar tooltip and both failure
-// messages are all made of these same three facts, and every one of them has
-// to name the server that is actually running.
-function resolveServer(context) {
-	let configuredPath = vscode.workspace
-		.getConfiguration("essence")
-		.get("server.path")
-
-	if (typeof configuredPath === "string" && configuredPath.trim() !== "") {
-		let serverPath = configuredPath.trim()
-
-		if (!fs.existsSync(serverPath)) {
-			reportFailure(
-				`'essence.server.path' points at '${serverPath}', which does not exist.`,
-			)
-
-			return null
-		}
-
-		// NOTE: Only a built bundle is JavaScript, and only that can run on
-		// Node. Everything else — a TypeScript entry point, or the compiler's
-		// extensionless `bin/esls` launcher — is source that needs Bun.
-		return {
-			command: /\.(js|cjs|mjs)$/.test(serverPath) ? "node" : "bun",
-			path: serverPath,
-			configured: true,
-		}
-	}
-
-	let bundledPath = path.join(context.extensionPath, "server", "server.js")
-
-	if (!fs.existsSync(bundledPath)) {
-		reportFailure(
-			"the bundled Language Server is missing. Run 'bun run build' in packages/vscode-extension, or set 'essence.server.path'.",
-		)
-
-		return null
-	}
-
-	return { command: "node", path: bundledPath, configured: false }
+function settings() {
+	return vscode.workspace.getConfiguration("essence")
 }
 
-function describeServer(server) {
-	return `${server.configured ? "configured" : "bundled"} Language Server '${server.path}', run with '${server.command}'`
+function workspaceRoot() {
+	return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
+}
+
+// NOTE: The login shell asked what VS Code failed to ask it at launch. Bounded,
+// because a shell that hangs is the very reason VS Code gave up, and an
+// extension that hangs with it has made nothing better; the output channel
+// names the runtime it was looking for, so a slow answer is at least
+// explained. Resolves to the shell's stdout, or to nothing on any failure —
+// `probeLoginShell` treats both the same.
+function runLoginShell(shell, args) {
+	return new Promise((resolve) => {
+		let output = ""
+		let settled = false
+		let finish = (answer) => {
+			if (!settled) {
+				settled = true
+				resolve(answer)
+			}
+		}
+		let child
+
+		try {
+			child = spawn(shell, args, {
+				stdio: ["ignore", "pipe", "ignore"],
+				env: process.env,
+			})
+		} catch {
+			finish(undefined)
+
+			return
+		}
+
+		let timer = setTimeout(() => {
+			outputChannel.appendLine(
+				`The login shell '${shell}' did not answer within 5 seconds; giving up on it.`,
+			)
+			child.kill()
+			finish(undefined)
+		}, 5000)
+
+		child.stdout.on("data", (chunk) => {
+			output += chunk.toString()
+		})
+		child.on("error", () => {
+			clearTimeout(timer)
+			finish(undefined)
+		})
+		child.on("close", () => {
+			clearTimeout(timer)
+			finish(output)
+		})
+	})
+}
+
+function listDirectory(directory) {
+	try {
+		return fs.readdirSync(directory)
+	} catch {
+		return []
+	}
+}
+
+// NOTE: Everything `launch.js` is handed about the machine, in one place, so
+// the Language Server and the debugger cannot disagree about where to look.
+function runtimeContext(settingName) {
+	return {
+		settingName,
+		env: process.env,
+		home: os.homedir(),
+		platform: process.platform,
+		shell: process.env.SHELL,
+		exists: fs.existsSync,
+		list: listDirectory,
+		run: runLoginShell,
+	}
+}
+
+// NOTE: `essence.bun.path` and `essence.node.path` are the explicit answers;
+// each runtime's `resolveRuntime` reads its own.
+function findRuntime(name) {
+	let settingName = `essence.${name}.path`
+
+	return resolveRuntime(
+		name,
+		settings().get(`${name}.path`),
+		runtimeContext(settingName),
+	)
+}
+
+// NOTE: What the output channel says about how a runtime was — or was not —
+// found. A runtime found anywhere but PATH (or by the setting) means PATH is
+// not what the user thinks it is, which is worth a line even on success: the
+// next tool to need it may not look as hard.
+function reportRuntimeLookup(name, resolution) {
+	if (resolution.error === undefined) {
+		if (resolution.source !== "PATH" && resolution.source !== "setting") {
+			outputChannel.appendLine(
+				`Found '${name}' at '${resolution.path}' through its ${resolution.source}; it is not on the PATH the extension host started with.`,
+			)
+
+			for (let line of describeEnvironment(runtimeContext())) {
+				outputChannel.appendLine(line)
+			}
+		}
+
+		return
+	}
+
+	if (resolution.searched?.length > 0) {
+		outputChannel.appendLine(
+			`Looked for '${name}' in: ${resolution.searched.join(", ")}`,
+		)
+	}
+
+	for (let line of describeEnvironment(runtimeContext())) {
+		outputChannel.appendLine(line)
+	}
+}
+
+function serverOptions(server) {
+	if (server.kind === "module") {
+		return { module: server.path, transport: TransportKind.stdio }
+	}
+
+	return { command: server.command, args: [server.path, "--stdio"] }
 }
 
 const statusByState = {
@@ -92,7 +180,7 @@ function setStatus(icon, detail) {
 		`Essence Language Server — ${detail}\n` +
 		(currentServer === null
 			? "No Language Server resolved.\n"
-			: `Using the ${describeServer(currentServer)}.\n`) +
+			: `Using the ${describeServer(currentServer)}${currentServer.fellBack ? " (fallback — the configured server could not run)" : ""}.\n`) +
 		"Click to restart it."
 
 	statusItem.show()
@@ -137,17 +225,28 @@ async function reportFailure(message) {
 	}
 }
 
-async function startClient(context) {
-	failure = null
-	currentServer = resolveServer(context)
+async function reportFallback(message) {
+	outputChannel.appendLine(message)
 
-	if (currentServer === null) {
-		setFailure("no server to run")
+	let choice = await vscode.window.showWarningMessage(
+		`Essence: ${message}`,
+		"Show Output",
+	)
 
-		return
+	if (choice === "Show Output") {
+		outputChannel.show(true)
 	}
+}
 
-	outputChannel.appendLine(`Starting the ${describeServer(currentServer)}.`)
+// NOTE: One attempt at one server. Answers whether it is running; a failure
+// is reported here, and the caller decides whether there is another server to
+// try. The spawn advice is specific to the kind: a module is forked on VS
+// Code's own Node, so a failed fork is a broken bundle and not a PATH
+// problem; a command is Bun, already resolved to a path that existed.
+async function launch(server) {
+	currentServer = server
+
+	outputChannel.appendLine(`Starting the ${describeServer(server)}.`)
 
 	stateListener?.dispose()
 
@@ -161,10 +260,7 @@ async function startClient(context) {
 	client = new LanguageClient(
 		"essence",
 		"Essence Language Server",
-		{
-			command: currentServer.command,
-			args: [currentServer.path, "--stdio"],
-		},
+		serverOptions(server),
 		{
 			documentSelector: [
 				{ scheme: "file", language: "essence" },
@@ -200,27 +296,109 @@ async function startClient(context) {
 
 	try {
 		await client.start()
+
+		return true
 	} catch (error) {
 		if (reportedByHandler) {
-			return
+			return false
 		}
 
 		let message = error instanceof Error ? error.message : String(error)
 
 		setFailure("failed to start")
+		outputChannel.appendLine(
+			`could not start the ${describeServer(server)} — ${message}`,
+		)
 
-		// NOTE: Not awaited. `activate` awaits its way down to here, and an
-		// error notification stays up until it is dismissed — awaiting the
-		// answer would leave the extension activating for as long as the
-		// notification is ignored, which is exactly the case where the user is
-		// reading it rather than clicking it.
-		reportFailure(
-			`could not start the ${describeServer(currentServer)} — ${message}. ` +
-				(currentServer.configured
-					? `That server is what 'essence.server.path' names; check that '${currentServer.command}' is on PATH, or clear the setting to fall back to the bundled server — rebuild it with 'bun run build' in packages/vscode-extension.`
-					: "Rebuild the bundled server with 'bun run build' in packages/vscode-extension, or point 'essence.server.path' at a checkout's 'packages/language-server/bin/esls'."),
+		return false
+	}
+}
+
+async function startClient(context) {
+	failure = null
+	currentServer = null
+
+	let resolution = await resolveServer(settings().get("server.path"), {
+		workspaceRoot: workspaceRoot(),
+		extensionPath: context.extensionPath,
+		home: os.homedir(),
+		exists: fs.existsSync,
+		resolveBun: async () => {
+			let bun = await findRuntime("bun")
+
+			reportRuntimeLookup("bun", bun)
+
+			return bun
+		},
+	})
+
+	if (resolution.error !== undefined) {
+		// NOTE: The configured server cannot run, and the bundled one can. The
+		// bundled one is what runs, and the user is told in a warning rather
+		// than an error — diagnostics are still coming, just not from the
+		// checkout — because silently serving a stale server to someone
+		// developing the compiler would be the more confusing outcome.
+		if (resolution.fallback !== undefined) {
+			reportFallback(
+				`${resolution.error} Running the bundled Language Server instead.`,
+			)
+
+			await launch({ ...resolution.fallback, fellBack: true })
+
+			return
+		}
+
+		setFailure("no server to run")
+		reportFailure(resolution.error)
+
+		return
+	}
+
+	if (resolution.kind === "command") {
+		outputChannel.appendLine(
+			`Using '${resolution.command}' (${resolution.runtimeSource}) to run it.`,
 		)
 	}
+
+	if (await launch(resolution)) {
+		return
+	}
+
+	// NOTE: A configured server that resolved but would not start. A source
+	// entry's Bun was a path that existed a moment ago, so this is the rare
+	// case — but the bundled server is still there, and still better than
+	// nothing. A bundle that fails to fork has nowhere left to go, and says so.
+	if (resolution.configured) {
+		let bundledPath = path.join(
+			context.extensionPath,
+			"server",
+			"server.js",
+		)
+
+		if (fs.existsSync(bundledPath) && resolution.path !== bundledPath) {
+			reportFallback(
+				`The configured Language Server did not start (see above). Running the bundled Language Server instead.`,
+			)
+
+			failure = null
+
+			await launch({
+				kind: "module",
+				path: bundledPath,
+				configured: false,
+				fellBack: true,
+			})
+
+			return
+		}
+	}
+
+	reportFailure(
+		`could not start the ${describeServer(resolution)}. ` +
+			(resolution.configured
+				? "That server is what 'essence.server.path' names; clear the setting to fall back to the bundled server — rebuild it with 'bun run build' in packages/vscode-extension."
+				: "Rebuild the bundled server with 'bun run build' in packages/vscode-extension, or point 'essence.server.path' at a checkout's 'packages/language-server/bin/esls'."),
+	)
 }
 
 async function stopClient() {
@@ -275,24 +453,62 @@ function queue(work) {
 	return lifecycle
 }
 
-// NOTE: The CLI half of `resolveServer`'s answer, for the debugger — which
-// executable compiles, described so the output channel can name it. The
-// resolution itself is pure and lives in `debug.js`; this reads the setting
-// and the workspace and reports the one failure that has a user fix.
-function resolveCliForDebugging() {
-	let configuredPath = vscode.workspace
-		.getConfiguration("essence")
-		.get("cli.path")
-	let workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
-	let cli = resolveCli(configuredPath, workspaceRoot, fs.existsSync)
+// NOTE: The Debug Adapter is the CLI's own `dap` command — the same binary
+// that compiles is the one that debugs, so the two can never disagree about a
+// bundle or its map. A bundle runs on VS Code's own Node, the way the
+// Language Server's does: `process.execPath` is the extension host, and
+// `ELECTRON_RUN_AS_NODE` makes it plain Node — no lookup. Source needs Bun,
+// and an installed `essence` needs finding; both go through the same
+// resolution as the Language Server, and both explain themselves the same way
+// when it fails.
+async function createDebugAdapter() {
+	let cli = resolveCli(settings().get("cli.path"), {
+		workspaceRoot: workspaceRoot(),
+		home: os.homedir(),
+		exists: fs.existsSync,
+	})
 
 	if (cli.error !== undefined) {
 		reportFailure(cli.error)
 
-		return null
+		return undefined
 	}
 
-	return cli
+	if (cli.kind === "module") {
+		outputChannel.appendLine(
+			`Starting the Debug Adapter through the ${cli.description}, run on VS Code's own Node.`,
+		)
+
+		return new vscode.DebugAdapterExecutable(
+			process.execPath,
+			[cli.path, "dap"],
+			{ env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" } },
+		)
+	}
+
+	let runtimeName = cli.kind === "bun" ? "bun" : "essence"
+	let runtime = await findRuntime(runtimeName)
+
+	reportRuntimeLookup(runtimeName, runtime)
+
+	if (runtime.error !== undefined) {
+		reportFailure(
+			cli.kind === "bun"
+				? `the ${cli.description} needs Bun to run, but ${runtime.error} Set 'essence.bun.path', or point 'essence.cli.path' at a built bundle.`
+				: `${runtime.error} Install the Essence CLI, or set 'essence.cli.path'.`,
+		)
+
+		return undefined
+	}
+
+	outputChannel.appendLine(
+		`Starting the Debug Adapter through the ${cli.description}, run with '${runtime.path}'.`,
+	)
+
+	return new vscode.DebugAdapterExecutable(
+		runtime.path,
+		cli.kind === "bun" ? [cli.path, "dap"] : ["dap"],
+	)
 }
 
 // NOTE: What the Run-and-Debug view offers before any launch.json exists —
@@ -324,7 +540,7 @@ function provideDynamicConfigurations() {
 // The empty object is what F5 sends with no launch.json, and it becomes the
 // same launch the contribution's `initialConfigurations` writes, built from
 // the active editor.
-function resolveEssenceDebugConfiguration(folder, config) {
+async function resolveEssenceDebugConfiguration(folder, config) {
 	if (
 		config.type === undefined &&
 		config.request === undefined &&
@@ -377,6 +593,22 @@ function resolveEssenceDebugConfiguration(folder, config) {
 		config.cwd = folder.uri.fsPath
 	}
 
+	// NOTE: The program itself runs on a real Node — the Adapter speaks its
+	// inspector protocol — which the Adapter would otherwise spawn as `node`
+	// off its own PATH, the same PATH that may have nothing on it. Resolved
+	// here, where there is a login shell to ask; a configuration that names
+	// its own `runtimeExecutable` is left alone, and when nothing is found the
+	// Adapter is left to try `node` and report in its own words.
+	if (config.runtimeExecutable === undefined) {
+		let node = await findRuntime("node")
+
+		reportRuntimeLookup("node", node)
+
+		if (node.error === undefined) {
+			config.runtimeExecutable = node.path
+		}
+	}
+
 	return config
 }
 
@@ -414,38 +646,23 @@ export async function activate(context) {
 			{ provideDebugConfigurations: provideDynamicConfigurations },
 			vscode.DebugConfigurationProviderTriggerKind.Dynamic,
 		),
-		// NOTE: The adapter is the CLI's own `dap` command — the same binary
-		// that compiles is the one that debugs, so the two can never disagree
-		// about a bundle or its map.
 		vscode.debug.registerDebugAdapterDescriptorFactory("essence", {
-			createDebugAdapterDescriptor: () => {
-				let cli = resolveCliForDebugging()
-
-				if (cli === null) {
-					return undefined
-				}
-
-				outputChannel.appendLine(
-					`Starting the Debug Adapter through the ${cli.description}.`,
-				)
-
-				return new vscode.DebugAdapterExecutable(cli.command, [
-					...cli.args,
-					"dap",
-				])
-			},
+			createDebugAdapterDescriptor: () => createDebugAdapter(),
 		}),
 		// NOTE: Only the spawn path is worth interrupting for, and only by
 		// asking — a restart drops every open document's diagnostics for a
 		// moment. `essence.trace.server` is deliberately absent:
 		// vscode-languageclient watches it itself and applies it live.
 		vscode.workspace.onDidChangeConfiguration(async (event) => {
-			if (!event.affectsConfiguration("essence.server.path")) {
+			if (
+				!event.affectsConfiguration("essence.server.path") &&
+				!event.affectsConfiguration("essence.bun.path")
+			) {
 				return
 			}
 
 			let choice = await vscode.window.showInformationMessage(
-				"Essence: 'essence.server.path' changed. Restart the Language Server to use it?",
+				"Essence: the Language Server's settings changed. Restart it to use them?",
 				"Restart",
 			)
 
