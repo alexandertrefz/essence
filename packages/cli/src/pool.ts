@@ -14,7 +14,7 @@ import {
 	createCompileSession,
 	groupEntries,
 } from "./session"
-import type { WorkerResponse } from "./worker"
+import type { WorkerRequest, WorkerResponse } from "./worker"
 
 // NOTE: Booting a worker and importing the Compiler into it costs about twenty
 // milliseconds of wall clock, so workers are only worth it where there is that
@@ -66,7 +66,13 @@ export type CompileDispatcher = {
 	// what a Module compiles as, and a graph is shared: the dispatcher has to
 	// know the whole invocation to load each file once, and the whole
 	// invocation is only known here.
-	begin: (inputFileNames: Array<string>) => void
+	// NOTE: `tests` is the compile MODE of the whole run — see
+	// `createCompileSession`. It travels with the entries rather than with each
+	// request because it is what the Session is opened in.
+	begin: (
+		inputFileNames: Array<string>,
+		options?: { tests?: boolean },
+	) => void
 	compile: (
 		request: CompileRequest,
 		onStage?: (stage: StageName) => void,
@@ -129,8 +135,8 @@ export function createInlineDispatcher(): CompileDispatcher {
 	let session: CompileSession = createCompileSession([])
 
 	return {
-		begin: (inputFileNames) => {
-			session = createCompileSession(inputFileNames)
+		begin: (inputFileNames, options) => {
+			session = createCompileSession(inputFileNames, options)
 		},
 		compile: (request, onStage) => compileFile(request, onStage, session),
 		dispose: async () => {},
@@ -243,6 +249,21 @@ export function createWorkerPool(size: number): CompileDispatcher {
 	let nextId = 0
 	let nextSlot = 0
 	let disposed = false
+	// NOTE: The mode the run was begun in, kept because a slot boots LAZILY —
+	// the first job that lands on it is what spawns its worker, and that is
+	// after `begin` has been and gone. An ordinary run boots every one of its
+	// workers that way, so this is the copy nearly all of them are opened from.
+	let tests = false
+
+	// NOTE: The one place a worker is told what run it is in, for both moments
+	// it can be told: `begin` reaches the slots that are already up, `spawn`
+	// reaches the ones that boot afterwards. `WorkerRequest` asks for the mode
+	// rather than allowing it, so a second caller can not leave it out.
+	let beginMessage = (slot: Slot): WorkerRequest => ({
+		type: "begin",
+		entries: slot.entries,
+		tests,
+	})
 
 	let spawn = (slot: Slot): Worker => {
 		let worker = new Worker(workerURL)
@@ -294,7 +315,7 @@ export function createWorkerPool(size: number): CompileDispatcher {
 		})
 
 		worker.unref()
-		worker.postMessage({ type: "begin", entries: slot.entries })
+		worker.postMessage(beginMessage(slot))
 
 		return worker
 	}
@@ -359,20 +380,18 @@ export function createWorkerPool(size: number): CompileDispatcher {
 	}
 
 	return {
-		begin: (inputFileNames) => {
+		begin: (inputFileNames, options) => {
 			let groups = groupEntries(inputFileNames)
 
 			active = Math.max(1, Math.min(size, groups.length))
 			assignment = assignSlots(slots, active, groups)
+			tests = options?.tests === true
 
 			// NOTE: A worker that already ran carries the Session of the
 			// previous run — a watch rebuild is a new run over new files, and
 			// the graph it holds is the one that just changed.
 			for (let slot of slots) {
-				slot.worker?.postMessage({
-					type: "begin",
-					entries: slot.entries,
-				})
+				slot.worker?.postMessage(beginMessage(slot))
 			}
 		},
 		compile: (request, onStage) =>

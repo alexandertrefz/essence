@@ -35,6 +35,10 @@ export type CompilationPlan = {
 	inputFileNames: Array<string>
 	outputs: Map<string, string> | null
 	dispatcher: CompileDispatcher
+	// NOTE: Whether this run asked for the tests. It is planned rather than
+	// passed per file because it decides how the whole run is compiled — the
+	// Session every entry is linked through opens in this mode.
+	tests?: boolean
 }
 
 export type CompilationResult = {
@@ -47,7 +51,7 @@ export async function planCompilation(
 	context: CLIContext,
 	command: CommandSpec,
 	patterns: Array<string>,
-	options: { emit: boolean; cacheOutput?: boolean },
+	options: { emit: boolean; cacheOutput?: boolean; tests?: boolean },
 ): Promise<CompilationPlan> {
 	let inputFileNames = await resolveInputFiles(
 		patterns,
@@ -84,6 +88,7 @@ export async function planCompilation(
 		dispatcher: useWorkers
 			? createWorkerPool(workerCount)
 			: createInlineDispatcher(),
+		tests: options.tests,
 	}
 }
 
@@ -103,7 +108,7 @@ export async function runCompilation(
 	// NOTE: The whole run's entries first, and only then the requests. A Module
 	// is compiled as a graph, and the graphs of a batch overlap: which files are
 	// going to be asked for decides how many times each of them is read.
-	plan.dispatcher.begin(plan.inputFileNames)
+	plan.dispatcher.begin(plan.inputFileNames, { tests: plan.tests })
 
 	let tasks = plan.inputFileNames.map<Task>((fileName) => ({
 		id: fileName,
@@ -132,6 +137,7 @@ export async function runCompilation(
 					sourcemapMode: options?.sourcemapMode,
 					optimisation: optimiserOptionsFor(context.options),
 					embed: context.options.embed,
+					tests: plan.tests,
 				},
 				(stage) => {
 					progress.update(inputFileName, {

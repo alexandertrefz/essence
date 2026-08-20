@@ -49,7 +49,12 @@ import {
 	type CompileRequest,
 	descriptorFileName,
 } from "../pipeline"
-import { defaultWorkerCount, shouldUseWorkers, workerFileName } from "../pool"
+import {
+	createWorkerPool,
+	defaultWorkerCount,
+	shouldUseWorkers,
+	workerFileName,
+} from "../pool"
 import {
 	countDiagnostics,
 	formatBytes,
@@ -835,6 +840,62 @@ describe("CLI", () => {
 			expect(workerFileName("file:///install/cli/dist/pool.js")).toBe(
 				"./worker.js",
 			)
+		})
+
+		// NOTE: The two moments a worker can be told what run it is in, over
+		// one worker. A slot boots on the first job that lands on it rather
+		// than when the run is planned, so the FIRST `begin` of a run reaches
+		// no worker at all and the mode has to be waiting when the boot comes;
+		// the second reaches the worker that is now up. A run whose workers
+		// were opened as builds compiles every file without the section it
+		// exists to check, and reports a project with nothing to run.
+		//
+		// NOTE: A file whose tests section does not compile is what says which
+		// mode the worker opened in — checking stops before anything is
+		// emitted, so this costs one boot and one enrichment.
+		it("opens a worker booted after begin in the run's mode", async () => {
+			let directory = mkdtempSync(path.join(tmpdir(), "essence-pool-"))
+			let entry = path.join(directory, "Mode.tests.es")
+			let request: CompileRequest = {
+				inputFileName: entry,
+				outputFileName: null,
+				minify: false,
+				sourcemap: false,
+			}
+			let pool = createWorkerPool(1)
+
+			writeFileSync(
+				entry,
+				[
+					"tests {",
+					'\ttest "asserts a String" {',
+					'\t\texpect "not a Boolean"',
+					"\t}",
+					"}",
+					"",
+				].join("\n"),
+			)
+
+			try {
+				pool.begin([entry], { tests: true })
+
+				let asked = await pool.compile({ ...request, tests: true })
+
+				expect(asked.ok).toBe(false)
+				expect(
+					asked.diagnostics.map((diagnostic) => diagnostic.code),
+				).toContain("expect-not-boolean")
+
+				pool.begin([entry])
+
+				let plain = await pool.compile(request)
+
+				expect(plain.diagnostics).toEqual([])
+				expect(plain.ok).toBe(true)
+			} finally {
+				await pool.dispose()
+				rmSync(directory, { recursive: true, force: true })
+			}
 		})
 	})
 

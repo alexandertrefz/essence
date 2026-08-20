@@ -66,6 +66,14 @@ export type WorkspaceOptions = {
 	// only truthful version of itself, and the version is what tells a cached
 	// parse from a stale one.
 	openDocument?: (filePath: string) => OpenDocument | undefined
+	// NOTE: Whether this Workspace types the tests — see `enrichDocument`. It
+	// belongs to the Workspace rather than to a request because a Workspace IS
+	// the cache: one entry holds one enriched Program, so a Workspace that
+	// answers about the section and one that does not are two of them rather
+	// than one flag on a call. The Server's own has it ON: a build drops the
+	// section, so the Editor is the only thing that can say a test does not
+	// type-check while it is being written.
+	tests?: boolean
 }
 
 export type WorkspaceOccurrence = {
@@ -709,7 +717,10 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 			annotationsFor !== undefined && graph.modules.has(annotationsFor)
 				? annotationsFor
 				: entryPath
-		let linked = linkModuleGraph(graph, { annotationsFor: annotated })
+		let linked = linkModuleGraph(graph, {
+			annotationsFor: annotated,
+			tests: options.tests,
+		})
 		let analyses = analyseLinkedGraph(linked, { cancellation })
 
 		if (analyses === null) {
@@ -803,7 +814,7 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 			entry.program,
 			entry.parseDiagnostics,
 			entry.filePath,
-			{ annotations: true },
+			{ annotations: true, tests: options.tests },
 		)
 
 		recordEdges(entry.filePath, [])
