@@ -101,6 +101,13 @@ export function isPureExpression(
 		// than half-read.
 		case "Match":
 			return false
+		// NOTE: An instrumented point WRITES — into the trace buffer of the
+		// context the test is running under — so it is never pure, whatever
+		// stands inside it. Answering otherwise would let a pass pool one,
+		// hoist it out of the assertion it belongs to, or drop it where its
+		// value is unread, and the recording is the whole point of it.
+		case "TestTrace":
+			return false
 		case "Intrinsic":
 			return isPureIntrinsic(node, shadowed)
 	}

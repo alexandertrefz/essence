@@ -106,12 +106,19 @@ function rewriteProgram(program: common.typedSimple.Program): string {
 		let implementation = rewriteImplementationSection(
 			program.implementation,
 		)
+		// NOTE: Inside the pool's collection, and reaching the fixed point
+		// below with the implementation: a test body calls the same standard
+		// library Methods a Program does, and a pooled constant a test names
+		// has to be declared in the band above it.
+		let tests =
+			program.tests === null ? [] : rewriteTestsSection(program.tests)
 
 		return {
 			implementation,
+			tests,
 			essenceMembers: reachableEssenceMethods(
 				prelude,
-				implementation,
+				[...implementation, ...tests],
 				freeFunctions,
 				[...pooledConstants.values()],
 			),
@@ -120,7 +127,12 @@ function rewriteProgram(program: common.typedSimple.Program): string {
 	const bands = essenceMemberBands(rewritten.essenceMembers)
 	const constantPool = constantPoolBand(
 		pool,
-		[bands.functions, bands.values, rewritten.implementation],
+		[
+			bands.functions,
+			bands.values,
+			rewritten.implementation,
+			rewritten.tests,
+		],
 		rewritten.implementation,
 	)
 	const essenceMembers = rewritten.essenceMembers
@@ -134,7 +146,7 @@ function rewriteProgram(program: common.typedSimple.Program): string {
 			// a lone Program costs nothing and stays what it always was. A
 			// Module of a bundle asks for what it names instead — there are
 			// twenty heads to read through there rather than one.
-			...runtimeImports(allRuntimeNames()),
+			...runtimeImports(lonelyRuntimeNames(program)),
 			// NOTE: Imports first — an Essence Method's const reads the runtime
 			// modules those imports bind. Then the Essence-implemented members,
 			// in the two bands `essenceMemberBands` puts them in: the
@@ -150,6 +162,10 @@ function rewriteProgram(program: common.typedSimple.Program): string {
 			...constantPool,
 			...bands.values,
 			...rewritten.implementation,
+			// NOTE: The tests come last, after everything the Program declares
+			// — a test reads the implementation and nothing reads a test.
+			...rewritten.tests,
+			...(program.tests === null ? [] : [testEntryPointsExport()]),
 		],
 	}
 
@@ -322,9 +338,18 @@ function rewriteModuleGraph(
 		// runtime imports and the prelude import are both decided by that.
 		let bodies = modules.map((module) => {
 			let { value: body, pool } = collectingConstantPool(() =>
-				withSourcePath(module.filePath, () =>
-					rewriteImplementationSection(module.program.implementation),
-				),
+				withSourcePath(module.filePath, () => [
+					...rewriteImplementationSection(
+						module.program.implementation,
+					),
+					// NOTE: In the Module's own pool collection: a test reads
+					// the standard library exactly as the implementation beside
+					// it does, and a constant pooled for a test is declared in
+					// this Module's band.
+					...(module.program.tests === null
+						? []
+						: rewriteTestsSection(module.program.tests)),
+				]),
 			)
 
 			return { module, body, pool: constantPoolBand(pool, body, body) }
@@ -358,8 +383,23 @@ function rewriteModuleGraph(
 		checkEssenceMethodsAreDeclared(preludeProgram, declared)
 		sources.set(PRELUDE_SPECIFIER, generateProgram(preludeProgram))
 
+		// NOTE: A bundle publishes ONE way in to the tests of every Module in
+		// it, and what a bundle exports is what its entry exports — so the
+		// entry carries it whether or not the entry itself wrote a `tests`
+		// block. A `Foo.tests.es` importing the Module it tests is exactly
+		// that shape.
+		let testRegistry = modules.some(
+			(module) => module.program.tests !== null,
+		)
+
 		for (let { module, body, pool } of bodies) {
-			let names = referencedNames([body, pool])
+			let published = [
+				...moduleExports(module.program, spellings),
+				...(testRegistry && module.filePath === entryPath
+					? [testEntryPointsExport()]
+					: []),
+			]
+			let names = referencedNames([body, pool, published])
 			let preludeNames = [...essenceMembers.keys()].filter((name) =>
 				names.has(name),
 			)
@@ -380,7 +420,7 @@ function rewriteModuleGraph(
 					...moduleImports(module.program, spellings),
 					...pool,
 					...body,
-					...moduleExports(module.program, spellings),
+					...published,
 				],
 			}
 
@@ -441,12 +481,35 @@ const runtimeModuleAliases = [
 	["$_", "functions"],
 	["$type", "type"],
 	["$helpers", "internalHelpers"],
+	// NOTE: The test runtime, which only a test compile ever names — a Program
+	// that wrote no `tests` block never mentions it, and esbuild shakes the
+	// import away with the module behind it.
+	["$testing", "Testing"],
 ] as const
 
+// NOTE: What a lone Program's head imports — every runtime module, and the test
+// runtime beside them exactly when the Program has tests to register.
+function lonelyRuntimeNames(program: common.typedSimple.Program): Set<string> {
+	let names = allRuntimeNames()
+
+	if (program.tests !== null) {
+		names.add(TESTING_MODULE)
+	}
+
+	return names
+}
+
+// NOTE: A lone Program's head is every runtime module whether the Program names
+// one or not — esbuild shakes an unused `import * as <Name>` away, so it costs
+// nothing and the head stays what it always was. The TEST runtime is the one
+// exception: only a test compile can name it, and a build that carried the
+// import would say a Program has tests in it when it has none.
 function allRuntimeNames(): Set<string> {
 	return new Set([
 		...runtimeNamespaceNames,
-		...runtimeModuleAliases.map(([name]) => name),
+		...runtimeModuleAliases
+			.map(([name]) => name)
+			.filter((name) => name !== TESTING_MODULE),
 	])
 }
 
@@ -826,6 +889,8 @@ function rewriteStatementByKind(
 			return rewriteReturnStatement(node)
 		case "FunctionStatement":
 			return rewriteFunctionStatement(node)
+		case "TestAssertionStatement":
+			return rewriteTestAssertion(node)
 		default:
 			return rewriteExpressionStatement(node)
 	}
@@ -2496,6 +2561,8 @@ function rewriteExpressionByKind(
 			return rewriteConformanceValue(node)
 		case "CaseValue":
 			return rewriteCaseValue(node)
+		case "TestTrace":
+			return rewriteTestTrace(node)
 		case "Intrinsic":
 			return rewriteIntrinsic(node)
 	}
@@ -4331,6 +4398,13 @@ const compilerOwnedNames = new Set([
 	"$_",
 	"$type",
 	"$helpers",
+	// NOTE: The test runtime and the name a test's context is bound to inside
+	// the Function a `tests` section becomes. A Program is free to write either
+	// — `$` is a legal Essence identifier character — and would otherwise take
+	// the context away from every assertion below it.
+	"$testing",
+	"$context",
+	"$tests",
 	"Object",
 	// NOTE: A counted walk whose bounds escaped safe range converts its start
 	// with it, so a Program declaring its own `BigInt` would take the
@@ -7642,4 +7716,345 @@ function typeDescriptorExpression(
 
 	return convertObjectToObjectExpression(type)
 }
+// #endregion
+
+// #region Tests
+
+// NOTE: The name the test runtime is imported under, and the name a test's
+// context is bound to inside the Function the section becomes. Both are in
+// `compilerOwnedNames`, so a Program writing either binds a mangled name
+// instead — `$` is a legal Essence identifier character, and neither of these
+// is a name an author can be told is taken.
+const TESTING_MODULE = "$testing"
+const TEST_CONTEXT = "$context"
+
+// NOTE: What a bundle publishes so a runner can reach the tests of EVERY Module
+// in it: the registry, and the runner that drives it. Both come from INSIDE the
+// bundle — see `entryPoints` in the runtime's `Testing` module — because every
+// Essence value carries a hidden Type key belonging to the runtime instance
+// that built it, and a bundle inlines its own.
+const TEST_ENTRY_POINTS = "$tests"
+
+function testingModule(): estree.Identifier {
+	return { type: "Identifier", name: TESTING_MODULE }
+}
+
+function testContext(): estree.Identifier {
+	return { type: "Identifier", name: TEST_CONTEXT }
+}
+
+function testingCall(
+	name: string,
+	args: Array<estree.Expression>,
+): estree.CallExpression {
+	return {
+		type: "CallExpression",
+		optional: false,
+		callee: memberRead(testingModule(), name),
+		arguments: args,
+	}
+}
+
+// NOTE: The whole `tests { … }` block as ONE Statement: a call registering the
+// Module's manifest, whose `run` is the section itself as a Function of the
+// per-test context. Running it evaluates the setup the selected test can see,
+// afresh, and then that test — which is the literal reading of "a tests-section
+// constant is indistinguishable from fresh evaluation per test".
+function rewriteTestsSection(
+	section: common.typedSimple.TestsSectionNode,
+): Array<estree.Statement> {
+	return [
+		{
+			type: "ExpressionStatement",
+			expression: testingCall("register", [
+				{
+					type: "ObjectExpression",
+					properties: [
+						property("module", literalOrNull(section.module)),
+						property("spans", testSpans(section.spans)),
+						property("tests", testManifest(section.tests)),
+						property("run", {
+							type: "ArrowFunctionExpression",
+							expression: false,
+							params: [testContext()],
+							body: {
+								type: "BlockStatement",
+								body: withNamespaceScope(() =>
+									rewriteTestsNodes(section.nodes),
+								),
+							},
+						}),
+					],
+				},
+			]),
+		},
+	]
+}
+
+// NOTE: One Scope's run of Nodes. A suite is a BLOCK, which is what JavaScript's
+// own scoping needs to keep a suite's Constants inside it and let one shadow the
+// section's — the Enricher gave each its own Scope, and an emission that flattened
+// them would declare one name twice in one block.
+function rewriteTestsNodes(
+	nodes: Array<common.typedSimple.TestsNode>,
+): Array<estree.Statement> {
+	return nodes.flatMap((node) => {
+		if (node.nodeType === "TestEntry") {
+			return withStatementLocation(
+				[
+					{
+						type: "ExpressionStatement",
+						expression: testingCall("entry", [
+							testContext(),
+							numberLiteral(node.index),
+							node.name === null
+								? { type: "Literal", value: null }
+								: rewriteExpression(node.name),
+							{
+								type: "ArrowFunctionExpression",
+								expression: false,
+								params: [],
+								body: rewriteBlockStatement(node.body),
+							},
+						]),
+					},
+				],
+				node.position,
+			)
+		}
+
+		if (node.nodeType === "TestScope") {
+			return [
+				{
+					type: "BlockStatement",
+					body: withNamespaceScope(() =>
+						rewriteTestsNodes(node.nodes),
+					),
+				},
+			]
+		}
+
+		return rewriteStatements(node)
+	})
+}
+
+// NOTE: The span table, indexed by point id. Emitted whole rather than per
+// point so that a reader with an event in hand can resolve it without the
+// Compiler — see `TestsSectionNode.spans`.
+function testSpans(
+	spans: Array<common.typedSimple.TestSpan>,
+): estree.ArrayExpression {
+	return {
+		type: "ArrayExpression",
+		elements: spans.map((span) => ({
+			type: "ObjectExpression",
+			properties: [
+				property("start", cursorObject(span.position.start)),
+				property("end", cursorObject(span.position.end)),
+				property("source", { type: "Literal", value: span.source }),
+			],
+		})),
+	}
+}
+
+function testManifest(
+	tests: Array<common.typedSimple.TestManifestEntry>,
+): estree.ArrayExpression {
+	return {
+		type: "ArrayExpression",
+		elements: tests.map((entry) => ({
+			type: "ObjectExpression",
+			properties: [
+				property("id", { type: "Literal", value: entry.id }),
+				property("name", { type: "Literal", value: entry.name }),
+				property("interpolated", {
+					type: "Literal",
+					value: entry.interpolated,
+				}),
+				property("suitePath", {
+					type: "ArrayExpression",
+					elements: entry.suitePath.map((step) => ({
+						type: "Literal" as const,
+						value: step,
+					})),
+				}),
+				property("tags", {
+					type: "ArrayExpression",
+					elements: entry.tags.map((tag) => ({
+						type: "Literal" as const,
+						value: tag,
+					})),
+				}),
+				property("focused", { type: "Literal", value: entry.focused }),
+				property("skipped", literalOrNull(entry.skipped)),
+				property("position", rangeObject(entry.position)),
+				property("keywordPosition", rangeObject(entry.keywordPosition)),
+			],
+		})),
+	}
+}
+
+function rangeObject(position: common.Position): estree.ObjectExpression {
+	return {
+		type: "ObjectExpression",
+		properties: [
+			property("start", cursorObject(position.start)),
+			property("end", cursorObject(position.end)),
+		],
+	}
+}
+
+function cursorObject(cursor: common.Cursor): estree.ObjectExpression {
+	return {
+		type: "ObjectExpression",
+		properties: [
+			property("line", numberLiteral(cursor.line)),
+			property("column", numberLiteral(cursor.column)),
+		],
+	}
+}
+
+function literalOrNull(value: string | null): estree.Expression {
+	return { type: "Literal", value }
+}
+
+function property(name: string, value: estree.Expression): estree.Property {
+	return {
+		type: "Property",
+		kind: "init",
+		method: false,
+		shorthand: false,
+		computed: false,
+		key: memberKey(name),
+		value,
+	}
+}
+
+// NOTE: What a bundle publishes when anything in it declared a test. It is on
+// the ENTRY Module, because what a bundle exports is what its entry exports,
+// and it is emitted whether or not the entry itself wrote a `tests` block: a
+// graph whose tests all live in its dependencies is the ordinary shape of a
+// `Foo.tests.es`.
+function testEntryPointsExport(): estree.ExportNamedDeclaration {
+	return {
+		type: "ExportNamedDeclaration",
+		declaration: {
+			type: "VariableDeclaration",
+			kind: "const",
+			declarations: [
+				{
+					type: "VariableDeclarator",
+					id: { type: "Identifier", name: TEST_ENTRY_POINTS },
+					init: memberRead(testingModule(), "entryPoints"),
+				},
+			],
+		},
+		specifiers: [],
+		attributes: [],
+	}
+}
+
+// NOTE: An instrumented point, which answers with the very value it recorded —
+// so wrapping an Expression in one changes nothing about what that Expression
+// evaluates to, and the Position it carries is the Position of what it wraps.
+function rewriteTestTrace(
+	node: common.typedSimple.TestTraceNode,
+): estree.Expression {
+	return testingCall("trace", [
+		testContext(),
+		numberLiteral(node.point),
+		rewriteExpression(node.value),
+	])
+}
+
+// NOTE: Both forms are one call. `expect` records and the test carries on;
+// `required` records and, where it did not hold, unwinds the test from where it
+// stands — so the Constants a Matcher binds below it are simply never reached.
+// The unwinding is the runtime's rather than an early `return` emitted here
+// because an assertion may stand inside a Handler of a `match` that is used as
+// an Expression, and that Handler is emitted as the body of an arrow Function:
+// a `return` would end the arrow and leave the test running.
+function rewriteTestAssertion(
+	node: common.typedSimple.TestAssertionStatementNode,
+): estree.Statement {
+	return {
+		type: "ExpressionStatement",
+		expression: testingCall(
+			node.form === "expect" ? "expected" : "required",
+			[
+				testContext(),
+				numberLiteral(node.point),
+				assertionTest(node),
+				assertionComparison(node.comparison),
+			],
+		),
+	}
+}
+
+// NOTE: What has to hold, as a RAW JavaScript boolean. A Matcher's test already
+// is one — it is the same chain of `&&`s a `match` Handler is tested by, read
+// off the Constant the Statement in front of this one holds the value under —
+// and a Boolean Expression is unwrapped, exactly as an `if`'s condition is.
+function assertionTest(
+	node: common.typedSimple.TestAssertionStatementNode,
+): estree.Expression {
+	let value = rewriteExpression(node.value)
+
+	if (node.matcher === null) {
+		return valueRead(value)
+	}
+
+	// NOTE: A Matcher's test reads the value as many times as the Matcher has
+	// parts, so it has to be a name. The Enricher's desugar guarantees one — a
+	// `require MATCHER = EXPR` is always preceded by the Constant holding what
+	// it asserts
+	// — and the arrow below is the answer for a Program that somehow arrives
+	// without it, rather than a wrong test emitted quietly.
+	//
+	// NOTE: It is also the answer for a Matcher `compile-type-tests` reached.
+	// That pass writes a compiled test against `_self` — the name a Match binds
+	// its value to — because it runs first and can not know what the value will
+	// be spelled as by the time it is emitted. So a compiled Matcher binds the
+	// value to that name, and one the Optimiser never saw is read as itself.
+	if (value.type === "Identifier" && !isCompiledHandler(node.matcher)) {
+		return handlerTest(node.matcher, value, null)
+	}
+
+	return {
+		type: "CallExpression",
+		optional: false,
+		callee: {
+			type: "ArrowFunctionExpression",
+			expression: true,
+			params: [selfIdentifier()],
+			body: handlerTest(node.matcher, selfIdentifier(), null),
+		},
+		arguments: [value],
+	}
+}
+
+// NOTE: Whether `compile-type-tests` decided this Handler's checks. Both fields
+// are the Optimiser's own — the Simplifier leaves them null — and either one of
+// them is written against `_self`.
+function isCompiledHandler(handler: common.typedSimple.MatchHandler): boolean {
+	return handler.typeTest !== null || handler.memberTests !== null
+}
+
+function assertionComparison(
+	comparison: common.typedSimple.TestComparison | null,
+): estree.Expression {
+	if (comparison === null) {
+		return { type: "Literal", value: null }
+	}
+
+	return {
+		type: "ObjectExpression",
+		properties: [
+			property("kind", { type: "Literal", value: comparison.kind }),
+			property("left", numberLiteral(comparison.left)),
+			property("right", numberLiteral(comparison.right)),
+		],
+	}
+}
+
 // #endregion

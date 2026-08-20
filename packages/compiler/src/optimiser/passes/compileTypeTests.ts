@@ -7,7 +7,7 @@ import {
 	matcherResidualOverMembers,
 	unionMembersOf,
 } from "../residual"
-import { rewriteExpressions } from "../walk"
+import { rewriteNodes } from "../walk"
 
 // NOTE: A Match asks the runtime which Type a value has, and it asked in the
 // most general way there is: `$type.isValueOfType(_self, { type: "Case",
@@ -65,9 +65,17 @@ import { rewriteExpressions } from "../walk"
 // constants` can hoist out of the test. Nothing about WHICH values the Handler
 // accepts changes; only how it is asked.
 
+// NOTE: A `require #Value(first) = x` is a Handler standing on its own, and it
+// is compiled by the same reading a Match's Handler is — otherwise the identical
+// question would be asked the general way in a test and the cheap way in the
+// `match` the test is spelled like.
 export const compileTypeTests: OptimiserPass = {
 	name: "compile-type-tests",
-	run: (program) => rewriteExpressions(program, compile),
+	run: (program) =>
+		rewriteNodes(program, {
+			expression: compile,
+			statement: compileAssertion,
+		}),
 }
 
 function compile(
@@ -77,51 +85,69 @@ function compile(
 		return node
 	}
 
-	let handlers = node.handlers.map((handler) => {
-		let memberTests = compileMemberTests(handler)
-
-		if (handler.typeTest !== null) {
-			return memberTests === handler.memberTests
-				? handler
-				: { ...handler, memberTests }
-		}
-
-		// NOTE: A literal Matcher's test IS the comparison, so the compiled
-		// form of it goes where a Type check's compiled form goes — the
-		// Rewriter reads `typeTest` first and falls back to `anyIs` over the
-		// literal where there is none. The `literal` itself stays: it is what
-		// `elide-final-match-test` reads to know that a final Handler with one
-		// can still decline a value, and what a build with this pass turned off
-		// is emitted from.
-		if (handler.literal !== null) {
-			let compiled = literalTest(node.value.type, handler.literal)
-
-			if (compiled === null) {
-				return memberTests === handler.memberTests
-					? handler
-					: { ...handler, memberTests }
-			}
-
-			return { ...handler, typeTest: compiled, memberTests }
-		}
-
-		let residual = matcherResidual(handler.matcher, node.value.type)
-
-		return {
-			...handler,
-			typeTest:
-				residual.kind === "tag"
-					? tagTest(node.value.type, residual.tag)
-					: typeTest(node.value.type, handler.matcher),
-			memberTests,
-		}
-	})
+	let handlers = node.handlers.map((handler) =>
+		compileHandler(handler, node.value.type),
+	)
 
 	if (handlers.every((handler, index) => handler === node.handlers[index])) {
 		return node
 	}
 
 	return { ...node, handlers }
+}
+
+function compileAssertion(
+	node: common.typedSimple.ImplementationNode,
+): common.typedSimple.ImplementationNode {
+	if (node.nodeType !== "TestAssertionStatement" || node.matcher === null) {
+		return node
+	}
+
+	let matcher = compileHandler(node.matcher, node.value.type)
+
+	return matcher === node.matcher ? node : { ...node, matcher }
+}
+
+function compileHandler(
+	handler: common.typedSimple.MatchHandler,
+	valueType: common.Type,
+): common.typedSimple.MatchHandler {
+	let memberTests = compileMemberTests(handler)
+
+	if (handler.typeTest !== null) {
+		return memberTests === handler.memberTests
+			? handler
+			: { ...handler, memberTests }
+	}
+
+	// NOTE: A literal Matcher's test IS the comparison, so the compiled form of
+	// it goes where a Type check's compiled form goes — the Rewriter reads
+	// `typeTest` first and falls back to `anyIs` over the literal where there is
+	// none. The `literal` itself stays: it is what `elide-final-match-test`
+	// reads to know that a final Handler with one can still decline a value, and
+	// what a build with this pass turned off is emitted from.
+	if (handler.literal !== null) {
+		let compiled = literalTest(valueType, handler.literal)
+
+		if (compiled === null) {
+			return memberTests === handler.memberTests
+				? handler
+				: { ...handler, memberTests }
+		}
+
+		return { ...handler, typeTest: compiled, memberTests }
+	}
+
+	let residual = matcherResidual(handler.matcher, valueType)
+
+	return {
+		...handler,
+		typeTest:
+			residual.kind === "tag"
+				? tagTest(valueType, residual.tag)
+				: typeTest(valueType, handler.matcher),
+		memberTests,
+	}
 }
 
 // NOTE: The scalar kinds a literal Matcher can be compiled for, and null for

@@ -592,6 +592,7 @@ describe("Code Generation — Naming and Escaping", () => {
 
 			let program = {
 				nodeType: "Program",
+				tests: null,
 				implementation: {
 					nodeType: "ImplementationSection",
 					nodes: [
@@ -875,6 +876,7 @@ describe("Code Generation — Naming and Escaping", () => {
 		function emitInteger(value: string): string {
 			let program = {
 				nodeType: "Program",
+				tests: null,
 				implementation: {
 					nodeType: "ImplementationSection",
 					nodes: [

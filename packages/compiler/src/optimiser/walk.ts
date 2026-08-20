@@ -92,15 +92,73 @@ export function rewriteNodes(
 	rewrites: NodeRewrites,
 ): common.typedSimple.Program {
 	let nodes = walkBody(program.implementation.nodes, rewrites)
+	let tests = walkTests(program.tests, rewrites)
 
-	if (nodes === program.implementation.nodes) {
+	if (nodes === program.implementation.nodes && tests === program.tests) {
 		return program
 	}
 
 	return {
 		...program,
 		implementation: { ...program.implementation, nodes },
+		tests,
 	}
+}
+
+// NOTE: A test compile's tests section is walked exactly as the implementation
+// is, and by the same passes. It has to be: `eliminate-dead-code` decides what
+// a Program READS, and a top-level Constant read only by a test would otherwise
+// be dropped out from under the test that reads it. Everything else follows
+// from that — a test body is Statements, and Statements the Optimiser does not
+// reach are Statements emitted as the Simplifier left them.
+//
+// NOTE: Null in every compile that did not ask for the tests, which is every
+// build, so this costs a null check per pass there.
+function walkTests(
+	section: common.typedSimple.TestsSectionNode | null,
+	rewrites: NodeRewrites,
+): common.typedSimple.TestsSectionNode | null {
+	if (section === null) {
+		return null
+	}
+
+	let nodes = walkTestsNodes(section.nodes, rewrites)
+
+	return nodes === section.nodes ? section : { ...section, nodes }
+}
+
+// NOTE: A Scope's run of Nodes — the section's own, and each suite's. The two
+// Nodes that are not Statements are walked by hand; everything else is a
+// Statement and goes through `walkImplementation`, so a setup Constant is
+// optimised the way the same Constant beside the implementation would be.
+//
+// NOTE: It is NOT `walkBody`: the `body` hook may answer with a different
+// number of Statements, and dropping a `TestEntry` would take a test away
+// without anything saying so. Each test's own body IS offered to that hook,
+// through `walkBody` below.
+function walkTestsNodes(
+	nodes: Array<common.typedSimple.TestsNode>,
+	rewrites: NodeRewrites,
+): Array<common.typedSimple.TestsNode> {
+	return mapArray(nodes, (node) => {
+		if (node.nodeType === "TestEntry") {
+			let name =
+				node.name === null ? null : walkExpression(node.name, rewrites)
+			let body = walkBody(node.body, rewrites)
+
+			return name === node.name && body === node.body
+				? node
+				: { ...node, name, body }
+		}
+
+		if (node.nodeType === "TestScope") {
+			let scoped = walkTestsNodes(node.nodes, rewrites)
+
+			return scoped === node.nodes ? node : { ...node, nodes: scoped }
+		}
+
+		return walkImplementation(node, rewrites)
+	})
 }
 
 export function rewriteExpressions(
@@ -296,6 +354,23 @@ function walkImplementationChildren(
 		}
 		case "IntrinsicStatement":
 			return walkIntrinsicStatementChildren(node, rewrites)
+		// NOTE: An assertion holds the Expression it asserts and, where a
+		// Matcher was written, that Matcher's test — the same two positions a
+		// Match Handler holds, walked the same way. Nothing here is offered to
+		// a pass as a Statement of its own: an assertion is not an Expression
+		// and a pass that lifted one out of its place would take away the
+		// early return a `require` is.
+		case "TestAssertionStatement": {
+			let value = walkExpression(node.value, rewrites)
+			let matcher =
+				node.matcher === null
+					? null
+					: walkHandler(node.matcher, rewrites)
+
+			return value === node.value && matcher === node.matcher
+				? node
+				: { ...node, value, matcher }
+		}
 		// NOTE: A Protocol's PROVIDED Methods are bodies, walked exactly as a
 		// Namespace's are — same rule, same reason: the Rewriter emits each as a
 		// const of its own, so there is no position there for another kind of
@@ -699,6 +774,14 @@ function walkChildren(
 		}
 		case "Intrinsic":
 			return walkIntrinsicChildren(node, rewrites)
+		// NOTE: An instrumented point wraps the Expression that stands there,
+		// so what a pass is offered is the Expression itself — a trace is
+		// transparent to every reading but the one that emits it.
+		case "TestTrace": {
+			let value = walkExpression(node.value, rewrites)
+
+			return value === node.value ? node : { ...node, value }
+		}
 		// NOTE: The leaves — a Literal holds its own value, an Identifier a
 		// name, and neither has anywhere for an Expression to hide.
 		case "StringValue":
@@ -723,58 +806,65 @@ function walkHandlers(
 	handlers: Array<common.typedSimple.MatchHandler>,
 	rewrites: NodeRewrites,
 ): Array<common.typedSimple.MatchHandler> {
-	return mapArray(handlers, (handler) => {
-		let typeTest =
-			handler.typeTest === null
-				? null
-				: walkExpression(handler.typeTest, rewrites)
-		let literal =
-			handler.literal === null
-				? null
-				: walkExpression(handler.literal, rewrites)
-		let memberLiterals =
-			handler.memberLiterals === null
-				? null
-				: mapRecord(handler.memberLiterals, (member) =>
-						walkExpression(member, rewrites),
-					)
-		// NOTE: `memberTypes` holds Types and is walked past; `memberTests` is
-		// what `compile-type-tests` compiled them into, and is Expressions like
-		// any other — a pass that rewrote every Expression but these would leave
-		// a Handler's requirements reading the shape the pass before it replaced.
-		let memberTests =
-			handler.memberTests === null
-				? null
-				: mapRecord(handler.memberTests, (test) =>
-						walkExpression(test, rewrites),
-					)
-		let guard =
-			handler.guard === null
-				? null
-				: walkExpression(handler.guard, rewrites)
-		let body = walkBody(handler.body, rewrites)
+	return mapArray(handlers, (handler) => walkHandler(handler, rewrites))
+}
 
-		if (
-			typeTest === handler.typeTest &&
-			literal === handler.literal &&
-			memberLiterals === handler.memberLiterals &&
-			memberTests === handler.memberTests &&
-			guard === handler.guard &&
-			body === handler.body
-		) {
-			return handler
-		}
+// NOTE: One Handler's own positions, taken out of the loop above because an
+// ASSERTION holds exactly one of these and nothing else — `require #Value = x`
+// is a Handler with no Guard and no body, and it is walked by the same reading
+// so that a pass can not reach the one and miss the other.
+function walkHandler(
+	handler: common.typedSimple.MatchHandler,
+	rewrites: NodeRewrites,
+): common.typedSimple.MatchHandler {
+	let typeTest =
+		handler.typeTest === null
+			? null
+			: walkExpression(handler.typeTest, rewrites)
+	let literal =
+		handler.literal === null
+			? null
+			: walkExpression(handler.literal, rewrites)
+	let memberLiterals =
+		handler.memberLiterals === null
+			? null
+			: mapRecord(handler.memberLiterals, (member) =>
+					walkExpression(member, rewrites),
+				)
+	// NOTE: `memberTypes` holds Types and is walked past; `memberTests` is
+	// what `compile-type-tests` compiled them into, and is Expressions like
+	// any other — a pass that rewrote every Expression but these would leave
+	// a Handler's requirements reading the shape the pass before it replaced.
+	let memberTests =
+		handler.memberTests === null
+			? null
+			: mapRecord(handler.memberTests, (test) =>
+					walkExpression(test, rewrites),
+				)
+	let guard =
+		handler.guard === null ? null : walkExpression(handler.guard, rewrites)
+	let body = walkBody(handler.body, rewrites)
 
-		return {
-			...handler,
-			typeTest,
-			literal,
-			memberLiterals,
-			memberTests,
-			guard,
-			body,
-		}
-	})
+	if (
+		typeTest === handler.typeTest &&
+		literal === handler.literal &&
+		memberLiterals === handler.memberLiterals &&
+		memberTests === handler.memberTests &&
+		guard === handler.guard &&
+		body === handler.body
+	) {
+		return handler
+	}
+
+	return {
+		...handler,
+		typeTest,
+		literal,
+		memberLiterals,
+		memberTests,
+		guard,
+		body,
+	}
 }
 
 // NOTE: An intrinsic is walked like anything else. A pass that runs after the

@@ -6116,6 +6116,7 @@ describe("Optimiser", () => {
 				return {
 					nodeType: "Program",
 					imports: null,
+					tests: null,
 					exports: null,
 					implementation: {
 						nodeType: "ImplementationSection",

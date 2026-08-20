@@ -7,7 +7,7 @@ import {
 	type OptimiserOptions,
 } from "../optimiser/index"
 import { type EmitTarget, rewriteModules } from "../rewriter/index"
-import { simplify } from "../simplifier/index"
+import { simplify, type SimplifyOptions } from "../simplifier/index"
 
 // NOTE: The back half of the pipeline — enriched Programs in, a bundle's bytes
 // out — written once and shared by everything that emits: `esc`, and the
@@ -64,7 +64,14 @@ export type EmitRequest = {
 // caches are `esc`'s: one typed Program is reached by every entry that imports
 // it, and simplifying is not something a Program survives twice.
 export type EmitHooks = {
-	simplify?: (program: common.typed.Program) => common.typedSimple.Program
+	// NOTE: The Options carry the Module's own text, which only a test compile
+	// reads — the span table a test lowering emits slices the source of every
+	// instrumented point out of it. A caching hook may ignore them: one Program
+	// is one Module's, and its text can not change under it.
+	simplify?: (
+		program: common.typed.Program,
+		options?: SimplifyOptions,
+	) => common.typedSimple.Program
 	optimise?: (
 		program: common.typedSimple.Program,
 		options: OptimiserOptions,
@@ -90,7 +97,9 @@ export async function generateModules(
 	let optimisation = request.optimisation ?? defaultOptimiserOptions
 
 	let simplified = await runStage("simplify", () =>
-		request.modules.map((module) => runSimplify(module.program)),
+		request.modules.map((module) =>
+			runSimplify(module.program, { source: module.sourceText }),
+		),
 	)
 
 	let optimised = await runStage("optimise", () =>
