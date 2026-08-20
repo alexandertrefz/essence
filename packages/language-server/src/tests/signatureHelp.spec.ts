@@ -424,6 +424,28 @@ describe("Signature Help for a standard library Method", () => {
 					"connect(using: { host: String, retries: Integer }) -> String",
 				)
 			})
+
+			// NOTE: And which of them a path key may reach INTO, which is the
+			// other half of the same fact.
+			it("should say which members a path key may reach into", () => {
+				let nested = [
+					"implementation {",
+					"	type Server = { host: String, port: Integer }",
+					"	type Options = { retries: Integer, server: Server }",
+					"",
+					'	function connect(using options: Options = { retries = 3, server = { host = "d", port = 80 } }) -> String {',
+					"		<- options.server.host",
+					"	}",
+					"	connect(",
+					"}",
+				].join("\n")
+
+				let help = findSignatureHelp(nested, { line: 8, column: 10 })
+
+				expect(help?.signatures[0].parameters[0]?.documentation).toBe(
+					"A call may leave 'retries', 'server' out of this Record. It may reach into 'server' with a path key.",
+				)
+			})
 		})
 	})
 })

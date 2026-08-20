@@ -5,6 +5,7 @@ import {
 	parameterDefaults,
 	parameterInternalName,
 	recordDefaultMembers,
+	recordDefaultNesting,
 } from "@essence-lang/compiler/helpers"
 import {
 	printCaseWithPayload,
@@ -1068,7 +1069,17 @@ function omittableMembersNote(
 		return null
 	}
 
-	return `A call may leave ${members.map((name) => `\`${name}\``).join(", ")} out of this Record.`
+	let sentence = `A call may leave ${members.map((name) => `\`${name}\``).join(", ")} out of this Record.`
+	// NOTE: And which of them a path key may reach INTO — the other half of the
+	// same fact, through the same helper, so a Type, an emission and a sentence
+	// can not disagree about what the merge reaches.
+	let reaching = Object.keys(
+		recordDefaultNesting(parameter.type, parameter.defaultValue) ?? {},
+	)
+
+	return reaching.length === 0
+		? sentence
+		: `${sentence} It may reach into ${reaching.map((name) => `\`${name}\``).join(", ")} with a path key.`
 }
 
 function invokedSignatures(

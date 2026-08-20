@@ -1223,6 +1223,28 @@ describe("A Record Parameter with a default", () => {
 		)
 	})
 
+	// NOTE: And which of them a path key may reach INTO, which is the other
+	// half of the same fact — the default writes those out member by member, so
+	// an Argument may merge into them rather than replace them.
+	it("should say which members a path key may reach into", () => {
+		let nested = [
+			"implementation {",
+			"\ttype Server = { host: String, port: Integer }",
+			"\ttype Options = { retries: Integer, server: Server }",
+			"",
+			'\tfunction connect(using options: Options = { retries = 3, server = { host = "d", port = 80 } }) -> String {',
+			"\t\t<- options.server.host",
+			"\t}",
+			"",
+			"\tTerminal.inspect(connect(using { server.port = 1 }))",
+			"}",
+		].join("\n")
+
+		expect(hoverDocumentation(nested, { line: 5, column: 20 })).toBe(
+			"A call may leave `retries`, `server` out of this Record. It may reach into `server` with a path key.",
+		)
+	})
+
 	// NOTE: Whichever of the three offers a Parameter makes is under the
 	// cursor — the span as written, the label, or the name the body reads it
 	// under — the sentence is the same.
