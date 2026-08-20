@@ -1194,6 +1194,77 @@ describe("Code Generation", () => {
 			expect(generate(source)).toContain(`"ok?": flags["ok?"] ??`)
 			expect(await run(source)).toEqual(['"true|1"'])
 		})
+
+		// NOTE: A member the default writes as a Record LITERAL is rebuilt one
+		// level further in rather than taken whole, which is what a path key in
+		// an Argument merges into. A caller that wrote the member whole wrote
+		// every one of ITS members — only the top level of an Argument may be
+		// partial — so the same rebuild hands that value straight back.
+		it("rebuilds a member the default writes as a Record", async () => {
+			const source = `implementation {
+	type Server = { host: String, port: Integer }
+	type Config = { retries: Integer, server: Server }
+
+	function connect(using settings: Config = { retries = 3, server = { host = "d", port = 80 } }) -> String {
+		<- "{settings.retries}|{settings.server.host}|{settings.server.port}"
+	}
+
+	Terminal.inspect(connect())
+	Terminal.inspect(connect(using { retries = 1 }))
+	Terminal.inspect(connect(using { server = { host = "h", port = 1 } }))
+}`
+
+			expect(generate(source)).toContain("settings?.server?.host ??")
+			expect(await run(source)).toEqual([
+				'"3|d|80"',
+				'"1|d|80"',
+				'"3|h|1"',
+			])
+		})
+
+		// NOTE: As deep as the default's own Literal goes, and no deeper: the
+		// nesting is what the default WRITES, so a Type may nest forever without
+		// the prologue growing with it.
+		it("rebuilds as deep as the default's Literal nests", async () => {
+			const source = `implementation {
+	type Tls = { enabled: Boolean, authority: String }
+	type Server = { port: Integer, tls: Tls }
+	type Config = { server: Server }
+
+	function connect(using settings: Config = { server = { port = 80, tls = { enabled = false, authority = "self" } } }) -> String {
+		<- "{settings.server.port}|{settings.server.tls.authority}"
+	}
+
+	Terminal.inspect(connect())
+}`
+
+			expect(generate(source)).toContain(
+				"settings?.server?.tls?.authority ??",
+			)
+			expect(await run(source)).toEqual(['"80|self"'])
+		})
+
+		// NOTE: A member the default does NOT write as a Literal can not be
+		// taken apart without being evaluated, so it is read whole — and a path
+		// key into one is refused where it is written, rather than quietly
+		// replacing the member here.
+		it("takes a member the default names rather than writes", async () => {
+			const source = `implementation {
+	type Server = { host: String, port: Integer }
+	type Config = { retries: Integer, server: Server }
+
+	constant fallback: Server = { host = "f", port = 7 }
+
+	function connect(using settings: Config = { retries = 3, server = fallback }) -> String {
+		<- "{settings.retries}|{settings.server.host}"
+	}
+
+	Terminal.inspect(connect())
+}`
+
+			expect(generate(source)).toContain("settings?.server ??")
+			expect(await run(source)).toEqual(['"3|f"'])
+		})
 	})
 
 	describe("String Methods", () => {

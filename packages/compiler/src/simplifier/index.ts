@@ -5,6 +5,7 @@ import {
 	conformanceParameterName,
 	openArgumentHoles,
 	recordDefaultMembers,
+	recordDefaultNesting,
 	resolveOverloadedMethodName,
 } from "../helpers/index"
 
@@ -1161,35 +1162,54 @@ function recordDefaultPrologue(
 
 		let recordType = parameter.type as common.RecordType
 		let defaultValue = parameter.defaultValue!
-		let declared = Object.keys(recordType.members)
 		let position = parameter.position
-		let read = (member: string): common.typedSimple.ExpressionNode => ({
-			nodeType: "Lookup",
-			base: {
-				nodeType: "Identifier",
-				name: simplified[index]!.internalName.name,
-				type: recordType,
-			},
-			member: {
-				nodeType: "Identifier",
-				name: member,
-				type: recordType.members[member]!,
-			},
-			type: recordType.members[member]!,
+		let argument = (): common.typedSimple.IdentifierNode => ({
+			nodeType: "Identifier",
+			name: simplified[index]!.internalName.name,
+			type: recordType,
 		})
+		// NOTE: The Argument's own value for a member the default does not
+		// supply — a plain read, because the Argument is then required and
+		// every member of it is written.
+		let read = (
+			path: Array<string>,
+			type: common.Type,
+		): common.typedSimple.ExpressionNode =>
+			path.reduce<common.typedSimple.ExpressionNode>(
+				(base, member, step) => ({
+					nodeType: "Lookup",
+					base,
+					member: {
+						nodeType: "Identifier",
+						name: member,
+						type:
+							step === path.length - 1
+								? type
+								: { type: "Unknown" },
+					},
+					type: step === path.length - 1 ? type : { type: "Unknown" },
+				}),
+				argument(),
+			)
 
 		// NOTE: `recordDefaultMembers` and nothing local, because this has to be
 		// the very set the Parameter's TYPE carries as `defaultMembers` — what a
 		// call may leave out and what the prologue fills in are one answer, and
-		// two spellings of it would be two answers waiting to disagree.
+		// two spellings of it would be two answers waiting to disagree. The same
+		// goes for the members it reaches INTO, which the Parameter's Type
+		// carries as `defaultNesting` and a path key in an Argument is admitted
+		// by.
 		let supplied = new Set(
 			recordDefaultMembers(recordType, defaultValue) ?? [],
 		)
-		let fallbackFor: (member: string) => common.typedSimple.ExpressionNode
+		let nesting = recordDefaultNesting(recordType, defaultValue) ?? {}
+		let fallbackFor: (
+			path: Array<string>,
+		) => common.typedSimple.ExpressionNode
 
 		if (defaultValue.nodeType === "RecordValue") {
-			fallbackFor = (member) =>
-				simplifyExpression(defaultValue.members[member]!)
+			fallbackFor = (path) =>
+				simplifyExpression(defaultMemberAt(defaultValue, path))
 		} else {
 			let hoisted: common.typedSimple.IdentifierNode = {
 				nodeType: "Identifier",
@@ -1206,58 +1226,116 @@ function recordDefaultPrologue(
 				position,
 			})
 
-			fallbackFor = (member) => ({
+			// NOTE: One step only — a default that is not a Literal can not be
+			// taken apart, so `recordDefaultNesting` names nothing under it and
+			// no path ever reaches past its first member.
+			fallbackFor = (path) => ({
 				nodeType: "Lookup",
 				base: { ...hoisted },
 				member: {
 					nodeType: "Identifier",
-					name: member,
-					type: recordType.members[member]!,
+					name: path[0]!,
+					type: recordType.members[path[0]!]!,
 				},
-				type: recordType.members[member]!,
+				type: recordType.members[path[0]!]!,
 			})
 		}
 
 		// NOTE: The base may be `undefined` exactly where the whole Argument
 		// may be left out, which is where the default supplies every member —
-		// the same answer `hasDefault` carries on the Parameter's Type.
-		let optional = supplied.size === declared.length
+		// the same answer `hasDefault` carries on the Parameter's Type. Every
+		// step PAST the first reads optionally whatever this says: a level the
+		// Argument left out is a level that is not there.
+		let optional = supplied.size === declared(recordType).length
+
+		// NOTE: One level of the Record the callee rebuilds. A member the
+		// default writes as a Record LITERAL is rebuilt one level further in
+		// rather than taken whole, which is what makes a path key MERGE: the
+		// Argument carries only the members the path wrote, and every other one
+		// falls through to the default's, exactly as it does at the top level.
+		// A member written WHOLE is complete by rule, so the same rebuild hands
+		// back the value the caller passed — one spelling, two readings, and
+		// the same answer for both.
+		let rebuild = (
+			type: common.RecordType,
+			levelSupplied: Set<string>,
+			levelNesting: common.DefaultNesting,
+			path: Array<string>,
+		): common.typedSimple.RecordValueNode => ({
+			nodeType: "RecordValue",
+			type,
+			members: Object.fromEntries(
+				declared(type).map((member) => {
+					let memberType = type.members[member]!
+					let memberPath = [...path, member]
+
+					if (!levelSupplied.has(member)) {
+						return [member, read(memberPath, memberType)]
+					}
+
+					if (Object.hasOwn(levelNesting, member)) {
+						let nested = memberType as common.RecordType
+
+						return [
+							member,
+							rebuild(
+								nested,
+								new Set(declared(nested)),
+								levelNesting[member]!,
+								memberPath,
+							),
+						]
+					}
+
+					return [
+						member,
+						{
+							nodeType: "Intrinsic",
+							kind: "member-or-default",
+							base: argument(),
+							path: memberPath,
+							fallback: fallbackFor(memberPath),
+							optional,
+							type: memberType,
+							position,
+						} satisfies common.typedSimple.MemberOrDefaultNode,
+					]
+				}),
+			),
+			position,
+		})
 
 		prologue.push({
 			nodeType: "VariableAssignmentStatement",
 			name: { ...simplified[index]!.internalName },
-			value: {
-				nodeType: "RecordValue",
-				type: recordType,
-				members: Object.fromEntries(
-					declared.map((member) => [
-						member,
-						supplied.has(member)
-							? ({
-									nodeType: "Intrinsic",
-									kind: "member-or-default",
-									base: {
-										nodeType: "Identifier",
-										name: simplified[index]!.internalName
-											.name,
-										type: recordType,
-									},
-									member,
-									fallback: fallbackFor(member),
-									optional,
-									type: recordType.members[member]!,
-									position,
-								} satisfies common.typedSimple.MemberOrDefaultNode)
-							: read(member),
-					]),
-				),
-				position,
-			},
+			value: rebuild(recordType, supplied, nesting, []),
 			position,
 		})
 	}
 
 	return prologue
+}
+
+// NOTE: The members a Record Type declares, in one spelling, because the
+// prologue asks for them at every level it rebuilds.
+function declared(type: common.RecordType): Array<string> {
+	return Object.keys(type.members)
+}
+
+// NOTE: The Expression a Record default writes at one path — `server.port`'s
+// `8080`. Every step but the last is a Record Literal by `recordDefaultNesting`,
+// which is the only thing that ever hands a path longer than one step in.
+function defaultMemberAt(
+	value: common.typed.ExpressionNode,
+	path: Array<string>,
+): common.typed.ExpressionNode {
+	let node = value
+
+	for (let member of path) {
+		node = (node as common.typed.RecordValueNode).members[member]!
+	}
+
+	return node
 }
 
 // NOTE: The hole a call leaves where a Parameter took its default. See

@@ -2665,12 +2665,11 @@ function rewriteIntrinsic(
 			return {
 				type: "LogicalExpression",
 				operator: "??",
-				left: node.optional
-					? optionalMemberRead(
-							rewriteExpression(node.base),
-							node.member,
-						)
-					: memberRead(rewriteExpression(node.base), node.member),
+				left: memberPathRead(
+					rewriteExpression(node.base),
+					node.path,
+					node.optional,
+				),
 				right: rewriteExpression(node.fallback),
 			}
 		case "dispatch-chain":
@@ -4670,28 +4669,40 @@ function memberRead(
 	}
 }
 
-// NOTE: `base?.member` — the read a callee makes of a Parameter whose whole
-// Argument may have been left out, where the base really can be `undefined`.
-// The one member read in an emitted Program that short circuits; every other
-// one is of a value that exists.
+// NOTE: `options?.server?.port` — the chain a callee reads one member of a
+// Record-defaulted Parameter through, and the only member read in an emitted
+// Program that short circuits: every other one is of a value that exists.
 //
-// NOTE: Wrapped in a `ChainExpression` for the reason `typeKeyRead` gives — a
-// bare `MemberExpression` carrying `optional` is not a tree the ESTree grammar
-// has, and the chain is the Node that says where the short circuit stops.
-function optionalMemberRead(
+// The FIRST step reads optionally exactly where the whole Argument may have been
+// left out; every step after it always does, because a level the Argument left
+// out is a level that is not there.
+//
+// NOTE: ONE `ChainExpression` wraps the whole read, for the reason `typeKeyRead`
+// gives — a bare `MemberExpression` carrying `optional` is not a tree the ESTree
+// grammar has — and because `?.` short circuits the rest of the chain it stands
+// in: a chain per link would answer `(a?.b)?.c`, which reads `c` off `undefined`.
+function memberPathRead(
 	object: estree.Expression,
-	name: string,
-): estree.ChainExpression {
-	return {
-		type: "ChainExpression",
-		expression: {
+	path: ReadonlyArray<string>,
+	optional: boolean,
+): estree.Expression {
+	let read = path.reduce<estree.Expression>(
+		(base, name, step) => ({
 			type: "MemberExpression",
-			optional: true,
-			object,
+			optional: step > 0 || optional,
+			object: base,
 			property: memberKey(name),
 			computed: !isJavaScriptIdentifierName(name),
-		},
-	}
+		}),
+		object,
+	)
+
+	return optional || path.length > 1
+		? {
+				type: "ChainExpression",
+				expression: read as estree.MemberExpression,
+			}
+		: read
 }
 
 function callIsValueOfType(
