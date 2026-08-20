@@ -190,12 +190,34 @@ construction may leave out. A payload's INDIVIDUAL members take no defaults —
 `Circle { radius: Integer = 1 }` does not parse; the default is one Record for
 the payload as a whole, because Record construction is not a call.
 
-Two restrictions. A payload default must be a LITERAL — a Number, a String
-without holes, a Boolean, and the Lists, Records and Case values built out of
-those — because a Case is constructed wherever its Choice is in reach, including
-Modules with no import edge naming the Choice, and a spliced default must name
-nothing wherever it lands. And a generic Choice takes none, since a default can
-not bind a Choice's Type Parameters.
+Two restrictions. A payload default is turned into DATA at the declaration — a
+Number, a String without holes, a Boolean, and the Lists, Records and Case
+values built out of those — because a Case is constructed wherever its Choice is
+in reach, including Modules with no import edge naming the Choice, and nothing
+that had to be worked out THERE could travel with the Type. And a generic Choice
+takes no default at all, since one can not bind a Choice's Type Parameters.
+
+A value in the default may still be written as a NAME, so long as it names a
+Constant of the Module the Choice is declared in:
+
+```essence
+constant standardHeaders: List<String> = []
+
+choice Fetch {
+	Get { url: String, headers: List<String> } = { headers = standardHeaders },
+}
+```
+
+The Constant is read there, once, where the Choice is declared, and its value is
+baked into the Case Type — so what travels is data either way, and the Module
+constructing the Case never has to have heard of the Constant. Following one
+Constant to the next is allowed; every leaf has to be written down. A Constant whose value is worked out is refused, and so are a
+Variable, an imported Constant, and a Constant declared below the Choice — a
+Constant does not hoist, and the default is read where it stands.
+
+The DEFAULT itself is written out either way: which members it fills in is read
+off the ones it writes, so `= standardHeaders` for the whole payload is not a
+partial default but a mistake.
 
 A Case with a payload is still constructed with one: `#Get({})` where the
 default fills everything in. The bare `#Get` spelling stays what it has always
@@ -237,9 +259,11 @@ MERGES, wherever the two are written.
 A path may reach into a member the default writes as a Record LITERAL of its
 own, as deep as that Literal is written out. A member the default fills in whole
 — `server = fallback`, naming a value rather than writing it — is taken or left
-whole, since a value can not be taken apart without being worked out, and a path
-into one is refused by name. So is a path into a member the default does not
-fill in at all: there would be nothing under it to merge with.
+whole, and a path into one is refused by name. That holds for a Case payload
+default naming a Constant as well, whose value is in hand: what a path may reach
+into is read off what the default WRITES, at both positions and for both
+reasons. So is a path into a member the default does not fill in at all: there
+would be nothing under it to merge with.
 
 The Case payload reads the same way, filled in where the Case is constructed
 rather than at a callee:
