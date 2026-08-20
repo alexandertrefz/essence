@@ -721,6 +721,31 @@ function findProbeReceiverInNode(
 
 			return null
 		}
+		// NOTE: What an assertion asserts, and the values its Matcher compares
+		// against — `require { points = total.|  } = standing`. Where a Matcher
+		// was written the asserted Expression is a synthesized name and the
+		// Expression itself is the Statement in front of this one, which this
+		// walk reaches on its own.
+		case "ExpectStatement":
+		case "RequireStatement": {
+			let found = findProbeReceiverInNode(node.value)
+
+			if (found !== null || node.matcher === null) {
+				return found
+			}
+
+			if (node.matcher.literal !== null) {
+				found = findProbeReceiverInNode(node.matcher.literal)
+			}
+
+			for (let literal of Object.values(
+				node.matcher.memberLiterals ?? {},
+			)) {
+				found ??= findProbeReceiverInNode(literal)
+			}
+
+			return found
+		}
 		case "TypeAliasStatement":
 		case "Identifier":
 		case "Self":
