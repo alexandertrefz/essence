@@ -1492,6 +1492,82 @@ Error: This block is never closed
 "
 `;
 
+exports[`Diagnostic Showcase Tests.es should render the same report every time 1`] = `
+"[test-outside-tests]
+Error: A 'test' may only be written in the 'tests { … }' section
+    ╭─┤ Tests.es:18:2 │
+    │
+ 18 │     test "records a win as three points" {
+    │     ──┬─  
+    │       ╰─── this 'test' stands outside every tests section
+    │ 
+    │ Help: Move it into the file's 'tests { … }' block, or open one below the implementation.
+    │ 
+    │ Note: The tests section is written below the implementation block, and a 'suite' groups the tests inside it.
+────╯
+
+[test-outside-tests]
+Error: A 'suite' may only be written in the 'tests { … }' section
+    ╭─┤ Tests.es:22:2 │
+    │
+ 22 │     suite "Standing" {
+    │     ──┬──  
+    │       ╰──── this 'suite' stands outside every tests section
+    │ 
+    │ Help: Move it into the file's 'tests { … }' block, or open one below the implementation.
+    │ 
+    │ Note: The tests section is written below the implementation block, and a 'suite' groups the tests inside it.
+────╯
+
+[expect-outside-test]
+Error: 'expect' may only be written in a test's body
+    ╭─┤ Tests.es:30:2 │
+    │
+ 30 │     expect lions.team::is("Lions")
+    │     ───┬──  
+    │        ╰──── this assertion belongs to no test
+    │ 
+    │ Help: Move it into a 'test "…" { … }' block, or return the value and assert on it there.
+    │ 
+    │ Note: An assertion records its result against the test that is running, so it is a Statement of a test's own block and of the blocks nested in it — never of a Function literal written there.
+────╯
+
+[expect-outside-test]
+Error: 'require' may only be written in a test's body
+    ╭─┤ Tests.es:32:2 │
+    │
+ 32 │     require lions is { team } as standing
+    │     ───┬───  
+    │        ╰───── this assertion belongs to no test
+    │ 
+    │ Help: Move it into a 'test "…" { … }' block, or return the value and assert on it there.
+    │ 
+    │ Note: An assertion records its result against the test that is running, so it is a Statement of a test's own block and of the blocks nested in it — never of a Function literal written there.
+────╯
+
+[misplaced-tests-section]
+Error: The 'tests { … }' block belongs above the 'export { … }' block
+    ╭─┤ Tests.es:43:1 │
+    │
+ 11 │ ╭─▶ implementation {
+    ┆ ┆   
+ 33 │ ├─▶ }
+    │ │       
+    │ ╰─────── the implementation block is here
+    │ 
+ 43 │     tests {
+    │     ──┬──  
+    │       ╰──── this block is written below what the Program ends with
+    │ 
+    │ Help: Move the 'tests { … }' block above 'export { … }'.
+    │ 
+    │ Note: A Program reads top to bottom: what it imports, what it does, what it proves, what it exports.
+────╯
+
+─── 5 errors
+"
+`;
+
 exports[`Diagnostic Showcase Types.es should render the same report every time 1`] = `
 "[assignment-type-mismatch]
 Error: This value does not fit Variable 'count'

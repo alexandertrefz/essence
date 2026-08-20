@@ -370,6 +370,12 @@ Optional#Value(2)
 "Less""
 `;
 
+exports[`Fixture Sweep Tests.es should print what it printed before 1`] = `
+"3
+1
+Outcome#Loss"
+`;
+
 exports[`Fixture Sweep Tree.es should print what it printed before 1`] = `
 "Readme.md
 sources/
