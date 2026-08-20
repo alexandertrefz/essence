@@ -44,6 +44,8 @@ export type DocumentSymbolKind =
 	| "staticMethod"
 	| "property"
 	| "export"
+	| "test"
+	| "suite"
 
 export type DocumentSymbolEntry = {
 	name: string
@@ -67,6 +69,13 @@ export function findDocumentSymbols(
 	if (enrichedProgram !== null) {
 		symbols = withDetails(symbols, detailsOf(enrichedProgram))
 	}
+
+	// NOTE: What the file PROVES, below what it does — read off the Parser like
+	// everything else here, so the outline holds up in a file that does not
+	// compile and in one a build would strip the block from. A test and a suite
+	// are named by a String rather than by an Identifier, so their names are
+	// shown as written, interpolations and all.
+	symbols = [...symbols, ...testsSymbols(program)]
 
 	// NOTE: What this Module publishes, last and under one entry — an outline is
 	// read for the declarations, and the export block is the summary of them
@@ -113,6 +122,75 @@ function exportSymbols(program: parser.Program): DocumentSymbolEntry | null {
 			}
 		}),
 	}
+}
+
+function testsSymbols(program: parser.Program): Array<DocumentSymbolEntry> {
+	return program.tests === null ? [] : testsNodeSymbols(program.tests.nodes)
+}
+
+function testsNodeSymbols(
+	nodes: Array<parser.TestsNode>,
+): Array<DocumentSymbolEntry> {
+	return nodes.flatMap((node) => {
+		if (node.nodeType === "Test") {
+			return [
+				{
+					name: writtenName(node.name),
+					kind: "test" as const,
+					detail: modifierDetail(node.modifiers),
+					range: node.position,
+					selectionRange: node.name.position,
+					children: symbolsOfBody(node.body),
+				},
+			]
+		}
+
+		if (node.nodeType === "Suite") {
+			return [
+				{
+					name: writtenName(node.name),
+					kind: "suite" as const,
+					detail: modifierDetail(node.modifiers),
+					range: node.position,
+					selectionRange: node.name.position,
+					children: testsNodeSymbols(node.nodes),
+				},
+			]
+		}
+
+		return symbolsOfNode(node)
+	})
+}
+
+// NOTE: The name as it stands in the source. An interpolation keeps its braces
+// — the outline is read beside the file, so what is shown should be what is
+// written there rather than a rendering of a row nothing has run yet.
+function writtenName(
+	node: parser.StringValueNode | parser.InterpolatedStringValueNode,
+): string {
+	if (node.nodeType === "StringValue") {
+		return node.value
+	}
+
+	return node.segments
+		.map((segment) =>
+			segment.kind === "text"
+				? segment.value
+				: segment.expression.nodeType === "Identifier"
+					? `{${segment.expression.content}}`
+					: "{…}",
+		)
+		.join("")
+}
+
+// NOTE: The Modifiers, spelled the way they were written, as the detail beside
+// the name — which is what tells a skipped test from a focused one at a glance.
+function modifierDetail(
+	modifiers: Array<parser.TestModifierNode>,
+): string | null {
+	return modifiers.length === 0
+		? null
+		: modifiers.map((modifier) => modifier.name.content).join(" ")
 }
 
 function symbolsOfBody(

@@ -463,4 +463,52 @@ describe("The export block", () => {
 			).map((symbol) => symbol.kind),
 		).toEqual(["constant"])
 	})
+
+	// NOTE: The outline is built from the Parser alone, so the tests section is
+	// in it whatever the compile mode was — a writer navigating a file sees
+	// what they PROVE below what they wrote, in a build that would strip the
+	// whole block.
+	it("should list the tests below the implementation", () => {
+		let symbols = symbolsOf(
+			[
+				"implementation {",
+				"\tconstant one = 1",
+				"}",
+				"",
+				"tests {",
+				'\tsuite "Standing" tagged slow {',
+				'\t\ttest "counts a win" {',
+				"\t\t\tconstant expected = 3",
+				"",
+				"\t\t\texpect expected::is(3)",
+				"\t\t}",
+				"\t}",
+				"",
+				'\ttest "{scored} is a win" skipped "the redesign" {',
+				"\t\texpect true",
+				"\t}",
+				"}",
+			].join("\n"),
+		)
+
+		expect(symbols.map((symbol) => [symbol.name, symbol.kind])).toEqual([
+			["one", "constant"],
+			["Standing", "suite"],
+			["{scored} is a win", "test"],
+		])
+
+		let suite = symbols[1]
+
+		expect(suite?.detail).toBe("tagged")
+		expect(
+			suite?.children.map((child) => [child.name, child.kind]),
+		).toEqual([["counts a win", "test"]])
+		expect(
+			suite?.children[0]?.children.map((child) => [
+				child.name,
+				child.kind,
+			]),
+		).toEqual([["expected", "constant"]])
+		expect(symbols[2]?.detail).toBe("skipped")
+	})
 })
