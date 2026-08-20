@@ -1062,6 +1062,254 @@ describe("formatter", () => {
 		})
 	})
 
+	// NOTE: The `tests { … }` section is a block of Statements like any other,
+	// so what is worth holding it to is the two shapes only it has: the head of
+	// an item, which breaks its Modifiers onto their own lines and puts the `{`
+	// back in the item's column, and a file that wrote no implementation block
+	// at all — where a printer that reached for `program.position` would write
+	// one that was never there.
+	describe("the tests section", () => {
+		// NOTE: Every Matcher a `require` may take a value apart with, each one
+		// standing where a Declaration's name stands. A round trip is the whole
+		// of what is asked: the safety gate compares Tokens, so a spelling this
+		// wrote out or dropped would refuse the file rather than reformat it.
+		it("writes a Matcher left of the '='", () => {
+			let source = [
+				"implementation {",
+				'\tconstant lions = { team = "Lions", points = 0 }',
+				"\tconstant rows  = [lions]",
+				"}",
+				"",
+				"tests {",
+				'\ttest "takes it apart" {',
+				"\t\trequire #Value(first) = rows::firstItem()",
+				"\t\trequire { team: String, points = 0 } = first",
+				"\t\trequire { team } as whole = first",
+				"\t\trequire Integer = first.points",
+				"\t\trequire #Empty = rows::item(at 9)",
+				"\t}",
+				"}",
+				"",
+			].join("\n")
+
+			let result = format(source)
+
+			expect(result.refusal).toBeNull()
+			expect(result.text).toBe(source)
+		})
+
+		it("writes the section between the implementation and the exports", () => {
+			let source = [
+				"implementation {",
+				"\tconstant x = 1",
+				"}",
+				"",
+				"tests {",
+				'\ttest "reads" {',
+				"\t\texpect x::is(1)",
+				"\t}",
+				"}",
+				"",
+				"export {",
+				"\tx",
+				"}",
+				"",
+			].join("\n")
+
+			let result = format(source)
+
+			expect(result.refusal).toBeNull()
+			expect(result.text).toBe(source)
+		})
+
+		it("lays a messy section out", () => {
+			let source = [
+				"implementation{constant x=1}",
+				"tests{",
+				'    test    "reads"     skipped   "later"    {',
+				"      expect   x::is( 1 )",
+				"    }",
+				"}",
+				"",
+			].join("\n")
+
+			expect(format(source).text).toBe(
+				[
+					"implementation {",
+					"\tconstant x = 1",
+					"}",
+					"tests {",
+					'\ttest "reads" skipped "later" {',
+					"\t\texpect x::is(1)",
+					"\t}",
+					"}",
+					"",
+				].join("\n"),
+			)
+		})
+
+		it("writes a file that is nothing but tests without an implementation block", () => {
+			let source = [
+				"import {",
+				'\tx from "./Other.es"',
+				"}",
+				"",
+				"tests {",
+				'\ttest "reads" {',
+				"\t\texpect x",
+				"\t}",
+				"}",
+				"",
+			].join("\n")
+
+			let result = format(source)
+
+			expect(result.refusal).toBeNull()
+			expect(result.text).toBe(source)
+		})
+
+		it("writes nested suites and their Modifiers", () => {
+			let source = [
+				"implementation {}",
+				"",
+				"tests {",
+				'\tconstant lions = { name = "Lions" }',
+				"",
+				'\tsuite "Standing" tagged fast {',
+				'\t\ttest "records a win" focused tagged slow, network {',
+				"\t\t\texpect true",
+				"\t\t}",
+				"",
+				'\t\tsuite "nested" {',
+				'\t\t\ttest "still reads" skipped "waiting on the redesign" {',
+				"\t\t\t\trequire { name } as team = lions",
+				'\t\t\t\texpect name::is("Lions")',
+				'\t\t\t\texpect team.name::is("Lions")',
+				"\t\t\t}",
+				"\t\t}",
+				"\t}",
+				"}",
+				"",
+			].join("\n")
+
+			let result = format(source)
+
+			expect(result.refusal).toBeNull()
+			expect(result.text).toBe(source)
+		})
+
+		// NOTE: The shape the design asks for when the head stops fitting: one
+		// Modifier per line, indented under the name, and the `{` back in the
+		// item's own column.
+		it("breaks a long head onto one Modifier per line", () => {
+			let source = [
+				"implementation {}",
+				"",
+				"tests {",
+				'\ttest "recording a result never lowers the number of points a team has" skipped "waiting on the Table redesign" tagged slow, network {',
+				"\t\texpect true",
+				"\t}",
+				"}",
+				"",
+			].join("\n")
+
+			expect(format(source).text).toBe(
+				[
+					"implementation {}",
+					"",
+					"tests {",
+					'\ttest "recording a result never lowers the number of points a team has"',
+					'\t\tskipped "waiting on the Table redesign"',
+					"\t\ttagged slow, network",
+					"\t{",
+					"\t\texpect true",
+					"\t}",
+					"}",
+					"",
+				].join("\n"),
+			)
+		})
+
+		it("keeps a Comment written against every part of the section", () => {
+			let source = [
+				"implementation {}",
+				"",
+				"§ what this file proves",
+				"tests { § the setup follows",
+				"\t§ above the test",
+				'\ttest "reads" { § the body follows',
+				"\t\t§ inside",
+				"\t\texpect true",
+				"\t}",
+				"}",
+				"",
+				"§ trailing",
+				"",
+			].join("\n")
+
+			let result = format(source)
+
+			expect(result.refusal).toBeNull()
+			expect(result.text).toBe(source)
+		})
+
+		it("aligns a run of Declarations inside the section", () => {
+			let source = [
+				"implementation {}",
+				"",
+				"tests {",
+				'\tconstant lions = { name = "Lions" }',
+				"\tconstant tigersAndBears = 2",
+				"",
+				'\ttest "reads" {',
+				"\t\texpect true",
+				"\t}",
+				"}",
+				"",
+			].join("\n")
+
+			expect(format(source).text).toBe(
+				[
+					"implementation {}",
+					"",
+					"tests {",
+					'\tconstant lions          = { name = "Lions" }',
+					"\tconstant tigersAndBears = 2",
+					"",
+					'\ttest "reads" {',
+					"\t\texpect true",
+					"\t}",
+					"}",
+					"",
+				].join("\n"),
+			)
+		})
+
+		it("writes an interpolated name and an empty section", () => {
+			let source = [
+				"implementation {}",
+				"",
+				"tests {",
+				"\tconstant scored = 2",
+				"",
+				'\ttest "{scored} is a win" {',
+				"\t\texpect true",
+				"\t}",
+				"}",
+				"",
+			].join("\n")
+
+			let result = format(source)
+
+			expect(result.refusal).toBeNull()
+			expect(result.text).toBe(source)
+
+			let empty = ["implementation {}", "", "tests {}", ""].join("\n")
+
+			expect(format(empty).text).toBe(empty)
+		})
+	})
+
 	describe("Comments above the Program", () => {
 		// NOTE: The blank line that separates a file's header from its
 		// `implementation {` used to be found under EVERY line of that header,
