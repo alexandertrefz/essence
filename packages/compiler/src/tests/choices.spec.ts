@@ -8,6 +8,7 @@ import type { common, parser } from "@essence-lang/interfaces"
 
 import { containsErrors } from "../diagnostics/index"
 import { enrich } from "../enricher/index"
+import { loadStdlibFrom, parseStdlibSource } from "../enricher/stdlib"
 import {
 	defaultOptimiserOptions,
 	optimise,
@@ -4458,6 +4459,32 @@ describe("Choices", () => {
 				)
 			})
 
+			// NOTE: A Pattern Declaration is the Constants an author could have
+			// written, and each one reads a member off the value — a Lookup, and
+			// no literal. It is refused for what it IS rather than for a name
+			// this Module supposedly does not declare.
+			it("refuses a Constant a Pattern Declaration binds", () => {
+				let reported = diagnosticsOf(`implementation {
+					constant sizes = { small = 1, large = 9 }
+					constant { small } = sizes
+
+					choice Fetch {
+						Get { url: String, retries: Integer } = { retries = small },
+					}
+				}`)
+
+				expect(reported.map(({ code }) => code)).toEqual([
+					"case-default-not-a-literal",
+				])
+				expect(reported[0].message).toBe(
+					"The Constant 'small' does not hold a literal",
+				)
+				// NOTE: The binding's value stands at the span of the name it
+				// binds, so the declaration label would repeat one already
+				// there.
+				expect(reported[0].labels).toHaveLength(2)
+			})
+
 			it("refuses a Variable", () => {
 				let reported = diagnosticsOf(`implementation {
 					variable attempts = 0
@@ -4473,6 +4500,31 @@ describe("Choices", () => {
 				expect(reported[0].message).toBe(
 					"'attempts' is not a Constant of this Module",
 				)
+			})
+
+			// NOTE: The standard library is a graph of Modules like any other
+			// and its files carry a top level Scope of their own, so the rule
+			// holds there too — one map per FILE, which is also what keeps the
+			// Diagnostic pointing inside the file being reported on. The loader
+			// throws on any Diagnostic, so loading IS the assertion.
+			it("holds in a standard library file", () => {
+				expect(() =>
+					loadStdlibFrom([
+						parseStdlibSource(
+							"Synthetic.es",
+							`declarations {
+								constant standardHeaders: List<String> = []
+
+								choice Fetch {
+									Get {
+										url: String,
+										headers: List<String>,
+									} = { headers = standardHeaders },
+								}
+							}`,
+						),
+					]),
+				).not.toThrow()
 			})
 
 			// NOTE: A Constant does not hoist, and a payload default is read at

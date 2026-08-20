@@ -499,6 +499,29 @@ describe("Semantic Tokens of a Record Literal's shorthand member", () => {
 // NOTE: A `#Case` written into a Case payload's default would go uncoloured
 // otherwise, for the same reason a Parameter default's would.
 describe("Semantic Tokens of a Case written in a payload default", () => {
+	// NOTE: A default value may NAME a Constant of the Module, whose value is
+	// baked into the Case Type — and the name is coloured as the Constant it is,
+	// because what the walk meets is an Expression like any other.
+	it("should colour a Constant a default names as a readonly variable", () => {
+		let source = [
+			"implementation {",
+			'\tconstant standardHeaders: List<String> = ["Accept"]',
+			"",
+			"\tchoice Fetch {",
+			"\t\tGet { url: String, headers: List<String> } = {",
+			"\t\t\theaders = standardHeaders,",
+			"\t\t},",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(tokenAt(source, 6, 14)).toMatchObject({
+			type: "variable",
+			modifiers: ["readonly"],
+			length: 15,
+		})
+	})
+
 	it("should colour a bare Case as an enum member", () => {
 		let source = [
 			"implementation {",

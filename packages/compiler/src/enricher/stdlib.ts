@@ -606,6 +606,13 @@ export function loadStdlibFrom(
 			members: scopeMap(),
 			declarations: scopeMap(),
 			constants: new Set(),
+			// NOTE: Present for the same reason `topLevelScope` carries one:
+			// this is a Program's top level, and a Case payload default here
+			// may name a Constant of the file it is written in exactly as one
+			// in a user Module may. One map per FILE, which is what keeps the
+			// answer — and the Diagnostic pointing at the declaration — inside
+			// the file that is being reported on.
+			constantValues: scopeMap(),
 			types: scopeMap(),
 			protocols: scopeMap(),
 		}),
