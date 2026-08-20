@@ -1285,6 +1285,28 @@ describe("Hover inside a Case payload default", () => {
 		expect(hover(source, { line: 3, column: 55 })).toBe("Integer")
 	})
 
+	// NOTE: A default that NAMES a Constant is baked into the Case Type as that
+	// Constant's value, and a Hover here answers with the NAME all the same —
+	// a default is an Expression written where it stands, and pointing at one is
+	// pointing at what was written, exactly as it is on a Parameter's default.
+	it("should answer a name in the default with the Constant it names", () => {
+		let source = [
+			"implementation {",
+			'\tconstant standardHeaders: List<String> = ["Accept"]',
+			"",
+			"\tchoice Fetch {",
+			"\t\tGet { url: String, headers: List<String> } = {",
+			"\t\t\theaders = standardHeaders,",
+			"\t\t},",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(hover(source, { line: 6, column: 16 })).toBe(
+			"standardHeaders: List<String>",
+		)
+	})
+
 	// NOTE: A member path is a Function literal the Compiler wrote. What a
 	// reader may point at is the path as a whole and each step it spells; the
 	// Parameter the Compiler named is never an answer, and a test that let it

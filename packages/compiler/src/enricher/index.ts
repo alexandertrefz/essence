@@ -96,6 +96,10 @@ export function topLevelScope(
 		// there is no source Position to point a Diagnostic at.
 		declarations: scopeMap(),
 		constants: new Set(Object.keys(members)),
+		// NOTE: Empty rather than absent, which is what marks this Scope as the
+		// one a Program's own Constants are recorded in — the builtins have no
+		// Essence value to record, and every child Scope leaves the field off.
+		constantValues: scopeMap(),
 		types: scopeMap(withoutShadowed(builtinTypes(), shadowed?.types)),
 		protocols: scopeMap(
 			withoutShadowed(builtinProtocols(), shadowed?.protocols),

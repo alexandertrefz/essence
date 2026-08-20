@@ -22,6 +22,21 @@ export type Scope = {
 	// NOTE: Names in `members` that are not reassignable — Constants,
 	// Functions, Namespaces, Parameters and `@`.
 	constants: Set<string>
+	// NOTE: What each Constant this Scope declares was given, as the Enricher
+	// typed it. Present on a Program's TOP LEVEL Scope alone — a child Scope is
+	// built fresh and carries none — because the one reader wants a value that
+	// stands wherever the Module does: a Case payload default, which is baked
+	// into the Case Type as data and spliced into every construction of it.
+	//
+	// Written as each Declaration is enriched, so it holds exactly the Constants
+	// ABOVE the Statement asking. That is the whole of the ordering rule a
+	// payload default lives by, and it is the same rule the emitted Module lives
+	// by: a Constant does not hoist.
+	//
+	// A reader must ask `findDeclaringScope` first and consult the Scope it
+	// answers — reading THIS map after resolving a name somewhere else would
+	// read past a binding that shadows the Constant.
+	constantValues?: Record<string, common.typed.ExpressionNode>
 	types: Record<string, common.Type>
 	// NOTE: Protocols live beside `types` rather than in them — a Protocol is
 	// not a Type, and keeping the maps apart is what lets Type positions

@@ -3,35 +3,73 @@
 exports[`Diagnostic Showcase CaseDefaults.es should render the same report every time 1`] = `
 "[case-default-not-a-literal]
 Error: The default for Case '#Get' is not a Record Literal
-    ╭─┤ CaseDefaults.es:12:48 │
+    ╭─┤ CaseDefaults.es:11:48 │
     │
- 12 │        Get { url: String, headers: List<String> } = standardHeaders,
+ 11 │        Get { url: String, headers: List<String> } = standardHeaders,
     │                                                     ───────┬───────  
     │                                                            ╰───────── this names a value rather than writing one
     │ 
     │ Help: Write the members out: '= { … }'.
     │ 
-    │ Note: A payload default is spliced into every construction of its Case, and a construction may stand in a Module that never named the Choice — so a default that read a name would read one that is not there.
+    │ Note 1: Which members a default fills in is read off the ones it writes, so the default itself is spelled out even where the values in it are names.
+    │ Note 2: A payload default is spliced into every construction of its Case, and a construction may stand in a Module that never named the Choice — so the value travels with the Case Type, and a name read where the Case is built would be a name that is not there.
 ────╯
 
 [case-default-not-a-literal]
-Error: This default member is not a literal
-    ╭─┤ CaseDefaults.es:20:55 │
+Error: This value in a payload default is not a literal
+    ╭─┤ CaseDefaults.es:19:55 │
     │
- 20 │        Get { url: String, retries: Integer } = { retries = none },
-    │                                                            ──┬─  
-    │                                                              ╰─── this is worked out rather than written down
+ 19 │        Get { url: String, retries: Integer } = { retries = sizes::length() },
+    │                                                            ───────┬───────  
+    │                                                                   ╰───────── this is worked out rather than written down
     │ 
-    │ Help: Write a literal — a Number, a String, a Boolean, or a List, Record or Case value built out of those.
+    │ Help: Write a literal — a Number, a String, a Boolean, or a List, Record or Case value built out of those — or name a Constant of this Module whose value is one.
     │ 
-    │ Note: A payload default is spliced into every construction of its Case, and a construction may stand in a Module that never named the Choice — so a default that read a name would read one that is not there.
+    │ Note: A payload default is spliced into every construction of its Case, and a construction may stand in a Module that never named the Choice — so the value travels with the Case Type, and a name read where the Case is built would be a name that is not there.
+────╯
+
+[case-default-not-a-literal]
+Error: The Constant 'biggest' does not hold a literal
+    ╭─┤ CaseDefaults.es:28:55 │
+    │
+ 25 │     constant biggest = sizes::length()
+    │              ───┬───   ───────┬───────  
+    │                 ╰─────────────│───────── 'biggest' is declared here
+    │                               │         
+    │                               ╰───────── this is worked out rather than written down
+    │ 
+ 28 │        Get { url: String, retries: Integer } = { retries = biggest },
+    │                                                            ───┬───  
+    │                                                               ╰───── this default value names 'biggest'
+    │ 
+    │ Help: Give 'biggest' a value that is written down, or write this default's value out here.
+    │ 
+    │ Note: A payload default is spliced into every construction of its Case, and a construction may stand in a Module that never named the Choice — so the value travels with the Case Type, and a name read where the Case is built would be a name that is not there.
+────╯
+
+[case-default-not-a-literal]
+Error: 'attempts' is not a Constant of this Module
+    ╭─┤ CaseDefaults.es:36:55 │
+    │
+ 33 │     variable attempts = 0
+    │              ────┬───  
+    │                  ╰───── 'attempts' is declared here
+    │ 
+ 36 │        Get { url: String, retries: Integer } = { retries = attempts },
+    │                                                            ────┬───  
+    │                                                                ╰───── this default value names 'attempts'
+    │ 
+    │ Help: Write a literal — a Number, a String, a Boolean, or a List, Record or Case value built out of those — or name a Constant of this Module whose value is one.
+    │ 
+    │ Note 1: A Variable holds whatever it was last assigned; a payload default is read once, where the Choice is declared.
+    │ Note 2: A payload default is spliced into every construction of its Case, and a construction may stand in a Module that never named the Choice — so the value travels with the Case Type, and a name read where the Case is built would be a name that is not there.
 ────╯
 
 [default-type-mismatch]
 Error: This default does not fit Case '#Get'
-    ╭─┤ CaseDefaults.es:26:25 │
+    ╭─┤ CaseDefaults.es:42:25 │
     │
- 26 │        Get { url: String } = { retries = 0 },
+ 42 │        Get { url: String } = { retries = 0 },
     │                              ───────┬───────  
     │                                     ╰───────── this is a { retries: Integer }
     │ 
@@ -43,9 +81,9 @@ Error: This default does not fit Case '#Get'
 
 [default-type-mismatch]
 Error: This default does not fit Case '#Get'
-    ╭─┤ CaseDefaults.es:32:43 │
+    ╭─┤ CaseDefaults.es:48:43 │
     │
- 32 │        Get { url: String, retries: Integer } = { retries = "none" },
+ 48 │        Get { url: String, retries: Integer } = { retries = "none" },
     │                                                ──────────┬─────────  
     │                                                          ╰─────────── this is a { retries: String }
     │ 
@@ -57,9 +95,9 @@ Error: This default does not fit Case '#Get'
 
 [case-default-on-generic-choice]
 Error: A generic Choice can not default a payload
-    ╭─┤ CaseDefaults.es:39:42 │
+    ╭─┤ CaseDefaults.es:55:42 │
     │
- 39 │        Full { value: Value, seen: Integer } = { seen = 0 },
+ 55 │        Full { value: Value, seen: Integer } = { seen = 0 },
     │                                               ──────┬─────  
     │                                                     ╰─────── this default
     │ 
@@ -68,7 +106,7 @@ Error: A generic Choice can not default a payload
     │ Note: 'Box' abstracts over 1 Type Parameter, and a value written here can bind none of them — every use site decides them, and each would want a default of its own.
 ────╯
 
-─── 5 errors
+─── 7 errors
 "
 `;
 
