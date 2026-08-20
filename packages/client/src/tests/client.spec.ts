@@ -1138,7 +1138,7 @@ describe("Leaving out a member a Case payload's default fills in", () => {
 
 	it("fills every member the payload left out", () => {
 		expect(fetched()({ $case: "Fetch#Get", url: "/a" })).toBe(
-			"/a|0|0|10|quiet",
+			"/a|0|0|Accept|10|quiet",
 		)
 	})
 
@@ -1149,10 +1149,11 @@ describe("Leaving out a member a Case payload's default fills in", () => {
 				url: "/a",
 				retries: 3n,
 				tags: ["x", "y"],
+				headers: ["X-Trace"],
 				limits: { calls: 1n },
 				mode: "Verbose",
 			}),
-		).toBe("/a|3|2|1|loud")
+		).toBe("/a|3|2|X-Trace|1|loud")
 	})
 
 	it("takes a payload built by the Case constructor", () => {
@@ -1160,7 +1161,26 @@ describe("Leaving out a member a Case payload's default fills in", () => {
 			Get: (payload: { url: string }) => unknown
 		}
 
-		expect(fetched()(Fetch.Get({ url: "/b" }))).toBe("/b|0|0|10|quiet")
+		expect(fetched()(Fetch.Get({ url: "/b" }))).toBe(
+			"/b|0|0|Accept|10|quiet",
+		)
+	})
+
+	// NOTE: `headers` is the one member whose default NAMES a Constant rather
+	// than writing a value. Nothing crosses but data — the declaring Module read
+	// the Constant at the declaration and baked its value into the Case Type —
+	// so this side fills it in exactly as it fills in a written literal, and the
+	// `.d.ts` marks it `?` for the same reason.
+	it("fills a member whose default names a Constant", () => {
+		expect(fetched()({ $case: "Fetch#Get", url: "/a" })).toContain(
+			"|Accept|",
+		)
+	})
+
+	it("refuses a member filled from a Constant written as undefined", () => {
+		expect(() =>
+			fetched()({ $case: "Fetch#Get", url: "/a", headers: undefined }),
+		).toThrow(EssenceMarshalError)
 	})
 
 	// NOTE: A member written `undefined` is a member WRITTEN, exactly as at a
@@ -1195,6 +1215,7 @@ describe("Leaving out a member a Case payload's default fills in", () => {
 			url: "/",
 			retries: 0n,
 			tags: [],
+			headers: ["Accept"],
 			limits: { calls: 10n },
 			mode: "Quiet",
 		})

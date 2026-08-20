@@ -190,11 +190,16 @@ describe("A Module described", () => {
 			}
 		}
 
-		// NOTE: Four members, at each of the three positions the Case is
+		// NOTE: Five members, at each of the three positions the Case is
 		// described from — the Choice's own entry, the Parameter that takes one
 		// and the return that hands one back. The mark is on the payload rather
 		// than on a direction; which direction prints a `?` is `dts.ts`'s.
-		expect(seen).toBe(12)
+		//
+		// One of the five is filled from a Constant rather than from a written
+		// literal, and it carries a `fill` like any other: what the declaring
+		// Module baked into the Case Type is a value, so this side can not tell
+		// the two apart and has nothing to do differently.
+		expect(seen).toBe(15)
 	})
 
 	it("collapses an Optional and leaves every other Union alone", () => {

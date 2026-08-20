@@ -43,6 +43,13 @@ implementation {
 		Quiet,
 	}
 
+	§ A default value that NAMES a Constant, through a second Constant on the
+	§ way. Nothing is spliced: the value is read once, where the Choice is
+	§ declared, and baked into the Case Type as data — so it reaches the
+	§ boundary the way a written literal does.
+	constant standardHeader = "Accept"
+	constant standardHeaders: List<String> = [standardHeader]
+
 	§ A Case whose payload shape carries a default. Unlike a Record Parameter's
 	§ there is no callee to fill it in at — a Case is built where it is written,
 	§ and a host writing one is where it is written — so the boundary itself
@@ -52,9 +59,16 @@ implementation {
 			url: String,
 			retries: Integer,
 			tags: List<String>,
+			headers: List<String>,
 			limits: { calls: Integer },
 			mode: Method,
-		} = { retries = 0, tags = [], limits = { calls = 10 }, mode = #Quiet },
+		} = {
+			retries = 0,
+			tags = [],
+			headers = standardHeaders,
+			limits = { calls = 10 },
+			mode = #Quiet,
+		},
 		Ping,
 	}
 
@@ -67,12 +81,14 @@ implementation {
 
 	function fetched(_ request: Fetch) -> String {
 		<- match request -> String {
-			case #Get({ url, retries, tags, limits, mode }) {
-				<- "{url}|{retries}|{tags::length()}|{limits.calls}|{
-					spelled(mode)
-				}"
+			case #Get({ url, retries, tags, headers, limits, mode }) {
+				<- "{url}|{retries}|{tags::length()}|{headers::join(with ",")}|{
+					limits.calls
+				}|{spelled(mode)}"
 			}
-			case #Ping                                      { <- "ping" }
+			case #Ping                                               {
+				<- "ping"
+			}
 		}
 	}
 
