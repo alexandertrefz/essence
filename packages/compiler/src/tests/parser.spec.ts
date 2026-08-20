@@ -802,6 +802,60 @@ describe("Parser", () => {
 
 				expect(diagnostics).toEqual([])
 			})
+
+			// NOTE: A path key is read the same way in every key position —
+			// the Parser writes one wherever a key can stand and the Enricher
+			// says where it MEANS something — so the refusals a key list is
+			// held to hold for a Literal merged into a default just the same.
+			describe("in a Literal merged into a default", () => {
+				it("should refuse a path key written with no value", () => {
+					let { diagnostics } = parseWithDiagnostics(
+						"implementation { constant value = connect(using { server.port }) }",
+					)
+
+					expect(diagnostics).toHaveLength(1)
+					expect(diagnostics[0]!.code).toBe("shorthand-on-path-key")
+				})
+
+				it("should refuse a descend with nothing in it", () => {
+					let { diagnostics } = parseWithDiagnostics(
+						"implementation { constant value = connect(using { server.{} }) }",
+					)
+
+					expect(diagnostics).toHaveLength(1)
+					expect(diagnostics[0]!.code).toBe("empty-path-group")
+				})
+
+				it("should refuse a key that a path already writes", () => {
+					let { diagnostics } = parseWithDiagnostics(
+						"implementation { constant value = connect(using { server = s, server.port = 1 }) }",
+					)
+
+					expect(diagnostics).toHaveLength(1)
+					expect(diagnostics[0]!.code).toBe("duplicate-member")
+				})
+
+				// NOTE: A descend holds a member LIST, and a plain key of one
+				// takes the shorthand wherever the list it stands in does —
+				// there is no `with` inside a descend for a bare name to be the
+				// whole value merged.
+				it("should take the shorthand inside a descend", () => {
+					let { diagnostics } = parseWithDiagnostics(
+						"implementation { constant value = connect(using { server.{ port } }) }",
+					)
+
+					expect(diagnostics).toEqual([])
+				})
+
+				it("should refuse a path key with no value in a payload", () => {
+					let { diagnostics } = parseWithDiagnostics(
+						"implementation { constant value = #Get({ limits.calls }) }",
+					)
+
+					expect(diagnostics).toHaveLength(1)
+					expect(diagnostics[0]!.code).toBe("shorthand-on-path-key")
+				})
+			})
 		})
 
 		describe("Literals", () => {
