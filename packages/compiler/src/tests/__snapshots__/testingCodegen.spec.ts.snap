@@ -1,0 +1,158 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`Test codegen — the emitted shape keeps the golden shape of a whole registration 1`] = `
+"$testing.register({
+	module: null,
+	spans: [
+		{
+			start: {
+				line: 10,
+				column: 11
+			},
+			end: {
+				line: 10,
+				column: 25
+			},
+			source: "doubled::is(4)"
+		},
+		{
+			start: {
+				line: 10,
+				column: 11
+			},
+			end: {
+				line: 10,
+				column: 18
+			},
+			source: "doubled"
+		},
+		{
+			start: {
+				line: 10,
+				column: 23
+			},
+			end: {
+				line: 10,
+				column: 24
+			},
+			source: "4"
+		},
+		{
+			start: {
+				line: 15,
+				column: 10
+			},
+			end: {
+				line: 15,
+				column: 24
+			},
+			source: "shipped::is(2)"
+		},
+		{
+			start: {
+				line: 15,
+				column: 10
+			},
+			end: {
+				line: 15,
+				column: 17
+			},
+			source: "shipped"
+		},
+		{
+			start: {
+				line: 15,
+				column: 22
+			},
+			end: {
+				line: 15,
+				column: 23
+			},
+			source: "2"
+		}
+	],
+	tests: [
+		{
+			id: "/arithmetic/doubles",
+			name: "doubles",
+			interpolated: false,
+			suitePath: ["arithmetic"],
+			tags: [],
+			focused: false,
+			skipped: null,
+			position: {
+				start: {
+					line: 9,
+					column: 3
+				},
+				end: {
+					line: 11,
+					column: 4
+				}
+			},
+			keywordPosition: {
+				start: {
+					line: 9,
+					column: 3
+				},
+				end: {
+					line: 9,
+					column: 7
+				}
+			}
+		},
+		{
+			id: "/carries the constant",
+			name: "carries the constant",
+			interpolated: false,
+			suitePath: [],
+			tags: ["slow"],
+			focused: false,
+			skipped: null,
+			position: {
+				start: {
+					line: 14,
+					column: 2
+				},
+				end: {
+					line: 16,
+					column: 3
+				}
+			},
+			keywordPosition: {
+				start: {
+					line: 14,
+					column: 2
+				},
+				end: {
+					line: 14,
+					column: 6
+				}
+			}
+		}
+	],
+	run: $context => {
+		const doubled = typeof shipped.value === "number" && typeof $pool_0.value === "number" && shipped.value * $pool_0.value >= -9007199254740991 && shipped.value * $pool_0.value <= 9007199254740991 ? {
+			[$type.typeKeySymbol]: "Integer",
+			value: shipped.value * $pool_0.value
+		} : Integer.product(shipped.value, $pool_0.value);
+		{
+			$testing.entry($context, 0, null, () => {
+				$testing.expected($context, 0, ($testing.trace($context, 1, doubled).value === $testing.trace($context, 2, $pool_1).value ? Boolean.trueInstance : Boolean.falseInstance).value, {
+					kind: "is",
+					left: 1,
+					right: 2
+				});
+			});
+		}
+		$testing.entry($context, 1, null, () => {
+			$testing.expected($context, 3, ($testing.trace($context, 4, shipped).value === $testing.trace($context, 5, $pool_0).value ? Boolean.trueInstance : Boolean.falseInstance).value, {
+				kind: "is",
+				left: 4,
+				right: 5
+			});
+		});
+	}
+});
+export const $tests = $testing.entryPoints;"
+`;
