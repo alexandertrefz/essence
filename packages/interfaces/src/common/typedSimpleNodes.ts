@@ -966,7 +966,13 @@ export interface MemberOrDefaultNode {
 	nodeType: "Intrinsic"
 	kind: "member-or-default"
 	base: ExpressionNode
-	member: string
+	// NOTE: The members read off the base, outermost first, never empty. One
+	// step is the ordinary case; a longer path is a member the default writes as
+	// a Record Literal of its own and the callee therefore rebuilds one level
+	// further in, so that a path key in the Argument merges into it. Every step
+	// past the first reads optionally whatever `optional` says: a level the
+	// Argument left out is a level that is not there.
+	path: ReadonlyArray<string>
 	fallback: ExpressionNode
 	optional: boolean
 	type: Type
