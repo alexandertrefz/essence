@@ -6,7 +6,15 @@ export type Program = {
 	// its Namespace bodies may hold body-less native Method signatures and
 	// value-less static Properties. Every user Program is `implementation { … }`
 	// and can never declare a native.
-	kind: "implementation" | "declarations"
+	//
+	// NOTE: `tests` is the form a file that is nothing but tests takes —
+	// `Season.tests.es`, imports and a `tests { … }` block and no
+	// implementation block at all. Such a Program still carries an
+	// `implementation` section, empty and spanning the `tests` block, so that
+	// everything reading a Program's Statements reads one shape; `kind` is what
+	// says the block was never written, and what keeps the Formatter from
+	// writing one.
+	kind: "implementation" | "declarations" | "tests"
 	// NOTE: The two Module sections framing the implementation, null when the
 	// file wrote neither — one file is one Module, and a Module with no imports
 	// and nothing exported is a complete Program. A `declarations { … }` Program
@@ -14,6 +22,13 @@ export type Program = {
 	// space, not a graph of Modules.
 	imports: ImportSectionNode | null
 	implementation: ImplementationSectionNode
+	// NOTE: `tests { … }`, written between the implementation and the
+	// `export { … }` block, and null in the files that write none — which is
+	// every file that ships. It is a section rather than a Statement because
+	// only a section can be dropped whole: `essence build` and `essence run`
+	// leave it behind before anything is enriched, so a test costs a shipped
+	// Program nothing.
+	tests: TestsSectionNode | null
 	exports: ExportSectionNode | null
 	position: Position
 }
@@ -25,6 +40,74 @@ export type ImplementationSectionNode = {
 	nodes: Array<ImplementationNode>
 	position: Position
 }
+
+// NOTE: The `tests { … }` block. It holds the same Statements an
+// implementation block does — a `constant` written here is setup, and a
+// `function` written here is a helper — plus the two items only tests have.
+export type TestsSectionNode = {
+	nodeType: "TestsSection"
+	nodes: Array<TestsNode>
+	position: Position
+}
+
+// NOTE: What may stand in a tests section, or in a `suite`'s body: a test, a
+// nested suite, or any ordinary Statement. `TestNode` and `SuiteNode` are
+// deliberately NOT part of `StatementNode` — they can only ever be written
+// inside a tests section, and keeping them out of the Statement union is what
+// keeps every stage that walks Statements from having to answer for a form it
+// can never meet.
+export type TestsNode = TestNode | SuiteNode | ImplementationNode
+
+// NOTE: `test "name" MODIFIER* { … }`. The name is a String so that it can say
+// what the test proves — and so that a table test can interpolate the row it
+// runs for.
+//
+// `keywordPosition` is the `test` Keyword alone. A test's Position spans the
+// whole form, which is what a Diagnostic about the test underlines, while a
+// Code Lens ("Run · Debug") wants the one word to sit above.
+export interface TestNode {
+	nodeType: "Test"
+	name: StringValueNode | InterpolatedStringValueNode
+	modifiers: Array<TestModifierNode>
+	body: Array<ImplementationNode>
+	keywordPosition: Position
+	position: Position
+}
+
+// NOTE: `suite "name" MODIFIER* { … }` — a group of tests with a shared scope,
+// nesting freely. Its Modifiers cover every test inside it.
+export interface SuiteNode {
+	nodeType: "Suite"
+	name: StringValueNode | InterpolatedStringValueNode
+	modifiers: Array<TestModifierNode>
+	nodes: Array<TestsNode>
+	keywordPosition: Position
+	position: Position
+}
+
+// NOTE: One Modifier of a test or a suite — `skipped "waiting on the redesign"`,
+// `focused`, `tagged slow, network`. The grammar is deliberately open: a name
+// and the arguments that follow it, with what each name MEANS left to the stage
+// that knows the vocabulary. That is what lets `within 2s` or `retries 3` be
+// vocabulary later rather than parser work.
+export interface TestModifierNode {
+	nodeType: "TestModifier"
+	name: IdentifierNode
+	arguments: Array<TestModifierArgumentNode>
+	position: Position
+}
+
+// NOTE: A Modifier argument is a literal or a bare name, and never a general
+// Expression: `{` opens the item's own block, and an Expression that may begin
+// with `{` would make `test "…" focused { … }` two readings with no lookahead
+// to settle them. A literal and a name are the two shapes the vocabulary needs
+// and the only two that can never be mistaken for the body.
+export type TestModifierArgumentNode =
+	| IdentifierNode
+	| StringValueNode
+	| IntegerValueNode
+	| RationalValueNode
+	| BooleanValueNode
 
 // NOTE: `import { … }`, written above the implementation. Every name a Module
 // uses from another one is listed here — including its Namespaces, since
@@ -405,6 +488,46 @@ export type StatementNode =
 	| ReturnStatementNode
 	| FunctionStatementNode
 	| OverloadedFunctionStatementNode
+	| ExpectStatementNode
+	| RequireStatementNode
+
+// NOTE: `expect EXPR`. An assertion is a Statement rather than a Method call so
+// that the Compiler can keep the value of every sub-expression of what was
+// asserted — which is what lets a plain Boolean Expression explain its own
+// failure without a vocabulary of matchers.
+//
+// `matcher` is written by `require MATCHER = EXPR` and by nothing else, so on
+// an `expect` it is always null: an `expect` records its result and the test
+// carries on, so it can introduce no names and has no form that takes a value
+// apart. The field stands on both because everything else about the two
+// Statements is one thing, and one reading answers for both.
+//
+// Both are Statements of a test's body, and of the blocks nested inside it —
+// never of a Function literal written there, whose body runs somewhere the
+// test can not answer for.
+export interface ExpectStatementNode {
+	nodeType: "ExpectStatement"
+	value: ExpressionNode
+	matcher: MatcherNode | null
+	position: Position
+}
+
+// NOTE: What `expect` says, plus the one form only this Keyword has:
+// `require MATCHER = EXPR`. What differs is what a failure does — an `expect`
+// records and the test carries on; a `require` ends the test where it stands,
+// which is what makes it the way a test takes an Optional or a Choice apart
+// before reading what is inside.
+//
+// The Matcher is the one `match` uses, written where a Declaration's name is
+// written, so `require #Value(item) = value` and `case #Value(item)` are the
+// same grammar reached from the same side: a name is introduced left of `=`,
+// in a Parameter, or in a Handler head, and never on the right of anything.
+export interface RequireStatementNode {
+	nodeType: "RequireStatement"
+	value: ExpressionNode
+	matcher: MatcherNode | null
+	position: Position
+}
 
 // NOTE: `name` is a Pattern where the Declaration takes the value apart —
 // `constant { matching, rest } = list::partition(where …)`. A Declaration can

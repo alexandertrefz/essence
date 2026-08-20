@@ -55,6 +55,11 @@ export enum TokenType {
 	KeywordExport = "KeywordExport",
 	KeywordFrom = "KeywordFrom",
 	KeywordAs = "KeywordAs",
+	KeywordTests = "KeywordTests",
+	KeywordTest = "KeywordTest",
+	KeywordSuite = "KeywordSuite",
+	KeywordExpect = "KeywordExpect",
+	KeywordRequire = "KeywordRequire",
 	//
 	Identifier = "Identifier",
 	Linebreak = "Linebreak",

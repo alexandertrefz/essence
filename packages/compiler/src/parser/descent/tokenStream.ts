@@ -113,6 +113,11 @@ const tokenTypeLexemes: { [tokenType in lexer.TokenType]?: string } = {
 	[TokenType.KeywordExport]: "export",
 	[TokenType.KeywordFrom]: "from",
 	[TokenType.KeywordAs]: "as",
+	[TokenType.KeywordTests]: "tests",
+	[TokenType.KeywordTest]: "test",
+	[TokenType.KeywordSuite]: "suite",
+	[TokenType.KeywordExpect]: "expect",
+	[TokenType.KeywordRequire]: "require",
 }
 
 export function describeTokenType(tokenType: lexer.TokenType): string {

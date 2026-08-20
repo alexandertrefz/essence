@@ -74,6 +74,7 @@ exports[`Parser Expressions MethodInvocations should parse MethodInvocation with
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -170,6 +171,7 @@ exports[`Parser Expressions MethodInvocations should parse MethodInvocation 1`] 
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -314,6 +316,7 @@ exports[`Parser Expressions MethodInvocations should parse chained MethodInvocat
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -395,6 +398,7 @@ exports[`Parser Expressions FunctionInvocations should parse Identifier Function
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -489,6 +493,7 @@ exports[`Parser Expressions FunctionInvocations should parse Identifier Function
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -583,6 +588,7 @@ exports[`Parser Expressions FunctionInvocations should parse Identifier Function
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -677,6 +683,7 @@ exports[`Parser Expressions FunctionInvocations should parse Identifier Function
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -771,6 +778,7 @@ exports[`Parser Expressions FunctionInvocations should parse Identifier Function
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -881,6 +889,7 @@ exports[`Parser Expressions FunctionInvocations should parse a bare Case value a
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -991,6 +1000,7 @@ exports[`Parser Expressions FunctionInvocations should parse an adjacent \`Choic
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -1142,6 +1152,7 @@ exports[`Parser Expressions FunctionInvocations should parse a Case value with i
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -1223,6 +1234,7 @@ exports[`Parser Expressions FunctionInvocations should parse Identifier Function
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -1322,6 +1334,7 @@ exports[`Parser Expressions FunctionInvocations should parse Identifier Function
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -1421,6 +1434,7 @@ exports[`Parser Expressions FunctionInvocations should parse Identifier Function
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -1538,6 +1552,7 @@ exports[`Parser Expressions FunctionInvocations should parse Identifier Function
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -1655,6 +1670,7 @@ exports[`Parser Expressions FunctionInvocations should parse Identifier Function
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -1799,6 +1815,7 @@ exports[`Parser Expressions FunctionInvocations should parse Lookup FunctionInvo
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -1927,6 +1944,7 @@ exports[`Parser Expressions FunctionInvocations should parse multiple FunctionIn
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -2002,6 +2020,7 @@ exports[`Parser Expressions Lookups should parse simple Lookup 1`] = `
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -2104,6 +2123,7 @@ exports[`Parser Expressions Lookups should parse complex Lookup 1`] = `
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -2152,6 +2172,7 @@ exports[`Parser Expressions Identifiers should parse Identifiers 1`] = `
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -2200,6 +2221,7 @@ exports[`Parser Expressions Identifiers should parse 'with' as Identifier 1`] = 
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -2248,6 +2270,7 @@ exports[`Parser Expressions Identifiers should parse 'static' as Identifier 1`] 
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -2296,6 +2319,7 @@ exports[`Parser Expressions Identifiers should parse 'case' as Identifier 1`] = 
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -2343,6 +2367,7 @@ exports[`Parser Expressions Self should parse @ 1`] = `
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -2418,6 +2443,7 @@ exports[`Parser Expressions Combination should parse 2 identifier combinations 1
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -2525,6 +2551,7 @@ exports[`Parser Expressions Combination should parse inline combinations 1`] = `
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -2632,6 +2659,7 @@ exports[`Parser Expressions Combination should parse inline combinations with tr
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -2769,6 +2797,7 @@ exports[`Parser Expressions Combination should parse inline combinations with mu
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -2860,6 +2889,7 @@ exports[`Parser Expressions Literals FunctionLiterals should parse FunctionLiter
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -3050,6 +3080,7 @@ exports[`Parser Expressions Literals FunctionLiterals should parse FunctionLiter
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -3240,6 +3271,7 @@ exports[`Parser Expressions Literals FunctionLiterals should parse FunctionLiter
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -3417,6 +3449,7 @@ exports[`Parser Expressions Literals FunctionLiterals should parse FunctionLiter
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -3677,6 +3710,7 @@ exports[`Parser Expressions Literals FunctionLiterals should parse FunctionLiter
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -3799,6 +3833,7 @@ exports[`Parser Expressions Literals GenericFunctionLiterals should parse Generi
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -4020,6 +4055,7 @@ exports[`Parser Expressions Literals GenericFunctionLiterals should parse Generi
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -4241,6 +4277,7 @@ exports[`Parser Expressions Literals GenericFunctionLiterals should parse Generi
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -4449,6 +4486,7 @@ exports[`Parser Expressions Literals GenericFunctionLiterals should parse Generi
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -4740,6 +4778,7 @@ exports[`Parser Expressions Literals GenericFunctionLiterals should parse Functi
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -4789,6 +4828,7 @@ exports[`Parser Expressions Literals AnonymousRecordLiteral should parse an empt
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -4869,6 +4909,7 @@ exports[`Parser Expressions Literals AnonymousRecordLiteral should parse Anonymo
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -4949,6 +4990,7 @@ exports[`Parser Expressions Literals AnonymousRecordLiteral should parse Anonymo
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -5059,6 +5101,7 @@ exports[`Parser Expressions Literals AnonymousRecordLiteral should parse Anonymo
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -5169,6 +5212,7 @@ exports[`Parser Expressions Literals AnonymousRecordLiteral should parse Anonymo
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -5281,6 +5325,7 @@ exports[`Parser Expressions Literals AnonymousRecordLiteral should parse Anonymo
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -5393,6 +5438,7 @@ exports[`Parser Expressions Literals AnonymousRecordLiteral should parse Anonymo
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -5499,6 +5545,7 @@ exports[`Parser Expressions Literals TypedRecordLiterals should parse TypedRecor
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -5605,6 +5652,7 @@ exports[`Parser Expressions Literals TypedRecordLiterals should parse TypedRecor
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -5741,6 +5789,7 @@ exports[`Parser Expressions Literals TypedRecordLiterals should parse TypedRecor
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -5877,6 +5926,7 @@ exports[`Parser Expressions Literals TypedRecordLiterals should parse TypedRecor
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -6041,6 +6091,7 @@ exports[`Parser Expressions Literals TypedRecordLiterals should parse TypedRecor
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -6089,6 +6140,7 @@ exports[`Parser Expressions Literals BooleanLiterals should parse 'true' Boolean
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -6137,6 +6189,7 @@ exports[`Parser Expressions Literals BooleanLiterals should parse 'false' Boolea
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -6185,6 +6238,7 @@ exports[`Parser Expressions Literals StringLiterals should parse empty StringLit
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -6233,6 +6287,7 @@ exports[`Parser Expressions Literals StringLiterals should parse filled StringLi
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -6281,6 +6336,7 @@ exports[`Parser Expressions Literals IntegerLiterals should parse IntegerLiteral
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -6329,6 +6385,7 @@ exports[`Parser Expressions Literals IntegerLiterals should parse IntegerLiteral
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -6377,6 +6434,7 @@ exports[`Parser Expressions Literals IntegerLiterals should parse IntegerLiteral
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -6425,6 +6483,7 @@ exports[`Parser Expressions Literals IntegerLiterals should parse negative Integ
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -6473,6 +6532,7 @@ exports[`Parser Expressions Literals IntegerLiterals should parse negative Integ
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -6521,6 +6581,7 @@ exports[`Parser Expressions Literals IntegerLiterals should parse negative Integ
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -6570,6 +6631,7 @@ exports[`Parser Expressions Literals RationalLiterals should parse RationalLiter
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -6619,6 +6681,7 @@ exports[`Parser Expressions Literals RationalLiterals should parse RationalLiter
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -6668,6 +6731,7 @@ exports[`Parser Expressions Literals RationalLiterals should parse negative nume
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -6717,6 +6781,7 @@ exports[`Parser Expressions Literals RationalLiterals should parse negative deno
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -6766,6 +6831,7 @@ exports[`Parser Expressions Literals RationalLiterals should parse fully negativ
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -6814,6 +6880,7 @@ exports[`Parser Expressions Literals ListLiterals should parse an empty List 1`]
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -6877,6 +6944,7 @@ exports[`Parser Expressions Literals ListLiterals should parse an List with a si
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -6968,6 +7036,7 @@ exports[`Parser Expressions Literals ListLiterals should parse an List with mult
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -7190,6 +7259,7 @@ exports[`Parser Expressions Match should parse match expression with function in
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -7251,6 +7321,7 @@ exports[`Parser Statements ReturnStatements should parse ReturnStatements 1`] = 
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -7313,6 +7384,7 @@ exports[`Parser Statements IfStatements should parse IfStatements 1`] = `
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -7376,6 +7448,7 @@ exports[`Parser Statements IfStatements should parse IfElseStatements 1`] = `
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -7468,6 +7541,7 @@ exports[`Parser Statements IfStatements should parse IfElse-If-Statements 1`] = 
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -7561,6 +7635,7 @@ exports[`Parser Statements IfStatements should parse IfElse-IfElse-Statements 1`
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -7683,6 +7758,7 @@ exports[`Parser Statements IfStatements should parse IfElse-IfElse-If-Statements
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -7760,6 +7836,7 @@ exports[`Parser Statements ConstantDeclarationStatements should parse ConstantDe
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -7863,6 +7940,7 @@ exports[`Parser Statements ConstantDeclarationStatements should parse ConstantDe
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -7954,6 +8032,7 @@ exports[`Parser Statements ConstantDeclarationStatements should parse ConstantDe
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -8120,6 +8199,7 @@ exports[`Parser Statements ConstantDeclarationStatements should parse ConstantDe
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -8391,6 +8471,7 @@ exports[`Parser Statements ConstantDeclarationStatements should parse ConstantDe
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -8468,6 +8549,7 @@ exports[`Parser Statements VariableDeclarationStatements should parse VariableDe
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -8571,6 +8653,7 @@ exports[`Parser Statements VariableDeclarationStatements should parse VariableDe
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -8662,6 +8745,7 @@ exports[`Parser Statements VariableDeclarationStatements should parse VariableDe
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -8828,6 +8912,7 @@ exports[`Parser Statements VariableDeclarationStatements should parse VariableDe
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -9099,6 +9184,7 @@ exports[`Parser Statements VariableDeclarationStatements should parse VariableDe
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -9176,6 +9262,7 @@ exports[`Parser Statements VariableDeclarationStatements should parse VariableDe
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -9253,6 +9340,7 @@ exports[`Parser Statements VariableDeclarationStatements should parse VariableDe
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -9330,6 +9418,7 @@ exports[`Parser Statements VariableDeclarationStatements should parse VariableDe
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -9405,6 +9494,7 @@ exports[`Parser Statements VariableAssignmentStatements should parse VariableAss
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -9472,6 +9562,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -9572,6 +9663,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -9704,6 +9796,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -9945,6 +10038,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -10359,6 +10453,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -10759,6 +10854,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -11315,6 +11411,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -11589,6 +11686,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -11682,6 +11780,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -11808,6 +11907,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -11966,6 +12066,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -12233,6 +12334,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -12673,6 +12775,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -13099,6 +13202,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -13681,6 +13785,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -13981,6 +14086,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -14248,6 +14354,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -14688,6 +14795,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -15114,6 +15222,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -15696,6 +15805,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -15996,6 +16106,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -16296,6 +16407,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -16360,6 +16472,7 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse an empty P
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -16485,6 +16598,7 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse a Protocol
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -16786,6 +16900,7 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse a Protocol
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -16911,6 +17026,7 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse a Protocol
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -17240,6 +17356,7 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse a Protocol
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -17469,6 +17586,7 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse a Protocol
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -17622,6 +17740,7 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse a document
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -17831,6 +17950,7 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse a Protocol
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -18071,6 +18191,7 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse a Protocol
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -18301,6 +18422,7 @@ exports[`Parser Statements ProtocolDeclarationStatements Contextual Function lit
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -18628,6 +18750,7 @@ exports[`Parser Statements ProtocolDeclarationStatements Contextual Function lit
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -18963,6 +19086,7 @@ exports[`Parser Statements ProtocolDeclarationStatements Generic Bounds should p
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -19224,6 +19348,7 @@ exports[`Parser Statements ProtocolDeclarationStatements Generic Bounds should p
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -19346,6 +19471,7 @@ exports[`Parser Statements ProtocolDeclarationStatements Conformance Clauses sho
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -19496,6 +19622,7 @@ exports[`Parser Statements ProtocolDeclarationStatements Conformance Clauses sho
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -19592,6 +19719,7 @@ exports[`Parser Statements ProtocolDeclarationStatements Conformance Clauses sho
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -19846,6 +19974,7 @@ exports[`Parser Statements ProtocolDeclarationStatements Conformance Clauses sho
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -20083,6 +20212,7 @@ exports[`Parser Statements ProtocolDeclarationStatements Where Clauses should pa
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -20423,6 +20553,7 @@ exports[`Parser Statements ProtocolDeclarationStatements Where Clauses should pa
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -20762,6 +20893,7 @@ exports[`Parser Statements ProtocolDeclarationStatements Where Clauses should pa
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -20853,6 +20985,7 @@ exports[`Parser Statements TypeAliasStatements should parse TypeAlias Statements
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -20931,6 +21064,7 @@ exports[`Parser Statements TypeAliasStatements should parse TypeAlias Statements
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -21053,6 +21187,7 @@ exports[`Parser Statements TypeAliasStatements should parse TypeAlias Statements
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -21248,6 +21383,7 @@ exports[`Parser Statements TypeAliasStatements should parse TypeAlias Statements
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -21399,6 +21535,7 @@ exports[`Parser Statements Refinement predicates should parse a predicate on a S
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -21504,6 +21641,7 @@ exports[`Parser Statements FunctionStatements should parse FunctionStatements wi
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -21708,6 +21846,7 @@ exports[`Parser Statements FunctionStatements should parse FunctionLiterals with
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -21912,6 +22051,7 @@ exports[`Parser Statements FunctionStatements should parse FunctionLiterals with
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -22103,6 +22243,7 @@ exports[`Parser Statements FunctionStatements should parse FunctionLiterals with
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;
 
@@ -22419,5 +22560,6 @@ exports[`Parser Statements FunctionStatements should parse FunctionLiterals with
       "line": 1,
     },
   },
+  "tests": null,
 }
 `;

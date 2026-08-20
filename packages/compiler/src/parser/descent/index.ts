@@ -54,6 +54,11 @@ const identifierTokenTypes = new Set([
 	TokenType.KeywordExport,
 	TokenType.KeywordFrom,
 	TokenType.KeywordAs,
+	TokenType.KeywordTests,
+	TokenType.KeywordTest,
+	TokenType.KeywordSuite,
+	TokenType.KeywordExpect,
+	TokenType.KeywordRequire,
 ])
 
 function isIdentifierToken(token: Token | undefined): boolean {
@@ -86,6 +91,36 @@ function startsExpression(token: Token | undefined): boolean {
 	return token !== undefined && expressionStartTokenTypes.has(token.type)
 }
 
+// NOTE: Every way an Expression CARRIES ON past a Token that has already been
+// read — the three postfix forms `parseExpressionLevels` loops over, plus the
+// `#` that makes an Identifier the Choice half of `Choice#Case` when the two
+// are written flush together. A Keyword that is also an Identifier (`expect`,
+// `require`) opens its Statement form only where none of these follows it:
+// `expect(true)` is a call of a Function named `expect`, `expect.first` reads a
+// member off one, and `expect#Win` names a Case of one. `::` needs no case here
+// — a `:` can not start an Expression, so `expect::isEmpty()` never reached the
+// question.
+function continuesExpression(
+	token: Token,
+	following: Token | undefined,
+): boolean {
+	if (following === undefined) {
+		return false
+	}
+
+	if (
+		following.type === TokenType.SymbolDot ||
+		following.type === TokenType.SymbolLeftParen
+	) {
+		return true
+	}
+
+	return (
+		following.type === TokenType.SymbolHash &&
+		isAdjacent(token.position, following.position)
+	)
+}
+
 // NOTE: The Token types that begin a literal Matcher — `case 0`, `case 1/2`,
 // `case "a"`. Everything else in Matcher position is read as a Type.
 // `LiteralStringStart` is here only so an interpolated String reaches
@@ -100,6 +135,25 @@ const literalMatcherTokenTypes = new Set([
 	TokenType.LiteralTrue,
 	TokenType.LiteralFalse,
 ])
+
+// NOTE: Every Token type a Matcher can begin with — a name (a Type, or the
+// Choice half of `Choice#Case`), a `{` Pattern, a `#` Case, a `(` Function
+// Type, a written value, or `_`. It is what `parseAssertionStatement` asks
+// before it reads the Matcher of `require MATCHER = EXPR` speculatively: an
+// assertion whose subject begins with anything else — `@`, `[`, `<`, `.`,
+// `match` — has no Matcher reading at all, and never pays for one.
+const matcherStartTokenTypes = new Set([
+	...identifierTokenTypes,
+	...literalMatcherTokenTypes,
+	TokenType.SymbolUnderscore,
+	TokenType.SymbolLeftBrace,
+	TokenType.SymbolHash,
+	TokenType.SymbolLeftParen,
+])
+
+function startsMatcher(token: Token | undefined): boolean {
+	return token !== undefined && matcherStartTokenTypes.has(token.type)
+}
 
 // NOTE: The Token types that can begin a Statement — these are the
 // resynchronisation points after a parse error. Every Keyword
@@ -120,6 +174,10 @@ const statementStartTokenTypes = new Set([
 	TokenType.KeywordOverload,
 	TokenType.KeywordStatic,
 	TokenType.KeywordChoice,
+	TokenType.KeywordTest,
+	TokenType.KeywordSuite,
+	TokenType.KeywordExpect,
+	TokenType.KeywordRequire,
 ])
 
 // NOTE: Whether two Positions are written flush against each other, with
@@ -210,6 +268,13 @@ class DescentParser {
 	// `maximumNestingDepth`. One shared budget, because the three recur into
 	// each other and it is the call stack they share that the limit protects.
 	protected nestingDepth = 0
+	// NOTE: Whether the Statement being read stands in a test's own body — set
+	// by `parseTest` and cleared again by every Function body written inside
+	// one, which is what makes `expect` a Statement of the test and not of the
+	// closure it was handed to. A `suite` body does NOT set it: the Statements
+	// directly in a suite are its setup, and there is no test there for an
+	// assertion to belong to.
+	protected insideTestBody = false
 
 	constructor(source: string, options: ParserOptions = {}) {
 		this.tokens = new TokenStream(source)
@@ -225,6 +290,36 @@ class DescentParser {
 
 	parseProgram(): parser.Program {
 		let above = this.parseModuleSections("above")
+
+		// NOTE: A file that is nothing but tests — the `Season.tests.es`
+		// convention — writes its imports and a `tests { … }` block and no
+		// implementation block at all. It still carries an implementation
+		// section, empty and spanning the tests block, so that every stage
+		// reading a Program's Statements reads one shape.
+		if (this.startsTestsSection()) {
+			let tests = this.parseTestsSection()
+			let below = this.parseModuleSections("below")
+			let { imports, exports } = this.resolveModuleSections(
+				[...above, ...below],
+				tests.position,
+			)
+
+			this.reportTrailingTokens(
+				below,
+				tests.position,
+				"the tests block ends here",
+			)
+
+			return generators.program(
+				generators.implementationSection([], tests.position),
+				tests.position,
+				"tests",
+				imports,
+				exports,
+				tests,
+			)
+		}
+
 		let header = this.parseProgramHeader()
 
 		if (header === null) {
@@ -253,36 +348,30 @@ class DescentParser {
 			end: closingPosition.end,
 		})
 
+		// NOTE: The tests section is read where it belongs, directly under the
+		// implementation block — and once more below the Module sections, so
+		// that a `tests { … }` written under `export { … }` is diagnosed as the
+		// block in the wrong place rather than as a Token where the Program was
+		// supposed to have ended.
+		let tests = this.startsTestsSection() ? this.parseTestsSection() : null
 		let below = this.parseModuleSections("below")
+
+		if (tests === null && this.startsTestsSection()) {
+			tests = this.parseMisplacedTestsSection(implementation.position)
+		}
+
 		let { imports, exports } = this.resolveModuleSections(
 			[...above, ...below],
 			implementation.position,
 		)
 
-		if (!this.tokens.isAtEnd() && !this.suppressDiagnostics) {
-			let token = this.peekOrFail()
-			let lastSection = below[below.length - 1]
-
-			reportError(
-				`Unexpected ${describeToken(token)} after the end of the Program`,
-				token.position,
-				{
-					code: "unexpected-token",
-					labels: [
-						primary(token.position, "nothing may follow here"),
-						secondary(
-							lastSection?.node.position ?? closingPosition,
-							lastSection === undefined
-								? "the implementation block ends here"
-								: "the Program ends here",
-						),
-					],
-					notes: [
-						"A Program is one 'implementation { … }' block, framed by an optional 'import { … }' block above it and an optional 'export { … }' block below it.",
-					],
-				},
-			)
-		}
+		this.reportTrailingTokens(
+			below,
+			tests?.position ?? closingPosition,
+			tests === null
+				? "the implementation block ends here"
+				: "the tests block ends here",
+		)
 
 		// NOTE: A Program's Position stays the implementation block's own span,
 		// sections or none — the Formatter reads it as the block it writes
@@ -294,6 +383,44 @@ class DescentParser {
 			header.kind,
 			imports,
 			exports,
+			tests,
+		)
+	}
+
+	// NOTE: Whatever is left once every section has been read. `endPosition` is
+	// where the Program was supposed to have ended — the last section's own
+	// span where there was one, and the block's closing brace where there was
+	// not.
+	protected reportTrailingTokens(
+		below: Array<ModuleSectionRead>,
+		endPosition: common.Position,
+		endDescription: string,
+	): void {
+		if (this.tokens.isAtEnd() || this.suppressDiagnostics) {
+			return
+		}
+
+		let token = this.peekOrFail()
+		let lastSection = below[below.length - 1]
+
+		reportError(
+			`Unexpected ${describeToken(token)} after the end of the Program`,
+			token.position,
+			{
+				code: "unexpected-token",
+				labels: [
+					primary(token.position, "nothing may follow here"),
+					secondary(
+						lastSection?.node.position ?? endPosition,
+						lastSection === undefined
+							? endDescription
+							: "the Program ends here",
+					),
+				],
+				notes: [
+					"A Program is one 'implementation { … }' block, framed by an optional 'import { … }' block above it and an optional 'tests { … }' and 'export { … }' block below it.",
+				],
+			},
 		)
 	}
 
@@ -559,6 +686,271 @@ class DescentParser {
 
 	// #endregion
 
+	// #region Tests
+
+	protected startsTestsSection(): boolean {
+		return (
+			this.tokens.peek()?.type === TokenType.KeywordTests &&
+			this.tokens.peek(1)?.type === TokenType.SymbolLeftBrace
+		)
+	}
+
+	// NOTE: `tests { … }`. Like the Module sections, the `{` is part of what is
+	// recognised, because `tests` is an ordinary Identifier everywhere else —
+	// `constant tests = […]` is still a Declaration of a name.
+	protected parseTestsSection(): parser.TestsSectionNode {
+		let keyword = this.tokens.next()
+		let leftBrace = this.tokens.next()
+
+		let nodes = this.parseStatementList(() => this.parseTestsNode())
+		let closingPosition = this.parseClosingBrace(leftBrace.position)
+
+		return generators.testsSection(nodes, {
+			start: keyword.position.start,
+			end: closingPosition.end,
+		})
+	}
+
+	// NOTE: A tests section written BELOW the `export { … }` block. It is read
+	// where it stands and kept — the Program it describes is the one the author
+	// meant, and dropping it would turn one Diagnostic about an order into a
+	// cascade of "unknown name" about everything inside it.
+	protected parseMisplacedTestsSection(
+		implementationPosition: common.Position,
+	): parser.TestsSectionNode {
+		let keyword = this.peekOrFail()
+		let section = this.parseTestsSection()
+
+		if (!this.suppressDiagnostics) {
+			reportError(
+				"The 'tests { … }' block belongs above the 'export { … }' block",
+				keyword.position,
+				{
+					code: "misplaced-tests-section",
+					labels: [
+						primary(
+							keyword.position,
+							"this block is written below what the Program ends with",
+						),
+						secondary(
+							implementationPosition,
+							"the implementation block is here",
+						),
+					],
+					notes: [
+						"A Program reads top to bottom: what it imports, what it does, what it proves, what it exports.",
+					],
+					helps: [
+						"Move the 'tests { … }' block above 'export { … }'.",
+					],
+				},
+			)
+		}
+
+		return section
+	}
+
+	// NOTE: What may stand in a tests section, and in a `suite`'s body: a test,
+	// a nested suite, or any Statement an implementation block takes — a
+	// `constant` written here is setup, a `function` is a helper.
+	protected parseTestsNode(): parser.TestsNode {
+		if (this.startsTestItem(this.peekOrFail())) {
+			return this.parseTestItem()
+		}
+
+		return this.parseImplementationNode()
+	}
+
+	// NOTE: `test` and `suite` are ordinary Identifiers as well, so what opens
+	// an item is the Keyword AND the name that must follow it — `test = 5`
+	// stays an assignment to a variable called `test`.
+	protected startsTestItem(token: Token): boolean {
+		if (
+			token.type !== TokenType.KeywordTest &&
+			token.type !== TokenType.KeywordSuite
+		) {
+			return false
+		}
+
+		let name = this.tokens.peek(1)?.type
+
+		return (
+			name === TokenType.LiteralString ||
+			name === TokenType.LiteralStringStart
+		)
+	}
+
+	protected parseTestItem(): parser.TestNode | parser.SuiteNode {
+		if (this.tokens.peek()?.type === TokenType.KeywordSuite) {
+			return this.parseSuite()
+		}
+
+		return this.parseTest()
+	}
+
+	protected parseTest(): parser.TestNode {
+		let keyword = this.tokens.expect(TokenType.KeywordTest)
+		let name = this.parseTestName()
+		let modifiers = this.parseTestModifiers()
+
+		let outerInsideTestBody = this.insideTestBody
+		this.insideTestBody = true
+
+		try {
+			let block = this.parseBlock()
+
+			return generators.test(
+				name,
+				modifiers,
+				block.body,
+				keyword.position,
+				{ start: keyword.position.start, end: block.position.end },
+			)
+		} finally {
+			this.insideTestBody = outerInsideTestBody
+		}
+	}
+
+	protected parseSuite(): parser.SuiteNode {
+		let keyword = this.tokens.expect(TokenType.KeywordSuite)
+		let name = this.parseTestName()
+		let modifiers = this.parseTestModifiers()
+
+		// NOTE: A suite's own body is not a test body — the Statements directly
+		// in it are the setup its tests share, and an assertion written among
+		// them belongs to no test.
+		let outerInsideTestBody = this.insideTestBody
+		this.insideTestBody = false
+
+		this.enterNesting()
+
+		try {
+			let leftBrace = this.tokens.expect(TokenType.SymbolLeftBrace)
+
+			let nodes = this.parseStatementList(() => this.parseTestsNode())
+			let closingPosition = this.parseClosingBrace(leftBrace.position)
+
+			return generators.suite(name, modifiers, nodes, keyword.position, {
+				start: keyword.position.start,
+				end: closingPosition.end,
+			})
+		} finally {
+			this.nestingDepth--
+			this.insideTestBody = outerInsideTestBody
+		}
+	}
+
+	// NOTE: A name is a String Literal so that it can say what the test proves
+	// rather than name it like a Function — and an interpolated one, because a
+	// table test names each row out of the row's own values.
+	protected parseTestName(): parser.TestNode["name"] {
+		let token = this.peekOrFail("the name of the test")
+
+		if (token.type === TokenType.LiteralStringStart) {
+			return this.parseInterpolatedString()
+		}
+
+		if (token.type !== TokenType.LiteralString) {
+			fail(
+				`Expected the name of the test but found ${describeToken(token)}.`,
+				token.position,
+				"expected a String Literal",
+			)
+		}
+
+		this.tokens.next()
+
+		return generators.stringValueNode(token.value, token.position)
+	}
+
+	// NOTE: Zero or more Modifiers, written between the name and the body the
+	// way trailing labelled Arguments are written after a call's own. The
+	// grammar is a name and the arguments that follow it; what a name MEANS is
+	// left to the stage that knows the vocabulary, so `within 2s` or
+	// `retries 3` land later as vocabulary rather than as parser work.
+	//
+	// NOTE: A literal always belongs to the Modifier in front of it — there is
+	// nothing else it could be. A bare name is the one shape a Modifier and its
+	// own argument share, and it is read as an argument only where a comma or
+	// the body follows it: in `tagged slow { … }` the body settles it, in
+	// `tagged slow, network` the comma does, and in `focused tagged slow` the
+	// name in the middle is left to be the Modifier it is. What no lookahead
+	// can settle — one bare argument with another Modifier behind it, as in
+	// `tagged slow focused` — reads as three Modifiers, which the stage that
+	// knows the vocabulary can say something useful about; a greedy reading
+	// would swallow `focused` instead and say nothing.
+	protected parseTestModifiers(): Array<parser.TestModifierNode> {
+		let modifiers: Array<parser.TestModifierNode> = []
+
+		while (isIdentifierToken(this.tokens.peek())) {
+			let name = this.parseIdentifier()
+			let modifierArguments: Array<parser.TestModifierArgumentNode> = []
+
+			if (this.opensTestModifierArguments()) {
+				modifierArguments.push(this.parseTestModifierArgument())
+
+				while (this.tokens.peek()?.type === TokenType.SymbolComma) {
+					this.tokens.next()
+					modifierArguments.push(this.parseTestModifierArgument())
+				}
+			}
+
+			let last = modifierArguments[modifierArguments.length - 1]
+
+			modifiers.push(
+				generators.testModifier(name, modifierArguments, {
+					start: name.position.start,
+					end: (last ?? name).position.end,
+				}),
+			)
+		}
+
+		return modifiers
+	}
+
+	protected opensTestModifierArguments(): boolean {
+		let token = this.tokens.peek()
+
+		if (token === undefined) {
+			return false
+		}
+
+		if (literalMatcherTokenTypes.has(token.type)) {
+			return true
+		}
+
+		if (!isIdentifierToken(token)) {
+			return false
+		}
+
+		let following = this.tokens.peek(1)?.type
+
+		return (
+			following === TokenType.SymbolComma ||
+			following === TokenType.SymbolLeftBrace
+		)
+	}
+
+	protected parseTestModifierArgument(): parser.TestModifierArgumentNode {
+		let token = this.peekOrFail("a Modifier argument")
+
+		if (isIdentifierToken(token)) {
+			return this.parseIdentifier()
+		}
+
+		if (!literalMatcherTokenTypes.has(token.type)) {
+			fail(
+				`Expected a Modifier argument but found ${describeToken(token)}.`,
+				token.position,
+				"expected a name, a Number, a String or a Boolean",
+			)
+		}
+
+		return this.parseLiteralMatcherValue()
+	}
+
+	// #endregion
+
 	// #region Error Recovery
 
 	protected reportParseError(error: unknown): void {
@@ -784,6 +1176,49 @@ class DescentParser {
 				return this.parseIfStatement()
 			case TokenType.KeywordFunction:
 				return this.parseFunctionStatement()
+		}
+
+		// NOTE: A `test` or a `suite` is an item of the tests section, and
+		// reached here only where one was written outside it. It is read to its
+		// end before it is refused, so the Diagnostic is about the item rather
+		// than about the first Token inside a block nobody expected.
+		if (this.startsTestItem(token)) {
+			this.parseTestItem()
+
+			throw new ParseError(
+				`A '${token.value}' may only be written in the 'tests { … }' section`,
+				token.position,
+				`this '${token.value}' stands outside every tests section`,
+				{
+					code: "test-outside-tests",
+					notes: [
+						"The tests section is written below the implementation block, and a 'suite' groups the tests inside it.",
+					],
+					helps: [
+						"Move it into the file's 'tests { … }' block, or open one below the implementation.",
+					],
+				},
+			)
+		}
+
+		// NOTE: `expect` and `require` are Identifiers as well, so an assertion
+		// is only read where what follows the Keyword could not be the Keyword
+		// itself, read as a value: `expect = 5` stays an assignment,
+		// `expect::isEmpty()` and `expect.first` stay reads of a value called
+		// `expect`, and `expect(true)` a call of a Function called `expect`.
+		//
+		// What may follow is an Expression, or the `_` that only a Matcher can
+		// begin with — `require _ = x` is refused where it is read, and a `_`
+		// that never reached the assertion would be refused as a stray Token
+		// instead.
+		if (
+			(token.type === TokenType.KeywordExpect ||
+				token.type === TokenType.KeywordRequire) &&
+			(startsExpression(this.tokens.peek(1)) ||
+				this.tokens.peek(1)?.type === TokenType.SymbolUnderscore) &&
+			!continuesExpression(token, this.tokens.peek(1))
+		) {
+			return this.parseAssertionStatement()
 		}
 
 		// NOTE: `choice` is a valid Identifier, so it only opens a Choice
@@ -1518,7 +1953,7 @@ class DescentParser {
 		let returnType = this.parseReturnType()
 
 		if (this.tokens.peek()?.type === TokenType.SymbolLeftBrace) {
-			let block = this.parseBlock()
+			let block = this.outsideTestBody(() => this.parseBlock())
 
 			let definition =
 				generics.length > 0
@@ -1679,7 +2114,7 @@ class DescentParser {
 		let body: parser.FunctionValueNode | null = null
 
 		if (this.tokens.peek()?.type === TokenType.SymbolLeftBrace) {
-			let block = this.parseBlock()
+			let block = this.outsideTestBody(() => this.parseBlock())
 
 			body = generators.functionValueNode(
 				generators.functionDefinition(
@@ -1725,6 +2160,214 @@ class DescentParser {
 		}
 
 		return null
+	}
+
+	// NOTE: `expect EXPR`, `require EXPR` and `require MATCHER = EXPR` — one
+	// method, because the two Keywords differ in what a failure does and in
+	// nothing else the grammar can see. `expect` judges a Boolean; `require`
+	// judges a Boolean or takes a value apart.
+	//
+	// The Matcher stands where a Declaration's name stands, and for the reason
+	// every other binding site has it there: a name is introduced left of `=`,
+	// in a Parameter, or in a Handler head — never on the right of anything.
+	// `expect` has no such form at all, because it records its result and the
+	// test carries on: a name it introduced would stand below a line that may
+	// never have run.
+	protected parseAssertionStatement():
+		| parser.ExpectStatementNode
+		| parser.RequireStatementNode {
+		let keyword = this.tokens.next()
+		let matcher = this.speculateAssertionMatcher()
+
+		if (matcher !== null) {
+			this.tokens.expect(TokenType.SymbolEqual)
+
+			let value = this.parseExpression()
+			let position = {
+				start: keyword.position.start,
+				end: value.position.end,
+			}
+
+			this.refuseMatcherOnExpect(keyword, matcher)
+			this.refuseUnusableMatcher(matcher)
+			this.reportAssertionOutsideTest(keyword, position)
+
+			return generators.requireStatement(value, matcher, position)
+		}
+
+		let value = this.parseExpression()
+		let position = {
+			start: keyword.position.start,
+			end: value.position.end,
+		}
+
+		let following = this.tokens.peek()
+
+		if (
+			following?.type === TokenType.Identifier &&
+			following.value === "is"
+		) {
+			this.refuseMatcherAfterValue(following)
+		}
+
+		this.reportAssertionOutsideTest(keyword, position)
+
+		if (keyword.type === TokenType.KeywordRequire) {
+			return generators.requireStatement(value, null, position)
+		}
+
+		return generators.expectStatement(value, null, position)
+	}
+
+	// NOTE: The Matcher of `require MATCHER = EXPR`, read speculatively. A
+	// Matcher and an Expression begin alike — `{ team, points }` and
+	// `#Value(second)` are both — and a Matcher holds what no Expression can
+	// (`points: Integer`, `} as whole`), so one reading can not stand for both
+	// and be reinterpreted afterwards. The Matcher is read first and kept only
+	// where the `=` behind it says that is what was written; where it is not,
+	// the reading is given back whole and the Expression is read instead.
+	//
+	// `startsMatcher` is what keeps an assertion whose subject can not be a
+	// Matcher from speculating at all.
+	protected speculateAssertionMatcher(): parser.MatcherNode | null {
+		if (!startsMatcher(this.tokens.peek())) {
+			return null
+		}
+
+		return this.speculate(
+			() => this.parseMatcher(true),
+			() => this.tokens.peek()?.type === TokenType.SymbolEqual,
+		)
+	}
+
+	// NOTE: `expect MATCHER = EXPR` — the form `require` has, written on the
+	// Keyword that can not have it. Read to the end of the Expression before
+	// it is refused, so what is dropped is the whole Statement rather than a
+	// tail of it read again as one of its own.
+	protected refuseMatcherOnExpect(
+		keyword: Token,
+		matcher: parser.MatcherNode,
+	): void {
+		if (keyword.type !== TokenType.KeywordExpect) {
+			return
+		}
+
+		throw new ParseError(
+			"An 'expect' can not take a value apart",
+			matcher.position,
+			"this would introduce a name",
+			{
+				code: "matcher-on-expect",
+				notes: [
+					"An 'expect' records its result and the test carries on, so a name it introduced would stand below a line that may never have run. A 'require' ends the test where it stands, which is what makes the names it introduces safe to read.",
+				],
+				helps: [
+					"Take the value apart with 'require': 'require #Value(item) = value'.",
+					"Or compare instead: 'expect value::is(…)'.",
+				],
+			},
+		)
+	}
+
+	// NOTE: The two Matchers that can not mean anything left of `=`. Every
+	// other one may stand there, whether it binds or not: `require #Empty = x`
+	// and `require Integer = x` name a shape and bind nothing, which is what a
+	// test asks when the shape is the whole of what it is proving.
+	protected refuseUnusableMatcher(matcher: parser.MatcherNode): void {
+		if (matcher.nodeType === "WildcardMatcher") {
+			throw new ParseError(
+				"This 'require' asks nothing of the value",
+				matcher.position,
+				"'_' holds for every value",
+				{
+					code: "wildcard-in-require",
+					notes: [
+						"A Matcher left of '=' both asks what the value has to be and names its parts, and '_' does neither: every value answers it, and it binds nothing.",
+					],
+					helps: [
+						"Name the shape the value has to have — a Case, a Type, a Pattern — or drop the line.",
+					],
+				},
+			)
+		}
+
+		if (matcher.nodeType === "LiteralMatcher") {
+			throw new ParseError(
+				"A written value has no parts to name",
+				matcher.position,
+				"this is a value, not a shape",
+				{
+					code: "literal-in-require",
+					notes: [
+						"'require MATCHER = EXPR' takes a value apart by its shape — a Case, a Type, a Pattern. A written value is not a shape: what it asks is whether the two are equal, and that is what 'Equatable::is' answers.",
+					],
+					helps: ["Compare instead: 'require x::is(3)'."],
+				},
+			)
+		}
+	}
+
+	// NOTE: `EXPR is MATCHER` — the form a writer reaches for who has met a
+	// Matcher behind an `is` somewhere else, recognised here only to say that
+	// this language has no such form. `is` is not a Keyword: it is the
+	// Equatable Method every value already has (`a::is(b)`), which is exactly
+	// why a Matcher written behind it reads as a comparison that USES the name
+	// it is declaring. The Matcher is read to its end before the report, so
+	// the Diagnostic underlines the whole of what was written and the
+	// Statement dropped is the whole Statement.
+	protected refuseMatcherAfterValue(is: Token): never {
+		this.tokens.next()
+
+		let matcher = this.parseMatcher(true)
+
+		throw new ParseError(
+			"An assertion has no 'is' form",
+			{ start: is.position.start, end: matcher.position.end },
+			"this Matcher stands after the value",
+			{
+				code: "matcher-after-value",
+				notes: [
+					"A name is introduced left of '=', in a Parameter, or in a Handler head — never on the right of anything.",
+				],
+				helps: [
+					"Take the value apart with 'require': 'require #Value(item) = value'.",
+					"Or compare instead: 'expect value::is(…)'.",
+				],
+			},
+		)
+	}
+
+	// NOTE: An assertion belongs to a test — to the test's own block and to
+	// every block nested inside it, and to nothing else. A Function literal
+	// written in a test body is the boundary: its body runs wherever it is
+	// handed to, which is not something the test can answer for.
+	protected reportAssertionOutsideTest(
+		keyword: Token,
+		position: common.Position,
+	): void {
+		if (this.insideTestBody || this.suppressDiagnostics) {
+			return
+		}
+
+		reportError(
+			`'${keyword.value}' may only be written in a test's body`,
+			position,
+			{
+				code: "expect-outside-test",
+				labels: [
+					primary(
+						keyword.position,
+						"this assertion belongs to no test",
+					),
+				],
+				notes: [
+					"An assertion records its result against the test that is running, so it is a Statement of a test's own block and of the blocks nested in it — never of a Function literal written there.",
+				],
+				helps: [
+					"Move it into a 'test \"…\" { … }' block, or return the value and assert on it there.",
+				],
+			},
+		)
 	}
 
 	protected parseReturnStatement(): parser.ReturnStatementNode {
@@ -1938,6 +2581,11 @@ class DescentParser {
 			case TokenType.KeywordExport:
 			case TokenType.KeywordFrom:
 			case TokenType.KeywordAs:
+			case TokenType.KeywordTests:
+			case TokenType.KeywordTest:
+			case TokenType.KeywordSuite:
+			case TokenType.KeywordExpect:
+			case TokenType.KeywordRequire:
 				return this.parseIdentifier()
 			default:
 				fail(
@@ -2120,7 +2768,14 @@ class DescentParser {
 	// NOTE: `_` is a wildcard only here — everywhere else it marks a labelless
 	// Parameter — so it is recognised in Matcher position rather than in
 	// `parseType`, where it would make `_` look like a Type name.
-	protected parseMatcher(): parser.MatcherNode {
+	//
+	// `allowsWholeValueBinder` is false in a Match Handler, where `@` is the
+	// scrutinee narrowed to the Matcher and a `} as name` would be a second
+	// name for it. An assertion has no `@`, and its subject is often a computed
+	// value with no name at all — `require { name } as row = rows::item(at 1)`
+	// — so there the binder is the only way to hold onto the whole of what was
+	// taken apart.
+	protected parseMatcher(allowsWholeValueBinder = false): parser.MatcherNode {
 		let token = this.tokens.peek()
 
 		if (token?.type === TokenType.SymbolUnderscore) {
@@ -2143,7 +2798,7 @@ class DescentParser {
 		// Matcher, so `} as name` would be a second name for what already has
 		// one.
 		if (token?.type === TokenType.SymbolLeftBrace) {
-			return this.parsePattern(false)
+			return this.parsePattern(allowsWholeValueBinder)
 		}
 
 		// NOTE: `case #Add` — the bare form resolves against the matched
@@ -3116,7 +3771,7 @@ class DescentParser {
 		let documentation = ownsDocumentation ? this.documentationHere() : null
 		let parameterList = this.parseParameterList(allowsInferredTypes)
 		let returnType = this.parseOptionalReturnType(allowsInferredTypes)
-		let block = this.parseBlock()
+		let block = this.outsideTestBody(() => this.parseBlock())
 
 		return generators.functionValueNode(
 			generators.functionDefinition(
@@ -3140,7 +3795,7 @@ class DescentParser {
 		let genericList = this.parseGenericList()
 		let parameterList = this.parseParameterList()
 		let returnType = this.parseReturnType()
-		let block = this.parseBlock()
+		let block = this.outsideTestBody(() => this.parseBlock())
 
 		return generators.functionValueNode(
 			generators.genericFunctionDefinition(
@@ -4101,6 +4756,21 @@ class DescentParser {
 		this.nestingDepth++
 	}
 
+	// NOTE: Reads a Function's body, which is never part of the test whose
+	// body it was written in — every Function block goes through here so that
+	// the one rule is stated in one place rather than at each of the four
+	// spellings a Function has.
+	protected outsideTestBody<T>(parse: () => T): T {
+		let outerInsideTestBody = this.insideTestBody
+		this.insideTestBody = false
+
+		try {
+			return parse()
+		} finally {
+			this.insideTestBody = outerInsideTestBody
+		}
+	}
+
 	protected parseIdentifier(): parser.IdentifierNode {
 		let token = this.peekOrFail("an Identifier")
 
@@ -4131,31 +4801,49 @@ class DescentParser {
 		return token
 	}
 
+	// NOTE: A reading kept wherever it parsed at all — the same text is often
+	// read twice (a typed Record Literal, then a Record Literal), and the
+	// first reading that holds together is the one that was written.
+	protected backtrack<T>(parseAttempt: () => T): T | null {
+		return this.speculate(parseAttempt, () => true)
+	}
+
 	// NOTE: A speculation that is thrown away must leave nothing behind — not
 	// the Tokens it read, not the Diagnostics it reported, which are about a
 	// shape the Program was never in, and not the suppression latch an attempt
 	// that ran to the end of the input left set: rewinding the Diagnostics
 	// while the latch survived is how a broken file once parsed in silence.
-	// The same text is often read twice (a typed Record Literal, then a Record
-	// Literal), and only the reading that is kept gets to report on it.
-	protected backtrack<T>(parseAttempt: () => T): T | null {
+	// Only the reading that is kept gets to report on the text.
+	//
+	// `keeps` is what a reading that SUCCEEDED is still judged by, asked with
+	// the stream standing behind it: the Matcher of `require MATCHER = EXPR`
+	// is told from an Expression by the `=` behind it and by nothing inside
+	// it, so text that read as a Matcher was not necessarily written as one.
+	protected speculate<T>(
+		parseAttempt: () => T,
+		keeps: () => boolean,
+	): T | null {
 		let saved = this.tokens.save()
 		let savedSuppressDiagnostics = this.suppressDiagnostics
 		let diagnosticMark = markDiagnostics()
 
 		try {
-			return parseAttempt()
-		} catch (error) {
-			if (error instanceof ParseError) {
-				this.tokens.restore(saved)
-				this.suppressDiagnostics = savedSuppressDiagnostics
-				rewindDiagnostics(diagnosticMark)
+			let result = parseAttempt()
 
-				return null
+			if (keeps()) {
+				return result
 			}
-
-			throw error
+		} catch (error) {
+			if (!(error instanceof ParseError)) {
+				throw error
+			}
 		}
+
+		this.tokens.restore(saved)
+		this.suppressDiagnostics = savedSuppressDiagnostics
+		rewindDiagnostics(diagnosticMark)
+
+		return null
 	}
 
 	// #endregion

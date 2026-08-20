@@ -166,6 +166,14 @@ export type DiagnosticCode =
 	| "declarations-outside-stdlib"
 	| "overload-function-outside-stdlib"
 	| "misplaced-module-section"
+	// Tests — the `tests { … }` section and what may be written in it.
+	| "misplaced-tests-section"
+	| "test-outside-tests"
+	| "expect-outside-test"
+	| "matcher-on-expect"
+	| "matcher-after-value"
+	| "wildcard-in-require"
+	| "literal-in-require"
 	// Names — declared twice, never declared, or not what the position wants.
 	| "duplicate-variable"
 	| "duplicate-type"

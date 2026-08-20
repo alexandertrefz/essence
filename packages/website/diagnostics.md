@@ -216,6 +216,135 @@ is one shared declaration space rather than a graph of Modules: every one of its
 files sees every other, and none of them is importable, so none of them may
 carry either section.
 
+## Tests
+
+The `tests { … }` section, the `test` and `suite` items written in it, and the
+assertions written in a test's body.
+
+### `misplaced-tests-section`
+
+The `tests { … }` block was written below the `export { … }` block. A Program
+reads top to bottom: what it imports, what it does, what it proves, what it
+exports. Move the block above `export { … }`.
+
+### `test-outside-tests`
+
+A `test "…" { … }` or `suite "…" { … }` was written somewhere other than a
+`tests { … }` section — in the implementation block, or inside another test's
+body. Both are items of the tests section and of the suites nested in it:
+
+```essence
+implementation {
+	test "records a win as three points" {}
+}
+```
+
+Move it into the file's `tests { … }` block, or open one below the
+implementation.
+
+### `expect-outside-test`
+
+An `expect` or a `require` was written where no test is running. An assertion
+records its result against the test it belongs to, so it is a Statement of a
+test's own block and of the blocks nested in it — an `if`, a `match` arm — and
+never of a Function literal written there, whose body runs wherever it is
+handed to:
+
+```essence
+tests {
+	test "every standing is ranked" {
+		expect standings::every((standing) {
+			§ this assertion belongs to no test
+			expect standing.points::isGreaterThan(0)
+
+			<- true
+		})
+	}
+}
+```
+
+Return the value from the Function and assert on it in the test's own block.
+
+### `matcher-on-expect`
+
+A Matcher was written left of `=` on an `expect`. Taking a value apart is
+`require`'s alone:
+
+```essence
+tests {
+	test "reads the first row" {
+		expect #Value(first) = table::firstItem()
+	}
+}
+```
+
+An `expect` records its result and the test carries on, so a name it introduced
+would stand below a line that may never have run. A `require` ends the test
+where it stands, which is what makes the names it introduces safe to read.
+
+Write `require #Value(first) = table::firstItem()` to take the value apart, or
+compare instead with `expect value::is(…)`.
+
+### `matcher-after-value`
+
+A Matcher was written after the value, behind an `is`:
+
+```essence
+tests {
+	test "reads the first row" {
+		require table::firstItem() is #Value(first)
+	}
+}
+```
+
+A name is introduced left of `=`, in a Parameter, or in a Handler head — never
+on the right of anything. `is` is the Equatable Method every value already has,
+so a Matcher written behind it read as a comparison that USED the name it was
+declaring.
+
+Write `require #Value(first) = table::firstItem()`, or compare with
+`::is(value)` where a comparison was what was meant.
+
+### `wildcard-in-require`
+
+A `require` names `_` as what the value has to be:
+
+```essence
+tests {
+	test "reads the first row" {
+		require _ = table::firstItem()
+	}
+}
+```
+
+A Matcher left of `=` both asks what the value has to be and names its parts,
+and `_` does neither: every value answers it, and it binds nothing. Name the
+shape the value has to have — a Case, a Type, a Pattern — or drop the line.
+
+Every other Matcher may stand there whether it binds or not: `require #Empty =
+undo(board)` and `require Integer = value` name a shape and bind nothing, which
+is what a test asks when the shape is the whole of what it is proving.
+
+### `literal-in-require`
+
+A `require` names a written value as what the value has to be:
+
+```essence
+tests {
+	test "scores a win" {
+		require 3 = points
+	}
+}
+```
+
+`require MATCHER = EXPR` takes a value apart by its shape — a Case, a Type, a
+Pattern. A written value is not a shape: what it asks is whether the two are
+equal, and that is what `Equatable::is` answers. Write `require points::is(3)`.
+
+A Pattern MEMBER constrained by a written value is a different thing and is
+allowed — `require { points = 3 } = standing` asks the question of one member
+of a shape the Pattern is naming.
+
 ## Names
 
 ### `duplicate-variable`

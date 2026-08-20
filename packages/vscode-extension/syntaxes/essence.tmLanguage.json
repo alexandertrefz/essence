@@ -258,6 +258,21 @@
 					"name": "keyword.other.essence"
 				},
 				{
+					"comment": "The `tests { … }` section. `tests` is an ordinary Identifier everywhere else, and the Parser tells the two apart exactly the way this does: by the `{` that must follow it.",
+					"match": "\\b(tests)\\b(?=[ \\t]*\\{)",
+					"name": "storage.type.essence"
+				},
+				{
+					"comment": "A `test` or a `suite` opens where the String Literal naming it follows — which is the Parser's own rule, and what keeps `constant test = 5` unlit.",
+					"match": "\\b(test|suite)\\b(?=[ \\t]+\")",
+					"name": "storage.type.essence"
+				},
+				{
+					"comment": "`expect` and `require` open an assertion where an Expression follows them. The excluded characters are what a name called `expect` is followed by instead — `constant expect = 6`, `expect::is(6)`, `f(expect)`.",
+					"match": "\\b(expect|require)\\b(?=[ \\t]+[^\\s=,:)\\]}])",
+					"name": "keyword.control.essence"
+				},
+				{
 					"comment": "`as` binds a Pattern's member under another name — `{ x as y }`, `{ origin as { x, y } }` — or names the whole value, `{ x, y } as point`. It is an Argument label as well, so `normalize(as #ComposedCanonical)` is a call and not a Pattern, and only what sits on BOTH sides tells the two apart: a label opens its Argument, so a `(`, a comma or the head of the line precedes it, where a binder follows what it binds — a member name, the `>` closing the Type that member was constrained to, or the Pattern's own `}`. What may follow is the Parser's own two-Token rule verbatim, a name or a nested Pattern and nothing else, which leaves `{ as }` and the trailing name of `{ as as as }` unlit as the Identifiers they are. The whitespace is matched rather than looked behind because Oniguruma looks back a fixed number of characters only. NOTE: A binder written on the line below what it binds stays unlit, and a value NAMED `as` in front of a block — `if as { … }` — lights as though it were a binder. Both need the Parser to tell, which one line read by one regex is not.",
 					"match": "(?<=[^\\s\"§(){\\[\\]<|/@,.:=~_#-])[ \\t]+(as)(?=[ \\t]+[^\\s\"§()}\\[\\]<>|/@,.:=~_#-])",
 					"captures": {

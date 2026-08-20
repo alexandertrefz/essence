@@ -9,6 +9,21 @@
 		"body": ["declarations {", "\t$0", "}"],
 		"description": "A declarations block — the body of a standard library file."
 	},
+	"tests": {
+		"prefix": "tests",
+		"body": ["tests {", "\t$0", "}"],
+		"description": "A tests block — written below the implementation, and dropped from every build."
+	},
+	"test": {
+		"prefix": "test",
+		"body": ["test \"${1:what it proves}\" {", "\texpect $0", "}"],
+		"description": "A test — one named body of assertions."
+	},
+	"suite": {
+		"prefix": "suite",
+		"body": ["suite \"${1:name}\" {", "\t$0", "}"],
+		"description": "A suite — a group of tests sharing a scope."
+	},
 	"constant": {
 		"prefix": "constant",
 		"body": ["constant ${1:name}${2:: ${3:Type}} = ${0:value}"],
