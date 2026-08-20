@@ -1,0 +1,580 @@
+---
+/*
+ * The frame every code sample on this site sits in — screens 1d / 7a.
+ *
+ * Two shapes, one component:
+ *   - with chrome, a window: rounded, its own background, a rail on top
+ *     carrying file tabs and a right-hand label (the hero);
+ *   - without chrome, an inset block: the code surface itself, bordered and
+ *     tucked into whatever card holds it (the feature cards).
+ *
+ * Props
+ *   variant   "code" (a source file), "shell" (a transcript — no highlighting
+ *             beyond the `sh` grammar, and the rail reads as a terminal title),
+ *             or "command" (a line a reader copies rather than reads: the
+ *             article fence's own surface and metrics, with a rail above it).
+ *   files     One entry per tab: { name, code, lang?, badge?, id? }. One entry is
+ *             a plain title; more than one is a real tab bar — every panel is in
+ *             the HTML and a click swaps which one is hidden, so a tab that
+ *             looks pressable is pressable.
+ *   group     Ties these tabs to every other window on the page carrying the
+ *             same group name: picking one tab picks it everywhere, and the
+ *             choice is remembered for the next page. Tabs are matched by `id`
+ *             (a file's `name` when it sets none), so a window may carry a
+ *             subset of the group's tabs — one with no match keeps what it has.
+ *   code      Shorthand for a single unnamed sample. Ignored when `files` is set.
+ *   lang      Grammar for `code` (default "essence"; "sh" for shell blocks).
+ *   title     Rail label when there are no tabs.
+ *   badge     Right-hand rail label ("exact" in the design). A file's own
+ *             `badge` wins over it.
+ *   copy      Adds a copy button to the rail. Needs `chrome`.
+ *   chrome    Set false for the bare inset block. Default true.
+ *   compact   Card metrics (13.5px / 24px) instead of hero metrics (14.5px / 26px).
+ *   elevated  The hero's drop shadow instead of the flat ring.
+ *
+ * Children replace the rendered body entirely, so a docs page can hand it a
+ * `<pre>` it highlighted itself.
+ */
+
+import { Code } from "astro:components"
+
+// NOTE: The same three files `astro.config.ts` loads for markdown fences. The
+// `Code` component carries its own highlighter config and cannot read the one
+// in `astro.config`, so the pairing is repeated rather than shared — if a theme
+// file or the grammar path moves, both places change.
+//
+// These are imports, not `readFileSync(new URL(…, import.meta.url))` as in the
+// config: this module is bundled into `dist/.prerender`, where `import.meta.url`
+// points at the chunk and every relative path resolves to nothing.
+import essenceGrammar from "../../../vscode-extension/syntaxes/essence.tmLanguage.json"
+import essenceDark from "../lib/shiki/essence-dark.json"
+import essenceLight from "../lib/shiki/essence-light.json"
+
+let essenceLang = { ...essenceGrammar, name: "essence", aliases: ["es"] } as any
+let themes = { light: essenceLight, dark: essenceDark } as any
+
+interface CodeFile {
+	name: string
+	code: string
+	lang?: string
+	badge?: string
+	id?: string
+}
+
+interface Props {
+	variant?: "code" | "shell" | "command"
+	files?: CodeFile[]
+	code?: string
+	lang?: string
+	title?: string
+	badge?: string
+	copy?: boolean
+	chrome?: boolean
+	compact?: boolean
+	elevated?: boolean
+	group?: string
+	class?: string
+}
+
+let {
+	variant = "code",
+	files,
+	code,
+	lang = "essence",
+	title,
+	badge,
+	copy = false,
+	chrome = true,
+	compact = false,
+	elevated = false,
+	group,
+	class: className,
+} = Astro.props
+
+let panels: CodeFile[] =
+	files ?? (code === undefined ? [] : [{ name: title ?? "", code, lang }])
+
+let hasTabs = (files?.length ?? 0) > 1
+let railLabel = hasTabs ? undefined : (title ?? files?.[0]?.name)
+let hasRail = chrome && Boolean(railLabel || hasTabs || badge || copy)
+
+function grammarFor(name: string | undefined) {
+	let resolved = name ?? (variant === "code" ? "essence" : "sh")
+	return resolved === "essence" || resolved === "es" ? essenceLang : resolved
+}
+
+// NOTE: A group matches tabs by name across windows, so the key has to be the
+// same string in each of them — the file's `id` where the label is not it.
+function keyFor(file: CodeFile) {
+	return file.id ?? file.name
+}
+---
+
+<div
+	class:list={[
+		"cw",
+		{ "cw--bare": !chrome, "cw--compact": compact, "cw--elevated": elevated },
+		className,
+	]}
+	data-variant={variant}
+	data-group={group}
+>
+	{
+		hasRail && (
+			<div class="cw__rail">
+				{hasTabs ? (
+					/*
+					 * Deliberately not `role="tablist"`: that pattern owes the
+					 * reader roving arrow-key focus and labelled panels, and a
+					 * half-implemented tablist reads worse than none. These are
+					 * plain toggle buttons over panels that follow them.
+					 */
+					<div class="cw__tabs">
+						{files!.map((file, index) => (
+							<button
+								class="cw__tab"
+								type="button"
+								data-tab={index}
+								data-key={keyFor(file)}
+								aria-pressed={index === 0 ? "true" : "false"}
+							>
+								{file.name}
+							</button>
+						))}
+					</div>
+				) : (
+					railLabel && <span class="cw__title">{railLabel}</span>
+				)}
+
+				<span class="cw__spacer" />
+
+				{panels.map((file, index) => {
+					let label = file.badge ?? badge
+					return (
+						label && (
+							<span class="cw__badge" data-badge={index} hidden={index !== 0}>
+								{label}
+							</span>
+						)
+					)
+				})}
+
+				{copy && (
+					<button class="cw__copy" type="button" data-copy>
+						<svg
+							width="15"
+							height="15"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="1.5"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+						>
+							<path d="M8 8m0 2a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-8a2 2 0 0 1 -2 -2z" />
+							<path d="M16 8v-2a2 2 0 0 0 -2 -2h-8a2 2 0 0 0 -2 2v8a2 2 0 0 0 2 2h2" />
+						</svg>
+						<span class="cw__copy-label" data-copy-label>
+							Copy
+						</span>
+					</button>
+				)}
+			</div>
+		)
+	}
+
+	<div class="cw__body">
+		{
+			panels.length === 0 ? (
+				<slot />
+			) : (
+				panels.map((file, index) => (
+					<div class="cw__panel" data-panel={index} hidden={index !== 0}>
+						<Code
+							code={file.code.trimEnd()}
+							lang={grammarFor(file.lang)}
+							themes={themes}
+							defaultColor={false}
+						/>
+					</div>
+				))
+			)
+		}
+	</div>
+</div>
+
+<script>
+	// One listener for every window on the page: tabs swap which panel and
+	// which rail badge is hidden, copy reads the visible panel's own text so
+	// nothing has to carry a second copy of the source.
+	//
+	// A window given a `group` switches every other window in that group with
+	// it, by tab name rather than by position — the picker for a package
+	// manager appears several times on a page, and not every block offers all
+	// four. The choice outlives the page in `localStorage`, which every read
+	// and write guards: Safari throws on it outright with cookies blocked.
+	let GROUP_STORAGE_PREFIX = "essence:code-window-group:"
+
+	function panelsOf(frame: HTMLElement) {
+		return Array.from(frame.querySelectorAll<HTMLElement>("[data-panel]"))
+	}
+
+	function framesOfGroup(group: string) {
+		return Array.from(
+			document.querySelectorAll<HTMLElement>(
+				`.cw[data-group="${CSS.escape(group)}"]`,
+			),
+		)
+	}
+
+	function show(frame: HTMLElement, index: number) {
+		for (let tab of frame.querySelectorAll<HTMLElement>("[data-tab]")) {
+			let pressed = Number(tab.dataset.tab) === index
+			tab.setAttribute("aria-pressed", pressed ? "true" : "false")
+		}
+
+		for (let panel of panelsOf(frame)) {
+			panel.hidden = Number(panel.dataset.panel) !== index
+		}
+
+		for (let badge of frame.querySelectorAll<HTMLElement>("[data-badge]")) {
+			badge.hidden = Number(badge.dataset.badge) !== index
+		}
+	}
+
+	function showKey(frame: HTMLElement, key: string) {
+		let tab = frame.querySelector<HTMLElement>(
+			`[data-tab][data-key="${CSS.escape(key)}"]`,
+		)
+
+		if (tab) {
+			show(frame, Number(tab.dataset.tab))
+		}
+	}
+
+	function remember(group: string, key: string) {
+		try {
+			localStorage.setItem(GROUP_STORAGE_PREFIX + group, key)
+		} catch {
+			// A reader who has turned storage off still gets the click.
+		}
+	}
+
+	function remembered(group: string) {
+		try {
+			return localStorage.getItem(GROUP_STORAGE_PREFIX + group)
+		} catch {
+			return null
+		}
+	}
+
+	document.addEventListener("click", (event) => {
+		let target = event.target as HTMLElement | null
+		let frame = target?.closest<HTMLElement>(".cw")
+
+		if (!frame) {
+			return
+		}
+
+		let tab = target?.closest<HTMLElement>("[data-tab]")
+
+		if (tab) {
+			let group = frame.dataset.group
+			let key = tab.dataset.key
+
+			if (group !== undefined && key !== undefined) {
+				for (let member of framesOfGroup(group)) {
+					showKey(member, key)
+				}
+
+				remember(group, key)
+			} else {
+				show(frame, Number(tab.dataset.tab))
+			}
+
+			return
+		}
+
+		if (!target?.closest("[data-copy]")) {
+			return
+		}
+
+		let visible = panelsOf(frame).find((panel) => !panel.hidden)
+		let source = visible?.querySelector("pre")?.textContent
+
+		if (!source) {
+			return
+		}
+
+		void navigator.clipboard.writeText(source).then(() => {
+			let label = frame.querySelector<HTMLElement>("[data-copy-label]")
+
+			if (!label) {
+				return
+			}
+
+			label.textContent = "Copied"
+			setTimeout(() => {
+				label.textContent = "Copy"
+			}, 1600)
+		})
+	})
+
+	// Whatever was picked last time, applied once per group on the page. This
+	// runs after the markup, so a group whose first tab is not the remembered
+	// one is briefly visible before it swaps — the alternative is a blocking
+	// inline script in the head, which is a poor trade for a code block.
+	for (let group of new Set(
+		Array.from(document.querySelectorAll<HTMLElement>(".cw[data-group]")).map(
+			(frame) => frame.dataset.group!,
+		),
+	)) {
+		let key = remembered(group)
+
+		if (key === null) {
+			continue
+		}
+
+		for (let frame of framesOfGroup(group)) {
+			showKey(frame, key)
+		}
+	}
+</script>
+
+<style>
+	.cw {
+		position: relative;
+		border-radius: 12px;
+		overflow: hidden;
+		background: var(--code-window-bg);
+		box-shadow: 0 0 0 1px var(--border);
+		min-width: 0;
+	}
+
+	.cw--elevated {
+		box-shadow: var(--code-window-shadow);
+	}
+
+	/* Without chrome the frame *is* the code surface — the feature cards. */
+	.cw--bare {
+		border-radius: 6px;
+		background: var(--code-bg);
+		box-shadow: 0 0 0 1px var(--code-border);
+	}
+
+	/*
+	 * A command block is a fence with a rail on top, not a window: same
+	 * surface, same border, same radius, same type as `.prose pre`, so a row
+	 * of them reads as part of the article instead of as three stacked
+	 * windows. The metrics live below, beside the window's own.
+	 */
+	.cw[data-variant="command"] {
+		border-radius: 8px;
+		background: var(--code-bg);
+		box-shadow: 0 0 0 1px var(--code-border);
+	}
+
+	/*
+	 * A tab this close to the frame's corner has to be concentric with it, or
+	 * the two curves read as a mistake: the card's 8px radius less the 4px
+	 * inset leaves 4px for the tab.
+	 *
+	 * That inset is a padding on all four sides rather than a rail height the
+	 * tab is centred in — centring inside a 32px box whose 1px bottom border
+	 * eats a pixel of it put the tab 3.5px from the top and 4px from the left,
+	 * which is exactly the kind of half-pixel nobody can name but everybody
+	 * sees. One number, one place, all four edges.
+	 */
+	.cw[data-variant="command"] .cw__rail {
+		padding: 4px;
+		gap: 4px;
+	}
+
+	.cw[data-variant="command"] .cw__tabs {
+		gap: 2px;
+	}
+
+	.cw[data-variant="command"] .cw__tab,
+	.cw[data-variant="command"] .cw__copy {
+		border-radius: 4px;
+	}
+
+	/*
+	 * The rail has no height of its own: it is one 24px item plus the padding
+	 * it states on both axes. Fixed at 42px with only horizontal padding, the
+	 * space above a tab was whatever the font's line box left over — 7.2px
+	 * against the 14px it had from the left, and a number that moves if the
+	 * mono face ever changes. Both insets are now chosen.
+	 */
+	.cw__rail {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		padding: 9px 14px;
+		background: var(--code-chrome-bg);
+		border-bottom: 1px solid var(--hairline);
+		font-family: var(--font-mono);
+		font-size: 12px;
+	}
+
+	/*
+	 * And every item in it is that same 24px, centred by flex rather than by a
+	 * line height — so the rail's padding is the item's inset on all four
+	 * edges, whatever the item holds. The copy button holds an icon and a word
+	 * on wide screens and only the icon on narrow ones, which used to make it a
+	 * pixel shorter than the tabs beside it.
+	 */
+	.cw__tab,
+	.cw__title,
+	.cw__copy {
+		display: flex;
+		align-items: center;
+		height: 24px;
+	}
+
+	.cw__tabs {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		min-width: 0;
+	}
+
+	.cw__tab,
+	.cw__title {
+		padding: 0 10px;
+		border: 0;
+		border-radius: 5px;
+		background: none;
+		font: inherit;
+		color: var(--text-muted);
+		white-space: nowrap;
+	}
+
+	.cw__tab {
+		cursor: pointer;
+	}
+
+	.cw__tab:hover {
+		color: var(--text-body);
+		background: var(--hairline-softest);
+	}
+
+	/*
+	 * The selected tab is the docs sidebar's active row, in miniature: soft
+	 * accent fill, a 1px accent ring, and the weight step. One selected-state
+	 * vocabulary across the site is worth more here than a look of its own —
+	 * and the ring is what carries the state where a fill this soft cannot,
+	 * which is most of what a reader glancing at four tabs needs.
+	 */
+	.cw__tab[aria-pressed="true"],
+	.cw__tab[aria-pressed="true"]:hover {
+		background: var(--accent-soft-bg-strong);
+		box-shadow: inset 0 0 0 1px var(--accent-active-border);
+		color: var(--accent-on-soft);
+		font-weight: 500;
+	}
+
+	.cw__spacer {
+		flex: 1;
+	}
+
+	.cw__badge {
+		color: var(--text-faintest);
+		white-space: nowrap;
+	}
+
+	.cw__copy {
+		gap: 6px;
+		padding: 0 8px;
+		border: 1px solid transparent;
+		border-radius: 5px;
+		background: none;
+		font: inherit;
+		color: var(--text-faintest);
+		cursor: pointer;
+	}
+
+	.cw__copy:hover {
+		color: var(--text-body);
+		border-color: var(--border);
+	}
+
+	.cw__body {
+		min-width: 0;
+	}
+
+	/*
+	 * Shiki writes its own `<pre class="astro-code">`, which is not part of this
+	 * template and therefore out of the scoped selector's reach — hence
+	 * `:global`. The colours come from `shiki.css`; only the box is set here.
+	 *
+	 * `shiki.css` gives every `pre.astro-code` a 1px border and an 8px radius so
+	 * a bare markdown fence has an edge; here the frame is the `.cw` around it,
+	 * so the `<pre>` must give both back or it draws a second box inside the
+	 * window.
+	 */
+	.cw__body :global(pre) {
+		margin: 0;
+		padding: 22px 24px 26px;
+		border: 0;
+		border-radius: 0;
+		background: transparent;
+		font-family: var(--font-mono);
+		font-weight: 400;
+		font-size: 14.5px;
+		line-height: 26px;
+		color: var(--code-text);
+		overflow-x: auto;
+		/* .es files are indented with tabs; four columns is what the editor
+		   extension and `essence format` assume. */
+		tab-size: 4;
+	}
+
+	.cw--bare .cw__body :global(pre) {
+		padding: 16px 18px;
+	}
+
+	.cw--compact .cw__body :global(pre) {
+		font-size: 13.5px;
+		line-height: 24px;
+	}
+
+	/* The article fence's own type and padding, less its bottom breathing room:
+	   a command is one line and does not need the room a sample does. */
+	.cw[data-variant="command"] .cw__body :global(pre) {
+		padding: 14px 20px 16px;
+		font-size: 14px;
+		line-height: 25px;
+	}
+
+	@media (max-width: 800px) {
+		.cw__rail {
+			padding: 7px 10px;
+		}
+
+		.cw__copy-label {
+			display: none;
+		}
+
+		.cw__body :global(pre) {
+			padding: 18px 18px 20px;
+			font-size: 13px;
+			line-height: 24px;
+		}
+
+		.cw--bare .cw__body :global(pre) {
+			padding: 14px 16px;
+		}
+
+		.cw--compact .cw__body :global(pre) {
+			font-size: 12.5px;
+			line-height: 22px;
+		}
+
+		.cw[data-variant="command"] .cw__body :global(pre) {
+			padding: 12px 16px 14px;
+			font-size: 12.5px;
+			line-height: 22px;
+		}
+	}
+</style>

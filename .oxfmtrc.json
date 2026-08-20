@@ -20,11 +20,11 @@
 		"packages/vscode-extension/snippets/**",
 		"packages/vscode-extension/syntaxes/**",
 		"packages/vscode-extension/language-configuration.json",
-		"packages/website/_layouts/**",
 		"packages/fixtures/files/**",
 		"**/*.es",
 		"**/__snapshots__/**",
 		"**/*.md",
+		"**/*.mdx",
 		"**/*.yml"
 	]
 }

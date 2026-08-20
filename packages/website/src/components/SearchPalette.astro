@@ -1,0 +1,1013 @@
+---
+/*
+ * The ⌘K palette (screens 1i / 7c). Rendered once per page by `BaseLayout`,
+ * after the content.
+ *
+ * ── The contract the rest of the site honours ─────────────────────────────
+ *
+ * Openers. Every control that should open the palette carries
+ * `data-search-trigger`: the marketing header's search field, the docs
+ * header's 300px field, the mobile docs header's search icon, and the mobile
+ * menu's search field. They are real `<button>`s, so a keyboard user reaches
+ * them by Tab and opens by Enter without any script. The listener below is
+ * delegated rather than bound per button — the mobile menu's field lives in a
+ * panel that is hidden at load, not created at open.
+ *
+ * Keyboard. This component owns ⌘K / Ctrl-K; nothing else listens for it.
+ *
+ * Element. `id="search-palette"`, which is what the triggers point at with
+ * `aria-controls`.
+ *
+ * Closing. Escape (the dialog's own cancel), a click on the overlay, and focus
+ * leaving the palette. While it is open the palette sets `data-search-open` on
+ * `<html>` — `MobileMenu`'s script reads that to keep its own Escape handler out
+ * of the way.
+ *
+ * Appearance. A fade, in CSS alone, both ways. Nothing in the script knows how
+ * the palette arrives, which is deliberate: opening is one call either way, and
+ * closing goes through the dialog's own `close()` however it was asked for.
+ */
+---
+
+<dialog id="search-palette" class="search-palette" aria-label="Search the documentation">
+	<div class="search-palette__panel">
+		<div class="search-palette__field">
+			<svg
+				class="search-palette__icon"
+				width="18"
+				height="18"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="1.5"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M10 10m-7 0a7 7 0 1 0 14 0a7 7 0 1 0 -14 0"></path>
+				<path d="M21 21l-6 -6"></path>
+			</svg>
+
+			<input
+				id="search-palette-input"
+				class="search-palette__input"
+				type="text"
+				role="combobox"
+				placeholder="Search the documentation"
+				aria-label="Search the documentation"
+				aria-controls="search-palette-results"
+				aria-expanded="true"
+				aria-autocomplete="list"
+				autocomplete="off"
+				autocorrect="off"
+				autocapitalize="off"
+				spellcheck="false"
+			/>
+
+			<span class="search-palette__key search-palette__key--esc">esc</span>
+		</div>
+
+		<div
+			id="search-palette-results"
+			class="search-palette__results"
+			role="listbox"
+			aria-label="Search results"
+		>
+		</div>
+
+		<div class="search-palette__footer">
+			<div class="search-palette__hints">
+				<span>↑↓ navigate</span>
+				<span>↵ open</span>
+				<span>⌘↵ new tab</span>
+			</div>
+			<div class="search-palette__count" aria-live="polite"></div>
+		</div>
+	</div>
+</dialog>
+
+<script>
+	/*
+	 * ── Scoring ───────────────────────────────────────────────────────────
+	 *
+	 * Case-insensitive substring matching, no fuzz: on a corpus this small a
+	 * near-miss is noise, and a typed query is nearly always a prefix of what
+	 * the reader wants. A query is split on whitespace and every term has to
+	 * appear in the same field for that field to score at all.
+	 *
+	 * Per term and field: 40 to match, +40 if the field *starts* with the
+	 * term, else +25 if the term starts a word — the character before it is
+	 * not alphanumeric, which is what lets `match` reward `Pattern Matching`
+	 * and `docs / language / pattern-matching` but not a stray mid-word hit —
+	 * plus up to 20 for the share of the field the term covers, so a short
+	 * title beats a long one that merely contains the word.
+	 *
+	 * Fields are then weighted: title 1, heading 0.6, crumb 0.3. A page's
+	 * score is the better of its title and its crumb; each matching heading
+	 * becomes its own row that deep-links with `#slug`. Rows sort by score
+	 * across the whole index, then get bucketed into their section and capped
+	 * at four per section, so one exhaustive page cannot own the palette.
+	 */
+
+	const TITLE_WEIGHT = 1
+	const HEADING_WEIGHT = 0.6
+	const CRUMB_WEIGHT = 0.3
+	const ROWS_PER_GROUP = 4
+
+	interface IndexHeading {
+		text: string
+		slug: string
+	}
+
+	interface IndexEntry {
+		title: string
+		url: string
+		group: string
+		groupOrder: number
+		crumb: string
+		mono: boolean
+		headings: IndexHeading[]
+	}
+
+	interface Row {
+		title: string
+		url: string
+		crumb: string
+		group: string
+		groupOrder: number
+		mono: boolean
+		score: number
+	}
+
+	let dialog = document.getElementById(
+		"search-palette",
+	) as HTMLDialogElement | null
+	let input = document.getElementById(
+		"search-palette-input",
+	) as HTMLInputElement | null
+	let list = document.getElementById("search-palette-results")
+	let count = document.querySelector<HTMLElement>(".search-palette__count")
+
+	if (dialog !== null && input !== null && list !== null && count !== null) {
+		let palette = dialog
+		let field = input
+		let results = list
+		let counter = count
+		let root = document.documentElement
+
+		let entries: IndexEntry[] = []
+		let loading: Promise<void> | null = null
+		let failed = false
+
+		let rows: HTMLAnchorElement[] = []
+		let selected = 0
+		let opener: HTMLElement | null = null
+
+		let scoreTerm = (text: string, term: string) => {
+			let index = text.toLowerCase().indexOf(term)
+
+			if (index < 0) {
+				return 0
+			}
+
+			let score = 40
+
+			if (index === 0) {
+				score += 40
+			} else if (!/[a-z0-9]/i.test(text.charAt(index - 1))) {
+				score += 25
+			}
+
+			return score + Math.round(20 * (term.length / text.length))
+		}
+
+		let scoreField = (text: string, terms: string[]) => {
+			let total = 0
+
+			for (let term of terms) {
+				let hit = scoreTerm(text, term)
+
+				if (hit === 0) {
+					return 0
+				}
+
+				total += hit
+			}
+
+			return total / terms.length
+		}
+
+		let collect = (terms: string[]) => {
+			let matches: Row[] = []
+
+			for (let entry of entries) {
+				let pageScore = Math.max(
+					scoreField(entry.title, terms) * TITLE_WEIGHT,
+					scoreField(entry.crumb, terms) * CRUMB_WEIGHT,
+				)
+
+				if (pageScore > 0) {
+					matches.push({
+						title: entry.title,
+						url: entry.url,
+						crumb: entry.crumb,
+						group: entry.group,
+						groupOrder: entry.groupOrder,
+						mono: entry.mono,
+						score: pageScore,
+					})
+				}
+
+				for (let heading of entry.headings) {
+					let score = scoreField(heading.text, terms) * HEADING_WEIGHT
+
+					if (score === 0) {
+						continue
+					}
+
+					matches.push({
+						title: heading.text,
+						url: `${entry.url}#${heading.slug}`,
+						crumb: entry.crumb,
+						group: entry.group,
+						groupOrder: entry.groupOrder,
+						mono: false,
+						score,
+					})
+				}
+			}
+
+			matches.sort(
+				(a, b) => b.score - a.score || a.title.length - b.title.length,
+			)
+
+			let buckets = new Map<number, { label: string; rows: Row[] }>()
+
+			for (let match of matches) {
+				let bucket = buckets.get(match.groupOrder) ?? {
+					label: match.group,
+					rows: [],
+				}
+
+				if (bucket.rows.length < ROWS_PER_GROUP) {
+					bucket.rows.push(match)
+				}
+
+				buckets.set(match.groupOrder, bucket)
+			}
+
+			return [...buckets.entries()]
+				.sort((a, b) => a[0] - b[0])
+				.map(([, bucket]) => bucket)
+		}
+
+		// Built as nodes rather than markup: a title goes into the document
+		// exactly as it was written, with no escaping step to get wrong.
+		let highlight = (text: string, terms: string[]) => {
+			let lower = text.toLowerCase()
+			let ranges: Array<[number, number]> = []
+
+			for (let term of terms) {
+				let index = lower.indexOf(term)
+
+				if (index >= 0) {
+					ranges.push([index, index + term.length])
+				}
+			}
+
+			ranges.sort((a, b) => a[0] - b[0])
+
+			let fragment = document.createDocumentFragment()
+			let cursor = 0
+
+			for (let [start, end] of ranges) {
+				if (end <= cursor) {
+					continue
+				}
+
+				let from = Math.max(start, cursor)
+
+				if (from > cursor) {
+					fragment.append(text.slice(cursor, from))
+				}
+
+				let mark = document.createElement("mark")
+				mark.textContent = text.slice(from, end)
+				fragment.append(mark)
+				cursor = end
+			}
+
+			if (cursor < text.length) {
+				fragment.append(text.slice(cursor))
+			}
+
+			return fragment
+		}
+
+		let setSelected = (next: number) => {
+			if (rows.length === 0) {
+				field.removeAttribute("aria-activedescendant")
+
+				return
+			}
+
+			let index = (next + rows.length) % rows.length
+			let previous = rows[selected]
+
+			if (previous !== undefined) {
+				previous.classList.remove("is-selected")
+				previous.setAttribute("aria-selected", "false")
+			}
+
+			selected = index
+
+			let row = rows[index]!
+			row.classList.add("is-selected")
+			row.setAttribute("aria-selected", "true")
+			field.setAttribute("aria-activedescendant", row.id)
+			row.scrollIntoView({ block: "nearest" })
+		}
+
+		let message = (text: string) => {
+			let paragraph = document.createElement("p")
+			paragraph.className = "search-palette__message"
+			paragraph.textContent = text
+			results.append(paragraph)
+		}
+
+		let render = () => {
+			results.replaceChildren()
+			rows = []
+			selected = 0
+			field.removeAttribute("aria-activedescendant")
+
+			let query = field.value.trim()
+			let terms = query.toLowerCase().split(/\s+/).filter(Boolean)
+
+			/*
+			 * With nothing typed there is nothing to list and nothing to
+			 * navigate, so the results area and the footer go and the palette is
+			 * the field alone. `data-empty` is what the stylesheet keys off, and
+			 * `aria-expanded` moves with it: the combobox owns a listbox that is
+			 * not being shown, and saying otherwise would be a lie a screen
+			 * reader acts on.
+			 */
+			let empty = terms.length === 0 && !failed
+			palette.toggleAttribute("data-empty", empty)
+			field.setAttribute("aria-expanded", empty ? "false" : "true")
+
+			if (failed) {
+				counter.textContent = ""
+				message("Search is unavailable right now.")
+
+				return
+			}
+
+			if (empty) {
+				counter.textContent = ""
+
+				return
+			}
+
+			let groups = collect(terms)
+
+			if (groups.length === 0) {
+				counter.textContent = "0 results"
+				message(`No results for “${query}”.`)
+
+				return
+			}
+
+			for (let group of groups) {
+				let section = document.createElement("div")
+				section.setAttribute("role", "group")
+				section.setAttribute("aria-label", group.label)
+
+				let label = document.createElement("div")
+				label.className = "search-palette__group"
+				label.textContent = group.label
+				section.append(label)
+
+				for (let match of group.rows) {
+					let row = document.createElement("a")
+					row.className = "search-palette__row"
+					row.id = `search-palette-row-${rows.length}`
+					row.href = match.url
+					// Rows are reached with the arrow keys, not with Tab: focus
+					// stays in the field so typing never has to be resumed.
+					row.tabIndex = -1
+					row.setAttribute("role", "option")
+					row.setAttribute("aria-selected", "false")
+
+					let text = document.createElement("span")
+					text.className = "search-palette__text"
+
+					let title = document.createElement("span")
+					title.className = match.mono
+						? "search-palette__title search-palette__title--mono"
+						: "search-palette__title"
+					title.append(highlight(match.title, terms))
+
+					let crumb = document.createElement("span")
+					crumb.className = "search-palette__crumb"
+					crumb.textContent = match.crumb
+
+					text.append(title, crumb)
+
+					let key = document.createElement("span")
+					key.className =
+						"search-palette__key search-palette__key--return"
+					key.textContent = "↵"
+
+					row.append(text, key)
+					section.append(row)
+					rows.push(row)
+				}
+
+				results.append(section)
+			}
+
+			counter.textContent = `${rows.length} ${rows.length === 1 ? "result" : "results"}`
+			setSelected(0)
+		}
+
+		let load = () => {
+			if (loading === null) {
+				loading = fetch("/search-index.json")
+					.then((response) => response.json())
+					.then((data: IndexEntry[]) => {
+						entries = data
+					})
+					.catch(() => {
+						failed = true
+					})
+			}
+
+			return loading
+		}
+
+		let show = () => {
+			root.dataset.searchOpen = "true"
+			palette.showModal()
+			render()
+			// The previous query survives a close, selected so the next
+			// keystroke replaces it — reopening to refine is the common case.
+			field.select()
+			void load().then(render)
+		}
+
+		// `source` is only ever the thing focus goes back to on close: the
+		// palette looks the same however it was asked for.
+		let open = (source: HTMLElement | null) => {
+			if (palette.open) {
+				return
+			}
+
+			opener =
+				source ??
+				(document.activeElement instanceof HTMLElement
+					? document.activeElement
+					: null)
+
+			show()
+		}
+
+		/*
+		 * Closing hands focus back to the bar — and focus on that bar is what
+		 * opens the palette, so without this every dismissal would reopen what it
+		 * just dismissed. The flag is what tells the two apart: a focus that
+		 * closing caused is not a reader asking for anything.
+		 *
+		 * It has to go up *before* the dialog closes, not in the `close` handler.
+		 * The browser restores focus itself, inside the closing steps, and the
+		 * `close` event is only queued from there — so by the time a handler could
+		 * raise the flag the focus it was meant to catch has already been and gone.
+		 * Hence `cancel` for Escape, which the browser fires before it closes, and
+		 * `close()` below for every other route.
+		 *
+		 * A frame, rather than the next line: both restorations — the browser's and
+		 * ours — land inside it, and a browser is free to deliver `focusin`
+		 * asynchronously.
+		 */
+		let restoring = false
+
+		let ignoreRestoredFocus = () => {
+			restoring = true
+			requestAnimationFrame(() => {
+				restoring = false
+			})
+		}
+
+		let close = () => {
+			if (palette.open) {
+				ignoreRestoredFocus()
+				palette.close()
+			}
+		}
+
+		palette.addEventListener("cancel", ignoreRestoredFocus)
+
+		/*
+		 * Set when the palette is closing *because* focus left it. Focus is then
+		 * already where the reader put it, and handing it back to the bar would
+		 * be taking it off whatever they just reached.
+		 */
+		let dismissedByFocus = false
+
+		palette.addEventListener("close", () => {
+			delete root.dataset.searchOpen
+
+			/*
+			 * Focus goes back to whatever opened the palette. Chrome does this
+			 * itself, from inside the closing steps — including when focus had
+			 * already left the dialog — so this is here to make the behaviour the
+			 * same everywhere rather than to be the only thing doing it.
+			 *
+			 * The exception is a palette dismissed *by* focus leaving: focus is then
+			 * already where the reader put it, and taking it back would be taking it
+			 * off whatever they just reached. A browser that restores it anyway is
+			 * making its own call about its own chrome, which is not worth fighting.
+			 */
+			if (opener !== null && !dismissedByFocus) {
+				ignoreRestoredFocus()
+				opener.focus()
+			}
+
+			dismissedByFocus = false
+			opener = null
+		})
+
+		/*
+		 * Focus leaving closes it, which is the other half of focus opening it.
+		 *
+		 * A modal dialog keeps focus inside itself, so this is narrower than it
+		 * looks: a programmatic `focus()` on an element out on the page is simply
+		 * refused. What does get through is Tab off the end of the palette, which
+		 * parks focus outside — on `body` here, on the browser's own UI in a real
+		 * window — and used to leave the palette standing open behind it.
+		 *
+		 * Judged on where focus actually landed, a frame later, rather than on
+		 * `relatedTarget`: the same exit reports the element in one browser and
+		 * nothing at all in another, and by then `activeElement` answers plainly
+		 * for both.
+		 *
+		 * Deliberately not gated on `document.hasFocus()`. That was the first
+		 * attempt — the idea being to spare a switch to another tab or
+		 * application — and it defeated the whole thing: tabbing out of a page
+		 * hands focus to the browser's own UI, which reads exactly like a switch
+		 * away, so the one case that can actually happen was the one being
+		 * excused. Switching windows does now close it, which costs nothing: the
+		 * query survives a close, so reopening brings it back.
+		 */
+		palette.addEventListener("focusout", () => {
+			requestAnimationFrame(() => {
+				if (!palette.open) {
+					return
+				}
+
+				if (palette.contains(document.activeElement)) {
+					return
+				}
+
+				dismissedByFocus = true
+				close()
+			})
+		})
+
+		// The overlay is the dialog itself, so a press that lands on it — and
+		// not on the panel inside — is a press outside the palette.
+		palette.addEventListener("pointerdown", (event) => {
+			if (event.target === palette) {
+				close()
+			}
+		})
+
+		palette.addEventListener("keydown", (event) => {
+			if (event.key === "ArrowDown") {
+				event.preventDefault()
+				setSelected(selected + 1)
+			} else if (event.key === "ArrowUp") {
+				event.preventDefault()
+				setSelected(selected - 1)
+			} else if (event.key === "Enter") {
+				let row = rows[selected]
+
+				if (row === undefined) {
+					return
+				}
+
+				event.preventDefault()
+
+				if (event.metaKey || event.ctrlKey) {
+					window.open(row.href, "_blank", "noopener")
+				} else {
+					// Closed first: a heading hit on the page already being
+					// read is only a hash change, and nothing would move the
+					// palette off the target it just scrolled to.
+					close()
+					window.location.assign(row.href)
+				}
+			}
+		})
+
+		field.addEventListener("input", render)
+
+		// A row is a real link, so the browser navigates on its own; the
+		// palette only has to get out of the way — except for the modified
+		// clicks, which open elsewhere and leave the search standing.
+		results.addEventListener("click", (event) => {
+			let target = event.target as HTMLElement | null
+
+			if (
+				target?.closest(".search-palette__row") != null &&
+				!event.metaKey &&
+				!event.ctrlKey &&
+				!event.shiftKey
+			) {
+				close()
+			}
+		})
+
+		/*
+		 * Focus opens it, so reaching the header's search field by Tab is enough
+		 * and there is no second gesture to discover. The click listener stays
+		 * for the browsers that do not focus a button when it is pressed — Safari
+		 * is one — and because `open` returns early when the palette is already
+		 * up, the two firing in sequence on a mouse press costs nothing.
+		 */
+		let trigger = (event: Event) => {
+			let target = event.target as HTMLElement | null
+
+			return target?.closest<HTMLElement>("[data-search-trigger]") ?? null
+		}
+
+		document.addEventListener("focusin", (event) => {
+			if (restoring) {
+				return
+			}
+
+			let source = trigger(event)
+
+			if (source !== null) {
+				open(source)
+			}
+		})
+
+		document.addEventListener("click", (event) => {
+			let source = trigger(event)
+
+			if (source !== null) {
+				event.preventDefault()
+				open(source)
+			}
+		})
+
+		document.addEventListener("keydown", (event) => {
+			if (
+				(event.metaKey || event.ctrlKey) &&
+				event.key.toLowerCase() === "k"
+			) {
+				event.preventDefault()
+
+				if (palette.open) {
+					close()
+				} else {
+					open(null)
+				}
+			}
+		})
+	}
+</script>
+
+<style is:global>
+	/*
+	 * Global rather than scoped: every result row is built by the script
+	 * above, so a scope hash would never reach one. Every selector is a
+	 * `.search-palette*` class, which nothing else on the site uses.
+	 */
+
+	.search-palette {
+		/*
+		 * The handful of values the shared tokens do not carry. Both themes
+		 * are lifted from the design (1i dark, 7c light); the palette's own
+		 * hairline and its two key chips are a touch stronger than the page's.
+		 */
+		--search-hairline: rgb(228, 223, 224);
+		--search-row-hover: rgba(0, 0, 0, 0.035);
+		--search-row-selected: rgba(0, 0, 0, 0.07);
+		--search-row-title: rgb(58, 55, 56);
+		--search-esc-border: rgb(212, 206, 207);
+		--search-return-bg: rgba(0, 0, 0, 0.03);
+		--search-return-border: rgb(200, 194, 195);
+		--search-return-text: rgb(72, 68, 69);
+		--search-footer-bg: rgba(0, 0, 0, 0.035);
+
+		position: fixed;
+		inset: 0;
+		width: 100%;
+		max-width: none;
+		height: 100%;
+		max-height: none;
+		margin: 0;
+		padding: 0;
+		border: 0;
+		overflow: hidden;
+		background: var(--overlay-bg);
+		-webkit-backdrop-filter: blur(3px);
+		backdrop-filter: blur(3px);
+		color: var(--text-strong);
+		font-family: var(--font-body);
+	}
+
+	@media (prefers-color-scheme: dark) {
+		.search-palette {
+			--search-hairline: rgb(34, 31, 32);
+			--search-row-hover: rgba(255, 255, 255, 0.04);
+			--search-row-selected: rgba(255, 255, 255, 0.08);
+			--search-row-title: rgb(219, 215, 216);
+			--search-esc-border: rgb(48, 45, 46);
+			--search-return-bg: rgba(0, 0, 0, 0.3);
+			--search-return-border: rgb(60, 56, 57);
+			--search-return-text: rgb(205, 201, 202);
+			--search-footer-bg: rgba(0, 0, 0, 0.35);
+		}
+	}
+
+	/* The overlay is painted by the dialog, so the real backdrop stays out. */
+	.search-palette::backdrop {
+		background: transparent;
+	}
+
+	.search-palette__panel {
+		display: flex;
+		flex-direction: column;
+		width: 640px;
+		max-width: calc(100% - 24px);
+		max-height: calc(100% - 156px);
+		margin: 108px auto 0;
+		overflow: hidden;
+		border: 1px solid var(--palette-border);
+		border-radius: 12px;
+		background: var(--palette-bg);
+		box-shadow: var(--palette-shadow);
+	}
+
+	.search-palette__field {
+		display: flex;
+		flex: none;
+		align-items: center;
+		gap: 14px;
+		height: 60px;
+		padding: 0 18px;
+		border-bottom: 1px solid var(--search-hairline);
+	}
+
+	.search-palette__icon {
+		flex: none;
+		color: var(--text-dim);
+	}
+
+	.search-palette__input {
+		flex: 1;
+		min-width: 0;
+		margin: 0;
+		padding: 0;
+		border: 0;
+		background: none;
+		font-family: var(--font-mono);
+		font-size: 16px;
+		color: var(--text-heading);
+		caret-color: var(--accent);
+	}
+
+	.search-palette__input::placeholder {
+		color: var(--text-placeholder);
+	}
+
+	.search-palette__input:focus {
+		outline: none;
+	}
+
+	.search-palette__key {
+		display: flex;
+		flex: none;
+		align-items: center;
+		justify-content: center;
+		border-radius: 5px;
+		font-family: var(--font-mono);
+		line-height: 1;
+	}
+
+	.search-palette__key--esc {
+		height: 22px;
+		padding: 0 8px;
+		border: 1px solid var(--search-esc-border);
+		font-size: 11.5px;
+		color: var(--text-dim);
+	}
+
+	.search-palette__key--return {
+		width: 24px;
+		height: 22px;
+		border: 1px solid var(--search-return-border);
+		background: var(--search-return-bg);
+		font-size: 14px;
+		color: var(--search-return-text);
+		/* Kept in the row so selection never shifts the text beside it. */
+		visibility: hidden;
+	}
+
+	.search-palette__results {
+		flex: 1;
+		min-height: 0;
+		overflow-y: auto;
+		overscroll-behavior: contain;
+		padding: 10px 10px 8px;
+		scrollbar-width: thin;
+	}
+
+	.search-palette__group {
+		padding: 14px 10px 6px;
+		font-family: var(--font-mono);
+		font-size: 10.5px;
+		letter-spacing: 0.14em;
+		text-transform: uppercase;
+		color: var(--text-faintest);
+	}
+
+	.search-palette__results > *:first-child .search-palette__group {
+		padding-top: 8px;
+	}
+
+	.search-palette__row {
+		display: flex;
+		align-items: center;
+		gap: 14px;
+		margin-bottom: 3px;
+		padding: 11px 12px;
+		border-radius: 8px;
+	}
+
+	.search-palette__row:hover {
+		background: var(--search-row-hover);
+	}
+
+	.search-palette__row.is-selected {
+		background: var(--search-row-selected);
+	}
+
+	.search-palette__text {
+		flex: 1;
+		min-width: 0;
+	}
+
+	.search-palette__title {
+		display: block;
+		font-size: 15px;
+		color: var(--search-row-title);
+		overflow-wrap: anywhere;
+	}
+
+	.search-palette__title--mono {
+		font-family: var(--font-mono);
+		font-size: 14.5px;
+	}
+
+	.search-palette__row.is-selected .search-palette__title {
+		font-weight: 500;
+		color: var(--text-hero);
+	}
+
+	.search-palette__row.is-selected .search-palette__key--return {
+		visibility: visible;
+	}
+
+	/* The one highlight that does not move between themes, like ::selection. */
+	.search-palette__title mark {
+		margin: 0 -1px;
+		padding: 1px 3px;
+		border-radius: 3px;
+		background: rgba(173, 31, 54, 0.85);
+		font-weight: 500;
+		color: rgb(255, 240, 242);
+	}
+
+	.search-palette__crumb {
+		display: block;
+		margin-top: 3px;
+		font-family: var(--font-mono);
+		font-size: 11.5px;
+		color: var(--text-faintest);
+		overflow-wrap: anywhere;
+	}
+
+	.search-palette__row.is-selected .search-palette__crumb {
+		color: var(--text-muted);
+	}
+
+	.search-palette__message {
+		padding: 14px 12px 18px;
+		font-family: var(--font-mono);
+		font-size: 12px;
+		color: var(--text-faintest);
+	}
+
+	.search-palette__footer {
+		display: flex;
+		flex: none;
+		align-items: center;
+		justify-content: space-between;
+		gap: 16px;
+		height: 42px;
+		padding: 0 16px;
+		border-top: 1px solid var(--search-hairline);
+		background: var(--search-footer-bg);
+		font-family: var(--font-mono);
+		font-size: 11px;
+		color: var(--text-faintest);
+	}
+
+	.search-palette__hints {
+		display: flex;
+		gap: 18px;
+	}
+
+	.search-palette__count {
+		flex: none;
+	}
+
+	/*
+	 * Nothing typed: no list, no hints for navigating a list that is not there,
+	 * and no border under the field to divide it from anything. The panel is the
+	 * field, and its height is the field's.
+	 */
+	.search-palette[data-empty] .search-palette__results,
+	.search-palette[data-empty] .search-palette__footer {
+		display: none;
+	}
+
+	.search-palette[data-empty] .search-palette__field {
+		border-bottom: 0;
+	}
+
+	@media (max-width: 800px) {
+		.search-palette__panel {
+			max-width: calc(100% - 20px);
+			max-height: calc(100% - 96px);
+			margin-top: 72px;
+		}
+
+		/* Two hints fit a 390px row; the third is a shortcut no phone has. */
+		.search-palette__hints span:last-child {
+			display: none;
+		}
+	}
+
+	/*
+	 * Overlay and panel fade together, over 90ms, in on open and out on close.
+	 * One property, both directions, no state in the script — and short enough
+	 * that it reads as the palette being there rather than as an animation you
+	 * wait through.
+	 *
+	 * `display` and `overlay` are transitioned too, with `allow-discrete`, and
+	 * that is what buys the fade *out*: `close()` otherwise takes the dialog out
+	 * of the top layer and hides it in the same frame, leaving nothing on screen
+	 * to fade. `overlay` matters as much as `display` — kept displayed but
+	 * dropped from the top layer, the palette would spend those 90ms behind the
+	 * header, which is `z-index: 60`. Browsers without `overlay` still parse the
+	 * shorthand (an unknown property there is just an ident) and simply cut.
+	 *
+	 * `@starting-style` is the other half: a transition needs a value to come
+	 * from, and an element that was `display: none` one frame ago has no previous
+	 * value to offer. Without it the fade in would not run at all.
+	 *
+	 * It runs under Reduce Motion as well. That preference is about travel, and a
+	 * cross-fade is what the guidance asks for in place of movement — there is
+	 * nothing here to be spared of.
+	 */
+	.search-palette {
+		opacity: 0;
+		/* A press in the closing frames belongs to the page underneath, not to a
+		   palette that is on its way out. */
+		pointer-events: none;
+		transition:
+			opacity 90ms ease,
+			display 90ms allow-discrete,
+			overlay 90ms allow-discrete;
+	}
+
+	.search-palette[open] {
+		opacity: 1;
+		pointer-events: auto;
+	}
+
+	@starting-style {
+		.search-palette[open] {
+			opacity: 0;
+		}
+	}
+
+	html[data-search-open] body {
+		overflow: hidden;
+	}
+</style>

@@ -1,0 +1,317 @@
+/*
+ * Article typography — screens 1f (dark) and 7b (light).
+ *
+ * Scoped to `.prose` so it only ever applies to rendered Markdown/MDX; the
+ * page furniture around it is styled by its own components. Headings are
+ * General Sans, running text is Supreme at 16px/1.7, and everything that
+ * carries the brand — the inline-code pill, the bullet marker — is drawn from
+ * the accent tokens so it re-derives with the theme rather than flipping.
+ */
+
+.prose {
+	max-width: 720px;
+	font-family: var(--font-body);
+	font-size: 16px;
+	line-height: 1.7;
+	color: var(--text-body-soft);
+}
+
+/* Headings */
+
+.prose h1 {
+	margin: 0;
+	font-size: 38px;
+	line-height: 1.1;
+	letter-spacing: -0.015em;
+	color: var(--text-hero);
+}
+
+.prose h2 {
+	margin: 44px 0 0;
+	font-size: 24px;
+	line-height: 1.2;
+	color: var(--text-heading);
+	scroll-margin-top: calc(var(--header-height-docs) + 24px);
+}
+
+.prose h3 {
+	margin: 36px 0 0;
+	font-size: 19px;
+	line-height: 1.3;
+	color: var(--text-subheading);
+	scroll-margin-top: calc(var(--header-height-docs) + 24px);
+}
+
+.prose h4 {
+	margin: 28px 0 0;
+	font-size: 16px;
+	color: var(--text-subheading);
+	scroll-margin-top: calc(var(--header-height-docs) + 24px);
+}
+
+/* Running text. The lede is the one paragraph set larger than the rest. */
+
+.prose p {
+	margin: 14px 0 0;
+	text-wrap: pretty;
+}
+
+.prose .lede {
+	font-size: 18px;
+	line-height: 1.6;
+	color: var(--text-lede);
+}
+
+.prose strong {
+	font-weight: 500;
+	color: var(--text-strong);
+}
+
+.prose em {
+	font-style: italic;
+}
+
+.prose a {
+	color: var(--text-strong);
+	text-decoration: underline;
+	text-decoration-color: var(--accent-underline);
+	text-underline-offset: 3px;
+}
+
+.prose a:hover {
+	color: var(--accent);
+}
+
+/*
+ * Inline code. Plain mono in body prose; the accent pill belongs to the lede
+ * alone — 1f/7b pill `match` in the opening paragraph and leave `@` and `->`
+ * further down plain. NOTE: the pill is deliberately not the default. Docs
+ * prose names a type or a method in nearly every sentence (276 inline spans on
+ * the diagnostics page), and pilling all of them turns a reference into a field
+ * of red instead of emphasising anything.
+ */
+
+.prose :not(pre) > code {
+	font-family: var(--font-mono);
+	font-size: 0.92em;
+	color: var(--code-text);
+}
+
+/* NOTE: A plain descendant selector — the lede's code is a direct child of it. */
+.prose .lede code,
+.ref__lede code {
+	color: var(--accent);
+	background: rgba(var(--accent-rgb), 0.14);
+	border-radius: 4px;
+	padding: 2px 6px;
+}
+
+/*
+ * Two ledes sit outside `.prose` — the reference entry's (1h, above the body)
+ * and the "Most Read" blurb on the overview. They are rendered by `RichText`,
+ * whose `<code>` is another component's element and so is out of reach of any
+ * scoped rule; these have to be global.
+ */
+
+.ref__lede code,
+.read__body code {
+	font-family: var(--font-mono);
+	font-size: 0.92em;
+}
+
+.read__body code {
+	color: var(--code-text);
+}
+
+/* Lists. The marker is an accent em-dash, matching "Where Matching Is Allowed". */
+
+.prose ul,
+.prose ol {
+	margin: 14px 0 0;
+	padding: 0;
+	list-style: none;
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+
+.prose li {
+	position: relative;
+	padding-left: 24px;
+	text-wrap: pretty;
+}
+
+.prose ul > li::before {
+	content: "—";
+	position: absolute;
+	left: 0;
+	color: var(--accent-strong);
+}
+
+.prose ol {
+	counter-reset: prose-ordered;
+}
+
+.prose ol > li {
+	counter-increment: prose-ordered;
+}
+
+.prose ol > li::before {
+	content: counter(prose-ordered) ".";
+	position: absolute;
+	left: 0;
+	font-family: var(--font-mono);
+	font-size: 0.85em;
+	color: var(--accent-strong);
+}
+
+.prose li > ul,
+.prose li > ol {
+	margin-top: 10px;
+}
+
+/* Code blocks */
+
+/*
+ * A code window carries the same stacking margin as a fence. It draws its own
+ * `<pre>` inside a frame, so the rule below cannot reach it, and without this
+ * one every `<CodeWindow>` in an article sits flush against the paragraph that
+ * introduces it while the fence beside it is spaced.
+ */
+.prose .cw {
+	margin: 20px 0 0;
+}
+
+.prose pre {
+	margin: 20px 0 0;
+	padding: 18px 20px;
+	border-radius: 8px;
+	border: 1px solid var(--code-border);
+	background: var(--code-bg);
+	font-family: var(--font-mono);
+	font-size: 14px;
+	line-height: 25px;
+	color: var(--code-text);
+	overflow-x: auto;
+}
+
+.prose pre code {
+	font-family: inherit;
+	font-size: inherit;
+	background: none;
+	padding: 0;
+	color: inherit;
+}
+
+/*
+ * Compiler output. Not source — a transcript of a terminal report, so it is
+ * set a step smaller on the sunken surface and in the muted ramp, with only
+ * the severity word carrying colour.
+ */
+.prose pre.error-output,
+.prose .error-output pre {
+	background: var(--code-output-bg);
+	font-size: 13.5px;
+	line-height: 24px;
+	color: var(--text-body);
+}
+
+.prose pre.error-output .severity {
+	color: var(--accent);
+}
+
+/* Blockquotes read as an aside, in the same shape as the Note callout. */
+
+.prose blockquote {
+	margin: 24px 0 0;
+	padding: 16px 18px;
+	border-radius: 8px;
+	border: 1px solid var(--accent-note-border);
+	border-left: 3px solid var(--accent-strong);
+	background: var(--accent-note-bg);
+	font-size: 15px;
+	line-height: 1.6;
+	color: var(--text-strong);
+}
+
+.prose blockquote > :first-child {
+	margin-top: 0;
+}
+
+/* Tables */
+
+.prose .table-scroll {
+	margin: 20px 0 0;
+	overflow-x: auto;
+}
+
+.prose table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 15px;
+}
+
+.prose th,
+.prose td {
+	padding: 10px 14px;
+	text-align: left;
+	border-bottom: 1px solid var(--hairline);
+	vertical-align: top;
+}
+
+.prose th {
+	font-family: var(--font-mono);
+	font-size: 11px;
+	letter-spacing: 0.12em;
+	text-transform: uppercase;
+	color: var(--text-faintest);
+	font-weight: 400;
+}
+
+.prose hr {
+	margin: 44px 0 0;
+	border-top: 1px solid var(--hairline-softest);
+}
+
+.prose img {
+	margin: 20px 0 0;
+	border-radius: 8px;
+	border: 1px solid var(--border);
+}
+
+/* The first block of an article never carries the stacking margin. */
+.prose > :first-child {
+	margin-top: 0;
+}
+
+@media (max-width: 800px) {
+	.prose {
+		font-size: 15.5px;
+		line-height: 1.65;
+	}
+
+	.prose h1 {
+		font-size: 30px;
+		letter-spacing: -0.01em;
+	}
+
+	.prose h2 {
+		margin-top: 30px;
+		font-size: 21px;
+	}
+
+	.prose h3 {
+		margin-top: 26px;
+		font-size: 17.5px;
+	}
+
+	.prose .lede {
+		font-size: 16.5px;
+	}
+
+	.prose pre {
+		padding: 14px 16px;
+		font-size: 12.5px;
+		line-height: 22px;
+	}
+}

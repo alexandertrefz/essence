@@ -1,13 +1,22 @@
 {
 	"name": "@essence-lang/website",
 	"version": "0.0.1",
-	"description": "essence-language.org — the language's documentation.",
+	"description": "essencelang.org — the language's documentation.",
 	"private": true,
 	"type": "module",
 	"author": "Alexander Trefz",
 	"license": "MIT",
+	"scripts": {
+		"dev": "astro dev",
+		"build": "astro build",
+		"preview": "astro preview",
+		"sync": "astro sync"
+	},
 	"devDependencies": {
+		"@astrojs/mdx": "7.0.3",
 		"@essence-lang/compiler": "workspace:*",
-		"@essence-lang/interfaces": "workspace:*"
+		"@essence-lang/interfaces": "workspace:*",
+		"@essence-lang/standard-library": "workspace:*",
+		"astro": "7.1.3"
 	}
 }

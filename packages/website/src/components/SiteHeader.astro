@@ -1,0 +1,582 @@
+---
+/*
+ * The full-width hairline rail every page wears — screens 1a/1d/7a (marketing,
+ * 72px) and 1e–1h/7b (docs, 64px).
+ *
+ * Sticky, with the header's own translucent fill and a blur behind it, so the
+ * hatch and the hero glow keep moving underneath as the page scrolls. Below
+ * 800px both variants collapse to the rows of 1j / 1k and hand off to
+ * `MobileMenu`.
+ */
+
+import Logo from "./Logo.astro"
+import MobileMenu from "./MobileMenu.astro"
+import { GITHUB_URL, ROUTES } from "../lib/site.ts"
+
+interface Props {
+	variant?: "marketing" | "docs"
+}
+
+let { variant = "marketing" } = Astro.props
+let isDocs = variant === "docs"
+
+/*
+ * Which nav entry is the page you are on.
+ *
+ * The built pages are directories, so a path arrives with a trailing slash that
+ * the route constants do not have — both sides are trimmed before comparing, or
+ * nothing would ever match. Documentation counts as current for anything under
+ * it, since every docs page is somewhere inside that one entry.
+ */
+let path = Astro.url.pathname.replace(/\/+$/, "") || "/"
+
+function isCurrent(href: string): boolean {
+	let target = href.replace(/\/+$/, "") || "/"
+
+	return target === ROUTES.docs
+		? path === target || path.startsWith(`${target}/`)
+		: path === target
+}
+
+function current(href: string): "page" | undefined {
+	return isCurrent(href) ? "page" : undefined
+}
+---
+
+<header class="header" data-variant={variant}>
+	<div class="header__row header__row--wide">
+		{
+			/*
+			 * The same mark and the same wordmark in both variants: this element
+			 * is the anchor of the header's view transition, and a brand that
+			 * changed size between the landing page and the documentation would
+			 * animate its own resize on every navigation between them.
+			 */
+		}
+		<a class="brand" href={ROUTES.home}>
+			<Logo size="lg" />
+			<span class="brand__wordmark">essence</span>
+		</a>
+
+		{
+			/*
+			 * The divider is on both variants now, so the brand is separated from
+			 * whatever follows it the same way on every page — one more thing the
+			 * header's transition no longer has to invent or discard mid-flight.
+			 */
+		}
+		<span class="brand__divider"></span>
+
+		{
+			isDocs && (
+				<>
+					<a class="brand__section" href={ROUTES.docs}>
+						Documentation
+					</a>
+				</>
+			)
+		}
+
+		{
+			!isDocs && (
+				<nav class="nav" aria-label="Main">
+					<a href={ROUTES.principles} aria-current={current(ROUTES.principles)}>
+						Principles
+					</a>
+					<a href={ROUTES.goals} aria-current={current(ROUTES.goals)}>Goals</a>
+					{
+						/*
+						 * Carries the same view-transition name as the documentation
+						 * header's own "Documentation", so the one word travels
+						 * between the two places it lives instead of fading out here
+						 * and in over there. Only ever one of them is rendered — this
+						 * nav belongs to the marketing variant, that label to the
+						 * docs one — which is what makes sharing the name legal.
+						 */
+					}
+					<a
+						class="nav__docs"
+						href={ROUTES.docs}
+						aria-current={current(ROUTES.docs)}
+					>
+						Documentation
+					</a>
+				</nav>
+			)
+		}
+
+		<span class="spacer"></span>
+
+		<div class="header__actions">
+			<button
+				class="field"
+				type="button"
+				data-search-trigger
+				aria-controls="search-palette"
+			>
+				<svg
+					width="16"
+					height="16"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="1.5"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+				>
+					<path d="M10 10m-7 0a7 7 0 1 0 14 0a7 7 0 1 0 -14 0"></path>
+					<path d="M21 21l-6 -6"></path>
+				</svg>
+				<span class="field__label">Search documentation</span>
+				<kbd class="kbd">⌘K</kbd>
+			</button>
+
+			{
+				/*
+				 * No "Get started" here — the hero's own primary call to action and
+				 * the mobile sheet's still carry it, and the bar is the better for
+				 * not repeating them.
+				 */
+			}
+			{
+				isDocs && (
+					<nav class="nav nav--compact" aria-label="Secondary">
+						<a href={GITHUB_URL}>GitHub</a>
+					</nav>
+				)
+			}
+		</div>
+	</div>
+
+	<div class="header__row header__row--narrow">
+		<a class="brand" href={ROUTES.home}>
+			<Logo size="sm" />
+			<span class="brand__wordmark brand__wordmark--small">essence</span>
+		</a>
+
+		{
+			isDocs && (
+				<>
+					<span class="brand__divider" />
+					<a class="brand__section brand__section--small" href={ROUTES.docs}>
+						Docs
+					</a>
+				</>
+			)
+		}
+
+		<span class="spacer"></span>
+
+		{
+			isDocs && (
+				<button
+					class="icon-button"
+					type="button"
+					data-search-trigger
+					aria-controls="search-palette"
+					aria-label="Search documentation"
+				>
+					<svg
+						width="20"
+						height="20"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="1.5"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					>
+						<path d="M10 10m-7 0a7 7 0 1 0 14 0a7 7 0 1 0 -14 0" />
+						<path d="M21 21l-6 -6" />
+					</svg>
+				</button>
+			)
+		}
+
+		<button
+			class="icon-button"
+			type="button"
+			data-menu-toggle
+			aria-controls="mobile-menu"
+			aria-label="Open menu"
+		>
+			<svg
+				width="20"
+				height="20"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="1.5"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+			>
+				<path d="M4 6l16 0"></path>
+				<path d="M4 12l16 0"></path>
+				<path d="M4 18l16 0"></path>
+			</svg>
+		</button>
+	</div>
+</header>
+
+<MobileMenu variant={variant}>
+	<slot name="mobile-tree" slot="tree" />
+</MobileMenu>
+
+<style>
+	.header {
+		position: sticky;
+		top: 0;
+		z-index: 60;
+		/*
+		 * Named, so a cross-document navigation animates the header as one
+		 * persistent thing instead of dissolving it along with the page beneath
+		 * it. Both variants are now the same height and carry the same brand, so
+		 * what is left to animate is the chrome that genuinely differs.
+		 */
+		view-transition-name: site-header;
+		background: var(--header-bg);
+		/* Safari still needs the prefix, and the fill alone is too thin
+		   without the blur — it would read as a smear over the hatch. */
+		-webkit-backdrop-filter: blur(28px) saturate(150%);
+		backdrop-filter: blur(28px) saturate(150%);
+		border-bottom: 1px solid var(--border);
+	}
+
+	.header[data-variant="docs"] {
+		background: var(--header-bg-docs);
+	}
+
+	.header__row {
+		display: flex;
+		align-items: center;
+		gap: 40px;
+		height: var(--header-height);
+		padding: 0 var(--gutter);
+	}
+
+	/* Same height as the marketing row — only the measure differs, because the
+	   documentation's chrome sits over a sidebar rather than a centred column. */
+	.header[data-variant="docs"] .header__row {
+		gap: 32px;
+		height: var(--header-height-docs);
+		padding: 0 var(--gutter-docs);
+	}
+
+	.header__row--narrow {
+		display: none;
+		gap: 10px;
+		height: var(--header-height-mobile);
+		padding: 0 var(--gutter-mobile);
+	}
+
+	/*
+	 * Named in its own right, so the brand slides between pages rather than
+	 * dissolving in place. Inside the header's snapshot it was a flat image
+	 * cross-fading from one position to another; lifted out, the browser has an
+	 * old box and a new box and tweens between them. It is 72px of pure sideways
+	 * travel — x=120 on the marketing gutter, x=48 on the documentation's — at
+	 * the same size and the same height on every page, which is what makes it a
+	 * translate and not a resize.
+	 *
+	 * Safe to hang off the class even though both header rows carry one: only
+	 * ever one of the two rows is rendered, and an element with `display: none`
+	 * is not captured. Two rendered elements sharing a name would abort the
+	 * transition outright.
+	 */
+	.brand {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		flex: none;
+		view-transition-name: site-brand;
+	}
+
+	.brand__wordmark {
+		font-family: var(--font-wordmark);
+		font-size: 25px;
+		line-height: 1;
+		margin-top: -3px;
+		color: var(--text-hero);
+	}
+
+	.brand__wordmark--small {
+		font-size: 19px;
+		margin-top: -2px;
+	}
+
+	.brand__divider {
+		width: 1px;
+		height: 20px;
+		margin: 0 4px;
+		background: var(--divider);
+		flex: none;
+		/* Travels with the brand: same distance, and the duration and easing of
+		   the brand's group, so the two read as one object moving. */
+		view-transition-name: site-divider;
+	}
+
+	/*
+	 * Shares its name with the marketing bar's "Documentation", so the word
+	 * moves between the two places it lives rather than fading out in one and in
+	 * at the other. Legal because the two are on opposite variants and never
+	 * rendered at the same time.
+	 */
+	.brand__section,
+	.nav__docs {
+		view-transition-name: site-docs-link;
+	}
+
+	.brand__section {
+		font-family: var(--font-heading);
+		font-weight: 500;
+		font-size: 16px;
+		color: var(--text-strong);
+		flex: none;
+	}
+
+	.brand__section--small {
+		font-size: 14px;
+		color: var(--text-muted);
+	}
+
+
+	/*
+	 * 16px, which is the size the documentation's own "Documentation" link has
+	 * always been — the marketing bar sat a point under it at 15px and the
+	 * documentation's secondary links two under at 14px, so the header changed
+	 * its type size depending on which page you were on. One size for every
+	 * link in the bar.
+	 */
+	.nav {
+		display: flex;
+		align-items: center;
+		gap: 30px;
+		font-family: var(--font-body);
+		font-size: 16px;
+		font-weight: 500;
+	}
+
+	.nav--compact {
+		gap: 22px;
+	}
+
+	.nav a {
+		position: relative;
+		color: var(--text-body);
+		white-space: nowrap;
+	}
+
+	.nav a:hover {
+		color: var(--text-heading);
+	}
+
+	/*
+	 * The page you are on. Driven off `aria-current`, so the thing a screen
+	 * reader is told and the thing everyone else can see are the same fact and
+	 * cannot drift apart. The rule is the site's existing mark for "this one" —
+	 * the same 2px accent underline the hero's primary call to action wears —
+	 * sat below the text's own box rather than on a pill.
+	 */
+	.nav a[aria-current="page"] {
+		color: var(--text-hero);
+	}
+
+	/*
+	 * Named, so the mark slides from the entry you were on to the entry you
+	 * asked for and takes its width with it, rather than blinking out under one
+	 * word and in under another. The link text itself is not named and still
+	 * cross-fades with the header; only the mark travels.
+	 *
+	 * A pseudo-element can carry a name — it is captured and given a group of
+	 * its own, verified in Chrome rather than assumed, which is why this does
+	 * not need a real element to hang the name on. Sharing one name across the
+	 * three entries is safe because `current()` answers for exactly one of
+	 * them: two rendered elements under one name abort the transition outright.
+	 * Where a page has no current entry — the landing page — there is no mark on
+	 * that side and the group fades the one side it has.
+	 */
+	.nav a[aria-current="page"]::after {
+		content: "";
+		position: absolute;
+		left: 0;
+		right: 0;
+		bottom: -7px;
+		height: 2px;
+		border-radius: 1px;
+		background: var(--accent);
+		view-transition-name: nav-mark;
+	}
+
+	.spacer {
+		flex: 1;
+	}
+
+	.header__actions {
+		display: flex;
+		align-items: center;
+		gap: 14px;
+		flex: none;
+	}
+
+	/*
+	 * One field on every page. It used to be 300px wide in the documentation and
+	 * a 120px label's worth on the marketing pages — two different objects
+	 * wearing the same class, which is no way to animate between them. Now it is
+	 * the one size, with the one label, and it is named so it travels between
+	 * where it sits on the marketing bar and where it sits in the documentation.
+	 */
+	.field {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		width: 300px;
+		height: 34px;
+		padding: 0 10px 0 12px;
+		border: 1px solid var(--border);
+		border-radius: 7px;
+		background: var(--field-bg);
+		font-family: var(--font-body);
+		font-size: 14px;
+		color: var(--text-placeholder);
+		cursor: pointer;
+		text-align: left;
+		view-transition-name: site-search;
+	}
+
+	.field:hover {
+		color: var(--text-body);
+		border-color: var(--divider);
+	}
+
+	.field__label {
+		flex: 1;
+		white-space: nowrap;
+	}
+
+	/*
+	 * Centred in the documentation's bar, but only while there is room for it:
+	 * the row's left cluster and the Reference/GitHub pair on the right both grow
+	 * towards the middle, so below the point where a centred 300px field would
+	 * meet them it goes back to sitting on the right, as it does everywhere else.
+	 * `position: absolute` is what takes it out of the flex flow, so the centring
+	 * is against the row and not against whatever is left over.
+	 */
+	@media (min-width: 1181px) {
+		.header[data-variant="docs"] .header__row--wide {
+			position: relative;
+		}
+
+		.header[data-variant="docs"] .field {
+			position: absolute;
+			left: 50%;
+			transform: translateX(-50%);
+		}
+	}
+
+	.kbd {
+		font-family: var(--font-mono);
+		font-size: 11px;
+		color: var(--text-muted);
+		border: 1px solid var(--kbd-border);
+		border-radius: 4px;
+		padding: 2px 5px;
+		background: var(--kbd-bg);
+	}
+
+	.icon-button {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 4px;
+		margin: -4px;
+		background: none;
+		border: 0;
+		color: var(--text-body);
+		cursor: pointer;
+	}
+
+	/*
+	 * The narrow row does not arrive until 800px, so the wide one has to still
+	 * fit at 801. Its content needs about 721px on its own; the tighter gutter
+	 * gets it inside the viewport and this closes the gaps for the slack.
+	 *
+	 * At the 1180px step rather than 960px, which is where it used to be and was
+	 * a pixel too low: `--gutter-docs` holds 48px the whole way down, so at 961
+	 * the documentation's header had 865px to fit in and — once its links went to
+	 * 16px — wanted 877. Sharing the breakpoint with the gutter's own first step
+	 * is also one less number to keep in mind.
+	 */
+	@media (max-width: 1180px) {
+		.header__row,
+		.header[data-variant="docs"] .header__row {
+			gap: 24px;
+		}
+
+		/* The field's 300px is what pushes the header past the viewport in this
+		   range, on either variant. Let it give. */
+		.field {
+			width: auto;
+			flex: 1;
+			min-width: 0;
+		}
+
+		/*
+		 * `.header__actions` is `flex: none`, so it takes its content's width
+		 * and never gives any back — which is why a flexible field inside it
+		 * changed nothing on its own. Letting the group shrink is what actually
+		 * frees the row, and the field and its label below are what it shrinks
+		 * into.
+		 */
+		.header__actions {
+			flex: 0 1 auto;
+			min-width: 0;
+		}
+
+		.field__label {
+			min-width: 0;
+			overflow: hidden;
+			text-overflow: ellipsis;
+		}
+	}
+
+	@media (max-width: 800px) {
+		.header__row--wide {
+			display: none;
+		}
+
+		.header__row--narrow {
+			display: flex;
+		}
+
+		.header,
+		.header[data-variant="docs"] {
+			background: var(--header-bg-mobile);
+		}
+	}
+
+	/*
+	 * Sliding is movement, which is the thing this preference is actually about
+	 * — so everything that would travel gives up its name and rides the header's
+	 * cross-fade instead. They still change position between pages; they simply
+	 * do not travel there.
+	 *
+	 * This block has to come after every rule it overrides, and that is the whole
+	 * reason it lives at the end of the stylesheet. A media query adds no
+	 * specificity, so `view-transition-name: none` and the declaration it is
+	 * meant to beat are evenly matched and source order decides. It used to sit
+	 * up beside `.brand`, which is the only name declared above it — the divider,
+	 * the "Documentation" link, the search field and the mark under the current
+	 * entry are all declared below, so all four kept their names and travelled
+	 * for anyone who had asked for less of exactly that.
+	 */
+	@media (prefers-reduced-motion: reduce) {
+		.brand,
+		.brand__divider,
+		.brand__section,
+		.nav__docs,
+		.field,
+		.nav a[aria-current="page"]::after {
+			view-transition-name: none;
+		}
+	}
+</style>

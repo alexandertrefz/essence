@@ -1,0 +1,209 @@
+{
+	"name": "essence-light",
+	"displayName": "Essence Light",
+	"type": "light",
+	"colors": {
+		"editor.background": "#f5f2f2",
+		"editor.foreground": "#2d2b2c"
+	},
+	"fg": "#2d2b2c",
+	"bg": "#f5f2f2",
+	"tokenColors": [
+		{
+			"settings": {
+				"foreground": "#2d2b2c"
+			}
+		},
+		{
+			"scope": [
+				"comment",
+				"comment.line",
+				"comment.block",
+				"comment.block.documentation",
+				"punctuation.definition.comment",
+				"punctuation.separator.documentation"
+			],
+			"settings": {
+				"foreground": "#928e8f"
+			}
+		},
+		{
+			"scope": ["keyword.other.documentation"],
+			"settings": {
+				"foreground": "#787475",
+				"fontStyle": "bold"
+			}
+		},
+		{
+			"scope": [
+				"comment variable.parameter",
+				"markup.inline.raw",
+				"markup.inline.raw.string"
+			],
+			"settings": {
+				"foreground": "#787475"
+			}
+		},
+		{
+			"scope": [
+				"keyword",
+				"keyword.control",
+				"keyword.control.return",
+				"keyword.other",
+				"storage",
+				"storage.type",
+				"storage.modifier",
+				"entity.name.tag",
+				"constant.character.escape",
+				"invalid",
+				"invalid.illegal"
+			],
+			"settings": {
+				"foreground": "#c41e34"
+			}
+		},
+		{
+			"scope": [
+				"entity.name.function",
+				"entity.name.type",
+				"entity.name.type.namespace",
+				"entity.name.class",
+				"entity.other.attribute-name",
+				"entity.other.inherited-class",
+				"support.function",
+				"support.function.native",
+				"support.class",
+				"support.type",
+				"support.type.property-name",
+				"support.constant",
+				"variable.other.enummember",
+				"markup.underline.link",
+				"string.other.link"
+			],
+			"settings": {
+				"foreground": "#1458be"
+			}
+		},
+		{
+			"scope": [
+				"string",
+				"string.quoted",
+				"string.quoted.double",
+				"string.quoted.single",
+				"string.template",
+				"string.unquoted",
+				"punctuation.definition.string",
+				"punctuation.definition.string.begin",
+				"punctuation.definition.string.end"
+			],
+			"settings": {
+				"foreground": "#b21e5a"
+			}
+		},
+		{
+			"scope": [
+				"constant",
+				"constant.numeric",
+				"constant.numeric.integer",
+				"constant.numeric.fraction",
+				"constant.language",
+				"constant.other",
+				"constant.character"
+			],
+			"settings": {
+				"foreground": "#3a3738"
+			}
+		},
+		{
+			"scope": [
+				"variable",
+				"variable.other",
+				"variable.other.property",
+				"variable.other.constant",
+				"variable.parameter",
+				"variable.language",
+				"variable.language.self",
+				"entity.name.label"
+			],
+			"settings": {
+				"foreground": "#2d2b2c"
+			}
+		},
+		{
+			"scope": [
+				"keyword.operator",
+				"keyword.operator.method",
+				"keyword.operator.arrow",
+				"keyword.operator.assignment",
+				"keyword.operator.union",
+				"punctuation",
+				"punctuation.definition.block",
+				"punctuation.definition.case",
+				"punctuation.definition.typeparameters",
+				"punctuation.definition.variable",
+				"punctuation.separator",
+				"punctuation.terminator",
+				"punctuation.accessor",
+				"punctuation.section",
+				"meta.brace",
+				"meta.brace.round",
+				"meta.brace.square",
+				"variable.language.wildcard"
+			],
+			"settings": {
+				"foreground": "#787475"
+			}
+		},
+		{
+			"scope": [
+				"entity.name.command",
+				"source.shell entity.name.function.call",
+				"source.shell support.function.builtin"
+			],
+			"settings": {
+				"foreground": "#2d2b2c"
+			}
+		},
+		{
+			"scope": ["string.unquoted.argument", "meta.argument"],
+			"settings": {
+				"foreground": "#3a3738"
+			}
+		},
+		{
+			"scope": ["constant.other.option"],
+			"settings": {
+				"foreground": "#787475"
+			}
+		},
+		{
+			"scope": ["markup.heading", "markup.bold"],
+			"settings": {
+				"foreground": "#c41e34",
+				"fontStyle": "bold"
+			}
+		},
+		{
+			"scope": ["markup.inserted"],
+			"settings": {
+				"foreground": "#166e42"
+			}
+		},
+		{
+			"scope": ["markup.deleted"],
+			"settings": {
+				"foreground": "#c41e34"
+			}
+		},
+		{
+			"name": "What is inside an interpolation hole is code, not string — see the same rule in essence-dark.json.",
+			"scope": [
+				"meta.embedded.interpolation",
+				"meta.embedded.interpolation.essence"
+			],
+			"settings": {
+				"foreground": "#2d2b2c"
+			}
+		}
+	]
+}

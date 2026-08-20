@@ -1,0 +1,116 @@
+/*
+ * Shiki: theme activation and the code-block surface.
+ *
+ * `markdown.shikiConfig` runs with `defaultColor: false`, so a highlighted
+ * token carries no inline colour at all — Shiki emits one custom property per
+ * configured theme (`--shiki-light`, `--shiki-dark`, plus the `-bg` pair on the
+ * `<pre>` itself) and it is the rules below that decide which one wins. That is
+ * also why both theme JSONs declare a bare `foreground`: a token that no scope
+ * rule matches would otherwise have no colour at all rather than a plain one.
+ *
+ * The theme backgrounds are the design's code surfaces (26,26,26 dark /
+ * 245,242,242 light) — the values `--code-bg` also carries — so reading the
+ * theme's own `-bg` keeps a block correct outside `.prose` too. A component
+ * that draws its own surface (the hero window sits on `--code-window-bg`, a
+ * transcript on `--code-output-bg`) sets `--code-surface` on its wrapper, and
+ * the `<pre>` inherits it.
+ *
+ * The measurements work the same way — set them on a wrapper or on the `<pre>`:
+ *   --code-surface --code-padding --code-radius --code-font-size
+ *   --code-line-height
+ * Unset, they are the article block of 1f/7b (14px/25px, 18px 20px, radius 8).
+ * `.code-compact` is the card and step block of 1d/1g (13.5px/24px), and
+ * `.code-bare` is a block whose frame its component has already drawn.
+ *
+ * Only the colour rules use `.astro-code` on its own: an inline `<Code inline>`
+ * renders as `<code class="astro-code">` and must not take the block surface.
+ * `margin` stays with the caller — `base.css` zeroes it and `prose.css` adds
+ * the article's stacking margin. `overflow-x: auto` is also inlined on the
+ * element by Astro's Shiki transformer.
+ */
+
+pre.astro-code {
+	padding: var(--code-padding, 18px 20px);
+	border: 1px solid var(--code-border);
+	border-radius: var(--code-radius, 8px);
+	background-color: var(--code-surface, var(--shiki-light-bg));
+	font-family: var(--font-mono);
+	font-size: var(--code-font-size, 14px);
+	line-height: var(--code-line-height, 25px);
+	/* Fira Code's ligatures — `->`, `::`, `=>`, `!=` and the rest — are all
+	   `calt` (the face ships no `liga`), so `contextual` is the switch that
+	   turns them on. They are on by default, but a code sample and a CLI
+	   transcript both mean to show them, so it is set rather than assumed: a
+	   reset or a calt-off client cannot take them away. */
+	font-variant-ligatures: contextual;
+	/* Four columns is the design's 2.4em indent at Fira Code's 0.6em advance. */
+	tab-size: 4;
+	overflow-x: auto;
+}
+
+.astro-code,
+.astro-code span {
+	color: var(--shiki-light);
+	font-style: var(--shiki-light-font-style);
+	font-weight: var(--shiki-light-font-weight);
+	text-decoration: var(--shiki-light-text-decoration);
+}
+
+@media (prefers-color-scheme: dark) {
+	pre.astro-code {
+		background-color: var(--code-surface, var(--shiki-dark-bg));
+	}
+
+	.astro-code,
+	.astro-code span {
+		color: var(--shiki-dark);
+		font-style: var(--shiki-dark-font-style);
+		font-weight: var(--shiki-dark-font-weight);
+		text-decoration: var(--shiki-dark-text-decoration);
+	}
+}
+
+/* Shiki wraps the block in a `<code>` that must re-style nothing. */
+.astro-code code {
+	display: block;
+	font: inherit;
+	background: none;
+	border: 0;
+	padding: 0;
+	color: inherit;
+}
+
+.code-compact,
+.code-compact pre.astro-code {
+	--code-font-size: 13.5px;
+	--code-line-height: 24px;
+	--code-padding: 16px 18px;
+	--code-radius: 6px;
+}
+
+.code-bare,
+.code-bare pre.astro-code {
+	--code-surface: transparent;
+	--code-padding: 0;
+	--code-radius: 0;
+}
+
+.code-bare pre.astro-code {
+	border: 0;
+}
+
+/* Mobile, per 1l/1m. The fallbacks move; a wrapper's own value still wins. */
+@media (max-width: 800px) {
+	pre.astro-code {
+		padding: var(--code-padding, 14px 16px);
+		font-size: var(--code-font-size, 12.5px);
+		line-height: var(--code-line-height, 22px);
+	}
+
+	.code-compact,
+	.code-compact pre.astro-code {
+		--code-font-size: 12.5px;
+		--code-line-height: 22px;
+		--code-padding: 14px 16px;
+	}
+}

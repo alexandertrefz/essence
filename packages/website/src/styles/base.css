@@ -1,0 +1,493 @@
+/*
+ * Fonts, reset, page defaults, and the two decorative layers every hero
+ * shares. Nothing here knows about a colour scheme — that is `tokens.css`.
+ *
+ * Every face is served from `public/fonts/`. There is no CDN request on any
+ * page of this site, so a font never leaks a visit to a third party and the
+ * site keeps working offline.
+ */
+
+@font-face {
+	font-family: "General Sans";
+	src: url("/fonts/general-sans-400.woff2") format("woff2");
+	font-weight: 400;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: "General Sans";
+	src: url("/fonts/general-sans-500.woff2") format("woff2");
+	font-weight: 500;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: "General Sans";
+	src: url("/fonts/general-sans-600.woff2") format("woff2");
+	font-weight: 600;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: "Supreme";
+	src: url("/fonts/supreme-400.woff2") format("woff2");
+	font-weight: 400;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: "Supreme";
+	src: url("/fonts/supreme-500.woff2") format("woff2");
+	font-weight: 500;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: "Fira Code";
+	src: url("/fonts/fira-code-400.woff2") format("woff2");
+	font-weight: 400;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: "Fira Code";
+	src: url("/fonts/fira-code-500.woff2") format("woff2");
+	font-weight: 500;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: "Fira Code";
+	src: url("/fonts/fira-code-600.woff2") format("woff2");
+	font-weight: 600;
+	font-style: normal;
+	font-display: swap;
+}
+
+/* Izoard sets the wordmark and nothing else. */
+@font-face {
+	font-family: "Izoard";
+	src: url("/fonts/izoard-regular.woff2") format("woff2");
+	font-weight: 400;
+	font-style: normal;
+	font-display: swap;
+}
+
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+}
+
+html {
+	-webkit-text-size-adjust: 100%;
+	scroll-behavior: smooth;
+	/* Also on `html`, not only on `body`: this is the colour the very first
+	   paint uses, and the one a view transition holds behind the two snapshots. */
+	background: var(--bg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	html {
+		scroll-behavior: auto;
+	}
+}
+
+/*
+ * Cross-document view transitions.
+ *
+ * Every navigation here is a real document load — static output, no client
+ * router — so the browser tore the old page down and painted the new one from
+ * scratch, which reads as a flash on every click. `navigation: auto` hands it
+ * the two snapshots to cross-fade instead.
+ *
+ * It costs nothing: no JavaScript, no router, no change to how a page is built,
+ * and a browser without support navigates exactly the way it did before. That
+ * is the whole reason to prefer it here over a client-side router, which would
+ * ship a bundle and put every inline script on this site at risk of running
+ * twice.
+ *
+ * NOT behind `prefers-reduced-motion: no-preference`, which is where this
+ * started: gating it there meant anyone with Reduce Motion turned on got the
+ * bare document swap back — the flash this exists to remove. The transition is
+ * a cross-fade, with no movement, no scale and no parallax, so there is nothing
+ * in it of the kind that preference is asking to be spared. What the preference
+ * does below is shorten it.
+ */
+@view-transition {
+	navigation: auto;
+}
+
+/*
+ * The fade is stated rather than left to the user agent, so its length is a
+ * decision and the header cannot finish at a different moment from the page
+ * underneath it — mismatched durations show up as a seam along the header's
+ * bottom edge.
+ */
+::view-transition-old(root),
+::view-transition-new(root),
+::view-transition-group(site-header),
+::view-transition-group(site-brand),
+::view-transition-group(site-divider),
+::view-transition-group(site-docs-link),
+::view-transition-group(site-search),
+::view-transition-group(nav-mark),
+/*
+ * The mark's own two snapshots are named as well as its group, because on a
+ * navigation where only one side has a current entry the browser builds no
+ * group at all — there is nothing to tween — and animates the single snapshot
+ * it has. Left out, that fade alone would run at the user agent's default
+ * length while everything around it ran at this one.
+ */
+::view-transition-old(nav-mark),
+::view-transition-new(nav-mark) {
+	animation-duration: 260ms;
+	animation-timing-function: ease;
+}
+
+/*
+ * The pieces of the header that travel rather than dissolve — the brand, the
+ * divider beside it, the search field, the one "Documentation" that lives in
+ * the bar on the marketing pages and next to the divider in the documentation,
+ * and the mark under whichever entry you are on. They share a duration and this
+ * easing so they move as one object instead of several things that happen to be
+ * moving: weighted, so it reads as carried, not dragged.
+ *
+ * The entries themselves — Principles, Goals, Reference, GitHub — stay unnamed
+ * and part of the header's own snapshot, so they cross-fade, which is what
+ * should happen to a word that is not on the next page at all. The mark beneath
+ * them is the exception: it is the same object on both sides of a navigation, so
+ * it slides between them and stretches to the width of the new word.
+ */
+::view-transition-group(site-brand),
+::view-transition-group(site-divider),
+::view-transition-group(site-docs-link),
+::view-transition-group(site-search),
+::view-transition-group(nav-mark) {
+	animation-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	::view-transition-old(root),
+	::view-transition-new(root),
+	::view-transition-group(site-header) {
+		animation-duration: 90ms;
+	}
+}
+
+body {
+	margin: 0;
+	background: var(--bg);
+	color: var(--text-body);
+	font-family: var(--font-body);
+	font-size: 16px;
+	line-height: 1.55;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+	text-rendering: optimizeLegibility;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+	margin: 0;
+	font-family: var(--font-heading);
+	font-weight: 500;
+	color: var(--text-heading);
+}
+
+p {
+	margin: 0;
+	text-wrap: pretty;
+}
+
+a {
+	color: inherit;
+	text-decoration: none;
+}
+
+a:hover {
+	color: var(--text-hero);
+}
+
+code,
+kbd,
+pre,
+samp {
+	font-family: var(--font-mono);
+	font-size: 1em;
+}
+
+pre {
+	margin: 0;
+}
+
+img,
+svg,
+video {
+	display: block;
+	max-width: 100%;
+}
+
+button,
+input,
+select,
+textarea {
+	font: inherit;
+	color: inherit;
+}
+
+ul,
+ol {
+	margin: 0;
+	padding: 0;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid var(--hairline-soft);
+}
+
+/* The one colour that does not move between themes. */
+::selection {
+	background: rgb(154, 26, 46);
+	color: rgb(255, 241, 243);
+	text-shadow: none;
+}
+
+:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: 2px;
+	border-radius: 3px;
+}
+
+.visually-hidden {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	margin: -1px;
+	padding: 0;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
+	border: 0;
+}
+
+/*
+ * Content that arrives with the page: a short fade up into place, one block
+ * after the next. Used by the two standalone pages, Principles and Goals, which
+ * are both a column of blocks — landing all of them in one frame reads as a wall
+ * of text appearing, and this gives the eye an order to take them in.
+ *
+ * `--reveal-index` is the block's place in document order and the only thing a
+ * page sets. `backwards` fill is what holds a block at the start of the
+ * animation through its delay; without it each one would paint in place first
+ * and then jump back to invisible when its turn came.
+ *
+ * The step is a fifth of the animation's own length, which is what makes each
+ * block arrive as itself. It was a fifteenth first, and that was too tight to
+ * see: neighbours were three pixels and eight per cent of a fade apart at any
+ * instant, so eleven blocks each with their own delay still read as one column
+ * moving together. The stagger has to be a decent fraction of the movement it is
+ * offsetting, or it is only arithmetic.
+ *
+ * The delay is capped at eight steps. Past eight blocks nothing is above the fold
+ * on any viewport, so the cap costs nothing to look at — and it bounds the wait
+ * for someone who arrives already scrolled, by a back navigation that restores
+ * its position, rather than letting it grow with the length of the page.
+ *
+ * The class is opt-in but never load-bearing: it animates content that is
+ * already in the document, so a browser that ignores all of this shows the page.
+ * That is also what Reduce Motion gets — this is travel, which is the thing the
+ * preference is actually asking to be spared.
+ */
+.reveal {
+	/*
+	 * Two animations of the same length rather than one with two properties in
+	 * it, so the fade can have its own curve. The rise is eased — most of the
+	 * distance early, then settling — while the opacity climbs straight through,
+	 * which keeps a block legible for the whole second half of its arrival
+	 * instead of being at full strength before it has stopped moving. One
+	 * `animation-delay` covers both, so they stay in step by construction.
+	 */
+	animation:
+		reveal-rise 500ms cubic-bezier(0.22, 0.61, 0.36, 1) backwards,
+		reveal-fade 500ms linear backwards;
+	animation-delay: calc(min(var(--reveal-index, 0), 8) * 100ms);
+}
+
+@keyframes reveal-rise {
+	from {
+		transform: translateY(28px);
+	}
+}
+
+@keyframes reveal-fade {
+	from {
+		opacity: 0;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.reveal {
+		animation: none;
+	}
+}
+
+/*
+ * The two decorative layers. Both are drawn in CSS rather than tiled from an
+ * image so the hatch line stays black in either theme and only `--hatch-alpha`
+ * moves — 0.07 on light, 0.5 on dark. They sit behind content and never take a
+ * pointer event.
+ */
+
+.hatch,
+.glow {
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	z-index: 0;
+}
+
+/*
+ * The glow is fixed rather than absolute, so it stays where the logo stays. The
+ * header is sticky and the bloom is what sits behind it, so scrolling the bloom
+ * away left the logo on bare page a few hundred pixels down. Fixed, it holds its
+ * corner for the whole scroll.
+ *
+ * The hatch is left absolute on purpose: that one is the page's texture and is
+ * meant to travel with the page. This is also why the fade down its length is
+ * something you can see at all.
+ *
+ * `position: fixed` resolves against the viewport here despite living inside
+ * `.page__backdrop` — a stacking context is not a containing block, and nothing
+ * above it carries a transform, filter or `will-change`, which are what would
+ * capture it.
+ */
+.glow {
+	position: fixed;
+}
+
+.hatch {
+	background: repeating-linear-gradient(
+		135deg,
+		rgb(0, 0, 0) 0 1.41px,
+		rgba(0, 0, 0, 0) 1.41px 9.19px
+	);
+	opacity: var(--hatch-alpha);
+	/*
+	 * A long, even fade that never reaches zero: the hatch used to be at full
+	 * strength to 42% and gone by 76%, which both banded visibly and left the
+	 * bottom of a long page bare. These stops thin it steadily from top to
+	 * bottom and hold it at 0.34 from there, so the texture is still under the
+	 * last section of any page however long it runs.
+	 *
+	 * Kept prefixed as well as unprefixed — see the `cssTarget` note in
+	 * `astro.config.ts`; the minifier will drop a `-webkit-` prefix it decides
+	 * is unnecessary if the target is set too new.
+	 */
+	-webkit-mask-image: linear-gradient(
+		180deg,
+		rgb(0, 0, 0) 0%,
+		rgba(0, 0, 0, 0.88) 22%,
+		rgba(0, 0, 0, 0.68) 44%,
+		rgba(0, 0, 0, 0.5) 66%,
+		rgba(0, 0, 0, 0.38) 85%,
+		rgba(0, 0, 0, 0.34) 100%
+	);
+	mask-image: linear-gradient(
+		180deg,
+		rgb(0, 0, 0) 0%,
+		rgba(0, 0, 0, 0.88) 22%,
+		rgba(0, 0, 0, 0.68) 44%,
+		rgba(0, 0, 0, 0.5) 66%,
+		rgba(0, 0, 0, 0.38) 85%,
+		rgba(0, 0, 0, 0.34) 100%
+	);
+}
+
+/*
+ * The three variants differ only in where the bloom sits and how wide its waist
+ * is, so those two are properties and the gradient itself is written once. It
+ * also has to be written once for the dither below to be able to reuse the shape
+ * as its mask.
+ */
+.glow {
+	--glow-shape: 1300px 700px at 6% -12%;
+	--glow-waist: 52%;
+	bottom: auto;
+	height: 1100px;
+	background: radial-gradient(
+		var(--glow-shape),
+		var(--glow-inner) 0%,
+		var(--glow-mid) var(--glow-waist),
+		var(--glow-outer) 100%
+	);
+}
+
+.glow--docs {
+	--glow-shape: 1100px 520px at 12% -30%;
+	--glow-waist: 60%;
+	height: 520px;
+}
+
+@media (max-width: 800px) {
+	/*
+	 * Last, so it takes both variants: a docs page at this width gets the small
+	 * bloom too, which is what the three separate gradients did before.
+	 */
+	.glow {
+		--glow-shape: 560px 460px at 10% -8%;
+		--glow-waist: 55%;
+		height: 620px;
+	}
+}
+
+/*
+ * The falloff is dithered, because the gradient has almost no room to work in.
+ * Across 1300px the red channel travels 37 levels — 50 down to 13 — so one level
+ * covers an arc tens of pixels wide, and the boundary between two of them reads
+ * as a circle somebody drew. Chrome dithers a gradient by about a level on its
+ * own, which cannot hide a step when the whole ramp is only 37 of them.
+ *
+ * A tile of fractal noise over the top, at roughly a level of amplitude,
+ * randomises which side of each rounding boundary a pixel falls on, so the
+ * boundary stops being a line and becomes a scatter. Its strength is a token
+ * because the two themes need very different amounts of it — see the note there.
+ *
+ * The mask is the glow's own shape, so the noise covers only the part of the page
+ * the bloom is on — but it holds full strength almost to the rim rather than
+ * thinning with the bloom. A step is one level wherever it falls, so the dither
+ * that hides it has to be the same everywhere the gradient is still moving.
+ * Fading it from the centre, in proportion to the glow, starved exactly the outer
+ * half where the rings were widest and left them standing there.
+ */
+.glow::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAAAAABWESUoAAAEK0lEQVR42gEgBN/7A6Xt7coZ5JqxIW3bpdQSUCLw4xIFEU1EAyDu5ENVnCk1A5325L3CM80jPbOXn24ed9WUA4qECspS0bkJE5n01QhJBCrspLWBcYXlmyxYRd40VK/7CS0NDy5IwgTXDvyNKEEJAs17U7oPCgtmkwCY2anARd0CR/jJYylbxiS5X43Z3/kHA/UThJRrgPncPuHWtwKpD/dA2BnThTaI48QyqOCzBrfpAOF8J8+MwHBx7uIvzLXsX/3LafDc1mcSIPiRJMdW26DpBB4ENP1xC5Fuq6LbFzT/aRYC8Mo1PQaazxfL9NByv1MVAyv1Q60qoSjhvj7OKonS3erYk3dI0kEloME9OpQHV+AIA7KML82G8uER+GMQv75HdgQL2vMQGCVvZZlm5NBdJfFZAjX3y/mVy0FSQ6j15WdJ8HLBkBpFRAEJLAuz2wd/bFroAA7VArTe1SUHrPK+vxf81x3RT5OxDtNl4oDLwCRTSgQdAO151wwGRjHl5zLudyyEkJj5cYbw5BSqyNzGBxTnZCCGBCsY2bsDOS/97Aw9wzT5hU10CIytS/nufHRUN6xhtJv4AtQLt3gCKyMnKYJFORf4PBoTH+pShMtdyBDc64xyNN+ZBIW58GfkjUWf1B6I+FoTAfrsHxLbI4Zrx+z15oOFnTPlAFRmmQncI0ZGclv/NPTDVKgKrIGT/sqWJkQOyexX6YZmAuhMouHsysg7W167Nzn93ivBEznDmusMvwQIkCFt1EijA2j1Mdpe1S8X/5WNM8Y6ZBOB1cglfxqj1aIJOvYIpOZvAB2g40H+BYnN3+s05vRGTz/hEG84y/uYRpIhe0RoWyoSBPW48DYYpNGYMX4UYc7O3ggnsPTF2HXKNRDy1diMje7jBIjOpQgktq5VYNoFOMb1XA4SLnxw6jUFsyGK9V/qsUcABASmoJsjIsJBpn8+0vL0ag3rLJpwFDPRFb8IsPySbfMhASMRNx36dPaRZ/GZRI86DIPK60vTyAIl2+Lkh4vP8q2bAL4KS4BJJ/psXQ2DTs/loeZhHX4oAjVR2CF1Q6pkQX0hABSkCMr+yi0bqtR5pkv4DBkK9HDtm2NuyUfv2T/z+Aj/AchMWYNKCD2GSkYTdu0yAhPj3K89BTkoIHM+VgjuME9sBBn53v5sjGCclyEsRSkSyr9BKR3b+pCuwvKG3jFAojGGAuJWbGNHpubdtVHcZ//VBKE4jpEXovzo8Dd78X8mLMqBA/TdGHChUzFm8VPaQk5bMSrxN/4gUgbxidr/BPPOBGi4AddFSu4OLU0zABF7DrWWo0Te0HZ0Uy4EIyTZ7ghTcOorAAegzSDnksU582QujyuiQeO04/zLRmpIgtCnCskHoInRAhfmQWVnNpfBjQ2q7MaakJ8lMxBAXP41+QLirhQSY8sFV8b9SYOqvPcAAAAASUVORK5CYII=");
+	opacity: var(--glow-dither);
+	-webkit-mask-image: radial-gradient(
+		var(--glow-shape),
+		rgb(0, 0, 0) 0%,
+		rgb(0, 0, 0) 88%,
+		rgba(0, 0, 0, 0) 100%
+	);
+	mask-image: radial-gradient(
+		var(--glow-shape),
+		rgb(0, 0, 0) 0%,
+		rgb(0, 0, 0) 88%,
+		rgba(0, 0, 0, 0) 100%
+	);
+}

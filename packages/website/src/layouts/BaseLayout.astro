@@ -1,0 +1,109 @@
+---
+/*
+ * The document every page is inside. Nothing visual of its own — the head, the
+ * four stylesheets in the order they have to cascade in, and the one search
+ * palette a page is allowed to have.
+ */
+
+import SearchPalette from "../components/SearchPalette.astro"
+import { SITE_DESCRIPTION, SITE_NAME } from "../lib/site.ts"
+
+import "../styles/tokens.css"
+import "../styles/base.css"
+import "../styles/prose.css"
+import "../styles/shiki.css"
+
+interface Props {
+	title: string
+	description?: string
+	/** Suppress the " — essence" suffix, for the landing page. */
+	bareTitle?: boolean
+	class?: string
+}
+
+let {
+	title,
+	description = SITE_DESCRIPTION,
+	bareTitle = false,
+	class: className,
+} = Astro.props
+
+let documentTitle = bareTitle ? title : `${title} — ${SITE_NAME}`
+let canonical = new URL(Astro.url.pathname, Astro.site)
+
+// NOTE: A description is displayed with its `backticked` spans promoted to
+// inline code (see `RichText`), but a meta tag has no markup to promote them
+// into — the backticks would be shown verbatim in a search result.
+let metaDescription = description.replaceAll("`", "")
+---
+
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="generator" content={Astro.generator} />
+
+		<title>{documentTitle}</title>
+		<meta name="description" content={metaDescription} />
+		<link rel="canonical" href={canonical} />
+
+		{
+			/*
+			 * The SVG icon carries both themes (its band brightens under
+			 * `prefers-color-scheme: dark`, the same rule the header logo
+			 * follows); the ico is for Safari, which ignores SVG icons.
+			 * Sources live in brand/ at the repo root.
+			 */
+		}
+		<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+		<link rel="icon" href="/favicon.ico" sizes="48x48 32x32 16x16" />
+		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+		<meta property="og:type" content="website" />
+		<meta property="og:site_name" content={SITE_NAME} />
+		<meta property="og:title" content={documentTitle} />
+		<meta property="og:description" content={metaDescription} />
+		<meta property="og:url" content={canonical} />
+		<meta property="og:image" content={new URL("/og-image.png", Astro.site)} />
+		<meta property="og:image:width" content="1200" />
+		<meta property="og:image:height" content="630" />
+		<meta name="twitter:card" content="summary_large_image" />
+
+		{
+			/*
+			 * The three faces that paint above the fold — the wordmark, the
+			 * headline weight and running text. Everything else loads on
+			 * demand. `crossorigin` is required even same-origin: a font
+			 * fetched without it is not the same request the CSS makes, and
+			 * the preload would be wasted.
+			 */
+		}
+		<link
+			rel="preload"
+			href="/fonts/general-sans-500.woff2"
+			as="font"
+			type="font/woff2"
+			crossorigin
+		/>
+		<link
+			rel="preload"
+			href="/fonts/supreme-400.woff2"
+			as="font"
+			type="font/woff2"
+			crossorigin
+		/>
+		<link
+			rel="preload"
+			href="/fonts/izoard-regular.woff2"
+			as="font"
+			type="font/woff2"
+			crossorigin
+		/>
+
+		<slot name="head" />
+	</head>
+	<body class={className}>
+		<slot />
+		<SearchPalette />
+	</body>
+</html>

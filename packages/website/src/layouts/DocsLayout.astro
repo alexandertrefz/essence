@@ -1,0 +1,282 @@
+---
+/*
+ * The three-column documentation shell — screens 1e (no third column), 1f, 1g,
+ * 1h and 7b, collapsing to the single column of 1k below 800px.
+ *
+ * The layout owns the chrome and nothing else: the rail, the on-this-page
+ * column and the scroll spy that ties them together. What goes between them is
+ * the page's business.
+ */
+
+import SidebarNav from "../components/docs/SidebarNav.astro"
+import Toc from "../components/docs/Toc.astro"
+import TocBar from "../components/docs/TocBar.astro"
+import SiteHeader from "../components/SiteHeader.astro"
+import type { SidebarSection, TocItem } from "../lib/navigation.ts"
+import BaseLayout from "./BaseLayout.astro"
+
+interface Props {
+	title: string
+	description: string
+	sections: SidebarSection[]
+	/** Collection id of the page being read; unset on the overview. */
+	activeId?: string
+	toc?: TocItem[]
+	/** "On this page" for an article, "Steps" for a guide. */
+	tocLabel?: string
+	editUrl?: string
+	issueUrl?: string
+	/** The overview drops the third column and reads wider. */
+	variant?: "entry" | "overview"
+}
+
+let {
+	title,
+	description,
+	sections,
+	activeId,
+	toc = [],
+	tocLabel,
+	editUrl,
+	issueUrl,
+	variant = "entry",
+} = Astro.props
+
+let hasAside =
+	variant === "entry" &&
+	(toc.length > 0 ||
+		editUrl !== undefined ||
+		issueUrl !== undefined ||
+		Astro.slots.has("aside"))
+---
+
+<BaseLayout title={title} description={description}>
+	{
+		/*
+		 * At document level and before the header, so the bloom is behind the
+		 * sticky header as well as the page. It used to sit inside `.docs`, which
+		 * begins below the header — so the documentation's header had no glow
+		 * behind it at all while the landing page's did, and every navigation
+		 * between the two flashed the difference. On every docs page rather than
+		 * only the overview, for the same reason.
+		 *
+		 * Nothing here may take an `overflow`: this is an ancestor of nothing,
+		 * but a wrapper around the header with one would make the header stick to
+		 * that box instead of the viewport.
+		 */
+	}
+	<div class="glow glow--docs" aria-hidden="true"></div>
+
+	<SiteHeader variant="docs">
+		<SidebarNav
+			slot="mobile-tree"
+			sections={sections}
+			activeId={activeId}
+			variant="mobile"
+		/>
+	</SiteHeader>
+
+	<TocBar items={toc} />
+
+	<div
+		class="docs"
+		data-variant={variant}
+		data-aside={hasAside ? "true" : "false"}
+	>
+		<div class="docs__rail">
+			<SidebarNav sections={sections} activeId={activeId} />
+		</div>
+
+		<main class="docs__main">
+			<slot />
+		</main>
+
+		{
+			hasAside && (
+				<aside class="docs__aside">
+					<Toc
+						items={toc}
+						label={tocLabel}
+						editUrl={editUrl}
+						issueUrl={issueUrl}
+					>
+						<slot name="aside" />
+					</Toc>
+				</aside>
+			)
+		}
+	</div>
+</BaseLayout>
+
+<style>
+	.docs {
+		position: relative;
+		display: grid;
+		grid-template-columns: 264px minmax(0, 1fr) 232px;
+		gap: 48px;
+		padding: 0 var(--gutter-docs);
+	}
+
+	.docs[data-aside="false"] {
+		grid-template-columns: 264px minmax(0, 1fr);
+	}
+
+	/* Everything sits above the wash; nothing needs to clip it. */
+	.docs__rail,
+	.docs__main,
+	.docs__aside {
+		position: relative;
+		z-index: 1;
+	}
+
+	.docs__main {
+		padding: 40px 0 72px;
+		max-width: 720px;
+		min-width: 0;
+	}
+
+	.docs[data-variant="overview"] .docs__main {
+		padding: 56px 0 80px;
+		max-width: 860px;
+	}
+
+	.docs__aside {
+		padding: 40px 0 72px;
+	}
+
+	@media (max-width: 800px) {
+		.docs,
+		.docs[data-aside="false"] {
+			grid-template-columns: minmax(0, 1fr);
+			gap: 0;
+			padding: 0 var(--gutter-mobile);
+		}
+
+		/* The rail moves into the mobile menu, where the header renders it. */
+		.docs__rail {
+			display: none;
+		}
+
+		.docs__main,
+		.docs[data-variant="overview"] .docs__main {
+			padding: 26px 0 48px;
+			max-width: none;
+		}
+
+		.docs__aside {
+			padding: 0 0 48px;
+		}
+
+		/*
+		 * An anchored heading has to clear the sticky header *and* the 40px
+		 * "on this page" bar sitting under it — `prose.css` only knows about
+		 * the desktop header.
+		 */
+		.docs :global(h2[id]),
+		.docs :global(h3[id]),
+		.docs :global(h4[id]) {
+			scroll-margin-top: calc(var(--header-height-mobile) + 40px + 12px);
+		}
+	}
+</style>
+
+<script>
+	/*
+	 * The scroll spy behind both on-this-page lists.
+	 *
+	 * One observer, two consumers: the rail's links and the mobile bar's links
+	 * carry the same `data-toc-link`, and the bar's summary shows whichever
+	 * heading is current. A heading is "current" while it sits in the band
+	 * between the sticky header and the lower third of the viewport; when the
+	 * band is empty — a long section with its heading scrolled off — the last
+	 * answer stands rather than flickering to none.
+	 */
+	let links = Array.from(
+		document.querySelectorAll<HTMLAnchorElement>("[data-toc-link]"),
+	)
+
+	if (links.length > 0) {
+		let label = document.querySelector<HTMLElement>("[data-toc-current]")
+		let order: string[] = []
+
+		for (let link of links) {
+			let slug = link.dataset.tocLink
+
+			if (slug !== undefined && !order.includes(slug)) {
+				order.push(slug)
+			}
+		}
+
+		let active: string | undefined
+
+		let setActive = (slug: string) => {
+			if (slug === active) {
+				return
+			}
+
+			active = slug
+
+			for (let link of links) {
+				link.classList.toggle("is-active", link.dataset.tocLink === slug)
+			}
+
+			if (label !== null) {
+				let match = links.find((link) => link.dataset.tocLink === slug)
+				label.textContent = match?.textContent?.trim() ?? label.textContent
+			}
+		}
+
+		let visible = new Set<string>()
+
+		let observer = new IntersectionObserver(
+			(entries) => {
+				for (let entry of entries) {
+					if (entry.isIntersecting) {
+						visible.add(entry.target.id)
+					} else {
+						visible.delete(entry.target.id)
+					}
+				}
+
+				let next = order.find((slug) => visible.has(slug))
+
+				if (next !== undefined) {
+					setActive(next)
+				}
+			},
+			{ rootMargin: "-96px 0px -62% 0px", threshold: 0 },
+		)
+
+		for (let slug of order) {
+			let heading = document.getElementById(slug)
+
+			if (heading !== null) {
+				observer.observe(heading)
+			}
+		}
+
+		let first = order[0]
+
+		if (first !== undefined) {
+			setActive(first)
+		}
+
+		// The bar is a `<details>`; following a link inside it has to shut it,
+		// or the panel covers the heading it just scrolled to.
+		document.addEventListener("click", (event) => {
+			let link = (event.target as HTMLElement | null)?.closest<HTMLElement>(
+				"[data-toc-link]",
+			)
+
+			if (link != null) {
+				link.closest("details")?.removeAttribute("open")
+
+				let slug = link.dataset.tocLink
+
+				if (slug !== undefined) {
+					setActive(slug)
+				}
+			}
+		})
+	}
+</script>
