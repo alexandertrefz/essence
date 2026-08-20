@@ -3053,13 +3053,7 @@ export function enrichConstantDeclarationStatement(
 
 	declareVariableInScope(name, declaredType ?? value.type, scope, true)
 
-	// NOTE: Only the top level Scope carries the map, so this records a Module's
-	// own Constants and nothing inside a body. A redeclaration overwrites, the
-	// way `declareVariableInScope` overwrites the Type — the two answers about
-	// one name are kept in step, and the Module is already reporting.
-	if (scope.constantValues !== undefined) {
-		scope.constantValues[name.content] = value
-	}
+	recordConstantValue(name.content, value, scope)
 
 	return {
 		nodeType: "ConstantDeclarationStatement",
@@ -3073,6 +3067,24 @@ export function enrichConstantDeclarationStatement(
 		type: value.type,
 		declaredType,
 		documentation: node.documentation,
+	}
+}
+
+// NOTE: What a Constant was given, kept beside its Type so that a Case payload
+// default may name it — see `Scope.constantValues`, which only a Program's top
+// level Scope carries, so this records a Module's own Constants and nothing
+// inside a body.
+//
+// A redeclaration overwrites, the way `declareVariableInScope` overwrites the
+// Type: the two answers about one name are kept in step, and the Module is
+// already reporting.
+function recordConstantValue(
+	name: string,
+	value: common.typed.ExpressionNode,
+	scope: enricher.Scope,
+): void {
+	if (scope.constantValues !== undefined) {
+		scope.constantValues[name] = value
 	}
 }
 
@@ -3169,6 +3181,8 @@ function enrichPatternDeclarationStatement(
 		synthesized: "base",
 	}
 
+	recordConstantValue(baseName, value, scope)
+
 	return [
 		base,
 		...declarePatternBindings(
@@ -3212,6 +3226,22 @@ function declarePatternBindings(
 			isConstant,
 		)
 
+		let value = memberPathLookup(
+			baseName,
+			subjectType,
+			binding,
+			type,
+			pattern.position,
+		)
+
+		// NOTE: A binding is a Constant an author could have written, so it is
+		// recorded like one — a Lookup is no literal and a payload default
+		// naming one is refused either way, but refused for what it IS rather
+		// than for a name this Module supposedly does not declare.
+		if (isConstant) {
+			recordConstantValue(binding.name.content, value, scope)
+		}
+
 		return {
 			nodeType: isConstant
 				? "ConstantDeclarationStatement"
@@ -3222,13 +3252,7 @@ function declarePatternBindings(
 				position: binding.name.position,
 				type,
 			},
-			value: memberPathLookup(
-				baseName,
-				subjectType,
-				binding,
-				type,
-				pattern.position,
-			),
+			value,
 			position: binding.name.position,
 			headPosition: binding.name.position,
 			declaredType,
@@ -4579,7 +4603,7 @@ function reportCaseDefaultConstantNotALiteral(
 					offending.position,
 					"this is worked out rather than written down",
 				),
-				...declarationLabel(name, declaring),
+				...declarationLabel(name, declaring, offending.position),
 			],
 			notes: [CASE_DEFAULT_NOTE],
 			helps: [
@@ -4590,16 +4614,29 @@ function reportCaseDefaultConstantNotALiteral(
 }
 
 // NOTE: Left out where the name was declared by the Compiler rather than in
-// Essence — a builtin has no source to point at.
+// Essence — a builtin has no source to point at — and where the declaration
+// stands exactly where a label already does. A Pattern binding is the one that
+// does: the value it reads is a Lookup the Compiler wrote, standing at the span
+// of the name it binds.
 function declarationLabel(
 	name: string,
 	declaring: enricher.Scope | null,
+	taken?: common.Position,
 ): Array<common.DiagnosticLabel> {
 	let position = declaring?.declarations[name]
 
-	return position === undefined
-		? []
-		: [secondary(position, `'${name}' is declared here`)]
+	if (
+		position === undefined ||
+		(taken !== undefined &&
+			position.start.line === taken.start.line &&
+			position.start.column === taken.start.column &&
+			position.end.line === taken.end.line &&
+			position.end.column === taken.end.column)
+	) {
+		return []
+	}
+
+	return [secondary(position, `'${name}' is declared here`)]
 }
 
 // NOTE: The condition is enriched BEFORE the branch Scopes exist, which is the
