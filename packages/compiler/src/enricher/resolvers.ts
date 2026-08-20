@@ -32,6 +32,7 @@ import {
 	type NamespaceTarget,
 	parameterInternalName,
 	recordDefaultMembers,
+	recordDefaultNesting,
 	refinementWithTypeArguments,
 	typeContainsError,
 	typeMentionsGeneric,
@@ -474,6 +475,11 @@ export function resolveChoiceDeclarationStatementType(
 						{ type: "Record", members },
 						choiceCase.defaultValue,
 					) ?? [],
+				nesting:
+					recordDefaultNesting(
+						{ type: "Record", members },
+						choiceCase.defaultValue,
+					) ?? {},
 				values: null,
 			},
 		}
@@ -5405,6 +5411,9 @@ function resolveParameterTypes(
 	return definition.parameters.map((parameter, index) => {
 		let type = resolveDeclaredType(parameter.type, scope)
 		let defaultMembers = recordDefaultMembers(type, parameter.defaultValue)
+		// NOTE: Left off entirely where nothing nests, so a signature whose
+		// default reaches into nothing stays structurally the Type it was.
+		let defaultNesting = recordDefaultNesting(type, parameter.defaultValue)
 		// NOTE: A PARTIAL Record default fills in some of its Parameter's
 		// members and leaves the rest to every caller, so the Argument is still
 		// required — which is exactly `hasDefault` being unset, and is why
@@ -5428,6 +5437,10 @@ function resolveParameterTypes(
 				? {}
 				: { hasDefault: true as const }),
 			...(defaultMembers === null ? {} : { defaultMembers }),
+			...(defaultNesting === null ||
+			Object.keys(defaultNesting).length === 0
+				? {}
+				: { defaultNesting }),
 		}
 	})
 }

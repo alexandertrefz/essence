@@ -348,11 +348,12 @@ function withoutParameterDefaults(type: common.Type): common.Type {
 	}
 }
 
-// NOTE: Both keys go, and for one reason: a Function taken as a VALUE drops its
-// defaults, so nothing a default was going to fill in is filled in any more —
-// neither a whole Argument nor a single member of one. A partial default leaves
-// `hasDefault` unset and `defaultMembers` set, which is exactly why the second
-// key can not ride along on the first's `some`.
+// NOTE: Every default key goes, and for one reason: a Function taken as a VALUE
+// drops its defaults, so nothing a default was going to fill in is filled in any
+// more — neither a whole Argument nor a single member of one, and nothing a path
+// key could have merged into. A partial default leaves `hasDefault` unset and
+// `defaultMembers` set, which is exactly why the other keys can not ride along
+// on the first's `some`.
 function requiredParameters(
 	parameters: Array<common.Parameter>,
 ): Array<common.Parameter> {
@@ -367,7 +368,8 @@ function requiredParameters(
 
 	return parameters.map(
 		// oxlint-disable-next-line eslint/no-unused-vars -- the keys being dropped
-		({ hasDefault, defaultMembers, ...parameter }) => parameter,
+		({ hasDefault, defaultMembers, defaultNesting, ...parameter }) =>
+			parameter,
 	)
 }
 

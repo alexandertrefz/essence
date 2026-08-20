@@ -2334,6 +2334,97 @@ export function recordDefaultMembers(
 	return declared.filter((name) => Object.hasOwn(written, name)).sort()
 }
 
+// NOTE: The Record Literal a written member holds, whichever of the two shapes
+// this walk was handed. A TYPED member IS its value and carries `nodeType`; a
+// Parser member is a Node of its own that hangs its value off `value`. One
+// discriminator, so the Resolver can ask this of the written AST and the
+// Simplifier of the typed one and neither needs a walk of its own.
+function writtenMemberValue(
+	member: unknown,
+): { nodeType: string; members?: Record<string, unknown> } | null {
+	if (typeof member !== "object" || member === null) {
+		return null
+	}
+
+	let value =
+		"nodeType" in member ? member : (member as { value?: unknown }).value
+
+	if (typeof value !== "object" || value === null || !("nodeType" in value)) {
+		return null
+	}
+
+	return value as { nodeType: string; members?: Record<string, unknown> }
+}
+
+// NOTE: The members a Record default writes as a Record Literal of their own,
+// and what THOSE write, recursively — `Parameter.defaultNesting`, and the same
+// answer for a Case payload's default. A member listed here is one a caller may
+// reach into with a path key: the callee rebuilds it member by member out of
+// the Argument and the default, so `server.port = 1` merges where a whole
+// `server = …` replaces.
+//
+// A member the default writes as anything ELSE is a value the callee takes or
+// leaves whole. There is no way to take an expression apart without evaluating
+// it — which is the very rule a non-literal default is hoisted by — so a path
+// key into one would quietly replace the whole member, and it is refused
+// instead.
+//
+// A nested literal has to write EVERY member its declared Type names, and one
+// that does not is left out: only the TOP level of a default may be partial,
+// so a nested one that falls short is a `default-type-mismatch` somebody has
+// already been told about, and half a Record is not a Record to merge into.
+//
+// Read off what the default WRITES, over the same two fields and for the same
+// reason `recordDefaultMembers` is.
+export function recordDefaultNesting(
+	type: common.Type,
+	defaultValue: {
+		nodeType: string
+		members?: Record<string, unknown>
+	} | null,
+): common.DefaultNesting | null {
+	if (
+		defaultValue === null ||
+		type.type !== "Record" ||
+		defaultValue.nodeType !== "RecordValue" ||
+		defaultValue.members === undefined
+	) {
+		return null
+	}
+
+	let written = defaultValue.members
+	// NOTE: A null prototype, because these are the SOURCE's member names — a
+	// member called 'toString' would otherwise be looked up on
+	// Object.prototype.
+	let nesting: Record<string, common.DefaultNesting> = Object.create(null)
+
+	for (let [name, memberType] of Object.entries(type.members)) {
+		if (memberType.type !== "Record" || !Object.hasOwn(written, name)) {
+			continue
+		}
+
+		let value = writtenMemberValue(written[name])
+
+		if (value === null || value.nodeType !== "RecordValue") {
+			continue
+		}
+
+		let members = value.members ?? {}
+
+		if (
+			!Object.keys(memberType.members).every((member) =>
+				Object.hasOwn(members, member),
+			)
+		) {
+			continue
+		}
+
+		nesting[name] = recordDefaultNesting(memberType, value) ?? {}
+	}
+
+	return nesting
+}
+
 // NOTE: The subsumption order Union building dedupes by — whether `member`
 // says nothing `existing` does not already cover. Assignability alone can not
 // answer that: the Unknown item Type an empty List Literal carries is a
