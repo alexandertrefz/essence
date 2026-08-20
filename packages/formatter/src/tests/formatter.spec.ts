@@ -67,7 +67,7 @@ const REFUSED = new Set([
 	"diagnostics/MemberPathSyntax.es",
 	"diagnostics/RecordShorthand.es",
 	"diagnostics/PathKeySyntax.es",
-	"diagnostics/Tests.es",
+	"diagnostics/TestsSyntax.es",
 ])
 
 describe("formatter", () => {

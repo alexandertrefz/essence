@@ -1,47 +1,72 @@
 § This file does not compile — on purpose.
 §
-§ It writes the tests forms everywhere they do not belong, so that the
-§ Parser's report about them can be read end to end in one run:
+§ It writes a tests section whose items are all wrong in one way each, so that
+§ the report about a test's Modifiers and its name can be read end to end.
 §
-§     bun packages/cli/bin/esc check packages/fixtures/files/diagnostics/Tests.es
+§ A tests section is only ever enriched by a compile that ASKS for it, so
+§ `esc check` of this file reports nothing at all — a build drops the block.
+§ What reads it is `diagnosticShowcase.spec.ts`, which compiles every showcase
+§ file the way `essence test` does.
+§
+§ Everything here is the Enricher's. What a tests section may be spelled like
+§ is `TestsSyntax.es`, whose Parser errors stop it long before this stage; what
+§ an assertion may assert is `Assertions.es`, whose Diagnostic is the
+§ Validator's and only runs where enrichment reported nothing.
 §
 § Keep it broken. If a change makes this compile, the Diagnostic it was
 § showcasing no longer has a home.
 
 implementation {
 	constant lions = { team = "Lions", points = 0 }
+}
 
-	§ test-outside-tests — a test and a suite are items of the tests section
-	§ and of the suites nested in it. The whole item is read before it is
-	§ refused, so the Diagnostic is about the item rather than about the first
-	§ Token inside a block nobody expected.
-	test "records a win as three points" {
+tests {
+
+	§ skipped-without-reason — a skip with no reason rots silently, and a skip
+	§ with one is a note the report repeats on every run.
+	test "renders a forfeit as 3–0" skipped {
+		expect lions.points::is(0)
+	}
+
+	§ contradictory-modifiers — one asks for this test to run and for the rest
+	§ not to; the other asks for it never to run.
+	test "records a win as three points" focused skipped "the redesign" {
 		expect lions.points::is(3)
 	}
 
+	§ unknown-modifier — the vocabulary is `focused`, `skipped` and `tagged`,
+	§ and a misspelling of one is answered with the one it meant.
+	test "reads the team" focussed {
+		expect lions.team::is("Lions")
+	}
+
+	§ malformed-modifier — a tag is a bare lower-case name, because that is
+	§ what `--tag` and `--skip-tag` match exactly.
+	test "sorts ten thousand rows" tagged "slow" {
+		expect lions.points::is(0)
+	}
+
+	§ duplicate-modifier — a Modifier says something about the whole test, so
+	§ writing it twice can only repeat it or contradict it.
+	test "reads the points" focused focused {
+		expect lions.points::is(0)
+	}
+
 	suite "Standing" {
-		test "has no rate before it has played" {
+
+		§ duplicate-test-name — what a test is called, together with the suites
+		§ around it, is what identifies it to a stored snapshot and to the
+		§ Editor.
+		test "counts a win" {
+			expect lions.points::is(0)
+		}
+
+		test "counts a win" {
 			expect lions.points::is(0)
 		}
 	}
-
-	§ expect-outside-test — an assertion records its result against the test
-	§ that is running, and here there is none.
-	expect lions.team::is("Lions")
-
-	require lions is { team } as standing
 }
 
 export {
 	lions
-}
-
-§ misplaced-tests-section — a Program reads top to bottom: what it imports,
-§ what it does, what it proves, what it exports. The block is kept where it
-§ stands all the same, so one Diagnostic about an order does not become a
-§ cascade about everything inside it.
-tests {
-	test "records a win as three points" {
-		expect lions.points::is(3)
-	}
 }

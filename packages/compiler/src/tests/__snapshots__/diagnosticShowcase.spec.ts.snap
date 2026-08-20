@@ -1,5 +1,38 @@
 // Bun Snapshot v1, https://bun.sh/docs/test/snapshots
 
+exports[`Diagnostic Showcase Assertions.es should render the same report every time 1`] = `
+"[expect-not-boolean]
+Error: An assertion has to be a Boolean
+    ╭─┤ Assertions.es:29:10 │
+    │
+ 29 │        expect lions
+    │               ──┬──  
+    │                 ╰──── this is a { team: String, points: Integer }
+    │ 
+    │ Help 1: Ask a question of it: '::is(…)', '::isGreaterThan(…)', '::hasItems()'.
+    │ Help 2: Or take it apart instead: 'require #Value(item) = value'.
+    │ 
+    │ Note: Essence has no truthiness — an assertion is a Boolean Expression, and the standard library's own Methods are the vocabulary it is written in.
+────╯
+
+[expect-not-boolean]
+Error: An assertion has to be a Boolean
+    ╭─┤ Assertions.es:35:11 │
+    │
+ 35 │        require lions.team
+    │                ─────┬────  
+    │                     ╰────── this is a String
+    │ 
+    │ Help 1: Ask a question of it: '::is(…)', '::isGreaterThan(…)', '::hasItems()'.
+    │ Help 2: Or take it apart instead: 'require #Value(item) = value'.
+    │ 
+    │ Note: Essence has no truthiness — an assertion is a Boolean Expression, and the standard library's own Methods are the vocabulary it is written in.
+────╯
+
+─── 2 errors
+"
+`;
+
 exports[`Diagnostic Showcase CaseDefaults.es should render the same report every time 1`] = `
 "[case-default-not-a-literal]
 Error: The default for Case '#Get' is not a Record Literal
@@ -1493,11 +1526,102 @@ Error: This block is never closed
 `;
 
 exports[`Diagnostic Showcase Tests.es should render the same report every time 1`] = `
+"[skipped-without-reason]
+Error: This test is skipped for no stated reason
+    ╭─┤ Tests.es:27:34 │
+    │
+ 27 │     test "renders a forfeit as 3–0" skipped {
+    │                                     ───┬───  
+    │                                        ╰───── this needs a reason
+    │ 
+    │ Help: Write it as a String: skipped "waiting on the Table redesign".
+    │ 
+    │ Note: A skip with no reason rots silently. A skip with one is a note the report repeats on every run, until somebody acts on it.
+────╯
+
+[contradictory-modifiers]
+Error: This test is skipped and focused
+    ╭─┤ Tests.es:33:39 │
+    │
+ 33 │     test "records a win as three points" focused skipped "the redesign" {
+    │                                          ───┬─── ───────────┬──────────  
+    │                                             ╰───────────────│──────────── this asks for it to run, and alone
+    │                                                             │            
+    │                                                             ╰──────────── this asks for it never to run
+    │ 
+    │ Help: Remove whichever one you did not mean.
+    │ 
+    │ Note: Which of the two was meant is not something the source says, and guessing at it is how a test nobody watches stops running.
+────╯
+
+[unknown-modifier]
+Error: There is no Modifier 'focussed'
+    ╭─┤ Tests.es:39:24 │
+    │
+ 39 │     test "reads the team" focussed {
+    │                           ────┬───  
+    │                               ╰───── no such Modifier
+    │ 
+    │ Help: Did you mean 'focused'?
+    │ 
+    │ Note: A test takes 'focused', 'skipped', 'tagged'.
+────╯
+
+[malformed-modifier]
+Error: 'tagged' takes a bare name
+    ╭─┤ Tests.es:45:40 │
+    │
+ 45 │     test "sorts ten thousand rows" tagged "slow" {
+    │                                           ───┬──  
+    │                                              ╰──── this is not a bare name
+    │ 
+    │ Help: Write a bare name here.
+    │ 
+    │ Note: A tag is written the way it is typed on a command line — 'essence test --tag slow' — so it is a name rather than a value.
+────╯
+
+[duplicate-modifier]
+Error: This test is 'focused' twice
+    ╭─┤ Tests.es:51:34 │
+    │
+ 51 │     test "reads the points" focused focused {
+    │                             ───┬─── ───┬───  
+    │                                ╰───────│───── already written here
+    │                                        │     
+    │                                        ╰───── written again here
+    │ 
+    │ Help: Remove one of them.
+    │ 
+    │ Note: A Modifier says something about the whole test, so saying it twice can only ever repeat it or contradict it.
+────╯
+
+[duplicate-test-name]
+Error: There is already a test called 'counts a win' here
+    ╭─┤ Tests.es:64:8 │
+    │
+ 60 │        test "counts a win" {
+    │             ───────┬──────  
+    │                    ╰──────── the other test is here
+    │ 
+ 64 │        test "counts a win" {
+    │             ───────┬──────  
+    │                    ╰──────── this name is taken
+    │ 
+    │ Help: Say what each of them proves, so that a report names the one that failed.
+    │ 
+    │ Note: What a test is called, together with the suites around it, is what identifies it — to a snapshot, to a stored counterexample, and to the Editor.
+────╯
+
+─── 6 errors
+"
+`;
+
+exports[`Diagnostic Showcase TestsSyntax.es should render the same report every time 1`] = `
 "[test-outside-tests]
 Error: A 'test' may only be written in the 'tests { … }' section
-    ╭─┤ Tests.es:18:2 │
+    ╭─┤ TestsSyntax.es:19:2 │
     │
- 18 │     test "records a win as three points" {
+ 19 │     test "records a win as three points" {
     │     ──┬─  
     │       ╰─── this 'test' stands outside every tests section
     │ 
@@ -1508,9 +1632,9 @@ Error: A 'test' may only be written in the 'tests { … }' section
 
 [test-outside-tests]
 Error: A 'suite' may only be written in the 'tests { … }' section
-    ╭─┤ Tests.es:22:2 │
+    ╭─┤ TestsSyntax.es:23:2 │
     │
- 22 │     suite "Standing" {
+ 23 │     suite "Standing" {
     │     ──┬──  
     │       ╰──── this 'suite' stands outside every tests section
     │ 
@@ -1521,9 +1645,9 @@ Error: A 'suite' may only be written in the 'tests { … }' section
 
 [expect-outside-test]
 Error: 'expect' may only be written in a test's body
-    ╭─┤ Tests.es:30:2 │
+    ╭─┤ TestsSyntax.es:31:2 │
     │
- 30 │     expect lions.team::is("Lions")
+ 31 │     expect lions.team::is("Lions")
     │     ───┬──  
     │        ╰──── this assertion belongs to no test
     │ 
@@ -1534,9 +1658,9 @@ Error: 'expect' may only be written in a test's body
 
 [expect-outside-test]
 Error: 'require' may only be written in a test's body
-    ╭─┤ Tests.es:32:2 │
+    ╭─┤ TestsSyntax.es:33:2 │
     │
- 32 │     require lions is { team } as standing
+ 33 │     require { team } as standing = lions
     │     ───┬───  
     │        ╰───── this assertion belongs to no test
     │ 
@@ -1545,17 +1669,71 @@ Error: 'require' may only be written in a test's body
     │ Note: An assertion records its result against the test that is running, so it is a Statement of a test's own block and of the blocks nested in it — never of a Function literal written there.
 ────╯
 
+[matcher-on-expect]
+Error: An 'expect' can not take a value apart
+    ╭─┤ TestsSyntax.es:54:10 │
+    │
+ 54 │        expect { team } = lions
+    │               ────┬───  
+    │                   ╰───── this would introduce a name
+    │ 
+    │ Help 1: Take the value apart with 'require': 'require #Value(item) = value'.
+    │ Help 2: Or compare instead: 'expect value::is(…)'.
+    │ 
+    │ Note: An 'expect' records its result and the test carries on, so a name it introduced would stand below a line that may never have run. A 'require' ends the test where it stands, which is what makes the names it introduces safe to read.
+────╯
+
+[matcher-after-value]
+Error: An assertion has no 'is' form
+    ╭─┤ TestsSyntax.es:60:17 │
+    │
+ 60 │        require lions is { team, points }
+    │                      ─────────┬─────────  
+    │                               ╰─────────── this Matcher stands after the value
+    │ 
+    │ Help 1: Take the value apart with 'require': 'require #Value(item) = value'.
+    │ Help 2: Or compare instead: 'expect value::is(…)'.
+    │ 
+    │ Note: A name is introduced left of '=', in a Parameter, or in a Handler head — never on the right of anything.
+────╯
+
+[wildcard-in-require]
+Error: This 'require' asks nothing of the value
+    ╭─┤ TestsSyntax.es:64:11 │
+    │
+ 64 │        require _ = lions
+    │                ▲  
+    │                ╰── '_' holds for every value
+    │ 
+    │ Help: Name the shape the value has to have — a Case, a Type, a Pattern — or drop the line.
+    │ 
+    │ Note: A Matcher left of '=' both asks what the value has to be and names its parts, and '_' does neither: every value answers it, and it binds nothing.
+────╯
+
+[literal-in-require]
+Error: A written value has no parts to name
+    ╭─┤ TestsSyntax.es:68:11 │
+    │
+ 68 │        require 3 = lions.points
+    │                ▲  
+    │                ╰── this is a value, not a shape
+    │ 
+    │ Help: Compare instead: 'require x::is(3)'.
+    │ 
+    │ Note: 'require MATCHER = EXPR' takes a value apart by its shape — a Case, a Type, a Pattern. A written value is not a shape: what it asks is whether the two are equal, and that is what 'Equatable::is' answers.
+────╯
+
 [misplaced-tests-section]
 Error: The 'tests { … }' block belongs above the 'export { … }' block
-    ╭─┤ Tests.es:43:1 │
+    ╭─┤ TestsSyntax.es:44:1 │
     │
- 11 │ ╭─▶ implementation {
+ 12 │ ╭─▶ implementation {
     ┆ ┆   
- 33 │ ├─▶ }
+ 34 │ ├─▶ }
     │ │       
     │ ╰─────── the implementation block is here
     │ 
- 43 │     tests {
+ 44 │     tests {
     │     ──┬──  
     │       ╰──── this block is written below what the Program ends with
     │ 
@@ -1564,7 +1742,7 @@ Error: The 'tests { … }' block belongs above the 'export { … }' block
     │ Note: A Program reads top to bottom: what it imports, what it does, what it proves, what it exports.
 ────╯
 
-─── 5 errors
+─── 9 errors
 "
 `;
 
