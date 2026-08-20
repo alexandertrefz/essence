@@ -2,6 +2,7 @@ import {
 	caseDefaults,
 	filterMostSpecificByTarget,
 	flattenUnionMembers,
+	isMergedLevel,
 	parameterDefaults,
 } from "@essence-lang/compiler/helpers"
 import {
@@ -13,7 +14,11 @@ import {
 import type { common, parser } from "@essence-lang/interfaces"
 
 import type { DocumentAnalysis } from "./analyse"
-import { type ArgumentContext, findArgumentContext } from "./argumentContext"
+import {
+	type ArgumentContext,
+	findArgumentContext,
+	pairedParameters,
+} from "./argumentContext"
 import { type ImportEdit, insertImportEdit } from "./autoImport"
 import {
 	type CallSnippet,
@@ -563,6 +568,12 @@ function findProbeReceiverInNode(
 			return findProbeReceiverInNode(node.expression)
 		case "ProtocolDeclarationStatement":
 			return null
+		// NOTE: No path-key reading for a Method's Arguments, for the reason
+		// `argumentContext` reads none of their Record members either: the
+		// probe truncates the call at the cursor, and a Method resolved off
+		// half its Arguments has no signature to name a Parameter's Type with.
+		// A free Function's callee is an Expression whose Type stands whatever
+		// follows it, which is why the one below can be asked at all.
 		case "MethodInvocation":
 			return (
 				findProbeReceiverInNode(node.base) ??
@@ -570,6 +581,12 @@ function findProbeReceiverInNode(
 			)
 		case "FunctionInvocation":
 			return (
+				findProbeKeyInArguments(
+					node.arguments,
+					node.name.type.type === "Function"
+						? node.name.type.parameterTypes
+						: null,
+				) ??
 				findProbeReceiverInNode(node.name) ??
 				findProbeReceiverInArguments(node.arguments)
 			)
@@ -675,9 +692,21 @@ function findProbeReceiverInNode(
 				findProbeReceiver(node.value.body)
 			)
 		case "CaseValue":
-			return node.value === null
-				? null
-				: findProbeReceiverInNode(node.value)
+			if (node.value === null) {
+				return null
+			}
+
+			// NOTE: A payload is merged into the Case's own default, so a path
+			// key inside one reaches into the Case's Record exactly as an
+			// Argument's reaches into the Parameter's it was written for.
+			return (
+				(node.type.type === "Case"
+					? findProbeKeyInMerged(node.value, {
+							type: "Record",
+							members: node.type.members,
+						})
+					: null) ?? findProbeReceiverInNode(node.value)
+			)
 		case "ChoiceDeclarationStatement": {
 			// NOTE: A `.` inside a Case payload's default probes the same way
 			// one inside a Parameter's does — the member list of whatever the
@@ -701,6 +730,78 @@ function findProbeReceiverInNode(
 		case "BooleanValue":
 			return null
 	}
+}
+
+// NOTE: The Record a path key inside a merged Literal reaches into — the answer
+// `{ config with server.<cursor> }` reads straight off the value being updated,
+// asked of an Argument or a payload, which have no such value written beside
+// them. What they merge into is the Parameter's Type, or the Case's, and each
+// level of the path reaches one member further into it.
+//
+// Only levels a path key BUILT are descended: a member written whole is a
+// replacement, and the Literal under it writes its members from nothing.
+function findProbeKeyInMerged(
+	value: common.typed.ExpressionNode,
+	into: common.Type,
+): common.Type | null {
+	if (value.nodeType !== "RecordValue" || into.type !== "Record") {
+		return null
+	}
+
+	for (let [name, member] of Object.entries(value.members)) {
+		// NOTE: `Object.hasOwn` before the read — a member named after one of
+		// `Object.prototype`'s would otherwise find a JavaScript function.
+		if (!isMergedLevel(member) || !Object.hasOwn(into.members, name)) {
+			continue
+		}
+
+		let declaredType = into.members[name]!
+
+		if (member.memberPositions?.[probeKeyName] !== undefined) {
+			return declaredType
+		}
+
+		let found = findProbeKeyInMerged(member, declaredType)
+
+		if (found !== null) {
+			return found
+		}
+	}
+
+	return null
+}
+
+// NOTE: The same, for the Arguments of one call — each Argument against the
+// Parameter it was written for, which is a question about LABELS once anything
+// may be left out. `pairedParameters` is the walk Completion already reads a
+// Record Literal's expected members through, so a path key inside one is held
+// to the very Parameter its siblings are.
+function findProbeKeyInArguments(
+	nodeArguments: Array<common.typed.ArgumentNode>,
+	parameterTypes: common.BaseFunction["parameterTypes"] | null,
+): common.Type | null {
+	if (parameterTypes === null) {
+		return null
+	}
+
+	let parameterForArgument = pairedParameters(nodeArguments, parameterTypes)
+
+	for (let [argumentIndex, argument] of nodeArguments.entries()) {
+		let parameter =
+			parameterTypes[parameterForArgument[argumentIndex] ?? argumentIndex]
+
+		if (parameter === undefined || parameter.type.type === "GenericUse") {
+			continue
+		}
+
+		let found = findProbeKeyInMerged(argument.value, parameter.type)
+
+		if (found !== null) {
+			return found
+		}
+	}
+
+	return null
 }
 
 function findProbeReceiverInArguments(

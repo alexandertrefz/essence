@@ -125,6 +125,91 @@ describe("Completion", () => {
 				"tls",
 			])
 		})
+
+		// NOTE: An Argument and a Case payload are merged into a DEFAULT, so
+		// what a path key inside one reaches into is the Parameter's Record or
+		// the Case's — there is no value written beside it to read them off.
+		describe("in a Literal merged into a default", () => {
+			const connect = [
+				"implementation {",
+				"\ttype Tls = { enabled: Boolean }",
+				"\ttype Server = { host: String, port: Integer, tls: Tls }",
+				"\ttype Config = { name: String, server: Server }",
+				"",
+				"\t§§ Answers the host.",
+				"\t§§",
+				"\t§§ @param using — how to connect.",
+				"\t§§ @returns — the host.",
+				"\tfunction connect(",
+				"\t\tusing config: Config = {",
+				'\t\t\tname = "api",',
+				'\t\t\tserver = { host = "h", port = 80, tls = { enabled = false } },',
+				"\t\t},",
+				"\t) -> String {",
+				"\t\t<- config.server.host",
+				"\t}",
+				"",
+			]
+
+			it("should list the members one step into an Argument", () => {
+				let source = [
+					...connect,
+					"\tconstant deep = connect(using { server. })",
+					"}",
+				].join("\n")
+
+				expect(labelsOf(source, { line: 19, column: 41 })).toEqual([
+					"host",
+					"port",
+					"tls",
+				])
+			})
+
+			it("should list the members two steps in", () => {
+				let source = [
+					...connect,
+					"\tconstant deep = connect(using { server.tls. })",
+					"}",
+				].join("\n")
+
+				expect(labelsOf(source, { line: 19, column: 45 })).toEqual([
+					"enabled",
+				])
+			})
+
+			it("should list the members inside a braced descend", () => {
+				let source = [
+					...connect,
+					"\tconstant deep = connect(using { server.{ tls. } })",
+					"}",
+				].join("\n")
+
+				expect(labelsOf(source, { line: 19, column: 47 })).toEqual([
+					"enabled",
+				])
+			})
+
+			it("should list the members one step into a payload", () => {
+				let source = [
+					"implementation {",
+					"\ttype Limits = { calls: Integer, burst: Integer }",
+					"",
+					"\tchoice Fetch {",
+					"\t\tGet { url: String, limits: Limits } = {",
+					"\t\t\tlimits = { calls = 1, burst = 2 },",
+					"\t\t},",
+					"\t}",
+					"",
+					'\tconstant a: Fetch = #Get({ url = "/x", limits. })',
+					"}",
+				].join("\n")
+
+				expect(labelsOf(source, { line: 10, column: 48 })).toEqual([
+					"calls",
+					"burst",
+				])
+			})
+		})
 	})
 
 	describe("Record members", () => {

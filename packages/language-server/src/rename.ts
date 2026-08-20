@@ -6,6 +6,7 @@ import {
 } from "@essence-lang/compiler/enricher/builtins"
 import {
 	caseDefaults,
+	isMergedLevel,
 	memberExpression,
 	parameterDefaults,
 	parameterInternalName,
@@ -1884,6 +1885,52 @@ function registerPathKeySite(
 	})
 }
 
+// NOTE: The keys of a Literal that is MERGED into a default and wrote a path
+// key — an Argument or a Case payload. The same fact `registerPathKeySite`
+// carries for an update, for the same reason: a path's later steps are keys of
+// lists that exist nowhere in the written AST, so the lexical walk never reaches
+// them and `memberPositions` is the only record of where they were spelled.
+//
+// The shape is the level's OWN keys rather than the whole Record, which is what
+// a Literal merged into a default can say for itself: what the merge fills in is
+// decided by the Parameter the Argument was committed to, and the union-find
+// unions a subset with the shape that holds it — the very reading a partial
+// Argument's own key list is already resolved by.
+//
+// Asked of every typed Record, so it is answered by the one field it takes to
+// know: a level a path key built carries `merged`, and the Literal that holds
+// one carries the level.
+function registerMergedKeySite(
+	node: common.typed.RecordValueNode,
+	context: WalkContext,
+) {
+	let positions = node.memberPositions
+
+	if (
+		positions === undefined ||
+		(node.merged !== true &&
+			!Object.values(node.members).some(isMergedLevel))
+	) {
+		return
+	}
+
+	let members = Object.keys(positions)
+
+	if (members.length === 0) {
+		return
+	}
+
+	context.recordSites.push({
+		names: members,
+		declares: false,
+		members: members.map((name) => ({
+			name,
+			position: positions[name],
+			edits: null,
+		})),
+	})
+}
+
 // NOTE: What renaming the MEMBER writes at a Record Literal's member — the
 // mirror of a Pattern's `memberRenameEdits`, and needed for the same reason:
 // `{ width }` is `{ width = width }`, so the one Identifier is the member AND
@@ -2428,6 +2475,8 @@ function walkTypedNode(
 
 			return
 		case "RecordValue":
+			registerMergedKeySite(node, context)
+
 			for (let member of Object.values(node.members)) {
 				walkTypedNode(member, context)
 			}
