@@ -581,6 +581,11 @@ default that is not a Literal is hoisted by — so there is no level under
 `server` for a path to reach into. Write the member whole at the call, or write
 the default's `server` out as a Record Literal, member by member.
 
+A Case payload default that names a Constant reads the same way. Its value IS in
+hand there — it is baked into the Case Type — but what a path key may reach into
+is read off what the default WRITES, so a member filled from a name is filled in
+whole.
+
 A Function taken as a VALUE drops its defaults, so a path key in an Argument
 passed through one is refused for the first reason: nothing is filled in any
 more.
@@ -878,8 +883,8 @@ business; anything else about the payload is still this code.
 
 ### `case-default-not-a-literal`
 
-A Case payload's `= { … }` default is not a Record Literal, or one of its
-members is worked out rather than written down:
+A Case payload's `= { … }` default is not a Record Literal, or a value in it is
+neither written down nor a Constant of this Module holding one:
 
 ```essence
 choice Fetch {
@@ -891,12 +896,40 @@ choice Fetch {
 Where a Parameter's default is evaluated in the callee — one place, the Module
 that declares it — a payload default is spliced into every construction of its
 Case, and a construction may stand in a Module that never named the Choice at
-all. A default that read a name would read one that is not there.
+all. So nothing that had to be worked out THERE can travel with the Type: what
+the Case Type carries is DATA, and the default is turned into some at the
+declaration.
 
-So a payload default says what says itself: a Number, a String without holes, a
-Boolean, and the Lists, Records and Case values built out of those.
-`{ headers = [] }`, `{ retries = 0 }` and `{ at = #Empty }` are all defaults;
-`{ retries = fallback }` is not.
+A value is written down — a Number, a String without holes, a Boolean, and the
+Lists, Records and Case values built out of those — or it NAMES a Constant of
+the Module the Choice is declared in, which is read there, at the declaration,
+and baked into the Case Type as its value:
+
+```essence
+constant standardHeaders: List<Header> = []
+
+choice Fetch {
+	Get { url: String, headers: List<Header> } = { headers = standardHeaders },
+}
+```
+
+Following one Constant to the next follows one written value to another and is
+fine as far as it goes; what has to be written down is every LEAF. So a Constant
+whose value is worked out — `constant biggest = sizes::length()` — is refused,
+and its Diagnostic points at the value it stops at.
+
+A name that is no Constant of this Module is refused as well. A Variable holds
+whatever it was last assigned, and a payload default is read once; an imported
+Constant's value stays in the Module that wrote it, since a Type crosses an
+import edge and an Expression does not.
+
+The DEFAULT itself is spelled out even where every value in it is a name: which
+members it fills in is read off the ones it writes, so `= standardHeaders` for
+the payload as a whole is this code too.
+
+A Constant does not hoist, so one declared BELOW the Choice is not in reach
+where the default is read, and reports as `unknown-name` — the answer any
+Statement gets for a name written above its declaration.
 
 ### `case-default-on-generic-choice`
 
