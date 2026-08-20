@@ -41,6 +41,7 @@ import {
 	openPendingRefinementCopies,
 	pendingRefinementCopiesOf,
 	predicateConjunctKey,
+	recordDefaultNesting,
 	refinementWithTypeArguments,
 	resolveOverloadedMethodName,
 	second,
@@ -1585,6 +1586,125 @@ describe("Helpers", () => {
 			).toBe(true)
 
 			expect(context.bindings.get("T")).toEqual(integer)
+		})
+	})
+
+	describe("recordDefaultNesting", () => {
+		const integer: Type = { type: "Integer" }
+		const string: Type = { type: "String" }
+
+		const tls: RecordType = {
+			type: "Record",
+			members: { enabled: { type: "Boolean" } },
+		}
+
+		const server: RecordType = {
+			type: "Record",
+			members: { host: string, port: integer, tls },
+		}
+
+		const options: RecordType = {
+			type: "Record",
+			members: { retries: integer, server },
+		}
+
+		// NOTE: Written the way the Parser writes one — a member Node hanging
+		// its value off `value` — which is the shape the Resolver asks about.
+		function written(members: Record<string, unknown>) {
+			return {
+				nodeType: "RecordValue",
+				members: Object.fromEntries(
+					Object.entries(members).map(([name, value]) => [
+						name,
+						{ value },
+					]),
+				),
+			}
+		}
+
+		function literal(members: Record<string, unknown>) {
+			return { nodeType: "RecordValue", members }
+		}
+
+		const wholeServer = written({
+			host: literal({}),
+			port: literal({}),
+			tls: written({ enabled: literal({}) }),
+		})
+
+		it("answers nothing for a default that is not a Record Literal", () => {
+			expect(
+				recordDefaultNesting(options, { nodeType: "Identifier" }),
+			).toBe(null)
+			expect(recordDefaultNesting(options, null)).toBe(null)
+			expect(recordDefaultNesting(integer, written({}))).toBe(null)
+		})
+
+		it("names a member written as a whole Record Literal", () => {
+			expect(
+				recordDefaultNesting(
+					options,
+					written({ retries: literal({}), server: wholeServer }),
+				),
+			).toEqual({ server: { tls: {} } })
+		})
+
+		it("leaves out a member the default does not write", () => {
+			expect(
+				recordDefaultNesting(
+					options,
+					written({ retries: literal({}) }),
+				),
+			).toEqual({})
+		})
+
+		it("leaves out a member written as anything but a Literal", () => {
+			expect(
+				recordDefaultNesting(
+					options,
+					written({ server: { nodeType: "Identifier" } }),
+				),
+			).toEqual({})
+		})
+
+		// NOTE: Only the TOP level of a default may be partial, so a nested
+		// Literal that falls short is a Record nobody may merge into — the
+		// members it does not write would be missing from what the callee
+		// rebuilds.
+		it("leaves out a nested Literal that writes less than its Type", () => {
+			expect(
+				recordDefaultNesting(
+					options,
+					written({ server: written({ host: literal({}) }) }),
+				),
+			).toEqual({})
+		})
+
+		// NOTE: The typed Record Literal, whose members ARE their values — the
+		// shape the Simplifier asks about, which has to answer the same.
+		it("reads the typed Literal the Simplifier hands it", () => {
+			expect(
+				recordDefaultNesting(
+					options,
+					literal({
+						retries: literal({}),
+						server: literal({
+							host: literal({}),
+							port: literal({}),
+							tls: literal({ enabled: literal({}) }),
+						}),
+					}),
+				),
+			).toEqual({ server: { tls: {} } })
+		})
+
+		it("refuses a member named after one of Object.prototype's", () => {
+			expect(
+				recordDefaultNesting(
+					{ type: "Record", members: { toString: server } },
+					literal({}),
+				),
+			).toEqual({})
 		})
 	})
 

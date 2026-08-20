@@ -374,6 +374,10 @@ export type RecordType = {
 // over nothing, and evaluates to itself wherever it is written.
 export type CasePayloadDefault = {
 	members: ReadonlyArray<string>
+	// NOTE: The same answer `Parameter.defaultNesting` carries, for the same
+	// reason and through the same helper — a path key in a partial payload
+	// reaches into the members the default writes as Records of their own.
+	nesting: DefaultNesting
 	values: Record<string, typed.ExpressionNode> | null
 }
 
@@ -467,7 +471,23 @@ export type Parameter = {
 	// alone: the Argument is required, and the members it does not fill in have
 	// to be written into it.
 	defaultMembers?: ReadonlyArray<string>
+	// NOTE: The members a Record default writes as a Record Literal of their
+	// OWN — the ones a path key in a partial Argument may reach into, because
+	// the callee rebuilds them member by member and merges what it was handed
+	// into what the default fills in. Absent where nothing nests, for the same
+	// reason `hasDefault` is absent rather than false.
+	defaultNesting?: DefaultNesting
 }
+
+// NOTE: A tree of member NAMES. A member present in one is written as a Record
+// Literal by the default it describes, and its own tree says the same of ITS
+// members — so `{ server: { tls: {} } }` says a caller may write `server.port`
+// and `server.tls.enabled`, and nothing about how deep `tls` goes.
+//
+// Names, never Expressions, for the reason `Parameter.defaultMembers` gives:
+// a Type is compared, cached and serialized, and what a caller may reach into
+// is all a Type has to say about it.
+export type DefaultNesting = { readonly [member: string]: DefaultNesting }
 
 // NOTE: `documentation` is optional in the type, but every builtin Namespace
 // Method declared in `packages/standard-library/sources/*.es` does carry it — the completion gate in
