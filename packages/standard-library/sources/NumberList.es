@@ -290,7 +290,7 @@ declarations {
 			§§ @param on — the key read off each item
 			§§ @returns — the total.
 			(on key: (_: ItemType) -> Integer) -> Integer {
-				<- Number.sum(@::map(key))
+				<- @::map(key)::sum()
 			}
 
 			§§ Adds together the Rationals the key reads off the items.
@@ -298,7 +298,7 @@ declarations {
 			§§ @param on — the key read off each item
 			§§ @returns — the total.
 			(on key: (_: ItemType) -> Rational) -> Rational {
-				<- Number.sum(@::map(key))
+				<- @::map(key)::sum()
 			}
 
 			§§ Adds together the Numbers the key reads off the items.
@@ -310,7 +310,7 @@ declarations {
 			(
 				on key: (_: ItemType) -> Integer | Rational,
 			) -> Integer | Rational {
-				<- Number.sum(@::map(key))
+				<- @::map(key)::sum()
 			}
 		}
 
@@ -325,7 +325,7 @@ declarations {
 			(
 				on key: (_: ItemType) -> Integer | Rational,
 			) -> Optional<Rational> {
-				<- Number.average(@::map(key))
+				<- @::map(key)::average()
 			}
 
 			§§ The mean of what the key reads off the items, or the given fallback for the empty List.
