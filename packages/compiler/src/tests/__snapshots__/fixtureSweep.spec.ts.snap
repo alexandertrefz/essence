@@ -245,6 +245,16 @@ true
 4433
 "edge"
 "internal"
+"localhost:8443 api"
+"api.example.com:80 edge"
+Endpoint#Bound {
+    label = "public",
+    server = {
+        port = 8080,
+        host = "0.0.0.0",
+        tls = { enabled = true, authority = "letsencrypt" }
+    }
+}
 80
 false"
 `;
