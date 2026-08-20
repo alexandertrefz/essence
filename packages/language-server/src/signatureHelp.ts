@@ -340,6 +340,16 @@ function withOmittableMembers(
 	let sentence = `A call may leave ${members
 		.map((name) => `'${name}'`)
 		.join(", ")} out of this Record.`
+	let reaching = Object.keys(parameter?.defaultNesting ?? {})
+
+	// NOTE: And which of them a path key may reach INTO, which is the other
+	// half of the same fact: the default writes those out member by member, so
+	// `server.port = 1` merges into what it wrote rather than replacing it.
+	if (reaching.length > 0) {
+		sentence += ` It may reach into ${reaching
+			.map((name) => `'${name}'`)
+			.join(", ")} with a path key.`
+	}
 
 	return documentation === null ? sentence : `${documentation}\n\n${sentence}`
 }

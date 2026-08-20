@@ -169,7 +169,8 @@ as it always has.
 Optional members are not implicitly omittable: a default that means to fill one
 in writes `timeout = #Empty`.
 
-Hover, Signature Help and Completion all say which members a call may leave out.
+Hover, Signature Help and Completion all say which members a call may leave out,
+and which of them a path key may reach into.
 
 ### A Case payload's default
 
