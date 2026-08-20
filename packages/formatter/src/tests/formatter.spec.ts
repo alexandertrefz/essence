@@ -768,6 +768,65 @@ describe("formatter", () => {
 			expect(once.refusal).toBeNull()
 			expect(twice.text).toBe(once.text)
 		})
+
+		// NOTE: A path key is a KEY, printed by the same member list wherever
+		// one stands — so a Literal merged into a default prints one exactly as
+		// an update's key list does, with no arm of its own anywhere.
+		describe("in a Literal merged into a default", () => {
+			it("keeps a dotted key in an Argument dotted", () => {
+				roundTrips(
+					block("\tconstant a = connect(using { server.port = 1 })"),
+				)
+			})
+
+			it("keeps every step of a longer path", () => {
+				roundTrips(
+					block(
+						"\tconstant a = connect(using { server.tls.enabled = true })",
+					),
+				)
+			})
+
+			it("keeps a braced descend braced", () => {
+				roundTrips(
+					block(
+						'\tconstant a = connect(using { server.{ port = 1, host = "db" } })',
+					),
+				)
+			})
+
+			it("keeps a dotted key in a payload dotted", () => {
+				roundTrips(
+					block(
+						'\tconstant a = #Get({ url = "/x", limits.calls = 2 })',
+					),
+				)
+			})
+
+			it("breaks a long Argument one path to a line", () => {
+				roundTrips(
+					block(
+						"\tconstant wide = connect(using {",
+						"\t\tserver.aaaaaaaaaaaaaaaa = 1,",
+						"\t\tserver.bbbbbbbbbbbbbbbb = 2,",
+						"\t\tserver.cccccccccccccccc = 3,",
+						"\t\tserver.dddddddddddddddd = 4,",
+						"\t})",
+					),
+				)
+			})
+
+			it("is idempotent over a path key in an Argument", () => {
+				let source = block(
+					"\tconstant a = connect(using { retries = 9, server.port = 1 })",
+				)
+				let once = format(source)
+				let twice = format(once.text)
+
+				expect(once.refusal).toBeNull()
+				expect(twice.text).toBe(once.text)
+			})
+		})
 	})
 
 	describe("Member paths", () => {
