@@ -3482,3 +3482,195 @@ describe("A default written on a native signature", () => {
 		).toEqual([])
 	})
 })
+
+// NOTE: A path key in a Literal that is merged into a default reaches into a
+// member the merge REBUILDS, and the Enricher admits it wherever the position
+// merges at all. Whether the default reaches that far is a question about the
+// Parameter — or the Case — the Literal was committed to, which is settled here.
+describe("A path key merged into a default", () => {
+	const server = `type Server = { host: String, port: Integer }
+		type Options = { retries: Integer, server: Server }`
+
+	function connect(defaultValue: string): string {
+		return `§§ Answers the address.
+		§§
+		§§ @param using — how to connect.
+		§§ @returns — the address.
+		function connect(using options: Options = ${defaultValue}) -> String {
+			<- options.server.host
+		}`
+	}
+
+	it("should accept a path into a member the default writes out", () => {
+		expect(
+			diagnosticsFor(`implementation {
+				${server}
+				${connect(`{ retries = 3, server = { host = "d", port = 80 } }`)}
+
+				constant a = connect(using { server.port = 1 })
+			}`),
+		).toEqual([])
+	})
+
+	it("should accept a path two levels into one", () => {
+		expect(
+			diagnosticsFor(`implementation {
+				type Tls = { enabled: Boolean }
+				type Server = { port: Integer, tls: Tls }
+				type Options = { server: Server }
+
+				§§ Answers the port.
+				§§
+				§§ @param using — how to connect.
+				§§ @returns — the port.
+				function connect(
+					using options: Options = {
+						server = { port = 80, tls = { enabled = false } },
+					},
+				) -> Integer {
+					<- options.server.port
+				}
+
+				constant a = connect(using { server.tls.enabled = true })
+			}`),
+		).toEqual([])
+	})
+
+	it("should refuse a path into a member no default fills in", () => {
+		let source = `implementation {
+			${server}
+			${connect(`{ retries = 3 }`)}
+
+			constant a = connect(using { server.port = 1 })
+		}`
+		let diagnostics = diagnosticsFor(source)
+
+		expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+			"path-key-without-default",
+		])
+		expect(underlinedBy(source, diagnostics[0].labels?.[0])).toBe("server")
+	})
+
+	it("should refuse a path into a member the default only names", () => {
+		let diagnostics = diagnosticsFor(`implementation {
+			${server}
+
+			constant fallback: Server = { host = "d", port = 80 }
+
+			${connect(`{ retries = 3, server = fallback }`)}
+
+			constant a = connect(using { server.port = 1 })
+		}`)
+
+		expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+			"path-key-without-default",
+		])
+	})
+
+	// NOTE: The default writes `server` out but leaves `tls` to a name, so the
+	// merge stops one level short of where the path reaches.
+	it("should refuse a path past where the default stops writing", () => {
+		let diagnostics = diagnosticsFor(`implementation {
+			type Tls = { enabled: Boolean }
+			type Server = { port: Integer, tls: Tls }
+			type Options = { server: Server }
+
+			constant plain: Tls = { enabled = false }
+
+			§§ Answers the port.
+			§§
+			§§ @param using — how to connect.
+			§§ @returns — the port.
+			function connect(
+				using options: Options = { server = { port = 80, tls = plain } },
+			) -> Integer {
+				<- options.server.port
+			}
+
+			constant a = connect(using { server.tls.enabled = true })
+		}`)
+
+		expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+			"path-key-without-default",
+		])
+	})
+
+	it("should refuse a step that is not a Record", () => {
+		let diagnostics = diagnosticsFor(`implementation {
+			${server}
+			${connect(`{ retries = 3, server = { host = "d", port = 80 } }`)}
+
+			constant a = connect(using { retries.length = 1, server.port = 1 })
+		}`)
+
+		expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+			"path-step-not-a-record",
+		])
+	})
+
+	// NOTE: A Function taken as a VALUE drops its defaults, so nothing is
+	// filled in any more and there is nothing under the key to merge with.
+	it("should refuse a path through a Function value", () => {
+		let diagnostics = diagnosticsFor(`implementation {
+			${server}
+			${connect(`{ retries = 3, server = { host = "d", port = 80 } }`)}
+
+			constant taken: (using: Options) -> String = connect
+			constant a = taken(using { server.port = 1 })
+		}`)
+
+		expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+			"path-key-without-default",
+		])
+	})
+
+	it("should accept a path into a Case payload's default", () => {
+		expect(
+			diagnosticsFor(`implementation {
+				type Limits = { calls: Integer, burst: Integer }
+
+				choice Fetch {
+					Get { url: String, limits: Limits } = {
+						limits = { calls = 1, burst = 2 },
+					},
+				}
+
+				constant a: Fetch = #Get({ url = "/x", limits.calls = 5 })
+			}`),
+		).toEqual([])
+	})
+
+	it("should refuse a path into a payload member no default fills in", () => {
+		let diagnostics = diagnosticsFor(`implementation {
+			type Limits = { calls: Integer, burst: Integer }
+
+			choice Fetch {
+				Get { limits: Limits, quota: Limits } = {
+					limits = { calls = 1, burst = 2 },
+				},
+			}
+
+			constant a: Fetch = #Get({ limits.calls = 5, quota.calls = 1 })
+		}`)
+
+		expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+			"path-key-without-default",
+		])
+	})
+
+	// NOTE: The members the path did not write are the default's, so a payload
+	// that reaches into one is not missing anything.
+	it("should not call a merged payload incomplete", () => {
+		expect(
+			diagnosticsFor(`implementation {
+				type Limits = { calls: Integer, burst: Integer }
+
+				choice Fetch {
+					Get { limits: Limits } = { limits = { calls = 1, burst = 2 } },
+				}
+
+				constant a: Fetch = #Get({ limits.calls = 5 })
+			}`),
+		).toEqual([])
+	})
+})

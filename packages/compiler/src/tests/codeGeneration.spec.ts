@@ -1265,6 +1265,56 @@ describe("Code Generation", () => {
 			expect(generate(source)).toContain("settings?.server ??")
 			expect(await run(source)).toEqual(['"3|f"'])
 		})
+
+		// NOTE: An Argument written for a defaulted Record Parameter IS the
+		// right-hand side of `{ default with argument }`, so it takes path keys
+		// on the terms every other right-hand side of a merge does — and means
+		// exactly what the same key means after a `with`.
+		it("merges a path key into the default's member", async () => {
+			const source = `implementation {
+	type Tls = { enabled: Boolean, authority: String }
+	type Server = { port: Integer, host: String, tls: Tls }
+	type Options = { retries: Integer, server: Server }
+
+	function connect(using options: Options = { retries = 3, server = { port = 8080, host = "local", tls = { enabled = false, authority = "self" } } }) -> String {
+		<- "{options.retries}|{options.server.port}|{options.server.host}|{options.server.tls.enabled}|{options.server.tls.authority}"
+	}
+
+	Terminal.inspect(connect(using { server.port = 1 }))
+	Terminal.inspect(connect(using { retries = 9, server.tls.enabled = true, server.host = "h" }))
+	Terminal.inspect(connect(using { server.{ port = 2, tls.authority = "x" } }))
+}`
+
+			expect(await run(source)).toEqual([
+				'"3|1|local|false|self"',
+				'"9|8080|h|true|self"',
+				'"3|2|local|false|x"',
+			])
+		})
+
+		// NOTE: The Argument carries only the members the path wrote — the merge
+		// is the callee's, which is where the default is. Nothing about the
+		// emitted callee says a path key was ever written: it rebuilds the
+		// member for every call site alike, and a complete one comes back out
+		// unchanged.
+		it("passes only the members a path key wrote", () => {
+			const generated = generate(`implementation {
+	type Server = { port: Integer, host: String }
+	type Options = { retries: Integer, server: Server }
+
+	function connect(using options: Options = { retries = 3, server = { port = 8080, host = "local" } }) -> String {
+		<- options.server.host
+	}
+
+	Terminal.inspect(connect(using { server.port = 1 }))
+}`)
+			const call = generated.slice(
+				generated.indexOf("Terminal.inspect(connect("),
+			)
+
+			expect(call).toContain("port:")
+			expect(call).not.toContain("host:")
+		})
 	})
 
 	describe("String Methods", () => {

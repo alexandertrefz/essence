@@ -719,6 +719,134 @@ describe("Enricher", () => {
 				expect(diagnostics).toHaveLength(1)
 				expect(diagnostics[0].code).toBe("path-key-outside-combination")
 			})
+
+			// NOTE: A Record Type standing over a Literal is not a value under
+			// it — a Declaration writes its members from nothing exactly as an
+			// unannotated Literal does.
+			it("should refuse a path key under a Record annotation", () => {
+				let diagnostics = diagnosticsFor(`implementation {
+					${config}
+					constant blank: Config = { name = "api", server.port = 1 }
+				}`)
+
+				expect(diagnostics).toHaveLength(1)
+				expect(diagnostics[0].code).toBe("path-key-outside-combination")
+			})
+		})
+
+		// NOTE: An Argument written for a defaulted Record Parameter and a Case
+		// payload written for a defaulting Case are Literals MERGED into a value
+		// that is already there — the default's — so they carry path keys on the
+		// terms a `with` does. `{ default with argument }` is what the merge is,
+		// and this is the follow-up that made it one rule for every right-hand
+		// side of one.
+		describe("path keys in a Literal merged into a default", () => {
+			const options = `type Server = { host: String, port: Integer }
+				type Options = { retries: Integer, server: Server }
+
+				§§ Answers the address.
+				§§
+				§§ @param using — how to connect.
+				§§ @returns — the address.
+				function connect(
+					using options: Options = {
+						retries = 3,
+						server = { host = "localhost", port = 8080 },
+					},
+				) -> String {
+					<- options.server.host
+				}`
+
+			it("should admit a path key in a partial Argument", () => {
+				expect(
+					diagnosticsFor(`implementation {
+						${options}
+
+						constant a = connect(using { server.port = 1 })
+					}`),
+				).toEqual([])
+			})
+
+			it("should admit a braced descend in a partial Argument", () => {
+				expect(
+					diagnosticsFor(`implementation {
+						${options}
+
+						constant a = connect(using { server.{ port = 1 } })
+					}`),
+				).toEqual([])
+			})
+
+			// NOTE: The one Argument reads as the whole of the merge, so a plain
+			// key and a path key stand side by side exactly as they do after a
+			// `with`.
+			it("should admit a path key beside a plain one", () => {
+				expect(
+					diagnosticsFor(`implementation {
+						${options}
+
+						constant a = connect(using { retries = 9, server.port = 1 })
+					}`),
+				).toEqual([])
+			})
+
+			// NOTE: The Node keeps the Type it WROTE — a partial of the member
+			// it merges into — and the merge is what the position measures it
+			// by. An Argument whose Type claimed the whole member would claim it
+			// to the Optimiser and the emission too, where only the members
+			// really written are there.
+			it("should leave the written Argument its own Type", () => {
+				let value = lastConstantValue(`implementation {
+					${options}
+
+					constant a = connect(using { server.port = 1 })
+				}`)
+
+				if (value.nodeType !== "FunctionInvocation") {
+					throw new Error("Expected a FunctionInvocation")
+				}
+
+				expect(value.arguments[0].value.type).toEqual({
+					type: "Record",
+					members: {
+						server: {
+							type: "Record",
+							members: { port: { type: "Integer" } },
+						},
+					},
+				})
+			})
+
+			it("should admit a path key in a partial Case payload", () => {
+				expect(
+					diagnosticsFor(`implementation {
+						type Limits = { calls: Integer, burst: Integer }
+
+						choice Fetch {
+							Get { url: String, limits: Limits } = {
+								limits = { calls = 1, burst = 2 },
+							},
+						}
+
+						constant a: Fetch = #Get({ url = "/x", limits.calls = 5 })
+					}`),
+				).toEqual([])
+			})
+
+			// NOTE: A path key inside a member's OWN Literal reaches into
+			// nothing — only the Literal that is merged is merged, and a member
+			// of it writes its value from nothing like any other.
+			it("should refuse a path key one level inside an Argument", () => {
+				let diagnostics = diagnosticsFor(`implementation {
+					${options}
+
+					constant a = connect(using { server = { port.length = 1 } })
+				}`)
+
+				expect(
+					diagnostics.map((diagnostic) => diagnostic.code),
+				).toContain("path-key-outside-combination")
+			})
 		})
 
 		it("should resolve a bare Case in an update against the declared member", () => {

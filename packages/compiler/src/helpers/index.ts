@@ -2356,6 +2356,99 @@ function writtenMemberValue(
 	return value as { nodeType: string; members?: Record<string, unknown> }
 }
 
+// NOTE: The Type a Record Literal carrying path keys HAS once the default it is
+// merged into has filled the rest in. A member a path key wrote stands for the
+// WHOLE member the merge rebuilds — `{ server.port = 1 }` carries a `server` of
+// Type `Server`, because the callee reads `port` off the Argument and every
+// other member off the default — so that is the Type it answers for one, and
+// every reader of a partial Literal goes on asking the one question it asked
+// before: is this a partial of what the position declares.
+//
+// `null` where there is nothing to answer — a value that is no Record Literal,
+// or one that wrote no path key — and where the merge does not hold: a step the
+// default does not reach into, one the position declares at another Type, or a
+// level whose own members the declared Type refuses. There the Literal is what
+// it says it is, the position turns it away, and the Diagnostic names the path.
+export function mergedRecordType(
+	into: common.Type | common.GenericUse,
+	nesting: common.DefaultNesting | undefined,
+	value: common.typed.ExpressionNode | null | undefined,
+	context: GenericInferenceContext | null = null,
+): common.RecordType | null {
+	if (
+		into.type !== "Record" ||
+		value == null ||
+		value.nodeType !== "RecordValue" ||
+		!Object.values(value.members).some(isMergedLevel)
+	) {
+		return null
+	}
+
+	return mergedLevelType(into, nesting ?? {}, value, context)
+}
+
+// NOTE: A level a path key built, which is a partial of the member it stands
+// for. Written as a guard rather than read inline so that "was this written as a
+// path" is asked in one spelling everywhere.
+export function isMergedLevel(
+	value: common.typed.ExpressionNode,
+): value is common.typed.RecordValueNode {
+	return value.nodeType === "RecordValue" && value.merged === true
+}
+
+function mergedLevelType(
+	into: common.RecordType,
+	nesting: common.DefaultNesting,
+	value: common.typed.RecordValueNode,
+	context: GenericInferenceContext | null,
+): common.RecordType | null {
+	let members: Record<string, common.Type> = {}
+
+	for (let [name, member] of Object.entries(value.members)) {
+		if (!isMergedLevel(member)) {
+			members[name] = member.type
+
+			continue
+		}
+
+		// NOTE: `Object.hasOwn` before either read — a member named after one of
+		// `Object.prototype`'s would otherwise find a JavaScript function where
+		// the Record has nothing, and a nesting that names nothing.
+		if (
+			!Object.hasOwn(into.members, name) ||
+			!Object.hasOwn(nesting, name)
+		) {
+			return null
+		}
+
+		let declaredType = into.members[name]!
+
+		if (declaredType.type !== "Record") {
+			return null
+		}
+
+		let inner = mergedLevelType(
+			declaredType,
+			nesting[name]!,
+			member,
+			context,
+		)
+
+		// NOTE: The level has to be a PARTIAL of the member it merges into,
+		// which is the very question the whole Literal is asked one level up —
+		// every member it writes is one that member declares, at a Type that
+		// member admits. What it leaves out is what the default fills in, and a
+		// default fills in every member of a Record it writes as a Literal.
+		if (inner === null || !isPartialOf(declaredType, inner, context)) {
+			return null
+		}
+
+		members[name] = declaredType
+	}
+
+	return { type: "Record", members }
+}
+
 // NOTE: The members a Record default writes as a Record Literal of their own,
 // and what THOSE write, recursively — `Parameter.defaultNesting`, and the same
 // answer for a Case payload's default. A member listed here is one a caller may
@@ -3001,6 +3094,11 @@ export type MatchableArgument = {
 	// `Box<Item>` Parameter is a Parameter like any other: what can not decide is
 	// this way of writing the value, not the place it is written in.
 	bindsNothing?: boolean
+	// NOTE: The Argument's enriched value where there is one, so a Record
+	// Literal that wrote a path key can be measured by what the merge makes of
+	// it rather than by what it says on its own. Answered lazily: an Argument is
+	// enriched at most once per Invocation, and this is asked once per candidate.
+	mergedValue?: () => common.typed.ExpressionNode | null
 	// NOTE: Set on an Argument written as a Record LITERAL, whose emitted value
 	// therefore carries exactly the members its Type names and no others.
 	//
@@ -3250,7 +3348,28 @@ function argumentFits(
 	argumentType: common.Type,
 	inferenceContext: GenericInferenceContext | null,
 ): boolean {
-	if (matchTypes(parameter.type, argumentType, inferenceContext)) {
+	// NOTE: A path key writes SOME of a member the default fills in, and the
+	// merge makes the whole of it — so the Argument is measured by what it will
+	// be, not by what it wrote. Asked before assignability rather than after it:
+	// a Literal carrying one is never assignable as it stands, and asking twice
+	// would bind a Generic off a partial member on the way past.
+	//
+	// NOTE: Asked only where a path key could possibly stand — a Parameter whose
+	// default reaches into something, given an Argument written as a Record
+	// Literal. `mergedValue` ENRICHES, and an Argument that reacts to the
+	// position it stands in must not be enriched by a candidate merely probing.
+	let effectiveType =
+		(parameter.defaultNesting !== undefined &&
+		argument.spellsItsMembers === true
+			? mergedRecordType(
+					expectedType,
+					parameter.defaultNesting,
+					argument.mergedValue?.(),
+					inferenceContext,
+				)
+			: null) ?? argumentType
+
+	if (matchTypes(parameter.type, effectiveType, inferenceContext)) {
 		return true
 	}
 
@@ -3258,12 +3377,12 @@ function argumentFits(
 		parameter.defaultMembers !== undefined &&
 		argument.spellsItsMembers === true &&
 		expectedType.type === "Record" &&
-		argumentType.type === "Record" &&
-		isPartialOf(expectedType, argumentType, inferenceContext) &&
+		effectiveType.type === "Record" &&
+		isPartialOf(expectedType, effectiveType, inferenceContext) &&
 		missingRecordMembers(
 			expectedType,
 			parameter.defaultMembers,
-			argumentType,
+			effectiveType,
 		).length === 0
 	)
 }

@@ -30,6 +30,7 @@ import {
 	matchArguments,
 	matchesType,
 	matchesTypeWithBindings,
+	mergedRecordType,
 	mentionsUnsolvedTypeParameter,
 	mergeUnionMembers,
 	parameterInternalName,
@@ -679,8 +680,22 @@ function makePayloadReadings(
 		let reading = readings.get(under)
 
 		if (reading === undefined) {
+			// NOTE: A payload written as a Record Literal is merged into the
+			// Case's payload default exactly as an Argument is merged into a
+			// Parameter's, so it may carry path keys for the same reason.
 			let { result, diagnostics } = collectDiagnostics(() =>
-				enrichExpression(payload, scope, expectedPayloadType(under)),
+				payload.nodeType === "RecordValue"
+					? enrichRecordValue(
+							payload,
+							scope,
+							expectedPayloadType(under),
+							true,
+						)
+					: enrichExpression(
+							payload,
+							scope,
+							expectedPayloadType(under),
+						),
 			)
 
 			reading = { value: result, diagnostics }
@@ -772,7 +787,14 @@ function wrapSingleMemberShorthand(
 		caseType.payloadDefault !== undefined &&
 		value.nodeType === "RecordValue" &&
 		value.type.type === "Record" &&
-		isPartialOf(recordShape as common.RecordType, value.type)
+		isPartialOf(
+			recordShape as common.RecordType,
+			mergedRecordType(
+				recordShape,
+				caseType.payloadDefault.nesting,
+				value,
+			) ?? value.type,
+		)
 	) {
 		return value
 	}
@@ -958,7 +980,7 @@ function payloadStandsForCase(
 		return false
 	}
 
-	return payloadFitsCase(caseType, value.type)
+	return payloadFitsCase(caseType, value.type, value)
 }
 
 export function enrichMethodInvocation(
@@ -1318,10 +1340,10 @@ function pathUpdate(
 }
 
 // NOTE: A step a path key reaches THROUGH must be a Record: it is the value the
-// level below it updates, and only a Record can be updated. A Case is a Record
-// with a nominal identity and is read through by a member path, but it can not
-// be updated — rebuilding one is a construction, not an update — so it is
-// turned away here too. Silent on an Error, which somebody has reported once
+// level below it reaches into, and only a Record has members to reach. A Case is
+// a Record with a nominal identity and is read through by a member path, but it
+// can not be updated — rebuilding one is a construction, not an update — so it
+// is turned away here too. Silent on an Error, which somebody has reported once
 // already.
 function pathKeyStepType(
 	step: parser.IdentifierNode,
@@ -1346,7 +1368,7 @@ function pathKeyStepType(
 			),
 		],
 		notes: [
-			"Every step but the last names the value the step after it updates, and only a Record can be updated.",
+			"Every step but the last names the value the step after it reaches into, and only a Record has members to reach.",
 		],
 		helps: [`Set '${step.content}' as a whole instead.`],
 	})
@@ -1690,6 +1712,15 @@ export function enrichRecordValue(
 	node: parser.RecordValueNode,
 	scope: enricher.Scope,
 	expectedType: common.Type | null = null,
+	// NOTE: Set where the Literal is MERGED into a default rather than standing
+	// on its own — an Argument written for a Record Parameter, or a Case
+	// payload. Those are the two positions where the members a Literal leaves
+	// out are filled in from somewhere, which is the only thing a path key needs
+	// to reach into one. Whether the default actually fills in the member a path
+	// names is a question about the Parameter this Argument lands on, which is
+	// settled once a candidate is committed; here it is only the POSITION that
+	// is decided.
+	mergeable = false,
 ): common.typed.RecordValueNode {
 	// NOTE: The annotation is resolved once here and handed to the core, which
 	// is the single place that reports 'record-annotation-not-record'. The
@@ -1701,22 +1732,40 @@ export function enrichRecordValue(
 	// NOTE: A member stands in the position its name has in whatever Record the
 	// literal is expected to be — its own annotation first, since that is the
 	// Type it will HAVE, and the surrounding position otherwise.
-	let members = enrichMembers(
-		hasPathKeys(node) ? refusePathKeys(node.members) : node.members,
-		scope,
-		expectedRecordMembers(resolvedAnnotation ?? expectedType),
+	let expectedMembers = expectedRecordMembers(
+		resolvedAnnotation ?? expectedType,
 	)
+	let level =
+		hasPathKeys(node) && mergeable
+			? mergedLevel(pathKeyEntries(node), scope, expectedMembers)
+			: {
+					members: enrichMembers(
+						hasPathKeys(node)
+							? refusePathKeys(node.members)
+							: node.members,
+						scope,
+						expectedMembers,
+					),
+					memberPositions: undefined,
+				}
 
 	let memberTypes: Record<string, common.Type> = {}
 
-	for (let [memberKey, memberValue] of Object.entries(members)) {
+	for (let [memberKey, memberValue] of Object.entries(level.members)) {
 		memberTypes[memberKey] = memberValue.type
 	}
 
 	return {
 		nodeType: "RecordValue",
-		members,
+		members: level.members,
 		position: node.position,
+		// NOTE: Where each key of a merged Literal was written, INCLUDING the
+		// keys somebody spelled: a path key's first step is one of them, and a
+		// Diagnostic about a path has to underline the step it is about. Absent
+		// on every Literal that wrote no path at all, which is all but one.
+		...(level.memberPositions === undefined
+			? {}
+			: { memberPositions: level.memberPositions }),
 		type: recordValueTypeOf(
 			resolvedAnnotation,
 			memberTypes,
@@ -1729,6 +1778,86 @@ export function enrichRecordValue(
 				? resolvedAnnotation
 				: null,
 	}
+}
+
+// NOTE: One level of a Literal that is merged into a default, with its path keys
+// written out as the levels they reach: `{ server.port = 1 }` is
+// `{ server = { port = 1 } }`, whose inner list is a PARTIAL of the member it
+// stands for — what it leaves out is what the default fills in, one level down,
+// exactly as the outer list works one level up. Keys sharing a first step build
+// ONE level, as they do in a combination, so `server.port` and `server.tls.enabled`
+// reach through a single `server`.
+//
+// The Position of each key of a level this writes is kept in `memberPositions`:
+// a path's later steps are keys of lists that exist nowhere in the written AST,
+// and that list is the only record of where they were spelled.
+function mergedLevel(
+	entries: Array<PathKeyEntry>,
+	scope: enricher.Scope,
+	expectedMembers: Record<string, common.Type> | null,
+): {
+	members: Record<string, common.typed.ExpressionNode>
+	memberPositions: Record<string, common.Position>
+} {
+	let groups = new Map<string, Array<PathKeyEntry>>()
+
+	for (let entry of entries) {
+		let group = groups.get(entry.steps[0].content)
+
+		if (group === undefined) {
+			groups.set(entry.steps[0].content, [entry])
+		} else {
+			group.push(entry)
+		}
+	}
+
+	let members: Record<string, common.typed.ExpressionNode> = {}
+	let memberPositions: Record<string, common.Position> = {}
+
+	for (let [name, group] of groups) {
+		memberPositions[name] = group[0].steps[0].position
+
+		// NOTE: A group holding both a whole member and a path into it is a
+		// clash the Parser already refused. The whole member is the one that
+		// can stand on its own, so it does.
+		let whole = group.find(
+			(entry) =>
+				entry.steps.length === 1 && entry.member.group === undefined,
+		)
+
+		if (whole !== undefined) {
+			members[name] = enrichMember(
+				whole.member,
+				scope,
+				expectedMembers?.[name] ?? null,
+			)
+
+			continue
+		}
+
+		let inner = mergedLevel(
+			group.flatMap(stepInto),
+			scope,
+			expectedRecordMembers(expectedMembers?.[name] ?? null),
+		)
+		let innerTypes: Record<string, common.Type> = {}
+
+		for (let [innerKey, innerValue] of Object.entries(inner.members)) {
+			innerTypes[innerKey] = innerValue.type
+		}
+
+		members[name] = {
+			nodeType: "RecordValue",
+			members: inner.members,
+			position: groupPosition(group),
+			type: { type: "Record", members: innerTypes },
+			declaredType: null,
+			memberPositions: inner.memberPositions,
+			merged: true,
+		}
+	}
+
+	return { members, memberPositions }
 }
 
 export function enrichStringValue(
@@ -4549,10 +4678,15 @@ function declareProtocolInScope(
 }
 
 // NOTE: A dotted key reaches into a value that is already there, so it only
-// means anything against one — and a Record Literal writes its members from
-// nothing. The path members are dropped rather than read under their dotted
-// spelling, which would put a member named `server.port` into the literal's
-// Type and report a second Diagnostic about a Record nobody wrote. A key the Parser
+// means anything where there IS one: the value a `with` updates, or the value a
+// default fills in — a Record Parameter's, for the Argument written against it,
+// or a Case's, for its payload. A Literal standing anywhere else writes its
+// members from nothing, and this is where it is turned away; `mergeable` says
+// which of the two it is, and it is decided by the position rather than here.
+//
+// The path members are dropped rather than read under their dotted spelling,
+// which would put a member named `server.port` into the literal's Type and
+// report a second Diagnostic about a Record nobody wrote. A key the Parser
 // already refused as a bare path is left alone: it has its message.
 // NOTE: Asked only where `hasPathKeys` said there is one, so the Literal every
 // Program is made of neither rebuilds its member Record nor walks it twice.
@@ -4577,11 +4711,11 @@ function refusePathKeys(
 			end: member.steps[member.steps.length - 1].position.end,
 		}
 
-		reportError("A path key updates nothing here", position, {
+		reportError("A path key reaches into nothing here", position, {
 			code: "path-key-outside-combination",
 			labels: [primary(position, "this reaches into a value")],
 			notes: [
-				"A Record Literal writes its members from nothing, so there is no value under this key to reach into.",
+				"A Record Literal writes its members from nothing, so there is no value under this key to reach into. A path key needs one that is already there — the value a 'with' updates, or the value a default fills in for an Argument or a Case payload.",
 			],
 			helps: [
 				`Write the whole member: '${member.steps[0].content} = { … }'.`,
@@ -6044,6 +6178,13 @@ type ArgumentTyper = {
 	enrichArgumentNode: (
 		argument: parser.ArgumentNode,
 	) => common.typed.ArgumentNode
+	// NOTE: The enriched value of one Argument, for a candidate that has to look
+	// at what was WRITTEN rather than only at the Type it came to — a Record
+	// Literal carrying path keys, whose merge is what decides whether it fits.
+	// The very Node `enrichArgumentNode` will commit, from the one cache.
+	enrichedArgumentValue: (
+		value: parser.ExpressionNode,
+	) => common.typed.ExpressionNode
 	// NOTE: Whether any Argument of this Invocation typed as Error, which is
 	// the poison value a Diagnostic already reported. `matchTypes` lets an
 	// Error match anything — including a Type Parameter, which it then leaves
@@ -6076,13 +6217,21 @@ function makeArgumentTyper(scope: enricher.Scope): ArgumentTyper {
 		return type
 	}
 
+	// NOTE: An Argument written as a Record Literal is a Literal MERGED into
+	// whatever the Parameter's default fills in, which is what lets it carry
+	// path keys. The position is decided here, where the Expression is known to
+	// be an Argument; whether the default reaches the member a path names is the
+	// committed Parameter's business, one stage on.
 	function enrichOnce(
 		value: parser.ExpressionNode,
 	): common.typed.ExpressionNode {
 		let cached = cache.get(value)
 
 		if (cached === undefined) {
-			cached = enrichExpression(value, scope)
+			cached =
+				value.nodeType === "RecordValue"
+					? enrichRecordValue(value, scope, null, true)
+					: enrichExpression(value, scope)
 			cache.set(value, cached)
 		}
 
@@ -6196,7 +6345,8 @@ function makeArgumentTyper(scope: enricher.Scope): ArgumentTyper {
 			// answers.
 			let payloadType = payload.typeUnder(result)
 			let fits =
-				payloadType === null || payloadFitsCase(result, payloadType)
+				payloadType === null ||
+				payloadFitsCase(result, payloadType, payload.valueUnder(result))
 
 			// NOTE: The prefixed form is recorded even where its payload does
 			// not fit — the paragraph above says why. The bare one is not: it
@@ -6405,6 +6555,9 @@ function makeArgumentTyper(scope: enricher.Scope): ArgumentTyper {
 		},
 		noteErrorArgument() {
 			sawErrorArgument = true
+		},
+		enrichedArgumentValue(value) {
+			return enrichOnce(value)
 		},
 		enrichArgumentNode(argument) {
 			let value = enrichOnce(argument.value)
@@ -6884,6 +7037,7 @@ function resolveInvokedMethodInNamespace(
 			getType: (expectedType, bindings) =>
 				typer.getType(argument.value, expectedType, bindings),
 			bindsNothing: bindsNoTypeParameter(argument),
+			mergedValue: () => typer.enrichedArgumentValue(argument.value),
 			spellsItsMembers: argument.value.nodeType === "RecordValue",
 		}),
 	)
@@ -8413,6 +8567,7 @@ function resolveFunctionInvocation(
 				getType: (expectedType, bindings) =>
 					typer.getType(argument.value, expectedType, bindings),
 				bindsNothing: bindsNoTypeParameter(argument),
+				mergedValue: () => typer.enrichedArgumentValue(argument.value),
 				spellsItsMembers: argument.value.nodeType === "RecordValue",
 			}),
 		)
@@ -8505,6 +8660,7 @@ function resolveFunctionInvocation(
 				getType: (expectedType, bindings) =>
 					typer.getType(argument.value, expectedType, bindings),
 				bindsNothing: bindsNoTypeParameter(argument),
+				mergedValue: () => typer.enrichedArgumentValue(argument.value),
 				spellsItsMembers: argument.value.nodeType === "RecordValue",
 			}),
 		)
@@ -9078,13 +9234,26 @@ function decideCaseFromExpectedType(
 function payloadFitsCase(
 	caseType: common.CaseType,
 	payloadType: common.Type,
+	// NOTE: The payload as WRITTEN, where the caller has it — a Literal
+	// carrying path keys is measured by what the merge makes of it, and its own
+	// Type says nothing about that. Left out where only a Type is in hand: a
+	// Case that defaults its payload can not be generic, so the one caller that
+	// has no value to give is deciding among instantiations a defaulting Case
+	// never has.
+	payloadValue: common.typed.ExpressionNode | null = null,
 ): boolean {
 	let recordShape: common.RecordType = {
 		type: "Record",
 		members: caseType.members,
 	}
+	let effectiveType =
+		mergedRecordType(
+			recordShape,
+			caseType.payloadDefault?.nesting,
+			payloadValue,
+		) ?? payloadType
 
-	if (matchesType(recordShape, payloadType)) {
+	if (matchesType(recordShape, effectiveType)) {
 		return true
 	}
 
@@ -9096,8 +9265,8 @@ function payloadFitsCase(
 	// be partial is `casePayloadIsPartial`'s question, one stage later.
 	if (
 		caseType.payloadDefault !== undefined &&
-		payloadType.type === "Record" &&
-		isPartialOf(recordShape, payloadType)
+		effectiveType.type === "Record" &&
+		isPartialOf(recordShape, effectiveType)
 	) {
 		return true
 	}

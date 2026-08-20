@@ -529,17 +529,61 @@ the path would have stood for and decide the value inside it.
 
 ### `path-key-outside-combination`
 
-A dotted key was written in a Record Literal — `{ server.port = 8080 }`. A path
-reaches into a value that is already there, and a Literal writes its members
-from nothing, so there is no `server` under the key to reach into.
+A dotted key was written in a Record Literal standing on its own —
+`constant blank: Config = { server.port = 8080 }`. A path reaches into a value
+that is already there, and a Literal writes its members from nothing, so there
+is no `server` under the key to reach into.
 
 Either write the whole member — `{ server = { port = 8080, host = "db" } }` —
-or update a value that already has one: `{ config with server.port = 8080 }`.
+or reach into a value that already has one.
 
-A path key is legal in an update's key list and nowhere else. In particular it
-is not yet legal in a partial Argument, which is a Record Literal standing where
-a Record Parameter is expected; that is a follow-up, and until it lands the
-Literal has to be written whole.
+There are three places a Record Literal has a value under it, and a path key is
+legal in all three and nowhere else:
+
+- an update's key list, `{ config with server.port = 8080 }`;
+- an Argument written for a Record Parameter that carries a default,
+  `connect("x", using { server.port = 1 })`;
+- the payload of a Case whose payload carries a default,
+  `#Get({ limits.calls = 2 })`.
+
+The last two merge into the DEFAULT rather than into a value the call named, and
+what a default fills in is what a path may reach into. See
+`path-key-without-default`.
+
+### `path-key-without-default`
+
+A path key was written in an Argument or a Case payload — the two Literals that
+are merged into a default — but reaches into a member that default does not fill
+in.
+
+```essence
+function connect(using options: Options = { retries = 3 }) -> String { … }
+
+connect(using { server.port = 1 })
+```
+
+`retries` is what this default fills in, so `server` is a member every call
+writes for itself, and there is nothing under `server.port` to merge with. Write
+the whole member: `{ server = { port = 1, host = "db" } }`.
+
+The other reading is a default that DOES fill the member in, but names a value
+for it rather than writing its members out:
+
+```essence
+constant fallback: Server = { port = 8080, host = "db" } 
+
+function connect(using options: Options = { server = fallback }) -> String { … }
+```
+
+The callee takes `server` from the default or from the Argument whole — a value
+can not be taken apart without being worked out, which is the same rule a
+default that is not a Literal is hoisted by — so there is no level under
+`server` for a path to reach into. Write the member whole at the call, or write
+the default's `server` out as a Record Literal, member by member.
+
+A Function taken as a VALUE drops its defaults, so a path key in an Argument
+passed through one is refused for the first reason: nothing is filled in any
+more.
 
 ### `path-on-computed-value`
 
@@ -578,8 +622,8 @@ Reaching INTO a member is spelled instead, and says so: `{ config with
 server.port = 8080 }` merges, and `{ config with server.{ port = 8080 } }`
 merges. So `server = { … }` always replaces, `server.port = …` always merges,
 and a Type may grow a member without either of them changing meaning. See
-`path-key-outside-combination`, `path-step-not-a-record`,
-`path-on-computed-value` and `empty-path-group`.
+`path-key-outside-combination`, `path-key-without-default`,
+`path-step-not-a-record`, `path-on-computed-value` and `empty-path-group`.
 
 ### `wrong-type-argument-count`
 

@@ -4176,6 +4176,85 @@ describe("Choices", () => {
 			).toEqual(['Fetch#Get { url = "/x", retries = 3 }'])
 		})
 
+		// NOTE: A payload is merged into its default exactly as an Argument is
+		// merged into a Parameter's, so it takes path keys for the same reason —
+		// and the Case is filled in where it is CONSTRUCTED, so the merge is
+		// spliced per site rather than made at a callee.
+		describe("a path key in a payload", () => {
+			let limited = `type Limits = { calls: Integer, burst: Integer }
+
+				choice Fetch {
+					Get { url: String, limits: Limits } = {
+						limits = { calls = 1, burst = 2 },
+					},
+				}`
+
+			it("merges into the member the default fills in", async () => {
+				expect(
+					await run(`implementation { ${limited}
+						constant call: Fetch = #Get({ url = "/x", limits.calls = 5 })
+
+						Terminal.inspect(call)
+					}`),
+				).toEqual([
+					'Fetch#Get { url = "/x", limits = { calls = 5, burst = 2 } }',
+				])
+			})
+
+			// NOTE: The members a level WROTE come first and the ones the
+			// default filled in follow, one level down exactly as they do at the
+			// top — `#Get({ url = "/x" })` prints `url` before `retries` for the
+			// same reason.
+			it("takes a braced descend the same way", async () => {
+				expect(
+					await run(`implementation { ${limited}
+						constant call: Fetch = #Get({ url = "/x", limits.{ burst = 9 } })
+
+						Terminal.inspect(call)
+					}`),
+				).toEqual([
+					'Fetch#Get { url = "/x", limits = { burst = 9, calls = 1 } }',
+				])
+			})
+
+			// NOTE: A member written WHOLE replaces, which is the one difference
+			// between the two spellings and the reason a path key is spelled at
+			// all.
+			it("leaves a member written whole a replacement", async () => {
+				expect(
+					await run(`implementation { ${limited}
+						constant call: Fetch = #Get({
+							url = "/x",
+							limits = { calls = 7, burst = 8 },
+						})
+
+						Terminal.inspect(call)
+					}`),
+				).toEqual([
+					'Fetch#Get { url = "/x", limits = { calls = 7, burst = 8 } }',
+				])
+			})
+
+			it("refuses a path into a member no default fills in", () => {
+				expect(
+					codesOf(`implementation {
+						type Limits = { calls: Integer, burst: Integer }
+
+						choice Fetch {
+							Get { limits: Limits, quota: Limits } = {
+								limits = { calls = 1, burst = 2 },
+							},
+						}
+
+						constant call: Fetch = #Get({
+							limits.calls = 5,
+							quota.calls = 1,
+						})
+					}`),
+				).toContain("path-key-without-default")
+			})
+		})
+
 		it("builds a wholly defaulted payload from an empty Record", async () => {
 			expect(
 				await run(`implementation { ${fetchChoice}
