@@ -109,6 +109,14 @@ export type CompileRequest = {
 	// is written beside it. It changes the bytes as well, so it joins the key
 	// too.
 	embed?: boolean
+	// NOTE: Whether this compile ASKED for the tests — `essence test` does, and
+	// nothing else. It changes what is enriched out of the very same sources,
+	// so it joins the key as well: a build's bundle and a test's are two
+	// different files over one graph, and the cache must never hand one for the
+	// other. The Session is what actually carries the mode into the Enricher,
+	// because linking is where it is read, so a request that sets this must be
+	// compiled through a Session that was opened with it.
+	tests?: boolean
 }
 
 // NOTE: One file of the compiled graph, with the text its Diagnostics are
@@ -498,7 +506,9 @@ async function enrichDeclarations(
 	}
 
 	let enriched = await timeline.run("enrich", () =>
-		enrichDocument(parsed.program, request.inputFileName),
+		enrichDocument(parsed.program, request.inputFileName, {
+			tests: request.tests,
+		}),
 	)
 
 	module.diagnostics.push(...enriched.diagnostics)
@@ -513,7 +523,9 @@ async function enrichDeclarations(
 export async function compileFile(
 	request: CompileRequest,
 	report?: ProgressReporter,
-	session: CompileSession = createCompileSession([request.inputFileName]),
+	session: CompileSession = createCompileSession([request.inputFileName], {
+		tests: request.tests,
+	}),
 ): Promise<CompileOutcome> {
 	let started = performance.now()
 	let timeline = new Timeline(report)

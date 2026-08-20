@@ -1053,6 +1053,39 @@ describe("the Server's request loop", () => {
 			files.dispose()
 		}
 	})
+
+	// NOTE: A build drops the `tests { … }` section, so the Editor is the only
+	// thing that reports on one while it is being written. The Server's
+	// Workspace types it for that reason, and this is what says so.
+	it("should report on a tests section, which no build ever sees", async () => {
+		let source = [
+			"implementation {",
+			"\tconstant one = 1",
+			"}",
+			"",
+			"tests {",
+			'\ttest "typed" {',
+			"\t\texpect one",
+			"\t}",
+			"}",
+			"",
+		].join("\n")
+		let files = makeSessionWorkspace({ "Typed.es": source })
+		let session = startSession()
+
+		try {
+			await session.initialize([files.root])
+			await session.open(files.pathOf("Typed.es"), source)
+			await session.settle(600)
+
+			expect(session.codesFor(files.pathOf("Typed.es"))).toEqual([
+				"expect-not-boolean",
+			])
+		} finally {
+			await session.dispose()
+			files.dispose()
+		}
+	})
 })
 
 function uriFor(filePath: string): string {

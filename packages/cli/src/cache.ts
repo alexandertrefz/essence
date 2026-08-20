@@ -130,6 +130,15 @@ function emitterKey(request: CompileRequest): string {
 		shape.push(BRIDGE_KEY)
 	}
 
+	// NOTE: A test compile enriches a section a build drops, out of sources
+	// that are byte for byte the same — so the graph's own hash can not tell
+	// the two apart and this is what does. Without it `essence test` would be
+	// handed the bundle `essence build` wrote, and neither would run what it
+	// was asked to.
+	if (request.tests === true) {
+		shape.push("tests")
+	}
+
 	if (!request.sourcemap) {
 		shape.push("no-map")
 	} else if (

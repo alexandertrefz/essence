@@ -8,8 +8,13 @@ import { type CompileSession, createCompileSession } from "./session"
 // spinner exactly when there is finally something worth spinning about, so
 // compilation happens here and the main thread is left free to draw.
 
+// NOTE: `tests` is spelled out rather than left optional. It is the compile
+// MODE of the whole run and a worker is opened in it — a `begin` that forgets
+// to say opens the worker as a build, which compiles every file of a test run
+// without the section the run exists to check. Requiring it is what makes the
+// two places a `begin` is written say the same thing.
 export type WorkerRequest =
-	| { type: "begin"; entries: Array<string> }
+	| { type: "begin"; entries: Array<string>; tests: boolean }
 	| { type: "compile"; id: number; request: CompileRequest }
 
 export type WorkerResponse =
@@ -30,7 +35,9 @@ if (port !== null) {
 
 	channel.on("message", (message: WorkerRequest) => {
 		if (message.type === "begin") {
-			session = createCompileSession(message.entries)
+			session = createCompileSession(message.entries, {
+				tests: message.tests,
+			})
 
 			return
 		}

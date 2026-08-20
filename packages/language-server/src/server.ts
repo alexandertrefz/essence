@@ -239,6 +239,13 @@ export function startServer(options: { connection?: Connection } = {}) {
 				? undefined
 				: { text: document.getText(), version: document.version }
 		},
+		// NOTE: The Editor types the `tests { … }` section. A build drops it, so
+		// nothing else would ever tell a writer that an assertion is not a
+		// Boolean or that a name inside a test body does not exist — an editor
+		// that says nothing about a section is an editor claiming it is
+		// correct. Running the tests is a different question, and a session
+		// that compiles and instruments them is still a Workspace of its own.
+		tests: true,
 	})
 	// NOTE: Which URIs this Server has published Diagnostics to, by the document
 	// whose analysis produced them. Publishing a dependency's Diagnostics means

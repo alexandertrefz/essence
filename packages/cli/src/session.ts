@@ -102,8 +102,13 @@ function reachableModules(
 	return component.groups.flat().filter((module) => seen.has(module.filePath))
 }
 
+// NOTE: `tests` is the compile MODE for the whole invocation — one run of
+// `esc` is one mode, so it belongs to the Session rather than to a request. It
+// is what the Session links every component under, and a linked component is
+// cached, so a Session opened in one mode may never answer for the other.
 export function createCompileSession(
 	entryFileNames: Array<string>,
+	options: { tests?: boolean } = {},
 ): CompileSession {
 	let texts = new Map<string, string>()
 	let errors = new Map<string, unknown>()
@@ -300,12 +305,15 @@ export function createCompileSession(
 	// one piece answers for as many entries as it holds.
 	let linkComponent = (component: Component): Map<string, LinkedModule> => {
 		if (component.linked === null) {
-			component.linked = linkModuleGraph({
-				entryPath: component.groups[0]![0]!.filePath,
-				modules: component.modules,
-				groups: component.groups,
-				diagnostics: [],
-			}).modules
+			component.linked = linkModuleGraph(
+				{
+					entryPath: component.groups[0]![0]!.filePath,
+					modules: component.modules,
+					groups: component.groups,
+					diagnostics: [],
+				},
+				{ tests: options.tests },
+			).modules
 		}
 
 		return component.linked
