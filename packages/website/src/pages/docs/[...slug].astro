@@ -1,0 +1,276 @@
+---
+/*
+ * Every documentation page — screens 1f (article), 1g (guide), 1h (reference)
+ * and 7b, collapsing to 1k below 800px.
+ *
+ * One route for three templates: the frontmatter's `template` decides what is
+ * drawn around the rendered body, and the body itself is the same MDX in every
+ * case. The components handed to `<Content>` are the vocabulary content may
+ * use — a page cannot reach for anything the templates do not sanction.
+ */
+
+import { type CollectionEntry, getCollection, render } from "astro:content"
+
+import CodeWindow from "../../components/CodeWindow.astro"
+import RichText from "../../components/RichText.astro"
+import Breadcrumbs from "../../components/docs/Breadcrumbs.astro"
+import Conformances from "../../components/docs/Conformances.astro"
+import MemberIndex from "../../components/docs/MemberIndex.astro"
+import Note from "../../components/docs/Note.astro"
+import PackageManagers from "../../components/docs/PackageManagers.astro"
+import ParamTable from "../../components/docs/ParamTable.astro"
+import PrevNext from "../../components/docs/PrevNext.astro"
+import SeeAlso from "../../components/docs/SeeAlso.astro"
+import SignatureBlock from "../../components/docs/SignatureBlock.astro"
+import StepItem from "../../components/docs/StepItem.astro"
+import Steps from "../../components/docs/Steps.astro"
+import StuckCard from "../../components/docs/StuckCard.astro"
+import DocsLayout from "../../layouts/DocsLayout.astro"
+import {
+	getCrumbs,
+	getPrevNext,
+	getSidebar,
+	getToc,
+} from "../../lib/navigation.ts"
+import { GITHUB_ISSUES_URL, GITHUB_URL } from "../../lib/site.ts"
+
+export async function getStaticPaths() {
+	let entries = await getCollection("docs")
+
+	return entries.map((entry) => ({
+		params: { slug: entry.id },
+		props: { entry },
+	}))
+}
+
+interface Props {
+	entry: CollectionEntry<"docs">
+}
+
+let { entry } = Astro.props
+let { Content, headings } = await render(entry)
+
+let entries = await getCollection("docs")
+let sections = getSidebar(entries)
+let crumbs = getCrumbs(entries, entry.id)
+let { previous, next } = getPrevNext(entries, entry.id)
+let toc = getToc(headings, entry.data.tocDepth)
+
+let isGuide = entry.data.template === "guide"
+let isType = entry.data.template === "type"
+/*
+ * A type page wears the reference head — a mono title and a kind badge — and
+ * then goes on to do something no other template does, which is to publish the
+ * index of its own Members. So the head is shared and the tail is not.
+ */
+let isReference = entry.data.template === "reference" || isType
+
+// NOTE: `filePath` is relative to this package, which is not the repository
+// root — the blob URL has to put the package back in front of it.
+let editUrl =
+	entry.filePath === undefined
+		? undefined
+		: `${GITHUB_URL}/blob/master/packages/website/${entry.filePath}`
+
+let issueUrl = `${GITHUB_ISSUES_URL}/new?title=${encodeURIComponent(
+	`Docs: ${entry.data.title}`,
+)}`
+
+let guideMeta = [
+	entry.data.steps === undefined ? undefined : `${entry.data.steps} steps`,
+	entry.data.minutes === undefined ? undefined : `~${entry.data.minutes} min`,
+].filter((part) => part !== undefined)
+
+// The vocabulary MDX may use. Everything here is a component the templates own.
+let components = {
+	CodeWindow,
+	Note,
+	PackageManagers,
+	ParamTable,
+	SeeAlso,
+	SignatureBlock,
+	StepItem,
+	Steps,
+}
+---
+
+<DocsLayout
+	title={entry.data.title}
+	description={entry.data.description}
+	sections={sections}
+	activeId={entry.id}
+	toc={toc}
+	tocLabel={isGuide && entry.data.steps !== undefined
+		? "Steps"
+		: "On this page"}
+	editUrl={editUrl}
+	issueUrl={issueUrl}
+>
+	{isGuide && <StuckCard slot="aside" />}
+
+	<Breadcrumbs crumbs={crumbs} />
+
+	{
+		isReference ? (
+			<>
+				<div class="ref__head">
+					<h1
+						class="ref__title"
+						class:list={{ "ref__title--mono": entry.data.monoTitle }}
+					>
+						{entry.data.title}
+					</h1>
+					{entry.data.kind !== undefined && (
+						<span class="ref__badge">{entry.data.kind}</span>
+					)}
+					{
+						/*
+						 * `since` is not shown while there has only ever been one
+						 * release — "since 0.1.0" on every entry tells a reader nothing.
+						 * The field stays in the schema and on the entries that set it,
+						 * ready for the release that makes it mean something.
+						 */
+					}
+				</div>
+
+				<p class="ref__lede">
+					<RichText text={entry.data.description} />
+				</p>
+
+				{isType && <Conformances conformsTo={entry.data.conformsTo} />}
+
+				{entry.data.signature !== undefined && (
+					<SignatureBlock signature={entry.data.signature} />
+				)}
+
+				<article class="prose ref__body">
+					<Content components={components} />
+				</article>
+
+				{isType && <MemberIndex parent={entry.id} />}
+			</>
+		) : (
+			<article class="prose">
+				<h1>{entry.data.title}</h1>
+				<p class="lede">
+					<RichText text={entry.data.description} />
+				</p>
+
+				{isGuide && (
+					<div class="guide__meta">
+						{guideMeta.map((part) => (
+							<span>{part}</span>
+						))}
+					</div>
+				)}
+
+				<Content components={components} />
+			</article>
+		)
+	}
+
+	<PrevNext previous={previous} next={next} />
+</DocsLayout>
+
+<style>
+	/* Guide meta — 1g. Interpuncts are drawn, not typed. */
+
+	.guide__meta {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 20px;
+		margin-top: 18px;
+		font-family: var(--font-mono);
+		font-size: 12px;
+		color: var(--text-faint);
+	}
+
+	.guide__meta span + span::before {
+		content: "·";
+		margin-right: 20px;
+	}
+
+	/* Reference head — 1h */
+
+	.ref__head {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 12px;
+	}
+
+	.ref__title {
+		margin: 0;
+		font-size: 38px;
+		line-height: 1.1;
+		letter-spacing: -0.015em;
+		color: var(--text-hero);
+	}
+
+	/* A method's name is code, and reads as code. */
+	.ref__title--mono {
+		font-family: var(--font-mono);
+		font-weight: 600;
+		font-size: 32px;
+		letter-spacing: -0.01em;
+	}
+
+	.ref__badge {
+		font-family: var(--font-mono);
+		font-size: 11px;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		color: var(--text-muted);
+		border: 1px solid var(--divider);
+		border-radius: 4px;
+		padding: 3px 7px;
+	}
+
+
+	.ref__lede {
+		margin-top: 14px;
+		font-family: var(--font-body);
+		font-size: 17px;
+		line-height: 1.6;
+		color: var(--text-lede);
+		text-wrap: pretty;
+	}
+
+	/*
+	 * `.prose` zeroes its first child's margin so an article's h1 sits at the
+	 * top of the column; here the body follows a signature card and has to be
+	 * pushed off it instead.
+	 */
+	.ref__body {
+		margin-top: 40px;
+	}
+
+	@media (max-width: 800px) {
+		.guide__meta {
+			gap: 12px;
+			margin-top: 14px;
+			font-size: 11px;
+		}
+
+		.guide__meta span + span::before {
+			margin-right: 12px;
+		}
+
+		.ref__title {
+			font-size: 30px;
+		}
+
+		.ref__title--mono {
+			font-size: 24px;
+		}
+
+		.ref__lede {
+			font-size: 16px;
+		}
+
+		.ref__body {
+			margin-top: 28px;
+		}
+	}
+</style>

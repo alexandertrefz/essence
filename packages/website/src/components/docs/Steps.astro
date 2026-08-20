@@ -1,0 +1,26 @@
+---
+/*
+ * The numbered column of screen 1g. It holds nothing but the counter its
+ * children read — the number in each circle is `counter(step)`, so inserting a
+ * step in the middle of an MDX file cannot leave the sequence lying.
+ */
+---
+
+<div class="steps"><slot /></div>
+
+<style>
+	.steps {
+		counter-reset: step;
+		display: flex;
+		flex-direction: column;
+		gap: 40px;
+		margin-top: 44px;
+	}
+
+	@media (max-width: 800px) {
+		.steps {
+			gap: 28px;
+			margin-top: 32px;
+		}
+	}
+</style>

@@ -1,0 +1,139 @@
+---
+/*
+ * The Parameters grid of screen 1h.
+ *
+ * A grid rather than a `<table>` so the three columns keep their widths while
+ * a description wraps; each type is run through the essence grammar, which is
+ * what gives it the same blue a type has everywhere else on the page.
+ */
+
+import { Code } from "astro:components"
+
+import { ESSENCE_LANG, ESSENCE_THEMES } from "./essenceLang.ts"
+
+export interface Param {
+	name: string
+	type: string
+	description: string
+}
+
+interface Props {
+	params: Param[]
+}
+
+let { params } = Astro.props
+---
+
+<div class="params">
+	<div class="params__head">
+		<span>Name</span>
+		<span>Type</span>
+		<span>Description</span>
+	</div>
+	{
+		params.map((param) => (
+			<div class="params__row">
+				<span class="params__name">{param.name}</span>
+				<span class="params__type">
+					<Code
+						code={param.type}
+						lang={ESSENCE_LANG}
+						themes={ESSENCE_THEMES}
+						defaultColor={false}
+						inline
+					/>
+				</span>
+				<span class="params__description">{param.description}</span>
+			</div>
+		))
+	}
+</div>
+
+<style>
+	.params {
+		margin-top: 14px;
+		border: 1px solid var(--hairline-soft);
+		border-radius: 9px;
+		overflow: hidden;
+	}
+
+	.params__head,
+	.params__row {
+		display: grid;
+		grid-template-columns: 150px 190px 1fr;
+		gap: 16px;
+	}
+
+	.params__head {
+		padding: 10px 16px;
+		border-bottom: 1px solid var(--hairline-soft);
+		background: var(--surface-raised);
+		font-family: var(--font-mono);
+		font-size: 11px;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		color: var(--text-faint);
+	}
+
+	.params__row {
+		padding: 14px 16px;
+		align-items: baseline;
+	}
+
+	.params__row + .params__row {
+		border-top: 1px solid var(--hairline-softest);
+	}
+
+	.params__name {
+		font-family: var(--font-mono);
+		font-size: 13.5px;
+		color: var(--text-strong);
+	}
+
+	/* `<Code inline>` renders a bare `<code>`, which takes its size from here. */
+	.params__type {
+		font-family: var(--font-mono);
+		font-size: 13.5px;
+		min-width: 0;
+		overflow-wrap: anywhere;
+	}
+
+	/*
+	 * A table used inside MDX sits in `.prose`, whose inline-code rule would
+	 * wrap the highlighted type in the accent pill. The tokens inside keep
+	 * their own colours; only this wrapper has to be talked back down.
+	 */
+	.params__type :global(code) {
+		padding: 0;
+		border-radius: 0;
+		background: none;
+		color: var(--code-text);
+	}
+
+	.params__description {
+		font-size: 14.5px;
+		line-height: 1.55;
+		color: var(--text-muted);
+		text-wrap: pretty;
+	}
+
+	/*
+	 * At 390px the three columns become three rows; the head would then label
+	 * nothing, so it goes and each cell carries its own weight.
+	 */
+	@media (max-width: 800px) {
+		.params__head {
+			display: none;
+		}
+
+		.params__row {
+			grid-template-columns: 1fr;
+			gap: 4px;
+			padding: 14px 16px;
+		}
+
+		.params__row + .params__row {
+			border-top: 1px solid var(--hairline-softest);
+		}
+	}
+</style>

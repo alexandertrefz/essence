@@ -1,0 +1,47 @@
+---
+/*
+ * The row of pills that closes a reference entry — screen 1h.
+ */
+
+interface Props {
+	links: { label: string; href: string }[]
+}
+
+let { links } = Astro.props
+---
+
+<div class="see-also">
+	{
+		links.map((link) => (
+			<a class="see-also__pill" href={link.href}>
+				{link.label}
+			</a>
+		))
+	}
+</div>
+
+<style>
+	.see-also {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 10px;
+		margin-top: 14px;
+	}
+
+	/* Used inside MDX, so `.prose a`'s underline has to be taken back off. */
+	.see-also__pill {
+		text-decoration: none;
+		padding: 7px 12px;
+		border: 1px solid var(--border);
+		border-radius: 6px;
+		background: var(--surface-raised);
+		font-family: var(--font-mono);
+		font-size: 13px;
+		color: var(--text-strong);
+	}
+
+	.see-also__pill:hover {
+		border-color: var(--accent-hover-border);
+		color: var(--text-hero);
+	}
+</style>

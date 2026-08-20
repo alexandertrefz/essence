@@ -1,0 +1,399 @@
+---
+/*
+ * The documentation entry point — screen 1e.
+ *
+ * The design's fourth card is a fabricated release feed ("0.4.2 — match arms
+ * may now return early"). There are no releases and no changelog, so its place
+ * goes to the one thing that is true and useful: where the source is.
+ *
+ * The "Most Read" list is resolved against the collection rather than written
+ * out here — a page that has not been written yet simply does not appear, and
+ * a renamed one is a missing row instead of a dead link.
+ */
+
+import { getCollection } from "astro:content"
+
+import RichText from "../../components/RichText.astro"
+import DocsLayout from "../../layouts/DocsLayout.astro"
+import { getSidebar, toDocLink } from "../../lib/navigation.ts"
+import {
+	GITHUB_COMMITS_URL,
+	GITHUB_URL,
+	ROUTES,
+} from "../../lib/site.ts"
+
+let entries = await getCollection("docs")
+let sections = getSidebar(entries)
+
+let steps = [
+	{
+		step: "Step 1",
+		title: "Install It",
+		description:
+			"One package from the npm registry, with whichever package manager the project already uses.",
+		linkLabel: "Installation",
+		href: ROUTES.getStarted,
+	},
+	{
+		step: "Step 2",
+		title: "Run A Program",
+		description:
+			"Four steps from an empty file to a program the compiler has proved correct.",
+		linkLabel: "Your first program",
+		href: ROUTES.firstProgram,
+	},
+	{
+		step: "Step 3",
+		title: "Lay Out A Project",
+		description:
+			"What a program is without a manifest, and what the compiler writes where.",
+		linkLabel: "Project layout",
+		href: ROUTES.projectLayout,
+	},
+]
+
+// NOTE: Ids, not paths — resolved below, so a slug that does not exist yet is
+// dropped rather than published as a link to nowhere.
+let MOST_READ = [
+	"language/pattern-matching",
+	"standard-library/numbers",
+	"language/values-and-constants",
+	"reference/diagnostics",
+]
+
+let mostRead = MOST_READ.flatMap((id) => {
+	let entry = entries.find((candidate) => candidate.id === id)
+
+	return entry === undefined ? [] : [toDocLink(entry)]
+})
+---
+
+<DocsLayout
+	title="Documentation"
+	description="Everything about the language, the standard library and the toolchain."
+	sections={sections}
+	variant="overview"
+>
+	<p class="eyebrow">Documentation</p>
+	<h1 class="title">Learn essence</h1>
+	<p class="lede">
+		Getting Started is published: install the toolchain, write a program, and
+		see what the compiler writes. The Language, Standard Library, Guides and
+		Reference sections are written and are being verified against the current
+		compiler before they go up.
+	</p>
+
+	<div class="steps">
+		{
+			steps.map((step) => (
+				<a class="step" href={step.href}>
+					<span class="step__eyebrow">{step.step}</span>
+					<span class="step__title">{step.title}</span>
+					<span class="step__body">{step.description}</span>
+					<span class="step__link">
+						{step.linkLabel}
+						<svg
+							class="arrow"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							aria-hidden="true"
+						>
+							<path d="M5 12l14 0" />
+							<path d="M13 18l6 -6" />
+							<path d="M13 6l6 6" />
+						</svg>
+					</span>
+				</a>
+			))
+		}
+	</div>
+
+	<div class="lower">
+		{
+			mostRead.length > 0 && (
+				<section aria-labelledby="most-read">
+					<h2 class="section-label" id="most-read">
+						Most Read
+					</h2>
+					<div class="reads">
+						{mostRead.map((link) => (
+							<a class="read" href={link.href}>
+								<span class="read__title">{link.title}</span>
+								<span class="read__body">
+									<RichText text={link.description} />
+								</span>
+							</a>
+						))}
+					</div>
+				</section>
+			)
+		}
+
+		<section class="source" aria-labelledby="source">
+			<h2 class="section-label" id="source">Source</h2>
+			<div class="source__lines">
+				<div class="source__version">Early preview</div>
+				<div class="source__dim">MIT licensed</div>
+				<div class="source__dim">alexandertrefz/essence</div>
+			</div>
+			<a class="source__link" href={GITHUB_URL}>
+				View on GitHub
+				<svg
+					class="arrow"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+					aria-hidden="true"
+				>
+					<path d="M5 12l14 0"></path>
+					<path d="M13 18l6 -6"></path>
+					<path d="M13 6l6 6"></path>
+				</svg>
+			</a>
+			<a class="source__link" href={GITHUB_COMMITS_URL}>
+				Recent commits
+				<svg
+					class="arrow"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+					aria-hidden="true"
+				>
+					<path d="M5 12l14 0"></path>
+					<path d="M13 18l6 -6"></path>
+					<path d="M13 6l6 6"></path>
+				</svg>
+			</a>
+		</section>
+	</div>
+</DocsLayout>
+
+<style>
+	.eyebrow {
+		font-family: var(--font-mono);
+		font-size: 12px;
+		letter-spacing: 0.12em;
+		text-transform: uppercase;
+		color: var(--accent-eyebrow);
+	}
+
+	.title {
+		margin-top: 14px;
+		font-size: 44px;
+		line-height: 1.05;
+		letter-spacing: -0.015em;
+		color: var(--text-hero);
+	}
+
+	.lede {
+		margin-top: 16px;
+		max-width: 620px;
+		font-size: 18px;
+		line-height: 1.6;
+		color: var(--text-body);
+	}
+
+	.arrow {
+		display: inline-block;
+		width: 1.3em;
+		height: 1.3em;
+		vertical-align: -0.3em;
+	}
+
+	/* The three entry points */
+
+	.steps {
+		display: grid;
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+		gap: 20px;
+		margin-top: 40px;
+	}
+
+	.step {
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+		min-height: 178px;
+		padding: 22px 22px 20px;
+		border-radius: 10px;
+		background: var(--surface);
+		box-shadow: var(--card-shadow);
+	}
+
+	/*
+	 * The accent ring is layered over the card's own — `--card-shadow` carries
+	 * the ring and the theme's lift together, and only the ring changes here.
+	 */
+	.step:hover {
+		box-shadow:
+			0 0 0 1px var(--accent-hover-border),
+			var(--accent-focus-glow),
+			var(--card-shadow);
+	}
+
+	.step__eyebrow {
+		font-family: var(--font-mono);
+		font-size: 11px;
+		letter-spacing: 0.12em;
+		text-transform: uppercase;
+		color: var(--accent-eyebrow);
+	}
+
+	.step__title {
+		font-family: var(--font-heading);
+		font-weight: 500;
+		font-size: 19px;
+		color: var(--text-heading);
+	}
+
+	.step__body {
+		font-size: 14.5px;
+		line-height: 1.5;
+		color: var(--text-muted);
+		text-wrap: pretty;
+	}
+
+	.step__link {
+		margin-top: auto;
+		font-family: var(--font-mono);
+		font-size: 12px;
+		color: var(--accent);
+	}
+
+	/* Most read, and where the source lives */
+
+	.lower {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) 300px;
+		gap: 40px;
+		margin-top: 56px;
+	}
+
+	.section-label {
+		font-family: var(--font-mono);
+		font-size: 11px;
+		font-weight: 400;
+		letter-spacing: 0.12em;
+		text-transform: uppercase;
+		color: var(--text-faintest);
+	}
+
+	.reads {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		margin: 14px -12px 0;
+	}
+
+	.read {
+		display: flex;
+		align-items: baseline;
+		gap: 16px;
+		padding: 12px;
+		border-radius: 8px;
+	}
+
+	.read:hover {
+		background: var(--surface-hover);
+	}
+
+	.read__title {
+		width: 200px;
+		flex: none;
+		font-family: var(--font-heading);
+		font-weight: 500;
+		font-size: 16px;
+		color: var(--text-strong);
+	}
+
+	.read__body {
+		font-size: 14px;
+		color: var(--text-dimmer);
+		text-wrap: pretty;
+	}
+
+	.source {
+		align-self: start;
+		padding: 20px;
+		border: 1px solid var(--hairline);
+		border-radius: 10px;
+		background: var(--surface-raised);
+	}
+
+	.source__lines {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+		margin-top: 14px;
+		font-family: var(--font-mono);
+		font-size: 12.5px;
+		line-height: 1.5;
+		color: var(--text-strong);
+	}
+
+	.source__version {
+		color: var(--accent);
+	}
+
+	.source__dim {
+		color: var(--text-dimmer);
+	}
+
+	.source__link {
+		display: block;
+		margin-top: 18px;
+		font-family: var(--font-mono);
+		font-size: 12px;
+		color: var(--accent-eyebrow);
+	}
+
+	.source__link:hover {
+		color: var(--accent);
+	}
+
+	@media (max-width: 800px) {
+		.title {
+			font-size: 32px;
+		}
+
+		.lede {
+			font-size: 16.5px;
+		}
+
+		.steps {
+			grid-template-columns: minmax(0, 1fr);
+			gap: 12px;
+			margin-top: 28px;
+		}
+
+		.step {
+			min-height: 0;
+			padding: 18px;
+		}
+
+		.lower {
+			grid-template-columns: minmax(0, 1fr);
+			gap: 32px;
+			margin-top: 40px;
+		}
+
+		.read {
+			flex-direction: column;
+			gap: 4px;
+		}
+
+		.read__title {
+			width: auto;
+		}
+	}
+</style>

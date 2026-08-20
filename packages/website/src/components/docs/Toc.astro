@@ -1,0 +1,161 @@
+---
+/*
+ * The on-this-page rail — screens 1f / 1h / 7b.
+ *
+ * A sticky list of the page's own headings with an accent rail on the active
+ * one. The rail is a left box-shadow rather than a border so it lands exactly
+ * on the hairline the list hangs from instead of beside it.
+ */
+
+import type { TocItem } from "../../lib/navigation.ts"
+
+interface Props {
+	items: TocItem[]
+	/** "On this page" for articles, "Steps" for a guide. */
+	label?: string
+	editUrl?: string
+	issueUrl?: string
+}
+
+let {
+	items,
+	label = "On this page",
+	editUrl,
+	issueUrl,
+} = Astro.props
+
+let hasLinks = editUrl !== undefined || issueUrl !== undefined
+---
+
+<div class="toc">
+	{
+		items.length > 0 && (
+			<>
+				<div class="toc__label">{label}</div>
+				<nav class="toc__list" aria-label={label}>
+					{items.map((item) => (
+						<a
+							class="toc__link"
+							class:list={{ "toc__link--nested": item.depth > 2 }}
+							href={`#${item.slug}`}
+							data-toc-link={item.slug}
+						>
+							{item.text}
+						</a>
+					))}
+				</nav>
+			</>
+		)
+	}
+
+	<slot />
+
+	{
+		hasLinks && (
+			<div
+				class="toc__meta"
+				class:list={{ "toc__meta--bare": items.length === 0 }}
+			>
+				{editUrl !== undefined && <a href={editUrl}>Edit this page</a>}
+				{issueUrl !== undefined && <a href={issueUrl}>Report an issue</a>}
+			</div>
+		)
+	}
+</div>
+
+<style>
+	/*
+	 * 1f measures the rail at 24px from the top of a page that does not
+	 * scroll. Ours does, under a sticky header — so the offset is the header
+	 * plus that 24px, or the list would ride up underneath it.
+	 */
+	.toc {
+		position: sticky;
+		top: calc(var(--header-height-docs) + 24px);
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+	}
+
+	.toc__label {
+		font-family: var(--font-mono);
+		font-size: 11px;
+		letter-spacing: 0.12em;
+		text-transform: uppercase;
+		color: var(--text-faintest);
+	}
+
+	.toc__list {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		border-left: 1px solid var(--hairline-soft);
+	}
+
+	.toc__link {
+		padding: 6px 0 6px 14px;
+		font-family: var(--font-body);
+		font-size: 13.5px;
+		color: var(--text-dim);
+		text-wrap: pretty;
+	}
+
+	.toc__link--nested {
+		padding-left: 26px;
+	}
+
+	.toc__link:hover {
+		color: var(--text-strong);
+	}
+
+	.toc__link.is-active {
+		color: var(--accent);
+		box-shadow: -1px 0 0 0 var(--accent-strong);
+	}
+
+	.toc__meta {
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+		margin-top: 18px;
+		padding-top: 18px;
+		border-top: 1px solid var(--hairline-softest);
+		font-family: var(--font-mono);
+		font-size: 12px;
+	}
+
+	/* With no headings above it there is nothing to rule off. */
+	.toc__meta--bare {
+		margin-top: 0;
+		padding-top: 0;
+		border-top: 0;
+	}
+
+	.toc__meta a {
+		color: var(--text-dimmer);
+	}
+
+	.toc__meta a:hover {
+		color: var(--accent);
+	}
+
+	/*
+	 * The heading list is desktop furniture — 1k puts it in the sticky bar
+	 * under the header instead. What is left of this column (the guide's
+	 * "Stuck?" card, the two repository links) stacks under the article.
+	 */
+	@media (max-width: 800px) {
+		.toc {
+			position: static;
+		}
+
+		.toc__label,
+		.toc__list {
+			display: none;
+		}
+
+		.toc__meta {
+			margin-top: 24px;
+		}
+	}
+</style>

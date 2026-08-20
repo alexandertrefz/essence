@@ -1,0 +1,79 @@
+---
+/*
+ * `Docs / Section / Title` — screens 1f, 1g, 1h; 1k drops the first crumb to
+ * keep the row on one line at 390px.
+ */
+
+import type { Crumb } from "../../lib/navigation.ts"
+
+interface Props {
+	crumbs: Crumb[]
+}
+
+let { crumbs } = Astro.props
+---
+
+<nav class="crumbs" aria-label="Breadcrumb">
+	{
+		crumbs.map((crumb, index) => (
+			<>
+				{index > 0 && <span class="crumbs__slash">/</span>}
+				{crumb.href === undefined || crumb.current === true ? (
+					<span
+						class="crumbs__crumb"
+						class:list={{ "crumbs__crumb--current": crumb.current }}
+						aria-current={crumb.current === true ? "page" : undefined}
+					>
+						{crumb.label}
+					</span>
+				) : (
+					<a class="crumbs__crumb crumbs__crumb--link" href={crumb.href}>
+						{crumb.label}
+					</a>
+				)}
+			</>
+		))
+	}
+</nav>
+
+<style>
+	.crumbs {
+		display: flex;
+		align-items: center;
+		flex-wrap: wrap;
+		gap: 8px;
+		padding-bottom: 18px;
+		font-family: var(--font-mono);
+		font-size: 12px;
+		color: var(--text-faintest);
+	}
+
+	.crumbs__crumb--link {
+		color: var(--text-dimmer);
+	}
+
+	.crumbs__crumb--link:hover {
+		color: var(--accent);
+	}
+
+	.crumbs__crumb--current {
+		color: var(--accent-eyebrow);
+	}
+
+	@media (max-width: 800px) {
+		.crumbs {
+			gap: 7px;
+			padding-bottom: 0;
+			font-size: 11px;
+		}
+
+		/*
+		 * "Docs" and its slash: the header already says where you are, and the
+		 * row has to survive a long title at 390px.
+		 */
+		.crumbs__crumb:first-child,
+		.crumbs__crumb:first-child + .crumbs__slash {
+			display: none;
+		}
+	}
+</style>

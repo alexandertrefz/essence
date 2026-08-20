@@ -1,0 +1,127 @@
+---
+/*
+ * One step of a guide — screen 1g. A numbered circle, the rail that connects it
+ * to the next one, and whatever the MDX puts in the body.
+ *
+ * NOTE: The title is a real `<h2>` with an id, so it can be linked to and read
+ * as structure — but it is JSX, not Markdown, so it is not in the `headings`
+ * the on-this-page list is built from. A guide that wants its steps listed
+ * there writes Markdown headings instead.
+ */
+
+interface Props {
+	title: string
+	/** Override the anchor derived from the title. */
+	id?: string
+}
+
+let { title, id } = Astro.props
+
+function slugify(text: string): string {
+	return text
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, "-")
+		.replace(/^-+|-+$/g, "")
+}
+
+let anchor = id ?? slugify(title)
+---
+
+<div class="step">
+	<div class="step__gutter">
+		<div class="step__marker"></div>
+		<div class="step__rail"></div>
+	</div>
+	<div class="step__body">
+		<h2 class="step__title" id={anchor}>{title}</h2>
+		<slot />
+	</div>
+</div>
+
+<style>
+	.step {
+		display: grid;
+		grid-template-columns: 34px 1fr;
+		gap: 20px;
+	}
+
+	.step__gutter {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 8px;
+	}
+
+	.step__marker {
+		width: 34px;
+		height: 34px;
+		flex: none;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		border: 1px solid var(--divider);
+		border-radius: 50%;
+		background: var(--surface);
+		font-family: var(--font-mono);
+		font-size: 13px;
+		color: var(--accent-eyebrow);
+	}
+
+	.step__marker::before {
+		counter-increment: step;
+		content: counter(step);
+	}
+
+	.step__rail {
+		width: 1px;
+		flex: 1;
+		background: var(--hairline);
+	}
+
+	/* Nothing to connect to after the last step. */
+	.step:last-child .step__rail {
+		display: none;
+	}
+
+	.step__body {
+		padding-bottom: 4px;
+		min-width: 0;
+	}
+
+	.step__title {
+		margin: 0;
+		font-family: var(--font-heading);
+		font-weight: 500;
+		font-size: 21px;
+		line-height: 1.25;
+		color: var(--text-heading);
+		scroll-margin-top: calc(var(--header-height-docs) + 24px);
+	}
+
+	/* Slotted Markdown keeps the page's scope — reached through `:global`. */
+	.step__body :global(p) {
+		margin: 10px 0 0;
+		line-height: 1.65;
+	}
+
+	.step__body :global(pre) {
+		margin-top: 16px;
+	}
+
+	@media (max-width: 800px) {
+		.step {
+			grid-template-columns: 28px 1fr;
+			gap: 14px;
+		}
+
+		.step__marker {
+			width: 28px;
+			height: 28px;
+			font-size: 12px;
+		}
+
+		.step__title {
+			font-size: 18px;
+		}
+	}
+</style>

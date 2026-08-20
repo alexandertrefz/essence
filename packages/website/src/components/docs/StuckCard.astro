@@ -1,0 +1,54 @@
+---
+/*
+ * The "Stuck?" card that sits under a guide's on-this-page rail — screen 1g.
+ *
+ * The design sends the reader to a Discord channel. There is no Discord, so it
+ * sends them where a question actually gets read: the repository's issues.
+ */
+
+import { GITHUB_ISSUES_URL } from "../../lib/site.ts"
+---
+
+<div class="stuck">
+	<div class="stuck__label">Stuck?</div>
+	<p class="stuck__body">
+		{/* NOTE: The explicit space is load-bearing — a newline between text and
+		an element is dropped, not collapsed to a space. */}
+		Anything that does not behave the way this page says it does is a bug.{" "}
+		<a href={GITHUB_ISSUES_URL}>Open an issue</a> — it is read.
+	</p>
+</div>
+
+<style>
+	.stuck {
+		margin-top: 18px;
+		padding: 14px;
+		border: 1px solid var(--hairline);
+		border-radius: 9px;
+		background: var(--surface-raised);
+	}
+
+	.stuck__label {
+		font-family: var(--font-mono);
+		font-size: 11px;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		color: var(--text-faintest);
+	}
+
+	.stuck__body {
+		margin-top: 8px;
+		font-size: 13.5px;
+		line-height: 1.5;
+		color: var(--text-muted);
+		text-wrap: pretty;
+	}
+
+	.stuck__body a {
+		color: var(--accent-eyebrow);
+	}
+
+	.stuck__body a:hover {
+		color: var(--accent);
+	}
+</style>

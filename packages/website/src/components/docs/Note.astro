@@ -1,0 +1,87 @@
+---
+/*
+ * The accent callout of screen 1f — a 3px rail, a mono label and a paragraph.
+ * Exposed to MDX so content writes `<Note>…</Note>`; the label can be changed
+ * (`<Note label="Caution">`) but the shape stays the one shape.
+ */
+
+interface Props {
+	label?: string
+}
+
+let { label = "Note" } = Astro.props
+---
+
+<aside class="note">
+	<span class="note__rail"></span>
+	<div>
+		<div class="note__label">{label}</div>
+		<div class="note__body"><slot /></div>
+	</div>
+</aside>
+
+<style>
+	.note {
+		display: flex;
+		gap: 14px;
+		margin-top: 24px;
+		padding: 16px 18px;
+		border: 1px solid var(--accent-note-border);
+		border-radius: 8px;
+		background: var(--accent-note-bg);
+	}
+
+	.note__rail {
+		width: 3px;
+		border-radius: 2px;
+		background: var(--accent-strong);
+		flex: none;
+	}
+
+	.note__label {
+		padding-bottom: 6px;
+		font-family: var(--font-mono);
+		font-size: 11px;
+		letter-spacing: 0.12em;
+		text-transform: uppercase;
+		color: var(--accent-note-label);
+	}
+
+	.note__body {
+		font-size: 15px;
+		line-height: 1.6;
+		color: var(--text-strong);
+	}
+
+	/*
+	 * Slotted markdown carries the page's scope, not this component's, so the
+	 * paragraphs `prose.css` already styled are reached through `:global`.
+	 */
+	.note__body :global(p) {
+		margin: 10px 0 0;
+		font-size: inherit;
+		line-height: inherit;
+	}
+
+	.note__body :global(:first-child) {
+		margin-top: 0;
+	}
+
+	@media (max-width: 800px) {
+		.note {
+			gap: 12px;
+			margin-top: 18px;
+			padding: 14px 16px;
+		}
+
+		.note__label {
+			padding-bottom: 5px;
+			font-size: 10.5px;
+		}
+
+		.note__body {
+			font-size: 14px;
+			line-height: 1.55;
+		}
+	}
+</style>

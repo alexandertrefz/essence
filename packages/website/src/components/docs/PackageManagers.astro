@@ -1,0 +1,50 @@
+---
+/*
+ * The same command, once per package manager, as a tab bar with a copy button.
+ *
+ * Every block on a page shares one group, so picking `bun` in the first one
+ * picks it in all of them and the choice is remembered on the next page. That
+ * is the whole reason this is a component rather than four lines in a `sh`
+ * fence: a reader picks their manager once instead of reading past three
+ * commands that are not theirs, every time.
+ *
+ * Props are the managers themselves. Omit one and it has no tab — Yarn has no
+ * global install to document, and a block that offers three tabs still answers
+ * a reader whose remembered pick is the fourth by keeping what it has.
+ */
+
+import CodeWindow from "../CodeWindow.astro"
+
+interface Props {
+	npm?: string
+	pnpm?: string
+	yarn?: string
+	bun?: string
+	badge?: string
+}
+
+let { npm, pnpm, yarn, bun, badge } = Astro.props
+
+// NOTE: One order, declared once, so a manager's tab sits in the same place in
+// every block a page shows — and so a block that omits one does not shift the
+// rest sideways.
+let managers: Array<[string, string | undefined]> = [
+	["npm", npm],
+	["pnpm", pnpm],
+	["yarn", yarn],
+	["bun", bun],
+]
+
+let files = managers
+	.filter((entry): entry is [string, string] => entry[1] !== undefined)
+	.map(([name, command]) => ({ name, code: command, lang: "sh" }))
+---
+
+<CodeWindow
+	files={files}
+	variant="command"
+	group="package-manager"
+	badge={badge}
+	class="code-bare"
+	copy
+/>

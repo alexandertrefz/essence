@@ -1,0 +1,134 @@
+---
+/*
+ * The docs tree — screens 1e/1f/1h (the rail) and 1m (the same tree inside the
+ * mobile menu).
+ *
+ * One component with two skins rather than two trees: the mobile menu gets the
+ * exact list the rail shows, so a page can never be reachable on one and
+ * missing from the other.
+ */
+
+import SidebarBranch from "./SidebarBranch.astro"
+import { DOCS_ROOT, type SidebarSection } from "../../lib/navigation.ts"
+
+interface Props {
+	sections: SidebarSection[]
+	/** Collection id of the page being read, if any. */
+	activeId?: string
+	variant?: "rail" | "mobile"
+}
+
+let { sections, activeId, variant = "rail" } = Astro.props
+let overviewActive = activeId === undefined
+---
+
+<nav class="tree" data-variant={variant} aria-label="Documentation">
+	<a
+		class="overview"
+		class:list={{ "is-active": overviewActive }}
+		href={DOCS_ROOT}
+		aria-current={overviewActive ? "page" : undefined}
+	>
+		Overview
+	</a>
+
+	{
+		sections.map((section) => (
+			<div class="group">
+				<div class="group__label">{section.label}</div>
+				<SidebarBranch
+					items={section.items}
+					activeId={activeId}
+					mono={section.id === "reference"}
+					variant={variant}
+				/>
+			</div>
+		))
+	}
+</nav>
+
+<style>
+	.tree {
+		display: flex;
+		flex-direction: column;
+	}
+
+	/* The rail — 1f. Its own hairline is the grid's only vertical rule. */
+
+	.tree[data-variant="rail"] {
+		gap: 26px;
+		padding: 32px 24px 64px 0;
+		border-right: 1px solid var(--hairline-softest);
+	}
+
+	.tree[data-variant="rail"] .overview {
+		padding: 8px 12px;
+		border-radius: 7px;
+		font-family: var(--font-body);
+		font-size: 14px;
+		font-weight: 500;
+		color: var(--text-body);
+	}
+
+	.tree[data-variant="rail"] .group {
+		display: flex;
+		flex-direction: column;
+		gap: 9px;
+	}
+
+	.tree[data-variant="rail"] .group__label {
+		padding: 0 0 3px 12px;
+		font-family: var(--font-mono);
+		font-size: 11px;
+		letter-spacing: 0.12em;
+		text-transform: uppercase;
+		color: var(--text-faintest);
+	}
+
+	/* The mobile tree — 1m. Same order, touch-sized rows. */
+
+	.tree[data-variant="mobile"] .overview {
+		padding: 11px 12px;
+		border-radius: 8px;
+		font-family: var(--font-heading);
+		font-weight: 500;
+		font-size: 15px;
+		color: var(--text-strong);
+	}
+
+	.tree[data-variant="mobile"] .group__label {
+		padding: 18px 12px 6px;
+		font-family: var(--font-mono);
+		font-size: 11px;
+		letter-spacing: 0.12em;
+		text-transform: uppercase;
+		color: var(--text-faintest);
+	}
+
+	.tree[data-variant="mobile"] .group {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+	}
+
+	/*
+	 * Shared states. Written with the same weight as the variant rules above
+	 * and placed after them, so the colour a state sets is the one that lands.
+	 */
+
+	.tree .overview:hover {
+		color: var(--text-hero);
+		background: var(--surface-hover);
+	}
+
+	/*
+	 * The ring is an inset shadow rather than a border: a real border would add
+	 * two pixels to the active row and nudge every label beside it.
+	 */
+	.tree .overview.is-active {
+		font-weight: 500;
+		color: var(--text-hero);
+		background: var(--accent-soft-bg-strong);
+		box-shadow: inset 0 0 0 1px var(--accent-active-border);
+	}
+</style>
