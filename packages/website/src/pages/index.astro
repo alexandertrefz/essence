@@ -1,0 +1,337 @@
+---
+/*
+ * The landing page — screens 1d (dark) and 7a (light), collapsing to 1j at
+ * 800px, less the code window those screens draw beside the headline: the hero
+ * is copy alone, and the samples start at the feature cards.
+ *
+ * Every sample below is a fragment: the `implementation {}` that is a real
+ * file's top level is left off, because on a landing page the wrapper is a tax
+ * on the first thing anyone reads.
+ *
+ * Three of them close with the JavaScript they replace, written in `§`
+ * comments. The Essence goes first in every one: the reader came to see this
+ * language, and a card that opens on somebody else's syntax spends its first
+ * line on the wrong one.
+ *
+ * They are Essence, and they are held to the compiler. The four the design drew
+ * were not, and were carried verbatim for a long time: they had `plus` for
+ * `add`, `return` for `<-`, `first()` for `firstItem()`, a bare `print` rather
+ * than `Terminal.print`, `Nothing` where the Optional cases are `#Value` and
+ * `#Empty`, and `listOfIntegers` and `amount` were never declared anywhere.
+ * `essence check` rejected all four.
+ *
+ * To hold one to the compiler again: wrap it back in an `implementation {}` and
+ * hand it to `essence check`. Two of them reach for a binding they do not
+ * declare — `state` is a Record with a `user` in it, and `items` is a List of
+ * Records with a `price` — so those two want a line in front of them, which is
+ * the one liberty a fragment takes. `essence format` leaves them exactly as they
+ * are written here.
+ *
+ * THE ARITHMETIC SAMPLE IS THE ONE EXCEPTION, and deliberately so: it is
+ * written in decimal literals, which are planned and not in the language yet.
+ * `essence check` answers `Expected an Identifier but found '1'` at the `0.1`,
+ * because `0.` starts a member access today. The shape around them is already
+ * right — a literal receiver takes a Method, so `1/10::add(2/10)::is(3/10)`
+ * passes — so the sample starts passing the day the literals land. Until then
+ * it is the page's one unchecked claim; the other three hold.
+ *
+ * The two decorative layers sit in `.page__backdrop`, which deliberately has
+ * no `overflow` of its own: an overflow on an ancestor of the sticky header
+ * would make it stick to that box instead of the viewport.
+ */
+
+import BatteriesCard from "../components/marketing/BatteriesCard.astro";
+import FeatureCard from "../components/marketing/FeatureCard.astro";
+import InPractice from "../components/marketing/InPractice.astro";
+import SiteFooter from "../components/SiteFooter.astro";
+import SiteHeader from "../components/SiteHeader.astro";
+import BaseLayout from "../layouts/BaseLayout.astro";
+import { HERO_SUBLINE, ROUTES } from "../lib/site.ts";
+
+// NOTE: Ordered by the height of the sample, not by argument: the grid is two
+// columns, so entries 1–2 share a row and 3–4 share the next, and a row is as
+// tall as its taller card. The two four-line samples pair off, the two
+// five-line ones pair off, and neither row carries slack under the shorter of
+// its two. Reordering these means checking that pairing again.
+let features = [
+	{
+		title: "Precise Arithmetic",
+		description:
+			"Arbitrary-precision integers and rationals, so your calculations are always accurate.",
+		code: `0.1::add(0.2)::is(0.3) § true
+
+§ JavaScript
+§ 0.1 + 0.2 == 0.3 // false`,
+	},
+	{
+		title: "Easy State Management",
+		description:
+			"Every data type is immutable, so equality is structural and state stays predictable.",
+		code: `constant recordA = { items = [1, 2], ok = true }
+constant recordB = { items = [1, 2], ok = true }
+
+recordA::is(recordB) § true`,
+	},
+	{
+		title: "No Runtime Errors",
+		description:
+			"A value that might be missing does not compile until you handle the case, so undefined never reaches your users.",
+		code: `match items::item(at 10) -> Integer {
+	case #Value(item) { <- item.price }
+	case #Empty       { <- 0 }
+}
+
+§ items[10].price // undefined is not an object`,
+	},
+	{
+		title: "Clutter-Free Syntax",
+		description:
+			"Write what you mean and nothing more, so there is no ceremony to read past.",
+		code: `constant next = { state with { user.name = "Ada" } }
+
+§ const next = {
+§   ...state,
+§   user: { ...state.user, name: "Ada" },
+§ }`,
+	},
+];
+---
+
+<BaseLayout title="essence — reliable, flexible, delightful" bareTitle>
+	<div class="page">
+		<div class="page__backdrop" aria-hidden="true">
+			<div class="hatch"></div>
+			<div class="glow"></div>
+		</div>
+
+		<SiteHeader variant="marketing" />
+
+		<main>
+			<section class="hero">
+				<div class="hero__copy">
+					<h1 class="hero__title">Reliable. Flexible. Delightful.</h1>
+
+					<p class="hero__subline">{HERO_SUBLINE}</p>
+
+					<div class="hero__ctas">
+						<a class="cta" href={ROUTES.getStarted}>
+							Get started
+							<svg
+								width="17"
+								height="17"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="var(--accent)"
+								stroke-width="2"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								aria-hidden="true"
+							>
+								<path d="M5 12l14 0"></path>
+								<path d="M13 18l6 -6"></path>
+								<path d="M13 6l6 6"></path>
+							</svg>
+						</a>
+					</div>
+				</div>
+			</section>
+
+			{
+				/*
+				 * No heading is drawn: the four cards say what they are, and the
+				 * hero's own bottom padding is all the separation the grid needs.
+				 * The landmark keeps the name in `aria-label`, so a screen reader
+				 * still announces the section rather than arriving at four
+				 * unexplained cards.
+				 */
+			}
+			<section class="features" id="goals" aria-label="Why Essence">
+
+				<div class="features__grid">
+					{features.map((feature) => <FeatureCard {...feature} />)}
+					<BatteriesCard />
+				</div>
+			</section>
+
+			<InPractice />
+		</main>
+	</div>
+
+	<SiteFooter />
+</BaseLayout>
+
+<style>
+	.page {
+		position: relative;
+	}
+
+	.page__backdrop {
+		position: absolute;
+		inset: 0;
+		pointer-events: none;
+		z-index: 0;
+	}
+
+	.hero,
+	.features {
+		position: relative;
+		z-index: 1;
+	}
+
+	/* Hero — 1d */
+
+	.hero {
+		padding: 104px var(--gutter) 96px;
+	}
+
+	.hero__copy {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 26px;
+	}
+
+	/*
+	 * The headline runs on one line at every width. Set that way it measures
+	 * 12.385× its font size (General Sans 500 at this tracking, measured);
+	 * 12.7 is that with room for a rounding difference between engines. The
+	 * space it has is the viewport less the gutter on both sides — read from
+	 * the token rather than written as a number, so it follows the gutter's
+	 * own steps down. `min()` keeps 62px as the ceiling so nothing grows past
+	 * the design. No `nowrap`: if the measure is ever off, a wrap is a far
+	 * better failure than a page that scrolls sideways.
+	 */
+	.hero__title {
+		font-size: min(62px, calc((100vw - 2 * var(--gutter)) / 12.7));
+		line-height: 1.02;
+		letter-spacing: -0.015em;
+		color: var(--text-hero);
+	}
+
+	/*
+	 * Measured, not chosen: the subline is three clauses, and this is the width
+	 * that puts the line break on the first comma rather than inside a clause.
+	 * The window that does it is about 580–650px — under it "them," drops to
+	 * the second line, over it "fits" climbs to the first — so 610 sits in the
+	 * middle of the range with room either side for a font that rounds
+	 * differently. Rewriting the subline means measuring this again.
+	 */
+	.hero__subline {
+		max-width: 610px;
+		font-size: 19px;
+		line-height: 1.5;
+		color: var(--text-body);
+	}
+
+	/* The wrapper survives its second child: it is what holds the call to
+	   action off the subline above it, and `inline-flex` on the link itself
+	   would stretch the underline across the column. */
+	.hero__ctas {
+		display: flex;
+		align-items: center;
+		padding-top: 10px;
+	}
+
+	/*
+	 * The call to action is an underline rather than a button: a 2px rule drawn
+	 * as `::after` so it sits on the text's box and not on a padded pill.
+	 */
+	.cta {
+		position: relative;
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		padding: 10px 2px;
+		font-family: var(--font-heading);
+		font-weight: 500;
+		font-size: 14px;
+		letter-spacing: 0.005em;
+		color: var(--text-strong);
+	}
+
+	.cta::after {
+		content: "";
+		position: absolute;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		height: 2px;
+		border-radius: 1px;
+		background: var(--accent-strong);
+	}
+
+	.cta:hover {
+		color: var(--text-hero);
+	}
+
+	/* Why essence — 1d */
+
+	.features {
+		padding: 0 var(--gutter) 112px;
+	}
+
+	.features__grid {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+		gap: 24px;
+	}
+
+	/*
+	 * The cards hold their two columns down to 960px; the hero only steps its
+	 * padding down before that.
+	 */
+	@media (max-width: 1180px) {
+		.hero {
+			padding: 72px var(--gutter) 72px;
+		}
+	}
+
+	@media (max-width: 960px) {
+		.features__grid {
+			grid-template-columns: minmax(0, 1fr);
+		}
+	}
+
+	/* 1j */
+	@media (max-width: 800px) {
+		.hero {
+			padding: 40px var(--gutter) 48px;
+		}
+
+		.hero__copy {
+			gap: 18px;
+		}
+
+		/*
+		 * The same one-line rule, against the 20px mobile gutter — but floored
+		 * at 24px, because past the point where the line stops fitting a
+		 * legible headline on two lines beats an unreadable one on one. In
+		 * practice the floor only engages under ~320px.
+		 */
+		.hero__title {
+			font-size: clamp(
+				24px,
+				calc((100vw - 2 * var(--gutter)) / 12.7),
+				40px
+			);
+			line-height: 1.04;
+		}
+
+		.hero__subline {
+			max-width: none;
+			font-size: 17px;
+		}
+
+		.hero__ctas {
+			padding-top: 0;
+		}
+
+		.features {
+			padding: 0 var(--gutter) 56px;
+		}
+
+		.features__grid {
+			gap: 16px;
+		}
+	}
+</style>

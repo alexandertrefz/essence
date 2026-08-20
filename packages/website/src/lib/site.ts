@@ -4,8 +4,22 @@
 
 export const SITE_NAME = "essence"
 export const SITE_URL = "https://essencelang.org"
+/**
+ * What every page tells a search engine and a link preview it is. Written for
+ * that job: plain, substantive, and it names the things somebody would search
+ * for. The landing page's own line is `HERO_SUBLINE` — a hook has to earn a
+ * click, which is the opposite of what belongs in a meta description.
+ */
 export const SITE_DESCRIPTION =
 	"A language for the web with exact arithmetic, immutable data and a type system that finds every error before you ship."
+
+/**
+ * The line under the landing page's headline, and nowhere else. Its three
+ * clauses answer the headline's three words in order — reliable, flexible,
+ * delightful — without saying any of them a second time.
+ */
+export const HERO_SUBLINE =
+	"A language for the web that catches your bugs as you are writing them, fits the stack you already have, and is a joy to use."
 
 /**
  * The version on the npm registry, which the packages carry in lockstep.

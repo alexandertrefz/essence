@@ -1,0 +1,392 @@
+---
+/*
+ * The Principles page.
+ *
+ * The eleven lines under "The Essence" in the repository's Readme are the
+ * language's own statement of itself, and they are reproduced here verbatim and
+ * in their original order — this page explains them, it does not restate them.
+ *
+ * Every body states the principle first and illustrates it second, and the
+ * illustration is at most a clause or two. Several of these used to be feature
+ * tours — "Readability counts" was three sentences on what `essence format`
+ * refuses to do — and a paragraph like that explains the feature rather than the
+ * principle, dates itself the moment the feature moves, and leaves a reader who
+ * came to learn what the language believes holding a changelog entry.
+ *
+ * Every explanation is also held to what the language does today: where a
+ * principle points at something still being built, it says so rather than
+ * describing the intention as though it had shipped. Inference in particular
+ * covers bindings and a function passed as an argument, while a declared
+ * Parameter carries its Type — which is why nothing here promises that a sketch
+ * compiles unannotated, as an earlier draft of the fourth did.
+ *
+ * The closing note credits the Zen of Python without counting the borrowings or
+ * naming which ones they are; that was deliberate, so keep it general if it is
+ * ever reworded.
+ */
+
+import RichText from "../components/RichText.astro";
+import PageLayout from "../layouts/PageLayout.astro";
+import { ROUTES } from "../lib/site.ts";
+
+interface Principle {
+	/** Verbatim from the Readme's "The Essence". */
+	essence: string;
+	body: string;
+}
+
+/*
+ * The blocks fade up into place one after the next as the page arrives — see
+ * `.reveal` in `base.css`. A counter handed out where the block is written,
+ * rather than numbers spelled out, so the order is document order by
+ * construction and inserting a principle renumbers what follows it on its own.
+ */
+let blocks = 0;
+let reveal = () => `--reveal-index: ${blocks++}`;
+
+let principles: Principle[] = [
+	{
+		essence: "Explicit is better than implicit.",
+		body: "You should be able to tell what a program does by reading it, rather than by knowing which conversions and defaults the language applies behind your back. So Essence applies none: no coercion, no truthiness, no value that is secretly true or false, and no case quietly falling through to a branch nobody wrote. Spelling something out costs a few characters once, and saves every reader from guessing.",
+	},
+	{
+		essence: "Extensibility is better than completeness.",
+		body: "No library is ever finished, because nobody can predict everything you will need from it. Essence is built to be extended from the outside: a type can be given new abilities long after it was created, no matter if it is yours or comes from a library. Room to extend beats a bigger surface with no way in.",
+	},
+	{
+		essence: "Creating correct code must be enjoyable.",
+		body: "Correctness that costs a fight is correctness people route around, so every check the language makes has to earn its place by helping. The compiler is built to be worth reading: it shows what it understood and where it stopped, points at the rule you crossed, and performs the repair itself when there is an obvious one. Being rigorous should feel like the cheap path, not the expensive one.",
+	},
+	{
+		essence:
+			"Prototyping must be fast – thus refactoring must be painless.",
+		body: "Fast prototyping is worth little on its own: a first draft is a guess, and a language that makes the guess cheap to write and expensive to revise has only helped you commit to it sooner. So speed at the start carries an obligation — unmaking a decision has to cost no more than making it did. A rename reaches every file, and whatever stops fitting is listed rather than left for you to find.",
+	},
+	{
+		essence: "Readability counts.",
+		body: "Code is read far more often than it is written, and by more people than wrote it, so wherever the reader's time and the writer's convenience collide, the reader wins. Names are spelled out instead of abbreviated, arguments are labelled so a call reads as a sentence, and layout is not a matter of opinion: one canonical format, nothing to configure, nobody's attention spent on it.",
+	},
+	{
+		essence:
+			"There should be one – and preferably only one – obvious way to do it.",
+		body: "Two ways of writing the same thing is a decision the writer has to make and every later reader has to work back through, and nothing was gained by either. So a job has one construct, a construct has one spelling, and where a difference would be pure style the formatter settles it and it stops being a choice at all. What you learn from one program carries to the next.",
+	},
+	{
+		essence: "Practicality beats purity.",
+		body: "Real programs run into things a tidy model did not plan for: a platform that works the way it works, a library you have to talk to, a case that will not fit the rule. Holding the model together anyway does not make any of that go away — it moves the work to you. So Essence bends where it has to, to stay practical.",
+	},
+	{
+		essence: "Simple is better than complex.",
+		body: "A language you can hold in your head is worth more than one that can express anything. Essence prefers few ideas that each go a long way over many that each cover a case, because complexity compounds: every new idea has to work with all the ones already there, so the tenth costs far more than the first. Every addition is asked whether the language would be simpler without it.",
+	},
+	{
+		essence: "Complex is better than complicated.",
+		body: "Complex means many parts working together; complicated means tangled — difficulty that comes from how a thing was built, not from the problem itself. A hard problem does not get easier by being ignored; the only question is where the difficulty lives.",
+	},
+	{
+		essence: "Beautiful is better than ugly.",
+		body: "Ugliness is rarely only about taste: it usually means something underneath does not fit. It also spreads — a construct that is awkward to write gets avoided, and what people write instead is usually worse. So beauty is not decoration; it is the shape of the code matching the shape of what it does.",
+	},
+	{
+		essence: "Clever is seldom good.",
+		body: "Cleverness is written once and paid for by everyone who reads it afterwards, usually at the worst possible moment. Where a rule could be surprising and powerful or boring and predictable, Essence takes predictable — in the language, in the standard library, and in what the compiler does with a program it finds questionable, which is to report it rather than guess what you meant.",
+	},
+];
+---
+
+<PageLayout
+	title="Principles"
+	description="The criteria the language is designed against — what each one means for the code you write, and what it rules out."
+	eyebrow="Principles"
+	heading="The Essence of essence"
+	lede="The criteria that decide what goes into the language, and more often what stays out. They are worth holding your own code to as well."
+>
+	<ol class="list">
+		{
+			principles.map((principle, index) => (
+				<li class="item reveal" style={reveal()}>
+					{/*
+					 * The number and the essence are siblings in one grid, sharing a
+					 * row, rather than the number sitting beside a wrapper holding
+					 * both essence and body — that shared row is what the number is
+					 * centred in. The span carries the digits; see `.item__index`.
+					 */}
+					<p class="item__index">
+						<span>{String(index + 1).padStart(2, "0")}</span>
+					</p>
+
+					<h2 class="item__essence">{principle.essence}</h2>
+
+					{/*
+					 * `RichText`, not `set:html`: a body that quotes `<-` or
+					 * `->` — several have — emits a raw `<` when injected as
+					 * markup, and only survives because a browser gives up
+					 * parsing it as a tag. RichText splits into text nodes.
+					 */}
+					<p class="item__body">
+						<RichText text={principle.body} />
+					</p>
+				</li>
+			))
+		}
+	</ol>
+
+	{
+		/* Last in the cascade, so the page settles from the top down in one pass. */
+	}
+	<aside class="outro reveal" style={reveal()}>
+		<h2 class="outro__title">Where these came from</h2>
+		<p class="outro__body">
+			{
+				/*
+				 * The space before an inline tag has to sit on the same source line as
+				 * the word before it. `compressHTML` — on by default — drops a newline
+				 * and its indentation at that boundary, which is how this paragraph
+				 * first shipped as "inspired bythe Zen of Python".
+				 */
+			}
+			These principles were inspired by <a
+				href="https://peps.python.org/pep-0020/">the Zen of Python</a
+			>, and some of them are borrowed from it outright. The rest are
+			essence's own, together they encapsulate what guides the development
+			of the language.
+		</p>
+		<p class="outro__body">
+			A separate question — what the language is for, and what it
+			deliberately leaves alone — is answered on the <a
+				href={ROUTES.goals}>Goals</a
+			> page.
+		</p>
+	</aside>
+</PageLayout>
+
+<style>
+	/*
+	 * The number column and the gap after it, declared on both boxes that measure
+	 * against them: the list lays its rows out with them, and the card below is
+	 * pushed right by their sum so its left edge lands on the principles' text
+	 * rather than on their numbers. Two rules reading one pair cannot drift the
+	 * way two literals can.
+	 */
+	.list,
+	.outro {
+		--index-column: 88px;
+		--index-gap: 24px;
+	}
+
+	.list {
+		margin-top: 64px;
+		list-style: none;
+	}
+
+	/*
+	 * The rule above each principle belongs to that principle, not to the one
+	 * before it or to the list — so it arrives when the principle does, rather
+	 * than being drawn first and having the text fade in under it. The padding is
+	 * the other way round from the border for the same reason it was before: the
+	 * rule sits 36px under the principle above and 34px over its own.
+	 *
+	 * Which also means the list ends without a line. There was one under the last
+	 * principle, and with the card below it that read as the card's own lid.
+	 */
+	/*
+	 * Number, essence and body are three children of one grid: the number and the
+	 * essence share row one, the body has row two to itself. That shared row is
+	 * the whole alignment mechanism — the number is centred in it, so nothing has
+	 * to be told where the essence's text is.
+	 *
+	 * Both boxes are trimmed to their capitals, which is what makes centring mean
+	 * what it looks like. A line box is not where its letters are: General Sans
+	 * reserves ascent 23 to descent 6 at this size — 79/21 — while its capitals
+	 * stand 16.51 tall, so the visible band sits low in a box measured by leading.
+	 * Trimmed, each box IS its cap band, and centring the two centres the ink.
+	 *
+	 * Spacing then measures from letters rather than from leading, which is why the
+	 * numbers below grew for an unchanged picture: 41px of padding now lands the
+	 * cap tops where 34px of padding plus the leading it hid used to, and 18px
+	 * carries the essence's baseline to the body's cap tops where 12px did. Both
+	 * were checked against the page as it stood, to 0.5px.
+	 */
+	.item {
+		display: grid;
+		grid-template-columns: var(--index-column) minmax(0, 1fr);
+		column-gap: var(--index-gap);
+		align-items: center;
+		padding: 34px 0 36px;
+		border-top: 1px solid var(--hairline);
+
+		/*
+		 * The heading's type metrics, declared here rather than on the heading
+		 * because the number beside it measures itself against them. Two rules
+		 * reading one pair of values cannot drift apart the way two literals can.
+		 */
+		--essence-size: 23px;
+		--essence-leading: 1.3;
+	}
+
+	.item__index {
+		grid-area: 1 / 1;
+		font-family: var(--font-mono);
+		font-size: 13px;
+		letter-spacing: 0.1em;
+		color: var(--accent-eyebrow);
+	}
+
+	.item__essence {
+		grid-area: 1 / 2;
+		max-width: 720px;
+		min-width: 0;
+		font-family: var(--font-heading);
+		font-weight: 500;
+		font-size: var(--essence-size);
+		line-height: var(--essence-leading);
+		letter-spacing: -0.005em;
+		color: var(--text-heading);
+		text-wrap: pretty;
+	}
+
+	.item__body {
+		grid-area: 2 / 2;
+		max-width: 720px;
+		min-width: 0;
+		margin-top: 12px;
+		font-size: 16px;
+		line-height: 1.65;
+		color: var(--text-body);
+		text-wrap: pretty;
+	}
+
+	/*
+	 * The value is `trim-both`, not `both` — the property was renamed from
+	 * `leading-trim` and its values took the verb with them. Querying the old
+	 * spelling is false everywhere, which fails as a silent no-op rather than an
+	 * error, so it is worth being exact about. Without the trim the row still
+	 * centres, on line boxes, which is where this page was before.
+	 *
+	 * The span exists for one reason: `1cap` resolves against the font of the
+	 * element it is written on, so the number's own box carries the ESSENCE's face
+	 * and size to make `1cap` the essence's cap height, and the span inside it
+	 * carries the mono digits. That is what pins the number to one cap band of the
+	 * essence — the first — instead of to however many lines the essence takes,
+	 * and it does it without a measured constant anywhere.
+	 */
+	@supports (text-box-trim: trim-both) {
+		.item__essence {
+			text-box: trim-both cap alphabetic;
+		}
+
+		.item__index {
+			display: flex;
+			align-items: center;
+			align-self: start;
+			height: 1cap;
+			font-family: var(--font-heading);
+			font-size: var(--essence-size);
+		}
+
+		.item__index span {
+			font-family: var(--font-mono);
+			font-size: 13px;
+			text-box: trim-both cap alphabetic;
+		}
+
+		.item {
+			padding-top: 41px;
+		}
+
+		.item__body {
+			margin-top: 18px;
+		}
+	}
+
+	/* `nowrap` because a code mark is one token: `->` in a body here broke across
+	   a line, leaving the hyphen at the end of one and the arrowhead at the start
+	   of the next, which in a ligature face reads as two different characters. */
+	.item__body :global(code) {
+		font-family: var(--font-mono);
+		font-size: 0.88em;
+		white-space: nowrap;
+		color: var(--text-strong);
+	}
+
+	.outro {
+		margin-top: 56px;
+		margin-left: calc(var(--index-column) + var(--index-gap));
+		max-width: 720px;
+		padding: 26px 28px 28px;
+		border: 1px solid var(--hairline);
+		border-radius: 10px;
+		background: var(--surface-raised);
+	}
+
+	.outro__title {
+		font-family: var(--font-mono);
+		font-weight: 400;
+		font-size: 11px;
+		letter-spacing: 0.12em;
+		text-transform: uppercase;
+		color: var(--text-faintest);
+	}
+
+	.outro__body {
+		margin-top: 14px;
+		font-size: 15.5px;
+		line-height: 1.65;
+		color: var(--text-muted);
+		text-wrap: pretty;
+	}
+
+	.outro__body a {
+		color: var(--text-strong);
+		text-decoration: underline;
+		text-decoration-color: var(--accent-underline);
+		text-underline-offset: 3px;
+	}
+
+	.outro__body a:hover {
+		color: var(--accent);
+	}
+
+	@media (max-width: 800px) {
+		.list {
+			margin-top: 40px;
+		}
+
+		/* Stacked: one column, and the three children take their own rows in
+		   document order, so the number sits above the essence with no line of it
+		   to be centred in. The cap trims stay — they are what makes these gaps
+		   measure from the letters. */
+		.item {
+			grid-template-columns: minmax(0, 1fr);
+			/* 16px from the number's baseline to the essence's caps, since with both
+			   trimmed a gap is the space you actually see. */
+			row-gap: 16px;
+			padding: 24px 0 26px;
+			--essence-size: 20px;
+		}
+
+		.item__index,
+		.item__essence,
+		.item__body {
+			grid-area: auto;
+		}
+
+		.item__index {
+			height: auto;
+			line-height: 1;
+		}
+
+		.item__body {
+			margin-top: 2px;
+		}
+
+		.item__body {
+			font-size: 15.5px;
+		}
+
+		.outro {
+			margin-left: 0;
+			padding: 20px;
+		}
+	}
+</style>

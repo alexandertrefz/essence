@@ -1,0 +1,118 @@
+---
+/*
+ * The three-column strip under the feature grid — the design's screens 1d / 7a,
+ * with its own copy.
+ *
+ * The design filled this strip with three principles, and the repository's
+ * principles have a page of their own. Restating them here spent the last band
+ * of the page on claims the cards above had already made — exhaustive matching
+ * and one-way-to-do-it appear twice within one screen — and told a reader
+ * weighing the language up nothing they could act on.
+ *
+ * So the strip sells the thing a new language has to answer first: you do not
+ * have to bet a project on it. One file, imported by the app you already have,
+ * and the compiler on your side while you write it.
+ *
+ * Nothing here repeats the toolchain — the Batteries Included card lists the
+ * commands, and saying it twice in one screen was the fault the principles had.
+ * Every claim is something the repository does today: the plugins and the
+ * generated declarations are `packages/client`, hot reload is its watch slice,
+ * and the diagnostics are the same ones the Language Server sends.
+ */
+
+let points = [
+	{
+		eyebrow: "01 — Adoption",
+		title: "Start With a Single File",
+		body: "Rewrite nothing. Move the part that has to be right — pricing, rules, game state — and import it from the app you already have.",
+	},
+	{
+		eyebrow: "02 — Interop",
+		title: "Compiles to JavaScript",
+		body: "Plugins for Vite, Bun and esbuild build your .es files with everything else, and generated declarations give TypeScript real types. Hot reload keeps working.",
+	},
+	{
+		eyebrow: "03 — Diagnostics",
+		title: "Easy to Debug",
+		body: "Every error points at the exact span, explains it in plain words and often shows what to write instead — in your editor as you type, not just in CI.",
+	},
+];
+---
+
+<section class="strip" id="in-practice" aria-label="Essence in practice">
+	<div class="strip__grid">
+		{
+			points.map((point) => (
+				<div class="point">
+					<p class="point__eyebrow">{point.eyebrow}</p>
+					<h2 class="point__title">{point.title}</h2>
+					<p class="point__body">{point.body}</p>
+				</div>
+			))
+		}
+	</div>
+</section>
+
+<style>
+	.strip {
+		position: relative;
+		z-index: 1;
+		padding: 56px var(--gutter) 64px;
+		border-top: 1px solid var(--hairline-soft);
+		background: var(--strip-bg);
+	}
+
+	.strip__grid {
+		display: grid;
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+		gap: 56px;
+	}
+
+	.point {
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+	}
+
+	.point__eyebrow {
+		font-family: var(--font-mono);
+		font-size: 12px;
+		letter-spacing: 0.12em;
+		text-transform: uppercase;
+		color: var(--accent-eyebrow);
+	}
+
+	.point__title {
+		font-family: var(--font-heading);
+		font-weight: 500;
+		font-size: 20px;
+		color: var(--text-heading);
+	}
+
+	.point__body {
+		font-size: 15px;
+		line-height: 1.55;
+		color: var(--text-muted);
+	}
+
+	@media (max-width: 1180px) {
+		.strip__grid {
+			gap: 36px;
+		}
+	}
+
+	@media (max-width: 800px) {
+		.strip {
+			padding: 36px var(--gutter) 40px;
+		}
+
+		.strip__grid {
+			grid-template-columns: minmax(0, 1fr);
+			gap: 28px;
+		}
+
+		.point__title {
+			font-size: 19px;
+		}
+	}
+</style>

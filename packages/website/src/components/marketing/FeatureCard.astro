@@ -1,0 +1,99 @@
+---
+/*
+ * One cell of the "Why essence" grid — screens 1d / 7a, and the single stacked
+ * card of 1j.
+ *
+ * Heading, one sentence, and a sample. There is no footer link: the only page
+ * any of them could point at is the documentation index, and a row of four
+ * identical "learn more in our documentation" lines tells the reader nothing.
+ *
+ * The card has no height of its own. Grid stretches the cells of a row to the
+ * tallest of them, which is the alignment that matters — two cards side by side
+ * ending on the same line — while a row of shorter cards is free to be shorter.
+ * A `min-height` here would flatten that into one height for every row.
+ */
+
+import CodeWindow from "../CodeWindow.astro"
+
+interface Props {
+	title: string
+	description: string
+	code: string
+	class?: string
+}
+
+let { title, description, code, class: className } = Astro.props
+---
+
+<article class:list={["card", className]}>
+	<div class="card__head">
+		<h3 class="card__title">{title}</h3>
+		<p class="card__description">{description}</p>
+	</div>
+
+	<div class="card__sample">
+		<CodeWindow chrome={false} compact code={code} />
+	</div>
+</article>
+
+<style>
+	.card {
+		display: flex;
+		flex-direction: column;
+		border-radius: 10px;
+		background: var(--surface);
+		box-shadow: var(--card-shadow);
+		overflow: hidden;
+		min-width: 0;
+	}
+
+	.card__head {
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+		padding: 26px 28px 18px;
+	}
+
+	.card__title {
+		font-family: var(--font-heading);
+		font-weight: 500;
+		font-size: 19px;
+		color: var(--text-heading);
+	}
+
+	/* `pretty` rather than the default: it costs the last line its orphan, and
+	   unlike `balance` it does not even up every line, so the paragraph keeps a
+	   normal ragged edge. The measure is capped short of the card so the text
+	   has a column of its own rather than running the full width. */
+	.card__description {
+		max-width: 85%;
+		font-size: 15px;
+		line-height: 1.5;
+		color: var(--text-body-soft);
+		text-wrap: pretty;
+	}
+
+	.card__sample {
+		padding: 0 28px 26px;
+		min-width: 0;
+	}
+
+	@media (max-width: 800px) {
+		.card__head {
+			gap: 8px;
+			padding: 20px 20px 14px;
+		}
+
+		.card__title {
+			font-size: 18px;
+		}
+
+		.card__description {
+			font-size: 14.5px;
+		}
+
+		.card__sample {
+			padding: 0 20px 20px;
+		}
+	}
+</style>

@@ -1,0 +1,241 @@
+---
+/*
+ * The full-width card that closes the "Why essence" grid — screens 1d / 7a.
+ *
+ * The design's tiles advertise a package manager, a test runner and three
+ * editors. None of those exist. What is listed instead is what the repository
+ * actually ships, chosen as six things a reader would otherwise have to go and
+ * find for themselves — a debugger and a standard library among them, which the
+ * command-shaped list this replaces left out because they are not subcommands.
+ *
+ * No tile carries its command any more: `essence format` under "Formatter" is
+ * the same word twice, and the reader deciding whether to try the language does
+ * not need the spelling yet. The Getting Started pages have it.
+ *
+ * Icons are the design's own Tabler paths, in the same 24-viewBox, 1.5-stroke
+ * style; the debugger and standard library borrow Tabler's `bug` and `books`,
+ * and the formatter `indent-increase` — the design's sliders read as settings,
+ * which is the one thing a formatter with no options is not.
+ */
+
+let parts = [
+	{
+		name: "Type Checker",
+		paths: ["M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0", "M9 12l2 2l4 -4"],
+	},
+	{
+		name: "Formatter",
+		paths: ["M20 6l-11 0", "M20 12l-7 0", "M20 18l-11 0", "M4 8l4 4l-4 4"],
+	},
+	{
+		name: "Language Server",
+		paths: ["M7 8l-4 4l4 4", "M17 8l4 4l-4 4", "M14 4l-4 16"],
+	},
+	{
+		name: "Debugger",
+		paths: [
+			"M9 9v-1a3 3 0 0 1 6 0v1",
+			"M8 9h8a6 6 0 0 1 1 3v3a5 5 0 0 1 -10 0v-3a6 6 0 0 1 1 -3",
+			"M3 13l4 0",
+			"M17 13l4 0",
+			"M12 20l0 -6",
+			"M4 19l3.35 -2",
+			"M20 19l-3.35 -2",
+			"M4 7l3.75 2.4",
+			"M20 7l-3.75 2.4",
+		],
+	},
+	{
+		name: "Standard Library",
+		paths: [
+			"M5 4m0 1a1 1 0 0 1 1 -1h1a1 1 0 0 1 1 1v14a1 1 0 0 1 -1 1h-1a1 1 0 0 1 -1 -1z",
+			"M9 4m0 1a1 1 0 0 1 1 -1h1a1 1 0 0 1 1 1v14a1 1 0 0 1 -1 1h-1a1 1 0 0 1 -1 -1z",
+			"M5 8l4 0",
+			"M9 16l4 0",
+			"M13.803 4.56l2.184 -.53c.562 -.135 1.133 .19 1.282 .732l3.695 13.418a1.02 1.02 0 0 1 -.634 1.219l-.133 .041l-2.184 .53c-.562 .135 -1.133 -.19 -1.282 -.732l-3.695 -13.418a1.02 1.02 0 0 1 .634 -1.219l.133 -.041z",
+			"M14 9l4 -1",
+			"M16 16l3.923 -.98",
+		],
+	},
+	{
+		name: "VS Code Extension",
+		paths: [
+			"M4 7h3a1 1 0 0 0 1 -1v-1a2 2 0 0 1 4 0v1a1 1 0 0 0 1 1h3a1 1 0 0 1 1 1v3a1 1 0 0 0 1 1h1a2 2 0 0 1 0 4h-1a1 1 0 0 0 -1 1v3a1 1 0 0 1 -1 1h-3a1 1 0 0 1 -1 -1v-1a2 2 0 0 0 -4 0v1a1 1 0 0 1 -1 1h-3a1 1 0 0 1 -1 -1v-3a1 1 0 0 1 1 -1h1a2 2 0 0 0 0 -4h-1a1 1 0 0 1 -1 -1v-3a1 1 0 0 1 1 -1",
+		],
+	},
+];
+---
+
+<article class="batteries">
+	<div class="batteries__body">
+		<div class="batteries__intro">
+			<h3 class="batteries__title">Batteries Included</h3>
+			<p class="batteries__description">
+				Type checking, formatting, debugging and editor support,
+				together with a standard library that is a pleasure to use.
+			</p>
+		</div>
+
+		<ul class="batteries__grid">
+			{
+				parts.map((part) => (
+					<li class="part">
+						<span class="part__tile">
+							<svg
+								width="18"
+								height="18"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="1.5"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								aria-hidden="true"
+							>
+								{part.paths.map((path) => (
+									<path d={path} />
+								))}
+							</svg>
+						</span>
+						<span class="part__name">{part.name}</span>
+					</li>
+				))
+			}
+		</ul>
+	</div>
+</article>
+
+<style>
+	.batteries {
+		/* The design's grid, spanned. */
+		grid-column: 1 / -1;
+		display: flex;
+		flex-direction: column;
+		border-radius: 10px;
+		background: var(--surface);
+		box-shadow: var(--card-shadow);
+		overflow: hidden;
+
+		/* Two values with no counterpart in the token set: the tile's fill and
+		   the glyph inside it are picked per theme in the design. */
+		--tile-bg: rgba(0, 0, 0, 0.03);
+		--tile-icon: rgb(72, 68, 69);
+	}
+
+	@media (prefers-color-scheme: dark) {
+		.batteries {
+			--tile-bg: rgba(255, 255, 255, 0.035);
+			--tile-icon: rgb(200, 196, 197);
+		}
+	}
+
+	/* Stacked rather than two columns: the intro reads as the card's lede and
+	   the six tiles sit under it as one band, which is what a full-width card
+	   is for. */
+	.batteries__body {
+		display: flex;
+		flex-direction: column;
+		gap: 26px;
+		padding: 30px 32px;
+	}
+
+	.batteries__intro {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+	}
+
+	.batteries__title {
+		font-family: var(--font-heading);
+		font-weight: 500;
+		font-size: 22px;
+		color: var(--text-heading);
+	}
+
+	/* Full width would run the sentence the whole way across the card, so the
+	   measure is capped in `ch` — a reading length rather than a share of a
+	   column that no longer exists. */
+	.batteries__description {
+		max-width: 64ch;
+		font-size: 15px;
+		line-height: 1.55;
+		color: var(--text-body-soft);
+		text-wrap: pretty;
+	}
+
+	/*
+	 * Three across and two down, capped rather than spread: six tiles over the
+	 * full width of the card leave a corridor of empty space after every short
+	 * name, and `auto-fit` picked five columns and orphaned the sixth onto a
+	 * row of its own. The cap keeps them a block under the lede.
+	 */
+	.batteries__grid {
+		display: grid;
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+		gap: 22px 24px;
+		max-width: 860px;
+		list-style: none;
+	}
+
+	@media (max-width: 700px) {
+		.batteries__grid {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+		}
+	}
+
+	/* Measured, like the 190px floor above: two tracks stop holding "VS Code
+	   Extension" on one line at about 460px of viewport, so the pair ends
+	   comfortably above that. */
+	@media (max-width: 520px) {
+		.batteries__grid {
+			grid-template-columns: minmax(0, 1fr);
+		}
+	}
+
+	.part {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		min-width: 0;
+	}
+
+	.part__tile {
+		width: 40px;
+		height: 40px;
+		flex: none;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		border-radius: 8px;
+		background: var(--tile-bg);
+		border: 1px solid var(--hairline);
+		color: var(--tile-icon);
+	}
+
+	.part__name {
+		font-family: var(--font-heading);
+		font-weight: 500;
+		font-size: 15px;
+		color: var(--text-subheading);
+		min-width: 0;
+	}
+
+	@media (max-width: 800px) {
+		.batteries__body {
+			gap: 22px;
+			padding: 20px;
+		}
+
+		.batteries__title {
+			font-size: 20px;
+		}
+
+		.batteries__description {
+			font-size: 14.5px;
+		}
+
+		.batteries__grid {
+			gap: 16px;
+		}
+	}
+</style>
