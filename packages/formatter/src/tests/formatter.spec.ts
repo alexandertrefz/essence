@@ -10,7 +10,7 @@ import { commentAnchors } from "../trivia"
 
 // NOTE: Every `.es` source in the repository, which is what a formatter has to
 // survive before it is allowed anywhere near a source tree. The Diagnostic
-// showcase files are included deliberately: all but the three in `REFUSED`
+// showcase files are included deliberately: all but the ones in `REFUSED`
 // carry no Parser error at all and only fail later, so a formatter must handle
 // them like any other file.
 function corpus(): Array<{ name: string; filePath: string; source: string }> {
@@ -56,10 +56,10 @@ const CORPUS = corpus()
 // NOTE: The showcase files the formatter must REFUSE — every one of them
 // carries an error the Parser itself reported, and formatting a file the Parser
 // could not read whole is exactly what the gate is there to prevent. Three of
-// them genuinely do not parse; the other two parse and are refused all the same,
-// because a `default-on-function-literal`, a `shorthand-in-combination` and a
-// `shorthand-on-path-key` are errors like any other and the formatter asks only
-// whether there were any.
+// them genuinely do not parse; the rest parse and are refused all the same,
+// because a `default-on-function-literal`, a `shorthand-in-combination`, a
+// `shorthand-on-path-key` and a `test-outside-tests` are errors like any other
+// and the formatter asks only whether there were any.
 const REFUSED = new Set([
 	"diagnostics/Syntax.es",
 	"diagnostics/UnclosedString.es",
@@ -67,6 +67,7 @@ const REFUSED = new Set([
 	"diagnostics/MemberPathSyntax.es",
 	"diagnostics/RecordShorthand.es",
 	"diagnostics/PathKeySyntax.es",
+	"diagnostics/Tests.es",
 ])
 
 describe("formatter", () => {
