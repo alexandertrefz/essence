@@ -18,8 +18,8 @@ import {
 	describeSignature,
 	describeType,
 	flattenUnionMembers,
-	isPartialOf,
 	isMergedLevel,
+	isPartialOf,
 	mergedRecordType,
 	type MatchableArgument,
 	matchArguments,
@@ -1970,7 +1970,7 @@ function validateCaseValue(
 		let missing = missingRecordMembers(
 			payloadType,
 			node.type.payloadDefault!.members,
-			casePayloadType(node.type, node.value),
+			casePayloadType(node.type, node.value) as common.RecordType,
 		)
 
 		if (missing.length > 0) {
@@ -2026,7 +2026,7 @@ function casePayloadIsPartial(
 		value.type.type === "Record" &&
 		isPartialOf(
 			{ type: "Record", members: caseType.members },
-			casePayloadType(caseType, value),
+			casePayloadType(caseType, value) as common.RecordType,
 		)
 	)
 }
@@ -2038,13 +2038,13 @@ function casePayloadIsPartial(
 function casePayloadType(
 	caseType: common.CaseType,
 	value: common.typed.ExpressionNode,
-): common.RecordType {
+): common.Type {
 	return (
 		mergedRecordType(
 			{ type: "Record", members: caseType.members },
 			caseType.payloadDefault?.nesting,
 			value,
-		) ?? (value.type as common.RecordType)
+		) ?? value.type
 	)
 }
 
