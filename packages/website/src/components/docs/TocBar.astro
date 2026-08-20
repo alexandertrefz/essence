@@ -1,0 +1,145 @@
+---
+/*
+ * The sticky "on this page" strip of screen 1k, shown only below 800px.
+ *
+ * A `<details>` rather than a scripted panel: it opens without JavaScript, and
+ * the label on the right is the heading the scroll spy is currently on — the
+ * same `data-toc-link` anchors the rail uses, so both stay in step.
+ */
+
+import type { TocItem } from "../../lib/navigation.ts"
+
+interface Props {
+	items: TocItem[]
+}
+
+let { items } = Astro.props
+let first = items[0]
+---
+
+{
+	items.length > 0 && (
+		<details class="bar">
+			<summary class="bar__row">
+				<span class="bar__label">on this page</span>
+				<span class="bar__current">
+					<svg
+						class="bar__chevron"
+						width="14"
+						height="14"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="1.5"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					>
+						<path d="M6 9l6 6l6 -6" />
+					</svg>
+					<span data-toc-current>{first?.text}</span>
+				</span>
+			</summary>
+
+			<nav class="bar__list" aria-label="On this page">
+				{items.map((item) => (
+					<a
+						class="bar__link"
+						class:list={{ "bar__link--nested": item.depth > 2 }}
+						href={`#${item.slug}`}
+						data-toc-link={item.slug}
+					>
+						{item.text}
+					</a>
+				))}
+			</nav>
+		</details>
+	)
+}
+
+<style>
+	.bar {
+		display: none;
+		position: sticky;
+		top: var(--header-height-mobile);
+		z-index: 50;
+		border-bottom: 1px solid var(--hairline-softest);
+		background: var(--header-bg-mobile);
+		-webkit-backdrop-filter: blur(28px) saturate(150%);
+		backdrop-filter: blur(28px) saturate(150%);
+	}
+
+	.bar__row {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		height: 40px;
+		padding: 0 var(--gutter-mobile);
+		font-family: var(--font-mono);
+		font-size: 11.5px;
+		color: var(--text-dimmer);
+		cursor: pointer;
+		list-style: none;
+	}
+
+	/* Safari draws its own marker unless both are silenced. */
+	.bar__row::-webkit-details-marker {
+		display: none;
+	}
+
+	.bar__current {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		color: var(--accent-eyebrow);
+		min-width: 0;
+	}
+
+	.bar__current > span {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.bar__chevron {
+		flex: none;
+		transition: transform 120ms ease;
+	}
+
+	.bar[open] .bar__chevron {
+		transform: rotate(180deg);
+	}
+
+	.bar__list {
+		display: flex;
+		flex-direction: column;
+		padding: 4px var(--gutter-mobile) 12px;
+		border-top: 1px solid var(--hairline-softest);
+	}
+
+	.bar__link {
+		padding: 8px 0;
+		font-family: var(--font-body);
+		font-size: 14px;
+		color: var(--text-dim);
+	}
+
+	.bar__link--nested {
+		padding-left: 14px;
+	}
+
+	.bar__link.is-active {
+		color: var(--accent);
+	}
+
+	@media (max-width: 800px) {
+		.bar {
+			display: block;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.bar__chevron {
+			transition: none;
+		}
+	}
+</style>

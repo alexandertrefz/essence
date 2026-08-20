@@ -1,0 +1,74 @@
+---
+/*
+ * The accent-tinted signature card of screen 1h.
+ *
+ * The signature is real essence, so it is highlighted with the real grammar
+ * rather than hand-coloured — a signature that stops parsing stops looking
+ * right, which is the point.
+ */
+
+import { Code } from "astro:components"
+
+import { ESSENCE_LANG, ESSENCE_THEMES } from "./essenceLang.ts"
+
+interface Props {
+	signature: string
+	label?: string
+}
+
+let { signature, label = "Signature" } = Astro.props
+---
+
+<div class="sig">
+	<div class="sig__label">{label}</div>
+	<div class="sig__code code-bare">
+		<Code
+			code={signature.trim()}
+			lang={ESSENCE_LANG}
+			themes={ESSENCE_THEMES}
+			defaultColor={false}
+		/>
+	</div>
+</div>
+
+<style>
+	.sig {
+		margin-top: 26px;
+		border: 1px solid var(--accent-active-border);
+		border-radius: 8px;
+		background: var(--accent-note-bg);
+		overflow: hidden;
+	}
+
+	.sig__label {
+		padding: 8px 16px;
+		border-bottom: 1px solid rgba(var(--accent-rgb), 0.18);
+		font-family: var(--font-mono);
+		font-size: 11px;
+		letter-spacing: 0.12em;
+		text-transform: uppercase;
+		color: var(--accent-note-label);
+	}
+
+	/*
+	 * `.code-bare` strips the block surface Shiki's own theme background would
+	 * paint; the card underneath is the surface. The measurements are 1h's.
+	 */
+	.sig__code {
+		--code-padding: 18px 20px;
+		--code-font-size: 15px;
+		--code-line-height: 24px;
+	}
+
+	@media (max-width: 800px) {
+		.sig {
+			margin-top: 20px;
+		}
+
+		.sig__code {
+			--code-padding: 14px 16px;
+			--code-font-size: 13px;
+			--code-line-height: 22px;
+		}
+	}
+</style>

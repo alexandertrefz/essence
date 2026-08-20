@@ -1,0 +1,117 @@
+---
+title: Project Layout
+description:
+  There is no manifest and no project file. A program is an entry file and
+  whatever it imports, and what comes out of the compiler runs on its own.
+section: getting-started
+order: 30
+template: article
+---
+
+essence has no project format. There is nothing to initialise, no manifest to
+fill in and no lockfile of its own — a program is a `.es` file, and `essence` is
+pointed at it directly.
+
+A program can still be several files. One file is one module, and an `import`
+block above the implementation names what it takes from another. What there is
+no format for is the project
+around them: the imports are the file list, and the compiler needs nothing else.
+
+## Every file opens with one wrapper
+
+```essence
+implementation {
+	§ everything the program is
+}
+```
+
+`implementation { … }` is the form a program takes, and the only thing that may
+stand outside it is a module's `import` and `export` block. The other form,
+`declarations { … }`, exists for the standard library: it is what allows a
+namespace body to hold method signatures with no body, which is how a
+declaration says "the runtime implements this". The compiler refuses
+`declarations` outside the standard library's directory, so `implementation` is
+the one you will write.
+
+## Where the output goes
+
+By default, next to the source:
+
+```sh
+$ essence build hello.es
+  ✔ hello.es → hello.js
+```
+
+`--out` sends it somewhere else. With one input it is a file; with several it
+is a directory, and each source keeps its own name. Missing parent directories
+are created.
+
+```sh
+$ essence build src/*.es -o dist/
+  ✔ 2 files compiled
+
+    ✔ src/main.es  → dist/main.js   6.8 kB   121 ms
+    ✔ src/other.es → dist/other.js  6.8 kB   122 ms
+
+    13.6 kB emitted across 2 files in 143 ms · 2 workers
+```
+
+Each output is a self-contained ES module. The parts of the essence runtime the
+program actually reaches are bundled into it, along with every module it
+imports — nothing is imported at runtime, and there is no runtime package to
+install alongside it — so it can be executed by Bun or Node, or loaded in a
+browser.
+
+## So what does a project look like
+
+Whatever you want it to. A directory of `.es` files and a shell command is a
+complete setup:
+
+```
+my-app/
+  src/
+    main.es      ← imports report.es
+    report.es
+  dist/          ← whatever essence last wrote
+```
+
+```sh
+essence check src/*.es                     # before committing
+essence build src/main.es -o dist/main.js  # before shipping
+essence watch src/main.es                  # while working
+```
+
+One entry is enough to build: `main.es` pulls in everything it imports, and
+`dist/main.js` holds all of it with no `import` statement left. Naming several
+files instead asks for several bundles, one per file, which is what you want for
+several entry points and not for one program's parts.
+
+`essence check src/*.es` is still the form for a check, because a module nothing
+imports yet is a module the entry cannot reach — and it is the file most likely
+to be the one you are working on.
+
+Several files given at once are compiled **in parallel**, one worker per core
+up to eight, and `--jobs 1` puts everything back on the main thread — which is
+what you want when a compiler crash gives you a stack trace to read.
+
+## Conventions worth keeping
+
+None of these are enforced. They are what the repository itself does.
+
+- **Tabs, and 80 columns.** There is nothing to configure: `essence format`
+  writes tabs and lays a file out to fit 80 columns, and that is the whole
+  style. Run `essence format --check '*.es'` in CI and `essence format src/*.es`
+  before committing.
+- **Formatting is never something a build does to your sources.** A build does
+  not touch the files it reads. Formatting is its own command, and its own
+  decision.
+- **`essence check` is the fast gate.** It stops after validation and writes
+  nothing, so it is the form meant for editors, pre-commit hooks and CI.
+  `--json` turns it into a diagnostic list another tool can read.
+
+## Next
+
+- [Installation](/docs/getting-started/installation) — every `essence` command,
+  and the four ways to install the toolchain.
+- [Your first program](/docs/getting-started/your-first-program) — four steps,
+  about five minutes.

@@ -1,0 +1,176 @@
+---
+title: Installation
+description:
+  The toolchain is one package on the npm registry. Install it with whichever
+  package manager the project already uses — or build it from a checkout, which
+  is one clone and one `bun install`.
+section: getting-started
+order: 10
+template: article
+---
+
+The compiler, the formatter, the Language Server and the Debug Adapter are one
+package: [`@essence-lang/cli`](https://www.npmjs.com/package/@essence-lang/cli).
+It is published as compiled JavaScript with type declarations beside it, so
+there is nothing to build before the first program.
+
+## What you need
+
+- **[Node](https://nodejs.org) 22 or newer, or [Bun](https://bun.sh).** Either
+  one runs the toolchain, and either one runs what it emits.
+- Nothing else. No native module is compiled during the install, and a program
+  the compiler has built depends on nothing at all.
+
+## Add it to a project
+
+A compiler belongs to the project it compiles, so the usual place for it is a
+development dependency — the exact version is then written into the lockfile
+along with everything else. Pick your package manager once; every block on this
+page follows it from here.
+
+<PackageManagers
+	npm="npm install --save-dev @essence-lang/cli"
+	pnpm="pnpm add --save-dev @essence-lang/cli"
+	yarn="yarn add --dev @essence-lang/cli"
+	bun="bun add --dev @essence-lang/cli"
+/>
+
+That gives the project an `essence` command. Reaching it is the one part that
+differs between managers:
+
+<PackageManagers
+	npm="npx essence --version"
+	pnpm="pnpm essence --version"
+	yarn="yarn essence --version"
+	bun="bun run essence --version"
+/>
+
+```
+0.1.0
+```
+
+If a version comes back, the toolchain is installed.
+
+## Or install it once, for everything
+
+One command for every project is what you want while trying the language out,
+or for `.es` files that are not part of a JavaScript project at all:
+
+<PackageManagers
+	npm="npm install --global @essence-lang/cli"
+	pnpm="pnpm add --global @essence-lang/cli"
+	bun="bun add --global @essence-lang/cli"
+/>
+
+Now `essence` is on your path, which is how every command in these pages is
+written. With a project-local install instead, put your manager's prefix in
+front of each one — `npx`, `pnpm`, `yarn`, or `bun run`.
+
+Yarn has no global install: `yarn global add` was removed in 2.x, and the answer
+it gives instead is either a project dependency or the one-off below.
+
+## Or run it without installing at all
+
+<PackageManagers
+	npm="npx --package @essence-lang/cli essence run hello.es"
+	pnpm="pnpm dlx --package @essence-lang/cli essence run hello.es"
+	yarn="yarn dlx --package @essence-lang/cli essence run hello.es"
+	bun="bunx @essence-lang/cli run hello.es"
+/>
+
+`--package` is needed because the package and the command it carries have
+different names: `npx @essence-lang/cli` finds no command called `cli` and
+refuses to guess between the two it did find. `bunx` picks `essence` on its
+own.
+
+## One executable, eight commands
+
+`essence help` lists them, and `essence help <command>` documents one in full.
+
+| Command  | What it does                                        |
+| -------- | --------------------------------------------------- |
+| `build`  | Compile Essence sources to JavaScript. The default. |
+| `run`    | Compile a file and execute it immediately.          |
+| `check`  | Type-check sources without writing any output.      |
+| `watch`  | Recompile whenever a source changes.                |
+| `format` | Format sources in place.                            |
+| `lsp`    | Start the Language Server, speaking over stdio.     |
+| `dap`    | Start the Debug Adapter, speaking over stdio.       |
+| `help`   | Help for `essence`, or for a single command.        |
+
+`esc` is installed beside `essence` under its original name, and takes exactly
+the same commands and flags. The standalone `esfmt`, `esls` and `esdap` belong
+to the packages that implement them, so whether they land on your path depends
+on how your package manager arranges dependencies — `essence format`,
+`essence lsp` and `essence dap` are the spellings that always work.
+
+The formatter has nothing to configure. It refuses a file that does not parse,
+and verifies before writing that the result means the same thing.
+
+<Note>
+	The library for calling Essence from a JavaScript codebase —
+	`@essence-lang/client` — is part of the same release train, but is not on the
+	registry yet.
+	Until it is published, a checkout is the way to reach it.
+</Note>
+
+## Building it from a checkout
+
+The other way in, and the one to use for working on the language itself or for
+tracking what has landed since the last release. It needs
+**[Bun](https://bun.sh) 1.3.14 or newer** — the version the repository is
+developed and tested against, written down in `.bun-version` — and **git**.
+
+```sh
+git clone https://github.com/alexandertrefz/essence.git
+cd essence
+bun install
+```
+
+There is no compile step to sit through here either: every package points
+`main` straight at its TypeScript and Bun runs the sources, so installing the
+workspace is installing the compiler.
+
+`bun install` links `essence` into `node_modules/.bin`, so from anywhere inside
+the repository:
+
+```sh
+bun run essence --version
+bun run essence format --check '*.es'
+```
+
+From outside the repository, or from a script, the executable lives in the
+package that owns it and can be run directly:
+
+```sh
+packages/cli/bin/essence help
+packages/cli/bin/essence lsp
+```
+
+## The editor extension
+
+The VS Code extension is at `0.3.0`, and it is the one part of the toolchain
+you cannot install from a registry: it is on neither the Marketplace nor Open
+VSX, because publishing needs a publisher account that does not exist yet. Until
+it does, build the `.vsix` from a checkout and install that. It is
+self-contained, with the Language Server bundled into it:
+
+```sh
+bun run --cwd packages/vscode-extension package
+code --install-extension packages/vscode-extension/essence-language-0.3.0.vsix
+```
+
+The extension brings syntax highlighting refined by semantic tokens, and — from
+the bundled Language Server — diagnostics as you type, Quick Fixes,
+go-to-definition, renaming, hovers, completion, signature help, inlay hints and
+Format on Save. It needs a `node` on your path to start that server, and the
+`essence` command for debugging: it takes the path from `essence.cli.path`,
+finds a checkout open in the workspace on its own, and falls back to what is on
+your path.
+
+## Where to go next
+
+- [Your first program](/docs/getting-started/your-first-program) — four steps,
+  about five minutes.
+- [Project layout](/docs/getting-started/project-layout) — what a program is,
+  and what the compiler writes.

@@ -1,0 +1,211 @@
+---
+/*
+ * One level of the docs tree, and — through itself — every level under it.
+ *
+ * Split out of `SidebarNav` because the tree stopped being two deep: the
+ * standard library is types, the cases of a union under the type they are cases
+ * of, and Members under each. Written as one component that renders itself, so
+ * a fourth level costs nothing.
+ *
+ * A branch is drawn only while the page being read is somewhere inside it.
+ * There are 179 Members across the standard library and the rail is meant to be
+ * glanceable, so what it shows is the path you are on rather than everything
+ * there is; the type page itself carries the complete index.
+ */
+
+import type { SidebarItem } from "../../lib/navigation.ts"
+
+interface Props {
+	items: SidebarItem[]
+	activeId?: string
+	/** Nesting depth, only ever used to decide how a row is set. */
+	depth?: number
+	mono?: boolean
+	variant?: "rail" | "mobile"
+}
+
+let { items, activeId, depth = 0, mono = false, variant = "rail" } = Astro.props
+
+/** Whether the page being read is this item or anywhere beneath it. */
+function holdsActive(item: SidebarItem): boolean {
+	return (
+		item.id === activeId || item.children.some((child) => holdsActive(child))
+	)
+}
+
+/*
+ * What of an item's children to draw, which is not the same question for the
+ * two kinds.
+ *
+ * The cases of a union are shown for as long as that union is on the way to
+ * wherever you are: they are four rows, and they are how the standard library
+ * is got around. A type's Methods are shown only when that type is the one being
+ * read, or when one of them is — there are 179 of them, and reading
+ * `Integer::add` should not unfold the sixteen Methods of `Number` on the way
+ * past.
+ */
+function visibleChildren(item: SidebarItem): SidebarItem[] {
+	if (!holdsActive(item)) {
+		return []
+	}
+
+	let readingThisOne =
+		item.id === activeId || item.children.some((child) => child.id === activeId)
+
+	return item.children.filter((child) => child.structural || readingThisOne)
+}
+
+/*
+ * `Integer::add` is written `add` under Integer, which is the row above it and
+ * the crumb above that. A case keeps its whole name — `Integer` is what it is
+ * called, and it is a type wherever it is listed, so it is set like the other
+ * types rather than like a Method.
+ */
+function label(item: SidebarItem): string {
+	return depth === 0 || item.structural
+		? item.title
+		: item.title.replace(/^.*(::|\.)/, "")
+}
+
+function isMemberRow(item: SidebarItem): boolean {
+	return depth > 0 && !item.structural
+}
+---
+
+{
+	items.map((item) => {
+		let shown = visibleChildren(item)
+
+		return (
+			<>
+				<a
+					class="item"
+					class:list={{
+						"is-active": item.id === activeId,
+						"item--mono": mono || isMemberRow(item),
+						"item--child": isMemberRow(item),
+						"item--case": item.structural,
+					}}
+					data-variant={variant}
+					href={item.href}
+					aria-current={item.id === activeId ? "page" : undefined}
+				>
+					{label(item)}
+				</a>
+
+				{shown.length > 0 && (
+					<div class="branch" data-variant={variant}>
+						<Astro.self
+							items={shown}
+							activeId={activeId}
+							depth={depth + 1}
+							mono={mono}
+							variant={variant}
+						/>
+					</div>
+				)}
+			</>
+		)
+	})
+}
+
+<style>
+	/*
+	 * The rows, and the rules that used to sit in `SidebarNav`. They moved here
+	 * with the markup: Astro scopes a component's styles to the elements in its
+	 * own template, so a selector written up there would no longer reach a row
+	 * rendered down here. The variant travels on the elements themselves for the
+	 * same reason — a `.tree[data-variant]` ancestor is in the other component's
+	 * scope and cannot be selected across the boundary.
+	 */
+
+	.item[data-variant="rail"] {
+		padding: 5px 12px;
+		border-radius: 6px;
+		font-family: var(--font-body);
+		font-size: 14px;
+		color: var(--text-body);
+		text-wrap: pretty;
+	}
+
+	.item--mono[data-variant="rail"] {
+		font-family: var(--font-mono);
+		font-size: 13px;
+	}
+
+	.item[data-variant="mobile"] {
+		padding: 11px 12px;
+		border-radius: 8px;
+		font-family: var(--font-heading);
+		font-weight: 500;
+		font-size: 15px;
+		color: var(--text-strong);
+	}
+
+	/*
+	 * What is nested under the row above it: the cases of a union, or a type's
+	 * Members. A column of its own — the rail is a flex column, so without this
+	 * the branch is one flex item and its links lay out inline, straight across
+	 * the page and out of the rail.
+	 *
+	 * The rule down the left is what says these belong to the row above rather
+	 * than being more of the section.
+	 */
+	.branch {
+		display: flex;
+		flex-direction: column;
+		margin: 4px 0 6px 12px;
+		padding-left: 12px;
+		border-left: 1px solid var(--hairline-softest);
+	}
+
+	.branch[data-variant="mobile"] {
+		margin-left: 12px;
+		gap: 2px;
+	}
+
+	/*
+	 * A case of a union is a type, and is set like every other type in the rail —
+	 * only its indentation says it is one. Its own padding, because the row above
+	 * it has already taken the left margin.
+	 */
+	.item--case[data-variant="rail"] {
+		padding: 5px 10px;
+		font-family: var(--font-body);
+		font-size: 14px;
+		color: var(--text-body);
+	}
+
+	.item--child {
+		font-family: var(--font-mono);
+		color: var(--text-muted);
+	}
+
+	.item--child[data-variant="rail"] {
+		padding: 4px 10px;
+		font-size: 12.5px;
+	}
+
+	.item--child[data-variant="mobile"] {
+		padding: 9px 12px;
+		font-size: 13px;
+	}
+
+	/* After the variants, so the colour a state sets is the one that lands. */
+
+	.item:hover {
+		color: var(--text-hero);
+		background: var(--surface-hover);
+	}
+
+	/*
+	 * The ring is an inset shadow rather than a border: a real border would add
+	 * two pixels to the active row and nudge every label beside it.
+	 */
+	.item.is-active {
+		font-weight: 500;
+		color: var(--text-hero);
+		background: var(--accent-soft-bg-strong);
+		box-shadow: inset 0 0 0 1px var(--accent-active-border);
+	}
+</style>

@@ -1,0 +1,132 @@
+---
+title: Your First Program
+description:
+  Four steps, about five minutes. You will end with a program the compiler has
+  proved correct, printing an exact fraction.
+section: getting-started
+order: 20
+template: guide
+steps: 4
+minutes: 5
+---
+
+<Steps>
+
+<StepItem title="Get the toolchain">
+
+The whole toolchain is one package on the npm registry. Installing it once puts
+an `essence` command on your path:
+
+<PackageManagers
+	npm="npm install --global @essence-lang/cli"
+	pnpm="pnpm add --global @essence-lang/cli"
+	bun="bun add --global @essence-lang/cli"
+/>
+
+[Installation](/docs/getting-started/installation) covers adding it to a project
+instead, running it without installing it, and building it from a checkout.
+
+`essence --version` should answer `0.1.0`.
+
+</StepItem>
+
+<StepItem title="Write a program">
+
+Put this in `hello.es`, anywhere you like. A program needs no manifest and no
+project around it — a file is enough.
+
+<CodeWindow
+	title="hello.es"
+	class="code-bare"
+	compact
+	code={`implementation {
+
+	§ Two exact thirds. There is no floating point anywhere in this program.
+	constant oneThird = 1/3
+	constant twoThirds = 2/3
+
+	constant sum = oneThird::add(twoThirds)
+
+	§ A String interpolates — a hole holds an Expression, and stringifies it.
+	Terminal.print("1/3 + 2/3 = {sum}")
+}`}
+/>
+
+Five things are worth naming before you run it:
+
+- **`implementation { … }` wraps the file.** It is the form a program takes;
+  the standard library uses `declarations { … }` instead, which is what lets it
+  declare methods the runtime implements.
+- **`§` starts a comment**, and `§§` a documentation comment. There is no `//`.
+- **`1/3` is a literal**, not a division that has already happened. It is a
+  `Rational`, kept exact and in lowest terms.
+- **`::` calls a method on a value.** `oneThird::add(twoThirds)` is the same
+  call as `Rational.add(oneThird, twoThirds)`.
+- **`{sum}` is an interpolation hole**, and it takes an expression rather than
+  only a name — whatever is inside it is stringified where it stands.
+
+</StepItem>
+
+<StepItem title="Check it">
+
+`essence check` runs the parser, enricher and validator and stops there. Nothing
+is written to disk, so this is the fastest way to ask whether a program is valid.
+
+```sh
+$ essence check hello.es
+  ✔ hello.es no errors
+
+    read      0.09 ms  ░
+    parse      1.4 ms  █
+    enrich      34 ms  ████████████████████████
+    validate  0.04 ms  ░
+
+    total   36 ms
+```
+
+Try breaking it — pass `add` a String, say — and check again. The compiler will
+tell you exactly which types did not line up, where, and what it was expecting
+instead. Every diagnostic carries a stable code, so the same error is looked up the
+same way however you met it.
+
+</StepItem>
+
+<StepItem title="Run it">
+
+`essence run` compiles the file and executes it in one step, without leaving a
+`.js` file behind.
+
+```sh
+$ essence run hello.es
+  ✔ hello.es → /tmp/essence-6NZrhM/hello.js
+
+    output  7.6 kB · 1.8 kB gzipped
+    total   90 ms
+
+  ─── program output ───────────────────────────────────────────────────────────
+"1/3 + 2/3 = 1/1"
+  ──────────────────────────────────────────────────────────────────────────────
+
+  ✔ program exited with code 0 after 14 ms
+```
+
+`1/1`, not `0.9999999999999998`. Thirds are held as thirds and added as thirds;
+nothing is rounded on the way, so the answer is exactly one.
+
+<Note>
+	The output is a self-contained ES module. Only the parts of the runtime the
+	program actually reaches are bundled into it, so it runs under Bun or Node,
+	or in a browser, with nothing else installed. Use `essence build hello.es` to
+	keep the file instead of throwing it away.
+</Note>
+
+</StepItem>
+
+</Steps>
+
+## What to read next
+
+- [Project layout](/docs/getting-started/project-layout) — what a program is
+  without a manifest, and what the compiler writes where.
+- [Installation](/docs/getting-started/installation) — adding the toolchain to a
+  project, and every command it carries.

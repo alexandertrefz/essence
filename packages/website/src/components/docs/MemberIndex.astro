@@ -1,0 +1,165 @@
+---
+/*
+ * Everything a type can do, on the type's own page.
+ *
+ * Built from the collection rather than from a list written here or in
+ * frontmatter: a Member's page IS its entry in this index, so the index cannot
+ * name a page that does not exist, and a page cannot exist without appearing.
+ * The generator writes the pages, `tests/stdlibMembers.spec.ts` checks that the
+ * set of them matches the standard library, and this renders whatever is there.
+ *
+ * Grouped by how a Member is reached, because that is the difference that
+ * decides what a reader can type: a Method needs a value in front of it
+ * (`2::add(3)`), a static one names the type (`Integer.parse("2")`), and a
+ * Property is a value already.
+ */
+
+import { getCollection } from "astro:content"
+
+import RichText from "../RichText.astro"
+import { parentId } from "../../lib/navigation.ts"
+
+interface Props {
+	/** The type page's collection id — its Members are the pages under it. */
+	parent: string
+}
+
+let { parent } = Astro.props
+
+let members = (await getCollection("docs"))
+	.filter((entry) => parentId(entry.id) === parent)
+	.sort(
+		(a, b) => a.data.order - b.data.order || a.data.title.localeCompare(b.data.title),
+	)
+
+// The order is the order of increasing distance from a value you are holding.
+const GROUPS = [
+	{ kind: "property", label: "Properties" },
+	{ kind: "method", label: "Methods" },
+	{ kind: "static method", label: "Static methods" },
+]
+
+let groups = GROUPS.map((group) => ({
+	...group,
+	members: members.filter((entry) => entry.data.kind === group.kind),
+})).filter((group) => group.members.length > 0)
+
+/** `Integer::add` → `add`: the type is the page you are on. */
+function shortName(title: string): string {
+	return title.replace(/^.*(::|\.)/, "")
+}
+---
+
+{
+	groups.length > 0 && (
+		<section class="members">
+			<h2 class="members__title" id="members">
+				Members
+			</h2>
+
+			{groups.map((group) => (
+				<div class="set">
+					<h3 class="set__label">{group.label}</h3>
+
+					<ul class="rows">
+						{group.members.map((entry) => (
+							<li class="row">
+								<a class="row__name" href={`/docs/${entry.id}`}>
+									{shortName(entry.data.title)}
+								</a>
+								<p class="row__summary">
+									<RichText text={entry.data.description} />
+								</p>
+							</li>
+						))}
+					</ul>
+				</div>
+			))}
+		</section>
+	)
+}
+
+<style>
+	.members {
+		margin-top: 56px;
+	}
+
+	.members__title {
+		font-size: 24px;
+		letter-spacing: -0.01em;
+		color: var(--text-heading);
+	}
+
+	.set {
+		margin-top: 30px;
+	}
+
+	.set__label {
+		font-family: var(--font-mono);
+		font-weight: 400;
+		font-size: 11px;
+		letter-spacing: 0.12em;
+		text-transform: uppercase;
+		color: var(--text-faintest);
+	}
+
+	.rows {
+		list-style: none;
+		margin-top: 10px;
+		border-top: 1px solid var(--hairline);
+	}
+
+	/*
+	 * Two columns while there is room for the name to have a measure of its own,
+	 * one below the other when there is not. The name column is fixed rather
+	 * than shrink-to-fit so the summaries line up down the page — a ragged left
+	 * edge on the prose is what makes a table like this hard to scan.
+	 */
+	.row {
+		display: grid;
+		grid-template-columns: 220px minmax(0, 1fr);
+		gap: 4px 24px;
+		padding: 14px 0;
+		border-bottom: 1px solid var(--hairline);
+	}
+
+	.row__name {
+		font-family: var(--font-mono);
+		font-size: 13.5px;
+		color: var(--text-strong);
+		overflow-wrap: anywhere;
+	}
+
+	.row__name:hover {
+		color: var(--accent);
+	}
+
+	.row__summary {
+		font-size: 15px;
+		line-height: 1.6;
+		color: var(--text-muted);
+		text-wrap: pretty;
+	}
+
+	.row__summary :global(code) {
+		font-family: var(--font-mono);
+		font-size: 0.88em;
+		color: var(--text-strong);
+	}
+
+	@media (max-width: 800px) {
+		.members {
+			margin-top: 40px;
+		}
+
+		.row {
+			grid-template-columns: minmax(0, 1fr);
+			gap: 5px;
+			padding: 12px 0;
+		}
+
+		.row__summary {
+			font-size: 14.5px;
+		}
+	}
+</style>

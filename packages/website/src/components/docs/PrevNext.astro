@@ -1,0 +1,147 @@
+---
+/*
+ * The pair of cards that closes an article or a guide — screen 1f, stacking
+ * at 390px as in 1k.
+ *
+ * Both slots are optional: the first page of the chain has no previous and the
+ * last has no next, and neither leaves a hole where the other card sits.
+ */
+
+import type { DocLink } from "../../lib/navigation.ts"
+
+interface Props {
+	previous?: DocLink
+	next?: DocLink
+}
+
+let { previous, next } = Astro.props
+---
+
+{
+	(previous !== undefined || next !== undefined) && (
+		<nav class="prevnext" aria-label="Page navigation">
+			{previous !== undefined && (
+				<a class="card" href={previous.href} rel="prev">
+					<span class="card__eyebrow">
+						<svg
+							class="card__arrow"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+						>
+							<path d="M5 12l14 0" />
+							<path d="M5 12l6 6" />
+							<path d="M5 12l6 -6" />
+						</svg>
+						Previous
+					</span>
+					<span class="card__title">{previous.title}</span>
+				</a>
+			)}
+
+			{next !== undefined && (
+				<a class="card card--next" href={next.href} rel="next">
+					<span class="card__eyebrow">
+						Next
+						<svg
+							class="card__arrow"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+						>
+							<path d="M5 12l14 0" />
+							<path d="M13 18l6 -6" />
+							<path d="M13 6l6 6" />
+						</svg>
+					</span>
+					<span class="card__title">{next.title}</span>
+				</a>
+			)}
+		</nav>
+	)
+}
+
+<style>
+	.prevnext {
+		display: flex;
+		gap: 16px;
+		margin-top: 56px;
+		padding-top: 28px;
+		border-top: 1px solid var(--hairline-softest);
+	}
+
+	.card {
+		flex: 1;
+		display: flex;
+		flex-direction: column;
+		padding: 16px 18px;
+		border: 1px solid var(--hairline);
+		border-radius: 9px;
+		background: var(--surface-raised);
+	}
+
+	.card:hover {
+		border-color: var(--accent-hover-border);
+		box-shadow: var(--accent-focus-glow);
+	}
+
+	.card--next {
+		text-align: right;
+		align-items: flex-end;
+	}
+
+	.card__eyebrow {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		padding-bottom: 6px;
+		font-family: var(--font-mono);
+		font-size: 11px;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		color: var(--text-faintest);
+	}
+
+	.card__arrow {
+		width: 1.3em;
+		height: 1.3em;
+		flex: none;
+	}
+
+	.card__title {
+		font-family: var(--font-body);
+		font-size: 15px;
+		font-weight: 500;
+		color: var(--text-strong);
+		text-wrap: pretty;
+	}
+
+	.card:hover .card__title {
+		color: var(--text-hero);
+	}
+
+	@media (max-width: 800px) {
+		.prevnext {
+			flex-direction: column;
+			gap: 12px;
+			margin-top: 32px;
+			padding-top: 24px;
+		}
+
+		.card {
+			padding: 14px 16px;
+		}
+
+		/* Stacked, the mirrored card would read as a mistake. */
+		.card--next {
+			text-align: left;
+			align-items: flex-start;
+		}
+	}
+</style>

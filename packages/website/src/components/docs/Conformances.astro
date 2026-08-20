@@ -1,0 +1,86 @@
+---
+/*
+ * Which Protocols a type conforms to, at the top of its page.
+ *
+ * A conditional conformance is shown with its condition rather than as a bare
+ * name — `Comparable where ItemType is Comparable` is a different claim from
+ * `Comparable`, and it is the one that explains why sorting a List of Records
+ * is a compile error while sorting a List of Integers is not. Flattening the
+ * two into one chip would hide exactly the thing worth reading.
+ */
+
+interface Props {
+	/** As written in the sources, condition and all. */
+	conformsTo: string[]
+}
+
+let { conformsTo } = Astro.props
+
+function split(entry: string): { protocol: string; condition: string | null } {
+	let [protocol, condition] = entry.split(/\s+where\s+/)
+
+	return { protocol: protocol!, condition: condition ?? null }
+}
+---
+
+{
+	conformsTo.length > 0 && (
+		<div class="conformances">
+			<span class="conformances__label">is</span>
+
+			<ul class="chips">
+				{conformsTo.map(split).map(({ protocol, condition }) => (
+					<li class="chip">
+						<span class="chip__protocol">{protocol}</span>
+						{condition !== null && (
+							<span class="chip__condition">where {condition}</span>
+						)}
+					</li>
+				))}
+			</ul>
+		</div>
+	)
+}
+
+<style>
+	.conformances {
+		display: flex;
+		align-items: baseline;
+		gap: 12px;
+		margin-top: 20px;
+	}
+
+	.conformances__label {
+		flex: none;
+		font-family: var(--font-mono);
+		font-size: 12px;
+		color: var(--text-faintest);
+	}
+
+	.chips {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 8px;
+		list-style: none;
+	}
+
+	.chip {
+		display: flex;
+		align-items: baseline;
+		gap: 7px;
+		padding: 4px 9px;
+		border: 1px solid var(--divider);
+		border-radius: 6px;
+		background: var(--surface-raised);
+		font-family: var(--font-mono);
+		font-size: 12px;
+	}
+
+	.chip__protocol {
+		color: var(--text-strong);
+	}
+
+	.chip__condition {
+		color: var(--text-faintest);
+	}
+</style>
