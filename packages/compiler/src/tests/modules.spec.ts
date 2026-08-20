@@ -2502,4 +2502,88 @@ export {
 			},
 		)
 	})
+
+	// NOTE: A Case payload default may name a Constant of the Module the Choice
+	// is declared in, and what travels is the VALUE — resolved there, baked into
+	// the Case Type as data. This is the test that says so: the Module that
+	// constructs the Case imports the Choice and never the Constant, and gets the
+	// Constant's value all the same.
+	it("bakes a Constant into a payload default read in another Module", async () => {
+		await withBuiltProject(
+			{
+				"Main.es": `import {
+	Fetch from "./Fetching.es"
+}
+
+implementation {
+	constant call: Fetch = #Get({ url = "/x" })
+
+	Terminal.inspect(call)
+}
+`,
+				"Fetching.es": `implementation {
+	constant standardHeaders: List<String> = ["Accept"]
+
+	choice Fetch {
+		Get { url: String, headers: List<String> } = { headers = standardHeaders },
+	}
+}
+
+export { Fetch }
+`,
+			},
+			async (directory) => {
+				let linked = linkModuleGraph(
+					loadModuleGraph(
+						path.join(directory, "Main.es"),
+						diskModuleHost,
+					),
+				)
+				let sources = generateModules(linked)
+
+				expect(await runBundle(sources, directory)).toEqual([
+					'./Fetching.es#Fetch#Get { url = "/x", headers = [ "Accept" ] }',
+				])
+			},
+		)
+	})
+
+	// NOTE: The other direction, and the reason the rule is written about the
+	// DECLARING Module: a Type crosses an import edge, an Expression does not, so
+	// the Module writing the Choice has the imported Constant's Type in hand and
+	// nothing to bake.
+	it("refuses a payload default that names an imported Constant", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	standardHeaders from "./Headers.es"
+}
+
+implementation {
+	choice Fetch {
+		Get { url: String, headers: List<String> } = { headers = standardHeaders },
+	}
+}
+`,
+				"Headers.es": `implementation {
+	constant standardHeaders: List<String> = ["Accept"]
+}
+
+export { standardHeaders }
+`,
+			},
+			(directory) => {
+				let linked = linkModuleGraph(
+					loadModuleGraph(
+						path.join(directory, "Main.es"),
+						diskModuleHost,
+					),
+				)
+
+				expect(
+					codesOf(linkedAt(directory, linked, "Main.es").diagnostics),
+				).toEqual(["case-default-not-a-literal"])
+			},
+		)
+	})
 })

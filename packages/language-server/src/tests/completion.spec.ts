@@ -2024,6 +2024,26 @@ describe("Completion of a label inside a Parameter's default", () => {
 // inside a Parameter's does — the member of the payload it is filling in — and
 // without the walk reaching there it has none at all.
 describe("Case completion inside a Case payload default", () => {
+	// NOTE: A default may name a Constant of this Module, so what is in Scope is
+	// an answer here and not only what a `#` opens. Nothing in Completion knows
+	// that: the default is an Expression on the walk, and a name in one probes
+	// exactly as a name anywhere else does.
+	it("should offer a Constant a default may name", () => {
+		let source = [
+			"implementation {",
+			'\tconstant standardHeaders: List<String> = ["Accept"]',
+			"",
+			"\tchoice Fetch {",
+			"\t\tGet { url: String, headers: List<String> } = { headers = stand },",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(labelsOf(source, { line: 5, column: 62 })).toContain(
+			"standardHeaders",
+		)
+	})
+
 	it("should offer the member's own Choice after a bare #", () => {
 		let source = [
 			"implementation {",

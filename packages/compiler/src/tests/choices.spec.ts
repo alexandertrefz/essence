@@ -4344,16 +4344,174 @@ describe("Choices", () => {
 			).toContain("case-default-not-a-literal")
 		})
 
-		it("refuses a default member that names a value", () => {
+		it("refuses a default value that is worked out where it stands", () => {
 			expect(
 				codesOf(`implementation {
-					constant none = 0
+					constant sizes = [1, 2, 3]
 
 					choice Fetch {
-						Get { url: String, retries: Integer } = { retries = none },
+						Get { url: String, retries: Integer } = { retries = sizes::length() },
 					}
 				}`),
 			).toContain("case-default-not-a-literal")
+		})
+
+		// NOTE: A Case is constructed wherever its Choice is in reach, so no
+		// Expression may be spliced into a construction — but a Constant of the
+		// declaring Module can be READ there, at the declaration, and its value
+		// baked into the Case Type as data. What travels is a value either way.
+		describe("a default value that names a Constant", () => {
+			it("bakes the Constant's value in", async () => {
+				expect(
+					await run(`implementation {
+						constant standardHeaders: List<String> = ["Accept"]
+
+						choice Fetch {
+							Get { url: String, headers: List<String> } = {
+								headers = standardHeaders,
+							},
+						}
+
+						constant call: Fetch = #Get({ url = "/x" })
+
+						Terminal.inspect(call)
+					}`),
+				).toEqual(['Fetch#Get { url = "/x", headers = [ "Accept" ] }'])
+			})
+
+			it("follows one Constant through to the next", async () => {
+				expect(
+					await run(`implementation {
+						constant defaultCalls = 10
+						constant baseLimits = { calls = defaultCalls }
+
+						choice Fetch {
+							Get { url: String, limits: { calls: Integer } } = {
+								limits = baseLimits,
+							},
+						}
+
+						constant call: Fetch = #Get({ url = "/x" })
+
+						Terminal.inspect(call)
+					}`),
+				).toEqual(['Fetch#Get { url = "/x", limits = { calls = 10 } }'])
+			})
+
+			it("bakes a Case value a Constant holds", async () => {
+				expect(
+					await run(`implementation {
+						choice Mode { Loud, Quiet }
+
+						constant defaultMode: Mode = #Quiet
+
+						choice Fetch {
+							Get { url: String, mode: Mode } = { mode = defaultMode },
+						}
+
+						constant call: Fetch = #Get({ url = "/x" })
+
+						Terminal.inspect(call)
+					}`),
+				).toEqual(['Fetch#Get { url = "/x", mode = Mode#Quiet }'])
+			})
+
+			it("refuses a Constant whose value is worked out", () => {
+				let reported = diagnosticsOf(`implementation {
+					constant sizes = [1, 2, 3]
+					constant biggest = sizes::length()
+
+					choice Fetch {
+						Get { url: String, retries: Integer } = { retries = biggest },
+					}
+				}`)
+
+				expect(reported.map(({ code }) => code)).toEqual([
+					"case-default-not-a-literal",
+				])
+				expect(reported[0].message).toBe(
+					"The Constant 'biggest' does not hold a literal",
+				)
+			})
+
+			// NOTE: The refusal follows the CHAIN — a Constant that holds a
+			// written Record whose member is worked out is not a literal either —
+			// and reports at the name the default wrote, not at the leaf.
+			it("refuses a Constant that reaches a worked-out value", () => {
+				let reported = diagnosticsOf(`implementation {
+					constant sizes = [1, 2, 3]
+					constant biggest = sizes::length()
+					constant baseLimits = { calls = biggest }
+
+					choice Fetch {
+						Get { url: String, limits: { calls: Integer } } = {
+							limits = baseLimits,
+						},
+					}
+				}`)
+
+				expect(reported.map(({ code }) => code)).toEqual([
+					"case-default-not-a-literal",
+				])
+				expect(reported[0].message).toBe(
+					"The Constant 'baseLimits' does not hold a literal",
+				)
+			})
+
+			it("refuses a Variable", () => {
+				let reported = diagnosticsOf(`implementation {
+					variable attempts = 0
+
+					choice Fetch {
+						Get { url: String, retries: Integer } = { retries = attempts },
+					}
+				}`)
+
+				expect(reported.map(({ code }) => code)).toEqual([
+					"case-default-not-a-literal",
+				])
+				expect(reported[0].message).toBe(
+					"'attempts' is not a Constant of this Module",
+				)
+			})
+
+			// NOTE: A Constant does not hoist, and a payload default is read at
+			// the Choice's own Statement — so one written below it is not there
+			// yet, and `unknown-name` is the whole of the answer.
+			it("refuses a Constant declared below the Choice", () => {
+				expect(
+					codesOf(`implementation {
+						choice Fetch {
+							Get { url: String, retries: Integer } = { retries = later },
+						}
+
+						constant later = 3
+					}`),
+				).toEqual(["unknown-name"])
+			})
+
+			// NOTE: The Constant a name stands for is read off the Scope that
+			// DECLARES it, so a binding closer in answers with nothing rather than
+			// with the Module Constant it hides.
+			it("refuses a binding that shadows a Constant", () => {
+				expect(
+					codesOf(`implementation {
+						constant retryCount = 3
+
+						function build() -> Integer {
+							constant retryCount = 9
+
+							choice Fetch {
+								Get { url: String, retries: Integer } = {
+									retries = retryCount,
+								},
+							}
+
+							<- 0
+						}
+					}`),
+				).toContain("case-default-not-a-literal")
+			})
 		})
 
 		it("takes a List, a Record and a Case value as literals", () => {

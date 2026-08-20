@@ -3053,6 +3053,14 @@ export function enrichConstantDeclarationStatement(
 
 	declareVariableInScope(name, declaredType ?? value.type, scope, true)
 
+	// NOTE: Only the top level Scope carries the map, so this records a Module's
+	// own Constants and nothing inside a body. A redeclaration overwrites, the
+	// way `declareVariableInScope` overwrites the Type — the two answers about
+	// one name are kept in step, and the Module is already reporting.
+	if (scope.constantValues !== undefined) {
+		scope.constantValues[name.content] = value
+	}
+
 	return {
 		nodeType: "ConstantDeclarationStatement",
 		name: enrichIdentifier(name, scope),
@@ -4236,11 +4244,11 @@ export function enrichChoiceDeclarationStatement(
 //
 // Where a Parameter's default is evaluated in the CALLEE, a payload's is spliced
 // into every construction, and a construction may stand in a Module that never
-// named the Choice — so a default that read a name would read one that is not
-// there. What a default may say is therefore exactly what says itself: literals,
-// and the Lists, Records and Case values built out of them. That is the whole of
-// the census this feature was built for (`{ headers = [] }`, `{ retries = 0 }`),
-// and it is the rule that lets the value travel on the Case Type.
+// named the Choice — so a default that read a name THERE would read one that is
+// not there. What a default may say is therefore what can be turned into data
+// HERE: literals and the Lists, Records and Case values built out of them, and
+// the Constants of this Module that hold one, resolved at the declaration and
+// baked into the Case Type. That is what lets the value travel on the Type.
 function enrichCasePayloadDefault(
 	choiceCase: parser.ChoiceCaseNode,
 	caseType: common.CaseType,
@@ -4272,7 +4280,7 @@ function enrichCasePayloadDefault(
 		value.type.type !== "Record" ||
 		caseType.payloadDefault === undefined
 	) {
-		reportCaseDefaultNotALiteral(value, caseType, "whole")
+		reportCaseDefaultNotARecordLiteral(value, caseType)
 
 		return value
 	}
@@ -4303,74 +4311,295 @@ function enrichCasePayloadDefault(
 	}
 
 	let literal = true
+	let baked: Record<string, common.typed.ExpressionNode> = {}
 
-	for (let member of Object.values(value.members)) {
-		if (!isSelfContainedValue(member)) {
-			reportCaseDefaultNotALiteral(member, caseType, "member")
+	for (let [name, member] of Object.entries(value.members)) {
+		let result = bakeCaseDefaultValue(member, scope, [])
 
+		if ("baked" in result) {
+			baked[name] = result.baked
+		} else {
 			literal = false
 		}
 	}
 
 	if (literal) {
-		caseType.payloadDefault.values = value.members
+		caseType.payloadDefault.values = baked
 	}
 
 	return value
 }
 
-function reportCaseDefaultNotALiteral(
+// NOTE: What a payload default's value came to: either the value baked into the
+// Case Type, or the node the walk gave up at. The walk REPORTS what it gave up
+// at while it is still inside the default — where the author wrote it — and
+// hands the node back once it has followed a name into a Constant, so that the
+// one Diagnostic lands on the name in the default and points at the Constant's
+// own value with a second label.
+type BakedCaseDefault =
+	| { baked: common.typed.ExpressionNode }
+	| { offending: common.typed.ExpressionNode }
+
+// NOTE: One value out of a payload default, resolved to the data spliced into
+// every construction of its Case. A written literal is itself; a NAME is the
+// Constant it stands for, read here — in the Module the Choice is declared in,
+// the only Module that can read it — and baked into the Case Type, so that by
+// the time the Type travels the value has stopped being a name.
+//
+// Following one Constant to another is following one written value to another,
+// so it is allowed as far as it goes; what has to be a literal is every LEAF.
+//
+// `through` is the Constants followed to get here. It is the cycle guard, and it
+// is also what tells "written in the default" (empty) from "found inside a
+// Constant" — which decides where the Diagnostic goes.
+function bakeCaseDefaultValue(
+	node: common.typed.ExpressionNode,
+	scope: enricher.Scope,
+	through: ReadonlyArray<string>,
+): BakedCaseDefault {
+	switch (node.nodeType) {
+		// NOTE: An interpolated String is deliberately absent — it holds
+		// Expressions — while a plain String is here, and a bare `#Case` is a
+		// Case value whose payload is null.
+		case "IntegerValue":
+		case "RationalValue":
+		case "StringValue":
+		case "BooleanValue":
+			return { baked: node }
+		case "ListValue": {
+			let values: Array<common.typed.ExpressionNode> = []
+			let changed = false
+
+			for (let value of node.values) {
+				let result = bakeCaseDefaultValue(value, scope, through)
+
+				if (!("baked" in result)) {
+					return result
+				}
+
+				changed ||= result.baked !== value
+				values.push(result.baked)
+			}
+
+			// NOTE: The node itself where nothing under it was a name, so a
+			// default that never mentions one is carried by the very Nodes the
+			// Enricher typed, exactly as it was before names were allowed.
+			return { baked: changed ? { ...node, values } : node }
+		}
+		case "RecordValue": {
+			let members: Record<string, common.typed.ExpressionNode> = {}
+			let changed = false
+
+			for (let [name, member] of Object.entries(node.members)) {
+				let result = bakeCaseDefaultValue(member, scope, through)
+
+				if (!("baked" in result)) {
+					return result
+				}
+
+				changed ||= result.baked !== member
+				members[name] = result.baked
+			}
+
+			return { baked: changed ? { ...node, members } : node }
+		}
+		case "CaseValue": {
+			if (node.value === null) {
+				return { baked: node }
+			}
+
+			let result = bakeCaseDefaultValue(node.value, scope, through)
+
+			if (!("baked" in result)) {
+				return result
+			}
+
+			return {
+				baked:
+					result.baked === node.value
+						? node
+						: { ...node, value: result.baked },
+			}
+		}
+		case "Identifier":
+			return bakeNamedCaseDefaultValue(node, scope, through)
+		default:
+			if (through.length === 0 && !alreadyReportedAbout(node)) {
+				reportCaseDefaultNotWrittenDown(node)
+			}
+
+			return { offending: node }
+	}
+}
+
+// NOTE: Whether the Enricher has already said what is wrong with this value. A
+// Constant named before it is declared is `unknown-name` and an Error Type, and
+// a second Diagnostic saying the name is not a Constant of this Module would be
+// answering a question the first one already answered — the name IS one, four
+// lines further down, and a Constant does not hoist.
+function alreadyReportedAbout(node: common.typed.ExpressionNode): boolean {
+	return typeContainsError(node.type)
+}
+
+// NOTE: A name in a payload default. It stands for its Constant's value when
+// this Module declares one under that name and the value is written down.
+//
+// Anything else is refused rather than followed. A Parameter and a body's
+// binding do not exist where a Choice is declared; a Variable holds whatever it
+// was last assigned, which is not what the declaration read; and an imported
+// Constant's value stays in the Module that wrote it — a Type crosses an import
+// edge, an Expression does not.
+function bakeNamedCaseDefaultValue(
+	node: common.typed.IdentifierNode,
+	scope: enricher.Scope,
+	through: ReadonlyArray<string>,
+): BakedCaseDefault {
+	let name = node.content
+	// NOTE: The DECLARING Scope's map, rather than the top level one reached
+	// past it, so a binding that shadows a Module's Constant answers with
+	// nothing instead of with the Constant it hides.
+	let declaring = findDeclaringScope(name, scope)
+	let value = declaring?.constantValues?.[name]
+
+	// NOTE: A cycle can not be written today: a Constant is enriched at its own
+	// Statement, so it can only name Constants above it, and a Constant that
+	// named itself would not have resolved. The guard stands because that is a
+	// property of the Enricher's ORDER rather than of this walk, and a walk that
+	// leant on it would stop terminating the day the order changed.
+	if (value === undefined || through.includes(name)) {
+		if (through.length === 0 && !alreadyReportedAbout(node)) {
+			reportCaseDefaultNameNotAConstant(node, declaring)
+		}
+
+		return { offending: node }
+	}
+
+	let result = bakeCaseDefaultValue(value, scope, [...through, name])
+
+	if ("baked" in result || through.length > 0) {
+		return result
+	}
+
+	reportCaseDefaultConstantNotALiteral(node, declaring, result.offending)
+
+	return result
+}
+
+// NOTE: One code and four readings, because they are four ways of missing one
+// rule — a payload default is DATA by the time the Case Type carries it. Each
+// says which way, and each carries the rule, so a reader who hits any of them is
+// told what a default may say.
+const CASE_DEFAULT_NOTE =
+	"A payload default is spliced into every construction of its Case, and a construction may stand in a Module that never named the Choice — so the value travels with the Case Type, and a name read where the Case is built would be a name that is not there."
+
+const CASE_DEFAULT_HELP =
+	"Write a literal — a Number, a String, a Boolean, or a List, Record or Case value built out of those — or name a Constant of this Module whose value is one."
+
+function reportCaseDefaultNotARecordLiteral(
 	node: common.typed.ExpressionNode,
 	caseType: common.CaseType,
-	kind: "whole" | "member",
 ): void {
 	reportError(
-		kind === "whole"
-			? `The default for Case '#${caseType.name}' is not a Record Literal`
-			: `This default member is not a literal`,
+		`The default for Case '#${caseType.name}' is not a Record Literal`,
 		node.position,
 		{
 			code: "case-default-not-a-literal",
 			labels: [
 				primary(
 					node.position,
-					kind === "whole"
-						? "this names a value rather than writing one"
-						: "this is worked out rather than written down",
+					"this names a value rather than writing one",
 				),
 			],
 			notes: [
-				"A payload default is spliced into every construction of its Case, and a construction may stand in a Module that never named the Choice — so a default that read a name would read one that is not there.",
+				"Which members a default fills in is read off the ones it writes, so the default itself is spelled out even where the values in it are names.",
+				CASE_DEFAULT_NOTE,
 			],
+			helps: ["Write the members out: '= { … }'."],
+		},
+	)
+}
+
+function reportCaseDefaultNotWrittenDown(
+	node: common.typed.ExpressionNode,
+): void {
+	reportError(
+		"This value in a payload default is not a literal",
+		node.position,
+		{
+			code: "case-default-not-a-literal",
+			labels: [
+				primary(
+					node.position,
+					"this is worked out rather than written down",
+				),
+			],
+			notes: [CASE_DEFAULT_NOTE],
+			helps: [CASE_DEFAULT_HELP],
+		},
+	)
+}
+
+function reportCaseDefaultNameNotAConstant(
+	node: common.typed.IdentifierNode,
+	declaring: enricher.Scope | null,
+): void {
+	let name = node.content
+
+	reportError(`'${name}' is not a Constant of this Module`, node.position, {
+		code: "case-default-not-a-literal",
+		labels: [
+			primary(node.position, `this default value names '${name}'`),
+			...declarationLabel(name, declaring),
+		],
+		notes: [
+			declaring !== null && !declaring.constants.has(name)
+				? "A Variable holds whatever it was last assigned; a payload default is read once, where the Choice is declared."
+				: "A payload default is read where the Choice is declared, so the only name it can follow is a Constant declared in the same Module.",
+			CASE_DEFAULT_NOTE,
+		],
+		helps: [CASE_DEFAULT_HELP],
+	})
+}
+
+function reportCaseDefaultConstantNotALiteral(
+	node: common.typed.IdentifierNode,
+	declaring: enricher.Scope | null,
+	offending: common.typed.ExpressionNode,
+): void {
+	let name = node.content
+
+	reportError(
+		`The Constant '${name}' does not hold a literal`,
+		node.position,
+		{
+			code: "case-default-not-a-literal",
+			labels: [
+				primary(node.position, `this default value names '${name}'`),
+				secondary(
+					offending.position,
+					"this is worked out rather than written down",
+				),
+				...declarationLabel(name, declaring),
+			],
+			notes: [CASE_DEFAULT_NOTE],
 			helps: [
-				kind === "whole"
-					? `Write the members out: '= { … }'.`
-					: "Write a literal — a Number, a String, a Boolean, or a List, Record or Case value built out of those.",
+				`Give '${name}' a value that is written down, or write this default's value out here.`,
 			],
 		},
 	)
 }
 
-// NOTE: A value that says itself: it names nothing, so it means the same thing
-// in every Module and needs nothing around it to be evaluated. An interpolated
-// String is deliberately NOT one — it holds Expressions — while a plain String
-// is, and a bare `#Case` is a Case value with no payload.
-function isSelfContainedValue(node: common.typed.ExpressionNode): boolean {
-	switch (node.nodeType) {
-		case "IntegerValue":
-		case "RationalValue":
-		case "StringValue":
-		case "BooleanValue":
-			return true
-		case "ListValue":
-			return node.values.every(isSelfContainedValue)
-		case "RecordValue":
-			return Object.values(node.members).every(isSelfContainedValue)
-		case "CaseValue":
-			return node.value === null || isSelfContainedValue(node.value)
-		default:
-			return false
-	}
+// NOTE: Left out where the name was declared by the Compiler rather than in
+// Essence — a builtin has no source to point at.
+function declarationLabel(
+	name: string,
+	declaring: enricher.Scope | null,
+): Array<common.DiagnosticLabel> {
+	let position = declaring?.declarations[name]
+
+	return position === undefined
+		? []
+		: [secondary(position, `'${name}' is declared here`)]
 }
 
 // NOTE: The condition is enriched BEFORE the branch Scopes exist, which is the
