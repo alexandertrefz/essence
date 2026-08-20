@@ -92,8 +92,10 @@ Program would change meaning because a Type it does not name grew a member.
 
 Each step but the last must name a Record, since it is the value the step after
 it updates. A step that names something else is refused, and so is a path key in
-a plain Record Literal, which writes its members from nothing and so has no
-value under the key to reach into.
+a Record Literal standing on its own, which writes its members from nothing and
+so has no value under the key to reach into. The other two Literals that DO have
+a value under them are an Argument and a Case payload merged into a default —
+see “Reaching into a default”.
 
 The value being updated has to be one that can be NAMED — `@`, a name, or a
 chain of member reads over one of those — because the compiled form reads it
@@ -197,6 +199,59 @@ not bind a Choice's Type Parameters.
 A Case with a payload is still constructed with one: `#Get({})` where the
 default fills everything in. The bare `#Get` spelling stays what it has always
 been — a Case that carries nothing at all.
+
+### Reaching into a default
+
+An Argument written for a defaulted Record Parameter, and a payload written for
+a defaulting Case, are Literals merged into a value that is already there. So
+they take PATH KEYS, and a braced descend, on exactly the terms a `with` does:
+
+```essence
+type Server = { host: String, port: Integer }
+type Options = { retries: Integer, server: Server }
+
+§§ Answers a description of the connection.
+§§
+§§ @param _ — the address to connect to.
+§§ @param using — how to connect.
+§§ @returns — the description.
+function connect(
+	_ url: String,
+	using options: Options = {
+		retries = 3,
+		server = { host = "localhost", port = 8080 },
+	},
+) -> String {
+	<- "{url} {options.server.host}:{options.server.port}"
+}
+
+constant local = connect("example.com", using { server.port = 1 })
+```
+
+`using { server.port = 1 }` reads exactly as `{ default with server.port = 1 }`
+does: `port` comes from the call and `host` from the default. One rule for every
+right-hand side of a merge — `server = { … }` REPLACES and `server.port = …`
+MERGES, wherever the two are written.
+
+A path may reach into a member the default writes as a Record LITERAL of its
+own, as deep as that Literal is written out. A member the default fills in whole
+— `server = fallback`, naming a value rather than writing it — is taken or left
+whole, since a value can not be taken apart without being worked out, and a path
+into one is refused by name. So is a path into a member the default does not
+fill in at all: there would be nothing under it to merge with.
+
+The Case payload reads the same way, filled in where the Case is constructed
+rather than at a callee:
+
+```essence
+type Limits = { calls: Integer, burst: Integer }
+
+choice Fetch {
+	Get { url: String, limits: Limits } = { limits = { calls = 1, burst = 2 } },
+}
+
+constant polite = #Get({ url = "/items", limits.calls = 5 })
+```
 
 ## Reading a member: paths as values
 

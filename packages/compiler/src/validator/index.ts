@@ -19,6 +19,8 @@ import {
 	describeType,
 	flattenUnionMembers,
 	isPartialOf,
+	isMergedLevel,
+	mergedRecordType,
 	type MatchableArgument,
 	matchArguments,
 	matchesType,
@@ -1958,17 +1960,25 @@ function validateCaseValue(
 						: [],
 			},
 		)
+	} else if (
+		reportUnmergedPayloadPathKey(payloadType, node.type, node.value)
+	) {
+		// NOTE: Reported already — a path key the payload's default does not
+		// reach into is what made the payload not fit, and naming the whole Type
+		// under it would name everything but the mistake.
 	} else if (casePayloadIsPartial(node.type, node.value)) {
 		let missing = missingRecordMembers(
 			payloadType,
 			node.type.payloadDefault!.members,
-			node.value.type as common.RecordType,
+			casePayloadType(node.type, node.value),
 		)
 
 		if (missing.length > 0) {
 			reportIncompleteCasePayload(node.type, missing, node.value)
 		}
-	} else if (!matchesType(payloadType, node.value.type)) {
+	} else if (
+		!matchesType(payloadType, casePayloadType(node.type, node.value))
+	) {
 		reportError(
 			`This payload does not fit Case '#${node.type.name}'`,
 			node.value.position,
@@ -2014,7 +2024,27 @@ function casePayloadIsPartial(
 		caseType.payloadDefault !== undefined &&
 		value.nodeType === "RecordValue" &&
 		value.type.type === "Record" &&
-		isPartialOf({ type: "Record", members: caseType.members }, value.type)
+		isPartialOf(
+			{ type: "Record", members: caseType.members },
+			casePayloadType(caseType, value),
+		)
+	)
+}
+
+// NOTE: What the payload comes to once the default has filled it in — the Type
+// a path key's member stands for, rather than the partial it wrote. The
+// payload's own Type wherever no path key was written, which is every payload
+// but one.
+function casePayloadType(
+	caseType: common.CaseType,
+	value: common.typed.ExpressionNode,
+): common.RecordType {
+	return (
+		mergedRecordType(
+			{ type: "Record", members: caseType.members },
+			caseType.payloadDefault?.nesting,
+			value,
+		) ?? (value.type as common.RecordType)
 	)
 }
 
@@ -2758,6 +2788,7 @@ function matchableArgumentsFromTypedNodes(
 ): Array<MatchableArgument> {
 	return argumentNodes.map((argumentNode) => ({
 		name: argumentNode.name,
+		mergedValue: () => argumentNode.value,
 		spellsItsMembers: argumentNode.value.nodeType === "RecordValue",
 		getType: (expectedType) => {
 			let asked =
@@ -2841,7 +2872,7 @@ function missingMembersOf(
 	parameter: common.Parameter,
 	argumentNode: common.typed.ArgumentNode,
 ): Array<string> | null {
-	let argumentType = argumentNode.value.type
+	let argumentType = argumentRecordType(parameter, argumentNode)
 
 	if (
 		parameter.defaultMembers === undefined ||
@@ -2860,6 +2891,23 @@ function missingMembersOf(
 	)
 
 	return missing.length === 0 ? null : missing
+}
+
+// NOTE: What the Argument comes to once the default has filled it in — a member
+// a path key wrote stands for the whole member the merge rebuilds. The
+// Argument's own Type wherever no path key was written, which is every Argument
+// but one.
+function argumentRecordType(
+	parameter: common.Parameter,
+	argumentNode: common.typed.ArgumentNode,
+): common.Type {
+	return (
+		mergedRecordType(
+			parameter.type,
+			parameter.defaultNesting,
+			argumentNode.value,
+		) ?? argumentNode.value.type
+	)
 }
 
 function reportIncompleteRecordArgument(
@@ -2898,6 +2946,138 @@ function quotedNames(names: ReadonlyArray<string>): string {
 	return names.map((name) => `'${name}'`).join(", ")
 }
 
+// NOTE: A path key in a Literal that is merged into a default reaches into a
+// member the merge REBUILDS — the callee writes that member out one level down,
+// taking each of ITS members from the Argument or from the default. A member the
+// merge does not rebuild is one the Argument replaces whole, and a path key into
+// one would quietly drop every member it did not write. That is the hole this
+// refuses, and it refuses it by name: the Argument does not fit its position
+// either way, and `argument-type-mismatch` would name the whole Type under the
+// one step that is wrong.
+//
+// The first refusal is the one reported. A path is walked from its root, and a
+// step that reaches nowhere makes every step after it a question about a value
+// that is not there.
+function reportUnmergedPathKey(
+	into: common.Type | common.GenericUse,
+	filled: ReadonlyArray<string> | undefined,
+	nesting: common.DefaultNesting | undefined,
+	value: common.typed.ExpressionNode,
+	subject: string,
+): boolean {
+	if (into.type !== "Record" || value.nodeType !== "RecordValue") {
+		return false
+	}
+
+	for (let [name, member] of Object.entries(value.members)) {
+		if (!isMergedLevel(member)) {
+			continue
+		}
+
+		let position = value.memberPositions?.[name] ?? member.position
+
+		// NOTE: A step the position does not declare at all is a member nobody
+		// has, which `argument-type-mismatch` and `payload-type-mismatch` name
+		// as they name every other one. This is about a member that IS there.
+		if (!Object.hasOwn(into.members, name)) {
+			continue
+		}
+
+		let declaredType = into.members[name]!
+
+		if (declaredType.type !== "Record") {
+			reportError("A path key steps through Records only", position, {
+				code: "path-step-not-a-record",
+				labels: [
+					primary(
+						position,
+						`this is ${withArticle(describeType(declaredType))}`,
+					),
+				],
+				notes: [
+					"Every step but the last names the value the step after it reaches into, and only a Record has members to reach.",
+				],
+				helps: [`Set '${name}' as a whole instead.`],
+			})
+
+			return true
+		}
+
+		if (!(filled ?? []).includes(name)) {
+			reportError(
+				"A path key reaches into a member no default fills in",
+				position,
+				{
+					code: "path-key-without-default",
+					labels: [primary(position, `nothing fills in '${name}'`)],
+					notes: [
+						`${subject} is ${describeType(into)}.`,
+						(filled ?? []).length === 0
+							? "Its default fills in nothing, so every member has to be written out here."
+							: `Its default fills in ${quotedNames(filled!)}, and '${name}' is not one of them — so there is nothing under this key to merge with.`,
+					],
+					helps: [`Write the whole member: '${name} = { … }'.`],
+				},
+			)
+
+			return true
+		}
+
+		if (!Object.hasOwn(nesting ?? {}, name)) {
+			reportError(
+				"A path key reaches into a member the default does not write out",
+				position,
+				{
+					code: "path-key-without-default",
+					labels: [primary(position, `'${name}' is filled in whole`)],
+					notes: [
+						`The default names a value for '${name}' rather than writing its members out, and a value can not be taken apart without being worked out — so '${name}' is filled in whole or not at all.`,
+					],
+					helps: [
+						`Write the whole member: '${name} = { … }'.`,
+						`Or write the default's '${name}' out as a Record Literal, member by member.`,
+					],
+				},
+			)
+
+			return true
+		}
+
+		// NOTE: One level down, where every member of the default's Literal is
+		// written out — so a step is refused there for the same reasons and
+		// under the same names.
+		if (
+			reportUnmergedPathKey(
+				declaredType,
+				Object.keys(declaredType.members),
+				nesting?.[name],
+				member,
+				`'${name}'`,
+			)
+		) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// NOTE: The same question about a Case's payload, which is merged into its
+// payload default exactly as an Argument is merged into a Parameter's.
+function reportUnmergedPayloadPathKey(
+	payloadType: common.RecordType,
+	caseType: common.CaseType,
+	value: common.typed.ExpressionNode,
+): boolean {
+	return reportUnmergedPathKey(
+		payloadType,
+		caseType.payloadDefault?.members,
+		caseType.payloadDefault?.nesting,
+		value,
+		`Case '#${caseType.name}'`,
+	)
+}
+
 function reportArgumentMismatch(
 	parameterTypes: Array<common.Parameter>,
 	index: number,
@@ -2919,6 +3099,22 @@ function reportArgumentMismatch(
 	let name = describeParameter(parameter, index)
 
 	if (parameter !== undefined) {
+		// NOTE: Before the missing-member reading and before the Type is named:
+		// a path key the default does not reach into is the ONE thing wrong
+		// with this Argument, and the whole Type is what every other reading
+		// names.
+		if (
+			reportUnmergedPathKey(
+				parameter.type,
+				parameter.defaultMembers,
+				parameter.defaultNesting,
+				argumentNode.value,
+				name,
+			)
+		) {
+			return
+		}
+
 		let missing = missingMembersOf(parameter, argumentNode)
 
 		if (missing !== null) {
@@ -2967,7 +3163,10 @@ function partialSpellingEvidence(
 	parameter: common.Parameter | undefined,
 	argumentNode: common.typed.ArgumentNode,
 ): { notes: Array<string>; helps: Array<string> } {
-	let argumentType = argumentNode.value.type
+	let argumentType =
+		parameter === undefined
+			? argumentNode.value.type
+			: argumentRecordType(parameter, argumentNode)
 
 	if (
 		parameter?.defaultMembers === undefined ||

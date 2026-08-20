@@ -195,6 +195,17 @@ export type RecordValueNode = {
 	// its own, and inventing one for every Literal would move the shape every
 	// snapshot of a typed Program compares.
 	memberPositions?: Record<string, Position>
+	// NOTE: Set on a level a path key built inside a Literal that is MERGED
+	// into a default — an Argument written for a Record Parameter that carries
+	// one, or the payload of a Case that does. `{ server.port = 1 }` is
+	// enriched as `{ server = { port = 1 } }`, and the inner list is a PARTIAL
+	// of the member it stands for: what it does not write is what the default
+	// fills in, one level down, exactly as the outer list works one level up.
+	//
+	// A member written WHOLE carries no such mark and is a replacement, which
+	// is the one difference between the two spellings — and the reason the mark
+	// exists rather than being read off the shape.
+	merged?: true
 }
 
 export type StringValueNode = {

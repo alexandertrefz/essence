@@ -710,6 +710,66 @@ Error: A member path steps through Records only
 "
 `;
 
+exports[`Diagnostic Showcase PathKeyDefaults.es should render the same report every time 1`] = `
+"[path-key-without-default]
+Error: A path key reaches into a member no default fills in
+    ╭─┤ PathKeyDefaults.es:34:49 │
+    │
+ 34 │     Terminal.print(connect("essence.lang", using { server.port = 1 }))
+    │                                                    ───┬──  
+    │                                                       ╰──── nothing fills in 'server'
+    │ 
+    │ Help: Write the whole member: 'server = { … }'.
+    │ 
+    │ Note 1: Parameter 'using' is { retries: Integer, server: { host: String, port: Integer } }.
+    │ Note 2: Its default fills in 'retries', and 'server' is not one of them — so there is nothing under this key to merge with.
+────╯
+
+[path-key-without-default]
+Error: A path key reaches into a member the default does not write out
+    ╭─┤ PathKeyDefaults.es:38:47 │
+    │
+ 38 │     Terminal.print(reach("essence.lang", using { server.port = 1 }))
+    │                                                  ───┬──  
+    │                                                     ╰──── 'server' is filled in whole
+    │ 
+    │ Help 1: Write the whole member: 'server = { … }'.
+    │ Help 2: Or write the default's 'server' out as a Record Literal, member by member.
+    │ 
+    │ Note: The default names a value for 'server' rather than writing its members out, and a value can not be taken apart without being worked out — so 'server' is filled in whole or not at all.
+────╯
+
+[path-step-not-a-record]
+Error: A path key steps through Records only
+    ╭─┤ PathKeyDefaults.es:43:33 │
+    │
+ 43 │        reach("essence.lang", using { retries.length = 1, server = fallback }),
+    │                                      ───┬───  
+    │                                         ╰───── this is an Integer
+    │ 
+    │ Help: Set 'retries' as a whole instead.
+    │ 
+    │ Note: Every step but the last names the value the step after it reaches into, and only a Record has members to reach.
+────╯
+
+[path-key-without-default]
+Error: A path key reaches into a member no default fills in
+    ╭─┤ PathKeyDefaults.es:54:36 │
+    │
+ 54 │     constant reaching: Fetch = #Get({ origin.port = 3, limits.port = 2 })
+    │                                       ───┬──  
+    │                                          ╰──── nothing fills in 'origin'
+    │ 
+    │ Help: Write the whole member: 'origin = { … }'.
+    │ 
+    │ Note 1: Case '#Get' is { origin: { host: String, port: Integer }, limits: { host: String, port: Integer } }.
+    │ Note 2: Its default fills in 'limits', and 'origin' is not one of them — so there is nothing under this key to merge with.
+────╯
+
+─── 4 errors
+"
+`;
+
 exports[`Diagnostic Showcase PathKeySyntax.es should render the same report every time 1`] = `
 "[shorthand-on-path-key]
 Error: A path key names no binding
@@ -759,7 +819,7 @@ Error: This descend updates nothing
 
 exports[`Diagnostic Showcase PathKeys.es should render the same report every time 1`] = `
 "[path-key-outside-combination]
-Error: A path key updates nothing here
+Error: A path key reaches into nothing here
     ╭─┤ PathKeys.es:23:3 │
     │
  23 │        server.port = 8080,
@@ -769,7 +829,7 @@ Error: A path key updates nothing here
     │ Help 1: Write the whole member: 'server = { … }'.
     │ Help 2: Or update a value that already has it: '{ original with server.port = … }'.
     │ 
-    │ Note: A Record Literal writes its members from nothing, so there is no value under this key to reach into.
+    │ Note: A Record Literal writes its members from nothing, so there is no value under this key to reach into. A path key needs one that is already there — the value a 'with' updates, or the value a default fills in for an Argument or a Case payload.
 ────╯
 
 [path-step-not-a-record]
@@ -782,7 +842,7 @@ Error: A path key steps through Records only
     │ 
     │ Help: Set 'name' as a whole instead.
     │ 
-    │ Note: Every step but the last names the value the step after it updates, and only a Record can be updated.
+    │ Note: Every step but the last names the value the step after it reaches into, and only a Record has members to reach.
 ────╯
 
 [path-on-computed-value]

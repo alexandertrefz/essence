@@ -4,6 +4,7 @@ import {
 	bodyDefinitelyReturns,
 	conformanceParameterName,
 	openArgumentHoles,
+	isMergedLevel,
 	recordDefaultMembers,
 	recordDefaultNesting,
 	resolveOverloadedMethodName,
@@ -168,6 +169,7 @@ function simplifyCaseValue(
 				? null
 				: fillCasePayloadDefault(
 						simplifyExpression(node.value),
+						node.value,
 						node.type,
 						node.position,
 					),
@@ -192,6 +194,7 @@ function simplifyCaseValue(
 // stop, and the declaration it was written at may be in another file entirely.
 function fillCasePayloadDefault(
 	value: common.typedSimple.ExpressionNode,
+	written: common.typed.ExpressionNode,
 	caseType: common.Type,
 	position: common.Position,
 ): common.typedSimple.ExpressionNode {
@@ -205,8 +208,58 @@ function fillCasePayloadDefault(
 		return value
 	}
 
+	return filledPayloadLevel(
+		value,
+		written,
+		values,
+		{ type: "Record", members: caseType.members },
+		position,
+	)
+}
+
+// NOTE: One level of the payload. A member a PATH KEY wrote is a level of its
+// own — `#Get({ limits.calls = 2 })` writes only `calls` — and the default's
+// Literal for that member fills the rest of it in, exactly as this level's
+// default fills in this level. A member written WHOLE is complete by rule and
+// is left alone, which is what keeps `limits = { … }` a replacement.
+function filledPayloadLevel(
+	value: common.typedSimple.RecordValueNode,
+	written: common.typed.ExpressionNode,
+	values: Record<string, common.typed.ExpressionNode>,
+	type: common.RecordType,
+	position: common.Position,
+): common.typedSimple.RecordValueNode {
 	let members = { ...value.members }
 	let filled = false
+
+	if (written.nodeType === "RecordValue") {
+		for (let [name, member] of Object.entries(written.members)) {
+			let inner = values[name]
+			let innerType = type.members[name]
+			let simplified = members[name]
+
+			if (
+				!isMergedLevel(member) ||
+				inner === undefined ||
+				inner.nodeType !== "RecordValue" ||
+				innerType === undefined ||
+				innerType.type !== "Record" ||
+				simplified === undefined ||
+				simplified.nodeType !== "RecordValue"
+			) {
+				continue
+			}
+
+			members[name] = filledPayloadLevel(
+				simplified,
+				member,
+				inner.members,
+				innerType,
+				position,
+			)
+			filled = true
+		}
+	}
 
 	for (let [name, member] of Object.entries(values)) {
 		if (!Object.hasOwn(members, name)) {
@@ -215,13 +268,7 @@ function fillCasePayloadDefault(
 		}
 	}
 
-	return filled
-		? {
-				...value,
-				members,
-				type: { type: "Record", members: caseType.members },
-			}
-		: value
+	return filled ? { ...value, members, type } : value
 }
 
 // NOTE: A deep copy of a simplified Expression with one Position stamped
