@@ -2424,4 +2424,82 @@ export {
 			},
 		)
 	})
+
+	// NOTE: What a path key reaches into is a fact about the DEFAULT, so it has
+	// to travel the way every other fact about one does — on the Type. A Module
+	// that merges into a default declared elsewhere is the only place that can
+	// go wrong, and it is the place a Record Parameter's merge happens at the
+	// callee while a Case payload's happens at the construction.
+	it("merges a path key into a default declared in another Module", async () => {
+		await withBuiltProject(
+			{
+				"Main.es": `import {
+	connect from "./Connecting.es"
+	Endpoint from "./Connecting.es"
+	describe from "./Connecting.es"
+}
+
+implementation {
+	Terminal.inspect(connect(using { server.port = 1 }))
+
+	constant bound: Endpoint = #Bound({ server.host = "far" })
+
+	Terminal.inspect(describe(bound))
+}
+`,
+				"Connecting.es": `implementation {
+	type Server = { host: String, port: Integer }
+	type Options = { retries: Integer, server: Server }
+
+	§§ Answers the address.
+	§§
+	§§ @param using — how to connect.
+	§§ @returns — the address.
+	function connect(
+		using options: Options = {
+			retries = 3,
+			server = { host = "near", port = 80 },
+		},
+	) -> String {
+		<- "{options.server.host}:{options.server.port} after {options.retries}"
+	}
+
+	choice Endpoint {
+		Bound { server: Server } = { server = { host = "any", port = 443 } },
+	}
+
+	§§ Answers a description of an Endpoint.
+	§§
+	§§ @param _ — the Endpoint to describe.
+	§§ @returns — the description.
+	function describe(_ endpoint: Endpoint) -> String {
+		<- match endpoint -> String {
+			case #Bound({ server }) { <- "{server.host}:{server.port}" }
+		}
+	}
+}
+
+export {
+	connect
+	Endpoint
+	describe
+}
+`,
+			},
+			async (directory) => {
+				let linked = linkModuleGraph(
+					loadModuleGraph(
+						path.join(directory, "Main.es"),
+						diskModuleHost,
+					),
+				)
+				let sources = generateModules(linked)
+
+				expect(await runBundle(sources, directory)).toEqual([
+					'"near:1 after 3"',
+					'"far:443"',
+				])
+			},
+		)
+	})
 })

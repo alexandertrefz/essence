@@ -1218,26 +1218,35 @@ function recordDefaultPrologue(
 		// NOTE: The Argument's own value for a member the default does not
 		// supply — a plain read, because the Argument is then required and
 		// every member of it is written.
-		let read = (
-			path: Array<string>,
-			type: common.Type,
-		): common.typedSimple.ExpressionNode =>
-			path.reduce<common.typedSimple.ExpressionNode>(
-				(base, member, step) => ({
+		//
+		// Only ever asked at the TOP level, since a level the merge reaches
+		// into is one the default writes out in full and every member of one is
+		// therefore supplied. Written over a path all the same, so that a level
+		// which somehow is not still reads the member it means rather than one
+		// of the Argument's own.
+		let read = (path: Array<string>): common.typedSimple.ExpressionNode => {
+			let type: common.Type = recordType
+			let node: common.typedSimple.ExpressionNode = argument()
+
+			for (let member of path) {
+				let memberType: common.Type = (type as common.RecordType)
+					.members[member]!
+
+				node = {
 					nodeType: "Lookup",
-					base,
+					base: node,
 					member: {
 						nodeType: "Identifier",
 						name: member,
-						type:
-							step === path.length - 1
-								? type
-								: { type: "Unknown" },
+						type: memberType,
 					},
-					type: step === path.length - 1 ? type : { type: "Unknown" },
-				}),
-				argument(),
-			)
+					type: memberType,
+				}
+				type = memberType
+			}
+
+			return node
+		}
 
 		// NOTE: `recordDefaultMembers` and nothing local, because this has to be
 		// the very set the Parameter's TYPE carries as `defaultMembers` — what a
@@ -1317,7 +1326,7 @@ function recordDefaultPrologue(
 					let memberPath = [...path, member]
 
 					if (!levelSupplied.has(member)) {
-						return [member, read(memberPath, memberType)]
+						return [member, read(memberPath)]
 					}
 
 					if (Object.hasOwn(levelNesting, member)) {
