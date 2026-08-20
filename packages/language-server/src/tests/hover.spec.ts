@@ -55,6 +55,42 @@ describe("Hover", () => {
 		)
 	})
 
+	// NOTE: A path key in a Literal MERGED into a default has no synthesized
+	// Lookup under it — the levels are the Record Literals the merge is made
+	// of — so a step answers with the level it is a key of, exactly as a plain
+	// key of a Literal answers with the Literal it belongs to.
+	it("should answer a merged path key's step with the level it writes", () => {
+		let source = [
+			"implementation {",
+			"\ttype Tls = { enabled: Boolean }",
+			"\ttype Server = { host: String, port: Integer, tls: Tls }",
+			"\ttype Config = { name: String, server: Server }",
+			"",
+			"\t§§ Answers the host.",
+			"\t§§",
+			"\t§§ @param using — how to connect.",
+			"\t§§ @returns — the host.",
+			"\tfunction connect(",
+			"\t\tusing config: Config = {",
+			'\t\t\tname = "api",',
+			'\t\t\tserver = { host = "h", port = 80, tls = { enabled = false } },',
+			"\t\t},",
+			"\t) -> String {",
+			"\t\t<- config.server.host",
+			"\t}",
+			"",
+			"\tconstant deep = connect(using { server.tls.enabled = true })",
+			"}",
+		].join("\n")
+
+		expect(hover(source, { line: 19, column: 34 })).toBe(
+			"{ server: { tls: { enabled: Boolean } } }",
+		)
+		expect(hover(source, { line: 19, column: 41 })).toBe(
+			"{ tls: { enabled: Boolean } }",
+		)
+	})
+
 	it("should describe Identifiers with their inferred Type", () => {
 		let source = [
 			"implementation {",

@@ -2071,5 +2071,67 @@ describe("Rename of a name a Case payload default reads", () => {
 				descended.replaceAll("enabled", "on"),
 			)
 		})
+
+		// NOTE: An Argument merged into a default carries path keys too, and
+		// there are no synthesized Lookups under one — the levels ARE the
+		// Record Literals the merge is made of, so every step but the first is
+		// a key of a list that exists nowhere in the written source and is
+		// carried by `memberPositions` alone.
+		describe("in an Argument merged into a default", () => {
+			let merged = [
+				"implementation {",
+				"\ttype Tls = { enabled: Boolean }",
+				"\ttype Server = { host: String, port: Integer, tls: Tls }",
+				"\ttype Config = { name: String, server: Server }",
+				"",
+				"\t§§ Answers the host.",
+				"\t§§",
+				"\t§§ @param using — how to connect.",
+				"\t§§ @returns — the host.",
+				"\tfunction connect(",
+				"\t\tusing config: Config = {",
+				'\t\t\tname = "api",',
+				'\t\t\tserver = { host = "h", port = 80, tls = { enabled = false } },',
+				"\t\t},",
+				"\t) -> String {",
+				"\t\t<- config.server.host",
+				"\t}",
+				"",
+				"\tconstant deep = connect(using { server.tls.enabled = true })",
+				"}",
+			].join("\n")
+
+			it("renames the first step", () => {
+				expect(
+					rename(merged, { line: 19, column: 34 }, "listener"),
+				).toBe(merged.replaceAll("server", "listener"))
+			})
+
+			it("renames a step in the middle", () => {
+				expect(
+					rename(merged, { line: 19, column: 41 }, "security"),
+				).toBe(
+					merged
+						.replace("tls: Tls }", "security: Tls }")
+						.replace("tls = { enabled", "security = { enabled")
+						.replace(
+							"server.tls.enabled",
+							"server.security.enabled",
+						),
+				)
+			})
+
+			it("renames the last step", () => {
+				expect(rename(merged, { line: 19, column: 45 }, "on")).toBe(
+					merged.replaceAll("enabled", "on"),
+				)
+			})
+
+			it("reaches the last step from the member's declaration", () => {
+				expect(rename(merged, { line: 2, column: 15 }, "on")).toBe(
+					merged.replaceAll("enabled", "on"),
+				)
+			})
+		})
 	})
 })

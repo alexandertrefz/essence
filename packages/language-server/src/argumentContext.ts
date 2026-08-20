@@ -412,7 +412,10 @@ function visitArguments(
 	})
 }
 
-function pairedParameters(
+// NOTE: Exported because the dotted-KEY probe asks the same question — which
+// Parameter an Argument belongs to — before it can say which Record a path key
+// inside that Argument reaches into.
+export function pairedParameters(
 	nodeArguments: Array<common.typed.ArgumentNode>,
 	parameterTypes: common.BaseFunction["parameterTypes"] | null,
 ): Array<number | undefined> {

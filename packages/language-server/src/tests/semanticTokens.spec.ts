@@ -47,6 +47,39 @@ describe("Semantic Tokens", () => {
 		expect(tokenAt(source, 10, 43)?.type).toBe("property")
 	})
 
+	// NOTE: A Literal merged into a default carries path keys too, and there
+	// are no synthesized Lookups under one — every step but the first is a key
+	// of a list that exists nowhere in the written source, coloured off the
+	// occurrences `memberPositions` puts in the rename index.
+	it("should classify every step of a merged path key as a property", () => {
+		let source = [
+			"implementation {",
+			"\ttype Tls = { enabled: Boolean }",
+			"\ttype Server = { host: String, port: Integer, tls: Tls }",
+			"\ttype Config = { name: String, server: Server }",
+			"",
+			"\t§§ Answers the host.",
+			"\t§§",
+			"\t§§ @param using — how to connect.",
+			"\t§§ @returns — the host.",
+			"\tfunction connect(",
+			"\t\tusing config: Config = {",
+			'\t\t\tname = "api",',
+			'\t\t\tserver = { host = "h", port = 80, tls = { enabled = false } },',
+			"\t\t},",
+			"\t) -> String {",
+			"\t\t<- config.server.host",
+			"\t}",
+			"",
+			"\tconstant deep = connect(using { server.tls.enabled = true })",
+			"}",
+		].join("\n")
+
+		expect(tokenAt(source, 19, 34)?.type).toBe("property")
+		expect(tokenAt(source, 19, 41)?.type).toBe("property")
+		expect(tokenAt(source, 19, 45)?.type).toBe("property")
+	})
+
 	it("should classify a Constant as a readonly variable declaration", () => {
 		let source = ["implementation {", "\tconstant value = 1", "}"].join(
 			"\n",
