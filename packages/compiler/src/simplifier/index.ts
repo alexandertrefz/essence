@@ -1678,6 +1678,30 @@ function simplifyTestsNodes(
 				row: null,
 			})
 
+			// NOTE: A property test is ONE entry of the manifest and one body,
+			// like a plain test — what differs is that the runtime runs the
+			// body once per generated case rather than once, which is a fact
+			// about the call and not about the identity.
+			if (node.properties !== null) {
+				return {
+					nodeType: "TestProperties" as const,
+					index,
+					name: interpolated ? simplifyExpression(node.name) : null,
+					parameters: node.properties.parameters.map((parameter) => ({
+						name: parameter.name,
+						generator: simplifyTestGenerator(parameter.generator),
+					})),
+					body: node.body.map((child) =>
+						probeStatement(
+							simplifyImplementationNode(child),
+							child.nodeType === "ConstantDeclarationStatement" &&
+								child.synthesized === undefined,
+						),
+					),
+					position: node.position,
+				}
+			}
+
 			return {
 				nodeType: "TestEntry" as const,
 				index,
@@ -1713,6 +1737,68 @@ function simplifyTestsNodes(
 
 		return probeStatement(simplifyImplementationNode(node))
 	})
+}
+
+// NOTE: A generator with its two Expression leaves lowered — a refinement's
+// checks and a `Generatable` call. Everything else is data the Enricher settled
+// and nothing here decides.
+function simplifyTestGenerator(
+	generator: common.typed.TestGenerator,
+): common.typedSimple.TestGenerator {
+	switch (generator.kind) {
+		case "list":
+			return {
+				kind: "list",
+				item: simplifyTestGenerator(generator.item),
+			}
+		case "record":
+			return {
+				kind: "record",
+				members: simplifyGeneratorMembers(generator.members),
+			}
+		case "case":
+			return {
+				kind: "case",
+				tag: generator.tag,
+				members: simplifyGeneratorMembers(generator.members),
+			}
+		case "union":
+			return {
+				kind: "union",
+				members: generator.members.map((member) =>
+					simplifyTestGenerator(member),
+				),
+			}
+		case "refined":
+			return {
+				kind: "refined",
+				name: generator.name,
+				base: simplifyTestGenerator(generator.base),
+				binding: generator.binding,
+				checks: generator.checks.map((check) =>
+					simplifyExpression(check),
+				),
+				narrowing: generator.narrowing,
+			}
+		case "generated":
+			return {
+				kind: "generated",
+				name: generator.name,
+				binding: generator.binding,
+				call: simplifyExpression(generator.call),
+			}
+		default:
+			return generator
+	}
+}
+
+function simplifyGeneratorMembers(
+	members: Array<common.typed.TestGeneratorMember>,
+): Array<common.typedSimple.TestGeneratorMember> {
+	return members.map((member) => ({
+		name: member.name,
+		generator: simplifyTestGenerator(member.generator),
+	}))
 }
 
 // NOTE: Everything a manifest entry says about a test that is not its identity.

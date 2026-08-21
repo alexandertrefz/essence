@@ -145,6 +145,7 @@ export type TestsNode =
 	| TestEntryNode
 	| TestScopeNode
 	| TestRowsNode
+	| TestPropertiesNode
 
 // NOTE: One test, standing where it was written — inside whatever setup it can
 // see. `index` is its place in the section's `tests` array, which is how the
@@ -184,6 +185,60 @@ export interface TestRowsNode {
 	name: ExpressionNode | null
 	body: Array<ImplementationNode>
 	position?: Position
+}
+
+// NOTE: A property test — ONE entry of the manifest and one body, run once per
+// generated case rather than once. The body reads its Parameters the way a
+// table's reads its row: they are the Parameters of the closure the emission
+// wraps it in, and the runtime calls it with the values it drew.
+export interface TestPropertiesNode {
+	nodeType: "TestProperties"
+	index: number
+	// NOTE: The name as an Expression, and only where it INTERPOLATES. It is
+	// worked out in the Scope the test was WRITTEN in rather than in the body's:
+	// what a property generates is a different value every case, so a name
+	// saying which one it ran for could name no test at all.
+	name: ExpressionNode | null
+	parameters: Array<TestPropertyParameter>
+	body: Array<ImplementationNode>
+	position?: Position
+}
+
+// NOTE: One generated Parameter: the name the body binds and a report names,
+// and how to draw a value for it.
+export type TestPropertyParameter = { name: string; generator: TestGenerator }
+
+// NOTE: The Enricher's generator with its Expressions lowered. It is the same
+// shape by design — one description of how to build a value, written once in
+// `common.typed` and carried through — because the runtime interprets it and
+// nothing between here and there decides anything about it.
+export type TestGenerator =
+	| { kind: "boolean" }
+	| { kind: "integer" }
+	| { kind: "rational" }
+	| { kind: "string" }
+	| { kind: "list"; item: TestGenerator }
+	| { kind: "record"; members: Array<TestGeneratorMember> }
+	| { kind: "case"; tag: string; members: Array<TestGeneratorMember> }
+	| { kind: "union"; members: Array<TestGenerator> }
+	| {
+			kind: "refined"
+			name: string
+			base: TestGenerator
+			binding: string
+			checks: Array<ExpressionNode>
+			narrowing: TestNarrowing
+	  }
+	| { kind: "generated"; name: string; binding: string; call: ExpressionNode }
+
+export type TestGeneratorMember = { name: string; generator: TestGenerator }
+
+export type TestNarrowing = {
+	atLeast?: string
+	atMost?: string
+	notEqualTo?: Array<string>
+	minimumLength?: number
+	maximumLength?: number
 }
 
 // NOTE: What a `suite` leaves behind: a Scope, so that what a suite declares is
