@@ -85,7 +85,7 @@ export function toCoverageJson(summary: CoverageSummary): string {
 	return `${JSON.stringify(
 		{
 			schema: 1,
-			files: summary.files.map((file) => ({
+			files: summary.files.filter(isReported).map((file) => ({
 				module: file.module,
 				lines: file.lines,
 				branches: file.branches,
