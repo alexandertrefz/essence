@@ -633,6 +633,11 @@ export interface RequireStatementNode {
 	position: Position
 }
 
+// NOTE: `subject` is the base of a `require MATCHER = EXPR`, which is the one
+// synthesized Constant whose value a reader is shown: the assertion
+// beside it reports what it held, so its Expression is instrumented the way an
+// asserted Boolean Expression is.
+//
 // NOTE: `synthesized` marks a Constant no source wrote — the base a Pattern
 // Declaration reads its members off, and the Constants a Pattern's bindings
 // desugar into. It carries a borrowed Position so that Hover, Completion and
@@ -650,7 +655,7 @@ export interface ConstantDeclarationStatementNode {
 	declaredType: Type | null
 	type: Type
 	documentation: Documentation | null
-	synthesized?: "base" | "binding"
+	synthesized?: "base" | "binding" | "subject"
 }
 
 // NOTE: `synthesized` means the same here as on a Constant — a Statement no

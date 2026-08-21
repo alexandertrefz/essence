@@ -807,7 +807,21 @@ function simplifyConstantDeclarationStatement(
 	return {
 		nodeType: "VariableDeclarationStatement",
 		name: simplifyIdentifier(node.name),
-		value: simplifyExpression(node.value),
+		// NOTE: A Matcher's subject is INSTRUMENTED, the whole of it — every
+		// sub-expression that computes and the value itself. It is what
+		// `require MATCHER = EXPR` has to explain a failure out of: the
+		// assertion behind this
+		// Statement drains what was recorded here, so a report says what
+		// `rows()::firstItem()` answered rather than only that an expect
+		// failed. Every other synthesized Constant is glue nobody is shown.
+		value:
+			node.synthesized === "subject"
+				? instrumentAssertion(
+						simplifyExpression(node.value),
+						null,
+						true,
+					).value
+				: simplifyExpression(node.value),
 		type: node.type,
 		isConstant: true,
 		// NOTE: Every Constant keeps its Position, the base a Pattern
@@ -2157,6 +2171,11 @@ type TestOperands = {
 function instrumentAssertion(
 	value: common.typedSimple.ExpressionNode,
 	operands: TestOperands | null,
+	// NOTE: Whether the outermost Expression is recorded too. It is not for an
+	// asserted Boolean — its value is the assertion's own answer, which the
+	// assertion records — and it is for a Matcher's subject, whose value is
+	// exactly what the reader was not told.
+	traceRoot = false,
 ): {
 	value: common.typedSimple.ExpressionNode
 	comparison: common.typedSimple.TestComparison | null
@@ -2178,7 +2197,10 @@ function instrumentAssertion(
 						? "right"
 						: null
 
-		if (side === null && (isRoot || !isTraceable(node))) {
+		if (
+			side === null &&
+			((isRoot && !traceRoot) || (!isRoot && !isTraceable(node)))
+		) {
 			return walked
 		}
 

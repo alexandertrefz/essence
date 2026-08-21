@@ -4043,7 +4043,7 @@ export function enrichAssertionStatement(
 		declaredType: null,
 		type: value.type,
 		documentation: null,
-		synthesized: "base",
+		synthesized: "subject",
 	}
 
 	recordConstantValue(baseName, value, scope)

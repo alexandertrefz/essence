@@ -2299,7 +2299,9 @@ function validateConstantDeclarationStatement(
 		if (!fitsExpectedType(node.declaredType, node.value)) {
 			reportDeclarationMismatch(
 				"Constant",
-				node.synthesized === "base" ? null : node.name.content,
+				node.synthesized === "base" || node.synthesized === "subject"
+					? null
+					: node.name.content,
 				node.declaredType,
 				node.value,
 			)
