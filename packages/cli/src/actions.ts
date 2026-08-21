@@ -50,11 +50,13 @@ async function compileAll(
 		emit: boolean
 		cacheOutput?: boolean
 		sourcemapMode?: "linked" | "inline"
+		tests?: boolean
 	},
 ): Promise<CompilationResult> {
 	let plan = await planCompilation(context, command, files, {
 		emit: options.emit,
 		cacheOutput: options.cacheOutput,
+		tests: options.tests,
 	})
 
 	try {
@@ -115,7 +117,16 @@ export async function runCheck(
 	command: CommandSpec,
 	files: Array<string>,
 ): Promise<number> {
-	let result = await compileAll(context, command, files, { emit: false })
+	// NOTE: WITH the tests section, which no other command outside `essence
+	// test` reads. `check` is the command that answers "is this file correct?",
+	// and a file whose tests do not compile is not — a build drops the section
+	// and would have said nothing, which left the one command a CI runs to be
+	// told about its code silent about a third of the file. It is also what the
+	// editor already types, so the two agree.
+	let result = await compileAll(context, command, files, {
+		emit: false,
+		tests: true,
+	})
 
 	printCompilationResult(context, result)
 
