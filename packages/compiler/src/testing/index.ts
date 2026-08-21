@@ -9,6 +9,7 @@ import type {
 	Span,
 	TestEvent,
 } from "@essence-lang/runtime/Testing"
+import { DEFAULT_CASES } from "@essence-lang/runtime/Testing"
 
 import { primary, secondary } from "../diagnostics/index"
 
@@ -70,6 +71,11 @@ export type TestRecord = {
 // the seed is what makes today's run repeatable tomorrow.
 export type PropertyRecord = {
 	cases: number
+	// NOTE: How many cases the run was TOLD to run. A replay has to say it back:
+	// the size a case is drawn at grows with the case number over the whole run,
+	// so a hundred cases and four hundred draw two different sequences from one
+	// seed.
+	requested: number
 	seed: string
 	shrinks: number
 	counterexample: Array<PropertyCounterexample> | null
@@ -262,6 +268,7 @@ export function collectTestRun(events: Array<TestEvent>): TestRun {
 				if (held !== undefined) {
 					held.property = {
 						cases: event.cases,
+						requested: event.requested,
 						seed: event.seed,
 						shrinks: event.shrinks,
 						counterexample: event.counterexample,
@@ -459,8 +466,15 @@ export function propertyHelps(test: TestRecord): Array<string> {
 		return []
 	}
 
+	// NOTE: `--cases` only where it differs from the default, because a command
+	// naming a default is a command a reader has to check.
+	let cases =
+		property.requested === DEFAULT_CASES
+			? ""
+			: ` --cases ${property.requested}`
+
 	return [
-		`Run it again: essence test --seed ${property.seed} -f ${JSON.stringify(test.name)}`,
+		`Run it again: essence test --seed ${property.seed}${cases} -f ${JSON.stringify(test.name)}`,
 	]
 }
 

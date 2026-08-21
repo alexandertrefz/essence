@@ -396,7 +396,14 @@ export type PropertySettings = { seed: string; word: number; cases: number }
 export type PropertyCounterexample = { name: string; value: string }
 
 export type PropertyResult = {
+	// NOTE: How many cases RAN, which is every one of them where the property
+	// held and the number it took to break it where it did not.
 	cases: number
+	// NOTE: How many the run was told to run, which is what a replay has to say
+	// back: the size a case is drawn at grows with the case number over the
+	// WHOLE run, so a hundred cases and four hundred draw two different
+	// sequences from one seed.
+	requested: number
 	seed: string
 	shrinks: number
 	counterexample: Array<PropertyCounterexample> | null
@@ -581,6 +588,7 @@ function runProperty(
 			// failure ends the test the way any other thrown error does.
 			context.propertyResult = {
 				cases: ran,
+				requested: settings.cases,
 				seed: settings.seed,
 				shrinks: 0,
 				counterexample: null,
@@ -601,6 +609,7 @@ function runProperty(
 	if (failing === null) {
 		context.propertyResult = {
 			cases: ran,
+			requested: settings.cases,
 			seed: settings.seed,
 			shrinks: 0,
 			counterexample: null,
@@ -613,6 +622,7 @@ function runProperty(
 
 	context.propertyResult = {
 		cases: ran,
+		requested: settings.cases,
 		seed: settings.seed,
 		shrinks: shrunk.shrinks,
 		counterexample: parameters.map((parameter, index) => ({
@@ -1217,6 +1227,7 @@ export type TestEvent =
 			id: string
 			name: string
 			cases: number
+			requested: number
 			seed: string
 			shrinks: number
 			counterexample: Array<PropertyCounterexample> | null
@@ -1659,6 +1670,7 @@ function runOne(
 			id: entry.id,
 			name,
 			cases: context.propertyResult.cases,
+			requested: context.propertyResult.requested,
 			seed: context.propertyResult.seed,
 			shrinks: context.propertyResult.shrinks,
 			counterexample: context.propertyResult.counterexample,

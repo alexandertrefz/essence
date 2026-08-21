@@ -276,6 +276,22 @@ describe("Generators", () => {
 			}
 		})
 
+		// NOTE: A narrowing that holds the whole predicate leaves no check to
+		// run, so nothing else would notice a draw or a shrink answering a bound
+		// it could not honour.
+		test("refuses a value the narrowing itself forbids", () => {
+			let generator = refined("Nothing", integers, {
+				atLeast: "5",
+				atMost: "5",
+				notEqualTo: ["5"],
+			})
+
+			expect(() => generate(generator, sourceOf(), 4)).toThrow(
+				GenerationFailure,
+			)
+			expect(minimal(generator)).toBeNull()
+		})
+
 		test("refuses a predicate nothing satisfies rather than answering", () => {
 			let generator = refined("Impossible", integers, {}, [
 				() => ({ value: false }),

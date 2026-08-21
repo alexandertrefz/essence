@@ -74,6 +74,7 @@ export type TestEvent = {
 	stream?: string
 	text?: string
 	cases?: number
+	requested?: number
 	seed?: string
 	shrinks?: number
 	counterexample?: Array<PropertyCounterexample> | null
@@ -240,6 +241,9 @@ export type PropertyCounterexample = { name: string; value: string }
 
 export type PropertyRecord = {
 	cases: number
+	// NOTE: How many cases the run was TOLD to run, which a replay has to say
+	// back — the size a case is drawn at grows over the whole run.
+	requested: number
 	seed: string
 	shrinks: number
 	counterexample: Array<PropertyCounterexample> | null
@@ -345,6 +349,7 @@ export function foldEvents(events: Array<TestEvent>): Array<TestRecord> {
 				if (held !== undefined) {
 					held.property = {
 						cases: event.cases ?? 0,
+						requested: event.requested ?? 0,
 						seed: event.seed ?? "",
 						shrinks: event.shrinks ?? 0,
 						counterexample: event.counterexample ?? null,
@@ -817,7 +822,11 @@ function counterexampleOf(property: PropertyRecord | null): Array<string> {
 		...property.counterexample.map(
 			(entry) => `  ${entry.name} = ${entry.value}`,
 		),
-		`replay: essence test --seed ${property.seed}`,
+		`replay: essence test --seed ${property.seed}${
+			property.requested === 0 || property.requested === 100
+				? ""
+				: ` --cases ${property.requested}`
+		}`,
 		"",
 	]
 }

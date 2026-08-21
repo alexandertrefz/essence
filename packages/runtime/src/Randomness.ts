@@ -115,6 +115,14 @@ export function below(source: RandomnessType, bound: number): number {
 		return 0
 	}
 
+	// NOTE: A bound WIDER than a word has no whole multiple inside one, so the
+	// rejection below would reject every draw and loop for ever. `bigBetween`
+	// is the same rule over as many words as the span needs, and it is reached
+	// from `string(upTo:)`, whose bound is whatever a caller wrote.
+	if (bound > 4294967296) {
+		return Number(bigBetween(source, 0n, BigInt(bound) - 1n))
+	}
+
 	let limit = 4294967296 - (4294967296 % bound)
 
 	while (true) {
