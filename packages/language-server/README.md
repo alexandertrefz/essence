@@ -54,10 +54,14 @@ are written out in `src/testProtocol.ts`.
 
 The server reads one configuration section, `essence.tests`, through
 `workspace/configuration` whenever the client says something under `essence`
-changed: `enabled` (default true) switches the session off, `skipTags` names
-tags no run selects, and `debounce` is how long a burst of edits may be before
-it costs a run (default 450 ms). A client that answers nothing keeps the
-defaults.
+changed: `enabled` (default true) stops the session running by itself,
+`skipTags` names tags no run selects, and `debounce` is how long a burst of
+edits may be before it costs a run (default 450 ms). A client that answers
+nothing keeps the defaults. What `enabled: false` declines is the automatic
+half — a request still runs, the lenses are still offered, and what a requested
+run found is still published. Only the workspace-wide tag Diagnostics go with
+it, because those walk every parse in the project on the Server's own
+account.
 
 The Run and Debug code lenses above every `test` and `suite` carry the commands
 **`essence.test.run`** and **`essence.test.debug`**, each with one argument:

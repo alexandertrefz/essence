@@ -141,7 +141,7 @@
 				"essence.tests.enabled": {
 					"type": "boolean",
 					"default": true,
-					"description": "Run the tests of the workspace as you type. Only the tests a change reaches are re-run; failures appear in Problems, and the values a run recorded appear beside the lines that produced them. Turn it off to keep the editor's test commands and stop the automatic runs."
+					"description": "Run the tests of the workspace as you type. Only the tests a change reaches are re-run; failures appear in Problems, and the values a run recorded appear beside the lines that produced them. Turn it off to stop the automatic runs and keep every gesture that asks for one: the Test Explorer, the Run lens and Re-run Failed Tests all still run what you ask them to."
 				},
 				"essence.tests.skipTags": {
 					"type": "array",

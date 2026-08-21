@@ -137,11 +137,11 @@ text of its own beside them.
 one line — what it covered, what it found, how long it took, and whether
 something would not compile.
 
-Three settings, all read by the server: `essence.tests.enabled` turns the
-automatic runs off while leaving every gesture above working,
-`essence.tests.skipTags` names tags no run selects, and
-`essence.tests.debounce` is how long a burst of edits may be before it costs a
-run.
+Three settings, all read by the server: `essence.tests.enabled` stops the
+automatic runs while leaving every gesture above working — a run you ask for
+still runs, and still says what it found — `essence.tests.skipTags` names tags
+no run selects, and `essence.tests.debounce` is how long a burst of edits may
+be before it costs a run.
 
 Debugging a single test is not wired up yet — the debug adapter has to compile
 the tests section and select one by id — so the Debug profile and the Debug
