@@ -424,6 +424,29 @@ export class Printer {
 			}
 		}
 
+		if (program.exports !== null) {
+			parts.push(hardline)
+
+			if (
+				this.source.hasBlankLineBetween(
+					program.position.end.line,
+					program.exports.position.start.line,
+				)
+			) {
+				parts.push(hardline)
+			}
+
+			parts.push(
+				concat(this.headingComments(program.exports.position)),
+				this.printModuleSection(
+					"export",
+					program.exports.position,
+					program.exports.entries,
+					compareExportEntries,
+				),
+			)
+		}
+
 		if (program.tests !== null) {
 			// NOTE: The block above wrote no separator of its own — except the
 			// `import { … }` block, which does, and which is what stands above
@@ -433,7 +456,7 @@ export class Printer {
 
 				if (
 					this.source.hasBlankLineBetween(
-						program.position.end.line,
+						(program.exports ?? program).position.end.line,
 						program.tests.position.start.line,
 					)
 				) {
@@ -452,33 +475,10 @@ export class Printer {
 			}
 		}
 
-		if (program.exports !== null) {
-			parts.push(hardline)
-
-			if (
-				this.source.hasBlankLineBetween(
-					(program.tests ?? program).position.end.line,
-					program.exports.position.start.line,
-				)
-			) {
-				parts.push(hardline)
-			}
-
-			parts.push(
-				concat(this.headingComments(program.exports.position)),
-				this.printModuleSection(
-					"export",
-					program.exports.position,
-					program.exports.entries,
-					compareExportEntries,
-				),
-			)
-		}
-
 		// NOTE: Whatever is left was written below the last block, and is
 		// written back below it — never pulled inside the block above, which
 		// would move it across a brace and be refused.
-		let previousEnd = (program.exports ?? program.tests ?? program).position
+		let previousEnd = (program.tests ?? program.exports ?? program).position
 			.end.line
 
 		for (let comment of this.trivia.takeRemaining()) {

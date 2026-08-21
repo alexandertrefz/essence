@@ -33,12 +33,8 @@ implementation {
 	require { team } as standing = lions
 }
 
-export {
-	lions
-}
-
-§ misplaced-tests-section — a Program reads top to bottom: what it imports,
-§ what it does, what it proves, what it exports. The block is kept where it
+§ misplaced-tests-section — a Module reads top to bottom: what it imports,
+§ what it does, what it exports, what it proves. The block is kept where it
 § stands all the same, so one Diagnostic about an order does not become a
 § cascade about everything inside it.
 tests {
@@ -72,4 +68,8 @@ tests {
 		§ on a line of its own.
 		require { team } = lions matches snapshot
 	}
+}
+
+export {
+	lions
 }

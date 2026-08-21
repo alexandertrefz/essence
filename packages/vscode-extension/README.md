@@ -131,7 +131,8 @@ test's `focused` silenced — and the line of a failed `expect` carries a dot of
 its own, with the whole explanation on hover and a mark in the overview ruler.
 The values a run recorded are drawn by the Language Server as inlay hints,
 which is one answer to one question: this extension deliberately adds no ghost
-text of its own beside them.
+text of its own beside them. They are inlay hints in the full sense, so
+`essence.inlayHints.enabled` turns them off along with the Type annotations.
 
 **Essence: Show Test Session Output** opens a channel where every cycle writes
 one line — what it covered, what it found, how long it took, and whether
