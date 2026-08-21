@@ -251,7 +251,7 @@ async function runEntry(
 					snapshots: collectSnapshots(events),
 					sources: sourcesOf(request.overlays, modules),
 					stored,
-					inline: writeInlineSnapshots,
+					inline: () => Promise.resolve(writeInlineSnapshots),
 					// NOTE: The companion files are written here; a SOURCE
 					// comes back as an edit, because the buffer that produced
 					// it may never have been saved.

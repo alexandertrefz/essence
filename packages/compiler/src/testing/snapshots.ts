@@ -55,7 +55,7 @@ const ENTRY = /^snapshot "((?:[^"\\]|\\.)*)"$/
 // escape it into a Literal would be asking them to read past the escaping.
 export function parseSnapshotFile(text: string): SnapshotStore {
 	let entries: SnapshotStore = {}
-	let lines = text.replace(/\r\n?/g, "\n").split("\n")
+	let lines = withoutCarriageReturns(text).split("\n")
 	let name: string | null = null
 	let collected: Array<string> = []
 
@@ -87,6 +87,18 @@ export function parseSnapshotFile(text: string): SnapshotStore {
 	close()
 
 	return entries
+}
+
+// NOTE: A file whose EVERY newline is a CRLF was written by a tool that
+// rewrote the line endings, and its `\r`s are that tool's rather than the
+// recorded value's. One that mixes them has `\r`s that a value put there — the
+// format writes `\n` and only `\n` — so they are left exactly where they are.
+// A value holding a CRLF inside a CRLF-rewritten file is the one case nothing
+// can tell apart, and `essence test --update` is the answer to it.
+function withoutCarriageReturns(text: string): string {
+	return text.includes("\r\n") && !/[^\r]\n/.test(text)
+		? text.replaceAll("\r\n", "\n")
+		: text
 }
 
 export function printSnapshotFile(entries: SnapshotStore): string {
@@ -189,7 +201,10 @@ export async function writeSnapshots(options: {
 	snapshots: Array<SnapshotRecord>
 	sources: Map<string, string>
 	stored: Record<string, SnapshotStore>
-	inline: InlineWriter
+	// NOTE: A FUNCTION that answers with the writer rather than the writer:
+	// rewriting a source goes through the Formatter, which both callers reach
+	// lazily, and a run with no inline snapshot in it must not load one.
+	inline: () => Promise<InlineWriter>
 	writeSources?: boolean
 }): Promise<SnapshotWrites> {
 	let { snapshots, sources, stored, inline, writeSources = true } = options
@@ -237,7 +252,7 @@ export async function writeSnapshots(options: {
 			continue
 		}
 
-		let answer = inline(
+		let answer = (await inline())(
 			source,
 			inlined.flatMap((snapshot) =>
 				snapshot.span === null

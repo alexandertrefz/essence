@@ -140,6 +140,18 @@ function reportInternalError(error: unknown, position: common.Position): void {
 
 function validateTestsNode(node: common.typed.TestsNode): void {
 	if (node.nodeType === "Test") {
+		// NOTE: The rows and what a Pattern Parameter binds off them are
+		// Expressions and Statements of the test like any other. Walking only
+		// the body would let a non-exhaustive `match` in a row compile in
+		// silence while the identical one a line below is refused.
+		for (let row of node.table?.rows ?? []) {
+			validateExpression(row)
+		}
+
+		for (let binding of node.table?.bindings ?? []) {
+			validateImplementationNode(binding, null)
+		}
+
 		for (let child of node.body) {
 			validateImplementationNode(child, null)
 		}

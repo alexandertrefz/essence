@@ -814,7 +814,11 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 			entry.program,
 			entry.parseDiagnostics,
 			entry.filePath,
-			{ annotations: true, tests: options.tests },
+			{
+				annotations: true,
+				tests: options.tests,
+				source: entry.sourceText,
+			},
 		)
 
 		recordEdges(entry.filePath, [])

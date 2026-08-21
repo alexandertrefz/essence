@@ -55,6 +55,22 @@ describe("The snapshot companion file", () => {
 		expect(parseSnapshotFile(printSnapshotFile(entries))).toEqual(entries)
 	})
 
+	// NOTE: The format writes `\n` and only `\n`, so a `\r` in a file is either
+	// a value's own or a tool's rewriting of the line endings — and which of
+	// the two it is, is what the whole file says rather than one line.
+	it("keeps a carriage return a value put there", () => {
+		let entries = { odd: "before\rafter" }
+
+		expect(parseSnapshotFile(printSnapshotFile(entries))).toEqual(entries)
+	})
+
+	it("reads a file whose line endings were rewritten", () => {
+		let entries = { plain: "one line", other: "two\nlines" }
+		let rewritten = printSnapshotFile(entries).replaceAll("\n", "\r\n")
+
+		expect(parseSnapshotFile(rewritten)).toEqual(entries)
+	})
+
 	it("answers with nothing for a file that says nothing", () => {
 		expect(parseSnapshotFile("")).toEqual({})
 		expect(parseSnapshotFile("§ just a comment\n")).toEqual({})

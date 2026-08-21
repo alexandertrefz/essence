@@ -1614,6 +1614,14 @@ const enrichTest = (
 			? null
 			: enrichTestTable(node.table, scope, bodyScope)
 
+	let body = node.body.flatMap((child) =>
+		guarded(child.position, () => enrichNode(child, bodyScope)),
+	)
+
+	if (table !== null) {
+		refuseInlineSnapshots(body)
+	}
+
 	return {
 		nodeType: "Test",
 		identity: {
@@ -1626,9 +1634,7 @@ const enrichTest = (
 		skipped: modifiers.skipped,
 		focused: modifiers.focused,
 		table,
-		body: node.body.flatMap((child) =>
-			guarded(child.position, () => enrichNode(child, bodyScope)),
-		),
+		body,
 		keywordPosition: node.keywordPosition,
 		position: node.position,
 	}
@@ -1667,6 +1673,65 @@ const enrichSuite = (
 		keywordPosition: node.keywordPosition,
 		position: node.position,
 	}
+}
+
+// NOTE: An inline snapshot inside a table test has nowhere to be written: every
+// row runs the same body, so N rows produce N values for the one slot the source
+// holds. A named one has a place per row — see `snapshotted` in the runtime,
+// which numbers a stored entry by the row that recorded it — so what this asks
+// for is a name.
+const refuseInlineSnapshots = (
+	nodes: Array<common.typed.ImplementationNode>,
+): void => {
+	let visit = (value: unknown): void => {
+		if (Array.isArray(value)) {
+			for (let item of value) {
+				visit(item)
+			}
+
+			return
+		}
+
+		if (value === null || typeof value !== "object") {
+			return
+		}
+
+		let node = value as Record<string, unknown>
+		let snapshot = node["snapshot"] as common.typed.SnapshotNode | null
+
+		if (
+			(node["nodeType"] === "ExpectStatement" ||
+				node["nodeType"] === "RequireStatement") &&
+			snapshot != null &&
+			snapshot.name === null
+		) {
+			reportError(
+				"A snapshot in a table test has to be named",
+				snapshot.position,
+				{
+					code: "inline-snapshot-in-table",
+					labels: [
+						primary(
+							snapshot.position,
+							"this records into the source, and every row would record here",
+						),
+					],
+					notes: [
+						"Every row of a table test runs this body, so a snapshot written here holds one value per row — and an inline snapshot is one slot of one line.",
+					],
+					helps: [
+						"Name it: 'matches snapshot from \"…\"'. Each row records an entry of its own, numbered by the row it ran for.",
+					],
+				},
+			)
+		}
+
+		for (let member of Object.values(node)) {
+			visit(member)
+		}
+	}
+
+	visit(nodes)
 }
 
 // NOTE: The cast holds because the Parser puts nothing else there — a name is a

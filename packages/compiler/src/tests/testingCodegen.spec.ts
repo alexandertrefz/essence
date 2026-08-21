@@ -1129,6 +1129,45 @@ tests {
 		)
 	})
 
+	// NOTE: One entry per ROW. The rows share a body, so one name would be one
+	// entry they overwrite in turn — the first run would store the last row's
+	// value and every run after would report the others as differing, for ever.
+	it("keeps a table's stored snapshot per row", async () => {
+		let source = `implementation {
+	function twice(_ n: Integer) -> Integer {
+		<- n::multiply(with 2)
+	}
+}
+
+tests {
+	test "{n} doubled" across [1, 2] (n: Integer) {
+		expect twice(n)::toString() matches snapshot from "doubled"
+	}
+}`
+		let { events } = await run(source)
+
+		expect(
+			eventsOf(events, "snapshot").map((event) =>
+				event.kind === "snapshot"
+					? [event.name, event.status, event.text]
+					: [],
+			),
+		).toEqual([
+			["doubled [0]", "written", "2"],
+			["doubled [1]", "written", "4"],
+		])
+
+		let { events: again } = await run(source, undefined, {
+			snapshots: { "": { "doubled [0]": "2", "doubled [1]": "4" } },
+		})
+
+		expect(
+			eventsOf(again, "snapshot").map((event) =>
+				event.kind === "snapshot" ? event.status : "",
+			),
+		).toEqual(["matched", "matched"])
+	})
+
 	it("leaves the Constant a Matcher's assertion synthesized alone", async () => {
 		let { events } = await run(`implementation {
 	constant lions = { team = "Lions", points = 19 }

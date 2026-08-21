@@ -359,6 +359,11 @@ export type TestContext = {
 	// test can not reach is a capability it does not have.
 	stored: SnapshotStore
 	updating: boolean
+	// NOTE: Which row of a table test is running, and null for the ordinary
+	// test that runs once. A stored snapshot is keyed by it — every row of a
+	// table runs the same body, so one name would be one entry the rows
+	// overwrite in turn, and only the last of them could ever match.
+	row: number | null
 	output: Array<OutputChunk>
 	// NOTE: What has been counted so far, asked from inside a running test
 	// rather than only read out at the end of a run. Coverage is a fact about
@@ -370,7 +375,11 @@ export type TestContext = {
 
 export function createContext(
 	index: number,
-	options: { stored?: SnapshotStore; updating?: boolean } = {},
+	options: {
+		stored?: SnapshotStore
+		updating?: boolean
+		row?: number | null
+	} = {},
 ): TestContext {
 	return {
 		index,
@@ -381,6 +390,7 @@ export function createContext(
 		snapshots: [],
 		stored: options.stored ?? {},
 		updating: options.updating ?? false,
+		row: options.row ?? null,
 		output: [],
 		coverage,
 	}
@@ -527,10 +537,9 @@ export function snapshotted(
 	text: StringType,
 ): void {
 	let actual = text.value
+	let name = storedName(snapshot.name, context.row)
 	let expected =
-		snapshot.name === null
-			? snapshot.recorded
-			: (context.stored[snapshot.name] ?? null)
+		name === null ? snapshot.recorded : (context.stored[name] ?? null)
 	let status: SnapshotStatus =
 		expected === null
 			? "written"
@@ -543,14 +552,14 @@ export function snapshotted(
 	context.snapshots.push({
 		point,
 		slot: snapshot.slot,
-		name: snapshot.name,
+		name,
 		status,
 		text: actual,
 		recorded: expected,
 	})
 
 	record(context, form, point, status !== "mismatched", null, {
-		name: snapshot.name,
+		name,
 		expected,
 		actual,
 	})
@@ -558,6 +567,18 @@ export function snapshotted(
 	if (status === "mismatched" && form === "require") {
 		throw requirementFailed
 	}
+}
+
+// NOTE: The entry a stored snapshot is kept under. A row of a table test gets
+// one per row, spelled with the row number, because the rows share a body and
+// would otherwise share the entry: the first run would store the last row's
+// value and every run after would report the others as differing, for ever.
+function storedName(name: string | null, row: number | null): string | null {
+	if (name === null) {
+		return null
+	}
+
+	return row === null ? name : `${name} [${row}]`
 }
 
 function record(
@@ -1257,6 +1278,7 @@ function runOne(
 	let context = createContext(test.index, {
 		stored: (options.snapshots ?? {})[test.module.module ?? ""] ?? {},
 		updating: options.update ?? false,
+		row: entry.row,
 	})
 
 	sink({

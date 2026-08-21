@@ -415,8 +415,9 @@ export async function runTestWatch(
 				),
 				sources,
 				stored,
-				inline: (await import("@essence-lang/formatter/snapshots"))
-					.writeInlineSnapshots,
+				inline: async () =>
+					(await import("@essence-lang/formatter/snapshots"))
+						.writeInlineSnapshots,
 			})
 
 			for (let problem of written.problems) {

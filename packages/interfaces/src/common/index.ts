@@ -221,6 +221,7 @@ export type DiagnosticCode =
 	| "table-not-written"
 	| "table-parameters"
 	| "snapshot-not-printable"
+	| "inline-snapshot-in-table"
 	// Names — declared twice, never declared, or not what the position wants.
 	| "duplicate-variable"
 	| "duplicate-type"
