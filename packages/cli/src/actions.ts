@@ -74,7 +74,10 @@ export async function runBuild(
 	command: CommandSpec,
 	files: Array<string>,
 ): Promise<number> {
-	let result = await compileAll(context, command, files, { emit: true })
+	let result = await compileAll(context, command, files, {
+		emit: true,
+		tests: context.options.tests,
+	})
 
 	printCompilationResult(context, result)
 

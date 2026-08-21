@@ -60,6 +60,9 @@ export type OptionValues = {
 	// NOTE: Whether the bundle carries a runtime bridge, with a Descriptor
 	// written beside it — see the Option's own details.
 	embed: boolean
+	// NOTE: Whether `essence build` compiles the tests section into the bundle
+	// rather than dropping it. A debugger is what asks; see the Option.
+	tests: boolean
 	noOptimise: boolean
 	// NOTE: The pass names `--without-optimisation` was given, already checked
 	// against the registry — an unknown one is a UsageError rather than a flag
@@ -119,6 +122,7 @@ export const emptyOptions: OptionValues = {
 	sourcemap: false,
 	minify: false,
 	embed: false,
+	tests: false,
 	noOptimise: false,
 	withoutOptimisation: [],
 	jobs: undefined,
@@ -495,6 +499,7 @@ export function parseArguments(
 			sourcemap: values.sourcemap === true,
 			minify: values.minify === true,
 			embed: values.embed === true,
+			tests: values.tests === true,
 			noOptimise: values["no-optimise"] === true,
 			withoutOptimisation: readDisabledPasses(
 				values["without-optimisation"] as Array<string> | undefined,

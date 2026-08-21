@@ -1,5 +1,5 @@
 import type { ChildProcess } from "node:child_process"
-import { mkdtempSync, realpathSync, rmSync } from "node:fs"
+import { mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import * as path from "node:path"
 import { pathToFileURL } from "node:url"
@@ -30,6 +30,7 @@ import {
 	LIST_ITEMS_SOURCE,
 } from "./render"
 import { blackboxPositions } from "./stepping"
+import { testRunnerSource } from "./testRunner"
 import {
 	fallbackDisplay,
 	isPresentableScope,
@@ -80,6 +81,12 @@ export type EssenceLaunchArguments = DebugProtocol.LaunchRequestArguments & {
 	keepArtifacts?: boolean
 	glueFrames?: "hide" | "subtle"
 	runtimeExecutable?: string
+	// NOTE: The structural ids of the tests to debug. Present at all — the
+	// empty Array included, which means every test of the file — the `program`
+	// is compiled WITH its `tests { … }` block and the session launches a
+	// runner that asks the bundle for those tests. Absent, a launch is what it
+	// has always been: the Program itself, run.
+	tests?: Array<string>
 }
 
 // NOTE: The emitted bundle runs on one thread; DAP still speaks in thread
@@ -166,13 +173,17 @@ export class EssenceDebugSession extends DebugSession {
 			return
 		}
 
-		let { bundlePath, scratchDirectory } = prepared
+		let { bundlePath, entryPath, scratchDirectory } = prepared
 		let sourcePath = args.program ?? args.artifact ?? bundlePath!
 
 		try {
 			let launched = await launchProgram({
 				runtime: args.runtimeExecutable ?? "node",
-				bundlePath: bundlePath!,
+				// NOTE: What is LAUNCHED and what is MAPPED are two files when
+				// the launch names tests: the runner beside the bundle is the
+				// entry, and the bundle is what breakpoints are addressed to.
+				// They are the same file for every other launch.
+				entryPath: entryPath ?? bundlePath!,
 				programArguments: args.args ?? [],
 				cwd: args.cwd ?? path.dirname(sourcePath),
 				env: { ...process.env, ...args.env },
@@ -1086,8 +1097,14 @@ export class EssenceDebugSession extends DebugSession {
 	// NOTE: What `launch` runs: the named `artifact` verbatim, or the program
 	// compiled into a scratch directory that lives exactly as long as the
 	// session (`keepArtifacts` keeps it for reading, and says where it is).
+	//
+	// NOTE: `entryPath` is what node is pointed at and `bundlePath` what the
+	// map describes. They differ for one launch: a session debugging a test
+	// launches a runner beside the bundle, because a test bundle publishes its
+	// registry and runs nothing on its own. Absent, the bundle is the entry.
 	private async prepareBundle(args: EssenceLaunchArguments): Promise<{
 		bundlePath?: string
+		entryPath?: string
 		scratchDirectory: string | null
 		error?: string
 	}> {
@@ -1121,11 +1138,16 @@ export class EssenceDebugSession extends DebugSession {
 		let scratchDirectory = realpathSync(
 			mkdtempSync(path.join(tmpdir(), "essence-dap-")),
 		)
+		// NOTE: `.mjs` for a test bundle, `.js` for everything else. A runner
+		// importing the bundle beside it is read as the module it is only if
+		// the extension says so, and the extension is the one thing about the
+		// name that is free to change.
+		let tests = Array.isArray(args.tests)
 		let outputFile = path.join(
 			scratchDirectory,
-			`${path.basename(args.program, ".es")}.js`,
+			`${path.basename(args.program, ".es")}${tests ? ".tests.mjs" : ".js"}`,
 		)
-		let compiled = await this.compile(args.program, outputFile)
+		let compiled = await this.compile(args.program, outputFile, { tests })
 
 		if (!compiled.ok || compiled.bundlePath === null) {
 			for (let diagnostic of compiled.diagnostics) {
@@ -1154,7 +1176,22 @@ export class EssenceDebugSession extends DebugSession {
 			)
 		}
 
-		return { bundlePath: compiled.bundlePath, scratchDirectory }
+		if (!tests) {
+			return { bundlePath: compiled.bundlePath, scratchDirectory }
+		}
+
+		// NOTE: Beside the bundle, in the directory that goes with the session.
+		// The runner imports the bundle by name, so the two must be siblings —
+		// and being a second file is what keeps the bundle byte for byte the
+		// file its map describes.
+		let entryPath = path.join(scratchDirectory, "run-tests.mjs")
+
+		writeFileSync(
+			entryPath,
+			testRunnerSource(path.basename(compiled.bundlePath), args.tests!),
+		)
+
+		return { bundlePath: compiled.bundlePath, entryPath, scratchDirectory }
 	}
 
 	private removeScratchDirectory(

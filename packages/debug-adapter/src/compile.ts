@@ -26,9 +26,18 @@ export type CompileResult = {
 	diagnostics: Array<CompileDiagnostic>
 }
 
+// NOTE: What a launch asks of a compile beyond "compile this". One member, and
+// it is the debugger's own: a session stepping through a test needs the
+// `tests { … }` block a build drops, because the block IS the code it steps
+// through.
+export type CompileOptions = {
+	tests?: boolean
+}
+
 export type CompileFunction = (
 	programPath: string,
 	outputFile: string,
+	options?: CompileOptions,
 ) => Promise<CompileResult>
 
 // NOTE: The `--json` report, reduced to what a failed launch reports. The
@@ -70,7 +79,7 @@ function resolveCliCommand(): Array<string> {
 }
 
 export function compileViaCli(): CompileFunction {
-	return (programPath, outputFile) =>
+	return (programPath, outputFile, options = {}) =>
 		new Promise((resolve) => {
 			let [command, ...leadingArguments] = resolveCliCommand()
 			let child = spawn(
@@ -82,6 +91,10 @@ export function compileViaCli(): CompileFunction {
 					"--out",
 					outputFile,
 					"--sourcemap",
+					// NOTE: `--tests` compiles the block a build drops, so
+					// that the bundle holds the test the session was asked to
+					// step through. It still runs nothing on load.
+					...(options.tests === true ? ["--tests"] : []),
 					// NOTE: The Program as WRITTEN, which is what a debug
 					// session steps through — the same choice `essence dap`
 					// makes when it injects its own compile, made here so that

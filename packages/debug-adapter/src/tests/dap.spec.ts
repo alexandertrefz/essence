@@ -328,6 +328,87 @@ describe("a debug session", () => {
 		}
 	}, 60_000)
 
+	// NOTE: The other thing a launch can be: a test rather than a Program. The
+	// bundle is compiled WITH the `tests { … }` block a build drops, and a
+	// runner beside it asks the registry for the tests named — so what is
+	// launched and what a breakpoint is addressed to are two different files,
+	// and this is what says the second one still binds.
+	it("debugs a test out of a file's tests section", async () => {
+		client = await startedClient()
+
+		let directory = realpathSync(
+			mkdtempSync(path.join(tmpdir(), "essence-dap-tests-")),
+		)
+		let programPath = path.join(directory, "Rules.es")
+
+		writeFileSync(
+			programPath,
+			"implementation {\n" +
+				"\tfunction double(_ value: Integer) -> Integer {\n" +
+				"\t\t<- value::multiply(with 2)\n" +
+				"\t}\n" +
+				"}\n" +
+				"\n" +
+				"tests {\n" +
+				'\ttest "doubles" {\n' +
+				"\t\tconstant doubled = double(21)\n" +
+				"\n" +
+				"\t\texpect doubled::is(42)\n" +
+				"\t}\n" +
+				"}\n",
+		)
+
+		let output: Array<string> = []
+
+		client.on("output", (event) => {
+			if (event.body.category === "stdout") {
+				output.push(event.body.output)
+			}
+		})
+
+		try {
+			let initialized = client.waitForEvent("initialized")
+			// NOTE: The empty Array is every test of the file, which is what a
+			// "Debug" on the section asks for. A named id runs that one.
+			let launched = client.launch({
+				program: programPath,
+				tests: [],
+			} as never)
+
+			await initialized
+
+			// NOTE: Line 9 is `constant doubled = double(21)` — a statement of
+			// the TEST's body, which is in the bundle at all only because the
+			// launch asked for the tests.
+			let bound = await client.setBreakpointsRequest({
+				source: { path: programPath },
+				breakpoints: [{ line: 9 }],
+			})
+
+			expect(bound.body.breakpoints[0]!.verified).toBe(true)
+
+			let stopped = client.waitForEvent("stopped")
+
+			await client.configurationDoneRequest()
+			await launched
+
+			expect((await stopped).body.reason).toBe("breakpoint")
+
+			let stack = await client.stackTraceRequest({ threadId: 1 })
+
+			expect(stack.body.stackFrames[0]!.line).toBe(9)
+
+			await Promise.all([
+				client.continueRequest({ threadId: 1 }),
+				client.waitForEvent("terminated"),
+			])
+
+			expect(output.join("")).toContain("✓ doubles")
+		} finally {
+			rmSync(directory, { recursive: true, force: true })
+		}
+	}, 60_000)
+
 	// NOTE: Exercised through the `artifact` door with a hand-built bundle: a
 	// Diagnostic-clean Essence program has no deterministic uncaught throw to
 	// offer — the one failure it can earn, a stack overflow, is the one V8

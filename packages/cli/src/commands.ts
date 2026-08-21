@@ -131,6 +131,22 @@ const minifyOption: OptionSpec = {
 	summary: "Minify the emitted JavaScript",
 }
 
+// NOTE: A build compiles what a Program DOES and drops what it proves, which is
+// what keeps a `tests { … }` block free. This is the one way to ask for a
+// bundle with the block in it, and it exists for the debugger: stepping through
+// one test means having a bundle that holds it, and the adapter reaches the
+// Compiler by spawning this command.
+const testsOption: OptionSpec = {
+	name: "tests",
+	type: "boolean",
+	summary: "Compile the tests section into the bundle",
+	details:
+		"The bundle exports its test registry as `$tests` and runs nothing on " +
+		"its own — `essence test` is what runs a project's tests. What needs " +
+		"this is a debugger, which has to load a bundle holding the test it is " +
+		"stepping through.",
+}
+
 // NOTE: Optimisation is on for every build, and these two are how it is turned
 // down. Both exist for the same reason the passes have names at all: when a
 // Program misbehaves, the question "does it still do that with the optimiser
@@ -232,6 +248,7 @@ export const commands: Array<CommandSpec> = [
 			sourcemapOption,
 			minifyOption,
 			embedOption,
+			testsOption,
 			noOptimiseOption,
 			withoutOptimisationOption,
 			jobsOption,
