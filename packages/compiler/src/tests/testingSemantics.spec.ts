@@ -985,6 +985,20 @@ describe("Tests Section Semantics", () => {
 			).toEqual(["table-not-written"])
 		})
 
+		// NOTE: No rows is no tests, and nothing in a report says so: no line,
+		// no count, no failure.
+		it("should refuse a table test with no rows in it", () => {
+			expect(
+				codesOf(
+					`implementation {}
+
+					tests {
+						test "one" across [] (row: Integer) { expect true }
+					}`,
+				),
+			).toEqual(["table-without-rows"])
+		})
+
 		it("should refuse a row taken by several Parameters", () => {
 			expect(
 				codesOf(

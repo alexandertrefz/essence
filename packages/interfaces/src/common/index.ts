@@ -219,6 +219,7 @@ export type DiagnosticCode =
 	| "similar-tags"
 	| "lonely-tag"
 	| "table-not-written"
+	| "table-without-rows"
 	| "table-parameters"
 	| "snapshot-not-printable"
 	| "inline-snapshot-in-table"

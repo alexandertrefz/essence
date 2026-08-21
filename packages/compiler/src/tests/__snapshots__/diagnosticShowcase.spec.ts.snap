@@ -1608,11 +1608,24 @@ Error: The rows of a table test have to be written here
     │ Note: Every row is a test of its own — it carries its row number in the identity a stored snapshot and the Editor's own results are keyed by — so the rows have to be countable before anything runs.
 ────╯
 
+[table-without-rows]
+Error: A table test with no rows in it runs no test
+    ╭─┤ Tests.es:70:37 │
+    │
+ 70 │     test "reads no rows at all" across [] (row: Integer) {
+    │                                        ─┐  
+    │                                         ╰── no rows to run
+    │ 
+    │ Help: Write the rows the test is for, or say why there are none with 'skipped "…"'.
+    │ 
+    │ Note: Every row is a test of its own, so a table test with none is nothing at all: it is reported by no line and counted in no total, and nothing would say it had stopped running.
+────╯
+
 [table-parameters]
 Error: A table test takes one row at a time
-    ╭─┤ Tests.es:70:46 │
+    ╭─┤ Tests.es:76:46 │
     │
- 70 │     test "reads two rows at once" across [1, 2] (a: Integer, b: Integer) {
+ 76 │     test "reads two rows at once" across [1, 2] (a: Integer, b: Integer) {
     │                                   ───┬──        ────────────┬───────────  
     │                                      ╰──────────────────────│───────────── the rows are here
     │                                                             │             
@@ -1625,9 +1638,9 @@ Error: A table test takes one row at a time
 
 [snapshot-not-printable]
 Error: Colour#Red can not be recorded as a snapshot
-    ╭─┤ Tests.es:78:10 │
+    ╭─┤ Tests.es:84:10 │
     │
- 78 │        expect Colour#Red matches snapshot
+ 84 │        expect Colour#Red matches snapshot
     │               ─────┬────  
     │                    ╰────── this is Colour#Red, which is not Printable
     │ 
@@ -1639,9 +1652,9 @@ Error: Colour#Red can not be recorded as a snapshot
 
 [property-parameters]
 Error: A generated Parameter has to write its Type
-    ╭─┤ Tests.es:84:39 │
+    ╭─┤ Tests.es:90:39 │
     │
- 84 │     test "over anything at all" for any (n) {
+ 90 │     test "over anything at all" for any (n) {
     │                                          ▲  
     │                                          ╰── nothing here says what to generate
     │ 
@@ -1652,9 +1665,9 @@ Error: A generated Parameter has to write its Type
 
 [ungeneratable-type]
 Error: Nothing can generate a (_ String) -> Integer
-    ╭─┤ Tests.es:90:34 │
+    ╭─┤ Tests.es:96:34 │
     │
- 90 │     test "over a Function" for any (read: (_: String) -> Integer) {
+ 96 │     test "over a Function" for any (read: (_: String) -> Integer) {
     │                                     ──────────────┬─────────────  
     │                                                   ╰─────────────── nothing knows how to build a (_ String) -> Integer
     │ 
@@ -1665,24 +1678,24 @@ Error: Nothing can generate a (_ String) -> Integer
 
 [contradictory-test-forms]
 Error: A test runs written rows or generated values, not both
-    ╭─┤ Tests.es:97:56 │
-    │
- 97 │     test "over rows and values" across [1] (row: Integer) for any (n: Integer) {
-    │                                 ───┬──                    ─┬─  
-    │                                    ╰───────────────────────│─── and this runs the rows
-    │                                                            │   
-    │                                                            ╰─── this generates a value for every case
-    │ 
-    │ Help: Keep one of them, or write two tests — one over the rows and one over the generated values.
-    │ 
-    │ Note: A table test runs its body once per row a reader wrote; a property test runs it once per value the runner made up. One body can not do both.
-────╯
+     ╭─┤ Tests.es:103:56 │
+     │
+ 103 │     test "over rows and values" across [1] (row: Integer) for any (n: Integer) {
+     │                                 ───┬──                    ─┬─  
+     │                                    ╰───────────────────────│─── and this runs the rows
+     │                                                            │   
+     │                                                            ╰─── this generates a value for every case
+     │ 
+     │ Help: Keep one of them, or write two tests — one over the rows and one over the generated values.
+     │ 
+     │ Note: A table test runs its body once per row a reader wrote; a property test runs it once per value the runner made up. One body can not do both.
+─────╯
 
 [snapshot-in-property]
 Error: A property test can not record a snapshot
-     ╭─┤ Tests.es:104:24 │
+     ╭─┤ Tests.es:110:24 │
      │
- 104 │        expect n::toString() matches snapshot from "drawn"
+ 110 │        expect n::toString() matches snapshot from "drawn"
      │                             ──────────────┬──────────────  
      │                                           ╰──────────────── every case would record here
      │ 
@@ -1693,13 +1706,13 @@ Error: A property test can not record a snapshot
 
 [duplicate-test-name]
 Error: There is already a test called 'counts a win' here
-     ╭─┤ Tests.es:116:8 │
+     ╭─┤ Tests.es:122:8 │
      │
- 112 │        test "counts a win" {
+ 118 │        test "counts a win" {
      │             ───────┬──────  
      │                    ╰──────── the other test is here
      │ 
- 116 │        test "counts a win" {
+ 122 │        test "counts a win" {
      │             ───────┬──────  
      │                    ╰──────── this name is taken
      │ 
@@ -1708,7 +1721,7 @@ Error: There is already a test called 'counts a win' here
      │ Note: What a test is called, together with the suites around it, is what identifies it — to a snapshot, to a stored counterexample, and to the Editor.
 ─────╯
 
-─── 13 errors
+─── 14 errors
 "
 `;
 
