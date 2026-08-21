@@ -1,0 +1,12 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`the test reporter writes the tree the design asks for 1`] = `
+" /Standings.es
+   Standing
+     ✓ records a win
+     outcomeOf
+       ✗ calls a draw
+   – renders a forfeit  skipped: waiting on the Table redesign
+
+ 1 passed  1 failed  1 skipped  1 not focused  ·  84 ms"
+`;
