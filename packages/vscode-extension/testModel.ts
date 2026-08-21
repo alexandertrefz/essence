@@ -169,10 +169,10 @@ export type TestRunNotification = {
 	}
 	duration: number
 	compiled: boolean
-	// NOTE: What the session has counted SO FAR, not what this cycle counted:
-	// the Server lays each cycle over what it had and sends the whole picture,
-	// so a client replaces rather than merges. Optional because a client reads
-	// the wire, and a Server that never turns coverage on never writes it.
+	// NOTE: `files` is what THIS CYCLE counted and is laid over what the client
+	// holds, keyed by module; `choices` is the session's whole answer and
+	// replaces what it holds. Optional because a client reads the wire, and a
+	// Server that never turns coverage on never writes the field.
 	coverage?: CoverageSummary
 }
 
@@ -349,9 +349,10 @@ export type ClientState = {
 	files: Map<string, FileState>
 	// NOTE: Coverage is held APART from the per-file test results, because
 	// those are two different sets: one cycle runs `Foo.tests.es` and counts
-	// `Foo.es`. It is REPLACED whole on every batch that carries it — the
-	// Server sends what it has counted so far rather than what this cycle
-	// counted, so there is nothing here to merge.
+	// `Foo.es`. The files a batch carries are laid over what is here, keyed by
+	// module — a cycle covers what a change reached and says nothing about the
+	// rest — while the Choices replace what is here, because the Server works
+	// that answer out across the whole run and nobody should work it out twice.
 	coverage: CoverageSummary
 }
 
@@ -476,10 +477,22 @@ export function applyBatch(
 	let covered: Array<string> = []
 
 	if (notification.coverage !== undefined) {
-		state.coverage = notification.coverage
-		covered = notification.coverage.files.flatMap((file) =>
-			file.module === null ? [] : [file.module],
+		let counted = new Map(
+			state.coverage.files.map((file) => [file.module, file]),
 		)
+
+		for (let file of notification.coverage.files) {
+			counted.set(file.module, file)
+
+			if (file.module !== null) {
+				covered.push(file.module)
+			}
+		}
+
+		state.coverage = {
+			files: [...counted.values()],
+			choices: notification.coverage.choices,
+		}
 	}
 
 	return { kind: "end", files: [...notification.files], changed, covered }
@@ -904,9 +917,10 @@ export function coverageLinesOf(file: FileCoverage): Array<CoverageLine> {
 	return [...lines.values()].sort((left, right) => left.line - right.line)
 }
 
-// NOTE: The lines nothing reached, as ranges a gutter can be drawn over.
-// Adjacent lines are merged, because a run of never-executed lines is one
-// thing a reader is looking at rather than nine.
+// NOTE: The lines nothing reached, in the same shape the test marks answer in —
+// ranges rather than lines, so a caller draws both the same way. Adjacent lines
+// are merged, which is what makes a run of never-executed lines one thing to
+// read rather than nine.
 export function uncoveredLinesOf(file: FileCoverage): Array<LineRange> {
 	let uncovered = coverageLinesOf(file)
 		.filter((line) => line.count === 0)
@@ -992,10 +1006,13 @@ export function describeCoverage(coverage: CoverageSummary): string {
 			}),
 			{ covered: 0, total: 0 },
 		)
+	// NOTE: Rounded DOWN, exactly as the Compiler's own `percentageOf` is, so
+	// that 100% means every one of them: 199 of 200 rounded up would say a file
+	// with a missed branch is complete.
 	let percentage = (ratio: CoverageRatio): string =>
 		ratio.total === 0
 			? "–"
-			: `${Math.round((ratio.covered / ratio.total) * 100)}%`
+			: `${Math.floor((ratio.covered / ratio.total) * 100)}%`
 	let lines = sum((file) => file.lines)
 	let branches = sum((file) => file.branches)
 	let cases = sum((file) => file.cases)

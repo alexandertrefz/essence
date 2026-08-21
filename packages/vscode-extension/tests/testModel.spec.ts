@@ -840,7 +840,7 @@ function coverage(): CoverageSummary {
 }
 
 describe("coverage on a batch", () => {
-	it("is replaced whole, because the Server sends the whole picture", () => {
+	it("lays a cycle's files over what it holds, keyed by module", () => {
 		let state = createState()
 		let applied = applyBatch(state, batch({ coverage: coverage() }))
 
@@ -850,12 +850,39 @@ describe("coverage on a batch", () => {
 			total: 5,
 		})
 
+		// NOTE: A cycle that counted a DIFFERENT file leaves this one standing
+		// — which is the whole of why the files are laid over rather than
+		// replaced: a cycle covers what a change reached and says nothing about
+		// the rest.
 		applyBatch(
 			state,
-			batch({ run: 2, coverage: { files: [], choices: [] } }),
+			batch({
+				run: 2,
+				coverage: {
+					files: [
+						{
+							module: "/repo/Other.es",
+							lines: { covered: 1, total: 1 },
+							branches: { covered: 0, total: 0 },
+							cases: { covered: 0, total: 0 },
+							missed: [],
+							points: [],
+						},
+					],
+					choices: [],
+				},
+			}),
 		)
 
-		expect(coverageOf(state, SOURCE)).toBeNull()
+		expect(coverageOf(state, SOURCE)?.lines).toEqual({
+			covered: 2,
+			total: 5,
+		})
+		expect(coverageOf(state, "/repo/Other.es")).not.toBeNull()
+		// NOTE: And the Choices ARE replaced, because the Server works out
+		// which Cases anything built across the whole run and a client that
+		// merged them would be working that answer out twice.
+		expect(state.coverage.choices).toEqual([])
 	})
 
 	it("is left alone by a batch that carries none", () => {

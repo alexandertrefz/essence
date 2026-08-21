@@ -279,10 +279,13 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 		}
 
 		let folded = collectTestRun(run.events)
+		let counted = coverageEnabled
+			? collectCoverage(run.events)
+			: emptyCoverage
 
-		if (coverageEnabled) {
-			coverage = mergeCoverage(coverage, collectCoverage(run.events))
-		}
+		coverage = coverageEnabled
+			? mergeCoverage(coverage, counted)
+			: emptyCoverage
 
 		options.notify({
 			version: TEST_RUN_VERSION,
@@ -301,7 +304,10 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 			},
 			duration: Date.now() - run.started,
 			compiled: run.compiled,
-			coverage,
+			// NOTE: This cycle's files, and the session's Choices. See the
+			// field's own NOTE in `testProtocol.ts` for why the two halves
+			// travel differently.
+			coverage: { files: counted.files, choices: coverage.choices },
 		})
 		options.onResults(run.entries)
 

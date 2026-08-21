@@ -336,6 +336,7 @@ export function createStub(): Stub {
 			},
 		},
 		workspace: {
+			workspaceFolders: [{ uri: uriOf("/repo") }],
 			getConfiguration: (section: string) => ({
 				get: (key: string) => settings[`${section}.${key}`],
 				update: (key: string, value: unknown, target?: number) => {
