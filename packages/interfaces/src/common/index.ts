@@ -405,6 +405,16 @@ export type TranscendentalType = {
 	type: "Transcendental"
 }
 
+// NOTE: A source of random values, and the one Type of the language whose
+// values nothing written in Essence can build or read. A `Randomness` is handed
+// to `Generatable::generate` by a property test's runner, its Methods answer a
+// value and advance it, and there is nothing else to do with one. It is a bare
+// tag rather than a `choice` because a Case would carry a payload a Program
+// could read, and what a source holds is the runner's business.
+export type RandomnessType = {
+	type: "Randomness"
+}
+
 export type RecordType = {
 	type: "Record"
 	members: Record<string, Type>
@@ -596,6 +606,7 @@ export type PrimitiveType =
 	| RationalType
 	| AlgebraicType
 	| TranscendentalType
+	| RandomnessType
 	| RecordType
 	| CaseType
 	| ListType

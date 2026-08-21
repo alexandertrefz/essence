@@ -101,6 +101,12 @@ export const builtinMemberOrder: Array<string> = [
 	// is free, and met last it reads as the extra it is: a List's own members
 	// are `List`'s, and these come after them.
 	"KeyedNumberList",
+	// NOTE: Last, and not because it is newest. `Randomness` targets a Type
+	// nothing else targets and shares not one Method name with the Namespaces
+	// above it, so its position decides nothing at all — and a reader of this
+	// list meets the Namespaces of the values a Program works with before the
+	// one only a property test is handed.
+	"Randomness",
 ]
 
 // NOTE: The same rule for the Type table, and for the same reason — a Type's
@@ -143,6 +149,11 @@ export const builtinTypeOrder: Array<string> = [
 	// newest — `Stream` is the only one of them with no Namespace of its own, so
 	// it appears in this table and not in the member order above.
 	"Stream",
+	// NOTE: After every Type a Program writes down, because it is the one Type
+	// a Program never writes down: a source arrives as a Parameter of
+	// `Generatable::generate` and goes nowhere else. Listing it earlier would
+	// put it in front of Types in every Completion of an annotation.
+	"Randomness",
 ]
 
 // NOTE: The third table's order, stated for the same reason as the two above.
@@ -163,6 +174,10 @@ export const builtinProtocolOrder: Array<string> = [
 	"Printable",
 	"Comparable",
 	"Orderable",
+	// NOTE: Last, because it builds on nothing above it and nothing builds on
+	// it — a conformance is what a property test reads instead of deriving a
+	// generator, and no other Protocol asks about one.
+	"Generatable",
 ]
 
 // NOTE: Accessors rather than consts, because what they answer with is read

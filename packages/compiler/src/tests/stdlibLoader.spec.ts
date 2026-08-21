@@ -1373,6 +1373,7 @@ describe("Standard Library Loader", () => {
 			// NOTE: And the keyed aggregates last, though their target is the
 			// widest List there is — see `builtinMemberOrder`.
 			"KeyedNumberList",
+			"Randomness",
 		])
 	})
 
@@ -1465,6 +1466,7 @@ describe("Standard Library Loader", () => {
 			"Printable",
 			"Comparable",
 			"Orderable",
+			"Generatable",
 		])
 	})
 

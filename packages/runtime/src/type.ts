@@ -5,6 +5,7 @@ import type { BooleanType } from "./Boolean"
 import type { IntegerType } from "./Integer"
 import type { ListType } from "./List"
 import type { OrderingType } from "./Ordering"
+import type { RandomnessType } from "./Randomness"
 import type { RationalType } from "./Rational"
 import type { RecordType } from "./Record"
 import type { StringType } from "./String"
@@ -219,9 +220,17 @@ export type AnyType =
 	| TranscendentalType
 	| BooleanType
 	| OrderingType
+	// NOTE: A source of randomness is a value like any other here — it is
+	// passed, held and answered — even though nothing written in Essence builds
+	// one and no Protocol reads one. It is in this union so that the printer and
+	// the Type test below can NAME it rather than fall to their "unknown value"
+	// arms.
+	| RandomnessType
 
 export function isValueOfType(value: AnyType, type: common.Type): boolean {
-	if (type.type === "Boolean") {
+	if (type.type === "Randomness") {
+		return value[typeKeySymbol] === "Randomness"
+	} else if (type.type === "Boolean") {
 		return value[typeKeySymbol] === "Boolean"
 	} else if (type.type === "String") {
 		return value[typeKeySymbol] === "String"

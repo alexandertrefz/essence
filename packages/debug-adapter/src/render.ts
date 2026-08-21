@@ -65,7 +65,11 @@ function describeEssenceValues(...values: Array<unknown>): string {
 			return `${record.numerator}/${record.denominator}`
 		}
 
-		if (tag === "Algebraic" || tag === "Transcendental") {
+		if (
+			tag === "Algebraic" ||
+			tag === "Transcendental" ||
+			tag === "Randomness"
+		) {
 			return tag
 		}
 

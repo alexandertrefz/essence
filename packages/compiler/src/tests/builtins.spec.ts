@@ -22,6 +22,7 @@ import * as numberFormat from "@essence-lang/runtime/NumberFormat"
 import * as numberList from "@essence-lang/runtime/NumberList"
 import * as optional from "@essence-lang/runtime/Optional"
 import * as ordering from "@essence-lang/runtime/Ordering"
+import * as randomness from "@essence-lang/runtime/Randomness"
 import * as rational from "@essence-lang/runtime/Rational"
 import * as rationalList from "@essence-lang/runtime/RationalList"
 import * as record from "@essence-lang/runtime/Record"
@@ -70,6 +71,7 @@ const runtimeModules: Record<string, Record<string, unknown>> = {
 	NonEmptyRationalList: nonEmptyRationalList,
 	NonEmptyNumberList: nonEmptyNumberList,
 	KeyedNumberList: keyedNumberList,
+	Randomness: randomness,
 }
 
 // NOTE: What the Simplifier will emit for a declared Method — the bare name for
