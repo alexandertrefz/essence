@@ -46,7 +46,7 @@ tests {
 		expect lions.points::is(3)
 	}
 
-	§ The four assertion forms the language does not have.
+	§ The five assertion forms the language does not have.
 	test "writes a Matcher where none belongs" {
 		§ matcher-on-expect — an `expect` records its result and the test
 		§ carries on, so a name it introduced would stand below a line that may
@@ -66,5 +66,10 @@ tests {
 		§ literal-in-require — a written value is not a shape: what it asks is
 		§ whether the two are equal, which is what `Equatable::is` answers.
 		require 3 = lions.points
+
+		§ snapshot-after-matcher — a snapshot records a value, and this line
+		§ took one apart. What there is to record is the name it introduced,
+		§ on a line of its own.
+		require { team } = lions matches snapshot
 	}
 }

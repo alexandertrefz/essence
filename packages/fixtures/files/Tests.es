@@ -16,6 +16,10 @@ implementation {
 
 	type Standing = { team: String, played: Integer, points: Integer }
 
+	§ The Type a table test's rows are read against. It is declared beside the
+	§ implementation because a tests section sees everything the file declares.
+	type Scoreline = { scored: Integer, conceded: Integer, points: Integer }
+
 	§ A private Function. The tests section sees it, which is the point of
 	§ living in the same file rather than beside it.
 	function outcomeOf(
@@ -31,6 +35,14 @@ implementation {
 		}
 	}
 
+	§§ Answers the points a result is worth: three for a win, one for a draw.
+	§§
+	§§ @example
+	§§   expect pointsFor(#Win)::is(3)
+	§§   expect pointsFor(#Loss)::is(0)
+	§§
+	§§ @param _ — the Outcome to score
+	§§ @returns — the points the Outcome earns.
 	function pointsFor(_ outcome: Outcome) -> Integer {
 		<- match outcome -> Integer {
 			case #Win  { <- 3 }
@@ -184,6 +196,50 @@ tests {
 
 	test "{scored}–{conceded} is a win" {
 		expect outcomeOf(scored, against conceded)::is(#Win)
+	}
+
+	§ A table test runs once per row of a written List. The rows are written
+	§ where the test is because each of them is a test in its own right: it
+	§ carries its row number as the last step of the identity everything
+	§ durable is keyed by. The annotation on the row Parameter is what lets a
+	§ bare Case stand in a row.
+	test "{scored}–{conceded} scores {points}" across [
+		{ scored = 2, conceded = 0, points = 3 },
+		{ scored = 1, conceded = 1, points = 1 },
+		{ scored = 0, conceded = 3, points = 0 },
+	] ({ scored, conceded, points }: Scoreline) {
+		expect pointsFor(outcomeOf(scored, against conceded))::is(points)
+	}
+
+	§ A row Parameter can simply name the row, and the rows themselves can be
+	§ any Expression — it is the brackets that have to be written here.
+	test "every standing starts blank" across [
+		table::item(at 0),
+		table::item(at 1),
+	] (row: Optional<Standing>) {
+		require #Value(standing) = row
+
+		expect standing.played::is(0)
+	}
+
+	§ `matches snapshot` compares a value against one a run recorded. Written
+	§ bare it is recorded INLINE — the first run writes the value back into the
+	§ source through the formatter, and the diff is where it is reviewed.
+	§ Written `from "name"` it is kept in `__snapshots__` beside the file, which
+	§ is where output too large to read inline belongs.
+	suite "snapshots" {
+		test "renders a standing" {
+			expect played.points::toString() matches snapshot "3"
+
+			§ Written bare, a snapshot is one no run has recorded yet: the
+			§ first run writes the value back here, through the formatter, so
+			§ what lands in the file is formatted source. This one has run.
+			expect played.team matches snapshot "Lions"
+		}
+
+		test "renders the whole table" {
+			expect table matches snapshot from "the-table"
+		}
 	}
 }
 

@@ -1,0 +1,6 @@
+§ Snapshots recorded by `essence test`. They are read back on every run,
+§ so a change here is a change to what the tests assert. Rewrite them with
+§ `essence test --update`.
+
+snapshot "the-table"
+	[ { team = "Lions", played = 0, points = 0 }, { team = "Tigers", played = 0, points = 0 } ]

@@ -29,7 +29,7 @@ function generate(source: string): string {
 
 	expect(containsErrors(parsed.diagnostics)).toBe(false)
 
-	let enriched = enrich(parsed.program, { tests: true })
+	let enriched = enrich(parsed.program, { tests: true, source })
 
 	expect(containsErrors(enriched.diagnostics)).toBe(false)
 	expect(containsErrors(validate(enriched.program))).toBe(false)
@@ -392,7 +392,7 @@ describe("Test codegen — the span table", () => {
 			}
 		}`
 		let parsed = parseWithDiagnostics(source)
-		let enriched = enrich(parsed.program, { tests: true })
+		let enriched = enrich(parsed.program, { tests: true, source })
 		let javaScript = rewrite(optimise(simplify(enriched.program)))
 
 		expect(registration(javaScript)).toContain('source: ""')
@@ -814,7 +814,7 @@ describe("Test codegen — the Tests.es fixture", () => {
 			passed: 1,
 			failed: 0,
 			skipped: 1,
-			deselected: 9,
+			deselected: 17,
 			focused: true,
 		})
 		expect(
@@ -833,7 +833,7 @@ describe("Test codegen — the Tests.es fixture", () => {
 		let { summary } = await run(source.replace(" focused {", " {"))
 
 		expect(summary).toMatchObject({
-			passed: 10,
+			passed: 18,
 			failed: 0,
 			skipped: 1,
 			deselected: 0,
