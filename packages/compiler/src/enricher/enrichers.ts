@@ -4884,12 +4884,14 @@ export function enrichIfElseStatementNode(
 	scope: enricher.Scope,
 ): common.typed.IfElseStatementNode {
 	let condition = enrichExpression(node.condition, scope)
-	let trueScope = trueBranchScope(condition, scope)
+	let narrowings = trueBranchNarrowings(condition, scope)
+	let trueScope = branchScope(narrowings, scope)
 	let falseScope = falseBranchScope(condition, scope)
 
 	return {
 		nodeType: "IfElseStatement",
 		condition,
+		narrows: narrowings.length > 0,
 		trueBody: node.trueBody.flatMap((node) => enrichNode(node, trueScope)),
 		falseBody: node.falseBody.flatMap((node) =>
 			enrichNode(node, falseScope),
@@ -4903,11 +4905,13 @@ export function enrichIfStatement(
 	scope: enricher.Scope,
 ): common.typed.IfStatementNode {
 	let condition = enrichExpression(node.condition, scope)
-	let bodyScope = trueBranchScope(condition, scope)
+	let narrowings = trueBranchNarrowings(condition, scope)
+	let bodyScope = branchScope(narrowings, scope)
 
 	return {
 		nodeType: "IfStatement",
 		condition,
+		narrows: narrowings.length > 0,
 		body: node.body.flatMap((node) => enrichNode(node, bodyScope)),
 		position: node.position,
 	}
@@ -5862,23 +5866,31 @@ type ConditionEvidence = Map<string, ProvenConjuncts>
 // NOTE: A binding and the refinement a branch has established for it.
 type Narrowing = { name: string; type: common.RefinementType }
 
-// NOTE: The Scope a true branch's body is enriched in — the surrounding one plus
-// whatever the condition established, and a plain child Scope when it established
-// nothing.
-function trueBranchScope(
+// NOTE: What a condition ESTABLISHES about the branch it opens. It is answered
+// on its own rather than inside the Scope below it because the ANSWER is
+// reported as well as used: a branch that narrows is a doorway, and a coverage
+// report asks separately whether the guarded path and the fallback were each
+// reached. Nothing else can say so later — checked refinements are erased
+// before the Optimiser sees a Program.
+function trueBranchNarrowings(
 	condition: common.typed.ExpressionNode,
 	scope: enricher.Scope,
-): enricher.Scope {
-	return childScope(
-		scopeShadowing(
-			narrowingsFor(
-				conditionEvidence(condition, scope),
-				scope,
-				predicateConjunctKey,
-			),
-			scope,
-		),
+): Array<Narrowing> {
+	return narrowingsFor(
+		conditionEvidence(condition, scope),
+		scope,
+		predicateConjunctKey,
 	)
+}
+
+// NOTE: The Scope a branch's body is enriched in — the surrounding one plus
+// whatever the condition established, and a plain child Scope when it established
+// nothing.
+function branchScope(
+	narrowings: Array<Narrowing>,
+	scope: enricher.Scope,
+): enricher.Scope {
+	return childScope(scopeShadowing(narrowings, scope))
 }
 
 // NOTE: And the Scope for the branch the condition answered `false` in. An
@@ -5889,15 +5901,13 @@ function falseBranchScope(
 	condition: common.typed.ExpressionNode,
 	scope: enricher.Scope,
 ): enricher.Scope {
-	return childScope(
-		scopeShadowing(
-			narrowingsFor(
-				complementEvidence(condition, scope),
-				scope,
-				predicateShapeKey,
-			),
+	return branchScope(
+		narrowingsFor(
+			complementEvidence(condition, scope),
 			scope,
+			predicateShapeKey,
 		),
+		scope,
 	)
 }
 

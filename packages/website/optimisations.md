@@ -55,6 +55,31 @@ passes the flag itself, so both paths debug the same JavaScript.
 
 ## Passes
 
+### `instrument-coverage`
+
+Counts what ran, where the caller asked to be told.
+
+`essence test --coverage` compiles a project with this pass on; every other
+compile finds it a no-op. It writes a counter in front of every Statement, one
+into each side of every `if`, one into every `match` arm and one around every
+Choice Case a source constructs — and a table beside them saying where each of
+those stands, what kind of thing it counts and what to call it. The test runtime
+holds the counts, and the runner reports them.
+
+It is **first** in the order, and that is what makes the answer about the source
+rather than about the Program the Optimiser made of it: a counter written before
+`lower-matches-to-statements` stands in the arm the author wrote, while one
+written after it stands in a Statement the Compiler invented.
+
+Two consequences worth knowing. A later pass may remove code a counter stands in
+— `fold-constants` folds a Conditional whose condition is known, and
+`prune-dead-match-arms` drops an arm no value can reach — and the point stays in
+the table, counted zero, and is reported as never taken. Which it is. And
+`--no-optimise --coverage` still instruments: turning the phase off says "do not
+improve my Program", not "ignore what I asked you to measure".
+
+The standard library is never instrumented, whatever the Options say.
+
 ### `compile-type-tests`
 
 Answers a Match Handler's Type question by reading the value's tag.

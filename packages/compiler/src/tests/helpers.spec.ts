@@ -3409,6 +3409,7 @@ describe("Helpers", () => {
 					nodeType: "Program",
 					imports: null,
 					tests: null,
+					coverage: null,
 					exports: null,
 					implementation: {
 						nodeType: "ImplementationSection",
@@ -3470,6 +3471,7 @@ describe("Helpers", () => {
 					nodeType: "Program",
 					imports: null,
 					tests: null,
+					coverage: null,
 					exports: null,
 					implementation: {
 						nodeType: "ImplementationSection",

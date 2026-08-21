@@ -35,6 +35,11 @@ export const simplify = (
 			program.tests === null
 				? null
 				: simplifyTestsSection(program.tests, options),
+		// NOTE: Always null here. Coverage is not a lowering of anything the
+		// source wrote: it is instrumentation an Optimiser pass adds when the
+		// caller asked to be told what ran, and `instrument-coverage` is the
+		// one thing that fills this.
+		coverage: null,
 		exports: simplifyExportSection(program.exports),
 	}
 }
@@ -995,6 +1000,7 @@ function simplifyConditional(
 		convertedNode = {
 			nodeType: "IfElseStatement",
 			condition: node.condition,
+			narrows: node.narrows,
 			trueBody: node.body,
 			falseBody: [],
 			position: node.position,
@@ -1006,6 +1012,10 @@ function simplifyConditional(
 	return {
 		nodeType: "ConditionalStatement",
 		condition: simplifyExpression(convertedNode.condition),
+		// NOTE: Carried through untouched — what a branch established was
+		// decided by the Enricher, and the evidence it decided from does not
+		// survive simplification.
+		narrows: convertedNode.narrows,
 		// NOTE: An Essence Boolean, which the Rewriter reads the JavaScript one
 		// out of — until an Optimiser pass finds the question already asked in
 		// JavaScript's terms. The Simplifier states what the Program says and

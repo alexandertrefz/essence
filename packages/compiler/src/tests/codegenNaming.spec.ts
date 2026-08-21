@@ -593,6 +593,7 @@ describe("Code Generation — Naming and Escaping", () => {
 			let program = {
 				nodeType: "Program",
 				tests: null,
+				coverage: null,
 				implementation: {
 					nodeType: "ImplementationSection",
 					nodes: [
@@ -877,6 +878,7 @@ describe("Code Generation — Naming and Escaping", () => {
 			let program = {
 				nodeType: "Program",
 				tests: null,
+				coverage: null,
 				implementation: {
 					nodeType: "ImplementationSection",
 					nodes: [

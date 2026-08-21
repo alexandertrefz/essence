@@ -5141,6 +5141,7 @@ describe("Optimiser", () => {
 						pruneDeadMatchArms.run(
 							program,
 							declaredNamespaces(program),
+							defaultOptimiserOptions,
 						),
 					),
 			).toBe(unreachable.length)
@@ -5167,7 +5168,11 @@ describe("Optimiser", () => {
 			// ends up as the chain's `else`.
 			let program = simplifiedSource(deadMatchArms)
 			let survivors = matchMatchers(
-				pruneDeadMatchArms.run(program, declaredNamespaces(program)),
+				pruneDeadMatchArms.run(
+					program,
+					declaredNamespaces(program),
+					defaultOptimiserOptions,
+				),
 			)
 
 			expect(survivors[3]).toHaveLength(2)
@@ -5186,7 +5191,11 @@ describe("Optimiser", () => {
 			let program = simplifiedSource(deadMatchArms)
 			let before = matchMatchers(program)
 			let after = matchMatchers(
-				pruneDeadMatchArms.run(program, declaredNamespaces(program)),
+				pruneDeadMatchArms.run(
+					program,
+					declaredNamespaces(program),
+					defaultOptimiserOptions,
+				),
 			)
 
 			expect(after).toHaveLength(before.length)
@@ -5882,7 +5891,11 @@ describe("Optimiser", () => {
 
 			expect(
 				declaredConstantNames(
-					eliminateDeadCode.run(program, declaredNamespaces(program)),
+					eliminateDeadCode.run(
+						program,
+						declaredNamespaces(program),
+						defaultOptimiserOptions,
+					),
 				),
 			).toEqual([])
 			expect(
@@ -5890,6 +5903,7 @@ describe("Optimiser", () => {
 					eliminateDeadCode.run(
 						exported,
 						declaredNamespaces(exported),
+						defaultOptimiserOptions,
 					),
 				),
 			).toEqual(["shared"])
@@ -6117,6 +6131,7 @@ describe("Optimiser", () => {
 					nodeType: "Program",
 					imports: null,
 					tests: null,
+					coverage: null,
 					exports: null,
 					implementation: {
 						nodeType: "ImplementationSection",
@@ -6136,6 +6151,7 @@ describe("Optimiser", () => {
 				let node = poolConstants.run(
 					program,
 					declaredNamespaces(program),
+					defaultOptimiserOptions,
 				).implementation.nodes[0]!
 
 				expect(node.nodeType).toBe("Intrinsic")

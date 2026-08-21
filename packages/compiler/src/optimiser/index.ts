@@ -13,6 +13,7 @@ import { elideFinalMatchTest } from "./passes/elideFinalMatchTest"
 import { eliminateDeadCode } from "./passes/eliminateDeadCode"
 import { foldConstants } from "./passes/foldConstants"
 import { inlineLoops } from "./passes/inlineLoops"
+import { instrumentCoverage } from "./passes/instrumentCoverage"
 import { lowerMatchesToStatements } from "./passes/lowerMatchesToStatements"
 import { lowerScalarOperations } from "./passes/lowerScalarOperations"
 import { lowerUnitCaseEquality } from "./passes/lowerUnitCaseEquality"
@@ -59,9 +60,15 @@ export type OptimiserPass = {
 	// a memo keyed on Program identity would never hit: a pass rebuilds the
 	// Program whenever it changes anything, and measured on the fixtures every
 	// one of the seven is preceded by a pass that did.
+	//
+	// NOTE: The Options the phase is running under, so that a pass the caller
+	// ASKED for can tell it was asked. Only `instrument-coverage` reads them —
+	// everything else here is a transform that is right whenever it is right —
+	// and a pass that ignores the parameter simply does not declare it.
 	run: (
 		program: common.typedSimple.Program,
 		namespaces: DeclaredNamespaces,
+		options: OptimiserOptions,
 	) => common.typedSimple.Program
 }
 
@@ -75,6 +82,16 @@ export type OptimiserOptions = {
 	// silently stayed on would look exactly like a pass that does not do what
 	// its name says.
 	disabledPasses: ReadonlySet<string>
+	// NOTE: Whether to INSTRUMENT — `essence test --coverage`, and nothing
+	// else. It is an opt-in rather than a pass that is on by default, because
+	// it is the one entry in the registry that makes a Program do more work
+	// rather than less, and because a Program that counts what it ran is not
+	// the Program its author wrote.
+	//
+	// NOTE: It is part of `optimiserOptionsKey`, so no cache keyed on the
+	// Options can hand an instrumented bundle to a build or a plain bundle to
+	// a coverage run.
+	coverage?: boolean
 }
 
 // NOTE: Everything on. What `optimise(program)` means with no Options given,
@@ -100,6 +117,10 @@ export const unoptimisedOptions: OptimiserOptions = {
 // in front of it is part of what it was written against. Turning one off never
 // reorders the rest.
 export const optimiserPasses: ReadonlyArray<OptimiserPass> = [
+	// NOTE: First, and it has to be: a counter written before anything else has
+	// moved stands where the AUTHOR wrote the code it counts. See the head of
+	// `passes/instrumentCoverage.ts`.
+	instrumentCoverage,
 	compileTypeTests,
 	lowerUnitCaseEquality,
 	lowerScalarOperations,
@@ -133,11 +154,26 @@ export function isOptimiserPassName(name: string): boolean {
 // is what tells the two apart. Sorted, so that one set of names spells one key
 // however the command line ordered them.
 export function optimiserOptionsKey(options: OptimiserOptions): string {
+	// NOTE: Coverage is spelled on BOTH sides of the `enabled` check, because
+	// it is not an optimisation: `--no-optimise --coverage` still instruments,
+	// and the bytes it produces are not the bytes `--no-optimise` alone does.
+	let coverage = options.coverage === true ? "+coverage" : ""
+
 	if (!options.enabled) {
-		return "off"
+		return `off${coverage}`
 	}
 
-	return `on:${[...options.disabledPasses].sort().join(",")}`
+	return `on${coverage}:${[...options.disabledPasses].sort().join(",")}`
+}
+
+// NOTE: The same Options with the instrumentation taken out — what the standard
+// library's prelude is built under. A report about a project is a report about
+// the project's own files, and instrumenting the library into every bundle
+// would cost more than the answer is worth. It is a function rather than a
+// second Options object so the caller can not forget the rest of what it was
+// given.
+export function withoutCoverage(options: OptimiserOptions): OptimiserOptions {
+	return options.coverage === true ? { ...options, coverage: false } : options
 }
 
 // NOTE: The one transform this stage performs that is NOT a pass, and it runs
@@ -157,23 +193,31 @@ export function optimise(
 	options: OptimiserOptions = defaultOptimiserOptions,
 ): common.typedSimple.Program {
 	let erased = eraseRefinements(program)
-
-	if (!options.enabled) {
-		return erased
-	}
-
-	let result = erased
 	// NOTE: Asked of the erased Program, which is what the first pass is given
 	// — and, by the argument on `OptimiserPass.run`, what every pass after it
 	// would answer for itself.
 	let namespaces = declaredNamespaces(erased)
+
+	// NOTE: `--no-optimise` says "do not improve my Program". It does not say
+	// "ignore what I asked you to measure" — a coverage run that answered with
+	// an empty report because the Optimiser was off would be a silent one. So
+	// the instrumentation still runs, and it is still the named pass, so
+	// `--without-optimisation instrument-coverage` still turns it off.
+	if (!options.enabled) {
+		return options.coverage === true &&
+			!options.disabledPasses.has(instrumentCoverage.name)
+			? instrumentCoverage.run(erased, namespaces, options)
+			: erased
+	}
+
+	let result = erased
 
 	for (let pass of optimiserPasses) {
 		if (options.disabledPasses.has(pass.name)) {
 			continue
 		}
 
-		result = pass.run(result, namespaces)
+		result = pass.run(result, namespaces, options)
 	}
 
 	return result
