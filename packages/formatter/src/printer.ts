@@ -580,13 +580,18 @@ export class Printer {
 		// put every Modifier on a line of its own for a table test that has
 		// one. A property list stands there for the same reason, since its
 		// Parameters break the same way.
-		let tail: Doc = EMPTY
-
-		if (table !== null) {
-			tail = concat([this.printTestTable(table), text(" ")])
-		} else if (properties !== null) {
-			tail = concat([this.printTestProperties(properties), text(" ")])
-		}
+		// NOTE: BOTH, where a test wrote both. It can not mean anything — the
+		// Enricher refuses it as `contradictory-test-forms` — but a printer
+		// that dropped one would be a formatter that changes what a file says,
+		// which is the one thing it may never do.
+		let tail: Doc = concat([
+			table === null
+				? EMPTY
+				: concat([this.printTestTable(table), text(" ")]),
+			properties === null
+				? EMPTY
+				: concat([this.printTestProperties(properties), text(" ")]),
+		])
 
 		if (modifiers.length === 0) {
 			return concat([...head, text(" "), tail])

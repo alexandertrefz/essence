@@ -5026,10 +5026,16 @@ class DescentParser {
 	// spellings a Function has.
 	// NOTE: Whether the `(` the reader is standing on opens a parameter list
 	// rather than a call: it does exactly when the `)` that closes it is
-	// followed by the `{` of a block. Parentheses are the only thing counted —
-	// they nest inside every other bracket and every other bracket nests inside
-	// them, so a `)` at depth zero is the one that closes this `(` whatever
-	// stands in between.
+	// followed by the `{` of a block, or by the `for` of a `for any (…)`.
+	// Parentheses are the only thing counted — they nest inside every other
+	// bracket and every other bracket nests inside them, so a `)` at depth zero
+	// is the one that closes this `(` whatever stands in between.
+	//
+	// NOTE: The `for` is what lets a test writing BOTH `across` and `for any`
+	// parse at all. It can not mean anything — a body runs written rows or
+	// generated values, never both — and the Enricher says exactly that. Reading
+	// it as a call instead would report a syntax error about a colon, which
+	// tells a reader nothing about what they wrote.
 	protected stopsBeforeParameterList(): boolean {
 		let depth = 0
 
@@ -5056,8 +5062,11 @@ class DescentParser {
 				continue
 			}
 
+			let following = this.tokens.peek(offset + 1)?.type
+
 			return (
-				this.tokens.peek(offset + 1)?.type === TokenType.SymbolLeftBrace
+				following === TokenType.SymbolLeftBrace ||
+				following === TokenType.KeywordFor
 			)
 		}
 	}

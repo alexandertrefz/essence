@@ -222,6 +222,10 @@ export type DiagnosticCode =
 	| "table-parameters"
 	| "snapshot-not-printable"
 	| "inline-snapshot-in-table"
+	| "property-parameters"
+	| "ungeneratable-type"
+	| "contradictory-test-forms"
+	| "snapshot-in-property"
 	// Names — declared twice, never declared, or not what the position wants.
 	| "duplicate-variable"
 	| "duplicate-type"

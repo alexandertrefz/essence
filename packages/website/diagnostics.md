@@ -639,6 +639,82 @@ tests {
 Name it — `matches snapshot from "doubled"` — and each row records an entry of
 its own in the file's `__snapshots__` companion, numbered by the row it ran for.
 
+### `property-parameters`
+
+A `for any (…)` Parameter is not the shape a generated value can be bound to.
+Every Parameter writes a name and a Type, and nothing else:
+
+```essence
+tests {
+	test "add commutes" for any (a, b: Integer) {
+		expect a::add(b)::is(b::add(a))
+	}
+}
+```
+
+The Type is the whole of what says what to generate, so it can not be left out.
+A Pattern is refused for the same reason a label and a default are: a
+counterexample is reported beside the name it was generated for, nothing calls a
+test, and every case generates a value of its own.
+
+### `ungeneratable-type`
+
+A `for any (…)` Parameter writes a Type nothing can build a value of — a
+Function, a Namespace, a Choice that names itself in a payload, or a checked
+refinement whose predicate the generator can not hold:
+
+```essence
+tests {
+	test "every reader reads" for any (read: (_: String) -> Integer) {
+		expect read("x")::isGreaterThan(0)
+	}
+}
+```
+
+Write a Type a value can be built of, or declare a `Generatable` conformance for
+the one in hand:
+
+```essence
+namespace Team for Team is Generatable {
+	static generate(from source: Randomness) -> Team {
+		<- { name = source::pick(from ["Lions", "Tigers", "Bears"]) }
+	}
+}
+```
+
+### `contradictory-test-forms`
+
+One test wrote both `across` and `for any`. A table test runs its body once per
+row a reader wrote; a property test runs it once per value the runner made up.
+One body can not do both:
+
+```essence
+tests {
+	test "doubling" across [1, 2] (n: Integer) for any (m: Integer) {
+		expect double(n)::is(n::add(n))
+	}
+}
+```
+
+Keep one of them, or write two tests.
+
+### `snapshot-in-property`
+
+A `matches snapshot` was written in a property test. A property runs its body
+once per generated value, so a snapshot written there records a different value
+every case and only the last of them could ever match:
+
+```essence
+tests {
+	test "rendering" for any (n: Integer) {
+		expect render(n) matches snapshot from "rendered"
+	}
+}
+```
+
+Assert what holds for every value instead, and snapshot a value a test WROTE, in
+a test of its own.
+
 ## Names
 
 ### `duplicate-variable`
