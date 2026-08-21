@@ -1666,10 +1666,19 @@ function runOne(
 		// error — what it recorded is on the context already, and the report is
 		// about the assertion rather than about the way the test ended.
 		if (thrown !== requirementFailed) {
+			// NOTE: A GenerationFailure is the one thrown value the test
+			// runtime raises ON PURPOSE, and its message is already written for
+			// a reader — everything under it is frames inside a staged bundle
+			// and the paths of the machinery that staged it, which is noise in
+			// a report a person reads and a CI log keeps. Anything else that
+			// throws is a bug in a Program or in the Compiler, where the frames
+			// are the evidence.
 			error =
-				thrown instanceof Error
-					? (thrown.stack ?? thrown.message)
-					: String(thrown)
+				thrown instanceof GenerationFailure
+					? thrown.message
+					: thrown instanceof Error
+						? (thrown.stack ?? thrown.message)
+						: String(thrown)
 		}
 	}
 

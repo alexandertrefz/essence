@@ -26,6 +26,7 @@ import { resolveFilters } from "../test"
 import {
 	collectTestRun,
 	focusedTestsDiagnostic,
+	renderTestFailures,
 	renderTestSummary,
 	renderTestTree,
 	testFailureDiagnostic,
@@ -1156,6 +1157,50 @@ describe("the test reporter", () => {
 		expect(renderTestTree(run, reportContext).join("\n")).toContain(
 			"(100 cases)",
 		)
+	})
+
+	// NOTE: The frames name a bundle in a temporary directory and the files of
+	// the runner that staged it — a path that will not exist by the time
+	// anybody reads the report. The message says what happened; `--verbose`
+	// keeps the rest, because a Compiler bug is reported out of it.
+	it("shows a thrown error without its JavaScript frames", () => {
+		let run = collectTestRun([
+			{
+				schema: 1,
+				kind: "test-start",
+				id: "/Threw.es/stops",
+				name: "stops",
+				suitePath: [],
+				module: "/Threw.es",
+				row: null,
+			},
+			{
+				schema: 1,
+				kind: "test-fail",
+				id: "/Threw.es/stops",
+				name: "stops",
+				duration: 1,
+				expectations: 0,
+				failures: [],
+				error: [
+					"RangeError: Maximum call stack size exceeded",
+					"    at runOne (/tmp/essence-test-Vh0pbQ/0/tests.mjs:679:11)",
+					"    at runTests (/tmp/essence-test-Vh0pbQ/0/tests.mjs:12:3)",
+				].join("\n"),
+			},
+		])
+		let quiet = renderTestFailures(run, reportContext, () => null).join(
+			"\n",
+		)
+		let loud = renderTestFailures(
+			run,
+			{ ...reportContext, verbose: true },
+			() => null,
+		).join("\n")
+
+		expect(quiet).toContain("RangeError: Maximum call stack size exceeded")
+		expect(quiet).not.toContain("tests.mjs")
+		expect(loud).toContain("tests.mjs")
 	})
 
 	it("names every test a focus was left on", () => {
