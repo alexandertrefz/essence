@@ -542,6 +542,14 @@ export const commands: Array<CommandSpec> = [
 					"cases it took and the smallest value it could shrink the " +
 					"failure to.",
 			},
+			// NOTE: A test run compiles, so the two ways of turning the
+			// Optimiser down belong here as much as they belong to `build` —
+			// "does it still do that with the optimiser off?" is a question
+			// asked of a failing TEST more often than of a build. Neither
+			// touches --coverage: instrumentation is a pass being turned on,
+			// and `--no-optimise --coverage` still counts.
+			noOptimiseOption,
+			withoutOptimisationOption,
 			jobsOption,
 		],
 		examples: [
