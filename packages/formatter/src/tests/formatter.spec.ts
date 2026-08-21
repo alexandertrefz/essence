@@ -1070,10 +1070,49 @@ describe("formatter", () => {
 	// at all — where a printer that reached for `program.position` would write
 	// one that was never there.
 	describe("the tests section", () => {
-		// NOTE: Every Matcher a `require` may take a value apart with, each one
-		// standing where a Declaration's name stands. A round trip is the whole
-		// of what is asked: the safety gate compares Tokens, so a spelling this
-		// wrote out or dropped would refuse the file rather than reformat it.
+		it("writes a table test's rows and its row Parameter", () => {
+			let source = [
+				"implementation {",
+				"\tconstant x = 1",
+				"}",
+				"",
+				"tests {",
+				'\ttest "{scored}-{conceded}" across [',
+				"\t\t{ scored = 2, conceded = 1 },",
+				"\t\t{ scored = 1, conceded = 1 },",
+				"\t] ({ scored, conceded }: Scoreline) {",
+				"\t\texpect scored::isGreaterThanOrEqualTo(conceded)",
+				"\t}",
+				"}",
+				"",
+			].join("\n")
+
+			let result = format(source)
+
+			expect(result.refusal).toBeNull()
+			expect(result.text).toBe(source)
+		})
+
+		it("writes a short table on one line, Modifiers and all", () => {
+			let source = [
+				"implementation {",
+				"\tconstant x = 1",
+				"}",
+				"",
+				"tests {",
+				'\ttest "rows" tagged slow across [1, 2] (n: Integer) {',
+				"\t\texpect n::isGreaterThan(0)",
+				"\t}",
+				"}",
+				"",
+			].join("\n")
+
+			let result = format(source)
+
+			expect(result.refusal).toBeNull()
+			expect(result.text).toBe(source)
+		})
+
 		it("writes a Matcher left of the '='", () => {
 			let source = [
 				"implementation {",
@@ -1088,6 +1127,28 @@ describe("formatter", () => {
 				"\t\trequire { team } as whole = first",
 				"\t\trequire Integer = first.points",
 				"\t\trequire #Empty = rows::item(at 9)",
+				"\t}",
+				"}",
+				"",
+			].join("\n")
+
+			let result = format(source)
+
+			expect(result.refusal).toBeNull()
+			expect(result.text).toBe(source)
+		})
+
+		it("writes the three shapes a snapshot takes", () => {
+			let source = [
+				"implementation {",
+				"\tconstant x = 1",
+				"}",
+				"",
+				"tests {",
+				'\ttest "renders" {',
+				"\t\texpect x matches snapshot",
+				'\t\texpect x matches snapshot "1"',
+				'\t\texpect x matches snapshot from "the-x"',
 				"\t}",
 				"}",
 				"",

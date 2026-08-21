@@ -121,6 +121,14 @@ function continuesExpression(
 	)
 }
 
+// NOTE: The words that open a form of their own where they stand and are
+// ordinary names everywhere else — the same rule `where` follows in a Guard.
+// None of them is a Keyword, so `constant across = 1` and `matches::isEmpty()`
+// are still what they say.
+const ACROSS = "across"
+const MATCHES = "matches"
+const SNAPSHOT = "snapshot"
+
 // NOTE: The Token types that begin a literal Matcher — `case 0`, `case 1/2`,
 // `case "a"`. Everything else in Matcher position is read as a Type.
 // `LiteralStringStart` is here only so an interpolated String reaches
@@ -136,19 +144,25 @@ const literalMatcherTokenTypes = new Set([
 	TokenType.LiteralFalse,
 ])
 
-// NOTE: Every Token type a Matcher can begin with — a name (a Type, or the
-// Choice half of `Choice#Case`), a `{` Pattern, a `#` Case, a `(` Function
-// Type, a written value, or `_`. It is what `parseAssertionStatement` asks
+// NOTE: Every Token type a Matcher can begin with where an assertion opens —
+// a name (a Type, or the Choice half of `Choice#Case`), a `{` Pattern, a `#`
+// Case, a written value, or `_`. It is what `parseAssertionStatement` asks
 // before it reads the Matcher of `require MATCHER = EXPR` speculatively: an
 // assertion whose subject begins with anything else — `@`, `[`, `<`, `.`,
 // `match` — has no Matcher reading at all, and never pays for one.
+//
+// The `(` a Function-Type Matcher begins with is not here, because that
+// reading never arises: `continuesExpression` makes `require (` a call of a
+// Function named `require` before an assertion is considered at all, so
+// `require (Integer) -> String = f` never reaches this question. A
+// Function-Type Matcher can not open an assertion, and is not meant to — what
+// it would prove is a shape a test already has from the Type of what it wrote.
 const matcherStartTokenTypes = new Set([
 	...identifierTokenTypes,
 	...literalMatcherTokenTypes,
 	TokenType.SymbolUnderscore,
 	TokenType.SymbolLeftBrace,
 	TokenType.SymbolHash,
-	TokenType.SymbolLeftParen,
 ])
 
 function startsMatcher(token: Token | undefined): boolean {
@@ -792,6 +806,7 @@ class DescentParser {
 		let keyword = this.tokens.expect(TokenType.KeywordTest)
 		let name = this.parseTestName()
 		let modifiers = this.parseTestModifiers()
+		let table = this.startsTestTable() ? this.parseTestTable() : null
 
 		let outerInsideTestBody = this.insideTestBody
 		this.insideTestBody = true
@@ -802,6 +817,7 @@ class DescentParser {
 			return generators.test(
 				name,
 				modifiers,
+				table,
 				block.body,
 				keyword.position,
 				{ start: keyword.position.start, end: block.position.end },
@@ -809,6 +825,36 @@ class DescentParser {
 		} finally {
 			this.insideTestBody = outerInsideTestBody
 		}
+	}
+
+	// NOTE: `across` is recognised by content, the way `matches` is in an
+	// assertion: it opens the one form that stands between a test's Modifiers
+	// and its body, and everywhere else it is an ordinary name.
+	protected startsTestTable(): boolean {
+		let token = this.tokens.peek()
+
+		return token?.type === TokenType.Identifier && token.value === ACROSS
+	}
+
+	// NOTE: `across [ … ] ({ scored, conceded }: Scoreline)` — the rows a test
+	// runs for, and what one row is called inside the body. The parameter list
+	// is a closure's, so a row can be taken apart by a Pattern and annotated
+	// with the Type that lets a bare Case in a row resolve.
+	protected parseTestTable(): parser.TestTableNode {
+		let keyword = this.tokens.next()
+		let value = this.parseExpression(true)
+		let parameterList = this.parseParameterList(true)
+
+		return generators.testTable(
+			value,
+			parameterList.parameters,
+			parameterList.position,
+			keyword.position,
+			{
+				start: keyword.position.start,
+				end: parameterList.position.end,
+			},
+		)
 	}
 
 	protected parseSuite(): parser.SuiteNode {
@@ -882,7 +928,10 @@ class DescentParser {
 	protected parseTestModifiers(): Array<parser.TestModifierNode> {
 		let modifiers: Array<parser.TestModifierNode> = []
 
-		while (isIdentifierToken(this.tokens.peek())) {
+		while (
+			isIdentifierToken(this.tokens.peek()) &&
+			!this.startsTestTable()
+		) {
 			let name = this.parseIdentifier()
 			let modifierArguments: Array<parser.TestModifierArgumentNode> = []
 
@@ -923,11 +972,16 @@ class DescentParser {
 			return false
 		}
 
-		let following = this.tokens.peek(1)?.type
+		let following = this.tokens.peek(1)
 
+		// NOTE: `tagged slow across [ … ]` — the table opens the same way the
+		// body does, so a bare name in front of one is that Modifier's own
+		// argument for exactly the reason it is in front of a `{`.
 		return (
-			following === TokenType.SymbolComma ||
-			following === TokenType.SymbolLeftBrace
+			following?.type === TokenType.SymbolComma ||
+			following?.type === TokenType.SymbolLeftBrace ||
+			(following?.type === TokenType.Identifier &&
+				following.value === ACROSS)
 		)
 	}
 
@@ -2190,16 +2244,24 @@ class DescentParser {
 
 			this.refuseMatcherOnExpect(keyword, matcher)
 			this.refuseUnusableMatcher(matcher)
+
+			let matches = this.tokens.peek()
+
+			if (
+				matches?.type === TokenType.Identifier &&
+				matches.value === MATCHES
+			) {
+				this.refuseSnapshotAfterMatcher()
+			}
+
 			this.reportAssertionOutsideTest(keyword, position)
 
-			return generators.requireStatement(value, matcher, position)
+			return generators.requireStatement(value, matcher, null, position)
 		}
 
 		let value = this.parseExpression()
-		let position = {
-			start: keyword.position.start,
-			end: value.position.end,
-		}
+		let snapshot: parser.SnapshotNode | null = null
+		let end = value.position.end
 
 		let following = this.tokens.peek()
 
@@ -2210,13 +2272,23 @@ class DescentParser {
 			this.refuseMatcherAfterValue(following)
 		}
 
+		if (
+			following?.type === TokenType.Identifier &&
+			following.value === MATCHES
+		) {
+			snapshot = this.parseSnapshot()
+			end = snapshot.position.end
+		}
+
+		let position = { start: keyword.position.start, end }
+
 		this.reportAssertionOutsideTest(keyword, position)
 
 		if (keyword.type === TokenType.KeywordRequire) {
-			return generators.requireStatement(value, null, position)
+			return generators.requireStatement(value, null, snapshot, position)
 		}
 
-		return generators.expectStatement(value, null, position)
+		return generators.expectStatement(value, null, snapshot, position)
 	}
 
 	// NOTE: The Matcher of `require MATCHER = EXPR`, read speculatively. A
@@ -2337,6 +2409,121 @@ class DescentParser {
 		)
 	}
 
+	// NOTE: `require MATCHER = EXPR matches snapshot` — a snapshot asked of
+	// the one assertion form that has no value to give it. A snapshot records
+	// a value; this line took one apart, and what came of that is the names it
+	// introduced. Recording one of them is a Statement of its own, written
+	// below: `expect item matches snapshot`.
+	//
+	// The snapshot is read to its end before the report, so the Diagnostic
+	// underlines the whole of what was written and no tail of it is read again
+	// as a Statement of its own.
+	protected refuseSnapshotAfterMatcher(): never {
+		let snapshot = this.parseSnapshot()
+
+		throw new ParseError(
+			"A snapshot records a value, and this line took one apart",
+			snapshot.position,
+			"there is no value here to record",
+			{
+				code: "snapshot-after-matcher",
+				notes: [
+					"A snapshot is of the value an assertion is written over, printed as text. 'require MATCHER = EXPR' is written over a shape instead: it asks what the value has to be and names its parts, so what there is to record is one of those names.",
+				],
+				helps: [
+					"Record the name on a line of its own: 'require #Value(item) = value' then 'expect item matches snapshot'.",
+					"Or snapshot the value whole, where it is one that prints: 'expect value matches snapshot'.",
+				],
+			},
+		)
+	}
+
+	// NOTE: `matches snapshot` and the two shapes a snapshot takes. An INLINE
+	// one carries its recorded text in the source, written there by the first
+	// run — `matches snapshot` alone is one that has never run. A STORED one
+	// names an entry of `__snapshots__/<File>.es.snap` and says so with `from`,
+	// which is what keeps the two apart: the text of an inline snapshot is a
+	// String Literal, and so is the name of a stored one.
+	protected parseSnapshot(): parser.SnapshotNode {
+		let matches = this.tokens.next()
+		let keyword = this.peekOrFail("'snapshot'")
+
+		if (
+			keyword.type !== TokenType.Identifier ||
+			keyword.value !== SNAPSHOT
+		) {
+			fail(
+				`Expected 'snapshot' but found ${describeToken(keyword)}.`,
+				keyword.position,
+				"expected 'snapshot'",
+			)
+		}
+
+		this.tokens.next()
+
+		if (this.tokens.peek()?.type === TokenType.KeywordFrom) {
+			this.tokens.next()
+
+			let name = this.parseSnapshotText("the name of the snapshot")
+
+			return generators.snapshot(
+				name,
+				null,
+				name.position,
+				keyword.position,
+				{ start: matches.position.start, end: name.position.end },
+			)
+		}
+
+		let token = this.tokens.peek()
+
+		// NOTE: An interpolated String reaches `parseSnapshotText`, which
+		// refuses it with a message about why — left alone it would read as a
+		// Statement of its own on the line below an empty snapshot, which is
+		// two readings of one line and no Diagnostic about either.
+		if (
+			token?.type !== TokenType.LiteralString &&
+			token?.type !== TokenType.LiteralStringStart
+		) {
+			return generators.snapshot(
+				null,
+				null,
+				keyword.position,
+				keyword.position,
+				{ start: matches.position.start, end: keyword.position.end },
+			)
+		}
+
+		let recorded = this.parseSnapshotText("the recorded value")
+
+		return generators.snapshot(
+			null,
+			recorded,
+			recorded.position,
+			keyword.position,
+			{ start: matches.position.start, end: recorded.position.end },
+		)
+	}
+
+	// NOTE: A plain String Literal — an interpolated one holds Expressions,
+	// and neither a recorded value nor the name of a stored snapshot is
+	// something a run works out.
+	protected parseSnapshotText(what: string): parser.StringValueNode {
+		let token = this.peekOrFail(what)
+
+		if (token.type !== TokenType.LiteralString) {
+			fail(
+				`Expected ${what} but found ${describeToken(token)}.`,
+				token.position,
+				"expected a String Literal",
+			)
+		}
+
+		this.tokens.next()
+
+		return generators.stringValueNode(token.value, token.position)
+	}
+
 	// NOTE: An assertion belongs to a test — to the test's own block and to
 	// every block nested inside it, and to nothing else. A Function literal
 	// written in a test body is the boundary: its body runs wherever it is
@@ -2386,22 +2573,39 @@ class DescentParser {
 
 	// #region Expressions
 
-	protected parseExpression(): parser.ExpressionNode {
+	// NOTE: `endsBeforeBlockParameters` is set for the one Expression that is
+	// followed by a parameter list — the rows of a table test, written
+	// `across [ … ] (row: Row) { … }`. A `(` there would otherwise be read as a
+	// call of what stands in front of it, and `[ … ](row: Row)` is a call
+	// nobody wrote. See `stopsBeforeParameterList`.
+	protected parseExpression(
+		endsBeforeBlockParameters = false,
+	): parser.ExpressionNode {
 		this.enterNesting()
 
 		try {
-			return this.parseExpressionLevels()
+			return this.parseExpressionLevels(endsBeforeBlockParameters)
 		} finally {
 			this.nestingDepth--
 		}
 	}
 
-	protected parseExpressionLevels(): parser.ExpressionNode {
+	protected parseExpressionLevels(
+		endsBeforeBlockParameters = false,
+	): parser.ExpressionNode {
 		let expression = this.parsePrimaryExpression()
 
 		while (true) {
 			let token = this.tokens.peek()
 			let following = this.tokens.peek(1)
+
+			if (
+				endsBeforeBlockParameters &&
+				token?.type === TokenType.SymbolLeftParen &&
+				this.stopsBeforeParameterList()
+			) {
+				break
+			}
 
 			// NOTE: The two ':' of a Method call are one lexeme — only written
 			// flush against each other do they read as '::', the same adjacency
@@ -4760,6 +4964,44 @@ class DescentParser {
 	// body it was written in — every Function block goes through here so that
 	// the one rule is stated in one place rather than at each of the four
 	// spellings a Function has.
+	// NOTE: Whether the `(` the reader is standing on opens a parameter list
+	// rather than a call: it does exactly when the `)` that closes it is
+	// followed by the `{` of a block. Parentheses are the only thing counted —
+	// they nest inside every other bracket and every other bracket nests inside
+	// them, so a `)` at depth zero is the one that closes this `(` whatever
+	// stands in between.
+	protected stopsBeforeParameterList(): boolean {
+		let depth = 0
+
+		for (let offset = 0; ; offset++) {
+			let token = this.tokens.peek(offset)
+
+			if (token === undefined) {
+				return false
+			}
+
+			if (token.type === TokenType.SymbolLeftParen) {
+				depth++
+
+				continue
+			}
+
+			if (token.type !== TokenType.SymbolRightParen) {
+				continue
+			}
+
+			depth--
+
+			if (depth > 0) {
+				continue
+			}
+
+			return (
+				this.tokens.peek(offset + 1)?.type === TokenType.SymbolLeftBrace
+			)
+		}
+	}
+
 	protected outsideTestBody<T>(parse: () => T): T {
 		let outerInsideTestBody = this.insideTestBody
 		this.insideTestBody = false

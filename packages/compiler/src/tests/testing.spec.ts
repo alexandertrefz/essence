@@ -810,6 +810,63 @@ describe("Tests Section", () => {
 			})
 		})
 
+		// NOTE: A snapshot records a value, and the line it is written on took
+		// one apart — so what there is to record is the name it introduced, on
+		// a line of its own.
+		it("should refuse a snapshot on a line that takes a value apart", () => {
+			let { diagnostics } = parse(
+				`implementation {}
+
+				tests {
+					test "reads" {
+						require #Value(second) = first matches snapshot "one"
+					}
+				}`,
+			)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("snapshot-after-matcher")
+
+			// NOTE: From `matches` through the end of the recorded text — the
+			// whole snapshot, read to its end before the report so no tail of
+			// it is left to be read as a Statement of its own.
+			expect(diagnostics[0].position).toEqual({
+				start: { line: 5, column: 38 },
+				end: { line: 5, column: 60 },
+			})
+		})
+
+		it("should refuse a snapshot that has never run the same way", () => {
+			let { program, diagnostics } = parse(
+				`implementation {}
+
+				tests {
+					test "reads" {
+						require #Value(second) = first matches snapshot
+					}
+
+					test "reads again" {
+						expect true
+					}
+				}`,
+			)
+
+			expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+				"snapshot-after-matcher",
+			])
+
+			// NOTE: The test below is read whole — the refusal drops the
+			// assertion and nothing else.
+			let section = program.tests as parser.TestsSectionNode
+
+			expect(section.nodes).toHaveLength(2)
+			expect(
+				(section.nodes[1] as parser.TestNode).body.map(
+					(node) => node.nodeType,
+				),
+			).toEqual(["ExpectStatement"])
+		})
+
 		// NOTE: A refused assertion is DROPPED, as every broken Statement is,
 		// and the Statements around it are still read.
 		it("should read the rest of the test past a refused assertion", () => {
@@ -993,6 +1050,223 @@ describe("Tests Section", () => {
 
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].code).toBe("expect-outside-test")
+		})
+	})
+
+	describe("Table tests", () => {
+		it("should read the rows and the row Parameter", () => {
+			let section = testsOf(
+				`implementation {}
+
+				tests {
+					test "{scored}–{conceded}" across [
+						{ scored = 2, conceded = 1 },
+						{ scored = 1, conceded = 1 },
+					] ({ scored, conceded }: Scoreline) {
+						expect true
+					}
+				}`,
+			)
+
+			let table = testAt(section, 0).table as parser.TestTableNode
+
+			expect(table.nodeType).toBe("TestTable")
+			expect(table.value.nodeType).toBe("ListValue")
+			expect((table.value as parser.ListValueNode).values).toHaveLength(2)
+			expect(table.parameters).toHaveLength(1)
+			expect(table.parameters[0]?.internalName?.nodeType).toBe("Pattern")
+		})
+
+		it("should read a named row Parameter", () => {
+			let section = testsOf(
+				`implementation {}
+
+				tests {
+					test "rows" across [1, 2] (n: Integer) {
+						expect true
+					}
+				}`,
+			)
+
+			let table = testAt(section, 0).table as parser.TestTableNode
+			let parameter = table.parameters[0] as parser.ParameterNode
+
+			expect(
+				(parameter.internalName as parser.IdentifierNode).content,
+			).toBe("n")
+		})
+
+		// NOTE: `(` after an Expression is a call everywhere else, so the one
+		// thing that says the Parameter list is a Parameter list is the block
+		// behind it.
+		it("should let the rows be a call", () => {
+			let section = testsOf(
+				`implementation {}
+
+				tests {
+					test "rows" across rowsOf(table) (n: Integer) {
+						expect true
+					}
+				}`,
+			)
+
+			let table = testAt(section, 0).table as parser.TestTableNode
+
+			expect(table.value.nodeType).toBe("FunctionInvocation")
+			expect(table.parameters).toHaveLength(1)
+		})
+
+		it("should read Modifiers in front of the rows", () => {
+			let section = testsOf(
+				`implementation {}
+
+				tests {
+					test "rows" tagged slow across [1] (n: Integer) {
+						expect true
+					}
+				}`,
+			)
+
+			let node = testAt(section, 0)
+
+			expect(modifierNames(node)).toEqual(["tagged"])
+			expect(
+				argumentsOf(node.modifiers[0] as parser.TestModifierNode),
+			).toEqual(["slow"])
+			expect(node.table).not.toBeNull()
+		})
+
+		it("should leave 'across' an ordinary name", () => {
+			let { diagnostics, program } = parse(
+				`implementation {
+					constant across = 1
+				}`,
+			)
+
+			expect(diagnostics).toEqual([])
+			expect(program.implementation.nodes).toHaveLength(1)
+		})
+
+		it("should span the Keyword through the Parameter list", () => {
+			let section = testsOf(
+				`implementation {}
+
+				tests {
+					test "rows" across [1] (n: Integer) {
+						expect true
+					}
+				}`,
+			)
+
+			let table = testAt(section, 0).table as parser.TestTableNode
+
+			expect(table.position).toEqual({
+				start: { line: 4, column: 18 },
+				end: { line: 4, column: 41 },
+			})
+		})
+	})
+
+	describe("Snapshots", () => {
+		it("should read a snapshot that has never run", () => {
+			let section = testsOf(
+				`implementation {}
+
+				tests {
+					test "renders" {
+						expect table matches snapshot
+					}
+				}`,
+			)
+
+			let node = testAt(section, 0).body[0] as parser.ExpectStatementNode
+			let snapshot = node.snapshot as parser.SnapshotNode
+
+			expect(snapshot.name).toBeNull()
+			expect(snapshot.value).toBeNull()
+			expect(node.matcher).toBeNull()
+		})
+
+		it("should read a recorded inline snapshot", () => {
+			let section = testsOf(
+				`implementation {}
+
+				tests {
+					test "renders" {
+						expect table matches snapshot "Lions 19"
+					}
+				}`,
+			)
+
+			let node = testAt(section, 0).body[0] as parser.ExpectStatementNode
+			let snapshot = node.snapshot as parser.SnapshotNode
+
+			expect(snapshot.name).toBeNull()
+			expect(snapshot.value?.value).toBe("Lions 19")
+			expect(snapshot.valuePosition).toEqual(
+				snapshot.value?.position as common.Position,
+			)
+		})
+
+		it("should read a stored snapshot by name", () => {
+			let section = testsOf(
+				`implementation {}
+
+				tests {
+					test "renders" {
+						expect table matches snapshot from "season-report"
+					}
+				}`,
+			)
+
+			let node = testAt(section, 0).body[0] as parser.ExpectStatementNode
+			let snapshot = node.snapshot as parser.SnapshotNode
+
+			expect(snapshot.name?.value).toBe("season-report")
+			expect(snapshot.value).toBeNull()
+		})
+
+		it("should read a snapshot after 'require'", () => {
+			let section = testsOf(
+				`implementation {}
+
+				tests {
+					test "renders" {
+						require table matches snapshot
+					}
+				}`,
+			)
+
+			let node = testAt(section, 0).body[0] as parser.RequireStatementNode
+
+			expect(node.nodeType).toBe("RequireStatement")
+			expect(node.snapshot).not.toBeNull()
+		})
+
+		it("should refuse an interpolated snapshot", () => {
+			let { diagnostics } = parse(
+				`implementation {}
+
+				tests {
+					test "renders" {
+						expect table matches snapshot "{name}"
+					}
+				}`,
+			)
+
+			expect(diagnostics.length).toBeGreaterThan(0)
+			expect(diagnostics[0].code).toBe("syntax-error")
+		})
+
+		it("should leave 'matches' an ordinary name", () => {
+			let { diagnostics, program } = parse(
+				`implementation {
+					constant matches = 1
+				}`,
+			)
+
+			expect(diagnostics).toEqual([])
+			expect(program.implementation.nodes).toHaveLength(1)
 		})
 	})
 })

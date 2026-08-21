@@ -179,6 +179,7 @@ export type DiagnosticCode =
 	| "matcher-after-value"
 	| "wildcard-in-require"
 	| "literal-in-require"
+	| "snapshot-after-matcher"
 	| "unknown-modifier"
 	| "duplicate-modifier"
 	| "malformed-modifier"

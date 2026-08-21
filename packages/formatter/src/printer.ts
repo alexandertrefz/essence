@@ -521,7 +521,12 @@ export class Printer {
 		switch (node.nodeType) {
 			case "Test":
 				return concat([
-					this.printItemHead("test", node.name, node.modifiers),
+					this.printItemHead(
+						"test",
+						node.name,
+						node.modifiers,
+						node.table,
+					),
 					this.bodyBlock(
 						node.body,
 						node.position.start.line,
@@ -531,7 +536,12 @@ export class Printer {
 
 			case "Suite":
 				return concat([
-					this.printItemHead("suite", node.name, node.modifiers),
+					this.printItemHead(
+						"suite",
+						node.name,
+						node.modifiers,
+						null,
+					),
 					this.bodyBlock(
 						node.nodes,
 						node.position.start.line,
@@ -553,27 +563,61 @@ export class Printer {
 		keyword: string,
 		name: parser.TestNode["name"],
 		modifiers: Array<parser.TestModifierNode>,
+		table: parser.TestTableNode | null,
 	): Doc {
 		let head: Array<Doc> = [text(keyword + " "), this.printValue(name)]
 
-		if (modifiers.length === 0) {
+		if (modifiers.length === 0 && table === null) {
 			return concat([...head, text(" ")])
 		}
 
-		return group(
-			concat([
-				...head,
-				indent(
-					concat(
-						modifiers.flatMap((modifier) => [
-							line,
-							this.printTestModifier(modifier),
-						]),
+		// NOTE: The table stands OUTSIDE the group the Modifiers break in: the
+		// rows are a List that lays itself out over lines of its own, and a
+		// group holding those breaks could never be written flat — which would
+		// put every Modifier on a line of its own for a table test that has
+		// one.
+		let tail =
+			table === null
+				? EMPTY
+				: concat([this.printTestTable(table), text(" ")])
+
+		if (modifiers.length === 0) {
+			return concat([...head, text(" "), tail])
+		}
+
+		return concat([
+			group(
+				concat([
+					...head,
+					indent(
+						concat(
+							modifiers.flatMap((modifier) => [
+								line,
+								this.printTestModifier(modifier),
+							]),
+						),
 					),
-				),
-				line,
-			]),
-		)
+					line,
+				]),
+			),
+			tail,
+		])
+	}
+
+	// NOTE: `across [ … ] (row: Row)`, written between the Modifiers and the
+	// body. The rows print as the List they are, so a table long enough to
+	// break breaks the way every other written List does.
+	private printTestTable(node: parser.TestTableNode): Doc {
+		return concat([
+			text("across "),
+			this.printExpression(node.value),
+			text(" "),
+			this.printParameterList(
+				node.parameters,
+				EMPTY,
+				node.parameterListPosition,
+			),
+		])
 	}
 
 	private printTestModifier(node: parser.TestModifierNode): Doc {
@@ -816,7 +860,37 @@ export class Printer {
 			])
 		}
 
-		return concat([text(keyword), this.printExpression(node.value)])
+		let parts: Array<Doc> = [
+			text(keyword),
+			this.printExpression(node.value),
+		]
+
+		if (node.snapshot !== null) {
+			parts.push(this.printSnapshot(node.snapshot))
+		}
+
+		return concat(parts)
+	}
+
+	// NOTE: `matches snapshot`, `matches snapshot "…"` — the recorded text a
+	// run wrote back — and `matches snapshot from "name"`, which names an entry
+	// of the file's `__snapshots__` companion.
+	private printSnapshot(node: parser.SnapshotNode): Doc {
+		if (node.name !== null) {
+			return concat([
+				text(" matches snapshot from "),
+				this.printValue(node.name),
+			])
+		}
+
+		if (node.value !== null) {
+			return concat([
+				text(" matches snapshot "),
+				this.printValue(node.value),
+			])
+		}
+
+		return text(" matches snapshot")
 	}
 
 	// NOTE: `padding` is written between the head and the `=`, and is the slot an
