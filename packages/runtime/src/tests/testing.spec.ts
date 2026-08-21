@@ -11,6 +11,7 @@ import {
 	createContext,
 	entry,
 	expected,
+	probe,
 	type Range,
 	registryOf,
 	required,
@@ -203,6 +204,17 @@ describe("The per-test context", () => {
 			form: "require",
 			passed: false,
 		})
+	})
+
+	test("keeps a probed value out of the assertion that followed it", () => {
+		let context = createContext(0)
+		let value = integer(19)
+
+		expect(probe(context, 5, value)).toBe(value)
+		expected(context, 0, true, null)
+
+		expect(context.probes).toEqual([{ point: 5, value }])
+		expect(context.expectations[0]?.traces).toEqual([])
 	})
 })
 
@@ -444,6 +456,69 @@ describe("The event stream", () => {
 			focused: false,
 			failedIds: [],
 		})
+	})
+
+	test("reports one probe per point, with the last value it held", () => {
+		let registry = registryOf([
+			module(
+				[manifest("/a")],
+				(context) => {
+					entry(context, 0, null, () => {
+						probe(context, 0, integer(1))
+						probe(context, 0, integer(2))
+						probe(context, 1, string("last"))
+						expected(context, 2, true, null)
+					})
+				},
+				[span("count"), span("word"), span("expect")],
+			),
+		])
+		let { events } = collect(registry)
+		let probes = events.filter((event) => event.kind === "probe")
+
+		expect(probes).toEqual([
+			{
+				schema: 1,
+				kind: "probe",
+				id: "/a",
+				point: 0,
+				span: span("count"),
+				value: "2",
+			},
+			{
+				schema: 1,
+				kind: "probe",
+				id: "/a",
+				point: 1,
+				span: span("word"),
+				value: '"last"',
+			},
+		])
+	})
+
+	test("reports a probe of a test that failed as well", () => {
+		let registry = registryOf([
+			module(
+				[manifest("/a")],
+				(context) => {
+					entry(context, 0, null, () => {
+						probe(context, 0, integer(7))
+						expected(context, 1, false, null)
+					})
+				},
+				[span("seven"), span("expect")],
+			),
+		])
+		let { events } = collect(registry)
+
+		expect(kinds(events)).toEqual([
+			"run-start",
+			"test-start",
+			"probe",
+			"expect",
+			"test-fail",
+			"run-end",
+		])
 	})
 
 	test("stamps every event with the schema version", () => {

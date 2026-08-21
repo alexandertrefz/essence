@@ -1123,6 +1123,57 @@ describe("formatter", () => {
 			expect(result.text).toBe(source)
 		})
 
+		it("keeps a value comment where it was written", () => {
+			let source = [
+				"implementation {",
+				"\tconstant x = 1",
+				"}",
+				"",
+				"tests {",
+				'\ttest "reads" {',
+				"\t\tconstant doubled = x::add(with x) §? what came out",
+				"",
+				"\t\texpect doubled::is(2)",
+				"\t}",
+				"}",
+				"",
+			].join("\n")
+
+			let result = format(source)
+
+			expect(result.refusal).toBeNull()
+			expect(result.text).toBe(source)
+		})
+
+		it("keeps a bare value comment on a messy line", () => {
+			let result = format(
+				[
+					"tests {",
+					'\ttest "reads"    {',
+					'\t\t   constant name    =   "Lions"     §?',
+					"",
+					'\t\texpect name::is("Lions")',
+					"\t}",
+					"}",
+					"",
+				].join("\n"),
+			)
+
+			expect(result.refusal).toBeNull()
+			expect(result.text).toBe(
+				[
+					"tests {",
+					'\ttest "reads" {',
+					'\t\tconstant name = "Lions" §?',
+					"",
+					'\t\texpect name::is("Lions")',
+					"\t}",
+					"}",
+					"",
+				].join("\n"),
+			)
+		})
+
 		it("lays a messy section out", () => {
 			let source = [
 				"implementation{constant x=1}",

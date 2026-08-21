@@ -187,10 +187,16 @@ export type ExpressionNode =
 // NOTE: It is a Node of the Simplifier's own rather than an intrinsic, because
 // intrinsics stand for shapes an Optimiser pass DECIDED and this stands for
 // something the source asked for. `expect` and `require` are its first
-// consumers; the `§?` value comment and coverage counters are the next two, and
-// they record at points of their own against the same table.
+// consumers; the `§?` value comment is the third and coverage counters are the
+// next, and they record at points of their own against the same table.
 export interface TestTraceNode {
 	nodeType: "TestTrace"
+	// NOTE: Which buffer the recording lands in. A `trace` belongs to the
+	// assertion that evaluated it and is DRAINED by it, so a report says what
+	// that assertion was built from; a `probe` belongs to the line it was
+	// written on and is kept for the whole test, because a value comment asks
+	// a question no assertion asked.
+	kind: "trace" | "probe"
 	// NOTE: Indexes the Module's span table — see `TestsSectionNode.spans`.
 	point: number
 	value: ExpressionNode

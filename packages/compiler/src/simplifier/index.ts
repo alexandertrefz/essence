@@ -10,6 +10,7 @@ import {
 	recordDefaultNesting,
 	resolveOverloadedMethodName,
 } from "../helpers/index"
+import { valueCommentLines } from "../valueComments"
 
 // NOTE: What the Simplifier needs to know beyond the Program, which today is
 // one thing and only for a test compile: the Module's own text. The span table
@@ -1547,6 +1548,16 @@ function simplifyArgument(
 type TestLowering = {
 	spans: Array<common.typedSimple.TestSpan>
 	lines: Array<string>
+	// NOTE: The lines that END in a `§?` value comment, and the Position of the
+	// comment itself — read off the source once per Module rather than at each
+	// Statement, because a value comment is a fact about the text and the text
+	// does not change while a section is lowered.
+	valueComments: Map<number, common.Position>
+	// NOTE: The lines a probe has already been handed out for. One value
+	// comment asks one question: a Statement the Enricher desugared into
+	// several — `require MATCHER = EXPR` is a Constant and an assertion — must
+	// not answer it once per piece.
+	probed: Set<number>
 }
 
 let testLowering: TestLowering | null = null
@@ -1559,6 +1570,11 @@ function simplifyTestsSection(
 	let lowering: TestLowering = {
 		spans: [],
 		lines: options.source === undefined ? [] : options.source.split("\n"),
+		valueComments:
+			options.source === undefined
+				? new Map()
+				: valueCommentLines(options.source),
+		probed: new Set(),
 	}
 
 	testLowering = lowering
@@ -1632,8 +1648,8 @@ function simplifyTestsNodes(
 				// manifest already, and emitting it a second time would be two
 				// spellings of one thing that could come to disagree.
 				name: interpolated ? simplifyExpression(node.name) : null,
-				body: node.body.map((child) =>
-					simplifyImplementationNode(child),
+				body: probeStatements(
+					node.body.map((child) => simplifyImplementationNode(child)),
 				),
 				position: node.position,
 			}
@@ -1647,8 +1663,128 @@ function simplifyTestsNodes(
 			}
 		}
 
-		return simplifyImplementationNode(node)
+		return probeStatement(simplifyImplementationNode(node))
 	})
+}
+
+// NOTE: The `§?` value comments of this Module, applied to Statements that have
+// already been simplified — so that what a probe records is the Expression as it
+// will be emitted, wrapped where every other instrumented point is wrapped.
+//
+// NOTE: A Conditional's two bodies are descended into, because a value comment
+// inside an `if` is the case a reader most wants an answer for. A Function
+// literal's body is NOT: it is a closure the test builds, and what a probe
+// promises is the value of the line, once, in the test that ran.
+function probeStatements(
+	nodes: Array<common.typedSimple.ImplementationNode>,
+): Array<common.typedSimple.ImplementationNode> {
+	return nodes.map((node) => probeStatement(node))
+}
+
+function probeStatement(
+	node: common.typedSimple.ImplementationNode,
+): common.typedSimple.ImplementationNode {
+	let lowering = testLowering
+
+	if (lowering === null || lowering.valueComments.size === 0) {
+		return node
+	}
+
+	if (node.nodeType === "ConditionalStatement") {
+		return {
+			...node,
+			trueBody: probeStatements(node.trueBody),
+			falseBody: probeStatements(node.falseBody),
+		}
+	}
+
+	// NOTE: The line the Statement ENDS on, which is the line the comment that
+	// asks about it was written on — a Statement spanning several lines is
+	// answered by a `§?` behind its last one.
+	let line = node.position?.end.line
+
+	if (line === undefined || !lowering.valueComments.has(line)) {
+		return node
+	}
+
+	if (
+		node.nodeType === "VariableDeclarationStatement" ||
+		node.nodeType === "VariableAssignmentStatement"
+	) {
+		let point = probePoint(lowering, line, node.value.position)
+
+		return point === null
+			? node
+			: {
+					...node,
+					value: {
+						nodeType: "TestTrace",
+						kind: "probe",
+						point,
+						value: node.value,
+						type: node.value.type,
+						position: node.value.position,
+					},
+				}
+	}
+
+	// NOTE: Everything else is only probed where it IS an Expression — a bare
+	// Expression Statement, which is the other half of what the spec says a
+	// value comment answers. A Return, a Namespace, an assertion and a Type
+	// alias have no value a line could be asking about.
+	if (isSimpleExpression(node)) {
+		let point = probePoint(lowering, line, node.position)
+
+		return point === null
+			? node
+			: {
+					nodeType: "TestTrace",
+					kind: "probe",
+					point,
+					value: node,
+					type: node.type,
+					position: node.position,
+				}
+	}
+
+	return node
+}
+
+// NOTE: One point per value comment, whoever asks first. The Enricher desugars
+// `require MATCHER = EXPR` into a Constant and an assertion that stand on one
+// line, and a reader who wrote one `§?` asked one question.
+function probePoint(
+	lowering: TestLowering,
+	line: number,
+	position: common.Position | undefined,
+): number | null {
+	if (position === undefined || lowering.probed.has(line)) {
+		return null
+	}
+
+	lowering.probed.add(line)
+
+	return testPoint(position)
+}
+
+function isSimpleExpression(
+	node: common.typedSimple.ImplementationNode,
+): node is common.typedSimple.ExpressionNode {
+	switch (node.nodeType) {
+		case "VariableDeclarationStatement":
+		case "VariableAssignmentStatement":
+		case "NamespaceDefinitionStatement":
+		case "ProtocolDeclarationStatement":
+		case "TypeAliasStatement":
+		case "ConditionalStatement":
+		case "ReturnStatement":
+		case "FunctionStatement":
+		case "TestAssertionStatement":
+		case "IntrinsicStatement":
+			return false
+		default:
+			return true
+	}
 }
 
 // NOTE: One instrumented point, handed out against the Module's span table. The
@@ -1871,6 +2007,7 @@ function instrumentAssertion(
 
 		return {
 			nodeType: "TestTrace",
+			kind: "trace",
 			point,
 			value: walked,
 			type: node.type,

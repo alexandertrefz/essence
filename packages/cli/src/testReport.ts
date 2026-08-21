@@ -9,6 +9,7 @@ import type { OutputStream } from "@essence-lang/runtime/Terminal"
 import type {
 	DiffLine,
 	FailureEvent,
+	ProbedValue,
 	TestEvent,
 } from "@essence-lang/runtime/Testing"
 
@@ -50,6 +51,12 @@ export type TestRecord = {
 	// than a failed assertion.
 	error: string | null
 	output: Array<{ stream: OutputStream; text: string }>
+	// NOTE: What the test's `§?` value comments answered, in the order they
+	// were written. Collected rather than printed: a value comment is a question
+	// asked of an Editor, which draws it beside the line — the terminal report
+	// says what held, and a reader looking at a terminal is looking at the
+	// source anyway.
+	probes: Array<ProbedValue>
 }
 
 export type TestCounts = {
@@ -111,6 +118,7 @@ export function collectTestRun(events: Array<TestEvent>): TestRun {
 				failures: [],
 				error: null,
 				output: [],
+				probes: [],
 			}
 			byId.set(id, existing)
 			tests.push(existing)
@@ -171,6 +179,13 @@ export function collectTestRun(events: Array<TestEvent>): TestRun {
 				byId.get(event.id)?.output.push({
 					stream: event.stream,
 					text: event.text,
+				})
+				break
+			case "probe":
+				byId.get(event.id)?.probes.push({
+					point: event.point,
+					span: event.span,
+					value: event.value,
 				})
 				break
 			case "run-end":
