@@ -4,10 +4,10 @@ import * as vscode from "vscode"
 
 import {
 	applyBatch,
-	commandFor,
 	coverageLinesOf,
 	coverageOf,
 	createState,
+	debugConfigurationsFor,
 	declarationsOf,
 	decorationsOf,
 	describeBatch,
@@ -663,35 +663,119 @@ export function createTestView(options) {
 		await ask(testRun, selectionOf(request), token)
 	}
 
-	function debug(request) {
-		let testRun = controller.createTestRun(request)
-		// NOTE: What to run instead, handed over rather than apologised for.
-		let command = commandFor(
+	// NOTE: A debug session is not a test run: it compiles the file WITH its
+	// tests section, launches a runner under the adapter and hands the reader
+	// the debugger. The Test Explorer's own results come from the live session
+	// and are not what a stepped-through test writes, so the TestRun VS Code
+	// hands over is ended at once rather than left open on a run nothing will
+	// report into.
+	//
+	// NOTE: One session per FILE, in sequence: a session steps through one
+	// bundle, and a bundle is one file's. Almost every gesture is one test in
+	// one file; a selection reaching more waits for each session to end before
+	// the next one starts, so a reader is never handed two debuggers at once.
+	async function debug(request) {
+		controller.createTestRun(request).end()
+
+		let configurations = debugConfigurationsFor(
 			(request.include ?? [])
 				.flatMap((item) => testItemsUnder(item, []))
 				.map((item) => ({
 					label: item.label,
 					file: item.uri?.fsPath ?? "",
+					id: item.id,
 				})),
 		)
 
-		log(
-			"debugging one test is not wired up yet: the debug adapter has to " +
-				`compile the tests section and run one by id. Run it: ${command}`,
-		)
-		void vscode.window
-			.showInformationMessage(
-				"Essence: debugging a single test is not wired up yet — the " +
-					"debug adapter has to compile the tests section and select " +
-					`one by id. Run it instead: ${command}`,
-				"Copy command",
+		await debugConfigurations(configurations)
+	}
+
+	async function debugConfigurations(configurations) {
+		if (configurations.length === 0) {
+			log("nothing to debug: the selection names no test in a file")
+
+			return
+		}
+
+		for (let configuration of configurations) {
+			let folder = vscode.workspace.getWorkspaceFolder(
+				vscode.Uri.file(configuration.program),
 			)
-			.then((chosen) => {
-				if (chosen !== undefined) {
-					void vscode.env.clipboard.writeText(command)
-				}
-			})
-		testRun.end()
+
+			log(
+				`debugging ${configuration.tests.length} ${
+					configuration.tests.length === 1 ? "test" : "tests"
+				} in ${path.basename(configuration.program)}`,
+			)
+
+			// NOTE: Listened for BEFORE the session starts. A test that passes
+			// in a millisecond ends its session before `startDebugging` has
+			// answered, and a listener registered after that answer would be
+			// waiting for an event that has already been and gone.
+			let ending = sessionEnding(configuration.name)
+			let started = await vscode.debug.startDebugging(
+				folder,
+				configuration,
+			)
+
+			if (!started) {
+				ending.cancel()
+				log("the debug session did not start")
+
+				return
+			}
+
+			await ending.ended
+		}
+	}
+
+	// NOTE: Resolved when the session this configuration named ends.
+	// `startDebugging` answers as soon as one has STARTED, so without waiting
+	// here a selection covering two files would open both debuggers at once —
+	// and the name is checked because a reader may be debugging something else
+	// beside this.
+	function sessionEnding(name) {
+		let subscription = null
+		let ended = new Promise((resolve) => {
+			subscription = vscode.debug.onDidTerminateDebugSession(
+				(session) => {
+					if (session !== undefined && session.name !== name) {
+						return
+					}
+
+					subscription?.dispose()
+					resolve()
+				},
+			)
+		})
+
+		return { ended, cancel: () => subscription?.dispose() }
+	}
+
+	// NOTE: What the Debug lens sends: the ids it carries, or the file it sits
+	// in where nothing has run yet and no id is known.
+	async function debugIds(ids, files) {
+		let covered = ids
+			.map((id) => items.get(id))
+			.filter((item) => item !== undefined)
+
+		await debugConfigurations(
+			covered.length === 0
+				? files.map((file) => ({
+						type: "essence",
+						request: "launch",
+						name: `${path.basename(file)} tests`,
+						program: file,
+						tests: [],
+					}))
+				: debugConfigurationsFor(
+						covered.map((item) => ({
+							label: item.label,
+							file: item.uri?.fsPath ?? "",
+							id: item.id,
+						})),
+					),
+		)
 	}
 
 	// NOTE: One profile per tag any test of the workspace carries, rebuilt as
@@ -754,10 +838,10 @@ export function createTestView(options) {
 		(request, token) => run(request, token),
 		true,
 	)
-	// NOTE: Offered although it refuses, because the gesture exists whether or
-	// not this extension names it: a reader who right-clicks a test and finds no
-	// Debug at all learns nothing, and one who finds a Debug that starts the
-	// program under test learns something false.
+	// NOTE: The debugger this repository already has, pointed at a test rather
+	// than a Program: the file is compiled with its tests section and a runner
+	// beside the bundle asks the registry for the tests selected, so a
+	// breakpoint in a test body is a breakpoint like any other.
 	let debugProfile = controller.createRunProfile(
 		"Debug",
 		vscode.TestRunProfileKind.Debug,
@@ -994,6 +1078,7 @@ export function createTestView(options) {
 	return {
 		handle,
 		runIds,
+		debugIds,
 		acceptSnapshots,
 		runFailed,
 		reset,

@@ -1138,27 +1138,54 @@ export function describeCoverage(coverage: CoverageSummary): string {
 
 // #endregion
 
-// #region What to run instead
+// #region What to debug
 
-// NOTE: The `essence test` invocation that runs exactly this selection, which
-// is what the Debug profile hands over in place of a debug session it can not
-// start yet. One test is named by `--filter`, which matches a substring of the
-// rendered name — the label an item carries; anything else is the whole run,
-// because a filter that matches several tests is not the thing that was asked
-// for.
-export function commandFor(
-	tests: Array<{ label: string; file: string }>,
-): string {
-	if (tests.length !== 1) {
-		return "essence test"
+// NOTE: The launch configurations that step through exactly this selection.
+// A debug session compiles ONE file — the bundle it steps through is that
+// file's — so a selection reaching several of them is several sessions, in the
+// order the files were first named, each carrying the ids of its own tests.
+//
+// NOTE: The ids rather than the labels. Two tests may render one name and never
+// share an id, and the id is what the adapter narrows the registry by; the
+// label is only ever what the session is CALLED in the debug pane.
+export type DebugConfiguration = {
+	type: "essence"
+	request: "launch"
+	name: string
+	program: string
+	tests: Array<string>
+}
+
+export function debugConfigurationsFor(
+	tests: Array<{ label: string; file: string; id: string }>,
+): Array<DebugConfiguration> {
+	let byFile = new Map<string, Array<{ label: string; id: string }>>()
+
+	for (let test of tests) {
+		if (test.file === "") {
+			continue
+		}
+
+		let held = byFile.get(test.file)
+
+		if (held === undefined) {
+			byFile.set(test.file, [{ label: test.label, id: test.id }])
+		} else {
+			held.push({ label: test.label, id: test.id })
+		}
 	}
 
-	let [only] = tests
-
-	return (
-		`essence test ${path.basename(only!.file)} ` +
-		`--filter ${JSON.stringify(only!.label)}`
-	)
+	return [...byFile.entries()].map(([file, held]) => ({
+		type: "essence" as const,
+		request: "launch" as const,
+		// NOTE: The one test's own name where it is one, because that is what
+		// the reader pressed Debug on and what the debug pane then says they
+		// are in.
+		name:
+			held.length === 1 ? held[0]!.label : `${path.basename(file)} tests`,
+		program: file,
+		tests: held.map((entry) => entry.id),
+	}))
 }
 
 // #endregion

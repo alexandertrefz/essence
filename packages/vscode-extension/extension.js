@@ -736,17 +736,19 @@ export async function activate(context) {
 		vscode.commands.registerCommand("essence.test.showOutput", () => {
 			testView?.show()
 		}),
-		// NOTE: Honest rather than absent. Debugging ONE test means compiling
-		// the test bundle under the debug adapter and running the registry
-		// narrowed to an id, which is the adapter's half of this feature and is
-		// not wired yet — and a lens whose command does not exist reports a
-		// protocol error, which tells a reader nothing at all.
-		vscode.commands.registerCommand("essence.test.debug", async () => {
-			await vscode.window.showInformationMessage(
-				"Essence: debugging a single test is not wired up yet — the " +
-					"debug adapter has to compile the tests and run one by id. " +
-					"Run it instead, or debug the program it tests.",
-			)
+		// NOTE: The "Debug" lens. It goes through the Test Explorer for the
+		// reason "Run" does — one place decides what a gesture means — and what
+		// it starts is a session of the `essence` debug type, over a bundle
+		// compiled WITH the file's tests section.
+		//
+		// Deliberately not in `contributes.commands`, like its siblings: it
+		// needs the ids the lens carries.
+		vscode.commands.registerCommand("essence.test.debug", async (item) => {
+			if (item === undefined) {
+				return
+			}
+
+			await testView?.debugIds(item.ids ?? [], [item.filePath])
 		}),
 		vscode.debug.registerDebugConfigurationProvider("essence", {
 			resolveDebugConfigurationWithSubstitutedVariables: (

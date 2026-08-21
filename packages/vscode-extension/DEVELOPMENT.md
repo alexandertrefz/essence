@@ -105,8 +105,11 @@ Development Host, over a workspace holding at least two files that write
   says so.
 - A test that prints shows what it printed under itself in the Test Results
   terminal, on its own lines rather than staircased.
-- The Debug profile and the Debug lens both refuse, name the `essence test
-  --filter` command for the selection, and copy it when asked.
+- The Debug profile and the Debug lens both start a debug session: put a
+  breakpoint inside a test body, press Debug on that test, and it stops there
+  with the test's own bindings in the Variables view. Stepping, Continue and
+  the Debug Console read as they do for a program; the console ends with
+  `✓ <name>` and a count.
 - Half-typing a line so the file stops compiling leaves the tree and the marks
   as they were rather than emptying them; the compile error is in Problems.
 - Setting `essence.tests.enabled` to false stops the automatic runs — the marks
