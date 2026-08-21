@@ -38,6 +38,11 @@ export type TestRecord = {
 	name: string
 	module: string | null
 	suitePath: Array<string>
+	// NOTE: Which row of a table test this is, counting from zero, and null for
+	// a test that is not one. What it labels is the row a name did not: a
+	// template with a hole in it renders differently per row and says which one
+	// by itself, and one without a hole renders the same N times.
+	row: number | null
 	state: TestState
 	// NOTE: Why it did not run — a skip's own reason, or the word for how it
 	// was deselected. Null for a test that ran.
@@ -172,6 +177,7 @@ export function collectTestRun(events: Array<TestEvent>): TestRun {
 				name,
 				module: null,
 				suitePath: [],
+				row: null,
 				state,
 				reason: null,
 				duration: 0,
@@ -201,6 +207,7 @@ export function collectTestRun(events: Array<TestEvent>): TestRun {
 				record(event.id, event.name, "passed", {
 					module: event.module,
 					suitePath: event.suitePath,
+					row: event.row,
 				})
 				break
 			case "test-pass":
@@ -221,6 +228,7 @@ export function collectTestRun(events: Array<TestEvent>): TestRun {
 				record(event.id, event.name, "skipped", {
 					module: event.module,
 					suitePath: event.suitePath,
+					row: event.row,
 					reason: event.reason,
 				})
 				break
@@ -234,6 +242,7 @@ export function collectTestRun(events: Array<TestEvent>): TestRun {
 					{
 						module: event.module,
 						suitePath: event.suitePath,
+						row: event.row,
 						reason: event.reason,
 					},
 				)
@@ -394,6 +403,19 @@ function comparisonHelps(failure: FailureEvent): Array<string> {
 		: []
 }
 
+// NOTE: What to call a row that its own name did not name. A table test's suite
+// path ends in the template its rows share, so a name with no hole in it
+// renders as that template for every row: N lines reading the same thing, under
+// a heading reading it once more. Where the rendering DOES say which row it is
+// — which is what interpolating the row's fields is for — nothing is added.
+export function rowLabel(
+	test: Pick<TestRecord, "name" | "suitePath" | "row">,
+): string | null {
+	return test.row === null || test.name !== test.suitePath.at(-1)
+		? null
+		: `row ${test.row + 1}`
+}
+
 // NOTE: One failed assertion as an ordinary Essence Diagnostic, so that a test
 // failure is rendered by the very pipeline every other Diagnostic is — same
 // excerpt, same colours, same margin, in the terminal and in an editor alike.
@@ -428,9 +450,16 @@ export function testFailureDiagnostic(
 		labels.push(secondary(value.span, value.value))
 	}
 
+	// NOTE: The path without the step the name repeats, which is the template a
+	// table test's rows share — said once, with the row beside it.
+	let row = rowLabel(test)
+	let path = row === null ? test.suitePath : test.suitePath.slice(0, -1)
+
 	return {
 		severity: "error",
-		message: `'${[...test.suitePath, test.name].join(" › ")}' failed`,
+		message: `'${[...path, test.name].join(" › ")}'${
+			row === null ? "" : ` (${row})`
+		} failed`,
 		position: span,
 		code: "test-failed",
 		labels: labels as [

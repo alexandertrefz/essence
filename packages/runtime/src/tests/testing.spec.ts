@@ -677,6 +677,7 @@ describe("The event stream", () => {
 		expect(events.find((event) => event.kind === "test-skip")).toEqual({
 			schema: 1,
 			kind: "test-skip",
+			row: null,
 			id: "/a",
 			name: "/a",
 			suitePath: [],
@@ -702,6 +703,7 @@ describe("The event stream", () => {
 		).toEqual({
 			schema: 1,
 			kind: "test-deselected",
+			row: null,
 			id: "/a",
 			name: "/a",
 			suitePath: [],

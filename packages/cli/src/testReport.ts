@@ -15,6 +15,7 @@ import {
 	percentageOf,
 	propertyHelps,
 	propertyNotes,
+	rowLabel,
 	type TestRecord,
 	type TestRun,
 	testFailureDiagnostic,
@@ -88,10 +89,14 @@ function deselectionWord(reason: string | null): string {
 function testLine(test: TestRecord, context: ReportContext): string {
 	let { palette } = context
 	let symbol = symbolFor(test, context)
+	// NOTE: A row whose name says nothing about which row it is says so as the
+	// row it is — the template it shares with its siblings is the heading right
+	// above it, and reading it again N times names nothing.
+	let written = rowLabel(test) ?? test.name
 	let name =
 		test.state === "passed" || test.state === "failed"
-			? test.name
-			: palette.muted(test.name)
+			? written
+			: palette.muted(written)
 	let detail = ""
 
 	if (test.state === "skipped") {
@@ -102,7 +107,17 @@ function testLine(test: TestRecord, context: ReportContext): string {
 		detail = palette.faint(`  ${formatDuration(test.duration)}`)
 	}
 
-	return `${symbol} ${name}${detail}`
+	// NOTE: A property test says how many cases it ran, and says it whether it
+	// held or not — "a hundred cases held" is as much an answer as a
+	// counterexample is, and it is the only thing that tells a property test
+	// apart from an ordinary one in the tree.
+	let cases =
+		test.property === null ||
+		(test.state !== "passed" && test.state !== "failed")
+			? ""
+			: palette.faint(`  (${pluralise(test.property.cases, "case")})`)
+
+	return `${symbol} ${name}${cases}${detail}`
 }
 
 // NOTE: What the tree shows without being asked. A deselected test is counted

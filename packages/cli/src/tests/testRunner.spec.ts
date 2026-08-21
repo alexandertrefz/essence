@@ -916,6 +916,7 @@ const events: Array<TestEvent> = [
 	{
 		schema: 1,
 		kind: "test-start",
+		row: null,
 		id: "/Standings.es/Standing/records a win",
 		name: "records a win",
 		suitePath: ["Standing"],
@@ -932,6 +933,7 @@ const events: Array<TestEvent> = [
 	{
 		schema: 1,
 		kind: "test-start",
+		row: null,
 		id: "/Standings.es/Standing/outcomeOf/calls a draw",
 		name: "calls a draw",
 		suitePath: ["Standing", "outcomeOf"],
@@ -976,6 +978,7 @@ const events: Array<TestEvent> = [
 	{
 		schema: 1,
 		kind: "test-skip",
+		row: null,
 		id: "/Standings.es/renders a forfeit",
 		name: "renders a forfeit",
 		suitePath: [],
@@ -985,6 +988,7 @@ const events: Array<TestEvent> = [
 	{
 		schema: 1,
 		kind: "test-deselected",
+		row: null,
 		id: "/Season.tests.es/the leader is clear",
 		name: "the leader is clear",
 		suitePath: [],
@@ -1059,6 +1063,99 @@ describe("the test reporter", () => {
 			"3",
 		])
 		expect(diagnostic.notes).toEqual(["`is` compared 3 with 2"])
+	})
+
+	// NOTE: A table test whose name interpolates nothing renders the same text
+	// for every row, under a heading that already says it — so the row says
+	// which row it is instead, in the tree and in the Diagnostic alike.
+	it("names the row a name did not name", () => {
+		let rows: Array<TestEvent> = [
+			{
+				schema: 1,
+				kind: "test-start",
+				id: "/Rows.es/three rows/0",
+				name: "three rows",
+				suitePath: ["three rows"],
+				module: "/Rows.es",
+				row: 0,
+			},
+			{
+				schema: 1,
+				kind: "test-start",
+				id: "/Rows.es/three rows/1",
+				name: "three rows",
+				suitePath: ["three rows"],
+				module: "/Rows.es",
+				row: 1,
+			},
+			{
+				schema: 1,
+				kind: "test-fail",
+				id: "/Rows.es/three rows/1",
+				name: "three rows",
+				duration: 1,
+				expectations: 1,
+				failures: [
+					{
+						form: "expect",
+						span: {
+							start: { line: 3, column: 3 },
+							end: { line: 3, column: 9 },
+							source: "n::is(1)",
+						},
+						values: [],
+						comparison: null,
+					},
+				],
+				error: null,
+			},
+		]
+		let run = collectTestRun(rows)
+		let failed = run.tests.find((test) => test.state === "failed")!
+
+		expect(renderTestTree(run, reportContext).join("\n")).toContain("row 2")
+		expect(testFailureDiagnostic(failed, failed.failures[0])!.message).toBe(
+			"'three rows' (row 2) failed",
+		)
+	})
+
+	// NOTE: "A hundred cases held" is as much an answer as a counterexample is,
+	// and it is the only thing that tells a property test apart in the tree.
+	it("says how many cases a property test ran", () => {
+		let run = collectTestRun([
+			{
+				schema: 1,
+				kind: "test-start",
+				id: "/Props.es/commutes",
+				name: "commutes",
+				suitePath: [],
+				module: "/Props.es",
+				row: null,
+			},
+			{
+				schema: 1,
+				kind: "property",
+				id: "/Props.es/commutes",
+				name: "commutes",
+				cases: 100,
+				requested: 100,
+				seed: "deadbeef",
+				shrinks: 0,
+				counterexample: null,
+			},
+			{
+				schema: 1,
+				kind: "test-pass",
+				id: "/Props.es/commutes",
+				name: "commutes",
+				duration: 1,
+				expectations: 100,
+			},
+		])
+
+		expect(renderTestTree(run, reportContext).join("\n")).toContain(
+			"(100 cases)",
+		)
 	})
 
 	it("names every test a focus was left on", () => {

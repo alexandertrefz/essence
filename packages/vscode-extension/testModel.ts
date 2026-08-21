@@ -69,6 +69,9 @@ export type TestEvent = {
 	name?: string
 	suitePath?: Array<string>
 	module?: string | null
+	// NOTE: Which row of a table test the event is about, and null for a test
+	// that is not one. `TestSite` carries the same fact off the manifest.
+	row?: number | null
 	duration?: number
 	expectations?: number
 	failures?: Array<Failure>

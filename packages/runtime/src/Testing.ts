@@ -1141,6 +1141,11 @@ export type TestEvent =
 			name: string
 			suitePath: Array<string>
 			module: string | null
+			// NOTE: Which row of a table test this is, counting from zero, and
+			// null for every test that is not one. The id ends in it already —
+			// this is the same fact where a reporter can read it without
+			// taking a name apart.
+			row: number | null
 	  }
 	| {
 			schema: 1
@@ -1171,6 +1176,7 @@ export type TestEvent =
 			suitePath: Array<string>
 			module: string | null
 			reason: string
+			row: number | null
 	  }
 	// NOTE: `suitePath` and `module` on a test that never started, for the same
 	// reason `test-start` carries them: a report groups by where a test was
@@ -1186,6 +1192,7 @@ export type TestEvent =
 			suitePath: Array<string>
 			module: string | null
 			reason: DeselectionReason
+			row: number | null
 	  }
 	| {
 			schema: 1
@@ -1513,6 +1520,7 @@ export function runTests(registry: Registry, options: RunOptions): RunSummary {
 				suitePath: pathOf(entry),
 				module: selection.test.module.module,
 				reason: selection.reason,
+				row: entry.row,
 			})
 
 			continue
@@ -1528,6 +1536,7 @@ export function runTests(registry: Registry, options: RunOptions): RunSummary {
 				suitePath: pathOf(entry),
 				module: selection.test.module.module,
 				reason: selection.reason,
+				row: entry.row,
 			})
 
 			continue
@@ -1641,6 +1650,7 @@ function runOne(
 		name,
 		suitePath: pathOf(entry),
 		module: test.module.module,
+		row: entry.row,
 	})
 
 	let started = now()
