@@ -1,9 +1,10 @@
 import { describe, expect, it } from "bun:test"
 
 import { parseDocument } from "@essence-lang/compiler/documents"
+import { editDistance } from "@essence-lang/compiler/helpers"
 import type { parser } from "@essence-lang/interfaces"
 
-import { damerauLevenshtein, tagDiagnostics, tagUsages } from "../testTags"
+import { tagDiagnostics, tagUsages } from "../testTags"
 
 // NOTE: The two questions a workspace can ask about its tags and one Module can
 // not. Everything here is over PARSER Programs, because that is what the
@@ -26,25 +27,25 @@ function codesFor(
 	)
 }
 
-describe("Damerau-Levenshtein", () => {
+describe("The edit distance a suggestion is measured by", () => {
 	it("counts a swap of two adjacent characters as one edit", () => {
-		expect(damerauLevenshtein("slwo", "slow")).toBe(1)
+		expect(editDistance("slwo", "slow")).toBe(1)
 	})
 
 	it("counts a substitution as one edit", () => {
-		expect(damerauLevenshtein("slow", "slot")).toBe(1)
+		expect(editDistance("slow", "slot")).toBe(1)
 	})
 
 	it("counts an insertion as one edit", () => {
-		expect(damerauLevenshtein("slow", "slows")).toBe(1)
+		expect(editDistance("slow", "slows")).toBe(1)
 	})
 
 	it("is zero for one word twice", () => {
-		expect(damerauLevenshtein("network", "network")).toBe(0)
+		expect(editDistance("network", "network")).toBe(0)
 	})
 
 	it("counts what it has to for two different words", () => {
-		expect(damerauLevenshtein("network", "slow")).toBeGreaterThan(2)
+		expect(editDistance("network", "slow")).toBeGreaterThan(2)
 	})
 })
 
