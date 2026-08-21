@@ -591,8 +591,25 @@ export async function runTest(
 	// has to say why somewhere.
 	printDiagnostics(context, compilation)
 
-	if (hasFailures(compilation)) {
-		return EXIT_FAILURE
+	// NOTE: An entry that would not compile is LEFT OUT rather than taken as
+	// the end of the run. A project where one file is half-typed is exactly the
+	// project whose other twenty files are worth hearing about, and a stream
+	// that stopped before its `run-start` tells a consumer nothing at all — not
+	// that the run failed, not that it is over. So the broken entries are named
+	// on stderr, the rest run, and the run ends non-zero because something in it
+	// could not be compiled. `--watch` has always worked this way.
+	let broken = compilation.outcomes.filter(
+		(outcome) => !outcome.ok || outcome.outputFileName === null,
+	)
+
+	for (let outcome of broken) {
+		context.terminal.err(
+			`  ${context.palette.warning(
+				context.theme.symbols.warning,
+			)} ${context.palette.muted(
+				`${displayPath(outcome.inputFileName)} did not compile — its tests did not run`,
+			)}`,
+		)
 	}
 
 	let sources = new Map<string, string>()
@@ -706,7 +723,7 @@ export async function runTest(
 
 	await writeCoverageReport(context, coverage)
 
-	if (run.counts.failed > 0) {
+	if (run.counts.failed > 0 || hasFailures(compilation)) {
 		return EXIT_FAILURE
 	}
 
