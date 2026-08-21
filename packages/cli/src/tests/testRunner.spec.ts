@@ -773,6 +773,39 @@ describe("essence test --json", () => {
 		})
 	})
 
+	// NOTE: `Terminal.inspect` renders a whole line and writes it through
+	// `console.log`, which does not go through `process.stdout.write` — so a
+	// Module that inspects a value as it is evaluated is the one way a byte
+	// that is not an event could reach stdout.
+	it("keeps what a Module inspected as it loaded off stdout", async () => {
+		await withFiles(
+			{
+				"Loud.es": [
+					"implementation {",
+					"\tconstant seen = Terminal.inspect(42)",
+					"}",
+					"",
+					"tests {",
+					'\ttest "holds" {',
+					"\t\texpect seen::is(42)",
+					"\t}",
+					"}",
+					"",
+				].join("\n"),
+			},
+			async (directory) => {
+				let { code, err, out } = await runTests(directory, ["--json"])
+				let lines = out.split("\n").filter((line) => line !== "")
+
+				expect(
+					lines.every((line) => line.startsWith('{"schema":1,')),
+				).toBe(true)
+				expect(err).toContain("42")
+				expect(code).toBe(EXIT_SUCCESS)
+			},
+		)
+	})
+
 	it("carries a failure's recorded values and the difference", async () => {
 		await withFiles({ "Wrong.tests.es": failing }, async (directory) => {
 			let { out } = await runTests(directory, ["--json"])

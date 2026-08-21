@@ -2,6 +2,7 @@ import { copyFile, link, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import * as path from "node:path"
 import { pathToFileURL } from "node:url"
+import { format } from "node:util"
 
 import { displayPath } from "@essence-lang/compiler/diagnostics/render"
 import {
@@ -382,8 +383,19 @@ export function reportUnknownTags(
 // arrives and still streams. What a test itself writes never comes through
 // here: the runtime captures it against the test and the report shows it with
 // the failure.
+//
+// NOTE: `console.log` is pointed at stderr as well, and that is not belt and
+// braces. `Terminal.inspect` renders a whole line and writes it through
+// `console.log`, which under Bun goes to the file descriptor DIRECTLY and never
+// through `process.stdout.write` — so a Module that inspects a value at its top
+// level would put its rendering on stdout ahead of the first event, and a
+// consumer parsing the stream a line at a time would die on it. It is written
+// through `process.stderr.write` rather than through `console.error` so that
+// whatever holds the two streams — a spec, a parent process — sees it where it
+// sees everything else.
 export function redirectStdout(): () => void {
 	let original = process.stdout.write
+	let log = console.log
 
 	process.stdout.write = ((
 		chunk: string | Uint8Array,
@@ -396,8 +408,13 @@ export function redirectStdout(): () => void {
 			) => boolean
 		)(chunk, ...rest)) as typeof process.stdout.write
 
+	console.log = ((...values: Array<unknown>) => {
+		process.stderr.write(`${format(...values)}\n`)
+	}) as typeof console.log
+
 	return () => {
 		process.stdout.write = original
+		console.log = log
 	}
 }
 
