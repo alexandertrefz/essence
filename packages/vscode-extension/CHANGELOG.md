@@ -1,7 +1,42 @@
 # Change Log
 
-## [Unreleased]
+## [0.5.0]
 
+Tests, live. Essence has a `tests { … }` section and an `essence test`
+runner; this release is the editor half of it — the workspace's tests
+running as you type, and everything they found where you are looking.
+
+- The Testing view lists every test the workspace holds, off the compiled
+  Module's own manifest rather than off a run: a test that has never run is
+  listed, on the line it was written on, and a file that stops compiling
+  mid-keystroke goes on saying what it last said instead of emptying.
+  Identities are structural, so moving a test up a file keeps its result and
+  its place in the tree.
+- Run from the ▶, the Run lens, Refresh, one profile per tag any test
+  carries, or **Essence: Re-run Failed Tests** — all of them ask the Language
+  Server, which owns the session, rather than starting a runner beside it. A
+  failure arrives as the assertion, every sub-expression the compiler
+  recorded, and — for an `is` — the two sides as a diff VS Code draws.
+  Whatever a test printed is under the test that printed it.
+- The gutter marks the lines of every test by what it last did, and the line
+  of a failed `expect` carries a dot of its own with the whole explanation on
+  hover. The values a run recorded stay the Language Server's inlay hints:
+  one answer to one question, so this extension draws no ghost text beside
+  them.
+- A failed `expect` is a Diagnostic with code `test-failed`, so it is in
+  Problems with the labels `essence test` prints. Two tag Diagnostics no
+  single compile could state come with it: `similar-tags` on the rarer of two
+  tags one typo apart, with a rename, and `lonely-tag` where exactly one test
+  carries one.
+- `essence.tests.enabled` turns the automatic runs off while leaving every
+  gesture working, `essence.tests.skipTags` names tags no run selects, and
+  `essence.tests.debounce` is how long a burst of edits may be before it costs
+  a run. **Essence: Show Test Session Output** shows what each cycle covered
+  and found.
+- Debugging one test is not wired up yet — the debug adapter has to compile a
+  tests section and select by id — so the Debug profile and the Debug lens say
+  so, and hand over the `essence test --filter` command that runs the
+  selection.
 - The Language Server no longer depends on PATH. The bundled server — and a
   configured `.js` bundle — is forked on the Node VS Code itself ships; it
   was previously spawned as `node`, which failed whenever VS Code had

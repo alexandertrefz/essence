@@ -2,7 +2,7 @@
 	"name": "essence-language",
 	"displayName": "Essence",
 	"description": "Language support for Essence: syntax highlighting, diagnostics, navigation, completion and debugging.",
-	"version": "0.4.0",
+	"version": "0.5.0",
 	"type": "module",
 	"publisher": "essence",
 	"license": "MIT",
