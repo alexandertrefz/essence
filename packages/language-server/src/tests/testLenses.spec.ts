@@ -96,6 +96,105 @@ describe("Test lenses", () => {
 		expect(lensesOf('tests {\n\tsuite "empty" {\n\t}\n}\n')).toEqual([])
 	})
 
+	// NOTE: A row of a table test is a test in its own right and carries its
+	// row number, so the lens above the whole table names every one of them.
+	it("names one id per row of a table test", () => {
+		let lenses = lensesOf(
+			[
+				"tests {",
+				'\ttest "{n} doubled" across [1, 2, 3] (n: Integer) {',
+				"\t\texpect true",
+				"\t}",
+				"}",
+				"",
+			].join("\n"),
+		)
+
+		expect(lenses[0]?.arguments.ids).toEqual([
+			testIdentityKey(
+				{
+					modulePath: "/Season.tests.es",
+					suitePath: [],
+					name: "{n} doubled",
+				},
+				0,
+			),
+			testIdentityKey(
+				{
+					modulePath: "/Season.tests.es",
+					suitePath: [],
+					name: "{n} doubled",
+				},
+				1,
+			),
+			testIdentityKey(
+				{
+					modulePath: "/Season.tests.es",
+					suitePath: [],
+					name: "{n} doubled",
+				},
+				2,
+			),
+		])
+	})
+
+	it("offers Accept snapshot only where a run left one pending", () => {
+		let source = [
+			"tests {",
+			'	test "renders" {',
+			"		expect true",
+			"	}",
+			"",
+			'	test "settles" {',
+			"		expect true",
+			"	}",
+			"}",
+			"",
+		].join("\n")
+		let pending = new Set([
+			testIdentityKey({
+				modulePath: "/Season.tests.es",
+				suitePath: [],
+				name: "renders",
+			}),
+		])
+		let lenses = findTestLenses(
+			parseDocument(source, "/Season.tests.es").program,
+			"/Season.tests.es",
+			pending,
+		)
+
+		expect(
+			lenses
+				.filter((lens) => lens.title === "Accept snapshot")
+				.map((lens) => lens.arguments.title),
+		).toEqual(["renders"])
+		expect(
+			lenses.find((lens) => lens.title === "Accept snapshot")?.command,
+		).toBe("essence.test.acceptSnapshot")
+	})
+
+	it("offers a suite an Accept snapshot when a test under it has one", () => {
+		let pending = new Set([
+			testIdentityKey({
+				modulePath: "/Season.tests.es",
+				suitePath: ["the season"],
+				name: "counts a win",
+			}),
+		])
+		let lenses = findTestLenses(
+			parseDocument(nested, "/Season.tests.es").program,
+			"/Season.tests.es",
+			pending,
+		)
+
+		expect(
+			lenses
+				.filter((lens) => lens.title === "Accept snapshot")
+				.map((lens) => lens.arguments.title),
+		).toEqual(["counts a win", "the season"])
+	})
+
 	it("offers nothing for a file with no tests section", () => {
 		expect(lensesOf("implementation {\n\tconstant x = 1\n}\n")).toEqual([])
 	})

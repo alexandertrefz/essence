@@ -1,3 +1,5 @@
+import { pathToFileURL } from "node:url"
+
 import { isStdlibDocument } from "@essence-lang/compiler/documents"
 import { loadStdlib } from "@essence-lang/compiler/enricher/stdlib"
 import type { common, parser } from "@essence-lang/interfaces"
@@ -332,7 +334,54 @@ export function startServer(options: { connection?: Connection } = {}) {
 				`essence: the test session could not run ${filePath}: ${problem}`,
 			)
 		},
+		// NOTE: An accepted snapshot is applied as an EDIT rather than written
+		// to disk: the run compiled whatever the buffer says, and a buffer with
+		// unsaved work in it would be overwritten by a write. The whole
+		// document is replaced, because what the Formatter answered with is a
+		// whole file.
+		onRewrites: (rewrites) => {
+			for (let rewrite of rewrites) {
+				let uri =
+					openPaths.get(rewrite.module) ??
+					pathToFileURL(rewrite.module).href
+
+				connection.workspace
+					.applyEdit({
+						label: "Accept snapshot",
+						edit: {
+							changes: {
+								[uri]: [
+									{
+										range: wholeDocument(uri),
+										newText: rewrite.text,
+									},
+								],
+							},
+						},
+					})
+					.catch(() => {})
+			}
+		},
 	})
+
+	// NOTE: A range that covers whatever the document holds. An open one is
+	// measured; one nothing has opened is replaced from its start to a line
+	// number nothing can exceed, which is what the protocol says a client must
+	// clamp.
+	function wholeDocument(uri: string): {
+		start: { line: number; character: number }
+		end: { line: number; character: number }
+	} {
+		let document = documents.get(uri)
+
+		return {
+			start: { line: 0, character: 0 },
+			end:
+				document === undefined
+					? { line: Number.MAX_SAFE_INTEGER, character: 0 }
+					: document.positionAt(document.getText().length),
+		}
+	}
 
 	// NOTE: Every file of the workspace that WROTE a `tests { … }` block, read
 	// off the parses the Workspace already holds. A file is an entry because of
@@ -528,9 +577,12 @@ export function startServer(options: { connection?: Connection } = {}) {
 			return null
 		}
 
+		let filePath = documentFilePath(params.textDocument.uri)
+
 		return findTestLenses(
 			program,
-			documentFilePath(params.textDocument.uri),
+			filePath,
+			pendingSnapshots(filePath),
 		).map((lens) => ({
 			range: toLspRange(lens.position),
 			command: {
@@ -541,13 +593,37 @@ export function startServer(options: { connection?: Connection } = {}) {
 		}))
 	})
 
+	// NOTE: The tests of this file whose last run left a snapshot to accept —
+	// one nothing had recorded, or one that differs from what was stored. It is
+	// read off the session's own records, so a file nothing has run yet offers
+	// no such lens, which is right: there is nothing to accept.
+	function pendingSnapshots(filePath: string): ReadonlySet<string> {
+		let pending = new Set<string>()
+
+		for (let record of session.recordsFor(filePath)) {
+			if (
+				record.snapshots.some(
+					(snapshot) => snapshot.status !== "matched",
+				)
+			) {
+				pending.add(record.id)
+			}
+		}
+
+		return pending
+	}
+
 	// NOTE: What a lens's command ends up sending, and what a Test Explorer's
 	// run button sends. It answers with the run number the notifications will
 	// carry, so a client can tie what it asked for to what arrives.
 	connection.onRequest(
 		RUN_TESTS_REQUEST,
 		(params: RunTestsParams): RunTestsResult => ({
-			run: session.run({ ids: params.ids, files: params.files }),
+			run: session.run({
+				ids: params.ids,
+				files: params.files,
+				update: params.update,
+			}),
 		}),
 	)
 

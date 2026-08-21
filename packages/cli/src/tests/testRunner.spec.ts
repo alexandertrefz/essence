@@ -1237,6 +1237,116 @@ describe("essence test --coverage", () => {
 
 // #endregion
 
+describe("essence test — snapshots", () => {
+	const snapshots = [
+		"implementation {",
+		"\tfunction greeting(_ name: String) -> String {",
+		'\t\t<- "Hello, {name}"',
+		"\t}",
+		"}",
+		"",
+		"tests {",
+		'\ttest "renders inline" {',
+		'\t\texpect greeting("Lions") matches snapshot',
+		"\t}",
+		"",
+		'\ttest "renders a stored one" {',
+		'\t\texpect greeting("Tigers") matches snapshot from "tigers"',
+		"\t}",
+		"}",
+		"",
+	].join("\n")
+
+	it("records what the first run produced, and passes", async () => {
+		await withFiles({ "Greeting.es": snapshots }, async (directory) => {
+			let { code, out } = await runTests(directory)
+
+			expect(code).toBe(EXIT_SUCCESS)
+			expect(out).toContain("2 passed")
+			expect(out).toContain("2 snapshots written")
+
+			expect(
+				readFileSync(path.join(directory, "Greeting.es"), "utf8"),
+			).toContain('matches snapshot "Hello, Lions"')
+
+			expect(
+				readFileSync(
+					path.join(directory, "__snapshots__", "Greeting.es.snap"),
+					"utf8",
+				),
+			).toContain("Hello, Tigers")
+		})
+	})
+
+	it("matches what it recorded on the run after", async () => {
+		await withFiles({ "Greeting.es": snapshots }, async (directory) => {
+			await runTests(directory)
+
+			let { code, out } = await runTests(directory)
+
+			expect(code).toBe(EXIT_SUCCESS)
+			expect(out).toContain("2 passed")
+			expect(out).not.toContain("snapshot written")
+		})
+	})
+
+	it("fails on a difference and says how to accept it", async () => {
+		await withFiles(
+			{
+				"Greeting.es": snapshots.replace(
+					"matches snapshot\n",
+					'matches snapshot "Hello, Foxes"\n',
+				),
+			},
+			async (directory) => {
+				let { code, err } = await runTests(directory)
+
+				expect(code).toBe(EXIT_FAILURE)
+				expect(err).toContain("test-failed")
+				expect(err).toContain("- Hello, Foxes")
+				expect(err).toContain("+ Hello, Lions")
+				expect(err).toContain("essence test --update")
+			},
+		)
+	})
+
+	it("records a difference when it is asked to", async () => {
+		await withFiles(
+			{
+				"Greeting.es": snapshots.replace(
+					"matches snapshot\n",
+					'matches snapshot "Hello, Foxes"\n',
+				),
+			},
+			async (directory) => {
+				let { code } = await runTests(directory, ["--update"])
+
+				expect(code).toBe(EXIT_SUCCESS)
+				expect(
+					readFileSync(path.join(directory, "Greeting.es"), "utf8"),
+				).toContain('matches snapshot "Hello, Lions"')
+			},
+		)
+	})
+
+	// NOTE: A stored entry no run visited is KEPT — a run narrowed by a filter
+	// has not asked about every test, and deleting what it did not ask about
+	// would lose a snapshot for the price of a `-f`.
+	it("keeps a stored entry a narrowed run never visited", async () => {
+		await withFiles({ "Greeting.es": snapshots }, async (directory) => {
+			await runTests(directory)
+			await runTests(directory, ["--filter", "inline", "--update"])
+
+			expect(
+				readFileSync(
+					path.join(directory, "__snapshots__", "Greeting.es.snap"),
+					"utf8",
+				),
+			).toContain("Hello, Tigers")
+		})
+	})
+})
+
 describe("the test command's own documentation", () => {
 	it("says where a project writes the tags it skips", () => {
 		expect(testCommand.description.join(" ")).toContain(

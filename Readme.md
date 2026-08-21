@@ -120,7 +120,12 @@ packages/cli/bin/essence test -f leader         # only the tests whose name says
 packages/cli/bin/essence test --skip-tag slow   # leave a tag out; --tag runs only that tag
 packages/cli/bin/essence test --watch           # stay up, re-run what each save reaches
 packages/cli/bin/essence test --coverage        # and report what the tests reached
+packages/cli/bin/essence test --update          # record every snapshot the run produced
 ```
+
+A test written `across` a List of rows runs once per row, and `matches snapshot` compares a value against one a
+run recorded — inline in the source, or in `__snapshots__/<File>.es.snap` beside it where the snapshot was
+given a name.
 
 `--watch` stays running and re-runs only the tests a change reached — the entries whose module graph holds the
 file that was saved — then clears the screen and reprints the whole picture, so what is on screen is the state

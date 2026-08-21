@@ -1926,13 +1926,39 @@ function simplifyAssertion(
 	// Position is the one the written Expression had, because the Constant the
 	// Enricher put in front of the assertion carries it.
 	let point = testPoint(
-		node.matcher === null
-			? node.value.position
-			: {
+		node.matcher !== null
+			? {
 					start: node.matcher.matcherPosition.start,
 					end: node.value.position.end,
-				},
+				}
+			: node.snapshot !== null
+				? {
+						start: node.value.position.start,
+						end: node.snapshot.position.end,
+					}
+				: node.value.position,
 	)
+
+	// NOTE: A snapshot asserts nothing of its own — what it records is the
+	// value RENDERED, which the Enricher already turned into the interpolation
+	// an author could have written. The point behind it is the slot a run
+	// writes a recorded value into.
+	if (node.snapshot !== null) {
+		return {
+			nodeType: "TestAssertionStatement",
+			form,
+			point,
+			value: simplifyExpression(node.value),
+			matcher: null,
+			snapshot: {
+				name: node.snapshot.name,
+				recorded: node.snapshot.recorded,
+				slot: testPoint(node.snapshot.valuePosition),
+			},
+			comparison: null,
+			position: node.position,
+		}
+	}
 
 	if (node.matcher !== null) {
 		return {
@@ -1941,6 +1967,7 @@ function simplifyAssertion(
 			point,
 			value: simplifyExpression(node.value),
 			matcher: assertionHandler(node.matcher),
+			snapshot: null,
 			comparison: null,
 			position: node.position,
 		}
@@ -1957,6 +1984,7 @@ function simplifyAssertion(
 		point,
 		value: instrumented.value,
 		matcher: null,
+		snapshot: null,
 		comparison: instrumented.comparison,
 		position: node.position,
 	}

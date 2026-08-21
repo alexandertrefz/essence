@@ -604,6 +604,24 @@ tests {
 
 Write `({ a, b }: Row)` instead, or `(row: Row)` and read `row.a`.
 
+### `snapshot-not-printable`
+
+`matches snapshot` records what a value LOOKS like, which is what
+`Printable::toString` answers — so a value with no such answer has nothing to
+record. An `Optional`, a bare structural Union and a `choice` that declares no
+`toString` are the three that reach this:
+
+```essence
+tests {
+	test "renders" {
+		expect table::item(at 0) matches snapshot
+	}
+}
+```
+
+Take it apart first — `require #Value(standing) = row` — and snapshot what is
+inside, or render it yourself and snapshot the String.
+
 ## Names
 
 ### `duplicate-variable`

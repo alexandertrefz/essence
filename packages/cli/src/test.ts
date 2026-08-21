@@ -5,8 +5,14 @@ import { pathToFileURL } from "node:url"
 
 import { displayPath } from "@essence-lang/compiler/diagnostics/render"
 import {
+	collectSnapshots,
 	coverageReportFileName,
 	hasCoverage,
+	noWrites,
+	readSnapshots,
+	type SnapshotStore,
+	type SnapshotWrites,
+	writeSnapshots,
 } from "@essence-lang/compiler/testing"
 import {
 	type entryPoints,
@@ -71,6 +77,13 @@ export type LoadedBundle = {
 
 // NOTE: A bundle and the tests it is the one to run.
 export type LoadedSuite = LoadedBundle & { registry: Registry }
+
+// NOTE: What a run knows about snapshots before it starts: the stored entries
+// of every Module in it, and whether one that differs is to be recorded.
+export type SnapshotOptions = {
+	stored?: Record<string, SnapshotStore>
+	update?: boolean
+}
 
 export type TestFilters = {
 	filter: string | null
@@ -232,6 +245,10 @@ export function runSuites(
 	// and answers with nothing — which is why the flag is passed through rather
 	// than guessed at from the events.
 	coverage = false,
+	// NOTE: What every `matches snapshot from "name"` of the run compares
+	// against, keyed by Module — read off disk here because a bundle reads
+	// nothing — and whether a difference is RECORDED rather than reported.
+	snapshots: SnapshotOptions = {},
 ): { planned: number; focused: boolean } {
 	let selected = all.map((suite) =>
 		suite.tests.select(suite.registry, filters),
@@ -273,6 +290,8 @@ export function runSuites(
 			},
 			filters: runFilters,
 			coverage,
+			snapshots: snapshots.stored,
+			update: snapshots.update,
 		})
 	}
 
@@ -374,11 +393,13 @@ export function printReport(
 	run: TestRun,
 	sources: Map<string, string>,
 	coverage: CoverageSummary = emptyCoverage,
+	snapshots: SnapshotWrites = noWrites,
 ): void {
 	let { failures, summary, tree } = renderTestReport(
 		run,
 		context.report,
 		(module) => (module === null ? null : (sources.get(module) ?? null)),
+		snapshots.recorded,
 	)
 
 	if (!context.options.quiet && tree !== "") {
@@ -552,6 +573,9 @@ export async function runTest(
 		}
 	}
 
+	// NOTE: Read before the run and handed over whole: a stored snapshot is a
+	// file, and the runtime is a bundle that reads none.
+	let stored = await readSnapshots(sources.keys())
 	let staging = await mkdtemp(path.join(tmpdir(), "essence-test-"))
 	let restore = redirectStdout()
 	let suites: Array<LoadedSuite>
@@ -581,6 +605,7 @@ export async function runTest(
 			filters,
 			emit,
 			context.options.coverage,
+			{ stored, update: context.options.update },
 		)
 		// NOTE: The stream is folded up ONCE, here, and the `run-end` this
 		// writes carries the counts it found. Re-reading the stream afterwards
@@ -617,9 +642,29 @@ export async function runTest(
 	let coverage = context.options.coverage
 		? collectCoverage(events)
 		: emptyCoverage
+	// NOTE: Written before the report, so that what the report says was
+	// recorded is what is on disk by the time a reader looks.
+	let written = await writeSnapshots({
+		snapshots: collectSnapshots(events),
+		sources,
+		stored,
+		// NOTE: Reached through a dynamic import, like every other delegate the
+		// command line has: `essence build` must not pay for the Formatter,
+		// and a run with no inline snapshot in it does not either.
+		inline: (await import("@essence-lang/formatter/snapshots"))
+			.writeInlineSnapshots,
+	})
+
+	for (let problem of written.problems) {
+		context.terminal.err(
+			`  ${context.palette.warning(
+				context.theme.symbols.warning,
+			)} ${context.palette.muted(problem)}`,
+		)
+	}
 
 	if (!context.options.json) {
-		printReport(context, run, sources, coverage)
+		printReport(context, run, sources, coverage, written)
 	}
 
 	await writeCoverageReport(context, coverage)

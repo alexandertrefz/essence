@@ -2726,8 +2726,11 @@ function checkNamespaceIsDeclared(
 function validateAssertion(
 	node: common.typed.ExpectStatementNode | common.typed.RequireStatementNode,
 ): common.typed.ImplementationNode {
+	// NOTE: A snapshot asserts nothing of its own — what it compares is the
+	// value RENDERED, which the Enricher already demanded be Printable.
 	if (
 		node.matcher === null &&
+		node.snapshot === null &&
 		node.value.type.type !== "Boolean" &&
 		node.value.type.type !== "Error"
 	) {

@@ -508,6 +508,27 @@ export interface ExpectStatementNode {
 	nodeType: "ExpectStatement"
 	value: ExpressionNode
 	matcher: AssertionMatcherNode | null
+	snapshot: SnapshotNode | null
+	position: Position
+}
+
+// NOTE: What `matches snapshot` records. The assertion's own `value` is the
+// asserted value RENDERED — the interpolation `"{value}"`, which is
+// `Printable::toString` and the Protocol the design names, so a Type that says
+// what it looks like is recorded in that form rather than as a structural dump
+// of its members.
+//
+// `name` is written for a STORED snapshot, kept in `__snapshots__/<File>.es.snap`
+// beside the file; an inline one carries its recorded text in the source, and
+// `recorded` is null until the first run writes one.
+export interface SnapshotNode {
+	nodeType: "Snapshot"
+	name: string | null
+	recorded: string | null
+	// NOTE: The span `essence test --update` and the Editor's "Accept snapshot"
+	// write into — a recorded value where one stands, the `snapshot` Keyword
+	// where none does.
+	valuePosition: Position
 	position: Position
 }
 
@@ -525,6 +546,7 @@ export interface RequireStatementNode {
 	nodeType: "RequireStatement"
 	value: ExpressionNode
 	matcher: AssertionMatcherNode | null
+	snapshot: SnapshotNode | null
 	position: Position
 }
 

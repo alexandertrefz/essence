@@ -4,6 +4,8 @@ import type {
 	DiffLine,
 	FailureEvent,
 	ProbedValue,
+	SnapshotStatus,
+	Span,
 	TestEvent,
 } from "@essence-lang/runtime/Testing"
 
@@ -51,6 +53,50 @@ export type TestRecord = {
 	// says what held, and a reader looking at a terminal is looking at the
 	// source anyway.
 	probes: Array<ProbedValue>
+	// NOTE: What the test's `matches snapshot` assertions recorded — a new one
+	// to be written, a stored one that still matches, or the difference that
+	// failed. A reporter shows the counts, a rewrite acts on them, and an
+	// Editor offers "Accept snapshot" where one is pending.
+	snapshots: Array<SnapshotRecord>
+}
+
+// NOTE: One `matches snapshot` as the run reported it. `name` is null for an
+// inline snapshot, whose `span` is the slot of the source a recorded value
+// stands in — that is what a rewrite replaces. A named one belongs to
+// `module`'s own `__snapshots__` companion.
+export type SnapshotRecord = {
+	id: string
+	module: string | null
+	name: string | null
+	status: SnapshotStatus
+	span: Span | null
+	text: string
+	recorded: string | null
+}
+
+// NOTE: Every snapshot a run recorded, in the order the tests ran. The command
+// line writes the new ones down and the Language Server offers them; both read
+// the same events, so what one of them writes is what the other would have.
+export function collectSnapshots(
+	events: Array<TestEvent>,
+): Array<SnapshotRecord> {
+	let snapshots: Array<SnapshotRecord> = []
+
+	for (let event of events) {
+		if (event.kind === "snapshot") {
+			snapshots.push({
+				id: event.id,
+				module: event.module,
+				name: event.name,
+				status: event.status,
+				span: event.span,
+				text: event.text,
+				recorded: event.recorded,
+			})
+		}
+	}
+
+	return snapshots
 }
 
 export type TestCounts = {
@@ -113,6 +159,7 @@ export function collectTestRun(events: Array<TestEvent>): TestRun {
 				error: null,
 				output: [],
 				probes: [],
+				snapshots: [],
 			}
 			byId.set(id, existing)
 			tests.push(existing)
@@ -180,6 +227,17 @@ export function collectTestRun(events: Array<TestEvent>): TestRun {
 					point: event.point,
 					span: event.span,
 					value: event.value,
+				})
+				break
+			case "snapshot":
+				byId.get(event.id)?.snapshots.push({
+					id: event.id,
+					module: event.module,
+					name: event.name,
+					status: event.status,
+					span: event.span,
+					text: event.text,
+					recorded: event.recorded,
 				})
 				break
 			case "run-end":
@@ -261,6 +319,19 @@ function comparisonNotes(failure: FailureEvent): Array<string> {
 	}
 
 	let notes: Array<string> = []
+
+	// NOTE: A snapshot's two sides are TEXT, and often several lines of it —
+	// what says how they differ is the difference itself, whatever its length,
+	// and never the two of them written out side by side.
+	if (comparison.kind === "snapshot") {
+		return [
+			comparison.left === null
+				? "nothing was recorded for this snapshot"
+				: "the recorded snapshot and this run differ",
+			diffNote(comparison.diff),
+			"Accept this run with `essence test --update`.",
+		]
+	}
 
 	if (comparison.left !== null && comparison.right !== null) {
 		notes.push(
@@ -404,3 +475,18 @@ export {
 	toCoverageJson,
 	toLcov,
 } from "./coverageReports"
+export {
+	type InlineUpdate,
+	type InlineWrite,
+	type InlineWriter,
+	noWrites,
+	parseSnapshotFile,
+	printSnapshotFile,
+	readSnapshots,
+	SNAPSHOT_DIRECTORY,
+	type SnapshotStore,
+	type SnapshotWrites,
+	snapshotFileOf,
+	type SourceRewrite,
+	writeSnapshots,
+} from "./snapshots"

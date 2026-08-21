@@ -2966,11 +2966,12 @@ function assertionNode(
 	nodeType: "ExpectStatement" | "RequireStatement",
 	value: common.typed.ExpressionNode,
 	matcher: common.typed.AssertionMatcherNode | null,
+	snapshot: common.typed.SnapshotNode | null,
 	position: common.Position,
 ): common.typed.ImplementationNode {
 	return nodeType === "ExpectStatement"
-		? { nodeType, value, matcher, position }
-		: { nodeType, value, matcher, position }
+		? { nodeType, value, matcher, snapshot, position }
+		: { nodeType, value, matcher, snapshot, position }
 }
 
 // NOTE: `across [ … ] (row: Row)` — the rows a table test runs for, and the one
@@ -3108,6 +3109,69 @@ function enrichTableRows(
 	return []
 }
 
+// NOTE: What a snapshot RECORDS: the asserted value rendered through
+// `Printable`, which is the Protocol the design names — so a Type that says
+// what it looks like is recorded in that form rather than in a structural dump
+// of its members. It is built as the interpolation an author could have written
+// (`"{value}"`), which is the one lowering of `toString` the whole Compiler
+// already has, witness and all.
+function enrichSnapshotValue(
+	node: parser.ExpressionNode,
+	scope: enricher.Scope,
+): common.typed.ExpressionNode {
+	let expression = enrichExpression(node, scope)
+	let solved = solveConformance(
+		expression.type,
+		"Printable",
+		scope,
+		expression.position,
+	)
+
+	if (!solved.ok && solved.chain.length > 0) {
+		reportError(
+			`${describeType(expression.type)} can not be recorded as a snapshot`,
+			expression.position,
+			{
+				code: "snapshot-not-printable",
+				labels: [
+					primary(
+						expression.position,
+						`this is ${describeType(expression.type)}, which is not Printable`,
+					),
+				],
+				notes: [
+					"A snapshot records what a value LOOKS like, which is what 'Printable::toString' answers — so a value with no such answer has nothing to record.",
+					...solved.chain,
+				],
+				helps: [
+					"Render it yourself and snapshot the String, or take it apart and snapshot each Case.",
+				],
+			},
+		)
+	}
+
+	return {
+		nodeType: "InterpolatedStringValue",
+		segments: [
+			{ kind: "text", value: "" },
+			{
+				kind: "expression",
+				expression,
+				conformance: {
+					genericName: "$snapshot",
+					protocolName: "Printable",
+					source: solved.ok
+						? solved.source
+						: { kind: "parameter", name: "$snapshot" },
+				},
+			},
+			{ kind: "text", value: "" },
+		],
+		position: expression.position,
+		type: { type: "String" },
+	}
+}
+
 export function enrichAssertionStatement(
 	node: parser.ExpectStatementNode | parser.RequireStatementNode,
 	scope: enricher.Scope,
@@ -3116,11 +3180,36 @@ export function enrichAssertionStatement(
 	// is nothing to hold and nothing to bind. The Validator is what refuses a
 	// value that is no Boolean, where `condition-not-boolean` is refused, so
 	// that the two questions are answered in one place and read alike.
+	if (node.snapshot !== null) {
+		return [
+			assertionNode(
+				node.nodeType,
+				enrichSnapshotValue(node.value, scope),
+				null,
+				{
+					nodeType: "Snapshot",
+					name:
+						node.snapshot.name === null
+							? null
+							: node.snapshot.name.value,
+					recorded:
+						node.snapshot.value === null
+							? null
+							: node.snapshot.value.value,
+					valuePosition: node.snapshot.valuePosition,
+					position: node.snapshot.position,
+				},
+				node.position,
+			),
+		]
+	}
+
 	if (node.matcher === null) {
 		return [
 			assertionNode(
 				node.nodeType,
 				enrichExpression(node.value, scope),
+				null,
 				null,
 				node.position,
 			),
@@ -3174,6 +3263,7 @@ export function enrichAssertionStatement(
 			memberLiterals: resolved.memberLiterals,
 			memberTypes: resolved.memberTypes,
 		},
+		null,
 		node.position,
 	)
 

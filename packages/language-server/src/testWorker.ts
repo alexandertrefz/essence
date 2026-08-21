@@ -8,6 +8,13 @@ import { compileToMemory } from "@essence-lang/compiler/embed"
 import type { ModuleHost } from "@essence-lang/compiler/modules"
 import { defaultOptimiserOptions } from "@essence-lang/compiler/optimiser"
 import {
+	collectSnapshots,
+	readSnapshots,
+	type SourceRewrite,
+	writeSnapshots,
+} from "@essence-lang/compiler/testing"
+import { writeInlineSnapshots } from "@essence-lang/formatter/snapshots"
+import {
 	type entryPoints,
 	pathOf,
 	type Registry,
@@ -124,6 +131,7 @@ async function runEntry(
 		focused: boolean,
 		compiled: boolean,
 		problem: string | null,
+		rewrites: Array<SourceRewrite> = [],
 	): TestWorkerResponse => ({
 		kind: "entry",
 		run: request.run,
@@ -133,6 +141,7 @@ async function runEntry(
 		focused,
 		compiled,
 		problem,
+		rewrites,
 	})
 	let bundle: string
 
@@ -205,6 +214,13 @@ async function runEntry(
 			...(request.ids.length > 0 ? { ids: request.ids } : {}),
 		}
 		let events: Array<TestEvent> = []
+		// NOTE: The stored entries of every Module this bundle holds, read off
+		// disk here — the Worker is the only end of the session with a
+		// filesystem, and the bundle it drives has none at all.
+		let modules = registry.modules.flatMap((each) =>
+			each.module === null ? [] : [each.module],
+		)
+		let stored = await readSnapshots(modules)
 
 		tests.run(registry, {
 			// NOTE: The bundle's own bookends are dropped. One cycle may cover
@@ -222,18 +238,67 @@ async function runEntry(
 			// NOTE: A bundle with no counters in it answers with nothing, so
 			// asking costs a run that was not instrumented exactly nothing.
 			coverage: request.coverage,
+			snapshots: stored,
+			update: request.update,
 		})
+
+		// NOTE: Only where the run was ASKED to record. Every other cycle
+		// leaves the disk alone: a session runs on every keystroke, and a
+		// snapshot written by one would be a file changing under a reader who
+		// was only typing.
+		let written = request.update
+			? await writeSnapshots({
+					snapshots: collectSnapshots(events),
+					sources: sourcesOf(request.overlays, modules),
+					stored,
+					inline: writeInlineSnapshots,
+					// NOTE: The companion files are written here; a SOURCE
+					// comes back as an edit, because the buffer that produced
+					// it may never have been saved.
+					writeSources: false,
+				})
+			: null
 
 		return answer(
 			events,
 			sitesOf(registry, entry),
 			tests.select(registry, request.filters).focused,
 			true,
-			null,
+			written === null || written.problems.length === 0
+				? null
+				: written.problems.join("; "),
+			written?.sources ?? [],
 		)
 	} catch (error) {
 		return answer([], [], false, true, rendered(error))
 	}
+}
+
+// NOTE: What each Module of the run SAYS, which is the unsaved buffer where
+// there is one and the file otherwise. A rewrite is spliced into the text the
+// run was compiled from, and compiling one text while rewriting another is how
+// a recorded value lands on the wrong line.
+function sourcesOf(
+	overlays: Record<string, string>,
+	modules: Array<string>,
+): Map<string, string> {
+	let sources = new Map<string, string>()
+
+	for (let module of modules) {
+		let overlay = overlays[module]
+
+		if (overlay !== undefined) {
+			sources.set(module, overlay)
+
+			continue
+		}
+
+		try {
+			sources.set(module, readFileSync(module, "utf8"))
+		} catch {}
+	}
+
+	return sources
 }
 
 function send(message: TestWorkerResponse): void {

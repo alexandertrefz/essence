@@ -1230,6 +1230,21 @@ export type StatementNode =
 // Matcher was written — a Matcher's test is a chain of `&&`s, not an Essence
 // value — and an Essence Boolean otherwise, which the Rewriter unwraps. The
 // `matcher` says which of the two it is looking at.
+// NOTE: What `matches snapshot` compares against, once the value itself is an
+// ordinary Expression of the assertion — the rendered String. `name` is written
+// for a STORED snapshot, kept in the file's `__snapshots__` companion; an inline
+// one carries its text in the source, and `recorded` is null until a run has
+// written one.
+//
+// `slot` is a point of the Module's own span table, standing where a recorded
+// value stands or would stand — which is what lets `essence test --update` and
+// the Editor's "Accept snapshot" write one back without the Compiler.
+export type TestSnapshot = {
+	name: string | null
+	recorded: string | null
+	slot: number
+}
+
 export interface TestAssertionStatementNode {
 	nodeType: "TestAssertionStatement"
 	form: "expect" | "require"
@@ -1242,6 +1257,7 @@ export interface TestAssertionStatementNode {
 	// assertion has no arm to fall through to, and what a Guard would say is
 	// another `expect` on the next line.
 	matcher: MatchHandler | null
+	snapshot: TestSnapshot | null
 	comparison: TestComparison | null
 	position?: Position
 }

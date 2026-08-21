@@ -1,4 +1,7 @@
-import type { CoverageSummary } from "@essence-lang/compiler/testing"
+import type {
+	CoverageSummary,
+	SourceRewrite,
+} from "@essence-lang/compiler/testing"
 import type { Range, TestEvent } from "@essence-lang/runtime/Testing"
 
 // NOTE: What the Language Server tells an Editor about a test run, and what it
@@ -170,6 +173,13 @@ export type RunTestsParams = {
 	// a Test Explorer's Run and Refresh buttons mean, and a client that had to
 	// name the files instead could only name the ones it had already been told
 	// about — never the file whose first test was written a moment ago.
+	//
+	// NOTE: `update` is what the "Accept snapshot" Code Lens sends: every
+	// snapshot this run produces is RECORDED, whether it differs from what was
+	// stored or was never stored at all. A `__snapshots__` companion is written
+	// where it stands; a source is answered as an edit, because the buffer the
+	// run compiled may never have been saved.
+	update?: boolean
 }
 
 export type RunTestsResult = {
@@ -217,6 +227,11 @@ export type TestWorkerRequest =
 			// NOTE: Run only these tests, by structural id. Empty runs whatever
 			// the filters select.
 			ids: Array<string>
+			// NOTE: Whether every snapshot this run produces is RECORDED —
+			// what the Editor's "Accept snapshot" asks for. A source it would
+			// rewrite comes back as `rewrites`; the companion files are
+			// written where the Worker stands.
+			update: boolean
 			// NOTE: Whether to compile with the instrumentation pass on and
 			// count what the run reaches. It changes the emitted bytes, so a
 			// session that turns it on compiles bundles of its own rather than
@@ -245,6 +260,11 @@ export type TestWorkerResponse =
 			// compiled or its bundle would not load. Diagnostics are not sent:
 			// the Server's own analysis publishes those, from the same buffers.
 			problem: string | null
+			// NOTE: The sources an accepted snapshot would rewrite, and what
+			// each would become. Empty unless the run was asked to record —
+			// the Server turns each into a workspace edit, so that an unsaved
+			// buffer is edited rather than written round.
+			rewrites: Array<SourceRewrite>
 	  }
 	| {
 			kind: "done"

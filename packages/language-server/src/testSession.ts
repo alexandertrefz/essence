@@ -8,6 +8,7 @@ import {
 	type CoverageSummary,
 	emptyCoverage,
 	mergeCoverage,
+	type SourceRewrite,
 	type TestRecord,
 	testFailureDiagnostic,
 } from "@essence-lang/compiler/testing"
@@ -59,6 +60,10 @@ export type TestSessionOptions = {
 	// of the same buffers — it is the session saying why it has nothing to
 	// report, which otherwise looks exactly like a file with no tests in it.
 	onProblem?: (filePath: string, problem: string) => void
+	// NOTE: The sources an accepted snapshot rewrote, and what each should
+	// become. The Server turns them into a workspace edit rather than writing
+	// them, because the buffer the run compiled may never have been saved.
+	onRewrites?: (rewrites: Array<SourceRewrite>) => void
 	// NOTE: Overridable so a spec can drive the Worker it wants — the real one
 	// is resolved beside this file, or beside the bundled Server.
 	workerPath?: string
@@ -75,7 +80,11 @@ export type TestSession = {
 	runAll(reason: TestRunNotification["reason"]): void
 	// NOTE: What `essence/runTests` asks for. Answers with the run number the
 	// notifications will carry, or null where there was nothing to run.
-	run(request: { ids?: Array<string>; files?: Array<string> }): number | null
+	run(request: {
+		ids?: Array<string>
+		files?: Array<string>
+		update?: boolean
+	}): number | null
 	setEnabled(enabled: boolean): void
 	isEnabled(): boolean
 	// NOTE: Tags no run of this session selects. It is the client's setting
@@ -152,6 +161,9 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 		// it, and a client that draws a tree is the thing that has to remember
 		// one.
 		sites: Array<TestSite>
+		// NOTE: The sources this cycle would rewrite, where it was asked to
+		// record what it found. Empty on every other cycle.
+		rewrites: Array<SourceRewrite>
 		compiled: boolean
 	} | null = null
 
@@ -256,6 +268,8 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 				options.onProblem?.(message.entry, message.problem)
 			}
 
+			inFlight.rewrites.push(...message.rewrites)
+
 			return
 		}
 
@@ -311,6 +325,12 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 		})
 		options.onResults(run.entries)
 
+		// NOTE: After the notification, so that the Editor has already drawn
+		// what the run found by the time it is asked to apply an edit.
+		if (run.rewrites.length > 0) {
+			options.onRewrites?.(run.rewrites)
+		}
+
 		if (dirty.size > 0) {
 			arm()
 		}
@@ -320,6 +340,7 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 		entries: Array<string>,
 		reason: TestRunNotification["reason"],
 		ids: Array<string>,
+		update = false,
 	): number | null {
 		if (disposed || entries.length === 0) {
 			return null
@@ -359,6 +380,7 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 			started: Date.now(),
 			events: [],
 			sites: [],
+			rewrites: [],
 			compiled: true,
 		}
 
@@ -394,6 +416,7 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 				),
 			},
 			ids,
+			update,
 			coverage: coverageEnabled,
 		}
 
@@ -452,9 +475,11 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 		run(request: {
 			ids?: Array<string>
 			files?: Array<string>
+			update?: boolean
 		}): number | null {
 			let ids = request.ids ?? []
 			let files = request.files ?? []
+			let update = request.update ?? false
 
 			// NOTE: Asking for neither is asking for everything — which is what
 			// a Test Explorer's Run button and its Refresh send, neither of
@@ -463,7 +488,7 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 			// find a file the client has never been told about, which is every
 			// file whose first test was written since the last cycle.
 			if (ids.length === 0 && files.length === 0) {
-				return start(testFiles(), "request", [])
+				return start(testFiles(), "request", [], update)
 			}
 
 			let known = new Set(testFiles())
@@ -489,6 +514,7 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 				"request",
 				// NOTE: Files without ids run whole.
 				entries.size > 0 && ids.length === 0 ? [] : ids,
+				update,
 			)
 		},
 		setEnabled(next: boolean): void {

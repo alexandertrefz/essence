@@ -999,6 +999,80 @@ describe("Tests Section Semantics", () => {
 		})
 	})
 
+	describe("Snapshots", () => {
+		let source = `implementation {
+			function greeting(_ name: String) -> String {
+				<- "Hello, {name}"
+			}
+		}
+
+		tests {
+			test "renders" {
+				expect greeting("Lions") matches snapshot
+				expect greeting("Tigers") matches snapshot "Hello, Tigers"
+				expect greeting("Bears") matches snapshot from "bears"
+			}
+		}`
+
+		function snapshotsOf(): Array<common.typed.SnapshotNode> {
+			let body = testsOf(sectionOf(source).nodes)[0]?.body ?? []
+
+			return body.map(
+				(node) =>
+					(node as common.typed.ExpectStatementNode)
+						.snapshot as common.typed.SnapshotNode,
+			)
+		}
+
+		it("reads the three shapes apart", () => {
+			expect(
+				snapshotsOf().map((snapshot) => [
+					snapshot.name,
+					snapshot.recorded,
+				]),
+			).toEqual([
+				[null, null],
+				[null, "Hello, Tigers"],
+				["bears", null],
+			])
+		})
+
+		// NOTE: What a snapshot records is the value RENDERED, which is
+		// `Printable::toString` — built as the interpolation an author could
+		// have written, so the witness and the lowering are the ones the
+		// language already has.
+		it("records the value through Printable", () => {
+			let body = testsOf(sectionOf(source).nodes)[0]?.body ?? []
+			let asserted = (body[0] as common.typed.ExpectStatementNode).value
+
+			expect(asserted.nodeType).toBe("InterpolatedStringValue")
+			expect(asserted.type).toEqual({ type: "String" })
+		})
+
+		it("asks nothing about Booleans", () => {
+			expect(codesOf(source)).toEqual([])
+		})
+
+		it("refuses a value with nothing to render", () => {
+			expect(
+				codesOf(
+					`implementation {
+						choice Colour {
+							Red,
+							Blue,
+						}
+					}
+
+					tests {
+						test "renders" {
+							expect Colour#Red matches snapshot
+						}
+					}`,
+				),
+			).toEqual(["snapshot-not-printable"])
+		})
+	})
+
 	describe("The compile mode", () => {
 		let source = `implementation {
 			constant shipped = 1

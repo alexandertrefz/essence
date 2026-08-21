@@ -35,12 +35,63 @@ function formatOnce(source: string, documentPath?: string): string | null {
 		return null
 	}
 
+	return printProgram(program, source)
+}
+
+// NOTE: The Printer over a tree the caller holds rather than over one parsed
+// from the text — which is what writing a recorded snapshot back needs, since
+// what it changed is in the tree and not yet anywhere in the source. `source`
+// is still the text the tree came FROM: the Comments and the verbatim slices
+// the Printer reads are the ones that were written there.
+export function printProgram(program: parser.Program, source: string): string {
 	let printer = new Printer(
 		new SourceText(source),
 		new TriviaCursor(collectComments(source)),
 	)
 
 	return printDoc(printer.printProgram(program), WIDTH)
+}
+
+// NOTE: The safety gate, over a print of a tree that was DELIBERATELY changed:
+// the two ASTs are compared as they are, so whatever the caller changed has to
+// be in both, and every Comment has to have stayed where it was. It is the same
+// two checks `format` runs, exported so that a rewrite is held to them too.
+export function refuseUnsafeRewrite(
+	before: parser.Program,
+	source: string,
+	printed: string,
+	documentPath?: string,
+): Refusal | null {
+	let after = parsed(printed, documentPath)
+
+	if (after === null) {
+		return {
+			kind: "unsafe",
+			message: "The rewritten source no longer parses.",
+			diagnostics: [],
+		}
+	}
+
+	if (JSON.stringify(astOf(before)) !== JSON.stringify(astOf(after))) {
+		return {
+			kind: "unsafe",
+			message: "The rewrite would have changed what this file means.",
+			diagnostics: [],
+		}
+	}
+
+	if (
+		commentAnchors(source, sectionSpans(before)).join("\n") !==
+		commentAnchors(printed, sectionSpans(after)).join("\n")
+	) {
+		return {
+			kind: "unsafe",
+			message: "The rewrite would have moved or lost a comment.",
+			diagnostics: [],
+		}
+	}
+
+	return null
 }
 
 // NOTE: Strips every Position so that two ASTs can be compared for the only

@@ -275,6 +275,16 @@ export type Expectation = {
 	passed: boolean
 	traces: Array<Trace>
 	comparison: RecordedComparison | null
+	// NOTE: What a snapshot assertion compared, as TEXT — a snapshot is two
+	// strings by the time anything compares them, so there is no value to
+	// render and no structure to walk. Null for every other assertion.
+	snapshot: SnapshotComparison | null
+}
+
+export type SnapshotComparison = {
+	name: string | null
+	expected: string | null
+	actual: string
 }
 
 // NOTE: What the LOWERING says about an assertion whose top-level call is
@@ -291,6 +301,35 @@ export type RecordedComparison = {
 }
 
 export type OutputChunk = { stream: OutputStream; text: string }
+
+// NOTE: The STORED snapshots of one Module, keyed by the name written after
+// `matches snapshot from`. They are read off `__snapshots__/<File>.es.snap`
+// beside the source and handed to the run, because the runtime is a bundle: it
+// may be running in a browser, and nothing in it reads a file.
+export type SnapshotStore = Record<string, string>
+
+// NOTE: What `matches snapshot` compares against, as the emitted call hands it
+// over. `slot` is the point of the Module's span table where a recorded value
+// stands, or would stand — what a run writes one back into.
+export type SnapshotSlot = {
+	name: string | null
+	recorded: string | null
+	slot: number
+}
+
+// NOTE: What one snapshot assertion did. `written` is a snapshot that had none
+// recorded, or one an updating run replaced — both a pass, and both something
+// the runner has to write down somewhere. `mismatched` is the failure.
+export type SnapshotStatus = "written" | "matched" | "mismatched"
+
+export type RecordedSnapshot = {
+	point: number
+	slot: number
+	name: string | null
+	status: SnapshotStatus
+	text: string
+	recorded: string | null
+}
 
 export type TestContext = {
 	// NOTE: Which `entry` of the Module's `run` is the one to run. `-1` runs
@@ -310,6 +349,16 @@ export type TestContext = {
 	// to the line it was written on for the whole of the test.
 	probes: Array<Trace>
 	expectations: Array<Expectation>
+	// NOTE: What the snapshot assertions of this test recorded, whether they
+	// held or not: a run has to write a new one down, and an updating run has
+	// to write a replaced one down too.
+	snapshots: Array<RecordedSnapshot>
+	// NOTE: The stored snapshots this Module's tests may name, read from disk
+	// by whoever started the run, and whether a mismatch is to be REPLACED
+	// rather than reported. Both belong to the context because a capability a
+	// test can not reach is a capability it does not have.
+	stored: SnapshotStore
+	updating: boolean
 	output: Array<OutputChunk>
 	// NOTE: What has been counted so far, asked from inside a running test
 	// rather than only read out at the end of a run. Coverage is a fact about
@@ -319,13 +368,19 @@ export type TestContext = {
 	coverage: () => Array<CoverageReport>
 }
 
-export function createContext(index: number): TestContext {
+export function createContext(
+	index: number,
+	options: { stored?: SnapshotStore; updating?: boolean } = {},
+): TestContext {
 	return {
 		index,
 		names: new Map(),
 		traces: [],
 		probes: [],
 		expectations: [],
+		snapshots: [],
+		stored: options.stored ?? {},
+		updating: options.updating ?? false,
 		output: [],
 		coverage,
 	}
@@ -454,12 +509,64 @@ export function required(
 	}
 }
 
+// NOTE: `matches snapshot`. What it is handed is the value already RENDERED —
+// `Printable::toString`, which the Compiler lowers as the interpolation an
+// author could have written — so the whole of the comparison here is two
+// strings, and a Type that says what it looks like is recorded in that form.
+//
+// A snapshot nothing has recorded PASSES and is written down: the first run of
+// a new snapshot is what records it, and a run that refused it would refuse
+// every new test. An updating run treats a difference the same way. Everything
+// recorded is handed back through the context, because writing a file is the
+// runner's business and not a bundle's.
+export function snapshotted(
+	context: TestContext,
+	point: number,
+	form: "expect" | "require",
+	snapshot: SnapshotSlot,
+	text: StringType,
+): void {
+	let actual = text.value
+	let expected =
+		snapshot.name === null
+			? snapshot.recorded
+			: (context.stored[snapshot.name] ?? null)
+	let status: SnapshotStatus =
+		expected === null
+			? "written"
+			: expected === actual
+				? "matched"
+				: context.updating
+					? "written"
+					: "mismatched"
+
+	context.snapshots.push({
+		point,
+		slot: snapshot.slot,
+		name: snapshot.name,
+		status,
+		text: actual,
+		recorded: expected,
+	})
+
+	record(context, form, point, status !== "mismatched", null, {
+		name: snapshot.name,
+		expected,
+		actual,
+	})
+
+	if (status === "mismatched" && form === "require") {
+		throw requirementFailed
+	}
+}
+
 function record(
 	context: TestContext,
 	form: "expect" | "require",
 	point: number,
 	passed: boolean,
 	comparison: Comparison | null,
+	snapshot: SnapshotComparison | null = null,
 ): void {
 	let traces = context.traces
 
@@ -469,6 +576,7 @@ function record(
 		point,
 		passed,
 		traces,
+		snapshot,
 		comparison:
 			comparison === null
 				? null
@@ -635,6 +743,52 @@ function diffEntries(
 	return lines
 }
 
+// NOTE: What a snapshot's difference reads as: the lines the two texts share,
+// and the ones only one of them has. It is the plainest correct answer — a
+// common-prefix and common-suffix walk, with whatever is left in the middle
+// reported whole — because a snapshot is text a reader wrote or a Program
+// printed, and a minimal edit script over lines would only ever say the same
+// thing in a way that is harder to read.
+export function lineDiff(left: string, right: string): Array<DiffLine> {
+	let leftLines = left.split("\n")
+	let rightLines = right.split("\n")
+	let head = 0
+
+	while (
+		head < leftLines.length &&
+		head < rightLines.length &&
+		leftLines[head] === rightLines[head]
+	) {
+		head += 1
+	}
+
+	let tail = 0
+
+	while (
+		tail < leftLines.length - head &&
+		tail < rightLines.length - head &&
+		leftLines[leftLines.length - 1 - tail] ===
+			rightLines[rightLines.length - 1 - tail]
+	) {
+		tail += 1
+	}
+
+	return [
+		...leftLines.slice(0, head).map((text) => same(text)),
+		...leftLines
+			.slice(head, leftLines.length - tail)
+			.map((text): DiffLine => ({ kind: "left", text })),
+		...rightLines
+			.slice(head, rightLines.length - tail)
+			.map((text): DiffLine => ({ kind: "right", text })),
+		...leftLines.slice(leftLines.length - tail).map((text) => same(text)),
+	]
+}
+
+function same(text: string): DiffLine {
+	return { kind: "same", text }
+}
+
 function render(value: AnyType): string {
 	return getStringRepresentation(value)
 }
@@ -751,6 +905,22 @@ export type TestEvent =
 	// assertion — it is the answer to a question a reader wrote into the source,
 	// which an Editor draws beside the line and a `--json` consumer may ignore.
 	| ({ schema: 1; kind: "probe"; id: string } & ProbedValue)
+	// NOTE: What one `matches snapshot` did. It is written whether the snapshot
+	// held or not, because a runner needs the text of a new one and the span to
+	// write it into as much as it needs to know a stored one still matches.
+	// `span` is where a recorded value stands or would stand, and `module` says
+	// which file's `__snapshots__` a named one belongs to.
+	| {
+			schema: 1
+			kind: "snapshot"
+			id: string
+			module: string | null
+			name: string | null
+			status: SnapshotStatus
+			span: Span | null
+			text: string
+			recorded: string | null
+	  }
 	| {
 			schema: 1
 			kind: "output"
@@ -794,7 +964,10 @@ export type TracedValue = { point: number; span: Span | null; value: string }
 export type ProbedValue = { point: number; span: Span | null; value: string }
 
 export type ComparisonEvent = {
-	kind: "is" | "isNot"
+	// NOTE: `snapshot` is the third: what an `is` compares are two values, and
+	// what a snapshot compares are two texts, which a reader wants shown as
+	// lines rather than as a structure.
+	kind: "is" | "isNot" | "snapshot"
 	left: string | null
 	right: string | null
 	diff: Array<DiffLine>
@@ -907,6 +1080,13 @@ export type RunOptions = {
 	filters?: Filters
 	// NOTE: Handed in so a spec can run the clock itself. `Date.now` otherwise.
 	now?: () => number
+	// NOTE: The stored snapshots of every Module in the run, keyed by the
+	// Module's canonical path and then by the name written after `from`. Read
+	// off disk by whoever started the run; a bundle reads nothing.
+	snapshots?: Record<string, SnapshotStore>
+	// NOTE: Whether a snapshot that differs is REPLACED rather than reported —
+	// `essence test --update`, and the Editor's "Accept snapshot".
+	update?: boolean
 	// NOTE: Whether to write a `coverage` event per instrumented Module when
 	// the run ends, and to put the counts back to what loading the bundle left
 	// them at before it starts. A bundle compiled without `--coverage` has no
@@ -990,7 +1170,7 @@ export function runTests(registry: Registry, options: RunOptions): RunSummary {
 			continue
 		}
 
-		runOne(selection.test, name, sink, now, summary)
+		runOne(selection.test, name, sink, now, summary, options)
 	}
 
 	summary.duration = now() - started
@@ -1070,10 +1250,14 @@ function runOne(
 	sink: EventSink,
 	now: () => number,
 	summary: RunSummary,
+	options: RunOptions,
 ): void {
 	let entry = test.entry
 	let spans = test.module.spans
-	let context = createContext(test.index)
+	let context = createContext(test.index, {
+		stored: (options.snapshots ?? {})[test.module.module ?? ""] ?? {},
+		updating: options.update ?? false,
+	})
 
 	sink({
 		schema: 1,
@@ -1127,6 +1311,23 @@ function runOne(
 			point,
 			span: spans[point] ?? null,
 			value: render(valueAt(context.probes, point)!),
+		})
+	}
+
+	// NOTE: Before the assertions, because a snapshot event carries what has to
+	// be WRITTEN and a reader of the stream acts on it whether the test passed
+	// or not.
+	for (let recorded of context.snapshots) {
+		sink({
+			schema: 1,
+			kind: "snapshot",
+			id: entry.id,
+			module: test.module.module,
+			name: recorded.name,
+			status: recorded.status,
+			span: spans[recorded.slot] ?? null,
+			text: recorded.text,
+			recorded: recorded.recorded,
 		})
 	}
 
@@ -1210,6 +1411,24 @@ function probedPoints(probes: Array<Trace>): Array<number> {
 // than at the sink so that a JSON consumer and a terminal reporter are shown
 // the same thing.
 function failureOf(expectation: Expectation, spans: Array<Span>): FailureEvent {
+	// NOTE: A snapshot failure has no traced values and no structure — two
+	// texts, and the lines that differ between them.
+	if (expectation.snapshot !== null) {
+		let snapshot = expectation.snapshot
+
+		return {
+			form: expectation.form,
+			span: spans[expectation.point] ?? null,
+			values: [],
+			comparison: {
+				kind: "snapshot",
+				left: snapshot.expected,
+				right: snapshot.actual,
+				diff: lineDiff(snapshot.expected ?? "", snapshot.actual),
+			},
+		}
+	}
+
 	return {
 		form: expectation.form,
 		span: spans[expectation.point] ?? null,

@@ -709,6 +709,23 @@ export async function activate(context) {
 
 			await testView?.runIds(item.ids ?? [], [item.filePath])
 		}),
+		// NOTE: The "Accept snapshot" lens. It is the same run, asked to record
+		// what it finds — the Server writes the `__snapshots__` companions and
+		// hands the sources back as a workspace edit, so an unsaved buffer is
+		// edited rather than written round.
+		//
+		// Deliberately not in `contributes.commands`, for the reason
+		// `essence.test.run` is not: it needs the ids the lens carries.
+		vscode.commands.registerCommand(
+			"essence.test.acceptSnapshot",
+			async (item) => {
+				if (item === undefined) {
+					return
+				}
+
+				await testView?.acceptSnapshots(item.ids ?? [], [item.filePath])
+			},
+		),
 		// NOTE: What failed is what a reader is iterating on, and re-running
 		// everything to get back to it is the loop this is here to shorten. It
 		// runs by id rather than by file: one failure in forty is not a reason

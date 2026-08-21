@@ -924,6 +924,28 @@ export function createTestView(options) {
 		)
 	}
 
+	// NOTE: What the "Accept snapshot" lens sends. It is a run like any other,
+	// asked to RECORD whatever the tests produce — the Server writes the
+	// `__snapshots__` companions itself and hands the sources back as an edit,
+	// so what lands in a buffer arrives through `workspace/applyEdit` and is
+	// undoable like anything else a reader did.
+	async function acceptSnapshots(ids, files) {
+		let covered = ids
+			.map((id) => items.get(id))
+			.filter((item) => item !== undefined)
+
+		await ask(
+			enqueue(
+				controller.createTestRun(new vscode.TestRunRequest(covered)),
+				covered,
+			),
+			covered.length === 0
+				? { ids: [], files, update: true }
+				: { ids, files: [], update: true },
+			undefined,
+		)
+	}
+
 	// NOTE: A Language Server that restarted is a session that starts over: it
 	// re-runs everything it finds, so what this holds is at best a copy and at
 	// worst a file it will never mention again.
@@ -972,6 +994,7 @@ export function createTestView(options) {
 	return {
 		handle,
 		runIds,
+		acceptSnapshots,
 		runFailed,
 		reset,
 		dispose,
