@@ -102,21 +102,24 @@ export type TestRunNotification = {
 	// says is that the results the client is holding for that file are the last
 	// ones that ran rather than the ones the buffer would produce.
 	compiled: boolean
-	// NOTE: What the session has counted SO FAR — the whole project's picture,
-	// not this cycle's. A cycle covers the entries a change reached and says
-	// nothing about the rest, so the Server lays each one over what it had and
-	// sends the result; a client replaces what it holds rather than merging.
+	// NOTE: What this CYCLE counted, and what the session knows about the
+	// Choices. The two halves are carried differently on purpose:
 	//
-	// NOTE: It is merged on the Server rather than by the client because which
-	// Cases were CONSTRUCTED is a question about the whole run — a Case built
-	// only by the file that was just re-run is still a Case somebody built —
-	// and a client working that out again would be a second answer to
-	// disagree with.
+	// `files` is only what this cycle recomputed, keyed by SOURCE file — which
+	// is not the same set as `files` above: a `Foo.tests.es` runs the tests,
+	// and what its counters counted is mostly `Foo.es`. A client showing the
+	// project lays each batch over what it had, keyed by `module`, and keeps
+	// the files this cycle says nothing about. Sending the whole project every
+	// time would put every point of every file on the wire at every keystroke.
 	//
-	// NOTE: `files` is keyed by SOURCE file, which is not the same set as
-	// `files` above: a `Foo.tests.es` runs the tests, and what its counters
-	// counted is mostly `Foo.es`. Empty unless the session was asked for
-	// coverage, and empty on a `start`.
+	// `choices` is the SESSION's answer, laid over cycle by cycle and sent
+	// whole, because which Cases were CONSTRUCTED is a question about the whole
+	// run — a Case built only by the file that was just re-run is still a Case
+	// somebody built — and it is small enough to say again. A client replaces
+	// it rather than merging, so nobody works that answer out twice.
+	//
+	// Both empty unless the session was asked for coverage, and empty on a
+	// `start`.
 	coverage: CoverageSummary
 }
 

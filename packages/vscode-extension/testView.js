@@ -789,14 +789,33 @@ export function createTestView(options) {
 			return
 		}
 
-		await settings.update(
-			"coverage",
-			true,
-			vscode.ConfigurationTarget.Workspace,
-		)
+		// NOTE: Workspace settings need a workspace. A single file opened on
+		// its own has none, and writing there rejects — so the setting goes to
+		// the user's own where there is nowhere else to put it.
+		let folders = vscode.workspace.workspaceFolders ?? []
+		let target =
+			folders.length === 0
+				? vscode.ConfigurationTarget.Global
+				: vscode.ConfigurationTarget.Workspace
+
+		try {
+			await settings.update("coverage", true, target)
+		} catch (error) {
+			// NOTE: And a setting that could not be written is not a reason to
+			// refuse the run. The tests still run; what is missing is the
+			// counting, and the line below says so.
+			log(`could not turn essence.tests.coverage on: ${String(error)}`)
+
+			return
+		}
+
+		// NOTE: The Server reads its configuration on its own schedule and has
+		// to compile again before anything is counted, so the run this press
+		// starts is very likely the last uninstrumented one. The cycle after it
+		// fills the coverage view in.
 		log(
-			"turned essence.tests.coverage on for this workspace — " +
-				"every run counts what it reaches until it is turned off",
+			"turned essence.tests.coverage on — every run counts what it " +
+				"reaches from the next cycle on, until it is turned off",
 		)
 	}
 
