@@ -30,6 +30,21 @@ function sourceOf(seed = "beef"): RandomnessType {
 }
 
 describe("Randomness", () => {
+	// NOTE: A bound WIDER than a word has no whole multiple inside one, so the
+	// rejection loop would reject every draw. It is reachable from
+	// `string(upTo:)`, whose bound is whatever a caller wrote.
+	test("answers a bound wider than a word rather than looping", () => {
+		let source = sourceOf()
+		let bound = 4294967296 * 4
+
+		for (let index = 0; index < 20; index++) {
+			let drawn = below(source, bound)
+
+			expect(drawn).toBeGreaterThanOrEqual(0)
+			expect(drawn).toBeLessThan(bound)
+		}
+	})
+
 	test("answers the same sequence for one seed", () => {
 		let first = Array.from({ length: 64 }, () => below(sourceOf(), 1000))
 		let second = Array.from({ length: 64 }, () => below(sourceOf(), 1000))

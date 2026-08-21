@@ -361,6 +361,56 @@ describe("Property tests", () => {
 			})
 		})
 
+		// NOTE: A refinement flows freely into its base, so a Namespace
+		// declared for the BASE is offered for the refinement — and taking it
+		// would generate values the refinement says are impossible.
+		it("does not let a conformance for the base claim a refinement", () => {
+			expect(
+				shapeOf(
+					generatorOf(
+						"n: EvenInteger",
+						`type EvenInteger = Integer where @::isEven()
+
+						namespace Counter for Integer is Generatable {
+							static generate(from source: Randomness) -> Integer {
+								<- 7
+							}
+						}`,
+					),
+				),
+			).toMatchObject({
+				kind: "refined",
+				name: "EvenInteger",
+				// NOTE: The BASE still generates through the conformance —
+				// a Namespace declared for a Type is usually declared because
+				// the structural generator is wrong for it, and a refinement of
+				// that Type wants the same values. What the fix is about is the
+				// predicate: the refinement filters what the conformance drew
+				// rather than being replaced by it.
+				base: { kind: "generated", name: "Counter" },
+				checks: 1,
+			})
+		})
+
+		// NOTE: A Program may declare `namespace Weird for Integer` and mean
+		// something else by a word the narrowing table knows. Reading the name
+		// alone would narrow by a promise nobody made — and drop the check that
+		// would have caught it.
+		it("narrows only by the base's own Namespace", () => {
+			expect(
+				shapeOf(
+					generatorOf(
+						"n: Odd",
+						`namespace Weird for Integer {
+							isPositive() -> Boolean { <- @::isLessThan(0) }
+						}
+
+						type Odd = Integer where @::<Weird>isPositive()`,
+					),
+				),
+			).toMatchObject({ kind: "refined", checks: 1, narrowing: {} })
+		})
+
 		it("enriches a predicate with a literal Argument as a check", () => {
 			expect(
 				shapeOf(
@@ -533,6 +583,24 @@ describe("Property tests", () => {
 			).toEqual(["snapshot-in-property"])
 		})
 
+		// NOTE: A Parameter that was reported is still BOUND, so the body
+		// reports what IT says rather than a cascade about a name that vanished.
+		it("binds a Parameter it refused, so the body does not cascade", () => {
+			expect(codesOf(sectionOf("n", "expect n::is(n)"))).toEqual([
+				"property-parameters",
+			])
+		})
+
+		it("reports two Parameters of one name where the second stands", () => {
+			let [diagnostic] = analyse(
+				sectionOf("a: Integer, a: String"),
+			).diagnostics
+
+			expect(diagnostic?.code).toBe("duplicate-variable")
+			expect(diagnostic?.position).not.toBeNull()
+			expect(diagnostic?.labels).not.toEqual([])
+		})
+
 		it("binds every Parameter in the body", () => {
 			expect(
 				codesOf(sectionOf("a: Integer, b: Integer", "expect a::is(b)")),
@@ -662,6 +730,22 @@ describe("Property tests", () => {
 			expect(propertyEvents(first.events)[0]).toEqual(
 				propertyEvents(again.events)[0]!,
 			)
+		})
+
+		// NOTE: The size a case is drawn at grows with the case number over the
+		// WHOLE run, so a hundred cases and four hundred draw two different
+		// sequences from one seed — which is why a replay has to name the count.
+		it("names --cases in the replay where it is not the default", async () => {
+			let { events } = await run(doubling, { cases: 400 })
+			let [property] = propertyEvents(events)
+
+			expect(property?.requested).toBe(400)
+		})
+
+		it("says a hundred cases were asked for where nobody said", async () => {
+			let { events } = await run(doubling)
+
+			expect(propertyEvents(events)[0]?.requested).toBe(100)
 		})
 
 		it("reports a different run for a different seed", async () => {

@@ -3184,6 +3184,23 @@ function enrichTestProperty(
 		)
 	}
 
+	// NOTE: A Parameter with no Type is still BOUND, to the Error Type every
+	// unanswerable Type resolves to — so the body underneath reports what IT
+	// says rather than a cascade of "unknown name" about a Parameter that was
+	// reported already. The table path binds an unreadable Parameter for the
+	// same reason.
+	let type: common.Type =
+		parameter.type === null
+			? { type: "Error" }
+			: resolveType(parameter.type, scope)
+
+	declareVariableInScope(
+		binding(name, parameter.position),
+		type,
+		bodyScope,
+		true,
+	)
+
 	if (parameter.type === null) {
 		reportPropertyParameters(
 			parameter.position,
@@ -3196,15 +3213,11 @@ function enrichTestProperty(
 		return {
 			nodeType: "TestProperty",
 			name,
-			type: { type: "Error" },
+			type,
 			generator: { kind: "boolean" },
 			position: parameter.position,
 		}
 	}
-
-	let type = resolveType(parameter.type, scope)
-
-	declareVariableInScope(name, type, bodyScope, true)
 
 	return {
 		nodeType: "TestProperty",
@@ -3220,6 +3233,16 @@ function enrichTestProperty(
 		},
 		position: parameter.position,
 	}
+}
+
+// NOTE: The Parameter's own name as an Identifier Node rather than as a bare
+// string: a Diagnostic about a name declared twice underlines WHERE, and rename
+// and go-to-definition read the same table.
+function binding(
+	name: string,
+	position: common.Position,
+): parser.IdentifierNode {
+	return { nodeType: "Identifier", content: name, position }
 }
 
 function reportPropertyParameters(
@@ -3460,6 +3483,15 @@ function narrowedBy(
 	let whole =
 		typeof digits === "string" && /^-?\d+$/.test(digits) ? digits : null
 
+	// NOTE: The NAMESPACE has to be the base's own. A Program may perfectly
+	// well declare `namespace Weird for Integer { isPositive() … }` and mean
+	// something else by the word — reading the name alone would narrow a
+	// generator by a promise nobody made, and the check that would have caught
+	// it is dropped exactly where a narrowing is taken.
+	if (conjunct.namespaceName !== base.type) {
+		return false
+	}
+
 	if (base.type === "Integer" && conjunct.args.length <= 1) {
 		switch (conjunct.methodName) {
 			case "is":
@@ -3622,7 +3654,16 @@ function predicateCheck(
 			content: conjunct.methodName,
 			position,
 		},
-		namespaceSpecifier: null,
+		// NOTE: The Namespace the predicate was RESOLVED to when the refinement
+		// was declared, written out. Two Namespaces may answer one Method name
+		// for one Type — a Program declaring `namespace Weird for Integer` is
+		// exactly that — and a call that named neither would be ambiguous where
+		// the predicate was not.
+		namespaceSpecifier: {
+			nodeType: "Identifier",
+			content: conjunct.namespaceName,
+			position,
+		},
 		arguments: args,
 		position,
 	}
@@ -3766,11 +3807,14 @@ function generatableConformance(
 	)
 
 	for (let [name, namespace] of targeting) {
-		if (!(namespace.conformsTo ?? []).includes(GENERATABLE_PROTOCOL)) {
+		if (
+			!(namespace.conformsTo ?? []).includes(GENERATABLE_PROTOCOL) ||
+			!targetsExactly(namespace, type)
+		) {
 			continue
 		}
 
-		let binding = synthesizedName("source", position)
+		let source = synthesizedName("source", position)
 		let call: parser.FunctionInvocationNode = {
 			nodeType: "FunctionInvocation",
 			name: {
@@ -3793,7 +3837,7 @@ function generatableConformance(
 					},
 					value: {
 						nodeType: "Identifier",
-						content: binding,
+						content: source,
 						position,
 					},
 				},
@@ -3801,9 +3845,9 @@ function generatableConformance(
 			position,
 		}
 		let sourceScope = childScope(scope, {
-			members: { [binding]: { type: "Randomness" } },
-			declarations: { [binding]: position },
-			constants: new Set([binding]),
+			members: { [source]: { type: "Randomness" } },
+			declarations: { [source]: position },
+			constants: new Set([source]),
 		})
 		let attempt = collectDiagnostics(() =>
 			enrichExpression(call, sourceScope),
@@ -3813,10 +3857,35 @@ function generatableConformance(
 			continue
 		}
 
-		return { kind: "generated", name, binding, call: attempt.result }
+		return {
+			kind: "generated",
+			name,
+			binding: source,
+			call: attempt.result,
+		}
 	}
 
 	return null
+}
+
+// NOTE: Whether a Namespace targets THIS Type rather than one this Type flows
+// into. A refinement flows freely into its base — the evidence is simply
+// forgotten — so a `namespace Counter for Integer is Generatable` is offered
+// for every `Integer where …` alias in the project, and taking it would
+// generate values the refinement says are impossible. Mutual assignability is
+// what says the two are the same Type, which is what a conformance replacing
+// the whole derivation has to be about.
+function targetsExactly(
+	namespace: common.NamespaceType,
+	type: common.Type,
+): boolean {
+	let target = namespace.targetType
+
+	return (
+		target !== null &&
+		matchesType(target, type) &&
+		matchesType(type, target)
+	)
 }
 
 const GENERATABLE_PROTOCOL = "Generatable"

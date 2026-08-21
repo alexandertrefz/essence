@@ -148,7 +148,7 @@ export function generate(
 					merged,
 				)
 
-				if (admits(generator, candidate)) {
+				if (admitted(generator, merged, candidate)) {
 					return candidate
 				}
 			}
@@ -328,12 +328,17 @@ function unsatisfiable(narrowing: Narrowing): boolean {
 	)
 }
 
-// NOTE: Whether a refinement's predicate holds for a candidate. The narrowing
-// is a saving and never the argument: a value is admitted because every check
-// answered `true`, and a refinement with no check left to run is one whose
-// narrowing holds the whole predicate by construction.
-function admits(
+// NOTE: Whether a candidate has EARNED the refinement — every check answered
+// `true`, and the value is inside whatever the narrowing states.
+//
+// The narrowing is asked about the value rather than trusted to have shaped it,
+// because a narrowing that holds the whole predicate leaves no check to run:
+// where a draw or a shrink answers a bound it could not honour — an excluded
+// value in a range holding nothing else, a step past one — nothing else would
+// notice.
+function admitted(
 	generator: Extract<Generator, { kind: "refined" }>,
+	narrowing: Narrowing,
 	value: AnyType,
 ): boolean {
 	for (let check of generator.checks) {
@@ -342,7 +347,36 @@ function admits(
 		}
 	}
 
-	return true
+	return inside(narrowing, value)
+}
+
+// NOTE: What a narrowing says about a value that is already built. A value of a
+// kind the narrowing says nothing about is inside it by definition.
+function inside(narrowing: Narrowing, value: AnyType): boolean {
+	let key = (value as unknown as Record<symbol, string>)[typeKeySymbol]
+
+	if (key === "Integer") {
+		return admitsWhole(
+			BigInt((value as unknown as { value: number | bigint }).value),
+			narrowing,
+		)
+	}
+
+	let length =
+		key === "String"
+			? [...(value as unknown as { value: string }).value].length
+			: key === "List"
+				? viewOf(value as Parameters<typeof viewOf>[0]).total
+				: null
+
+	if (length === null) {
+		return true
+	}
+
+	return (
+		length >= (narrowing.minimumLength ?? 0) &&
+		length <= (narrowing.maximumLength ?? length)
+	)
 }
 
 // #endregion
@@ -395,7 +429,7 @@ export function shrink(
 			let merged = mergeNarrowing(narrowing, generator.narrowing)
 
 			return shrink(generator.base, value, merged).filter((candidate) =>
-				admits(generator, candidate),
+				admitted(generator, merged, candidate),
 			)
 		}
 		// NOTE: A Namespace's own generator says how to BUILD a value and
@@ -472,12 +506,12 @@ export function minimal(
 			return null
 		}
 		case "refined": {
-			let value = minimal(
-				generator.base,
-				mergeNarrowing(narrowing, generator.narrowing),
-			)
+			let merged = mergeNarrowing(narrowing, generator.narrowing)
+			let value = minimal(generator.base, merged)
 
-			return value !== null && admits(generator, value) ? value : null
+			return value !== null && admitted(generator, merged, value)
+				? value
+				: null
 		}
 		case "generated":
 			return null

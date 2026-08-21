@@ -622,6 +622,7 @@ describe("what a property test says", () => {
 			id,
 			name,
 			cases: 37,
+			requested: 100,
 			seed: "deadbeef",
 			shrinks: 12,
 			counterexample: [
@@ -640,6 +641,7 @@ describe("what a property test says", () => {
 
 		expect(record.property).toEqual({
 			cases: 37,
+			requested: 100,
 			seed: "deadbeef",
 			shrinks: 12,
 			counterexample: [
@@ -662,6 +664,7 @@ describe("what a property test says", () => {
 		let [message] = messagesOf({
 			property: {
 				cases: 37,
+				requested: 100,
 				seed: "deadbeef",
 				shrinks: 12,
 				counterexample: [{ name: "n", value: "500" }],
@@ -683,6 +686,7 @@ describe("what a property test says", () => {
 		let [message] = messagesOf({
 			property: {
 				cases: 0,
+				requested: 100,
 				seed: "deadbeef",
 				shrinks: 0,
 				counterexample: [{ name: "n", value: "0" }],
