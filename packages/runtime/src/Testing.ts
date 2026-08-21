@@ -643,6 +643,10 @@ export type Filters = {
 	filter?: string | null
 	tags?: Array<string>
 	skipTags?: Array<string>
+	// NOTE: Structural ids. Where any are named, ONLY those run — which is what
+	// an Editor's "run this test" asks for, and the one selection a name can not
+	// express: two tests may render the same name and never share an id.
+	ids?: Array<string>
 	// NOTE: Whether a registry BESIDE this one holds a focused test. Focus is
 	// decided across a whole run rather than per bundle — the design's
 	// "focusing one test in Standings.es also silences Season.tests.es" — and a
@@ -675,12 +679,22 @@ export function selectTests(
 	let tags = filters.tags ?? []
 	let skipTags = filters.skipTags ?? []
 	let filter = filters.filter ?? null
+	let ids = filters.ids ?? []
 
 	let selections = registry.tests.map((test): Selection => {
 		let entry = test.entry
 
 		if (entry.skipped !== null) {
 			return { test, state: "skip", reason: entry.skipped }
+		}
+
+		// NOTE: Before focus, deliberately. Naming a test IS the narrowing, and
+		// a run somebody asked for by id is not the run a leftover `focused`
+		// was meant to narrow.
+		if (ids.length > 0) {
+			return ids.includes(entry.id)
+				? { test, state: "run" }
+				: { test, state: "deselected", reason: "filter" }
 		}
 
 		if (focused && !entry.focused) {

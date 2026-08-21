@@ -1648,8 +1648,19 @@ function simplifyTestsNodes(
 				// manifest already, and emitting it a second time would be two
 				// spellings of one thing that could come to disagree.
 				name: interpolated ? simplifyExpression(node.name) : null,
-				body: probeStatements(
-					node.body.map((child) => simplifyImplementationNode(child)),
+				// NOTE: A Constant a test WROTE is probed whether or not a `§?`
+				// asked for it. What a reader wants beside a test body is the
+				// value of every step of it, which is what an Editor draws from
+				// these — and a Constant is a step the author named, so the
+				// name and the value read together. A Constant the Enricher
+				// synthesized is not one: it stands for a Matcher's subject,
+				// which the assertion beside it already reports.
+				body: node.body.map((child) =>
+					probeStatement(
+						simplifyImplementationNode(child),
+						child.nodeType === "ConstantDeclarationStatement" &&
+							child.synthesized === undefined,
+					),
 				),
 				position: node.position,
 			}
@@ -1681,12 +1692,16 @@ function probeStatements(
 	return nodes.map((node) => probeStatement(node))
 }
 
+// NOTE: `always` is what a test BODY asks for: every Constant of one is probed
+// whether or not a value comment named it. Everywhere else a probe is what a
+// `§?` asked for and nothing more.
 function probeStatement(
 	node: common.typedSimple.ImplementationNode,
+	always = false,
 ): common.typedSimple.ImplementationNode {
 	let lowering = testLowering
 
-	if (lowering === null || lowering.valueComments.size === 0) {
+	if (lowering === null || (!always && lowering.valueComments.size === 0)) {
 		return node
 	}
 
@@ -1703,7 +1718,7 @@ function probeStatement(
 	// answered by a `§?` behind its last one.
 	let line = node.position?.end.line
 
-	if (line === undefined || !lowering.valueComments.has(line)) {
+	if (line === undefined || !(always || lowering.valueComments.has(line))) {
 		return node
 	}
 

@@ -19,12 +19,17 @@ import {
 	type ProtocolConnection,
 	PublishDiagnosticsNotification,
 	RegistrationRequest,
+	ShutdownRequest,
 	UnregistrationRequest,
 } from "vscode-languageserver/node"
 
 import { compilationCounts, resetCompilationCounts } from "../compilation"
 import { uriOf } from "../server"
 import { startServer } from "../server"
+import {
+	TEST_RUN_NOTIFICATION,
+	type TestRunNotification,
+} from "../testProtocol"
 
 // NOTE: The real Server, driven the way an Editor drives it: over a connection,
 // through the document store, past the debounce, one request at a time. Every
@@ -100,7 +105,14 @@ export function startSession() {
 	// per URI. What a Server sends that changes nothing is invisible in the state
 	// it leaves behind, and it is exactly what a client pays for.
 	let publishLog: Array<{ uri: string; version?: number }> = []
+	let testRuns: Array<TestRunNotification> = []
 
+	// NOTE: The custom notification the test session pushes. Kept as a log
+	// rather than as a latest-value, because what a client pays for is every
+	// one of them and a run is two: a `start` and an `end`.
+	client.onNotification(TEST_RUN_NOTIFICATION, (notification) => {
+		testRuns.push(notification as TestRunNotification)
+	})
 	// NOTE: The Server registers its watcher and its configuration listener
 	// dynamically, and a registration is a REQUEST — unanswered, it stays
 	// pending for the whole session and the first `Promise.all` a test writes
@@ -219,6 +231,20 @@ export function startSession() {
 			(published.get(uriOf(filePath)) ?? []).map(
 				(diagnostic) => diagnostic.code,
 			),
+		testRuns: () => testRuns,
+		// NOTE: Waits for a NUMBER of finished runs rather than for a length of
+		// time: a compile takes as long as the machine takes.
+		waitForTestRuns: async (count: number, timeout = 30_000) => {
+			let deadline = Date.now() + timeout
+			let ended = () =>
+				testRuns.filter((run) => run.kind === "end").length
+
+			while (ended() < count && Date.now() < deadline) {
+				await new Promise((resolve) => setTimeout(resolve, 25))
+			}
+
+			return testRuns.filter((run) => run.kind === "end")
+		},
 		publishCount: () => publishCount,
 		publishesSince: (mark: number) => publishLog.slice(mark),
 		publishMark: () => publishLog.length,
@@ -245,6 +271,10 @@ export function startSession() {
 				await close(filePath)
 			}
 
+			// NOTE: The shutdown request rather than merely dropping the pipes:
+			// it is what stops the test session's Worker, and a Worker left
+			// running keeps compiling for a Server nobody is listening to.
+			await client.sendRequest(ShutdownRequest.type).catch(() => {})
 			await new Promise<void>((resolve) => setTimeout(resolve, 50))
 
 			client.dispose()

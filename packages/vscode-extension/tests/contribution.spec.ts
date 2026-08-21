@@ -77,3 +77,27 @@ describe("the debugger contribution", () => {
 		}
 	})
 })
+
+// NOTE: The live test session is a thing that RUNS a project's code as it is
+// typed, so the setting that declines it is part of the contract rather than a
+// convenience — a reader who cannot find it has no way to stop it.
+describe("the test session contribution", () => {
+	it("offers the setting that switches the live session off", () => {
+		let properties = manifest.contributes.configuration.properties
+
+		expect(properties["essence.tests.enabled"]).toMatchObject({
+			type: "boolean",
+			default: true,
+		})
+	})
+
+	it("keeps the lens commands out of the palette", () => {
+		// NOTE: `essence.test.run` and `essence.test.debug` are registered in
+		// `extension.js` and invoked by a Code Lens, which carries the ids to
+		// run. A command in `contributes.commands` is a command the palette
+		// offers with no ids at all, which could only ever do nothing.
+		expect(
+			manifest.contributes.commands.map((command) => command.command),
+		).toEqual(["essence.restartServer"])
+	})
+})

@@ -84,7 +84,9 @@ export function renderDiagnostic(
 	let severityColor =
 		diagnostic.severity === "error"
 			? config.errorColor()
-			: config.warningColor()
+			: diagnostic.severity === "warning"
+				? config.warningColor()
+				: config.adviceColor()
 	// NOTE: Secondary Labels each get their own generated color so that a
 	// report with several of them stays readable — the arrows are what tie a
 	// message to its span, and identically colored arrows that cross are not
@@ -128,7 +130,12 @@ export function renderDiagnostic(
 	}
 
 	let report = new Report({
-		kind: diagnostic.severity,
+		// NOTE: ariadne's third kind is called "advice", which is what an
+		// `information` Diagnostic is.
+		kind:
+			diagnostic.severity === "information"
+				? "advice"
+				: diagnostic.severity,
 		span: { start: primaryOffset, end: primaryOffset },
 		code: diagnostic.code,
 		message: diagnostic.message,
@@ -177,7 +184,10 @@ function renderSummary(
 	let errors = diagnostics.filter(
 		(diagnostic) => diagnostic.severity === "error",
 	).length
-	let warnings = diagnostics.length - errors
+	let remarks = diagnostics.filter(
+		(diagnostic) => diagnostic.severity === "information",
+	).length
+	let warnings = diagnostics.length - errors - remarks
 	let counts: Array<string> = []
 
 	if (errors > 0) {
@@ -186,6 +196,10 @@ function renderSummary(
 
 	if (warnings > 0) {
 		counts.push(paint(countOf(warnings, "warning"), config.warningColor()))
+	}
+
+	if (remarks > 0) {
+		counts.push(paint(countOf(remarks, "remark"), config.adviceColor()))
 	}
 
 	return `\n${paint("───", config.marginColor())} ${counts.join(", ")}\n`

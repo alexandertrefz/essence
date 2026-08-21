@@ -86,7 +86,9 @@ export function toLspDiagnostic(
 		severity:
 			diagnostic.severity === "error"
 				? DiagnosticSeverity.Error
-				: DiagnosticSeverity.Warning,
+				: diagnostic.severity === "warning"
+					? DiagnosticSeverity.Warning
+					: DiagnosticSeverity.Information,
 		message: toLspMessage(diagnostic),
 		source: "essence",
 		code: diagnostic.code,

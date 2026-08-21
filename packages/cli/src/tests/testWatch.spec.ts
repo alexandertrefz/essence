@@ -197,7 +197,10 @@ describe("The source watcher", () => {
 type Session = {
 	runs: () => Array<Array<TestEvent>>
 	waitForRuns: (count: number) => Promise<Array<Array<TestEvent>>>
-	stop: () => void
+	// NOTE: Awaited rather than fired and forgotten. A watch session that
+	// outlives its test goes on compiling in the background, and the suites
+	// running after it are the ones that pay for it.
+	stop: () => Promise<void>
 }
 
 function startSession(directory: string): Session {
@@ -262,7 +265,11 @@ function startSession(directory: string): Session {
 
 			return complete
 		},
-		stop: () => child.kill(),
+		async stop(): Promise<void> {
+			child.kill()
+
+			await child.exited
+		},
 	}
 }
 
@@ -366,7 +373,7 @@ describe("essence test --watch", () => {
 					expect(runs).toHaveLength(2)
 					expect(namesOf(runs[1]!)).toEqual(["doubles"])
 				} finally {
-					session.stop()
+					await session.stop()
 				}
 			},
 		)
@@ -395,7 +402,7 @@ describe("essence test --watch", () => {
 					failed: 1,
 				})
 			} finally {
-				session.stop()
+				await session.stop()
 			}
 		})
 	}, 60_000)
@@ -450,7 +457,7 @@ describe("essence test --watch", () => {
 				expect(runs).toHaveLength(2)
 				expect(namesOf(runs[1]!)).toEqual(["adds late"])
 			} finally {
-				session.stop()
+				await session.stop()
 			}
 		})
 	}, 60_000)

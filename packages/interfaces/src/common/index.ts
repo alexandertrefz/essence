@@ -56,7 +56,11 @@ export type TypeAnnotation = {
 	type: Type
 }
 
-export type DiagnosticSeverity = "error" | "warning"
+// NOTE: `information` is the quietest of the three: a remark about something
+// that is not wrong and is worth knowing — a tag exactly one test carries. It
+// renders as ariadne's "advice" in the terminal and as an Information in an
+// Editor, and it never fails a build.
+export type DiagnosticSeverity = "error" | "warning" | "information"
 
 // NOTE: `unnecessary` renders the code greyed out rather than underlined —
 // for Diagnostics about code that has no effect instead of code that is
@@ -183,6 +187,8 @@ export type DiagnosticCode =
 	| "duplicate-test-name"
 	| "test-failed"
 	| "focused-tests-remain"
+	| "similar-tags"
+	| "lonely-tag"
 	// Names — declared twice, never declared, or not what the position wants.
 	| "duplicate-variable"
 	| "duplicate-type"

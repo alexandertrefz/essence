@@ -502,6 +502,54 @@ Error: This test is still focused
 ────╯
 ```
 
+### `similar-tags`
+
+Two tags in the workspace are within two edits of each other — `slwo` beside
+`slow`. A run is narrowed by a tag spelled exactly, so two spellings of one idea
+are two sets and `--tag` answers with half of what was meant. Reported on the
+rarer of the two, which is the one that is probably the mistake, with a Quick Fix
+that renames it to the common one. A workspace-wide question, so only the
+Language Server asks it: a compile sees one Module, and `tagged slwo` is
+perfectly well-formed inside it.
+
+```
+[similar-tags]
+Warning: The tags 'netwrok' and 'network' are nearly the same
+   ╭─┤ Season.tests.es:21:16 │
+   │
+21 │        test "reaches the server" tagged netwrok {
+   │                                         ───┬───
+   │                                            ╰───── 'network' is written elsewhere
+   │
+   │ Help: Write 'network' here, or rename the other one.
+   │ Note: A run is narrowed by a tag spelled exactly, so two spellings of
+   │       one idea are two sets, and --tag answers with half of what was
+   │       meant.
+───╯
+```
+
+### `lonely-tag`
+
+Exactly one test in the workspace carries this tag. That is not wrong — a tag
+names a set of tests, and a set of one is a set — but it is what a tag that was
+meant to catch on and did not looks like, and what a typo nothing else is close
+enough to looks like. An `information`, so it never fails anything; the Language
+Server reports it and no compile does.
+
+```
+[lonely-tag]
+Advice: Only one test carries the tag 'flaky'
+   ╭─┤ Season.tests.es:33:9 │
+   │
+33 │        test "settles" tagged flaky {
+   │                              ──┬──
+   │                                ╰──── no other test carries it
+   │
+   │ Note: A tag names a set of tests to run or to leave out. A set of one
+   │       is a test that can be named by its own name.
+───╯
+```
+
 ## Names
 
 ### `duplicate-variable`

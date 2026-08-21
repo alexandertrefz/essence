@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs"
 import * as path from "node:path"
 
 // NOTE: This module is the only one here the Compiler imports as a module. The
@@ -26,7 +27,22 @@ export function runtimeDirectoryFor(moduleDirname: string): string {
 		: moduleDirname
 }
 
-export const RUNTIME_DIRECTORY = runtimeDirectoryFor(import.meta.dirname)
+// NOTE: A THIRD layout, and the only one this module can not answer from its
+// own path: a bundle. The Language Server inside the VS Code extension is one
+// file, `import.meta.dirname` is wherever that file was written, and the runtime
+// sources have to have been copied next to it — the Bundler writes their
+// absolute paths into the JavaScript it emits and then reads them off disk, and
+// no bundler can see through that. The extension's `buildServer.js` copies
+// them, exactly as it copies the standard library's `.es` sources; this finds
+// them there. Without it a Server that compiles — which is what the test
+// session does — reports "Could not resolve .../Integer.ts" for every Program
+// it is asked about.
+const OWN_RUNTIME = runtimeDirectoryFor(import.meta.dirname)
+const BUNDLED_RUNTIME = path.resolve(import.meta.dirname, "runtime")
+
+export const RUNTIME_DIRECTORY = existsSync(path.join(OWN_RUNTIME, "type.ts"))
+	? OWN_RUNTIME
+	: BUNDLED_RUNTIME
 
 // NOTE: The tsconfig esbuild transpiles the runtime modules with while
 // inlining them. It is deliberately not this repository's — the runtime is
