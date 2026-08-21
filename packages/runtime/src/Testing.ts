@@ -177,6 +177,10 @@ export type TestContext = {
 	// It is drained rather than cleared so that the values belong to the
 	// assertion that evaluated them.
 	traces: Array<Trace>
+	// NOTE: What the `§?` value comments of this test recorded. Never drained:
+	// a value comment asks a question no assertion asked, and its answer belongs
+	// to the line it was written on for the whole of the test.
+	probes: Array<Trace>
 	expectations: Array<Expectation>
 	output: Array<OutputChunk>
 }
@@ -186,6 +190,7 @@ export function createContext(index: number): TestContext {
 		index,
 		names: new Map(),
 		traces: [],
+		probes: [],
 		expectations: [],
 		output: [],
 	}
@@ -225,6 +230,21 @@ export function trace<Value extends AnyType>(
 	value: Value,
 ): Value {
 	context.traces.push({ point, value })
+
+	return value
+}
+
+// NOTE: The `§?` value comment — the same recording as a trace, into the buffer
+// no assertion drains, so what a line asked about survives to the end of the
+// test whatever was asserted after it. A line inside a loop records once per
+// turn and the last one is what is reported, for the same reason a traced
+// sub-expression is: what a reader is looking at is the turn they can see.
+export function probe<Value extends AnyType>(
+	context: TestContext,
+	point: number,
+	value: Value,
+): Value {
+	context.probes.push({ point, value })
 
 	return value
 }
@@ -561,6 +581,10 @@ export type TestEvent =
 			values: Array<TracedValue>
 			comparison: ComparisonEvent | null
 	  }
+	// NOTE: What a `§?` value comment recorded. It is not a failure and not an
+	// assertion — it is the answer to a question a reader wrote into the source,
+	// which an Editor draws beside the line and a `--json` consumer may ignore.
+	| ({ schema: 1; kind: "probe"; id: string } & ProbedValue)
 	| {
 			schema: 1
 			kind: "output"
@@ -585,6 +609,12 @@ export type TestEvent =
 export type DeselectionReason = "not-focused" | "tag" | "filter"
 
 export type TracedValue = { point: number; span: Span | null; value: string }
+
+// NOTE: What one `§?` line answered — the same three fields a traced value
+// carries, named apart because a consumer keeps them apart: a traced value
+// explains an assertion that failed, and a probed one answers a question that
+// was asked whether or not anything failed.
+export type ProbedValue = { point: number; span: Span | null; value: string }
 
 export type ComparisonEvent = {
 	kind: "is" | "isNot"
@@ -869,6 +899,20 @@ function runOne(
 		})
 	}
 
+	// NOTE: One event per PROBED POINT rather than per recording, carrying the
+	// last value that point held — a `§?` on a line inside a loop is one
+	// question, asked once, and an Editor draws one answer beside it.
+	for (let point of probedPoints(context.probes)) {
+		sink({
+			schema: 1,
+			kind: "probe",
+			id: entry.id,
+			point,
+			span: spans[point] ?? null,
+			value: render(valueAt(context.probes, point)!),
+		})
+	}
+
 	let failures: Array<FailureEvent> = []
 
 	for (let expectation of context.expectations) {
@@ -928,6 +972,21 @@ function runOne(
 	})
 }
 
+// NOTE: The points a test probed, in the order they were first recorded at —
+// which is the order the value comments were written in, so an Editor drawing
+// them reads down the file.
+function probedPoints(probes: Array<Trace>): Array<number> {
+	let points: Array<number> = []
+
+	for (let entry of probes) {
+		if (!points.includes(entry.point)) {
+			points.push(entry.point)
+		}
+	}
+
+	return points
+}
+
 // NOTE: One recorded assertion, rendered — every value as the text a reader
 // sees, every point resolved against the Module's span table, and the two
 // operands of an `Equatable` comparison diffed. Rendering happens HERE rather
@@ -982,6 +1041,12 @@ function failureOf(expectation: Expectation, spans: Array<Span>): FailureEvent {
 // Rewriter has to learn.
 export const entryPoints = {
 	registry,
+	// NOTE: Offered here as well as exported, for a runner that can not import
+	// this module at all — the Language Server's session runs a bundle inside a
+	// Worker, whose only way to reach anything is the bundle it was handed. It
+	// indexes what it is given and reads no value, so unlike everything beside
+	// it, it is safe to call from either side of the boundary.
+	registryOf,
 	run: runTests,
 	select: selectTests,
 }

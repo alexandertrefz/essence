@@ -7957,10 +7957,14 @@ function testEntryPointsExport(): estree.ExportNamedDeclaration {
 // NOTE: An instrumented point, which answers with the very value it recorded —
 // so wrapping an Expression in one changes nothing about what that Expression
 // evaluates to, and the Position it carries is the Position of what it wraps.
+//
+// NOTE: A `probe` is the same recording into a different buffer: what a `§?`
+// line asks about belongs to the test rather than to the next assertion, which
+// drains what it was built from.
 function rewriteTestTrace(
 	node: common.typedSimple.TestTraceNode,
 ): estree.Expression {
-	return testingCall("trace", [
+	return testingCall(node.kind === "probe" ? "probe" : "trace", [
 		testContext(),
 		numberLiteral(node.point),
 		rewriteExpression(node.value),

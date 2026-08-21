@@ -809,3 +809,136 @@ describe("Test codegen — the Tests.es fixture", () => {
 		})
 	})
 })
+
+describe("Test codegen — value comments", () => {
+	const probed = `implementation {
+	function double(_ value: Integer) -> Integer {
+		<- value::multiply(with 2)
+	}
+}
+
+tests {
+	constant setup = double(1) §? the setup
+
+	test "answers a line" {
+		constant doubled = double(21) §? what came out
+
+		expect doubled::is(42)
+	}
+}`
+
+	it("records a probed line into the buffer no assertion drains", () => {
+		let emitted = registration(generate(probed))
+
+		expect(emitted).toContain("$testing.probe($context,")
+		expect(emitted).toContain("$testing.trace($context,")
+	})
+
+	it("emits nothing for a build", () => {
+		expect(build(probed)).not.toContain("$testing.probe")
+	})
+
+	it("reports the value of the line, with the span of the Expression", async () => {
+		let { events } = await run(probed)
+		let probes = eventsOf(events, "probe")
+
+		expect(probes).toHaveLength(2)
+		expect(probes[0]).toMatchObject({
+			kind: "probe",
+			span: {
+				start: { line: 8, column: 19 },
+				end: { line: 8, column: 28 },
+				source: "double(1)",
+			},
+			value: "2",
+		})
+		expect(probes[1]).toMatchObject({
+			kind: "probe",
+			span: { source: "double(21)" },
+			value: "42",
+		})
+	})
+
+	it("leaves the assertion's own values to the assertion", async () => {
+		let { events } = await run(probed)
+		let expectations = eventsOf(events, "expect")
+
+		expect(expectations).toHaveLength(1)
+		expect(expectations[0]).toMatchObject({ passed: true, values: [] })
+	})
+
+	it("answers a bare Expression Statement as well as a Declaration", async () => {
+		let { events } = await run(`implementation {
+	function double(_ value: Integer) -> Integer {
+		<- value::multiply(with 2)
+	}
+}
+
+tests {
+	test "answers an Expression" {
+		double(3) §?
+
+		expect true
+	}
+}`)
+
+		expect(eventsOf(events, "probe")[0]).toMatchObject({
+			value: "6",
+			span: { source: "double(3)" },
+		})
+	})
+
+	it("answers a line inside a conditional with the turn that ran", async () => {
+		let { events } = await run(`implementation {
+	function double(_ value: Integer) -> Integer {
+		<- value::multiply(with 2)
+	}
+}
+
+tests {
+	test "answers a nested line" {
+		if true {
+			constant nested = double(5) §?
+
+			expect nested::is(10)
+		} else {
+			constant other = double(6) §?
+
+			expect other::is(12)
+		}
+	}
+}`)
+		let probes = eventsOf(events, "probe")
+
+		expect(probes).toHaveLength(1)
+		expect(probes[0]).toMatchObject({ value: "10" })
+	})
+
+	it("hands one point out per line, however the line was desugared", async () => {
+		let { events } = await run(`implementation {
+	constant lions = { team = "Lions", points = 19 }
+}
+
+tests {
+	test "answers a matched line" {
+		require { points = 19 } = lions §?
+
+		expect true
+	}
+}`)
+
+		expect(eventsOf(events, "probe")).toHaveLength(1)
+	})
+
+	it("says nothing about a `§?` written inside a String", async () => {
+		let { events } = await run(`tests {
+	test "writes a value comment" {
+		constant text = "§? not a comment"
+
+		expect text::is("§? not a comment")
+	}
+}`)
+
+		expect(eventsOf(events, "probe")).toHaveLength(0)
+	})
+})
