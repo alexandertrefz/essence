@@ -1128,6 +1128,24 @@ describe("the test reporter", () => {
 		).toMatchSnapshot()
 	})
 
+	// NOTE: The design's own tail on the summary line. It is about the COMPILE
+	// and the duration beside it is about the run, so a reader is only told it
+	// where it is true of every entry — which the runner works out and the
+	// report is handed.
+	it("notes a warm compile cache, and only when it was one", () => {
+		let run = collectTestRun(events)
+
+		expect(renderTestSummary(run, reportContext, 0, true)).toContain(
+			"compile cache warm",
+		)
+		expect(renderTestSummary(run, reportContext, 0, false)).not.toContain(
+			"compile cache",
+		)
+		expect(renderTestSummary(run, reportContext)).not.toContain(
+			"compile cache",
+		)
+	})
+
 	it("lists what was deselected only when asked", () => {
 		let verbose = renderTestTree(collectTestRun(events), {
 			...reportContext,

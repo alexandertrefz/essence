@@ -271,6 +271,13 @@ export async function runTestWatch(
 						{ cacheOutput: true, sourcemapMode: "inline" },
 					)
 
+		// NOTE: A cycle that compiled nothing is warm by default: the entries it
+		// re-ran are the ones a change reached, and where a change reached none
+		// of them the bundles are exactly the ones the last cycle loaded.
+		let cacheWarm = (compilation?.outcomes ?? []).every(
+			(outcome) => outcome.cached,
+		)
+
 		if (compilation !== null) {
 			recordGraphs(compilation)
 			await watcher.watch([
@@ -502,7 +509,7 @@ export async function runTestWatch(
 					)}  ${palette.faint(timestamp())}`,
 				)
 
-				printReport(context, run, sources, coverage, written)
+				printReport(context, run, sources, coverage, written, cacheWarm)
 				footer()
 			}
 

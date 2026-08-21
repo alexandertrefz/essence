@@ -135,6 +135,7 @@ function outcome(overrides: Partial<CompileOutcome> = {}): CompileOutcome {
 		gzipBytes: 512,
 		failedStage: null,
 		stack: null,
+		cached: false,
 		...overrides,
 	}
 }
