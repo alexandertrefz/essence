@@ -408,6 +408,36 @@ describe("Selection", () => {
 		).toEqual(["run", "tag", "tag"])
 	})
 
+	// NOTE: What a reader types is what a reader SAW, and what a reader saw is
+	// the rendered name — a row of a table test, or a name with a hole in it.
+	// The template still matches, so a filter written against the source works
+	// as well.
+	test("filters on the name a run renders", () => {
+		let registry = registryOf([
+			module(
+				[
+					manifest("/a", {
+						name: "{scored}–{conceded} is a win",
+						interpolated: true,
+					}),
+					manifest("/b"),
+				],
+				(context) => {
+					entry(context, 0, string("2–0 is a win"), () => {})
+				},
+			),
+		])
+		let rendered = selectTests(registry, { filter: "2–0" })
+		let template = selectTests(registry, { filter: "{scored}" })
+		let neither = selectTests(registry, { filter: "3–1" })
+
+		expect(rendered.selections[0]?.state).toBe("run")
+		expect(rendered.matched).toBe(1)
+		expect(template.selections[0]?.state).toBe("run")
+		expect(neither.selections[0]?.state).toBe("deselected")
+		expect(neither.matched).toBe(0)
+	})
+
 	test("filters on the name template", () => {
 		let registry = registryOf([
 			module(

@@ -261,7 +261,7 @@ export function runSuites(
 	// draw from the same one — which is what makes the replay a report prints
 	// reproduce a whole run and not just one file of it.
 	properties: PropertyOptions = {},
-): { planned: number; focused: boolean } {
+): { planned: number; focused: boolean; matched: number } {
 	let selected = all.map((suite) =>
 		suite.tests.select(suite.registry, filters),
 	)
@@ -309,7 +309,17 @@ export function runSuites(
 		})
 	}
 
-	return { planned, focused }
+	return {
+		planned,
+		focused,
+		// NOTE: Across every bundle, because a filter names a test and the run
+		// is what holds the tests — a name that matches nothing in this file
+		// and something in the next one matched the run.
+		matched: selected.reduce(
+			(total, selection) => total + selection.matched,
+			0,
+		),
+	}
 }
 
 // NOTE: `--skip-tag` wins over `--tag`, and a project's configured default is a
@@ -373,6 +383,26 @@ export function reportUnknownTags(
 			)} ${context.palette.muted(`no test carries tag "${tag}"`)}`,
 		)
 	}
+}
+
+// NOTE: A filter that named nothing. `--tag` says so already, and a `--filter`
+// that quietly reports "0 passed" is the worse half of the pair: a run that
+// selected nothing looks exactly like a run where everything held — and the
+// replay a failing property test prints is spelled with a `-f`.
+export function reportUnmatchedFilter(
+	context: CLIContext,
+	filter: string | null,
+	matched: number,
+): void {
+	if (filter === null || matched > 0) {
+		return
+	}
+
+	context.terminal.err(
+		`  ${context.palette.warning(
+			context.theme.symbols.warning,
+		)} ${context.palette.muted(`no test name contains "${filter}"`)}`,
+	)
 }
 
 // NOTE: A Module's own top-level output — a `Terminal.print` outside any test —
@@ -631,6 +661,7 @@ export async function runTest(
 	let restore = redirectStdout()
 	let suites: Array<LoadedSuite>
 	let run: TestRun = emptyRun
+	let matchedNames = 0
 
 	try {
 		suites = claimRegistries(
@@ -650,7 +681,7 @@ export async function runTest(
 		)
 
 		let started = performance.now()
-		let { focused } = runSuites(
+		let { focused, matched } = runSuites(
 			suites,
 			suites,
 			filters,
@@ -666,6 +697,7 @@ export async function runTest(
 		// duration measured around the loop, which is put back below.
 		let duration = performance.now() - started
 
+		matchedNames = matched
 		run = { ...collectTestRun(events), duration }
 
 		emit({
@@ -690,6 +722,7 @@ export async function runTest(
 		...filters.tags,
 		...context.options.skipTag,
 	])
+	reportUnmatchedFilter(context, filters.filter, matchedNames)
 
 	let coverage = context.options.coverage
 		? collectCoverage(events)

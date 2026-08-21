@@ -447,11 +447,11 @@ export const commands: Array<CommandSpec> = [
 				placeholder: "text",
 				summary: "Run only the tests whose name contains this",
 				details:
-					"Matched against the name as it is written. A name with a " +
-					"hole in it — an interpolated name — is matched on the " +
-					"template, because what fills the hole is worked out where " +
-					"the test stands and selection happens before anything has " +
-					"run.",
+					"Matched against the name as the report shows it, and " +
+					"against the template it was written as — so a row of a " +
+					"table test is selected by what fills its holes, and a " +
+					"name with a hole in it is still selected by the text " +
+					"around them. A filter that names no test says so.",
 			},
 			{
 				name: "tag",

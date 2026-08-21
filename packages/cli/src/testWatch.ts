@@ -22,6 +22,7 @@ import {
 	loadBundles,
 	printReport,
 	redirectStdout,
+	reportUnmatchedFilter,
 	resolveFilters,
 	runSuites,
 	type TestFilters,
@@ -372,7 +373,7 @@ export async function runTestWatch(
 			// ones on disk now.
 			let stored = await readSnapshots(sources.keys())
 
-			runSuites(
+			let { matched } = runSuites(
 				suites,
 				toRun,
 				filters,
@@ -397,6 +398,8 @@ export async function runTestWatch(
 					cases: context.options.cases,
 				},
 			)
+
+			reportUnmatchedFilter(context, filters.filter, matched)
 
 			// NOTE: Everything a Module wrote as it was evaluated has been
 			// written by now, so stdout goes back to being the report's before
