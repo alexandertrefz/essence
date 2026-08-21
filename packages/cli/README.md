@@ -62,6 +62,12 @@ naming them in the nearest `package.json`:
 { "essence": { "test": { "skipTags": ["slow"] } } }
 ```
 
+A test runs once per row of a table it is written `across`, and a
+`matches snapshot` compares against a value the first run records — inline in
+the source, or in `__snapshots__/<File>.es.snap` beside it where the snapshot
+was given a name. `--update` records a snapshot that differs rather than
+reporting it.
+
 The exit code is 0 when everything that ran passed, 1 when a test failed, and 2
 when a run nobody narrowed still holds a `focused` test.
 

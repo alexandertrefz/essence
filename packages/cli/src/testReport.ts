@@ -19,7 +19,7 @@ import {
 } from "@essence-lang/compiler/testing"
 
 import type { ReportContext } from "./report"
-import { formatDuration } from "./report"
+import { formatDuration, pluralise } from "./report"
 
 // NOTE: Everything a person READS about a test run is produced here, as
 // strings, so that the shape of the report can be asserted on without a
@@ -31,12 +31,15 @@ import { formatDuration } from "./report"
 // through one name from inside the command line, wherever it is defined.
 export {
 	collectCoverage,
+	collectSnapshots,
 	collectTestRun,
 	type CoverageSummary,
 	emptyCoverage,
 	emptyRun,
 	type FocusedTest,
 	focusedTestsDiagnostic,
+	readSnapshots,
+	type SnapshotRecord,
 	type TestCounts,
 	type TestRecord,
 	type TestRun,
@@ -44,6 +47,7 @@ export {
 	testFailureDiagnostic,
 	toCoverageJson,
 	toLcov,
+	writeSnapshots,
 } from "@essence-lang/compiler/testing"
 
 const INDENT = "  "
@@ -188,6 +192,10 @@ export function renderTestTree(
 export function renderTestSummary(
 	run: TestRun,
 	context: ReportContext,
+	// NOTE: What the run RECORDED, which is not what it counted: a snapshot
+	// written for the first time is a pass that left something on disk, and a
+	// reader has to be told it happened without reading a diff to find out.
+	snapshots = 0,
 ): string {
 	let { palette, theme } = context
 	let { counts } = run
@@ -211,6 +219,10 @@ export function renderTestSummary(
 
 	if (counts.deselected > 0) {
 		parts.push(palette.muted(`${counts.deselected} deselected`))
+	}
+
+	if (snapshots > 0) {
+		parts.push(palette.muted(`${pluralise(snapshots, "snapshot")} written`))
 	}
 
 	return ` ${parts.join("  ")}  ${palette.faint(
@@ -395,11 +407,12 @@ export function renderTestReport(
 	run: TestRun,
 	context: ReportContext,
 	sourceOf: SourceLookup,
+	snapshots = 0,
 ): { tree: string; failures: string; summary: string } {
 	return {
 		tree: renderTestTree(run, context).join("\n"),
 		failures: renderTestFailures(run, context, sourceOf).join("\n"),
-		summary: renderTestSummary(run, context),
+		summary: renderTestSummary(run, context, snapshots),
 	}
 }
 

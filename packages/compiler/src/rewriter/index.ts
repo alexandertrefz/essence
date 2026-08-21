@@ -8175,6 +8175,33 @@ function rewriteTestTrace(
 function rewriteTestAssertion(
 	node: common.typedSimple.TestAssertionStatementNode,
 ): estree.Statement {
+	// NOTE: A snapshot is recorded rather than tested: what it hands over is
+	// the rendered text, which slot of the source a recorded value stands in,
+	// and what stands there now. Whether that holds is the runtime's question,
+	// because only the run knows what a stored snapshot says.
+	if (node.snapshot !== null) {
+		return {
+			type: "ExpressionStatement",
+			expression: testingCall("snapshotted", [
+				testContext(),
+				numberLiteral(node.point),
+				{ type: "Literal", value: node.form },
+				{
+					type: "ObjectExpression",
+					properties: [
+						property("name", literalOrNull(node.snapshot.name)),
+						property(
+							"recorded",
+							literalOrNull(node.snapshot.recorded),
+						),
+						property("slot", numberLiteral(node.snapshot.slot)),
+					],
+				},
+				rewriteExpression(node.value),
+			]),
+		}
+	}
+
 	return {
 		type: "ExpressionStatement",
 		expression: testingCall(

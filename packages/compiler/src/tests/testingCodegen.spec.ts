@@ -102,6 +102,10 @@ type Run = {
 async function run(
 	source: string,
 	filters?: Parameters<typeof entryPoints.run>[1]["filters"],
+	options: {
+		snapshots?: Parameters<typeof entryPoints.run>[1]["snapshots"]
+		update?: boolean
+	} = {},
 ): Promise<Run> {
 	let before = registry().modules.length
 	let { loaded, dispose } = await load(generate(source))
@@ -118,6 +122,8 @@ async function run(
 			sink: (event) => events.push(event),
 			now: () => 0,
 			filters,
+			snapshots: options.snapshots,
+			update: options.update,
 		})
 
 		return { events, summary }
@@ -157,6 +163,21 @@ const tableTest = `implementation {
 tests {
 	test "{n} doubled" across [1, 2, 3] (n: Integer) {
 		expect twice(n)::isLessThan(6)
+	}
+}`
+
+const snapshotTest = `implementation {
+	function greeting(_ name: String) -> String {
+		<- "Hello, {name}"
+	}
+}
+
+tests {
+	test "renders" {
+		expect greeting("Lions") matches snapshot
+		expect greeting("Tigers") matches snapshot "Hello, Tigers"
+		expect greeting("Bears") matches snapshot from "bears"
+		expect greeting("Wolves") matches snapshot "Hello, Foxes"
 	}
 }`
 
@@ -1042,6 +1063,70 @@ tests {
 				event.kind === "test-start" ? event.name : "",
 			),
 		).toEqual(["2 doubled"])
+	})
+
+	it("hands a snapshot the rendered value and the slot to write into", () => {
+		let emitted = registration(generate(snapshotTest))
+
+		expect(emitted).toContain("$testing.snapshotted($context, ")
+		expect(emitted).toContain('name: "bears"')
+		expect(emitted).toContain('recorded: "Hello, Tigers"')
+	})
+
+	it("records a new snapshot, matches a recorded one and reports a difference", async () => {
+		let { events, summary } = await run(snapshotTest)
+
+		expect(
+			eventsOf(events, "snapshot").map((event) =>
+				event.kind === "snapshot"
+					? [event.name, event.status, event.text]
+					: [],
+			),
+		).toEqual([
+			[null, "written", "Hello, Lions"],
+			[null, "matched", "Hello, Tigers"],
+			["bears", "written", "Hello, Bears"],
+			[null, "mismatched", "Hello, Wolves"],
+		])
+		expect(summary.failed).toBe(1)
+	})
+
+	it("compares a stored snapshot with what the run was handed", async () => {
+		let { events } = await run(snapshotTest, undefined, {
+			snapshots: { "": { bears: "Hello, Bears" } },
+		})
+
+		expect(
+			eventsOf(events, "snapshot").flatMap((event) =>
+				event.kind === "snapshot" && event.name === "bears"
+					? [event.status]
+					: [],
+			),
+		).toEqual(["matched"])
+	})
+
+	it("records a difference instead of reporting it when asked to", async () => {
+		let { events, summary } = await run(snapshotTest, undefined, {
+			update: true,
+		})
+
+		expect(
+			eventsOf(events, "snapshot").flatMap((event) =>
+				event.kind === "snapshot" && event.status === "mismatched"
+					? [event.text]
+					: [],
+			),
+		).toEqual([])
+		expect(summary.failed).toBe(0)
+	})
+
+	it("says where a recorded value would be written", async () => {
+		let { events } = await run(snapshotTest)
+		let first = eventsOf(events, "snapshot")[0]
+
+		expect(first?.kind === "snapshot" ? first.span?.source : "").toBe(
+			"snapshot",
+		)
 	})
 
 	it("leaves the Constant a Matcher's assertion synthesized alone", async () => {

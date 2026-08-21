@@ -9,7 +9,8 @@
 	"exports": {
 		".": "./src/index.ts",
 		"./cli": "./src/cli.ts",
-		"./doc": "./src/doc.ts"
+		"./doc": "./src/doc.ts",
+		"./snapshots": "./src/snapshots.ts"
 	},
 	"bin": {
 		"esfmt": "bin/esfmt"

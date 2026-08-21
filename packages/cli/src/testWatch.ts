@@ -29,9 +29,12 @@ import {
 } from "./test"
 import {
 	collectCoverage,
+	collectSnapshots,
 	collectTestRun,
 	emptyCoverage,
+	readSnapshots,
 	renderNoTests,
+	writeSnapshots,
 } from "./testReport"
 import { createDependentsIndex, createSourceWatcher } from "./watcher"
 
@@ -122,6 +125,18 @@ export async function runTestWatch(
 		let events: Array<TestEvent> = []
 
 		for (let inputFileName of inputFileNames) {
+			events.push(...(eventsByEntry.get(inputFileName) ?? []))
+		}
+
+		return events
+	}
+
+	// NOTE: What THIS cycle's entries wrote, which is what a snapshot write
+	// acts on — everything else is on disk from an earlier cycle already.
+	let cycleEvents = (entries: Array<string>): Array<TestEvent> => {
+		let events: Array<TestEvent> = []
+
+		for (let inputFileName of entries) {
 			events.push(...(eventsByEntry.get(inputFileName) ?? []))
 		}
 
@@ -350,6 +365,13 @@ export async function runTestWatch(
 				eventsByEntry.set(suite.inputFileName, [])
 			}
 
+			// NOTE: Read afresh every cycle. A watching session is exactly the
+			// one that sees a `__snapshots__` file change under it — a
+			// `--update` run in another terminal, an editor's "Accept
+			// snapshot" — and the entries it compares against have to be the
+			// ones on disk now.
+			let stored = await readSnapshots(sources.keys())
+
 			runSuites(
 				suites,
 				toRun,
@@ -364,6 +386,7 @@ export async function runTestWatch(
 					}
 				},
 				context.options.coverage,
+				{ stored, update: context.options.update },
 			)
 
 			// NOTE: Everything a Module wrote as it was evaluated has been
@@ -383,6 +406,26 @@ export async function runTestWatch(
 			let coverage = context.options.coverage
 				? collectCoverage(allEvents())
 				: emptyCoverage
+			// NOTE: This cycle's own snapshots, not every cycle's — a snapshot
+			// written two saves ago is on disk already, and writing it again
+			// would rewrite a file nothing asked about.
+			let written = await writeSnapshots({
+				snapshots: collectSnapshots(
+					cycleEvents(toRun.map((suite) => suite.inputFileName)),
+				),
+				sources,
+				stored,
+				inline: (await import("@essence-lang/formatter/snapshots"))
+					.writeInlineSnapshots,
+			})
+
+			for (let problem of written.problems) {
+				terminal.err(
+					`  ${palette.warning(
+						theme.symbols.warning,
+					)} ${palette.muted(problem)}`,
+				)
+			}
 
 			// NOTE: Compile Diagnostics go to stderr whatever was asked for,
 			// including under --json: they are not events, and a file that
@@ -438,7 +481,7 @@ export async function runTestWatch(
 					)}  ${palette.faint(timestamp())}`,
 				)
 
-				printReport(context, run, sources, coverage)
+				printReport(context, run, sources, coverage, written)
 				footer()
 			}
 

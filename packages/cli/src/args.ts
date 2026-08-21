@@ -78,6 +78,10 @@ export type OptionValues = {
 	coverage: boolean
 	coverageReport: CoverageReportFormat | null
 	coverageOut: string | undefined
+	// NOTE: Whether a snapshot that DIFFERS is recorded rather than reported.
+	// One nothing has recorded is written either way — the first run of a new
+	// snapshot is what records it.
+	update: boolean
 }
 
 export type Invocation = {
@@ -119,6 +123,7 @@ export const emptyOptions: OptionValues = {
 	coverage: false,
 	coverageReport: null,
 	coverageOut: undefined,
+	update: false,
 }
 
 // NOTE: The two flags as the Compiler reads them. Nothing named means every
@@ -488,6 +493,7 @@ export function parseArguments(
 				command,
 			),
 			coverageOut: values["coverage-out"] as string | undefined,
+			update: values.update === true,
 		},
 		files: parsed.positionals.map((positional) => String(positional)),
 		programArguments: program,

@@ -146,6 +146,42 @@ was written in.
 branches and the scope each point stands in, none of which lcov can spell. Both
 write into `coverage/`, or into `--coverage-out <directory>`.
 
+## Tables, snapshots and examples
+
+A test written `across` a List of rows runs once per row, with the row bound to
+the name after it and the test's own name interpolating whatever the row holds
+— so the report says which row failed:
+
+```essence
+test "{scored}–{conceded}" across [
+	{ scored = 2, conceded = 1 },
+	{ scored = 1, conceded = 1 },
+] ({ scored, conceded }: Scoreline) {
+	expect scored::isGreaterThanOrEqualTo(conceded)
+}
+```
+
+The rows are written where the test is, because each of them is a test in its
+own right and carries its row number in the identity everything durable is
+keyed by.
+
+`matches snapshot` compares a value against one a run recorded. Written bare, it
+is recorded **inline**: the first run writes the value back into the source
+through the formatter, and the diff is where it is reviewed. Written
+`from "name"`, it is kept in `__snapshots__/<File>.es.snap` beside the source,
+which is where output too large to read inline belongs:
+
+```essence
+test "renders the table" {
+	expect Table.render(table) matches snapshot from "after-round-7"
+}
+```
+
+A snapshot nothing has recorded is written and the test passes; one that differs
+is a failure with the difference as a note, and `essence test --update` records
+it instead. In an editor, the "Accept snapshot" lens above the test does the
+same for that test alone.
+
 ## Conventions worth keeping
 
 None of these are enforced. They are what the repository itself does.

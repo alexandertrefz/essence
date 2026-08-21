@@ -192,6 +192,7 @@ export type DiagnosticCode =
 	| "lonely-tag"
 	| "table-not-written"
 	| "table-parameters"
+	| "snapshot-not-printable"
 	// Names — declared twice, never declared, or not what the position wants.
 	| "duplicate-variable"
 	| "duplicate-type"

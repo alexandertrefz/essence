@@ -508,6 +508,18 @@ export const commands: Array<CommandSpec> = [
 					"file is called lcov.info or coverage.json after the " +
 					"format.",
 			},
+			{
+				name: "update",
+				type: "boolean",
+				summary: "Record every snapshot this run produced",
+				details:
+					"An inline `matches snapshot` is written back into the " +
+					"source through the formatter, and a stored one into the " +
+					"file's `__snapshots__` companion. A snapshot nothing has " +
+					"recorded is written whether this is asked for or not — " +
+					"what it asks for is REPLACING one that differs, which is " +
+					"otherwise the failure.",
+			},
 			jobsOption,
 		],
 		examples: [
@@ -534,6 +546,10 @@ export const commands: Array<CommandSpec> = [
 			{
 				command: `${PROGRAM} test --coverage-report lcov`,
 				description: "Report what the tests reached, and write lcov",
+			},
+			{
+				command: `${PROGRAM} test --update`,
+				description: "Accept every snapshot this run produced",
 			},
 		],
 	},

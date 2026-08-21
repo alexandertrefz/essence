@@ -13,8 +13,34 @@ function identityKey(
 	modulePath: string,
 	suitePath: Array<string>,
 	name: string,
+	row: number | null = null,
 ): string {
-	return testIdentityKey({ modulePath, suitePath, name })
+	return testIdentityKey({ modulePath, suitePath, name }, row)
+}
+
+// NOTE: Every id one written test stands for — one for an ordinary test, and
+// one per ROW of a table test, because a row is a test in its own right and
+// carries its row number as the last step of its identity. The rows are counted
+// off the written List, which is the only reason a table test's rows have to be
+// written where the test is.
+function identitiesOf(
+	node: parser.TestNode,
+	modulePath: string,
+	suitePath: Array<string>,
+	name: string,
+): Array<string> {
+	let rows =
+		node.table?.value.nodeType === "ListValue"
+			? node.table.value.values.length
+			: null
+
+	if (rows === null) {
+		return [identityKey(modulePath, suitePath, name)]
+	}
+
+	return Array.from({ length: rows }, (_unused, row) =>
+		identityKey(modulePath, suitePath, name, row),
+	)
 }
 
 // NOTE: The Run and Debug lenses above every `test` and every `suite`. The
@@ -30,11 +56,14 @@ function identityKey(
 // and no client should be spelling one.
 
 export type TestLensCommand =
-	// NOTE: The two the extension must bind. `essence.test.run` runs the ids;
-	// `essence.test.debug` runs them under the debug adapter. Both take one
-	// argument — see `TestLensArguments` — so a client binds two commands and
-	// reads one shape.
-	"essence.test.run" | "essence.test.debug"
+	// NOTE: The three the extension must bind. `essence.test.run` runs the ids;
+	// `essence.test.debug` runs them under the debug adapter;
+	// `essence.test.acceptSnapshot` re-runs them and RECORDS whatever they
+	// produce, which is `essence test --update` narrowed to what a reader is
+	// looking at, and is offered only where a run left something to accept.
+	// All three take one argument — see `TestLensArguments` — so a client binds
+	// three commands and reads one shape.
+	"essence.test.run" | "essence.test.debug" | "essence.test.acceptSnapshot"
 
 export type TestLensArguments = {
 	// NOTE: Structural ids, exactly as every event spells them. A suite carries
@@ -60,8 +89,15 @@ export type TestLens = {
 export function findTestLenses(
 	program: parser.Program,
 	filePath: string,
+	// NOTE: The tests whose last run left a snapshot to accept — one nothing
+	// had recorded, or one that differs. A lens to accept a snapshot is offered
+	// only over those: an "Accept snapshot" above every test in the file would
+	// be a button that usually does nothing.
+	pendingSnapshots: ReadonlySet<string> = new Set(),
 ): Array<TestLens> {
 	let lenses: Array<TestLens> = []
+	let accepting = (ids: Array<string>): boolean =>
+		ids.some((id) => pendingSnapshots.has(id))
 
 	// NOTE: The ids under a node, gathered as the walk unwinds, so that a suite
 	// carries what its tests carry and the walk is one pass.
@@ -74,21 +110,30 @@ export function findTestLenses(
 		for (let node of nodes) {
 			if (node.nodeType === "Test") {
 				let name = nameTemplate(node.name)
-				let id = identityKey(filePath, suitePath, name)
+				let ids = identitiesOf(node, filePath, suitePath, name)
 
-				gathered.push(id)
+				gathered.push(...ids)
 				lenses.push({
 					position: node.keywordPosition,
 					title: "Run",
 					command: "essence.test.run",
-					arguments: { ids: [id], filePath, title: name },
+					arguments: { ids, filePath, title: name },
 				})
 				lenses.push({
 					position: node.keywordPosition,
 					title: "Debug",
 					command: "essence.test.debug",
-					arguments: { ids: [id], filePath, title: name },
+					arguments: { ids, filePath, title: name },
 				})
+
+				if (accepting(ids)) {
+					lenses.push({
+						position: node.keywordPosition,
+						title: "Accept snapshot",
+						command: "essence.test.acceptSnapshot",
+						arguments: { ids, filePath, title: name },
+					})
+				}
 
 				continue
 			}
@@ -121,6 +166,15 @@ export function findTestLenses(
 				command: "essence.test.debug",
 				arguments: { ids: inside, filePath, title: name },
 			})
+
+			if (accepting(inside)) {
+				lenses.push({
+					position: node.keywordPosition,
+					title: "Accept snapshot",
+					command: "essence.test.acceptSnapshot",
+					arguments: { ids: inside, filePath, title: name },
+				})
+			}
 		}
 
 		return gathered
