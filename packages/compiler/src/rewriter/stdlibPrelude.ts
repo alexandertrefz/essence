@@ -9,6 +9,7 @@ import {
 	optimise,
 	type OptimiserOptions,
 	optimiserOptionsKey,
+	withoutCoverage,
 } from "../optimiser/index"
 import { simplify } from "../simplifier/index"
 
@@ -218,13 +219,20 @@ export function buildStdlibPrelude(stdlib: Stdlib): Array<PreludeNamespace> {
 // nothing the `withOptimiserOptions` around the whole rewrite does not.
 let currentOptimiserOptions: OptimiserOptions = defaultOptimiserOptions
 
+// NOTE: Coverage is taken OUT here and nowhere else. The standard library is
+// never instrumented — a report about a project is a report about the project's
+// own files, and counting seventeen library Programs into every bundle would
+// cost far more than the answer is worth. Stripping it at the door also keeps
+// the prelude cache from splitting: a coverage run and a plain one build one
+// prelude between them, because with coverage gone the two Options spell the
+// same key.
 export function withOptimiserOptions<Value>(
 	options: OptimiserOptions,
 	build: () => Value,
 ): Value {
 	let previous = currentOptimiserOptions
 
-	currentOptimiserOptions = options
+	currentOptimiserOptions = withoutCoverage(options)
 
 	try {
 		return build()

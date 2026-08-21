@@ -147,6 +147,11 @@ function rewriteProgram(program: common.typedSimple.Program): string {
 			// Module of a bundle asks for what it names instead — there are
 			// twenty heads to read through there rather than one.
 			...runtimeImports(lonelyRuntimeNames(program)),
+			// NOTE: And the coverage counter directly under them, ahead of
+			// everything a counter could stand in.
+			...(program.coverage === null
+				? []
+				: coverageHead(program.coverage, null)),
 			// NOTE: Imports first — an Essence Method's const reads the runtime
 			// modules those imports bind. Then the Essence-implemented members,
 			// in the two bands `essenceMemberBands` puts them in: the
@@ -399,7 +404,15 @@ function rewriteModuleGraph(
 					? [testEntryPointsExport()]
 					: []),
 			]
-			let names = referencedNames([body, pool, published])
+			// NOTE: Ahead of `referencedNames`, because the head NAMES the
+			// test runtime: a Module instrumented for coverage imports
+			// `$testing` for the counters alone, whether or not it wrote a
+			// `tests` block of its own.
+			let head =
+				module.program.coverage === null
+					? []
+					: coverageHead(module.program.coverage, module.filePath)
+			let names = referencedNames([body, pool, published, head])
 			let preludeNames = [...essenceMembers.keys()].filter((name) =>
 				names.has(name),
 			)
@@ -418,6 +431,10 @@ function rewriteModuleGraph(
 								),
 							]),
 					...moduleImports(module.program, spellings),
+					// NOTE: Under the imports and above everything else, so
+					// that a top-level Statement's own counter finds the name
+					// bound.
+					...head,
 					...pool,
 					...body,
 					...published,
@@ -492,7 +509,7 @@ const runtimeModuleAliases = [
 function lonelyRuntimeNames(program: common.typedSimple.Program): Set<string> {
 	let names = allRuntimeNames()
 
-	if (program.tests !== null) {
+	if (program.tests !== null || program.coverage !== null) {
 		names.add(TESTING_MODULE)
 	}
 
@@ -2563,6 +2580,8 @@ function rewriteExpressionByKind(
 			return rewriteCaseValue(node)
 		case "TestTrace":
 			return rewriteTestTrace(node)
+		case "CoverageCounter":
+			return rewriteCoverageCounter(node)
 		case "Intrinsic":
 			return rewriteIntrinsic(node)
 	}
@@ -4405,6 +4424,10 @@ const compilerOwnedNames = new Set([
 	"$testing",
 	"$context",
 	"$tests",
+	// NOTE: The Module's coverage counter, bound at the head of a Module a
+	// coverage compile instrumented. Every counter in the body calls it by
+	// this name.
+	"$cover",
 	"Object",
 	// NOTE: A counted walk whose bounds escaped safe range converts its start
 	// with it, so a Program declaring its own `BigInt` would take the
@@ -7951,6 +7974,117 @@ function testEntryPointsExport(): estree.ExportNamedDeclaration {
 		},
 		specifiers: [],
 		attributes: [],
+	}
+}
+
+// NOTE: The name a Module's coverage counter is bound to, and the head that
+// binds it: one call registering this Module's table with the test runtime,
+// answering with the Function every counter in the body calls. It is a closure
+// over the Module's own counts rather than a lookup by Module name, so a
+// counter costs one call and one increment.
+const COVERAGE_COUNTER = "$cover"
+
+function coverageCounter(): estree.Identifier {
+	return { type: "Identifier", name: COVERAGE_COUNTER }
+}
+
+// NOTE: The head is emitted BEFORE anything else the Module says, because a
+// top-level Statement is instrumented too and would otherwise call a name that
+// is not bound yet. The table goes with it: what a counter MEANT — where it
+// stands, what kind of thing it counts, what to call it — can not be read back
+// off the emitted JavaScript, so it travels beside the counters it indexes.
+function coverageHead(
+	section: common.typedSimple.CoverageSectionNode,
+	modulePath: string | null,
+): Array<estree.Statement> {
+	return [
+		{
+			type: "VariableDeclaration",
+			kind: "const",
+			declarations: [
+				{
+					type: "VariableDeclarator",
+					id: coverageCounter(),
+					init: testingCall("counters", [
+						{
+							type: "ObjectExpression",
+							properties: [
+								property("module", literalOrNull(modulePath)),
+								property(
+									"points",
+									coveragePoints(section.points),
+								),
+								property(
+									"choices",
+									coverageChoices(section.choices),
+								),
+							],
+						},
+					]),
+				},
+			],
+		},
+	]
+}
+
+function coveragePoints(
+	points: Array<common.typedSimple.CoveragePoint>,
+): estree.ArrayExpression {
+	return {
+		type: "ArrayExpression",
+		elements: points.map((point) => ({
+			type: "ObjectExpression",
+			properties: [
+				property("kind", { type: "Literal", value: point.kind }),
+				property("label", { type: "Literal", value: point.label }),
+				property("scope", { type: "Literal", value: point.scope }),
+				property("position", rangeObject(point.position)),
+				property("refinement", {
+					type: "Literal",
+					value: point.refinement,
+				}),
+				property("tag", literalOrNull(point.tag)),
+			],
+		})),
+	}
+}
+
+function coverageChoices(
+	choices: Array<common.typedSimple.CoverageChoice>,
+): estree.ArrayExpression {
+	return {
+		type: "ArrayExpression",
+		elements: choices.map((choice) => ({
+			type: "ObjectExpression",
+			properties: [
+				property("name", { type: "Literal", value: choice.name }),
+				property("cases", {
+					type: "ArrayExpression",
+					elements: choice.cases.map((tag) => ({
+						type: "Literal" as const,
+						value: tag,
+					})),
+				}),
+				property("position", rangeObject(choice.position)),
+			],
+		})),
+	}
+}
+
+// NOTE: One counter. Standing on its own it counts and answers with nothing;
+// wrapping a Case construction it counts and answers with the very value, so
+// what the Expression evaluates to is unchanged.
+function rewriteCoverageCounter(
+	node: common.typedSimple.CoverageCounterNode,
+): estree.Expression {
+	return {
+		type: "CallExpression",
+		optional: false,
+		callee: coverageCounter(),
+		arguments:
+			node.value === null
+				? [numberLiteral(node.point)]
+				: [numberLiteral(node.point), rewriteExpression(node.value)],
 	}
 }
 

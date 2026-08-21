@@ -782,6 +782,18 @@ function walkChildren(
 
 			return value === node.value ? node : { ...node, value }
 		}
+		// NOTE: And a coverage counter the same way, where it holds anything at
+		// all: a counter standing on its own in a Statement position holds no
+		// Expression, and one wrapping a Case construction is transparent to
+		// every reading but the one that emits it.
+		case "CoverageCounter": {
+			let value =
+				node.value === null
+					? null
+					: walkExpression(node.value, rewrites)
+
+			return value === node.value ? node : { ...node, value }
+		}
 		// NOTE: The leaves — a Literal holds its own value, an Identifier a
 		// name, and neither has anywhere for an Expression to hide.
 		case "StringValue":

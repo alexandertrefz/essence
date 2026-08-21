@@ -735,9 +735,17 @@ export interface ChoiceDeclarationStatementNode {
 	documentation: Documentation | null
 }
 
+// NOTE: `narrows` says that the condition ESTABLISHED something — that the true
+// branch is a doorway, entered with a binding refined to a Type the code above
+// it does not have. It is recorded by the Enricher, which is the only stage that
+// knows: what a branch narrows is read off the typed condition, and checked
+// refinements are erased before the Optimiser sees a Program at all. Coverage
+// reads it, so that "the guarded path and the fallback were each reached" is a
+// question a report can ask of the branches where it means something.
 export interface IfElseStatementNode {
 	nodeType: "IfElseStatement"
 	condition: ExpressionNode
+	narrows: boolean
 	trueBody: Array<ImplementationNode>
 	falseBody: Array<ImplementationNode>
 	position: Position
@@ -746,6 +754,7 @@ export interface IfElseStatementNode {
 export interface IfStatementNode {
 	nodeType: "IfStatement"
 	condition: ExpressionNode
+	narrows: boolean
 	body: Array<ImplementationNode>
 	position: Position
 }

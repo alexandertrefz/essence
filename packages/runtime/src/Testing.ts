@@ -133,6 +133,120 @@ export function registryOf(modules: Array<TestModule>): Registry {
 
 // #endregion
 
+// #region Coverage
+
+// NOTE: What one counter counts, and everything a report needs to say so. It is
+// the Compiler's `CoveragePoint`, spelled here because this module compiles
+// under the runtime's own tsconfig and is inlined into a user's bundle.
+export type CoveragePoint = {
+	kind: "statement" | "branch" | "case" | "construction"
+	label: string
+	scope: string
+	position: Range
+	refinement: boolean
+	tag: string | null
+}
+
+// NOTE: What a Choice DECLARES, so a report can say which of its Cases nothing
+// ever built. A construction is counted where it happens, which may be any
+// Module of the graph; what is declared is known only in the Module that
+// declares it.
+export type CoverageChoice = {
+	name: string
+	cases: Array<string>
+	position: Range
+}
+
+export type CoverageModule = {
+	module: string | null
+	points: Array<CoveragePoint>
+	choices: Array<CoverageChoice>
+}
+
+// NOTE: What the emitted JavaScript calls. Standing alone it counts; handed a
+// value it counts and answers with that very value, so wrapping an Expression
+// in one changes nothing about what it evaluates to.
+export type CoverageCounter = {
+	(point: number): void
+	<Value extends AnyType>(point: number, value: Value): Value
+}
+
+type CoverageRecord = {
+	module: CoverageModule
+	counts: Array<number>
+	// NOTE: What the counts were when the FIRST run began — which is what a
+	// Module's top-level Statements had already added by simply being loaded.
+	// A second run resets to this rather than to zero, because a Module is
+	// evaluated once however many times its tests are run, and zeroing what it
+	// did would report every top-level Statement as never executed.
+	baseline: Array<number> | null
+}
+
+// NOTE: Per BUNDLE, exactly as the test registry beside it is: a bundle inlines
+// this module, so two bundles loaded in one process count into two of these.
+// That is what makes coverage isolated per run without anybody arranging it —
+// a run loads its bundles, reads their counts and drops them.
+const covered: Array<CoverageRecord> = []
+
+// NOTE: Called once per instrumented Module, as the Module is evaluated. It
+// answers with a closure over that Module's own counts, so a counter costs one
+// call and one increment rather than a lookup by Module name.
+export function counters(module: CoverageModule): CoverageCounter {
+	let counts = module.points.map(() => 0)
+
+	covered.push({ module, counts, baseline: null })
+
+	return ((point: number, value?: AnyType) => {
+		counts[point] = (counts[point] ?? 0) + 1
+
+		return value
+	}) as CoverageCounter
+}
+
+// NOTE: What a run counted, per Module — the table the Compiler emitted, with
+// the count each point reached. Asked at the end of a run, and callable at any
+// point during one: `TestContext.coverage` is this, offered to a test that
+// wants to know what it has reached so far.
+export type CoveredPoint = CoveragePoint & { count: number }
+
+export type CoverageReport = {
+	module: string | null
+	points: Array<CoveredPoint>
+	choices: Array<CoverageChoice>
+}
+
+export function coverage(): Array<CoverageReport> {
+	return covered.map((record) => ({
+		module: record.module.module,
+		points: record.module.points.map((point, index) => ({
+			...point,
+			count: record.counts[index] ?? 0,
+		})),
+		choices: record.module.choices,
+	}))
+}
+
+// NOTE: The line between one run and the next. The first call RECORDS what
+// loading the bundle already counted; every call after it puts the counts back
+// to exactly that. A watch session and the Language Server's session both run
+// the same loaded bundle again and again, and without this each cycle would
+// report the sum of every cycle before it.
+export function beginCoverageRun(): void {
+	for (let record of covered) {
+		if (record.baseline === null) {
+			record.baseline = [...record.counts]
+
+			continue
+		}
+
+		for (let index = 0; index < record.counts.length; index += 1) {
+			record.counts[index] = record.baseline[index] ?? 0
+		}
+	}
+}
+
+// #endregion
+
 // #region The per-test context
 
 // NOTE: One recorded value: the point it was recorded at, and what stood there.
@@ -183,6 +297,12 @@ export type TestContext = {
 	probes: Array<Trace>
 	expectations: Array<Expectation>
 	output: Array<OutputChunk>
+	// NOTE: What has been counted so far, asked from inside a running test
+	// rather than only read out at the end of a run. Coverage is a fact about
+	// the BUNDLE and not about one test, so this is the same answer for every
+	// context — it is offered here because the context is what a test holds,
+	// and a capability a test can not reach is a capability it does not have.
+	coverage: () => Array<CoverageReport>
 }
 
 export function createContext(index: number): TestContext {
@@ -193,6 +313,7 @@ export function createContext(index: number): TestContext {
 		probes: [],
 		expectations: [],
 		output: [],
+		coverage,
 	}
 }
 
@@ -592,6 +713,17 @@ export type TestEvent =
 			stream: OutputStream
 			text: string
 	  }
+	// NOTE: What one Module's counters counted, written once per instrumented
+	// Module at the end of a run. Only a run that ASKED for coverage carries
+	// these; every other stream has none, which is what "a consumer ignores
+	// what it does not know" is for.
+	| {
+			schema: 1
+			kind: "coverage"
+			module: string | null
+			points: Array<CoveredPoint>
+			choices: Array<CoverageChoice>
+	  }
 	| {
 			schema: 1
 			kind: "run-end"
@@ -730,6 +862,12 @@ export type RunOptions = {
 	filters?: Filters
 	// NOTE: Handed in so a spec can run the clock itself. `Date.now` otherwise.
 	now?: () => number
+	// NOTE: Whether to write a `coverage` event per instrumented Module when
+	// the run ends, and to put the counts back to what loading the bundle left
+	// them at before it starts. A bundle compiled without `--coverage` has no
+	// counters at all and the events are empty, so asking costs nothing; a
+	// runner that did not ask is not told.
+	coverage?: boolean
 }
 
 export type RunSummary = {
@@ -766,6 +904,12 @@ export function runTests(registry: Registry, options: RunOptions): RunSummary {
 	// name needs — the scope it was written in — and it costs one evaluation of
 	// the setup rather than one per test.
 	let names = renderedNames(registry)
+
+	// NOTE: After the enumeration, which evaluates a Module's setup and would
+	// otherwise be counted into the run that follows it.
+	if (options.coverage === true) {
+		beginCoverageRun()
+	}
 
 	for (let selection of selections) {
 		let entry = selection.test.entry
@@ -805,6 +949,20 @@ export function runTests(registry: Registry, options: RunOptions): RunSummary {
 	}
 
 	summary.duration = now() - started
+
+	// NOTE: Before `run-end`, so that a consumer folding the stream has every
+	// Module's counts in hand by the time the run is declared over.
+	if (options.coverage === true) {
+		for (let report of coverage()) {
+			sink({
+				schema: 1,
+				kind: "coverage",
+				module: report.module,
+				points: report.points,
+				choices: report.choices,
+			})
+		}
+	}
 
 	sink({
 		schema: 1,
@@ -1063,6 +1221,11 @@ export const entryPoints = {
 	registryOf,
 	run: runTests,
 	select: selectTests,
+	// NOTE: What a Module's counters have counted, read from INSIDE the bundle
+	// like everything else here. The report is plain data — numbers and the
+	// table the Compiler emitted — so it crosses the boundary safely once it
+	// has been asked for in here.
+	coverage,
 }
 
 // #endregion

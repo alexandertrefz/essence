@@ -25,6 +25,11 @@ export type Program = {
 	// typed `tests { … }` block into the Statements a runner registers; see
 	// `TestsSectionNode`.
 	tests: TestsSectionNode | null
+	// NOTE: Null in every compile that did not ask for coverage, which is every
+	// build and every ordinary test run. `instrument-coverage` is the only
+	// thing that fills it, and it fills it with the table the counters it wrote
+	// into the Program are indexed by; see `CoverageSectionNode`.
+	coverage: CoverageSectionNode | null
 	exports: ExportSectionNode | null
 }
 
@@ -157,6 +162,54 @@ export interface TestScopeNode {
 
 // #endregion
 
+// #region Coverage
+
+// NOTE: What `instrument-coverage` wrote into a Module, and the only thing that
+// can say what a counter MEANT. The Program carries counter calls indexed into
+// `points`; a report needs to know where each of those stands, what kind of
+// thing it counts and what to call it, and none of that can be read back off
+// the emitted JavaScript. So the table travels with the Module and is emitted
+// beside it.
+export type CoverageSectionNode = {
+	nodeType: "CoverageSection"
+	points: Array<CoveragePoint>
+	// NOTE: Every Choice this Module DECLARES, with its Cases — the denominator
+	// of "which Cases were never constructed". A construction is counted where
+	// it happens, which may be any Module of the graph; what is declared is
+	// known only here.
+	choices: Array<CoverageChoice>
+}
+
+export type CoveragePointKind = "statement" | "branch" | "case" | "construction"
+
+// NOTE: One counter. `label` is what a report calls it — `"else"`, `"case
+// #Postponed"`, `"#Forfeited"` — and `scope` is the Namespace Method or free
+// Function it stands in, so a "not taken" line reads `Standings::compute ›
+// case #Postponed` without the reader going to the file.
+export type CoveragePoint = {
+	kind: CoveragePointKind
+	label: string
+	scope: string
+	position: Position
+	// NOTE: Set on a branch whose condition ESTABLISHED something — the
+	// `if played::isNot(0)` that guards a division. Both sides of such a branch
+	// are worth reporting on separately, which is what refinement coverage is.
+	refinement: boolean
+	// NOTE: The Case a construction point builds, spelled `Choice#Case`. Null
+	// on every other kind.
+	tag: string | null
+}
+
+export type CoverageChoice = {
+	name: string
+	// NOTE: Spelled `Choice#Case`, the way a construction's tag is, so the two
+	// are compared without either side taking a spelling apart.
+	cases: Array<string>
+	position: Position
+}
+
+// #endregion
+
 // #region Expressions
 
 // NOTE: Every Expression and Statement carries the `position` of the typed
@@ -177,6 +230,7 @@ export type ExpressionNode =
 	| ConformanceValueNode
 	| CaseValueNode
 	| TestTraceNode
+	| CoverageCounterNode
 	| IntrinsicNode
 
 // NOTE: An instrumented point: record what stands here, then answer with it.
@@ -200,6 +254,26 @@ export interface TestTraceNode {
 	// NOTE: Indexes the Module's span table — see `TestsSectionNode.spans`.
 	point: number
 	value: ExpressionNode
+	type: Type
+	position?: Position
+}
+
+// NOTE: A coverage counter — "control arrived here", counted. It is the same
+// idea as a trace and deliberately not the same Node: a trace records a VALUE
+// against a per-test context and is read by the assertion that drained it, and
+// a counter records that control arrived, against the Module, whether a test is
+// running or not. The two tables are separate for the same reason.
+//
+// NOTE: `value` is null in Statement position, where the counter stands on its
+// own. It is set where a counter has to answer with something — a Choice Case
+// built inside an Expression — and the emitted call answers with the very value
+// it was handed, so wrapping an Expression in one changes nothing about what it
+// evaluates to.
+export interface CoverageCounterNode {
+	nodeType: "CoverageCounter"
+	// NOTE: Indexes the Module's coverage table — see `CoverageSectionNode`.
+	point: number
+	value: ExpressionNode | null
 	type: Type
 	position?: Position
 }
@@ -1208,6 +1282,11 @@ export interface TypeAliasStatementNode {
 export interface ConditionalStatementNode {
 	nodeType: "ConditionalStatement"
 	condition: ExpressionNode
+	// NOTE: That the condition ESTABLISHED something — see the typed
+	// `IfElseStatementNode`, which is where the Enricher records it. Carried
+	// through simplification because `instrument-coverage` reads it and
+	// checked refinements are erased before any pass runs.
+	narrows: boolean
 	// NOTE: That `condition` is a RAW JavaScript boolean rather than an Essence
 	// Boolean, so the Rewriter emits it as the `if`'s question instead of
 	// reading `.value` off it — `lower-matches-to-statements` sets it where the

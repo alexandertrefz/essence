@@ -108,6 +108,12 @@ export function isPureExpression(
 		// value is unread, and the recording is the whole point of it.
 		case "TestTrace":
 			return false
+		// NOTE: And a counter WRITES too — into the Module's coverage table —
+		// so nothing may pool one, hoist it out of the branch it belongs to or
+		// drop it where the value it answers with is unread. Counting is the
+		// whole point of it.
+		case "CoverageCounter":
+			return false
 		case "Intrinsic":
 			return isPureIntrinsic(node, shadowed)
 	}
