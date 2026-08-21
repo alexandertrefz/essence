@@ -47,6 +47,7 @@ export function test(
 	name: parser.TestNode["name"],
 	modifiers: Array<parser.TestModifierNode>,
 	table: parser.TestTableNode | null,
+	properties: parser.TestPropertiesNode | null,
 	body: Array<parser.ImplementationNode>,
 	keywordPosition: common.Position,
 	position: common.Position,
@@ -56,6 +57,7 @@ export function test(
 		name,
 		modifiers,
 		table,
+		properties,
 		body,
 		keywordPosition,
 		position,
@@ -72,6 +74,21 @@ export function testTable(
 	return {
 		nodeType: "TestTable",
 		value,
+		parameters,
+		parameterListPosition,
+		keywordPosition,
+		position,
+	}
+}
+
+export function testProperties(
+	parameters: Array<parser.ParameterNode>,
+	parameterListPosition: common.Position,
+	keywordPosition: common.Position,
+	position: common.Position,
+): parser.TestPropertiesNode {
+	return {
+		nodeType: "TestProperties",
 		parameters,
 		parameterListPosition,
 		keywordPosition,

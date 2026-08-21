@@ -126,6 +126,7 @@ function continuesExpression(
 // None of them is a Keyword, so `constant across = 1` and `matches::isEmpty()`
 // are still what they say.
 const ACROSS = "across"
+const ANY = "any"
 const MATCHES = "matches"
 const SNAPSHOT = "snapshot"
 
@@ -814,6 +815,9 @@ class DescentParser {
 		let name = this.parseTestName()
 		let modifiers = this.parseTestModifiers()
 		let table = this.startsTestTable() ? this.parseTestTable() : null
+		let properties = this.startsTestProperties()
+			? this.parseTestProperties()
+			: null
 
 		let outerInsideTestBody = this.insideTestBody
 		this.insideTestBody = true
@@ -825,6 +829,7 @@ class DescentParser {
 				name,
 				modifiers,
 				table,
+				properties,
 				block.body,
 				keyword.position,
 				{ start: keyword.position.start, end: block.position.end },
@@ -832,6 +837,44 @@ class DescentParser {
 		} finally {
 			this.insideTestBody = outerInsideTestBody
 		}
+	}
+
+	// NOTE: `for any` is the one two-word opener in the grammar. `for` is a
+	// Keyword and `any` is an ordinary name, so the pair is read together: a
+	// `for` with anything else behind it opens nothing here, and `constant any =
+	// 1` is still a Declaration of a name.
+	protected startsTestProperties(): boolean {
+		if (this.tokens.peek()?.type !== TokenType.KeywordFor) {
+			return false
+		}
+
+		let following = this.tokens.peek(1)
+
+		return (
+			following?.type === TokenType.Identifier && following.value === ANY
+		)
+	}
+
+	// NOTE: `for any (a: Integer, b: NonEmptyList<String>)` — what the runner
+	// generates a value of, once per case. The Parameter list is a closure's, so
+	// the shape reads the way a reader already knows it; the Enricher is what
+	// asks every Parameter for the Type that says what to generate.
+	protected parseTestProperties(): parser.TestPropertiesNode {
+		let keyword = this.tokens.next()
+
+		this.tokens.next()
+
+		let parameterList = this.parseParameterList(true)
+
+		return generators.testProperties(
+			parameterList.parameters,
+			parameterList.position,
+			keyword.position,
+			{
+				start: keyword.position.start,
+				end: parameterList.position.end,
+			},
+		)
 	}
 
 	// NOTE: `across` is recognised by content, the way `matches` is in an
@@ -981,12 +1024,14 @@ class DescentParser {
 
 		let following = this.tokens.peek(1)
 
-		// NOTE: `tagged slow across [ … ]` — the table opens the same way the
-		// body does, so a bare name in front of one is that Modifier's own
-		// argument for exactly the reason it is in front of a `{`.
+		// NOTE: `tagged slow across [ … ]` and `tagged slow for any (…)` — both
+		// open where the body would, so a bare name in front of either is that
+		// Modifier's own argument for exactly the reason it is in front of a
+		// `{`.
 		return (
 			following?.type === TokenType.SymbolComma ||
 			following?.type === TokenType.SymbolLeftBrace ||
+			following?.type === TokenType.KeywordFor ||
 			(following?.type === TokenType.Identifier &&
 				following.value === ACROSS)
 		)

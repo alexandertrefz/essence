@@ -1167,6 +1167,120 @@ describe("Tests Section", () => {
 		})
 	})
 
+	describe("Property tests", () => {
+		it("should read the Parameters the runner generates", () => {
+			let section = testsOf(
+				`implementation {}
+
+				tests {
+					test "add commutes" for any (a: Integer, b: Integer) {
+						expect true
+					}
+				}`,
+			)
+
+			let properties = testAt(section, 0)
+				.properties as parser.TestPropertiesNode
+
+			expect(properties.nodeType).toBe("TestProperties")
+			expect(properties.parameters).toHaveLength(2)
+			expect(
+				properties.parameters.map(
+					(parameter) =>
+						(parameter.internalName as parser.IdentifierNode)
+							.content,
+				),
+			).toEqual(["a", "b"])
+		})
+
+		it("should read an applied Type on a Parameter", () => {
+			let section = testsOf(
+				`implementation {}
+
+				tests {
+					test "keeps every team" for any (teams: NonEmptyList<String>) {
+						expect true
+					}
+				}`,
+			)
+
+			let properties = testAt(section, 0)
+				.properties as parser.TestPropertiesNode
+
+			expect(properties.parameters).toHaveLength(1)
+			expect(properties.parameters[0]?.type?.nodeType).toBe(
+				"GenericTypeDeclaration",
+			)
+		})
+
+		it("should read Modifiers in front of the Parameters", () => {
+			let section = testsOf(
+				`implementation {}
+
+				tests {
+					test "holds" tagged slow for any (a: Integer) {
+						expect true
+					}
+				}`,
+			)
+
+			let node = testAt(section, 0)
+
+			expect(modifierNames(node)).toEqual(["tagged"])
+			expect(
+				argumentsOf(node.modifiers[0] as parser.TestModifierNode),
+			).toEqual(["slow"])
+			expect(node.properties).not.toBeNull()
+		})
+
+		it("should leave 'any' an ordinary name", () => {
+			let { diagnostics, program } = parse(
+				`implementation {
+					constant any = 1
+					constant other = any
+				}`,
+			)
+
+			expect(diagnostics).toEqual([])
+			expect(program.implementation.nodes).toHaveLength(2)
+		})
+
+		it("should span the Keyword through the Parameter list", () => {
+			let section = testsOf(
+				`implementation {}
+
+				tests {
+					test "holds" for any (a: Integer) {
+						expect true
+					}
+				}`,
+			)
+
+			let properties = testAt(section, 0)
+				.properties as parser.TestPropertiesNode
+
+			expect(properties.position).toEqual({
+				start: { line: 4, column: 19 },
+				end: { line: 4, column: 39 },
+			})
+		})
+
+		it("should read a test with neither a table nor Parameters", () => {
+			let section = testsOf(
+				`implementation {}
+
+				tests {
+					test "plain" {
+						expect true
+					}
+				}`,
+			)
+
+			expect(testAt(section, 0).properties).toBeNull()
+			expect(testAt(section, 0).table).toBeNull()
+		})
+	})
+
 	describe("Snapshots", () => {
 		it("should read a snapshot that has never run", () => {
 			let section = testsOf(
