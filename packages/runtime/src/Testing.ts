@@ -527,12 +527,28 @@ export type TestEvent =
 			// where it stands.
 			error: string | null
 	  }
-	| { schema: 1; kind: "test-skip"; id: string; name: string; reason: string }
+	| {
+			schema: 1
+			kind: "test-skip"
+			id: string
+			name: string
+			suitePath: Array<string>
+			module: string | null
+			reason: string
+	  }
+	// NOTE: `suitePath` and `module` on a test that never started, for the same
+	// reason `test-start` carries them: a report groups by where a test was
+	// written, and a skip is reported in its place in that tree rather than in a
+	// list of its own. Nothing can derive them from the id — the id escapes its
+	// steps, and a reader would be parsing an identity it is meant to treat as
+	// opaque.
 	| {
 			schema: 1
 			kind: "test-deselected"
 			id: string
 			name: string
+			suitePath: Array<string>
+			module: string | null
 			reason: DeselectionReason
 	  }
 	| {
@@ -718,6 +734,8 @@ export function runTests(registry: Registry, options: RunOptions): RunSummary {
 				kind: "test-skip",
 				id: entry.id,
 				name,
+				suitePath: entry.suitePath,
+				module: selection.test.module.module,
 				reason: selection.reason,
 			})
 
@@ -731,6 +749,8 @@ export function runTests(registry: Registry, options: RunOptions): RunSummary {
 				kind: "test-deselected",
 				id: entry.id,
 				name,
+				suitePath: entry.suitePath,
+				module: selection.test.module.module,
 				reason: selection.reason,
 			})
 

@@ -570,6 +570,8 @@ describe("The event stream", () => {
 			kind: "test-skip",
 			id: "/a",
 			name: "/a",
+			suitePath: [],
+			module: "/Season.es",
 			reason: "not yet",
 		})
 	})
@@ -593,6 +595,8 @@ describe("The event stream", () => {
 			kind: "test-deselected",
 			id: "/a",
 			name: "/a",
+			suitePath: [],
+			module: "/Season.es",
 			reason: "tag",
 		})
 	})
