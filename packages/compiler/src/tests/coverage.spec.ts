@@ -1,8 +1,9 @@
 import { describe, expect, it } from "bun:test"
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
+import { fixturePath } from "@essence-lang/fixtures"
 import type { common } from "@essence-lang/interfaces"
 import type { entryPoints, TestEvent } from "@essence-lang/runtime/Testing"
 import { registryOf } from "@essence-lang/runtime/Testing"
@@ -473,6 +474,58 @@ tests {
 		} finally {
 			rmSync(directory, { recursive: true, force: true })
 		}
+	})
+})
+
+// NOTE: The repository's own tests fixture, counted. It is the one file in the
+// repository that writes every shape a coverage run has to say something about
+// — a Choice, a Match over all of it, an `else if` chain, a Namespace, a
+// private free Function — so what it counts is a fixed point worth pinning.
+describe("The Tests.es fixture, counted", () => {
+	const fixture = readFileSync(fixturePath("Tests.es"), "utf8")
+
+	it("counts the whole of what loading it and running it reached", async () => {
+		let { summary } = await runWithCoverage(fixture)
+		let [file] = summary.files
+
+		expect(file).toBeDefined()
+		expect(file!.lines).toEqual({ covered: 15, total: 16 })
+		expect(file!.branches).toEqual({ covered: 4, total: 4 })
+		expect(file!.cases).toEqual({ covered: 2, total: 3 })
+	})
+
+	it("names the one arm nothing took", async () => {
+		let { summary } = await runWithCoverage(fixture)
+		let [file] = summary.files
+
+		expect(
+			file!.missed.map((missed) => `${missed.scope} › ${missed.label}`),
+		).toEqual(["pointsFor › case #Loss"])
+	})
+
+	it("finds every Case of its Choice built by something", async () => {
+		let { summary } = await runWithCoverage(fixture)
+
+		expect(neverConstructed(summary)).toEqual([])
+	})
+
+	// NOTE: And this is the fixture's most useful claim. It FOCUSES one test,
+	// so focusing changes which tests run — and changes the coverage not at
+	// all, because what its counters counted is mostly its own Program body,
+	// which runs when the Module is loaded. That is deliberate: a Module is
+	// evaluated once however many times its tests are run, and a run resets the
+	// counts to what LOADING left rather than to zero, so a top-level Statement
+	// is never reported as never executed.
+	it("counts what loading the Module did, whatever the run selects", async () => {
+		let focused = await runWithCoverage(fixture)
+		let all = await runWithCoverage(fixture.replace(" focused {", " {"))
+
+		expect(all.summary.files[0]!.lines).toEqual(
+			focused.summary.files[0]!.lines,
+		)
+		expect(all.summary.files[0]!.cases).toEqual(
+			focused.summary.files[0]!.cases,
+		)
 	})
 })
 

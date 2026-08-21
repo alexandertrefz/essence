@@ -8,6 +8,9 @@ import type { StreamType } from "../Stream"
 import { createString } from "../String"
 import { inspect, write, withOutputSink } from "../Terminal"
 import {
+	beginCoverageRun,
+	coverage,
+	counters,
 	createContext,
 	entry,
 	expected,
@@ -797,6 +800,146 @@ describe("The event stream", () => {
 				text: "second\n",
 			},
 		])
+	})
+})
+
+// NOTE: The counters as the emitted JavaScript uses them: one call per Module
+// answering a Function, and that Function called wherever control arrives.
+// Nothing here compiles anything — a coverage table is plain data.
+describe("The coverage counters", () => {
+	const point = (line: number, overrides = {}) => ({
+		kind: "statement" as const,
+		label: "",
+		scope: "",
+		position: {
+			start: { line, column: 1 },
+			end: { line, column: 9 },
+		},
+		refinement: false,
+		tag: null,
+		...overrides,
+	})
+
+	test("counts a point every time control arrives at it", () => {
+		let count = counters({
+			module: "/Counted.es",
+			points: [point(1), point(2)],
+			choices: [],
+		})
+
+		count(0)
+		count(0)
+		count(1)
+
+		let report = coverage().find((each) => each.module === "/Counted.es")
+
+		expect(report?.points.map((each) => each.count)).toEqual([2, 1])
+	})
+
+	test("answers with the very value it was handed", () => {
+		let count = counters({
+			module: "/Answering.es",
+			points: [point(1, { kind: "construction", tag: "Colour#Red" })],
+			choices: [],
+		})
+		let value = integer(7)
+
+		expect(count(0, value)).toBe(value)
+	})
+
+	test("is queryable from a running test's context", () => {
+		let count = counters({
+			module: "/Asked.es",
+			points: [point(1)],
+			choices: [],
+		})
+		// NOTE: A holder rather than a bare binding, so that TypeScript does
+		// not narrow it to what it was initialised with — the write happens
+		// inside a closure it does not follow.
+		let seen: { count: number | undefined } = { count: undefined }
+		let one = module([manifest("/asks")], (context) => {
+			entry(context, 0, null, () => {
+				count(0)
+				seen.count = context
+					.coverage()
+					.find(
+						(each) => each.module === "/Asked.es",
+					)?.points[0]?.count
+			})
+		})
+
+		runTests(registryOf([one]), { sink: () => {}, now: () => 0 })
+
+		// NOTE: Asked from INSIDE the test, while it is running — coverage is
+		// not a thing that is only dumped when everything is over.
+		expect(seen.count).toBe(1)
+	})
+
+	test("writes a coverage event per Module, only where it was asked", () => {
+		counters({
+			module: "/Reported.es",
+			points: [point(1)],
+			choices: [
+				{ name: "Colour", cases: ["Colour#Red"], position: nowhere },
+			],
+		})
+
+		let one = module([manifest("/a")], (context) => {
+			entry(context, 0, null, () => {})
+		})
+		let silent: Array<TestEvent> = []
+		let loud: Array<TestEvent> = []
+
+		runTests(registryOf([one]), {
+			sink: (event) => silent.push(event),
+			now: () => 0,
+		})
+		runTests(registryOf([one]), {
+			sink: (event) => loud.push(event),
+			now: () => 0,
+			coverage: true,
+		})
+
+		expect(kinds(silent)).not.toContain("coverage")
+
+		let reported = loud.filter((event) => event.kind === "coverage")
+
+		expect(reported.length).toBeGreaterThan(0)
+		expect(reported.some((event) => event.module === "/Reported.es")).toBe(
+			true,
+		)
+		// NOTE: Before the run is declared over, so a consumer folding the
+		// stream has every Module's counts in hand by then.
+		expect(kinds(loud).indexOf("coverage")).toBeLessThan(
+			kinds(loud).indexOf("run-end"),
+		)
+	})
+
+	test("starts a second run where loading the Module left it", () => {
+		let count = counters({
+			module: "/Twice.es",
+			points: [point(1), point(2)],
+			choices: [],
+		})
+		let countsOf = () =>
+			coverage()
+				.find((each) => each.module === "/Twice.es")
+				?.points.map((each) => each.count)
+
+		// NOTE: What a Module's top-level Statements did as it was evaluated.
+		count(0)
+
+		beginCoverageRun()
+		count(1)
+
+		expect(countsOf()).toEqual([1, 1])
+
+		beginCoverageRun()
+
+		// NOTE: The load's count survives; the run's does not. A Module is
+		// evaluated once however many times its tests are run, and zeroing what
+		// it did would report every top-level Statement as never executed.
+		expect(countsOf()).toEqual([1, 0])
 	})
 })
 
