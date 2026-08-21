@@ -61,6 +61,12 @@ export type OptionValues = {
 	// that quietly does nothing.
 	withoutOptimisation: Array<string>
 	jobs: number | undefined
+	// NOTE: How `essence test` narrows a run — a substring of a test's name,
+	// the tags to run, and the tags to leave out. Repeats are unions and
+	// `skipTag` wins over `tag`; see the Command's own details.
+	filter: string | undefined
+	tag: Array<string>
+	skipTag: Array<string>
 }
 
 export type Invocation = {
@@ -96,6 +102,9 @@ export const emptyOptions: OptionValues = {
 	noOptimise: false,
 	withoutOptimisation: [],
 	jobs: undefined,
+	filter: undefined,
+	tag: [],
+	skipTag: [],
 }
 
 // NOTE: The two flags as the Compiler reads them. Nothing named means every
@@ -250,6 +259,35 @@ function readJobs(
 	return value
 }
 
+// NOTE: A tag is a bare lower-case name in the source, and `--tag`/`--skip-tag`
+// match it exactly — so a spelling that could never have been written is a
+// mistake worth refusing here rather than a filter that quietly selects
+// nothing. The rule is the Enricher's own, asked from the reading side: a tag
+// is what it is when it is lower-cased, and it is not empty.
+function readTags(
+	raw: Array<string> | undefined,
+	flag: string,
+	command: CommandSpec,
+): Array<string> {
+	let names = raw ?? []
+
+	for (let name of names) {
+		if (name === "") {
+			throw new UsageError(`${flag} expects a tag.`, command)
+		}
+
+		if (name !== name.toLowerCase()) {
+			throw new UsageError(
+				`${flag} expects a lower-case tag, but got "${name}".`,
+				command,
+				`Did you mean "${flag} ${name.toLowerCase()}"?`,
+			)
+		}
+	}
+
+	return names
+}
+
 // NOTE: A pass name is checked HERE rather than left to the Optimiser, which
 // would simply not find it in the registry and run everything — a misspelt name
 // that silently changed nothing looks exactly like a pass that does not do what
@@ -372,6 +410,17 @@ export function parseArguments(
 				programName,
 			),
 			jobs: readJobs(values.jobs as string | undefined, command),
+			filter: values.filter as string | undefined,
+			tag: readTags(
+				values.tag as Array<string> | undefined,
+				"--tag",
+				command,
+			),
+			skipTag: readTags(
+				values["skip-tag"] as Array<string> | undefined,
+				"--skip-tag",
+				command,
+			),
 		},
 		files: parsed.positionals.map((positional) => String(positional)),
 		programArguments: program,

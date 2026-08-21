@@ -450,6 +450,58 @@ What a test is called, together with the suites around it, is what identifies it
 — to a stored snapshot, to a stored counterexample, and to the editor. Say what
 each of them proves, so that a report names the one that failed.
 
+### `test-failed`
+
+An `expect` or a `require` did not hold while the test was running. Unlike every
+other code on this page it is not reported by a compile: `essence test` reports
+it, and so does the editor's live session, so that a failing assertion is a
+squiggle in the Problems list rather than something only a terminal knows about.
+
+```
+[test-failed]
+Error: 'Standing › the leader is two points clear' failed
+    ╭─┤ Season.tests.es:14:9 │
+    │
+ 14 │        expect leader.points::subtract(second.points)::is(2)
+    │               ──────┬────── ──────────┬──────────── ──┬──
+    │                     ╰─────────────────│───────────────│─── 19
+    │                                       ╰───────────────│─── 3
+    │                                                       ╰─── this expect failed
+    │
+    │ Note: `is` compared 3 with 2
+────╯
+```
+
+The Labels are the values the assertion evaluated on its way to `false` — every
+sub-expression the compile recorded, at the span it was written at. There is
+nothing to fix in the assertion itself: either the Program is wrong, or the test
+is, and the values are what says which.
+
+### `focused-tests-remain`
+
+A run nobody narrowed — no `--filter`, no `--tag`, no `--skip-tag`, which is
+what CI runs — still holds a `focused` test. Focusing silences every other test,
+so such a run did not answer the question it was asked, and `essence test` exits
+non-zero and names every test the focus was left on. Reported by the runner
+rather than by a compile; while iterating, a filter makes the same run say
+nothing about focus.
+
+```
+[focused-tests-remain]
+Error: This test is still focused
+    ╭─┤ Season.tests.es:14:2 │
+    │
+ 14 │        test "the leader is two points clear" focused {
+    │        ──┬─
+    │          ╰── only focused tests ran
+    │
+    │ Help: Remove `focused` before this lands, or narrow the run with
+    │       --filter or --tag while you are iterating.
+    │ Note: A focused test silences every other test of the run, so a run
+    │       nobody narrowed has not answered the question it was asked.
+────╯
+```
+
 ## Names
 
 ### `duplicate-variable`

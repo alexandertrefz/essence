@@ -171,7 +171,22 @@ export async function runCompilation(
 // NOTE: Diagnostics go to stderr and the report goes to stdout — a build whose
 // output is being read by another process should not have its Diagnostics
 // folded into that stream, and a build being watched by a human should show
-// both.
+// both. Separate from the report because a command may want one without the
+// other: `essence test` reports a RUN rather than a compilation, and still has
+// to say what the compile found.
+export function printDiagnostics(
+	context: CLIContext,
+	result: CompilationResult,
+): void {
+	for (let outcome of result.outcomes) {
+		let rendered = renderDiagnosticsFor(outcome, context.report)
+
+		if (rendered !== null) {
+			context.terminal.err(rendered)
+		}
+	}
+}
+
 export function printCompilationResult(
 	context: CLIContext,
 	result: CompilationResult,
@@ -180,13 +195,7 @@ export function printCompilationResult(
 		return
 	}
 
-	for (let outcome of result.outcomes) {
-		let rendered = renderDiagnosticsFor(outcome, context.report)
-
-		if (rendered !== null) {
-			context.terminal.err(rendered)
-		}
-	}
+	printDiagnostics(context, result)
 
 	if (result.outcomes.length === 1) {
 		context.terminal.out(

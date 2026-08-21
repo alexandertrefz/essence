@@ -181,6 +181,8 @@ export type DiagnosticCode =
 	| "skipped-without-reason"
 	| "contradictory-modifiers"
 	| "duplicate-test-name"
+	| "test-failed"
+	| "focused-tests-remain"
 	// Names — declared twice, never declared, or not what the position wants.
 	| "duplicate-variable"
 	| "duplicate-type"

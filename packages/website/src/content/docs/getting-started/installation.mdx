@@ -83,7 +83,7 @@ different names: `npx @essence-lang/cli` finds no command called `cli` and
 refuses to guess between the two it did find. `bunx` picks `essence` on its
 own.
 
-## One executable, eight commands
+## One executable, nine commands
 
 `essence help` lists them, and `essence help <command>` documents one in full.
 
@@ -93,6 +93,7 @@ own.
 | `run`    | Compile a file and execute it immediately.          |
 | `check`  | Type-check sources without writing any output.      |
 | `watch`  | Recompile whenever a source changes.                |
+| `test`   | Compile the tests a project writes, and run them.   |
 | `format` | Format sources in place.                            |
 | `lsp`    | Start the Language Server, speaking over stdio.     |
 | `dap`    | Start the Debug Adapter, speaking over stdio.       |
