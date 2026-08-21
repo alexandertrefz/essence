@@ -203,7 +203,7 @@ type Session = {
 	stop: () => Promise<void>
 }
 
-function startSession(directory: string): Session {
+function startSession(directory: string, extra: Array<string> = []): Session {
 	let child = Bun.spawn(
 		[
 			process.execPath,
@@ -215,6 +215,7 @@ function startSession(directory: string): Session {
 			"--jobs",
 			"1",
 			"--no-color",
+			...extra,
 		],
 		{ cwd: directory, stdout: "pipe", stderr: "pipe" },
 	)
@@ -433,6 +434,79 @@ describe("essence test --watch", () => {
 						),
 					).toHaveLength(1)
 					expect(namesOf(runs[1]!)).toEqual(["adds"])
+				} finally {
+					await session.stop()
+				}
+			},
+		)
+	}, 60_000)
+
+	// NOTE: A watching coverage run is incremental for free — an entry nothing
+	// reached keeps the events it had, coverage among them — so what is worth
+	// pinning is exactly that: the cycle carries only what it re-ran, and the
+	// file it did not touch is still in the picture the report draws.
+	//
+	// NOTE: A `Foo.tests.es` of imports and tests has nothing to count and
+	// reports nothing; what a coverage run is ABOUT is the implementation
+	// Modules its tests reach.
+	it("counts only the files a cycle re-ran", async () => {
+		const second = [
+			"implementation {",
+			"\tfunction triple(_ value: Integer) -> Integer {",
+			"\t\t<- value::multiply(with 3)",
+			"\t}",
+			"}",
+			"",
+			"export {",
+			"\ttriple",
+			"}",
+			"",
+		].join("\n")
+		const secondReader = [
+			"import {",
+			'\ttriple from "./Second.es"',
+			"}",
+			"",
+			"tests {",
+			'\ttest "triples" {',
+			"\t\texpect triple(2)::is(6)",
+			"\t}",
+			"}",
+			"",
+		].join("\n")
+
+		await withProject(
+			{
+				"Library.es": library,
+				"Reader.tests.es": reader,
+				"Second.es": second,
+				"Second.tests.es": secondReader,
+			},
+			async (directory) => {
+				let session = startSession(directory, ["--coverage"])
+
+				try {
+					let [first] = await session.waitForRuns(1)
+					let covered = (events: Array<TestEvent>) =>
+						events.flatMap((event) =>
+							event.kind === "coverage" && event.module !== null
+								? [path.basename(event.module)]
+								: [],
+						)
+
+					expect(covered(first!).sort()).toEqual([
+						"Library.es",
+						"Second.es",
+					])
+
+					writeFileSync(
+						path.join(directory, "Second.tests.es"),
+						secondReader.replace('"triples"', '"triples it"'),
+					)
+
+					let runs = await session.waitForRuns(2)
+
+					expect(covered(runs[1]!)).toEqual(["Second.es"])
 				} finally {
 					await session.stop()
 				}
