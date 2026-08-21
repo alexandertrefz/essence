@@ -95,6 +95,8 @@ export async function runTestWatch(
 		files,
 		command,
 		context.programName,
+		process.cwd(),
+		configuration.test.exclude,
 	)
 	let plan = await planCompilation(context, command, inputFileNames, {
 		emit: true,
@@ -206,7 +208,13 @@ export async function runTestWatch(
 			return
 		}
 
-		let found = await discoverTestFiles(files, command, context.programName)
+		let found = await discoverTestFiles(
+			files,
+			command,
+			context.programName,
+			process.cwd(),
+			configuration.test.exclude,
+		)
 		let added = found.filter(
 			(fileName) => !inputFileNames.includes(fileName),
 		)

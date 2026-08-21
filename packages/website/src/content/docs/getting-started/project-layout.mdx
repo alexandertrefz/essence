@@ -122,6 +122,12 @@ adopt whole later:
 `essence test --tag slow` runs exactly the tests a default like that leaves out
 — which is how a nightly job runs what a working day skips.
 
+The same key takes `"exclude"`, a list of directories the search stays out of,
+written relative to the `package.json` that names them — a corpus of
+deliberately broken sources, an example a book quotes. It narrows the search and
+nothing else: a file named on the command line was asked about by name, and is
+still compiled and still reported.
+
 While you are writing them, `essence test --watch` stays up and re-runs only the
 tests a save reached — the entries whose module graph holds the file that
 changed — clearing the screen and reprinting the whole picture each time. A

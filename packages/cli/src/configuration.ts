@@ -2,13 +2,16 @@ import { readFile } from "node:fs/promises"
 import * as path from "node:path"
 
 // NOTE: Essence has no project file, and this is deliberately not the moment to
-// invent one. What a project needs to say about its tests today is one list —
-// the tags a plain run leaves out — and every Essence project that is more than
-// one file already has a `package.json`, because that is what installs the
-// compiler. So the setting lives there, under an `essence` key that a later
-// project file can adopt whole:
+// invent one. What a project needs to say about its tests today is two lists —
+// the tags a plain run leaves out, and the directories a walk stays out of —
+// and every Essence project that is more than one file already has a
+// `package.json`, because that is what installs the compiler. So the settings
+// live there, under an `essence` key that a later project file can adopt whole:
 //
-//     { "essence": { "test": { "skipTags": ["slow"] } } }
+//     { "essence": { "test": {
+//         "skipTags": ["slow"],
+//         "exclude": ["fixtures/broken"]
+//     } } }
 //
 // NOTE: The NEAREST `package.json` that says something about Essence, walking
 // up from the working directory — not simply the nearest `package.json`. In a
@@ -18,6 +21,11 @@ import * as path from "node:path"
 
 export type TestConfiguration = {
 	skipTags: Array<string>
+	// NOTE: Absolute paths a discovery walk never descends into, resolved
+	// against the manifest that named them. A file NAMED on the command line is
+	// still compiled and still reported: what this excludes is the walk, which
+	// is the half nobody asked for by name.
+	exclude: Array<string>
 }
 
 export type ProjectConfiguration = {
@@ -34,7 +42,7 @@ export type ProjectConfiguration = {
 
 export const noConfiguration: ProjectConfiguration = {
 	filePath: null,
-	test: { skipTags: [] },
+	test: { skipTags: [], exclude: [] },
 	problems: [],
 }
 
@@ -43,19 +51,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function readSkipTags(
-	test: unknown,
+	test: Record<string, unknown>,
 	filePath: string,
 	problems: Array<string>,
 ): Array<string> {
-	if (!isRecord(test)) {
-		problems.push(
-			`${filePath}: "essence.test" is not an object, so no test ` +
-				"settings were read from it.",
-		)
-
-		return []
-	}
-
 	let skipTags = test.skipTags
 
 	if (skipTags === undefined) {
@@ -75,6 +74,41 @@ function readSkipTags(
 	}
 
 	return skipTags as Array<string>
+}
+
+// NOTE: Every project holds sources that are not the project's own tests — a
+// directory of deliberately broken files, a corpus, an example a book quotes.
+// They are named RELATIVE to the manifest, because that is where a reader
+// thinks of them from, and answered as absolute paths, because that is what the
+// walk compares.
+function readExclusions(
+	test: Record<string, unknown>,
+	filePath: string,
+	problems: Array<string>,
+): Array<string> {
+	let exclude = test.exclude
+
+	if (exclude === undefined) {
+		return []
+	}
+
+	if (
+		!Array.isArray(exclude) ||
+		exclude.some((each) => typeof each !== "string")
+	) {
+		problems.push(
+			`${filePath}: "essence.test.exclude" is not a list of paths, so ` +
+				"nothing is excluded from the walk.",
+		)
+
+		return []
+	}
+
+	let directory = path.dirname(filePath)
+
+	return (exclude as Array<string>).map((each) =>
+		path.resolve(directory, each),
+	)
 }
 
 async function readManifest(filePath: string): Promise<unknown | undefined> {
@@ -108,7 +142,7 @@ export async function readProjectConfiguration(
 			if (!isRecord(manifest.essence)) {
 				return {
 					filePath,
-					test: { skipTags: [] },
+					test: { skipTags: [], exclude: [] },
 					problems: [
 						`${filePath}: "essence" is not an object, so no ` +
 							"settings were read from it.",
@@ -116,12 +150,26 @@ export async function readProjectConfiguration(
 				}
 			}
 
-			let test =
+			let written =
 				manifest.essence.test === undefined ? {} : manifest.essence.test
+
+			if (!isRecord(written)) {
+				return {
+					filePath,
+					test: { skipTags: [], exclude: [] },
+					problems: [
+						`${filePath}: "essence.test" is not an object, so no ` +
+							"test settings were read from it.",
+					],
+				}
+			}
 
 			return {
 				filePath,
-				test: { skipTags: readSkipTags(test, filePath, problems) },
+				test: {
+					skipTags: readSkipTags(written, filePath, problems),
+					exclude: readExclusions(written, filePath, problems),
+				},
 				problems,
 			}
 		}
