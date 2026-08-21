@@ -5,7 +5,7 @@ import { join } from "node:path"
 
 import { fixturePath } from "@essence-lang/fixtures"
 import type { entryPoints, TestEvent } from "@essence-lang/runtime/Testing"
-import { registryOf } from "@essence-lang/runtime/Testing"
+import { registry, registryOf } from "@essence-lang/runtime/Testing"
 
 import { containsErrors } from "../diagnostics/index"
 import { compileToMemory } from "../embed/index"
@@ -88,13 +88,13 @@ type Run = {
 	summary: ReturnType<typeof entryPoints.run>
 }
 
-// NOTE: How many Modules the registry already held when the last run finished.
-// An emitted `.ts` program imports the runtime by its absolute path, which is
-// the very module this spec file imports — so every program loaded here
-// registers into ONE array, and a run has to be given the Modules that arrived
-// since the run before it. A bundle has no such trouble: esbuild inlines a
-// runtime of its own, so its registry holds its Modules and nothing else.
-let consumed = 0
+// NOTE: An emitted `.ts` program imports the runtime by its absolute path, which
+// is the very module this spec file imports — so every program loaded ANYWHERE
+// in this process registers into ONE array, and a run has to be given the
+// Modules its own program put there. The count is read immediately before the
+// load rather than kept between runs, because another spec file sharing this
+// process registers into the same array and would otherwise be run by this one.
+// A bundle has no such trouble: esbuild inlines a runtime of its own.
 
 // NOTE: Essence source in, the events its tests emitted out — the whole
 // pipeline, then the run, which is the only way to be sure the emitted shape
@@ -103,16 +103,15 @@ async function run(
 	source: string,
 	filters?: Parameters<typeof entryPoints.run>[1]["filters"],
 ): Promise<Run> {
+	let before = registry().modules.length
 	let { loaded, dispose } = await load(generate(source))
 	let modules = loaded.$tests.registry().modules
 	// NOTE: `registryOf` only indexes what it is handed — no Essence value is
 	// read — so this spec's copy of it answers for a Module whichever runtime
 	// instance registered it. The RUN goes through the loaded program's own
 	// `$tests`, which is where the values belong.
-	let scoped = registryOf(modules.slice(consumed))
+	let scoped = registryOf(modules.slice(before))
 	let events: Array<TestEvent> = []
-
-	consumed = modules.length
 
 	try {
 		let summary = loaded.$tests.run(scoped, {
