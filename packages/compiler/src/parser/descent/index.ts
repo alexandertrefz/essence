@@ -319,7 +319,22 @@ class DescentParser {
 		// section, empty and spanning the tests block, so that every stage
 		// reading a Program's Statements reads one shape.
 		if (this.startsTestsSection()) {
+			let keyword = this.peekOrFail()
 			let tests = this.parseTestsSection()
+
+			// NOTE: An implementation block BELOW the tests section, which is a
+			// file written in the wrong order rather than a file that is
+			// nothing but tests. Both blocks are kept where they stand — the
+			// Program the author meant is the one they wrote — and the
+			// Diagnostic points at the block that moved rather than at the one
+			// that did not, which is what an "unexpected 'implementation'"
+			// would have done.
+			if (this.startsProgramHeader()) {
+				this.reportTestsSectionAboveImplementation(keyword.position)
+
+				return this.parseProgramBody(above, tests)
+			}
+
 			let below = this.parseModuleSections("below")
 			let { imports, exports } = this.resolveModuleSections(
 				[...above, ...below],
@@ -342,6 +357,15 @@ class DescentParser {
 			)
 		}
 
+		return this.parseProgramBody(above, null)
+	}
+
+	// NOTE: Everything from the implementation block down, with the tests
+	// section handed in where one was already read above it.
+	protected parseProgramBody(
+		above: Array<ModuleSectionRead>,
+		testsAbove: parser.TestsSectionNode | null,
+	): parser.Program {
 		let header = this.parseProgramHeader()
 
 		if (header === null) {
@@ -370,16 +394,34 @@ class DescentParser {
 			end: closingPosition.end,
 		})
 
-		// NOTE: The tests section is read where it belongs, directly under the
-		// implementation block — and once more below the Module sections, so
-		// that a `tests { … }` written under `export { … }` is diagnosed as the
-		// block in the wrong place rather than as a Token where the Program was
-		// supposed to have ended.
-		let tests = this.startsTestsSection() ? this.parseTestsSection() : null
+		// NOTE: The tests section is read where it belongs, last of all — and
+		// once more directly under the implementation block, so that a
+		// `tests { … }` written above `export { … }` is diagnosed as the block
+		// in the wrong place rather than as a Token where the Program was
+		// supposed to have ended. A Module with nothing to export has nothing
+		// for the block to stand after, so a section read there is where it
+		// belongs and no Diagnostic is owed.
+		let testsAboveExports =
+			testsAbove === null && this.startsTestsSection()
+				? this.parseTestsSection()
+				: null
 		let below = this.parseModuleSections("below")
+		let tests =
+			testsAbove ??
+			testsAboveExports ??
+			(this.startsTestsSection() ? this.parseTestsSection() : null)
 
-		if (tests === null && this.startsTestsSection()) {
-			tests = this.parseMisplacedTestsSection(implementation.position)
+		if (testsAboveExports !== null) {
+			let exported = below.find(
+				(section) => section.node.nodeType === "ExportSection",
+			)
+
+			if (exported !== undefined) {
+				this.reportTestsSectionAboveExports(
+					testsAboveExports.position,
+					exported.keywordPosition,
+				)
+			}
 		}
 
 		let { imports, exports } = this.resolveModuleSections(
@@ -710,6 +752,23 @@ class DescentParser {
 
 	// #region Tests
 
+	// NOTE: What opens an implementation block, asked without consuming
+	// anything — `declarations {` included, because a stdlib file written in
+	// the wrong order deserves the same answer.
+	protected startsProgramHeader(): boolean {
+		let token = this.tokens.peek()
+
+		if (token?.type === TokenType.KeywordImplementation) {
+			return this.tokens.peek(1)?.type === TokenType.SymbolLeftBrace
+		}
+
+		return (
+			token?.type === TokenType.Identifier &&
+			token.value === "declarations" &&
+			this.tokens.peek(1)?.type === TokenType.SymbolLeftBrace
+		)
+	}
+
 	protected startsTestsSection(): boolean {
 		return (
 			this.tokens.peek()?.type === TokenType.KeywordTests &&
@@ -733,43 +792,66 @@ class DescentParser {
 		})
 	}
 
-	// NOTE: A tests section written BELOW the `export { … }` block. It is read
+	// NOTE: A tests section written ABOVE the implementation block, which reads
+	// as a tests-only file until the implementation block turns up behind it.
+	protected reportTestsSectionAboveImplementation(
+		keywordPosition: common.Position,
+	): void {
+		if (this.suppressDiagnostics) {
+			return
+		}
+
+		reportError(
+			"The 'tests { … }' block belongs below the 'implementation { … }' block",
+			keywordPosition,
+			{
+				code: "misplaced-tests-section",
+				labels: [
+					primary(
+						keywordPosition,
+						"this block is written above the implementation",
+					),
+				],
+				notes: [
+					"A Module reads top to bottom: what it imports, what it does, what it exports, what it proves.",
+				],
+				helps: [
+					"Move the 'tests { … }' block below 'implementation { … }', and below anything the Module exports.",
+				],
+			},
+		)
+	}
+
+	// NOTE: A tests section written ABOVE the `export { … }` block. It is read
 	// where it stands and kept — the Program it describes is the one the author
 	// meant, and dropping it would turn one Diagnostic about an order into a
 	// cascade of "unknown name" about everything inside it.
-	protected parseMisplacedTestsSection(
-		implementationPosition: common.Position,
-	): parser.TestsSectionNode {
-		let keyword = this.peekOrFail()
-		let section = this.parseTestsSection()
-
-		if (!this.suppressDiagnostics) {
-			reportError(
-				"The 'tests { … }' block belongs above the 'export { … }' block",
-				keyword.position,
-				{
-					code: "misplaced-tests-section",
-					labels: [
-						primary(
-							keyword.position,
-							"this block is written below what the Program ends with",
-						),
-						secondary(
-							implementationPosition,
-							"the implementation block is here",
-						),
-					],
-					notes: [
-						"A Program reads top to bottom: what it imports, what it does, what it proves, what it exports.",
-					],
-					helps: [
-						"Move the 'tests { … }' block above 'export { … }'.",
-					],
-				},
-			)
+	protected reportTestsSectionAboveExports(
+		sectionPosition: common.Position,
+		exportPosition: common.Position,
+	): void {
+		if (this.suppressDiagnostics) {
+			return
 		}
 
-		return section
+		reportError(
+			"The 'tests { … }' block belongs below the 'export { … }' block",
+			sectionPosition,
+			{
+				code: "misplaced-tests-section",
+				labels: [
+					primary(
+						sectionPosition,
+						"this block is written above what the Module hands out",
+					),
+					secondary(exportPosition, "the export block is here"),
+				],
+				notes: [
+					"A Module reads top to bottom: what it imports, what it does, what it exports, what it proves.",
+				],
+				helps: ["Move the 'tests { … }' block below 'export { … }'."],
+			},
+		)
 	}
 
 	// NOTE: What may stand in a tests section, and in a `suite`'s body: a test,

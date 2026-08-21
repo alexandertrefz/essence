@@ -136,7 +136,7 @@
 				"essence.inlayHints.enabled": {
 					"type": "boolean",
 					"default": true,
-					"description": "Show inferred Types as inlay hints where the source states none — Constants, Variables, and the Parameters and return Type of contextually typed Function literals."
+					"description": "Show inferred Types as inlay hints where the source states none — Constants, Variables, and the Parameters and return Type of contextually typed Function literals. It also governs the values a live test run records: the ghost text after a Constant in a test body, after a failed expect and on a § ? line."
 				},
 				"essence.tests.enabled": {
 					"type": "boolean",

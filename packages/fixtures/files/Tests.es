@@ -87,6 +87,11 @@ implementation {
 	Terminal.inspect(outcomeOf(0, against 3)) § Outcome#Loss
 }
 
+export {
+	Outcome
+	Standing
+}
+
 tests {
 
 	§ Setup is just values. Nothing here is a hook: a `constant` in a tests
@@ -297,9 +302,4 @@ tests {
 			expect ["Lions", "Tigers", "Bears"]::contains(team.name)
 		}
 	}
-}
-
-export {
-	Outcome
-	Standing
 }

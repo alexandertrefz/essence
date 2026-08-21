@@ -223,9 +223,12 @@ assertions written in a test's body.
 
 ### `misplaced-tests-section`
 
-The `tests { … }` block was written below the `export { … }` block. A Program
-reads top to bottom: what it imports, what it does, what it proves, what it
-exports. Move the block above `export { … }`.
+The `tests { … }` block was written above the `export { … }` block, or above
+the implementation block. A Module reads top to bottom: what it imports, what
+it does, what it exports, what it proves. Move the block to the end, below
+`export { … }` — a Module that exports nothing has nothing for it to stand
+after, and a section directly below the implementation block is where it
+belongs.
 
 ### `test-outside-tests`
 

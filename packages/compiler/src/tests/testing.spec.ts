@@ -80,20 +80,20 @@ describe("Tests Section", () => {
 			expect(nameOf(testAt(section, 0))).toBe("reads")
 		})
 
-		it("should read a tests section between the implementation and the exports", () => {
+		it("should read a tests section below the exports", () => {
 			let { program, diagnostics } = parse(
 				`implementation {
 					constant x = 1
+				}
+
+				export {
+					x
 				}
 
 				tests {
 					test "reads" {
 						expect true
 					}
-				}
-
-				export {
-					x
 				}`,
 			)
 
@@ -176,20 +176,44 @@ describe("Tests Section", () => {
 			expect(program.implementation.nodes).toHaveLength(2)
 		})
 
-		it("should report a tests section written below the exports", () => {
+		// NOTE: A tests block first reads as a file that is nothing but tests
+		// until the implementation block turns up behind it. The Diagnostic has
+		// to be about the block that moved, rather than "unexpected
+		// 'implementation'" about the one that did not.
+		it("should report a tests section written above the implementation", () => {
+			let { program, diagnostics } = parse(
+				`tests {
+					test "reads" {
+						expect x
+					}
+				}
+
+				implementation {
+					constant x = true
+				}`,
+			)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("misplaced-tests-section")
+			expect(diagnostics[0].position.start.line).toBe(1)
+			expect(program.tests?.nodes).toHaveLength(1)
+			expect(program.implementation.nodes).toHaveLength(1)
+		})
+
+		it("should report a tests section written above the exports", () => {
 			let { program, diagnostics } = parse(
 				`implementation {
 					constant x = 1
-				}
-
-				export {
-					x
 				}
 
 				tests {
 					test "reads" {
 						expect true
 					}
+				}
+
+				export {
+					x
 				}`,
 			)
 

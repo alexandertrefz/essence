@@ -23,7 +23,13 @@ implementation {
 	}
 
 	constant lions = { team = "Lions", points = 0 }
-	constant rows = [1, 2, 3]
+	constant rows  = [1, 2, 3]
+}
+
+export {
+	Colour
+	lions
+	rows
 }
 
 tests {
@@ -111,7 +117,6 @@ tests {
 	}
 
 	suite "Standing" {
-
 		§ duplicate-test-name — what a test is called, together with the suites
 		§ around it, is what identifies it to a stored snapshot and to the
 		§ Editor.
@@ -123,10 +128,4 @@ tests {
 			expect lions.points::is(0)
 		}
 	}
-}
-
-export {
-	Colour
-	lions
-	rows
 }

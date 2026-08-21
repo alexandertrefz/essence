@@ -19,6 +19,10 @@ implementation {
 	constant lions = { team = "Lions", points = 0 }
 }
 
+export {
+	lions
+}
+
 tests {
 
 	§ expect-not-boolean — Essence has no truthiness. An assertion is a Boolean
@@ -44,8 +48,4 @@ tests {
 		expect team::is("Lions")
 		expect points::is(0)
 	}
-}
-
-export {
-	lions
 }
