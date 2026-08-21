@@ -129,6 +129,11 @@ comment to a build, a probe to a test run.
 `--json` writes the run as one JSON event per line. A project skips tags by default by naming them in the
 nearest `package.json`, under `{ "essence": { "test": { "skipTags": ["slow"] } } }`.
 
+The same runner is live in an editor: the Language Server keeps one test session per workspace and re-runs what
+an edit reached, on the unsaved buffer, and pushes the batch over a custom notification. The VS Code extension
+draws it as a Test Explorer, as marks down the gutter, and as the values a run recorded beside the lines that
+produced them.
+
 Formatting is a separate command, and never something a build does to your sources:
 
 ```sh
