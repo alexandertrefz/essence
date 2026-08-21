@@ -294,7 +294,17 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 		reason: TestRunNotification["reason"],
 		ids: Array<string>,
 	): number | null {
-		if (!enabled || disposed || entries.length === 0) {
+		if (disposed || entries.length === 0) {
+			return null
+		}
+
+		// NOTE: A session switched off stops running tests BY ITSELF. What the
+		// setting declines is the automatic half — compiling and running a
+		// project on every keystroke — and an Editor that asked for a run in so
+		// many words has asked for exactly the thing that is not automatic. A
+		// Run lens that quietly did nothing would be the worse reading of a
+		// setting called `enabled`.
+		if (!enabled && reason !== "request") {
 			return null
 		}
 
@@ -415,9 +425,21 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 			files?: Array<string>
 		}): number | null {
 			let ids = request.ids ?? []
+			let files = request.files ?? []
+
+			// NOTE: Asking for neither is asking for everything — which is what
+			// a Test Explorer's Run button and its Refresh send, neither of
+			// which is about a file. Naming the workspace's test files here
+			// rather than making the client name them is also what lets a run
+			// find a file the client has never been told about, which is every
+			// file whose first test was written since the last cycle.
+			if (ids.length === 0 && files.length === 0) {
+				return start(testFiles(), "request", [])
+			}
+
 			let known = new Set(testFiles())
 			let entries = new Set(
-				(request.files ?? []).filter((filePath) => known.has(filePath)),
+				files.filter((filePath) => known.has(filePath)),
 			)
 
 			// NOTE: An id spells the Module it belongs to as its first step,

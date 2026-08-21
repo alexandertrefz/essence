@@ -45,7 +45,12 @@ are written out in `src/testProtocol.ts`.
     narrowed batch reports a deselection for every other test of that file, so a
     client merges by id rather than replacing the file.
 - **`essence/runTests`** — a request taking `{ ids?, files? }` and answering
-  `{ run }`, the number the notifications for it will carry.
+  `{ run }`, the number the notifications for it will carry. Naming neither runs
+  every test file of the workspace, which is what a Test Explorer's Run and
+  Refresh buttons mean — and the only way to reach a file whose first test was
+  written since the last cycle. `null` comes back where nothing matched.
+  A request is answered even while `essence.tests.enabled` is false: what the
+  setting declines is running on every keystroke, not running when asked.
 
 The server reads one configuration section, `essence.tests`, through
 `workspace/configuration` whenever the client says something under `essence`
