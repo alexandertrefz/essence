@@ -253,6 +253,13 @@
 							"artifact": {
 								"type": "string",
 								"description": "A precompiled bundle to debug instead of compiling 'program' — its source map must sit beside it."
+							},
+							"tests": {
+								"type": "array",
+								"items": {
+									"type": "string"
+								},
+								"description": "Debug tests rather than the program: 'program' is compiled with its tests section and these test ids are run. An empty array runs every test in the file."
 							}
 						}
 					}

@@ -52,10 +52,10 @@ running as you type, and everything they found where you are looking.
   and records what it finds — a `__snapshots__` companion is written beside
   the source, and the source itself arrives as an ordinary edit, so an unsaved
   buffer is edited rather than written round and the change is undoable.
-- Debugging one test is not wired up yet — the debug adapter has to compile a
-  tests section and select by id — so the Debug profile and the Debug lens say
-  so, and hand over the `essence test --filter` command that runs the
-  selection.
+- **Debug** steps through the test. The Debug profile and the Debug lens both
+  start a session of the `essence` debug type over a bundle compiled with the
+  file's tests section, narrowed to the ids the gesture named — so a breakpoint
+  in a test body binds, stops and steps like one anywhere else.
 - The Language Server no longer depends on PATH. The bundled server — and a
   configured `.js` bundle — is forked on the Node VS Code itself ships; it
   was previously spawned as `node`, which failed whenever VS Code had

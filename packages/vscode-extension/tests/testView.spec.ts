@@ -748,28 +748,54 @@ describe("the profiles it offers", () => {
 		])
 	})
 
-	it("refuses to debug, names what to run instead and copies it", async () => {
+	// NOTE: Debugging is not a test run: it launches the `essence` debug type
+	// over a bundle compiled WITH the file's tests section, and asks the Server
+	// for nothing at all.
+	it("debugs a test by launching a session over the file it is in", async () => {
 		let session = live()
 		let one = site()
 
-		stub.answerMessageWith("Copy command")
 		session.view.handle(batch({ sites: [one] }))
 
 		await profileNamed("Debug")!.run(
 			{ include: children(fileItem()) },
 			undefined,
 		)
-		// NOTE: The message is answered on a Promise the handler does not
-		// await — it ends the run either way.
-		await Promise.resolve()
 
-		expect(stub.messages.at(-1)!.text).toContain(
-			'essence test Season.tests.es --filter "adds up"',
-		)
-		expect(stub.clipboard).toEqual([
-			'essence test Season.tests.es --filter "adds up"',
+		expect(
+			stub.debugSessions.map((started) => started.configuration),
+		).toEqual([
+			{
+				type: "essence",
+				request: "launch",
+				name: "adds up",
+				program: FILE,
+				tests: [one.id],
+			},
 		])
 		expect(session.asked).toEqual([])
+	})
+
+	// NOTE: A session that would not start is the end of the walk: whatever
+	// stopped it would stop the next one, and a reader watching debuggers open
+	// one after another for a reason nobody explained is worse than a line in
+	// the channel.
+	it("stops where a session would not start, and says so", async () => {
+		let session = live()
+		let one = site()
+
+		stub.refuseDebugStart()
+		session.view.handle(batch({ sites: [one] }))
+
+		await profileNamed("Debug")!.run(
+			{ include: children(fileItem()) },
+			undefined,
+		)
+
+		expect(stub.debugSessions).toHaveLength(1)
+		expect(stub.channel.lines.join("\n")).toContain(
+			"the debug session did not start",
+		)
 	})
 })
 

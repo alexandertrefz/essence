@@ -194,6 +194,14 @@ export type Stub = {
 	channel: { lines: Array<string>; shown: number; disposals: number }
 	messages: Array<{ text: string; actions: Array<string> }>
 	clipboard: Array<string>
+	// NOTE: What `vscode.debug.startDebugging` was handed, in order. A Debug
+	// gesture is a launch configuration and nothing else, so this is the whole
+	// of what a spec has to read.
+	debugSessions: Array<{
+		folder: unknown
+		configuration: Record<string, unknown>
+	}>
+	refuseDebugStart: () => void
 	editors: Array<StubEditor>
 	deletions: Array<(uri: StubUri) => void>
 	// NOTE: The client's own settings, so a spec can read back a setting the
@@ -230,6 +238,12 @@ export function createStub(): Stub {
 	let channel = { lines: [] as Array<string>, shown: 0, disposals: 0 }
 	let messages: Array<{ text: string; actions: Array<string> }> = []
 	let clipboard: Array<string> = []
+	let debugSessions: Array<{
+		folder: unknown
+		configuration: Record<string, unknown>
+	}> = []
+	let debugTerminations: Array<(session: { name: unknown }) => void> = []
+	let debugStarts = true
 	let editors: Array<StubEditor> = []
 	let deletions: Array<(uri: StubUri) => void> = []
 	let answer: string | undefined = undefined
@@ -335,8 +349,56 @@ export function createStub(): Stub {
 				return Promise.resolve(answer)
 			},
 		},
+		// NOTE: A debug session that starts and ends at once. What a spec reads
+		// back is the configuration — which file, which ids — and the loop that
+		// waits for one session before starting the next needs the terminate
+		// listener to be called, or a selection covering two files would hang.
+		debug: {
+			startDebugging: (
+				folder: unknown,
+				configuration: Record<string, unknown>,
+			) => {
+				debugSessions.push({ folder, configuration })
+
+				queueMicrotask(() => {
+					// NOTE: A copy, because a listener disposes itself as it
+					// runs and would otherwise be spliced out from under the
+					// walk.
+					let listeners = debugTerminations.slice()
+
+					for (let listener of listeners) {
+						listener({ name: configuration.name })
+					}
+				})
+
+				return Promise.resolve(debugStarts)
+			},
+			onDidTerminateDebugSession: (
+				listener: (session: { name: unknown }) => void,
+			) => {
+				debugTerminations.push(listener)
+
+				return {
+					dispose: () => {
+						let at = debugTerminations.indexOf(listener)
+
+						if (at !== -1) {
+							debugTerminations.splice(at, 1)
+						}
+					},
+				}
+			},
+			registerDebugConfigurationProvider: () => ({ dispose: () => {} }),
+			registerDebugAdapterDescriptorFactory: () => ({
+				dispose: () => {},
+			}),
+		},
 		workspace: {
 			workspaceFolders: [{ uri: uriOf("/repo") }],
+			getWorkspaceFolder: (uri: StubUri) =>
+				uri.fsPath.startsWith("/repo")
+					? { uri: uriOf("/repo") }
+					: undefined,
 			getConfiguration: (section: string) => ({
 				get: (key: string) => settings[`${section}.${key}`],
 				update: (key: string, value: unknown, target?: number) => {
@@ -544,6 +606,10 @@ export function createStub(): Stub {
 		channel,
 		messages,
 		clipboard,
+		debugSessions,
+		refuseDebugStart: () => {
+			debugStarts = false
+		},
 		editors,
 		deletions,
 		settings,
@@ -559,6 +625,9 @@ export function createStub(): Stub {
 			channel.disposals = 0
 			messages.length = 0
 			clipboard.length = 0
+			debugSessions.length = 0
+			debugTerminations.length = 0
+			debugStarts = true
 			editors.length = 0
 			deletions.length = 0
 			answer = undefined

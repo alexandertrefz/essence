@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test"
 
 import {
 	applyBatch,
-	commandFor,
+	debugConfigurationsFor,
 	type CoveragePoint,
 	coverageLinesOf,
 	coverageOf,
@@ -855,23 +855,58 @@ describe("what to draw in the gutter", () => {
 	})
 })
 
-describe("what to run instead of debugging", () => {
-	it("names one test by a filter on its rendered name", () => {
+describe("what a Debug gesture launches", () => {
+	it("names one test by its id, and the session by what it is called", () => {
 		expect(
-			commandFor([{ label: "adds up", file: "/repo/Season.tests.es" }]),
-		).toBe('essence test Season.tests.es --filter "adds up"')
+			debugConfigurationsFor([
+				{
+					label: "adds up",
+					file: "/repo/Season.tests.es",
+					id: "/adds up",
+				},
+			]),
+		).toEqual([
+			{
+				type: "essence",
+				request: "launch",
+				name: "adds up",
+				program: "/repo/Season.tests.es",
+				tests: ["/adds up"],
+			},
+		])
 	})
 
-	// NOTE: A filter that would match several tests is not what was asked for,
-	// and neither is a suite's own name.
-	it("runs everything for a selection that is not one test", () => {
-		expect(commandFor([])).toBe("essence test")
+	// NOTE: One session compiles one file, so a selection reaching two of them
+	// is two of them — in the order the files were first named, each carrying
+	// its own tests.
+	it("splits a selection by the file each test is written in", () => {
 		expect(
-			commandFor([
-				{ label: "adds up", file: FILE },
-				{ label: "subtracts", file: FILE },
+			debugConfigurationsFor([
+				{ label: "adds up", file: FILE, id: "/adds up" },
+				{
+					label: "elsewhere",
+					file: "/repo/Other.es",
+					id: "/elsewhere",
+				},
+				{ label: "subtracts", file: FILE, id: "/subtracts" },
+			]).map((configuration) => [
+				configuration.program,
+				configuration.name,
+				configuration.tests,
 			]),
-		).toBe("essence test")
+		).toEqual([
+			[FILE, "Season.tests.es tests", ["/adds up", "/subtracts"]],
+			["/repo/Other.es", "elsewhere", ["/elsewhere"]],
+		])
+	})
+
+	it("has nothing to launch for a selection naming no file", () => {
+		expect(debugConfigurationsFor([])).toEqual([])
+		expect(
+			debugConfigurationsFor([
+				{ label: "adds up", file: "", id: "/adds up" },
+			]),
+		).toEqual([])
 	})
 })
 

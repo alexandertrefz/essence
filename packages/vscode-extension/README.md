@@ -157,10 +157,12 @@ no run selects, `essence.tests.debounce` is how long a burst of edits may be
 before it costs a run, and `essence.tests.coverage` counts what each run
 reaches.
 
-Debugging a single test is not wired up yet — the debug adapter has to compile
-the tests section and select one by id — so the Debug profile and the Debug
-lens say so, and hand over the `essence test --filter` command that runs the
-selection, rather than starting a session that would run the wrong thing.
+**Debug** — the profile in the Test Explorer and the lens above a `test` or a
+`suite` — steps through the test itself. The file is compiled with its tests
+section, and a breakpoint in a test body is a breakpoint like any other: the
+same adapter, the same stepping, the same Variables view. A selection reaching
+several files opens one session per file, in turn, since a session steps
+through one bundle.
 
 ### Editing
 
