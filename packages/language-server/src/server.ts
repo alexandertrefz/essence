@@ -88,6 +88,7 @@ import {
 	semanticTokenTypes,
 } from "./semanticTokens"
 import { findSignatureHelp } from "./signatureHelp"
+import { focusDiagnostics } from "./testFocus"
 import { findValueHints } from "./testHints"
 import {
 	RUN_TESTS_REQUEST,
@@ -431,8 +432,15 @@ export function startServer(options: { connection?: Connection } = {}) {
 	// so the only failures here are the ones a run somebody ASKED for found,
 	// and hiding those would be hiding the answer to the question.
 	function testDiagnosticsFor(filePath: string): Array<common.Diagnostic> {
+		let program = workspace.programOf(filePath)
+
 		return [
 			...session.diagnosticsFor(filePath),
+			// NOTE: Ungated, unlike the tags: what a `focused` does is refuse a
+			// plain run at the command line, and a reader who switched the live
+			// session off still wants to be told before that happens. It costs
+			// a walk of one parse the workspace is holding anyway.
+			...(program === null ? [] : focusDiagnostics(program)),
 			...tagDiagnosticsFor(filePath),
 		]
 	}

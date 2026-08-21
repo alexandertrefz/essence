@@ -511,6 +511,11 @@ non-zero and names every test the focus was left on. Reported by the runner
 rather than by a compile; while iterating, a filter makes the same run say
 nothing about focus.
 
+An editor can refuse nothing, so it says the same thing where the word is
+written: a warning on each `focused` — on the `suite` as well as on the test —
+with a Quick Fix that removes it. A `focused` that is also `skipped` narrows
+nothing and is not reported either way.
+
 ```
 [focused-tests-remain]
 Error: This test is still focused
