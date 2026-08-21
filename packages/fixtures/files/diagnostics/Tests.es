@@ -17,7 +17,13 @@
 § showcasing no longer has a home.
 
 implementation {
+	choice Colour {
+		Red,
+		Blue,
+	}
+
 	constant lions = { team = "Lions", points = 0 }
+	constant rows = [1, 2, 3]
 }
 
 tests {
@@ -52,6 +58,26 @@ tests {
 		expect lions.points::is(0)
 	}
 
+	§ table-not-written — every row of a table test is a test in its own right
+	§ and carries its row number, so the rows have to be countable before
+	§ anything runs.
+	test "reads a row" across rows (row: Integer) {
+		expect row::isGreaterThan(0)
+	}
+
+	§ table-parameters — each item of the List is one row, and one row is one
+	§ value; a test wanting several says so by writing a Record.
+	test "reads two rows at once" across [1, 2] (a: Integer, b: Integer) {
+		expect a::isLessThan(b)
+	}
+
+	§ snapshot-not-printable — a snapshot records what a value LOOKS like,
+	§ which is what `Printable::toString` answers, so a value with no such
+	§ answer has nothing to record.
+	test "renders a Case" {
+		expect Colour#Red matches snapshot
+	}
+
 	suite "Standing" {
 
 		§ duplicate-test-name — what a test is called, together with the suites
@@ -68,5 +94,7 @@ tests {
 }
 
 export {
+	Colour
 	lions
+	rows
 }

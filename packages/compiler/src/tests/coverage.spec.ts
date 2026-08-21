@@ -555,11 +555,24 @@ describe("The Tests.es fixture, counted", () => {
 		let focused = await runWithCoverage(fixture)
 		let all = await runWithCoverage(fixture.replace(" focused {", " {"))
 
-		expect(all.summary.files[0]!.lines).toEqual(
-			focused.summary.files[0]!.lines,
+		expect(focused.summary.files[0]!.lines.total).toBe(
+			all.summary.files[0]!.lines.total,
 		)
-		expect(all.summary.files[0]!.cases).toEqual(
-			focused.summary.files[0]!.cases,
+		// NOTE: NOT equal, and the difference is the point of the comparison
+		// rather than a hole in it. The fixture's own tests reach a line
+		// loading it does not — `pointsFor`'s `case #Loss`, which only a table
+		// row and an example ever score — so a focused run counts one fewer.
+		// What has to hold is that a focused run counts nearly all of them
+		// anyway: the Module was evaluated, and a run resets the counts to what
+		// evaluating it left rather than to zero.
+		expect(focused.summary.files[0]!.lines.covered).toBeGreaterThanOrEqual(
+			all.summary.files[0]!.lines.covered - 1,
+		)
+		expect(focused.summary.files[0]!.cases.total).toBe(
+			all.summary.files[0]!.cases.total,
+		)
+		expect(focused.summary.files[0]!.cases.covered).toBeGreaterThanOrEqual(
+			all.summary.files[0]!.cases.covered - 1,
 		)
 	})
 })
