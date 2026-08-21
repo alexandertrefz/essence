@@ -69,7 +69,27 @@ export interface TestNode {
 	nodeType: "Test"
 	name: StringValueNode | InterpolatedStringValueNode
 	modifiers: Array<TestModifierNode>
+	// NOTE: `across ROWS (row: Row)` — a table test, and null for the ordinary
+	// one. It is written between the Modifiers and the body because it is the
+	// last thing about the test that is not the test: what a reader reads is
+	// the name, then what it holds for, then what it does.
+	table: TestTableNode | null
 	body: Array<ImplementationNode>
+	keywordPosition: Position
+	position: Position
+}
+
+// NOTE: `across [ … ] (row: Row)`. The rows are a WRITTEN List so that each one
+// is a test of its own before anything runs — a test's identity carries the row
+// index, and a value worked out at run time could not be numbered at compile
+// time. `parameters` is a closure's parameter list, so a row can be taken apart
+// by a Pattern, and the annotation on it is what lets a bare Case in a row
+// resolve.
+export interface TestTableNode {
+	nodeType: "TestTable"
+	value: ExpressionNode
+	parameters: Array<ParameterNode>
+	parameterListPosition: Position
 	keywordPosition: Position
 	position: Position
 }
@@ -509,6 +529,28 @@ export interface ExpectStatementNode {
 	nodeType: "ExpectStatement"
 	value: ExpressionNode
 	matcher: MatcherNode | null
+	// NOTE: `matches snapshot`, and null for every other form. An assertion
+	// carries at most one of `matcher` and `snapshot` — the Parser writes the
+	// one that was written.
+	snapshot: SnapshotNode | null
+	position: Position
+}
+
+// NOTE: What `matches snapshot` compares against. `name` is written for a
+// STORED snapshot — `matches snapshot from "season-report"`, kept in
+// `__snapshots__/<File>.es.snap` beside the file — and null for an inline one,
+// whose recorded text is the String Literal in the source. `value` is null
+// before the first run has written one, which is what `essence test` fills in.
+export interface SnapshotNode {
+	nodeType: "Snapshot"
+	name: StringValueNode | null
+	value: StringValueNode | null
+	// NOTE: Where a recorded value stands, or would stand — the `snapshot`
+	// Keyword's own span where none is written yet. It is the span
+	// `essence test --update` replaces, and the one the Editor's "Accept
+	// snapshot" writes into.
+	valuePosition: Position
+	keywordPosition: Position
 	position: Position
 }
 
@@ -526,6 +568,7 @@ export interface RequireStatementNode {
 	nodeType: "RequireStatement"
 	value: ExpressionNode
 	matcher: MatcherNode | null
+	snapshot: SnapshotNode | null
 	position: Position
 }
 

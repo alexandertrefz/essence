@@ -365,6 +365,28 @@ A Pattern MEMBER constrained by a written value is a different thing and is
 allowed — `require { points = 3 } = standing` asks the question of one member
 of a shape the Pattern is naming.
 
+### `snapshot-after-matcher`
+
+A `matches snapshot` was written on the line that takes a value apart:
+
+```essence
+tests {
+	test "reads the first row" {
+		require #Value(first) = table::firstItem() matches snapshot
+	}
+}
+```
+
+A snapshot is of the value an assertion is written over, printed as text.
+`require MATCHER = EXPR` is written over a shape instead: it asks what the value
+has to be and names its parts, so what there is to record is one of those names.
+
+Record the name on a line of its own — `require #Value(first) =
+table::firstItem()` and below it `expect first matches snapshot`. Snapshotting
+the value whole is the other way, where it is one that prints: an `Optional` is
+not (see `snapshot-not-printable`), which is usually why the line took it apart
+in the first place.
+
 ### `unknown-modifier`
 
 A `test` or a `suite` carries a Modifier that is not one. The Modifiers are

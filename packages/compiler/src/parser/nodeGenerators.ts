@@ -46,6 +46,7 @@ export function testsSection(
 export function test(
 	name: parser.TestNode["name"],
 	modifiers: Array<parser.TestModifierNode>,
+	table: parser.TestTableNode | null,
 	body: Array<parser.ImplementationNode>,
 	keywordPosition: common.Position,
 	position: common.Position,
@@ -54,7 +55,25 @@ export function test(
 		nodeType: "Test",
 		name,
 		modifiers,
+		table,
 		body,
+		keywordPosition,
+		position,
+	}
+}
+
+export function testTable(
+	value: parser.ExpressionNode,
+	parameters: Array<parser.ParameterNode>,
+	parameterListPosition: common.Position,
+	keywordPosition: common.Position,
+	position: common.Position,
+): parser.TestTableNode {
+	return {
+		nodeType: "TestTable",
+		value,
+		parameters,
+		parameterListPosition,
 		keywordPosition,
 		position,
 	}
@@ -669,17 +688,36 @@ export function ifStatement(
 export function expectStatement(
 	value: parser.ExpressionNode,
 	matcher: parser.MatcherNode | null,
+	snapshot: parser.SnapshotNode | null,
 	position: common.Position,
 ): parser.ExpectStatementNode {
-	return { nodeType: "ExpectStatement", value, matcher, position }
+	return { nodeType: "ExpectStatement", value, matcher, snapshot, position }
 }
 
 export function requireStatement(
 	value: parser.ExpressionNode,
 	matcher: parser.MatcherNode | null,
+	snapshot: parser.SnapshotNode | null,
 	position: common.Position,
 ): parser.RequireStatementNode {
-	return { nodeType: "RequireStatement", value, matcher, position }
+	return { nodeType: "RequireStatement", value, matcher, snapshot, position }
+}
+
+export function snapshot(
+	name: parser.StringValueNode | null,
+	value: parser.StringValueNode | null,
+	valuePosition: common.Position,
+	keywordPosition: common.Position,
+	position: common.Position,
+): parser.SnapshotNode {
+	return {
+		nodeType: "Snapshot",
+		name,
+		value,
+		valuePosition,
+		keywordPosition,
+		position,
+	}
 }
 
 export function returnStatement(
