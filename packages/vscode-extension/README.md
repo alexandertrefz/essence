@@ -4,7 +4,8 @@ Language support for [Essence](https://github.com/alexandertrefz/essence). Synta
 highlighting comes from a TextMate grammar refined by semantic tokens;
 diagnostics, Quick Fixes, renaming, go-to-definition, hovers, references, an
 outline, call hierarchy, completion, signature help, formatting, folding,
-selection ranges and inlay hints all come from the Essence Language Server.
+selection ranges, code lenses, inlay hints and the live test session all come
+from the Essence Language Server.
 
 ## Features
 
@@ -100,6 +101,20 @@ resolves to, which a grammar alone cannot determine — including which names
 come from the standard library. Inlay hints annotate declarations written
 without a Type annotation, and double-clicking one writes it into the source;
 `essence.inlayHints.enabled` turns them off.
+
+### Tests, live
+
+The workspace's tests run as you type. Saving — or simply typing — re-runs the
+test files the change reached and nothing else: a failed `expect` appears in
+Problems with the same labels `essence test` prints, and the values a run
+recorded appear beside the lines that produced them, including every `constant`
+a test body writes and every line ending in a `§?` value comment. Run and Debug
+lenses sit above each `test` and `suite`. `essence.tests.enabled` turns the
+automatic runs off.
+
+Debugging a single test is not wired up yet — the debug adapter has to compile
+the tests and run one by id — so the Debug lens says so rather than starting a
+session that would run the wrong thing.
 
 ### Editing
 
