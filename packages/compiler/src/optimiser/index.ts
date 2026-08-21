@@ -139,6 +139,15 @@ export const optimiserPasses: ReadonlyArray<OptimiserPass> = [
 	poolConstants,
 ]
 
+// NOTE: What a pass that does not read them is handed on the path where nobody
+// computed them — see `optimise`. Answering the question costs a deep walk of
+// everything a Program holds, and the one pass that runs with the phase off
+// does not ask it.
+const emptyNamespaces: DeclaredNamespaces = {
+	all: new Set(),
+	nested: new Set(),
+}
+
 export const optimiserPassNames: ReadonlyArray<string> = optimiserPasses.map(
 	(pass) => pass.name,
 )
@@ -157,13 +166,23 @@ export function optimiserOptionsKey(options: OptimiserOptions): string {
 	// NOTE: Coverage is spelled on BOTH sides of the `enabled` check, because
 	// it is not an optimisation: `--no-optimise --coverage` still instruments,
 	// and the bytes it produces are not the bytes `--no-optimise` alone does.
-	let coverage = options.coverage === true ? "+coverage" : ""
+	//
+	// NOTE: And it is spelled as what WILL HAPPEN rather than as what was
+	// asked for. With the phase off, the disabled names decide nothing else —
+	// so `off` says nothing about them — but they still decide whether the
+	// instrumentation runs, and two compiles that emit different bytes may not
+	// share a key.
+	let instrumenting =
+		options.coverage === true &&
+		!options.disabledPasses.has(instrumentCoverage.name)
 
 	if (!options.enabled) {
-		return `off${coverage}`
+		return instrumenting ? "off+coverage" : "off"
 	}
 
-	return `on${coverage}:${[...options.disabledPasses].sort().join(",")}`
+	return `on${instrumenting ? "+coverage" : ""}:${[...options.disabledPasses]
+		.sort()
+		.join(",")}`
 }
 
 // NOTE: The same Options with the instrumentation taken out — what the standard
@@ -193,24 +212,29 @@ export function optimise(
 	options: OptimiserOptions = defaultOptimiserOptions,
 ): common.typedSimple.Program {
 	let erased = eraseRefinements(program)
-	// NOTE: Asked of the erased Program, which is what the first pass is given
-	// — and, by the argument on `OptimiserPass.run`, what every pass after it
-	// would answer for itself.
-	let namespaces = declaredNamespaces(erased)
 
 	// NOTE: `--no-optimise` says "do not improve my Program". It does not say
 	// "ignore what I asked you to measure" — a coverage run that answered with
 	// an empty report because the Optimiser was off would be a silent one. So
 	// the instrumentation still runs, and it is still the named pass, so
 	// `--without-optimisation instrument-coverage` still turns it off.
+	//
+	// NOTE: And the Namespaces are NOT computed on this path. Answering costs a
+	// deep walk of everything the Program holds, Types included, and the one
+	// pass that runs here does not read them — `esc dap` compiles every debug
+	// session this way.
 	if (!options.enabled) {
 		return options.coverage === true &&
 			!options.disabledPasses.has(instrumentCoverage.name)
-			? instrumentCoverage.run(erased, namespaces, options)
+			? instrumentCoverage.run(erased, emptyNamespaces, options)
 			: erased
 	}
 
 	let result = erased
+	// NOTE: Asked of the erased Program, which is what the first pass is given
+	// — and, by the argument on `OptimiserPass.run`, what every pass after it
+	// would answer for itself.
+	let namespaces = declaredNamespaces(erased)
 
 	for (let pass of optimiserPasses) {
 		if (options.disabledPasses.has(pass.name)) {

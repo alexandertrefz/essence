@@ -264,7 +264,7 @@ function instrumentHandlers(
 			...handler,
 			body: [
 				counter(
-					mark("case", matcherLabel(handler.matcher), position),
+					mark("case", matcherLabel(handler), position),
 					position,
 				),
 				...handler.body,
@@ -299,13 +299,49 @@ function instrumentConstruction(
 	}
 }
 
-// NOTE: What a report calls an arm. A Case Matcher is spelled the way the arm
-// itself is — `case #Postponed` — and everything else names the Type it tests
-// for, which is what the arm was written as.
-function matcherLabel(type: common.Type): string {
-	return type.type === "Case"
-		? `case #${type.name}`
-		: `case ${describeType(type)}`
+// NOTE: What a report calls an arm, spelled the way the arm itself was written.
+// A Case Matcher is `case #Postponed`; a Matcher that tests a VALUE is that
+// value, because `case 0` and `case Integer` are two different arms of one
+// `match` and a report that called them both `case Integer` would name neither.
+// Everything else names the Type it tests for.
+function matcherLabel(handler: common.typedSimple.MatchHandler): string {
+	if (handler.literal !== null) {
+		return `case ${literalLabel(handler.literal)}`
+	}
+
+	if (handler.matcher.type === "Case") {
+		return `case #${handler.matcher.name}`
+	}
+
+	let members =
+		handler.memberLiterals === null
+			? []
+			: Object.entries(handler.memberLiterals).map(
+					([name, value]) => `${name} = ${literalLabel(value)}`,
+				)
+
+	return members.length === 0
+		? `case ${describeType(handler.matcher)}`
+		: `case { ${members.join(", ")} }`
+}
+
+// NOTE: A literal as a reader wrote it. Anything that is not one — which a
+// Matcher's literal never is, but the Type says it could be — falls back to the
+// Type, because a label that is a fragment of emitted JavaScript is worse than
+// a label that is vague.
+function literalLabel(node: common.typedSimple.ExpressionNode): string {
+	switch (node.nodeType) {
+		case "StringValue":
+			return JSON.stringify(node.value)
+		case "IntegerValue":
+			return node.value
+		case "RationalValue":
+			return `${node.numerator}/${node.denominator}`
+		case "BooleanValue":
+			return node.value ? "true" : "false"
+		default:
+			return describeType(node.type)
+	}
 }
 
 // #endregion
@@ -359,8 +395,9 @@ function scopesOf(program: common.typedSimple.Program): Array<CoverageScope> {
 
 // NOTE: The INNERMOST scope holding the point — a Function literal written
 // inside a Method is the Method's business, and a Method written inside a
-// Namespace inside a Function is its own. Ties go to the one declared later,
-// which is the nested one.
+// Namespace inside a Function is its own. A tie goes to the one collected
+// FIRST, and the walk that collects them is bottom-up, so on a tie the nested
+// one is the one that was collected first.
 function scopeAt(
 	scopes: Array<CoverageScope>,
 	position: common.Position,
@@ -375,7 +412,7 @@ function scopeAt(
 
 		let span = scope.position.end.line - scope.position.start.line
 
-		if (span <= width) {
+		if (span < width) {
 			found = scope.name
 			width = span
 		}

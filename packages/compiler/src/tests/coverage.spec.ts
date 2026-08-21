@@ -286,6 +286,41 @@ tests {
 		).not.toBe(optimiserOptionsKey(unoptimisedOptions))
 	})
 
+	it("keys on what will happen, not on what was asked for", () => {
+		// NOTE: With the phase off, the disabled names decide nothing else, so
+		// `off` says nothing about them — but they still decide whether the
+		// instrumentation runs, and a compile that asked for coverage and
+		// turned the pass off emits the bytes a compile that asked for neither
+		// does.
+		expect(
+			optimiserOptionsKey({
+				...unoptimisedOptions,
+				coverage: true,
+				disabledPasses: new Set(["instrument-coverage"]),
+			}),
+		).toBe(optimiserOptionsKey(unoptimisedOptions))
+	})
+
+	it("names a literal arm by its value rather than by its Type", () => {
+		// NOTE: `case 0` and `case Integer` are two arms of one `match`, and a
+		// report that called them both `case Integer` would name neither.
+		let program = instrumented(`implementation {
+	function readCount(_ count: Integer) -> String {
+		<- match count -> String {
+			case 0 { <- "none" }
+			case 1 { <- "one" }
+			case Integer { <- "many" }
+		}
+	}
+}`)
+
+		expect(labelsOf(program, "case")).toEqual([
+			"readCount › case 0",
+			"readCount › case 1",
+			"readCount › case Integer",
+		])
+	})
+
 	it("never instruments the standard library", () => {
 		// NOTE: An implementation of one Statement whose test reaches into the
 		// library, so the emitted file holds the library's own bodies. Exactly
@@ -613,6 +648,11 @@ describe("Folding a coverage run", () => {
 		expect(percentageOf({ covered: 1, total: 2 })).toBe(50)
 	})
 
+	it("rounds a percentage down, so that 100 means all of them", () => {
+		expect(percentageOf({ covered: 199, total: 200 })).toBe(99)
+		expect(percentageOf({ covered: 200, total: 200 })).toBe(100)
+	})
+
 	it("adds the counts of a Module two bundles both reported", () => {
 		let points = [point({ kind: "statement", line: 1, count: 2 })]
 		let summary = collectCoverage([
@@ -633,6 +673,32 @@ describe("Folding a coverage run", () => {
 		])
 
 		expect(summary.files[0]!.points[0]!.count).toBe(4)
+	})
+
+	it("replaces a report whose points moved under it", () => {
+		// NOTE: The same number of points at different Positions is a different
+		// COMPILE — a watch session mid-edit holds a stale table beside a fresh
+		// one — and adding those would attribute one compile's counts to
+		// another compile's points.
+		let summary = collectCoverage([
+			{
+				schema: 1,
+				kind: "coverage",
+				module: "/project/A.es",
+				points: [point({ kind: "statement", line: 1, count: 2 })],
+				choices: [],
+			},
+			{
+				schema: 1,
+				kind: "coverage",
+				module: "/project/A.es",
+				points: [point({ kind: "statement", line: 9, count: 1 })],
+				choices: [],
+			},
+		])
+
+		expect(summary.files[0]!.points[0]!.position.start.line).toBe(9)
+		expect(summary.files[0]!.points[0]!.count).toBe(1)
 	})
 
 	it("replaces a report whose table no longer agrees", () => {
@@ -753,5 +819,26 @@ describe("Writing a coverage run out", () => {
 
 	it("writes nothing for a run that counted nothing", () => {
 		expect(toLcov({ files: [], choices: [] })).toBe("")
+	})
+
+	it("keeps a comma out of an lcov branch name", () => {
+		// NOTE: A `BRDA` record is four comma-separated fields, and a Record
+		// Matcher's label holds commas of its own — which would move the count
+		// into the name and leave the record unreadable.
+		let written = toLcov({
+			files: [
+				fileCoverageOf("/project/Match.es", [
+					point({
+						kind: "case",
+						line: 3,
+						count: 0,
+						label: "case { x: Integer, y: Integer }",
+					}),
+				]),
+			],
+			choices: [],
+		})
+
+		expect(written).toContain("BRDA:3,0,case { x: Integer; y: Integer },0")
 	})
 })

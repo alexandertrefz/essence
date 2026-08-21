@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test"
 import { spawnSync } from "node:child_process"
 import {
+	existsSync,
 	mkdirSync,
 	mkdtempSync,
 	readFileSync,
@@ -1191,6 +1192,33 @@ describe("essence test --coverage", () => {
 				"Fixture",
 			])
 		})
+	})
+
+	it("writes no file for a run that counted nothing", async () => {
+		// NOTE: A `Foo.tests.es` of imports and tests has nothing to count, so
+		// there is nothing to write — and an empty tracefile is not an empty
+		// report: a viewer reads it as a valid claim about zero files.
+		await withFiles(
+			{ "Bare.tests.es": failing.replace("5", "4") },
+			async (directory) => {
+				let out = path.join(directory, "reports")
+
+				await runTests(directory, [
+					"--coverage-report",
+					"lcov",
+					"--coverage-out",
+					out,
+				])
+
+				expect(existsSync(path.join(out, "lcov.info"))).toBe(false)
+			},
+		)
+	})
+
+	it("refuses a place to write with nothing to write there", () => {
+		expect(() =>
+			parseArguments(["test", "--coverage", "--coverage-out", "reports"]),
+		).toThrow(UsageError)
 	})
 
 	it("refuses a format it does not know", () => {
