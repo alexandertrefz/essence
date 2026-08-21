@@ -141,6 +141,90 @@ function harness(
 	}
 }
 
+// NOTE: The one failure the Worker exists for. A test that loops for ever can
+// not be ended from inside the run — only the Worker can be taken away — and a
+// session that waited on one would never run another test, because a request
+// arriving while a run is in flight is remembered rather than started.
+describe("A session whose run never ends", () => {
+	const endless = [
+		"implementation {",
+		"\tfunction forever(_ n: Integer) -> Integer {",
+		"\t\t<- forever(n::add(1))",
+		"\t}",
+		"}",
+		"",
+		"tests {",
+		'\ttest "never ends" {',
+		"\t\texpect forever(0)::isGreaterThan(0)",
+		"\t}",
+		"}",
+		"",
+	].join("\n")
+
+	const quick = [
+		"tests {",
+		'\ttest "ends" {',
+		"\t\texpect true",
+		"\t}",
+		"}",
+		"",
+	].join("\n")
+
+	it("stops it, says why, and runs the next one", async () => {
+		let file = path.join(root, "Endless.tests.es")
+
+		writeFileSync(file, endless)
+
+		let problems: Array<string> = []
+		let notifications: Array<TestRunNotification> = []
+		let session = createTestSession({
+			testFiles: () => [file],
+			dependentsOf: (filePath) => [filePath],
+			overlays: () => ({}),
+			notify: (notification) => notifications.push(notification),
+			onResults: () => {},
+			onProblem: (_, problem) => problems.push(problem),
+			debounce: 20,
+			deadline: 3_000,
+		})
+		let ended = () =>
+			notifications.filter((notification) => notification.kind === "end")
+				.length
+		let waitFor = async (count: number): Promise<void> => {
+			let until = Date.now() + 30_000
+
+			while (ended() < count && Date.now() < until) {
+				await new Promise((resolve) => setTimeout(resolve, 25))
+			}
+		}
+
+		try {
+			session.run({ files: [file] })
+
+			await waitFor(1)
+
+			expect(problems.join("\n")).toContain("did not finish")
+
+			// NOTE: And the session is still a session. Nothing about the run
+			// that was stopped is held against the next one.
+			writeFileSync(file, quick)
+			session.run({ files: [file] })
+
+			await waitFor(2)
+
+			expect(ended()).toBe(2)
+			expect(
+				notifications.at(-1)?.kind === "end"
+					? notifications.at(-1)?.counts.passed
+					: null,
+			).toBe(1)
+		} finally {
+			await session.dispose()
+			rmSync(file, { force: true })
+		}
+	}, 60_000)
+})
+
 describe("A session asked to accept a snapshot", () => {
 	const snapshots = [
 		"tests {",
