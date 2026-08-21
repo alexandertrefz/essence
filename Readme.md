@@ -118,7 +118,13 @@ packages/cli/bin/essence test                   # every tests section and *.test
 packages/cli/bin/essence test Standings.es      # one file's tests
 packages/cli/bin/essence test -f leader         # only the tests whose name says "leader"
 packages/cli/bin/essence test --skip-tag slow   # leave a tag out; --tag runs only that tag
+packages/cli/bin/essence test --watch           # stay up, re-run what each save reaches
 ```
+
+`--watch` stays running and re-runs only the tests a change reached — the entries whose module graph holds the
+file that was saved — then clears the screen and reprints the whole picture, so what is on screen is the state
+of the project rather than a log. A line ending in a `§?` value comment answers with what it held: an ordinary
+comment to a build, a probe to a test run.
 
 `--json` writes the run as one JSON event per line. A project skips tags by default by naming them in the
 nearest `package.json`, under `{ "essence": { "test": { "skipTags": ["slow"] } } }`.

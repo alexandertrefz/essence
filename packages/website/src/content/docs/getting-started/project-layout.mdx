@@ -122,6 +122,12 @@ adopt whole later:
 `essence test --tag slow` runs exactly the tests a default like that leaves out
 — which is how a nightly job runs what a working day skips.
 
+While you are writing them, `essence test --watch` stays up and re-runs only the
+tests a save reached — the entries whose module graph holds the file that
+changed — clearing the screen and reprinting the whole picture each time. A
+statement whose line ends in `§?` answers with what it held; it is an ordinary
+comment to every other command.
+
 ## Conventions worth keeping
 
 None of these are enforced. They are what the repository itself does.

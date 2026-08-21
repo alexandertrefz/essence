@@ -402,9 +402,17 @@ export const commands: Array<CommandSpec> = [
 			"A tag that list leaves out still runs when --tag asks for it by " +
 				"name, which is how a nightly job runs what a working day " +
 				"skips.",
+			"--watch stays up and re-runs on every save. Only the tests a " +
+				"change reached run again — the entries whose module graph " +
+				"holds the file that changed — and the report is cleared and " +
+				"reprinted whole, so what is on screen is the state of the " +
+				"project rather than a log. Press r to re-run everything, c " +
+				"to clear and q — or Ctrl+C — to quit.",
 			"--json writes the event stream instead of the report: one JSON " +
 				"object per line on stdout and nothing else, the same stream " +
-				"the editor's live session reads. Diagnostics stay on stderr.",
+				"the editor's live session reads. Diagnostics stay on stderr. " +
+				"Under --watch the stream carries on, one run-start … run-end " +
+				"per re-run.",
 			"The exit code is 0 when everything that ran passed, 1 when a test " +
 				"failed, and 2 when a run nobody narrowed still holds a " +
 				"`focused` test — so a focus left behind while iterating can " +
@@ -415,6 +423,17 @@ export const commands: Array<CommandSpec> = [
 			`${PROGRAM} test --tag slow`,
 		],
 		options: [
+			{
+				name: "watch",
+				short: "w",
+				type: "boolean",
+				summary: "Stay up and re-run the tests a change reaches",
+				details:
+					"Only the entries whose module graph holds the file that " +
+					"changed are compiled and run again; everything else keeps " +
+					"the result it had. A `focused` test left behind never " +
+					"fails a watching run — it is how iterating works.",
+			},
 			{
 				name: "filter",
 				short: "f",
@@ -463,6 +482,10 @@ export const commands: Array<CommandSpec> = [
 			{
 				command: `${PROGRAM} test -f leader`,
 				description: "Run the tests whose name mentions the leader",
+			},
+			{
+				command: `${PROGRAM} test --watch`,
+				description: "Stay up and re-run what each save reaches",
 			},
 			{
 				command: `${PROGRAM} test --skip-tag slow --json`,

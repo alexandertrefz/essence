@@ -1,6 +1,4 @@
 import type { ChildProcess } from "node:child_process"
-import { watch as watchPath } from "node:fs"
-import { stat } from "node:fs/promises"
 import * as path from "node:path"
 
 import { EXIT_SUCCESS } from "./actions"
@@ -14,12 +12,7 @@ import {
 import type { CLIContext } from "./context"
 import { startProgram } from "./execute"
 import { renderDiagnosticsFor, renderWatchLine } from "./report"
-
-// NOTE: Editors rarely write a file in place — many write a temporary file and
-// rename it over the original, which destroys the watch on the file itself.
-// Watching the containing directory and filtering by name survives that, and
-// also catches a file that is deleted and recreated.
-const DEBOUNCE = 60
+import { createDependentsIndex, createSourceWatcher } from "./watcher"
 const CTRL_C = "\u0003"
 
 function timestamp(): string {
@@ -42,67 +35,25 @@ export async function runWatch(
 		emit: options.emit,
 	})
 
-	let signatures = new Map<string, string>()
 	let running: ChildProcess | null = null
 	let pending = new Set<string>()
-	let debounceTimer: ReturnType<typeof setTimeout> | null = null
 	let building = false
-	let watchers = new Map<string, ReturnType<typeof watchPath>>()
 
-	// NOTE: Every file of every entry's graph, and which entries to rebuild when
-	// it changes — a dependency is never rebuilt as an entry of its own, because
-	// what it changes is the output of the Modules that import it. A file two
-	// entries reach wakes both.
-	let dependents = new Map<string, Set<string>>()
+	let dependents = createDependentsIndex()
 
 	let recordGraphs = (result: CompilationResult): void => {
 		for (let outcome of result.outcomes) {
-			let entry = path.resolve(outcome.inputFileName)
-
-			for (let files of dependents.values()) {
-				files.delete(outcome.inputFileName)
-			}
-
-			for (let fileName of [
-				entry,
-				...outcome.modules.map((module) => module.fileName),
-			]) {
-				let files = dependents.get(fileName)
-
-				if (files === undefined) {
-					dependents.set(fileName, new Set([outcome.inputFileName]))
-				} else {
-					files.add(outcome.inputFileName)
-				}
-			}
+			dependents.record(
+				outcome.inputFileName,
+				outcome.modules.map((module) => module.fileName),
+			)
 		}
-
-		for (let [fileName, files] of dependents) {
-			if (files.size === 0) {
-				dependents.delete(fileName)
-			}
-		}
-	}
-
-	// NOTE: The entries whose graph a changed file sits in. A file nobody
-	// reached any more — a dependency an import was just deleted from — is
-	// simply not in the map, and nothing is rebuilt for it.
-	let entriesFor = (fileNames: Array<string>): Array<string> => {
-		let entries = new Set<string>()
-
-		for (let fileName of fileNames) {
-			for (let entry of dependents.get(fileName) ?? []) {
-				entries.add(entry)
-			}
-		}
-
-		return [...entries]
 	}
 
 	let watchedFiles = (): Array<string> => [
 		...new Set([
 			...plan.inputFileNames.map((fileName) => path.resolve(fileName)),
-			...dependents.keys(),
+			...dependents.files(),
 		]),
 	]
 
@@ -183,112 +134,30 @@ export async function runWatch(
 		}
 	}
 
-	let schedule = (fileNames: Array<string>) => {
-		for (let fileName of fileNames) {
-			pending.add(fileName)
-		}
+	let watcher = createSourceWatcher({
+		onChange: (changed) => {
+			let targets = dependents.entriesFor(changed)
 
-		if (debounceTimer !== null) {
-			clearTimeout(debounceTimer)
-		}
+			if (targets.length > 0) {
+				void rebuild(targets)
+			}
+		},
+		onError: (directory, error) => {
+			terminal.err(
+				`  ${palette.warning(theme.symbols.warning)} ${palette.muted(
+					`Could not watch ${directory}: ${
+						error instanceof Error ? error.message : String(error)
+					}`,
+				)}`,
+			)
+		},
+	})
 
-		debounceTimer = setTimeout(() => {
-			debounceTimer = null
-
-			let targets = [...pending]
-
-			pending.clear()
-			void rebuild(targets)
-		}, DEBOUNCE)
-	}
-
-	// NOTE: A directory event says only that something happened in that
-	// directory — on macOS a save that renames a temporary file over the
-	// original is reported under the temporary file's name, so the event's
-	// file name cannot be trusted to identify what changed. The event is used
-	// purely as a prompt to re-examine the sources themselves.
-	let signature = async (fileName: string): Promise<string> => {
-		try {
-			let info = await stat(fileName)
-
-			return `${info.mtimeMs}:${info.size}`
-		} catch {
-			return "missing"
-		}
-	}
-
-	// NOTE: Only files not seen before. A rebuild takes long enough for a save
-	// to land while it runs, and re-reading a signature that is already held
-	// would adopt that save as the state everything is compared against — the
-	// change would be watched for and never noticed.
-	async function captureSignatures(): Promise<void> {
-		await Promise.all(
-			watchedFiles()
-				.filter((fileName) => !signatures.has(fileName))
-				.map(async (fileName) => {
-					signatures.set(fileName, await signature(fileName))
-				}),
-		)
-	}
-
-	async function checkForChanges(): Promise<void> {
-		let changed: Array<string> = []
-
-		await Promise.all(
-			watchedFiles().map(async (fileName) => {
-				let current = await signature(fileName)
-
-				if (
-					current === "missing" ||
-					signatures.get(fileName) === current
-				) {
-					return
-				}
-
-				signatures.set(fileName, current)
-				changed.push(fileName)
-			}),
-		)
-
-		let targets = entriesFor(changed)
-
-		if (targets.length > 0) {
-			schedule(targets)
-		}
-	}
-
-	// NOTE: One watcher per directory holding a file of some graph, added as the
-	// graphs grow — an import written during the session brings a directory with
-	// it, and a rebuild that never watched it would be the last one.
+	// NOTE: The graphs GROW — an import written during the session brings a
+	// directory with it, and a rebuild that never watched it would be the last
+	// one.
 	async function watchGraph(): Promise<void> {
-		await captureSignatures()
-
-		for (let fileName of watchedFiles()) {
-			let directory = path.dirname(fileName)
-
-			if (watchers.has(directory)) {
-				continue
-			}
-
-			try {
-				watchers.set(
-					directory,
-					watchPath(directory, () => {
-						void checkForChanges()
-					}),
-				)
-			} catch (error) {
-				terminal.err(
-					`  ${palette.warning(theme.symbols.warning)} ${palette.muted(
-						`Could not watch ${directory}: ${
-							error instanceof Error
-								? error.message
-								: String(error)
-						}`,
-					)}`,
-				)
-			}
-		}
+		await watcher.watch(watchedFiles())
 	}
 
 	terminal.out("")
@@ -314,10 +183,7 @@ export async function runWatch(
 
 	return new Promise<number>((resolve) => {
 		let shutdown = async () => {
-			for (let watcher of watchers.values()) {
-				watcher.close()
-			}
-
+			watcher.close()
 			stopProgram()
 			restoreInput()
 			await plan.dispatcher.dispose()

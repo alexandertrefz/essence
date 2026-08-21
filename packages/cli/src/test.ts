@@ -46,17 +46,20 @@ import {
 // in them publishes nothing, which is not an error — it is the answer.
 type TestEntryPoints = typeof entryPoints
 
-type LoadedBundle = { $tests?: TestEntryPoints }
+type LoadedTestBundle = { $tests?: TestEntryPoints }
 
-// NOTE: One compiled entry, and the tests of ITS graph that no earlier entry
-// already claimed. Two entries that reach one Module both carry that Module's
-// tests, and running them twice would report every one of them twice — so the
-// first bundle to hold a Module runs it, and the rest leave it alone.
-type LoadedSuite = {
+// NOTE: One compiled entry and everything its bundle registered. The tests it
+// RUNS are a subset — two entries that reach one Module both carry that
+// Module's tests, and running them twice would report every one of them twice —
+// which is what `claimRegistries` works out across the whole run.
+export type LoadedBundle = {
 	inputFileName: string
 	tests: TestEntryPoints
-	registry: Registry
+	modules: Array<TestModule>
 }
+
+// NOTE: A bundle and the tests it is the one to run.
+export type LoadedSuite = LoadedBundle & { registry: Registry }
 
 export type TestFilters = {
 	filter: string | null
@@ -65,12 +68,12 @@ export type TestFilters = {
 }
 
 function claimModules(
-	registry: Registry,
+	modules: Array<TestModule>,
 	claimed: Set<string>,
 ): Array<TestModule> {
 	let kept: Array<TestModule> = []
 
-	for (let module of registry.modules) {
+	for (let module of modules) {
 		if (module.tests.length === 0) {
 			continue
 		}
@@ -90,6 +93,22 @@ function claimModules(
 	}
 
 	return kept
+}
+
+// NOTE: Which bundle runs which Module, decided across the whole run rather
+// than as the bundles arrive — so that a session re-loading ONE entry does not
+// silently take a shared Module away from the entry that has been running it.
+// The order is the order the entries were compiled in, which is the order they
+// were named in, so the answer is the same every time it is asked.
+export function claimRegistries(
+	bundles: Array<LoadedBundle>,
+): Array<LoadedSuite> {
+	let claimed = new Set<string>()
+
+	return bundles.map((bundle) => ({
+		...bundle,
+		registry: registryOf(claimModules(bundle.modules, claimed)),
+	}))
 }
 
 // NOTE: Every test the run was narrowed to, so that the refusal at the end can
@@ -129,6 +148,14 @@ async function stageBundle(
 
 	let staged = path.join(directory, "tests.mjs")
 
+	// NOTE: The name is taken first, and this is not tidiness. A staged bundle
+	// is a HARD LINK to the cache entry, so a `copyFile` onto a staged name that
+	// already exists writes THROUGH the link and overwrites the cache entry
+	// itself — a content-addressed name would then answer with somebody else's
+	// bundle, in this session and in every later one. Unlinking first means a
+	// copy makes a file of its own whatever was there.
+	await rm(staged, { force: true })
+
 	try {
 		await link(bundle, staged)
 	} catch {
@@ -138,12 +165,11 @@ async function stageBundle(
 	return staged
 }
 
-async function loadSuites(
+export async function loadBundles(
 	staging: string,
 	outputFileNames: Array<{ inputFileName: string; bundle: string }>,
-): Promise<Array<LoadedSuite>> {
-	let suites: Array<LoadedSuite> = []
-	let claimed = new Set<string>()
+): Promise<Array<LoadedBundle>> {
+	let bundles: Array<LoadedBundle> = []
 	let index = 0
 
 	for (let { inputFileName, bundle } of outputFileNames) {
@@ -151,23 +177,89 @@ async function loadSuites(
 
 		index += 1
 
-		let loaded = (await import(pathToFileURL(staged).href)) as LoadedBundle
+		let loaded = (await import(
+			pathToFileURL(staged).href
+		)) as LoadedTestBundle
 		let tests = loaded.$tests
 
 		if (tests === undefined) {
 			continue
 		}
 
-		let registry = registryOf(claimModules(tests.registry(), claimed))
-
-		if (registry.tests.length === 0) {
-			continue
-		}
-
-		suites.push({ inputFileName, tests, registry })
+		bundles.push({
+			inputFileName,
+			tests,
+			modules: tests
+				.registry()
+				.modules.filter((module) => module.tests.length > 0),
+		})
 	}
 
-	return suites
+	return bundles
+}
+
+// NOTE: One run over several bundles. `all` is every bundle the run knows
+// about and `running` the ones to drive — the two differ only for a watch
+// session, which re-runs what a change reached and leaves the rest as they
+// were, but has to decide FOCUS across every test it holds all the same.
+//
+// NOTE: Whether the run holds a focus is each bundle's own answer, asked of the
+// bundle — the rule for what counts as focused lives in the runtime and is not
+// worth a second spelling here. Once one bundle says yes, every bundle is told
+// so, and the ones holding no focused test of their own deselect everything
+// through the same selection that runs the rest.
+export function runSuites(
+	all: Array<LoadedSuite>,
+	running: Array<LoadedSuite>,
+	filters: TestFilters,
+	// NOTE: The suite an event came out of, so a session holding one stream per
+	// entry can replace the right one. Null for the run's own bookend, which
+	// belongs to no bundle.
+	emit: (event: TestEvent, suite: LoadedSuite | null) => void,
+): { planned: number; focused: boolean } {
+	let selected = all.map((suite) =>
+		suite.tests.select(suite.registry, filters),
+	)
+	let focused = selected.some((selection) => selection.focused)
+	let runFilters: TestFilters & { focusedElsewhere?: boolean } = focused
+		? { ...filters, focusedElsewhere: true }
+		: filters
+	// NOTE: A bundle that holds a focused test already selected correctly
+	// above; one that holds none runs nothing at all once another bundle does.
+	// So the count is read off the selection that was already made, rather than
+	// made a second time under the wider filters.
+	let planned = all.reduce((total, suite, index) => {
+		let selection = selected[index]!
+
+		if (!running.includes(suite) || (focused && !selection.focused)) {
+			return total
+		}
+
+		return (
+			total +
+			selection.selections.filter((each) => each.state === "run").length
+		)
+	}, 0)
+
+	emit({ schema: 1, kind: "run-start", tests: planned, focused }, null)
+
+	for (let suite of running) {
+		suite.tests.run(suite.registry, {
+			// NOTE: One run over several bundles is still one run, so each
+			// bundle's own bookends are dropped and the pair around the whole
+			// of it is written by the caller.
+			sink: (event) => {
+				if (event.kind === "run-start" || event.kind === "run-end") {
+					return
+				}
+
+				emit(event, suite)
+			},
+			filters: runFilters,
+		})
+	}
+
+	return { planned, focused }
 }
 
 // NOTE: `--skip-tag` wins over `--tag`, and a project's configured default is a
@@ -205,7 +297,7 @@ function isPlainRun(filters: TestFilters, explicitSkipTags: number): boolean {
 	)
 }
 
-function reportUnknownTags(
+export function reportUnknownTags(
 	context: CLIContext,
 	suites: Array<LoadedSuite>,
 	named: Array<string>,
@@ -241,7 +333,7 @@ function reportUnknownTags(
 // arrives and still streams. What a test itself writes never comes through
 // here: the runtime captures it against the test and the report shows it with
 // the failure.
-function redirectStdout(): () => void {
+export function redirectStdout(): () => void {
 	let original = process.stdout.write
 
 	process.stdout.write = ((
@@ -260,7 +352,7 @@ function redirectStdout(): () => void {
 	}
 }
 
-function printReport(
+export function printReport(
 	context: CLIContext,
 	run: TestRun,
 	sources: Map<string, string>,
@@ -381,71 +473,24 @@ export async function runTest(
 	let run: TestRun = emptyRun
 
 	try {
-		suites = await loadSuites(
-			staging,
-			compilation.outcomes.flatMap((outcome) =>
-				outcome.outputFileName === null
-					? []
-					: [
-							{
-								inputFileName: outcome.inputFileName,
-								bundle: outcome.outputFileName,
-							},
-						],
+		suites = claimRegistries(
+			await loadBundles(
+				staging,
+				compilation.outcomes.flatMap((outcome) =>
+					outcome.outputFileName === null
+						? []
+						: [
+								{
+									inputFileName: outcome.inputFileName,
+									bundle: outcome.outputFileName,
+								},
+							],
+				),
 			),
 		)
 
-		// NOTE: Whether the RUN holds a focus is each bundle's own answer,
-		// asked of the bundle — the rule for what counts as focused lives in
-		// the runtime and is not worth a second spelling here. Once one bundle
-		// says yes, every bundle is told so, and the ones holding no focused
-		// test of their own deselect everything through the same selection that
-		// runs the rest.
-		let selected = suites.map((suite) =>
-			suite.tests.select(suite.registry, filters),
-		)
-		let focused = selected.some((selection) => selection.focused)
-		let runFilters: TestFilters & { focusedElsewhere?: boolean } = focused
-			? { ...filters, focusedElsewhere: true }
-			: filters
-		// NOTE: A bundle that holds a focused test already selected correctly
-		// above; one that holds none runs nothing at all once another bundle
-		// does. So the count is read off the selection that was already made,
-		// rather than made a second time under the wider filters.
-		let planned = selected.reduce(
-			(total, selection) =>
-				total +
-				(focused && !selection.focused
-					? 0
-					: selection.selections.filter(
-							(each) => each.state === "run",
-						).length),
-			0,
-		)
-
-		emit({ schema: 1, kind: "run-start", tests: planned, focused })
-
 		let started = performance.now()
-
-		for (let suite of suites) {
-			suite.tests.run(suite.registry, {
-				// NOTE: One run over several bundles is still one run, so each
-				// bundle's own bookends are dropped and the pair around the
-				// whole of it is written here.
-				sink: (event) => {
-					if (
-						event.kind === "run-start" ||
-						event.kind === "run-end"
-					) {
-						return
-					}
-
-					emit(event)
-				},
-				filters: runFilters,
-			})
-		}
-
+		let { focused } = runSuites(suites, suites, filters, emit)
 		// NOTE: The stream is folded up ONCE, here, and the `run-end` this
 		// writes carries the counts it found. Re-reading the stream afterwards
 		// would walk every `expect` of every test a second time to be told what
