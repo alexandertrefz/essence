@@ -179,6 +179,34 @@ describe("Writing a recorded value into the source", () => {
 		expect(written.text).toBe(source)
 	})
 
+	// NOTE: Recording a snapshot is a test run writing into a source, and a run
+	// that also reformatted the file would be a build formatting your code.
+	// Only the slot moves; the rest of the file is left exactly as it was
+	// written, however it was written.
+	it("leaves an unformatted file unformatted but for the slot", () => {
+		let messy = [
+			"implementation {",
+			"    constant   x =  1",
+			"}",
+			"",
+			"tests {",
+			'\ttest "renders" {',
+			"\t\texpect x matches snapshot",
+			"\t}",
+			"}",
+			"",
+		].join("\n")
+		let slots = slotsOf(messy)
+		let written = writeInlineSnapshots(messy, [
+			{ position: slots[0]!.valuePosition, text: "1" },
+		])
+
+		expect(written.refusal).toBeNull()
+		expect(written.applied).toBe(1)
+		expect(written.text).toContain("    constant   x =  1")
+		expect(written.text).toContain('expect x matches snapshot "1"')
+	})
+
 	it("leaves a file that does not parse alone", () => {
 		let written = writeInlineSnapshots("implementation {", [
 			{
