@@ -7886,6 +7886,49 @@ function rewriteTestsNodes(
 			)
 		}
 
+		if (node.nodeType === "TestProperties") {
+			return withStatementLocation(
+				[
+					{
+						type: "ExpressionStatement",
+						expression: testingCall("properties", [
+							testContext(),
+							numberLiteral(node.index),
+							node.name === null
+								? { type: "Literal", value: null }
+								: rewriteExpression(node.name),
+							{
+								type: "ArrayExpression",
+								elements: node.parameters.map((parameter) => ({
+									type: "ObjectExpression",
+									properties: [
+										property("name", {
+											type: "Literal",
+											value: parameter.name,
+										}),
+										property(
+											"generator",
+											testGenerator(parameter.generator),
+										),
+									],
+								})),
+							},
+							{
+								type: "ArrowFunctionExpression",
+								expression: false,
+								params: node.parameters.map((parameter) => ({
+									type: "Identifier",
+									name: escapeName(parameter.name),
+								})),
+								body: rewriteBlockStatement(node.body),
+							},
+						]),
+					},
+				],
+				node.position,
+			)
+		}
+
 		if (node.nodeType === "TestScope") {
 			return [
 				{
@@ -7899,6 +7942,138 @@ function rewriteTestsNodes(
 
 		return rewriteStatements(node)
 	})
+}
+
+// NOTE: A generator as the test runtime reads it: plain data, apart from the
+// two leaves that carry an Expression. Both of those are emitted as a closure
+// of the ONE name they bind — a refinement's check takes the candidate, a
+// `Generatable` call takes the source — which is the same shape a table's rows
+// are given, and for the same reason: the interpreter holds a value and the
+// emitted code is what knows what to do with it.
+function testGenerator(
+	generator: common.typedSimple.TestGenerator,
+): estree.Expression {
+	let properties: Array<estree.Property> = [
+		property("kind", { type: "Literal", value: generator.kind }),
+	]
+
+	switch (generator.kind) {
+		case "list":
+			properties.push(property("item", testGenerator(generator.item)))
+
+			break
+		case "record":
+			properties.push(
+				property("members", testGeneratorMembers(generator.members)),
+			)
+
+			break
+		case "case":
+			properties.push(
+				// NOTE: The tag every value of the Case carries, spelled the
+				// way `createCase` stamps it — through `renderIdentity`, so a
+				// Choice declared in another Module is named as this bundle
+				// spells it.
+				property("tag", {
+					type: "Literal",
+					value: renderIdentity(generator.tag),
+				}),
+				property("members", testGeneratorMembers(generator.members)),
+			)
+
+			break
+		case "union":
+			properties.push(
+				property("members", {
+					type: "ArrayExpression",
+					elements: generator.members.map((member) =>
+						testGenerator(member),
+					),
+				}),
+			)
+
+			break
+		case "refined":
+			properties.push(
+				property("name", { type: "Literal", value: generator.name }),
+				property("base", testGenerator(generator.base)),
+				property("checks", {
+					type: "ArrayExpression",
+					elements: generator.checks.map((check) =>
+						generatorClosure(generator.binding, check),
+					),
+				}),
+				property("narrowing", testNarrowing(generator.narrowing)),
+			)
+
+			break
+		case "generated":
+			properties.push(
+				property("name", { type: "Literal", value: generator.name }),
+				property(
+					"generate",
+					generatorClosure(generator.binding, generator.call),
+				),
+			)
+
+			break
+		default:
+			break
+	}
+
+	return { type: "ObjectExpression", properties }
+}
+
+function testGeneratorMembers(
+	members: Array<common.typedSimple.TestGeneratorMember>,
+): estree.ArrayExpression {
+	return {
+		type: "ArrayExpression",
+		elements: members.map((member) => ({
+			type: "ObjectExpression",
+			properties: [
+				property("name", { type: "Literal", value: member.name }),
+				property("generator", testGenerator(member.generator)),
+			],
+		})),
+	}
+}
+
+function testNarrowing(
+	narrowing: common.typedSimple.TestNarrowing,
+): estree.ObjectExpression {
+	let properties: Array<estree.Property> = []
+
+	for (let [name, value] of Object.entries(narrowing)) {
+		properties.push(
+			property(
+				name,
+				Array.isArray(value)
+					? {
+							type: "ArrayExpression",
+							elements: value.map((entry) => ({
+								type: "Literal" as const,
+								value: entry,
+							})),
+						}
+					: { type: "Literal", value },
+			),
+		)
+	}
+
+	return { type: "ObjectExpression", properties }
+}
+
+function generatorClosure(
+	binding: string,
+	value: common.typedSimple.ExpressionNode,
+): estree.Expression {
+	return {
+		type: "ArrowFunctionExpression",
+		expression: true,
+		params: [{ type: "Identifier", name: escapeName(binding) }],
+		body: rewriteExpression(value),
+	}
 }
 
 // NOTE: What a table test's rows share: one Function of the row, for the name

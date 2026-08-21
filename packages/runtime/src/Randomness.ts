@@ -236,6 +236,13 @@ const CHARACTERS = [
 	"🇩🇪",
 ]
 
+// NOTE: One character of that alphabet. It is what the structural generator a
+// property test derives builds a String out of, character by character, since
+// the one below answers a whole String and can not be told a MINIMUM length.
+export function character(source: RandomnessType): string {
+	return CHARACTERS[below(source, CHARACTERS.length)] ?? "a"
+}
+
 // NOTE: A String of at most `upTo` characters, and possibly of none. A negative
 // bound answers the empty String, which is the only String shorter than nothing
 // asked for.

@@ -172,6 +172,28 @@ function walkTestsNodes(
 				: { ...node, name, rows, bindings, body }
 		}
 
+		if (node.nodeType === "TestProperties") {
+			let name =
+				node.name === null ? null : walkExpression(node.name, rewrites)
+			// NOTE: A generator's Expressions are walked too — a refinement's
+			// check and a `Generatable` call are ordinary Expressions of this
+			// Module, so a pass that improves one improves these.
+			let parameters = mapArray(node.parameters, (parameter) => {
+				let generator = walkGenerator(parameter.generator, rewrites)
+
+				return generator === parameter.generator
+					? parameter
+					: { ...parameter, generator }
+			})
+			let body = walkBody(node.body, rewrites)
+
+			return name === node.name &&
+				parameters === node.parameters &&
+				body === node.body
+				? node
+				: { ...node, name, parameters, body }
+		}
+
 		if (node.nodeType === "TestScope") {
 			let scoped = walkTestsNodes(node.nodes, rewrites)
 
@@ -180,6 +202,60 @@ function walkTestsNodes(
 
 		return walkImplementation(node, rewrites)
 	})
+}
+
+function walkGenerator(
+	generator: common.typedSimple.TestGenerator,
+	rewrites: NodeRewrites,
+): common.typedSimple.TestGenerator {
+	if (generator.kind === "list") {
+		let item = walkGenerator(generator.item, rewrites)
+
+		return item === generator.item ? generator : { ...generator, item }
+	}
+
+	if (generator.kind === "record" || generator.kind === "case") {
+		let members = mapArray(generator.members, (member) => {
+			let walked = walkGenerator(member.generator, rewrites)
+
+			return walked === member.generator
+				? member
+				: { ...member, generator: walked }
+		})
+
+		return members === generator.members
+			? generator
+			: { ...generator, members }
+	}
+
+	if (generator.kind === "union") {
+		let members = mapArray(generator.members, (member) =>
+			walkGenerator(member, rewrites),
+		)
+
+		return members === generator.members
+			? generator
+			: { ...generator, members }
+	}
+
+	if (generator.kind === "refined") {
+		let base = walkGenerator(generator.base, rewrites)
+		let checks = mapArray(generator.checks, (check) =>
+			walkExpression(check, rewrites),
+		)
+
+		return base === generator.base && checks === generator.checks
+			? generator
+			: { ...generator, base, checks }
+	}
+
+	if (generator.kind === "generated") {
+		let call = walkExpression(generator.call, rewrites)
+
+		return call === generator.call ? generator : { ...generator, call }
+	}
+
+	return generator
 }
 
 export function rewriteExpressions(

@@ -1,5 +1,12 @@
+import {
+	type Generator,
+	GenerationFailure,
+	generate,
+	shrink,
+} from "./Generators"
 import { anyIs } from "./internalHelpers"
 import { materialise } from "./List"
+import { createRandomness, seedOf } from "./Randomness"
 import type { StringType } from "./String"
 import {
 	getStringRepresentation,
@@ -364,6 +371,15 @@ export type TestContext = {
 	// table runs the same body, so one name would be one entry the rows
 	// overwrite in turn, and only the last of them could ever match.
 	row: number | null
+	// NOTE: What a property test draws with, and how many cases it runs. The
+	// seed is the RUN's, printed on a failure and read back by `--seed`; `word`
+	// is that seed folded together with the test's own id, so replaying one
+	// test with `-f` draws exactly the sequence the whole run drew for it.
+	property: PropertySettings
+	// NOTE: What the property test of THIS context did, and null for every
+	// ordinary test. It is written by `properties` and read by the run, which
+	// is what turns it into the one event that says how many cases held.
+	propertyResult: PropertyResult | null
 	output: Array<OutputChunk>
 	// NOTE: What has been counted so far, asked from inside a running test
 	// rather than only read out at the end of a run. Coverage is a fact about
@@ -373,12 +389,32 @@ export type TestContext = {
 	coverage: () => Array<CoverageReport>
 }
 
+// NOTE: What a property test draws with. `word` is the state a source is built
+// from and `seed` is what a reader types after `--seed` to get it back.
+export type PropertySettings = { seed: string; word: number; cases: number }
+
+export type PropertyCounterexample = { name: string; value: string }
+
+export type PropertyResult = {
+	cases: number
+	seed: string
+	shrinks: number
+	counterexample: Array<PropertyCounterexample> | null
+}
+
+// NOTE: The cases a property runs where nobody said. A hundred is the number
+// the design names, and it is the number every property testing library has
+// settled on: enough that a shape-level mistake shows, few enough that a suite
+// of them still runs while a reader waits.
+export const DEFAULT_CASES = 100
+
 export function createContext(
 	index: number,
 	options: {
 		stored?: SnapshotStore
 		updating?: boolean
 		row?: number | null
+		property?: PropertySettings
 	} = {},
 ): TestContext {
 	return {
@@ -391,6 +427,12 @@ export function createContext(
 		stored: options.stored ?? {},
 		updating: options.updating ?? false,
 		row: options.row ?? null,
+		property: options.property ?? {
+			seed: "",
+			word: 0,
+			cases: DEFAULT_CASES,
+		},
+		propertyResult: null,
 		output: [],
 		coverage,
 	}
@@ -450,6 +492,229 @@ export function rows<Value extends AnyType>(
 	})
 }
 
+// NOTE: One property test, standing where it was written. The body is run once
+// per generated case rather than once, and what a reader is shown when it fails
+// is the SMALLEST case that still fails — everything a run records about the
+// cases that held is rolled back, so a hundred passing cases leave exactly
+// nothing behind.
+export type PropertyParameter = { name: string; generator: Generator }
+
+export function properties(
+	context: TestContext,
+	index: number,
+	name: StringType | null,
+	parameters: Array<PropertyParameter>,
+	run: (...values: Array<AnyType>) => void,
+): void {
+	if (name !== null) {
+		context.names.set(index, name.value)
+	}
+
+	if (context.index !== index) {
+		return
+	}
+
+	runProperty(context, parameters, run)
+}
+
+// NOTE: What a case may leave on the context. A case that held leaves none of
+// it: the buffers are cut back to these lengths, so what a report reads is the
+// FAILING case's recordings and nothing from the ninety-nine before it.
+type ContextMark = {
+	traces: number
+	probes: number
+	expectations: number
+	snapshots: number
+	output: number
+}
+
+function markOf(context: TestContext): ContextMark {
+	return {
+		traces: context.traces.length,
+		probes: context.probes.length,
+		expectations: context.expectations.length,
+		snapshots: context.snapshots.length,
+		output: context.output.length,
+	}
+}
+
+function rewind(context: TestContext, mark: ContextMark): void {
+	context.traces.length = mark.traces
+	context.probes.length = mark.probes
+	context.expectations.length = mark.expectations
+	context.snapshots.length = mark.snapshots
+	context.output.length = mark.output
+}
+
+// NOTE: How many candidates a shrink is allowed to try before it answers with
+// the smallest thing it has. A pass over one Parameter is cheap; a property
+// whose body is slow is what this bounds.
+const SHRINK_ATTEMPTS = 400
+
+function runProperty(
+	context: TestContext,
+	parameters: Array<PropertyParameter>,
+	run: (...values: Array<AnyType>) => void,
+): void {
+	let settings = context.property
+	let source = createRandomness(settings.word)
+	let mark = markOf(context)
+	let failing: Array<AnyType> | null = null
+	let ran = 0
+
+	for (let index = 0; index < settings.cases; index++) {
+		// NOTE: The size grows with the case number, so the early cases are
+		// small — a failure found among them is nearly minimal already — and
+		// the late ones are big enough to break an assumption a short List
+		// never would.
+		let size =
+			1 + Math.floor((index * 48) / Math.max(settings.cases - 1, 1))
+		let values: Array<AnyType>
+
+		try {
+			values = parameters.map((parameter) =>
+				generate(parameter.generator, source, size),
+			)
+		} catch (thrown) {
+			// NOTE: A refinement nothing could satisfy. The result is recorded
+			// FIRST so the report still says how many cases held, and then the
+			// failure ends the test the way any other thrown error does.
+			context.propertyResult = {
+				cases: ran,
+				seed: settings.seed,
+				shrinks: 0,
+				counterexample: null,
+			}
+
+			throw thrown
+		}
+
+		ran += 1
+
+		if (!holds(context, mark, run, values)) {
+			failing = values
+
+			break
+		}
+	}
+
+	if (failing === null) {
+		context.propertyResult = {
+			cases: ran,
+			seed: settings.seed,
+			shrinks: 0,
+			counterexample: null,
+		}
+
+		return
+	}
+
+	let shrunk = shrinkCase(context, mark, run, parameters, failing)
+
+	context.propertyResult = {
+		cases: ran,
+		seed: settings.seed,
+		shrinks: shrunk.shrinks,
+		counterexample: parameters.map((parameter, index) => ({
+			name: parameter.name,
+			value: render(shrunk.values[index]!),
+		})),
+	}
+
+	// NOTE: The last run is the one whose recordings the report is built from,
+	// and it is NOT guarded: a body that throws has to end the test the way it
+	// would have ended an ordinary one, and a failed `require` has to unwind
+	// exactly as far as it always does.
+	rewind(context, mark)
+	run(...shrunk.values)
+}
+
+// NOTE: One case, rolled back where it held. A case FAILS when it recorded a
+// failed assertion or when it threw — a failed `require` throws the runtime's
+// own sentinel, which is a failure like any other here rather than the end of
+// the test.
+function holds(
+	context: TestContext,
+	mark: ContextMark,
+	run: (...values: Array<AnyType>) => void,
+	values: Array<AnyType>,
+): boolean {
+	rewind(context, mark)
+
+	try {
+		run(...values)
+	} catch (thrown) {
+		if (thrown === requirementFailed) {
+			return false
+		}
+
+		// NOTE: A generation failure inside a body is nobody's counterexample —
+		// it says the run could not ask the question at all.
+		if (thrown instanceof GenerationFailure) {
+			throw thrown
+		}
+
+		return false
+	}
+
+	for (
+		let index = mark.expectations;
+		index < context.expectations.length;
+		index++
+	) {
+		if (!context.expectations[index]!.passed) {
+			return false
+		}
+	}
+
+	return true
+}
+
+// NOTE: The smallest failing case this can reach: one Parameter at a time,
+// keeping every candidate that still fails, and starting over whenever one did
+// — so a List that shrinks to three items has its items shrunk afterwards.
+function shrinkCase(
+	context: TestContext,
+	mark: ContextMark,
+	run: (...values: Array<AnyType>) => void,
+	parameters: Array<PropertyParameter>,
+	failing: Array<AnyType>,
+): { values: Array<AnyType>; shrinks: number } {
+	let values = [...failing]
+	let shrinks = 0
+	let attempts = 0
+	let improved = true
+
+	while (improved && attempts < SHRINK_ATTEMPTS) {
+		improved = false
+
+		for (let [index, parameter] of parameters.entries()) {
+			for (let candidate of shrink(parameter.generator, values[index]!)) {
+				if (attempts >= SHRINK_ATTEMPTS) {
+					break
+				}
+
+				attempts += 1
+
+				let attempt = [...values]
+
+				attempt[index] = candidate
+
+				if (holds(context, mark, run, attempt)) {
+					continue
+				}
+
+				values = attempt
+				shrinks += 1
+				improved = true
+
+				break
+			}
+		}
+	}
+
+	return { values, shrinks }
+}
 // NOTE: THE trace mechanism — record a value at an instrumented point,
 // attributed to a source span, and answer with the very value so that wrapping
 // an Expression in one changes nothing about what it evaluates to. `expect` and
@@ -942,6 +1207,20 @@ export type TestEvent =
 			text: string
 			recorded: string | null
 	  }
+	// NOTE: What one property test's run of cases did. It is written whether the
+	// property held or not, because "a hundred cases held" is the answer a
+	// reader wants as much as the counterexample is — and the seed is on it
+	// either way, so a run that passed today can be run again tomorrow.
+	| {
+			schema: 1
+			kind: "property"
+			id: string
+			name: string
+			cases: number
+			seed: string
+			shrinks: number
+			counterexample: Array<PropertyCounterexample> | null
+	  }
 	| {
 			schema: 1
 			kind: "output"
@@ -1108,6 +1387,14 @@ export type RunOptions = {
 	// NOTE: Whether a snapshot that differs is REPLACED rather than reported —
 	// `essence test --update`, and the Editor's "Accept snapshot".
 	update?: boolean
+	// NOTE: What every property test of the run draws from, spelled as the
+	// hexadecimal a reader types after `--seed`. One is made up where none was
+	// handed over, and it is on every `property` event either way, so a failure
+	// says how to see it again. Each test folds its own id into it, which is
+	// what makes replaying ONE test with a filter draw what the whole run drew.
+	seed?: string
+	// NOTE: How many cases each property test runs. `DEFAULT_CASES` otherwise.
+	cases?: number
 	// NOTE: Whether to write a `coverage` event per instrumented Module when
 	// the run ends, and to put the counts back to what loading the bundle left
 	// them at before it starts. A bundle compiled without `--coverage` has no
@@ -1126,9 +1413,24 @@ export type RunSummary = {
 	failedIds: Array<string>
 }
 
+// NOTE: A seed nobody asked for, as the eight hexadecimal characters `--seed`
+// reads back. It is made HERE rather than left empty so that every run of a
+// property test is a different run, and so that the one that failed can be run
+// again exactly.
+export function randomSeed(): string {
+	return Math.floor(Math.random() * 0x1_0000_0000)
+		.toString(16)
+		.padStart(8, "0")
+}
+
 export function runTests(registry: Registry, options: RunOptions): RunSummary {
 	let now = options.now ?? (() => Date.now())
 	let sink = options.sink
+
+	if (options.seed === undefined) {
+		options = { ...options, seed: randomSeed() }
+	}
+
 	let { selections, focused } = selectTests(registry, options.filters)
 	let running = selections.filter((selection) => selection.state === "run")
 	let started = now()
@@ -1275,10 +1577,21 @@ function runOne(
 ): void {
 	let entry = test.entry
 	let spans = test.module.spans
+	let seed = options.seed ?? ""
 	let context = createContext(test.index, {
 		stored: (options.snapshots ?? {})[test.module.module ?? ""] ?? {},
 		updating: options.update ?? false,
 		row: entry.row,
+		property: {
+			seed,
+			// NOTE: The run's seed folded together with the test's own id. Two
+			// property tests of one run therefore draw two unrelated sequences,
+			// and running either of them ALONE draws exactly what the whole run
+			// drew for it — which is what makes the replay a report prints work
+			// with the filter beside it.
+			word: seedOf(`${seed}/${entry.id}`),
+			cases: options.cases ?? DEFAULT_CASES,
+		},
 	})
 
 	sink({
@@ -1333,6 +1646,22 @@ function runOne(
 			point,
 			span: spans[point] ?? null,
 			value: render(valueAt(context.probes, point)!),
+		})
+	}
+
+	// NOTE: Before the assertions, because what a property test's assertions say
+	// is about ONE case — the smallest one that failed — and a reader has to be
+	// told that before being shown it.
+	if (context.propertyResult !== null) {
+		sink({
+			schema: 1,
+			kind: "property",
+			id: entry.id,
+			name,
+			cases: context.propertyResult.cases,
+			seed: context.propertyResult.seed,
+			shrinks: context.propertyResult.shrinks,
+			counterexample: context.propertyResult.counterexample,
 		})
 	}
 
