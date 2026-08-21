@@ -48,18 +48,36 @@ const reader = [
 	"",
 ].join("\n")
 
+const tagged = [
+	"tests {",
+	'\tsuite "slow things" tagged slow {',
+	'\t\ttest "waits" {',
+	"\t\t\texpect true",
+	"\t\t}",
+	"\t}",
+	"",
+	'\ttest "is quick" {',
+	"\t\texpect true",
+	"\t}",
+	"}",
+	"",
+].join("\n")
+
 let root: string
 let library: string
 let readerFile: string
+let taggedFile: string
 
 beforeAll(() => {
 	root = canonicalPath(mkdtempSync(path.join(tmpdir(), "essence-session-")))
 	library = path.join(root, "Library.es")
 	readerFile = path.join(root, "Reader.tests.es")
+	taggedFile = path.join(root, "Tagged.tests.es")
 
 	mkdirSync(root, { recursive: true })
 	writeFileSync(library, passing)
 	writeFileSync(readerFile, reader)
+	writeFileSync(taggedFile, tagged)
 })
 
 afterAll(() => {
@@ -75,7 +93,10 @@ type Harness = {
 	waitForRuns: (count: number) => Promise<void>
 }
 
-function harness(options: { debounce?: number } = {}): Harness {
+function harness(
+	options: { debounce?: number; files?: Array<string> } = {},
+): Harness {
+	let files = options.files ?? [library, readerFile]
 	let notifications: Array<TestRunNotification> = []
 	let results: Array<Array<string>> = []
 	let overlays: Record<string, string> = {}
@@ -83,7 +104,7 @@ function harness(options: { debounce?: number } = {}): Harness {
 	let session = createTestSession({
 		onProblem: (filePath, problem) =>
 			problems.push(`${filePath}: ${problem}`),
-		testFiles: () => [library, readerFile],
+		testFiles: () => files,
 		// NOTE: The Workspace answers with the file itself and everything that
 		// imports it; here the one import in the fixture is spelled out.
 		dependentsOf: (filePath) =>
@@ -129,13 +150,13 @@ describe("The Language Server's test session", () => {
 
 			expect(live.problems).toEqual([])
 			expect(live.notifications[0]).toMatchObject({
-				version: 1,
+				version: 2,
 				kind: "start",
 				reason: "open",
 				run: 1,
 			})
 			expect(ended[0]).toMatchObject({
-				version: 1,
+				version: 2,
 				kind: "end",
 				run: 1,
 				compiled: true,
@@ -280,6 +301,116 @@ describe("The Language Server's test session", () => {
 				files: [readerFile],
 				counts: { passed: 1 },
 			})
+			// NOTE: What the batch was narrowed TO, so that a client merges the
+			// same way the session does rather than adopting the deselection
+			// every other test of that file was reported with.
+			expect(ended[1]?.ids).toEqual([record!.id])
+		} finally {
+			await live.session.dispose()
+		}
+	}, 60_000)
+
+	it("says where every test it ran stands", async () => {
+		let live = harness()
+
+		try {
+			live.session.runAll("open")
+
+			await live.waitForRuns(1)
+
+			let [ended] = live.notifications.filter(
+				(notification) => notification.kind === "end",
+			)
+
+			expect(ended?.sites.map((site) => site.name).sort()).toEqual([
+				"doubles",
+				"reads",
+			])
+
+			let site = ended?.sites.find((each) => each.name === "reads")
+
+			expect(site).toMatchObject({
+				file: readerFile,
+				suitePath: [],
+				tags: [],
+				focused: false,
+				skipped: null,
+			})
+			// NOTE: The whole item for a gutter, the keyword alone for a lens.
+			expect(site?.keywordRange.start).toEqual(site!.range.start)
+			expect(site?.range.end.line).toBeGreaterThan(site!.range.start.line)
+			// NOTE: The same id the events spell, which is what ties the two
+			// halves of a batch together.
+			expect(
+				ended?.events.some(
+					(event) => "id" in event && event.id === site?.id,
+				),
+			).toBe(true)
+		} finally {
+			await live.session.dispose()
+		}
+	}, 60_000)
+
+	it("carries a suite's tags down to the tests under it", async () => {
+		let live = harness({ files: [taggedFile] })
+
+		try {
+			live.session.runAll("open")
+
+			await live.waitForRuns(1)
+
+			let [ended] = live.notifications.filter(
+				(notification) => notification.kind === "end",
+			)
+
+			expect(
+				ended?.sites.map((site) => [
+					site.name,
+					site.suitePath,
+					site.tags,
+				]),
+			).toEqual([
+				["waits", ["slow things"], ["slow"]],
+				["is quick", [], []],
+			])
+		} finally {
+			await live.session.dispose()
+		}
+	}, 60_000)
+
+	it("leaves out the tags the client asked it to skip", async () => {
+		let live = harness({ files: [taggedFile] })
+
+		try {
+			live.session.setSkipTags(["slow"])
+
+			await live.waitForRuns(1)
+
+			expect(
+				live.session
+					.recordsFor(taggedFile)
+					.map((record) => [record.name, record.state]),
+			).toEqual([
+				["waits", "deselected"],
+				["is quick", "passed"],
+			])
+			expect(live.notifications[0]).toMatchObject({
+				kind: "start",
+				reason: "settings",
+			})
+
+			// NOTE: The same tags again is not a reason to run the workspace a
+			// second time — a client re-reads its whole configuration whenever
+			// anything under `essence` changes.
+			live.session.setSkipTags(["slow"])
+
+			await new Promise((resolve) => setTimeout(resolve, 100))
+
+			expect(
+				live.notifications.filter(
+					(notification) => notification.kind === "start",
+				),
+			).toHaveLength(1)
 		} finally {
 			await live.session.dispose()
 		}

@@ -1,10 +1,44 @@
-import type { TestEvent } from "@essence-lang/runtime/Testing"
+import type { Range, TestEvent } from "@essence-lang/runtime/Testing"
 
 // NOTE: What the Language Server tells an Editor about a test run, and what it
 // tells the Worker that performs one. Both are written down here, apart from
 // the code that sends them, because they are a CONTRACT: an extension is built
 // against the notification and a bundled Worker is built against the messages,
 // and neither can be read out of the implementation once it ships.
+
+// #region Where a test stands
+
+// NOTE: One test as the Compiler found it, independently of what running it
+// said. It is the half of a run an Editor needs to draw a TREE — a Test
+// Explorer lists what exists, including everything a filter left out, and puts
+// each item on the line it was written on.
+//
+// NOTE: The events carry no Position at all, on purpose: an event is about what
+// happened, and a span belongs to the source. These come off the Module's own
+// manifest, which is what the Compiler emitted beside the tests, so the ranges
+// are the ranges the lenses and the Diagnostics use.
+export type TestSite = {
+	// NOTE: The structural id, exactly as every event spells it.
+	id: string
+	// NOTE: The name TEMPLATE. What a run reports is the RENDERING, which only
+	// differs where the name interpolates — a client shows the rendering it has
+	// and falls back to this, which is the only name a test that never ran has.
+	name: string
+	suitePath: Array<string>
+	// NOTE: The file the test was WRITTEN in, as an absolute path.
+	file: string
+	// NOTE: The whole `test "…" { … }`, which is what a gutter marks, and the
+	// keyword alone, which is where a lens and an Explorer item sit.
+	range: Range
+	keywordRange: Range
+	// NOTE: The EFFECTIVE tags — the test's own and every enclosing suite's —
+	// so a client filtering by tag never has to walk a suite path.
+	tags: Array<string>
+	focused: boolean
+	skipped: string | null
+}
+
+// #endregion
 
 // #region The custom notification
 
@@ -20,8 +54,12 @@ import type { TestEvent } from "@essence-lang/runtime/Testing"
 // does not know must ignore that event and keep the rest.
 export const TEST_RUN_NOTIFICATION = "essence/testRun"
 
+// NOTE: The version this Server sends, so a client can name what it needs
+// rather than repeating the number in a condition.
+export const TEST_RUN_VERSION = 2
+
 export type TestRunNotification = {
-	version: 1
+	version: typeof TEST_RUN_VERSION
 	// NOTE: Which cycle this is, counted from the session's start. The `end`
 	// carrying a run number answers the `start` that carried it, and a client
 	// that has already drawn a later run may drop an earlier one that arrives
@@ -29,15 +67,28 @@ export type TestRunNotification = {
 	run: number
 	kind: "start" | "end"
 	// NOTE: What asked for the run. `open` is the session starting or a folder
-	// arriving, `change` an edit, and `request` an `essence/runTests` from the
-	// Editor — which is what a Run lens sends.
-	reason: "open" | "change" | "request"
+	// arriving, `change` an edit, `settings` a setting that changes what runs,
+	// and `request` an `essence/runTests` from the Editor — which is what a Run
+	// lens sends.
+	reason: "open" | "change" | "settings" | "request"
 	// NOTE: The files this cycle covers, as absolute paths. On a `start` they
 	// are what is about to run; on an `end` they are what ran. Everything the
-	// session holds for a file in this list is REPLACED by this batch.
+	// session holds for a file in this list is REPLACED by this batch — unless
+	// the batch was NARROWED, see `ids`.
 	files: Array<string>
+	// NOTE: The tests this cycle was narrowed to, empty where it was not. What
+	// it decides is how much of a file the batch replaces: a run somebody asked
+	// for by id reports a deselection for every OTHER test of that file, and a
+	// client that adopted those would turn "run this one" into "forget the
+	// rest". The Server holds its own results the same way.
+	ids: Array<string>
 	// NOTE: The whole batch, in the order it happened. Empty on a `start`.
 	events: Array<TestEvent>
+	// NOTE: Every test of every file this cycle covers, whether it ran or not,
+	// in the order they were written. Empty on a `start`, and empty for a file
+	// that would not compile — which is what lets a client keep drawing the
+	// tree it last had rather than emptying it on a half-typed line.
+	sites: Array<TestSite>
 	counts: {
 		passed: number
 		failed: number
@@ -50,6 +101,21 @@ export type TestRunNotification = {
 	// says is that the results the client is holding for that file are the last
 	// ones that ran rather than the ones the buffer would produce.
 	compiled: boolean
+}
+
+// #endregion
+
+// #region What the Server reads out of the client's configuration
+
+// NOTE: The `essence.tests` section, pulled with `workspace/configuration`
+// whenever the client says something under `essence` changed. It is part of
+// this contract rather than of the extension's manifest because any client may
+// answer it, and a client that answers nothing keeps the defaults — a session
+// that is on, skips nothing, and waits `450` milliseconds.
+export type TestSettings = {
+	enabled?: boolean
+	skipTags?: Array<string>
+	debounce?: number
 }
 
 // #endregion
@@ -126,6 +192,10 @@ export type TestWorkerResponse =
 			run: number
 			entry: string
 			events: Array<TestEvent>
+			// NOTE: Every test this entry holds, off the compiled Module's own
+			// manifest, whether it ran or not. Empty where the entry would not
+			// compile, for the same reason `events` is.
+			sites: Array<TestSite>
 			// NOTE: Whether this entry holds a focused test, so the session can
 			// tell every other entry so on the next cycle — focus is decided
 			// across a whole run and one Worker message knows one bundle.
