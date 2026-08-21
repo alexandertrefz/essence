@@ -1298,9 +1298,11 @@ export type EventSink = (event: TestEvent) => void
 // #region Selection
 
 export type Filters = {
-	// NOTE: A substring of the test's name. An interpolated name is matched on
-	// its TEMPLATE, because selection happens before anything has run and a
-	// rendering is worked out where the test stands.
+	// NOTE: A substring of the test's name, matched against what a reader SEES —
+	// the rendered name — and against the template it was written as. An
+	// interpolated name has to be rendered before it can be matched, which means
+	// evaluating each Module's setup: `selectTests` does that once, and only
+	// where a filter was given and some name of the registry interpolates.
 	filter?: string | null
 	tags?: Array<string>
 	skipTags?: Array<string>
@@ -1331,7 +1333,19 @@ export type Selection =
 export function selectTests(
 	registry: Registry,
 	filters: Filters = {},
-): { selections: Array<Selection>; focused: boolean } {
+	// NOTE: The rendered names, where the caller holds them already — `runTests`
+	// works them out for the report and hands them down rather than paying for
+	// them twice.
+	rendered?: Map<string, string>,
+): {
+	selections: Array<Selection>
+	focused: boolean
+	// NOTE: How many tests the FILTER matched, whatever narrowed them
+	// afterwards. A run that selected nothing because no test is called that is
+	// worth saying out loud, and a run that selected nothing because a tag took
+	// them is a different sentence.
+	matched: number
+} {
 	let focused =
 		(filters.focusedElsewhere ?? false) ||
 		registry.tests.some(
@@ -1341,6 +1355,14 @@ export function selectTests(
 	let skipTags = filters.skipTags ?? []
 	let filter = filters.filter ?? null
 	let ids = filters.ids ?? []
+	let names =
+		filter === null
+			? new Map<string, string>()
+			: (rendered ?? renderedNames(registry))
+	let matches = (entry: TestManifestEntry): boolean =>
+		filter === null ||
+		entry.name.includes(filter) ||
+		(names.get(entry.id) ?? "").includes(filter)
 
 	let selections = registry.tests.map((test): Selection => {
 		let entry = test.entry
@@ -1372,14 +1394,21 @@ export function selectTests(
 			return { test, state: "deselected", reason: "tag" }
 		}
 
-		if (filter !== null && !entry.name.includes(filter)) {
+		if (!matches(entry)) {
 			return { test, state: "deselected", reason: "filter" }
 		}
 
 		return { test, state: "run" }
 	})
 
-	return { selections, focused }
+	return {
+		selections,
+		focused,
+		matched:
+			filter === null
+				? registry.tests.length
+				: registry.tests.filter((test) => matches(test.entry)).length,
+	}
 }
 
 // #endregion
@@ -1442,7 +1471,13 @@ export function runTests(registry: Registry, options: RunOptions): RunSummary {
 		options = { ...options, seed: randomSeed() }
 	}
 
-	let { selections, focused } = selectTests(registry, options.filters)
+	// NOTE: The rendered names, worked out ONCE per Module by running its
+	// section with a context that selects no test. It is what an interpolated
+	// name needs — the scope it was written in — and it costs one evaluation of
+	// the setup rather than one per test. Before the selection, because a
+	// `--filter` matches what a reader sees.
+	let names = renderedNames(registry)
+	let { selections, focused } = selectTests(registry, options.filters, names)
 	let running = selections.filter((selection) => selection.state === "run")
 	let started = now()
 
@@ -1457,12 +1492,6 @@ export function runTests(registry: Registry, options: RunOptions): RunSummary {
 		focused,
 		failedIds: [],
 	}
-
-	// NOTE: The rendered names, worked out ONCE per Module by running its
-	// section with a context that selects no test. It is what an interpolated
-	// name needs — the scope it was written in — and it costs one evaluation of
-	// the setup rather than one per test.
-	let names = renderedNames(registry)
 
 	// NOTE: After the enumeration, which evaluates a Module's setup and would
 	// otherwise be counted into the run that follows it.
