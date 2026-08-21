@@ -164,6 +164,10 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 		// NOTE: The sources this cycle would rewrite, where it was asked to
 		// record what it found. Empty on every other cycle.
 		rewrites: Array<SourceRewrite>
+		// NOTE: Whether this cycle was asked to RECORD what it found. A cycle
+		// that was runs again afterwards, so what it recorded is compared
+		// against rather than left standing as something to accept.
+		update: boolean
 		compiled: boolean
 	} | null = null
 
@@ -331,6 +335,17 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 			options.onRewrites?.(run.rewrites)
 		}
 
+		// NOTE: A cycle that recorded something runs again. What it recorded is
+		// on disk (a companion file) or on its way into a buffer (a source), and
+		// until something compares against it the results still say a snapshot
+		// is waiting to be accepted — which would leave the lens standing over
+		// a test whose snapshot has just been accepted.
+		if (run.update) {
+			for (let entry of run.entries) {
+				dirty.add(entry)
+			}
+		}
+
 		if (dirty.size > 0) {
 			arm()
 		}
@@ -381,6 +396,7 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 			events: [],
 			sites: [],
 			rewrites: [],
+			update,
 			compiled: true,
 		}
 

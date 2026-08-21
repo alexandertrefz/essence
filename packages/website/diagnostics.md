@@ -622,6 +622,23 @@ tests {
 Take it apart first — `require #Value(standing) = row` — and snapshot what is
 inside, or render it yourself and snapshot the String.
 
+### `inline-snapshot-in-table`
+
+An inline `matches snapshot` was written in a table test. Every row of a table
+test runs the same body, and an inline snapshot is one slot of one source line —
+so N rows would have N values and one place to write them:
+
+```essence
+tests {
+	test "{n} doubled" across [1, 2, 3] (n: Integer) {
+		expect double(n) matches snapshot
+	}
+}
+```
+
+Name it — `matches snapshot from "doubled"` — and each row records an entry of
+its own in the file's `__snapshots__` companion, numbered by the row it ran for.
+
 ## Names
 
 ### `duplicate-variable`

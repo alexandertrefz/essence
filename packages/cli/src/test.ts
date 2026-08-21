@@ -650,9 +650,11 @@ export async function runTest(
 		stored,
 		// NOTE: Reached through a dynamic import, like every other delegate the
 		// command line has: `essence build` must not pay for the Formatter,
-		// and a run with no inline snapshot in it does not either.
-		inline: (await import("@essence-lang/formatter/snapshots"))
-			.writeInlineSnapshots,
+		// and a run with no inline snapshot in it does not either — which is
+		// why what is handed over is the LOADER rather than what it loads.
+		inline: async () =>
+			(await import("@essence-lang/formatter/snapshots"))
+				.writeInlineSnapshots,
 	})
 
 	for (let problem of written.problems) {

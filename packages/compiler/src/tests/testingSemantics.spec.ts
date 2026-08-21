@@ -984,6 +984,65 @@ describe("Tests Section Semantics", () => {
 			).toEqual(["table-parameters"])
 		})
 
+		// NOTE: The rows and the Constants a Pattern Parameter binds off them are
+		// Statements of the test like any other, and the Validator has to walk
+		// them: a non-exhaustive `match` in a row would otherwise compile in
+		// silence while the identical one a line below is refused.
+		it("should hold a row to what the Validator asks of every Expression", () => {
+			expect(
+				codesOf(
+					`implementation {
+						choice Colour {
+							Red,
+							Blue,
+						}
+					}
+
+					tests {
+						constant colour: Colour = #Red
+
+						test "reads {n}" across [
+							match colour -> Integer {
+								case #Red { <- 1 }
+							},
+						] (n: Integer) {
+							expect n::isGreaterThan(0)
+						}
+					}`,
+				),
+			).toEqual(["missing-case"])
+		})
+
+		// NOTE: Every row runs the same body, so an inline snapshot written in
+		// one would hold a value per row and one slot to write them into.
+		it("should refuse an inline snapshot in a table test", () => {
+			expect(
+				codesOf(
+					`implementation {}
+
+					tests {
+						test "reads {n}" across [1, 2] (n: Integer) {
+							expect n::toString() matches snapshot
+						}
+					}`,
+				),
+			).toEqual(["inline-snapshot-in-table"])
+		})
+
+		it("should take a named snapshot in a table test", () => {
+			expect(
+				codesOf(
+					`implementation {}
+
+					tests {
+						test "reads {n}" across [1, 2] (n: Integer) {
+							expect n::toString() matches snapshot from "read"
+						}
+					}`,
+				),
+			).toEqual([])
+		})
+
 		it("should refuse a table that names no row", () => {
 			expect(
 				codesOf(

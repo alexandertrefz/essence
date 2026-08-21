@@ -601,6 +601,12 @@ export function startServer(options: { connection?: Connection } = {}) {
 		let pending = new Set<string>()
 
 		for (let record of session.recordsFor(filePath)) {
+			// NOTE: `written` counts as pending here, and it does not on the
+			// command line: an ordinary cycle of the session records NOTHING,
+			// so a snapshot nothing had stored is one the reader still has to
+			// accept. A cycle that DID record re-runs what it recorded, so
+			// what was accepted reports as matched on the cycle after and the
+			// lens goes.
 			if (
 				record.snapshots.some(
 					(snapshot) => snapshot.status !== "matched",

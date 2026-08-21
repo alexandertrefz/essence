@@ -122,7 +122,7 @@ export function analyseDocument(
 			parsedProgram,
 			parserDiagnostics,
 			documentPath,
-			{ tests: options.tests },
+			{ tests: options.tests, source },
 		)
 
 		enrichedProgram = analysed.enrichedProgram
@@ -303,7 +303,14 @@ export function analyseEnrichedDocument(
 	program: parser.Program,
 	parserDiagnostics: Array<common.Diagnostic>,
 	documentPath: string | undefined,
-	options: { annotations?: boolean; tests?: boolean } = {},
+	options: {
+		annotations?: boolean
+		tests?: boolean
+		// NOTE: The document's own text. Only a test analysis reads it, and
+		// only to compile the `@example` blocks of a `§§` block — leave it out
+		// and the editor says nothing about an example that a run will fail on.
+		source?: string
+	} = {},
 ): {
 	enrichedProgram: common.typed.Program
 	diagnostics: Array<common.Diagnostic>
