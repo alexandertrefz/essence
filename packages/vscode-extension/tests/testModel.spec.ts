@@ -560,6 +560,38 @@ describe("what a failure says", () => {
 		expect(message.text).toContain("`isNot` compared 4 with 4")
 	})
 
+	// NOTE: A snapshot is the one failure that IS a text difference, and the
+	// pair VS Code draws as a diff is what was recorded against what this run
+	// held. Saying `is` of them would claim the very thing that failed.
+	it("explains a snapshot as a recording and a run", () => {
+		let [message] = messagesOf({
+			property: null,
+			failures: [
+				failure({
+					comparison: {
+						kind: "snapshot",
+						left: "plain",
+						right: "plainer",
+						diff: [
+							{ kind: "left", text: "plain" },
+							{ kind: "right", text: "plainer" },
+						],
+					},
+				}),
+			],
+			error: null,
+		})
+
+		expect(message.expected).toBe("plain")
+		expect(message.actual).toBe("plainer")
+		expect(message.text).toContain(
+			"the recorded snapshot and this run differ",
+		)
+		expect(message.text).toContain("- plain")
+		expect(message.text).toContain("+ plainer")
+		expect(message.text).not.toContain("`snapshot` compared")
+	})
+
 	it("writes out a difference that walked into a Record", () => {
 		let [message] = messagesOf({
 			property: null,
