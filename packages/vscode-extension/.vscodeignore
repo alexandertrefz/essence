@@ -9,3 +9,9 @@ buildServer.js
 # Bundled into dist/extension.js by `bun run build`.
 node_modules/**
 extension.js
+launch.js
+testView.js
+testModel.ts
+
+# Specs run at the repository root and are no part of what ships.
+tests/**

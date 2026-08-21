@@ -95,9 +95,40 @@ describe("the test session contribution", () => {
 		// NOTE: `essence.test.run` and `essence.test.debug` are registered in
 		// `extension.js` and invoked by a Code Lens, which carries the ids to
 		// run. A command in `contributes.commands` is a command the palette
-		// offers with no ids at all, which could only ever do nothing.
+		// offers with no ids at all, which could only ever do nothing. The two
+		// that ARE offered take no arguments: what failed, and where the
+		// session writes.
 		expect(
 			manifest.contributes.commands.map((command) => command.command),
-		).toEqual(["essence.restartServer"])
+		).toEqual([
+			"essence.restartServer",
+			"essence.test.runFailed",
+			"essence.test.showOutput",
+		])
+	})
+
+	// NOTE: The palette groups by the prefix, and a `category` beside a title
+	// that already carries one reads as "Test: Essence: …".
+	it("names every palette command the same way", () => {
+		for (let command of manifest.contributes.commands) {
+			expect(command.title.startsWith("Essence: ")).toBe(true)
+			expect(command).not.toHaveProperty("category")
+		}
+	})
+
+	// NOTE: The live session runs a project's code on every edit, so what it
+	// runs and how often are settings rather than constants — and each one is
+	// only real because the Server reads it back out of the client.
+	it("offers the settings that say what runs and how often", () => {
+		let properties = manifest.contributes.configuration.properties
+
+		expect(properties["essence.tests.skipTags"]).toMatchObject({
+			type: "array",
+			default: [],
+		})
+		expect(properties["essence.tests.debounce"]).toMatchObject({
+			type: "number",
+			default: 450,
+		})
 	})
 })
