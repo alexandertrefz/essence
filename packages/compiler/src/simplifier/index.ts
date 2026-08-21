@@ -1742,9 +1742,17 @@ function simplifyTestsNodes(
 		}
 
 		if (node.nodeType === "Suite") {
+			// NOTE: Read off the manifest as it fills rather than counted out
+			// of the tree: a table test is N entries for one written item, and
+			// the run a Scope holds is whatever its own items pushed.
+			let first = tests.length
+			let nodes = simplifyTestsNodes(node.nodes, tests)
+
 			return {
 				nodeType: "TestScope" as const,
-				nodes: simplifyTestsNodes(node.nodes, tests),
+				first,
+				last: tests.length,
+				nodes,
 				position: node.position,
 			}
 		}

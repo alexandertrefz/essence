@@ -243,9 +243,19 @@ export type TestNarrowing = {
 
 // NOTE: What a `suite` leaves behind: a Scope, so that what a suite declares is
 // gone outside it and may shadow what the section declares. It is emitted as a
-// block, which is what JavaScript's own scoping needs to keep the shadow.
+// closure the runtime calls, which is what JavaScript's own scoping needs to
+// keep the shadow and what lets a run step over the suites it is not in.
+//
+// NOTE: `first` and `last` are the half-open run of `tests` indices the Scope
+// holds, nested suites included. A run is ONE test, and the setup it must see
+// is the setup of the section and of the suites it is written in — so a Scope
+// holding no part of it is not evaluated at all. That is what keeps a suite's
+// printed output from being attributed to a test written beside it, and what
+// keeps a section of twenty suites from evaluating twenty setups per test.
 export interface TestScopeNode {
 	nodeType: "TestScope"
+	first: number
+	last: number
 	nodes: Array<TestsNode>
 	position?: Position
 }

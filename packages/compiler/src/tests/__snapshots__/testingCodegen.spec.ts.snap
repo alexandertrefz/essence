@@ -138,7 +138,7 @@ exports[`Test codegen — the emitted shape keeps the golden shape of a whole re
 			[$type.typeKeySymbol]: "Integer",
 			value: shipped.value * $pool_0.value
 		} : Integer.product(shipped.value, $pool_0.value);
-		{
+		$testing.scope($context, 0, 1, () => {
 			$testing.entry($context, 0, null, () => {
 				$testing.expected($context, 0, ($testing.trace($context, 1, doubled).value === $testing.trace($context, 2, $pool_1).value ? Boolean.trueInstance : Boolean.falseInstance).value, {
 					kind: "is",
@@ -146,7 +146,7 @@ exports[`Test codegen — the emitted shape keeps the golden shape of a whole re
 					right: 2
 				});
 			});
-		}
+		});
 		$testing.entry($context, 1, null, () => {
 			$testing.expected($context, 3, ($testing.trace($context, 4, shipped).value === $testing.trace($context, 5, $pool_0).value ? Boolean.trueInstance : Boolean.falseInstance).value, {
 				kind: "is",
