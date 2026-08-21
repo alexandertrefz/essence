@@ -56,7 +56,7 @@ import {
 	admittedByEvaluation,
 	refinementDecidedBy,
 } from "../helpers/predicateEval"
-import { signaturesOf } from "../printType"
+import { printType, signaturesOf } from "../printType"
 import {
 	checkProtocolConformance,
 	type CheckedConformance,
@@ -69,6 +69,7 @@ import {
 	derivedPrintableNamespace,
 	derivedPrintableNamespaceName,
 	findProtocolInScope,
+	getAllNamespacesInScope,
 	protocolMethodBody,
 	invalidateNamespacesInScope,
 	providedMethodNamespaces,
@@ -3109,6 +3110,739 @@ function enrichTableRows(
 	return []
 }
 
+// NOTE: `for any (a: Integer, b: NonEmptyList<String>)` — the Parameters a
+// property test generates a value of, once per case. Every one of them writes
+// a Type, because the Type is the whole of what says what to generate, and
+// every one of them writes a NAME rather than a Pattern, because a shrunk
+// counterexample is reported beside the name it was generated for.
+export function enrichTestProperties(
+	node: parser.TestPropertiesNode,
+	scope: enricher.Scope,
+	bodyScope: enricher.Scope,
+): common.typed.TestPropertiesNode {
+	if (node.parameters.length === 0) {
+		reportPropertyParameters(
+			node.parameterListPosition,
+			"A property test has to name what it generates",
+			"no Parameter to generate a value for",
+			"Write a Parameter and its Type: 'for any (n: Integer)'.",
+		)
+	}
+
+	return {
+		nodeType: "TestProperties",
+		parameters: node.parameters.map((parameter) =>
+			enrichTestProperty(parameter, scope, bodyScope),
+		),
+		position: node.position,
+	}
+}
+
+function enrichTestProperty(
+	parameter: parser.ParameterNode,
+	scope: enricher.Scope,
+	bodyScope: enricher.Scope,
+): common.typed.TestPropertyNode {
+	let name =
+		parameter.internalName?.nodeType === "Identifier"
+			? parameter.internalName.content
+			: synthesizedName("any", parameter.position)
+
+	if (parameter.internalName?.nodeType === "Pattern") {
+		reportPropertyParameters(
+			parameter.position,
+			"A generated Parameter has to be a name",
+			"this takes a value apart",
+			"Name the whole value — 'for any (standing: Standing)' — and take it apart inside the body.",
+			"A counterexample is reported beside the name it was generated for, and a Pattern names no value.",
+		)
+	}
+
+	// NOTE: `a: Integer` records one Identifier as both names — the label and
+	// the name are the same word — so a LABEL is two words that differ, which
+	// is what this refuses.
+	if (
+		parameter.externalName !== null &&
+		parameter.internalName?.nodeType === "Identifier" &&
+		parameter.externalName.content !== parameter.internalName.content
+	) {
+		reportPropertyParameters(
+			parameter.externalName.position,
+			"A generated Parameter takes no label",
+			"nothing calls this test",
+			`Write the name alone: 'for any (${name}: …)'.`,
+			"A label is what a caller writes at a call site, and nothing calls a test.",
+		)
+	}
+
+	if (parameter.defaultValue !== null) {
+		reportPropertyParameters(
+			parameter.defaultValue.position,
+			"A generated Parameter takes no default",
+			"this value is never used",
+			"Remove the default — every case generates a value of the Type.",
+		)
+	}
+
+	if (parameter.type === null) {
+		reportPropertyParameters(
+			parameter.position,
+			"A generated Parameter has to write its Type",
+			"nothing here says what to generate",
+			`Write the Type: 'for any (${name}: Integer)'.`,
+			"The Type is the whole of what a generator is derived from.",
+		)
+
+		return {
+			nodeType: "TestProperty",
+			name,
+			type: { type: "Error" },
+			generator: { kind: "boolean" },
+			position: parameter.position,
+		}
+	}
+
+	let type = resolveType(parameter.type, scope)
+
+	declareVariableInScope(name, type, bodyScope, true)
+
+	return {
+		nodeType: "TestProperty",
+		name,
+		type,
+		// NOTE: The placeholder stands where a Diagnostic has already been
+		// reported, and a Program carrying one never reaches emission — so what
+		// it generates is never asked for. It is a Boolean rather than nothing
+		// so the Parameter keeps its place, and the body underneath reports
+		// what IT says rather than a cascade about a Parameter that vanished.
+		generator: deriveGenerator(type, scope, parameter.position, []) ?? {
+			kind: "boolean",
+		},
+		position: parameter.position,
+	}
+}
+
+function reportPropertyParameters(
+	position: common.Position,
+	message: string,
+	label: string,
+	help: string,
+	note?: string,
+): void {
+	reportError(message, position, {
+		code: "property-parameters",
+		labels: [primary(position, label)],
+		notes: note === undefined ? [] : [note],
+		helps: [help],
+	})
+}
+
+// NOTE: THE derivation: what to draw a value of one Type from. A Namespace's
+// own `Generatable` conformance is asked first, because a Type whose values
+// carry an invariant no structure can state is exactly what a conformance is
+// for; everything else is read off the Type itself.
+//
+// `enclosing` is the Choices already being derived, which is what refuses a
+// Type that contains itself: a descriptor is finite data, and a Choice naming
+// itself in a payload would be an infinite one.
+function deriveGenerator(
+	type: common.Type,
+	scope: enricher.Scope,
+	position: common.Position,
+	enclosing: Array<string>,
+): common.typed.TestGenerator | null {
+	let conformance = generatableConformance(type, scope, position)
+
+	if (conformance !== null) {
+		return conformance
+	}
+
+	switch (type.type) {
+		case "Boolean":
+			return { kind: "boolean" }
+		case "Integer":
+			return { kind: "integer" }
+		case "Rational":
+			return { kind: "rational" }
+		case "String":
+			return { kind: "string" }
+		case "List": {
+			let item = deriveGenerator(
+				type.itemType,
+				scope,
+				position,
+				enclosing,
+			)
+
+			return item === null ? null : { kind: "list", item }
+		}
+		// NOTE: A List nothing applied a Type Argument to. Its items are
+		// whatever a Type Parameter admits, which is the ladder below.
+		case "GenericList":
+			return { kind: "list", item: anyValueGenerator() }
+		// NOTE: A Type Parameter, which stands for whatever a use site
+		// instantiates it with. The ladder is what the design asks for: a
+		// generic instantiates over an Integer, a String and a small Record,
+		// which between them exercise a scalar, a sequence of characters and a
+		// structure.
+		case "GenericUse":
+			return anyValueGenerator()
+		case "Record": {
+			let members = deriveMembers(
+				type.members,
+				scope,
+				position,
+				enclosing,
+			)
+
+			return members === null ? null : { kind: "record", members }
+		}
+		case "Case": {
+			if (enclosing.includes(type.choice)) {
+				return refuseUngeneratableType(
+					type,
+					position,
+					`'${displayChoiceName(type.choice)}' names itself in a payload`,
+					"A generator is finite, and a Type that contains itself has no smallest value to build.",
+				)
+			}
+
+			let members = deriveMembers(type.members, scope, position, [
+				...enclosing,
+				type.choice,
+			])
+
+			return members === null
+				? null
+				: { kind: "case", tag: `${type.choice}#${type.name}`, members }
+		}
+		case "UnionType": {
+			let members: Array<common.typed.TestGenerator> = []
+
+			for (let member of flattenUnionMembers(type)) {
+				let generator = deriveGenerator(
+					member,
+					scope,
+					position,
+					enclosing,
+				)
+
+				if (generator === null) {
+					return null
+				}
+
+				members.push(generator)
+			}
+
+			return members.length === 0 ? null : { kind: "union", members }
+		}
+		case "Refinement":
+			return refinedGenerator(type, scope, position, enclosing)
+		// NOTE: An Error Type has already been reported by whatever produced
+		// it, and a second Diagnostic about the same Parameter would say
+		// nothing further.
+		case "Error":
+			return null
+		default:
+			return refuseUngeneratableType(
+				type,
+				position,
+				`nothing knows how to build ${withArticle(printType(type))}`,
+			)
+	}
+}
+
+// NOTE: What a Type Parameter admits, and what a bare `List`'s items are: an
+// Integer, a String, and a Record small enough to read in a counterexample.
+function anyValueGenerator(): common.typed.TestGenerator {
+	return {
+		kind: "union",
+		members: [
+			{ kind: "integer" },
+			{ kind: "string" },
+			{
+				kind: "record",
+				members: [
+					{ name: "name", generator: { kind: "string" } },
+					{ name: "count", generator: { kind: "integer" } },
+				],
+			},
+		],
+	}
+}
+
+function deriveMembers(
+	members: Record<string, common.Type>,
+	scope: enricher.Scope,
+	position: common.Position,
+	enclosing: Array<string>,
+): Array<common.typed.TestGeneratorMember> | null {
+	let derived: Array<common.typed.TestGeneratorMember> = []
+
+	for (let [name, memberType] of Object.entries(members)) {
+		let generator = deriveGenerator(memberType, scope, position, enclosing)
+
+		if (generator === null) {
+			return null
+		}
+
+		derived.push({ name, generator })
+	}
+
+	return derived
+}
+
+// NOTE: A checked refinement. Every conjunct is answered in one of two ways: a
+// recognised one NARROWS the generator, so the values drawn hold it by
+// construction, and anything else is enriched as the check an author could have
+// written and used as a filter. A conjunct that is neither is refused rather
+// than ignored — generating a value the Type says is impossible would make
+// every property test over it a report about the generator.
+function refinedGenerator(
+	type: common.RefinementType,
+	scope: enricher.Scope,
+	position: common.Position,
+	enclosing: Array<string>,
+): common.typed.TestGenerator | null {
+	let base = deriveGenerator(type.base, scope, position, enclosing)
+
+	if (base === null) {
+		return null
+	}
+
+	let binding = synthesizedName("candidate", position)
+	let narrowing: common.typed.TestNarrowing = {}
+	let checks: Array<common.typed.ExpressionNode> = []
+
+	for (let conjunct of type.conjuncts ?? []) {
+		if (narrowedBy(conjunct, type.base, narrowing)) {
+			continue
+		}
+
+		let check = predicateCheck(conjunct, type, binding, scope, position)
+
+		if (check === null) {
+			return refuseUngeneratableType(
+				type,
+				position,
+				`nothing knows how to hold '@::${conjunct.methodName}(…)'`,
+				`'${type.name}' is a checked refinement, and a generated value has to satisfy its predicate.`,
+				`Declare a 'Generatable' conformance for '${type.name}': 'namespace ${type.name} for ${type.name} is Generatable { … }'.`,
+			)
+		}
+
+		checks.push(check)
+	}
+
+	return {
+		kind: "refined",
+		name: type.name,
+		base,
+		binding,
+		checks,
+		narrowing,
+	}
+}
+
+// NOTE: The predicates a generator can hold BY CONSTRUCTION, which is every one
+// the standard library writes and the obvious neighbours of each. A refinement's
+// base is an Integer, a String or a List and nothing else, so this table is
+// bounded by the language rather than by what anybody has thought of.
+//
+// Answering `true` means the narrowing now holds the conjunct entirely: no
+// check is enriched for it and no value that fails it is ever drawn.
+function narrowedBy(
+	conjunct: common.PredicateConjunct,
+	base: common.Type,
+	narrowing: common.typed.TestNarrowing,
+): boolean {
+	let digits = conjunct.args[0]
+	let whole =
+		typeof digits === "string" && /^-?\d+$/.test(digits) ? digits : null
+
+	if (base.type === "Integer" && conjunct.args.length <= 1) {
+		switch (conjunct.methodName) {
+			case "is":
+				return (
+					whole !== null &&
+					atLeast(narrowing, whole) &&
+					atMost(narrowing, whole)
+				)
+			case "isNot":
+				if (whole === null) {
+					return false
+				}
+
+				narrowing.notEqualTo = [...(narrowing.notEqualTo ?? []), whole]
+
+				return true
+			case "isGreaterThan":
+				return whole !== null && atLeast(narrowing, step(whole, 1n))
+			case "isGreaterThanOrEqualTo":
+				return whole !== null && atLeast(narrowing, whole)
+			case "isLessThan":
+				return whole !== null && atMost(narrowing, step(whole, -1n))
+			case "isLessThanOrEqualTo":
+				return whole !== null && atMost(narrowing, whole)
+			case "isPositive":
+				return conjunct.args.length === 0 && atLeast(narrowing, "1")
+			case "isNegative":
+				return conjunct.args.length === 0 && atMost(narrowing, "-1")
+			case "isZero":
+				return (
+					conjunct.args.length === 0 &&
+					atLeast(narrowing, "0") &&
+					atMost(narrowing, "0")
+				)
+			default:
+				return false
+		}
+	}
+
+	if (
+		(base.type === "List" || base.type === "String") &&
+		conjunct.args.length === 0
+	) {
+		switch (conjunct.methodName) {
+			case "hasItems":
+			case "hasCharacters":
+				narrowing.minimumLength = Math.max(
+					narrowing.minimumLength ?? 0,
+					1,
+				)
+
+				return true
+			case "isEmpty":
+				narrowing.maximumLength = 0
+
+				return true
+			default:
+				return false
+		}
+	}
+
+	return false
+}
+
+function atLeast(
+	narrowing: common.typed.TestNarrowing,
+	bound: string,
+): boolean {
+	narrowing.atLeast =
+		narrowing.atLeast === undefined ||
+		BigInt(narrowing.atLeast) < BigInt(bound)
+			? bound
+			: narrowing.atLeast
+
+	return true
+}
+
+function atMost(narrowing: common.typed.TestNarrowing, bound: string): boolean {
+	narrowing.atMost =
+		narrowing.atMost === undefined ||
+		BigInt(narrowing.atMost) > BigInt(bound)
+			? bound
+			: narrowing.atMost
+
+	return true
+}
+
+function step(digits: string, by: bigint): string {
+	return (BigInt(digits) + by).toString()
+}
+
+// NOTE: A conjunct as the Boolean Expression an author could have written about
+// the value — `<candidate>::isEven()`. It is enriched HERE, where the property
+// test stands, so it resolves through the Scope the test can see and is emitted
+// in the Module the test is in; a predicate rebuilt anywhere else could name a
+// Namespace the emitted JavaScript does not bind.
+//
+// The Diagnostics are collected and DROPPED: a conjunct this can not rebuild is
+// answered with null, and the refusal is reported once, about the Type, rather
+// than as a puzzle about a call nobody wrote.
+function predicateCheck(
+	conjunct: common.PredicateConjunct,
+	refinement: common.RefinementType,
+	binding: string,
+	scope: enricher.Scope,
+	position: common.Position,
+): common.typed.ExpressionNode | null {
+	let signature = predicateSignature(conjunct, scope)
+
+	if (signature === null) {
+		return null
+	}
+
+	// NOTE: The Parameters the ARGUMENTS stand for. A Method's own signature
+	// carries its receiver first, and a Protocol's carries it too, so a
+	// signature that has one more Parameter than the conjunct has Arguments is
+	// one whose first Parameter is the value itself.
+	let parameters =
+		signature.parameterTypes.length === conjunct.args.length + 1
+			? signature.parameterTypes.slice(1)
+			: signature.parameterTypes
+
+	if (parameters.length !== conjunct.args.length) {
+		return null
+	}
+
+	let args: Array<parser.ArgumentNode> = []
+
+	for (let [index, parameter] of parameters.entries()) {
+		let value = predicateArgument(
+			conjunct.args[index]!,
+			parameter.type,
+			refinement.base,
+			position,
+		)
+
+		if (value === null) {
+			return null
+		}
+
+		args.push({
+			nodeType: "Argument",
+			name:
+				parameter.name === null
+					? null
+					: {
+							nodeType: "Identifier",
+							content: parameter.name,
+							position,
+						},
+			value,
+		})
+	}
+
+	let call: parser.MethodInvocationNode = {
+		nodeType: "MethodInvocation",
+		base: { nodeType: "Identifier", content: binding, position },
+		member: {
+			nodeType: "Identifier",
+			content: conjunct.methodName,
+			position,
+		},
+		namespaceSpecifier: null,
+		arguments: args,
+		position,
+	}
+	// NOTE: The candidate is typed as the refinement's BASE rather than as the
+	// refinement: what the check answers is whether a drawn value has earned the
+	// refinement, and typing it as one already would make the question answered.
+	let checkScope = childScope(scope, {
+		members: { [binding]: refinement.base },
+		declarations: { [binding]: position },
+		constants: new Set([binding]),
+	})
+	let attempt = collectDiagnostics(() => enrichExpression(call, checkScope))
+
+	return containsErrors(attempt.diagnostics) ||
+		attempt.result.type.type !== "Boolean"
+		? null
+		: attempt.result
+}
+
+// NOTE: The signature the conjunct's Method was resolved to when the refinement
+// was declared — the Namespace's own where it declares one, and the Protocol's
+// where a conformance provided it (`Equatable` provides `isNot`, which is what
+// 'NonZeroInteger' is written with). It is read for two things only: what each
+// Argument is LABELLED, and what Type it is, which is what turns a conjunct's
+// stable scalars back into the Literals they were written as.
+function predicateSignature(
+	conjunct: common.PredicateConjunct,
+	scope: enricher.Scope,
+): common.BaseFunction | null {
+	// NOTE: The lookup REPORTS where the name means something other than a
+	// Namespace here, which is the reading a written `::<Name>method()`
+	// deserves. This is not one: nobody wrote this name, and what a failed
+	// lookup means is answered once, about the Type, by whoever asked.
+	let found = collectDiagnostics(() =>
+		getAllNamespacesInScope(scope, {
+			nodeType: "Identifier",
+			content: conjunct.namespaceName,
+			position: {
+				start: { line: 1, column: 1 },
+				end: { line: 1, column: 1 },
+			},
+		}).get(conjunct.namespaceName),
+	)
+	let namespace = found.result
+
+	if (namespace === undefined || containsErrors(found.diagnostics)) {
+		return null
+	}
+
+	let method = namespace.methods[conjunct.methodName]
+
+	if (method === undefined) {
+		for (let protocolName of namespace.conformsTo ?? []) {
+			let protocol = findProtocolInScope(protocolName, scope)
+			let provided = protocol?.methods[conjunct.methodName]
+
+			if (provided !== undefined) {
+				method = provided
+
+				break
+			}
+		}
+	}
+
+	if (method === undefined) {
+		return null
+	}
+
+	if (
+		method.type === "OverloadedMethod" ||
+		method.type === "OverloadedStaticMethod"
+	) {
+		return method.overloads[conjunct.overloadIndex ?? 0] ?? null
+	}
+
+	return method
+}
+
+// NOTE: One stable scalar as the Literal it was written as. A conjunct keeps an
+// Integer's digits and a String's characters in the one field, so the Parameter
+// is what says which of the two is in hand — the same reading the Enricher gave
+// the Literal when it read the predicate.
+function predicateArgument(
+	argument: string | boolean,
+	declared: common.Type | common.GenericUse,
+	base: common.Type,
+	position: common.Position,
+): parser.ExpressionNode | null {
+	// NOTE: A Type Parameter in the Method's signature, resolved against what
+	// the refinement is ABOUT: `Self` is the base — `Equatable::isNot(_ other:
+	// Self)` over an Integer takes an Integer — and a List Method's `ItemType`
+	// is the item Type the base was applied with.
+	let type =
+		declared.type === "GenericUse"
+			? declared.name === "Self"
+				? base
+				: base.type === "List"
+					? base.itemType
+					: declared
+			: declared
+
+	if (typeof argument === "boolean") {
+		return type.type === "Boolean"
+			? { nodeType: "BooleanValue", value: argument, position }
+			: null
+	}
+
+	switch (type.type) {
+		case "Integer":
+			return { nodeType: "IntegerValue", value: argument, position }
+		case "String":
+			return { nodeType: "StringValue", value: argument, position }
+		case "Rational": {
+			let [numerator, denominator] = argument.split("/")
+
+			return numerator === undefined || denominator === undefined
+				? null
+				: {
+						nodeType: "RationalValue",
+						numerator,
+						denominator,
+						position,
+					}
+		}
+		default:
+			return null
+	}
+}
+
+// NOTE: A Namespace conforming to `Generatable`, as the call an author could
+// have written — `Team.generate(from <source>)`. The conformance replaces the
+// structural answer entirely, which is the whole point of declaring one.
+function generatableConformance(
+	type: common.Type,
+	scope: enricher.Scope,
+	position: common.Position,
+): common.typed.TestGenerator | null {
+	let targeting = namespacesTargeting(
+		getAllNamespacesInScope(scope, null),
+		type,
+	)
+
+	for (let [name, namespace] of targeting) {
+		if (!(namespace.conformsTo ?? []).includes(GENERATABLE_PROTOCOL)) {
+			continue
+		}
+
+		let binding = synthesizedName("source", position)
+		let call: parser.FunctionInvocationNode = {
+			nodeType: "FunctionInvocation",
+			name: {
+				nodeType: "Lookup",
+				base: { nodeType: "Identifier", content: name, position },
+				member: {
+					nodeType: "Identifier",
+					content: GENERATABLE_METHOD,
+					position,
+				},
+				position,
+			},
+			arguments: [
+				{
+					nodeType: "Argument",
+					name: {
+						nodeType: "Identifier",
+						content: GENERATABLE_LABEL,
+						position,
+					},
+					value: {
+						nodeType: "Identifier",
+						content: binding,
+						position,
+					},
+				},
+			],
+			position,
+		}
+		let sourceScope = childScope(scope, {
+			members: { [binding]: { type: "Randomness" } },
+			declarations: { [binding]: position },
+			constants: new Set([binding]),
+		})
+		let attempt = collectDiagnostics(() =>
+			enrichExpression(call, sourceScope),
+		)
+
+		if (containsErrors(attempt.diagnostics)) {
+			continue
+		}
+
+		return { kind: "generated", name, binding, call: attempt.result }
+	}
+
+	return null
+}
+
+const GENERATABLE_PROTOCOL = "Generatable"
+const GENERATABLE_METHOD = "generate"
+const GENERATABLE_LABEL = "from"
+
+function refuseUngeneratableType(
+	type: common.Type,
+	position: common.Position,
+	label: string,
+	note = "A property test generates a value of every Parameter's Type, once per case.",
+	help = "Write a Type a value can be built of, or declare a 'Generatable' conformance for this one.",
+): null {
+	reportError(
+		`Nothing can generate ${withArticle(printType(type))}`,
+		position,
+		{
+			code: "ungeneratable-type",
+			labels: [primary(position, label)],
+			notes: [note],
+			helps: [help],
+		},
+	)
+
+	return null
+}
 // NOTE: What a snapshot RECORDS: the asserted value rendered through
 // `Printable`, which is the Protocol the design names — so a Type that says
 // what it looks like is recorded in that form rather than in a structural dump

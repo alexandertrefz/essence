@@ -152,6 +152,15 @@ function validateTestsNode(node: common.typed.TestsNode): void {
 			validateImplementationNode(binding, null)
 		}
 
+		// NOTE: And a generator's own Expressions, for the same reason: a
+		// refinement's check and a `Generatable` call are Expressions the
+		// Compiler wrote, but they are emitted into this Module and run in this
+		// test, so whatever the Validator says about an Expression it says
+		// about these.
+		for (let parameter of node.properties?.parameters ?? []) {
+			validateGenerator(parameter.generator)
+		}
+
 		for (let child of node.body) {
 			validateImplementationNode(child, null)
 		}
@@ -168,6 +177,42 @@ function validateTestsNode(node: common.typed.TestsNode): void {
 	}
 
 	validateImplementationNode(node, null)
+}
+
+function validateGenerator(generator: common.typed.TestGenerator): void {
+	switch (generator.kind) {
+		case "list":
+			validateGenerator(generator.item)
+
+			return
+		case "record":
+		case "case":
+			for (let member of generator.members) {
+				validateGenerator(member.generator)
+			}
+
+			return
+		case "union":
+			for (let member of generator.members) {
+				validateGenerator(member)
+			}
+
+			return
+		case "refined":
+			validateGenerator(generator.base)
+
+			for (let check of generator.checks) {
+				validateExpression(check)
+			}
+
+			return
+		case "generated":
+			validateExpression(generator.call)
+
+			return
+		default:
+			return
+	}
 }
 
 function collectTopLevelNamespaces(

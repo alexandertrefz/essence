@@ -6,6 +6,7 @@ import {
 	primary,
 	report,
 	reportError,
+	secondary,
 } from "../diagnostics/index"
 import {
 	closePendingRefinementCopies,
@@ -18,6 +19,7 @@ import {
 	enrichExpression,
 	enrichNode,
 	enrichOverloadedFunctionStatement,
+	enrichTestProperties,
 	enrichTestTable,
 	type HoistedTypes,
 	pendingRefinementIn,
@@ -1613,13 +1615,28 @@ const enrichTest = (
 		node.table === null
 			? null
 			: enrichTestTable(node.table, scope, bodyScope)
+	// NOTE: Beside the table for the same reason, and never with one: a table
+	// runs a row a reader wrote and a property runs a value the runner made up,
+	// so a test asking for both is asking for two runs of one body.
+	let properties =
+		node.properties === null
+			? null
+			: enrichTestProperties(node.properties, scope, bodyScope)
+
+	if (table !== null && properties !== null) {
+		refuseBothTestForms(node)
+	}
 
 	let body = node.body.flatMap((child) =>
 		guarded(child.position, () => enrichNode(child, bodyScope)),
 	)
 
 	if (table !== null) {
-		refuseInlineSnapshots(body)
+		refuseSnapshots(body, "table")
+	}
+
+	if (properties !== null) {
+		refuseSnapshots(body, "property")
 	}
 
 	return {
@@ -1629,11 +1646,16 @@ const enrichTest = (
 			suitePath: context.suitePath,
 			name: nameTemplate(node.name),
 		},
+		// NOTE: A property test's name is read in the OUTER Scope: what a
+		// property generates is a different value every case, so a name saying
+		// which one it ran for could not be worked out once and could not name
+		// the test at all.
 		name: enrichTestName(node.name, table === null ? scope : bodyScope),
 		tags: modifiers.tags,
 		skipped: modifiers.skipped,
 		focused: modifiers.focused,
 		table,
+		properties,
 		body,
 		keywordPosition: node.keywordPosition,
 		position: node.position,
@@ -1675,13 +1697,44 @@ const enrichSuite = (
 	}
 }
 
+// NOTE: `across` and `for any` are two answers to one question — what the body
+// runs for. A test writing both would run every row for every generated value,
+// which is a third thing nobody asked for.
+const refuseBothTestForms = (node: parser.TestNode): void => {
+	if (node.table === null || node.properties === null) {
+		return
+	}
+
+	reportError(
+		"A test runs written rows or generated values, not both",
+		node.properties.keywordPosition,
+		{
+			code: "contradictory-test-forms",
+			labels: [
+				primary(
+					node.properties.keywordPosition,
+					"this generates a value for every case",
+				),
+				secondary(node.table.keywordPosition, "and this runs the rows"),
+			],
+			notes: [
+				"A table test runs its body once per row a reader wrote; a property test runs it once per value the runner made up. One body can not do both.",
+			],
+			helps: [
+				"Keep one of them, or write two tests — one over the rows and one over the generated values.",
+			],
+		},
+	)
+}
+
 // NOTE: An inline snapshot inside a table test has nowhere to be written: every
 // row runs the same body, so N rows produce N values for the one slot the source
 // holds. A named one has a place per row — see `snapshotted` in the runtime,
 // which numbers a stored entry by the row that recorded it — so what this asks
 // for is a name.
-const refuseInlineSnapshots = (
+const refuseSnapshots = (
 	nodes: Array<common.typed.ImplementationNode>,
+	form: "table" | "property",
 ): void => {
 	let visit = (value: unknown): void => {
 		if (Array.isArray(value)) {
@@ -1703,26 +1756,44 @@ const refuseInlineSnapshots = (
 			(node["nodeType"] === "ExpectStatement" ||
 				node["nodeType"] === "RequireStatement") &&
 			snapshot != null &&
-			snapshot.name === null
+			(form === "property" || snapshot.name === null)
 		) {
 			reportError(
-				"A snapshot in a table test has to be named",
+				form === "property"
+					? "A property test can not record a snapshot"
+					: "A snapshot in a table test has to be named",
 				snapshot.position,
-				{
-					code: "inline-snapshot-in-table",
-					labels: [
-						primary(
-							snapshot.position,
-							"this records into the source, and every row would record here",
-						),
-					],
-					notes: [
-						"Every row of a table test runs this body, so a snapshot written here holds one value per row — and an inline snapshot is one slot of one line.",
-					],
-					helps: [
-						"Name it: 'matches snapshot from \"…\"'. Each row records an entry of its own, numbered by the row it ran for.",
-					],
-				},
+				form === "property"
+					? {
+							code: "snapshot-in-property",
+							labels: [
+								primary(
+									snapshot.position,
+									"every case would record here",
+								),
+							],
+							notes: [
+								"A property test runs its body once per generated value, so a snapshot written here records a different value every case and only the last of them could ever match.",
+							],
+							helps: [
+								"Assert what holds for every value instead — 'expect …' — and snapshot a value a test WROTE, in a test of its own.",
+							],
+						}
+					: {
+							code: "inline-snapshot-in-table",
+							labels: [
+								primary(
+									snapshot.position,
+									"this records into the source, and every row would record here",
+								),
+							],
+							notes: [
+								"Every row of a table test runs this body, so a snapshot written here holds one value per row — and an inline snapshot is one slot of one line.",
+							],
+							helps: [
+								"Name it: 'matches snapshot from \"…\"'. Each row records an entry of its own, numbered by the row it ran for.",
+							],
+						},
 			)
 		}
 
