@@ -168,9 +168,19 @@ function regrouped(
 	return grouped
 }
 
-// NOTE: A Modifier read as taking ONE bare name that names a Modifier is two
+// NOTE: A Modifier read as taking ONE bare name that IS a Modifier is two
 // Modifiers, because no Modifier takes another one as an argument. Anything
 // with a comma in it was read unambiguously and is left alone.
+//
+// NOTE: A near-miss counts only where the HEAD is not a Modifier either, which
+// is the `tagged slow focussed` shape: the Parser read `slow(focussed)`, and
+// neither name is a Modifier, so taking the pair apart is what lets `tagged`
+// adopt `slow` and the typo report itself. Where the head IS a Modifier the
+// argument is that Modifier's, and `tagged focus` is a test tagged `focus` —
+// `focus`, `skip` and `tags` all sit within a typo's distance of a Modifier
+// while being perfectly ordinary things to tag a test with, and taking one of
+// them apart reported two Diagnostics about a problem the writer did not have
+// while `tagged focus, network` was accepted right beside it.
 function split(
 	modifier: parser.TestModifierNode,
 ): Array<parser.TestModifierNode> {
@@ -180,7 +190,10 @@ function split(
 		modifier.arguments.length !== 1 ||
 		only === undefined ||
 		only.nodeType !== "Identifier" ||
-		!namesAModifier(only.content)
+		!(
+			isModifier(only.content) ||
+			(!isModifier(modifier.name.content) && namesAModifier(only.content))
+		)
 	) {
 		return [modifier]
 	}
@@ -218,11 +231,12 @@ function adopts(
 	)
 }
 
+function isModifier(name: string): boolean {
+	return MODIFIERS.includes(name as (typeof MODIFIERS)[number])
+}
+
 function namesAModifier(name: string): boolean {
-	return (
-		MODIFIERS.includes(name as (typeof MODIFIERS)[number]) ||
-		closestMatch(name, [...MODIFIERS]) !== null
-	)
+	return isModifier(name) || closestMatch(name, [...MODIFIERS]) !== null
 }
 
 function resolveSkipReason(

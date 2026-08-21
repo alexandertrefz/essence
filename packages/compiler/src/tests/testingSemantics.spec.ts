@@ -506,6 +506,21 @@ describe("Tests Section Semantics", () => {
 			).toEqual(["unknown-modifier"])
 		})
 
+		// NOTE: A tag is any bare name, and plenty of ordinary ones sit within a
+		// typo's distance of a Modifier. Only a name that IS one is read as a
+		// Modifier written in the wrong place.
+		it("should take a tag that merely looks like a Modifier", () => {
+			let section = sectionOf(
+				`implementation {}
+
+				tests {
+					test "one" tagged focus { expect true }
+				}`,
+			)
+
+			expect(testsOf(section.nodes)[0]?.tags).toEqual(["focus"])
+		})
+
 		it("should refuse a Modifier nobody declared", () => {
 			expect(
 				codesOf(
