@@ -111,7 +111,7 @@ export function collectCoverage(events: Array<TestEvent>): CoverageSummary {
 
 		files.set(
 			key,
-			existing === undefined || existing.length !== event.points.length
+			existing === undefined || !sameTable(existing, event.points)
 				? event.points.map((point) => ({ ...point }))
 				: existing.map((point, index) => ({
 						...point,
@@ -286,10 +286,14 @@ export function fileCoverageOf(
 // file with no branches in it is not 0% branch-covered and it is not 100%
 // either — the honest answer is a dash, and only the caller knows how to draw
 // one.
+//
+// NOTE: Rounded DOWN, so that 100% means every one of them. 199 of 200 rounds
+// to 100 and a gate reading it lets a missed branch through — the number a
+// reader trusts most is the one it is worst to be wrong about.
 export function percentageOf(ratio: CoverageRatio): number | null {
 	return ratio.total === 0
 		? null
-		: Math.round((ratio.covered / ratio.total) * 100)
+		: Math.floor((ratio.covered / ratio.total) * 100)
 }
 
 // NOTE: Every Case of every declared Choice that nothing built, flattened for a
@@ -314,6 +318,35 @@ export function caseNameOf(tag: string): string {
 	let hash = tag.lastIndexOf("#")
 
 	return hash === -1 ? `#${tag}` : `#${tag.slice(hash + 1)}`
+}
+
+// NOTE: Whether two reports are about the same COMPILE, which is what decides
+// whether their counts may be added. Two entries of one run that both hold a
+// Module report the identical table and their counts add; a watch session
+// mid-edit may hold a stale table beside a fresh one, and adding those would
+// attribute one compile's counts to another compile's points — a missed arm
+// named at a line the edit moved.
+//
+// NOTE: Compared by what a report READS off a point rather than by every field:
+// what makes two tables the same table is that point N means the same thing in
+// both, and a label that changed without the kind or the position changing
+// changes nothing anybody is counting.
+function sameTable(
+	left: Array<CoveredPointRecord>,
+	right: Array<CoveredPointRecord>,
+): boolean {
+	return (
+		left.length === right.length &&
+		left.every((point, index) => {
+			let other = right[index]!
+
+			return (
+				point.kind === other.kind &&
+				point.position.start.line === other.position.start.line &&
+				point.position.start.column === other.position.start.column
+			)
+		})
+	)
 }
 
 function keyOf(module: string | null): string {

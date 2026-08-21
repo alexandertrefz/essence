@@ -313,9 +313,22 @@ function readTags(
 // was asked for.
 function readCoverageReport(
 	raw: string | undefined,
+	out: string | undefined,
 	command: CommandSpec,
 ): CoverageReportFormat | null {
 	if (raw === undefined) {
+		// NOTE: A place to write and nothing to write there is a mistake that
+		// costs a whole run to discover — the table appears, the directory
+		// does not, and nothing says why. Refused rather than defaulted: which
+		// format was meant is not something to guess at.
+		if (out !== undefined) {
+			throw new UsageError(
+				"--coverage-out says where to write a report, and no report was asked for.",
+				command,
+				`Add --coverage-report ${coverageReportFormats.join(" or ")}.`,
+			)
+		}
+
 		return null
 	}
 
@@ -471,6 +484,7 @@ export function parseArguments(
 				values["coverage-report"] !== undefined,
 			coverageReport: readCoverageReport(
 				values["coverage-report"] as string | undefined,
+				values["coverage-out"] as string | undefined,
 				command,
 			),
 			coverageOut: values["coverage-out"] as string | undefined,

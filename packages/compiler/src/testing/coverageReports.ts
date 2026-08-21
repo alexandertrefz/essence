@@ -65,7 +65,9 @@ export function toLcov(summary: CoverageSummary): string {
 			}
 
 			lines.push(
-				`BRDA:${point.position.start.line},${block},${point.label},${point.count}`,
+				`BRDA:${point.position.start.line},${block},${branchName(
+					point.label,
+				)},${point.count}`,
 			)
 			block += 1
 		}
@@ -102,6 +104,15 @@ export function toCoverageJson(summary: CoverageSummary): string {
 		null,
 		"\t",
 	)}\n`
+}
+
+// NOTE: A `BRDA` record is four COMMA-separated fields, so a label holding a
+// comma — `case { x: Integer, y: Integer }` is one an ordinary Record Matcher
+// produces — would move the count into the name and leave the record
+// unreadable. The commas go; the label with them intact is in the JSON report,
+// which has no such trouble.
+function branchName(label: string): string {
+	return label.replaceAll(",", ";")
 }
 
 // NOTE: How often each line ran, which is the one thing lcov asks for that the

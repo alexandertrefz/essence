@@ -4,7 +4,10 @@ import * as path from "node:path"
 import { pathToFileURL } from "node:url"
 
 import { displayPath } from "@essence-lang/compiler/diagnostics/render"
-import { coverageReportFileName } from "@essence-lang/compiler/testing"
+import {
+	coverageReportFileName,
+	hasCoverage,
+} from "@essence-lang/compiler/testing"
 import {
 	type entryPoints,
 	type Registry,
@@ -425,16 +428,22 @@ export async function writeCoverageReport(
 		return
 	}
 
+	let written =
+		format === "lcov" ? toLcov(coverage) : toCoverageJson(coverage)
+
+	// NOTE: Nothing counted is nothing to write. An empty tracefile is not an
+	// empty report — a viewer reads it as a valid claim about zero files — and
+	// a directory made for it is litter.
+	if (!hasCoverage(coverage)) {
+		return
+	}
+
 	let directory = path.resolve(context.options.coverageOut ?? "coverage")
 	let fileName = path.join(directory, coverageReportFileName(format))
 
 	try {
 		await mkdir(directory, { recursive: true })
-		await writeFile(
-			fileName,
-			format === "lcov" ? toLcov(coverage) : toCoverageJson(coverage),
-			"utf8",
-		)
+		await writeFile(fileName, written, "utf8")
 	} catch (error) {
 		context.terminal.err(
 			`  ${context.palette.warning(

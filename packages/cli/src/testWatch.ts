@@ -439,11 +439,14 @@ export async function runTestWatch(
 				)
 
 				printReport(context, run, sources, coverage)
-
-				await writeCoverageReport(context, coverage)
-
 				footer()
 			}
+
+			// NOTE: Outside the branch above, because writing a report is not
+			// something the terminal decides: a job piping `--json` out of a
+			// watching session asked for the file exactly as a job reading the
+			// table did.
+			await writeCoverageReport(context, coverage)
 		} finally {
 			if (!restored) {
 				restore()
