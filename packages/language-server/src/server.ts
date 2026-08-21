@@ -351,6 +351,10 @@ export function startServer(options: { connection?: Connection } = {}) {
 	let tags: Map<string, Array<common.Diagnostic>> | null = null
 
 	function tagDiagnosticsFor(filePath: string): Array<common.Diagnostic> {
+		// NOTE: Gated on the setting although it runs nothing, because it walks
+		// every parse in the workspace to answer — and a reader who declined
+		// the live session declined the Server going through the project on its
+		// own account.
 		if (!session.isEnabled()) {
 			return []
 		}
@@ -372,11 +376,12 @@ export function startServer(options: { connection?: Connection } = {}) {
 	// assertions of its last run, and what its tags say about the workspace's.
 	// Published BESIDE the analysis's own Diagnostics, because the protocol has
 	// one list per URI and the second sender would otherwise clear the first.
+	//
+	// NOTE: Not gated on the setting, unlike the tags below. What a session
+	// that is switched off holds is nothing — being switched off empties it —
+	// so the only failures here are the ones a run somebody ASKED for found,
+	// and hiding those would be hiding the answer to the question.
 	function testDiagnosticsFor(filePath: string): Array<common.Diagnostic> {
-		if (!session.isEnabled()) {
-			return []
-		}
-
 		return [
 			...session.diagnosticsFor(filePath),
 			...tagDiagnosticsFor(filePath),
@@ -505,11 +510,12 @@ export function startServer(options: { connection?: Connection } = {}) {
 	// NOTE: The Run and Debug lenses. Read off the PARSE — nothing has to have
 	// run for a test to be worth offering to run — so a file opened in a
 	// session that is still starting up already carries them.
+	//
+	// NOTE: Offered while the session is switched off, too. What that setting
+	// declines is compiling and running a project on every keystroke; pressing
+	// Run is the gesture it promises to keep, and a Run lens is where a reader
+	// presses it.
 	connection.onCodeLens((params) => {
-		if (!session.isEnabled()) {
-			return null
-		}
-
 		let program = parsedOf(params.textDocument.uri)
 
 		if (program === null) {
@@ -1406,7 +1412,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 		// typed Program and is true of the code, the other is read off the
 		// events and is true of one run.
 		let values =
-			document === undefined || !session.isEnabled()
+			document === undefined
 				? []
 				: findValueHints(
 						session.eventsFor(
