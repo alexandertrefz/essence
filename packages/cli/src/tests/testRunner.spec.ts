@@ -445,6 +445,60 @@ describe("essence test — project configuration", () => {
 		)
 	})
 
+	// NOTE: Every project holds sources that are not its own tests — a corpus
+	// of deliberately broken files is the one this repository holds, and it is
+	// what made `essence test` unrunnable at its own root.
+	it("stays out of the directories a project excludes", async () => {
+		await withFiles(
+			{
+				"package.json": JSON.stringify({
+					essence: { test: { exclude: ["broken"] } },
+				}),
+				"Rules.es": passing,
+				"broken/Bad.tests.es": broken,
+			},
+			async (directory) => {
+				let configuration = await readProjectConfiguration(directory)
+				let found = await discoverTestFiles(
+					[],
+					testCommand,
+					"essence",
+					directory,
+					configuration.test.exclude,
+				)
+
+				expect(found.map((each) => path.basename(each))).toEqual([
+					"Rules.es",
+				])
+			},
+		)
+	})
+
+	// NOTE: A file asked about BY NAME is answered about. The setting narrows
+	// the search, which is the half nobody asked for.
+	it("still compiles an excluded file that was named", async () => {
+		await withFiles(
+			{
+				"package.json": JSON.stringify({
+					essence: { test: { exclude: ["broken"] } },
+				}),
+				"broken/Bad.tests.es": broken,
+			},
+			async (directory) => {
+				let configuration = await readProjectConfiguration(directory)
+				let found = await discoverTestFiles(
+					[path.join(directory, "broken", "Bad.tests.es")],
+					testCommand,
+					"essence",
+					directory,
+					configuration.test.exclude,
+				)
+
+				expect(found).toHaveLength(1)
+			},
+		)
+	})
+
 	it("reports a setting of the wrong shape rather than obeying it", async () => {
 		await withFiles(
 			{

@@ -18,6 +18,13 @@
 		"publish:smoke": "bun scripts/publishing/smoke.ts",
 		"publish:packages": "bun scripts/publishing/publish.ts"
 	},
+	"essence": {
+		"test": {
+			"exclude": [
+				"packages/fixtures/files/diagnostics"
+			]
+		}
+	},
 	"keywords": [
 		"language",
 		"essence"

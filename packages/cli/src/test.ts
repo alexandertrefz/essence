@@ -576,6 +576,8 @@ export async function runTest(
 		files,
 		command,
 		context.programName,
+		process.cwd(),
+		configuration.test.exclude,
 	)
 
 	if (inputFileNames.length === 0) {

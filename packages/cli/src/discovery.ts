@@ -60,6 +60,18 @@ async function isDirectory(target: string): Promise<boolean> {
 // NOTE: Symlinked directories are read as files rather than descended into, so
 // a link back up the tree can not send the walk round for ever — the same rule
 // the Language Server's walk follows.
+// NOTE: Whether a path is one the project said to stay out of. Compared as a
+// path rather than as text, so that `fixtures/broken` excludes everything under
+// it and `fixtures/brokenish` beside it stays.
+function isExcluded(target: string, exclude: Array<string>): boolean {
+	let resolved = path.resolve(target)
+
+	return exclude.some(
+		(each) =>
+			resolved === each || resolved.startsWith(`${each}${path.sep}`),
+	)
+}
+
 async function collectEssenceFiles(
 	directory: string,
 	found: Set<string>,
@@ -69,6 +81,9 @@ async function collectEssenceFiles(
 	// library is a different question: the library's own `@example` blocks are
 	// tests, and `essence test` run in it is how they are run.
 	allowStdlib: boolean,
+	// NOTE: What the project said not to walk into. Empty for every caller that
+	// read no configuration, which is every caller but the two commands.
+	exclude: Array<string> = [],
 ): Promise<void> {
 	let entries: Array<{ name: string; isDirectory: boolean }> = []
 
@@ -87,14 +102,22 @@ async function collectEssenceFiles(
 		let entryPath = path.join(directory, entry.name)
 
 		if (entry.isDirectory) {
-			if (!skippedDirectories.has(entry.name)) {
-				await collectEssenceFiles(entryPath, found, allowStdlib)
+			if (
+				!skippedDirectories.has(entry.name) &&
+				!isExcluded(entryPath, exclude)
+			) {
+				await collectEssenceFiles(
+					entryPath,
+					found,
+					allowStdlib,
+					exclude,
+				)
 			}
 
 			continue
 		}
 
-		if (!entry.name.endsWith(".es")) {
+		if (!entry.name.endsWith(".es") || isExcluded(entryPath, exclude)) {
 			continue
 		}
 
@@ -159,6 +182,11 @@ export async function discoverTestFiles(
 	command: CommandSpec,
 	programName: string = DEFAULT_PROGRAM_NAME,
 	workingDirectory: string = process.cwd(),
+	// NOTE: The project's own `essence.test.exclude`. It narrows the WALK and
+	// nothing else: a file named on the command line was asked about by name,
+	// and answering "there is a setting" to a direct question would be the
+	// worse reading of both.
+	exclude: Array<string> = [],
 ): Promise<Array<string>> {
 	let walked = new Set<string>()
 	let named = new Set<string>()
@@ -173,6 +201,7 @@ export async function discoverTestFiles(
 			workingDirectory,
 			walked,
 			isStdlibWalk(workingDirectory),
+			exclude,
 		)
 	}
 
@@ -200,7 +229,12 @@ export async function discoverTestFiles(
 
 		for (let match of matches) {
 			if (await isDirectory(match)) {
-				await collectEssenceFiles(match, walked, isStdlibWalk(match))
+				await collectEssenceFiles(
+					match,
+					walked,
+					isStdlibWalk(match),
+					exclude,
+				)
 
 				continue
 			}

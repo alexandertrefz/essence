@@ -406,6 +406,14 @@ export const commands: Array<CommandSpec> = [
 			"A tag that list leaves out still runs when --tag asks for it by " +
 				"name, which is how a nightly job runs what a working day " +
 				"skips.",
+			"The same key takes the directories the walk stays out of — a " +
+				"corpus of deliberately broken sources, an example a book " +
+				"quotes — written relative to the package.json that names " +
+				"them:",
+			'    { "essence": { "test": { "exclude": ["fixtures/broken"] } } }',
+			"It narrows the WALK and nothing else: a file named on the " +
+				"command line was asked about by name and is still compiled " +
+				"and still reported.",
 			"--watch stays up and re-runs on every save. Only the tests a " +
 				"change reached run again — the entries whose module graph " +
 				"holds the file that changed — and the report is cleared and " +
