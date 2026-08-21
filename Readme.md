@@ -43,6 +43,7 @@ Essence compiles to modern ECMAScript, allowing execution in Bun, Node.js as wel
 * Patterns — one way to name the parts of a value, in every position that takes one apart
 * Arbitrary Precision Numbers
 * First-Class Functions
+* Tests — a module section of its own, run by `essence test`, dropped by every build
 
 
 # Example Code
@@ -103,7 +104,24 @@ packages/cli/bin/essence run HelloWorld.es      # compile and execute, emitting 
 packages/cli/bin/essence check *.es             # type-check only, no output
 packages/cli/bin/essence watch List.es          # recompile on every save
 packages/cli/bin/essence build *.es -o dist/    # compile a batch, in parallel
+packages/cli/bin/essence test                   # run every test under this directory
 ```
+
+Tests are part of the language rather than a library: a file ends in a `tests { … }` section beside its
+`implementation`, or is a `Foo.tests.es` of nothing but imports and tests, and a test says what it expects with
+`expect` and `require`. A build drops the section before anything is enriched, so tests cost a shipped program
+nothing, and only `essence test` compiles them. A failed `expect` is reported as an ordinary Diagnostic, with
+the value of every sub-expression the compiler recorded shown at the span it was written at:
+
+```sh
+packages/cli/bin/essence test                   # every tests section and *.tests.es under the directory
+packages/cli/bin/essence test Standings.es      # one file's tests
+packages/cli/bin/essence test -f leader         # only the tests whose name says "leader"
+packages/cli/bin/essence test --skip-tag slow   # leave a tag out; --tag runs only that tag
+```
+
+`--json` writes the run as one JSON event per line. A project skips tags by default by naming them in the
+nearest `package.json`, under `{ "essence": { "test": { "skipTags": ["slow"] } } }`.
 
 Formatting is a separate command, and never something a build does to your sources:
 

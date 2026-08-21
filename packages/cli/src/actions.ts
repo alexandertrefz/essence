@@ -15,6 +15,15 @@ export const EXIT_SUCCESS = 0
 export const EXIT_FAILURE = 1
 export const EXIT_USAGE = 2
 
+// NOTE: The same 2 a usage error exits with, deliberately. `essence test`
+// leaving a `focused` modifier behind is a run that did not do what it was
+// asked to — it ran two tests out of forty — and that is what a usage error is
+// as well: the invocation and the answer do not match. A third number would
+// have to be documented as meaning something a caller can act on differently,
+// and there is nothing different to do: read the message. Both are non-zero,
+// both are not 1, and 1 stays the one code that means "a test failed".
+export const EXIT_FOCUSED = 2
+
 function emitJSON(
 	context: CLIContext,
 	result: CompilationResult,

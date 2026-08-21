@@ -222,6 +222,15 @@ async function dispatch(
 		case "watch":
 			return runWatch(context, command, files, { emit: true })
 
+		case "test": {
+			// NOTE: Imported where it is used, like the Formatter and the
+			// Language Server. It reaches the test runtime and the emitter, and
+			// `esc check` must not pay for either.
+			let { runTest } = await import("./test")
+
+			return runTest(context, command, files)
+		}
+
 		case "format":
 			return runFormat(context, rawArguments)
 

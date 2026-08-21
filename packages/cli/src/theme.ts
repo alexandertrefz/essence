@@ -32,6 +32,12 @@ export type Theme = {
 		warning: string
 		info: string
 		pending: string
+		// NOTE: A test's own three marks, lighter than the compilation's — a
+		// report listing forty of them beside each other is read by shape, and
+		// the heavy ✔/✖ that suit one headline per file turn a tree into noise.
+		pass: string
+		fail: string
+		skip: string
 		bullet: string
 		arrow: string
 		bar: string
@@ -98,6 +104,9 @@ const unicodeSymbols: Theme["symbols"] = {
 	warning: "⚠",
 	info: "ℹ",
 	pending: "◌",
+	pass: "✓",
+	fail: "✗",
+	skip: "–",
 	bullet: "·",
 	arrow: "→",
 	bar: "█",
@@ -111,6 +120,9 @@ const asciiSymbols: Theme["symbols"] = {
 	warning: "!",
 	info: "i",
 	pending: "-",
+	pass: "+",
+	fail: "x",
+	skip: "-",
 	bullet: "*",
 	arrow: "->",
 	bar: "#",

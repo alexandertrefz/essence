@@ -77,6 +77,7 @@ my-app/
 
 ```sh
 essence check src/*.es                     # before committing
+essence test                               # the tests the sources themselves write
 essence build src/main.es -o dist/main.js  # before shipping
 essence watch src/main.es                  # while working
 ```
@@ -93,6 +94,33 @@ to be the one you are working on.
 Several files given at once are compiled **in parallel**, one worker per core
 up to eight, and `--jobs 1` puts everything back on the main thread — which is
 what you want when a compiler crash gives you a stack trace to read.
+
+## The one thing a project may configure
+
+Tests are written in the language: a file ends in a `tests { … }` section beside
+its `implementation`, or is a `Foo.tests.es` of nothing but imports and tests.
+`essence test` finds them under the working directory, compiles them and runs
+them; every other command drops the sections before anything is enriched, so
+they cost a shipped program nothing.
+
+A test may carry tags, and a project usually wants some of them left out of an
+everyday run. That is the one setting there is, and it lives in the nearest
+`package.json` — the file a project already has, under a key a project file can
+adopt whole later:
+
+```json
+{
+	"essence": {
+		"test": {
+			"skipTags": ["slow"]
+		}
+	}
+}
+```
+
+`essence test --skip-tag slow` says the same thing for one run, and
+`essence test --tag slow` runs exactly the tests a default like that leaves out
+— which is how a nightly job runs what a working day skips.
 
 ## Conventions worth keeping
 

@@ -377,6 +377,100 @@ export const commands: Array<CommandSpec> = [
 		],
 	},
 	{
+		name: "test",
+		aliases: ["t"],
+		summary: "Compile the tests and run them",
+		description: [
+			"Compiles every module that writes a tests { … } section — and " +
+				"every *.tests.es file — with the tests enriched, then runs " +
+				"them in this process and reports what held. Without " +
+				"arguments every Essence source under the working directory is " +
+				"searched, skipping .git, node_modules, dist, build and " +
+				".claude. With arguments only those files, or every source " +
+				"under a directory named as one.",
+			"A failed assertion is reported as an ordinary Essence Diagnostic " +
+				"— the asserted Expression underlined, and the value of every " +
+				"sub-expression the Compiler recorded shown at the span it was " +
+				"written at. Whatever a failing test printed is shown with it " +
+				"rather than interleaved with the report.",
+			"Selection happens here rather than in the source: --filter " +
+				"matches a substring of a test's name, --tag runs only the " +
+				"tests carrying one of the given tags and --skip-tag leaves " +
+				"them out. --skip-tag wins over --tag. A project may skip tags " +
+				"by default by writing them in the nearest package.json:",
+			'    { "essence": { "test": { "skipTags": ["slow"] } } }',
+			"A tag that list leaves out still runs when --tag asks for it by " +
+				"name, which is how a nightly job runs what a working day " +
+				"skips.",
+			"--json writes the event stream instead of the report: one JSON " +
+				"object per line on stdout and nothing else, the same stream " +
+				"the editor's live session reads. Diagnostics stay on stderr.",
+			"The exit code is 0 when everything that ran passed, 1 when a test " +
+				"failed, and 2 when a run nobody narrowed still holds a " +
+				"`focused` test — so a focus left behind while iterating can " +
+				"not land unnoticed.",
+		],
+		usage: [
+			`${PROGRAM} test [file...] [options]`,
+			`${PROGRAM} test --tag slow`,
+		],
+		options: [
+			{
+				name: "filter",
+				short: "f",
+				type: "string",
+				placeholder: "text",
+				summary: "Run only the tests whose name contains this",
+				details:
+					"Matched against the name as it is written. A name with a " +
+					"hole in it — an interpolated name — is matched on the " +
+					"template, because what fills the hole is worked out where " +
+					"the test stands and selection happens before anything has " +
+					"run.",
+			},
+			{
+				name: "tag",
+				type: "string",
+				multiple: true,
+				placeholder: "tag",
+				summary: "Run only the tests carrying this tag",
+				details:
+					"Repeatable, and repeats are a union: --tag network --tag " +
+					"slow runs everything carrying either. A test's tags are " +
+					"its own plus every enclosing suite's.",
+			},
+			{
+				name: "skip-tag",
+				type: "string",
+				multiple: true,
+				placeholder: "tag",
+				summary: "Leave out the tests carrying this tag",
+				details:
+					"Repeatable, and it wins over --tag. Tests left out are " +
+					"counted rather than failed.",
+			},
+			jobsOption,
+		],
+		examples: [
+			{
+				command: `${PROGRAM} test`,
+				description: "Run every test under the working directory",
+			},
+			{
+				command: `${PROGRAM} test Standings.es`,
+				description: "Run one file's tests",
+			},
+			{
+				command: `${PROGRAM} test -f leader`,
+				description: "Run the tests whose name mentions the leader",
+			},
+			{
+				command: `${PROGRAM} test --skip-tag slow --json`,
+				description: "Emit the event stream, leaving the slow ones out",
+			},
+		],
+	},
+	{
 		name: "format",
 		aliases: ["fmt"],
 		summary: "Format Essence sources in place",

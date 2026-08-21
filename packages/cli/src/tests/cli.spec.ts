@@ -1419,6 +1419,9 @@ function testOptions(overrides: Partial<OptionValues> = {}): OptionValues {
 		noOptimise: false,
 		withoutOptimisation: [],
 		jobs: 1,
+		filter: undefined,
+		tag: [],
+		skipTag: [],
 		...overrides,
 	}
 }
