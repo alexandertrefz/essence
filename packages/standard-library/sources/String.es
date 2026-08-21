@@ -131,6 +131,10 @@ declarations {
 
 		§§ Answers whether the given String occurs anywhere in this one.
 		§§
+		§§ @example
+		§§   expect "Lions"::contains("ion")
+		§§   expect "Lions"::doesNotContain("Tiger")
+		§§
 		§§ @param _ — the String to look for
 		§§ @returns — `true` when it occurs.
 		contains(_ other: String) -> Boolean {
@@ -146,6 +150,10 @@ declarations {
 		}
 
 		§§ Answers whether the String begins with the given one.
+		§§
+		§§ @example
+		§§   expect "Lions"::starts(with "Li")
+		§§   expect "Lions"::doesNotStart(with "Ti")
 		starts(with prefix: String) -> Boolean {
 			§ A prefix longer than the String slices to the whole String,
 			§ which can not equal the prefix, so it needs no guard.

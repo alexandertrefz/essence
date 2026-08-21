@@ -14,6 +14,10 @@ declarations {
 		is(_ other: Boolean) -> Boolean
 
 		§§ Answers the Boolean as a String: `"true"` or `"false"`.
+		§§
+		§§ @example
+		§§   expect true::toString()::is("true")
+		§§   expect false::toString()::is("false")
 		toString() -> String {
 			if @ {
 				<- "true"
@@ -26,6 +30,10 @@ declarations {
 		negate() -> Boolean
 
 		§§ Answers the logical conjunction: `true` only when both Booleans are `true`.
+		§§
+		§§ @example
+		§§   expect true::and(true)
+		§§   expect true::and(false)::negate()
 		§§
 		§§ @param _ — the other Boolean
 		and(_ other: Boolean) -> Boolean

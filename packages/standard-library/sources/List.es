@@ -676,6 +676,11 @@ declarations {
 
 		§§ Answers a new List with the items in the opposite order.
 		§§
+		§§ @example
+		§§   constant reversed = [1, 2, 3]::reverse()
+		§§
+		§§   expect reversed::is([3, 2, 1])
+		§§
 		§§ @returns — the reversed List.
 		reverse() -> List<ItemType>
 

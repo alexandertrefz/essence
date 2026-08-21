@@ -247,6 +247,12 @@ function isAdjacent(left: common.Position, right: common.Position): boolean {
 const maximumNestingDepth = 1024
 
 export type ParserOptions = {
+	// NOTE: Opt-in that says the Statements about to be read stand in a test's
+	// body, which is what makes `expect` and `require` legal in them. Only the
+	// `@example` blocks of a `§§` Documentation block set it: what is written
+	// under one is a test body, and it is parsed on its own rather than as part
+	// of the file it was written in.
+	insideTestBody?: boolean
 	// NOTE: Opt-in that lets a Program open with `declarations { … }` — the
 	// standard library sets it, every user file leaves it off so that a
 	// `declarations` block there is diagnosed rather than parsed. It is also
@@ -293,6 +299,7 @@ class DescentParser {
 	constructor(source: string, options: ParserOptions = {}) {
 		this.tokens = new TokenStream(source)
 		this.allowDeclarationsHeader = options.allowDeclarationsHeader ?? false
+		this.insideTestBody = options.insideTestBody ?? false
 
 		// NOTE: A Lexer error truncates the Token stream, so every
 		// end-of-input error after it would only be a cascade of the already
@@ -1004,6 +1011,14 @@ class DescentParser {
 	}
 
 	// #endregion
+
+	// NOTE: The list loop with nothing around it — no block, no braces, no
+	// Program. `parseStatementList` stops at a `}` or at the end of the input,
+	// and an example has neither, so what it reads is everything the text
+	// holds.
+	parseStatements(): Array<parser.ImplementationNode> {
+		return this.parseStatementList(() => this.parseImplementationNode())
+	}
 
 	// #region Error Recovery
 
@@ -5113,4 +5128,32 @@ export function parseWithDiagnostics(
 
 export function parse(chunk: string, options?: ParserOptions): parser.Program {
 	return parseWithDiagnostics(chunk, options).program
+}
+
+// NOTE: A bare run of Statements rather than a Program — what an `@example`
+// block holds. It is parsed from a text the caller built, in which every line
+// but the example's own is blank and each of the example's stands at the column
+// it stands at in the file: so every Position the parse produces is the
+// Position it has in the source, and a Diagnostic about an example underlines
+// the `§§` line it was written on.
+//
+// `insideTestBody` is set, because what an example holds IS a test body — an
+// example that asserts nothing proves nothing, and `expect` is how it does.
+export function parseTestBody(
+	chunk: string,
+	options: ParserOptions = {},
+): {
+	body: Array<parser.ImplementationNode>
+	diagnostics: Array<common.Diagnostic>
+} {
+	let { result, diagnostics } = collectDiagnostics(() => {
+		let parser = new DescentParser(chunk, {
+			...options,
+			insideTestBody: true,
+		})
+
+		return parser.parseStatements()
+	})
+
+	return { body: result, diagnostics }
 }

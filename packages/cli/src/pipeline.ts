@@ -508,6 +508,7 @@ async function enrichDeclarations(
 	let enriched = await timeline.run("enrich", () =>
 		enrichDocument(parsed.program, request.inputFileName, {
 			tests: request.tests,
+			source: read.sourceText,
 		}),
 	)
 

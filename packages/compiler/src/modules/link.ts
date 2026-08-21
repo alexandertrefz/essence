@@ -775,6 +775,9 @@ function linkGroup(
 		[...states.values()].map((state) => ({
 			program: state.module.program,
 			scope: state.scope,
+			// NOTE: Only a test compile reads it, and only to compile the
+			// `@example` blocks of a `§§` block out of the file's own lines.
+			source: state.module.sourceText,
 		})),
 		{
 			seedRound,

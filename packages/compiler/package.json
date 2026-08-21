@@ -12,6 +12,7 @@
 		"./parser": "./src/parser/index.ts",
 		"./enricher": "./src/enricher/index.ts",
 		"./enricher/builtins": "./src/enricher/builtins.ts",
+		"./enricher/examples": "./src/enricher/examples.ts",
 		"./enricher/resolvers": "./src/enricher/resolvers.ts",
 		"./enricher/stdlib": "./src/enricher/stdlib.ts",
 		"./enricher/tests": "./src/enricher/tests.ts",

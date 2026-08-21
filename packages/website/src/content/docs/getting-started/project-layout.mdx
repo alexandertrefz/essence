@@ -182,6 +182,23 @@ is a failure with the difference as a note, and `essence test --update` records
 it instead. In an editor, the "Accept snapshot" lens above the test does the
 same for that test alone.
 
+An `@example` block in a `§§` documentation comment is a test as well. It is
+compiled in the file's own scope and reported under a synthetic `examples`
+suite, named after the Method or Function it documents — so an example that
+drifts from the code fails a run rather than quietly lying in hover text:
+
+```essence
+§§ The points a Standing has won per game played.
+§§
+§§ @example
+§§   constant standing = Standings.blank(of lions)::record(scored 2, conceded 0)
+§§
+§§   expect standing::pointsPerGame()::is(3/1)
+§§
+§§ @returns — the points divided by the games played, or 0/1 before any game.
+pointsPerGame() -> Rational {
+```
+
 ## Conventions worth keeping
 
 None of these are enforced. They are what the repository itself does.
