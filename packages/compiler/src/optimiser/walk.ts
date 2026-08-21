@@ -151,6 +151,27 @@ function walkTestsNodes(
 				: { ...node, name, body }
 		}
 
+		if (node.nodeType === "TestRows") {
+			let name =
+				node.name === null ? null : walkExpression(node.name, rewrites)
+			let rows = mapArray(node.rows, (row) =>
+				walkExpression(row, rewrites),
+			)
+			// NOTE: NOT `walkBody` — a hook answering with a different number
+			// of Statements would part the bindings from the row they read.
+			let bindings = mapArray(node.bindings, (binding) =>
+				walkImplementation(binding, rewrites),
+			)
+			let body = walkBody(node.body, rewrites)
+
+			return name === node.name &&
+				rows === node.rows &&
+				bindings === node.bindings &&
+				body === node.body
+				? node
+				: { ...node, name, rows, bindings, body }
+		}
+
 		if (node.nodeType === "TestScope") {
 			let scoped = walkTestsNodes(node.nodes, rewrites)
 

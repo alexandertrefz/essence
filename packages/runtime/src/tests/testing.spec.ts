@@ -63,6 +63,7 @@ function manifest(
 		id,
 		name: id,
 		interpolated: false,
+		row: null,
 		suitePath: [],
 		tags: [],
 		focused: false,

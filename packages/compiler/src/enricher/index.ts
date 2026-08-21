@@ -18,6 +18,7 @@ import {
 	enrichExpression,
 	enrichNode,
 	enrichOverloadedFunctionStatement,
+	enrichTestTable,
 	type HoistedTypes,
 	pendingRefinementIn,
 	refinementPredicateScope,
@@ -1541,6 +1542,13 @@ const enrichTest = (
 	// next one — the Scope is what says two tests share nothing but the setup
 	// above them.
 	let bodyScope = childScope(scope)
+	// NOTE: Before the name and before the body: a table test binds its row in
+	// the body's Scope, and both of them read it — the name because it says
+	// which row it ran for, which is the whole point of interpolating one.
+	let table =
+		node.table === null
+			? null
+			: enrichTestTable(node.table, scope, bodyScope)
 
 	return {
 		nodeType: "Test",
@@ -1549,10 +1557,11 @@ const enrichTest = (
 			suitePath: context.suitePath,
 			name: nameTemplate(node.name),
 		},
-		name: enrichTestName(node.name, scope),
+		name: enrichTestName(node.name, table === null ? scope : bodyScope),
 		tags: modifiers.tags,
 		skipped: modifiers.skipped,
 		focused: modifiers.focused,
+		table,
 		body: node.body.flatMap((child) =>
 			guarded(child.position, () => enrichNode(child, bodyScope)),
 		),

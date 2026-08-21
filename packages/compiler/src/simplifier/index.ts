@@ -1639,16 +1639,43 @@ function simplifyTestsNodes(
 			let index = tests.length
 			let interpolated = node.name.nodeType === "InterpolatedStringValue"
 
+			// NOTE: A table test is N entries of the manifest and ONE emitted
+			// body: each row is a test in its own right, carrying its row
+			// number as the last step of its identity, and the body they share
+			// reads whichever row is running.
+			if (node.table !== null) {
+				for (let row = 0; row < node.table.rows.length; row++) {
+					tests.push({
+						...manifestEntry(node, interpolated),
+						id: testIdentityKey(node.identity, row),
+						row,
+					})
+				}
+
+				return {
+					nodeType: "TestRows" as const,
+					first: index,
+					binding: node.table.binding,
+					rows: node.table.rows.map((row) => simplifyExpression(row)),
+					bindings: node.table.bindings.map((binding) =>
+						simplifyImplementationNode(binding),
+					),
+					name: interpolated ? simplifyExpression(node.name) : null,
+					body: node.body.map((child) =>
+						probeStatement(
+							simplifyImplementationNode(child),
+							child.nodeType === "ConstantDeclarationStatement" &&
+								child.synthesized === undefined,
+						),
+					),
+					position: node.position,
+				}
+			}
+
 			tests.push({
+				...manifestEntry(node, interpolated),
 				id: testIdentityKey(node.identity),
-				name: node.identity.name,
-				interpolated,
-				suitePath: node.identity.suitePath,
-				tags: node.tags,
-				focused: node.focused !== null,
-				skipped: node.skipped === null ? null : node.skipped.reason,
-				position: node.position,
-				keywordPosition: node.keywordPosition,
+				row: null,
 			})
 
 			return {
@@ -1686,6 +1713,25 @@ function simplifyTestsNodes(
 
 		return probeStatement(simplifyImplementationNode(node))
 	})
+}
+
+// NOTE: Everything a manifest entry says about a test that is not its identity.
+// A table test's rows differ in the id and the row number and in nothing else —
+// they share the template, the Modifiers and the span they were written at.
+function manifestEntry(
+	node: common.typed.TestNode,
+	interpolated: boolean,
+): Omit<common.typedSimple.TestManifestEntry, "id" | "row"> {
+	return {
+		name: node.identity.name,
+		interpolated,
+		suitePath: node.identity.suitePath,
+		tags: node.tags,
+		focused: node.focused !== null,
+		skipped: node.skipped === null ? null : node.skipped.reason,
+		position: node.position,
+		keywordPosition: node.keywordPosition,
+	}
 }
 
 // NOTE: The `§?` value comments of this Module, applied to Statements that have

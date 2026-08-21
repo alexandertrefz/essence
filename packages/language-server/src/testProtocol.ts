@@ -25,6 +25,11 @@ export type TestSite = {
 	// differs where the name interpolates — a client shows the rendering it has
 	// and falls back to this, which is the only name a test that never ran has.
 	name: string
+	// NOTE: Which row of a table test this is, and null for the ordinary test
+	// that runs once. `suitePath` already ends in the template the rows share,
+	// so a client that draws a tree needs nothing else; this is what it labels
+	// a row with before anything has run and worked out its name.
+	row: number | null
 	suitePath: Array<string>
 	// NOTE: The file the test was WRITTEN in, as an absolute path.
 	file: string

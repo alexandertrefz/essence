@@ -434,8 +434,16 @@ export function nameTemplate(
 // key rather than the parts — a Map, an event's `id`, a snapshot file's
 // heading. `/` separates the steps and is escaped inside them, so that two
 // different identities can never spell the same key.
-export function testIdentityKey(identity: common.typed.TestIdentity): string {
-	return [identity.modulePath ?? "", ...identity.suitePath, identity.name]
+export function testIdentityKey(
+	identity: common.typed.TestIdentity,
+	row: number | null = null,
+): string {
+	return [
+		identity.modulePath ?? "",
+		...identity.suitePath,
+		identity.name,
+		...(row === null ? [] : [String(row)]),
+	]
 		.map((step) => step.replaceAll("\\", "\\\\").replaceAll("/", "\\/"))
 		.join("/")
 }

@@ -7,10 +7,11 @@ import { parentPort } from "node:worker_threads"
 import { compileToMemory } from "@essence-lang/compiler/embed"
 import type { ModuleHost } from "@essence-lang/compiler/modules"
 import { defaultOptimiserOptions } from "@essence-lang/compiler/optimiser"
-import type {
-	entryPoints,
-	Registry,
-	TestEvent,
+import {
+	type entryPoints,
+	pathOf,
+	type Registry,
+	type TestEvent,
 } from "@essence-lang/runtime/Testing"
 
 import type {
@@ -99,7 +100,11 @@ function sitesOf(registry: Registry, entry: string): Array<TestSite> {
 	return registry.tests.map(({ entry: test }) => ({
 		id: test.id,
 		name: test.name,
-		suitePath: test.suitePath,
+		row: test.row,
+		// NOTE: Through the runtime's own rule rather than a second copy of it
+		// — the rows of a table test are reported under the template they
+		// share, and the events say so too.
+		suitePath: pathOf(test),
 		file: entry,
 		range: test.position,
 		keywordRange: test.keywordPosition,

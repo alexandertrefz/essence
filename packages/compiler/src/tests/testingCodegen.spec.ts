@@ -148,6 +148,18 @@ tests {
 	}
 }`
 
+const tableTest = `implementation {
+	function twice(_ n: Integer) -> Integer {
+		<- n::multiply(with 2)
+	}
+}
+
+tests {
+	test "{n} doubled" across [1, 2, 3] (n: Integer) {
+		expect twice(n)::isLessThan(6)
+	}
+}`
+
 describe("Test codegen — the emitted shape", () => {
 	it("registers one manifest for the Module and publishes the way in", () => {
 		let javaScript = generate(twoTests)
@@ -967,6 +979,69 @@ tests {
 			["double(2)", "4"],
 			["double(first)", "8"],
 		])
+	})
+
+	it("emits one call for a whole table and one entry per row", async () => {
+		let emitted = registration(generate(tableTest))
+
+		expect(emitted).toContain("$testing.rows($context, 0, [")
+		expect(emitted.match(/\$testing\.rows\(/g)).toHaveLength(1)
+		expect(emitted).toContain('id: "/{n} doubled/0"')
+		expect(emitted).toContain('id: "/{n} doubled/2"')
+		expect(emitted).not.toContain('id: "/{n} doubled/3"')
+	})
+
+	it("runs the body once per row, under the name that row renders", async () => {
+		let { events, summary } = await run(tableTest)
+
+		expect(summary.passed).toBe(2)
+		expect(summary.failed).toBe(1)
+		expect(
+			eventsOf(events, "test-start").map((event) =>
+				event.kind === "test-start"
+					? [event.name, event.suitePath]
+					: [],
+			),
+		).toEqual([
+			["1 doubled", ["{n} doubled"]],
+			["2 doubled", ["{n} doubled"]],
+			["3 doubled", ["{n} doubled"]],
+		])
+	})
+
+	// NOTE: A row that is not the one running costs nothing but its own value —
+	// the body is one closure, and the name is worked out for the row being
+	// enumerated or run.
+	it("evaluates one row's body per test", async () => {
+		let { events } = await run(`implementation {
+	function twice(_ n: Integer) -> Integer {
+		<- n::multiply(with 2)
+	}
+}
+
+tests {
+	test "{n} doubled" across [1, 2, 3] (n: Integer) {
+		Terminal.print("ran {n}")
+
+		expect twice(n)::isGreaterThan(0)
+	}
+}`)
+
+		expect(
+			eventsOf(events, "output").map((event) =>
+				event.kind === "output" ? event.text : "",
+			),
+		).toEqual(["ran 1\n", "ran 2\n", "ran 3\n"])
+	})
+
+	it("selects a row by its own id", async () => {
+		let { events } = await run(tableTest, { ids: ["/{n} doubled/1"] })
+
+		expect(
+			eventsOf(events, "test-start").map((event) =>
+				event.kind === "test-start" ? event.name : "",
+			),
+		).toEqual(["2 doubled"])
 	})
 
 	it("leaves the Constant a Matcher's assertion synthesized alone", async () => {

@@ -806,6 +806,199 @@ describe("Tests Section Semantics", () => {
 		})
 	})
 
+	describe("Table tests", () => {
+		let source = `implementation {
+			choice Outcome {
+				Win,
+				Draw,
+				Loss,
+			}
+		}
+
+		tests {
+			type Scoreline = { scored: Integer, conceded: Integer, expected: Outcome }
+
+			test "{scored}–{conceded}" across [
+				{ scored = 2, conceded = 1, expected = #Win },
+				{ scored = 1, conceded = 1, expected = #Draw },
+			] ({ scored, conceded, expected }: Scoreline) {
+				expect scored::isGreaterThanOrEqualTo(conceded)
+			}
+		}`
+
+		it("should read one row per written item", () => {
+			let table = testsOf(sectionOf(source).nodes)[0]
+				?.table as common.typed.TestTableNode
+
+			expect(table.rows).toHaveLength(2)
+			expect(table.type.type).toBe("Record")
+		})
+
+		// NOTE: The whole reason a Parameter is annotated at all — the rows are
+		// read against what it declared, so a bare Case resolves the way it
+		// does under any other annotation.
+		it("should resolve a bare Case in a row against the annotation", () => {
+			let table = testsOf(sectionOf(source).nodes)[0]
+				?.table as common.typed.TestTableNode
+			let row = table.rows[0] as common.typed.RecordValueNode
+
+			expect(row.members["expected"]?.type).toEqual({
+				type: "Case",
+				choice: "Outcome",
+				name: "Win",
+				members: {},
+				unitChoice: true,
+			})
+		})
+
+		it("should bind a Pattern Parameter off the row", () => {
+			let table = testsOf(sectionOf(source).nodes)[0]
+				?.table as common.typed.TestTableNode
+
+			expect(
+				table.bindings.map((binding) =>
+					binding.nodeType === "ConstantDeclarationStatement"
+						? binding.name.content
+						: binding.nodeType,
+				),
+			).toEqual(["scored", "conceded", "expected"])
+		})
+
+		it("should number a row's identity", () => {
+			let section = simplifiedSectionOf(source)
+
+			expect(section.tests.map((entry) => [entry.id, entry.row])).toEqual(
+				[
+					["/{scored}–{conceded}/0", 0],
+					["/{scored}–{conceded}/1", 1],
+				],
+			)
+		})
+
+		it("should keep the template on every row", () => {
+			let section = simplifiedSectionOf(source)
+
+			expect(
+				section.tests.map((entry) => [entry.name, entry.interpolated]),
+			).toEqual([
+				["{scored}–{conceded}", true],
+				["{scored}–{conceded}", true],
+			])
+		})
+
+		it("should emit one node for the whole table", () => {
+			let section = simplifiedSectionOf(source)
+			let rows = section.nodes.find(
+				(node) => node.nodeType === "TestRows",
+			) as common.typedSimple.TestRowsNode
+
+			expect(rows.first).toBe(0)
+			expect(rows.rows).toHaveLength(2)
+			expect(rows.bindings).toHaveLength(3)
+			expect(rows.name).not.toBeNull()
+		})
+
+		it("should let a named Parameter bind the row itself", () => {
+			let table = testsOf(
+				sectionOf(
+					`implementation {}
+
+					tests {
+						test "rows" across [1, 2] (n: Integer) {
+							expect n::isGreaterThan(0)
+						}
+					}`,
+				).nodes,
+			)[0]?.table as common.typed.TestTableNode
+
+			expect(table.binding).toBe("n")
+			expect(table.bindings).toEqual([])
+			expect(table.type).toEqual({ type: "Integer" })
+		})
+
+		// NOTE: A row is a value like any other, so a `require` takes it apart
+		// where it stands — and what it binds is read by the rest of that row's
+		// own run of the body.
+		it("should take a row apart with a Matcher", () => {
+			expect(
+				codesOf(
+					`implementation {}
+
+					tests {
+						test "rows" across [
+							[1],
+							[2],
+						] (row: List<Integer>) {
+							require #Value(first) = row::firstItem()
+
+							expect first::isGreaterThan(0)
+						}
+					}`,
+				),
+			).toEqual([])
+		})
+
+		it("should infer the row Type where nothing was annotated", () => {
+			let table = testsOf(
+				sectionOf(
+					`implementation {}
+
+					tests {
+						test "rows" across [1, 2] (n) {
+							expect n::isGreaterThan(0)
+						}
+					}`,
+				).nodes,
+			)[0]?.table as common.typed.TestTableNode
+
+			expect(table.type).toEqual({ type: "Integer" })
+		})
+
+		it("should refuse rows that are not written here", () => {
+			expect(
+				codesOf(
+					`implementation {
+						constant scorelines: List<Integer> = [1, 2]
+					}
+
+					tests {
+						test "rows" across scorelines (n: Integer) {
+							expect n::isGreaterThan(0)
+						}
+					}`,
+				),
+			).toEqual(["table-not-written"])
+		})
+
+		it("should refuse a row taken by several Parameters", () => {
+			expect(
+				codesOf(
+					`implementation {}
+
+					tests {
+						test "rows" across [1] (a: Integer, b: Integer) {
+							expect a::isGreaterThan(b)
+						}
+					}`,
+				),
+			).toEqual(["table-parameters"])
+		})
+
+		it("should refuse a table that names no row", () => {
+			expect(
+				codesOf(
+					`implementation {}
+
+					tests {
+						test "rows" across [1] () {
+							expect true
+						}
+					}`,
+				),
+			).toEqual(["table-parameters"])
+		})
+	})
+
 	describe("The compile mode", () => {
 		let source = `implementation {
 			constant shipped = 1
@@ -876,6 +1069,22 @@ function build(source: string): string {
 	expect(validate(enriched.program)).toEqual([])
 
 	return rewrite(optimise(simplify(enriched.program)))
+}
+
+// NOTE: The section as the lowering leaves it — the manifest and the Nodes a
+// runner is registered with, which is where a table test's rows become tests.
+function simplifiedSectionOf(
+	source: string,
+): common.typedSimple.TestsSectionNode {
+	let { program, diagnostics } = analyse(source)
+
+	expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([])
+
+	let simplified = simplify(program, { source })
+
+	expect(simplified.tests).not.toBeNull()
+
+	return simplified.tests as common.typedSimple.TestsSectionNode
 }
 
 // NOTE: The block cut out by its own Position, lines and all, rather than by
