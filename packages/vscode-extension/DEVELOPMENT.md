@@ -77,11 +77,14 @@ hand, in the Extension Development Host:
 The Test Explorer has no extension-host harness either. Everything it DECIDES
 is `testModel.ts` — folding a batch, merging a narrowed one, building the tree,
 what a failure says, what to mark — and `tests/testModel.spec.ts` covers that
-without VS Code; `testView.js` is the half that calls the API, and it decides
-nothing. So a release is checked by hand, in the Extension Development Host,
-over a workspace holding at least two files that write `tests { … }`, one of
-which imports the other, plus a `suite`, a `tagged`, a `skipped "reason"` and a
-`focused`:
+without VS Code. `testView.js` is the half that calls the API, and
+`tests/testView.spec.ts` drives it against `tests/vscodeStub.ts`, a stand-in
+for the API that records every call: which item was created, which run was
+ended, what was drawn on which editor. What a stand-in cannot say is whether VS
+Code agrees with it, so a release is still checked by hand, in the Extension
+Development Host, over a workspace holding at least two files that write
+`tests { … }`, one of which imports the other, plus a `suite`, a `tagged`, a
+`skipped "reason"` and a `focused`:
 
 - The Testing view fills in on its own, without anything being run: files, then
   suites, then tests, each on its own line, in the order they were written. A

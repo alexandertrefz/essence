@@ -520,14 +520,25 @@ export function createTestView(options) {
 		}
 	}
 
-	async function run(request, token) {
-		let testRun = controller.createTestRun(request)
-
-		for (let item of request.include ?? []) {
+	// NOTE: Marked as waiting before the Server has said anything, so that a
+	// gesture answers instantly rather than after a round trip. The `start`
+	// notification marks the same tests again, which costs nothing and covers
+	// the tests this side could not name.
+	function enqueue(testRun, items) {
+		for (let item of items) {
 			for (let test of testItemsUnder(item, [])) {
 				testRun.enqueued(test)
 			}
 		}
+
+		return testRun
+	}
+
+	async function run(request, token) {
+		let testRun = enqueue(
+			controller.createTestRun(request),
+			request.include ?? [],
+		)
 
 		await ask(testRun, selectionOf(request), token)
 	}
@@ -707,7 +718,10 @@ export function createTestView(options) {
 			.filter((item) => item !== undefined)
 
 		await ask(
-			controller.createTestRun(new vscode.TestRunRequest(covered)),
+			enqueue(
+				controller.createTestRun(new vscode.TestRunRequest(covered)),
+				covered,
+			),
 			{ ids, files: [] },
 			undefined,
 		)
@@ -723,7 +737,10 @@ export function createTestView(options) {
 			.filter((item) => item !== undefined)
 
 		await ask(
-			controller.createTestRun(new vscode.TestRunRequest(covered)),
+			enqueue(
+				controller.createTestRun(new vscode.TestRunRequest(covered)),
+				covered,
+			),
 			covered.length === 0 ? { ids: [], files } : { ids, files: [] },
 			undefined,
 		)
