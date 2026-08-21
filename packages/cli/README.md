@@ -52,8 +52,9 @@ module with a `tests { … }` section and every `*.tests.es` file under the
 working directory, or only the files it is given. A failed `expect` is reported
 as an ordinary Diagnostic, showing the value of every sub-expression the
 compiler recorded at the span it was written at. `-f` filters by name, `--tag`
-and `--skip-tag` by tag, and a project skips tags by default by naming them in
-the nearest `package.json`:
+and `--skip-tag` by tag, `--watch` stays up and re-runs only what a change
+reached, and a project skips tags by default by naming them in the nearest
+`package.json`:
 
 ```json
 { "essence": { "test": { "skipTags": ["slow"] } } }

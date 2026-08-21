@@ -226,6 +226,12 @@ async function dispatch(
 			// NOTE: Imported where it is used, like the Formatter and the
 			// Language Server. It reaches the test runtime and the emitter, and
 			// `esc check` must not pay for either.
+			if (options.watch) {
+				let { runTestWatch } = await import("./testWatch")
+
+				return runTestWatch(context, command, files)
+			}
+
 			let { runTest } = await import("./test")
 
 			return runTest(context, command, files)
