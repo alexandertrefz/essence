@@ -111,7 +111,7 @@ function lineCounts(file: FileCoverage): Array<[number, number]> {
 	let counts = new Map<number, number>()
 
 	for (let point of file.points) {
-		if (point.kind !== "statement") {
+		if (point.kind === "construction") {
 			continue
 		}
 

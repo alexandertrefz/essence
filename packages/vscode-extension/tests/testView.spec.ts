@@ -1,7 +1,13 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test"
 
-import type { TestEvent, TestRunNotification, TestSite } from "../testModel.js"
-import { suiteKey } from "../testModel.js"
+import type {
+	CoveragePoint,
+	CoverageSummary,
+	TestEvent,
+	TestRunNotification,
+	TestSite,
+} from "../testModel.js"
+import { suiteKey, TEST_RUN_VERSION } from "../testModel.js"
 import {
 	createStub,
 	type StubTestItem,
@@ -51,7 +57,7 @@ function batch(
 	overrides: Partial<TestRunNotification> = {},
 ): TestRunNotification {
 	return {
-		version: 2,
+		version: TEST_RUN_VERSION,
 		run: 1,
 		kind: "end",
 		reason: "change",
@@ -420,13 +426,266 @@ describe("the marks it draws", () => {
 	})
 })
 
+// NOTE: A source file the counters counted: one line that ran and one that did
+// not, both sides of a branch with only one taken, an arm nothing took, and a
+// Choice with a Case nobody built.
+const SOURCE = "/repo/Season.es"
+
+function point(overrides: Partial<CoveragePoint>): CoveragePoint {
+	return {
+		kind: "statement",
+		label: "",
+		scope: "",
+		position: {
+			start: { line: 1, column: 1 },
+			end: { line: 1, column: 9 },
+		},
+		refinement: false,
+		tag: null,
+		count: 0,
+		...overrides,
+	}
+}
+
+function atLine(line: number, overrides: Partial<CoveragePoint>) {
+	return point({
+		...overrides,
+		position: {
+			start: { line, column: 1 },
+			end: { line, column: 9 },
+		},
+	})
+}
+
+function coverage(): CoverageSummary {
+	return {
+		files: [
+			{
+				module: SOURCE,
+				lines: { covered: 1, total: 2 },
+				branches: { covered: 1, total: 2 },
+				cases: { covered: 0, total: 1 },
+				missed: [
+					{
+						kind: "branch",
+						scope: "share",
+						label: "else",
+						refinement: true,
+						position: {
+							start: { line: 5, column: 1 },
+							end: { line: 5, column: 9 },
+						},
+					},
+				],
+				points: [
+					atLine(3, { count: 2 }),
+					atLine(4, { count: 0 }),
+					atLine(5, { kind: "branch", label: "if", count: 2 }),
+					atLine(5, {
+						kind: "branch",
+						label: "else",
+						count: 0,
+						refinement: true,
+					}),
+					atLine(9, {
+						kind: "case",
+						label: "case #Postponed",
+						scope: "Standings::points",
+						count: 0,
+					}),
+				],
+			},
+		],
+		choices: [
+			{
+				name: "Fixture",
+				module: SOURCE,
+				position: {
+					start: { line: 2, column: 1 },
+					end: { line: 6, column: 2 },
+				},
+				cases: [
+					{ tag: "Fixture#Played", constructed: true },
+					{ tag: "Fixture#Forfeited", constructed: false },
+				],
+			},
+		],
+	}
+}
+
+describe("the coverage it draws", () => {
+	it("attaches what each file counted to the run", () => {
+		let session = live()
+
+		session.view.handle(batch({ sites: [site()], coverage: coverage() }))
+
+		let [attached] = stub.runs[0]!.coverages
+
+		expect(attached?.uri.fsPath).toBe(SOURCE)
+		expect(attached?.statementCoverage).toEqual({ covered: 1, total: 2 })
+		expect(attached?.branchCoverage).toEqual({ covered: 1, total: 2 })
+		// NOTE: One Match arm and two Cases of a Choice, of which the arm was
+		// never taken and one Case never built.
+		expect(attached?.declarationCoverage).toEqual({ covered: 1, total: 3 })
+	})
+
+	it("attributes a counted run to the coverage profile", () => {
+		let session = live()
+
+		session.view.handle(batch({ sites: [site()], coverage: coverage() }))
+
+		let request = stub.runs[0]!.request as { profile?: { label: string } }
+
+		expect(request.profile?.label).toBe("Run with Coverage")
+	})
+
+	it("attaches nothing to a run that counted nothing", () => {
+		let session = live()
+
+		session.view.handle(batch({ sites: [site()] }))
+
+		expect(stub.runs[0]!.coverages).toEqual([])
+		expect(
+			(stub.runs[0]!.request as { profile?: unknown }).profile,
+		).toBeUndefined()
+	})
+
+	it("answers the detail with a statement per line and its branches", async () => {
+		let session = live()
+
+		session.view.handle(batch({ sites: [site()], coverage: coverage() }))
+
+		let profile = profileNamed("Run with Coverage")!
+		let details = (await (
+			profile as unknown as {
+				loadDetailedCoverage: (
+					run: unknown,
+					file: unknown,
+				) => Promise<Array<Record<string, unknown>>>
+			}
+		).loadDetailedCoverage(null, { uri: { fsPath: SOURCE } })) as Array<{
+			kind: string
+			executed: number
+			name?: string
+			location: { line: number }
+			branches?: Array<{ label: string; executed: number }>
+		}>
+		let statements = details.filter((each) => each.kind === "statement")
+
+		expect(
+			statements.map((each) => [each.location.line, each.executed]),
+		).toEqual([
+			[2, 2],
+			[3, 0],
+			[4, 2],
+			[8, 0],
+		])
+		expect(
+			statements[2]!.branches?.map((branch) => [
+				branch.label,
+				branch.executed,
+			]),
+		).toEqual([
+			["if", 2],
+			["else", 0],
+		])
+	})
+
+	it("answers a Match arm and a Choice Case as declarations", async () => {
+		let session = live()
+
+		session.view.handle(batch({ sites: [site()], coverage: coverage() }))
+
+		let profile = profileNamed("Run with Coverage")!
+		let details = (await (
+			profile as unknown as {
+				loadDetailedCoverage: (
+					run: unknown,
+					file: unknown,
+				) => Promise<Array<Record<string, unknown>>>
+			}
+		).loadDetailedCoverage(null, { uri: { fsPath: SOURCE } })) as Array<{
+			kind: string
+			name?: string
+			executed: number
+		}>
+
+		expect(
+			details
+				.filter((each) => each.kind === "declaration")
+				.map((each) => [each.name, each.executed]),
+		).toEqual([
+			["Standings::points › case #Postponed", 0],
+			["Fixture#Played", 1],
+			["Fixture#Forfeited", 0],
+		])
+	})
+
+	it("marks the lines nothing reached in the gutter", () => {
+		let session = live()
+		let editor = stub.editor(SOURCE)
+
+		session.view.handle(batch({ sites: [site()], coverage: coverage() }))
+
+		let uncovered = stub.decorations.find(
+			(decoration) => decoration.options.gutterIconPath !== undefined,
+		)
+
+		expect(uncovered).toBeDefined()
+
+		let drawn = [...editor.drawn.entries()].flatMap(([, ranges]) => ranges)
+
+		// NOTE: Line 4 is the one nothing reached; VS Code's lines are 0-based.
+		expect(
+			drawn.some(
+				(range) => (range as { startLine: number }).startLine === 3,
+			),
+		).toBe(true)
+	})
+
+	it("says what it counted in the output channel", () => {
+		let session = live()
+
+		session.view.handle(batch({ sites: [site()], coverage: coverage() }))
+
+		expect(stub.channel.lines.join("\n")).toContain("50% lines")
+		expect(stub.channel.lines.join("\n")).toContain("0/1 cases")
+		expect(stub.channel.lines.join("\n")).toContain("1 never constructed")
+	})
+
+	it("turns the setting on when a reader runs with coverage", async () => {
+		let session = live(() => ({ run: 4 }))
+		let profile = profileNamed("Run with Coverage")!
+
+		await profile.run({ include: undefined }, undefined)
+
+		expect(stub.settings["essence.tests.coverage"]).toBe(true)
+		expect(stub.updates.map((update) => update.key)).toEqual(["coverage"])
+		expect(session.asked).toHaveLength(1)
+	})
+
+	it("leaves a setting that is already on alone", async () => {
+		let session = live(() => ({ run: 4 }))
+
+		stub.settings["essence.tests.coverage"] = true
+
+		await profileNamed("Run with Coverage")!.run(
+			{ include: undefined },
+			undefined,
+		)
+
+		expect(stub.updates).toEqual([])
+		expect(session.asked).toHaveLength(1)
+	})
+})
+
 describe("the profiles it offers", () => {
-	it("offers Run, Debug and one profile per tag anything carries", () => {
+	it("offers Run, Debug, coverage and one profile per tag anything carries", () => {
 		let session = live()
 
 		expect(
 			stub.controller.profiles.map((profile) => profile.label),
-		).toEqual(["Run", "Debug"])
+		).toEqual(["Run", "Debug", "Run with Coverage"])
 
 		session.view.handle(
 			batch({ sites: [site({ tags: ["slow", "network"] })] }),
@@ -435,7 +694,11 @@ describe("the profiles it offers", () => {
 		expect(
 			stub.controller.profiles
 				.map((profile) => profile.label)
-				.filter((label) => label.startsWith("Run ")),
+				.filter(
+					(label) =>
+						label.startsWith("Run ") &&
+						label !== "Run with Coverage",
+				),
 		).toEqual(["Run network", "Run slow"])
 
 		// NOTE: VS Code offers a profile whether or not anything would run

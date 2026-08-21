@@ -5,9 +5,13 @@ import * as vscode from "vscode"
 import {
 	applyBatch,
 	commandFor,
+	coverageLinesOf,
+	coverageOf,
 	createState,
+	declarationsOf,
 	decorationsOf,
 	describeBatch,
+	describeCoverage,
 	failedIdsOf,
 	fileKey,
 	forgetFile,
@@ -16,6 +20,7 @@ import {
 	tagsOf,
 	TEST_RUN_VERSION,
 	treeOf,
+	uncoveredLinesOf,
 } from "./testModel.js"
 
 // NOTE: The half of the Test Explorer that talks to VS Code. Everything it
@@ -39,6 +44,10 @@ const COLOURS = {
 	failed: "#f85149",
 	skipped: "#8b949e",
 	notFocused: "#d29922",
+	// NOTE: The same grey a skipped test is marked in, at half the width — a
+	// line nothing ran and a test nobody ran are the same news about different
+	// things, and a third colour in the gutter would be a third thing to learn.
+	uncovered: "#8b949e",
 }
 
 function icon(svg) {
@@ -89,6 +98,16 @@ function createDecorations() {
 			gutterIconSize: "contain",
 			overviewRulerColor: COLOURS.failed,
 			overviewRulerLane: vscode.OverviewRulerLane.Right,
+			rangeBehavior: vscode.DecorationRangeBehavior.ClosedClosed,
+		}),
+		// NOTE: A line nothing ran. VS Code's own coverage view draws this too
+		// — once a reader has opened it — and this is drawn whether or not they
+		// have: what a coverage run is FOR is being told, while reading the
+		// file, that a line was never reached.
+		uncovered: vscode.window.createTextEditorDecorationType({
+			gutterIconPath: bar(COLOURS.uncovered),
+			gutterIconSize: "contain",
+			isWholeLine: true,
 			rangeBehavior: vscode.DecorationRangeBehavior.ClosedClosed,
 		}),
 	}
@@ -273,7 +292,18 @@ export function createTestView(options) {
 		}
 
 		let run = controller.createTestRun(
-			new vscode.TestRunRequest(itemsOfFiles(notification.files)),
+			new vscode.TestRunRequest(
+				itemsOfFiles(notification.files),
+				undefined,
+				// NOTE: The run is attributed to the coverage profile exactly
+				// when there is coverage to attach — VS Code shows what a run
+				// counted through the profile it ran under, and a run that
+				// counted nothing under a Coverage profile would show an empty
+				// report rather than none.
+				(notification.coverage?.files.length ?? 0) > 0
+					? coverageProfile
+					: undefined,
+			),
 			"Essence tests",
 			// NOTE: A cycle nobody asked for is not worth a line in the Test
 			// Results history; a burst of typing would otherwise be twenty.
@@ -381,7 +411,90 @@ export function createTestView(options) {
 			}
 		}
 
+		addCoverage(run, notification)
 		run.end()
+	}
+
+	// NOTE: What the run counted, told to VS Code — the summary per file here,
+	// and the per-line detail on demand through the profile below. A Match arm
+	// and a Choice Case are reported as DECLARATIONS: they are things the
+	// source declares, they are counted one by one, and an exhaustive language
+	// can say which of them nothing reached without guessing. That is the
+	// closest thing the Testing API has to what this language knows, and it
+	// wants no view of its own.
+	function addCoverage(run, notification) {
+		let coverage = notification.coverage
+
+		if (coverage === undefined || coverage.files.length === 0) {
+			return
+		}
+
+		for (let file of coverage.files) {
+			if (file.module === null) {
+				continue
+			}
+
+			let declarations = declarationsOf(state, file.module)
+
+			run.addCoverage(
+				new vscode.FileCoverage(
+					vscode.Uri.file(file.module),
+					new vscode.TestCoverageCount(
+						file.lines.covered,
+						file.lines.total,
+					),
+					new vscode.TestCoverageCount(
+						file.branches.covered,
+						file.branches.total,
+					),
+					new vscode.TestCoverageCount(
+						declarations.filter(
+							(declaration) => declaration.count > 0,
+						).length,
+						declarations.length,
+					),
+				),
+			)
+		}
+	}
+
+	// NOTE: Asked for once a reader opens the coverage view on a file, which is
+	// why the detail is built here rather than sent with every cycle.
+	function detailedCoverage(fileCoverage) {
+		let file = fileCoverage.uri.fsPath
+		let coverage = coverageOf(state, file)
+
+		if (coverage === null) {
+			return []
+		}
+
+		let details = coverageLinesOf(coverage).map(
+			(line) =>
+				new vscode.StatementCoverage(
+					line.count,
+					new vscode.Position(line.line - 1, 0),
+					line.branches.map(
+						(branch) =>
+							new vscode.BranchCoverage(
+								branch.count,
+								new vscode.Position(branch.line - 1, 0),
+								branch.label,
+							),
+					),
+				),
+		)
+
+		for (let declaration of declarationsOf(state, file)) {
+			details.push(
+				new vscode.DeclarationCoverage(
+					declaration.name,
+					declaration.count,
+					toRange(declaration.position),
+				),
+			)
+		}
+
+		return details
 	}
 
 	// #endregion
@@ -411,6 +524,13 @@ export function createTestView(options) {
 					"text",
 				),
 			})),
+		)
+
+		let coverage = coverageOf(state, editor.document.uri.fsPath)
+
+		editor.setDecorations(
+			decorations.uncovered,
+			coverage === null ? [] : lineRanges(uncoveredLinesOf(coverage)),
 		)
 	}
 
@@ -644,6 +764,41 @@ export function createTestView(options) {
 		(request) => debug(request),
 		false,
 	)
+	// NOTE: Running WITH COVERAGE is the same run — the Server owns it, and it
+	// counts what it reaches only when `essence.tests.coverage` says so. So the
+	// gesture turns that setting on: pressing "Run with Coverage" and being
+	// shown nothing because a setting was off is the worst of the readings, and
+	// the setting is written where a reader can see it and turn it back off.
+	let coverageProfile = controller.createRunProfile(
+		"Run with Coverage",
+		vscode.TestRunProfileKind.Coverage,
+		async (request, token) => {
+			await askForCoverage()
+			await run(request, token)
+		},
+		false,
+	)
+
+	coverageProfile.loadDetailedCoverage = (_run, fileCoverage) =>
+		Promise.resolve(detailedCoverage(fileCoverage))
+
+	async function askForCoverage() {
+		let settings = vscode.workspace.getConfiguration("essence.tests")
+
+		if (settings.get("coverage") === true) {
+			return
+		}
+
+		await settings.update(
+			"coverage",
+			true,
+			vscode.ConfigurationTarget.Workspace,
+		)
+		log(
+			"turned essence.tests.coverage on for this workspace — " +
+				"every run counts what it reaches until it is turned off",
+		)
+	}
 
 	// NOTE: Refresh is the gesture for "I do not believe what I am looking at",
 	// which is a run of everything rather than of what this client happens to
@@ -700,6 +855,10 @@ export function createTestView(options) {
 		report(notification)
 		redraw()
 		log(describeBatch(notification))
+
+		if (applied.covered.length > 0) {
+			log(describeCoverage(state.coverage))
+		}
 	}
 
 	async function runFailed() {
@@ -780,6 +939,7 @@ export function createTestView(options) {
 		tagProfiles.clear()
 		runProfile.dispose()
 		debugProfile.dispose()
+		coverageProfile.dispose()
 
 		for (let decoration of Object.values(decorations)) {
 			decoration.dispose()

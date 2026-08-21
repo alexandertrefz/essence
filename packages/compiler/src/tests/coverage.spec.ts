@@ -527,8 +527,12 @@ const sampleFile = fileCoverageOf("/project/Standings.es", [
 ])
 
 describe("Folding a coverage run", () => {
-	it("counts a line once, however many Statements stand on it", () => {
-		expect(sampleFile.lines).toEqual({ covered: 1, total: 2 })
+	it("counts a line once, however many points stand on it", () => {
+		// NOTE: Lines 1 and 2 hold Statements, line 4 a branch and line 7 an
+		// arm — four lines, of which the one that ran and the one the branch
+		// was taken on are covered. The construction on line 9 is no line of
+		// its own: the Statement it stands in is counted already.
+		expect(sampleFile.lines).toEqual({ covered: 2, total: 4 })
 	})
 
 	it("counts branches and Cases apart", () => {

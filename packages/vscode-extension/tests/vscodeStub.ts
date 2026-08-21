@@ -78,6 +78,18 @@ export class StubTestItemCollection {
 	}
 }
 
+export type StubCount = { covered: number; total: number }
+
+// NOTE: What `run.addCoverage` was handed, flattened — the counts a coverage
+// view draws per file. The DETAIL is asked for separately, through the
+// profile's `loadDetailedCoverage`, which a spec calls itself.
+export type StubFileCoverage = {
+	uri: StubUri
+	statementCoverage: StubCount
+	branchCoverage: StubCount | undefined
+	declarationCoverage: StubCount | undefined
+}
+
 export type StubMessage = {
 	text: string
 	expected: string | null
@@ -101,6 +113,7 @@ export class StubTestRun {
 	}> = []
 	skippedTests: Array<string> = []
 	outputChunks: Array<{ id: string | undefined; text: string }> = []
+	coverages: Array<StubFileCoverage> = []
 	ends = 0
 
 	constructor(request: unknown, name?: string, persist?: boolean) {
@@ -131,6 +144,10 @@ export class StubTestRun {
 
 	skipped(item: StubTestItem): void {
 		this.skippedTests.push(item.id)
+	}
+
+	addCoverage(coverage: StubFileCoverage): void {
+		this.coverages.push(coverage)
 	}
 
 	appendOutput(
@@ -179,6 +196,15 @@ export type Stub = {
 	clipboard: Array<string>
 	editors: Array<StubEditor>
 	deletions: Array<(uri: StubUri) => void>
+	// NOTE: The client's own settings, so a spec can read back a setting the
+	// view WROTE — running with coverage turns `essence.tests.coverage` on.
+	settings: Record<string, unknown>
+	updates: Array<{
+		section: string
+		key: string
+		value: unknown
+		target: number | undefined
+	}>
 	answerMessageWith: (action: string | undefined) => void
 	editor: (filePath: string, languageId?: string) => StubEditor
 	// NOTE: The module object is registered once for the whole spec file — a
@@ -207,6 +233,15 @@ export function createStub(): Stub {
 	let editors: Array<StubEditor> = []
 	let deletions: Array<(uri: StubUri) => void> = []
 	let answer: string | undefined = undefined
+	// NOTE: The client's own settings, so that a gesture which WRITES one — the
+	// coverage profile turning `essence.tests.coverage` on — can be read back.
+	let settings: Record<string, unknown> = {}
+	let updates: Array<{
+		section: string
+		key: string
+		value: unknown
+		target: number | undefined
+	}> = []
 	let controller = {
 		id: "",
 		label: "",
@@ -301,6 +336,15 @@ export function createStub(): Stub {
 			},
 		},
 		workspace: {
+			getConfiguration: (section: string) => ({
+				get: (key: string) => settings[`${section}.${key}`],
+				update: (key: string, value: unknown, target?: number) => {
+					settings[`${section}.${key}`] = value
+					updates.push({ section, key, value, target })
+
+					return Promise.resolve()
+				},
+			}),
 			createFileSystemWatcher: () => ({
 				onDidDelete: (listener: (uri: StubUri) => void) => {
 					deletions.push(listener)
@@ -373,13 +417,100 @@ export function createStub(): Stub {
 		TestRunRequest: class {
 			include: Array<StubTestItem> | undefined
 			exclude: Array<StubTestItem> | undefined
+			profile: StubProfile | undefined
 
 			constructor(
 				include?: Array<StubTestItem>,
 				exclude?: Array<StubTestItem>,
+				profile?: StubProfile,
 			) {
 				this.include = include
 				this.exclude = exclude
+				this.profile = profile
+			}
+		},
+		TestCoverageCount: class {
+			covered: number
+			total: number
+
+			constructor(covered: number, total: number) {
+				this.covered = covered
+				this.total = total
+			}
+		},
+		FileCoverage: class {
+			uri: StubUri
+			statementCoverage: StubCount
+			branchCoverage: StubCount | undefined
+			declarationCoverage: StubCount | undefined
+
+			constructor(
+				uri: StubUri,
+				statementCoverage: StubCount,
+				branchCoverage?: StubCount,
+				declarationCoverage?: StubCount,
+			) {
+				this.uri = uri
+				this.statementCoverage = statementCoverage
+				this.branchCoverage = branchCoverage
+				this.declarationCoverage = declarationCoverage
+			}
+		},
+		StatementCoverage: class {
+			kind = "statement"
+			executed: number | boolean
+			location: unknown
+			branches: Array<unknown>
+
+			constructor(
+				executed: number | boolean,
+				location: unknown,
+				branches: Array<unknown> = [],
+			) {
+				this.executed = executed
+				this.location = location
+				this.branches = branches
+			}
+		},
+		BranchCoverage: class {
+			kind = "branch"
+			executed: number | boolean
+			location: unknown
+			label: string | undefined
+
+			constructor(
+				executed: number | boolean,
+				location?: unknown,
+				label?: string,
+			) {
+				this.executed = executed
+				this.location = location
+				this.label = label
+			}
+		},
+		DeclarationCoverage: class {
+			kind = "declaration"
+			name: string
+			executed: number | boolean
+			location: unknown
+
+			constructor(
+				name: string,
+				executed: number | boolean,
+				location: unknown,
+			) {
+				this.name = name
+				this.executed = executed
+				this.location = location
+			}
+		},
+		Position: class {
+			line: number
+			character: number
+
+			constructor(line: number, character: number) {
+				this.line = line
+				this.character = character
 			}
 		},
 		TestTag: class {
@@ -399,6 +530,7 @@ export function createStub(): Stub {
 			}
 		},
 		TestRunProfileKind: { Run: 1, Debug: 2, Coverage: 3 },
+		ConfigurationTarget: { Global: 1, Workspace: 2, WorkspaceFolder: 3 },
 		DecorationRangeBehavior: { ClosedClosed: 3 },
 		OverviewRulerLane: { Right: 4 },
 	}
@@ -413,6 +545,8 @@ export function createStub(): Stub {
 		clipboard,
 		editors,
 		deletions,
+		settings,
+		updates,
 		answerMessageWith: (action) => {
 			answer = action
 		},
@@ -427,6 +561,12 @@ export function createStub(): Stub {
 			editors.length = 0
 			deletions.length = 0
 			answer = undefined
+
+			for (let key of Object.keys(settings)) {
+				delete settings[key]
+			}
+
+			updates.length = 0
 			controller.items.replace([])
 			controller.profiles.length = 0
 			controller.refreshHandler = undefined
