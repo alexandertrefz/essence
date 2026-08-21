@@ -214,6 +214,10 @@ export function renderTestSummary(
 	// written for the first time is a pass that left something on disk, and a
 	// reader has to be told it happened without reading a diff to find out.
 	snapshots = 0,
+	// NOTE: Whether every entry of the run came out of the bundle cache. The
+	// duration beside it is the RUN's, and a reader comparing two runs of the
+	// same project deserves to know that one of them also compiled it.
+	cacheWarm = false,
 ): string {
 	let { palette, theme } = context
 	let { counts } = run
@@ -243,9 +247,15 @@ export function renderTestSummary(
 		parts.push(palette.muted(`${pluralise(snapshots, "snapshot")} written`))
 	}
 
-	return ` ${parts.join("  ")}  ${palette.faint(
+	let tail = ` ${parts.join("  ")}  ${palette.faint(
 		theme.symbols.bullet,
 	)}  ${palette.number(formatDuration(run.duration))}`
+
+	return cacheWarm
+		? `${tail}  ${palette.faint(theme.symbols.bullet)}  ${palette.muted(
+				"compile cache warm",
+			)}`
+		: tail
 }
 
 // NOTE: The line a run with nothing to do ends on. It is not a failure — a
@@ -451,11 +461,12 @@ export function renderTestReport(
 	context: ReportContext,
 	sourceOf: SourceLookup,
 	snapshots = 0,
+	cacheWarm = false,
 ): { tree: string; failures: string; summary: string } {
 	return {
 		tree: renderTestTree(run, context).join("\n"),
 		failures: renderTestFailures(run, context, sourceOf).join("\n"),
-		summary: renderTestSummary(run, context, snapshots),
+		summary: renderTestSummary(run, context, snapshots, cacheWarm),
 	}
 }
 

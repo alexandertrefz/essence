@@ -192,6 +192,7 @@ function workerFailure(
 		gzipBytes: null,
 		failedStage: null,
 		stack: error instanceof Error ? (error.stack ?? null) : null,
+		cached: false,
 	}
 }
 

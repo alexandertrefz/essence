@@ -454,12 +454,18 @@ export function printReport(
 	sources: Map<string, string>,
 	coverage: CoverageSummary = emptyCoverage,
 	snapshots: SnapshotWrites = noWrites,
+	// NOTE: Whether the compile this run stands on emitted nothing, every entry
+	// of it having been in the bundle cache already. It is the design's own
+	// note at the end of the summary, and it is the difference between a fast
+	// run and a fast run that also compiled the project.
+	cacheWarm = false,
 ): void {
 	let { failures, summary, tree } = renderTestReport(
 		run,
 		context.report,
 		(module) => (module === null ? null : (sources.get(module) ?? null)),
 		snapshots.recorded,
+		cacheWarm,
 	)
 
 	if (!context.options.quiet && tree !== "") {
@@ -633,6 +639,12 @@ export async function runTest(
 	let broken = compilation.outcomes.filter(
 		(outcome) => !outcome.ok || outcome.outputFileName === null,
 	)
+	// NOTE: Warm when the emitter ran for nothing at all. A run where one entry
+	// had to be compiled is not a warm one, and saying so of it would make the
+	// note say nothing.
+	let cacheWarm =
+		compilation.outcomes.length > 0 &&
+		compilation.outcomes.every((outcome) => outcome.cached)
 
 	for (let outcome of broken) {
 		context.terminal.err(
@@ -753,7 +765,7 @@ export async function runTest(
 	}
 
 	if (!context.options.json) {
-		printReport(context, run, sources, coverage, written)
+		printReport(context, run, sources, coverage, written, cacheWarm)
 	}
 
 	await writeCoverageReport(context, coverage)

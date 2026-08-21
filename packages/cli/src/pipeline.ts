@@ -147,6 +147,11 @@ export type CompileOutcome = {
 	gzipBytes: number | null
 	failedStage: StageName | null
 	stack: string | null
+	// NOTE: Whether the bundle came out of the bundle cache rather than the
+	// emitter. It is what a report means by a warm cache, and it is the answer
+	// for THIS entry: a run over twenty files is warm when every one of them
+	// was.
+	cached: boolean
 }
 
 export type ProgressReporter = (stage: StageName) => void
@@ -554,6 +559,7 @@ export async function compileFile(
 		gzipBytes: null,
 		failedStage,
 		stack: null,
+		cached: false,
 		...extras,
 	})
 
@@ -636,6 +642,7 @@ export async function compileFile(
 				outputFileName: target ?? cached.path,
 				bytes: cached.contents.byteLength,
 				gzipBytes: gzipSync(cached.contents).byteLength,
+				cached: true,
 			})
 		}
 
