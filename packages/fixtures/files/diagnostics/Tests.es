@@ -65,6 +65,12 @@ tests {
 		expect row::isGreaterThan(0)
 	}
 
+	§ table-without-rows — every row is a test of its own, so a table test with
+	§ none is reported by no line and counted in no total.
+	test "reads no rows at all" across [] (row: Integer) {
+		expect row::isGreaterThan(0)
+	}
+
 	§ table-parameters — each item of the List is one row, and one row is one
 	§ value; a test wanting several says so by writing a Record.
 	test "reads two rows at once" across [1, 2] (a: Integer, b: Integer) {

@@ -3087,6 +3087,27 @@ function enrichTableRows(
 	scope: enricher.Scope,
 ): Array<common.typed.ExpressionNode> {
 	if (node.nodeType === "ListValue") {
+		// NOTE: No rows is no tests, and a test that never exists is exactly
+		// what `skipped "reason"` demands a reason for. Nothing in a report
+		// says it: no line, no count, no failure — the test is simply not
+		// there, and a reader who wrote it believes it ran.
+		if (node.values.length === 0) {
+			reportError(
+				"A table test with no rows in it runs no test",
+				node.position,
+				{
+					code: "table-without-rows",
+					labels: [primary(node.position, "no rows to run")],
+					notes: [
+						"Every row is a test of its own, so a table test with none is nothing at all: it is reported by no line and counted in no total, and nothing would say it had stopped running.",
+					],
+					helps: [
+						"Write the rows the test is for, or say why there are none with 'skipped \"…\"'.",
+					],
+				},
+			)
+		}
+
 		return node.values.map((value) =>
 			enrichExpression(value, scope, declaredType),
 		)

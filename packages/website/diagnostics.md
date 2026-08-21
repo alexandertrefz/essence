@@ -590,6 +590,24 @@ Write the rows where the test is: `across [ … ] (row: Row)`. A row itself is a
 Expression, so a List of names is fine — it is the brackets that have to be
 there.
 
+### `table-without-rows`
+
+The List after `across` is written and empty. Every row is a test of its own, so
+a table test with no rows is nothing at all: no line in the report, no count in
+the summary, and nothing that would ever say it had stopped running.
+
+```essence
+tests {
+	§ nothing runs, and nothing says so
+	test "no rows at all" across [] (n: Integer) {
+		expect n::isGreaterThan(0)
+	}
+}
+```
+
+Write the rows the test is for. A test that has none for now says why the way
+every other one does, with `skipped "…"`.
+
 ### `table-parameters`
 
 A table test names its row with exactly one Parameter. Each item of the List is
