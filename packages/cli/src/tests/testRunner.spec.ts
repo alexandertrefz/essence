@@ -174,6 +174,16 @@ const passing = [
 	"",
 ].join("\n")
 
+// NOTE: A tests section that does not COMPILE, rather than one that fails.
+const broken = [
+	"tests {",
+	'\ttest "asserts a String" {',
+	'\t\texpect "not a Boolean"',
+	"\t}",
+	"}",
+	"",
+].join("\n")
+
 const failing = [
 	"tests {",
 	'\ttest "adds two and two" {',
@@ -699,23 +709,51 @@ describe("essence test — running", () => {
 		)
 	})
 
-	it("reports a compile error and runs nothing", async () => {
+	// NOTE: A project with one half-typed file in it is exactly the project
+	// whose other twenty files are worth hearing about, so the broken entry is
+	// named and left out and the rest of the run happens. The run still ends
+	// non-zero: something in it could not be compiled.
+	it("reports a compile error, leaves that entry out and runs the rest", async () => {
 		await withFiles(
 			{
-				"Broken.tests.es": [
-					"tests {",
-					'\ttest "asserts a String" {',
-					'\t\texpect "not a Boolean"',
-					"\t}",
-					"}",
-					"",
-				].join("\n"),
+				"Broken.tests.es": broken,
+				"Rules.es": passing,
 			},
 			async (directory) => {
 				let { code, err, out } = await runTests(directory)
 
 				expect(err).toContain("expect-not-boolean")
-				expect(out).not.toContain("passed")
+				expect(err).toContain("Broken.tests.es did not compile")
+				expect(out).toContain("doubles a positive number")
+				expect(code).toBe(EXIT_FAILURE)
+			},
+		)
+	})
+
+	// NOTE: The stream is bracketed whatever happened, because a consumer
+	// reading it a line at a time has nothing else to tell it the run is over.
+	it("brackets the event stream when an entry did not compile", async () => {
+		await withFiles(
+			{
+				"Broken.tests.es": broken,
+				"Rules.es": passing,
+			},
+			async (directory) => {
+				let { code, out } = await runTests(directory, ["--json"])
+				let events = out
+					.split("\n")
+					.filter((line) => line !== "")
+					.map((line) => JSON.parse(line) as TestEvent)
+
+				expect(events[0]?.kind).toBe("run-start")
+				expect(events.at(-1)?.kind).toBe("run-end")
+				expect(
+					events.some(
+						(event) =>
+							event.kind === "test-pass" &&
+							event.name === "doubles a positive number",
+					),
+				).toBe(true)
 				expect(code).toBe(EXIT_FAILURE)
 			},
 		)
