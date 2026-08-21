@@ -1418,6 +1418,7 @@ function testOptions(overrides: Partial<OptionValues> = {}): OptionValues {
 		sourcemap: false,
 		minify: false,
 		embed: false,
+		tests: false,
 		noOptimise: false,
 		withoutOptimisation: [],
 		jobs: 1,

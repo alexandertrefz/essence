@@ -148,6 +148,7 @@ async function runLanguageServer(): Promise<number> {
 export function debugAdapterCompile(): (
 	programPath: string,
 	outputFile: string,
+	options?: { tests?: boolean },
 ) => Promise<{
 	ok: boolean
 	bundlePath: string | null
@@ -160,7 +161,11 @@ export function debugAdapterCompile(): (
 		column: number | null
 	}>
 }> {
-	return async (programPath: string, outputFile: string) => {
+	return async (
+		programPath: string,
+		outputFile: string,
+		options: { tests?: boolean } = {},
+	) => {
 		let { unoptimisedOptions } =
 			await import("@essence-lang/compiler/optimiser")
 		let { compileFile } = await import("./pipeline")
@@ -171,6 +176,10 @@ export function debugAdapterCompile(): (
 			minify: false,
 			sourcemap: true,
 			optimisation: unoptimisedOptions,
+			// NOTE: A session debugging one test steps through the
+			// `tests { … }` block, which a build drops — so the block is
+			// compiled when, and only when, the launch asked for a test.
+			tests: options.tests,
 		})
 
 		return {

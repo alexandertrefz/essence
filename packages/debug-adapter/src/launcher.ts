@@ -17,7 +17,11 @@ const inspectorNoise =
 
 export function launchProgram(options: {
 	runtime: string
-	bundlePath: string
+	// NOTE: The script node is pointed at. It is the bundle for an ordinary
+	// launch and the test runner beside it for one debugging a test — which is
+	// why this is not called the bundle's path: the bundle is what a breakpoint
+	// is addressed to, and that is the session's to know.
+	entryPath: string
 	programArguments: Array<string>
 	cwd: string
 	env: Record<string, string | undefined>
@@ -33,7 +37,7 @@ export function launchProgram(options: {
 				// trace to stderr — read through the bundle's map, it names
 				// `.es` lines there too.
 				"--enable-source-maps",
-				options.bundlePath,
+				options.entryPath,
 				...options.programArguments,
 			],
 			{
