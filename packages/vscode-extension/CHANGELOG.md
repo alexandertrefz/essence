@@ -42,6 +42,11 @@ running as you type, and everything they found where you are looking.
 - A test written `across` a List of rows is listed once per ROW, under the
   template the rows share, and each row reports the name it renders — so a
   table that fails says which row did.
+- A test written `for any (…)` runs for values the runner generates from its
+  Parameters' Types. What a failure shows is the SHRUNK counterexample — the
+  smallest values that still fail, one per line, above the assertion — and the
+  seed they were drawn from, as the `essence test --seed` that draws them
+  again in a terminal.
 - **Accept snapshot** appears above a test whose last run left a snapshot to
   accept: one nothing had recorded, or one that differs. It re-runs that test
   and records what it finds — a `__snapshots__` companion is written beside

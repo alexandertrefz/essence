@@ -1347,6 +1347,121 @@ describe("essence test — snapshots", () => {
 	})
 })
 
+// NOTE: What a property test looks like from the command line: the report a
+// failure prints, the replay it names, and the two flags that pin a run.
+describe("essence test — property tests", () => {
+	const properties = [
+		"implementation {",
+		"\tfunction double(_ value: Integer) -> Integer {",
+		"\t\t<- value::add(value)",
+		"\t}",
+		"}",
+		"",
+		"tests {",
+		'\ttest "add commutes" for any (a: Integer, b: Integer) {',
+		"\t\texpect a::add(b)::is(b::add(a))",
+		"\t}",
+		"",
+		'\ttest "doubling stays small" for any (n: Integer) {',
+		"\t\texpect double(n)::isLessThan(1000)",
+		"\t}",
+		"}",
+		"",
+	].join("\n")
+
+	it("reports the counterexample it shrank to, and how to draw it again", async () => {
+		await withFiles({ "Doubling.es": properties }, async (directory) => {
+			let { code, out, err } = await runTests(directory, [
+				"--seed",
+				"deadbeef",
+			])
+
+			expect(code).toBe(EXIT_FAILURE)
+			expect(out).toContain("✓ add commutes")
+			expect(out).toContain("✗ doubling stays small")
+			expect(err).toContain("shrunk to: n = 500")
+			expect(err).toContain(
+				'essence test --seed deadbeef -f "doubling stays small"',
+			)
+		})
+	})
+
+	// NOTE: THE claim `--seed` makes: the command a failure printed reproduces
+	// the failure, filter and all.
+	it("draws the same counterexample for the same seed", async () => {
+		await withFiles({ "Doubling.es": properties }, async (directory) => {
+			let whole = await runTests(directory, ["--seed", "deadbeef"])
+			let alone = await runTests(directory, [
+				"--seed",
+				"deadbeef",
+				"--filter",
+				"doubling stays small",
+			])
+
+			expect(alone.err).toContain("shrunk to: n = 500")
+			expect(whole.err).toContain("shrunk to: n = 500")
+		})
+	})
+
+	it("runs as many cases as --cases asks for", async () => {
+		await withFiles({ "Doubling.es": properties }, async (directory) => {
+			let { out } = await runTests(directory, [
+				"--seed",
+				"deadbeef",
+				"--cases",
+				"3",
+				"--filter",
+				"add commutes",
+				"--json",
+			])
+			let events = out
+				.split("\n")
+				.filter((line) => line.length > 0)
+				.map((line) => JSON.parse(line) as TestEvent)
+			let [property] = events.filter((event) => event.kind === "property")
+
+			expect((property as { cases: number }).cases).toBe(3)
+		})
+	})
+
+	it("carries the seed on every property event", async () => {
+		await withFiles({ "Doubling.es": properties }, async (directory) => {
+			let { out } = await runTests(directory, [
+				"--seed",
+				"c0ffee",
+				"--json",
+			])
+			let seeds = out
+				.split("\n")
+				.filter((line) => line.length > 0)
+				.map((line) => JSON.parse(line) as TestEvent)
+				.filter((event) => event.kind === "property")
+				.map((event) => (event as { seed: string }).seed)
+
+			expect(seeds).toEqual(["c0ffee", "c0ffee"])
+		})
+	})
+
+	it("refuses a case count that is not a whole number", () => {
+		expect(() =>
+			parseArguments(["test", "--cases", "banana"], "essence"),
+		).toThrow(UsageError)
+		expect(() =>
+			parseArguments(["test", "--cases", "0"], "essence"),
+		).toThrow(UsageError)
+	})
+
+	it("reads both flags off the command line", () => {
+		let { options } = parseArguments(
+			["test", "--seed", "beef", "--cases", "7"],
+			"essence",
+		)
+
+		expect(options.seed).toBe("beef")
+		expect(options.cases).toBe(7)
+	})
+})
+
 describe("the test command's own documentation", () => {
 	it("says where a project writes the tags it skips", () => {
 		expect(testCommand.description.join(" ")).toContain(

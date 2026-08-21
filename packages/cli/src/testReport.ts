@@ -13,6 +13,8 @@ import {
 	hasCoverage,
 	isReported,
 	percentageOf,
+	propertyHelps,
+	propertyNotes,
 	type TestRecord,
 	type TestRun,
 	testFailureDiagnostic,
@@ -38,6 +40,7 @@ export {
 	emptyRun,
 	type FocusedTest,
 	focusedTestsDiagnostic,
+	type PropertyRecord,
 	readSnapshots,
 	type SnapshotRecord,
 	type TestCounts,
@@ -328,6 +331,18 @@ export function renderTestFailures(
 				`${INDENT}${palette.error(theme.symbols.fail)} ${palette.error(
 					[...test.suitePath, test.name].join(" › "),
 				)} ${palette.muted("stopped with an error")}`,
+			)
+			// NOTE: A property test that STOPPED rather than failed an
+			// assertion still has to say which values it stopped on — the
+			// Diagnostic above is where they are written for a failed `expect`,
+			// and there is no Diagnostic here.
+			lines.push(
+				...propertyNotes(test).map(
+					(note) => `${INDENT}${INDENT}${palette.muted(note)}`,
+				),
+				...propertyHelps(test).map(
+					(help) => `${INDENT}${INDENT}${palette.muted(help)}`,
+				),
 			)
 			lines.push(
 				...indented(test.error, `${INDENT}${INDENT}`).map((line) =>

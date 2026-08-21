@@ -146,6 +146,59 @@ was written in.
 branches and the scope each point stands in, none of which lcov can spell. Both
 write into `coverage/`, or into `--coverage-out <directory>`.
 
+## Properties
+
+A test written `for any (…)` declares typed Parameters, and the runner generates
+a value of each Type once per case — a hundred cases by default. This is where
+the type system pays out: the generator is derived from the Type, structurally.
+A Record is built member by member, a Choice is built Case by Case, a List from
+its item Type, and a checked refinement is honoured, so a `NonEmptyList` is
+never empty and a `NonZeroInteger` is never zero:
+
+```essence
+test "add commutes" for any (a: Integer, b: Integer) {
+	expect a::add(b)::is(b::add(a))
+}
+
+test "ranking keeps every team" for any (standings: NonEmptyList<Standing>) {
+	constant ranked = Standings.ranked(standings)
+
+	expect ranked::length()::is(standings::length())
+}
+```
+
+A failing case is **shrunk**: the runner keeps trying smaller values that still
+fail, so what a report shows is the smallest counterexample it could reach
+rather than the wall of digits the source happened to draw. Beside it stands the
+seed the values came from, and `essence test --seed <hex>` draws them again —
+each test folds its own identity into the run's seed, so replaying one test with
+`--filter` still draws exactly what it drew. `--cases <count>` runs another
+number of them.
+
+```
+[test-failed]
+Error: 'recording a result never lowers points' failed
+    │ Help: Run it again: essence test --seed 41c37ea3 -f "never lowers points"
+    │
+    │ Note: after 37 cases, shrunk to: standing = { …, points = 0 }  scored = 0  conceded = 1
+```
+
+A Type whose values carry an invariant no structure can know about generates
+itself instead. A Namespace conforming to `Generatable` replaces the derived
+generator for the Type it targets:
+
+```essence
+namespace Team for Team is Generatable {
+	static generate(from source: Randomness) -> Team {
+		<- { name = source::pick(from ["Lions", "Tigers", "Bears", "Wolves"]) }
+	}
+}
+```
+
+A `Randomness` is the one value in the language that changes: every Method
+answers a value and advances the source, so asking for a name and then for a
+score never answers the same draw twice.
+
 ## Tables, snapshots and examples
 
 A test written `across` a List of rows runs once per row, with the row bound to

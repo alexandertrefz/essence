@@ -73,6 +73,10 @@ export type TestEvent = {
 	reason?: string
 	stream?: string
 	text?: string
+	cases?: number
+	seed?: string
+	shrinks?: number
+	counterexample?: Array<PropertyCounterexample> | null
 }
 
 // NOTE: One test as the Compiler found it, independently of what running it
@@ -225,6 +229,20 @@ export type TestRecord = {
 	failures: Array<Failure>
 	error: string | null
 	output: Array<OutputChunk>
+	// NOTE: What a property test's run of cases did, and null for every other
+	// test. It is what turns "this failed" into "this failed for THESE values"
+	// — the values a property failed on are made up by the runner, so nothing
+	// in the source says what they were.
+	property: PropertyRecord | null
+}
+
+export type PropertyCounterexample = { name: string; value: string }
+
+export type PropertyRecord = {
+	cases: number
+	seed: string
+	shrinks: number
+	counterexample: Array<PropertyCounterexample> | null
 }
 
 function emptyRecord(id: string, name: string): TestRecord {
@@ -240,6 +258,7 @@ function emptyRecord(id: string, name: string): TestRecord {
 		failures: [],
 		error: null,
 		output: [],
+		property: null,
 	}
 }
 
@@ -320,6 +339,20 @@ export function foldEvents(events: Array<TestEvent>): Array<TestRecord> {
 					},
 				)
 				break
+			case "property": {
+				let held = byId.get(event.id)
+
+				if (held !== undefined) {
+					held.property = {
+						cases: event.cases ?? 0,
+						seed: event.seed ?? "",
+						shrinks: event.shrinks ?? 0,
+						counterexample: event.counterexample ?? null,
+					}
+				}
+
+				break
+			}
 			case "output":
 				byId.get(event.id)?.output.push({
 					// NOTE: `output` or `error`, which is what the runtime
@@ -697,9 +730,13 @@ export type Message = {
 // comparison held. `expected`/`actual` are filled in only for `is` — VS Code
 // draws those two as a diff, and "expected" is a claim `isNot` never makes.
 export function messagesOf(
-	record: Pick<TestRecord, "failures" | "error">,
+	record: Pick<TestRecord, "failures" | "error" | "property">,
 ): Array<Message> {
 	let messages: Array<Message> = []
+	// NOTE: What a property test failed FOR, said once above each assertion:
+	// every assertion of a property test failed for the same generated values,
+	// and nothing in the source says what they were.
+	let counterexample = counterexampleOf(record.property)
 
 	for (let failure of record.failures) {
 		let span = failure.span
@@ -708,7 +745,7 @@ export function messagesOf(
 			continue
 		}
 
-		let lines = [`${failure.form} ${span.source}`]
+		let lines = [...counterexample, `${failure.form} ${span.source}`]
 
 		for (let value of failure.values) {
 			if (explains(value, span)) {
@@ -755,7 +792,7 @@ export function messagesOf(
 	// the test itself.
 	if (record.error !== null) {
 		messages.push({
-			text: record.error,
+			text: [...counterexample, record.error].join("\n"),
 			expected: null,
 			actual: null,
 			range: null,
@@ -763,6 +800,26 @@ export function messagesOf(
 	}
 
 	return messages
+}
+
+// NOTE: The values a property test failed on, and how to draw them again — the
+// same two lines the terminal's report carries, because a reader who has one
+// open should not have to learn the other.
+function counterexampleOf(property: PropertyRecord | null): Array<string> {
+	if (property === null || property.counterexample === null) {
+		return []
+	}
+
+	return [
+		property.shrinks === 0
+			? `after ${property.cases} cases:`
+			: `after ${property.cases} cases, shrunk to:`,
+		...property.counterexample.map(
+			(entry) => `  ${entry.name} = ${entry.value}`,
+		),
+		`replay: essence test --seed ${property.seed}`,
+		"",
+	]
 }
 
 // NOTE: Everything a test's captured output said, as one block. `Terminal.print`

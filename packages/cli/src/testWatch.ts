@@ -2,7 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import * as path from "node:path"
 
-import type { TestEvent } from "@essence-lang/runtime/Testing"
+import { randomSeed, type TestEvent } from "@essence-lang/runtime/Testing"
 
 import { EXIT_SUCCESS } from "./actions"
 import type { CommandSpec } from "./commands"
@@ -387,6 +387,15 @@ export async function runTestWatch(
 				},
 				context.options.coverage,
 				{ stored, update: context.options.update },
+				// NOTE: A seed per CYCLE rather than per session: a watching
+				// run is a fresh run of everything a save reached, and drawing
+				// the very values the last cycle drew would hide a property
+				// that only fails sometimes. `--seed` pins it where a reader
+				// asked for the same values every time.
+				{
+					seed: context.options.seed ?? randomSeed(),
+					cases: context.options.cases,
+				},
 			)
 
 			// NOTE: Everything a Module wrote as it was evaluated has been

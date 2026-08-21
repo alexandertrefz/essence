@@ -520,6 +520,28 @@ export const commands: Array<CommandSpec> = [
 					"what it asks for is REPLACING one that differs, which is " +
 					"otherwise the failure.",
 			},
+			{
+				name: "seed",
+				type: "string",
+				placeholder: "hex",
+				summary: "Draw every property test's values from this seed",
+				details:
+					"A run makes one up and prints it beside a property that " +
+					"failed, so the run that found a counterexample can be run " +
+					"again exactly. Each test folds its own identity into the " +
+					"seed, so replaying one test with --filter draws what the " +
+					"whole run drew for it.",
+			},
+			{
+				name: "cases",
+				type: "string",
+				placeholder: "count",
+				summary: "How many values each property test runs for",
+				details:
+					"100 by default. A property that failed reports how many " +
+					"cases it took and the smallest value it could shrink the " +
+					"failure to.",
+			},
 			jobsOption,
 		],
 		examples: [
