@@ -195,7 +195,7 @@ describe("Tests Section", () => {
 
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].code).toBe("misplaced-tests-section")
-			expect(diagnostics[0].position.start.line).toBe(1)
+			expect(diagnostics[0].position?.start.line).toBe(1)
 			expect(program.tests?.nodes).toHaveLength(1)
 			expect(program.implementation.nodes).toHaveLength(1)
 		})

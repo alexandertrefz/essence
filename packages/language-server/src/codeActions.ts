@@ -156,6 +156,8 @@ function actionsFor(
 			return listed(elseBranchAction(diagnostic, program, lines))
 		case "unused-import":
 			return listed(removeImportAction(diagnostic, program, lines))
+		case "focused-tests-remain":
+			return listed(removeFocusedAction(diagnostic, lines))
 		default:
 			return []
 	}
@@ -546,6 +548,46 @@ function removeLabelAction(
 		diagnosticPosition: diagnostic.position,
 		isPreferred: true,
 		edits: [{ range: diagnostic.position, newText: written[1] }],
+	}
+}
+
+// NOTE: The Diagnostic spans exactly the `focused` Modifier, and what has to go
+// is the word and the space in front of it — `test "a" focused {` becomes
+// `test "a" {`. Where nothing but whitespace stands in front of it the word
+// alone goes: the Modifier is on a line of its own, and eating the indentation
+// would join it to the line above.
+function removeFocusedAction(
+	diagnostic: common.Diagnostic & { position: common.Position },
+	lines: Array<string>,
+): CodeActionEntry | null {
+	if (sliceOf(lines, diagnostic.position) !== "focused") {
+		return null
+	}
+
+	let line = lines[diagnostic.position.start.line - 1] ?? ""
+	let before = line.slice(0, diagnostic.position.start.column - 1)
+	let trimmed = before.replace(/[ \t]+$/, "")
+	let column =
+		trimmed === "" ? diagnostic.position.start.column : trimmed.length + 1
+
+	return {
+		title: "Remove 'focused'",
+		kind: "quickfix",
+		diagnosticCode: diagnostic.code,
+		diagnosticPosition: diagnostic.position,
+		isPreferred: true,
+		edits: [
+			{
+				range: {
+					start: {
+						line: diagnostic.position.start.line,
+						column,
+					},
+					end: diagnostic.position.end,
+				},
+				newText: "",
+			},
+		],
 	}
 }
 
