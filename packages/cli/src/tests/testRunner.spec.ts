@@ -775,6 +775,42 @@ describe("essence test — running", () => {
 
 // #region The event stream
 
+// NOTE: `check` is the command a project runs to be told whether it is
+// correct. A build drops the tests section, and a gate that answered about less
+// than the editor does would pass a file the next step can not compile.
+describe("essence check — the tests section", () => {
+	it("reports what a tests section says that does not compile", async () => {
+		await withFiles({ "Broken.tests.es": broken }, async (directory) => {
+			let { code, err } = await capture(() =>
+				run(
+					[
+						"check",
+						path.join(directory, "Broken.tests.es"),
+						"--no-color",
+					],
+					"essence",
+				),
+			)
+
+			expect(err).toContain("expect-not-boolean")
+			expect(code).toBe(EXIT_FAILURE)
+		})
+	})
+
+	it("says nothing about a file whose tests are fine", async () => {
+		await withFiles({ "Rules.es": passing }, async (directory) => {
+			let { code } = await capture(() =>
+				run(
+					["check", path.join(directory, "Rules.es"), "--no-color"],
+					"essence",
+				),
+			)
+
+			expect(code).toBe(EXIT_SUCCESS)
+		})
+	})
+})
+
 describe("essence test --json", () => {
 	it("writes the event stream and nothing else on stdout", async () => {
 		await withFiles({ "Rules.es": passing }, async (directory) => {

@@ -313,6 +313,10 @@ export const commands: Array<CommandSpec> = [
 			"Every Module a source imports is checked with it. A file given " +
 				"twice over — named on the command line and imported by another " +
 				"file that was — is checked once and reported once.",
+			"The `tests { … }` block is checked too, which no build does: a " +
+				"build drops the section, and the one command a project runs " +
+				"to be told whether it is correct would otherwise say nothing " +
+				"about a third of the file.",
 		],
 		usage: [`${PROGRAM} check <file...> [options]`],
 		options: [jobsOption],

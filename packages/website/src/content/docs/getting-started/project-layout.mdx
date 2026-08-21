@@ -265,7 +265,10 @@ None of these are enforced. They are what the repository itself does.
   decision.
 - **`essence check` is the fast gate.** It stops after validation and writes
   nothing, so it is the form meant for editors, pre-commit hooks and CI.
-  `--json` turns it into a diagnostic list another tool can read.
+  `--json` turns it into a diagnostic list another tool can read. It checks the
+  `tests { … }` block as well, which a build never does — a build drops the
+  section, and a gate that said nothing about it would pass a file the next
+  step cannot compile.
 
 ## Next
 
