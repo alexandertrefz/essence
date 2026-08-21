@@ -1,5 +1,11 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test"
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import {
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs"
 import { tmpdir } from "node:os"
 import * as path from "node:path"
 
@@ -134,6 +140,91 @@ function harness(
 		},
 	}
 }
+
+describe("A session asked to accept a snapshot", () => {
+	const snapshots = [
+		"tests {",
+		'\ttest "renders" {',
+		'\t\texpect "Lions" matches snapshot',
+		"\t}",
+		"}",
+		"",
+	].join("\n")
+
+	it("records what the run produced and answers with the source to write", async () => {
+		let file = path.join(root, "Snapshots.tests.es")
+
+		writeFileSync(file, snapshots)
+
+		let rewrites: Array<{ module: string; text: string }> = []
+		let live = harness({ files: [file] })
+		let session = createTestSession({
+			testFiles: () => [file],
+			dependentsOf: (filePath) => [filePath],
+			overlays: () => ({}),
+			notify: () => {},
+			onResults: () => {},
+			onRewrites: (written) => rewrites.push(...written),
+			debounce: 20,
+		})
+
+		await live.session.dispose()
+
+		try {
+			session.run({ files: [file], update: true })
+
+			let deadline = Date.now() + 30_000
+
+			while (rewrites.length === 0 && Date.now() < deadline) {
+				await new Promise((resolve) => setTimeout(resolve, 25))
+			}
+
+			expect(rewrites).toHaveLength(1)
+			expect(rewrites[0]?.module).toBe(file)
+			expect(rewrites[0]?.text).toContain('matches snapshot "Lions"')
+			// NOTE: The SOURCE is answered rather than written: the buffer the
+			// run compiled may never have been saved, and the Server turns this
+			// into an edit.
+			expect(readFileSync(file, "utf8")).toBe(snapshots)
+		} finally {
+			await session.dispose()
+			rmSync(file, { force: true })
+		}
+	}, 60_000)
+
+	it("leaves the disk alone on a cycle nobody asked to record", async () => {
+		let file = path.join(root, "Untouched.tests.es")
+
+		writeFileSync(file, snapshots)
+
+		let rewrites: Array<{ module: string }> = []
+		let live = harness({ files: [file] })
+
+		await live.session.dispose()
+
+		let session = createTestSession({
+			testFiles: () => [file],
+			dependentsOf: (filePath) => [filePath],
+			overlays: () => ({}),
+			notify: () => {},
+			onResults: () => {},
+			onRewrites: (written) => rewrites.push(...written),
+			debounce: 20,
+		})
+
+		try {
+			session.run({ files: [file] })
+
+			await new Promise((resolve) => setTimeout(resolve, 3_000))
+
+			expect(rewrites).toEqual([])
+			expect(readFileSync(file, "utf8")).toBe(snapshots)
+		} finally {
+			await session.dispose()
+			rmSync(file, { force: true })
+		}
+	}, 60_000)
+})
 
 describe("A session asked for coverage", () => {
 	it("says nothing about coverage until it is asked", async () => {

@@ -121,6 +121,15 @@ Development Host, over a workspace holding at least two files that write
   `match` arm and every Case of a `choice` with a tick or a cross. Turning the
   setting off again stops the counting and the marks. The output channel writes
   a second line per cycle with the two percentages.
+- A test written `across` a List of rows is listed once per row, under a node
+  named by the template, and each row's item shows the name that row renders.
+  ▶ beside the template runs every row; ▶ beside one row runs only it.
+- A test whose snapshot has never been recorded gets an **Accept snapshot**
+  lens after its first run. Pressing it writes the recorded value into the
+  source as an ordinary edit — the file becomes dirty rather than changing
+  under the buffer, and one undo takes it back. A `matches snapshot from "…"`
+  writes a `__snapshots__` file beside the source instead, and the lens goes
+  once there is nothing left to accept.
 - `Essence: Restart Language Server` empties the tree and fills it in again.
 
 ## Packaging

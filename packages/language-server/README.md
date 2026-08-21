@@ -82,3 +82,16 @@ The Run and Debug code lenses above every `test` and `suite` carry the commands
 an editor gesture, and the server has no idea whether it is looking at a Test
 Explorer, a terminal or a debug session. Forwarding `ids` and `filePath` to
 `essence/runTests` is the whole of what `essence.test.run` has to do.
+
+A third lens, **`essence.test.acceptSnapshot`**, is offered above a test whose
+last run left a snapshot to accept — one nothing had recorded, or one that
+differs from what was stored. It carries the same argument, and what it has to
+do is forward it to `essence/runTests` with `update: true`. The server records
+whatever that run produces: a `__snapshots__` companion is written where it
+stands, and a source it would rewrite comes back as a `workspace/applyEdit` —
+so an unsaved buffer is edited rather than written round, and the change is
+undoable like anything else the reader did.
+
+Every id a lens carries is a test's own. A table test has one per ROW, because
+a row is a test in its own right and carries its row number as the last step of
+its identity.
