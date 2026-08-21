@@ -1,6 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test"
 import { spawnSync } from "node:child_process"
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import {
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
@@ -1035,6 +1041,169 @@ describe("the test reporter", () => {
 		})!
 
 		expect(diagnostic.labels).toHaveLength(1)
+	})
+})
+
+// #endregion
+
+// #region Coverage
+
+// NOTE: A file with something to miss in it: an `else` no test enters, an arm
+// no value takes and a Case nothing builds.
+const covered = [
+	"implementation {",
+	"\tchoice Fixture {",
+	"\t\tPlayed,",
+	"\t\tPostponed,",
+	"\t}",
+	"",
+	"\tfunction points(_ fixture: Fixture) -> Integer {",
+	"\t\t<- match fixture -> Integer {",
+	"\t\t\tcase #Played { <- 3 }",
+	"\t\t\tcase #Postponed { <- 0 }",
+	"\t\t}",
+	"\t}",
+	"",
+	"\tfunction share(_ total: Integer, over played: Integer) -> Integer {",
+	"\t\tif played::isNot(0) {",
+	"\t\t\t<- total",
+	"\t\t} else {",
+	"\t\t\t<- 0",
+	"\t\t}",
+	"\t}",
+	"}",
+	"",
+	"tests {",
+	'\ttest "counts a played fixture" {',
+	"\t\texpect points(#Played)::is(3)",
+	"\t}",
+	"",
+	'\ttest "shares nothing over no games" {',
+	"\t\texpect share(10, over 0)::is(0)",
+	"\t}",
+	"}",
+	"",
+].join("\n")
+
+describe("essence test --coverage", () => {
+	it("reports nothing about coverage unless it was asked", async () => {
+		await withFiles({ "Fixture.es": covered }, async (directory) => {
+			let { out } = await runTests(directory)
+
+			expect(out).not.toContain("Not taken")
+		})
+	})
+
+	it("writes the table, with a row per file", async () => {
+		await withFiles({ "Fixture.es": covered }, async (directory) => {
+			let { code, out } = await runTests(directory, ["--coverage"])
+
+			expect(code).toBe(EXIT_SUCCESS)
+			expect(out).toContain("File")
+			expect(out).toContain("Lines")
+			expect(out).toContain("Branches")
+			expect(out).toContain("Cases")
+			expect(out).toContain("Not taken")
+			expect(out).toContain("Fixture.es")
+		})
+	})
+
+	it("names the arm no value took and the branch nothing entered", async () => {
+		await withFiles({ "Fixture.es": covered }, async (directory) => {
+			let { out } = await runTests(directory, ["--coverage"])
+
+			expect(out).toContain("points › case #Postponed")
+			expect(out).toContain("share › if")
+		})
+	})
+
+	it("says which Case of a Choice no test ever built", async () => {
+		await withFiles({ "Fixture.es": covered }, async (directory) => {
+			let { out } = await runTests(directory, ["--coverage"])
+
+			expect(out).toContain(
+				"Choice Fixture: #Postponed never constructed by a test",
+			)
+			expect(out).not.toContain("#Played never constructed")
+		})
+	})
+
+	it("keeps the event stream alone on stdout under --json", async () => {
+		await withFiles({ "Fixture.es": covered }, async (directory) => {
+			let { out } = await runTests(directory, ["--coverage", "--json"])
+			let events = out
+				.trim()
+				.split("\n")
+				.map((line) => JSON.parse(line) as TestEvent)
+			let coverage = events.filter((event) => event.kind === "coverage")
+
+			expect(coverage).toHaveLength(1)
+			expect(out).not.toContain("Not taken")
+		})
+	})
+
+	it("writes lcov where it was asked to", async () => {
+		await withFiles({ "Fixture.es": covered }, async (directory) => {
+			let out = path.join(directory, "reports")
+
+			await runTests(directory, [
+				"--coverage-report",
+				"lcov",
+				"--coverage-out",
+				out,
+			])
+
+			let written = readFileSync(path.join(out, "lcov.info"), "utf8")
+
+			expect(written).toContain("SF:")
+			expect(written).toContain("Fixture.es")
+			expect(written).toContain("BRDA:")
+			expect(written).toContain("end_of_record")
+		})
+	})
+
+	it("writes json where it was asked to, in the Compiler's vocabulary", async () => {
+		await withFiles({ "Fixture.es": covered }, async (directory) => {
+			let out = path.join(directory, "reports")
+
+			await runTests(directory, [
+				"--coverage-report",
+				"json",
+				"--coverage-out",
+				out,
+			])
+
+			let written = JSON.parse(
+				readFileSync(path.join(out, "coverage.json"), "utf8"),
+			) as {
+				schema: number
+				files: Array<{ missed: Array<{ label: string }> }>
+				choices: Array<{ name: string }>
+			}
+
+			expect(written.schema).toBe(1)
+			expect(
+				written.files.flatMap((file) =>
+					file.missed.map((missed) => missed.label),
+				),
+			).toContain("case #Postponed")
+			expect(written.choices.map((choice) => choice.name)).toEqual([
+				"Fixture",
+			])
+		})
+	})
+
+	it("refuses a format it does not know", () => {
+		expect(() =>
+			parseArguments(["test", "--coverage-report", "cobertura"]),
+		).toThrow(UsageError)
+	})
+
+	it("asks for coverage the moment a report is named", () => {
+		expect(
+			parseArguments(["test", "--coverage-report", "lcov"]).options
+				.coverage,
+		).toBe(true)
 	})
 })
 

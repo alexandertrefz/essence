@@ -1,0 +1,233 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`Writing a coverage run out writes lcov 1`] = `
+"TN:
+SF:/project/Standings.es
+DA:1,3
+DA:2,0
+LF:2
+LH:1
+BRDA:4,0,else,0
+BRDA:4,1,if,2
+BRDA:7,2,case #Postponed,0
+BRF:3
+BRH:1
+end_of_record
+"
+`;
+
+exports[`Writing a coverage run out writes json 1`] = `
+"{
+	"schema": 1,
+	"files": [
+		{
+			"module": "/project/Standings.es",
+			"lines": {
+				"covered": 1,
+				"total": 2
+			},
+			"branches": {
+				"covered": 1,
+				"total": 2
+			},
+			"cases": {
+				"covered": 0,
+				"total": 1
+			},
+			"percentages": {
+				"lines": 50,
+				"branches": 50
+			},
+			"missed": [
+				{
+					"kind": "branch",
+					"scope": "Standings::compute",
+					"label": "else",
+					"refinement": true,
+					"position": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 9
+						}
+					}
+				},
+				{
+					"kind": "case",
+					"scope": "Standings::compute",
+					"label": "case #Postponed",
+					"refinement": false,
+					"position": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 9
+						}
+					}
+				}
+			],
+			"points": [
+				{
+					"kind": "statement",
+					"label": "",
+					"scope": "",
+					"position": {
+						"start": {
+							"line": 1,
+							"column": 1
+						},
+						"end": {
+							"line": 1,
+							"column": 9
+						}
+					},
+					"refinement": false,
+					"tag": null,
+					"count": 3
+				},
+				{
+					"kind": "statement",
+					"label": "",
+					"scope": "",
+					"position": {
+						"start": {
+							"line": 1,
+							"column": 1
+						},
+						"end": {
+							"line": 1,
+							"column": 9
+						}
+					},
+					"refinement": false,
+					"tag": null,
+					"count": 0
+				},
+				{
+					"kind": "statement",
+					"label": "",
+					"scope": "",
+					"position": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 2,
+							"column": 9
+						}
+					},
+					"refinement": false,
+					"tag": null,
+					"count": 0
+				},
+				{
+					"kind": "branch",
+					"label": "else",
+					"scope": "Standings::compute",
+					"position": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 9
+						}
+					},
+					"refinement": true,
+					"tag": null,
+					"count": 0
+				},
+				{
+					"kind": "branch",
+					"label": "if",
+					"scope": "",
+					"position": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 9
+						}
+					},
+					"refinement": false,
+					"tag": null,
+					"count": 2
+				},
+				{
+					"kind": "case",
+					"label": "case #Postponed",
+					"scope": "Standings::compute",
+					"position": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 9
+						}
+					},
+					"refinement": false,
+					"tag": null,
+					"count": 0
+				},
+				{
+					"kind": "construction",
+					"label": "#Played",
+					"scope": "",
+					"position": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 9
+						}
+					},
+					"refinement": false,
+					"tag": "Fixture#Played",
+					"count": 1
+				}
+			]
+		}
+	],
+	"choices": [
+		{
+			"name": "Fixture",
+			"module": "/project/Standings.es",
+			"position": {
+				"start": {
+					"line": 1,
+					"column": 1
+				},
+				"end": {
+					"line": 1,
+					"column": 9
+				}
+			},
+			"cases": [
+				{
+					"tag": "Fixture#Played",
+					"constructed": true
+				},
+				{
+					"tag": "Fixture#Forfeited",
+					"constructed": false
+				}
+			]
+		}
+	]
+}
+"
+`;
