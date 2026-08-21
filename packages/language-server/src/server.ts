@@ -92,6 +92,7 @@ import {
 	type RunTestsParams,
 	type RunTestsResult,
 	TEST_RUN_NOTIFICATION,
+	type TestSettings,
 } from "./testProtocol"
 import { createTestSession } from "./testSession"
 import { tagDiagnostics } from "./testTags"
@@ -439,12 +440,29 @@ export function startServer(options: { connection?: Connection } = {}) {
 			// NOTE: The live test session, which a reader must be able to
 			// decline: it compiles and runs a project's tests on every edit,
 			// and a project where that is too much work is a project where
-			// this has to be off rather than merely quiet.
-			let readTestSetting = () =>
+			// this has to be off rather than merely quiet. The whole section
+			// is pulled at once — three settings that are one decision, and
+			// three round trips to answer it would be three.
+			let readTestSettings = () =>
 				connection.workspace
-					.getConfiguration("essence.tests.enabled")
-					.then((enabled) => {
-						session.setEnabled(enabled !== false)
+					.getConfiguration("essence.tests")
+					.then((tests: TestSettings | null | undefined) => {
+						session.setSkipTags(
+							Array.isArray(tests?.skipTags)
+								? tests.skipTags.filter(
+										(tag) => typeof tag === "string",
+									)
+								: [],
+						)
+
+						if (typeof tests?.debounce === "number") {
+							session.setDebounce(tests.debounce)
+						}
+
+						// NOTE: Last, so that a session being switched ON runs
+						// with the tags and the delay it was just told about
+						// rather than with the ones it started with.
+						session.setEnabled(tests?.enabled !== false)
 					})
 					.catch(() => {})
 
@@ -455,10 +473,10 @@ export function startServer(options: { connection?: Connection } = {}) {
 				.catch(() => {})
 			connection.onDidChangeConfiguration(() => {
 				readInlayHintSetting()
-				readTestSetting()
+				readTestSettings()
 			})
 			readInlayHintSetting()
-			readTestSetting()
+			readTestSettings()
 		}
 
 		// NOTE: Started once the client has finished initialising, rather than

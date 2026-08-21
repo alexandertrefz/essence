@@ -10,10 +10,12 @@ import {
 import type { common } from "@essence-lang/interfaces"
 import type { TestEvent } from "@essence-lang/runtime/Testing"
 
-import type {
-	TestRunNotification,
-	TestWorkerRequest,
-	TestWorkerResponse,
+import {
+	TEST_RUN_VERSION,
+	type TestRunNotification,
+	type TestSite,
+	type TestWorkerRequest,
+	type TestWorkerResponse,
 } from "./testProtocol"
 
 // NOTE: One test session per workspace. It watches what the analysis already
@@ -72,6 +74,12 @@ export type TestSession = {
 	run(request: { ids?: Array<string>; files?: Array<string> }): number | null
 	setEnabled(enabled: boolean): void
 	isEnabled(): boolean
+	// NOTE: Tags no run of this session selects. It is the client's setting
+	// rather than a filter of its own: an Editor running a project's tests on
+	// every keystroke is exactly where "not the slow ones" is worth saying.
+	setSkipTags(tags: Array<string>): void
+	// NOTE: How long a burst of edits is allowed to be before it costs a run.
+	setDebounce(milliseconds: number): void
 	// NOTE: The `test-failed` Diagnostics for one file, for the Server to
 	// publish beside the analysis's.
 	diagnosticsFor(filePath: string): Array<common.Diagnostic>
@@ -98,6 +106,7 @@ export function defaultWorkerPath(): string {
 export function createTestSession(options: TestSessionOptions): TestSession {
 	let workerPath = options.workerPath ?? defaultWorkerPath()
 	let debounce = options.debounce ?? debounceInMilliseconds
+	let skipTags: Array<string> = []
 	let enabled = true
 	let disposed = false
 	let worker: Worker | null = null
@@ -122,6 +131,11 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 		ids: Array<string>
 		started: number
 		events: Array<TestEvent>
+		// NOTE: Where every test of every entry of this cycle stands. It is
+		// accumulated rather than held between runs: nothing on this side reads
+		// it, and a client that draws a tree is the thing that has to remember
+		// one.
+		sites: Array<TestSite>
 		compiled: boolean
 	} | null = null
 
@@ -210,6 +224,7 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 
 			eventsByEntry.set(message.entry, events)
 			inFlight.events.push(...message.events)
+			inFlight.sites.push(...message.sites)
 
 			if (message.focused) {
 				focusedEntries.add(message.entry)
@@ -250,12 +265,14 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 		let folded = collectTestRun(run.events)
 
 		options.notify({
-			version: 1,
+			version: TEST_RUN_VERSION,
 			run: run.run,
 			kind: "end",
 			reason: run.reason,
 			files: run.entries,
+			ids: run.ids,
 			events: run.events,
+			sites: run.sites,
 			counts: {
 				passed: folded.counts.passed,
 				failed: folded.counts.failed,
@@ -304,16 +321,19 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 			ids,
 			started: Date.now(),
 			events: [],
+			sites: [],
 			compiled: true,
 		}
 
 		options.notify({
-			version: 1,
+			version: TEST_RUN_VERSION,
 			run,
 			kind: "start",
 			reason,
 			files: entries,
+			ids,
 			events: [],
+			sites: [],
 			counts: { passed: 0, failed: 0, skipped: 0, deselected: 0 },
 			duration: 0,
 			compiled: true,
@@ -330,6 +350,7 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 			// is told. It converges after one cycle, which is one keystroke's
 			// worth of being wrong about a test nobody is looking at.
 			filters: {
+				skipTags,
 				focusedElsewhere: [...focusedEntries].some(
 					(each) => !entries.includes(each),
 				),
@@ -446,6 +467,26 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 			this.runAll("open")
 		},
 		isEnabled: () => enabled,
+		setSkipTags(tags: Array<string>): void {
+			// NOTE: Sorted before the comparison, so that a client re-reading
+			// its configuration and answering with the same tags in another
+			// order does not re-run the whole workspace.
+			let next = [...tags].sort()
+
+			if (next.join("\u0000") === [...skipTags].sort().join("\u0000")) {
+				return
+			}
+
+			skipTags = next
+
+			// NOTE: What runs changed, so everything runs again — a test the
+			// old tags left out has no result at all, and a client would go on
+			// drawing the deselection it was last told about.
+			this.runAll("settings")
+		},
+		setDebounce(milliseconds: number): void {
+			debounce = Math.max(0, milliseconds)
+		},
 		diagnosticsFor(filePath: string): Array<common.Diagnostic> {
 			let diagnostics: Array<common.Diagnostic> = []
 

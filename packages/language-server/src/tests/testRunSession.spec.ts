@@ -61,12 +61,12 @@ describe("The Server's live test session", () => {
 		let [ended] = await session.waitForTestRuns(1)
 
 		expect(session.testRuns()[0]).toMatchObject({
-			version: 1,
+			version: 2,
 			kind: "start",
 			reason: "open",
 		})
 		expect(ended).toMatchObject({
-			version: 1,
+			version: 2,
 			kind: "end",
 			compiled: true,
 			counts: { passed: 0, failed: 1, skipped: 0, deselected: 0 },

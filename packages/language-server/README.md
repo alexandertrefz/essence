@@ -33,11 +33,26 @@ are written out in `src/testProtocol.ts`.
 - **`essence/testRun`** — a notification, sent twice per run: once as
   `kind: "start"` naming the files about to run, and once as `kind: "end"`
   carrying the whole event batch, the counts and the duration. It has a
-  `version` of its own (`1`), separate from the `schema` each event carries; a
+  `version` of its own (`2`), separate from the `schema` each event carries; a
   client that meets a version it does not know ignores the notification, and one
   that meets an event kind it does not know ignores that event.
+  - `sites` carries every test of every file the batch covers — id, name
+    template, suite path, effective tags, and the ranges of the whole item and
+    of its keyword — whether it ran or not, so a client can draw a tree and put
+    each item on its line without parsing anything. It is empty for a file that
+    would not compile, which is the signal to keep drawing the tree it last had.
+  - `ids` carries what the batch was narrowed to, empty where it was not. A
+    narrowed batch reports a deselection for every other test of that file, so a
+    client merges by id rather than replacing the file.
 - **`essence/runTests`** — a request taking `{ ids?, files? }` and answering
   `{ run }`, the number the notifications for it will carry.
+
+The server reads one configuration section, `essence.tests`, through
+`workspace/configuration` whenever the client says something under `essence`
+changed: `enabled` (default true) switches the session off, `skipTags` names
+tags no run selects, and `debounce` is how long a burst of edits may be before
+it costs a run (default 450 ms). A client that answers nothing keeps the
+defaults.
 
 The Run and Debug code lenses above every `test` and `suite` carry the commands
 **`essence.test.run`** and **`essence.test.debug`**, each with one argument:

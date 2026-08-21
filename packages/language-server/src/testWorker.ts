@@ -6,9 +6,17 @@ import { parentPort } from "node:worker_threads"
 
 import { compileToMemory } from "@essence-lang/compiler/embed"
 import type { ModuleHost } from "@essence-lang/compiler/modules"
-import type { entryPoints, TestEvent } from "@essence-lang/runtime/Testing"
+import type {
+	entryPoints,
+	Registry,
+	TestEvent,
+} from "@essence-lang/runtime/Testing"
 
-import type { TestWorkerRequest, TestWorkerResponse } from "./testProtocol"
+import type {
+	TestSite,
+	TestWorkerRequest,
+	TestWorkerResponse,
+} from "./testProtocol"
 
 // NOTE: The other end of the session — see `testProtocol.ts` for why a Worker
 // exists at all. It compiles each entry with the tests enriched, writes the
@@ -81,12 +89,32 @@ function rendered(error: unknown): string {
 		: String(error)
 }
 
+// NOTE: The tests of one Module as an Editor needs them — where each one
+// stands, what it is tagged, and whether it would run — read off the manifest
+// the Compiler emitted rather than off anything a run produced. It is answered
+// even for a run that was narrowed to one test, because a tree lists what
+// exists and a narrowing is about what happens.
+function sitesOf(registry: Registry, entry: string): Array<TestSite> {
+	return registry.tests.map(({ entry: test }) => ({
+		id: test.id,
+		name: test.name,
+		suitePath: test.suitePath,
+		file: entry,
+		range: test.position,
+		keywordRange: test.keywordPosition,
+		tags: test.tags,
+		focused: test.focused,
+		skipped: test.skipped,
+	}))
+}
+
 async function runEntry(
 	request: Extract<TestWorkerRequest, { kind: "run" }>,
 	entry: string,
 ): Promise<TestWorkerResponse> {
 	let answer = (
 		events: Array<TestEvent>,
+		sites: Array<TestSite>,
 		focused: boolean,
 		compiled: boolean,
 		problem: string | null,
@@ -95,6 +123,7 @@ async function runEntry(
 		run: request.run,
 		entry,
 		events,
+		sites,
 		focused,
 		compiled,
 		problem,
@@ -115,6 +144,7 @@ async function runEntry(
 			// squiggles.
 			return answer(
 				[],
+				[],
 				false,
 				false,
 				emitted.diagnostics
@@ -128,7 +158,7 @@ async function runEntry(
 
 		bundle = stage(emitted.bundleHash, emitted.code)
 	} catch (error) {
-		return answer([], false, false, rendered(error))
+		return answer([], [], false, false, rendered(error))
 	}
 
 	try {
@@ -140,7 +170,7 @@ async function runEntry(
 		loaded += 1
 
 		if (tests === undefined) {
-			return answer([], false, true, null)
+			return answer([], [], false, true, null)
 		}
 
 		// NOTE: The tests of THIS Module and no others. A file two entries
@@ -174,12 +204,13 @@ async function runEntry(
 
 		return answer(
 			events,
+			sitesOf(registry, entry),
 			tests.select(registry, request.filters).focused,
 			true,
 			null,
 		)
 	} catch (error) {
-		return answer([], false, true, rendered(error))
+		return answer([], [], false, true, rendered(error))
 	}
 }
 
