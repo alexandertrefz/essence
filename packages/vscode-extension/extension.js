@@ -20,8 +20,18 @@ import {
 	resolveRuntime,
 	resolveServer,
 } from "./launch.js"
+import { createTestView } from "./testView.js"
 
 let client
+// NOTE: The Test Explorer, the gutter marks and the test output channel. It
+// outlives a client — a restarted Language Server re-runs everything it finds,
+// and the view is reset rather than rebuilt — so it is created once, on
+// activation, and told when a run happened.
+let testView
+// NOTE: The `essence/testRun` subscription belongs to the client it was made on:
+// a restart builds a new client, and a handler left on the old one is a handler
+// that will never be called again.
+let testListener
 // NOTE: `onDidChangeState` belongs to the client, and a restart builds a new
 // one. Held here so the subscription can be disposed with the client it came
 // from — a listener left attached to a dead client keeps driving the status
@@ -297,6 +307,15 @@ async function launch(server) {
 	try {
 		await client.start()
 
+		// NOTE: After the start, because a client refuses to be subscribed to
+		// before it is running. The session begins its first cycle at
+		// `initialized`, so the first batch can be in flight already — which is
+		// why the view is fed rather than asked.
+		testListener?.dispose()
+		testListener = client.onNotification("essence/testRun", (payload) => {
+			testView?.handle(payload)
+		})
+
 		return true
 	} catch (error) {
 		if (reportedByHandler) {
@@ -317,6 +336,11 @@ async function launch(server) {
 async function startClient(context) {
 	failure = null
 	currentServer = null
+
+	// NOTE: A new Server is a new session, which re-runs everything it finds —
+	// so what the view holds is at best about to be replaced and at worst about
+	// a file this Server will never mention.
+	testView?.reset()
 
 	let resolution = await resolveServer(settings().get("server.path"), {
 		workspaceRoot: workspaceRoot(),
@@ -404,6 +428,8 @@ async function startClient(context) {
 async function stopClient() {
 	stateListener?.dispose()
 	stateListener = undefined
+	testListener?.dispose()
+	testListener = undefined
 
 	if (client === undefined) {
 		return
@@ -626,9 +652,41 @@ export async function activate(context) {
 	statusItem.name = "Essence Language Server"
 	statusItem.command = "essence.restartServer"
 
+	// NOTE: Built before the client, so that the first `essence/testRun` — the
+	// session starts its first cycle at `initialized` — has somewhere to land.
+	testView = createTestView({
+		// NOTE: The Server answers with the cycle number the results will
+		// arrive under. A client that is not running answers with nothing,
+		// which the view reports as "nothing ran".
+		runTests: async (selection) => {
+			if (client === undefined) {
+				return null
+			}
+
+			try {
+				return await client.sendRequest("essence/runTests", selection)
+			} catch (error) {
+				outputChannel.appendLine(
+					`Asking the Language Server to run tests failed: ${error instanceof Error ? error.message : String(error)}`,
+				)
+
+				return null
+			}
+		},
+	})
+
 	context.subscriptions.push(
 		outputChannel,
 		statusItem,
+		testView,
+		// NOTE: A file opened in a second editor group, or an editor scrolled
+		// back to, has never been drawn on — decorations belong to an editor
+		// rather than to a document.
+		vscode.window.onDidChangeVisibleTextEditors((editors) => {
+			for (let editor of editors) {
+				testView?.drawEditor(editor)
+			}
+		}),
 		vscode.commands.registerCommand("essence.restartServer", () =>
 			queue(async () => {
 				await stopClient()
@@ -645,14 +703,21 @@ export async function activate(context) {
 		// is a command a reader can invoke with no test in front of them, and
 		// what this needs is the ids the lens carries.
 		vscode.commands.registerCommand("essence.test.run", async (item) => {
-			if (client === undefined || item === undefined) {
+			if (item === undefined) {
 				return
 			}
 
-			await client.sendRequest("essence/runTests", {
-				ids: item.ids,
-				files: [item.filePath],
-			})
+			await testView?.runIds(item.ids ?? [], [item.filePath])
+		}),
+		// NOTE: What failed is what a reader is iterating on, and re-running
+		// everything to get back to it is the loop this is here to shorten. It
+		// runs by id rather than by file: one failure in forty is not a reason
+		// to run forty.
+		vscode.commands.registerCommand("essence.test.runFailed", async () => {
+			await testView?.runFailed()
+		}),
+		vscode.commands.registerCommand("essence.test.showOutput", () => {
+			testView?.show()
 		}),
 		// NOTE: Honest rather than absent. Debugging ONE test means compiling
 		// the test bundle under the debug adapter and running the registry
