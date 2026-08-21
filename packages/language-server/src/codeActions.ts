@@ -56,6 +56,11 @@ export function findCodeActions(
 	documentPath?: string,
 	workspace?: Workspace,
 	cached: Analysis | null = null,
+	// NOTE: Diagnostics that no compile produced and that a quick fix answers
+	// all the same — a workspace-wide `similar-tags`, which one Module can not
+	// see. Handed in rather than recomputed, so the lightbulb and the squiggle
+	// are offered on the very same Diagnostic.
+	extra: Array<common.Diagnostic> = [],
 ): Array<CodeActionEntry> {
 	// NOTE: ONE run of the pipeline per request — the analysis hands back both
 	// the Parser AST an edit is measured against and the enriched Program the
@@ -85,7 +90,7 @@ export function findCodeActions(
 					program,
 				}
 
-	for (let diagnostic of diagnostics) {
+	for (let diagnostic of [...diagnostics, ...extra]) {
 		if (
 			diagnostic.position === null ||
 			!overlaps(diagnostic.position, range)
@@ -126,6 +131,7 @@ function actionsFor(
 				),
 			]
 		case "unknown-member":
+		case "similar-tags":
 			return listed(
 				suggestionAction(diagnostic, (suggestion) => suggestion),
 			)

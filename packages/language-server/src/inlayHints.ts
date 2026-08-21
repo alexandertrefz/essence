@@ -18,8 +18,14 @@ import { typedHandlerExpressions } from "./matchHandlerChildren"
 export type InlayHint = {
 	position: common.Cursor
 	label: string
-	kind: "type"
-	textEdit: InlayHintEdit
+	// NOTE: `type` is the annotation the source left out; `value` is what a
+	// test RECORDED at that place — the answer of an `expect` that did not
+	// hold, the value of a Constant a test body wrote, the value of a line
+	// ending in `§?`. A value Hint carries no edit: there is nothing to accept,
+	// because a value is a fact about one run rather than something the source
+	// could have said.
+	kind: "type" | "value"
+	textEdit: InlayHintEdit | null
 }
 
 // NOTE: An insertion, so a Cursor rather than a Position — the annotation goes

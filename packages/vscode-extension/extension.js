@@ -635,6 +635,37 @@ export async function activate(context) {
 				await startClient(context)
 			}),
 		),
+		// NOTE: What the Run lens above every `test` and every `suite` sends.
+		// The server owns the run — it holds the session, the compiled bundles
+		// and the results — so the whole of this is forwarding the ids it put
+		// on the lens back to it. The results arrive as `essence/testRun`
+		// notifications, the same ones every other edit produces.
+		//
+		// Deliberately not in `contributes.commands`: a command in the palette
+		// is a command a reader can invoke with no test in front of them, and
+		// what this needs is the ids the lens carries.
+		vscode.commands.registerCommand("essence.test.run", async (item) => {
+			if (client === undefined || item === undefined) {
+				return
+			}
+
+			await client.sendRequest("essence/runTests", {
+				ids: item.ids,
+				files: [item.filePath],
+			})
+		}),
+		// NOTE: Honest rather than absent. Debugging ONE test means compiling
+		// the test bundle under the debug adapter and running the registry
+		// narrowed to an id, which is the adapter's half of this feature and is
+		// not wired yet — and a lens whose command does not exist reports a
+		// protocol error, which tells a reader nothing at all.
+		vscode.commands.registerCommand("essence.test.debug", async () => {
+			await vscode.window.showInformationMessage(
+				"Essence: debugging a single test is not wired up yet — the " +
+					"debug adapter has to compile the tests and run one by id. " +
+					"Run it instead, or debug the program it tests.",
+			)
+		}),
 		vscode.debug.registerDebugConfigurationProvider("essence", {
 			resolveDebugConfigurationWithSubstitutedVariables: (
 				folder,

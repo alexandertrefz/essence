@@ -138,6 +138,11 @@
 					"default": true,
 					"description": "Show inferred Types as inlay hints where the source states none — Constants, Variables, and the Parameters and return Type of contextually typed Function literals."
 				},
+				"essence.tests.enabled": {
+					"type": "boolean",
+					"default": true,
+					"description": "Run the tests of the workspace as you type. Only the tests a change reaches are re-run; failures appear in Problems, and the values a run recorded appear beside the lines that produced them. Turn it off to keep the editor's test commands and stop the automatic runs."
+				},
 				"essence.trace.server": {
 					"type": "string",
 					"enum": [

@@ -27,7 +27,7 @@ function hintsOf(source: string) {
 function applyHints(source: string): string {
 	let lines = source.split("\n")
 	let edits = allHintsOf(source)
-		.map((hint) => hint.textEdit)
+		.flatMap((hint) => (hint.textEdit === null ? [] : [hint.textEdit]))
 		.sort(
 			(a, b) =>
 				b.position.line - a.position.line ||

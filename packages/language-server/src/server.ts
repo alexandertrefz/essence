@@ -18,6 +18,7 @@ import {
 	type DocumentSymbol,
 	ErrorCodes,
 	FileChangeType,
+	type InlayHint,
 	InlayHintKind,
 	InsertTextFormat,
 	LSPErrorCodes,
@@ -50,6 +51,7 @@ import {
 } from "./callHierarchy"
 import { escapeSnippet } from "./callSnippets"
 import { type CodeActionEntry, findCodeActions } from "./codeActions"
+import { findTestLenses } from "./codeLenses"
 import { enrichDocument, parseDocument } from "./compilation"
 import {
 	type CompletionEntry,
@@ -64,7 +66,7 @@ import {
 import { findFoldingRanges } from "./foldingRanges"
 import { findFormattingEdits } from "./formatting"
 import { findHover } from "./hover"
-import { findInlayHints } from "./inlayHints"
+import { findInlayHints, type InlayHint as InlayHintEntry } from "./inlayHints"
 import { isSamePosition } from "./positions"
 import {
 	findDefinition,
@@ -84,6 +86,15 @@ import {
 	semanticTokenTypes,
 } from "./semanticTokens"
 import { findSignatureHelp } from "./signatureHelp"
+import { findValueHints } from "./testHints"
+import {
+	RUN_TESTS_REQUEST,
+	type RunTestsParams,
+	type RunTestsResult,
+	TEST_RUN_NOTIFICATION,
+} from "./testProtocol"
+import { createTestSession } from "./testSession"
+import { tagDiagnostics } from "./testTags"
 import {
 	createWorkspace,
 	type WorkspaceOccurrence,
@@ -169,6 +180,11 @@ export const serverCapabilities: ServerCapabilities = {
 	},
 	foldingRangeProvider: true,
 	selectionRangeProvider: true,
+	// NOTE: Run and Debug above every `test` and every `suite`. No resolve: a
+	// lens carries its command and its arguments already, because what it needs
+	// is the ids of the tests under it and those are read off the same parse the
+	// lens itself was.
+	codeLensProvider: { resolveProvider: false },
 	inlayHintProvider: true,
 	linkedEditingRangeProvider: true,
 	callHierarchyProvider: true,
@@ -263,6 +279,108 @@ export function startServer(options: { connection?: Connection } = {}) {
 	// had.
 	let inlayHintsEnabled = true
 	let clientSupportsConfiguration = false
+	// NOTE: The live test session. It compiles and runs in a Worker of its own,
+	// so everything the Server does with it is bookkeeping: which files changed,
+	// what to publish, what to draw. Off by a setting, because running a
+	// project's tests on every keystroke is a thing a reader must be able to
+	// decline.
+	let session = createTestSession({
+		testFiles,
+		dependentsOf: (filePath) => workspace.dependentsOf(filePath),
+		overlays: () => {
+			let overlays: Record<string, string> = {}
+
+			for (let [filePath, uri] of openPaths) {
+				let document = documents.get(uri)
+
+				if (document !== undefined) {
+					overlays[filePath] = document.getText()
+				}
+			}
+
+			return overlays
+		},
+		notify: (notification) => {
+			// NOTE: A connection that has gone away THROWS rather than
+			// rejecting, and a run finishing after an Editor closed is an
+			// ordinary end to a session rather than a failure — so the throw is
+			// swallowed here, where the alternative is an unhandled error that
+			// takes the rest of the shutdown with it.
+			try {
+				void connection
+					.sendNotification(TEST_RUN_NOTIFICATION, notification)
+					.catch(() => {})
+			} catch {}
+		},
+		// NOTE: New results mean new `test-failed` Diagnostics, and those are
+		// published BESIDE the analysis's own — one list per URI is what the
+		// protocol has, so the two are merged where the analysis publishes.
+		onResults: (filePaths) => {
+			for (let filePath of filePaths) {
+				let uri = openPaths.get(filePath)
+
+				if (uri !== undefined && documents.get(uri) !== undefined) {
+					analyseAndPublish(uri)
+				}
+			}
+
+			connection.languages.inlayHint.refresh().catch(() => {})
+		},
+		onProblem: (filePath, problem) => {
+			connection.console.log(
+				`essence: the test session could not run ${filePath}: ${problem}`,
+			)
+		},
+	})
+
+	// NOTE: Every file of the workspace that WROTE a `tests { … }` block, read
+	// off the parses the Workspace already holds. A file is an entry because of
+	// what it says rather than because of what it is called: `Foo.tests.es` is a
+	// convention and a section is the fact.
+	function testFiles(): Array<string> {
+		return [...workspace.knownFiles()].filter(
+			(filePath) => workspace.programOf(filePath)?.tests != null,
+		)
+	}
+
+	// NOTE: What the tags of the WHOLE workspace say about each other, which no
+	// compile can answer: `tagged netwrok` is well-formed inside its own Module.
+	// Recomputed when a file changes and cached in between, because it is asked
+	// once per publish and once per lightbulb.
+	let tags: Map<string, Array<common.Diagnostic>> | null = null
+
+	function tagDiagnosticsFor(filePath: string): Array<common.Diagnostic> {
+		if (!session.isEnabled()) {
+			return []
+		}
+
+		if (tags === null) {
+			tags = tagDiagnostics(
+				testFiles().flatMap((each) => {
+					let program = workspace.programOf(each)
+
+					return program === null ? [] : [{ filePath: each, program }]
+				}),
+			)
+		}
+
+		return tags.get(filePath) ?? []
+	}
+
+	// NOTE: Everything the test session has to say about a file: the failed
+	// assertions of its last run, and what its tags say about the workspace's.
+	// Published BESIDE the analysis's own Diagnostics, because the protocol has
+	// one list per URI and the second sender would otherwise clear the first.
+	function testDiagnosticsFor(filePath: string): Array<common.Diagnostic> {
+		if (!session.isEnabled()) {
+			return []
+		}
+
+		return [
+			...session.diagnosticsFor(filePath),
+			...tagDiagnosticsFor(filePath),
+		]
+	}
 
 	// NOTE: The standard library is read, hoisted, enriched and validated once
 	// per process. Doing it here — while the client is still setting up —
@@ -318,6 +436,18 @@ export function startServer(options: { connection?: Connection } = {}) {
 					})
 					.catch(() => {})
 
+			// NOTE: The live test session, which a reader must be able to
+			// decline: it compiles and runs a project's tests on every edit,
+			// and a project where that is too much work is a project where
+			// this has to be off rather than merely quiet.
+			let readTestSetting = () =>
+				connection.workspace
+					.getConfiguration("essence.tests.enabled")
+					.then((enabled) => {
+						session.setEnabled(enabled !== false)
+					})
+					.catch(() => {})
+
 			connection.client
 				.register(DidChangeConfigurationNotification.type, {
 					section: "essence",
@@ -325,9 +455,17 @@ export function startServer(options: { connection?: Connection } = {}) {
 				.catch(() => {})
 			connection.onDidChangeConfiguration(() => {
 				readInlayHintSetting()
+				readTestSetting()
 			})
 			readInlayHintSetting()
+			readTestSetting()
 		}
+
+		// NOTE: Started once the client has finished initialising, rather than
+		// in `onInitialize`: the first thing it does is walk the workspace for
+		// files that write tests, and a client is entitled to a prompt answer
+		// to its initialize request.
+		session.runAll("open")
 
 		connection.workspace.onDidChangeWorkspaceFolders((event) => {
 			let folders = new Set(workspace.folders())
@@ -341,12 +479,59 @@ export function startServer(options: { connection?: Connection } = {}) {
 			}
 
 			workspace.setFolders([...folders])
+			tags = null
+			session.runAll("open")
 		})
 	})
 
+	// NOTE: The Run and Debug lenses. Read off the PARSE — nothing has to have
+	// run for a test to be worth offering to run — so a file opened in a
+	// session that is still starting up already carries them.
+	connection.onCodeLens((params) => {
+		if (!session.isEnabled()) {
+			return null
+		}
+
+		let program = parsedOf(params.textDocument.uri)
+
+		if (program === null) {
+			return null
+		}
+
+		return findTestLenses(
+			program,
+			documentFilePath(params.textDocument.uri),
+		).map((lens) => ({
+			range: toLspRange(lens.position),
+			command: {
+				title: lens.title,
+				command: lens.command,
+				arguments: [lens.arguments],
+			},
+		}))
+	})
+
+	// NOTE: What a lens's command ends up sending, and what a Test Explorer's
+	// run button sends. It answers with the run number the notifications will
+	// carry, so a client can tie what it asked for to what arrives.
+	connection.onRequest(
+		RUN_TESTS_REQUEST,
+		(params: RunTestsParams): RunTestsResult => ({
+			run: session.run({ ids: params.ids, files: params.files }),
+		}),
+	)
+
+	connection.onShutdown(() => {
+		void session.dispose()
+	})
+
 	connection.onDidChangeWatchedFiles((params) => {
+		let changed: Array<string> = []
+
 		for (let change of params.changes) {
 			let filePath = documentFilePath(change.uri)
+
+			changed.push(filePath)
 
 			if (change.type === FileChangeType.Deleted) {
 				workspace.removed(filePath)
@@ -354,6 +539,9 @@ export function startServer(options: { connection?: Connection } = {}) {
 				workspace.changed(filePath)
 			}
 		}
+
+		tags = null
+		session.changed(changed)
 
 		// NOTE: A file changing on disk changes the graph every open document
 		// sits in, and an analysis is the only thing that ever publishes: the
@@ -1142,6 +1330,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 			params.textDocument.uri,
 			workspace,
 			analysis,
+			tagDiagnosticsFor(documentFilePath(params.textDocument.uri)),
 		).map((entry) => toLspCodeAction(entry, params))
 	})
 
@@ -1189,41 +1378,37 @@ export function startServer(options: { connection?: Connection } = {}) {
 			return abandoned(token)
 		}
 
+		let range = {
+			start: toCursor(params.range.start),
+			end: toCursor(params.range.end),
+		}
+		let document = documents.get(params.textDocument.uri)
+		// NOTE: What the last run RECORDED, beside the Types the source left
+		// out. Two kinds of ghost text with two sources: one is read off the
+		// typed Program and is true of the code, the other is read off the
+		// events and is true of one run.
+		let values =
+			document === undefined || !session.isEnabled()
+				? []
+				: findValueHints(
+						session.eventsFor(
+							documentFilePath(params.textDocument.uri),
+						),
+						document.getText(),
+						range,
+					)
 		let parsed = parseAndEnrich(params.textDocument.uri, {
 			cancellation: token,
 		})
 
 		if (parsed?.enrichedProgram == null) {
-			return null
+			return values.map(toLspInlayHint)
 		}
 
-		return findInlayHints(parsed.enrichedProgram, {
-			start: toCursor(params.range.start),
-			end: toCursor(params.range.end),
-		}).map((hint) => {
-			// NOTE: Accepting a Hint writes its own label at its own position,
-			// which the protocol asks for as an edit — and an insertion is an
-			// empty Range there rather than a Position of its own.
-			let insertion = {
-				line: hint.textEdit.position.line - 1,
-				character: hint.textEdit.position.column - 1,
-			}
-
-			return {
-				position: {
-					line: hint.position.line - 1,
-					character: hint.position.column - 1,
-				},
-				label: hint.label,
-				kind: InlayHintKind.Type,
-				textEdits: [
-					{
-						range: { start: insertion, end: insertion },
-						newText: hint.textEdit.newText,
-					},
-				],
-			}
-		})
+		return [
+			...findInlayHints(parsed.enrichedProgram, range),
+			...values,
+		].map(toLspInlayHint)
 	})
 
 	connection.onCompletion(async (params, token) => {
@@ -1517,7 +1702,13 @@ export function startServer(options: { connection?: Connection } = {}) {
 				host: workspace.host,
 			})
 		let results = new Map<string, Array<common.Diagnostic>>([
-			[uri, analysis.diagnostics],
+			[
+				uri,
+				[
+					...analysis.diagnostics,
+					...testDiagnosticsFor(documentFilePath(uri)),
+				],
+			],
 		])
 
 		// NOTE: A dependency's Diagnostics are published under ITS OWN URI,
@@ -1528,7 +1719,10 @@ export function startServer(options: { connection?: Connection } = {}) {
 			let dependencyUri = uriOf(filePath)
 
 			if (documents.get(dependencyUri) === undefined) {
-				results.set(dependencyUri, diagnostics)
+				results.set(dependencyUri, [
+					...diagnostics,
+					...testDiagnosticsFor(filePath),
+				])
 			}
 		}
 
@@ -1541,7 +1735,12 @@ export function startServer(options: { connection?: Connection } = {}) {
 
 		openPaths.set(filePath, event.document.uri)
 		workspace.changed(filePath)
+		tags = null
 		scheduleAnalysis(event.document.uri)
+		// NOTE: On the UNSAVED buffer, exactly as the analysis is. What a
+		// reader is looking at is what the session answers for; a file on disk
+		// nobody has open is answered for out of the file.
+		session.changed([filePath])
 	})
 
 	documents.onDidClose((event) => {
@@ -1583,6 +1782,45 @@ export function startServer(options: { connection?: Connection } = {}) {
 // NOTE: The inverse of the decoding `documentFilePath` does. Each segment is
 // encoded on its own so that the separators survive — a file named `a b.es`
 // becomes `a%20b.es`, and the client matches the URI it handed over.
+// NOTE: Accepting a TYPE Hint writes its own label at its own position, which
+// the protocol asks for as an edit — and an insertion is an empty Range there
+// rather than a Position of its own. A VALUE Hint has nothing to accept: what a
+// test recorded is a fact about one run, not something the source could have
+// said, so it carries no edit and is offered as a Parameter Hint, which is the
+// kind Editors draw quietly.
+export function toLspInlayHint(hint: InlayHintEntry): InlayHint {
+	let position = {
+		line: hint.position.line - 1,
+		character: hint.position.column - 1,
+	}
+
+	if (hint.textEdit === null) {
+		return {
+			position,
+			label: hint.label,
+			kind: InlayHintKind.Parameter,
+			paddingLeft: true,
+		}
+	}
+
+	let insertion = {
+		line: hint.textEdit.position.line - 1,
+		character: hint.textEdit.position.column - 1,
+	}
+
+	return {
+		position,
+		label: hint.label,
+		kind: InlayHintKind.Type,
+		textEdits: [
+			{
+				range: { start: insertion, end: insertion },
+				newText: hint.textEdit.newText,
+			},
+		],
+	}
+}
+
 export function uriOf(filePath: string): string {
 	return `file://${filePath.split("/").map(encodeURIComponent).join("/")}`
 }

@@ -932,10 +932,52 @@ tests {
 
 	it("says nothing about a `§?` written inside a String", async () => {
 		let { events } = await run(`tests {
-	test "writes a value comment" {
-		constant text = "§? not a comment"
+	constant text = "§? not a comment"
 
+	test "writes a value comment" {
 		expect text::is("§? not a comment")
+	}
+}`)
+
+		expect(eventsOf(events, "probe")).toHaveLength(0)
+	})
+
+	it("answers every Constant a test body wrote, asked or not", async () => {
+		let { events } = await run(`implementation {
+	function double(_ value: Integer) -> Integer {
+		<- value::multiply(with 2)
+	}
+}
+
+tests {
+	constant setup = double(1)
+
+	test "answers its own Constants" {
+		constant first = double(2)
+		constant second = double(first)
+
+		expect second::is(8)
+	}
+}`)
+
+		expect(
+			eventsOf(events, "probe").map((event) =>
+				event.kind === "probe" ? [event.span?.source, event.value] : [],
+			),
+		).toEqual([
+			["double(2)", "4"],
+			["double(first)", "8"],
+		])
+	})
+
+	it("leaves the Constant a Matcher's assertion synthesized alone", async () => {
+		let { events } = await run(`implementation {
+	constant lions = { team = "Lions", points = 19 }
+}
+
+tests {
+	test "matches" {
+		require { points = 19 } = lions
 	}
 }`)
 
