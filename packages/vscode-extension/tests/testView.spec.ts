@@ -123,6 +123,7 @@ type Answer = { run: number | null } | null
 type View = {
 	handle: (notification: TestRunNotification) => void
 	runIds: (ids: Array<string>, files: Array<string>) => Promise<void>
+	acceptSnapshots: (ids: Array<string>, files: Array<string>) => Promise<void>
 	runFailed: () => Promise<void>
 	reset: () => void
 	dispose: () => void
@@ -132,7 +133,11 @@ type View = {
 
 type Live = {
 	view: View
-	asked: Array<{ ids: Array<string>; files: Array<string> }>
+	asked: Array<{
+		ids: Array<string>
+		files: Array<string>
+		update?: boolean
+	}>
 	answer: (selection: {
 		ids: Array<string>
 		files: Array<string>
@@ -148,7 +153,11 @@ function live(
 		files: Array<string>
 	}) => Answer | Promise<Answer> = () => null,
 ): Live {
-	let asked: Array<{ ids: Array<string>; files: Array<string> }> = []
+	let asked: Array<{
+		ids: Array<string>
+		files: Array<string>
+		update?: boolean
+	}> = []
 	let session: Live = {
 		asked,
 		answer,
@@ -806,6 +815,37 @@ describe("the runs it keeps", () => {
 
 		expect(run.passedTests).toEqual([{ id: one.id, duration: 4 }])
 		expect(run.ends).toBe(1)
+	})
+
+	// NOTE: "Accept snapshot" is an ordinary run, asked to RECORD what it finds.
+	// The Server does the writing — a companion file where it stands, a source
+	// as an edit — so all this end has to do is say so.
+	it("asks for a run that records what it finds", async () => {
+		let session = live()
+		let one = site({ name: "renders" })
+
+		session.view.handle(batch({ sites: [one] }))
+		session.answer = () => ({ run: 9 })
+
+		await session.view.acceptSnapshots([one.id], [FILE])
+
+		expect(session.asked.at(-1)).toEqual({
+			ids: [one.id],
+			files: [],
+			update: true,
+		})
+	})
+
+	it("accepts a whole file where it knows no id", async () => {
+		let session = live(() => ({ run: 3 }))
+
+		await session.view.acceptSnapshots([], [FILE])
+
+		expect(session.asked.at(-1)).toEqual({
+			ids: [],
+			files: [FILE],
+			update: true,
+		})
 	})
 
 	// NOTE: A request made while a cycle is already going is answered with THAT

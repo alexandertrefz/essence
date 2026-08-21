@@ -39,6 +39,14 @@ running as you type, and everything they found where you are looking.
   `essence.tests.debounce` is how long a burst of edits may be before it costs
   a run. **Essence: Show Test Session Output** shows what each cycle covered
   and found.
+- A test written `across` a List of rows is listed once per ROW, under the
+  template the rows share, and each row reports the name it renders — so a
+  table that fails says which row did.
+- **Accept snapshot** appears above a test whose last run left a snapshot to
+  accept: one nothing had recorded, or one that differs. It re-runs that test
+  and records what it finds — a `__snapshots__` companion is written beside
+  the source, and the source itself arrives as an ordinary edit, so an unsaved
+  buffer is edited rather than written round and the change is undoable.
 - Debugging one test is not wired up yet — the debug adapter has to compile a
   tests section and select by id — so the Debug profile and the Debug lens say
   so, and hand over the `essence test --filter` command that runs the
