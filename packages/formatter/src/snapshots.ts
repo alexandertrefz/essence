@@ -143,6 +143,23 @@ function writeUnguarded(
 		}
 	}
 
+	// NOTE: The formatter's answer is taken for a file that was ALREADY
+	// formatted, and only then. Recording a snapshot is something a test run
+	// does to a source, and a run that reformatted forty lines nobody touched
+	// would be a build formatting your code — which this project does not do,
+	// and which no report would mention. Where the file was already in the
+	// shape `esfmt` writes, the only lines that can differ are the ones the
+	// splice touched, so the recorded literal still arrives formatted: broken
+	// across lines if it is long, indented where it stands.
+	if (format(source, { documentPath }).text !== source) {
+		return {
+			text: rewritten,
+			changed: true,
+			applied: wanted.length,
+			refusal: null,
+		}
+	}
+
 	return {
 		text: formatted.text,
 		changed: formatted.text !== source,
