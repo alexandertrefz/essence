@@ -806,7 +806,7 @@ describe("Tests Section", () => {
 			// opened it.
 			expect(diagnostics[0].position).toEqual({
 				start: { line: 5, column: 21 },
-				end: { line: 5, column: 37 },
+				end: { line: 5, column: 38 },
 			})
 		})
 
