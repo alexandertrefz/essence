@@ -345,7 +345,7 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 			// Compiler, so hovering it would answer with a name no source
 			// wrote. Its value is still visited: the Expression under the
 			// cursor is the author's either way.
-			if (node.synthesized === "base") {
+			if (node.synthesized === "base" || node.synthesized === "subject") {
 				visitNode(node.value, state)
 				return
 			}

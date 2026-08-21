@@ -269,7 +269,7 @@ describe("Test codegen — the emitted shape", () => {
 		// it are never reached however deep in the lowering the assertion
 		// stands.
 		expect(javaScript).toMatch(
-			/\$testing\.required\(\$context, 0, [\s\S]*?\);\n\s*const first =/,
+			/\$testing\.required\(\$context, \d+, [\s\S]*?\);\n\s*const first =/,
 		)
 		expect(javaScript).not.toContain("!$testing.required")
 	})
@@ -468,6 +468,41 @@ describe("Test codegen — running what was emitted", () => {
 						{ span: { source: "2" }, value: "2" },
 					],
 					comparison: { kind: "is", left: "3", right: "2" },
+				},
+			],
+		})
+	})
+
+	// NOTE: `require MATCHER = EXPR` asserts a Matcher's test over a value held
+	// under a name, so there is no expression tree at the assertion to take
+	// apart — the subject is the Statement in front of it, and that is what is
+	// instrumented. Without it a failed Matcher explained itself with nothing
+	// at all.
+	it("explains a failed Matcher out of what its subject held", async () => {
+		let { events } = await run(`implementation {
+			function rows() -> List<Integer> {
+				<- []
+			}
+		}
+
+		tests {
+			test "the first row" {
+				require #Value(first) = rows()::firstItem()
+			}
+		}`)
+		let failure = eventsOf(events, "test-fail")[0]
+
+		expect(failure).toMatchObject({
+			failures: [
+				{
+					form: "require",
+					values: [
+						{ span: { source: "rows()" }, value: "[]" },
+						{
+							span: { source: "rows()::firstItem()" },
+							value: "Optional#Empty",
+						},
+					],
 				},
 			],
 		})
