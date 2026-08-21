@@ -6,6 +6,7 @@ import {
 	primary,
 	report,
 	reportError,
+	reportWarning,
 	secondary,
 } from "../diagnostics/index"
 import {
@@ -13,6 +14,7 @@ import {
 	openPendingRefinementCopies,
 	pendingRefinementCopiesOf,
 } from "../helpers/index"
+import { VALUE_COMMENT, valueCommentLines } from "../valueComments"
 import { collectAnnotations } from "./annotations"
 import { builtinMembers, builtinProtocols, builtinTypes } from "./builtins"
 import {
@@ -224,6 +226,50 @@ export const enrich = (
 	return { program: result, diagnostics, annotations }
 }
 
+// NOTE: A value comment written where nothing will ever answer it. `§?` asks
+// for the value of the Statement it ends, and the points that record one are
+// handed out while the `tests { … }` block is lowered — so a value comment in
+// the implementation records nothing, draws no ghost text beside its line, and
+// said nothing at all about why. A reader who asks a question deserves an
+// answer or a refusal, and this is the refusal.
+//
+// NOTE: A Warning, and only ever from a compile that asked for the tests. To a
+// build a value comment is an ordinary Comment and costs a shipped Program
+// nothing, which is the whole of what makes it writable in the first place.
+function reportStrayValueComments(
+	program: parser.Program,
+	source: string | undefined,
+): void {
+	if (source === undefined) {
+		return
+	}
+
+	let section = program.tests?.position ?? null
+
+	for (let [line, position] of valueCommentLines(source)) {
+		if (
+			section !== null &&
+			line >= section.start.line &&
+			line <= section.end.line
+		) {
+			continue
+		}
+
+		reportWarning("This value comment is answered by nothing", position, {
+			code: "value-comment-outside-tests",
+			labels: [
+				primary(position, "no test records the value of this line"),
+			],
+			notes: [
+				`A '${VALUE_COMMENT}' asks for the value of the Statement it ends, and the points that record one are handed out while a 'tests { … }' block is compiled. Everywhere else it is an ordinary Comment.`,
+			],
+			helps: [
+				`Ask it of a Statement inside the 'tests { … }' block, or write '§' for a Comment that asks nothing.`,
+			],
+		})
+	}
+}
+
 // NOTE: The one place the mode flag is read. A compile that did not ask for the
 // tests answers null, and a file that wrote none answers null as well — which
 // is why nothing downstream may read a null `tests` as "this file has no
@@ -238,6 +284,8 @@ function testsSectionOf(
 	if (tests !== true) {
 		return null
 	}
+
+	reportStrayValueComments(program, source)
 
 	// NOTE: The `@example` blocks of the file, as the tests they are. They are
 	// gathered before the written section is enriched so that the whole of what
