@@ -76,6 +76,7 @@ function started(one: TestSite): TestEvent {
 	return {
 		schema: 1,
 		kind: "test-start",
+		row: null,
 		id: one.id,
 		name: one.name,
 		suitePath: one.suitePath,
@@ -321,6 +322,7 @@ describe("what it tells VS Code a run found", () => {
 					{
 						schema: 1,
 						kind: "test-skip",
+						row: null,
 						id: out.id,
 						name: out.name,
 						suitePath: [],

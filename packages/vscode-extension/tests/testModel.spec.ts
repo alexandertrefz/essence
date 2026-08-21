@@ -104,6 +104,7 @@ function started(
 	return {
 		schema: 1,
 		kind: "test-start",
+		row: null,
 		id,
 		name,
 		suitePath,
@@ -155,6 +156,7 @@ describe("folding an event batch", () => {
 			{
 				schema: 1,
 				kind: "test-skip",
+				row: null,
 				id: "c",
 				name: "waits",
 				suitePath: [],
@@ -164,6 +166,7 @@ describe("folding an event batch", () => {
 			{
 				schema: 1,
 				kind: "test-deselected",
+				row: null,
 				id: "d",
 				name: "elsewhere",
 				suitePath: [],
@@ -173,6 +176,7 @@ describe("folding an event batch", () => {
 			{
 				schema: 1,
 				kind: "test-deselected",
+				row: null,
 				id: "e",
 				name: "tagged out",
 				suitePath: [],
@@ -344,6 +348,7 @@ describe("applying a batch", () => {
 					{
 						schema: 1,
 						kind: "test-deselected",
+						row: null,
 						id: two.id,
 						name: two.name,
 						suitePath: [],
@@ -754,6 +759,7 @@ describe("what to draw in the gutter", () => {
 					{
 						schema: 1,
 						kind: "test-skip",
+						row: null,
 						id: two.id,
 						name: two.name,
 						suitePath: [],
@@ -791,6 +797,7 @@ describe("what to draw in the gutter", () => {
 					{
 						schema: 1,
 						kind: "test-deselected",
+						row: null,
 						id: one.id,
 						name: one.name,
 						suitePath: [],
@@ -821,6 +828,7 @@ describe("what to draw in the gutter", () => {
 					{
 						schema: 1,
 						kind: "test-deselected",
+						row: null,
 						id: one.id,
 						name: one.name,
 						suitePath: [],
