@@ -115,6 +115,7 @@ function exampleTest(
 		name: { nodeType: "StringValue", value: name, position },
 		modifiers: [],
 		table: null,
+		properties: null,
 		body,
 		keywordPosition: entry.example.tag?.position ?? position,
 		position,

@@ -74,6 +74,12 @@ export interface TestNode {
 	// last thing about the test that is not the test: what a reader reads is
 	// the name, then what it holds for, then what it does.
 	table: TestTableNode | null
+	// NOTE: `for any (a: T, b: U)` — a property test, and null for the ordinary
+	// one. It stands in the same slot a table's rows stand in, and for the same
+	// reason: it is the last thing about the test that is not the test. A test
+	// can not be both — one runs a written row at a time, the other runs a value
+	// the runner made up — and the Enricher is what says so.
+	properties: TestPropertiesNode | null
 	body: Array<ImplementationNode>
 	keywordPosition: Position
 	position: Position
@@ -88,6 +94,19 @@ export interface TestNode {
 export interface TestTableNode {
 	nodeType: "TestTable"
 	value: ExpressionNode
+	parameters: Array<ParameterNode>
+	parameterListPosition: Position
+	keywordPosition: Position
+	position: Position
+}
+
+// NOTE: `for any (a: Integer, b: NonEmptyList<String>)`. Each Parameter names a
+// value the runner generates from its Type, once per case, and binds it in the
+// body. The Parameter list is a closure's, so the shape is the one a reader
+// already knows — but every Parameter must write a Type, since the Type is the
+// whole of what says what to generate.
+export interface TestPropertiesNode {
+	nodeType: "TestProperties"
 	parameters: Array<ParameterNode>
 	parameterListPosition: Position
 	keywordPosition: Position

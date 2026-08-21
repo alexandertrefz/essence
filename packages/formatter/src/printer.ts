@@ -526,6 +526,7 @@ export class Printer {
 						node.name,
 						node.modifiers,
 						node.table,
+						node.properties,
 					),
 					this.bodyBlock(
 						node.body,
@@ -540,6 +541,7 @@ export class Printer {
 						"suite",
 						node.name,
 						node.modifiers,
+						null,
 						null,
 					),
 					this.bodyBlock(
@@ -564,10 +566,11 @@ export class Printer {
 		name: parser.TestNode["name"],
 		modifiers: Array<parser.TestModifierNode>,
 		table: parser.TestTableNode | null,
+		properties: parser.TestPropertiesNode | null,
 	): Doc {
 		let head: Array<Doc> = [text(keyword + " "), this.printValue(name)]
 
-		if (modifiers.length === 0 && table === null) {
+		if (modifiers.length === 0 && table === null && properties === null) {
 			return concat([...head, text(" ")])
 		}
 
@@ -575,11 +578,15 @@ export class Printer {
 		// rows are a List that lays itself out over lines of its own, and a
 		// group holding those breaks could never be written flat — which would
 		// put every Modifier on a line of its own for a table test that has
-		// one.
-		let tail =
-			table === null
-				? EMPTY
-				: concat([this.printTestTable(table), text(" ")])
+		// one. A property list stands there for the same reason, since its
+		// Parameters break the same way.
+		let tail: Doc = EMPTY
+
+		if (table !== null) {
+			tail = concat([this.printTestTable(table), text(" ")])
+		} else if (properties !== null) {
+			tail = concat([this.printTestProperties(properties), text(" ")])
+		}
 
 		if (modifiers.length === 0) {
 			return concat([...head, text(" "), tail])
@@ -612,6 +619,20 @@ export class Printer {
 			text("across "),
 			this.printExpression(node.value),
 			text(" "),
+			this.printParameterList(
+				node.parameters,
+				EMPTY,
+				node.parameterListPosition,
+			),
+		])
+	}
+
+	// NOTE: `for any (a: Integer, b: String)`, in the slot a table's rows stand
+	// in. The Parameters print as a closure's, so a list long enough to break
+	// breaks the way every other Parameter list does.
+	private printTestProperties(node: parser.TestPropertiesNode): Doc {
+		return concat([
+			text("for any "),
 			this.printParameterList(
 				node.parameters,
 				EMPTY,

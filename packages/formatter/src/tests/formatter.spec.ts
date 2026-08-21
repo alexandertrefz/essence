@@ -1113,6 +1113,73 @@ describe("formatter", () => {
 			expect(result.text).toBe(source)
 		})
 
+		it("writes a property test's Parameters", () => {
+			let source = [
+				"implementation {",
+				"\tconstant x = 1",
+				"}",
+				"",
+				"tests {",
+				'\ttest "add commutes" for any (a: Integer, b: Integer) {',
+				"\t\texpect a::add(b)::is(b::add(a))",
+				"\t}",
+				"}",
+				"",
+			].join("\n")
+
+			let result = format(source)
+
+			expect(result.refusal).toBeNull()
+			expect(result.text).toBe(source)
+		})
+
+		it("writes a property test's Modifiers in front of its Parameters", () => {
+			let source = [
+				"implementation {",
+				"\tconstant x = 1",
+				"}",
+				"",
+				"tests {",
+				'\ttest "holds" tagged slow for any (a: Integer) {',
+				"\t\texpect a::is(a)",
+				"\t}",
+				"}",
+				"",
+			].join("\n")
+
+			let result = format(source)
+
+			expect(result.refusal).toBeNull()
+			expect(result.text).toBe(source)
+		})
+
+		it("breaks a property test's Parameters onto their own lines", () => {
+			let source = [
+				"implementation {",
+				"\tconstant x = 1",
+				"}",
+				"",
+				"tests {",
+				'\ttest "a very long name that pushes the Parameters over the margin" for any (',
+				"\t\tstandings: NonEmptyList<String>,",
+				"\t\tscored: Integer,",
+				"\t) {",
+				"\t\texpect scored::is(scored)",
+				"\t}",
+				"}",
+				"",
+			].join("\n")
+
+			let result = format(source)
+
+			expect(result.refusal).toBeNull()
+			expect(result.text).toBe(source)
+		})
+
+		// NOTE: Every Matcher a `require` may take a value apart with, each one
+		// standing where a Declaration's name stands. A round trip is the whole
+		// of what is asked: the safety gate compares Tokens, so a spelling this
+		// wrote out or dropped would refuse the file rather than reformat it.
 		it("writes a Matcher left of the '='", () => {
 			let source = [
 				"implementation {",

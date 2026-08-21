@@ -24,6 +24,15 @@
 		"body": ["suite \"${1:name}\" {", "\t$0", "}"],
 		"description": "A suite — a group of tests sharing a scope."
 	},
+	"property test": {
+		"prefix": "for any",
+		"body": [
+			"test \"${1:what holds}\" for any (${2:value}: ${3:Type}) {",
+			"\texpect $0",
+			"}"
+		],
+		"description": "A property test — one body run over generated values."
+	},
 	"constant": {
 		"prefix": "constant",
 		"body": ["constant ${1:name}${2:: ${3:Type}} = ${0:value}"],
