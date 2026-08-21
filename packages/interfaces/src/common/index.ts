@@ -23,6 +23,12 @@ export type Documentation = {
 	// — so the order is the meaning, and two lines can carry the same name.
 	parameters: Array<DocumentationParameter>
 	returns: string | null
+	// NOTE: The `@example` blocks, in written order. Each is Essence that a
+	// test compile turns into a test of the file the block was written in —
+	// which is what keeps an example from drifting away from the code it
+	// documents. Empty for the hand written builtin Namespaces, and for every
+	// block that wrote none.
+	examples: Array<DocumentationExample>
 	// NOTE: Null for the hand written builtin Namespaces — they document
 	// themselves in TypeScript rather than in a `§§` block, so there is no
 	// Essence source to point back at.
@@ -43,6 +49,28 @@ export type DocumentationParameter = {
 	// standard library exactly as `position` is. The Position is nested under a
 	// field of that name so that the Formatter's AST comparison, which drops
 	// every `position`, keeps dropping this one too.
+	tag?: { position: Position }
+}
+
+// NOTE: One `§§` line, paired with the span it occupies. It is what lets a
+// Diagnostic underline one tag rather than a whole block — and what lets an
+// `@example` be compiled at the very lines it was written on, so that
+// everything a run reports about it points into the file.
+export type DocumentationLine = {
+	text: string
+	position: Position
+}
+
+// NOTE: One `@example` block: the lines under the tag, until the next tag or
+// the end of the block. They are kept as LINES rather than as one string
+// because each of them carries where it stands, and a test compiled out of them
+// is compiled at those very Positions.
+export type DocumentationExample = {
+	lines: Array<DocumentationLine>
+	position: Position
+	// NOTE: The `@example` line itself, for a Diagnostic about the block rather
+	// than about anything in it. Nested under a field of that name so the
+	// Formatter's AST comparison, which drops every `position`, drops this one.
 	tag?: { position: Position }
 }
 

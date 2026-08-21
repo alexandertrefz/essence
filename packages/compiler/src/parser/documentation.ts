@@ -30,7 +30,7 @@ export const documentationPrefix = "§§"
 
 const separator = "—"
 
-const tagPattern = /^@(param|returns)\b[ \t]*(.*)$/
+const tagPattern = /^@(param|returns|example)\b[ \t]*(.*)$/
 
 const namePattern = /^([^ \t—]*)(.*)$/
 
@@ -40,11 +40,9 @@ const namePattern = /^([^ \t—]*)(.*)$/
 const fencePattern = /^\s*(?:```|~~~)/
 
 // NOTE: A `§§` Comment paired with the span it occupies, so that a Diagnostic
-// about one tag can underline that tag rather than the whole block.
-export type DocumentationLine = {
-	text: string
-	position: common.Position
-}
+// about one tag can underline that tag rather than the whole block — and so
+// that an `@example` can be compiled at the lines it was written on.
+export type DocumentationLine = common.DocumentationLine
 
 export type DocumentationProblem = {
 	kind: "missing-separator"
@@ -67,37 +65,86 @@ type ParameterSection = {
 	position: common.Position
 }
 
+// NOTE: One `@example` while it is being collected. Unlike every other section
+// it keeps the LINES rather than their text: what is written under the tag is
+// Essence, and compiling it at the Positions it was written at is what makes
+// everything a run says about it point into the file.
+type ExampleSection = {
+	lines: Array<common.DocumentationLine>
+	position: common.Position
+	tag: common.Position
+}
+
 export function parseDocumentation(
 	lines: Array<DocumentationLine>,
 	position: common.Position,
 ): ParsedDocumentation {
 	let description: Array<string> = []
 	let parameters: Array<ParameterSection> = []
+	let examples: Array<ExampleSection> = []
 	let returns: Array<string> | null = null
 	let problems: Array<DocumentationProblem> = []
 	let fenced = false
 	// NOTE: Lines following a tag continue it until the next tag starts, so a
 	// Parameter can be described across as many lines as it needs.
 	let section = description
+	// NOTE: The `@example` being collected, if any. It is kept apart from
+	// `section` because what it collects is Lines rather than text — and
+	// because its lines are lifted OUT of the description: an example is code
+	// the run compiles, not prose the Editor renders.
+	let example: ExampleSection | null = null
 
 	for (let line of lines) {
 		let body = stripPrefix(line.text)
 
 		if (fencePattern.test(body)) {
 			fenced = !fenced
-			section.push(body)
+
+			if (example === null) {
+				section.push(body)
+			} else {
+				example.lines.push(line)
+			}
+
 			continue
 		}
 
 		let tag = fenced ? null : tagPattern.exec(body)
 
 		if (tag === null) {
-			section.push(body)
+			if (example === null) {
+				section.push(body)
+			} else {
+				example.lines.push(line)
+				example.position = {
+					start: example.position.start,
+					end: line.position.end,
+				}
+			}
+
 			continue
 		}
 
 		let [, name, rest] = tag
 		let parameterName: string | null = null
+
+		example = null
+
+		if (name === "example") {
+			// NOTE: A tag with nothing under it yet. The lines below it are
+			// what it holds, and a block that ends here holds an example of no
+			// lines — which is nothing to compile and is dropped below.
+			example = {
+				lines: [],
+				position: line.position,
+				tag: line.position,
+			}
+
+			examples.push(example)
+			section = description
+
+			continue
+		}
 
 		if (name === "param") {
 			let [tagged, afterName] = splitLeadingName(rest)
@@ -153,10 +200,27 @@ export function parseDocumentation(
 				tag: { position: parameter.position },
 			})),
 			returns: returns === null ? null : joinSection(returns),
+			// NOTE: An `@example` with no lines under it is dropped: there is
+			// nothing to compile, and a test that runs no Statement would be a
+			// test that always passes.
+			examples: examples
+				.filter((entry) => entry.lines.some(holdsCode))
+				.map((entry) => ({
+					lines: entry.lines,
+					position: entry.position,
+					tag: { position: entry.tag },
+				})),
 			position,
 		},
 		problems,
 	}
+}
+
+// NOTE: Whether a line of an example says anything. A blank one is kept — it is
+// where the author put it and the compiled example is written at the very lines
+// it stands on — but a block of nothing but blanks holds no example.
+function holdsCode(line: common.DocumentationLine): boolean {
+	return stripPrefix(line.text).trim() !== ""
 }
 
 // NOTE: One leading space after the sigil is the separator rather than

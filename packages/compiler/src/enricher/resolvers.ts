@@ -2471,6 +2471,7 @@ export function derivedEquatableNamespaceForChoice(
 			description,
 			parameters: [{ name: "other", text: "the Choice to compare with" }],
 			returns,
+			examples: [],
 			position: null,
 		},
 	})
@@ -2540,6 +2541,7 @@ export function derivedPrintableNamespaceForChoice(
 			description: "Answers the Case's name as a String.",
 			parameters: [],
 			returns: "the name of the Case, without its `#`.",
+			examples: [],
 			position: null,
 		},
 	}

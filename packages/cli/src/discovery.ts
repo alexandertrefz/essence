@@ -5,8 +5,10 @@ import { containsErrors } from "@essence-lang/compiler/diagnostics"
 import {
 	canonicalPath,
 	isStdlibDocument,
+	isStdlibWalk,
 	parseDocument,
 } from "@essence-lang/compiler/documents"
+import { hasDocumentationExamples } from "@essence-lang/compiler/enricher/examples"
 
 import { UsageError } from "./args"
 import { type CommandSpec, DEFAULT_PROGRAM_NAME } from "./commands"
@@ -37,6 +39,12 @@ export const skippedDirectories = new Set([
 // not be read can not be shown to hold no tests.
 const TESTS_SUFFIX = ".tests.es"
 
+// NOTE: The one thing a file with no `tests { … }` block may still write that
+// makes it a file with tests. Like the substring check on `tests`, it can only
+// rule a file OUT — an `@example` may perfectly well be prose — so what follows
+// it is a parse.
+const EXAMPLE_TAG = "@example"
+
 export function namesTests(filePath: string): boolean {
 	return path.basename(filePath).endsWith(TESTS_SUFFIX)
 }
@@ -55,6 +63,12 @@ async function isDirectory(target: string): Promise<boolean> {
 async function collectEssenceFiles(
 	directory: string,
 	found: Set<string>,
+	// NOTE: Whether a standard library source counts. A walk of a PROJECT must
+	// never pick one up, wherever the checkout puts it — it declares the
+	// builtins and is nobody's test. A walk that STARTED inside the standard
+	// library is a different question: the library's own `@example` blocks are
+	// tests, and `essence test` run in it is how they are run.
+	allowStdlib: boolean,
 ): Promise<void> {
 	let entries: Array<{ name: string; isDirectory: boolean }> = []
 
@@ -74,7 +88,7 @@ async function collectEssenceFiles(
 
 		if (entry.isDirectory) {
 			if (!skippedDirectories.has(entry.name)) {
-				await collectEssenceFiles(entryPath, found)
+				await collectEssenceFiles(entryPath, found, allowStdlib)
 			}
 
 			continue
@@ -84,10 +98,7 @@ async function collectEssenceFiles(
 			continue
 		}
 
-		// NOTE: A standard library source is not a Module and is nobody's test
-		// — it declares the builtins. Whichever directory a checkout puts it
-		// in, a walk of a project must not pick it up.
-		if (!isStdlibDocument(entryPath)) {
+		if (allowStdlib || !isStdlibDocument(entryPath)) {
 			found.add(canonicalPath(entryPath))
 		}
 	}
@@ -119,7 +130,11 @@ async function keepsFile(filePath: string, named: boolean): Promise<boolean> {
 	// contextual keyword, so a file that writes it may only be naming a
 	// Constant, and that is why what follows is a parse rather than a second
 	// guess.
-	if (!named && !sourceText.includes("tests")) {
+	if (
+		!named &&
+		!sourceText.includes("tests") &&
+		!sourceText.includes(EXAMPLE_TAG)
+	) {
 		return false
 	}
 
@@ -127,6 +142,11 @@ async function keepsFile(filePath: string, named: boolean): Promise<boolean> {
 
 	return (
 		parsed.program.tests !== null ||
+		// NOTE: A file that writes no section may still promise something: an
+		// `@example` in a `§§` block is a test of the file it was written in,
+		// and a project's documentation is the last place a drifting example
+		// should be allowed to sit unrun.
+		hasDocumentationExamples(parsed.program) ||
 		(named && containsErrors(parsed.diagnostics))
 	)
 }
@@ -149,7 +169,11 @@ export async function discoverTestFiles(
 		path.resolve(workingDirectory, target)
 
 	if (patterns.length === 0) {
-		await collectEssenceFiles(workingDirectory, walked)
+		await collectEssenceFiles(
+			workingDirectory,
+			walked,
+			isStdlibWalk(workingDirectory),
+		)
 	}
 
 	for (let pattern of patterns) {
@@ -176,7 +200,7 @@ export async function discoverTestFiles(
 
 		for (let match of matches) {
 			if (await isDirectory(match)) {
-				await collectEssenceFiles(match, walked)
+				await collectEssenceFiles(match, walked, isStdlibWalk(match))
 
 				continue
 			}

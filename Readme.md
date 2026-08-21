@@ -125,7 +125,9 @@ packages/cli/bin/essence test --update          # record every snapshot the run 
 
 A test written `across` a List of rows runs once per row, and `matches snapshot` compares a value against one a
 run recorded — inline in the source, or in `__snapshots__/<File>.es.snap` beside it where the snapshot was
-given a name.
+given a name. An `@example` block in a `§§` comment is a test too, compiled in the file's own scope and
+reported under an `examples` suite, so an example that drifts from the code fails rather than lying in hover
+text.
 
 `--watch` stays running and re-runs only the tests a change reached — the entries whose module graph holds the
 file that was saved — then clears the screen and reprints the whole picture, so what is on screen is the state

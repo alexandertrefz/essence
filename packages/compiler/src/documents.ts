@@ -110,6 +110,22 @@ export function isStdlibDocument(documentPath: string | undefined): boolean {
 	)
 }
 
+// NOTE: Whether a directory a walk starts in IS the standard library: the
+// sources directory, anything under it, or the package that holds it. It is a
+// separate question from `isStdlibDocument`, which answers about a FILE and is
+// what keeps a project's own walk from picking the library up. A walk of the
+// library itself is the one place its sources are wanted — its `@example`
+// blocks are tests, and `essence test` run in it is how they are run.
+export function isStdlibWalk(directory: string): boolean {
+	let resolved = canonicalPath(directory)
+
+	return (
+		resolved === CANONICAL_STDLIB_DIRECTORY ||
+		resolved === path.dirname(CANONICAL_STDLIB_DIRECTORY) ||
+		resolved.startsWith(`${CANONICAL_STDLIB_DIRECTORY}${path.sep}`)
+	)
+}
+
 export function parseDocument(
 	source: string,
 	documentPath?: string,
@@ -130,7 +146,14 @@ export function parseDocument(
 export function enrichDocument(
 	program: parser.Program,
 	documentPath?: string,
-	options: { annotations?: boolean; tests?: boolean } = {},
+	options: {
+		annotations?: boolean
+		tests?: boolean
+		// NOTE: The document's own text, which only a test compile reads — an
+		// `@example` block is compiled out of the file's own lines. See
+		// `enrich`'s own `source`.
+		source?: string
+	} = {},
 ): {
 	program: common.typed.Program
 	diagnostics: Array<common.Diagnostic>
@@ -144,8 +167,15 @@ export function enrichDocument(
 	// another standard library file declares is a genuine builtin as far as
 	// this one is concerned — the loader hoists them all into one Scope, and
 	// the editor's view of a single file should agree.
+	//
+	// NOTE: A standard library source is not a Module, so its Scope names none
+	// — and a test out of one still has to say which file it came from. The
+	// path is handed over for the identities alone; the Scope's own
+	// `modulePath` stays absent, which is what keeps the library's Choices
+	// unqualified.
 	return enrich(program, {
 		...options,
+		testsPath: documentPath,
 		shadowedBuiltins: declaredNames([program]),
 	})
 }

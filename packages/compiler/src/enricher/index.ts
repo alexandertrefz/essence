@@ -27,6 +27,7 @@ import {
 	resolveTypeAliasStatementSkeleton,
 	resolveTypeAliasStatementType,
 } from "./enrichers"
+import { exampleSuite, exampleTestsOf } from "./examples"
 import {
 	invalidateNamespacesInScope,
 	referencedTypeNames,
@@ -142,6 +143,18 @@ export const enrich = (
 		// "stripped from every build" means — the Program that comes out has
 		// never heard of it. See `common.typed.Program.tests`.
 		tests?: boolean
+		// NOTE: What a test's identity spells as its Module where the Scope
+		// carries none of its own. The standard library is the one compile that
+		// is not a graph of Modules — its Choices are deliberately unqualified,
+		// so its Scope names no Module — and its files still have to name
+		// themselves in a report.
+		testsPath?: string
+		// NOTE: The Program's own source text, which only a test compile reads:
+		// an `@example` block is Essence written inside a Comment, and it is
+		// compiled out of the file's own lines so that every Position it
+		// produces is a Position in the file. Left out, a file's examples are
+		// simply not tests.
+		source?: string
 	} = {},
 ): {
 	program: common.typed.Program
@@ -167,7 +180,13 @@ export const enrich = (
 					program.implementation,
 					scope,
 				),
-				tests: testsSectionOf(program, scope, options.tests),
+				tests: testsSectionOf(
+					program,
+					scope,
+					options.tests,
+					options.source,
+					options.testsPath,
+				),
 			})
 
 			if (options.annotations !== true) {
@@ -211,10 +230,41 @@ function testsSectionOf(
 	program: parser.Program,
 	scope: enricher.Scope,
 	tests: boolean | undefined,
+	source: string | undefined,
+	testsPath?: string,
 ): common.typed.TestsSectionNode | null {
-	return tests === true && program.tests !== null
-		? enrichTestsSection(program.tests, scope)
-		: null
+	if (tests !== true) {
+		return null
+	}
+
+	// NOTE: The `@example` blocks of the file, as the tests they are. They are
+	// gathered before the written section is enriched so that the whole of what
+	// a file proves — what it wrote and what its documentation promises — goes
+	// through ONE enrichment, in one Scope, and comes out as one manifest.
+	let examples = exampleTestsOf(program, source)
+
+	if (program.tests === null && examples.length === 0) {
+		return null
+	}
+
+	let position = program.tests?.position ?? program.implementation.position
+	let written = program.tests?.nodes ?? []
+
+	return enrichTestsSection(
+		{
+			nodeType: "TestsSection",
+			// NOTE: The examples come LAST, so that a file's own tests keep the
+			// indices they had — and read first, which is the order they were
+			// written in.
+			nodes:
+				examples.length === 0
+					? written
+					: [...written, exampleSuite(examples, position)],
+			position,
+		},
+		scope,
+		testsPath,
+	)
 }
 
 // NOTE: One Program and the Scope its top level is enriched in. The standard
@@ -224,6 +274,9 @@ function testsSectionOf(
 export type EnrichedProgramInput = {
 	program: parser.Program
 	scope: enricher.Scope
+	// NOTE: The Module's own text, which only a test compile reads — see
+	// `enrich`'s own `source`.
+	source?: string
 }
 
 // NOTE: Several Programs enriched with hoisting run ONCE over every file's Nodes
@@ -331,7 +384,7 @@ const enrichProgramsInner = (
 		options.seedRound,
 	)
 
-	return inputs.map(({ program, scope }) => {
+	return inputs.map(({ program, scope, source }) => {
 		let { result, diagnostics } = collectDiagnostics(
 			(): common.typed.Program => {
 				for (let node of program.implementation.nodes) {
@@ -348,7 +401,12 @@ const enrichProgramsInner = (
 						scope,
 						hoistedTypes,
 					),
-					tests: testsSectionOf(program, scope, options.tests),
+					tests: testsSectionOf(
+						program,
+						scope,
+						options.tests,
+						source,
+					),
 					exports: null,
 					position: program.position,
 				}
@@ -1450,6 +1508,8 @@ const guarded = <NodeType>(
 type TestsContext = {
 	suitePath: Array<string>
 	covering: TestModifiers
+	// NOTE: What every identity in the section spells as its Module.
+	modulePath: string | null
 }
 
 // NOTE: The `tests { … }` block, enriched only where the compile ASKED for it —
@@ -1472,12 +1532,16 @@ type TestsContext = {
 export const enrichTestsSection = (
 	section: parser.TestsSectionNode,
 	scope: enricher.Scope,
+	// NOTE: See `enrich`'s own `testsPath`. Null everywhere a Scope names its
+	// Module, which is every compile but the standard library's own.
+	testsPath?: string,
 ): common.typed.TestsSectionNode => {
 	return {
 		nodeType: "TestsSection",
 		nodes: enrichTestsNodes(section.nodes, childScope(scope), {
 			suitePath: [],
 			covering: noModifiers,
+			modulePath: modulePathOf(scope) ?? testsPath ?? null,
 		}),
 		position: section.position,
 	}
@@ -1553,7 +1617,7 @@ const enrichTest = (
 	return {
 		nodeType: "Test",
 		identity: {
-			modulePath: modulePathOf(scope),
+			modulePath: context.modulePath,
 			suitePath: context.suitePath,
 			name: nameTemplate(node.name),
 		},
@@ -1587,7 +1651,7 @@ const enrichSuite = (
 	return {
 		nodeType: "Suite",
 		identity: {
-			modulePath: modulePathOf(scope),
+			modulePath: context.modulePath,
 			suitePath: context.suitePath,
 			name,
 		},
@@ -1598,6 +1662,7 @@ const enrichSuite = (
 		nodes: enrichTestsNodes(node.nodes, bodyScope, {
 			suitePath: [...context.suitePath, name],
 			covering: modifiers,
+			modulePath: context.modulePath,
 		}),
 		keywordPosition: node.keywordPosition,
 		position: node.position,

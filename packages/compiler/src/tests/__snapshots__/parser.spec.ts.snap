@@ -17600,6 +17600,7 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse a document
         "conformsTo": [],
         "documentation": {
           "description": "Anything that can represent itself as a String.",
+          "examples": [],
           "parameters": [],
           "position": {
             "end": {
@@ -17634,6 +17635,7 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse a document
               "body": null,
               "documentation": {
                 "description": "The String representation.",
+                "examples": [],
                 "parameters": [],
                 "position": {
                   "end": {
