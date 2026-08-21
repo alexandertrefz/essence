@@ -1682,6 +1682,16 @@ describe("the test command's own documentation", () => {
 		)
 	})
 
+	// NOTE: `optimisations.md` documents `--no-optimise --coverage` and turning
+	// `instrument-coverage` off by name, and --coverage is a flag of this
+	// command alone — so both documented combinations have to be spellable
+	// here.
+	it("takes the two flags that turn the Optimiser down", () => {
+		expect(testCommand.options.map((option) => option.name)).toEqual(
+			expect.arrayContaining(["no-optimise", "without-optimisation"]),
+		)
+	})
+
 	it("is reachable under both names the binary is installed as", () => {
 		let context = createContext(
 			parseArguments(["test"], "essence").options,
