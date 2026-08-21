@@ -376,3 +376,31 @@ export function focusedTestsDiagnostic(
 		],
 	}
 }
+
+// NOTE: Coverage is folded, weighed and written out next door, and re-exported
+// here so that everything about a test run is still reached through one name.
+export {
+	caseNameOf,
+	type ChoiceCoverage,
+	collectCoverage,
+	type CoverageRatio,
+	type CoverageSummary,
+	type CoveredPointRecord,
+	emptyCoverage,
+	type FileCoverage,
+	fileCoverageOf,
+	hasCoverage,
+	isReported,
+	mergeCoverage,
+	type MissedPoint,
+	neverConstructed,
+	percentageOf,
+} from "./coverage"
+export {
+	type CoverageReportFormat,
+	coverageReportFileName,
+	coverageReportFormats,
+	isCoverageReportFormat,
+	toCoverageJson,
+	toLcov,
+} from "./coverageReports"

@@ -282,6 +282,7 @@ describe("CLI", () => {
 			expect(optimiserOptionsFor(options)).toEqual({
 				enabled: true,
 				disabledPasses: new Set(),
+				coverage: false,
 			})
 		})
 
@@ -1422,6 +1423,9 @@ function testOptions(overrides: Partial<OptionValues> = {}): OptionValues {
 		filter: undefined,
 		tag: [],
 		skipTag: [],
+		coverage: false,
+		coverageReport: null,
+		coverageOut: undefined,
 		...overrides,
 	}
 }

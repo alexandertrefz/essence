@@ -128,6 +128,24 @@ changed — clearing the screen and reprinting the whole picture each time. A
 statement whose line ends in `§?` answers with what it held; it is an ordinary
 comment to every other command.
 
+`essence test --coverage` reports what the run reached, in a table beside the
+results: lines and branches as percentages, `match` arms as taken out of total,
+and then the part a line-counting tool can not say — every arm no value took
+and every Case of a `choice` no test ever built, each named by the Method it
+was written in.
+
+```
+ File          Lines  Branches  Cases  Not taken
+ Season.es     43%    –         0/6    Fixture::toString › case #Played
+ Standings.es  97%    95%       9/9    Standing::recentForm › else
+ Table.es      96%    83%       –      signOf › if
+```
+
+`--coverage-report lcov` writes the tracefile a coverage viewer reads, and
+`--coverage-report json` the Compiler's own vocabulary — the arms, the guarded
+branches and the scope each point stands in, none of which lcov can spell. Both
+write into `coverage/`, or into `--coverage-out <directory>`.
+
 ## Conventions worth keeping
 
 None of these are enforced. They are what the repository itself does.

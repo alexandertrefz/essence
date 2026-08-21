@@ -1,8 +1,10 @@
-import { copyFile, link, mkdir, mkdtemp, rm } from "node:fs/promises"
+import { copyFile, link, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import * as path from "node:path"
 import { pathToFileURL } from "node:url"
 
+import { displayPath } from "@essence-lang/compiler/diagnostics/render"
+import { coverageReportFileName } from "@essence-lang/compiler/testing"
 import {
 	type entryPoints,
 	type Registry,
@@ -23,13 +25,19 @@ import { readProjectConfiguration } from "./configuration"
 import type { CLIContext } from "./context"
 import { discoverTestFiles } from "./discovery"
 import {
+	collectCoverage,
 	collectTestRun,
+	type CoverageSummary,
+	emptyCoverage,
 	emptyRun,
 	type FocusedTest,
+	renderCoverage,
 	renderFocusedTests,
 	renderNoTests,
 	renderTestReport,
 	type TestRun,
+	toCoverageJson,
+	toLcov,
 } from "./testReport"
 
 // NOTE: `essence test` compiles every file it was pointed at with the tests
@@ -216,6 +224,11 @@ export function runSuites(
 	// entry can replace the right one. Null for the run's own bookend, which
 	// belongs to no bundle.
 	emit: (event: TestEvent, suite: LoadedSuite | null) => void,
+	// NOTE: Whether each bundle writes what its counters counted. A bundle
+	// compiled without the instrumentation has none, so asking costs nothing
+	// and answers with nothing — which is why the flag is passed through rather
+	// than guessed at from the events.
+	coverage = false,
 ): { planned: number; focused: boolean } {
 	let selected = all.map((suite) =>
 		suite.tests.select(suite.registry, filters),
@@ -256,6 +269,7 @@ export function runSuites(
 				emit(event, suite)
 			},
 			filters: runFilters,
+			coverage,
 		})
 	}
 
@@ -356,6 +370,7 @@ export function printReport(
 	context: CLIContext,
 	run: TestRun,
 	sources: Map<string, string>,
+	coverage: CoverageSummary = emptyCoverage,
 ): void {
 	let { failures, summary, tree } = renderTestReport(
 		run,
@@ -373,10 +388,71 @@ export function printReport(
 		context.terminal.err(failures)
 	}
 
+	// NOTE: Between the failures and the summary line — a reader who has just
+	// been told what broke reads what was reached next, and the counts stay
+	// where they have always been, at the bottom.
+	let table = context.options.quiet
+		? []
+		: renderCoverage(coverage, context.report)
+
+	if (table.length > 0) {
+		context.terminal.out("")
+
+		for (let line of table) {
+			context.terminal.out(line)
+		}
+	}
+
 	if (!context.options.quiet) {
 		context.terminal.out("")
 		context.terminal.out(summary)
 		context.terminal.out("")
+	}
+}
+
+// NOTE: The written half of a coverage run. Nothing is written unless a format
+// was named: a table is what `--coverage` promises, and a file left in a
+// project nobody asked for is litter. The directory is made on the way, and a
+// failure to write is a WARNING rather than a failure of the run — the tests
+// have already answered, and a full disk is not a broken test.
+export async function writeCoverageReport(
+	context: CLIContext,
+	coverage: CoverageSummary,
+): Promise<void> {
+	let format = context.options.coverageReport
+
+	if (format === null) {
+		return
+	}
+
+	let directory = path.resolve(context.options.coverageOut ?? "coverage")
+	let fileName = path.join(directory, coverageReportFileName(format))
+
+	try {
+		await mkdir(directory, { recursive: true })
+		await writeFile(
+			fileName,
+			format === "lcov" ? toLcov(coverage) : toCoverageJson(coverage),
+			"utf8",
+		)
+	} catch (error) {
+		context.terminal.err(
+			`  ${context.palette.warning(
+				context.theme.symbols.warning,
+			)} ${context.palette.muted(
+				`could not write ${displayPath(fileName)}: ${String(error)}`,
+			)}`,
+		)
+
+		return
+	}
+
+	if (!context.options.json && !context.options.quiet) {
+		context.terminal.out(
+			` ${context.palette.muted(
+				`coverage written to ${displayPath(fileName)}`,
+			)}`,
+		)
 	}
 }
 
@@ -490,7 +566,13 @@ export async function runTest(
 		)
 
 		let started = performance.now()
-		let { focused } = runSuites(suites, suites, filters, emit)
+		let { focused } = runSuites(
+			suites,
+			suites,
+			filters,
+			emit,
+			context.options.coverage,
+		)
 		// NOTE: The stream is folded up ONCE, here, and the `run-end` this
 		// writes carries the counts it found. Re-reading the stream afterwards
 		// would walk every `expect` of every test a second time to be told what
@@ -523,9 +605,15 @@ export async function runTest(
 		...context.options.skipTag,
 	])
 
+	let coverage = context.options.coverage
+		? collectCoverage(events)
+		: emptyCoverage
+
 	if (!context.options.json) {
-		printReport(context, run, sources)
+		printReport(context, run, sources, coverage)
 	}
+
+	await writeCoverageReport(context, coverage)
 
 	if (run.counts.failed > 0) {
 		return EXIT_FAILURE
