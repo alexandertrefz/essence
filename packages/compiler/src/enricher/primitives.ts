@@ -22,6 +22,11 @@ export const algebraicType: common.AlgebraicType = { type: "Algebraic" }
 export const transcendentalType: common.TranscendentalType = {
 	type: "Transcendental",
 }
+// NOTE: The source a property test generates its values from. It has no
+// declaration anywhere for the reason the tags above have none: nothing a
+// `type`, `choice` or `protocol` could say produces a value that carries state
+// only the runtime can read.
+export const randomnessType: common.RandomnessType = { type: "Randomness" }
 // NOTE: The open Record Type — `{}` members, which every Record is assignable
 // to. It is the receiver Type the Record Namespace targets, and it is also the
 // UNIT Type: a Function that answers nothing useful promises a Record with no
@@ -44,6 +49,7 @@ export const primitiveTypes: Record<string, common.Type> = {
 	Rational: rationalType,
 	Algebraic: algebraicType,
 	Transcendental: transcendentalType,
+	Randomness: randomnessType,
 	Record: recordType,
 	List: genericListType,
 }

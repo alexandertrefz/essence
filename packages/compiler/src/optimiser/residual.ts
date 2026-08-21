@@ -510,6 +510,7 @@ function runtimeTagOf(type: common.Type): string | null {
 		case "Rational":
 		case "Algebraic":
 		case "Transcendental":
+		case "Randomness":
 		case "Record":
 			return type.type
 		case "List":
@@ -570,6 +571,7 @@ function checkIsTagAlone(matcher: common.Type): boolean {
 		case "Rational":
 		case "Algebraic":
 		case "Transcendental":
+		case "Randomness":
 		case "GenericList":
 			return true
 		case "List":
@@ -689,6 +691,7 @@ function checkIsImplied(matcher: common.Type, valueType: common.Type): boolean {
 		case "Rational":
 		case "Algebraic":
 		case "Transcendental":
+		case "Randomness":
 			return valueType.type === matcher.type
 		case "Function":
 			return valueType.type === "Function"

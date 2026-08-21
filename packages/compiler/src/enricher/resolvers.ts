@@ -126,6 +126,8 @@ function describeTypesForCombination(type: common.Type): string {
 			return "Algebraics"
 		case "Transcendental":
 			return "Transcendentals"
+		case "Randomness":
+			return "Randomness sources"
 		case "String":
 			return "Strings"
 		case "Unknown":
@@ -1827,6 +1829,8 @@ function runtimeTagOf(type: common.Type): string | null {
 			return "Algebraic"
 		case "Transcendental":
 			return "Transcendental"
+		case "Randomness":
+			return "Randomness"
 		case "Record":
 			return "Record"
 		case "List":

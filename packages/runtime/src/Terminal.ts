@@ -160,6 +160,11 @@ export function getStringRepresentation(
 		return obj.value ? "true" : "false"
 	} else if (obj[typeKeySymbol] === "String") {
 		return `"${escapeStringContents(obj.value)}"`
+	} else if (obj[typeKeySymbol] === "Randomness") {
+		// NOTE: One fixed word, like a Function's. What a source holds is four
+		// words of generator state, which say nothing to a reader and would
+		// differ between two runs of one Program.
+		return "Randomness"
 	} else if (obj[typeKeySymbol].includes("#")) {
 		// NOTE: Case values print as their tag, with the payload spelled out
 		// like a Record when the Case carries one.

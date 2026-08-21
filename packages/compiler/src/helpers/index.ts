@@ -2843,6 +2843,10 @@ function matchTypes(
 		return true
 	}
 
+	if (lhs.type === "Randomness" && rhs.type === "Randomness") {
+		return true
+	}
+
 	if (lhs.type === "UnionType") {
 		let lhsMembers = orderUnionMembersForMatching(lhs.types, context)
 

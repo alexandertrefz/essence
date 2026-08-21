@@ -50,6 +50,7 @@ const RUNTIME_TYPE_MODULES: Record<string, string> = {
 	OptionalType: "./Optional",
 	ValueType: "./Optional",
 	EmptyType: "./Optional",
+	RandomnessType: "./Randomness",
 	RationalType: "./Rational",
 	RecordType: "./Record",
 	StepType: "./Step",
@@ -226,6 +227,9 @@ function mapType(
 		case "Transcendental":
 			ctx.used.add("TranscendentalType")
 			return "TranscendentalType"
+		case "Randomness":
+			ctx.used.add("RandomnessType")
+			return "RandomnessType"
 		case "List":
 			ctx.used.add("ListType")
 			return `ListType<${mapType(type.itemType, ctx, where)}>`
@@ -416,6 +420,8 @@ function describeEssenceType(type: common.Type | common.GenericUse): string {
 			return "Algebraic"
 		case "Transcendental":
 			return "Transcendental"
+		case "Randomness":
+			return "Randomness"
 		case "List":
 			return `List<${describeEssenceType(type.itemType)}>`
 		// NOTE: Named, not spelled out — the comment is there so an Overload

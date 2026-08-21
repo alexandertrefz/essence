@@ -31,6 +31,8 @@ export {
 	Ordering             from "./Ordering.es"
 	Equatable            from "./Protocols.es"
 	Printable            from "./Protocols.es"
+	Generatable          from "./Randomness.es"
+	Randomness           from "./Randomness.es"
 	NumberFormat         from "./Rational.es"
 	Rational             from "./Rational.es"
 	Rounding             from "./Rational.es"

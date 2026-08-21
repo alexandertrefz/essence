@@ -20,6 +20,7 @@ import type { NumberType } from "./Number"
 import type { NumberFormatType } from "./NumberFormat"
 import type { OptionalType } from "./Optional"
 import type { OrderingType } from "./Ordering"
+import type { RandomnessType } from "./Randomness"
 import type { RationalType } from "./Rational"
 import type { RecordType } from "./Record"
 import type { SideType } from "./Side"
@@ -387,6 +388,19 @@ export type KeyedNumberListNatives = {
 
 }
 
+export type RandomnessNatives = {
+	// boolean() -> Boolean
+	boolean: (self: RandomnessType) => BooleanType
+	// integer(between: Integer, and: Integer) -> Integer
+	integer: (self: RandomnessType, between: IntegerType, and: IntegerType) => IntegerType
+	// rational(between: Rational, and: Rational) -> Rational
+	rational: (self: RandomnessType, between: RationalType, and: RationalType) => RationalType
+	// string(upTo: Integer) -> String
+	string: (self: RandomnessType, upTo: IntegerType) => StringType
+	// pick<ItemType>(from: NonEmptyList) -> ItemType
+	pick: <ItemType extends AnyType>(self: RandomnessType, from: ListType<ItemType>) => ItemType
+}
+
 export type FunctionsNatives = {
 	// static loop<State>(startingWith: State, while: (_: State) -> Boolean, step: (_: State) -> State) -> State
 	loop__overload$1: <State extends AnyType>(startingWith: State, argument1: (argument0: State) => BooleanType, step: (argument0: State) => State) => State
@@ -631,6 +645,16 @@ export const $NonEmptyNumberListAbsent: AssertNoEssenceExports<typeof import("./
 declare const KeyedNumberListModule: typeof import("./KeyedNumberList")
 export const $KeyedNumberList: KeyedNumberListNatives = KeyedNumberListModule
 export const $KeyedNumberListAbsent: AssertNoEssenceExports<typeof import("./KeyedNumberList"), "sum__overload$1" | "sum__overload$2" | "sum__overload$3" | "average__overload$1" | "average__overload$2"> = true
+
+declare const RandomnessModule: typeof import("./Randomness")
+export const $Randomness: RandomnessNatives = RandomnessModule
+export const $RandomnessArity: AssertArities<typeof import("./Randomness"), {
+	boolean: 1
+	integer: 3
+	rational: 3
+	string: 2
+	pick: 2
+}> = true
 
 declare const functionsModule: typeof import("./functions")
 export const $functions: FunctionsNatives = functionsModule
