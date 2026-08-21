@@ -297,6 +297,18 @@ function renderOutput(test: TestRecord, context: ReportContext): Array<string> {
 	]
 }
 
+// NOTE: A JavaScript stack under a message that already says what happened.
+// The frames name a bundle staged in a temporary directory and the files of the
+// runner that staged it — nothing a reader of an Essence report can act on, and
+// a path that will not exist by the time they read it. `--verbose` keeps them,
+// because a Compiler bug is reported out of exactly those lines.
+function withoutFrames(error: string): string {
+	let lines = error.split("\n")
+	let frames = lines.findIndex((line) => /^\s+at\s/.test(line))
+
+	return frames === -1 ? error : lines.slice(0, frames).join("\n")
+}
+
 export type SourceLookup = (module: string | null) => string | null
 
 // NOTE: Every failure of a run, rendered. A test whose module's source is not
@@ -360,9 +372,10 @@ export function renderTestFailures(
 				),
 			)
 			lines.push(
-				...indented(test.error, `${INDENT}${INDENT}`).map((line) =>
-					palette.faint(line),
-				),
+				...indented(
+					context.verbose ? test.error : withoutFrames(test.error),
+					`${INDENT}${INDENT}`,
+				).map((line) => palette.faint(line)),
 			)
 			lines.push("")
 		}
