@@ -49,6 +49,13 @@ function comparisonLabel(
 	let comparison = event.comparison
 
 	if (comparison !== null && comparison.left !== null) {
+		// NOTE: A snapshot's two sides are not an equality that failed but a
+		// recording and a run that differ, and saying "is" of them would claim
+		// the very thing the failure is about.
+		if (comparison.kind === "snapshot") {
+			return `recorded ${comparison.left}, held ${comparison.right}`
+		}
+
 		return `${comparison.left} ${
 			comparison.kind === "is" ? "is not" : "is"
 		} ${comparison.right}`

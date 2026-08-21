@@ -38,7 +38,10 @@ export type TracedValue = { point: number; span: Span | null; value: string }
 export type DiffLine = { kind: "same" | "left" | "right"; text: string }
 
 export type Comparison = {
-	kind: "is" | "isNot"
+	// NOTE: The three the runtime writes. A snapshot is a comparison like the
+	// other two and explains itself unlike either: what it holds is a
+	// recording and what this run held.
+	kind: "is" | "isNot" | "snapshot"
 	left: string | null
 	right: string | null
 	diff: Array<DiffLine>
@@ -721,8 +724,9 @@ function diffLines(diff: Array<DiffLine>): Array<string> {
 
 export type Message = {
 	text: string
-	// NOTE: Filled in only for `is`, which is the one comparison that HAS an
-	// expectation. VS Code draws the pair as a diff.
+	// NOTE: Filled in for `is` and for a snapshot, the two comparisons that
+	// HAVE an expectation — what it was compared with, and what was recorded.
+	// VS Code draws the pair as a diff. `isNot` never makes such a claim.
 	expected: string | null
 	actual: string | null
 	// NOTE: Where to say it. Null for a body that threw, which happened to the
@@ -732,8 +736,9 @@ export type Message = {
 
 // NOTE: One failed assertion, said the way the terminal says it: the assertion
 // itself, then every sub-expression the lowering recorded, then what the
-// comparison held. `expected`/`actual` are filled in only for `is` — VS Code
-// draws those two as a diff, and "expected" is a claim `isNot` never makes.
+// comparison held. `expected`/`actual` are filled in for `is` and for a
+// snapshot — VS Code draws those two as a diff, and "expected" is a claim
+// `isNot` never makes.
 export function messagesOf(
 	record: Pick<TestRecord, "failures" | "error" | "property">,
 ): Array<Message> {
@@ -762,7 +767,30 @@ export function messagesOf(
 		let expected = null
 		let actual = null
 
-		if (comparison !== null && comparison.left !== null) {
+		// NOTE: A snapshot is not an equality that failed: what it holds is a
+		// recording and what this run held, and the difference between them is
+		// the whole explanation however short it is. It is also the one failure
+		// that IS a text diff, which is what VS Code draws `expected`/`actual`
+		// as.
+		if (comparison !== null && comparison.kind === "snapshot") {
+			lines.push(
+				"",
+				comparison.left === null
+					? "nothing was recorded for this snapshot"
+					: "the recorded snapshot and this run differ",
+			)
+
+			if (comparison.diff.length > 0) {
+				lines.push(
+					"",
+					"the difference, - what was recorded, + what this run held:",
+					...diffLines(comparison.diff),
+				)
+			}
+
+			expected = comparison.left
+			actual = comparison.right
+		} else if (comparison !== null && comparison.left !== null) {
 			lines.push(
 				"",
 				`\`${comparison.kind}\` compared ${comparison.left} with ${comparison.right}`,

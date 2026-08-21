@@ -366,7 +366,6 @@ function comparisonNotes(failure: FailureEvent): Array<string> {
 				? "nothing was recorded for this snapshot"
 				: "the recorded snapshot and this run differ",
 			diffNote(comparison.diff),
-			"Accept this run with `essence test --update`.",
 		]
 	}
 
@@ -384,6 +383,15 @@ function comparisonNotes(failure: FailureEvent): Array<string> {
 	}
 
 	return notes
+}
+
+// NOTE: What to DO about it, which is a help rather than a note — a snapshot
+// that differs is either a bug or a change somebody meant, and the second is
+// one command away.
+function comparisonHelps(failure: FailureEvent): Array<string> {
+	return failure.comparison?.kind === "snapshot"
+		? ["Accept this run with `essence test --update`"]
+		: []
 }
 
 // NOTE: One failed assertion as an ordinary Essence Diagnostic, so that a test
@@ -430,7 +438,7 @@ export function testFailureDiagnostic(
 			...Array<common.DiagnosticLabel>,
 		],
 		notes: [...propertyNotes(test), ...comparisonNotes(failure)],
-		helps: propertyHelps(test),
+		helps: [...propertyHelps(test), ...comparisonHelps(failure)],
 	}
 }
 

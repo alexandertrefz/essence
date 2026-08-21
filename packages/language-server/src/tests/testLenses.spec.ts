@@ -269,6 +269,33 @@ describe("Value hints", () => {
 		expect(hint?.label).toBe("4 is not 5")
 	})
 
+	// NOTE: A snapshot's two sides are a recording and a run, not an equality —
+	// drawing `is` between them would claim what the failure denies.
+	it("draws a snapshot as what was recorded and what held", () => {
+		let [hint] = findValueHints(
+			[
+				{
+					schema: 1,
+					kind: "expect",
+					id: "/a",
+					form: "expect",
+					passed: false,
+					span: span(5, "doubled matches snapshot"),
+					values: [],
+					comparison: {
+						kind: "snapshot",
+						left: "plain",
+						right: "plainer",
+						diff: [],
+					},
+				},
+			],
+			source,
+		)
+
+		expect(hint?.label).toBe("recorded plain, held plainer")
+	})
+
 	it("draws nothing for an assertion that held", () => {
 		expect(
 			findValueHints(
