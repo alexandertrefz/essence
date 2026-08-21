@@ -137,11 +137,24 @@ text of its own beside them.
 one line — what it covered, what it found, how long it took, and whether
 something would not compile.
 
-Three settings, all read by the server: `essence.tests.enabled` stops the
+**Run with Coverage** turns the counters on. Lines and branches appear in VS
+Code's coverage view, the lines nothing ran are marked down the gutter whether
+or not that view is open, and the part a line counter has no words for is
+reported as declarations: every `match` arm no value took, and every Case of a
+`choice` no test ever built. Because the language is exhaustive, those are
+complete statements rather than estimates.
+
+Coverage rides `essence.tests.coverage`, which the gesture turns on for the
+workspace — instrumenting compiles a different bundle from the one a build
+produces and makes the program do more work on every keystroke, so it stays off
+until it is asked for, and turning the setting off stops it.
+
+Four settings, all read by the server: `essence.tests.enabled` stops the
 automatic runs while leaving every gesture above working — a run you ask for
 still runs, and still says what it found — `essence.tests.skipTags` names tags
-no run selects, and `essence.tests.debounce` is how long a burst of edits may
-be before it costs a run.
+no run selects, `essence.tests.debounce` is how long a burst of edits may be
+before it costs a run, and `essence.tests.coverage` counts what each run
+reaches.
 
 Debugging a single test is not wired up yet — the debug adapter has to compile
 the tests section and select one by id — so the Debug profile and the Debug

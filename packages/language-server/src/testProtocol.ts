@@ -1,4 +1,4 @@
-import type { FileCoverage } from "@essence-lang/compiler/testing"
+import type { CoverageSummary } from "@essence-lang/compiler/testing"
 import type { Range, TestEvent } from "@essence-lang/runtime/Testing"
 
 // NOTE: What the Language Server tells an Editor about a test run, and what it
@@ -102,16 +102,22 @@ export type TestRunNotification = {
 	// says is that the results the client is holding for that file are the last
 	// ones that ran rather than the ones the buffer would produce.
 	compiled: boolean
-	// NOTE: What the counters counted, one entry per SOURCE file — which is not
-	// the same set as `files`: a `Foo.tests.es` runs the tests, and what its
-	// counters counted is mostly `Foo.es`. Empty unless the session was asked
-	// for coverage, and empty on a `start`.
+	// NOTE: What the session has counted SO FAR — the whole project's picture,
+	// not this cycle's. A cycle covers the entries a change reached and says
+	// nothing about the rest, so the Server lays each one over what it had and
+	// sends the result; a client replaces what it holds rather than merging.
 	//
-	// NOTE: One cycle covers the entries a change reached and says nothing
-	// about the rest, so a client showing the whole project's coverage lays
-	// each batch over what it had, keyed by `module`. The Server holds its own
-	// results the same way.
-	coverage: Array<FileCoverage>
+	// NOTE: It is merged on the Server rather than by the client because which
+	// Cases were CONSTRUCTED is a question about the whole run — a Case built
+	// only by the file that was just re-run is still a Case somebody built —
+	// and a client working that out again would be a second answer to
+	// disagree with.
+	//
+	// NOTE: `files` is keyed by SOURCE file, which is not the same set as
+	// `files` above: a `Foo.tests.es` runs the tests, and what its counters
+	// counted is mostly `Foo.es`. Empty unless the session was asked for
+	// coverage, and empty on a `start`.
+	coverage: CoverageSummary
 }
 
 // #endregion

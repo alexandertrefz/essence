@@ -23,7 +23,7 @@ import path from "node:path"
 // other version is IGNORED — that is the protocol's own rule, and guessing at a
 // shape nobody wrote down is how a Test Explorer comes to show yesterday's
 // answers with today's confidence.
-export const TEST_RUN_VERSION = 2
+export const TEST_RUN_VERSION = 3
 
 // #region What arrives on the wire
 
@@ -94,6 +94,61 @@ export type TestSite = {
 	skipped: string | null
 }
 
+// NOTE: What the run's counters counted, one point at a time — where it stands,
+// what kind of thing it counts, what to call it and how often control reached
+// it. `scope` is the Method or Function it was written in, which is what makes
+// a "never taken" line readable without opening the file.
+export type CoveragePoint = {
+	kind: "statement" | "branch" | "case" | "construction"
+	label: string
+	scope: string
+	position: Range
+	// NOTE: A branch whose condition ESTABLISHED something — the guard in front
+	// of a division. Both sides of one are worth looking at separately.
+	refinement: boolean
+	// NOTE: `Choice#Case` on a construction point, null on every other kind.
+	tag: string | null
+	count: number
+}
+
+export type CoverageRatio = { covered: number; total: number }
+
+export type MissedPoint = {
+	kind: "branch" | "case"
+	scope: string
+	label: string
+	refinement: boolean
+	position: Range
+}
+
+// NOTE: One SOURCE file's coverage, which is not the file the tests are in: a
+// `Foo.tests.es` runs the tests, and what its counters counted is mostly
+// `Foo.es`.
+export type FileCoverage = {
+	module: string | null
+	lines: CoverageRatio
+	branches: CoverageRatio
+	cases: CoverageRatio
+	missed: Array<MissedPoint>
+	points: Array<CoveragePoint>
+}
+
+// NOTE: A declared Choice and which of its Cases anything built. It is answered
+// across the whole run rather than per file — a Choice is declared in one
+// Module and constructed in any — which is why the Server sends the merged
+// picture rather than the cycle.
+export type ChoiceCoverage = {
+	name: string
+	module: string | null
+	position: Range
+	cases: Array<{ tag: string; constructed: boolean }>
+}
+
+export type CoverageSummary = {
+	files: Array<FileCoverage>
+	choices: Array<ChoiceCoverage>
+}
+
 // NOTE: `essence/testRun`, as a client must be able to READ it rather than as
 // the Server declares it: `version` is a number here, because the number a
 // client refuses is exactly the one it was not built for.
@@ -114,6 +169,11 @@ export type TestRunNotification = {
 	}
 	duration: number
 	compiled: boolean
+	// NOTE: What the session has counted SO FAR, not what this cycle counted:
+	// the Server lays each cycle over what it had and sends the whole picture,
+	// so a client replaces rather than merges. Optional because a client reads
+	// the wire, and a Server that never turns coverage on never writes it.
+	coverage?: CoverageSummary
 }
 
 // #endregion
@@ -285,10 +345,18 @@ export type FileState = {
 	duration: number
 }
 
-export type ClientState = { files: Map<string, FileState> }
+export type ClientState = {
+	files: Map<string, FileState>
+	// NOTE: Coverage is held APART from the per-file test results, because
+	// those are two different sets: one cycle runs `Foo.tests.es` and counts
+	// `Foo.es`. It is REPLACED whole on every batch that carries it — the
+	// Server sends what it has counted so far rather than what this cycle
+	// counted, so there is nothing here to merge.
+	coverage: CoverageSummary
+}
 
 export function createState(): ClientState {
-	return { files: new Map() }
+	return { files: new Map(), coverage: { files: [], choices: [] } }
 }
 
 function fileState(state: ClientState, file: string): FileState {
@@ -329,6 +397,10 @@ export type AppliedBatch = {
 	// what a view redraws. A batch that found nothing for a file it could not
 	// compile moves nothing.
 	changed: Array<string>
+	// NOTE: The SOURCE files this batch has coverage for, which is a different
+	// list from `changed` for the reason `ClientState.coverage` is held apart.
+	// Empty where the session was not asked for coverage.
+	covered: Array<string>
 }
 
 // NOTE: One batch applied to what the client holds, answering which files it
@@ -351,7 +423,12 @@ export function applyBatch(
 	}
 
 	if (notification.kind === "start") {
-		return { kind: "start", files: [...notification.files], changed: [] }
+		return {
+			kind: "start",
+			files: [...notification.files],
+			changed: [],
+			covered: [],
+		}
 	}
 
 	let narrowed = new Set(notification.ids ?? [])
@@ -396,7 +473,16 @@ export function applyBatch(
 		changed.push(file)
 	}
 
-	return { kind: "end", files: [...notification.files], changed }
+	let covered: Array<string> = []
+
+	if (notification.coverage !== undefined) {
+		state.coverage = notification.coverage
+		covered = notification.coverage.files.flatMap((file) =>
+			file.module === null ? [] : [file.module],
+		)
+	}
+
+	return { kind: "end", files: [...notification.files], changed, covered }
 }
 
 // NOTE: A file the workspace no longer holds tests for. The session stops
@@ -404,6 +490,11 @@ export function applyBatch(
 // be told separately — by the file being deleted, or by a batch that covered it
 // and found nothing.
 export function forgetFile(state: ClientState, file: string): boolean {
+	state.coverage = {
+		files: state.coverage.files.filter((each) => each.module !== file),
+		choices: state.coverage.choices.filter((each) => each.module !== file),
+	}
+
 	return state.files.delete(file)
 }
 
@@ -737,6 +828,187 @@ export function decorationsOf(state: ClientState, file: string): Marks {
 	}
 
 	return marks
+}
+
+// #endregion
+
+// #region What the coverage view draws
+
+// NOTE: One line, and how often it ran. A line may carry several Statements —
+// the greatest of their counts is how often the LINE ran, which is what a
+// coverage view draws beside it.
+export type CoverageLine = {
+	line: number
+	count: number
+	// NOTE: The branches standing on this line, each named as it was written:
+	// `if`, `else`, `case #Postponed`. VS Code draws them as the branch detail
+	// of the statement they are on.
+	branches: Array<CoverageBranch>
+}
+
+export type CoverageBranch = { line: number; label: string; count: number }
+
+// NOTE: A thing that either RAN or did not, named — a Match arm, a Choice Case.
+// It is what VS Code calls a declaration, which is the right shape for it: an
+// arm and a Case are things the source declares, they are counted one by one,
+// and an exhaustive language can say which of them nothing reached without
+// guessing.
+export type CoverageDeclaration = {
+	name: string
+	count: number
+	position: Range
+}
+
+export function coverageOf(
+	state: ClientState,
+	file: string,
+): FileCoverage | null {
+	return state.coverage.files.find((each) => each.module === file) ?? null
+}
+
+export function coverageLinesOf(file: FileCoverage): Array<CoverageLine> {
+	let lines = new Map<number, CoverageLine>()
+	let lineAt = (line: number): CoverageLine => {
+		let existing = lines.get(line)
+
+		if (existing === undefined) {
+			existing = { line, count: 0, branches: [] }
+			lines.set(line, existing)
+		}
+
+		return existing
+	}
+
+	for (let point of file.points) {
+		if (point.kind === "construction") {
+			continue
+		}
+
+		let line = point.position.start.line
+		let entry = lineAt(line)
+
+		// NOTE: A branch and an arm count towards their line exactly as a
+		// Statement does — they are places control arrives — and the same rule
+		// is what the ratios beside them were counted under.
+		entry.count = Math.max(entry.count, point.count)
+
+		if (point.kind === "branch") {
+			entry.branches.push({
+				line,
+				label: point.label,
+				count: point.count,
+			})
+		}
+	}
+
+	return [...lines.values()].sort((left, right) => left.line - right.line)
+}
+
+// NOTE: The lines nothing reached, as ranges a gutter can be drawn over.
+// Adjacent lines are merged, because a run of never-executed lines is one
+// thing a reader is looking at rather than nine.
+export function uncoveredLinesOf(file: FileCoverage): Array<LineRange> {
+	let uncovered = coverageLinesOf(file)
+		.filter((line) => line.count === 0)
+		.map((line) => line.line)
+	let ranges: Array<LineRange> = []
+
+	for (let line of uncovered) {
+		let last = ranges[ranges.length - 1]
+
+		if (last !== undefined && last.end === line - 1) {
+			last.end = line
+
+			continue
+		}
+
+		ranges.push({ start: line, end: line })
+	}
+
+	return ranges
+}
+
+// NOTE: Every Match arm of one file, and every Case of every Choice DECLARED in
+// it — which is why the whole state is read rather than the file's own entry: a
+// Choice's Cases are counted wherever they are built, and what is declared is
+// known only where it was written.
+export function declarationsOf(
+	state: ClientState,
+	file: string,
+): Array<CoverageDeclaration> {
+	let coverage = coverageOf(state, file)
+	let declarations: Array<CoverageDeclaration> =
+		coverage === null
+			? []
+			: coverage.points
+					.filter((point) => point.kind === "case")
+					.map((point) => ({
+						name:
+							point.scope === ""
+								? point.label
+								: `${point.scope} › ${point.label}`,
+						count: point.count,
+						position: point.position,
+					}))
+
+	for (let choice of state.coverage.choices) {
+		if (choice.module !== file) {
+			continue
+		}
+
+		for (let entry of choice.cases) {
+			declarations.push({
+				name: `${choice.name}${caseNameOf(entry.tag)}`,
+				count: entry.constructed ? 1 : 0,
+				position: choice.position,
+			})
+		}
+	}
+
+	return declarations
+}
+
+// NOTE: `Fixture#Forfeited` is how a tag is spelled where it is compared;
+// `#Forfeited` is how a Case is written.
+function caseNameOf(tag: string): string {
+	let hash = tag.lastIndexOf("#")
+
+	return hash === -1 ? `#${tag}` : `#${tag.slice(hash + 1)}`
+}
+
+// NOTE: The one line the output channel writes about a cycle's coverage — the
+// two percentages and the count of what an exhaustive language can say and a
+// line counter can not.
+export function describeCoverage(coverage: CoverageSummary): string {
+	if (coverage.files.length === 0) {
+		return ""
+	}
+
+	let sum = (pick: (file: FileCoverage) => CoverageRatio): CoverageRatio =>
+		coverage.files.reduce(
+			(total, file) => ({
+				covered: total.covered + pick(file).covered,
+				total: total.total + pick(file).total,
+			}),
+			{ covered: 0, total: 0 },
+		)
+	let percentage = (ratio: CoverageRatio): string =>
+		ratio.total === 0
+			? "–"
+			: `${Math.round((ratio.covered / ratio.total) * 100)}%`
+	let lines = sum((file) => file.lines)
+	let branches = sum((file) => file.branches)
+	let cases = sum((file) => file.cases)
+	let never = coverage.choices.flatMap((choice) =>
+		choice.cases.filter((entry) => !entry.constructed),
+	).length
+
+	return (
+		`coverage: ${percentage(lines)} lines · ` +
+		`${percentage(branches)} branches · ` +
+		`${cases.covered}/${cases.total} cases` +
+		(never === 0 ? "" : ` · ${never} never constructed`)
+	)
 }
 
 // #endregion

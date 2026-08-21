@@ -152,6 +152,12 @@
 					"markdownDescription": "Tags no run of the live session selects, as bare names — `slow`, `network`. A test carries its own tags and every enclosing suite's. Tests left out this way are reported as not run rather than as failures, and the Test Explorer still lists them.",
 					"scope": "resource"
 				},
+				"essence.tests.coverage": {
+					"type": "boolean",
+					"default": false,
+					"markdownDescription": "Count what each run reaches, and report it: lines and branches in the coverage view, the lines nothing ran marked in the gutter, and — because the language is exhaustive — every `match` arm no value took and every Case of a `choice` no test ever built, as declarations. Off by default: instrumenting compiles a different bundle from the one a build produces and makes the program do more work on every keystroke. Running the tests with coverage from the Test Explorer turns it on.",
+					"scope": "resource"
+				},
 				"essence.tests.debounce": {
 					"type": "number",
 					"default": 450,

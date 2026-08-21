@@ -114,6 +114,13 @@ Development Host, over a workspace holding at least two files that write
   `essence.tests.skipTags` to a tag the workspace uses re-runs everything and
   leaves those tests unmarked.
 - **Essence: Show Test Session Output** writes one line per cycle.
+- Running with coverage (the profile picker's "Run with Coverage") sets
+  `essence.tests.coverage` to true in the workspace settings, and from then on
+  every cycle counts: the coverage view fills in per file, the lines nothing
+  ran carry a grey bar in the gutter, and the file's declarations list every
+  `match` arm and every Case of a `choice` with a tick or a cross. Turning the
+  setting off again stops the counting and the marks. The output channel writes
+  a second line per cycle with the two percentages.
 - `Essence: Restart Language Server` empties the tree and fills it in again.
 
 ## Packaging

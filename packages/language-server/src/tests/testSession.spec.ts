@@ -148,8 +148,8 @@ describe("A session asked for coverage", () => {
 				(notification) => notification.kind === "end",
 			)
 
-			expect(ended[0]?.coverage).toEqual([])
-			expect(live.session.coverage()).toEqual([])
+			expect(ended[0]?.coverage.files).toEqual([])
+			expect(live.session.coverage().files).toEqual([])
 		} finally {
 			await live.session.dispose()
 		}
@@ -166,14 +166,14 @@ describe("A session asked for coverage", () => {
 			let ended = live.notifications.filter(
 				(notification) => notification.kind === "end",
 			)
-			let counted = ended[ended.length - 1]?.coverage ?? []
+			let counted = ended[ended.length - 1]?.coverage.files ?? []
 
 			expect(counted.map((file) => file.module)).toEqual([library])
 			expect(counted[0]!.lines.total).toBeGreaterThan(0)
 			expect(counted[0]!.lines.covered).toBeGreaterThan(0)
-			expect(live.session.coverage().map((file) => file.module)).toEqual([
-				library,
-			])
+			expect(
+				live.session.coverage().files.map((file) => file.module),
+			).toEqual([library])
 		} finally {
 			await live.session.dispose()
 		}
@@ -190,7 +190,7 @@ describe("A session asked for coverage", () => {
 			let ended = live.notifications.filter(
 				(notification) => notification.kind === "end",
 			)
-			let counted = ended[ended.length - 1]?.coverage ?? []
+			let counted = ended[ended.length - 1]?.coverage.files ?? []
 
 			// NOTE: `Reader.tests.es` is imports and tests — what its counters
 			// counted is `Library.es`, which is the whole point of reporting
@@ -209,11 +209,11 @@ describe("A session asked for coverage", () => {
 
 			await live.waitForRuns(1)
 
-			expect(live.session.coverage()).not.toEqual([])
+			expect(live.session.coverage().files).not.toEqual([])
 
 			live.session.setCoverage(false)
 
-			expect(live.session.coverage()).toEqual([])
+			expect(live.session.coverage().files).toEqual([])
 		} finally {
 			await live.session.dispose()
 		}

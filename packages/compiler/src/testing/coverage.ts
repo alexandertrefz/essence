@@ -230,15 +230,23 @@ export function fileCoverageOf(
 	let missed: Array<MissedPoint> = []
 
 	for (let point of points) {
-		if (point.kind === "statement") {
-			let line = point.position.start.line
-
-			lines.set(line, (lines.get(line) ?? false) || point.count > 0)
-
+		// NOTE: A Case built at a line is an Expression, and the Statement it
+		// stands in is counted already — so a construction says nothing about
+		// whether a LINE ran, and a file that holds nothing else (a
+		// `Foo.tests.es`, instrumented for the Cases its tests build) has no
+		// coverage rather than a hundred per cent of nothing.
+		if (point.kind === "construction") {
 			continue
 		}
 
-		if (point.kind === "construction") {
+		// NOTE: Every other kind counts towards its line — a branch and an arm
+		// are places control arrives, exactly as a Statement is, and a line
+		// whose only point is one of them either ran or it did not.
+		let line = point.position.start.line
+
+		lines.set(line, (lines.get(line) ?? false) || point.count > 0)
+
+		if (point.kind === "statement") {
 			continue
 		}
 

@@ -28,6 +28,12 @@ running as you type, and everything they found where you are looking.
   single compile could state come with it: `similar-tags` on the rarer of two
   tags one typo apart, with a rename, and `lonely-tag` where exactly one test
   carries one.
+- **Run with Coverage** counts what a run reaches. Lines and branches go to
+  VS Code's coverage view, the lines nothing ran are marked down the gutter,
+  and every `match` arm no value took and every Case of a `choice` no test
+  ever built are reported as declarations — complete statements rather than
+  estimates, because the language is exhaustive. It rides
+  `essence.tests.coverage`, which the gesture turns on for the workspace.
 - `essence.tests.enabled` turns the automatic runs off while leaving every
   gesture working, `essence.tests.skipTags` names tags no run selects, and
   `essence.tests.debounce` is how long a burst of edits may be before it costs

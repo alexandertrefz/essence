@@ -130,5 +130,12 @@ describe("the test session contribution", () => {
 			type: "number",
 			default: 450,
 		})
+		// NOTE: Off by default, and it has to be: instrumenting compiles a
+		// different bundle from the one a build produces and makes the program
+		// do more work on every keystroke.
+		expect(properties["essence.tests.coverage"]).toMatchObject({
+			type: "boolean",
+			default: false,
+		})
 	})
 })

@@ -3,7 +3,13 @@ import { describe, expect, it } from "bun:test"
 import {
 	applyBatch,
 	commandFor,
+	type CoveragePoint,
+	coverageLinesOf,
+	coverageOf,
+	type CoverageSummary,
 	createState,
+	declarationsOf,
+	describeCoverage,
 	decorationsOf,
 	describeBatch,
 	type Failure,
@@ -13,6 +19,7 @@ import {
 	forgetFile,
 	messagesOf,
 	outputOf,
+	uncoveredLinesOf,
 	type Span,
 	suiteKey,
 	tagsOf,
@@ -757,3 +764,182 @@ describe("the line the output channel writes", () => {
 		)
 	})
 })
+
+// #region Coverage
+
+const SOURCE = "/repo/Season.es"
+
+function point(overrides: Partial<CoveragePoint>): CoveragePoint {
+	return {
+		kind: "statement",
+		label: "",
+		scope: "",
+		position: {
+			start: { line: 1, column: 1 },
+			end: { line: 1, column: 9 },
+		},
+		refinement: false,
+		tag: null,
+		count: 0,
+		...overrides,
+	}
+}
+
+function atLine(line: number, overrides: Partial<CoveragePoint>) {
+	return point({
+		...overrides,
+		position: { start: { line, column: 1 }, end: { line, column: 9 } },
+	})
+}
+
+function coverage(): CoverageSummary {
+	return {
+		files: [
+			{
+				module: SOURCE,
+				lines: { covered: 2, total: 5 },
+				branches: { covered: 1, total: 2 },
+				cases: { covered: 0, total: 1 },
+				missed: [],
+				points: [
+					atLine(3, { count: 2 }),
+					atLine(4, { count: 0 }),
+					atLine(5, { count: 0 }),
+					atLine(7, { kind: "branch", label: "if", count: 2 }),
+					atLine(7, { kind: "branch", label: "else", count: 0 }),
+					atLine(9, {
+						kind: "case",
+						label: "case #Postponed",
+						scope: "Standings::points",
+						count: 0,
+					}),
+					atLine(11, {
+						kind: "construction",
+						label: "#Played",
+						tag: "Fixture#Played",
+						count: 3,
+					}),
+				],
+			},
+		],
+		choices: [
+			{
+				name: "Fixture",
+				module: SOURCE,
+				position: {
+					start: { line: 2, column: 1 },
+					end: { line: 6, column: 2 },
+				},
+				cases: [
+					{ tag: "Fixture#Played", constructed: true },
+					{ tag: "Fixture#Forfeited", constructed: false },
+				],
+			},
+		],
+	}
+}
+
+describe("coverage on a batch", () => {
+	it("is replaced whole, because the Server sends the whole picture", () => {
+		let state = createState()
+		let applied = applyBatch(state, batch({ coverage: coverage() }))
+
+		expect(applied?.covered).toEqual([SOURCE])
+		expect(coverageOf(state, SOURCE)?.lines).toEqual({
+			covered: 2,
+			total: 5,
+		})
+
+		applyBatch(
+			state,
+			batch({ run: 2, coverage: { files: [], choices: [] } }),
+		)
+
+		expect(coverageOf(state, SOURCE)).toBeNull()
+	})
+
+	it("is left alone by a batch that carries none", () => {
+		let state = createState()
+
+		applyBatch(state, batch({ coverage: coverage() }))
+		applyBatch(state, batch({ run: 2 }))
+
+		expect(coverageOf(state, SOURCE)).not.toBeNull()
+	})
+
+	it("goes with a file that is forgotten", () => {
+		let state = createState()
+
+		applyBatch(state, batch({ coverage: coverage() }))
+		forgetFile(state, SOURCE)
+
+		expect(coverageOf(state, SOURCE)).toBeNull()
+		expect(state.coverage.choices).toEqual([])
+	})
+})
+
+describe("what a coverage view draws", () => {
+	it("counts a line by the greatest of the points on it", () => {
+		let file = coverage().files[0]!
+
+		expect(
+			coverageLinesOf(file).map((line) => [line.line, line.count]),
+		).toEqual([
+			[3, 2],
+			[4, 0],
+			[5, 0],
+			[7, 2],
+			[9, 0],
+		])
+	})
+
+	it("hangs the branches of a line off the line they stand on", () => {
+		let file = coverage().files[0]!
+		let line = coverageLinesOf(file).find((each) => each.line === 7)
+
+		expect(
+			line?.branches.map((branch) => [branch.label, branch.count]),
+		).toEqual([
+			["if", 2],
+			["else", 0],
+		])
+	})
+
+	it("merges the lines nothing reached into runs", () => {
+		let file = coverage().files[0]!
+
+		expect(uncoveredLinesOf(file)).toEqual([
+			{ start: 4, end: 5 },
+			{ start: 9, end: 9 },
+		])
+	})
+
+	it("answers every arm and every Case as a declaration", () => {
+		let state = createState()
+
+		applyBatch(state, batch({ coverage: coverage() }))
+
+		expect(
+			declarationsOf(state, SOURCE).map((each) => [
+				each.name,
+				each.count,
+			]),
+		).toEqual([
+			["Standings::points › case #Postponed", 0],
+			["Fixture#Played", 1],
+			["Fixture#Forfeited", 0],
+		])
+	})
+
+	it("says what it counted in one line", () => {
+		expect(describeCoverage(coverage())).toBe(
+			"coverage: 40% lines · 50% branches · 0/1 cases · 1 never constructed",
+		)
+	})
+
+	it("says nothing about a run that counted nothing", () => {
+		expect(describeCoverage({ files: [], choices: [] })).toBe("")
+	})
+})
+
+// #endregion
