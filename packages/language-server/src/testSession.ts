@@ -3,7 +3,10 @@ import { fileURLToPath } from "node:url"
 import { Worker } from "node:worker_threads"
 
 import {
+	collectCoverage,
 	collectTestRun,
+	type FileCoverage,
+	mergeCoverage,
 	type TestRecord,
 	testFailureDiagnostic,
 } from "@essence-lang/compiler/testing"
@@ -80,6 +83,14 @@ export type TestSession = {
 	setSkipTags(tags: Array<string>): void
 	// NOTE: How long a burst of edits is allowed to be before it costs a run.
 	setDebounce(milliseconds: number): void
+	// NOTE: Whether a run counts what it reached. Turning it on compiles every
+	// entry again — an instrumented bundle is different bytes — so the answer
+	// arrives on the next cycle rather than at once.
+	setCoverage(coverage: boolean): void
+	// NOTE: What every cycle so far counted, one entry per source file, laid
+	// over each other in the order they arrived. Empty where the session was
+	// never asked for coverage.
+	coverage(): Array<FileCoverage>
 	// NOTE: The `test-failed` Diagnostics for one file, for the Server to
 	// publish beside the analysis's.
 	diagnosticsFor(filePath: string): Array<common.Diagnostic>
@@ -108,6 +119,12 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 	let debounce = options.debounce ?? debounceInMilliseconds
 	let skipTags: Array<string> = []
 	let enabled = true
+	let coverageEnabled = false
+	// NOTE: Laid over cycle by cycle, keyed by the source file the counters are
+	// in — which is not the entry that ran them. A cycle covers what a change
+	// reached and says nothing about the rest, so what is HELD is the project
+	// and what is SENT is the cycle.
+	let coverage = new Map<string, FileCoverage>()
 	let disposed = false
 	let worker: Worker | null = null
 	let runCounter = 0
@@ -263,6 +280,14 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 		}
 
 		let folded = collectTestRun(run.events)
+		let counted = coverageEnabled ? collectCoverage(run.events).files : []
+
+		for (let file of mergeCoverage(
+			{ files: [...coverage.values()], choices: [] },
+			{ files: counted, choices: [] },
+		).files) {
+			coverage.set(file.module ?? "", file)
+		}
 
 		options.notify({
 			version: TEST_RUN_VERSION,
@@ -281,6 +306,7 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 			},
 			duration: Date.now() - run.started,
 			compiled: run.compiled,
+			coverage: counted,
 		})
 		options.onResults(run.entries)
 
@@ -347,6 +373,7 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 			counts: { passed: 0, failed: 0, skipped: 0, deselected: 0 },
 			duration: 0,
 			compiled: true,
+			coverage: [],
 		})
 
 		let request: TestWorkerRequest = {
@@ -366,6 +393,7 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 				),
 			},
 			ids,
+			coverage: coverageEnabled,
 		}
 
 		ensureWorker().postMessage(request)
@@ -508,6 +536,23 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 		},
 		setDebounce(milliseconds: number): void {
 			debounce = Math.max(0, milliseconds)
+		},
+		setCoverage(next: boolean): void {
+			if (next === coverageEnabled) {
+				return
+			}
+
+			coverageEnabled = next
+			// NOTE: What was counted under the old setting is thrown away
+			// rather than kept: an instrumented compile and a plain one are
+			// different bundles, and half a project's coverage laid under the
+			// other half's would be a picture of neither.
+			coverage.clear()
+
+			this.runAll("settings")
+		},
+		coverage(): Array<FileCoverage> {
+			return [...coverage.values()]
 		},
 		diagnosticsFor(filePath: string): Array<common.Diagnostic> {
 			let diagnostics: Array<common.Diagnostic> = []

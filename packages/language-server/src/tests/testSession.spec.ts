@@ -5,7 +5,7 @@ import * as path from "node:path"
 
 import { canonicalPath } from "@essence-lang/compiler/documents"
 
-import type { TestRunNotification } from "../testProtocol"
+import { TEST_RUN_VERSION, type TestRunNotification } from "../testProtocol"
 import { createTestSession, type TestSession } from "../testSession"
 
 // NOTE: The live session, driven without an Editor: the Workspace's answers are
@@ -135,6 +135,91 @@ function harness(
 	}
 }
 
+describe("A session asked for coverage", () => {
+	it("says nothing about coverage until it is asked", async () => {
+		let live = harness({ files: [library] })
+
+		try {
+			live.session.runAll("open")
+
+			await live.waitForRuns(1)
+
+			let ended = live.notifications.filter(
+				(notification) => notification.kind === "end",
+			)
+
+			expect(ended[0]?.coverage).toEqual([])
+			expect(live.session.coverage()).toEqual([])
+		} finally {
+			await live.session.dispose()
+		}
+	}, 60_000)
+
+	it("carries what the counters counted, per source file", async () => {
+		let live = harness({ files: [library] })
+
+		try {
+			live.session.setCoverage(true)
+
+			await live.waitForRuns(1)
+
+			let ended = live.notifications.filter(
+				(notification) => notification.kind === "end",
+			)
+			let counted = ended[ended.length - 1]?.coverage ?? []
+
+			expect(counted.map((file) => file.module)).toEqual([library])
+			expect(counted[0]!.lines.total).toBeGreaterThan(0)
+			expect(counted[0]!.lines.covered).toBeGreaterThan(0)
+			expect(live.session.coverage().map((file) => file.module)).toEqual([
+				library,
+			])
+		} finally {
+			await live.session.dispose()
+		}
+	}, 60_000)
+
+	it("counts what a test file's own bundle reached in the file it tests", async () => {
+		let live = harness({ files: [readerFile] })
+
+		try {
+			live.session.setCoverage(true)
+
+			await live.waitForRuns(1)
+
+			let ended = live.notifications.filter(
+				(notification) => notification.kind === "end",
+			)
+			let counted = ended[ended.length - 1]?.coverage ?? []
+
+			// NOTE: `Reader.tests.es` is imports and tests — what its counters
+			// counted is `Library.es`, which is the whole point of reporting
+			// coverage per SOURCE file rather than per entry.
+			expect(counted.map((file) => file.module)).toContain(library)
+		} finally {
+			await live.session.dispose()
+		}
+	}, 60_000)
+
+	it("throws away what it counted when the setting changes", async () => {
+		let live = harness({ files: [library] })
+
+		try {
+			live.session.setCoverage(true)
+
+			await live.waitForRuns(1)
+
+			expect(live.session.coverage()).not.toEqual([])
+
+			live.session.setCoverage(false)
+
+			expect(live.session.coverage()).toEqual([])
+		} finally {
+			await live.session.dispose()
+		}
+	}, 60_000)
+})
+
 describe("The Language Server's test session", () => {
 	it("runs every test file and reports what held", async () => {
 		let live = harness()
@@ -150,13 +235,13 @@ describe("The Language Server's test session", () => {
 
 			expect(live.problems).toEqual([])
 			expect(live.notifications[0]).toMatchObject({
-				version: 2,
+				version: TEST_RUN_VERSION,
 				kind: "start",
 				reason: "open",
 				run: 1,
 			})
 			expect(ended[0]).toMatchObject({
-				version: 2,
+				version: TEST_RUN_VERSION,
 				kind: "end",
 				run: 1,
 				compiled: true,

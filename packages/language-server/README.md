@@ -33,7 +33,7 @@ are written out in `src/testProtocol.ts`.
 - **`essence/testRun`** — a notification, sent twice per run: once as
   `kind: "start"` naming the files about to run, and once as `kind: "end"`
   carrying the whole event batch, the counts and the duration. It has a
-  `version` of its own (`2`), separate from the `schema` each event carries; a
+  `version` of its own (`3`), separate from the `schema` each event carries; a
   client that meets a version it does not know ignores the notification, and one
   that meets an event kind it does not know ignores that event.
   - `sites` carries every test of every file the batch covers — id, name
@@ -44,6 +44,14 @@ are written out in `src/testProtocol.ts`.
   - `ids` carries what the batch was narrowed to, empty where it was not. A
     narrowed batch reports a deselection for every other test of that file, so a
     client merges by id rather than replacing the file.
+  - `coverage` carries what the run's counters counted, one entry per SOURCE
+    file — which is not the same set as `files`: a `Foo.tests.es` runs the
+    tests, and what its counters counted is mostly `Foo.es`. Each entry holds
+    the line, branch and Case ratios, every point with its count and range, and
+    the branches and arms nothing reached. It is empty unless
+    `essence.tests.coverage` is on, and a cycle only covers the entries a change
+    reached — so a client showing the whole project lays each batch over what it
+    had, keyed by `module`.
 - **`essence/runTests`** — a request taking `{ ids?, files? }` and answering
   `{ run }`, the number the notifications for it will carry. Naming neither runs
   every test file of the workspace, which is what a Test Explorer's Run and
@@ -55,9 +63,14 @@ are written out in `src/testProtocol.ts`.
 The server reads one configuration section, `essence.tests`, through
 `workspace/configuration` whenever the client says something under `essence`
 changed: `enabled` (default true) stops the session running by itself,
-`skipTags` names tags no run selects, and `debounce` is how long a burst of
-edits may be before it costs a run (default 450 ms). A client that answers
-nothing keeps the defaults. What `enabled: false` declines is the automatic
+`skipTags` names tags no run selects, `debounce` is how long a burst of edits
+may be before it costs a run (default 450 ms), and `coverage` (default false)
+makes every run count what it reached. A client that answers nothing keeps the
+defaults. Coverage is off by default deliberately: instrumenting compiles a
+different bundle from the one a build produces and makes the Program do more
+work on every keystroke, so it is the reader who decides it is worth that.
+Changing it throws away what was counted under the old setting and runs
+everything again. What `enabled: false` declines is the automatic
 half — a request still runs, the lenses are still offered, and what a requested
 run found is still published. Only the workspace-wide tag Diagnostics go with
 it, because those walk every parse in the project on the Server's own
