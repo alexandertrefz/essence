@@ -39,6 +39,14 @@ import {
 // thing to be wrong about.
 const debounceInMilliseconds = 450
 
+// NOTE: How long one cycle — compile, load, run — is given before the Worker is
+// taken away from it. A test can loop for ever, and this is the only thing that
+// ends one: the Worker exists so that a run CAN be stopped, and nothing stopped
+// it. Long enough that a cold compile of a large workspace is never mistaken
+// for a hang, and short enough that a reader who wrote a loop by accident gets
+// their session back within a cup of coffee's inattention.
+const deadlineInMilliseconds = 60_000
+
 export type TestSessionOptions = {
 	// NOTE: Every `.es` file the workspace knows, and — for each of them —
 	// whether it wrote a `tests { … }` block and which files a change to it
@@ -68,6 +76,8 @@ export type TestSessionOptions = {
 	// is resolved beside this file, or beside the bundled Server.
 	workerPath?: string
 	debounce?: number
+	// NOTE: Overridable so a spec can wait a millisecond rather than a minute.
+	deadline?: number
 }
 
 export type TestSession = {
@@ -126,6 +136,7 @@ export function defaultWorkerPath(): string {
 export function createTestSession(options: TestSessionOptions): TestSession {
 	let workerPath = options.workerPath ?? defaultWorkerPath()
 	let debounce = options.debounce ?? debounceInMilliseconds
+	let deadline = options.deadline ?? deadlineInMilliseconds
 	let skipTags: Array<string> = []
 	let enabled = true
 	let coverageEnabled = false
@@ -147,6 +158,9 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 	// that a burst costs one answer rather than one per character.
 	let changedFiles = new Set<string>()
 	let timer: ReturnType<typeof setTimeout> | null = null
+	// NOTE: The run in flight's own clock. Armed with the run and cleared when
+	// it answers, so that a cycle that never answers ends anyway.
+	let clock: ReturnType<typeof setTimeout> | null = null
 	let inFlight: {
 		run: number
 		reason: TestRunNotification["reason"]
@@ -286,6 +300,11 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 		let run = inFlight
 
 		inFlight = null
+
+		if (clock !== null) {
+			clearTimeout(clock)
+			clock = null
+		}
 
 		if (run === null) {
 			return
@@ -438,6 +457,35 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 
 		ensureWorker().postMessage(request)
 
+		// NOTE: A cycle that does not answer takes the Worker with it. Nothing
+		// else can end a test that loops for ever, and a session that waited on
+		// one would never run another test: the request that arrives while a
+		// run is in flight is remembered, not started, so ONE such test would
+		// stop the session for the life of the Server. What was reported before
+		// the run stopped is kept — the tests that did answer answered — and
+		// the entries are told why they say nothing more.
+		clock = setTimeout(() => {
+			clock = null
+
+			if (inFlight === null || inFlight.run !== run) {
+				return
+			}
+
+			void worker?.terminate()
+			worker = null
+
+			for (let entry of inFlight.entries) {
+				options.onProblem?.(
+					entry,
+					`The test run did not finish within ${Math.round(
+						deadline / 1000,
+					)}s and was stopped. A test that never ends — a loop with no way out — is the usual reason.`,
+				)
+			}
+
+			finish(false)
+		}, deadline)
+
 		return run
 	}
 
@@ -548,6 +596,11 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 					timer = null
 				}
 
+				if (clock !== null) {
+					clearTimeout(clock)
+					clock = null
+				}
+
 				eventsByEntry.clear()
 				focusedEntries.clear()
 				inFlight = null
@@ -625,6 +678,11 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 			if (timer !== null) {
 				clearTimeout(timer)
 				timer = null
+			}
+
+			if (clock !== null) {
+				clearTimeout(clock)
+				clock = null
 			}
 
 			inFlight = null
