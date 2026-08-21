@@ -8,17 +8,24 @@ workspace satisfies that pin, so `buildServer.js` resolves to the sibling
 package's TypeScript sources; anywhere else, `bun install` fetches the
 published package and the same build bundles its compiled `dist/`. The
 standard library's `.es` sources are copied beside the bundle the same way,
-resolved off `@essence-lang/standard-library` rather than a relative path.
+resolved off `@essence-lang/standard-library` rather than a relative path — and
+so are the runtime's, which the Bundler writes absolute paths to and reads back
+off disk, so no bundler can see through them.
+
+The live test session's Worker is bundled BESIDE the server as
+`server/testWorker.js`: a Worker is started from a file, and the server ships
+as one file with nothing to resolve out of.
 
 ```sh
 bun install        # links the workspace, or fetches the published packages
-bun run build      # bundles @essence-lang/language-server into server/server.js
+bun run build      # server/server.js, server/testWorker.js, and the sources
+                   # each of them reads at run time
 ```
 
 Press `F5` ("Extension") to open an Extension Development Host.
 
-`server/server.js` is generated and not committed — rebuild it after changing
-the Language Server. To skip the bundling step entirely while working on the
+`server/` is generated and not committed — rebuild it after changing the
+Language Server. To skip the bundling step entirely while working on the
 server, point `essence.server.path` at `packages/language-server/bin/esls` —
 as `${workspaceFolder}/packages/language-server/bin/esls` in a workspace
 `.vscode/settings.json`, which then works from any checkout. A built `.js` bundle
@@ -64,6 +71,47 @@ hand, in the Extension Development Host:
   Debug Console; the Problems view carries the same details.
 - `essence.cli.path` pointed at a checkout's `packages/cli/bin/essence` is
   used and named in the Essence output channel.
+
+## The test walkthrough
+
+The Test Explorer has no extension-host harness either. Everything it DECIDES
+is `testModel.ts` — folding a batch, merging a narrowed one, building the tree,
+what a failure says, what to mark — and `tests/testModel.spec.ts` covers that
+without VS Code; `testView.js` is the half that calls the API, and it decides
+nothing. So a release is checked by hand, in the Extension Development Host,
+over a workspace holding at least two files that write `tests { … }`, one of
+which imports the other, plus a `suite`, a `tagged`, a `skipped "reason"` and a
+`focused`:
+
+- The Testing view fills in on its own, without anything being run: files, then
+  suites, then tests, each on its own line, in the order they were written. A
+  test whose name interpolates shows its template until it has run once.
+- Typing a failure into a test turns its item red within about half a second,
+  the failure shows up in Problems under `test-failed`, the gutter marks the
+  test's lines and the failed `expect`'s line, and hovering that line says what
+  the terminal says. Undoing it turns everything green again.
+- Editing the imported file re-runs both files; editing the importer re-runs
+  only it. Deleting a test file removes it from the tree.
+- ▶ beside one test runs that one and leaves every other result standing —
+  neither the tree nor the gutter loses what it knew. ▶ beside a suite runs its
+  tests. Run All runs everything, including a file whose first test was written
+  a moment ago and which nothing had reported on yet.
+- The profile picker offers one entry per tag; picking "Run slow" runs exactly
+  the tests carrying it.
+- **Essence: Re-run Failed Tests** runs only what is red. With nothing red it
+  says so.
+- A test that prints shows what it printed under itself in the Test Results
+  terminal, on its own lines rather than staircased.
+- The Debug profile and the Debug lens both refuse, name the `essence test
+  --filter` command for the selection, and copy it when asked.
+- Half-typing a line so the file stops compiling leaves the tree and the marks
+  as they were rather than emptying them; the compile error is in Problems.
+- Setting `essence.tests.enabled` to false stops the automatic runs — the marks
+  stop changing as you type — while ▶ and the Run lens still work. Setting
+  `essence.tests.skipTags` to a tag the workspace uses re-runs everything and
+  leaves those tests unmarked.
+- **Essence: Show Test Session Output** writes one line per cycle.
+- `Essence: Restart Language Server` empties the tree and fills it in again.
 
 ## Packaging
 

@@ -109,12 +109,44 @@ test files the change reached and nothing else: a failed `expect` appears in
 Problems with the same labels `essence test` prints, and the values a run
 recorded appear beside the lines that produced them, including every `constant`
 a test body writes and every line ending in a `§?` value comment. Run and Debug
-lenses sit above each `test` and `suite`. `essence.tests.enabled` turns the
-automatic runs off.
+lenses sit above each `test` and `suite`.
+
+The Testing view lists every test the workspace holds — files, then suites,
+then tests — including the ones a filter left out, each on the line it was
+written on. What it draws comes off the compiled Module's own manifest rather
+than off a run, so a test that has never run is listed, and a file that stops
+compiling half way through a keystroke goes on saying what it last said instead
+of emptying. Names are structural, so moving a test up a file keeps its result,
+its selection and its place in the tree.
+
+Running goes through the Language Server, which owns the session: the ▶ beside
+a test, the tag profiles ("Run slow", one per tag anything carries), Refresh,
+the Run lens and **Essence: Re-run Failed Tests** all ask it for a run and wait
+for the results to arrive like any other. Nothing starts a second runner beside
+the one already watching the workspace.
+
+Down the gutter, the lines of every test are marked by what it last did — green
+for passing, red for failing, grey for skipped and amber for a test some other
+test's `focused` silenced — and the line of a failed `expect` carries a dot of
+its own, with the whole explanation on hover and a mark in the overview ruler.
+The values a run recorded are drawn by the Language Server as inlay hints,
+which is one answer to one question: this extension deliberately adds no ghost
+text of its own beside them.
+
+**Essence: Show Test Session Output** opens a channel where every cycle writes
+one line — what it covered, what it found, how long it took, and whether
+something would not compile.
+
+Three settings, all read by the server: `essence.tests.enabled` turns the
+automatic runs off while leaving every gesture above working,
+`essence.tests.skipTags` names tags no run selects, and
+`essence.tests.debounce` is how long a burst of edits may be before it costs a
+run.
 
 Debugging a single test is not wired up yet — the debug adapter has to compile
-the tests and run one by id — so the Debug lens says so rather than starting a
-session that would run the wrong thing.
+the tests section and select one by id — so the Debug profile and the Debug
+lens say so, and hand over the `essence test --filter` command that runs the
+selection, rather than starting a session that would run the wrong thing.
 
 ### Editing
 
