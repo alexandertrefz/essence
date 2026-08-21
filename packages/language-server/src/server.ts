@@ -446,8 +446,8 @@ export function startServer(options: { connection?: Connection } = {}) {
 			// decline: it compiles and runs a project's tests on every edit,
 			// and a project where that is too much work is a project where
 			// this has to be off rather than merely quiet. The whole section
-			// is pulled at once — three settings that are one decision, and
-			// three round trips to answer it would be three.
+			// is pulled at once — four settings that are one decision, and
+			// four round trips to answer it would be four.
 			let readTestSettings = () =>
 				connection.workspace
 					.getConfiguration("essence.tests")
@@ -463,6 +463,12 @@ export function startServer(options: { connection?: Connection } = {}) {
 						if (typeof tests?.debounce === "number") {
 							session.setDebounce(tests.debounce)
 						}
+
+						// NOTE: Off unless it was asked for. Counting what a
+						// run reached compiles a different bundle and makes
+						// the Program do more work on every keystroke, so it
+						// is the reader who decides it is worth that.
+						session.setCoverage(tests?.coverage === true)
 
 						// NOTE: Last, so that a session being switched ON runs
 						// with the tags and the delay it was just told about

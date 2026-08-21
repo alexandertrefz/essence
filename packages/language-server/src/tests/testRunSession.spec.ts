@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "bun:test"
 
 import { CodeLensRequest, InlayHintRequest } from "vscode-languageserver"
 
+import { TEST_RUN_VERSION } from "../testProtocol"
 import {
 	type LspSession,
 	makeSessionWorkspace,
@@ -61,12 +62,12 @@ describe("The Server's live test session", () => {
 		let [ended] = await session.waitForTestRuns(1)
 
 		expect(session.testRuns()[0]).toMatchObject({
-			version: 2,
+			version: TEST_RUN_VERSION,
 			kind: "start",
 			reason: "open",
 		})
 		expect(ended).toMatchObject({
-			version: 2,
+			version: TEST_RUN_VERSION,
 			kind: "end",
 			compiled: true,
 			counts: { passed: 0, failed: 1, skipped: 0, deselected: 0 },

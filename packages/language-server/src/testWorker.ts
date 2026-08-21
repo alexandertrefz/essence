@@ -6,6 +6,7 @@ import { parentPort } from "node:worker_threads"
 
 import { compileToMemory } from "@essence-lang/compiler/embed"
 import type { ModuleHost } from "@essence-lang/compiler/modules"
+import { defaultOptimiserOptions } from "@essence-lang/compiler/optimiser"
 import type {
 	entryPoints,
 	Registry,
@@ -134,6 +135,19 @@ async function runEntry(
 		let emitted = await compileToMemory(entry, {
 			host: hostOf(request.overlays),
 			tests: true,
+			// NOTE: The instrumentation is part of the Optimiser's Options, so
+			// it is part of `bundleHash` — an instrumented bundle and a plain
+			// one never share a staged name, and turning the setting on or off
+			// mid-session compiles rather than answering out of what is
+			// already loaded.
+			...(request.coverage
+				? {
+						optimisation: {
+							...defaultOptimiserOptions,
+							coverage: true,
+						},
+					}
+				: {}),
 		})
 
 		if (emitted.code === "") {
@@ -200,6 +214,9 @@ async function runEntry(
 				events.push(event)
 			},
 			filters,
+			// NOTE: A bundle with no counters in it answers with nothing, so
+			// asking costs a run that was not instrumented exactly nothing.
+			coverage: request.coverage,
 		})
 
 		return answer(

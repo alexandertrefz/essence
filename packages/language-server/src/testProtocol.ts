@@ -1,3 +1,4 @@
+import type { FileCoverage } from "@essence-lang/compiler/testing"
 import type { Range, TestEvent } from "@essence-lang/runtime/Testing"
 
 // NOTE: What the Language Server tells an Editor about a test run, and what it
@@ -56,7 +57,7 @@ export const TEST_RUN_NOTIFICATION = "essence/testRun"
 
 // NOTE: The version this Server sends, so a client can name what it needs
 // rather than repeating the number in a condition.
-export const TEST_RUN_VERSION = 2
+export const TEST_RUN_VERSION = 3
 
 export type TestRunNotification = {
 	version: typeof TEST_RUN_VERSION
@@ -101,6 +102,16 @@ export type TestRunNotification = {
 	// says is that the results the client is holding for that file are the last
 	// ones that ran rather than the ones the buffer would produce.
 	compiled: boolean
+	// NOTE: What the counters counted, one entry per SOURCE file — which is not
+	// the same set as `files`: a `Foo.tests.es` runs the tests, and what its
+	// counters counted is mostly `Foo.es`. Empty unless the session was asked
+	// for coverage, and empty on a `start`.
+	//
+	// NOTE: One cycle covers the entries a change reached and says nothing
+	// about the rest, so a client showing the whole project's coverage lays
+	// each batch over what it had, keyed by `module`. The Server holds its own
+	// results the same way.
+	coverage: Array<FileCoverage>
 }
 
 // #endregion
@@ -116,6 +127,12 @@ export type TestSettings = {
 	enabled?: boolean
 	skipTags?: Array<string>
 	debounce?: number
+	// NOTE: Whether a run counts what it reached. It is off by default and
+	// deliberately: instrumentation makes every compile of the session a
+	// different bundle from the one a build would produce, and it makes the
+	// Program do more work on every keystroke. A reader who wants the gutter
+	// asks for it.
+	coverage?: boolean
 }
 
 // #endregion
@@ -186,6 +203,11 @@ export type TestWorkerRequest =
 			// NOTE: Run only these tests, by structural id. Empty runs whatever
 			// the filters select.
 			ids: Array<string>
+			// NOTE: Whether to compile with the instrumentation pass on and
+			// count what the run reaches. It changes the emitted bytes, so a
+			// session that turns it on compiles bundles of its own rather than
+			// re-using the ones it already staged.
+			coverage: boolean
 	  }
 	| { kind: "close" }
 
