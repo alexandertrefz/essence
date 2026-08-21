@@ -449,6 +449,30 @@ export function createContext(
 
 // #region What the emitted JavaScript calls
 
+// NOTE: One suite's Scope, holding the tests `first` up to `last`. A run is one
+// test, and the setup that test must see is the section's and that of the suites
+// it is written IN — so a Scope holding no part of the run is stepped over
+// whole. Without that, every test of a file evaluated every suite's setup: work
+// nobody asked for, and, where a suite printed something, output attributed to
+// tests written beside it rather than in it.
+//
+// NOTE: `-1` is the enumeration pass, which walks the section to work out every
+// rendered name and runs no test. It enters every Scope, because a name it did
+// not reach is a name nothing can report.
+export function scope(
+	context: TestContext,
+	first: number,
+	last: number,
+	run: () => void,
+): void {
+	if (
+		context.index === -1 ||
+		(context.index >= first && context.index < last)
+	) {
+		run()
+	}
+}
+
 // NOTE: One test, standing where it was written — inside whatever setup it can
 // see, which has just been evaluated afresh. The name is handed over only where
 // it interpolates, because a plain one is a String the manifest carries and

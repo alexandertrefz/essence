@@ -326,7 +326,7 @@ describe("Test codegen — the emitted shape", () => {
 		)
 	})
 
-	it("emits a suite as a block, so its Constants can shadow", () => {
+	it("emits a suite as a Scope of its own, so its Constants can shadow", () => {
 		let javaScript = generate(`implementation {}
 
 		tests {
@@ -342,8 +342,47 @@ describe("Test codegen — the emitted shape", () => {
 		}`)
 
 		expect(javaScript).toMatch(
-			/const rows = \$pool_\d+;\n\s*\{\n\s*const rows = \$pool_\d+;/,
+			/const rows = \$pool_\d+;\n\s*\$testing\.scope\(\$context, 0, 1, \(\) => \{\n\s*const rows = \$pool_\d+;/,
 		)
+	})
+
+	// NOTE: The indices are the half-open run of the manifest the suite holds,
+	// and a nested one is inside its parent's run — which is what lets a run
+	// step over a whole branch of the tree at its head.
+	it("carries the run of tests every suite holds, nested ones included", () => {
+		let javaScript = generate(`implementation {}
+
+		tests {
+			suite "outer" {
+				test "one" {
+					expect true
+				}
+
+				suite "inner" {
+					test "two" {
+						expect true
+					}
+				}
+			}
+
+			suite "beside" {
+				test "three" {
+					expect true
+				}
+			}
+		}`)
+
+		expect(
+			[
+				...javaScript.matchAll(
+					/\$testing\.scope\(\$context, (\d+), (\d+)/g,
+				),
+			].map((match) => [Number(match[1]), Number(match[2])]),
+		).toEqual([
+			[0, 2],
+			[1, 2],
+			[2, 3],
+		])
 	})
 })
 
@@ -668,6 +707,40 @@ describe("Test codegen — running what was emitted", () => {
 				event.kind === "output" ? event.id : "",
 			),
 		).toEqual(["/one", "/two"])
+	})
+
+	// NOTE: "Fresh evaluation of the bindings a test can SEE" — a suite's setup
+	// is not one of them for a test written beside it. Printing is again the
+	// one thing that can tell, and it is also what made this visible: a test
+	// outside the suite was shown the suite's output as its own.
+	it("evaluates the setup of the suites a test is in, and no others", async () => {
+		let { events } = await run(`implementation {}
+
+		tests {
+			constant section = Terminal.print("section")
+
+			suite "inner" {
+				constant inner = Terminal.print("inner")
+
+				test "one" {
+					expect true
+				}
+			}
+
+			test "two" {
+				expect true
+			}
+		}`)
+
+		expect(
+			eventsOf(events, "output").map((event) =>
+				event.kind === "output" ? [event.id, event.text.trim()] : [],
+			),
+		).toEqual([
+			["/inner/one", "section"],
+			["/inner/one", "inner"],
+			["/two", "section"],
+		])
 	})
 
 	it("keeps a Constant nothing but a test reads", async () => {

@@ -7930,12 +7930,28 @@ function rewriteTestsNodes(
 		}
 
 		if (node.nodeType === "TestScope") {
+			// NOTE: A call rather than a bare block, so that the runtime can
+			// decline to evaluate a suite the running test is not in. The
+			// closure is the Scope JavaScript needs either way.
 			return [
 				{
-					type: "BlockStatement",
-					body: withNamespaceScope(() =>
-						rewriteTestsNodes(node.nodes),
-					),
+					type: "ExpressionStatement",
+					expression: testingCall("scope", [
+						testContext(),
+						numberLiteral(node.first),
+						numberLiteral(node.last),
+						{
+							type: "ArrowFunctionExpression",
+							expression: false,
+							params: [],
+							body: {
+								type: "BlockStatement",
+								body: withNamespaceScope(() =>
+									rewriteTestsNodes(node.nodes),
+								),
+							},
+						},
+					]),
 				},
 			]
 		}
