@@ -53,8 +53,10 @@ working directory, or only the files it is given. A failed `expect` is reported
 as an ordinary Diagnostic, showing the value of every sub-expression the
 compiler recorded at the span it was written at. `-f` filters by name, `--tag`
 and `--skip-tag` by tag, `--watch` stays up and re-runs only what a change
-reached, and a project skips tags by default by naming them in the nearest
-`package.json`:
+reached, `--coverage` reports what the run reached — lines, branches, `match`
+arms and the Cases of a `choice` nothing built, with `--coverage-report
+lcov|json` writing a file as well — and a project skips tags by default by
+naming them in the nearest `package.json`:
 
 ```json
 { "essence": { "test": { "skipTags": ["slow"] } } }

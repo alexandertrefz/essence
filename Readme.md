@@ -119,12 +119,18 @@ packages/cli/bin/essence test Standings.es      # one file's tests
 packages/cli/bin/essence test -f leader         # only the tests whose name says "leader"
 packages/cli/bin/essence test --skip-tag slow   # leave a tag out; --tag runs only that tag
 packages/cli/bin/essence test --watch           # stay up, re-run what each save reaches
+packages/cli/bin/essence test --coverage        # and report what the tests reached
 ```
 
 `--watch` stays running and re-runs only the tests a change reached — the entries whose module graph holds the
 file that was saved — then clears the screen and reprints the whole picture, so what is on screen is the state
 of the project rather than a log. A line ending in a `§?` value comment answers with what it held: an ordinary
 comment to a build, a probe to a test run.
+
+`--coverage` compiles with an instrumentation pass on and reports what the run reached: lines and branches as
+percentages, `match` arms as taken out of total, and — because the language is exhaustive — every arm no value
+took and every Case of a `choice` no test ever built, named rather than counted. `--coverage-report lcov|json`
+writes a file beside the table.
 
 `--json` writes the run as one JSON event per line. A project skips tags by default by naming them in the
 nearest `package.json`, under `{ "essence": { "test": { "skipTags": ["slow"] } } }`.

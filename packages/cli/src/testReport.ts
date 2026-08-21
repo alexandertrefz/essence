@@ -4,8 +4,15 @@ import {
 	renderDiagnostic,
 } from "@essence-lang/compiler/diagnostics/render"
 import {
+	caseNameOf,
+	type CoverageRatio,
+	type CoverageSummary,
+	type FileCoverage,
 	type FocusedTest,
 	focusedTestsDiagnostic,
+	hasCoverage,
+	isReported,
+	percentageOf,
 	type TestRecord,
 	type TestRun,
 	testFailureDiagnostic,
@@ -23,7 +30,10 @@ import { formatDuration } from "./report"
 // NOTE: Re-exported so that everything about a test RUN is still reached
 // through one name from inside the command line, wherever it is defined.
 export {
+	collectCoverage,
 	collectTestRun,
+	type CoverageSummary,
+	emptyCoverage,
 	emptyRun,
 	type FocusedTest,
 	focusedTestsDiagnostic,
@@ -32,6 +42,8 @@ export {
 	type TestRun,
 	type TestState,
 	testFailureDiagnostic,
+	toCoverageJson,
+	toLcov,
 } from "@essence-lang/compiler/testing"
 
 const INDENT = "  "
@@ -390,3 +402,123 @@ export function renderTestReport(
 		summary: renderTestSummary(run, context),
 	}
 }
+
+// #region Coverage
+
+// NOTE: What a `--coverage` run says, as the design's table: a row per file
+// with lines and branches as percentages, Match arms as taken out of total,
+// and — spilling down the last column — every branch and arm nothing reached,
+// named by the Method or Function it stands in. Under it, one line per Case of
+// a `choice` that no test ever built, which is a claim an exhaustive language
+// can make and a line-counting one can not.
+//
+// NOTE: A dash rather than a number where there was nothing to be a percentage
+// of. A file with no branches in it is not 0% branch-covered and it is not 100%
+// either.
+export function renderCoverage(
+	summary: CoverageSummary,
+	context: ReportContext,
+): Array<string> {
+	if (!hasCoverage(summary)) {
+		return []
+	}
+
+	let { palette } = context
+	let rows = summary.files.filter(isReported).map((file) => ({
+		file: moduleLabel(file.module),
+		lines: ratioLabel(file.lines),
+		branches: ratioLabel(file.branches),
+		cases:
+			file.cases.total === 0
+				? "–"
+				: `${file.cases.covered}/${file.cases.total}`,
+		missed: missedLabels(file),
+	}))
+	let widths = {
+		file: widest(["File", ...rows.map((row) => row.file)]),
+		lines: widest(["Lines", ...rows.map((row) => row.lines)]),
+		branches: widest(["Branches", ...rows.map((row) => row.branches)]),
+		cases: widest(["Cases", ...rows.map((row) => row.cases)]),
+	}
+
+	let lines = [
+		palette.muted(
+			` ${pad("File", widths.file)}  ${pad("Lines", widths.lines)}  ${pad(
+				"Branches",
+				widths.branches,
+			)}  ${pad("Cases", widths.cases)}  Not taken`,
+		),
+	]
+
+	for (let row of rows) {
+		let head =
+			` ${pad(row.file, widths.file)}  ` +
+			`${palette.number(pad(row.lines, widths.lines))}  ` +
+			`${palette.number(pad(row.branches, widths.branches))}  ` +
+			`${palette.number(pad(row.cases, widths.cases))}  `
+		let indent = " ".repeat(
+			1 +
+				widths.file +
+				2 +
+				widths.lines +
+				2 +
+				widths.branches +
+				2 +
+				widths.cases +
+				2,
+		)
+
+		lines.push(`${head}${palette.muted(row.missed[0] ?? "")}`.trimEnd())
+
+		for (let missed of row.missed.slice(1)) {
+			lines.push(`${indent}${palette.muted(missed)}`)
+		}
+	}
+
+	for (let choice of summary.choices) {
+		for (let entry of choice.cases) {
+			if (entry.constructed) {
+				continue
+			}
+
+			lines.push(
+				palette.muted(
+					` Choice ${choice.name}: ${caseNameOf(
+						entry.tag,
+					)} never constructed by a test`,
+				),
+			)
+		}
+	}
+
+	return lines
+}
+
+// NOTE: A doorway that was never entered is marked, because it is the one a
+// reader should look at first: a branch whose condition established something
+// guards a path the rest of the file can not reach any other way.
+function missedLabels(file: FileCoverage): Array<string> {
+	return file.missed.map((missed) => {
+		let where = missed.scope === "" ? "" : `${missed.scope} › `
+		let mark =
+			missed.refinement && missed.kind === "branch" ? " (guarded)" : ""
+
+		return `${where}${missed.label}${mark}`
+	})
+}
+
+function ratioLabel(ratio: CoverageRatio): string {
+	let percentage = percentageOf(ratio)
+
+	return percentage === null ? "–" : `${percentage}%`
+}
+
+function widest(values: Array<string>): number {
+	return values.reduce((width, value) => Math.max(width, value.length), 0)
+}
+
+function pad(value: string, width: number): string {
+	return value.padEnd(width)
+}
+
+// #endregion

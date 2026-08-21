@@ -25,8 +25,14 @@ import {
 	resolveFilters,
 	runSuites,
 	type TestFilters,
+	writeCoverageReport,
 } from "./test"
-import { collectTestRun, renderNoTests } from "./testReport"
+import {
+	collectCoverage,
+	collectTestRun,
+	emptyCoverage,
+	renderNoTests,
+} from "./testReport"
 import { createDependentsIndex, createSourceWatcher } from "./watcher"
 
 // NOTE: `essence test --watch` stays up and re-runs only what a change reached.
@@ -344,15 +350,21 @@ export async function runTestWatch(
 				eventsByEntry.set(suite.inputFileName, [])
 			}
 
-			runSuites(suites, toRun, filters, (event, suite) => {
-				if (suite !== null) {
-					eventsByEntry.get(suite.inputFileName)?.push(event)
-				}
+			runSuites(
+				suites,
+				toRun,
+				filters,
+				(event, suite) => {
+					if (suite !== null) {
+						eventsByEntry.get(suite.inputFileName)?.push(event)
+					}
 
-				if (context.options.json) {
-					writeEvent(`${JSON.stringify(event)}\n`)
-				}
-			})
+					if (context.options.json) {
+						writeEvent(`${JSON.stringify(event)}\n`)
+					}
+				},
+				context.options.coverage,
+			)
 
 			// NOTE: Everything a Module wrote as it was evaluated has been
 			// written by now, so stdout goes back to being the report's before
@@ -362,7 +374,15 @@ export async function runTestWatch(
 			restored = true
 
 			let duration = performance.now() - started
+			// NOTE: Over EVERY entry's stream, not just this cycle's. An entry
+			// nothing reached keeps the events it had, coverage among them, so
+			// the picture is of the project rather than of the save — which is
+			// what makes a watching coverage report incremental without
+			// anything here merging anything.
 			let run = { ...collectTestRun(allEvents()), duration }
+			let coverage = context.options.coverage
+				? collectCoverage(allEvents())
+				: emptyCoverage
 
 			// NOTE: Compile Diagnostics go to stderr whatever was asked for,
 			// including under --json: they are not events, and a file that
@@ -418,7 +438,10 @@ export async function runTestWatch(
 					)}  ${palette.faint(timestamp())}`,
 				)
 
-				printReport(context, run, sources)
+				printReport(context, run, sources, coverage)
+
+				await writeCoverageReport(context, coverage)
+
 				footer()
 			}
 		} finally {

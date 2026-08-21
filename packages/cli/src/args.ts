@@ -6,6 +6,11 @@ import {
 	type OptimiserOptions,
 	optimiserPassNames,
 } from "@essence-lang/compiler/optimiser"
+import {
+	type CoverageReportFormat,
+	coverageReportFormats,
+	isCoverageReportFormat,
+} from "@essence-lang/compiler/testing"
 
 import {
 	type CommandSpec,
@@ -67,6 +72,12 @@ export type OptionValues = {
 	filter: string | undefined
 	tag: Array<string>
 	skipTag: Array<string>
+	// NOTE: How `essence test` reports what the run REACHED. `coverage` turns
+	// the instrumentation pass on; `coverageReport` names a file format to
+	// write beside the table and implies it; `coverageOut` says where.
+	coverage: boolean
+	coverageReport: CoverageReportFormat | null
+	coverageOut: string | undefined
 }
 
 export type Invocation = {
@@ -105,14 +116,23 @@ export const emptyOptions: OptionValues = {
 	filter: undefined,
 	tag: [],
 	skipTag: [],
+	coverage: false,
+	coverageReport: null,
+	coverageOut: undefined,
 }
 
 // NOTE: The two flags as the Compiler reads them. Nothing named means every
 // pass runs, which is what a build the user said nothing about compiles with.
+//
+// NOTE: And `--coverage`, which is not one of the two: it turns an
+// instrumentation pass ON rather than an optimisation off, and it is here
+// because that pass lives in the registry and reads the Options. Only
+// `essence test` offers the flag, so every other command asks with it false.
 export function optimiserOptionsFor(options: OptionValues): OptimiserOptions {
 	return {
 		enabled: !options.noOptimise,
 		disabledPasses: new Set(options.withoutOptimisation),
+		coverage: options.coverage,
 	}
 }
 
@@ -288,6 +308,28 @@ function readTags(
 	return names
 }
 
+// NOTE: The format names are the Compiler's, checked here so that a misspelt
+// one is refused rather than written as the other format under the name that
+// was asked for.
+function readCoverageReport(
+	raw: string | undefined,
+	command: CommandSpec,
+): CoverageReportFormat | null {
+	if (raw === undefined) {
+		return null
+	}
+
+	if (!isCoverageReportFormat(raw)) {
+		throw new UsageError(
+			`There is no coverage report format called "${raw}".`,
+			command,
+			`Try ${coverageReportFormats.join(" or ")}.`,
+		)
+	}
+
+	return raw
+}
+
 // NOTE: A pass name is checked HERE rather than left to the Optimiser, which
 // would simply not find it in the registry and run everything — a misspelt name
 // that silently changed nothing looks exactly like a pass that does not do what
@@ -421,6 +463,17 @@ export function parseArguments(
 				"--skip-tag",
 				command,
 			),
+			// NOTE: Asking for a report is asking for coverage — a written
+			// file with nothing in it is not what anybody meant by naming a
+			// format.
+			coverage:
+				values.coverage === true ||
+				values["coverage-report"] !== undefined,
+			coverageReport: readCoverageReport(
+				values["coverage-report"] as string | undefined,
+				command,
+			),
+			coverageOut: values["coverage-out"] as string | undefined,
 		},
 		files: parsed.positionals.map((positional) => String(positional)),
 		programArguments: program,

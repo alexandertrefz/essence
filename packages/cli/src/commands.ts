@@ -413,6 +413,12 @@ export const commands: Array<CommandSpec> = [
 				"the editor's live session reads. Diagnostics stay on stderr. " +
 				"Under --watch the stream carries on, one run-start … run-end " +
 				"per re-run.",
+			"--coverage compiles the tests with counters in them and reports " +
+				"what ran: lines and branches as percentages, Match arms as " +
+				"taken out of total, every branch and arm nothing reached " +
+				"named by the Method it stands in, and every Case of a choice " +
+				"no test ever built. --coverage-report writes lcov or json " +
+				"beside the table, into --coverage-out.",
 			"The exit code is 0 when everything that ran passed, 1 when a test " +
 				"failed, and 2 when a run nobody narrowed still holds a " +
 				"`focused` test — so a focus left behind while iterating can " +
@@ -468,6 +474,40 @@ export const commands: Array<CommandSpec> = [
 					"Repeatable, and it wins over --tag. Tests left out are " +
 					"counted rather than failed.",
 			},
+			{
+				name: "coverage",
+				type: "boolean",
+				summary: "Report what the tests reached",
+				details:
+					"Compiles with an instrumentation pass on, so the run " +
+					"counts every Statement, both sides of every branch, every " +
+					"Match arm and every Choice Case a source constructs. " +
+					"Because the language is exhaustive, an arm nothing took " +
+					"and a Case nothing built are complete statements rather " +
+					"than guesses — both are named in the report.",
+			},
+			{
+				name: "coverage-report",
+				type: "string",
+				placeholder: "lcov|json",
+				summary: "Write the coverage as a file as well as a table",
+				details:
+					"lcov writes the tracefile every coverage viewer reads, " +
+					"with Match arms written as branches. json writes the " +
+					"Compiler's own vocabulary — the arms, the doorways and " +
+					"the scope each point stands in — which lcov has no way of " +
+					"saying. Implies --coverage.",
+			},
+			{
+				name: "coverage-out",
+				type: "string",
+				placeholder: "directory",
+				summary: "Where --coverage-report writes",
+				details:
+					"Defaults to `coverage` under the working directory. The " +
+					"file is called lcov.info or coverage.json after the " +
+					"format.",
+			},
 			jobsOption,
 		],
 		examples: [
@@ -490,6 +530,10 @@ export const commands: Array<CommandSpec> = [
 			{
 				command: `${PROGRAM} test --skip-tag slow --json`,
 				description: "Emit the event stream, leaving the slow ones out",
+			},
+			{
+				command: `${PROGRAM} test --coverage-report lcov`,
+				description: "Report what the tests reached, and write lcov",
 			},
 		],
 	},
