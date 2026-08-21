@@ -135,6 +135,10 @@ export type RunTestsParams = {
 	ids?: Array<string>
 	// NOTE: Whole files, as absolute paths. Given both, the union runs.
 	files?: Array<string>
+	// NOTE: Given NEITHER, every test file of the workspace runs. That is what
+	// a Test Explorer's Run and Refresh buttons mean, and a client that had to
+	// name the files instead could only name the ones it had already been told
+	// about — never the file whose first test was written a moment ago.
 }
 
 export type RunTestsResult = {

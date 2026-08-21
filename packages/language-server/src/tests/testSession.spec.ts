@@ -433,4 +433,63 @@ describe("The Language Server's test session", () => {
 			await live.session.dispose()
 		}
 	}, 60_000)
+
+	// NOTE: What a Test Explorer's Run and Refresh buttons send. Neither is
+	// about a file, and a client that had to name them could only name the ones
+	// it had already been told about.
+	it("runs every test file for a request that names neither", async () => {
+		let live = harness()
+
+		try {
+			expect(live.session.run({})).toBe(1)
+
+			await live.waitForRuns(1)
+
+			let ended = live.notifications.filter(
+				(notification) => notification.kind === "end",
+			)
+
+			expect(ended[0]).toMatchObject({
+				reason: "request",
+				ids: [],
+				counts: { passed: 2, failed: 0, skipped: 0, deselected: 0 },
+			})
+			expect([...ended[0]!.files].sort()).toEqual(
+				[library, readerFile].sort(),
+			)
+		} finally {
+			await live.session.dispose()
+		}
+	}, 60_000)
+
+	it("still runs what an Editor asks for while it is switched off", async () => {
+		let live = harness()
+
+		try {
+			live.session.setEnabled(false)
+
+			expect(live.session.run({ files: [readerFile] })).toBe(1)
+
+			await live.waitForRuns(1)
+
+			expect(
+				live.session
+					.recordsFor(readerFile)
+					.map((record) => record.state),
+			).toEqual(["passed"])
+			// NOTE: And nothing else started because of it — the setting still
+			// declines the automatic half.
+			live.session.changed([library])
+
+			await new Promise((resolve) => setTimeout(resolve, 200))
+
+			expect(
+				live.notifications.filter(
+					(notification) => notification.kind === "start",
+				),
+			).toHaveLength(1)
+		} finally {
+			await live.session.dispose()
+		}
+	}, 60_000)
 })
