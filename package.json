@@ -21,7 +21,8 @@
 	"essence": {
 		"test": {
 			"exclude": [
-				"packages/fixtures/files/diagnostics"
+				"packages/fixtures/files/diagnostics",
+				"packages/vscode-extension/server"
 			]
 		}
 	},
