@@ -7846,6 +7846,46 @@ function rewriteTestsNodes(
 			)
 		}
 
+		if (node.nodeType === "TestRows") {
+			return withStatementLocation(
+				[
+					{
+						type: "ExpressionStatement",
+						expression: testingCall("rows", [
+							testContext(),
+							numberLiteral(node.first),
+							{
+								type: "ArrayExpression",
+								elements: node.rows.map((row) =>
+									rewriteExpression(row),
+								),
+							},
+							node.name === null
+								? { type: "Literal", value: null }
+								: rowClosure(node.binding, [
+										...node.bindings.flatMap((binding) =>
+											rewriteStatements(binding),
+										),
+										{
+											type: "ReturnStatement",
+											argument: rewriteExpression(
+												node.name,
+											),
+										},
+									]),
+							rowClosure(node.binding, [
+								...node.bindings.flatMap((binding) =>
+									rewriteStatements(binding),
+								),
+								...rewriteBlockStatement(node.body).body,
+							]),
+						]),
+					},
+				],
+				node.position,
+			)
+		}
+
 		if (node.nodeType === "TestScope") {
 			return [
 				{
@@ -7859,6 +7899,22 @@ function rewriteTestsNodes(
 
 		return rewriteStatements(node)
 	})
+}
+
+// NOTE: What a table test's rows share: one Function of the row, for the name
+// and one for the body. Both are Functions rather than values because a row
+// that is not the one running must cost nothing — a table of a hundred rows
+// interpolates one name and runs one body, not a hundred of each.
+function rowClosure(
+	binding: string,
+	body: Array<estree.Statement>,
+): estree.Expression {
+	return {
+		type: "ArrowFunctionExpression",
+		expression: false,
+		params: [{ type: "Identifier", name: escapeName(binding) }],
+		body: { type: "BlockStatement", body },
+	}
 }
 
 // NOTE: The span table, indexed by point id. Emitted whole rather than per
@@ -7893,6 +7949,10 @@ function testManifest(
 				property("interpolated", {
 					type: "Literal",
 					value: entry.interpolated,
+				}),
+				property("row", {
+					type: "Literal",
+					value: entry.row,
 				}),
 				property("suitePath", {
 					type: "ArrayExpression",

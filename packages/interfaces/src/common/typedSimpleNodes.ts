@@ -127,6 +127,11 @@ export type TestManifestEntry = {
 	// rather than read back off the name because a plain name may perfectly
 	// well hold a brace of its own.
 	interpolated: boolean
+	// NOTE: Which row of a table test this entry is, and null for the ordinary
+	// test that runs once. It is the last step of the identity — a row is a
+	// test in its own right, and everything durable is keyed by that identity —
+	// and it is what a report groups under the template the rows share.
+	row: number | null
 	suitePath: Array<string>
 	tags: Array<string>
 	focused: boolean
@@ -135,7 +140,11 @@ export type TestManifestEntry = {
 	keywordPosition: Position
 }
 
-export type TestsNode = ImplementationNode | TestEntryNode | TestScopeNode
+export type TestsNode =
+	| ImplementationNode
+	| TestEntryNode
+	| TestScopeNode
+	| TestRowsNode
 
 // NOTE: One test, standing where it was written — inside whatever setup it can
 // see. `index` is its place in the section's `tests` array, which is how the
@@ -146,6 +155,32 @@ export interface TestEntryNode {
 	// NOTE: The name as an Expression, and only where it INTERPOLATES: a plain
 	// String Literal is in the manifest already, and emitting it a second time
 	// would be two spellings of one thing.
+	name: ExpressionNode | null
+	body: Array<ImplementationNode>
+	position?: Position
+}
+
+// NOTE: A table test — one written row per entry of the manifest, all of them
+// sharing ONE body and ONE name Expression, each of which reads the row under
+// `binding`. The rows are a plain JavaScript Array rather than a List, because
+// nothing ever holds them all at once: what the emission needs is the value of
+// row N, and building a List to read one item back out of it would be work
+// nobody asked for.
+//
+// `first` is the manifest index of row 0; row N is at `first + N`, which is
+// what the context selects by.
+export interface TestRowsNode {
+	nodeType: "TestRows"
+	first: number
+	binding: string
+	rows: Array<ExpressionNode>
+	// NOTE: What a Pattern Parameter binds off the row. It stands at the head
+	// of BOTH the name and the body, because both read the row's parts and the
+	// name is worked out without the body running.
+	bindings: Array<ImplementationNode>
+	// NOTE: The name as an Expression, and only where it INTERPOLATES — the
+	// same rule a plain test follows. It reads the row, which is why a table
+	// test's name can say which row it ran for.
 	name: ExpressionNode | null
 	body: Array<ImplementationNode>
 	position?: Position

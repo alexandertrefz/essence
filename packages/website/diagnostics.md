@@ -572,6 +572,38 @@ Advice: Only one test carries the tag 'flaky'
 ───╯
 ```
 
+### `table-not-written`
+
+The value after `across` is not a written List. A table test is N tests before
+anything runs — each row carries its row number as the last step of the identity
+a stored snapshot, the Editor's own results and a timing baseline are keyed by —
+so the rows have to be countable while the file is being compiled:
+
+```essence
+tests {
+	§ `scorelines` is a value, and a value has no length until it is evaluated
+	test "{scored}–{conceded}" across scorelines (row: Scoreline) {}
+}
+```
+
+Write the rows where the test is: `across [ … ] (row: Row)`. A row itself is any
+Expression, so a List of names is fine — it is the brackets that have to be
+there.
+
+### `table-parameters`
+
+A table test names its row with exactly one Parameter. Each item of the List is
+one row, and one row is one value — a test wanting several values per row says
+so by writing a Record and taking it apart where it is bound:
+
+```essence
+tests {
+	test "adds" across [{ a = 1, b = 2 }] (a: Integer, b: Integer) {}
+}
+```
+
+Write `({ a, b }: Row)` instead, or `(row: Row)` and read `row.a`.
+
 ## Names
 
 ### `duplicate-variable`

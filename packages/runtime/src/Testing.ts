@@ -50,12 +50,26 @@ export type TestManifestEntry = {
 	// and it is recorded by the Compiler rather than guessed from the name here,
 	// because a plain name may hold a brace of its own.
 	interpolated: boolean
+	// NOTE: Which row of a table test this is, and null for the ordinary test
+	// that runs once. Everything a report groups by reads it: the rows of one
+	// table share a template, and what they are shown under is that template.
+	row: number | null
 	suitePath: Array<string>
 	tags: Array<string>
 	focused: boolean
 	skipped: string | null
 	position: Range
 	keywordPosition: Range
+}
+
+// NOTE: Where a test is REPORTED — its suite path, and for a row of a table
+// test the template the rows share as one more step of it. So a table test
+// reads as a group of its own wherever a suite does, in the terminal's tree and
+// in an Editor's, and nothing that draws either had to learn what a row is.
+export function pathOf(entry: TestManifestEntry): Array<string> {
+	return entry.row === null
+		? entry.suitePath
+		: [...entry.suitePath, entry.name]
 }
 
 // NOTE: One Module's tests. `run` is the whole section as one Function: the
@@ -338,6 +352,37 @@ export function entry(
 	if (context.index === index) {
 		run()
 	}
+}
+
+// NOTE: One table test's rows, standing where the test was written. Only the
+// row that is running is built into anything: the name is worked out for the
+// row being enumerated or run, and the body for the one selected. Everything
+// else about a row — its identity, its Modifiers, where it was written — is in
+// the manifest already.
+export function rows<Value extends AnyType>(
+	context: TestContext,
+	first: number,
+	values: Array<Value>,
+	name: ((row: Value) => StringType) | null,
+	run: (row: Value) => void,
+): void {
+	values.forEach((value, offset) => {
+		let index = first + offset
+
+		// NOTE: `-1` is the enumeration pass, which works out every rendered
+		// name and runs nothing.
+		if (context.index !== index && context.index !== -1) {
+			return
+		}
+
+		if (name !== null) {
+			context.names.set(index, name(value).value)
+		}
+
+		if (context.index === index) {
+			run(value)
+		}
+	})
 }
 
 // NOTE: THE trace mechanism — record a value at an instrumented point,
@@ -922,7 +967,7 @@ export function runTests(registry: Registry, options: RunOptions): RunSummary {
 				kind: "test-skip",
 				id: entry.id,
 				name,
-				suitePath: entry.suitePath,
+				suitePath: pathOf(entry),
 				module: selection.test.module.module,
 				reason: selection.reason,
 			})
@@ -937,7 +982,7 @@ export function runTests(registry: Registry, options: RunOptions): RunSummary {
 				kind: "test-deselected",
 				id: entry.id,
 				name,
-				suitePath: entry.suitePath,
+				suitePath: pathOf(entry),
 				module: selection.test.module.module,
 				reason: selection.reason,
 			})
@@ -1035,7 +1080,7 @@ function runOne(
 		kind: "test-start",
 		id: entry.id,
 		name,
-		suitePath: entry.suitePath,
+		suitePath: pathOf(entry),
 		module: test.module.module,
 	})
 

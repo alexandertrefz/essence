@@ -2973,6 +2973,141 @@ function assertionNode(
 		: { nodeType, value, matcher, position }
 }
 
+// NOTE: `across [ … ] (row: Row)` — the rows a table test runs for, and the one
+// name the body reads a row under.
+//
+// The rows are WRITTEN, not worked out: a table test is N tests before anything
+// runs, each carrying its row index in its identity, and a List a run produces
+// could not be numbered at compile time. They are read against what the
+// Parameter declared, which is what lets a bare Case stand in a row.
+//
+// A Pattern Parameter desugars exactly as a Pattern Declaration does: the row
+// is bound to a Compiler name, and one Constant per binding reads its way down
+// it. Those Constants stand on the table rather than at the head of the body,
+// because the NAME reads them too.
+export function enrichTestTable(
+	node: parser.TestTableNode,
+	scope: enricher.Scope,
+	bodyScope: enricher.Scope,
+): common.typed.TestTableNode {
+	let parameter = node.parameters[0]
+
+	if (node.parameters.length !== 1) {
+		reportError(
+			node.parameters.length === 0
+				? "A table test has to name its row"
+				: "A table test takes one row at a time",
+			node.parameterListPosition,
+			{
+				code: "table-parameters",
+				labels: [
+					primary(
+						node.parameterListPosition,
+						node.parameters.length === 0
+							? "no Parameter to bind a row to"
+							: `${node.parameters.length} Parameters for one row`,
+					),
+					secondary(node.keywordPosition, "the rows are here"),
+				],
+				notes: [
+					"Each item of the List is one row, and one row is one value — a test that wanted several values per row would say so by writing a Record.",
+				],
+				helps: [
+					"Write one Parameter: '(row: Row)', or take the row apart where it is bound: '({ scored, conceded }: Row)'.",
+				],
+			},
+		)
+	}
+
+	let declaredType =
+		parameter?.type === undefined || parameter.type === null
+			? null
+			: resolveType(parameter.type, scope)
+	let rows = enrichTableRows(node.value, declaredType, scope)
+	let type = declaredType ?? listItemTypeOf(rows.map((row) => row.type))
+	let pattern =
+		parameter?.internalName?.nodeType === "Pattern"
+			? parameter.internalName
+			: null
+	let binding =
+		parameter?.internalName?.nodeType === "Identifier"
+			? parameter.internalName.content
+			: synthesizedName("row", node.parameterListPosition)
+
+	declareVariableInScope(
+		{
+			nodeType: "Identifier",
+			content: binding,
+			position: parameter?.position ?? node.parameterListPosition,
+		},
+		type,
+		bodyScope,
+		true,
+	)
+
+	// NOTE: A table that named several Parameters has already been reported,
+	// and the rest of them are declared anyway — every one of them binds the
+	// row. What the body says about them is wrong in the same way the
+	// Parameter list is, and a cascade of "unknown name" underneath the one
+	// Diagnostic that explains it would say nothing further.
+	for (let extra of node.parameters.slice(1)) {
+		if (extra.internalName?.nodeType === "Identifier") {
+			declareVariableInScope(extra.internalName, type, bodyScope, true)
+		}
+	}
+
+	return {
+		nodeType: "TestTable",
+		rows,
+		binding,
+		type,
+		bindings:
+			pattern === null
+				? []
+				: declarePatternBindings(
+						pattern,
+						binding,
+						type,
+						bodyScope,
+						true,
+					),
+		position: node.position,
+	}
+}
+
+// NOTE: The items of the written List, each read against what the Parameter
+// declared. A value that is no written List has no rows at all — reported, and
+// answered with none, so the body is still enriched and still reports whatever
+// else it says.
+function enrichTableRows(
+	node: parser.ExpressionNode,
+	declaredType: common.Type | null,
+	scope: enricher.Scope,
+): Array<common.typed.ExpressionNode> {
+	if (node.nodeType === "ListValue") {
+		return node.values.map((value) =>
+			enrichExpression(value, scope, declaredType),
+		)
+	}
+
+	reportError(
+		"The rows of a table test have to be written here",
+		node.position,
+		{
+			code: "table-not-written",
+			labels: [primary(node.position, "this is not a written List")],
+			notes: [
+				"Every row is a test of its own — it carries its row number in the identity a stored snapshot and the Editor's own results are keyed by — so the rows have to be countable before anything runs.",
+			],
+			helps: [
+				"Write the rows as a List: 'across [ … ] (row: Row)'. A row itself can be any Expression.",
+			],
+		},
+	)
+
+	return []
+}
+
 export function enrichAssertionStatement(
 	node: parser.ExpectStatementNode | parser.RequireStatementNode,
 	scope: enricher.Scope,

@@ -104,8 +104,32 @@ export type TestNode = {
 	// NOTE: Where `focused` was written, on this item or on a suite covering
 	// it, and null where it was not.
 	focused: Position | null
+	// NOTE: `across [ … ] (row: Row)` — the rows this test runs for, and null
+	// for the ordinary test that runs once. Every row is a test of its own from
+	// here on: it carries the row index in its identity, and the name is worked
+	// out in a scope where the row is bound, which is what lets it say which
+	// row it ran for.
+	table: TestTableNode | null
 	body: Array<ImplementationNode>
 	keywordPosition: Position
+	position: Position
+}
+
+// NOTE: The rows of a table test, each already read against what the Parameter
+// declared — which is what lets a bare Case stand in a row. `binding` is the
+// name one row is bound to inside the body: the Parameter's own name where it
+// wrote one, and a Compiler name where it wrote a Pattern instead.
+export type TestTableNode = {
+	nodeType: "TestTable"
+	rows: Array<ExpressionNode>
+	binding: string
+	type: Type
+	// NOTE: What a Pattern Parameter binds off the row — the same Constants a
+	// Pattern Declaration desugars into, so nothing downstream has to know a
+	// Pattern was written. They stand apart from the body because the NAME
+	// reads them too: a table test's name says which row it ran for, and it is
+	// worked out without the body running.
+	bindings: Array<ImplementationNode>
 	position: Position
 }
 

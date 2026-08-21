@@ -190,6 +190,8 @@ export type DiagnosticCode =
 	| "focused-tests-remain"
 	| "similar-tags"
 	| "lonely-tag"
+	| "table-not-written"
+	| "table-parameters"
 	// Names — declared twice, never declared, or not what the position wants.
 	| "duplicate-variable"
 	| "duplicate-type"

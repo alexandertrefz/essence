@@ -84,6 +84,10 @@ export type TestSite = {
 	// NOTE: The name TEMPLATE. What a run reports is the RENDERING, which only
 	// differs where the name interpolates.
 	name: string
+	// NOTE: Which row of a table test this is, and null for the ordinary test.
+	// `suitePath` already ends in the template the rows share, so this is only
+	// what labels a row before anything has run and worked its name out.
+	row?: number | null
 	suitePath: Array<string>
 	file: string
 	range: Range
@@ -535,6 +539,12 @@ export type TreeNode = {
 // NOTE: A file's tests as a tree of suites, in the order they were written. A
 // suite stands where its FIRST test stands, which is where it was written: the
 // manifest lists tests in source order, and a suite is the path they share.
+function labelOf(site: TestSite): string {
+	return site.row === null || site.row === undefined
+		? site.name
+		: `row ${site.row}`
+}
+
 export function treeOf(state: ClientState, file: string): Array<TreeNode> {
 	let entry = state.files.get(file)
 
@@ -583,8 +593,9 @@ export function treeOf(state: ClientState, file: string): Array<TreeNode> {
 			id: site.id,
 			// NOTE: The rendering a run reported, and the template where
 			// nothing has run — which is the only name an interpolated test
-			// that was never selected has.
-			label: record?.name ?? site.name,
+			// that was never selected has. A row of a table test stands under
+			// that template already, so what it falls back to is its number.
+			label: record?.name ?? labelOf(site),
 			file,
 			children: [],
 			site,
