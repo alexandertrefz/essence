@@ -68,6 +68,11 @@ the source, or in `__snapshots__/<File>.es.snap` beside it where the snapshot
 was given a name. `--update` records a snapshot that differs rather than
 reporting it.
 
+A test written `for any (…)` runs for values the runner derives from its
+Parameters' Types — a hundred of them, `--cases` for another number. A failure
+is shrunk to the smallest values that still fail and reported with the seed it
+drew them from; `--seed` draws them again.
+
 The exit code is 0 when everything that ran passed, 1 when a test failed, and 2
 when a run nobody narrowed still holds a `focused` test.
 

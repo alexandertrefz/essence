@@ -82,6 +82,11 @@ export type OptionValues = {
 	// One nothing has recorded is written either way — the first run of a new
 	// snapshot is what records it.
 	update: boolean
+	// NOTE: What every property test draws from, and how many values each of
+	// them runs for. A run with no seed makes one up and reports it beside
+	// whatever failed, which is what `--seed` reads back.
+	seed: string | undefined
+	cases: number | null
 }
 
 export type Invocation = {
@@ -124,6 +129,8 @@ export const emptyOptions: OptionValues = {
 	coverageReport: null,
 	coverageOut: undefined,
 	update: false,
+	seed: undefined,
+	cases: null,
 }
 
 // NOTE: The two flags as the Compiler reads them. Nothing named means every
@@ -313,6 +320,31 @@ function readTags(
 	return names
 }
 
+// NOTE: How many cases a property test runs. It is read as text and checked
+// here rather than taken as a number, because `node:util`'s parser has no
+// numeric Option — and a `--cases banana` that silently ran a hundred would be
+// a run nobody asked for.
+function readCases(
+	raw: string | undefined,
+	command: CommandSpec,
+): number | null {
+	if (raw === undefined) {
+		return null
+	}
+
+	let count = Number(raw)
+
+	if (!Number.isSafeInteger(count) || count < 1) {
+		throw new UsageError(
+			`--cases expects a whole number of at least 1, but got "${raw}".`,
+			command,
+			"Try --cases 100.",
+		)
+	}
+
+	return count
+}
+
 // NOTE: The format names are the Compiler's, checked here so that a misspelt
 // one is refused rather than written as the other format under the name that
 // was asked for.
@@ -494,6 +526,8 @@ export function parseArguments(
 			),
 			coverageOut: values["coverage-out"] as string | undefined,
 			update: values.update === true,
+			seed: values.seed as string | undefined,
+			cases: readCases(values.cases as string | undefined, command),
 		},
 		files: parsed.positionals.map((positional) => String(positional)),
 		programArguments: program,

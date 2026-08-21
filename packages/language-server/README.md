@@ -52,6 +52,13 @@ are written out in `src/testProtocol.ts`.
     `essence.tests.coverage` is on, and a cycle only covers the entries a change
     reached — so a client showing the whole project lays each batch over what it
     had, keyed by `module`.
+  - A `property` event is written for every property test the batch ran,
+    carrying how many cases held, the seed they were drawn from, how many
+    shrinks it took and the counterexample the shrink reached. Nothing in the
+    source says what a property failed FOR — the values are made up by the
+    runner — so a client that wants to show it reads this event. A session
+    draws a fresh seed per cycle, so a property that only fails sometimes still
+    goes red sometimes.
 - **`essence/runTests`** — a request taking `{ ids?, files? }` and answering
   `{ run }`, the number the notifications for it will carry. Naming neither runs
   every test file of the workspace, which is what a Test Explorer's Run and

@@ -1427,6 +1427,8 @@ function testOptions(overrides: Partial<OptionValues> = {}): OptionValues {
 		coverageReport: null,
 		coverageOut: undefined,
 		update: false,
+		seed: undefined,
+		cases: null,
 		...overrides,
 	}
 }

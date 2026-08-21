@@ -121,7 +121,15 @@ packages/cli/bin/essence test --skip-tag slow   # leave a tag out; --tag runs on
 packages/cli/bin/essence test --watch           # stay up, re-run what each save reaches
 packages/cli/bin/essence test --coverage        # and report what the tests reached
 packages/cli/bin/essence test --update          # record every snapshot the run produced
+packages/cli/bin/essence test --seed 41c37ea3   # draw a property test's values again
 ```
+
+A test written `for any (a: Integer, b: Standing)` is a property test: the runner derives a generator from each
+Parameter's Type — Records member by member, Choices Case by Case, checked refinements honoured, so a
+`NonEmptyList` is never empty — and runs the body a hundred times over values it made up. A failure is shrunk
+to the smallest values that still fail and reported with the seed it drew them from, so `--seed` runs it again
+exactly. A Type whose values carry an invariant no structure can state conforms to `Generatable` and generates
+itself.
 
 A test written `across` a List of rows runs once per row, and `matches snapshot` compares a value against one a
 run recorded — inline in the source, or in `__snapshots__/<File>.es.snap` beside it where the snapshot was

@@ -483,6 +483,7 @@ describe("the tree", () => {
 describe("what a failure says", () => {
 	it("writes the assertion and every sub-expression that explains it", () => {
 		let [message] = messagesOf({
+			property: null,
 			failures: [
 				failure({
 					span: span(4, 3, 24, "total::is(5)"),
@@ -512,6 +513,7 @@ describe("what a failure says", () => {
 
 	it("hands VS Code the two sides of an `is` to diff", () => {
 		let [message] = messagesOf({
+			property: null,
 			failures: [
 				failure({
 					comparison: {
@@ -540,6 +542,7 @@ describe("what a failure says", () => {
 	// two fields as "expected this, got that".
 	it("does not claim an expectation for an isNot", () => {
 		let [message] = messagesOf({
+			property: null,
 			failures: [
 				failure({
 					comparison: {
@@ -559,6 +562,7 @@ describe("what a failure says", () => {
 
 	it("writes out a difference that walked into a Record", () => {
 		let [message] = messagesOf({
+			property: null,
 			failures: [
 				failure({
 					comparison: {
@@ -586,6 +590,7 @@ describe("what a failure says", () => {
 	// failed assertion, and it has no span of its own.
 	it("reports a thrown body against the test itself", () => {
 		let messages = messagesOf({
+			property: null,
 			failures: [],
 			error: "RangeError: out of range",
 		})
@@ -597,8 +602,97 @@ describe("what a failure says", () => {
 
 	it("drops a failure the lowering could not place", () => {
 		expect(
-			messagesOf({ failures: [failure({ span: null })], error: null }),
+			messagesOf({
+				property: null,
+				failures: [failure({ span: null })],
+				error: null,
+			}),
 		).toEqual([])
+	})
+})
+
+// NOTE: A property test's values are made up by the runner, so nothing in the
+// source says what a failure failed FOR — which is why the batch carries them
+// and the message says them.
+describe("what a property test says", () => {
+	function property(id: string, name: string): TestEvent {
+		return {
+			schema: 1,
+			kind: "property",
+			id,
+			name,
+			cases: 37,
+			seed: "deadbeef",
+			shrinks: 12,
+			counterexample: [
+				{ name: "scored", value: "0" },
+				{ name: "conceded", value: "1" },
+			],
+		}
+	}
+
+	it("folds the run of cases onto the test it belongs to", () => {
+		let [record] = foldEvents([
+			started("a", "never lowers points"),
+			property("a", "never lowers points"),
+			failed("a", "never lowers points", [failure()]),
+		])
+
+		expect(record.property).toEqual({
+			cases: 37,
+			seed: "deadbeef",
+			shrinks: 12,
+			counterexample: [
+				{ name: "scored", value: "0" },
+				{ name: "conceded", value: "1" },
+			],
+		})
+	})
+
+	it("leaves an ordinary test with nothing", () => {
+		let [record] = foldEvents([
+			started("a", "adds up"),
+			passed("a", "adds up"),
+		])
+
+		expect(record.property).toBeNull()
+	})
+
+	it("says the values a failure failed for, above the assertion", () => {
+		let [message] = messagesOf({
+			property: {
+				cases: 37,
+				seed: "deadbeef",
+				shrinks: 12,
+				counterexample: [{ name: "n", value: "500" }],
+			},
+			failures: [failure({ span: span(4, 3, 20, "double(n)") })],
+			error: null,
+		})
+
+		expect(message.text.split("\n")).toEqual([
+			"after 37 cases, shrunk to:",
+			"  n = 500",
+			"replay: essence test --seed deadbeef",
+			"",
+			"expect double(n)",
+		])
+	})
+
+	it("says the values a thrown body threw on", () => {
+		let [message] = messagesOf({
+			property: {
+				cases: 0,
+				seed: "deadbeef",
+				shrinks: 0,
+				counterexample: [{ name: "n", value: "0" }],
+			},
+			failures: [],
+			error: "RangeError: out of range",
+		})
+
+		expect(message.text).toContain("after 0 cases:")
+		expect(message.text).toContain("RangeError: out of range")
 	})
 })
 

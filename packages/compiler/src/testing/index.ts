@@ -4,6 +4,7 @@ import type {
 	DiffLine,
 	FailureEvent,
 	ProbedValue,
+	PropertyCounterexample,
 	SnapshotStatus,
 	Span,
 	TestEvent,
@@ -58,6 +59,20 @@ export type TestRecord = {
 	// failed. A reporter shows the counts, a rewrite acts on them, and an
 	// Editor offers "Accept snapshot" where one is pending.
 	snapshots: Array<SnapshotRecord>
+	// NOTE: What a property test's run of cases did — how many held, the seed
+	// they were drawn from, and the smallest failing value the shrink reached.
+	// Null for every test that is not a property test.
+	property: PropertyRecord | null
+}
+
+// NOTE: One property test's run of cases, as the report reads it. It is written
+// whether the property held or not: "a hundred cases held" is an answer, and
+// the seed is what makes today's run repeatable tomorrow.
+export type PropertyRecord = {
+	cases: number
+	seed: string
+	shrinks: number
+	counterexample: Array<PropertyCounterexample> | null
 }
 
 // NOTE: One `matches snapshot` as the run reported it. `name` is null for an
@@ -160,6 +175,7 @@ export function collectTestRun(events: Array<TestEvent>): TestRun {
 				output: [],
 				probes: [],
 				snapshots: [],
+				property: null,
 			}
 			byId.set(id, existing)
 			tests.push(existing)
@@ -240,6 +256,20 @@ export function collectTestRun(events: Array<TestEvent>): TestRun {
 					recorded: event.recorded,
 				})
 				break
+			case "property": {
+				let held = byId.get(event.id)
+
+				if (held !== undefined) {
+					held.property = {
+						cases: event.cases,
+						seed: event.seed,
+						shrinks: event.shrinks,
+						counterexample: event.counterexample,
+					}
+				}
+
+				break
+			}
 			case "run-end":
 				duration += event.duration
 				focused = focused || event.focused
@@ -392,9 +422,50 @@ export function testFailureDiagnostic(
 			common.DiagnosticLabel,
 			...Array<common.DiagnosticLabel>,
 		],
-		notes: comparisonNotes(failure),
-		helps: [],
+		notes: [...propertyNotes(test), ...comparisonNotes(failure)],
+		helps: propertyHelps(test),
 	}
+}
+
+// NOTE: What a property test's failure adds to the report: how many cases ran
+// before one failed, and the smallest values the shrink could reach. It reads
+// above the comparison, because what the assertion says is about THESE values
+// and a reader has to be told which ones first.
+export function propertyNotes(test: TestRecord): Array<string> {
+	let property = test.property
+
+	if (property === null || property.counterexample === null) {
+		return []
+	}
+
+	let values = property.counterexample
+		.map((entry) => `${entry.name} = ${entry.value}`)
+		.join("  ")
+
+	return [
+		property.shrinks === 0
+			? `after ${countOf(property.cases, "case")}: ${values}`
+			: `after ${countOf(property.cases, "case")}, shrunk to: ${values}`,
+	]
+}
+
+// NOTE: The command that draws exactly these values again. The seed pins the
+// whole run and the filter narrows it to this test, which still draws what this
+// test drew — every property test folds its own identity into the run's seed.
+export function propertyHelps(test: TestRecord): Array<string> {
+	let property = test.property
+
+	if (property === null || property.counterexample === null) {
+		return []
+	}
+
+	return [
+		`Run it again: essence test --seed ${property.seed} -f ${JSON.stringify(test.name)}`,
+	]
+}
+
+function countOf(count: number, noun: string): string {
+	return `${count} ${noun}${count === 1 ? "" : "s"}`
 }
 
 // NOTE: A test the run was narrowed to, and where its `test` keyword stands.

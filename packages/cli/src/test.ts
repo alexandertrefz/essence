@@ -16,6 +16,7 @@ import {
 } from "@essence-lang/compiler/testing"
 import {
 	type entryPoints,
+	randomSeed,
 	type Registry,
 	registryOf,
 	type TestEvent,
@@ -77,6 +78,10 @@ export type LoadedBundle = {
 
 // NOTE: A bundle and the tests it is the one to run.
 export type LoadedSuite = LoadedBundle & { registry: Registry }
+
+// NOTE: What a run tells every property test of it. Both are the command
+// line's: `--seed` and `--cases`.
+export type PropertyOptions = { seed?: string; cases?: number | null }
 
 // NOTE: What a run knows about snapshots before it starts: the stored entries
 // of every Module in it, and whether one that differs is to be recorded.
@@ -249,6 +254,12 @@ export function runSuites(
 	// against, keyed by Module — read off disk here because a bundle reads
 	// nothing — and whether a difference is RECORDED rather than reported.
 	snapshots: SnapshotOptions = {},
+	// NOTE: What every property test of the run draws from, and how many values
+	// each of them runs for. The SEED is made here rather than in the runtime,
+	// because one run over several bundles is one run and every bundle has to
+	// draw from the same one — which is what makes the replay a report prints
+	// reproduce a whole run and not just one file of it.
+	properties: PropertyOptions = {},
 ): { planned: number; focused: boolean } {
 	let selected = all.map((suite) =>
 		suite.tests.select(suite.registry, filters),
@@ -292,6 +303,8 @@ export function runSuites(
 			coverage,
 			snapshots: snapshots.stored,
 			update: snapshots.update,
+			seed: properties.seed,
+			cases: properties.cases ?? undefined,
 		})
 	}
 
@@ -576,6 +589,10 @@ export async function runTest(
 	// NOTE: Read before the run and handed over whole: a stored snapshot is a
 	// file, and the runtime is a bundle that reads none.
 	let stored = await readSnapshots(sources.keys())
+	// NOTE: One seed for the whole run, made HERE where there is one run: every
+	// bundle draws from it, and every property test folds its own identity in.
+	// So the replay a failure prints reproduces the run rather than the file.
+	let seed = context.options.seed ?? randomSeed()
 	let staging = await mkdtemp(path.join(tmpdir(), "essence-test-"))
 	let restore = redirectStdout()
 	let suites: Array<LoadedSuite>
@@ -606,6 +623,7 @@ export async function runTest(
 			emit,
 			context.options.coverage,
 			{ stored, update: context.options.update },
+			{ seed, cases: context.options.cases },
 		)
 		// NOTE: The stream is folded up ONCE, here, and the `run-end` this
 		// writes carries the counts it found. Re-reading the stream afterwards
