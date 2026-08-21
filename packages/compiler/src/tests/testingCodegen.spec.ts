@@ -814,7 +814,7 @@ describe("Test codegen — the Tests.es fixture", () => {
 			passed: 1,
 			failed: 0,
 			skipped: 1,
-			deselected: 17,
+			deselected: 21,
 			focused: true,
 		})
 		expect(
@@ -833,7 +833,7 @@ describe("Test codegen — the Tests.es fixture", () => {
 		let { summary } = await run(source.replace(" focused {", " {"))
 
 		expect(summary).toMatchObject({
-			passed: 18,
+			passed: 22,
 			failed: 0,
 			skipped: 1,
 			deselected: 0,

@@ -524,7 +524,7 @@ describe("The Tests.es fixture, counted", () => {
 		let [file] = summary.files
 
 		expect(file).toBeDefined()
-		expect(file!.lines).toEqual({ covered: 15, total: 16 })
+		expect(file!.lines).toEqual({ covered: 15, total: 17 })
 		expect(file!.branches).toEqual({ covered: 4, total: 4 })
 		expect(file!.cases).toEqual({ covered: 2, total: 3 })
 	})
@@ -559,14 +559,15 @@ describe("The Tests.es fixture, counted", () => {
 			all.summary.files[0]!.lines.total,
 		)
 		// NOTE: NOT equal, and the difference is the point of the comparison
-		// rather than a hole in it. The fixture's own tests reach a line
+		// rather than a hole in it. The fixture's own tests reach two lines
 		// loading it does not — `pointsFor`'s `case #Loss`, which only a table
-		// row and an example ever score — so a focused run counts one fewer.
+		// row and an example ever score, and `Supported.generate`, which only a
+		// property test ever draws through — so a focused run counts two fewer.
 		// What has to hold is that a focused run counts nearly all of them
 		// anyway: the Module was evaluated, and a run resets the counts to what
 		// evaluating it left rather than to zero.
 		expect(focused.summary.files[0]!.lines.covered).toBeGreaterThanOrEqual(
-			all.summary.files[0]!.lines.covered - 1,
+			all.summary.files[0]!.lines.covered - 2,
 		)
 		expect(focused.summary.files[0]!.cases.total).toBe(
 			all.summary.files[0]!.cases.total,

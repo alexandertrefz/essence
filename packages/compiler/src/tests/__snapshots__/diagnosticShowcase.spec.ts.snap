@@ -1637,24 +1637,78 @@ Error: Colour#Red can not be recorded as a snapshot
     │ Note 2: Colour#Red does not conform to 'Printable'.
 ────╯
 
-[duplicate-test-name]
-Error: There is already a test called 'counts a win' here
-    ╭─┤ Tests.es:90:8 │
+[property-parameters]
+Error: A generated Parameter has to write its Type
+    ╭─┤ Tests.es:84:39 │
     │
- 86 │        test "counts a win" {
-    │             ───────┬──────  
-    │                    ╰──────── the other test is here
+ 84 │     test "over anything at all" for any (n) {
+    │                                          ▲  
+    │                                          ╰── nothing here says what to generate
     │ 
- 90 │        test "counts a win" {
-    │             ───────┬──────  
-    │                    ╰──────── this name is taken
+    │ Help: Write the Type: 'for any (n: Integer)'.
     │ 
-    │ Help: Say what each of them proves, so that a report names the one that failed.
-    │ 
-    │ Note: What a test is called, together with the suites around it, is what identifies it — to a snapshot, to a stored counterexample, and to the Editor.
+    │ Note: The Type is the whole of what a generator is derived from.
 ────╯
 
-─── 9 errors
+[ungeneratable-type]
+Error: Nothing can generate a (_ String) -> Integer
+    ╭─┤ Tests.es:90:34 │
+    │
+ 90 │     test "over a Function" for any (read: (_: String) -> Integer) {
+    │                                     ──────────────┬─────────────  
+    │                                                   ╰─────────────── nothing knows how to build a (_ String) -> Integer
+    │ 
+    │ Help: Write a Type a value can be built of, or declare a 'Generatable' conformance for this one.
+    │ 
+    │ Note: A property test generates a value of every Parameter's Type, once per case.
+────╯
+
+[contradictory-test-forms]
+Error: A test runs written rows or generated values, not both
+    ╭─┤ Tests.es:97:56 │
+    │
+ 97 │     test "over rows and values" across [1] (row: Integer) for any (n: Integer) {
+    │                                 ───┬──                    ─┬─  
+    │                                    ╰───────────────────────│─── and this runs the rows
+    │                                                            │   
+    │                                                            ╰─── this generates a value for every case
+    │ 
+    │ Help: Keep one of them, or write two tests — one over the rows and one over the generated values.
+    │ 
+    │ Note: A table test runs its body once per row a reader wrote; a property test runs it once per value the runner made up. One body can not do both.
+────╯
+
+[snapshot-in-property]
+Error: A property test can not record a snapshot
+     ╭─┤ Tests.es:104:24 │
+     │
+ 104 │        expect n::toString() matches snapshot from "drawn"
+     │                             ──────────────┬──────────────  
+     │                                           ╰──────────────── every case would record here
+     │ 
+     │ Help: Assert what holds for every value instead — 'expect …' — and snapshot a value a test WROTE, in a test of its own.
+     │ 
+     │ Note: A property test runs its body once per generated value, so a snapshot written here records a different value every case and only the last of them could ever match.
+─────╯
+
+[duplicate-test-name]
+Error: There is already a test called 'counts a win' here
+     ╭─┤ Tests.es:116:8 │
+     │
+ 112 │        test "counts a win" {
+     │             ───────┬──────  
+     │                    ╰──────── the other test is here
+     │ 
+ 116 │        test "counts a win" {
+     │             ───────┬──────  
+     │                    ╰──────── this name is taken
+     │ 
+     │ Help: Say what each of them proves, so that a report names the one that failed.
+     │ 
+     │ Note: What a test is called, together with the suites around it, is what identifies it — to a snapshot, to a stored counterexample, and to the Editor.
+─────╯
+
+─── 13 errors
 "
 `;
 
