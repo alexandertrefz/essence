@@ -67,6 +67,19 @@ implementation {
 		}
 	}
 
+	§ A Type whose values carry an invariant a structural generator can not
+	§ know about — a supported team is one of three, and a Record of a String
+	§ is any String at all. A Namespace conforming to `Generatable` replaces
+	§ the derived generator for the Type it targets, and a property test over
+	§ `Supported` draws through it.
+	type Supported = { name: String }
+
+	namespace Supported for Supported is Generatable {
+		static generate(from source: Randomness) -> Supported {
+			<- { name = source::pick(from ["Lions", "Tigers", "Bears"]) }
+		}
+	}
+
 	constant lions = Standing.blank(of "Lions")
 
 	Terminal.inspect(lions::record(scored 2, conceded 0).points) § 3
@@ -239,6 +252,49 @@ tests {
 
 		test "renders the whole table" {
 			expect table matches snapshot from "the-table"
+		}
+	}
+
+	§ A property test says what holds for EVERY value rather than for the ones
+	§ a reader thought of. `for any` declares typed Parameters, and the runner
+	§ generates a value of each Type once per case — a hundred of them by
+	§ default, `--cases` for another number. A failure is shrunk to the smallest
+	§ value that still fails and reported with the seed it was drawn from, so
+	§ `--seed` runs it again exactly.
+	suite "properties" {
+		§ The generator is derived from the Type, structurally: a Record member
+		§ by member, a Choice Case by Case, a List from its item Type.
+		test "an outcome is worth what it scores" for any (
+			scored: Integer,
+			conceded: Integer,
+		) {
+			expect pointsFor(
+				outcomeOf(scored, against conceded),
+			)::isGreaterThanOrEqualTo(0)
+		}
+
+		§ A checked refinement is honoured: `NonEmptyList` is never empty and
+		§ `NonZeroInteger` is never zero, because the generator holds the
+		§ predicate rather than drawing values and hoping.
+		test "a team always has a name" for any (
+			names: NonEmptyList<String>,
+			seats: NonZeroInteger,
+		) {
+			expect names::hasItems()
+			expect seats::isNot(0)
+		}
+
+		§ A Choice generates every one of its Cases, and a shrink walks towards
+		§ the ones that carry no payload.
+		test "every outcome scores at most three" for any (outcome: Outcome) {
+			expect pointsFor(outcome)::isLessThanOrEqualTo(3)
+		}
+
+		§ A Type whose values carry an invariant no structure can state
+		§ conforms to `Generatable` instead, and that Namespace's own Method is
+		§ what a case is drawn from.
+		test "a supported team is one of ours" for any (team: Supported) {
+			expect ["Lions", "Tigers", "Bears"]::contains(team.name)
 		}
 	}
 }

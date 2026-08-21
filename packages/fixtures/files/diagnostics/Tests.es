@@ -78,6 +78,32 @@ tests {
 		expect Colour#Red matches snapshot
 	}
 
+	§ property-parameters — a generated Parameter writes a name and a Type, and
+	§ nothing else: the Type is the whole of what says what to generate, and a
+	§ counterexample is reported beside the name it was generated for.
+	test "over anything at all" for any (n) {
+		expect true
+	}
+
+	§ ungeneratable-type — nothing can build a value of a Function, so nothing
+	§ can run this test even once.
+	test "over a Function" for any (read: (_: String) -> Integer) {
+		expect true
+	}
+
+	§ contradictory-test-forms — a table test runs its body once per row a
+	§ reader wrote; a property test runs it once per value the runner made up.
+	§ One body can not do both.
+	test "over rows and values" across [1] (row: Integer) for any (n: Integer) {
+		expect true
+	}
+
+	§ snapshot-in-property — every case would record into the one slot, and
+	§ only the last of them could ever match.
+	test "records a draw" for any (n: Integer) {
+		expect n::toString() matches snapshot from "drawn"
+	}
+
 	suite "Standing" {
 
 		§ duplicate-test-name — what a test is called, together with the suites
