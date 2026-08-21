@@ -227,6 +227,7 @@ export type DiagnosticCode =
 	| "ungeneratable-type"
 	| "contradictory-test-forms"
 	| "snapshot-in-property"
+	| "value-comment-outside-tests"
 	// Names — declared twice, never declared, or not what the position wants.
 	| "duplicate-variable"
 	| "duplicate-type"

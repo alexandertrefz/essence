@@ -1009,6 +1009,46 @@ tests {
 		expect(eventsOf(events, "probe")).toHaveLength(0)
 	})
 
+	// NOTE: The one a compile can not answer. Everything above is written
+	// inside the section, which is where a value comment records; one written
+	// outside it records nothing, and used to say nothing about that either.
+	it("refuses one written outside the tests section", () => {
+		let source = `implementation {
+	constant outside = 1 §?
+}
+
+tests {
+	test "asks nothing" {
+		expect true
+	}
+}`
+		let parsed = parseWithDiagnostics(source)
+		let enriched = enrich(parsed.program, { tests: true, source })
+
+		expect(
+			enriched.diagnostics.map((diagnostic) => [
+				diagnostic.code,
+				diagnostic.severity,
+			]),
+		).toEqual([["value-comment-outside-tests", "warning"]])
+	})
+
+	it("says nothing about one in a build, where it is an ordinary Comment", () => {
+		let source = `implementation {
+	constant outside = 1 §?
+}
+
+tests {
+	test "asks nothing" {
+		expect true
+	}
+}`
+
+		expect(
+			enrich(parseWithDiagnostics(source).program).diagnostics,
+		).toEqual([])
+	})
+
 	it("answers every Constant a test body wrote, asked or not", async () => {
 		let { events } = await run(`implementation {
 	function double(_ value: Integer) -> Integer {

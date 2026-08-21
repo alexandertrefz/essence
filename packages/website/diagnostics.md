@@ -741,6 +741,22 @@ tests {
 Assert what holds for every value instead, and snapshot a value a test WROTE, in
 a test of its own.
 
+### `value-comment-outside-tests`
+
+A `§?` value comment was written outside the `tests { … }` block. It asks for
+the value of the Statement it ends, and the points that record one are handed
+out while the tests section is compiled — everywhere else it is an ordinary
+comment, and nothing ever answers it:
+
+```essence
+implementation {
+	constant rate = leader::pointsPerGame() §?
+}
+```
+
+Ask it of a Statement inside the tests section, or write `§` for a comment that
+asks nothing.
+
 ## Names
 
 ### `duplicate-variable`
