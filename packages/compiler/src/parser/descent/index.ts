@@ -3075,10 +3075,15 @@ class DescentParser {
 			let caseName = this.parseIdentifier()
 			let binding = this.parseCaseMatcherBinding()
 
-			return generators.caseMatcher(null, caseName, binding, {
-				start: token.position.start,
-				end: (binding ?? caseName).position.end,
-			})
+			return generators.caseMatcher(
+				null,
+				caseName,
+				binding?.node ?? null,
+				{
+					start: token.position.start,
+					end: binding?.end ?? caseName.position.end,
+				},
+			)
 		}
 
 		if (
@@ -3092,10 +3097,15 @@ class DescentParser {
 			let caseName = this.parseIdentifier()
 			let binding = this.parseCaseMatcherBinding()
 
-			return generators.caseMatcher(choice, caseName, binding, {
-				start: choice.position.start,
-				end: (binding ?? caseName).position.end,
-			})
+			return generators.caseMatcher(
+				choice,
+				caseName,
+				binding?.node ?? null,
+				{
+					start: choice.position.start,
+					end: binding?.end ?? caseName.position.end,
+				},
+			)
 		}
 
 		return this.parseType()
@@ -3118,10 +3128,14 @@ class DescentParser {
 	// second name rather than redefining the one that exists. That is also why a
 	// Pattern in Matcher position carries no whole-value binder of its own,
 	// while one in a payload does: what the constructor took is not `@`.
-	protected parseCaseMatcherBinding():
-		| parser.IdentifierNode
-		| parser.PatternNode
-		| null {
+	protected parseCaseMatcherBinding(): {
+		node: parser.IdentifierNode | parser.PatternNode
+		// NOTE: Where the binder ends, which is the closing paren rather than
+		// the name inside it. A Matcher's span is what a failed assertion draws
+		// its underline from, and one that stopped at the name left the `)`
+		// standing bare beyond it.
+		end: common.Cursor
+	} | null {
 		if (this.tokens.peek()?.type !== TokenType.SymbolLeftParen) {
 			return null
 		}
@@ -3133,9 +3147,9 @@ class DescentParser {
 				? this.parsePattern()
 				: this.parseIdentifier()
 
-		this.tokens.expect(TokenType.SymbolRightParen)
+		let closing = this.tokens.expect(TokenType.SymbolRightParen)
 
-		return binding
+		return { node: binding, end: closing.position.end }
 	}
 
 	// NOTE: A Pattern names the parts of a value, in every position that takes
