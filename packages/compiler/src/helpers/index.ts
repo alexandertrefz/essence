@@ -1,24 +1,47 @@
 import type { common, lexer, parser } from "@essence-lang/interfaces"
 
-function editDistance(left: string, right: string): number {
-	let previous = Array.from({ length: right.length + 1 }, (_, i) => i)
+// NOTE: The Damerau-Levenshtein distance — Levenshtein plus the swap of two
+// adjacent characters as ONE edit rather than two, because that is the typo
+// people actually make: `slwo` for `slow`, `retrun` for `return`. Exported
+// because every "did you mean" in the toolchain has to answer the same way
+// about the same pair of words, whether it is asked here or by the Language
+// Server about a tag.
+export function editDistance(left: string, right: string): number {
+	let rows = left.length + 1
+	let columns = right.length + 1
+	let distances: Array<Array<number>> = []
 
-	for (let i = 1; i <= left.length; i++) {
-		let current = [i]
-
-		for (let j = 1; j <= right.length; j++) {
-			let substitution =
-				previous[j - 1] + (left[i - 1] === right[j - 1] ? 0 : 1)
-
-			current.push(
-				Math.min(previous[j] + 1, current[j - 1] + 1, substitution),
-			)
-		}
-
-		previous = current
+	for (let row = 0; row < rows; row += 1) {
+		distances.push(
+			Array.from({ length: columns }, (_, column) =>
+				row === 0 ? column : column === 0 ? row : 0,
+			),
+		)
 	}
 
-	return previous[right.length]
+	for (let row = 1; row < rows; row += 1) {
+		for (let column = 1; column < columns; column += 1) {
+			let cost = left[row - 1] === right[column - 1] ? 0 : 1
+			let best = Math.min(
+				distances[row - 1]![column]! + 1,
+				distances[row]![column - 1]! + 1,
+				distances[row - 1]![column - 1]! + cost,
+			)
+
+			if (
+				row > 1 &&
+				column > 1 &&
+				left[row - 1] === right[column - 2] &&
+				left[row - 2] === right[column - 1]
+			) {
+				best = Math.min(best, distances[row - 2]![column - 2]! + cost)
+			}
+
+			distances[row]![column] = best
+		}
+	}
+
+	return distances[rows - 1]![columns - 1]!
 }
 
 // NOTE: A suggestion is only offered when it is close enough to be plausible —

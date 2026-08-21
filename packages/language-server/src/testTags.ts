@@ -1,3 +1,4 @@
+import { editDistance } from "@essence-lang/compiler/helpers"
 import type { common, parser } from "@essence-lang/interfaces"
 
 // NOTE: What the tags of a whole workspace say about each other. Two questions,
@@ -13,7 +14,9 @@ import type { common, parser } from "@essence-lang/interfaces"
 //   to catch on and did not looks like, and what a typo nothing is close enough
 //   to look like.
 
-// NOTE: Two edits, which is a typo. Three is a different word.
+// NOTE: Two edits, which is a typo. Three is a different word. The distance is
+// the Compiler's own — the same one every "did you mean" in the toolchain is
+// measured by, counting the swap of two adjacent characters as one edit.
 const MAXIMUM_DISTANCE = 2
 
 // NOTE: The tag's own span, so a rename edits the word and not the Modifier.
@@ -131,47 +134,6 @@ export function tagUsages(
 	return usages
 }
 
-// NOTE: The Damerau-Levenshtein distance — Levenshtein plus the swap of two
-// adjacent characters as one edit, because `slwo` for `slow` is the typo tags
-// are most often written with and plain Levenshtein calls it two.
-export function damerauLevenshtein(left: string, right: string): number {
-	let rows = left.length + 1
-	let columns = right.length + 1
-	let distances: Array<Array<number>> = []
-
-	for (let row = 0; row < rows; row += 1) {
-		distances.push(
-			Array.from({ length: columns }, (_, column) =>
-				row === 0 ? column : column === 0 ? row : 0,
-			),
-		)
-	}
-
-	for (let row = 1; row < rows; row += 1) {
-		for (let column = 1; column < columns; column += 1) {
-			let cost = left[row - 1] === right[column - 1] ? 0 : 1
-			let best = Math.min(
-				distances[row - 1]![column]! + 1,
-				distances[row]![column - 1]! + 1,
-				distances[row - 1]![column - 1]! + cost,
-			)
-
-			if (
-				row > 1 &&
-				column > 1 &&
-				left[row - 1] === right[column - 2] &&
-				left[row - 2] === right[column - 1]
-			) {
-				best = Math.min(best, distances[row - 2]![column - 2]! + cost)
-			}
-
-			distances[row]![column] = best
-		}
-	}
-
-	return distances[rows - 1]![columns - 1]!
-}
-
 // NOTE: Which of two similar tags is the mistake: the one fewer tests carry,
 // and where they are carried by as many, the one that sorts later — so that the
 // answer does not depend on the order the workspace happened to read its files
@@ -258,7 +220,7 @@ export function tagDiagnostics(
 			let left = usages[index]!
 			let right = usages[other]!
 
-			if (damerauLevenshtein(left.tag, right.tag) > MAXIMUM_DISTANCE) {
+			if (editDistance(left.tag, right.tag) > MAXIMUM_DISTANCE) {
 				continue
 			}
 
