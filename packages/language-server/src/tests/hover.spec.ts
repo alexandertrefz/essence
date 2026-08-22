@@ -1411,7 +1411,7 @@ describe("Hover over a written receiver", () => {
 		].join("\n")
 
 		expect(hover(source, { line: 5, column: 17 })).toBe(
-			"Integer where @::isEven()::and(@::isGreaterThan(10))::and(@::isGreaterThanOrEqualTo(0))::and(@::isNot(0))",
+			"Integer where @::isNot(0)::and(@::isEven())::and(@::isGreaterThan(10))::and(@::isGreaterThanOrEqualTo(0))",
 		)
 	})
 

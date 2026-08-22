@@ -1080,8 +1080,8 @@ describe("Resolvers", () => {
 			conjuncts: [
 				{
 					namespaceName: "Integer",
-					methodName: "isNot",
-					overloadIndex: null,
+					methodName: "is",
+					negated: true,
 					args: ["0"],
 				},
 			],
@@ -1168,8 +1168,8 @@ describe("Resolvers", () => {
 				conjuncts: [
 					{
 						namespaceName: "List",
-						methodName: "hasItems",
-						overloadIndex: 0,
+						methodName: "isEmpty",
+						negated: true,
 						args: [],
 					},
 				],

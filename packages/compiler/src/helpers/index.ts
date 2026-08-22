@@ -1766,19 +1766,36 @@ export function typeContainsRefinement(type: common.Type): boolean {
 }
 
 // NOTE: What makes two predicate leaves the SAME question — the Namespace that
-// answers it, the Method, which Overload of it, and the Arguments. Assignability
-// between two refinements is set inclusion over these keys, so nothing may spell
-// two questions alike. Which is why the separator is a COLON and the Arguments
-// are JSON: the Lexer reads `:` as a Symbol, so no name a Program can write
-// holds one, while `$` is an ordinary Identifier character — a Method called
-// `isNot$1` would otherwise key exactly as Overload 1 of `isNot` — and a String
-// Argument may hold whatever a joined list's separator would have been.
+// answers it, the Method, whether the answer is negated, and the Arguments.
+// Assignability between two refinements is set inclusion over these keys, so
+// nothing may spell two questions alike. Which is why the separator is a COLON
+// and the Arguments are JSON: the Lexer reads `:` as a Symbol, so no name a
+// Program can write holds one, and a String Argument — which arrives quoted —
+// may hold whatever a joined list's separator would have been.
+//
+// The leaf is already RESOLVED where it is built, so this compares questions
+// rather than spellings: `@::isZero()` and `@::is(0)` key alike, and
+// `@::isNot(0)` is the second of those with the flag on. `spelling` is how the
+// leaf was written and is deliberately absent — it names the question for a
+// reader, it does not decide it.
 export function predicateConjunctKey(
 	conjunct: common.PredicateConjunct,
 ): string {
 	return `${conjunct.namespaceName}::${conjunct.methodName}:${
-		conjunct.overloadIndex ?? ""
+		conjunct.negated ? "!" : ""
 	}${JSON.stringify(conjunct.args)}`
+}
+
+// NOTE: The same leaf asked the other way round. A resolved leaf carries its
+// polarity as a flag, so the opposite of one is one field flipped — and the
+// spelling goes with the polarity it belonged to: `hasCharacters` is not what
+// the contrary of `@::hasCharacters()` is called.
+export function negatedPredicateConjunct(
+	conjunct: common.PredicateConjunct,
+): common.PredicateConjunct {
+	let { spelling: _spelling, ...leaf } = conjunct
+
+	return { ...leaf, negated: !conjunct.negated }
 }
 
 // NOTE: The one door to a refinement's conjuncts. They are null while the

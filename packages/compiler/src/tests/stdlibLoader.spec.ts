@@ -674,9 +674,10 @@ describe("Standard Library Loader", () => {
 		expect(alias.conjuncts).toEqual([
 			{
 				namespaceName: "Integer",
-				methodName: "isNot",
-				overloadIndex: null,
+				methodName: "is",
+				negated: true,
 				args: ["0"],
+				spelling: { methodName: "isNot", args: ["0"] },
 			},
 		])
 
@@ -744,11 +745,15 @@ describe("Standard Library Loader", () => {
 			itemType: { type: "GenericUse", name: "Item" },
 		})
 		expect(declared.conjuncts).toEqual([
+			// NOTE: `hasItems` is declared here WITHOUT a body, so it is a leaf
+			// of its own. The standard library's own writes it as
+			// `@::isEmpty()::negate()` and resolves to that.
 			{
 				namespaceName: "List",
 				methodName: "hasItems",
-				overloadIndex: null,
+				negated: false,
 				args: [],
+				spelling: { methodName: "hasItems", args: [] },
 			},
 		])
 
@@ -840,11 +845,15 @@ describe("Standard Library Loader", () => {
 		let declared = alias.aliasedType
 
 		expect(declared.conjuncts).toEqual([
+			// NOTE: `hasItems` is declared here WITHOUT a body, so it is a leaf
+			// of its own. The standard library's own writes it as
+			// `@::isEmpty()::negate()` and resolves to that.
 			{
 				namespaceName: "List",
 				methodName: "hasItems",
-				overloadIndex: null,
+				negated: false,
 				args: [],
+				spelling: { methodName: "hasItems", args: [] },
 			},
 		])
 

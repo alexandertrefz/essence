@@ -33,6 +33,7 @@ import {
 	mergedRecordType,
 	mentionsUnsolvedTypeParameter,
 	mergeUnionMembers,
+	negatedPredicateConjunct,
 	parameterInternalName,
 	type PatternBinding,
 	type PatternStep,
@@ -2903,7 +2904,6 @@ export function enrichMatch(
 				guardNarrowings = narrowingsFor(
 					conditionEvidence(guard, guardScope),
 					guardScope,
-					predicateConjunctKey,
 				)
 			}
 
@@ -3523,6 +3523,12 @@ function refinedGenerator(
 //
 // Answering `true` means the narrowing now holds the conjunct entirely: no
 // check is enriched for it and no value that fails it is ever drawn.
+//
+// NOTE: The rows are the PRIMITIVES, and each is read in both polarities. A
+// conjunct arrives resolved — `isZero` is `is(0)`, `isNot` is `is` negated,
+// `hasItems` is `isEmpty` negated, `isGreaterThanOrEqualTo` is `isLessThan`
+// negated — so a table naming the written spellings would have half its rows
+// unreachable and the other half doing the same work twice.
 function narrowedBy(
 	conjunct: common.PredicateConjunct,
 	base: common.Type,
@@ -3541,40 +3547,28 @@ function narrowedBy(
 		return false
 	}
 
-	if (base.type === "Integer" && conjunct.args.length <= 1) {
+	if (base.type === "Integer" && conjunct.args.length === 1) {
+		if (whole === null) {
+			return false
+		}
+
 		switch (conjunct.methodName) {
 			case "is":
-				return (
-					whole !== null &&
-					atLeast(narrowing, whole) &&
-					atMost(narrowing, whole)
-				)
-			case "isNot":
-				if (whole === null) {
-					return false
+				if (!conjunct.negated) {
+					return atLeast(narrowing, whole) && atMost(narrowing, whole)
 				}
 
 				narrowing.notEqualTo = [...(narrowing.notEqualTo ?? []), whole]
 
 				return true
 			case "isGreaterThan":
-				return whole !== null && atLeast(narrowing, step(whole, 1n))
-			case "isGreaterThanOrEqualTo":
-				return whole !== null && atLeast(narrowing, whole)
+				return conjunct.negated
+					? atMost(narrowing, whole)
+					: atLeast(narrowing, step(whole, 1n))
 			case "isLessThan":
-				return whole !== null && atMost(narrowing, step(whole, -1n))
-			case "isLessThanOrEqualTo":
-				return whole !== null && atMost(narrowing, whole)
-			case "isPositive":
-				return conjunct.args.length === 0 && atLeast(narrowing, "1")
-			case "isNegative":
-				return conjunct.args.length === 0 && atMost(narrowing, "-1")
-			case "isZero":
-				return (
-					conjunct.args.length === 0 &&
-					atLeast(narrowing, "0") &&
-					atMost(narrowing, "0")
-				)
+				return conjunct.negated
+					? atLeast(narrowing, whole)
+					: atMost(narrowing, step(whole, -1n))
 			default:
 				return false
 		}
@@ -3582,24 +3576,16 @@ function narrowedBy(
 
 	if (
 		(base.type === "List" || base.type === "String") &&
-		conjunct.args.length === 0
+		conjunct.args.length === 0 &&
+		conjunct.methodName === "isEmpty"
 	) {
-		switch (conjunct.methodName) {
-			case "hasItems":
-			case "hasCharacters":
-				narrowing.minimumLength = Math.max(
-					narrowing.minimumLength ?? 0,
-					1,
-				)
-
-				return true
-			case "isEmpty":
-				narrowing.maximumLength = 0
-
-				return true
-			default:
-				return false
+		if (conjunct.negated) {
+			narrowing.minimumLength = Math.max(narrowing.minimumLength ?? 0, 1)
+		} else {
+			narrowing.maximumLength = 0
 		}
+
+		return true
 	}
 
 	return false
@@ -3648,12 +3634,58 @@ function predicateCheck(
 	scope: enricher.Scope,
 	position: common.Position,
 ): common.typed.ExpressionNode | null {
-	let signature = predicateSignature(conjunct, scope)
+	// NOTE: The candidate is typed as the refinement's BASE rather than as the
+	// refinement: what the check answers is whether a drawn value has earned the
+	// refinement, and typing it as one already would make the question answered.
+	let checkScope = childScope(scope, {
+		members: { [binding]: refinement.base },
+		declarations: { [binding]: position },
+		constants: new Set([binding]),
+	})
 
-	if (signature === null) {
-		return null
+	// NOTE: Every entry of the Method is tried, in order, because a conjunct
+	// names no Overload — the Arguments are what tell two entries apart, and
+	// they are stable scalars rather than Types. So the signatures are read for
+	// what they can offer, an Argument LABEL and the Type each scalar was
+	// written as, and the one that rebuilds into a call this Scope accepts is
+	// the one that was meant. A wrong guess does not typecheck.
+	for (let signature of predicateSignatures(conjunct, scope)) {
+		let call = predicateCall(
+			conjunct,
+			signature,
+			refinement.base,
+			binding,
+			position,
+		)
+
+		if (call === null) {
+			continue
+		}
+
+		let attempt = collectDiagnostics(() =>
+			enrichExpression(call, checkScope),
+		)
+
+		if (
+			!containsErrors(attempt.diagnostics) &&
+			attempt.result.type.type === "Boolean"
+		) {
+			return attempt.result
+		}
 	}
 
+	return null
+}
+
+// NOTE: One conjunct rebuilt against one candidate signature, or null where the
+// scalars it keeps are not the Types that signature takes.
+function predicateCall(
+	conjunct: common.PredicateConjunct,
+	signature: common.BaseFunction,
+	base: common.Type,
+	binding: string,
+	position: common.Position,
+): parser.MethodInvocationNode | null {
 	// NOTE: The Parameters the ARGUMENTS stand for. A Method's own signature
 	// carries its receiver first, and a Protocol's carries it too, so a
 	// signature that has one more Parameter than the conjunct has Arguments is
@@ -3673,7 +3705,7 @@ function predicateCheck(
 		let value = predicateArgument(
 			conjunct.args[index]!,
 			parameter.type,
-			refinement.base,
+			base,
 			position,
 		)
 
@@ -3716,32 +3748,42 @@ function predicateCheck(
 		arguments: args,
 		position,
 	}
-	// NOTE: The candidate is typed as the refinement's BASE rather than as the
-	// refinement: what the check answers is whether a drawn value has earned the
-	// refinement, and typing it as one already would make the question answered.
-	let checkScope = childScope(scope, {
-		members: { [binding]: refinement.base },
-		declarations: { [binding]: position },
-		constants: new Set([binding]),
-	})
-	let attempt = collectDiagnostics(() => enrichExpression(call, checkScope))
 
-	return containsErrors(attempt.diagnostics) ||
-		attempt.result.type.type !== "Boolean"
-		? null
-		: attempt.result
+	// NOTE: A negated leaf is the call the standard library writes for it —
+	// `@::isEmpty()::negate()` — because that is the Essence an author would
+	// have written and the only spelling that holds for every leaf. The
+	// spelling the predicate WAS written as names one Method for the reader;
+	// this has to be code.
+	return conjunct.negated
+		? {
+				nodeType: "MethodInvocation",
+				base: call,
+				member: {
+					nodeType: "Identifier",
+					content: "negate",
+					position,
+				},
+				namespaceSpecifier: null,
+				arguments: [],
+				position,
+			}
+		: call
 }
 
-// NOTE: The signature the conjunct's Method was resolved to when the refinement
-// was declared — the Namespace's own where it declares one, and the Protocol's
-// where a conformance provided it (`Equatable` provides `isNot`, which is what
-// 'NonZeroInteger' is written with). It is read for two things only: what each
-// Argument is LABELLED, and what Type it is, which is what turns a conjunct's
-// stable scalars back into the Literals they were written as.
-function predicateSignature(
+// NOTE: The signatures the conjunct's Method could have been resolved to — the
+// Namespace's own where it declares one, and the Protocol's where a conformance
+// provided it (`Equatable` provides `isNot`, which is what 'NonZeroInteger' is
+// written with). They are read for two things only: what each Argument is
+// LABELLED, and what Type it is, which is what turns a conjunct's stable
+// scalars back into the Literals they were written as.
+//
+// All of an Overload's entries come back, in order. A conjunct names none of
+// them, and the caller finds the one that was meant by rebuilding the call and
+// seeing whether it typechecks.
+function predicateSignatures(
 	conjunct: common.PredicateConjunct,
 	scope: enricher.Scope,
-): common.BaseFunction | null {
+): Array<common.BaseFunction> {
 	// NOTE: The lookup REPORTS where the name means something other than a
 	// Namespace here, which is the reading a written `::<Name>method()`
 	// deserves. This is not one: nobody wrote this name, and what a failed
@@ -3759,7 +3801,7 @@ function predicateSignature(
 	let namespace = found.result
 
 	if (namespace === undefined || containsErrors(found.diagnostics)) {
-		return null
+		return []
 	}
 
 	let method = namespace.methods[conjunct.methodName]
@@ -3778,17 +3820,13 @@ function predicateSignature(
 	}
 
 	if (method === undefined) {
-		return null
+		return []
 	}
 
-	if (
-		method.type === "OverloadedMethod" ||
+	return method.type === "OverloadedMethod" ||
 		method.type === "OverloadedStaticMethod"
-	) {
-		return method.overloads[conjunct.overloadIndex ?? 0] ?? null
-	}
-
-	return method
+		? method.overloads
+		: [method]
 }
 
 // NOTE: One stable scalar as the Literal it was written as. A conjunct keeps an
@@ -3822,9 +3860,24 @@ function predicateArgument(
 
 	switch (type.type) {
 		case "Integer":
-			return { nodeType: "IntegerValue", value: argument, position }
-		case "String":
-			return { nodeType: "StringValue", value: argument, position }
+			return /^-?\d+$/.test(argument)
+				? { nodeType: "IntegerValue", value: argument, position }
+				: null
+		case "String": {
+			// NOTE: A String scalar arrives as the JSON of its characters,
+			// which is the half of it that says it was a String and not the
+			// digits it may happen to spell. Anything else is a scalar of
+			// another kind and no Literal this Parameter takes.
+			if (!argument.startsWith('"')) {
+				return null
+			}
+
+			let text: unknown = JSON.parse(argument)
+
+			return typeof text === "string"
+				? { nodeType: "StringValue", value: text, position }
+				: null
+		}
 		case "Rational": {
 			let [numerator, denominator] = argument.split("/")
 
@@ -6953,11 +7006,7 @@ function trueBranchNarrowings(
 	condition: common.typed.ExpressionNode,
 	scope: enricher.Scope,
 ): Array<Narrowing> {
-	return narrowingsFor(
-		conditionEvidence(condition, scope),
-		scope,
-		predicateConjunctKey,
-	)
+	return narrowingsFor(conditionEvidence(condition, scope), scope)
 }
 
 // NOTE: The Scope a branch's body is enriched in — the surrounding one plus
@@ -6979,11 +7028,7 @@ function falseBranchScope(
 	scope: enricher.Scope,
 ): enricher.Scope {
 	return branchScope(
-		narrowingsFor(
-			complementEvidence(condition, scope),
-			scope,
-			predicateShapeKey,
-		),
+		narrowingsFor(complementEvidence(condition, scope), scope),
 		scope,
 	)
 }
@@ -7070,13 +7115,7 @@ function collectConditionEvidence(
 		args.push(literal)
 	}
 
-	let conjunct: common.PredicateConjunct = {
-		namespaceName: condition.namespace.name,
-		methodName: condition.member.name,
-		overloadIndex: condition.overloadedMethodIndex,
-		args,
-	}
-
+	let conjunct = resolvedConjunct(condition, args)
 	let proven = evidence.get(name)
 
 	if (proven === undefined) {
@@ -7193,8 +7232,11 @@ function lentBindingName(
 // other way round. Where several qualify, the one proving the MOST wins, because
 // it is the one that forgets the least.
 //
-// `keyOf` is what "the same question" means here, and the complement path passes
-// a looser one — see `predicateShapeKey`.
+// Every path in compares by the ONE key. A conjunct is stored resolved, so a
+// complement is that leaf with its polarity flipped and spells the same key the
+// branch above spelled — where the two used to be told apart by a looser key of
+// the complement's own, because the opposite of `is` had to be guessed as
+// `isNot` with no Overload behind it.
 //
 // NOTE: A GENERIC refined Alias stands for a different refinement at every use, so
 // it is no candidate until a receiver has decided its Type Arguments — which is
@@ -7202,7 +7244,6 @@ function lentBindingName(
 function narrowingsFor(
 	evidence: ConditionEvidence,
 	scope: enricher.Scope,
-	keyOf: (conjunct: common.PredicateConjunct) => string,
 ): Array<Narrowing> {
 	if (evidence.size === 0) {
 		return []
@@ -7225,7 +7266,7 @@ function narrowingsFor(
 			continue
 		}
 
-		let keys = new Set(proven.conjuncts.map(keyOf))
+		let keys = new Set(proven.conjuncts.map(predicateConjunctKey))
 
 		// NOTE: Evidence the binding's Type already carries is evidence the branch
 		// has. A Parameter declared `NonZeroInteger` asking `if n::isOdd()` has
@@ -7233,7 +7274,7 @@ function narrowingsFor(
 		// to what the `else` established rather than start over.
 		if (proven.receiverType.type === "Refinement") {
 			for (let conjunct of provenConjuncts(proven.receiverType)) {
-				keys.add(keyOf(conjunct))
+				keys.add(predicateConjunctKey(conjunct))
 			}
 		}
 
@@ -7249,7 +7290,7 @@ function narrowingsFor(
 				// declared one.
 				!matchesType(proven.receiverType, refinement) ||
 				!provenConjuncts(refinement).every((conjunct) =>
-					keys.has(keyOf(conjunct)),
+					keys.has(predicateConjunctKey(conjunct)),
 				)
 			) {
 				continue
@@ -7664,79 +7705,22 @@ function complementEvidence(
 	collectConditionEvidence(condition, scope, evidence)
 
 	for (let [name, proven] of evidence) {
-		let complement = complementConjunct(proven.conjuncts[0])
-
-		if (complement !== null) {
-			complemented.set(name, {
-				receiverType: proven.receiverType,
-				conjuncts: [complement],
-			})
-		}
+		complemented.set(name, {
+			receiverType: proven.receiverType,
+			// NOTE: The opposite of a leaf is the leaf with its polarity
+			// flipped, and that is the whole of it. A conjunct is stored
+			// RESOLVED — `@::isZero()` is `Integer::is(0)`, `@::hasCharacters()`
+			// is `String::isEmpty()` negated, `@::isNot(0)` is `Integer::is(0)`
+			// negated — so two Methods the standard library writes as each
+			// other's contraries have already become one leaf in two polarities,
+			// and no table of names is left with anything to pair up. The false
+			// branch of `if n::isZero()` proves exactly the leaf
+			// `NonZeroInteger` is declared by.
+			conjuncts: [negatedPredicateConjunct(proven.conjuncts[0]!)],
+		})
 	}
 
 	return complemented
-}
-
-// NOTE: The Methods the standard library declares as each other's opposites, for
-// the emptiness pairs that are not spelled `is`/`isNot`. Named per Namespace,
-// because a String's `isEmpty` has a differently spelled opposite than a List's.
-//
-// Hardcoded, deliberately: nothing in Essence lets a Method DECLARE that it
-// answers the negation of another, so a table someone can read is honest where an
-// inference from names would be a guess.
-const predicateOpposites = new Map<string, string>([
-	["String::isEmpty", "hasCharacters"],
-	["String::hasCharacters", "isEmpty"],
-	["List::isEmpty", "hasItems"],
-	["List::hasItems", "isEmpty"],
-])
-
-function complementConjunct(
-	conjunct: common.PredicateConjunct,
-): common.PredicateConjunct | null {
-	let opposite =
-		conjunct.methodName === "is"
-			? "isNot"
-			: conjunct.methodName === "isNot"
-				? "is"
-				: predicateOpposites.get(
-						`${conjunct.namespaceName}::${conjunct.methodName}`,
-					)
-
-	// NOTE: The Overload is dropped rather than guessed — see
-	// `predicateShapeKey`, which is the key a complemented conjunct is compared
-	// by.
-	return opposite === undefined
-		? null
-		: { ...conjunct, methodName: opposite, overloadIndex: null }
-}
-
-// NOTE: A conjunct's identity WITHOUT which Overload answered it. The two paths
-// that SYNTHESIZE a conjunct rather than reading one off a typed Invocation
-// compare by this, and they have to: the opposite of `is` is `isNot`, and which
-// Overload of either a receiver would have answered with is not something a
-// Method name and a list of literals can say — `String::is` is overloaded where
-// `String::isNot` is not, so either spelling of the pair would be wrong for the
-// other half. Two Overloads of one Method taking literals that spell the same are
-// conflated by this, which no Namespace in the standard library declares.
-//
-// NOTE: And WITHOUT the Namespace for that one pair, because its two halves need
-// not share one. `is` is written on each conforming Namespace and `isNot` is
-// provided by `Equatable` through that Namespace's conformance, so the two
-// usually agree — but a receiver whose own Namespace rejects an Argument falls
-// to the covering one, and the pair would then be spelled `Integer::is` against
-// `Number::isNot`. Naming the Namespace here would stop the pair pairing, which
-// is the whole of what this key is for. It costs nothing: a candidate refinement
-// has already been held to a base the receiver's Type flows into, and the only
-// Namespaces answering `is` on such a receiver are the one that owns it and the
-// covering `Number` — which ask the same question of the same two values.
-function predicateShapeKey(conjunct: common.PredicateConjunct): string {
-	let namespace =
-		conjunct.methodName === "is" || conjunct.methodName === "isNot"
-			? ""
-			: `${conjunct.namespaceName}::`
-
-	return `${namespace}${conjunct.methodName}${JSON.stringify(conjunct.args)}`
 }
 
 // NOTE: The Type `@` is bound to inside a Match Handler — the Matcher's own,
@@ -7763,16 +7747,7 @@ function refinedSelfType(
 	literal: common.typed.ExpressionNode | null,
 	scope: enricher.Scope,
 ): common.Type {
-	let proven: Array<common.PredicateConjunct> = []
-
-	for (let named of namedAbove) {
-		let complement = complementConjunct(named)
-
-		if (complement !== null) {
-			proven.push(complement)
-		}
-	}
-
+	let proven = namedAbove.map(negatedPredicateConjunct)
 	let named = literal === null ? null : namedValueConjunct(literal)
 
 	if (named !== null) {
@@ -7790,7 +7765,6 @@ function refinedSelfType(
 	let narrowings = narrowingsFor(
 		new Map([["@", { receiverType: matcher, conjuncts: proven }]]),
 		scope,
-		predicateShapeKey,
 	)
 
 	return narrowings[0]?.type ?? matcher
@@ -7820,10 +7794,8 @@ function namedValueConjunct(
 		: {
 				namespaceName: literal.type.type,
 				methodName: "is",
-				// NOTE: Unknowable from here, and dropped by the key this is
-				// compared under — see `predicateShapeKey`.
-				overloadIndex: null,
 				args: [argument],
+				negated: false,
 			}
 }
 
@@ -13195,14 +13167,7 @@ function extractPredicateConjuncts(
 		args.push(literal)
 	}
 
-	return [
-		{
-			namespaceName: predicate.namespace.name,
-			methodName: predicate.member.name,
-			overloadIndex: predicate.overloadedMethodIndex,
-			args,
-		},
-	]
+	return [resolvedConjunct(predicate, args)]
 }
 
 function reportInvalidPredicateLeaf(
@@ -13224,18 +13189,355 @@ function reportInvalidPredicateLeaf(
 	)
 }
 
+// #region Predicate Aliases
+
+// NOTE: The three Methods the standard library writes as the contrary of
+// another over the same Argument, and the leaf each of them resolves to.
+// `isNot` is `Equatable`'s and reads an `if` rather than a call — an import
+// cycle the Protocol works around — while `isGreaterThanOrEqualTo` and
+// `isLessThanOrEqualTo` ARE written `<- @::isLessThan(other)::negate()` and
+// forward the Argument they were given. Both are named here rather than derived
+// because a forwarded Argument is a template, and a leaf holds literals.
+//
+// Nothing else is hardcoded. Every Method a Namespace writes as one call on `@`
+// with written Arguments is read off its BODY — see `derivePredicateAliases` —
+// which is what makes `@::isZero()`, `@::isPositive()` and `@::hasItems()`
+// resolve without anybody naming them anywhere.
+//
+// NOTE: The names are trusted, not asked about. These are `Equatable`'s and
+// `Orderable`'s vocabulary, and a Namespace declaring one of them under another
+// meaning is telling the language something false about a name it reserves in
+// spirit — the reading this pass has always taken of `is` and `isNot`.
+const PRIMITIVE_PREDICATES: ReadonlyMap<string, string> = new Map([
+	["isNot", "is"],
+	["isGreaterThanOrEqualTo", "isLessThan"],
+	["isLessThanOrEqualTo", "isGreaterThan"],
+])
+
+// NOTE: One predicate leaf as the question it really asks. A Method written on
+// another one is put down as the one it calls, with `negated` carrying whatever
+// `::negate()` the body spelled — so `@::isZero()` and `@::is(0)` are one leaf,
+// `@::hasItems()` is `List::isEmpty()` negated, and the opposite of any of them
+// is the same leaf with the flag flipped.
+//
+// The name it was WRITTEN as rides along for the Diagnostic that has to say
+// which predicate a value did not answer. It decides nothing.
+//
+// An alias is only ever read for a leaf with no Arguments, which is the shape
+// `derivePredicateAliases` records: a Method taking nothing has one entry
+// whatever else its name is overloaded with, so there is no Overload left to
+// tell apart. The three named pairs above take exactly one.
+function resolvedConjunct(
+	invocation: common.typed.MethodInvocationNode,
+	args: Array<string | boolean>,
+): common.PredicateConjunct {
+	let spelling: common.PredicateSpelling = {
+		methodName: invocation.member.name,
+		args,
+	}
+
+	if (args.length === 0) {
+		let alias = predicateAliasOf(invocation)
+
+		if (alias !== undefined) {
+			return { ...alias, spelling }
+		}
+	}
+
+	let primitive =
+		args.length === 1
+			? PRIMITIVE_PREDICATES.get(spelling.methodName)
+			: undefined
+
+	return {
+		namespaceName: invocation.namespace.name,
+		methodName: primitive ?? spelling.methodName,
+		args,
+		negated: primitive !== undefined,
+		spelling,
+	}
+}
+
+// NOTE: The alias recorded on the entry this call resolved to, if it is one. The
+// Namespace Type on a typed Invocation is the very object hoisting registered —
+// `namespacesTargeting` hands the Scope's own — so the annotation written at the
+// hoist is read straight off it, and it rides the standard library's snapshot
+// like every other field of a Type.
+function predicateAliasOf(
+	invocation: common.typed.MethodInvocationNode,
+): common.PredicateConjunct | undefined {
+	let method = invocation.namespace.type.methods[invocation.member.name]
+
+	if (method === undefined) {
+		return undefined
+	}
+
+	if (method.type === "SimpleMethod") {
+		return method.predicateAlias
+	}
+
+	if (method.type !== "OverloadedMethod") {
+		return undefined
+	}
+
+	return invocation.overloadedMethodIndex === null
+		? undefined
+		: method.overloads[invocation.overloadedMethodIndex]?.predicateAlias
+}
+
+// NOTE: What a Namespace's own Methods say about each other, written onto the
+// Method Types as the Namespace reaches Scope. A Method that takes no Arguments,
+// answers a Boolean and whose whole body is one call on `@` — optionally negated
+// — is a PREDICATE ALIAS of that call: `Integer::isZero` is `@::is(0)`,
+// `List::hasItems` is `@::isEmpty()::negate()`, and a Program's own
+// `isInStock() -> Boolean { <- @::isGreaterThan(0) }` is the same shape and gets
+// the same treatment.
+//
+// Read off the BODY rather than declared. A Namespace could declare that one
+// Method is the contrary of another and be wrong; there is nothing to be wrong
+// about here, and every pair the old hardcoded table held falls out of it.
+//
+// NOTE: Called once per Namespace, the moment it reaches Scope and before the
+// hoisting round that reads a pending predicate — so a refinement written on an
+// alias is resolved with the alias already known, in the standard library's own
+// files as much as in a Program. The body is ENRICHED, silently, which is what
+// answers the one question the source can not: which Namespace answers the call
+// `@` makes. That is the same thing a `where` clause does at the same point.
+//
+// The candidates are found by SHAPE before anything is enriched, so a Namespace
+// with no Method of this shape costs one walk of its Method names and nothing
+// else.
+export function derivePredicateAliases(
+	node: parser.NamespaceDefinitionStatementNode,
+	namespaceType: common.NamespaceType,
+	scope: enricher.Scope,
+): void {
+	let targetType = namespaceType.targetType
+
+	if (targetType === null) {
+		return
+	}
+
+	let selfScope: enricher.Scope | null = null
+
+	for (let [methodName, method] of Object.entries(node.methods)) {
+		for (let [index, entry] of methodEntries(method).entries()) {
+			// NOTE: A body-less entry of a mixed `overload` block holds its
+			// POSITION and offers nothing to read, which is what keeps every
+			// other entry of the block on the index its Overload has.
+			let body = entry === null ? null : aliasBodyOf(entry.value)
+
+			if (
+				body === null ||
+				!answersBoolean(namespaceType, methodName, index)
+			) {
+				continue
+			}
+
+			// NOTE: Built once and only where a candidate was found, because
+			// `@` is the one binding an alias body reads and a Namespace
+			// without one has no use for the Scope at all.
+			selfScope ??= scopeWithRefinedSelf(
+				targetType,
+				scopeWithGenerics(node.generics, scope),
+			)
+
+			let alias = aliasTargetOf(body, selfScope)
+
+			if (alias !== null) {
+				writePredicateAlias(namespaceType, methodName, index, alias)
+			}
+		}
+	}
+}
+
+// NOTE: A Method's bodied entries, in the order its Overloads are registered in,
+// with a null standing for every entry that has no body to read.
+//
+// The standard library is a `declarations { … }` Program, where a Method with a
+// body still parses as a bodied one but an `overload` block ALWAYS parses as
+// signatures — bodied and native entries mixed under one name. So the block form
+// has to be read for the bodies it does carry, or `List::hasItems` and every
+// other predicate the standard library writes inside an `overload` would be
+// invisible here while the same Method in a Program was not.
+//
+// A static Method is skipped entirely: `@` is not bound in one, so no body of one
+// can be a predicate on a receiver.
+function methodEntries(
+	method: parser.NamespaceMethods[string],
+): Array<parser.FunctionValueNode | null> {
+	switch (method.nodeType) {
+		case "SimpleMethod":
+			return [method.method]
+		case "OverloadedMethod":
+			return method.methods
+		case "OverloadedMethodSignatures":
+			return method.methods.map((entry) =>
+				entry.nodeType === "FunctionValue" ? entry : null,
+			)
+		default:
+			return []
+	}
+}
+
+// NOTE: The call an alias body makes, and whether the body negated it. Every
+// other body answers null: one Statement, a `<-`, a Method call whose receiver
+// is `@` itself, and Arguments the Compiler can read. A chain
+// (`@::length()::is(0)`) is a leaf of its own — the intermediate value's
+// evidence is nobody's to read here — which is why the standard library's
+// emptiness Methods stay primitives and their negations do not.
+function aliasBodyOf(
+	definition: parser.FunctionDefinitionNode,
+): { call: parser.MethodInvocationNode; negated: boolean } | null {
+	if (definition.parameters.length !== 0 || definition.body.length !== 1) {
+		return null
+	}
+
+	let statement = definition.body[0]!
+
+	if (statement.nodeType !== "ReturnStatement") {
+		return null
+	}
+
+	let expression = statement.expression
+	let negated = false
+
+	if (
+		expression.nodeType === "MethodInvocation" &&
+		expression.member.content === "negate" &&
+		expression.arguments.length === 0
+	) {
+		negated = true
+		expression = expression.base
+	}
+
+	return expression.nodeType === "MethodInvocation" &&
+		expression.base.nodeType === "Self"
+		? { call: expression, negated }
+		: null
+}
+
+// NOTE: Whether the entry answers a Boolean, asked of the RESOLVED Method rather
+// than of the written `-> Boolean`, so a name shadowing decides nothing. The
+// Parameter list carries the receiver, so an entry taking no Arguments has
+// exactly one.
+function answersBoolean(
+	namespaceType: common.NamespaceType,
+	methodName: string,
+	index: number,
+): boolean {
+	let method = namespaceType.methods[methodName]
+
+	if (method === undefined) {
+		return false
+	}
+
+	let entry =
+		method.type === "SimpleMethod"
+			? method
+			: method.type === "OverloadedMethod"
+				? method.overloads[index]
+				: undefined
+
+	return (
+		entry !== undefined &&
+		entry.parameterTypes.length === 1 &&
+		entry.returnType.type === "Boolean"
+	)
+}
+
+// NOTE: The leaf an alias body's call resolves to, or null where it resolves to
+// nothing this can be sure of. Enriched in a collection of its own: the body is
+// enriched again for real when the Namespace's Statement is reached, and this
+// reading is a question asked ahead of that one — a Diagnostic here would be the
+// same Diagnostic twice.
+//
+// The answer is itself RESOLVED, so an alias of an alias declared above it comes
+// out as the leaf both of them mean. A chain running the other way — an alias
+// naming one written below it — resolves one step and stops, which is a
+// difference nothing in the standard library can tell.
+function aliasTargetOf(
+	body: { call: parser.MethodInvocationNode; negated: boolean },
+	scope: enricher.Scope,
+): common.PredicateConjunct | null {
+	let { result, diagnostics } = collectDiagnostics(() =>
+		enrichExpression(body.call, scope),
+	)
+
+	if (
+		containsErrors(diagnostics) ||
+		result.nodeType !== "MethodInvocation" ||
+		result.type.type !== "Boolean"
+	) {
+		return null
+	}
+
+	let args: Array<string | boolean> = []
+
+	for (let argument of result.arguments) {
+		let literal = literalPredicateArgument(argument.value)
+
+		if (literal === null) {
+			return null
+		}
+
+		args.push(literal)
+	}
+
+	let { spelling: _spelling, ...leaf } = resolvedConjunct(result, args)
+
+	return body.negated ? negatedPredicateConjunct(leaf) : leaf
+}
+
+// NOTE: Written onto the Method Type in place. The Type is the object every use
+// site already holds — hoisting registered it and handed it out — so the
+// annotation reaches the Invocations resolved before this ran as surely as the
+// ones after, and it is part of the Type wherever that Type is kept.
+function writePredicateAlias(
+	namespaceType: common.NamespaceType,
+	methodName: string,
+	index: number,
+	alias: common.PredicateConjunct,
+): void {
+	let method = namespaceType.methods[methodName]
+
+	if (method === undefined) {
+		return
+	}
+
+	if (method.type === "SimpleMethod") {
+		method.predicateAlias = alias
+	} else if (method.type === "OverloadedMethod") {
+		let entry = method.overloads[index]
+
+		if (entry !== undefined) {
+			entry.predicateAlias = alias
+		}
+	}
+}
+
+// #endregion
+
 // NOTE: A literal Argument as the stable scalar a conjunct key is built from.
 // The Integer's digits rather than its value, because a value is a number or a
 // bigint at run time and neither spells every Integer in JSON; the Rational's
 // two halves under the slash it was written with, which no Integer's digits can
 // spell.
+//
+// NOTE: A String keeps the QUOTES `JSON.stringify` gives it, and that is the
+// half of the scalar that says which kind it is. A conjunct names no Overload —
+// the Method a body forwards to is read long before anything resolves an
+// Overload of it — so the Arguments are the whole of what tells two entries of
+// one name apart, and `@::check(1)` and `@::check("1")` have to stay two
+// questions. Digits, a fraction and a Boolean each spell only themselves.
 function literalPredicateArgument(
 	value: common.typed.ExpressionNode,
 ): string | boolean | null {
 	switch (value.nodeType) {
 		case "IntegerValue":
-		case "StringValue":
 			return value.value
+		case "StringValue":
+			return JSON.stringify(value.value)
 		case "BooleanValue":
 			return value.value
 		case "RationalValue":

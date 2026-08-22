@@ -18,6 +18,7 @@ import { VALUE_COMMENT, valueCommentLines } from "../valueComments"
 import { collectAnnotations } from "./annotations"
 import { builtinMembers, builtinProtocols, builtinTypes } from "./builtins"
 import {
+	derivePredicateAliases,
 	enrichExpression,
 	enrichNode,
 	enrichOverloadedFunctionStatement,
@@ -1384,6 +1385,28 @@ function hoistDeclarationsInner(
 					node.nodeType === "NamespaceDefinitionStatement"
 				) {
 					scope.constants.add(node.name.content)
+				}
+
+				// NOTE: Which of this Namespace's Methods are written as one
+				// call on another — `isZero` is `@::is(0)`, `hasItems` is
+				// `@::isEmpty()::negate()` — recorded onto the Method Types now
+				// that the Namespace is in Scope and its own Methods can be
+				// resolved through it.
+				//
+				// Here rather than inside the resolution, because the reading
+				// asks the Scope what answers a call `@` makes, and this is the
+				// first moment the Namespace itself is one of the answers. The
+				// pending predicates are filled at the TOP of a round, so a
+				// refinement written on an alias is read with the alias already
+				// recorded — which is what lets the standard library's own
+				// `NonEmptyList` and `NonEmptyString` resolve to the leaf their
+				// `else` branches prove.
+				if (node.nodeType === "NamespaceDefinitionStatement") {
+					derivePredicateAliases(
+						node,
+						speculation.result as common.NamespaceType,
+						scope,
+					)
 				}
 
 				// NOTE: A refined Alias hoists with its predicate still to be

@@ -2962,9 +2962,12 @@ describe("Validator", () => {
 			])
 		})
 
-		// NOTE: The conjuncts are canonical — sorted, so that one predicate is one
-		// set however it was written — and that is the order they are spelled back
-		// out in, rather than the order the clause happened to put them in.
+		// NOTE: The conjuncts are canonical — RESOLVED to the leaf each spelling
+		// asks, then sorted, so that one predicate is one set however it was
+		// written — and that is the order they are spelled back out in, rather
+		// than the order the clause happened to put them in. `isOdd` sorts under
+		// `isEven`, which is the leaf it negates, and prints under the name the
+		// clause gave it.
 		it("should name every conjunct of the predicate it refused", () => {
 			let diagnostics = diagnosticsOfBody(`
 				function tripled(_ n: SmallOdd) -> Integer {
@@ -2975,7 +2978,7 @@ describe("Validator", () => {
 			`)
 
 			expect(diagnostics[0].helps).toEqual([
-				"Check '@::isLessThan(10)::and(@::isOdd())' on the value in an 'if' or a 'match', or pass a value that already has Type 'SmallOdd'.",
+				"Check '@::isOdd()::and(@::isLessThan(10))' on the value in an 'if' or a 'match', or pass a value that already has Type 'SmallOdd'.",
 			])
 		})
 

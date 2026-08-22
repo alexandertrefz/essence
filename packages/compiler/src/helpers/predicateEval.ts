@@ -36,11 +36,17 @@ import {
 // `Integer::isNot` conjunct is the standard library's `isNot` and no other, and
 // the meanings below are its meanings, read off its bodies.
 //
-// The Overload is NOT part of the key. An Overload is told apart by the
+// The Overload is no part of a conjunct at all. An Overload is told apart by the
 // Arguments it takes, and an entry that can not decode the Arguments it was
 // given refuses — which is how `@::isLessThan(1/2)`, Integer's Rational
 // Overload, falls out here rather than being compared as though the bound were
 // an Integer.
+//
+// NOTE: The table is over the PRIMITIVES alone, because a conjunct is stored
+// resolved: `isZero` arrives as `is`, `hasCharacters` as a negated `isEmpty`,
+// `isGreaterThanOrEqualTo` as a negated `isLessThan`. Every Method the standard
+// library writes on another one is gone by the time a value is asked about it,
+// and what is left is the handful of questions that read a value directly.
 export function admittedByEvaluation(
 	refinement: common.RefinementType,
 	value: common.typed.ExpressionNode,
@@ -150,6 +156,13 @@ export function refinementDecidedBy(
 // so it is not kept and a labelled Method prints its Arguments bare —
 // `@::isBetween(0, 9)` for a clause written `@::isBetween(0, and 9)`. The text
 // names the question; it is not offered as something to paste.
+//
+// NOTE: A leaf is stored RESOLVED — `@::hasCharacters()` is `String::isEmpty`
+// negated — and what is printed is the name it was WRITTEN as, which the leaf
+// carries for this one purpose. A reader is told the predicate they wrote and
+// not the Method the standard library wrote it on top of. A leaf nobody wrote
+// carries no spelling, and those are exactly the synthesized ones — a
+// complement, a Matcher's `case 0` — which no Diagnostic ever names.
 // NOTE: Folded from the FIRST conjunct rather than from a seed, because a
 // refinement proving nothing does not exist: a predicate spells one leaf or a
 // conjunction of leaves, so the set is never empty, and the unresolved case is
@@ -164,18 +177,26 @@ export function describePredicate(refinement: common.RefinementType): string {
 }
 
 function spellConjunct(conjunct: common.PredicateConjunct): string {
-	return `@::${conjunct.methodName}(${conjunct.args
+	let written = conjunct.spelling ?? conjunct
+	let call = `@::${written.methodName}(${written.args
 		.map(spellScalar)
 		.join(", ")})`
+
+	// NOTE: A spelling is written the way it was asked, so the flag is already
+	// in the name and adding anything would be saying it twice. Only a leaf
+	// nobody wrote can reach the negation here, and it prints as the Essence a
+	// reader would have to write for it.
+	return conjunct.negated && conjunct.spelling === undefined
+		? `${call}::negate()`
+		: call
 }
 
-// NOTE: A String Argument is printed quoted and everything else bare. The
-// scalars a conjunct keeps are the written value's own characters, and a
-// String's are the only ones a reader could mistake for a number's digits.
+// NOTE: A String Argument arrives already quoted — that is what tells `1` from
+// `"1"` in the key — and every other scalar is bare digits, a fraction or a
+// Boolean. So the scalar IS its own spelling, and the only one that has to be
+// made into text is the Boolean.
 function spellScalar(scalar: string | boolean): string {
-	return typeof scalar === "boolean" || /^-?\d+(\/-?\d+)?$/.test(scalar)
-		? String(scalar)
-		: JSON.stringify(scalar)
+	return typeof scalar === "boolean" ? String(scalar) : scalar
 }
 
 // NOTE: A written value as the JavaScript the table below compares — a bigint
@@ -232,11 +253,8 @@ type PredicateEvaluator = (
 // question about the same two integers.
 const NUMERIC_COMPARISONS: Record<string, PredicateEvaluator> = {
 	is: integerComparison((value, other) => value === other),
-	isNot: integerComparison((value, other) => value !== other),
 	isLessThan: integerComparison((value, other) => value < other),
-	isLessThanOrEqualTo: integerComparison((value, other) => value <= other),
 	isGreaterThan: integerComparison((value, other) => value > other),
-	isGreaterThanOrEqualTo: integerComparison((value, other) => value >= other),
 
 	// NOTE: Both bounds included, and bounds in the wrong order enclosing
 	// nothing — which is what the standard library's own body says, so the answer
@@ -257,17 +275,16 @@ const NUMERIC_COMPARISONS: Record<string, PredicateEvaluator> = {
 	},
 }
 
-// NOTE: Integer's alone — `Number` declares none of the five over the tower.
+// NOTE: Integer's alone — `Number` declares none of these over the tower.
+// `isZero`, `isPositive` and `isNegative` are not here: each is written on a
+// comparison above and arrives as that comparison, so the table would be asked
+// a question nothing can spell any more.
 const INTEGER_QUESTIONS: Record<string, PredicateEvaluator> = {
-	isZero: integerQuestion((value) => value === 0n),
-	isPositive: integerQuestion((value) => value > 0n),
-	isNegative: integerQuestion((value) => value < 0n),
-
 	// NOTE: A negative remainder is still a remainder — `-3 % 2` is `-1` in
-	// JavaScript — so evenness is asked as "the remainder is zero" and oddness as
-	// its negation, which is also how Integer writes the two.
+	// JavaScript — so evenness is asked as "the remainder is zero", which is
+	// also how Integer writes it. Oddness is the same leaf negated and is
+	// decided by the flag rather than by a row of its own.
 	isEven: integerQuestion((value) => value % 2n === 0n),
-	isOdd: integerQuestion((value) => value % 2n !== 0n),
 }
 
 // NOTE: Essence's String equality is canonical equivalence: `String.is` is
@@ -279,18 +296,18 @@ const INTEGER_QUESTIONS: Record<string, PredicateEvaluator> = {
 // admission.
 const STRING_PREDICATES: Record<string, PredicateEvaluator> = {
 	is: stringComparison((value, other) => value === other),
-	isNot: stringComparison((value, other) => value !== other),
 
 	// NOTE: `isEmpty` is `@::length()::is(0)`, and `length` counts grapheme
 	// clusters — a String has no clusters exactly when it has no code units, so
 	// the JavaScript length answers the emptiness question, and only that one.
+	// It is a leaf of its own for that reason: the body reads a chain rather
+	// than asking one Method of `@`. `hasCharacters` is this one negated.
 	isEmpty: stringQuestion((value) => value.length === 0),
-	hasCharacters: stringQuestion((value) => value.length > 0),
 }
 
 const LIST_PREDICATES: Record<string, PredicateEvaluator> = {
+	// NOTE: `hasItems` is this one negated, exactly as on a String.
 	isEmpty: listQuestion((items) => items.length === 0),
-	hasItems: listQuestion((items) => items.length > 0),
 }
 
 // NOTE: One flat table, keyed the way a conjunct is: the Namespace, a COLON, the
@@ -317,6 +334,10 @@ function keyedByNamespace(
 	)
 }
 
+// NOTE: The flag is applied to the ANSWER and not to the table, so a question
+// the table declines to decide stays undecided either way round: `null` is "not
+// a shape this entry can read", and the contrary of something unreadable is not
+// `true`.
 function evaluateConjunct(
 	conjunct: common.PredicateConjunct,
 	value: LiteralValue,
@@ -324,7 +345,13 @@ function evaluateConjunct(
 	let evaluator =
 		PREDICATES[`${conjunct.namespaceName}::${conjunct.methodName}`]
 
-	return evaluator === undefined ? null : evaluator(value, conjunct.args)
+	if (evaluator === undefined) {
+		return null
+	}
+
+	let answer = evaluator(value, conjunct.args)
+
+	return answer === null ? null : answer !== conjunct.negated
 }
 
 function integerComparison(
@@ -353,8 +380,7 @@ function stringComparison(
 ): PredicateEvaluator {
 	return (value, args) => {
 		let text = stringLiteral(value)
-		let other =
-			args.length === 1 && typeof args[0] === "string" ? args[0] : null
+		let other = args.length === 1 ? stringScalar(args[0]!) : null
 
 		return text === null || other === null
 			? null
@@ -392,12 +418,27 @@ function stringLiteral(value: LiteralItem): string | null {
 
 // NOTE: A conjunct keeps a written Integer as its DIGITS, because a value is a
 // bigint at run time and JSON has no bigint — so an Argument spelled any other
-// way, a Rational's `1/2` or a Boolean, is refused right here. That is what keeps
-// a Rational bound out of a comparison between integers.
+// way, a Rational's `1/2`, a quoted String or a Boolean, is refused right here.
+// That is what keeps a Rational bound out of a comparison between integers.
 function integerScalar(scalar: string | boolean): bigint | null {
 	return typeof scalar === "string" && /^-?\d+$/.test(scalar)
 		? BigInt(scalar)
 		: null
+}
+
+// NOTE: And a written String as the JSON of its characters, quotes and all,
+// which is the half of the scalar that says it was a String and not the digits
+// it may happen to spell. Read back through `JSON.parse`, which is what wrote
+// it; anything else is an Argument of another kind and no question this entry
+// can decide.
+function stringScalar(scalar: string | boolean): string | null {
+	if (typeof scalar !== "string" || !scalar.startsWith('"')) {
+		return null
+	}
+
+	let parsed: unknown = JSON.parse(scalar)
+
+	return typeof parsed === "string" ? parsed : null
 }
 
 function literalValueOf(

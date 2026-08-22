@@ -6257,9 +6257,10 @@ describe("Enricher", () => {
 			expect(refinement.conjuncts).toEqual([
 				{
 					namespaceName: "Integer",
-					methodName: "isNot",
-					overloadIndex: null,
+					methodName: "is",
+					negated: true,
 					args: ["0"],
+					spelling: { methodName: "isNot", args: ["0"] },
 				},
 			])
 		})
@@ -6300,9 +6301,10 @@ describe("Enricher", () => {
 			expect(refinement.conjuncts).toEqual([
 				{
 					namespaceName: "List",
-					methodName: "hasItems",
-					overloadIndex: 0,
+					methodName: "isEmpty",
+					negated: true,
 					args: [],
+					spelling: { methodName: "hasItems", args: [] },
 				},
 			])
 		})
@@ -6367,8 +6369,9 @@ describe("Enricher", () => {
 				{
 					namespaceName: "Integer",
 					methodName: "isBetween",
-					overloadIndex: null,
+					negated: false,
 					args: ["0", "9"],
+					spelling: { methodName: "isBetween", args: ["0", "9"] },
 				},
 			])
 		})
@@ -6861,10 +6864,11 @@ describe("Enricher", () => {
 
 				expect(declared.conjuncts).toEqual([
 					{
-						namespaceName: "Listing",
-						methodName: "isFilled",
-						overloadIndex: null,
+						namespaceName: "List",
+						methodName: "isEmpty",
+						negated: true,
 						args: [],
+						spelling: { methodName: "isFilled", args: [] },
 					},
 				])
 
@@ -7036,10 +7040,9 @@ describe("Enricher", () => {
 			).toBe("Integer")
 		})
 
-		// NOTE: Two questions about the same value are not the same question. A
-		// refinement is established by the predicate it DECLARES and by nothing
-		// that merely implies it — `isGreaterThan(0)` does imply `isNot(0)`, and
-		// the Compiler has no way to know that.
+		// NOTE: A leaf proves ITSELF and no leaf that merely follows from it.
+		// `isGreaterThan(0)` does imply `isNot(0)`, and nothing here reads one
+		// question off another.
 		it("should not narrow on a differently spelled predicate", () => {
 			expect(
 				narrowedTypeOf(
@@ -7053,6 +7056,24 @@ describe("Enricher", () => {
 					"d",
 				),
 			).toBe("Integer")
+		})
+
+		// NOTE: The leaf it IS spelled by narrows, whichever of the two names
+		// the condition used — `@::isNot(0)` and `@::is(0)` are one leaf in two
+		// polarities, and `NonZeroInteger` is declared by the negated one.
+		it("should narrow on the leaf the refinement is declared by", () => {
+			expect(
+				narrowedTypeOf(
+					`implementation {
+						constant d = 3
+
+						if d::isNot(0) {
+							Terminal.inspect(d)
+						}
+					}`,
+					"d",
+				),
+			).toBe("NonZeroInteger")
 		})
 
 		it("should not narrow a Constant the condition says nothing about", () => {
@@ -7266,7 +7287,12 @@ describe("Enricher", () => {
 				).toBe("Integer")
 			})
 
-			it("should not narrow through a Method with no declared opposite", () => {
+			// NOTE: No Method is declared to be another's opposite any more.
+			// `isGreaterThanOrEqualTo` IS `isLessThan` negated — the standard
+			// library writes it that way — so the leaf the condition proves and
+			// the leaf its `else` proves are one leaf in two polarities, and the
+			// `else` proves exactly what `Small` is declared by.
+			it("should narrow through a Method written as another's negation", () => {
 				expect(
 					narrowedTypeOf(
 						`implementation {
@@ -7282,7 +7308,7 @@ describe("Enricher", () => {
 						}`,
 						"d",
 					),
-				).toBe("Integer")
+				).toBe("Small")
 			})
 
 			// NOTE: An `else if` needs nothing of its own — the nested If lives in
@@ -7304,10 +7330,15 @@ describe("Enricher", () => {
 				// NOTE: The nested condition's own receiver, then both of its
 				// branches — the outer condition's receiver is the Integer before
 				// any of it, and is not among these three.
+				//
+				// NOTE: The last of the three is the one both `else`s reached,
+				// and between them they have proven the value is neither zero
+				// nor below it — which is what `PositiveInteger` says, and more
+				// than the `NonZeroInteger` one `else` alone proves.
 				expect(readTypesOf(source, "d").slice(-3)).toEqual([
 					"NonZeroInteger",
 					"NonZeroInteger",
-					"NonZeroInteger",
+					"PositiveInteger",
 				])
 			})
 		})
@@ -8331,7 +8362,7 @@ describe("Enricher", () => {
 
 					constant text = 12::toString()`),
 			).toBe(
-				"Integer where @::isEven()::and(@::isGreaterThan(10))::and(@::isGreaterThanOrEqualTo(0))::and(@::isNot(0))",
+				"Integer where @::isNot(0)::and(@::isEven())::and(@::isGreaterThan(10))::and(@::isGreaterThanOrEqualTo(0))",
 			)
 		})
 

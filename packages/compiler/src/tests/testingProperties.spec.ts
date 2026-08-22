@@ -395,8 +395,31 @@ describe("Property tests", () => {
 		// NOTE: A Program may declare `namespace Weird for Integer` and mean
 		// something else by a word the narrowing table knows. Reading the name
 		// alone would narrow by a promise nobody made — and drop the check that
-		// would have caught it.
+		// would have caught it. `isLessThan` is one of the words the table
+		// knows, and this Namespace's body means the opposite by it.
 		it("narrows only by the base's own Namespace", () => {
+			expect(
+				shapeOf(
+					generatorOf(
+						"n: Odd",
+						`namespace Weird for Integer {
+							isLessThan(_ other: Integer) -> Boolean {
+								<- @::isGreaterThan(other)
+							}
+						}
+
+						type Odd = Integer where @::<Weird>isLessThan(0)`,
+					),
+				),
+			).toMatchObject({ kind: "refined", checks: 1, narrowing: {} })
+		})
+
+		// NOTE: What a Namespace's own body says IS read, which is the other
+		// half of the same rule. `Weird::isPositive` is written as one call on
+		// `@`, so the predicate it stands for is that call — a value below zero
+		// — and the generator holds it by construction rather than by drawing
+		// and checking. The name it was given decides nothing either way.
+		it("narrows by the leaf a Namespace's own body forwards to", () => {
 			expect(
 				shapeOf(
 					generatorOf(
@@ -408,7 +431,11 @@ describe("Property tests", () => {
 						type Odd = Integer where @::<Weird>isPositive()`,
 					),
 				),
-			).toMatchObject({ kind: "refined", checks: 1, narrowing: {} })
+			).toMatchObject({
+				kind: "refined",
+				checks: 0,
+				narrowing: { atMost: "-1" },
+			})
 		})
 
 		it("enriches a predicate with a literal Argument as a check", () => {
