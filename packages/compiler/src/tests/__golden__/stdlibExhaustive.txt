@@ -243,6 +243,7 @@
 "NonZeroInteger.multiply(with: Transcendental) => 6·π"
 "NonZeroInteger.raise(to: Integer) => 1/216"
 "NonZeroInteger.raise(to: Integer) [non-negative exponent] => 36"
+"NonZeroInteger.raise(to: NonNegativeInteger) => 36"
 "NonNegativeInteger.squareRoot() => 2"
 "NonNegativeInteger.squareRoot() [irrational] => √3"
 "NonNegativeInteger.squareRoot() [zero] => 0"

@@ -149,7 +149,9 @@ export type NonZeroIntegerNatives = {
 	// multiply(with: NonZeroInteger) -> NonZeroInteger
 	multiply__overload$1: (self: IntegerType, argument1: IntegerType) => IntegerType
 	// raise(to: Integer) -> Integer | Rational
-	raise: (self: IntegerType, to: IntegerType) => IntegerType | RationalType
+	raise__overload$1: (self: IntegerType, to: IntegerType) => IntegerType | RationalType
+	// raise(to: NonNegativeInteger) -> Integer
+	raise__overload$2: (self: IntegerType, to: IntegerType) => IntegerType
 }
 
 export type NonNegativeIntegerNatives = {
@@ -499,7 +501,8 @@ export const $NonZeroInteger: NonZeroIntegerNatives = NonZeroIntegerModule
 export const $NonZeroIntegerAbsent: AssertNoEssenceExports<typeof import("./NonZeroInteger"), "multiply__overload$2" | "multiply__overload$3"> = true
 export const $NonZeroIntegerArity: AssertArities<typeof import("./NonZeroInteger"), {
 	multiply__overload$1: 2
-	raise: 2
+	raise__overload$1: 2
+	raise__overload$2: 2
 }> = true
 
 declare const NonNegativeIntegerModule: typeof import("./NonNegativeInteger")

@@ -659,7 +659,8 @@ third"::lines())
 	§ its own proof — so the receiver is declared and the Argument is written
 	§ where it stands. The two irrational entries spend the receiver's proof
 	§ alone, and so does `raise`: a base that is not zero has a power at every
-	§ exponent, negative ones included.
+	§ exponent, negative ones included. Its second entry takes the exponent's
+	§ proof as well, so the base entry is reached with a computed one.
 	constant provenSix: NonZeroInteger = 6
 
 	show(
@@ -677,8 +678,9 @@ third"::lines())
 	show("NonZeroInteger.raise(to: Integer)", provenSix::raise(to -3))
 	show(
 		"NonZeroInteger.raise(to: Integer) [non-negative exponent]",
-		provenSix::raise(to 2),
+		provenSix::raise(to computedTwo),
 	)
+	show("NonZeroInteger.raise(to: NonNegativeInteger)", provenSix::raise(to 2))
 
 	§ ——— NonNegativeInteger ————————————————————————————————————————————————
 	§ The one Method a sign proves. A written literal does not refine the
