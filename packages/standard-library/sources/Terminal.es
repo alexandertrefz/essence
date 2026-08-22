@@ -43,6 +43,8 @@ declarations {
 		§§
 		§§ This is the primitive `print` is built on. The text goes to `#Output` unless `to` names a different Stream.
 		§§
+		§§ In a browser, where the host has no streams, the text lands on the console as a line instead. A console has no way to continue a line.
+		§§
 		§§ @param _ — the text to write, unchanged.
 		§§ @param to — the Stream the text lands on; `#Output` when it is left out.
 		static write(_ text: String, to stream: Stream = #Output) -> {}

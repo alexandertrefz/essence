@@ -222,14 +222,60 @@ const unit: RecordType = { [typeKeySymbol]: "Record" }
 // `console.log`/`console.error`, which both append a newline of their own —
 // there is no way to spell "no newline" through them, and a `write` that added
 // one would not be the primitive `print` is built on.
+//
+// NOTE: But only where the host HAS those streams. Bun, Node and Deno do; a
+// browser has no `process` at all, and what it offers instead — the console —
+// is made of lines. So the stream is looked for first, and where there is none
+// the text goes to the console with the one newline `print` appended taken off
+// again, which is the newline the console puts back. A `write` that ends
+// without one still lands as a line of its own there — the console has no way
+// to continue a line — which is the honest cost of a host without streams, and
+// not one a Program pays on any host that has them.
 export function write(text: StringType, stream: StreamType): RecordType {
-	if (stream[typeKeySymbol] === "Stream#Error") {
-		process.stderr.write(text.value)
+	let toError = stream[typeKeySymbol] === "Stream#Error"
+	let host = hostStream(toError)
+
+	if (host !== undefined) {
+		host.write(text.value)
+	} else if (toError) {
+		console.error(asConsoleLine(text.value))
 	} else {
-		process.stdout.write(text.value)
+		console.log(asConsoleLine(text.value))
 	}
 
 	return unit
+}
+
+// NOTE: Looked up on every write rather than once at load, for two reasons. A
+// top-level read of `process.stdout` is a statement esbuild can not shake, so
+// it would sit in every bundle whether or not the Program writes; and the spec
+// harnesses swap `process.stdout.write` for the duration of a Program, which a
+// stream remembered at load time would never see. The lookup is a `typeof` and
+// two property reads, beside a write to a file descriptor.
+//
+// NOTE: `typeof process`, because a bare `process` in a host without one is a
+// ReferenceError, not `undefined`. And the stream's `write` is checked rather
+// than the stream's presence: a bundler's `process` shim tends to carry a
+// `stdout` that is an empty object, or null.
+type HostStream = { write(text: string): unknown }
+
+function hostStream(toError: boolean): HostStream | undefined {
+	if (typeof process === "undefined") {
+		return undefined
+	}
+
+	let candidate: HostStream | null | undefined = toError
+		? process.stderr
+		: process.stdout
+
+	return typeof candidate?.write === "function" ? candidate : undefined
+}
+
+// NOTE: Exactly one newline comes off, never all of them: `print("")` is a
+// blank line and has to stay one, and a text that ends in two is a line
+// followed by a blank one.
+function asConsoleLine(text: string): string {
+	return text.endsWith("\n") ? text.slice(0, -1) : text
 }
 
 // NOTE: `inspect` — the structural print, for the Program's AUTHOR. It answers
