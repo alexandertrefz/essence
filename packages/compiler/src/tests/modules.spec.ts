@@ -1276,6 +1276,89 @@ export {
 		)
 	})
 
+	// NOTE: The shape every checked refinement is written in — a `type` and the
+	// `namespace` targeting it, under ONE name — carried across a cycle. The two
+	// halves do not hoist in the same round: the refined Alias hoists as a
+	// skeleton, and the Namespace lands only once the predicate has been filled.
+	// A cycle seeds its imports between rounds, so an entry that bound whatever
+	// was in Scope and called itself done kept the Type and never saw the
+	// Namespace. What pins it is the ANSWER rather than the Type: `marked()` is
+	// declared on `Balanced` alone, so a Module holding only the Type reports
+	// that no Method of that name was found and falls to `Integer`.
+	it("binds both halves of a name imported across a cycle", () => {
+		withProject(
+			{
+				"A.es": `import {
+	Tag from "./C.es"
+}
+
+implementation {
+	type Marker = { tag: Tag }
+
+	namespace Sizes for Integer {
+		isBalanced() -> Boolean {
+			<- @::isGreaterThan(0)
+		}
+	}
+}
+
+export {
+	Marker
+	Sizes
+}
+`,
+				"B.es": `import {
+	Marker from "./A.es"
+	Sizes from "./A.es"
+}
+
+implementation {
+	type Balanced = Integer where @::isBalanced()
+
+	namespace Balanced for Balanced {
+		marked() -> Marker {
+			<- { tag = "balanced" }
+		}
+	}
+}
+
+export {
+	Balanced
+}
+`,
+				"C.es": `import {
+	Balanced from "./B.es"
+}
+
+implementation {
+	type Tag = String
+
+	function tagOf(_ value: Balanced) -> Tag {
+		<- value::marked().tag
+	}
+}
+
+export {
+	Tag
+	tagOf
+}
+`,
+			},
+			(directory) => {
+				let linked = linkProject(directory, "A.es")
+
+				for (let name of ["A.es", "B.es", "C.es"]) {
+					expect([
+						name,
+						reportsOf(
+							linkedAt(directory, linked, name).diagnostics,
+						),
+					]).toEqual([name, []])
+				}
+			},
+		)
+	})
+
 	// NOTE: The one kind a cycle can not carry, because it is the one kind that
 	// does not hoist — and it is genuinely broken at runtime, not merely
 	// unsupported: the emitted binding is read in its temporal dead zone.

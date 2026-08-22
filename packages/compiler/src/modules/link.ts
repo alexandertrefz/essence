@@ -227,6 +227,10 @@ type ImportBinding = {
 	// entry is left alone rather than reported about twice.
 	dependencyPath: string | null
 	state: "pending" | "bound" | "refused"
+	// NOTE: How many of the three tables the entry has bound so far — see
+	// `tablesOffered`. Zero until it binds, and what says whether a bound entry
+	// is still missing half of what its name means.
+	boundTables: number
 }
 
 type ModuleState = {
@@ -733,6 +737,7 @@ function linkGroup(
 				dependencyPath:
 					module.resolutions.get(entry.source.path) ?? null,
 				state: "pending",
+				boundTables: 0,
 			})
 		}
 
@@ -935,11 +940,36 @@ function surfaceOf(
 	return surface
 }
 
+// NOTE: How many of the three tables a surface offers a name — the value, the
+// Type and the Protocol. One name travels across every table it is declared in:
+// a `type NonEmptyList` beside a `namespace NonEmptyList` is a Type AND a value,
+// and only both together let an importing file dispatch a `::` call through the
+// Namespace. The count is what tells a bound entry that its dependency has since
+// published the other half.
+function tablesOffered(surface: ExportSurface, exportedName: string): number {
+	return (
+		(surface.values[exportedName] === undefined ? 0 : 1) +
+		(surface.types[exportedName] === undefined ? 0 : 1) +
+		(surface.protocols[exportedName] === undefined ? 0 : 1)
+	)
+}
+
 // NOTE: Every entry that can be bound now, bound. Answers whether anything new
 // was — which is what keeps the hoist rounds going through a cycle. An entry that
 // names something the dependency does not export is reported and refused on the
 // first pass: that answer can not change, because an export list is read off the
 // AST rather than resolved.
+//
+// NOTE: An entry already bound is offered its dependency's surface again while
+// that surface can still grow, which is only ever inside the group being linked —
+// a Module already linked has a final surface, read straight back. The two halves
+// of one name do not hoist in the same round: a refined Alias hoists as a
+// skeleton and the Namespace targeting it lands only once the predicate has been
+// filled, and a cycle seeds its imports BETWEEN rounds. An entry that stopped at
+// the round it first bound in kept the Type and never saw the Namespace, so every
+// `::` call on that Type in the importing file fell to the base Namespace —
+// `pieces::firstItem()` on a `NonEmptyList<String>` answered an Optional inside
+// `String.es` and the item itself everywhere else.
 function seedImports(
 	state: ModuleState,
 	states: Map<string, ModuleState>,
@@ -949,15 +979,27 @@ function seedImports(
 	let bound = false
 
 	for (let binding of state.imports) {
-		if (binding.state !== "pending") {
+		if (binding.state === "refused") {
 			continue
 		}
 
 		let { entry, localName, dependencyPath } = binding
+		let rebinding = binding.state === "bound"
 
 		if (dependencyPath === null) {
 			binding.state = "refused"
 
+			continue
+		}
+
+		// NOTE: A bound entry is asked again only while the dependency is still
+		// being linked, and only while a table it will come to offer is missing.
+		// Three is every table there is, so each entry is re-bound at most twice
+		// and the rounds still terminate.
+		if (
+			rebinding &&
+			(!states.has(dependencyPath) || binding.boundTables >= 3)
+		) {
 			continue
 		}
 
@@ -966,10 +1008,11 @@ function seedImports(
 		// before hoisting has put it in Scope, and before the import could shadow
 		// it. Refusing the entry is what keeps the report to one Diagnostic: the
 		// local declaration then lands in an empty slot and is not a duplicate of
-		// anything.
+		// anything. A re-binding entry is what took the name, so it is not asked.
 		if (
-			state.declarations.has(localName) ||
-			isTaken(state.scope, localName)
+			!rebinding &&
+			(state.declarations.has(localName) ||
+				isTaken(state.scope, localName))
 		) {
 			reportDuplicateImport(
 				entry,
@@ -986,7 +1029,9 @@ function seedImports(
 		let surface = surfaceFor(dependencyPath)
 
 		if (surface === null) {
-			binding.state = "refused"
+			if (!rebinding) {
+				binding.state = "refused"
+			}
 
 			continue
 		}
@@ -995,6 +1040,10 @@ function seedImports(
 		let kind = surface.kinds[exportedName]
 
 		if (kind === undefined) {
+			if (rebinding) {
+				continue
+			}
+
 			reportMissingExport(
 				entry.name,
 				entry.source.path,
@@ -1019,11 +1068,9 @@ function seedImports(
 			continue
 		}
 
-		if (
-			surface.values[exportedName] === undefined &&
-			surface.types[exportedName] === undefined &&
-			surface.protocols[exportedName] === undefined
-		) {
+		let tables = tablesOffered(surface, exportedName)
+
+		if (tables === 0 || tables <= binding.boundTables) {
 			continue
 		}
 
@@ -1035,6 +1082,7 @@ function seedImports(
 			exportedName,
 		)
 		binding.state = "bound"
+		binding.boundTables = tables
 		bound = true
 	}
 
