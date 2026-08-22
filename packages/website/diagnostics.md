@@ -1392,6 +1392,11 @@ that can say so.
 
 The call is refused nothing and compiles as it stands. Drop the Argument.
 
+**Quick Fix — "Remove the 'defaultingTo' Argument":** deletes it together with
+the comma beside it, leaving the call as it would have been written — the comma
+in front where the fallback stands last, and the one after it where another
+Argument follows.
+
 The rule is the label, not a list of Methods: an Invocation that writes an
 Argument labelled `defaultingTo` is resolved a second time without it, and the
 Warning is reported when that second resolution answers a Type that is not an

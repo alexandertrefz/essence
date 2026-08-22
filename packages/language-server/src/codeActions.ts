@@ -156,6 +156,8 @@ function actionsFor(
 			return listed(elseBranchAction(diagnostic, program, lines))
 		case "unused-import":
 			return listed(removeImportAction(diagnostic, program, lines))
+		case "fallback-never-used":
+			return listed(removeFallbackAction(diagnostic, lines))
 		case "focused-tests-remain":
 			return listed(removeFocusedAction(diagnostic, lines))
 		default:
@@ -548,6 +550,106 @@ function removeLabelAction(
 		diagnosticPosition: diagnostic.position,
 		isPreferred: true,
 		edits: [{ range: diagnostic.position, newText: written[1] }],
+	}
+}
+
+// NOTE: The Diagnostic spans exactly `defaultingTo <value>`, and an Argument
+// does not stand on its own — the separator beside it goes too, or the call is
+// left with a comma against a bracket. The one in FRONT is taken where there is
+// one, which is every call the Standard Library shapes, since `defaultingTo:`
+// is written last: `10::divide(by 2, defaultingTo 0/1)` becomes
+// `10::divide(by 2)`. A fallback written first takes the comma AFTER it
+// instead, and one that is the only Argument takes neither.
+//
+// The whitespace between the Argument and its comma goes with the comma, which
+// is what carries a multi-line call: the line the Argument stood on is left
+// empty rather than left holding a stray comma.
+function removeFallbackAction(
+	diagnostic: common.Diagnostic & { position: common.Position },
+	lines: Array<string>,
+): CodeActionEntry | null {
+	// NOTE: Read back off the buffer, as every edit here is: a Position from a
+	// stale analysis pointing at something else would delete that instead.
+	if (!/^defaultingTo\b/.test(sliceOf(lines, diagnostic.position))) {
+		return null
+	}
+
+	let start =
+		commaBefore(lines, diagnostic.position.start) ??
+		diagnostic.position.start
+	let end =
+		start === diagnostic.position.start
+			? (commaAfter(lines, diagnostic.position.end) ??
+				diagnostic.position.end)
+			: diagnostic.position.end
+
+	return {
+		title: "Remove the 'defaultingTo' Argument",
+		kind: "quickfix",
+		diagnosticCode: diagnostic.code,
+		diagnosticPosition: diagnostic.position,
+		isPreferred: true,
+		edits: [{ range: { start, end }, newText: "" }],
+	}
+}
+
+// NOTE: Where the comma separating this Argument from the one before it stands,
+// or null where nothing but the opening bracket does. Whitespace and line breaks
+// are walked through, and nothing else is: the first thing that is neither is
+// either that comma or the bracket.
+function commaBefore(
+	lines: Array<string>,
+	start: common.Cursor,
+): common.Cursor | null {
+	let cursor = start
+
+	while (true) {
+		let line = lineAt(lines, cursor.line)
+		let before = line.slice(0, cursor.column - 1).replace(/[ \t]+$/, "")
+
+		if (before.endsWith(",")) {
+			return { line: cursor.line, column: before.length }
+		}
+
+		if (before !== "" || cursor.line === 1) {
+			return null
+		}
+
+		cursor = {
+			line: cursor.line - 1,
+			column: lineAt(lines, cursor.line - 1).length + 1,
+		}
+	}
+}
+
+// NOTE: The mirror, for a fallback somebody wrote ahead of another Argument. The
+// comma after it is what separates the two, and a `)` says this Argument was
+// last. The blanks on the far side of the comma go with it here, so the
+// Argument that follows keeps the one space in front of it that it had.
+function commaAfter(
+	lines: Array<string>,
+	end: common.Cursor,
+): common.Cursor | null {
+	let cursor = end
+
+	while (true) {
+		let line = lineAt(lines, cursor.line)
+		let after = line.slice(cursor.column - 1).replace(/^[ \t]+/, "")
+
+		if (after.startsWith(",")) {
+			let rest = after.slice(1).replace(/^[ \t]+/, "")
+
+			return {
+				line: cursor.line,
+				column: line.length - rest.length + 1,
+			}
+		}
+
+		if (after !== "" || cursor.line === lines.length) {
+			return null
+		}
+
+		cursor = { line: cursor.line + 1, column: 1 }
 	}
 }
 
