@@ -810,6 +810,8 @@
 "List.repeat<ItemType>(_ ItemType, times: Integer) => [ x, x, x ]"
 "List.repeat<ItemType>(_ ItemType, times: Integer) [zero] => []"
 "List.repeat<ItemType>(_ ItemType, times: Integer) [negative] => []"
+"List.repeat<ItemType>(_ ItemType, times: PositiveInteger) => [ x, x, x ]"
+"List.repeat<ItemType>(_ ItemType, times: PositiveInteger) [one] => [ x ]"
 "List.of(integersFrom: Integer, through: Integer) => [ 1, 2, 3, 4, 5 ]"
 "List.of(integersFrom: Integer, through: Integer) [single] => [ 1 ]"
 "List.of(integersFrom: Integer, through: Integer) [inverted] => [ 5, 4, 3, 2, 1 ]"

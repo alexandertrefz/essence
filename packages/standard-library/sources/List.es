@@ -1,13 +1,14 @@
 import {
-	Boolean        from "./Boolean.es"
-	Comparable     from "./Comparable.es"
-	Integer        from "./Integer.es"
-	NonZeroInteger from "./Integer.es"
-	Optional       from "./Optional.es"
-	Ordering       from "./Ordering.es"
-	Equatable      from "./Protocols.es"
-	Printable      from "./Protocols.es"
-	Step           from "./Step.es"
+	Boolean         from "./Boolean.es"
+	Comparable      from "./Comparable.es"
+	Integer         from "./Integer.es"
+	NonZeroInteger  from "./Integer.es"
+	PositiveInteger from "./Integer.es"
+	Optional        from "./Optional.es"
+	Ordering        from "./Ordering.es"
+	Equatable       from "./Protocols.es"
+	Printable       from "./Protocols.es"
+	Step            from "./Step.es"
 }
 
 declarations {
@@ -51,24 +52,46 @@ declarations {
 		is Comparable where ItemType is Comparable {
 		§§ Answers a List holding the given item the given number of times.
 		§§
-		§§ A count of zero or less answers the empty List.
-		§§
-		§§ @param _ — the item to repeat
-		§§ @param times — how many copies the List holds
-		§§ @returns — the List of repeated items.
-		static repeat(
-			_ item: ItemType,
-			times count: Integer,
-		) -> List<ItemType> {
-			§ `of` counts down when the first Integer is the greater, so a count
-			§ below one would answer `[1]` rather than nothing. The guard
-			§ answers the empty List instead.
-			if count::isLessThan(1) {
-				<- []
-			} else {
-				§ The Integers are only the tally. Each is replaced by the item.
-				<- List.of(integersFrom 1, through count)::map((_) { <- item })
+		§§ A count of zero or less answers the empty List. A count proven to be above zero answers a List with something in it.
+		overload static repeat {
+			§§ Answers a List holding the given item the given number of times.
+			§§
+			§§ A count of zero or less answers the empty List.
+			§§
+			§§ @param _ — the item to repeat
+			§§ @param times — how many copies the List holds
+			§§ @returns — the List of repeated items.
+			(_ item: ItemType, times count: Integer) -> List<ItemType> {
+				§ `of` counts down when the first Integer is the greater, so a
+				§ count below one would answer `[1]` rather than nothing. The
+				§ guard answers the empty List instead.
+				if count::isLessThan(1) {
+					<- []
+				} else {
+					§ The Integers are only the tally. Each is replaced by the
+					§ item.
+					<- List.of(integersFrom 1, through count)::map((_) {
+						<- item
+					})
+				}
 			}
+
+			§ Native for the reason the single-item `append` is. In Essence the
+			§ body would be the entry above, whose answer is a `List`. An
+			§ expression that is not empty is not the same as one the language
+			§ can be told is not empty.
+
+			§§ Answers a List holding the given item a number of times proven to be above zero.
+			§§
+			§§ At least one copy is held, so the answer certainly has something in it.
+			§§
+			§§ @param _ — the item to repeat
+			§§ @param times — how many copies the List holds, proven to be above zero
+			§§ @returns — the List of repeated items, which is never empty.
+			(
+				_ item: ItemType,
+				times count: PositiveInteger,
+			) -> NonEmptyList<ItemType>
 		}
 
 		§ Essence has no Range Type, so a counting loop writes

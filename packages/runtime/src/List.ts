@@ -1174,3 +1174,24 @@ export function of(
 
 	return createList(integers)
 }
+
+// NOTE: The count of this entry is a `PositiveInteger` in the source — proven
+// while compiling, erased to an Integer here — so the answer certainly holds
+// something and the Namespace may say so. The Essence entry beside it can not:
+// its body is a `map` over `of`, and what that answers is a `List`.
+//
+// NOTE: The count is a JavaScript number, for the reason `of` counts in one. A
+// count needing a bigint asks for more items than there is memory for, and is
+// only ever reached to be refused by whatever runs out first.
+export function repeat__overload$2<ItemType extends AnyType>(
+	item: ItemType,
+	count: IntegerType,
+): ListType<ItemType> {
+	let copies: Array<ItemType> = []
+
+	for (let index = Number(count.value); index > 0; index--) {
+		copies.push(item)
+	}
+
+	return createList(copies)
+}

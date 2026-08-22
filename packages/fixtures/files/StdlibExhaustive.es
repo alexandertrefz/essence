@@ -2561,9 +2561,14 @@ third"::lines())
 		"List.split<ItemType>(intoGroupsOf: Integer) [empty, zero]",
 		noNumbers::split(intoGroupsOf 0),
 	)
+	§ `repeat` tells its two entries apart by what is known about the COUNT, so
+	§ the computed Constant from the Integer section keeps this call on the
+	§ entry answering a plain List. A written count above zero is its own proof
+	§ and reaches the entry that answers a NonEmptyList; the two written below
+	§ it can not, since neither is above zero.
 	show(
 		"List.repeat<ItemType>(_ ItemType, times: Integer)",
-		List.repeat("x", times 3),
+		List.repeat("x", times computedThree),
 	)
 	show(
 		"List.repeat<ItemType>(_ ItemType, times: Integer) [zero]",
@@ -2572,6 +2577,14 @@ third"::lines())
 	show(
 		"List.repeat<ItemType>(_ ItemType, times: Integer) [negative]",
 		List.repeat("x", times -1),
+	)
+	show(
+		"List.repeat<ItemType>(_ ItemType, times: PositiveInteger)",
+		List.repeat("x", times 3),
+	)
+	show(
+		"List.repeat<ItemType>(_ ItemType, times: PositiveInteger) [one]",
+		List.repeat("x", times 1),
 	)
 	show(
 		"List.of(integersFrom: Integer, through: Integer)",
