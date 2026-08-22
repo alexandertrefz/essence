@@ -4,6 +4,7 @@ import {
 	Integer        from "./Integer.es"
 	NonZeroInteger from "./Integer.es"
 	List           from "./List.es"
+	NonEmptyList   from "./List.es"
 	Optional       from "./Optional.es"
 	Orderable      from "./Orderable.es"
 	Ordering       from "./Ordering.es"
@@ -124,17 +125,18 @@ declarations {
 					if fractionPieces::length()::is(2) {
 						§ One slash means a numerator over a denominator, and
 						§ `andThen` carries the three answers that can refuse.
-						<- Integer.parse(
-							fractionPieces::firstItem(defaultingTo ""),
-						)::andThen((parsedNumerator) {
-							<- Integer.parse(
-								fractionPieces::lastItem(defaultingTo ""),
-							)::andThen((parsedDenominator) {
-								<- Rational.of(
-									parsedNumerator::multiply(with signFactor),
-									over parsedDenominator,
-								)
-							})
+						constant numeratorText   = fractionPieces::firstItem()
+						constant denominatorText = fractionPieces::lastItem()
+
+						<- Integer.parse(numeratorText)::andThen((numerator) {
+							<- Integer.parse(denominatorText)::andThen(
+								(denominator) {
+									<- Rational.of(
+										numerator::multiply(with signFactor),
+										over denominator,
+									)
+								},
+							)
 						})
 					} else if fractionPieces::length()::isNot(1) {
 						<- #Empty
@@ -144,12 +146,8 @@ declarations {
 						if decimalPieces::length()::is(2) {
 							§ One dot means the digits on both sides over
 							§ a power of ten.
-							constant wholeText      = decimalPieces::firstItem(
-								defaultingTo "",
-							)
-							constant fractionalText = decimalPieces::lastItem(
-								defaultingTo "",
-							)
+							constant wholeText      = decimalPieces::firstItem()
+							constant fractionalText = decimalPieces::lastItem()
 
 							if wholeText
 								::isEmpty()

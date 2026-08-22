@@ -266,9 +266,8 @@ declarations {
 						<- #Empty
 					} else {
 						§ The first piece is everything before the first
-						§ occurrence, so its length is that position and
-						§ the fallback never fires.
-						<- #Value(pieces::firstItem(defaultingTo "")::length())
+						§ occurrence, so its length is that position.
+						<- #Value(pieces::firstItem()::length())
 					}
 				}
 			}
@@ -433,7 +432,7 @@ declarations {
 				} else {
 					§ The first piece is everything before the first
 					§ occurrence, and the rest rejoin on the original part.
-					constant head = pieces::firstItem(defaultingTo "")
+					constant head = pieces::firstItem()
 
 					<- head::append(replacement)
 						::append(pieces::removeFirst()::join(with part))
