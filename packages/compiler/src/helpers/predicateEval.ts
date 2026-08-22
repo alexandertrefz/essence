@@ -324,7 +324,9 @@ function spellScalar(scalar: string | boolean): string {
 
 // NOTE: A written value as the JavaScript the table below compares — a bigint
 // for an Integer, because that is what an Integer is at run time and what its
-// digits mean.
+// digits mean, and a PAIR of them for a Rational, kept in lowest terms with the
+// sign on the numerator, because that is what a Rational is at run time and
+// what `1/2` and `2/4` both mean.
 //
 // A List is admitted by its LENGTH. `[x, y]` holds exactly two items whatever
 // `x` and `y` turn out to be: a List literal is a bracketed list of
@@ -350,6 +352,7 @@ function spellScalar(scalar: string | boolean): string {
 // something about without seeing the whole of it.
 type LiteralValue =
 	| { kind: "Integer"; value: bigint }
+	| { kind: "Rational"; numerator: bigint; denominator: bigint }
 	| { kind: "String"; value: string }
 	| { kind: "Boolean"; value: boolean }
 	| { kind: "List"; items: Array<LiteralItem> }
@@ -433,14 +436,222 @@ const LIST_PREDICATES: Record<string, PredicateEvaluator> = {
 	isEmpty: listQuestion((items) => items.length === 0),
 }
 
+// #region Rational literals
+
+// NOTE: A Rational as the pair the entries below compare — the lowest-terms
+// form with the sign on the numerator, which is the one form `1/2` and `2/4`
+// share. The runtime canonicalises the same way (`createRational` moves a
+// negative sign off the denominator, `reduced` divides both parts out), so a
+// written Rational is read here as exactly the value it will be.
+type ExactValue = { numerator: bigint; denominator: bigint }
+
+// NOTE: The Rational rung of the comparisons, and the PRIMITIVES of it alone:
+// `Rational` declares them on its own `compare` and `Orderable` provides
+// `isBetween` through its conformance, each keyed as `Rational::…` since a
+// conjunct names the Namespace that ANSWERED. `isNot`, `isLessThanOrEqualTo`
+// and `isGreaterThanOrEqualTo` are no rows here for the reason no Integer rung
+// holds them either — a conjunct arrives resolved, so each of the three is one
+// of these three with the flag turned over.
+//
+// Each takes a Rational OR an Integer bound, because that is what the entries
+// take: `Rational::isLessThan` has an Overload for each, and both are the same
+// question about the same two exact numbers. An Integer bound is read as `n/1`,
+// which is what widening one to a Rational does.
+const RATIONAL_COMPARISONS: Record<string, PredicateEvaluator> = {
+	is: rationalComparison((value, other) => compareExact(value, other) === 0),
+	isLessThan: rationalComparison(
+		(value, other) => compareExact(value, other) < 0,
+	),
+	isGreaterThan: rationalComparison(
+		(value, other) => compareExact(value, other) > 0,
+	),
+
+	// NOTE: Both bounds included, and bounds in the wrong order enclosing
+	// nothing — the Integer entry's rule, and for the same reason: this is what
+	// `Orderable::isBetween` says, whichever kind it was provided for.
+	isBetween: (value, args) => {
+		let rational = rationalLiteral(value)
+
+		if (rational === null || args.length !== 2) {
+			return null
+		}
+
+		let lower = rationalScalar(args[0])
+		let upper = rationalScalar(args[1])
+
+		return lower === null || upper === null
+			? null
+			: compareExact(rational, lower) >= 0 &&
+					compareExact(rational, upper) <= 0
+	},
+}
+
+// NOTE: Rational's alone, and the whole of it — `isWholeNumber` is the one
+// question the Namespace asks of a Rational and nothing else.
+const RATIONAL_QUESTIONS: Record<string, PredicateEvaluator> = {
+	// NOTE: `@::denominator()::is(1)`, which is Rational's own body, and the
+	// denominator it reads is the lowest-terms one — so `4/2` is whole.
+	isWholeNumber: rationalQuestion((value) => value.denominator === 1n),
+}
+
+// NOTE: The covering Namespace answers for whichever kind stands in front of
+// it, so its rung is BOTH tables: an Integer receiver keeps the Integer entry
+// it always reached, and a Rational one is read as a Rational. A conjunct
+// reaches `Number` where the two operands are of different kinds —
+// `1/2::isNot(0)` finds no same-kind entry and falls to `Number`'s, resolved to
+// `Number::is` negated — and where the Method is provided rather than declared,
+// as `isBetween` is over Integer bounds.
+const NUMBER_COMPARISONS: Record<string, PredicateEvaluator> = eitherTable(
+	NUMERIC_COMPARISONS,
+	RATIONAL_COMPARISONS,
+)
+
+// NOTE: The first entry that can decide the value, which is at most one of
+// them: each refuses a value of the kind it does not read, so the two tables
+// never both answer and the order between them decides nothing.
+function eitherTable(
+	first: Record<string, PredicateEvaluator>,
+	second: Record<string, PredicateEvaluator>,
+): Record<string, PredicateEvaluator> {
+	let composed: Record<string, PredicateEvaluator> = { ...first }
+
+	for (let [methodName, evaluator] of Object.entries(second)) {
+		let existing = composed[methodName]
+
+		composed[methodName] =
+			existing === undefined
+				? evaluator
+				: (value, args) =>
+						existing(value, args) ?? evaluator(value, args)
+	}
+
+	return composed
+}
+
+function rationalComparison(
+	compare: (value: ExactValue, other: ExactValue) => boolean,
+): PredicateEvaluator {
+	return (value, args) => {
+		let rational = rationalLiteral(value)
+		let other = args.length === 1 ? rationalScalar(args[0]) : null
+
+		return rational === null || other === null
+			? null
+			: compare(rational, other)
+	}
+}
+
+function rationalQuestion(
+	ask: (value: ExactValue) => boolean,
+): PredicateEvaluator {
+	return (value, args) => {
+		let rational = rationalLiteral(value)
+
+		return rational === null || args.length !== 0 ? null : ask(rational)
+	}
+}
+
+// NOTE: A denominator in lowest terms is positive, so the cross-multiplication
+// keeps the order and no division is taken anywhere.
+function compareExact(value: ExactValue, other: ExactValue): number {
+	let left = value.numerator * other.denominator
+	let right = other.numerator * value.denominator
+
+	return left < right ? -1 : left > right ? 1 : 0
+}
+
+function rationalLiteral(value: LiteralItem): ExactValue | null {
+	return value.kind === "Rational" ? value : null
+}
+
+// NOTE: A conjunct keeps a written Rational as its two runs of DIGITS with a
+// slash between them — the form `literalPredicateArgument` writes and
+// `spellScalar` prints back. A bare run of digits is read as well, and is an
+// Integer bound standing where a Rational is compared: `Rational::isLessThan`
+// declares an Overload for each, and `1/2::isLessThan(1)` is the same question
+// as `1/2::isLessThan(1/1)`.
+//
+// This is the one scalar reader that decodes a fraction. `integerScalar` still
+// refuses one, which is what keeps a Rational bound out of a comparison between
+// integers.
+function rationalScalar(scalar: string | boolean): ExactValue | null {
+	if (typeof scalar !== "string") {
+		return null
+	}
+
+	let parts = /^(-?\d+)(?:\/(-?\d+))?$/.exec(scalar)
+
+	if (parts === null) {
+		return null
+	}
+
+	let numerator = BigInt(parts[1]!)
+	let denominator = parts[2] === undefined ? 1n : BigInt(parts[2])
+
+	return denominator === 0n ? null : reducedExact(numerator, denominator)
+}
+
+// NOTE: The lowest-terms form with the sign on the numerator, and zero as
+// `0/1` — the canonical form `createRational` and `reduced` give a Rational at
+// run time, taken here so that two written spellings of one number are one
+// value.
+function reducedExact(numerator: bigint, denominator: bigint): ExactValue {
+	if (denominator < 0n) {
+		numerator = -numerator
+		denominator = -denominator
+	}
+
+	let divisor = greatestCommonDivisor(
+		numerator < 0n ? -numerator : numerator,
+		denominator,
+	)
+
+	return {
+		numerator: numerator / divisor,
+		denominator: denominator / divisor,
+	}
+}
+
+// NOTE: Euclid's, over a magnitude that may be zero and a denominator that is
+// not — `gcd(0, d)` is `d`, which is what canonicalises every zero as `0/1`.
+function greatestCommonDivisor(magnitude: bigint, denominator: bigint): bigint {
+	while (denominator !== 0n) {
+		;[magnitude, denominator] = [denominator, magnitude % denominator]
+	}
+
+	return magnitude
+}
+
+// NOTE: The spelling a conjunct KEEPS for a written Rational, which is the
+// lowest-terms one. Two refinements are compared by their conjunct sets, and
+// `@::isNot(0/1)` and `@::isNot(0/2)` are one question about one number — so
+// the number is what the key holds, rather than the characters that were typed.
+// A pair this can not read is handed back as it was written: a zero denominator
+// is refused by the Validator, and the Diagnostics in between should say what
+// stands in the source.
+export function reducedRationalSpelling(
+	numerator: string,
+	denominator: string,
+): string {
+	let reduced = rationalScalar(`${numerator}/${denominator}`)
+
+	return reduced === null
+		? `${numerator}/${denominator}`
+		: `${reduced.numerator}/${reduced.denominator}`
+}
+
+// #endregion
+
 // NOTE: One flat table, keyed the way a conjunct is: the Namespace, a COLON, the
 // Method. The Lexer reads `:` as a Symbol so no name a Program can write holds
 // one — which is also what keeps every key here away from the property names an
 // Object carries of its own accord.
 const PREDICATES: Record<string, PredicateEvaluator> = {
 	...keyedByNamespace("Integer", NUMERIC_COMPARISONS),
-	...keyedByNamespace("Number", NUMERIC_COMPARISONS),
+	...keyedByNamespace("Number", NUMBER_COMPARISONS),
 	...keyedByNamespace("Integer", INTEGER_QUESTIONS),
+	...keyedByNamespace("Rational", RATIONAL_COMPARISONS),
+	...keyedByNamespace("Rational", RATIONAL_QUESTIONS),
 	...keyedByNamespace("String", STRING_PREDICATES),
 	...keyedByNamespace("List", LIST_PREDICATES),
 }
@@ -543,6 +754,8 @@ function stringLiteral(value: LiteralItem): string | null {
 // bigint at run time and JSON has no bigint — so an Argument spelled any other
 // way, a Rational's `1/2`, a quoted String or a Boolean, is refused right here.
 // That is what keeps a Rational bound out of a comparison between integers.
+// `rationalScalar` is the one reader that decodes the fraction, and it is asked
+// only where a Rational stands.
 function integerScalar(scalar: string | boolean): bigint | null {
 	return typeof scalar === "string" && /^-?\d+$/.test(scalar)
 		? BigInt(scalar)
@@ -572,6 +785,17 @@ function literalValueOf(
 			let integer = integerScalar(value.value)
 
 			return integer === null ? null : { kind: "Integer", value: integer }
+		}
+		// NOTE: Read as the number rather than as the two runs of digits that
+		// were typed, so `2/4` is the value `1/2` is. A zero denominator is
+		// refused here and reported by the Validator, which runs after this: it
+		// is no Rational, so it is no value to decide anything about.
+		case "RationalValue": {
+			let rational = rationalScalar(
+				`${value.numerator}/${value.denominator}`,
+			)
+
+			return rational === null ? null : { kind: "Rational", ...rational }
 		}
 		case "StringValue":
 			return { kind: "String", value: value.value }
