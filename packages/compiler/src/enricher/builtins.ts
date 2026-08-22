@@ -45,6 +45,11 @@ export const builtinMemberOrder: Array<string> = [
 	// together, and the general one has to be met FIRST so that
 	// `NonZeroInteger::multiply` reads as the extra a proven Integer has.
 	"NonZeroInteger",
+	// NOTE: And the second refinement of `Integer` after the first, for the same
+	// reason. The two share no Method name, so their order decides nothing
+	// between them — they are listed together so that a reader meets what an
+	// Integer can be proven to be in one place.
+	"NonNegativeInteger",
 	"Rational",
 	"Algebraic",
 	"Transcendental",

@@ -152,6 +152,11 @@ export type NonZeroIntegerNatives = {
 	raise: (self: IntegerType, to: IntegerType) => IntegerType | RationalType
 }
 
+export type NonNegativeIntegerNatives = {
+	// squareRoot() -> Integer | Algebraic
+	squareRoot: (self: IntegerType) => IntegerType | AlgebraicType
+}
+
 export type RationalNatives = {
 	// static of(_: Integer, over: Integer) -> Optional<Rational>
 	of__overload$1: (argument0: IntegerType, over: IntegerType) => OptionalType<RationalType>
@@ -491,6 +496,12 @@ export const $NonZeroIntegerAbsent: AssertNoEssenceExports<typeof import("./NonZ
 export const $NonZeroIntegerArity: AssertArities<typeof import("./NonZeroInteger"), {
 	multiply__overload$1: 2
 	raise: 2
+}> = true
+
+declare const NonNegativeIntegerModule: typeof import("./NonNegativeInteger")
+export const $NonNegativeInteger: NonNegativeIntegerNatives = NonNegativeIntegerModule
+export const $NonNegativeIntegerArity: AssertArities<typeof import("./NonNegativeInteger"), {
+	squareRoot: 1
 }> = true
 
 declare const RationalModule: typeof import("./Rational")

@@ -529,6 +529,20 @@ declarations {
 		§§ @returns — the power.
 		raise(to exponent: Integer) -> Integer | Rational
 	}
+
+	§ The other half of the sign. A negative Integer is the only one with no
+	§ real square root, so a receiver proven not to be negative answers the
+	§ root itself. No other Method of `Integer` turns on this proof. And no
+	§ operation closes over it: a difference of two non-negative Integers can
+	§ be negative, as `1` and `2` show.
+	namespace NonNegativeInteger for NonNegativeInteger {
+		§§ Answers the exact square root of this NonNegativeInteger.
+		§§
+		§§ A negative Integer is the only one with no real root, and the receiver is proven not to be one. So the answer is the root itself rather than an Optional. A perfect square answers an Integer, and every other value answers an exact Algebraic.
+		§§
+		§§ @returns — the root.
+		squareRoot() -> Integer | Algebraic
+	}
 }
 
 export {

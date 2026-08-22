@@ -680,6 +680,21 @@ third"::lines())
 		provenSix::raise(to 2),
 	)
 
+	§ ——— NonNegativeInteger ————————————————————————————————————————————————
+	§ The one Method a sign proves. A written literal does not refine the
+	§ RECEIVER of a call, so `4::squareRoot()` above reaches Integer's entry and
+	§ answers an Optional; the proof has to be on a declared value.
+	constant provenFour: NonNegativeInteger  = 4
+	constant provenThree: NonNegativeInteger = 3
+	constant provenZero: NonNegativeInteger  = 0
+
+	show("NonNegativeInteger.squareRoot()", provenFour::squareRoot())
+	show(
+		"NonNegativeInteger.squareRoot() [irrational]",
+		provenThree::squareRoot(),
+	)
+	show("NonNegativeInteger.squareRoot() [zero]", provenZero::squareRoot())
+
 	§ ——— Rational —————————————————————————————————————————————————————————
 	§ The two entries of `of` are told apart by what is known about the
 	§ DENOMINATOR — the same split the Integer division family above makes, and
