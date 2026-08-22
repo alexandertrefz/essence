@@ -1,14 +1,16 @@
 implementation {
 
 	§ The everyday Integer Methods. The Compiler reads a written divisor, so it
-	§ knows `3` is not zero and this remainder answers a bare Integer. A Method
-	§ that can fail answers an `Optional`, and `Terminal.inspect` shows the whole
-	§ answer: `Optional#Value(1024)` rather than `1024`. A Method that can answer
-	§ empty offers a `defaultingTo:` entry beside it. An Optional already held in
-	§ data collapses with `value(defaultingTo:)`. Both forms are shown below.
+	§ knows `3` is not zero and this remainder answers a bare Integer. It reads a
+	§ written exponent the same way, so a power with a non-negative one answers a
+	§ bare Integer. A Method that can fail answers an `Optional`, and
+	§ `Terminal.inspect` shows the whole answer: `Optional#Value(1/4)` rather than
+	§ `1/4`. A Method that can answer empty offers a `defaultingTo:` entry beside
+	§ it. An Optional already held in data collapses with `value(defaultingTo:)`.
+	§ Both forms are shown below.
 	Terminal.inspect(-7::remainder(dividingBy 3)) § 2 — Euclidean, so a negative dividend still leaves a non-negative
 	§ remainder. `7::remainder(dividingBy 3)` is the plain `1`.
-	Terminal.inspect(2::raise(to 10)) § Optional#Value(1024)
+	Terminal.inspect(2::raise(to 10)) § 1024 — the exponent is not negative, so there certainly is a power
 	Terminal.inspect(2::raise(to -2)) § Optional#Value(1/4) — negative powers stay exact
 	Terminal.inspect(-5::absolute()) § 5
 	Terminal.inspect(4::isEven()) § true
@@ -55,8 +57,8 @@ implementation {
 	Terminal.inspect([1]::removeFirst()::firstItem(defaultingTo 99)) § 99
 
 	§ An Optional already held in data collapses with `value(defaultingTo:)`.
-	constant power = 2::raise(to 10)
-	Terminal.inspect(power::value(defaultingTo 0)) § 1024
+	constant reciprocalPower = 2::raise(to -2)
+	Terminal.inspect(reciprocalPower::value(defaultingTo 0)) § 1/4
 
 	§ Sorting reads the items' own `Comparable`, so no comparison is written here.
 	Terminal.inspect([3, 1, 2]::sort()) § [ 1, 2, 3 ]

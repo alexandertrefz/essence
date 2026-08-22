@@ -292,7 +292,7 @@ describe("a folded operation", () => {
 				program(`	Terminal.print(9007199254740991::add(1))
 	Terminal.print(9007199254740992::subtract(1))
 	Terminal.print(94906266::multiply(with 94906266))
-	Terminal.print(2::raise(to 200)::value(defaultingTo 0))`),
+	Terminal.print(2::raise(to 200))`),
 			),
 		).toEqual([
 			"9007199254740992",
@@ -557,7 +557,7 @@ describe("what a Program computes across the boundary", () => {
 	Terminal.print(ratio(-9007199254740992, 3))
 	Terminal.print(left(9007199254740992, 3))
 	Terminal.print(left(-9007199254740993, 1000000007))
-	Terminal.print(2::raise(to 53)::value(defaultingTo 0))
+	Terminal.print(2::raise(to 53))
 	Terminal.print(1::divide(by 9007199254740992))`),
 			),
 		).toEqual([

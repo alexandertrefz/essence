@@ -313,7 +313,7 @@ declarations {
 
 		§§ Raises the Integer to the given power.
 		§§
-		§§ A non-negative exponent answers an Integer, and a negative one answers the exact reciprocal as a Rational. Zero to the power of zero is one. Zero raised to a negative power answers empty, and the `defaultingTo:` entry answers the given value instead.
+		§§ A non-negative exponent answers an Integer, and a negative one answers the exact reciprocal as a Rational. Zero to the power of zero is one. Raising this Integer to an exponent proven not to be negative can not fail. Zero raised to a negative power answers empty, and the `defaultingTo:` entry answers the given value instead.
 		overload raise {
 			§§ @param to — the exponent
 			§§ @returns — the power, or nothing when raising zero to a negative power.
@@ -330,6 +330,14 @@ declarations {
 			) -> Integer | Rational {
 				<- @::raise(to exponent)::value(defaultingTo fallback)
 			}
+
+			§§ Raises the Integer to an exponent proven not to be negative.
+			§§
+			§§ Every Integer has such a power and every one of them is whole. So the answer is the power itself rather than an Optional, and it is an Integer rather than a Rational.
+			§§
+			§§ @param to — the exponent, proven not to be negative
+			§§ @returns — the power.
+			(to exponent: NonNegativeInteger) -> Integer
 		}
 
 		§§ Answers the exact square root.

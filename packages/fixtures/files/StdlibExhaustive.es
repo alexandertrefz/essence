@@ -396,9 +396,16 @@ third"::lines())
 	§ Program COMPUTES might be anything, so it reaches the entry answering an
 	§ Optional; one written where it stands is its own proof that it is not
 	§ zero, and reaches the total entry.
+	§
+	§ `raise` splits the same way on the sign of its EXPONENT, so the two
+	§ computed exponents below keep those calls on the entry answering an
+	§ Optional. A written non-negative exponent is its own proof and reaches
+	§ the total entry.
 	constant computedTwo   = 1::add(1)
 	constant computedThree = 1::add(2)
 	constant computedEight = 4::multiply(with 2)
+	constant computedTen   = 5::add(5)
+	constant computedZero  = 1::subtract(1)
 
 	constant computedNegativeThree = 0::subtract(3)
 
@@ -557,8 +564,11 @@ third"::lines())
 		"Integer.quotient(dividingBy: Integer, defaultingTo: Integer) [by zero]",
 		7::quotient(dividingBy 0, defaultingTo 0),
 	)
-	show("Integer.raise(to: Integer)", 2::raise(to 10))
-	show("Integer.raise(to: Integer) [zero exponent]", 2::raise(to 0))
+	show("Integer.raise(to: Integer)", 2::raise(to computedTen))
+	show(
+		"Integer.raise(to: Integer) [zero exponent]",
+		2::raise(to computedZero),
+	)
 	show("Integer.raise(to: Integer) [negative exponent]", 2::raise(to -2))
 	show(
 		"Integer.raise(to: Integer) [zero to a negative power]",
@@ -572,6 +582,12 @@ third"::lines())
 		"Integer.raise(to: Integer, defaultingTo: Integer | Rational) [zero to a negative power]",
 		0::raise(to -1, defaultingTo 0),
 	)
+	show("Integer.raise(to: NonNegativeInteger)", 2::raise(to 10))
+	show(
+		"Integer.raise(to: NonNegativeInteger) [zero exponent]",
+		2::raise(to 0),
+	)
+	show("Integer.raise(to: NonNegativeInteger) [zero base]", 0::raise(to 2))
 	show(
 		"Integer.clamp(between: Integer, and: Integer) [above]",
 		15::clamp(between 1, and 10),

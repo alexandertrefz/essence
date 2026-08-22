@@ -137,6 +137,8 @@ export type IntegerNatives = {
 	quotient__overload$2: (self: IntegerType, dividingBy: IntegerType) => IntegerType
 	// raise(to: Integer) -> Optional<Integer | Rational>
 	raise__overload$1: (self: IntegerType, to: IntegerType) => OptionalType<IntegerType | RationalType>
+	// raise(to: NonNegativeInteger) -> Integer
+	raise__overload$3: (self: IntegerType, to: IntegerType) => IntegerType
 	// squareRoot() -> Optional<Integer | Algebraic>
 	squareRoot__overload$1: (self: IntegerType) => OptionalType<IntegerType | AlgebraicType>
 	// negate() -> Integer
@@ -476,6 +478,7 @@ export const $IntegerArity: AssertArities<typeof import("./Integer"), {
 	quotient__overload$1: 2
 	quotient__overload$2: 2
 	raise__overload$1: 2
+	raise__overload$3: 2
 	squareRoot__overload$1: 1
 	negate: 1
 }> = true

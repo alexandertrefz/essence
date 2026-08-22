@@ -374,25 +374,44 @@ export function divide__overload$4(
 // correctly-rounded argument the three inlined operations rest on does not
 // cover it, so a double power can not be checked after the fact the way a
 // product can.
+//
+// NOTE: The power itself, for every pair it is defined at — a non-negative
+// exponent answers a whole number and a negative one the exact reciprocal. The
+// one pair with no power at all, zero to a negative exponent, is decided by
+// each entry before it reads this. `NonZeroInteger.raise` is this Function
+// under that Namespace's name: a base that is not zero has every power.
+export function power(
+	base: IntegerType,
+	exponent: IntegerType,
+): IntegerType | RationalType {
+	// NOTE: `0` rather than `0n`: an ordering comparison is exact across the
+	// two representations, so one spelling asks both.
+	return exponent.value >= 0
+		? raise__overload$3(base, exponent)
+		: createRational(1n, escaped(base.value) ** -escaped(exponent.value))
+}
+
 export function raise__overload$1(
 	base: IntegerType,
 	exponent: IntegerType,
 ): OptionalType<IntegerType | RationalType> {
-	let power = exponent.value
-
-	// NOTE: `0` rather than `0n`: an ordering comparison is exact across the
-	// two representations, so one spelling asks both.
-	if (power >= 0) {
-		return createValue(createInteger(escaped(base.value) ** escaped(power)))
-	}
-
-	if (base.value === 0) {
+	if (base.value === 0 && exponent.value < 0) {
 		return createEmpty()
 	}
 
-	return createValue(
-		createRational(1n, escaped(base.value) ** -escaped(power)),
-	)
+	return createValue(power(base, exponent))
+}
+
+// NOTE: The exponent of this entry is a `NonNegativeInteger` in the source —
+// proven while compiling, erased to an Integer here — so the reciprocal arm
+// above is unreachable and the answer is always whole. It holds the whole power
+// rather than reading it back out of the Optional entry, which is the direction
+// `remainder` and `quotient` pair their two entries in as well.
+export function raise__overload$3(
+	base: IntegerType,
+	exponent: IntegerType,
+): IntegerType {
+	return createInteger(escaped(base.value) ** escaped(exponent.value))
 }
 
 // #endregion
