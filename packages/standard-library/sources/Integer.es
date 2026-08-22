@@ -473,17 +473,20 @@ declarations {
 
 	§ A refinement adds Methods and takes none away, so a NonZeroInteger
 	§ answers every Method above. This Namespace holds the entries the proof
-	§ changes the answer of, and it changes it in two ways.
+	§ changes the answer of, and it changes it in three ways.
 	§
 	§ One is closure: the answer is a NonZeroInteger too. Only multiplication
 	§ qualifies, because a product is zero exactly when one of its factors is.
 	§ A sum or a difference of two non-zero Integers can be zero, as `1` and
 	§ `-1` show. Negation would close, and nothing needs it.
 	§
-	§ The other tightens another kind's answer. An irrational times an Integer
+	§ The second tightens another kind's answer. An irrational times an Integer
 	§ is a Union, because a zero factor collapses it to a Rational. A proven
-	§ factor can not, so the last two entries hand the receiver to the
+	§ factor can not, so the two multiply entries hand the receiver to the
 	§ irrational's own refined entry and answer that kind itself.
+	§
+	§ The third is totality: zero is the only base with a missing power, so
+	§ `raise` answers the power itself rather than an Optional.
 	namespace NonZeroInteger for NonZeroInteger {
 		§§ Multiplies this NonZeroInteger with a number.
 		§§
@@ -517,6 +520,14 @@ declarations {
 				<- other::multiply(with @)
 			}
 		}
+
+		§§ Raises this NonZeroInteger to the given power.
+		§§
+		§§ A base that is not zero has every power, so the answer is the power itself rather than an Optional. A non-negative exponent answers an Integer, and a negative one answers the exact reciprocal as a Rational.
+		§§
+		§§ @param to — the exponent
+		§§ @returns — the power.
+		raise(to exponent: Integer) -> Integer | Rational
 	}
 }
 
