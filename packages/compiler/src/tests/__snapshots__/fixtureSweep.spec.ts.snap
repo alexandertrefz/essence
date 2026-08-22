@@ -48,7 +48,7 @@ true"
 exports[`Fixture Sweep Everyday.es should print what it printed before 1`] = `
 "2
 1024
-Optional#Value(1/4)
+1/4
 5
 true
 false
@@ -138,9 +138,10 @@ World has 3 apples today"
 `;
 
 exports[`Fixture Sweep Irrational.es should print what it printed before 1`] = `
-"Optional#Value(3)
-Optional#Value(√2)
-Optional#Value(2·√3)
+"3
+√2
+2·√3
+Optional#Empty
 Optional#Value(2/1)
 1 + √2
 3·√2

@@ -9,11 +9,15 @@
 § was showcasing no longer has a home.
 
 implementation {
-	§ unknown-method — with a near miss offered from the same Namespaces.
+	§ unknown-method — with a near miss offered from the same Namespaces. A
+	§ written value proves what it can about itself, so the receiver is named
+	§ as the refinement it proved and the Note names the Namespace that
+	§ answers for it.
 	constant length = "essence"::lenght()
 
 	§ unknown-method again, on a receiver several Namespaces answer for — the
-	§ Note names every one that was searched, not just the first.
+	§ Note names every one that was searched, not just the first. A written `1`
+	§ is neither zero nor negative, so the refined Namespaces are searched too.
 	constant magnitude = 1::lenght()
 
 	§ no-matching-overload — every candidate signature is listed.
