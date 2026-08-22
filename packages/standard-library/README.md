@@ -12,7 +12,9 @@ the base it narrows: `NonZeroInteger`, `NonNegativeInteger` and
 `PositiveInteger` beside `Integer`, `NonEmptyString` beside `String`,
 `NonEmptyList` beside `List`. Each reaches everything its base reaches, and the
 tighter answers a proof affords on top — `DEVELOPMENT.md` has the rule a
-narrowed receiver is read by. The aggregates a List of numbers answers
+narrowed receiver is read by. A value written down is its own proof and reaches
+them without being narrowed at all: `4::squareRoot()` answers a number and
+`[1, 2]::firstItem()` answers an item. The aggregates a List of numbers answers
 are reachable from the List itself, through six Namespaces of their own in
 `NumberList.es` — `IntegerList`, `RationalList` and `NumberList`, and the
 `NonEmptyIntegerList`, `NonEmptyRationalList` and `NonEmptyNumberList` a proof

@@ -223,9 +223,11 @@ What is lowered, and nothing else:
   `@::add(other::negate())` — is one allocation where it was two, and no call on
   the path that is taken.
 - **NonZeroInteger**: `multiply`, and only where both operands are exactly
-  `Integer`. A checked refinement is erased before the first pass runs, so such
-  a call holds two ordinary Integers, and the Method it would have reached is
-  Integer's own product re-exported under the refined Namespace's name. Same
+  `Integer`. This is where a written receiver's product goes — `2::multiply(with
+  3)` proves both operands away — as well as a receiver a branch narrowed. A
+  checked refinement is erased before the first pass runs, so such a call holds
+  two ordinary Integers, and the Method it would have reached is Integer's own
+  product re-exported under the refined Namespace's name. Same
   operator, same operands, same answer: the evidence was spent while compiling
   and there is nothing left of it to run. The Namespace declares three more
   entries, and each is left as the call it is. Two of them scale an Algebraic or
@@ -908,7 +910,11 @@ String.createString("a count: 7")
 What is folded is Integer and Rational arithmetic (`add`, `subtract`,
 `multiply`, `negate`, `absolute`), the comparison and equality family for both,
 String concatenation (`append`, `prepend`), and an interpolation hole whose value
-is a literal and whose witness names a standard library `toString`. Where every
+is a literal and whose witness names a standard library `toString`. A written
+receiver proves what it can about itself, so `60::multiply(with 60)` is
+`NonZeroInteger`'s product rather than `Integer`'s by the time this reads it —
+that rung folds too, on the same two-written-Integers guard
+`lower-scalar-operations` reads it by. Where every
 hole of an interpolated String folds, the whole String becomes a literal — and
 `pool-constants` then declares it once.
 
