@@ -807,9 +807,10 @@ export type PredicateSpelling = {
 //
 // NOTE: Refinements are erased before emission — nothing about one survives
 // into the JavaScript, and the Optimiser stage is where they go. `base` is an
-// Integer, a String or an applied List, and a GENERIC Alias' base is an applied
-// List whose item Type is still a Type Parameter — `List<Item>` — which a use
-// site substitutes through the Generic Alias wrapping the refinement.
+// Integer, a Rational, a String or an applied List, and a GENERIC Alias' base is
+// an applied List whose item Type is still a Type Parameter — `List<Item>` —
+// which a use site substitutes through the Generic Alias wrapping the
+// refinement.
 //
 // NOTE: `conjuncts` is null while the predicate is still UNRESOLVED — the state
 // a refined Alias hoists in when the Namespace answering its predicate has not

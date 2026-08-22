@@ -3520,8 +3520,14 @@ function refinedGenerator(
 
 // NOTE: The predicates a generator can hold BY CONSTRUCTION, which is every one
 // the standard library writes and the obvious neighbours of each. A refinement's
-// base is an Integer, a String or a List and nothing else, so this table is
-// bounded by the language rather than by what anybody has thought of.
+// base is an Integer, a Rational, a String or a List and nothing else, so this
+// table is bounded by the language rather than by what anybody has thought of.
+//
+// NOTE: The bounds read below are Integer DIGITS, so a Rational conjunct falls
+// through to `false` and its check is enriched rather than built in. A
+// generator that draws a Rational satisfying `@::isNot(0/1)` by construction is
+// worth writing; nobody has weighed it, and until somebody does the drawn
+// values are filtered instead.
 //
 // Answering `true` means the narrowing now holds the conjunct entirely: no
 // check is enriched for it and no value that fails it is ever drawn.
@@ -7791,9 +7797,11 @@ function refinedSelfType(
 // NOTE: Integer and String only, and null for every other kind of value. The
 // Namespace that answers `is` has to be one whose meaning is known here, and what
 // the Matcher compiles to (`anyIs`) has to answer exactly what that Namespace's
-// `is` answers — those two hold for the two scalars a refinement can be declared
-// over, and a Rational or a Case would need the same argument made about it
-// before its evidence could be trusted.
+// `is` answers — those two hold for the two scalars a literal `match` admits.
+// A Rational is a refinable base as well now, and `anyIs` cross-multiplies the
+// parts exactly as `Rational.is` does, so the same argument would carry; what is
+// missing is the Matcher, which the Validator still refuses. A Case would need
+// the argument made about it from the start.
 function namedValueConjunct(
 	literal: common.typed.ExpressionNode,
 ): common.PredicateConjunct | null {
@@ -13039,7 +13047,7 @@ function refinementSkeletonAdmissible(
 				code: "invalid-refinement-predicate",
 				labels: [primary(node.type.position, `this is ${described}`)],
 				notes: [
-					"A checked refinement is written on an Integer, a String or an applied List — 'List<String>', never a bare 'List'.",
+					"A checked refinement is written on an Integer, a Rational, a String or an applied List — 'List<String>', never a bare 'List'.",
 				],
 				helps: [`Drop the 'where' clause from '${node.name.content}'.`],
 			},

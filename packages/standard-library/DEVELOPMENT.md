@@ -330,13 +330,16 @@ level Generic here is written `<infer Result>` or
 `<infer ItemType is Equatable>`.
 
 **A written literal is its own refinement proof.** The Compiler reads the value
-of a literal, so `2` is a NonZeroInteger. `@::remainder(dividingBy 2)` answers a
-bare Integer, and there is no Optional to take apart. It proves the same things
-where it stands as the RECEIVER: `4::squareRoot()` reaches
-`namespace NonNegativeInteger` and `[1, 2]::firstItem()` reaches
-`namespace NonEmptyList`. A value the Program is handed carries no such proof
-and goes through the predicate instead — which is why a body or a harness that
-has to reach the unproven entry computes its operand.
+of a literal, so `2` is a NonZeroInteger and `1/2` a NonZeroRational — a written
+Rational is read as the pair the runtime keeps it as, so `2/4` proves what `1/2`
+proves. `@::remainder(dividingBy 2)` answers a bare Integer, and there is no
+Optional to take apart. It proves the same things where it stands as the
+RECEIVER: `4::squareRoot()` reaches `namespace NonNegativeInteger`,
+`1/2::reciprocal()` reaches `namespace NonZeroRational`, and
+`[1, 2]::firstItem()` reaches `namespace NonEmptyList`. A value the Program is
+handed carries no such proof and goes through the predicate instead — which is
+why a body or a harness that has to reach the unproven entry computes its
+operand.
 
 **A written Method REPLACES a Protocol's provided one on that Namespace's own
 rung.** `Equatable` writes `isNot` and `Orderable` writes six Methods, and every
@@ -568,12 +571,12 @@ rule stated there.
   same things for itself — `[1, 2]::firstItem()` answers an Integer — so the
   entries a proof unlocks are reached by a literal as much as by a narrowed
   name. Two refined targets neither of which is narrower than the other leave
-  the call `ambiguous-namespace`, exactly as two unrefined ones do. None of the three can be written in Essence,
-  which is the point rather than a gap: a refinement erases before anything
-  runs, so a native is what spending the evidence looks like. `length` is the
-  plainest case — an Essence body could only write `@::length()`, which is that
-  same Method on a receiver that still carries the proof, and the Validator
-  refuses it as `infinite-recursion`.
+  the call `ambiguous-namespace`, exactly as two unrefined ones do. None of the
+  three can be written in Essence, which is the point rather than a gap: a
+  refinement erases before anything runs, so a native is what spending the
+  evidence looks like. `length` is the plainest case — an Essence body could
+  only write `@::length()`, which is that same Method on a receiver that still
+  carries the proof, and the Validator refuses it as `infinite-recursion`.
 - **The two rules meet in one Namespace where a target is narrower both
   ways.** `NonEmptyNestedList<infer ItemType> for NonEmptyList<NonEmptyList<ItemType>>`
   targets a List proven to have something in it whose items are Lists proven the

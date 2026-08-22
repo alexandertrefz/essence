@@ -1214,8 +1214,8 @@ has been proven to satisfy — `type NonZeroInteger = Integer where @::isNot(0)`
 is why the predicate is stored as a set of resolved Method calls rather than as
 the text that was written. Four shapes are refused:
 
-- a base outside Integer, String and an applied List (`List<String>` or
-  `List<Item>`, never a bare `List`);
+- a base outside Integer, Rational, String and an applied List (`List<String>`
+  or `List<Item>`, never a bare `List`);
 - a receiver that is not `@` — the clause is a question about the value being
   refined and about nothing else;
 - a chained receiver (`@::trim()::hasCharacters()`) — the evidence would be

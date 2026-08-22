@@ -227,9 +227,9 @@ What is lowered, and nothing else:
   3)` proves both operands away — as well as a receiver a branch narrowed. A
   checked refinement is erased before the first pass runs, so such a call holds
   two ordinary Integers, and the Method it would have reached is Integer's own
-  product re-exported under the refined Namespace's name. Same
-  operator, same operands, same answer: the evidence was spent while compiling
-  and there is nothing left of it to run. The Namespace declares three more
+  product re-exported under the refined Namespace's name. Same operator, same
+  operands, same answer: the evidence was spent while compiling and there is
+  nothing left of it to run. The Namespace declares three more
   entries, and each is left as the call it is. Two of them scale an Algebraic or
   a Transcendental — the overload index is not what tells those apart, since the
   operands are, and `scalarOperands` answers null for anything but two Integers
@@ -914,9 +914,12 @@ is a literal and whose witness names a standard library `toString`. A written
 receiver proves what it can about itself, so `60::multiply(with 60)` is
 `NonZeroInteger`'s product rather than `Integer`'s by the time this reads it —
 that rung folds too, on the same two-written-Integers guard
-`lower-scalar-operations` reads it by. Where every
-hole of an interpolated String folds, the whole String becomes a literal — and
-`pool-constants` then declares it once.
+`lower-scalar-operations` reads it by. `1/2::multiply(with 2/3)` is
+`NonZeroRational`'s product for the same reason, and folds on the matching guard
+of two written Rationals. `NonZeroRational.reciprocal` is left as the call it
+is: it takes one operand apart rather than combining two, and nobody has weighed
+it. Where every hole of an interpolated String folds, the whole String becomes a
+literal — and `pool-constants` then declares it once.
 
 Safe because the Compiler works the answer out THE SAME WAY the Program would
 have. Essence arithmetic is exact — the fold is carried out in bigints and pairs

@@ -1485,12 +1485,15 @@ function reportEmptyListOverlap(
 // declared by — `refinedSelfType` in the Enricher is what reads it — so the
 // shape is a rule about what the Program MEANS rather than a matter of style.
 //
-// NOTE: Integer and String, and no other Type. They are the two refinable scalar
-// bases, and they are the two whose literal Matcher asks exactly what their
-// Namespace's `is` asks: `anyIs` compares Integers as bigints and Strings
-// NFC-normalised, which is what `Integer.is` and `String.is` answer, so a Case
-// that declined really does prove `isNot`. A Boolean's two values are an `if`
-// written the long way, and everything else keeps `match-on-non-union`.
+// NOTE: Integer and String, and no other Type. They are the two whose literal
+// Matcher asks exactly what their Namespace's `is` asks: `anyIs` compares
+// Integers as bigints and Strings NFC-normalised, which is what `Integer.is`
+// and `String.is` answer, so a Case that declined really does prove `isNot`.
+// A Rational would carry the same argument — it is a refinable base too, and
+// `anyIs` cross-multiplies its parts exactly as `Rational.is` does — but
+// admitting a third scrutinee is a change to `match` that nobody has weighed.
+// A Boolean's two values are an `if` written the long way, and everything else,
+// a Rational included, keeps `match-on-non-union`.
 //
 // NOTE: A Match on one of the two that names NO value at all is not one of
 // these. It asks nothing about the value it was given, which is the one-outcome
