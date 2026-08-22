@@ -11,6 +11,11 @@
 § and what it may say is a question about Types. That is why they all reach the
 § Enricher, and why a refusal here never keeps the next one from being reported.
 §
+§ The calls at the end are the other kind: they compile, and each carries a
+§ `defaultingTo` Argument that can never be read, because the proof the call
+§ already holds took the empty answer away. That is a Warning rather than an
+§ Error, and it is showcased here because the proof is what makes it one.
+§
 § Keep it broken. If a change makes one of these compile, the Diagnostic it was
 § showcasing no longer has a home.
 
@@ -64,4 +69,22 @@ implementation {
 		case #Full({ value: NonZeroInteger }) { <- "nonzero" }
 		case _                                { <- "other" }
 	}
+
+	§ fallback-never-used — the receiver is proven to hold items, so
+	§ `firstItem()` answers an Integer and the fallback is unreachable.
+	constant scores: NonEmptyList<Integer> = [3, 1, 2]
+
+	constant best = scores::firstItem(defaultingTo 0)
+
+	§ fallback-never-used — the same rule from the other side: a written '2' is
+	§ proof the quotient exists.
+	constant half = 10::divide(by 2, defaultingTo 0/1)
+
+	§ Silent on purpose, and the reason the rule re-probes the call rather than
+	§ reading a Parameter list: `firstItem(where:)` can find nothing in a List
+	§ that holds items, so the fallback here is the one that gets read.
+	constant firstBig = scores::firstItem(
+		where (score) { <- score::isGreaterThan(2) },
+		defaultingTo 0,
+	)
 }
