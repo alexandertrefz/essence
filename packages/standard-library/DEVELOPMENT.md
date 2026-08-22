@@ -385,8 +385,12 @@ entry asks for reaches it wherever it stands. Two consequences are worth
 knowing: `Optional::is` declares the whole Optional entry FIRST, so
 `#Empty::is(#Empty)` asks whether the receiver is empty; `Rational.of` declares
 its refined entry after the general one, so it is numbered second of the three
-and still read first. The `defaultingTo:` entry stands last, where a new entry
-goes — appending is what leaves every earlier number alone.
+and still read first. Appending is the rule, because it leaves every earlier
+number alone — so the `defaultingTo:` entry is last only where nothing has been
+written since. Nine Overloads carry a refined entry written after one, and each
+of those is read first all the same: `Integer::raise`, `Rational::divide` and
+`Rational::raise`, `Algebraic::multiply`, the irrationals' `divide`,
+`Number.average` and the two `Number` extrema.
 
 **A body pulls its whole transitive reach into every bundle.** A Method is
 emitted into a Program that reaches it, and so is everything its body calls.
