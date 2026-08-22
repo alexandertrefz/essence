@@ -1602,13 +1602,14 @@ function signatureMatches(
 				actual.parameterTypes[i].type,
 				expected.parameterTypes[i].type,
 				context,
+				NESTED,
 			)
 		) {
 			return false
 		}
 	}
 
-	return matchTypes(expected.returnType, actual.returnType, context)
+	return matchTypes(expected.returnType, actual.returnType, context, NESTED)
 }
 
 // #region Protocol Conformance
@@ -2457,7 +2458,7 @@ export function unionMembersKeepingNames(
 }
 
 export function matchesType(lhs: common.Type, rhs: common.Type): boolean {
-	return matchTypes(lhs, rhs, null)
+	return matchTypes(lhs, rhs, null, OUTERMOST)
 }
 
 // NOTE: Whether `part` says only things `whole` already declares — every member
@@ -2488,7 +2489,12 @@ export function isPartialOf(
 		// JavaScript function the Record does not have.
 		if (
 			!Object.hasOwn(whole.members, partName) ||
-			!matchTypes(whole.members[partName], partMemberType, context)
+			!matchTypes(
+				whole.members[partName],
+				partMemberType,
+				context,
+				NESTED,
+			)
 		) {
 			return false
 		}
@@ -2867,7 +2873,7 @@ export function matchesTypeWithBindings(
 	rhs: common.Type,
 	context: GenericInferenceContext,
 ): boolean {
-	return matchTypes(lhs, rhs, context)
+	return matchTypes(lhs, rhs, context, OUTERMOST)
 }
 
 // NOTE: The (lhs, rhs) Case pairs whose members are mid-comparison, keyed by
@@ -2905,10 +2911,22 @@ function isOpenBindable(
 	)
 }
 
+// NOTE: Where in a Type the comparison currently stands. `OUTERMOST` is the
+// whole of what a position asks — an Argument against its Parameter, a value
+// against its Declaration — and `NESTED` is everything reached by going THROUGH
+// a Type: a List's items, a Record's or a Case's members, a signature's
+// Parameters. Only one rule reads it, the refinement unwrapping below, and only
+// the reason it gives there makes the distinction worth carrying.
+type MatchDepth = "outermost" | "nested"
+
+const OUTERMOST: MatchDepth = "outermost"
+const NESTED: MatchDepth = "nested"
+
 function matchTypes(
 	lhs: common.Type,
 	rhs: common.Type,
 	context: GenericInferenceContext | null,
+	depth: MatchDepth,
 ): boolean {
 	// NOTE: Error Types are poison values — they only occur after a
 	// Diagnostic has already been reported, and match anything in both
@@ -2921,11 +2939,21 @@ function matchTypes(
 	// NOTE: A checked refinement flows into anything its BASE flows into — the
 	// evidence is simply forgotten, and every value of `NonZeroInteger` is an
 	// Integer. This unwrapping sits ahead of Generic binding below on purpose:
-	// it is what makes a Type Parameter bind the base, so `T` inferred from a
-	// refined Argument is `Integer` and never `NonZeroInteger`. A refined
-	// Generic binding (`List<NonZeroInteger>` produced by inference) would
-	// carry evidence into positions nothing proved anything about, and it is
-	// explicitly not part of v1.
+	// it is what makes a Type Parameter bind the base at the OUTERMOST position,
+	// so `T` inferred from a refined Argument is `Integer` and never
+	// `NonZeroInteger`. That rule is what keeps a Generic standing for a value
+	// the call THREADS from being pinned to evidence the thread does not carry:
+	// a `loop(startingWith nonZero, step …)` whose step answers an ordinary
+	// Integer is a Program that works, and binding `State` to `NonZeroInteger`
+	// off the seed would refuse it.
+	//
+	// NOTE: A refinement standing INSIDE another Type is a different matter, and
+	// binds as itself. Nobody inferred it there — `List<NonEmptyList<Integer>>`
+	// says what it says because something wrote it down or because a Method
+	// promised it, and the item Type is not a place a later value can widen. So
+	// `groups::firstItem()` answers `Optional<NonEmptyList<Integer>>` and the
+	// proof survives being a Type Argument, while the outermost rule above is
+	// untouched.
 	//
 	// NOTE: An expected Union is left to decompose FIRST — unwrapping here
 	// would strip the evidence before the Union's own refinement member could
@@ -2936,9 +2964,14 @@ function matchTypes(
 	if (
 		rhs.type === "Refinement" &&
 		lhs.type !== "Refinement" &&
-		lhs.type !== "UnionType"
+		lhs.type !== "UnionType" &&
+		!(
+			depth === NESTED &&
+			lhs.type === "GenericUse" &&
+			isOpenBindable(lhs.name, context)
+		)
 	) {
-		return matchTypes(lhs, rhs.base, context)
+		return matchTypes(lhs, rhs.base, context, depth)
 	}
 
 	// NOTE: The other direction needs the evidence. A refinement is accepted by
@@ -2951,7 +2984,26 @@ function matchTypes(
 	// spells — see `impliedConjunctKeys`. A value proven above zero has been
 	// proven not to be zero, and a Type saying so has to reach the Namespace
 	// that asks for exactly that.
-	if (lhs.type === "Refinement") {
+	//
+	// NOTE: A Generic that is already BOUND is not "nothing else" — it stands
+	// for whatever it was bound to, and the comparison belongs against that. It
+	// is reached when a Type Parameter has picked a refinement up out of a Type
+	// Argument and the same Parameter comes back round in a flipped position:
+	// `groups::map((inner) { … })` binds `ItemType` to `NonEmptyList<Integer>`
+	// off the receiver, and the lambda's own Parameter — typed from that very
+	// binding — is then measured against `ItemType` with the sides swapped.
+	// Refused here it made the call unresolvable. An UNBOUND Generic still gets
+	// nothing from this side: a refinement does not bind a Type Parameter from
+	// the actual side of a signature, which is the outermost rule above read in
+	// the mirror.
+	if (
+		lhs.type === "Refinement" &&
+		!(
+			rhs.type === "GenericUse" &&
+			context?.bindings.has(rhs.name) === true &&
+			isOpenBindable(rhs.name, context)
+		)
+	) {
 		if (rhs.type !== "Refinement") {
 			return false
 		}
@@ -2959,7 +3011,7 @@ function matchTypes(
 		let proven = impliedConjunctKeys(provenConjuncts(rhs))
 
 		return (
-			matchTypes(lhs.base, rhs.base, context) &&
+			matchTypes(lhs.base, rhs.base, context, depth) &&
 			provenConjuncts(lhs).every((conjunct) =>
 				proven.has(predicateConjunctKey(conjunct)),
 			)
@@ -2990,13 +3042,13 @@ function matchTypes(
 	// compared (contravariant parameter positions flip the sides).
 	if (lhs.type === "GenericUse" && isOpenBindable(lhs.name, context)) {
 		return matchGenericUse(lhs, rhs, context, (binding) =>
-			matchTypes(binding, rhs, context),
+			matchTypes(binding, rhs, context, depth),
 		)
 	}
 
 	if (rhs.type === "GenericUse" && isOpenBindable(rhs.name, context)) {
 		return matchGenericUse(rhs, lhs, context, (binding) =>
-			matchTypes(lhs, binding, context),
+			matchTypes(lhs, binding, context, depth),
 		)
 	}
 
@@ -3033,7 +3085,7 @@ function matchTypes(
 			return true
 		}
 
-		return matchTypes(lhs.itemType, rhs.itemType, context)
+		return matchTypes(lhs.itemType, rhs.itemType, context, NESTED)
 	}
 
 	if (lhs.type === "String" && rhs.type === "String") {
@@ -3088,7 +3140,7 @@ function matchTypes(
 				let attempt = markBindings(context)
 
 				for (let lhsType of lhsMembers) {
-					if (matchTypes(lhsType, rhsType, context)) {
+					if (matchTypes(lhsType, rhsType, context, depth)) {
 						foundMatch = true
 						break
 					}
@@ -3097,7 +3149,7 @@ function matchTypes(
 				}
 
 				if (!foundMatch && rhsType.type === "UnionType") {
-					foundMatch = matchTypes(lhs, rhsType, context)
+					foundMatch = matchTypes(lhs, rhsType, context, depth)
 				}
 
 				if (!foundMatch) {
@@ -3124,7 +3176,7 @@ function matchTypes(
 			let attempt = markBindings(context)
 
 			for (let type of lhsMembers) {
-				if (matchTypes(type, rhs, context)) {
+				if (matchTypes(type, rhs, context, depth)) {
 					return true
 				}
 
@@ -3204,6 +3256,7 @@ function matchTypes(
 						lhs.members[memberName],
 						rhs.members[memberName],
 						context,
+						NESTED,
 					)
 				) {
 					return false
@@ -3234,6 +3287,7 @@ function matchTypes(
 					lhs.members[memberName],
 					rhs.members[memberName],
 					context,
+					NESTED,
 				)
 			) {
 				return false
@@ -3590,7 +3644,9 @@ function argumentFits(
 				)
 			: null) ?? argumentType
 
-	if (matchTypes(parameter.type, effectiveType, inferenceContext)) {
+	if (
+		matchTypes(parameter.type, effectiveType, inferenceContext, OUTERMOST)
+	) {
 		return true
 	}
 

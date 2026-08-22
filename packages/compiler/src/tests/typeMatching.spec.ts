@@ -862,10 +862,13 @@ describe("Type matching", () => {
 			expect(matchesType(error, nonZero)).toBe(true)
 		})
 
-		// NOTE: The widening rule sits ahead of Generic binding on purpose. A
-		// Type Parameter inferred from a refined Argument binds the BASE, so no
-		// inference carries evidence into a position nothing proved anything
-		// about — refinement-typed Generic bindings are explicitly v2.
+		// NOTE: The widening rule sits ahead of Generic binding on purpose at the
+		// OUTERMOST position — the whole of what an Argument or a Declaration
+		// asks. A Type Parameter inferred from a refined Argument binds the
+		// BASE, so a Generic standing for a value the call threads is never
+		// pinned to evidence the thread does not carry: a walk seeded with a
+		// `NonZeroInteger` whose step answers an ordinary Integer still
+		// compiles. The rule one level in is the opposite one, pinned below.
 		it("should bind a Type Parameter to the base rather than the refinement", () => {
 			let context = createInferenceContext([
 				{ name: "T", infer: true, defaultType: null },
@@ -970,8 +973,8 @@ describe("Type matching", () => {
 			})
 
 			// NOTE: A Type Parameter binds the BASE here too — a `T` inferred from
-			// a NonEmptyList Argument is `List<String>`, and no inference carries
-			// evidence into a position nothing proved anything about.
+			// a NonEmptyList Argument is `List<String>`, for the reason the
+			// non-generic case above gives.
 			it("should bind a Type Parameter to the instantiated base", () => {
 				let context = createInferenceContext([
 					{ name: "T", infer: true, defaultType: null },
@@ -985,6 +988,75 @@ describe("Type matching", () => {
 					),
 				).toBe(true)
 				expect(context.bindings.get("T")).toEqual(strings)
+			})
+
+			// NOTE: And the rule one level IN, which is the opposite one. A
+			// refinement standing as a Type Argument was not inferred there:
+			// something wrote `List<NonEmptyList<String>>` down or a Method
+			// promised it, and the item Type is not a place a later value can
+			// widen. So the Parameter binds the refinement itself and
+			// `groups::firstItem()` answers the proof back.
+			it("should bind a Type Parameter inside a Type to the refinement", () => {
+				let context = createInferenceContext([
+					{ name: "T", infer: true, defaultType: null },
+				])
+
+				expect(
+					matchesTypeWithBindings(
+						{
+							type: "List",
+							itemType: { type: "GenericUse", name: "T" },
+						},
+						{ type: "List", itemType: nonEmptyStrings },
+						context,
+					),
+				).toBe(true)
+				expect(context.bindings.get("T")).toEqual(nonEmptyStrings)
+			})
+
+			// NOTE: The binding is then measured against as itself, in both
+			// directions — the flipped one is what a lambda Parameter typed off
+			// the binding meets when the signature is compared back.
+			it("should measure a bound refinement against itself either way round", () => {
+				let context = createInferenceContext([
+					{ name: "T", infer: true, defaultType: null },
+				])
+				let generic: common.Type = { type: "GenericUse", name: "T" }
+
+				expect(
+					matchesTypeWithBindings(
+						{ type: "List", itemType: generic },
+						{ type: "List", itemType: nonEmptyStrings },
+						context,
+					),
+				).toBe(true)
+				expect(
+					matchesTypeWithBindings(nonEmptyStrings, generic, context),
+				).toBe(true)
+				expect(matchesTypeWithBindings(strings, generic, context)).toBe(
+					true,
+				)
+				expect(matchesTypeWithBindings(generic, strings, context)).toBe(
+					false,
+				)
+			})
+
+			// NOTE: An UNBOUND Type Parameter still gets nothing from a
+			// refinement on the actual side of a signature — the outermost rule
+			// read in the mirror, and what keeps the fall-through above from
+			// becoming a second inference route.
+			it("should refuse a refinement against an unbound Type Parameter", () => {
+				let context = createInferenceContext([
+					{ name: "T", infer: true, defaultType: null },
+				])
+
+				expect(
+					matchesTypeWithBindings(
+						nonEmptyStrings,
+						{ type: "GenericUse", name: "T" },
+						context,
+					),
+				).toBe(false)
 			})
 
 			it("should collapse a Union of an instantiation and its base, either order", () => {
