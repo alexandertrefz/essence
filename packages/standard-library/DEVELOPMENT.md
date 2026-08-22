@@ -8,6 +8,14 @@ calls every declared Method across its edge cases and its output is diffed
 against a checked-in capture. Never regenerate that capture to make a test
 pass — a changed value means a body is wrong.
 
+An entry appended to a refined Namespace can move a harness call onto it while
+every printed value stays the same, because a written receiver proves what it
+can and the capture holds values. The label beside each line names the Namespace
+the call resolved to and is checked against it, but two Overloads of one Method
+share a label. So after appending a refined entry, read the harness calls that
+reach that Method, and give the ones that have to keep exercising the base entry
+a computed operand.
+
 ## `declarations { … }`
 
 Each file opens with `declarations { … }` rather than `implementation { … }`.
