@@ -7,7 +7,8 @@ Protocols (`Equatable`, `Printable`, `Comparable`, `Orderable`), `Boolean`,
 `Optional`, `Ordering`, `Record`, `String`, the whole numeric tower (`Integer`,
 `Rational`, `Algebraic`, `Transcendental` and the covering `Number`, which
 brings the `Number` and `Irrational` Union Types with it), and `List` together
-with `NestedList` and `NonEmptyList`. A checked refinement is exported beside
+with `NestedList`, `NonEmptyList` and the `NonEmptyNestedList` that only both
+of those proofs together reach. A checked refinement is exported beside
 the base it narrows: `NonZeroInteger`, `NonNegativeInteger` and
 `PositiveInteger` beside `Integer`, `NonEmptyString` beside `String`,
 `NonEmptyList` beside `List`. Each reaches everything its base reaches, and the

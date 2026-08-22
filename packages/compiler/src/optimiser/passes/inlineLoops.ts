@@ -332,9 +332,10 @@ class Inlining {
 		// was handed — so a proven receiver reaches `List`'s own entry by
 		// widening and is emitted under `List`'s own name, which is why they
 		// were never affected. Everything else that Namespace declares stays
-		// refused until somebody weighs it: `reverse` and `sort` are re-exports
-		// this pass does not walk, and `prepend(contentsOf:)`,
-		// `removeDuplicates` and `replace` are not `List`'s Functions at all.
+		// refused until somebody weighs it: `reverse`, `sort`, `pair` and
+		// `split` are re-exports this pass does not walk, and
+		// `prepend(contentsOf:)`, `removeDuplicates` and `replace` are not
+		// `List`'s Functions at all.
 		if (node.base.name === "NonEmptyList") {
 			return node.member.name === "map" ? this.mapWalk(node) : null
 		}
