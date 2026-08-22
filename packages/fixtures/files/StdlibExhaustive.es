@@ -576,7 +576,7 @@ third"::lines())
 	)
 	show(
 		"Integer.raise(to: Integer, defaultingTo: Integer | Rational)",
-		2::raise(to 10, defaultingTo 0),
+		2::raise(to computedTen, defaultingTo 0),
 	)
 	show(
 		"Integer.raise(to: Integer, defaultingTo: Integer | Rational) [zero to a negative power]",
@@ -750,7 +750,7 @@ third"::lines())
 	)
 	show(
 		"Rational.divide(by: Integer, defaultingTo: Rational)",
-		1/2::divide(by 2, defaultingTo 0/1),
+		1/2::divide(by computedTwo, defaultingTo 0/1),
 	)
 	show(
 		"Rational.divide(by: Integer, defaultingTo: Rational) [by zero]",
@@ -904,7 +904,7 @@ third"::lines())
 	)
 	show(
 		"Rational.raise(to: Integer, defaultingTo: Rational)",
-		2/3::raise(to 2, defaultingTo 0/1),
+		2/3::raise(to computedTwo, defaultingTo 0/1),
 	)
 	show(
 		"Rational.raise(to: Integer, defaultingTo: Rational) [zero to a negative power]",
@@ -1129,7 +1129,7 @@ third"::lines())
 		)
 		show(
 			"Algebraic.divide(by: Integer, defaultingTo: Algebraic)",
-			rootTwo::divide(by 2, defaultingTo rootTwo),
+			rootTwo::divide(by computedTwo, defaultingTo rootTwo),
 		)
 		show(
 			"Algebraic.divide(by: Integer, defaultingTo: Algebraic) [by zero]",
@@ -1225,7 +1225,7 @@ third"::lines())
 	show("Transcendental.divide(by: NonZeroInteger)", Number.Pi::divide(by 2))
 	show(
 		"Transcendental.divide(by: Integer, defaultingTo: Transcendental)",
-		Number.Pi::divide(by 2, defaultingTo Number.E),
+		Number.Pi::divide(by computedTwo, defaultingTo Number.E),
 	)
 	show(
 		"Transcendental.divide(by: Integer, defaultingTo: Transcendental) [by zero]",
@@ -1468,7 +1468,7 @@ third"::lines())
 	)
 	show(
 		"Number.average(_ List<Integer>, defaultingTo: Rational)",
-		Number.average([1, 2], defaultingTo 0/1),
+		Number.average(twoNumbers, defaultingTo 0/1),
 	)
 	show(
 		"Number.average(_ List<Integer>, defaultingTo: Rational) [empty]",
@@ -1476,7 +1476,7 @@ third"::lines())
 	)
 	show(
 		"Number.average(_ List<Rational>, defaultingTo: Rational)",
-		Number.average([1/2, 1/3], defaultingTo 0/1),
+		Number.average(twoRationals, defaultingTo 0/1),
 	)
 	show(
 		"Number.average(_ List<Rational>, defaultingTo: Rational) [empty]",
@@ -1484,7 +1484,7 @@ third"::lines())
 	)
 	show(
 		"Number.average(_ List<Integer | Rational>, defaultingTo: Rational)",
-		Number.average([1, 1/2], defaultingTo 0/1),
+		Number.average(twoMixedNumbers, defaultingTo 0/1),
 	)
 	show(
 		"Number.average(_ List<Integer | Rational>, defaultingTo: Rational) [empty]",
@@ -1538,7 +1538,7 @@ third"::lines())
 	)
 	show(
 		"Number.lowestNumber(_ List<Integer>, defaultingTo: Integer)",
-		Number.lowestNumber([3, 1, 2], defaultingTo 0),
+		Number.lowestNumber(threeNumbers, defaultingTo 0),
 	)
 	show(
 		"Number.lowestNumber(_ List<Integer>, defaultingTo: Integer) [empty]",
@@ -1546,7 +1546,7 @@ third"::lines())
 	)
 	show(
 		"Number.lowestNumber(_ List<Rational>, defaultingTo: Rational)",
-		Number.lowestNumber([1/2, 1/3], defaultingTo 0/1),
+		Number.lowestNumber(twoRationals, defaultingTo 0/1),
 	)
 	show(
 		"Number.lowestNumber(_ List<Rational>, defaultingTo: Rational) [empty]",
@@ -1554,7 +1554,7 @@ third"::lines())
 	)
 	show(
 		"Number.lowestNumber(_ List<Integer | Rational>, defaultingTo: Integer | Rational)",
-		Number.lowestNumber([1, 1/2], defaultingTo 0),
+		Number.lowestNumber(twoMixedNumbers, defaultingTo 0),
 	)
 	show(
 		"Number.lowestNumber(_ List<Integer | Rational>, defaultingTo: Integer | Rational) [empty]",
@@ -1620,7 +1620,7 @@ third"::lines())
 	)
 	show(
 		"Number.greatestNumber(_ List<Integer>, defaultingTo: Integer)",
-		Number.greatestNumber([3, 1, 2], defaultingTo 0),
+		Number.greatestNumber(threeNumbers, defaultingTo 0),
 	)
 	show(
 		"Number.greatestNumber(_ List<Integer>, defaultingTo: Integer) [empty]",
@@ -1628,7 +1628,7 @@ third"::lines())
 	)
 	show(
 		"Number.greatestNumber(_ List<Rational>, defaultingTo: Rational)",
-		Number.greatestNumber([1/2, 1/3], defaultingTo 0/1),
+		Number.greatestNumber(twoRationals, defaultingTo 0/1),
 	)
 	show(
 		"Number.greatestNumber(_ List<Rational>, defaultingTo: Rational) [empty]",
@@ -1636,7 +1636,7 @@ third"::lines())
 	)
 	show(
 		"Number.greatestNumber(_ List<Integer | Rational>, defaultingTo: Integer | Rational)",
-		Number.greatestNumber([1, 1/2], defaultingTo 0),
+		Number.greatestNumber(twoMixedNumbers, defaultingTo 0),
 	)
 	show(
 		"Number.greatestNumber(_ List<Integer | Rational>, defaultingTo: Integer | Rational) [empty]",
