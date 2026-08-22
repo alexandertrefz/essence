@@ -58,6 +58,7 @@ import {
 	admissionOfWrittenValue,
 	admittedTypeOf,
 	describePredicate,
+	reducedRationalSpelling,
 	refinementInside,
 } from "../helpers/predicateEval"
 import { printType, signaturesOf } from "../printType"
@@ -7656,7 +7657,7 @@ function refinedLiteralReceiverType(
 	return remembered
 }
 
-// NOTE: The receiver Node carrying whatever it proved about itself. Only the four
+// NOTE: The receiver Node carrying whatever it proved about itself. Only the five
 // written shapes are ever refined — the ones `literalValueOf` can read — and the
 // switch is what says so in the Types rather than in a comment: every other
 // Expression comes back as itself, untouched and unallocated.
@@ -7672,6 +7673,8 @@ function writtenReceiver(
 
 	switch (base.nodeType) {
 		case "IntegerValue":
+			return { ...base, type: refinement }
+		case "RationalValue":
 			return { ...base, type: refinement }
 		case "StringValue":
 			return { ...base, type: refinement }
@@ -13099,12 +13102,13 @@ export function resolveRefinementConjuncts(
 	return canonicalPredicateConjuncts(conjuncts)
 }
 
-// NOTE: The bases a `where` clause may be written on. Integer and String are the
-// two scalars every predicate in the standard library's own slice is about, and an
-// APPLIED List is the third — `List<String>` or `List<Item>`, never a bare `List`,
-// whose item Type nothing has decided. The list is short because each base is a
-// promise: every Method a base answers, a refinement of it answers too, and every
-// one of those has to keep meaning what it meant.
+// NOTE: The bases a `where` clause may be written on. Integer, Rational and
+// String are the three scalars every predicate in the standard library's own
+// slice is about, and an APPLIED List is the fourth — `List<String>` or
+// `List<Item>`, never a bare `List`, whose item Type nothing has decided. The
+// list is short because each base is a promise: every Method a base answers, a
+// refinement of it answers too, and every one of those has to keep meaning what
+// it meant.
 //
 // NOTE: A generic Alias' base is an applied List whose item Type is still its Type
 // Parameter, which passes for the same reason `List<String>` does — what nothing has
@@ -13115,6 +13119,7 @@ export function resolveRefinementConjuncts(
 function isRefinableBase(type: common.Type): boolean {
 	return (
 		type.type === "Integer" ||
+		type.type === "Rational" ||
 		type.type === "String" ||
 		type.type === "List"
 	)
@@ -13542,8 +13547,13 @@ function writePredicateAlias(
 // NOTE: A literal Argument as the stable scalar a conjunct key is built from.
 // The Integer's digits rather than its value, because a value is a number or a
 // bigint at run time and neither spells every Integer in JSON; the Rational's
-// two halves under the slash it was written with, which no Integer's digits can
-// spell.
+// two halves under a slash, which no Integer's digits can spell.
+//
+// NOTE: The Rational's halves are the LOWEST-TERMS ones rather than the two
+// runs of digits that were typed. A conjunct is a key, and two refinements are
+// compared by their conjunct sets — `@::isNot(0/1)` and `@::isNot(0/2)` ask one
+// question about one number, so the number is what is kept. An Integer needs no
+// such step: its digits are already the one spelling of its value.
 //
 // NOTE: A String keeps the QUOTES `JSON.stringify` gives it, and that is the
 // half of the scalar that says which kind it is. A conjunct names no Overload —
@@ -13562,7 +13572,7 @@ function literalPredicateArgument(
 		case "BooleanValue":
 			return value.value
 		case "RationalValue":
-			return `${value.numerator}/${value.denominator}`
+			return reducedRationalSpelling(value.numerator, value.denominator)
 		default:
 			return null
 	}

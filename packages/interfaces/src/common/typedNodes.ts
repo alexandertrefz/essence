@@ -445,12 +445,19 @@ export type IntegerValueNode = {
 	type: IntegerType | RefinementType
 }
 
+// NOTE: A written value's Type is its own kind, or a REFINEMENT of it. Only one
+// position ever refines one: a Method receiver, which is the one position that
+// asks a value nothing and so lets the value answer for itself —
+// `1/2::reciprocal()` reaches `namespace NonZeroRational` because the `1/2` says
+// so. Everywhere else a written value keeps the kind it is written as, and a
+// refinement is erased before emission, so `typedSimple`'s twins of these Nodes
+// carry the kind alone.
 export type RationalValueNode = {
 	nodeType: "RationalValue"
 	numerator: string
 	denominator: string
 	position: Position
-	type: RationalType
+	type: RationalType | RefinementType
 }
 
 // NOTE: A written value's Type is its own kind, or a REFINEMENT of it. Only one

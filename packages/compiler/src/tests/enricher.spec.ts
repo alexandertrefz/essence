@@ -6284,6 +6284,58 @@ describe("Enricher", () => {
 			).toEqual({ type: "List", itemType: { type: "String" } })
 		})
 
+		// NOTE: The fourth base. `Rational` declares its own `is` and its own
+		// four comparisons, and a bound written beside one of them is a written
+		// Rational — so the conjunct keeps a fraction where an Integer's keeps
+		// digits, and the Namespace it names is Rational's own.
+		it("should refine a Rational, keeping the fraction the bound was written as", () => {
+			let refinement = refinementOf(
+				"implementation { type NonZeroRatio = Rational where @::isNot(0/1) }",
+			)
+
+			expect(refinement.base).toEqual({ type: "Rational" })
+			expect(refinement.conjuncts).toEqual([
+				{
+					namespaceName: "Rational",
+					methodName: "is",
+					negated: true,
+					args: ["0/1"],
+					spelling: { methodName: "isNot", args: ["0/1"] },
+				},
+			])
+		})
+
+		// NOTE: A conjunct is a KEY, and `0/2` and `0/1` are one question about
+		// one number — so what the key holds is the number, in the lowest terms
+		// the runtime keeps it in, rather than the two runs of digits that were
+		// typed. Without this the two Aliases below would be different Types
+		// that admit exactly the same values.
+		it("should key a written Rational bound by its value", () => {
+			expect(
+				refinementOf(
+					"implementation { type NonZeroRatio = Rational where @::isNot(0/2) }",
+				).conjuncts,
+			).toEqual(
+				refinementOf(
+					"implementation { type NonZeroRatio = Rational where @::isNot(0/1) }",
+				).conjuncts,
+			)
+
+			expect(
+				refinementOf(
+					"implementation { type Half = Rational where @::isGreaterThan(2/4) }",
+				).conjuncts,
+			).toEqual([
+				{
+					namespaceName: "Rational",
+					methodName: "isGreaterThan",
+					negated: false,
+					args: ["1/2"],
+					spelling: { methodName: "isGreaterThan", args: ["1/2"] },
+				},
+			])
+		})
+
 		// NOTE: The conjunct set of a generic refinement is the point of the whole
 		// design: `hasItems` asks nothing about the items, so the key holds no Type
 		// Argument at all and `Filled<String>` differs from `Filled<Integer>`
@@ -7006,6 +7058,28 @@ describe("Enricher", () => {
 					"d",
 				),
 			).toBe("NonZeroInteger")
+		})
+
+		// NOTE: A Rational narrows on the same rail, with the bound written as
+		// the fraction `Rational::isNot` takes. An Integer bound there would
+		// find no same-kind entry and fall to the covering `Number`'s rung,
+		// which is a different question to a conjunct key — so an Alias asking
+		// about a Rational asks it of a Rational.
+		it("should narrow a Rational the condition proved the predicate of", () => {
+			expect(
+				narrowedTypeOf(
+					`implementation {
+						type NonZeroRatio = Rational where @::isNot(0/1)
+
+						constant r = 1/2::add(1/3)
+
+						if r::isNot(0/1) {
+							Terminal.inspect(r)
+						}
+					}`,
+					"r",
+				),
+			).toBe("NonZeroRatio")
 		})
 
 		// NOTE: The narrowing is worth exactly what it lets a Program write, which
@@ -8304,6 +8378,80 @@ describe("Enricher", () => {
 			).toBe(1)
 		})
 
+		// NOTE: The same two answers for a written Rational, which is as visibly
+		// not zero as a written Integer is. What the entry is told apart by is
+		// the value rather than the spelling: `2/4` is the number `1/2` is.
+		describe("a written Rational", () => {
+			function scaledRatio(argument: string): string {
+				return `implementation {
+					type NonZeroRatio = Rational where @::isNot(0/1)
+
+					namespace Scaling for Integer {
+						overload scaled {
+							(by other: NonZeroRatio) -> String {
+								<- "refined"
+							}
+
+							(by other: Rational) -> String {
+								<- "base"
+							}
+						}
+					}
+
+					constant scaledValue = 3::scaled(by ${argument})
+				}`
+			}
+
+			it("should admit a written Rational the predicate holds of", () => {
+				expect(
+					lastConstantMethodInvocation(scaledRatio("2/4"))
+						.overloadedMethodIndex,
+				).toBe(0)
+			})
+
+			it("should not admit a written Rational the predicate refuses", () => {
+				expect(
+					lastConstantMethodInvocation(scaledRatio("0/2"))
+						.overloadedMethodIndex,
+				).toBe(1)
+			})
+
+			// NOTE: An Integer bound standing where a Rational is compared is
+			// the same question about the same number — `Rational::isLessThan`
+			// declares an entry for each kind, and `1/2::isLessThan(1)` asks
+			// what `1/2::isLessThan(1/1)` asks.
+			function belowOne(argument: string): string {
+				return `implementation {
+					type BelowOne = Rational where @::isLessThan(1)
+
+					namespace Scaling for Integer {
+						overload scaled {
+							(by other: BelowOne) -> String {
+								<- "refined"
+							}
+
+							(by other: Rational) -> String {
+								<- "base"
+							}
+						}
+					}
+
+					constant scaledValue = 3::scaled(by ${argument})
+				}`
+			}
+
+			it("should read an Integer bound as the Rational it widens to", () => {
+				expect(
+					lastConstantMethodInvocation(belowOne("1/2"))
+						.overloadedMethodIndex,
+				).toBe(0)
+				expect(
+					lastConstantMethodInvocation(belowOne("3/2"))
+						.overloadedMethodIndex,
+				).toBe(1)
+			})
+		})
+
 		// NOTE: The whole reason admission answers a POSITION rather than writing
 		// the refinement onto the Node: the first entry here admits the Argument it
 		// is asked about and loses anyway, on the Argument after it. Nothing it
@@ -8494,6 +8642,24 @@ describe("Enricher", () => {
 			).toBe(
 				"Integer where @::isNot(0)::and(@::isEven())::and(@::isPositive())::and(@::isGreaterThan(10))::and(@::isGreaterThanOrEqualTo(0))",
 			)
+		})
+
+		// NOTE: A written Rational answers for itself the way a written Integer
+		// does, and prints under the Alias whose conjuncts are exactly what it
+		// proved. A zero proves nothing, so it stays the Rational it is written
+		// as.
+		it("should carry a written Rational's proof", () => {
+			expect(
+				receiverTypeOf(`type NonZeroRatio = Rational where @::isNot(0/1)
+
+					constant text = 1/2::toString()`),
+			).toBe("NonZeroRatio")
+
+			expect(
+				receiverTypeOf(`type NonZeroRatio = Rational where @::isNot(0/1)
+
+					constant text = 0/1::toString()`),
+			).toBe("Rational")
 		})
 
 		it("should carry a generic refinement applied to the items", () => {
