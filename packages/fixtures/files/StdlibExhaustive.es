@@ -2564,11 +2564,20 @@ third"::lines())
 		"List.partition<ItemType>(where: (_ ItemType) -> Boolean) [empty]",
 		noNumbers::partition(where (item) { <- item::isEven() }),
 	)
+	§ A receiver written down proves it has something in it, and both Methods
+	§ below have an entry that spends the proof. So the two receivers that
+	§ carry it are declared as plain Lists, which is what keeps these calls on
+	§ the entries `List` itself declares. `pair` asks the ARGUMENT for a proof
+	§ too, so the empty case reaches `List` through what is paired with it.
+	§
 	§ One pair only: the pretty printer wraps a Record List past sixty
 	§ characters, and every line of this file's output has to stay one line.
+	constant oneWord: List<String>      = ["a"]
+	constant fiveNumbers: List<Integer> = [1, 2, 3, 4, 5]
+
 	show(
 		"List.pair<ItemType, Other>(with: List<Other>)",
-		["a"]::pair(with [1, 2, 3]),
+		oneWord::pair(with [1, 2, 3]),
 	)
 	show(
 		"List.pair<ItemType, Other>(with: List<Other>) [empty]",
@@ -2576,7 +2585,7 @@ third"::lines())
 	)
 	show(
 		"List.split<ItemType>(intoGroupsOf: Integer)",
-		[1, 2, 3, 4, 5]::split(intoGroupsOf 2),
+		fiveNumbers::split(intoGroupsOf 2),
 	)
 	show(
 		"List.split<ItemType>(intoGroupsOf: Integer) [zero]",
@@ -2794,6 +2803,33 @@ third"::lines())
 		"NonEmptyList.replace<ItemType>(_ ItemType, at: Integer) [proof carried]",
 		provenNumbers::replace(99, at -99)::lastItem(),
 	)
+	§ Pairing asks the Argument for the proof the receiver carries, since the
+	§ pairing stops with the shorter of the two. One pair only, for the reason
+	§ `List`'s own entry shows one.
+	show(
+		"NonEmptyList.pair<ItemType, Other>(with: NonEmptyList)",
+		provenOne::pair(with provenWords),
+	)
+	show(
+		"NonEmptyList.pair<ItemType, Other>(with: NonEmptyList) [proof carried]",
+		provenOne::pair(with provenWords)::firstItem(),
+	)
+	§ Splitting carries the proof twice over: a group is opened for the first
+	§ item, and every group it opens holds one. The chained call reads both
+	§ back — the outer List has a first group and the group has a first item,
+	§ with no Optional between them.
+	show(
+		"NonEmptyList.split<ItemType>(intoGroupsOf: Integer)",
+		provenNumbers::split(intoGroupsOf 2),
+	)
+	show(
+		"NonEmptyList.split<ItemType>(intoGroupsOf: Integer) [zero]",
+		provenNumbers::split(intoGroupsOf 0),
+	)
+	show(
+		"NonEmptyList.split<ItemType>(intoGroupsOf: Integer) [proof carried]",
+		provenNumbers::split(intoGroupsOf 2)::firstItem()::firstItem(),
+	)
 
 	§ The proofs a Method HANDS OVER rather than ones a literal carries. Each
 	§ receiver below is a call to a `List` Method that says what it builds is
@@ -2822,6 +2858,26 @@ third"::lines())
 	show(
 		"NonEmptyList.firstItem<ItemType>() [from List.insert]",
 		noNumbers::insert(5, at -99)::firstItem(),
+	)
+
+	§ ——— NonEmptyNestedList ———————————————————————————————————————————————
+	§ The Namespace both proofs together reach. `NestedList::flatten` can
+	§ promise nothing, because an outer List with something in it can hold
+	§ nothing but empty Lists. With the inner Lists proven as well, the first
+	§ group's first item is in the answer, so the answer is not empty.
+	constant provenNested: NonEmptyList<NonEmptyList<Integer>> = [[1, 2], [3]]
+
+	show("NonEmptyNestedList.flatten<ItemType>()", provenNested::flatten())
+	show(
+		"NonEmptyNestedList.flatten<ItemType>() [proof carried]",
+		provenNested::flatten()::lastItem(),
+	)
+	§ The receiver a Method HANDS OVER rather than one written down, which is
+	§ the same shape the proven `firstItem` lines use further up: `split` is
+	§ what builds a proven List of proven Lists out of a proven List.
+	show(
+		"NonEmptyNestedList.flatten<ItemType>() [from NonEmptyList.split]",
+		provenNumbers::split(intoGroupsOf 2)::flatten(),
 	)
 
 	§ ——— IntegerList, RationalList, NumberList ———————————————————————————

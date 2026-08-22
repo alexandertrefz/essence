@@ -89,7 +89,14 @@ export const builtinMemberOrder: Array<string> = [
 	// Namespace a call RESOLVES to is not decided here either: the refined target
 	// beats the base one regardless of this order.
 	"NonEmptyList",
-	// NOTE: And after all three, for the same reason a fourth time. Each of
+	// NOTE: And after both of the Namespaces it narrows, for the same reason a
+	// fourth time. `NonEmptyNestedList` targets a proven List of proven Lists,
+	// which is a `List<List<…>>` and a `NonEmptyList` as well, so a receiver of
+	// that Type reaches `NestedList::flatten` and `NonEmptyList::firstItem`
+	// too. Both have to be met FIRST, or Completion on a nested List would
+	// offer the total `flatten` that only two proofs can answer.
+	"NonEmptyNestedList",
+	// NOTE: And after all four, for the same reason a fifth time. Each of
 	// these targets a List of a particular Number Type — `List<Integer>`,
 	// `List<Rational>`, the mixed `List<Integer | Rational>` and the proven
 	// forms of the three — so `List` has to be met FIRST, and each general one

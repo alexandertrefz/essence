@@ -37,6 +37,7 @@ export const runtimeNamespaceNames = [
 	"List",
 	"NestedList",
 	"NonEmptyList",
+	"NonEmptyNestedList",
 	"IntegerList",
 	"RationalList",
 	"NumberList",

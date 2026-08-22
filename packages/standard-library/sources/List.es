@@ -873,13 +873,19 @@ declarations {
 			with other: List<Other>,
 		) -> List<{ first: ItemType, second: Other }>
 
+		§ Every group holds at least one item, which is what the item Type of
+		§ the answer says. A group is opened for an item and never for the
+		§ space after one. So the shorter last group exists only when
+		§ something remains to put in it. A size below one answers one group
+		§ holding everything, and the empty List answers no groups.
+
 		§§ Answers the List split into groups of the given size, in order.
 		§§
-		§§ The last group holds whatever remains, so it can be shorter. A size below one names no grouping, and the answer is one group holding every item. The empty List answers no groups at all, whatever the size.
+		§§ The last group holds whatever remains, so it can be shorter. Every group holds at least one item. A size below one names no grouping, and the answer is one group holding every item. The empty List answers no groups at all, whatever the size.
 		§§
 		§§ @param intoGroupsOf — how many items each group holds
-		§§ @returns — the List of groups.
-		split(intoGroupsOf size: Integer) -> List<List<ItemType>>
+		§§ @returns — the List of groups, each of which certainly has something in it.
+		split(intoGroupsOf size: Integer) -> List<NonEmptyList<ItemType>>
 
 		§ The item a key is lowest or greatest at. That is a different
 		§ question from `lowestNumber`, which answers a number the List holds.
@@ -1125,6 +1131,36 @@ declarations {
 		§§ @returns — the List with the item replaced, which is never empty.
 		replace(_ item: ItemType, at index: Integer) -> NonEmptyList<ItemType>
 
+		§ Pairing stops with the shorter List, so two Lists that each have
+		§ something in them pair at least their first items. The entry on
+		§ `List` takes any List, and this one asks the Argument for the proof
+		§ the receiver carries. A pairing with the empty List is empty,
+		§ whatever the receiver holds.
+
+		§§ Answers the items of the two Lists paired position by position.
+		§§
+		§§ The pairing stops with the shorter List, which certainly has something in it.
+		§§
+		§§ @param with — the List to pair the items with
+		§§ @returns — a List of Records, each holding one item of this List under `first` and its counterpart under `second`. It is never empty.
+		pair<infer Other>(
+			with other: NonEmptyList<Other>,
+		) -> NonEmptyList<{ first: ItemType, second: Other }>
+
+		§ Splitting a List with something in it opens a group for the first
+		§ item, and every group it opens holds one. So the proof is carried
+		§ twice: the List of groups has a group, and each group has an item.
+
+		§§ Answers the List split into groups of the given size, in order.
+		§§
+		§§ The last group holds whatever remains, so it can be shorter. A size below one names no grouping, and the answer is one group holding every item.
+		§§
+		§§ @param intoGroupsOf — how many items each group holds
+		§§ @returns — the List of groups, which certainly has one, and each group certainly has an item.
+		split(
+			intoGroupsOf size: Integer,
+		) -> NonEmptyList<NonEmptyList<ItemType>>
+
 		§ The proof spent again. A List with something in it has an item its
 		§ key is lowest at, so these answer the item rather than an Optional.
 		§ Each reaches `List`'s own Optional entry through a Namespace
@@ -1159,10 +1195,29 @@ declarations {
 			<- @::<List>greatestItem(on key)::value(defaultingTo @::firstItem())
 		}
 	}
+
+	§ A List of Lists where both proofs are in hand, and the one Method that
+	§ answers better for having them. The entry on `NestedList` can promise
+	§ nothing about its answer. An outer List with something in it can hold
+	§ nothing but empty Lists, and flattening those answers the empty List.
+	§ Prove the inner Lists too and that is settled, because the first
+	§ group's first item is in the answer.
+	§
+	§ It mirrors `NestedList`, and sits after it and after `NonEmptyList` for
+	§ the reason every proven Namespace sits after the one it narrows.
+	namespace NonEmptyNestedList<infer ItemType> for NonEmptyList<NonEmptyList<ItemType>> {
+		§§ Answers the inner Lists flattened by one level, into a single List.
+		§§
+		§§ Every inner List's items keep their order.
+		§§
+		§§ @returns — the flattened List, which certainly has something in it.
+		flatten() -> NonEmptyList<ItemType>
+	}
 }
 
 export {
 	List
 	NestedList
 	NonEmptyList
+	NonEmptyNestedList
 }
