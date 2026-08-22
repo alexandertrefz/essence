@@ -56,9 +56,9 @@ import {
 } from "../helpers/index"
 import {
 	admissionOfWrittenValue,
-	admittedByEvaluation,
+	admittedTypeOf,
 	describePredicate,
-	refinementDecidedBy,
+	refinementInside,
 } from "../helpers/predicateEval"
 import { printType, signaturesOf } from "../printType"
 import {
@@ -6913,13 +6913,7 @@ function enrichParameterDefault(
 	// omits it passes, so the two questions have to be the same one; asking
 	// only about assignability would refuse the very literal every written call
 	// is admitted by.
-	if (
-		type.type === "Refinement" &&
-		admittedByEvaluation(
-			refinementDecidedBy(type, valueType) ?? type,
-			value,
-		)
-	) {
+	if (admittedTypeOf(type, value) !== null) {
 		return value
 	}
 
@@ -7988,7 +7982,10 @@ type ArgumentTyper = {
 
 function makeArgumentTyper(scope: enricher.Scope): ArgumentTyper {
 	let cache = new Map<parser.ExpressionNode, common.typed.ExpressionNode>()
-	let admissions = new Map<parser.ExpressionNode, Map<string, boolean>>()
+	let admissions = new Map<
+		parser.ExpressionNode,
+		Map<string, common.Type | null>
+	>()
 	let sawErrorArgument = false
 
 	function noteErrors(type: common.Type): common.Type {
@@ -8020,12 +8017,12 @@ function makeArgumentTyper(scope: enricher.Scope): ArgumentTyper {
 		return cached
 	}
 
-	// NOTE: Whether this written value is admitted into the refinement its
+	// NOTE: The Type this written value is admitted at, for the Type its
 	// position demands. Asked again and again — once per Overload candidate, then
 	// once more for the winner as the committed Argument is matched — and a pure
 	// question about a literal, so the answer is kept.
 	//
-	// Keyed by the refinement's SPELLING, which is its printing identity —
+	// Keyed by the position's SPELLING, which is its printing identity —
 	// Arguments and all, because a generic refined Alias stands for a different
 	// Type at every one of them: `NonEmptyList<Integer>` and `NonEmptyList<String>` are
 	// one name and two questions about a written List, and keyed by the name alone
@@ -8036,8 +8033,12 @@ function makeArgumentTyper(scope: enricher.Scope): ArgumentTyper {
 	// afterwards.
 	function admitted(
 		value: parser.ExpressionNode,
-		refinement: common.RefinementType,
-	): boolean {
+		expectedType: common.Type,
+	): common.Type | null {
+		if (!refinementInside(expectedType)) {
+			return null
+		}
+
 		let bySpelling = admissions.get(value)
 
 		if (bySpelling === undefined) {
@@ -8045,15 +8046,16 @@ function makeArgumentTyper(scope: enricher.Scope): ArgumentTyper {
 			admissions.set(value, bySpelling)
 		}
 
-		let spelling = describeType(refinement)
-		let answer = bySpelling.get(spelling)
+		let spelling = describeType(expectedType)
 
-		if (answer === undefined) {
-			answer = admittedByEvaluation(refinement, enrichOnce(value))
-			bySpelling.set(spelling, answer)
+		if (!bySpelling.has(spelling)) {
+			bySpelling.set(
+				spelling,
+				admittedTypeOf(expectedType, enrichOnce(value)),
+			)
 		}
 
-		return answer
+		return bySpelling.get(spelling) ?? null
 	}
 
 	// NOTE: An Argument's position is the Parameter Type of whichever candidate
@@ -8310,17 +8312,19 @@ function makeArgumentTyper(scope: enricher.Scope): ArgumentTyper {
 			// Parameter's own Type Arguments are still open, and there the Parameter
 			// as it stands is not yet a Type any value could be of. What comes back
 			// is matched against the Parameter as DECLARED, which is what binds the
-			// Type Parameter the value just decided.
+			// Type Parameter the value just decided. A Parameter naming a refined
+			// ITEM Type is the same question asked of each written item, and what
+			// comes back is a List of what they decided.
 			//
 			// NOTE: And not while the caller's proof is erased. The re-probe that
 			// erases it asks what this same Argument would have decided had the
 			// caller held nothing, so a `2` standing where a NonZeroInteger does
 			// stays the ordinary Integer it is written as, and an Argument whose
 			// own Type is a refinement arrives as the Type it is refined from.
-			if (expectedType.type === "Refinement" && !erasingRefinementProof) {
-				let asked = refinementDecidedBy(expectedType, type)
+			if (!erasingRefinementProof) {
+				let asked = admitted(value, expectedType)
 
-				if (asked !== null && admitted(value, asked)) {
+				if (asked !== null) {
 					return asked
 				}
 			}

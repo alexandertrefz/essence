@@ -31,9 +31,10 @@ import {
 	withArticle,
 } from "../helpers/index"
 import {
-	admittedByEvaluation,
+	admittedTypeOf,
 	describePredicate,
-	refinementDecidedBy,
+	fitsWritten,
+	unadmittedWrittenItem,
 } from "../helpers/predicateEval"
 
 type CurrentFunctionContext = common.typed.FunctionDefinitionNode | null
@@ -2347,7 +2348,7 @@ function reportDeclarationMismatch(
 	declaredType: common.Type,
 	value: common.typed.ExpressionNode,
 ): void {
-	let evidence = refinementEvidence(declaredType)
+	let evidence = refinementEvidence(declaredType, value)
 	let subject = name === null ? "the Pattern" : `${kind} '${name}'`
 
 	reportError(
@@ -2360,6 +2361,7 @@ function reportDeclarationMismatch(
 					value.position,
 					`this is ${withArticle(describeType(value.type))}`,
 				),
+				...evidence.labels,
 			],
 			notes: [
 				`${name === null ? "The Pattern" : `'${name}'`} is declared as ${describeType(declaredType)}.`,
@@ -2375,7 +2377,7 @@ function validateVariableAssignmentStatement(
 ): common.typed.VariableAssignmentStatementNode {
 	if (!fitsExpectedType(node.name.type, node.value)) {
 		let declaredType = describeType(node.name.type)
-		let evidence = refinementEvidence(node.name.type)
+		let evidence = refinementEvidence(node.name.type, node.value)
 
 		reportError(
 			`This value does not fit Variable '${node.name.content}'`,
@@ -2685,7 +2687,10 @@ function validateReturnStatement(
 	} else if (
 		!fitsExpectedType(currentFunctionContext.returnType, node.expression)
 	) {
-		let evidence = refinementEvidence(currentFunctionContext.returnType)
+		let evidence = refinementEvidence(
+			currentFunctionContext.returnType,
+			node.expression,
+		)
 
 		reportError(
 			"This value does not fit the declared return Type",
@@ -2701,6 +2706,7 @@ function validateReturnStatement(
 						node.expression.position,
 						`this is ${withArticle(describeType(node.expression.type))}`,
 					),
+					...evidence.labels,
 				],
 				notes: [
 					`The Function returns ${describeType(currentFunctionContext.returnType)}.`,
@@ -2888,11 +2894,7 @@ function fitsExpectedType(
 	expected: common.Type,
 	value: common.typed.ExpressionNode,
 ): boolean {
-	return (
-		matchesType(expected, value.type) ||
-		(expected.type === "Refinement" &&
-			admittedByEvaluation(expected, value))
-	)
+	return fitsWritten(expected, value)
 }
 
 // NOTE: What a mismatch against a refinement has to say beyond naming the two
@@ -2907,18 +2909,47 @@ function fitsExpectedType(
 // 'NonEmptyList' names something the Program would refuse for taking no Arguments. A
 // refinement carrying none spells as its name alone, which is every non-generic
 // one.
-function refinementEvidence(expected: common.Type | undefined): {
+function refinementEvidence(
+	expected: common.Type | undefined,
+	value?: common.typed.ExpressionNode,
+): {
+	labels: Array<common.DiagnosticLabel>
 	notes: Array<string>
 	helps: Array<string>
 } {
+	if (expected !== undefined && value !== undefined) {
+		let refused = unadmittedWrittenItem(expected, value)
+
+		if (refused !== null) {
+			let predicate = describePredicate(refused.refinement)
+			let spelling = describeType(refused.refinement)
+
+			return {
+				labels: [
+					secondary(
+						refused.value.position,
+						`this item is ${withArticle(describeType(refused.value.type))}`,
+					),
+				],
+				notes: [
+					`Every item has to be ${withArticle(spelling)}, and every value of that Type has been proven to answer '${predicate}'.`,
+				],
+				helps: [
+					`Check '${predicate}' on the item in an 'if' or a 'match', or write an item that already has Type '${spelling}'.`,
+				],
+			}
+		}
+	}
+
 	if (expected === undefined || expected.type !== "Refinement") {
-		return { notes: [], helps: [] }
+		return { labels: [], notes: [], helps: [] }
 	}
 
 	let predicate = describePredicate(expected)
 	let spelling = describeType(expected)
 
 	return {
+		labels: [],
 		notes: [
 			`Every value of '${spelling}' has been proven to answer '${predicate}'.`,
 		],
@@ -2944,17 +2975,9 @@ function matchableArgumentsFromTypedNodes(
 		name: argumentNode.name,
 		mergedValue: () => argumentNode.value,
 		spellsItsMembers: argumentNode.value.nodeType === "RecordValue",
-		getType: (expectedType) => {
-			let asked =
-				expectedType.type === "Refinement"
-					? refinementDecidedBy(expectedType, argumentNode.value.type)
-					: null
-
-			return asked !== null &&
-				admittedByEvaluation(asked, argumentNode.value)
-				? asked
-				: argumentNode.type
-		},
+		getType: (expectedType) =>
+			admittedTypeOf(expectedType, argumentNode.value) ??
+			argumentNode.type,
 	}))
 }
 
@@ -3283,7 +3306,7 @@ function reportArgumentMismatch(
 		}
 	}
 
-	let evidence = refinementEvidence(parameter?.type)
+	let evidence = refinementEvidence(parameter?.type, argumentNode.value)
 	let spelling = partialSpellingEvidence(parameter, argumentNode)
 
 	reportError(
@@ -3296,6 +3319,7 @@ function reportArgumentMismatch(
 					argumentNode.value.position,
 					`this is ${withArticle(describeType(argumentNode.value.type))}`,
 				),
+				...evidence.labels,
 			],
 			notes: [
 				...(parameter === undefined

@@ -2,6 +2,7 @@ import type { common } from "@essence-lang/interfaces"
 
 import {
 	applyGenericBindings,
+	buildUnion,
 	type GenericBindings,
 	genericNamesMentioned,
 	matchesType,
@@ -54,6 +55,123 @@ export function admittedByEvaluation(
 	return admissionOfWrittenValue(value)?.(refinement) ?? false
 }
 
+// NOTE: The Type a written value is admitted AT, given the Type its position
+// asks for — which is the question every site below really has, since a position
+// naming a refinement wants the refinement back to match its Parameter by.
+// `null` is "nothing here was decided": the position asks for no evidence, or
+// the value did not answer what it asked.
+//
+// NOTE: A written LIST is asked item by item. The two List predicates read the
+// count and nothing else, so `[[1], [2, 3]]` is a `List<NonEmptyList<Integer>>`
+// for the same reason `[1]` is a `NonEmptyList<Integer>` — the brackets are
+// right there, one pair per item. What comes back is a List of what the ITEMS
+// decided rather than of what the position asked, so a position whose item Type
+// is still binding Type Parameters gets the instantiation the values made.
+//
+// An item that decides nothing has to fit as it stands, which is what refuses
+// an empty one and refuses an opaque one BY TYPE: `[[1], made()]` is admitted
+// exactly when `made()` already answers a `NonEmptyList`.
+export function admittedTypeOf(
+	expected: common.Type,
+	value: common.typed.ExpressionNode,
+): common.Type | null {
+	if (expected.type === "Refinement") {
+		let asked = refinementDecidedBy(expected, value.type)
+
+		return asked !== null && admittedByEvaluation(asked, value)
+			? asked
+			: null
+	}
+
+	if (
+		expected.type !== "List" ||
+		value.nodeType !== "ListValue" ||
+		!refinementInside(expected.itemType)
+	) {
+		return null
+	}
+
+	let itemTypes: Array<common.Type> = []
+
+	for (let item of value.values) {
+		let decided = admittedTypeOf(expected.itemType, item)
+
+		if (decided === null && !matchesType(expected.itemType, item.type)) {
+			return null
+		}
+
+		itemTypes.push(decided ?? item.type)
+	}
+
+	// NOTE: The empty written List decides nothing and needs to: its item Type
+	// is Unknown, which every List Type already accepts.
+	return itemTypes.length === 0
+		? null
+		: { type: "List", itemType: buildUnion(itemTypes) }
+}
+
+// NOTE: Whether a written value fits where it stands — assignability, plus the
+// evidence a written value carries of its own. Every position that measures a
+// value against a Type it did not resolve asks this rather than `matchesType`.
+export function fitsWritten(
+	expected: common.Type,
+	value: common.typed.ExpressionNode,
+): boolean {
+	return (
+		matchesType(expected, value.type) ||
+		admittedTypeOf(expected, value) !== null
+	)
+}
+
+// NOTE: Whether a position asks a written value for evidence at all — the one
+// cheap question every Argument is asked before anything is read or memoised.
+// Down the List spine only: an item is a position a written List has a Node
+// for, and a Record's or a Case's member is one this would have to learn to
+// read before it could ask.
+export function refinementInside(type: common.Type): boolean {
+	return (
+		type.type === "Refinement" ||
+		(type.type === "List" && refinementInside(type.itemType))
+	)
+}
+
+// NOTE: The first written item that did not answer the question its position
+// asks, and that question — what a Diagnostic points at when a List is refused
+// for something one item in it did not prove. `null` where the refusal is about
+// the List itself, which is what every site already reports.
+export function unadmittedWrittenItem(
+	expected: common.Type,
+	value: common.typed.ExpressionNode,
+): {
+	value: common.typed.ExpressionNode
+	refinement: common.RefinementType
+} | null {
+	let listType = expected.type === "Refinement" ? expected.base : expected
+
+	if (
+		listType.type !== "List" ||
+		value.nodeType !== "ListValue" ||
+		!refinementInside(listType.itemType)
+	) {
+		return null
+	}
+
+	for (let item of value.values) {
+		if (fitsWritten(listType.itemType, item)) {
+			continue
+		}
+
+		return (
+			unadmittedWrittenItem(listType.itemType, item) ??
+			(listType.itemType.type === "Refinement"
+				? { value: item, refinement: listType.itemType }
+				: null)
+		)
+	}
+
+	return null
+}
+
 // NOTE: The same question asked of MANY refinements at once, with the value read
 // only once. A Method receiver is the one position nothing hands an expected
 // Type — it is typed bottom-up and Namespace lookup runs from whatever that came
@@ -76,8 +194,13 @@ export function admissionOfWrittenValue(
 	// true of a List of Strings and says nothing whatever about the
 	// `List<Integer>` a refinement of that base demands — the conjuncts alone
 	// would admit it.
+	//
+	// NOTE: Asked as a WRITTEN value, so a base that names a refinement of its
+	// own reaches the items — `NonEmptyList<NonEmptyList<Integer>>` proves its
+	// own count here and asks the base for each item's. A base naming no
+	// refinement costs the one `matchesType` it always cost.
 	return (refinement) =>
-		matchesType(refinement.base, value.type) &&
+		fitsWritten(refinement.base, value) &&
 		provenConjuncts(refinement).every(
 			(conjunct) => evaluateConjunct(conjunct, literal) === true,
 		)
