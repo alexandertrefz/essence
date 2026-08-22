@@ -194,12 +194,16 @@ export type AlgebraicNatives = {
 	multiply__overload$2: (self: AlgebraicType, argument1: RationalType) => AlgebraicType | RationalType
 	// multiply(with: Algebraic) -> Optional<Rational | Algebraic>
 	multiply__overload$3: (self: AlgebraicType, argument1: AlgebraicType) => OptionalType<RationalType | AlgebraicType>
+	// multiply(with: NonZeroInteger) -> Algebraic
+	multiply__overload$5: (self: AlgebraicType, argument1: IntegerType) => AlgebraicType
 	// divide(by: Integer) -> Optional<Algebraic>
 	divide__overload$1: (self: AlgebraicType, by: IntegerType) => OptionalType<AlgebraicType>
 	// divide(by: Rational) -> Optional<Algebraic>
 	divide__overload$2: (self: AlgebraicType, by: RationalType) => OptionalType<AlgebraicType>
 	// divide(by: Algebraic) -> Optional<Rational | Algebraic>
 	divide__overload$3: (self: AlgebraicType, by: AlgebraicType) => OptionalType<RationalType | AlgebraicType>
+	// divide(by: NonZeroInteger) -> Algebraic
+	divide__overload$7: (self: AlgebraicType, by: IntegerType) => AlgebraicType
 	// negate() -> Algebraic
 	negate: (self: AlgebraicType) => AlgebraicType
 }
@@ -219,12 +223,16 @@ export type TranscendentalNatives = {
 	multiply__overload$1: (self: TranscendentalType, argument1: IntegerType) => TranscendentalType | RationalType
 	// multiply(with: Rational) -> Transcendental | Rational
 	multiply__overload$2: (self: TranscendentalType, argument1: RationalType) => TranscendentalType | RationalType
+	// multiply(with: NonZeroInteger) -> Transcendental
+	multiply__overload$3: (self: TranscendentalType, argument1: IntegerType) => TranscendentalType
 	// divide(by: Integer) -> Optional<Transcendental>
 	divide__overload$1: (self: TranscendentalType, by: IntegerType) => OptionalType<TranscendentalType>
 	// divide(by: Rational) -> Optional<Transcendental>
 	divide__overload$2: (self: TranscendentalType, by: RationalType) => OptionalType<TranscendentalType>
 	// divide(by: Transcendental) -> Optional<Rational>
 	divide__overload$3: (self: TranscendentalType, by: TranscendentalType) => OptionalType<RationalType>
+	// divide(by: NonZeroInteger) -> Transcendental
+	divide__overload$7: (self: TranscendentalType, by: IntegerType) => TranscendentalType
 	// absolute() -> Transcendental
 	absolute: (self: TranscendentalType) => TranscendentalType
 	// negate() -> Transcendental
@@ -509,9 +517,11 @@ export const $AlgebraicArity: AssertArities<typeof import("./Algebraic"), {
 	multiply__overload$1: 2
 	multiply__overload$2: 2
 	multiply__overload$3: 2
+	multiply__overload$5: 2
 	divide__overload$1: 2
 	divide__overload$2: 2
 	divide__overload$3: 2
+	divide__overload$7: 2
 	negate: 1
 }> = true
 
@@ -526,9 +536,11 @@ export const $TranscendentalArity: AssertArities<typeof import("./Transcendental
 	add__overload$3: 2
 	multiply__overload$1: 2
 	multiply__overload$2: 2
+	multiply__overload$3: 2
 	divide__overload$1: 2
 	divide__overload$2: 2
 	divide__overload$3: 2
+	divide__overload$7: 2
 	absolute: 1
 	negate: 1
 }> = true

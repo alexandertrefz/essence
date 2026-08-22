@@ -3327,12 +3327,15 @@ describe("Optimiser", () => {
 		it("keeps the cases in the order the Enricher put them", () => {
 			// NOTE: A four member Union, tested in declaration order with the
 			// last case's test elided — and the overload-mangled name each
-			// member resolved to carried through per branch.
+			// member resolved to carried through per branch. The Argument is a
+			// written `2`, which is its own proof that it is not zero, so the
+			// two irrational members reach their refined entries and the other
+			// two their only ones: each branch resolves on its own.
 			expect(generate(unionDispatch)).toContain(
 				'number[$type.typeKeySymbol] === "Integer" ? Integer.multiply__overload$1(number, $pool_',
 			)
 			expect(generate(unionDispatch)).toMatch(
-				/=== "Rational" \? \$es_Rational_multiply__overload\$2.*=== "Algebraic" \? Algebraic\.multiply__overload\$1.*: Transcendental\.multiply__overload\$1/,
+				/=== "Rational" \? \$es_Rational_multiply__overload\$2.*=== "Algebraic" \? Algebraic\.multiply__overload\$5.*: Transcendental\.multiply__overload\$3/,
 			)
 		})
 

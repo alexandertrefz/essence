@@ -12,7 +12,7 @@ import {
 import type { BooleanType } from "./Boolean"
 import { createBoolean } from "./Boolean"
 import type { IntegerType } from "./Integer"
-import type { OptionalType } from "./Optional"
+import type { OptionalType, ValueType } from "./Optional"
 import { createEmpty, createValue } from "./Optional"
 import type { OrderingType } from "./Ordering"
 import { equal, greater, less } from "./Ordering"
@@ -557,6 +557,17 @@ export function divide(
 	)
 }
 
+// NOTE: `divide` under the proof its refined entry carries. The divisor is a
+// `NonZeroInteger` in the source, so the zero test above it can not fire and the
+// Optional always holds a value. A read of that value rather than a second
+// division: the arithmetic stays in one place.
+export function divideByNonZero(
+	transcendental: TranscendentalType,
+	other: IntegerType,
+): TranscendentalType {
+	return (divide(transcendental, other) as ValueType<TranscendentalType>).item
+}
+
 export function addTranscendental(
 	transcendental: TranscendentalType,
 	other: TranscendentalType,
@@ -686,8 +697,20 @@ export const add__overload$2 = add
 export const add__overload$3 = addTranscendental
 export const multiply__overload$1 = multiply
 export const multiply__overload$2 = multiply
+// NOTE: The refined entries take the same Integer the plain ones do — a
+// refinement erases before anything runs — and answer the narrower Type the
+// proof affords: a non-zero factor scales the rational part and every base
+// coefficient without taking one to zero, so at least one term survives and the
+// value can not collapse to a Rational. The product is the very implementation
+// above under a narrower signature, which is what keeps a proven call and an
+// unproven one the same arithmetic.
+export const multiply__overload$3 = multiply as (
+	transcendental: TranscendentalType,
+	other: IntegerType,
+) => TranscendentalType
 export const divide__overload$1 = divide
 export const divide__overload$2 = divide
 export const divide__overload$3 = divideByTranscendental
+export const divide__overload$7 = divideByNonZero
 
 // #endregion
