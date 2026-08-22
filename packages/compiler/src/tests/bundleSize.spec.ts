@@ -330,6 +330,14 @@ describe("Bundle Size", () => {
 	// is for: `5::isLessThan(3)` and the same call inside `<Item is Orderable>`
 	// now run the same Method, so an override may say something different rather
 	// than only the same thing faster.
+	// NOTE: 72,831 now, down 201, and the ceiling STAYS at 74,100. Two figures
+	// make the fall and only one of them is a change here: the line above rose
+	// FROM 73,237 rather than the 73,032 recorded, so this campaign takes 406
+	// off rather than 201 — the same unrecorded drift this file has caught
+	// three times now. What leaves is the Optional handling around two powers.
+	// `2::raise(to 10)` and `2/3::raise(to 2)` reach the entries a written
+	// exponent proves and answer bare, so the fixture writes `2::raise(to -2)`
+	// to keep an Optional in the file at all.
 	it("keeps Everyday.es from dragging in the whole numeric tower", async () => {
 		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(74_100)
 	})
@@ -407,8 +415,17 @@ describe("Bundle Size", () => {
 	// inequalities enter its witness whether or not the file calls them; the
 	// cross-kind `compare` it reaches through the covering Namespace's witness is
 	// the one it always reached.
+	// NOTE: It now measures 36,598, up 496, and the ceiling moves to 37,500 to
+	// put back the order of headroom the rest of this file keeps. Two figures
+	// make the rise and only one of them is a change here: the line above rose
+	// FROM 36,211 rather than the 36,102 recorded, so this campaign adds 387
+	// rather than 496. This file scales and divides irrationals by written
+	// Integers, so `@::multiply(with 3)` and `Number.Pi::multiply(with 2)` reach
+	// the `NonZeroInteger` rungs the irrationals gained and answer an Algebraic
+	// or a Transcendental rather than a Union — which is what puts each answer's
+	// own arithmetic in the bundle instead of the covering `Number`'s.
 	it("keeps Irrational.es from dragging in the whole numeric tower", async () => {
-		expect(await bundleSizeOf("Irrational.es")).toBeLessThan(37_000)
+		expect(await bundleSizeOf("Irrational.es")).toBeLessThan(37_500)
 	})
 
 	// NOTE: The same claim for a bundle of several Modules, where it is far
