@@ -2354,6 +2354,17 @@ third"::lines())
 	}> = []
 	constant fallbackRow = { tag = "z", n = 0, r = 0/1, m = 0 }
 
+	§ A tie at each end of the order, which no other List here has: two rows
+	§ share the lowest key and two share the greatest. The four `[tie]` labels
+	§ below pin the rule all four blocks promise, that the earlier item is the
+	§ one kept.
+	constant tiedRows: List<{ tag: String, n: Integer }> = [
+		{ tag = "a", n = 1 },
+		{ tag = "b", n = 2 },
+		{ tag = "c", n = 1 },
+		{ tag = "d", n = 2 },
+	]
+
 	show(
 		"List.sort<ItemType, Key is Comparable>(on: (_ ItemType) -> Key)",
 		rows::sort(on .tag)::map(.n),
@@ -2379,6 +2390,10 @@ third"::lines())
 		noRows::lowestItem(on .n, defaultingTo fallbackRow),
 	)
 	show(
+		"List.lowestItem<ItemType, Key is Comparable>(on: (_ ItemType) -> Key) [tie]",
+		tiedRows::lowestItem(on .n),
+	)
+	show(
 		"List.greatestItem<ItemType, Key is Comparable>(on: (_ ItemType) -> Key)",
 		rows::greatestItem(on .n),
 	)
@@ -2393,6 +2408,10 @@ third"::lines())
 	show(
 		"List.greatestItem<ItemType, Key is Comparable>(on: (_ ItemType) -> Key, defaultingTo: ItemType) [empty]",
 		noRows::greatestItem(on .n, defaultingTo fallbackRow),
+	)
+	show(
+		"List.greatestItem<ItemType, Key is Comparable>(on: (_ ItemType) -> Key) [tie]",
+		tiedRows::greatestItem(on .n),
 	)
 	show(
 		"List.compare<ItemType is Comparable>(to: List<ItemType>)",
@@ -2699,10 +2718,16 @@ third"::lines())
 	§ The keyed entries here spend the proof twice over: the sorted List is
 	§ still proven, and the lowest and greatest answer an item rather than an
 	§ Optional.
-	constant provenRows: NonEmptyList<{ tag: String, n: Integer }> = [
+	constant provenRows: NonEmptyList<{ tag: String, n: Integer }>     = [
 		{ tag = "b", n = 2 },
 		{ tag = "a", n = 1 },
 		{ tag = "c", n = 3 },
+	]
+	constant tiedProvenRows: NonEmptyList<{ tag: String, n: Integer }> = [
+		{ tag = "a", n = 1 },
+		{ tag = "b", n = 2 },
+		{ tag = "c", n = 1 },
+		{ tag = "d", n = 2 },
 	]
 
 	show(
@@ -2720,6 +2745,14 @@ third"::lines())
 	show(
 		"NonEmptyList.greatestItem<ItemType, Key is Comparable>(on: (_ ItemType) -> Key)",
 		provenRows::greatestItem(on .n),
+	)
+	show(
+		"NonEmptyList.lowestItem<ItemType, Key is Comparable>(on: (_ ItemType) -> Key) [tie]",
+		tiedProvenRows::lowestItem(on .n),
+	)
+	show(
+		"NonEmptyList.greatestItem<ItemType, Key is Comparable>(on: (_ ItemType) -> Key) [tie]",
+		tiedProvenRows::greatestItem(on .n),
 	)
 	show(
 		"NonEmptyList.replace<ItemType>(_ ItemType, at: Integer)",
