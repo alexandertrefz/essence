@@ -351,7 +351,7 @@ export type ListNatives = {
 	join: <ItemType extends AnyType>(self: ListType<ItemType>, argument1: StringType, ItemType__conformance: PrintableConformance<ItemType>) => StringType
 	// pair<ItemType, Other>(with: List<Other>) -> List<{ first: ItemType, second: Other }>
 	pair: <ItemType extends AnyType, Other extends AnyType>(self: ListType<ItemType>, argument1: ListType<Other>) => ListType<RecordType & { first: ItemType; second: Other }>
-	// split<ItemType>(intoGroupsOf: Integer) -> List<List<ItemType>>
+	// split<ItemType>(intoGroupsOf: Integer) -> List<NonEmptyList>
 	split: <ItemType extends AnyType>(self: ListType<ItemType>, intoGroupsOf: IntegerType) => ListType<ListType<ItemType>>
 }
 
@@ -383,6 +383,15 @@ export type NonEmptyListNatives = {
 	sort__overload$2: <ItemType extends AnyType>(self: ListType<ItemType>, by: (argument0: ItemType, argument1: ItemType) => OrderingType) => ListType<ItemType>
 	// replace<ItemType>(_: ItemType, at: Integer) -> NonEmptyList
 	replace: <ItemType extends AnyType>(self: ListType<ItemType>, argument1: ItemType, at: IntegerType) => ListType<ItemType>
+	// pair<ItemType, Other>(with: NonEmptyList) -> NonEmptyList
+	pair: <ItemType extends AnyType, Other extends AnyType>(self: ListType<ItemType>, argument1: ListType<Other>) => ListType<RecordType & { first: ItemType; second: Other }>
+	// split<ItemType>(intoGroupsOf: Integer) -> NonEmptyList
+	split: <ItemType extends AnyType>(self: ListType<ItemType>, intoGroupsOf: IntegerType) => ListType<ListType<ItemType>>
+}
+
+export type NonEmptyNestedListNatives = {
+	// flatten<ItemType>() -> NonEmptyList
+	flatten: <ItemType extends AnyType>(self: ListType<ListType<ItemType>>) => ListType<ItemType>
 }
 
 export type IntegerListNatives = {
@@ -662,6 +671,14 @@ export const $NonEmptyListArity: AssertArities<typeof import("./NonEmptyList"), 
 	sort__overload$1: 2
 	sort__overload$2: 2
 	replace: 3
+	pair: 2
+	split: 2
+}> = true
+
+declare const NonEmptyNestedListModule: typeof import("./NonEmptyNestedList")
+export const $NonEmptyNestedList: NonEmptyNestedListNatives = NonEmptyNestedListModule
+export const $NonEmptyNestedListArity: AssertArities<typeof import("./NonEmptyNestedList"), {
+	flatten: 1
 }> = true
 
 declare const IntegerListModule: typeof import("./IntegerList")

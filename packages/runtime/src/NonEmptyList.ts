@@ -185,3 +185,11 @@ export function replace<ItemType extends AnyType>(
 
 	return listRebuildingBack(back, originalList, view)
 }
+
+// NOTE: Pairing and splitting, both `List`'s own natives, and last for the
+// reason the declarations are: this file reads in the order `List.es` writes
+// them. Pairing stops where the shorter side does and splitting opens a group
+// per item, so neither can answer nothing when it was handed something. `pair`
+// asks the ARGUMENT for the proof too, which the Type says and the Function
+// neither knows nor needs to.
+export { pair, split } from "./List"
