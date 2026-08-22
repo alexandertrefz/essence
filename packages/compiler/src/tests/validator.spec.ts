@@ -3390,6 +3390,45 @@ describe("Validator", () => {
 					}`),
 				).toEqual([])
 			})
+
+			// NOTE: The other half of "comes back out as itself": what comes
+			// back out has to go back IN. A Method whose Parameter is the item
+			// Type meets an `ItemType` bound to a refinement, and both a proven
+			// value and a written one are accepted there. A List with nothing
+			// proving it has an item is refused, which is the whole of what the
+			// Type Argument said.
+			it("should take a proven item back where the item Type stands", () => {
+				expect(
+					diagnosticsFor(
+						withGroups(`constant proven: NonEmptyList<Integer> = [9]
+
+						Terminal.inspect(groups()::append(proven))
+						Terminal.inspect(groups()::append([9]))
+						Terminal.inspect(groups()::contains(proven))
+						Terminal.inspect(groups()::firstItem(defaultingTo [9]))`),
+					),
+				).toEqual([])
+			})
+
+			// NOTE: Refused where the Method is RESOLVED rather than where a
+			// value is measured against a Declaration, so these read the
+			// Enricher's own Diagnostics: an Argument that fits no Parameter
+			// leaves the call with no entry to commit to.
+			it("should refuse an item nothing proves has anything in it", () => {
+				let refusals = (body: string) =>
+					enrich(parse(withGroups(body))).diagnostics.map(
+						(diagnostic) => diagnostic.code,
+					)
+
+				expect(
+					refusals(`constant plain: List<Integer> = [9]
+
+						Terminal.inspect(groups()::append(plain))`),
+				).toEqual(["no-matching-overload"])
+				expect(
+					refusals("Terminal.inspect(groups()::append([]))"),
+				).toEqual(["no-matching-overload"])
+			})
 		})
 
 		// NOTE: What a written List lets the Compiler decide is its LENGTH, and

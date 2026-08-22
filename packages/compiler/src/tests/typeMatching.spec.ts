@@ -1041,6 +1041,33 @@ describe("Type matching", () => {
 				)
 			})
 
+			// NOTE: And the ARGUMENT side of that binding, which is what a
+			// Method taking its own item Type meets: `groups::append(proven)`
+			// hands a `NonEmptyList<String>` to an `ItemType` bound to one.
+			// Widening the actual to its base first — which is what an unbound
+			// Parameter does — would refuse a proof for being proven. A value
+			// carrying no proof is refused there as it always was.
+			it("should accept a proven Argument where a bound refinement stands", () => {
+				let context = createInferenceContext([
+					{ name: "T", infer: true, defaultType: null },
+				])
+				let generic: common.Type = { type: "GenericUse", name: "T" }
+
+				expect(
+					matchesTypeWithBindings(
+						{ type: "List", itemType: generic },
+						{ type: "List", itemType: nonEmptyStrings },
+						context,
+					),
+				).toBe(true)
+				expect(
+					matchesTypeWithBindings(generic, nonEmptyStrings, context),
+				).toBe(true)
+				expect(matchesTypeWithBindings(generic, strings, context)).toBe(
+					false,
+				)
+			})
+
 			// NOTE: An UNBOUND Type Parameter still gets nothing from a
 			// refinement on the actual side of a signature — the outermost rule
 			// read in the mirror, and what keeps the fall-through above from
