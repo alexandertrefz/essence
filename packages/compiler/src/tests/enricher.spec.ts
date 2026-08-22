@@ -8135,6 +8135,36 @@ describe("Enricher", () => {
 			).toEqual(["Integer", "Integer"])
 		})
 
+		// NOTE: The RECEIVER of a Namespace over a refinement is a refinement in
+		// every entry, and it is not evidence any of them asked for — it can not
+		// tell two entries apart. Counting it put them all in one partition, which
+		// left the order they were written in, which is the one order an APPENDED
+		// refined entry can never win from.
+		it("should probe an appended refined entry first under a refined receiver", () => {
+			let invocation = lastConstantMethodInvocation(`implementation {
+				type NonZero = Integer where @::isNot(0)
+				type NotNegative = Integer where @::isGreaterThanOrEqualTo(0)
+
+				namespace Powers for NonZero {
+					overload power {
+						(to exponent: Integer) -> String {
+							<- "base"
+						}
+
+						(to exponent: NotNegative) -> Integer {
+							<- 0
+						}
+					}
+				}
+
+				constant proven: NonZero = 3
+				constant raised = proven::power(to 2)
+			}`)
+
+			expect(invocation.overloadedMethodIndex).toBe(1)
+			expect(printType(invocation.type)).toBe("Integer")
+		})
+
 		// NOTE: The one position where the refinement standing there is not yet a
 		// Type: a Parameter written `NonEmptyList<Item>` whose `Item` the CALL has to
 		// work out. Asked as it stands, its base is `List<Item>` and no written List
