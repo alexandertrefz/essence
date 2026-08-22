@@ -8202,4 +8202,304 @@ describe("Enricher", () => {
 			})
 		})
 	})
+
+	// NOTE: The other half of what a proof buys. A refinement ADDS Methods and
+	// takes none away, so `namespace NonEmptyList` can answer `firstItem()` bare
+	// and still not hide `List::firstItem(defaultingTo:)` — the call compiles,
+	// and the fallback beside it is text that can never run. Only a Diagnostic
+	// can say so.
+	//
+	// The rule is written about the LABEL and about nothing else: an Invocation
+	// carrying an Argument labelled `defaultingTo` is resolved a second time with
+	// that Argument struck out, and the Warning is reported when the second
+	// resolution answers a Type that is not an Optional. No Method name and no
+	// Namespace name is named anywhere in it, which is what makes a Program's own
+	// Namespace following the same convention read the same way.
+	describe("Dead 'defaultingTo' fallbacks", () => {
+		function programWith(body: string): string {
+			return `implementation {
+				constant proven: NonEmptyList<Integer> = [3, 1, 2]
+				constant plain: List<Integer> = []
+
+				${body}
+			}`
+		}
+
+		function codesFor(source: string): Array<string> {
+			return diagnosticsFor(source).map((diagnostic) => diagnostic.code)
+		}
+
+		it("should warn where a proven receiver answers bare", () => {
+			expect(
+				codesFor(
+					programWith(
+						"constant first = proven::firstItem(defaultingTo 0)",
+					),
+				),
+			).toEqual(["fallback-never-used"])
+		})
+
+		it("should warn where a proven Argument answers bare", () => {
+			expect(
+				codesFor(
+					programWith(
+						"constant greatest = Number.greatestNumber(proven, defaultingTo 0)",
+					),
+				),
+			).toEqual(["fallback-never-used"])
+		})
+
+		// NOTE: A written `2` is proof enough for `divide`'s NonZeroInteger
+		// entry, so the quotient exists and the fallback is as dead as the
+		// receiver-side ones — the evidence is on the ARGUMENT here, which is
+		// the same rule from the other side.
+		it("should warn where a written Argument proves the answer exists", () => {
+			expect(
+				codesFor(
+					programWith(
+						"constant half = 10::divide(by 2, defaultingTo 0/1)",
+					),
+				),
+			).toEqual(["fallback-never-used"])
+		})
+
+		// NOTE: The Warning has to name the Type the call already answers, or a
+		// reader is told to delete an Argument without being told what is left.
+		it("should name the Type the call answers without the fallback", () => {
+			let source = programWith(
+				"constant first = proven::firstItem(defaultingTo 0)",
+			)
+			let diagnostic = diagnosticsFor(source)[0]
+
+			expect(diagnostic.severity).toBe("warning")
+			expect(diagnostic.tags).toEqual(["unnecessary"])
+			expect(diagnostic.labels[0]).toMatchObject({
+				kind: "primary",
+				message: "this fallback can never be read",
+			})
+			expect(diagnostic.notes).toEqual([
+				"Without it the call answers an Integer, which is never empty.",
+			])
+			expect(diagnostic.helps).toEqual([
+				"Drop the 'defaultingTo' Argument; the call already answers an Integer.",
+			])
+		})
+
+		// NOTE: The label is part of the span, because the label is part of what
+		// the Help asks the reader to drop.
+		it("should underline the label together with its value", () => {
+			let source = programWith(
+				"constant first = proven::firstItem(defaultingTo 0)",
+			)
+
+			expect(underlinedText(source, diagnosticsFor(source)[0])).toBe(
+				"defaultingTo 0",
+			)
+		})
+
+		// NOTE: The one entry the whole rule is built around — and the reason it
+		// re-probes rather than reading a Parameter list. `Optional::value`
+		// declares no bare `value()` at all, so the second resolution finds no
+		// winner and there is nothing to say.
+		it("should stay silent on 'Optional::value(defaultingTo:)'", () => {
+			expect(
+				codesFor(
+					programWith(
+						"constant first = plain::firstItem()::value(defaultingTo 0)",
+					),
+				),
+			).toEqual([])
+		})
+
+		// NOTE: A proven receiver is not on its own enough. `firstItem(where:)`
+		// can find nothing in a List that holds items, so the bare call still
+		// answers an Optional and the fallback is live.
+		it("should stay silent where the bare call still answers an Optional", () => {
+			expect(
+				codesFor(
+					programWith(
+						"constant first = proven::firstItem(where (item) { <- item::isGreaterThan(2) }, defaultingTo 0)",
+					),
+				),
+			).toEqual([])
+		})
+
+		it("should stay silent on an unproven receiver", () => {
+			expect(
+				codesFor(
+					programWith(
+						"constant first = plain::firstItem(defaultingTo 0)",
+					),
+				),
+			).toEqual([])
+		})
+
+		// NOTE: Nothing in the rule is about the standard library. A Namespace a
+		// Program declares over a refinement of its own, with the same two
+		// entries beside each other, is read exactly the same way.
+		it("should read a Program's own Namespaces by the same convention", () => {
+			expect(
+				codesFor(`implementation {
+					type Filled<Item> = List<Item> where @::hasItems()
+
+					namespace Boxes for List<Integer> {
+						overload head {
+							() -> Optional<Integer> {
+								<- @::firstItem()
+							}
+
+							(defaultingTo fallback: Integer) -> Integer {
+								<- @::firstItem(defaultingTo fallback)
+							}
+						}
+					}
+
+					namespace FilledBoxes for Filled<Integer> {
+						head() -> Integer {
+							<- @::firstItem()
+						}
+					}
+
+					constant filled: Filled<Integer> = [3, 1, 2]
+					constant head = filled::head(defaultingTo 0)
+				}`),
+			).toEqual(["fallback-never-used"])
+		})
+
+		// NOTE: The same Namespace with no bare entry to fall to. The fallback is
+		// the only way to call it, which is `Optional::value`'s shape written by
+		// a Program.
+		it("should stay silent where the Method declares no bare entry", () => {
+			expect(
+				codesFor(`implementation {
+					namespace Boxes for List<Integer> {
+						head(defaultingTo fallback: Integer) -> Integer {
+							<- @::firstItem(defaultingTo fallback)
+						}
+					}
+
+					constant plain: List<Integer> = []
+					constant head = plain::head(defaultingTo 0)
+				}`),
+			).toEqual([])
+		})
+
+		// NOTE: A `defaultingTo` Parameter carrying a default value is filled in
+		// by the callee where no Argument is written, so striking the Argument
+		// reaches the very entry the call already selected. Nothing was proven —
+		// it is one entry asked twice — and the Argument that WAS written is read
+		// at run time, so the Help would change what the Program answers.
+		it("should stay silent where the Parameter was defaulted, not dropped", () => {
+			expect(
+				codesFor(`implementation {
+					namespace Wallets for { cents: Integer } {
+						spend(_ amount: Integer, defaultingTo fallback: Integer = 0) -> Integer {
+							if amount::isGreaterThan(@.cents) {
+								<- fallback
+							} else {
+								<- amount
+							}
+						}
+					}
+
+					constant wallet = { cents = 10 }
+					constant spent = wallet::spend(50, defaultingTo 7)
+				}`),
+			).toEqual([])
+		})
+
+		// NOTE: The same on the other rail, since both go through the one probe.
+		it("should stay silent where a Function's Parameter was defaulted", () => {
+			expect(
+				codesFor(`implementation {
+					function pick(_ amount: Integer, defaultingTo fallback: Integer = 0) -> Integer {
+						if amount::isGreaterThan(10) {
+							<- fallback
+						} else {
+							<- amount
+						}
+					}
+
+					constant spent = pick(50, defaultingTo 7)
+				}`),
+			).toEqual([])
+		})
+
+		// NOTE: Striking the Argument can let an ENTIRELY different entry win, and
+		// an entry that answers bare for reasons of its own proves nothing. A
+		// plain List reaches this one holding no proof at all, the written call
+		// really does read its fallback — no item is greater than 100 — and the
+		// Help would silently swap which entry runs.
+		it("should stay silent where the bare entry needed no proof", () => {
+			expect(
+				codesFor(`implementation {
+					namespace Picks for List<Integer> {
+						overload pick {
+							(where check: (_: Integer) -> Boolean) -> Integer {
+								<- 0
+							}
+
+							(where check: (_: Integer) -> Boolean, defaultingTo fallback: Integer) -> Integer {
+								<- @::firstItem(where check, defaultingTo fallback)
+							}
+						}
+					}
+
+					constant plain: List<Integer> = [1, 2, 3]
+					constant picked = plain::pick(where (item) { <- item::isGreaterThan(100) }, defaultingTo 9)
+				}`),
+			).toEqual([])
+		})
+
+		// NOTE: A call that resolved to nothing has no entry to have written the
+		// fallback for, so it is told nothing about it — the Validator is
+		// already reporting the Argument it could not place, and "drop the
+		// fallback" on top of that reads as a second, unrelated fault.
+		it("should stay silent where the written call resolved to nothing", () => {
+			expect(
+				codesFor(`implementation {
+					function twice(_ value: Integer) -> Integer {
+						<- value::multiply(with 2)
+					}
+
+					constant doubled = twice(3, defaultingTo 0)
+				}`),
+			).toEqual([])
+		})
+
+		// NOTE: A re-probe enriches the Arguments it keeps, and one of those may
+		// write a `defaultingTo` of its own — so the re-probe is not re-entered.
+		// The inner call still reports for itself, from the enrichment the
+		// Program commits, and the outer one stays silent because a plain List
+		// can still be empty.
+		it("should report a nested call once, from its own enrichment", () => {
+			expect(
+				codesFor(
+					programWith(
+						"constant first = plain::firstItem(defaultingTo proven::firstItem(defaultingTo 0))",
+					),
+				),
+			).toEqual(["fallback-never-used"])
+		})
+
+		// NOTE: The Warning is a Warning: the call is well typed, nothing is
+		// refused, and what the Program does is unchanged. A reader who leaves it
+		// alone gets the same answer — which `lastConstantValue` can not be asked
+		// for, since it requires a Program that enriches silently and this one is
+		// the whole point.
+		it("should leave the call resolving to the entry it was written for", () => {
+			let { program } = enrichSource(
+				programWith(
+					"constant first = proven::firstItem(defaultingTo 0)",
+				),
+			)
+			let constants = program.implementation.nodes.filter(
+				(node) => node.nodeType === "ConstantDeclarationStatement",
+			)
+
+			expect(printType(constants[constants.length - 1].value.type)).toBe(
+				"Integer",
+			)
+		})
+	})
 })
