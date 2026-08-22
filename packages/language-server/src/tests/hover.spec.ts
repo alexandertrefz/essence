@@ -1350,3 +1350,81 @@ describe("Hover inside a Case payload default", () => {
 		})
 	})
 })
+
+// NOTE: A written value proves what it can about itself where a Method is
+// looked up on it, and the Hover over that value is where a reader can see
+// WHY the call came back the way it did — the receiver names the proof, and
+// the Method beside it names the entry the proof reached.
+describe("Hover over a written receiver", () => {
+	it("names the refinement the value proved", () => {
+		let source = [
+			"implementation {",
+			"\tconstant root = 4::squareRoot()",
+			"}",
+		].join("\n")
+
+		expect(hover(source, { line: 2, column: 18 })).toBe("PositiveInteger")
+		expect(hover(source, { line: 2, column: 22 })).toBe(
+			"squareRoot() -> Integer | Algebraic",
+		)
+	})
+
+	it("names a generic refinement as the items decided it", () => {
+		let source = [
+			"implementation {",
+			"\tconstant first = [1, 2]::firstItem()",
+			"}",
+		].join("\n")
+
+		expect(hover(source, { line: 2, column: 19 })).toBe(
+			"NonEmptyList<Integer>",
+		)
+	})
+
+	// NOTE: A written String proves `NonEmptyString`, which no Namespace
+	// targets — so the Hover names the proof and the call still reaches
+	// `String`'s own Method, which is what a refinement adding Methods and
+	// taking none away looks like from here.
+	it("names a proof no Namespace targets", () => {
+		let source = [
+			"implementation {",
+			'\tconstant length = "abc"::length()',
+			"}",
+		].join("\n")
+
+		expect(hover(source, { line: 2, column: 20 })).toBe("NonEmptyString")
+		expect(hover(source, { line: 2, column: 28 })).toBe(
+			"length() -> Integer",
+		)
+	})
+
+	// NOTE: Where no declared Alias proves the whole conjunction, the Hover
+	// spells the Declaration a reader would have to write for it.
+	it("spells a conjunction no declared name covers", () => {
+		let source = [
+			"implementation {",
+			"\ttype Even = Integer where @::isEven()",
+			"\ttype Big = Integer where @::isGreaterThan(10)",
+			"",
+			"\tconstant sum = 12::add(1)",
+			"}",
+		].join("\n")
+
+		expect(hover(source, { line: 5, column: 17 })).toBe(
+			"Integer where @::isEven()::and(@::isGreaterThan(10))::and(@::isGreaterThanOrEqualTo(0))::and(@::isNot(0))",
+		)
+	})
+
+	// NOTE: The other side of it. A value the Program computed proves nothing,
+	// so the name it was bound to hovers as the Type it was written with.
+	it("leaves a computed receiver as the Type it was computed to", () => {
+		let source = [
+			"implementation {",
+			"\tconstant two = 1::add(1)",
+			"\tconstant root = two::squareRoot()",
+			"}",
+		].join("\n")
+
+		expect(hover(source, { line: 3, column: 19 })).toBe("two: Integer")
+	})
+})
