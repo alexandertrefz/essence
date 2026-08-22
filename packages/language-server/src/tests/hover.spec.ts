@@ -1415,6 +1415,27 @@ describe("Hover over a written receiver", () => {
 		)
 	})
 
+	// NOTE: A proof standing as a Type ARGUMENT is spelled where it stands, and
+	// the Method it makes reachable reads back as DECLARED. The receiver's own
+	// Hover is the whole of what a reader needs to see the item Type is proven:
+	// the answer of `firstItem` is `ItemType`, and only the receiver says what
+	// that was bound to.
+	it("spells a proof standing as a Type Argument", () => {
+		let source = [
+			"implementation {",
+			"\tconstant groups: List<NonEmptyList<Integer>> = [[1], [2, 3]]",
+			"\tconstant first = groups::firstItem()",
+			"}",
+		].join("\n")
+
+		expect(hover(source, { line: 3, column: 20 })).toBe(
+			"groups: List<NonEmptyList<Integer>>",
+		)
+		expect(hover(source, { line: 3, column: 28 })).toBe(
+			"firstItem<ItemType>() -> Optional<ItemType>",
+		)
+	})
+
 	// NOTE: The other side of it. A value the Program computed proves nothing,
 	// so the name it was bound to hovers as the Type it was written with.
 	it("leaves a computed receiver as the Type it was computed to", () => {

@@ -574,6 +574,15 @@ rule stated there.
   plainest case — an Essence body could only write `@::length()`, which is that
   same Method on a receiver that still carries the proof, and the Validator
   refuses it as `infinite-recursion`.
+- **The two rules meet in one Namespace where a target is narrower both
+  ways.** `NonEmptyNestedList<infer ItemType> for NonEmptyList<NonEmptyList<ItemType>>`
+  targets a List proven to have something in it whose items are Lists proven the
+  same. Its `flatten` answers a `NonEmptyList<ItemType>` where `NestedList`'s
+  answers a `List<ItemType>`, and neither proof alone is enough to say that: an
+  outer List with something in it can hold nothing but empty Lists, and an inner
+  proof says nothing about how many inner Lists there are. A receiver reaches it
+  only with both in hand, and beats `NestedList` for `flatten` because its target
+  is narrower — the same rule two nested targets are separated by.
 - **A Type and the Namespace that targets it belong in one file.** `Optional`
   and `Ordering` each declare their Choice and the Namespace over it together;
   splitting them across files works, but leaves the two halves of one idea
