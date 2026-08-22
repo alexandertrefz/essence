@@ -1,40 +1,41 @@
 implementation {
 
 	§ Exact square roots — perfect squares collapse to whole numbers,
-	§ everything else stays exact and symbolic. A negative has no real root, so
-	§ the answer is an Optional and `Terminal.inspect` shows the whole of it.
+	§ everything else stays exact and symbolic. A written receiver proves its
+	§ own sign, so each of these answers a number rather than an Optional.
 	Terminal.inspect(9::squareRoot())
 	Terminal.inspect(2::squareRoot())
 	Terminal.inspect(12::squareRoot())
 
+	§ A negative has no real root, and a receiver the Program computes might
+	§ be one — so that answer is an Optional and `Terminal.inspect` shows the
+	§ whole of it.
+	constant computedNegative = 0::subtract(4)
+
+	Terminal.inspect(computedNegative::squareRoot())
+
 	constant rootTwo = 2::squareRoot()
 
 	Terminal.inspect(match rootTwo -> String {
-		case #Value(root) {
-			<- match root -> String {
-				case Algebraic {
-					§ The round-trip is exact: √2 · √2 is exactly 2.
-					Terminal.inspect(@::multiply(with @))
+		case Algebraic {
+			§ The round-trip is exact: √2 · √2 is exactly 2.
+			Terminal.inspect(@::multiply(with @))
 
-					§ Arithmetic stays symbolic.
-					Terminal.inspect(@::add(1))
-					Terminal.inspect(@::multiply(with 3))
+			§ Arithmetic stays symbolic.
+			Terminal.inspect(@::add(1))
+			Terminal.inspect(@::multiply(with 3))
 
-					§ Dividing by an Irrational can never fail — the answer is
-					§ not an Optional at all.
-					Terminal.inspect(1::divide(by @))
+			§ Dividing by an Irrational can never fail — the answer is not an
+			§ Optional at all.
+			Terminal.inspect(1::divide(by @))
 
-					§ Ordering is exact, too: √2 is below 3/2.
-					Terminal.inspect(@::compare(to 3/2)::toString())
+			§ Ordering is exact, too: √2 is below 3/2.
+			Terminal.inspect(@::compare(to 3/2)::toString())
 
-					<- @::toString()
-				}
-
-				case Integer { <- @::toString() }
-			}
+			<- @::toString()
 		}
 
-		case #Empty { <- "not representable" }
+		case Integer { <- @::toString() }
 	})
 
 	§ π and Tau are exact Transcendentals now, not approximations.
@@ -81,17 +82,12 @@ implementation {
 
 	§ An Integer against √2, through Number — √2 ≈ 1.414.
 	Terminal.inspect(match 2::squareRoot() -> String {
-		case #Value(root) {
-			<- match root -> String {
-				case Algebraic {
-					<- "1 < √2: {1::isLessThan(@)}, 2 > √2: {
-						2::isGreaterThan(@)
-					}, 1 + √2 = {1::add(@)}"
-				}
-				case Integer   { <- "collapsed" }
-			}
+		case Algebraic {
+			<- "1 < √2: {1::isLessThan(@)}, 2 > √2: {
+				2::isGreaterThan(@)
+			}, 1 + √2 = {1::add(@)}"
 		}
-		case #Empty { <- "none" }
+		case Integer   { <- "collapsed" }
 	})
 
 	§ `Irrational` names exactly the Union of the two new Types.

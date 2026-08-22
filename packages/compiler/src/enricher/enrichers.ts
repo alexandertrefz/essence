@@ -54,6 +54,8 @@ import {
 } from "../helpers/index"
 import {
 	admittedByEvaluation,
+	describePredicate,
+	isWrittenValue,
 	refinementDecidedBy,
 } from "../helpers/predicateEval"
 import { printType, signaturesOf } from "../printType"
@@ -1008,7 +1010,13 @@ export function enrichMethodInvocation(
 	// or not at all — `Box<Integer>#Full(1)::label()` is the spelling, and the
 	// undecided `Box#Full(1)::label()` says which Arguments are missing and how
 	// to write them.
-	let base = enrichExpression(node.base, scope)
+	// NOTE: A written receiver carries whatever it proves about itself into
+	// dispatch — see `refinedLiteralReceiverType`, which is where the whole of
+	// that rule is. The Type is written onto the receiver Node as well as handed
+	// to the resolver, so a Hover over the `4` in `4::squareRoot()` says the same
+	// thing the Namespace it reached does. Refinements erase before emission, so
+	// the Node the Rewriter sees is the Integer it always was.
+	let base = writtenReceiver(enrichExpression(node.base, scope), scope)
 	let typer = makeArgumentTyper(scope)
 	let resolved = resolveMethodInvocation(node, base.type, scope, typer)
 	let {
@@ -7417,6 +7425,157 @@ function instantiatedRefinementFor(
 				),
 			)
 		: null
+}
+
+// NOTE: The conjunction Types a written receiver has already been given, kept by
+// what they SAY rather than by where they were built: a base and a conjunct set
+// are the whole of what assignability, dispatch specificity and admission read,
+// so two receivers proving the same thing about the same base are one Type and
+// may as well be one object. That identity is what the memos downstream want —
+// `namespacesTargeting` remembers per Type object — and it is why the name is in
+// the key too, so nothing here can hand a reader a name it did not build.
+let literalReceiverConjunctions = new Map<string, common.RefinementType>()
+
+// NOTE: What a written receiver proves about itself. Every other position that
+// admits a written value was ASKED — a Parameter, a declared Constant, a return
+// Type — and a receiver is the one position that asks nothing at all: it is typed
+// bottom-up and Namespace lookup then runs from whatever that came to. So `4`
+// reached `Integer` and never `NonNegativeInteger`, and `4::squareRoot()` came
+// back Optional while a Constant declared `NonNegativeInteger` did not, for no
+// reason a reader could see in the two lines.
+//
+// The question is asked here instead, of every refinement in scope at once,
+// because there is no single one to ask about. What comes back is the CONJUNCTION
+// of everything admitted — `3` is not zero and is not negative, and both are
+// true of it at once — which flows into each of the named refinements by the
+// ordinary conjunct-subset rule and so reaches every Namespace any of them does.
+//
+// It is DISPLAYED as the refinement whose conjuncts are exactly that conjunction
+// where one is declared, which is the usual case: `3` proves what
+// `PositiveInteger` proves and prints as PositiveInteger. Where no declared name
+// says the whole of it — two unrelated refinements a Program declared, both true
+// of one literal — the Type prints as the Declaration a reader would have to
+// write for it, `Integer where @::isEven()::and(@::isGreaterThan(10))`. That text
+// names the proof; like every other predicate spelling, it is not offered as
+// something to paste.
+//
+// NOTE: The tie between two refinements proving the SAME conjunction is settled
+// by the walk `refinementsFor` returns, which is the order narrowing settles its
+// own tie by — nearest Scope first, builtins ahead of a Program's own aliases,
+// concretes ahead of a generic instantiated here. Nothing semantic rests on it:
+// the two are one Type to everything that reads conjuncts, so it decides the name
+// a Hover prints and nothing else.
+//
+// NOTE: Silent while the caller's proof is erased. `fallback-never-used` asks
+// what a call would have answered had nothing been proven at all, and a written
+// receiver is proof of exactly the kind that probe exists to take away —
+// `[1, 2]::firstItem(defaultingTo 0)` answers bare because the brackets say so,
+// which is what makes the fallback dead and the Warning true.
+function refinedLiteralReceiverType(
+	base: common.typed.ExpressionNode,
+	scope: enricher.Scope,
+): common.RefinementType | null {
+	if (erasingRefinementProof || !isWrittenValue(base)) {
+		return null
+	}
+
+	let declared = refinementCandidatesInScope(scope)
+
+	if (declared.concrete.length === 0 && declared.generic.length === 0) {
+		return null
+	}
+
+	let admitted: Array<common.RefinementType> = []
+
+	for (let refinement of refinementsFor(declared, base.type)) {
+		// NOTE: A predicate nobody has read yet is no candidate. Every other
+		// reader of `conjuncts` refuses the null by throwing, which the hoisting
+		// rounds read as "not this round" — and this rail is the one that RUNS
+		// inside a round: a predicate Expression, a Parameter default and a
+		// bodied static Property are all enriched while declarations hoist, and
+		// a written receiver may stand in any of them. Throwing there escaped the
+		// round entirely, so a Program declaring `type Trimmed = String where …`
+		// could not write a literal receiver anywhere in the file. The Alias is
+		// simply not a candidate until its predicate has arrived, and by the
+		// enrichment pass every one of them has.
+		if (
+			refinement.conjuncts !== null &&
+			admittedByEvaluation(refinement, base)
+		) {
+			admitted.push(refinement)
+		}
+	}
+
+	if (admitted.length === 0) {
+		return null
+	}
+
+	let conjuncts = canonicalPredicateConjuncts(
+		admitted.flatMap(provenConjuncts),
+	)
+
+	// NOTE: Each admitted refinement proves a SUBSET of the conjunction, so one
+	// proving as many conjuncts as the whole of it proves exactly the whole of
+	// it. Counted over the canonical keys rather than over the array, since that
+	// is what "the same question" means everywhere else.
+	let named = admitted.find(
+		(refinement) =>
+			new Set(provenConjuncts(refinement).map(predicateConjunctKey))
+				.size === conjuncts.length,
+	)
+
+	if (named !== undefined) {
+		return named
+	}
+
+	let name = `${describeType(base.type)} where ${describePredicate({
+		type: "Refinement",
+		name: "",
+		base: base.type,
+		conjuncts,
+	})}`
+	let key = `${name}${conjuncts.map(predicateConjunctKey).join("")}`
+	let remembered = literalReceiverConjunctions.get(key)
+
+	if (remembered === undefined) {
+		remembered = {
+			type: "Refinement",
+			name,
+			base: base.type,
+			conjuncts,
+		}
+		literalReceiverConjunctions.set(key, remembered)
+	}
+
+	return remembered
+}
+
+// NOTE: The receiver Node carrying whatever it proved about itself. Only the four
+// written shapes are ever refined — the ones `literalValueOf` can read — and the
+// switch is what says so in the Types rather than in a comment: every other
+// Expression comes back as itself, untouched and unallocated.
+function writtenReceiver(
+	base: common.typed.ExpressionNode,
+	scope: enricher.Scope,
+): common.typed.ExpressionNode {
+	let refinement = refinedLiteralReceiverType(base, scope)
+
+	if (refinement === null) {
+		return base
+	}
+
+	switch (base.nodeType) {
+		case "IntegerValue":
+			return { ...base, type: refinement }
+		case "StringValue":
+			return { ...base, type: refinement }
+		case "BooleanValue":
+			return { ...base, type: refinement }
+		case "ListValue":
+			return { ...base, type: refinement }
+		default:
+			return base
+	}
 }
 
 // NOTE: `a::and(b)` — the one Expression a condition is read THROUGH rather than

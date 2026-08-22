@@ -60,6 +60,16 @@ export function admittedByEvaluation(
 	)
 }
 
+// NOTE: Whether the Compiler can see this value WRITTEN — the one question a
+// receiver asks before it goes looking for the refinements it proves. A Method
+// receiver is typed bottom-up and no position ever hands it an expected Type, so
+// nothing asks it what it might be; this is what lets it ask itself. It answers
+// exactly what `admittedByEvaluation` can decide anything about, so that a
+// receiver the table can not read costs one switch and no candidate walk at all.
+export function isWrittenValue(value: common.typed.ExpressionNode): boolean {
+	return literalValueOf(value) !== null
+}
+
 // NOTE: The refinement a written value is asked ABOUT, where the position it
 // stands at has not finished saying what it is. A Parameter written
 // `NonEmptyList<Item>` in a signature that infers `Item` is not a Type until

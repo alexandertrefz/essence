@@ -34,19 +34,15 @@ implementation {
 	}
 
 	§ An Algebraic can not be written as a literal — it is only ever reached
-	§ through `squareRoot`, whose result is an Optional the caller has to
-	§ match apart. These two hand one to a body so that the Methods needing
-	§ an Algebraic receiver or Argument read as ordinary calls.
+	§ through `squareRoot`, whose answer is an Integer or an Algebraic and has
+	§ to be matched apart. These two hand one to a body so that the Methods
+	§ needing an Algebraic receiver or Argument read as ordinary calls. A
+	§ written receiver proves its own sign, so the root is there and no Empty
+	§ Case stands between the call and the value.
 	function withRootTwo(_ body: (_ rootTwo: Algebraic) -> {}) -> {} {
 		<- match 2::squareRoot() -> {} {
-			case #Value(root) {
-				<- match root -> {} {
-					case Algebraic { <- body(@) }
-					case Integer   { <- {} }
-				}
-			}
-
-			case #Empty { <- {} }
+			case Algebraic { <- body(@) }
+			case Integer   { <- {} }
 		}
 	}
 
@@ -55,14 +51,8 @@ implementation {
 	) -> {} {
 		<- withRootTwo((_ rootTwo: Algebraic) -> {} {
 			<- match 3::squareRoot() -> {} {
-				case #Value(root) {
-					<- match root -> {} {
-						case Algebraic { <- body(rootTwo, @) }
-						case Integer   { <- {} }
-					}
-				}
-
-				case #Empty { <- {} }
+				case Algebraic { <- body(rootTwo, @) }
+				case Integer   { <- {} }
 			}
 		})
 	}
@@ -401,13 +391,24 @@ third"::lines())
 	§ computed exponents below keep those calls on the entry answering an
 	§ Optional. A written non-negative exponent is its own proof and reaches
 	§ the total entry.
+	§
+	§ A RECEIVER written down proves the same things about itself, and reaches
+	§ the refined Namespace that spends the proof. So a computed receiver is
+	§ what keeps a call on the entry `Integer` declares, and each refined
+	§ Namespace is called under a label of its own further down.
 	constant computedTwo   = 1::add(1)
 	constant computedThree = 1::add(2)
-	constant computedEight = 4::multiply(with 2)
+	constant computedEight = 4::add(4)
+	constant computedNine  = 4::add(5)
 	constant computedTen   = 5::add(5)
 	constant computedZero  = 1::subtract(1)
 
+	constant computedHundred       = 99::add(1)
 	constant computedNegativeThree = 0::subtract(3)
+
+	§ One over the range a JavaScript number holds exactly, computed so that
+	§ the multiplication below is Integer's own.
+	constant computedHugeInteger = 9_007_199_254_740_990::add(1)
 
 	show("Integer.is(_ Integer)", 7::is(7))
 	show("Integer.is(_ Integer) [differing]", 7::is(8))
@@ -441,13 +442,19 @@ third"::lines())
 		"Integer.divide(by: Rational, defaultingTo: Rational) [by zero]",
 		1::divide(by 0/1, defaultingTo 0/1),
 	)
-	show("Integer.multiply(with: Integer)", 100::multiply(with 1000))
+	show(
+		"Integer.multiply(with: Integer)",
+		computedHundred::multiply(with 1000),
+	)
 	show(
 		"Integer.multiply(with: Integer) [beyond IEEE 754]",
-		9_007_199_254_740_991::multiply(with 500),
+		computedHugeInteger::multiply(with 500),
 	)
 	show("Integer.multiply(with: Rational)", 3::multiply(with 1/3))
-	show("Integer.multiply(with: Transcendental)", 2::multiply(with Number.Pi))
+	show(
+		"Integer.multiply(with: Transcendental)",
+		computedTwo::multiply(with Number.Pi),
+	)
 	show(
 		"Integer.multiply(with: Transcendental) [collapses to Rational]",
 		0::multiply(with Number.Pi),
@@ -486,13 +493,13 @@ third"::lines())
 		"Integer.isGreaterThanOrEqualTo(_ Rational) [less]",
 		1::isGreaterThanOrEqualTo(3/2),
 	)
-	show("Integer.squareRoot() [perfect square]", 9::squareRoot())
-	show("Integer.squareRoot() [irrational]", 2::squareRoot())
-	show("Integer.squareRoot() [zero]", 0::squareRoot())
+	show("Integer.squareRoot() [perfect square]", computedNine::squareRoot())
+	show("Integer.squareRoot() [irrational]", computedTwo::squareRoot())
+	show("Integer.squareRoot() [zero]", computedZero::squareRoot())
 	show("Integer.squareRoot() [negative]", -1::squareRoot())
 	show(
 		"Integer.squareRoot(defaultingTo: Integer | Algebraic)",
-		9::squareRoot(defaultingTo 0),
+		computedNine::squareRoot(defaultingTo 0),
 	)
 	show(
 		"Integer.squareRoot(defaultingTo: Integer | Algebraic) [negative]",
@@ -564,28 +571,31 @@ third"::lines())
 		"Integer.quotient(dividingBy: Integer, defaultingTo: Integer) [by zero]",
 		7::quotient(dividingBy 0, defaultingTo 0),
 	)
-	show("Integer.raise(to: Integer)", 2::raise(to computedTen))
+	show("Integer.raise(to: Integer)", computedTwo::raise(to computedTen))
 	show(
 		"Integer.raise(to: Integer) [zero exponent]",
-		2::raise(to computedZero),
+		computedTwo::raise(to computedZero),
 	)
-	show("Integer.raise(to: Integer) [negative exponent]", 2::raise(to -2))
+	show(
+		"Integer.raise(to: Integer) [negative exponent]",
+		computedTwo::raise(to -2),
+	)
 	show(
 		"Integer.raise(to: Integer) [zero to a negative power]",
 		0::raise(to -1),
 	)
 	show(
 		"Integer.raise(to: Integer, defaultingTo: Integer | Rational)",
-		2::raise(to computedTen, defaultingTo 0),
+		computedTwo::raise(to computedTen, defaultingTo 0),
 	)
 	show(
 		"Integer.raise(to: Integer, defaultingTo: Integer | Rational) [zero to a negative power]",
 		0::raise(to -1, defaultingTo 0),
 	)
-	show("Integer.raise(to: NonNegativeInteger)", 2::raise(to 10))
+	show("Integer.raise(to: NonNegativeInteger)", computedTwo::raise(to 10))
 	show(
 		"Integer.raise(to: NonNegativeInteger) [zero exponent]",
-		2::raise(to 0),
+		computedTwo::raise(to 0),
 	)
 	show("Integer.raise(to: NonNegativeInteger) [zero base]", 0::raise(to 2))
 	show(
@@ -645,7 +655,10 @@ third"::lines())
 		show("Integer.add(_ Algebraic)", 1::add(rootTwo))
 		show("Integer.subtract(_ Algebraic)", 1::subtract(rootTwo))
 		show("Integer.divide(by: Algebraic)", 1::divide(by rootTwo))
-		show("Integer.multiply(with: Algebraic)", 3::multiply(with rootTwo))
+		show(
+			"Integer.multiply(with: Algebraic)",
+			computedThree::multiply(with rootTwo),
+		)
 		show(
 			"Integer.multiply(with: Algebraic) [collapses to Rational]",
 			0::multiply(with rootTwo),
@@ -1421,9 +1434,11 @@ third"::lines())
 	})
 
 	§ The Lists the three aggregates below fold, each bound to a `List` Type.
-	§ A written List is its own proof of having an item, so a literal Argument
-	§ reaches the entry taking a `NonEmptyList` — which is what the calls
-	§ naming that Type do, with a literal each.
+	§ A written List is its own proof of having an item, as an Argument and as
+	§ a RECEIVER both, so a literal reaches the entry taking a `NonEmptyList` —
+	§ which is what the calls naming that Type do, with a literal each. These
+	§ bound names are what keeps the `List` entries called.
+	constant twoFruits: List<String>      = ["banana", "apple"]
 	constant twoNumbers: List<Integer>    = [1, 2]
 	constant threeNumbers: List<Integer>  = [3, 1, 2]
 	constant twoRationals: List<Rational> = [1/2, 1/3]
@@ -2311,11 +2326,8 @@ third"::lines())
 	)
 	show("List.reverse<ItemType>()", numbers::reverse())
 	show("List.reverse<ItemType>() [empty]", noNumbers::reverse())
-	show("List.sort<ItemType is Comparable>()", [3, 1, 2]::sort())
-	show(
-		"List.sort<ItemType is Comparable>() [Strings]",
-		["banana", "apple"]::sort(),
-	)
+	show("List.sort<ItemType is Comparable>()", threeNumbers::sort())
+	show("List.sort<ItemType is Comparable>() [Strings]", twoFruits::sort())
 	show("List.sort<ItemType is Comparable>() [empty]", noNumbers::sort())
 	show(
 		"List.sort<ItemType>(by: (_ ItemType, _ ItemType) -> Ordering)",
