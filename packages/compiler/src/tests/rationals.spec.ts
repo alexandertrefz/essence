@@ -417,6 +417,10 @@ describe("Rationals", () => {
 			).toEqual(['"-1/6"', '"-1/6"'])
 		})
 
+		// NOTE: The List is bound to a `List` Type on purpose. A written List is
+		// its own proof of having an item, so a literal Argument would reach
+		// `Number.lowestNumber(_ NonEmptyList<Integer | Rational>)` and answer
+		// bare — and the fold under test here is the one answering an Optional.
 		it("finds the lowest of a mixed List through the Essence fold", async () => {
 			expect(
 				await run(`implementation {
@@ -425,10 +429,12 @@ describe("Rationals", () => {
 					constant quotient = 1/2
 						::divide(by negativeThree)
 						::value(defaultingTo 0/1)
+					constant mixed: List<Integer | Rational> = [
+						quotient,
+						negativeOne,
+					]
 
-					Terminal.inspect(match Number.lowestNumber(
-						[quotient, negativeOne],
-					) -> String {
+					Terminal.inspect(match Number.lowestNumber(mixed) -> String {
 						case #Value(lowest) {
 							<- match lowest -> String {
 								case Integer  { <- @::toString() }
