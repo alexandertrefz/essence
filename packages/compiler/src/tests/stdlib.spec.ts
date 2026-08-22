@@ -460,10 +460,14 @@ describe("Stdlib", () => {
 		// out of the Union the Alias stood for. `Optional` is a nominal Choice
 		// now, so what it is typed by is the Choice's own Type Argument — the
 		// `item` the `#Value` Case carries — and the fallback has to match that.
+		// NOTE: The List is bound to a `List` Type. A written one proves it
+		// holds an item, and `firstItem` on a proven receiver answers no
+		// Optional for `value(defaultingTo:)` to collapse.
 		it("types value(defaultingTo:) by the Optional's item Type", () => {
 			expect(
 				diagnosticsFor(`implementation {
-					constant fallback: Integer = [1]::firstItem()::value(defaultingTo 0)
+					constant numbers: List<Integer> = [1]
+					constant fallback: Integer = numbers::firstItem()::value(defaultingTo 0)
 				}`),
 			).toEqual([])
 		})
@@ -471,7 +475,8 @@ describe("Stdlib", () => {
 		it("rejects a fallback of the wrong Type", () => {
 			expect(
 				diagnosticsFor(`implementation {
-					constant fallback = [1]::firstItem()::value(defaultingTo "zero")
+					constant numbers: List<Integer> = [1]
+					constant fallback = numbers::firstItem()::value(defaultingTo "zero")
 				}`),
 			).not.toEqual([])
 		})

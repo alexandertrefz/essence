@@ -179,6 +179,18 @@ function foldInvocation(
 	switch (node.base.name) {
 		case "Integer":
 			return foldInteger(node, member, shadowed)
+		// NOTE: The same rung `lower-scalar-operations` reads, and for the same
+		// reason: a refinement is erased before the first pass runs, so both
+		// operands are plain Integers here, but the Method the Simplifier
+		// emitted is still `NonZeroInteger`'s — which is where a written
+		// receiver's product goes now. `multiply` alone, because that is the
+		// only entry of that Namespace whose body is one bigint operation;
+		// `foldInteger` then demands two written Integers, so the entries
+		// scaling an Algebraic or a Transcendental fall out on their operands.
+		case "NonZeroInteger":
+			return member === "multiply"
+				? foldInteger(node, member, shadowed)
+				: node
 		case "Rational":
 			return foldRational(node, member, shadowed)
 		case "String":

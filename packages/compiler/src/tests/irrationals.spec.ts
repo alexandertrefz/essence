@@ -493,10 +493,16 @@ describe("Irrationals", () => {
 	})
 
 	describe("Enricher", () => {
+		// NOTE: Both halves of the split. A receiver the Program COMPUTED might
+		// be negative, so `squareRoot` answers an Optional there; a written one
+		// proves its own sign and reaches `namespace NonNegativeInteger`, whose
+		// entry answers the two kinds bare.
 		it("types squareRoot as Optional<Integer | Algebraic>", () => {
 			expect(
 				diagnosticsFor(`implementation {
-					constant root: Optional<Integer | Algebraic> = 2::squareRoot()
+					constant two = 1::add(1)
+					constant root: Optional<Integer | Algebraic> = two::squareRoot()
+					constant written: Integer | Algebraic = 2::squareRoot()
 				}`),
 			).toEqual([])
 		})
@@ -577,23 +583,16 @@ describe("Irrationals", () => {
 		// an `Algebraic | Rational` and NOT an `Optional` of one, because an
 		// irrational is never zero. If division by an Algebraic ever became
 		// fallible the arm would answer an `Optional<…>`, `toString` would not
-		// resolve on it, and this would stop being Diagnostic-free. The outer
-		// match takes the Optional that `squareRoot` answers apart; the inner
-		// one narrows the payload Union, which is the only way in now that
-		// `case Algebraic` can not reach through the wrapper.
+		// resolve on it, and this would stop being Diagnostic-free. One match
+		// narrows the Union `squareRoot` answers a written receiver with.
 		it("keeps division by an Algebraic total — the quotient is not an Optional", () => {
 			expect(
 				diagnosticsFor(`implementation {
 					constant root = 2::squareRoot()
 
 					Terminal.inspect(match root -> String {
-						case #Value(value) {
-							<- match value -> String {
-								case Algebraic { <- 1::divide(by @)::toString() }
-								case Integer { <- @::toString() }
-							}
-						}
-						case #Empty { <- "impossible" }
+						case Algebraic { <- 1::divide(by @)::toString() }
+						case Integer { <- @::toString() }
 					})
 				}`),
 			).toEqual([])

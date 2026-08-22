@@ -500,17 +500,23 @@ describe("Resolvers", () => {
 	// are rejected now — there is no witness to emit for a Type nothing has
 	// pinned down yet.
 	describe("Witness conditions over an unpinned item Type", () => {
+		// NOTE: The witness condition is not what refuses this one any more.
+		// A written List proves it holds items, so the receiver is a
+		// `NonEmptyList<List<Unknown>>` and both `List` and `NonEmptyList`
+		// declare `sort` — and a receiver carrying an Unknown is refused
+		// before the specificity order is asked anything. The mistake and the
+		// fix are the same either way, and the Help names the annotation that
+		// pins the item Type. The witness condition itself is covered by the
+		// sibling below, whose Method only `List` declares.
 		it("should report sorting a List of empty Lists", () => {
 			let diagnostics = diagnosticsFor(`implementation {
 				Terminal.inspect([[], []]::sort())
 			}`)
 
 			expect(diagnostics).toHaveLength(1)
-			expect(diagnostics[0].code).toBe(
-				"unsatisfied-conformance-condition",
-			)
-			expect(diagnostics[0].notes).toContain(
-				"Its 'ItemType' is not determined here — an empty List Literal leaves the item Type unknown until something pins it down.",
+			expect(diagnostics[0].code).toBe("undecided-receiver-type")
+			expect(diagnostics[0].helps).toContain(
+				"Annotate what the receiver comes from — 'constant items: List<Integer> = []' — so its Type is decided before the call.",
 			)
 		})
 
