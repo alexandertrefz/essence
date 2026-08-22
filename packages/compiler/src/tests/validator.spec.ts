@@ -3527,6 +3527,127 @@ describe("Validator", () => {
 				).toHaveLength(1)
 			})
 		})
+
+		// NOTE: An item is a position like any other, so a written List standing
+		// where the item Type is refined is asked the question item by item.
+		// `[[1], [2, 3]]` is a `List<NonEmptyList<Integer>>` for the reason `[1]`
+		// is a `NonEmptyList<Integer>`: the brackets are right there, one pair
+		// per item.
+		describe("into a refined item Type", () => {
+			it("should admit every written item at all three positions", () => {
+				expect(
+					diagnosticsFor(`implementation {
+						function widest(_ groups: List<NonEmptyList<Integer>>) -> Integer {
+							<- groups::length()
+						}
+
+						function made() -> List<NonEmptyList<Integer>> {
+							<- [[1], [2, 3]]
+						}
+
+						constant written: List<NonEmptyList<Integer>> = [[1], [2, 3]]
+
+						Terminal.inspect(widest(written))
+						Terminal.inspect(widest([[1], [2, 3]]))
+						Terminal.inspect(widest(made()))
+					}`),
+				).toEqual([])
+			})
+
+			// NOTE: Both proofs at once — the outer List's own count and each
+			// item's — which is the Type `split(intoGroupsOf:)` answers.
+			it("should admit a written List into a proven List of proven Lists", () => {
+				expect(
+					diagnosticsFor(`implementation {
+						constant groups: NonEmptyList<NonEmptyList<Integer>> = [[1], [2]]
+
+						Terminal.inspect(groups::firstItem()::firstItem())
+					}`),
+				).toEqual([])
+			})
+
+			// NOTE: The refusal points at the ITEM. The List itself is written
+			// perfectly well and its Type names nothing wrong; what went
+			// unanswered is one item's predicate, and the arrow has to land
+			// where a reader can act on it.
+			it("should refuse an empty item, pointing at it", () => {
+				let diagnostics = diagnosticsFor(`implementation {
+					constant broken: List<NonEmptyList<Integer>> = [[1], []]
+				}`)
+
+				expect(diagnostics).toHaveLength(1)
+				expect(diagnostics[0].code).toBe("assignment-type-mismatch")
+				expect(diagnostics[0].labels[1]?.kind).toBe("secondary")
+				expect(diagnostics[0].labels[1]?.message).toBe(
+					"this item is a List<Unknown>",
+				)
+				expect(diagnostics[0].notes).toEqual([
+					"'broken' is declared as List<NonEmptyList<Integer>>.",
+					"Every item has to be a NonEmptyList<Integer>, and every value of that Type has been proven to answer '@::hasItems()'.",
+				])
+				expect(diagnostics[0].helps).toEqual([
+					"Check '@::hasItems()' on the item in an 'if' or a 'match', or write an item that already has Type 'NonEmptyList<Integer>'.",
+				])
+			})
+
+			// NOTE: An item nobody wrote out is refused BY TYPE, which is the
+			// same rule the count already followed: what the brackets say is how
+			// many items there are, never what one of them is. An opaque item
+			// that already answers the refinement is admitted, and one that does
+			// not is refused where it stands.
+			it("should judge an item the Program computes by its Type", () => {
+				let source = (answer: string) => `implementation {
+					function made() -> ${answer} {
+						<- [7]
+					}
+
+					constant groups: List<NonEmptyList<Integer>> = [[1], made()]
+
+					Terminal.inspect(groups::length())
+				}`
+
+				expect(diagnosticsFor(source("NonEmptyList<Integer>"))).toEqual(
+					[],
+				)
+
+				let refused = diagnosticsFor(source("List<Integer>"))
+
+				expect(refused).toHaveLength(1)
+				expect(refused[0].labels[1]?.message).toBe(
+					"this item is a List<Integer>",
+				)
+			})
+
+			// NOTE: The empty written List decides nothing about its items and
+			// needs to decide nothing: it has none, and every List Type already
+			// accepts it.
+			it("should keep the empty written List assignable", () => {
+				expect(
+					diagnosticsFor(`implementation {
+						constant none: List<NonEmptyList<Integer>> = []
+
+						Terminal.inspect(none::length())
+					}`),
+				).toEqual([])
+			})
+
+			// NOTE: And the same question where the item's Type Arguments are
+			// the call's to work out — the items decide the instantiation, and
+			// the List handed back is of what they decided.
+			it("should decide a Type Argument the call infers from the items", () => {
+				expect(
+					diagnosticsFor(`implementation {
+						type Filled<Item> = List<Item> where @::hasItems()
+
+						function countOf<infer Item>(_ groups: List<Filled<Item>>) -> Integer {
+							<- groups::length()
+						}
+
+						Terminal.inspect(countOf([["a"], ["b", "c"]]))
+					}`),
+				).toEqual([])
+			})
+		})
 	})
 })
 
