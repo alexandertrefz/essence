@@ -26,13 +26,10 @@ declarations {
 	§ real square root. Both operations answer an Optional without the proof.
 	type NonNegativeInteger = Integer where @::isGreaterThanOrEqualTo(0)
 
-	§ The Integers above zero, written as the two predicates above rather than
-	§ as `@::isPositive()`. One refinement flows into another by conjunct
-	§ subset. So a Type carrying `@::isPositive()` alone reaches neither of
-	§ them, and is refused where either is wanted. Written as the conjunction,
-	§ one of these is both.
-	type PositiveInteger = Integer where @::isNot(0)
-		::and(@::isGreaterThanOrEqualTo(0))
+	§ The Integers above zero. `isPositive` is written `@::isGreaterThan(0)`,
+	§ and a value above zero is neither zero nor below it. So a value proven
+	§ to be one of these is accepted wherever either Type above is wanted.
+	type PositiveInteger = Integer where @::isPositive()
 
 	§ Whole numbers of arbitrary size, and the exact arithmetic over them.
 	§ Nothing here rounds. An operation that leaves the Integers widens into

@@ -33,6 +33,7 @@ import {
 	mergedRecordType,
 	mentionsUnsolvedTypeParameter,
 	mergeUnionMembers,
+	impliedConjunctKeys,
 	negatedPredicateConjunct,
 	parameterInternalName,
 	type PatternBinding,
@@ -7266,17 +7267,21 @@ function narrowingsFor(
 			continue
 		}
 
-		let keys = new Set(proven.conjuncts.map(predicateConjunctKey))
-
 		// NOTE: Evidence the binding's Type already carries is evidence the branch
 		// has. A Parameter declared `NonZeroInteger` asking `if n::isOdd()` has
 		// proven both things, which is what lets an `else if` inside an `else` add
 		// to what the `else` established rather than start over.
-		if (proven.receiverType.type === "Refinement") {
-			for (let conjunct of provenConjuncts(proven.receiverType)) {
-				keys.add(predicateConjunctKey(conjunct))
-			}
-		}
+		//
+		// NOTE: Closed over what the leaves IMPLY, and closed over the whole of
+		// them at once — the `else` of `@::is(0)` and the `else` of
+		// `@::isLessThan(0)` say nothing apiece and say "above zero" together.
+		// So the two are gathered before the closure rather than keyed as they
+		// arrive.
+		let keys = impliedConjunctKeys(
+			proven.receiverType.type === "Refinement"
+				? [...proven.conjuncts, ...provenConjuncts(proven.receiverType)]
+				: proven.conjuncts,
+		)
 
 		let established: common.RefinementType | null = null
 
@@ -7296,8 +7301,13 @@ function narrowingsFor(
 				continue
 			}
 
+			// NOTE: Counted through what a leaf IMPLIES, so that "proves the
+			// most" is about the questions a refinement answers rather than the
+			// ones it spells: `PositiveInteger` is one leaf and answers three,
+			// where `NonZeroInteger` is one leaf and answers one.
+			//
 			// NOTE: Strictly GREATER, so where two candidates prove the same
-			// number of conjuncts the one walked FIRST stands. That walk is
+			// number of questions the one walked FIRST stands. That walk is
 			// ordered, and the order is the whole tie-break: nearest Scope first,
 			// insertion order within a table — which puts the builtins ahead of a
 			// Program's own declarations — and every concrete candidate ahead of a
@@ -7314,8 +7324,8 @@ function narrowingsFor(
 			// branch may write.
 			if (
 				established === null ||
-				provenConjuncts(refinement).length >
-					provenConjuncts(established).length
+				impliedConjunctKeys(provenConjuncts(refinement)).size >
+					impliedConjunctKeys(provenConjuncts(established)).size
 			) {
 				established = refinement
 			}
@@ -7609,12 +7619,19 @@ function refinedLiteralReceiverType(
 	}
 
 	// NOTE: Each admitted refinement proves a SUBSET of the conjunction, so one
-	// proving as many conjuncts as the whole of it proves exactly the whole of
-	// it. A declared predicate's conjuncts are canonical — sorted and deduped
-	// where the Alias was read — so counting them counts distinct questions.
-	let named = admitted.find(
-		(refinement) => provenConjuncts(refinement).length === proven.size,
-	)
+	// that proves every question the whole of it asks IS the whole of it, and
+	// gets to name it. Read through what a leaf implies — `PositiveInteger` is
+	// one leaf and `3` is admitted into three Aliases, but a value above zero
+	// has already been proven to be neither zero nor below it, so the one name
+	// covers the three.
+	let named = admitted.find((refinement) => {
+		let implied = impliedConjunctKeys(provenConjuncts(refinement))
+
+		return (
+			implied.size >= proven.size &&
+			[...proven].every((key) => implied.has(key))
+		)
+	})
 
 	if (named !== undefined) {
 		return named
