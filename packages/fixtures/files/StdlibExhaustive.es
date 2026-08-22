@@ -1001,7 +1001,14 @@ third"::lines())
 			"Algebraic.subtract(_ Algebraic) [differing radicals]",
 			rootTwo::subtract(rootThree),
 		)
-		show("Algebraic.multiply(with: Integer)", rootTwo::multiply(with 3))
+		§ The irrational arithmetic tells its entries apart by what is known
+		§ about the OTHER operand, exactly as the Integer division family
+		§ above does, so the computed Constants keep these calls on the
+		§ entries answering a Union or an Optional.
+		show(
+			"Algebraic.multiply(with: Integer)",
+			rootTwo::multiply(with computedThree),
+		)
 		show(
 			"Algebraic.multiply(with: Integer) [by zero]",
 			rootTwo::multiply(with 0),
@@ -1015,7 +1022,11 @@ third"::lines())
 			"Algebraic.multiply(with: Algebraic) [differing radicals]",
 			rootTwo::multiply(with rootThree),
 		)
-		show("Algebraic.divide(by: Integer)", rootTwo::divide(by 2))
+		show(
+			"Algebraic.multiply(with: NonZeroInteger)",
+			rootTwo::multiply(with 3),
+		)
+		show("Algebraic.divide(by: Integer)", rootTwo::divide(by computedTwo))
 		show("Algebraic.divide(by: Integer) [by zero]", rootTwo::divide(by 0))
 		show("Algebraic.divide(by: Rational)", rootTwo::divide(by 1/2))
 		show(
@@ -1030,6 +1041,7 @@ third"::lines())
 			"Algebraic.divide(by: Algebraic) [differing radicals]",
 			rootTwo::divide(by rootThree),
 		)
+		show("Algebraic.divide(by: NonZeroInteger)", rootTwo::divide(by 2))
 		§ The fallback entries. A sum over differing radicals leaves the
 		§ quadratic slice, and so does a product of two values that are not
 		§ pure radicals — those are the two shapes the fallback answers for.
@@ -1112,7 +1124,13 @@ third"::lines())
 		"Transcendental.subtract(_ Transcendental) [stays Transcendental]",
 		Number.Tau::subtract(Number.Pi),
 	)
-	show("Transcendental.multiply(with: Integer)", Number.Pi::multiply(with 2))
+	§ The same split as the Algebraic block above: a computed factor or
+	§ divisor reaches the entry answering a Union or an Optional, and one
+	§ written where it stands proves itself and reaches the total entry.
+	show(
+		"Transcendental.multiply(with: Integer)",
+		Number.Pi::multiply(with computedTwo),
+	)
 	show(
 		"Transcendental.multiply(with: Integer) [by zero]",
 		Number.Pi::multiply(with 0),
@@ -1121,7 +1139,14 @@ third"::lines())
 		"Transcendental.multiply(with: Rational)",
 		Number.Pi::multiply(with 1/2),
 	)
-	show("Transcendental.divide(by: Integer)", Number.Pi::divide(by 2))
+	show(
+		"Transcendental.multiply(with: NonZeroInteger)",
+		Number.Pi::multiply(with 2),
+	)
+	show(
+		"Transcendental.divide(by: Integer)",
+		Number.Pi::divide(by computedTwo),
+	)
 	show(
 		"Transcendental.divide(by: Integer) [by zero]",
 		Number.Pi::divide(by 0),
@@ -1139,6 +1164,7 @@ third"::lines())
 		"Transcendental.divide(by: Transcendental) [π by e]",
 		Number.Pi::divide(by Number.E),
 	)
+	show("Transcendental.divide(by: NonZeroInteger)", Number.Pi::divide(by 2))
 	show(
 		"Transcendental.divide(by: Integer, defaultingTo: Transcendental)",
 		Number.Pi::divide(by 2, defaultingTo Number.E),

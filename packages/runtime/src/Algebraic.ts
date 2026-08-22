@@ -8,7 +8,7 @@ import {
 	subtractRationals,
 } from "./bigRational"
 import type { IntegerType } from "./Integer"
-import type { OptionalType } from "./Optional"
+import type { OptionalType, ValueType } from "./Optional"
 import { createEmpty, createValue } from "./Optional"
 import type { OrderingType } from "./Ordering"
 import { equal, greater, less } from "./Ordering"
@@ -411,6 +411,17 @@ export function divide(
 	)
 }
 
+// NOTE: `divide` under the proof its refined entry carries. The divisor is a
+// `NonZeroInteger` in the source, so the zero test above it can not fire and the
+// Optional always holds a value. A read of that value rather than a second
+// division: the arithmetic stays in one place.
+export function divideByNonZero(
+	algebraic: AlgebraicType,
+	other: IntegerType,
+): AlgebraicType {
+	return (divide(algebraic, other) as ValueType<AlgebraicType>).item
+}
+
 // NOTE: Same-radicand arithmetic stays inside the slice (and may collapse to
 // a Rational — √2·√2 = 2); different radicands generally do not — those come
 // back empty until the general algebraic representation exists.
@@ -612,8 +623,19 @@ export const add__overload$3 = addAlgebraic
 export const multiply__overload$1 = multiply
 export const multiply__overload$2 = multiply
 export const multiply__overload$3 = multiplyWithAlgebraic
+// NOTE: The refined entries take the same Integer the plain ones do — a
+// refinement erases before anything runs — and answer the narrower Type the
+// proof affords: scaling `a + b·√d` by a non-zero factor leaves `b` non-zero,
+// so the radical survives and the value can not collapse to a Rational. The
+// product is the very implementation above under a narrower signature, which
+// is what keeps a proven call and an unproven one the same arithmetic.
+export const multiply__overload$5 = multiply as (
+	algebraic: AlgebraicType,
+	other: IntegerType,
+) => AlgebraicType
 export const divide__overload$1 = divide
 export const divide__overload$2 = divide
 export const divide__overload$3 = divideByAlgebraic
+export const divide__overload$7 = divideByNonZero
 
 // #endregion

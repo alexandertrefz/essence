@@ -176,14 +176,18 @@ direction an edge points. A value-LESS
 `Number.Pi` member read — no standard library Property has a value yet.
 
 `Number.Pi`, `Number.Tau` and `Number.E` look like the ones that should have
-gone first, and none of them can. No Essence expression produces a
+gone first, and `Pi` and `E` can not. No Essence expression produces a
 Transcendental out of nothing — every native that answers with one takes one —
-so `Pi` and `E` ARE the primitives the rest are written from, and there is no
-Transcendental literal to write instead. Every arithmetic route to `Tau` is
-Typed `Transcendental | Rational` (`Number.Pi::multiply(with 2)`,
-`Number.Pi::add(Number.Pi)`), because a zero factor and a cancelled π term
-collapse the value to a Rational, and the declared `Transcendental` refuses the
-Union. `Number.GoldenRatio` alone has an Essence spelling — a half plus half of
+so those two ARE the primitives the rest are written from, and there is no
+Transcendental literal to write instead. Every arithmetic route to `Tau` was
+Typed `Transcendental | Rational` as well, because a zero factor and a cancelled
+π term both collapse the value to a Rational and the declared `Transcendental`
+refuses the Union. One of them is not any more: `Number.Pi::multiply(with 2)`
+reaches the `NonZeroInteger` entry, since a written `2` proves the factor away,
+and answers a bare `Transcendental` — `Number.Pi::add(Number.Pi)` still answers
+the Union. What a bodied `Tau` would cost the emission band is unweighed, so it
+stays value-less with the other two. `Number.GoldenRatio` alone has an Essence
+spelling — a half plus half of
 `5::squareRoot()` — but `squareRoot`'s no-Argument entry answers an
 `Optional` the `Algebraic` annotation refuses, so it stays value-less with the others. So the band is
 exercised through `useStdlib`
