@@ -1122,8 +1122,13 @@ declarations {
 
 		§ The proof spent again. A List with something in it has an item its
 		§ key is lowest at, so these answer the item rather than an Optional.
-		§ The fallback is the first item, which the proof also affords. It is
-		§ never the answer unless it is itself the lowest.
+		§ Each reaches `List`'s own Optional entry through a Namespace
+		§ specifier. Without it the bare call would find this very entry, and
+		§ `infinite-recursion` would say so. The empty answer the proof rules
+		§ out is read off by the first item. So the comparison is written once,
+		§ in `List`, and the key Function is called for each item beyond the
+		§ first. Nothing can tell this fallback is dead, since
+		§ `Optional::value(defaultingTo:)` declares no bare `value()`.
 
 		§§ Answers the item whose key is lowest, which a non-empty List always has.
 		§§
@@ -1134,7 +1139,7 @@ declarations {
 		lowestItem<infer Key is Comparable>(
 			on key: (_: ItemType) -> Key,
 		) -> ItemType {
-			<- @::lowestItem(on key, defaultingTo @::firstItem())
+			<- @::<List>lowestItem(on key)::value(defaultingTo @::firstItem())
 		}
 
 		§§ Answers the item whose key is greatest, which a non-empty List always has.
@@ -1146,7 +1151,7 @@ declarations {
 		greatestItem<infer Key is Comparable>(
 			on key: (_: ItemType) -> Key,
 		) -> ItemType {
-			<- @::greatestItem(on key, defaultingTo @::firstItem())
+			<- @::<List>greatestItem(on key)::value(defaultingTo @::firstItem())
 		}
 	}
 }
