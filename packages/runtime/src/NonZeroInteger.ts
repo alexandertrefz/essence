@@ -18,8 +18,15 @@
 // its first entry binds to `multiply__overload$1`, which is the name
 // `Integer.ts` gives that Function too.
 //
-// NOTE: `raise` is the same shape. `Integer::raise` decides one case before it
-// reads the power — zero to a negative exponent, which has none — and the
-// receiver's proof is exactly what rules that case out. So the Function behind
-// the decision IS this Namespace's `raise`, re-exported under its name.
-export { multiply__overload$1, power as raise } from "./Integer"
+// NOTE: `raise` is the same shape, twice over. `Integer::raise` decides one
+// case before it reads the power — zero to a negative exponent, which has none
+// — and the receiver's proof is exactly what rules that case out, so the
+// Function behind the decision is this Namespace's first entry. The second is
+// `Integer`'s own non-negative entry under a second name: a Namespace over a
+// refinement hides the base's Method of the same name, so the entry has to be
+// declared here to stay reachable, and it is the same whole power either way.
+export {
+	multiply__overload$1,
+	power as raise__overload$1,
+	raise__overload$3 as raise__overload$2,
+} from "./Integer"

@@ -486,7 +486,11 @@ declarations {
 	§ irrational's own refined entry and answer that kind itself.
 	§
 	§ The third is totality: zero is the only base with a missing power, so
-	§ `raise` answers the power itself rather than an Optional.
+	§ `raise` answers the power itself rather than an Optional. Its second
+	§ entry repeats `Integer::raise(to NonNegativeInteger)`, which this
+	§ Namespace would otherwise hide. A refined target beats the base target
+	§ for a Method both declare. Without the repeat, a proven receiver would
+	§ answer the Union where an unproven one answers an Integer.
 	namespace NonZeroInteger for NonZeroInteger {
 		§§ Multiplies this NonZeroInteger with a number.
 		§§
@@ -523,11 +527,24 @@ declarations {
 
 		§§ Raises this NonZeroInteger to the given power.
 		§§
-		§§ A base that is not zero has every power, so the answer is the power itself rather than an Optional. A non-negative exponent answers an Integer, and a negative one answers the exact reciprocal as a Rational.
-		§§
-		§§ @param to — the exponent
-		§§ @returns — the power.
-		raise(to exponent: Integer) -> Integer | Rational
+		§§ A base that is not zero has every power, so the answer is the power itself rather than an Optional. An exponent proven not to be negative narrows that answer to an Integer.
+		overload raise {
+			§§ Raises this NonZeroInteger to the given power.
+			§§
+			§§ A non-negative exponent answers an Integer, and a negative one answers the exact reciprocal as a Rational.
+			§§
+			§§ @param to — the exponent
+			§§ @returns — the power.
+			(to exponent: Integer) -> Integer | Rational
+
+			§§ Raises this NonZeroInteger to an exponent proven not to be negative.
+			§§
+			§§ Every such power is whole, so the answer is an Integer rather than a Union. The entry is `Integer`'s own, declared here as well, because a receiver carrying more proof must not answer wider than one carrying none.
+			§§
+			§§ @param to — the exponent, proven not to be negative
+			§§ @returns — the power.
+			(to exponent: NonNegativeInteger) -> Integer
+		}
 	}
 
 	§ The other half of the sign. A negative Integer is the only one with no
