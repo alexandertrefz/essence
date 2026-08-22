@@ -6507,7 +6507,7 @@ describe("Enricher", () => {
 				})
 			})
 
-			it("should refuse a base outside Integer, String and an applied List", () => {
+			it("should refuse a base outside Integer, Rational, String and an applied List", () => {
 				expect(
 					refusal(
 						"implementation { type Yes = Boolean where @::is(true) }",

@@ -1349,7 +1349,7 @@ Error: A 'where' clause can not refine Boolean
     │ 
     │ Help: Drop the 'where' clause from 'Yes'.
     │ 
-    │ Note: A checked refinement is written on an Integer, a String or an applied List — 'List<String>', never a bare 'List'.
+    │ Note: A checked refinement is written on an Integer, a Rational, a String or an applied List — 'List<String>', never a bare 'List'.
 ────╯
 
 [invalid-refinement-predicate]
@@ -1362,7 +1362,7 @@ Error: A 'where' clause can not refine List
     │ 
     │ Help: Drop the 'where' clause from 'Several'.
     │ 
-    │ Note: A checked refinement is written on an Integer, a String or an applied List — 'List<String>', never a bare 'List'.
+    │ Note: A checked refinement is written on an Integer, a Rational, a String or an applied List — 'List<String>', never a bare 'List'.
 ────╯
 
 [invalid-refinement-predicate]
