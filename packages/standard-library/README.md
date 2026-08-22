@@ -10,8 +10,8 @@ brings the `Number` and `Irrational` Union Types with it), and `List` together
 with `NestedList`, `NonEmptyList` and the `NonEmptyNestedList` that only both
 of those proofs together reach. A checked refinement is exported beside
 the base it narrows: `NonZeroInteger`, `NonNegativeInteger` and
-`PositiveInteger` beside `Integer`, `NonEmptyString` beside `String`,
-`NonEmptyList` beside `List`. Each reaches everything its base reaches, and the
+`PositiveInteger` beside `Integer`, `NonZeroRational` beside `Rational`,
+`NonEmptyString` beside `String`, `NonEmptyList` beside `List`. Each reaches everything its base reaches, and the
 tighter answers a proof affords on top — `DEVELOPMENT.md` has the rule a
 narrowed receiver is read by. A value written down is its own proof and reaches
 them without being narrowed at all: `4::squareRoot()` answers a number and

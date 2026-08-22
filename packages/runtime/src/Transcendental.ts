@@ -557,13 +557,13 @@ export function divide(
 	)
 }
 
-// NOTE: `divide` under the proof its refined entry carries. The divisor is a
-// `NonZeroInteger` in the source, so the zero test above it can not fire and the
-// Optional always holds a value. A read of that value rather than a second
-// division: the arithmetic stays in one place.
+// NOTE: `divide` under the proof its refined entries carry. The divisor is a
+// `NonZeroInteger` or a `NonZeroRational` in the source, so the zero test above
+// it can not fire and the Optional always holds a value. A read of that value
+// rather than a second division: the arithmetic stays in one place.
 export function divideByNonZero(
 	transcendental: TranscendentalType,
-	other: IntegerType,
+	other: IntegerType | RationalType,
 ): TranscendentalType {
 	return (divide(transcendental, other) as ValueType<TranscendentalType>).item
 }
@@ -708,9 +708,20 @@ export const multiply__overload$3 = multiply as (
 	transcendental: TranscendentalType,
 	other: IntegerType,
 ) => TranscendentalType
+export const multiply__overload$4 = multiply as (
+	transcendental: TranscendentalType,
+	other: RationalType,
+) => TranscendentalType
 export const divide__overload$1 = divide
 export const divide__overload$2 = divide
 export const divide__overload$3 = divideByTranscendental
-export const divide__overload$7 = divideByNonZero
+export const divide__overload$7 = divideByNonZero as (
+	transcendental: TranscendentalType,
+	other: IntegerType,
+) => TranscendentalType
+export const divide__overload$8 = divideByNonZero as (
+	transcendental: TranscendentalType,
+	other: RationalType,
+) => TranscendentalType
 
 // #endregion

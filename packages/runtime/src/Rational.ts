@@ -15,7 +15,7 @@ import {
 import type { IntegerType } from "./Integer"
 import { createInteger } from "./Integer"
 import type { NumberFormatType } from "./NumberFormat"
-import type { OptionalType } from "./Optional"
+import type { OptionalType, ValueType } from "./Optional"
 import { createEmpty, createValue } from "./Optional"
 import type { OrderingType } from "./Ordering"
 import { equal, greater, less } from "./Ordering"
@@ -207,6 +207,17 @@ export function divide__overload$1(
 	return createValue(
 		createReducedRational(divideRationals(reducedParts(rational), divisor)),
 	)
+}
+
+// NOTE: The same division under the proof its refined entry carries. The
+// divisor is a `NonZeroRational` in the source, so the numerator test above can
+// not fire and the Optional always holds a value. A read of that value rather
+// than a second division: the arithmetic stays in one place.
+export function divide__overload$7(
+	rational: RationalType,
+	other: RationalType,
+): RationalType {
+	return (divide__overload$1(rational, other) as ValueType<RationalType>).item
 }
 
 // #endregion

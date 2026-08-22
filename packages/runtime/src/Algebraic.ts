@@ -411,13 +411,13 @@ export function divide(
 	)
 }
 
-// NOTE: `divide` under the proof its refined entry carries. The divisor is a
-// `NonZeroInteger` in the source, so the zero test above it can not fire and the
-// Optional always holds a value. A read of that value rather than a second
-// division: the arithmetic stays in one place.
+// NOTE: `divide` under the proof its refined entries carry. The divisor is a
+// `NonZeroInteger` or a `NonZeroRational` in the source, so the zero test above
+// it can not fire and the Optional always holds a value. A read of that value
+// rather than a second division: the arithmetic stays in one place.
 export function divideByNonZero(
 	algebraic: AlgebraicType,
-	other: IntegerType,
+	other: IntegerType | RationalType,
 ): AlgebraicType {
 	return (divide(algebraic, other) as ValueType<AlgebraicType>).item
 }
@@ -633,9 +633,20 @@ export const multiply__overload$5 = multiply as (
 	algebraic: AlgebraicType,
 	other: IntegerType,
 ) => AlgebraicType
+export const multiply__overload$6 = multiply as (
+	algebraic: AlgebraicType,
+	other: RationalType,
+) => AlgebraicType
 export const divide__overload$1 = divide
 export const divide__overload$2 = divide
 export const divide__overload$3 = divideByAlgebraic
-export const divide__overload$7 = divideByNonZero
+export const divide__overload$7 = divideByNonZero as (
+	algebraic: AlgebraicType,
+	other: IntegerType,
+) => AlgebraicType
+export const divide__overload$8 = divideByNonZero as (
+	algebraic: AlgebraicType,
+	other: RationalType,
+) => AlgebraicType
 
 // #endregion

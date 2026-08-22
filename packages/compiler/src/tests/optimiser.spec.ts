@@ -4954,7 +4954,12 @@ describe("Optimiser", () => {
 			// folded. The entry taking an Integer is still emitted — the mixed
 			// sum at the end of the Program reaches it, and is left alone.
 			expect(generated).not.toContain("Rational.add__overload$1")
+			// NOTE: A written `1/2` proves it is not zero, so the product of
+			// two of them is `NonZeroRational`'s entry rather than
+			// `Rational`'s. The fold reads the Namespace by name and has to
+			// know that one too, so BOTH names are asked for here.
 			expect(generated).not.toContain("Rational.multiply__overload$1")
+			expect(generated).not.toContain("NonZeroRational.multiply")
 		})
 
 		it("renders an interpolation hole whose value is written out", () => {

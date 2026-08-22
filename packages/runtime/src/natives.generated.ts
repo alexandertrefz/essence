@@ -178,6 +178,8 @@ export type RationalNatives = {
 	divide__overload$1: (self: RationalType, by: RationalType) => OptionalType<RationalType>
 	// divide(by: Algebraic) -> Algebraic | Rational
 	divide__overload$3: (self: RationalType, by: AlgebraicType) => AlgebraicType | RationalType
+	// divide(by: NonZeroRational) -> Rational
+	divide__overload$7: (self: RationalType, by: RationalType) => RationalType
 	// raise(to: Integer) -> Optional<Rational>
 	raise__overload$1: (self: RationalType, to: IntegerType) => OptionalType<RationalType>
 	// raise(to: NonNegativeInteger) -> Rational
@@ -188,6 +190,13 @@ export type RationalNatives = {
 	numerator: (self: RationalType) => IntegerType
 	// denominator() -> NonZeroInteger
 	denominator: (self: RationalType) => IntegerType
+}
+
+export type NonZeroRationalNatives = {
+	// multiply(with: NonZeroRational) -> NonZeroRational
+	multiply: (self: RationalType, argument1: RationalType) => RationalType
+	// reciprocal() -> NonZeroRational
+	reciprocal: (self: RationalType) => RationalType
 }
 
 export type AlgebraicNatives = {
@@ -209,6 +218,8 @@ export type AlgebraicNatives = {
 	multiply__overload$3: (self: AlgebraicType, argument1: AlgebraicType) => OptionalType<RationalType | AlgebraicType>
 	// multiply(with: NonZeroInteger) -> Algebraic
 	multiply__overload$5: (self: AlgebraicType, argument1: IntegerType) => AlgebraicType
+	// multiply(with: NonZeroRational) -> Algebraic
+	multiply__overload$6: (self: AlgebraicType, argument1: RationalType) => AlgebraicType
 	// divide(by: Integer) -> Optional<Algebraic>
 	divide__overload$1: (self: AlgebraicType, by: IntegerType) => OptionalType<AlgebraicType>
 	// divide(by: Rational) -> Optional<Algebraic>
@@ -217,6 +228,8 @@ export type AlgebraicNatives = {
 	divide__overload$3: (self: AlgebraicType, by: AlgebraicType) => OptionalType<RationalType | AlgebraicType>
 	// divide(by: NonZeroInteger) -> Algebraic
 	divide__overload$7: (self: AlgebraicType, by: IntegerType) => AlgebraicType
+	// divide(by: NonZeroRational) -> Algebraic
+	divide__overload$8: (self: AlgebraicType, by: RationalType) => AlgebraicType
 	// negate() -> Algebraic
 	negate: (self: AlgebraicType) => AlgebraicType
 }
@@ -238,6 +251,8 @@ export type TranscendentalNatives = {
 	multiply__overload$2: (self: TranscendentalType, argument1: RationalType) => TranscendentalType | RationalType
 	// multiply(with: NonZeroInteger) -> Transcendental
 	multiply__overload$3: (self: TranscendentalType, argument1: IntegerType) => TranscendentalType
+	// multiply(with: NonZeroRational) -> Transcendental
+	multiply__overload$4: (self: TranscendentalType, argument1: RationalType) => TranscendentalType
 	// divide(by: Integer) -> Optional<Transcendental>
 	divide__overload$1: (self: TranscendentalType, by: IntegerType) => OptionalType<TranscendentalType>
 	// divide(by: Rational) -> Optional<Transcendental>
@@ -246,6 +261,8 @@ export type TranscendentalNatives = {
 	divide__overload$3: (self: TranscendentalType, by: TranscendentalType) => OptionalType<RationalType>
 	// divide(by: NonZeroInteger) -> Transcendental
 	divide__overload$7: (self: TranscendentalType, by: IntegerType) => TranscendentalType
+	// divide(by: NonZeroRational) -> Transcendental
+	divide__overload$8: (self: TranscendentalType, by: RationalType) => TranscendentalType
 	// absolute() -> Transcendental
 	absolute: (self: TranscendentalType) => TranscendentalType
 	// negate() -> Transcendental
@@ -487,7 +504,7 @@ export const $BooleanArity: AssertArities<typeof import("./Boolean"), {
 
 declare const IntegerModule: typeof import("./Integer")
 export const $Integer: IntegerNatives = IntegerModule
-export const $IntegerAbsent: AssertNoEssenceExports<typeof import("./Integer"), "parse__overload$1" | "parse__overload$2" | "is" | "add__overload$2" | "add__overload$3" | "add__overload$4" | "subtract__overload$1" | "subtract__overload$2" | "subtract__overload$3" | "subtract__overload$4" | "multiply__overload$2" | "multiply__overload$3" | "multiply__overload$4" | "divide__overload$1" | "divide__overload$2" | "divide__overload$5" | "divide__overload$6" | "remainder__overload$3" | "quotient__overload$3" | "raise__overload$2" | "squareRoot__overload$2" | "isLessThan__overload$1" | "isLessThan__overload$2" | "isLessThanOrEqualTo__overload$1" | "isLessThanOrEqualTo__overload$2" | "isGreaterThan__overload$1" | "isGreaterThan__overload$2" | "isGreaterThanOrEqualTo__overload$1" | "isGreaterThanOrEqualTo__overload$2" | "isEven" | "isOdd" | "isPositive" | "isNegative" | "isZero" | "absolute"> = true
+export const $IntegerAbsent: AssertNoEssenceExports<typeof import("./Integer"), "parse__overload$1" | "parse__overload$2" | "is" | "add__overload$2" | "add__overload$3" | "add__overload$4" | "subtract__overload$1" | "subtract__overload$2" | "subtract__overload$3" | "subtract__overload$4" | "multiply__overload$2" | "multiply__overload$3" | "multiply__overload$4" | "divide__overload$1" | "divide__overload$2" | "divide__overload$5" | "divide__overload$6" | "divide__overload$7" | "remainder__overload$3" | "quotient__overload$3" | "raise__overload$2" | "squareRoot__overload$2" | "isLessThan__overload$1" | "isLessThan__overload$2" | "isLessThanOrEqualTo__overload$1" | "isLessThanOrEqualTo__overload$2" | "isGreaterThan__overload$1" | "isGreaterThan__overload$2" | "isGreaterThanOrEqualTo__overload$1" | "isGreaterThanOrEqualTo__overload$2" | "isEven" | "isOdd" | "isPositive" | "isNegative" | "isZero" | "absolute"> = true
 export const $IntegerArity: AssertArities<typeof import("./Integer"), {
 	compare: 2
 	toString: 1
@@ -533,11 +550,19 @@ export const $RationalArity: AssertArities<typeof import("./Rational"), {
 	multiply__overload$1: 2
 	divide__overload$1: 2
 	divide__overload$3: 2
+	divide__overload$7: 2
 	raise__overload$1: 2
 	raise__overload$3: 2
 	squareRoot__overload$1: 1
 	numerator: 1
 	denominator: 1
+}> = true
+
+declare const NonZeroRationalModule: typeof import("./NonZeroRational")
+export const $NonZeroRational: NonZeroRationalNatives = NonZeroRationalModule
+export const $NonZeroRationalArity: AssertArities<typeof import("./NonZeroRational"), {
+	multiply: 2
+	reciprocal: 1
 }> = true
 
 declare const AlgebraicModule: typeof import("./Algebraic")
@@ -553,10 +578,12 @@ export const $AlgebraicArity: AssertArities<typeof import("./Algebraic"), {
 	multiply__overload$2: 2
 	multiply__overload$3: 2
 	multiply__overload$5: 2
+	multiply__overload$6: 2
 	divide__overload$1: 2
 	divide__overload$2: 2
 	divide__overload$3: 2
 	divide__overload$7: 2
+	divide__overload$8: 2
 	negate: 1
 }> = true
 
@@ -572,10 +599,12 @@ export const $TranscendentalArity: AssertArities<typeof import("./Transcendental
 	multiply__overload$1: 2
 	multiply__overload$2: 2
 	multiply__overload$3: 2
+	multiply__overload$4: 2
 	divide__overload$1: 2
 	divide__overload$2: 2
 	divide__overload$3: 2
 	divide__overload$7: 2
+	divide__overload$8: 2
 	absolute: 1
 	negate: 1
 }> = true

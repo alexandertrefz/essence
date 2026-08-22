@@ -40,6 +40,13 @@ declarations {
 
 	namespace Rounding for Rounding is Equatable, is Printable {}
 
+	§ The Rationals that are not zero, as a checked refinement, and the sister
+	§ of `NonZeroInteger`. The bound is written `0/1` rather than `0`, because
+	§ `Rational::isNot` is the entry a Rational bound reaches. An Integer bound
+	§ finds no same-kind entry and falls to the covering `Number`, which is a
+	§ different question to a conjunct key.
+	type NonZeroRational = Rational where @::isNot(0/1)
+
 	§ Exact ratios of Integers, kept in lowest terms with the sign on the
 	§ numerator. The literal form is `3/4`, and `Rational.of` builds one from
 	§ two computed Integers. Arithmetic never rounds: an operation that leaves
@@ -247,7 +254,9 @@ declarations {
 		§ The four same-kind entries are native. An Essence body would read both
 		§ parts of both operands and hand them to `Rational.of`, whose answer is
 		§ not reduced. The runtime's bigint core does each one as one
-		§ cross-multiplication and one reduction.
+		§ cross-multiplication and one reduction. The refined quotient below is
+		§ native beside them, and is that same division with the zero test taken
+		§ out.
 
 		§§ Adds a number to the Rational, and stays exact for every member of the numeric tower.
 		overload add {
@@ -314,7 +323,7 @@ declarations {
 
 		§§ Divides the Rational by a number, exactly.
 		§§
-		§§ Dividing by an Integer or a Rational answers empty for a zero divisor. With `defaultingTo`, the given value stands in place of empty. Dividing by an Algebraic always answers, because an Algebraic is irrational and so never zero. Dividing by an Integer proven not to be zero always answers too.
+		§§ Dividing by an Integer or a Rational answers empty for a zero divisor. With `defaultingTo`, the given value stands in place of empty. Dividing by an Algebraic always answers, because an Algebraic is irrational and so never zero. Dividing by an Integer proven not to be zero always answers too. A Rational proven not to be zero answers as well.
 		overload divide {
 			§§ @param by — the Rational to divide by
 			§§ @returns — the quotient, or nothing when the divisor is zero.
@@ -361,6 +370,14 @@ declarations {
 					over @::denominator()::multiply(with other),
 				)
 			}
+
+			§§ Divides by a Rational proven not to be zero.
+			§§
+			§§ There is no failure to report, so the quotient itself is the answer.
+			§§
+			§§ @param by — the divisor, proven not to be zero
+			§§ @returns — the quotient.
+			(by other: NonZeroRational) -> Rational
 		}
 
 		§§ Raises the Rational to the given power.
@@ -502,7 +519,7 @@ declarations {
 
 		§§ Answers the reciprocal of the Rational.
 		§§
-		§§ The reciprocal exchanges the numerator and the denominator. Zero has no reciprocal, and the `defaultingTo:` entry answers the given Rational instead.
+		§§ The reciprocal exchanges the numerator and the denominator. Zero has no reciprocal, and the `defaultingTo:` entry answers the given Rational instead. A receiver proven not to be zero answers the reciprocal itself.
 		overload reciprocal {
 			§§ @returns — the reciprocal, or nothing for zero.
 			() -> Optional<Rational> {
@@ -579,9 +596,35 @@ declarations {
 			}
 		}
 	}
+
+	§ What a Rational proven not to be zero answers that a bare one can not,
+	§ the sister of `namespace NonZeroInteger`. Both entries are native: a
+	§ refinement erases before anything runs, so an entry whose promise is
+	§ about the answer can not be written in Essence.
+	§
+	§ Multiplication closes over the proof, as it does for the Integers: a
+	§ product of two Rationals that are not zero is never zero. Addition does
+	§ not, as `1/2` and `-1/2` show, so nothing else here is written on it.
+	namespace NonZeroRational for NonZeroRational {
+		§§ Multiplies this NonZeroRational with another.
+		§§
+		§§ The product is never zero, so the answer is a NonZeroRational too.
+		§§
+		§§ @param with — the NonZeroRational to multiply with
+		§§ @returns — the product, which is not zero.
+		multiply(with other: NonZeroRational) -> NonZeroRational
+
+		§§ Answers the reciprocal of this NonZeroRational.
+		§§
+		§§ Zero is the one Rational with no reciprocal, and the receiver is proven not to be one. So the answer is the reciprocal itself rather than an Optional. Exchanging the two parts of a value that is not zero leaves a value that is not zero, so the answer is proven as well.
+		§§
+		§§ @returns — the reciprocal, which is not zero.
+		reciprocal() -> NonZeroRational
+	}
 }
 
 export {
+	NonZeroRational
 	NumberFormat
 	Rational
 	Rounding

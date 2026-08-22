@@ -51,6 +51,11 @@ export const builtinMemberOrder: Array<string> = [
 	// Integer can be proven to be in one place.
 	"NonNegativeInteger",
 	"Rational",
+	// NOTE: Directly after `Rational`, for the reason `NonZeroInteger` sits
+	// directly after `Integer` — the two Namespaces one Rational value can
+	// reach belong together, and the general one has to be met FIRST so that
+	// `NonZeroRational::reciprocal` reads as the extra a proven Rational has.
+	"NonZeroRational",
 	"Algebraic",
 	"Transcendental",
 	"Number",
@@ -155,6 +160,9 @@ export const builtinTypeOrder: Array<string> = [
 	"NonNegativeInteger",
 	"PositiveInteger",
 	"Rational",
+	// NOTE: Directly after the Type it refines, for the reason `NonZeroInteger`
+	// sits directly after `Integer`.
+	"NonZeroRational",
 	"Algebraic",
 	"Transcendental",
 	"Record",
