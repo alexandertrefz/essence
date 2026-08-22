@@ -2911,6 +2911,23 @@ function isOpenBindable(
 	)
 }
 
+// NOTE: Whether a Type Parameter already stands for a refinement. A Parameter
+// binds the BASE wherever a value is measured against it, so this is only ever
+// true of one bound from INSIDE a Type — `ItemType` off a
+// `List<NonEmptyList<Integer>>` receiver — or of one an author applied by hand.
+// Either way it is a proof somebody wrote down, and the comparison belongs
+// against it rather than against what it narrows.
+function refinementBoundTo(
+	type: common.Type,
+	context: GenericInferenceContext | null,
+): boolean {
+	if (type.type !== "GenericUse" || !isOpenBindable(type.name, context)) {
+		return false
+	}
+
+	return context?.bindings.get(type.name)?.type === "Refinement"
+}
+
 // NOTE: Where in a Type the comparison currently stands. `OUTERMOST` is the
 // whole of what a position asks — an Argument against its Parameter, a value
 // against its Declaration — and `NESTED` is everything reached by going THROUGH
@@ -2961,6 +2978,14 @@ function matchTypes(
 	// it names. Each member then faces the intact refinement: a refinement
 	// member by its conjuncts below, any other member through this same
 	// unwrapping one level down.
+	//
+	// NOTE: And not where the Type Parameter is already BOUND to a refinement,
+	// wherever it stands. There is nothing left to infer there — the Parameter
+	// stands for a proof already, and unwrapping would ask a proven Argument to
+	// fit the base and then refuse it for being proven. It is what a Method
+	// whose Parameter is the item Type meets on a proven item Type:
+	// `groups::append(proven)` and `groups::contains([9])` both hand a
+	// `NonEmptyList<Integer>` to an `ItemType` bound to one.
 	if (
 		rhs.type === "Refinement" &&
 		lhs.type !== "Refinement" &&
@@ -2969,7 +2994,8 @@ function matchTypes(
 			depth === NESTED &&
 			lhs.type === "GenericUse" &&
 			isOpenBindable(lhs.name, context)
-		)
+		) &&
+		!refinementBoundTo(lhs, context)
 	) {
 		return matchTypes(lhs, rhs.base, context, depth)
 	}
