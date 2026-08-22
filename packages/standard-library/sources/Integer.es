@@ -313,7 +313,7 @@ declarations {
 
 		§§ Raises the Integer to the given power.
 		§§
-		§§ A non-negative exponent answers an Integer, and a negative one answers the exact reciprocal as a Rational. Zero to the power of zero is one. Raising this Integer to an exponent proven not to be negative can not fail. Zero raised to a negative power answers empty, and the `defaultingTo:` entry answers the given value instead.
+		§§ A non-negative exponent answers an Integer, and a negative one answers the exact reciprocal as a Rational. Zero to the power of zero is one. Raising this Integer to an exponent proven not to be negative can not fail. A receiver proven not to be zero can not fail either, and answers through `NonZeroInteger`. Zero raised to a negative power answers empty, and the `defaultingTo:` entry answers the given value instead.
 		overload raise {
 			§§ @param to — the exponent
 			§§ @returns — the power, or nothing when raising zero to a negative power.
@@ -342,7 +342,7 @@ declarations {
 
 		§§ Answers the exact square root.
 		§§
-		§§ A perfect square answers an Integer, and any other non-negative Integer answers an exact Algebraic. A negative Integer answers empty, and the `defaultingTo:` entry answers the given value instead.
+		§§ A perfect square answers an Integer, and any other non-negative Integer answers an exact Algebraic. A negative Integer answers empty, and the `defaultingTo:` entry answers the given value instead. A receiver proven not to be negative answers the root itself, through `NonNegativeInteger`.
 		overload squareRoot {
 			§§ @returns — the root, or nothing for a negative Integer.
 			() -> Optional<Integer | Algebraic>
