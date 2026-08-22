@@ -583,6 +583,108 @@ describe("Code Actions", () => {
 		})
 	})
 
+	describe("fallback-never-used", () => {
+		// NOTE: The Argument the Warning names goes, and the comma in front of it
+		// goes with it — a call left holding `(by 2, )` is not what the Help asks
+		// for. The Warning is the only thing wrong with this Program, so the
+		// buffer analyses clean once the fix is applied.
+		it("should remove the fallback and the comma in front of it", () => {
+			let lines = [
+				"implementation {",
+				"\tconstant half = 10::divide(by 2, defaultingTo 0/1)",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+			let result = applied(lines, fix)
+
+			expect(fix.title).toBe("Remove the 'defaultingTo' Argument")
+			expect(result[1]).toBe("\tconstant half = 10::divide(by 2)")
+
+			expect(codesOf(result)).toEqual([])
+		})
+
+		// NOTE: A fallback that is the only Argument has no comma to take, and
+		// the brackets stay.
+		it("should leave the brackets where the fallback stands alone", () => {
+			let lines = [
+				"implementation {",
+				"\tconstant scores: NonEmptyList<Integer> = [3, 1, 2]",
+				"\tconstant best = scores::firstItem(defaultingTo 0)",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+			let result = applied(lines, fix)
+
+			expect(result[2]).toBe("\tconstant best = scores::firstItem()")
+
+			expect(codesOf(result)).toEqual([])
+		})
+
+		// NOTE: The Standard Library writes `defaultingTo:` last, but nothing
+		// makes a Program do so — a fallback ahead of another Argument takes the
+		// comma AFTER it instead, or the call is left starting with one.
+		it("should take the comma after a fallback written first", () => {
+			let lines = [
+				"implementation {",
+				"\tnamespace Boxes for List<Integer> {",
+				"\t\toverload head {",
+				"\t\t\t(also extra: Integer) -> Optional<Integer> {",
+				"\t\t\t\t<- @::firstItem()",
+				"\t\t\t}",
+				"",
+				"\t\t\t(defaultingTo fallback: Integer, also extra: Integer) -> Integer {",
+				"\t\t\t\t<- @::firstItem(defaultingTo fallback)",
+				"\t\t\t}",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tnamespace FilledBoxes for NonEmptyList<Integer> {",
+				"\t\thead(also extra: Integer) -> Integer {",
+				"\t\t\t<- @::firstItem()",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tconstant proven: NonEmptyList<Integer> = [3, 1, 2]",
+				"\tconstant head = proven::head(defaultingTo 0, also 1)",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+			let result = applied(lines, fix)
+
+			expect(result[20]).toBe("\tconstant head = proven::head(also 1)")
+
+			expect(codesOf(result)).toEqual([])
+		})
+
+		// NOTE: A call written over several lines leaves the Argument's line
+		// empty rather than holding a comma on its own, which is what taking the
+		// whitespace with the comma buys.
+		it("should carry a call written over several lines", () => {
+			let lines = [
+				"implementation {",
+				"\tconstant half = 10::divide(",
+				"\t\tby 2,",
+				"\t\tdefaultingTo 0/1,",
+				"\t)",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+			let result = applied(lines, fix)
+
+			expect(result.slice(1, 4)).toEqual([
+				"\tconstant half = 10::divide(",
+				"\t\tby 2,",
+				"\t)",
+			])
+
+			expect(codesOf(result)).toEqual([])
+		})
+	})
+
 	describe("missing-return", () => {
 		it("should add an else branch when the body ends in an If", () => {
 			let lines = [
