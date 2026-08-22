@@ -566,5 +566,64 @@ describe("Stdlib", () => {
 				}`),
 			).toEqual([])
 		})
+
+		// NOTE: Splitting opens a group per item, so every group it answers
+		// holds one — which is the item Type, and true of the empty receiver
+		// too, since it answers no groups at all. What the RECEIVER carries is
+		// a second promise on top: a List proven to have something in it
+		// answers groups it certainly has one of.
+		//
+		// The three receiver kinds are pinned together because they are told
+		// apart by what each one proves: a written List proves its own count,
+		// a Constant declared `NonEmptyList` carries the proof it was declared
+		// with, and a computed List carries none.
+		it("types split by what the receiver proves", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					constant computed: List<Integer> = [1, 2]::map((n) { <- n::add(0) })
+					constant proven: NonEmptyList<Integer> = [1, 2]
+
+					constant written: NonEmptyList<NonEmptyList<Integer>> = [1, 2]::split(intoGroupsOf 1)
+					constant fromProof: NonEmptyList<NonEmptyList<Integer>> = proven::split(intoGroupsOf 1)
+					constant fromComputed: List<NonEmptyList<Integer>> = computed::split(intoGroupsOf 1)
+					constant item: Integer = fromProof::firstItem()::firstItem()
+					constant flat: NonEmptyList<Integer> = fromProof::flatten()
+					constant flatComputed: List<Integer> = fromComputed::flatten()
+				}`),
+			).toEqual([])
+
+			// NOTE: The one a computed receiver can NOT promise, which is what
+			// keeps the two entries apart: nothing said the List had an item,
+			// so nothing says it answers a group.
+			expect(
+				diagnosticsFor(`implementation {
+					constant computed: List<Integer> = [1, 2]::map((n) { <- n::add(0) })
+					constant groups: NonEmptyList<NonEmptyList<Integer>> = computed::split(intoGroupsOf 1)
+				}`),
+			).not.toEqual([])
+		})
+
+		// NOTE: Pairing stops with the shorter List, so the proof has to come
+		// from BOTH sides — the receiver's alone leaves the pairing as empty as
+		// what it was paired with.
+		it("types pair by what both Lists prove", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					constant computed: List<Integer> = [1, 2]::map((n) { <- n::add(0) })
+					constant proven: NonEmptyList<Integer> = [1, 2]
+
+					constant both: NonEmptyList<{ first: Integer, second: Integer }> = proven::pair(with proven)
+					constant one: List<{ first: Integer, second: Integer }> = proven::pair(with computed)
+				}`),
+			).toEqual([])
+
+			expect(
+				diagnosticsFor(`implementation {
+					constant computed: List<Integer> = [1, 2]::map((n) { <- n::add(0) })
+					constant proven: NonEmptyList<Integer> = [1, 2]
+					constant pairs: NonEmptyList<{ first: Integer, second: Integer }> = proven::pair(with computed)
+				}`),
+			).not.toEqual([])
+		})
 	})
 })
