@@ -102,6 +102,44 @@ describe("The affected set", () => {
 	})
 })
 
+// NOTE: A report is WAITED FOR, never slept through. The platform delivers a
+// directory event when it delivers it: on an idle machine that is a few
+// milliseconds, and on one running three test suites at once it was measured
+// past the 400 ms these tests once slept — so they failed while the watcher
+// was right. A deadline is the only timing left, and it is generous, because
+// it is only ever reached when the watcher is wrong.
+function arrival(): { arrived: Promise<void>; arrive: () => void } {
+	let arrive = (): void => {}
+	let arrived = new Promise<void>((resolve) => {
+		arrive = resolve
+	})
+
+	return { arrived, arrive }
+}
+
+function within(
+	deadline: number,
+	arrived: Promise<void>,
+	what: string,
+): Promise<void> {
+	return new Promise((resolve, reject) => {
+		let timer = setTimeout(() => {
+			reject(new Error(`${what} did not arrive within ${deadline} ms`))
+		}, deadline)
+
+		void arrived.then(() => {
+			clearTimeout(timer)
+			resolve()
+		})
+	})
+}
+
+// NOTE: Under bun's own per-test timeout of five seconds, and deliberately so.
+// A deadline that fires AFTER the test has already timed out rejects a Promise
+// nobody is waiting on any more, which bun reports as an "unhandled error
+// between tests" — a second failure, unattributed, for the price of one.
+const DEADLINE = 4000
+
 describe("The source watcher", () => {
 	it("reports a file that changed and not the ones that did not", async () => {
 		let directory = mkdtempSync(path.join(tmpdir(), "essence-watcher-"))
@@ -112,9 +150,13 @@ describe("The source watcher", () => {
 		writeFileSync(still, "one")
 
 		let seen: Array<Array<string>> = []
+		let { arrived, arrive } = arrival()
 		let watcher = createSourceWatcher({
 			debounce: 10,
-			onChange: (files) => seen.push(files),
+			onChange: (files) => {
+				seen.push(files)
+				arrive()
+			},
 		})
 
 		try {
@@ -124,7 +166,13 @@ describe("The source watcher", () => {
 			// in length for a save landing inside one millisecond to count.
 			writeFileSync(changed, "one and a half")
 
-			await new Promise((resolve) => setTimeout(resolve, 400))
+			await within(DEADLINE, arrived, "the change")
+
+			// NOTE: One more debounce window, so that a file that did NOT
+			// change has had every chance to be reported wrongly. This wait
+			// can only make the test fail for a watcher that is wrong, never
+			// for a machine that is slow.
+			await new Promise((resolve) => setTimeout(resolve, 50))
 
 			expect(seen).toEqual([[changed]])
 		} finally {
@@ -140,11 +188,13 @@ describe("The source watcher", () => {
 		writeFileSync(watched, "one")
 
 		let activity = 0
+		let { arrived, arrive } = arrival()
 		let watcher = createSourceWatcher({
 			debounce: 10,
 			onChange: () => {},
 			onActivity: () => {
 				activity += 1
+				arrive()
 			},
 		})
 
@@ -152,7 +202,7 @@ describe("The source watcher", () => {
 			await watcher.watch([watched])
 			writeFileSync(path.join(directory, "New.es"), "two")
 
-			await new Promise((resolve) => setTimeout(resolve, 400))
+			await within(DEADLINE, arrived, "the activity")
 
 			expect(activity).toBeGreaterThan(0)
 		} finally {
@@ -161,6 +211,111 @@ describe("The source watcher", () => {
 		}
 	})
 
+	// NOTE: The timer is the fallback for an event the platform never delivers
+	// — measured, not imagined; see the NOTE atop watcher.ts. A directory
+	// watcher that reports nothing stands in for that platform here, so what
+	// these two prove is the timer on its own.
+	const silent = (): { close(): void; on(): void } => ({
+		close() {},
+		on() {},
+	})
+
+	it("finds a change its directory watcher never reported", async () => {
+		let directory = mkdtempSync(path.join(tmpdir(), "essence-watcher-"))
+		let changed = path.join(directory, "Changed.es")
+
+		writeFileSync(changed, "one")
+
+		let seen: Array<Array<string>> = []
+		let { arrived, arrive } = arrival()
+		let watcher = createSourceWatcher({
+			debounce: 10,
+			poll: 50,
+			watchDirectory: silent,
+			onChange: (files) => {
+				seen.push(files)
+				arrive()
+			},
+		})
+
+		try {
+			await watcher.watch([changed])
+			writeFileSync(changed, "one and a half")
+
+			await within(DEADLINE, arrived, "the change")
+
+			expect(seen).toEqual([[changed]])
+		} finally {
+			watcher.close()
+			rmSync(directory, { recursive: true, force: true })
+		}
+	})
+
+	it("finds a file that appeared without its directory watcher saying so", async () => {
+		let directory = mkdtempSync(path.join(tmpdir(), "essence-watcher-"))
+		let watched = path.join(directory, "Watched.es")
+
+		writeFileSync(watched, "one")
+
+		let activity = 0
+		let { arrived, arrive } = arrival()
+		let watcher = createSourceWatcher({
+			debounce: 10,
+			poll: 50,
+			watchDirectory: silent,
+			onChange: () => {},
+			onActivity: () => {
+				activity += 1
+				arrive()
+			},
+		})
+
+		try {
+			await watcher.watch([watched])
+			writeFileSync(path.join(directory, "New.es"), "two")
+
+			await within(DEADLINE, arrived, "the activity")
+
+			expect(activity).toBeGreaterThan(0)
+		} finally {
+			watcher.close()
+			rmSync(directory, { recursive: true, force: true })
+		}
+	})
+
+	// NOTE: An idle tick must report nothing: a session that heard "something
+	// happened" every half second would rebuild for ever.
+	it("says nothing from a tick where nothing changed", async () => {
+		let directory = mkdtempSync(path.join(tmpdir(), "essence-watcher-"))
+		let watched = path.join(directory, "Watched.es")
+
+		writeFileSync(watched, "one")
+
+		let activity = 0
+		let watcher = createSourceWatcher({
+			debounce: 10,
+			poll: 20,
+			watchDirectory: silent,
+			onChange: () => {},
+			onActivity: () => {
+				activity += 1
+			},
+		})
+
+		try {
+			await watcher.watch([watched])
+
+			await new Promise((resolve) => setTimeout(resolve, 200))
+
+			expect(activity).toBe(0)
+		} finally {
+			watcher.close()
+			rmSync(directory, { recursive: true, force: true })
+		}
+	})
+
+	// NOTE: The timer is closed with the watchers; `poll` is short here so a
+	// tick that outlived `close` would be caught inside the wait.
 	it("says nothing once it is closed", async () => {
 		let directory = mkdtempSync(path.join(tmpdir(), "essence-watcher-"))
 		let watched = path.join(directory, "Watched.es")
@@ -170,6 +325,7 @@ describe("The source watcher", () => {
 		let seen = 0
 		let watcher = createSourceWatcher({
 			debounce: 10,
+			poll: 20,
 			onChange: () => {
 				seen += 1
 			},

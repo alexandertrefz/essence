@@ -44,6 +44,15 @@ export type WatchOptions = LoadOptions & {
 	// renamed over the original — and a load per event would compile a file
 	// halfway through being written.
 	debounce?: number
+	// NOTE: How often the sources' signatures are read without a directory
+	// event prompting it, in milliseconds; `DEFAULT_POLL` otherwise, and zero
+	// for never. A directory watcher is NOT armed when `fs.watch` returns, and
+	// a busy machine loses the event outright rather than delivering it late —
+	// measured at 4 writes in 30 unreported when made right after the watch
+	// began, and none when they waited 300 ms. The timer finds a save the
+	// platform never mentioned within one tick; the events stay, because a
+	// tick is slow and an event is not.
+	poll?: number
 }
 
 export type ModuleWatcher = {
@@ -58,6 +67,7 @@ export type ModuleWatcher = {
 }
 
 const DEFAULT_DEBOUNCE = 60
+const DEFAULT_POLL = 500
 
 export async function watchModule(
 	entryPath: string,
@@ -65,6 +75,7 @@ export async function watchModule(
 ): Promise<ModuleWatcher> {
 	let entry = canonicalPath(entryPath)
 	let debounce = options.debounce ?? DEFAULT_DEBOUNCE
+	let poll = options.poll ?? DEFAULT_POLL
 	let current: EssenceModule | null = null
 	let currentHash: string | null = null
 	let files: Array<string> = []
@@ -75,6 +86,7 @@ export async function watchModule(
 	let signatures = new Map<string, string>()
 	let watchers = new Map<string, ReturnType<typeof watchDirectory>>()
 	let timer: ReturnType<typeof setTimeout> | null = null
+	let ticker: ReturnType<typeof setInterval> | null = null
 	let loading = false
 	// NOTE: A change that landed WHILE a load was running. The load in flight
 	// read the sources before it, so it is loaded again once it is done rather
@@ -120,12 +132,19 @@ export async function watchModule(
 			}
 
 			try {
-				watchers.set(
-					directory,
-					watchDirectory(directory, () => {
-						void checkForChanges()
-					}),
-				)
+				let watcher = watchDirectory(directory, () => {
+					void checkForChanges()
+				})
+
+				// NOTE: A watcher can fail AFTER it was made — the directory
+				// goes away, or the platform runs out of handles — and says so
+				// with an "error" event, which an EventEmitter with no listener
+				// throws as an uncaught exception. That would take the HOST
+				// down for a directory it may not even be editing, so it is
+				// heard and left alone, for the reason the catch below gives.
+				watcher.on("error", () => {})
+
+				watchers.set(directory, watcher)
 			} catch {
 				// NOTE: A directory that can not be watched is one whose files
 				// change unnoticed. There is nothing to do about it here that
@@ -216,6 +235,17 @@ export async function watchModule(
 
 	await load()
 
+	// NOTE: The timer is a fallback and not a reason to stay alive: the
+	// directory watchers hold the process open, and a host that closed them
+	// is one the timer must not keep running.
+	if (poll > 0 && !closed) {
+		ticker = setInterval(() => {
+			void checkForChanges()
+		}, poll)
+
+		ticker.unref()
+	}
+
 	return {
 		get module() {
 			return current
@@ -229,6 +259,11 @@ export async function watchModule(
 			if (timer !== null) {
 				clearTimeout(timer)
 				timer = null
+			}
+
+			if (ticker !== null) {
+				clearInterval(ticker)
+				ticker = null
 			}
 
 			for (let watcher of watchers.values()) {
