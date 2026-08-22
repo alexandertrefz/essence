@@ -581,6 +581,7 @@ describe("Stdlib Call Graph", () => {
 			"NonEmptyIntegerList.average",
 			"NonEmptyIntegerList.greatestNumber",
 			"NonEmptyIntegerList.lowestNumber",
+			"NonEmptyKeyedNumberList.average",
 			"NonEmptyList.greatestItem",
 			"NonEmptyList.lowestItem",
 			"NonEmptyList.sort__overload$3",

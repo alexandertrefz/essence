@@ -12,6 +12,7 @@ import * as list from "@essence-lang/runtime/List"
 import * as nestedList from "@essence-lang/runtime/NestedList"
 import * as nestedOptional from "@essence-lang/runtime/NestedOptional"
 import * as nonEmptyIntegerList from "@essence-lang/runtime/NonEmptyIntegerList"
+import * as nonEmptyKeyedNumberList from "@essence-lang/runtime/NonEmptyKeyedNumberList"
 import * as nonEmpty from "@essence-lang/runtime/NonEmptyList"
 import * as nonEmptyNumberList from "@essence-lang/runtime/NonEmptyNumberList"
 import * as nonEmptyRationalList from "@essence-lang/runtime/NonEmptyRationalList"
@@ -71,6 +72,7 @@ const runtimeModules: Record<string, Record<string, unknown>> = {
 	NonEmptyRationalList: nonEmptyRationalList,
 	NonEmptyNumberList: nonEmptyNumberList,
 	KeyedNumberList: keyedNumberList,
+	NonEmptyKeyedNumberList: nonEmptyKeyedNumberList,
 	Randomness: randomness,
 }
 

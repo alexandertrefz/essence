@@ -388,6 +388,10 @@ export type KeyedNumberListNatives = {
 
 }
 
+export type NonEmptyKeyedNumberListNatives = {
+
+}
+
 export type RandomnessNatives = {
 	// boolean() -> Boolean
 	boolean: (self: RandomnessType) => BooleanType
@@ -645,6 +649,10 @@ export const $NonEmptyNumberListAbsent: AssertNoEssenceExports<typeof import("./
 declare const KeyedNumberListModule: typeof import("./KeyedNumberList")
 export const $KeyedNumberList: KeyedNumberListNatives = KeyedNumberListModule
 export const $KeyedNumberListAbsent: AssertNoEssenceExports<typeof import("./KeyedNumberList"), "sum__overload$1" | "sum__overload$2" | "sum__overload$3" | "average__overload$1" | "average__overload$2"> = true
+
+declare const NonEmptyKeyedNumberListModule: typeof import("./NonEmptyKeyedNumberList")
+export const $NonEmptyKeyedNumberList: NonEmptyKeyedNumberListNatives = NonEmptyKeyedNumberListModule
+export const $NonEmptyKeyedNumberListAbsent: AssertNoEssenceExports<typeof import("./NonEmptyKeyedNumberList"), "average"> = true
 
 declare const RandomnessModule: typeof import("./Randomness")
 export const $Randomness: RandomnessNatives = RandomnessModule

@@ -101,6 +101,15 @@ export const builtinMemberOrder: Array<string> = [
 	// is free, and met last it reads as the extra it is: a List's own members
 	// are `List`'s, and these come after them.
 	"KeyedNumberList",
+	// NOTE: And after it, for the reason every proven Namespace sits after the
+	// one it narrows — a reader meets a List's own keyed aggregates before the
+	// extra a proof adds. Both declare `average`, and neither what Completion
+	// SHOWS nor what a call RESOLVES to turns on the order: the name is claimed
+	// by whichever of the two is met first, `mostSpecificMethod` then shows the
+	// refined entry's signature either way, and the Enricher picks the refined
+	// target for the same reason. All this order decides is where the one
+	// `average` lands in the list.
+	"NonEmptyKeyedNumberList",
 	// NOTE: Last, and not because it is newest. `Randomness` targets a Type
 	// nothing else targets and shares not one Method name with the Namespaces
 	// above it, so its position decides nothing at all — and a reader of this

@@ -12,6 +12,9 @@ are reachable from the List itself, through six Namespaces of their own in
 `NumberList.es` — `IntegerList`, `RationalList` and `NumberList`, and the
 `NonEmptyIntegerList`, `NonEmptyRationalList` and `NonEmptyNumberList` a proof
 of non-emptiness reaches instead, whose answers are bare rather than Optional.
+Two more read their numbers off a key rather than off the items:
+`KeyedNumberList`, whose target is the widest List there is, and
+`NonEmptyKeyedNumberList` beside it, where the same proof makes the mean bare.
 The modes a Method takes are Choices declared beside it: `Side`, `Rounding`,
 `NumberFormat`, `CaseSensitivity`, `NormalizationForm`, `Stream` and `Step`.
 A Choice whose Cases all carry no payload derives both its `Equatable` and its

@@ -898,6 +898,8 @@
 "KeyedNumberList.average<ItemType>(on: (_ ItemType) -> Integer | Rational) [empty] => Empty"
 "KeyedNumberList.average<ItemType>(on: (_ ItemType) -> Integer | Rational, defaultingTo: Rational) => 3/2"
 "KeyedNumberList.average<ItemType>(on: (_ ItemType) -> Integer | Rational, defaultingTo: Rational) [empty] => 0"
+"NonEmptyKeyedNumberList.average<ItemType>(on: (_ ItemType) -> Integer | Rational) => 2"
+"KeyedNumberList.sum<ItemType>(on: (_ ItemType) -> Integer) [proven receiver] => 6"
 "loop<State>(from: Integer, through: Integer, startingWith: State, step: (_ Integer, _ State) -> State) => 15"
 "loop<State>(from: Integer, through: Integer, startingWith: State, step: (_ Integer, _ State) -> State) [down] => 321"
 "loop<State>(startingWith: State, while: (_ State) -> Boolean, step: (_ State) -> State) => 128"
