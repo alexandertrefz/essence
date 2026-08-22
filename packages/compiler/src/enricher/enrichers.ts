@@ -53,9 +53,9 @@ import {
 	withArticle,
 } from "../helpers/index"
 import {
+	admissionOfWrittenValue,
 	admittedByEvaluation,
 	describePredicate,
-	isWrittenValue,
 	refinementDecidedBy,
 } from "../helpers/predicateEval"
 import { printType, signaturesOf } from "../printType"
@@ -7307,6 +7307,10 @@ type RefinementCandidates = {
 // Arguments, with the refinement one level in — which is why the two are collected
 // through one walk and kept apart, under the one `seen` set: `NonEmptyList` occupies
 // its name in the Type Scope exactly as `NonZeroInteger` occupies its own.
+// NOTE: Walked with `for...in` rather than over `Object.entries`, which
+// allocated a pair for every Type name in every Scope on the chain — the
+// standard library's names among them. A written RECEIVER asks this of every
+// literal it meets rather than once per branch, so the allocation showed.
 function refinementCandidatesInScope(
 	scope: enricher.Scope,
 ): RefinementCandidates {
@@ -7319,12 +7323,14 @@ function refinementCandidatesInScope(
 		current !== null;
 		current = current.parent
 	) {
-		for (let [name, type] of Object.entries(current.types)) {
+		for (let name in current.types) {
 			if (seen.has(name)) {
 				continue
 			}
 
 			seen.add(name)
+
+			let type = current.types[name]!
 
 			if (type.type === "Refinement") {
 				concrete.push(type)
@@ -7403,6 +7409,36 @@ function instantiatedRefinementFor(
 		return null
 	}
 
+	// NOTE: Remembered per Alias and per receiver SPELLING, which is what an
+	// instantiation is decided by — and remembered for the ANSWER's identity as
+	// much as for the work: `namespacesTargeting` keeps which Namespaces target a
+	// Type OBJECT, and a fresh `NonEmptyList<Integer>` built at every written
+	// List receiver missed that memo every time and walked every Namespace in
+	// scope over again. Asked AFTER the unification, which is the cheap half and
+	// the one that answers for every receiver the Alias does not fit at all.
+	//
+	// Weak on the Alias, so a Program's own goes when the Program does. A pending
+	// predicate is never remembered: the object handed back is a promise the fill
+	// has still to keep, and the copy has to be registered against its source
+	// each time one is taken.
+	let remembered =
+		refinement.conjuncts === null
+			? undefined
+			: (instantiatedRefinementMemos.get(alias) ??
+				new Map<string, common.RefinementType>())
+	let spelling = ""
+
+	if (remembered !== undefined) {
+		instantiatedRefinementMemos.set(alias, remembered)
+		spelling = describeType(receiverType)
+
+		let answer = remembered.get(spelling)
+
+		if (answer !== undefined) {
+			return answer
+		}
+	}
+
 	let instantiated = applyGenericBindings(refinement, bindings)
 
 	// NOTE: A substitution that changed nothing came back as the DECLARED object,
@@ -7416,16 +7452,26 @@ function instantiatedRefinementFor(
 	// have thrown on a pending predicate long before this line — so this is not
 	// where a pending one is expected, it is where the rule stays the same
 	// wherever a refinement is copied.
-	return instantiated.type === "Refinement" && instantiated !== refinement
-		? refinementWithTypeArguments(
-				instantiated,
-				alias.generics.map(
-					(generic) =>
-						bindings.get(generic.name) ?? { type: "Error" },
-				),
-			)
-		: null
+	if (instantiated.type !== "Refinement" || instantiated === refinement) {
+		return null
+	}
+
+	let stamped = refinementWithTypeArguments(
+		instantiated,
+		alias.generics.map(
+			(generic) => bindings.get(generic.name) ?? { type: "Error" },
+		),
+	)
+
+	remembered?.set(spelling, stamped)
+
+	return stamped
 }
+
+let instantiatedRefinementMemos = new WeakMap<
+	common.GenericAliasType,
+	Map<string, common.RefinementType>
+>()
 
 // NOTE: The conjunction Types a written receiver has already been given, kept by
 // what they SAY rather than by where they were built: a base and a conjunct set
@@ -7475,7 +7521,13 @@ function refinedLiteralReceiverType(
 	base: common.typed.ExpressionNode,
 	scope: enricher.Scope,
 ): common.RefinementType | null {
-	if (erasingRefinementProof || !isWrittenValue(base)) {
+	if (erasingRefinementProof) {
+		return null
+	}
+
+	let admits = admissionOfWrittenValue(base)
+
+	if (admits === null) {
 		return null
 	}
 
@@ -7486,6 +7538,7 @@ function refinedLiteralReceiverType(
 	}
 
 	let admitted: Array<common.RefinementType> = []
+	let proven = new Set<string>()
 
 	for (let refinement of refinementsFor(declared, base.type)) {
 		// NOTE: A predicate nobody has read yet is no candidate. Every other
@@ -7498,36 +7551,36 @@ function refinedLiteralReceiverType(
 		// could not write a literal receiver anywhere in the file. The Alias is
 		// simply not a candidate until its predicate has arrived, and by the
 		// enrichment pass every one of them has.
-		if (
-			refinement.conjuncts !== null &&
-			admittedByEvaluation(refinement, base)
-		) {
+		if (refinement.conjuncts !== null && admits(refinement)) {
 			admitted.push(refinement)
+
+			for (let conjunct of refinement.conjuncts) {
+				proven.add(predicateConjunctKey(conjunct))
+			}
 		}
 	}
 
-	if (admitted.length === 0) {
-		return null
+	// NOTE: One admitted refinement IS the conjunction, which is the everyday
+	// case and the one worth not allocating for.
+	if (admitted.length <= 1) {
+		return admitted[0] ?? null
 	}
-
-	let conjuncts = canonicalPredicateConjuncts(
-		admitted.flatMap(provenConjuncts),
-	)
 
 	// NOTE: Each admitted refinement proves a SUBSET of the conjunction, so one
 	// proving as many conjuncts as the whole of it proves exactly the whole of
-	// it. Counted over the canonical keys rather than over the array, since that
-	// is what "the same question" means everywhere else.
+	// it. A declared predicate's conjuncts are canonical — sorted and deduped
+	// where the Alias was read — so counting them counts distinct questions.
 	let named = admitted.find(
-		(refinement) =>
-			new Set(provenConjuncts(refinement).map(predicateConjunctKey))
-				.size === conjuncts.length,
+		(refinement) => provenConjuncts(refinement).length === proven.size,
 	)
 
 	if (named !== undefined) {
 		return named
 	}
 
+	let conjuncts = canonicalPredicateConjuncts(
+		admitted.flatMap(provenConjuncts),
+	)
 	let name = `${describeType(base.type)} where ${describePredicate({
 		type: "Refinement",
 		name: "",

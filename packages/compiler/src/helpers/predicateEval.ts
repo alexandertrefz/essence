@@ -45,29 +45,36 @@ export function admittedByEvaluation(
 	refinement: common.RefinementType,
 	value: common.typed.ExpressionNode,
 ): boolean {
+	return admissionOfWrittenValue(value)?.(refinement) ?? false
+}
+
+// NOTE: The same question asked of MANY refinements at once, with the value read
+// only once. A Method receiver is the one position nothing hands an expected
+// Type — it is typed bottom-up and Namespace lookup runs from whatever that came
+// to — so it asks every refinement in scope instead of one, and reading a written
+// List's items again per candidate is work the answer does not depend on.
+//
+// `null` is "not a value the Compiler can see written", which is the receiver's
+// first question and the cheapest: a receiver the table can not read costs one
+// switch and no candidate walk at all.
+export function admissionOfWrittenValue(
+	value: common.typed.ExpressionNode,
+): ((refinement: common.RefinementType) => boolean) | null {
 	let literal = literalValueOf(value)
+
+	if (literal === null) {
+		return null
+	}
 
 	// NOTE: The base is asked as well as the predicate. `["a"]::hasItems()` is
 	// true of a List of Strings and says nothing whatever about the
 	// `List<Integer>` a refinement of that base demands — the conjuncts alone
 	// would admit it.
-	if (literal === null || !matchesType(refinement.base, value.type)) {
-		return false
-	}
-
-	return provenConjuncts(refinement).every(
-		(conjunct) => evaluateConjunct(conjunct, literal) === true,
-	)
-}
-
-// NOTE: Whether the Compiler can see this value WRITTEN — the one question a
-// receiver asks before it goes looking for the refinements it proves. A Method
-// receiver is typed bottom-up and no position ever hands it an expected Type, so
-// nothing asks it what it might be; this is what lets it ask itself. It answers
-// exactly what `admittedByEvaluation` can decide anything about, so that a
-// receiver the table can not read costs one switch and no candidate walk at all.
-export function isWrittenValue(value: common.typed.ExpressionNode): boolean {
-	return literalValueOf(value) !== null
+	return (refinement) =>
+		matchesType(refinement.base, value.type) &&
+		provenConjuncts(refinement).every(
+			(conjunct) => evaluateConjunct(conjunct, literal) === true,
+		)
 }
 
 // NOTE: The refinement a written value is asked ABOUT, where the position it
