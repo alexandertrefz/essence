@@ -222,12 +222,17 @@ What is lowered, and nothing else:
   `Integer.product` where either fails. So `a::subtract(b)` — which is
   `@::add(other::negate())` — is one allocation where it was two, and no call on
   the path that is taken.
-- **NonZeroInteger**: `multiply`, and only that one — the Namespace declares
-  nothing else. A checked refinement is erased before the first pass runs, so
-  what a call of it holds is two ordinary Integers, and the Method it
-  would have reached is Integer's own product re-exported under the refined
-  Namespace's name. Same operator, same operands, same answer: the evidence was
-  spent while compiling and there is nothing left of it to run.
+- **NonZeroInteger**: `multiply`, and only where both operands are exactly
+  `Integer`. A checked refinement is erased before the first pass runs, so such
+  a call holds two ordinary Integers, and the Method it would have reached is
+  Integer's own product re-exported under the refined Namespace's name. Same
+  operator, same operands, same answer: the evidence was spent while compiling
+  and there is nothing left of it to run. The Namespace declares three more
+  entries, and each is left as the call it is. Two of them scale an Algebraic or
+  a Transcendental — the overload index is not what tells those apart, since the
+  operands are, and `scalarOperands` answers null for anything but two Integers
+  — and `raise` is refused by name as well as by `lowerInteger`, whose reason is
+  that the answer's size is the exponent's value rather than its length.
 - **Boolean**: `negate`, `and`, `or`, which become `!`, `&&` and `||`.
 - **String**: `is` and the provided `isNot`, which become one call to the
   runtime's `stringEquals`. Two Strings are equal when their CHARACTERS are — the same

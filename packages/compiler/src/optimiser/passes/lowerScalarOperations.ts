@@ -104,8 +104,9 @@ function lower(
 		// and reading it back would tie this pass to the Simplifier's numbering —
 		// the OPERANDS are: `scalarOperands` demands two Integers and answers null
 		// for anything else, which is the same guard `Integer`'s own case rests
-		// on. Anything else a Namespace of proven Integers grows is left alone
-		// until somebody weighs it.
+		// on. Every other member of the Namespace is left alone until somebody
+		// weighs it — `raise` among them, which `lowerInteger` refuses in any case,
+		// because the answer's size is the exponent's value rather than its length.
 		case "NonZeroInteger":
 			return member === "multiply" ? lowerInteger(node, member) : node
 		case "Boolean":
