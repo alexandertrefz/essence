@@ -21,6 +21,19 @@ declarations {
 	§ Rational rather than an Optional.
 	type NonZeroInteger = Integer where @::isNot(0)
 
+	§ The Integers from zero upward. An exponent proven to be one of these
+	§ raises any Integer to a whole power. A receiver proven to be one has a
+	§ real square root. Both operations answer an Optional without the proof.
+	type NonNegativeInteger = Integer where @::isGreaterThanOrEqualTo(0)
+
+	§ The Integers above zero, written as the two predicates above rather than
+	§ as `@::isPositive()`. One refinement flows into another by conjunct
+	§ subset. So a Type carrying `@::isPositive()` alone reaches neither of
+	§ them, and is refused where either is wanted. Written as the conjunction,
+	§ one of these is both.
+	type PositiveInteger = Integer where @::isNot(0)
+		::and(@::isGreaterThanOrEqualTo(0))
+
 	§ Whole numbers of arbitrary size, and the exact arithmetic over them.
 	§ Nothing here rounds. An operation that leaves the Integers widens into
 	§ a Rational, an Algebraic or a Transcendental instead.
@@ -501,5 +514,7 @@ declarations {
 
 export {
 	Integer
+	NonNegativeInteger
 	NonZeroInteger
+	PositiveInteger
 }
