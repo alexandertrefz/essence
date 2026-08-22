@@ -1694,7 +1694,12 @@ describe("Enricher", () => {
 						}
 
 						constant doubledOrLabel = [1]::transformFirst((value) {
-							if value::isGreaterThan(0) {
+							§ isEven is asked rather than isGreaterThan(0),
+							§ which the standard library declares
+							§ PositiveInteger by. The return would be that
+							§ refinement rather than a bare Integer, and the
+							§ Union is what this is about.
+							if value::isEven() {
 								<- value::multiply(with 2)
 							}
 
@@ -7040,10 +7045,11 @@ describe("Enricher", () => {
 			).toBe("Integer")
 		})
 
-		// NOTE: A leaf proves ITSELF and no leaf that merely follows from it.
-		// `isGreaterThan(0)` does imply `isNot(0)`, and nothing here reads one
-		// question off another.
-		it("should not narrow on a differently spelled predicate", () => {
+		// NOTE: One question spelled two ways is one question. `PositiveInteger`
+		// is declared `@::isPositive()`, whose body is `@::isGreaterThan(0)`, so
+		// the condition below asks the very leaf the Alias is declared by and
+		// the branch has proven it. Which spelling was written decides nothing.
+		it("should narrow on a differently spelled predicate", () => {
 			expect(
 				narrowedTypeOf(
 					`implementation {
@@ -7055,12 +7061,12 @@ describe("Enricher", () => {
 					}`,
 					"d",
 				),
-			).toBe("Integer")
+			).toBe("PositiveInteger")
 		})
 
-		// NOTE: The leaf it IS spelled by narrows, whichever of the two names
-		// the condition used — `@::isNot(0)` and `@::is(0)` are one leaf in two
-		// polarities, and `NonZeroInteger` is declared by the negated one.
+		// NOTE: And the one proving the MOST wins, counted through what a leaf
+		// implies. `@::isNot(0)` proves one question and reaches the one Alias
+		// declared by it; `PositiveInteger` would have to be proven above zero.
 		it("should narrow on the leaf the refinement is declared by", () => {
 			expect(
 				narrowedTypeOf(
@@ -7435,11 +7441,14 @@ describe("Enricher", () => {
 		})
 
 		it("should leave '@' alone where a Guard proves nothing declared", () => {
+			// NOTE: `isGreaterThan(7)` rather than `isGreaterThan(0)`, which the
+			// standard library declares `PositiveInteger` by. The bound is the
+			// whole of what makes this Guard prove nothing anybody named.
 			let value = lastConstantValue(`implementation {
 				constant value: Integer | String = 3
 
 				constant narrowed = match value -> Integer {
-					case Integer where @::isGreaterThan(0) {
+					case Integer where @::isGreaterThan(7) {
 						<- @
 					}
 
@@ -8362,7 +8371,7 @@ describe("Enricher", () => {
 
 					constant text = 12::toString()`),
 			).toBe(
-				"Integer where @::isNot(0)::and(@::isEven())::and(@::isGreaterThan(10))::and(@::isGreaterThanOrEqualTo(0))",
+				"Integer where @::isNot(0)::and(@::isEven())::and(@::isPositive())::and(@::isGreaterThan(10))::and(@::isGreaterThanOrEqualTo(0))",
 			)
 		})
 

@@ -1798,6 +1798,178 @@ export function negatedPredicateConjunct(
 	return { ...leaf, negated: !conjunct.negated }
 }
 
+// NOTE: What a set of leaves proves BESIDES the leaves themselves, as keys. A
+// value proven above zero has been proven not to be zero — so a receiver the
+// `if` proved `@::isPositive()` of reaches `NonZeroInteger`, which is what a
+// reader expects of the two and what comparing the spelled leaves alone does
+// not give.
+//
+// This is the ordering's own law and nothing more, which is what `Comparable`
+// promises of its conformers: below, above and equal to one bound exclude each
+// other and cover everything. So a leaf excludes the other two, and any two
+// exclusions leave the third — the `else` of `@::is(0)` and the `else` of
+// `@::isLessThan(0)` between them say the value is above zero. `isBetween` is
+// the same statement about two bounds at once, and says nothing at all when the
+// bounds enclose nothing.
+//
+// It is the SAME Argument throughout. `@::is(5)` says plenty about zero as
+// well, and every one of those would have to be worked out against every
+// literal any refinement in scope mentions — so what is here is the closure a
+// set carries on its own, which can not grow with the Program.
+//
+// NOTE: The Methods are named, not asked. `is`, `isLessThan`, `isGreaterThan`
+// and `isBetween` are `Equatable`'s and `Orderable`'s vocabulary, and a
+// Namespace declaring one of them under another meaning is telling the language
+// something false about a name it reserves in spirit — the reading this pass has
+// always taken of `is` and `isNot`.
+//
+// Remembered against the conjuncts ARRAY rather than the refinement, because
+// that array is the object the two-stage fill writes into every copy of an
+// Alias — so the declared `NonEmptyList<Item>` and every instantiation of it
+// share one answer, which is exactly what a memo wants. Assignability asks this
+// on a hot path and used to build a fresh Set at every call.
+let impliedKeyMemos = new WeakMap<
+	Array<common.PredicateConjunct>,
+	ReadonlySet<string>
+>()
+
+export function impliedConjunctKeys(
+	conjuncts: Array<common.PredicateConjunct>,
+): ReadonlySet<string> {
+	let remembered = impliedKeyMemos.get(conjuncts)
+
+	if (remembered !== undefined) {
+		return remembered
+	}
+
+	let keys = new Set<string>()
+
+	for (let conjunct of conjuncts) {
+		keys.add(predicateConjunctKey(conjunct))
+
+		for (let implied of excludedByConjunct(conjunct)) {
+			keys.add(predicateConjunctKey(implied))
+		}
+	}
+
+	for (let left of conjuncts) {
+		for (let remaining of leftByExclusions(left, conjuncts)) {
+			keys.add(predicateConjunctKey(remaining))
+		}
+	}
+
+	impliedKeyMemos.set(conjuncts, keys)
+
+	return keys
+}
+
+// NOTE: The two comparisons one leaf rules out, over its own Argument.
+function excludedByConjunct(
+	conjunct: common.PredicateConjunct,
+): Array<common.PredicateConjunct> {
+	if (conjunct.negated) {
+		return []
+	}
+
+	if (conjunct.args.length === 1) {
+		let others = COMPARISON_TRIO[conjunct.methodName]
+
+		return others === undefined
+			? []
+			: others.map((methodName) =>
+					comparisonLeaf(
+						conjunct,
+						methodName,
+						conjunct.args[0]!,
+						true,
+					),
+				)
+	}
+
+	if (conjunct.methodName === "isBetween" && conjunct.args.length === 2) {
+		let lower = integerArgument(conjunct.args[0]!)
+		let upper = integerArgument(conjunct.args[1]!)
+
+		// NOTE: Bounds in the wrong order enclose nothing, which is what the
+		// standard library's own body says — so the leaf is a claim no value
+		// answers, and reading anything off it would be reading off a
+		// contradiction.
+		if (lower === null || upper === null || lower > upper) {
+			return []
+		}
+
+		return [
+			comparisonLeaf(conjunct, "isLessThan", conjunct.args[0]!, true),
+			comparisonLeaf(conjunct, "isGreaterThan", conjunct.args[1]!, true),
+		]
+	}
+
+	return []
+}
+
+// NOTE: The comparison two EXCLUSIONS over one bound leave standing. The three
+// cover everything between them, so ruling out two proves the third: the `else`
+// of `@::is(0)` and the `else` of `@::isLessThan(0)` say nothing apiece and say
+// "above zero" together.
+function leftByExclusions(
+	conjunct: common.PredicateConjunct,
+	conjuncts: Array<common.PredicateConjunct>,
+): Array<common.PredicateConjunct> {
+	let others = conjunct.negated
+		? COMPARISON_TRIO[conjunct.methodName]
+		: undefined
+
+	if (others === undefined || conjunct.args.length !== 1) {
+		return []
+	}
+
+	let argument = conjunct.args[0]!
+	let standing = others.filter(
+		(methodName) =>
+			!conjuncts.some(
+				(other) =>
+					other.negated &&
+					other.namespaceName === conjunct.namespaceName &&
+					other.methodName === methodName &&
+					other.args.length === 1 &&
+					other.args[0] === argument,
+			),
+	)
+
+	return standing.length === 1
+		? [comparisonLeaf(conjunct, standing[0]!, argument, false)]
+		: []
+}
+
+// NOTE: The three comparisons over one bound, each mapped to the other two. Read
+// in one direction it is what a leaf rules out, and in the other what two ruled
+// out leave standing.
+const COMPARISON_TRIO: Record<string, Array<string>> = {
+	is: ["isLessThan", "isGreaterThan"],
+	isLessThan: ["is", "isGreaterThan"],
+	isGreaterThan: ["is", "isLessThan"],
+}
+
+function comparisonLeaf(
+	source: common.PredicateConjunct,
+	methodName: string,
+	argument: string | boolean,
+	negated: boolean,
+): common.PredicateConjunct {
+	return {
+		namespaceName: source.namespaceName,
+		methodName,
+		args: [argument],
+		negated,
+	}
+}
+
+function integerArgument(scalar: string | boolean): bigint | null {
+	return typeof scalar === "string" && /^-?\d+$/.test(scalar)
+		? BigInt(scalar)
+		: null
+}
+
 // NOTE: The one door to a refinement's conjuncts. They are null while the
 // predicate is still unresolved — the state a refined Alias hoists in when the
 // Namespace answering its predicate has not hoisted yet — and NOTHING may be
@@ -2774,12 +2946,17 @@ function matchTypes(
 	// more than was asked is proof enough, proving less is no proof at all — and
 	// by nothing else: a bare Integer arriving where `NonZeroInteger` stands is
 	// exactly the mistake the Type exists to name.
+	//
+	// "Include" reads the leaves the other side proves BESIDES the ones it
+	// spells — see `impliedConjunctKeys`. A value proven above zero has been
+	// proven not to be zero, and a Type saying so has to reach the Namespace
+	// that asks for exactly that.
 	if (lhs.type === "Refinement") {
 		if (rhs.type !== "Refinement") {
 			return false
 		}
 
-		let proven = new Set(provenConjuncts(rhs).map(predicateConjunctKey))
+		let proven = impliedConjunctKeys(provenConjuncts(rhs))
 
 		return (
 			matchTypes(lhs.base, rhs.base, context) &&
