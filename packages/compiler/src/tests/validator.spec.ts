@@ -3304,6 +3304,94 @@ describe("Validator", () => {
 			})
 		})
 
+		// NOTE: A refinement standing as a Type ARGUMENT comes back out as
+		// itself. Nobody inferred it there — something wrote
+		// `List<NonEmptyList<Integer>>` down, or a Method promised it — so the
+		// item Type is not a place a later value can widen, and a Type
+		// Parameter bound off it keeps the proof. The rule at the OUTERMOST
+		// position is the opposite one and is untouched: a Generic inferred
+		// from a refined Argument still binds the base.
+		describe("as a Type Argument", () => {
+			function withGroups(body: string): string {
+				return `implementation {
+					function groups() -> List<NonEmptyList<Integer>> {
+						<- []
+					}
+
+					${body}
+				}`
+			}
+
+			// NOTE: Read by asking for a Boolean, which nothing here is: the
+			// Diagnostic then names the Type the expression really has.
+			function typeOf(expression: string): string {
+				let diagnostics = diagnosticsFor(
+					withGroups(`constant probe: Boolean = ${expression}`),
+				)
+
+				return diagnostics[0]?.labels[0]?.message ?? "no Diagnostic"
+			}
+
+			it("should answer the item's proof back out of the List", () => {
+				expect(typeOf("groups()::firstItem()")).toBe(
+					"this is an Optional<NonEmptyList<Integer>>",
+				)
+			})
+
+			it("should hand a transform the proven item Type", () => {
+				expect(
+					typeOf("groups()::map((inner) { <- inner::firstItem() })"),
+				).toBe("this is a List<Integer>")
+			})
+
+			// NOTE: The proof two levels down, which is what makes the Type
+			// worth promising: the outer List's own proof and the inner one's
+			// are read one after the other with no branch anywhere. The written
+			// List holds an item that is already proven, so the item Type it
+			// infers is the refinement and the outer proof is its own count.
+			it("should spend both proofs of a proven List of proven Lists", () => {
+				expect(
+					diagnosticsFor(`implementation {
+						function groups() -> NonEmptyList<NonEmptyList<Integer>> {
+							constant inner: NonEmptyList<Integer> = [1]
+
+							<- [inner]
+						}
+
+						Terminal.inspect(groups()::firstItem()::firstItem())
+					}`),
+				).toEqual([])
+			})
+
+			// NOTE: A Namespace over the unrefined shape still answers — a
+			// `List<NonEmptyList<Integer>>` is a `List<List<Integer>>`, and the
+			// item Type binds through the base exactly as it always did.
+			it("should still reach a Namespace written over the base", () => {
+				expect(typeOf("groups()::flatten()")).toBe(
+					"this is a List<Integer>",
+				)
+			})
+
+			// NOTE: THE rule the outermost position keeps. A walk's State is a
+			// Type Parameter the call threads, and binding it to the seed's
+			// proof would refuse every step that answers an ordinary value.
+			it("should still bind a threaded Type Parameter to the base", () => {
+				expect(
+					diagnosticsFor(`implementation {
+						constant half: Rational = 1/2
+						constant seed = half::denominator()
+
+						constant answer = loop(from 1, through 3, startingWith seed, step (
+							_index,
+							carried,
+						) { <- carried::add(carried) })
+
+						Terminal.inspect(answer)
+					}`),
+				).toEqual([])
+			})
+		})
+
 		// NOTE: What a written List lets the Compiler decide is its LENGTH, and
 		// the two List predicates in the allowlist read nothing else. `[x, y]`
 		// holds exactly two items whatever `x` and `y` turn out to be — the
