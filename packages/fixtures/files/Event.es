@@ -47,7 +47,7 @@ implementation {
 		static createFrom(_ eventDescription: String = "") -> Event {
 			constant splitEvent = eventDescription::split(on ".")
 
-			constant eventName = splitEvent::firstItem()::value(defaultingTo "")
+			constant eventName = splitEvent::firstItem()
 
 			constant namespaces = splitEvent::removeFirst()::removeDuplicates()
 

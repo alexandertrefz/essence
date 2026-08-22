@@ -6222,7 +6222,7 @@ describe("Enricher", () => {
 		it("should refine a String and an applied List", () => {
 			expect(
 				refinementOf(
-					"implementation { type NonEmptyString = String where @::hasCharacters() }",
+					"implementation { type NonEmptyText = String where @::hasCharacters() }",
 				).base,
 			).toEqual({ type: "String" })
 
@@ -7091,8 +7091,6 @@ describe("Enricher", () => {
 		// of them narrows on its own.
 		it("should narrow both bindings a conjunction names", () => {
 			let source = `implementation {
-				type NonEmptyString = String where @::hasCharacters()
-
 				constant d = 3
 				constant s = "essence"
 
@@ -7150,8 +7148,6 @@ describe("Enricher", () => {
 				expect(
 					narrowedTypeOf(
 						`implementation {
-							type NonEmptyString = String where @::hasCharacters()
-
 							constant s = "essence"
 
 							if s::isEmpty() {
@@ -7419,6 +7415,13 @@ describe("Enricher", () => {
 				return printType(returned.expression.type)
 			}
 
+			// NOTE: The standard library's own `NonEmptyString` proves the very
+			// thing `Shout` does, and it is reached first, being declared first
+			// in the one top-level table — so it is the Type the Guard
+			// establishes. `Shout` is what the sources below ask nothing of:
+			// each is about a name or a binding form the evidence does not
+			// reach, and a Program-declared candidate beside the builtin is
+			// what keeps them about that rather than about which Alias won.
 			it("should narrow the binding its Guard proved the predicate of", () => {
 				expect(
 					bodyReadingOf(`implementation {
@@ -7436,7 +7439,7 @@ describe("Enricher", () => {
 							}
 						}
 					}`),
-				).toBe("Shout")
+				).toBe("NonEmptyString")
 			})
 
 			it("should leave the binding alone where a Guard proves nothing declared", () => {
@@ -7573,25 +7576,27 @@ describe("Enricher", () => {
 		})
 
 		// NOTE: A refinement over a base the binding is not of establishes nothing,
-		// however the predicate is spelled. Asked of a String receiver rather than
-		// of a List one, because the standard library's own `NonEmptyList` is a
-		// refinement over every List and would be established here on its own
-		// account — which is the doorway working, not this rule failing.
+		// however the predicate is spelled. Asked of an Integer receiver rather
+		// than of a List or a String one, because the standard library's own
+		// `NonEmptyList` and `NonEmptyString` are refinements over every List and
+		// every String and would be established here on their own account — which
+		// is the doorway working, not this rule failing. `isEven` is a predicate
+		// no refinement in scope asks, so nothing but the base can answer.
 		it("should not narrow across bases", () => {
 			expect(
 				narrowedTypeOf(
 					`implementation {
 						type NonEmptyStrings = List<String> where @::hasItems()
 
-						constant text = "essence"
+						constant count = 4
 
-						if text::hasCharacters() {
-							Terminal.inspect(text)
+						if count::isEven() {
+							Terminal.inspect(count)
 						}
 					}`,
-					"text",
+					"count",
 				),
-			).toBe("String")
+			).toBe("Integer")
 		})
 
 		// NOTE: A GENERIC refined Alias stands for nothing until something decides
@@ -7993,7 +7998,7 @@ describe("Enricher", () => {
 		it("should not narrow on a differently spelled predicate", () => {
 			expect(
 				selfTypesOf(`implementation {
-					type NonEmptyString = String where @::hasCharacters()
+					type NonEmptyText = String where @::hasCharacters()
 
 					constant text = "essence"
 

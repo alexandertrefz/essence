@@ -718,7 +718,7 @@ describe("Rewriter", () => {
 			describe("split", () => {
 				it("splits correctly when splitting on an empty string", () => {
 					expect(
-						string.split(
+						string.split__overload$1(
 							string.createString("abc"),
 							string.createString(""),
 						),
@@ -742,7 +742,10 @@ describe("Rewriter", () => {
 					let emoji = string.createString("a\u{1F600}b")
 
 					expect(
-						string.split(emoji, string.createString("")),
+						string.split__overload$1(
+							emoji,
+							string.createString(""),
+						),
 					).toEqual(
 						list.createList([
 							string.createString("a"),
@@ -753,7 +756,7 @@ describe("Rewriter", () => {
 				})
 
 				it("splits correctly using a substring", () => {
-					let pieces = string.split(
+					let pieces = string.split__overload$1(
 						string.createString("1 2 3"),
 						string.createString(" "),
 					)
@@ -766,7 +769,7 @@ describe("Rewriter", () => {
 				})
 
 				it("splits on an astral separator", () => {
-					let pieces = string.split(
+					let pieces = string.split__overload$1(
 						string.createString("a\u{1F600}b\u{1F600}c"),
 						string.createString("\u{1F600}"),
 					)

@@ -245,7 +245,13 @@ export function append(
 	return joined
 }
 
-export function split(
+// NOTE: The first of two entries, and the two are the same Function. The
+// second declares a `NonEmptyString` separator and answers a `NonEmptyList` —
+// a promise the Types make and erase, so there is nothing here to do
+// differently. What makes it true is the unconditional `pieces.push(current)`
+// below: a separator with a character in it leaves the piece before it,
+// whether or not it matched, so only the empty separator can answer no pieces.
+export function split__overload$1(
 	originalString: StringType,
 	splitterString: StringType,
 ): ListType<StringType> {
@@ -296,6 +302,8 @@ export function split(
 	// could pair the clusters differently (see `createSegmentedString`).
 	return createList(pieces.map((piece) => createSegmentedString(piece)))
 }
+
+export const split__overload$2 = split__overload$1
 
 // NOTE: The reversed String REMEMBERS its character view — the original's
 // clusters in the opposite order — rather than letting the joined text be

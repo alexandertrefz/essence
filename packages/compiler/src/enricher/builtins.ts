@@ -128,6 +128,9 @@ export const builtinMemberOrder: Array<string> = [
 export const builtinTypeOrder: Array<string> = [
 	"Boolean",
 	"String",
+	// NOTE: Directly after the Type it refines, for the reason `NonZeroInteger`
+	// sits directly after `Integer`.
+	"NonEmptyString",
 	"Integer",
 	// NOTE: Directly after the Type it refines, for the reason `NestedList` sits
 	// directly after `List` — a reader of this table meets `Integer` and then what
