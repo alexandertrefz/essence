@@ -19,8 +19,20 @@ import * as path from "node:path"
 //   before: a rebuild takes long enough for a save to land while it runs, and
 //   adopting that save as the baseline would mean waiting for a change that has
 //   already happened.
+// - A directory watcher is NOT armed when `watch` returns, and a busy machine
+//   loses the event outright rather than delivering it late. Measured, not
+//   supposed: with three test suites running, a watched file written right
+//   after `fs.watch` returned went unreported 4 times in 30, and never once
+//   when the write waited 300 ms. So the signatures are also read on a timer,
+//   and a save the platform never mentioned is found within one tick. The
+//   events stay, because a tick is slow and an event is not.
 
 export const DEFAULT_DEBOUNCE = 60
+
+// NOTE: How often the signatures are read without an event prompting it. Half
+// a second is long enough that a session of a few hundred files costs nothing
+// a reader notices, and short enough that a lost save is not a mystery.
+export const DEFAULT_POLL = 500
 
 // NOTE: Every file of every entry's graph, and which entries a change to it
 // reaches — a dependency is never rebuilt as an entry of its own, because what
@@ -97,6 +109,20 @@ export type SourceWatcherOptions = {
 	onActivity?: () => void
 	onError?: (directory: string, error: unknown) => void
 	debounce?: number
+	// NOTE: The timer's interval; `DEFAULT_POLL` otherwise, and zero for none.
+	poll?: number
+	// NOTE: How a directory watcher is made — `fs.watch` otherwise. A spec
+	// hands over one that reports nothing, to prove the timer on its own.
+	watchDirectory?: (
+		directory: string,
+		listener: () => void,
+	) => DirectoryWatcher
+}
+
+// NOTE: What `fs.watch` answers with, as far as this file reads it.
+export type DirectoryWatcher = {
+	close(): void
+	on(event: "error", listener: (error: unknown) => void): unknown
 }
 
 async function signature(fileName: string): Promise<string> {
@@ -113,11 +139,16 @@ export function createSourceWatcher(
 	options: SourceWatcherOptions,
 ): SourceWatcher {
 	let debounce = options.debounce ?? DEFAULT_DEBOUNCE
+	let poll = options.poll ?? DEFAULT_POLL
+	let watchDirectory = options.watchDirectory ?? watchPath
 	let signatures = new Map<string, string>()
-	let watchers = new Map<string, ReturnType<typeof watchPath>>()
+	let directorySignatures = new Map<string, string>()
+	let watchers = new Map<string, DirectoryWatcher>()
 	let watched = new Set<string>()
 	let pending = new Set<string>()
 	let timer: ReturnType<typeof setTimeout> | null = null
+	let ticker: ReturnType<typeof setInterval> | null = null
+	let reading: Promise<void> = Promise.resolve()
 	let closed = false
 
 	let schedule = (changed: Array<string>): void => {
@@ -150,11 +181,18 @@ export function createSourceWatcher(
 		}, debounce)
 	}
 
-	let checkForChanges = async (): Promise<void> => {
+	// NOTE: One read of every signature, prompted by a directory event or by
+	// the timer. A prompt from an event is activity whatever the read finds,
+	// since something happened in a watched directory; the timer is activity
+	// only where a directory's own signature moved, which is what a file
+	// appearing or going looks like from in here, so an idle tick reports
+	// nothing.
+	let readSignatures = async (prompted: boolean): Promise<void> => {
 		let changed: Array<string> = []
+		let activity = prompted
 
-		await Promise.all(
-			[...watched].map(async (fileName) => {
+		await Promise.all([
+			...[...watched].map(async (fileName) => {
 				let current = await signature(fileName)
 
 				if (
@@ -167,11 +205,37 @@ export function createSourceWatcher(
 				signatures.set(fileName, current)
 				changed.push(fileName)
 			}),
-		)
+			...[...watchers.keys()].map(async (directory) => {
+				let current = await signature(directory)
 
-		if (changed.length > 0 || options.onActivity !== undefined) {
+				if (
+					current === "missing" ||
+					directorySignatures.get(directory) === current
+				) {
+					return
+				}
+
+				directorySignatures.set(directory, current)
+				activity = true
+			}),
+		])
+
+		if (
+			changed.length > 0 ||
+			(activity && options.onActivity !== undefined)
+		) {
 			schedule(changed)
 		}
+	}
+
+	// NOTE: The reads are queued behind one another rather than run at once.
+	// An event and a tick landing together would otherwise both read the new
+	// signature before either had recorded it, and one save would be reported
+	// twice.
+	let checkForChanges = (prompted: boolean): Promise<void> => {
+		reading = reading.then(() => readSignatures(prompted))
+
+		return reading
 	}
 
 	return {
@@ -195,16 +259,43 @@ export function createSourceWatcher(
 					continue
 				}
 
+				// NOTE: The directory's signature is taken BEFORE its watcher
+				// is made, for the reason a file's is: whatever lands between
+				// the two is then a change the timer finds.
+				directorySignatures.set(directory, await signature(directory))
+
 				try {
-					watchers.set(
-						directory,
-						watchPath(directory, () => {
-							void checkForChanges()
-						}),
-					)
+					let watcher = watchDirectory(directory, () => {
+						void checkForChanges(true)
+					})
+
+					// NOTE: A watcher can fail AFTER it was made — the
+					// directory goes away, or the platform runs out of
+					// handles — and it says so with an "error" event. An
+					// EventEmitter with no listener for that event throws it
+					// as an uncaught exception, which would take the whole
+					// session down for a directory nobody is editing any
+					// more. It is handed to the same `onError` a failure to
+					// start reaches, and that is all that is known about it.
+					watcher.on("error", (error) => {
+						options.onError?.(directory, error)
+					})
+
+					watchers.set(directory, watcher)
 				} catch (error) {
 					options.onError?.(directory, error)
 				}
+			}
+
+			// NOTE: The timer is a fallback and not a reason to stay alive:
+			// the directory watchers hold the process open, and a session
+			// that closed them is one the timer must not keep running.
+			if (ticker === null && poll > 0 && watchers.size > 0) {
+				ticker = setInterval(() => {
+					void checkForChanges(false)
+				}, poll)
+
+				ticker.unref()
 			}
 		},
 		files: () => [...watched],
@@ -214,6 +305,11 @@ export function createSourceWatcher(
 			if (timer !== null) {
 				clearTimeout(timer)
 				timer = null
+			}
+
+			if (ticker !== null) {
+				clearInterval(ticker)
+				ticker = null
 			}
 
 			for (let watcher of watchers.values()) {

@@ -409,10 +409,15 @@ function listeners(): {
 		waiting: Array<(value: Value) => void>,
 		what: string,
 	): Promise<Value> =>
+		// NOTE: Under bun's own per-test timeout of five seconds, and
+		// deliberately so. A deadline that fires AFTER the test has already
+		// timed out rejects a Promise nobody is waiting on any more, which
+		// bun reports as an "unhandled error between tests" — a second
+		// failure, unattributed, for the price of one.
 		new Promise((resolve, reject) => {
 			let timeout = setTimeout(
-				() => reject(new Error(`No ${what} arrived within 5 seconds.`)),
-				5000,
+				() => reject(new Error(`No ${what} arrived within 4 seconds.`)),
+				4000,
 			)
 
 			waiting.push((value) => {
