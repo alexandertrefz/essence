@@ -3670,6 +3670,32 @@ describe("Validator", () => {
 				).toEqual([])
 			})
 
+			// NOTE: A written Rational item answers for itself the way a
+			// written Integer or a written List does — the item Type may be a
+			// refinement of any base a `where` clause is written on, and the
+			// question asked of each item is the one that base's own rung
+			// decides.
+			it("should admit written Rational items into a refined item Type", () => {
+				expect(
+					diagnosticsFor(`implementation {
+						constant ratios: List<NonZeroRational> = [1/2, 2/4]
+
+						Terminal.inspect(ratios::length())
+					}`),
+				).toEqual([])
+
+				let refused = diagnosticsFor(`implementation {
+					constant ratios: List<NonZeroRational> = [1/2, 0/3]
+
+					Terminal.inspect(ratios::length())
+				}`)
+
+				expect(refused).toHaveLength(1)
+				expect(refused[0].labels[1]?.message).toBe(
+					"this item is a Rational",
+				)
+			})
+
 			// NOTE: And the same question where the item's Type Arguments are
 			// the call's to work out — the items decide the instantiation, and
 			// the List handed back is of what they decided.

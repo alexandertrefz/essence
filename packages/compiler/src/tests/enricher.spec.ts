@@ -7080,6 +7080,53 @@ describe("Enricher", () => {
 			).toBe("NonZeroRational")
 		})
 
+		// NOTE: And the ELSE of the question turned round, which is the leaf
+		// read in the other polarity: `@::is(0/1)` failing IS `@::isNot(0/1)`
+		// holding, so the branch that did not find a zero holds a
+		// `NonZeroRational`. Nothing declares the contrary Type, so the `if`
+		// side stays the Rational it was — a complement narrows to a refinement
+		// somebody wrote down or to nothing at all.
+		it("should narrow a Rational in the else of the opposite question", () => {
+			expect(
+				narrowedTypeOf(
+					`implementation {
+						constant r = 1/2::add(1/3)
+
+						if r::is(0/1) {
+							Terminal.inspect(0)
+						} else {
+							Terminal.inspect(r)
+						}
+					}`,
+					"r",
+				),
+			).toBe("NonZeroRational")
+		})
+
+		// NOTE: A Rational bound is read by the same ordering law an Integer
+		// bound is: a value proven above zero has been proven not to BE zero, so
+		// a condition nobody wrote an Alias for still reaches the Alias its
+		// answer proves. The `reciprocal` inside is what the narrowing is worth
+		// — the entry answering a bare Rational is the one a proven receiver
+		// reaches, and the annotation refuses the Optional the base answers.
+		it("should reach a Rational refinement an ordering proves", () => {
+			expect(
+				narrowedTypeOf(
+					`implementation {
+						constant r = 1/2::add(1/3)
+
+						if r::isGreaterThan(0/1) {
+							constant flipped: Rational = r::reciprocal()
+
+							Terminal.inspect(flipped)
+							Terminal.inspect(r)
+						}
+					}`,
+					"r",
+				),
+			).toBe("NonZeroRational")
+		})
+
 		// NOTE: The narrowing is worth exactly what it lets a Program write, which
 		// is the call a bare Integer is refused by — asserted end to end in
 		// `codeGeneration.spec.ts`, where the Validator that refuses it runs.
