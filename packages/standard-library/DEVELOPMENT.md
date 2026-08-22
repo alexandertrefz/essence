@@ -144,16 +144,24 @@ Integers reaches `Integer.compare` and no other kind.
 implemented in BOTH — delete the TypeScript in the same commit that writes the
 Essence.
 
-**`NonEmptyList` is the one place the same operation is written twice, on
-purpose.** Every entry of that Namespace is native, because a refinement erases
-before anything runs and the promise can not be said in Essence. Three of them
-— `prepend(contentsOf:)`, `removeDuplicates` and `replace` — are written in
-Essence on `List`, so the runtime writes the same operation out beside the
-Essence body rather than instead of it. That is the exception the rule above
-allows, and it is only safe because `StdlibExhaustive.es` calls both entries
-over the same inputs: the golden capture is what stops the two from drifting.
-Adding a Method to `NonEmptyList` that `List` implements in Essence means
-adding those lines too.
+**A refined entry that duplicates an Essence body is written twice, on
+purpose** — wherever it stands. A refinement erases before anything runs, so an
+entry whose promise is about the answer can not say it in Essence and has to be
+native; where the entry it stands beside is an Essence body, the runtime writes
+that operation out a second time rather than instead of it. Four do.
+`NonEmptyList` holds three — `prepend(contentsOf:)`, `removeDuplicates` and
+`replace`, each written in Essence on `List` — and `List.repeat`'s
+`PositiveInteger` entry is the fourth, native because the entry beside it
+answers a `List`, and an expression that is not empty is not one the language
+can be told is not empty. That is the exception the rule above allows, and it is
+only safe because `StdlibExhaustive.es` calls both entries over the same inputs,
+wherever they stand: the golden capture is what stops the two from drifting.
+Writing another one means adding those lines too.
+
+Most of `NonEmptyList` is native, but not all of it. `sort(on:)` hands its key
+to the native `sort(by:)`, and `lowestItem(on:)` and `greatestItem(on:)` read
+`List`'s Optional answer off the native `firstItem()`. An Essence body can carry
+a proof another entry already holds; what it can not do is mint one.
 
 A const is emitted only into Programs that reach it. The reachability search
 reads each Method's TYPED body, so it follows a Method reached only through
