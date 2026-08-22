@@ -3,15 +3,17 @@ implementation {
 	§ The everyday Integer Methods. The Compiler reads a written divisor, so it
 	§ knows `3` is not zero and this remainder answers a bare Integer. It reads a
 	§ written exponent the same way, so a power with a non-negative one answers a
-	§ bare Integer. A Method that can fail answers an `Optional`, and
-	§ `Terminal.inspect` shows the whole answer: `Optional#Value(1/4)` rather than
-	§ `1/4`. A Method that can answer empty offers a `defaultingTo:` entry beside
-	§ it. An Optional already held in data collapses with `value(defaultingTo:)`.
-	§ Both forms are shown below.
+	§ bare Integer. And it reads the RECEIVER too: a power is empty only where a
+	§ zero base meets a negative exponent, so a written `2` answers a number
+	§ whatever the exponent is. A Method that can still fail answers an
+	§ `Optional`, and `Terminal.inspect` shows the whole answer:
+	§ `Optional#Value(4/3)` rather than `4/3`. A Method that can answer empty
+	§ offers a `defaultingTo:` entry beside it. An Optional already held in data
+	§ collapses with `value(defaultingTo:)`. Both forms are shown below.
 	Terminal.inspect(-7::remainder(dividingBy 3)) § 2 — Euclidean, so a negative dividend still leaves a non-negative
 	§ remainder. `7::remainder(dividingBy 3)` is the plain `1`.
 	Terminal.inspect(2::raise(to 10)) § 1024 — the exponent is not negative, so there certainly is a power
-	Terminal.inspect(2::raise(to -2)) § Optional#Value(1/4) — negative powers stay exact
+	Terminal.inspect(2::raise(to -2)) § 1/4 — negative powers stay exact
 	Terminal.inspect(-5::absolute()) § 5
 	Terminal.inspect(4::isEven()) § true
 	Terminal.inspect(0::isPositive()) § false — zero is neither sign

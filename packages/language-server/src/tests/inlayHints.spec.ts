@@ -295,14 +295,17 @@ describe("Inlay Hints", () => {
 
 		// NOTE: The divisor is COMPUTED, deliberately — a written `2` is its
 		// own proof of not being zero and reaches `divide`'s total entry, whose
-		// Hint is the plain `Rational` asserted alongside.
+		// Hint is the plain `Rational` asserted alongside. The List is bound to
+		// a `List` Type for the same reason: a written one proves it holds an
+		// item, and `firstItem` on a proven receiver answers no Optional.
 		it("should describe builtin fallible Methods as `Optional`", () => {
 			let source = [
 				"implementation {",
 				"\tconstant two = 1::add(1)",
+				"\tconstant numbers: List<Integer> = [1, 2, 3]",
 				"\tconstant half = 1110::divide(by two)",
 				"\tconstant sure = 1110::divide(by 2)",
-				"\tconstant first = [1, 2, 3]::firstItem()",
+				"\tconstant first = numbers::firstItem()",
 				"}",
 			].join("\n")
 
@@ -444,14 +447,21 @@ describe("Inlay Hints", () => {
 			// NOTE: The stdlib spells mixed fallible results as one nested
 			// payload (`Optional<Integer | Rational>`), which is what lets
 			// `value(defaultingTo:)` bind the payload in one piece.
+			//
+			// NOTE: The base is COMPUTED. A written one proves it is not zero,
+			// and a power is empty only where a zero base meets a negative
+			// exponent — so a written base answers the payload without a
+			// wrapper and leaves nothing to collapse.
 			let source = [
 				"implementation {",
-				"\tconstant power = 2::raise(to -2)",
+				"\tconstant two = 1::add(1)",
+				"\tconstant power = two::raise(to -2)",
 				"\tconstant sure = power::value(defaultingTo 0)",
 				"}",
 			].join("\n")
 
 			expect(hintsOf(source).map((hint) => hint.label)).toEqual([
+				": Integer",
 				": Optional<Integer | Rational>",
 				": Integer | Rational",
 			])

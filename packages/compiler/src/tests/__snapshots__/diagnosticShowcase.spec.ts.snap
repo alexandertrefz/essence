@@ -347,11 +347,11 @@ Error: Case '#Up' carries no payload to default
 exports[`Diagnostic Showcase Dispatch.es should render the same report every time 1`] = `
 "[unknown-method]
 Error: No Method named 'lenght' for this value
-    ╭─┤ Dispatch.es:13:31 │
+    ╭─┤ Dispatch.es:16:31 │
     │
- 13 │     constant length = "essence"::lenght()
+ 16 │     constant length = "essence"::lenght()
     │                       ────┬────  ───┬──  
-    │                           ╰─────────│──── this is a String
+    │                           ╰─────────│──── this is a NonEmptyString
     │                                     │    
     │                                     ╰──── no Method of this name
     │ 
@@ -362,22 +362,22 @@ Error: No Method named 'lenght' for this value
 
 [unknown-method]
 Error: No Method named 'lenght' for this value
-    ╭─┤ Dispatch.es:17:26 │
+    ╭─┤ Dispatch.es:21:26 │
     │
- 17 │     constant magnitude = 1::lenght()
+ 21 │     constant magnitude = 1::lenght()
     │                          ▲  ───┬──  
-    │                          ╰─────│──── this is an Integer
+    │                          ╰─────│──── this is a PositiveInteger
     │                                │    
     │                                ╰──── no Method of this name
     │ 
-    │ Note: Searched Namespaces 'Integer', 'Number'.
+    │ Note: Searched Namespaces 'Integer', 'NonZeroInteger', 'NonNegativeInteger', 'Number'.
 ────╯
 
 [no-matching-overload]
 Error: No overload of 'prepend' accepts these Arguments
-    ╭─┤ Dispatch.es:20:19 │
+    ╭─┤ Dispatch.es:24:19 │
     │
- 20 │     constant piece = "essence"::prepend()
+ 24 │     constant piece = "essence"::prepend()
     │                      ──────────┬─────────  
     │                                ╰─────────── this call passes 0 Arguments
     │ 
@@ -386,9 +386,9 @@ Error: No overload of 'prepend' accepts these Arguments
 
 [unknown-method]
 Error: No Method named 'describe' for this value
-    ╭─┤ Dispatch.es:23:32 │
+    ╭─┤ Dispatch.es:27:32 │
     │
- 23 │     constant nowhere = { x = 1 }::describe()
+ 27 │     constant nowhere = { x = 1 }::describe()
     │                        ────┬────  ────┬───  
     │                            ╰──────────│───── this is a { x: Integer }
     │                                       │     
@@ -399,9 +399,9 @@ Error: No Method named 'describe' for this value
 
 [unknown-name]
 Error: 'nmae' is not declared
-    ╭─┤ Dispatch.es:27:19 │
+    ╭─┤ Dispatch.es:31:19 │
     │
- 27 │     constant shout = nmae
+ 31 │     constant shout = nmae
     │                      ──┬─  
     │                        ╰─── no such Variable or Constant
     │ 
@@ -410,9 +410,9 @@ Error: 'nmae' is not declared
 
 [unknown-member]
 Error: { x: Integer, y: Integer } has no member 'z'
-    ╭─┤ Dispatch.es:31:25 │
+    ╭─┤ Dispatch.es:35:25 │
     │
- 31 │     constant depth = point.z
+ 35 │     constant depth = point.z
     │                            ▲  
     │                            ╰── no such member
     │ 

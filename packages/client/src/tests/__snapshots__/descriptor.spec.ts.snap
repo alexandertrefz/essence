@@ -3686,23 +3686,19 @@ exports[`A Module described describes Refused.es 1`] = `
       "emitted": "root",
       "kind": "constant",
       "of": {
-        "kind": "optional",
-        "of": {
-          "arms": [
-            {
-              "kind": "integer",
-              "shown": "Integer",
-            },
-            {
-              "kind": "refused",
-              "shown": "Algebraic",
-              "why": "Algebraic can not be marshalled yet.",
-            },
-          ],
-          "kind": "union",
-          "shown": "Integer | Algebraic",
-        },
-        "shown": "Optional<Integer | Algebraic>",
+        "arms": [
+          {
+            "kind": "integer",
+            "shown": "Integer",
+          },
+          {
+            "kind": "refused",
+            "shown": "Algebraic",
+            "why": "Algebraic can not be marshalled yet.",
+          },
+        ],
+        "kind": "union",
+        "shown": "Integer | Algebraic",
       },
     },
     "shallow": {

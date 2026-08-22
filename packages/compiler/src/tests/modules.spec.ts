@@ -1732,8 +1732,12 @@ export {
 				// `ItemType | Nothing` and an Integer is a member of
 				// `Integer | Nothing`. Now that `Optional` is a nominal Choice
 				// an Integer is not one, so its Namespace is not searched.
+				//
+				// NOTE: The receiver is a written `2`, which proves it is
+				// neither zero nor negative — so the refined Namespaces are in
+				// the search too, in the same table order the rest are in.
 				expect(unknownMethod?.notes[0]).toContain(
-					"'Integer', 'Number', 'Alpha', 'Zulu'",
+					"'Integer', 'NonZeroInteger', 'NonNegativeInteger', 'Number', 'Alpha', 'Zulu'",
 				)
 			},
 		)

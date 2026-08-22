@@ -888,10 +888,19 @@ describe("Hover of conformance clauses", () => {
 		)
 	})
 
+	// NOTE: The receiver is BOUND to a `List` Type. A written List proves it
+	// holds items and reaches `namespace NonEmptyList`, whose `sort` is the one
+	// that carries the proof onward — a signature of its own, and not the one
+	// this case is about.
 	it("should show a Method's Protocol bound", () => {
-		let source = ["implementation {", "\t[3, 1]::sort()", "}"].join("\n")
+		let source = [
+			"implementation {",
+			"\tconstant numbers: List<Integer> = [3, 1]",
+			"\tnumbers::sort()",
+			"}",
+		].join("\n")
 
-		expect(hover(source, { line: 2, column: 11 })).toBe(
+		expect(hover(source, { line: 3, column: 12 })).toBe(
 			"sort<ItemType is Comparable>() -> List<ItemType>",
 		)
 	})

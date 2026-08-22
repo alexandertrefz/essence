@@ -1530,10 +1530,14 @@ describe("Validator", () => {
 			expect(diagnostics[0].code).toBe("assignment-type-mismatch")
 		})
 
+		// NOTE: The receiver is BOUND to a `List` Type. A written List proves
+		// it holds an item, and `firstItem` on a proven receiver answers the
+		// item itself — there would be no Optional here to declare.
 		it("should accept declared Types matching inferred return Types", () => {
 			expect(
 				diagnosticsFor(`implementation {
-					constant a: Optional<String> = ["x"]::firstItem()
+					constant texts: List<String> = ["x"]
+					constant a: Optional<String> = texts::firstItem()
 				}`),
 			).toEqual([])
 		})
@@ -2521,7 +2525,7 @@ describe("Validator", () => {
 			expect(diagnostics[0].severity).toBe("error")
 			expect(diagnostics[0].code).toBe("internal-error")
 			expect(diagnostics[0].message).toContain(
-				"'List::sort' was given 0 conformance Arguments for a Signature with 1 Protocol-bounded Type Parameter",
+				"'NonEmptyList::sort' was given 0 conformance Arguments for a Signature with 1 Protocol-bounded Type Parameter",
 			)
 		})
 
