@@ -2867,6 +2867,19 @@ third"::lines())
 		noRows::average(on .r, defaultingTo 0/1),
 	)
 
+	§ ——— NonEmptyKeyedNumberList —————————————————————————————————————————
+	§ The one keyed aggregate the proof changes: `map` carries it to the List
+	§ of numbers, whose mean is bare. `sum(on:)` is total already, so a proven
+	§ receiver keeps reaching `KeyedNumberList` for it.
+	show(
+		"NonEmptyKeyedNumberList.average<ItemType>(on: (_ ItemType) -> Integer | Rational)",
+		provenRows::average(on .n),
+	)
+	show(
+		"KeyedNumberList.sum<ItemType>(on: (_ ItemType) -> Integer) [proven receiver]",
+		provenRows::sum(on .n),
+	)
+
 	§ ——— loop ————————————————————————————————————————————————————————————
 	§ The free-Function loop family. `loop` belongs to no Namespace, so its
 	§ labels carry no prefix — the coverage net learns them from the member

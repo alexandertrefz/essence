@@ -1178,9 +1178,16 @@ describe("Resolvers", () => {
 			// List reaches it — what makes its aggregates keyed is the
 			// Function they take, not the items. It is offered on both halves
 			// for that reason, and says nothing about the refinement either
-			// way.
+			// way. `NonEmptyKeyedNumberList` is that same rule one rung up:
+			// its target is any PROVEN List, so it joins the refined half and
+			// no other.
 			expect(base).toEqual(["List", "KeyedNumberList"])
-			expect(refined).toEqual(["List", "NonEmptyList", "KeyedNumberList"])
+			expect(refined).toEqual([
+				"List",
+				"NonEmptyList",
+				"KeyedNumberList",
+				"NonEmptyKeyedNumberList",
+			])
 		})
 
 		// NOTE: Conformance is found through the same widening rule, which is why

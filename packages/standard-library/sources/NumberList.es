@@ -415,12 +415,31 @@ declarations {
 			<- Number.average(@)
 		}
 	}
+
+	§ The keyed mean of a List with an item in it. `sum(on:)` is already total
+	§ and stays on `KeyedNumberList`, which a proven receiver reaches too. The
+	§ refined target beats the base only for a Method both declare.
+	§
+	§ `NonEmptyList::map` carries the proof, and the mean of a proven List of
+	§ Numbers is bare, so the body needs no fallback.
+	namespace NonEmptyKeyedNumberList<infer ItemType> for NonEmptyList<ItemType> {
+		§§ The mean of what the key reads off every item: their total divided by their count.
+		§§
+		§§ The List has an item, so the answer is the mean itself rather than an Optional.
+		§§
+		§§ @param on — the key read off each item
+		§§ @returns — the mean.
+		average(on key: (_: ItemType) -> Integer | Rational) -> Rational {
+			<- @::map(key)::average()
+		}
+	}
 }
 
 export {
 	IntegerList
 	KeyedNumberList
 	NonEmptyIntegerList
+	NonEmptyKeyedNumberList
 	NonEmptyNumberList
 	NonEmptyRationalList
 	NumberList
