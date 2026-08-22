@@ -187,9 +187,12 @@ reaches the `NonZeroInteger` entry, since a written `2` proves the factor away,
 and answers a bare `Transcendental` — `Number.Pi::add(Number.Pi)` still answers
 the Union. What a bodied `Tau` would cost the emission band is unweighed, so it
 stays value-less with the other two. `Number.GoldenRatio` alone has an Essence
-spelling — a half plus half of
-`5::squareRoot()` — but `squareRoot`'s no-Argument entry answers an
-`Optional` the `Algebraic` annotation refuses, so it stays value-less with the others. So the band is
+spelling — a half plus half of `5::squareRoot()` — but a written receiver does
+not refine, so that call reaches `Integer`'s own entry and answers an
+`Optional<Integer | Algebraic>` the `Algebraic` annotation refuses.
+`NonNegativeInteger`'s entry answers `Integer | Algebraic`, a Union that
+annotation refuses just the same, so `GoldenRatio` stays value-less with the
+others. So the band is
 exercised through `useStdlib`
 (`packages/compiler/src/enricher/stdlib.ts`), the seam that swaps the
 process-wide library for one a test wrote, until a Property that can carry a

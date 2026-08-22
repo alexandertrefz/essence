@@ -1331,10 +1331,11 @@ describe("Standard Library Loader", () => {
 			"String",
 			"Boolean",
 			"Integer",
-			// NOTE: The one Namespace a proven Integer can reach besides
+			// NOTE: The two Namespaces a proven Integer can reach besides
 			// `Integer`, listed after it for the same reason `NestedList` is
 			// listed after `List` — see `builtinMemberOrder`.
 			"NonZeroInteger",
+			"NonNegativeInteger",
 			"Rational",
 			"Algebraic",
 			"Transcendental",
