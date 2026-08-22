@@ -165,6 +165,11 @@ declarations {
 			§§
 			§§ @returns — `true` when the List is not empty.
 			() -> Boolean {
+				§ This body is read as well as run. A predicate written as
+				§ one call on `@` is that call, so the `else` of an `if`
+				§ asking `isEmpty` proves `NonEmptyList`. The chain in
+				§ `isEmpty` keeps it a question of its own. See
+				§ DEVELOPMENT.md, Why bodies look the way they do.
 				<- @::isEmpty()::negate()
 			}
 

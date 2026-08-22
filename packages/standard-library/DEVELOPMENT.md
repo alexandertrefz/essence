@@ -313,7 +313,7 @@ out and moving a member moves them.
 
 ## Why bodies look the way they do
 
-Eight mechanics account for most of what looks odd in these files. Each is
+Nine mechanics account for most of what looks odd in these files. Each is
 explained once, here. A body that leans on one carries a one line pointer to
 this section, and the bodies beside it carry nothing. One file names a mechanic
 once: a reader who opens `Algebraic.es` alone finds the pointer there, and does
@@ -401,6 +401,19 @@ written since. Nine Overloads carry a refined entry written after one, and each
 of those is read first all the same: `Integer::raise`, `Rational::divide` and
 `Rational::raise`, `Algebraic::multiply`, the irrationals' `divide`,
 `Number.average` and the two `Number` extrema.
+
+**A predicate written as one call on `@` IS that call.** A Method taking no
+Arguments, answering a Boolean and whose whole body is one call on `@` —
+optionally negated — is read off its body and recorded as the question that call
+asks. `isZero` is `@::is(0)`, `hasItems` is `@::isEmpty()::negate()`,
+`isPositive` is `@::isGreaterThan(0)`. So a refinement written on either name is
+one Type, and the `else` of an `if` asking one of them proves the other. Two
+things follow for an editor. Rewriting such a body changes what an `else`
+narrows to, so `isZero` may not become `@::compare(to 0)::is(#Equal)` without
+weighing that. And a body that CHAINS is a question of its own for the same
+reason: `isEmpty` is `@::length()::is(0)`, which is why `List::isEmpty` and
+`String::isEmpty` are primitives and their negations are read from them rather
+than the other way round.
 
 **A body pulls its whole transitive reach into every bundle.** A Method is
 emitted into a Program that reaches it, and so is everything its body calls.
