@@ -451,19 +451,51 @@ declarations {
 	}
 
 	§ A refinement adds Methods and takes none away, so a NonZeroInteger
-	§ answers every Method above. This Namespace holds the operations whose
-	§ answer is a NonZeroInteger too. Only multiplication qualifies: a product
-	§ is zero exactly when one of its factors is. A sum or a difference of two
-	§ non-zero Integers can be zero, as `1` and `-1` show. Negation would
-	§ close, and nothing needs it.
+	§ answers every Method above. This Namespace holds the entries the proof
+	§ changes the answer of, and it changes it in two ways.
+	§
+	§ One is closure: the answer is a NonZeroInteger too. Only multiplication
+	§ qualifies, because a product is zero exactly when one of its factors is.
+	§ A sum or a difference of two non-zero Integers can be zero, as `1` and
+	§ `-1` show. Negation would close, and nothing needs it.
+	§
+	§ The other tightens another kind's answer. An irrational times an Integer
+	§ is a Union, because a zero factor collapses it to a Rational. A proven
+	§ factor can not, so the last two entries hand the receiver to the
+	§ irrational's own refined entry and answer that kind itself.
 	namespace NonZeroInteger for NonZeroInteger {
-		§§ Multiplies this NonZeroInteger with another.
+		§§ Multiplies this NonZeroInteger with a number.
 		§§
-		§§ The product is never zero, so the answer is a NonZeroInteger too.
-		§§
-		§§ @param with — the NonZeroInteger to multiply with
-		§§ @returns — the product, which is not zero.
-		multiply(with other: NonZeroInteger) -> NonZeroInteger
+		§§ A product of two non-zero Integers is never zero. An irrational scaled by a non-zero Integer stays irrational, so those two entries answer the irrational kind itself.
+		overload multiply {
+			§§ Multiplies this NonZeroInteger with another.
+			§§
+			§§ The product is never zero, so the answer is a NonZeroInteger too.
+			§§
+			§§ @param with — the NonZeroInteger to multiply with
+			§§ @returns — the product, which is not zero.
+			(with other: NonZeroInteger) -> NonZeroInteger
+
+			§§ Multiplies this NonZeroInteger with an Algebraic.
+			§§
+			§§ The factor is proven, so the radical survives and the answer is an Algebraic rather than a Union.
+			§§
+			§§ @param with — the Algebraic to multiply with
+			§§ @returns — the exact product.
+			(with other: Algebraic) -> Algebraic {
+				<- other::multiply(with @)
+			}
+
+			§§ Multiplies this NonZeroInteger with a Transcendental.
+			§§
+			§§ The factor is proven, so every base term survives and the answer is a Transcendental rather than a Union.
+			§§
+			§§ @param with — the Transcendental to multiply with
+			§§ @returns — the exact product.
+			(with other: Transcendental) -> Transcendental {
+				<- other::multiply(with @)
+			}
+		}
 	}
 }
 

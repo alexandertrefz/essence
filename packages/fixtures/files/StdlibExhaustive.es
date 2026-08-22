@@ -638,14 +638,23 @@ third"::lines())
 	})
 
 	§ ——— NonZeroInteger ———————————————————————————————————————————————————
-	§ The one Method a proven Integer has that a bare one does not. Both
-	§ operands have to be proven, and a value written down is its own proof —
-	§ so the receiver is declared and the Argument is written where it stands.
+	§ The Methods a proven Integer has that a bare one does not. The closing
+	§ entry needs both operands proven, and a value written down is its own
+	§ proof — so the receiver is declared and the Argument is written where it
+	§ stands. The two irrational entries spend the receiver's proof alone.
 	constant provenSix: NonZeroInteger = 6
 
 	show(
 		"NonZeroInteger.multiply(with: NonZeroInteger)",
 		provenSix::multiply(with 7),
+	)
+	show(
+		"NonZeroInteger.multiply(with: Algebraic)",
+		provenSix::multiply(with Number.GoldenRatio),
+	)
+	show(
+		"NonZeroInteger.multiply(with: Transcendental)",
+		provenSix::multiply(with Number.Pi),
 	)
 
 	§ ——— Rational —————————————————————————————————————————————————————————

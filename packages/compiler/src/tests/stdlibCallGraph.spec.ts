@@ -591,6 +591,8 @@ describe("Stdlib Call Graph", () => {
 			"NonEmptyRationalList.average",
 			"NonEmptyRationalList.greatestNumber",
 			"NonEmptyRationalList.lowestNumber",
+			"NonZeroInteger.multiply__overload$2",
+			"NonZeroInteger.multiply__overload$3",
 			"Number.average__overload$1",
 			"Number.average__overload$2",
 			"Number.average__overload$3",
