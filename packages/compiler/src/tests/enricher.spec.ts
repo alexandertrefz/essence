@@ -7176,9 +7176,10 @@ describe("Enricher", () => {
 			expect(narrowedTypeOf(source, "s")).toBe("NonEmptyString")
 		})
 
-		// NOTE: The complement table — the handful of Method pairs the standard
-		// library declares as each other's opposites, which is what makes an `else`
-		// narrow.
+		// NOTE: An `else` proves the leaf its condition proved, asked the other
+		// way round. A leaf is stored RESOLVED and carries its polarity as a
+		// flag, so the opposite of one is that flag flipped and no pair of
+		// Methods has to be declared anywhere to be each other's contraries.
 		describe("the else branch", () => {
 			it("should narrow through isNot where the condition asked is", () => {
 				expect(
@@ -7346,6 +7347,126 @@ describe("Enricher", () => {
 					"NonZeroInteger",
 					"PositiveInteger",
 				])
+			})
+
+			// NOTE: `isZero` is written `<- @::is(0)`, so its `else` proves the
+			// leaf `NonZeroInteger` is declared by. No Method names any other as
+			// its opposite anywhere; the body is what says it.
+			it("should narrow through a Method written as one call on '@'", () => {
+				expect(
+					narrowedTypeOf(
+						`implementation {
+							constant d = 3
+
+							if d::isZero() {
+								Terminal.inspect(0)
+							} else {
+								Terminal.inspect(d)
+							}
+						}`,
+						"d",
+					),
+				).toBe("NonZeroInteger")
+			})
+
+			// NOTE: And `isNegative` is `<- @::isLessThan(0)`, whose contrary is
+			// the leaf `NonNegativeInteger` is declared by — written there as
+			// `@::isGreaterThanOrEqualTo(0)`, which is that same leaf negated.
+			// Three spellings, one question.
+			it("should narrow an else to a Type spelled three names away", () => {
+				expect(
+					narrowedTypeOf(
+						`implementation {
+							constant d = 3
+
+							if d::isNegative() {
+								Terminal.inspect(0)
+							} else {
+								Terminal.inspect(d)
+							}
+						}`,
+						"d",
+					),
+				).toBe("NonNegativeInteger")
+			})
+		})
+
+		// NOTE: A Program's own Method of the shape is read exactly as the
+		// standard library's is — one call on `@`, Arguments written out — and
+		// what it forwards to is the leaf both branches are decided by.
+		describe("a Program's own predicate alias", () => {
+			// NOTE: The bound is 5 rather than 0, which the standard library
+			// declares `PositiveInteger` by — two refinements proving one leaf
+			// are one Type, and the tie above would hand the branch the builtin
+			// name.
+			const STOCK = `namespace Stock for Integer {
+					isInStock() -> Boolean {
+						<- @::isGreaterThan(5)
+					}
+
+					isOutOfStock() -> Boolean {
+						<- @::isGreaterThan(5)::negate()
+					}
+				}
+
+				type Stocked = Integer where @::isInStock()
+
+				type Unstocked = Integer where @::isOutOfStock()`
+
+			it("should narrow the true branch of the alias", () => {
+				expect(
+					narrowedTypeOf(
+						`implementation {
+							${STOCK}
+
+							constant d = 3
+
+							if d::isInStock() {
+								Terminal.inspect(d)
+							}
+						}`,
+						"d",
+					),
+				).toBe("Stocked")
+			})
+
+			// NOTE: The condition asks the leaf the alias forwards to, and the
+			// branch reaches the refinement written on the alias. Which of the
+			// two names was written decides nothing.
+			it("should narrow through the leaf the alias forwards to", () => {
+				expect(
+					narrowedTypeOf(
+						`implementation {
+							${STOCK}
+
+							constant d = 3
+
+							if d::isGreaterThan(5) {
+								Terminal.inspect(d)
+							}
+						}`,
+						"d",
+					),
+				).toBe("Stocked")
+			})
+
+			it("should narrow the else branch of the alias", () => {
+				expect(
+					narrowedTypeOf(
+						`implementation {
+							${STOCK}
+
+							constant d = 3
+
+							if d::isInStock() {
+								Terminal.inspect(0)
+							} else {
+								Terminal.inspect(d)
+							}
+						}`,
+						"d",
+					),
+				).toBe("Unstocked")
 			})
 		})
 
@@ -7757,10 +7878,10 @@ describe("Enricher", () => {
 				).toEqual([])
 			})
 
-			// NOTE: The complement table is about the Method pair alone, so the
-			// `else` of an `isEmpty` establishes the instantiated refinement for the
-			// same reason the true branch of a `hasItems` does — one shared helper
-			// asks both.
+			// NOTE: `hasItems` IS `isEmpty` negated — the standard library writes
+			// it that way and the body is read — so the `else` of an `isEmpty`
+			// establishes the instantiated refinement for the same reason the
+			// true branch of a `hasItems` does. One shared helper asks both.
 			it("should narrow the else branch of isEmpty", () => {
 				expect(
 					narrowedTypeOf(

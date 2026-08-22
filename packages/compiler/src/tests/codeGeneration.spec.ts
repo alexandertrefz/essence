@@ -4342,6 +4342,73 @@ declarations {
 		})
 	})
 
+	// NOTE: The doorway an `else` opens, which is the one this campaign added.
+	// No Method is declared to be another's contrary anywhere: `isZero` is
+	// written `<- @::is(0)` and `isNegative` `<- @::isLessThan(0)`, so the leaf
+	// each `else` proves is that call asked the other way round — and the two
+	// Types the standard library declares by exactly those leaves are what the
+	// branches reach. What runs is a Program with no refinement in it.
+	describe("a doorway an else branch opens", () => {
+		const SOURCE = `implementation {
+	§ Total because the exponent is proven whole, and because the divisor is
+	§ proven not to be zero. Neither answers an Optional.
+	function raised(_ base: Integer, by exponent: NonNegativeInteger) -> Integer {
+		<- base::raise(to exponent)
+	}
+
+	function shared(_ total: Integer, among count: NonZeroInteger) -> Rational {
+		<- total::divide(by count)
+	}
+
+	§ The 'else' of a Method written as one call on '@' is the other polarity of
+	§ that call, and nothing here spells either Type.
+	function safelyRaised(_ base: Integer, by exponent: Integer) -> Integer {
+		if exponent::isNegative() {
+			<- 0
+		} else {
+			<- raised(base, by exponent)
+		}
+	}
+
+	function safelyShared(_ total: Integer, among count: Integer) -> String {
+		if count::isZero() {
+			<- "nobody"
+		} else {
+			<- shared(total, among count)::toString()
+		}
+	}
+
+	Terminal.inspect(safelyRaised(2, by 10))
+	Terminal.inspect(safelyRaised(2, by -1))
+	Terminal.inspect(safelyShared(9, among 3))
+	Terminal.inspect(safelyShared(9, among 0))
+}`
+
+		// NOTE: The same Program with the branches taken out, which is the only
+		// thing that makes the run above mean anything.
+		const UNCHECKED = `implementation {
+	function raised(_ base: Integer, by exponent: NonNegativeInteger) -> Integer {
+		<- base::raise(to exponent)
+	}
+
+	function safelyRaised(_ base: Integer, by exponent: Integer) -> Integer {
+		<- raised(base, by exponent)
+	}
+
+	Terminal.inspect(safelyRaised(2, by 10))
+}`
+
+		it("runs each else branch through its total operation", async () => {
+			expect(await run(SOURCE)).toEqual(["1024", "0", '"3"', '"nobody"'])
+		})
+
+		it("refuses the same call with no branch above it", () => {
+			expect(
+				hasCode(diagnosticsOf(UNCHECKED), "argument-type-mismatch"),
+			).toBe(true)
+		})
+	})
+
 	// NOTE: The same total operation over a Parameter whose Type Argument the CALL
 	// works out, which is the one position where nothing has spelled the refinement
 	// at all: `NonEmptyList<Item>` is a Type only once something says what `Item` is,

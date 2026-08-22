@@ -702,6 +702,58 @@ describe("Type matching", () => {
 			expect(matchesType(positiveNonZero, nonZero)).toBe(false)
 		})
 
+		// NOTE: And what a leaf IMPLIES is proven by it. Below, above and equal
+		// to one bound exclude each other and cover everything, so a value above
+		// zero has been proven not to be zero and not to be below it — and
+		// reaches the two Types declared by exactly those.
+		describe("what one comparison says about the others", () => {
+			const above = refinement("PositiveInteger", integer, [
+				conjunct("isGreaterThan", ["0"]),
+			])
+			const notZero = refinement("NonZeroInteger", integer, [
+				{ ...conjunct("is", ["0"]), negated: true },
+			])
+			const notBelow = refinement("NonNegativeInteger", integer, [
+				{ ...conjunct("isLessThan", ["0"]), negated: true },
+			])
+
+			it("should accept a leaf where what it excludes is expected", () => {
+				expect(matchesType(notZero, above)).toBe(true)
+				expect(matchesType(notBelow, above)).toBe(true)
+			})
+
+			// NOTE: The other way round proves nothing. A value that is merely
+			// not zero may be below it.
+			it("should refuse an exclusion where the leaf is expected", () => {
+				expect(matchesType(above, notZero)).toBe(false)
+				expect(matchesType(above, notBelow)).toBe(false)
+			})
+
+			// NOTE: Two exclusions leave the third standing, which is the same
+			// law read backwards — and the pair has to be read TOGETHER, since
+			// neither half says anything about direction on its own.
+			it("should accept the leaf two exclusions leave standing", () => {
+				let neither = refinement("Neither", integer, [
+					{ ...conjunct("is", ["0"]), negated: true },
+					{ ...conjunct("isLessThan", ["0"]), negated: true },
+				])
+
+				expect(matchesType(above, neither)).toBe(true)
+				expect(matchesType(above, notZero)).toBe(false)
+			})
+
+			// NOTE: The bound is part of the question. Nothing is read across
+			// two literals, which is what keeps the closure a leaf carries from
+			// growing with the Program.
+			it("should read nothing across two bounds", () => {
+				let aboveOne = refinement("AboveOne", integer, [
+					conjunct("isGreaterThan", ["1"]),
+				])
+
+				expect(matchesType(notZero, aboveOne)).toBe(false)
+			})
+		})
+
 		// NOTE: The conjunct set is compared by KEY, so the same predicate
 		// written the other way round is the same Type. Which is why the
 		// canonical form exists, and why nothing here relies on the order.

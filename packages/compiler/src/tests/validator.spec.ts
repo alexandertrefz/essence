@@ -2794,6 +2794,67 @@ describe("Validator", () => {
 			return diagnosticsFor(withRefinements(body))
 		}
 
+		// NOTE: Every predicate the standard library declares a refinement by,
+		// asked of a written value. Each is stored RESOLVED — `isNot` is `is`
+		// negated, `hasItems` is `isEmpty` negated, `isPositive` is
+		// `isGreaterThan(0)` — so the evaluator answers a handful of primitives
+		// and each spelling arrives as one of them. A row that stopped being
+		// admitted is a row whose leaf nothing can decide any more.
+		describe("the predicates the standard library declares", () => {
+			function codesFor(declared: string, value: string): Array<string> {
+				return diagnosticsFor(
+					`implementation { constant admitted: ${declared} = ${value} }`,
+				).map((diagnostic) => diagnostic.code)
+			}
+
+			it("should admit a written value each Alias holds of", () => {
+				expect(codesFor("NonZeroInteger", "5")).toEqual([])
+				expect(codesFor("NonNegativeInteger", "0")).toEqual([])
+				expect(codesFor("PositiveInteger", "7")).toEqual([])
+				expect(codesFor("NonEmptyString", '"x"')).toEqual([])
+				expect(codesFor("NonEmptyList<Integer>", "[1]")).toEqual([])
+			})
+
+			it("should refuse a written value each Alias refuses", () => {
+				expect(codesFor("NonZeroInteger", "0")).toEqual([
+					"assignment-type-mismatch",
+				])
+				expect(codesFor("NonNegativeInteger", "-1")).toEqual([
+					"assignment-type-mismatch",
+				])
+				expect(codesFor("PositiveInteger", "0")).toEqual([
+					"assignment-type-mismatch",
+				])
+				expect(codesFor("NonEmptyString", '""')).toEqual([
+					"assignment-type-mismatch",
+				])
+				expect(codesFor("NonEmptyList<Integer>", "[]")).toEqual([
+					"assignment-type-mismatch",
+				])
+			})
+
+			// NOTE: And a Program's own alias of a primitive is decided by the
+			// leaf it forwards to, exactly as the standard library's are.
+			it("should decide a Program's own alias by what it forwards to", () => {
+				let diagnostics = diagnosticsFor(`implementation {
+					namespace Stock for Integer {
+						isInStock() -> Boolean {
+							<- @::isGreaterThan(5)
+						}
+					}
+
+					type Stocked = Integer where @::isInStock()
+
+					constant kept: Stocked = 9
+					constant refused: Stocked = 1
+				}`)
+
+				expect(
+					diagnostics.map((diagnostic) => diagnostic.code),
+				).toEqual(["assignment-type-mismatch"])
+			})
+		})
+
 		it("should admit a written value into a declared refinement", () => {
 			expect(
 				diagnosticsOfBody(`
