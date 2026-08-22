@@ -2153,6 +2153,13 @@ describe("essence run", () => {
 	// exit code, with no --json qualification. The program here overflows the
 	// stack at run time, something no Diagnostic can see, so a non-zero exit
 	// can only mean it actually ran.
+	//
+	// NOTE: Driven as a child process with its streams CAPTURED, like the test
+	// below, rather than through the in-process harness. `run` hands the
+	// program the CLI's own streams, so in-process the overflow's stack trace
+	// landed in this suite's output — eleven lines of `RangeError` in a green
+	// run, which more than one reader has taken for a failing test. Captured,
+	// the trace is evidence the program ran, and it is asserted on.
 	it("still executes the program and answers its exit code under --json", async () => {
 		await withModules(
 			{
@@ -2172,25 +2179,29 @@ describe("essence run", () => {
 				].join("\n"),
 			},
 			async (directory) => {
-				let { terminal, lines } = captureTerminal()
-				let context = createContext(
-					testOptions({ json: true, noOptimise: true }),
-					"essence",
-					terminal,
+				let binary = fileURLToPath(
+					import.meta.resolve("../../bin/essence"),
+				)
+				let result = spawnSync(
+					process.execPath,
+					[
+						binary,
+						"run",
+						path.join(directory, "Overflow.es"),
+						"--json",
+						"--no-optimise",
+					],
+					{ encoding: "utf-8", env: { ...process.env } },
 				)
 
-				let code = await runRun(
-					context,
-					runCommand,
-					[path.join(directory, "Overflow.es")],
-					[],
-				)
-
-				let report = JSON.parse(lines.join("\n")) as JSONReport
+				let report = JSON.parse(result.stdout) as JSONReport
 
 				expect(report.command).toBe("run")
 				expect(report.ok).toBe(true)
-				expect(code).not.toBe(EXIT_SUCCESS)
+				expect(result.stderr).toContain(
+					"Maximum call stack size exceeded",
+				)
+				expect(result.status).not.toBe(EXIT_SUCCESS)
 			},
 		)
 	})
