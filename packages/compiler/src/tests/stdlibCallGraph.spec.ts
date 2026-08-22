@@ -569,7 +569,7 @@ describe("Stdlib Call Graph", () => {
 			"List.removeEvery__overload$2",
 			"List.removeFirst",
 			"List.removeLast",
-			"List.repeat",
+			"List.repeat__overload$1",
 			"List.replace",
 			"List.sort__overload$3",
 			// NOTE: `flatten` is the one Optional Method that is not on every
