@@ -1,17 +1,18 @@
 import {
-	Algebraic      from "./Algebraic.es"
-	Boolean        from "./Boolean.es"
-	Integer        from "./Integer.es"
-	NonZeroInteger from "./Integer.es"
-	List           from "./List.es"
-	NonEmptyList   from "./List.es"
-	Optional       from "./Optional.es"
-	Orderable      from "./Orderable.es"
-	Ordering       from "./Ordering.es"
-	Equatable      from "./Protocols.es"
-	Printable      from "./Protocols.es"
-	String         from "./String.es"
-	Transcendental from "./Transcendental.es"
+	Algebraic          from "./Algebraic.es"
+	Boolean            from "./Boolean.es"
+	Integer            from "./Integer.es"
+	NonNegativeInteger from "./Integer.es"
+	NonZeroInteger     from "./Integer.es"
+	List               from "./List.es"
+	NonEmptyList       from "./List.es"
+	Optional           from "./Optional.es"
+	Orderable          from "./Orderable.es"
+	Ordering           from "./Ordering.es"
+	Equatable          from "./Protocols.es"
+	Printable          from "./Protocols.es"
+	String             from "./String.es"
+	Transcendental     from "./Transcendental.es"
 }
 
 declarations {
@@ -364,7 +365,7 @@ declarations {
 
 		§§ Raises the Rational to the given power.
 		§§
-		§§ A negative exponent answers the exact reciprocal power. Zero raised to the power of zero is one. Zero raised to a negative power answers empty, and the `defaultingTo:` entry answers the given Rational instead.
+		§§ A negative exponent answers the exact reciprocal power. Zero raised to the power of zero is one. Raising this Rational to an exponent proven not to be negative can not fail. Zero raised to a negative power answers empty, and the `defaultingTo:` entry answers the given Rational instead.
 		overload raise {
 			§§ @param to — the exponent
 			§§ @returns — the power, or nothing when raising zero to a negative power.
@@ -381,6 +382,14 @@ declarations {
 			) -> Rational {
 				<- @::raise(to exponent)::value(defaultingTo fallback)
 			}
+
+			§§ Raises the Rational to an exponent proven not to be negative.
+			§§
+			§§ Every Rational has such a power, the reciprocal is never taken, and no denominator can reach zero. So the answer is the power itself rather than an Optional.
+			§§
+			§§ @param to — the exponent, proven not to be negative
+			§§ @returns — the power.
+			(to exponent: NonNegativeInteger) -> Rational
 		}
 
 		§§ Answers the exact square root of the Rational.

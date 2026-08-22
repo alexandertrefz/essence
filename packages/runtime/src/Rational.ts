@@ -228,18 +228,13 @@ export function raise__overload$1(
 	rational: RationalType,
 	exponent: IntegerType,
 ): OptionalType<RationalType> {
-	let parts = reducedParts(rational)
-
 	let power = BigInt(exponent.value)
 
 	if (power >= 0n) {
-		return createValue(
-			createRational(
-				parts.numerator ** power,
-				parts.denominator ** power,
-			),
-		)
+		return createValue(raise__overload$3(rational, exponent))
 	}
+
+	let parts = reducedParts(rational)
 
 	if (parts.numerator === 0n) {
 		return createEmpty()
@@ -248,6 +243,21 @@ export function raise__overload$1(
 	return createValue(
 		createRational(parts.denominator ** -power, parts.numerator ** -power),
 	)
+}
+
+// NOTE: The exponent of this entry is a `NonNegativeInteger` in the source —
+// proven while compiling, erased to an Integer here — so there is no empty arm
+// to build and no reciprocal to take. It holds the non-negative power rather
+// than reading it back out of the Optional entry, which is the direction
+// `Integer`'s two `raise` entries are paired in as well.
+export function raise__overload$3(
+	rational: RationalType,
+	exponent: IntegerType,
+): RationalType {
+	let parts = reducedParts(rational)
+	let power = BigInt(exponent.value)
+
+	return createRational(parts.numerator ** power, parts.denominator ** power)
 }
 
 // #endregion
