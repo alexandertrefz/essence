@@ -120,6 +120,19 @@ export function essence(options: PluginOptions = {}): VitePlugin {
 			compiler.invalidate(id)
 		},
 		resolveId(source, importer) {
+			// NOTE: An id this plugin already answered comes back through
+			// resolution whenever Vite resolves a URL it does not hold a
+			// module for — a request for a raw Module right after an edit
+			// invalidated it, say. It is answered as itself. Marking it again
+			// spelled `\0\0essence-raw:…`, which `load` stripped one mark off,
+			// read as no raw id at all, and compiled as a FILE of that name:
+			// `module-not-found`, once in a while, on a busy machine.
+			if (source.startsWith("\0")) {
+				return rawFile(source) !== null || source === `\0${PRELUDE_ID}`
+					? source
+					: null
+			}
+
 			// NOTE: The wrapper's own import, coming back through resolution
 			// with the entry already spelled out. `\0` is Rollup's mark for a
 			// module no filesystem holds, which is exactly what an emitted

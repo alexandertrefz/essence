@@ -790,6 +790,31 @@ describe("The Vite plugin", () => {
 		).toBe(raw)
 	})
 
+	// NOTE: Vite resolves a URL it holds no module for through the plugins —
+	// which is how an id this plugin already answered comes back to it, after
+	// an edit invalidated the module it named. Marked a second time it spelled
+	// `\0\0essence-raw:…`, which `load` read as a FILE of that name and the
+	// Compiler reported as `module-not-found` — once in a while, on a busy
+	// machine, in the dev-server test that edits a Module and asks for it again.
+	it("answers an id it already marked as itself", () => {
+		let entry = fixturePath("modules", "math", "Math.es")
+		let plugin = essence()
+		let raw = `\0${rawSpecifier(entry)}`
+
+		expect(plugin.resolveId.call(undefined, raw, undefined)).toBe(raw)
+		expect(
+			plugin.resolveId.call(undefined, `\0${PRELUDE_ID}`, undefined),
+		).toBe(`\0${PRELUDE_ID}`)
+		// NOTE: A marked id that is not this plugin's is not claimed.
+		expect(
+			plugin.resolveId.call(
+				undefined,
+				"\0somebody-elses:thing",
+				undefined,
+			),
+		).toBe(null)
+	})
+
 	// NOTE: Every source of the GRAPH, not the entry alone — the file that
 	// changed is rarely the file that was asked for, and a host watching one
 	// would sit still through every edit to what it imports. Served per file,
