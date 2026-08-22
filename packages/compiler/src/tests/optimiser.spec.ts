@@ -1268,15 +1268,20 @@ const shadowedNonEmptyList = `implementation {
 	}
 
 	constant proven: NonEmptyList<Integer> = [1, 2]
+	constant written: List<Integer>        = [1, 2]
 
 	Terminal.inspect(trick())
 	Terminal.inspect(proven::map((item) { <- item::add(1) })::length())
-	Terminal.inspect([1, 2]::map((item) { <- item::add(1) })::length())
+	Terminal.inspect(written::map((item) { <- item::add(1) })::length())
 }`
 
 // NOTE: A Program that declares a Namespace named \`List\`, which stands in front
 // of the builtin for the rest of its block — so a \`map\` written in it may be a
 // Method the Program wrote, and every walk in the Program is left alone.
+//
+// NOTE: The ordinary walk reads a BOUND List. A written one proves it holds
+// items, which sends it to \`NonEmptyList\` — a name this Program did not take —
+// and there would be nothing here for the gate to refuse.
 const shadowedList = `implementation {
 	§§ Answers a doubled Integer, from a Namespace named after a builtin.
 	§§
@@ -1295,8 +1300,10 @@ const shadowedList = `implementation {
 		<- 21::doubled()
 	}
 
+	constant written: List<Integer> = [1, 2]
+
 	Terminal.inspect(trick())
-	Terminal.inspect([1, 2]::map((item) { <- item::add(1) })::length())
+	Terminal.inspect(written::map((item) { <- item::add(1) })::length())
 }`
 
 // NOTE: A walk standing in an Argument, where there is nowhere to write a
@@ -5997,9 +6004,14 @@ describe("Optimiser", () => {
 		// NOTE: The standard library's own bodies go through the same pass, in
 		// the prelude the Rewriter builds — which is where most of a Program's
 		// Record and List construction actually happens.
+		// NOTE: The List is BOUND. A written one proves it holds items, which
+		// sends `removeDuplicates` to `NonEmptyList`'s hand-written native —
+		// and the body this reads for is the one `List` writes in Essence.
 		it("collapses the standard library's bodies too", () => {
 			const source = `implementation {
-				Terminal.inspect([1, 2, 2]::removeDuplicates())
+				constant numbers: List<Integer> = [1, 2, 2]
+
+				Terminal.inspect(numbers::removeDuplicates())
 			}`
 
 			let generated = generate(source)

@@ -1054,10 +1054,13 @@ describe("Enricher", () => {
 			)
 		})
 
+		// NOTE: The receiver is computed. A written one proves its own sign,
+		// and `squareRoot` on a proven receiver answers no Optional at all.
 		it("should accept an Optional hole whose payload is Printable", () => {
 			expect(
 				diagnosticsFor(`implementation {
-					constant maybe = 3::squareRoot()
+					constant three = 1::add(2)
+					constant maybe = three::squareRoot()
 					constant message = "root: {maybe}"
 				}`),
 			).toEqual([])
@@ -1067,10 +1070,13 @@ describe("Enricher", () => {
 			// NOTE: The conditional half of the conformance — the Optional
 			// itself is the same Type as the one accepted above, and it is the
 			// payload that decides. A List of Functions is the shortest way to
-			// hand `firstItem` a payload nothing can print.
+			// hand `firstItem` a payload nothing can print, and the List is
+			// bound to a `List` Type: a written one proves it holds items and
+			// `firstItem` would answer the Function bare.
 			let diagnostics = diagnosticsFor(`implementation {
 				constant greet = (subject: String) -> String { <- subject }
-				constant maybe = [greet]::firstItem()
+				constant greeters: List<(subject: String) -> String> = [greet]
+				constant maybe = greeters::firstItem()
 				constant message = "greeting: {maybe}"
 			}`)
 
@@ -1336,23 +1342,32 @@ describe("Enricher", () => {
 			throw new Error("No ConstantDeclarationStatement found.")
 		}
 
+		// NOTE: The answer is the item Type BARE. A written List proves it
+		// holds an item, so the receiver reaches `namespace NonEmptyList`,
+		// whose `firstItem` is total — and the inference under test is the
+		// same one either way, since `ItemType` is decided by the receiver.
 		it("should infer List item Types through Method Invocations", () => {
 			expect(
 				typeOfFirstConstant(`implementation {
 					constant first = [1, 2]::firstItem()
 				}`),
-			).toEqual(optionalOf({ type: "Integer" }))
+			).toEqual({ type: "Integer" })
 		})
 
 		it("should infer map's result Type from the callback's return", () => {
 			// NOTE: `Result` occurs only in the callback's return position and
 			// in `map`'s own return — the case 0.5b unblocked. The callback is
 			// contextually typed, so `n` needs no annotation.
+			// NOTE: Printed rather than compared whole, because a written
+			// receiver proves it holds items and `NonEmptyList::map` carries
+			// that proof onto the answer — the item Type is what this is about.
 			expect(
-				typeOfFirstConstant(`implementation {
-					constant texts = [1, 2]::map((n) { <- n::toString() })
-				}`),
-			).toEqual({ type: "List", itemType: { type: "String" } })
+				printType(
+					typeOfFirstConstant(`implementation {
+						constant texts = [1, 2]::map((n) { <- n::toString() })
+					}`),
+				),
+			).toBe("NonEmptyList<String>")
 		})
 
 		it("should infer reduce's result Type from the starting value", () => {
@@ -1372,10 +1387,12 @@ describe("Enricher", () => {
 			// NOTE: `isGreaterThan` only resolves if `n` typed as Integer, so
 			// a broken item-Type substitution fails outright here.
 			expect(
-				typeOfFirstConstant(`implementation {
-					constant flags = [1, 2]::map((n) { <- n::isGreaterThan(1) })
-				}`),
-			).toEqual({ type: "List", itemType: { type: "Boolean" } })
+				printType(
+					typeOfFirstConstant(`implementation {
+						constant flags = [1, 2]::map((n) { <- n::isGreaterThan(1) })
+					}`),
+				),
+			).toBe("NonEmptyList<Boolean>")
 		})
 
 		it("should find an item with the firstItem check overload", () => {
@@ -2126,6 +2143,10 @@ describe("Enricher", () => {
 			// specificity order can not break the tie and the Argument really
 			// is an Error — a concrete Namespace beside the stdlib's generic
 			// one would simply win and leave nothing to cascade from.
+			//
+			// NOTE: The receiver is a bound name. A written List would prove it
+			// holds items and reach `NonEmptyList`, which is more specific than
+			// both of these and would break the tie this test needs.
 			expect(
 				diagnosticsFor(`implementation {
 					namespace AnyList<infer ItemType> for List<ItemType> {
@@ -2134,7 +2155,9 @@ describe("Enricher", () => {
 						}
 					}
 
-					Terminal.inspect([1, 2, 3]::firstItem())
+					constant numbers: List<Integer> = [1, 2, 3]
+
+					Terminal.inspect(numbers::firstItem())
 				}`).map((diagnostic) => diagnostic.code),
 			).toEqual(["ambiguous-namespace"])
 		})
@@ -3807,6 +3830,7 @@ describe("Enricher", () => {
 				expect(diagnostics[0].notes).toEqual([
 					"'List::prepend' takes 1 Argument: Parameter 1 is Integer.",
 					"'List::prepend' takes 1 Argument: Parameter 'contentsOf' is List<Integer>.",
+					"'NonEmptyList::prepend' takes 1 Argument: Parameter 'contentsOf' is List<Integer>.",
 				])
 			})
 
@@ -4199,11 +4223,10 @@ describe("Enricher", () => {
 		// with nothing widened at the call. The annotation below says what the
 		// Constant holds and no more; every bound stays written.
 		//
-		// NOTE: `squareRoot` answers an `Optional<Integer | Algebraic>`, which
-		// takes two matches to take apart rather than one: the outer one names
-		// the Cases of the Optional and binds the payload, the inner one
-		// narrows that payload's Union. The kinds are what this is about, and
-		// they are still both reached.
+		// NOTE: `squareRoot` on a written receiver answers an
+		// `Integer | Algebraic`, which one match takes apart: the receiver
+		// proves its own sign, so there is no Optional between the call and
+		// the value. The kinds are what this is about, and both are reached.
 		it("should compare across Number kinds through the Number Namespace", () => {
 			expect(
 				diagnosticsFor(`implementation {
@@ -4211,17 +4234,12 @@ describe("Enricher", () => {
 					constant belowPi: Boolean = three::isLessThan(Number.Pi)
 					constant orderedPis: Boolean = Number.Pi::isGreaterThan(Number.Tau)
 					constant rootVsHalf = match 2::squareRoot() -> Boolean {
-						case #Value(root) {
-							<- match root -> Boolean {
-								case Algebraic {
-									constant half: Number = 3/2
+						case Algebraic {
+							constant half: Number = 3/2
 
-									<- half::isGreaterThanOrEqualTo(@)
-								}
-								case Integer { <- false }
-							}
+							<- half::isGreaterThanOrEqualTo(@)
 						}
-						case #Empty { <- false }
+						case Integer { <- false }
 					}
 				}`),
 			).toEqual([])
@@ -4229,22 +4247,16 @@ describe("Enricher", () => {
 
 		it("should span the numeric tower for Integer::add", () => {
 			// NOTE: The Transcendental annotation only type-checks if
-			// `1::add(π)` resolves to the new overload. The match unwraps the
-			// `Optional` √2 comes back in and then narrows the payload to an
-			// Algebraic, and adds an Integer to it — the other new overload —
+			// `1::add(π)` resolves to the new overload. The match narrows √2 to
+			// an Algebraic and adds an Integer to it — the other new overload —
 			// with `toString` keeping the handler's return a String so the test
 			// turns on resolution, not on the result Type.
 			expect(
 				diagnosticsFor(`implementation {
 					constant withPi: Transcendental = 1::add(Number.Pi)
 					constant withRoot: String = match 2::squareRoot() -> String {
-						case #Value(root) {
-							<- match root -> String {
-								case Algebraic { <- 1::add(@)::toString() }
-								case Integer   { <- @::toString() }
-							}
-						}
-						case #Empty { <- "none" }
+						case Algebraic { <- 1::add(@)::toString() }
+						case Integer   { <- @::toString() }
 					}
 				}`),
 			).toEqual([])
@@ -4680,7 +4692,36 @@ describe("Enricher", () => {
 			// NOTE: `firstItem` is the stdlib's, declared for every
 			// `List<ItemType>` — a Namespace naming the item Type outright is
 			// the more specific of the two and answers the call.
+			//
+			// NOTE: The receiver is a bound name and not the `[1, 2, 3]` it
+			// once was. A written List proves it holds items, which puts
+			// `NonEmptyList` on the ladder as well — and that one is neither
+			// more nor less specific than `List<Integer>`, so the call is
+			// ambiguous rather than concrete-wins. The test below pins that.
 			let invocation = lastConstantMethodInvocation(`implementation {
+				namespace IntegerTally for List<Integer> {
+					firstItem() -> Integer {
+						<- 0
+					}
+				}
+
+				constant numbers: List<Integer> = [1, 2, 3]
+				constant first = numbers::firstItem()
+			}`)
+
+			expect(invocation.namespace.name).toBe("IntegerTally")
+			expect(invocation.type).toEqual({ type: "Integer" })
+		})
+
+		// NOTE: A written receiver carries its proof into dispatch, and two
+		// Namespaces neither of which is more specific than the other are the
+		// ambiguity they have always been — a literal receiver is exactly a
+		// Constant declared with what the literal proves, and answers the same
+		// Diagnostic and the same Help. Nothing here is special to a literal:
+		// `constant proven: NonEmptyList<Integer> = [1, 2, 3]` reports this
+		// same ambiguity for the same two candidates.
+		it("should report a written receiver matching two unordered Namespaces", () => {
+			let diagnostics = diagnosticsFor(`implementation {
 				namespace IntegerTally for List<Integer> {
 					firstItem() -> Integer {
 						<- 0
@@ -4690,8 +4731,12 @@ describe("Enricher", () => {
 				constant first = [1, 2, 3]::firstItem()
 			}`)
 
-			expect(invocation.namespace.name).toBe("IntegerTally")
-			expect(invocation.type).toEqual({ type: "Integer" })
+			expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+				"ambiguous-namespace",
+			])
+			expect(diagnostics[0].helps).toEqual([
+				"Name it at the call, e.g. 'value::<NonEmptyList>firstItem(…)'.",
+			])
 		})
 
 		it("should prefer a nested generic target over a flat one", () => {

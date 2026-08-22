@@ -476,13 +476,8 @@ describe("Rationals", () => {
 			expect(
 				await run(`implementation {
 					Terminal.inspect(match 0::squareRoot() -> String {
-						case #Value(root) {
-							<- match root -> String {
-								case Integer   { <- @::toString() }
-								case Algebraic { <- @::toString() }
-							}
-						}
-						case #Empty { <- "Empty" }
+						case Integer   { <- @::toString() }
+						case Algebraic { <- @::toString() }
 					})
 
 					Terminal.inspect(match 0/5::squareRoot() -> String {
