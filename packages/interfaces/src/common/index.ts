@@ -288,6 +288,7 @@ export type DiagnosticCode =
 	| "native-property-without-type"
 	| "indistinguishable-default-parameter"
 	| "ambiguous-overload-default"
+	| "fallback-never-used"
 	// Choices and their Cases.
 	| "empty-choice"
 	| "unknown-case"

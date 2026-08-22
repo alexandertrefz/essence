@@ -206,7 +206,12 @@ easy to break:
   visible where it is taken, so defaulting a division by zero is something the
   call site has said rather than something a Method decided.
   `Optional::value(defaultingTo:)` stays, and is for an Optional held in data
-  rather than one a call has just produced.
+  rather than one a call has just produced. A caller that already holds a proof
+  is warned rather than left with dead text: `nonEmpty::firstItem(defaultingTo
+  0)` answers the very Integer `firstItem()` does, and `fallback-never-used`
+  says so at the Argument. The library can not refuse that call for itself — a
+  refinement ADDS Methods and takes none away, so `NonEmptyList` answers
+  `firstItem()` bare and still can not hide `List`'s fallback entry.
 - **Count-like nonsense is lenient; value-like failure returns an `Optional`** —
   `List.repeat(_, times 0)` is the empty List, `list::split(intoGroupsOf 0)` is
   one group holding every item, and `7::clamp(between 10, and 1)` takes the

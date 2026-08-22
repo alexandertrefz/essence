@@ -1010,6 +1010,7 @@ export function enrichMethodInvocation(
 	// to write them.
 	let base = enrichExpression(node.base, scope)
 	let typer = makeArgumentTyper(scope)
+	let resolved = resolveMethodInvocation(node, base.type, scope, typer)
 	let {
 		namespace,
 		type,
@@ -1018,7 +1019,15 @@ export function enrichMethodInvocation(
 		omittedParameterIndices,
 		derivedDescriptor,
 		dispatch,
-	} = resolveMethodInvocation(node, base.type, scope, typer)
+	} = resolved
+
+	reportDeadFallbackOnMethodInvocation(
+		node,
+		base.type,
+		scope,
+		typer,
+		resolved,
+	)
 
 	return {
 		nodeType: "MethodInvocation",
@@ -1049,8 +1058,19 @@ export function enrichFunctionInvocation(
 	// resolution and the same typed Nodes build the final Invocation.
 	let name = enrichCalleeExpression(node.name, scope)
 	let typer = makeArgumentTyper(scope)
-	let { type, conformances, overloadedMethodIndex, omittedParameterIndices } =
-		resolveFunctionInvocation(node, name.type, scope, typer)
+	let {
+		type,
+		conformances,
+		overloadedMethodIndex,
+		omittedParameterIndices,
+		selected,
+	} = resolveFunctionInvocation(node, name.type, scope, typer)
+
+	reportDeadFallbackOnFunctionInvocation(node, name.type, scope, typer, {
+		type,
+		selected,
+		overloadedMethodIndex,
+	})
 
 	return {
 		nodeType: "FunctionInvocation",
@@ -8089,7 +8109,13 @@ function makeArgumentTyper(scope: enricher.Scope): ArgumentTyper {
 			// as it stands is not yet a Type any value could be of. What comes back
 			// is matched against the Parameter as DECLARED, which is what binds the
 			// Type Parameter the value just decided.
-			if (expectedType.type === "Refinement") {
+			//
+			// NOTE: And not while the caller's proof is erased. The re-probe that
+			// erases it asks what this same Argument would have decided had the
+			// caller held nothing, so a `2` standing where a NonZeroInteger does
+			// stays the ordinary Integer it is written as, and an Argument whose
+			// own Type is a refinement arrives as the Type it is refined from.
+			if (expectedType.type === "Refinement" && !erasingRefinementProof) {
 				let asked = refinementDecidedBy(expectedType, type)
 
 				if (asked !== null && admitted(value, asked)) {
@@ -8097,7 +8123,7 @@ function makeArgumentTyper(scope: enricher.Scope): ArgumentTyper {
 				}
 			}
 
-			return type
+			return erasingRefinementProof ? withoutRefinement(type) : type
 		},
 		hasErrorArgument() {
 			return sawErrorArgument
@@ -10113,6 +10139,13 @@ function resolveFunctionInvocation(
 	// `Namespace.method` Lookup.
 	overloadedMethodIndex: number | null
 	omittedParameterIndices: Array<number>
+	// NOTE: Whether a candidate was actually SELECTED, which the answer's Type
+	// alone does not say: a lone signature whose Arguments did not match still
+	// answers its declared return Type below, so that the Validator reports the
+	// Argument rather than a cascade on top of it. Read by the dead-fallback
+	// re-probe, which must not read a Type nothing resolved to as an answer the
+	// call could have given.
+	selected: boolean
 } {
 	const type = nameType
 
@@ -10165,6 +10198,7 @@ function resolveFunctionInvocation(
 				overloadedMethodIndex: null,
 				omittedParameterIndices:
 					selected.inferred.omittedParameterIndices,
+				selected: true,
 			}
 		}
 
@@ -10209,6 +10243,7 @@ function resolveFunctionInvocation(
 			conformances: [],
 			overloadedMethodIndex: null,
 			omittedParameterIndices: [],
+			selected: false,
 		}
 	} else if (
 		type.type === "OverloadedMethod" ||
@@ -10252,6 +10287,7 @@ function resolveFunctionInvocation(
 				overloadedMethodIndex: selected.index,
 				omittedParameterIndices:
 					selected.inferred.omittedParameterIndices,
+				selected: true,
 			}
 		}
 
@@ -10280,6 +10316,7 @@ function resolveFunctionInvocation(
 			conformances: [],
 			overloadedMethodIndex: null,
 			omittedParameterIndices: [],
+			selected: false,
 		}
 	} else {
 		if (type.type !== "Error") {
@@ -10303,8 +10340,338 @@ function resolveFunctionInvocation(
 			conformances: [],
 			overloadedMethodIndex: null,
 			omittedParameterIndices: [],
+			selected: false,
 		}
 	}
+}
+
+// NOTE: The label the Standard Library gives the Argument that stands in for an
+// answer there is none — `firstItem(defaultingTo 0)`, `divide(by 2,
+// defaultingTo 0/1)`, `average(on .total, defaultingTo 0/1)`. Nothing below
+// knows a Method or a Namespace name, so a Program's own Namespace following the
+// same convention is read exactly the same way.
+const fallbackArgumentLabel = "defaultingTo"
+
+// NOTE: The Argument a dead fallback would be reported on. A call that writes
+// none — which is nearly every call in every Program — costs one `find` over a
+// list that is usually empty and nothing else.
+function writtenFallbackArgument(
+	args: Array<parser.ArgumentNode>,
+): parser.ArgumentNode | undefined {
+	return args.find(
+		(argument) => argument.name?.content === fallbackArgumentLabel,
+	)
+}
+
+// NOTE: Whether the bare call could still come back empty. Any Case of the
+// builtin `Optional` among the answer's members is enough: the fallback is dead
+// only when there is no empty answer left for it to stand in for, so an answer
+// that still holds one keeps it. The identity is compared whole, so a Module
+// declaring a `choice Optional` of its own is a Choice like any other.
+function answersOptional(type: common.Type): boolean {
+	if (type.type === "Case") {
+		return type.choice === "Optional"
+	}
+
+	if (type.type === "UnionType") {
+		return flattenUnionMembers(type).some(
+			(member) => member.type === "Case" && member.choice === "Optional",
+		)
+	}
+
+	return false
+}
+
+// NOTE: A Type with the proof its refinement carries taken off. Only the
+// OUTERMOST one is taken: what a dead fallback is measured against is the
+// receiver's or the Argument's own proof, and a refinement nested inside one
+// promises something about the items rather than about the answer being there.
+function withoutRefinement(type: common.Type): common.Type {
+	return type.type === "Refinement" ? type.base : type
+}
+
+// NOTE: Which entry a resolution selected, written out as one line — the
+// Namespace it was found in and the position inside that Namespace's Overload. A
+// dispatched receiver selects one per Union member and is written out in branch
+// order, which the two probes share because they share the receiver. Compared
+// instead of the answers, since two entries of one Overload can answer the very
+// same Type and still be different code.
+function selectedEntry(
+	entries: Array<{
+		namespaceName: string
+		overloadedMethodIndex: number | null
+	}>,
+): string {
+	return entries
+		.map((entry) => `${entry.namespaceName}#${entry.overloadedMethodIndex}`)
+		.join("|")
+}
+
+// NOTE: A re-probe re-enriches the Arguments it keeps, and one of those may be
+// an Invocation writing a `defaultingTo` of its own. Re-probing THAT one from
+// inside here would double the work per nesting level and could report nothing
+// anyway — its Diagnostics are dropped with the rest of the probe's, and the
+// enrichment the Program actually commits reports on it for itself.
+let probingDeadFallback = false
+
+// NOTE: Set while the SECOND re-probe runs — the one asking what the same call
+// would have answered had the caller held no proof at all. Read by the Argument
+// typer; the receiver is widened by the rail, which is the only place holding it.
+let erasingRefinementProof = false
+
+// NOTE: What one re-probe answered, and which entry answered it.
+type ProbedBareAnswer = {
+	type: common.Type
+	selected: boolean
+	entry: string
+}
+
+// NOTE: What the same Invocation answers with the `defaultingTo` Argument struck
+// out, or null where that question has no answer worth reporting on.
+//
+// Resolved by the SAME resolver the call itself went through: whatever entry the
+// bare call reaches is what the fallback is measured against, so no per-Method
+// knowledge is needed and an Overload set the Library grows later is covered on
+// the day it is written. A probe that selects nothing, reports an Error, or
+// answers a Type carrying one says nothing at all — an ambiguous or failing
+// re-probe is not evidence about the call that was written.
+//
+// Two more things a bare answer alone does not say, and each of them would make
+// the Warning's own text false, so each is asked for on its own:
+//
+// The Parameter may have been DEFAULTED rather than dropped. A `defaultingTo`
+// Parameter carrying a default value is filled in by the callee where no Argument
+// is written, so striking the Argument reaches the very entry the call already
+// selected and answers its declared Type — while the Argument that WAS written is
+// read at run time and answers with. Nothing was proven there; it is one entry
+// asked twice. So a probe landing on the written call's own entry says nothing.
+//
+// And the proof may not be what made the difference. Striking an Argument can let
+// an entirely different entry win — an Overload whose other entry answers bare for
+// reasons of its own is reached by a caller holding no proof at all — and then the
+// fallback IS read and following the Help swaps which entry runs. So the question
+// is asked a second time with the caller's proof erased: the receiver widened to
+// the Type its refinement is refined from, and no written value admitted to one.
+// An answer that is never empty even then was never the proof's doing.
+//
+// Held aside on every rail. The Diagnostics are collected and dropped, since the
+// call that was written has already reported its own; the contextual recordings
+// are made under a recording nobody commits, so a Function literal or a member
+// path Argument is left typed by the resolution the Program committed to rather
+// than by this speculative one.
+function bareAnswerWithoutFallback(
+	writtenEntry: string,
+	probe: (erasingProof: boolean) => ProbedBareAnswer,
+): common.Type | null {
+	if (probingDeadFallback) {
+		return null
+	}
+
+	function ask(erasingProof: boolean): {
+		result: ProbedBareAnswer
+		diagnostics: Array<common.Diagnostic>
+	} {
+		probingDeadFallback = true
+		erasingRefinementProof = erasingProof
+
+		try {
+			return probeContextualFunctionTypes(() =>
+				collectDiagnostics(() => probe(erasingProof)),
+			).result
+		} finally {
+			probingDeadFallback = false
+			erasingRefinementProof = false
+		}
+	}
+
+	function answersBare(probed: {
+		result: ProbedBareAnswer
+		diagnostics: Array<common.Diagnostic>
+	}): boolean {
+		return (
+			probed.result.selected &&
+			!containsErrors(probed.diagnostics) &&
+			!typeContainsError(probed.result.type) &&
+			!answersOptional(probed.result.type)
+		)
+	}
+
+	let bare = ask(false)
+
+	if (!answersBare(bare) || bare.result.entry === writtenEntry) {
+		return null
+	}
+
+	if (answersBare(ask(true))) {
+		return null
+	}
+
+	return bare.result.type
+}
+
+// NOTE: A `defaultingTo` Argument is worth writing only where the call could
+// come back empty without it, and a proof the caller already holds can take that
+// possibility away: `nonEmpty::firstItem()` answers an Integer, so
+// `nonEmpty::firstItem(defaultingTo 0)` answers that same Integer and the
+// fallback is unreachable. The Library can not refuse the call for itself — a
+// refinement adds Methods and takes none away, so `namespace NonEmptyList`
+// answers `firstItem()` bare and can not hide `List::firstItem(defaultingTo:)`
+// — which is why this is a Diagnostic rather than a signature.
+function reportDeadFallback(
+	fallback: parser.ArgumentNode,
+	bareType: common.Type,
+): void {
+	// NOTE: The label is part of the span, because the label is part of what the
+	// Help asks the reader to drop.
+	let position = {
+		start: (fallback.name ?? fallback.value).position.start,
+		end: fallback.value.position.end,
+	}
+	let answer = withArticle(describeType(bareType))
+
+	reportWarning(
+		`This '${fallbackArgumentLabel}' Argument can never be read`,
+		position,
+		{
+			code: "fallback-never-used",
+			labels: [primary(position, "this fallback can never be read")],
+			notes: [
+				`Without it the call answers ${answer}, which is never empty.`,
+			],
+			helps: [
+				`Drop the '${fallbackArgumentLabel}' Argument; the call already answers ${answer}.`,
+			],
+			tags: ["unnecessary"],
+		},
+	)
+}
+
+// NOTE: The two Invocation shapes hand the same question to the same helper: a
+// Method call through `::`, and a Function or static call written with its
+// Arguments in brackets. A dispatched Union receiver comes through the first,
+// since per-member dispatch answers from `resolveMethodInvocation` like any
+// other receiver does.
+function reportDeadFallbackOnMethodInvocation(
+	node: parser.MethodInvocationNode,
+	baseType: common.Type,
+	scope: enricher.Scope,
+	typer: ArgumentTyper,
+	written: ResolvedMethodInvocation,
+): void {
+	let fallback = writtenFallbackArgument(node.arguments)
+
+	if (fallback === undefined || typeContainsError(written.type)) {
+		return
+	}
+
+	let bareType = bareAnswerWithoutFallback(
+		methodInvocationEntry(written),
+		(erasingProof) => {
+			let resolved = resolveMethodInvocation(
+				{
+					...node,
+					arguments: node.arguments.filter(
+						(argument) => argument !== fallback,
+					),
+				},
+				// NOTE: The receiver is the caller's other proof, so the probe
+				// that erases one erases this one too — a `NonEmptyList` asks as
+				// the List it is refined from, and reaches whatever a caller
+				// holding nothing would have reached.
+				erasingProof ? withoutRefinement(baseType) : baseType,
+				scope,
+				typer,
+			)
+
+			// NOTE: A Method Invocation that resolved to nothing answers an Error
+			// Type and says so that way — `resolveFailedMethodInvocation` is every
+			// one of its failure rails.
+			return {
+				type: resolved.type,
+				selected: resolved.type.type !== "Error",
+				entry: methodInvocationEntry(resolved),
+			}
+		},
+	)
+
+	if (bareType !== null) {
+		reportDeadFallback(fallback, bareType)
+	}
+}
+
+// NOTE: A dispatched Invocation keeps its targets in `dispatch` and resolves to
+// the placeholder Namespace, so the branches are what names it; every other one
+// is the single Namespace it was found in.
+function methodInvocationEntry(resolved: ResolvedMethodInvocation): string {
+	return selectedEntry(
+		resolved.dispatch ?? [
+			{
+				namespaceName: resolved.namespace.name,
+				overloadedMethodIndex: resolved.overloadedMethodIndex,
+			},
+		],
+	)
+}
+
+function reportDeadFallbackOnFunctionInvocation(
+	node: parser.FunctionInvocationNode,
+	nameType: common.Type,
+	scope: enricher.Scope,
+	typer: ArgumentTyper,
+	resolved: {
+		type: common.Type
+		selected: boolean
+		overloadedMethodIndex: number | null
+	},
+): void {
+	let fallback = writtenFallbackArgument(node.arguments)
+
+	// NOTE: The call that was WRITTEN has to have resolved to something first —
+	// a lone signature the Arguments did not match still answers its declared
+	// return Type, and `twice(3, defaultingTo 0)` against a `twice(_ Integer)`
+	// would be told to drop an Argument the Validator is already reporting for
+	// passing.
+	if (
+		fallback === undefined ||
+		!resolved.selected ||
+		typeContainsError(resolved.type)
+	) {
+		return
+	}
+
+	// NOTE: One callee, so the Overload position alone names the entry. And
+	// nothing to widen either: the callee is a Function rather than a receiver,
+	// which leaves the Arguments as the only proof there is to erase.
+	let bareType = bareAnswerWithoutFallback(
+		functionInvocationEntry(resolved.overloadedMethodIndex),
+		() => {
+			let probed = resolveFunctionInvocation(
+				{
+					...node,
+					arguments: node.arguments.filter(
+						(argument) => argument !== fallback,
+					),
+				},
+				nameType,
+				scope,
+				typer,
+			)
+
+			return {
+				type: probed.type,
+				selected: probed.selected,
+				entry: functionInvocationEntry(probed.overloadedMethodIndex),
+			}
+		},
+	)
+
+	if (bareType !== null) {
+		reportDeadFallback(fallback, bareType)
+	}
+}
+
+function functionInvocationEntry(overloadedMethodIndex: number | null): string {
+	return selectedEntry([{ namespaceName: "", overloadedMethodIndex }])
 }
 
 // NOTE: Resolves `ChoiceName#CaseName` to the Case's Type. The Choice's name
