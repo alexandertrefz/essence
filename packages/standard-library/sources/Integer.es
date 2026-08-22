@@ -447,6 +447,11 @@ declarations {
 
 		§§ Answers whether the Integer is exactly zero.
 		isZero() -> Boolean {
+			§ This body is read as well as run. A predicate written as one
+			§ call on `@` is that call, so the `else` of an `if` asking
+			§ `isZero` proves `NonZeroInteger`. The same holds of `isOdd`,
+			§ `isPositive` and `isNegative` above. See DEVELOPMENT.md, Why
+			§ bodies look the way they do.
 			<- @::is(0)
 		}
 
