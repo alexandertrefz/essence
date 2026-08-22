@@ -1,16 +1,17 @@
 import {
-	Algebraic      from "./Algebraic.es"
-	Boolean        from "./Boolean.es"
-	List           from "./List.es"
-	Optional       from "./Optional.es"
-	Orderable      from "./Orderable.es"
-	Ordering       from "./Ordering.es"
-	Equatable      from "./Protocols.es"
-	Printable      from "./Protocols.es"
-	Rational       from "./Rational.es"
-	Step           from "./Step.es"
-	String         from "./String.es"
-	Transcendental from "./Transcendental.es"
+	Algebraic       from "./Algebraic.es"
+	Boolean         from "./Boolean.es"
+	List            from "./List.es"
+	Optional        from "./Optional.es"
+	Orderable       from "./Orderable.es"
+	Ordering        from "./Ordering.es"
+	Equatable       from "./Protocols.es"
+	Printable       from "./Protocols.es"
+	NonZeroRational from "./Rational.es"
+	Rational        from "./Rational.es"
+	Step            from "./Step.es"
+	String          from "./String.es"
+	Transcendental  from "./Transcendental.es"
 }
 
 declarations {
@@ -200,7 +201,7 @@ declarations {
 
 		§§ Divides this Integer by a number, exactly.
 		§§
-		§§ Dividing by an Integer or a Rational answers empty for a zero divisor. Dividing this Integer by a NonZeroInteger or by an Algebraic can not fail. The first divisor is proven, and an Algebraic is irrational and so never zero. The `defaultingTo:` entries answer the given value in place of empty.
+		§§ Dividing by an Integer or a Rational answers empty for a zero divisor. Dividing this Integer by a NonZeroInteger, by a NonZeroRational or by an Algebraic can not fail. The first two divisors are proven, and an Algebraic is irrational and so never zero. The `defaultingTo:` entries answer the given value in place of empty.
 		overload divide {
 			(by other: Integer) -> Optional<Rational> {
 				<- Rational.of(@, over other)
@@ -242,6 +243,18 @@ declarations {
 			§§ @returns — the quotient, or the given value in its place.
 			(by other: Rational, defaultingTo fallback: Rational) -> Rational {
 				<- @::divide(by other)::value(defaultingTo fallback)
+			}
+
+			§§ Divides this Integer by a Rational proven not to be zero.
+			§§
+			§§ The division can not fail, so the answer is the quotient itself rather than an Optional.
+			§§
+			§§ @param by — the divisor, proven not to be zero
+			§§ @returns — the exact quotient.
+			(by other: NonZeroRational) -> Rational {
+				§ The reciprocal of a Rational that is not zero is proven
+				§ too, so the product below is the whole of the division.
+				<- @::multiply(with other::reciprocal())
 			}
 		}
 

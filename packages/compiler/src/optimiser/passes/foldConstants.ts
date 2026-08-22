@@ -193,6 +193,16 @@ function foldInvocation(
 				: node
 		case "Rational":
 			return foldRational(node, member, shadowed)
+		// NOTE: The Rational sister of the rung above, for the same reason: a
+		// written `1/2` proves it is not zero, so its product is
+		// `NonZeroRational`'s and the name is all this pass has to go by.
+		// `multiply` alone again — `reciprocal` is the Namespace's other entry
+		// and it exchanges the two parts of ONE value, which `foldRational`
+		// takes by name and nobody has weighed yet.
+		case "NonZeroRational":
+			return member === "multiply"
+				? foldRational(node, member, shadowed)
+				: node
 		case "String":
 			return foldString(node, member, shadowed)
 		default:

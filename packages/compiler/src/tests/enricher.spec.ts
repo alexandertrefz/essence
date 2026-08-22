@@ -7069,8 +7069,6 @@ describe("Enricher", () => {
 			expect(
 				narrowedTypeOf(
 					`implementation {
-						type NonZeroRatio = Rational where @::isNot(0/1)
-
 						constant r = 1/2::add(1/3)
 
 						if r::isNot(0/1) {
@@ -7079,7 +7077,7 @@ describe("Enricher", () => {
 					}`,
 					"r",
 				),
-			).toBe("NonZeroRatio")
+			).toBe("NonZeroRational")
 		})
 
 		// NOTE: The narrowing is worth exactly what it lets a Program write, which
@@ -8649,17 +8647,13 @@ describe("Enricher", () => {
 		// proved. A zero proves nothing, so it stays the Rational it is written
 		// as.
 		it("should carry a written Rational's proof", () => {
-			expect(
-				receiverTypeOf(`type NonZeroRatio = Rational where @::isNot(0/1)
+			expect(receiverTypeOf("constant text = 1/2::toString()")).toBe(
+				"NonZeroRational",
+			)
 
-					constant text = 1/2::toString()`),
-			).toBe("NonZeroRatio")
-
-			expect(
-				receiverTypeOf(`type NonZeroRatio = Rational where @::isNot(0/1)
-
-					constant text = 0/1::toString()`),
-			).toBe("Rational")
+			expect(receiverTypeOf("constant text = 0/1::toString()")).toBe(
+				"Rational",
+			)
 		})
 
 		it("should carry a generic refinement applied to the items", () => {

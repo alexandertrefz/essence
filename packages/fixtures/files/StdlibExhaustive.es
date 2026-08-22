@@ -406,6 +406,15 @@ third"::lines())
 	constant computedHundred       = 99::add(1)
 	constant computedNegativeThree = 0::subtract(3)
 
+	§ A written Rational proves it is not zero exactly as a written Integer
+	§ does, so these keep the calls below on the entries taking a Rational that
+	§ might be. Each is the sum of two halves of itself, which the exact
+	§ arithmetic answers in lowest terms — so each holds the parts the written
+	§ form holds.
+	constant computedHalf          = 1/4::add(1/4)
+	constant computedSixth         = 1/12::add(1/12)
+	constant computedThreeQuarters = 1/2::add(1/4)
+
 	§ One over the range a JavaScript number holds exactly, computed so that
 	§ the multiplication below is Integer's own.
 	constant computedHugeInteger = 9_007_199_254_740_990::add(1)
@@ -423,9 +432,10 @@ third"::lines())
 	show("Integer.subtract(_ Transcendental)", 1::subtract(Number.Pi))
 	show("Integer.divide(by: Integer)", 1110::divide(by computedTwo))
 	show("Integer.divide(by: Integer) [by zero]", 1::divide(by 0))
-	show("Integer.divide(by: Rational)", 1::divide(by 1/2))
+	show("Integer.divide(by: Rational)", 1::divide(by computedHalf))
 	show("Integer.divide(by: Rational) [by zero]", 1::divide(by 0/1))
 	show("Integer.divide(by: NonZeroInteger)", 1110::divide(by 2))
+	show("Integer.divide(by: NonZeroRational)", 1::divide(by 1/2))
 	show(
 		"Integer.divide(by: Integer, defaultingTo: Rational)",
 		1110::divide(by computedTwo, defaultingTo 0/1),
@@ -436,7 +446,7 @@ third"::lines())
 	)
 	show(
 		"Integer.divide(by: Rational, defaultingTo: Rational)",
-		1::divide(by 1/2, defaultingTo 0/1),
+		1::divide(by computedHalf, defaultingTo 0/1),
 	)
 	show(
 		"Integer.divide(by: Rational, defaultingTo: Rational) [by zero]",
@@ -750,14 +760,15 @@ third"::lines())
 	show("Rational.subtract(_ Rational)", 1/2::subtract(1/3))
 	show("Rational.subtract(_ Integer)", 1/2::subtract(1))
 	show("Rational.subtract(_ Transcendental)", 1/2::subtract(Number.Pi))
-	show("Rational.divide(by: Rational)", 1/2::divide(by 1/6))
+	show("Rational.divide(by: Rational)", 1/2::divide(by computedSixth))
 	show("Rational.divide(by: Rational) [by zero]", 1/2::divide(by 0/1))
 	show("Rational.divide(by: Integer)", 1/2::divide(by computedTwo))
 	show("Rational.divide(by: Integer) [by zero]", 1/2::divide(by 0))
 	show("Rational.divide(by: NonZeroInteger)", 1/2::divide(by 2))
+	show("Rational.divide(by: NonZeroRational)", 1/2::divide(by 1/6))
 	show(
 		"Rational.divide(by: Rational, defaultingTo: Rational)",
-		1/2::divide(by 1/6, defaultingTo 0/1),
+		1/2::divide(by computedSixth, defaultingTo 0/1),
 	)
 	show(
 		"Rational.divide(by: Rational, defaultingTo: Rational) [by zero]",
@@ -771,7 +782,7 @@ third"::lines())
 		"Rational.divide(by: Integer, defaultingTo: Rational) [by zero]",
 		1/2::divide(by 0, defaultingTo 0/1),
 	)
-	show("Rational.multiply(with: Rational)", 1/2::multiply(with 2/3))
+	show("Rational.multiply(with: Rational)", computedHalf::multiply(with 2/3))
 	show("Rational.multiply(with: Integer)", 1/2::multiply(with 2))
 	show(
 		"Rational.multiply(with: Transcendental)",
@@ -857,11 +868,11 @@ third"::lines())
 	show("Rational.denominator()", 3/4::denominator())
 	show("Rational.absolute()", -3/4::absolute())
 	show("Rational.negate()", 3/4::negate())
-	show("Rational.reciprocal()", 3/4::reciprocal())
+	show("Rational.reciprocal()", computedThreeQuarters::reciprocal())
 	show("Rational.reciprocal() [of zero]", 0/1::reciprocal())
 	show(
 		"Rational.reciprocal(defaultingTo: Rational)",
-		3/4::reciprocal(defaultingTo 0/1),
+		computedThreeQuarters::reciprocal(defaultingTo 0/1),
 	)
 	show(
 		"Rational.reciprocal(defaultingTo: Rational) [of zero]",
@@ -991,6 +1002,17 @@ third"::lines())
 		<- {}
 	})
 
+	§ ——— NonZeroRational ——————————————————————————————————————————————————
+	§ The Methods a proven Rational has that a bare one does not, and the
+	§ sister of the NonZeroInteger block above. `multiply` needs both operands
+	§ proven, and a value written down is its own proof — as a receiver as much
+	§ as as an Argument. So both calls here are written where they stand.
+	show(
+		"NonZeroRational.multiply(with: NonZeroRational)",
+		1/2::multiply(with 2/3),
+	)
+	show("NonZeroRational.reciprocal()", 3/4::reciprocal())
+
 	§ ——— Algebraic ————————————————————————————————————————————————————————
 	withTwoRoots((_ rootTwo: Algebraic, _ rootThree: Algebraic) -> {} {
 		show("Algebraic.is(_ Algebraic)", rootTwo::is(rootTwo))
@@ -1086,7 +1108,10 @@ third"::lines())
 			"Algebraic.multiply(with: Integer) [by zero]",
 			rootTwo::multiply(with 0),
 		)
-		show("Algebraic.multiply(with: Rational)", rootTwo::multiply(with 1/2))
+		show(
+			"Algebraic.multiply(with: Rational)",
+			rootTwo::multiply(with computedHalf),
+		)
 		show(
 			"Algebraic.multiply(with: Algebraic) [same radical]",
 			rootTwo::multiply(with rootTwo),
@@ -1099,9 +1124,13 @@ third"::lines())
 			"Algebraic.multiply(with: NonZeroInteger)",
 			rootTwo::multiply(with 3),
 		)
+		show(
+			"Algebraic.multiply(with: NonZeroRational)",
+			rootTwo::multiply(with 1/2),
+		)
 		show("Algebraic.divide(by: Integer)", rootTwo::divide(by computedTwo))
 		show("Algebraic.divide(by: Integer) [by zero]", rootTwo::divide(by 0))
-		show("Algebraic.divide(by: Rational)", rootTwo::divide(by 1/2))
+		show("Algebraic.divide(by: Rational)", rootTwo::divide(by computedHalf))
 		show(
 			"Algebraic.divide(by: Rational) [by zero]",
 			rootTwo::divide(by 0/1),
@@ -1115,6 +1144,7 @@ third"::lines())
 			rootTwo::divide(by rootThree),
 		)
 		show("Algebraic.divide(by: NonZeroInteger)", rootTwo::divide(by 2))
+		show("Algebraic.divide(by: NonZeroRational)", rootTwo::divide(by 1/2))
 		§ The fallback entries. A sum over differing radicals leaves the
 		§ quadratic slice, and so does a product of two values that are not
 		§ pure radicals — those are the two shapes the fallback answers for.
@@ -1152,7 +1182,7 @@ third"::lines())
 		)
 		show(
 			"Algebraic.divide(by: Rational, defaultingTo: Algebraic)",
-			rootTwo::divide(by 1/2, defaultingTo rootTwo),
+			rootTwo::divide(by computedHalf, defaultingTo rootTwo),
 		)
 		show(
 			"Algebraic.divide(by: Rational, defaultingTo: Algebraic) [by zero]",
@@ -1210,11 +1240,15 @@ third"::lines())
 	)
 	show(
 		"Transcendental.multiply(with: Rational)",
-		Number.Pi::multiply(with 1/2),
+		Number.Pi::multiply(with computedHalf),
 	)
 	show(
 		"Transcendental.multiply(with: NonZeroInteger)",
 		Number.Pi::multiply(with 2),
+	)
+	show(
+		"Transcendental.multiply(with: NonZeroRational)",
+		Number.Pi::multiply(with 1/2),
 	)
 	show(
 		"Transcendental.divide(by: Integer)",
@@ -1224,7 +1258,10 @@ third"::lines())
 		"Transcendental.divide(by: Integer) [by zero]",
 		Number.Pi::divide(by 0),
 	)
-	show("Transcendental.divide(by: Rational)", Number.Pi::divide(by 1/2))
+	show(
+		"Transcendental.divide(by: Rational)",
+		Number.Pi::divide(by computedHalf),
+	)
 	show(
 		"Transcendental.divide(by: Rational) [by zero]",
 		Number.Pi::divide(by 0/1),
@@ -1239,6 +1276,10 @@ third"::lines())
 	)
 	show("Transcendental.divide(by: NonZeroInteger)", Number.Pi::divide(by 2))
 	show(
+		"Transcendental.divide(by: NonZeroRational)",
+		Number.Pi::divide(by 1/2),
+	)
+	show(
 		"Transcendental.divide(by: Integer, defaultingTo: Transcendental)",
 		Number.Pi::divide(by computedTwo, defaultingTo Number.E),
 	)
@@ -1248,7 +1289,7 @@ third"::lines())
 	)
 	show(
 		"Transcendental.divide(by: Rational, defaultingTo: Transcendental)",
-		Number.Pi::divide(by 1/2, defaultingTo Number.E),
+		Number.Pi::divide(by computedHalf, defaultingTo Number.E),
 	)
 	show(
 		"Transcendental.divide(by: Rational, defaultingTo: Transcendental) [by zero]",

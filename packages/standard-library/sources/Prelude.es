@@ -37,6 +37,7 @@ export {
 	Printable               from "./Protocols.es"
 	Generatable             from "./Randomness.es"
 	Randomness              from "./Randomness.es"
+	NonZeroRational         from "./Rational.es"
 	NumberFormat            from "./Rational.es"
 	Rational                from "./Rational.es"
 	Rounding                from "./Rational.es"

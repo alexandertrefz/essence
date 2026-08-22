@@ -25,7 +25,7 @@ implementation {
 	Terminal.inspect(sevenHalves::round(toward #Down)) § 3
 	Terminal.inspect(sevenHalves::negate()::round(toward #TowardZero)) § -3 — towards zero
 	Terminal.inspect(3/4::numerator()) § 3
-	Terminal.inspect(3/4::reciprocal()) § Optional#Value(4/3)
+	Terminal.inspect(3/4::reciprocal()) § 4/3 — a written Rational is not zero, so there certainly is a reciprocal
 	Terminal.inspect(2/3::raise(to 2)) § 4/9 — a Rational takes a proven exponent too
 
 	§ Reading a Number from text. A text that spells no Number answers the fallback.

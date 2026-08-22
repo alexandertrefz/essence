@@ -1,13 +1,14 @@
 import {
-	Boolean        from "./Boolean.es"
-	Integer        from "./Integer.es"
-	NonZeroInteger from "./Integer.es"
-	Optional       from "./Optional.es"
-	Orderable      from "./Orderable.es"
-	Ordering       from "./Ordering.es"
-	Equatable      from "./Protocols.es"
-	Printable      from "./Protocols.es"
-	Rational       from "./Rational.es"
+	Boolean         from "./Boolean.es"
+	Integer         from "./Integer.es"
+	NonZeroInteger  from "./Integer.es"
+	Optional        from "./Optional.es"
+	Orderable       from "./Orderable.es"
+	Ordering        from "./Ordering.es"
+	Equatable       from "./Protocols.es"
+	Printable       from "./Protocols.es"
+	NonZeroRational from "./Rational.es"
+	Rational        from "./Rational.es"
 }
 
 declarations {
@@ -98,7 +99,7 @@ declarations {
 
 		§§ Answers the exact product of the Algebraic and a number.
 		§§
-		§§ A radical times itself turns rational: `√2 · √2` is `2`. Multiplying by zero answers zero. Multiplying by a NonZeroInteger keeps the radical, so that entry answers an Algebraic. The `defaultingTo:` entry answers the given value in place of empty.
+		§§ A radical times itself turns rational: `√2 · √2` is `2`. Multiplying by zero answers zero. Multiplying by a NonZeroInteger or a NonZeroRational keeps the radical, so those entries answer an Algebraic. The `defaultingTo:` entry answers the given value in place of empty.
 		overload multiply {
 			(with other: Integer) -> Algebraic | Rational
 
@@ -130,11 +131,19 @@ declarations {
 			§§ @param with — the factor, proven not to be zero
 			§§ @returns — the exact product.
 			(with other: NonZeroInteger) -> Algebraic
+
+			§§ Answers the exact product of the Algebraic and a Rational factor proven not to be zero.
+			§§
+			§§ A Rational that is not zero scales both parts and leaves the radical in place. The answer is again an Algebraic rather than a Union.
+			§§
+			§§ @param with — the factor, proven not to be zero
+			§§ @returns — the exact product.
+			(with other: NonZeroRational) -> Algebraic
 		}
 
 		§§ Answers the exact quotient of the Algebraic and a number.
 		§§
-		§§ Dividing by an Integer or a Rational is empty only for zero. Dividing by a NonZeroInteger can not fail, because that divisor is proven. Dividing by an Algebraic multiplies by its reciprocal, which the conjugate always gives. That quotient is empty wherever the matching product is empty. The `defaultingTo:` entries answer the given value in place of empty.
+		§§ Dividing by an Integer or a Rational is empty only for zero. Dividing by a NonZeroInteger or a NonZeroRational can not fail, because those divisors are proven. Dividing by an Algebraic multiplies by its reciprocal, which the conjugate always gives. That quotient is empty wherever the matching product is empty. The `defaultingTo:` entries answer the given value in place of empty.
 		overload divide {
 			(by other: Integer) -> Optional<Algebraic>
 
@@ -188,6 +197,14 @@ declarations {
 			§§ @param by — the divisor, proven not to be zero
 			§§ @returns — the exact quotient.
 			(by other: NonZeroInteger) -> Algebraic
+
+			§§ Answers the exact quotient of the Algebraic and a Rational divisor proven not to be zero.
+			§§
+			§§ The division can not fail, so the answer is the quotient itself rather than an Optional.
+			§§
+			§§ @param by — the divisor, proven not to be zero
+			§§ @returns — the exact quotient.
+			(by other: NonZeroRational) -> Algebraic
 		}
 
 		§§ Answers the Algebraic without its sign, which is its distance from zero.

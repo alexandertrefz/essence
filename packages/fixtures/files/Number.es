@@ -24,7 +24,8 @@ implementation {
 	Terminal.inspect(9_007_199_254_740_991::multiply(with 500)) § 4503599627370495500
 
 	§ Rationals stay exact through every step. A written divisor proves itself
-	§ here too, so the second line answers a Rational rather than an Optional.
-	Terminal.inspect(1/2::divide(by 1/6)) § Optional#Value(3/1)
+	§ here too, whether it is written as a Rational or as an Integer, so neither
+	§ line answers an Optional.
+	Terminal.inspect(1/2::divide(by 1/6)) § 3/1
 	Terminal.inspect(1/2::multiply(with 2)::divide(by 6)) § 1/6
 }

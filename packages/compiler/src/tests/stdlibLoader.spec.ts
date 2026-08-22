@@ -1346,6 +1346,10 @@ describe("Standard Library Loader", () => {
 			"NonZeroInteger",
 			"NonNegativeInteger",
 			"Rational",
+			// NOTE: The one Namespace a proven Rational can reach besides
+			// `Rational`, listed after it for the same reason — see
+			// `builtinMemberOrder`.
+			"NonZeroRational",
 			"Algebraic",
 			"Transcendental",
 			"Number",
