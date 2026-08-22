@@ -9,4 +9,10 @@
 // multiplication it always was, and the evidence the Types carried was spent
 // while compiling. A separate implementation could only be the same three
 // characters written twice, with two places for them to disagree.
-export { multiply__overload$1 as multiply } from "./Integer"
+//
+// NOTE: One line for a Namespace that declares three entries, because the other
+// two — a proven Integer scaling an Algebraic or a Transcendental — are written
+// in Essence, and a Method implemented there has no runtime export at all. The
+// name carries the entry's position: `multiply` became an Overload, so its first
+// entry binds to `multiply__overload$1`.
+export { multiply__overload$1 } from "./Integer"

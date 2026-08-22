@@ -421,7 +421,9 @@ const unitCaseEquality = `implementation {
 // because the Namespace name is the only thing telling it from the one above it:
 // `NonZeroInteger.multiply` is Integer's own product re-exported, reached because
 // both operands were proven not to be zero, and the evidence that reached it was
-// spent long before this pass runs.
+// spent long before this pass runs. The proven scaling of a Transcendental is
+// here for the opposite reason: it carries the same Namespace name and the same
+// Method name, and it is no bigint operation at all.
 const scalarOperations = `implementation {
 	§§ Prints as it answers, so that skipping it is visible.
 	§§
@@ -451,6 +453,7 @@ const scalarOperations = `implementation {
 	Terminal.inspect(a::subtract(b))
 	Terminal.inspect(a::multiply(with b))
 	Terminal.inspect(proven::multiply(with alsoProven))
+	Terminal.inspect(proven::multiply(with Number.Pi))
 
 	Terminal.inspect(text::is(other))
 	Terminal.inspect(text::isNot(other))
@@ -2826,6 +2829,18 @@ describe("Optimiser", () => {
 			expect(generated).not.toContain("NonZeroInteger.multiply")
 		})
 
+		// NOTE: And the other two entries of that same name are left where they
+		// stand. `multiply` on a proven Integer covers three entries now, and only
+		// the first is two bigints: the operand Types are what tell them apart,
+		// not the overload index, which this pass strips before it reads the name.
+		it("leaves the proven Namespace's irrational entries alone", () => {
+			let generated = generate(scalarOperations)
+
+			expect(generated).toContain(
+				"$es_NonZeroInteger_multiply__overload$3(proven, Number.Pi)",
+			)
+		})
+
 		it("compares two Strings through the runtime's own comparison", () => {
 			// NOTE: NOT `===`. Two Strings are equal when their characters are,
 			// and the same accent written as one code point and as two is one
@@ -3022,7 +3037,7 @@ describe("Optimiser", () => {
 			expect(generated).toContain("$es_Integer_isLessThan__overload$1(a,")
 			expect(generated).toContain("Integer.add__overload$1(a, b)")
 			expect(generated).toContain(
-				"NonZeroInteger.multiply(proven, alsoProven)",
+				"NonZeroInteger.multiply__overload$1(proven, alsoProven)",
 			)
 			expect(generated).toContain("Boolean.negate(yes)")
 			expect(generated).toContain(
@@ -3054,6 +3069,9 @@ describe("Optimiser", () => {
 				// Namespaces multiply the same two bigints and one of them was
 				// entitled to say the answer is not zero.
 				"15",
+				// NOTE: And the entry beside it, which this pass leaves as the
+				// call it was, whether the pass runs or not.
+				"3·π",
 				"false",
 				"true",
 				"true",

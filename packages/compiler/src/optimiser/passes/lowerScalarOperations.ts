@@ -89,15 +89,23 @@ function lower(
 	switch (node.base.name) {
 		case "Integer":
 			return lowerInteger(node, member)
-		// NOTE: A refinement is erased before the first pass runs, so both
+		// NOTE: A refinement is erased before the first pass runs, so the
 		// operands and the answer are plain Integers by the time this reads them
 		// — but the Method the Simplifier emitted is still the refined
 		// Namespace's, and a name is all this pass has to go by. `NonZeroInteger`
-		// answers one Method, `multiply`, by re-exporting Integer's own product:
-		// the same bigints, the same operator, and evidence that was spent while
-		// compiling. So the one Method the two Namespaces share is asked of
-		// Integer's own entry, and everything a Namespace of proven Integers might
-		// grow later is left alone until somebody weighs it.
+		// answers `multiply` by re-exporting Integer's own product for two proven
+		// Integers: the same bigints, the same operator, and evidence that was
+		// spent while compiling.
+		//
+		// NOTE: That name now covers THREE entries. The other two scale an
+		// Algebraic or a Transcendental, and each is a call into the irrational's
+		// own arithmetic that no bigint operator stands for. The overload index is
+		// not what tells them apart — `withoutOverloadSuffix` took it off above,
+		// and reading it back would tie this pass to the Simplifier's numbering —
+		// the OPERANDS are: `scalarOperands` demands two Integers and answers null
+		// for anything else, which is the same guard `Integer`'s own case rests
+		// on. Anything else a Namespace of proven Integers grows is left alone
+		// until somebody weighs it.
 		case "NonZeroInteger":
 			return member === "multiply" ? lowerInteger(node, member) : node
 		case "Boolean":
