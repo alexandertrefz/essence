@@ -3,6 +3,7 @@ import {
 	Boolean        from "./Boolean.es"
 	Integer        from "./Integer.es"
 	List           from "./List.es"
+	NonEmptyList   from "./List.es"
 	Optional       from "./Optional.es"
 	Orderable      from "./Orderable.es"
 	Ordering       from "./Ordering.es"
@@ -201,11 +202,13 @@ declarations {
 		}
 
 		§ The empty List needs no guard here. It sums to zero, and dividing by
-		§ its zero count is the empty Optional the signature answers with.
+		§ its zero count is the empty Optional the signature answers with. A
+		§ proven List divides by a NonZeroInteger count, so the proven entries
+		§ at the end answer the mean itself.
 
 		§§ The arithmetic mean of the Numbers in the List: their sum divided by their count, as an exact Rational.
 		§§
-		§§ The empty List has no mean, and the `defaultingTo:` entries answer the given Rational in place of nothing.
+		§§ The empty List has no mean, and the `defaultingTo:` entries answer the given Rational in place of nothing. A List proven to have an item answers the mean itself.
 		overload static average {
 			(_ integers: List<Integer>) -> Optional<Rational> {
 				<- Number.sum(integers)::divide(by integers::length())
@@ -260,11 +263,52 @@ declarations {
 			) -> Rational {
 				<- Number.average(numbers)::value(defaultingTo fallback)
 			}
+
+			§ The proven entries stand after the `defaultingTo:` ones because an
+			§ entry's position is the name it is emitted under; see
+			§ DEVELOPMENT.md, Editing hazards. A call that can prove what one of
+			§ them asks for reaches it wherever it stands.
+
+			§§ The arithmetic mean of the Integers in a List proven to have an item.
+			§§
+			§§ The count is above zero, so the answer is the mean itself rather than an Optional.
+			§§
+			§§ @param _ — the Integers to average
+			§§ @returns — the mean.
+			(_ integers: NonEmptyList<Integer>) -> Rational {
+				<- Number.sum(integers)::divide(by integers::length())
+			}
+
+			§§ The arithmetic mean of the Rationals in a List proven to have an item.
+			§§
+			§§ The count is above zero, so the answer is the mean itself rather than an Optional.
+			§§
+			§§ @param _ — the Rationals to average
+			§§ @returns — the mean.
+			(_ rationals: NonEmptyList<Rational>) -> Rational {
+				<- Number.sum(rationals)::divide(by rationals::length())
+			}
+
+			§§ The arithmetic mean of the Numbers in a List proven to have an item.
+			§§
+			§§ The count is above zero, so the answer is the mean itself rather than an Optional.
+			§§
+			§§ @param _ — the Numbers to average
+			§§ @returns — the mean.
+			(_ numbers: NonEmptyList<Integer | Rational>) -> Rational {
+				constant count = numbers::length()
+
+				<- match Number.sum(numbers) -> Rational {
+					case Integer  { <- @::divide(by count) }
+
+					case Rational { <- @::divide(by count) }
+				}
+			}
 		}
 
 		§§ The lower of two Numbers, or the lowest in a List of them.
 		§§
-		§§ The answer for two equal Numbers is the first of them. A List answers the earliest of its lowest items. The empty List has none, and the `defaultingTo:` entries answer the given Number in place of nothing.
+		§§ The answer for two equal Numbers is the first of them. A List answers the earliest of its lowest items. The empty List has none, and the `defaultingTo:` entries answer the given Number in place of nothing. A List proven to have an item answers the item itself.
 		overload static lowestNumber {
 			(_ firstNumber: Integer, _ secondNumber: Integer) -> Integer {
 				if firstNumber::isLessThanOrEqualTo(secondNumber) {
@@ -394,11 +438,66 @@ declarations {
 			) -> Integer | Rational {
 				<- Number.lowestNumber(numbers)::value(defaultingTo fallback)
 			}
+
+			§ The proven entries fold the same pairwise ones from `firstItem()`,
+			§ which the List certainly holds. There is no empty seed to carry,
+			§ so no entry answers an Optional.
+
+			§§ The lowest of the Integers in a List proven to have an item.
+			§§
+			§§ The List has a lowest item, so the answer is that item rather than an Optional.
+			§§
+			§§ @param _ — the Integers to compare
+			§§ @returns — the lowest Integer.
+			(_ integers: NonEmptyList<Integer>) -> Integer {
+				<- integers::reduce(
+					startingWith integers::firstItem(),
+					(lowest, integer) {
+						<- Number.lowestNumber(lowest, integer)
+					},
+				)
+			}
+
+			§§ The lowest of the Rationals in a List proven to have an item.
+			§§
+			§§ The List has a lowest item, so the answer is that item rather than an Optional.
+			§§
+			§§ @param _ — the Rationals to compare
+			§§ @returns — the lowest Rational.
+			(_ rationals: NonEmptyList<Rational>) -> Rational {
+				<- rationals::reduce(
+					startingWith rationals::firstItem(),
+					(lowest, rational) {
+						<- Number.lowestNumber(lowest, rational)
+					},
+				)
+			}
+
+			§§ The lowest of the Numbers in a List proven to have an item.
+			§§
+			§§ The List has a lowest item, so the answer is that item rather than an Optional.
+			§§
+			§§ @param _ — the Numbers to compare
+			§§ @returns — the lowest Number.
+			(
+				_ numbers: NonEmptyList<Integer | Rational>,
+			) -> Integer | Rational {
+				<- numbers::reduce(
+					startingWith numbers::firstItem(),
+					(lowest, number) {
+						if lowest::isLessThanOrEqualTo(number) {
+							<- lowest
+						} else {
+							<- number
+						}
+					},
+				)
+			}
 		}
 
 		§§ The greater of two Numbers, or the greatest in a List of them.
 		§§
-		§§ The answer for two equal Numbers is the first of them. A List answers the earliest of its greatest items. The empty List has none, and the `defaultingTo:` entries answer the given Number in place of nothing.
+		§§ The answer for two equal Numbers is the first of them. A List answers the earliest of its greatest items. The empty List has none, and the `defaultingTo:` entries answer the given Number in place of nothing. A List proven to have an item answers the item itself.
 		overload static greatestNumber {
 			(_ firstNumber: Integer, _ secondNumber: Integer) -> Integer {
 				if firstNumber::isGreaterThanOrEqualTo(secondNumber) {
@@ -522,6 +621,57 @@ declarations {
 				defaultingTo fallback: Integer | Rational,
 			) -> Integer | Rational {
 				<- Number.greatestNumber(numbers)::value(defaultingTo fallback)
+			}
+
+			§§ The greatest of the Integers in a List proven to have an item.
+			§§
+			§§ The List has a greatest item, so the answer is that item rather than an Optional.
+			§§
+			§§ @param _ — the Integers to compare
+			§§ @returns — the greatest Integer.
+			(_ integers: NonEmptyList<Integer>) -> Integer {
+				<- integers::reduce(
+					startingWith integers::firstItem(),
+					(greatest, integer) {
+						<- Number.greatestNumber(greatest, integer)
+					},
+				)
+			}
+
+			§§ The greatest of the Rationals in a List proven to have an item.
+			§§
+			§§ The List has a greatest item, so the answer is that item rather than an Optional.
+			§§
+			§§ @param _ — the Rationals to compare
+			§§ @returns — the greatest Rational.
+			(_ rationals: NonEmptyList<Rational>) -> Rational {
+				<- rationals::reduce(
+					startingWith rationals::firstItem(),
+					(greatest, rational) {
+						<- Number.greatestNumber(greatest, rational)
+					},
+				)
+			}
+
+			§§ The greatest of the Numbers in a List proven to have an item.
+			§§
+			§§ The List has a greatest item, so the answer is that item rather than an Optional.
+			§§
+			§§ @param _ — the Numbers to compare
+			§§ @returns — the greatest Number.
+			(
+				_ numbers: NonEmptyList<Integer | Rational>,
+			) -> Integer | Rational {
+				<- numbers::reduce(
+					startingWith numbers::firstItem(),
+					(greatest, number) {
+						if greatest::isGreaterThanOrEqualTo(number) {
+							<- greatest
+						} else {
+							<- number
+						}
+					},
+				)
 			}
 		}
 

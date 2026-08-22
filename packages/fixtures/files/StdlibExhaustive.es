@@ -1313,6 +1313,15 @@ third"::lines())
 		<- {}
 	})
 
+	§ The Lists the three aggregates below fold, each bound to a `List` Type.
+	§ A written List is its own proof of having an item, so a literal Argument
+	§ reaches the entry taking a `NonEmptyList` — which is what the calls
+	§ naming that Type do, with a literal each.
+	constant twoNumbers: List<Integer>    = [1, 2]
+	constant threeNumbers: List<Integer>  = [3, 1, 2]
+	constant twoRationals: List<Rational> = [1/2, 1/3]
+	constant twoMixedNumbers: List<Integer | Rational> = [1, 1/2]
+
 	show("Number.sum(_ List<Integer>)", Number.sum([1, 2, 3]))
 	show("Number.sum(_ List<Integer>) [empty]", Number.sum(noNumbers))
 	show("Number.sum(_ List<Rational>)", Number.sum([1/2, 1/3]))
@@ -1337,14 +1346,17 @@ third"::lines())
 		"Number.product(_ List<Integer | Rational>) [empty]",
 		Number.product(noMixedNumbers),
 	)
-	show("Number.average(_ List<Integer>)", Number.average([1, 2]))
+	show("Number.average(_ List<Integer>)", Number.average(twoNumbers))
 	show("Number.average(_ List<Integer>) [empty]", Number.average(noNumbers))
-	show("Number.average(_ List<Rational>)", Number.average([1/2, 1/3]))
+	show("Number.average(_ List<Rational>)", Number.average(twoRationals))
 	show(
 		"Number.average(_ List<Rational>) [empty]",
 		Number.average(noRationals),
 	)
-	show("Number.average(_ List<Integer | Rational>)", Number.average([1, 1/2]))
+	show(
+		"Number.average(_ List<Integer | Rational>)",
+		Number.average(twoMixedNumbers),
+	)
 	show(
 		"Number.average(_ List<Integer | Rational>) [empty]",
 		Number.average(noMixedNumbers),
@@ -1373,6 +1385,15 @@ third"::lines())
 		"Number.average(_ List<Integer | Rational>, defaultingTo: Rational) [empty]",
 		Number.average(noMixedNumbers, defaultingTo 0/1),
 	)
+	§ The same Lists written where they stand, which is the proof these entries
+	§ ask for. Each answers the mean itself where the twin above it answers an
+	§ Optional.
+	show("Number.average(_ NonEmptyList<Integer>)", Number.average([1, 2]))
+	show("Number.average(_ NonEmptyList<Rational>)", Number.average([1/2, 1/3]))
+	show(
+		"Number.average(_ NonEmptyList<Integer | Rational>)",
+		Number.average([1, 1/2]),
+	)
 	show("Number.lowestNumber(_ Integer, _ Integer)", Number.lowestNumber(3, 2))
 	show(
 		"Number.lowestNumber(_ Rational, _ Rational)",
@@ -1386,14 +1407,17 @@ third"::lines())
 		"Number.lowestNumber(_ Rational, _ Integer)",
 		Number.lowestNumber(2/3, 1),
 	)
-	show("Number.lowestNumber(_ List<Integer>)", Number.lowestNumber([3, 1, 2]))
+	show(
+		"Number.lowestNumber(_ List<Integer>)",
+		Number.lowestNumber(threeNumbers),
+	)
 	show(
 		"Number.lowestNumber(_ List<Integer>) [empty]",
 		Number.lowestNumber(noNumbers),
 	)
 	show(
 		"Number.lowestNumber(_ List<Rational>)",
-		Number.lowestNumber([1/2, 1/3]),
+		Number.lowestNumber(twoRationals),
 	)
 	show(
 		"Number.lowestNumber(_ List<Rational>) [empty]",
@@ -1401,7 +1425,7 @@ third"::lines())
 	)
 	show(
 		"Number.lowestNumber(_ List<Integer | Rational>)",
-		Number.lowestNumber([1, 1/2]),
+		Number.lowestNumber(twoMixedNumbers),
 	)
 	show(
 		"Number.lowestNumber(_ List<Integer | Rational>) [empty]",
@@ -1432,6 +1456,24 @@ third"::lines())
 		Number.lowestNumber(noMixedNumbers, defaultingTo 0),
 	)
 	show(
+		"Number.lowestNumber(_ NonEmptyList<Integer>)",
+		Number.lowestNumber([3, 1, 2]),
+	)
+	§ One item, which is the seed the fold starts from and the answer it ends
+	§ with.
+	show(
+		"Number.lowestNumber(_ NonEmptyList<Integer>) [single]",
+		Number.lowestNumber([7]),
+	)
+	show(
+		"Number.lowestNumber(_ NonEmptyList<Rational>)",
+		Number.lowestNumber([1/2, 1/3]),
+	)
+	show(
+		"Number.lowestNumber(_ NonEmptyList<Integer | Rational>)",
+		Number.lowestNumber([1, 1/2]),
+	)
+	show(
 		"Number.greatestNumber(_ Integer, _ Integer)",
 		Number.greatestNumber(3, 2),
 	)
@@ -1449,7 +1491,7 @@ third"::lines())
 	)
 	show(
 		"Number.greatestNumber(_ List<Integer>)",
-		Number.greatestNumber([3, 1, 2]),
+		Number.greatestNumber(threeNumbers),
 	)
 	show(
 		"Number.greatestNumber(_ List<Integer>) [empty]",
@@ -1457,7 +1499,7 @@ third"::lines())
 	)
 	show(
 		"Number.greatestNumber(_ List<Rational>)",
-		Number.greatestNumber([1/2, 1/3]),
+		Number.greatestNumber(twoRationals),
 	)
 	show(
 		"Number.greatestNumber(_ List<Rational>) [empty]",
@@ -1465,7 +1507,7 @@ third"::lines())
 	)
 	show(
 		"Number.greatestNumber(_ List<Integer | Rational>)",
-		Number.greatestNumber([1, 1/2]),
+		Number.greatestNumber(twoMixedNumbers),
 	)
 	show(
 		"Number.greatestNumber(_ List<Integer | Rational>) [empty]",
@@ -1494,6 +1536,18 @@ third"::lines())
 	show(
 		"Number.greatestNumber(_ List<Integer | Rational>, defaultingTo: Integer | Rational) [empty]",
 		Number.greatestNumber(noMixedNumbers, defaultingTo 0),
+	)
+	show(
+		"Number.greatestNumber(_ NonEmptyList<Integer>)",
+		Number.greatestNumber([3, 1, 2]),
+	)
+	show(
+		"Number.greatestNumber(_ NonEmptyList<Rational>)",
+		Number.greatestNumber([1/2, 1/3]),
+	)
+	show(
+		"Number.greatestNumber(_ NonEmptyList<Integer | Rational>)",
+		Number.greatestNumber([1, 1/2]),
 	)
 
 	§ ——— Optional —————————————————————————————————————————————————————————
