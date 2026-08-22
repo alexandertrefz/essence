@@ -1,12 +1,13 @@
 import {
-	Boolean    from "./Boolean.es"
-	Comparable from "./Comparable.es"
-	Integer    from "./Integer.es"
-	List       from "./List.es"
-	Optional   from "./Optional.es"
-	Ordering   from "./Ordering.es"
-	Equatable  from "./Protocols.es"
-	Printable  from "./Protocols.es"
+	Boolean      from "./Boolean.es"
+	Comparable   from "./Comparable.es"
+	Integer      from "./Integer.es"
+	List         from "./List.es"
+	NonEmptyList from "./List.es"
+	Optional     from "./Optional.es"
+	Ordering     from "./Ordering.es"
+	Equatable    from "./Protocols.es"
+	Printable    from "./Protocols.es"
 }
 
 declarations {
@@ -46,6 +47,18 @@ declarations {
 	namespace NormalizationForm for NormalizationForm
 		is Equatable,
 		is Printable {}
+
+	§ The Strings that have a character in them. It is a checked refinement:
+	§ the predicate is what a value has to be proven to satisfy, and the proof
+	§ is what the Type carries.
+	§
+	§ Two routes reach the proof. A String written down with a character in it
+	§ is its own proof. A String a Program is handed goes through an `if`
+	§ asking `hasCharacters`, or the `else` of one asking `isEmpty`.
+	§
+	§ `split(on:)` is the one Method the proof changes. A separator with a
+	§ character in it always leaves a piece, so the answer is a `NonEmptyList`.
+	type NonEmptyString = String where @::hasCharacters()
 
 	§ A character here is a Unicode grapheme cluster: a base with its
 	§ combining marks, a ZWJ emoji sequence, a flag's two regional
@@ -182,8 +195,8 @@ declarations {
 		§§
 		§§ A line break is `\n`, `\r` or `\r\n`. A trailing break leaves a final empty line. The empty String is one empty line.
 		§§
-		§§ @returns — the List of lines, without the line breaks.
-		lines() -> List<String> {
+		§§ @returns — the List of lines, without the line breaks. The List always has a line in it.
+		lines() -> NonEmptyList<String> {
 			§ No single `split(on:)` separator expresses all three breaks, so
 			§ the other two are folded onto `\n` first. The two-character
 			§ break is folded first, or the `\r` in it becomes a line.
@@ -323,11 +336,25 @@ declarations {
 
 		§§ Splits the String at every occurrence of the given separator.
 		§§
-		§§ `join(with:)` on the answer rebuilds the String.
-		§§
-		§§ @param on — the separator to split at
-		§§ @returns — the List of pieces, without the separator.
-		split(on separator: String) -> List<String>
+		§§ `join(with:)` on the answer rebuilds the String. A separator with a character in it always leaves at least one piece, and the entry taking a proven separator answers that.
+		overload split {
+			§§ @param on — the separator to split at
+			§§ @returns — the List of pieces, without the separator.
+			(on separator: String) -> List<String>
+
+			§ The same native under the proof: a refinement erases before
+			§ anything runs, so the runtime binds both entries to one Function.
+			§ The empty separator is the only one that can answer no pieces,
+			§ and it is the one this entry refuses.
+
+			§§ Splits the String at every occurrence of a separator proven to have a character.
+			§§
+			§§ Such a separator cuts between the pieces, and the piece before the first cut is always there. So the answer is never empty.
+			§§
+			§§ @param on — the separator to split at, proven to have a character
+			§§ @returns — the List of pieces, which always holds at least one.
+			(on separator: NonEmptyString) -> NonEmptyList<String>
+		}
 
 		§§ Answers how many times the given String occurs in this one.
 		§§
@@ -497,6 +524,7 @@ declarations {
 
 export {
 	CaseSensitivity
+	NonEmptyString
 	NormalizationForm
 	Side
 	String

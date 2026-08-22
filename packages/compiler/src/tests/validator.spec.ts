@@ -2773,7 +2773,7 @@ describe("Validator", () => {
 		function withRefinements(body: string): string {
 			return `implementation {
 				type NonZero = Integer where @::isNot(0)
-				type NonEmptyString = String where @::hasCharacters()
+				type NonEmptyText = String where @::hasCharacters()
 				type NonEmptyStrings = List<String> where @::hasItems()
 				type Digit = Integer where @::isBetween(0, and 9)
 				type SmallOdd = Integer where @::isOdd()::and(@::isLessThan(10))
@@ -2869,7 +2869,7 @@ describe("Validator", () => {
 		it("should admit a written String and a written List", () => {
 			expect(
 				diagnosticsOfBody(`
-					function shouted(_ text: NonEmptyString) -> String {
+					function shouted(_ text: NonEmptyText) -> String {
 						<- text::append("!")
 					}
 

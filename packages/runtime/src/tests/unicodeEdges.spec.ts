@@ -14,7 +14,7 @@ import {
 	length,
 	repeat,
 	slice,
-	split,
+	split__overload$1 as split,
 } from "../String"
 import { typeKeySymbol } from "../type"
 

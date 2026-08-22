@@ -84,7 +84,9 @@ export type StringNatives = {
 	// append(_: String) -> String
 	append: (self: StringType, argument1: StringType) => StringType
 	// split(on: String) -> List<String>
-	split: (self: StringType, on: StringType) => ListType<StringType>
+	split__overload$1: (self: StringType, on: StringType) => ListType<StringType>
+	// split(on: NonEmptyString) -> NonEmptyList
+	split__overload$2: (self: StringType, on: StringType) => ListType<StringType>
 	// uppercase() -> String
 	uppercase: (self: StringType) => StringType
 	// lowercase() -> String
@@ -430,7 +432,8 @@ export const $StringArity: AssertArities<typeof import("./String"), {
 	length: 1
 	character__overload$1: 2
 	append: 2
-	split: 2
+	split__overload$1: 2
+	split__overload$2: 2
 	uppercase: 1
 	lowercase: 1
 	normalize: 2

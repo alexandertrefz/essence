@@ -40,6 +40,7 @@ export {
 	Record                  from "./Record.es"
 	Step                    from "./Step.es"
 	CaseSensitivity         from "./String.es"
+	NonEmptyString          from "./String.es"
 	NormalizationForm       from "./String.es"
 	Side                    from "./String.es"
 	String                  from "./String.es"

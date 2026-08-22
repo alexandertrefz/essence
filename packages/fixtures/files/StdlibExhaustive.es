@@ -112,10 +112,31 @@ implementation {
 	show("String.prepend(_ String) [empty]", greeting::prepend(emptyText))
 	show("String.append(_ String)", greeting::append("!"))
 	show("String.append(_ String) [empty]", greeting::append(emptyText))
-	show("String.split(on: String)", "a,b,c"::split(on ","))
-	show("String.split(on: String) [no match]", greeting::split(on ";"))
+	§ The two entries of `split` are told apart by what is known about the
+	§ SEPARATOR, so the calls have to be told apart the same way. A separator
+	§ the Program COMPUTES might be the empty one, which is the only separator
+	§ that answers no pieces at all; one written where it stands is its own
+	§ proof that it has a character, and reaches the entry answering a
+	§ NonEmptyList.
+	constant computedComma     = ","::append(emptyText)
+	constant computedSemicolon = ";"::append(emptyText)
+
+	show("String.split(on: String)", "a,b,c"::split(on computedComma))
+	show(
+		"String.split(on: String) [no match]",
+		greeting::split(on computedSemicolon),
+	)
 	show("String.split(on: String) [empty separator]", "abc"::split(on ""))
-	show("String.split(on: String) [empty receiver]", emptyText::split(on ","))
+	show(
+		"String.split(on: String) [empty receiver]",
+		emptyText::split(on computedComma),
+	)
+	show("String.split(on: NonEmptyString)", "a,b,c"::split(on ","))
+	show("String.split(on: NonEmptyString) [no match]", greeting::split(on ";"))
+	show(
+		"String.split(on: NonEmptyString) [empty receiver]",
+		emptyText::split(on ","),
+	)
 	show("String.lines()", "first
 second
 third"::lines())

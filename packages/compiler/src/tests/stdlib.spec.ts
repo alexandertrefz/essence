@@ -249,7 +249,7 @@ describe("Stdlib", () => {
 		// the way the Simplifier passes it — String's `toString` is the
 		// identity, Integer's is the conversion the widening bought.
 		it("joins Strings — the return trip of split", () => {
-			const pieces = string.split(str("a,b,c"), str(","))
+			const pieces = string.split__overload$1(str("a,b,c"), str(","))
 
 			expect(
 				list.join(pieces, str(" + "), {

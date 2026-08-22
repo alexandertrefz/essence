@@ -20,12 +20,9 @@ implementation {
 
 	§ `NonZeroInteger` is the standard library's own — the refinement the whole
 	§ design was written for, and the one `Rational::denominator` answers with —
-	§ so it is USED here rather than declared, as `NonEmptyList<Item>` is further
-	§ down. Everything else below is a Program's own, declared exactly the way
-	§ those two are.
-
-	§ A String with something in it.
-	type NonEmptyString = String where @::hasCharacters()
+	§ so it is USED here rather than declared, as `NonEmptyString` and
+	§ `NonEmptyList<Item>` are further down. Everything else below is a
+	§ Program's own, declared exactly the way those three are.
 
 	§ A List with something in it. The base is an APPLIED List — `List<String>`,
 	§ never a bare `List`, whose item Type nothing has decided.

@@ -4064,13 +4064,13 @@ declarations {
 	describe("an admitted literal", () => {
 		const SOURCE = `implementation {
 	type NonZero = Integer where @::isNot(0)
-	type NonEmptyString = String where @::hasCharacters()
+	type NonEmptyText = String where @::hasCharacters()
 
 	function doubled(_ d: NonZero) -> Integer {
 		<- d::multiply(with 2)
 	}
 
-	function shouted(_ text: NonEmptyString) -> String {
+	function shouted(_ text: NonEmptyText) -> String {
 		<- text::append("!")
 	}
 
