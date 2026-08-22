@@ -24,7 +24,7 @@ implementation {
 	Terminal.inspect(sevenHalves::negate()::round(toward #TowardZero)) § -3 — towards zero
 	Terminal.inspect(3/4::numerator()) § 3
 	Terminal.inspect(3/4::reciprocal()) § Optional#Value(4/3)
-	Terminal.inspect(2/3::raise(to 2)) § Optional#Value(4/9)
+	Terminal.inspect(2/3::raise(to 2)) § 4/9 — a Rational takes a proven exponent too
 
 	§ Reading a Number from text. A text that spells no Number answers the fallback.
 	Terminal.inspect(Integer.parse("42", defaultingTo 0)) § 42

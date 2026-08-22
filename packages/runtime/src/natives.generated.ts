@@ -178,6 +178,8 @@ export type RationalNatives = {
 	divide__overload$3: (self: RationalType, by: AlgebraicType) => AlgebraicType | RationalType
 	// raise(to: Integer) -> Optional<Rational>
 	raise__overload$1: (self: RationalType, to: IntegerType) => OptionalType<RationalType>
+	// raise(to: NonNegativeInteger) -> Rational
+	raise__overload$3: (self: RationalType, to: IntegerType) => RationalType
 	// squareRoot() -> Optional<Rational | Algebraic>
 	squareRoot__overload$1: (self: RationalType) => OptionalType<RationalType | AlgebraicType>
 	// numerator() -> Integer
@@ -518,6 +520,7 @@ export const $RationalArity: AssertArities<typeof import("./Rational"), {
 	divide__overload$1: 2
 	divide__overload$3: 2
 	raise__overload$1: 2
+	raise__overload$3: 2
 	squareRoot__overload$1: 1
 	numerator: 1
 	denominator: 1

@@ -890,8 +890,13 @@ third"::lines())
 		"Rational.round(toward?: Rounding) [below a half]",
 		1/4::round(toward #Nearest),
 	)
-	show("Rational.raise(to: Integer)", 2/3::raise(to 2))
-	show("Rational.raise(to: Integer) [zero exponent]", 2/3::raise(to 0))
+	§ The same split `Integer::raise` makes, and the same computed exponents
+	§ keep these calls on the entry answering an Optional.
+	show("Rational.raise(to: Integer)", 2/3::raise(to computedTwo))
+	show(
+		"Rational.raise(to: Integer) [zero exponent]",
+		2/3::raise(to computedZero),
+	)
 	show("Rational.raise(to: Integer) [negative exponent]", 2/3::raise(to -2))
 	show(
 		"Rational.raise(to: Integer) [zero to a negative power]",
@@ -905,6 +910,12 @@ third"::lines())
 		"Rational.raise(to: Integer, defaultingTo: Rational) [zero to a negative power]",
 		0/1::raise(to -1, defaultingTo 0/1),
 	)
+	show("Rational.raise(to: NonNegativeInteger)", 2/3::raise(to 2))
+	show(
+		"Rational.raise(to: NonNegativeInteger) [zero exponent]",
+		2/3::raise(to 0),
+	)
+	show("Rational.raise(to: NonNegativeInteger) [zero base]", 0/1::raise(to 3))
 	show("Rational.parse(_ String)", Rational.parse("0.75"))
 	show("Rational.parse(_ String) [not a number]", Rational.parse("nope"))
 	show("Rational.parse(_ String) [fraction]", Rational.parse("3/4"))
