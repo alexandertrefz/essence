@@ -2049,8 +2049,8 @@ describe("Optimiser", () => {
 			conjuncts: [
 				{
 					namespaceName: "Integer",
-					methodName: "isNot",
-					overloadIndex: null,
+					methodName: "is",
+					negated: true,
 					args: ["0"],
 				},
 			],

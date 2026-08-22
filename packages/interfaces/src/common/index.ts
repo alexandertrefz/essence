@@ -571,6 +571,21 @@ export type BaseFunction = {
 	generics: Array<GenericDeclaration>
 	returnType: Type | GenericUse
 	documentation?: Documentation
+	// NOTE: Set where this entry is a PREDICATE ALIAS — a Method that takes no
+	// Arguments, answers a Boolean, and whose whole body is one call on `@`,
+	// optionally negated. `Integer::isZero` is `@::is(0)`, `List::hasItems` is
+	// `@::isEmpty()::negate()`. What is stored is the leaf that call resolves
+	// to, so a refinement written on the alias and one written on the Method it
+	// forwards to are the same predicate, and the opposite of either is the
+	// other.
+	//
+	// Read off the BODY rather than declared, which is what makes it true: a
+	// Namespace could declare that one Method is another's contrary and be
+	// wrong, and there is nothing to be wrong about here. Absent on every
+	// Method that is not one — a body that reads a chain (`@::length()::is(0)`)
+	// is a leaf of its own, and the standard library's emptiness Methods are
+	// exactly that.
+	predicateAlias?: PredicateConjunct
 }
 
 export type FunctionType = BaseFunction & {
@@ -739,18 +754,44 @@ export type GenericAliasType = {
 // Expression lives on the Type Alias Statement it was written on, which keeps
 // `conformanceKey` and its memo keys off the whole of it.
 //
-// `overloadIndex` is null for a Method that is not overloaded (`Integer.isNot`
-// is one), and the index of the resolved Overload where it is — the two spell
-// different questions under one name.
+// A leaf is stored RESOLVED: the Method a Namespace writes as a call to another
+// one is put down as the call it makes, and `negated` is what a Method written
+// `<- @::m()::negate()` contributes. So `@::isZero()` and `@::is(0)` are one
+// key, `@::hasCharacters()` is `String::isEmpty` negated, and the OPPOSITE of a
+// leaf is that leaf with the flag flipped — which is why nothing here needs a
+// table of Methods declared to be each other's contraries.
+//
+// The Overload is NOT part of it. Two Overloads of one Method are told apart by
+// the Arguments they take, and the Arguments are stored with their kind: a
+// written String keeps its quotes, so `@::check(1)` and `@::check("1")` stay two
+// questions while the Overload that answered each stays the Enricher's business.
+// A resolved leaf could not carry the index anyway — the Method a body forwards
+// to is read before anything has resolved an Overload of it.
 //
 // NOTE: An Argument is kept as a stable scalar rather than as a Type: an
 // Integer's value is a string because it is a bigint at run time and JSON has
 // no bigint, and every consumer — the canonical key, the literal evaluator, a
-// Diagnostic naming the predicate — reads it back the same way.
+// Diagnostic naming the predicate — reads it back the same way. A String keeps
+// the quotes JSON gives it, which is what tells `1` from `"1"`.
+//
+// NOTE: `spelling` is the CALL the leaf was written as — the Method name and the
+// Arguments a reader gave it, which need be neither the ones the leaf resolved
+// to: `@::isPositive()` takes none where the leaf it resolves to takes `0`. A
+// Diagnostic naming the predicate says what the reader wrote.
+//
+// DISPLAY only, and no part of the key: two spellings of one question are one
+// question. Absent on a leaf nobody wrote, which is every leaf the complement
+// and the Match doorway synthesize.
 export type PredicateConjunct = {
 	namespaceName: string
 	methodName: string
-	overloadIndex: number | null
+	args: Array<string | boolean>
+	negated: boolean
+	spelling?: PredicateSpelling
+}
+
+export type PredicateSpelling = {
+	methodName: string
 	args: Array<string | boolean>
 }
 

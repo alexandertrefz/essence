@@ -658,7 +658,7 @@ describe("Type matching", () => {
 			args: Array<string | boolean> = [],
 			namespaceName: string = "Integer",
 		): common.PredicateConjunct {
-			return { namespaceName, methodName, overloadIndex: null, args }
+			return { namespaceName, methodName, args, negated: false }
 		}
 
 		function refinement(

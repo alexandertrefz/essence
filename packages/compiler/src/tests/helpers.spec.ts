@@ -11,6 +11,7 @@ import type {
 	NamespaceType,
 	OverloadedMethodType,
 	OverloadedStaticMethodType,
+	PredicateConjunct,
 	PrimitiveType,
 	ProtocolType,
 	RecordType,
@@ -2959,13 +2960,16 @@ describe("Helpers", () => {
 		function conjunct(
 			methodName: string,
 			args: Array<string | boolean> = [],
-			overloadIndex: number | null = null,
+			negated: boolean = false,
 			namespaceName: string = "Integer",
-		) {
-			return { namespaceName, methodName, overloadIndex, args }
+		): PredicateConjunct {
+			return { namespaceName, methodName, args, negated }
 		}
 
-		const isNotZero = conjunct("isNot", ["0"])
+		// NOTE: `NonZeroInteger` is written `@::isNot(0)` and stored as the leaf
+		// that resolves to — `Integer::is(0)` negated — which is the form every
+		// reader of a conjunct sees.
+		const isNotZero = conjunct("is", ["0"], true)
 
 		function refinementOf(base: Type, name = "NonZeroInteger"): Type {
 			return { type: "Refinement", name, base, conjuncts: [isNotZero] }
@@ -3001,18 +3005,35 @@ describe("Helpers", () => {
 		describe("predicateConjunctKey", () => {
 			it("should give one question one key", () => {
 				expect(predicateConjunctKey(isNotZero)).toBe(
-					predicateConjunctKey(conjunct("isNot", ["0"])),
+					predicateConjunctKey(conjunct("is", ["0"], true)),
 				)
 			})
 
-			it("should tell the Namespace, the Method and the Overload apart", () => {
+			// NOTE: The spelling a leaf was written as names the question for a
+			// reader and decides nothing, so two leaves differing in nothing
+			// else are one question.
+			it("should ignore how the leaf was written", () => {
+				expect(
+					predicateConjunctKey({
+						...isNotZero,
+						spelling: { methodName: "isNot", args: ["0"] },
+					}),
+				).toBe(
+					predicateConjunctKey({
+						...isNotZero,
+						spelling: { methodName: "isZero", args: [] },
+					}),
+				)
+			})
+
+			it("should tell the Namespace, the Method, the polarity and the Arguments apart", () => {
 				let keys = new Set(
 					[
 						isNotZero,
 						conjunct("is", ["0"]),
-						conjunct("isNot", ["1"]),
-						conjunct("isNot", ["0"], 2),
-						conjunct("isNot", ["0"], null, "Number"),
+						conjunct("is", ["1"], true),
+						conjunct("isLessThan", ["0"], true),
+						conjunct("is", ["0"], true, "Number"),
 					].map(predicateConjunctKey),
 				)
 
@@ -3022,9 +3043,13 @@ describe("Helpers", () => {
 			// NOTE: Two predicates that spelled one key between them would
 			// silently accept each other's evidence, so nothing a Program can
 			// write may reach across a separator: an Argument is JSON rather
-			// than joined, and the Overload is told apart by a colon, which is a
-			// Symbol and so unspellable inside a name — where `$` is an ordinary
-			// Identifier character.
+			// than joined, and a written String keeps the quotes that tell it
+			// from the digits it may spell.
+			//
+			// NOTE: The Overload used to be part of this and no longer is —
+			// nothing resolves one where a Method's body is read — so the
+			// Arguments carry the whole burden of telling two entries of one
+			// name apart. Which is why the String below has to keep its quotes.
 			it("should not let anything spell another conjunct's key", () => {
 				expect(predicateConjunctKey(conjunct("is", ["a,b"]))).not.toBe(
 					predicateConjunctKey(conjunct("is", ["a", "b"])),
@@ -3032,8 +3057,8 @@ describe("Helpers", () => {
 				expect(predicateConjunctKey(conjunct("is", ["true"]))).not.toBe(
 					predicateConjunctKey(conjunct("is", [true])),
 				)
-				expect(predicateConjunctKey(conjunct("isNot$1"))).not.toBe(
-					predicateConjunctKey(conjunct("isNot", [], 1)),
+				expect(predicateConjunctKey(conjunct("is", ['"1"']))).not.toBe(
+					predicateConjunctKey(conjunct("is", ["1"])),
 				)
 			})
 		})
@@ -3041,24 +3066,24 @@ describe("Helpers", () => {
 		describe("canonicalPredicateConjuncts", () => {
 			it("should sort by key and drop what is asked twice", () => {
 				let canonical = canonicalPredicateConjuncts([
-					conjunct("isPositive"),
+					conjunct("isEven"),
 					isNotZero,
-					conjunct("isNot", ["0"]),
+					conjunct("is", ["0"], true),
 				])
 
 				expect(canonical.map((entry) => entry.methodName)).toEqual([
-					"isNot",
-					"isPositive",
+					"is",
+					"isEven",
 				])
 			})
 
 			it("should give one predicate one canonical form, however it was written", () => {
 				let one = canonicalPredicateConjuncts([
 					isNotZero,
-					conjunct("isPositive"),
+					conjunct("isEven"),
 				])
 				let other = canonicalPredicateConjuncts([
-					conjunct("isPositive"),
+					conjunct("isEven"),
 					isNotZero,
 				])
 
@@ -3356,7 +3381,7 @@ describe("Helpers", () => {
 						type: "Refinement",
 						name: "PositiveNonZeroInteger",
 						base: nonZero,
-						conjuncts: [conjunct("isPositive")],
+						conjuncts: [conjunct("isEven")],
 					}),
 				).toEqual(integer)
 			})
@@ -3374,7 +3399,7 @@ describe("Helpers", () => {
 					type: "Refinement",
 					name: "NonEmptyList",
 					base: { type: "List", itemType },
-					conjuncts: [conjunct("hasItems", [], null, "List")],
+					conjuncts: [conjunct("isEmpty", [], true, "List")],
 					typeArguments: [itemType],
 				})
 

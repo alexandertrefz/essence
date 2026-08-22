@@ -198,8 +198,8 @@ describe("printType", () => {
 			conjuncts: [
 				{
 					namespaceName: "Integer",
-					methodName: "isNot",
-					overloadIndex: null,
+					methodName: "is",
+					negated: true,
 					args: ["0"],
 				},
 			],
@@ -249,7 +249,7 @@ describe("printType", () => {
 						{
 							namespaceName: "List",
 							methodName: "hasItems",
-							overloadIndex: 0,
+							negated: false,
 							args: [],
 						},
 					],
