@@ -8278,6 +8278,162 @@ describe("Enricher", () => {
 		})
 	})
 
+	// NOTE: A RECEIVER is the one position that asks a value nothing. A
+	// Parameter, a declared Constant, a return position and an Argument matched
+	// against a refined entry each hand a written value a question; dispatch
+	// reads whatever the receiver's Type came to and looks a Namespace up in it.
+	// So the receiver asks ITSELF, of every refinement in scope at once, and
+	// carries the conjunction of everything admitted.
+	describe("A written receiver", () => {
+		function receiverTypeOf(body: string): string {
+			return printType(
+				lastConstantMethodInvocation(`implementation {
+					${body}
+				}`).base.type,
+			)
+		}
+
+		function answerOf(body: string): string {
+			return printType(
+				lastConstantValue(`implementation {
+					${body}
+				}`).type,
+			)
+		}
+
+		// NOTE: `3` proves both builtin predicates over an Integer, and
+		// `PositiveInteger` is the Alias whose conjuncts are exactly the two —
+		// so the conjunction has a name to print and prints under it.
+		it("should carry every refinement the value is admitted into", () => {
+			expect(receiverTypeOf("constant text = 3::toString()")).toBe(
+				"PositiveInteger",
+			)
+		})
+
+		it("should carry only the refinements the value proves", () => {
+			expect(receiverTypeOf("constant text = 0::toString()")).toBe(
+				"NonNegativeInteger",
+			)
+			expect(receiverTypeOf("constant text = -4::toString()")).toBe(
+				"NonZeroInteger",
+			)
+		})
+
+		// NOTE: Where no declared Alias proves the whole conjunction, the Type
+		// prints as the Declaration a reader would have to write for it — the
+		// conjuncts in the order they are compared, joined the way a chain is.
+		// It names the proof; like every other predicate spelling, it is not
+		// offered as something to paste.
+		it("should spell a conjunction no declared name covers", () => {
+			expect(
+				receiverTypeOf(`type Even = Integer where @::isEven()
+					type Big = Integer where @::isGreaterThan(10)
+
+					constant text = 12::toString()`),
+			).toBe(
+				"Integer where @::isEven()::and(@::isGreaterThan(10))::and(@::isGreaterThanOrEqualTo(0))::and(@::isNot(0))",
+			)
+		})
+
+		it("should carry a generic refinement applied to the items", () => {
+			expect(receiverTypeOf('constant text = ["a"]::isEmpty()')).toBe(
+				"NonEmptyList<String>",
+			)
+		})
+
+		// NOTE: A written String proves `NonEmptyString`, which no Namespace
+		// targets — so the call falls to `String`'s own, which is what a
+		// refinement adding Methods and taking none away means.
+		it("should reach the base Namespace where nothing targets the proof", () => {
+			expect(receiverTypeOf('constant length = "abc"::length()')).toBe(
+				"NonEmptyString",
+			)
+			expect(answerOf('constant length = "abc"::length()')).toBe(
+				"Integer",
+			)
+		})
+
+		// NOTE: A written List is counted by its BRACKETS, and an empty pair
+		// counts nothing — so the one predicate it could have proven is false
+		// of it and the receiver stays the List it is written as. A Boolean
+		// beside it, whose Type no refinement may even be written over.
+		it("should prove nothing about a written value the predicates refuse", () => {
+			expect(receiverTypeOf("constant grown = []::append(1)")).toBe(
+				"List<Unknown>",
+			)
+			expect(receiverTypeOf("constant text = true::toString()")).toBe(
+				"Boolean",
+			)
+		})
+
+		// NOTE: The other side of the same rule. A value the Program COMPUTES is
+		// a value nothing has decided anything about, however plainly it was
+		// computed a line above — which is what keeps every unproven entry
+		// reachable.
+		it("should prove nothing about a computed receiver", () => {
+			expect(
+				answerOf(`constant two = 1::add(1)
+					constant root = two::squareRoot()`),
+			).toBe("Optional<Integer | Algebraic>")
+		})
+
+		it("should spend the proof on the Namespace that takes it", () => {
+			expect(answerOf("constant root = 4::squareRoot()")).toBe(
+				"Integer | Algebraic",
+			)
+			expect(answerOf("constant first = [1, 2]::firstItem()")).toBe(
+				"Integer",
+			)
+			expect(answerOf("constant mean = [1, 2]::average()")).toBe(
+				"Rational",
+			)
+			expect(
+				answerOf(
+					"constant scaled = 2::multiply(with Number.GoldenRatio)",
+				),
+			).toBe("Algebraic")
+		})
+
+		// NOTE: What the proof may never do is make an answer WIDER. `raise`
+		// answers an Integer for a non-negative exponent whatever the receiver
+		// proves, `add` is total either way, and a receiver proving only that it
+		// is not negative reaches no `raise` of its own — so a negative exponent
+		// there is still the entry that can come back empty.
+		it("should never widen an answer the base already gave", () => {
+			expect(answerOf("constant power = 2::raise(to 10)")).toBe("Integer")
+			expect(answerOf("constant sum = 1::add(2)")).toBe("Integer")
+			expect(answerOf("constant power = 0::raise(to -1)")).toBe(
+				"Optional<Integer | Rational>",
+			)
+		})
+
+		// NOTE: And where the proof tightens the answer it says so — a product
+		// of two proven Integers is proven itself, which is what `namespace
+		// NonZeroInteger` was written to carry.
+		it("should answer with the refinement a refined entry declares", () => {
+			expect(answerOf("constant product = 2::multiply(with 3)")).toBe(
+				"NonZeroInteger",
+			)
+		})
+
+		// NOTE: A Program's own Alias is a candidate beside the builtins, and a
+		// Namespace over it is reached by a written receiver exactly as the
+		// standard library's are.
+		it("should reach a Program's own refined Namespace", () => {
+			expect(
+				answerOf(`type Even = Integer where @::isEven()
+
+					namespace EvenInteger for Even {
+						halved() -> String {
+							<- "half"
+						}
+					}
+
+					constant half = 4::halved()`),
+			).toBe("String")
+		})
+	})
+
 	// NOTE: The other half of what a proof buys. A refinement ADDS Methods and
 	// takes none away, so `namespace NonEmptyList` can answer `firstItem()` bare
 	// and still not hide `List::firstItem(defaultingTo:)` — the call compiles,
@@ -8319,6 +8475,22 @@ describe("Enricher", () => {
 				codesFor(
 					programWith(
 						"constant greatest = Number.greatestNumber(proven, defaultingTo 0)",
+					),
+				),
+			).toEqual(["fallback-never-used"])
+		})
+
+		// NOTE: A written RECEIVER is proof of the same kind, and the probe that
+		// erases the caller's proof erases it too — the receiver is widened past
+		// its refinement and no written value is admitted to one, so the
+		// question asked is what a caller holding nothing would have reached.
+		// Without that, `[1, 2]::firstItem(defaultingTo 0)` would look like an
+		// entry swap rather than the dead fallback it is.
+		it("should warn where a written receiver answers bare", () => {
+			expect(
+				codesFor(
+					programWith(
+						"constant first = [1, 2]::firstItem(defaultingTo 0)",
 					),
 				),
 			).toEqual(["fallback-never-used"])

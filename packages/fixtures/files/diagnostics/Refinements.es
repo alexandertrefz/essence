@@ -80,6 +80,10 @@ implementation {
 	§ proof the quotient exists.
 	constant half = 10::divide(by 2, defaultingTo 0/1)
 
+	§ fallback-never-used — and from the third side: the RECEIVER is written,
+	§ the brackets say it holds an item, and `firstItem` answers one.
+	constant written = [3, 1, 2]::firstItem(defaultingTo 0)
+
 	§ Silent on purpose, and the reason the rule re-probes the call rather than
 	§ reading a Parameter list: `firstItem(where:)` can find nothing in a List
 	§ that holds items, so the fallback here is the one that gets read.

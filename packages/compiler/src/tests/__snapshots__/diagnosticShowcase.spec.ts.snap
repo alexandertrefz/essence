@@ -1467,7 +1467,20 @@ Warning: This 'defaultingTo' Argument can never be read
     │ Note: Without it the call answers a Rational, which is never empty.
 ────╯
 
-─── 8 errors, 2 warnings
+[fallback-never-used]
+Warning: This 'defaultingTo' Argument can never be read
+    ╭─┤ Refinements.es:85:42 │
+    │
+ 85 │     constant written = [3, 1, 2]::firstItem(defaultingTo 0)
+    │                                             ───────┬──────  
+    │                                                    ╰──────── this fallback can never be read
+    │ 
+    │ Help: Drop the 'defaultingTo' Argument; the call already answers an Integer.
+    │ 
+    │ Note: Without it the call answers an Integer, which is never empty.
+────╯
+
+─── 8 errors, 3 warnings
 "
 `;
 

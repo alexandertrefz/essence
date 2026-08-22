@@ -682,6 +682,80 @@ describe("Completion", () => {
 			])
 		})
 
+		// NOTE: A `::` cursor is a Method receiver, so the probe writes one — and
+		// a written value proves what it can about itself there. `4::` offers
+		// the Methods of every Namespace the proof reaches, and the entry a
+		// refined Namespace answers with is the one described.
+		describe("on a written receiver", () => {
+			const evenInteger = [
+				"implementation {",
+				"	type Even = Integer where @::isEven()",
+				"",
+				"	namespace EvenInteger for Even {",
+				"		halved() -> String {",
+				'			<- "half"',
+				"		}",
+				"	}",
+				"",
+			]
+
+			it("should offer a refined Namespace's Methods", () => {
+				let source = [...evenInteger, "\t4::", "}"].join("\n")
+
+				expect(labelsOf(source, { line: 10, column: 5 })).toContain(
+					"halved",
+				)
+			})
+
+			it("should withhold them from a receiver the proof misses", () => {
+				let source = [...evenInteger, "\t3::", "}"].join("\n")
+
+				expect(labelsOf(source, { line: 10, column: 5 })).not.toContain(
+					"halved",
+				)
+			})
+
+			it("should withhold them from a computed receiver", () => {
+				let source = [
+					...evenInteger,
+					"\tconstant four = 2::add(2)",
+					"\tfour::",
+					"}",
+				].join("\n")
+
+				expect(labelsOf(source, { line: 11, column: 8 })).not.toContain(
+					"halved",
+				)
+			})
+
+			// NOTE: The signature offered is the one the call would reach — the
+			// total entry `namespace NonNegativeInteger` writes, and not
+			// `Integer`'s, which answers an Optional for a receiver that might
+			// be negative.
+			it("should describe the entry the proof reaches", () => {
+				let source = ["implementation {", "\t4::", "}"].join("\n")
+
+				expect(
+					entryFor(source, { line: 2, column: 5 }, "squareRoot")
+						?.detail,
+				).toBe("() -> Integer | Algebraic")
+			})
+
+			it("should describe the base entry for a computed receiver", () => {
+				let source = [
+					"implementation {",
+					"\tconstant four = 2::add(2)",
+					"\tfour::",
+					"}",
+				].join("\n")
+
+				expect(
+					entryFor(source, { line: 3, column: 8 }, "squareRoot")
+						?.detail,
+				).toBe("() -> Optional<Integer | Algebraic>")
+			})
+		})
+
 		it("should not offer static Methods through ::", () => {
 			let source = [
 				"implementation {",

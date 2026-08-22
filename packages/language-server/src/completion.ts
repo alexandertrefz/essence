@@ -207,6 +207,13 @@ export function findCompletions(
 		// would answer whatever else happens to be called that. It answers only
 		// where the Enricher really wrote a nested update out, so every other
 		// cursor falls through to the reading it always had.
+		// NOTE: A `::` cursor is probed as a METHOD call and a `.` cursor as a
+		// member Lookup, because a receiver answers a different Type in the two
+		// positions: a written value proves what it can about itself where a
+		// Method is looked up on it, and `4::` offers `namespace
+		// NonNegativeInteger`'s Methods for that reason. A Lookup probe would
+		// ask the same `4` with nothing in front of it and offer Integer's
+		// alone.
 		let base =
 			(memberMatch === null
 				? null
@@ -214,7 +221,14 @@ export function findCompletions(
 						headText,
 						documentPath,
 						`.${probeKeyName} = 0`,
-					)) ?? resolveProbedBase(headText, documentPath)
+					)) ??
+			resolveProbedBase(
+				headText,
+				documentPath,
+				memberMatch === null
+					? `::${probeMemberName}()`
+					: `.${probeMemberName}`,
+			)
 
 		if (base === null) {
 			return []
@@ -574,7 +588,13 @@ function findProbeReceiverInNode(
 		// half its Arguments has no signature to name a Parameter's Type with.
 		// A free Function's callee is an Expression whose Type stands whatever
 		// follows it, which is why the one below can be asked at all.
+		// NOTE: The probe a `::` cursor writes, and the Type it is asked for is
+		// the RECEIVER's — the one Method resolution reads, refinements and all.
 		case "MethodInvocation":
+			if (node.member.name === probeMemberName) {
+				return node.base.type
+			}
+
 			return (
 				findProbeReceiverInNode(node.base) ??
 				findProbeReceiverInArguments(node.arguments)
