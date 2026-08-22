@@ -137,6 +137,11 @@ export const builtinTypeOrder: Array<string> = [
 	// an Integer can be proven to be, and `closestMatch` breaks a tie on the FIRST
 	// candidate, so a typo near both still reads as the base Type.
 	"NonZeroInteger",
+	// NOTE: The other two refinements of `Integer`, with the first and in the
+	// order they build on each other — `PositiveInteger` is spelled as the
+	// conjunction of the two above it, so a value of it is both.
+	"NonNegativeInteger",
+	"PositiveInteger",
 	"Rational",
 	"Algebraic",
 	"Transcendental",

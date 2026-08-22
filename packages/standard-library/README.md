@@ -7,7 +7,12 @@ Protocols (`Equatable`, `Printable`, `Comparable`, `Orderable`), `Boolean`,
 `Optional`, `Ordering`, `Record`, `String`, the whole numeric tower (`Integer`,
 `Rational`, `Algebraic`, `Transcendental` and the covering `Number`, which
 brings the `Number` and `Irrational` Union Types with it), and `List` together
-with `NestedList` and `NonEmptyList`. The aggregates a List of numbers answers
+with `NestedList` and `NonEmptyList`. A checked refinement is exported beside
+the base it narrows: `NonZeroInteger`, `NonNegativeInteger` and
+`PositiveInteger` beside `Integer`, `NonEmptyString` beside `String`,
+`NonEmptyList` beside `List`. Each reaches everything its base reaches, and the
+tighter answers a proof affords on top — `DEVELOPMENT.md` has the rule a
+narrowed receiver is read by. The aggregates a List of numbers answers
 are reachable from the List itself, through six Namespaces of their own in
 `NumberList.es` — `IntegerList`, `RationalList` and `NumberList`, and the
 `NonEmptyIntegerList`, `NonEmptyRationalList` and `NonEmptyNumberList` a proof
