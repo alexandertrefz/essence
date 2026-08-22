@@ -8393,8 +8393,18 @@ function probeOverload(
 // A lone candidate is answered without asking anything: every plain Function,
 // SimpleMethod and static Method invocation in a Program comes through here as an
 // Overload set of one, and one candidate has no order to put it in.
+//
+// NOTE: The RECEIVER is not evidence any entry asked for. A Method's Parameter 0
+// is the receiver, and it is the same Type in every entry of one Namespace's
+// Overload — so it can not tell two entries apart, and reading it here put every
+// entry of a Namespace over a refinement in the same partition. The partition was
+// then a no-op and the order stayed the one they were written in, which is the
+// one place an APPENDED refined entry can never win from: `NonZeroInteger::raise`
+// answered its `(to Integer)` entry for a written `2` while the `(to
+// NonNegativeInteger)` entry beside it went unread.
 function overloadProbeOrder(
 	overloads: Array<common.BaseFunction>,
+	receiverParameters: number,
 ): Array<[number, common.BaseFunction]> {
 	let candidates = [...overloads.entries()]
 
@@ -8409,9 +8419,9 @@ function overloadProbeOrder(
 		let [, overload] = candidate
 
 		if (
-			overload.parameterTypes.some((parameter) =>
-				typeContainsRefinement(parameter.type),
-			)
+			overload.parameterTypes
+				.slice(receiverParameters)
+				.some((parameter) => typeContainsRefinement(parameter.type))
 		) {
 			asking.push(candidate)
 		} else {
@@ -8448,12 +8458,19 @@ function selectOverload(
 	scope: enricher.Scope,
 	position: common.Position,
 	typer: ArgumentTyper,
+	// NOTE: How many leading Parameters stand for something the call did not
+	// write — one for a Method, whose receiver is unshifted in front of the
+	// Arguments, and none for anything else. Read only by `overloadProbeOrder`.
+	receiverParameters = 0,
 ): SelectedOverload | undefined {
 	let firstArgumentMatch:
 		| { selected: SelectedOverload; sawErrorArgument: boolean }
 		| undefined
 
-	for (let [index, overload] of overloadProbeOrder(overloads)) {
+	for (let [index, overload] of overloadProbeOrder(
+		overloads,
+		receiverParameters,
+	)) {
 		// NOTE: Up to and including the first candidate whose Arguments match, a
 		// probe reports and records where it stands — an Argument is enriched
 		// exactly once, so a report held back there would be held back forever.
@@ -8657,6 +8674,7 @@ function resolveInvokedMethodInNamespace(
 		scope,
 		node.position,
 		typer,
+		1,
 	)
 
 	if (selected === undefined) {
