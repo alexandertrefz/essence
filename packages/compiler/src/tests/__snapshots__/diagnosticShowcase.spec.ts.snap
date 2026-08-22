@@ -1341,9 +1341,9 @@ Error: Type 'Boxed' names itself
 exports[`Diagnostic Showcase Refinements.es should render the same report every time 1`] = `
 "[invalid-refinement-predicate]
 Error: A 'where' clause can not refine Boolean
-    ╭─┤ Refinements.es:20:13 │
+    ╭─┤ Refinements.es:25:13 │
     │
- 20 │     type Yes = Boolean where @::is(true)
+ 25 │     type Yes = Boolean where @::is(true)
     │                ───┬───  
     │                   ╰───── this is Boolean
     │ 
@@ -1354,9 +1354,9 @@ Error: A 'where' clause can not refine Boolean
 
 [invalid-refinement-predicate]
 Error: A 'where' clause can not refine List
-    ╭─┤ Refinements.es:24:17 │
+    ╭─┤ Refinements.es:29:17 │
     │
- 24 │     type Several = List where @::hasItems()
+ 29 │     type Several = List where @::hasItems()
     │                    ──┬─  
     │                      ╰─── this is List
     │ 
@@ -1367,9 +1367,9 @@ Error: A 'where' clause can not refine List
 
 [invalid-refinement-predicate]
 Error: This is not a predicate a refinement can be checked by
-    ╭─┤ Refinements.es:28:29 │
+    ╭─┤ Refinements.es:33:29 │
     │
- 28 │     type Named = Integer where "essence"::hasCharacters()
+ 33 │     type Named = Integer where "essence"::hasCharacters()
     │                                ────┬────  
     │                                    ╰────── this is not '@'
     │ 
@@ -1380,9 +1380,9 @@ Error: This is not a predicate a refinement can be checked by
 
 [invalid-refinement-predicate]
 Error: This is not a predicate a refinement can be checked by
-    ╭─┤ Refinements.es:32:30 │
+    ╭─┤ Refinements.es:37:30 │
     │
- 32 │     type Trimmed = String where @::trim()::hasCharacters()
+ 37 │     type Trimmed = String where @::trim()::hasCharacters()
     │                                 ────┬────  
     │                                     ╰────── this is not '@'
     │ 
@@ -1393,9 +1393,9 @@ Error: This is not a predicate a refinement can be checked by
 
 [invalid-refinement-predicate]
 Error: This is not a predicate a refinement can be checked by
-    ╭─┤ Refinements.es:38:45 │
+    ╭─┤ Refinements.es:43:45 │
     │
- 38 │     type Bounded = Integer where @::isLessThan(limit)
+ 43 │     type Bounded = Integer where @::isLessThan(limit)
     │                                                ──┬──  
     │                                                  ╰──── this is not a literal value
     │ 
@@ -1406,9 +1406,9 @@ Error: This is not a predicate a refinement can be checked by
 
 [predicate-not-boolean]
 Error: This predicate is not a Boolean
-    ╭─┤ Refinements.es:42:29 │
+    ╭─┤ Refinements.es:47:29 │
     │
- 42 │     type Sized = Integer where @::absolute()
+ 47 │     type Sized = Integer where @::absolute()
     │                                ──────┬──────  
     │                                      ╰──────── this is Integer
     │ 
@@ -1417,9 +1417,9 @@ Error: This predicate is not a Boolean
 
 [refinement-as-matcher]
 Error: A Matcher can not test for 'NonZeroInteger'
-    ╭─┤ Refinements.es:50:8 │
+    ╭─┤ Refinements.es:55:8 │
     │
- 50 │        case NonZeroInteger { <- "nonzero" }
+ 55 │        case NonZeroInteger { <- "nonzero" }
     │             ───────┬──────  
     │                    ╰──────── this is a checked refinement
     │ 
@@ -1430,9 +1430,9 @@ Error: A Matcher can not test for 'NonZeroInteger'
 
 [refinement-as-matcher]
 Error: A Matcher can not test for 'NonZeroInteger'
-    ╭─┤ Refinements.es:64:23 │
+    ╭─┤ Refinements.es:69:23 │
     │
- 64 │        case #Full({ value: NonZeroInteger }) { <- "nonzero" }
+ 69 │        case #Full({ value: NonZeroInteger }) { <- "nonzero" }
     │                            ───────┬──────  
     │                                   ╰──────── this is a checked refinement
     │ 
@@ -1441,7 +1441,33 @@ Error: A Matcher can not test for 'NonZeroInteger'
     │ Note: A refinement's predicate erases before the Program runs, so the emitted check could only ask about 'Integer' — and the arm would run for values the predicate refuses.
 ────╯
 
-─── 8 errors
+[fallback-never-used]
+Warning: This 'defaultingTo' Argument can never be read
+    ╭─┤ Refinements.es:77:36 │
+    │
+ 77 │     constant best = scores::firstItem(defaultingTo 0)
+    │                                       ───────┬──────  
+    │                                              ╰──────── this fallback can never be read
+    │ 
+    │ Help: Drop the 'defaultingTo' Argument; the call already answers an Integer.
+    │ 
+    │ Note: Without it the call answers an Integer, which is never empty.
+────╯
+
+[fallback-never-used]
+Warning: This 'defaultingTo' Argument can never be read
+    ╭─┤ Refinements.es:81:35 │
+    │
+ 81 │     constant half = 10::divide(by 2, defaultingTo 0/1)
+    │                                      ────────┬───────  
+    │                                              ╰───────── this fallback can never be read
+    │ 
+    │ Help: Drop the 'defaultingTo' Argument; the call already answers a Rational.
+    │ 
+    │ Note: Without it the call answers a Rational, which is never empty.
+────╯
+
+─── 8 errors, 2 warnings
 "
 `;
 
