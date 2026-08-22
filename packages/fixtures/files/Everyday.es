@@ -36,7 +36,7 @@ implementation {
 	Terminal.inspect(scores::sum()) § 6
 	Terminal.inspect([1, 1/2, 1/2]::sum()) § 2 — a whole mixed sum is an Integer
 	Terminal.inspect([1/2, 2/3]::product()) § 1/3
-	Terminal.inspect([1, 2]::average(defaultingTo 0/1)) § 3/2
+	Terminal.inspect([1, 2]::average()) § 3/2 — the brackets prove there is one
 
 	§ The sign Methods reach the whole tower.
 	Terminal.inspect(Number.Pi::negate()::absolute()) § π
@@ -52,12 +52,16 @@ implementation {
 	§ Splitting a String answers a List, and joining that List answers a String.
 	Terminal.inspect("a,b,c"::split(on ",")::join(with " + ")) § "a + b + c"
 
-	§ A Method that can answer empty takes the fallback itself.
-	Terminal.inspect([1, 2, 3]::firstItem(defaultingTo 0)) § 1
+	§ A written List holds an item, so its first one is an Integer. A call
+	§ that can still answer empty takes the fallback itself.
+	Terminal.inspect([1, 2, 3]::firstItem()) § 1
 	Terminal.inspect([1]::removeFirst()::firstItem(defaultingTo 99)) § 99
 
-	§ An Optional already held in data collapses with `value(defaultingTo:)`.
-	constant reciprocalPower = 2::raise(to -2)
+	§ A power is empty only where a zero base meets a negative exponent, and a
+	§ base the Program computed might be zero. An Optional held in data
+	§ collapses with `value(defaultingTo:)`.
+	constant base            = 1::add(1)
+	constant reciprocalPower = base::raise(to -2)
 	Terminal.inspect(reciprocalPower::value(defaultingTo 0)) § 1/4
 
 	§ Sorting reads the items' own `Comparable`, so no comparison is written here.
