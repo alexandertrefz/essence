@@ -1374,6 +1374,53 @@ overlapped by Type stay exactly as they were.
 Where a default was written to replace a shorter entry, delete the shorter
 entry: the default already means it.
 
+### `fallback-never-used`
+
+A Warning, tagged `unnecessary`: a call writes a `defaultingTo` Argument that
+can never be read, because the same call answers a bare value without it. Given
+a `constant scores: NonEmptyList<Integer>`, `scores::firstItem()` answers an
+`Integer`, so `scores::firstItem(defaultingTo 0)` answers that same `Integer`
+and the `0` is dead text.
+
+The proof is what makes it dead. A `NonEmptyList` receiver, an Integer divisor
+written as a literal, a separator that visibly has characters — each one reaches
+an entry that answers bare, and the entry beside it that answers an `Optional`
+is the one the fallback was written for. A checked refinement ADDS Methods and
+takes none away, so `namespace NonEmptyList` can answer `firstItem()` bare and
+still not hide `List::firstItem(defaultingTo:)`. This Warning is the only thing
+that can say so.
+
+The call is refused nothing and compiles as it stands. Drop the Argument.
+
+The rule is the label, not a list of Methods: an Invocation that writes an
+Argument labelled `defaultingTo` is resolved a second time without it, and the
+Warning is reported when that second resolution answers a Type that is not an
+`Optional`. A Namespace of your own following the same convention is read the
+same way.
+
+Four things have to hold before anything is said, because the Warning claims the
+PROOF is what made the fallback dead:
+
+- The bare call answers something that is not an `Optional`.
+  `list::firstItem(where check, defaultingTo 0)` can still find nothing, so its
+  fallback is live.
+- The bare call resolves to something at all. `Optional::value(defaultingTo:)`
+  declares no bare `value()`, so its fallback is always live.
+- The bare call reaches a DIFFERENT entry. A `defaultingTo` Parameter carrying
+  a default value is filled in by the callee, so striking the Argument lands on
+  the very entry the call already selected — one entry asked twice, proving
+  nothing, while the Argument that was written is still read at run time.
+- That entry is one the proof unlocked. The call is resolved a third time with
+  the proof erased — the receiver widened to the Type it is refined from, and
+  no written value admitted to a refinement — and an entry still reachable then
+  was never the proof's doing. An Overload whose other entry answers bare for
+  reasons of its own is left alone.
+
+Note that a written literal proves things about a call's ARGUMENTS and not about
+its receiver, so `[1, 2, 3]::firstItem(defaultingTo 0)` says nothing: the
+receiver is a plain `List<Integer>` and the fallback is live. Bind it to a
+`NonEmptyList<Integer>` first, the way `scores` above is.
+
 ## Choices
 
 ### `empty-choice`
