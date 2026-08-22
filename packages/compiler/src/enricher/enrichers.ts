@@ -7307,6 +7307,7 @@ type RefinementCandidates = {
 // Arguments, with the refinement one level in — which is why the two are collected
 // through one walk and kept apart, under the one `seen` set: `NonEmptyList` occupies
 // its name in the Type Scope exactly as `NonZeroInteger` occupies its own.
+//
 // NOTE: Walked with `for...in` rather than over `Object.entries`, which
 // allocated a pair for every Type name in every Scope on the chain — the
 // standard library's names among them. A written RECEIVER asks this of every

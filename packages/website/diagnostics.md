@@ -1421,10 +1421,10 @@ PROOF is what made the fallback dead:
   was never the proof's doing. An Overload whose other entry answers bare for
   reasons of its own is left alone.
 
-Note that a written literal proves things about a call's ARGUMENTS and not about
-its receiver, so `[1, 2, 3]::firstItem(defaultingTo 0)` says nothing: the
-receiver is a plain `List<Integer>` and the fallback is live. Bind it to a
-`NonEmptyList<Integer>` first, the way `scores` above is.
+A written value proves what it can wherever it stands, as an Argument and as a
+RECEIVER both — so `[1, 2, 3]::firstItem(defaultingTo 0)` is warned about too:
+the brackets say the List holds an item, `firstItem()` answers one, and the `0`
+is as dead as it is beside the `scores` above.
 
 ## Choices
 

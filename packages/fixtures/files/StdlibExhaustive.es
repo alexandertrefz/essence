@@ -669,8 +669,8 @@ third"::lines())
 	§ ——— NonZeroInteger ———————————————————————————————————————————————————
 	§ The Methods a proven Integer has that a bare one does not. The closing
 	§ `multiply` entry needs both operands proven, and a value written down is
-	§ its own proof — so the receiver is declared and the Argument is written
-	§ where it stands. The two irrational entries spend the receiver's proof
+	§ its own proof — as a receiver as much as as an Argument. The receivers are
+	§ declared all the same, so that the Integer entries above keep their calls. The two irrational entries spend the receiver's proof
 	§ alone, and so does `raise`: a base that is not zero has a power at every
 	§ exponent, negative ones included. Its second entry takes the exponent's
 	§ proof as well, so the base entry is reached with a computed one.
@@ -696,9 +696,9 @@ third"::lines())
 	show("NonZeroInteger.raise(to: NonNegativeInteger)", provenSix::raise(to 2))
 
 	§ ——— NonNegativeInteger ————————————————————————————————————————————————
-	§ The one Method a sign proves. A written literal does not refine the
-	§ RECEIVER of a call, so `4::squareRoot()` above reaches Integer's entry and
-	§ answers an Optional; the proof has to be on a declared value.
+	§ The one Method a sign proves. The receivers are declared rather than
+	§ written, so that the calls above keep reaching Integer's own entry: a
+	§ written `4` proves its sign for itself and comes here instead.
 	constant provenFour: NonNegativeInteger  = 4
 	constant provenThree: NonNegativeInteger = 3
 	constant provenZero: NonNegativeInteger  = 0

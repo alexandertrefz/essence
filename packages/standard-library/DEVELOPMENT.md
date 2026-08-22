@@ -195,12 +195,10 @@ reaches the `NonZeroInteger` entry, since a written `2` proves the factor away,
 and answers a bare `Transcendental` — `Number.Pi::add(Number.Pi)` still answers
 the Union. What a bodied `Tau` would cost the emission band is unweighed, so it
 stays value-less with the other two. `Number.GoldenRatio` alone has an Essence
-spelling — a half plus half of `5::squareRoot()` — but a written receiver does
-not refine, so that call reaches `Integer`'s own entry and answers an
-`Optional<Integer | Algebraic>` the `Algebraic` annotation refuses.
-`NonNegativeInteger`'s entry answers `Integer | Algebraic`, a Union that
-annotation refuses just the same, so `GoldenRatio` stays value-less with the
-others. So the band is
+spelling — a half plus half of `5::squareRoot()` — and a written receiver proves
+its own sign, so that call reaches `NonNegativeInteger`'s entry and answers
+`Integer | Algebraic`. That is a Union the `Algebraic` annotation refuses, so
+`GoldenRatio` stays value-less with the others. So the band is
 exercised through `useStdlib`
 (`packages/compiler/src/enricher/stdlib.ts`), the seam that swaps the
 process-wide library for one a test wrote, until a Property that can carry a
@@ -333,8 +331,12 @@ level Generic here is written `<infer Result>` or
 
 **A written literal is its own refinement proof.** The Compiler reads the value
 of a literal, so `2` is a NonZeroInteger. `@::remainder(dividingBy 2)` answers a
-bare Integer, and there is no Optional to take apart. A value the Program is
-handed carries no such proof and goes through the predicate instead.
+bare Integer, and there is no Optional to take apart. It proves the same things
+where it stands as the RECEIVER: `4::squareRoot()` reaches
+`namespace NonNegativeInteger` and `[1, 2]::firstItem()` reaches
+`namespace NonEmptyList`. A value the Program is handed carries no such proof
+and goes through the predicate instead — which is why a body or a harness that
+has to reach the unproven entry computes its operand.
 
 **A written Method REPLACES a Protocol's provided one on that Namespace's own
 rung.** `Equatable` writes `isNot` and `Orderable` writes six Methods, and every
@@ -549,7 +551,11 @@ rule stated there.
   something in it still has something in it. A refined receiver reaches every
   Namespace its base reaches and this one besides, so the refined target beats
   the base target for a Method both declare; a List nothing proved anything
-  about does not reach it at all. None of the three can be written in Essence,
+  about does not reach it at all. A receiver WRITTEN where it stands proves the
+  same things for itself — `[1, 2]::firstItem()` answers an Integer — so the
+  entries a proof unlocks are reached by a literal as much as by a narrowed
+  name. Two refined targets neither of which is narrower than the other leave
+  the call `ambiguous-namespace`, exactly as two unrefined ones do. None of the three can be written in Essence,
   which is the point rather than a gap: a refinement erases before anything
   runs, so a native is what spending the evidence looks like. `length` is the
   plainest case — an Essence body could only write `@::length()`, which is that
