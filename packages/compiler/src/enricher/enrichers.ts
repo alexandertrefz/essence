@@ -13515,8 +13515,11 @@ function collapsedLeaf(
 // writes it as `@::isGreaterThan(n)`, so a receiver of Rank's proves the leaf
 // both spellings mean.
 //
-// An OVERLOADED Method is left as it stands — which entry a leaf names is the
-// Arguments' business, and nothing here resolves one.
+// An OVERLOADED Method ENDS the walk: which entry a leaf names is the Arguments'
+// business, and a leaf carries scalars where an Overload is chosen by typed,
+// labelled Arguments. So the leaf stays the name it had, which is a question a
+// refinement spelled the same way still matches and a refinement spelled as the
+// entry's own body does not.
 function throughWitness(
 	leaf: common.PredicateConjunct,
 	scope: enricher.Scope,
@@ -13993,7 +13996,9 @@ function booleanEntryOf(
 // The receiver may be `@` or a bare name, since a body may write the ordering
 // backwards (`<- other::isGreaterThanOrEqualTo(@)`). Which of the two it was is
 // settled once the call is enriched and the name has a Parameter to be.
-function aliasBodyOf(definition: parser.FunctionDefinitionNode): AliasBody | null {
+function aliasBodyOf(
+	definition: parser.FunctionDefinitionNode,
+): AliasBody | null {
 	if (definition.body.length !== 1) {
 		return null
 	}
@@ -14051,7 +14056,9 @@ function aliasCallOf(expression: parser.ExpressionNode): AliasBody | null {
 // Exactly that shape and no other: the `if` is the whole body, each branch
 // answers one written Boolean, and the two differ. `{ <- true } else { <- false }`
 // is the call itself; `{ <- false } else { <- true }` is the call negated.
-function aliasIfShapeOf(statement: parser.IfElseStatementNode): AliasBody | null {
+function aliasIfShapeOf(
+	statement: parser.IfElseStatementNode,
+): AliasBody | null {
 	let answered = returnedBooleanOf(statement.trueBody)
 	let otherwise = returnedBooleanOf(statement.falseBody)
 

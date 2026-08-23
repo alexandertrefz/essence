@@ -164,6 +164,12 @@ declarations {
 		§§ @param _ — the String to look for
 		§§ @returns — `true` when it does not occur.
 		doesNotContain(_ other: String) -> Boolean {
+			§ This body is read as well as run, and so are the two
+			§ `doesNot` bodies below it. Each asks its contrary's
+			§ question over whatever bound the call writes, so the `else`
+			§ of an `if` proves a refinement written on either name.
+			§ Moving one of the three to native would take that away. See
+			§ DEVELOPMENT.md, Why bodies look the way they do.
 			<- @::contains(other)::negate()
 		}
 
