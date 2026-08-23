@@ -1077,6 +1077,45 @@ declarations {
 				<- @::highestItem(on key)::value(defaultingTo fallback)
 			}
 		}
+
+		§ Keeping from an end, which is what `removeFirst` and `removeLast`
+		§ answer the other way round. Both take a count rather than a
+		§ position. A count is lenient here as everywhere in the library.
+		§ Nothing is kept for a count below one, and everything for a count
+		§ past the length.
+		§
+		§ Each guards its count before handing it to `slice`, which reads a
+		§ negative Argument as a position counting back from the end. A
+		§ `slice(from 0)` is the whole List, so a count of zero would keep
+		§ everything without the guard.
+
+		§§ Answers a new List of the leading items, up to the given count.
+		§§
+		§§ A count below one answers the empty List. A count past the length answers every item.
+		§§
+		§§ @param _ — how many leading items to keep
+		§§ @returns — the List of leading items, in the order they were in.
+		firstItems(_ count: Integer) -> List<ItemType> {
+			if count::isLessThan(1) {
+				<- []
+			} else {
+				<- @::slice(to count)
+			}
+		}
+
+		§§ Answers a new List of the trailing items, up to the given count.
+		§§
+		§§ A count below one answers the empty List. A count past the length reaches back past the start, where `slice` settles on zero, so it answers every item.
+		§§
+		§§ @param _ — how many trailing items to keep
+		§§ @returns — the List of trailing items, in the order they were in.
+		lastItems(_ count: Integer) -> List<ItemType> {
+			if count::isLessThan(1) {
+				<- []
+			} else {
+				<- @::slice(from count::negate())
+			}
+		}
 	}
 
 	§ A List of Lists, and the one Method only such a List can answer. Its
