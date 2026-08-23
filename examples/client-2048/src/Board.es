@@ -42,8 +42,6 @@ implementation {
 
 	constant last = size::subtract(1)
 
-	constant indices = List.of(integersFrom 0, through last)
-
 	§ The annotation is what tells `#Up` apart from the standard library's
 	§ `Rounding#Up`.
 	constant directions: List<Direction> = [#Up, #Down, #Left, #Right]
@@ -78,17 +76,14 @@ implementation {
 		§§ — and the row is padded back to its length.
 		slide() -> Slid {
 			§ Each tile beside the position it started at.
-			constant tiles = @::pair(with indices)
-				::everyItem(where ({ first }) { <- first::isNot(0) })
+			constant tiles = @::enumerate()
+				::everyItem(where ({ item }) { <- item::isNot(0) })
 
 			§ One walk over the tiles. `open` is false right after a merge, so
 			§ a tile merges once.
 			constant merged = tiles::reduce(
 				startingWith nothingMerged,
-				(
-					{ placed, gained, open },
-					{ first as tile, second as origin },
-				) {
+				({ placed, gained, open }, { index as origin, item as tile }) {
 					constant previous = placed::lastItem()
 
 					§ `lastItem` is an Optional; a Match takes it apart, and
@@ -149,9 +144,15 @@ implementation {
 		transpose() -> Board {
 			constant board = @
 
-			<- indices::map((column) {
-				<- board::map((row) { <- row::item(at column, defaultingTo 0) })
-			})
+			§ A board is square, so the positions its rows stand at are the
+			§ positions inside a row as well.
+			<- board
+				::indices()
+				::map((column) {
+					<- board::map((row) {
+						<- row::item(at column, defaultingTo 0)
+					})
+				})
 		}
 
 		§§ Every row reversed.
@@ -165,11 +166,11 @@ implementation {
 		slideRows() -> Pushed {
 			constant slid = @::map((row) { <- row::slide() })
 
-			constant movements = slid::pair(with indices)
-				::map(({ first as { placed }, second as row }) {
+			constant movements = slid::enumerate()
+				::map(({ index as row, item as { placed } }) {
 					<- placed
-						::pair(with indices)
-						::map(({ first as { sources }, second as column }) {
+						::enumerate()
+						::map(({ index as column, item as { sources } }) {
 							<- sources
 								::everyItem(where (source) {
 									<- source::isNot(column)
@@ -238,27 +239,31 @@ implementation {
 		§§ Every empty square, row by row — where a new tile may go. The
 		§§ host picks one; this side has no dice, and needs none.
 		emptyCells() -> List<Cell> {
-			<- @::pair(with indices)
-				::map(({ first as row, second as rowIndex }) {
-					<- row::pair(with indices)
-						::everyItem(where ({ first }) { <- first::is(0) })
-						::map(({ second }) {
-							<- { row = rowIndex, column = second }
+			<- @::enumerate()
+				::map(({ index as rowIndex, item as row }) {
+					<- row::enumerate()
+						::everyItem(where ({ item }) { <- item::is(0) })
+						::map(({ index }) {
+							<- { row = rowIndex, column = index }
 						})
 				})
 				::flatten()
 		}
 
-		§§ The board with one tile set. A cell off the board changes nothing.
+		§§ The board with one tile set. A row off the board changes nothing.
 		place(_ value: Integer, at cell: Cell) -> Board {
-			<- @::pair(with indices)
-				::map(({ first as row, second as rowIndex }) {
-					if rowIndex::is(cell.row) {
-						<- row::replace(value, at cell.column)
-					}
-
-					<- row
+			§ One row is rebuilt, and every other rides along. The guard is
+			§ what the alternative — a walk comparing each position against
+			§ `cell.row` — gives for free: a negative position counts back
+			§ from the end at both `replace` entries, so without it a row of
+			§ -1 would set a tile on the last row.
+			if cell.row::isLessThan(0) {
+				<- @
+			} else {
+				<- @::replace(at cell.row, (row) {
+					<- row::replace(value, at cell.column)
 				})
+			}
 		}
 
 		§§ The highest tile on the board.
@@ -461,9 +466,15 @@ tests {
 			expect Board.empty::highest()::is(0)
 		}
 
+		§ Both ways off: a row past the last one, and a row before the first.
+		§ The second is the one `place` guards for itself, since `replace`
+		§ reads a negative position as a count back from the end.
 		test "changes nothing for a square off the board" {
 			expect Board.empty
 				::place(2, at { row = 9, column = 9 })
+				::is(Board.empty)
+			expect Board.empty
+				::place(2, at { row = -1, column = 0 })
 				::is(Board.empty)
 		}
 

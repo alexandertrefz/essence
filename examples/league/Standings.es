@@ -156,13 +156,12 @@ implementation {
 		§§ The last `count` outcomes, oldest first — the form guide, which is
 		§§ five long unless asked otherwise.
 		recentForm(_ count: Integer = 5) -> List<Outcome> {
-			constant start = @.form::length()::subtract(count)
-
-			if start::isPositive() {
-				<- @.form::slice(from start)
-			}
-
-			<- @.form
+			§ A count is lenient here as everywhere in the library, so a form
+			§ shorter than the count is answered whole. The alternative is
+			§ `slice(from length::subtract(count))`, which needs a guard of
+			§ its own: the subtraction goes negative on a short form, and a
+			§ negative position counts back from the end.
+			<- @.form::lastItems(count)
 		}
 	}
 

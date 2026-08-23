@@ -60,27 +60,26 @@ implementation {
 	Terminal.print("")
 
 	§ The biggest win of the season. Only a played match has a margin, so the
-	§ fold does the filtering: a played fixture adds its margin, and every
-	§ other Case hands the List on as it was. `highestItem(on:)` then asks the
-	§ question outright, reading the key with a member path — a Record has no
-	§ natural order of its own, and the margin inside it does.
+	§ Match answers one where there is one and nothing where there is not, and
+	§ `values()` keeps what is there. `highestItem(on:)` then asks the question
+	§ outright, reading the key with a member path — a Record has no natural
+	§ order of its own, and the margin inside it does.
 	type Margin = { fixture: Fixture, margin: Integer }
 
-	constant margins: List<Margin> = fixtures::reduce(
-		startingWith [],
-		(found, fixture) {
-			<- match fixture -> List<Margin> {
+	constant margins: List<Margin> = fixtures
+		::map((fixture) {
+			<- match fixture -> Optional<Margin> {
 				case #Played({ homeGoals, awayGoals }) {
-					<- found::append({
+					<- #Value({
 						fixture,
 						margin = homeGoals::subtract(awayGoals)::absolute(),
 					})
 				}
-				case #Forfeited                        { <- found }
-				case #Postponed                        { <- found }
+				case #Forfeited                        { <- #Empty }
+				case #Postponed                        { <- #Empty }
 			}
-		},
-	)
+		})
+		::values()
 
 	constant widest = margins::highestItem(on .margin)
 
