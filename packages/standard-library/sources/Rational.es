@@ -259,7 +259,7 @@ declarations {
 
 		§§ Answers the Rational as a String, in lowest terms.
 		§§
-		§§ The form is `3/4` when no format is named, and the named format otherwise. A whole Rational prints its numerator alone, so `1/2::add(1/2)` prints `1` and `10::divide(by 2)` prints `5`. The `Rational.parse` Method reads every one of these forms. The fraction form reads back as the same Rational. A decimal form does too when its expansion ends within 80 digits, and reads back as the rounded value otherwise.
+		§§ The form is `3/4` when no format is named, and the named format otherwise. A whole Rational prints its numerator alone, so `1/2::add(1/2)` prints `1` and `10::divide(by 2)` prints `5`. The `Rational.parse` Method reads every one of these forms. The fraction form reads back as the same Rational. A decimal form does too when its expansion ends within 80 digits, and reads back as the rounded value otherwise. Naming a count of places writes exactly that many digits after the point.
 		§§
 		§§ @returns — the String representation of the Rational.
 		overload toString {
@@ -283,6 +283,19 @@ declarations {
 
 			§§ @param as — the form to represent the Rational in
 			(as format: NumberFormat) -> String
+
+			§ Native beside the entry above, and written on the same long
+			§ division. An Essence body would have to pad and cut the text
+			§ that entry answers, which is reading a number back out of its
+			§ own rendering.
+
+			§§ Answers the Rational as a decimal with exactly that many places.
+			§§
+			§§ The digits are padded with zeroes where the expansion is shorter, so `1/2` over two places is `0.50`. The last digit kept is rounded to the nearest, with halves away from zero, so `1/8` is `0.13`. A count below one answers the whole part alone. The `#Fraction` format ignores the count.
+			§§
+			§§ @param as — the form to represent the Rational in
+			§§ @param places — how many digits to write after the point
+			(as format: NumberFormat, places count: Integer) -> String
 		}
 
 		§ The Integer entries are written on the accessors and `Rational.of`, so
@@ -603,63 +616,94 @@ declarations {
 			}
 		}
 
-		§§ Answers the Rational as an Integer, rounded in the named direction.
+		§§ Answers the Rational rounded in the named direction.
 		§§
-		§§ The direction is `#Nearest` when a call names none. A value exactly halfway between two Integers rounds away from zero, so `1/2` answers `1` and `-1/2` answers `-1`. The other directions answer the floor for `#Down`, the ceiling for `#Up`, and the Integer part for `#TowardZero`.
-		§§
-		§§ @param toward — the direction to round in, `#Nearest` when it is left out
-		§§ @returns — the rounded Integer.
-		round(toward direction: Rounding = #Nearest) -> Integer {
-			§ The denominator is positive in lowest terms, so the Euclidean
-			§ quotient is the floor, and every branch below is written on it.
-			§ A NonZeroInteger divisor makes `quotient` total.
-			constant floored = @::numerator()
-				::quotient(dividingBy @::denominator())
+		§§ The direction is `#Nearest` when a call names none. A value exactly halfway between two steps rounds away from zero, so `1/2` answers `1` and `-1/2` answers `-1`. The other directions answer the floor for `#Down`, the ceiling for `#Up`, and the value towards zero for `#TowardZero`. Naming a count of places rounds to a decimal grid of that width instead, and answers a Rational.
+		overload round {
+			§§ Answers the Rational as an Integer, rounded in the named direction.
+			§§
+			§§ @param toward — the direction to round in, `#Nearest` when it is left out
+			§§ @returns — the rounded Integer.
+			(toward direction: Rounding = #Nearest) -> Integer {
+				§ The denominator is positive in lowest terms, so the Euclidean
+				§ quotient is the floor, and every branch below is written on it.
+				§ A NonZeroInteger divisor makes `quotient` total.
+				constant floored = @::numerator()
+					::quotient(dividingBy @::denominator())
 
-			constant isWhole = @::isWholeNumber()
+				constant isWhole = @::isWholeNumber()
 
-			§ `@` is rebound inside `match`; see DEVELOPMENT.md, Why bodies
-			§ look the way they do.
-			constant value = @
+				§ `@` is rebound inside `match`; see DEVELOPMENT.md, Why bodies
+				§ look the way they do.
+				constant value = @
 
-			<- match direction -> Integer {
-				case #Down { <- floored }
+				<- match direction -> Integer {
+					case #Down { <- floored }
 
-				case #Up {
-					§ A whole Rational is its own ceiling.
-					if isWhole {
-						<- floored
-					} else {
-						<- floored::add(1)
+					case #Up {
+						§ A whole Rational is its own ceiling.
+						if isWhole {
+							<- floored
+						} else {
+							<- floored::add(1)
+						}
+					}
+
+					case #TowardZero {
+						§ Cutting the fractional part off is the floor, except
+						§ for a negative value that is not whole, which takes
+						§ one step back towards zero.
+						if value::isLessThan(0/1)::and(isWhole::negate()) {
+							<- floored::add(1)
+						} else {
+							<- floored
+						}
+					}
+
+					case #Nearest {
+						§ Above a half the Integer above is nearer, and below
+						§ a half the floor is. A tie breaks away from zero,
+						§ which for a negative value is the floor.
+						constant fractionalPart = value::subtract(floored)
+
+						if fractionalPart::isGreaterThan(1/2) {
+							<- floored::add(1)
+						} else if fractionalPart::isLessThan(1/2) {
+							<- floored
+						} else if value::isLessThan(0/1) {
+							<- floored
+						} else {
+							<- floored::add(1)
+						}
 					}
 				}
+			}
 
-				case #TowardZero {
-					§ Cutting the fractional part off is the floor, except
-					§ for a negative value that is not whole, which takes
-					§ one step back towards zero.
-					if value::isLessThan(0/1)::and(isWhole::negate()) {
-						<- floored::add(1)
-					} else {
-						<- floored
-					}
-				}
+			§§ Answers the Rational rounded to a decimal grid of the given width.
+			§§
+			§§ Two places round to hundredths, so `5/3` answers `167/100`. The answer is exact, and it is a Rational rather than text: `toString(as #Decimal, places 2)` is what writes `1.67`. A count below one rounds to a whole number, answered as a Rational.
+			§§
+			§§ @param toPlaces — how many decimal places to keep
+			§§ @param toward — the direction to round in, `#Nearest` when it is left out
+			§§ @returns — the rounded Rational.
+			(
+				toPlaces places: Integer,
+				toward direction: Rounding = #Nearest,
+			) -> Rational {
+				§ Both powers are total: a written receiver proves what
+				§ `raise` asks of it, and the `if` proves the exponent is not
+				§ negative. The grid step is its own exact Rational rather
+				§ than a division. A divisor computed here carries no proof,
+				§ so dividing would answer an Optional.
+				if places::isPositive() {
+					constant scale = 10::raise(to places)
+					constant step  = 1/10::raise(to places)
 
-				case #Nearest {
-					§ Above a half the Integer above is nearer, and below
-					§ a half the floor is. A tie breaks away from zero,
-					§ which for a negative value is the floor.
-					constant fractionalPart = value::subtract(floored)
-
-					if fractionalPart::isGreaterThan(1/2) {
-						<- floored::add(1)
-					} else if fractionalPart::isLessThan(1/2) {
-						<- floored
-					} else if value::isLessThan(0/1) {
-						<- floored
-					} else {
-						<- floored::add(1)
-					}
+					<- @::multiply(with scale)
+						::round(toward direction)
+						::multiply(with step)
+				} else {
+					<- Rational.of(@::round(toward direction), over 1)
 				}
 			}
 		}

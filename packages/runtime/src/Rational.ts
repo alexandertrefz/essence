@@ -364,6 +364,43 @@ function formatAsDecimal(rational: RationalType): string {
 	return `${sign}${wholePart}.${digits.join("")}`
 }
 
+// NOTE: The same long division as `formatAsDecimal`, over a fixed width: the
+// magnitude is scaled by a power of ten first, so the quotient IS the digit
+// string and the remainder decides the one rounding. Halves go away from zero,
+// which is what `round` does and what the cut digit above does. A width below
+// one is the whole part alone, and no dot is written for it.
+//
+// NOTE: The sign is prefixed only where something is left of it, so a value
+// that rounds to nothing prints `0.00` rather than `-0.00`.
+function formatAsFixedDecimal(rational: RationalType, places: number): string {
+	let parts = reducedParts(rational)
+	let isNegative = parts.numerator < 0n
+	let magnitude = isNegative ? -parts.numerator : parts.numerator
+	let scale = places < 1 ? 1n : 10n ** BigInt(places)
+	let scaled = magnitude * scale
+
+	let digits = scaled / parts.denominator
+	let remainder = scaled % parts.denominator
+
+	if (remainder * 2n >= parts.denominator) {
+		digits = digits + 1n
+	}
+
+	let sign = isNegative && digits !== 0n ? "-" : ""
+
+	if (places < 1) {
+		return `${sign}${digits}`
+	}
+
+	// NOTE: Padded to one digit more than the width, so that a value below one
+	// keeps the `0` in front of its point.
+	let text = digits.toString().padStart(places + 1, "0")
+
+	return `${sign}${text.slice(0, text.length - places)}.${text.slice(
+		text.length - places,
+	)}`
+}
+
 // #region toString
 
 // NOTE: The format arrives as a `NumberFormat` Case rather than a String, so
@@ -375,6 +412,23 @@ export function toString__overload$2(
 ): StringType {
 	if (format[typeKeySymbol] === "NumberFormat#Decimal") {
 		return createString(formatAsDecimal(rational))
+	} else {
+		return createString(formatAsFraction(rational))
+	}
+}
+
+// NOTE: The width is meaningless to a fraction — `3/4` has no digits after a
+// point to count — so `#Fraction` answers what the entry above answers for it
+// and ignores the count, as the declaration says it does.
+export function toString__overload$3(
+	rational: RationalType,
+	format: NumberFormatType,
+	places: IntegerType,
+): StringType {
+	if (format[typeKeySymbol] === "NumberFormat#Decimal") {
+		return createString(
+			formatAsFixedDecimal(rational, Number(places.value)),
+		)
 	} else {
 		return createString(formatAsFraction(rational))
 	}

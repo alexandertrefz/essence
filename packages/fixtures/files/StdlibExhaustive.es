@@ -963,6 +963,30 @@ third"::lines())
 		"Rational.round(toward?: Rounding) [below a half]",
 		1/4::round(toward #Nearest),
 	)
+	show(
+		"Rational.round(toPlaces: Integer, toward?: Rounding)",
+		5/3::round(toPlaces 2),
+	)
+	show(
+		"Rational.round(toPlaces: Integer, toward?: Rounding) [negative]",
+		-5/3::round(toPlaces 2),
+	)
+	show(
+		"Rational.round(toPlaces: Integer, toward?: Rounding) [a half rounds away from zero]",
+		1/8::round(toPlaces 2),
+	)
+	show(
+		"Rational.round(toPlaces: Integer, toward?: Rounding) [down]",
+		5/3::round(toPlaces 1, toward #Down),
+	)
+	show(
+		"Rational.round(toPlaces: Integer, toward?: Rounding) [no places]",
+		2/3::round(toPlaces 0),
+	)
+	show(
+		"Rational.round(toPlaces: Integer, toward?: Rounding) [a count below one]",
+		2/3::round(toPlaces -1),
+	)
 	§ The same split `Integer::raise` makes, and the same computed exponents
 	§ keep these calls on the entry answering an Optional.
 	show("Rational.raise(to: Integer)", 2/3::raise(to computedTwo))
@@ -1032,6 +1056,30 @@ third"::lines())
 	show(
 		"Rational.toString(as: NumberFormat) [fraction, whole]",
 		4/2::toString(as NumberFormat#Fraction),
+	)
+	show(
+		"Rational.toString(as: NumberFormat, places: Integer)",
+		5/3::toString(as NumberFormat#Decimal, places 2),
+	)
+	show(
+		"Rational.toString(as: NumberFormat, places: Integer) [padded]",
+		1/2::toString(as NumberFormat#Decimal, places 2),
+	)
+	show(
+		"Rational.toString(as: NumberFormat, places: Integer) [negative]",
+		-5/3::toString(as NumberFormat#Decimal, places 2),
+	)
+	show(
+		"Rational.toString(as: NumberFormat, places: Integer) [a half rounds away from zero]",
+		1/8::toString(as NumberFormat#Decimal, places 2),
+	)
+	show(
+		"Rational.toString(as: NumberFormat, places: Integer) [no places]",
+		2/3::toString(as NumberFormat#Decimal, places 0),
+	)
+	show(
+		"Rational.toString(as: NumberFormat, places: Integer) [fraction ignores the count]",
+		3/4::toString(as NumberFormat#Fraction, places 2),
 	)
 	show("Rational.compare(to: Rational)", 1/2::compare(to 2/3))
 	show("Rational.compare(to: Rational) [equal]", 1/2::compare(to 2/4))
