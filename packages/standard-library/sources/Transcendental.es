@@ -40,8 +40,20 @@ declarations {
 		§§
 		§§ Two Transcendentals can cancel their π and e terms, which leaves a Rational.
 		overload add {
+			§§ Adds an Integer to the Transcendental.
+			§§
+			§§ The sum is a Transcendental, since an Integer changes the rational part alone.
+			§§
+			§§ @param _ — the Integer to add
+			§§ @returns — the sum, as a Transcendental.
 			(_ other: Integer) -> Transcendental
 
+			§§ Adds a Rational to the Transcendental.
+			§§
+			§§ The sum is a Transcendental, since a Rational changes the rational part alone.
+			§§
+			§§ @param _ — the Rational to add
+			§§ @returns — the sum, as a Transcendental.
 			(_ other: Rational) -> Transcendental
 
 			§§ Answers the exact sum of the two Transcendentals.
@@ -54,14 +66,32 @@ declarations {
 		§§
 		§§ Subtracting equal π and e terms leaves a Rational.
 		overload subtract {
+			§§ Subtracts an Integer from the Transcendental.
+			§§
+			§§ The difference is a Transcendental, since an Integer changes the rational part alone.
+			§§
+			§§ @param _ — the Integer to subtract
+			§§ @returns — the difference, as a Transcendental.
 			(_ other: Integer) -> Transcendental {
 				<- @::add(other::negate())
 			}
 
+			§§ Subtracts a Rational from the Transcendental.
+			§§
+			§§ The difference is a Transcendental, since a Rational changes the rational part alone.
+			§§
+			§§ @param _ — the Rational to subtract
+			§§ @returns — the difference, as a Transcendental.
 			(_ other: Rational) -> Transcendental {
 				<- @::add(other::negate())
 			}
 
+			§§ Subtracts one Transcendental from another.
+			§§
+			§§ Equal π and e terms cancel, which leaves a Rational. Every other difference is a Transcendental.
+			§§
+			§§ @param _ — the Transcendental to subtract
+			§§ @returns — the difference, as a Rational or a Transcendental.
 			(_ other: Transcendental) -> Rational | Transcendental {
 				<- @::add(other::negate())
 			}
@@ -71,8 +101,20 @@ declarations {
 		§§
 		§§ Multiplying by zero answers zero. Multiplying by a NonZeroInteger or a NonZeroRational keeps every base term, so those entries answer a Transcendental. Two Transcendentals can not be multiplied: `π·π` and `π·e` leave the linear grammar.
 		overload multiply {
+			§§ Multiplies the Transcendental with an Integer.
+			§§
+			§§ The product is a Transcendental, since an Integer scales the rational part and every base term. A zero factor answers zero, which is a Rational.
+			§§
+			§§ @param with — the Integer to multiply with
+			§§ @returns — the product, as a Transcendental or a Rational.
 			(with other: Integer) -> Transcendental | Rational
 
+			§§ Multiplies the Transcendental with a Rational.
+			§§
+			§§ The product is a Transcendental, since a Rational scales the rational part and every base term. A zero factor answers zero, which is a Rational.
+			§§
+			§§ @param with — the Rational to multiply with
+			§§ @returns — the product, as a Transcendental or a Rational.
 			(with other: Rational) -> Transcendental | Rational
 
 			§§ Answers the exact product of the Transcendental and a factor proven not to be zero.
@@ -96,8 +138,20 @@ declarations {
 		§§
 		§§ Dividing by an Integer or a Rational is empty only for zero. Dividing by a NonZeroInteger or a NonZeroRational can not fail, because those divisors are proven. Dividing by another Transcendental answers a Rational when the two are proportional: `Tau::divide(by Pi)` is `2`. Anything else is empty. The `defaultingTo:` entries answer the given value in place of empty.
 		overload divide {
+			§§ Divides the Transcendental by an Integer.
+			§§
+			§§ The quotient is a Transcendental, since an Integer scales the rational part and every base term. A zero divisor answers empty, and the `defaultingTo:` entry answers the given value instead.
+			§§
+			§§ @param by — the Integer to divide by
+			§§ @returns — the quotient, or nothing when the divisor is zero.
 			(by other: Integer) -> Optional<Transcendental>
 
+			§§ Divides the Transcendental by a Rational.
+			§§
+			§§ The quotient is a Transcendental, since a Rational scales the rational part and every base term. A zero divisor answers empty, and the `defaultingTo:` entry answers the given value instead.
+			§§
+			§§ @param by — the Rational to divide by
+			§§ @returns — the quotient, or nothing when the divisor is zero.
 			(by other: Rational) -> Optional<Transcendental>
 
 			§§ Answers the exact quotient of the two Transcendentals.
