@@ -680,10 +680,11 @@ third"::lines())
 	§ The Methods a proven Integer has that a bare one does not. The closing
 	§ `multiply` entry needs both operands proven, and a value written down is
 	§ its own proof — as a receiver as much as as an Argument. The receivers are
-	§ declared all the same, so that the Integer entries above keep their calls. The two irrational entries spend the receiver's proof
-	§ alone, and so does `raise`: a base that is not zero has a power at every
-	§ exponent, negative ones included. Its second entry takes the exponent's
-	§ proof as well, so the base entry is reached with a computed one.
+	§ declared all the same, so that the Integer entries above keep their
+	§ calls. The two irrational entries spend the receiver's proof alone, and
+	§ so does `raise`: a base that is not zero has a power at every exponent,
+	§ negative ones included. Its second entry takes the exponent's proof as
+	§ well, so the base entry is reached with a computed one.
 	constant provenSix: NonZeroInteger = 6
 
 	show(
