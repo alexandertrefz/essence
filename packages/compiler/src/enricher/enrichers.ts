@@ -13437,15 +13437,8 @@ function reportInvalidPredicateLeaf(
 // body to read instead. Every bodied one is now read off its body — see
 // `derivePredicateAliases` — and this is what a bare signature falls back to.
 //
-// NOTE: The names are read only where the BASE itself answers them. These are
-// `Equatable`'s and `Orderable`'s vocabulary, and the standard library always
-// answers all three through the conforming Namespace — so the rewrite is taken
-// when the Namespace that answered is the receiver's own, or the covering
-// `Number` a bound of the other numeric kind falls to. A Program's
-// `namespace Tag for String { isLessThan(_ n: Integer) … }` means whatever its
-// body means, and is kept as it was written rather than turned into the negation
-// of a sibling that says something else. It is `narrowedBy`'s guard, and
-// `impliedConjunctKeys` reads the same one.
+// NOTE: The names are read only where the BASE itself answers them, which is
+// `narrowedBy`'s guard and the one `impliedConjunctKeys` reads.
 const PRIMITIVE_PREDICATES: ReadonlyMap<string, string> = new Map([
 	["isNot", "is"],
 	["isGreaterThanOrEqualTo", "isLessThan"],
@@ -13728,8 +13721,25 @@ type AliasCandidate = {
 type AliasContainer = {
 	selfNamespaceName: string | null
 	trustsOrdering: boolean
+	// NOTE: What `Self` stands for while a PROTOCOL's provided body is read —
+	// the Type Parameter BOUNDED by the Protocol, which is what makes a call on
+	// `@` resolve through the Protocol's own surface. A Namespace needs none:
+	// its receiver Parameter already names the Type it is for.
+	selfType?: common.Type
 	canonicalTarget?: (methodName: string) => common.BaseFunction | null
 }
+
+// NOTE: What one body came to. `Unresolved` is the reading that has to be
+// offered AGAIN: the call named a Namespace that had not hoisted yet, which is
+// what the two numeric kinds do to each other. `None` is settled — the body
+// says something a leaf can not, and no later round changes that.
+type AliasReading =
+	| { kind: "Alias"; candidate: AliasCandidate }
+	| { kind: "None" }
+	| { kind: "Unresolved" }
+
+const NO_ALIAS: AliasReading = { kind: "None" }
+const UNRESOLVED_ALIAS: AliasReading = { kind: "Unresolved" }
 
 // NOTE: What a Namespace's own Methods say about each other, written onto the
 // Method Types as the Namespace reaches Scope. A Method that answers a Boolean
@@ -13758,11 +13768,11 @@ export function derivePredicateAliases(
 	node: parser.NamespaceDefinitionStatementNode,
 	namespaceType: common.NamespaceType,
 	scope: enricher.Scope,
-): void {
+): boolean {
 	let targetType = namespaceType.targetType
 
 	if (targetType === null) {
-		return
+		return true
 	}
 
 	let container: AliasContainer = {
@@ -13776,8 +13786,8 @@ export function derivePredicateAliases(
 			refinableBaseTag(targetType),
 		),
 	}
-	let genericScope: enricher.Scope | null = null
 	let candidates: Array<AliasCandidate> = []
+	let complete = true
 
 	for (let [methodName, method] of Object.entries(node.methods)) {
 		for (let [index, value] of methodEntries(method).entries()) {
@@ -13795,27 +13805,26 @@ export function derivePredicateAliases(
 				continue
 			}
 
-			// NOTE: Built once and only where a candidate was found, because a
-			// Namespace without one has no use for the Scope at all.
-			genericScope ??= scopeWithGenerics(node.generics, scope)
-
-			let candidate = aliasCandidateOf(
+			let reading = aliasCandidateOf(
 				body,
 				value.value,
 				entry,
 				methodName,
-				targetType,
-				genericScope,
+				scope,
 				container,
 			)
 
-			if (candidate !== null) {
-				candidates.push(candidate)
+			if (reading.kind === "Alias") {
+				candidates.push(reading.candidate)
+			} else if (reading.kind === "Unresolved") {
+				complete = false
 			}
 		}
 	}
 
 	writePredicateAliases(candidates, container)
+
+	return complete
 }
 
 // NOTE: The same reading of a PROTOCOL's provided bodies, run as the Protocol
@@ -13838,9 +13847,15 @@ export function deriveProvidedPredicateAliases(
 	node: parser.ProtocolDeclarationStatementNode,
 	protocolType: common.ProtocolType,
 	scope: enricher.Scope,
-): void {
+): boolean {
+	let selfType: common.GenericUse = {
+		type: "GenericUse",
+		name: "Self",
+		constraint: node.name.content,
+	}
 	let container: AliasContainer = {
 		selfNamespaceName: null,
+		selfType,
 		// NOTE: A Protocol's `Self` is no base, so there is no ordering of one
 		// to read a flipped call against. Nothing in the standard library writes
 		// one, and a Protocol that did would keep it as the question it wrote.
@@ -13851,13 +13866,9 @@ export function deriveProvidedPredicateAliases(
 			return target?.type === "SimpleMethod" ? target : null
 		},
 	}
-	let selfType: common.GenericUse = {
-		type: "GenericUse",
-		name: "Self",
-		constraint: node.name.content,
-	}
 	let bodyScope: enricher.Scope | null = null
 	let candidates: Array<AliasCandidate> = []
+	let complete = true
 
 	for (let [methodName, method] of Object.entries(node.methods)) {
 		let body = protocolMethodBody(method)
@@ -13884,22 +13895,25 @@ export function deriveProvidedPredicateAliases(
 			providedMethodOf: node.name.content,
 		})
 
-		let candidate = aliasCandidateOf(
+		let reading = aliasCandidateOf(
 			shape,
 			body.value,
 			entry,
 			methodName,
-			selfType,
 			bodyScope,
 			container,
 		)
 
-		if (candidate !== null) {
-			candidates.push(candidate)
+		if (reading.kind === "Alias") {
+			candidates.push(reading.candidate)
+		} else if (reading.kind === "Unresolved") {
+			complete = false
 		}
 	}
 
 	writePredicateAliases(candidates, container)
+
+	return complete
 }
 
 // NOTE: A Method's bodied entries, in the order its Overloads are registered in,
@@ -14060,29 +14074,36 @@ function aliasCandidateOf(
 	definition: parser.FunctionDefinitionNode,
 	entry: common.BaseFunction,
 	methodName: string,
-	selfType: common.Type,
 	scope: enricher.Scope,
 	container: AliasContainer,
-): AliasCandidate | null {
+): AliasReading {
 	// NOTE: A Parameter list the signature does not agree with is a Method
 	// whose Types were never resolved — nothing to read a forwarded name off.
 	if (entry.parameterTypes.length !== definition.parameters.length + 1) {
-		return null
+		return NO_ALIAS
 	}
 
 	let { result, diagnostics } = collectDiagnostics(() =>
 		enrichExpression(
 			body.call,
-			aliasBodyScope(definition, entry, selfType, scope),
+			aliasBodyScope(definition, entry, scope, container),
 		),
 	)
 
+	// NOTE: A call that did not resolve is a call whose Namespace has not
+	// hoisted YET — the two numeric kinds name each other's Methods, and one of
+	// them reaches Scope first. Answered as unresolved rather than as no alias,
+	// so the reading is offered again once the round that hoists the other one
+	// is over.
+	if (containsErrors(diagnostics)) {
+		return UNRESOLVED_ALIAS
+	}
+
 	if (
-		containsErrors(diagnostics) ||
 		result.nodeType !== "MethodInvocation" ||
 		result.type.type !== "Boolean"
 	) {
-		return null
+		return NO_ALIAS
 	}
 
 	let slots = parameterSlotsOf(definition)
@@ -14092,7 +14113,7 @@ function aliasCandidateOf(
 		let slot = argumentSlotOf(argument.value, slots)
 
 		if (slot === null) {
-			return null
+			return NO_ALIAS
 		}
 
 		args.push(slot)
@@ -14101,47 +14122,83 @@ function aliasCandidateOf(
 	let converse = converseReceiverOf(result, args, slots)
 
 	if (result.base.nodeType !== "Self" && converse === null) {
-		return null
+		return NO_ALIAS
 	}
 
 	return {
-		methodName,
-		entry,
-		step: {
-			namespaceName:
-				container.selfNamespaceName === null
-					? null
-					: result.namespace.name,
-			methodName: result.member.name,
-			args,
-			negated: body.negated,
+		kind: "Alias",
+		candidate: {
+			methodName,
+			entry,
+			step: {
+				namespaceName:
+					container.selfNamespaceName === null
+						? null
+						: result.namespace.name,
+				methodName: result.member.name,
+				args,
+				negated: body.negated,
+			},
+			target:
+				container.canonicalTarget?.(result.member.name) ??
+				resolvedEntryOf(result) ??
+				null,
+			converse,
+			converseTrusted:
+				container.trustsOrdering &&
+				namespaceAnswersForBase(
+					result.namespace.name,
+					refinableBaseTag(result.base.type),
+				),
 		},
-		target:
-			container.canonicalTarget?.(result.member.name) ??
-			resolvedEntryOf(result) ??
-			null,
-		converse,
-		converseTrusted:
-			container.trustsOrdering &&
-			namespaceAnswersForBase(
-				result.namespace.name,
-				refinableBaseTag(result.base.type),
-			),
 	}
 }
 
-// NOTE: The Scope an alias body is read in — `@` bound to what the declaration
-// is about, the Method's own Type Parameters, and each Parameter under the name
-// its body calls it by.
+// NOTE: The Scope an alias body is read in — `@`, the Type Parameters, and each
+// Parameter under the name its body calls it by, every one of them read off the
+// RESOLVED signature. That is what makes a generic Method readable: an enclosing
+// Namespace's Type Parameters are merged into each signature, so the receiver's
+// `List<ItemType>` and the Argument's `ItemType` are one Parameter there, and a
+// bound the Method declares is on it. Resolving the written Types again would
+// give two.
 function aliasBodyScope(
 	definition: parser.FunctionDefinitionNode,
 	entry: common.BaseFunction,
-	selfType: common.Type,
 	scope: enricher.Scope,
+	container: AliasContainer,
 ): enricher.Scope {
-	let bodyScope = scopeWithRefinedSelf(
-		selfType,
-		scopeWithGenerics(definition.generics, scope),
+	let types: Record<string, common.Type> = {}
+	let bindings: GenericBindings = new Map()
+
+	// NOTE: The Method's own bound is on the Parameter it declares and NOT on
+	// the receiver, which was resolved where the Namespace's Type Parameter is
+	// bare — `List<ItemType>` against `item: ItemType is Equatable`. Bound into
+	// the receiver here, so that a call binding the items off `@` gets the
+	// Parameter the Method declared rather than the one it shadows.
+	for (let generic of entry.generics) {
+		let use: common.GenericUse = {
+			type: "GenericUse",
+			name: generic.name,
+			...(generic.constraint == null
+				? {}
+				: { constraint: generic.constraint }),
+		}
+
+		types[generic.name] = use
+		bindings.set(generic.name, use)
+	}
+
+	if (container.selfType !== undefined) {
+		bindings.set("Self", container.selfType)
+	}
+
+	let bodyScope = childScope(scope, { types })
+
+	declareVariableInScope(
+		"@",
+		aliasBodyType(entry.parameterTypes[0]?.type, bindings),
+		bodyScope,
+		true,
 	)
 
 	for (let [index, parameter] of definition.parameters.entries()) {
@@ -14152,11 +14209,30 @@ function aliasBodyScope(
 		// nothing it binds can be forwarded whole. The body simply reads names
 		// this Scope does not hold, and the reading refuses.
 		if (name !== null && type !== undefined) {
-			declareVariableInScope(name, type, bodyScope, true)
+			declareVariableInScope(
+				name,
+				aliasBodyType(type, bindings),
+				bodyScope,
+				true,
+			)
 		}
 	}
 
 	return bodyScope
+}
+
+// NOTE: A signature's Type with the bindings above applied, and untouched where
+// there is nothing to apply — which is every Method of a Namespace with no Type
+// Parameters, and so nearly all of them.
+function aliasBodyType(
+	type: common.Type | undefined,
+	bindings: GenericBindings,
+): common.Type {
+	if (type === undefined) {
+		return { type: "Unknown" }
+	}
+
+	return bindings.size === 0 ? type : applyGenericBindings(type, bindings)
 }
 
 // NOTE: Each Parameter's POSITION under the name the body reads it by. Positions
