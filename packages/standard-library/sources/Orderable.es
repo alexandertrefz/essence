@@ -24,6 +24,13 @@ declarations {
 	§ conform, so each of the six has two rungs on a numeric receiver. A
 	§ same-kind question is answered within the kind, and one across two
 	§ kinds falls to `Number`'s rung, with nothing widened at the call.
+	§
+	§ The two `…OrEqualTo` bodies are read as well as run. Each is one call
+	§ on `@` negated, over the bound it was handed. So a refinement written
+	§ on either name is the one written on the comparison it negates. The
+	§ conformer that answered gives the leaf its Namespace. `isLessThan`,
+	§ `isGreaterThan` and `isBetween` read a chain and stay questions of
+	§ their own. See DEVELOPMENT.md, Why bodies look the way they do.
 
 	§§ Anything on a line, where a value can be below another, between two others or pulled into a range.
 	protocol Orderable is Comparable {

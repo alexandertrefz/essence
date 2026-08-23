@@ -385,6 +385,13 @@ declarations {
 		§ runs them. Agreeing with `Orderable`'s bodies is a promise about
 		§ speed rather than one the language leans on, and both read `compare`
 		§ either way.
+		§
+		§ These bodies are read as well as run. The two `…OrEqualTo` entries
+		§ are one call on `@` negated, over the bound each was handed. The
+		§ flipped entries ask the same question of the same two numbers in the
+		§ other order, and are read as its converse. So each of the four is the
+		§ comparison it negates, and a refinement written on either name is one
+		§ Type. See DEVELOPMENT.md, Why bodies look the way they do.
 
 		§§ Answers whether this Integer is strictly below the given number.
 		overload isLessThan {

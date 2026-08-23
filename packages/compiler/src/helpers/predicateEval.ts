@@ -45,9 +45,15 @@ import {
 //
 // NOTE: The table is over the PRIMITIVES alone, because a conjunct is stored
 // resolved: `isZero` arrives as `is`, `hasCharacters` as a negated `isEmpty`,
-// `isGreaterThanOrEqualTo` as a negated `isLessThan`. Every Method the standard
-// library writes on another one is gone by the time a value is asked about it,
-// and what is left is the handful of questions that read a value directly.
+// `isGreaterThanOrEqualTo` as a negated `isLessThan` over the bound the call
+// wrote. Every Method the standard library writes on another one is gone by the
+// time a value is asked about it, and what is left is the handful of questions
+// that read a value directly.
+//
+// Which Methods those are is read off their BODIES rather than named anywhere,
+// so the list is not a promise this file may keep on its own: the census in
+// `stdlibLoader.spec.ts` is the whole of it, and a body rewritten to stop
+// forwarding puts a question here that nothing can decide.
 export function admittedByEvaluation(
 	refinement: common.RefinementType,
 	value: common.typed.ExpressionNode,
