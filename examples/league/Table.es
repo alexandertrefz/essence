@@ -76,11 +76,6 @@ implementation {
 			_ standings: NonEmptyList<Standing>,
 			titled title: String,
 		) -> String {
-			constant positions = List.of(
-				integersFrom 1,
-				through standings::length(),
-			)
-
 			constant header = ""::append(column("#", width 2))
 				::append("  ")
 				::append(label("Team", width nameWidth))
@@ -93,12 +88,12 @@ implementation {
 				::append(column("Pts", width 5))
 				::append("  Form")
 
-			§ `pair(with:)` walks the rows beside their positions and hands
-			§ each pair to a Pattern that names both halves.
+			§ `enumerate` walks the rows beside the positions they stand at,
+			§ and a table counts from one where a List counts from zero.
 			constant rows = standings
-				::pair(with positions)
-				::map(({ first as standing, second as position }) {
-					<- Table.row(standing, at position)
+				::enumerate()
+				::map(({ index, item }) {
+					<- Table.row(item, at index::add(1))
 				})
 
 			<- [title, "-"::repeat(times header::length()), header]

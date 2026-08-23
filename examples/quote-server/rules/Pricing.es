@@ -157,15 +157,14 @@ implementation {
 	function quote(_ order: Order) -> Quote {
 		constant checks = order.lines::map(checked)
 
-		constant problems: List<Problem> = checks::reduce(
-			startingWith [],
-			(found, check) {
-				<- match check -> List<Problem> {
-					case #Wrong({ problem }) { <- found::append(problem) }
-					case #Fine               { <- found }
+		constant problems: List<Problem> = checks
+			::map((check) {
+				<- match check -> Optional<Problem> {
+					case #Wrong({ problem }) { <- #Value(problem) }
+					case #Fine               { <- #Empty }
 				}
-			},
-		)
+			})
+			::values()
 
 		constant couponProblems = match order.coupon -> List<Problem> {
 			case #Value(code) {
@@ -187,17 +186,16 @@ implementation {
 			<- #Rejected({ problems = everyProblem })
 		}
 
-		constant fine: List<FineLine> = checks::reduce(
-			startingWith [],
-			(found, check) {
-				<- match check -> List<FineLine> {
+		constant fine: List<FineLine> = checks
+			::map((check) {
+				<- match check -> Optional<FineLine> {
 					case #Fine({ line, weightGrams }) {
-						<- found::append({ line, weightGrams })
+						<- #Value({ line, weightGrams })
 					}
-					case #Wrong                       { <- found }
+					case #Wrong                       { <- #Empty }
 				}
-			},
-		)
+			})
+			::values()
 
 		constant lines    = fine::map(.line)
 		constant subtotal = lines::sum(on .total)
