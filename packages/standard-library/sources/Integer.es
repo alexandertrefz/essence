@@ -172,6 +172,7 @@ declarations {
 			§§ The sum is an Integer.
 			§§
 			§§ @param _ — the Integer to add
+			§§ @returns — the sum.
 			(_ other: Integer) -> Integer
 
 			§§ Adds a Rational to this Integer.
@@ -179,6 +180,7 @@ declarations {
 			§§ The sum is a Rational, since it need not be whole.
 			§§
 			§§ @param _ — the Rational to add
+			§§ @returns — the sum.
 			(_ other: Rational) -> Rational {
 				<- other::add(@)
 			}
@@ -188,6 +190,7 @@ declarations {
 			§§ The sum stays exact. Shifting the rational part of `a + b·√d` leaves the radical untouched.
 			§§
 			§§ @param _ — the Algebraic to add
+			§§ @returns — the exact sum.
 			(_ other: Algebraic) -> Algebraic {
 				<- other::add(@)
 			}
@@ -197,6 +200,7 @@ declarations {
 			§§ The sum stays exact. Shifting the rational part of `a + b·π + c·e` leaves the base terms untouched.
 			§§
 			§§ @param _ — the Transcendental to add
+			§§ @returns — the exact sum.
 			(_ other: Transcendental) -> Transcendental {
 				<- other::add(@)
 			}
@@ -204,18 +208,42 @@ declarations {
 
 		§§ Subtracts a number from this Integer, staying exact for every member of the numeric tower.
 		overload subtract {
+			§§ Subtracts an Integer from this Integer.
+			§§
+			§§ The difference is an Integer.
+			§§
+			§§ @param _ — the Integer to subtract
+			§§ @returns — the difference.
 			(_ other: Integer) -> Integer {
 				<- @::add(other::negate())
 			}
 
+			§§ Subtracts a Rational from this Integer.
+			§§
+			§§ The difference is a Rational, since it need not be whole.
+			§§
+			§§ @param _ — the Rational to subtract
+			§§ @returns — the difference.
 			(_ other: Rational) -> Rational {
 				<- @::add(other::negate())
 			}
 
+			§§ Subtracts an Algebraic from this Integer.
+			§§
+			§§ The difference stays exact. Negating `a + b·√d` flips both parts and leaves the radical itself in place.
+			§§
+			§§ @param _ — the Algebraic to subtract
+			§§ @returns — the exact difference.
 			(_ other: Algebraic) -> Algebraic {
 				<- @::add(other::negate())
 			}
 
+			§§ Subtracts a Transcendental from this Integer.
+			§§
+			§§ The difference stays exact. Negating `a + b·π + c·e` flips every part and leaves the base terms in place.
+			§§
+			§§ @param _ — the Transcendental to subtract
+			§§ @returns — the exact difference.
 			(_ other: Transcendental) -> Transcendental {
 				<- @::add(other::negate())
 			}
@@ -223,16 +251,40 @@ declarations {
 
 		§§ Multiplies this Integer with a number, staying exact for every member of the numeric tower.
 		overload multiply {
+			§§ Multiplies this Integer with another Integer.
+			§§
+			§§ The product is an Integer.
+			§§
+			§§ @param with — the Integer to multiply with
+			§§ @returns — the product.
 			(with other: Integer) -> Integer
 
+			§§ Multiplies this Integer with a Rational.
+			§§
+			§§ The product is a Rational, since it need not be whole.
+			§§
+			§§ @param with — the Rational to multiply with
+			§§ @returns — the product.
 			(with other: Rational) -> Rational {
 				<- other::multiply(with @)
 			}
 
+			§§ Multiplies this Integer with an Algebraic.
+			§§
+			§§ The product stays exact. A zero factor collapses it to the Rational zero, so the answer is a Union of both kinds.
+			§§
+			§§ @param with — the Algebraic to multiply with
+			§§ @returns — the exact product, an Algebraic or a Rational.
 			(with other: Algebraic) -> Algebraic | Rational {
 				<- other::multiply(with @)
 			}
 
+			§§ Multiplies this Integer with a Transcendental.
+			§§
+			§§ The product stays exact. A zero factor collapses it to the Rational zero, so the answer is a Union of both kinds.
+			§§
+			§§ @param with — the Transcendental to multiply with
+			§§ @returns — the exact product, a Transcendental or a Rational.
 			(with other: Transcendental) -> Transcendental | Rational {
 				<- other::multiply(with @)
 			}
@@ -242,10 +294,22 @@ declarations {
 		§§
 		§§ Dividing by an Integer or a Rational answers empty for a zero divisor. Dividing this Integer by a NonZeroInteger, by a NonZeroRational or by an Algebraic can not fail. The first two divisors are proven, and an Algebraic is irrational and so never zero. The `defaultingTo:` entries answer the given value in place of empty.
 		overload divide {
+			§§ Divides this Integer by an Integer.
+			§§
+			§§ The quotient is a Rational, since it need not be whole. A zero divisor answers empty.
+			§§
+			§§ @param by — the divisor
+			§§ @returns — the exact quotient, or nothing when the divisor is zero.
 			(by other: Integer) -> Optional<Rational> {
 				<- Rational.of(@, over other)
 			}
 
+			§§ Divides this Integer by a Rational.
+			§§
+			§§ The quotient is a Rational, since it need not be whole. A zero divisor answers empty.
+			§§
+			§§ @param by — the divisor
+			§§ @returns — the exact quotient, or nothing when the divisor is zero.
 			(by other: Rational) -> Optional<Rational> {
 				constant dividend = @
 
@@ -256,6 +320,12 @@ declarations {
 					})
 			}
 
+			§§ Divides this Integer by an Algebraic.
+			§§
+			§§ An Algebraic is irrational, so it is never zero and the division can not fail. A zero receiver answers the Rational zero.
+			§§
+			§§ @param by — the divisor
+			§§ @returns — the exact quotient, an Algebraic or a Rational.
 			(by other: Algebraic) -> Algebraic | Rational
 
 			§§ Divides this Integer by a divisor proven not to be zero.
@@ -439,10 +509,18 @@ declarations {
 
 		§§ Answers whether this Integer is strictly below the given number.
 		overload isLessThan {
+			§§ Answers whether this Integer is strictly below another Integer.
+			§§
+			§§ @param _ — the Integer to compare against
+			§§ @returns — `true` when this Integer is below the other.
 			(_ other: Integer) -> Boolean {
 				<- @::compare(to other)::is(#Less)
 			}
 
+			§§ Answers whether this Integer is strictly below a Rational.
+			§§
+			§§ @param _ — the Rational to compare against
+			§§ @returns — `true` when this Integer is below the Rational.
 			(_ other: Rational) -> Boolean {
 				<- other::isGreaterThan(@)
 			}
@@ -450,10 +528,20 @@ declarations {
 
 		§§ Answers whether this Integer is below the given number, or equal to it.
 		overload isLessThanOrEqualTo {
+			§§ Answers whether this Integer is below another Integer, or equal to it.
+			§§
+			§§ @param _ — the Integer to compare against
+			§§ @returns — `true` when this Integer is not above the other.
 			(_ other: Integer) -> Boolean {
 				<- @::isGreaterThan(other)::negate()
 			}
 
+			§§ Answers whether this Integer is below a Rational, or equal to it.
+			§§
+			§§ An Integer equals a Rational only when that Rational is whole.
+			§§
+			§§ @param _ — the Rational to compare against
+			§§ @returns — `true` when this Integer is not above the Rational.
 			(_ other: Rational) -> Boolean {
 				<- other::isGreaterThanOrEqualTo(@)
 			}
@@ -461,10 +549,18 @@ declarations {
 
 		§§ Answers whether this Integer is strictly above the given number.
 		overload isGreaterThan {
+			§§ Answers whether this Integer is strictly above another Integer.
+			§§
+			§§ @param _ — the Integer to compare against
+			§§ @returns — `true` when this Integer is above the other.
 			(_ other: Integer) -> Boolean {
 				<- @::compare(to other)::is(#Greater)
 			}
 
+			§§ Answers whether this Integer is strictly above a Rational.
+			§§
+			§§ @param _ — the Rational to compare against
+			§§ @returns — `true` when this Integer is above the Rational.
 			(_ other: Rational) -> Boolean {
 				<- other::isLessThan(@)
 			}
@@ -472,10 +568,20 @@ declarations {
 
 		§§ Answers whether this Integer is above the given number, or equal to it.
 		overload isGreaterThanOrEqualTo {
+			§§ Answers whether this Integer is above another Integer, or equal to it.
+			§§
+			§§ @param _ — the Integer to compare against
+			§§ @returns — `true` when this Integer is not below the other.
 			(_ other: Integer) -> Boolean {
 				<- @::isLessThan(other)::negate()
 			}
 
+			§§ Answers whether this Integer is above a Rational, or equal to it.
+			§§
+			§§ An Integer equals a Rational only when that Rational is whole.
+			§§
+			§§ @param _ — the Rational to compare against
+			§§ @returns — `true` when this Integer is not below the Rational.
 			(_ other: Rational) -> Boolean {
 				<- other::isLessThanOrEqualTo(@)
 			}
