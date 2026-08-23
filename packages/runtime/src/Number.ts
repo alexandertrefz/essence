@@ -159,10 +159,12 @@ export function compare(number: NumberType, other: NumberType): OrderingType {
 // on), and the `…OrEqualTo` pair negates the strict opposite. `compare` is
 // the one ordering primitive they all fall out of, and it stays native.
 
-// NOTE: `isBetween` is written in Essence now — `packages/standard-library/sources/Number.es` — as
+// NOTE: `isBetween` is written in Essence now — `Orderable` provides it, in
+// `packages/standard-library/sources/Orderable.es` — as
 // `@::isGreaterThanOrEqualTo(lower)::and(@::isLessThanOrEqualTo(upper))`, which
 // is the same two comparisons this function made, read off the same covering
-// order. Both bounds stay included, and bounds in the wrong order still enclose
-// no Number at all, so the answer is simply `false`.
+// order. Both bounds stay included, and the two name the same range in either
+// order: a pair written the other way round runs that chain with the two
+// exchanged, which is the reading `clamp` gives the same pair.
 
 // #endregion

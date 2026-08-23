@@ -219,8 +219,9 @@ easy to break:
   `firstItem()` bare and still can not hide `List`'s fallback entry.
 - **Count-like nonsense is lenient; value-like failure returns an `Optional`** —
   `List.repeat(_, times 0)` is the empty List, `list::split(intoGroupsOf 0)` is
-  one group holding every item, and `7::clamp(between 10, and 1)` takes the
-  bounds in either order and answers `7`. Nothing is dropped and nothing comes
+  one group holding every item, and a pair of bounds names the same range in
+  either order, so `7::clamp(between 10, and 1)` answers `7` and
+  `7::isBetween(10, and 1)` answers `true`. Nothing is dropped and nothing comes
   back empty for a count that makes no sense. An answer that genuinely is not
   there is what an `Optional` is for — `Rational.of(1, over 0)` is no
   Rational, `[]::firstItem()` is no item, `"abc"::character(at 9)` is no

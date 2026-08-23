@@ -1947,25 +1947,26 @@ function excludedByConjunct(
 	}
 
 	if (conjunct.methodName === "isBetween" && conjunct.args.length === 2) {
-		let lower = boundArgument(conjunct.args[0]!)
-		let upper = boundArgument(conjunct.args[1]!)
+		let first = boundArgument(conjunct.args[0]!)
+		let second = boundArgument(conjunct.args[1]!)
 
-		// NOTE: Bounds in the wrong order enclose nothing, which is what the
-		// standard library's own body says — so the leaf is a claim no value
-		// answers, and reading anything off it would be reading off a
-		// contradiction.
-		if (
-			lower === null ||
-			upper === null ||
-			lower.numerator * upper.denominator >
-				upper.numerator * lower.denominator
-		) {
+		if (first === null || second === null) {
 			return []
 		}
 
+		// NOTE: The two bounds name the same range in either order, which is
+		// what the standard library's own body says — so a pair written the
+		// other way round is read with the two exchanged, rather than as a
+		// contradiction nothing may be read off.
+		let exchanged =
+			first.numerator * second.denominator >
+			second.numerator * first.denominator
+		let lowest = exchanged ? conjunct.args[1]! : conjunct.args[0]!
+		let highest = exchanged ? conjunct.args[0]! : conjunct.args[1]!
+
 		return [
-			comparisonLeaf(conjunct, "isLessThan", conjunct.args[0]!, true),
-			comparisonLeaf(conjunct, "isGreaterThan", conjunct.args[1]!, true),
+			comparisonLeaf(conjunct, "isLessThan", lowest, true),
+			comparisonLeaf(conjunct, "isGreaterThan", highest, true),
 		]
 	}
 

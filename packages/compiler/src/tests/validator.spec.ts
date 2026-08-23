@@ -2989,6 +2989,27 @@ describe("Validator", () => {
 			).toEqual([])
 		})
 
+		// NOTE: The two bounds name the same range in either order, which is
+		// what `Orderable::isBetween` says — so a refinement written backwards
+		// admits what the same pair written forwards admits, and refuses what
+		// it refuses.
+		it("should read a pair of bounds either way round", () => {
+			let source = `implementation {
+				type Backwards = Integer where @::isBetween(9, and 0)
+
+				function placed(_ digit: Backwards) -> Integer {
+					<- digit::add(1)
+				}
+
+				Terminal.inspect(placed(7))
+			}`
+
+			expect(diagnosticsFor(source)).toEqual([])
+			expect(
+				diagnosticsFor(source.replace("placed(7)", "placed(11)")),
+			).toHaveLength(1)
+		})
+
 		it("should admit a written value only where every conjunct holds", () => {
 			let source = `
 				function tripled(_ n: SmallOdd) -> Integer {
