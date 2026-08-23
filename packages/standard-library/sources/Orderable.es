@@ -68,14 +68,23 @@ declarations {
 
 		§§ Answers whether the value lies between the two given ones, both included.
 		§§
-		§§ Bounds in the wrong order enclose no value, and the answer is `false`.
+		§§ The two bounds name the same range in either order: `7::isBetween(10, and 1)` is `true`, and `15::isBetween(10, and 1)` is `false`.
 		§§
-		§§ @param _ — the lower bound, included
-		§§ @param and — the upper bound, included
+		§§ @param _ — one bound of the range, included
+		§§ @param and — the other bound of the range, included
 		§§ @returns — `true` when the value is within the bounds.
 		isBetween(_ lower: Self, and upper: Self) -> Boolean {
-			<- @::isGreaterThanOrEqualTo(lower)
-				::and(@::isLessThanOrEqualTo(upper))
+			§ The two chains below are one chain with the bounds exchanged, the
+			§ shape `clamp` is written in. A `clamp` answer compared with `@`
+			§ says the same thing. But `Orderable` does not imply `Equatable`,
+			§ so nothing here can ask whether two values are equal.
+			if lower::isGreaterThan(upper) {
+				<- @::isGreaterThanOrEqualTo(upper)
+					::and(@::isLessThanOrEqualTo(lower))
+			} else {
+				<- @::isGreaterThanOrEqualTo(lower)
+					::and(@::isLessThanOrEqualTo(upper))
+			}
 		}
 
 		§§ Answers the value, pulled into the given bounds.

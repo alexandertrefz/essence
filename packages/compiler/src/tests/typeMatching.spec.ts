@@ -742,6 +742,22 @@ describe("Type matching", () => {
 				expect(matchesType(above, notZero)).toBe(false)
 			})
 
+			// NOTE: `isBetween` excludes the comparison outside each of its two
+			// bounds, and the two bounds name the same range in either order —
+			// so a pair written backwards excludes exactly what the same pair
+			// written forwards does.
+			it("should read a pair of bounds either way round", () => {
+				let within = refinement("Digit", integer, [
+					conjunct("isBetween", ["0", "9"]),
+				])
+				let backwards = refinement("Backwards", integer, [
+					conjunct("isBetween", ["9", "0"]),
+				])
+
+				expect(matchesType(notBelow, within)).toBe(true)
+				expect(matchesType(notBelow, backwards)).toBe(true)
+			})
+
 			// NOTE: The bound is part of the question. Nothing is read across
 			// two literals, which is what keeps the closure a leaf carries from
 			// growing with the Program.

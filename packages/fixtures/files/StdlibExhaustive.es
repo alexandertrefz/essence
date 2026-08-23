@@ -641,6 +641,14 @@ third"::lines())
 		"Integer.isBetween(_ Integer, and: Integer) [on the bound]",
 		10::isBetween(1, and 10),
 	)
+	show(
+		"Integer.isBetween(_ Integer, and: Integer) [inverted bounds]",
+		5::isBetween(10, and 1),
+	)
+	show(
+		"Integer.isBetween(_ Integer, and: Integer) [inverted bounds, above]",
+		15::isBetween(10, and 1),
+	)
 	show("Integer.parse(_ String)", Integer.parse("42"))
 	show("Integer.parse(_ String) [negative]", Integer.parse("-42"))
 	show("Integer.parse(_ String) [not a number]", Integer.parse("nope"))
@@ -841,6 +849,10 @@ third"::lines())
 	show(
 		"Rational.isBetween(_ Rational, and: Rational) [outside]",
 		1/2::isBetween(2/3, and 3/4),
+	)
+	show(
+		"Rational.isBetween(_ Rational, and: Rational) [inverted bounds]",
+		1/2::isBetween(2/3, and 1/3),
 	)
 	show(
 		"Rational.clamp(between: Rational, and: Rational) [above]",
@@ -1075,6 +1087,10 @@ third"::lines())
 		show(
 			"Algebraic.isBetween(_ Algebraic, and: Algebraic) [outside]",
 			rootThree::isBetween(rootTwo, and rootTwo),
+		)
+		show(
+			"Algebraic.isBetween(_ Algebraic, and: Algebraic) [inverted bounds]",
+			rootTwo::isBetween(rootThree, and rootTwo),
 		)
 		show(
 			"Algebraic.clamp(between: Algebraic, and: Algebraic) [above]",
@@ -1459,6 +1475,10 @@ third"::lines())
 		show(
 			"Number.isBetween(_ Number, and: Number) [on the bound]",
 			asNumber(5)::isBetween(5, and 5),
+		)
+		show(
+			"Number.isBetween(_ Number, and: Number) [inverted bounds]",
+			asNumber(Number.Pi)::isBetween(22/7, and 3),
 		)
 		show(
 			"Number.clamp(between: Number, and: Number) [above]",

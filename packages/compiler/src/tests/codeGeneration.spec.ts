@@ -2427,10 +2427,12 @@ describe("Code Generation", () => {
 		// ones: the reachability fixed point now has two candidate consts, and
 		// each has to be emitted exactly when the Program reaches it.
 		//
-		// NOTE: These six cases are the ones `stdlib.spec.ts` used to assert
+		// NOTE: These seven cases are the ones `stdlib.spec.ts` used to assert
 		// against the runtime `isBetween` before it was deleted — both bounds
-		// included, both bounds excluded from outside, and bounds in the wrong
-		// order — now run through the compiled Method instead.
+		// included, both bounds excluded from outside, and a pair written the
+		// other way round — now run through the compiled Method instead. The
+		// last two are what makes the exchange visible: the same range named
+		// backwards holds `5` and does not hold `15`.
 		it("runs isBetween from its const", async () => {
 			expect(
 				await run(`implementation {
@@ -2440,6 +2442,7 @@ describe("Code Generation", () => {
 					Terminal.inspect(11::isBetween(1, and 10)::toString())
 					Terminal.inspect(0::isBetween(1, and 10)::toString())
 					Terminal.inspect(5::isBetween(10, and 1)::toString())
+					Terminal.inspect(15::isBetween(10, and 1)::toString())
 				}`),
 			).toEqual([
 				'"true"',
@@ -2447,6 +2450,7 @@ describe("Code Generation", () => {
 				'"true"',
 				'"false"',
 				'"false"',
+				'"true"',
 				'"false"',
 			])
 		})

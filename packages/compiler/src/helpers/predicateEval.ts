@@ -400,9 +400,10 @@ const NUMERIC_COMPARISONS: Record<string, PredicateEvaluator> = {
 	isLessThan: integerComparison((value, other) => value < other),
 	isGreaterThan: integerComparison((value, other) => value > other),
 
-	// NOTE: Both bounds included, and bounds in the wrong order enclosing
-	// nothing — which is what the standard library's own body says, so the answer
-	// here is `false` for them rather than unanswerable.
+	// NOTE: Both bounds included, and the two naming the same range in either
+	// order — which is what the standard library's own body says, so a pair
+	// written the other way round is read with the two exchanged rather than as
+	// a range that encloses nothing.
 	isBetween: (value, args) => {
 		let integer = integerLiteral(value)
 
@@ -410,12 +411,17 @@ const NUMERIC_COMPARISONS: Record<string, PredicateEvaluator> = {
 			return null
 		}
 
-		let lower = integerScalar(args[0])
-		let upper = integerScalar(args[1])
+		let first = integerScalar(args[0])
+		let second = integerScalar(args[1])
 
-		return lower === null || upper === null
-			? null
-			: integer >= lower && integer <= upper
+		if (first === null || second === null) {
+			return null
+		}
+
+		let lower = first <= second ? first : second
+		let upper = first <= second ? second : first
+
+		return integer >= lower && integer <= upper
 	},
 }
 
@@ -484,8 +490,8 @@ const RATIONAL_COMPARISONS: Record<string, PredicateEvaluator> = {
 		(value, other) => compareExact(value, other) > 0,
 	),
 
-	// NOTE: Both bounds included, and bounds in the wrong order enclosing
-	// nothing — the Integer entry's rule, and for the same reason: this is what
+	// NOTE: Both bounds included, and the two naming the same range in either
+	// order — the Integer entry's rule, and for the same reason: this is what
 	// `Orderable::isBetween` says, whichever kind it was provided for.
 	isBetween: (value, args) => {
 		let rational = rationalLiteral(value)
@@ -494,13 +500,21 @@ const RATIONAL_COMPARISONS: Record<string, PredicateEvaluator> = {
 			return null
 		}
 
-		let lower = rationalScalar(args[0])
-		let upper = rationalScalar(args[1])
+		let first = rationalScalar(args[0])
+		let second = rationalScalar(args[1])
 
-		return lower === null || upper === null
-			? null
-			: compareExact(rational, lower) >= 0 &&
-					compareExact(rational, upper) <= 0
+		if (first === null || second === null) {
+			return null
+		}
+
+		let exchanged = compareExact(first, second) > 0
+		let lower = exchanged ? second : first
+		let upper = exchanged ? first : second
+
+		return (
+			compareExact(rational, lower) >= 0 &&
+			compareExact(rational, upper) <= 0
+		)
 	},
 }
 
