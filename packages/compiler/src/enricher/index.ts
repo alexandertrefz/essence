@@ -1237,6 +1237,18 @@ function hoistDeclarationsInner(
 		}
 	}
 
+	// NOTE: The Namespaces and Protocols whose Methods could not all be read as
+	// the questions they ask, because a body named something still on its way —
+	// `Integer::isLessThanOrEqualTo` is written on a Rational's own comparison,
+	// and one of the two numeric kinds reaches Scope first. Offered again at the
+	// top of every later round, and once more before the predicates get their
+	// final reading, so a `where` clause written on such a Method is filled with
+	// the alias already known. A reading that succeeds drops out of the list.
+	let unreadAliases: Array<() => boolean> = []
+	let rereadAliases = (): void => {
+		unreadAliases = unreadAliases.filter((reread) => !reread())
+	}
+
 	while (pendingNodes.length > 0) {
 		// NOTE: Before the resolution rounds rather than after, so a Module whose
 		// import became bindable by the previous round has it in Scope while its
@@ -1248,6 +1260,7 @@ function hoistDeclarationsInner(
 		// Namespace that round hoisted, and whatever reads the conjuncts THIS
 		// round — a bodied static Property enriched while its Namespace resolves —
 		// has to find them written in.
+		rereadAliases()
 		fillPendingPredicates(pendingPredicates, sink, hoistedTypes, false)
 		let remainingNodes: Array<PendingDeclaration> = []
 		// NOTE: The Protocols this round can still hoist, per Scope — a Namespace
@@ -1419,11 +1432,14 @@ function hoistDeclarationsInner(
 				// `NonEmptyList` and `NonEmptyString` resolve to the leaf their
 				// `else` branches prove.
 				if (node.nodeType === "NamespaceDefinitionStatement") {
-					derivePredicateAliases(
-						node,
-						speculation.result as common.NamespaceType,
-						scope,
-					)
+					let namespaceType =
+						speculation.result as common.NamespaceType
+					let reread = (): boolean =>
+						derivePredicateAliases(node, namespaceType, scope)
+
+					if (!reread()) {
+						unreadAliases.push(reread)
+					}
 				} else if (node.nodeType === "ProtocolDeclarationStatement") {
 					// NOTE: And which of a PROTOCOL's provided Methods are
 					// written on another — `isGreaterThanOrEqualTo` is
@@ -1431,11 +1447,17 @@ function hoistDeclarationsInner(
 					// that says the same of `is`. A conformer answers both
 					// through those very bodies, so the leaf its receiver
 					// proves is read here rather than named in a table.
-					deriveProvidedPredicateAliases(
-						node,
-						speculation.result as common.ProtocolType,
-						scope,
-					)
+					let protocolType = speculation.result as common.ProtocolType
+					let reread = (): boolean =>
+						deriveProvidedPredicateAliases(
+							node,
+							protocolType,
+							scope,
+						)
+
+					if (!reread()) {
+						unreadAliases.push(reread)
+					}
 				}
 
 				// NOTE: A refined Alias hoists with its predicate still to be
@@ -1490,6 +1512,7 @@ function hoistDeclarationsInner(
 	// for the in-order enrichment to resolve and report. Nothing past hoisting
 	// ever meets `conjuncts: null` — that is the promise every thrown guard on
 	// it stands on.
+	rereadAliases()
 	fillPendingPredicates(pendingPredicates, sink, hoistedTypes, true)
 
 	// NOTE: Each recursive declaration is resolved once, with the seeded Errors
