@@ -41,10 +41,10 @@ declarations {
 	namespace Rounding for Rounding is Equatable, is Printable {}
 
 	§ The Rationals that are not zero, as a checked refinement, and the sister
-	§ of `NonZeroInteger`. The bound is written `0/1` rather than `0`, because
-	§ `Rational::isNot` is the entry a Rational bound reaches. An Integer bound
-	§ finds no same-kind entry and falls to the covering `Number`, which is a
-	§ different question to a conjunct key.
+	§ of `NonZeroInteger`. The bound is written `0/1`, which is the house
+	§ spelling for a Rational zero. A bare `0` asks the same question: the
+	§ Compiler reads every Integer bound on a Rational as `n/1`, so both
+	§ spellings reach this Type.
 	type NonZeroRational = Rational where @::isNot(0/1)
 
 	§ Exact ratios of Integers, kept in lowest terms with the sign on the
