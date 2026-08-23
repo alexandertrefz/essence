@@ -13,6 +13,20 @@ import {
 
 declarations {
 
+	§ Which way `sort` runs. The Choice is declared beside its only user, and
+	§ `#Ascending` is the default. Descending is not a sort followed by a
+	§ reverse. The comparison is turned around instead, so items the order
+	§ does not tell apart keep the order they had.
+	choice SortOrder {
+		Ascending,
+		Descending,
+	}
+
+	§ Equality and printing are both derived for a Choice of Cases that carry
+	§ no payload. This Namespace declares the two and writes neither; see
+	§ DEVELOPMENT.md, Why bodies look the way they do.
+	namespace SortOrder for SortOrder is Equatable, is Printable {}
+
 	§ The Lists that have something in them. It is a checked refinement: the
 	§ predicate is what a value has to be proven to satisfy, and the proof is
 	§ what the Type carries.
@@ -810,25 +824,35 @@ declarations {
 		§ site: `Integer` for a `List<Integer>`, and the covering `Number` for a
 		§ mixed numeric List.
 		§
-		§ Both entries are native. In Essence the no-Argument body would be
-		§ `@::sort(by …)`, a call that has to pick between the two entries here.
-		§ Picking one is what would give the comparison's Parameters their
-		§ Types. Annotating them does not rescue it either. This entry's bounded
-		§ `ItemType` shadows the Namespace's, so the annotated Function is typed
-		§ in a different `ItemType` than the `by:` entry expects.
+		§ The first two entries are native. In Essence the first entry's body
+		§ would be `@::sort(by …)`, a call that has to pick one of the entries
+		§ below it. Picking one is what would give the comparison's Parameters
+		§ their Types. Annotating them does not rescue it either. That entry's
+		§ bounded `ItemType` shadows the Namespace's, so the annotated Function
+		§ is typed in a different `ItemType` than the `by:` entry expects.
+		§
+		§ A direction is a Parameter of the two entries that read an ordering.
+		§ The `by:` entry takes none, because a comparison already says which
+		§ way it runs. Descending turns the comparison around rather than
+		§ reversing the answer, so a sort stays stable in either direction.
 
 		§§ Answers a new List in order, by the items' own ordering or by the given comparison.
 		§§
-		§§ The no-Argument entry is available whenever the items conform to `Comparable`. Items the order does not tell apart keep the order they had.
+		§§ The first entry is available whenever the items conform to `Comparable`. Items the order does not tell apart keep the order they had, in either direction.
+		§§
+		§§ A direction is read where one is taken, and it is `#Ascending` when a call names none.
 		§§
 		§§ @returns — the ordered List.
 		overload sort {
-			§§ Answers a new List in ascending order, by the items' own ordering.
+			§§ Answers a new List in the given direction, by the items' own ordering.
 			§§
-			§§ The entry is available whenever the items conform to `Comparable`. For any other order, use the `by:` entry.
+			§§ The entry is available whenever the items conform to `Comparable`. The direction is `#Ascending` when a call names none. For any other order, use the `by:` entry.
 			§§
+			§§ @param in — the direction to order in, `#Ascending` when it is left out
 			§§ @returns — the ordered List.
-			<infer ItemType is Comparable>() -> List<ItemType>
+			<infer ItemType is Comparable>(
+				in order: SortOrder = #Ascending,
+			) -> List<ItemType>
 
 			§§ Answers a new List ordered by the given comparison, applied to each pair of items.
 			§§
@@ -841,7 +865,7 @@ declarations {
 			§ Written on the `by:` entry, and able to be. The bound is on the
 			§ key, so `ItemType` is still the Namespace's. The comparison this
 			§ hands over is therefore typed in the one the entry expects. That
-			§ is the difference from the no-Argument entry above.
+			§ is the difference from the first entry above.
 			§
 			§ `on` is the label for a key-reading Function everywhere one is
 			§ taken: here, on `lowestItem`, `highestItem`, `sum` and
@@ -850,18 +874,37 @@ declarations {
 			§ one entry up. Two same-labelled entries told apart by arity
 			§ alone would be a trap.
 
-			§§ Answers a new List in ascending order of what the key reads off each item.
+			§§ Answers a new List in the given direction of what the key reads off each item.
 			§§
-			§§ The key is read once per comparison, and the entry is available whenever what it answers conforms to `Comparable`.
+			§§ The key is read once per comparison, and the entry is available whenever what it answers conforms to `Comparable`. The direction is `#Ascending` when a call names none.
 			§§
 			§§ @param on — the key each item is ordered by
+			§§ @param in — the direction to order in, `#Ascending` when it is left out
 			§§ @returns — the ordered List.
 			<infer Key is Comparable>(
 				on key: (_: ItemType) -> Key,
+				in order: SortOrder = #Ascending,
 			) -> List<ItemType> {
-				<- @::sort(by (first, second) {
-					<- key(first)::compare(to key(second))
-				})
+				§ `@` is rebound inside `match`; see DEVELOPMENT.md, Why
+				§ bodies look the way they do.
+				constant items = @
+
+				<- match order -> List<ItemType> {
+					case #Ascending {
+						<- items::sort(by (first, second) {
+							<- key(first)::compare(to key(second))
+						})
+					}
+
+					case #Descending {
+						§ The pair the other way round, which is what keeps
+						§ the sort stable: two items the key does not tell
+						§ apart still compare `#Equal`.
+						<- items::sort(by (first, second) {
+							<- key(second)::compare(to key(first))
+						})
+					}
+				}
 			}
 		}
 
@@ -1270,16 +1313,21 @@ declarations {
 
 		§§ Answers a new List in order, by the items' own ordering or by the given comparison.
 		§§
-		§§ The no-Argument entry is available whenever the items conform to `Comparable`. Items the order does not tell apart keep the order they had.
+		§§ The first entry is available whenever the items conform to `Comparable`. Items the order does not tell apart keep the order they had, in either direction.
+		§§
+		§§ A direction is read where one is taken, and it is `#Ascending` when a call names none.
 		§§
 		§§ @returns — the ordered List, which certainly has something in it.
 		overload sort {
-			§§ Answers a new List in ascending order, by the items' own ordering.
+			§§ Answers a new List in the given direction, by the items' own ordering.
 			§§
-			§§ The entry is available whenever the items conform to `Comparable`. For any other order, use the `by:` entry.
+			§§ The entry is available whenever the items conform to `Comparable`. The direction is `#Ascending` when a call names none. For any other order, use the `by:` entry.
 			§§
+			§§ @param in — the direction to order in, `#Ascending` when it is left out
 			§§ @returns — the ordered List, which certainly has something in it.
-			<infer ItemType is Comparable>() -> NonEmptyList<ItemType>
+			<infer ItemType is Comparable>(
+				in order: SortOrder = #Ascending,
+			) -> NonEmptyList<ItemType>
 
 			§§ Answers a new List ordered by the given comparison, applied to each pair of items.
 			§§
@@ -1290,22 +1338,40 @@ declarations {
 			) -> NonEmptyList<ItemType>
 
 			§ The one entry here with a body. It hands the `by:` entry above a
-			§ comparison built out of the key. That entry is native and carries
-			§ the proof, so this one carries it too — without having to say in
-			§ Essence what `sort` promises.
+			§ comparison built out of the key. A descending sort turns that
+			§ comparison around, exactly as `List`'s own entry does. The
+			§ `by:` entry is native and carries the proof, so this one
+			§ carries it too — without having to say in Essence what `sort`
+			§ promises.
 
-			§§ Answers a new List in ascending order of what the key reads off each item.
+			§§ Answers a new List in the given direction of what the key reads off each item.
 			§§
-			§§ The key is read once per comparison, and the entry is available whenever what it answers conforms to `Comparable`.
+			§§ The key is read once per comparison, and the entry is available whenever what it answers conforms to `Comparable`. The direction is `#Ascending` when a call names none.
 			§§
 			§§ @param on — the key each item is ordered by
+			§§ @param in — the direction to order in, `#Ascending` when it is left out
 			§§ @returns — the ordered List, which certainly has something in it.
 			<infer Key is Comparable>(
 				on key: (_: ItemType) -> Key,
+				in order: SortOrder = #Ascending,
 			) -> NonEmptyList<ItemType> {
-				<- @::sort(by (first, second) {
-					<- key(first)::compare(to key(second))
-				})
+				§ `@` is rebound inside `match`; see DEVELOPMENT.md, Why
+				§ bodies look the way they do.
+				constant items = @
+
+				<- match order -> NonEmptyList<ItemType> {
+					case #Ascending  {
+						<- items::sort(by (first, second) {
+							<- key(first)::compare(to key(second))
+						})
+					}
+
+					case #Descending {
+						<- items::sort(by (first, second) {
+							<- key(second)::compare(to key(first))
+						})
+					}
+				}
 			}
 		}
 
@@ -1412,4 +1478,5 @@ export {
 	NonEmptyList
 	NonEmptyNestedList
 	OptionalList
+	SortOrder
 }

@@ -974,7 +974,7 @@ describe("Hover of conformance clauses", () => {
 		].join("\n")
 
 		expect(hover(source, { line: 3, column: 12 })).toBe(
-			"sort<ItemType is Comparable>() -> List<ItemType>",
+			"sort<ItemType is Comparable>(in?: SortOrder) -> List<ItemType>",
 		)
 	})
 })

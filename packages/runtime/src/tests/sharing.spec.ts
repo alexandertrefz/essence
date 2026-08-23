@@ -96,6 +96,10 @@ const integerEquality = {
 
 const integerOrder = { compare: compareIntegers }
 
+// NOTE: `sort` reads a direction now, and every call here wants the everyday
+// one — the Case a call that names none is shimmed with.
+const ascending = { [typeKeySymbol]: "SortOrder#Ascending" } as const
+
 // NOTE: The same reading as `itemsOf`, for the Arrays a build is handed rather
 // than the boxes a native answers.
 const valuesOf = (items: Array<IntegerType>): Array<number> =>
@@ -373,7 +377,9 @@ describe("every native against an upgraded receiver", () => {
 		expect(itemsOf(reverse(upgraded()))).toEqual([5, 4, 3, 2, 1])
 
 		expect(
-			itemsOf(sortByOwnOrder(reverse(upgraded()), integerOrder)),
+			itemsOf(
+				sortByOwnOrder(reverse(upgraded()), ascending, integerOrder),
+			),
 		).toEqual([1, 2, 3, 4, 5])
 		expect(
 			itemsOf(
@@ -556,7 +562,9 @@ describe("NonEmptyList against an upgraded receiver", () => {
 		])
 		expect(itemsOf(reverse(upgraded()))).toEqual([5, 4, 3, 2, 1])
 		expect(
-			itemsOf(sortByOwnOrder(reverse(upgraded()), integerOrder)),
+			itemsOf(
+				sortByOwnOrder(reverse(upgraded()), ascending, integerOrder),
+			),
 		).toEqual([1, 2, 3, 4, 5])
 	})
 })

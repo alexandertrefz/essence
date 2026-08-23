@@ -821,6 +821,14 @@ export interface NativeShimNode {
 	overloadIndex: number | null
 	isStatic: boolean
 	parameters: Array<ParameterNode>
+	// NOTE: The bounded Type Parameters of the entry, by name, in declaration
+	// order — the hidden trailing Arguments a call site appends after the
+	// written ones. The shim has to take them and hand them on, or a native
+	// with BOTH a default and a Protocol bound would see the witness in the
+	// defaulted Parameter's slot and nothing in its own. Empty for every native
+	// whose Type Parameters are unbounded, which keeps that shim the arrow it
+	// has always been.
+	conformances: Array<string>
 }
 
 export interface ProtocolDeclarationStatementNode {

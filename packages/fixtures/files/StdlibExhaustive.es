@@ -2081,6 +2081,29 @@ third"::lines())
 		toTowardZero::toString(),
 	)
 
+	§ ——— SortOrder ————————————————————————————————————————————————————————
+	constant ascending: SortOrder  = #Ascending
+	constant descending: SortOrder = #Descending
+
+	show("Choice_Equatable.is(_ SortOrder)", ascending::is(#Ascending))
+	show(
+		"Choice_Equatable.is(_ SortOrder) [differing]",
+		ascending::is(#Descending),
+	)
+	show("Choice_Equatable.isNot(_ SortOrder)", ascending::isNot(#Descending))
+	show(
+		"Choice_Equatable.isNot(_ SortOrder) [same]",
+		descending::isNot(#Descending),
+	)
+	show(
+		"Choice_Printable.toString() [SortOrder#Ascending]",
+		ascending::toString(),
+	)
+	show(
+		"Choice_Printable.toString() [SortOrder#Descending]",
+		descending::toString(),
+	)
+
 	§ ——— Record ———————————————————————————————————————————————————————————
 	§ LOAD-BEARING: `point` prints as `{ x = 1, y = 2 }`, well under sixty
 	§ characters. `getStringRepresentation` has a bug where a Record whose
@@ -2505,9 +2528,34 @@ third"::lines())
 	)
 	show("List.reverse<ItemType>()", numbers::reverse())
 	show("List.reverse<ItemType>() [empty]", noNumbers::reverse())
-	show("List.sort<ItemType is Comparable>()", threeNumbers::sort())
-	show("List.sort<ItemType is Comparable>() [Strings]", twoFruits::sort())
-	show("List.sort<ItemType is Comparable>() [empty]", noNumbers::sort())
+	show(
+		"List.sort<ItemType is Comparable>(in?: SortOrder)",
+		threeNumbers::sort(),
+	)
+	show(
+		"List.sort<ItemType is Comparable>(in?: SortOrder) [Strings]",
+		twoFruits::sort(),
+	)
+	show(
+		"List.sort<ItemType is Comparable>(in?: SortOrder) [empty]",
+		noNumbers::sort(),
+	)
+	show(
+		"List.sort<ItemType is Comparable>(in?: SortOrder) [ascending named]",
+		threeNumbers::sort(in #Ascending),
+	)
+	show(
+		"List.sort<ItemType is Comparable>(in?: SortOrder) [descending]",
+		threeNumbers::sort(in #Descending),
+	)
+	show(
+		"List.sort<ItemType is Comparable>(in?: SortOrder) [descending, Strings]",
+		twoFruits::sort(in #Descending),
+	)
+	show(
+		"List.sort<ItemType is Comparable>(in?: SortOrder) [descending, empty]",
+		noNumbers::sort(in #Descending),
+	)
 	show(
 		"List.sort<ItemType>(by: (_ ItemType, _ ItemType) -> Ordering)",
 		numbers::sort(by (first, second) { <- first::compare(to second) }),
@@ -2559,12 +2607,27 @@ third"::lines())
 	]
 
 	show(
-		"List.sort<ItemType, Key is Comparable>(on: (_ ItemType) -> Key)",
+		"List.sort<ItemType, Key is Comparable>(on: (_ ItemType) -> Key, in?: SortOrder)",
 		rows::sort(on .tag)::map(.n),
 	)
 	show(
-		"List.sort<ItemType, Key is Comparable>(on: (_ ItemType) -> Key) [empty]",
+		"List.sort<ItemType, Key is Comparable>(on: (_ ItemType) -> Key, in?: SortOrder) [empty]",
 		noRows::sort(on .tag)::map(.n),
+	)
+	show(
+		"List.sort<ItemType, Key is Comparable>(on: (_ ItemType) -> Key, in?: SortOrder) [descending]",
+		rows::sort(on .tag, in #Descending)::map(.n),
+	)
+	§ The two lines the stability promise rests on: `a` and `c` share the
+	§ lowest key and `b` and `d` the highest, so an unstable sort would put
+	§ either pair the other way round in one of the two directions.
+	show(
+		"List.sort<ItemType, Key is Comparable>(on: (_ ItemType) -> Key, in?: SortOrder) [tie]",
+		tiedRows::sort(on .n)::map(.tag),
+	)
+	show(
+		"List.sort<ItemType, Key is Comparable>(on: (_ ItemType) -> Key, in?: SortOrder) [descending, tie]",
+		tiedRows::sort(on .n, in #Descending)::map(.tag),
 	)
 	show(
 		"List.lowestItem<ItemType, Key is Comparable>(on: (_ ItemType) -> Key)",
@@ -3000,10 +3063,21 @@ third"::lines())
 		"NonEmptyList.reverse<ItemType>() [proof carried]",
 		provenWords::reverse()::firstItem(),
 	)
-	show("NonEmptyList.sort<ItemType is Comparable>()", provenNumbers::sort())
 	show(
-		"NonEmptyList.sort<ItemType is Comparable>() [proof carried]",
+		"NonEmptyList.sort<ItemType is Comparable>(in?: SortOrder)",
+		provenNumbers::sort(),
+	)
+	show(
+		"NonEmptyList.sort<ItemType is Comparable>(in?: SortOrder) [proof carried]",
 		provenNumbers::sort()::firstItem(),
+	)
+	show(
+		"NonEmptyList.sort<ItemType is Comparable>(in?: SortOrder) [descending]",
+		provenNumbers::sort(in #Descending),
+	)
+	show(
+		"NonEmptyList.sort<ItemType is Comparable>(in?: SortOrder) [descending, proof carried]",
+		provenNumbers::sort(in #Descending)::firstItem(),
 	)
 	show(
 		"NonEmptyList.sort<ItemType>(by: (_ ItemType, _ ItemType) -> Ordering)",
@@ -3034,12 +3108,20 @@ third"::lines())
 	]
 
 	show(
-		"NonEmptyList.sort<ItemType, Key is Comparable>(on: (_ ItemType) -> Key)",
+		"NonEmptyList.sort<ItemType, Key is Comparable>(on: (_ ItemType) -> Key, in?: SortOrder)",
 		provenRows::sort(on .tag)::map(.n),
 	)
 	show(
-		"NonEmptyList.sort<ItemType, Key is Comparable>(on: (_ ItemType) -> Key) [proof carried]",
+		"NonEmptyList.sort<ItemType, Key is Comparable>(on: (_ ItemType) -> Key, in?: SortOrder) [proof carried]",
 		provenRows::sort(on .tag)::firstItem(),
+	)
+	show(
+		"NonEmptyList.sort<ItemType, Key is Comparable>(on: (_ ItemType) -> Key, in?: SortOrder) [descending]",
+		provenRows::sort(on .tag, in #Descending)::map(.n),
+	)
+	show(
+		"NonEmptyList.sort<ItemType, Key is Comparable>(on: (_ ItemType) -> Key, in?: SortOrder) [descending, tie]",
+		tiedProvenRows::sort(on .n, in #Descending)::map(.tag),
 	)
 	show(
 		"NonEmptyList.lowestItem<ItemType, Key is Comparable>(on: (_ ItemType) -> Key)",

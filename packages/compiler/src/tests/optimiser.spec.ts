@@ -3294,8 +3294,13 @@ describe("Optimiser", () => {
 			// NOTE: `sort` is bounded by `Comparable`, so each branch carries the
 			// witness for ITS item Type — two witnesses, one per branch, each
 			// built once by the pool rather than per call by the dispatch.
+			//
+			// NOTE: `sort` also declares a defaulted direction, so each branch
+			// reaches the shim holding that default rather than the native, and
+			// the hole the call left for the direction stands between the
+			// receiver and the witness.
 			expect(generate(unionDispatch)).toMatch(
-				/List\.sort__overload\$1\(items, \$pool_\d+\).*List\.sort__overload\$1\(items, \$pool_\d+\)/,
+				/\$es_List_sort__overload\$1\(items, void 0, \$pool_\d+\).*\$es_List_sort__overload\$1\(items, void 0, \$pool_\d+\)/,
 			)
 		})
 

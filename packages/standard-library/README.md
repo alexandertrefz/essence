@@ -25,10 +25,11 @@ Two more read their numbers off a key rather than off the items:
 `KeyedNumberList`, whose target is the widest List there is, and
 `NonEmptyKeyedNumberList` beside it, where the same proof makes the mean bare.
 The modes a Method takes are Choices declared beside it: `Side`, `Rounding`,
-`NumberFormat`, `CaseSensitivity`, `NormalizationForm`, `Stream` and `Step`.
+`NumberFormat`, `CaseSensitivity`, `NormalizationForm`, `SortOrder`, `Stream`
+and `Step`.
 A Choice whose Cases all carry no payload derives both its `Equatable` and its
-`Printable` conformance, so six of those Namespaces declare the two and hold no
-body at all: `#Less` prints `Less` without anybody writing that down.
+`Printable` conformance, so seven of those Namespaces declare the two and hold
+no body at all: `#Less` prints `Less` without anybody writing that down.
 
 The only things NOT declared here are the ones no declaration could produce:
 the bare Type tags — `Boolean`, `String`, `Integer`, `Rational`, `Algebraic`,

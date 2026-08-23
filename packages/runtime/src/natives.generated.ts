@@ -24,6 +24,7 @@ import type { RandomnessType } from "./Randomness"
 import type { RationalType } from "./Rational"
 import type { RecordType } from "./Record"
 import type { SideType } from "./Side"
+import type { SortOrderType } from "./SortOrder"
 import type { StepType } from "./Step"
 import type { StreamType } from "./Stream"
 import type { StringType } from "./String"
@@ -317,6 +318,10 @@ export type RoundingNatives = {
 
 }
 
+export type SortOrderNatives = {
+
+}
+
 export type RecordNatives = {
 	// is(_: Record) -> Boolean
 	is: (self: RecordType, argument1: RecordType) => BooleanType
@@ -363,8 +368,8 @@ export type ListNatives = {
 	slice: <ItemType extends AnyType>(self: ListType<ItemType>, from: IntegerType, to: IntegerType) => ListType<ItemType>
 	// reverse<ItemType>() -> List<ItemType>
 	reverse: <ItemType extends AnyType>(self: ListType<ItemType>) => ListType<ItemType>
-	// sort<ItemType is Comparable>() -> List<ItemType>
-	sort__overload$1: <ItemType extends AnyType>(self: ListType<ItemType>, ItemType__conformance: ComparableConformance<ItemType>) => ListType<ItemType>
+	// sort<ItemType is Comparable>(in: SortOrder) -> List<ItemType>
+	sort__overload$1: <ItemType extends AnyType>(self: ListType<ItemType>, argument1: SortOrderType, ItemType__conformance: ComparableConformance<ItemType>) => ListType<ItemType>
 	// sort<ItemType>(by: (_: ItemType, _: ItemType) -> Ordering) -> List<ItemType>
 	sort__overload$2: <ItemType extends AnyType>(self: ListType<ItemType>, by: (argument0: ItemType, argument1: ItemType) => OrderingType) => ListType<ItemType>
 	// insert<ItemType>(_: ItemType, at: Integer) -> NonEmptyList
@@ -405,8 +410,8 @@ export type NonEmptyListNatives = {
 	map: <ItemType extends AnyType, Result extends AnyType>(self: ListType<ItemType>, argument1: (argument0: ItemType) => Result) => ListType<Result>
 	// reverse<ItemType>() -> NonEmptyList
 	reverse: <ItemType extends AnyType>(self: ListType<ItemType>) => ListType<ItemType>
-	// sort<ItemType is Comparable>() -> NonEmptyList
-	sort__overload$1: <ItemType extends AnyType>(self: ListType<ItemType>, ItemType__conformance: ComparableConformance<ItemType>) => ListType<ItemType>
+	// sort<ItemType is Comparable>(in: SortOrder) -> NonEmptyList
+	sort__overload$1: <ItemType extends AnyType>(self: ListType<ItemType>, argument1: SortOrderType, ItemType__conformance: ComparableConformance<ItemType>) => ListType<ItemType>
 	// sort<ItemType>(by: (_: ItemType, _: ItemType) -> Ordering) -> NonEmptyList
 	sort__overload$2: <ItemType extends AnyType>(self: ListType<ItemType>, by: (argument0: ItemType, argument1: ItemType) => OrderingType) => ListType<ItemType>
 	// replace<ItemType>(_: ItemType, at: Integer) -> NonEmptyList
@@ -657,6 +662,9 @@ export const $NumberFormat: NumberFormatNatives = NumberFormatModule
 declare const RoundingModule: typeof import("./Rounding")
 export const $Rounding: RoundingNatives = RoundingModule
 
+declare const SortOrderModule: typeof import("./SortOrder")
+export const $SortOrder: SortOrderNatives = SortOrderModule
+
 declare const RecordModule: typeof import("./Record")
 export const $Record: RecordNatives = RecordModule
 export const $RecordArity: AssertArities<typeof import("./Record"), {
@@ -687,7 +695,7 @@ export const $ListArity: AssertArities<typeof import("./List"), {
 	everyItem: 2
 	slice: 3
 	reverse: 1
-	sort__overload$1: 2
+	sort__overload$1: 3
 	sort__overload$2: 2
 	insert: 3
 	join: 3
@@ -718,7 +726,7 @@ export const $NonEmptyListArity: AssertArities<typeof import("./NonEmptyList"), 
 	append: 2
 	map: 2
 	reverse: 1
-	sort__overload$1: 2
+	sort__overload$1: 3
 	sort__overload$2: 2
 	replace: 3
 	pair: 2
