@@ -1003,11 +1003,14 @@ declarations {
 	§ Method of `List`. A Namespace of its own is for the Methods that answer
 	§ better for having the proof.
 	§
-	§ Three Methods spend the proof: `firstItem`, `lastItem` and `length`.
-	§ Everything else here carries it forward. Each answers with one item for
-	§ every item it was handed, or with those items and more besides. So none
-	§ of them can empty a List that was not empty. They are declared in the
-	§ order `List` declares them, so the two can be read side by side.
+	§ Five Methods spend the proof: `firstItem`, `lastItem`, `length`,
+	§ `lowestItem(on:)` and `greatestItem(on:)`. Everything else here carries
+	§ it forward. Most answer with one item for every item they were handed,
+	§ or with those items and more besides. So they can not empty a List that
+	§ was not empty. Splitting regroups the items instead, and every group it
+	§ opens holds one. Pairing demands the second proof of its Argument,
+	§ because it stops with the shorter List. They are declared in the order
+	§ `List` declares them, so the two can be read side by side.
 	§
 	§ Every entry is native, because the promise can not be said in Essence:
 	§ `<- @::map(transform)` is the right answer and its Type is
@@ -1016,9 +1019,10 @@ declarations {
 	§ one Namespace.
 	§
 	§ What the proof does not survive stays on `List`, from `everyItem` and
-	§ `slice` to `partition` and `split`. The single-item growers are absent
-	§ for the opposite reason: `append(_:)`, `prepend(_:)` and `insert(_:at:)`
-	§ answer a `NonEmptyList` on `List` itself, whatever they were handed.
+	§ `slice` to `partition` and `removeEvery(where:)`. The single-item
+	§ growers are absent for the opposite reason: `append(_:)`, `prepend(_:)`
+	§ and `insert(_:at:)` answer a `NonEmptyList` on `List` itself, whatever
+	§ they were handed.
 	namespace NonEmptyList<infer ItemType> for NonEmptyList<ItemType> {
 		§§ Answers the first item of the List, which certainly has one.
 		§§

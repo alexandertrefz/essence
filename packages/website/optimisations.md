@@ -599,9 +599,9 @@ re-exported, so it is inlined as List's is. `map` is the only walking Method the
 two share: `everyItem` and both `reduce` entries can answer with fewer items than
 they were handed, so a proven receiver reaches List's own entry by widening and
 arrives under List's own name. Everything else `NonEmptyList` declares is left
-alone — `reverse` and `sort` are re-exports this pass does not walk anyway, and
-`prepend(contentsOf:)`, `removeDuplicates` and `replace` are not List's Functions
-at all.
+alone — `reverse`, `sort`, `pair` and `split` are re-exports this pass does not
+walk anyway, and `prepend(contentsOf:)`, `removeDuplicates` and `replace` are not
+List's Functions at all.
 
 **A callback is inlined only where it is WRITTEN at the call.** A
 Function-valued name is whatever was bound to it, which is not something a
