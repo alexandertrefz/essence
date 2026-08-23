@@ -2703,6 +2703,28 @@ third"::lines())
 		numbers::lastIndex(of 9, defaultingTo -1),
 	)
 	show(
+		"List.lastIndex<ItemType>(where: (_ ItemType) -> Boolean)",
+		numbers::lastIndex(where (item) { <- item::isGreaterThan(2) }),
+	)
+	show(
+		"List.lastIndex<ItemType>(where: (_ ItemType) -> Boolean) [no match]",
+		numbers::lastIndex(where (item) { <- item::isGreaterThan(9) }),
+	)
+	show(
+		"List.lastIndex<ItemType>(where: (_ ItemType) -> Boolean, defaultingTo: Integer)",
+		numbers::lastIndex(
+			where (item) { <- item::isGreaterThan(2) },
+			defaultingTo -1,
+		),
+	)
+	show(
+		"List.lastIndex<ItemType>(where: (_ ItemType) -> Boolean, defaultingTo: Integer) [no match]",
+		numbers::lastIndex(
+			where (item) { <- item::isGreaterThan(9) },
+			defaultingTo -1,
+		),
+	)
+	show(
 		"List.join<ItemType is Printable>(with: String)",
 		["a", "b", "c"]::join(with " + "),
 	)
