@@ -24,19 +24,19 @@ declarations {
 
 		§§ Answers a whole number between two bounds, with both bounds included.
 		§§
-		§§ Bounds in the wrong order answer the lower bound.
+		§§ The two bounds name the same range in either order.
 		§§
-		§§ @param between — the lowest number the answer can be.
-		§§ @param and — the highest number the answer can be.
+		§§ @param between — one bound of the range.
+		§§ @param and — the other bound of the range.
 		§§ @returns — a number from the range, with each one equally likely.
 		integer(between low: Integer, and high: Integer) -> Integer
 
 		§§ Answers an exact fraction between two bounds, with both bounds included.
 		§§
-		§§ The denominator is one of the small ones a reader recognises. Bounds in the wrong order answer the lower bound.
+		§§ The denominator is one of the small ones a reader recognises. The two bounds name the same range in either order.
 		§§
-		§§ @param between — the lowest fraction the answer can be.
-		§§ @param and — the highest fraction the answer can be.
+		§§ @param between — one bound of the range.
+		§§ @param and — the other bound of the range.
 		§§ @returns — a fraction from the range.
 		rational(between low: Rational, and high: Rational) -> Rational
 

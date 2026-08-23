@@ -190,19 +190,19 @@ export function boolean(source: RandomnessType): BooleanType {
 	return createBoolean(nextWord(source) >= 2147483648)
 }
 
-// NOTE: Both bounds included, and bounds in the wrong order answer the lower
-// one — the same reading `Orderable::clamp` gives a pair that encloses nothing.
+// NOTE: Both bounds included, and the two naming the same range in either
+// order — the reading `Orderable::clamp` and `Orderable::isBetween` both give a
+// pair, so a draw between them reads it the same way. The bounds are exchanged
+// rather than the lower one answered, which is what made this the odd one out.
 export function integer(
 	source: RandomnessType,
 	low: IntegerType,
 	high: IntegerType,
 ): IntegerType {
-	let lowest = BigInt(low.value)
-	let highest = BigInt(high.value)
-
-	if (highest <= lowest) {
-		return createInteger(lowest)
-	}
+	let first = BigInt(low.value)
+	let second = BigInt(high.value)
+	let lowest = first <= second ? first : second
+	let highest = first <= second ? second : first
 
 	return createInteger(bigBetween(source, lowest, highest))
 }
@@ -213,21 +213,34 @@ export function integer(
 // halves, thirds, and the powers of ten a decimal is written with.
 const DENOMINATORS = [1n, 2n, 3n, 4n, 5n, 6n, 8n, 10n, 12n, 16n, 100n, 1000n]
 
+// NOTE: The two bounds name the same range in either order, exactly as they do
+// for the Integer above. A denominator is positive after `createRational`, so
+// the cross-multiplication below orders the pair.
 export function rational(
 	source: RandomnessType,
 	low: RationalType,
 	high: RationalType,
 ): RationalType {
+	let exchanged =
+		low.numerator * high.denominator > high.numerator * low.denominator
+	let lowerBound = exchanged ? high : low
+	let upperBound = exchanged ? low : high
 	let denominator = DENOMINATORS[below(source, DENOMINATORS.length)] ?? 1n
 	// NOTE: The bounds scaled to that denominator, rounded INWARDS on both
 	// sides, so every answer is inside the range the caller wrote. A range too
 	// narrow to hold one multiple of the denominator answers the lower bound,
 	// which is inside it.
-	let lowest = ceilingOf(low.numerator * denominator, low.denominator)
-	let highest = floorOf(high.numerator * denominator, high.denominator)
+	let lowest = ceilingOf(
+		lowerBound.numerator * denominator,
+		lowerBound.denominator,
+	)
+	let highest = floorOf(
+		upperBound.numerator * denominator,
+		upperBound.denominator,
+	)
 
 	if (highest < lowest) {
-		return createRational(low.numerator, low.denominator)
+		return createRational(lowerBound.numerator, lowerBound.denominator)
 	}
 
 	return createRational(bigBetween(source, lowest, highest), denominator)

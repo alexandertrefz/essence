@@ -182,10 +182,17 @@ describe("Randomness", () => {
 			expect([...seen].sort()).toEqual([1, 2, 3, 4])
 		})
 
-		test("answers the lower bound where the bounds are the wrong way round", () => {
-			expect(
-				integer(sourceOf(), createInteger(9), createInteger(2)).value,
-			).toBe(9)
+		test("reads the bounds as the same range either way round", () => {
+			let source = sourceOf()
+			let seen = new Set<number | bigint>()
+
+			for (let index = 0; index < 400; index++) {
+				seen.add(
+					integer(source, createInteger(4), createInteger(1)).value,
+				)
+			}
+
+			expect([...seen].sort()).toEqual([1, 2, 3, 4])
 		})
 
 		test("draws past the safe range as a bigint", () => {
@@ -252,6 +259,20 @@ describe("Randomness", () => {
 
 			expect(drawn.numerator).toBe(1n)
 			expect(drawn.denominator).toBe(7n)
+		})
+
+		test("reads the bounds as the same range either way round", () => {
+			let source = sourceOf()
+			let low = createRational(-3n, 2n)
+			let high = createRational(7n, 2n)
+
+			for (let index = 0; index < 500; index++) {
+				let drawn = rational(source, high, low)
+				let scaled = drawn.numerator * 2n
+
+				expect(scaled >= -3n * drawn.denominator).toBe(true)
+				expect(scaled <= 7n * drawn.denominator).toBe(true)
+			}
 		})
 	})
 
