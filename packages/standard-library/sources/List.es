@@ -1197,6 +1197,47 @@ declarations {
 				<- @::slice(from count::negate())
 			}
 		}
+
+		§ Gathering by a key, and the answer is a List of Records rather than a
+		§ Dictionary. There is no Dictionary Type in the language. A List of
+		§ groups also keeps something a Dictionary would throw away: the order
+		§ the keys were first met.
+		§
+		§ Quadratic in the number of distinct keys, as `removeDuplicates` is in
+		§ the number of distinct items. Every item looks for its key among the
+		§ groups opened so far. A bound of `Equatable` gives equality and
+		§ nothing to look a key up by.
+
+		§§ Answers the items gathered into groups, one group for each distinct key.
+		§§
+		§§ The groups stand in the order their keys were first met, and the items inside a group keep the order they were in. Every group holds at least one item, and the empty List answers no groups at all. The Method is available whenever what the key answers conforms to `Equatable`.
+		§§
+		§§ @param on — the key the items are gathered by
+		§§ @returns — the List of Records, each holding a key under `key` and the items gathered at it under `items`.
+		group<infer Key is Equatable>(
+			on key: (_: ItemType) -> Key,
+		) -> List<{ key: Key, items: List<ItemType> }> {
+			constant opened: List<{ key: Key, items: List<ItemType> }> = []
+
+			<- @::reduce(startingWith opened, (gathered, item) {
+				constant itemKey  = key(item)
+				constant position = gathered::firstIndex(where (candidate) {
+					<- candidate.key::is(itemKey)
+				})
+
+				<- match position -> List<{ key: Key, items: List<ItemType> }> {
+					case #Value(index) {
+						<- gathered::replace(at index, (found) {
+							<- { found with items = found.items::append(item) }
+						})
+					}
+
+					case #Empty        {
+						<- gathered::append({ key = itemKey, items = [item] })
+					}
+				}
+			})
+		}
 	}
 
 	§ A List of Lists, and the one Method only such a List can answer. Its
