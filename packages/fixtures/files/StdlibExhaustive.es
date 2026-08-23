@@ -290,32 +290,36 @@ third"::lines())
 		greeting::lastIndex(of "zz", defaultingTo -1),
 	)
 	show(
-		"String.pad(to: Integer, with: String, at?: Side) [no end named]",
+		"String.pad(to: Integer, with?: String, at?: Side) [no end named]",
 		"7"::pad(to 3, with "0"),
 	)
 	show(
-		"String.pad(to: Integer, with: String, at?: Side) [no end named, already long enough]",
+		"String.pad(to: Integer, with?: String, at?: Side) [no end named, already long enough]",
 		greeting::pad(to 3, with "0"),
 	)
 	show(
-		"String.pad(to: Integer, with: String, at?: Side) [end]",
+		"String.pad(to: Integer, with?: String, at?: Side) [end]",
 		"7"::pad(to 3, with ".", at Side#End),
 	)
 	show(
-		"String.pad(to: Integer, with: String, at?: Side) [end, already long enough]",
+		"String.pad(to: Integer, with?: String, at?: Side) [end, already long enough]",
 		greeting::pad(to 3, with ".", at Side#End),
 	)
 	show(
-		"String.pad(to: Integer, with: String, at?: Side) [both ends, even]",
+		"String.pad(to: Integer, with?: String, at?: Side) [both ends, even]",
 		"7"::pad(to 5, with "-", at Side#BothEnds),
 	)
 	show(
-		"String.pad(to: Integer, with: String, at?: Side) [both ends, odd]",
+		"String.pad(to: Integer, with?: String, at?: Side) [both ends, odd]",
 		"7"::pad(to 4, with "-", at Side#BothEnds),
 	)
 	show(
-		"String.pad(to: Integer, with: String, at?: Side) [both ends, multi-character]",
+		"String.pad(to: Integer, with?: String, at?: Side) [both ends, multi-character]",
 		"ab"::pad(to 8, with "xy", at Side#BothEnds),
+	)
+	show(
+		"String.pad(to: Integer, with?: String, at?: Side) [no padding named]",
+		"abc"::pad(to 6),
 	)
 	show("String.compare(to: String)", "app"::compare(to "apple"))
 	show(
