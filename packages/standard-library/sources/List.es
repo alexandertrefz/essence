@@ -115,7 +115,7 @@ declarations {
 		) -> NonEmptyList<Integer>
 
 		§ An Essence body would be length equality and
-		§ `pair(with other)::hasItems(onlyWhere …)`, and it can not be written
+		§ `pair(with other)::hasOnlyItems(where …)`, and it can not be written
 		§ that way yet. The pair Record mentions `ItemType`. Binding a List
 		§ Method's own `ItemType` to a Type that mentions it makes inference
 		§ substitute the name into itself until the stack runs out. The bound is
@@ -150,14 +150,14 @@ declarations {
 		§§ @returns — the String representation of the List.
 		toString<infer ItemType is Printable>() -> String
 
-		§ Both quantified entries fold a Boolean. The alternative is
+		§ Each quantified Method folds a Boolean. The alternative is
 		§ `firstItem(where:)::hasValue()`, which answers the same question and
 		§ builds an Optional per call to throw away. So the accumulator carries
 		§ the answer rather than the item.
 
-		§§ Answers whether the List has an item, has an item the check accepts, or holds only items the check accepts.
+		§§ Answers whether the List has an item, or has an item the check accepts.
 		§§
-		§§ @returns — `true` when the List has an item, when the check accepts an item, or when the check accepts every item.
+		§§ @returns — `true` when the List has an item, or when the check accepts an item.
 		overload hasItems {
 			§§ Answers whether the List has at least one item.
 			§§
@@ -187,17 +187,6 @@ declarations {
 						<- #Continue(found)
 					}
 				})
-			}
-
-			§§ Answers whether the check accepts every item.
-			§§
-			§§ The walk stops at the first item the check refuses. The empty List has no item to fail the check, so it answers `true`.
-			§§
-			§§ @param onlyWhere — the check each item is offered to
-			§§ @returns — `true` when the check accepts every item.
-			(onlyWhere check: (_: ItemType) -> Boolean) -> Boolean {
-				<- @::hasItems(where (item) { <- check(item)::negate() })
-					::negate()
 			}
 		}
 
@@ -235,6 +224,32 @@ declarations {
 			§ negated, over whatever item the call writes. See
 			§ DEVELOPMENT.md, Why bodies look the way they do.
 			<- @::contains(item)::negate()
+		}
+
+		§ The universal and the empty quantifier are Methods of their own
+		§ rather than labels on `hasItems`. A `hasItems(onlyWhere:)` promises
+		§ existence in its prefix and answers `true` for the empty List, which
+		§ is the opposite of what the prefix says. A name of its own says which
+		§ quantifier is asked.
+
+		§§ Answers whether the check accepts every item.
+		§§
+		§§ The walk stops at the first item the check refuses. The empty List has no item to fail the check, so it answers `true`.
+		§§
+		§§ @param where — the check each item is offered to
+		§§ @returns — `true` when the check accepts every item.
+		hasOnlyItems(where check: (_: ItemType) -> Boolean) -> Boolean {
+			<- @::hasItems(where (item) { <- check(item)::negate() })::negate()
+		}
+
+		§§ Answers whether the check accepts no item at all.
+		§§
+		§§ The walk stops at the first accepted item. The empty List has no item to accept, so it answers `true`.
+		§§
+		§§ @param where — the check each item is offered to
+		§§ @returns — `true` when the check accepts no item.
+		hasNoItems(where check: (_: ItemType) -> Boolean) -> Boolean {
+			<- @::hasItems(where check)::negate()
 		}
 
 		§§ Answers how many items the List has.

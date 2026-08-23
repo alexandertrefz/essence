@@ -273,7 +273,7 @@ describe("Stdlib searching Methods", () => {
 						Integer.parse("5"),
 					]
 
-					Terminal.inspect(parsed::hasItems(onlyWhere (value) {
+					Terminal.inspect(parsed::hasOnlyItems(where (value) {
 						<- value::hasValue()
 					})::toString())
 				}`),
@@ -329,13 +329,13 @@ describe("Stdlib searching Methods", () => {
 					Terminal.inspect(none::hasItems(where (item) {
 						<- item::isGreaterThan(0)
 					})::toString())
-					Terminal.inspect(numbers::hasItems(onlyWhere (item) {
+					Terminal.inspect(numbers::hasOnlyItems(where (item) {
 						<- item::isGreaterThan(0)
 					})::toString())
-					Terminal.inspect(numbers::hasItems(onlyWhere (item) {
+					Terminal.inspect(numbers::hasOnlyItems(where (item) {
 						<- item::isGreaterThan(2)
 					})::toString())
-					Terminal.inspect(none::hasItems(onlyWhere (item) {
+					Terminal.inspect(none::hasOnlyItems(where (item) {
 						<- item::isGreaterThan(0)
 					})::toString())
 				}`),
@@ -359,7 +359,7 @@ describe("Stdlib searching Methods", () => {
 					constant any = [1, 2, 3, 4]::hasItems(where (item) {
 						<- Terminal.inspect(item)::isGreaterThan(1)
 					})
-					constant every = [1, 2, 3, 4]::hasItems(onlyWhere (item) {
+					constant every = [1, 2, 3, 4]::hasOnlyItems(where (item) {
 						<- Terminal.inspect(item)::isLessThan(2)
 					})
 

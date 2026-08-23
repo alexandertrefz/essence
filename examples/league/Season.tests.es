@@ -26,12 +26,9 @@ tests {
 		}
 
 		test "gives the leader no rival on points" {
-			expect table
-				::everyItem(where (standing) {
-					<- standing.points::isLessThanOrEqualTo(leader.points)
-				})
-				::length()
-				::is(table::length())
+			expect table::hasOnlyItems(where (standing) {
+				<- standing.points::isLessThanOrEqualTo(leader.points)
+			})
 		}
 
 		test "puts the leader one point clear of the second row" {
@@ -58,12 +55,9 @@ tests {
 		}
 
 		test "leaves every row with as many results as it played" {
-			expect table
-				::everyItem(where (standing) {
-					<- standing.form::length()::is(standing.played)
-				})
-				::length()
-				::is(table::length())
+			expect table::hasOnlyItems(where (standing) {
+				<- standing.form::length()::is(standing.played)
+			})
 		}
 
 		§ The longest unbeaten run of the season — a question each row answers

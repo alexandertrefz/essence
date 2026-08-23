@@ -243,7 +243,7 @@ Composition is not free, and four costs are easy to miss because no test fails:
 - **A body can change complexity class.** `String.length` written as
   `@::characters()::length()` is correct, but builds a List of every character
   to count them, and pulls `List`'s whole import graph in behind it. It is
-  native too. `List.hasItems(where:)` and `hasItems(onlyWhere:)` ARE written in
+  native too. `List.hasItems(where:)` and `hasOnlyItems(where:)` ARE written in
   Essence, but on `reduce`'s early-stopping entry rather than on the eager
   `everyItem(where:)`, so they stop at the item that decides the answer — the
   earlier filtering form lost that and measured ~0 ms → ~180 ms over 2000 calls

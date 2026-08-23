@@ -93,14 +93,11 @@ tests {
 		}
 
 		test "sells every product under a SKU of its own" {
-			expect catalog
-				::everyItem(where (product) {
-					<- catalog
-						::count(where (other) { <- other.sku::is(product.sku) })
-						::is(1)
-				})
-				::length()
-				::is(catalog::length())
+			expect catalog::hasOnlyItems(where (product) {
+				<- catalog
+					::count(where (other) { <- other.sku::is(product.sku) })
+					::is(1)
+			})
 		}
 	}
 }

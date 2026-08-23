@@ -203,18 +203,11 @@ tests {
 		§ lists are written apart, and nothing but structural equality keeps
 		§ them in step.
 		test "is played by the teams it says it is" {
-			expect fixtures
-				::everyItem(where (fixture) {
-					<- fixture
-						::teams()
-						::everyItem(where (team) {
-							<- teams::contains(team)::negate()
-						})
-						::hasItems()
-						::negate()
-				})
-				::length()
-				::is(fixtures::length())
+			expect fixtures::hasOnlyItems(where (fixture) {
+				<- fixture
+					::teams()
+					::hasOnlyItems(where (team) { <- teams::contains(team) })
+			})
 		}
 
 		test "carries the forfeit and the postponement it is known for" {
