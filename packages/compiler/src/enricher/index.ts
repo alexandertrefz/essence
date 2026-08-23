@@ -1252,15 +1252,34 @@ function hoistDeclarationsInner(
 	// the questions they ask, because a body named something still on its way —
 	// `Integer::isLessThanOrEqualTo` is written on a Rational's own comparison,
 	// and one of the two numeric kinds reaches Scope first. Offered again at the
-	// top of every later round, and once more before the predicates get their
-	// final reading, so a `where` clause written on such a Method is filled with
-	// the alias already known. A reading that succeeds drops out of the list.
+	// top of a later round, and once more before the predicates get their final
+	// reading, so a `where` clause written on such a Method is filled with the
+	// alias already known. A reading that succeeds drops out of the list.
+	//
+	// NOTE: A reading is offered again only once something it could have been
+	// waiting FOR has arrived — a Namespace hoisting, or a round of seeding
+	// binding an import. Reading a body means enriching it, and a body naming
+	// something hoisting will never put in Scope (a Program's Constant) is
+	// indistinguishable from one waiting on a Namespace: it fails every time.
+	// Without this a Program with a deep chain of Protocols paid for every such
+	// body once per round, and 20 of them over 30 rounds cost more than the
+	// rest of the enrichment together.
+	let hoistGeneration = 0
 	let unreadAliases: Array<{
 		blocks: (conjunct: common.PredicateConjunct) => boolean
 		reread: () => boolean
+		attemptedAt: number
 	}> = []
-	let rereadAliases = (): void => {
-		unreadAliases = unreadAliases.filter((entry) => !entry.reread())
+	let rereadAliases = (force: boolean): void => {
+		unreadAliases = unreadAliases.filter((entry) => {
+			if (!force && entry.attemptedAt === hoistGeneration) {
+				return true
+			}
+
+			entry.attemptedAt = hoistGeneration
+
+			return !entry.reread()
+		})
 	}
 	// NOTE: Whether a leaf could still be read further. A Namespace whose own
 	// bodies did not all resolve blocks every leaf naming IT; a Protocol blocks
@@ -1277,12 +1296,16 @@ function hoistDeclarationsInner(
 		// own declarations are resolved.
 		let seeded = seedRound?.(false) ?? false
 
+		if (seeded) {
+			hoistGeneration++
+		}
+
 		// NOTE: Before the declarations too, and for the mirror reason: a
 		// predicate left pending by the previous round may be answerable by a
 		// Namespace that round hoisted, and whatever reads the conjuncts THIS
 		// round — a bodied static Property enriched while its Namespace resolves —
 		// has to find them written in.
-		rereadAliases()
+		rereadAliases(false)
 		fillPendingPredicates(
 			pendingPredicates,
 			sink,
@@ -1465,11 +1488,14 @@ function hoistDeclarationsInner(
 					let reread = (): boolean =>
 						derivePredicateAliases(node, namespaceType, scope)
 
+					hoistGeneration++
+
 					if (!reread()) {
 						unreadAliases.push({
 							blocks: (conjunct) =>
 								conjunct.namespaceName === node.name.content,
 							reread,
+							attemptedAt: hoistGeneration,
 						})
 					}
 				} else if (node.nodeType === "ProtocolDeclarationStatement") {
@@ -1494,6 +1520,7 @@ function hoistDeclarationsInner(
 							blocks: (conjunct) =>
 								names.has(conjunct.methodName),
 							reread,
+							attemptedAt: hoistGeneration,
 						})
 					}
 				}
@@ -1550,7 +1577,7 @@ function hoistDeclarationsInner(
 	// for the in-order enrichment to resolve and report. Nothing past hoisting
 	// ever meets `conjuncts: null` — that is the promise every thrown guard on
 	// it stands on.
-	rereadAliases()
+	rereadAliases(true)
 	fillPendingPredicates(pendingPredicates, sink, hoistedTypes, true)
 
 	// NOTE: Each recursive declaration is resolved once, with the seeded Errors
