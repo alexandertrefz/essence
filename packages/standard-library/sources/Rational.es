@@ -551,9 +551,9 @@ declarations {
 		}
 
 		§ The sign of a Rational is the sign of its numerator, because the
-		§ denominator is always positive in lowest terms. So these three are
+		§ denominator is always positive in lowest terms. So the two below are
 		§ the Integer questions of the same names asked one level down, and
-		§ none of them builds a `0/1` to compare against.
+		§ neither builds a `0/1` to compare against.
 
 		§§ Answers whether the Rational is above zero.
 		§§
@@ -571,7 +571,14 @@ declarations {
 
 		§§ Answers whether the Rational is exactly zero.
 		isZero() -> Boolean {
-			<- @::numerator()::isZero()
+			§ This one asks `@` rather than its numerator, and the bound is
+			§ the `0/1` `NonZeroRational` is written over. A predicate
+			§ written as one call on `@` is that call. So the `else` of an
+			§ `if` asking this proves that refinement, exactly as Integer's
+			§ `isZero` does. Reading the numerator would be a chain, and
+			§ would prove nothing. See DEVELOPMENT.md, Why bodies look the
+			§ way they do.
+			<- @::is(0/1)
 		}
 
 		§§ Answers the numerator of the Rational in lowest terms.
