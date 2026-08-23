@@ -7732,7 +7732,7 @@ function writtenReceiverKey(base: common.typed.ExpressionNode): string | null {
 		case "StringValue":
 			return base.type.type === "String" ? `S${base.value}` : null
 		case "BooleanValue":
-			return base.type.type === "Boolean" ? `B${base.value}` : null
+			return `B${base.value}`
 		default:
 			return null
 	}
@@ -7848,10 +7848,15 @@ function provenLiteralReceiverType(
 	return remembered
 }
 
-// NOTE: The receiver Node carrying whatever it proved about itself. Only the five
-// written shapes are ever refined — the ones `literalValueOf` can read — and the
-// switch is what says so in the Types rather than in a comment: every other
-// Expression comes back as itself, untouched and unallocated.
+// NOTE: The receiver Node carrying whatever it proved about itself. Only the four
+// written shapes a refinement may be written ON are ever refined — an Integer, a
+// Rational, a String and a List — and the switch is what says so in the Types
+// rather than in a comment: every other Expression comes back as itself,
+// untouched and unallocated.
+//
+// A written Boolean is not among them, though `literalValueOf` reads one: it is
+// read because it can stand as a written List's ITEM, and `isRefinableBase`
+// refuses a Boolean outright, so no refinement can ever admit one.
 function writtenReceiver(
 	base: common.typed.ExpressionNode,
 	scope: enricher.Scope,
@@ -7868,8 +7873,6 @@ function writtenReceiver(
 		case "RationalValue":
 			return { ...base, type: refinement }
 		case "StringValue":
-			return { ...base, type: refinement }
-		case "BooleanValue":
 			return { ...base, type: refinement }
 		case "ListValue":
 			return { ...base, type: refinement }

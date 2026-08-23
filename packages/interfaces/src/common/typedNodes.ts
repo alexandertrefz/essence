@@ -402,9 +402,15 @@ export type RecordValueNode = {
 // NOTE: A written value's Type is its own kind, or a REFINEMENT of it. Only one
 // position ever refines one: a Method receiver, which is the one position that
 // asks a value nothing and so lets the value answer for itself — `4::squareRoot()`
-// reaches `namespace NonNegativeInteger` because the `4` says so. Everywhere else
-// a written value keeps the kind it is written as, and a refinement is erased
+// reaches `namespace NonNegativeInteger` because the `4` says so, and
+// `1/2::reciprocal()` reaches `namespace NonZeroRational`. Everywhere else a
+// written value keeps the kind it is written as, and a refinement is erased
 // before emission, so `typedSimple`'s twins of these Nodes carry the kind alone.
+//
+// The four kinds a refinement may be written ON are the four that carry one:
+// `Integer`, `Rational`, `String` and an applied `List`. A written Boolean is
+// read by the admission table — it can stand as a written List's ITEM — and is
+// still never refined itself, because no `where` clause may be written on one.
 export type StringValueNode = {
 	nodeType: "StringValue"
 	value: string
@@ -432,12 +438,7 @@ export type InterpolatedStringValueNode = {
 	type: StringType
 }
 
-// NOTE: A written value's Type is its own kind, or a REFINEMENT of it. Only one
-// position ever refines one: a Method receiver, which is the one position that
-// asks a value nothing and so lets the value answer for itself — `4::squareRoot()`
-// reaches `namespace NonNegativeInteger` because the `4` says so. Everywhere else
-// a written value keeps the kind it is written as, and a refinement is erased
-// before emission, so `typedSimple`'s twins of these Nodes carry the kind alone.
+// NOTE: Refined as a receiver and nowhere else — see `StringValueNode` above.
 export type IntegerValueNode = {
 	nodeType: "IntegerValue"
 	value: string
@@ -445,13 +446,7 @@ export type IntegerValueNode = {
 	type: IntegerType | RefinementType
 }
 
-// NOTE: A written value's Type is its own kind, or a REFINEMENT of it. Only one
-// position ever refines one: a Method receiver, which is the one position that
-// asks a value nothing and so lets the value answer for itself —
-// `1/2::reciprocal()` reaches `namespace NonZeroRational` because the `1/2` says
-// so. Everywhere else a written value keeps the kind it is written as, and a
-// refinement is erased before emission, so `typedSimple`'s twins of these Nodes
-// carry the kind alone.
+// NOTE: Refined as a receiver and nowhere else — see `StringValueNode` above.
 export type RationalValueNode = {
 	nodeType: "RationalValue"
 	numerator: string
@@ -460,17 +455,14 @@ export type RationalValueNode = {
 	type: RationalType | RefinementType
 }
 
-// NOTE: A written value's Type is its own kind, or a REFINEMENT of it. Only one
-// position ever refines one: a Method receiver, which is the one position that
-// asks a value nothing and so lets the value answer for itself — `4::squareRoot()`
-// reaches `namespace NonNegativeInteger` because the `4` says so. Everywhere else
-// a written value keeps the kind it is written as, and a refinement is erased
-// before emission, so `typedSimple`'s twins of these Nodes carry the kind alone.
+// NOTE: The one written value that is never refined, for the reason the NOTE
+// above `StringValueNode` gives: no `where` clause may be written on a Boolean,
+// so no refinement can have one as its base and none can admit one.
 export type BooleanValueNode = {
 	nodeType: "BooleanValue"
 	value: boolean
 	position: Position
-	type: BooleanType | RefinementType
+	type: BooleanType
 }
 
 // NOTE: `synthesized` marks a Function literal no source wrote — a member path
@@ -487,12 +479,7 @@ export type FunctionValueNode = {
 	synthesized?: "path"
 }
 
-// NOTE: A written value's Type is its own kind, or a REFINEMENT of it. Only one
-// position ever refines one: a Method receiver, which is the one position that
-// asks a value nothing and so lets the value answer for itself — `4::squareRoot()`
-// reaches `namespace NonNegativeInteger` because the `4` says so. Everywhere else
-// a written value keeps the kind it is written as, and a refinement is erased
-// before emission, so `typedSimple`'s twins of these Nodes carry the kind alone.
+// NOTE: Refined as a receiver and nowhere else — see `StringValueNode` above.
 export type ListValueNode = {
 	nodeType: "ListValue"
 	values: Array<ExpressionNode>
