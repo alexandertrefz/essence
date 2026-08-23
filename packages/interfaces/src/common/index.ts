@@ -831,6 +831,13 @@ export type PredicateAlias = {
 // conjunct's own Arguments are, or the POSITION of a Parameter the body
 // forwarded. Positions are counted over the Arguments a caller writes, so the
 // receiver is no part of them.
+//
+// A position is where the Parameter was DECLARED, which is where the Argument is
+// WRITTEN only because a Method with a defaulted Parameter is refused a reading:
+// a caller leaving one out would shift every slot after it. If a call ever gets
+// to write its labelled Arguments in another order, the slots have to be paired
+// by label rather than by position, here and wherever a conjunct's own Arguments
+// are built.
 export type PredicateAliasArgument =
 	| { kind: "Literal"; value: string | boolean }
 	| { kind: "Parameter"; index: number }
