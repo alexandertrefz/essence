@@ -44,7 +44,7 @@ import {
 	lastItem,
 	prepend as prependContentsOf,
 	removeDuplicates,
-	replace,
+	replace__overload$1 as replace,
 } from "../NonEmptyList"
 import { createString } from "../String"
 import { getStringRepresentation } from "../Terminal"

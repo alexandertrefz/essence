@@ -156,7 +156,7 @@ export { reverse, sort__overload$1, sort__overload$2 } from "./List"
 // position falls in rather than for the whole of itself, and the receiver keeps
 // the representation it arrived in — nothing here combines the runs, because
 // combining them would be the very copy this is avoiding.
-export function replace<ItemType extends AnyType>(
+export function replace__overload$1<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 	item: ItemType,
 	at: IntegerType,

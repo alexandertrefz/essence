@@ -2777,6 +2777,31 @@ third"::lines())
 		"List.replace<ItemType>(_ ItemType, at: Integer) [before the start]",
 		numbers::replace(99, at -99),
 	)
+	§ The transform entry, over the same five positions. It is written on the
+	§ entry above, so the two answer the same position the same way — and the
+	§ transform is never run where no item stands.
+	show(
+		"List.replace<ItemType>(at: Integer, _ (_ ItemType) -> ItemType)",
+		numbers::replace(at 0, (item) { <- item::multiply(with 10) }),
+	)
+	show(
+		"List.replace<ItemType>(at: Integer, _ (_ ItemType) -> ItemType) [at length]",
+		numbers::replace(at numbers::length(), (item) {
+			<- item::multiply(with 10)
+		}),
+	)
+	show(
+		"List.replace<ItemType>(at: Integer, _ (_ ItemType) -> ItemType) [negative]",
+		numbers::replace(at -1, (item) { <- item::multiply(with 10) }),
+	)
+	show(
+		"List.replace<ItemType>(at: Integer, _ (_ ItemType) -> ItemType) [before the start]",
+		numbers::replace(at -99, (item) { <- item::multiply(with 10) }),
+	)
+	show(
+		"List.replace<ItemType>(at: Integer, _ (_ ItemType) -> ItemType) [empty]",
+		noNumbers::replace(at 0, (item) { <- item::multiply(with 10) }),
+	)
 	show(
 		"List.lastIndex<ItemType is Equatable>(of: ItemType)",
 		numbers::lastIndex(of 1),
@@ -2957,7 +2982,6 @@ third"::lines())
 		numbers::lastItems(99),
 	)
 	show("List.lastItems<ItemType>(_ Integer) [empty]", noNumbers::lastItems(2))
-
 	§ ——— NestedList ———————————————————————————————————————————————————————
 	show("NestedList.flatten<ItemType>()", [[1, 2], [3]]::flatten())
 	show("NestedList.flatten<ItemType>() [empty]", noNestedNumbers::flatten())
@@ -3164,6 +3188,26 @@ third"::lines())
 	show(
 		"NonEmptyList.replace<ItemType>(_ ItemType, at: Integer) [proof carried]",
 		provenNumbers::replace(99, at -99)::lastItem(),
+	)
+	§ The transform entry, which carries the proof through the `by:`-shaped
+	§ route: it hands the entry above an item and answers what that answers.
+	show(
+		"NonEmptyList.replace<ItemType>(at: Integer, _ (_ ItemType) -> ItemType)",
+		provenNumbers::replace(at 0, (item) { <- item::multiply(with 10) }),
+	)
+	show(
+		"NonEmptyList.replace<ItemType>(at: Integer, _ (_ ItemType) -> ItemType) [negative]",
+		provenNumbers::replace(at -1, (item) { <- item::multiply(with 10) }),
+	)
+	show(
+		"NonEmptyList.replace<ItemType>(at: Integer, _ (_ ItemType) -> ItemType) [before the start]",
+		provenNumbers::replace(at -99, (item) { <- item::multiply(with 10) }),
+	)
+	show(
+		"NonEmptyList.replace<ItemType>(at: Integer, _ (_ ItemType) -> ItemType) [proof carried]",
+		provenNumbers
+			::replace(at -99, (item) { <- item::multiply(with 10) })
+			::lastItem(),
 	)
 	§ Pairing asks the Argument for the proof the receiver carries, since the
 	§ pairing stops with the shorter of the two. One pair only, for the reason
