@@ -7925,6 +7925,65 @@ describe("Enricher", () => {
 				).toBe("Over")
 			})
 
+			// NOTE: Three Namespaces, one chain, and every order of writing
+			// them down. A Namespace hoisting before what it names records the
+			// NAME, and one that hoists after records what the name had said by
+			// then, so a reading is finished where the leaf is read rather than
+			// where the body was. The middle Namespace is written first here,
+			// which is the order that leaves it recording a name.
+			const ASKS = {
+				A: `namespace Asker for Integer {
+						asks(_ n: Integer) -> Boolean {
+							<- @::isGreaterThan(n)
+						}
+					}`,
+				B: `namespace Relay for Integer {
+						relays(_ n: Integer) -> Boolean {
+							<- @::asks(n)
+						}
+					}`,
+				C: `namespace Chain for Integer {
+						chains(_ n: Integer) -> Boolean {
+							<- @::relays(n)
+						}
+					}`,
+			}
+
+			function chainedTypeOf(order: Array<"A" | "B" | "C">): string {
+				return narrowedTypeOf(
+					`implementation {
+						${order.map((name) => ASKS[name]).join("\n\n")}
+
+						type Over = Integer where @::isGreaterThan(9)
+
+						constant d = 12
+
+						if d::chains(9) {
+							Terminal.inspect(d)
+						}
+					}`,
+					"d",
+				)
+			}
+
+			it("should resolve a chain across Namespaces in every order", () => {
+				expect([
+					chainedTypeOf(["A", "B", "C"]),
+					chainedTypeOf(["A", "C", "B"]),
+					chainedTypeOf(["B", "A", "C"]),
+					chainedTypeOf(["B", "C", "A"]),
+					chainedTypeOf(["C", "A", "B"]),
+					chainedTypeOf(["C", "B", "A"]),
+				]).toEqual([
+					"Over",
+					"Over",
+					"Over",
+					"Over",
+					"Over",
+					"Over",
+				])
+			})
+
 			// NOTE: Two Methods written as each other's contrary say nothing
 			// about anything: believing either would make the other its own
 			// contrary. Both are left asking their own question, so the `else`
@@ -7990,6 +8049,46 @@ describe("Enricher", () => {
 							if d::isAtMost(3) {
 								Terminal.inspect(0)
 							} else {
+								Terminal.inspect(d)
+							}
+						}`,
+						"d",
+					),
+				).toBe("Above")
+			})
+
+			// NOTE: And a body of the CONFORMER's own that names a provided
+			// Method reaches the requirement through two readings, neither of
+			// which the other could see: the provided body names `Self::isAbove`
+			// and this one names the provided body. Both are recorded by the
+			// time the leaf is read, so the leaf is followed the whole way.
+			it("should follow a conformer's body through a provided one", () => {
+				expect(
+					narrowedTypeOf(
+						`implementation {
+							protocol Ranked {
+								isAbove(_ n: Integer) -> Boolean
+
+								isAtMost(_ n: Integer) -> Boolean {
+									<- @::isAbove(n)::negate()
+								}
+							}
+
+							namespace Rank for Integer is Ranked {
+								isAbove(_ n: Integer) -> Boolean {
+									<- @::isGreaterThan(n)
+								}
+
+								isWayOff(_ n: Integer) -> Boolean {
+									<- @::isAtMost(n)::negate()
+								}
+							}
+
+							type Above = Integer where @::isGreaterThan(3)
+
+							constant d = 12
+
+							if d::isWayOff(3) {
 								Terminal.inspect(d)
 							}
 						}`,

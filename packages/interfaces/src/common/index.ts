@@ -819,7 +819,10 @@ export type PredicateSpelling = {
 // A chain is resolved through: an alias whose target is itself one is recorded
 // as the leaf both of them mean, whichever order the two were written in, and a
 // ring of Methods defined by each other is left primitive rather than followed
-// round.
+// round. What the hoist can not fold — a witness's own body under a Protocol's
+// requirement, and a target whose reading was recorded after the body naming it
+// — is followed where the leaf is read instead, so the order two declarations
+// were written in decides nothing either way.
 export type PredicateAlias = {
 	namespaceName: string | null
 	methodName: string

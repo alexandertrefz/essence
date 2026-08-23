@@ -13462,27 +13462,61 @@ function resolvedConjunct(
 			? null
 			: aliasLeafOf(alias, invocation.namespace.name, args)
 
-	// NOTE: An alias read on `Self` names a Method of the WITNESS, which is the
-	// one step the reading could not take: a Protocol sees a requirement where
-	// a conformer may have written a body. So it is taken here, once, against
-	// the Namespace the witness turned out to be.
-	if (resolved !== null && alias?.namespaceName === null) {
-		resolved = throughWitness(resolved, scope) ?? resolved
+	// NOTE: And whatever the leaf itself is written on is followed from here,
+	// which is the step the reading could not take. A Protocol sees a
+	// REQUIREMENT where a conformer may have written a body, and a body read
+	// while what it names was still on its way records the name rather than the
+	// leaf. Both are settled by the time anything asks, so asking is what this
+	// does.
+	if (resolved !== null) {
+		resolved = collapsedLeaf(resolved, scope)
 	}
 
 	return { ...forNumericBase(resolved ?? written, tag), spelling }
 }
 
-// NOTE: The leaf a WITNESS's own Method stands for, where a Protocol's provided
-// body named it. `Ranked::isAtMost` is written on `Self::isAbove`, and what
+// NOTE: A leaf followed to the end of whatever it names. Every step is one
+// Method's recorded reading, so a chain the hoist collapsed answers at the first
+// step and stops; what is left to follow here is what hoisting could not see —
+// the witness's own body under a Protocol's requirement, and a target whose
+// reading was recorded after the body naming it had been read.
+//
+// A leaf coming back round is left EXACTLY as it arrived: two Methods written
+// as each other's contraries say nothing about either, and believing a step
+// would make the answer depend on which of them was asked.
+function collapsedLeaf(
+	leaf: common.PredicateConjunct,
+	scope: enricher.Scope,
+): common.PredicateConjunct {
+	let current = leaf
+	let seen = new Set<string>([`${leaf.namespaceName}::${leaf.methodName}`])
+
+	for (;;) {
+		let next = throughWitness(current, scope)
+
+		if (next === null) {
+			return current
+		}
+
+		let key = `${next.namespaceName}::${next.methodName}`
+
+		if (seen.has(key)) {
+			return leaf
+		}
+
+		seen.add(key)
+		current = next
+	}
+}
+
+// NOTE: The leaf one Method's own reading names, or null where the Method has
+// nothing recorded. `Ranked::isAtMost` is written on `Self::isAbove`, and what
 // `isAbove` asks is the conformer's business — `namespace Rank for Integer`
 // writes it as `@::isGreaterThan(n)`, so a receiver of Rank's proves the leaf
-// both spellings mean. Null where the witness says nothing further.
+// both spellings mean.
 //
-// One step and no more: a Namespace's own aliases are collapsed as it hoists,
-// so whatever the witness records is already the leaf it means. An OVERLOADED
-// Method is left as it stands — which entry a leaf names is the Arguments'
-// business, and nothing here resolves one.
+// An OVERLOADED Method is left as it stands — which entry a leaf names is the
+// Arguments' business, and nothing here resolves one.
 function throughWitness(
 	leaf: common.PredicateConjunct,
 	scope: enricher.Scope,
@@ -14422,9 +14456,11 @@ type CollapseContext = {
 // NOTE: One candidate as the PRIMITIVE it names, however many Methods stand
 // between the two. A target read in the same declaration is collapsed first, so
 // which of the pair was written above the other decides nothing; a target
-// somewhere else was collapsed when ITS declaration reached Scope, and reading
-// its recorded alias once is the whole of the chain. Remembered per entry, so a
-// declaration whose Methods all forward to one of them costs one walk.
+// somewhere else is folded in from whatever it had recorded by now, which is
+// the whole of the chain wherever that reading was already finished. Where it
+// was not, the leaf is followed the rest of the way at the call. Remembered per
+// entry, so a declaration whose Methods all forward to one of them costs one
+// walk.
 function collapsedAlias(
 	candidate: AliasCandidate,
 	context: CollapseContext,
