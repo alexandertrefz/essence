@@ -2040,6 +2040,8 @@ describe("Standard Library Loader", () => {
 
 		expect([...new Set(primitives)].sort()).toEqual([
 			"Algebraic::is",
+			"Algebraic::isNegative",
+			"Algebraic::isPositive",
 			"Boolean::and",
 			"Boolean::is",
 			"Boolean::negate",
@@ -2060,7 +2062,10 @@ describe("Standard Library Loader", () => {
 			"Rational::is",
 			"Rational::isGreaterThan",
 			"Rational::isLessThan",
+			"Rational::isNegative",
+			"Rational::isPositive",
 			"Rational::isWholeNumber",
+			"Rational::isZero",
 			"Record::is",
 			"String::contains",
 			"String::ends",

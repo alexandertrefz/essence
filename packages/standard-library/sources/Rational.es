@@ -499,6 +499,30 @@ declarations {
 			<- @::denominator()::is(1)
 		}
 
+		§ The sign of a Rational is the sign of its numerator, because the
+		§ denominator is always positive in lowest terms. So these three are
+		§ the Integer questions of the same names asked one level down, and
+		§ none of them builds a `0/1` to compare against.
+
+		§§ Answers whether the Rational is above zero.
+		§§
+		§§ Zero is neither positive nor negative.
+		isPositive() -> Boolean {
+			<- @::numerator()::isPositive()
+		}
+
+		§§ Answers whether the Rational is below zero.
+		§§
+		§§ Zero is neither positive nor negative.
+		isNegative() -> Boolean {
+			<- @::numerator()::isNegative()
+		}
+
+		§§ Answers whether the Rational is exactly zero.
+		isZero() -> Boolean {
+			<- @::numerator()::isZero()
+		}
+
 		§§ Answers the numerator of the Rational in lowest terms.
 		§§
 		§§ The numerator carries the sign, because the denominator is always positive.
@@ -511,7 +535,7 @@ declarations {
 
 		§§ Answers the Rational without its sign, which is its distance from zero.
 		absolute() -> Rational {
-			if @::isLessThan(0/1) {
+			if @::isNegative() {
 				<- @::negate()
 			} else {
 				<- @

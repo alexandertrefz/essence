@@ -897,6 +897,12 @@ third"::lines())
 	)
 	show("Rational.isWholeNumber()", 4/2::isWholeNumber())
 	show("Rational.isWholeNumber() [fractional]", 3/4::isWholeNumber())
+	show("Rational.isPositive()", 3/4::isPositive())
+	show("Rational.isPositive() [zero]", 0/1::isPositive())
+	show("Rational.isNegative()", -3/4::isNegative())
+	show("Rational.isNegative() [zero]", 0/1::isNegative())
+	show("Rational.isZero()", 0/1::isZero())
+	show("Rational.isZero() [non zero]", 3/4::isZero())
 	show("Rational.round(toward?: Rounding) [no direction named]", 7/2::round())
 	show(
 		"Rational.round(toward?: Rounding) [negative, no direction named]",
@@ -1217,6 +1223,13 @@ third"::lines())
 			"Algebraic.divide(by: Algebraic, defaultingTo: Rational | Algebraic) [differing radicals]",
 			rootTwo::divide(by rootThree, defaultingTo 0/1),
 		)
+		show("Algebraic.isPositive()", rootTwo::isPositive())
+		show(
+			"Algebraic.isPositive() [negative]",
+			rootTwo::negate()::isPositive(),
+		)
+		show("Algebraic.isNegative()", rootTwo::negate()::isNegative())
+		show("Algebraic.isNegative() [positive]", rootTwo::isNegative())
 		show("Algebraic.absolute()", rootTwo::absolute())
 		show("Algebraic.absolute() [negative]", rootTwo::negate()::absolute())
 		show("Algebraic.negate()", rootTwo::negate())
