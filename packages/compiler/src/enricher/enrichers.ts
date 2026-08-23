@@ -13432,19 +13432,6 @@ function reportInvalidPredicateLeaf(
 // `Integer::isGreaterThan(9)` negated off `isLessThanOrEqualTo`'s body, which
 // forwards the Argument it was handed. Nothing here resolves an Overload — the
 // entry the call already resolved to is the one whose template is read.
-// NOTE: The three Methods the standard library writes as the contrary of
-// another over the same Argument, read by NAME for an entry that carries no
-// body to read instead. Every bodied one is now read off its body — see
-// `derivePredicateAliases` — and this is what a bare signature falls back to.
-//
-// NOTE: The names are read only where the BASE itself answers them, which is
-// `narrowedBy`'s guard and the one `impliedConjunctKeys` reads.
-const PRIMITIVE_PREDICATES: ReadonlyMap<string, string> = new Map([
-	["isNot", "is"],
-	["isGreaterThanOrEqualTo", "isLessThan"],
-	["isLessThanOrEqualTo", "isGreaterThan"],
-])
-
 function resolvedConjunct(
 	invocation: common.typed.MethodInvocationNode,
 	args: Array<string | boolean>,
@@ -13461,20 +13448,14 @@ function resolvedConjunct(
 	// refinement already. Both have to key alike, or an `if` would stop
 	// rewriting where the clause it has to match kept on.
 	let tag = refinableBaseTag(invocation.base.type)
-	let leaf: common.PredicateConjunct = {
+	// NOTE: The leaf a Method with nothing to read stands for — itself. No
+	// Method is named anywhere as the contrary of another: a body says it, and
+	// a Method whose body says nothing asks its own question.
+	let written: common.PredicateConjunct = {
 		namespaceName: invocation.namespace.name,
 		methodName: spelling.methodName,
 		args,
 		negated: false,
-	}
-	let primitive =
-		args.length === 1 && answersForBase(leaf, tag)
-			? PRIMITIVE_PREDICATES.get(spelling.methodName)
-			: undefined
-	let written: common.PredicateConjunct = {
-		...leaf,
-		methodName: primitive ?? spelling.methodName,
-		negated: primitive !== undefined,
 	}
 	let resolved =
 		alias === undefined
