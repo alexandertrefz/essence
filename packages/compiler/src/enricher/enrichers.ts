@@ -13959,9 +13959,7 @@ function booleanEntryOf(
 // The receiver may be `@` or a bare name, since a body may write the ordering
 // backwards (`<- other::isGreaterThanOrEqualTo(@)`). Which of the two it was is
 // settled once the call is enriched and the name has a Parameter to be.
-function aliasBodyOf(
-	definition: parser.FunctionDefinitionNode,
-): { call: parser.MethodInvocationNode; negated: boolean } | null {
+function aliasBodyOf(definition: parser.FunctionDefinitionNode): AliasBody | null {
 	if (definition.body.length !== 1) {
 		return null
 	}
@@ -13977,25 +13975,36 @@ function aliasBodyOf(
 		: null
 }
 
-// NOTE: A Method call, with an outermost `::negate()` peeled off it and counted.
-function aliasCallOf(
-	expression: parser.ExpressionNode,
-): { call: parser.MethodInvocationNode; negated: boolean } | null {
-	let negated = false
+// NOTE: A body as the reading has to enrich it. `expression` is the WHOLE of
+// what was written, `::negate()` and all, because a name is nobody's until the
+// Enricher says whose it is — `peeled` only records that a trailing `negate`
+// was found by shape, and whether it is Boolean's own is settled after.
+type AliasBody = {
+	expression: parser.ExpressionNode
+	peeled: boolean
+	negated: boolean
+}
+
+// NOTE: A Method call, with an outermost `::negate()` found by shape and
+// counted. The Expression is handed on WHOLE: peeling here and enriching what
+// is left would take a Program's own `negate` for Boolean's, and every body
+// carrying one would be read as the contrary of what it asks.
+function aliasCallOf(expression: parser.ExpressionNode): AliasBody | null {
+	let call = expression
+	let peeled = false
 
 	if (
-		expression.nodeType === "MethodInvocation" &&
-		expression.member.content === "negate" &&
-		expression.arguments.length === 0
+		call.nodeType === "MethodInvocation" &&
+		call.member.content === "negate" &&
+		call.arguments.length === 0
 	) {
-		negated = true
-		expression = expression.base
+		peeled = true
+		call = call.base
 	}
 
-	return expression.nodeType === "MethodInvocation" &&
-		(expression.base.nodeType === "Self" ||
-			expression.base.nodeType === "Identifier")
-		? { call: expression, negated }
+	return call.nodeType === "MethodInvocation" &&
+		(call.base.nodeType === "Self" || call.base.nodeType === "Identifier")
+		? { expression, peeled, negated: peeled }
 		: null
 }
 
@@ -14008,9 +14017,7 @@ function aliasCallOf(
 // Exactly that shape and no other: the `if` is the whole body, each branch
 // answers one written Boolean, and the two differ. `{ <- true } else { <- false }`
 // is the call itself; `{ <- false } else { <- true }` is the call negated.
-function aliasIfShapeOf(
-	statement: parser.IfElseStatementNode,
-): { call: parser.MethodInvocationNode; negated: boolean } | null {
+function aliasIfShapeOf(statement: parser.IfElseStatementNode): AliasBody | null {
 	let answered = returnedBooleanOf(statement.trueBody)
 	let otherwise = returnedBooleanOf(statement.falseBody)
 
@@ -14051,7 +14058,7 @@ function returnedBooleanOf(
 // forwarded name be recognised as the Parameter it is. Their Types are the ones
 // the entry already carries, so nothing is resolved a second time.
 function aliasCandidateOf(
-	body: { call: parser.MethodInvocationNode; negated: boolean },
+	body: AliasBody,
 	definition: parser.FunctionDefinitionNode,
 	entry: common.BaseFunction,
 	methodName: string,
@@ -14082,7 +14089,7 @@ function aliasCandidateOf(
 
 	let { result, diagnostics } = collectDiagnostics(() =>
 		enrichExpression(
-			body.call,
+			body.expression,
 			aliasBodyScope(definition, entry, scope, container),
 		),
 	)
@@ -14096,9 +14103,17 @@ function aliasCandidateOf(
 		return UNRESOLVED_ALIAS
 	}
 
+	// NOTE: The trailing `::negate()` is taken off HERE, where the call has
+	// resolved and the Method it names has an owner. A body ending in anything
+	// else is no alias: `Boolean::negate` is the one Method whose answer the
+	// polarity flag stands for, and reading a Program's own `negate` as it
+	// would put a value's opposite down as the value.
+	let call = body.peeled ? peeledNegationOf(result, scope) : result
+
 	if (
-		result.nodeType !== "MethodInvocation" ||
-		result.type.type !== "Boolean"
+		call === null ||
+		call.nodeType !== "MethodInvocation" ||
+		call.type.type !== "Boolean"
 	) {
 		return NO_ALIAS
 	}
@@ -14106,7 +14121,7 @@ function aliasCandidateOf(
 	let slots = parameterSlotsOf(definition)
 	let args: Array<DerivedArgument> = []
 
-	for (let argument of result.arguments) {
+	for (let argument of call.arguments) {
 		let slot = argumentSlotOf(argument.value, slots)
 
 		if (slot === null) {
@@ -14116,9 +14131,9 @@ function aliasCandidateOf(
 		args.push(slot)
 	}
 
-	let converse = converseReceiverOf(result, args, slots)
+	let converse = converseReceiverOf(call, args, slots)
 
-	if (result.base.nodeType !== "Self" && converse === null) {
+	if (call.base.nodeType !== "Self" && converse === null) {
 		return NO_ALIAS
 	}
 
@@ -14131,24 +14146,48 @@ function aliasCandidateOf(
 				namespaceName:
 					container.selfNamespaceName === null
 						? null
-						: result.namespace.name,
-				methodName: result.member.name,
+						: call.namespace.name,
+				methodName: call.member.name,
 				args,
 				negated: body.negated,
 			},
 			target:
-				container.canonicalTarget?.(result.member.name) ??
-				resolvedEntryOf(result) ??
+				container.canonicalTarget?.(call.member.name) ??
+				resolvedEntryOf(call) ??
 				null,
 			converse,
 			converseTrusted:
 				container.trustsOrdering &&
 				namespaceAnswersForBase(
-					result.namespace.name,
-					refinableBaseTag(result.base.type),
+					call.namespace.name,
+					refinableBaseTag(call.base.type),
 				),
 		},
 	}
+}
+
+// NOTE: What a trailing `::negate()` was written ON, or null where the call it
+// resolved to is not `Boolean`'s own. `negate` is a name like any other until
+// the Enricher says whose it is, and a Program may write one over a Boolean of
+// its own — an identity `negate` would have every body carrying it recorded as
+// the contrary of the question it asks, and a value proven the opposite of what
+// it is.
+function peeledNegationOf(
+	result: common.typed.ExpressionNode,
+	scope: enricher.Scope,
+): common.typed.ExpressionNode | null {
+	if (
+		result.nodeType !== "MethodInvocation" ||
+		result.arguments.length !== 0
+	) {
+		return null
+	}
+
+	let negate = namespaceNamedInScope("Boolean", scope)?.methods["negate"]
+
+	return negate?.type === "SimpleMethod" && resolvedEntryOf(result) === negate
+		? result.base
+		: null
 }
 
 // NOTE: The Scope an alias body is read in — `@`, the Type Parameters, and each
