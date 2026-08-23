@@ -793,8 +793,22 @@ export type PredicateConjunct = {
 
 export type PredicateSpelling = {
 	methodName: string
-	args: Array<string | boolean>
+	args: Array<PredicateSpellingArgument>
 }
+
+// NOTE: One Argument as it was WRITTEN. A bare scalar where the call wrote one,
+// and the scalar under the LABEL in front of it where it wrote that — which is
+// what makes the text a Diagnostic prints a thing a reader can write back. A
+// `match` guard is spelled `case Integer where @::isBetween(0, and 9)`, `@` and
+// all, so a Help offering `@::isBetween(0, 9)` offers something no Overload
+// answers.
+//
+// The label is no part of the KEY. Two spellings of one question are one
+// question, and a conjunct's own `args` carry the scalars alone.
+export type PredicateSpellingArgument =
+	| string
+	| boolean
+	| { label: string; value: string | boolean }
 
 // NOTE: What a Method's BODY says it asks, recorded on the entry as its
 // Namespace or its Protocol reaches Scope. It is a TEMPLATE rather than a leaf:

@@ -281,10 +281,11 @@ export function refinementDecidedBy(
 // CANONICAL form: the conjuncts in the order they are compared, joined the way a
 // chain is written.
 //
-// An Argument LABEL is not part of what makes two conjuncts the same question,
-// so it is not kept and a labelled Method prints its Arguments bare —
-// `@::isBetween(0, 9)` for a clause written `@::isBetween(0, and 9)`. The text
-// names the question; it is not offered as something to paste.
+// An Argument LABEL is no part of what makes two conjuncts the same question,
+// so the KEY does not keep it — but the spelling does, and the text reads
+// `@::isBetween(0, and 9)` exactly as the clause was written. A `match` guard is
+// spelled `case Integer where @::isBetween(0, and 9)`, `@` and all, so a Help
+// that dropped the label offered something no Overload answers.
 //
 // NOTE: A leaf is stored RESOLVED — `@::hasCharacters()` is `String::isEmpty`
 // negated — and what is printed is the name it was WRITTEN as, which the leaf
@@ -308,7 +309,7 @@ export function describePredicate(refinement: common.RefinementType): string {
 function spellConjunct(conjunct: common.PredicateConjunct): string {
 	let written = conjunct.spelling ?? conjunct
 	let call = `@::${written.methodName}(${written.args
-		.map(spellScalar)
+		.map(spellArgument)
 		.join(", ")})`
 
 	// NOTE: A spelling is written the way it was asked, so the flag is already
@@ -318,6 +319,17 @@ function spellConjunct(conjunct: common.PredicateConjunct): string {
 	return conjunct.negated && conjunct.spelling === undefined
 		? `${call}::negate()`
 		: call
+}
+
+// NOTE: An Argument as it was written — the scalar under the label the call put
+// in front of it, and the scalar alone where it wrote none. A leaf nobody wrote
+// carries its bare scalars here, which is what a synthesized conjunct has.
+function spellArgument(
+	argument: common.PredicateSpellingArgument | string | boolean,
+): string {
+	return typeof argument === "object"
+		? `${argument.label} ${spellScalar(argument.value)}`
+		: spellScalar(argument)
 }
 
 // NOTE: A String Argument arrives already quoted — that is what tells `1` from

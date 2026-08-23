@@ -6486,6 +6486,10 @@ describe("Enricher", () => {
 		// it in reach — `Integer` for an Integer receiver, which is also what
 		// answers `isOdd` beside it. The conjunct records what answered, because
 		// that is what makes two conjuncts the same question.
+		//
+		// The LABEL is on the spelling and nowhere else. It decides nothing
+		// about the key, and the text a Diagnostic prints has to carry it: a
+		// `match` guard is written the way that text reads.
 		it("should key a conjunct by the Namespace that answered it", () => {
 			expect(
 				refinementOf(
@@ -6497,7 +6501,10 @@ describe("Enricher", () => {
 					methodName: "isBetween",
 					negated: false,
 					args: ["0", "9"],
-					spelling: { methodName: "isBetween", args: ["0", "9"] },
+					spelling: {
+						methodName: "isBetween",
+						args: ["0", { label: "and", value: "9" }],
+					},
 				},
 			])
 		})

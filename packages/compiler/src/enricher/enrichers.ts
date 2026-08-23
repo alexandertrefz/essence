@@ -7637,9 +7637,10 @@ function rootScopeOf(scope: enricher.Scope): enricher.Scope {
 // `PositiveInteger` proves and prints as PositiveInteger. Where no declared name
 // says the whole of it — two unrelated refinements a Program declared, both true
 // of one literal — the Type prints as the Declaration a reader would have to
-// write for it, `Integer where @::isEven()::and(@::isGreaterThan(10))`. That text
-// names the proof; like every other predicate spelling, it is not offered as
-// something to paste.
+// write for it, `Integer where @::isEven()::and(@::isGreaterThan(10))`. Each leaf
+// a reader wrote reads back as they wrote it, Argument labels and all. A leaf
+// nobody wrote — a complement, a Matcher's `case 0` — prints as the Essence that
+// asks it, which need not be a spelling the Program had in reach.
 //
 // NOTE: The tie between two refinements proving the SAME conjunction is settled
 // by the walk `refinementsFor` returns, which is the order narrowing settles its
@@ -13439,7 +13440,16 @@ function resolvedConjunct(
 ): common.PredicateConjunct {
 	let spelling: common.PredicateSpelling = {
 		methodName: invocation.member.name,
-		args,
+		// NOTE: The LABEL rides along with the scalar it stood in front of, and
+		// nowhere else: the conjunct's own `args` are the key and two spellings
+		// of one question are one question. It is the printed text that needs
+		// it, because a `match` guard is written the way the text reads and
+		// `@::isBetween(0, 9)` answers no Overload.
+		args: args.map((value, index) => {
+			let label = invocation.arguments[index]?.name
+
+			return label == null ? value : { label, value }
+		}),
 	}
 	let alias = predicateAliasOf(invocation)
 	// NOTE: The receiver's own Type is what says how a bound is spelled, and it
