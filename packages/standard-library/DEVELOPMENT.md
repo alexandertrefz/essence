@@ -353,6 +353,16 @@ handed carries no such proof and goes through the predicate instead — which is
 why a body or a harness that has to reach the unproven entry computes its
 operand.
 
+The proof is about the value ITSELF and about nothing inside it. A written List
+is asked for its own predicate and its written items are asked for none, so they
+keep the Types they were inferred at: `[[1], [2]]::flatten()` answers a
+`List<Integer>`, because the receiver proved the outer List has something in it
+and nothing about the two inner ones. The same literal reaches
+`NonEmptyNestedList` once its items carry the inner proof already —
+`[inner, inner]` where `inner` is declared `NonEmptyList<Integer>` does — and a
+DECLARED `NonEmptyList<NonEmptyList<Integer>>` reaches it outright, because the
+declaration is a position that asks the items and the receiver rail is not.
+
 **A written Method REPLACES a Protocol's provided one on that Namespace's own
 rung.** `Equatable` writes `isNot` and `Orderable` writes six Methods, and every
 conformer answers them without declaring anything. A Namespace that declares a
@@ -581,8 +591,9 @@ rule stated there.
   the base target for a Method both declare; a List nothing proved anything
   about does not reach it at all. A receiver WRITTEN where it stands proves the
   same things for itself — `[1, 2]::firstItem()` answers an Integer — so the
-  entries a proof unlocks are reached by a literal as much as by a narrowed
-  name. Two refined targets neither of which is narrower than the other leave
+  entries ONE proof unlocks are reached by a literal as much as by a narrowed
+  name. A proof about the items is the exception: a written receiver is asked
+  for its own predicate and its written items are asked for none. Two refined targets neither of which is narrower than the other leave
   the call `ambiguous-namespace`, exactly as two unrefined ones do. None of the
   three can be written in Essence, which is the point rather than a gap: a
   refinement erases before anything runs, so a native is what spending the
@@ -597,7 +608,10 @@ rule stated there.
   outer List with something in it can hold nothing but empty Lists, and an inner
   proof says nothing about how many inner Lists there are. A receiver reaches it
   only with both in hand, and beats `NestedList` for `flatten` because its target
-  is narrower — the same rule two nested targets are separated by.
+  is narrower — the same rule two nested targets are separated by. A written
+  receiver reaches it only where its items ALREADY carry the inner proof:
+  `[[1], [2]]::flatten()` answers a `List<Integer>`, because the items of a
+  literal are never asked for a predicate of their own.
 - **A Type and the Namespace that targets it belong in one file.** `Optional`
   and `Ordering` each declare their Choice and the Namespace over it together;
   splitting them across files works, but leaves the two halves of one idea
