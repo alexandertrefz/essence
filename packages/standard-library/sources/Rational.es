@@ -600,7 +600,11 @@ declarations {
 	§ What a Rational proven not to be zero answers that a bare one can not,
 	§ the sister of `namespace NonZeroInteger`. Both entries are native: a
 	§ refinement erases before anything runs, so an entry whose promise is
-	§ about the answer can not be written in Essence.
+	§ about the answer can not be written in Essence. Multiplying is one
+	§ Function under two names and can not drift. Taking the reciprocal is
+	§ written a second time, because the Essence body beside it exports
+	§ nothing to import. See DEVELOPMENT.md, Native and Essence in one
+	§ Namespace.
 	§
 	§ Multiplication closes over the proof, as it does for the Integers: a
 	§ product of two Rationals that are not zero is never zero. Addition does
