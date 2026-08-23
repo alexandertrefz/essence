@@ -204,14 +204,51 @@ declarations {
 			}
 		}
 
-		§§ Answers whether the Rational has the same value as another Rational.
+		§ The Integer entries carry equality where the four inequalities
+		§ already carry order. Without them `rate::is(2)` falls to the covering
+		§ `Number`'s sixteen-cell table and pulls the whole tower in. A Program
+		§ that asks it alone measured 20.1 kB, against 6.2 kB with these
+		§ entries and 6.5 kB for `rate::isLessThan(2)`. The Rational entry
+		§ stands first, because it is the `Equatable` witness; see
+		§ DEVELOPMENT.md, Why bodies look the way they do.
+
+		§§ Answers whether the Rational has the same value as a number.
 		§§
-		§§ The comparison is in lowest terms, so `1/2` equals `2/4`.
+		§§ The comparison is in lowest terms, so `1/2` equals `2/4`. A Rational equals an Integer when it is whole and its numerator is that Integer.
+		overload is {
+			§§ @param _ — the Rational to compare against
+			§§ @returns — `true` when both are equal.
+			(_ other: Rational) -> Boolean {
+				<- @::compare(to other)::is(#Equal)
+			}
+
+			§§ @param _ — the Integer to compare against
+			§§ @returns — `true` when the Rational is whole and its numerator is that Integer.
+			(_ other: Integer) -> Boolean {
+				<- @::isWholeNumber()::and(@::numerator()::is(other))
+			}
+		}
+
+		§ `Equatable` provides an `isNot` over `Self` alone, and a written
+		§ Method replaces a provided one whole. So the Integer entry above
+		§ needs its contrary written here, as `Optional`'s does and for the
+		§ same reason.
+
+		§§ Answers whether the Rational differs from a number.
 		§§
-		§§ @param _ — the Rational to compare against
-		§§ @returns — `true` when both are equal.
-		is(_ other: Rational) -> Boolean {
-			<- @::compare(to other)::is(#Equal)
+		§§ A Rational that is not whole differs from every Integer.
+		overload isNot {
+			§§ @param _ — the Rational to compare against
+			§§ @returns — `true` when the two differ.
+			(_ other: Rational) -> Boolean {
+				<- @::is(other)::negate()
+			}
+
+			§§ @param _ — the Integer to compare against
+			§§ @returns — `true` when the two differ.
+			(_ other: Integer) -> Boolean {
+				<- @::is(other)::negate()
+			}
 		}
 
 		§§ Orders the Rational against another Rational.

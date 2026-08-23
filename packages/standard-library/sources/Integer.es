@@ -106,12 +106,50 @@ declarations {
 			}
 		}
 
-		§§ Answers whether the Integer has the same value as another.
+		§ The Rational entry is the flipped call the mixed-kind inequalities
+		§ below are, and it is here for their reason. Without it `count::is(1/2)`
+		§ falls to the covering `Number`'s sixteen-cell table and pulls the
+		§ whole tower in. The Integer entry stands first, because it is the
+		§ `Equatable` witness; see DEVELOPMENT.md, Why bodies look the way
+		§ they do.
+
+		§§ Answers whether this Integer has the same value as a number.
 		§§
-		§§ @param _ — the Integer to compare against
-		§§ @returns — `true` when both are equal.
-		is(_ other: Integer) -> Boolean {
-			<- @::compare(to other)::is(#Equal)
+		§§ An Integer equals a Rational when that Rational is whole and its numerator is this Integer.
+		overload is {
+			§§ @param _ — the Integer to compare against
+			§§ @returns — `true` when both are equal.
+			(_ other: Integer) -> Boolean {
+				<- @::compare(to other)::is(#Equal)
+			}
+
+			§§ @param _ — the Rational to compare against
+			§§ @returns — `true` when both are equal.
+			(_ other: Rational) -> Boolean {
+				<- other::is(@)
+			}
+		}
+
+		§ `Equatable` provides an `isNot` over `Self` alone, and a written
+		§ Method replaces a provided one whole. So the Rational entry above
+		§ needs its contrary written here, as `Optional`'s does and for the
+		§ same reason.
+
+		§§ Answers whether this Integer differs from a number.
+		§§
+		§§ Every Integer differs from a Rational that is not whole.
+		overload isNot {
+			§§ @param _ — the Integer to compare against
+			§§ @returns — `true` when the two differ.
+			(_ other: Integer) -> Boolean {
+				<- @::is(other)::negate()
+			}
+
+			§§ @param _ — the Rational to compare against
+			§§ @returns — `true` when the two differ.
+			(_ other: Rational) -> Boolean {
+				<- @::is(other)::negate()
+			}
 		}
 
 		§§ Orders the Integer against another Integer.

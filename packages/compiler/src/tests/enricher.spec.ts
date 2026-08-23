@@ -4672,9 +4672,23 @@ describe("Enricher", () => {
 			expect(invocation.namespace.name).toBe("Integer")
 		})
 
-		it("should resolve mixed-member comparisons through the Number Namespace", () => {
+		// NOTE: An Integer against a Rational is Integer's own rung now:
+		// `Integer::is` holds a Rational entry beside its Integer one, as its
+		// four inequalities do. What still falls to the covering Namespace is
+		// a bound of a kind neither rung names, which is what the second half
+		// asks.
+		it("should resolve an Integer against a Rational on Integer's rung", () => {
 			let invocation = lastConstantMethodInvocation(`implementation {
 				constant same = 1::is(1/1)
+			}`)
+
+			expect(invocation.namespace.name).toBe("Integer")
+			expect(invocation.type).toEqual({ type: "Boolean" })
+		})
+
+		it("should resolve mixed-member comparisons through the Number Namespace", () => {
+			let invocation = lastConstantMethodInvocation(`implementation {
+				constant same = 1::is(Number.Pi)
 			}`)
 
 			expect(invocation.namespace.name).toBe("Number")

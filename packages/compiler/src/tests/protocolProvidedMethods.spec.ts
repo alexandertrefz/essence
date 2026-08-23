@@ -1276,12 +1276,17 @@ describe("Protocol-provided Methods", () => {
 		// a call that misses is the ordinary Argument mismatch the `::`
 		// spelling reports — never the Compiler's own bug channel, which is
 		// where a bounded Signature's missing witness used to send it.
+		//
+		// NOTE: `Boolean` rather than `Integer`, because `Integer` WRITES an
+		// `isNot` of its own now — a two entry Overload, whose misses are
+		// `no-matching-overload` and say nothing about a provided Method.
+		// Boolean's `isNot` is `Equatable`'s, which is what this asks about.
 		it("should report the Arguments the pinned signature rejects", () => {
 			expect(
 				codesOf(
 					[
 						"implementation {",
-						'\tTerminal.inspect(Integer.isNot(3, "x"))',
+						'\tTerminal.inspect(Boolean.isNot(true, "x"))',
 						"}",
 					].join("\n"),
 				),
@@ -1291,7 +1296,7 @@ describe("Protocol-provided Methods", () => {
 				codesOf(
 					[
 						"implementation {",
-						"\tTerminal.inspect(Integer.isNot(3))",
+						"\tTerminal.inspect(Boolean.isNot(true))",
 						"}",
 					].join("\n"),
 				),
@@ -1301,7 +1306,7 @@ describe("Protocol-provided Methods", () => {
 				codesOf(
 					[
 						"implementation {",
-						'\tTerminal.inspect(Integer.isNot("y", "x"))',
+						'\tTerminal.inspect(Boolean.isNot("y", "x"))',
 						"}",
 					].join("\n"),
 				),
