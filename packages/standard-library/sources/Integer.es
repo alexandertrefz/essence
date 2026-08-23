@@ -531,6 +531,20 @@ declarations {
 			<- true
 		}
 
+		§§ Answers whether the Integer is a whole multiple of the given divisor.
+		§§
+		§§ Zero is a multiple of every Integer. A zero divisor answers `false`: there is no remainder to read, and an empty answer is not zero.
+		§§
+		§§ @param of — the divisor
+		§§ @returns — `true` when the division leaves no remainder.
+		isMultiple(of divisor: Integer) -> Boolean {
+			§ The divisor carries no proof, so `remainder` answers an
+			§ Optional. `Optional::is` takes a bare item, and an empty
+			§ Optional is not zero. So the zero divisor answers `false`
+			§ without a Case of its own here.
+			<- @::remainder(dividingBy divisor)::is(0)
+		}
+
 		§§ Answers the Integer without its sign, which is its distance from zero.
 		absolute() -> Integer {
 			if @::isNegative() {
