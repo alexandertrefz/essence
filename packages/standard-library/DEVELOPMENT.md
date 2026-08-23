@@ -88,7 +88,9 @@ which follows `Ordering.es`, which follows `Protocols.es`. And `Protocols.es`
 imports NOTHING, which is what keeps the frozen shape at one cycle:
 `Boolean.es` conforms to `Equatable`, so a `Boolean` import here would close a
 second circle. That is why `Equatable.isNot`'s body is an `if` rather than
-`@::is(other)::negate()` — a body that reaches no Namespace needs no import.
+`@::is(other)::negate()` — a body that reaches no Namespace needs no import. It
+is read as that call all the same, so the workaround costs the reader nothing;
+see *A predicate written as one call on `@` IS that call*.
 `Orderable.es` is under no such rule and imports `Boolean` and `Ordering` freely,
 because nothing imports it back.
 
@@ -427,18 +429,47 @@ of those is read first all the same: `Integer::divide` and `Integer::raise`,
 `Rational::divide` and `Rational::raise`, `Algebraic::multiply`, the
 irrationals' `divide`, `Number.average` and the two `Number` extrema.
 
-**A predicate written as one call on `@` IS that call.** A Method taking no
-Arguments, answering a Boolean and whose whole body is one call on `@` —
-optionally negated — is read off its body and recorded as the question that call
-asks. `isZero` is `@::is(0)`, `hasItems` is `@::isEmpty()::negate()`,
-`isPositive` is `@::isGreaterThan(0)`. So a refinement written on either name is
-one Type, and the `else` of an `if` asking one of them proves the other. Two
-things follow for an editor. Rewriting such a body changes what an `else`
+**A predicate written as one call on `@` IS that call.** A Method answering a
+Boolean whose whole body is one call on `@` — optionally negated — is read off
+its body and recorded as the question that call asks. `isZero` is `@::is(0)`,
+`hasItems` is `@::isEmpty()::negate()`, `isPositive` is `@::isGreaterThan(0)`.
+So a refinement written on either name is one Type, and the `else` of an `if`
+asking one of them proves the other.
+
+The Arguments go with it. A Method that takes some forwards them, and what is
+recorded is a template: `isGreaterThanOrEqualTo(_ other)` is `isLessThan`
+negated over whatever bound the CALL writes, so `n::isGreaterThanOrEqualTo(5)`
+and `n::isLessThan(5)` are one question in two polarities. A slot the caller
+does not write down contributes nothing, exactly as a computed Argument always
+has.
+
+Three more shapes are read. An `if` that spells the call out —
+`if @::is(other) { <- false } else { <- true }` — is that call negated, which is
+what `Equatable::isNot` is written as and has to be. A PROTOCOL's provided
+bodies are read as the Protocol hoists, with no Namespace on the leaf: a
+provided Method belongs to whichever conformance reaches it, so the witness
+fills its own in, and one further step is taken through that witness where the
+Protocol saw a requirement and the conformer wrote a body. And a body that
+writes the ordering BACKWARDS — `<- other::isGreaterThanOrEqualTo(@)`, which is
+how `Integer` answers a Rational bound — is read as the converse of what it
+asks, under the same guard the ordering's law is read under: both the Namespace
+that answered and the Namespace the body is in have to be the base's own or the
+covering `Number`.
+
+A chain is followed to the end whichever order the Methods were written in, and
+a ring of Methods written as each other's contraries is left alone rather than
+followed round — believing either half would make the other its own contrary.
+
+Two things follow for an editor. Rewriting such a body changes what an `else`
 narrows to, so `isZero` may not become `@::compare(to 0)::is(#Equal)` without
 weighing that. And a body that CHAINS is a question of its own for the same
 reason: `isEmpty` is `@::length()::is(0)`, which is why the negations of
 `List::isEmpty` and `String::isEmpty` are read from them rather than the other
-way round.
+way round. `isEven`, `isWholeNumber`, `isBetween` and the four comparisons
+written on `compare` stay questions of their own for that reason too — the
+census in `packages/compiler/src/tests/stdlibLoader.spec.ts` is the whole list,
+and the literal evaluator and the generator's narrowing may only ever be asked
+what is on it.
 
 **A body pulls its whole transitive reach into every bundle.** A Method is
 emitted into a Program that reaches it, and so is everything its body calls.

@@ -439,6 +439,12 @@ declarations {
 		§ An override is in the conformance witness, so a bounded
 		§ `<Item is Orderable>` runs these entries where
 		§ `1/2::isLessThan(2/3)` runs them. Both read `compare` either way.
+		§
+		§ These bodies are read as well as run. Each `…OrEqualTo` entry is one
+		§ call on `@` negated, over the bound it was handed, so it is the
+		§ comparison it negates. A Rational receiver reads every bare Integer
+		§ bound as `n/1`, so one question has one key however it is written.
+		§ See DEVELOPMENT.md, Why bodies look the way they do.
 
 		§§ Answers whether the Rational is strictly below the given number.
 		overload isLessThan {

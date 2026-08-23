@@ -16,6 +16,12 @@ declarations {
 		§ `Boolean::negate` would need `Boolean` imported here, and
 		§ `Boolean.es` imports this file. That is a second cycle in a graph
 		§ that has one; see DEVELOPMENT.md, The shape of the graph is frozen.
+		§
+		§ This body is read as well as run. An `if` that answers one Boolean
+		§ in each branch spells out the call it asks. So `isNot` is `is`
+		§ negated, and the `else` of `if n::isNot(0)` proves a refinement
+		§ written on `@::is(0)`. The conformer that answered gives the leaf
+		§ its Namespace. See DEVELOPMENT.md, Why bodies look the way they do.
 
 		§§ Answers whether the values differ.
 		§§
