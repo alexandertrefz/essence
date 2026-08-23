@@ -53,7 +53,7 @@ implementation {
 		}),
 	)
 	Terminal.inspect(
-		readings::hasItems(onlyWhere (degrees) { § true — no frost all week
+		readings::hasOnlyItems(where (degrees) { § true — no frost all week
 			<- degrees::isPositive()
 		}),
 	)

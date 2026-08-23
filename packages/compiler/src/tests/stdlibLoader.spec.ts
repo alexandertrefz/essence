@@ -1946,7 +1946,8 @@ describe("Standard Library Loader", () => {
 	// A body that reads a CHAIN is a question of its own, which is why
 	// `isEmpty`, `isEven`, `isWholeNumber` and the strict comparisons written
 	// on `compare` stay here. So does `isBetween`, written as two comparisons
-	// joined, and `hasItems(where:)`, whose Argument is a Function.
+	// joined, and `hasItems(where:)` and `hasOnlyItems(where:)`, whose Argument
+	// is a Function.
 	it("reads every predicate the standard library writes off its body", () => {
 		let stdlib = loadStdlib()
 		let aliases: Array<string> = []
@@ -2022,6 +2023,7 @@ describe("Standard Library Loader", () => {
 			"Integer::isZero -> Integer::is(0)",
 			"List::doesNotContain -> not List::contains(#0)",
 			"List::hasItems -> not List::isEmpty()",
+			"List::hasNoItems -> not List::hasItems(#0)",
 			"Optional::isEmpty -> not Optional::hasValue()",
 			"Optional::isNot -> not Optional::is(#0)",
 			"Rational::isGreaterThanOrEqualTo -> not Rational::isLessThan(#0)",
@@ -2047,6 +2049,7 @@ describe("Standard Library Loader", () => {
 			"Integer::isLessThan",
 			"List::contains",
 			"List::hasItems",
+			"List::hasOnlyItems",
 			"List::is",
 			"List::isEmpty",
 			"Number::is",

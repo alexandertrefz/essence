@@ -180,11 +180,12 @@ A few more conventions worth stating because they are already consistent and
 easy to break:
 
 - **A predicate Parameter is always labelled `where`** — `everyItem(where:)`,
-  `count(where:)`, `removeEvery(where:)`, `hasItems(where:)`. The universal
-  quantifier is the one variant of that label, and it is spelled out:
-  `hasItems(where:)` asks whether ANY item passes, `hasItems(onlyWhere:)`
-  whether EVERY item does. The filter is `everyItem(where:)`, which answers the
-  items themselves.
+  `count(where:)`, `removeEvery(where:)`, `hasItems(where:)`. The quantifier is
+  in the NAME rather than in a variant of that label, so that each name reads
+  true in English on the empty List: `hasItems(where:)` asks whether ANY item
+  passes, `hasOnlyItems(where:)` whether EVERY item does, and
+  `hasNoItems(where:)` whether NO item does. The filter is `everyItem(where:)`,
+  which answers the items themselves.
 - **A key-reading Function is always labelled `on`** — `sort(on:)`,
   `lowestItem(on:)`, `highestItem(on:)`, `sum(on:)`, `average(on:)`. Each
   takes a Function of one Parameter answering the value the Method is really
