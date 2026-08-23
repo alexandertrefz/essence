@@ -269,7 +269,7 @@ the layer below can not decide for itself:
 | `Orderable is Comparable` | — | `isLessThan(_:)`, `isLessThanOrEqualTo(_:)`, `isGreaterThan(_:)`, `isGreaterThanOrEqualTo(_:)`, `isBetween(_:and:)`, `clamp(between:and:)` |
 
 `Comparable` asks for one Method and stays there, because one total order is all
-`sort`, `lowest` and `greatest` need. `Orderable` is the layer that turns that
+`sort`, `lowest` and `highest` need. `Orderable` is the layer that turns that
 order into the questions a reader actually writes, and it asks for nothing of its
 own: a Type that can `compare` can answer all six.
 

@@ -304,7 +304,7 @@ or added up, under one label — `on`:
 ```essence
 products::sort(on .price)
 products::lowestItem(on .price)
-products::greatestItem(on .price, defaultingTo fallback)
+products::highestItem(on .price, defaultingTo fallback)
 products::sum(on .price)
 products::average(on .price)
 ```

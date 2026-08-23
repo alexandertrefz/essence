@@ -611,7 +611,7 @@ export const $TranscendentalArity: AssertArities<typeof import("./Transcendental
 
 declare const NumberModule: typeof import("./Number")
 export const $Number: NumberNatives = NumberModule
-export const $NumberAbsent: AssertNoEssenceExports<typeof import("./Number"), "sum__overload$1" | "sum__overload$2" | "sum__overload$3" | "product__overload$1" | "product__overload$2" | "product__overload$3" | "average__overload$1" | "average__overload$2" | "average__overload$3" | "average__overload$4" | "average__overload$5" | "average__overload$6" | "average__overload$7" | "average__overload$8" | "average__overload$9" | "lowestNumber__overload$1" | "lowestNumber__overload$2" | "lowestNumber__overload$3" | "lowestNumber__overload$4" | "lowestNumber__overload$5" | "lowestNumber__overload$6" | "lowestNumber__overload$7" | "lowestNumber__overload$8" | "lowestNumber__overload$9" | "lowestNumber__overload$10" | "lowestNumber__overload$11" | "lowestNumber__overload$12" | "lowestNumber__overload$13" | "greatestNumber__overload$1" | "greatestNumber__overload$2" | "greatestNumber__overload$3" | "greatestNumber__overload$4" | "greatestNumber__overload$5" | "greatestNumber__overload$6" | "greatestNumber__overload$7" | "greatestNumber__overload$8" | "greatestNumber__overload$9" | "greatestNumber__overload$10" | "greatestNumber__overload$11" | "greatestNumber__overload$12" | "greatestNumber__overload$13" | "is" | "toString"> = true
+export const $NumberAbsent: AssertNoEssenceExports<typeof import("./Number"), "sum__overload$1" | "sum__overload$2" | "sum__overload$3" | "product__overload$1" | "product__overload$2" | "product__overload$3" | "average__overload$1" | "average__overload$2" | "average__overload$3" | "average__overload$4" | "average__overload$5" | "average__overload$6" | "average__overload$7" | "average__overload$8" | "average__overload$9" | "lowestNumber__overload$1" | "lowestNumber__overload$2" | "lowestNumber__overload$3" | "lowestNumber__overload$4" | "lowestNumber__overload$5" | "lowestNumber__overload$6" | "lowestNumber__overload$7" | "lowestNumber__overload$8" | "lowestNumber__overload$9" | "lowestNumber__overload$10" | "lowestNumber__overload$11" | "lowestNumber__overload$12" | "lowestNumber__overload$13" | "highestNumber__overload$1" | "highestNumber__overload$2" | "highestNumber__overload$3" | "highestNumber__overload$4" | "highestNumber__overload$5" | "highestNumber__overload$6" | "highestNumber__overload$7" | "highestNumber__overload$8" | "highestNumber__overload$9" | "highestNumber__overload$10" | "highestNumber__overload$11" | "highestNumber__overload$12" | "highestNumber__overload$13" | "is" | "toString"> = true
 export const $NumberArity: AssertArities<typeof import("./Number"), {
 	compare: 2
 }> = true
@@ -652,7 +652,7 @@ export const $RecordArity: AssertArities<typeof import("./Record"), {
 
 declare const ListModule: typeof import("./List")
 export const $List: ListNatives = ListModule
-export const $ListAbsent: AssertNoEssenceExports<typeof import("./List"), "repeat__overload$1" | "hasItems__overload$1" | "hasItems__overload$2" | "hasItems__overload$3" | "isEmpty" | "contains" | "doesNotContain" | "firstItem__overload$1" | "firstItem__overload$2" | "firstItem__overload$3" | "firstItem__overload$4" | "lastItem__overload$1" | "lastItem__overload$2" | "lastItem__overload$3" | "lastItem__overload$4" | "item__overload$2" | "firstIndex__overload$1" | "firstIndex__overload$2" | "firstIndex__overload$3" | "firstIndex__overload$4" | "lastIndex__overload$1" | "lastIndex__overload$2" | "removeFirst" | "removeEvery__overload$1" | "removeEvery__overload$2" | "removeLast" | "removeDuplicates" | "prepend__overload$2" | "sort__overload$3" | "count__overload$1" | "count__overload$2" | "replace" | "partition" | "lowestItem__overload$1" | "lowestItem__overload$2" | "greatestItem__overload$1" | "greatestItem__overload$2"> = true
+export const $ListAbsent: AssertNoEssenceExports<typeof import("./List"), "repeat__overload$1" | "hasItems__overload$1" | "hasItems__overload$2" | "hasItems__overload$3" | "isEmpty" | "contains" | "doesNotContain" | "firstItem__overload$1" | "firstItem__overload$2" | "firstItem__overload$3" | "firstItem__overload$4" | "lastItem__overload$1" | "lastItem__overload$2" | "lastItem__overload$3" | "lastItem__overload$4" | "item__overload$2" | "firstIndex__overload$1" | "firstIndex__overload$2" | "firstIndex__overload$3" | "firstIndex__overload$4" | "lastIndex__overload$1" | "lastIndex__overload$2" | "removeFirst" | "removeEvery__overload$1" | "removeEvery__overload$2" | "removeLast" | "removeDuplicates" | "prepend__overload$2" | "sort__overload$3" | "count__overload$1" | "count__overload$2" | "replace" | "partition" | "lowestItem__overload$1" | "lowestItem__overload$2" | "highestItem__overload$1" | "highestItem__overload$2"> = true
 export const $ListArity: AssertArities<typeof import("./List"), {
 	repeat__overload$2: 2
 	of: 2
@@ -687,7 +687,7 @@ export const $NestedListArity: AssertArities<typeof import("./NestedList"), {
 
 declare const NonEmptyListModule: typeof import("./NonEmptyList")
 export const $NonEmptyList: NonEmptyListNatives = NonEmptyListModule
-export const $NonEmptyListAbsent: AssertNoEssenceExports<typeof import("./NonEmptyList"), "sort__overload$3" | "lowestItem" | "greatestItem"> = true
+export const $NonEmptyListAbsent: AssertNoEssenceExports<typeof import("./NonEmptyList"), "sort__overload$3" | "lowestItem" | "highestItem"> = true
 export const $NonEmptyListArity: AssertArities<typeof import("./NonEmptyList"), {
 	firstItem: 1
 	lastItem: 1
@@ -712,27 +712,27 @@ export const $NonEmptyNestedListArity: AssertArities<typeof import("./NonEmptyNe
 
 declare const IntegerListModule: typeof import("./IntegerList")
 export const $IntegerList: IntegerListNatives = IntegerListModule
-export const $IntegerListAbsent: AssertNoEssenceExports<typeof import("./IntegerList"), "sum" | "product" | "average__overload$1" | "average__overload$2" | "lowestNumber__overload$1" | "lowestNumber__overload$2" | "greatestNumber__overload$1" | "greatestNumber__overload$2"> = true
+export const $IntegerListAbsent: AssertNoEssenceExports<typeof import("./IntegerList"), "sum" | "product" | "average__overload$1" | "average__overload$2" | "lowestNumber__overload$1" | "lowestNumber__overload$2" | "highestNumber__overload$1" | "highestNumber__overload$2"> = true
 
 declare const RationalListModule: typeof import("./RationalList")
 export const $RationalList: RationalListNatives = RationalListModule
-export const $RationalListAbsent: AssertNoEssenceExports<typeof import("./RationalList"), "sum" | "product" | "average__overload$1" | "average__overload$2" | "lowestNumber__overload$1" | "lowestNumber__overload$2" | "greatestNumber__overload$1" | "greatestNumber__overload$2"> = true
+export const $RationalListAbsent: AssertNoEssenceExports<typeof import("./RationalList"), "sum" | "product" | "average__overload$1" | "average__overload$2" | "lowestNumber__overload$1" | "lowestNumber__overload$2" | "highestNumber__overload$1" | "highestNumber__overload$2"> = true
 
 declare const NumberListModule: typeof import("./NumberList")
 export const $NumberList: NumberListNatives = NumberListModule
-export const $NumberListAbsent: AssertNoEssenceExports<typeof import("./NumberList"), "sum" | "product" | "average__overload$1" | "average__overload$2" | "lowestNumber__overload$1" | "lowestNumber__overload$2" | "greatestNumber__overload$1" | "greatestNumber__overload$2"> = true
+export const $NumberListAbsent: AssertNoEssenceExports<typeof import("./NumberList"), "sum" | "product" | "average__overload$1" | "average__overload$2" | "lowestNumber__overload$1" | "lowestNumber__overload$2" | "highestNumber__overload$1" | "highestNumber__overload$2"> = true
 
 declare const NonEmptyIntegerListModule: typeof import("./NonEmptyIntegerList")
 export const $NonEmptyIntegerList: NonEmptyIntegerListNatives = NonEmptyIntegerListModule
-export const $NonEmptyIntegerListAbsent: AssertNoEssenceExports<typeof import("./NonEmptyIntegerList"), "lowestNumber" | "greatestNumber" | "average"> = true
+export const $NonEmptyIntegerListAbsent: AssertNoEssenceExports<typeof import("./NonEmptyIntegerList"), "lowestNumber" | "highestNumber" | "average"> = true
 
 declare const NonEmptyRationalListModule: typeof import("./NonEmptyRationalList")
 export const $NonEmptyRationalList: NonEmptyRationalListNatives = NonEmptyRationalListModule
-export const $NonEmptyRationalListAbsent: AssertNoEssenceExports<typeof import("./NonEmptyRationalList"), "lowestNumber" | "greatestNumber" | "average"> = true
+export const $NonEmptyRationalListAbsent: AssertNoEssenceExports<typeof import("./NonEmptyRationalList"), "lowestNumber" | "highestNumber" | "average"> = true
 
 declare const NonEmptyNumberListModule: typeof import("./NonEmptyNumberList")
 export const $NonEmptyNumberList: NonEmptyNumberListNatives = NonEmptyNumberListModule
-export const $NonEmptyNumberListAbsent: AssertNoEssenceExports<typeof import("./NonEmptyNumberList"), "lowestNumber" | "greatestNumber" | "average"> = true
+export const $NonEmptyNumberListAbsent: AssertNoEssenceExports<typeof import("./NonEmptyNumberList"), "lowestNumber" | "highestNumber" | "average"> = true
 
 declare const KeyedNumberListModule: typeof import("./KeyedNumberList")
 export const $KeyedNumberList: KeyedNumberListNatives = KeyedNumberListModule

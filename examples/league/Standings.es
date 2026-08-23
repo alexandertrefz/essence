@@ -145,7 +145,7 @@ implementation {
 
 					<- {
 						current = extended,
-						best = Number.greatestNumber(best, extended),
+						best = Number.highestNumber(best, extended),
 					}
 				},
 			)

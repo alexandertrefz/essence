@@ -61,7 +61,7 @@ implementation {
 
 	§ The biggest win of the season. Only a played match has a margin, so the
 	§ fold does the filtering: a played fixture adds its margin, and every
-	§ other Case hands the List on as it was. `greatestItem(on:)` then asks the
+	§ other Case hands the List on as it was. `highestItem(on:)` then asks the
 	§ question outright, reading the key with a member path — a Record has no
 	§ natural order of its own, and the margin inside it does.
 	type Margin = { fixture: Fixture, margin: Integer }
@@ -82,7 +82,7 @@ implementation {
 		},
 	)
 
-	constant widest = margins::greatestItem(on .margin)
+	constant widest = margins::highestItem(on .margin)
 
 	Terminal.print(match widest -> String {
 		case #Value({ fixture, margin }) {
@@ -92,9 +92,9 @@ implementation {
 	})
 
 	§ The longest unbeaten run — a question each row answers about itself,
-	§ and `greatestItem(on:)` asks it of every row. The table is a
+	§ and `highestItem(on:)` asks it of every row. The table is a
 	§ NonEmptyList, so the answer is a Standing and not an Optional.
-	constant longestRun = table::greatestItem(on (standing) {
+	constant longestRun = table::highestItem(on (standing) {
 		<- standing::unbeatenRun()
 	})
 

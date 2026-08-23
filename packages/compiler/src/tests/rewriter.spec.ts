@@ -90,7 +90,7 @@ describe("Rewriter", () => {
 	describe("Runtime", () => {
 		describe("Internal Helpers", () => {
 			// NOTE: `isFirstRationalBigger` is gone — the `lowestNumber` and
-			// `greatestNumber` List entries it served are written in Essence
+			// `highestNumber` List entries it served are written in Essence
 			// now (`packages/standard-library/sources/Number.es`), folding the pairwise
 			// entries, which read the members' own `compare`.
 
@@ -974,7 +974,7 @@ describe("Rewriter", () => {
 		})
 
 		describe("Number", () => {
-			// NOTE: every `lowestNumber`/`greatestNumber` overload is
+			// NOTE: every `lowestNumber`/`highestNumber` overload is
 			// implemented in Essence now (`packages/standard-library/sources/Number.es`)
 			// — the List forms fold the pairwise ones — as are `sum`,
 			// `product` and `average`. The golden harness covers them all;

@@ -753,7 +753,7 @@ declarations {
 			§ is the difference from the no-Argument entry above.
 			§
 			§ `on` is the label for a key-reading Function everywhere one is
-			§ taken: here, on `lowestItem`, `greatestItem`, `sum` and
+			§ taken: here, on `lowestItem`, `highestItem`, `sum` and
 			§ `average`. A member path then reads the same way at each of
 			§ them. `by` is not reused, because it already means a comparison
 			§ one entry up. Two same-labelled entries told apart by arity
@@ -890,7 +890,7 @@ declarations {
 		§§ @returns — the List of groups, each of which certainly has something in it.
 		split(intoGroupsOf size: Integer) -> List<NonEmptyList<ItemType>>
 
-		§ The item a key is lowest or greatest at. That is a different
+		§ The item a key is lowest or highest at. That is a different
 		§ question from `lowestNumber`, which answers a number the List holds.
 		§ This one answers the item a number was read off. The return Type is
 		§ what tells them apart, so rule 4 does not make these Overloads of it.
@@ -943,11 +943,11 @@ declarations {
 			}
 		}
 
-		§§ Answers the item whose key is greatest.
+		§§ Answers the item whose key is highest.
 		§§
 		§§ Ties keep the earlier item. The empty List has no such item, and the `defaultingTo:` entry answers the given item in place of nothing.
-		overload greatestItem {
-			§§ Answers the item whose key is greatest.
+		overload highestItem {
+			§§ Answers the item whose key is highest.
 			§§
 			§§ @param on — the key the items are ordered by
 			§§ @returns — the item, or nothing for the empty List.
@@ -956,8 +956,8 @@ declarations {
 			) -> Optional<ItemType> {
 				constant start: Optional<ItemType> = #Empty
 
-				<- @::reduce(startingWith start, (greatest, item) {
-					<- match greatest -> Optional<ItemType> {
+				<- @::reduce(startingWith start, (highest, item) {
+					<- match highest -> Optional<ItemType> {
 						case #Empty { <- #Value(item) }
 
 						case #Value(found) {
@@ -967,14 +967,14 @@ declarations {
 							{
 								<- #Value(item)
 							} else {
-								<- greatest
+								<- highest
 							}
 						}
 					}
 				})
 			}
 
-			§§ Answers the item whose key is greatest, or the given fallback for the empty List.
+			§§ Answers the item whose key is highest, or the given fallback for the empty List.
 			§§
 			§§ @param on — the key the items are ordered by
 			§§ @param defaultingTo — the item to answer with when there is none
@@ -983,7 +983,7 @@ declarations {
 				on key: (_: ItemType) -> Key,
 				defaultingTo fallback: ItemType,
 			) -> ItemType {
-				<- @::greatestItem(on key)::value(defaultingTo fallback)
+				<- @::highestItem(on key)::value(defaultingTo fallback)
 			}
 		}
 	}
@@ -1007,7 +1007,7 @@ declarations {
 	§ better for having the proof.
 	§
 	§ Five Methods spend the proof: `firstItem`, `lastItem`, `length`,
-	§ `lowestItem(on:)` and `greatestItem(on:)`. Everything else here carries
+	§ `lowestItem(on:)` and `highestItem(on:)`. Everything else here carries
 	§ it forward. Most answer with one item for every item they were handed,
 	§ or with those items and more besides. So they can not empty a List that
 	§ was not empty. Splitting regroups the items instead, and every group it
@@ -1190,16 +1190,16 @@ declarations {
 			<- @::<List>lowestItem(on key)::value(defaultingTo @::firstItem())
 		}
 
-		§§ Answers the item whose key is greatest, which a non-empty List always has.
+		§§ Answers the item whose key is highest, which a non-empty List always has.
 		§§
 		§§ Ties keep the earlier item.
 		§§
 		§§ @param on — the key the items are ordered by
 		§§ @returns — the item.
-		greatestItem<infer Key is Comparable>(
+		highestItem<infer Key is Comparable>(
 			on key: (_: ItemType) -> Key,
 		) -> ItemType {
-			<- @::<List>greatestItem(on key)::value(defaultingTo @::firstItem())
+			<- @::<List>highestItem(on key)::value(defaultingTo @::firstItem())
 		}
 	}
 

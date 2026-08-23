@@ -263,7 +263,7 @@ implementation {
 
 		§§ The highest tile on the board.
 		highest() -> Integer {
-			<- @::flatten()::greatestNumber(defaultingTo 0)
+			<- @::flatten()::highestNumber(defaultingTo 0)
 		}
 
 		§§ Whether any push would change the board. Lists compare by value, so
