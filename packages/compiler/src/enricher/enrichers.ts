@@ -34,6 +34,8 @@ import {
 	mentionsUnsolvedTypeParameter,
 	mergeUnionMembers,
 	impliedConjunctKeys,
+	answersForBase,
+	refinableBaseTag,
 	negatedPredicateConjunct,
 	parameterInternalName,
 	type PatternBinding,
@@ -7282,6 +7284,7 @@ function narrowingsFor(
 			proven.receiverType.type === "Refinement"
 				? [...proven.conjuncts, ...provenConjuncts(proven.receiverType)]
 				: proven.conjuncts,
+			proven.receiverType,
 		)
 
 		let established: common.RefinementType | null = null
@@ -7325,8 +7328,14 @@ function narrowingsFor(
 			// branch may write.
 			if (
 				established === null ||
-				impliedConjunctKeys(provenConjuncts(refinement)).size >
-					impliedConjunctKeys(provenConjuncts(established)).size
+				impliedConjunctKeys(
+					provenConjuncts(refinement),
+					refinement.base,
+				).size >
+					impliedConjunctKeys(
+						provenConjuncts(established),
+						established.base,
+					).size
 			) {
 				established = refinement
 			}
@@ -7626,7 +7635,10 @@ function refinedLiteralReceiverType(
 	// has already been proven to be neither zero nor below it, so the one name
 	// covers the three.
 	let named = admitted.find((refinement) => {
-		let implied = impliedConjunctKeys(provenConjuncts(refinement))
+		let implied = impliedConjunctKeys(
+			provenConjuncts(refinement),
+			refinement.base,
+		)
 
 		return (
 			implied.size >= proven.size &&
@@ -13238,10 +13250,15 @@ function reportInvalidPredicateLeaf(
 // which is what makes `@::isZero()`, `@::isPositive()` and `@::hasItems()`
 // resolve without anybody naming them anywhere.
 //
-// NOTE: The names are trusted, not asked about. These are `Equatable`'s and
-// `Orderable`'s vocabulary, and a Namespace declaring one of them under another
-// meaning is telling the language something false about a name it reserves in
-// spirit — the reading this pass has always taken of `is` and `isNot`.
+// NOTE: The names are read only where the BASE itself answers them. These are
+// `Equatable`'s and `Orderable`'s vocabulary, and the standard library always
+// answers all three through the conforming Namespace — so the rewrite is taken
+// when the Namespace that answered is the receiver's own, or the covering
+// `Number` a bound of the other numeric kind falls to. A Program's
+// `namespace Tag for String { isLessThan(_ n: Integer) … }` means whatever its
+// body means, and is kept as it was written rather than turned into the negation
+// of a sibling that says something else. It is `narrowedBy`'s guard, and
+// `impliedConjunctKeys` reads the same one.
 const PRIMITIVE_PREDICATES: ReadonlyMap<string, string> = new Map([
 	["isNot", "is"],
 	["isGreaterThanOrEqualTo", "isLessThan"],
@@ -13278,8 +13295,22 @@ function resolvedConjunct(
 		}
 	}
 
+	// NOTE: The receiver's own Type is what says whether the name may be read,
+	// and it is unwrapped first: a `where` clause asks `@` bound to the bare base,
+	// while a condition asks an ordinary binding whose Type is often a refinement
+	// already. Both have to key alike, or an `if` would stop rewriting where the
+	// clause it has to match kept on.
 	let primitive =
-		args.length === 1
+		args.length === 1 &&
+		answersForBase(
+			{
+				namespaceName: invocation.namespace.name,
+				methodName: spelling.methodName,
+				args,
+				negated: false,
+			},
+			refinableBaseTag(invocation.base.type),
+		)
 			? PRIMITIVE_PREDICATES.get(spelling.methodName)
 			: undefined
 
