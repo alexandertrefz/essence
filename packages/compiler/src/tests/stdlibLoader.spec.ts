@@ -671,11 +671,14 @@ describe("Standard Library Loader", () => {
 			throw new Error("'NonZero' did not load as a refinement")
 		}
 
+		// NOTE: `isNot` is declared here with NO body, so it asks its own
+		// question. The standard library's own is `Equatable`'s, whose provided
+		// body is the `if` that spells out `is`, and resolves to that.
 		expect(alias.conjuncts).toEqual([
 			{
 				namespaceName: "Integer",
-				methodName: "is",
-				negated: true,
+				methodName: "isNot",
+				negated: false,
 				args: ["0"],
 				spelling: { methodName: "isNot", args: ["0"] },
 			},
