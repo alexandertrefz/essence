@@ -9,6 +9,7 @@ import {
 	Printable       from "./Protocols.es"
 	NonZeroRational from "./Rational.es"
 	Rational        from "./Rational.es"
+	Rounding        from "./Rational.es"
 	Step            from "./Step.es"
 	String          from "./String.es"
 	Transcendental  from "./Transcendental.es"
@@ -480,6 +481,18 @@ declarations {
 			<- @::is(0)
 		}
 
+		§ This and `round` below answer for an Integer what `Rational` already
+		§ answers. Both are Integer's rung of a Method a Union receiver
+		§ dispatches over. So `numbers::sum()::round()` is one call rather
+		§ than a `match` written at the use site.
+
+		§§ Answers whether the Integer is a whole number.
+		§§
+		§§ Every Integer is whole, so the answer is always `true`.
+		isWholeNumber() -> Boolean {
+			<- true
+		}
+
 		§§ Answers the Integer without its sign, which is its distance from zero.
 		absolute() -> Integer {
 			if @::isNegative() {
@@ -491,6 +504,16 @@ declarations {
 
 		§§ Answers the Integer with its sign flipped.
 		negate() -> Integer
+
+		§§ Answers the Integer, rounded in the named direction.
+		§§
+		§§ An Integer is already whole, so every direction answers the receiver itself. The direction is `#Nearest` when a call names none.
+		§§
+		§§ @param toward — the direction to round in, `#Nearest` when it is left out
+		§§ @returns — the Integer itself.
+		round(toward direction: Rounding = #Nearest) -> Integer {
+			<- @
+		}
 
 		§ `clamp` and `isBetween` are `Orderable`'s provided Methods now. Both
 		§ are written on that Protocol's own inequalities, which read
