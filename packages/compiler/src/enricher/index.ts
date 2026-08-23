@@ -41,7 +41,12 @@ import {
 	resolveOverloadedFunctionStatementType,
 	resolveProtocolDeclarationStatementType,
 } from "./resolvers"
-import { childScope, modulePathOf, scopeMap } from "./scope"
+import {
+	childScope,
+	countTypeDeclaration,
+	modulePathOf,
+	scopeMap,
+} from "./scope"
 import {
 	mergedModifiers,
 	nameTemplate,
@@ -583,6 +588,7 @@ function fillPendingPredicates(
 
 			hoistedTypes.delete(node)
 			delete scope.types[node.name.content]
+			countTypeDeclaration()
 		} else {
 			sink(node, diagnostics)
 			refinement.conjuncts = result
@@ -590,6 +596,14 @@ function fillPendingPredicates(
 			for (let copy of copies) {
 				copy.conjuncts = result
 			}
+
+			// NOTE: The Alias was already in Scope while its predicate was
+			// pending, and a written receiver standing inside a hoisting round
+			// skipped it for exactly that reason. What it PROVES has changed
+			// without a name being declared, so the count is bumped by hand —
+			// an answer worked out before this line was worked out without
+			// this Alias in it.
+			countTypeDeclaration()
 		}
 
 		pending.splice(index, 1)
@@ -1182,6 +1196,7 @@ function hoistDeclarationsInner(
 		)) {
 			recursiveNodes.push({ node, scope })
 			scope.types[node.name.content] = { type: "Error" }
+			countTypeDeclaration()
 		}
 	}
 
@@ -1359,6 +1374,7 @@ function hoistDeclarationsInner(
 				sink(node, speculation.diagnostics)
 
 				targetMap[node.name.content] = speculation.result
+				countTypeDeclaration()
 
 				// NOTE: "Which Namespaces can this Scope see" is memoised
 				// against a version that every declaration bumps, and the hoist
@@ -1508,6 +1524,7 @@ function hoistDeclarationsInner(
 		sink(node, diagnostics)
 
 		scope.types[node.name.content] = result
+		countTypeDeclaration()
 		hoistedTypes.set(node, result)
 	}
 

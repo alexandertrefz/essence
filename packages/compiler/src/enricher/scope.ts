@@ -76,3 +76,25 @@ export function childScope(
 		protocols: scopeMap(overrides.protocols),
 	}
 }
+
+// NOTE: How many Types have been declared anywhere, ever. "Which refinements can
+// this Scope see" is memoised per Scope, and the answer changes only when a Type
+// is declared into one of the Scopes on the chain — during the hoisting rounds,
+// and again while a body that writes its own `type` is enriched. ONE counter
+// rather than a version per Scope compared up the chain: a Type declaration is
+// rare beside a written receiver, so dropping every answer at one costs less
+// than revalidating each of them, and a count that moves too often only ever
+// costs a recount.
+//
+// Every write to a `types` table bumps it — including a DELETE, which is what a
+// refinement whose predicate never resolved leaves behind, and including the
+// hoist's direct writes, which deliberately go around `declareTypeInScope`.
+let typeDeclarations = 0
+
+export function typeDeclarationCount(): number {
+	return typeDeclarations
+}
+
+export function countTypeDeclaration(): void {
+	typeDeclarations += 1
+}

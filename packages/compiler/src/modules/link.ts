@@ -11,6 +11,7 @@ import {
 } from "../diagnostics/index"
 import { enrichPrograms, topLevelScope } from "../enricher/index"
 import { invalidateNamespacesInScope } from "../enricher/resolvers"
+import { countTypeDeclaration } from "../enricher/scope"
 import { patternBindings } from "../helpers/index"
 import type { Module, ModuleGraph } from "./graph"
 
@@ -402,6 +403,7 @@ function bindInto(
 
 	if (type !== undefined) {
 		scope.types[localName] = type
+		countTypeDeclaration()
 	}
 
 	let protocol = surface.protocols[exportedName]
@@ -434,6 +436,7 @@ function bindAsError(
 ): void {
 	scope.members[localName] = { type: "Error" }
 	scope.types[localName] = { type: "Error" }
+	countTypeDeclaration()
 	scope.constants.add(localName)
 	scope.declarations[localName] = position
 }
@@ -876,6 +879,7 @@ function surfaceOf(
 
 			if (type !== undefined) {
 				surface.types[publicName] = type
+				countTypeDeclaration()
 			}
 
 			let protocol = state.scope.protocols[exportedName]
@@ -916,6 +920,7 @@ function surfaceOf(
 
 		if (forwardedType !== undefined) {
 			surface.types[publicName] = forwardedType
+			countTypeDeclaration()
 		}
 
 		let forwardedProtocol = dependency.protocols[exportedName]

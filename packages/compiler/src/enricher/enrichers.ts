@@ -112,8 +112,10 @@ import {
 } from "./resolvers"
 import {
 	childScope,
+	countTypeDeclaration,
 	modulePathOf,
 	scopeMap,
+	typeDeclarationCount,
 	unimportedNamespacesOf,
 } from "./scope"
 
@@ -6298,6 +6300,7 @@ function declareTypeInScope(
 	}
 
 	scope.types[variableName] = type
+	countTypeDeclaration()
 
 	return scope
 }
@@ -7657,6 +7660,88 @@ function refinedLiteralReceiverType(
 		return null
 	}
 
+	// NOTE: The whole answer, remembered per Scope and per written value. The
+	// same `7` occurs over and over in a file and asks the same question every
+	// time, and the question is expensive: every Type name in every Scope on the
+	// chain is walked, and every refinement that came back is then asked to admit
+	// the value. A Program declaring refinements of its own paid a multiple of it
+	// at every literal it wrote.
+	//
+	// The answer is a pure function of the Scope chain and the value, so the only
+	// thing that can stale it is a Type DECLARED after it was remembered — which
+	// is what the count guards. A written List is left off, because the Type of
+	// its items is part of the question and its spelling is not part of the key.
+	let key = writtenReceiverKey(base)
+
+	if (key === null) {
+		return provenLiteralReceiverType(base, scope)
+	}
+
+	let answers = remembersRefinedReceivers(scope)
+
+	if (answers.has(key)) {
+		return answers.get(key) ?? null
+	}
+
+	let answer = provenLiteralReceiverType(base, scope)
+
+	answers.set(key, answer)
+
+	return answer
+}
+
+// NOTE: The table this Scope's answers live in, thrown away whole the moment a
+// Type is declared anywhere — which is what keeps an answer from outliving the
+// candidates it was worked out from. A Function writing its own `type` empties
+// it once and fills it again, which is the cost of being exact.
+function remembersRefinedReceivers(
+	scope: enricher.Scope,
+): Map<string, common.RefinementType | null> {
+	let declarations = typeDeclarationCount()
+	let remembered = refinedReceiverAnswers.get(scope)
+
+	if (remembered === undefined || remembered.declarations !== declarations) {
+		remembered = { declarations, answers: new Map() }
+		refinedReceiverAnswers.set(scope, remembered)
+	}
+
+	return remembered.answers
+}
+
+let refinedReceiverAnswers = new WeakMap<
+	enricher.Scope,
+	{
+		declarations: number
+		answers: Map<string, common.RefinementType | null>
+	}
+>()
+
+// NOTE: What the value IS, as a string — the whole of what the question depends
+// on besides the Scope. The kind is checked as well as the shape, because a
+// receiver that has already been refined once is a different question from the
+// bare literal it was written as. Null for everything else, which takes it off
+// the memo rather than onto it under a key that does not identify it.
+function writtenReceiverKey(base: common.typed.ExpressionNode): string | null {
+	switch (base.nodeType) {
+		case "IntegerValue":
+			return base.type.type === "Integer" ? `I${base.value}` : null
+		case "RationalValue":
+			return base.type.type === "Rational"
+				? `R${base.numerator}/${base.denominator}`
+				: null
+		case "StringValue":
+			return base.type.type === "String" ? `S${base.value}` : null
+		case "BooleanValue":
+			return base.type.type === "Boolean" ? `B${base.value}` : null
+		default:
+			return null
+	}
+}
+
+function provenLiteralReceiverType(
+	base: common.typed.ExpressionNode,
+	scope: enricher.Scope,
+): common.RefinementType | null {
 	let admits = admissionOfWrittenValue(base)
 
 	if (admits === null) {
