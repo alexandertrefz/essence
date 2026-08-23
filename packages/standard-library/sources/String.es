@@ -484,12 +484,12 @@ declarations {
 		§§ The padding goes at the front when no end is named. `#BothEnds` centres the String.
 		§§
 		§§ @param to — the length to reach
-		§§ @param with — the String to pad with, repeated as needed
+		§§ @param with — the String to pad with, repeated as needed; a space when it is left out.
 		§§ @param at — the end to pad; `#Start` when it is left out.
 		§§ @returns — the padded String; unchanged when it is already that long.
 		pad(
 			to length: Integer,
-			with padding: String,
+			with padding: String = " ",
 			at side: Side = #Start,
 		) -> String {
 			if padding::isEmpty() {
