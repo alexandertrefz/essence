@@ -448,7 +448,7 @@ Three more shapes are read. An `if` that spells the call out —
 what `Equatable::isNot` is written as and has to be. A PROTOCOL's provided
 bodies are read as the Protocol hoists, with no Namespace on the leaf: a
 provided Method belongs to whichever conformance reaches it, so the witness
-fills its own in, and one further step is taken through that witness where the
+fills its own in, and the leaf is followed on through that witness where the
 Protocol saw a requirement and the conformer wrote a body. And a body that
 writes the ordering BACKWARDS — `<- other::isGreaterThanOrEqualTo(@)`, which is
 how `Integer` answers a Rational bound — is read as the converse of what it
@@ -459,6 +459,9 @@ covering `Number`.
 A chain is followed to the end whichever order the Methods were written in, and
 a ring of Methods written as each other's contraries is left alone rather than
 followed round — believing either half would make the other its own contrary.
+What one hoist can fold together it folds; what it can not — a witness's own
+body, or a target read after the body naming it — is followed at the call
+instead, where every reading is finished.
 
 Two things follow for an editor. Rewriting such a body changes what an `else`
 narrows to, so `isZero` may not become `@::compare(to 0)::is(#Equal)` without
