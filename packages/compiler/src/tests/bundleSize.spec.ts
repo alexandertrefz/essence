@@ -336,8 +336,18 @@ describe("Bundle Size", () => {
 	// off rather than 201 — the same unrecorded drift this file has caught
 	// three times now. What leaves is the Optional handling around two powers.
 	// `2::raise(to 10)` and `2/3::raise(to 2)` reach the entries a written
-	// exponent proves and answer bare, so the fixture writes `2::raise(to -2)`
-	// to keep an Optional in the file at all.
+	// exponent proves and answer bare.
+	// NOTE: 72,659 now, down 172, and the ceiling STAYS at 74,100 — 1,441 of
+	// headroom, the order the rest of this file keeps. A written RECEIVER
+	// proves its own predicates now, which retracts the last sentence above:
+	// `2::raise(to -2)` answers bare as well, since a power is empty only
+	// where a zero base meets a negative exponent. So does
+	// `3/4::reciprocal()`, and `[1, 2, 3]::firstItem(defaultingTo 0)` and
+	// `[1, 2]::average(defaultingTo 0/1)` lose fallbacks that could never be
+	// read — the second of those never answered an Optional at all, it reached
+	// the `NonEmptyList` entry. The fall is only 172 because the fixture had to
+	// BUY an Optional back: `constant base = 1::add(1)` feeding
+	// `base::raise(to -2)` is what keeps `value(defaultingTo:)` shown at all.
 	it("keeps Everyday.es from dragging in the whole numeric tower", async () => {
 		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(74_100)
 	})
@@ -424,6 +434,14 @@ describe("Bundle Size", () => {
 	// the `NonZeroInteger` rungs the irrationals gained and answer an Algebraic
 	// or a Transcendental rather than a Union — which is what puts each answer's
 	// own arithmetic in the bundle instead of the covering `Number`'s.
+	// NOTE: It now measures 36,292, down 306, and the ceiling STAYS at 37,500 —
+	// 1,208 of headroom, the order the rest of this file keeps. A written
+	// receiver proves its own sign, so the three `Terminal.inspect(N::
+	// squareRoot())` calls answer a number and the two Matches over a root
+	// lose their `#Value`/`#Empty` arms. What arrived against it is the
+	// Optional the fixture bought back: `constant computedNegative =
+	// 0::subtract(4)` and the `squareRoot` of it, so a root that has no answer
+	// is still shown.
 	it("keeps Irrational.es from dragging in the whole numeric tower", async () => {
 		expect(await bundleSizeOf("Irrational.es")).toBeLessThan(37_500)
 	})
