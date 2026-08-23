@@ -523,6 +523,8 @@ third"::lines())
 	show("Integer.absolute() [positive]", 5::absolute())
 	show("Integer.negate()", 5::negate())
 	show("Integer.negate() [zero]", 0::negate())
+	show("Integer.round(toward?: Rounding) [no direction named]", 5::round())
+	show("Integer.round(toward?: Rounding)", -5::round(toward #Up))
 	show("Integer.isEven()", 4::isEven())
 	show("Integer.isEven() [odd]", 3::isEven())
 	show("Integer.isOdd()", -3::isOdd())
@@ -533,6 +535,7 @@ third"::lines())
 	show("Integer.isNegative() [zero]", 0::isNegative())
 	show("Integer.isZero()", 0::isZero())
 	show("Integer.isZero() [non zero]", 1::isZero())
+	show("Integer.isWholeNumber()", 5::isWholeNumber())
 	show(
 		"Integer.remainder(dividingBy: Integer)",
 		7::remainder(dividingBy computedThree),
@@ -3053,6 +3056,19 @@ third"::lines())
 
 	show("NumberList.sum()", mixedNumbers::sum())
 	show("NumberList.sum() [empty]", noMixedNumbers::sum())
+
+	§ Both members of the Union answer `round` and `isWholeNumber`, so a
+	§ total of mixed Numbers reaches each through Union dispatch rather
+	§ than through a `match` written here.
+	show(
+		"Integer.round(toward?: Rounding) [union receiver]",
+		twoMixedNumbers::sum()::round(),
+	)
+	show(
+		"Integer.isWholeNumber() [union receiver]",
+		twoMixedNumbers::sum()::isWholeNumber(),
+	)
+
 	show("NumberList.product()", mixedNumbers::product())
 	show("NumberList.product() [empty]", noMixedNumbers::product())
 	show("NumberList.average()", mixedNumbers::average())

@@ -2050,6 +2050,7 @@ describe("Standard Library Loader", () => {
 			"Integer::isEven",
 			"Integer::isGreaterThan",
 			"Integer::isLessThan",
+			"Integer::isWholeNumber",
 			"List::contains",
 			"List::hasItems",
 			"List::hasOnlyItems",

@@ -29,8 +29,9 @@ declarations {
 	§ DEVELOPMENT.md, Why bodies look the way they do.
 	namespace NumberFormat for NumberFormat is Equatable, is Printable {}
 
-	§ Which Integer `round` reaches for a Rational that is not whole. The
-	§ Choice is declared beside its only user, and `#Nearest` is the default.
+	§ Which step `round` reaches for a value that is not already on one. The
+	§ Choice is declared beside the Namespace that rounds most, and `#Nearest`
+	§ is the default. `Integer.es` imports it for its own `round`.
 	choice Rounding {
 		Nearest,
 		Down,
