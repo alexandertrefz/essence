@@ -47,8 +47,18 @@ const KEPT_BUNDLES = 512
 
 // NOTE: In the key, so that a change to what `esc` puts around the Compiler's
 // output — a different scratch name for `run`, a different pairing of bundle
-// and map — can not be read back as the shape it replaced.
-const EMITTER = "esc-1"
+// and map — can not be read back as the shape it replaced. The Compiler's own
+// code is fingerprinted rather than versioned, because the standard library
+// snapshot has already read it; `esc`'s is not, and this number is what stands
+// in for it.
+//
+// NOTE: `esc-2` retires everything `esc-1` named. The worker pool opened every
+// worker it booted as a build, so `essence test` emitted bundles with no tests
+// in them and wrote them under keys that say `tests` — a name that promises
+// one thing and holds another, which no later run can tell from a good one.
+// Nothing about the sources or the Compiler moved, so nothing else in the key
+// could retire them.
+const EMITTER = "esc-2"
 
 // NOTE: `.mjs`, so that a bundle `esc run` spawns is read as a Module whatever
 // the nearest `package.json` in the cache directory's ancestry happens to say.
