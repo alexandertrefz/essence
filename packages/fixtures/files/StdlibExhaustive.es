@@ -2982,6 +2982,36 @@ third"::lines())
 		numbers::lastItems(99),
 	)
 	show("List.lastItems<ItemType>(_ Integer) [empty]", noNumbers::lastItems(2))
+	§ Grouping, over three kinds of key. The first shows the order the groups
+	§ stand in, which is the order their keys were first met. The third reads
+	§ its key with a member path, as `sort(on:)` does, and its items are read
+	§ down to their tags for the reason the `[tie]` lines above are: a Record
+	§ per item would wrap the line.
+	show(
+		"List.group<ItemType, Key is Equatable>(on: (_ ItemType) -> Key)",
+		numbers::group(on (item) { <- item }),
+	)
+	show(
+		"List.group<ItemType, Key is Equatable>(on: (_ ItemType) -> Key) [Boolean key]",
+		numbers::group(on (item) { <- item::isEven() }),
+	)
+	show(
+		"List.group<ItemType, Key is Equatable>(on: (_ ItemType) -> Key) [member path]",
+		tiedRows
+			::group(on .n)
+			::map((found) {
+				<- { key = found.key, tags = found.items::map(.tag) }
+			}),
+	)
+	show(
+		"List.group<ItemType, Key is Equatable>(on: (_ ItemType) -> Key) [one group]",
+		[7]::group(on (item) { <- item }),
+	)
+	show(
+		"List.group<ItemType, Key is Equatable>(on: (_ ItemType) -> Key) [empty]",
+		noNumbers::group(on (item) { <- item }),
+	)
+
 	§ ——— NestedList ———————————————————————————————————————————————————————
 	show("NestedList.flatten<ItemType>()", [[1, 2], [3]]::flatten())
 	show("NestedList.flatten<ItemType>() [empty]", noNestedNumbers::flatten())
