@@ -571,13 +571,14 @@ export type BaseFunction = {
 	generics: Array<GenericDeclaration>
 	returnType: Type | GenericUse
 	documentation?: Documentation
-	// NOTE: Set where this entry is a PREDICATE ALIAS — a Method that takes no
-	// Arguments, answers a Boolean, and whose whole body is one call on `@`,
-	// optionally negated. `Integer::isZero` is `@::is(0)`, `List::hasItems` is
-	// `@::isEmpty()::negate()`. What is stored is the leaf that call resolves
-	// to, so a refinement written on the alias and one written on the Method it
-	// forwards to are the same predicate, and the opposite of either is the
-	// other.
+	// NOTE: Set where this entry is a PREDICATE ALIAS — a Method that answers a
+	// Boolean and whose whole body is one call on `@`, optionally negated.
+	// `Integer::isZero` is `@::is(0)`, `List::hasItems` is
+	// `@::isEmpty()::negate()`, and `Integer::isGreaterThanOrEqualTo` is
+	// `@::isLessThan(other)` negated over the Argument it was handed. What is
+	// stored is the leaf that call resolves to, so a refinement written on the
+	// alias and one written on the Method it forwards to are the same
+	// predicate, and the opposite of either is the other.
 	//
 	// Read off the BODY rather than declared, which is what makes it true: a
 	// Namespace could declare that one Method is another's contrary and be
@@ -585,7 +586,7 @@ export type BaseFunction = {
 	// Method that is not one — a body that reads a chain (`@::length()::is(0)`)
 	// is a leaf of its own, and the standard library's emptiness Methods are
 	// exactly that.
-	predicateAlias?: PredicateConjunct
+	predicateAlias?: PredicateAlias
 }
 
 export type FunctionType = BaseFunction & {
@@ -794,6 +795,45 @@ export type PredicateSpelling = {
 	methodName: string
 	args: Array<string | boolean>
 }
+
+// NOTE: What a Method's BODY says it asks, recorded on the entry as its
+// Namespace or its Protocol reaches Scope. It is a TEMPLATE rather than a leaf:
+// a Method that takes Arguments forwards them, so a slot is either a scalar the
+// body wrote down or the position of one of the Method's own Parameters, and
+// the call site substitutes what it was given. `isGreaterThanOrEqualTo(_ other)`
+// is `isLessThan` negated over Parameter 0, `isZero()` is `is` over the literal
+// `0`, and `isWithin(_ n)` written `@::isBetween(0, and n)` is `isBetween` over
+// the literal and Parameter 0 together.
+//
+// A call whose Argument in a forwarded slot is not written down contributes no
+// conjunct at all, exactly as a computed Argument always has.
+//
+// `namespaceName` is null where the body was read on `Self` — a Protocol's
+// PROVIDED Method, which every conformer reaches through a witness of its own.
+// The Namespace the call answered through is the conformance SOURCE, so it is
+// filled in at the call site: `x::isGreaterThanOrEqualTo(0)` keys as
+// `Integer::isLessThan(0)` negated on an Integer and as `Number::isLessThan(0)`
+// negated on a Number, which is what a `where` clause written over each base
+// keys as.
+//
+// A chain is resolved through: an alias whose target is itself one is recorded
+// as the leaf both of them mean, whichever order the two were written in, and a
+// ring of Methods defined by each other is left primitive rather than followed
+// round.
+export type PredicateAlias = {
+	namespaceName: string | null
+	methodName: string
+	args: Array<PredicateAliasArgument>
+	negated: boolean
+}
+
+// NOTE: One slot of an alias' Arguments — a scalar spelled exactly as a
+// conjunct's own Arguments are, or the POSITION of a Parameter the body
+// forwarded. Positions are counted over the Arguments a caller writes, so the
+// receiver is no part of them.
+export type PredicateAliasArgument =
+	| { kind: "Literal"; value: string | boolean }
+	| { kind: "Parameter"; index: number }
 
 // NOTE: A checked refinement — a base Type together with the predicate every
 // value of it has been proven to satisfy. `type NonZeroInteger = Integer where

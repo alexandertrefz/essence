@@ -396,8 +396,31 @@ describe("Property tests", () => {
 		// something else by a word the narrowing table knows. Reading the name
 		// alone would narrow by a promise nobody made — and drop the check that
 		// would have caught it. `isLessThan` is one of the words the table
-		// knows, and this Namespace's body means the opposite by it.
+		// knows, and the body below reads a CHAIN, so there is nothing to
+		// resolve it to and the leaf stays this Namespace's own question.
 		it("narrows only by the base's own Namespace", () => {
+			expect(
+				shapeOf(
+					generatorOf(
+						"n: Odd",
+						`namespace Weird for Integer {
+							isLessThan(_ other: Integer) -> Boolean {
+								<- @::absolute()::isGreaterThan(other)
+							}
+						}
+
+						type Odd = Integer where @::<Weird>isLessThan(0)`,
+					),
+				),
+			).toMatchObject({ kind: "refined", checks: 1, narrowing: {} })
+		})
+
+		// NOTE: And a body that forwards the Argument it was handed is read
+		// through to the same leaf a written bound reaches. `Weird::isLessThan`
+		// is `@::isGreaterThan(other)`, so the refinement below asks for a value
+		// above zero and the generator draws one — under the name of the
+		// opposite comparison, which decides nothing.
+		it("narrows by the leaf a forwarded Argument reaches", () => {
 			expect(
 				shapeOf(
 					generatorOf(
@@ -411,7 +434,11 @@ describe("Property tests", () => {
 						type Odd = Integer where @::<Weird>isLessThan(0)`,
 					),
 				),
-			).toMatchObject({ kind: "refined", checks: 1, narrowing: {} })
+			).toMatchObject({
+				kind: "refined",
+				checks: 0,
+				narrowing: { atLeast: "1" },
+			})
 		})
 
 		// NOTE: What a Namespace's own body says IS read, which is the other
