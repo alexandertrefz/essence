@@ -207,16 +207,32 @@ declarations {
 			(by other: NonZeroRational) -> Algebraic
 		}
 
+		§ An Algebraic is never zero, so it is below its own negation exactly
+		§ when it is negative, and above it exactly when it is positive. This
+		§ Namespace's own `compare` decides both. The covering `Number`'s
+		§ `isLessThan(0)` says the same and reaches the whole numeric tower;
+		§ see DEVELOPMENT.md, Why bodies look the way they do. No `isZero`
+		§ stands beside them: there is no Algebraic it answers `true` for.
+
+		§§ Answers whether the Algebraic is above zero.
+		§§
+		§§ The sign of `a + b·√d` is exactly decidable. No approximation is consulted.
+		isPositive() -> Boolean {
+			<- @::compare(to @::negate())::is(#Greater)
+		}
+
+		§§ Answers whether the Algebraic is below zero.
+		§§
+		§§ The sign of `a + b·√d` is exactly decidable. No approximation is consulted.
+		isNegative() -> Boolean {
+			<- @::compare(to @::negate())::is(#Less)
+		}
+
 		§§ Answers the Algebraic without its sign, which is its distance from zero.
 		§§
 		§§ The sign of `a + b·√d` is exactly decidable. No approximation is consulted.
 		absolute() -> Algebraic {
-			§ An Algebraic is never zero, so it is below its own negation
-			§ exactly when it is negative. This Namespace's own `compare`
-			§ decides that. The covering `Number`'s `isLessThan(0)` says the
-			§ same and reaches the whole numeric tower; see DEVELOPMENT.md,
-			§ Why bodies look the way they do.
-			if @::compare(to @::negate())::is(#Less) {
+			if @::isNegative() {
 				<- @::negate()
 			} else {
 				<- @
