@@ -42,13 +42,28 @@ declarations {
 		§§
 		§§ Two Algebraics over the same radical stay in the slice. Their radical parts can also cancel, which leaves a Rational. The `defaultingTo:` entry answers the given value in place of empty.
 		overload add {
+			§§ Answers the exact sum of the Algebraic and an Integer.
+			§§
+			§§ An Integer shifts the rational part and leaves the radical in place, so the sum is again an Algebraic.
+			§§
+			§§ @param _ — the Integer to add
+			§§ @returns — the exact sum.
 			(_ other: Integer) -> Algebraic
 
+			§§ Answers the exact sum of the Algebraic and a Rational.
+			§§
+			§§ A Rational shifts the rational part and leaves the radical in place, so the sum is again an Algebraic.
+			§§
+			§§ @param _ — the Rational to add
+			§§ @returns — the exact sum.
 			(_ other: Rational) -> Algebraic
 
 			§§ Answers the exact sum of the two Algebraics.
 			§§
 			§§ Over the same radical the sum stays in the slice, and can collapse to a Rational. Over different radicals there is no sum yet, and the answer is empty.
+			§§
+			§§ @param _ — the Algebraic to add
+			§§ @returns — the sum, or nothing when the radicals differ.
 			(_ other: Algebraic) -> Optional<Rational | Algebraic>
 
 			§§ Answers the exact sum of the two Algebraics.
@@ -70,14 +85,32 @@ declarations {
 		§§
 		§§ Subtracting an equal radical part leaves a Rational. The `defaultingTo:` entry answers the given value in place of empty.
 		overload subtract {
+			§§ Answers the exact difference of the Algebraic and an Integer.
+			§§
+			§§ An Integer shifts the rational part and leaves the radical in place, so the difference is again an Algebraic.
+			§§
+			§§ @param _ — the Integer to subtract
+			§§ @returns — the exact difference.
 			(_ other: Integer) -> Algebraic {
 				<- @::add(other::negate())
 			}
 
+			§§ Answers the exact difference of the Algebraic and a Rational.
+			§§
+			§§ A Rational shifts the rational part and leaves the radical in place, so the difference is again an Algebraic.
+			§§
+			§§ @param _ — the Rational to subtract
+			§§ @returns — the exact difference.
 			(_ other: Rational) -> Algebraic {
 				<- @::add(other::negate())
 			}
 
+			§§ Answers the exact difference of the two Algebraics.
+			§§
+			§§ Over the same radical the difference stays in the slice, and can collapse to a Rational. Over different radicals there is no difference, and the answer is empty.
+			§§
+			§§ @param _ — the Algebraic to subtract
+			§§ @returns — the difference, or nothing when the radicals differ.
 			(_ other: Algebraic) -> Optional<Rational | Algebraic> {
 				<- @::add(other::negate())
 			}
@@ -101,13 +134,28 @@ declarations {
 		§§
 		§§ A radical times itself turns rational: `√2 · √2` is `2`. Multiplying by zero answers zero. Multiplying by a NonZeroInteger or a NonZeroRational keeps the radical, so those entries answer an Algebraic. The `defaultingTo:` entry answers the given value in place of empty.
 		overload multiply {
+			§§ Answers the exact product of the Algebraic and an Integer.
+			§§
+			§§ An Integer scales both parts and leaves the radical in place. A zero factor collapses the product to the Rational zero.
+			§§
+			§§ @param with — the Integer to multiply with
+			§§ @returns — the exact product, an Algebraic or a Rational.
 			(with other: Integer) -> Algebraic | Rational
 
+			§§ Answers the exact product of the Algebraic and a Rational.
+			§§
+			§§ A Rational scales both parts and leaves the radical in place. A zero factor collapses the product to the Rational zero.
+			§§
+			§§ @param with — the Rational to multiply with
+			§§ @returns — the exact product, an Algebraic or a Rational.
 			(with other: Rational) -> Algebraic | Rational
 
 			§§ Answers the exact product of the two Algebraics.
 			§§
 			§§ Over the same radical the product stays exact: `√2 · √2` is `2`. Two pure radicals combine across radicals: `√2 · √3` is `√6`. Anything else is empty.
+			§§
+			§§ @param with — the Algebraic to multiply with
+			§§ @returns — the product, or nothing when there is none.
 			(with other: Algebraic) -> Optional<Rational | Algebraic>
 
 			§§ Answers the exact product of the two Algebraics.
@@ -145,10 +193,28 @@ declarations {
 		§§
 		§§ Dividing by an Integer or a Rational is empty only for zero. Dividing by a NonZeroInteger or a NonZeroRational can not fail, because those divisors are proven. Dividing by an Algebraic multiplies by its reciprocal, which the conjugate always gives. That quotient is empty wherever the matching product is empty. The `defaultingTo:` entries answer the given value in place of empty.
 		overload divide {
+			§§ Answers the exact quotient of the Algebraic and an Integer.
+			§§
+			§§ A divisor that is not zero scales both parts and leaves the radical in place. A zero divisor answers empty.
+			§§
+			§§ @param by — the divisor
+			§§ @returns — the exact quotient, or nothing when the divisor is zero.
 			(by other: Integer) -> Optional<Algebraic>
 
+			§§ Answers the exact quotient of the Algebraic and a Rational.
+			§§
+			§§ A divisor that is not zero scales both parts and leaves the radical in place. A zero divisor answers empty.
+			§§
+			§§ @param by — the divisor
+			§§ @returns — the exact quotient, or nothing when the divisor is zero.
 			(by other: Rational) -> Optional<Algebraic>
 
+			§§ Answers the exact quotient of the two Algebraics.
+			§§
+			§§ The divisor's conjugate gives its reciprocal, and the quotient is that product. It is empty wherever the matching product is empty.
+			§§
+			§§ @param by — the divisor
+			§§ @returns — the quotient, or nothing when there is none.
 			(by other: Algebraic) -> Optional<Rational | Algebraic>
 
 			§§ Answers the exact quotient of the Algebraic and an Integer.
