@@ -8,7 +8,7 @@ import { equal, greater, less, type OrderingType } from "./Ordering"
 import type { RecordType } from "./Record"
 import type { StepType } from "./Step"
 import type { StringType } from "./String"
-import { createString } from "./String"
+import { createString, itemText } from "./String"
 import { type AnyType, typeKeySymbol } from "./type"
 
 // NOTE: A List is TWO runs and a VIEW into each — the back run stored forward
@@ -1051,24 +1051,35 @@ export function join<ItemType extends AnyType>(
 	return createString(pieces.join(separator.value))
 }
 
-// NOTE: `join` with brackets around it, carrying the same `Printable` witness
-// through. Here rather than in Essence because the brackets are String
-// concatenation: written there it would call `String::append`, the only edge
-// this Namespace drew into a Namespace that is written on THIS one. The empty
-// List has no items to space, so it prints as `[]` rather than `[  ]`.
+// NOTE: What a READER sees, which is the form a Program writes the List down
+// in: `[1, 2, 3]`, and `[]` for the empty one. Here rather than in Essence
+// because the brackets are String concatenation: written there it would call
+// `String::append`, the only edge this Namespace drew into a Namespace that is
+// written on THIS one.
+//
+// NOTE: Not `join` with brackets around it any more, and the difference is the
+// one rule `itemText` holds: a String item is QUOTED here where `join` leaves
+// it bare. Joining answers the raw text — `["a", "b"]::join(with ", ")` is
+// `a, b` — and printing answers what was written down, so `["a", "", "b"]`
+// reads as three items rather than as `[a, , b]`.
 export function toString<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 	conformance: {
 		toString: (value: ItemType) => StringType
 	},
 ): StringType {
-	if (viewOf(originalList).total === 0) {
-		return createString("[]")
+	let view = viewOf(originalList)
+	let pieces: Array<string> = []
+
+	for (let index = view.frontCount - 1; index >= 0; index--) {
+		pieces.push(itemText(view.front[index], conformance))
 	}
 
-	return createString(
-		`[ ${join(originalList, createString(", "), conformance).value} ]`,
-	)
+	for (let index = 0; index < view.backCount; index++) {
+		pieces.push(itemText(view.back[index], conformance))
+	}
+
+	return createString(`[${pieces.join(", ")}]`)
 }
 
 export function flatten<ItemType extends AnyType>(

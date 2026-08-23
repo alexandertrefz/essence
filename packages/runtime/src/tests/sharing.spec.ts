@@ -459,7 +459,7 @@ describe("every native against an upgraded receiver", () => {
 			"1-2-3-4-5",
 		)
 		expect(listToString(upgraded(), integerPrinting).value).toBe(
-			"[ 1, 2, 3, 4, 5 ]",
+			"[1, 2, 3, 4, 5]",
 		)
 		expect(getStringRepresentation(upgraded())).toBe("[ 1, 2, 3, 4, 5 ]")
 

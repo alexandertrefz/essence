@@ -3563,8 +3563,8 @@ describe("Optimiser", () => {
 			).toEqual([
 				'"you have 3 left"',
 				'"a box of 3"',
-				'"nested: [ 1, 2 ]"',
-				'"[ 1, 2 ]"',
+				'"nested: [1, 2]"',
+				'"[1, 2]"',
 			])
 		})
 

@@ -2117,7 +2117,7 @@ describe("Code Generation", () => {
 				Terminal.inspect(same([1, 2], [3, 4])::toString())
 			}`)
 
-			expect(output).toEqual(['"[ 1, 2, 3 ]"', '"true"', '"false"'])
+			expect(output).toEqual(['"[1, 2, 3]"', '"true"', '"false"'])
 		})
 	})
 

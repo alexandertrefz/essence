@@ -168,9 +168,9 @@ declarations {
 			to other: List<ItemType>,
 		) -> Ordering
 
-		§§ Answers the List and its items as a String, in the form `[ 1, 2, 3 ]`.
+		§§ Answers the List and its items as a String, in the form `[1, 2, 3]`.
 		§§
-		§§ Each item is rendered by its own `toString`. The empty List answers `[]`. The Method is available whenever the items conform to `Printable`.
+		§§ Each item is rendered by its own `toString`, and a String item is quoted: `["a", "b"]` answers `["a", "b"]`. A String prints bare on its own and quoted inside a structure. The empty List answers `[]`. The Method is available whenever the items conform to `Printable`.
 		§§
 		§§ @returns — the String representation of the List.
 		toString<infer ItemType is Printable>() -> String
@@ -931,7 +931,7 @@ declarations {
 
 		§§ Answers the items joined into one String, with the given separator between them.
 		§§
-		§§ Each item is rendered by its own `toString`: `[1, 2, 3]::join(with ", ")` is `"1, 2, 3"`. For a List of Strings the Method undoes `String::split(on:)`. It is available whenever the items conform to `Printable`.
+		§§ Each item is rendered by its own `toString`: `[1, 2, 3]::join(with ", ")` is `"1, 2, 3"`. The answer is the raw text, so a String item is not quoted, which is where joining differs from `toString`. For a List of Strings the Method undoes `String::split(on:)`. It is available whenever the items conform to `Printable`.
 		§§
 		§§ @param with — the separator to place between the items
 		§§ @returns — the joined String. The empty List answers the empty String.

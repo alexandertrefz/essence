@@ -96,21 +96,18 @@ declarations {
 			}
 		}
 
+		§ Native, and the one Method here that is. An Essence body renders the
+		§ payload through a hole, and a hole renders a String bare, so the body
+		§ could not quote a String payload. A helper it could reach instead
+		§ would have to be a Method of the language, which costs more than the
+		§ native does.
+
 		§§ Answers the Optional as a String, written `Value(…)` or `Empty`.
 		§§
-		§§ The payload renders through its own `toString`. The Method is available whenever the payload conforms to `Printable`.
+		§§ The payload renders through its own `toString`, and a String payload is quoted: `#Value("a")` answers `Value("a")`. A String prints bare on its own and quoted inside a structure. The Method is available whenever the payload conforms to `Printable`.
 		§§
 		§§ @returns — the text `Value(…)` around the payload, or `Empty`.
-		toString<infer ItemType is Printable>() -> String {
-			§ The `#` sigil is left out, as `Ordering` prints `Less`. A
-			§ rendering names the Case; it does not quote the Expression that
-			§ builds it. The parentheses stay: without them `#Value("Empty")`
-			§ and `#Empty` read alike.
-			<- match @ -> String {
-				case #Value(item) { <- "Value({item})" }
-				case #Empty       { <- "Empty" }
-			}
-		}
+		toString<infer ItemType is Printable>() -> String
 
 		§ These two let a Program ask, rather than only collapse. The
 		§ alternative is to match the Optional apart at the use site, or to

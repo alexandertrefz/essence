@@ -4,7 +4,7 @@ import { materialise } from "./List"
 import { formatAsRational, type RationalType } from "./Rational"
 import type { RecordType } from "./Record"
 import type { StreamType } from "./Stream"
-import type { StringType } from "./String"
+import { quoted, type StringType } from "./String"
 import { toString as transcendentalToString } from "./Transcendental"
 import { type AnyType, typeKeySymbol } from "./type"
 
@@ -22,30 +22,6 @@ import { type AnyType, typeKeySymbol } from "./type"
 // whose variables pane shows a value the way a `Terminal.inspect` would.
 
 const singleLineMaxLength = 60
-
-// NOTE: The escapes are the String Literal's own spellings, so what a quoted
-// rendering shows is unambiguous: an embedded quote no longer reads as the
-// closing one, a backslash as an escape it never was, and a line break no
-// longer splits the one value across two lines of output. The remaining
-// control characters have no Essence spelling of their own, so they render as
-// their code point.
-const stringEscapes: { [character: string]: string } = {
-	"\\": "\\\\",
-	'"': '\\"',
-	"\n": "\\n",
-	"\r": "\\r",
-	"\t": "\\t",
-}
-
-function escapeStringContents(value: string): string {
-	return value.replace(
-		// oxlint-disable-next-line no-control-regex -- matching control characters is this function's job
-		/[\\"\n\r\t\u0000-\u001F\u007F-\u009F]/g,
-		(character) =>
-			stringEscapes[character] ??
-			`\\u{${character.charCodeAt(0).toString(16).toUpperCase()}}`,
-	)
-}
 
 // NOTE: Two readers, one walk. `Terminal.inspect` asks for the STRUCTURAL
 // rendering — what a value IS — and `Record.toString` asks for the PRINTABLE
@@ -159,7 +135,11 @@ export function getStringRepresentation(
 		// rendering it does is spelled out here rather than called.
 		return obj.value ? "true" : "false"
 	} else if (obj[typeKeySymbol] === "String") {
-		return `"${escapeStringContents(obj.value)}"`
+		// NOTE: The same quoting `List.toString` and `Optional.toString` reach
+		// for, out of `String.ts` — a String is quoted inside a structure
+		// wherever the structure is rendered, and this walk is one of the
+		// places that renders one.
+		return quoted(obj.value)
 	} else if (obj[typeKeySymbol] === "Randomness") {
 		// NOTE: One fixed word, like a Function's. What a source holds is four
 		// words of generator state, which say nothing to a reader and would
