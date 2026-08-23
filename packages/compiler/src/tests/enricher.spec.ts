@@ -7675,17 +7675,336 @@ describe("Enricher", () => {
 			})
 		})
 
+		// NOTE: A Method that TAKES Arguments is read the same way, with the
+		// Arguments the body forwarded standing in for whatever a caller writes
+		// — `isLessThanOrEqualTo(_ other)` is `@::isGreaterThan(other)` negated,
+		// so a call passing 9 asks the leaf `@::isGreaterThan(9)`.
+		describe("an alias that forwards its Arguments", () => {
+			it("should narrow the else of a bound the standard library forwards", () => {
+				expect(
+					narrowedTypeOf(
+						`implementation {
+							type Big = Integer where @::isGreaterThan(9)
+
+							constant d = 12
+
+							if d::isLessThanOrEqualTo(9) {
+								Terminal.inspect(0)
+							} else {
+								Terminal.inspect(d)
+							}
+						}`,
+						"d",
+					),
+				).toBe("Big")
+			})
+
+			// NOTE: The bound is the CALL's, not the body's — two calls of one
+			// alias with different Arguments are two questions.
+			it("should not narrow where the bounds differ", () => {
+				expect(
+					narrowedTypeOf(
+						`implementation {
+							type Big = Integer where @::isGreaterThan(9)
+
+							constant d = 12
+
+							if d::isLessThanOrEqualTo(4) {
+								Terminal.inspect(0)
+							} else {
+								Terminal.inspect(d)
+							}
+						}`,
+						"d",
+					),
+				).toBe("Integer")
+			})
+
+			// NOTE: A Program's own reads exactly alike. `Healthy` and
+			// `Integer where @::isGreaterThanOrEqualTo(5)` are one Type, so the
+			// `else` of the sibling question reaches it.
+			const STOCK = `namespace Stock for Integer {
+					isAtLeast(_ n: Integer) -> Boolean {
+						<- @::isLessThan(n)::negate()
+					}
+
+					isLow() -> Boolean {
+						<- @::isLessThan(5)
+					}
+				}
+
+				type Healthy = Integer where @::isAtLeast(5)`
+
+			it("should narrow the else of a Program's own forwarded alias", () => {
+				expect(
+					narrowedTypeOf(
+						`implementation {
+							${STOCK}
+
+							constant units = 12
+
+							if units::isLow() {
+								Terminal.inspect(0)
+							} else {
+								Terminal.inspect(units)
+							}
+						}`,
+						"units",
+					),
+				).toBe("Healthy")
+			})
+
+			it("should make the alias and the leaf one Type in both directions", () => {
+				expect(
+					diagnosticsFor(`implementation {
+						${STOCK}
+
+						type Spelled = Integer where @::isGreaterThanOrEqualTo(5)
+
+						function needsHealthy(_ n: Healthy) -> Integer {
+							<- n
+						}
+
+						function needsSpelled(_ n: Spelled) -> Integer {
+							<- n
+						}
+
+						constant healthy: Healthy = 5
+						constant spelled: Spelled = 7
+
+						Terminal.inspect(needsSpelled(healthy))
+						Terminal.inspect(needsHealthy(spelled))
+					}`),
+				).toEqual([])
+			})
+
+			// NOTE: A body writing the ordering BACKWARDS is read as its
+			// converse — `@ ≤ other` is what `other ≥ @` says, which is how
+			// `Integer::isLessThanOrEqualTo` answers a Rational bound. Read as
+			// written it would be a question of its own, and the `else` below
+			// would reach nothing.
+			it("should narrow the else of a flipped call", () => {
+				expect(
+					narrowedTypeOf(
+						`implementation {
+							type Big = Integer where @::isGreaterThan(1/2)
+
+							constant d = 12
+
+							if d::isLessThanOrEqualTo(1/2) {
+								Terminal.inspect(0)
+							} else {
+								Terminal.inspect(d)
+							}
+						}`,
+						"d",
+					),
+				).toBe("Big")
+			})
+		})
+
+		// NOTE: An alias naming an alias is the leaf both of them mean, and
+		// WHICH of the two was written first decides nothing — the readings are
+		// taken together and collapsed against each other.
+		describe("a chain of aliases", () => {
+			it("should resolve a target written below", () => {
+				expect(
+					narrowedTypeOf(
+						`implementation {
+							namespace Downward for Integer {
+								big(_ n: Integer) -> Boolean {
+									<- @::huge(n)
+								}
+
+								huge(_ n: Integer) -> Boolean {
+									<- @::isGreaterThan(n)
+								}
+							}
+
+							type Over = Integer where @::isGreaterThan(9)
+
+							constant d = 12
+
+							if d::<Downward>big(9) {
+								Terminal.inspect(d)
+							}
+						}`,
+						"d",
+					),
+				).toBe("Over")
+			})
+
+			it("should resolve a target written above", () => {
+				expect(
+					narrowedTypeOf(
+						`implementation {
+							namespace Upward for Integer {
+								vast(_ n: Integer) -> Boolean {
+									<- @::isGreaterThan(n)
+								}
+
+								wide(_ n: Integer) -> Boolean {
+									<- @::vast(n)
+								}
+							}
+
+							type Over = Integer where @::isGreaterThan(9)
+
+							constant d = 12
+
+							if d::<Upward>wide(9) {
+								Terminal.inspect(d)
+							}
+						}`,
+						"d",
+					),
+				).toBe("Over")
+			})
+
+			// NOTE: Two Methods written as each other's contrary say nothing
+			// about anything: believing either would make the other its own
+			// contrary. Both are left asking their own question, so the `else`
+			// of one proves nothing about the other.
+			it("should leave a ring of aliases primitive", () => {
+				expect(
+					narrowedTypeOf(
+						`implementation {
+							namespace Ring for Integer {
+								yin(_ n: Integer) -> Boolean {
+									<- @::yang(n)::negate()
+								}
+
+								yang(_ n: Integer) -> Boolean {
+									<- @::yin(n)::negate()
+								}
+							}
+
+							type Yinned = Integer where @::yin(0)
+
+							constant d = 12
+
+							if d::yang(0) {
+								Terminal.inspect(0)
+							} else {
+								Terminal.inspect(d)
+							}
+						}`,
+						"d",
+					),
+				).toBe("Integer")
+			})
+		})
+
+		// NOTE: A Protocol's PROVIDED body is read as it hoists, with no
+		// Namespace on the leaf — a provided Method belongs to whichever
+		// conformance reaches it — and the witness fills its own in. The
+		// standard library's `isNot` and the two `…OrEqualTo` are all of this
+		// shape, and a Program's own Protocol is read exactly alike.
+		describe("a Protocol's provided predicate", () => {
+			it("should narrow through a Protocol a Program declares", () => {
+				expect(
+					narrowedTypeOf(
+						`implementation {
+							protocol Ranked {
+								isAbove(_ n: Integer) -> Boolean
+
+								isAtMost(_ n: Integer) -> Boolean {
+									<- @::isAbove(n)::negate()
+								}
+							}
+
+							namespace Rank for Integer is Ranked {
+								isAbove(_ n: Integer) -> Boolean {
+									<- @::isGreaterThan(n)
+								}
+							}
+
+							type Above = Integer where @::isGreaterThan(3)
+
+							constant d = 12
+
+							if d::isAtMost(3) {
+								Terminal.inspect(0)
+							} else {
+								Terminal.inspect(d)
+							}
+						}`,
+						"d",
+					),
+				).toBe("Above")
+			})
+
+			// NOTE: The chain above crosses the witness: the Protocol sees a
+			// REQUIREMENT where the conformer wrote a body, so the reading takes
+			// one step through whichever Namespace answered. A body whose last
+			// call is not on `@` is no alias at all, and this one is the same
+			// Namespace's.
+			it("should leave a chained body a question of its own", () => {
+				expect(
+					narrowedTypeOf(
+						`implementation {
+							namespace Rank for Integer {
+								isBigger(than n: Integer) -> Boolean {
+									<- @::absolute()::isGreaterThan(n)
+								}
+							}
+
+							type Above = Integer where @::isGreaterThan(3)
+
+							constant d = 12
+
+							if d::isBigger(than 3) {
+								Terminal.inspect(d)
+							}
+						}`,
+						"d",
+					),
+				).toBe("Integer")
+			})
+
+			// NOTE: And `Orderable`'s own provided bodies reach a witness the
+			// same way. `String` conforms to `Comparable` alone, so a Program
+			// declaring the wider conformance is where those bodies answer a
+			// String — and `isLessThanOrEqualTo` is `isGreaterThan` negated
+			// through that very Namespace.
+			it("should narrow through a provided body the standard library writes", () => {
+				expect(
+					narrowedTypeOf(
+						`implementation {
+							namespace Word for String is Orderable {
+								compare(to other: String) -> Ordering {
+									<- @::<String>compare(to other)
+								}
+							}
+
+							type Long = String where @::<Word>isGreaterThan("mm")
+
+							constant w = "zebra"
+
+							if w::isLessThanOrEqualTo("mm") {
+								Terminal.inspect(0)
+							} else {
+								Terminal.inspect(w)
+							}
+						}`,
+						"w",
+					),
+				).toBe("Long")
+			})
+		})
+
 		// NOTE: The ordering's law is the BASE's promise, so it is read off the
 		// base's own Namespace and off the covering `Number`, and off nothing
 		// else. A Program may spell `is`, `isLessThan` or `isNot` in a Namespace
 		// of its own and mean whatever its body means by them — reading below,
 		// above and equal off those words would rule out comparisons nobody made.
 		describe("a foreign Namespace spelling the comparisons", () => {
-			// NOTE: `Tag::is` and `Tag::isLessThan` are two questions about the
-			// LENGTH, and neither excludes the other: a three-letter word answers
-			// both. Read as the trichotomy, the true branch would have proven the
-			// contrary of `Tag::isLessThan(3)` and walked into 'NotLess', whose
-			// own predicate the value answers 'false'.
+			// NOTE: `Tag::is` and `Tag::isLessThan` each read a CHAIN, so each
+			// is a question of its own about the LENGTH, and neither excludes
+			// the other: a three-letter word answers both. Read as the
+			// trichotomy, the true branch would have proven the contrary of
+			// `Tag::isLessThan(3)` and walked into 'NotLess', whose own
+			// predicate the value answers 'false'.
 			it("should not exclude a sibling comparison it never contradicts", () => {
 				expect(
 					narrowedTypeOf(
@@ -7717,11 +8036,12 @@ describe("Enricher", () => {
 				).toBe("String")
 			})
 
-			// NOTE: And `isNot` is not turned into `is` negated here either.
-			// Both of these say "above the bound", so the `else` of one is the
-			// contrary of the other only if the names are believed over the
-			// bodies. Kept as written, the two are simply two questions.
-			it("should keep a foreign contrary as the question it was written as", () => {
+			// NOTE: And `isNot` is not turned into `is` negated here either. The
+			// BODY decides, and both of these bodies say "above the bound" — so
+			// each is `Integer::isGreaterThan(other)` and neither is the other's
+			// contrary. The `else` below has proven the value is NOT above zero,
+			// which no refinement in scope is declared by.
+			it("should read a foreign contrary as the question its body asks", () => {
 				expect(
 					narrowedTypeOf(
 						`implementation {
@@ -7748,6 +8068,43 @@ describe("Enricher", () => {
 						"d",
 					),
 				).toBe("Integer")
+			})
+
+			// NOTE: Which is the same rule the other way round. `Weird::isNot`
+			// asks whether the value is above the bound, so a refinement written
+			// on it is the one written on that comparison — `PositiveInteger`,
+			// which the standard library declares. Two refinements proving one
+			// leaf are one Type, and a value proven either way reaches both.
+			it("should make a foreign alias one Type with the leaf it asks", () => {
+				expect(
+					diagnosticsFor(`implementation {
+						namespace Weird for Integer {
+							isNot(_ other: Integer) -> Boolean {
+								<- @::isGreaterThan(other)
+							}
+						}
+
+						type Above = Integer where @::<Weird>isNot(0)
+
+						function needsAbove(_ n: Above) -> Integer {
+							<- n
+						}
+
+						function needsPositive(_ n: PositiveInteger) -> Integer {
+							<- n
+						}
+
+						constant d = 3
+
+						if d::isPositive() {
+							Terminal.inspect(needsAbove(d))
+						}
+
+						if d::<Weird>isNot(0) {
+							Terminal.inspect(needsPositive(d))
+						}
+					}`),
+				).toEqual([])
 			})
 		})
 

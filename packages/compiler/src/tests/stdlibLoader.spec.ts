@@ -1915,6 +1915,152 @@ describe("Standard Library Loader", () => {
 		expect(stdlib.timing.total).toBeGreaterThanOrEqual(0)
 	})
 
+	// NOTE: The CENSUS. Every Method the standard library writes that answers a
+	// Boolean, split into the ones read as another Method's question and the
+	// ones that ask their own — with the leaf each alias resolves to spelled
+	// out, `#0` standing for the Argument a caller writes at that position.
+	//
+	// It is the proof that no Method has to be NAMED anywhere as the contrary of
+	// another. Every pair a hardcoded table once held is in the first list,
+	// read off a body: `Equatable::isNot` off the `if` it is written as, both
+	// `…OrEqualTo` off `Orderable`'s provided bodies and off the entries Integer
+	// and Rational write themselves — the mixed-kind ones among them, which
+	// write the ordering backwards and are read as its converse.
+	//
+	// It is also the guard on the two tables that read a leaf: the literal
+	// evaluator in `predicateEval.ts` and the generator's narrowing both hold
+	// PRIMITIVES alone, so the second list is exactly what they may ever be
+	// asked. A Method leaving it has to be added to them, and a Method joining
+	// it makes a row of theirs unreachable.
+	//
+	// A body that reads a CHAIN is a question of its own, which is why
+	// `isEmpty`, `isEven`, `isWholeNumber` and the four comparisons written on
+	// `compare` stay here. So does `isBetween`, written as two comparisons
+	// joined, and `hasItems(where:)`, whose Argument is a Function.
+	it("reads every predicate the standard library writes off its body", () => {
+		let stdlib = loadStdlib()
+		let aliases: Array<string> = []
+		let primitives: Array<string> = []
+
+		function readingOf(
+			owner: string,
+			methodName: string,
+			entry: common.BaseFunction,
+		): void {
+			if (entry.returnType.type !== "Boolean") {
+				return
+			}
+
+			let alias = entry.predicateAlias
+
+			if (alias === undefined) {
+				primitives.push(`${owner}::${methodName}`)
+
+				return
+			}
+
+			let args = alias.args
+				.map((slot) =>
+					slot.kind === "Literal"
+						? String(slot.value)
+						: `#${slot.index}`,
+				)
+				.join(", ")
+
+			aliases.push(
+				`${owner}::${methodName} -> ${alias.negated ? "not " : ""}${
+					alias.namespaceName ?? "Self"
+				}::${alias.methodName}(${args})`,
+			)
+		}
+
+		for (let [name, member] of Object.entries(stdlib.members)) {
+			if (member.type !== "Namespace") {
+				continue
+			}
+
+			for (let [methodName, method] of Object.entries(member.methods)) {
+				if (method.type === "SimpleMethod") {
+					readingOf(name, methodName, method)
+				} else if (method.type === "OverloadedMethod") {
+					for (let entry of method.overloads) {
+						readingOf(name, methodName, entry)
+					}
+				}
+			}
+		}
+
+		for (let [name, protocol] of Object.entries(stdlib.protocols)) {
+			for (let [methodName, method] of Object.entries(protocol.methods)) {
+				if (method.type === "SimpleMethod") {
+					readingOf(`protocol ${name}`, methodName, method)
+				}
+			}
+		}
+
+		// NOTE: Sorted and deduplicated, because two Overloads of one name that
+		// ask one question are one row: `Integer::isLessThanOrEqualTo` takes an
+		// Integer bound and a Rational one, and both are `isGreaterThan`
+		// negated over the bound they were handed.
+		expect([...new Set(aliases)].sort()).toEqual([
+			"Boolean::exclusiveOr -> not Boolean::is(#0)",
+			"Integer::isGreaterThanOrEqualTo -> not Integer::isLessThan(#0)",
+			"Integer::isLessThanOrEqualTo -> not Integer::isGreaterThan(#0)",
+			"Integer::isNegative -> Integer::isLessThan(0)",
+			"Integer::isOdd -> not Integer::isEven()",
+			"Integer::isPositive -> Integer::isGreaterThan(0)",
+			"Integer::isZero -> Integer::is(0)",
+			"List::doesNotContain -> not List::contains(#0)",
+			"List::hasItems -> not List::isEmpty()",
+			"Optional::isEmpty -> not Optional::hasValue()",
+			"Optional::isNot -> not Optional::is(#0)",
+			"Rational::isGreaterThanOrEqualTo -> not Rational::isLessThan(#0)",
+			"Rational::isLessThanOrEqualTo -> not Rational::isGreaterThan(#0)",
+			"String::doesNotContain -> not String::contains(#0)",
+			"String::doesNotEnd -> not String::ends(#0)",
+			"String::doesNotStart -> not String::starts(#0)",
+			"String::hasCharacters -> not String::isEmpty()",
+			"protocol Equatable::isNot -> not Self::is(#0)",
+			"protocol Orderable::isGreaterThanOrEqualTo -> not Self::isLessThan(#0)",
+			"protocol Orderable::isLessThanOrEqualTo -> not Self::isGreaterThan(#0)",
+		])
+
+		expect([...new Set(primitives)].sort()).toEqual([
+			"Algebraic::is",
+			"Boolean::and",
+			"Boolean::is",
+			"Boolean::negate",
+			"Boolean::or",
+			"Integer::is",
+			"Integer::isEven",
+			"Integer::isGreaterThan",
+			"Integer::isLessThan",
+			"List::contains",
+			"List::hasItems",
+			"List::is",
+			"List::isEmpty",
+			"Number::is",
+			"Optional::hasValue",
+			"Optional::is",
+			"Randomness::boolean",
+			"Rational::is",
+			"Rational::isGreaterThan",
+			"Rational::isLessThan",
+			"Rational::isWholeNumber",
+			"Record::is",
+			"String::contains",
+			"String::ends",
+			"String::is",
+			"String::isEmpty",
+			"String::starts",
+			"Transcendental::is",
+			"protocol Equatable::is",
+			"protocol Orderable::isBetween",
+			"protocol Orderable::isGreaterThan",
+			"protocol Orderable::isLessThan",
+		])
+	})
+
 	// NOTE: A standard library file is the WHOLE of what the Namespace it
 	// declares contains. No member is merged in from anywhere else — a name the
 	// sources do not write is a name a Program can not reach, which is what

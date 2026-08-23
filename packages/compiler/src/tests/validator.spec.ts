@@ -2853,6 +2853,32 @@ describe("Validator", () => {
 					diagnostics.map((diagnostic) => diagnostic.code),
 				).toEqual(["assignment-type-mismatch"])
 			})
+
+			// NOTE: And one that FORWARDS the bound it was handed is decided by
+			// the leaf with that bound written into it. The Diagnostic names the
+			// predicate as the reader wrote it, which is the alias and its
+			// Argument rather than what either resolves to.
+			it("should decide a Program's own alias by the bound it forwards", () => {
+				let diagnostics = diagnosticsFor(`implementation {
+					namespace Stock for Integer {
+						isAtLeast(_ n: Integer) -> Boolean {
+							<- @::isLessThan(n)::negate()
+						}
+					}
+
+					type Healthy = Integer where @::isAtLeast(5)
+
+					constant kept: Healthy = 5
+					constant refused: Healthy = 4
+				}`)
+
+				expect(diagnostics).toHaveLength(1)
+				expect(diagnostics[0].code).toBe("assignment-type-mismatch")
+				expect(diagnostics[0].notes).toEqual([
+					"'refused' is declared as Healthy.",
+					"Every value of 'Healthy' has been proven to answer '@::isAtLeast(5)'.",
+				])
+			})
 		})
 
 		it("should admit a written value into a declared refinement", () => {
