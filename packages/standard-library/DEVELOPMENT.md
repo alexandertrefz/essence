@@ -156,12 +156,16 @@ Essence.
 purpose** — wherever it stands. A refinement erases before anything runs, so an
 entry whose promise is about the answer can not say it in Essence and has to be
 native; where the entry it stands beside is an Essence body, the runtime writes
-that operation out a second time rather than instead of it. Four do.
+that operation out a second time rather than instead of it. Five do.
 `NonEmptyList` holds three — `prepend(contentsOf:)`, `removeDuplicates` and
-`replace`, each written in Essence on `List` — and `List.repeat`'s
+`replace`, each written in Essence on `List` — `List.repeat`'s
 `PositiveInteger` entry is the fourth, native because the entry beside it
 answers a `List`, and an expression that is not empty is not one the language
-can be told is not empty. That is the exception the rule above allows, and it is
+can be told is not empty; and `NonZeroRational::reciprocal` is the fifth, for
+the same reason one level along. Every other refined entry added since READS
+off the native beside it instead — `NonNegativeInteger::squareRoot` is the
+shape to copy — and `reciprocal` can not, because the entry it stands beside is
+an Essence body and so exports no runtime Function to import. That is the exception the rule above allows, and it is
 only safe because `StdlibExhaustive.es` calls both entries over the same inputs,
 wherever they stand: the golden capture is what stops the two from drifting.
 Writing another one means adding those lines too.
@@ -408,10 +412,10 @@ knowing: `Optional::is` declares the whole Optional entry FIRST, so
 its refined entry after the general one, so it is numbered second of the three
 and still read first. Appending is the rule, because it leaves every earlier
 number alone — so the `defaultingTo:` entry is last only where nothing has been
-written since. Nine Overloads carry a refined entry written after one, and each
-of those is read first all the same: `Integer::raise`, `Rational::divide` and
-`Rational::raise`, `Algebraic::multiply`, the irrationals' `divide`,
-`Number.average` and the two `Number` extrema.
+written since. Ten Overloads carry a refined entry written after one, and each
+of those is read first all the same: `Integer::divide` and `Integer::raise`,
+`Rational::divide` and `Rational::raise`, `Algebraic::multiply`, the
+irrationals' `divide`, `Number.average` and the two `Number` extrema.
 
 **A predicate written as one call on `@` IS that call.** A Method taking no
 Arguments, answering a Boolean and whose whole body is one call on `@` —
@@ -422,9 +426,9 @@ one Type, and the `else` of an `if` asking one of them proves the other. Two
 things follow for an editor. Rewriting such a body changes what an `else`
 narrows to, so `isZero` may not become `@::compare(to 0)::is(#Equal)` without
 weighing that. And a body that CHAINS is a question of its own for the same
-reason: `isEmpty` is `@::length()::is(0)`, which is why `List::isEmpty` and
-`String::isEmpty` are primitives and their negations are read from them rather
-than the other way round.
+reason: `isEmpty` is `@::length()::is(0)`, which is why the negations of
+`List::isEmpty` and `String::isEmpty` are read from them rather than the other
+way round.
 
 **A body pulls its whole transitive reach into every bundle.** A Method is
 emitted into a Program that reaches it, and so is everything its body calls.
