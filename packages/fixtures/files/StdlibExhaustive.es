@@ -2724,6 +2724,10 @@ third"::lines())
 			defaultingTo -1,
 		),
 	)
+	show("List.enumerate<ItemType>()", numbers::enumerate())
+	show("List.enumerate<ItemType>() [empty]", noNumbers::enumerate())
+	show("List.indices<ItemType>()", numbers::indices())
+	show("List.indices<ItemType>() [empty]", noNumbers::indices())
 	show(
 		"List.join<ItemType is Printable>(with: String)",
 		["a", "b", "c"]::join(with " + "),
@@ -2859,6 +2863,16 @@ third"::lines())
 	show("NonEmptyList.lastItem<ItemType>() [single]", provenOne::lastItem())
 	show("NonEmptyList.length<ItemType>()", provenNumbers::length())
 	show("NonEmptyList.length<ItemType>() [single]", provenOne::length())
+	show("NonEmptyList.enumerate<ItemType>()", provenWords::enumerate())
+	show(
+		"NonEmptyList.enumerate<ItemType>() [proof carried]",
+		provenWords::enumerate()::firstItem(),
+	)
+	show("NonEmptyList.indices<ItemType>()", provenNumbers::indices())
+	show(
+		"NonEmptyList.indices<ItemType>() [proof carried]",
+		provenNumbers::indices()::lastItem(),
+	)
 
 	§ The transforms that CARRY the proof rather than spending it. Each is shown
 	§ twice: once for the value, which has to be the one `List`'s own entry gives

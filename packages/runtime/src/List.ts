@@ -1088,6 +1088,32 @@ export function flatten<ItemType extends AnyType>(
 	return createList(flattened)
 }
 
+// NOTE: One walk and one Record per item — the position beside the item it
+// stands at, so a fold that needs both does not have to carry a counter of its
+// own. Written here rather than in Essence because the Essence body would be
+// `@::indices()::map(…)`, and reading each item back by position builds an
+// Optional per item to take apart again.
+//
+// NOTE: `materialise` rather than a view, for the reason `pair` uses one: the
+// answer is a fresh Array of the receiver's whole length either way, so there
+// is nothing to gain by walking the two runs apart.
+export function enumerate<ItemType extends AnyType>(
+	originalList: ListType<ItemType>,
+): ListType<RecordType & { index: IntegerType; item: ItemType }> {
+	let items = materialise(originalList)
+	let entries: Array<RecordType & { index: IntegerType; item: ItemType }> = []
+
+	for (let index = 0; index < items.length; index++) {
+		entries.push({
+			[typeKeySymbol]: "Record",
+			index: createInteger(index),
+			item: items[index],
+		})
+	}
+
+	return createList(entries)
+}
+
 export function pair<ItemType extends AnyType, Other extends AnyType>(
 	originalList: ListType<ItemType>,
 	otherList: ListType<Other>,

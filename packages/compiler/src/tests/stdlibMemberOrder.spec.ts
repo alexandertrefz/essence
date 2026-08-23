@@ -66,6 +66,8 @@ const ACCESSORS = new Set([
 	"lastItem",
 	"firstIndex",
 	"lastIndex",
+	"enumerate",
+	"indices",
 	"keys",
 	"characters",
 	"words",

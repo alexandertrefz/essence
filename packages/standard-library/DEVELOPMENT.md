@@ -284,8 +284,8 @@ groups, in this order:
    `doesNotContain`.
 5. **Accessors** — the Methods that answer a named part of the receiver:
    `length`, `numerator`, `denominator`, `absolute`, `item(at:)`, `firstItem`,
-   `lastItem`, `firstIndex`, `lastIndex`, `keys`, `characters`, `words`,
-   `lines`, `character(at:)`, `value(defaultingTo:)`.
+   `lastItem`, `firstIndex`, `lastIndex`, `enumerate`, `indices`, `keys`,
+   `characters`, `words`, `lines`, `character(at:)`, `value(defaultingTo:)`.
 6. **Transforms, and everything else** — `negate`, `round`, `clamp`,
    `reciprocal`, `map`, `reduce`, `everyItem`, `sort`, `slice`, `append`,
    `join`, `split`, `trim`, `pad`, `flatten`, `andThen`.
