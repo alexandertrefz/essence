@@ -8226,6 +8226,43 @@ describe("Enricher", () => {
 					),
 				).toBe("NonEmptyList")
 			})
+
+			// NOTE: The instantiation is remembered per receiver, and a NAME is
+			// the one thing a Program may spell twice — so the two `Even`s here
+			// print alike and prove different things. Remembered by their
+			// spelling, the second receiver was handed the first one's
+			// `NonEmptyList<Even>`, whose items answer another question
+			// altogether, and the branch then narrowed to nothing at all.
+			it("should tell two shadowing refinements of one name apart", () => {
+				let source = `implementation {
+					type Even = Integer where @::isEven()
+
+					function outer(_ items: List<Even>) -> Integer {
+						if items::hasItems() {
+							<- items::firstItem()
+						}
+
+						<- 0
+					}
+
+					function inner() -> Integer {
+						type Even = Integer where @::isPositive()
+
+						constant items: List<Even> = [2, 4]
+
+						if items::hasItems() {
+							<- items::firstItem()
+						}
+
+						<- 0
+					}
+				}`
+
+				expect(diagnosticsFor(source)).toEqual([])
+				expect(readTypesOf(source, "items").slice(-1)).toEqual([
+					"NonEmptyList<Even>",
+				])
+			})
 		})
 	})
 

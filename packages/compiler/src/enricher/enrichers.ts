@@ -7471,13 +7471,13 @@ function instantiatedRefinementFor(
 		return null
 	}
 
-	// NOTE: Remembered per Alias and per receiver SPELLING, which is what an
-	// instantiation is decided by — and remembered for the ANSWER's identity as
-	// much as for the work: `namespacesTargeting` keeps which Namespaces target a
-	// Type OBJECT, and a fresh `NonEmptyList<Integer>` built at every written
-	// List receiver missed that memo every time and walked every Namespace in
-	// scope over again. Asked AFTER the unification, which is the cheap half and
-	// the one that answers for every receiver the Alias does not fit at all.
+	// NOTE: Remembered per Alias and per RECEIVER — and remembered for the
+	// ANSWER's identity as much as for the work: `namespacesTargeting` keeps
+	// which Namespaces target a Type OBJECT, and a fresh `NonEmptyList<Integer>`
+	// built at every written List receiver missed that memo every time and walked
+	// every Namespace in scope over again. Asked AFTER the unification, which is
+	// the cheap half and the one that answers for every receiver the Alias does
+	// not fit at all.
 	//
 	// Weak on the Alias, so a Program's own goes when the Program does. A pending
 	// predicate is never remembered: the object handed back is a promise the fill
@@ -7486,18 +7486,28 @@ function instantiatedRefinementFor(
 	let remembered =
 		refinement.conjuncts === null
 			? undefined
-			: (instantiatedRefinementMemos.get(alias) ??
-				new Map<string, common.RefinementType>())
-	let spelling = ""
+			: (instantiatedRefinementMemos.get(alias) ?? {
+					byType: new WeakMap<common.Type, common.RefinementType>(),
+					bySpelling: new Map<string, common.RefinementType>(),
+				})
+	let spelling: string | null = null
 
 	if (remembered !== undefined) {
 		instantiatedRefinementMemos.set(alias, remembered)
-		spelling = describeType(receiverType)
 
-		let answer = remembered.get(spelling)
+		let answer = remembered.byType.get(receiverType)
 
 		if (answer !== undefined) {
 			return answer
+		}
+
+		if (spellingIdentifies(receiverType)) {
+			spelling = describeType(receiverType)
+			answer = remembered.bySpelling.get(spelling)
+
+			if (answer !== undefined) {
+				return answer
+			}
 		}
 	}
 
@@ -7525,15 +7535,56 @@ function instantiatedRefinementFor(
 		),
 	)
 
-	remembered?.set(spelling, stamped)
+	if (remembered !== undefined) {
+		if (spelling === null) {
+			remembered.byType.set(receiverType, stamped)
+		} else {
+			remembered.bySpelling.set(spelling, stamped)
+		}
+	}
 
 	return stamped
 }
 
+// NOTE: TWO doors, because a spelling does not identify a Type. A NAME is the
+// one thing a Program may spell twice — `type Even = Integer where @::isEven()`
+// at the top of a file and another `Even` inside a Function print alike and
+// prove different things — so a spelling was handing the second receiver the
+// first one's instantiation, and `List<Even>` then narrowed to nothing at all.
+//
+// A Type built out of the scalars and Lists alone IS what its spelling says,
+// and a written receiver's Type is always one of those: that is the door the
+// memo was added for, where a fresh object arrives at every literal. Everything
+// else is remembered by IDENTITY, which costs nothing to ask and is exactly
+// right for a declared binding, whose Type is the one object its declaration
+// made.
+type RefinementInstantiations = {
+	byType: WeakMap<common.Type, common.RefinementType>
+	bySpelling: Map<string, common.RefinementType>
+}
+
 let instantiatedRefinementMemos = new WeakMap<
 	common.GenericAliasType,
-	Map<string, common.RefinementType>
+	RefinementInstantiations
 >()
+
+// NOTE: Whether `describeType` tells this Type apart from every other. Nothing
+// here is printed by a name a Program could declare twice — the scalars print
+// as themselves and a List prints as its items — so two of these that spell
+// alike really are the same Type.
+function spellingIdentifies(type: common.Type): boolean {
+	switch (type.type) {
+		case "Integer":
+		case "Rational":
+		case "String":
+		case "Boolean":
+			return true
+		case "List":
+			return spellingIdentifies(type.itemType)
+		default:
+			return false
+	}
+}
 
 // NOTE: The conjunction Types a written receiver has already been given, kept by
 // what they SAY rather than by where they were built: a base and a conjunct set
@@ -7542,7 +7593,26 @@ let instantiatedRefinementMemos = new WeakMap<
 // may as well be one object. That identity is what the memos downstream want —
 // `namespacesTargeting` remembers per Type object — and it is why the name is in
 // the key too, so nothing here can hand a reader a name it did not build.
-let literalReceiverConjunctions = new Map<string, common.RefinementType>()
+//
+// Hung off the Scope a Module's own declarations go into, so it lives as long as
+// the Module being enriched and no longer. A process-global one grew for as long
+// as the process ran, which a Language Server does.
+let literalReceiverConjunctions = new WeakMap<
+	enricher.Scope,
+	Map<string, common.RefinementType>
+>()
+
+// NOTE: The Scope with nothing above it — the one `topLevelScope` builds per
+// Module, and the object a per-compile memo hangs off.
+function rootScopeOf(scope: enricher.Scope): enricher.Scope {
+	let current = scope
+
+	while (current.parent !== null) {
+		current = current.parent
+	}
+
+	return current
+}
 
 // NOTE: What a written receiver proves about itself. Every other position that
 // admits a written value was ASKED — a Parameter, a declared Constant, a return
@@ -7659,17 +7729,35 @@ function refinedLiteralReceiverType(
 		base: base.type,
 		conjuncts,
 	})}`
+	let conjunction: common.RefinementType = {
+		type: "Refinement",
+		name,
+		base: base.type,
+		conjuncts,
+	}
+
+	// NOTE: Only where the base's own spelling tells it apart from every other,
+	// which every base a written receiver can carry does. The key is a spelling
+	// throughout, and one that does not identify would hand a reader a Type built
+	// over somebody else's base.
+	if (!spellingIdentifies(base.type)) {
+		return conjunction
+	}
+
+	let root = rootScopeOf(scope)
+	let byKey = literalReceiverConjunctions.get(root)
+
+	if (byKey === undefined) {
+		byKey = new Map()
+		literalReceiverConjunctions.set(root, byKey)
+	}
+
 	let key = `${name}${conjuncts.map(predicateConjunctKey).join("")}`
-	let remembered = literalReceiverConjunctions.get(key)
+	let remembered = byKey.get(key)
 
 	if (remembered === undefined) {
-		remembered = {
-			type: "Refinement",
-			name,
-			base: base.type,
-			conjuncts,
-		}
-		literalReceiverConjunctions.set(key, remembered)
+		remembered = conjunction
+		byKey.set(key, remembered)
 	}
 
 	return remembered
