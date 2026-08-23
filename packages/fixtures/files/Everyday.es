@@ -43,10 +43,11 @@ implementation {
 	§ The sign Methods reach the whole tower.
 	Terminal.inspect(Number.Pi::negate()::absolute()) § π
 
-	§ `isBetween` reads the tower's one order, and includes both bounds. It
-	§ is `Orderable`'s, which Integer offers over Integers and the covering
-	§ `Number` offers over the whole tower — so a question that mixes kinds is
-	§ answered by `Number`, and one that does not is answered by `Integer`.
+	§ `isBetween` reads the tower's one order, includes both bounds, and takes
+	§ them in either order as `clamp` does. It is `Orderable`'s, which Integer
+	§ offers over Integers and the covering `Number` offers over the whole tower
+	§ — so a question that mixes kinds is answered by `Number`, and one that
+	§ does not is answered by `Integer`.
 	Terminal.inspect(5::isBetween(1, and 10)) § true
 	Terminal.inspect(Number.Pi::isBetween(3, and 22/7)) § true — π is above 3 and below 22/7
 	Terminal.inspect(Number.Pi::isBetween(22/7, and 4)) § false — π is below 22/7
