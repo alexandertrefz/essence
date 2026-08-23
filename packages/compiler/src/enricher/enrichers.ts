@@ -35,6 +35,7 @@ import {
 	mergeUnionMembers,
 	impliedConjunctKeys,
 	answersForBase,
+	namespaceAnswersForBase,
 	refinableBaseTag,
 	negatedPredicateConjunct,
 	parameterInternalName,
@@ -7122,7 +7123,7 @@ function collectConditionEvidence(
 		args.push(literal)
 	}
 
-	let conjunct = resolvedConjunct(condition, args)
+	let conjunct = resolvedConjunct(condition, args, scope)
 	let proven = evidence.get(name)
 
 	if (proven === undefined) {
@@ -13289,7 +13290,7 @@ export function resolveRefinementConjuncts(
 		return null
 	}
 
-	let conjuncts = extractPredicateConjuncts(predicate)
+	let conjuncts = extractPredicateConjuncts(predicate, scope)
 
 	if (conjuncts === null) {
 		return null
@@ -13343,6 +13344,7 @@ function describeRefinementBase(type: common.Type): string {
 // value's evidence, and a computed Argument would need evaluating.
 function extractPredicateConjuncts(
 	predicate: common.typed.ExpressionNode,
+	scope: enricher.Scope,
 ): Array<common.PredicateConjunct> | null {
 	if (predicate.nodeType !== "MethodInvocation") {
 		reportInvalidPredicateLeaf(
@@ -13355,8 +13357,11 @@ function extractPredicateConjuncts(
 	}
 
 	if (isConjunction(predicate)) {
-		let left = extractPredicateConjuncts(predicate.base)
-		let right = extractPredicateConjuncts(predicate.arguments[0].value)
+		let left = extractPredicateConjuncts(predicate.base, scope)
+		let right = extractPredicateConjuncts(
+			predicate.arguments[0].value,
+			scope,
+		)
 
 		return left === null || right === null ? null : [...left, ...right]
 	}
@@ -13389,7 +13394,7 @@ function extractPredicateConjuncts(
 		args.push(literal)
 	}
 
-	return [resolvedConjunct(predicate, args)]
+	return [resolvedConjunct(predicate, args, scope)]
 }
 
 function reportInvalidPredicateLeaf(
@@ -13413,18 +13418,24 @@ function reportInvalidPredicateLeaf(
 
 // #region Predicate Aliases
 
-// NOTE: The three Methods the standard library writes as the contrary of
-// another over the same Argument, and the leaf each of them resolves to.
-// `isNot` is `Equatable`'s and reads an `if` rather than a call — an import
-// cycle the Protocol works around — while `isGreaterThanOrEqualTo` and
-// `isLessThanOrEqualTo` ARE written `<- @::isLessThan(other)::negate()` and
-// forward the Argument they were given. Both are named here rather than derived
-// because a forwarded Argument is a template, and a leaf holds literals.
+// NOTE: One predicate leaf as the question it really asks. A Method written on
+// another one is put down as the one it calls, with `negated` carrying whatever
+// `::negate()` the body spelled — so `@::isZero()` and `@::is(0)` are one leaf,
+// `@::hasItems()` is `List::isEmpty()` negated, and the opposite of any of them
+// is the same leaf with the flag flipped.
 //
-// Nothing else is hardcoded. Every Method a Namespace writes as one call on `@`
-// with written Arguments is read off its BODY — see `derivePredicateAliases` —
-// which is what makes `@::isZero()`, `@::isPositive()` and `@::hasItems()`
-// resolve without anybody naming them anywhere.
+// The name it was WRITTEN as rides along for the Diagnostic that has to say
+// which predicate a value did not answer. It decides nothing.
+//
+// An alias is a TEMPLATE, so this is where the Arguments a call was given are
+// substituted into it: `n::isLessThanOrEqualTo(9)` reads the leaf
+// `Integer::isGreaterThan(9)` negated off `isLessThanOrEqualTo`'s body, which
+// forwards the Argument it was handed. Nothing here resolves an Overload — the
+// entry the call already resolved to is the one whose template is read.
+// NOTE: The three Methods the standard library writes as the contrary of
+// another over the same Argument, read by NAME for an entry that carries no
+// body to read instead. Every bodied one is now read off its body — see
+// `derivePredicateAliases` — and this is what a bare signature falls back to.
 //
 // NOTE: The names are read only where the BASE itself answers them. These are
 // `Equatable`'s and `Orderable`'s vocabulary, and the standard library always
@@ -13441,41 +13452,21 @@ const PRIMITIVE_PREDICATES: ReadonlyMap<string, string> = new Map([
 	["isLessThanOrEqualTo", "isGreaterThan"],
 ])
 
-// NOTE: One predicate leaf as the question it really asks. A Method written on
-// another one is put down as the one it calls, with `negated` carrying whatever
-// `::negate()` the body spelled — so `@::isZero()` and `@::is(0)` are one leaf,
-// `@::hasItems()` is `List::isEmpty()` negated, and the opposite of any of them
-// is the same leaf with the flag flipped.
-//
-// The name it was WRITTEN as rides along for the Diagnostic that has to say
-// which predicate a value did not answer. It decides nothing.
-//
-// An alias is only ever read for a leaf with no Arguments, which is the shape
-// `derivePredicateAliases` records: a Method taking nothing has one entry
-// whatever else its name is overloaded with, so there is no Overload left to
-// tell apart. The three named pairs above take exactly one.
 function resolvedConjunct(
 	invocation: common.typed.MethodInvocationNode,
 	args: Array<string | boolean>,
+	scope: enricher.Scope,
 ): common.PredicateConjunct {
 	let spelling: common.PredicateSpelling = {
 		methodName: invocation.member.name,
 		args,
 	}
-
-	if (args.length === 0) {
-		let alias = predicateAliasOf(invocation)
-
-		if (alias !== undefined) {
-			return { ...alias, spelling }
-		}
-	}
-
-	// NOTE: The receiver's own Type is what says whether the name may be read,
-	// and it is unwrapped first: a `where` clause asks `@` bound to the bare base,
-	// while a condition asks an ordinary binding whose Type is often a refinement
-	// already. Both have to key alike, or an `if` would stop rewriting where the
-	// clause it has to match kept on.
+	let alias = predicateAliasOf(invocation)
+	// NOTE: The receiver's own Type is what says how a bound is spelled, and it
+	// is unwrapped first: a `where` clause asks `@` bound to the bare base,
+	// while a condition asks an ordinary binding whose Type is often a
+	// refinement already. Both have to key alike, or an `if` would stop
+	// rewriting where the clause it has to match kept on.
 	let tag = refinableBaseTag(invocation.base.type)
 	let leaf: common.PredicateConjunct = {
 		namespaceName: invocation.namespace.name,
@@ -13487,17 +13478,110 @@ function resolvedConjunct(
 		args.length === 1 && answersForBase(leaf, tag)
 			? PRIMITIVE_PREDICATES.get(spelling.methodName)
 			: undefined
+	let written: common.PredicateConjunct = {
+		...leaf,
+		methodName: primitive ?? spelling.methodName,
+		negated: primitive !== undefined,
+	}
+	let resolved =
+		alias === undefined
+			? null
+			: aliasLeafOf(alias, invocation.namespace.name, args)
+
+	// NOTE: An alias read on `Self` names a Method of the WITNESS, which is the
+	// one step the reading could not take: a Protocol sees a requirement where
+	// a conformer may have written a body. So it is taken here, once, against
+	// the Namespace the witness turned out to be.
+	if (resolved !== null && alias?.namespaceName === null) {
+		resolved = throughWitness(resolved, scope) ?? resolved
+	}
+
+	return { ...forNumericBase(resolved ?? written, tag), spelling }
+}
+
+// NOTE: The leaf a WITNESS's own Method stands for, where a Protocol's provided
+// body named it. `Ranked::isAtMost` is written on `Self::isAbove`, and what
+// `isAbove` asks is the conformer's business — `namespace Rank for Integer`
+// writes it as `@::isGreaterThan(n)`, so a receiver of Rank's proves the leaf
+// both spellings mean. Null where the witness says nothing further.
+//
+// One step and no more: a Namespace's own aliases are collapsed as it hoists,
+// so whatever the witness records is already the leaf it means. An OVERLOADED
+// Method is left as it stands — which entry a leaf names is the Arguments'
+// business, and nothing here resolves one.
+function throughWitness(
+	leaf: common.PredicateConjunct,
+	scope: enricher.Scope,
+): common.PredicateConjunct | null {
+	let namespaceType = namespaceNamedInScope(leaf.namespaceName, scope)
+	let method = namespaceType?.methods[leaf.methodName]
+
+	if (
+		method?.type !== "SimpleMethod" ||
+		method.predicateAlias === undefined
+	) {
+		return null
+	}
+
+	let resolved = aliasLeafOf(
+		method.predicateAlias,
+		leaf.namespaceName,
+		leaf.args,
+	)
+
+	return resolved === null
+		? null
+		: { ...resolved, negated: resolved.negated !== leaf.negated }
+}
+
+// NOTE: The Namespace a name stands for, or null where the name is not one. A
+// Namespace is declared as a MEMBER, so this is the ordinary name lookup with
+// the answer's kind checked.
+function namespaceNamedInScope(
+	name: string,
+	scope: enricher.Scope,
+): common.NamespaceType | null {
+	let declaring = findDeclaringScope(name, scope)
+	let member = declaring?.members[name]
+
+	return member?.type === "Namespace" ? member : null
+}
+
+// NOTE: The leaf an alias stands for at THIS call — the recorded template with
+// the Arguments the caller wrote substituted into its forwarded slots, and the
+// witness' own Namespace where the body was read on `Self`.
+//
+// `null` where a slot names an Argument the call did not write, which nothing
+// reaches today: a leaf is only ever built from Arguments that are all
+// literals, so a template slot always has one to take.
+function aliasLeafOf(
+	alias: common.PredicateAlias,
+	witnessName: string,
+	args: Array<string | boolean>,
+): common.PredicateConjunct | null {
+	let resolved: Array<string | boolean> = []
+
+	for (let slot of alias.args) {
+		if (slot.kind === "Literal") {
+			resolved.push(slot.value)
+
+			continue
+		}
+
+		let given = args[slot.index]
+
+		if (given === undefined) {
+			return null
+		}
+
+		resolved.push(given)
+	}
 
 	return {
-		...forNumericBase(
-			{
-				...leaf,
-				methodName: primitive ?? spelling.methodName,
-				negated: primitive !== undefined,
-			},
-			tag,
-		),
-		spelling,
+		namespaceName: alias.namespaceName ?? witnessName,
+		methodName: alias.methodName,
+		args: resolved,
+		negated: alias.negated,
 	}
 }
 
@@ -13517,6 +13601,11 @@ function resolvedConjunct(
 // Rational's own. A Program's own Namespace over a Rational is left exactly as
 // written: what `Frac::isHalf` asks is the Program's question, not the
 // ordering's, and nothing may quietly rename it.
+//
+// Read AFTER an alias is substituted rather than before, because a template
+// slot holds no bound to respell: `isLessThanOrEqualTo(_ other)` forwards
+// whatever number the caller wrote, and the caller is the one who wrote `2`
+// where `2/1` was meant.
 function forNumericBase(
 	leaf: common.PredicateConjunct,
 	tag: string,
@@ -13548,7 +13637,16 @@ function rationalBound(scalar: string | boolean): string | boolean {
 // like every other field of a Type.
 function predicateAliasOf(
 	invocation: common.typed.MethodInvocationNode,
-): common.PredicateConjunct | undefined {
+): common.PredicateAlias | undefined {
+	return resolvedEntryOf(invocation)?.predicateAlias
+}
+
+// NOTE: The one signature a Method call settled on. A Method of one entry is
+// that entry; an Overloaded one is the entry the call bound, which the Enricher
+// has already chosen by the time anything asks.
+function resolvedEntryOf(
+	invocation: common.typed.MethodInvocationNode,
+): common.BaseFunction | undefined {
 	let method = invocation.namespace.type.methods[invocation.member.name]
 
 	if (method === undefined) {
@@ -13556,7 +13654,7 @@ function predicateAliasOf(
 	}
 
 	if (method.type === "SimpleMethod") {
-		return method.predicateAlias
+		return method
 	}
 
 	if (method.type !== "OverloadedMethod") {
@@ -13565,20 +13663,86 @@ function predicateAliasOf(
 
 	return invocation.overloadedMethodIndex === null
 		? undefined
-		: method.overloads[invocation.overloadedMethodIndex]?.predicateAlias
+		: method.overloads[invocation.overloadedMethodIndex]
+}
+
+// NOTE: The two names an ordering answers when the call is written the other way
+// round, which is what makes `<- other::isGreaterThanOrEqualTo(@)` readable at
+// all. Each row is one line of the same truth table:
+//
+//   other = @   is  other ≠ @   isNot   — each is its own converse
+//   other < @   isLessThan             @ > other   isGreaterThan
+//   other > @   isGreaterThan          @ < other   isLessThan
+//   other ≤ @   isLessThanOrEqualTo    @ ≥ other   isGreaterThanOrEqualTo
+//   other ≥ @   isGreaterThanOrEqualTo @ ≤ other   isLessThanOrEqualTo
+//
+// It is the ordering's own law and nothing more — the same law
+// `impliedConjunctKeys` reads off these very names — so it is read under the
+// same guard: both the Namespace that ANSWERED the flipped call and the
+// Namespace the body belongs to have to be one the base's ordering speaks
+// through. A Program's `namespace Tally for String { isLessThan(…) }` means
+// whatever its body means, and reading a converse off the word would invent a
+// comparison nobody made.
+const CONVERSE_COMPARISONS: ReadonlyMap<string, string> = new Map([
+	["is", "is"],
+	["isNot", "isNot"],
+	["isLessThan", "isGreaterThan"],
+	["isGreaterThan", "isLessThan"],
+	["isLessThanOrEqualTo", "isGreaterThanOrEqualTo"],
+	["isGreaterThanOrEqualTo", "isLessThanOrEqualTo"],
+])
+
+// NOTE: An Argument slot while a body is still being read. `Self` is `@` handed
+// to somebody else, which only the converse below can turn back into a slot a
+// caller fills — every other body carrying one is refused, since a leaf has
+// nowhere to put the receiver.
+type DerivedArgument = common.PredicateAliasArgument | { kind: "Self" }
+
+// NOTE: One step of the reading — the call a body makes, before anything the
+// call's own target says about itself is folded in.
+type AliasStep = {
+	namespaceName: string | null
+	methodName: string
+	args: Array<DerivedArgument>
+	negated: boolean
+}
+
+// NOTE: One Method read as an alias, and everything the chain needs of it. The
+// TARGET is the entry object the body's call resolved to, which is what lets a
+// chain be followed without resolving a name twice; `converse` is the Parameter
+// the call was made ON where the body flipped it, and null where `@` stood in
+// front of the call as usual.
+type AliasCandidate = {
+	methodName: string
+	entry: common.BaseFunction
+	step: AliasStep
+	target: common.BaseFunction | null
+	converse: number | null
+	converseTrusted: boolean
+}
+
+// NOTE: What the reading needs of whatever DECLARED the body — a Namespace or a
+// Protocol. `selfNamespaceName` is the name a leaf read off `@` belongs to, and
+// is null for a Protocol: a provided Method belongs to whichever witness reaches
+// it, so the Namespace is filled in at the call site instead.
+type AliasContainer = {
+	selfNamespaceName: string | null
+	trustsOrdering: boolean
+	canonicalTarget?: (methodName: string) => common.BaseFunction | null
 }
 
 // NOTE: What a Namespace's own Methods say about each other, written onto the
-// Method Types as the Namespace reaches Scope. A Method that takes no Arguments,
-// answers a Boolean and whose whole body is one call on `@` — optionally negated
-// — is a PREDICATE ALIAS of that call: `Integer::isZero` is `@::is(0)`,
-// `List::hasItems` is `@::isEmpty()::negate()`, and a Program's own
-// `isInStock() -> Boolean { <- @::isGreaterThan(0) }` is the same shape and gets
-// the same treatment.
+// Method Types as the Namespace reaches Scope. A Method that answers a Boolean
+// and whose whole body is one call on `@` — optionally negated — is a PREDICATE
+// ALIAS of that call: `Integer::isZero` is `@::is(0)`, `List::hasItems` is
+// `@::isEmpty()::negate()`, `Integer::isLessThanOrEqualTo` is
+// `@::isGreaterThan(other)` negated over the Argument it forwards, and a
+// Program's own `isInStock() -> Boolean { <- @::isGreaterThan(0) }` is the same
+// shape and gets the same treatment.
 //
 // Read off the BODY rather than declared. A Namespace could declare that one
 // Method is the contrary of another and be wrong; there is nothing to be wrong
-// about here, and every pair the old hardcoded table held falls out of it.
+// about here, and every pair a hardcoded table once held falls out of it.
 //
 // NOTE: Called once per Namespace, the moment it reaches Scope and before the
 // hoisting round that reads a pending predicate — so a refinement written on an
@@ -13601,37 +13765,141 @@ export function derivePredicateAliases(
 		return
 	}
 
-	let selfScope: enricher.Scope | null = null
+	let container: AliasContainer = {
+		selfNamespaceName: namespaceType.name,
+		// NOTE: The same guard `impliedConjunctKeys` and `narrowedBy` read: the
+		// ordering is the BASE's promise, so its words are only believed where
+		// the Namespace answering them is the base's own or the covering
+		// `Number`.
+		trustsOrdering: namespaceAnswersForBase(
+			namespaceType.name,
+			refinableBaseTag(targetType),
+		),
+	}
+	let genericScope: enricher.Scope | null = null
+	let candidates: Array<AliasCandidate> = []
 
 	for (let [methodName, method] of Object.entries(node.methods)) {
-		for (let [index, entry] of methodEntries(method).entries()) {
+		for (let [index, value] of methodEntries(method).entries()) {
 			// NOTE: A body-less entry of a mixed `overload` block holds its
 			// POSITION and offers nothing to read, which is what keeps every
 			// other entry of the block on the index its Overload has.
-			let body = entry === null ? null : aliasBodyOf(entry.value)
-
-			if (
-				body === null ||
-				!answersBoolean(namespaceType, methodName, index)
-			) {
+			if (value === null) {
 				continue
 			}
 
-			// NOTE: Built once and only where a candidate was found, because
-			// `@` is the one binding an alias body reads and a Namespace
-			// without one has no use for the Scope at all.
-			selfScope ??= scopeWithRefinedSelf(
+			let entry = booleanEntryOf(namespaceType, methodName, index)
+			let body = aliasBodyOf(value.value)
+
+			if (entry === null || body === null) {
+				continue
+			}
+
+			// NOTE: Built once and only where a candidate was found, because a
+			// Namespace without one has no use for the Scope at all.
+			genericScope ??= scopeWithGenerics(node.generics, scope)
+
+			let candidate = aliasCandidateOf(
+				body,
+				value.value,
+				entry,
+				methodName,
 				targetType,
-				scopeWithGenerics(node.generics, scope),
+				genericScope,
+				container,
 			)
 
-			let alias = aliasTargetOf(body, selfScope)
-
-			if (alias !== null) {
-				writePredicateAlias(namespaceType, methodName, index, alias)
+			if (candidate !== null) {
+				candidates.push(candidate)
 			}
 		}
 	}
+
+	writePredicateAliases(candidates, container)
+}
+
+// NOTE: The same reading of a PROTOCOL's provided bodies, run as the Protocol
+// reaches Scope. `Orderable` writes `isGreaterThanOrEqualTo` as
+// `@::isLessThan(other)::negate()` and `Equatable` writes `isNot` as the `if`
+// that says the same thing, and every conformer answers both through those very
+// bodies — so the leaf a conformer's receiver proves is read here, once, rather
+// than being named in a table of Methods declared to be each other's
+// contraries.
+//
+// `@` is `Self` BOUNDED by this Protocol, exactly as it is where the body is
+// enriched for real, so the call resolves through the Protocol's own surface
+// and nothing else. The Namespace it lands on is therefore no Namespace a
+// Program has: the leaf is recorded WITHOUT one, and the witness that reaches
+// the Method fills its own in.
+//
+// Only the Methods THIS Protocol wrote. An inherited one was read where it was
+// written, and the descendant holds the same annotation on its copy of it.
+export function deriveProvidedPredicateAliases(
+	node: parser.ProtocolDeclarationStatementNode,
+	protocolType: common.ProtocolType,
+	scope: enricher.Scope,
+): void {
+	let container: AliasContainer = {
+		selfNamespaceName: null,
+		// NOTE: A Protocol's `Self` is no base, so there is no ordering of one
+		// to read a flipped call against. Nothing in the standard library writes
+		// one, and a Protocol that did would keep it as the question it wrote.
+		trustsOrdering: false,
+		canonicalTarget: (methodName) => {
+			let target = protocolType.methods[methodName]
+
+			return target?.type === "SimpleMethod" ? target : null
+		},
+	}
+	let selfType: common.GenericUse = {
+		type: "GenericUse",
+		name: "Self",
+		constraint: node.name.content,
+	}
+	let bodyScope: enricher.Scope | null = null
+	let candidates: Array<AliasCandidate> = []
+
+	for (let [methodName, method] of Object.entries(node.methods)) {
+		let body = protocolMethodBody(method)
+		let entry = protocolType.methods[methodName]
+
+		if (
+			body === null ||
+			entry?.type !== "SimpleMethod" ||
+			entry.returnType.type !== "Boolean" ||
+			providedMethodProtocol(protocolType, methodName) !==
+				node.name.content
+		) {
+			continue
+		}
+
+		let shape = aliasBodyOf(body.value)
+
+		if (shape === null) {
+			continue
+		}
+
+		bodyScope ??= childScope(scope, {
+			types: { Self: selfType },
+			providedMethodOf: node.name.content,
+		})
+
+		let candidate = aliasCandidateOf(
+			shape,
+			body.value,
+			entry,
+			methodName,
+			selfType,
+			bodyScope,
+			container,
+		)
+
+		if (candidate !== null) {
+			candidates.push(candidate)
+		}
+	}
+
+	writePredicateAliases(candidates, container)
 }
 
 // NOTE: A Method's bodied entries, in the order its Overloads are registered in,
@@ -13663,26 +13931,61 @@ function methodEntries(
 	}
 }
 
+// NOTE: The resolved entry standing at this position under this name, where it
+// answers a Boolean and nothing else. Asked of the RESOLVED Method rather than
+// of the written `-> Boolean`, so a name shadowing decides nothing.
+function booleanEntryOf(
+	namespaceType: common.NamespaceType,
+	methodName: string,
+	index: number,
+): common.BaseFunction | null {
+	let method = namespaceType.methods[methodName]
+	let entry =
+		method === undefined
+			? undefined
+			: method.type === "SimpleMethod"
+				? method
+				: method.type === "OverloadedMethod"
+					? method.overloads[index]
+					: undefined
+
+	return entry !== undefined && entry.returnType.type === "Boolean"
+		? entry
+		: null
+}
+
 // NOTE: The call an alias body makes, and whether the body negated it. Every
-// other body answers null: one Statement, a `<-`, a Method call whose receiver
-// is `@` itself, and Arguments the Compiler can read. A chain
-// (`@::length()::is(0)`) is a leaf of its own — the intermediate value's
-// evidence is nobody's to read here — which is why the standard library's
-// emptiness Methods stay primitives and their negations do not.
+// other body answers null: one Statement, and either a `<-` of a Method call or
+// the `if` that spells one out. A chain (`@::length()::is(0)`) is a leaf of its
+// own — the intermediate value's evidence is nobody's to read here — which is
+// why the standard library's emptiness Methods stay primitives and their
+// negations do not.
+//
+// The receiver may be `@` or a bare name, since a body may write the ordering
+// backwards (`<- other::isGreaterThanOrEqualTo(@)`). Which of the two it was is
+// settled once the call is enriched and the name has a Parameter to be.
 function aliasBodyOf(
 	definition: parser.FunctionDefinitionNode,
 ): { call: parser.MethodInvocationNode; negated: boolean } | null {
-	if (definition.parameters.length !== 0 || definition.body.length !== 1) {
+	if (definition.body.length !== 1) {
 		return null
 	}
 
 	let statement = definition.body[0]!
 
-	if (statement.nodeType !== "ReturnStatement") {
-		return null
+	if (statement.nodeType === "ReturnStatement") {
+		return aliasCallOf(statement.expression)
 	}
 
-	let expression = statement.expression
+	return statement.nodeType === "IfElseStatement"
+		? aliasIfShapeOf(statement)
+		: null
+}
+
+// NOTE: A Method call, with an outermost `::negate()` peeled off it and counted.
+function aliasCallOf(
+	expression: parser.ExpressionNode,
+): { call: parser.MethodInvocationNode; negated: boolean } | null {
 	let negated = false
 
 	if (
@@ -13695,56 +13998,83 @@ function aliasBodyOf(
 	}
 
 	return expression.nodeType === "MethodInvocation" &&
-		expression.base.nodeType === "Self"
+		(expression.base.nodeType === "Self" ||
+			expression.base.nodeType === "Identifier")
 		? { call: expression, negated }
 		: null
 }
 
-// NOTE: Whether the entry answers a Boolean, asked of the RESOLVED Method rather
-// than of the written `-> Boolean`, so a name shadowing decides nothing. The
-// Parameter list carries the receiver, so an entry taking no Arguments has
-// exactly one.
-function answersBoolean(
-	namespaceType: common.NamespaceType,
-	methodName: string,
-	index: number,
-): boolean {
-	let method = namespaceType.methods[methodName]
+// NOTE: `if @::is(other) { <- false } else { <- true }` — a call spelled out as
+// the two answers it gives. `Equatable::isNot` is written this way and has to
+// be: reaching `Boolean::negate` would need `Boolean` imported into the file
+// `Boolean.es` itself imports, which is a second cycle in a graph that has one.
+// See the standard library's DEVELOPMENT.md, The shape of the graph is frozen.
+//
+// Exactly that shape and no other: the `if` is the whole body, each branch
+// answers one written Boolean, and the two differ. `{ <- true } else { <- false }`
+// is the call itself; `{ <- false } else { <- true }` is the call negated.
+function aliasIfShapeOf(
+	statement: parser.IfElseStatementNode,
+): { call: parser.MethodInvocationNode; negated: boolean } | null {
+	let answered = returnedBooleanOf(statement.trueBody)
+	let otherwise = returnedBooleanOf(statement.falseBody)
 
-	if (method === undefined) {
-		return false
+	if (answered === null || otherwise === null || answered === otherwise) {
+		return null
 	}
 
-	let entry =
-		method.type === "SimpleMethod"
-			? method
-			: method.type === "OverloadedMethod"
-				? method.overloads[index]
-				: undefined
+	let call = aliasCallOf(statement.condition)
 
-	return (
-		entry !== undefined &&
-		entry.parameterTypes.length === 1 &&
-		entry.returnType.type === "Boolean"
-	)
+	return call === null
+		? null
+		: { ...call, negated: call.negated !== !answered }
 }
 
-// NOTE: The leaf an alias body's call resolves to, or null where it resolves to
-// nothing this can be sure of. Enriched in a collection of its own: the body is
-// enriched again for real when the Namespace's Statement is reached, and this
-// reading is a question asked ahead of that one — a Diagnostic here would be the
-// same Diagnostic twice.
+// NOTE: The one written Boolean a branch answers, or null where the branch does
+// anything else at all.
+function returnedBooleanOf(
+	body: Array<parser.ImplementationNode>,
+): boolean | null {
+	let statement = body.length === 1 ? body[0]! : null
+
+	if (statement === null || statement.nodeType !== "ReturnStatement") {
+		return null
+	}
+
+	return statement.expression.nodeType === "BooleanValue"
+		? statement.expression.value
+		: null
+}
+
+// NOTE: One Method read as an alias of another, or null where its body says
+// something this can not be sure of. Enriched in a collection of its own: the
+// body is enriched again for real when the declaration's Statement is reached,
+// and this reading is a question asked ahead of that one — a Diagnostic here
+// would be the same Diagnostic twice.
 //
-// The answer is itself RESOLVED, so an alias of an alias declared above it comes
-// out as the leaf both of them mean. A chain running the other way — an alias
-// naming one written below it — resolves one step and stops, which is a
-// difference nothing in the standard library can tell.
-function aliasTargetOf(
+// The Parameters are declared from the RESOLVED signature, which is what lets a
+// forwarded name be recognised as the Parameter it is. Their Types are the ones
+// the entry already carries, so nothing is resolved a second time.
+function aliasCandidateOf(
 	body: { call: parser.MethodInvocationNode; negated: boolean },
+	definition: parser.FunctionDefinitionNode,
+	entry: common.BaseFunction,
+	methodName: string,
+	selfType: common.Type,
 	scope: enricher.Scope,
-): common.PredicateConjunct | null {
+	container: AliasContainer,
+): AliasCandidate | null {
+	// NOTE: A Parameter list the signature does not agree with is a Method
+	// whose Types were never resolved — nothing to read a forwarded name off.
+	if (entry.parameterTypes.length !== definition.parameters.length + 1) {
+		return null
+	}
+
 	let { result, diagnostics } = collectDiagnostics(() =>
-		enrichExpression(body.call, scope),
+		enrichExpression(
+			body.call,
+			aliasBodyScope(definition, entry, selfType, scope),
+		),
 	)
 
 	if (
@@ -13755,47 +14085,376 @@ function aliasTargetOf(
 		return null
 	}
 
-	let args: Array<string | boolean> = []
+	let slots = parameterSlotsOf(definition)
+	let args: Array<DerivedArgument> = []
 
 	for (let argument of result.arguments) {
-		let literal = literalPredicateArgument(argument.value)
+		let slot = argumentSlotOf(argument.value, slots)
 
-		if (literal === null) {
+		if (slot === null) {
 			return null
 		}
 
-		args.push(literal)
+		args.push(slot)
 	}
 
-	let { spelling: _spelling, ...leaf } = resolvedConjunct(result, args)
+	let converse = converseReceiverOf(result, args, slots)
 
-	return body.negated ? negatedPredicateConjunct(leaf) : leaf
+	if (result.base.nodeType !== "Self" && converse === null) {
+		return null
+	}
+
+	return {
+		methodName,
+		entry,
+		step: {
+			namespaceName:
+				container.selfNamespaceName === null
+					? null
+					: result.namespace.name,
+			methodName: result.member.name,
+			args,
+			negated: body.negated,
+		},
+		target:
+			container.canonicalTarget?.(result.member.name) ??
+			resolvedEntryOf(result) ??
+			null,
+		converse,
+		converseTrusted:
+			container.trustsOrdering &&
+			namespaceAnswersForBase(
+				result.namespace.name,
+				refinableBaseTag(result.base.type),
+			),
+	}
 }
 
-// NOTE: Written onto the Method Type in place. The Type is the object every use
-// site already holds — hoisting registered it and handed it out — so the
-// annotation reaches the Invocations resolved before this ran as surely as the
-// ones after, and it is part of the Type wherever that Type is kept.
-function writePredicateAlias(
-	namespaceType: common.NamespaceType,
-	methodName: string,
-	index: number,
-	alias: common.PredicateConjunct,
-): void {
-	let method = namespaceType.methods[methodName]
+// NOTE: The Scope an alias body is read in — `@` bound to what the declaration
+// is about, the Method's own Type Parameters, and each Parameter under the name
+// its body calls it by.
+function aliasBodyScope(
+	definition: parser.FunctionDefinitionNode,
+	entry: common.BaseFunction,
+	selfType: common.Type,
+	scope: enricher.Scope,
+): enricher.Scope {
+	let bodyScope = scopeWithRefinedSelf(
+		selfType,
+		scopeWithGenerics(definition.generics, scope),
+	)
 
-	if (method === undefined) {
+	for (let [index, parameter] of definition.parameters.entries()) {
+		let name = parameterInternalName(parameter)
+		let type = entry.parameterTypes[index + 1]?.type
+
+		// NOTE: A Parameter taken apart by a Pattern binds no one name, so
+		// nothing it binds can be forwarded whole. The body simply reads names
+		// this Scope does not hold, and the reading refuses.
+		if (name !== null && type !== undefined) {
+			declareVariableInScope(name, type, bodyScope, true)
+		}
+	}
+
+	return bodyScope
+}
+
+// NOTE: Each Parameter's POSITION under the name the body reads it by. Positions
+// are counted over the Arguments a caller writes, which is what a template slot
+// stands for.
+function parameterSlotsOf(
+	definition: parser.FunctionDefinitionNode,
+): Map<string, number> {
+	let slots = new Map<string, number>()
+
+	for (let [index, parameter] of definition.parameters.entries()) {
+		let name = parameterInternalName(parameter)
+
+		if (name !== null) {
+			slots.set(name.content, index)
+		}
+	}
+
+	return slots
+}
+
+// NOTE: One Argument of an alias body as the slot it fills — a value written
+// down, a Parameter forwarded whole, or `@` handed on. Anything computed answers
+// null, and the body is no alias.
+function argumentSlotOf(
+	value: common.typed.ExpressionNode,
+	slots: ReadonlyMap<string, number>,
+): DerivedArgument | null {
+	let literal = literalPredicateArgument(value)
+
+	if (literal !== null) {
+		return { kind: "Literal", value: literal }
+	}
+
+	if (value.nodeType === "Self") {
+		return { kind: "Self" }
+	}
+
+	if (value.nodeType !== "Identifier") {
+		return null
+	}
+
+	let index = slots.get(value.content)
+
+	return index === undefined ? null : { kind: "Parameter", index }
+}
+
+// NOTE: The Parameter a body made the call ON, where it wrote the ordering
+// backwards — `<- other::isGreaterThanOrEqualTo(@)`, which asks the same
+// question of the same two numbers as `@::isLessThanOrEqualTo(other)` does.
+// Null for every ordinary body, and for a flipped one that hands over anything
+// but `@` alone.
+function converseReceiverOf(
+	result: common.typed.MethodInvocationNode,
+	args: Array<DerivedArgument>,
+	slots: ReadonlyMap<string, number>,
+): number | null {
+	if (result.base.nodeType !== "Identifier" || args.length !== 1) {
+		return null
+	}
+
+	return args[0]!.kind === "Self"
+		? (slots.get(result.base.content) ?? null)
+		: null
+}
+
+// NOTE: Every candidate collapsed to the leaf it really names, and written onto
+// the entries in place. The Type is the object every use site already holds —
+// hoisting registered it and handed it out — so the annotation reaches the
+// Invocations resolved before this ran as surely as the ones after, and it is
+// part of the Type wherever that Type is kept.
+function writePredicateAliases(
+	candidates: Array<AliasCandidate>,
+	container: AliasContainer,
+): void {
+	if (candidates.length === 0) {
 		return
 	}
 
-	if (method.type === "SimpleMethod") {
-		method.predicateAlias = alias
-	} else if (method.type === "OverloadedMethod") {
-		let entry = method.overloads[index]
+	let byEntry = new Map<common.BaseFunction, AliasCandidate>()
 
-		if (entry !== undefined) {
-			entry.predicateAlias = alias
+	for (let candidate of candidates) {
+		byEntry.set(candidate.entry, candidate)
+	}
+
+	let context = {
+		byEntry,
+		container,
+		cyclic: cyclicCandidates(candidates, byEntry),
+		done: new Map<common.BaseFunction, common.PredicateAlias | null>(),
+	}
+
+	for (let candidate of candidates) {
+		let alias = collapsedAlias(candidate, context)
+
+		if (alias !== null) {
+			candidate.entry.predicateAlias = alias
 		}
+	}
+}
+
+// NOTE: The entries that stand in a RING — `a` written as the contrary of `b`
+// while `b` is written as the contrary of `a`. Each candidate names exactly one
+// target, so following the targets is a walk that either runs out or comes back;
+// everything on the part that comes back is left primitive. Believing either
+// half would make the other say that it is its own contrary, and a Program that
+// writes such a pair has written two Methods that call each other for ever —
+// which is its own mistake to make and not one a leaf can describe.
+function cyclicCandidates(
+	candidates: Array<AliasCandidate>,
+	byEntry: ReadonlyMap<common.BaseFunction, AliasCandidate>,
+): Set<common.BaseFunction> {
+	let cyclic = new Set<common.BaseFunction>()
+
+	for (let candidate of candidates) {
+		let path: Array<common.BaseFunction> = []
+		let visited = new Map<common.BaseFunction, number>()
+		let current: AliasCandidate | undefined = candidate
+
+		while (current !== undefined) {
+			let seen = visited.get(current.entry)
+
+			if (seen !== undefined) {
+				for (let entry of path.slice(seen)) {
+					cyclic.add(entry)
+				}
+
+				break
+			}
+
+			visited.set(current.entry, path.length)
+			path.push(current.entry)
+			current =
+				current.target === null
+					? undefined
+					: byEntry.get(current.target)
+		}
+	}
+
+	return cyclic
+}
+
+type CollapseContext = {
+	byEntry: ReadonlyMap<common.BaseFunction, AliasCandidate>
+	container: AliasContainer
+	cyclic: ReadonlySet<common.BaseFunction>
+	done: Map<common.BaseFunction, common.PredicateAlias | null>
+}
+
+// NOTE: One candidate as the PRIMITIVE it names, however many Methods stand
+// between the two. A target read in the same declaration is collapsed first, so
+// which of the pair was written above the other decides nothing; a target
+// somewhere else was collapsed when ITS declaration reached Scope, and reading
+// its recorded alias once is the whole of the chain. Remembered per entry, so a
+// declaration whose Methods all forward to one of them costs one walk.
+function collapsedAlias(
+	candidate: AliasCandidate,
+	context: CollapseContext,
+): common.PredicateAlias | null {
+	let remembered = context.done.get(candidate.entry)
+
+	if (remembered !== undefined) {
+		return remembered
+	}
+
+	let alias =
+		context.cyclic.has(candidate.entry) === true
+			? null
+			: finishedAlias(candidate, context)
+
+	context.done.set(candidate.entry, alias)
+
+	return alias
+}
+
+function finishedAlias(
+	candidate: AliasCandidate,
+	context: CollapseContext,
+): common.PredicateAlias | null {
+	let target = candidate.target
+	let ahead = target === null ? undefined : context.byEntry.get(target)
+	let inner =
+		ahead !== undefined
+			? collapsedAlias(ahead, context)
+			: (target?.predicateAlias ?? null)
+	let step =
+		inner === null ? candidate.step : composedStep(candidate.step, inner)
+
+	if (step === null) {
+		return null
+	}
+
+	if (candidate.converse !== null) {
+		step = conversedStep(step, candidate, context.container)
+
+		if (step === null) {
+			return null
+		}
+	}
+
+	let args: Array<common.PredicateAliasArgument> = []
+
+	for (let slot of step.args) {
+		// NOTE: `@` reached a leaf that has nowhere to put it, which every body
+		// but a flipped one leaves standing. A leaf asks about its receiver, so
+		// a receiver written as one of its Arguments is a question of a shape
+		// this can not spell.
+		if (slot.kind === "Self") {
+			return null
+		}
+
+		args.push(slot)
+	}
+
+	// NOTE: A leaf naming the very Method it was read off says nothing at all —
+	// which is what a flipped call to a sibling Overload of one's own name
+	// collapses to, and what one half of a ring would say. Left primitive, so
+	// the question is the one the Method's own name asks.
+	if (
+		step.namespaceName === context.container.selfNamespaceName &&
+		step.methodName === candidate.methodName
+	) {
+		return null
+	}
+
+	return {
+		namespaceName: step.namespaceName,
+		methodName: step.methodName,
+		args,
+		negated: step.negated,
+	}
+}
+
+// NOTE: A body's call folded together with what its TARGET says it asks. The
+// target's Arguments are its own Parameters' positions, and each of them is
+// filled with whatever the body handed that Parameter — so
+// `isLessThanOrEqualTo(_ other) { <- @::isGreaterThan(other)::negate() }` on a
+// `isGreaterThan` that is itself written on something else comes out as that
+// something else, over the very Argument a caller writes.
+//
+// The Namespace is the target's, and the polarity is the two of them counted
+// together: a Method written as the contrary of a contrary asks the plain
+// question.
+function composedStep(
+	outer: AliasStep,
+	inner: common.PredicateAlias,
+): AliasStep | null {
+	let args: Array<DerivedArgument> = []
+
+	for (let slot of inner.args) {
+		if (slot.kind !== "Parameter") {
+			args.push(slot)
+
+			continue
+		}
+
+		let forwarded = outer.args[slot.index]
+
+		if (forwarded === undefined) {
+			return null
+		}
+
+		args.push(forwarded)
+	}
+
+	return {
+		namespaceName: inner.namespaceName ?? outer.namespaceName,
+		methodName: inner.methodName,
+		args,
+		negated: outer.negated !== inner.negated,
+	}
+}
+
+// NOTE: A flipped call read back onto `@`. What is left of the body by now is
+// one question about the two values in the other order, so the leaf is the
+// converse of it over the Parameter the call was made on. The guard is the
+// ordering's, checked where the body was read.
+function conversedStep(
+	step: AliasStep,
+	candidate: AliasCandidate,
+	container: AliasContainer,
+): AliasStep | null {
+	let flipped = CONVERSE_COMPARISONS.get(step.methodName)
+
+	if (
+		!candidate.converseTrusted ||
+		flipped === undefined ||
+		step.args.length !== 1 ||
+		step.args[0]!.kind !== "Self"
+	) {
+		return null
+	}
+
+	return {
+		namespaceName: container.selfNamespaceName,
+		methodName: flipped,
+		args: [{ kind: "Parameter", index: candidate.converse! }],
+		negated: step.negated,
 	}
 }
 

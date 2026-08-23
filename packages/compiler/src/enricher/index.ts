@@ -19,6 +19,7 @@ import { collectAnnotations } from "./annotations"
 import { builtinMembers, builtinProtocols, builtinTypes } from "./builtins"
 import {
 	derivePredicateAliases,
+	deriveProvidedPredicateAliases,
 	enrichExpression,
 	enrichNode,
 	enrichOverloadedFunctionStatement,
@@ -1421,6 +1422,18 @@ function hoistDeclarationsInner(
 					derivePredicateAliases(
 						node,
 						speculation.result as common.NamespaceType,
+						scope,
+					)
+				} else if (node.nodeType === "ProtocolDeclarationStatement") {
+					// NOTE: And which of a PROTOCOL's provided Methods are
+					// written on another — `isGreaterThanOrEqualTo` is
+					// `@::isLessThan(other)::negate()`, `isNot` is the `if`
+					// that says the same of `is`. A conformer answers both
+					// through those very bodies, so the leaf its receiver
+					// proves is read here rather than named in a table.
+					deriveProvidedPredicateAliases(
+						node,
+						speculation.result as common.ProtocolType,
 						scope,
 					)
 				}

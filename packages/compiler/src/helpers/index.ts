@@ -1894,7 +1894,17 @@ export function answersForBase(
 	conjunct: common.PredicateConjunct,
 	tag: string,
 ): boolean {
-	return conjunct.namespaceName === tag || conjunct.namespaceName === "Number"
+	return namespaceAnswersForBase(conjunct.namespaceName, tag)
+}
+
+// NOTE: The same question asked of a NAME alone, which is what reading a body
+// has instead of a leaf: the Enricher decides whether a flipped call may be
+// read as the ordering's converse before it has a conjunct to ask about.
+export function namespaceAnswersForBase(
+	namespaceName: string,
+	tag: string,
+): boolean {
+	return namespaceName === tag || namespaceName === "Number"
 }
 
 // NOTE: The tag of the Type a refinement is written ON. A refinement of a
