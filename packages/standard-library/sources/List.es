@@ -939,32 +939,70 @@ declarations {
 		§§ @returns — the List with the item inserted. It is never empty.
 		insert(_ item: ItemType, at index: Integer) -> NonEmptyList<ItemType>
 
-		§§ Answers a new List with the item at the given position replaced.
+		§§ Answers a new List with the item at the given position replaced by a given item, or by a transform of it.
 		§§
 		§§ A negative position counts back from the end: -1 is the last item. A position outside the List leaves it unchanged.
 		§§
-		§§ @param _ — the item to put at that position
-		§§ @param at — the position of the item to replace
 		§§ @returns — the List with the item replaced.
-		replace(_ item: ItemType, at index: Integer) -> List<ItemType> {
-			constant length = @::length()
+		overload replace {
+			§§ Answers a new List with the item at the given position replaced.
+			§§
+			§§ A negative position counts back from the end: -1 is the last item. A position outside the List leaves it unchanged.
+			§§
+			§§ @param _ — the item to put at that position
+			§§ @param at — the position of the item to replace
+			§§ @returns — the List with the item replaced.
+			(_ item: ItemType, at index: Integer) -> List<ItemType> {
+				constant length = @::length()
 
-			§ The guard is needed, because `remove(at:)` ignores a position
-			§ outside the List but `insert(_:at:)` clamps it. Without it the
-			§ item would be added at an end.
-			§
-			§ A negative position is resolved first, because `remove(at:)`
-			§ shortens the List before `insert(_:at:)` reads the position again.
-			§ The same negative position names a different place in the shorter
-			§ List.
-			if index::isLessThan(0::subtract(length)) {
-				<- @
-			} else if index::isLessThan(0) {
-				<- @::replace(item, at index::add(length))
-			} else if index::isGreaterThanOrEqualTo(length) {
-				<- @
-			} else {
-				<- @::remove(at index)::insert(item, at index)
+				§ The guard is needed, because `remove(at:)` ignores a position
+				§ outside the List but `insert(_:at:)` clamps it. Without it
+				§ the item would be added at an end.
+				§
+				§ A negative position is resolved first, because `remove(at:)`
+				§ shortens the List before `insert(_:at:)` reads the position
+				§ again. The same negative position names a different place in
+				§ the shorter List.
+				if index::isLessThan(0::subtract(length)) {
+					<- @
+				} else if index::isLessThan(0) {
+					<- @::replace(item, at index::add(length))
+				} else if index::isGreaterThanOrEqualTo(length) {
+					<- @
+				} else {
+					<- @::remove(at index)::insert(item, at index)
+				}
+			}
+
+			§ Written on the entry above, over the item that is already there.
+			§ The position needs no guard of its own. The `item(at:)` call
+			§ counts a negative position back from the end exactly as the entry
+			§ above does. It answers nothing for a position outside the List.
+			§ That is the case that leaves the receiver alone, so the transform
+			§ is never handed an item the List does not hold.
+
+			§§ Answers a new List with the item at the given position replaced by what the transform answers for it.
+			§§
+			§§ A negative position counts back from the end: -1 is the last item. A position outside the List leaves it unchanged, and the transform is not run.
+			§§
+			§§ @param at — the position of the item to replace
+			§§ @param _ — the transform the item at that position is handed to
+			§§ @returns — the List with the item replaced.
+			(
+				at index: Integer,
+				_ transform: (_: ItemType) -> ItemType,
+			) -> List<ItemType> {
+				§ `@` is rebound inside `match`; see DEVELOPMENT.md, Why bodies
+				§ look the way they do.
+				constant items = @
+
+				<- match @::item(at index) -> List<ItemType> {
+					case #Value(item) {
+						<- items::replace(transform(item), at index)
+					}
+
+					case #Empty       { <- items }
+				}
 			}
 		}
 
@@ -1375,18 +1413,54 @@ declarations {
 			}
 		}
 
-		§ Replacing keeps the length in both of the cases `List`'s own entry
-		§ has. A position inside the List swaps one item for one item, and a
+		§ Replacing keeps the length in both of the cases `List`'s own entries
+		§ have. A position inside the List swaps one item for one item, and a
 		§ position outside it answers the receiver untouched.
 
-		§§ Answers a new List with the item at the given position replaced.
+		§§ Answers a new List with the item at the given position replaced by a given item, or by a transform of it.
 		§§
-		§§ A negative position counts back from the end: -1 is the last item. A position outside the List leaves it unchanged. Neither case can empty the List.
+		§§ A negative position counts back from the end: -1 is the last item. A position outside the List leaves it unchanged. No case can empty the List.
 		§§
-		§§ @param _ — the item to put at that position
-		§§ @param at — the position of the item to replace
 		§§ @returns — the List with the item replaced, which is never empty.
-		replace(_ item: ItemType, at index: Integer) -> NonEmptyList<ItemType>
+		overload replace {
+			§§ Answers a new List with the item at the given position replaced.
+			§§
+			§§ A negative position counts back from the end: -1 is the last item. A position outside the List leaves it unchanged. Neither case can empty the List.
+			§§
+			§§ @param _ — the item to put at that position
+			§§ @param at — the position of the item to replace
+			§§ @returns — the List with the item replaced, which is never empty.
+			(_ item: ItemType, at index: Integer) -> NonEmptyList<ItemType>
+
+			§ Written on the entry above, which is native and carries the
+			§ proof, so this one carries it too — the shape `sort(on:)` has
+			§ here. It is the same body `List` gives the transform entry, over
+			§ the proven `replace` instead of the plain one.
+
+			§§ Answers a new List with the item at the given position replaced by what the transform answers for it.
+			§§
+			§§ A negative position counts back from the end: -1 is the last item. A position outside the List leaves it unchanged, and the transform is not run.
+			§§
+			§§ @param at — the position of the item to replace
+			§§ @param _ — the transform the item at that position is handed to
+			§§ @returns — the List with the item replaced, which is never empty.
+			(
+				at index: Integer,
+				_ transform: (_: ItemType) -> ItemType,
+			) -> NonEmptyList<ItemType> {
+				§ `@` is rebound inside `match`; see DEVELOPMENT.md, Why bodies
+				§ look the way they do.
+				constant items = @
+
+				<- match @::item(at index) -> NonEmptyList<ItemType> {
+					case #Value(item) {
+						<- items::replace(transform(item), at index)
+					}
+
+					case #Empty       { <- items }
+				}
+			}
+		}
 
 		§ Pairing stops with the shorter List, so two Lists that each have
 		§ something in them pair at least their first items. The entry on

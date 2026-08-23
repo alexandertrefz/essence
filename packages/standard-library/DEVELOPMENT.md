@@ -160,7 +160,7 @@ entry whose promise is about the answer can not say it in Essence and has to be
 native; where the entry it stands beside is an Essence body, the runtime writes
 that operation out a second time rather than instead of it. Five do.
 `NonEmptyList` holds three — `prepend(contentsOf:)`, `removeDuplicates` and
-`replace`, each written in Essence on `List` — `List.repeat`'s
+`replace(_:at:)`, each written in Essence on `List` — `List.repeat`'s
 `PositiveInteger` entry is the fourth, native because the entry beside it
 answers a `List`, and an expression that is not empty is not one the language
 can be told is not empty; and `NonZeroRational::reciprocal` is the fifth, for
@@ -173,7 +173,8 @@ wherever they stand: the golden capture is what stops the two from drifting.
 Writing another one means adding those lines too.
 
 Most of `NonEmptyList` is native, but not all of it. `sort(on:)` hands its key
-to the native `sort(by:)`, and `lowestItem(on:)` and `highestItem(on:)` read
+to the native `sort(by:)`, `replace(at:_:)` hands the transformed item to the
+native `replace(_:at:)`, and `lowestItem(on:)` and `highestItem(on:)` read
 `List`'s Optional answer off the native `firstItem()`. An Essence body can carry
 a proof another entry already holds; what it can not do is mint one.
 

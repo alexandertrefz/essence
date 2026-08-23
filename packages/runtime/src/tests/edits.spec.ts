@@ -17,7 +17,7 @@ import {
 	slice,
 	toString as listToString,
 } from "../List"
-import { replace } from "../NonEmptyList"
+import { replace__overload$1 as replace } from "../NonEmptyList"
 import { createString } from "../String"
 import { getStringRepresentation } from "../Terminal"
 
