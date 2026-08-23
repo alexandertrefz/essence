@@ -356,8 +356,27 @@ describe("Bundle Size", () => {
 	// bundle entirely. What the pair buys is measured on a Program that asks
 	// `rate::is(2)` and nothing else: 20.1 kB before and 6.2 kB now, against
 	// 6.5 kB for the `rate::isLessThan(2)` that already had its Integer entry.
+	// NOTE: 73,300 now, up 641 across the whole usability campaign, and the
+	// ceiling moves to 74,400 to put back the kilobyte of headroom the rest of
+	// this file keeps. Four changes reach this file and one is most of the
+	// figure. `sort` takes a direction, so the `SortOrder` Choice and the
+	// turned-around comparison arrive beside the three `sort()` calls here: 429.
+	// `isBetween` reads its two bounds in either order for 203 — and for the
+	// same 203 in Irrational.es, which never asks it, because a conformance
+	// witness carries `Orderable`'s provided body whether the Program reaches it
+	// or not. `List.of` splitting into an `overload static` block costs 27, and
+	// the rendering rule gives 7 back: `List::toString` and `Optional::toString`
+	// are natives now, so the walk that reached `join` is one runtime function
+	// rather than an Essence body per Program. Everything else the campaign
+	// added is free here — `firstItems`, `lastItems`, `group`, `replace(at:_:)`
+	// and the numeric predicates are all unreached, which is the shakeability
+	// this ceiling exists to watch.
+	// NOTE: The figure the numeric line above fell to is 72,851 in this history
+	// rather than the 72,600 it records, because `isBetween` landed before it
+	// here and not on the branch it was measured on. The fall itself is the
+	// same shape: 11 rather than 59.
 	it("keeps Everyday.es from dragging in the whole numeric tower", async () => {
-		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(74_100)
+		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(74_400)
 	})
 
 	// NOTE: Measured 42,719 bytes; a reintroduced `Number` spread was 54,849.
@@ -450,6 +469,14 @@ describe("Bundle Size", () => {
 	// Optional the fixture bought back: `constant computedNegative =
 	// 0::subtract(4)` and the `squareRoot` of it, so a root that has no answer
 	// is still shown.
+	// NOTE: 36,467 now, up 175, and the ceiling STAYS at 37,500 — 1,033 of
+	// headroom, the order the rest of this file keeps. Two changes reach a file
+	// that asks for neither by name. `isBetween` reading its bounds in either
+	// order adds 203, because the witness this file builds carries `Orderable`'s
+	// provided body whichever Methods the Program calls. The rendering rule
+	// gives 28 back: this file prints the `squareRoot` of a negative, and
+	// `Optional::toString` is a native now rather than a body written on a hole.
+	// Nothing else the campaign added is reached at all.
 	it("keeps Irrational.es from dragging in the whole numeric tower", async () => {
 		expect(await bundleSizeOf("Irrational.es")).toBeLessThan(37_500)
 	})
