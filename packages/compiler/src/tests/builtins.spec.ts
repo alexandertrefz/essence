@@ -319,6 +319,7 @@ describe("Builtins", () => {
 				false,
 				false,
 				true,
+				false,
 			])
 			expect(stdlib.members["loop"]?.type).toBe("OverloadedStaticMethod")
 			expect(typeof functions.loop__overload$1).toBe("function")

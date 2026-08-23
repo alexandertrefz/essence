@@ -98,21 +98,46 @@ declarations {
 		§ `List.of(integersFrom 1, through 10)::map(…)`. The Method is fixed to
 		§ Integers, so the Namespace's `ItemType` has nothing to merge into.
 		§
-		§ Both ends are included, so the shortest List it builds is the one-item
-		§ `[start]`, and counting down covers the rest. No pair of Integers
-		§ answers empty, and the return Type is where that is written down.
+		§ Two entries, because a range written from a length has to be able to
+		§ be empty. The `through:` entry counts down when the first Integer is
+		§ the greater, so no pair of Integers answers empty. A length of zero
+		§ reaches `through -1` and gets `[0, -1]` for it. The `upTo:` entry
+		§ stops before the end and only counts up, so it answers the empty
+		§ List instead.
 
-		§§ Answers the Integers from one value through another, both included.
+		§§ Answers the Integers of a range, through the last value or up to it.
 		§§
-		§§ The count runs down when the first value is the greater. There is always at least the first value, so the answer certainly has something in it.
+		§§ The `through:` entry includes both ends and counts in either direction. The `upTo:` entry stops before the end and only counts up.
 		§§
-		§§ @param integersFrom — the first Integer of the List
-		§§ @param through — the last Integer of the List, which is included
-		§§ @returns — the List of Integers, which is never empty.
-		static of(
-			integersFrom start: Integer,
-			through end: Integer,
-		) -> NonEmptyList<Integer>
+		§§ @returns — the List of Integers.
+		overload static of {
+			§§ Answers the Integers from one value through another, both included.
+			§§
+			§§ The count runs down when the first value is the greater. There is always at least the first value, so the answer certainly has something in it.
+			§§
+			§§ @param integersFrom — the first Integer of the List
+			§§ @param through — the last Integer of the List, which is included
+			§§ @returns — the List of Integers, which is never empty.
+			(
+				integersFrom start: Integer,
+				through end: Integer,
+			) -> NonEmptyList<Integer>
+
+			§§ Answers the Integers from one value up to, but not including, another.
+			§§
+			§§ The count only runs up. An end at or below the start answers the empty List.
+			§§
+			§§ @param integersFrom — the first Integer of the List
+			§§ @param upTo — the Integer the List stops before
+			§§ @returns — the List of Integers. It is empty when the end is not above the start.
+			(integersFrom start: Integer, upTo end: Integer) -> List<Integer> {
+				if end::isGreaterThan(start) {
+					<- List.of(integersFrom start, through end::subtract(1))
+				} else {
+					<- []
+				}
+			}
+		}
 
 		§ An Essence body would be length equality and
 		§ `pair(with other)::hasOnlyItems(where …)`, and it can not be written

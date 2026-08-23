@@ -21,7 +21,7 @@ import {
 	createList,
 	item__overload$1 as item,
 	length,
-	of,
+	of__overload$1 as of,
 	slice,
 } from "../List"
 import { createRational, formatAsRational } from "../Rational"

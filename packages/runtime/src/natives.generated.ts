@@ -329,7 +329,7 @@ export type ListNatives = {
 	// static repeat<ItemType>(_: ItemType, times: PositiveInteger) -> NonEmptyList
 	repeat__overload$2: <ItemType extends AnyType>(argument0: ItemType, times: IntegerType) => ListType<ItemType>
 	// static of(integersFrom: Integer, through: Integer) -> NonEmptyList
-	of: (integersFrom: IntegerType, through: IntegerType) => ListType<IntegerType>
+	of__overload$1: (integersFrom: IntegerType, through: IntegerType) => ListType<IntegerType>
 	// is<ItemType is Equatable>(_: List<ItemType>) -> Boolean
 	is: <ItemType extends AnyType>(self: ListType<ItemType>, argument1: ListType<ItemType>, ItemType__conformance: EquatableConformance<ItemType>) => BooleanType
 	// compare<ItemType is Comparable>(to: List<ItemType>) -> Ordering
@@ -655,10 +655,10 @@ export const $RecordArity: AssertArities<typeof import("./Record"), {
 
 declare const ListModule: typeof import("./List")
 export const $List: ListNatives = ListModule
-export const $ListAbsent: AssertNoEssenceExports<typeof import("./List"), "repeat__overload$1" | "hasItems__overload$1" | "hasItems__overload$2" | "isEmpty" | "contains" | "doesNotContain" | "hasOnlyItems" | "hasNoItems" | "firstItem__overload$1" | "firstItem__overload$2" | "firstItem__overload$3" | "firstItem__overload$4" | "lastItem__overload$1" | "lastItem__overload$2" | "lastItem__overload$3" | "lastItem__overload$4" | "item__overload$2" | "firstIndex__overload$1" | "firstIndex__overload$2" | "firstIndex__overload$3" | "firstIndex__overload$4" | "lastIndex__overload$1" | "lastIndex__overload$2" | "removeFirst" | "removeEvery__overload$1" | "removeEvery__overload$2" | "removeLast" | "removeDuplicates" | "prepend__overload$2" | "sort__overload$3" | "count__overload$1" | "count__overload$2" | "replace" | "partition" | "lowestItem__overload$1" | "lowestItem__overload$2" | "highestItem__overload$1" | "highestItem__overload$2"> = true
+export const $ListAbsent: AssertNoEssenceExports<typeof import("./List"), "repeat__overload$1" | "of__overload$2" | "hasItems__overload$1" | "hasItems__overload$2" | "isEmpty" | "contains" | "doesNotContain" | "hasOnlyItems" | "hasNoItems" | "firstItem__overload$1" | "firstItem__overload$2" | "firstItem__overload$3" | "firstItem__overload$4" | "lastItem__overload$1" | "lastItem__overload$2" | "lastItem__overload$3" | "lastItem__overload$4" | "item__overload$2" | "firstIndex__overload$1" | "firstIndex__overload$2" | "firstIndex__overload$3" | "firstIndex__overload$4" | "lastIndex__overload$1" | "lastIndex__overload$2" | "removeFirst" | "removeEvery__overload$1" | "removeEvery__overload$2" | "removeLast" | "removeDuplicates" | "prepend__overload$2" | "sort__overload$3" | "count__overload$1" | "count__overload$2" | "replace" | "partition" | "lowestItem__overload$1" | "lowestItem__overload$2" | "highestItem__overload$1" | "highestItem__overload$2"> = true
 export const $ListArity: AssertArities<typeof import("./List"), {
 	repeat__overload$2: 2
-	of: 2
+	of__overload$1: 2
 	is: 3
 	compare: 3
 	toString: 2
@@ -757,7 +757,7 @@ export const $RandomnessArity: AssertArities<typeof import("./Randomness"), {
 
 declare const functionsModule: typeof import("./functions")
 export const $functions: FunctionsNatives = functionsModule
-export const $functionsAbsent: AssertNoEssenceExports<typeof import("./functions"), "loop__overload$2" | "loop__overload$3"> = true
+export const $functionsAbsent: AssertNoEssenceExports<typeof import("./functions"), "loop__overload$2" | "loop__overload$3" | "loop__overload$5"> = true
 export const $functionsArity: AssertArities<typeof import("./functions"), {
 	loop__overload$1: 3
 	loop__overload$4: 2

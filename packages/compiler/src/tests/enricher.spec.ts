@@ -3855,6 +3855,7 @@ describe("Enricher", () => {
 					"'loop' takes 3 Arguments: Parameter 'startingWith' is State, Parameter 'until' is (_: State) -> Boolean, Parameter 'step' is (_: State) -> State.",
 					"'loop' takes 4 Arguments: Parameter 'from' is Integer, Parameter 'through' is Integer, Parameter 'startingWith' is State, Parameter 'step' is (_: Integer, _: State) -> State.",
 					"'loop' takes 2 Arguments: Parameter 'startingWith' is State, Parameter 'step' is (_: State) -> Step<State, Result>.",
+					"'loop' takes 4 Arguments: Parameter 'from' is Integer, Parameter 'upTo' is Integer, Parameter 'startingWith' is State, Parameter 'step' is (_: Integer, _: State) -> State.",
 				])
 			})
 
