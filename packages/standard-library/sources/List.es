@@ -795,7 +795,7 @@ declarations {
 
 		§§ Answers a new List in order, by the items' own ordering or by the given comparison.
 		§§
-		§§ The no-Argument entry is available whenever the items conform to `Comparable`.
+		§§ The no-Argument entry is available whenever the items conform to `Comparable`. Items the order does not tell apart keep the order they had.
 		§§
 		§§ @returns — the ordered List.
 		overload sort {
@@ -1153,7 +1153,7 @@ declarations {
 
 		§§ Answers a new List in order, by the items' own ordering or by the given comparison.
 		§§
-		§§ The no-Argument entry is available whenever the items conform to `Comparable`.
+		§§ The no-Argument entry is available whenever the items conform to `Comparable`. Items the order does not tell apart keep the order they had.
 		§§
 		§§ @returns — the ordered List, which certainly has something in it.
 		overload sort {
