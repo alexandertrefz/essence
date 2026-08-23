@@ -2869,6 +2869,31 @@ third"::lines())
 		"List.of(integersFrom: Integer, upTo: Integer) [end below the start]",
 		List.of(integersFrom 3, upTo 1),
 	)
+	show("List.firstItems<ItemType>(_ Integer)", numbers::firstItems(2))
+	show("List.firstItems<ItemType>(_ Integer) [zero]", numbers::firstItems(0))
+	show(
+		"List.firstItems<ItemType>(_ Integer) [below one]",
+		numbers::firstItems(-1),
+	)
+	show(
+		"List.firstItems<ItemType>(_ Integer) [past the length]",
+		numbers::firstItems(99),
+	)
+	show(
+		"List.firstItems<ItemType>(_ Integer) [empty]",
+		noNumbers::firstItems(2),
+	)
+	show("List.lastItems<ItemType>(_ Integer)", numbers::lastItems(2))
+	show("List.lastItems<ItemType>(_ Integer) [zero]", numbers::lastItems(0))
+	show(
+		"List.lastItems<ItemType>(_ Integer) [below one]",
+		numbers::lastItems(-1),
+	)
+	show(
+		"List.lastItems<ItemType>(_ Integer) [past the length]",
+		numbers::lastItems(99),
+	)
+	show("List.lastItems<ItemType>(_ Integer) [empty]", noNumbers::lastItems(2))
 
 	§ ——— NestedList ———————————————————————————————————————————————————————
 	show("NestedList.flatten<ItemType>()", [[1, 2], [3]]::flatten())
