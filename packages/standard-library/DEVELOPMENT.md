@@ -370,11 +370,13 @@ rung.** `Equatable` writes `isNot` and `Orderable` writes six Methods, and every
 conformer answers them without declaring anything. A Namespace that declares a
 Method of the same name replaces the provided one entirely for its own target —
 no entry is merged in — and it has to hold an entry the provided signature
-accepts, which is the same check a requirement gets. Three declarations here do
+accepts, which is the same check a requirement gets. Five declarations here do
 it, and each says why at its own site: `Optional::isNot` takes a bare item as
-well as an Optional, `Integer::isLessThan` and `Rational::isLessThan` hold an
-entry for the other numeric kind and are written on their own `compare` rather
-than on the cross-kind table.
+well as an Optional; `Integer::isNot` and `Rational::isNot` carry the contrary
+of an equality entry over the OTHER numeric kind, which a provided Method over
+`Self` alone has no entry for; and `Integer::isLessThan` and
+`Rational::isLessThan` hold an entry for the other numeric kind and are written
+on their own `compare` rather than on the cross-kind table.
 
 It replaces nothing on another Namespace's rung. A provided Method is a candidate
 of every Namespace whose conformance offers it, ranked by that Namespace's target

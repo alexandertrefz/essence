@@ -348,6 +348,14 @@ describe("Bundle Size", () => {
 	// the `NonEmptyList` entry. The fall is only 172 because the fixture had to
 	// BUY an Optional back: `constant base = 1::add(1)` feeding
 	// `base::raise(to -2)` is what keeps `value(defaultingTo:)` shown at all.
+	// NOTE: 72,600 now, down 59, and the ceiling STAYS at 74,100. `Integer`
+	// and `Rational` write an `is`/`isNot` pair of their own now, each holding
+	// an entry for the other kind, so the witness this file builds for an
+	// Integer names two consts of its own where it named `Equatable`'s
+	// provided body through `providedConformance` — and that body leaves the
+	// bundle entirely. What the pair buys is measured on a Program that asks
+	// `rate::is(2)` and nothing else: 20.1 kB before and 6.2 kB now, against
+	// 6.5 kB for the `rate::isLessThan(2)` that already had its Integer entry.
 	it("keeps Everyday.es from dragging in the whole numeric tower", async () => {
 		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(74_100)
 	})
