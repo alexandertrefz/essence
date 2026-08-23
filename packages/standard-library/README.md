@@ -63,9 +63,12 @@ written on top of it, count and cut by grapheme). The short-circuiting
 `firstItem(where:)` is not among them: it is written in Essence on `reduce`'s
 early-stopping entry, and leaves the walk at the item that decides the answer.
 
-One Method is native for a reason worth reading before assuming otherwise:
+Two Methods are native for a reason worth reading before assuming otherwise:
 `List.is`, because the pairwise form trips an infinite recursion in generic
-inference (the repro is at the declaration). `String.replaceEvery` used to be
+inference (the repro is at the declaration), and `Optional.toString`, because
+an Essence body renders the payload through a hole and a hole renders a String
+BARE — which is exactly the quoting rule the entry exists to keep.
+`String.replaceEvery` used to be
 too — its empty part inserted at UTF-16 code-unit boundaries — but the empty
 part is now a no-op, so it is `split(on part)::join(with replacement)` in
 Essence.
@@ -226,6 +229,15 @@ easy to break:
   there is what an `Optional` is for — `Rational.of(1, over 0)` is no
   Rational, `[]::firstItem()` is no item, `"abc"::character(at 9)` is no
   character — and each of those offers `defaultingTo:` beside it.
+- **A String prints bare on its own and quoted inside a structure** —
+  `Terminal.print("x")` writes `x`, and so does a hole, because there the String
+  is the whole of the text. Inside a List, an Optional or a Record it is one
+  piece beside others and has to be told from the text around it, so
+  `["a", "b", "", "c"]::toString()` is `["a", "b", "", "c"]`,
+  `#Value("a")::toString()` is `Value("a")` and `{ name = "x" }::toString()` is
+  `{ name = "x" }` — each item spelled the way a Program would write it down.
+  `join(with:)` is the one place the rule does not apply, because the raw text
+  is its whole job: `["a", "b"]::join(with ", ")` is `a, b`.
 - **Keep return Types tight.** Add Overloads rather than widening one signature:
   `Integer::add(Integer) -> Integer` beside `add(Rational) -> Rational`, never a
   single `add(Number) -> Number`.

@@ -1832,6 +1832,14 @@ third"::lines())
 		"Optional.toString<ItemType is Printable>() [empty]",
 		noNumbers::firstItem()::toString(),
 	)
+	§ A String payload is QUOTED, because a rendering inside a structure has
+	§ to be told from the text around it: without the quotes `#Value("Empty")`
+	§ and `#Empty` read alike, and `#Value("")` reads as a pair of empty
+	§ parentheses.
+	show(
+		"Optional.toString<ItemType is Printable>() [String payload]",
+		greeting::characters()::firstItem()::toString(),
+	)
 	show(
 		"Optional.value<ItemType>(defaultingTo: ItemType) [present]",
 		numbers::firstItem()::value(defaultingTo 0),
@@ -2142,6 +2150,26 @@ third"::lines())
 	show(
 		"List.toString<ItemType is Printable>() [single]",
 		singleNumber::toString(),
+	)
+	§ The rendering is the form the List was WRITTEN in, and a String item is
+	§ quoted inside it: `[ a, , b ]` said nothing about how many items there
+	§ were. `join(with:)` is the entry that answers the raw text.
+	constant words: List<String>           = ["a", "b", "", "c"]
+	constant nested: List<List<Integer>>   = [[1, 2], []]
+	constant named: List<{ name: String }> = [{ name = "x" }]
+	constant halves: List<Rational>        = [1/2, 2/1]
+	constant maybeWords: List<Optional<String>> = [#Value("a"), #Empty]
+
+	show("List.toString<ItemType is Printable>() [Strings]", words::toString())
+	show("List.toString<ItemType is Printable>() [nested]", nested::toString())
+	show("List.toString<ItemType is Printable>() [Records]", named::toString())
+	show(
+		"List.toString<ItemType is Printable>() [Rationals]",
+		halves::toString(),
+	)
+	show(
+		"List.toString<ItemType is Printable>() [Optionals]",
+		maybeWords::toString(),
 	)
 	show("List.length<ItemType>()", numbers::length())
 	show("List.length<ItemType>() [empty]", noNumbers::length())

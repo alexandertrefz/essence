@@ -669,7 +669,6 @@ describe("Stdlib Call Graph", () => {
 			"Optional.is__overload$2",
 			"Optional.keep",
 			"Optional.map",
-			"Optional.toString",
 			"Optional.value",
 			// NOTE: `values` needs a receiver not every List is, so it lives in
 			// a Namespace of its own — receiver `List<Optional<ItemType>>` —

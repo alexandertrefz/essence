@@ -10,12 +10,63 @@ import { createEmpty, createValue } from "./Optional"
 import type { OrderingType } from "./Ordering"
 import { equal, greater, less } from "./Ordering"
 import type { SideType } from "./Side"
-import { typeKeySymbol } from "./type"
+import { type AnyType, typeKeySymbol } from "./type"
 
 export type StringType = { [typeKeySymbol]: "String"; value: string }
 
 export function createString(value: string): StringType {
 	return { [typeKeySymbol]: "String", value }
+}
+
+// NOTE: The escapes are the String Literal's own spellings, so what a quoted
+// rendering shows is unambiguous: an embedded quote no longer reads as the
+// closing one, a backslash as an escape it never was, and a line break no
+// longer splits the one value across two lines of output. The remaining
+// control characters have no Essence spelling of their own, so they render as
+// their code point.
+const stringEscapes: { [character: string]: string } = {
+	"\\": "\\\\",
+	'"': '\\"',
+	"\n": "\\n",
+	"\r": "\\r",
+	"\t": "\\t",
+}
+
+// NOTE: A String written the way a Program would write it down — the text in
+// quotes, with anything a Literal has to escape escaped. It is here rather than
+// beside its callers because it is the one answer to one question, and three
+// readers ask it: `List.toString`, `Optional.toString` and the structural
+// rendering `Terminal.inspect` and `Record.toString` share.
+export function quoted(value: string): string {
+	return `"${value.replace(
+		// oxlint-disable-next-line no-control-regex -- matching control characters is this function's job
+		/[\\"\n\r\t\u0000-\u001F\u007F-\u009F]/g,
+		(character) =>
+			stringEscapes[character] ??
+			`\\u{${character.charCodeAt(0).toString(16).toUpperCase()}}`,
+	)}"`
+}
+
+// NOTE: THE ONE RULE for a value rendered INSIDE a structure: a String is
+// quoted there and bare on its own. `Terminal.print("x")` writes `x` and a hole
+// renders `x`, because there the String IS the whole of the text; inside a List
+// or a Case it is one piece beside others, and `["a", "", "b"]` has to be told
+// from `[a, , b]`. `Record.toString` has quoted its String members all along,
+// and this is the same rule where a List and an Optional read their items.
+//
+// NOTE: The tag is read rather than the conformance, because a `Printable`
+// witness says how a value renders and not what kind it is: `String.toString`
+// is the identity, so a String item arrives already indistinguishable from the
+// text around it.
+export function itemText<ItemType extends AnyType>(
+	value: ItemType,
+	conformance: {
+		toString: (value: ItemType) => StringType
+	},
+): string {
+	return value[typeKeySymbol] === "String"
+		? quoted((value as StringType).value)
+		: conformance.toString(value).value
 }
 
 // NOTE: The canonical grapheme view every position Method reads through: the
