@@ -560,6 +560,30 @@ declarations {
 			}
 		}
 
+		§ The positions the receiver has, and the items beside them. A `map`
+		§ answers one item for each and forgets where each stood. A counter
+		§ threaded through a `reduce` is what put that back.
+		§
+		§ `enumerate` is native and walks once. In Essence its body would be
+		§ `@::indices()::map(…)`, which reads every item back through
+		§ `item(at:)` and builds an Optional per item to take apart again.
+
+		§§ Answers every item beside the position it stands at.
+		§§
+		§§ The position counts from zero. The empty List answers no entries.
+		§§
+		§§ @returns — the List of Records, each holding a position under `index` and the item at it under `item`.
+		enumerate() -> List<{ index: Integer, item: ItemType }>
+
+		§§ Answers the positions the List has, in order.
+		§§
+		§§ The positions count from zero and stop before the length. The empty List answers no positions.
+		§§
+		§§ @returns — the List of positions.
+		indices() -> List<Integer> {
+			<- List.of(integersFrom 0, upTo @::length())
+		}
+
 		§§ Answers a new List without the first item, or without the given number of leading items.
 		§§
 		§§ The answer is empty when more items are removed than the List has. A count below one removes nothing.
@@ -1108,6 +1132,28 @@ declarations {
 		§§
 		§§ @returns — the number of items, which is never zero.
 		length() -> NonZeroInteger
+
+		§ Both carry the proof. There is one entry for every item and one
+		§ position for every item. So neither can answer nothing when it was
+		§ handed something. The `indices` body is written on
+		§ `List.of(integersFrom:through:)`, which promises that already. It
+		§ carries a proof another Method holds rather than minting one.
+
+		§§ Answers every item beside the position it stands at.
+		§§
+		§§ The position counts from zero.
+		§§
+		§§ @returns — the List of Records, each holding a position under `index` and the item at it under `item`. It is never empty.
+		enumerate() -> NonEmptyList<{ index: Integer, item: ItemType }>
+
+		§§ Answers the positions the List has, in order.
+		§§
+		§§ The positions count from zero and stop before the length.
+		§§
+		§§ @returns — the List of positions, which is never empty.
+		indices() -> NonEmptyList<Integer> {
+			<- List.of(integersFrom 0, through @::length()::subtract(1))
+		}
 
 		§ Removing duplicates keeps the first of every group of equal items, so
 		§ it keeps at least one of whatever it was handed.

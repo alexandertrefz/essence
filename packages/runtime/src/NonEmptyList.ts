@@ -186,6 +186,13 @@ export function replace<ItemType extends AnyType>(
 	return listRebuildingBack(back, originalList, view)
 }
 
+// NOTE: `enumerate` is `List`'s own native, under the same name: one entry for
+// every item means the answer is as long as the receiver, so a receiver with
+// something in it answers with something in it. `indices` is not here — it is
+// written in Essence on `List.of(integersFrom:through:)`, which already
+// promises what it builds is not empty.
+export { enumerate } from "./List"
+
 // NOTE: Pairing and splitting, both `List`'s own natives, and last for the
 // reason the declarations are: this file reads in the order `List.es` writes
 // them. Pairing stops where the shorter side does and splitting opens a group
