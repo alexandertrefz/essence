@@ -11,16 +11,18 @@ declarations {
 	§ State it threads, not about a value it hangs off. The entries resolve by
 	§ their labels, as an overloaded Method's entries do.
 	§
-	§ Two of the four are native, because only a native can loop where the one
+	§ Two of the five are native, because only a native can loop where the one
 	§ recursion is not stack-safe. They are `while` and the general
 	§ `step -> Step` loop. The general loop can not be written on `while`, which
 	§ only ever answers with its State: no Expression names the Result where
-	§ the loop stops. The other two entries are written in Essence on `while`,
-	§ and need no `Step`, because the predicate is the whole of their stopping.
+	§ the loop stops. The other three entries are written in Essence and need
+	§ no `Step`, because the predicate is the whole of their stopping. Two of
+	§ them are written on `while`, and the exclusive count on the inclusive
+	§ one.
 
 	§§ Answers the State the loop settles on, or the Result a step stops with.
 	§§
-	§§ A `startingWith` value seeds the State and a `step` callback advances it. The entries differ in what ends the loop. The `while` and `until` entries check a predicate before each step. The counted entry runs once per Integer from `from` through `through`. The general entry lets a `step` answer with a `Step`, and finishes with a Result of its own Type. Pick the entry by the labels it reads, as with an overloaded Method.
+	§§ A `startingWith` value seeds the State and a `step` callback advances it. The entries differ in what ends the loop. The `while` and `until` entries check a predicate before each step. One counted entry runs once per Integer from `from` through `through`, and the other stops before `upTo`. The general entry lets a `step` answer with a `Step`, and finishes with a Result of its own Type. Pick the entry by the labels it reads, as with an overloaded Method.
 	§§
 	§§ @returns — the State the loop settles on, or the Result a `#Done` carries.
 	overload function loop {
@@ -121,6 +123,36 @@ declarations {
 			startingWith state: State,
 			step advance: (_: State) -> Step<State, Result>,
 		) -> Result
+
+		§§ Runs the body once for each Integer from `from` up to, but not including, `upTo`, and answers the State after the last step.
+		§§
+		§§ The count only runs up. The body runs zero times when `upTo` is not above `from`, and the seed is answered untouched. That mirrors `List.of(integersFrom:upTo:)`, so a count written from a length is empty rather than inverted.
+		§§
+		§§ @param from — the first Integer the body sees.
+		§§ @param upTo — the Integer the count stops before.
+		§§ @param startingWith — the State the first step builds on.
+		§§ @param step — the body, handed each Integer and the running State, answering with the next State.
+		§§ @returns — the State after the last step, or the seed when the body never runs.
+		<infer State>(
+			from start: Integer,
+			upTo end: Integer,
+			startingWith state: State,
+			step advance: (_: Integer, _: State) -> State,
+		) -> State {
+			§ Written on the counted entry above, whose range is inclusive. The
+			§ guard is what keeps an end at or below the start from counting
+			§ down: `upTo start` would otherwise run once, over `start - 1`.
+			if end::isGreaterThan(start) {
+				<- loop(
+					from start,
+					through end::subtract(1),
+					startingWith state,
+					step advance,
+				)
+			} else {
+				<- state
+			}
+		}
 	}
 }
 

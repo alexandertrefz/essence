@@ -2597,7 +2597,11 @@ describe("Code Generation", () => {
 					stdlibFreeFunctions().map(
 						(freeFunction) => freeFunction.name,
 					),
-				).toEqual(["loop__overload$2", "loop__overload$3"])
+				).toEqual([
+					"loop__overload$2",
+					"loop__overload$3",
+					"loop__overload$5",
+				])
 			})
 
 			// NOTE: The name the Rewriter keys a candidate by has to be the name

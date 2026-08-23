@@ -2803,6 +2803,18 @@ third"::lines())
 		"List.of(integersFrom: Integer, through: Integer) [inverted]",
 		List.of(integersFrom 5, through 1),
 	)
+	show(
+		"List.of(integersFrom: Integer, upTo: Integer)",
+		List.of(integersFrom 0, upTo 5),
+	)
+	show(
+		"List.of(integersFrom: Integer, upTo: Integer) [end at the start]",
+		List.of(integersFrom 0, upTo 0),
+	)
+	show(
+		"List.of(integersFrom: Integer, upTo: Integer) [end below the start]",
+		List.of(integersFrom 3, upTo 1),
+	)
 
 	§ ——— NestedList ———————————————————————————————————————————————————————
 	show("NestedList.flatten<ItemType>()", [[1, 2], [3]]::flatten())
@@ -3288,6 +3300,18 @@ third"::lines())
 		"loop<State>(from: Integer, through: Integer, startingWith: State, step: (_ Integer, _ State) -> State) [down]",
 		loop(from 3, through 1, startingWith "", step (index, acc) {
 			<- acc::append(index::toString())
+		}),
+	)
+	show(
+		"loop<State>(from: Integer, upTo: Integer, startingWith: State, step: (_ Integer, _ State) -> State)",
+		loop(from 0, upTo 5, startingWith 0, step (index, total) {
+			<- total::add(index)
+		}),
+	)
+	show(
+		"loop<State>(from: Integer, upTo: Integer, startingWith: State, step: (_ Integer, _ State) -> State) [zero turns]",
+		loop(from 0, upTo 0, startingWith 99, step (index, total) {
+			<- total::add(index)
 		}),
 	)
 	show(

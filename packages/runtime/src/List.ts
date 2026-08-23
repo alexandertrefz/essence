@@ -1136,7 +1136,10 @@ export function split<ItemType extends AnyType>(
 	return createList(groups)
 }
 
-export function of(
+// NOTE: The INCLUSIVE entry, and the only one with a native. The `upTo:` entry
+// beside it is written in Essence on this one, over an end one lower, because
+// what it adds is a guard rather than a walk.
+export function of__overload$1(
 	firstInteger: IntegerType,
 	lastInteger: IntegerType,
 ): ListType<IntegerType> {

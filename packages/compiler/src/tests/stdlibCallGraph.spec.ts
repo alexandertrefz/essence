@@ -446,9 +446,10 @@ describe("Stdlib Call Graph", () => {
 	// no more a static call than a Function-typed Parameter's is.
 	//
 	// NOTE: The free Functions are in the same graph, which is what makes `loop`'s
-	// two bodied entries answerable for: each is written on the native primitive
-	// of its family today, and an entry written on ANOTHER bodied entry tomorrow
-	// is a cycle two individually reasonable commits can close between them.
+	// three bodied entries answerable for: two are written on the native
+	// primitive of their family and the third on one of those two, and a further
+	// entry written on a bodied one is a cycle two individually reasonable
+	// commits can close between them.
 	it("has no cycle among the Essence-implemented Methods", () => {
 		let cycle = findCycle(
 			buildCallGraph(stdlibPrelude(), stdlibFreeFunctions()),
@@ -572,6 +573,7 @@ describe("Stdlib Call Graph", () => {
 			"List.lastItem__overload$4",
 			"List.lowestItem__overload$1",
 			"List.lowestItem__overload$2",
+			"List.of__overload$2",
 			"List.partition",
 			"List.prepend__overload$2",
 			"List.removeDuplicates",
@@ -757,9 +759,11 @@ describe("Stdlib Call Graph", () => {
 			"Transcendental.subtract__overload$3",
 			// NOTE: The bodied free Functions, keyed by the bare name they are
 			// emitted under. `loop`'s other two entries are native — there is no
-			// body to walk, exactly as for a native Method.
+			// body to walk, exactly as for a native Method. `$5` is the
+			// exclusive count, written on `$3`, the inclusive one.
 			"loop__overload$2",
 			"loop__overload$3",
+			"loop__overload$5",
 		])
 	})
 

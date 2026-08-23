@@ -277,9 +277,13 @@ describe("Stdlib", () => {
 		// runtime-direct test that lived here is retired.
 
 		it("builds inclusive Integer ranges, counting either way", () => {
-			expect(list.of(int(1n), int(4n))).toEqual(ints(1n, 2n, 3n, 4n))
-			expect(list.of(int(3n), int(1n))).toEqual(ints(3n, 2n, 1n))
-			expect(list.of(int(2n), int(2n))).toEqual(ints(2n))
+			expect(list.of__overload$1(int(1n), int(4n))).toEqual(
+				ints(1n, 2n, 3n, 4n),
+			)
+			expect(list.of__overload$1(int(3n), int(1n))).toEqual(
+				ints(3n, 2n, 1n),
+			)
+			expect(list.of__overload$1(int(2n), int(2n))).toEqual(ints(2n))
 		})
 	})
 
