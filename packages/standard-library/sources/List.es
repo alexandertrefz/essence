@@ -488,11 +488,9 @@ declarations {
 			}
 		}
 
-		§§ Answers the position of the last item equal to the given one.
+		§§ Answers the position of the last item equal to the given one, or of the last item the check accepts.
 		§§
-		§§ Equality is the items' own `is`. The Method is available whenever the items conform to `Equatable`.
-		§§
-		§§ A List without that item answers nothing, and the `defaultingTo:` entry answers the given position instead.
+		§§ A List without such an item answers nothing, and the `defaultingTo:` entries answer the given position instead.
 		overload lastIndex {
 			§§ Answers the position of the last item equal to the given one.
 			§§
@@ -530,6 +528,35 @@ declarations {
 				defaultingTo fallback: Integer,
 			) -> Integer {
 				<- @::lastIndex(of item)::value(defaultingTo fallback)
+			}
+
+			§ The reversal the by-value entry above uses, over the check
+			§ instead of the item. The walk `firstIndex(where:)` makes stops
+			§ at the item that decides it, so this one stops at the last
+			§ accepted item.
+
+			§§ Answers the position of the last item the check accepts.
+			§§
+			§§ @param where — the check each item is offered to
+			§§ @returns — the zero-based position, or nothing when no item is accepted.
+			(where check: (_: ItemType) -> Boolean) -> Optional<Integer> {
+				constant lastPosition = @::length()::subtract(1)
+
+				<- @::reverse()
+					::firstIndex(where check)
+					::map((position) { <- lastPosition::subtract(position) })
+			}
+
+			§§ Answers the position of the last item the check accepts, or the given fallback when it accepts none.
+			§§
+			§§ @param where — the check each item is offered to
+			§§ @param defaultingTo — the position to answer with when no item is accepted
+			§§ @returns — the zero-based position, or the fallback in its place.
+			(
+				where check: (_: ItemType) -> Boolean,
+				defaultingTo fallback: Integer,
+			) -> Integer {
+				<- @::lastIndex(where check)::value(defaultingTo fallback)
 			}
 		}
 
