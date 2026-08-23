@@ -39,6 +39,15 @@ running as you type, and everything they found where you are looking.
   `essence.tests.debounce` is how long a burst of edits may be before it costs
   a run. **Essence: Show Test Session Output** shows what each cycle covered
   and found.
+- Everything the editor says about a file now reaches into the
+  `tests { … }` block: hover, go to definition, document highlight, rename,
+  completion, signature help, inlay hints, semantic colouring, folding,
+  expand selection, the call hierarchy and quick fixes all answer inside a
+  test body and a suite as they do above them. Renaming something the
+  implementation declares rewrites every test that reads it — in the file and
+  in a `.tests.es` beside it — and the three names only a test binds rename
+  with it: a table's row, a `for any` Parameter, and what a
+  `require MATCHER = EXPR` takes apart.
 - A test written `across` a List of rows is listed once per ROW, under the
   template the rows share, and each row reports the name it renders — so a
   table that fails says which row did.
