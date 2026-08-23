@@ -13476,27 +13476,69 @@ function resolvedConjunct(
 	// while a condition asks an ordinary binding whose Type is often a refinement
 	// already. Both have to key alike, or an `if` would stop rewriting where the
 	// clause it has to match kept on.
+	let tag = refinableBaseTag(invocation.base.type)
+	let leaf: common.PredicateConjunct = {
+		namespaceName: invocation.namespace.name,
+		methodName: spelling.methodName,
+		args,
+		negated: false,
+	}
 	let primitive =
-		args.length === 1 &&
-		answersForBase(
-			{
-				namespaceName: invocation.namespace.name,
-				methodName: spelling.methodName,
-				args,
-				negated: false,
-			},
-			refinableBaseTag(invocation.base.type),
-		)
+		args.length === 1 && answersForBase(leaf, tag)
 			? PRIMITIVE_PREDICATES.get(spelling.methodName)
 			: undefined
 
 	return {
-		namespaceName: invocation.namespace.name,
-		methodName: primitive ?? spelling.methodName,
-		args,
-		negated: primitive !== undefined,
+		...forNumericBase(
+			{
+				...leaf,
+				methodName: primitive ?? spelling.methodName,
+				negated: primitive !== undefined,
+			},
+			tag,
+		),
 		spelling,
 	}
+}
+
+// NOTE: The leaf a RATIONAL receiver asks, spelled one way. `@::isNot(0)` and
+// `@::isNot(0/1)` are one question about one number, and they were two keys: a
+// fraction is answered by `Rational`'s own entry, while a bare Integer bound
+// finds no same-kind entry and falls to the covering `Number`. So
+// `NonZeroRational` was reachable through one spelling and not the other — and
+// `@::isNot(0)`, the spelling the Compiler's own Help offers, was the one that
+// missed. `isLessThan` and `isGreaterThan` split the same way without `Number`
+// coming into it at all, since Rational declares an Overload for each kind.
+//
+// The RECEIVER decides it, not the entry that answered: where a Rational stands
+// in front of the call, every bare run of digits is read as `n/1` — which is
+// what widening an Integer bound to a Rational does, and what the admission
+// table has always read one as — and the covering Namespace is spelled as
+// Rational's own. A Program's own Namespace over a Rational is left exactly as
+// written: what `Frac::isHalf` asks is the Program's question, not the
+// ordering's, and nothing may quietly rename it.
+function forNumericBase(
+	leaf: common.PredicateConjunct,
+	tag: string,
+): common.PredicateConjunct {
+	if (tag !== "Rational" || !answersForBase(leaf, tag)) {
+		return leaf
+	}
+
+	return {
+		...leaf,
+		namespaceName: "Rational",
+		args: leaf.args.map(rationalBound),
+	}
+}
+
+// NOTE: A bare run of digits as the Rational it stands for, and everything else
+// as it was written — a fraction is already in this form, a String keeps its
+// quotes, and a Boolean is no bound at all.
+function rationalBound(scalar: string | boolean): string | boolean {
+	return typeof scalar === "string" && /^-?\d+$/.test(scalar)
+		? reducedRationalSpelling(scalar, "1")
+		: scalar
 }
 
 // NOTE: The alias recorded on the entry this call resolved to, if it is one. The

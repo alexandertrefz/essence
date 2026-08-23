@@ -6336,6 +6336,75 @@ describe("Enricher", () => {
 			])
 		})
 
+		// NOTE: And an Integer bound written on a Rational is the same number
+		// and so the same key. The two spellings used to be two questions —
+		// `Rational::isNot` answers a fraction while a bare `0` finds no
+		// same-kind entry and falls to the covering `Number` — so
+		// `NonZeroRational` was reachable through one of them and not the other,
+		// and `@::isNot(0)`, the spelling the Compiler's own Help offers, was
+		// the one that missed. The RECEIVER decides it now.
+		it("should read an Integer bound on a Rational as the Rational it is", () => {
+			expect(
+				refinementOf(
+					"implementation { type NonZeroRatio = Rational where @::isNot(0) }",
+				).conjuncts,
+			).toEqual([
+				{
+					namespaceName: "Rational",
+					methodName: "is",
+					negated: true,
+					args: ["0/1"],
+					spelling: { methodName: "isNot", args: ["0"] },
+				},
+			])
+
+			// NOTE: The `spelling` is what was WRITTEN and stays apart — it is
+			// the half a Diagnostic reads back — so the two are compared by
+			// everything the key is taken from.
+			let leavesOf = (source: string) =>
+				refinementOf(source).conjuncts?.map(
+					({ spelling: _spelling, ...leaf }) => leaf,
+				)
+
+			expect(
+				leavesOf(
+					"implementation { type Negative = Rational where @::isLessThan(0) }",
+				),
+			).toEqual(
+				leavesOf(
+					"implementation { type Negative = Rational where @::isLessThan(0/1) }",
+				),
+			)
+		})
+
+		// NOTE: A Program's own Namespace over a Rational is left exactly as
+		// written. What `Frac::isHalf` asks is the Program's question, and
+		// renaming it to Rational's own would say the standard library answers
+		// something it never declared.
+		it("should leave a Program's own Namespace over a Rational alone", () => {
+			expect(
+				refinementOf(
+					`implementation {
+						namespace Frac for Rational {
+							isBig(_ bound: Integer) -> Boolean {
+								<- @::numerator()::isGreaterThan(bound)
+							}
+						}
+
+						type Big = Rational where @::<Frac>isBig(2)
+					}`,
+				).conjuncts,
+			).toEqual([
+				{
+					namespaceName: "Frac",
+					methodName: "isBig",
+					negated: false,
+					args: ["2"],
+					spelling: { methodName: "isBig", args: ["2"] },
+				},
+			])
+		})
+
 		// NOTE: The conjunct set of a generic refinement is the point of the whole
 		// design: `hasItems` asks nothing about the items, so the key holds no Type
 		// Argument at all and `Filled<String>` differs from `Filled<Integer>`
@@ -7061,10 +7130,7 @@ describe("Enricher", () => {
 		})
 
 		// NOTE: A Rational narrows on the same rail, with the bound written as
-		// the fraction `Rational::isNot` takes. An Integer bound there would
-		// find no same-kind entry and fall to the covering `Number`'s rung,
-		// which is a different question to a conjunct key — so an Alias asking
-		// about a Rational asks it of a Rational.
+		// the fraction `Rational::isNot` takes.
 		it("should narrow a Rational the condition proved the predicate of", () => {
 			expect(
 				narrowedTypeOf(
@@ -7072,6 +7138,26 @@ describe("Enricher", () => {
 						constant r = 1/2::add(1/3)
 
 						if r::isNot(0/1) {
+							Terminal.inspect(r)
+						}
+					}`,
+					"r",
+				),
+			).toBe("NonZeroRational")
+		})
+
+		// NOTE: And with the bound written as a bare Integer, which is the same
+		// number and so the same question. It used to be a different one: a
+		// bare `0` finds no same-kind entry and falls to the covering `Number`'s
+		// rung, so this branch narrowed to nothing at all while the fraction
+		// beside it reached `NonZeroRational`.
+		it("should narrow a Rational proved by an Integer bound", () => {
+			expect(
+				narrowedTypeOf(
+					`implementation {
+						constant r = 1/2::add(1/3)
+
+						if r::isNot(0) {
 							Terminal.inspect(r)
 						}
 					}`,

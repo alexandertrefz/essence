@@ -1937,14 +1937,19 @@ function excludedByConjunct(
 	}
 
 	if (conjunct.methodName === "isBetween" && conjunct.args.length === 2) {
-		let lower = integerArgument(conjunct.args[0]!)
-		let upper = integerArgument(conjunct.args[1]!)
+		let lower = boundArgument(conjunct.args[0]!)
+		let upper = boundArgument(conjunct.args[1]!)
 
 		// NOTE: Bounds in the wrong order enclose nothing, which is what the
 		// standard library's own body says — so the leaf is a claim no value
 		// answers, and reading anything off it would be reading off a
 		// contradiction.
-		if (lower === null || upper === null || lower > upper) {
+		if (
+			lower === null ||
+			upper === null ||
+			lower.numerator * upper.denominator >
+				upper.numerator * lower.denominator
+		) {
 			return []
 		}
 
@@ -2014,10 +2019,39 @@ function comparisonLeaf(
 	}
 }
 
-function integerArgument(scalar: string | boolean): bigint | null {
-	return typeof scalar === "string" && /^-?\d+$/.test(scalar)
-		? BigInt(scalar)
-		: null
+// NOTE: A bound as the exact number it is — a run of digits, or two of them
+// with a slash between, which is what a Rational receiver's conjunct keeps. The
+// two are only ever COMPARED here, so the pair is kept rather than divided, and
+// a negative denominator is moved onto the numerator so the cross-multiplication
+// keeps the order.
+//
+// The reader is written out again rather than borrowed from `predicateEval`,
+// which reads the same two forms: that module is the one that DECIDES a
+// predicate and it imports this one, so the borrowing would have to run the
+// other way round.
+function boundArgument(
+	scalar: string | boolean,
+): { numerator: bigint; denominator: bigint } | null {
+	if (typeof scalar !== "string") {
+		return null
+	}
+
+	let parts = /^(-?\d+)(?:\/(-?\d+))?$/.exec(scalar)
+
+	if (parts === null) {
+		return null
+	}
+
+	let numerator = BigInt(parts[1]!)
+	let denominator = parts[2] === undefined ? 1n : BigInt(parts[2])
+
+	if (denominator === 0n) {
+		return null
+	}
+
+	return denominator < 0n
+		? { numerator: -numerator, denominator: -denominator }
+		: { numerator, denominator }
 }
 
 // NOTE: The one door to a refinement's conjuncts. They are null while the

@@ -497,10 +497,15 @@ const RATIONAL_QUESTIONS: Record<string, PredicateEvaluator> = {
 // NOTE: The covering Namespace answers for whichever kind stands in front of
 // it, so its rung is BOTH tables: an Integer receiver keeps the Integer entry
 // it always reached, and a Rational one is read as a Rational. A conjunct
-// reaches `Number` where the two operands are of different kinds —
-// `1/2::isNot(0)` finds no same-kind entry and falls to `Number`'s, resolved to
-// `Number::is` negated — and where the Method is provided rather than declared,
-// as `isBetween` is over Integer bounds.
+// reaches `Number` where the two operands are of different kinds — an Integer
+// bound on a Rational finds no same-kind entry and falls to `Number`'s — and
+// where the Method is provided rather than declared, as `isBetween` is over
+// Integer bounds.
+//
+// A Rational RECEIVER is spelled as Rational's own before the key is taken, so
+// `1/2::isNot(0)` reaches `Rational::is` negated over `0/1` rather than
+// `Number`'s. What is left for this table is an INTEGER receiver whose bound is
+// a fraction, which no entry of Integer's own reads.
 const NUMBER_COMPARISONS: Record<string, PredicateEvaluator> = eitherTable(
 	NUMERIC_COMPARISONS,
 	RATIONAL_COMPARISONS,
