@@ -272,9 +272,9 @@ describe("Standard Library Member Order", () => {
 		// NOTE: A guard on the reading above. Every check below passes on an
 		// empty list, so a collector that found no Namespace, or that found no
 		// member in the ones it found, would make this file a no-op nobody
-		// notices. Six of the Namespaces declare no member at all — a Choice of
-		// payload-free Cases derives everything it answers — so the two counts
-		// do not match and neither stands in for the other.
+		// notices. Seven of the Namespaces declare no member at all — a Choice
+		// of payload-free Cases derives everything it answers — so the two
+		// counts do not match and neither stands in for the other.
 		let members = declaredMembers()
 
 		expect(declaredNamespaces().size).toBeGreaterThan(20)

@@ -6,6 +6,7 @@ import type { OptionalType } from "./Optional"
 import { createEmpty, createValue } from "./Optional"
 import { equal, greater, less, type OrderingType } from "./Ordering"
 import type { RecordType } from "./Record"
+import type { SortOrderType } from "./SortOrder"
 import type { StepType } from "./Step"
 import type { StringType } from "./String"
 import { createString, itemText } from "./String"
@@ -943,19 +944,31 @@ export function insert<ItemType extends AnyType>(
 	return createList(items)
 }
 
-// NOTE: `sort` is one Method with two Overloads, so both bind by position.
-// `$1` is the no-Argument entry, whose `Comparable` bound hands its
-// conformance in as the trailing Argument; it orders by the items' own
-// `compare`. `$2` takes the comparison outright. Both land on the same walk.
+// NOTE: `sort` is one Method with three Overloads, and the two native ones bind
+// by position. `$1` reads the direction and orders by the items' own `compare`,
+// whose conformance its `Comparable` bound hands in as the trailing Argument;
+// `$2` takes the comparison outright and needs no direction, since a comparison
+// says which way it runs. Both land on the same walk.
+//
+// NOTE: A descending sort hands the SAME comparison the pair the other way
+// round rather than reversing the answer. `Array.sort` is stable, and two items
+// the comparison calls `#Equal` still call each other `#Equal` swapped — so a
+// tie keeps the order it had in either direction, which reversing the answer
+// would break.
 export function sort__overload$1<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
+	order: SortOrderType,
 	conformance: {
 		compare: (self: ItemType, other: ItemType) => OrderingType
 	},
 ): ListType<ItemType> {
-	return sort__overload$2(originalList, (first, second) =>
-		conformance.compare(first, second),
-	)
+	return order[typeKeySymbol] === "SortOrder#Descending"
+		? sort__overload$2(originalList, (first, second) =>
+				conformance.compare(second, first),
+			)
+		: sort__overload$2(originalList, (first, second) =>
+				conformance.compare(first, second),
+			)
 }
 
 export function sort__overload$2<ItemType extends AnyType>(

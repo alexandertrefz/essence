@@ -33,6 +33,7 @@ import * as rationalList from "@essence-lang/runtime/RationalList"
 import * as record from "@essence-lang/runtime/Record"
 import * as rounding from "@essence-lang/runtime/Rounding"
 import * as side from "@essence-lang/runtime/Side"
+import * as sortOrder from "@essence-lang/runtime/SortOrder"
 import * as string from "@essence-lang/runtime/String"
 import * as terminal from "@essence-lang/runtime/Terminal"
 import * as transcendental from "@essence-lang/runtime/Transcendental"
@@ -67,6 +68,7 @@ const runtimeModules: Record<string, Record<string, unknown>> = {
 	NormalizationForm: normalizationForm,
 	NumberFormat: numberFormat,
 	Rounding: rounding,
+	SortOrder: sortOrder,
 	Record: record,
 	List: list,
 	NestedList: nestedList,

@@ -6528,6 +6528,13 @@ function enrichNativeShim(
 		overloadIndex,
 		isStatic,
 		parameters,
+		// NOTE: Read off the RESOLVED signature rather than off the written
+		// Generics, because that is what the native contract generator counts
+		// its witness slots from — one source for both, so the frame and the
+		// contract can not disagree about how many Arguments arrive.
+		conformances: (resolved?.generics ?? [])
+			.filter((generic) => generic.constraint != null)
+			.map((generic) => generic.name),
 	}
 }
 

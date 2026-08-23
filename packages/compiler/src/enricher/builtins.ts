@@ -71,6 +71,12 @@ export const builtinMemberOrder: Array<string> = [
 	"NormalizationForm",
 	"NumberFormat",
 	"Rounding",
+	// NOTE: With the other mode Choices, and after them because it is the
+	// newest. `SortOrder` is declared beside `sort` in `List.es` rather than
+	// with these, and it shares no Method name with any Namespace here — all
+	// three of its Methods are derived — so its position decides nothing but
+	// where a reader of this list meets it.
+	"SortOrder",
 	"Record",
 	"List",
 	// NOTE: Directly after `List`, because both target a List and the position
@@ -188,9 +194,12 @@ export const builtinTypeOrder: Array<string> = [
 	"NormalizationForm",
 	"NumberFormat",
 	"Rounding",
+	// NOTE: Beside the mode Choice it is one of, and after `Rounding` for the
+	// reason it follows `Rounding` in the member order above.
+	"SortOrder",
 	// NOTE: With the other mode Choices, and last among them because it is the
-	// newest — `Stream` is the only one of them with no Namespace of its own, so
-	// it appears in this table and not in the member order above.
+	// only one of them with no Namespace of its own — so it appears in this
+	// table and not in the member order above.
 	"Stream",
 	// NOTE: After every Type a Program writes down, because it is the one Type
 	// a Program never writes down: a source arrives as a Parameter of

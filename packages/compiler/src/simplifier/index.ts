@@ -926,6 +926,37 @@ function simplifyNativeShim(
 		})
 	}
 
+	// NOTE: The frame a native's default is evaluated in is a Function like any
+	// other, so a Record default is merged in it the same way — and the native
+	// still receives a whole Record, which is the whole point of the shim.
+	// `_self` is unshifted above, so the Parameter list this is built against is
+	// the one the shim emits. It is read BEFORE the witnesses are appended,
+	// because the prologue pairs the typed Parameters with the simplified ones
+	// by position and a witness is written in neither.
+	let prologue = recordDefaultPrologue(
+		shim.isStatic
+			? shim.parameters
+			: [receiverPlaceholder(targetType), ...shim.parameters],
+		parameters,
+	)
+
+	// NOTE: The hidden trailing Parameters a bounded Type Parameter adds, the
+	// same ones `simplifyFunctionDefinition` appends to a bodied Method — a call
+	// that leaves an Argument out still passes its witnesses, positionally,
+	// after the hole it opened for the default.
+	for (let name of shim.conformances) {
+		parameters.push({
+			nodeType: "Parameter",
+			externalName: null,
+			internalName: {
+				nodeType: "Identifier",
+				name: conformanceParameterName(name),
+				type: { type: "Unknown" },
+			},
+			defaultValue: null,
+		})
+	}
+
 	return {
 		memberName:
 			shim.overloadIndex === null
@@ -936,17 +967,7 @@ function simplifyNativeShim(
 					),
 		isStatic: shim.isStatic,
 		parameters,
-		// NOTE: The frame a native's default is evaluated in is a Function like
-		// any other, so a Record default is merged in it the same way — and the
-		// native still receives a whole Record, which is the whole point of the
-		// shim. `_self` is unshifted above, so the Parameter list this is built
-		// against is the one the shim emits.
-		prologue: recordDefaultPrologue(
-			shim.isStatic
-				? shim.parameters
-				: [receiverPlaceholder(targetType), ...shim.parameters],
-			parameters,
-		),
+		prologue,
 	}
 }
 

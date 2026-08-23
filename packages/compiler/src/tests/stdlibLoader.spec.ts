@@ -1095,6 +1095,7 @@ describe("Standard Library Loader", () => {
 			"Rounding",
 			"NumberFormat",
 			"NormalizationForm",
+			"SortOrder",
 			"Equatable",
 			"Printable",
 			"Comparable",
@@ -1371,6 +1372,7 @@ describe("Standard Library Loader", () => {
 			"NormalizationForm",
 			"NumberFormat",
 			"Rounding",
+			"SortOrder",
 			"Record",
 			"List",
 			// NOTE: The two Namespaces a List value can reach besides `List`,
@@ -1476,6 +1478,7 @@ describe("Standard Library Loader", () => {
 			"Rounding",
 			"NumberFormat",
 			"NormalizationForm",
+			"SortOrder",
 		]) {
 			expect(choicesOf(types[name])).toEqual([name])
 		}

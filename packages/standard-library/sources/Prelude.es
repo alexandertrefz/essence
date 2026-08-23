@@ -19,6 +19,7 @@ export {
 	NonEmptyList            from "./List.es"
 	NonEmptyNestedList      from "./List.es"
 	OptionalList            from "./List.es"
+	SortOrder               from "./List.es"
 	loop                    from "./Loop.es"
 	Irrational              from "./Number.es"
 	Number                  from "./Number.es"

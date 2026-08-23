@@ -34,6 +34,7 @@ export const runtimeNamespaceNames = [
 	"NormalizationForm",
 	"NumberFormat",
 	"Rounding",
+	"SortOrder",
 	"Record",
 	"List",
 	"NestedList",

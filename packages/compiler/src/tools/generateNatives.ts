@@ -39,6 +39,9 @@ const RUNTIME_TYPE_MODULES: Record<string, string> = {
 	StartType: "./Side",
 	EndType: "./Side",
 	BothEndsType: "./Side",
+	SortOrderType: "./SortOrder",
+	AscendingType: "./SortOrder",
+	DescendingType: "./SortOrder",
 	NumberFormatType: "./NumberFormat",
 	FractionType: "./NumberFormat",
 	DecimalType: "./NumberFormat",
@@ -72,6 +75,7 @@ const RUNTIME_TYPE_MODULES: Record<string, string> = {
 const UNION_NAME_ALIASES: Record<string, string> = {
 	Ordering: "OrderingType",
 	Side: "SideType",
+	SortOrder: "SortOrderType",
 	NumberFormat: "NumberFormatType",
 	NormalizationForm: "NormalizationFormType",
 	Number: "NumberType",
@@ -102,7 +106,7 @@ const GENERIC_CASE_TYPES: Record<string, string> = {
 }
 
 // NOTE: The runtime unit types of the builtin unit Choices — `Ordering`,
-// `Side`, `NumberFormat`, `NormalizationForm` and `Stream` — the only Cases
+// `Side`, `SortOrder`, `NumberFormat`, `NormalizationForm` and `Stream` — the only Cases
 // reachable in a signature, and then only inside their own Union, which is
 // mapped whole before its Cases are ever visited.
 const CASE_TYPES: Record<string, string> = {
@@ -112,6 +116,8 @@ const CASE_TYPES: Record<string, string> = {
 	"Side#Start": "StartType",
 	"Side#End": "EndType",
 	"Side#BothEnds": "BothEndsType",
+	"SortOrder#Ascending": "AscendingType",
+	"SortOrder#Descending": "DescendingType",
 	"NumberFormat#Fraction": "FractionType",
 	"NumberFormat#Decimal": "DecimalType",
 	"NormalizationForm#ComposedCanonical": "ComposedCanonicalType",
