@@ -173,7 +173,7 @@ predicate naming, not prepositional Arguments, so `isGreaterThan`, `isBetween`
 and `doesNotContain` keep their fused word. Quantifiers and adjectives are not
 prepositions either: `removeEvery`, `everyItem`, `removeFirst`,
 `removeDuplicates`, `firstItem`/`lastItem` keep theirs. So do
-`lowestNumber`/`greatestNumber`, which name the same question on `Number` and on
+`lowestNumber`/`highestNumber`, which name the same question on `Number` and on
 a List of them.
 
 A few more conventions worth stating because they are already consistent and
@@ -186,7 +186,7 @@ easy to break:
   whether EVERY item does. The filter is `everyItem(where:)`, which answers the
   items themselves.
 - **A key-reading Function is always labelled `on`** — `sort(on:)`,
-  `lowestItem(on:)`, `greatestItem(on:)`, `sum(on:)`, `average(on:)`. Each
+  `lowestItem(on:)`, `highestItem(on:)`, `sum(on:)`, `average(on:)`. Each
   takes a Function of one Parameter answering the value the Method is really
   about, and a member path is what makes them read as one family:
   `products::sort(on .price)`, `orders::sum(on .total)`. `by` is not reused for
@@ -201,7 +201,7 @@ easy to break:
   a Namespace over that List — `IntegerList`, `RationalList` or `NumberList` by
   the item Type — delegating to the static. A List proven non-empty reaches the
   narrowed Namespace beside it, where `average`, `lowestNumber` and
-  `greatestNumber` answer a number rather than an Optional.
+  `highestNumber` answer a number rather than an Optional.
 - **A Method that can answer empty offers a `defaultingTo:` entry** — beside
   every entry answering an `Optional` stands one taking the fallback and
   answering the bare Type: `list::firstItem(defaultingTo 0)`,
@@ -243,7 +243,7 @@ but that each can say what it is, so `[1, 2, 3]::join(with ", ")` is `"1, 2, 3"`
 not a type error. `sort<infer ItemType is Comparable>()` is the same shape for
 ordering.
 
-`sort(on:)`, `lowestItem(on:)` and `greatestItem(on:)` bound the KEY rather
+`sort(on:)`, `lowestItem(on:)` and `highestItem(on:)` bound the KEY rather
 than the item — `<infer Key is Comparable>` — so a List of anything can be
 ordered by anything comparable read off it. The key is what has to be ordered,
 and the item never is.

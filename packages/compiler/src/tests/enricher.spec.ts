@@ -9701,7 +9701,7 @@ describe("Enricher", () => {
 			expect(
 				codesFor(
 					programWith(
-						"constant greatest = Number.greatestNumber(proven, defaultingTo 0)",
+						"constant highest = Number.highestNumber(proven, defaultingTo 0)",
 					),
 				),
 			).toEqual(["fallback-never-used"])

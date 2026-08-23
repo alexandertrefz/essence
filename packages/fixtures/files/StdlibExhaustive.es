@@ -1638,80 +1638,80 @@ third"::lines())
 		Number.lowestNumber([1, 1/2]),
 	)
 	show(
-		"Number.greatestNumber(_ Integer, _ Integer)",
-		Number.greatestNumber(3, 2),
+		"Number.highestNumber(_ Integer, _ Integer)",
+		Number.highestNumber(3, 2),
 	)
 	show(
-		"Number.greatestNumber(_ Rational, _ Rational)",
-		Number.greatestNumber(1/2, 1/3),
+		"Number.highestNumber(_ Rational, _ Rational)",
+		Number.highestNumber(1/2, 1/3),
 	)
 	show(
-		"Number.greatestNumber(_ Integer, _ Rational)",
-		Number.greatestNumber(1, 2/3),
+		"Number.highestNumber(_ Integer, _ Rational)",
+		Number.highestNumber(1, 2/3),
 	)
 	show(
-		"Number.greatestNumber(_ Rational, _ Integer)",
-		Number.greatestNumber(2/3, 1),
+		"Number.highestNumber(_ Rational, _ Integer)",
+		Number.highestNumber(2/3, 1),
 	)
 	show(
-		"Number.greatestNumber(_ List<Integer>)",
-		Number.greatestNumber(threeNumbers),
+		"Number.highestNumber(_ List<Integer>)",
+		Number.highestNumber(threeNumbers),
 	)
 	show(
-		"Number.greatestNumber(_ List<Integer>) [empty]",
-		Number.greatestNumber(noNumbers),
+		"Number.highestNumber(_ List<Integer>) [empty]",
+		Number.highestNumber(noNumbers),
 	)
 	show(
-		"Number.greatestNumber(_ List<Rational>)",
-		Number.greatestNumber(twoRationals),
+		"Number.highestNumber(_ List<Rational>)",
+		Number.highestNumber(twoRationals),
 	)
 	show(
-		"Number.greatestNumber(_ List<Rational>) [empty]",
-		Number.greatestNumber(noRationals),
+		"Number.highestNumber(_ List<Rational>) [empty]",
+		Number.highestNumber(noRationals),
 	)
 	show(
-		"Number.greatestNumber(_ List<Integer | Rational>)",
-		Number.greatestNumber(twoMixedNumbers),
+		"Number.highestNumber(_ List<Integer | Rational>)",
+		Number.highestNumber(twoMixedNumbers),
 	)
 	show(
-		"Number.greatestNumber(_ List<Integer | Rational>) [empty]",
-		Number.greatestNumber(noMixedNumbers),
+		"Number.highestNumber(_ List<Integer | Rational>) [empty]",
+		Number.highestNumber(noMixedNumbers),
 	)
 	show(
-		"Number.greatestNumber(_ List<Integer>, defaultingTo: Integer)",
-		Number.greatestNumber(threeNumbers, defaultingTo 0),
+		"Number.highestNumber(_ List<Integer>, defaultingTo: Integer)",
+		Number.highestNumber(threeNumbers, defaultingTo 0),
 	)
 	show(
-		"Number.greatestNumber(_ List<Integer>, defaultingTo: Integer) [empty]",
-		Number.greatestNumber(noNumbers, defaultingTo 0),
+		"Number.highestNumber(_ List<Integer>, defaultingTo: Integer) [empty]",
+		Number.highestNumber(noNumbers, defaultingTo 0),
 	)
 	show(
-		"Number.greatestNumber(_ List<Rational>, defaultingTo: Rational)",
-		Number.greatestNumber(twoRationals, defaultingTo 0/1),
+		"Number.highestNumber(_ List<Rational>, defaultingTo: Rational)",
+		Number.highestNumber(twoRationals, defaultingTo 0/1),
 	)
 	show(
-		"Number.greatestNumber(_ List<Rational>, defaultingTo: Rational) [empty]",
-		Number.greatestNumber(noRationals, defaultingTo 0/1),
+		"Number.highestNumber(_ List<Rational>, defaultingTo: Rational) [empty]",
+		Number.highestNumber(noRationals, defaultingTo 0/1),
 	)
 	show(
-		"Number.greatestNumber(_ List<Integer | Rational>, defaultingTo: Integer | Rational)",
-		Number.greatestNumber(twoMixedNumbers, defaultingTo 0),
+		"Number.highestNumber(_ List<Integer | Rational>, defaultingTo: Integer | Rational)",
+		Number.highestNumber(twoMixedNumbers, defaultingTo 0),
 	)
 	show(
-		"Number.greatestNumber(_ List<Integer | Rational>, defaultingTo: Integer | Rational) [empty]",
-		Number.greatestNumber(noMixedNumbers, defaultingTo 0),
+		"Number.highestNumber(_ List<Integer | Rational>, defaultingTo: Integer | Rational) [empty]",
+		Number.highestNumber(noMixedNumbers, defaultingTo 0),
 	)
 	show(
-		"Number.greatestNumber(_ NonEmptyList<Integer>)",
-		Number.greatestNumber([3, 1, 2]),
+		"Number.highestNumber(_ NonEmptyList<Integer>)",
+		Number.highestNumber([3, 1, 2]),
 	)
 	show(
-		"Number.greatestNumber(_ NonEmptyList<Rational>)",
-		Number.greatestNumber([1/2, 1/3]),
+		"Number.highestNumber(_ NonEmptyList<Rational>)",
+		Number.highestNumber([1/2, 1/3]),
 	)
 	show(
-		"Number.greatestNumber(_ NonEmptyList<Integer | Rational>)",
-		Number.greatestNumber([1, 1/2]),
+		"Number.highestNumber(_ NonEmptyList<Integer | Rational>)",
+		Number.highestNumber([1, 1/2]),
 	)
 
 	§ ——— Optional —————————————————————————————————————————————————————————
@@ -2411,7 +2411,7 @@ third"::lines())
 	constant fallbackRow = { tag = "z", n = 0, r = 0/1, m = 0 }
 
 	§ A tie at each end of the order, which no other List here has: two rows
-	§ share the lowest key and two share the greatest. The four `[tie]` labels
+	§ share the lowest key and two share the highest. The four `[tie]` labels
 	§ below pin the rule all four blocks promise, that the earlier item is the
 	§ one kept.
 	constant tiedRows: List<{ tag: String, n: Integer }> = [
@@ -2450,24 +2450,24 @@ third"::lines())
 		tiedRows::lowestItem(on .n),
 	)
 	show(
-		"List.greatestItem<ItemType, Key is Comparable>(on: (_ ItemType) -> Key)",
-		rows::greatestItem(on .n),
+		"List.highestItem<ItemType, Key is Comparable>(on: (_ ItemType) -> Key)",
+		rows::highestItem(on .n),
 	)
 	show(
-		"List.greatestItem<ItemType, Key is Comparable>(on: (_ ItemType) -> Key) [empty]",
-		noRows::greatestItem(on .n),
+		"List.highestItem<ItemType, Key is Comparable>(on: (_ ItemType) -> Key) [empty]",
+		noRows::highestItem(on .n),
 	)
 	show(
-		"List.greatestItem<ItemType, Key is Comparable>(on: (_ ItemType) -> Key, defaultingTo: ItemType)",
-		rows::greatestItem(on .n, defaultingTo fallbackRow),
+		"List.highestItem<ItemType, Key is Comparable>(on: (_ ItemType) -> Key, defaultingTo: ItemType)",
+		rows::highestItem(on .n, defaultingTo fallbackRow),
 	)
 	show(
-		"List.greatestItem<ItemType, Key is Comparable>(on: (_ ItemType) -> Key, defaultingTo: ItemType) [empty]",
-		noRows::greatestItem(on .n, defaultingTo fallbackRow),
+		"List.highestItem<ItemType, Key is Comparable>(on: (_ ItemType) -> Key, defaultingTo: ItemType) [empty]",
+		noRows::highestItem(on .n, defaultingTo fallbackRow),
 	)
 	show(
-		"List.greatestItem<ItemType, Key is Comparable>(on: (_ ItemType) -> Key) [tie]",
-		tiedRows::greatestItem(on .n),
+		"List.highestItem<ItemType, Key is Comparable>(on: (_ ItemType) -> Key) [tie]",
+		tiedRows::highestItem(on .n),
 	)
 	show(
 		"List.compare<ItemType is Comparable>(to: List<ItemType>)",
@@ -2781,7 +2781,7 @@ third"::lines())
 	)
 
 	§ The keyed entries here spend the proof twice over: the sorted List is
-	§ still proven, and the lowest and greatest answer an item rather than an
+	§ still proven, and the lowest and highest answer an item rather than an
 	§ Optional.
 	constant provenRows: NonEmptyList<{ tag: String, n: Integer }>     = [
 		{ tag = "b", n = 2 },
@@ -2808,16 +2808,16 @@ third"::lines())
 		provenRows::lowestItem(on .n),
 	)
 	show(
-		"NonEmptyList.greatestItem<ItemType, Key is Comparable>(on: (_ ItemType) -> Key)",
-		provenRows::greatestItem(on .n),
+		"NonEmptyList.highestItem<ItemType, Key is Comparable>(on: (_ ItemType) -> Key)",
+		provenRows::highestItem(on .n),
 	)
 	show(
 		"NonEmptyList.lowestItem<ItemType, Key is Comparable>(on: (_ ItemType) -> Key) [tie]",
 		tiedProvenRows::lowestItem(on .n),
 	)
 	show(
-		"NonEmptyList.greatestItem<ItemType, Key is Comparable>(on: (_ ItemType) -> Key) [tie]",
-		tiedProvenRows::greatestItem(on .n),
+		"NonEmptyList.highestItem<ItemType, Key is Comparable>(on: (_ ItemType) -> Key) [tie]",
+		tiedProvenRows::highestItem(on .n),
 	)
 	show(
 		"NonEmptyList.replace<ItemType>(_ ItemType, at: Integer)",
@@ -2956,15 +2956,15 @@ third"::lines())
 		"IntegerList.lowestNumber(defaultingTo: Integer) [empty]",
 		noNumbers::lowestNumber(defaultingTo 0),
 	)
-	show("IntegerList.greatestNumber()", numbers::greatestNumber())
-	show("IntegerList.greatestNumber() [empty]", noNumbers::greatestNumber())
+	show("IntegerList.highestNumber()", numbers::highestNumber())
+	show("IntegerList.highestNumber() [empty]", noNumbers::highestNumber())
 	show(
-		"IntegerList.greatestNumber(defaultingTo: Integer)",
-		numbers::greatestNumber(defaultingTo 0),
+		"IntegerList.highestNumber(defaultingTo: Integer)",
+		numbers::highestNumber(defaultingTo 0),
 	)
 	show(
-		"IntegerList.greatestNumber(defaultingTo: Integer) [empty]",
-		noNumbers::greatestNumber(defaultingTo 0),
+		"IntegerList.highestNumber(defaultingTo: Integer) [empty]",
+		noNumbers::highestNumber(defaultingTo 0),
 	)
 
 	show("RationalList.sum()", rationals::sum())
@@ -2991,15 +2991,15 @@ third"::lines())
 		"RationalList.lowestNumber(defaultingTo: Rational) [empty]",
 		noRationals::lowestNumber(defaultingTo 0/1),
 	)
-	show("RationalList.greatestNumber()", rationals::greatestNumber())
-	show("RationalList.greatestNumber() [empty]", noRationals::greatestNumber())
+	show("RationalList.highestNumber()", rationals::highestNumber())
+	show("RationalList.highestNumber() [empty]", noRationals::highestNumber())
 	show(
-		"RationalList.greatestNumber(defaultingTo: Rational)",
-		rationals::greatestNumber(defaultingTo 0/1),
+		"RationalList.highestNumber(defaultingTo: Rational)",
+		rationals::highestNumber(defaultingTo 0/1),
 	)
 	show(
-		"RationalList.greatestNumber(defaultingTo: Rational) [empty]",
-		noRationals::greatestNumber(defaultingTo 0/1),
+		"RationalList.highestNumber(defaultingTo: Rational) [empty]",
+		noRationals::highestNumber(defaultingTo 0/1),
 	)
 
 	show("NumberList.sum()", mixedNumbers::sum())
@@ -3026,18 +3026,15 @@ third"::lines())
 		"NumberList.lowestNumber(defaultingTo: Integer | Rational) [empty]",
 		noMixedNumbers::lowestNumber(defaultingTo 0),
 	)
-	show("NumberList.greatestNumber()", mixedNumbers::greatestNumber())
+	show("NumberList.highestNumber()", mixedNumbers::highestNumber())
+	show("NumberList.highestNumber() [empty]", noMixedNumbers::highestNumber())
 	show(
-		"NumberList.greatestNumber() [empty]",
-		noMixedNumbers::greatestNumber(),
+		"NumberList.highestNumber(defaultingTo: Integer | Rational)",
+		mixedNumbers::highestNumber(defaultingTo 0),
 	)
 	show(
-		"NumberList.greatestNumber(defaultingTo: Integer | Rational)",
-		mixedNumbers::greatestNumber(defaultingTo 0),
-	)
-	show(
-		"NumberList.greatestNumber(defaultingTo: Integer | Rational) [empty]",
-		noMixedNumbers::greatestNumber(defaultingTo 0),
+		"NumberList.highestNumber(defaultingTo: Integer | Rational) [empty]",
+		noMixedNumbers::highestNumber(defaultingTo 0),
 	)
 
 	§ ——— NonEmptyIntegerList, NonEmptyRationalList, NonEmptyNumberList ————
@@ -3051,8 +3048,8 @@ third"::lines())
 		noNumbers::append(5)::append(2)::lowestNumber(),
 	)
 	show(
-		"NonEmptyIntegerList.greatestNumber()",
-		noNumbers::append(5)::append(2)::greatestNumber(),
+		"NonEmptyIntegerList.highestNumber()",
+		noNumbers::append(5)::append(2)::highestNumber(),
 	)
 	show(
 		"NonEmptyIntegerList.average()",
@@ -3067,8 +3064,8 @@ third"::lines())
 		noRationals::append(3/2)::append(1/2)::lowestNumber(),
 	)
 	show(
-		"NonEmptyRationalList.greatestNumber()",
-		noRationals::append(3/2)::append(1/2)::greatestNumber(),
+		"NonEmptyRationalList.highestNumber()",
+		noRationals::append(3/2)::append(1/2)::highestNumber(),
 	)
 	show(
 		"NonEmptyRationalList.average()",
@@ -3079,8 +3076,8 @@ third"::lines())
 		noMixedNumbers::append(3)::append(1/2)::lowestNumber(),
 	)
 	show(
-		"NonEmptyNumberList.greatestNumber()",
-		noMixedNumbers::append(3)::append(1/2)::greatestNumber(),
+		"NonEmptyNumberList.highestNumber()",
+		noMixedNumbers::append(3)::append(1/2)::highestNumber(),
 	)
 	§ The total is an Integer here and a Rational in the call below it, so both
 	§ arms of the match are walked.

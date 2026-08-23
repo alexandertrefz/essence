@@ -495,10 +495,10 @@ declarations {
 			}
 		}
 
-		§§ The greater of two Numbers, or the greatest in a List of them.
+		§§ The higher of two Numbers, or the highest in a List of them.
 		§§
-		§§ The answer for two equal Numbers is the first of them. A List answers the earliest of its greatest items. The empty List has none, and the `defaultingTo:` entries answer the given Number in place of nothing. A List proven to have an item answers the item itself.
-		overload static greatestNumber {
+		§§ The answer for two equal Numbers is the first of them. A List answers the earliest of its highest items. The empty List has none, and the `defaultingTo:` entries answer the given Number in place of nothing. A List proven to have an item answers the item itself.
+		overload static highestNumber {
 			(_ firstNumber: Integer, _ secondNumber: Integer) -> Integer {
 				if firstNumber::isGreaterThanOrEqualTo(secondNumber) {
 					<- firstNumber
@@ -540,12 +540,12 @@ declarations {
 			(_ integers: List<Integer>) -> Optional<Integer> {
 				constant start: Optional<Integer> = #Empty
 
-				<- integers::reduce(startingWith start, (greatest, integer) {
-					<- match greatest -> Optional<Integer> {
+				<- integers::reduce(startingWith start, (highest, integer) {
+					<- match highest -> Optional<Integer> {
 						case #Empty          { <- #Value(integer) }
 
 						case #Value(running) {
-							<- #Value(Number.greatestNumber(running, integer))
+							<- #Value(Number.highestNumber(running, integer))
 						}
 					}
 				})
@@ -554,12 +554,12 @@ declarations {
 			(_ rationals: List<Rational>) -> Optional<Rational> {
 				constant start: Optional<Rational> = #Empty
 
-				<- rationals::reduce(startingWith start, (greatest, rational) {
-					<- match greatest -> Optional<Rational> {
+				<- rationals::reduce(startingWith start, (highest, rational) {
+					<- match highest -> Optional<Rational> {
 						case #Empty          { <- #Value(rational) }
 
 						case #Value(running) {
-							<- #Value(Number.greatestNumber(running, rational))
+							<- #Value(Number.highestNumber(running, rational))
 						}
 					}
 				})
@@ -570,8 +570,8 @@ declarations {
 			) -> Optional<Integer | Rational> {
 				constant start: Optional<Integer | Rational> = #Empty
 
-				<- numbers::reduce(startingWith start, (greatest, number) {
-					<- match greatest -> Optional<Integer | Rational> {
+				<- numbers::reduce(startingWith start, (highest, number) {
+					<- match highest -> Optional<Integer | Rational> {
 						case #Empty { <- #Value(number) }
 
 						case #Value(running) {
@@ -585,88 +585,86 @@ declarations {
 				})
 			}
 
-			§§ The greatest of the Integers, with a value to answer for the empty List.
+			§§ The highest of the Integers, with a value to answer for the empty List.
 			§§
 			§§ @param _ — the Integers to compare
-			§§ @param defaultingTo — the value to answer with when there is no greatest
-			§§ @returns — the greatest Integer, or the given value in its place.
+			§§ @param defaultingTo — the value to answer with when there is no highest
+			§§ @returns — the highest Integer, or the given value in its place.
 			(
 				_ integers: List<Integer>,
 				defaultingTo fallback: Integer,
 			) -> Integer {
-				<- Number.greatestNumber(integers)::value(defaultingTo fallback)
+				<- Number.highestNumber(integers)::value(defaultingTo fallback)
 			}
 
-			§§ The greatest of the Rationals, with a value to answer for the empty List.
+			§§ The highest of the Rationals, with a value to answer for the empty List.
 			§§
 			§§ @param _ — the Rationals to compare
-			§§ @param defaultingTo — the value to answer with when there is no greatest
-			§§ @returns — the greatest Rational, or the given value in its place.
+			§§ @param defaultingTo — the value to answer with when there is no highest
+			§§ @returns — the highest Rational, or the given value in its place.
 			(
 				_ rationals: List<Rational>,
 				defaultingTo fallback: Rational,
 			) -> Rational {
-				<- Number.greatestNumber(rationals)::value(
-					defaultingTo fallback,
-				)
+				<- Number.highestNumber(rationals)::value(defaultingTo fallback)
 			}
 
-			§§ The greatest of the Numbers, with a value to answer for the empty List.
+			§§ The highest of the Numbers, with a value to answer for the empty List.
 			§§
 			§§ @param _ — the Numbers to compare
-			§§ @param defaultingTo — the value to answer with when there is no greatest
-			§§ @returns — the greatest Number, or the given value in its place.
+			§§ @param defaultingTo — the value to answer with when there is no highest
+			§§ @returns — the highest Number, or the given value in its place.
 			(
 				_ numbers: List<Integer | Rational>,
 				defaultingTo fallback: Integer | Rational,
 			) -> Integer | Rational {
-				<- Number.greatestNumber(numbers)::value(defaultingTo fallback)
+				<- Number.highestNumber(numbers)::value(defaultingTo fallback)
 			}
 
-			§§ The greatest of the Integers in a List proven to have an item.
+			§§ The highest of the Integers in a List proven to have an item.
 			§§
-			§§ The List has a greatest item, so the answer is that item rather than an Optional.
+			§§ The List has a highest item, so the answer is that item rather than an Optional.
 			§§
 			§§ @param _ — the Integers to compare
-			§§ @returns — the greatest Integer.
+			§§ @returns — the highest Integer.
 			(_ integers: NonEmptyList<Integer>) -> Integer {
 				<- integers::reduce(
 					startingWith integers::firstItem(),
-					(greatest, integer) {
-						<- Number.greatestNumber(greatest, integer)
+					(highest, integer) {
+						<- Number.highestNumber(highest, integer)
 					},
 				)
 			}
 
-			§§ The greatest of the Rationals in a List proven to have an item.
+			§§ The highest of the Rationals in a List proven to have an item.
 			§§
-			§§ The List has a greatest item, so the answer is that item rather than an Optional.
+			§§ The List has a highest item, so the answer is that item rather than an Optional.
 			§§
 			§§ @param _ — the Rationals to compare
-			§§ @returns — the greatest Rational.
+			§§ @returns — the highest Rational.
 			(_ rationals: NonEmptyList<Rational>) -> Rational {
 				<- rationals::reduce(
 					startingWith rationals::firstItem(),
-					(greatest, rational) {
-						<- Number.greatestNumber(greatest, rational)
+					(highest, rational) {
+						<- Number.highestNumber(highest, rational)
 					},
 				)
 			}
 
-			§§ The greatest of the Numbers in a List proven to have an item.
+			§§ The highest of the Numbers in a List proven to have an item.
 			§§
-			§§ The List has a greatest item, so the answer is that item rather than an Optional.
+			§§ The List has a highest item, so the answer is that item rather than an Optional.
 			§§
 			§§ @param _ — the Numbers to compare
-			§§ @returns — the greatest Number.
+			§§ @returns — the highest Number.
 			(
 				_ numbers: NonEmptyList<Integer | Rational>,
 			) -> Integer | Rational {
 				<- numbers::reduce(
 					startingWith numbers::firstItem(),
-					(greatest, number) {
-						if greatest::isGreaterThanOrEqualTo(number) {
-							<- greatest
+					(highest, number) {
+						if highest::isGreaterThanOrEqualTo(number) {
+							<- highest
 						} else {
 							<- number
 						}

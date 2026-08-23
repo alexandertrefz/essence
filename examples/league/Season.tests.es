@@ -69,7 +69,7 @@ tests {
 		§ The longest unbeaten run of the season — a question each row answers
 		§ about itself, asked of every row at once.
 		test "has Riverside unbeaten all season" {
-			constant longest = table::greatestItem(on (standing) {
+			constant longest = table::highestItem(on (standing) {
 				<- standing::unbeatenRun()
 			})
 

@@ -81,23 +81,23 @@ declarations {
 			}
 		}
 
-		§§ The greatest item.
+		§§ The highest item.
 		§§
-		§§ The empty List has no greatest item, and the `defaultingTo:` entry answers the given item in place of nothing.
-		overload greatestNumber {
-			§§ The greatest item.
+		§§ The empty List has no highest item, and the `defaultingTo:` entry answers the given item in place of nothing.
+		overload highestNumber {
+			§§ The highest item.
 			§§
-			§§ @returns — the greatest item, or nothing for the empty List.
+			§§ @returns — the highest item, or nothing for the empty List.
 			() -> Optional<Integer> {
-				<- Number.greatestNumber(@)
+				<- Number.highestNumber(@)
 			}
 
-			§§ The greatest item, or the given fallback for the empty List.
+			§§ The highest item, or the given fallback for the empty List.
 			§§
 			§§ @param defaultingTo — the item to answer with when there is none
-			§§ @returns — the greatest item, or the fallback in its place.
+			§§ @returns — the highest item, or the fallback in its place.
 			(defaultingTo fallback: Integer) -> Integer {
-				<- @::greatestNumber()::value(defaultingTo fallback)
+				<- @::highestNumber()::value(defaultingTo fallback)
 			}
 		}
 	}
@@ -161,23 +161,23 @@ declarations {
 			}
 		}
 
-		§§ The greatest item.
+		§§ The highest item.
 		§§
-		§§ The empty List has no greatest item, and the `defaultingTo:` entry answers the given item in place of nothing.
-		overload greatestNumber {
-			§§ The greatest item.
+		§§ The empty List has no highest item, and the `defaultingTo:` entry answers the given item in place of nothing.
+		overload highestNumber {
+			§§ The highest item.
 			§§
-			§§ @returns — the greatest item, or nothing for the empty List.
+			§§ @returns — the highest item, or nothing for the empty List.
 			() -> Optional<Rational> {
-				<- Number.greatestNumber(@)
+				<- Number.highestNumber(@)
 			}
 
-			§§ The greatest item, or the given fallback for the empty List.
+			§§ The highest item, or the given fallback for the empty List.
 			§§
 			§§ @param defaultingTo — the item to answer with when there is none
-			§§ @returns — the greatest item, or the fallback in its place.
+			§§ @returns — the highest item, or the fallback in its place.
 			(defaultingTo fallback: Rational) -> Rational {
-				<- @::greatestNumber()::value(defaultingTo fallback)
+				<- @::highestNumber()::value(defaultingTo fallback)
 			}
 		}
 	}
@@ -241,23 +241,23 @@ declarations {
 			}
 		}
 
-		§§ The greatest item.
+		§§ The highest item.
 		§§
-		§§ The empty List has no greatest item, and the `defaultingTo:` entry answers the given item in place of nothing.
-		overload greatestNumber {
-			§§ The greatest item.
+		§§ The empty List has no highest item, and the `defaultingTo:` entry answers the given item in place of nothing.
+		overload highestNumber {
+			§§ The highest item.
 			§§
-			§§ @returns — the greatest item, or nothing for the empty List.
+			§§ @returns — the highest item, or nothing for the empty List.
 			() -> Optional<Integer | Rational> {
-				<- Number.greatestNumber(@)
+				<- Number.highestNumber(@)
 			}
 
-			§§ The greatest item, or the given fallback for the empty List.
+			§§ The highest item, or the given fallback for the empty List.
 			§§
 			§§ @param defaultingTo — the item to answer with when there is none
-			§§ @returns — the greatest item, or the fallback in its place.
+			§§ @returns — the highest item, or the fallback in its place.
 			(defaultingTo fallback: Integer | Rational) -> Integer | Rational {
-				<- @::greatestNumber()::value(defaultingTo fallback)
+				<- @::highestNumber()::value(defaultingTo fallback)
 			}
 		}
 	}
@@ -342,7 +342,7 @@ declarations {
 		}
 	}
 
-	§ A List with an item in it has a lowest item, a greatest item and a mean,
+	§ A List with an item in it has a lowest item, a highest item and a mean,
 	§ so these three answer bare. Every other question the Namespaces above
 	§ answer is already total, and is not repeated here. Each body is the
 	§ delegation the general Namespaces write. The receiver carries its proof
@@ -355,11 +355,11 @@ declarations {
 			<- Number.lowestNumber(@)
 		}
 
-		§§ The greatest item, which a non-empty List always has.
+		§§ The highest item, which a non-empty List always has.
 		§§
-		§§ @returns — the greatest item.
-		greatestNumber() -> Integer {
-			<- Number.greatestNumber(@)
+		§§ @returns — the highest item.
+		highestNumber() -> Integer {
+			<- Number.highestNumber(@)
 		}
 
 		§§ The mean of the items: their total divided by their count.
@@ -378,11 +378,11 @@ declarations {
 			<- Number.lowestNumber(@)
 		}
 
-		§§ The greatest item, which a non-empty List always has.
+		§§ The highest item, which a non-empty List always has.
 		§§
-		§§ @returns — the greatest item.
-		greatestNumber() -> Rational {
-			<- Number.greatestNumber(@)
+		§§ @returns — the highest item.
+		highestNumber() -> Rational {
+			<- Number.highestNumber(@)
 		}
 
 		§§ The mean of the items: their total divided by their count.
@@ -401,11 +401,11 @@ declarations {
 			<- Number.lowestNumber(@)
 		}
 
-		§§ The greatest item, which a non-empty List always has.
+		§§ The highest item, which a non-empty List always has.
 		§§
-		§§ @returns — the greatest item.
-		greatestNumber() -> Integer | Rational {
-			<- Number.greatestNumber(@)
+		§§ @returns — the highest item.
+		highestNumber() -> Integer | Rational {
+			<- Number.highestNumber(@)
 		}
 
 		§§ The mean of the items: their total divided by their count.

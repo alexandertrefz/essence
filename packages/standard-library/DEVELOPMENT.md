@@ -173,7 +173,7 @@ wherever they stand: the golden capture is what stops the two from drifting.
 Writing another one means adding those lines too.
 
 Most of `NonEmptyList` is native, but not all of it. `sort(on:)` hands its key
-to the native `sort(by:)`, and `lowestItem(on:)` and `greatestItem(on:)` read
+to the native `sort(by:)`, and `lowestItem(on:)` and `highestItem(on:)` read
 `List`'s Optional answer off the native `firstItem()`. An Essence body can carry
 a proof another entry already holds; what it can not do is mint one.
 
