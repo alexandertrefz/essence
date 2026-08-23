@@ -640,10 +640,20 @@ declarations {
 		§§
 		§§ @returns — the List of remaining items.
 		overload removeEvery {
+			§§ Answers a new List without every item equal to the given one.
+			§§
+			§§ Equality is the items' own `is`. The entry is available whenever the items conform to `Equatable`.
+			§§
+			§§ @param _ — the item to remove
+			§§ @returns — the List of remaining items.
 			<infer ItemType is Equatable>(_ item: ItemType) -> List<ItemType> {
 				<- @::removeEvery(where (candidate) { <- candidate::is(item) })
 			}
 
+			§§ Answers a new List without every item the check accepts.
+			§§
+			§§ @param where — the check each item is offered to
+			§§ @returns — the List of the items the check rejects.
 			(where check: (_: ItemType) -> Boolean) -> List<ItemType> {
 				<- @::everyItem(where (item) { <- check(item)::negate() })
 			}
@@ -914,10 +924,20 @@ declarations {
 		§§
 		§§ @returns — the count.
 		overload count {
+			§§ Answers how many items equal the given one.
+			§§
+			§§ Equality is the items' own `is`. The entry is available whenever the items conform to `Equatable`.
+			§§
+			§§ @param of — the item to look for
+			§§ @returns — how many items equal it.
 			<infer ItemType is Equatable>(of item: ItemType) -> Integer {
 				<- @::count(where (candidate) { <- candidate::is(item) })
 			}
 
+			§§ Answers how many items the check accepts.
+			§§
+			§§ @param where — the check each item is offered to
+			§§ @returns — how many items the check accepts.
 			(where check: (_: ItemType) -> Boolean) -> Integer {
 				<- @::everyItem(where check)::length()
 			}
