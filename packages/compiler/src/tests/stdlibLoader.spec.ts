@@ -1930,12 +1930,22 @@ describe("Standard Library Loader", () => {
 	// It is also the guard on the two tables that read a leaf: the literal
 	// evaluator in `predicateEval.ts` and the generator's narrowing both hold
 	// PRIMITIVES alone, so the second list is exactly what they may ever be
-	// asked. A Method leaving it has to be added to them, and a Method joining
+	// asked. A Method JOINING the second list has to be added to them wherever
+	// they are meant to go on deciding it from a literal, and a Method LEAVING
 	// it makes a row of theirs unreachable.
 	//
+	// A `protocol` row is asked under the Namespace of whichever conformance
+	// answered, never under the Protocol's name. So `protocol Equatable::is`
+	// and `protocol Orderable::isLessThan` are asked as the conformer's own
+	// rows, which this list names in their own right, and
+	// `protocol Orderable::isBetween`, which no Namespace declares, is what
+	// `Integer::isBetween`, `Rational::isBetween` and `Number::isBetween` in
+	// the literal evaluator stand for. The narrowing table holds no `isBetween`
+	// row at all.
+	//
 	// A body that reads a CHAIN is a question of its own, which is why
-	// `isEmpty`, `isEven`, `isWholeNumber` and the four comparisons written on
-	// `compare` stay here. So does `isBetween`, written as two comparisons
+	// `isEmpty`, `isEven`, `isWholeNumber` and the strict comparisons written
+	// on `compare` stay here. So does `isBetween`, written as two comparisons
 	// joined, and `hasItems(where:)`, whose Argument is a Function.
 	it("reads every predicate the standard library writes off its body", () => {
 		let stdlib = loadStdlib()

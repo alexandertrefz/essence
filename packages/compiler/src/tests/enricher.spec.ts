@@ -7734,6 +7734,49 @@ describe("Enricher", () => {
 				).toBe("Big")
 			})
 
+			// NOTE: The standard library's own `doesNot` Methods are of this
+			// shape, and String and List are two of the four bases a `where`
+			// clause may be written on. So the `else` of `contains` proves a
+			// refinement written on the contrary, over the very bound the
+			// condition asked about.
+			it("should narrow the else of a String the standard library forwards", () => {
+				expect(
+					narrowedTypeOf(
+						`implementation {
+							type Clean = String where @::doesNotContain("x")
+
+							constant s = "abc"
+
+							if s::contains("x") {
+								Terminal.inspect(0)
+							} else {
+								Terminal.inspect(s)
+							}
+						}`,
+						"s",
+					),
+				).toBe("Clean")
+			})
+
+			it("should narrow the else of a List the standard library forwards", () => {
+				expect(
+					narrowedTypeOf(
+						`implementation {
+							type Clean = List<String> where @::doesNotContain("x")
+
+							constant l = ["a", "b"]
+
+							if l::contains("x") {
+								Terminal.inspect(0)
+							} else {
+								Terminal.inspect(l)
+							}
+						}`,
+						"l",
+					),
+				).toBe("Clean")
+			})
+
 			// NOTE: The bound is the CALL's, not the body's — two calls of one
 			// alias with different Arguments are two questions.
 			it("should not narrow where the bounds differ", () => {
@@ -8017,14 +8060,35 @@ describe("Enricher", () => {
 					chainedTypeOf(["B", "C", "A"]),
 					chainedTypeOf(["C", "A", "B"]),
 					chainedTypeOf(["C", "B", "A"]),
-				]).toEqual([
-					"Over",
-					"Over",
-					"Over",
-					"Over",
-					"Over",
-					"Over",
-				])
+				]).toEqual(["Over", "Over", "Over", "Over", "Over", "Over"])
+			})
+
+			// NOTE: A chain is no alias at all, however short. `@::absolute()`
+			// is an intermediate value whose evidence is nobody's to read here,
+			// so the `if` proves nothing about `d` and the refinement written
+			// on the comparison is out of reach. This is the rule that keeps
+			// the standard library's `isEmpty` a question of its own.
+			it("should leave a chained body a question of its own", () => {
+				expect(
+					narrowedTypeOf(
+						`implementation {
+							namespace Rank for Integer {
+								isBigger(than n: Integer) -> Boolean {
+									<- @::absolute()::isGreaterThan(n)
+								}
+							}
+
+							type Above = Integer where @::isGreaterThan(3)
+
+							constant d = 12
+
+							if d::isBigger(than 3) {
+								Terminal.inspect(d)
+							}
+						}`,
+						"d",
+					),
+				).toBe("Integer")
 			})
 
 			// NOTE: Two Methods written as each other's contrary say nothing
@@ -8140,32 +8204,58 @@ describe("Enricher", () => {
 				).toBe("Above")
 			})
 
-			// NOTE: The chain above crosses the witness: the Protocol sees a
-			// REQUIREMENT where the conformer wrote a body, so the reading takes
-			// one step through whichever Namespace answered. A body whose last
-			// call is not on `@` is no alias at all, and this one is the same
-			// Namespace's.
-			it("should leave a chained body a question of its own", () => {
-				expect(
-					narrowedTypeOf(
-						`implementation {
-							namespace Rank for Integer {
-								isBigger(than n: Integer) -> Boolean {
-									<- @::absolute()::isGreaterThan(n)
-								}
+			// NOTE: A leaf naming an OVERLOADED Method stops there. Which
+			// entry of an Overload a leaf means is the Arguments' business,
+			// and a leaf carries scalars rather than the typed, labelled
+			// Arguments an Overload is chosen by. So the requirement is as far
+			// as the leaf goes: the comparison the conformer wrote is out of
+			// reach, while a refinement written on the provided Method itself
+			// is not.
+			it("should stop at an Overload the witness answers with", () => {
+				const RANKED = `protocol Ranked {
+						isAbove(_ n: Integer) -> Boolean
+
+						isAtMost(_ n: Integer) -> Boolean {
+							<- @::isAbove(n)::negate()
+						}
+					}
+
+					namespace Rank for Integer is Ranked {
+						overload isAbove {
+							(_ n: Integer) -> Boolean {
+								<- @::isGreaterThan(n)
 							}
 
-							type Above = Integer where @::isGreaterThan(3)
+							(_ n: Rational) -> Boolean {
+								<- @::isGreaterThan(n)
+							}
+						}
+					}`
+
+				function narrowedThrough(
+					refinement: string,
+					proven = false,
+				): string {
+					return narrowedTypeOf(
+						`implementation {
+							${RANKED}
+
+							type Above = Integer where ${refinement}
 
 							constant d = 12
 
-							if d::isBigger(than 3) {
-								Terminal.inspect(d)
+							if d::isAtMost(3) {
+								Terminal.inspect(${proven ? "d" : "0"})
+							} else {
+								Terminal.inspect(${proven ? "0" : "d"})
 							}
 						}`,
 						"d",
-					),
-				).toBe("Integer")
+					)
+				}
+
+				expect(narrowedThrough("@::isGreaterThan(3)")).toBe("Integer")
+				expect(narrowedThrough("@::isAtMost(3)", true)).toBe("Above")
 			})
 
 			// NOTE: And `Orderable`'s own provided bodies reach a witness the

@@ -231,6 +231,9 @@ declarations {
 		doesNotContain<infer ItemType is Equatable>(
 			_ item: ItemType,
 		) -> Boolean {
+			§ This body is read as well as run. It asks `contains`
+			§ negated, over whatever item the call writes. See
+			§ DEVELOPMENT.md, Why bodies look the way they do.
 			<- @::contains(item)::negate()
 		}
 

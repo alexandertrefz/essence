@@ -454,7 +454,13 @@ writes the ordering BACKWARDS — `<- other::isGreaterThanOrEqualTo(@)`, which i
 how `Integer` answers a Rational bound — is read as the converse of what it
 asks, under the same guard the ordering's law is read under: both the Namespace
 that answered and the Namespace the body is in have to be the base's own or the
-covering `Number`.
+covering `Number`. A reading whose leaf names the very Method it was read off
+says nothing and is left primitive, whichever shape produced it. That is why
+Integer's flipped `isLessThan` and `isGreaterThan` entries stay questions of
+their own while its flipped `…OrEqualTo` entries do not: the leaf is taken
+AFTER the target's own reading is folded in, and `Rational::isGreaterThan` is a
+question of its own where `Rational::isGreaterThanOrEqualTo` is `isLessThan`
+negated.
 
 A chain is followed to the end whichever order the Methods were written in, and
 a ring of Methods written as each other's contraries is left alone rather than
@@ -468,11 +474,15 @@ narrows to, so `isZero` may not become `@::compare(to 0)::is(#Equal)` without
 weighing that. And a body that CHAINS is a question of its own for the same
 reason: `isEmpty` is `@::length()::is(0)`, which is why the negations of
 `List::isEmpty` and `String::isEmpty` are read from them rather than the other
-way round. `isEven`, `isWholeNumber`, `isBetween` and the four comparisons
+way round. `isEven`, `isWholeNumber`, `isBetween` and the strict comparisons
 written on `compare` stay questions of their own for that reason too — the
 census in `packages/compiler/src/tests/stdlibLoader.spec.ts` is the whole list,
 and the literal evaluator and the generator's narrowing may only ever be asked
-what is on it.
+what is on it. A `protocol` row on that list is asked under the Namespace of
+whichever conformance answered rather than under the Protocol's name, so
+`protocol Orderable::isBetween` is what the `Integer::isBetween`,
+`Rational::isBetween` and `Number::isBetween` rows of the literal evaluator
+stand for.
 
 **A body pulls its whole transitive reach into every bundle.** A Method is
 emitted into a Program that reaches it, and so is everything its body calls.
