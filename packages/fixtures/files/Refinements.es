@@ -166,6 +166,117 @@ implementation {
 		<- zero::toString()
 	}
 
+	§ Every predicate above is one the standard library wrote. A Program's own
+	§ read exactly alike, because the rule is about the BODY and not about the
+	§ name: a Method answering a Boolean whose whole body is one call on `@`
+	§ asks whatever that call asks. Nothing is declared, and nothing is named
+	§ in a table — so it holds of a predicate that TAKES Arguments too, with
+	§ whatever the caller wrote standing in for the Arguments the body handed
+	§ on.
+	namespace Stock for Integer {
+		§ One call on `@`, forwarding the count it was given. `isAtLeast(5)`
+		§ therefore asks what `isGreaterThanOrEqualTo(5)` asks — and
+		§ `isAtLeast(4)` asks something else, because the bound belongs to the
+		§ CALL rather than to the body.
+		isAtLeast(_ count: Integer) -> Boolean {
+			<- @::isGreaterThanOrEqualTo(count)
+		}
+
+		§ The same call, negated. So these two Methods are one question with
+		§ two answers, which is the whole of what the doorway below needs.
+		isBelow(_ count: Integer) -> Boolean {
+			<- @::isGreaterThanOrEqualTo(count)::negate()
+		}
+
+		§ A forwarded Parameter beside a value written down — both reach the
+		§ question underneath, so `isUpTo(9)` asks `isBetween(1, and 9)`.
+		isUpTo(_ ceiling: Integer) -> Boolean {
+			<- @::isBetween(1, and ceiling)
+		}
+	}
+
+	§ A refinement on a Program's own predicate is a refinement on the question
+	§ that predicate asks, so the first two below prove contrary things and
+	§ nothing had to declare it: each is the comparison its body named, and one
+	§ of them is the other with the answer turned round.
+	type Healthy = Integer where @::isAtLeast(5)
+
+	type Depleted = Integer where @::isBelow(5)
+
+	type Small = Integer where @::isUpTo(9)
+
+	§ Which is what makes BOTH branches of one `if` carry evidence. The
+	§ condition asks `isBelow`, so the branch where it held has a `Depleted`
+	§ and the ELSE branch has a `Healthy` — and that second half is the one
+	§ nothing could write before, because a predicate taking an Argument had
+	§ no contrary to be read as.
+	function restocked(_ units: Integer) -> Integer {
+		if units::isBelow(5) {
+			<- refilled(units)
+		} else {
+			<- shipped(units)
+		}
+	}
+
+	function refilled(_ units: Depleted) -> Integer {
+		<- units::add(5)
+	}
+
+	function shipped(_ units: Healthy) -> Integer {
+		<- units::subtract(1)
+	}
+
+	§ And the plain direction, where the branch that PROVED the predicate is
+	§ the one that reaches the Function asking for it.
+	function scaledOrZero(_ n: Integer) -> Integer {
+		if n::isUpTo(9) {
+			<- scaled(n)
+		}
+
+		<- 0
+	}
+
+	function scaled(_ n: Small) -> Integer {
+		<- n::multiply(with 10)
+	}
+
+	§ A value written down decides a Program's own predicate exactly as it
+	§ decides the standard library's, since what it is asked is one comparison
+	§ either way.
+	constant stocked: Healthy = 20
+
+	§ A Protocol writes a body once for everything that conforms to it, and it
+	§ is read there. `isAtMost` is `isAbove` negated, whoever answers `isAbove`
+	§ — so the question is the CONFORMER's, and `Rank` answers it with a
+	§ comparison. That is what the `else` below has proven.
+	protocol Ranked {
+		isAbove(_ mark: Integer) -> Boolean
+
+		isAtMost(_ mark: Integer) -> Boolean {
+			<- @::isAbove(mark)::negate()
+		}
+	}
+
+	namespace Rank for Integer is Ranked {
+		isAbove(_ mark: Integer) -> Boolean {
+			<- @::isGreaterThan(mark)
+		}
+	}
+
+	type Above = Integer where @::isGreaterThan(3)
+
+	function ranked(_ n: Integer) -> String {
+		if n::isAtMost(3) {
+			<- "low"
+		} else {
+			<- placement(n)
+		}
+	}
+
+	function placement(_ n: Above) -> String {
+		<- n::toString()
+	}
+
 	§ A value written DOWN is its own evidence: the predicate is decided while
 	§ compiling, so no branch stands in front of this and nothing has asked
 	§ anything. The doorways above are for the values a Program is HANDED.
@@ -222,4 +333,17 @@ implementation {
 	Terminal.inspect(digitOrZero("seven"))
 	Terminal.inspect(doubledOrNamed(21))
 	Terminal.inspect(doubledOrNamed(0))
+
+	§ A Program's own predicates, asked of ordinary values, and the doorways
+	§ their contraries open.
+	Terminal.inspect(12::isAtLeast(5))
+	Terminal.inspect(3::isBelow(5))
+	Terminal.inspect(7::isUpTo(9))
+	Terminal.inspect(shipped(stocked))
+	Terminal.inspect(restocked(12))
+	Terminal.inspect(restocked(3))
+	Terminal.inspect(scaledOrZero(7))
+	Terminal.inspect(scaledOrZero(12))
+	Terminal.inspect(ranked(12))
+	Terminal.inspect(ranked(3))
 }
