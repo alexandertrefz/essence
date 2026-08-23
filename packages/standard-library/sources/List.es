@@ -1093,6 +1093,38 @@ declarations {
 		flatten() -> List<ItemType>
 	}
 
+	§ A List of Optionals, and the one Method only such a List can answer. Its
+	§ `ItemType` binds to the payload Type, so `values()` answers a
+	§ `List<Integer>` for a `List<Optional<Integer>>`. No Protocol bound can
+	§ name a Type that is not in the signature. That is why it is not a Method
+	§ of `List`, for the reason `flatten` is not.
+	§
+	§ Written in Essence on `reduce` and `append`, which is the shape
+	§ `removeDuplicates` has and reaches only `List`'s own primitives. A native
+	§ would fill one Array of the answer's own size instead of a box per kept
+	§ item. Neither saves the other a walk.
+	§
+	§ There is no proven twin. A List with something in it can hold nothing but
+	§ empty Optionals, so a proof about the receiver says nothing about the
+	§ answer.
+	namespace OptionalList<infer ItemType> for List<Optional<ItemType>> {
+		§§ Answers the values the Optionals hold, in order.
+		§§
+		§§ The empty Optionals are left out, so the answer can be shorter than the receiver. A List of empty Optionals answers the empty List.
+		§§
+		§§ @returns — the List of values.
+		values() -> List<ItemType> {
+			constant kept: List<ItemType> = []
+
+			<- @::reduce(startingWith kept, (accumulated, item) {
+				<- match item -> List<ItemType> {
+					case #Value(value) { <- accumulated::append(value) }
+					case #Empty        { <- accumulated }
+				}
+			})
+		}
+	}
+
 	§ The Methods the proof changes. A NonEmptyList already answers every
 	§ Method of `List`. A Namespace of its own is for the Methods that answer
 	§ better for having the proof.
@@ -1340,4 +1372,5 @@ export {
 	NestedList
 	NonEmptyList
 	NonEmptyNestedList
+	OptionalList
 }

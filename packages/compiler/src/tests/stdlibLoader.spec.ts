@@ -1078,6 +1078,7 @@ describe("Standard Library Loader", () => {
 			"String",
 			"List",
 			"NestedList",
+			"OptionalList",
 			"Optional",
 			"NestedOptional",
 			"Ordering",
@@ -1377,6 +1378,9 @@ describe("Standard Library Loader", () => {
 			// searched FIRST for a `List<List<…>>` receiver and for a proven
 			// one, so that the narrow Namespace reads as the extra it is.
 			"NestedList",
+			// NOTE: And the Namespace a List of Optionals reaches, beside it
+			// and for the same reason — see `builtinMemberOrder`.
+			"OptionalList",
 			"NonEmptyList",
 			// NOTE: And the Namespace a List reaches only with both proofs in
 			// hand, after both of the Namespaces it narrows — see

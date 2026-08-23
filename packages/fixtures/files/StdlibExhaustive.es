@@ -2846,6 +2846,22 @@ third"::lines())
 	show("NestedList.flatten<ItemType>()", [[1, 2], [3]]::flatten())
 	show("NestedList.flatten<ItemType>() [empty]", noNestedNumbers::flatten())
 
+	§ ——— OptionalList —————————————————————————————————————————————————————
+	§ The Namespace a List of Optionals reaches, as `NestedList` is the one a
+	§ List of Lists reaches. Each receiver is declared, because the item Type
+	§ is what puts the Namespace in reach.
+	constant someMaybes: List<Optional<Integer>> = [
+		#Value(1),
+		#Empty,
+		#Value(3),
+	]
+	constant allEmpty: List<Optional<Integer>>   = [#Empty, #Empty]
+	constant noMaybes: List<Optional<Integer>>   = []
+
+	show("OptionalList.values<ItemType>()", someMaybes::values())
+	show("OptionalList.values<ItemType>() [all empty]", allEmpty::values())
+	show("OptionalList.values<ItemType>() [empty]", noMaybes::values())
+
 	§ ——— NonEmptyList —————————————————————————————————————————————————————————
 	§ The Methods a List has to have been PROVEN to answer. A List written down
 	§ with something in it is its own proof, so each receiver is declared and
