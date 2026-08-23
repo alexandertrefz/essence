@@ -867,6 +867,79 @@ describe("Hover inside a Protocol or Choice declaration", () => {
 			"firstItem<ItemType>() -> ItemType",
 		)
 	})
+
+	// NOTE: A predicate that TAKES Arguments is read off its body like every
+	// other one, so a refinement written on a Program's own reads back as the
+	// name it was given — and the ELSE branch of the Method written as its
+	// contrary is where a value has it. Neither Method was declared to be the
+	// other's opposite: `isBelow` is `isAtLeast` negated because that is what
+	// the two bodies say, over the bound the CALL wrote.
+	it("should describe a value a Program's own parameterised predicate proved", () => {
+		let source = [
+			"implementation {",
+			"\tnamespace Stock for Integer {",
+			"\t\tisAtLeast(_ count: Integer) -> Boolean {",
+			"\t\t\t<- @::isGreaterThanOrEqualTo(count)",
+			"\t\t}",
+			"",
+			"\t\tisBelow(_ count: Integer) -> Boolean {",
+			"\t\t\t<- @::isGreaterThanOrEqualTo(count)::negate()",
+			"\t\t}",
+			"\t}",
+			"",
+			"\ttype Healthy = Integer where @::isAtLeast(5)",
+			"",
+			"\tconstant units = 12",
+			"",
+			"\tif units::isBelow(5) {",
+			"\t\tTerminal.inspect(0)",
+			"\t} else {",
+			"\t\tTerminal.inspect(units)",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(hover(source, { line: 12, column: 7 })).toBe("Healthy: Integer")
+		expect(hover(source, { line: 16, column: 6 })).toBe("units: Integer")
+		expect(hover(source, { line: 19, column: 21 })).toBe("units: Healthy")
+	})
+
+	// NOTE: And a PROTOCOL's provided body is read where it is written, with
+	// the conformer filling in what it asks — `Rank` answers `isAbove` with a
+	// comparison, so the `else` of `isAtMost` proves the refinement written on
+	// that comparison rather than one written on the Protocol's own name.
+	it("should describe a value a Protocol's provided predicate proved", () => {
+		let source = [
+			"implementation {",
+			"\tprotocol Ranked {",
+			"\t\tisAbove(_ mark: Integer) -> Boolean",
+			"",
+			"\t\tisAtMost(_ mark: Integer) -> Boolean {",
+			"\t\t\t<- @::isAbove(mark)::negate()",
+			"\t\t}",
+			"\t}",
+			"",
+			"\tnamespace Rank for Integer is Ranked {",
+			"\t\tisAbove(_ mark: Integer) -> Boolean {",
+			"\t\t\t<- @::isGreaterThan(mark)",
+			"\t\t}",
+			"\t}",
+			"",
+			"\ttype Above = Integer where @::isGreaterThan(3)",
+			"",
+			"\tconstant score = 12",
+			"",
+			"\tif score::isAtMost(3) {",
+			"\t\tTerminal.inspect(0)",
+			"\t} else {",
+			"\t\tTerminal.inspect(score)",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(hover(source, { line: 16, column: 7 })).toBe("Above: Integer")
+		expect(hover(source, { line: 23, column: 21 })).toBe("score: Above")
+	})
 })
 
 describe("Hover of conformance clauses", () => {
@@ -1412,6 +1485,32 @@ describe("Hover over a written receiver", () => {
 
 		expect(hover(source, { line: 5, column: 17 })).toBe(
 			"Integer where @::isNot(0)::and(@::isEven())::and(@::isPositive())::and(@::isGreaterThan(10))::and(@::isGreaterThanOrEqualTo(0))",
+		)
+	})
+
+	// NOTE: And each conjunct is spelled the way the reader WROTE it, not the
+	// way it resolved. `@::isAtLeast(5)` is a Program's own predicate over a
+	// forwarded bound, and what it asks is `@::isLessThan(5)` negated —
+	// `@::isGreaterThanOrEqualTo(0)` beside it is the standard library's own
+	// of the same shape. A conjunction naming the leaves would be a Type
+	// nobody in the source wrote.
+	it("spells each conjunct as its predicate was written", () => {
+		let source = [
+			"implementation {",
+			"	namespace Stock for Integer {",
+			"		isAtLeast(_ count: Integer) -> Boolean {",
+			"			<- @::isGreaterThanOrEqualTo(count)",
+			"		}",
+			"	}",
+			"",
+			"	type Healthy = Integer where @::isAtLeast(5)",
+			"",
+			"	constant next = 12::add(1)",
+			"}",
+		].join("\n")
+
+		expect(hover(source, { line: 10, column: 18 })).toBe(
+			"Integer where @::isNot(0)::and(@::isPositive())::and(@::isGreaterThanOrEqualTo(0))::and(@::isAtLeast(5))",
 		)
 	})
 
