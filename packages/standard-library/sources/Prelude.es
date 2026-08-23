@@ -18,6 +18,7 @@ export {
 	NestedList              from "./List.es"
 	NonEmptyList            from "./List.es"
 	NonEmptyNestedList      from "./List.es"
+	OptionalList            from "./List.es"
 	loop                    from "./Loop.es"
 	Irrational              from "./Number.es"
 	Number                  from "./Number.es"

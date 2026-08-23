@@ -381,6 +381,10 @@ export type NestedListNatives = {
 	flatten: <ItemType extends AnyType>(self: ListType<ListType<ItemType>>) => ListType<ItemType>
 }
 
+export type OptionalListNatives = {
+
+}
+
 export type NonEmptyListNatives = {
 	// firstItem<ItemType>() -> ItemType
 	firstItem: <ItemType extends AnyType>(self: ListType<ItemType>) => ItemType
@@ -692,6 +696,10 @@ export const $NestedList: NestedListNatives = NestedListModule
 export const $NestedListArity: AssertArities<typeof import("./NestedList"), {
 	flatten: 1
 }> = true
+
+declare const OptionalListModule: typeof import("./OptionalList")
+export const $OptionalList: OptionalListNatives = OptionalListModule
+export const $OptionalListAbsent: AssertNoEssenceExports<typeof import("./OptionalList"), "values"> = true
 
 declare const NonEmptyListModule: typeof import("./NonEmptyList")
 export const $NonEmptyList: NonEmptyListNatives = NonEmptyListModule

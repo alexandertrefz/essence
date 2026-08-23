@@ -87,7 +87,13 @@ export const builtinMemberOrder: Array<string> = [
 	// Method name are separated by target specificity, where the nested target
 	// beats the flat one regardless of this order.
 	"NestedList",
-	// NOTE: And after both, for the third time and the same reason. `NonEmptyList`
+	// NOTE: And beside it, for the same reason and the same distance from
+	// `List` — `OptionalList` narrows a List by what its items ARE, exactly as
+	// `NestedList` does, so `List` has to be met first here too. It shares no
+	// Method name with any Namespace above or below it, so its position decides
+	// only where `values` is offered.
+	"OptionalList",
+	// NOTE: And after those, for the third time and the same reason. `NonEmptyList`
 	// targets a refinement of `List`, and its `firstItem`/`lastItem` are named by
 	// `List` as well — so `List` has to be met FIRST, or Completion on any List
 	// would offer the total pair that only a proven List can answer. Which
@@ -101,7 +107,7 @@ export const builtinMemberOrder: Array<string> = [
 	// too. Both have to be met FIRST, or Completion on a nested List would
 	// offer the total `flatten` that only two proofs can answer.
 	"NonEmptyNestedList",
-	// NOTE: And after all four, for the same reason a fifth time. Each of
+	// NOTE: And after all of them, for the same reason once more. Each of
 	// these targets a List of a particular Number Type — `List<Integer>`,
 	// `List<Rational>`, the mixed `List<Integer | Rational>` and the proven
 	// forms of the three — so `List` has to be met FIRST, and each general one

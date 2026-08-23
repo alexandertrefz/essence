@@ -25,6 +25,7 @@ import * as number from "@essence-lang/runtime/Number"
 import * as numberFormat from "@essence-lang/runtime/NumberFormat"
 import * as numberList from "@essence-lang/runtime/NumberList"
 import * as optional from "@essence-lang/runtime/Optional"
+import * as optionalList from "@essence-lang/runtime/OptionalList"
 import * as ordering from "@essence-lang/runtime/Ordering"
 import * as randomness from "@essence-lang/runtime/Randomness"
 import * as rational from "@essence-lang/runtime/Rational"
@@ -69,6 +70,7 @@ const runtimeModules: Record<string, Record<string, unknown>> = {
 	Record: record,
 	List: list,
 	NestedList: nestedList,
+	OptionalList: optionalList,
 	NonEmptyList: nonEmpty,
 	NonEmptyNestedList: nonEmptyNestedList,
 	IntegerList: integerList,
