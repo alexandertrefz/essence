@@ -507,6 +507,7 @@ describe("Stdlib Call Graph", () => {
 			"Integer.isLessThanOrEqualTo__overload$2",
 			"Integer.isLessThan__overload$1",
 			"Integer.isLessThan__overload$2",
+			"Integer.isMultiple",
 			"Integer.isNegative",
 			"Integer.isNot__overload$1",
 			"Integer.isNot__overload$2",

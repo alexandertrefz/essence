@@ -540,6 +540,19 @@ third"::lines())
 	show("Integer.isZero()", 0::isZero())
 	show("Integer.isZero() [non zero]", 1::isZero())
 	show("Integer.isWholeNumber()", 5::isWholeNumber())
+	show("Integer.isMultiple(of: Integer)", 9::isMultiple(of computedThree))
+	show(
+		"Integer.isMultiple(of: Integer) [not a multiple]",
+		10::isMultiple(of computedThree),
+	)
+	show(
+		"Integer.isMultiple(of: Integer) [zero is a multiple of every Integer]",
+		computedZero::isMultiple(of computedThree),
+	)
+	show(
+		"Integer.isMultiple(of: Integer) [by zero]",
+		9::isMultiple(of computedZero),
+	)
 	show(
 		"Integer.remainder(dividingBy: Integer)",
 		7::remainder(dividingBy computedThree),
