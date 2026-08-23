@@ -2,7 +2,9 @@ import { caseDefaults } from "@essence-lang/compiler/helpers"
 import { printType } from "@essence-lang/compiler/printType"
 import type { common } from "@essence-lang/interfaces"
 
+import { typedAssertionExpressions } from "./assertionChildren"
 import { typedHandlerExpressions } from "./matchHandlerChildren"
+import { typedProgramBodies } from "./sections"
 
 // NOTE: Inlay Hints annotate whatever carries no Type annotation with the Type
 // it was inferred as — Constant and Variable declarations, and the Parameters
@@ -55,7 +57,9 @@ export function findInlayHints(
 ): Array<InlayHint> {
 	let hints: Array<InlayHint> = []
 
-	visitBody(program.implementation.nodes, hints)
+	for (let body of typedProgramBodies(program)) {
+		visitBody(body, hints)
+	}
 
 	if (range === null) {
 		return hints
@@ -148,6 +152,13 @@ function visitNode(
 			return
 		case "ReturnStatement":
 			visitNode(node.expression, hints)
+			return
+		case "ExpectStatement":
+		case "RequireStatement":
+			for (let expression of typedAssertionExpressions(node)) {
+				visitNode(expression, hints)
+			}
+
 			return
 		case "FunctionInvocation":
 			visitNode(node.name, hints)

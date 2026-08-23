@@ -5,8 +5,10 @@ import {
 } from "@essence-lang/compiler/helpers"
 import type { common } from "@essence-lang/interfaces"
 
+import { typedAssertionExpressions } from "./assertionChildren"
 import { typedHandlerExpressions } from "./matchHandlerChildren"
 import { contains, isSmaller } from "./positions"
+import { typedProgramBodies } from "./sections"
 
 // NOTE: Two completion contexts need to know what is *expected* at the
 // cursor rather than what is in Scope:
@@ -73,7 +75,9 @@ export function findArgumentContext(
 		lines,
 	}
 
-	visitBody(program.implementation.nodes, null, state)
+	for (let body of typedProgramBodies(program)) {
+		visitBody(body, null, state)
+	}
 
 	return state.best
 }
@@ -161,6 +165,16 @@ function visitNode(
 			return
 		case "ReturnStatement":
 			visitNode(node.expression, expected, state)
+			return
+		// NOTE: An assertion holds its Expressions directly — there is no body
+		// to descend into — so without this an Argument being written inside a
+		// test body has no context at all. See `assertionChildren.ts`.
+		case "ExpectStatement":
+		case "RequireStatement":
+			for (let expression of typedAssertionExpressions(node)) {
+				visitNode(expression, null, state)
+			}
+
 			return
 		case "RecordValue":
 			visitRecordValue(node, expected, state, true)

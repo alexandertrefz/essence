@@ -20,6 +20,11 @@ import type { common, parser } from "@essence-lang/interfaces"
 import { documentationOf, renderDocumentation } from "./documentation"
 import { typedHandlerExpressions } from "./matchHandlerChildren"
 import { contains, isSmaller } from "./positions"
+import {
+	programNodes,
+	typedProgramNodes,
+	typedProgramSections,
+} from "./sections"
 
 // NOTE: Hovers are resolved on the enriched AST — every Expression carries
 // its inferred Type there. The smallest typed node containing the cursor
@@ -55,7 +60,7 @@ function protocolsOf(
 		...builtinProtocols(),
 	}
 
-	for (let node of program.implementation.nodes) {
+	for (let node of typedProgramNodes(program)) {
 		if (node.nodeType === "ProtocolDeclarationStatement") {
 			protocols[node.name.content] = node.protocolType
 		}
@@ -95,7 +100,19 @@ export function findHover(
 		protocols: protocolsOf(program),
 	}
 
-	visitBody(program.implementation.nodes, state)
+	// NOTE: Every body the Program holds — see `sections.ts`. Without this a
+	// Hover inside a test body answered with nothing at all, while every Type in
+	// it was sitting in the typed tree.
+	for (let section of typedProgramSections(program)) {
+		visitBody([...section.head, ...section.nodes], state)
+
+		// NOTE: `for any (a: Integer)` names a value no Statement declares, so
+		// the Parameter answers for its own span here — the Type is the whole of
+		// what says what the runner generates.
+		for (let property of section.properties) {
+			consider(state, property.position, property.type, property.name)
+		}
+	}
 
 	if (parserProgram !== null) {
 		visitNativeSignatures(parserProgram, program, state)
@@ -572,6 +589,27 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 		case "ReturnStatement":
 			consider(state, node.position, node.expression.type, null)
 			visitNode(node.expression, state)
+			return
+		// NOTE: What the Matcher of a `require MATCHER = EXPR` proved, spelled
+		// out the way a Match Handler's is — the Case with its payload, at the
+		// span the Matcher was written. The asserted value is the Constant
+		// holding it there, whose synthesized name answers for nothing; what the
+		// Matcher BOUND is a Constant of its own, standing in the body below.
+		case "ExpectStatement":
+		case "RequireStatement":
+			if (
+				node.matcher !== null &&
+				node.matcher.matcher.type === "Case" &&
+				wins(state, node.matcher.matcherPosition)
+			) {
+				state.best = {
+					position: node.matcher.matcherPosition,
+					content: printCaseWithPayload(node.matcher.matcher),
+					documentation: null,
+				}
+			}
+
+			visitNode(node.value, state)
 			return
 		case "Identifier":
 			// NOTE: A Pattern's bindings read off a Constant the Compiler
@@ -1133,7 +1171,7 @@ function namespaceTypesOf(
 ): Map<string, common.NamespaceType> {
 	let types = new Map<string, common.NamespaceType>()
 
-	for (let node of program.implementation.nodes) {
+	for (let node of typedProgramNodes(program)) {
 		if (node.nodeType === "NamespaceDefinitionStatement") {
 			types.set(node.name.content, node.type)
 		}
@@ -1198,7 +1236,7 @@ function visitNativeSignatures(
 ) {
 	let namespaceTypes = namespaceTypesOf(program)
 
-	for (let node of parserProgram.implementation.nodes) {
+	for (let node of programNodes(parserProgram)) {
 		if (node.nodeType !== "NamespaceDefinitionStatement") {
 			continue
 		}
@@ -1347,13 +1385,13 @@ function visitProtocolBodies(
 ) {
 	let protocolTypes = new Map<string, common.ProtocolType>()
 
-	for (let node of program.implementation.nodes) {
+	for (let node of typedProgramNodes(program)) {
 		if (node.nodeType === "ProtocolDeclarationStatement") {
 			protocolTypes.set(node.name.content, node.protocolType)
 		}
 	}
 
-	for (let node of parserProgram.implementation.nodes) {
+	for (let node of programNodes(parserProgram)) {
 		if (node.nodeType !== "ProtocolDeclarationStatement") {
 			continue
 		}
@@ -1430,7 +1468,7 @@ function visitChoicePayloads(
 ) {
 	let choiceCases = new Map<string, Map<string, common.CaseType>>()
 
-	for (let node of program.implementation.nodes) {
+	for (let node of typedProgramNodes(program)) {
 		if (node.nodeType === "ChoiceDeclarationStatement") {
 			choiceCases.set(
 				node.name.content,
@@ -1444,7 +1482,7 @@ function visitChoicePayloads(
 		}
 	}
 
-	for (let node of parserProgram.implementation.nodes) {
+	for (let node of programNodes(parserProgram)) {
 		if (node.nodeType !== "ChoiceDeclarationStatement") {
 			continue
 		}

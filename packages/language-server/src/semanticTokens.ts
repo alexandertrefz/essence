@@ -5,8 +5,10 @@ import {
 } from "@essence-lang/compiler/helpers"
 import type { common, parser } from "@essence-lang/interfaces"
 
+import { assertionExpressions } from "./assertionChildren"
 import { methodsOf, nativeSignaturesOf } from "./namespaceMembers"
 import { type DeclarationKind, indexProgram, type ProgramIndex } from "./rename"
+import { programBodies } from "./sections"
 
 // NOTE: Semantic Tokens classify Identifiers by what they actually resolve
 // to, which the TextMate grammar cannot do — it has no way to tell a
@@ -119,7 +121,11 @@ export function findSemanticTokens(
 	let { index } = programIndex ?? indexProgram(program, enrichedProgram)
 	let tokens: Array<SemanticToken> = []
 
-	collectCases(program.implementation.nodes, tokens)
+	// NOTE: Every body the Program holds, the tests section's included — a Case
+	// written in a test body is as much a Case as one written above it.
+	for (let body of programBodies(program)) {
+		collectCases(body, tokens)
+	}
 
 	for (let occurrence of index) {
 		let { position, declaration } = occurrence
@@ -316,6 +322,13 @@ function collectCasesFromNode(
 			return
 		case "ReturnStatement":
 			collectCasesFromNode(node.expression, tokens)
+			return
+		case "ExpectStatement":
+		case "RequireStatement":
+			for (let expression of assertionExpressions(node)) {
+				collectCasesFromNode(expression, tokens)
+			}
+
 			return
 		case "IfStatement":
 			collectCasesFromNode(node.condition, tokens)

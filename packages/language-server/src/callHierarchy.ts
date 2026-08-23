@@ -5,6 +5,10 @@ import {
 } from "@essence-lang/compiler/helpers"
 import type { common, parser } from "@essence-lang/interfaces"
 
+import {
+	assertionExpressions,
+	typedAssertionExpressions,
+} from "./assertionChildren"
 import { typedHandlerExpressions } from "./matchHandlerChildren"
 import { isAtOrBefore } from "./positions"
 import {
@@ -13,6 +17,7 @@ import {
 	occurrenceAt,
 	type RenameIndex,
 } from "./rename"
+import { programBodies, typedProgramSections } from "./sections"
 
 // NOTE: The Call Hierarchy is single-document and stateless. Nothing survives a
 // request: an Item round-trips its `selectionRange`, so the incoming and
@@ -85,6 +90,12 @@ type Context = {
 	// when enrichment failed and the typed walk contributes nothing.
 	items: Map<string, CallHierarchyItem>
 	topLevel: CallHierarchyItem
+	// NOTE: The caller everything written in the `tests { … }` block attributes
+	// to, the way a top level Statement attributes to the implementation. Null
+	// where the file wrote no block. A test is not a Declaration and can not be
+	// called either, so the whole section stands as one caller rather than one
+	// per test — what a reader asks of a Function is whether the tests reach it.
+	testsLevel: CallHierarchyItem | null
 }
 
 export function prepareCallHierarchy(
@@ -159,7 +170,9 @@ function buildContext(
 
 	let items = new Map<string, CallHierarchyItem>()
 
-	collectItems(program.implementation.nodes, null, items)
+	for (let body of programBodies(program)) {
+		collectItems(body, null, items)
+	}
 
 	return {
 		enrichedProgram,
@@ -167,6 +180,7 @@ function buildContext(
 		declarationAt,
 		items,
 		topLevel: topLevelItem(program),
+		testsLevel: testsItem(program),
 	}
 }
 
@@ -211,6 +225,30 @@ function topLevelItem(program: parser.Program): CallHierarchyItem {
 			end: {
 				line: position.start.line,
 				column: position.start.column + program.kind.length,
+			},
+		},
+	}
+}
+
+// NOTE: The same for the `tests { … }` block — its own Statements, and every
+// test and suite inside it, attribute here.
+function testsItem(program: parser.Program): CallHierarchyItem | null {
+	if (program.tests === null) {
+		return null
+	}
+
+	let position = program.tests.position
+
+	return {
+		name: "tests",
+		kind: "implementation",
+		container: null,
+		range: position,
+		selectionRange: {
+			start: position.start,
+			end: {
+				line: position.start.line,
+				column: position.start.column + "tests".length,
 			},
 		},
 	}
@@ -338,6 +376,13 @@ function collectItemsFromNode(
 			return
 		case "ReturnStatement":
 			collectItemsFromNode(node.expression, container, items)
+			return
+		case "ExpectStatement":
+		case "RequireStatement":
+			for (let expression of assertionExpressions(node)) {
+				collectItemsFromNode(expression, container, items)
+			}
+
 			return
 		case "FunctionValue":
 			collectItems(node.value.body, container, items)
@@ -530,12 +575,14 @@ function collectSites(context: Context): Array<CallSite> {
 		return sites
 	}
 
-	visitBody(
-		context.enrichedProgram.implementation.nodes,
-		context.topLevel,
-		context,
-		sites,
-	)
+	for (let section of typedProgramSections(context.enrichedProgram)) {
+		let caller =
+			section.kind === "implementation"
+				? context.topLevel
+				: (context.testsLevel ?? context.topLevel)
+
+		visitBody([...section.head, ...section.nodes], caller, context, sites)
+	}
 
 	return sites
 }
@@ -688,6 +735,16 @@ function visitNode(
 			return
 		case "ReturnStatement":
 			visitNode(node.expression, caller, context, sites)
+			return
+		// NOTE: A call written in an assertion is a call — without this a
+		// Function's incoming calls stopped at the implementation, and every
+		// test that exercises it went unreported.
+		case "ExpectStatement":
+		case "RequireStatement":
+			for (let expression of typedAssertionExpressions(node)) {
+				visitNode(expression, caller, context, sites)
+			}
+
 			return
 		case "FunctionInvocation":
 			if (node.name.nodeType === "Identifier") {

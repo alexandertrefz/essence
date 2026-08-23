@@ -1136,6 +1136,12 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 				continue
 			}
 
+			// NOTE: The implementation alone, and deliberately — this answers
+			// what a Module PUBLISHES, and an `export { … }` block can only
+			// name what the implementation declares. A Namespace written in
+			// the `tests { … }` block is reachable inside that block and
+			// nowhere else, so offering it to an importer would offer an
+			// import that can never resolve.
 			for (let node of program.implementation.nodes) {
 				if (
 					node.nodeType === "NamespaceDefinitionStatement" &&
@@ -1816,6 +1822,12 @@ function matchesQuery(name: string, query: string): boolean {
 // question `modules/link.ts` answers for the export surface, asked here without
 // enriching anything, because auto-import and workspace symbols both need it for
 // every file and neither needs a Type.
+//
+// NOTE: The tests section is left out on purpose, as it is everywhere the
+// export surface is the question: a name declared there is private to the
+// block, and an entry naming one is a Diagnostic rather than an offer. What a
+// SEARCH finds in a tests section comes from the document outline instead,
+// which reaches the section through `findDocumentSymbols`.
 function topLevelDeclarations(
 	program: parser.Program,
 ): Map<string, { kind: DeclarationKind; position: common.Position }> {

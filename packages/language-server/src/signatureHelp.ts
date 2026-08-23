@@ -11,12 +11,14 @@ import {
 import type { common } from "@essence-lang/interfaces"
 
 import type { DocumentAnalysis } from "./analyse"
+import { typedAssertionExpressions } from "./assertionChildren"
 import { enrichDocument, parseDocument } from "./compilation"
 import { describe, documentationOf } from "./documentation"
 import { typedHandlerExpressions } from "./matchHandlerChildren"
 import { matchingNamespaces } from "./namespaces"
 import { contains, isAtOrBefore, isSmaller } from "./positions"
 import { probeSourcesFor, stripNoise } from "./probe"
+import { typedProgramNodes } from "./sections"
 
 // NOTE: Signature Help resolves the enclosing invocation the same way
 // Completion resolves a receiver: the document text up to the cursor is
@@ -89,13 +91,18 @@ export function findSignatureHelp(
 		try {
 			let { program } = parseDocument(probeSource, documentPath)
 
-			enrichedProgram = enrichDocument(program, documentPath).program
+			// NOTE: The probe types the `tests { … }` block too — a call being
+			// written inside a test body is a call, and a Program enriched
+			// without the tests holds no Node for it at all.
+			enrichedProgram = enrichDocument(program, documentPath, {
+				tests: true,
+			}).program
 		} catch {
 			continue
 		}
 
 		invocation = findEnclosingInvocation(
-			enrichedProgram.implementation.nodes,
+			typedProgramNodes(enrichedProgram),
 			cursorPoint,
 		)
 
@@ -550,6 +557,16 @@ function findEnclosingInvocation(
 				return
 			case "ReturnStatement":
 				visitNode(node.expression)
+				return
+			// NOTE: `expect greet(` IS a call being written, so a cursor inside
+			// an assertion has a signature to help with exactly as one in a
+			// body does.
+			case "ExpectStatement":
+			case "RequireStatement":
+				for (let expression of typedAssertionExpressions(node)) {
+					visitNode(expression)
+				}
+
 				return
 			case "MethodInvocation":
 				visitNode(node.base)

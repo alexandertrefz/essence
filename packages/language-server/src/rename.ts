@@ -16,6 +16,11 @@ import type { common, parser } from "@essence-lang/interfaces"
 
 import { typedHandlerExpressions } from "./matchHandlerChildren"
 import { methodsOf, nativeSignaturesOf } from "./namespaceMembers"
+import {
+	type ParserSection,
+	programSections,
+	typedProgramSections,
+} from "./sections"
 
 // NOTE: Renaming is resolved on the Parser AST with a lexical Scope model
 // that mirrors the Enricher's binding rules — `values` corresponds to the
@@ -494,9 +499,7 @@ export function indexProgram(
 	// a Scope the whole implementation has been walked into.
 	declareImports(program, topLevelScope, context)
 
-	walkBody(program.implementation.nodes, topLevelScope, context, {
-		hoist: true,
-	})
+	walkSections(program, topLevelScope, context)
 
 	referenceExports(program, topLevelScope, context)
 
@@ -519,7 +522,10 @@ export function indexProgram(
 	}
 
 	if (enrichedProgram !== null) {
-		walkTypedBody(enrichedProgram.implementation.nodes, context)
+		for (let section of typedProgramSections(enrichedProgram)) {
+			walkTypedBody(section.head, context)
+			walkTypedBody(section.nodes, context)
+		}
 	}
 
 	resolveRecordMembers(context)
@@ -578,6 +584,11 @@ function declareImports(
 // NOTE: What the implementation declares at its top level, off the Parser AST —
 // asked before anything is walked, which is the only moment an import entry can
 // be told from a declaration of the same name.
+//
+// NOTE: The tests section is deliberately absent. It is a CHILD Scope, so a
+// name it declares beside an entry of the same name SHADOWS it rather than
+// colliding with it — and a use inside the section resolves to the shadow,
+// which is what the walk binds it to.
 function topLevelNames(program: parser.Program): Set<string> {
 	let names = new Set<string>()
 
@@ -883,6 +894,89 @@ function rangeOfBody(
 /* Walkers */
 /***********/
 
+// NOTE: Every body a Program holds, each in the Scope it opens — see
+// `sections.ts`. The Sections arrive outermost first, so the Scope a Section is
+// nested in has always been made by the time it is reached, and one Map is the
+// whole of the nesting.
+//
+// A test's body does NOT hoist and every other Section does, which is exactly
+// what the Enricher says: the tests section and a suite hoist the ordinary
+// Statements standing in them, while a test's body binds in order like any
+// other block.
+function walkSections(
+	program: parser.Program,
+	topLevelScope: Scope,
+	context: WalkContext,
+) {
+	let scopes = new Map<ParserSection, Scope>()
+
+	for (let section of programSections(program)) {
+		let parentScope =
+			section.parent === null
+				? topLevelScope
+				: (scopes.get(section.parent) ?? topLevelScope)
+		let scope =
+			section.parent === null
+				? topLevelScope
+				: childScope(parentScope, section.position, context)
+
+		scopes.set(section, scope)
+
+		// NOTE: Read in the Scope AROUND the Section — a table's rows are
+		// written outside the body and can not name the row they are bound to.
+		for (let node of section.head) {
+			walkNode(node, parentScope, context)
+		}
+
+		declareTestParameters(section.parameters, scope, context)
+
+		walkBody(section.nodes, scope, context, {
+			hoist: section.kind !== "test",
+		})
+	}
+}
+
+// NOTE: The two binders only a test has: the row Parameter of
+// `across [ … ] (row: Row)` and the Parameters `for any (a: T, b: U)`
+// generates a value of. Both are written as a closure's Parameter list, so both
+// are read like one — except for the call site label, which a test has no use
+// for: nothing calls a test, and the Enricher refuses a label written on a
+// generated Parameter outright.
+function declareTestParameters(
+	parameters: Array<parser.ParameterNode>,
+	scope: Scope,
+	context: WalkContext,
+) {
+	for (let parameter of parameters) {
+		walkTypeDeclaration(parameter.type, scope, context)
+
+		if (parameter.defaultValue !== null) {
+			walkNode(parameter.defaultValue, scope, context)
+		}
+
+		if (parameter.internalName === null) {
+			continue
+		}
+
+		if (parameter.internalName.nodeType === "Pattern") {
+			declarePattern(parameter.internalName, scope, context, "parameter")
+
+			continue
+		}
+
+		// NOTE: Visible throughout the Section, which is what `null` means —
+		// a table test's NAME reads the row, and the name is written above the
+		// body rather than in it.
+		declareInScope(
+			scope,
+			"values",
+			parameter.internalName,
+			"parameter",
+			context,
+		)
+	}
+}
+
 function walkBody(
 	nodes: Array<parser.ImplementationNode>,
 	scope: Scope,
@@ -1094,6 +1188,65 @@ function walkNode(
 		case "ReturnStatement":
 			walkNode(node.expression, scope, context)
 			return
+		// NOTE: `expect EXPR` and `require EXPR` read a value and bind nothing.
+		// `require MATCHER = EXPR` is the ONE form that introduces names, and it
+		// introduces them into the block it stands in rather than into a Scope
+		// of its own: a `require` ends the test where it stands, so everything
+		// BELOW it may read what its Matcher took apart. That is what
+		// `node.position.end` says — the same thing an ordinary Declaration
+		// says, and what stops Completion from offering the name above the line
+		// that binds it.
+		case "ExpectStatement":
+		case "RequireStatement": {
+			walkNode(node.value, scope, context)
+
+			if (node.matcher === null) {
+				return
+			}
+
+			// NOTE: The Matcher's own reading is the Match Handler's, field for
+			// field — a bare Case resolves through the asserted value's Union,
+			// so only a prefixed Choice name is a Type reference of its own.
+			if (node.matcher.nodeType === "Pattern") {
+				declarePattern(
+					node.matcher,
+					scope,
+					context,
+					"constant",
+					node.position.end,
+				)
+			} else if (node.matcher.nodeType === "CaseMatcher") {
+				if (node.matcher.choice !== null) {
+					reference(scope, "types", node.matcher.choice, context)
+				}
+
+				if (node.matcher.binding?.nodeType === "Pattern") {
+					declarePattern(
+						node.matcher.binding,
+						scope,
+						context,
+						"constant",
+						node.position.end,
+					)
+				} else if (node.matcher.binding !== null) {
+					declareInScope(
+						scope,
+						"values",
+						node.matcher.binding,
+						"constant",
+						context,
+						node.position.end,
+					)
+				}
+			} else if (
+				node.matcher.nodeType !== "WildcardMatcher" &&
+				node.matcher.nodeType !== "LiteralMatcher"
+			) {
+				walkTypeDeclaration(node.matcher, scope, context)
+			}
+
+			return
+		}
 		case "Identifier":
 			reference(scope, "values", node, context)
 			return
@@ -2407,6 +2560,15 @@ function walkTypedNode(
 			return
 		case "ReturnStatement":
 			walkTypedNode(node.expression, context)
+			return
+		// NOTE: What a `require MATCHER = EXPR` bound is not here — the
+		// Enricher desugared each name into a Constant of its own, standing in
+		// the very body this walks, so the Declarations above answer for them.
+		// What is left is the asserted value, which on the Matcher form is the
+		// Constant holding it rather than the Expression.
+		case "ExpectStatement":
+		case "RequireStatement":
+			walkTypedNode(node.value, context)
 			return
 		case "MethodInvocation":
 			bindNamespaceMember(

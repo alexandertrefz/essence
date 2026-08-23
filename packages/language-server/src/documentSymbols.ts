@@ -10,8 +10,10 @@ import {
 } from "@essence-lang/compiler/printType"
 import type { common, parser } from "@essence-lang/interfaces"
 
+import { typedAssertionExpressions } from "./assertionChildren"
 import { typedHandlerExpressions } from "./matchHandlerChildren"
 import { isAtOrBefore } from "./positions"
+import { typedProgramBodies } from "./sections"
 
 // NOTE: The outline is built from the Parser AST alone — it must work while
 // the Program has Type errors. Top level Statements become symbols;
@@ -590,7 +592,12 @@ function cursorKey(cursor: common.Cursor): string {
 function detailsOf(program: common.typed.Program): Details {
 	let details: Details = new Map()
 
-	collectDetails(program.implementation.nodes, details)
+	// NOTE: The tests section's bodies too — the outline already shows what
+	// stands in a test, and a Constant declared there deserves the same Type
+	// beside it that one above it gets.
+	for (let body of typedProgramBodies(program)) {
+		collectDetails(body, details)
+	}
 
 	return details
 }
@@ -679,6 +686,13 @@ function collectDetail(
 			return
 		case "ReturnStatement":
 			collectDetail(node.expression, details)
+			return
+		case "ExpectStatement":
+		case "RequireStatement":
+			for (let expression of typedAssertionExpressions(node)) {
+				collectDetail(expression, details)
+			}
+
 			return
 		case "Match":
 			collectDetail(node.value, details)

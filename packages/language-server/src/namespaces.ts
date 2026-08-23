@@ -20,6 +20,7 @@ import type { common } from "@essence-lang/interfaces"
 
 import type { DocumentAnalysis } from "./analyse"
 import { enrichDocument, parseDocument } from "./compilation"
+import { typedProgramBodies, typedProgramNodes } from "./sections"
 
 // NOTE: Shared between Completion's `::` Method listing and Signature
 // Help's Method resolution — both need "every Namespace whose target Type
@@ -467,13 +468,15 @@ function collectNamespaceTypes(
 			enrichDocument(
 				parseDocument(documentText, documentPath).program,
 				documentPath,
+				{ tests: true },
 			).program
 		let namespaces: Array<common.NamespaceType> = []
 
-		collectNamespaceTypesInBody(
-			enrichedProgram.implementation.nodes,
-			namespaces,
-		)
+		// NOTE: A Namespace declared in the `tests { … }` block is a Namespace
+		// the tests may reach through `::`, so it is offered there.
+		for (let body of typedProgramBodies(enrichedProgram)) {
+			collectNamespaceTypesInBody(body, namespaces)
+		}
 
 		return namespaces
 	} catch {
@@ -510,10 +513,11 @@ export function collectProtocolTypes(
 			enrichDocument(
 				parseDocument(documentText, documentPath).program,
 				documentPath,
+				{ tests: true },
 			).program
 		let protocols: Array<common.ProtocolType> = []
 
-		for (let node of enrichedProgram.implementation.nodes) {
+		for (let node of typedProgramNodes(enrichedProgram)) {
 			if (node.nodeType === "ProtocolDeclarationStatement") {
 				protocols.push(node.protocolType)
 			}
