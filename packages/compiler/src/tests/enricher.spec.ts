@@ -7966,6 +7966,49 @@ describe("Enricher", () => {
 				)
 			}
 
+			// NOTE: A refinement is read at the top of a round, and the reading
+			// of what it names may be a round or two behind — `Relay` waits on
+			// a Type written below it. The conjuncts are written ONCE, so a
+			// leaf put down before the reading landed would stay the name it
+			// was while the `if` beside it went on to the leaf. Held back to a
+			// later round instead.
+			it("should hold a refinement back until its leaf is read", () => {
+				const LATE = `namespace Chain for Integer {
+						chains(_ n: Integer) -> Boolean {
+							<- @::relays(n)
+						}
+					}
+
+					type Over = Integer where @::chains(9)
+
+					namespace Relay for Integer {
+						relays(_ n: Integer) -> Boolean {
+							<- @::isGreaterThan(n)
+						}
+
+						tag() -> Tag {
+							<- "x"
+						}
+					}
+
+					type Tag = String`
+
+				expect(
+					narrowedTypeOf(
+						`implementation {
+							${LATE}
+
+							constant d = 12
+
+							if d::isGreaterThan(9) {
+								Terminal.inspect(d)
+							}
+						}`,
+						"d",
+					),
+				).toBe("Over")
+			})
+
 			it("should resolve a chain across Namespaces in every order", () => {
 				expect([
 					chainedTypeOf(["A", "B", "C"]),

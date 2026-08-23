@@ -548,6 +548,7 @@ function fillPendingPredicates(
 	sink: HoistDiagnosticSink,
 	hoistedTypes: HoistedTypes,
 	final: boolean,
+	unread?: (conjunct: common.PredicateConjunct) => boolean,
 ): void {
 	for (let index = pending.length - 1; index >= 0; index--) {
 		let { node, scope, refinement } = pending[index]
@@ -569,6 +570,16 @@ function fillPendingPredicates(
 		)
 
 		if (!final && (containsErrors(diagnostics) || result === null)) {
+			continue
+		}
+
+		// NOTE: A leaf whose reading is still to come is not written down. The
+		// conjuncts are written ONCE — the object is already bound into every
+		// signature that named the Alias — so a leaf recorded before what it
+		// names was read would stay the name it was, while the `if` beside it
+		// goes on to the leaf and asks a different question. Held back to a
+		// later round instead, where the reading has landed.
+		if (!final && result !== null && result.some(unread ?? (() => false))) {
 			continue
 		}
 
@@ -1244,10 +1255,21 @@ function hoistDeclarationsInner(
 	// top of every later round, and once more before the predicates get their
 	// final reading, so a `where` clause written on such a Method is filled with
 	// the alias already known. A reading that succeeds drops out of the list.
-	let unreadAliases: Array<() => boolean> = []
+	let unreadAliases: Array<{
+		blocks: (conjunct: common.PredicateConjunct) => boolean
+		reread: () => boolean
+	}> = []
 	let rereadAliases = (): void => {
-		unreadAliases = unreadAliases.filter((reread) => !reread())
+		unreadAliases = unreadAliases.filter((entry) => !entry.reread())
 	}
+	// NOTE: Whether a leaf could still be read further. A Namespace whose own
+	// bodies did not all resolve blocks every leaf naming IT; a Protocol blocks
+	// every leaf naming one of its Methods, whichever conformance answered —
+	// what a provided body says is recorded on the Protocol and reaches a
+	// conformer's own Namespace name, so the name a leaf carries is no help
+	// there and the Method's is.
+	let unreadLeaf = (conjunct: common.PredicateConjunct): boolean =>
+		unreadAliases.some((entry) => entry.blocks(conjunct))
 
 	while (pendingNodes.length > 0) {
 		// NOTE: Before the resolution rounds rather than after, so a Module whose
@@ -1261,7 +1283,13 @@ function hoistDeclarationsInner(
 		// round — a bodied static Property enriched while its Namespace resolves —
 		// has to find them written in.
 		rereadAliases()
-		fillPendingPredicates(pendingPredicates, sink, hoistedTypes, false)
+		fillPendingPredicates(
+			pendingPredicates,
+			sink,
+			hoistedTypes,
+			false,
+			unreadLeaf,
+		)
 		let remainingNodes: Array<PendingDeclaration> = []
 		// NOTE: The Protocols this round can still hoist, per Scope — a Namespace
 		// conforming to one of them can not have its conditional bounds woven yet
@@ -1438,7 +1466,11 @@ function hoistDeclarationsInner(
 						derivePredicateAliases(node, namespaceType, scope)
 
 					if (!reread()) {
-						unreadAliases.push(reread)
+						unreadAliases.push({
+							blocks: (conjunct) =>
+								conjunct.namespaceName === node.name.content,
+							reread,
+						})
 					}
 				} else if (node.nodeType === "ProtocolDeclarationStatement") {
 					// NOTE: And which of a PROTOCOL's provided Methods are
@@ -1456,7 +1488,13 @@ function hoistDeclarationsInner(
 						)
 
 					if (!reread()) {
-						unreadAliases.push(reread)
+						let names = new Set(Object.keys(protocolType.methods))
+
+						unreadAliases.push({
+							blocks: (conjunct) =>
+								names.has(conjunct.methodName),
+							reread,
+						})
 					}
 				}
 
