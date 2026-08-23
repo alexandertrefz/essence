@@ -7801,6 +7801,35 @@ describe("Enricher", () => {
 					),
 				).toBe("Big")
 			})
+
+			// NOTE: A slot is a POSITION, and a Parameter a caller may leave
+			// out makes the two sides count positions differently: `n` is
+			// declared second and written first, so the leaf would take its
+			// bound from `slack` and the branch would prove a bound nobody
+			// asked. Refused outright rather than read, so the question stays
+			// the Method's own.
+			it("should read no alias off a Method with a defaulted Parameter", () => {
+				expect(
+					narrowedTypeOf(
+						`implementation {
+							namespace Stock for Integer {
+								isOver(_ pad: Integer = 0, than n: Integer, orSo slack: Integer) -> Boolean {
+									<- @::isGreaterThan(n)
+								}
+							}
+
+							type Huge = Integer where @::isGreaterThan(100)
+
+							constant d = 12
+
+							if d::isOver(than 9, orSo 100) {
+								Terminal.inspect(d)
+							}
+						}`,
+						"d",
+					),
+				).toBe("Integer")
+			})
 		})
 
 		// NOTE: An alias naming an alias is the leaf both of them mean, and

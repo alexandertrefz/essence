@@ -13526,8 +13526,8 @@ function namespaceNamedInScope(
 // witness' own Namespace where the body was read on `Self`.
 //
 // `null` where a slot names an Argument the call did not write, which nothing
-// reaches today: a leaf is only ever built from Arguments that are all
-// literals, so a template slot always has one to take.
+// reaches today: a Method a caller may write fewer Arguments to is refused a
+// reading outright, so every slot a template holds has an Argument to take.
 function aliasLeafOf(
 	alias: common.PredicateAlias,
 	witnessName: string,
@@ -14064,6 +14064,22 @@ function aliasCandidateOf(
 		return NO_ALIAS
 	}
 
+	// NOTE: A Method a caller may write fewer Arguments to is not read at all.
+	// A slot is a POSITION, and the two sides count positions differently: the
+	// reading counts a Parameter where it was DECLARED, while the call site
+	// counts the Arguments that were WRITTEN. A default lets the two disagree,
+	// and every slot after the omitted one would then be filled from the wrong
+	// Argument — silently, since a leaf carries no names to check. Pairing the
+	// written Arguments back to their Parameters is what would be needed to
+	// read one, and no predicate in the standard library asks for it.
+	if (
+		definition.parameters.some(
+			(parameter) => parameter.defaultValue !== null,
+		)
+	) {
+		return NO_ALIAS
+	}
+
 	let { result, diagnostics } = collectDiagnostics(() =>
 		enrichExpression(
 			body.call,
@@ -14216,9 +14232,10 @@ function aliasBodyType(
 	return bindings.size === 0 ? type : applyGenericBindings(type, bindings)
 }
 
-// NOTE: Each Parameter's POSITION under the name the body reads it by. Positions
-// are counted over the Arguments a caller writes, which is what a template slot
-// stands for.
+// NOTE: Each Parameter's POSITION under the name the body reads it by, counted
+// where the Parameter was DECLARED. A template slot stands for the position of
+// an Argument a caller WRITES, and the two are the same number only because a
+// Method with a defaulted Parameter is refused a reading above.
 function parameterSlotsOf(
 	definition: parser.FunctionDefinitionNode,
 ): Map<string, number> {
