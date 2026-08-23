@@ -1111,7 +1111,10 @@ export function pair<ItemType extends AnyType, Other extends AnyType>(
 // NOTE: A group size below one names no grouping, and the answer is the whole
 // List in ONE group — nothing is dropped and nothing is refused. `1` rather
 // than `1n`: an ordering comparison reads both representations, so one spelling
-// asks the question of either.
+// asks the question of either. That clamp is what makes the loop below safe to
+// read as it is: the size is never below one, and a group is opened only while
+// an item remains to put in it, so every group comes back with at least one
+// item. The declared item Type `NonEmptyList<ItemType>` rests on exactly that.
 //
 // NOTE: The empty List answers with no groups at all, for every size, because
 // there is no item to put in one. That is the same answer a valid size gives
