@@ -7589,6 +7589,82 @@ describe("Enricher", () => {
 			})
 		})
 
+		// NOTE: The ordering's law is the BASE's promise, so it is read off the
+		// base's own Namespace and off the covering `Number`, and off nothing
+		// else. A Program may spell `is`, `isLessThan` or `isNot` in a Namespace
+		// of its own and mean whatever its body means by them — reading below,
+		// above and equal off those words would rule out comparisons nobody made.
+		describe("a foreign Namespace spelling the comparisons", () => {
+			// NOTE: `Tag::is` and `Tag::isLessThan` are two questions about the
+			// LENGTH, and neither excludes the other: a three-letter word answers
+			// both. Read as the trichotomy, the true branch would have proven the
+			// contrary of `Tag::isLessThan(3)` and walked into 'NotLess', whose
+			// own predicate the value answers 'false'.
+			it("should not exclude a sibling comparison it never contradicts", () => {
+				expect(
+					narrowedTypeOf(
+						`implementation {
+							namespace Tag for String {
+								is(_ length: Integer) -> Boolean {
+									<- @::length()::is(length)
+								}
+
+								isLessThan(_ length: Integer) -> Boolean {
+									<- @::length()::isGreaterThan(0)
+								}
+
+								notLess() -> Boolean {
+									<- @::<Tag>isLessThan(3)::negate()
+								}
+							}
+
+							type NotLess = String where @::notLess()
+
+							constant word = "zzz"
+
+							if word::<Tag>is(3) {
+								Terminal.inspect(word)
+							}
+						}`,
+						"word",
+					),
+				).toBe("String")
+			})
+
+			// NOTE: And `isNot` is not turned into `is` negated here either.
+			// Both of these say "above the bound", so the `else` of one is the
+			// contrary of the other only if the names are believed over the
+			// bodies. Kept as written, the two are simply two questions.
+			it("should keep a foreign contrary as the question it was written as", () => {
+				expect(
+					narrowedTypeOf(
+						`implementation {
+							namespace Weird for Integer {
+								is(_ other: Integer) -> Boolean {
+									<- @::isGreaterThan(other)
+								}
+
+								isNot(_ other: Integer) -> Boolean {
+									<- @::isGreaterThan(other)
+								}
+							}
+
+							type Above = Integer where @::<Weird>isNot(0)
+
+							constant d = 3
+
+							if d::<Weird>is(0) {
+								Terminal.inspect(0)
+							} else {
+								Terminal.inspect(d)
+							}
+						}`,
+						"d",
+					),
+				).toBe("Integer")
+			})
+		})
+
 		// NOTE: The shadow lives in a WRAPPER Scope of its own, so a body that
 		// re-declares the very name the condition narrowed is told nothing — the
 		// declaration it would collide with is one nobody wrote.

@@ -1818,26 +1818,35 @@ export function negatedPredicateConjunct(
 // literal any refinement in scope mentions — so what is here is the closure a
 // set carries on its own, which can not grow with the Program.
 //
-// NOTE: The Methods are named, not asked. `is`, `isLessThan`, `isGreaterThan`
-// and `isBetween` are `Equatable`'s and `Orderable`'s vocabulary, and a
-// Namespace declaring one of them under another meaning is telling the language
-// something false about a name it reserves in spirit — the reading this pass has
-// always taken of `is` and `isNot`.
+// NOTE: The Methods are named, but only where the base itself answers them.
+// `is`, `isLessThan`, `isGreaterThan` and `isBetween` are `Equatable`'s and
+// `Orderable`'s vocabulary, and the ordering's law is a promise the BASE makes —
+// so a leaf is read for it only when the Namespace that answered is the base's
+// own, or the covering `Number` an Integer bound on a Rational falls to. A
+// Program may declare `namespace Tally for String { isLessThan(_ n: Integer) … }`
+// and mean something else entirely by the word, and reading the law off that
+// would rule out comparisons nobody made. It is `narrowedBy`'s guard, spelled
+// once more, and it costs the standard library nothing: every conjunct there is
+// `Integer::`, `Rational::`, `String::`, `List::` or `Number::`.
 //
 // Remembered against the conjuncts ARRAY rather than the refinement, because
 // that array is the object the two-stage fill writes into every copy of an
 // Alias — so the declared `NonEmptyList<Item>` and every instantiation of it
 // share one answer, which is exactly what a memo wants. Assignability asks this
-// on a hot path and used to build a fresh Set at every call.
+// on a hot path and used to build a fresh Set at every call. The BASE is in the
+// key as well, because the answer is now a question about the two together.
 let impliedKeyMemos = new WeakMap<
 	Array<common.PredicateConjunct>,
-	ReadonlySet<string>
+	Map<string, ReadonlySet<string>>
 >()
 
 export function impliedConjunctKeys(
 	conjuncts: Array<common.PredicateConjunct>,
+	base: common.Type,
 ): ReadonlySet<string> {
-	let remembered = impliedKeyMemos.get(conjuncts)
+	let tag = refinableBaseTag(base)
+	let byBase = impliedKeyMemos.get(conjuncts)
+	let remembered = byBase?.get(tag)
 
 	if (remembered !== undefined) {
 		return remembered
@@ -1848,20 +1857,60 @@ export function impliedConjunctKeys(
 	for (let conjunct of conjuncts) {
 		keys.add(predicateConjunctKey(conjunct))
 
+		if (!answersForBase(conjunct, tag)) {
+			continue
+		}
+
 		for (let implied of excludedByConjunct(conjunct)) {
 			keys.add(predicateConjunctKey(implied))
 		}
 	}
 
 	for (let left of conjuncts) {
+		if (!answersForBase(left, tag)) {
+			continue
+		}
+
 		for (let remaining of leftByExclusions(left, conjuncts)) {
 			keys.add(predicateConjunctKey(remaining))
 		}
 	}
 
-	impliedKeyMemos.set(conjuncts, keys)
+	if (byBase === undefined) {
+		byBase = new Map()
+		impliedKeyMemos.set(conjuncts, byBase)
+	}
+
+	byBase.set(tag, keys)
 
 	return keys
+}
+
+// NOTE: Whether the Namespace that answered a leaf is one the base's own
+// ordering speaks through — the base's Namespace, or the covering `Number` a
+// bound of the other numeric kind falls to. Anything else is a Program's own
+// word for something, and says nothing about below, above and equal.
+export function answersForBase(
+	conjunct: common.PredicateConjunct,
+	tag: string,
+): boolean {
+	return conjunct.namespaceName === tag || conjunct.namespaceName === "Number"
+}
+
+// NOTE: The tag of the Type a refinement is written ON. A refinement of a
+// refinement carries its own base one level in, and a generic Alias carries the
+// refinement one level in — so both are walked through to the Integer, Rational,
+// String or List underneath. Anything else answers as itself, which no conjunct's
+// Namespace is ever named after, and so trusts nothing.
+export function refinableBaseTag(type: common.Type): string {
+	let current = type
+
+	while (current.type === "Refinement" || current.type === "GenericAlias") {
+		current =
+			current.type === "Refinement" ? current.base : current.aliasedType
+	}
+
+	return current.type
 }
 
 // NOTE: The two comparisons one leaf rules out, over its own Argument.
@@ -3034,7 +3083,7 @@ function matchTypes(
 			return false
 		}
 
-		let proven = impliedConjunctKeys(provenConjuncts(rhs))
+		let proven = impliedConjunctKeys(provenConjuncts(rhs), rhs.base)
 
 		return (
 			matchTypes(lhs.base, rhs.base, context, depth) &&
