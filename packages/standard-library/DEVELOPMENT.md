@@ -388,9 +388,10 @@ offer all six, and a call Integer's rung rejects falls to Number's.
 An override answers a bounded call too. The witness a `<Item is Orderable>` bound
 is handed names the conformer's override where it wrote one and the Protocol's
 shared const where it did not, so `1::isLessThan(2)` and the same call inside a
-bounded Function run the same Method. The library's three overrides are written
-to say the same thing FASTER, which is now a promise about performance rather
-than one the language leans on.
+bounded Function run the same Method. The library's five overrides all say over
+`Self` what the provided body says — faster, or with an entry for a kind the
+provided signature has no room for — which is now a promise about the library
+rather than one the language leans on.
 
 And a DERIVE answers ahead of a provided Method. A Choice's `isNot` is
 `Choice_Equatable`'s, fabricated for that receiver, and it is what the witness
@@ -403,8 +404,8 @@ EVERY Choice: it compares by tag, and by payload where a Case carries one.
 Printing is derived for a Choice whose Cases all carry no payload, and answers
 the Case's own name — `#Less` prints `Less`. So a Namespace over a Choice of
 unit Cases declares `is Equatable, is Printable` and has an empty body:
-`Ordering`, `Side`, `CaseSensitivity`, `NormalizationForm`, `NumberFormat` and
-`Rounding` are all that shape.
+`Ordering`, `Side`, `CaseSensitivity`, `NormalizationForm`, `NumberFormat`,
+`Rounding` and `SortOrder` are all that shape.
 
 Printing is DECLARED where equality is not — a Choice compares by its tags
 whatever anyone says, but how it READS is a decision, so a Choice whose
@@ -757,6 +758,22 @@ const $es_String_trim = (_self, side = $type.createCase("Side#BothEnds")) =>
 writes every Argument emits byte-identically to what it always did — a direct
 read off the imported runtime module, tree-shakeable exactly as before — and the
 shim, which nothing references, is dropped by the bundler.
+
+**A bounded Type Parameter adds a Parameter to the shim as well.** A conformance
+witness is passed positionally, after everything the signature declares, exactly
+as it is to a bodied Method — so a shim listing only the declared Parameters
+takes the witness in the slot the default opened and hands the default on as the
+witness. `sort<ItemType is Comparable>(in order: SortOrder = #Ascending)` is the
+first native with both, and the shim now ends with one Parameter per bounded Type
+Parameter:
+
+```js
+const $es_NonEmptyList_sort__overload$1 = (
+	_self,
+	order = $type.createCase("SortOrder#Ascending"),
+	ItemType__conformance,
+) => NonEmptyList.sort__overload$1(_self, order, ItemType__conformance)
+```
 
 The invariant this rests on is worth writing down: **a native's declaration in
 `sources/` stays the single source of truth for its defaults.** Asking the

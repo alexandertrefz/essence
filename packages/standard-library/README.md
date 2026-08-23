@@ -8,12 +8,12 @@ Protocols (`Equatable`, `Printable`, `Comparable`, `Orderable`), `Boolean`,
 `Rational`, `Algebraic`, `Transcendental` and the covering `Number`, which
 brings the `Number` and `Irrational` Union Types with it), and `List` together
 with `NestedList`, `OptionalList`, `NonEmptyList` and the `NonEmptyNestedList`
-that only both of those proofs together reach. A checked refinement is exported beside the base it
-narrows: `NonZeroInteger`, `NonNegativeInteger` and `PositiveInteger` beside
-`Integer`, `NonZeroRational` beside `Rational`, `NonEmptyString` beside
-`String`, `NonEmptyList` beside `List`. Each reaches everything its base
-reaches, and the tighter answers a proof affords on top — `DEVELOPMENT.md` has
-the rule a narrowed receiver is read by. A value written down is its own proof
+that only both of those proofs together reach. A checked refinement is exported
+beside the base it narrows: `NonZeroInteger`, `NonNegativeInteger` and
+`PositiveInteger` beside `Integer`, `NonZeroRational` beside `Rational`,
+`NonEmptyString` beside `String`, `NonEmptyList` beside `List`. Each reaches
+everything its base reaches, and the tighter answers a proof affords on top —
+`DEVELOPMENT.md` has the rule a narrowed receiver is read by. A value written down is its own proof
 and reaches them without being narrowed at all: `4::squareRoot()` answers a
 number and `[1, 2]::firstItem()` answers an item. The aggregates a List of
 numbers answers are reachable from the List itself, through six Namespaces of
@@ -41,14 +41,15 @@ all, in `Loop.es`, as ordinary free Functions. Printing is a Namespace:
 `Terminal.inspect` shows a value's structure and answers with it unchanged, and
 `Terminal.write` is the raw primitive both are built on (`Terminal.es`).
 
-Seven of every ten declared Method entries are also IMPLEMENTED here, in
-Essence — 236 of 366 as this is written; the rest bind to
-`@essence-lang/runtime`. Seven more are written on a PROTOCOL rather than on a
-Namespace, once for every conformer: `Equatable.isNot`, and `Orderable`'s four
-inequalities, `isBetween` and `clamp`. A conformer answers each without writing
-anything, and a Namespace that writes a Method of the name replaces the provided
-one on its own rung — which is what `Optional::isNot` and `Integer::isLessThan`
-do, each for a reason its own declaration gives. What stays native is a
+Two of every three declared Method entries are also IMPLEMENTED here, in
+Essence — 280 of 421 as this is written, counting one entry per Overload and
+`loop`'s free Functions with them; the rest bind to `@essence-lang/runtime`.
+Seven more are written on a PROTOCOL rather than on a Namespace, once for every
+conformer: `Equatable.isNot`, and `Orderable`'s four inequalities, `isBetween`
+and `clamp`. A conformer answers each without writing anything, and a Namespace
+that writes a Method of the name replaces the provided one on its own rung —
+which is what `Optional::isNot`, `Integer::isNot` and `Integer::isLessThan` do,
+each for a reason its own declaration gives. What stays native is a
 deliberate line, not a backlog: the primitives everything else is composed from
 (`Boolean.negate`/`is`/`and`/`or`, integer and rational arithmetic, same-kind
 `compare`), the JavaScript intrinsics Essence has no expression for
@@ -69,10 +70,9 @@ Two Methods are native for a reason worth reading before assuming otherwise:
 inference (the repro is at the declaration), and `Optional.toString`, because
 an Essence body renders the payload through a hole and a hole renders a String
 BARE — which is exactly the quoting rule the entry exists to keep.
-`String.replaceEvery` used to be
-too — its empty part inserted at UTF-16 code-unit boundaries — but the empty
-part is now a no-op, so it is `split(on part)::join(with replacement)` in
-Essence.
+`String.replaceEvery` used to be too — its empty part inserted at UTF-16
+code-unit boundaries — but the empty part is now a no-op, so it is
+`split(on part)::join(with replacement)` in Essence.
 
 `Record` is the one Namespace with a native the library does not offer.
 `Record.keys` is declared and `entries` and `values` are not: both would answer
