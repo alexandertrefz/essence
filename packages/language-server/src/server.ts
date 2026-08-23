@@ -1820,6 +1820,9 @@ export function startServer(options: { connection?: Connection } = {}) {
 			}) ??
 			analyseDocument(document.getText(), uri, {
 				host: workspace.host,
+				// NOTE: As the Workspace itself has it — a document it holds
+				// nothing for still has its `tests { … }` block typed.
+				tests: true,
 			})
 		let results = new Map<string, Array<common.Diagnostic>>([
 			[

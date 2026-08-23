@@ -19,6 +19,7 @@ import {
 	findArgumentContext,
 	pairedParameters,
 } from "./argumentContext"
+import { typedAssertionExpressions } from "./assertionChildren"
 import { type ImportEdit, insertImportEdit } from "./autoImport"
 import {
 	type CallSnippet,
@@ -39,6 +40,7 @@ import {
 	type ScopeRange,
 	type SymbolSpace,
 } from "./rename"
+import { typedProgramBodies, typedProgramNodes } from "./sections"
 import type { WorkspaceOffer } from "./workspace"
 
 // NOTE: Completion has three modes, told apart by the text immediately
@@ -358,6 +360,10 @@ function contextualCompletions(
 			let { program: enrichedProgram } = enrichDocument(
 				program,
 				documentPath,
+				// NOTE: The probe types the `tests { … }` block too — an
+				// Argument being written inside a test body is an Argument, and
+				// a Program enriched without the tests holds no Node for it.
+				{ tests: true },
 			)
 
 			context = findArgumentContext(enrichedProgram, cursor, lines)
@@ -461,10 +467,9 @@ function resolveProbedBase(
 			let { program: enrichedProgram } = enrichDocument(
 				program,
 				documentPath,
+				{ tests: true },
 			)
-			let baseType = findProbeReceiver(
-				enrichedProgram.implementation.nodes,
-			)
+			let baseType = findProbeReceiver(typedProgramNodes(enrichedProgram))
 
 			if (baseType !== null) {
 				return { type: baseType, program: enrichedProgram }
@@ -950,7 +955,9 @@ function namespacePropertyDocumentation(
 		}
 	}
 
-	visitBody(program.implementation.nodes)
+	for (let body of typedProgramBodies(program)) {
+		visitBody(body)
+	}
 
 	return documented
 }
@@ -1240,7 +1247,9 @@ function caseCompletions(
 
 	try {
 		let { program } = parseDocument(probeText, documentPath)
-		enrichedProgram = enrichDocument(program, documentPath).program
+		enrichedProgram = enrichDocument(program, documentPath, {
+			tests: true,
+		}).program
 	} catch {
 		return []
 	}
@@ -1449,6 +1458,15 @@ function analyseCaseProbe(program: common.typed.Program): {
 			case "ReturnStatement":
 				visitNode(node.expression, expectedType)
 				return
+			// NOTE: `expect outcome::is(#|)` offers the Cases of what the
+			// Method expects, exactly as a call written anywhere else does.
+			case "ExpectStatement":
+			case "RequireStatement":
+				for (let expression of typedAssertionExpressions(node)) {
+					visitNode(expression, null)
+				}
+
+				return
 			case "FunctionInvocation": {
 				let calleeType = node.name.type
 
@@ -1531,7 +1549,9 @@ function analyseCaseProbe(program: common.typed.Program): {
 		}
 	}
 
-	visitBody(program.implementation.nodes, null)
+	for (let body of typedProgramBodies(program)) {
+		visitBody(body, null)
+	}
 
 	return { expected: expected ?? null, choices }
 }
@@ -1580,7 +1600,9 @@ function scopeCompletions(
 
 	if (document === null) {
 		try {
-			enrichedProgram = enrichDocument(program, documentPath).program
+			enrichedProgram = enrichDocument(program, documentPath, {
+				tests: true,
+			}).program
 		} catch {}
 	}
 
@@ -1842,6 +1864,13 @@ function describeDeclarations(
 			case "ReturnStatement":
 				visitNode(node.expression)
 				return
+			case "ExpectStatement":
+			case "RequireStatement":
+				for (let expression of typedAssertionExpressions(node)) {
+					visitNode(expression)
+				}
+
+				return
 			case "IfStatement":
 				visitNode(node.condition)
 				visitBody(node.body)
@@ -1914,7 +1943,9 @@ function describeDeclarations(
 		}
 	}
 
-	visitBody(program.implementation.nodes)
+	for (let body of typedProgramBodies(program)) {
+		visitBody(body)
+	}
 
 	return described
 }

@@ -6,11 +6,13 @@ import {
 import type { common, parser } from "@essence-lang/interfaces"
 
 import { type Analysis, analyseDocument, documentFilePath } from "./analyse"
+import { assertionExpressions } from "./assertionChildren"
 import { insertImportEdit, relativeSpecifier } from "./autoImport"
 import { findInlayHints } from "./inlayHints"
 import { matcherValueExpressions } from "./matchHandlerChildren"
 import { methodsOf, nativeSignaturesOf } from "./namespaceMembers"
 import { isSamePosition } from "./positions"
+import { programBodies } from "./sections"
 import type { Workspace } from "./workspace"
 
 // NOTE: Every edit here is computed from the text handed in, on a fresh
@@ -70,6 +72,10 @@ export function findCodeActions(
 		cached ??
 		analyseDocument(documentText, documentPath, {
 			host: workspace?.host,
+			// NOTE: As the Server's own Workspace has it — a Quick Fix offered
+			// inside a `tests { … }` block answers a Diagnostic only a compile
+			// that asked for the tests ever reports.
+			tests: true,
 		})
 
 	let { program, enrichedProgram, diagnostics } = analysis
@@ -1145,7 +1151,9 @@ function walk(
 	program: parser.Program,
 	visit: (node: parser.ImplementationNode) => void,
 ) {
-	walkBody(program.implementation.nodes, visit)
+	for (let body of programBodies(program)) {
+		walkBody(body, visit)
+	}
 }
 
 function walkBody(
@@ -1228,6 +1236,13 @@ function walkNode(
 			return
 		case "ReturnStatement":
 			walkNode(node.expression, visit)
+			return
+		case "ExpectStatement":
+		case "RequireStatement":
+			for (let expression of assertionExpressions(node)) {
+				walkNode(expression, visit)
+			}
+
 			return
 		case "Match":
 			walkNode(node.value, visit)

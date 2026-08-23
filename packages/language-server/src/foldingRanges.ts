@@ -5,6 +5,9 @@ import {
 } from "@essence-lang/compiler/helpers"
 import type { common, parser } from "@essence-lang/interfaces"
 
+import { assertionExpressions } from "./assertionChildren"
+import { programSections } from "./sections"
+
 // NOTE: Folding is derived from the Parser AST, so it keeps working while the
 // Program has Type errors. Only constructs that span more than one line are
 // worth folding, and the last line is excluded so that the closing brace
@@ -27,8 +30,14 @@ export function findFoldingRanges(
 		addRange(ranges, program.imports.position)
 	}
 
-	addRange(ranges, program.implementation.position)
-	collectFromBody(program.implementation.nodes, ranges)
+	// NOTE: Every Section folds as the block it is written as — the
+	// implementation, the `tests { … }` block below it, and each `suite` and
+	// `test` inside that. A reader who is done with what a file PROVES collapses
+	// one line, exactly as they collapse the import list.
+	for (let section of programSections(program)) {
+		addRange(ranges, section.position)
+		collectFromBody([...section.head, ...section.nodes], ranges)
+	}
 
 	if (program.exports !== null) {
 		addRange(ranges, program.exports.position)
@@ -42,10 +51,27 @@ function addRange(ranges: Array<FoldingRange>, position: common.Position) {
 		return
 	}
 
-	ranges.push({
+	let range = {
 		startLine: position.start.line,
 		endLine: position.end.line - 1,
-	})
+	}
+
+	// NOTE: Two ranges over the same lines are one fold, and a file that is
+	// nothing but tests hands out exactly that — its implementation section is
+	// an empty stand-in spanning the `tests { … }` block, so both Sections
+	// cover the same lines. A Statement wrapping a single Expression has always
+	// produced the same pair.
+	if (
+		ranges.some(
+			(existing) =>
+				existing.startLine === range.startLine &&
+				existing.endLine === range.endLine,
+		)
+	) {
+		return
+	}
+
+	ranges.push(range)
 }
 
 function collectFromBody(
@@ -193,6 +219,16 @@ function collectFromNode(
 			return
 		case "ReturnStatement":
 			collectFromNode(node.expression, ranges)
+			return
+		// NOTE: An assertion folds nothing of its own — it is one Statement —
+		// but a Function literal written inside one lays itself out over lines
+		// and folds like any other.
+		case "ExpectStatement":
+		case "RequireStatement":
+			for (let expression of assertionExpressions(node)) {
+				collectFromNode(expression, ranges)
+			}
+
 			return
 		case "Match":
 			addRange(ranges, node.position)

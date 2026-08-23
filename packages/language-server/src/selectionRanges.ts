@@ -5,8 +5,10 @@ import {
 } from "@essence-lang/compiler/helpers"
 import type { common, parser } from "@essence-lang/interfaces"
 
+import { assertionExpressions } from "./assertionChildren"
 import { matcherValueExpressions } from "./matchHandlerChildren"
 import { contains } from "./positions"
+import { type ParserSection, programSections } from "./sections"
 
 // NOTE: "Expand selection" wants the chain of ever-larger constructs
 // containing the cursor. Collecting every Position on the path down the
@@ -19,14 +21,58 @@ export function findSelectionRanges(
 ): Array<common.Position> {
 	let chain: Array<common.Position> = []
 
-	if (contains(program.implementation.position, cursor)) {
-		chain.push(program.implementation.position)
-		collectFromBody(program.implementation.nodes, cursor, chain)
+	// NOTE: The innermost Section the cursor is in, and the Sections around it —
+	// so expanding out of a Statement inside a test reaches the test, then the
+	// suite, then the `tests { … }` block, each as the form it is written as.
+	// The implementation is filtered out along the way for a cursor inside the
+	// tests block: the two are Scopes one inside the other and spans side by
+	// side, and only a span containing the cursor belongs in the chain.
+	let section = innermostSection(programSections(program), cursor)
+
+	if (section !== null) {
+		for (let enclosing of ancestry(section)) {
+			if (contains(enclosing.position, cursor)) {
+				chain.push(enclosing.position)
+			}
+		}
+
+		collectFromBody([...section.head, ...section.nodes], cursor, chain)
 	}
 
 	// NOTE: Innermost first, and duplicates dropped — a Statement wrapping a
 	// single Expression often shares its Position exactly.
 	return dropRepeats(chain.reverse())
+}
+
+// NOTE: The LAST Section containing the cursor, which is the innermost one:
+// `programSections` hands them out outermost first, so anything nested in a
+// Section stands after it.
+function innermostSection(
+	sections: Array<ParserSection>,
+	cursor: common.Cursor,
+): ParserSection | null {
+	let found: ParserSection | null = null
+
+	for (let section of sections) {
+		if (contains(section.position, cursor)) {
+			found = section
+		}
+	}
+
+	return found
+}
+
+// NOTE: Outermost first, the Section itself last.
+function ancestry(section: ParserSection): Array<ParserSection> {
+	let chain: Array<ParserSection> = []
+	let current: ParserSection | null = section
+
+	while (current !== null) {
+		chain.unshift(current)
+		current = current.parent
+	}
+
+	return chain
 }
 
 function dropRepeats(
@@ -172,6 +218,13 @@ function collectFromNode(
 			return
 		case "ReturnStatement":
 			descend(node.expression, cursor, chain)
+			return
+		case "ExpectStatement":
+		case "RequireStatement":
+			for (let expression of assertionExpressions(node)) {
+				descend(expression, cursor, chain)
+			}
+
 			return
 		case "Match":
 			descend(node.value, cursor, chain)
