@@ -7673,6 +7673,41 @@ describe("Enricher", () => {
 					),
 				).toBe("Unstocked")
 			})
+
+			// NOTE: `negate` is a name until the Enricher says whose it is, and
+			// a Program may write one of its own over a Boolean. Only
+			// `Boolean::negate` is the answer the polarity flag stands for, so
+			// the peel is taken after the call resolves — `Same::negate` here
+			// answers the value it was handed, and reading it as a negation
+			// would prove `d` the opposite of what the branch tested.
+			it("should read no alias off a negate that is not Boolean's", () => {
+				expect(
+					narrowedTypeOf(
+						`implementation {
+							namespace Same for Boolean {
+								negate() -> Boolean {
+									<- @
+								}
+							}
+
+							namespace Stock for Integer {
+								isBig(_ n: Integer) -> Boolean {
+									<- @::isGreaterThan(n)::<Same>negate()
+								}
+							}
+
+							type NotBig = Integer where @::isLessThanOrEqualTo(9)
+
+							constant d = 12
+
+							if d::isBig(9) {
+								Terminal.inspect(d)
+							}
+						}`,
+						"d",
+					),
+				).toBe("Integer")
+			})
 		})
 
 		// NOTE: A Method that TAKES Arguments is read the same way, with the
