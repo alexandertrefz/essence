@@ -125,18 +125,36 @@ declarations {
 		§§
 		§§ @returns — the exact total.
 		overload static sum {
+			§§ Adds up every Integer in the List.
+			§§
+			§§ The sum is an Integer, since whole numbers add to a whole number. The empty List sums to zero.
+			§§
+			§§ @param _ — the Integers to add up
+			§§ @returns — the total.
 			(_ integers: List<Integer>) -> Integer {
 				<- integers::reduce(startingWith 0, (total, integer) {
 					<- total::add(integer)
 				})
 			}
 
+			§§ Adds up every Rational in the List.
+			§§
+			§§ The sum is a Rational, since it need not be whole. The empty List sums to zero.
+			§§
+			§§ @param _ — the Rationals to add up
+			§§ @returns — the total.
 			(_ rationals: List<Rational>) -> Rational {
 				<- rationals::reduce(startingWith 0/1, (total, rational) {
 					<- total::add(rational)
 				})
 			}
 
+			§§ Adds up a List holding both Integers and Rationals.
+			§§
+			§§ The sum is an Integer when the total is whole, and a Rational otherwise. The empty List sums to zero.
+			§§
+			§§ @param _ — the Numbers to add up
+			§§ @returns — the total.
 			(_ numbers: List<Integer | Rational>) -> Integer | Rational {
 				constant start: Integer | Rational = 0
 
@@ -165,18 +183,36 @@ declarations {
 		§§
 		§§ @returns — the exact product.
 		overload static product {
+			§§ Multiplies every Integer in the List together.
+			§§
+			§§ The product is an Integer, since whole numbers multiply to a whole number. The empty List multiplies to one.
+			§§
+			§§ @param _ — the Integers to multiply
+			§§ @returns — the product.
 			(_ integers: List<Integer>) -> Integer {
 				<- integers::reduce(startingWith 1, (total, integer) {
 					<- total::multiply(with integer)
 				})
 			}
 
+			§§ Multiplies every Rational in the List together.
+			§§
+			§§ The product is a Rational, since it need not be whole. The empty List multiplies to one.
+			§§
+			§§ @param _ — the Rationals to multiply
+			§§ @returns — the product.
 			(_ rationals: List<Rational>) -> Rational {
 				<- rationals::reduce(startingWith 1/1, (total, rational) {
 					<- total::multiply(with rational)
 				})
 			}
 
+			§§ Multiplies a List holding both Integers and Rationals together.
+			§§
+			§§ The product is an Integer when it is whole, and a Rational otherwise. The empty List multiplies to one.
+			§§
+			§§ @param _ — the Numbers to multiply
+			§§ @returns — the product.
 			(_ numbers: List<Integer | Rational>) -> Integer | Rational {
 				constant start: Integer | Rational = 1
 
@@ -210,14 +246,32 @@ declarations {
 		§§
 		§§ The empty List has no mean, and the `defaultingTo:` entries answer the given Rational in place of nothing. A List proven to have an item answers the mean itself.
 		overload static average {
+			§§ The arithmetic mean of the Integers: their sum divided by their count.
+			§§
+			§§ The mean is a Rational, since it need not be whole. The empty List has no mean.
+			§§
+			§§ @param _ — the Integers to average
+			§§ @returns — the mean, or nothing for the empty List.
 			(_ integers: List<Integer>) -> Optional<Rational> {
 				<- Number.sum(integers)::divide(by integers::length())
 			}
 
+			§§ The arithmetic mean of the Rationals: their sum divided by their count.
+			§§
+			§§ The mean is a Rational. The empty List has no mean.
+			§§
+			§§ @param _ — the Rationals to average
+			§§ @returns — the mean, or nothing for the empty List.
 			(_ rationals: List<Rational>) -> Optional<Rational> {
 				<- Number.sum(rationals)::divide(by rationals::length())
 			}
 
+			§§ The arithmetic mean of a List holding both Integers and Rationals.
+			§§
+			§§ The mean is a Rational, since it need not be whole. The empty List has no mean.
+			§§
+			§§ @param _ — the Numbers to average
+			§§ @returns — the mean, or nothing for the empty List.
 			(_ numbers: List<Integer | Rational>) -> Optional<Rational> {
 				constant count = numbers::length()
 
@@ -310,6 +364,13 @@ declarations {
 		§§
 		§§ The answer for two equal Numbers is the first of them. A List answers the earliest of its lowest items. The empty List has none, and the `defaultingTo:` entries answer the given Number in place of nothing. A List proven to have an item answers the item itself.
 		overload static lowestNumber {
+			§§ The lower of two Integers.
+			§§
+			§§ The answer is an Integer. Two equal Integers answer the first of them.
+			§§
+			§§ @param _ — the first Integer to compare
+			§§ @param _ — the second Integer to compare
+			§§ @returns — the lower Integer.
 			(_ firstNumber: Integer, _ secondNumber: Integer) -> Integer {
 				if firstNumber::isLessThanOrEqualTo(secondNumber) {
 					<- firstNumber
@@ -318,6 +379,13 @@ declarations {
 				}
 			}
 
+			§§ The lower of two Rationals.
+			§§
+			§§ The answer is a Rational. Two equal Rationals answer the first of them.
+			§§
+			§§ @param _ — the first Rational to compare
+			§§ @param _ — the second Rational to compare
+			§§ @returns — the lower Rational.
 			(_ firstNumber: Rational, _ secondNumber: Rational) -> Rational {
 				if firstNumber::isLessThanOrEqualTo(secondNumber) {
 					<- firstNumber
@@ -326,6 +394,13 @@ declarations {
 				}
 			}
 
+			§§ The lower of an Integer and a Rational.
+			§§
+			§§ The answer keeps the kind of the Number it picks, so it is an Integer or a Rational. Two equal Numbers answer the Integer.
+			§§
+			§§ @param _ — the Integer to compare
+			§§ @param _ — the Rational to compare
+			§§ @returns — the lower Number.
 			(
 				_ firstNumber: Integer,
 				_ secondNumber: Rational,
@@ -337,6 +412,13 @@ declarations {
 				}
 			}
 
+			§§ The lower of a Rational and an Integer.
+			§§
+			§§ The answer keeps the kind of the Number it picks, so it is an Integer or a Rational. Two equal Numbers answer the Rational.
+			§§
+			§§ @param _ — the Rational to compare
+			§§ @param _ — the Integer to compare
+			§§ @returns — the lower Number.
 			(
 				_ firstNumber: Rational,
 				_ secondNumber: Integer,
@@ -352,6 +434,12 @@ declarations {
 			§ is empty, so the first item becomes the running answer and the
 			§ empty List keeps it.
 
+			§§ The lowest of the Integers in the List.
+			§§
+			§§ The answer is the earliest of the lowest items. The empty List has none.
+			§§
+			§§ @param _ — the Integers to compare
+			§§ @returns — the lowest Integer, or nothing for the empty List.
 			(_ integers: List<Integer>) -> Optional<Integer> {
 				constant start: Optional<Integer> = #Empty
 
@@ -366,6 +454,12 @@ declarations {
 				})
 			}
 
+			§§ The lowest of the Rationals in the List.
+			§§
+			§§ The answer is the earliest of the lowest items. The empty List has none.
+			§§
+			§§ @param _ — the Rationals to compare
+			§§ @returns — the lowest Rational, or nothing for the empty List.
 			(_ rationals: List<Rational>) -> Optional<Rational> {
 				constant start: Optional<Rational> = #Empty
 
@@ -383,6 +477,13 @@ declarations {
 			§ The mixed entry needs no dispatch: an `Integer | Rational`
 			§ receiver reaches `Number::isLessThanOrEqualTo` for the
 			§ cross-kind order.
+
+			§§ The lowest Number in a List holding both Integers and Rationals.
+			§§
+			§§ The answer keeps the kind of the item it picks, and is the earliest of the lowest items. The empty List has none.
+			§§
+			§§ @param _ — the Numbers to compare
+			§§ @returns — the lowest Number, or nothing for the empty List.
 			(
 				_ numbers: List<Integer | Rational>,
 			) -> Optional<Integer | Rational> {
@@ -499,6 +600,13 @@ declarations {
 		§§
 		§§ The answer for two equal Numbers is the first of them. A List answers the earliest of its highest items. The empty List has none, and the `defaultingTo:` entries answer the given Number in place of nothing. A List proven to have an item answers the item itself.
 		overload static highestNumber {
+			§§ The higher of two Integers.
+			§§
+			§§ The answer is an Integer. Two equal Integers answer the first of them.
+			§§
+			§§ @param _ — the first Integer to compare
+			§§ @param _ — the second Integer to compare
+			§§ @returns — the higher Integer.
 			(_ firstNumber: Integer, _ secondNumber: Integer) -> Integer {
 				if firstNumber::isGreaterThanOrEqualTo(secondNumber) {
 					<- firstNumber
@@ -507,6 +615,13 @@ declarations {
 				}
 			}
 
+			§§ The higher of two Rationals.
+			§§
+			§§ The answer is a Rational. Two equal Rationals answer the first of them.
+			§§
+			§§ @param _ — the first Rational to compare
+			§§ @param _ — the second Rational to compare
+			§§ @returns — the higher Rational.
 			(_ firstNumber: Rational, _ secondNumber: Rational) -> Rational {
 				if firstNumber::isGreaterThanOrEqualTo(secondNumber) {
 					<- firstNumber
@@ -515,6 +630,13 @@ declarations {
 				}
 			}
 
+			§§ The higher of an Integer and a Rational.
+			§§
+			§§ The answer keeps the kind of the Number it picks, so it is an Integer or a Rational. Two equal Numbers answer the Integer.
+			§§
+			§§ @param _ — the Integer to compare
+			§§ @param _ — the Rational to compare
+			§§ @returns — the higher Number.
 			(
 				_ firstNumber: Integer,
 				_ secondNumber: Rational,
@@ -526,6 +648,13 @@ declarations {
 				}
 			}
 
+			§§ The higher of a Rational and an Integer.
+			§§
+			§§ The answer keeps the kind of the Number it picks, so it is an Integer or a Rational. Two equal Numbers answer the Rational.
+			§§
+			§§ @param _ — the Rational to compare
+			§§ @param _ — the Integer to compare
+			§§ @returns — the higher Number.
 			(
 				_ firstNumber: Rational,
 				_ secondNumber: Integer,
@@ -537,6 +666,12 @@ declarations {
 				}
 			}
 
+			§§ The highest of the Integers in the List.
+			§§
+			§§ The answer is the earliest of the highest items. The empty List has none.
+			§§
+			§§ @param _ — the Integers to compare
+			§§ @returns — the highest Integer, or nothing for the empty List.
 			(_ integers: List<Integer>) -> Optional<Integer> {
 				constant start: Optional<Integer> = #Empty
 
@@ -551,6 +686,12 @@ declarations {
 				})
 			}
 
+			§§ The highest of the Rationals in the List.
+			§§
+			§§ The answer is the earliest of the highest items. The empty List has none.
+			§§
+			§§ @param _ — the Rationals to compare
+			§§ @returns — the highest Rational, or nothing for the empty List.
 			(_ rationals: List<Rational>) -> Optional<Rational> {
 				constant start: Optional<Rational> = #Empty
 
@@ -565,6 +706,12 @@ declarations {
 				})
 			}
 
+			§§ The highest Number in a List holding both Integers and Rationals.
+			§§
+			§§ The answer keeps the kind of the item it picks, and is the earliest of the highest items. The empty List has none.
+			§§
+			§§ @param _ — the Numbers to compare
+			§§ @returns — the highest Number, or nothing for the empty List.
 			(
 				_ numbers: List<Integer | Rational>,
 			) -> Optional<Integer | Rational> {
