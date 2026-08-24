@@ -867,3 +867,341 @@ function itemsOf(value: AnyType): Array<AnyType> {
 }
 
 // #endregion
+
+// #region Writing a failing value down
+
+// NOTE: A counterexample as DATA, so that the value a search found once is
+// asked about again on every later run. It is here beside `generate` and
+// `shrink` for the same reason those two live together: writing a value down
+// and building one back are one question asked from both ends, and a pair that
+// drifted apart would answer with something the Type says is impossible.
+//
+// NOTE: Neither the printed form nor the seed would do. What a report prints is
+// for a reader and does not read back — `3/4` is a Rational, a String and a
+// piece of a sentence, and nothing in it says which. A seed draws the case the
+// search STARTED from, and the value worth keeping is the one the shrink ended
+// at, which no draw ever produced.
+//
+// NOTE: The encoding is shaped by the GENERATOR rather than self-describing:
+// the generator is what says how to read the data back, so what is written down
+// is only what the generator can not know by itself. That is what makes a Type
+// which has changed under a stored value answer nothing at all, rather than
+// answer a value of a shape the property was never asked about.
+export type EncodedValue =
+	| { kind: "boolean"; value: boolean }
+	// NOTE: Digits rather than a JSON number — an Integer is a bigint at run
+	// time and no JSON number spells every one of them. It is the same spelling
+	// `Narrowing.atLeast` is written in, for the same reason.
+	| { kind: "integer"; value: string }
+	| { kind: "rational"; numerator: string; denominator: string }
+	| { kind: "string"; value: string }
+	| { kind: "list"; items: Array<EncodedValue> }
+	| { kind: "record"; members: Record<string, EncodedValue> }
+	| { kind: "case"; tag: string; members: Record<string, EncodedValue> }
+	// NOTE: Which ARM of a Union the value belongs to, by its index among them.
+	// A Union that was written in another order, or that lost an arm, is a Union
+	// the index no longer names what it was written for — which is exactly the
+	// change a stored value has to be refused over.
+	| { kind: "union"; member: number; value: EncodedValue }
+	| { kind: "refined"; value: EncodedValue }
+
+// NOTE: What a value looks like written down, and NOTHING where it can not be
+// written down at all. It never throws: what asks is a run that has already
+// found a counterexample and still has to report it, so a value that does not
+// answer the generator's shape costs the corpus rather than the report.
+export function encode(
+	generator: Generator,
+	value: AnyType,
+): EncodedValue | null {
+	// NOTE: One question at the top rather than one per kind. `claims` is what a
+	// Union already asks to find the arm a value belongs to, and a value the
+	// generator does not claim is one the encoding could only get wrong.
+	if (!claims(generator, value)) {
+		return null
+	}
+
+	switch (generator.kind) {
+		case "boolean":
+			return {
+				kind: "boolean",
+				value: (value as { value: boolean }).value,
+			}
+		case "integer":
+			return {
+				kind: "integer",
+				value: BigInt(
+					(value as { value: number | bigint }).value,
+				).toString(),
+			}
+		case "rational": {
+			let rational = value as { numerator: bigint; denominator: bigint }
+
+			return {
+				kind: "rational",
+				numerator: rational.numerator.toString(),
+				denominator: rational.denominator.toString(),
+			}
+		}
+		case "string":
+			return { kind: "string", value: (value as { value: string }).value }
+		case "list": {
+			let items: Array<EncodedValue> = []
+
+			for (let item of itemsOf(value)) {
+				let encoded = encode(generator.item, item)
+
+				if (encoded === null) {
+					return null
+				}
+
+				items.push(encoded)
+			}
+
+			return { kind: "list", items }
+		}
+		case "record": {
+			let members = encodeMembers(generator.members, value)
+
+			return members === null ? null : { kind: "record", members }
+		}
+		case "case": {
+			let members = encodeMembers(generator.members, value)
+
+			return members === null
+				? null
+				: { kind: "case", tag: generator.tag, members }
+		}
+		case "union": {
+			let member = generator.members.findIndex((arm) =>
+				claims(arm, value),
+			)
+
+			if (member === -1) {
+				return null
+			}
+
+			let encoded = encode(generator.members[member]!, value)
+
+			return encoded === null
+				? null
+				: { kind: "union", member, value: encoded }
+		}
+		case "refined": {
+			let encoded = encode(generator.base, value)
+
+			return encoded === null ? null : { kind: "refined", value: encoded }
+		}
+		// NOTE: A Namespace's own generator says how to BUILD a value and
+		// nothing about what one is made of, which is the whole of what writing
+		// one down would need. A property test with such a Parameter keeps no
+		// corpus at all — the same silence a shrink answers with.
+		case "generated":
+			return null
+	}
+}
+
+function encodeMembers(
+	members: Array<GeneratorMember>,
+	value: AnyType,
+): Record<string, EncodedValue> | null {
+	let holder = value as unknown as Record<string, AnyType>
+	let encoded: Record<string, EncodedValue> = {}
+
+	for (let member of members) {
+		let held = holder[member.name]
+
+		if (held === undefined) {
+			return null
+		}
+
+		let entry = encode(member.generator, held)
+
+		if (entry === null) {
+			return null
+		}
+
+		encoded[member.name] = entry
+	}
+
+	return encoded
+}
+
+// NOTE: `generate`'s switch with the randomness taken out. Every value is built
+// through the very constructors a draw builds through, so a replayed
+// counterexample is indistinguishable from a drawn one — hidden Type key and
+// all, which is what lets `is`, `toString` and a Match read it.
+//
+// NOTE: Nothing is trusted. The data came off a file that a hand, a merge or an
+// older Compiler may have been through, and the Types it was written against
+// may have changed since — so every mismatch answers nothing, and the entry
+// that held it is dropped rather than reported as a value of a shape nobody
+// asked about.
+export function decode(
+	generator: Generator,
+	data: EncodedValue,
+	narrowing: Narrowing = {},
+): AnyType | null {
+	if (typeof data !== "object" || data === null) {
+		return null
+	}
+
+	switch (generator.kind) {
+		case "boolean":
+			return data.kind === "boolean" && typeof data.value === "boolean"
+				? createBoolean(data.value)
+				: null
+		case "integer": {
+			if (data.kind !== "integer") {
+				return null
+			}
+
+			let whole = wholeFrom(data.value)
+
+			return whole === null ? null : createInteger(whole)
+		}
+		case "rational": {
+			if (data.kind !== "rational") {
+				return null
+			}
+
+			let numerator = wholeFrom(data.numerator)
+			let denominator = wholeFrom(data.denominator)
+
+			// NOTE: A denominator of zero is a Rational nothing ever built.
+			// `createRational` would answer one all the same, and it would print
+			// and compare as a value the Type says is impossible.
+			return numerator === null ||
+				denominator === null ||
+				denominator === 0n
+				? null
+				: createRational(numerator, denominator)
+		}
+		case "string":
+			return data.kind === "string" && typeof data.value === "string"
+				? createString(data.value)
+				: null
+		case "list": {
+			if (data.kind !== "list" || !Array.isArray(data.items)) {
+				return null
+			}
+
+			let items: Array<AnyType> = []
+
+			for (let item of data.items) {
+				let decoded = decode(generator.item, item)
+
+				if (decoded === null) {
+					return null
+				}
+
+				items.push(decoded)
+			}
+
+			return createList(items)
+		}
+		case "record": {
+			if (data.kind !== "record") {
+				return null
+			}
+
+			let members = decodeMembers(generator.members, data.members)
+
+			return members === null ? null : createRecord(members)
+		}
+		case "case": {
+			// NOTE: The tag as well as the kind. A Case that was renamed is a
+			// Case the stored value is no longer about, whatever its payload
+			// still looks like.
+			if (data.kind !== "case" || data.tag !== generator.tag) {
+				return null
+			}
+
+			let members = decodeMembers(generator.members, data.members)
+
+			return members === null
+				? null
+				: caseValue(
+						generator.tag,
+						generator.members.length === 0 ? undefined : members,
+					)
+		}
+		case "union": {
+			if (data.kind !== "union") {
+				return null
+			}
+
+			let member = generator.members[data.member]
+
+			return member === undefined
+				? null
+				: decode(member, data.value, narrowing)
+		}
+		case "refined": {
+			if (data.kind !== "refined") {
+				return null
+			}
+
+			let merged = mergeNarrowing(narrowing, generator.narrowing)
+			let value = decode(generator.base, data.value, merged)
+
+			// NOTE: The predicate is asked AGAIN rather than taken on trust. A
+			// stored value was admitted by whatever the refinement said the day
+			// it was written down, and one that has narrowed since no longer
+			// admits it — which is a stale entry rather than a counterexample.
+			return value !== null && admitted(generator, merged, value)
+				? value
+				: null
+		}
+		// NOTE: Nothing was written down, so there is nothing to read back.
+		case "generated":
+			return null
+	}
+}
+
+// NOTE: Exactly the members the generator names, and no others. A Record that
+// gained one has a stored value saying nothing about it; one that lost a member
+// has a stored value carrying a member the Type no longer has. Both are the
+// Type having changed under the entry, which is what makes it stale.
+function decodeMembers(
+	members: Array<GeneratorMember>,
+	data: Record<string, EncodedValue>,
+): Record<string, AnyType> | null {
+	if (
+		typeof data !== "object" ||
+		data === null ||
+		Object.keys(data).length !== members.length
+	) {
+		return null
+	}
+
+	let decoded: Record<string, AnyType> = {}
+
+	for (let member of members) {
+		let held = data[member.name]
+
+		if (held === undefined) {
+			return null
+		}
+
+		let value = decode(member.generator, held)
+
+		if (value === null) {
+			return null
+		}
+
+		decoded[member.name] = value
+	}
+
+	return decoded
+}
+
+// NOTE: What `BigInt` would take and should not: it reads an empty String as
+// zero, reads whitespace around digits as nothing at all, and throws on the
+// rest — none of which is an answer a file on disk has earned.
+const DIGITS = /^-?\d+$/
+
+function wholeFrom(text: string): bigint | null {
+	return typeof text === "string" && DIGITS.test(text) ? BigInt(text) : null
+}
+
+// #endregion
