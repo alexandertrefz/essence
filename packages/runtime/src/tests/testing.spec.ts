@@ -1835,3 +1835,209 @@ describe("The failing-example corpus", () => {
 		})
 	})
 })
+
+// NOTE: The coverage-guided search, driven the way the emitted JavaScript
+// drives it: a property test is `properties` standing where it was written, and
+// an instrumented bundle is one whose Module asked for `counters` and whose body
+// calls them. There is no flag to turn any of this on — a bundle that counts
+// nothing never fills the pool, which is what makes the modules below an A/B
+// rather than two configurations.
+describe("The coverage-guided search", () => {
+	const integers: Generator = { kind: "integer" }
+
+	function wholeOf(value: AnyType): bigint {
+		return BigInt((value as unknown as { value: number | bigint }).value)
+	}
+
+	// NOTE: The guards are written as residues so that how OFTEN one holds is
+	// the same whatever size the case was drawn at — the size ramp would
+	// otherwise make an early case and a late one two different experiments.
+	const MODULUS = 60n
+
+	function residue(value: AnyType, wanted: bigint): boolean {
+		return ((wholeOf(value) % MODULUS) + MODULUS) % MODULUS === wanted
+	}
+
+	function coveragePoint(kind: "statement" | "branch") {
+		return {
+			kind,
+			label: "",
+			scope: "",
+			position: nowhere,
+			refinement: false,
+			tag: null,
+		} as const
+	}
+
+	// NOTE: ONE property over two Parameters that fails only where BOTH of them
+	// are inside a narrow guard — a case a blind search has to meet at once and
+	// a guided one climbs to, holding whichever guard a kept case already met.
+	//
+	// `instrumented` is whether the Module registered counters at all, and
+	// `gated` is whether the point it counts depends on a VALUE. The three
+	// combinations are the whole experiment: only a counter that moves on a
+	// value can tell the search that a case reached somewhere new.
+	function pairing(options: {
+		instrumented: boolean
+		gated: boolean
+		guardsA?: (value: AnyType) => boolean
+	}): TestModule {
+		let guardsA = options.guardsA ?? ((value) => residue(value, 13n))
+		let count = options.instrumented
+			? counters({
+					module: "/Guided.es",
+					points: [
+						coveragePoint("statement"),
+						coveragePoint("branch"),
+					],
+					choices: [],
+				})
+			: null
+
+		return module([manifest("/pair", { key: "pair" })], (context) => {
+			properties(
+				context,
+				0,
+				null,
+				[
+					{ name: "a", generator: integers },
+					{ name: "b", generator: integers },
+				],
+				(a, b) => {
+					count?.(0)
+
+					if (count !== null && options.gated && guardsA(a!)) {
+						count(1)
+					}
+
+					required(
+						context,
+						0,
+						!(guardsA(a!) && residue(b!, 41n)),
+						null,
+					)
+				},
+			)
+		})
+	}
+
+	// NOTE: The seed and the case budget are PINNED, and the numbers below are
+	// pinned to them: they were found by running the three modules over a sweep
+	// of seeds and keeping one where the guided search finds the conjunction
+	// well inside the budget and neither control finds it at all. Any change to
+	// what the search draws, or in what order, moves them — which is the point
+	// of writing them down.
+	const SEED = "4e93e921"
+	const BUDGET = 1200
+
+	function search(
+		one: TestModule,
+		options: Partial<RunOptions> = {},
+	): { found: boolean; cases: number; events: Array<TestEvent> } {
+		let events: Array<TestEvent> = []
+
+		runTests(registryOf([one]), {
+			sink: (event) => events.push(event),
+			now: () => 0,
+			seed: SEED,
+			cases: BUDGET,
+			...options,
+		})
+
+		let event = events.find((each) => each.kind === "property") as
+			| Extract<TestEvent, { kind: "property" }>
+			| undefined
+
+		return {
+			found: event !== undefined && event.counterexample !== null,
+			cases: event?.cases ?? -1,
+			events,
+		}
+	}
+
+	// NOTE: Instrumentation on its own is not guidance. Both modules here count,
+	// and only the one whose counter depends on a VALUE ever reaches ground a
+	// case can be credited with — so only that one fills the pool, and only that
+	// one finds the conjunction. Asserted through the search's OUTCOME, because
+	// the pool is the driver's own business and nothing exports it.
+	test("fills its pool only where a case reached new ground", () => {
+		let guided = search(pairing({ instrumented: true, gated: true }))
+		let ungated = search(pairing({ instrumented: true, gated: false }))
+
+		expect(guided.found).toBe(true)
+		expect(guided.cases).toBe(806)
+		expect(ungated.found).toBe(false)
+		expect(ungated.cases).toBe(BUDGET)
+	})
+
+	// NOTE: THE value proof. The identical property, once in a Module that
+	// counts and once in a Module that does not — which is the control the
+	// no-flag design gives away for free, since a bundle with no counters in it
+	// can not fill a pool however the driver is written. Same seed, same budget,
+	// same generators: the only difference is whether anything told the search
+	// where it had been.
+	test("finds a conjunction the blind search does not, at one seed", () => {
+		let guided = search(pairing({ instrumented: true, gated: true }))
+		let blind = search(pairing({ instrumented: false, gated: false }))
+
+		expect(guided.found).toBe(true)
+		expect(guided.cases).toBe(806)
+		expect(blind.found).toBe(false)
+		expect(blind.cases).toBe(BUDGET)
+	})
+
+	// NOTE: A stored counterexample is asked before anything is drawn, and one
+	// that reaches new ground is exactly the neighbourhood worth searching — so
+	// the corpus does not only catch the bug it was written for, it hands the
+	// search a place to start. Here the guard on `a` is a single value no draw
+	// ever answers, so the pool can be seeded by the replay and by nothing else.
+	test("searches around a stored value that broke new ground", () => {
+		let narrow = () =>
+			pairing({
+				instrumented: true,
+				gated: true,
+				guardsA: (value) => wholeOf(value) === 12345n,
+			})
+		let corpus = {
+			"/Season.es": {
+				pair: [
+					{
+						values: [
+							{
+								name: "a",
+								data: { kind: "integer", value: "12345" },
+							} as const,
+							{
+								name: "b",
+								data: { kind: "integer", value: "0" },
+							} as const,
+						],
+					},
+				],
+			},
+		}
+		let seeded = search(narrow(), {
+			seed: "2fedcba2",
+			counterexamples: corpus,
+		})
+		let control = search(narrow(), { seed: "2fedcba2" })
+
+		expect(seeded.found).toBe(true)
+		expect(seeded.cases).toBe(339)
+		// NOTE: The same run without the corpus. Nothing ever draws the value
+		// the guard names, so the gated point is never counted, the pool never
+		// holds a case worth searching around, and the conjunction is never met.
+		expect(control.found).toBe(false)
+		expect(control.cases).toBe(BUDGET)
+	})
+
+	// NOTE: The coin, the pick and the neighbour are all drawn from the test's
+	// own seeded source, so `--seed` replays a guided run exactly — which is
+	// what the command a failure prints promises.
+	test("draws the same guided run twice for one seed", () => {
+		let first = search(pairing({ instrumented: true, gated: true }))
+		let again = search(pairing({ instrumented: true, gated: true }))
+
+		expect(first.events).toEqual(again.events)
+	})
+})

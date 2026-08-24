@@ -5,11 +5,20 @@ import {
 	type Generator,
 	GenerationFailure,
 	generate,
+	mutate,
 	shrink,
 } from "./Generators"
 import { anyIs } from "./internalHelpers"
 import { materialise } from "./List"
-import { createEntropy, createRandomness, nextWord, seedOf } from "./Randomness"
+import {
+	type RandomnessType,
+	below,
+	createEntropy,
+	createRandomness,
+	fraction,
+	nextWord,
+	seedOf,
+} from "./Randomness"
 import type { StringType } from "./String"
 import {
 	getStringRepresentation,
@@ -767,6 +776,34 @@ function rewind(context: TestContext, mark: ContextMark): void {
 // whose body is slow is what this bounds.
 const SHRINK_ATTEMPTS = 400
 
+// NOTE: THE coverage-guided search. Where the bundle is instrumented — which is
+// `essence test --coverage` and nothing else — a case whose run reached ground
+// no case before it had is KEPT, and a share of the later cases step one move
+// away from one of the kept cases instead of drawing blind. A property that
+// fails only where several Parameters agree is what this finds: blind draws
+// have to meet every condition at once, while a neighbour holds the ones a case
+// already met and moves one coordinate.
+//
+// NOTE: It has no flag of its own, and needs none. An uninstrumented bundle
+// counts nothing, so `coverageStamp` never moves, so the pool never fills and
+// the branch below is never taken — the draws such a run makes are word for
+// word the draws it made before this existed. That is also the CONTROL a spec
+// gets for free: the same module without counters is the same search blind.
+//
+// NOTE: How many cases are kept. Eight is small on purpose: a pool that held
+// every interesting case would spend the run mutating whatever it found first,
+// and the oldest is dropped so the search follows where the coverage went.
+const GUIDED_POOL = 8
+// NOTE: What share of the cases after the warm-up take a neighbour rather than
+// a fresh draw. Half — a search that only exploited would never find the ground
+// it has not seen, and one that only explored is the blind search.
+const GUIDED_SHARE = 0.5
+// NOTE: How much of the run draws blind before any of it exploits. A quarter,
+// and at least one case: there is nothing worth searching around until
+// something has reached somewhere, and the early cases are the small ones a
+// failure is nearly minimal already at.
+const GUIDED_WARMUP = 0.25
+
 function runProperty(
 	context: TestContext,
 	parameters: Array<PropertyParameter>,
@@ -780,6 +817,29 @@ function runProperty(
 	let fromCorpus = false
 	let replayed = 0
 	let ran = 0
+	// NOTE: The cases whose run reached ground nothing before them had, newest
+	// last. It stays EMPTY for an uninstrumented bundle, which is what makes the
+	// search below cost nothing where there is nothing to guide it.
+	let pool: Array<Array<AnyType>> = []
+	let warmup = Math.max(1, Math.floor(settings.cases * GUIDED_WARMUP))
+	// NOTE: One case, asked whether it holds and watched for new ground on the
+	// way. Every case goes through here — the corpus replays included, because a
+	// stored counterexample that reaches somewhere fresh is exactly the
+	// neighbourhood worth searching.
+	let asked = (values: Array<AnyType>): boolean => {
+		let reached = coverageStamp()
+		let outcome = holds(context, mark, run, values)
+
+		if (coverageStamp() > reached) {
+			pool.push(values)
+
+			if (pool.length > GUIDED_POOL) {
+				pool.shift()
+			}
+		}
+
+		return outcome
+	}
 
 	// NOTE: The corpus BEFORE the search, in the order it was stored, newest
 	// first. What it holds is every value this test has ever failed on, so a
@@ -800,7 +860,7 @@ function runProperty(
 
 		replayed += 1
 
-		if (!holds(context, mark, run, values)) {
+		if (!asked(values)) {
 			failing = values
 			fromCorpus = true
 
@@ -821,9 +881,17 @@ function runProperty(
 		let values: Array<AnyType>
 
 		try {
-			values = parameters.map((parameter) =>
-				generate(parameter.generator, source, size),
-			)
+			// NOTE: The coin is drawn LAST and only where the pool could serve,
+			// so a run with nothing in the pool spends no word on the question
+			// and draws exactly the sequence it drew before this existed.
+			values =
+				index >= warmup &&
+				pool.length > 0 &&
+				fraction(source) < GUIDED_SHARE
+					? neighbourOf(parameters, pool, source, size)
+					: parameters.map((parameter) =>
+							generate(parameter.generator, source, size),
+						)
 		} catch (thrown) {
 			// NOTE: A refinement nothing could satisfy. The result is recorded
 			// FIRST so the report still says how many cases held, and then the
@@ -845,7 +913,7 @@ function runProperty(
 
 		ran += 1
 
-		if (!holds(context, mark, run, values)) {
+		if (!asked(values)) {
 			failing = values
 
 			break
@@ -894,6 +962,33 @@ function runProperty(
 	// exactly as far as it always does.
 	rewind(context, mark)
 	run(...shrunk.values)
+}
+
+// NOTE: One case built out of a case that reached new ground: the tuple copied,
+// and ONE of its Parameters replaced by a structural neighbour of what it held.
+// Everything else is shared rather than redrawn — a value is immutable, and
+// keeping the rest is the whole point: what the kept case reached, it reached
+// with those values, and moving one coordinate is what asks what is next to it.
+function neighbourOf(
+	parameters: Array<PropertyParameter>,
+	pool: Array<Array<AnyType>>,
+	source: RandomnessType,
+	size: number,
+): Array<AnyType> {
+	let values = [...(pool[below(source, pool.length)] ?? [])]
+	let index = below(source, parameters.length)
+	let parameter = parameters[index]
+	let held = values[index]
+
+	// NOTE: A property with no Parameters at all runs one case, and that case
+	// has no neighbour to step to.
+	if (parameter === undefined || held === undefined) {
+		return values
+	}
+
+	values[index] = mutate(parameter.generator, held, source, size)
+
+	return values
 }
 
 // NOTE: One stored counterexample read back as the values to run the body with,
