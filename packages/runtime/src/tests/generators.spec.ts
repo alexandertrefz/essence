@@ -726,6 +726,80 @@ describe("Generators", () => {
 			expect(crossed).toBeLessThan(tags.length / 2)
 		})
 
+		// NOTE: The claims question, sharpened: the runtime key alone reads
+		// every Record as the FIRST Record arm, and a neighbour rebuilt under
+		// the wrong arm drops the very members the kept case held. The member
+		// names are what tell two Record arms apart.
+		test("holds a value inside its own Record arm of a Union", () => {
+			let generator: Generator = {
+				kind: "union",
+				members: [
+					{
+						kind: "record",
+						members: [{ name: "name", generator: strings }],
+					},
+					{
+						kind: "record",
+						members: [{ name: "count", generator: integers }],
+					},
+				],
+			}
+			let value = createRecord({
+				count: createInteger(5n),
+			}) as unknown as AnyType
+			let kept = neighbours(generator, value, 60).filter((moved) =>
+				Object.keys(moved as unknown as object).includes("count"),
+			)
+
+			// NOTE: Most neighbours stay in the value's own arm — the cross-arm
+			// coin is one in four — and every one that stayed still holds the
+			// arm's own member rather than the first arm's.
+			expect(kept.length).toBeGreaterThan(30)
+		})
+
+		// NOTE: Two refinements of one base share a key too, and there the
+		// predicate is what claims — a positive Integer mutated under the
+		// negative arm's generator would answer values the kept case's arm
+		// refuses.
+		test("tells two refined arms of one base apart by their predicates", () => {
+			let positive: Generator = {
+				kind: "refined",
+				name: "Positive",
+				base: integers,
+				checks: [
+					(value) => ({
+						value: wholeOf(value) > 0n,
+					}),
+				],
+				narrowing: { atLeast: "1" },
+			}
+			let negative: Generator = {
+				kind: "refined",
+				name: "Negative",
+				base: integers,
+				checks: [
+					(value) => ({
+						value: wholeOf(value) < 0n,
+					}),
+				],
+				narrowing: { atMost: "-1" },
+			}
+			let generator: Generator = {
+				kind: "union",
+				members: [positive, negative],
+			}
+			let moved = neighbours(generator, createInteger(-7n), 60).map(
+				wholeOf,
+			)
+
+			// NOTE: The cross-arm coin still crosses — what may never happen is
+			// a "stay" that lands in the other arm because the first one
+			// claimed a value its own predicate refuses.
+			expect(moved.filter((value) => value < 0n).length).toBeGreaterThan(
+				30,
+			)
+		})
+
 		// NOTE: A value no arm claims is a value the Union never built, and a
 		// draw is the only honest answer to it.
 		test("draws afresh for a value no arm of a Union claims", () => {
