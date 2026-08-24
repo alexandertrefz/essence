@@ -65,8 +65,15 @@ export type TestsNode = TestNode | SuiteNode | ImplementationNode
 // `keywordPosition` is the `test` Keyword alone. A test's Position spans the
 // whole form, which is what a Diagnostic about the test underlines, while a
 // Code Lens ("Run · Debug") wants the one word to sit above.
+//
+// NOTE: `form` says which of the two sibling Keywords opened the item. A
+// `benchmark` is a test in every structural respect — a name, Modifiers, a
+// body, an identity — and what differs is what RUNNING it means: a test's body
+// is judged, a benchmark's body is timed. One Node keeps every stage that
+// walks tests from answering twice for one shape.
 export interface TestNode {
 	nodeType: "Test"
+	form: "test" | "benchmark"
 	name: StringValueNode | InterpolatedStringValueNode
 	modifiers: Array<TestModifierNode>
 	// NOTE: `across ROWS (row: Row)` — a table test, and null for the ordinary

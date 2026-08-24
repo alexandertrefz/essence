@@ -842,6 +842,22 @@ describe("Lexer", () => {
 			expect(stripPosition(lexer.next())).toEqual(output)
 		})
 
+		it("should lex benchmark", () => {
+			let lexer = new Lexer()
+			let input: string
+			let output: SimpleToken
+
+			input = "benchmark"
+			output = {
+				value: "benchmark",
+				type: TokenType.KeywordBenchmark,
+			}
+
+			lexer.reset(input)
+
+			expect(stripPosition(lexer.next())).toEqual(output)
+		})
+
 		it("should lex expect", () => {
 			let lexer = new Lexer()
 			let input: string

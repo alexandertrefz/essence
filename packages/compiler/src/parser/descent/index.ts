@@ -57,6 +57,7 @@ const identifierTokenTypes = new Set([
 	TokenType.KeywordTests,
 	TokenType.KeywordTest,
 	TokenType.KeywordSuite,
+	TokenType.KeywordBenchmark,
 	TokenType.KeywordExpect,
 	TokenType.KeywordRequire,
 ])
@@ -191,6 +192,7 @@ const statementStartTokenTypes = new Set([
 	TokenType.KeywordChoice,
 	TokenType.KeywordTest,
 	TokenType.KeywordSuite,
+	TokenType.KeywordBenchmark,
 	TokenType.KeywordExpect,
 	TokenType.KeywordRequire,
 ])
@@ -865,13 +867,14 @@ class DescentParser {
 		return this.parseImplementationNode()
 	}
 
-	// NOTE: `test` and `suite` are ordinary Identifiers as well, so what opens
-	// an item is the Keyword AND the name that must follow it — `test = 5`
-	// stays an assignment to a variable called `test`.
+	// NOTE: `test`, `suite` and `benchmark` are ordinary Identifiers as well, so
+	// what opens an item is the Keyword AND the name that must follow it —
+	// `test = 5` stays an assignment to a variable called `test`.
 	protected startsTestItem(token: Token): boolean {
 		if (
 			token.type !== TokenType.KeywordTest &&
-			token.type !== TokenType.KeywordSuite
+			token.type !== TokenType.KeywordSuite &&
+			token.type !== TokenType.KeywordBenchmark
 		) {
 			return false
 		}
@@ -892,9 +895,21 @@ class DescentParser {
 		return this.parseTest()
 	}
 
+	// NOTE: One reading for both forms — a benchmark is a test whose body is
+	// timed rather than judged, and it takes the same head: a name, Modifiers,
+	// and the `across` rows that make it several. What a benchmark may NOT take
+	// (`for any`) is the Enricher's refusal, because the Parser failing over a
+	// form it can read would drop the body a reader is still editing.
 	protected parseTest(): parser.TestNode {
-		let keyword = this.tokens.expect(TokenType.KeywordTest)
-		let name = this.parseTestName()
+		let keyword =
+			this.tokens.peek()?.type === TokenType.KeywordBenchmark
+				? this.tokens.expect(TokenType.KeywordBenchmark)
+				: this.tokens.expect(TokenType.KeywordTest)
+		let form =
+			keyword.type === TokenType.KeywordBenchmark
+				? ("benchmark" as const)
+				: ("test" as const)
+		let name = this.parseTestName(form)
 		let modifiers = this.parseTestModifiers()
 		let table = this.startsTestTable() ? this.parseTestTable() : null
 		let properties = this.startsTestProperties()
@@ -908,6 +923,7 @@ class DescentParser {
 			let block = this.parseBlock()
 
 			return generators.test(
+				form,
 				name,
 				modifiers,
 				table,
@@ -991,7 +1007,7 @@ class DescentParser {
 
 	protected parseSuite(): parser.SuiteNode {
 		let keyword = this.tokens.expect(TokenType.KeywordSuite)
-		let name = this.parseTestName()
+		let name = this.parseTestName("suite")
 		let modifiers = this.parseTestModifiers()
 
 		// NOTE: A suite's own body is not a test body — the Statements directly
@@ -1021,8 +1037,10 @@ class DescentParser {
 	// NOTE: A name is a String Literal so that it can say what the test proves
 	// rather than name it like a Function — and an interpolated one, because a
 	// table test names each row out of the row's own values.
-	protected parseTestName(): parser.TestNode["name"] {
-		let token = this.peekOrFail("the name of the test")
+	protected parseTestName(
+		item: "test" | "suite" | "benchmark" = "test",
+	): parser.TestNode["name"] {
+		let token = this.peekOrFail(`the name of the ${item}`)
 
 		if (token.type === TokenType.LiteralStringStart) {
 			return this.parseInterpolatedString()
@@ -1030,7 +1048,7 @@ class DescentParser {
 
 		if (token.type !== TokenType.LiteralString) {
 			fail(
-				`Expected the name of the test but found ${describeToken(token)}.`,
+				`Expected the name of the ${item} but found ${describeToken(token)}.`,
 				token.position,
 				"expected a String Literal",
 			)
@@ -2930,6 +2948,7 @@ class DescentParser {
 			case TokenType.KeywordTests:
 			case TokenType.KeywordTest:
 			case TokenType.KeywordSuite:
+			case TokenType.KeywordBenchmark:
 			case TokenType.KeywordExpect:
 			case TokenType.KeywordRequire:
 				return this.parseIdentifier()

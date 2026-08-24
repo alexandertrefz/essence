@@ -394,6 +394,79 @@ describe("Tests Section", () => {
 		})
 	})
 
+	describe("benchmark", () => {
+		it("should read a benchmark as a test whose form says so", () => {
+			let section = testsOf(
+				`implementation {}
+
+				tests {
+					test "records a win" {
+						expect true
+					}
+
+					benchmark "sorts ten thousand rows" {
+						expect true
+					}
+				}`,
+			)
+
+			expect(testAt(section, 0).form).toBe("test")
+
+			let node = testAt(section, 1)
+
+			expect(node.form).toBe("benchmark")
+			expect(nameOf(node)).toBe("sorts ten thousand rows")
+		})
+
+		it("should read a benchmark's Modifiers and rows the way a test's read", () => {
+			let section = testsOf(
+				`implementation {}
+
+				tests {
+					benchmark "sorts {size} rows" tagged slow across [100, 10000] (size: Integer) {
+						expect true
+					}
+				}`,
+			)
+
+			let node = testAt(section, 0)
+
+			expect(node.form).toBe("benchmark")
+			expect(modifierNames(node)).toEqual(["tagged"])
+			expect(node.table).not.toBeNull()
+		})
+
+		it("should keep 'benchmark' usable as a name", () => {
+			let { program, diagnostics } = parse(
+				`implementation {
+					constant benchmark = 1
+					constant doubled = benchmark
+				}`,
+			)
+
+			expect(diagnostics).toEqual([])
+			expect(
+				program.implementation.nodes.map((node) => node.nodeType),
+			).toEqual([
+				"ConstantDeclarationStatement",
+				"ConstantDeclarationStatement",
+			])
+		})
+
+		it("should report a benchmark written outside every tests section", () => {
+			let { diagnostics } = parse(
+				`implementation {
+					benchmark "nope" {
+						expect true
+					}
+				}`,
+			)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("test-outside-tests")
+		})
+	})
+
 	// NOTE: Error recovery resynchronises on the Tokens a Statement can begin
 	// with, so a Keyword missing from that list is not a Statement start to the
 	// recovery — and the whole item it opens, braces and all, is skipped

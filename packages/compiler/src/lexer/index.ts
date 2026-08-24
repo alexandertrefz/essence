@@ -63,6 +63,7 @@ const keywords = [
 	"tests",
 	"test",
 	"suite",
+	"benchmark",
 	"expect",
 	"require",
 ]
@@ -219,6 +220,7 @@ const wordTypes = new Map<string, lexer.TokenType>([
 	["tests", TokenType.KeywordTests],
 	["test", TokenType.KeywordTest],
 	["suite", TokenType.KeywordSuite],
+	["benchmark", TokenType.KeywordBenchmark],
 	["expect", TokenType.KeywordExpect],
 	["require", TokenType.KeywordRequire],
 	["true", TokenType.LiteralTrue],

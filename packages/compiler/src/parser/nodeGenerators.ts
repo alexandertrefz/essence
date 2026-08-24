@@ -44,6 +44,7 @@ export function testsSection(
 }
 
 export function test(
+	form: parser.TestNode["form"],
 	name: parser.TestNode["name"],
 	modifiers: Array<parser.TestModifierNode>,
 	table: parser.TestTableNode | null,
@@ -54,6 +55,7 @@ export function test(
 ): parser.TestNode {
 	return {
 		nodeType: "Test",
+		form,
 		name,
 		modifiers,
 		table,

@@ -1157,6 +1157,26 @@ describe("formatter", () => {
 			expect(result.text).toBe(source)
 		})
 
+		it("writes a benchmark under its own Keyword", () => {
+			let source = [
+				"implementation {",
+				"\tconstant x = 1",
+				"}",
+				"",
+				"tests {",
+				'\tbenchmark "sorts ten thousand rows" tagged slow {',
+				"\t\tconstant sorted = rows::sort()",
+				"\t}",
+				"}",
+				"",
+			].join("\n")
+
+			let result = format(source)
+
+			expect(result.refusal).toBeNull()
+			expect(result.text).toBe(source)
+		})
+
 		it("writes a property test's Modifiers in front of its Parameters", () => {
 			let source = [
 				"implementation {",

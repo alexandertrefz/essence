@@ -112,6 +112,7 @@ function exampleTest(
 
 	return {
 		nodeType: "Test",
+		form: "test",
 		name: { nodeType: "StringValue", value: name, position },
 		modifiers: [],
 		table: null,

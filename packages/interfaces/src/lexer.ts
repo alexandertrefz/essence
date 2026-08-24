@@ -58,6 +58,7 @@ export enum TokenType {
 	KeywordTests = "KeywordTests",
 	KeywordTest = "KeywordTest",
 	KeywordSuite = "KeywordSuite",
+	KeywordBenchmark = "KeywordBenchmark",
 	KeywordExpect = "KeywordExpect",
 	KeywordRequire = "KeywordRequire",
 	//
