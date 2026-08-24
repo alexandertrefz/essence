@@ -460,34 +460,25 @@ export async function runTestWatch(
 			let coverage = context.options.coverage
 				? collectCoverage(allEvents())
 				: emptyCoverage
-			// NOTE: This cycle's own snapshots, not every cycle's — a snapshot
-			// written two saves ago is on disk already, and writing it again
-			// would rewrite a file nothing asked about.
+			// NOTE: This cycle's OWN events, bound once for the three
+			// collectors below — what an entry nothing reached recorded two
+			// saves ago is on disk already, and three copies of this filter
+			// would be three module lists that could drift apart.
+			let cycled = cycleEvents(toRun.map((suite) => suite.inputFileName))
 			let written = await writeSnapshots({
-				snapshots: collectSnapshots(
-					cycleEvents(toRun.map((suite) => suite.inputFileName)),
-				),
+				snapshots: collectSnapshots(cycled),
 				sources,
 				stored,
 				inline: async () =>
 					(await import("@essence-lang/formatter/snapshots"))
 						.writeInlineSnapshots,
 			})
-			// NOTE: This cycle's own counterexamples too, and for the same
-			// reason: what an entry nothing reached found is on disk already.
 			let kept = await writeCorpus({
 				corpus,
-				...collectCorpusChanges(
-					cycleEvents(toRun.map((suite) => suite.inputFileName)),
-				),
+				...collectCorpusChanges(cycled),
 			})
-
-			// NOTE: This cycle's own measurements, for the same reason — a
-			// baseline recorded two saves ago is on disk already.
 			let recorded = await writeBenchmarks({
-				benchmarks: collectBenchmarks(
-					cycleEvents(toRun.map((suite) => suite.inputFileName)),
-				),
+				benchmarks: collectBenchmarks(cycled),
 				stored: baselines,
 			})
 

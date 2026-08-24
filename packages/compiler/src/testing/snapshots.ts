@@ -174,9 +174,14 @@ export async function readSnapshots(
 ): Promise<Record<string, SnapshotStore>> {
 	let stores: Record<string, SnapshotStore> = {}
 
-	for (let module of modules) {
-		stores[module] = await readSnapshotFile(snapshotFileOf(module))
-	}
+	// NOTE: Fanned out rather than awaited one at a time — the files are
+	// independent, and a project of hundreds of Modules pays this sweep at the
+	// head of every run.
+	await Promise.all(
+		[...modules].map(async (module) => {
+			stores[module] = await readSnapshotFile(snapshotFileOf(module))
+		}),
+	)
 
 	return stores
 }
