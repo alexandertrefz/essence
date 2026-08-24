@@ -152,6 +152,13 @@ function tally(out: string): Extract<TestEvent, { kind: "mutation-end" }> {
 	return end as Extract<TestEvent, { kind: "mutation-end" }>
 }
 
+// NOTE: How many mutants were actually BUILT and asked, which is what a
+// `--mutation-limit` caps — `sites` counts what the walker found, and the
+// remainder between the two is what a limit left alone.
+function judged(counts: Extract<TestEvent, { kind: "mutation-end" }>): number {
+	return counts.killed + counts.survived + counts.hung
+}
+
 // NOTE: The threshold and the comparison on two lines of their own, so that the
 // four-per-line cap leaves both operators with room. A fixture where the cap
 // decides which mutants exist would be a spec about the cap.
@@ -180,6 +187,29 @@ const SHARP = threshold([
 	"expect passes(51)",
 	"expect passes(50)::is(false)",
 ])
+
+// NOTE: Two Functions, one of them tested. Every site in `untested` is one no
+// test reaches, which is what makes this the fixture for both claims about
+// them: that they are never compiled, and that a `--mutation-limit` leaves them
+// exactly where they were.
+const UNCOVERED = [
+	"implementation {",
+	"	function untested(_ n: Integer) -> Integer {",
+	"		<- n::add(7)",
+	"	}",
+	"",
+	"	function used(_ n: Integer) -> Integer {",
+	"		<- n::add(1)",
+	"	}",
+	"}",
+	"",
+	"tests {",
+	'	test "uses one of them" {',
+	"		expect used(1)::is(2)",
+	"	}",
+	"}",
+	"",
+].join("\n")
 
 // NOTE: A fixture where one mutant PROVABLY never ends. `loop(startingWith:
 // while:step:)` is the language's whole answer to iteration and the Optimiser
@@ -276,26 +306,7 @@ describe("essence test --mutate", () => {
 	// exists to avoid. Proven by the counts: the tally names them apart, and
 	// nothing outside `killed` and `survived` was ever built.
 	it("reports a site no test reaches without compiling it", async () => {
-		let source = [
-			"implementation {",
-			"	function untested(_ n: Integer) -> Integer {",
-			"		<- n::add(7)",
-			"	}",
-			"",
-			"	function used(_ n: Integer) -> Integer {",
-			"		<- n::add(1)",
-			"	}",
-			"}",
-			"",
-			"tests {",
-			'	test "uses one of them" {',
-			"		expect used(1)::is(2)",
-			"	}",
-			"}",
-			"",
-		].join("\n")
-
-		await withFiles({ "Halves.es": source }, async (directory) => {
+		await withFiles({ "Halves.es": UNCOVERED }, async (directory) => {
 			let { out } = await mutate(directory, ["--json"])
 			let counts = tally(out)
 			let uncovered = mutants(out).filter(
@@ -307,7 +318,7 @@ describe("essence test --mutate", () => {
 			expect(
 				uncovered.every((mutant) => mutant.position.start.line === 3),
 			).toBe(true)
-			expect(counts.killed + counts.survived).toBe(
+			expect(counts.killed + counts.survived + counts.hung).toBe(
 				counts.sites - counts.uncovered - counts.invalid,
 			)
 		})
@@ -321,8 +332,47 @@ describe("essence test --mutate", () => {
 					.out,
 			)
 
-			expect(whole.killed + whole.survived).toBeGreaterThan(2)
-			expect(limited.killed + limited.survived).toBe(2)
+			expect(judged(whole)).toBeGreaterThan(2)
+			expect(judged(limited)).toBe(2)
+			// NOTE: What the limit stopped is JUDGING, and it unfinds nothing:
+			// the walker kept the same sites either way, and the remainder
+			// between them and what was judged is what a consumer subtracts.
+			expect(limited.sites).toBe(whole.sites)
+		})
+	})
+
+	// NOTE: A site nothing reaches costs neither a compile nor a run, so a
+	// limit — which is what a reader buys their way out of those with — has
+	// nothing to say about it. Leaving them out would report a project as
+	// having fewer untested lines the harder its run was narrowed, which is the
+	// number moving for a reason nobody could act on.
+	it("records every uncovered site whatever the limit", async () => {
+		await withFiles({ "Halves.es": UNCOVERED }, async (directory) => {
+			let whole = tally((await mutate(directory, ["--json"])).out)
+			let limited = (
+				await mutate(directory, ["--json", "--mutation-limit", "1"])
+			).out
+
+			expect(whole.uncovered).toBeGreaterThan(0)
+			expect(tally(limited).uncovered).toBe(whole.uncovered)
+			expect(judged(tally(limited))).toBe(1)
+			expect(
+				mutants(limited).filter(
+					(mutant) => mutant.status === "uncovered",
+				).length,
+			).toBe(whole.uncovered)
+		})
+	})
+
+	// NOTE: A reader comparing two scores has to be told that one of them was
+	// taken over a sample — the sample is the file order, and a project's
+	// hardest lines may all be in the last file.
+	it("says so where the limit stopped the judging", async () => {
+		await withFiles({ "Grading.es": WEAK }, async (directory) => {
+			let { out } = await mutate(directory, ["--mutation-limit", "2"])
+
+			expect(out).toContain("limit reached after 2 mutants")
+			expect(out).toContain("left unjudged")
 		})
 	})
 
@@ -566,14 +616,24 @@ describe("The attribution join", () => {
 		expect(coveringPoints(points, at(3, 4, 3, 10))).toEqual([0, 1])
 	})
 
-	// NOTE: The fallback, and the reason it is the SMALLEST overlap: a site the
+	// NOTE: The fallback, and the reason it is EVERY overlap: a site the
 	// Simplifier trimmed differently from the Node the counter stands in front
 	// of overlaps rather than nests, and answering with nothing would report a
 	// well-tested site as one no test reaches.
-	it("falls back to the smallest overlapping span", () => {
+	it("falls back to every overlapping span", () => {
 		let points = [at(1, 1, 4, 30), at(3, 1, 4, 8), at(9, 1, 9, 5)]
 
-		expect(coveringPoints(points, at(4, 6, 5, 2))).toEqual([1])
+		expect(coveringPoints(points, at(4, 6, 5, 2))).toEqual([0, 1])
+	})
+
+	// NOTE: A site that STRADDLES two points is reached by whatever reached
+	// either of them: neither span holds it, and the tests of the narrower one
+	// alone are a covering set with a test missing — which is a survivor nobody
+	// can trust.
+	it("takes both points a site straddles", () => {
+		let points = [at(3, 1, 3, 20), at(3, 25, 4, 4)]
+
+		expect(coveringPoints(points, at(3, 15, 3, 30))).toEqual([0, 1])
 	})
 
 	it("answers with nothing where no point comes near", () => {

@@ -621,12 +621,21 @@ export type MutantCounts = {
 // NOTE: ONE tally, read by the summary line and written into `mutation-end`.
 // They are two renderings of one fact, and counting twice is two chances to
 // disagree about what a run found.
-export function tallyMutants(mutants: Array<MutantRecord>): MutantCounts {
+//
+// NOTE: `sites` is every site the WALKER kept rather than every record here,
+// because a `--mutation-limit` stops the judging without unfinding anything:
+// the remainder between the two is what the limit left alone, and a consumer
+// that wants it subtracts. It defaults to the records, which is what a run
+// nobody narrowed has.
+export function tallyMutants(
+	mutants: Array<MutantRecord>,
+	sites: number = mutants.length,
+): MutantCounts {
 	let counted = (status: MutantRecord["status"]): number =>
 		mutants.filter((each) => each.status === status).length
 
 	return {
-		sites: mutants.length,
+		sites,
 		killed: counted("killed"),
 		survived: counted("survived"),
 		uncovered: counted("uncovered"),
@@ -650,9 +659,15 @@ export function renderMutation(
 	mutants: Array<MutantRecord>,
 	context: ReportContext,
 	sourceOf: SourceLookup,
+	// NOTE: What a `--mutation-limit` stopped, where one did: how many mutants
+	// were judged before it was reached, and how many covered sites were left
+	// alone. Null for a run nobody narrowed. A reader comparing two scores has
+	// to be told that one of them was taken over a sample, because the sample is
+	// the file order and a project's hardest lines may all be in the last file.
+	limit: { after: number; unjudged: number } | null = null,
 ): Array<string> {
 	let { palette, theme } = context
-	let counts = tallyMutants(mutants)
+	let counts = tallyMutants(mutants, mutants.length + (limit?.unjudged ?? 0))
 	let lines: Array<string> = [""]
 
 	for (let mutant of mutants) {
@@ -705,7 +720,22 @@ export function renderMutation(
 		lines.push("")
 	}
 
-	lines.push(renderMutationSummary(mutants.length, counts, context))
+	// NOTE: Above the summary rather than folded into it, because it is not a
+	// count of anything the run found — it is the sentence that says the run
+	// stopped looking, and a reader has to meet it before they read a score.
+	if (limit !== null) {
+		lines.push(
+			`${INDENT}${palette.muted(theme.symbols.info)} ${palette.muted(
+				`limit reached after ${pluralise(
+					limit.after,
+					"mutant",
+				)} — ${pluralise(limit.unjudged, "site")} left unjudged`,
+			)}`,
+		)
+		lines.push("")
+	}
+
+	lines.push(renderMutationSummary(counts, context))
 	lines.push("")
 
 	return lines
@@ -722,13 +752,12 @@ const ASIDES: Partial<Record<MutantRecord["status"], string>> = {
 }
 
 function renderMutationSummary(
-	sites: number,
 	counts: MutantCounts,
 	context: ReportContext,
 ): string {
 	let { palette, theme } = context
 	let parts = [
-		palette.number(`${pluralise(sites, "mutant")}`),
+		palette.number(`${pluralise(counts.sites, "mutant")}`),
 		palette.success(`${counts.killed} killed`),
 	]
 
