@@ -1201,15 +1201,10 @@ describe("Tests Section Semantics", () => {
 			])
 		})
 
-		it("should lower a benchmark with the key its baseline is stored under", () => {
-			let entries = simplifiedSectionOf(source).nodes.filter(
-				(node) => node.nodeType === "TestEntry",
-			) as Array<common.typedSimple.TestEntryNode>
-
-			expect(entries.map((entry) => entry.benchmark)).toEqual([
-				null,
-				"doubling",
-			])
+		it("should put the stored key on every manifest entry", () => {
+			expect(
+				simplifiedSectionOf(source).tests.map((entry) => entry.key),
+			).toEqual(["doubles", "doubling"])
 		})
 
 		// NOTE: The stored key is the identity WITHOUT the Module path — the
@@ -1227,7 +1222,7 @@ describe("Tests Section Semantics", () => {
 		})
 
 		it("should key a benchmark on the suites around it", () => {
-			let entries = simplifiedSectionOf(
+			let section = simplifiedSectionOf(
 				`implementation {}
 
 				tests {
@@ -1237,20 +1232,17 @@ describe("Tests Section Semantics", () => {
 						}
 					}
 				}`,
-			).nodes
+			)
 
-			expect(
-				(
-					(entries[0] as common.typedSimple.TestScopeNode)
-						.nodes[0] as common.typedSimple.TestEntryNode
-				).benchmark,
-			).toBe("Standing/ranks the table")
+			expect(section.tests.map((entry) => entry.key)).toEqual([
+				"Standing/ranks the table",
+			])
 		})
 
 		// NOTE: Each row is a benchmark in its own right, measured and compared
-		// against a baseline of its own — so the rows share the key and the
-		// runtime numbers the entry by the row that recorded it.
-		it("should take rows, and share one stored key between them", () => {
+		// against a baseline of its own — so each row's manifest entry carries
+		// its own key, the row spelled as the identity's last step.
+		it("should take rows, each keyed by its own entry", () => {
 			let section = simplifiedSectionOf(
 				`implementation {}
 
@@ -1265,12 +1257,12 @@ describe("Tests Section Semantics", () => {
 			) as common.typedSimple.TestRowsNode
 
 			expect(
-				section.tests.map((entry) => [entry.id, entry.benchmark]),
+				section.tests.map((entry) => [entry.key, entry.benchmark]),
 			).toEqual([
-				["/sorts {size} rows/0", true],
-				["/sorts {size} rows/1", true],
+				["sorts {size} rows/0", true],
+				["sorts {size} rows/1", true],
 			])
-			expect(rows.benchmark).toBe("sorts {size} rows")
+			expect(rows.benchmark).toBe(true)
 		})
 
 		it("should take the Modifiers a test takes", () => {

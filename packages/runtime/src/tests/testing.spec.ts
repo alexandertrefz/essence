@@ -77,6 +77,9 @@ function manifest(
 		focused: false,
 		skipped: null,
 		benchmark: false,
+		// NOTE: The id doubles as the key here the way it doubles as the name:
+		// a spec that cares about the real spelling overrides it.
+		key: id,
 		position: nowhere,
 		keywordPosition: nowhere,
 		...overrides,
@@ -907,9 +910,15 @@ function benchmarkModule(
 	overrides: Partial<TestManifestEntry> = {},
 ): TestModule {
 	return module(
-		[manifest("/bench", { benchmark: true, ...overrides })],
+		[
+			manifest("/bench", {
+				benchmark: true,
+				key: "doubling",
+				...overrides,
+			}),
+		],
 		(context) => {
-			benchmark(context, 0, null, "doubling", () => {
+			benchmark(context, 0, null, () => {
 				tick()
 				expected(context, 0, true, null)
 			})
@@ -1086,7 +1095,7 @@ describe("Benchmarks", () => {
 		let ran = 0
 		let registry = registryOf([
 			module([manifest("/bench", { benchmark: true })], (context) => {
-				benchmark(context, 0, null, "doubling", () => {
+				benchmark(context, 0, null, () => {
 					ran += 1
 					expected(context, 0, false, null)
 				})
@@ -1140,8 +1149,16 @@ describe("Benchmarks", () => {
 		let registry = registryOf([
 			module(
 				[
-					manifest("/rows/0", { benchmark: true, row: 0 }),
-					manifest("/rows/1", { benchmark: true, row: 1 }),
+					manifest("/rows/0", {
+						benchmark: true,
+						row: 0,
+						key: "sorts {size} rows/0",
+					}),
+					manifest("/rows/1", {
+						benchmark: true,
+						row: 1,
+						key: "sorts {size} rows/1",
+					}),
 				],
 				(context) => {
 					benchmarkRows(
@@ -1149,7 +1166,6 @@ describe("Benchmarks", () => {
 						0,
 						[integer(1), integer(2)],
 						null,
-						"sorts {size} rows",
 						() => {
 							tick()
 							expected(context, 0, true, null)
@@ -1162,13 +1178,13 @@ describe("Benchmarks", () => {
 			clock,
 			filters: { bench: true },
 			benchmarks: {
-				"/Season.es": { "sorts {size} rows [1]": 500_000 },
+				"/Season.es": { "sorts {size} rows/1": 500_000 },
 			},
 		})
 
 		expect(measured.map((event) => [event.key, event.status])).toEqual([
-			["sorts {size} rows [0]", "written"],
-			["sorts {size} rows [1]", "regressed"],
+			["sorts {size} rows/0", "written"],
+			["sorts {size} rows/1", "regressed"],
 		])
 	})
 })
@@ -1384,7 +1400,13 @@ describe("The failing-example corpus", () => {
 		}
 
 		return module(
-			[manifest("/a", { name: "stays small", ...options.overrides })],
+			[
+				manifest("/a", {
+					name: "stays small",
+					key: "stays small",
+					...options.overrides,
+				}),
+			],
 			(context) => {
 				properties(context, 0, null, [parameter], (value) => {
 					options.seen?.push(value!)
@@ -1612,15 +1634,14 @@ describe("The failing-example corpus", () => {
 	// again here because a bundle imports nothing from the Compiler. The two
 	// are pinned to each other by this string and its twin in the Compiler's
 	// own spec.
-	test("names an entry by the identity without the Module step", () => {
+	// NOTE: The key is the Compiler's, read off the manifest — the runtime
+	// derives nothing, so the escaping exists in exactly one place and the
+	// event repeats what the entry already said.
+	test("names an entry by the key the Compiler spelled for it", () => {
 		let event = reported(
 			runWith(
 				property(() => true, {
-					overrides: {
-						name: "a/b",
-						suitePath: ["table"],
-						row: 2,
-					},
+					overrides: { key: "table/a\\/b/2" },
 				}),
 			),
 		)
