@@ -115,6 +115,33 @@ describe("Mutation sites", () => {
 		])
 	})
 
+	// NOTE: A bound moved by one, or an order REVERSED, for every member of
+	// the table — the two `…OrEqualTo` names included. A bound written the
+	// wrong way round is the commonest comparison bug there is, and leaving
+	// those two with only their bound-moving step made them the two names a
+	// suite could get backwards without the score moving.
+	it("reverses the order of an OrEqualTo comparison too", () => {
+		let source = [
+			"implementation {",
+			"	function within(_ n: Integer, _ limit: Integer) -> Boolean {",
+			"		<- n::isLessThanOrEqualTo(limit)",
+			"	}",
+			"",
+			"	function beyond(_ n: Integer, _ limit: Integer) -> Boolean {",
+			"		<- n::isGreaterThanOrEqualTo(limit)",
+			"	}",
+			"}",
+			"",
+		].join("\n")
+
+		expect(only(sitesOf(source), "comparison")).toEqual([
+			"3 swap ::isLessThanOrEqualTo for ::isLessThan",
+			"3 swap ::isLessThanOrEqualTo for ::isGreaterThanOrEqualTo",
+			"7 swap ::isGreaterThanOrEqualTo for ::isGreaterThan",
+			"7 swap ::isGreaterThanOrEqualTo for ::isLessThanOrEqualTo",
+		])
+	})
+
 	it("finds the equality rotation", () => {
 		expect(only(sitesOf(), "equality")).toEqual([
 			"33 swap ::is for ::isNot",
@@ -197,6 +224,158 @@ describe("Mutation sites", () => {
 		)
 
 		expect(onLine.length).toBe(4)
+	})
+
+	// NOTE: The condition of a NARROWING `if` is what typed the body it opens.
+	// A mutant that asks a different question there runs a body against a
+	// refinement nobody proved — it fails everything it touches, which
+	// distinguishes no suite from another. It is the same refusal the branch
+	// swap has always had, reaching the condition it is written out of.
+	it("offers nothing inside the condition of a narrowing if", () => {
+		let source = [
+			"implementation {",
+			"	function share(_ total: Integer, _ parts: Integer) -> Rational {",
+			"		if parts::isNot(0) {",
+			"			<- total::divide(by parts)",
+			"		} else {",
+			"			<- 0",
+			"		}",
+			"	}",
+			"",
+			"	function above(_ n: Integer) -> Integer {",
+			"		if n::isGreaterThan(0) {",
+			"			<- n",
+			"		} else {",
+			"			<- 0",
+			"		}",
+			"	}",
+			"}",
+			"",
+		].join("\n")
+		let sites = sitesOf(source)
+
+		expect(only(sites, "equality")).toEqual([])
+		expect(only(sites, "comparison")).toEqual([])
+		expect(only(sites, "branch")).toEqual([])
+		// NOTE: And the literals of those conditions are still sites, which is
+		// what says the refusal is about the QUESTION being asked rather than
+		// about the line it is asked on.
+		expect(only(sites, "integer")).toEqual([
+			"3 swap 0 for 1",
+			"3 swap 0 for -1",
+			"6 swap 0 for 1",
+			"6 swap 0 for -1",
+			"11 swap 0 for 1",
+			"11 swap 0 for -1",
+			"14 swap 0 for 1",
+			"14 swap 0 for -1",
+		])
+	})
+
+	// NOTE: The Arguments a call site wrote are handed on UNTOUCHED, so a swap
+	// onto a Method that takes a different number of them crashes wherever it
+	// runs — which a mutation run would record as a kill the tests never
+	// earned, the one answer this walker must never give. The builtin branch
+	// has always checked it; the Module's own Namespaces did not.
+	it("refuses a swap onto a same-slot Method of another arity", () => {
+		let source = [
+			"implementation {",
+			"	type Money = { cents: Integer }",
+			"",
+			"	namespace Money for Money {",
+			"		overload add {",
+			"			(_ other: Money) -> Money {",
+			"				<- { cents = 1 }",
+			"			}",
+			"",
+			"			(_ other: Money, _ also: Money) -> Money {",
+			"				<- { cents = 2 }",
+			"			}",
+			"		}",
+			"",
+			"		overload subtract {",
+			"			(_ other: Money, _ also: Money) -> Money {",
+			"				<- { cents = 3 }",
+			"			}",
+			"",
+			"			(_ other: Money) -> Money {",
+			"				<- { cents = 4 }",
+			"			}",
+			"		}",
+			"	}",
+			"",
+			"	function total(_ left: Money, _ right: Money) -> Money {",
+			"		<- left::add(right)",
+			"	}",
+			"}",
+			"",
+		].join("\n")
+
+		expect(only(sitesOf(source), "arithmetic")).toEqual([])
+	})
+
+	// NOTE: A Method a PROTOCOL provided is answered by the Protocol, so the
+	// swap is sound exactly where that Protocol wrote a body for the target.
+	// `Orderable` writes all four comparisons, so a user Type conforming to it
+	// offers the rotations a builtin does.
+	it("rotates a comparison a Protocol provided", () => {
+		let source = [
+			"implementation {",
+			"	type Rank = { value: Integer }",
+			"",
+			"	namespace Rank for Rank is Orderable {",
+			"		compare(to other: Rank) -> Ordering {",
+			"			<- @.value::compare(to other.value)",
+			"		}",
+			"	}",
+			"",
+			"	function below(_ left: Rank, _ right: Rank) -> Boolean {",
+			"		<- left::isLessThan(right)",
+			"	}",
+			"",
+			"	function atMost(_ left: Rank, _ right: Rank) -> Boolean {",
+			"		<- left::isLessThanOrEqualTo(right)",
+			"	}",
+			"}",
+			"",
+		].join("\n")
+
+		expect(only(sitesOf(source), "comparison")).toEqual([
+			"11 swap ::isLessThan for ::isLessThanOrEqualTo",
+			"11 swap ::isLessThan for ::isGreaterThan",
+			"15 swap ::isLessThanOrEqualTo for ::isLessThan",
+			"15 swap ::isLessThanOrEqualTo for ::isGreaterThanOrEqualTo",
+		])
+	})
+
+	// NOTE: And the other half of the same rule. `Equatable` REQUIRES `is` and
+	// provides `isNot`, so the body a swap onto `is` would name is written by
+	// each conformer under its own Namespace and by the Protocol nowhere at
+	// all. Offering it emitted a call to a Function that does not exist, which
+	// this run would have recorded as a kill.
+	it("refuses a swap onto a member the Protocol only requires", () => {
+		let source = [
+			"implementation {",
+			"	type Tag = { name: String }",
+			"",
+			"	namespace Tag for Tag is Equatable {",
+			"		is(_ other: Tag) -> Boolean {",
+			"			<- @.name::is(other.name)",
+			"		}",
+			"	}",
+			"",
+			"	function differ(_ left: Tag, _ right: Tag) -> Boolean {",
+			"		<- left::isNot(right)",
+			"	}",
+			"}",
+			"",
+		].join("\n")
+
+		expect(
+			only(sitesOf(source), "equality").filter((site) =>
+				site.startsWith("11 "),
+			),
+		).toEqual([])
 	})
 })
 
