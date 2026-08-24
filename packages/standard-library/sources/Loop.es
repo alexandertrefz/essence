@@ -141,7 +141,8 @@ declarations {
 		) -> State {
 			§ Written on the counted entry above, whose range is inclusive. The
 			§ guard is what keeps an end at or below the start from counting
-			§ down: `upTo start` would otherwise run once, over `start - 1`.
+			§ down: `upTo start` would otherwise run twice, over `start` and
+			§ `start - 1`.
 			if end::isGreaterThan(start) {
 				<- loop(
 					from start,
