@@ -452,27 +452,39 @@ export function testIdentityKey(
 	identity: common.typed.TestIdentity,
 	row: number | null = null,
 ): string {
-	return escapedSteps([
+	return identityKey([
 		identity.modulePath ?? "",
-		...identity.suitePath,
-		identity.name,
-		...(row === null ? [] : [String(row)]),
+		...identitySteps(identity, row),
 	])
 }
 
-// NOTE: The same key WITHOUT the Module path — what a durable entry stored
-// beside the file itself is keyed on, which today is a benchmark's baseline.
-// The path is what says which file's companion the entry is in, so writing it
-// into the key as well would spell the file twice and lose every entry the day
-// it moves. The row is left out for the same reason a snapshot's name leaves it
-// out: the rows share a body, and a run numbers the entry it recorded.
+// NOTE: The same key with the Module step LEFT OFF, for what is stored beside
+// the source rather than across a whole run — a benchmark's baseline and a
+// failing-example corpus live in the Module's own companion directory, so
+// spelling the path inside the file as well would be the one fact written
+// twice, and a Module that moved would take a store its keys no longer name.
+// A benchmark's baseline leaves the row off as well, the way a snapshot's
+// name does: the rows share a body, and the run numbers the entry it
+// recorded.
 export function relativeIdentityKey(
 	identity: common.typed.TestIdentity,
+	row: number | null = null,
 ): string {
-	return escapedSteps([...identity.suitePath, identity.name])
+	return identityKey(identitySteps(identity, row))
 }
 
-function escapedSteps(steps: Array<string>): string {
+function identitySteps(
+	identity: common.typed.TestIdentity,
+	row: number | null,
+): Array<string> {
+	return [
+		...identity.suitePath,
+		identity.name,
+		...(row === null ? [] : [String(row)]),
+	]
+}
+
+function identityKey(steps: Array<string>): string {
 	return steps
 		.map((step) => step.replaceAll("\\", "\\\\").replaceAll("/", "\\/"))
 		.join("/")

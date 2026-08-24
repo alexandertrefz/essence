@@ -8,6 +8,7 @@ import type {
 	PropertyCounterexample,
 	SnapshotStatus,
 	Span,
+	StoredValue,
 	TestEvent,
 } from "@essence-lang/runtime/Testing"
 import { DEFAULT_CASES } from "@essence-lang/runtime/Testing"
@@ -89,6 +90,16 @@ export type PropertyRecord = {
 	seed: string
 	shrinks: number
 	counterexample: Array<PropertyCounterexample> | null
+	// NOTE: What the test's failing-example corpus did — the entry it is stored
+	// under, how many stored values were re-run before anything was drawn, which
+	// of them no longer read back, whether the failure came from one of them,
+	// and the shrunk value written down ready to store. A reader is told the
+	// first three; the runner acts on the last two.
+	key: string
+	replayed: number
+	stale: Array<number>
+	fromCorpus: boolean
+	encoded: Array<StoredValue> | null
 }
 
 // NOTE: One benchmark as the run reported it — what it measured, what it was
@@ -330,6 +341,11 @@ export function collectTestRun(events: Array<TestEvent>): TestRun {
 						seed: event.seed,
 						shrinks: event.shrinks,
 						counterexample: event.counterexample,
+						key: event.key,
+						replayed: event.replayed,
+						stale: event.stale,
+						fromCorpus: event.fromCorpus,
+						encoded: event.encoded,
 					}
 				}
 
@@ -743,6 +759,23 @@ export {
 	neverConstructed,
 	percentageOf,
 } from "./coverage"
+export {
+	collectCorpusChanges,
+	CORPUS_DIRECTORY,
+	CORPUS_LIMIT,
+	CORPUS_SCHEMA,
+	type CorpusAddition,
+	type CorpusChanges,
+	type CorpusFile,
+	type CorpusRemoval,
+	type CorpusWrites,
+	corpusFileOf,
+	noCorpusWrites,
+	parseCorpusFile,
+	printCorpusFile,
+	readCorpus,
+	writeCorpus,
+} from "./corpus"
 export {
 	type CoverageReportFormat,
 	coverageReportFileName,
