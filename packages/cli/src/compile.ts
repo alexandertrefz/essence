@@ -39,6 +39,11 @@ export type CompilationPlan = CompileMode & {
 	inputFileNames: Array<string>
 	outputs: Map<string, string> | null
 	dispatcher: CompileDispatcher
+	// NOTE: Whether every entry is also asked what mutations its Modules admit
+	// — see `CompileRequest.enumerateMutations`. Planned like the mode because
+	// it is a fact about the whole run: only a mutation run's baseline asks, and
+	// it asks of every entry of it.
+	enumerateMutations?: boolean
 }
 
 export type CompilationResult = {
@@ -54,6 +59,7 @@ export async function planCompilation(
 	options: CompileMode & {
 		emit: boolean
 		cacheOutput?: boolean
+		enumerateMutations?: boolean
 	},
 ): Promise<CompilationPlan> {
 	let inputFileNames = await resolveInputFiles(
@@ -92,6 +98,7 @@ export async function planCompilation(
 		dispatcher: useWorkers
 			? createWorkerPool(workerCount)
 			: createInlineDispatcher(),
+		enumerateMutations: options.enumerateMutations,
 	}
 }
 
@@ -141,6 +148,7 @@ export async function runCompilation(
 					sourcemapMode: options?.sourcemapMode,
 					optimisation: optimiserOptionsFor(context.options),
 					embed: context.options.embed,
+					enumerateMutations: plan.enumerateMutations,
 				},
 				(stage) => {
 					progress.update(inputFileName, {
