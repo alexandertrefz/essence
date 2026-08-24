@@ -79,6 +79,7 @@ function manifest(
 		focused: false,
 		skipped: null,
 		benchmark: false,
+		cases: null,
 		// NOTE: The id doubles as the key here the way it doubles as the name:
 		// a spec that cares about the real spelling overrides it.
 		key: id,
@@ -1837,6 +1838,20 @@ describe("The failing-example corpus", () => {
 
 		expect(event.module).toBe("/Season.es")
 		expect(event.key).toBe("table/a\\/b/2")
+	})
+
+	// NOTE: The entry's own budget — a synthesized goal's — loses to an
+	// explicit `--cases` and beats the silent default, in that order.
+	test("runs an entry's own case budget unless the run named one", () => {
+		let budgeted = property(() => true, { overrides: { cases: 7 } })
+
+		expect(reported(runWith(budgeted, { cases: undefined }))).toMatchObject(
+			{ cases: 7, requested: 7 },
+		)
+		expect(reported(runWith(budgeted, { cases: 3 }))).toMatchObject({
+			cases: 3,
+			requested: 3,
+		})
 	})
 
 	test("replays nothing where the run was told about nothing", () => {

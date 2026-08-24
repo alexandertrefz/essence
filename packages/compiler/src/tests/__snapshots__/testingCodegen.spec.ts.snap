@@ -82,6 +82,7 @@ exports[`Test codegen — the emitted shape keeps the golden shape of a whole re
 			focused: false,
 			skipped: null,
 			benchmark: false,
+			cases: null,
 			key: "arithmetic/doubles",
 			position: {
 				start: {
@@ -114,6 +115,7 @@ exports[`Test codegen — the emitted shape keeps the golden shape of a whole re
 			focused: false,
 			skipped: null,
 			benchmark: false,
+			cases: null,
 			key: "carries the constant",
 			position: {
 				start: {

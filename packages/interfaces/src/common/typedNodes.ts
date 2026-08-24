@@ -122,6 +122,12 @@ export type TestNode = {
 	// table runs a row a reader wrote, a property runs a value the runner made
 	// up.
 	properties: TestPropertiesNode | null
+	// NOTE: How many cases THIS property runs where the command line says
+	// nothing — null for every written test, which runs at the run's own
+	// count. A synthesized contract goal sets it: a Namespace is dozens of
+	// goals, and a hundred cases each is a run nobody asked to wait for, so a
+	// goal runs fewer and `--cases` still overrides either way.
+	cases: number | null
 	body: Array<ImplementationNode>
 	keywordPosition: Position
 	position: Position

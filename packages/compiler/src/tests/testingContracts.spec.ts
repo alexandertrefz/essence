@@ -338,6 +338,23 @@ describe("Contract tests", () => {
 		})
 	})
 
+	describe("What a goal carries", () => {
+		// NOTE: The ratified budget: a Namespace is dozens of goals, and a
+		// hundred cases each is a run nobody asked to wait for.
+		it("budgets a generated goal at twenty-five cases", () => {
+			let [goal] = goalsOf(
+				moduleOf(`	namespace Counting for Integer {
+		up() -> Integer {
+			<- @::add(1)
+		}
+	}`),
+			)
+
+			expect(goal?.cases).toBe(25)
+			expect(goal?.properties).not.toBeNull()
+		})
+	})
+
 	describe("What it refuses to synthesize", () => {
 		it("says once per Namespace what got no goal", () => {
 			expect(

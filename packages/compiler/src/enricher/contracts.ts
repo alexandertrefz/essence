@@ -35,6 +35,13 @@ import { childScope } from "./scope"
 // the prover can not see through: a native binding, and a `Generatable`
 // conformance that hands back a value its own Type refuses.
 
+// NOTE: How many cases one goal runs where the command line says nothing. A
+// Namespace is dozens of goals and a hundred cases each is a run nobody asked
+// to wait for; twenty-five is enough for a shape-level lie to show, and
+// `--cases` overrides it either way — for the reader who wants one goal
+// hammered, and for the sweep that wants them all brief.
+const CONTRACT_CASES = 25
+
 // NOTE: The name the answer is bound to inside a goal's body. A `$` name no
 // Essence source can spell, so a Method taking an Argument labelled `answer`
 // can not collide with it, and one name for every goal because a goal is its
@@ -362,6 +369,7 @@ function goalOf(
 			parameters.length === 0
 				? null
 				: { nodeType: "TestProperties", parameters, position },
+		cases: parameters.length === 0 ? null : CONTRACT_CASES,
 		body,
 		keywordPosition: position,
 		position,

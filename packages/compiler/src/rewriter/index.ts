@@ -8197,6 +8197,7 @@ function testManifest(
 					type: "Literal",
 					value: entry.benchmark,
 				}),
+				property("cases", { type: "Literal", value: entry.cases }),
 				property("key", { type: "Literal", value: entry.key }),
 				property("position", rangeObject(entry.position)),
 				property("keywordPosition", rangeObject(entry.keywordPosition)),

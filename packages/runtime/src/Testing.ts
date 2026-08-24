@@ -82,6 +82,11 @@ export type TestManifestEntry = {
 	// takes hundreds of runs of it, which is work no ordinary run asked for, so
 	// a benchmark runs where a run said `bench` and where somebody named it.
 	benchmark: boolean
+	// NOTE: How many cases this entry's property runs where the run says
+	// nothing — a synthesized contract goal's budget, and null for every
+	// written test. An explicit `--cases` beats it: the reader who typed a
+	// number meant it for everything.
+	cases: number | null
 	// NOTE: The identity WITHOUT the Module path, a row spelled as its last
 	// step — what everything stored BESIDE the file is keyed by: a benchmark's
 	// baseline, a property test's counterexamples. The Compiler spells it, so
@@ -2357,7 +2362,7 @@ function runOne(
 			// drew for it — which is what makes the replay a report prints work
 			// with the filter beside it.
 			word: seedOf(`${seed}/${entry.id}`),
-			cases: options.cases ?? DEFAULT_CASES,
+			cases: options.cases ?? entry.cases ?? DEFAULT_CASES,
 			replays:
 				((options.counterexamples ?? {})[test.module.module ?? ""] ??
 					{})[entry.key] ?? [],
