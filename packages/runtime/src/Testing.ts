@@ -222,6 +222,18 @@ type CoverageRecord = {
 // a run loads its bundles, reads their counts and drops them.
 const covered: Array<CoverageRecord> = []
 
+// NOTE: How much DISTINCT ground the bundle's counters have touched — bumped
+// once, the first time a point's count leaves zero. It is one integer so that
+// asking is O(1): a property test reads it after every generated case, and a
+// case that moved it is a case that reached somewhere no case before it had.
+// It is monotone per bundle and never reset — only its DELTAS mean anything,
+// and only within one run.
+let ground = 0
+
+export function coverageStamp(): number {
+	return ground
+}
+
 // NOTE: Called once per instrumented Module, as the Module is evaluated. It
 // answers with a closure over that Module's own counts, so a counter costs one
 // call and one increment rather than a lookup by Module name.
@@ -231,7 +243,13 @@ export function counters(module: CoverageModule): CoverageCounter {
 	covered.push({ module, counts, baseline: null })
 
 	return ((point: number, value?: AnyType) => {
-		counts[point] = (counts[point] ?? 0) + 1
+		let count = counts[point] ?? 0
+
+		if (count === 0) {
+			ground += 1
+		}
+
+		counts[point] = count + 1
 
 		return value
 	}) as CoverageCounter
@@ -1759,6 +1777,17 @@ export type TestEvent =
 			points: Array<CoveredPoint>
 			choices: Array<CoverageChoice>
 	  }
+	// NOTE: The points ONE test touched in one instrumented Module, by index
+	// into that Module's coverage table — written per test, and only where the
+	// run asked to attribute. The inverse of the affected-set map: a consumer
+	// folding these knows, for every point, which tests cover it.
+	| {
+			schema: 1
+			kind: "test-coverage"
+			id: string
+			module: string | null
+			points: Array<number>
+	  }
 	// NOTE: That the events which follow were REPLAYED rather than run — one
 	// compiled entry whose answer a runner already held, under a name that can
 	// only mean the code, the stores and the filters this run has. It carries the
@@ -2001,6 +2030,14 @@ export type RunOptions = {
 	// counters at all and the events are empty, so asking costs nothing; a
 	// runner that did not ask is not told.
 	coverage?: boolean
+	// NOTE: Whether each TEST also says which points IT touched — a
+	// `test-coverage` event per instrumented Module the test reached, worked
+	// out by diffing the counts around the test's run. It is the inverse of
+	// the affected-set map: which tests cover this line. Apart from
+	// `coverage` deliberately — this is what a mutation run and an editor's
+	// "covered by" ask for, and neither wants the run-end tables; it costs a
+	// copy of every counter per test, so nobody pays who did not ask.
+	coverageByTest?: boolean
 }
 
 export type RunSummary = {
@@ -2214,6 +2251,15 @@ function runOne(
 		row: entry.row,
 	})
 
+	// NOTE: What every counter stood at before THIS test — the counts copied
+	// whole, so what the test touched is the difference. Only where the run
+	// asked to attribute: the copy is every point of every instrumented
+	// Module, per test.
+	let before =
+		options.coverageByTest === true
+			? covered.map((record) => [...record.counts])
+			: null
+
 	let started = now()
 	let error: string | null = null
 
@@ -2256,6 +2302,32 @@ function runOne(
 			id: entry.id,
 			stream: chunk.stream,
 			text: chunk.text,
+		})
+	}
+
+	// NOTE: The points this one test moved, per instrumented Module — the
+	// counts as they stand against the copy taken above. Written before the
+	// verdict events, the way every other fact about the run is.
+	if (before !== null) {
+		covered.forEach((record, index) => {
+			let counts = before[index] ?? []
+			let points: Array<number> = []
+
+			for (let point = 0; point < record.counts.length; point += 1) {
+				if ((record.counts[point] ?? 0) > (counts[point] ?? 0)) {
+					points.push(point)
+				}
+			}
+
+			if (points.length > 0) {
+				sink({
+					schema: 1,
+					kind: "test-coverage",
+					id: entry.id,
+					module: record.module.module,
+					points,
+				})
+			}
 		})
 	}
 
