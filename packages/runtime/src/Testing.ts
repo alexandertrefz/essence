@@ -65,6 +65,11 @@ export type TestManifestEntry = {
 	tags: Array<string>
 	focused: boolean
 	skipped: string | null
+	// NOTE: Whether the item was written as a `benchmark` rather than as a
+	// `test`. It is what says whether the entry runs at all: measuring a body
+	// takes hundreds of runs of it, which is work no ordinary run asked for, so
+	// a benchmark runs where a run said `bench` and where somebody named it.
+	benchmark: boolean
 	position: Range
 	keywordPosition: Range
 }
@@ -338,6 +343,36 @@ export type RecordedSnapshot = {
 	recorded: string | null
 }
 
+// NOTE: The STORED baselines of one Module, keyed the way a stored snapshot is
+// — by the entry a measurement is written under, which is the identity without
+// the Module path and with a table row's number behind it. Read off
+// `__benchmarks__/<File>.es.bench` beside the source and handed to the run,
+// because the runtime is a bundle and nothing in it reads a file.
+export type BenchmarkStore = Record<string, number>
+
+// NOTE: What one measurement did against what was recorded. `written` is a
+// benchmark that had no baseline, or one an updating run replaced — both a
+// pass, and both something the runner has to write down. `regressed` is the
+// failure; `improved` passes and says so, because a measurement that got faster
+// is news rather than a problem, and the baseline is only replaced where
+// somebody asked.
+export type BenchmarkStatus = "written" | "matched" | "regressed" | "improved"
+
+// NOTE: One measurement. `nanoseconds` is the time of ONE run of the body — the
+// median sample's batch divided by the runs in it — in whole nanoseconds,
+// because that is the unit at which the number stops being a float that reads
+// differently every time it is printed. `iterations` and `samples` are what it
+// was measured out of, which is what says how much to believe it.
+export type BenchmarkResult = {
+	key: string
+	nanoseconds: number
+	iterations: number
+	samples: number
+	baseline: number | null
+	ratio: number | null
+	status: BenchmarkStatus
+}
+
 export type TestContext = {
 	// NOTE: Which `entry` of the Module's `run` is the one to run. `-1` runs
 	// none of them, which is how a run ENUMERATES: the setup evaluates once and
@@ -365,6 +400,11 @@ export type TestContext = {
 	// rather than reported. Both belong to the context because a capability a
 	// test can not reach is a capability it does not have.
 	stored: SnapshotStore
+	// NOTE: The stored baselines this Module's benchmarks are held to, read off
+	// disk by whoever started the run. It is on the context for the same reason
+	// the snapshots are: a capability a test can not reach is a capability it
+	// does not have.
+	benchStored: BenchmarkStore
 	updating: boolean
 	// NOTE: Which row of a table test is running, and null for the ordinary
 	// test that runs once. A stored snapshot is keyed by it — every row of a
@@ -380,6 +420,16 @@ export type TestContext = {
 	// ordinary test. It is written by `properties` and read by the run, which
 	// is what turns it into the one event that says how many cases held.
 	propertyResult: PropertyResult | null
+	// NOTE: What the benchmark of THIS context measured, and null for every
+	// test that is not one — the same arrangement `propertyResult` has, and for
+	// the same reason: the driver writes it and the run turns it into the one
+	// event that says how long the body took.
+	benchmarkResult: BenchmarkResult | null
+	// NOTE: The clock a measurement is read off, in high-resolution
+	// milliseconds. It is on the context rather than reached for so that a spec
+	// can drive it: a measurement asserted against a real clock is a test whose
+	// answer depends on the machine, which is a flake with a schedule.
+	clock: () => number
 	output: Array<OutputChunk>
 	// NOTE: What has been counted so far, asked from inside a running test
 	// rather than only read out at the end of a run. Coverage is a fact about
@@ -415,13 +465,23 @@ export type PropertyResult = {
 // of them still runs while a reader waits.
 export const DEFAULT_CASES = 100
 
+// NOTE: `performance.now` where the host has one, and `Date.now` where it has
+// not. A bundle is inlined wherever it is loaded, which is not always somewhere
+// with a high-resolution clock — and a measurement read off a coarse one is
+// still a measurement, taken over a batch big enough to show.
+function defaultClock(): number {
+	return typeof performance === "undefined" ? Date.now() : performance.now()
+}
+
 export function createContext(
 	index: number,
 	options: {
 		stored?: SnapshotStore
+		benchmarks?: BenchmarkStore
 		updating?: boolean
 		row?: number | null
 		property?: PropertySettings
+		clock?: () => number
 	} = {},
 ): TestContext {
 	return {
@@ -432,6 +492,7 @@ export function createContext(
 		expectations: [],
 		snapshots: [],
 		stored: options.stored ?? {},
+		benchStored: options.benchmarks ?? {},
 		updating: options.updating ?? false,
 		row: options.row ?? null,
 		property: options.property ?? {
@@ -440,6 +501,8 @@ export function createContext(
 			cases: DEFAULT_CASES,
 		},
 		propertyResult: null,
+		benchmarkResult: null,
+		clock: options.clock ?? defaultClock,
 		output: [],
 		coverage,
 	}
@@ -521,6 +584,37 @@ export function rows<Value extends AnyType>(
 			run(value)
 		}
 	})
+}
+
+// NOTE: One benchmark, standing where it was written. It is the `entry` call
+// with the driver wrapped round the body: which entry is selected, and what its
+// rendered name is, are the same questions for both forms, and answering them
+// twice is how the two would come to disagree.
+export function benchmark(
+	context: TestContext,
+	index: number,
+	name: StringType | null,
+	// NOTE: The key this benchmark's baseline is stored under, as the Compiler
+	// spelled it — the identity without the Module path. The row a table
+	// benchmark is running is added here rather than emitted, because one body
+	// stands for every row.
+	key: string,
+	run: () => void,
+): void {
+	entry(context, index, name, () => runBenchmark(context, key, run))
+}
+
+export function benchmarkRows<Value extends AnyType>(
+	context: TestContext,
+	first: number,
+	values: Array<Value>,
+	name: ((row: Value) => StringType) | null,
+	key: string,
+	run: (row: Value) => void,
+): void {
+	rows(context, first, values, name, (value) =>
+		runBenchmark(context, key, () => run(value)),
+	)
 }
 
 // NOTE: One property test, standing where it was written. The body is run once
@@ -749,6 +843,127 @@ function shrinkCase(
 
 	return { values, shrinks }
 }
+
+// NOTE: How a measurement is taken. A single run of a fast body is mostly the
+// clock's own resolution, so the body is run in BATCHES big enough to take a
+// few milliseconds, and the batch is timed rather than the run. Several batches
+// are taken and the MIDDLE one answers: a mean is dragged by the one batch the
+// machine was busy through, and the fastest is the one nothing interrupted
+// rather than the one a reader will meet.
+const BENCHMARK_SAMPLES = 7
+const BENCHMARK_BATCH_MILLISECONDS = 5
+// NOTE: What the calibration stops at, whatever the body costs. A body fast
+// enough to want more than this is measured well enough already, and one that
+// is not is a body a reader would rather see the answer for than wait out.
+const BENCHMARK_MAX_ITERATIONS = 65536
+// NOTE: The band a measurement is allowed to move in before it is news. A
+// quarter slower is a regression a reader has to look at; a fifth faster is an
+// improvement worth recording. Everything between the two is the machine.
+const REGRESSION_RATIO = 1.25
+const IMPROVEMENT_RATIO = 0.8
+
+function runBenchmark(
+	context: TestContext,
+	key: string,
+	run: () => void,
+): void {
+	let mark = markOf(context)
+
+	// NOTE: A body that does not hold is REPORTED and never timed. Timing
+	// something that is wrong measures the wrong thing, and the number would go
+	// into a baseline as if it meant something. The last run is unguarded, so
+	// exactly one execution's recordings are left behind — the move
+	// `runProperty` makes after a shrink, for the same reason.
+	if (!holds(context, mark, run, [])) {
+		rewind(context, mark)
+		run()
+
+		return
+	}
+
+	let iterations = 1
+
+	while (
+		timeBatch(context, mark, run, iterations) <
+			BENCHMARK_BATCH_MILLISECONDS &&
+		iterations < BENCHMARK_MAX_ITERATIONS
+	) {
+		iterations *= 2
+	}
+
+	let perRun: Array<number> = []
+
+	for (let sample = 0; sample < BENCHMARK_SAMPLES; sample++) {
+		perRun.push(timeBatch(context, mark, run, iterations) / iterations)
+	}
+
+	// NOTE: At least one nanosecond. A body the clock can not tell from nothing
+	// is not free, and a baseline of zero is a number every later run is
+	// infinitely slower than.
+	let nanoseconds = Math.max(1, Math.round(median(perRun) * 1_000_000))
+	// NOTE: The entry a stored baseline is kept under, numbered by the row that
+	// recorded it — through the very Function a stored snapshot's name goes
+	// through, because the rows of a table share one key and one entry they
+	// overwrote in turn could only ever match the last row that ran.
+	let storedKey = storedName(key, context.row) ?? key
+	let baseline = context.benchStored[storedKey] ?? null
+	let ratio = baseline === null ? null : nanoseconds / baseline
+	let status: BenchmarkStatus =
+		ratio === null
+			? "written"
+			: ratio <= REGRESSION_RATIO && ratio >= IMPROVEMENT_RATIO
+				? "matched"
+				: context.updating
+					? "written"
+					: ratio > REGRESSION_RATIO
+						? "regressed"
+						: "improved"
+
+	context.benchmarkResult = {
+		key: storedKey,
+		nanoseconds,
+		iterations,
+		samples: BENCHMARK_SAMPLES,
+		baseline,
+		ratio,
+		status,
+	}
+
+	// NOTE: The run whose recordings the report is built from, and it is NOT
+	// guarded — a body that throws has to end the test the way it always would,
+	// exactly as the last run of a shrunk property does.
+	rewind(context, mark)
+	run()
+}
+
+// NOTE: One batch, timed. The context is rewound BEFORE the clock is read and
+// never inside it: a batch of a thousand runs records a thousand times over,
+// and clearing that between them would be timing the runner's bookkeeping
+// alongside the body.
+function timeBatch(
+	context: TestContext,
+	mark: ContextMark,
+	run: () => void,
+	iterations: number,
+): number {
+	rewind(context, mark)
+
+	let started = context.clock()
+
+	for (let index = 0; index < iterations; index++) {
+		run()
+	}
+
+	return context.clock() - started
+}
+
+// NOTE: The lower middle of the samples, which for an odd count is the middle.
+function median(values: Array<number>): number {
+	let sorted = [...values].sort((left, right) => left - right)
+
+	return sorted[(sorted.length - 1) >> 1] ?? 0
+}
+
 // NOTE: THE trace mechanism — record a value at an instrumented point,
 // attributed to a source span, and answer with the very value so that wrapping
 // an Expression in one changes nothing about what it evaluates to. `expect` and
@@ -1263,6 +1478,24 @@ export type TestEvent =
 			shrinks: number
 			counterexample: Array<PropertyCounterexample> | null
 	  }
+	// NOTE: What one benchmark measured. It is written whether the measurement
+	// held to its baseline or not, because a runner needs the number of a new
+	// one to write down as much as it needs to know an old one still holds —
+	// and `module` says which file's `__benchmarks__` the entry belongs to.
+	| {
+			schema: 1
+			kind: "benchmark"
+			id: string
+			name: string
+			module: string | null
+			key: string
+			nanoseconds: number
+			iterations: number
+			samples: number
+			baseline: number | null
+			ratio: number | null
+			status: BenchmarkStatus
+	  }
 	| {
 			schema: 1
 			kind: "output"
@@ -1293,9 +1526,9 @@ export type TestEvent =
 	  }
 
 // NOTE: `not-focused` and `tag` are the spec's two; `filter` is the third a
-// `--filter` needs, and is why a consumer is told to tolerate what it does not
-// know rather than to switch exhaustively.
-export type DeselectionReason = "not-focused" | "tag" | "filter"
+// `--filter` needs, and `bench` the fourth — which together are why a consumer
+// is told to tolerate what it does not know rather than to switch exhaustively.
+export type DeselectionReason = "not-focused" | "tag" | "filter" | "bench"
 
 export type TracedValue = { point: number; span: Span | null; value: string }
 
@@ -1341,6 +1574,12 @@ export type Filters = {
 	// an Editor's "run this test" asks for, and the one selection a name can not
 	// express: two tests may render the same name and never share an id.
 	ids?: Array<string>
+	// NOTE: Whether the benchmarks of the run are to be MEASURED. Measuring a
+	// body takes hundreds of runs of it, which is not what somebody waiting on
+	// `essence test` asked for — so a benchmark is deselected as `bench` unless
+	// this says otherwise, and it ADDS to a run rather than replacing it: a run
+	// that measures still judges everything beside the measurements.
+	bench?: boolean
 	// NOTE: Whether a registry BESIDE this one holds a focused test. Focus is
 	// decided across a whole run rather than per bundle — the design's
 	// "focusing one test in Standings.es also silences Season.tests.es" — and a
@@ -1377,10 +1616,17 @@ export function selectTests(
 	// them is a different sentence.
 	matched: number
 } {
+	let bench = filters.bench === true
+	// NOTE: A focused BENCHMARK narrows nothing while the run is not measuring
+	// — it does not run either way, and counting it would silence every test of
+	// the project because somebody left a focus on something nobody is running.
 	let focused =
 		(filters.focusedElsewhere ?? false) ||
 		registry.tests.some(
-			(test) => test.entry.focused && test.entry.skipped === null,
+			(test) =>
+				test.entry.focused &&
+				test.entry.skipped === null &&
+				(bench || !test.entry.benchmark),
 		)
 	let tags = filters.tags ?? []
 	let skipTags = filters.skipTags ?? []
@@ -1409,6 +1655,15 @@ export function selectTests(
 			return ids.includes(entry.id)
 				? { test, state: "run" }
 				: { test, state: "deselected", reason: "filter" }
+		}
+
+		// NOTE: After the ids branch, deliberately: naming a benchmark IS asking
+		// for it to be measured, which is what an Editor's "run this one" sends
+		// and the one door a measurement has without a flag. Before focus,
+		// because a benchmark nobody asked to measure did not run for a reason
+		// of its own, and "only with --bench" is what says so.
+		if (entry.benchmark && !bench) {
+			return { test, state: "deselected", reason: "bench" }
 		}
 
 		if (focused && !entry.focused) {
@@ -1455,8 +1710,19 @@ export type RunOptions = {
 	// Module's canonical path and then by the name written after `from`. Read
 	// off disk by whoever started the run; a bundle reads nothing.
 	snapshots?: Record<string, SnapshotStore>
+	// NOTE: The stored baselines of every Module in the run, keyed by the
+	// Module's canonical path and then by the entry a measurement is written
+	// under — the same shape `snapshots` takes, read off disk by whoever
+	// started the run.
+	benchmarks?: Record<string, BenchmarkStore>
+	// NOTE: The clock every measurement of the run is read off. Handed in so a
+	// spec can measure a body without measuring the machine; `performance.now`
+	// otherwise.
+	clock?: () => number
 	// NOTE: Whether a snapshot that differs is REPLACED rather than reported —
-	// `essence test --update`, and the Editor's "Accept snapshot".
+	// `essence test --update`, and the Editor's "Accept snapshot". A benchmark
+	// reads it too: a measurement outside its band is recorded rather than
+	// reported, which is how a baseline is moved on purpose.
 	update?: boolean
 	// NOTE: What every property test of the run draws from, spelled as the
 	// hexadecimal a reader types after `--seed`. One is made up where none was
@@ -1652,6 +1918,8 @@ function runOne(
 	let seed = options.seed ?? ""
 	let context = createContext(test.index, {
 		stored: (options.snapshots ?? {})[test.module.module ?? ""] ?? {},
+		benchmarks: (options.benchmarks ?? {})[test.module.module ?? ""] ?? {},
+		clock: options.clock,
 		updating: options.update ?? false,
 		row: entry.row,
 		property: {
@@ -1748,6 +2016,28 @@ function runOne(
 		})
 	}
 
+	// NOTE: Beside the property event and for the same reason: what a benchmark
+	// says is about the whole of the test, and the assertions below it are what
+	// the ONE reported run left behind rather than what was measured.
+	if (context.benchmarkResult !== null) {
+		let measured = context.benchmarkResult
+
+		sink({
+			schema: 1,
+			kind: "benchmark",
+			id: entry.id,
+			name,
+			module: test.module.module,
+			key: measured.key,
+			nanoseconds: measured.nanoseconds,
+			iterations: measured.iterations,
+			samples: measured.samples,
+			baseline: measured.baseline,
+			ratio: measured.ratio,
+			status: measured.status,
+		})
+	}
+
 	// NOTE: Before the assertions, because a snapshot event carries what has to
 	// be WRITTEN and a reader of the stream acts on it whether the test passed
 	// or not.
@@ -1796,7 +2086,13 @@ function runOne(
 		}
 	}
 
-	if (failures.length === 0 && error === null) {
+	// NOTE: A measurement outside its band is a FAILED test and not a note
+	// beside a passing one. A benchmark says what a body is allowed to cost,
+	// the way an assertion says what it is allowed to answer — and the run that
+	// silently reported "slower, but passing" is the run nobody reads.
+	let regressed = context.benchmarkResult?.status === "regressed"
+
+	if (failures.length === 0 && error === null && !regressed) {
 		summary.passed += 1
 		sink({
 			schema: 1,
