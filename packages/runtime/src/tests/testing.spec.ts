@@ -12,6 +12,7 @@ import {
 	beginCoverageRun,
 	benchmark,
 	benchmarkRows,
+	coverageStamp,
 	type CorpusStore,
 	coverage,
 	counters,
@@ -1309,6 +1310,92 @@ describe("The coverage counters", () => {
 		let report = coverage().find((each) => each.module === "/Counted.es")
 
 		expect(report?.points.map((each) => each.count)).toEqual([2, 1])
+	})
+
+	// NOTE: Deltas rather than absolutes — the stamp is one global the whole
+	// spec file shares, exactly as a bundle's tests share it.
+	test("stamps new ground once, however often it is walked", () => {
+		let count = counters({
+			module: "/Stamped.es",
+			points: [point(1), point(2)],
+			choices: [],
+		})
+		let opening = coverageStamp()
+
+		count(0)
+
+		expect(coverageStamp()).toBe(opening + 1)
+
+		count(0)
+		count(0)
+
+		expect(coverageStamp()).toBe(opening + 1)
+
+		count(1)
+
+		expect(coverageStamp()).toBe(opening + 2)
+	})
+
+	// NOTE: The inverse of the affected-set map, per test: the run copies the
+	// counts around each test and says which points moved. Only where it was
+	// asked — the copy is every counter, per test.
+	test("says which points each test touched, where the run asked", () => {
+		let count = counters({
+			module: "/Attributed.es",
+			points: [point(1), point(2), point(3)],
+			choices: [],
+		})
+		let one = module(
+			[manifest("/first"), manifest("/second")],
+			(context) => {
+				entry(context, 0, null, () => {
+					count(0)
+					expected(context, 0, true, null)
+				})
+				entry(context, 1, null, () => {
+					count(1)
+					count(2)
+					expected(context, 0, true, null)
+				})
+			},
+		)
+		let events: Array<TestEvent> = []
+
+		runTests(registryOf([one]), {
+			sink: (event) => events.push(event),
+			now: () => 0,
+			coverageByTest: true,
+		})
+
+		let attributed = events.filter(
+			(event) =>
+				event.kind === "test-coverage" &&
+				event.module === "/Attributed.es",
+		) as Array<Extract<TestEvent, { kind: "test-coverage" }>>
+
+		expect(attributed.map((event) => [event.id, event.points])).toEqual([
+			["/first", [0]],
+			["/second", [1, 2]],
+		])
+	})
+
+	test("attributes nothing where nobody asked", () => {
+		let count = counters({
+			module: "/Unasked.es",
+			points: [point(1)],
+			choices: [],
+		})
+		let one = module([manifest("/only")], (context) => {
+			entry(context, 0, null, () => {
+				count(0)
+				expected(context, 0, true, null)
+			})
+		})
+		let { events } = collect(registryOf([one]))
+
+		expect(
+			events.filter((event) => event.kind === "test-coverage"),
+		).toEqual([])
 	})
 
 	test("answers with the very value it was handed", () => {
