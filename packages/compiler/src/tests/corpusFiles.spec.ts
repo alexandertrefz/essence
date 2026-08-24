@@ -1,5 +1,11 @@
 import { describe, expect, it } from "bun:test"
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs"
+import {
+	existsSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
 
@@ -110,16 +116,20 @@ describe("The counterexample companion file", () => {
 		expect(first).toContain('\n\t"entries": {')
 	})
 
-	it("reads a file it can not parse as holding nothing", () => {
-		expect(parseCorpusFile("not json at all")).toEqual({})
-		expect(parseCorpusFile("[]")).toEqual({})
-		expect(parseCorpusFile("")).toEqual({})
+	// NOTE: Null rather than an empty store, and the two must never be
+	// confused: an empty store is a file the next write may lay a value over,
+	// and a mangled one — a merge conflict, a stray edit — is a file the next
+	// write must LEAVE, or everything its bytes still hold is gone.
+	it("refuses a file it can not parse", () => {
+		expect(parseCorpusFile("not json at all")).toBeNull()
+		expect(parseCorpusFile("[]")).toBeNull()
+		expect(parseCorpusFile("")).toBeNull()
 	})
 
 	// NOTE: A corpus is an optimisation over a search that works without it, so
 	// the worst a version nobody here understands can cost is the values it
-	// held.
-	it("reads a file of another schema as holding nothing", () => {
+	// held — but they are held, not overwritten.
+	it("refuses a file of another schema", () => {
 		expect(
 			parseCorpusFile(
 				JSON.stringify({
@@ -127,7 +137,7 @@ describe("The counterexample companion file", () => {
 					entries: { a: [{ values: values("1") }] },
 				}),
 			),
-		).toEqual({})
+		).toBeNull()
 	})
 
 	it("leaves out an entry that is not a List of named values", () => {
@@ -151,7 +161,47 @@ describe("Reading a run's stored counterexamples", () => {
 		await withDirectory(async (directory) => {
 			let module = path.join(directory, "Season.es")
 
-			expect(await readCorpus([module])).toEqual({ [module]: {} })
+			expect((await readCorpus([module])).stores).toEqual({
+				[module]: {},
+			})
+		})
+	})
+
+	// NOTE: THE reason unreadable is its own answer. The run before this fix
+	// read a mangled file as empty, replayed nothing — correct — and then the
+	// next failing write rewrote the file whole from that emptiness, silently
+	// discarding every counterexample the bytes still held.
+	it("says a mangled companion out loud, and never writes over it", async () => {
+		await withDirectory(async (directory) => {
+			let module = path.join(directory, "Season.es")
+			let mangled = "<<<<<<< HEAD not json at all"
+
+			await writeCorpus({
+				corpus: { stores: {}, unreadable: [] },
+				additions: [{ module, key: "small", values: values("7") }],
+				removals: [],
+			})
+
+			let filePath = fileOf(directory)
+
+			writeFileSync(filePath, mangled)
+
+			let reading = await readCorpus([module])
+
+			expect(reading.stores[module]).toEqual({})
+			expect(reading.unreadable).toHaveLength(1)
+			expect(reading.unreadable[0]?.problem).toContain(
+				"not a corpus file",
+			)
+
+			let written = await writeCorpus({
+				corpus: reading,
+				additions: [{ module, key: "small", values: values("9") }],
+				removals: [],
+			})
+
+			expect(written.files).toBe(0)
+			expect(readFileSync(filePath, "utf8")).toBe(mangled)
 		})
 	})
 
@@ -160,14 +210,14 @@ describe("Reading a run's stored counterexamples", () => {
 			let module = path.join(directory, "Season.es")
 
 			await writeCorpus({
-				corpus: {},
+				corpus: { stores: {}, unreadable: [] },
 				additions: [
 					{ module, key: "stays small", values: values("500") },
 				],
 				removals: [],
 			})
 
-			expect(await readCorpus([module])).toEqual({
+			expect((await readCorpus([module])).stores).toEqual({
 				[module]: { "stays small": [{ values: values("500") }] },
 			})
 		})
@@ -178,7 +228,7 @@ describe("Writing what a run said about its corpus", () => {
 	it("writes nothing where a run said nothing", async () => {
 		await withDirectory(async (directory) => {
 			let written = await writeCorpus({
-				corpus: {},
+				corpus: { stores: {}, unreadable: [] },
 				additions: [],
 				removals: [],
 			})
@@ -193,7 +243,7 @@ describe("Writing what a run said about its corpus", () => {
 			let module = path.join(directory, "Season.es")
 
 			await writeCorpus({
-				corpus: {},
+				corpus: { stores: {}, unreadable: [] },
 				additions: [{ module, key: "small", values: values("7") }],
 				removals: [],
 			})
@@ -203,7 +253,7 @@ describe("Writing what a run said about its corpus", () => {
 				removals: [],
 			})
 
-			expect((await readCorpus([module]))[module]).toEqual({
+			expect((await readCorpus([module])).stores[module]).toEqual({
 				small: [{ values: values("9") }, { values: values("7") }],
 			})
 		})
@@ -216,7 +266,10 @@ describe("Writing what a run said about its corpus", () => {
 		await withDirectory(async (directory) => {
 			let module = path.join(directory, "Season.es")
 			let corpus = {
-				[module]: { small: [{ values: values("7") }] },
+				stores: {
+					[module]: { small: [{ values: values("7") }] },
+				},
+				unreadable: [],
 			}
 			let written = await writeCorpus({
 				corpus,
@@ -242,7 +295,8 @@ describe("Writing what a run said about its corpus", () => {
 				})
 			}
 
-			let stored = (await readCorpus([module]))[module]?.["small"] ?? []
+			let stored =
+				(await readCorpus([module])).stores[module]?.["small"] ?? []
 
 			expect(stored).toHaveLength(CORPUS_LIMIT)
 			expect(stored[0]).toEqual({ values: values("12") })
@@ -256,13 +310,16 @@ describe("Writing what a run said about its corpus", () => {
 		await withDirectory(async (directory) => {
 			let module = path.join(directory, "Season.es")
 			let corpus = {
-				[module]: {
-					small: [
-						{ values: values("1") },
-						{ values: values("2") },
-						{ values: values("3") },
-					],
+				stores: {
+					[module]: {
+						small: [
+							{ values: values("1") },
+							{ values: values("2") },
+							{ values: values("3") },
+						],
+					},
 				},
+				unreadable: [],
 			}
 			let written = await writeCorpus({
 				corpus,
@@ -274,7 +331,7 @@ describe("Writing what a run said about its corpus", () => {
 			})
 
 			expect(written).toMatchObject({ dropped: 2, files: 1 })
-			expect((await readCorpus([module]))[module]).toEqual({
+			expect((await readCorpus([module])).stores[module]).toEqual({
 				small: [{ values: values("2") }],
 			})
 		})
@@ -285,7 +342,7 @@ describe("Writing what a run said about its corpus", () => {
 			let module = path.join(directory, "Season.es")
 
 			await writeCorpus({
-				corpus: {},
+				corpus: { stores: {}, unreadable: [] },
 				additions: [{ module, key: "small", values: values("7") }],
 				removals: [],
 			})
@@ -314,7 +371,10 @@ describe("Writing what a run said about its corpus", () => {
 		await withDirectory(async (directory) => {
 			let module = path.join(directory, "Season.es")
 			let corpus = {
-				[module]: { elsewhere: [{ values: values("4") }] },
+				stores: {
+					[module]: { elsewhere: [{ values: values("4") }] },
+				},
+				unreadable: [],
 			}
 
 			await writeCorpus({
@@ -323,7 +383,7 @@ describe("Writing what a run said about its corpus", () => {
 				removals: [],
 			})
 
-			expect((await readCorpus([module]))[module]).toEqual({
+			expect((await readCorpus([module])).stores[module]).toEqual({
 				elsewhere: [{ values: values("4") }],
 				small: [{ values: values("7") }],
 			})
@@ -333,7 +393,7 @@ describe("Writing what a run said about its corpus", () => {
 	it("writes a file a reader can open", async () => {
 		await withDirectory(async (directory) => {
 			await writeCorpus({
-				corpus: {},
+				corpus: { stores: {}, unreadable: [] },
 				additions: [
 					{
 						module: path.join(directory, "Season.es"),
