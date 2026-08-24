@@ -878,7 +878,7 @@ declarations {
 			§ is the difference from the first entry above.
 			§
 			§ `on` is the label for a key-reading Function everywhere one is
-			§ taken: here, on `lowestItem`, `highestItem`, `sum` and
+			§ taken: here, on `group`, `lowestItem`, `highestItem`, `sum` and
 			§ `average`. A member path then reads the same way at each of
 			§ them. `by` is not reused, because it already means a comparison
 			§ one entry up. Two same-labelled entries told apart by arity
