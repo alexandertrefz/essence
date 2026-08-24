@@ -427,7 +427,11 @@ the question it asked the code. Two runs at one seed are the same report.
 
 `--mutation-limit` caps how many mutants are compiled — a mutant costs a compile
 and a run, so a large project is worth narrowing — and the sites are taken in
-file order, so the same limit answers about the same mutants twice.
+file order, so the same limit answers about the same mutants twice. It caps what
+is **judged** and nothing else: a site no test reaches costs neither a compile
+nor a run, and is reported whatever the limit. The report says where the limit
+stopped and how many sites it left alone, and the `mutation-end` tally still
+counts every site the walker found, so a consumer subtracts to get the rest.
 
 A mutation score is **information**, so the run exits 0 whatever it found.
 `--strict` is what a job that holds a project to its score asks for: a survivor

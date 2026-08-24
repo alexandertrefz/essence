@@ -169,29 +169,25 @@ function overlaps(left: common.Position, right: common.Position): boolean {
 	return !before(left.end, right.start) && !before(right.end, left.start)
 }
 
-// NOTE: How wide a span is, as a number that orders the way a reader would: a
-// span of fewer LINES is always the narrower one, and columns decide a tie.
-// Only compared against another span of the same file, so the scale is
-// arbitrary and only the order matters.
-function width(position: common.Position): number {
-	return (
-		(position.end.line - position.start.line) * 1_000_000 +
-		(position.end.column - position.start.column)
-	)
-}
-
 // NOTE: Which points of a Module's table stand over a site. Every point whose
 // span HOLDS the site is one — a site inside a Statement inside a branch inside
 // a Method body is covered by each of them, and a test that reached any of them
 // reached the site.
 //
-// NOTE: The fallback is the SMALLEST overlapping span, and it is not a nicety:
-// a point's span is the span of the Node the instrumentation stood in front of,
+// NOTE: The fallback is EVERY overlapping span, and it is not a nicety: a
+// point's span is the span of the Node the instrumentation stood in front of,
 // and a site inside a Statement that spans several lines is held by it — but a
 // site standing in a Method's Parameter default, or in a Node whose Position the
 // Simplifier trimmed differently, may only overlap. Answering with nothing there
 // would report a well-tested site as UNCOVERED, which is the one wrong answer
 // worth writing a fallback for.
+//
+// NOTE: All of them rather than the narrowest, because a site that STRADDLES two
+// points is reached by whatever reached either — the two spans between them are
+// the ground the site stands on, and picking the smaller one drops the tests of
+// the other. The whole point of the join is that a mutant is judged by every
+// test that could possibly notice it, and a covering set that is missing one is
+// a survivor nobody can trust.
 export function coveringPoints(
 	points: Array<common.Position>,
 	position: common.Position,
@@ -200,26 +196,11 @@ export function coveringPoints(
 		holds(point, position) ? [index] : [],
 	)
 
-	if (containing.length > 0) {
-		return containing
-	}
-
-	let best: number | null = null
-
-	points.forEach((point, index) => {
-		if (!overlaps(point, position)) {
-			return
-		}
-
-		if (
-			best === null ||
-			width(point) < width(points[best] as common.Position)
-		) {
-			best = index
-		}
-	})
-
-	return best === null ? [] : [best]
+	return containing.length > 0
+		? containing
+		: points.flatMap((point, index) =>
+				overlaps(point, position) ? [index] : [],
+			)
 }
 
 // NOTE: The tests that reach a site, in the order the RUN met them, so that a
@@ -728,6 +709,21 @@ export async function runMutation(
 			emit({ schema: 1, kind: "mutant", ...mutant })
 		}
 
+		// NOTE: The limit caps what is JUDGED and nothing else. A mutant costs a
+		// compile and a run, which is what a reader narrowing a large project is
+		// buying their way out of; a site no test reaches costs neither, and
+		// leaving those out under a limit would report a project as having fewer
+		// untested lines the harder its run was narrowed. So an uncovered site
+		// is recorded whatever the limit, in the walk's own order, and the limit
+		// is counted against the mutants that were actually built.
+		//
+		// NOTE: A site past the limit is neither judged nor DROPPED. `sites`
+		// counts every site the walker kept, and the five statuses under it
+		// count what became of the ones that were looked at — so what the limit
+		// left alone is the remainder, which a consumer subtracts and the human
+		// report is told outright.
+		let unjudged = 0
+
 		for (let site of sites) {
 			let covering = coveringTests(site, attribution, order)
 
@@ -741,7 +737,9 @@ export async function runMutation(
 				context.options.mutationLimit !== null &&
 				compiled >= context.options.mutationLimit
 			) {
-				break
+				unjudged += 1
+
+				continue
 			}
 
 			compiled += 1
@@ -765,7 +763,7 @@ export async function runMutation(
 			)
 		}
 
-		let counts = tallyMutants(mutants)
+		let counts = tallyMutants(mutants, sites.length)
 
 		emit({ schema: 1, kind: "mutation-end", ...counts })
 
@@ -777,6 +775,7 @@ export async function runMutation(
 				context.report,
 				(module) =>
 					module === null ? null : (sources.get(module) ?? null),
+				unjudged === 0 ? null : { after: compiled, unjudged },
 			)) {
 				context.terminal.out(line)
 			}

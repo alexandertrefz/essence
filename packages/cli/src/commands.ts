@@ -592,7 +592,11 @@ export const commands: Array<CommandSpec> = [
 					"Every covered site by default. A mutant costs a compile " +
 					"and a run of the tests that reach it, so a large project " +
 					"is worth narrowing — the sites are taken in file order, " +
-					"so the same limit answers about the same mutants twice.",
+					"so the same limit answers about the same mutants twice. " +
+					"It caps what is JUDGED and nothing else: a site no test " +
+					"reaches costs neither a compile nor a run, and is " +
+					"reported whatever the limit. The report says where the " +
+					"limit stopped and how many sites it left alone.",
 			},
 			{
 				name: "strict",
