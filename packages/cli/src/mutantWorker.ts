@@ -1,9 +1,10 @@
 import { pathToFileURL } from "node:url"
-import { format } from "node:util"
 import { parentPort } from "node:worker_threads"
 
 import type { CorpusStore, SnapshotStore } from "@essence-lang/compiler/testing"
 import type { entryPoints, TestEvent } from "@essence-lang/runtime/Testing"
+
+import { redirectStdout, rendered } from "./running"
 
 // NOTE: Where a MUTANT runs, and the one piece of machinery `--mutate` needed
 // that nothing else in the CLI had. A mutation run compiles hundreds of
@@ -99,43 +100,6 @@ export type MutantWorkerResponse =
 	  }
 
 let loaded = 0
-
-function rendered(error: unknown): string {
-	return error instanceof Error
-		? (error.stack ?? error.message)
-		: String(error)
-}
-
-// NOTE: A mutant's Modules are evaluated as the bundle loads, and a Module's
-// own top-level `Terminal.print` writes as they are. It belongs to nobody —
-// there is no test running — and under `--json` the parent's stdout carries the
-// event stream and nothing else, so it goes to stderr for the length of the
-// run. `console.log` is pointed there too: under Bun it writes to the file
-// descriptor directly and never through `process.stdout.write`.
-function redirectStdout(): () => void {
-	let original = process.stdout.write
-	let log = console.log
-
-	process.stdout.write = ((
-		chunk: string | Uint8Array,
-		...rest: Array<unknown>
-	) =>
-		(
-			process.stderr.write as unknown as (
-				value: string | Uint8Array,
-				...args: Array<unknown>
-			) => boolean
-		)(chunk, ...rest)) as typeof process.stdout.write
-
-	console.log = ((...values: Array<unknown>) => {
-		process.stderr.write(`${format(...values)}\n`)
-	}) as typeof console.log
-
-	return () => {
-		process.stdout.write = original
-		console.log = log
-	}
-}
 
 async function runMutant(
 	request: Extract<MutantWorkerRequest, { kind: "run" }>,

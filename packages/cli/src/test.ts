@@ -2,7 +2,6 @@ import { copyFile, link, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import * as path from "node:path"
 import { pathToFileURL } from "node:url"
-import { format } from "node:util"
 
 import { displayPath } from "@essence-lang/compiler/diagnostics/render"
 import {
@@ -56,6 +55,7 @@ import {
 	resultKey,
 	writeResult,
 } from "./resultCache"
+import { redirectStdout } from "./running"
 import {
 	collectCoverage,
 	collectTestRun,
@@ -151,6 +151,23 @@ export type PropertyOptions = {
 export type SnapshotOptions = {
 	stored?: Record<string, SnapshotStore>
 	update?: boolean
+}
+
+// NOTE: What a run wants out of the coverage counters. The table itself is what
+// `--coverage` reports, and a bundle compiled without the instrumentation has
+// none — so asking costs nothing and answers with nothing, which is why it is
+// passed through rather than guessed at from the events.
+//
+// NOTE: `byTest` is the second reading of the same counters, and only
+// `essence test --mutate` asks for it — see `RunOptions.coverageByTest`. It is
+// what turns "this line ran" into "these tests reach this line", which is how a
+// mutant is judged by the tests that could possibly notice it. It costs the
+// points each test actually touched, and nobody pays who did not ask. It lives
+// beside the table rather than as a parameter of its own because it is a fact
+// about the SAME counters, and a caller that wanted it and not them would be
+// asking for the impossible.
+export type CoverageOptions = {
+	byTest?: boolean
 }
 
 export type TestFilters = {
@@ -329,11 +346,10 @@ export function runSuites(
 	// entry can replace the right one. Null for the run's own bookend, which
 	// belongs to no bundle.
 	emit: (event: TestEvent, suite: LoadedSuite | null) => void,
-	// NOTE: Whether each bundle writes what its counters counted. A bundle
-	// compiled without the instrumentation has none, so asking costs nothing
-	// and answers with nothing — which is why the flag is passed through rather
-	// than guessed at from the events.
-	coverage = false,
+	// NOTE: What the run wants OUT of the counters — see `CoverageOptions`. A
+	// plain `true` is the whole table and nothing per test, which is what
+	// `--coverage` and a watching session ask for.
+	coverage: boolean | CoverageOptions = false,
 	// NOTE: What every `matches snapshot from "name"` of the run compares
 	// against, keyed by Module — read off disk here because a bundle reads
 	// nothing — and whether a difference is RECORDED rather than reported.
@@ -356,12 +372,6 @@ export function runSuites(
 	// counted into the plan and written into the stream in their own place, so a
 	// warm run is the cold one's report and the cold one's stream.
 	replay: ReplayOptions = {},
-	// NOTE: Whether each TEST also says which points IT touched — see
-	// `RunOptions.coverageByTest`. Only `essence test --mutate` asks: it is
-	// what turns "this line ran" into "these tests reach this line", which is
-	// how a mutant is judged by the tests that could possibly notice it. It
-	// costs the points a test actually touched, and nobody pays who did not ask.
-	attribution = false,
 ): {
 	planned: number
 	focused: boolean
@@ -372,6 +382,8 @@ export function runSuites(
 	// this selection has already rendered.
 	entries: Array<EntrySelection>
 } {
+	let counters = coverage === true || coverage !== false
+	let byTest = coverage !== true && coverage !== false && coverage.byTest
 	let selected = all.map((suite) =>
 		suite.tests.select(suite.registry, filters),
 	)
@@ -473,8 +485,8 @@ export function runSuites(
 				emit(event, suite)
 			},
 			filters: runFilters,
-			coverage,
-			coverageByTest: attribution,
+			coverage: counters,
+			coverageByTest: byTest,
 			snapshots: snapshots.stored,
 			benchmarks,
 			update: snapshots.update,
@@ -753,49 +765,6 @@ export function reportBenchOnlyFilter(
 			`"${filter}" matched only benchmarks — measure them with --bench`,
 		)}`,
 	)
-}
-
-// NOTE: A Module's own top-level output — a `Terminal.print` outside any test —
-// is written by the bundle as it is evaluated: before any test is running, and
-// with no test to attribute it to. It is not part of the report, and under
-// --json stdout carries the event stream and nothing else — so for the length
-// of the load and the run stdout is pointed at stderr, where the output still
-// arrives and still streams. What a test itself writes never comes through
-// here: the runtime captures it against the test and the report shows it with
-// the failure.
-//
-// NOTE: `console.log` is pointed at stderr as well, and that is not belt and
-// braces. `Terminal.inspect` renders a whole line and writes it through
-// `console.log`, which under Bun goes to the file descriptor DIRECTLY and never
-// through `process.stdout.write` — so a Module that inspects a value at its top
-// level would put its rendering on stdout ahead of the first event, and a
-// consumer parsing the stream a line at a time would die on it. It is written
-// through `process.stderr.write` rather than through `console.error` so that
-// whatever holds the two streams — a spec, a parent process — sees it where it
-// sees everything else.
-export function redirectStdout(): () => void {
-	let original = process.stdout.write
-	let log = console.log
-
-	process.stdout.write = ((
-		chunk: string | Uint8Array,
-		...rest: Array<unknown>
-	) =>
-		(
-			process.stderr.write as unknown as (
-				value: string | Uint8Array,
-				...args: Array<unknown>
-			) => boolean
-		)(chunk, ...rest)) as typeof process.stdout.write
-
-	console.log = ((...values: Array<unknown>) => {
-		process.stderr.write(`${format(...values)}\n`)
-	}) as typeof console.log
-
-	return () => {
-		process.stdout.write = original
-		console.log = log
-	}
 }
 
 export function printReport(

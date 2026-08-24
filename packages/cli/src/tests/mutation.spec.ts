@@ -1,7 +1,4 @@
 import { describe, expect, it } from "bun:test"
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
-import { tmpdir } from "node:os"
-import path from "node:path"
 
 import type { common } from "@essence-lang/interfaces"
 import type { TestEvent } from "@essence-lang/runtime/Testing"
@@ -26,6 +23,7 @@ import {
 import type { ReportContext } from "../report"
 import { remembersResults } from "../test"
 import { type MutantRecord, renderMutation } from "../testReport"
+import { capture, within, withFiles as withProject } from "./harness"
 
 // NOTE: What `essence test --mutate` ANSWERS, driven the way `testRunner.spec`
 // drives the rest of the runner: a throwaway project on disk and the command
@@ -33,70 +31,13 @@ import { type MutantRecord, renderMutation } from "../testReport"
 // runs, so every fixture here is tiny on purpose — the question each of them
 // asks is about one operator, one status or one flag.
 
-async function withFiles<Value>(
+// NOTE: A directory of this suite's own, so one left behind by a crash says
+// which spec made it. The harness under it is the one `testRunner.spec` drives.
+function withFiles<Value>(
 	files: Record<string, string>,
 	body: (directory: string) => Promise<Value>,
 ): Promise<Value> {
-	let directory = mkdtempSync(path.join(tmpdir(), "essence-mutation-"))
-
-	try {
-		for (let [fileName, source] of Object.entries(files)) {
-			let filePath = path.join(directory, fileName)
-
-			mkdirSync(path.dirname(filePath), { recursive: true })
-			writeFileSync(filePath, source)
-		}
-
-		return await body(directory)
-	} finally {
-		rmSync(directory, { recursive: true, force: true })
-	}
-}
-
-// NOTE: A project's settings are read out of the nearest package.json, found by
-// walking up from the WORKING DIRECTORY — so a spec about a configured project
-// has to stand in one. Restored before `withFiles` removes the directory, which
-// is why the two are nested rather than folded together.
-async function within<Value>(
-	directory: string,
-	body: () => Promise<Value>,
-): Promise<Value> {
-	let previous = process.cwd()
-
-	process.chdir(directory)
-
-	try {
-		return await body()
-	} finally {
-		process.chdir(previous)
-	}
-}
-
-async function capture(
-	invoke: () => Promise<number>,
-): Promise<{ code: number; out: string; err: string }> {
-	let out = ""
-	let err = ""
-	let writeOut = process.stdout.write
-	let writeErr = process.stderr.write
-
-	process.stdout.write = ((chunk: string): boolean => {
-		out += chunk
-
-		return true
-	}) as typeof process.stdout.write
-	process.stderr.write = ((chunk: string): boolean => {
-		err += chunk
-
-		return true
-	}) as typeof process.stderr.write
-
-	try {
-		return { code: await invoke(), out, err }
-	} finally {
-		process.stdout.write = writeOut
-		process.stderr.write = writeErr
-	}
+	return withProject(files, body, "essence-mutation-")
 }
 
 // NOTE: One job and one pinned seed, always. The seed is what makes a property

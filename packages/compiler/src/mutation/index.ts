@@ -1,7 +1,7 @@
 import type { common } from "@essence-lang/interfaces"
 
 import { builtinNamespaces, builtinProtocols } from "../enricher/builtins"
-import { resolveOverloadedMethodName } from "../helpers/index"
+import { overloadIndexOf, resolveOverloadedMethodName } from "../helpers/index"
 import { withoutOverloadSuffix } from "../optimiser/purity"
 import { rewriteNodes } from "../optimiser/walk"
 
@@ -186,6 +186,17 @@ type Candidate = {
 	description: string
 }
 
+// NOTE: One lie about one Node, ready to be told: what family it belongs to,
+// the sentence a report reads out, and the replacement itself, built only if
+// anybody asks. Every producer below answers with these and `offer` consumes
+// them, so what a candidate IS is spelled once rather than restated at each end
+// of every hand-off.
+export type MutationCandidate<Node> = {
+	operator: MutationOperator
+	description: string
+	rewrite: () => Node
+}
+
 // NOTE: One walk, shared by enumeration and application, because two walks
 // would be two chances to disagree about which site an id names. `take`
 // answers whether THIS candidate is the one to apply; enumeration records and
@@ -203,11 +214,7 @@ function walkMutations(
 	let offer = <Node>(
 		node: Node,
 		position: common.Position,
-		candidates: Array<{
-			operator: MutationOperator
-			description: string
-			rewrite: () => Node
-		}>,
+		candidates: Array<MutationCandidate<Node>>,
 	): Node => {
 		let result = node
 
@@ -249,12 +256,12 @@ function walkMutations(
 type Offer = <Node>(
 	node: Node,
 	position: common.Position,
-	candidates: Array<{
-		operator: MutationOperator
-		description: string
-		rewrite: () => Node
-	}>,
+	candidates: Array<MutationCandidate<Node>>,
 ) => Node
+
+// NOTE: What every producer below answers with — a lie about one Expression,
+// which is every position this walker tells one in.
+type ExpressionCandidate = MutationCandidate<common.typedSimple.ExpressionNode>
 
 function mutateStatement(
 	node: common.typedSimple.ImplementationNode,
@@ -350,11 +357,9 @@ function mutateExpression(
 // and a literal `1` taken to zero are the SAME mutant, and a literal `0` taken
 // to zero is the Program itself, which nothing can kill and which would be
 // reported as a survivor for ever.
-function integerNudges(node: common.typedSimple.IntegerValueNode): Array<{
-	operator: MutationOperator
-	description: string
-	rewrite: () => common.typedSimple.ExpressionNode
-}> {
+function integerNudges(
+	node: common.typedSimple.IntegerValueNode,
+): Array<ExpressionCandidate> {
 	let value: bigint
 
 	try {
@@ -387,11 +392,7 @@ function integerNudges(node: common.typedSimple.IntegerValueNode): Array<{
 function caseSwaps(
 	node: common.typedSimple.CaseValueNode,
 	context: MutationContext,
-): Array<{
-	operator: MutationOperator
-	description: string
-	rewrite: () => common.typedSimple.ExpressionNode
-}> {
+): Array<ExpressionCandidate> {
 	if (node.type.type !== "Case") {
 		return []
 	}
@@ -458,22 +459,14 @@ function nextSibling(
 function memberSwaps(
 	node: common.typedSimple.MethodInvocationNode,
 	context: MutationContext,
-): Array<{
-	operator: MutationOperator
-	description: string
-	rewrite: () => common.typedSimple.ExpressionNode
-}> {
+): Array<ExpressionCandidate> {
 	let member = withoutOverloadSuffix(node.member.name)
 	let families: Array<[MutationOperator, Array<string>]> = [
 		["equality", EQUALITY_SWAPS.get(member) ?? []],
 		["comparison", COMPARISON_SWAPS.get(member) ?? []],
 		["arithmetic", ARITHMETIC_SWAPS.get(member) ?? []],
 	]
-	let swaps: Array<{
-		operator: MutationOperator
-		description: string
-		rewrite: () => common.typedSimple.ExpressionNode
-	}> = []
+	let swaps: Array<ExpressionCandidate> = []
 
 	// NOTE: Nothing inside the condition of a NARROWING `if`, for the reason
 	// that already leaves the doorway itself alone: `if n::isNot(0)` is what
@@ -650,21 +643,6 @@ function provides(protocolName: string, member: string): boolean {
 			member
 		] === protocolName
 	)
-}
-
-// NOTE: The Overload slot a mangled name names, counting from zero, or null
-// where the name carries no suffix at all — which is what a Method with one
-// Overload emits.
-function overloadIndexOf(name: string): number | null {
-	let suffix = name.indexOf("__overload$")
-
-	if (suffix === -1) {
-		return null
-	}
-
-	let index = Number(name.slice(suffix + "__overload$".length))
-
-	return Number.isInteger(index) && index > 0 ? index - 1 : null
 }
 
 // #endregion

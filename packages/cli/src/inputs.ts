@@ -8,7 +8,11 @@ import { type CommandSpec, DEFAULT_PROGRAM_NAME } from "./commands"
 // platform, and not when the pattern is quoted to stop them from trying. The
 // patterns that survive to here are expanded so that `esc build "src/*.es"`
 // behaves the same everywhere.
-const GLOB_PATTERN = /[*?[\]{}]/
+// NOTE: Exported beside `looksLikeGlob` for the one caller that needs WHERE the
+// pattern turns magic rather than whether it does — `--mutate` reads a pattern
+// down to its literal head. Two spellings of what a glob character is would be
+// two ideas of which files a run was pointed at.
+export const GLOB_PATTERN = /[*?[\]{}]/
 
 export type ResolvedInput = {
 	fileName: string

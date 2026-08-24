@@ -228,12 +228,17 @@ function assignSlots(
 	return assignment
 }
 
-// NOTE: The worker is booted as whatever this module is running as — the
-// TypeScript source under Bun in the workspace, the compiled JavaScript in the
-// published package, where no `worker.ts` exists to boot. Exported for the
-// spec: which file that is is a pure question, the Worker around it is not.
-export function workerFileName(moduleURL: string): string {
-	return moduleURL.endsWith(".ts") ? "./worker.ts" : "./worker.js"
+// NOTE: A worker is booted as whatever the module booting it is running as —
+// the TypeScript source under Bun in the workspace, the compiled JavaScript in
+// the published package, where no `.ts` exists to boot. Exported for the spec:
+// which file that is is a pure question, the Worker around it is not.
+//
+// NOTE: `base` because there are two Workers in this package and the question
+// is the same one for both — the compile pool's, and the one a mutation run
+// loads its bundles in. It is asked of the CALLER's own module URL, which is
+// what makes the answer right for a file in either shape.
+export function workerFileName(moduleURL: string, base = "worker"): string {
+	return moduleURL.endsWith(".ts") ? `./${base}.ts` : `./${base}.js`
 }
 
 export function createWorkerPool(size: number): CompileDispatcher {

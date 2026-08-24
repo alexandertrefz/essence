@@ -33,6 +33,7 @@ import {
 	testFailureDiagnostic,
 } from "../testReport"
 import { createPalette, createTheme } from "../theme"
+import { capture, withFiles as withProject } from "./harness"
 
 // NOTE: A bundle cache of this spec's own, and a result cache beside it. They
 // are assigned rather than exported because where a cache lives is read off the
@@ -92,55 +93,13 @@ const reportContext: ReportContext = {
 	quiet: false,
 }
 
-async function withFiles<Value>(
+// NOTE: A directory of this suite's own, so one left behind by a crash says
+// which spec made it. The harness under it is the one `mutation.spec` drives.
+function withFiles<Value>(
 	files: Record<string, string>,
 	body: (directory: string) => Promise<Value>,
 ): Promise<Value> {
-	let directory = mkdtempSync(path.join(tmpdir(), "essence-tests-"))
-
-	try {
-		for (let [fileName, source] of Object.entries(files)) {
-			let filePath = path.join(directory, fileName)
-
-			mkdirSync(path.dirname(filePath), { recursive: true })
-			writeFileSync(filePath, source)
-		}
-
-		return await body(directory)
-	} finally {
-		rmSync(directory, { recursive: true, force: true })
-	}
-}
-
-// NOTE: Everything the CLI writes goes through `process.stdout` and
-// `process.stderr`, so driving `run` from a spec means holding both for the
-// length of the call — including the window in which the runner points stdout
-// at stderr while a bundle is loading.
-async function capture(
-	invoke: () => Promise<number>,
-): Promise<{ code: number; out: string; err: string }> {
-	let out = ""
-	let err = ""
-	let writeOut = process.stdout.write
-	let writeErr = process.stderr.write
-
-	process.stdout.write = ((chunk: string): boolean => {
-		out += chunk
-
-		return true
-	}) as typeof process.stdout.write
-	process.stderr.write = ((chunk: string): boolean => {
-		err += chunk
-
-		return true
-	}) as typeof process.stderr.write
-
-	try {
-		return { code: await invoke(), out, err }
-	} finally {
-		process.stdout.write = writeOut
-		process.stderr.write = writeErr
-	}
+	return withProject(files, body, "essence-tests-")
 }
 
 // NOTE: One job unless a test asks for more. What a run of this suite is about
