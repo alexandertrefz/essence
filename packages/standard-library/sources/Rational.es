@@ -259,7 +259,7 @@ declarations {
 
 		§§ Answers the Rational as a String, in lowest terms.
 		§§
-		§§ The form is `3/4` when no format is named, and the named format otherwise. A whole Rational prints its numerator alone, so `1/2::add(1/2)` prints `1` and `10::divide(by 2)` prints `5`. The `Rational.parse` Method reads every one of these forms. The fraction form reads back as the same Rational. A decimal form does too when its expansion ends within 80 digits, and reads back as the rounded value otherwise. Naming a count of places writes exactly that many digits after the point.
+		§§ The form is `3/4` when no format is named, and the named format otherwise. A whole Rational prints its numerator alone, so `1/2::add(1/2)` prints `1` and `10::divide(by 2)` prints `5`. The `Rational.parse` Method reads every one of these forms. The fraction form reads back as the same Rational. A decimal form does too when its expansion ends within 80 digits, and reads back as the rounded value otherwise. A count of one or more places writes exactly that many digits after the point.
 		§§
 		§§ @returns — the String representation of the Rational.
 		overload toString {
@@ -296,7 +296,7 @@ declarations {
 
 			§§ Answers the Rational as a decimal with exactly that many places.
 			§§
-			§§ The digits are padded with zeroes where the expansion is shorter, so `1/2` over two places is `0.50`. The last digit kept is rounded to the nearest, with halves away from zero, so `1/8` is `0.13`. A count below one answers the whole part alone. The `#Fraction` format ignores the count.
+			§§ The digits are padded with zeroes where the expansion is shorter, so `1/2` over two places is `0.50`. The last digit kept is rounded to the nearest, with halves away from zero, so `1/8` is `0.13`. A count below one rounds to a whole number, and no point is written. The `#Fraction` format ignores the count.
 			§§
 			§§ @param as — the form to represent the Rational in
 			§§ @param places — how many digits to write after the point

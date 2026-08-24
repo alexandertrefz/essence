@@ -368,7 +368,8 @@ function formatAsDecimal(rational: RationalType): string {
 // magnitude is scaled by a power of ten first, so the quotient IS the digit
 // string and the remainder decides the one rounding. Halves go away from zero,
 // which is what `round` does and what the cut digit above does. A width below
-// one is the whole part alone, and no dot is written for it.
+// one rounds to a whole number, the same answer `round(toPlaces:)` gives, and
+// no dot is written for it.
 //
 // NOTE: The sign is prefixed only where something is left of it, so a value
 // that rounds to nothing prints `0.00` rather than `-0.00`.
