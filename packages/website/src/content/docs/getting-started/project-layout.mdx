@@ -375,6 +375,55 @@ snapshot is.
 `for any` is refused here. A measurement is comparable only where every run does
 the same work, and a generated value changes the work every case.
 
+## Mutation testing
+
+Coverage says a line **ran**. Mutation says a bug there would be **caught**.
+`essence test --mutate` asks the second question: it changes the code on
+purpose, one deliberate lie at a time, and runs the tests that reach the line
+to see whether any of them notices.
+
+```sh
+essence test --mutate                 # every module the walk finds
+essence test --mutate src/Standings.es  # one file's own lies
+```
+
+```
+ 41 mutants  ·  36 killed  ·  3 survived  ·  2 on lines no test reaches  ·  92% caught
+
+ ✗ Standings.es:31  swap ::isGreaterThan for ::isGreaterThanOrEqualTo — every test still passes
+    if scored::isGreaterThan(conceded) {
+    reached by 4 tests
+```
+
+The lies are the compiler's, told on the typed program rather than on the text,
+so every one of them is a program that still typechecks: a comparison rotated a
+single step, `is` against `isNot`, addition against subtraction, a Boolean
+literal flipped, an `if` turned inside out by swapping its two bodies, an
+Integer literal nudged up, down or to zero, and a Case construction swapped for
+a **sibling Case of its own Choice**. That last one is the operator an
+exhaustive language makes possible: the Cases are a closed set, so "no test
+notices this being a `#Draw`" is a complete statement rather than a guess.
+
+A mutant is judged only by the tests that **reach** it. The run compiles once
+with the coverage counters in, runs the tests once with each of them saying
+which lines it touched, and then runs each mutant against that line's own tests
+alone — so the cost is a compile and a handful of tests, not a compile and the
+whole suite. A site no test reaches is reported as its own count and never
+compiled at all: it is the coverage report's finding wearing mutation's hat.
+
+The whole run draws from one seed, minted once and handed to the baseline and to
+every mutant alike, so a property test in a covering set asks the mutant exactly
+the question it asked the code. Two runs at one seed are the same report.
+
+`--mutation-limit` caps how many mutants are compiled — a mutant costs a compile
+and a run, so a large project is worth narrowing — and the sites are taken in
+file order, so the same limit answers about the same mutants twice.
+
+A mutation score is **information**, so the run exits 0 whatever it found.
+`--strict` is what a job that holds a project to its score asks for: a survivor
+exits 1, the way a failing test does. `--json` writes one `mutant` event per
+line and a `mutation-end` tally, exactly as `--json` does for a test run.
+
 ## Conventions worth keeping
 
 None of these are enforced. They are what the repository itself does.
