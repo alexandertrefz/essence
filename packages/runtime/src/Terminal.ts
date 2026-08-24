@@ -26,20 +26,25 @@ const singleLineMaxLength = 60
 // NOTE: Two readers, one walk. `Terminal.inspect` asks for the STRUCTURAL
 // rendering — what a value IS — and `Record.toString` asks for the PRINTABLE
 // one, since a Record conforms to `Printable` and `Terminal.print` goes through
-// it. The two differ in one place, the Rational, so that is the one piece a
-// caller hands in: `Record.toString` passes `formatAsFraction`, where a whole
-// Rational prints its numerator alone. The rest of the rendering is the same
-// for both, quoted Strings included, and `Record.es` says so at its own
+// it. The two differ in TWO pieces, and a caller hands in both: the Rational,
+// where `Record.toString` passes `formatAsFraction` and a whole Rational prints
+// its numerator alone, and the padding inside a List's brackets, where it
+// passes none, so that a List member reads `[1, 2]` — the form `List.toString`
+// answers and a Program writes a List down in. The rest of the rendering is the
+// same for both, quoted Strings included, and `Record.es` says so at its own
 // `toString`.
 //
-// NOTE: A Function rather than a mode, so that a Program which never prints a
-// Record never carries the second formatter. Naming `formatAsFraction` inside
-// this walk puts it in every Program that prints anything at all, and measured
-// 331 bytes of `Irrational.es` against the 139 the handed-in Function costs.
+// NOTE: A Function rather than a mode for the Rational, so that a Program which
+// never prints a Record never carries the second formatter. Naming
+// `formatAsFraction` inside this walk puts it in every Program that prints
+// anything at all, and measured 331 bytes of `Irrational.es` against the 139
+// the handed-in Function costs. The padding is a String rather than a Function
+// because there is nothing behind it to carry.
 export function getStringRepresentation(
 	obj: AnyType,
 	indentLevel = 0,
 	rationalForm: (rational: RationalType) => string = formatAsRational,
+	listPadding = " ",
 ): string {
 	const baseIndent = " ".repeat(4 * indentLevel)
 	const contentIndent = " ".repeat(4 * (indentLevel + 1))
@@ -69,7 +74,7 @@ export function getStringRepresentation(
 			let singleLineString = `{ ${entries
 				.map(
 					([key, value]) =>
-						`${key} = ${getStringRepresentation(value, 0, rationalForm)}`,
+						`${key} = ${getStringRepresentation(value, 0, rationalForm, listPadding)}`,
 				)
 				.join(", ")} }`
 
@@ -83,6 +88,7 @@ export function getStringRepresentation(
 								value,
 								indentLevel + 1,
 								rationalForm,
+								listPadding,
 							)}`,
 					)
 					.join(`,\n${contentIndent}`)}\n${baseIndent}}`
@@ -98,9 +104,16 @@ export function getStringRepresentation(
 		let items = materialise(obj)
 
 		if (items.length > 0) {
-			let singleLineString = `[ ${items
-				.map((value) => getStringRepresentation(value, 0, rationalForm))
-				.join(", ")} ]`
+			let singleLineString = `[${listPadding}${items
+				.map((value) =>
+					getStringRepresentation(
+						value,
+						0,
+						rationalForm,
+						listPadding,
+					),
+				)
+				.join(", ")}${listPadding}]`
 
 			if (singleLineString.length < singleLineMaxLength) {
 				return singleLineString
@@ -111,6 +124,7 @@ export function getStringRepresentation(
 							value,
 							indentLevel + 1,
 							rationalForm,
+							listPadding,
 						),
 					)
 					.join(`,\n${contentIndent}`)}\n${baseIndent}]`
@@ -166,6 +180,7 @@ export function getStringRepresentation(
 				payloadEntries[0]![1] as never,
 				indentLevel,
 				rationalForm,
+				listPadding,
 			)})`
 		}
 
@@ -178,6 +193,7 @@ export function getStringRepresentation(
 			payload as never,
 			indentLevel,
 			rationalForm,
+			listPadding,
 		)}`
 	} else {
 		// NOTE: Unreachable for any value the Compiler emits — every Essence

@@ -88,12 +88,14 @@ export function is(
 // Rational member prints its numerator alone, exactly as it does everywhere
 // else a value is rendered for a reader. `formatAsFraction` is what says so,
 // and it is handed in rather than named inside the walk, so a Program that
-// prints no Record does not carry it. The layout is still the structural one —
-// members as `name = value`, a String member quoted — which is what `Record.es`
-// promises.
+// prints no Record does not carry it. The empty padding beside it is the same
+// promise about a List member: `List.toString` answers `[1, 2]`, and a Record
+// holding that List has to say the same thing about it. The layout is still the
+// structural one — members as `name = value`, a String member quoted — which is
+// what `Record.es` promises.
 // biome-ignore lint/suspicious/noShadowRestrictedNames: This is a runtime function
 export function toString(recordInstance: RecordType): StringType {
 	return createString(
-		getStringRepresentation(recordInstance, 0, formatAsFraction),
+		getStringRepresentation(recordInstance, 0, formatAsFraction, ""),
 	)
 }

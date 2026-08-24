@@ -201,7 +201,7 @@ describe("Runtime Internals", () => {
 						callbacks: list.createList([functionValue()]),
 					}),
 				).value,
-			).toBe("{ callbacks = [ Function ] }")
+			).toBe("{ callbacks = [Function] }")
 		})
 	})
 
