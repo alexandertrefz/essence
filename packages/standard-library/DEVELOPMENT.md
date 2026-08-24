@@ -172,11 +172,13 @@ only safe because `StdlibExhaustive.es` calls both entries over the same inputs,
 wherever they stand: the golden capture is what stops the two from drifting.
 Writing another one means adding those lines too.
 
-Most of `NonEmptyList` is native, but not all of it. `sort(on:)` hands its key
-to the native `sort(by:)`, `replace(at:_:)` hands the transformed item to the
-native `replace(_:at:)`, and `lowestItem(on:)` and `highestItem(on:)` read
-`List`'s Optional answer off the native `firstItem()`. An Essence body can carry
-a proof another entry already holds; what it can not do is mint one.
+Most of `NonEmptyList` is native, but not all of it. `indices()` is written on
+`List.of(integersFrom:through:)`, which promises a non-empty answer already,
+`sort(on:)` hands its key to the native `sort(by:)`, `replace(at:_:)` hands the
+transformed item to the native `replace(_:at:)`, and `lowestItem(on:)` and
+`highestItem(on:)` read `List`'s Optional answer off the native `firstItem()`.
+An Essence body can carry a proof another entry already holds; what it can not
+do is mint one.
 
 A const is emitted only into Programs that reach it. The reachability search
 reads each Method's TYPED body, so it follows a Method reached only through
@@ -763,9 +765,9 @@ shim, which nothing references, is dropped by the bundler.
 witness is passed positionally, after everything the signature declares, exactly
 as it is to a bodied Method — so a shim listing only the declared Parameters
 takes the witness in the slot the default opened and hands the default on as the
-witness. `sort<ItemType is Comparable>(in order: SortOrder = #Ascending)` is the
-first native with both, and the shim now ends with one Parameter per bounded Type
-Parameter:
+witness. `sort<infer ItemType is Comparable>(in order: SortOrder = #Ascending)`
+is the first native with both, and the shim now ends with one Parameter per
+bounded Type Parameter:
 
 ```js
 const $es_NonEmptyList_sort__overload$1 = (
