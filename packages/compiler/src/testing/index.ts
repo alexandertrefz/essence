@@ -140,21 +140,30 @@ export function collectBenchmarks(
 
 	for (let event of events) {
 		if (event.kind === "benchmark" && !failed.has(event.id)) {
-			benchmarks.push({
-				id: event.id,
-				module: event.module,
-				key: event.key,
-				nanoseconds: event.nanoseconds,
-				iterations: event.iterations,
-				samples: event.samples,
-				baseline: event.baseline,
-				ratio: event.ratio,
-				status: event.status,
-			})
+			benchmarks.push(benchmarkRecordOf(event))
 		}
 	}
 
 	return benchmarks
+}
+
+// NOTE: The record IS the event's fields — spelled once, here, so the fold the
+// report reads and the collection the baseline writer reads can never carry
+// two different ideas of what a measurement said.
+function benchmarkRecordOf(
+	event: Extract<TestEvent, { kind: "benchmark" }>,
+): BenchmarkRecord {
+	return {
+		id: event.id,
+		module: event.module,
+		key: event.key,
+		nanoseconds: event.nanoseconds,
+		iterations: event.iterations,
+		samples: event.samples,
+		baseline: event.baseline,
+		ratio: event.ratio,
+		status: event.status,
+	}
 }
 
 // NOTE: One `matches snapshot` as the run reported it. `name` is null for an
@@ -367,17 +376,7 @@ export function collectTestRun(events: Array<TestEvent>): TestRun {
 				let held = byId.get(event.id)
 
 				if (held !== undefined) {
-					held.benchmark = {
-						id: event.id,
-						module: event.module,
-						key: event.key,
-						nanoseconds: event.nanoseconds,
-						iterations: event.iterations,
-						samples: event.samples,
-						baseline: event.baseline,
-						ratio: event.ratio,
-						status: event.status,
-					}
+					held.benchmark = benchmarkRecordOf(event)
 				}
 
 				break

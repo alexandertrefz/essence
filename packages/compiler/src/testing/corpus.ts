@@ -173,41 +173,49 @@ export async function readCorpus(
 	let stores: Record<string, CorpusStore> = {}
 	let unreadable: Array<{ module: string; problem: string }> = []
 
-	for (let module of modules) {
-		let filePath = corpusFileOf(module)
-		let text: string
+	// NOTE: Fanned out, exactly as the snapshots beside them are. The
+	// unreadable list is ordered afterwards so two runs report in one order
+	// whatever the disk answered first.
+	await Promise.all(
+		[...modules].map(async (module) => {
+			let filePath = corpusFileOf(module)
+			let text: string
 
-		try {
-			text = await readFile(filePath, "utf8")
-		} catch (error) {
-			stores[module] = {}
+			try {
+				text = await readFile(filePath, "utf8")
+			} catch (error) {
+				stores[module] = {}
 
-			// NOTE: Only absence is ordinary. A file that is there and cannot
-			// be read is a file the writer must not rewrite from nothing.
-			if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-				unreadable.push({
-					module,
-					problem: `${filePath}: ${describe(error)}`,
-				})
+				// NOTE: Only absence is ordinary. A file that is there and
+				// cannot be read is a file the writer must not rewrite from
+				// nothing.
+				if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+					unreadable.push({
+						module,
+						problem: `${filePath}: ${describe(error)}`,
+					})
+				}
+
+				return
 			}
 
-			continue
-		}
+			let parsed = parseCorpusFile(text)
 
-		let parsed = parseCorpusFile(text)
+			if (parsed === null) {
+				stores[module] = {}
+				unreadable.push({
+					module,
+					problem: `${filePath}: not a corpus file — fix it or delete it; nothing stored there is replayed, and nothing will be written over it`,
+				})
 
-		if (parsed === null) {
-			stores[module] = {}
-			unreadable.push({
-				module,
-				problem: `${filePath}: not a corpus file — fix it or delete it; nothing stored there is replayed, and nothing will be written over it`,
-			})
+				return
+			}
 
-			continue
-		}
+			stores[module] = parsed
+		}),
+	)
 
-		stores[module] = parsed
-	}
+	unreadable.sort((left, right) => left.module.localeCompare(right.module))
 
 	return { stores, unreadable }
 }

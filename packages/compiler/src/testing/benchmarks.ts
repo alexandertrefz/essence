@@ -122,9 +122,12 @@ export async function readBenchmarks(
 ): Promise<Record<string, BenchmarkStore>> {
 	let stores: Record<string, BenchmarkStore> = {}
 
-	for (let module of modules) {
-		stores[module] = await readBenchmarkFile(benchmarkFileOf(module))
-	}
+	// NOTE: Fanned out, exactly as the snapshots beside them are.
+	await Promise.all(
+		[...modules].map(async (module) => {
+			stores[module] = await readBenchmarkFile(benchmarkFileOf(module))
+		}),
+	)
 
 	return stores
 }
