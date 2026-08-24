@@ -133,6 +133,7 @@ packages/cli/bin/essence test -f leader         # only the tests whose name says
 packages/cli/bin/essence test --skip-tag slow   # leave a tag out; --tag runs only that tag
 packages/cli/bin/essence test --watch           # stay up, re-run what each save reaches
 packages/cli/bin/essence test --coverage        # and report what the tests reached
+packages/cli/bin/essence test --mutate          # and report which bugs they would catch
 packages/cli/bin/essence test --update          # record every snapshot the run produced
 packages/cli/bin/essence test --seed 41c37ea3   # draw a property test's values again
 ```
@@ -170,6 +171,24 @@ comment to a build, a probe to a test run.
 percentages, `match` arms as taken out of total, and — because the language is exhaustive — every arm no value
 took and every Case of a `choice` no test ever built, named rather than counted. `--coverage-report lcov|json`
 writes a file beside the table.
+
+`--mutate` asks the question coverage cannot: coverage says a line ran, mutation says a bug there would be
+caught. The compiler changes the code on purpose, one deliberate lie at a time — a comparison rotated a single
+step, `is` against `isNot`, an `if` turned inside out, a literal nudged, a Case construction swapped for a
+sibling Case of its own Choice — and runs only the tests that reach the line to see whether any notices. The
+lies are told on the typed program, so every one of them still typechecks, and the closed set of Cases makes
+"no test notices this being a `#Draw`" a complete statement rather than a guess. A site no test reaches is
+counted apart and never compiled. The run draws from one seed throughout, so a property test asks a mutant
+exactly what it asked the code, and two runs at one seed are the same report.
+
+```
+ 41 mutants  ·  36 killed  ·  3 survived  ·  2 on lines no test reaches  ·  92% caught
+
+ ✗ Standings.es:31  swap ::isGreaterThan for ::isGreaterThanOrEqualTo — every test still passes
+```
+
+A score is information, so `--mutate` exits 0 whatever it found; `--strict` makes a survivor a failure, and
+`--mutation-limit` caps how many mutants are compiled.
 
 `--json` writes the run as one JSON event per line. A project skips tags by default by naming them in the
 nearest `package.json`, under `{ "essence": { "test": { "skipTags": ["slow"] } } }`.

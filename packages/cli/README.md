@@ -77,6 +77,26 @@ case is drawn on every later run, so a value that broke a property once goes on
 being asked about. A stored value the Types no longer fit is dropped where it is
 met.
 
+`essence test --mutate` asks what coverage cannot: coverage says a line ran,
+mutation says a bug there would be caught. The compiler changes the code on
+purpose, one deliberate lie at a time — a comparison rotated a single step, `is`
+against `isNot`, addition against subtraction, a Boolean flipped, an `if` turned
+inside out, an Integer literal nudged, a Case construction swapped for a sibling
+Case of its own Choice — and runs only the tests that reach the site to see
+whether any of them notices. The lies are told on the typed program, so each
+mutant still typechecks; a site no test reaches is counted apart and never
+compiled. The whole run draws from one seed, so two runs at one seed are the
+same report. A survivor is named with the sentence that says what was changed:
+
+```
+ 41 mutants  ·  36 killed  ·  3 survived  ·  2 on lines no test reaches  ·  92% caught
+
+ ✗ Standings.es:31  swap ::isGreaterThan for ::isGreaterThanOrEqualTo — every test still passes
+```
+
+A score is information, so the run exits 0 whatever it found. `--strict` makes a
+survivor exit 1, and `--mutation-limit` caps how many mutants are compiled.
+
 The exit code is 0 when everything that ran passed, 1 when a test failed, and 2
 when a run nobody narrowed still holds a `focused` test.
 
@@ -97,6 +117,6 @@ narrowed. A second run over a file nothing touched replays what the first one
 reported rather than running it, and says so beside the tally — `8 of 9
 entries cached`. An entry that failed, one holding a property test, and one that
 recorded a snapshot or a baseline are never remembered, and a focused run is
-not remembered at all; `--update`, `--coverage`, `--bench`, `--seed` and
-`--cases` neither read nor write. `ESSENCE_RESULTS_CACHE` moves the directory
+not remembered at all; `--update`, `--coverage`, `--bench`, `--mutate`,
+`--seed` and `--cases` neither read nor write. `ESSENCE_RESULTS_CACHE` moves the directory
 and `ESSENCE_RESULTS_CACHE=off` turns it off, for a run that has to be live.
