@@ -2,6 +2,9 @@ import { describe, expect, test } from "bun:test"
 
 import { createBoolean } from "../Boolean"
 import {
+	decode,
+	encode,
+	type EncodedValue,
 	generate,
 	GenerationFailure,
 	type Generator,
@@ -10,6 +13,7 @@ import {
 	shrink,
 } from "../Generators"
 import { createInteger } from "../Integer"
+import { anyIs } from "../internalHelpers"
 import { createList, viewOf } from "../List"
 import { createRandomness, type RandomnessType, seedOf } from "../Randomness"
 import { createRational } from "../Rational"
@@ -504,6 +508,340 @@ describe("Generators", () => {
 					]),
 				),
 			).toBeNull()
+		})
+	})
+
+	// NOTE: THE law every stored counterexample rests on — what is written down
+	// reads back as the very value that was written. A kind that round-trips for
+	// nothing is a corpus entry that quietly stops replaying, so every kind but
+	// a Namespace's own is asked here.
+	describe("what a value written down reads back as", () => {
+		const optionals: Generator = {
+			kind: "union",
+			members: [
+				{
+					kind: "case",
+					tag: "Optional#Value",
+					members: [{ name: "item", generator: integers }],
+				},
+				{ kind: "case", tag: "Optional#Empty", members: [] },
+			],
+		}
+		const standings: Generator = {
+			kind: "record",
+			members: [
+				{ name: "team", generator: strings },
+				{ name: "form", generator: { kind: "list", item: booleans } },
+				{
+					name: "best",
+					generator: {
+						kind: "record",
+						members: [{ name: "goals", generator: integers }],
+					},
+				},
+			],
+		}
+		const evens = refined("EvenInteger", integers, { atLeast: "0" }, [
+			(value) => ({ value: wholeOf(value) % 2n === 0n }),
+		])
+
+		const written: Array<[string, Generator, AnyType]> = [
+			["true", booleans, createBoolean(true)],
+			["false", booleans, createBoolean(false)],
+			["zero", integers, createInteger(0n)],
+			["a negative Integer", integers, createInteger(-19n)],
+			[
+				"an Integer no double holds",
+				integers,
+				createInteger(9_007_199_254_740_993n),
+			],
+			[
+				"an Integer of eighty digits",
+				integers,
+				createInteger(10n ** 80n + 7n),
+			],
+			["a negative Rational", rationals, createRational(-7n, 4n)],
+			["a whole Rational", rationals, createRational(6n, 1n)],
+			["the empty String", strings, createString("")],
+			["a String past the basic plane", strings, createString("é🐈")],
+			[
+				"the empty List",
+				{ kind: "list", item: integers },
+				createList([]),
+			],
+			[
+				"a List of Lists",
+				{ kind: "list", item: { kind: "list", item: integers } },
+				createList([createList([createInteger(1n)]), createList([])]),
+			],
+			[
+				"a nested Record",
+				standings,
+				createRecord({
+					team: createString("Lions"),
+					form: createList([
+						createBoolean(true),
+						createBoolean(false),
+					]),
+					best: createRecord({ goals: createInteger(3n) }),
+				}),
+			],
+			[
+				"a Case carrying a payload",
+				optionals,
+				createCase("Optional#Value", {
+					item: createInteger(7n),
+				}) as unknown as AnyType,
+			],
+			[
+				"a Case carrying none",
+				optionals,
+				createCase("Optional#Empty") as unknown as AnyType,
+			],
+			["a refined Integer", evens, createInteger(12n)],
+			[
+				"a refined List",
+				refined(
+					"NonEmptyList",
+					{ kind: "list", item: strings },
+					{ minimumLength: 1 },
+				),
+				createList([createString("only")]),
+			],
+		]
+
+		for (let [what, generator, value] of written) {
+			// NOTE: Through JSON rather than straight back, because a corpus is
+			// a file: a value that only survives while it stays an object
+			// survives nothing at all.
+			test(`reads ${what} back as the very value`, () => {
+				let data = encode(generator, value)
+
+				expect(data).toBeTruthy()
+
+				let read = decode(
+					generator,
+					JSON.parse(JSON.stringify(data)) as EncodedValue,
+				)
+
+				expect(read).toBeTruthy()
+				expect(anyIs(read!, value)).toBe(true)
+			})
+		}
+
+		test("writes the same data down every time", () => {
+			let value = createRecord({
+				team: createString("Lions"),
+				form: createList([createBoolean(true)]),
+				best: createRecord({ goals: createInteger(3n) }),
+			})
+
+			expect(JSON.stringify(encode(standings, value))).toBe(
+				JSON.stringify(encode(standings, value)),
+			)
+		})
+
+		test("names the arm of the Union a value belongs to", () => {
+			expect(
+				encode(
+					optionals,
+					createCase("Optional#Empty") as unknown as AnyType,
+				),
+			).toEqual({
+				kind: "union",
+				member: 1,
+				value: { kind: "case", tag: "Optional#Empty", members: {} },
+			})
+		})
+	})
+
+	describe("what a stored value is refused over", () => {
+		test("writes nothing down for a Namespace's own generator", () => {
+			let generator: Generator = {
+				kind: "generated",
+				name: "Team",
+				generate: () => createString("Lions"),
+			}
+
+			expect(encode(generator, createString("Lions"))).toBeNull()
+			expect(
+				decode(generator, { kind: "string", value: "Lions" }),
+			).toBeNull()
+		})
+
+		// NOTE: One Parameter is enough to cost the whole test its corpus, so a
+		// generator holding one anywhere inside it has to say so from the top.
+		test("writes nothing down where one is nested inside a Record", () => {
+			let generator: Generator = {
+				kind: "record",
+				members: [
+					{ name: "name", generator: strings },
+					{
+						name: "team",
+						generator: {
+							kind: "generated",
+							name: "Team",
+							generate: () => createString("Lions"),
+						},
+					},
+				],
+			}
+
+			expect(
+				encode(
+					generator,
+					createRecord({
+						name: createString("Rae"),
+						team: createString("Lions"),
+					}),
+				),
+			).toBeNull()
+		})
+
+		test("writes nothing down for a value of another shape", () => {
+			expect(encode(integers, createString("12"))).toBeNull()
+			expect(encode(strings, createInteger(12n))).toBeNull()
+		})
+
+		test("refuses data of another kind", () => {
+			expect(decode(integers, { kind: "string", value: "12" })).toBeNull()
+			expect(decode(strings, { kind: "integer", value: "12" })).toBeNull()
+			expect(
+				decode({ kind: "list", item: integers }, {
+					kind: "list",
+					items: "nothing",
+				} as unknown as EncodedValue),
+			).toBeNull()
+		})
+
+		test("refuses digits that spell no Integer", () => {
+			expect(decode(integers, { kind: "integer", value: "" })).toBeNull()
+			expect(
+				decode(integers, { kind: "integer", value: " 12 " }),
+			).toBeNull()
+			expect(
+				decode(integers, { kind: "integer", value: "twelve" }),
+			).toBeNull()
+			expect(decode(integers, { kind: "integer", value: "-12" })).toEqual(
+				createInteger(-12n),
+			)
+		})
+
+		test("refuses a Rational over nothing", () => {
+			expect(
+				decode(rationals, {
+					kind: "rational",
+					numerator: "1",
+					denominator: "0",
+				}),
+			).toBeNull()
+		})
+
+		test("refuses a member set the Record no longer has", () => {
+			let generator: Generator = {
+				kind: "record",
+				members: [
+					{ name: "team", generator: strings },
+					{ name: "points", generator: integers },
+				],
+			}
+			let team: EncodedValue = { kind: "string", value: "Lions" }
+			let points: EncodedValue = { kind: "integer", value: "19" }
+
+			expect(
+				decode(generator, { kind: "record", members: { team } }),
+			).toBeNull()
+			expect(
+				decode(generator, {
+					kind: "record",
+					members: { team, points, goals: points },
+				}),
+			).toBeNull()
+			expect(
+				decode(generator, {
+					kind: "record",
+					members: { team, scored: points },
+				}),
+			).toBeNull()
+			expect(
+				decode(generator, {
+					kind: "record",
+					members: { team, points },
+				}),
+			).not.toBeNull()
+		})
+
+		test("refuses a tag the Case no longer carries", () => {
+			let generator: Generator = {
+				kind: "case",
+				tag: "Optional#Empty",
+				members: [],
+			}
+
+			expect(
+				decode(generator, {
+					kind: "case",
+					tag: "Optional#Nothing",
+					members: {},
+				}),
+			).toBeNull()
+		})
+
+		test("refuses an arm the Union no longer has", () => {
+			let generator: Generator = {
+				kind: "union",
+				members: [{ kind: "case", tag: "Shade#Light", members: [] }],
+			}
+
+			expect(
+				decode(generator, {
+					kind: "union",
+					member: 1,
+					value: { kind: "case", tag: "Shade#Dark", members: {} },
+				}),
+			).toBeNull()
+		})
+
+		// NOTE: A refinement that has NARROWED since a counterexample was stored
+		// no longer admits it, and a value the Type says is impossible is not a
+		// counterexample — it is an entry to drop.
+		test("refuses a value the narrowing no longer admits", () => {
+			let generator = refined("BigEnough", integers, { atLeast: "10" })
+			let small: EncodedValue = {
+				kind: "refined",
+				value: { kind: "integer", value: "4" },
+			}
+			let big: EncodedValue = {
+				kind: "refined",
+				value: { kind: "integer", value: "11" },
+			}
+
+			expect(decode(generator, small)).toBeNull()
+			expect(decode(generator, big)).toEqual(createInteger(11n))
+		})
+
+		test("refuses a value a check no longer admits", () => {
+			let generator = refined("EvenInteger", integers, {}, [
+				(value) => ({ value: wholeOf(value) % 2n === 0n }),
+			])
+
+			expect(
+				decode(generator, {
+					kind: "refined",
+					value: { kind: "integer", value: "7" },
+				}),
+			).toBeNull()
+			expect(
+				decode(generator, {
+					kind: "refined",
+					value: { kind: "integer", value: "8" },
+				}),
+			).toEqual(createInteger(8n))
+		})
+
+		test("refuses anything that is not data at all", () => {
+			expect(decode(integers, null as unknown as EncodedValue)).toBeNull()
+			expect(decode(integers, "12" as unknown as EncodedValue)).toBeNull()
 		})
 	})
 })
