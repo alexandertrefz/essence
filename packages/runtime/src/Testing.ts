@@ -1,4 +1,7 @@
 import {
+	decode,
+	encode,
+	type EncodedValue,
 	type Generator,
 	GenerationFailure,
 	generate,
@@ -320,6 +323,24 @@ export type OutputChunk = { stream: OutputStream; text: string }
 // may be running in a browser, and nothing in it reads a file.
 export type SnapshotStore = Record<string, string>
 
+// NOTE: One Parameter of a stored counterexample. It is kept under the
+// Parameter's NAME rather than at a position, because a property whose
+// Parameters were reordered is one a stored tuple would otherwise be silently
+// wrong about — and a name that is no longer there is what says the entry has
+// gone stale.
+export type StoredValue = { name: string; data: EncodedValue }
+
+export type StoredCounterexample = { values: Array<StoredValue> }
+
+// NOTE: The STORED counterexamples of one Module, keyed by the test's identity
+// WITHOUT the Module step — the file they were read from is that Module's
+// already. Every one of them is re-run before a single case is drawn, so a bug
+// a search found once is caught by the run after it, and by every run after
+// that, for as long as the entry lives. Like a snapshot they are read off a
+// companion beside the source and handed to the run: the runtime is a bundle,
+// it may be running in a browser, and nothing in it reads a file.
+export type CorpusStore = Record<string, Array<StoredCounterexample>>
+
 // NOTE: What `matches snapshot` compares against, as the emitted call hands it
 // over. `slot` is the point of the Module's span table where a recorded value
 // stands, or would stand — what a run writes one back into.
@@ -441,7 +462,17 @@ export type TestContext = {
 
 // NOTE: What a property test draws with. `word` is the state a source is built
 // from and `seed` is what a reader types after `--seed` to get it back.
-export type PropertySettings = { seed: string; word: number; cases: number }
+//
+// NOTE: `replays` are the counterexamples THIS test has failed on before, run
+// first and in the order they were stored. A run that finds one still failing
+// never draws a case at all: the answer is already in hand, and a search that
+// went looking for it again would report whatever it happened to find instead.
+export type PropertySettings = {
+	seed: string
+	word: number
+	cases: number
+	replays: Array<StoredCounterexample>
+}
 
 export type PropertyCounterexample = { name: string; value: string }
 
@@ -457,6 +488,25 @@ export type PropertyResult = {
 	seed: string
 	shrinks: number
 	counterexample: Array<PropertyCounterexample> | null
+	// NOTE: How many stored counterexamples were read back and re-run before
+	// anything was drawn. It is counted APART from `cases` on purpose: a replay
+	// takes no word from the source, so a run of ten replays and a hundred cases
+	// draws exactly what a run of a hundred cases draws — which is what keeps
+	// `--seed` reproducing a run whose corpus has grown since.
+	replayed: number
+	// NOTE: Which stored entries no longer read back, by their index in the
+	// stored list. The Types changed under them, or a refinement stopped
+	// admitting what it once did; the runner drops exactly these on the next
+	// write.
+	stale: Array<number>
+	// NOTE: Whether the failure came from a replay rather than from a draw,
+	// which is what a report says in place of "after N cases".
+	fromCorpus: boolean
+	// NOTE: The SHRUNK counterexample written down, ready to be stored — and
+	// null where any Parameter refuses to be written down at all, because one
+	// `Generatable` conformance anywhere inside a generator costs the whole test
+	// its corpus.
+	encoded: Array<StoredValue> | null
 }
 
 // NOTE: The cases a property runs where nobody said. A hundred is the number
@@ -499,6 +549,7 @@ export function createContext(
 			seed: "",
 			word: 0,
 			cases: DEFAULT_CASES,
+			replays: [],
 		},
 		propertyResult: null,
 		benchmarkResult: null,
@@ -684,10 +735,43 @@ function runProperty(
 	let settings = context.property
 	let source = createRandomness(settings.word)
 	let mark = markOf(context)
+	let stale: Array<number> = []
 	let failing: Array<AnyType> | null = null
+	let fromCorpus = false
+	let replayed = 0
 	let ran = 0
 
-	for (let index = 0; index < settings.cases; index++) {
+	// NOTE: The corpus BEFORE the search, in the order it was stored, newest
+	// first. What it holds is every value this test has ever failed on, so a
+	// regression on an old bug is caught before a single word is drawn — and
+	// found in the one case that is known to have found it, rather than in
+	// whatever a hundred fresh draws happen to turn up.
+	for (let [index, replay] of settings.replays.entries()) {
+		let values = decodeReplay(parameters, replay)
+
+		// NOTE: An entry the generators no longer read back — the Types moved
+		// under it. It is recorded rather than dropped here, because a bundle
+		// writes no file: what happens to the entry is the runner's to decide.
+		if (values === null) {
+			stale.push(index)
+
+			continue
+		}
+
+		replayed += 1
+
+		if (!holds(context, mark, run, values)) {
+			failing = values
+			fromCorpus = true
+
+			break
+		}
+	}
+
+	// NOTE: Only where every stored case held. A replay that failed IS the
+	// counterexample, and drawing a hundred more would report whichever value
+	// the search happened to reach first in place of the one already in hand.
+	for (let index = 0; failing === null && index < settings.cases; index++) {
 		// NOTE: The size grows with the case number, so the early cases are
 		// small — a failure found among them is nearly minimal already — and
 		// the late ones are big enough to break an assumption a short List
@@ -710,6 +794,10 @@ function runProperty(
 				seed: settings.seed,
 				shrinks: 0,
 				counterexample: null,
+				replayed,
+				stale,
+				fromCorpus: false,
+				encoded: null,
 			}
 
 			throw thrown
@@ -731,11 +819,18 @@ function runProperty(
 			seed: settings.seed,
 			shrinks: 0,
 			counterexample: null,
+			replayed,
+			stale,
+			fromCorpus: false,
+			encoded: null,
 		}
 
 		return
 	}
 
+	// NOTE: A replayed failure is shrunk as well, rather than reported as it
+	// was stored: the code has changed since it was written down, and it may
+	// now fail on something smaller than what broke it the first time.
 	let shrunk = shrinkCase(context, mark, run, parameters, failing)
 
 	context.propertyResult = {
@@ -747,6 +842,10 @@ function runProperty(
 			name: parameter.name,
 			value: render(shrunk.values[index]!),
 		})),
+		replayed,
+		stale,
+		fromCorpus,
+		encoded: encodeCase(parameters, shrunk.values),
 	}
 
 	// NOTE: The last run is the one whose recordings the report is built from,
@@ -755,6 +854,70 @@ function runProperty(
 	// exactly as far as it always does.
 	rewind(context, mark)
 	run(...shrunk.values)
+}
+
+// NOTE: One stored counterexample read back as the values to run the body with,
+// and nothing where it no longer describes this property. The Parameters are
+// matched by NAME and the name set has to be exactly the generators' — a
+// Parameter that was added, removed or renamed makes the entry a claim about a
+// test that no longer exists.
+function decodeReplay(
+	parameters: Array<PropertyParameter>,
+	replay: StoredCounterexample,
+): Array<AnyType> | null {
+	let stored = replay.values
+
+	if (!Array.isArray(stored) || stored.length !== parameters.length) {
+		return null
+	}
+
+	let byName = new Map(stored.map((value) => [value?.name, value?.data]))
+
+	if (byName.size !== parameters.length) {
+		return null
+	}
+
+	let values: Array<AnyType> = []
+
+	for (let parameter of parameters) {
+		let data = byName.get(parameter.name)
+
+		if (data === undefined) {
+			return null
+		}
+
+		let value = decode(parameter.generator, data)
+
+		if (value === null) {
+			return null
+		}
+
+		values.push(value)
+	}
+
+	return values
+}
+
+// NOTE: The whole case written down, or nothing at all. One Parameter that can
+// not be written down costs the test its corpus: half a case is not a case, and
+// storing it would replay a property with a value nobody chose in the hole.
+function encodeCase(
+	parameters: Array<PropertyParameter>,
+	values: Array<AnyType>,
+): Array<StoredValue> | null {
+	let stored: Array<StoredValue> = []
+
+	for (let [index, parameter] of parameters.entries()) {
+		let data = encode(parameter.generator, values[index]!)
+
+		if (data === null) {
+			return null
+		}
+
+		stored.push({ name: parameter.name, data })
+	}
+
+	return stored
 }
 
 // NOTE: One case, rolled back where it held. A case FAILS when it recorded a
@@ -1467,16 +1630,27 @@ export type TestEvent =
 	// property held or not, because "a hundred cases held" is the answer a
 	// reader wants as much as the counterexample is — and the seed is on it
 	// either way, so a run that passed today can be run again tomorrow.
+	//
+	// NOTE: `module` and `key` say where a counterexample belongs, exactly as a
+	// snapshot event's `module` and `name` do. The key is the test's identity
+	// without the Module step, worked out HERE so that no consumer has to spell
+	// the escaping a second time and risk spelling it differently.
 	| {
 			schema: 1
 			kind: "property"
 			id: string
 			name: string
+			module: string | null
+			key: string
 			cases: number
 			requested: number
 			seed: string
 			shrinks: number
 			counterexample: Array<PropertyCounterexample> | null
+			replayed: number
+			stale: Array<number>
+			fromCorpus: boolean
+			encoded: Array<StoredValue> | null
 	  }
 	// NOTE: What one benchmark measured. It is written whether the measurement
 	// held to its baseline or not, because a runner needs the number of a new
@@ -1719,6 +1893,13 @@ export type RunOptions = {
 	// spec can measure a body without measuring the machine; `performance.now`
 	// otherwise.
 	clock?: () => number
+	// NOTE: The stored counterexamples of every Module in the run, keyed the
+	// same way the snapshots beside them are: the Module's canonical path, and
+	// then the test's identity without that path in it. Read off disk by
+	// whoever started the run; a bundle reads nothing. A runner that hands none
+	// over simply replays nothing, which is what the Language Server's session
+	// does today.
+	counterexamples?: Record<string, CorpusStore>
 	// NOTE: Whether a snapshot that differs is REPLACED rather than reported —
 	// `essence test --update`, and the Editor's "Accept snapshot". A benchmark
 	// reads it too: a measurement outside its band is recorded rather than
@@ -1916,6 +2097,7 @@ function runOne(
 	let entry = test.entry
 	let spans = test.module.spans
 	let seed = options.seed ?? ""
+	let key = relativeKey(entry)
 	let context = createContext(test.index, {
 		stored: (options.snapshots ?? {})[test.module.module ?? ""] ?? {},
 		benchmarks: (options.benchmarks ?? {})[test.module.module ?? ""] ?? {},
@@ -1931,6 +2113,9 @@ function runOne(
 			// with the filter beside it.
 			word: seedOf(`${seed}/${entry.id}`),
 			cases: options.cases ?? DEFAULT_CASES,
+			replays:
+				((options.counterexamples ?? {})[test.module.module ?? ""] ??
+					{})[key] ?? [],
 		},
 	})
 
@@ -2008,11 +2193,17 @@ function runOne(
 			kind: "property",
 			id: entry.id,
 			name,
+			module: test.module.module,
+			key,
 			cases: context.propertyResult.cases,
 			requested: context.propertyResult.requested,
 			seed: context.propertyResult.seed,
 			shrinks: context.propertyResult.shrinks,
 			counterexample: context.propertyResult.counterexample,
+			replayed: context.propertyResult.replayed,
+			stale: context.propertyResult.stale,
+			fromCorpus: context.propertyResult.fromCorpus,
+			encoded: context.propertyResult.encoded,
 		})
 	}
 
@@ -2118,6 +2309,25 @@ function runOne(
 		failures,
 		error,
 	})
+}
+
+// NOTE: The entry a stored counterexample is kept under: the test's identity
+// with the MODULE step left off, because the file it is stored in is that
+// Module's already — so a Module that moves takes its corpus with it, exactly
+// as it takes its snapshots.
+//
+// NOTE: The escaping is the Compiler's `relativeIdentityKey`, spelled a second
+// time here on purpose. This module is inlined into a user's bundle and imports
+// nothing from the Compiler, and the two are pinned to each other by a spec
+// rather than by a shared function.
+function relativeKey(entry: TestManifestEntry): string {
+	return [
+		...entry.suitePath,
+		entry.name,
+		...(entry.row === null ? [] : [String(entry.row)]),
+	]
+		.map((step) => step.replaceAll("\\", "\\\\").replaceAll("/", "\\/"))
+		.join("/")
 }
 
 // NOTE: The points a test probed, in the order they were first recorded at —
