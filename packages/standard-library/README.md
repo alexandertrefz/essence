@@ -191,15 +191,15 @@ easy to break:
   `hasNoItems(where:)` whether NO item does. The filter is `everyItem(where:)`,
   which answers the items themselves.
 - **A key-reading Function is always labelled `on`** — `sort(on:)`,
-  `lowestItem(on:)`, `highestItem(on:)`, `sum(on:)`, `average(on:)`. Each
-  takes a Function of one Parameter answering the value the Method is really
-  about, and a member path is what makes them read as one family:
-  `products::sort(on .price)`, `orders::sum(on .total)`. `by` is not reused for
-  this, because `sort(by:)` already means a COMPARISON, and two same-labelled
-  entries told apart by arity alone would be a trap; `of` is not either,
-  because `count(of item)` already means "of this VALUE". Write the path where
-  the body is a pure read, and the Function literal where it is anything else —
-  `sort(on (_ line: Line) { <- line.total::rounded() })`.
+  `group(on:)`, `lowestItem(on:)`, `highestItem(on:)`, `sum(on:)`,
+  `average(on:)`. Each takes a Function of one Parameter answering the value the
+  Method is really about, and a member path is what makes them read as one
+  family: `products::sort(on .price)`, `orders::sum(on .total)`. `by` is not
+  reused for this, because `sort(by:)` already means a COMPARISON, and two
+  same-labelled entries told apart by arity alone would be a trap; `of` is not
+  either, because `count(of item)` already means "of this VALUE". Write the path
+  where the body is a pure read, and the Function literal where it is anything
+  else — `sort(on (_ line: Line) { <- line.total::rounded() })`.
 - **An aggregate is reachable from the value it is about** —
   `[3, 1, 2]::sum()`, `::average()`, `::lowestNumber()`. `Number.sum` and its
   four siblings stay as the statics that implement them; what a List answers is
