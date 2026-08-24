@@ -42,8 +42,9 @@ const VALUE = /^\t(\d+) ns$/
 //   • Lines above the first entry are a comment, and are written afresh every
 //     time the file is written.
 //   • An entry opens with `benchmark "key"` at the left margin. The key is
-//     written the way a String Literal is, so a quote or a backslash in one
-//     escapes.
+//     written the way a String Literal is, so a quote, a backslash or a line
+//     break in one escapes — the format is line-oriented, and a key holding a
+//     raw line break would be a key no line could ever hold.
 //   • One tab-indented line follows it, holding the time of a single run in
 //     whole nanoseconds. Nothing else belongs to an entry: unlike a snapshot,
 //     what is recorded here is a number rather than whatever a value printed.
@@ -99,11 +100,17 @@ export function printBenchmarkFile(entries: BenchmarkStore): string {
 }
 
 function escapeKey(key: string): string {
-	return key.replaceAll("\\", "\\\\").replaceAll('"', '\\"')
+	return key
+		.replaceAll("\\", "\\\\")
+		.replaceAll('"', '\\"')
+		.replaceAll("\n", "\\n")
+		.replaceAll("\r", "\\r")
 }
 
 function unescapeKey(key: string): string {
-	return key.replaceAll(/\\(.)/g, "$1")
+	return key.replaceAll(/\\(.)/g, (_, char: string) =>
+		char === "n" ? "\n" : char === "r" ? "\r" : char,
+	)
 }
 
 // NOTE: The baselines of every Module of the run, keyed by the Module's

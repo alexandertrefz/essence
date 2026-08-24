@@ -125,9 +125,21 @@ export function collectBenchmarks(
 	events: Array<TestEvent>,
 ): Array<BenchmarkRecord> {
 	let benchmarks: Array<BenchmarkRecord> = []
+	// NOTE: A measurement whose test then FAILED is not a baseline — the run it
+	// reports on ended wrong, and a number recorded off it would be exactly the
+	// "number about nothing" the driver's own guard exists to refuse. The
+	// measurement is taken before the reported run, so the failure is only
+	// known here, where both events are in hand.
+	let failed = new Set<string>()
 
 	for (let event of events) {
-		if (event.kind === "benchmark") {
+		if (event.kind === "test-fail") {
+			failed.add(event.id)
+		}
+	}
+
+	for (let event of events) {
+		if (event.kind === "benchmark" && !failed.has(event.id)) {
 			benchmarks.push({
 				id: event.id,
 				module: event.module,
