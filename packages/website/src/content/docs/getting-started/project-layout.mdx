@@ -95,7 +95,7 @@ Several files given at once are compiled **in parallel**, one worker per core
 up to eight, and `--jobs 1` puts everything back on the main thread — which is
 what you want when a compiler crash gives you a stack trace to read.
 
-## The one thing a project may configure
+## What a project may configure
 
 Tests are written in the language: a file ends in a `tests { … }` section beside
 its `implementation`, or is a `Foo.tests.es` of nothing but imports and tests.
@@ -121,6 +121,13 @@ adopt whole later:
 `essence test --skip-tag slow` says the same thing for one run, and
 `essence test --tag slow` runs exactly the tests a default like that leaves out
 — which is how a nightly job runs what a working day skips.
+
+The same key takes `"contracts"`, which says whether a run also tests what the
+project's own declarations promise — see
+[the properties a declaration already states](#the-properties-a-declaration-already-states).
+`essence test --contracts` says it for one run, and the two are a union: the flag
+asks about a project that never configured them, and the setting asks for them
+every time.
 
 The same key takes `"exclude"`, a list of directories the search stays out of,
 written relative to the `package.json` that names them — a corpus of
@@ -230,6 +237,49 @@ A generator written this way says how to build a value and nothing about what
 one is made of, which is the whole of what writing one down would need — so a
 property test with such a Parameter keeps no counterexamples, and neither
 shrinks nor replays them.
+
+## The properties a declaration already states
+
+A checked refinement is a property, and a Method that writes one in its return
+Type has already stated the property its answer holds. `essence test --contracts`
+runs it: the receiver and every Argument are generated from the declared Types,
+the Method is called, and the answer is expected to hold each conjunct the
+return Type promises.
+
+```essence
+namespace Standings for NonEmptyList<Standing> {
+	§ Every goal below runs this with a generated receiver and expects the
+	§ answer to be above zero, because that is what the Type says.
+	leaderPoints() -> PositiveInteger {
+		<- @::highestItem(on (standing) { <- standing.points }).points
+	}
+}
+```
+
+A goal that **throws** fails whatever the return Type says, because a signature
+is a promise to answer over the domain it names — so a Method with no refinement
+at all still gets a goal, and totality is what it checks. The goals are reported
+under a `contracts` suite beside the tests the project wrote, named as the Method
+is spelled, and they are ordinary property tests in every other respect: the same
+seeds, the same shrinking, the same stored counterexamples.
+
+Nothing is synthesized for a generic Method — a value drawn for one instantiation
+proves nothing about the rest — nor for one whose Parameters nothing can build a
+value of. Both are named once per Namespace as an `ungeneratable-contract`
+remark, which is a note about what a run is covering rather than a mistake
+anybody made.
+
+A project that wants them every run says so in the same `package.json` key:
+
+```json
+{
+	"essence": {
+		"test": {
+			"contracts": true
+		}
+	}
+}
+```
 
 ## Tables, snapshots and examples
 
