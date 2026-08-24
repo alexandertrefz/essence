@@ -223,6 +223,10 @@ type CoverageRecord = {
 	// evaluated once however many times its tests are run, and zeroing what it
 	// did would report every top-level Statement as never executed.
 	baseline: Array<number> | null
+	// NOTE: The span each point last registered under — see
+	// `beginCoverageSpan`. Hits before any span began mark nothing: nothing is
+	// running that they could be attributed to.
+	marks: Array<number>
 }
 
 // NOTE: Per BUNDLE, exactly as the test registry beside it is: a bundle inlines
@@ -231,16 +235,30 @@ type CoverageRecord = {
 // a run loads its bundles, reads their counts and drops them.
 const covered: Array<CoverageRecord> = []
 
-// NOTE: How much DISTINCT ground the bundle's counters have touched — bumped
-// once, the first time a point's count leaves zero. It is one integer so that
-// asking is O(1): a property test reads it after every generated case, and a
-// case that moved it is a case that reached somewhere no case before it had.
-// It is monotone per bundle and never reset — only its DELTAS mean anything,
-// and only within one run.
-let ground = 0
+// NOTE: The SPAN the counters attribute to — one test, begun by the runner.
+// Every counter marks the points it touches against the current span, first
+// touch only, into one list: `touchedGround()` is an O(1) read a property
+// search asks after every generated case, and the list itself is what a run
+// that attributes per test reads whole. A span rather than a bundle-global
+// stamp, deliberately: what a case "reached" is measured from the start of
+// ITS OWN test, so the search a seed replays does not depend on which tests
+// ran before it, or on a filter having left them out.
+let epoch = 0
+let touched: Array<{ record: CoverageRecord; point: number }> = []
 
-export function coverageStamp(): number {
-	return ground
+export function beginCoverageSpan(): void {
+	epoch += 1
+	touched.length = 0
+}
+
+export function touchedGround(): number {
+	return touched.length
+}
+
+// NOTE: The span's touches themselves, for the runner that attributes them —
+// read whole after a test, never mutated by a reader.
+function coverageTouches(): Array<{ record: CoverageRecord; point: number }> {
+	return touched
 }
 
 // NOTE: Called once per instrumented Module, as the Module is evaluated. It
@@ -248,17 +266,22 @@ export function coverageStamp(): number {
 // call and one increment rather than a lookup by Module name.
 export function counters(module: CoverageModule): CoverageCounter {
 	let counts = module.points.map(() => 0)
+	let marks = module.points.map(() => 0)
+	let record: CoverageRecord = { module, counts, baseline: null, marks }
 
-	covered.push({ module, counts, baseline: null })
+	covered.push(record)
 
 	return ((point: number, value?: AnyType) => {
-		let count = counts[point] ?? 0
-
-		if (count === 0) {
-			ground += 1
+		// NOTE: First touch per span, recorded where the count already flows —
+		// one compare and, rarely, one push. This is what per-test attribution
+		// and the guided search both read; the counting below is what the
+		// coverage report reads, and neither pays for the other.
+		if (marks[point] !== epoch) {
+			marks[point] = epoch
+			touched.push({ record, point })
 		}
 
-		counts[point] = count + 1
+		counts[point] = (counts[point] ?? 0) + 1
 
 		return value
 	}) as CoverageCounter
@@ -785,10 +808,15 @@ const SHRINK_ATTEMPTS = 400
 // already met and moves one coordinate.
 //
 // NOTE: It has no flag of its own, and needs none. An uninstrumented bundle
-// counts nothing, so `coverageStamp` never moves, so the pool never fills and
+// counts nothing, so `touchedGround` never moves, so the pool never fills and
 // the branch below is never taken — the draws such a run makes are word for
 // word the draws it made before this existed. That is also the CONTROL a spec
 // gets for free: the same module without counters is the same search blind.
+//
+// NOTE: Ground is measured from the start of the test's OWN span — see
+// `beginCoverageSpan` — so what a case counts as reaching does not depend on
+// which tests ran before this one, or on a `--filter` having left them out:
+// the search a seed replays is the search the full run ran.
 //
 // NOTE: How many cases are kept. Eight is small on purpose: a pool that held
 // every interesting case would spend the run mutating whatever it found first,
@@ -827,10 +855,10 @@ function runProperty(
 	// stored counterexample that reaches somewhere fresh is exactly the
 	// neighbourhood worth searching.
 	let asked = (values: Array<AnyType>): boolean => {
-		let reached = coverageStamp()
+		let reached = touchedGround()
 		let outcome = holds(context, mark, run, values)
 
-		if (coverageStamp() > reached) {
+		if (touchedGround() > reached) {
 			pool.push(values)
 
 			if (pool.length > GUIDED_POOL) {
@@ -2346,14 +2374,11 @@ function runOne(
 		row: entry.row,
 	})
 
-	// NOTE: What every counter stood at before THIS test — the counts copied
-	// whole, so what the test touched is the difference. Only where the run
-	// asked to attribute: the copy is every point of every instrumented
-	// Module, per test.
-	let before =
-		options.coverageByTest === true
-			? covered.map((record) => [...record.counts])
-			: null
+	// NOTE: The test's own coverage span opens here, unconditionally — it is
+	// one increment and a truncation, and it is what makes a guided property's
+	// "new ground" a fact about THIS test rather than about whichever tests
+	// happened to run before it.
+	beginCoverageSpan()
 
 	let started = now()
 	let error: string | null = null
@@ -2400,30 +2425,37 @@ function runOne(
 		})
 	}
 
-	// NOTE: The points this one test moved, per instrumented Module — the
-	// counts as they stand against the copy taken above. Written before the
-	// verdict events, the way every other fact about the run is.
-	if (before !== null) {
-		covered.forEach((record, index) => {
-			let counts = before[index] ?? []
-			let points: Array<number> = []
+	// NOTE: The points this one test touched, per instrumented Module — read
+	// off the span's own list, so the cost is the points actually touched
+	// rather than a copy of every counter per test. Written before the verdict
+	// events, the way every other fact about the run is; the points are sorted
+	// so two runs of one test write one event.
+	if (options.coverageByTest === true && touchedGround() > 0) {
+		let byRecord = new Map<CoverageRecord, Array<number>>()
 
-			for (let point = 0; point < record.counts.length; point += 1) {
-				if ((record.counts[point] ?? 0) > (counts[point] ?? 0)) {
-					points.push(point)
-				}
+		for (let entry of coverageTouches()) {
+			let points = byRecord.get(entry.record)
+
+			if (points === undefined) {
+				byRecord.set(entry.record, [entry.point])
+			} else {
+				points.push(entry.point)
 			}
+		}
 
-			if (points.length > 0) {
+		for (let record of covered) {
+			let points = byRecord.get(record)
+
+			if (points !== undefined) {
 				sink({
 					schema: 1,
 					kind: "test-coverage",
 					id: entry.id,
 					module: record.module.module,
-					points,
+					points: points.sort((left, right) => left - right),
 				})
 			}
-		})
+		}
 	}
 
 	// NOTE: One event per PROBED POINT rather than per recording, carrying the
