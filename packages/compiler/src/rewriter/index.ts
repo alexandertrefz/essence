@@ -7827,30 +7827,21 @@ function rewriteTestsNodes(
 				[
 					{
 						type: "ExpressionStatement",
-						// NOTE: A benchmark is the same call with the stored key
-						// wedged in — one entry, one body, and a runtime that
+						// NOTE: A benchmark is the same call through the sibling
+						// entry point — one entry, one body, and a runtime that
 						// times the body rather than running it once. Which of
-						// the two is emitted is the whole of the difference: a
-						// benchmark is not a Node of its own anywhere behind
-						// this line either.
-						expression:
-							node.benchmark === null
-								? testingCall("entry", [
-										testContext(),
-										numberLiteral(node.index),
-										testName(node.name),
-										testBody(node.body),
-									])
-								: testingCall("benchmark", [
-										testContext(),
-										numberLiteral(node.index),
-										testName(node.name),
-										{
-											type: "Literal",
-											value: node.benchmark,
-										},
-										testBody(node.body),
-									]),
+						// the two is emitted is the whole of the difference: the
+						// key its baseline is stored under rides the manifest,
+						// where every durable identity already is.
+						expression: testingCall(
+							node.benchmark ? "benchmark" : "entry",
+							[
+								testContext(),
+								numberLiteral(node.index),
+								testName(node.name),
+								testBody(node.body),
+							],
+						),
 					},
 				],
 				node.position,
@@ -7885,30 +7876,20 @@ function rewriteTestsNodes(
 				[
 					{
 						type: "ExpressionStatement",
-						// NOTE: The rows of a benchmark share ONE stored key,
-						// the way they share the template it is spelled out of;
-						// the runtime numbers each row's own entry by the row
-						// that recorded it.
-						expression:
-							node.benchmark === null
-								? testingCall("rows", [
-										testContext(),
-										numberLiteral(node.first),
-										rows,
-										rowName,
-										rowBody,
-									])
-								: testingCall("benchmarkRows", [
-										testContext(),
-										numberLiteral(node.first),
-										rows,
-										rowName,
-										{
-											type: "Literal",
-											value: node.benchmark,
-										},
-										rowBody,
-									]),
+						// NOTE: A benchmark's rows go through the sibling entry
+						// point the way a plain benchmark goes through
+						// `benchmark`; each row's baseline key is its own
+						// manifest entry's, the row spelled as its last step.
+						expression: testingCall(
+							node.benchmark ? "benchmarkRows" : "rows",
+							[
+								testContext(),
+								numberLiteral(node.first),
+								rows,
+								rowName,
+								rowBody,
+							],
+						),
 					},
 				],
 				node.position,
@@ -8216,6 +8197,7 @@ function testManifest(
 					type: "Literal",
 					value: entry.benchmark,
 				}),
+				property("key", { type: "Literal", value: entry.key }),
 				property("position", rangeObject(entry.position)),
 				property("keywordPosition", rangeObject(entry.keywordPosition)),
 			],

@@ -388,7 +388,7 @@ describe("Test codegen — the emitted shape", () => {
 	// NOTE: The one place the two forms part company. A benchmark is the same
 	// call with the key its baseline is stored under wedged in before the body,
 	// which is what says the runtime is to TIME the body rather than run it once.
-	it("emits a benchmark as the entry call with its stored key", () => {
+	it("emits a benchmark as the sibling of the entry call", () => {
 		let emitted = registration(
 			generate(`implementation {}
 
@@ -405,11 +405,12 @@ describe("Test codegen — the emitted shape", () => {
 
 		expect(emitted).toContain("$testing.entry($context, 0, null, () => {")
 		expect(emitted).toContain(
-			'$testing.benchmark($context, 1, null, "doubling", () => {',
+			"$testing.benchmark($context, 1, null, () => {",
 		)
+		expect(emitted).toContain('key: "doubling"')
 	})
 
-	it("emits the rows of a benchmark under one stored key", () => {
+	it("emits the rows of a benchmark keyed entry by entry", () => {
 		let emitted = registration(
 			generate(`implementation {}
 
@@ -421,7 +422,8 @@ describe("Test codegen — the emitted shape", () => {
 		)
 
 		expect(emitted).toContain("$testing.benchmarkRows($context, 0, [")
-		expect(emitted).toContain('"sorts {size} rows"')
+		expect(emitted).toContain('key: "sorts {size} rows/0"')
+		expect(emitted).toContain('key: "sorts {size} rows/1"')
 	})
 })
 

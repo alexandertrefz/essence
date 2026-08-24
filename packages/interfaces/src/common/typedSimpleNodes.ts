@@ -141,6 +141,15 @@ export type TestManifestEntry = {
 	// — a benchmark is timed, which is work nobody asked an ordinary run to do,
 	// so it runs under `--bench` or where somebody named it by id.
 	benchmark: boolean
+	// NOTE: The identity WITHOUT the Module path, spelled by
+	// `relativeIdentityKey` — for a row of a table, with the row as its last
+	// step. It is what everything stored BESIDE the file is keyed by (a
+	// benchmark's baseline, a property test's counterexamples): the file the
+	// entry belongs to is the file the companion sits next to, so spelling the
+	// path into the key as well would break every entry the day the file moves.
+	// Spelled ONCE, here, by the Compiler — a runner that re-derived it would
+	// be a second copy of the escaping that could drift.
+	key: string
 	position: Position
 	keywordPosition: Position
 }
@@ -162,13 +171,11 @@ export interface TestEntryNode {
 	// String Literal is in the manifest already, and emitting it a second time
 	// would be two spellings of one thing.
 	name: ExpressionNode | null
-	// NOTE: The key a benchmark's baseline is STORED under, and null for an
-	// ordinary test. It is the identity WITHOUT the Module path — the file it
-	// belongs to is the file the baseline is written beside, so spelling the
-	// path into the key as well would break every entry the day the file moves.
-	// The row number is not in it either: the runtime appends one at run time,
-	// the way a stored snapshot's name is numbered by the row that recorded it.
-	benchmark: string | null
+	// NOTE: Whether the item is a `benchmark`, whose body the runtime times
+	// rather than judges. The key its baseline is stored under is not here —
+	// it is the manifest entry's `key`, the one durable identity everything
+	// beside the file shares.
+	benchmark: boolean
 	body: Array<ImplementationNode>
 	position?: Position
 }
@@ -195,11 +202,10 @@ export interface TestRowsNode {
 	// same rule a plain test follows. It reads the row, which is why a table
 	// test's name can say which row it ran for.
 	name: ExpressionNode | null
-	// NOTE: The stored key of a benchmark's baseline, and null for an ordinary
-	// table test — see `TestEntryNode.benchmark`. The rows SHARE it, exactly as
-	// they share the template it is spelled out of; each row's own entry is that
-	// key with the row number behind it, which the runtime appends.
-	benchmark: string | null
+	// NOTE: Whether the rows are a benchmark's — see `TestEntryNode.benchmark`.
+	// Each row's baseline key is its own manifest entry's `key`, the row spelled
+	// as the identity's last step.
+	benchmark: boolean
 	body: Array<ImplementationNode>
 	position?: Position
 }

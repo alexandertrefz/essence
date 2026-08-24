@@ -73,6 +73,11 @@ export type TestManifestEntry = {
 	// takes hundreds of runs of it, which is work no ordinary run asked for, so
 	// a benchmark runs where a run said `bench` and where somebody named it.
 	benchmark: boolean
+	// NOTE: The identity WITHOUT the Module path, a row spelled as its last
+	// step — what everything stored BESIDE the file is keyed by: a benchmark's
+	// baseline, a property test's counterexamples. The Compiler spells it, so
+	// the escaping exists once; nothing in here re-derives it.
+	key: string
 	position: Range
 	keywordPosition: Range
 }
@@ -432,6 +437,11 @@ export type TestContext = {
 	// table runs the same body, so one name would be one entry the rows
 	// overwrite in turn, and only the last of them could ever match.
 	row: number | null
+	// NOTE: The running entry's durable identity as the Compiler spelled it —
+	// suite path and name, a row as its last step, the Module left off. It is
+	// what a baseline is stored under, and it arrives through the manifest so
+	// that the escaping exists in exactly one place.
+	key: string
 	// NOTE: What a property test draws with, and how many cases it runs. The
 	// seed is the RUN's, printed on a failure and read back by `--seed`; `word`
 	// is that seed folded together with the test's own id, so replaying one
@@ -530,6 +540,7 @@ export function createContext(
 		benchmarks?: BenchmarkStore
 		updating?: boolean
 		row?: number | null
+		key?: string
 		property?: PropertySettings
 		clock?: () => number
 	} = {},
@@ -545,6 +556,7 @@ export function createContext(
 		benchStored: options.benchmarks ?? {},
 		updating: options.updating ?? false,
 		row: options.row ?? null,
+		key: options.key ?? "",
 		property: options.property ?? {
 			seed: "",
 			word: 0,
@@ -645,14 +657,9 @@ export function benchmark(
 	context: TestContext,
 	index: number,
 	name: StringType | null,
-	// NOTE: The key this benchmark's baseline is stored under, as the Compiler
-	// spelled it — the identity without the Module path. The row a table
-	// benchmark is running is added here rather than emitted, because one body
-	// stands for every row.
-	key: string,
 	run: () => void,
 ): void {
-	entry(context, index, name, () => runBenchmark(context, key, run))
+	entry(context, index, name, () => runBenchmark(context, run))
 }
 
 export function benchmarkRows<Value extends AnyType>(
@@ -660,11 +667,10 @@ export function benchmarkRows<Value extends AnyType>(
 	first: number,
 	values: Array<Value>,
 	name: ((row: Value) => StringType) | null,
-	key: string,
 	run: (row: Value) => void,
 ): void {
 	rows(context, first, values, name, (value) =>
-		runBenchmark(context, key, () => run(value)),
+		runBenchmark(context, () => run(value)),
 	)
 }
 
@@ -1025,11 +1031,7 @@ const BENCHMARK_MAX_ITERATIONS = 65536
 const REGRESSION_RATIO = 1.25
 const IMPROVEMENT_RATIO = 0.8
 
-function runBenchmark(
-	context: TestContext,
-	key: string,
-	run: () => void,
-): void {
+function runBenchmark(context: TestContext, run: () => void): void {
 	let mark = markOf(context)
 
 	// NOTE: A body that does not hold is REPORTED and never timed. Timing
@@ -1064,11 +1066,11 @@ function runBenchmark(
 	// is not free, and a baseline of zero is a number every later run is
 	// infinitely slower than.
 	let nanoseconds = Math.max(1, Math.round(median(perRun) * 1_000_000))
-	// NOTE: The entry a stored baseline is kept under, numbered by the row that
-	// recorded it — through the very Function a stored snapshot's name goes
-	// through, because the rows of a table share one key and one entry they
-	// overwrote in turn could only ever match the last row that ran.
-	let storedKey = storedName(key, context.row) ?? key
+	// NOTE: The entry a stored baseline is kept under is the one durable
+	// identity the Compiler spelled for this entry — a table row's key already
+	// carries the row as its last step, so the rows of one table never share
+	// an entry they would overwrite in turn.
+	let storedKey = context.key
 	let baseline = context.benchStored[storedKey] ?? null
 	let ratio = baseline === null ? null : nanoseconds / baseline
 	let status: BenchmarkStatus =
@@ -2097,13 +2099,13 @@ function runOne(
 	let entry = test.entry
 	let spans = test.module.spans
 	let seed = options.seed ?? ""
-	let key = relativeKey(entry)
 	let context = createContext(test.index, {
 		stored: (options.snapshots ?? {})[test.module.module ?? ""] ?? {},
 		benchmarks: (options.benchmarks ?? {})[test.module.module ?? ""] ?? {},
 		clock: options.clock,
 		updating: options.update ?? false,
 		row: entry.row,
+		key: entry.key,
 		property: {
 			seed,
 			// NOTE: The run's seed folded together with the test's own id. Two
@@ -2115,7 +2117,7 @@ function runOne(
 			cases: options.cases ?? DEFAULT_CASES,
 			replays:
 				((options.counterexamples ?? {})[test.module.module ?? ""] ??
-					{})[key] ?? [],
+					{})[entry.key] ?? [],
 		},
 	})
 
@@ -2194,7 +2196,7 @@ function runOne(
 			id: entry.id,
 			name,
 			module: test.module.module,
-			key,
+			key: entry.key,
 			cases: context.propertyResult.cases,
 			requested: context.propertyResult.requested,
 			seed: context.propertyResult.seed,
@@ -2309,25 +2311,6 @@ function runOne(
 		failures,
 		error,
 	})
-}
-
-// NOTE: The entry a stored counterexample is kept under: the test's identity
-// with the MODULE step left off, because the file it is stored in is that
-// Module's already — so a Module that moves takes its corpus with it, exactly
-// as it takes its snapshots.
-//
-// NOTE: The escaping is the Compiler's `relativeIdentityKey`, spelled a second
-// time here on purpose. This module is inlined into a user's bundle and imports
-// nothing from the Compiler, and the two are pinned to each other by a spec
-// rather than by a shared function.
-function relativeKey(entry: TestManifestEntry): string {
-	return [
-		...entry.suitePath,
-		entry.name,
-		...(entry.row === null ? [] : [String(entry.row)]),
-	]
-		.map((step) => step.replaceAll("\\", "\\\\").replaceAll("/", "\\/"))
-		.join("/")
 }
 
 // NOTE: The points a test probed, in the order they were first recorded at —
