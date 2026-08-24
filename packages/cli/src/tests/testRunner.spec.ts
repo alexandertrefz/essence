@@ -2096,9 +2096,25 @@ describe("essence test --contracts", () => {
 	// at, so the union is asserted where it is decided rather than through a
 	// process this spec would have to move.
 	it("takes the flag and the project's own setting as a union", () => {
-		expect(resolveContracts({ contracts: false }, true)).toBe(true)
-		expect(resolveContracts({ contracts: true }, false)).toBe(true)
-		expect(resolveContracts({ contracts: false }, false)).toBe(false)
+		let flags = (contracts: boolean, noContracts = false) => ({
+			contracts,
+			noContracts,
+		})
+
+		expect(resolveContracts(flags(false), true)).toBe(true)
+		expect(resolveContracts(flags(true), false)).toBe(true)
+		expect(resolveContracts(flags(false), false)).toBe(false)
+	})
+
+	// NOTE: The way out of a configured setting — a project that always tests
+	// its declarations still gets a plain run on demand.
+	it("lets --no-contracts beat the setting and the flag", () => {
+		expect(
+			resolveContracts({ contracts: false, noContracts: true }, true),
+		).toBe(false)
+		expect(
+			resolveContracts({ contracts: true, noContracts: true }, true),
+		).toBe(false)
 	})
 
 	// NOTE: THE cache-key claim. A contract compile enriches a suite that is

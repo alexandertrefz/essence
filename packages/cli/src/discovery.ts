@@ -9,7 +9,6 @@ import {
 	parseDocument,
 } from "@essence-lang/compiler/documents"
 import { hasDocumentationExamples } from "@essence-lang/compiler/enricher/examples"
-import type { parser } from "@essence-lang/interfaces"
 
 import { UsageError } from "./args"
 import { type CommandSpec, DEFAULT_PROGRAM_NAME } from "./commands"
@@ -168,11 +167,22 @@ async function keepsFile(
 	// contextual keyword, so a file that writes it may only be naming a
 	// Constant, and that is why what follows is a parse rather than a second
 	// guess.
+	//
+	// NOTE: Under `--contracts` the text scan is the WHOLE answer: a Namespace
+	// declaration promises goals, a declaration can not be written without the
+	// word, and nearly every implementation file writes one — so a parse here
+	// would be a parse of most of the project, serially, before the compile
+	// parses it all again in parallel. A file the word turns up in that
+	// declares nothing simply synthesizes zero goals; over-keeping is the
+	// compile's cost once, under-parsing here was every run's.
+	if (contracts && sourceText.includes(NAMESPACE_KEYWORD)) {
+		return true
+	}
+
 	if (
 		!named &&
 		!sourceText.includes("tests") &&
-		!sourceText.includes(EXAMPLE_TAG) &&
-		!(contracts && sourceText.includes(NAMESPACE_KEYWORD))
+		!sourceText.includes(EXAMPLE_TAG)
 	) {
 		return false
 	}
@@ -186,18 +196,7 @@ async function keepsFile(
 		// and a project's documentation is the last place a drifting example
 		// should be allowed to sit unrun.
 		hasDocumentationExamples(parsed.program) ||
-		// NOTE: And under `--contracts` a Namespace declaration promises
-		// something too — every Method of it states the property its return
-		// Type holds. A file of nothing but declarations is exactly the file
-		// those goals are worth most in.
-		(contracts && declaresNamespace(parsed.program)) ||
 		(named && containsErrors(parsed.diagnostics))
-	)
-}
-
-function declaresNamespace(program: parser.Program): boolean {
-	return program.implementation.nodes.some(
-		(node) => node.nodeType === "NamespaceDefinitionStatement",
 	)
 }
 
@@ -273,13 +272,15 @@ export async function discoverTestFiles(
 	}
 
 	let candidates = [...new Set([...named, ...walked])].sort()
-	let kept: Array<string> = []
+	// NOTE: Fanned out — each answer is one independent read (and sometimes a
+	// parse), and a project of hundreds of files pays this walk at the head of
+	// every run and every watch cycle. The order of the answers is the sorted
+	// candidates', whatever order the disk answered in.
+	let answers = await Promise.all(
+		candidates.map((candidate) =>
+			keepsFile(candidate, named.has(candidate), contracts),
+		),
+	)
 
-	for (let candidate of candidates) {
-		if (await keepsFile(candidate, named.has(candidate), contracts)) {
-			kept.push(candidate)
-		}
-	}
-
-	return kept
+	return candidates.filter((_, index) => answers[index] === true)
 }

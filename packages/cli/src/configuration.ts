@@ -48,9 +48,16 @@ export type ProjectConfiguration = {
 	problems: Array<string>
 }
 
+// NOTE: THE spelling of the defaults — the two error returns below reuse it,
+// so a field added to TestConfiguration is added in one place and can not
+// default differently on the path that could not read the file.
+function emptyTestConfiguration(): TestConfiguration {
+	return { skipTags: [], exclude: [], contracts: false }
+}
+
 export const noConfiguration: ProjectConfiguration = {
 	filePath: null,
-	test: { skipTags: [], exclude: [], contracts: false },
+	test: emptyTestConfiguration(),
 	problems: [],
 }
 
@@ -178,7 +185,7 @@ export async function readProjectConfiguration(
 			if (!isRecord(manifest.essence)) {
 				return {
 					filePath,
-					test: { skipTags: [], exclude: [], contracts: false },
+					test: emptyTestConfiguration(),
 					problems: [
 						`${filePath}: "essence" is not an object, so no ` +
 							"settings were read from it.",
@@ -192,7 +199,7 @@ export async function readProjectConfiguration(
 			if (!isRecord(written)) {
 				return {
 					filePath,
-					test: { skipTags: [], exclude: [], contracts: false },
+					test: emptyTestConfiguration(),
 					problems: [
 						`${filePath}: "essence.test" is not an object, so no ` +
 							"test settings were read from it.",
