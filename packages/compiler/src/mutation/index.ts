@@ -1,6 +1,6 @@
 import type { common } from "@essence-lang/interfaces"
 
-import { builtinNamespaces } from "../enricher/builtins"
+import { builtinNamespaces, builtinProtocols } from "../enricher/builtins"
 import { resolveOverloadedMethodName } from "../helpers/index"
 import { withoutOverloadSuffix } from "../optimiser/purity"
 import { rewriteNodes } from "../optimiser/walk"
@@ -22,10 +22,11 @@ import { rewriteNodes } from "../optimiser/walk"
 // nothing downstream would catch a lie that does not typecheck. A Case swap
 // demands the identical member-name shape, a literal nudge answers the same
 // Type, a branch swap moves Statements that were already there, and a member
-// swap is refused outright unless the Namespace it is aimed at actually
-// declares the name — see `swappableMember`. Where a site can not be shown to
-// be sound it is silently not a site; the walker's reach improves later, and
-// a mutant nobody can trust is worse than a mutant nobody made.
+// swap is refused outright unless the Namespace it is aimed at declares the
+// name AT THE SAME ARITY, or the Protocol that answered the call wrote a body
+// for it — see `swappableMember`. Where a site can not be shown to be sound it
+// is silently not a site; the walker's reach improves later, and a mutant
+// nobody can trust is worse than a mutant nobody made.
 
 export type MutationSite = {
 	// NOTE: The site's position in the walk, which is its NAME: `applyMutation`
@@ -68,15 +69,22 @@ const SITES_PER_LINE = 4
 // all already fails, so the mutant would be killed by everything and would
 // distinguish no suite from another.
 //
+// NOTE: Both steps for EVERY member, which is the rule stated above and not a
+// rule with two members exempt from it. `isLessThanOrEqualTo` reversed is
+// `isGreaterThanOrEqualTo` — a bound written the wrong way round, which is the
+// commonest comparison bug there is — and leaving the two `…OrEqualTo` names
+// with only their bound-moving step made them the two names a suite could get
+// backwards without the score moving.
+//
 // NOTE: Maps rather than object literals, all three of them, and that is not a
 // preference. A Method's name is user text — `toString`, `valueOf`,
 // `constructor` are all perfectly good members — and an object literal answers
 // every one of those out of `Object.prototype` rather than saying it has none.
 const COMPARISON_SWAPS = new Map<string, Array<string>>([
 	["isLessThan", ["isLessThanOrEqualTo", "isGreaterThan"]],
-	["isLessThanOrEqualTo", ["isLessThan"]],
+	["isLessThanOrEqualTo", ["isLessThan", "isGreaterThanOrEqualTo"]],
 	["isGreaterThan", ["isGreaterThanOrEqualTo", "isLessThan"]],
-	["isGreaterThanOrEqualTo", ["isGreaterThan"]],
+	["isGreaterThanOrEqualTo", ["isGreaterThan", "isLessThanOrEqualTo"]],
 ])
 
 // NOTE: `is` against `isNot` is the one equality rotation there is, and it is
@@ -229,7 +237,7 @@ function walkMutations(
 		{ ...program, tests: null },
 		{
 			expression: (node) => mutateExpression(node, context, offer),
-			statement: (node) => mutateStatement(node, offer),
+			statement: (node) => mutateStatement(node, context, offer),
 		},
 	)
 
@@ -250,6 +258,7 @@ type Offer = <Node>(
 
 function mutateStatement(
 	node: common.typedSimple.ImplementationNode,
+	context: MutationContext,
 	offer: Offer,
 ): common.typedSimple.ImplementationNode {
 	if (node.nodeType !== "ConditionalStatement") {
@@ -270,7 +279,12 @@ function mutateStatement(
 	// the refinement in the branch where the refinement does not hold — the
 	// mutant is not type-shaped, it fails everything it touches, and a mutant
 	// killed by every test distinguishes no suite from another.
-	if (node.narrows) {
+	//
+	// NOTE: Asked of the CONDITION rather than of `node.narrows`, because the
+	// same refusal has to reach the member swaps inside that condition and a
+	// swap is offered at a Node the walk has already passed by the time this
+	// runs. One set answers both — see `narrowingConditions`.
+	if (context.narrowed.has(node.condition)) {
 		return node
 	}
 
@@ -461,6 +475,18 @@ function memberSwaps(
 		rewrite: () => common.typedSimple.ExpressionNode
 	}> = []
 
+	// NOTE: Nothing inside the condition of a NARROWING `if`, for the reason
+	// that already leaves the doorway itself alone: `if n::isNot(0)` is what
+	// typed the body it opens, and a mutant that asks a different question
+	// there runs a body against a refinement nobody proved — which fails
+	// everything it touches and distinguishes no suite from another. It is the
+	// same set the branch swap consults, asked of the condition and of every
+	// Node the condition is written out of, because a condition is read as a
+	// conjunction and the narrowing leaves of one are nested inside it.
+	if (context.narrowed.has(node)) {
+		return []
+	}
+
 	for (let [operator, targets] of families) {
 		for (let target of targets) {
 			let name = swappableMember(node, member, target, context)
@@ -492,8 +518,18 @@ function memberSwaps(
 //
 // NOTE: A Method a PROTOCOL provided is answered by the Protocol rather than by
 // the Namespace named on the call: `5::isNot(3)` is `Integer`'s conformance
-// reaching `Equatable`'s one body. `Equatable` provides exactly `is` and
-// `isNot`, so those two swap freely; every other Protocol is left alone.
+// reaching `Equatable`'s one body. So the swap is sound exactly when the SAME
+// Protocol wrote a body for the target — that body is the Function the emitted
+// call names, and a target the Protocol merely REQUIRES has no body anywhere to
+// name. `Equatable` requires `is` and provides `isNot`, so a provided `isNot`
+// has nowhere to rotate to; `Orderable` provides all four comparisons, so a
+// user Type that conforms to it offers the same rotations a builtin does.
+//
+// NOTE: Asked of the standard library's Protocol table, which is the only one
+// in reach here — the walk runs on a SIMPLIFIED Program and the Enricher's
+// Scope, where a Module's own Protocols live, is long gone by then. A Method a
+// Module's own Protocol provided is refused rather than guessed at, and it
+// becomes swappable when the sites a Module offers do.
 function swappableMember(
 	node: common.typedSimple.MethodInvocationNode,
 	member: string,
@@ -503,8 +539,11 @@ function swappableMember(
 	let overload = overloadIndexOf(node.member.name)
 
 	if (node.providedBy !== undefined) {
-		return node.providedBy === "Equatable" &&
-			(target === "is" || target === "isNot")
+		// NOTE: And never where the call site was MANGLED. A provided Method is
+		// emitted under its plain name, so a mangled call is one whose Protocol
+		// declared Overloads and whose target's slot is not this one's to
+		// assume.
+		return overload === null && provides(node.providedBy, target)
 			? target
 			: null
 	}
@@ -516,28 +555,36 @@ function swappableMember(
 	}
 
 	// NOTE: A Namespace the MODULE declares carries its Methods already
-	// mangled, so the name to call is the name to look for and there is nothing
-	// to work out. A builtin carries a Method TYPE per member, and the index
-	// the call site was mangled with has to be a slot that Method actually has:
-	// two members of one Namespace need not have the same number of Overloads,
-	// and calling the fourth Overload of a Method that has two is calling
-	// nothing at all.
+	// mangled, so the name to call is the name to look for. A builtin carries a
+	// Method TYPE per member, and the index the call site was mangled with has
+	// to be a slot that Method actually has: two members of one Namespace need
+	// not have the same number of Overloads, and calling the fourth Overload of
+	// a Method that has two is calling nothing at all.
+	//
+	// NOTE: Both of them check the ARITY, and for one reason: the Arguments the
+	// call site already wrote are handed on untouched. Two Methods that happen
+	// to share a slot need not take the same number of values, and a swap onto
+	// one that does not would crash wherever it ran — which this run would
+	// record as a KILL the tests never earned, the one answer this file's own
+	// header forbids.
 	if (declared.kind === "module") {
 		let name =
 			overload === null
 				? target
 				: resolveOverloadedMethodName(target, overload)
+		let replacement = ownMethod(declared.methods, name)
+		let original = ownMethod(declared.methods, node.member.name)
 
-		return declared.members.has(name) ? name : null
+		return replacement !== undefined &&
+			original !== undefined &&
+			replacement.isStatic === original.isStatic &&
+			replacement.method.value.parameters.length ===
+				original.method.value.parameters.length
+			? name
+			: null
 	}
 
-	// NOTE: `hasOwn` and not a bare read, for the reason the tables above are
-	// Maps: `methods["toString"]` answers out of `Object.prototype` for a
-	// Namespace that declares no such Method, and the answer is a Function that
-	// no call site could ever reach.
-	let method = Object.hasOwn(declared.methods, target)
-		? declared.methods[target]
-		: undefined
+	let method = ownMethod(declared.methods, target)
 
 	if (method === undefined) {
 		return null
@@ -557,9 +604,7 @@ function swappableMember(
 	}
 
 	let replacement = method.overloads[overload]
-	let original = Object.hasOwn(declared.methods, member)
-		? declared.methods[member]
-		: undefined
+	let original = ownMethod(declared.methods, member)
 
 	if (
 		replacement === undefined ||
@@ -582,6 +627,29 @@ function swappableMember(
 			replacement.parameterTypes.length
 		? resolveOverloadedMethodName(target, overload)
 		: null
+}
+
+// NOTE: `hasOwn` and not a bare read, for the reason the tables above are Maps:
+// `methods["toString"]` answers out of `Object.prototype` for a Namespace that
+// declares no such Method, and the answer is a Function no call site could ever
+// reach.
+function ownMethod<Method>(
+	methods: Record<string, Method>,
+	name: string,
+): Method | undefined {
+	return Object.hasOwn(methods, name) ? methods[name] : undefined
+}
+
+// NOTE: Whether a Protocol wrote the BODY this swap would call. `providedMethods`
+// names the Protocol each provided Method belongs to, and it has to be this one:
+// a name an ancestor wrote is emitted under the ancestor's, so a swap onto it
+// from here would name a Function that is not there.
+function provides(protocolName: string, member: string): boolean {
+	return (
+		ownMethod(builtinProtocols(), protocolName)?.providedMethods?.[
+			member
+		] === protocolName
+	)
 }
 
 // NOTE: The Overload slot a mangled name names, counting from zero, or null
@@ -609,7 +677,7 @@ function overloadIndexOf(name: string): number | null {
 // imported from another Module of the graph is neither, and a swap aimed at one
 // is refused — the sites a Module offers improve when this does.
 type KnownNamespace =
-	| { kind: "module"; members: Set<string> }
+	| { kind: "module"; methods: common.typedSimple.Methods }
 	| { kind: "builtin"; methods: Record<string, common.MethodType> }
 
 type MutationContext = {
@@ -621,6 +689,12 @@ type MutationContext = {
 	// themselves so that a Choice declared in another Module is still swappable
 	// among the Cases this one builds.
 	choices: Map<string, Array<common.CaseType>>
+	// NOTE: Every Node the condition of a NARROWING `if` is written out of, the
+	// condition itself included. It is one set because it answers one question
+	// asked in two places — see `mutateStatement` and `memberSwaps` — and it is
+	// gathered here because the walk that offers sites reaches a condition's
+	// Nodes before it reaches the `if` they belong to.
+	narrowed: Set<common.typedSimple.ExpressionNode>
 }
 
 function contextOf(program: common.typedSimple.Program): MutationContext {
@@ -649,6 +723,8 @@ function contextOf(program: common.typedSimple.Program): MutationContext {
 		}
 	}
 
+	let narrowed = new Set<common.typedSimple.ExpressionNode>()
+
 	// NOTE: The declared Choices FIRST, so a Choice this Module declares is
 	// ordered the way it was written rather than the way it happens to be
 	// constructed — which is what makes "the next sibling" a reader's next
@@ -660,7 +736,7 @@ function contextOf(program: common.typedSimple.Program): MutationContext {
 				if (node.nodeType === "NamespaceDefinitionStatement") {
 					namespaces.set(node.name.name, {
 						kind: "module",
-						members: new Set(Object.keys(node.methods)),
+						methods: node.methods,
 					})
 				}
 
@@ -668,6 +744,13 @@ function contextOf(program: common.typedSimple.Program): MutationContext {
 					for (let type of declaredCases(node.type, node.name.name)) {
 						remember(type)
 					}
+				}
+
+				// NOTE: `narrows` is spelled HERE and nowhere else. What the
+				// walk needs is not "is this `if` a doorway" but "may this Node
+				// be mutated", and the two are one question with one answer.
+				if (node.nodeType === "ConditionalStatement" && node.narrows) {
+					collectCondition(program, node.condition, narrowed)
 				}
 
 				return node
@@ -685,7 +768,33 @@ function contextOf(program: common.typedSimple.Program): MutationContext {
 		},
 	)
 
-	return { namespaces, choices }
+	return { namespaces, choices, narrowed }
+}
+
+// NOTE: Every Node of one condition, gathered by walking it as a Program of its
+// own — an Expression IS an `ImplementationNode`, so the walk that reads a whole
+// Module reads one Expression without a second walker being written for it. The
+// hook answers with the Node it was handed, so nothing is rebuilt and the
+// identities the mutation walk will meet are the identities gathered here.
+function collectCondition(
+	program: common.typedSimple.Program,
+	condition: common.typedSimple.ExpressionNode,
+	found: Set<common.typedSimple.ExpressionNode>,
+): void {
+	rewriteNodes(
+		{
+			...program,
+			implementation: { ...program.implementation, nodes: [condition] },
+			tests: null,
+		},
+		{
+			expression: (node) => {
+				found.add(node)
+
+				return node
+			},
+		},
+	)
 }
 
 // NOTE: A Choice's own Cases, read off the Type Alias it erased to — the same
