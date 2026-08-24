@@ -71,7 +71,11 @@ reporting it.
 A test written `for any (…)` runs for values the runner derives from its
 Parameters' Types — a hundred of them, `--cases` for another number. A failure
 is shrunk to the smallest values that still fail and reported with the seed it
-drew them from; `--seed` draws them again.
+drew them from; `--seed` draws them again. The shrunk value is kept in
+`__counterexamples__/<File>.es.json` beside the source and re-run before any
+case is drawn on every later run, so a value that broke a property once goes on
+being asked about. A stored value the Types no longer fit is dropped where it is
+met.
 
 The exit code is 0 when everything that ran passed, 1 when a test failed, and 2
 when a run nobody narrowed still holds a `focused` test.

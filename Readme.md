@@ -141,8 +141,11 @@ A test written `for any (a: Integer, b: Standing)` is a property test: the runne
 Parameter's Type — Records member by member, Choices Case by Case, checked refinements honoured, so a
 `NonEmptyList` is never empty — and runs the body a hundred times over values it made up. A failure is shrunk
 to the smallest values that still fail and reported with the seed it drew them from, so `--seed` runs it again
-exactly. A Type whose values carry an invariant no structure can state conforms to `Generatable` and generates
-itself.
+exactly. That shrunk value is also written down, in `__counterexamples__/<File>.es.json` beside the source, and
+every later run asks about it before it draws anything — so a bug the search found once is caught by the run
+after it whether or not the search would find it again. A Type whose values carry an invariant no structure can
+state conforms to `Generatable` and generates itself; a property test over one keeps no counterexamples, since
+there is nothing to write down.
 
 A test written `across` a List of rows runs once per row, and `matches snapshot` compares a value against one a
 run recorded — inline in the source, or in `__snapshots__/<File>.es.snap` beside it where the snapshot was
