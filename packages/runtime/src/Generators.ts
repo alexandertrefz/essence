@@ -255,16 +255,28 @@ function drawCharacters(
 	return characters.join("")
 }
 
-function drawLength(
-	source: RandomnessType,
-	size: number,
+// NOTE: THE length window, spelled once — what a draw obeys is what a
+// neighbour obeys, or a mutated List could grow past anything a draw of the
+// same generator would ever build.
+function lengthBounds(
 	narrowing: Narrowing,
-): number {
+	size: number,
+): { lowest: number; highest: number } {
 	let lowest = Math.max(0, narrowing.minimumLength ?? 0)
 	let highest = Math.min(
 		MAXIMUM_LENGTH,
 		narrowing.maximumLength ?? lowest + size,
 	)
+
+	return { lowest, highest }
+}
+
+function drawLength(
+	source: RandomnessType,
+	size: number,
+	narrowing: Narrowing,
+): number {
+	let { lowest, highest } = lengthBounds(narrowing, size)
 
 	return highest <= lowest
 		? lowest
@@ -439,11 +451,12 @@ export function mutate(
 				size,
 				(members) => createRecord(members),
 			)
-		// NOTE: A payload-free Case is the only value of its own shape, so
-		// there is nothing in it to move and a fresh draw answers with it.
+		// NOTE: A payload-free Case is the only value of its own shape — there
+		// is nothing in it to move, no word of randomness to spend, and the
+		// value itself is its whole neighbourhood.
 		case "case":
 			return generator.members.length === 0
-				? generate(generator, source, size)
+				? value
 				: mutateMembers(
 						generator.members,
 						value,
@@ -503,11 +516,7 @@ function mutateList(
 	narrowing: Narrowing,
 ): AnyType {
 	let items = itemsOf(value)
-	let lowest = Math.max(0, narrowing.minimumLength ?? 0)
-	let highest = Math.min(
-		MAXIMUM_LENGTH,
-		narrowing.maximumLength ?? MAXIMUM_LENGTH,
-	)
+	let { lowest, highest } = lengthBounds(narrowing, size)
 	let moves: Array<"redraw" | "drop" | "insert"> = []
 
 	if (items.length > 0) {
@@ -609,15 +618,16 @@ function mutateUnion(
 		return generate({ kind: "union", members }, source, size, narrowing)
 	}
 
-	let others = members.filter((_, index) => index !== own)
+	if (members.length > 1 && below(source, CROSS_ARM) === 0) {
+		// NOTE: A pick over every arm but the value's own — one draw, the own
+		// index stepped over, no copy of the arms per mutation.
+		let pick = below(source, members.length - 1)
 
-	if (others.length > 0 && below(source, CROSS_ARM) === 0) {
-		return generate(
-			others[below(source, others.length)] ?? members[own]!,
-			source,
-			size,
-			narrowing,
-		)
+		if (pick >= own) {
+			pick += 1
+		}
+
+		return generate(members[pick]!, source, size, narrowing)
 	}
 
 	return mutate(members[own]!, value, source, size, narrowing)
@@ -1027,6 +1037,14 @@ function shrinkUnion(
 // by its tag, and everything else by the hidden Type key every value carries —
 // which is the same question `isValueOfType` asks, answered here without a Type
 // descriptor because a generator already knows the shape it built.
+//
+// NOTE: The key alone is not enough where two arms share one: a Union of two
+// Record shapes, or of two refinements of one base, answered its FIRST arm for
+// every value — and a search that mutates or shrinks under the wrong arm
+// rebuilds the value as something else entirely. So a Record arm also asks for
+// its own member names, a refined arm asks its own predicate, and a List arm
+// asks its items — one level down, which is as far as two arms of a written
+// Union ever need telling apart.
 function claims(generator: Generator, value: AnyType): boolean {
 	let key = (value as unknown as Record<symbol, string>)[typeKeySymbol]
 
@@ -1039,16 +1057,46 @@ function claims(generator: Generator, value: AnyType): boolean {
 			return key === "Rational"
 		case "string":
 			return key === "String"
-		case "list":
-			return key === "List"
-		case "record":
-			return key === "Record"
+		case "list": {
+			if (key !== "List") {
+				return false
+			}
+
+			let items = itemsOf(value)
+
+			return items.length === 0 || claims(generator.item, items[0]!)
+		}
+		case "record": {
+			if (key !== "Record") {
+				return false
+			}
+
+			let held = Object.keys(value as unknown as object)
+			let names = new Set(generator.members.map((member) => member.name))
+
+			return (
+				held.length === names.size &&
+				held.every((name) => names.has(name))
+			)
+		}
 		case "case":
 			return key === generator.tag
 		case "union":
 			return generator.members.some((member) => claims(member, value))
-		case "refined":
-			return claims(generator.base, value)
+		case "refined": {
+			if (!claims(generator.base, value)) {
+				return false
+			}
+
+			// NOTE: The predicate is asked, and a predicate that THROWS on a
+			// value from another arm's world is a predicate that did not claim
+			// it.
+			try {
+				return admitted(generator, generator.narrowing, value)
+			} catch {
+				return false
+			}
+		}
 		case "generated":
 			return true
 	}
