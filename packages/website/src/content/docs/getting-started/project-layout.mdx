@@ -189,6 +189,27 @@ Error: 'recording a result never lowers points' failed
     │ Note: after 37 cases, shrunk to: standing = { …, points = 0 }  scored = 0  conceded = 1
 ```
 
+The value a shrink ended at is also **written down**, in
+`__counterexamples__/<File>.es.json` beside the source — a sibling of the
+snapshots, kept under the same identity everything durable is keyed by, and
+meant to be committed. Every later run replays what that file holds before it
+draws a single case, so a bug the search found once is caught by the run after
+it whether or not a fresh hundred cases would turn it up again:
+
+```
+[test-failed]
+Error: 'recording a result never lowers points' failed
+    │ Note: failed on a stored counterexample (1 re-run): standing = { …, points = 0 }  scored = 0  conceded = 1
+```
+
+A replay draws nothing and is counted apart from the cases — a test that
+re-ran one and then passed reads `(100 cases · 1 replayed)` — so `--seed` goes
+on reproducing the run it names however much the corpus has grown since. A
+stored value is kept once the code is fixed, because what it is worth is that it
+goes on being asked; one the Types no longer fit is dropped by the run that met
+it. A test keeps the ten newest, and a run narrowed by `--filter` or a tag
+leaves what it did not visit alone.
+
 A Type whose values carry an invariant no structure can know about generates
 itself instead. A Namespace conforming to `Generatable` replaces the derived
 generator for the Type it targets:
@@ -204,6 +225,11 @@ namespace Team for Team is Generatable {
 A `Randomness` is the one value in the language that changes: every Method
 answers a value and advances the source, so asking for a name and then for a
 score never answers the same draw twice.
+
+A generator written this way says how to build a value and nothing about what
+one is made of, which is the whole of what writing one down would need — so a
+property test with such a Parameter keeps no counterexamples, and neither
+shrinks nor replays them.
 
 ## Tables, snapshots and examples
 
