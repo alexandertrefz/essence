@@ -522,7 +522,7 @@ export class Printer {
 			case "Test":
 				return concat([
 					this.printItemHead(
-						"test",
+						node.form,
 						node.name,
 						node.modifiers,
 						node.table,

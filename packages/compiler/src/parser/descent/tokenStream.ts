@@ -116,6 +116,7 @@ const tokenTypeLexemes: { [tokenType in lexer.TokenType]?: string } = {
 	[TokenType.KeywordTests]: "tests",
 	[TokenType.KeywordTest]: "test",
 	[TokenType.KeywordSuite]: "suite",
+	[TokenType.KeywordBenchmark]: "benchmark",
 	[TokenType.KeywordExpect]: "expect",
 	[TokenType.KeywordRequire]: "require",
 }
