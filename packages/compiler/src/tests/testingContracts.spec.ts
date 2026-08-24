@@ -530,5 +530,41 @@ tests {
 			).toEqual([[], ["contracts"]])
 			expect(start?.name).toBe("written")
 		})
+
+		// NOTE: One refinement, several entries over it. The synthesis derives
+		// the refinement's generator ONCE per Module and every goal shares it,
+		// so the typed check inside is simplified once per goal that holds it —
+		// and a Simplifier that wrote the mangled Overload name back into the
+		// typed node named `is__overload$1__overload$1` from the second goal
+		// on, a member nothing declares. A Rational conjunct is the one the
+		// standard library holds as a check rather than as a bound, which is
+		// where the stdlib's own contract run found it.
+		it("shares one refinement's check between every goal over it", async () => {
+			let events = await run(
+				moduleOf(`	type NonZeroRate = Rational where @::isNot(0/1)
+
+	namespace Rates for NonZeroRate {
+		doubled() -> Rational {
+			<- @::multiply(with 2)
+		}
+
+		halved() -> Rational {
+			<- @::multiply(with 1/2)
+		}
+
+		scaled(by factor: NonZeroRate) -> Rational {
+			<- @::multiply(with factor)
+		}
+	}`),
+			)
+
+			expect(passedNames(events).sort()).toEqual([
+				"Rates::doubled()",
+				"Rates::halved()",
+				"Rates::scaled(by:)",
+				"written",
+			])
+			expect(failed(events)).toEqual([])
+		})
 	})
 })
