@@ -381,6 +381,250 @@ function inside(narrowing: Narrowing, value: AnyType): boolean {
 
 // #endregion
 
+// #region Moving one step from a value
+
+// NOTE: How hard a mutation tries to stay inside a refinement before it draws a
+// fresh value instead. It is far below `REFINEMENT_ATTEMPTS` because a
+// neighbour the predicate keeps refusing is a neighbourhood the predicate says
+// nothing about — walking it eight more times would answer no faster than a
+// draw does, and the draw is what makes this function TOTAL.
+const MUTATION_ATTEMPTS = 8
+
+// NOTE: How often a Union's neighbour is taken from another ARM: one time in
+// four. A neighbour is worth having because it keeps most of what the value
+// already reached, so most of them stay where the value is; a search that could
+// never cross between `#Value(…)` and `#Empty` would be searching half a Type.
+const CROSS_ARM = 4
+
+// NOTE: ONE structural neighbour of a value — the same value with one part of
+// it moved, rather than a fresh draw. It lives beside `generate` and `shrink`
+// for the reason those two live together: what a value is MADE OF is one
+// question, and building one, making one smaller and stepping one away from one
+// are three answers that would drift apart if they were written apart.
+//
+// NOTE: What asks is the coverage-guided search in `Testing.ts`. A case whose
+// run reached ground no case before it had is worth looking AROUND, and looking
+// around means keeping every coordinate of it but one. Every choice below draws
+// from `source` and from nothing else, which is what makes the whole search
+// replay under the run's own seed.
+export function mutate(
+	generator: Generator,
+	value: AnyType,
+	source: RandomnessType,
+	size: number,
+	narrowing: Narrowing = {},
+): AnyType {
+	switch (generator.kind) {
+		// NOTE: A Boolean has exactly one neighbour, and it is the other one.
+		case "boolean":
+			return createBoolean(!(value as { value: boolean }).value)
+		// NOTE: A leaf is REDRAWN rather than nudged. What a nudge would mean is
+		// a distance, and the assumptions a number breaks are not about the
+		// small distances — `drawWhole` already reaches far past a small window
+		// one draw in eight, which is the whole of what a neighbour of a number
+		// is worth.
+		case "integer":
+			return createInteger(drawWhole(source, size, narrowing))
+		case "rational":
+			return drawRational(source, size)
+		case "string":
+			return createString(drawCharacters(source, size, narrowing))
+		case "list":
+			return mutateList(generator.item, value, source, size, narrowing)
+		case "record":
+			return mutateMembers(
+				generator.members,
+				value,
+				source,
+				size,
+				(members) => createRecord(members),
+			)
+		// NOTE: A payload-free Case is the only value of its own shape, so
+		// there is nothing in it to move and a fresh draw answers with it.
+		case "case":
+			return generator.members.length === 0
+				? generate(generator, source, size)
+				: mutateMembers(
+						generator.members,
+						value,
+						source,
+						size,
+						(members) => caseValue(generator.tag, members),
+					)
+		case "union":
+			return mutateUnion(
+				generator.members,
+				value,
+				source,
+				size,
+				narrowing,
+			)
+		case "refined": {
+			let merged = mergeNarrowing(narrowing, generator.narrowing)
+
+			for (let attempt = 0; attempt < MUTATION_ATTEMPTS; attempt++) {
+				let candidate = mutate(
+					generator.base,
+					value,
+					source,
+					size,
+					merged,
+				)
+
+				if (admitted(generator, merged, candidate)) {
+					return candidate
+				}
+			}
+
+			// NOTE: A neighbourhood the predicate kept refusing. A draw is what
+			// always answers an ADMITTED value — the same admission `generate`
+			// enforces, reached the way `generate` reaches it, including the
+			// failure a predicate nothing satisfies raises.
+			return generate(generator, source, size, narrowing)
+		}
+		// NOTE: A Namespace's own generator says how to BUILD a value and
+		// nothing about what one is made of, so the nearest thing to a
+		// neighbour of one is another value it built. It is the same silence
+		// `shrink` and `encode` answer with, for the same reason.
+		case "generated":
+			return generator.generate(source)
+	}
+}
+
+// NOTE: A List's neighbour: one item redrawn, one dropped, or one inserted.
+// Which of the three is a seeded choice among the ones the narrowing leaves
+// available — a List that must stay full can not drop an item, and one already
+// at its longest can not take another.
+function mutateList(
+	item: Generator,
+	value: AnyType,
+	source: RandomnessType,
+	size: number,
+	narrowing: Narrowing,
+): AnyType {
+	let items = itemsOf(value)
+	let lowest = Math.max(0, narrowing.minimumLength ?? 0)
+	let highest = Math.min(
+		MAXIMUM_LENGTH,
+		narrowing.maximumLength ?? MAXIMUM_LENGTH,
+	)
+	let moves: Array<"redraw" | "drop" | "insert"> = []
+
+	if (items.length > 0) {
+		moves.push("redraw")
+	}
+
+	if (items.length > lowest) {
+		moves.push("drop")
+	}
+
+	if (items.length < highest) {
+		moves.push("insert")
+	}
+
+	let move = moves[below(source, moves.length)]
+
+	// NOTE: A narrowing that pins the length to nothing at all leaves an empty
+	// List with no neighbour, which is the one value it can answer with.
+	if (move === undefined) {
+		return createList(items)
+	}
+
+	if (move === "redraw") {
+		let index = below(source, items.length)
+		let moved = [...items]
+
+		moved[index] = generate(item, source, size)
+
+		return createList(moved)
+	}
+
+	if (move === "drop") {
+		let index = below(source, items.length)
+
+		return createList([...items.slice(0, index), ...items.slice(index + 1)])
+	}
+
+	let index = below(source, items.length + 1)
+
+	return createList([
+		...items.slice(0, index),
+		generate(item, source, size),
+		...items.slice(index),
+	])
+}
+
+// NOTE: ONE member moved and every other one kept exactly as it stands. Sharing
+// them is safe because every value here is immutable, and it is the POINT: what
+// a neighbour is for is holding on to everything the case already reached while
+// one part of it moves.
+function mutateMembers(
+	members: Array<GeneratorMember>,
+	value: AnyType,
+	source: RandomnessType,
+	size: number,
+	build: (members: Record<string, AnyType>) => AnyType,
+): AnyType {
+	let holder = value as unknown as Record<string, AnyType>
+	let moved: Record<string, AnyType> = {}
+
+	for (let entry of members) {
+		let held = holder[entry.name]
+
+		if (held !== undefined) {
+			moved[entry.name] = held
+		}
+	}
+
+	let member = members[below(source, members.length)]
+
+	if (member !== undefined) {
+		let held = holder[member.name]
+
+		moved[member.name] =
+			held === undefined
+				? generate(member.generator, source, size)
+				: mutate(member.generator, held, source, size)
+	}
+
+	return build(moved)
+}
+
+// NOTE: A Union's neighbour usually stays in the arm the value inhabits — which
+// is what keeps a mutation a small move rather than a fresh case — and one time
+// in four is drawn from another arm instead. `claims` is what finds the arm,
+// exactly as it does for a shrink and for an encoding.
+function mutateUnion(
+	members: Array<Generator>,
+	value: AnyType,
+	source: RandomnessType,
+	size: number,
+	narrowing: Narrowing,
+): AnyType {
+	let own = members.findIndex((member) => claims(member, value))
+
+	// NOTE: A value no arm claims is a value this Union never built. There is
+	// no neighbourhood to stay inside, so a draw is the honest answer.
+	if (own === -1) {
+		return generate({ kind: "union", members }, source, size, narrowing)
+	}
+
+	let others = members.filter((_, index) => index !== own)
+
+	if (others.length > 0 && below(source, CROSS_ARM) === 0) {
+		return generate(
+			others[below(source, others.length)] ?? members[own]!,
+			source,
+			size,
+			narrowing,
+		)
+	}
+
+	return mutate(members[own]!, value, source, size, narrowing)
+}
+
+// #endregion
+
 // #region Making a failing value smaller
 
 // NOTE: The candidates worth trying instead of a value that failed, smallest
