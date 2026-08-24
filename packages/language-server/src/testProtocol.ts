@@ -45,6 +45,18 @@ export type TestSite = {
 	tags: Array<string>
 	focused: boolean
 	skipped: string | null
+	// NOTE: Whether the item was written as a `benchmark`. The session runs
+	// without `--bench`, so one is reported deselected for the reason `bench` —
+	// and this is what lets a client say so as a fact about the item rather than
+	// as an accident of the run, and offer to measure the one somebody points
+	// at. Running one BY ID measures it: the ids branch of the selection is
+	// ahead of the gate, which is exactly the "Run this one" door.
+	//
+	// NOTE: Added without moving `TEST_RUN_VERSION`. A client built before this
+	// existed reads the sites it always read and never looks here — which is the
+	// same tolerance the events ask for, where a kind nobody knows is ignored
+	// rather than refused.
+	benchmark: boolean
 }
 
 // #endregion
