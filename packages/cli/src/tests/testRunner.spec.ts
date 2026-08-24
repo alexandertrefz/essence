@@ -2022,6 +2022,41 @@ describe("essence test — benchmarks", () => {
 		})
 	})
 
+	// NOTE: No measurement writes a zero — the driver floors at a nanosecond —
+	// so one can only be a hand-edited or merge-mangled file. Holding a run to
+	// it would fail every later measurement as infinitely slower; it is
+	// re-recorded instead.
+	it("re-records a baseline of nothing rather than failing against it", async () => {
+		await withFiles({ "Doubling.es": benchmarks }, async (directory) => {
+			recordBaseline(directory, 0)
+
+			let { code, out } = await runTests(directory, ["--bench"])
+
+			expect(code).toBe(EXIT_SUCCESS)
+			expect(out).toContain("1 baseline written")
+			expect(readFileSync(baselineFile(directory), "utf8")).not.toContain(
+				"\t0 ns",
+			)
+		})
+	})
+
+	// NOTE: A measurement is taken before the reported run, so a body that then
+	// fails has already been measured — and a number measured off a failing
+	// benchmark is not a baseline.
+	it("writes no baseline for a benchmark that failed", async () => {
+		let failing = benchmarks.replace(
+			"expect double(500)::is(1000)",
+			"expect double(500)::is(999)",
+		)
+
+		await withFiles({ "Doubling.es": failing }, async (directory) => {
+			let { code } = await runTests(directory, ["--bench"])
+
+			expect(code).toBe(EXIT_FAILURE)
+			expect(existsSync(baselineFile(directory))).toBe(false)
+		})
+	})
+
 	// NOTE: Faster is news rather than a problem, and the baseline stands until
 	// somebody moves it — ten seconds a run is a baseline nothing on any machine
 	// will fail to beat.

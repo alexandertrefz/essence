@@ -1071,7 +1071,12 @@ function runBenchmark(context: TestContext, run: () => void): void {
 	// carries the row as its last step, so the rows of one table never share
 	// an entry they would overwrite in turn.
 	let storedKey = context.key
-	let baseline = context.benchStored[storedKey] ?? null
+	let stored = context.benchStored[storedKey]
+	// NOTE: A baseline of nothing is not a baseline. No measurement writes one
+	// — the driver floors at a nanosecond — so a zero can only be a hand-edited
+	// or merge-mangled file, and holding a run to it would report every later
+	// measurement as infinitely slower. It is re-recorded instead.
+	let baseline = stored !== undefined && stored > 0 ? stored : null
 	let ratio = baseline === null ? null : nanoseconds / baseline
 	let status: BenchmarkStatus =
 		ratio === null

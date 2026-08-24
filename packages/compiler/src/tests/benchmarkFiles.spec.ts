@@ -11,7 +11,7 @@ import {
 	readBenchmarks,
 	writeBenchmarks,
 } from "../testing/benchmarks"
-import type { BenchmarkRecord } from "../testing/index"
+import { type BenchmarkRecord, collectBenchmarks } from "../testing/index"
 
 // NOTE: Where a measurement is kept between two runs, and what survives the
 // round trip — because a baseline is worth exactly what can be read back out of
@@ -73,10 +73,21 @@ describe("The benchmark companion file", () => {
 		expect(parseBenchmarkFile(printBenchmarkFile(entries))).toEqual(entries)
 	})
 
+	// NOTE: The format is line-oriented, so a line break in a key is the one
+	// character that could take the file apart — it escapes like a String
+	// Literal's, and the file stays one entry per line whatever the name says.
+	it("escapes a line break in a key and reads it back", () => {
+		let entries = { "first\nsecond": 7, "returns\rcarried": 8 }
+		let written = printBenchmarkFile(entries)
+
+		expect(written).toContain('benchmark "first\\nsecond"')
+		expect(parseBenchmarkFile(written)).toEqual(entries)
+	})
+
 	it("reads a row's numbered entry as the key it is", () => {
 		let entries = {
-			"sorts {size} rows [0]": 10,
-			"sorts {size} rows [1]": 20,
+			"sorts {size} rows/0": 10,
+			"sorts {size} rows/1": 20,
 		}
 
 		expect(parseBenchmarkFile(printBenchmarkFile(entries))).toEqual(entries)
@@ -231,5 +242,58 @@ describe("Reading and writing what a run measured", () => {
 
 			expect(readFileSync(filePath, "utf8")).toContain("\t100 ns")
 		})
+	})
+})
+
+// NOTE: What the fold hands the writer. The one rule worth its own spec is the
+// refusal: a measurement whose test then failed is not a baseline.
+describe("Collecting what a run measured", () => {
+	const measured = {
+		schema: 1 as const,
+		kind: "benchmark" as const,
+		id: "/bench",
+		name: "doubling",
+		module: "/Doubling.es",
+		key: "doubling",
+		nanoseconds: 1234,
+		iterations: 8,
+		samples: 7,
+		baseline: null,
+		ratio: null,
+		status: "written" as const,
+	}
+
+	it("keeps a measurement whose test passed", () => {
+		expect(
+			collectBenchmarks([
+				measured,
+				{
+					schema: 1,
+					kind: "test-pass",
+					id: "/bench",
+					name: "doubling",
+					duration: 1,
+					expectations: 1,
+				},
+			]).map((record) => record.key),
+		).toEqual(["doubling"])
+	})
+
+	it("drops a measurement whose test then failed", () => {
+		expect(
+			collectBenchmarks([
+				measured,
+				{
+					schema: 1,
+					kind: "test-fail",
+					id: "/bench",
+					name: "doubling",
+					duration: 1,
+					expectations: 1,
+					failures: [],
+					error: "it threw after the measurement",
+				},
+			]),
+		).toEqual([])
 	})
 })
