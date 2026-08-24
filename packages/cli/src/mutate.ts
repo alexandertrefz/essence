@@ -26,7 +26,11 @@ import {
 import { readProjectConfiguration } from "./configuration"
 import type { CLIContext } from "./context"
 import { discoverTestFiles } from "./discovery"
-import type { MutantWorkerRequest, MutantWorkerResponse } from "./mutantWorker"
+import type {
+	MutantPhase,
+	MutantWorkerRequest,
+	MutantWorkerResponse,
+} from "./mutantWorker"
 import type { CompileOutcome } from "./pipeline"
 import {
 	claimRegistries,
@@ -41,6 +45,7 @@ import {
 	type MutantRecord,
 	renderMutation,
 	renderNoTests,
+	tallyMutants,
 } from "./testReport"
 
 // NOTE: `essence test --mutate` — the driver of the design's §12. Coverage says
@@ -261,8 +266,30 @@ type MutantRequest = Omit<
 // — which is the whole reason it exists: every bundle a run loads is a Module
 // that can never be unloaded, and a run compiles hundreds of them.
 type MutantRunner = {
-	run: (request: MutantRequest) => Promise<MutantRun>
+	// NOTE: `timeout` is per mutant, in milliseconds, and it is not optional:
+	// a run that could wait forever is a run that can hang a CI job forever,
+	// which is worse than no mutation report at all. What the number is, is
+	// `mutantTimeout`'s business.
+	run: (request: MutantRequest, timeout: number) => Promise<MutantRun>
 	dispose: () => Promise<void>
+}
+
+// NOTE: How long ONE mutant may run before the driver stops waiting. A mutant
+// is a deliberate lie, and one of the lies this walker tells — a comparison
+// rotated, a literal nudged, an `if` turned inside out — is exactly the shape
+// that turns a terminating loop into a loop with no end. So the wait is bounded
+// by what the same tests took when they were green: ten times that, because a
+// machine under load is slower than a machine that is not and a false HUNG
+// would be a lie about the tests, and never less than five seconds, because ten
+// times a millisecond is not a timeout, it is a coin toss.
+const MINIMUM_MUTANT_TIMEOUT = 5_000
+const MUTANT_TIMEOUT_FACTOR = 10
+
+export function mutantTimeout(baselineMilliseconds: number): number {
+	return Math.max(
+		MINIMUM_MUTANT_TIMEOUT,
+		MUTANT_TIMEOUT_FACTOR * baselineMilliseconds,
+	)
 }
 
 // NOTE: The Worker is booted as whatever this module is running as — the
@@ -274,6 +301,14 @@ export function mutantWorkerFileName(moduleURL: string): string {
 	return moduleURL.endsWith(".ts") ? "./mutantWorker.ts" : "./mutantWorker.js"
 }
 
+// NOTE: Whether the Worker that answered this way is still worth keeping. One
+// that crashed on a bundle caught its own error and is as good as it was; one
+// that was TERMINATED mid-spin, one that died, and one whose port would not
+// carry an answer are each a thread the next mutant may not be handed.
+function keepsWorker(phase: MutantPhase | null): boolean {
+	return phase === null || phase === "load" || phase === "run"
+}
+
 function createMutantRunner(): MutantRunner {
 	let workerURL = new URL(
 		mutantWorkerFileName(import.meta.url),
@@ -281,6 +316,14 @@ function createMutantRunner(): MutantRunner {
 	)
 	let worker: Worker | null = null
 	let next = 0
+
+	let discard = async (held: Worker): Promise<void> => {
+		if (worker === held) {
+			worker = null
+		}
+
+		await held.terminate()
+	}
 
 	let stop = async (): Promise<void> => {
 		let held = worker
@@ -291,7 +334,7 @@ function createMutantRunner(): MutantRunner {
 	}
 
 	return {
-		run: async (request) => {
+		run: async (request, timeout) => {
 			let id = next
 
 			next += 1
@@ -301,37 +344,78 @@ function createMutantRunner(): MutantRunner {
 			worker = running
 
 			let answer = await new Promise<MutantRun>((resolve) => {
-				let onMessage = (message: MutantWorkerResponse): void => {
-					if (message.kind !== "ran" || message.id !== id) {
+				let timer: ReturnType<typeof setTimeout> | null = null
+				let settled = false
+				// NOTE: Every way out of the wait goes through here, and it
+				// answers ONCE: a Worker that dies a moment after it was given
+				// up on, or one whose message arrives as the timer fires, must
+				// not resolve a Promise that is already resolved and must not
+				// leave a timer behind that outlives the run.
+				let settle = (run: MutantRun): void => {
+					if (settled) {
 						return
+					}
+
+					settled = true
+
+					if (timer !== null) {
+						clearTimeout(timer)
 					}
 
 					running.off("message", onMessage)
 					running.off("error", onError)
-					resolve(message)
+					running.off("exit", onExit)
+					resolve(run)
 				}
-				// NOTE: A Worker that dies takes its mutant with it, and the
-				// mutant is answered as one nothing could be learnt from
-				// rather than as a kill. A crash is not evidence about the
-				// tests.
-				let onError = (error: unknown): void => {
-					running.off("message", onMessage)
-					running.off("error", onError)
-					worker = null
-					resolve({
+				let failed = (problem: string, phase: MutantPhase): void => {
+					settle({
 						kind: "ran",
 						id,
 						events: [],
-						problem:
-							error instanceof Error
-								? (error.stack ?? error.message)
-								: String(error),
-						exhausted: true,
+						problem,
+						phase,
+						exhausted: !keepsWorker(phase),
 					})
+				}
+				let onMessage = (message: MutantWorkerResponse): void => {
+					if (message.kind === "ran" && message.id === id) {
+						settle(message)
+					}
+				}
+				// NOTE: A Worker that dies takes its mutant with it, and what
+				// died was the mutant's own run — so it is answered as a
+				// mutant the world noticed rather than as one nothing could be
+				// learnt from. The thread is dropped either way, so the next
+				// mutant boots a fresh one.
+				let onError = (error: unknown): void => {
+					failed(
+						error instanceof Error
+							? (error.stack ?? error.message)
+							: String(error),
+						"worker",
+					)
+				}
+				// NOTE: The listener without which this whole Promise could
+				// never settle. A Worker can go away without ever raising an
+				// `error` — a native crash, a `process.exit` inside a mutated
+				// Module's top level — and the driver was left waiting on a
+				// thread that no longer exists.
+				let onExit = (code: number): void => {
+					failed(
+						`the mutant's Worker exited with code ${code} before it answered`,
+						"worker",
+					)
 				}
 
 				running.on("message", onMessage)
 				running.on("error", onError)
+				running.on("exit", onExit)
+				timer = setTimeout(() => {
+					failed(
+						`the mutant did not finish within ${timeout} ms`,
+						"timeout",
+					)
+				}, timeout)
 				running.postMessage({
 					kind: "run",
 					id,
@@ -339,8 +423,13 @@ function createMutantRunner(): MutantRunner {
 				} satisfies MutantWorkerRequest)
 			})
 
+			// NOTE: A hung mutant is still SPINNING, and terminating it is the
+			// only thing that stops it. The same call recycles the Worker for
+			// every other answer that leaves one unfit — see `keepsWorker` —
+			// and for the ordinary case of a Worker that has loaded its last
+			// bundle.
 			if (answer.exhausted) {
-				await stop()
+				await discard(running)
 			}
 
 			return answer
@@ -434,11 +523,22 @@ export function collectSites(
 		)
 }
 
+// NOTE: What a SPEC may reach in and change, and nothing a command line can
+// say. The per-mutant timeout is minutes long by design, and a spec that proves
+// a hang is caught has to be able to ask for one that is not — so the seam is a
+// parameter of this Function rather than an Option or an environment variable,
+// which are both promises to a user that nobody wants to keep.
+export type MutationInternals = {
+	timeoutFor?: (baselineMilliseconds: number) => number
+}
+
 export async function runMutation(
 	context: CLIContext,
 	command: CommandSpec,
 	files: Array<string>,
+	internals: MutationInternals = {},
 ): Promise<number> {
+	let timeoutFor = internals.timeoutFor ?? mutantTimeout
 	let refusal = contradiction(context.options)
 
 	if (refusal !== null) {
@@ -473,15 +573,7 @@ export async function runMutation(
 	)
 
 	if (inputFileNames.length === 0) {
-		emit({
-			schema: 1,
-			kind: "mutation-end",
-			sites: 0,
-			killed: 0,
-			survived: 0,
-			uncovered: 0,
-			invalid: 0,
-		})
+		emit({ schema: 1, kind: "mutation-end", ...tallyMutants([]) })
 
 		if (!context.options.json && !context.options.quiet) {
 			context.terminal.out("")
@@ -603,6 +695,13 @@ export async function runMutation(
 		}
 
 		let attribution = attributionOf(events)
+		// NOTE: How long each test took while the code was still telling the
+		// truth, which is what a mutant's own wait is measured against — see
+		// `mutantTimeout`. Read off the baseline fold rather than off the events
+		// a second time, because the fold has already answered it.
+		let durations = new Map(
+			baseline.tests.map((test) => [test.id, test.duration]),
+		)
 		// NOTE: The order the RUN met each test, which is what makes a covering
 		// set a list rather than a set: the Worker runs them in it and stops at
 		// the first kill, so the killer a report names is the same one twice.
@@ -660,19 +759,13 @@ export async function runMutation(
 					seed,
 					stored,
 					counterexamples,
+					durations,
+					timeoutFor,
 				}),
 			)
 		}
 
-		let counts = {
-			sites: mutants.length,
-			killed: mutants.filter((each) => each.status === "killed").length,
-			survived: mutants.filter((each) => each.status === "survived")
-				.length,
-			uncovered: mutants.filter((each) => each.status === "uncovered")
-				.length,
-			invalid: mutants.filter((each) => each.status === "invalid").length,
-		}
+		let counts = tallyMutants(mutants)
 
 		emit({ schema: 1, kind: "mutation-end", ...counts })
 
@@ -739,6 +832,10 @@ async function judge(work: {
 	seed: string
 	stored: Record<string, SnapshotStore>
 	counterexamples: Record<string, CorpusStore>
+	// NOTE: What each covering test took in the BASELINE, which is what this
+	// mutant's own wait is measured against — see `mutantTimeout`.
+	durations: Map<string, number>
+	timeoutFor: (baselineMilliseconds: number) => number
 }): Promise<MutantRecord> {
 	let byEntry = new Map<string, Array<string>>()
 
@@ -807,17 +904,34 @@ async function judge(work: {
 			return verdict("invalid")
 		}
 
-		let answer = await work.runner.run({
-			bundle: outcome.outputFileName,
-			ids,
-			seed: work.seed,
-			cases: work.context.options.cases,
-			snapshots: work.stored,
-			counterexamples: work.counterexamples,
-		})
+		let answer = await work.runner.run(
+			{
+				bundle: outcome.outputFileName,
+				ids,
+				seed: work.seed,
+				cases: work.context.options.cases,
+				snapshots: work.stored,
+				counterexamples: work.counterexamples,
+			},
+			work.timeoutFor(
+				ids.reduce(
+					(total, id) => total + (work.durations.get(id) ?? 0),
+					0,
+				),
+			),
+		)
 
-		if (answer.problem !== null) {
-			return verdict("invalid")
+		// NOTE: A mutant that never came back is CAUGHT. A run that does not end
+		// is a failure anybody would notice — the loop that no longer stops is
+		// exactly what a rotated comparison or a nudged bound turns a good one
+		// into — so it counts for the tests rather than against them.
+		//
+		// NOTE: Every other problem is a KILL. A bundle that would not load, a
+		// runner that threw, a Worker that died: a program that comes apart is a
+		// program the world notices, and `invalid` means one thing only, which
+		// is that the mutant did not COMPILE. There is no killer to name.
+		if (answer.phase !== null) {
+			return verdict(answer.phase === "timeout" ? "hung" : "killed")
 		}
 
 		let failure = answer.events.find((event) => event.kind === "test-fail")

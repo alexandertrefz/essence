@@ -7,9 +7,20 @@ import type { common } from "@essence-lang/interfaces"
 import type { TestEvent } from "@essence-lang/runtime/Testing"
 
 import { EXIT_FAILURE, EXIT_SUCCESS, EXIT_USAGE } from "../actions"
+import { emptyOptions, parseArguments } from "../args"
+import { createContext } from "../context"
 import { run } from "../index"
-import { coveringPoints, isInScope, mutationScope } from "../mutate"
+import {
+	coveringPoints,
+	isInScope,
+	type MutationInternals,
+	mutantTimeout,
+	mutationScope,
+	runMutation,
+} from "../mutate"
+import type { ReportContext } from "../report"
 import { remembersResults } from "../test"
+import { type MutantRecord, renderMutation } from "../testReport"
 
 // NOTE: What `essence test --mutate` ANSWERS, driven the way `testRunner.spec`
 // drives the rest of the runner: a throwaway project on disk and the command
@@ -67,27 +78,57 @@ async function capture(
 // NOTE: One job and one pinned seed, always. The seed is what makes a property
 // test in a covering set answer the same question twice, and one job keeps the
 // compile in this process — a worker would answer the same and boot a second
-// copy of the Compiler to do it.
+// copy of the Compiler to do it. Spelled apart from `mutate` because the run
+// that reaches past the entry point needs exactly the same command line.
+function argumentsFor(
+	directory: string,
+	essenceArguments: Array<string>,
+): Array<string> {
+	return [
+		"test",
+		directory,
+		"--mutate",
+		"--jobs",
+		"1",
+		"--no-color",
+		"--seed",
+		"1234abcd",
+		...essenceArguments,
+	]
+}
+
 function mutate(
 	directory: string,
 	essenceArguments: Array<string> = [],
 ): Promise<{ code: number; out: string; err: string }> {
 	return capture(() =>
-		run(
-			[
-				"test",
-				directory,
-				"--mutate",
-				"--jobs",
-				"1",
-				"--no-color",
-				"--seed",
-				"1234abcd",
-				...essenceArguments,
-			],
-			"essence",
-		),
+		run(argumentsFor(directory, essenceArguments), "essence"),
 	)
+}
+
+// NOTE: The same run, with the seam only a spec may reach. `runMutation`'s
+// internals are not an Option and not an environment variable — see
+// `MutationInternals` — so a spec that needs a timeout measured in
+// milliseconds rather than in seconds goes through the entry point the command
+// line goes through and hands them over on the way.
+function mutateWith(
+	directory: string,
+	internals: MutationInternals,
+	essenceArguments: Array<string> = [],
+): Promise<{ code: number; out: string; err: string }> {
+	return capture(() => {
+		let invocation = parseArguments(
+			argumentsFor(directory, essenceArguments),
+			"essence",
+		)
+
+		return runMutation(
+			createContext(invocation.options, "essence"),
+			invocation.command,
+			invocation.files,
+			internals,
+		)
+	})
 }
 
 function eventsOf(out: string): Array<TestEvent> {
@@ -139,6 +180,51 @@ const SHARP = threshold([
 	"expect passes(51)",
 	"expect passes(50)::is(false)",
 ])
+
+// NOTE: A fixture where one mutant PROVABLY never ends. `loop(startingWith:
+// while:step:)` is the language's whole answer to iteration and the Optimiser
+// writes it out as a real `while`, so the mutant that rotates `::isLessThan`
+// into `::isGreaterThan` spins on a State the step never changes — no stack to
+// overflow, no error to catch, and nothing but a timeout that ends it.
+//
+// NOTE: `twice` is here for the half of the claim the hang can not make on its
+// own: its mutants are judged AFTER the hung one, so a run that reports them
+// killed is a run whose Worker was terminated and replaced. A driver that
+// terminated the thread and forgot to boot another would report them as
+// anything but killed.
+const SPINNING = [
+	"implementation {",
+	"	function settle(_ n: Integer) -> Integer {",
+	"		<- loop(",
+	"			startingWith n,",
+	"			while (each) { <- each::isLessThan(0) },",
+	"			step (each) { <- each },",
+	"		)",
+	"	}",
+	"",
+	"	function twice(_ n: Integer) -> Integer {",
+	"		<- n::multiply(with 2)",
+	"	}",
+	"}",
+	"",
+	"tests {",
+	'	test "settles where it starts" {',
+	"		expect settle(1)::is(1)",
+	"	}",
+	"",
+	'	test "doubles what it is handed" {',
+	"		expect twice(3)::is(6)",
+	"	}",
+	"}",
+	"",
+].join("\n")
+
+// NOTE: Long enough that nothing which actually finishes is ever called hung —
+// a mutant of this fixture runs one assertion, and two seconds is a machine
+// under load's worth of headroom over that — and short enough that the suite
+// pays for the hang once and in full. Nothing here asserts on a clock: what is
+// checked is the STATUS the run recorded and that the run went on afterwards.
+const SPIN_TIMEOUT = { timeoutFor: (): number => 2_000 }
 
 describe("essence test --mutate", () => {
 	it("names a mutant no test notices, and still exits 0", async () => {
@@ -313,6 +399,34 @@ describe("essence test --mutate", () => {
 		})
 	})
 
+	// NOTE: The safety claim the whole feature rests on. A mutation tool that
+	// can wait for ever is a tool that can hang a job for ever, which is worse
+	// than no tool — so a mutant that does not come back is STOPPED, recorded
+	// as `hung`, and the run goes on.
+	it("stops a mutant that never comes back, and goes on", async () => {
+		await withFiles({ "Spinning.es": SPINNING }, async (directory) => {
+			let { code, out } = await mutateWith(directory, SPIN_TIMEOUT, [
+				"--json",
+			])
+			let found = mutants(out)
+			let hung = found.findIndex((mutant) => mutant.status === "hung")
+
+			expect(found[hung]?.description).toBe(
+				"swap ::isLessThan for ::isGreaterThan",
+			)
+			expect(tally(out).hung).toBe(1)
+			// NOTE: The recycling, said as a fact about the ANSWERS rather than
+			// about the threads: a mutant judged after the terminated one can
+			// only have been killed by a Worker that was booted to replace it.
+			expect(
+				found
+					.slice(hung + 1)
+					.some((mutant) => mutant.status === "killed"),
+			).toBe(true)
+			expect(code).toBe(EXIT_SUCCESS)
+		})
+	})
+
 	// NOTE: THE reproducibility claim. One seed, one pinned corpus and a walk
 	// that is a function of the sources: two runs are the same stream, line for
 	// line, or nothing a mutation score says can be compared between runs.
@@ -366,6 +480,72 @@ describe("essence test --mutate", () => {
 			expect(code).toBe(EXIT_FAILURE)
 			expect(err).toContain("a baseline that passes")
 		})
+	})
+})
+
+describe("The mutant timeout", () => {
+	// NOTE: Nothing here waits for anything. The wait is a pure function of what
+	// the same tests took while the code still told the truth, and that is the
+	// only part of it a spec can assert without becoming a spec about a machine.
+	it("never waits less than five seconds", () => {
+		expect(mutantTimeout(0)).toBe(5_000)
+		expect(mutantTimeout(120)).toBe(5_000)
+	})
+
+	it("waits ten times a slow baseline", () => {
+		expect(mutantTimeout(900)).toBe(9_000)
+		expect(mutantTimeout(4_000)).toBe(40_000)
+	})
+})
+
+describe("The mutation report", () => {
+	let reportContext = (verbose: boolean): ReportContext =>
+		createContext({ ...emptyOptions, noColor: true, verbose }, "essence")
+			.report
+	let mutant = (
+		status: MutantRecord["status"],
+		description = "swap ::isLessThan for ::isGreaterThan",
+	): MutantRecord => ({
+		module: "Spinning.es",
+		position: {
+			start: { line: 5, column: 1 },
+			end: { line: 5, column: 9 },
+		},
+		operator: "comparison",
+		description,
+		status,
+		killedBy: null,
+		tests: 1,
+	})
+	let rendered = (mutants: Array<MutantRecord>, verbose = false): string =>
+		renderMutation(mutants, reportContext(verbose), () => null).join("\n")
+
+	// NOTE: A hang is a failure a reader would notice as surely as a red test,
+	// so it counts for the tests rather than against them — three killed and one
+	// hung out of four judged is a suite that caught everything.
+	it("counts a hung mutant as caught", () => {
+		expect(
+			rendered([
+				mutant("killed"),
+				mutant("killed"),
+				mutant("killed"),
+				mutant("hung"),
+			]),
+		).toContain("100% caught")
+	})
+
+	it("names the hung ones only where there were any", () => {
+		expect(rendered([mutant("killed"), mutant("hung")])).toContain("1 hung")
+		expect(rendered([mutant("killed")])).not.toContain("hung")
+	})
+
+	// NOTE: Which site stopped answering is the one thing the summary line can
+	// not say, and it is what a reader chasing a hang needs first.
+	it("names where a mutant hung under --verbose", () => {
+		expect(rendered([mutant("hung")], true)).toContain(
+			"the run never came back, and was stopped",
+		)
+		expect(rendered([mutant("hung")])).not.toContain("never came back")
 	})
 })
 

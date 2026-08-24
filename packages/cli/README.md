@@ -85,8 +85,11 @@ inside out, an Integer literal nudged, a Case construction swapped for a sibling
 Case of its own Choice — and runs only the tests that reach the site to see
 whether any of them notices. The lies are told on the typed program, so each
 mutant still typechecks; a site no test reaches is counted apart and never
-compiled. The whole run draws from one seed, so two runs at one seed are the
-same report. A survivor is named with the sentence that says what was changed:
+compiled. A mutant that crashes counts as killed, and one whose run never comes
+back is stopped and counted as hung, which counts as caught; only a mutant that
+would not compile is left out of the score. The whole run draws from one seed,
+so two runs at one seed are the same report. A survivor is named with the
+sentence that says what was changed:
 
 ```
  41 mutants  ·  36 killed  ·  3 survived  ·  2 on lines no test reaches  ·  92% caught
