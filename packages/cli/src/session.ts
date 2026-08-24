@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs"
 
+import type { CompileMode } from "@essence-lang/compiler/compileMode"
 import { isStdlibDocument } from "@essence-lang/compiler/documents"
 import {
 	canonicalPath,
@@ -108,14 +109,13 @@ function reachableModules(
 	return component.groups.flat().filter((module) => seen.has(module.filePath))
 }
 
-// NOTE: `tests` and `contracts` are the compile MODE for the whole invocation —
-// one run of `esc` is one mode, so they belong to the Session rather than to a
-// request. They are what the Session links every component under, and a linked
-// component is cached, so a Session opened in one mode may never answer for
-// another.
+// NOTE: The compile MODE is the whole INVOCATION's — one run of `esc` is one
+// mode, so it belongs to the Session rather than to a request. It is what the
+// Session links every component under, and a linked component is cached, so a
+// Session opened in one mode may never answer for another. See `CompileMode`.
 export function createCompileSession(
 	entryFileNames: Array<string>,
-	options: { tests?: boolean; contracts?: boolean } = {},
+	mode: CompileMode = {},
 ): CompileSession {
 	let texts = new Map<string, string>()
 	let errors = new Map<string, unknown>()
@@ -319,7 +319,7 @@ export function createCompileSession(
 					groups: component.groups,
 					diagnostics: [],
 				},
-				{ tests: options.tests, contracts: options.contracts },
+				mode,
 			).modules
 		}
 

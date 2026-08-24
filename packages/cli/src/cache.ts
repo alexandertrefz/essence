@@ -7,6 +7,7 @@ import {
 	isCacheDisabled,
 	writeAtomic,
 } from "@essence-lang/compiler/cache"
+import { modeKey } from "@essence-lang/compiler/compileMode"
 import { BRIDGE_KEY } from "@essence-lang/compiler/embed/bridge"
 import { hashGraph, toolchainKey } from "@essence-lang/compiler/embed/hash"
 import { defaultOptimiserOptions } from "@essence-lang/compiler/optimiser"
@@ -140,21 +141,16 @@ function emitterKey(request: CompileRequest): string {
 		shape.push(BRIDGE_KEY)
 	}
 
-	// NOTE: A test compile enriches a section a build drops, out of sources
-	// that are byte for byte the same — so the graph's own hash can not tell
-	// the two apart and this is what does. Without it `essence test` would be
-	// handed the bundle `essence build` wrote, and neither would run what it
-	// was asked to.
-	if (request.tests === true) {
-		shape.push("tests")
-	}
+	// NOTE: The compile MODE, through the one Function that spells it — a test
+	// compile enriches a section a build drops and a contract compile a suite
+	// that is in no file at all, out of sources that are byte for byte the
+	// same, so the graph's own hash can not tell any of them apart and this is
+	// what does. `bundleHash` reads the very same Function, so a facet can not
+	// join the mode without joining both names at once. See `CompileMode`.
+	let mode = modeKey(request)
 
-	// NOTE: And the goals, for the very same reason and out of the very same
-	// sources: `--contracts` enriches a suite that is not in the file at all.
-	// Without it a plain `essence test` would be handed the bundle the contract
-	// run wrote — and would run, and report, goals nobody asked for.
-	if (request.contracts === true) {
-		shape.push("contracts")
+	if (mode !== "") {
+		shape.push(mode)
 	}
 
 	if (!request.sourcemap) {

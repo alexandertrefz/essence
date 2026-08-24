@@ -1,5 +1,6 @@
 import type { common, enricher, parser } from "@essence-lang/interfaces"
 
+import type { CompileMode } from "../compileMode"
 import {
 	collectDiagnostics,
 	containsErrors,
@@ -131,9 +132,13 @@ export function topLevelScope(
 	}
 }
 
+// NOTE: The MODE is where this Program's `tests { … }` block and the goals its
+// declarations promise are finally read — see `CompileMode`, which is the one
+// place either is spelled. Everything else here is about the one Program in
+// hand rather than about the run it is part of.
 export const enrich = (
 	program: parser.Program,
-	options: {
+	options: CompileMode & {
 		shadowedBuiltins?: ShadowedBuiltins
 		// NOTE: Only the Language Server sets this, for Hovers over a written
 		// Type. A compile leaves it off and the collector stays null.
@@ -150,19 +155,6 @@ export const enrich = (
 		// that came back. The standard library's Choices are the canonical ones
 		// and stay unqualified, tags included.
 		modulePath?: string
-		// NOTE: Whether this compile ASKED for the tests. Only `essence test`
-		// and the Editor's test session do; a build and a run leave the parsed
-		// `tests { … }` block behind untouched, which is the whole of what
-		// "stripped from every build" means — the Program that comes out has
-		// never heard of it. See `common.typed.Program.tests`.
-		tests?: boolean
-		// NOTE: Whether this compile also asked for the CONTRACTS — the goals a
-		// Module's own Namespace declarations promise, synthesized as property
-		// tests and reported beside the written ones. `essence test
-		// --contracts` and the `essence.test.contracts` setting are what ask;
-		// it means nothing without `tests`, which is the mode the section it is
-		// appended to exists in at all. See `contractSuite`.
-		contracts?: boolean
 		// NOTE: What a test's identity spells as its Module where the Scope
 		// carries none of its own. The standard library is the one compile that
 		// is not a graph of Modules — its Choices are deliberately unqualified,
@@ -203,8 +195,7 @@ export const enrich = (
 				tests: testsSectionOf(
 					program,
 					scope,
-					options.tests,
-					options.contracts,
+					options,
 					options.source,
 					options.testsPath,
 				),
@@ -294,16 +285,14 @@ function reportStrayValueComments(
 function testsSectionOf(
 	program: parser.Program,
 	scope: enricher.Scope,
-	tests: boolean | undefined,
-	// NOTE: Whether this compile also asked for the goals a Module's own
-	// declarations promise — see `contractSuite`. It rides beside `tests`
-	// rather than replacing it: a contract run runs a project's written tests
-	// as well, and a goal is reported in the same manifest they are.
-	contracts: boolean | undefined,
+	// NOTE: The whole mode, because the goals ride BESIDE the tests rather than
+	// replacing them: a contract run runs a project's written tests as well, and
+	// a goal is reported in the same manifest they are. See `contractSuite`.
+	mode: CompileMode,
 	source: string | undefined,
 	testsPath?: string,
 ): common.typed.TestsSectionNode | null {
-	if (tests !== true) {
+	if (mode.tests !== true) {
 		return null
 	}
 
@@ -315,7 +304,11 @@ function testsSectionOf(
 	// through ONE enrichment, in one Scope, and comes out as one manifest.
 	let examples = exampleTestsOf(program, source)
 
-	if (program.tests === null && examples.length === 0 && contracts !== true) {
+	if (
+		program.tests === null &&
+		examples.length === 0 &&
+		mode.contracts !== true
+	) {
 		return null
 	}
 
@@ -348,7 +341,7 @@ function testsSectionOf(
 		testsPath,
 	)
 
-	if (contracts !== true) {
+	if (mode.contracts !== true) {
 		return section
 	}
 
@@ -401,14 +394,9 @@ export type EnrichedProgramInput = {
 // also the only way a cycle of Modules can be enriched: nothing inside an SCC
 // can be resolved before the rest of it. Diagnostics are collected per Program,
 // so each stays attributable to the file it came from.
-export type EnrichProgramsOptions = {
-	// NOTE: Whether this compile asked for the tests — see `enrich`. It covers
-	// every Program of the group: one compile is one mode.
-	tests?: boolean
-	// NOTE: And whether it asked for the contract goals as well — see `enrich`.
-	// One compile is one mode here too: a graph linked for a contract run
-	// synthesizes goals in every Module of it.
-	contracts?: boolean
+// NOTE: The MODE covers every Program of the group — one compile is one mode,
+// so a graph linked for a contract run synthesizes goals in every Module of it.
+export type EnrichProgramsOptions = CompileMode & {
 	// NOTE: Called at the top of every hoist round, and once more after the
 	// last one, to bind whatever became bindable since — the seam a cycle of
 	// Modules needs: an import across an SCC can only be seeded once the
@@ -519,13 +507,7 @@ const enrichProgramsInner = (
 						scope,
 						hoistedTypes,
 					),
-					tests: testsSectionOf(
-						program,
-						scope,
-						options.tests,
-						options.contracts,
-						source,
-					),
+					tests: testsSectionOf(program, scope, options, source),
 					exports: null,
 					position: program.position,
 				}

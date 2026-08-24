@@ -4,6 +4,7 @@ import path from "node:path"
 import type { common, parser } from "@essence-lang/interfaces"
 import { STDLIB_DIRECTORY } from "@essence-lang/standard-library"
 
+import type { CompileMode } from "./compileMode"
 import { enrich } from "./enricher/index"
 import { declaredNames } from "./enricher/stdlib"
 import { parseWithDiagnostics } from "./parser/index"
@@ -138,21 +139,16 @@ export function parseDocument(
 	})
 }
 
-// NOTE: `tests` is the compile MODE, and the only way a `tests { … }` block
-// becomes anything but parsed text. `essence build`, `essence run` and the
+// NOTE: The compile MODE is what makes a `tests { … }` block anything but
+// parsed text — see `CompileMode`. `essence build`, `essence run` and the
 // Editor's ordinary analysis leave it off, so the block is read — a syntax
 // error in it is still reported — and then dropped before enrichment, which is
 // the whole of what "a test costs a shipped Program nothing" means.
 export function enrichDocument(
 	program: parser.Program,
 	documentPath?: string,
-	options: {
+	options: CompileMode & {
 		annotations?: boolean
-		tests?: boolean
-		// NOTE: And whether it asked for the goals the document's own Namespace
-		// declarations promise — see `enrich`'s own `contracts`. It means
-		// nothing without `tests`.
-		contracts?: boolean
 		// NOTE: The document's own text, which only a test compile reads — an
 		// `@example` block is compiled out of the file's own lines. See
 		// `enrich`'s own `source`.
