@@ -81,6 +81,7 @@ exports[`Test codegen — the emitted shape keeps the golden shape of a whole re
 			tags: [],
 			focused: false,
 			skipped: null,
+			benchmark: false,
 			position: {
 				start: {
 					line: 9,
@@ -111,6 +112,7 @@ exports[`Test codegen — the emitted shape keeps the golden shape of a whole re
 			tags: ["slow"],
 			focused: false,
 			skipped: null,
+			benchmark: false,
 			position: {
 				start: {
 					line: 14,

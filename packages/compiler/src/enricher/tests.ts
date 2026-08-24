@@ -452,12 +452,28 @@ export function testIdentityKey(
 	identity: common.typed.TestIdentity,
 	row: number | null = null,
 ): string {
-	return [
+	return escapedSteps([
 		identity.modulePath ?? "",
 		...identity.suitePath,
 		identity.name,
 		...(row === null ? [] : [String(row)]),
-	]
+	])
+}
+
+// NOTE: The same key WITHOUT the Module path — what a durable entry stored
+// beside the file itself is keyed on, which today is a benchmark's baseline.
+// The path is what says which file's companion the entry is in, so writing it
+// into the key as well would spell the file twice and lose every entry the day
+// it moves. The row is left out for the same reason a snapshot's name leaves it
+// out: the rows share a body, and a run numbers the entry it recorded.
+export function relativeIdentityKey(
+	identity: common.typed.TestIdentity,
+): string {
+	return escapedSteps([...identity.suitePath, identity.name])
+}
+
+function escapedSteps(steps: Array<string>): string {
+	return steps
 		.map((step) => step.replaceAll("\\", "\\\\").replaceAll("/", "\\/"))
 		.join("/")
 }

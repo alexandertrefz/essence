@@ -1743,15 +1743,30 @@ Error: A property test can not record a snapshot
      │ Note: A property test runs its body once per generated value, so a snapshot written here records a different value every case and only the last of them could ever match.
 ─────╯
 
+[benchmark-for-any]
+Error: A benchmark times written work, not generated values
+     ╭─┤ Tests.es:121:23 │
+     │
+ 121 │     benchmark "counting" for any (n: Integer) {
+     │     ────┬────            ─┬─  
+     │         ╰─────────────────│─── and this asks for a timing
+     │                           │   
+     │                           ╰─── this asks for a value the runner makes up
+     │ 
+     │ Help: Write the inputs: a constant above the benchmark, or the rows to measure — across [ … ].
+     │ 
+     │ Note: A measurement is comparable only where every run does the same work, and a generated value changes the work every case.
+─────╯
+
 [duplicate-test-name]
 Error: There is already a test called 'counts a win' here
-     ╭─┤ Tests.es:127:8 │
+     ╭─┤ Tests.es:133:8 │
      │
- 123 │        test "counts a win" {
+ 129 │        test "counts a win" {
      │             ───────┬──────  
      │                    ╰──────── the other test is here
      │ 
- 127 │        test "counts a win" {
+ 133 │        test "counts a win" {
      │             ───────┬──────  
      │                    ╰──────── this name is taken
      │ 
@@ -1760,7 +1775,7 @@ Error: There is already a test called 'counts a win' here
      │ Note: What a test is called, together with the suites around it, is what identifies it — to a snapshot, to a stored counterexample, and to the Editor.
 ─────╯
 
-─── 14 errors
+─── 15 errors
 "
 `;
 

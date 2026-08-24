@@ -1,6 +1,6 @@
 import type { common } from "@essence-lang/interfaces"
 
-import { testIdentityKey } from "../enricher/tests"
+import { relativeIdentityKey, testIdentityKey } from "../enricher/tests"
 import {
 	bodyDefinitelyReturns,
 	conformanceParameterName,
@@ -1709,6 +1709,7 @@ function simplifyTestsNodes(
 						simplifyImplementationNode(binding),
 					),
 					name: interpolated ? simplifyExpression(node.name) : null,
+					benchmark: benchmarkKey(node),
 					body: node.body.map((child) =>
 						probeStatement(
 							simplifyImplementationNode(child),
@@ -1757,6 +1758,7 @@ function simplifyTestsNodes(
 				// manifest already, and emitting it a second time would be two
 				// spellings of one thing that could come to disagree.
 				name: interpolated ? simplifyExpression(node.name) : null,
+				benchmark: benchmarkKey(node),
 				// NOTE: A Constant a test WROTE is probed whether or not a `§?`
 				// asked for it. What a reader wants beside a test body is the
 				// value of every step of it, which is what an Editor draws from
@@ -1871,9 +1873,17 @@ function manifestEntry(
 		tags: node.tags,
 		focused: node.focused !== null,
 		skipped: node.skipped === null ? null : node.skipped.reason,
+		benchmark: node.form === "benchmark",
 		position: node.position,
 		keywordPosition: node.keywordPosition,
 	}
+}
+
+// NOTE: The key a benchmark's baseline is stored under, and null for a test —
+// which is what says, at every site that emits one, whether the runtime is
+// being asked to time the body or to judge it.
+function benchmarkKey(node: common.typed.TestNode): string | null {
+	return node.form === "benchmark" ? relativeIdentityKey(node.identity) : null
 }
 
 // NOTE: The `§?` value comments of this Module, applied to Statements that have

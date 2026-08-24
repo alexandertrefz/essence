@@ -1816,6 +1816,10 @@ const enrichTest = (
 		refuseBothTestForms(node)
 	}
 
+	if (node.form === "benchmark" && properties !== null) {
+		refuseGeneratedBenchmark(node)
+	}
+
 	let body = node.body.flatMap((child) =>
 		guarded(child.position, () => enrichNode(child, bodyScope)),
 	)
@@ -1830,6 +1834,10 @@ const enrichTest = (
 
 	return {
 		nodeType: "Test",
+		// NOTE: Carried rather than decided: what the Keyword said is what the
+		// runner is told, and everything between here and the run — the
+		// identity, the Modifiers, the rows — answers for one shape.
+		form: node.form,
 		identity: {
 			modulePath: context.modulePath,
 			suitePath: context.suitePath,
@@ -1911,6 +1919,41 @@ const refuseBothTestForms = (node: parser.TestNode): void => {
 			],
 			helps: [
 				"Keep one of them, or write two tests — one over the rows and one over the generated values.",
+			],
+		},
+	)
+}
+
+// NOTE: A benchmark is a MEASUREMENT, and a measurement is comparable only
+// where every run does the same work. A generated value is a different value
+// every case, so the body would be timed doing something else each time and the
+// baseline it is held to would be a number about nothing.
+//
+// NOTE: The properties are enriched all the same — the Error above has already
+// stopped anything from running, and error recovery keeps the tree whole so
+// that everything an Editor draws off it is still there.
+const refuseGeneratedBenchmark = (node: parser.TestNode): void => {
+	if (node.properties === null) {
+		return
+	}
+
+	reportError(
+		"A benchmark times written work, not generated values",
+		node.properties.keywordPosition,
+		{
+			code: "benchmark-for-any",
+			labels: [
+				primary(
+					node.properties.keywordPosition,
+					"this asks for a value the runner makes up",
+				),
+				secondary(node.keywordPosition, "and this asks for a timing"),
+			],
+			notes: [
+				"A measurement is comparable only where every run does the same work, and a generated value changes the work every case.",
+			],
+			helps: [
+				"Write the inputs: a constant above the benchmark, or the rows to measure — across [ … ].",
 			],
 		},
 	)

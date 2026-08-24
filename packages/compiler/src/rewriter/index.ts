@@ -7827,19 +7827,30 @@ function rewriteTestsNodes(
 				[
 					{
 						type: "ExpressionStatement",
-						expression: testingCall("entry", [
-							testContext(),
-							numberLiteral(node.index),
-							node.name === null
-								? { type: "Literal", value: null }
-								: rewriteExpression(node.name),
-							{
-								type: "ArrowFunctionExpression",
-								expression: false,
-								params: [],
-								body: rewriteBlockStatement(node.body),
-							},
-						]),
+						// NOTE: A benchmark is the same call with the stored key
+						// wedged in — one entry, one body, and a runtime that
+						// times the body rather than running it once. Which of
+						// the two is emitted is the whole of the difference: a
+						// benchmark is not a Node of its own anywhere behind
+						// this line either.
+						expression:
+							node.benchmark === null
+								? testingCall("entry", [
+										testContext(),
+										numberLiteral(node.index),
+										testName(node.name),
+										testBody(node.body),
+									])
+								: testingCall("benchmark", [
+										testContext(),
+										numberLiteral(node.index),
+										testName(node.name),
+										{
+											type: "Literal",
+											value: node.benchmark,
+										},
+										testBody(node.body),
+									]),
 					},
 				],
 				node.position,
@@ -7847,39 +7858,57 @@ function rewriteTestsNodes(
 		}
 
 		if (node.nodeType === "TestRows") {
+			let rowName: estree.Expression =
+				node.name === null
+					? { type: "Literal", value: null }
+					: rowClosure(node.binding, [
+							...node.bindings.flatMap((binding) =>
+								rewriteStatements(binding),
+							),
+							{
+								type: "ReturnStatement",
+								argument: rewriteExpression(node.name),
+							},
+						])
+			let rowBody = rowClosure(node.binding, [
+				...node.bindings.flatMap((binding) =>
+					rewriteStatements(binding),
+				),
+				...rewriteBlockStatement(node.body).body,
+			])
+			let rows: estree.Expression = {
+				type: "ArrayExpression",
+				elements: node.rows.map((row) => rewriteExpression(row)),
+			}
+
 			return withStatementLocation(
 				[
 					{
 						type: "ExpressionStatement",
-						expression: testingCall("rows", [
-							testContext(),
-							numberLiteral(node.first),
-							{
-								type: "ArrayExpression",
-								elements: node.rows.map((row) =>
-									rewriteExpression(row),
-								),
-							},
-							node.name === null
-								? { type: "Literal", value: null }
-								: rowClosure(node.binding, [
-										...node.bindings.flatMap((binding) =>
-											rewriteStatements(binding),
-										),
+						// NOTE: The rows of a benchmark share ONE stored key,
+						// the way they share the template it is spelled out of;
+						// the runtime numbers each row's own entry by the row
+						// that recorded it.
+						expression:
+							node.benchmark === null
+								? testingCall("rows", [
+										testContext(),
+										numberLiteral(node.first),
+										rows,
+										rowName,
+										rowBody,
+									])
+								: testingCall("benchmarkRows", [
+										testContext(),
+										numberLiteral(node.first),
+										rows,
+										rowName,
 										{
-											type: "ReturnStatement",
-											argument: rewriteExpression(
-												node.name,
-											),
+											type: "Literal",
+											value: node.benchmark,
 										},
+										rowBody,
 									]),
-							rowClosure(node.binding, [
-								...node.bindings.flatMap((binding) =>
-									rewriteStatements(binding),
-								),
-								...rewriteBlockStatement(node.body).body,
-							]),
-						]),
 					},
 				],
 				node.position,
@@ -8108,6 +8137,28 @@ function rowClosure(
 	}
 }
 
+// NOTE: The name an item is handed, and only where it INTERPOLATES — a plain
+// one is in the manifest already. Written once because the two calls a test may
+// be emitted as, and the two a benchmark may be, all take it in the same place.
+function testName(
+	name: common.typedSimple.ExpressionNode | null,
+): estree.Expression {
+	return name === null
+		? { type: "Literal", value: null }
+		: rewriteExpression(name)
+}
+
+function testBody(
+	body: Array<common.typedSimple.ImplementationNode>,
+): estree.Expression {
+	return {
+		type: "ArrowFunctionExpression",
+		expression: false,
+		params: [],
+		body: rewriteBlockStatement(body),
+	}
+}
+
 // NOTE: The span table, indexed by point id. Emitted whole rather than per
 // point so that a reader with an event in hand can resolve it without the
 // Compiler — see `TestsSectionNode.spans`.
@@ -8161,6 +8212,10 @@ function testManifest(
 				}),
 				property("focused", { type: "Literal", value: entry.focused }),
 				property("skipped", literalOrNull(entry.skipped)),
+				property("benchmark", {
+					type: "Literal",
+					value: entry.benchmark,
+				}),
 				property("position", rangeObject(entry.position)),
 				property("keywordPosition", rangeObject(entry.keywordPosition)),
 			],

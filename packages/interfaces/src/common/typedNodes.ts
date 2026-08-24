@@ -93,6 +93,12 @@ export type TestSkip = {
 // will run.
 export type TestNode = {
 	nodeType: "Test"
+	// NOTE: Which of the two sibling Keywords opened the item, carried through
+	// from the Parser. A `benchmark` is a test in every structural respect —
+	// this name, these Modifiers, this identity, this body — and what differs is
+	// what RUNNING it means: a test's body is judged, a benchmark's body is
+	// timed. One Node keeps every stage that walks tests answering once.
+	form: "test" | "benchmark"
 	identity: TestIdentity
 	// NOTE: The name as an Expression, because an interpolated one is worked
 	// out where the test runs. `identity.name` is what it was WRITTEN as.

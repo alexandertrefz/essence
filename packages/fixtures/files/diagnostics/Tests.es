@@ -116,6 +116,12 @@ tests {
 		expect n::toString() matches snapshot from "drawn"
 	}
 
+	§ benchmark-for-any — a measurement is comparable only where every run
+	§ does the same work, and a generated value changes the work every case.
+	benchmark "counting" for any (n: Integer) {
+		expect n::is(n)
+	}
+
 	suite "Standing" {
 		§ duplicate-test-name — what a test is called, together with the suites
 		§ around it, is what identifies it to a stored snapshot and to the
