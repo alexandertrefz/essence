@@ -11,23 +11,38 @@ import { createString } from "./String"
 import { type AnyType, typeKeySymbol } from "./type"
 
 // NOTE: A source of random values, and the one Essence value that CHANGES. Every
-// other value in this runtime is immutable; a source holds four 32 bit words
-// that every answer advances, so two reads of one source answer two different
-// values. That is what `Generatable::generate` needs — a body asking for a name
-// and then for a score must not be handed the same number twice — and it is why
-// `Randomness` is a bare tag rather than a Choice: a Case would carry a payload
-// a Program could read, and the state is the runner's business.
+// other value in this runtime is immutable; a source answers a different value
+// every time it is read. That is what `Generatable::generate` needs — a body
+// asking for a name and then for a score must not be handed the same number
+// twice — and it is why `Randomness` is a bare tag rather than a Choice: a Case
+// would carry a payload a Program could read, and the state is the runner's
+// business.
+//
+// NOTE: One tag, two kinds. A SEEDED source holds four 32 bit words that every
+// answer advances, so one seed answers one sequence — what `--seed` replays. An
+// ENTROPY source holds nothing and reads the machine instead; what cannot be
+// told apart cannot be replayed, so a property run draws from the first kind,
+// and the second is for what must NOT repeat, beginning with the run's own
+// made-up seed.
 //
 // NOTE: The mutation is invisible to everything that reasons about Essence
 // values. The Optimiser's purity table is an ALLOWLIST keyed by Namespace name
 // (`packages/compiler/src/optimiser/purity.ts`), and `Randomness` has no entry,
 // so no pass pools, hoists or drops a call on one.
-export type RandomnessType = {
+export type RandomnessType = SeededRandomnessType | EntropyRandomnessType
+
+type SeededRandomnessType = {
 	[typeKeySymbol]: "Randomness"
+	seeded: true
 	a: number
 	b: number
 	c: number
 	d: number
+}
+
+type EntropyRandomnessType = {
+	[typeKeySymbol]: "Randomness"
+	seeded: false
 }
 
 // NOTE: sfc32 — four words of state, one shift and three adds per answer. It is
@@ -35,8 +50,13 @@ export type RandomnessType = {
 // allocation, and a property run draws hundreds of thousands of times. It
 // passes PractRand at the sizes a test run reaches, which is the whole of what
 // is asked of it: nothing here is a source of secrets, and the Documentation
-// says so.
-function nextWord(source: RandomnessType): number {
+// says so. An entropy source has no words of its own and is handed the
+// machine's instead, so every draw below serves both kinds unchanged.
+export function nextWord(source: RandomnessType): number {
+	if (!source.seeded) {
+		return entropyWord()
+	}
+
 	let t = (source.a + source.b) | 0
 
 	source.a = source.b ^ (source.b >>> 9)
@@ -80,9 +100,9 @@ export function seedOf(text: string): number {
 	return hash >>> 0
 }
 
-// NOTE: THE door every source is built through. `createRandomness` is not a
-// native — nothing written in Essence builds a source — so this is reached from
-// the test runtime alone.
+// NOTE: The door every SEEDED source is built through. `createRandomness` is
+// not a native — nothing written in Essence builds a source — so this is
+// reached from the test runtime alone.
 export function createRandomness(seed: number): RandomnessType {
 	let state = seed | 0
 	let first = scramble(state)
@@ -92,6 +112,7 @@ export function createRandomness(seed: number): RandomnessType {
 
 	let source: RandomnessType = {
 		[typeKeySymbol]: "Randomness",
+		seeded: true,
 		a: first.word,
 		b: second.word,
 		c: third.word,
@@ -103,6 +124,42 @@ export function createRandomness(seed: number): RandomnessType {
 	}
 
 	return source
+}
+
+// NOTE: The machine's words, read through `globalThis.crypto` — the one door
+// every host a bundle runs on owns: Bun, Node, Deno and the browsers the client
+// package reaches, where importing `node:crypto` would sink the bundle. They
+// are read 256 at a time into one buffer, because what a `getRandomValues` call
+// costs is the crossing into the host rather than the bytes; the buffer stays
+// far under the 65536 byte ceiling the host puts on one call.
+const ENTROPY_WORDS = new Uint32Array(256)
+
+let entropyCursor = ENTROPY_WORDS.length
+
+function entropyWord(): number {
+	if (entropyCursor >= ENTROPY_WORDS.length) {
+		globalThis.crypto.getRandomValues(ENTROPY_WORDS)
+		entropyCursor = 0
+	}
+
+	let word = ENTROPY_WORDS[entropyCursor] ?? 0
+
+	entropyCursor += 1
+
+	return word
+}
+
+// NOTE: The door to the machine's own randomness. Every call answers THE one
+// value, because two entropy sources could not be told apart — the machine is
+// one, and the words above are drawn from it rather than held. It is a seeded
+// source that is worth building twice, since its state is its own.
+const ENTROPY: EntropyRandomnessType = {
+	[typeKeySymbol]: "Randomness",
+	seeded: false,
+}
+
+export function createEntropy(): RandomnessType {
+	return ENTROPY
 }
 
 // NOTE: A whole number in `[0, bound)`, taken from the low bits with the
