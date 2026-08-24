@@ -1759,6 +1759,17 @@ export type TestEvent =
 			points: Array<CoveredPoint>
 			choices: Array<CoverageChoice>
 	  }
+	// NOTE: That the events which follow were REPLAYED rather than run — one
+	// compiled entry whose answer a runner already held, under a name that can
+	// only mean the code, the stores and the filters this run has. It carries the
+	// entry it stands for and how many tests that entry planned, so a reader is
+	// told what was skipped and a summary can count it.
+	//
+	// NOTE: Written by the COMMAND LINE and never by the runtime. It lives in
+	// this union because this union IS the stream's schema, and a consumer that
+	// meets it has to read it the way it reads every other kind — which for this
+	// one, per the stream's own contract at the top of the union, is to ignore it.
+	| { schema: 1; kind: "results-cached"; entry: string; tests: number }
 	| {
 			schema: 1
 			kind: "run-end"

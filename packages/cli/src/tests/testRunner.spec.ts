@@ -1156,6 +1156,58 @@ describe("the test reporter", () => {
 		)
 	})
 
+	// NOTE: The kind the command line writes when it replays an entry it already
+	// held the answer for. It says nothing about any test — the events after it
+	// are that entry's own — so the fold counts it and changes nothing else.
+	it("counts a replayed entry without disturbing the tests it stands for", () => {
+		let plain = collectTestRun(events)
+		let replayed = collectTestRun([
+			events[0]!,
+			{
+				schema: 1,
+				kind: "results-cached",
+				entry: "/Season.tests.es",
+				tests: 2,
+			},
+			...events.slice(1),
+		])
+
+		expect(plain.cached).toBe(0)
+		expect(replayed.cached).toBe(1)
+		expect(replayed.counts).toEqual(plain.counts)
+		expect(replayed.tests.map((test) => test.id)).toEqual(
+			plain.tests.map((test) => test.id),
+		)
+	})
+
+	it("notes replayed entries as a share of the run's own", () => {
+		let run = { ...collectTestRun(events), cached: 2 }
+
+		expect(renderTestSummary(run, reportContext, 0, false, 0, 3)).toContain(
+			"2 of 3 entries cached",
+		)
+		// NOTE: Both notes at once is the ordinary second run of a project: it
+		// compiled nothing and it ran only what had moved.
+		expect(renderTestSummary(run, reportContext, 0, true, 0, 3)).toContain(
+			"compile cache warm",
+		)
+		// NOTE: A run that asked the cache nothing says nothing. `entries` is
+		// zero for a watching session, which never reads this store at all.
+		expect(
+			renderTestSummary(run, reportContext, 0, false, 0, 0),
+		).not.toContain("cached")
+		expect(
+			renderTestSummary(
+				collectTestRun(events),
+				reportContext,
+				0,
+				false,
+				0,
+				3,
+			),
+		).not.toContain("cached")
+	})
+
 	it("lists what was deselected only when asked", () => {
 		let verbose = renderTestTree(collectTestRun(events), {
 			...reportContext,

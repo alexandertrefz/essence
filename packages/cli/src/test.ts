@@ -535,6 +535,10 @@ export function printReport(
 	// is beside it: a measurement written for the first time is a pass that
 	// left something on disk, and a reader has to be told without going to look.
 	baselines: BenchmarkWrites = noBenchmarkWrites,
+	// NOTE: How many compiled entries the run held, which is what the count of
+	// replayed ones in the fold is a share of. Zero for a session that never asks
+	// the result cache — a watching one — which is what leaves the note off.
+	entries = 0,
 ): void {
 	let { failures, summary, tree } = renderTestReport(
 		run,
@@ -543,6 +547,7 @@ export function printReport(
 		snapshots.recorded,
 		cacheWarm,
 		baselines.recorded,
+		entries,
 	)
 
 	if (!context.options.quiet && tree !== "") {

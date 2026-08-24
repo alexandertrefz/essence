@@ -281,6 +281,11 @@ export function renderTestSummary(
 	// count beside it is: a measurement written for the first time is a pass
 	// that left something on disk.
 	baselines = 0,
+	// NOTE: How many compiled entries the run held, so that the replayed ones can
+	// be reported as a share of them rather than as a bare number a reader has
+	// nothing to compare against. Zero for a run that did not ask the result
+	// cache anything, which is what leaves the note off.
+	entries = 0,
 ): string {
 	let { palette, theme } = context
 	let { counts } = run
@@ -314,15 +319,32 @@ export function renderTestSummary(
 		parts.push(palette.muted(`${pluralise(baselines, "baseline")} written`))
 	}
 
+	let notes: Array<string> = []
+
+	if (cacheWarm) {
+		notes.push("compile cache warm")
+	}
+
+	// NOTE: Beside the warm-compile note and after it, because the two answer the
+	// same question in the order a reader asks it: this run did not compile the
+	// project, and it did not run all of it either.
+	if (run.cached > 0 && entries > 0) {
+		notes.push(
+			`${run.cached} of ${pluralise(entries, "entry", "entries")} cached`,
+		)
+	}
+
 	let tail = ` ${parts.join("  ")}  ${palette.faint(
 		theme.symbols.bullet,
 	)}  ${palette.number(formatDuration(run.duration))}`
 
-	return cacheWarm
-		? `${tail}  ${palette.faint(theme.symbols.bullet)}  ${palette.muted(
-				"compile cache warm",
-			)}`
-		: tail
+	return notes.reduce(
+		(line, note) =>
+			`${line}  ${palette.faint(theme.symbols.bullet)}  ${palette.muted(
+				note,
+			)}`,
+		tail,
+	)
 }
 
 // NOTE: The line a run with nothing to do ends on. It is not a failure — a
@@ -555,6 +577,7 @@ export function renderTestReport(
 	snapshots = 0,
 	cacheWarm = false,
 	baselines = 0,
+	entries = 0,
 ): { tree: string; failures: string; summary: string } {
 	return {
 		tree: renderTestTree(run, context).join("\n"),
@@ -565,6 +588,7 @@ export function renderTestReport(
 			snapshots,
 			cacheWarm,
 			baselines,
+			entries,
 		),
 	}
 }
