@@ -226,6 +226,7 @@ export type DiagnosticCode =
 	| "property-parameters"
 	| "ungeneratable-type"
 	| "ungeneratable-contract"
+	| "reserved-suite-name"
 	| "contradictory-test-forms"
 	| "benchmark-for-any"
 	| "snapshot-in-property"

@@ -6,6 +6,7 @@ import {
 	primary,
 	reportInformation,
 } from "../diagnostics/index"
+import { countOf } from "../helpers/index"
 import {
 	deriveGenerator,
 	enrichExpression,
@@ -40,9 +41,11 @@ import { childScope } from "./scope"
 // own Scope.
 const ANSWER = "$answer"
 
-// NOTE: The suite every goal is reported under. It collides with a suite an
-// author writes under the same name, exactly as `examples` does — a known and
-// shared hazard, kept rather than papered over with a name nobody would guess.
+// NOTE: The suite every goal is reported under. A written suite of the same
+// name is REFUSED where the synthesis happens — see `reservedSuiteName` in
+// tests.ts — because two suites sharing one identity share the corpus, the
+// seeds and the focus that identity anchors, and a collision the author can
+// not see is a collision nothing can diagnose.
 export const CONTRACT_SUITE = "contracts"
 
 // NOTE: One Namespace's goals, and what was skipped on the way. The skips are
@@ -51,7 +54,19 @@ export const CONTRACT_SUITE = "contracts"
 // report with one remark per Method.
 type Synthesis = {
 	goals: Array<common.typed.TestNode>
-	skipped: Array<{ name: string; reason: string }>
+	skipped: Array<{ name: string; reason: string; generation: boolean }>
+}
+
+// NOTE: Why one entry got no goal. `generic` is the deliberate rule the docs
+// state — one instantiation proves nothing about the rest — and is not worth a
+// remark, let alone the `Generatable` help that could never make it eligible.
+// The others are said out loud, each in its own words.
+type GoalSkip = {
+	skip: "generic" | "generation" | "call" | "conjunct"
+}
+
+function skipOf(answer: common.typed.TestNode | GoalSkip): GoalSkip | null {
+	return "skip" in answer ? answer : null
 }
 
 // NOTE: The `suite "contracts" { … }` a Module's own declarations promise, or
@@ -67,6 +82,13 @@ export function contractSuite(
 	modulePath: string | null,
 ): common.typed.SuiteNode | null {
 	let goals: Array<common.typed.TestNode> = []
+	// NOTE: One derivation per Type for the whole Module. A Namespace's entries
+	// share their parameter Types by identity — every non-static entry carries
+	// the same receiver Type object — and deriving a refined Type re-enriches a
+	// predicate call per conjunct, so without this a wide Namespace repeats the
+	// same speculative enrichment once per entry. Only what derived is kept:
+	// a failure is re-attempted so its report stays with the goal that asked.
+	let derived = new WeakMap<common.Type, common.typed.TestGenerator>()
 
 	for (let node of program.implementation.nodes) {
 		if (node.nodeType !== "NamespaceDefinitionStatement") {
@@ -85,7 +107,21 @@ export function contractSuite(
 			continue
 		}
 
-		let synthesis = namespaceGoals(namespace, scope, position, modulePath)
+		// NOTE: Only the members THIS statement wrote. The Scope answers with
+		// the MERGED Namespace — a second `namespace X for T`, in this file or
+		// in a Module that imports it, folds into one table — so goal-ing the
+		// table per statement would goal an inherited Method once per
+		// extension, under one spelled name, colliding in everything the
+		// identity anchors.
+		let declared = new Set(Object.keys(node.methods))
+		let synthesis = namespaceGoals(
+			namespace,
+			declared,
+			scope,
+			position,
+			modulePath,
+			derived,
+		)
 
 		goals.push(...synthesis.goals)
 		reportSkippedGoals(node, synthesis.skipped)
@@ -115,13 +151,19 @@ export function contractSuite(
 
 function namespaceGoals(
 	namespace: common.NamespaceType,
+	declared: Set<string>,
 	scope: enricher.Scope,
 	position: common.Position,
 	modulePath: string | null,
+	derived: WeakMap<common.Type, common.typed.TestGenerator>,
 ): Synthesis {
 	let synthesis: Synthesis = { goals: [], skipped: [] }
 
 	for (let [methodName, method] of Object.entries(namespace.methods)) {
+		if (!declared.has(methodName)) {
+			continue
+		}
+
 		let isStatic =
 			method.type === "StaticMethod" ||
 			method.type === "OverloadedStaticMethod"
@@ -145,34 +187,73 @@ function namespaceGoals(
 			// answered once, about the Namespace, by whoever asked. So the
 			// collection is opened here and the Diagnostics inside it are read
 			// for their first message and then dropped.
-			let attempt = collectDiagnostics(() =>
-				goalOf(
-					namespace,
-					methodName,
-					entry,
-					isStatic,
-					name,
-					scope,
-					position,
-					modulePath,
-				),
-			)
-
-			if (
-				attempt.result === null ||
-				containsErrors(attempt.diagnostics)
-			) {
+			//
+			// NOTE: And it is GUARDED — `collectDiagnostics` restores the
+			// ambient collection and rethrows, so an enricher invariant
+			// tripping over the call nobody wrote would otherwise take the
+			// whole compile down for a file that compiles fine without the
+			// flag. A throw is a skipped goal that says so.
+			let attempt
+			try {
+				attempt = collectDiagnostics(() =>
+					goalOf(
+						namespace,
+						methodName,
+						entry,
+						isStatic,
+						name,
+						scope,
+						position,
+						modulePath,
+						derived,
+					),
+				)
+			} catch (error) {
 				synthesis.skipped.push({
 					name,
-					reason:
-						attempt.diagnostics[0]?.message ??
-						"its Parameters can not be generated",
+					reason: `an internal Compiler error stopped it: ${
+						error instanceof Error ? error.message : String(error)
+					}`,
+					generation: false,
 				})
 
 				continue
 			}
 
-			synthesis.goals.push(attempt.result)
+			let skip = skipOf(attempt.result)
+
+			if (skip !== null || containsErrors(attempt.diagnostics)) {
+				// NOTE: A generic entry is the one skip not worth a word — the
+				// docs state the rule, and no conformance an author could
+				// declare would ever make it eligible.
+				if (skip?.skip === "generic") {
+					continue
+				}
+
+				let generation =
+					skip === null ||
+					skip.skip === "generation" ||
+					attempt.diagnostics.some(
+						(diagnostic) =>
+							diagnostic.code === "ungeneratable-type",
+					)
+
+				synthesis.skipped.push({
+					name,
+					reason:
+						attempt.diagnostics[0]?.message ??
+						(skip?.skip === "call"
+							? "the call it would make does not typecheck"
+							: skip?.skip === "conjunct"
+								? "its return Type's refinement holds a predicate nothing can rebuild as a check"
+								: "its Parameters can not be generated"),
+					generation,
+				})
+
+				continue
+			}
+
+			synthesis.goals.push(attempt.result as common.typed.TestNode)
 		}
 	}
 
@@ -192,14 +273,15 @@ function goalOf(
 	scope: enricher.Scope,
 	position: common.Position,
 	modulePath: string | null,
-): common.typed.TestNode | null {
+	derived: WeakMap<common.Type, common.typed.TestGenerator>,
+): common.typed.TestNode | GoalSkip {
 	// NOTE: A Method whose signature still mentions a Type Parameter is left
 	// alone. What a generic Method's contract says is a claim about every
 	// instantiation of it, and the values this generates are drawn from ONE —
 	// so a goal over it would either not typecheck or quietly prove the
 	// contract for an Integer and report it as proven for all of them.
 	if (entry.generics.length > 0) {
-		return null
+		return { skip: "generic" }
 	}
 
 	let members: Record<string, common.Type> = {}
@@ -207,11 +289,15 @@ function goalOf(
 	let values: Array<parser.ExpressionNode> = []
 
 	for (let [index, parameter] of entry.parameterTypes.entries()) {
-		let generator = deriveGenerator(parameter.type, scope, position, [])
+		let generator =
+			derived.get(parameter.type) ??
+			deriveGenerator(parameter.type, scope, position, [])
 
 		if (generator === null) {
-			return null
+			return { skip: "generation" }
 		}
+
+		derived.set(parameter.type, generator)
 
 		let binding = bindingName(parameter, index, isStatic, members)
 
@@ -246,13 +332,13 @@ function goalOf(
 	let answer = enrichExpression(call, bodyScope)
 
 	if (answer.type.type === "Error") {
-		return null
+		return { skip: "call" }
 	}
 
 	let body = bodyOf(answer, bodyScope, position)
 
 	if (body === null) {
-		return null
+		return { skip: "conjunct" }
 	}
 
 	return {
@@ -474,16 +560,20 @@ function goalName(
 // leave a reader believing their whole Namespace was under contract.
 function reportSkippedGoals(
 	node: parser.NamespaceDefinitionStatementNode,
-	skipped: Array<{ name: string; reason: string }>,
+	skipped: Synthesis["skipped"],
 ): void {
 	if (skipped.length === 0) {
 		return
 	}
 
 	let first = skipped[0]!
+	// NOTE: The `Generatable` help is real advice only where a generation
+	// refused — offered for a call that does not typecheck it would send the
+	// author declaring a conformance that changes nothing.
+	let generation = skipped.some((entry) => entry.generation)
 
 	reportInformation(
-		`${countOf(skipped.length)} of '${node.name.content}' got no contract test`,
+		`${countOf(skipped.length, "Method")} of '${node.name.content}' got no contract test`,
 		node.name.position,
 		{
 			code: "ungeneratable-contract",
@@ -498,12 +588,10 @@ function reportSkippedGoals(
 				`'${first.name}' was left out because ${first.reason}.`,
 			],
 			helps: [
-				"Write the property as a test of its own, or declare a 'Generatable' conformance for the Type its Parameters could not be drawn from.",
+				generation
+					? "Write the property as a test of its own, or declare a 'Generatable' conformance for the Type its Parameters could not be drawn from."
+					: "Write the property as a test of its own.",
 			],
 		},
 	)
-}
-
-function countOf(count: number): string {
-	return count === 1 ? "One Method" : `${count} Methods`
 }

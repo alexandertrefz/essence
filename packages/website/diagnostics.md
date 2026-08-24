@@ -728,15 +728,39 @@ implementation {
 }
 ```
 
-The usual reasons are a Parameter of a Type nothing can generate — see
-`ungeneratable-type` — and a Method whose signature still mentions a Type
-Parameter, which is left alone because a value drawn for one instantiation
-proves nothing about the rest.
+The usual reason is a Parameter of a Type nothing can generate — see
+`ungeneratable-type`. A Method whose signature still mentions a Type Parameter
+is left alone without a remark: that is the rule rather than a gap, because a
+value drawn for one instantiation proves nothing about the rest, and no
+conformance an author could declare would change it.
 
 Write the property as a test of its own, or declare a `Generatable` conformance
 for the Type its Parameters could not be drawn from. Nothing is wrong with a
 Namespace that reports this: it says which of its promises a run is keeping and
 which it is not.
+
+### `reserved-suite-name`
+
+A written `suite` uses a name the Enricher fills itself — `examples`, where the
+file holds `@example` blocks, or `contracts`, where the run synthesizes goals
+from the file's declarations:
+
+```essence
+implementation {}
+
+tests {
+	suite "contracts" {
+		test "totality" {
+			expect true
+		}
+	}
+}
+```
+
+Two suites of one name share one identity, and with it everything durable that
+identity anchors — stored counterexamples, seeds, and the Editor's focus — so a
+collision with a suite no source holds is refused where the synthesis happens.
+Call the written suite something else.
 
 ### `contradictory-test-forms`
 
