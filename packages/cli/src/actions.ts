@@ -1,3 +1,5 @@
+import { type CompileMode, modeOf } from "@essence-lang/compiler/compileMode"
+
 import { UsageError } from "./args"
 import type { CommandSpec } from "./commands"
 import {
@@ -46,19 +48,16 @@ async function compileAll(
 	context: CLIContext,
 	command: CommandSpec,
 	files: Array<string>,
-	options: {
+	options: CompileMode & {
 		emit: boolean
 		cacheOutput?: boolean
 		sourcemapMode?: "linked" | "inline"
-		tests?: boolean
-		contracts?: boolean
 	},
 ): Promise<CompilationResult> {
 	let plan = await planCompilation(context, command, files, {
+		...modeOf(options),
 		emit: options.emit,
 		cacheOutput: options.cacheOutput,
-		tests: options.tests,
-		contracts: options.contracts,
 	})
 
 	try {

@@ -3,6 +3,7 @@ import * as path from "node:path"
 import type { common } from "@essence-lang/interfaces"
 
 import type { ModuleSources } from "../bundler/index"
+import { type CompileMode, modeKey, modeOf } from "../compileMode"
 import { containsErrors } from "../diagnostics/index"
 import { loadModuleGraph, type ModuleGraph } from "../modules/graph"
 import { diskModuleHost, type ModuleHost } from "../modules/host"
@@ -85,23 +86,14 @@ export { toolchainKey } from "./hash"
 // and rendering one is a choice this seam has no business making. A throw that
 // escapes is a Compiler bug and stays a throw.
 
-export type EmbedOptions = {
+// NOTE: The compile MODE is one of these — see `CompileMode`. It changes the
+// emitted bytes out of sources that are byte for byte the same, so it joins
+// `bundleHash` rather than being trusted to the caller.
+export type EmbedOptions = CompileMode & {
 	// NOTE: Where the sources are read from. The default reads disk; a host
 	// holding unsaved text answers out of memory, exactly as the Language
 	// Server does.
 	host?: ModuleHost
-	// NOTE: Whether this compile asked for the `tests { … }` blocks. Off is
-	// what a build and a run mean, and the section is then left unenriched and
-	// unemitted, so a test costs a shipped Program nothing. On is what
-	// `essence test` and the Language Server's test session mean — and it
-	// changes the emitted bytes, so it joins `bundleHash` rather than being
-	// trusted to the caller.
-	tests?: boolean
-	// NOTE: And whether it asked for the goals a Module's own Namespace
-	// declarations promise — see `enrich`'s own `contracts`. It changes the
-	// emitted bytes exactly as `tests` does, so it joins `bundleHash` beside
-	// it, and it means nothing without `tests`.
-	contracts?: boolean
 	optimisation?: OptimiserOptions
 	transformSources?: (sources: ModuleSources) => ModuleSources
 	// NOTE: What the HOST puts into the bundle beyond the sources, named. A
@@ -222,10 +214,7 @@ export function linkToMemory(
 		return parsed
 	}
 
-	let linked = linkModuleGraph(front.graph, {
-		tests: options.tests,
-		contracts: options.contracts,
-	})
+	let linked = linkModuleGraph(front.graph, modeOf(options))
 
 	return answer(
 		linked.modules.get(front.entry)?.surface ?? emptySurface(),
@@ -373,10 +362,7 @@ function validateGraph(
 		return { stopped: parsed }
 	}
 
-	let linked = linkModuleGraph(front.graph, {
-		tests: options.tests,
-		contracts: options.contracts,
-	})
+	let linked = linkModuleGraph(front.graph, modeOf(options))
 	let modules = [...linked.modules.values()]
 	let surface = linked.modules.get(front.entry)?.surface ?? emptySurface()
 	// NOTE: Copied rather than pointed at, because validation appends to these
@@ -473,21 +459,14 @@ function readSources(entryPath: string, options: EmbedOptions): ReadSources {
 			// spelled before there was a target to name still names the same
 			// bytes, and a host's Modules can never be served out of a cache
 			// under a bundle's name.
-			// NOTE: And the compile MODE, for the same reason: a test compile
-			// emits the `tests` blocks and a build does not, off the very same
-			// sources — so the two must never be served to each other out of a
-			// cache. It contributes nothing where it is off, which is what
-			// keeps every hash spelled before there were tests naming the same
-			// bytes.
+			// NOTE: And the compile MODE, for the same reason and through the
+			// one Function that spells it — `modeKey`, which `esc`'s own key
+			// reads too, so a facet can not join the mode without joining both
+			// names at once. See `CompileMode`.
 			emitterKey: [
 				options.emitterKey ?? "",
 				emitTargetKey(options.emit ?? BUNDLE_TARGET),
-				options.tests === true ? "tests" : "",
-				// NOTE: And the goals, which are more emitted tests over the
-				// same sources again. Nothing where they were not asked for, so
-				// every hash spelled before there were contracts to ask for
-				// still names the same bytes.
-				options.contracts === true ? "contracts" : "",
+				modeKey(options),
 			]
 				.filter((part) => part !== "")
 				.join("|"),

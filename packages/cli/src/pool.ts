@@ -1,6 +1,10 @@
 import { availableParallelism } from "node:os"
 import { Worker } from "node:worker_threads"
 
+import {
+	type CompileMode,
+	completeMode,
+} from "@essence-lang/compiler/compileMode"
 import { placelessDiagnostic } from "@essence-lang/compiler/diagnostics"
 
 import {
@@ -66,13 +70,10 @@ export type CompileDispatcher = {
 	// what a Module compiles as, and a graph is shared: the dispatcher has to
 	// know the whole invocation to load each file once, and the whole
 	// invocation is only known here.
-	// NOTE: `tests` and `contracts` are the compile MODE of the whole run — see
-	// `createCompileSession`. They travel with the entries rather than with each
-	// request because they are what the Session is opened in.
-	begin: (
-		inputFileNames: Array<string>,
-		options?: { tests?: boolean; contracts?: boolean },
-	) => void
+	// NOTE: The MODE is the whole run's — see `createCompileSession`. It travels
+	// with the entries rather than with each request because it is what the
+	// Session is opened in.
+	begin: (inputFileNames: Array<string>, mode?: CompileMode) => void
 	compile: (
 		request: CompileRequest,
 		onStage?: (stage: StageName) => void,
@@ -135,8 +136,8 @@ export function createInlineDispatcher(): CompileDispatcher {
 	let session: CompileSession = createCompileSession([])
 
 	return {
-		begin: (inputFileNames, options) => {
-			session = createCompileSession(inputFileNames, options)
+		begin: (inputFileNames, mode) => {
+			session = createCompileSession(inputFileNames, mode)
 		},
 		compile: (request, onStage) => compileFile(request, onStage, session),
 		dispose: async () => {},
@@ -254,18 +255,16 @@ export function createWorkerPool(size: number): CompileDispatcher {
 	// the first job that lands on it is what spawns its worker, and that is
 	// after `begin` has been and gone. An ordinary run boots every one of its
 	// workers that way, so this is the copy nearly all of them are opened from.
-	let tests = false
-	let contracts = false
+	let mode = completeMode()
 
 	// NOTE: The one place a worker is told what run it is in, for both moments
 	// it can be told: `begin` reaches the slots that are already up, `spawn`
-	// reaches the ones that boot afterwards. `WorkerRequest` asks for the mode
-	// rather than allowing it, so a second caller can not leave it out.
+	// reaches the ones that boot afterwards. `WorkerRequest` asks for every
+	// facet rather than allowing it, so a second caller can not leave one out.
 	let beginMessage = (slot: Slot): WorkerRequest => ({
 		type: "begin",
 		entries: slot.entries,
-		tests,
-		contracts,
+		...mode,
 	})
 
 	let spawn = (slot: Slot): Worker => {
@@ -383,13 +382,12 @@ export function createWorkerPool(size: number): CompileDispatcher {
 	}
 
 	return {
-		begin: (inputFileNames, options) => {
+		begin: (inputFileNames, begun) => {
 			let groups = groupEntries(inputFileNames)
 
 			active = Math.max(1, Math.min(size, groups.length))
 			assignment = assignSlots(slots, active, groups)
-			tests = options?.tests === true
-			contracts = options?.contracts === true
+			mode = completeMode(begun)
 
 			// NOTE: A worker that already ran carries the Session of the
 			// previous run — a watch rebuild is a new run over new files, and

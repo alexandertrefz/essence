@@ -2,6 +2,7 @@ import * as path from "node:path"
 
 import type { common, enricher, parser } from "@essence-lang/interfaces"
 
+import { type CompileMode, modeOf } from "../compileMode"
 import {
 	collectDiagnostics,
 	primary,
@@ -518,7 +519,9 @@ function reportMissingExport(
 	)
 }
 
-export type LinkOptions = {
+// NOTE: One graph is linked in ONE mode — see `CompileMode` — so every Module
+// of it enriches the section and synthesizes the goals the run asked for.
+export type LinkOptions = CompileMode & {
 	// NOTE: The canonical path of the one Module whose written annotations
 	// are wanted alongside its typed Program — the Hover seam.
 	annotationsFor?: string
@@ -531,14 +534,6 @@ export type LinkOptions = {
 	// IS the builtins, and asking for them while loading them is unbounded
 	// recursion, since the cache is only filled once the load returns.
 	scopeFor?: (module: Module) => enricher.Scope
-	// NOTE: Whether this compile ASKED for the tests — see `enrich`. `essence
-	// test` and the Editor's test session set it; a build and a run leave every
-	// `tests { … }` block in the graph parsed and unenriched.
-	tests?: boolean
-	// NOTE: And whether it asked for the contract goals as well — see `enrich`.
-	// One graph is linked in one mode, so every Module of it synthesizes the
-	// goals its own declarations promise.
-	contracts?: boolean
 }
 
 export function linkModuleGraph(
@@ -792,11 +787,10 @@ function linkGroup(
 			source: state.module.sourceText,
 		})),
 		{
+			...modeOf(options),
 			seedRound,
 			annotationsFor:
 				annotationsIndex === -1 ? undefined : annotationsIndex,
-			tests: options.tests,
-			contracts: options.contracts,
 		},
 	)
 

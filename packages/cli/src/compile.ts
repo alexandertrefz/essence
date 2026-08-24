@@ -1,3 +1,4 @@
+import { type CompileMode, modeOf } from "@essence-lang/compiler/compileMode"
 import { displayPath } from "@essence-lang/compiler/diagnostics/render"
 
 import { optimiserOptionsFor } from "./args"
@@ -31,17 +32,13 @@ import { Progress, type Task } from "./spinner"
 // the work itself — resolving inputs, choosing how to run, driving the
 // progress display, printing Diagnostics and the report — happens once here.
 
-export type CompilationPlan = {
+// NOTE: The compile MODE is PLANNED rather than passed per file, because it
+// decides how the whole run is compiled — the Session every entry is linked
+// through opens in it. See `CompileMode`.
+export type CompilationPlan = CompileMode & {
 	inputFileNames: Array<string>
 	outputs: Map<string, string> | null
 	dispatcher: CompileDispatcher
-	// NOTE: Whether this run asked for the tests. It is planned rather than
-	// passed per file because it decides how the whole run is compiled — the
-	// Session every entry is linked through opens in this mode.
-	tests?: boolean
-	// NOTE: And whether it asked for the contract goals as well, which is the
-	// same kind of fact about the same Session — see `createCompileSession`.
-	contracts?: boolean
 }
 
 export type CompilationResult = {
@@ -54,11 +51,9 @@ export async function planCompilation(
 	context: CLIContext,
 	command: CommandSpec,
 	patterns: Array<string>,
-	options: {
+	options: CompileMode & {
 		emit: boolean
 		cacheOutput?: boolean
-		tests?: boolean
-		contracts?: boolean
 	},
 ): Promise<CompilationPlan> {
 	let inputFileNames = await resolveInputFiles(
@@ -91,13 +86,12 @@ export async function planCompilation(
 		context.options.jobs ?? defaultWorkerCount(inputFileNames.length)
 
 	return {
+		...modeOf(options),
 		inputFileNames,
 		outputs,
 		dispatcher: useWorkers
 			? createWorkerPool(workerCount)
 			: createInlineDispatcher(),
-		tests: options.tests,
-		contracts: options.contracts,
 	}
 }
 
@@ -117,10 +111,7 @@ export async function runCompilation(
 	// NOTE: The whole run's entries first, and only then the requests. A Module
 	// is compiled as a graph, and the graphs of a batch overlap: which files are
 	// going to be asked for decides how many times each of them is read.
-	plan.dispatcher.begin(plan.inputFileNames, {
-		tests: plan.tests,
-		contracts: plan.contracts,
-	})
+	plan.dispatcher.begin(plan.inputFileNames, plan)
 
 	let tasks = plan.inputFileNames.map<Task>((fileName) => ({
 		id: fileName,
@@ -141,6 +132,7 @@ export async function runCompilation(
 		plan.inputFileNames.map(async (inputFileName) => {
 			let outcome = await plan.dispatcher.compile(
 				{
+					...modeOf(plan),
 					inputFileName,
 					outputFileName: plan.outputs?.get(inputFileName) ?? null,
 					cacheOutput: options?.cacheOutput,
@@ -149,8 +141,6 @@ export async function runCompilation(
 					sourcemapMode: options?.sourcemapMode,
 					optimisation: optimiserOptionsFor(context.options),
 					embed: context.options.embed,
-					tests: plan.tests,
-					contracts: plan.contracts,
 				},
 				(stage) => {
 					progress.update(inputFileName, {

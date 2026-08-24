@@ -2,6 +2,7 @@ import * as path from "node:path"
 import { gzipSync } from "node:zlib"
 
 import type { BundleOutput } from "@essence-lang/compiler/bundler"
+import { type CompileMode, modeOf } from "@essence-lang/compiler/compileMode"
 import {
 	containsErrors,
 	placelessDiagnostic,
@@ -74,7 +75,13 @@ export type StageTiming = {
 	duration: number
 }
 
-export type CompileRequest = {
+// NOTE: A request carries the compile MODE — see `CompileMode`. It changes what
+// is enriched out of the very same sources, so it joins `bundleKey`: a build's
+// bundle and a test's are two different files over one graph, and the cache must
+// never hand one for the other. The SESSION is what actually carries the mode
+// into the Enricher, because linking is where it is read, so a request that sets
+// it must be compiled through a Session that was opened with it.
+export type CompileRequest = CompileMode & {
 	inputFileName: string
 	// NOTE: Where the bundle is written, or null for a compile that emits
 	// nothing at all — which is what `check` is. `esc run` without `--out` names
@@ -109,19 +116,6 @@ export type CompileRequest = {
 	// is written beside it. It changes the bytes as well, so it joins the key
 	// too.
 	embed?: boolean
-	// NOTE: Whether this compile ASKED for the tests — `essence test` does, and
-	// nothing else. It changes what is enriched out of the very same sources,
-	// so it joins the key as well: a build's bundle and a test's are two
-	// different files over one graph, and the cache must never hand one for the
-	// other. The Session is what actually carries the mode into the Enricher,
-	// because linking is where it is read, so a request that sets this must be
-	// compiled through a Session that was opened with it.
-	tests?: boolean
-	// NOTE: And whether it asked for the goals a Module's own Namespace
-	// declarations promise. Everything `tests` says applies word for word: it
-	// changes what is enriched out of the very same sources, so it joins the
-	// key, and the Session is what carries it into the Enricher.
-	contracts?: boolean
 }
 
 // NOTE: One file of the compiled graph, with the text its Diagnostics are
@@ -517,8 +511,7 @@ async function enrichDeclarations(
 
 	let enriched = await timeline.run("enrich", () =>
 		enrichDocument(parsed.program, request.inputFileName, {
-			tests: request.tests,
-			contracts: request.contracts,
+			...modeOf(request),
 			source: read.sourceText,
 		}),
 	)
@@ -535,10 +528,10 @@ async function enrichDeclarations(
 export async function compileFile(
 	request: CompileRequest,
 	report?: ProgressReporter,
-	session: CompileSession = createCompileSession([request.inputFileName], {
-		tests: request.tests,
-		contracts: request.contracts,
-	}),
+	session: CompileSession = createCompileSession(
+		[request.inputFileName],
+		request,
+	),
 ): Promise<CompileOutcome> {
 	let started = performance.now()
 	let timeline = new Timeline(report)
