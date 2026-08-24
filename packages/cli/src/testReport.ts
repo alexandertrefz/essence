@@ -452,7 +452,10 @@ export function renderTestFailures(
 			)
 		}
 
-		if (test.error !== null) {
+		// NOTE: A regression's `error` is the stream's copy of the sentence the
+		// block above already wrote — repeating it here would report one failure
+		// twice.
+		if (test.error !== null && test.benchmark?.status !== "regressed") {
 			lines.push(
 				`${INDENT}${palette.error(theme.symbols.fail)} ${palette.error(
 					[...test.suitePath, test.name].join(" › "),
