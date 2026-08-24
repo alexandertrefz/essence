@@ -442,6 +442,19 @@ export type TestContext = {
 	// what a baseline is stored under, and it arrives through the manifest so
 	// that the escaping exists in exactly one place.
 	key: string
+	// NOTE: Whether a benchmark of this run MEASURES. A coverage run does not:
+	// its bundle counts every branch it takes, which makes the body slower by
+	// an amount only the instrumentation knows — a number measured there is
+	// about the counters, and a baseline recorded off it would fail the first
+	// uninstrumented run. The body still runs once, so its lines are covered.
+	measure: boolean
+	// NOTE: Whether the recording primitives write anything down. The
+	// measurement batches turn this off: a batch of sixty-five thousand runs
+	// would otherwise record sixty-five thousand expectations, and the clock
+	// would be timing the runner's own bookkeeping alongside the body. What a
+	// `require` DOES — end the run where it failed — is not recording, and
+	// never turns off.
+	recording: boolean
 	// NOTE: What a property test draws with, and how many cases it runs. The
 	// seed is the RUN's, printed on a failure and read back by `--seed`; `word`
 	// is that seed folded together with the test's own id, so replaying one
@@ -541,6 +554,7 @@ export function createContext(
 		updating?: boolean
 		row?: number | null
 		key?: string
+		measure?: boolean
 		property?: PropertySettings
 		clock?: () => number
 	} = {},
@@ -557,6 +571,8 @@ export function createContext(
 		updating: options.updating ?? false,
 		row: options.row ?? null,
 		key: options.key ?? "",
+		measure: options.measure ?? true,
+		recording: true,
 		property: options.property ?? {
 			seed: "",
 			word: 0,
@@ -1025,6 +1041,11 @@ const BENCHMARK_BATCH_MILLISECONDS = 5
 // enough to want more than this is measured well enough already, and one that
 // is not is a body a reader would rather see the answer for than wait out.
 const BENCHMARK_MAX_ITERATIONS = 65536
+// NOTE: The batch times behind the sample tiers — see the note where the tier
+// is chosen. Two hundred milliseconds is a body no batching helped; a second
+// is a body whose one run is the measurement.
+const BENCHMARK_STEADY_BATCH_MILLISECONDS = 200
+const BENCHMARK_SLOW_BATCH_MILLISECONDS = 1000
 // NOTE: The band a measurement is allowed to move in before it is news. A
 // quarter slower is a regression a reader has to look at; a fifth faster is an
 // improvement worth recording. Everything between the two is the machine.
@@ -1032,6 +1053,16 @@ const REGRESSION_RATIO = 1.25
 const IMPROVEMENT_RATIO = 0.8
 
 function runBenchmark(context: TestContext, run: () => void): void {
+	// NOTE: A run that is not measuring — a coverage run — takes the body the
+	// way it takes a test's: once, unguarded, nothing recorded about time.
+	// Measuring an instrumented body would time the counters, and a baseline
+	// recorded off one would fail the first uninstrumented run.
+	if (!context.measure) {
+		run()
+
+		return
+	}
+
 	let mark = markOf(context)
 
 	// NOTE: A body that does not hold is REPORTED and never timed. Timing
@@ -1047,19 +1078,42 @@ function runBenchmark(context: TestContext, run: () => void): void {
 	}
 
 	let iterations = 1
-
-	while (
-		timeBatch(context, mark, run, iterations) <
-			BENCHMARK_BATCH_MILLISECONDS &&
-		iterations < BENCHMARK_MAX_ITERATIONS
-	) {
-		iterations *= 2
-	}
-
+	let elapsed: number
 	let perRun: Array<number> = []
+	let samples: number
 
-	for (let sample = 0; sample < BENCHMARK_SAMPLES; sample++) {
-		perRun.push(timeBatch(context, mark, run, iterations) / iterations)
+	// NOTE: Nothing is recorded while the clock runs — see
+	// `TestContext.recording`. The flag comes back on whatever the body does,
+	// because the run below it is the one the report is built from.
+	context.recording = false
+
+	try {
+		elapsed = timeBatch(context, mark, run, iterations)
+
+		while (
+			elapsed < BENCHMARK_BATCH_MILLISECONDS &&
+			iterations < BENCHMARK_MAX_ITERATIONS
+		) {
+			iterations *= 2
+			elapsed = timeBatch(context, mark, run, iterations)
+		}
+
+		// NOTE: Fewer samples the slower the body. Seven batches of a body that
+		// takes seconds is a minute a reader did not ask to wait — and the
+		// editor's run-by-id door has a session deadline behind it — while a
+		// slow body's batches barely jitter: one long run IS its own average.
+		samples =
+			elapsed >= BENCHMARK_SLOW_BATCH_MILLISECONDS
+				? 1
+				: elapsed >= BENCHMARK_STEADY_BATCH_MILLISECONDS
+					? 3
+					: BENCHMARK_SAMPLES
+
+		for (let sample = 0; sample < samples; sample++) {
+			perRun.push(timeBatch(context, mark, run, iterations) / iterations)
+		}
+	} finally {
+		context.recording = true
 	}
 
 	// NOTE: At least one nanosecond. A body the clock can not tell from nothing
@@ -1093,7 +1147,7 @@ function runBenchmark(context: TestContext, run: () => void): void {
 		key: storedKey,
 		nanoseconds,
 		iterations,
-		samples: BENCHMARK_SAMPLES,
+		samples,
 		baseline,
 		ratio,
 		status,
@@ -1144,7 +1198,9 @@ export function trace<Value extends AnyType>(
 	point: number,
 	value: Value,
 ): Value {
-	context.traces.push({ point, value })
+	if (context.recording) {
+		context.traces.push({ point, value })
+	}
 
 	return value
 }
@@ -1159,7 +1215,9 @@ export function probe<Value extends AnyType>(
 	point: number,
 	value: Value,
 ): Value {
-	context.probes.push({ point, value })
+	if (context.recording) {
+		context.probes.push({ point, value })
+	}
 
 	return value
 }
@@ -1233,14 +1291,16 @@ export function snapshotted(
 					? "written"
 					: "mismatched"
 
-	context.snapshots.push({
-		point,
-		slot: snapshot.slot,
-		name,
-		status,
-		text: actual,
-		recorded: expected,
-	})
+	if (context.recording) {
+		context.snapshots.push({
+			point,
+			slot: snapshot.slot,
+			name,
+			status,
+			text: actual,
+			recorded: expected,
+		})
+	}
 
 	record(context, form, point, status !== "mismatched", null, {
 		name,
@@ -1273,6 +1333,10 @@ function record(
 	comparison: Comparison | null,
 	snapshot: SnapshotComparison | null = null,
 ): void {
+	if (!context.recording) {
+		return
+	}
+
 	let traces = context.traces
 
 	context.traces = []
@@ -2111,6 +2175,9 @@ function runOne(
 		updating: options.update ?? false,
 		row: entry.row,
 		key: entry.key,
+		// NOTE: A coverage run counts, and a counted body must not be timed —
+		// see `TestContext.measure`.
+		measure: options.coverage !== true,
 		property: {
 			seed,
 			// NOTE: The run's seed folded together with the test's own id. Two
@@ -2141,7 +2208,11 @@ function runOne(
 
 	try {
 		withOutputSink(
-			(text, stream) => context.output.push({ stream, text }),
+			(text, stream) => {
+				if (context.recording) {
+					context.output.push({ stream, text })
+				}
+			},
 			() => test.module.run(context),
 		)
 	} catch (thrown) {
@@ -2302,6 +2373,22 @@ function runOne(
 		})
 
 		return
+	}
+
+	// NOTE: A regression failed no assertion and threw nothing, so without
+	// this the failure event would carry an empty `failures` and a null
+	// `error` — and a consumer of the stream, which the contract tells to
+	// ignore the `benchmark` kind it may not know, would see a failure with no
+	// stated reason. The sentence is rendered here for the same reason every
+	// failure is: so a JSON consumer and a terminal reporter are shown the
+	// same thing. The terminal writes its own richer block off the `benchmark`
+	// event and skips this one.
+	if (regressed && error === null && context.benchmarkResult !== null) {
+		let measured = context.benchmarkResult
+
+		error = `${(measured.ratio ?? 0).toFixed(1)}× slower than its baseline (${
+			measured.nanoseconds
+		} ns, was ${measured.baseline} ns) — if the new time is right, record it: essence test --bench --update`
 	}
 
 	summary.failed += 1

@@ -442,6 +442,41 @@ export function reportUnmatchedFilter(
 	)
 }
 
+// NOTE: The one way a filter can match something and still run nothing: it
+// named benchmarks, and the run is not measuring. `matched` deliberately
+// counts what the FILTER matched — see `selectTests` — so the warning above
+// stays quiet, and the plain tree does not list a deselection; without this
+// sentence the run ends green with the reader's target never run.
+export function reportBenchOnlyFilter(
+	context: CLIContext,
+	run: TestRun,
+	filter: string | null,
+	bench: boolean,
+): void {
+	if (bench || filter === null) {
+		return
+	}
+
+	let ran = run.tests.some(
+		(test) => test.state === "passed" || test.state === "failed",
+	)
+	let benched = run.tests.some(
+		(test) => test.state === "deselected" && test.reason === "bench",
+	)
+
+	if (ran || !benched) {
+		return
+	}
+
+	context.terminal.err(
+		`  ${context.palette.warning(
+			context.theme.symbols.warning,
+		)} ${context.palette.muted(
+			`"${filter}" matched only benchmarks — measure them with --bench`,
+		)}`,
+	)
+}
+
 // NOTE: A Module's own top-level output — a `Terminal.print` outside any test —
 // is written by the bundle as it is evaluated: before any test is running, and
 // with no test to attribute it to. It is not part of the report, and under
@@ -791,6 +826,7 @@ export async function runTest(
 		...context.options.skipTag,
 	])
 	reportUnmatchedFilter(context, filters.filter, matchedNames)
+	reportBenchOnlyFilter(context, run, filters.filter, context.options.bench)
 
 	let coverage = context.options.coverage
 		? collectCoverage(events)

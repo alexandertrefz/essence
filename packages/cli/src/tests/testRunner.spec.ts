@@ -2022,6 +2022,23 @@ describe("essence test — benchmarks", () => {
 		})
 	})
 
+	// NOTE: The one way a filter matches something and still runs nothing:
+	// it named benchmarks, and the run is not measuring. Without the sentence
+	// the run ends green with the reader's target never run.
+	it("says so where a filter names only benchmarks", async () => {
+		await withFiles({ "Doubling.es": benchmarks }, async (directory) => {
+			let { code, err } = await runTests(directory, [
+				"--filter",
+				"doubling",
+			])
+
+			expect(code).toBe(EXIT_SUCCESS)
+			expect(err).toContain(
+				'"doubling" matched only benchmarks — measure them with --bench',
+			)
+		})
+	})
+
 	// NOTE: No measurement writes a zero — the driver floors at a nanosecond —
 	// so one can only be a hand-edited or merge-mangled file. Holding a run to
 	// it would fail every later measurement as infinitely slower; it is

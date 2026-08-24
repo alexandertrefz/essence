@@ -222,6 +222,31 @@ describe("The per-test context", () => {
 		})
 	})
 
+	// NOTE: What the measurement batches turn off. Recording is bookkeeping;
+	// what a `require` DOES — end the run where it failed — is not, and holds
+	// whatever the flag says.
+	test("writes nothing down while recording is off, but still unwinds", () => {
+		let context = createContext(0)
+
+		context.recording = false
+		trace(context, 1, integer(3))
+		probe(context, 2, integer(4))
+		expected(context, 0, false, null)
+
+		let ended = false
+
+		try {
+			required(context, 3, false, null)
+		} catch {
+			ended = true
+		}
+
+		expect(ended).toBe(true)
+		expect(context.traces).toEqual([])
+		expect(context.probes).toEqual([])
+		expect(context.expectations).toEqual([])
+	})
+
 	test("keeps a probed value out of the assertion that followed it", () => {
 		let context = createContext(0)
 		let value = integer(19)
@@ -876,6 +901,7 @@ function measure(
 		filters?: Parameters<typeof runTests>[1]["filters"]
 		benchmarks?: Parameters<typeof runTests>[1]["benchmarks"]
 		update?: boolean
+		coverage?: boolean
 	},
 ): {
 	events: Array<TestEvent>
@@ -890,6 +916,7 @@ function measure(
 		filters: options.filters,
 		benchmarks: options.benchmarks,
 		update: options.update,
+		coverage: options.coverage,
 	})
 
 	return {
@@ -1031,9 +1058,17 @@ describe("Benchmarks", () => {
 		})
 		expect(summary.failed).toBe(1)
 		expect(summary.failedIds).toEqual(["/bench"])
+
+		// NOTE: The stream's copy of the reason. A consumer is told to ignore
+		// the `benchmark` kind it may not know, so a regression that left
+		// `error` empty would be a failure with no stated reason anywhere a
+		// stranger reads.
+		let failed = events.find((event) => event.kind === "test-fail")
+
+		expect(failed).toMatchObject({ failures: [] })
 		expect(
-			events.find((event) => event.kind === "test-fail"),
-		).toMatchObject({ failures: [], error: null })
+			(failed as Extract<TestEvent, { kind: "test-fail" }>).error,
+		).toContain("slower than its baseline")
 	})
 
 	// NOTE: Faster is news rather than a problem, and the baseline stands until
@@ -1143,6 +1178,60 @@ describe("Benchmarks", () => {
 
 	// NOTE: Every row is a benchmark in its own right, held to a baseline of its
 	// own — the rows share one body and one key, so an entry they overwrote in
+	// NOTE: Seven batches of a body that takes seconds is a minute nobody
+	// asked to wait — and the editor's run-by-id door has a session deadline
+	// behind it. The tiers are arithmetic over the injected clock, like
+	// everything else here.
+	test("takes fewer samples of a body no batching helped", () => {
+		let { clock, tick } = workClock(300)
+		let { measured } = measure(registryOf([benchmarkModule(tick)]), {
+			clock,
+			filters: { bench: true },
+		})
+
+		expect(measured[0]).toMatchObject({
+			iterations: 1,
+			samples: 3,
+			nanoseconds: 300_000_000,
+		})
+	})
+
+	test("takes one sample of a body whose one run is the measurement", () => {
+		let { clock, tick } = workClock(1_200)
+		let { measured } = measure(registryOf([benchmarkModule(tick)]), {
+			clock,
+			filters: { bench: true },
+		})
+
+		expect(measured[0]).toMatchObject({ iterations: 1, samples: 1 })
+	})
+
+	// NOTE: A coverage run counts every branch the body takes, so a
+	// measurement of it would be about the counters — and a baseline recorded
+	// off one would fail the first uninstrumented run. The body still runs
+	// once, as a test's would, so its lines are covered.
+	test("runs a benchmark once, unmeasured, under coverage", () => {
+		let ran = 0
+		let { clock } = workClock(1)
+		let registry = registryOf([
+			module([manifest("/bench", { benchmark: true })], (context) => {
+				benchmark(context, 0, null, () => {
+					ran += 1
+					expected(context, 0, true, null)
+				})
+			}),
+		])
+		let { measured, summary } = measure(registry, {
+			clock,
+			filters: { bench: true },
+			coverage: true,
+		})
+
+		expect(measured).toEqual([])
+		expect(ran).toBe(1)
+		expect(summary.passed).toBe(1)
+	})
+
 	// turn could only ever match the last row that ran.
 	test("keeps one stored entry per row of a table benchmark", () => {
 		let { clock, tick } = workClock(1)
