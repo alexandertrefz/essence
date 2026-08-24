@@ -117,12 +117,16 @@ declarations {
 		§§
 		§§ An Integer equals a Rational when that Rational is whole and its numerator is this Integer.
 		overload is {
+			§§ Answers whether this Integer has the same value as another Integer.
+			§§
 			§§ @param _ — the Integer to compare against
 			§§ @returns — `true` when both are equal.
 			(_ other: Integer) -> Boolean {
 				<- @::compare(to other)::is(#Equal)
 			}
 
+			§§ Answers whether this Integer has the same value as a Rational.
+			§§
 			§§ @param _ — the Rational to compare against
 			§§ @returns — `true` when both are equal.
 			(_ other: Rational) -> Boolean {
@@ -139,12 +143,16 @@ declarations {
 		§§
 		§§ Every Integer differs from a Rational that is not whole.
 		overload isNot {
+			§§ Answers whether this Integer differs from another Integer.
+			§§
 			§§ @param _ — the Integer to compare against
 			§§ @returns — `true` when the two differ.
 			(_ other: Integer) -> Boolean {
 				<- @::is(other)::negate()
 			}
 
+			§§ Answers whether this Integer differs from a Rational.
+			§§
 			§§ @param _ — the Rational to compare against
 			§§ @returns — `true` when the two differ.
 			(_ other: Rational) -> Boolean {
