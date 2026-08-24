@@ -7,6 +7,16 @@ import type {
 	TestEvent,
 } from "@essence-lang/runtime/Testing"
 
+// NOTE: The store's shape is the RUNTIME's, re-exported here rather than
+// spelled again — unlike `SnapshotStore`, which is one alias of `Record<string,
+// string>` and costs nothing to write twice. What a counterexample looks like is
+// nested and typed, and two spellings of it would drift apart in silence.
+export type {
+	CorpusStore,
+	StoredCounterexample,
+	StoredValue,
+} from "@essence-lang/runtime/Testing"
+
 // NOTE: The STORED half of a property test — every value it has ever failed on,
 // kept so that the next run asks about them before it draws anything. It is the
 // same arrangement `matches snapshot` has next door, for the same reason: the

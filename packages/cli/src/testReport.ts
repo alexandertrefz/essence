@@ -16,6 +16,7 @@ import {
 	hasCoverage,
 	isReported,
 	percentageOf,
+	type PropertyRecord,
 	propertyHelps,
 	propertyNotes,
 	rowLabel,
@@ -38,6 +39,7 @@ import { formatDuration, pluralise } from "./report"
 export {
 	type BenchmarkRecord,
 	collectBenchmarks,
+	collectCorpusChanges,
 	collectCoverage,
 	collectSnapshots,
 	collectTestRun,
@@ -48,6 +50,7 @@ export {
 	focusedTestsDiagnostic,
 	type PropertyRecord,
 	readBenchmarks,
+	readCorpus,
 	readSnapshots,
 	type SnapshotRecord,
 	type TestCounts,
@@ -58,6 +61,7 @@ export {
 	toCoverageJson,
 	toLcov,
 	writeBenchmarks,
+	writeCorpus,
 	writeSnapshots,
 } from "@essence-lang/compiler/testing"
 
@@ -124,7 +128,7 @@ function testLine(test: TestRecord, context: ReportContext): string {
 		test.property === null ||
 		(test.state !== "passed" && test.state !== "failed")
 			? ""
-			: palette.faint(`  (${pluralise(test.property.cases, "case")})`)
+			: palette.faint(`  (${casesOf(test.property)})`)
 
 	return `${symbol} ${name}${cases}${measurement(test, context)}${detail}`
 }
@@ -160,6 +164,19 @@ function measurement(test: TestRecord, context: ReportContext): string {
 			1,
 		)}× faster — record it with --bench --update`,
 	)}`
+}
+
+// NOTE: The cases a property drew, and the stored counterexamples it re-ran
+// before drawing any. They are counted apart because they are different things:
+// a replay spends no randomness and asks a question the search has answered
+// once already, so folding the two together would make the number a `--seed`
+// replay has to match a number that changes as the corpus grows.
+function casesOf(property: PropertyRecord): string {
+	let drawn = pluralise(property.cases, "case")
+
+	return property.replayed === 0
+		? drawn
+		: `${drawn} · ${property.replayed} replayed`
 }
 
 // NOTE: What the tree shows without being asked. A deselected test is counted

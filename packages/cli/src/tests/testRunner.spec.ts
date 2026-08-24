@@ -1841,19 +1841,29 @@ describe("essence test — property tests", () => {
 
 	// NOTE: THE claim `--seed` makes: the command a failure printed reproduces
 	// the failure, filter and all.
+	//
+	// NOTE: A directory each rather than two runs in one. What is claimed here
+	// is that the SEED draws the value — and a run that read the
+	// `__counterexamples__` the run before it wrote would answer the same thing
+	// without drawing anything at all.
 	it("draws the same counterexample for the same seed", async () => {
-		await withFiles({ "Doubling.es": properties }, async (directory) => {
-			let whole = await runTests(directory, ["--seed", "deadbeef"])
-			let alone = await runTests(directory, [
-				"--seed",
-				"deadbeef",
-				"--filter",
-				"doubling stays small",
-			])
+		let whole = await withFiles(
+			{ "Doubling.es": properties },
+			(directory) => runTests(directory, ["--seed", "deadbeef"]),
+		)
+		let alone = await withFiles(
+			{ "Doubling.es": properties },
+			(directory) =>
+				runTests(directory, [
+					"--seed",
+					"deadbeef",
+					"--filter",
+					"doubling stays small",
+				]),
+		)
 
-			expect(alone.err).toContain("shrunk to: n = 500")
-			expect(whole.err).toContain("shrunk to: n = 500")
-		})
+		expect(alone.err).toContain("shrunk to: n = 500")
+		expect(whole.err).toContain("shrunk to: n = 500")
 	})
 
 	it("runs as many cases as --cases asks for", async () => {
@@ -2089,6 +2099,172 @@ describe("essence test — benchmarks", () => {
 			parseArguments(["test", "--bench"], "essence").options.bench,
 		).toBe(true)
 		expect(parseArguments(["test"], "essence").options.bench).toBe(false)
+	})
+})
+
+// NOTE: The failing-example corpus from the command line: what a failure leaves
+// on disk, and what the run after it does with what it found.
+describe("essence test — the failing-example corpus", () => {
+	// NOTE: A property NO value satisfies, so that nothing below depends on
+	// which one was drawn. The shrink walks an Integer towards zero and every
+	// candidate still fails, so the stored value is `0` at any seed.
+	const broken = [
+		"tests {",
+		'\ttest "is never itself" for any (n: Integer) {',
+		"\t\texpect n::isNot(n)",
+		"\t}",
+		"}",
+		"",
+	].join("\n")
+
+	const held = [
+		"tests {",
+		'\ttest "is never itself" for any (n: Integer) {',
+		"\t\texpect n::is(n)",
+		"\t}",
+		"}",
+		"",
+	].join("\n")
+
+	// NOTE: The same test over a Parameter of another Type, which is what makes
+	// every stored value of it unreadable — the change a corpus has to survive
+	// by dropping what it holds rather than by replaying it as something else.
+	const retyped = [
+		"tests {",
+		'\ttest "is never itself" for any (n: String) {',
+		"\t\texpect n::is(n)",
+		"\t}",
+		"}",
+		"",
+	].join("\n")
+
+	function corpusPath(directory: string): string {
+		return path.join(directory, "__counterexamples__", "Numbers.es.json")
+	}
+
+	function propertyEvents(out: string): Array<Record<string, unknown>> {
+		return out
+			.split("\n")
+			.filter((line) => line.length > 0)
+			.map((line) => JSON.parse(line) as TestEvent)
+			.filter((event) => event.kind === "property") as unknown as Array<
+			Record<string, unknown>
+		>
+	}
+
+	it("writes down the value a failure shrank to", async () => {
+		await withFiles({ "Numbers.es": broken }, async (directory) => {
+			let { code } = await runTests(directory)
+
+			expect(code).toBe(EXIT_FAILURE)
+
+			let stored = JSON.parse(
+				readFileSync(corpusPath(directory), "utf8"),
+			) as {
+				schema: number
+				entries: Record<string, Array<{ values: Array<unknown> }>>
+			}
+
+			expect(stored.schema).toBe(1)
+			expect(stored.entries["is never itself"]).toEqual([
+				{
+					values: [
+						{ name: "n", data: { kind: "integer", value: "0" } },
+					],
+				},
+			])
+		})
+	})
+
+	it("writes nothing down for a property that held", async () => {
+		await withFiles({ "Numbers.es": held }, async (directory) => {
+			let { code } = await runTests(directory)
+
+			expect(code).toBe(EXIT_SUCCESS)
+			expect(existsSync(corpusPath(directory))).toBe(false)
+		})
+	})
+
+	// NOTE: THE claim the corpus makes. The second run does not go looking: it
+	// asks about the value the first run found, finds it still failing, and
+	// reports that rather than a fresh case.
+	it("replays what it stored before it draws anything", async () => {
+		await withFiles({ "Numbers.es": broken }, async (directory) => {
+			await runTests(directory)
+
+			let second = await runTests(directory, ["--json"])
+			let [property] = propertyEvents(second.out)
+
+			expect(second.code).toBe(EXIT_FAILURE)
+			expect(property).toMatchObject({
+				cases: 0,
+				replayed: 1,
+				fromCorpus: true,
+				stale: [],
+			})
+		})
+	})
+
+	it("says a failure came from a stored counterexample", async () => {
+		await withFiles({ "Numbers.es": broken }, async (directory) => {
+			await runTests(directory)
+
+			let { err } = await runTests(directory)
+
+			expect(err).toContain(
+				"failed on a stored counterexample (1 re-run)",
+			)
+			expect(err).toContain("n = 0")
+		})
+	})
+
+	// NOTE: A stored value that now holds is KEPT and re-run for ever: what it
+	// is worth is exactly that it goes on being asked, and a run that dropped
+	// it the moment it passed would drop it the moment it mattered.
+	it("keeps re-running a stored value once the code is fixed", async () => {
+		await withFiles({ "Numbers.es": broken }, async (directory) => {
+			await runTests(directory)
+			writeFileSync(path.join(directory, "Numbers.es"), held)
+
+			let { code, out } = await runTests(directory, ["--json"])
+			let [property] = propertyEvents(out)
+
+			expect(code).toBe(EXIT_SUCCESS)
+			expect(property).toMatchObject({
+				replayed: 1,
+				fromCorpus: false,
+				counterexample: null,
+			})
+			expect(existsSync(corpusPath(directory))).toBe(true)
+		})
+	})
+
+	it("counts the replays beside the cases in the tree", async () => {
+		await withFiles({ "Numbers.es": broken }, async (directory) => {
+			await runTests(directory)
+			writeFileSync(path.join(directory, "Numbers.es"), held)
+
+			expect((await runTests(directory)).out).toContain(
+				"(100 cases · 1 replayed)",
+			)
+		})
+	})
+
+	// NOTE: The Type moved under the entry. It is not a counterexample and not
+	// a failure — it is an entry nothing can read, and the run that met it is
+	// what takes it off the disk.
+	it("drops an entry the Types no longer read back", async () => {
+		await withFiles({ "Numbers.es": broken }, async (directory) => {
+			await runTests(directory)
+			writeFileSync(path.join(directory, "Numbers.es"), retyped)
+
+			let { code, out } = await runTests(directory, ["--json"])
+			let [property] = propertyEvents(out)
+
+			expect(code).toBe(EXIT_SUCCESS)
+			expect(property).toMatchObject({ replayed: 0, stale: [0] })
+			expect(existsSync(corpusPath(directory))).toBe(false)
+		})
 	})
 })
 

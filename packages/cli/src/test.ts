@@ -9,16 +9,20 @@ import {
 	type BenchmarkStore,
 	type BenchmarkWrites,
 	collectBenchmarks,
+	collectCorpusChanges,
 	collectSnapshots,
+	type CorpusStore,
 	coverageReportFileName,
 	hasCoverage,
 	noBenchmarkWrites,
 	noWrites,
 	readBenchmarks,
+	readCorpus,
 	readSnapshots,
 	type SnapshotStore,
 	type SnapshotWrites,
 	writeBenchmarks,
+	writeCorpus,
 	writeSnapshots,
 } from "@essence-lang/compiler/testing"
 import {
@@ -86,9 +90,17 @@ export type LoadedBundle = {
 // NOTE: A bundle and the tests it is the one to run.
 export type LoadedSuite = LoadedBundle & { registry: Registry }
 
-// NOTE: What a run tells every property test of it. Both are the command
-// line's: `--seed` and `--cases`.
-export type PropertyOptions = { seed?: string; cases?: number | null }
+// NOTE: What a run tells every property test of it. The first two are the
+// command line's — `--seed` and `--cases` — and the third is what every one of
+// them has failed on before, read off the `__counterexamples__` companions
+// beside the sources. It travels with the seed rather than beside it because
+// what it decides is the same thing: which values a property test is asked
+// about.
+export type PropertyOptions = {
+	seed?: string
+	cases?: number | null
+	counterexamples?: Record<string, CorpusStore>
+}
 
 // NOTE: What a run knows about snapshots before it starts: the stored entries
 // of every Module in it, and whether one that differs is to be recorded.
@@ -324,6 +336,7 @@ export function runSuites(
 			update: snapshots.update,
 			seed: properties.seed,
 			cases: properties.cases ?? undefined,
+			counterexamples: properties.counterexamples,
 		})
 	}
 
@@ -702,6 +715,11 @@ export async function runTest(
 	let baselines = context.options.bench
 		? await readBenchmarks(sources.keys())
 		: {}
+	// NOTE: And the values every property test of the run has failed on before,
+	// for the very same reason. They are read whether or not the run holds a
+	// property test at all — a Module with no companion answers with nothing,
+	// which costs one stat per file and saves asking twice.
+	let corpus = await readCorpus(sources.keys())
 	// NOTE: One seed for the whole run, made HERE where there is one run: every
 	// bundle draws from it, and every property test folds its own identity in.
 	// So the replay a failure prints reproduces the run rather than the file.
@@ -737,7 +755,7 @@ export async function runTest(
 			emit,
 			context.options.coverage,
 			{ stored, update: context.options.update },
-			{ seed, cases: context.options.cases },
+			{ seed, cases: context.options.cases, counterexamples: corpus },
 			baselines,
 		)
 		// NOTE: The stream is folded up ONCE, here, and the `run-end` this
@@ -801,7 +819,17 @@ export async function runTest(
 		stored: baselines,
 	})
 
-	for (let problem of [...written.problems, ...recorded.problems]) {
+	// NOTE: And the corpus, so the next run replays the value this one printed.
+	let kept = await writeCorpus({
+		corpus,
+		...collectCorpusChanges(events),
+	})
+
+	for (let problem of [
+		...written.problems,
+		...recorded.problems,
+		...kept.problems,
+	]) {
 		context.terminal.err(
 			`  ${context.palette.warning(
 				context.theme.symbols.warning,
