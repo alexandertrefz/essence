@@ -62,6 +62,20 @@ export type MutantWorkerRequest =
 	  }
 	| { kind: "close" }
 
+// NOTE: WHERE a mutant's run came apart, which is the whole of what lets the
+// driver classify it rather than guess. `load` is a bundle that would not
+// import and `run` is a runner that threw — both of them a mutant the world
+// noticed, and both counted as KILLED. `answer` is this file failing to hand
+// the result back: the run finished and its events would not cross the port,
+// which is the mutant having produced something the protocol can not carry, so
+// it is answered the way a crash is rather than as a survivor nothing supports.
+//
+// NOTE: The last two are written by the DRIVER and never by this file — a
+// Worker that died wrote nothing, and a Worker still spinning never will. They
+// live here because this union is the protocol, and the protocol is spelled
+// once.
+export type MutantPhase = "load" | "run" | "answer" | "worker" | "timeout"
+
 export type MutantWorkerResponse =
 	| { kind: "ready" }
 	| {
@@ -72,9 +86,12 @@ export type MutantWorkerResponse =
 			// the killer.
 			events: Array<TestEvent>
 			// NOTE: Why there is no answer, when there is none — a bundle that
-			// would not load, a runner that threw. It is not a kill: nothing was
-			// learnt about the code.
+			// would not load, a runner that threw — rendered for a reader.
 			problem: string | null
+			// NOTE: Which phase the problem above came out of. Null exactly when
+			// `problem` is: the two are one fact written as two fields, because
+			// one of them is prose and the other is what the driver switches on.
+			phase: MutantPhase | null
 			// NOTE: Whether this Worker has loaded its last bundle. The driver
 			// terminates it and boots another rather than waiting to be told
 			// twice.
@@ -126,14 +143,21 @@ async function runMutant(
 	let answer = (
 		events: Array<TestEvent>,
 		problem: string | null,
+		phase: MutantPhase | null = null,
 	): MutantWorkerResponse => ({
 		kind: "ran",
 		id: request.id,
 		events,
 		problem,
+		phase,
 		exhausted: loaded >= BUNDLE_LIMIT,
 	})
 	let restore = redirectStdout()
+	// NOTE: Which half of the work threw, kept as the work moves rather than
+	// worked out from the error afterwards. A bundle that would not load and a
+	// runner that threw raise the same kinds of Error, and only the place they
+	// were raised in tells them apart.
+	let phase: MutantPhase = "load"
 
 	try {
 		let module = (await import(
@@ -142,6 +166,7 @@ async function runMutant(
 		let tests = module.$tests
 
 		loaded += 1
+		phase = "run"
 
 		// NOTE: A mutant of a Module with no tests in the graph at all. It is
 		// not a kill and not a failure — there was nothing to ask.
@@ -186,7 +211,7 @@ async function runMutant(
 
 		return answer(events, null)
 	} catch (error) {
-		return answer([], rendered(error))
+		return answer([], rendered(error), phase)
 	} finally {
 		restore()
 	}
@@ -213,7 +238,31 @@ parentPort?.on("message", (request: MutantWorkerRequest) => {
 
 			send(await runMutant(request))
 		})
-		.catch(() => {})
+		// NOTE: A rejection here is a `postMessage` that would not carry the
+		// answer — an event payload structured clone refuses, a port already
+		// closing — and swallowing it would leave the driver waiting on a
+		// mutant that has already been decided. So the failure is ANSWERED: a
+		// minimal response carrying nothing but the problem, which is small
+		// enough that whatever the first post choked on is not in it.
+		//
+		// NOTE: And only if THAT post fails too is anything swallowed, because
+		// at that point there is no channel left to say so on. The driver's own
+		// timeout and its `exit` listener are what catch it from there, which is
+		// why a swallow here is a last resort rather than a hole.
+		.catch((error: unknown) => {
+			try {
+				send({
+					kind: "ran",
+					id: request.kind === "run" ? request.id : -1,
+					events: [],
+					problem: rendered(error),
+					phase: "answer",
+					exhausted: true,
+				})
+			} catch {
+				// NOTE: Deliberately silent — see above.
+			}
+		})
 })
 
 send({ kind: "ready" })

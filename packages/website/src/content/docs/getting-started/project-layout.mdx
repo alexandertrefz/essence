@@ -411,6 +411,16 @@ alone — so the cost is a compile and a handful of tests, not a compile and the
 whole suite. A site no test reaches is reported as its own count and never
 compiled at all: it is the coverage report's finding wearing mutation's hat.
 
+A mutant that **crashes** — one whose bundle will not load, or which throws as
+it runs — counts as killed: a program that comes apart is a program the world
+notices. A mutant whose run never comes back is stopped and counted as **hung**,
+which counts as caught too, because a loop that no longer ends is a failure a
+reader would see as surely as a red test. The wait before a run is given up on
+is ten times what the same tests took when they were green, and never less than
+five seconds. Only a mutant that would not **compile** is left out of the score
+altogether; that is the walker's own shortfall rather than anything the tests
+did.
+
 The whole run draws from one seed, minted once and handed to the baseline and to
 every mutant alike, so a property test in a covering set asks the mutant exactly
 the question it asked the code. Two runs at one seed are the same report.

@@ -1934,6 +1934,15 @@ export type TestEvent =
 	// is what makes a survivor readable: a mutant no test covers and a mutant
 	// twelve tests miss are different findings.
 	//
+	// NOTE: The five statuses, and the line each of them draws. `killed` is a
+	// test that failed — and a mutant that CRASHED, whether it would not load or
+	// threw as it ran, because a program that comes apart is a program the world
+	// notices. `hung` is a mutant whose run never came back and was stopped,
+	// which is a failure a reader would see too. `survived` is the finding.
+	// `uncovered` is a site no test reaches. `invalid` means one thing only: the
+	// mutant DID NOT COMPILE, which is the walker's own shortfall rather than
+	// anything the tests did or did not do.
+	//
 	// NOTE: Written by the COMMAND LINE and never by the runtime, exactly as
 	// `results-cached` is, and here for exactly the same reason — this union IS
 	// the stream's schema, and a consumer that meets one of these reads it the
@@ -1945,13 +1954,15 @@ export type TestEvent =
 			position: Range
 			operator: string
 			description: string
-			status: "killed" | "survived" | "uncovered" | "invalid"
+			status: "killed" | "survived" | "uncovered" | "invalid" | "hung"
 			killedBy: string | null
 			tests: number
 	  }
 	// NOTE: The tally of a mutation run, written once where a `run-end` would
 	// stand. `sites` counts every mutant the walker found, whatever became of
-	// it, so the four statuses below it add up to it.
+	// it, so the five statuses below it add up to it — and where a
+	// `--mutation-limit` stopped the judging early, the remainder a consumer
+	// derives from them is what the limit left unjudged.
 	| {
 			schema: 1
 			kind: "mutation-end"
@@ -1960,6 +1971,7 @@ export type TestEvent =
 			survived: number
 			uncovered: number
 			invalid: number
+			hung: number
 	  }
 	| {
 			schema: 1

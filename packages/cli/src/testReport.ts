@@ -604,9 +604,35 @@ export type MutantRecord = {
 	position: common.Position
 	operator: string
 	description: string
-	status: "killed" | "survived" | "uncovered" | "invalid"
+	status: "killed" | "survived" | "uncovered" | "invalid" | "hung"
 	killedBy: string | null
 	tests: number
+}
+
+export type MutantCounts = {
+	sites: number
+	killed: number
+	survived: number
+	uncovered: number
+	invalid: number
+	hung: number
+}
+
+// NOTE: ONE tally, read by the summary line and written into `mutation-end`.
+// They are two renderings of one fact, and counting twice is two chances to
+// disagree about what a run found.
+export function tallyMutants(mutants: Array<MutantRecord>): MutantCounts {
+	let counted = (status: MutantRecord["status"]): number =>
+		mutants.filter((each) => each.status === status).length
+
+	return {
+		sites: mutants.length,
+		killed: counted("killed"),
+		survived: counted("survived"),
+		uncovered: counted("uncovered"),
+		invalid: counted("invalid"),
+		hung: counted("hung"),
+	}
 }
 
 // NOTE: The design's own summary line, and a block per SURVIVOR: a mutant
@@ -626,12 +652,7 @@ export function renderMutation(
 	sourceOf: SourceLookup,
 ): Array<string> {
 	let { palette, theme } = context
-	let counts = {
-		killed: mutants.filter((each) => each.status === "killed").length,
-		survived: mutants.filter((each) => each.status === "survived").length,
-		uncovered: mutants.filter((each) => each.status === "uncovered").length,
-		invalid: mutants.filter((each) => each.status === "invalid").length,
-	}
+	let counts = tallyMutants(mutants)
 	let lines: Array<string> = [""]
 
 	for (let mutant of mutants) {
@@ -663,24 +684,20 @@ export function renderMutation(
 	// are the coverage report's finding wearing mutation's hat — a line no test
 	// runs is a line no mutant of it could ever be caught on — and they are
 	// listed rather than summarised only where a reader asked for everything.
+	// A mutant that HUNG is listed beside them for the reason a reader would
+	// want: it counted as caught, and which site stopped answering is the one
+	// thing the summary line can not say.
 	for (let mutant of mutants) {
-		if (
-			!context.verbose ||
-			(mutant.status !== "uncovered" && mutant.status !== "invalid")
-		) {
+		let aside = ASIDES[mutant.status]
+
+		if (!context.verbose || aside === undefined) {
 			continue
 		}
 
 		lines.push(
 			`${INDENT}${palette.muted(theme.symbols.info)} ${palette.path(
 				siteLabel(mutant),
-			)}  ${palette.muted(
-				`${mutant.description} — ${
-					mutant.status === "uncovered"
-						? "no test reaches this line"
-						: "the mutant did not compile"
-				}`,
-			)}`,
+			)}  ${palette.muted(`${mutant.description} — ${aside}`)}`,
 		)
 	}
 
@@ -694,14 +711,19 @@ export function renderMutation(
 	return lines
 }
 
+// NOTE: What a status that is not a SURVIVOR is worth saying about a site, in
+// the one line --verbose gives it. A killed mutant has none: it is the answer a
+// reader hoped for, and naming every one of them would bury the three that
+// matter.
+const ASIDES: Partial<Record<MutantRecord["status"], string>> = {
+	uncovered: "no test reaches this line",
+	invalid: "the mutant did not compile",
+	hung: "the run never came back, and was stopped",
+}
+
 function renderMutationSummary(
 	sites: number,
-	counts: {
-		killed: number
-		survived: number
-		uncovered: number
-		invalid: number
-	},
+	counts: MutantCounts,
 	context: ReportContext,
 ): string {
 	let { palette, theme } = context
@@ -712,6 +734,12 @@ function renderMutationSummary(
 
 	if (counts.survived > 0) {
 		parts.push(palette.error(`${counts.survived} survived`))
+	}
+
+	// NOTE: Only where there were any, because a hang is rare enough that a
+	// standing "0 hung" would be noise on every run that never met one.
+	if (counts.hung > 0) {
+		parts.push(palette.success(`${counts.hung} hung`))
 	}
 
 	if (counts.uncovered > 0) {
@@ -732,11 +760,16 @@ function renderMutationSummary(
 	// share of the mutants that could be judged at all: a site no test reaches
 	// and a mutant that would not compile say nothing about the tests, so
 	// counting them in would move the number for reasons nobody could act on.
-	let judged = counts.killed + counts.survived
+	//
+	// NOTE: A mutant that HUNG counts, and it counts as CAUGHT. A run that does
+	// not end is a failure a reader would notice as surely as a red test, and
+	// leaving it out would let a suite improve its number by writing the one
+	// kind of bug this tool can not wait for.
+	let judged = counts.killed + counts.survived + counts.hung
 	let score =
 		judged === 0
 			? null
-			: `${Math.round((counts.killed / judged) * 100)}% caught`
+			: `${Math.round(((counts.killed + counts.hung) / judged) * 100)}% caught`
 
 	return score === null
 		? ` ${parts.join(`  ${palette.faint(theme.symbols.bullet)}  `)}`
