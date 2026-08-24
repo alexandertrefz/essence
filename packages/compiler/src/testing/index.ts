@@ -632,6 +632,11 @@ export function benchmarkHelps(test: TestRecord): Array<string> {
 // before one failed, and the smallest values the shrink could reach. It reads
 // above the comparison, because what the assertion says is about THESE values
 // and a reader has to be told which ones first.
+//
+// NOTE: A failure a STORED counterexample found ran no case at all, so "after N
+// cases" would be a sentence about nothing. What a reader needs to be told is
+// that the property has broken on this value before — which is different news
+// from a search having just turned one up.
 export function propertyNotes(test: TestRecord): Array<string> {
 	let property = test.property
 
@@ -642,11 +647,14 @@ export function propertyNotes(test: TestRecord): Array<string> {
 	let values = property.counterexample
 		.map((entry) => `${entry.name} = ${entry.value}`)
 		.join("  ")
+	let found = property.fromCorpus
+		? `failed on a stored counterexample (${countOf(property.replayed, "re-run")})`
+		: `after ${countOf(property.cases, "case")}`
 
 	return [
 		property.shrinks === 0
-			? `after ${countOf(property.cases, "case")}: ${values}`
-			: `after ${countOf(property.cases, "case")}, shrunk to: ${values}`,
+			? `${found}: ${values}`
+			: `${found}, shrunk to: ${values}`,
 	]
 }
 
@@ -768,12 +776,15 @@ export {
 	type CorpusChanges,
 	type CorpusFile,
 	type CorpusRemoval,
+	type CorpusStore,
 	type CorpusWrites,
 	corpusFileOf,
 	noCorpusWrites,
 	parseCorpusFile,
 	printCorpusFile,
 	readCorpus,
+	type StoredCounterexample,
+	type StoredValue,
 	writeCorpus,
 } from "./corpus"
 export {

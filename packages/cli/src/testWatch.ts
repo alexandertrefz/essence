@@ -30,14 +30,17 @@ import {
 } from "./test"
 import {
 	collectBenchmarks,
+	collectCorpusChanges,
 	collectCoverage,
 	collectSnapshots,
 	collectTestRun,
 	emptyCoverage,
 	readBenchmarks,
+	readCorpus,
 	readSnapshots,
 	renderNoTests,
 	writeBenchmarks,
+	writeCorpus,
 	writeSnapshots,
 } from "./testReport"
 import { createDependentsIndex, createSourceWatcher } from "./watcher"
@@ -396,6 +399,11 @@ export async function runTestWatch(
 			let baselines = context.options.bench
 				? await readBenchmarks(sources.keys())
 				: {}
+			// NOTE: The corpus too, and it matters more here than it does for
+			// a snapshot: a watching session is what WRITES a counterexample
+			// down, and the cycle after a failure has to see the value the
+			// cycle before it recorded.
+			let corpus = await readCorpus(sources.keys())
 
 			let { matched } = runSuites(
 				suites,
@@ -420,6 +428,7 @@ export async function runTestWatch(
 				{
 					seed: context.options.seed ?? randomSeed(),
 					cases: context.options.cases,
+					counterexamples: corpus,
 				},
 				baselines,
 			)
@@ -456,6 +465,14 @@ export async function runTestWatch(
 					(await import("@essence-lang/formatter/snapshots"))
 						.writeInlineSnapshots,
 			})
+			// NOTE: This cycle's own counterexamples too, and for the same
+			// reason: what an entry nothing reached found is on disk already.
+			let kept = await writeCorpus({
+				corpus,
+				...collectCorpusChanges(
+					cycleEvents(toRun.map((suite) => suite.inputFileName)),
+				),
+			})
 
 			// NOTE: This cycle's own measurements, for the same reason — a
 			// baseline recorded two saves ago is on disk already.
@@ -466,7 +483,11 @@ export async function runTestWatch(
 				stored: baselines,
 			})
 
-			for (let problem of [...written.problems, ...recorded.problems]) {
+			for (let problem of [
+				...written.problems,
+				...recorded.problems,
+				...kept.problems,
+			]) {
 				terminal.err(
 					`  ${palette.warning(
 						theme.symbols.warning,
