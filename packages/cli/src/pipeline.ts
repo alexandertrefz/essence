@@ -194,6 +194,21 @@ export function descriptorFileName(outputFileName: string): string {
 	)}.descriptor.json`
 }
 
+// NOTE: How big the bundle is over the wire, which is the number a build report
+// prints beside the size on disk — and null for a compile nobody is going to
+// ask, exactly as the failure path answers null.
+//
+// NOTE: A MUTANT is nobody's build artifact. It is compiled, imported once by a
+// Worker and thrown away, and a mutation run compiles hundreds of them — so
+// compressing every one of them to produce a number no report reads is the
+// cheapest thing in the loop to stop doing.
+function gzipBytesOf(
+	request: CompileRequest,
+	contents: Uint8Array,
+): number | null {
+	return request.mutation === undefined ? gzipSync(contents).byteLength : null
+}
+
 // NOTE: The boundary between this Module and the JavaScript that will load it,
 // written beside the bundle — and written on the cached path as well as the
 // emitted one, because a build that found its bundle still has to leave the pair
@@ -688,7 +703,7 @@ export async function compileFile(
 			return finish(true, null, {
 				outputFileName: target ?? cached.path,
 				bytes: cached.contents.byteLength,
-				gzipBytes: gzipSync(cached.contents).byteLength,
+				gzipBytes: gzipBytesOf(request, cached.contents),
 				cached: true,
 			})
 		}
@@ -835,7 +850,7 @@ export async function compileFile(
 		return finish(true, null, {
 			outputFileName,
 			bytes: emitted.contents.byteLength,
-			gzipBytes: gzipSync(emitted.contents).byteLength,
+			gzipBytes: gzipBytesOf(request, emitted.contents),
 			...(request.enumerateMutations === true ? { mutations } : {}),
 		})
 	} catch (error) {

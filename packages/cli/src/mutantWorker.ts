@@ -34,7 +34,22 @@ const BUNDLE_LIMIT = 64
 type TestEntryPoints = typeof entryPoints
 type LoadedTestBundle = { $tests?: TestEntryPoints }
 
+// NOTE: What every mutant of a run compares itself against, read off disk ONCE
+// by the driver because a bundle reads nothing. They belong to the run rather
+// than to any one mutant, so they cross once per Worker rather than once per
+// bundle: a mutation run judges hundreds of mutants, and a project with a few
+// hundred stored snapshots would otherwise structured-clone the whole store
+// through the port for each of them.
+export type MutantStores = {
+	snapshots: Record<string, SnapshotStore>
+	counterexamples: Record<string, CorpusStore>
+}
+
 export type MutantWorkerRequest =
+	// NOTE: Posted by the driver the moment a Worker is booted, and before the
+	// first mutant. Messages are handled in the order they arrive, so a `run`
+	// posted straight after this one is answered with the stores already here.
+	| ({ kind: "init" } & MutantStores)
 	| {
 			kind: "run"
 			// NOTE: Which request this answer belongs to. A driver runs one
@@ -57,9 +72,6 @@ export type MutantWorkerRequest =
 			// that established the baseline was green.
 			seed: string
 			cases: number | null
-			// NOTE: Read off disk by the driver, because a bundle reads nothing.
-			snapshots: Record<string, SnapshotStore>
-			counterexamples: Record<string, CorpusStore>
 	  }
 	| { kind: "close" }
 
@@ -100,6 +112,10 @@ export type MutantWorkerResponse =
 	  }
 
 let loaded = 0
+// NOTE: The run's own stores, handed over once by `init` — see `MutantStores`.
+// Empty until then, which is what a Worker nobody told would compare a snapshot
+// against: nothing, and so a first-time recording rather than a false match.
+let stores: MutantStores = { snapshots: {}, counterexamples: {} }
 
 async function runMutant(
 	request: Extract<MutantWorkerRequest, { kind: "run" }>,
@@ -160,8 +176,8 @@ async function runMutant(
 					events.push(event)
 				},
 				filters: { ids: [id], bench: false },
-				snapshots: request.snapshots,
-				counterexamples: request.counterexamples,
+				snapshots: stores.snapshots,
+				counterexamples: stores.counterexamples,
 				seed: request.seed,
 				...(request.cases === null ? {} : { cases: request.cases }),
 			})
@@ -196,6 +212,15 @@ parentPort?.on("message", (request: MutantWorkerRequest) => {
 		.then(async () => {
 			if (request.kind === "close") {
 				parentPort?.close()
+
+				return
+			}
+
+			if (request.kind === "init") {
+				stores = {
+					snapshots: request.snapshots,
+					counterexamples: request.counterexamples,
+				}
 
 				return
 			}

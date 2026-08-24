@@ -675,7 +675,32 @@ type MutationContext = {
 	narrowed: Set<common.typedSimple.ExpressionNode>
 }
 
+// NOTE: One context per Program, kept. A mutation run walks ONE simplified
+// Program once to enumerate its sites and once more per mutant it compiles out
+// of it — hundreds of times, on the same object, through a Session that holds
+// that object for the length of the run. What the context reads is a whole
+// second walk of the Module plus the standard library's Namespace table, and
+// none of it can have changed: the walk never mutates the Program it is handed.
+//
+// NOTE: A WeakMap, so a Program a Session has finished with takes its context
+// with it rather than pinning it for the length of the process.
+const CONTEXTS = new WeakMap<common.typedSimple.Program, MutationContext>()
+
 function contextOf(program: common.typedSimple.Program): MutationContext {
+	let held = CONTEXTS.get(program)
+
+	if (held !== undefined) {
+		return held
+	}
+
+	let context = readContext(program)
+
+	CONTEXTS.set(program, context)
+
+	return context
+}
+
+function readContext(program: common.typedSimple.Program): MutationContext {
 	let namespaces = new Map<string, KnownNamespace>()
 
 	for (let namespace of builtinNamespaces()) {

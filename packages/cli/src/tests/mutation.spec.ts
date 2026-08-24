@@ -356,6 +356,55 @@ describe("essence test --mutate", () => {
 		})
 	})
 
+	// NOTE: A mutant compares itself against the snapshots ON DISK, which the
+	// driver reads once and hands to each Worker as it boots. A Worker that
+	// never got them would find nothing to compare against, RECORD the mutant's
+	// own answer as a first snapshot, pass, and report a survivor — so this is
+	// the claim that says the stores crossed at all.
+	it("judges a mutant against the snapshots on disk", async () => {
+		let source = [
+			"implementation {",
+			"	function label(_ n: Integer) -> String {",
+			"		if n::isGreaterThan(1) {",
+			'			<- "many"',
+			"		} else {",
+			'			<- "one"',
+			"		}",
+			"	}",
+			"}",
+			"",
+			"tests {",
+			'	test "labels a count" {',
+			'		expect label(2) matches snapshot from "label"',
+			"	}",
+			"}",
+			"",
+		].join("\n")
+
+		await withFiles({ "Label.es": source }, async (directory) => {
+			// NOTE: One plain run first, because a snapshot nothing has recorded
+			// is written rather than compared — which is the very answer this
+			// spec has to tell apart from a store that never arrived.
+			await capture(() =>
+				run(
+					["test", directory, "--jobs", "1", "--no-color"],
+					"essence",
+				),
+			)
+
+			let killed = mutants(
+				(await mutate(directory, ["--json"])).out,
+			).filter((mutant) => mutant.status === "killed")
+
+			expect(killed.length).toBeGreaterThan(0)
+			expect(
+				killed.every((mutant) =>
+					mutant.killedBy?.endsWith("labels a count"),
+				),
+			).toBe(true)
+		})
+	})
+
 	// NOTE: A reader comparing two scores has to be told that one of them was
 	// taken over a sample — the sample is the file order, and a project's
 	// hardest lines may all be in the last file.
