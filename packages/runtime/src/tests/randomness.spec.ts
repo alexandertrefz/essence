@@ -6,9 +6,11 @@ import {
 	below,
 	bigBetween,
 	boolean,
+	createEntropy,
 	createRandomness,
 	fraction,
 	integer,
+	nextWord,
 	pick,
 	type RandomnessType,
 	rational,
@@ -336,6 +338,72 @@ describe("Randomness", () => {
 
 		test("answers a different word for different text", () => {
 			expect(seedOf("41c37ea3")).not.toBe(seedOf("41c37ea4"))
+		})
+	})
+
+	// NOTE: An entropy source has no seed, so nothing about its SEQUENCE can be
+	// asserted — only the ranges every draw stays in, and that it never answers
+	// the same run of words twice. Where a test below counts on chance, the odds
+	// of a miss are written out: none is within 10^30 of a flake, so a failure
+	// here is a broken source and never a rerun.
+	describe("entropy", () => {
+		test("carries the Randomness tag", () => {
+			expect(createEntropy()[typeKeySymbol]).toBe("Randomness")
+		})
+
+		test("answers THE one source from every call", () => {
+			expect(createEntropy()).toBe(createEntropy())
+		})
+
+		// NOTE: Two runs of 64 words agree with odds of one in 2^2048.
+		test("never answers the same run of words twice", () => {
+			let source = createEntropy()
+			let first = Array.from({ length: 64 }, () => nextWord(source))
+			let second = Array.from({ length: 64 }, () => nextWord(source))
+
+			expect(first).not.toEqual(second)
+		})
+
+		// NOTE: 2000 draws cross the 256 word buffer's edge a handful of times,
+		// so the refill is walked here rather than the first fill alone.
+		test("stays inside the bound", () => {
+			let source = createEntropy()
+
+			for (let index = 0; index < 2000; index++) {
+				let drawn = below(source, 7)
+
+				expect(drawn).toBeGreaterThanOrEqual(0)
+				expect(drawn).toBeLessThan(7)
+			}
+		})
+
+		// NOTE: A value of six goes unseen in 400 draws with odds of six in
+		// 10^32.
+		test("reaches every value of a small bound", () => {
+			let source = createEntropy()
+			let seen = new Set<number>()
+
+			for (let index = 0; index < 400; index++) {
+				seen.add(below(source, 6))
+			}
+
+			expect([...seen].sort()).toEqual([0, 1, 2, 3, 4, 5])
+		})
+
+		// NOTE: The natives never mind the kind — every draw runs through the
+		// one word door — so one of them driven over entropy stands for all.
+		// A bound of four goes unseen in 400 draws with odds of four in 10^49.
+		test("drives the natives as the seeded kind does", () => {
+			let source = createEntropy()
+			let seen = new Set<number | bigint>()
+
+			for (let index = 0; index < 400; index++) {
+				seen.add(
+					integer(source, createInteger(1), createInteger(4)).value,
+				)
+			}
+
+			expect([...seen].sort()).toEqual([1, 2, 3, 4])
 		})
 	})
 })
