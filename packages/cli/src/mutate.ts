@@ -15,6 +15,7 @@ import {
 	readCorpus,
 	readSnapshots,
 	type SnapshotStore,
+	type TestRun,
 } from "@essence-lang/compiler/testing"
 import type { common } from "@essence-lang/interfaces"
 import { randomSeed, type TestEvent } from "@essence-lang/runtime/Testing"
@@ -34,6 +35,7 @@ import { discoverTestFiles } from "./discovery"
 import { GLOB_PATTERN } from "./inputs"
 import type {
 	MutantPhase,
+	MutantStores,
 	MutantWorkerRequest,
 	MutantWorkerResponse,
 } from "./mutantWorker"
@@ -293,7 +295,7 @@ function keepsWorker(phase: MutantPhase | null): boolean {
 	return phase === null || phase === "load" || phase === "run"
 }
 
-function createMutantRunner(): MutantRunner {
+function createMutantRunner(stores: MutantStores): MutantRunner {
 	// NOTE: Asked of THIS module's own URL, because that is what says whether
 	// the package is running as sources or as what was published — see
 	// `workerFileName`, which the compile pool asks the same question of.
@@ -303,6 +305,22 @@ function createMutantRunner(): MutantRunner {
 	)
 	let worker: Worker | null = null
 	let next = 0
+
+	// NOTE: The stores cross ONCE per thread rather than once per mutant. They
+	// belong to the run — every mutant of it compares itself against the same
+	// snapshots and replays the same counterexamples — and a Worker recycles
+	// every sixty-four bundles, so a project with a large `__snapshots__` was
+	// paying a structured clone of the whole of it per compile.
+	let boot = (): Worker => {
+		let fresh = new Worker(workerURL)
+
+		fresh.postMessage({
+			kind: "init",
+			...stores,
+		} satisfies MutantWorkerRequest)
+
+		return fresh
+	}
 
 	let discard = async (held: Worker): Promise<void> => {
 		if (worker === held) {
@@ -326,7 +344,7 @@ function createMutantRunner(): MutantRunner {
 
 			next += 1
 
-			let running = worker ?? new Worker(workerURL)
+			let running = worker ?? boot()
 
 			worker = running
 
@@ -620,7 +638,10 @@ export async function runMutation(
 		enumerateMutations: true,
 	})
 	let staging = await mkdtemp(path.join(tmpdir(), "essence-mutate-"))
-	let runner = createMutantRunner()
+	// NOTE: Built once the stores it hands its Workers are known, which is after
+	// the baseline compiled — so it is a name declared here and assigned there,
+	// because the `finally` below is what disposes of it however the run ends.
+	let runner: MutantRunner | null = null
 
 	try {
 		let compilation = await runCompilation(instrumented, plan, {
@@ -662,6 +683,9 @@ export async function runMutation(
 		)
 		let corpus = await readCorpus(sources.keys())
 		let counterexamples: Record<string, CorpusStore> = corpus.stores
+
+		runner = createMutantRunner({ snapshots: stored, counterexamples })
+
 		// NOTE: ONE seed for the baseline and for every mutant of the run. See
 		// the note at the top of the file: it is what makes a property test in
 		// the covering set answer the same question of the mutant that it
@@ -741,14 +765,15 @@ export async function runMutation(
 			return stopEarly(EXIT_FOCUSED, events)
 		}
 
-		let attribution = attributionOf(events)
-		// NOTE: How long each test took while the code was still telling the
-		// truth, which is what a mutant's own wait is measured against — see
-		// `mutantTimeout`. Read off the baseline fold rather than off the events
-		// a second time, because the fold has already answered it.
-		let durations = new Map(
-			baseline.tests.map((test) => [test.id, test.duration]),
-		)
+		let { attribution, durations } = foldBaseline(baseline, events)
+
+		// NOTE: And the stream is DROPPED here, which is the last moment
+		// anything needs it: the early exits above replay it, and everything
+		// past this point reads the folds instead. A green suite's baseline is
+		// several events per test, and the loop it is standing in front of
+		// compiles and loads hundreds of Modules.
+		events.length = 0
+
 		// NOTE: The order the RUN met each test, which is what makes a covering
 		// set a list rather than a set: the Worker runs them in it and stops at
 		// the first kill, so the killer a report names is the same one twice.
@@ -821,8 +846,6 @@ export async function runMutation(
 					index: compiled,
 					runner,
 					seed,
-					stored,
-					counterexamples,
 					durations,
 					timeoutFor,
 					contracts,
@@ -855,9 +878,30 @@ export async function runMutation(
 			? EXIT_FAILURE
 			: EXIT_SUCCESS
 	} finally {
-		await runner.dispose()
+		await runner?.dispose()
 		await plan.dispatcher.dispose()
 		await rm(staging, { recursive: true, force: true })
+	}
+}
+
+// NOTE: The baseline's stream read down to the three things the rest of the run
+// needs from it — which tests there were, which of them reach which point, and
+// how long each of them took while the code still told the truth. Spelled apart
+// so the events themselves are unreferenced the moment it answers.
+function foldBaseline(
+	baseline: TestRun,
+	events: Array<TestEvent>,
+): {
+	attribution: Map<string, ModuleAttribution>
+	durations: Map<string, number>
+} {
+	return {
+		attribution: attributionOf(events),
+		// NOTE: Read off the FOLD rather than off the events a second time,
+		// because the fold has already answered it.
+		durations: new Map(
+			baseline.tests.map((test) => [test.id, test.duration]),
+		),
 	}
 }
 
@@ -895,8 +939,6 @@ async function judge(work: {
 	index: number
 	runner: MutantRunner
 	seed: string
-	stored: Record<string, SnapshotStore>
-	counterexamples: Record<string, CorpusStore>
 	// NOTE: What each covering test took in the BASELINE, which is what this
 	// mutant's own wait is measured against — see `mutantTimeout`.
 	durations: Map<string, number>
@@ -981,8 +1023,6 @@ async function judge(work: {
 				ids,
 				seed: work.seed,
 				cases: work.context.options.cases,
-				snapshots: work.stored,
-				counterexamples: work.counterexamples,
 			},
 			work.timeoutFor(
 				ids.reduce(
