@@ -23,11 +23,16 @@ const essence = path.resolve(
 )
 
 // NOTE: A bundle cache of this spec's own, so a run neither answers out of the
-// developer's cache nor fills it.
+// developer's cache nor fills it — and a result cache beside it, for the same
+// reason twice over: this run is the STANDARD LIBRARY's own, so an answer left
+// in the developer's store would be replayed by the very next `essence test`
+// they run in this repository.
 const cache = mkdtempSync(path.join(tmpdir(), "essence-stdlib-examples-"))
+const results = mkdtempSync(path.join(tmpdir(), "essence-stdlib-results-"))
 
 afterAll(() => {
 	rmSync(cache, { recursive: true, force: true })
+	rmSync(results, { recursive: true, force: true })
 })
 
 it("runs every example the standard library documents", () => {
@@ -35,7 +40,11 @@ it("runs every example the standard library documents", () => {
 		[process.execPath, essence, "test", "--no-color"],
 		{
 			cwd: STDLIB_DIRECTORY,
-			env: { ...process.env, ESSENCE_CLI_CACHE: cache },
+			env: {
+				...process.env,
+				ESSENCE_CLI_CACHE: cache,
+				ESSENCE_RESULTS_CACHE: results,
+			},
 		},
 	)
 	let out = answer.stdout.toString()

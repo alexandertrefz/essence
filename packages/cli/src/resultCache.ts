@@ -58,9 +58,9 @@ export type ResultRecord = {
 	// still be told it named nothing without the bundle being loaded to ask.
 	tags: Array<string>
 	// NOTE: How many tests the entry PLANNED under the keyed filters, which is
-	// what the run's `run-start` has to count. It is the number of `test-start`
-	// events in the stream, written down rather than counted again by every
-	// reader.
+	// what the run's `run-start` has to count as its own — the very number the
+	// selection gave the entry when it ran, written down rather than worked out
+	// again from the stream by every reader.
 	tests: number
 	// NOTE: How many tests the entry's `--filter` matched, whatever narrowed
 	// them afterwards — the count `reportUnmatchedFilter` adds up across a run.

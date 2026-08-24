@@ -78,11 +78,17 @@ import {
 // anything below imports its way to a compile, because where the cache lives is
 // read off the environment every time it is asked for.
 let bundleCache = mkdtempSync(path.join(tmpdir(), "essence-cli-cache-"))
+// NOTE: And a result cache of its own beside it, for the same reason: a spec
+// driving `essence test` may neither answer out of the user's store nor leave a
+// fixture's answer in it.
+let resultCache = mkdtempSync(path.join(tmpdir(), "essence-cli-results-"))
 
 process.env.ESSENCE_CLI_CACHE = bundleCache
+process.env.ESSENCE_RESULTS_CACHE = resultCache
 
 afterAll(() => {
 	rmSync(bundleCache, { recursive: true, force: true })
+	rmSync(resultCache, { recursive: true, force: true })
 })
 
 type Command = NonNullable<ReturnType<typeof findCommand>>

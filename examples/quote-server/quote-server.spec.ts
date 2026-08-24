@@ -17,8 +17,12 @@ const REPOSITORY = path.join(EXAMPLE, "..", "..")
 const ESSENCE = path.join(REPOSITORY, "packages", "cli", "bin", "essence")
 
 // NOTE: A bundle cache of this run's own, so that a spec compiling the rules
-// neither answers out of the user's cache nor fills it.
+// neither answers out of the user's cache nor fills it — and a result cache
+// beside it, for the same reason and one more: this spec runs `essence test` in
+// the example's OWN directory, so an answer left in the user's store would be
+// replayed by the next run a reader does there by hand.
 const cache = mkdtempSync(path.join(tmpdir(), "essence-quote-cache-"))
+const results = mkdtempSync(path.join(tmpdir(), "essence-quote-results-"))
 
 let server: Subprocess<"ignore", "pipe", "pipe"> | null = null
 let origin = ""
@@ -63,6 +67,7 @@ beforeAll(async () => {
 afterAll(() => {
 	server?.kill()
 	rmSync(cache, { recursive: true, force: true })
+	rmSync(results, { recursive: true, force: true })
 })
 
 describe("examples/quote-server", () => {
@@ -71,7 +76,11 @@ describe("examples/quote-server", () => {
 			[process.execPath, ESSENCE, "test", "rules", "--no-color"],
 			{
 				cwd: EXAMPLE,
-				env: { ...process.env, ESSENCE_CLI_CACHE: cache },
+				env: {
+					...process.env,
+					ESSENCE_CLI_CACHE: cache,
+					ESSENCE_RESULTS_CACHE: results,
+				},
 				stdout: "pipe",
 				stderr: "pipe",
 			},

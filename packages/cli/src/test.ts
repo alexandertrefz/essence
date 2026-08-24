@@ -46,6 +46,17 @@ import { readProjectConfiguration } from "./configuration"
 import type { CLIContext } from "./context"
 import { discoverTestFiles } from "./discovery"
 import {
+	bundleHashOf,
+	createStoreReader,
+	hostKey,
+	readResult,
+	RESULTS_FORMAT,
+	type ResultRecord,
+	resultCacheDirectory,
+	resultKey,
+	writeResult,
+} from "./resultCache"
+import {
 	collectCoverage,
 	collectTestRun,
 	type CoverageSummary,
@@ -90,6 +101,39 @@ export type LoadedBundle = {
 // NOTE: A bundle and the tests it is the one to run.
 export type LoadedSuite = LoadedBundle & { registry: Registry }
 
+// NOTE: One entry whose whole answer a run already held, ready to be written
+// back into the stream in place of running it. `tests` is what that entry
+// PLANNED, which the run's `run-start` has to count as its own.
+export type CachedEntry = {
+	inputFileName: string
+	tests: number
+	events: Array<TestEvent>
+}
+
+// NOTE: What a run is REPLAYING rather than running, and where each of those
+// entries stands among the ones it is running. The order matters: a replayed
+// entry is written into the stream exactly where it would have run, so that a
+// warm run and a cold one are the same report in the same order and the same
+// stream line for line. That is the whole claim a replay makes, and a reader
+// comparing two runs is the one it is made to.
+export type ReplayOptions = {
+	entries?: Array<CachedEntry>
+	// NOTE: Every entry of the run by name, replayed and live alike. Empty for a
+	// caller that replays nothing, which then runs what it was handed in the
+	// order it was handed it — the loop this has always been.
+	order?: Array<string>
+}
+
+// NOTE: What one running suite selected, per entry — how many tests it planned
+// and how many its `--filter` matched. Both are facts about the selection rather
+// than about the run, and both are what a result cache writes down so that a
+// replay can answer them without a bundle.
+export type EntrySelection = {
+	inputFileName: string
+	planned: number
+	matched: number
+}
+
 // NOTE: What a run tells every property test of it. The first two are the
 // command line's — `--seed` and `--cases` — and the third is what every one of
 // them has failed on before, read off the `__counterexamples__` companions
@@ -120,6 +164,18 @@ export type TestFilters = {
 	bench: boolean
 }
 
+// NOTE: A Module's tests all arrive together, so what is claimed is the Module
+// — by its path, or by the id of its first test where a compile had no path to
+// give (which the CLI never does, and a spec driving one program might).
+//
+// NOTE: Named apart so that a result cache can write down which Modules an
+// entry claimed and read them back without the bundle. What a claim is keyed by
+// has to be one spelling, or a record written under one would be checked against
+// the other.
+export function moduleKeyOf(module: TestModule): string {
+	return module.module ?? module.tests[0]?.id ?? ""
+}
+
 function claimModules(
 	modules: Array<TestModule>,
 	claimed: Set<string>,
@@ -131,11 +187,7 @@ function claimModules(
 			continue
 		}
 
-		// NOTE: A Module's tests all arrive together, so what is claimed is the
-		// Module — by its path, or by the id of its first test where a compile
-		// had no path to give (which the CLI never does, and a spec driving one
-		// program might).
-		let key = module.module ?? module.tests[0].id
+		let key = moduleKeyOf(module)
 
 		if (claimed.has(key)) {
 			continue
@@ -153,11 +205,15 @@ function claimModules(
 // silently take a shared Module away from the entry that has been running it.
 // The order is the order the entries were compiled in, which is the order they
 // were named in, so the answer is the same every time it is asked.
+//
+// NOTE: `claimed` is what the run has already given away to entries that are
+// NOT among these bundles — which is only ever an entry a result cache answered
+// for, whose bundle nobody loaded. Empty for every other caller, which is the
+// same walk this has always done.
 export function claimRegistries(
 	bundles: Array<LoadedBundle>,
+	claimed: Set<string> = new Set(),
 ): Array<LoadedSuite> {
-	let claimed = new Set<string>()
-
 	return bundles.map((bundle) => ({
 		...bundle,
 		registry: registryOf(claimModules(bundle.modules, claimed)),
@@ -290,7 +346,22 @@ export function runSuites(
 	// than failed is `snapshots.update`: it is one flag, and a run that accepts
 	// what it produced accepts all of it.
 	benchmarks: Record<string, BenchmarkStore> = {},
-): { planned: number; focused: boolean; matched: number } {
+	// NOTE: The entries this run is REPLAYING rather than running — read off a
+	// result cache by whoever started the run, because a bundle reads nothing —
+	// and where each of them stands among the ones it is running. They are
+	// counted into the plan and written into the stream in their own place, so a
+	// warm run is the cold one's report and the cold one's stream.
+	replay: ReplayOptions = {},
+): {
+	planned: number
+	focused: boolean
+	matched: number
+	// NOTE: What each RUNNING suite selected. A caller keeping one record per
+	// entry needs both numbers per entry, and asking the registry a second time
+	// would evaluate every interpolating Module's setup again to render names
+	// this selection has already rendered.
+	entries: Array<EntrySelection>
+} {
 	let selected = all.map((suite) =>
 		suite.tests.select(suite.registry, filters),
 	)
@@ -302,22 +373,84 @@ export function runSuites(
 	// above; one that holds none runs nothing at all once another bundle does.
 	// So the count is read off the selection that was already made, rather than
 	// made a second time under the wider filters.
-	let planned = all.reduce((total, suite, index) => {
-		let selection = selected[index]!
-
-		if (!running.includes(suite) || (focused && !selection.focused)) {
-			return total
+	let entries = all.flatMap((suite, index): Array<EntrySelection> => {
+		if (!running.includes(suite)) {
+			return []
 		}
 
-		return (
-			total +
-			selection.selections.filter((each) => each.state === "run").length
-		)
-	}, 0)
+		let selection = selected[index]!
+
+		return [
+			{
+				inputFileName: suite.inputFileName,
+				planned:
+					focused && !selection.focused
+						? 0
+						: selection.selections.filter(
+								(each) => each.state === "run",
+							).length,
+				matched: selection.matched,
+			},
+		]
+	})
+	let replayed = replay.entries ?? []
+	let planned =
+		entries.reduce((total, entry) => total + entry.planned, 0) +
+		replayed.reduce((total, entry) => total + entry.tests, 0)
 
 	emit({ schema: 1, kind: "run-start", tests: planned, focused }, null)
 
-	for (let suite of running) {
+	let replays = new Map(replayed.map((entry) => [entry.inputFileName, entry]))
+	let live = new Map(running.map((suite) => [suite.inputFileName, suite]))
+	// NOTE: The run's own order where a caller gave one, so a replayed entry is
+	// written into the stream exactly where it would have run. Where none was
+	// given every replay still goes out, ahead of the suites — nothing handed
+	// over may be lost for want of a place to put it — and a caller that replays
+	// nothing runs what it was handed in the order it was handed it, which is
+	// the loop this has always been.
+	let sequence = replay.order ?? [
+		...replays.keys(),
+		...running.map((suite) => suite.inputFileName),
+	]
+
+	for (let inputFileName of sequence) {
+		let entry = replays.get(inputFileName)
+
+		if (entry !== undefined) {
+			// NOTE: Attributed to no suite. A record is written out of a stream a
+			// bundle produced, and one replayed out of a record is never written
+			// again.
+			//
+			// NOTE: A replayed entry can not hold a focused test — nothing is
+			// ever remembered out of a focused run, and a caller discards every
+			// one of these the moment a live bundle turns out to hold one — so
+			// nothing written here is silencing what runs around it.
+			emit(
+				{
+					schema: 1,
+					kind: "results-cached",
+					entry: inputFileName,
+					tests: entry.tests,
+				},
+				null,
+			)
+
+			for (let event of entry.events) {
+				emit(event, null)
+			}
+
+			continue
+		}
+
+		let suite = live.get(inputFileName)
+
+		// NOTE: A name the caller holds that is neither replayed nor running is
+		// an entry whose bundle published no tests at all, which is an answer
+		// rather than an omission.
+		if (suite === undefined) {
+			continue
+		}
+
 		suite.tests.run(suite.registry, {
 			// NOTE: One run over several bundles is still one run, so each
 			// bundle's own bookends are dropped and the pair around the whole
@@ -350,6 +483,7 @@ export function runSuites(
 			(total, selection) => total + selection.matched,
 			0,
 		),
+		entries,
 	}
 }
 
@@ -383,6 +517,85 @@ export function resolveFilters(
 	}
 }
 
+// NOTE: Whether an entry's own stream may be REMEMBERED, so that the next run
+// over the same code, the same stores and the same filters can replay it
+// instead of running it. The replay claims that these tests passed, were skipped
+// or were deselected; each refusal below is a case where that claim would be
+// made about a run that has to happen again.
+//
+// A FAILURE always re-runs: a reader working through one wants this run's
+// output and this run's spans, and an entry that failed is the entry they are
+// editing. A `not-focused` deselection is a run somebody NARROWED by hand, and
+// what a focus silences is decided across a whole run rather than per entry — so
+// nothing out of it may be replayed into a run that focuses somewhere else. A
+// PROPERTY test is the one thing here that is meant to answer differently every
+// time: fresh entropy is what the search is for, and freezing a hundred cases
+// under a name would end it. The values it has already failed on are the
+// corpus's business, and the corpus is in the key.
+//
+// A snapshot or a baseline WRITTEN is a run that changed the very file the key
+// reads, so the record would be keyed against a disk that no longer exists.
+// Recording it one run later — when the entry has compared itself against what
+// it wrote and matched — is both correct and one run away.
+//
+// NOTE: A deselection by tag, by filter or by `bench`, and a skip, are all
+// deterministic functions of the manifest and of the filters in the key, so
+// they are remembered like a pass.
+export function isRemembered(events: Array<TestEvent>): boolean {
+	return events.every((event) => {
+		switch (event.kind) {
+			case "test-fail":
+			case "property":
+				return false
+			case "test-deselected":
+				return event.reason !== "not-focused"
+			case "snapshot":
+			case "benchmark":
+				return event.status !== "written"
+			default:
+				return true
+		}
+	})
+}
+
+// NOTE: Which Modules of an entry the run would hand it, worked out WITHOUT the
+// bundles a result cache answered for. `claimRegistries` decides this across the
+// whole run in the order the entries were named, so a replayed entry has to be
+// handed exactly the Modules it was handed when it was recorded — otherwise a
+// Module whose owner moved would be reported twice or by nobody. A hit knows
+// its own Modules because the record wrote them down and the bundle hash that
+// names the record pins them; a miss has been loaded and can be asked.
+export function planClaims(
+	entries: Array<{ inputFileName: string; modules: Array<string> }>,
+): Map<string, Array<string>> {
+	let claimed = new Set<string>()
+	let plan = new Map<string, Array<string>>()
+
+	for (let entry of entries) {
+		let kept: Array<string> = []
+
+		for (let key of entry.modules) {
+			if (claimed.has(key)) {
+				continue
+			}
+
+			claimed.add(key)
+			kept.push(key)
+		}
+
+		plan.set(entry.inputFileName, kept)
+	}
+
+	return plan
+}
+
+function sameClaim(left: Array<string>, right: Array<string>): boolean {
+	return (
+		left.length === right.length &&
+		left.every((key, index) => key === right[index])
+	)
+}
+
 // NOTE: A run nobody narrowed — no filter, no tags — is what CI runs, and it is
 // the run a leftover `focused` may not survive. Under any filter, focusing is
 // ordinary working practice and says nothing about the branch.
@@ -398,16 +611,22 @@ export function reportUnknownTags(
 	context: CLIContext,
 	suites: Array<LoadedSuite>,
 	named: Array<string>,
+	// NOTE: The tags of every entry the run REPLAYED, which carry no registry to
+	// be asked. A record writes them down for exactly this: a tag that only the
+	// cached half of a project uses is a tag the run knows, and saying otherwise
+	// would make the warning fire because the cache was warm.
+	alsoKnown: Array<string> = [],
 ): void {
 	if (named.length === 0) {
 		return
 	}
 
-	let known = new Set(
-		suites.flatMap((suite) =>
+	let known = new Set([
+		...suites.flatMap((suite) =>
 			suite.registry.tests.flatMap((test) => test.entry.tags),
 		),
-	)
+		...alsoKnown,
+	])
 
 	for (let tag of named) {
 		if (known.has(tag)) {
@@ -652,8 +871,25 @@ export async function runTest(
 	let filters = resolveFilters(context.options, configuration.test.skipTags)
 	let writeEvent = process.stdout.write.bind(process.stdout)
 	let events: Array<TestEvent> = []
-	let emit = (event: TestEvent): void => {
+	// NOTE: The same stream a second time, bucketed by the entry that produced
+	// it — which is what a record is written out of. The flat one is what the
+	// report and `--json` read, in the order everything happened; a record needs
+	// one entry's events alone, and the emit is the one place that knows which
+	// entry an event came from.
+	let byEntry = new Map<string, Array<TestEvent>>()
+	let emit = (event: TestEvent, suite: LoadedSuite | null = null): void => {
 		events.push(event)
+
+		if (suite !== null) {
+			let held = byEntry.get(suite.inputFileName)
+
+			if (held === undefined) {
+				held = []
+				byEntry.set(suite.inputFileName, held)
+			}
+
+			held.push(event)
+		}
 
 		if (context.options.json) {
 			writeEvent(`${JSON.stringify(event)}\n`)
@@ -775,31 +1011,199 @@ export async function runTest(
 	// bundle draws from it, and every property test folds its own identity in.
 	// So the replay a failure prints reproduces the run rather than the file.
 	let seed = context.options.seed ?? randomSeed()
+
+	// NOTE: The runs that may not be answered out of the result cache, at all,
+	// in either direction. `--update` and `--coverage` are runs whose whole point
+	// is the file they leave behind; `--bench` measures a machine rather than
+	// asking a question about the code; `--seed` and `--cases` say which values a
+	// property test draws, and a property test is never remembered anyway. What
+	// is NOT here is `--json` — a replay is the same events on the same lines —
+	// and the filters, which go into the key instead so that a narrowed run is an
+	// answer of its own rather than one that can never be kept.
+	//
+	// NOTE: `--watch` and the Language Server's session do not come through here
+	// and use none of this. A watching run already re-runs only what a save
+	// reached, out of bundles it is holding, and answering out of a file would be
+	// slower than the loop it replaced.
+	let cachingActive =
+		!context.options.update &&
+		!context.options.coverage &&
+		!context.options.bench &&
+		context.options.seed === undefined &&
+		context.options.cases === null
+	let resultStore = cachingActive ? resultCacheDirectory() : null
+	// NOTE: The entries a result cache could answer for at all — one that would
+	// not compile has no answer to remember and no bundle to name one with.
+	let loadable = compilation.outcomes.flatMap((outcome) =>
+		outcome.outputFileName === null
+			? []
+			: [{ ...outcome, outputFileName: outcome.outputFileName }],
+	)
+	let ordered = loadable.map((outcome) => outcome.inputFileName)
+	let bundleOf = new Map(
+		loadable.map((outcome) => [
+			outcome.inputFileName,
+			outcome.outputFileName,
+		]),
+	)
+	let keys = new Map<string, string>()
+	let hits = new Map<string, ResultRecord>()
+
+	if (resultStore !== null) {
+		let readStores = createStoreReader()
+		let host = hostKey()
+
+		for (let outcome of loadable) {
+			// NOTE: An entry that did not compile is left out of the store in
+			// both directions. Its bundle may be an older run's, and what the
+			// report says about it is that its tests did not run.
+			if (!outcome.ok) {
+				continue
+			}
+
+			let key = resultKey({
+				bundleHash: bundleHashOf(outcome.outputFileName),
+				stores: await readStores(
+					outcome.modules.map((module) => module.fileName),
+				),
+				filters,
+				host,
+			})
+
+			keys.set(outcome.inputFileName, key)
+
+			let held = await readResult(resultStore, key)
+
+			if (held !== null) {
+				hits.set(outcome.inputFileName, held)
+			}
+		}
+	}
+
 	let staging = await mkdtemp(path.join(tmpdir(), "essence-test-"))
 	let restore = redirectStdout()
 	let suites: Array<LoadedSuite>
 	let run: TestRun = emptyRun
 	let matchedNames = 0
+	let selections: Array<EntrySelection> = []
 
 	try {
-		suites = claimRegistries(
-			await loadBundles(
-				staging,
-				compilation.outcomes.flatMap((outcome) =>
-					outcome.outputFileName === null
-						? []
-						: [
-								{
-									inputFileName: outcome.inputFileName,
-									bundle: outcome.outputFileName,
-								},
-							],
-				),
-			),
+		// NOTE: Each call stages into a directory of this run's own. Staging is
+		// numbered WITHIN a call, so two calls into one directory would both
+		// write `0/tests.mjs` — and `import()` caches by URL, so the second
+		// bundle would answer with the first one's registry.
+		let staged = 0
+		let live = new Map<string, LoadedBundle>()
+		let load = async (names: Array<string>): Promise<void> => {
+			let loaded = await loadBundles(
+				path.join(staging, String(staged)),
+				names.map((name) => ({
+					inputFileName: name,
+					bundle: bundleOf.get(name)!,
+				})),
+			)
+
+			staged += 1
+
+			for (let bundle of loaded) {
+				live.set(bundle.inputFileName, bundle)
+			}
+		}
+
+		await load(ordered.filter((name) => !hits.has(name)))
+
+		let claimBundles = (): Array<LoadedBundle> =>
+			ordered.flatMap((name) => {
+				let bundle = live.get(name)
+
+				return bundle === undefined ? [] : [bundle]
+			})
+		// NOTE: What the run would give each entry if every bundle were here.
+		// A hit reads its Modules off its record — the bundle hash that names
+		// the record pins them, so what it says is what the bundle would say —
+		// and a miss has just been loaded.
+		let plan = planClaims(
+			ordered.map((name) => ({
+				inputFileName: name,
+				modules:
+					hits.get(name)?.modules ??
+					(live.get(name)?.modules ?? []).map(moduleKeyOf),
+			})),
 		)
+		// NOTE: A hit whose claim has MOVED is demoted and run live. It happens
+		// when an entry before it in the run changed and now reaches — or no
+		// longer reaches — a Module they share: the record answers for Modules
+		// this run would give somebody else, or is missing ones nobody else will
+		// run. Every other hit's claim is untouched by the demotion, because its
+		// Modules are the same either way.
+		let moved = ordered.filter((name) => {
+			let held = hits.get(name)
+
+			return (
+				held !== undefined &&
+				!sameClaim(plan.get(name) ?? [], held.claimed)
+			)
+		})
+
+		if (moved.length > 0) {
+			for (let name of moved) {
+				hits.delete(name)
+			}
+
+			await load(moved)
+		}
+
+		// NOTE: Seeded with what the surviving hits hold, so that a live entry
+		// sharing a Module with a replayed one does not take it over and report
+		// the tests the replay has already reported.
+		let claimHits = (): Set<string> =>
+			new Set([...hits.keys()].flatMap((name) => plan.get(name) ?? []))
+
+		suites = claimRegistries(claimBundles(), claimHits())
+
+		// NOTE: A focus silences every other test of the run, and a replayed
+		// stream would claim runs that must not happen — so one focused live
+		// bundle discards every hit and everything runs. Nothing cached can be
+		// focused itself: a focused run is never remembered.
+		//
+		// NOTE: Focus is a fact about the MANIFEST rather than about the
+		// filters, so the probe hands the runtime only the one filter it depends
+		// on. Asking with the run's own `--filter` would render every
+		// interpolated name a second time to be told the same thing.
+		if (
+			hits.size > 0 &&
+			suites.some(
+				(suite) =>
+					suite.tests.select(suite.registry, {
+						bench: filters.bench,
+					}).focused,
+			)
+		) {
+			let demoted = [...hits.keys()]
+
+			hits.clear()
+
+			await load(demoted)
+
+			suites = claimRegistries(claimBundles())
+		}
+
+		let cached = ordered.flatMap((name): Array<CachedEntry> => {
+			let held = hits.get(name)
+
+			return held === undefined
+				? []
+				: [
+						{
+							inputFileName: name,
+							tests: held.tests,
+							events: held.events,
+						},
+					]
+		})
 
 		let started = performance.now()
-		let { focused, matched } = runSuites(
+		let { focused, matched, entries } = runSuites(
 			suites,
 			suites,
 			filters,
@@ -812,6 +1216,7 @@ export async function runTest(
 				counterexamples: corpus.stores,
 			},
 			baselines,
+			{ entries: cached, order: ordered },
 		)
 		// NOTE: The stream is folded up ONCE, here, and the `run-end` this
 		// writes carries the counts it found. Re-reading the stream afterwards
@@ -820,7 +1225,13 @@ export async function runTest(
 		// duration measured around the loop, which is put back below.
 		let duration = performance.now() - started
 
-		matchedNames = matched
+		// NOTE: Across the live entries AND the replayed ones, because a filter
+		// names a test and the run is what holds the tests — a name that matched
+		// nothing live and something in a cached entry matched the run.
+		matchedNames =
+			matched +
+			[...hits.values()].reduce((total, held) => total + held.matched, 0)
+		selections = entries
 		run = { ...collectTestRun(events), duration }
 
 		emit({
@@ -841,10 +1252,12 @@ export async function runTest(
 		await rm(staging, { recursive: true, force: true })
 	}
 
-	reportUnknownTags(context, suites, [
-		...filters.tags,
-		...context.options.skipTag,
-	])
+	reportUnknownTags(
+		context,
+		suites,
+		[...filters.tags, ...context.options.skipTag],
+		[...hits.values()].flatMap((held) => held.tags),
+	)
 	reportUnmatchedFilter(context, filters.filter, matchedNames)
 	reportBenchOnlyFilter(context, run, filters.filter, context.options.bench)
 
@@ -893,6 +1306,47 @@ export async function runTest(
 		)
 	}
 
+	// NOTE: After the stores have been written, so that a record is only ever
+	// keyed against a disk that has already settled — and refused for this run
+	// where a snapshot or a baseline was recorded, which is what changed it.
+	//
+	// NOTE: Nothing at all is remembered out of a FOCUSED run. Every entry of it
+	// reports what a narrowing decided rather than what the code says, including
+	// the one holding the focus, whose own stream carries no sign of it where
+	// every test it holds is focused.
+	if (resultStore !== null && !run.focused) {
+		for (let suite of suites) {
+			let key = keys.get(suite.inputFileName)
+			let stream = byEntry.get(suite.inputFileName) ?? []
+			let selection = selections.find(
+				(entry) => entry.inputFileName === suite.inputFileName,
+			)
+
+			if (
+				key === undefined ||
+				selection === undefined ||
+				!isRemembered(stream)
+			) {
+				continue
+			}
+
+			await writeResult(resultStore, key, {
+				format: RESULTS_FORMAT,
+				entry: suite.inputFileName,
+				tags: [
+					...new Set(
+						suite.registry.tests.flatMap((test) => test.entry.tags),
+					),
+				].sort(),
+				tests: selection.planned,
+				matched: selection.matched,
+				modules: suite.modules.map(moduleKeyOf),
+				claimed: suite.registry.modules.map(moduleKeyOf),
+				events: stream,
+			})
+		}
+	}
+
 	if (!context.options.json) {
 		printReport(
 			context,
@@ -902,6 +1356,7 @@ export async function runTest(
 			written,
 			cacheWarm,
 			recorded,
+			ordered.length,
 		)
 	}
 

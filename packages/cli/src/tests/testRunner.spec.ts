@@ -4,6 +4,7 @@ import {
 	existsSync,
 	mkdirSync,
 	mkdtempSync,
+	readdirSync,
 	readFileSync,
 	rmSync,
 	writeFileSync,
@@ -33,16 +34,26 @@ import {
 } from "../testReport"
 import { createPalette, createTheme } from "../theme"
 
-// NOTE: A bundle cache of this spec's own. It is assigned rather than exported
-// because where the cache lives is read off the environment every time it is
-// asked for, and restored afterwards so that a suite running beside this one
-// keeps the directory it named.
+// NOTE: A bundle cache of this spec's own, and a result cache beside it. They
+// are assigned rather than exported because where a cache lives is read off the
+// environment every time it is asked for, and restored afterwards so that a
+// suite running beside this one keeps the directories it named.
+//
+// NOTE: Directories rather than `off` for both, so that what these specs drive
+// is what a reader's own `essence test` does — including the store a second run
+// answers out of. Nothing here may reach the user's caches: a spec that filled
+// one would make the next real run replay a fixture, and a spec that read one
+// would answer out of a project it has never seen.
 let bundleCache = mkdtempSync(path.join(tmpdir(), "essence-test-cache-"))
+let resultCache = mkdtempSync(path.join(tmpdir(), "essence-test-results-"))
 let previousCache: string | undefined
+let previousResults: string | undefined
 
 beforeAll(() => {
 	previousCache = process.env.ESSENCE_CLI_CACHE
+	previousResults = process.env.ESSENCE_RESULTS_CACHE
 	process.env.ESSENCE_CLI_CACHE = bundleCache
+	process.env.ESSENCE_RESULTS_CACHE = resultCache
 })
 
 afterAll(() => {
@@ -52,7 +63,14 @@ afterAll(() => {
 		process.env.ESSENCE_CLI_CACHE = previousCache
 	}
 
+	if (previousResults === undefined) {
+		delete process.env.ESSENCE_RESULTS_CACHE
+	} else {
+		process.env.ESSENCE_RESULTS_CACHE = previousResults
+	}
+
 	rmSync(bundleCache, { recursive: true, force: true })
+	rmSync(resultCache, { recursive: true, force: true })
 })
 
 const testCommand = findCommand("test") as NonNullable<
@@ -2368,6 +2386,601 @@ describe("essence test — the failing-example corpus", () => {
 			expect(code).toBe(EXIT_SUCCESS)
 			expect(property).toMatchObject({ replayed: 0, stale: [0] })
 			expect(existsSync(corpusPath(directory))).toBe(false)
+		})
+	})
+})
+
+// NOTE: What a second `essence test` over an untouched project does. The claim
+// a replay makes is that these tests ran and said this, so every spec here is
+// about one of the two halves of that claim: what makes a run answerable out of
+// the store, and what makes an answer in the store no longer this run's.
+describe("essence test — the result cache", () => {
+	// NOTE: A Module with no tests of its own, so that touching it moves what
+	// another entry ANSWERS without moving which entry claims what.
+	const library = [
+		"implementation {",
+		"\tfunction triple(_ value: Integer) -> Integer {",
+		"\t\t<- value::multiply(with 3)",
+		"\t}",
+		"}",
+		"",
+		"export {",
+		"\ttriple",
+		"}",
+		"",
+	].join("\n")
+
+	const usesLibrary = [
+		"import {",
+		'\ttriple from "./Library.es"',
+		"}",
+		"",
+		"tests {",
+		'\ttest "triples" {',
+		"\t\texpect triple(2)::is(6)",
+		"\t}",
+		"}",
+		"",
+	].join("\n")
+
+	const standalone = [
+		"tests {",
+		'\ttest "holds on its own" {',
+		"\t\texpect true",
+		"\t}",
+		"}",
+		"",
+	].join("\n")
+
+	const property = [
+		"tests {",
+		'\ttest "is itself" for any (n: Integer) {',
+		"\t\texpect n::is(n)",
+		"\t}",
+		"}",
+		"",
+	].join("\n")
+
+	const snapshotting = [
+		"implementation {",
+		"\tfunction greeting(_ name: String) -> String {",
+		'\t\t<- "Hello, {name}"',
+		"\t}",
+		"}",
+		"",
+		"tests {",
+		'\ttest "renders a stored one" {',
+		'\t\texpect greeting("Tigers") matches snapshot from "tigers"',
+		"\t}",
+		"}",
+		"",
+	].join("\n")
+
+	// NOTE: A store of this spec's own, so that counting what is in it counts
+	// only what this spec put there. The variable is read every time the store
+	// is asked for, so setting it here reaches the run below.
+	async function withResults<Value>(
+		body: (store: string) => Promise<Value>,
+	): Promise<Value> {
+		let store = mkdtempSync(path.join(tmpdir(), "essence-result-store-"))
+		let previous = process.env.ESSENCE_RESULTS_CACHE
+
+		process.env.ESSENCE_RESULTS_CACHE = store
+
+		try {
+			return await body(store)
+		} finally {
+			if (previous === undefined) {
+				delete process.env.ESSENCE_RESULTS_CACHE
+			} else {
+				process.env.ESSENCE_RESULTS_CACHE = previous
+			}
+
+			rmSync(store, { recursive: true, force: true })
+		}
+	}
+
+	function records(store: string): Array<string> {
+		return readdirSync(store).filter((name) => name.endsWith(".json"))
+	}
+
+	function bundles(): Array<string> {
+		return readdirSync(bundleCache).filter((name) => name.endsWith(".mjs"))
+	}
+
+	// NOTE: The honest proof that a replayed entry is never loaded. A bundle is
+	// content-addressed, so its name is a function of the sources and not of what
+	// is inside the file — poison the bytes and a run that still passes is a run
+	// that never imported them. Only this fixture's bundles are touched: every
+	// spec compiles out of a directory of its own, so no other name can collide.
+	function poison(before: Array<string>): number {
+		let written = bundles().filter((name) => !before.includes(name))
+
+		for (let name of written) {
+			writeFileSync(
+				path.join(bundleCache, name),
+				'throw new Error("this bundle was imported")\n',
+			)
+		}
+
+		return written.length
+	}
+
+	function events(out: string): Array<TestEvent> {
+		return out
+			.split("\n")
+			.filter((line) => line !== "")
+			.map((line) => JSON.parse(line) as TestEvent)
+	}
+
+	// NOTE: The report without its tally, which is the one line a warm run and a
+	// cold one are meant to differ on — the duration is the run's own and the
+	// note beside it is what says the run was warm.
+	function tree(out: string): string {
+		return out
+			.split("\n")
+			.filter((line) => !line.includes("passed"))
+			.join("\n")
+	}
+
+	it("remembers one record per entry the first run answered", async () => {
+		await withResults(async (store) => {
+			await withFiles(
+				{
+					"Library.es": library,
+					"Uses.tests.es": usesLibrary,
+					"Standalone.tests.es": standalone,
+				},
+				async (directory) => {
+					let { code, out } = await runTests(directory)
+
+					expect(code).toBe(EXIT_SUCCESS)
+					expect(out).toContain("2 passed")
+					expect(out).not.toContain("entries cached")
+					expect(records(store)).toHaveLength(2)
+				},
+			)
+		})
+	})
+
+	it("replays them on the run after, without loading a bundle", async () => {
+		await withResults(async () => {
+			await withFiles(
+				{
+					"Library.es": library,
+					"Uses.tests.es": usesLibrary,
+					"Standalone.tests.es": standalone,
+				},
+				async (directory) => {
+					let before = bundles()
+
+					await runTests(directory)
+
+					expect(poison(before)).toBe(2)
+
+					let { code, out } = await runTests(directory)
+
+					expect(code).toBe(EXIT_SUCCESS)
+					expect(out).toContain("2 passed")
+					expect(out).toContain("2 of 2 entries cached")
+					expect(out).toContain("triples")
+					expect(out).toContain("holds on its own")
+				},
+			)
+		})
+	})
+
+	// NOTE: The whole point of keying on the graph rather than on the entry: a
+	// Module with no tests of its own still decides what the tests that reach it
+	// answer, so touching it has to reach the entry that imports it and nothing
+	// else.
+	it("re-runs the entry a touched dependency reaches, and only it", async () => {
+		await withResults(async () => {
+			await withFiles(
+				{
+					"Library.es": library,
+					"Uses.tests.es": usesLibrary,
+					"Standalone.tests.es": standalone,
+				},
+				async (directory) => {
+					await runTests(directory)
+
+					writeFileSync(
+						path.join(directory, "Library.es"),
+						library.replace("with 3", "with 4"),
+					)
+
+					let { code, out } = await runTests(directory)
+
+					expect(code).toBe(EXIT_FAILURE)
+					expect(out).toContain("1 of 2 entries cached")
+					expect(out).toContain("1 failed")
+					expect(out).toContain("1 passed")
+				},
+			)
+		})
+	})
+
+	it("never remembers an entry that failed", async () => {
+		await withResults(async (store) => {
+			await withFiles(
+				{ "Wrong.tests.es": failing },
+				async (directory) => {
+					expect((await runTests(directory)).code).toBe(EXIT_FAILURE)
+					expect(records(store)).toHaveLength(0)
+
+					let { code, out } = await runTests(directory)
+
+					expect(code).toBe(EXIT_FAILURE)
+					expect(out).not.toContain("entries cached")
+				},
+			)
+		})
+	})
+
+	// NOTE: Fresh entropy every run is what a property test IS. Freezing a
+	// hundred cases under a name would end its search, and the values it has
+	// already failed on are the corpus's business rather than this store's.
+	it("never remembers an entry holding a property test", async () => {
+		await withResults(async (store) => {
+			await withFiles(
+				{
+					"Numbers.tests.es": property,
+					"Standalone.tests.es": standalone,
+				},
+				async (directory) => {
+					expect((await runTests(directory)).code).toBe(EXIT_SUCCESS)
+					expect(records(store)).toHaveLength(1)
+
+					let { out } = await runTests(directory)
+
+					expect(out).toContain("1 of 2 entries cached")
+				},
+			)
+		})
+	})
+
+	// NOTE: A first run WRITES the file the key reads, so a record of it would
+	// be keyed against a disk that no longer exists. One run later the entry has
+	// compared itself against what it wrote and matched, and that run is the one
+	// worth keeping.
+	it("waits a run out where a snapshot was recorded", async () => {
+		await withResults(async (store) => {
+			await withFiles(
+				{ "Greeting.tests.es": snapshotting },
+				async (directory) => {
+					let first = await runTests(directory)
+
+					expect(first.out).toContain("1 snapshot written")
+					expect(records(store)).toHaveLength(0)
+
+					let second = await runTests(directory)
+
+					expect(second.out).not.toContain("entries cached")
+					expect(records(store)).toHaveLength(1)
+
+					let third = await runTests(directory)
+
+					expect(third.code).toBe(EXIT_SUCCESS)
+					expect(third.out).toContain("1 of 1 entry cached")
+				},
+			)
+		})
+	})
+
+	// NOTE: A stored snapshot is in the key, so accepting one by hand is a
+	// different question and not the same one answered again.
+	it("re-runs an entry whose stored snapshot changed", async () => {
+		await withResults(async () => {
+			await withFiles(
+				{ "Greeting.tests.es": snapshotting },
+				async (directory) => {
+					await runTests(directory)
+					await runTests(directory)
+
+					let stored = path.join(
+						directory,
+						"__snapshots__",
+						"Greeting.tests.es.snap",
+					)
+
+					writeFileSync(
+						stored,
+						readFileSync(stored, "utf8").replace(
+							"Hello, Tigers",
+							"Hello, Foxes",
+						),
+					)
+
+					let { code, out } = await runTests(directory)
+
+					expect(out).not.toContain("entries cached")
+					expect(code).toBe(EXIT_FAILURE)
+				},
+			)
+		})
+	})
+
+	// NOTE: Each of these is a run whose answer is not the question this store
+	// asks — one that writes the files the key reads, one that measures a
+	// machine, one that says which values a property draws. None of them may
+	// read the store either: a replay would leave the run without the very thing
+	// it was asked for.
+	it("is inert under the flags that mean something else", async () => {
+		for (let flags of [
+			["--update"],
+			["--coverage"],
+			["--seed", "abcdef"],
+			["--cases", "10"],
+			["--bench"],
+		]) {
+			await withResults(async (store) => {
+				await withFiles(
+					{ "Standalone.tests.es": standalone },
+					async (directory) => {
+						await runTests(directory, flags)
+
+						expect(records(store)).toHaveLength(0)
+
+						await runTests(directory)
+						expect(records(store)).toHaveLength(1)
+
+						let { out } = await runTests(directory, flags)
+
+						expect(out).not.toContain("entries cached")
+					},
+				)
+			})
+		}
+	})
+
+	// NOTE: A focus silences every other test of the run, so a replayed stream
+	// would claim runs that must not happen. One focused live bundle discards
+	// every hit and everything runs — and nothing at all is remembered out of it.
+	it("discards every hit once a live entry turns out to be focused", async () => {
+		await withResults(async (store) => {
+			await withFiles(
+				{ "Standalone.tests.es": standalone },
+				async (directory) => {
+					await runTests(directory)
+
+					expect(records(store)).toHaveLength(1)
+
+					writeFileSync(
+						path.join(directory, "Focus.tests.es"),
+						focused,
+					)
+
+					let { code, out } = await runTests(directory)
+
+					expect(code).toBe(EXIT_FOCUSED)
+					expect(out).not.toContain("entries cached")
+					expect(out).toContain("1 passed")
+					expect(out).toContain("2 not focused")
+					// NOTE: Nothing new was written: a focused run reports what a
+					// narrowing decided rather than what the code says.
+					expect(records(store)).toHaveLength(1)
+				},
+			)
+		})
+	})
+
+	// NOTE: Two entries reaching one Module WITH tests, which is the arrangement
+	// `claimRegistries` exists for: only one of them may run that Module, and
+	// which one is decided across the whole run in the order the entries were
+	// named. A replayed entry is a bundle nobody loaded, so the claim it was
+	// recorded under is checked against the claim this run would give it.
+	const shared = [
+		"implementation {",
+		"\tconstant answer = 42",
+		"}",
+		"",
+		"export {",
+		"\tanswer",
+		"}",
+		"",
+		"tests {",
+		'\ttest "the shared Module holds" {',
+		"\t\texpect true",
+		"\t}",
+		"}",
+		"",
+	].join("\n")
+
+	const reader = [
+		"import {",
+		'\tanswer from "./Shared.es"',
+		"}",
+		"",
+		"tests {",
+		'\ttest "reads the shared value" {',
+		"\t\texpect answer::is(42)",
+		"\t}",
+		"}",
+		"",
+	].join("\n")
+
+	const alone = [
+		"tests {",
+		'\ttest "reads the shared value" {',
+		"\t\texpect 42::is(42)",
+		"\t}",
+		"}",
+		"",
+	].join("\n")
+
+	it("keeps a shared Module with the entry that was running it", async () => {
+		await withResults(async () => {
+			await withFiles(
+				{ "Shared.es": shared, "Reader.tests.es": reader },
+				async (directory) => {
+					await runTests(directory)
+
+					// NOTE: Only the entry that CLAIMED the shared Module moves.
+					// The other one is replayed, and what it claimed — nothing —
+					// is what this run would give it too.
+					writeFileSync(
+						path.join(directory, "Reader.tests.es"),
+						reader.replace("::is(42)", "::isNot(0)"),
+					)
+
+					let { code, out } = await runTests(directory)
+
+					expect(code).toBe(EXIT_SUCCESS)
+					expect(out).toContain("1 of 2 entries cached")
+					expect(out).toContain("2 passed")
+					expect(out).toContain("the shared Module holds")
+				},
+			)
+		})
+	})
+
+	// NOTE: The case a replay would otherwise lose a whole Module to. The entry
+	// that had been running the shared tests stops reaching it, so the run hands
+	// them to the entry whose record says it runs nothing — and a record read
+	// back under a claim that has moved is refused rather than replayed.
+	it("re-runs a replayed entry whose claim has moved", async () => {
+		await withResults(async () => {
+			await withFiles(
+				{ "Shared.es": shared, "Reader.tests.es": reader },
+				async (directory) => {
+					await runTests(directory)
+					await runTests(directory)
+
+					writeFileSync(
+						path.join(directory, "Reader.tests.es"),
+						alone,
+					)
+
+					let { code, out } = await runTests(directory)
+
+					expect(code).toBe(EXIT_SUCCESS)
+					expect(out).toContain("2 passed")
+					expect(out).toContain("the shared Module holds")
+					expect(out).toContain("reads the shared value")
+					expect(out).not.toContain("entries cached")
+				},
+			)
+		})
+	})
+
+	// NOTE: A tag only the replayed half of a project carries is a tag the run
+	// knows. Warning about it would make the warning fire because the cache was
+	// warm, which is the one thing it must never mean.
+	it("knows the tags of an entry it replayed", async () => {
+		await withResults(async () => {
+			await withFiles({ "Rules.es": passing }, async (directory) => {
+				await runTests(directory, ["--skip-tag", "slow"])
+
+				let { err, out } = await runTests(directory, [
+					"--skip-tag",
+					"slow",
+				])
+
+				expect(out).toContain("1 of 1 entry cached")
+				expect(err).not.toContain("no test carries tag")
+			})
+		})
+	})
+
+	// NOTE: The filters are in the key rather than a reason to refuse the store,
+	// so a narrowed run is an answer of its own beside the whole one.
+	it("keeps a narrowed run apart from the run it narrowed", async () => {
+		await withResults(async (store) => {
+			await withFiles({ "Rules.es": passing }, async (directory) => {
+				await runTests(directory)
+				await runTests(directory, ["--tag", "slow"])
+
+				expect(records(store)).toHaveLength(2)
+
+				let { out } = await runTests(directory, ["--tag", "slow"])
+
+				expect(out).toContain("1 of 1 entry cached")
+				expect(out).toContain("is slow")
+			})
+		})
+	})
+
+	// NOTE: What a replay CLAIMS is that these tests ran and said this, so the
+	// report of a warm run has to be the report of the cold one it stands in for
+	// — the same files in the same order, every test where it was. Only the tally
+	// differs, which is where the run says so. Nothing in the tree is timed
+	// except a benchmark's measurement, and measuring is one of the runs this
+	// store is inert under.
+	it("reads exactly as the run it stands in for", async () => {
+		await withResults(async () => {
+			await withFiles(
+				{
+					"Numbers.tests.es": property,
+					"Standalone.tests.es": standalone,
+					"Shared.es": shared,
+					"Reader.tests.es": reader,
+				},
+				async (directory) => {
+					let cold = await runTests(directory)
+					let warm = await runTests(directory)
+
+					expect(warm.out).toContain("3 of 4 entries cached")
+					expect(tree(warm.out)).toBe(tree(cold.out))
+				},
+			)
+		})
+	})
+
+	it("replays into the stream one event per line", async () => {
+		await withResults(async () => {
+			await withFiles(
+				{ "Standalone.tests.es": standalone },
+				async (directory) => {
+					await runTests(directory, ["--json"])
+
+					let { code, out } = await runTests(directory, ["--json"])
+					let stream = events(out)
+
+					expect(
+						out
+							.split("\n")
+							.filter((line) => line !== "")
+							.every((line) => line.startsWith('{"schema":1,')),
+					).toBe(true)
+					expect(stream.map((event) => event.kind)).toEqual([
+						"run-start",
+						"results-cached",
+						"test-start",
+						"expect",
+						"test-pass",
+						"run-end",
+					])
+					expect(stream[0]).toMatchObject({ tests: 1 })
+					expect(stream[1]).toMatchObject({ tests: 1 })
+					expect(stream.at(-1)).toMatchObject({
+						passed: 1,
+						failed: 0,
+					})
+					expect(code).toBe(EXIT_SUCCESS)
+				},
+			)
+		})
+	})
+
+	it("is off where the variable says a disabling word", async () => {
+		await withResults(async (store) => {
+			await withFiles(
+				{ "Standalone.tests.es": standalone },
+				async (directory) => {
+					await runTests(directory)
+
+					expect(records(store)).toHaveLength(1)
+
+					process.env.ESSENCE_RESULTS_CACHE = "off"
+
+					let { code, out } = await runTests(directory)
+
+					expect(code).toBe(EXIT_SUCCESS)
+					expect(out).toContain("1 passed")
+					expect(out).not.toContain("entries cached")
+				},
+			)
 		})
 	})
 })
