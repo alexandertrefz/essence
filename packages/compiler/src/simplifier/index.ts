@@ -338,12 +338,19 @@ function simplifyMethodInvocation(
 		return simplifyUnionMethodInvocation(node, node.dispatch)
 	}
 
-	if (node.overloadedMethodIndex !== null) {
-		node.member.name = resolveOverloadedMethodName(
-			node.member.name,
-			node.overloadedMethodIndex,
-		)
-	}
+	// NOTE: The mangled name goes into the NEW node and is never written back.
+	// The typed Program is read again after this — the Language Server holds
+	// it for every hover and rename, and a contract goal shares one typed
+	// check between every entry over the same refinement — and the suffix
+	// only appends, so a node simplified twice would name
+	// `is__overload$1__overload$1` the second time, a member nothing declares.
+	let memberName =
+		node.overloadedMethodIndex === null
+			? node.member.name
+			: resolveOverloadedMethodName(
+					node.member.name,
+					node.overloadedMethodIndex,
+				)
 
 	return {
 		nodeType: "MethodInvocation",
@@ -353,7 +360,7 @@ function simplifyMethodInvocation(
 			type: node.namespace.type,
 			position: node.position,
 		},
-		member: { name: node.member.name },
+		member: { name: memberName },
 		...(node.omittedParameterIndices.length === 0
 			? {}
 			: { omitsArguments: true as const }),
@@ -424,20 +431,24 @@ function simplifyUnionMethodInvocation(
 function simplifyFunctionInvocation(
 	node: common.typed.FunctionInvocationNode,
 ): common.typedSimple.FunctionInvocationNode {
+	// NOTE: Mangled on the SIMPLIFIED callee, which is a fresh node, for the
+	// reason `simplifyMethodInvocation` gives: the typed one is read again.
+	let name = simplifyExpression(node.name)
+
 	if (node.overloadedMethodIndex !== null) {
-		if (node.name.nodeType === "Lookup") {
+		if (name.nodeType === "Lookup") {
 			// NOTE: A `Namespace.method(…)` call whose Method is overloaded — the
 			// index names which Overload the Enricher picked.
-			node.name.member.content = resolveOverloadedMethodName(
-				node.name.member.content,
+			name.member.name = resolveOverloadedMethodName(
+				name.member.name,
 				node.overloadedMethodIndex,
 			)
-		} else if (node.name.nodeType === "Identifier") {
+		} else if (name.nodeType === "Identifier") {
 			// NOTE: A bare `loop(…)` call whose callee is an overloaded free
 			// Function — same numbering, on the Identifier itself. The Rewriter
 			// then reads `loop__overload$N` off the runtime `functions` module.
-			node.name.content = resolveOverloadedMethodName(
-				node.name.content,
+			name.name = resolveOverloadedMethodName(
+				name.name,
 				node.overloadedMethodIndex,
 			)
 		}
@@ -445,7 +456,7 @@ function simplifyFunctionInvocation(
 
 	return {
 		nodeType: "FunctionInvocation",
-		name: simplifyExpression(node.name),
+		name,
 		...(node.omittedParameterIndices.length === 0
 			? {}
 			: { omitsArguments: true as const }),
