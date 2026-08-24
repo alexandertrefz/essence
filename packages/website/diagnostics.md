@@ -708,6 +708,36 @@ namespace Team for Team is Generatable {
 }
 ```
 
+### `ungeneratable-contract`
+
+A remark rather than a mistake. `essence test --contracts` reads every Method a
+Namespace declares as the property its return Type states, and runs it: the
+receiver and every Argument are generated from the declared Types, the Method is
+called, and the answer is expected to hold each conjunct the return Type
+promises. A Method it could not build a goal for is named here, once per
+Namespace:
+
+```essence
+implementation {
+	namespace Reading for String {
+		§ Nothing knows how to build a Function, so nothing can call this.
+		with(each read: (_ text: String) -> Integer) -> Integer {
+			<- read(@)
+		}
+	}
+}
+```
+
+The usual reasons are a Parameter of a Type nothing can generate — see
+`ungeneratable-type` — and a Method whose signature still mentions a Type
+Parameter, which is left alone because a value drawn for one instantiation
+proves nothing about the rest.
+
+Write the property as a test of its own, or declare a `Generatable` conformance
+for the Type its Parameters could not be drawn from. Nothing is wrong with a
+Namespace that reports this: it says which of its promises a run is keeping and
+which it is not.
+
 ### `contradictory-test-forms`
 
 One test wrote both `across` and `for any`. A table test runs its body once per

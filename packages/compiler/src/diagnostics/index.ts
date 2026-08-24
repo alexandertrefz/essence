@@ -121,6 +121,29 @@ export function reportWarning(
 	report(buildDiagnostic("warning", message, position, details))
 }
 
+// NOTE: The quietest of the three, and the one nothing has to act on: a remark
+// about what the Compiler DID, where a reader who never reads it still has a
+// correct Program. Everything about the shape is a Warning's — a code, a
+// primary Label, notes and helps — because a remark a reader can not look up
+// or place is worth less than saying nothing.
+export function reportInformation(
+	message: string,
+	position: common.Position,
+	details: LocatedDetails,
+): void
+export function reportInformation(
+	message: string,
+	position: null,
+	details: PlacelessDetails,
+): void
+export function reportInformation(
+	message: string,
+	position: common.Position | null,
+	details: LocatedDetails | PlacelessDetails,
+): void {
+	report(buildDiagnostic("information", message, position, details))
+}
+
 // NOTE: For the Diagnostics that are about the Compiler run rather than about
 // a Program — a file that could not be read, a bundle that failed. They have
 // no source to point into, which is exactly the placeless half of the

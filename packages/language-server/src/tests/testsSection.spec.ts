@@ -587,6 +587,48 @@ describe("The tests section", () => {
 			expect(renamed).toContain("\t§§ expect double(of 2)::is(4)")
 		})
 	})
+
+	// NOTE: The `contracts` suite is synthesized the same way and left out of
+	// the walk by the same rule — it stands at the section's own span, since no
+	// source wrote a span for it. The Editor never compiles with the goals on
+	// today, so this is the guarantee that turning them on would cost the walk
+	// nothing rather than a behaviour anybody sees.
+	describe("Contract goals", () => {
+		const declaring = [
+			"implementation {",
+			"\ttype Positive = Integer where @::isGreaterThan(0)",
+			"\tnamespace Counting for Integer {",
+			"\t\tup() -> Positive {",
+			"\t\t\t<- 1",
+			"\t\t}",
+			"\t}",
+			"}",
+			"tests {",
+			'\ttest "counts" {',
+			"\t\texpect 1::isGreaterThan(0)",
+			"\t}",
+			"}",
+		].join("\n")
+
+		it("should leave the contracts suite out of the walk", () => {
+			let { program } = parseWithDiagnostics(declaring)
+			let { program: enrichedProgram } = enrich(program, {
+				tests: true,
+				contracts: true,
+				annotations: true,
+				source: declaring,
+			})
+
+			expect(
+				enrichedProgram.tests?.nodes.map((node) => node.nodeType),
+			).toEqual(["Test", "Suite"])
+			expect(
+				typedProgramSections(enrichedProgram).map(
+					(section) => section.kind,
+				),
+			).toEqual(["implementation", "tests", "test"])
+		})
+	})
 })
 
 // NOTE: The cross-Module half. `examples/league` is the real thing this feature

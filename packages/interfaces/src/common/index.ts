@@ -225,6 +225,7 @@ export type DiagnosticCode =
 	| "inline-snapshot-in-table"
 	| "property-parameters"
 	| "ungeneratable-type"
+	| "ungeneratable-contract"
 	| "contradictory-test-forms"
 	| "benchmark-for-any"
 	| "snapshot-in-property"
