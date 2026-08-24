@@ -136,6 +136,11 @@ export type TestManifestEntry = {
 	tags: Array<string>
 	focused: boolean
 	skipped: string | null
+	// NOTE: Whether the item was written as a `benchmark` rather than as a
+	// `test`. It is what a runner reads to decide whether the entry runs at all
+	// — a benchmark is timed, which is work nobody asked an ordinary run to do,
+	// so it runs under `--bench` or where somebody named it by id.
+	benchmark: boolean
 	position: Position
 	keywordPosition: Position
 }
@@ -157,6 +162,13 @@ export interface TestEntryNode {
 	// String Literal is in the manifest already, and emitting it a second time
 	// would be two spellings of one thing.
 	name: ExpressionNode | null
+	// NOTE: The key a benchmark's baseline is STORED under, and null for an
+	// ordinary test. It is the identity WITHOUT the Module path — the file it
+	// belongs to is the file the baseline is written beside, so spelling the
+	// path into the key as well would break every entry the day the file moves.
+	// The row number is not in it either: the runtime appends one at run time,
+	// the way a stored snapshot's name is numbered by the row that recorded it.
+	benchmark: string | null
 	body: Array<ImplementationNode>
 	position?: Position
 }
@@ -183,6 +195,11 @@ export interface TestRowsNode {
 	// same rule a plain test follows. It reads the row, which is why a table
 	// test's name can say which row it ran for.
 	name: ExpressionNode | null
+	// NOTE: The stored key of a benchmark's baseline, and null for an ordinary
+	// table test — see `TestEntryNode.benchmark`. The rows SHARE it, exactly as
+	// they share the template it is spelled out of; each row's own entry is that
+	// key with the row number behind it, which the runtime appends.
+	benchmark: string | null
 	body: Array<ImplementationNode>
 	position?: Position
 }

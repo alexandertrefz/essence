@@ -6,7 +6,7 @@ import type { common } from "@essence-lang/interfaces"
 
 import { containsErrors } from "../diagnostics/index"
 import { enrich } from "../enricher/index"
-import { testIdentityKey } from "../enricher/tests"
+import { relativeIdentityKey, testIdentityKey } from "../enricher/tests"
 import { optimise } from "../optimiser/index"
 import { parseWithDiagnostics } from "../parser/index"
 import { rewrite } from "../rewriter/index"
@@ -1158,6 +1158,185 @@ describe("Tests Section Semantics", () => {
 					}`,
 				),
 			).toEqual(["snapshot-not-printable"])
+		})
+	})
+
+	// NOTE: A benchmark is a test in every structural respect and differs in
+	// exactly one: what RUNNING it means. So what is asked here is that the form
+	// reaches the lowering, that the key its baseline is stored under is spelled
+	// where the run can read it, and that the one shape a measurement can not
+	// take is refused.
+	describe("Benchmarks", () => {
+		let source = `implementation {
+			function double(_ value: Integer) -> Integer {
+				<- value::add(value)
+			}
+		}
+
+		tests {
+			test "doubles" {
+				expect double(2)::is(4)
+			}
+
+			benchmark "doubling" {
+				expect double(500)::is(1000)
+			}
+		}`
+
+		it("should carry the Keyword that opened the item onto the node", () => {
+			expect(
+				testsOf(sectionOf(source).nodes).map((node) => node.form),
+			).toEqual(["test", "benchmark"])
+		})
+
+		it("should say in the manifest which entries are benchmarks", () => {
+			expect(
+				simplifiedSectionOf(source).tests.map((entry) => [
+					entry.name,
+					entry.benchmark,
+				]),
+			).toEqual([
+				["doubles", false],
+				["doubling", true],
+			])
+		})
+
+		it("should lower a benchmark with the key its baseline is stored under", () => {
+			let entries = simplifiedSectionOf(source).nodes.filter(
+				(node) => node.nodeType === "TestEntry",
+			) as Array<common.typedSimple.TestEntryNode>
+
+			expect(entries.map((entry) => entry.benchmark)).toEqual([
+				null,
+				"doubling",
+			])
+		})
+
+		// NOTE: The stored key is the identity WITHOUT the Module path — the
+		// file it belongs to is the file its baselines are written beside, so
+		// naming it in the key as well would lose every entry the day the file
+		// moves.
+		it("should spell a stored key without the Module path", () => {
+			expect(
+				relativeIdentityKey({
+					modulePath: "/Season.es",
+					suitePath: ["a/b"],
+					name: "c",
+				}),
+			).toBe("a\\/b/c")
+		})
+
+		it("should key a benchmark on the suites around it", () => {
+			let entries = simplifiedSectionOf(
+				`implementation {}
+
+				tests {
+					suite "Standing" {
+						benchmark "ranks the table" {
+							expect true
+						}
+					}
+				}`,
+			).nodes
+
+			expect(
+				(
+					(entries[0] as common.typedSimple.TestScopeNode)
+						.nodes[0] as common.typedSimple.TestEntryNode
+				).benchmark,
+			).toBe("Standing/ranks the table")
+		})
+
+		// NOTE: Each row is a benchmark in its own right, measured and compared
+		// against a baseline of its own — so the rows share the key and the
+		// runtime numbers the entry by the row that recorded it.
+		it("should take rows, and share one stored key between them", () => {
+			let section = simplifiedSectionOf(
+				`implementation {}
+
+				tests {
+					benchmark "sorts {size} rows" across [10, 100] (size: Integer) {
+						expect size::isGreaterThan(0)
+					}
+				}`,
+			)
+			let rows = section.nodes.find(
+				(node) => node.nodeType === "TestRows",
+			) as common.typedSimple.TestRowsNode
+
+			expect(
+				section.tests.map((entry) => [entry.id, entry.benchmark]),
+			).toEqual([
+				["/sorts {size} rows/0", true],
+				["/sorts {size} rows/1", true],
+			])
+			expect(rows.benchmark).toBe("sorts {size} rows")
+		})
+
+		it("should take the Modifiers a test takes", () => {
+			let node = testsOf(
+				sectionOf(
+					`implementation {}
+
+					tests {
+						benchmark "doubling" tagged slow {
+							expect true
+						}
+					}`,
+				).nodes,
+			)[0]
+
+			expect(node?.form).toBe("benchmark")
+			expect(node?.tags).toEqual(["slow"])
+		})
+
+		it("should refuse a benchmark over values the runner makes up", () => {
+			expect(
+				codesOf(
+					`implementation {}
+
+					tests {
+						benchmark "sorting" for any (n: Integer) {
+							expect n::isGreaterThanOrEqualTo(n)
+						}
+					}`,
+				),
+			).toEqual(["benchmark-for-any"])
+		})
+
+		// NOTE: The refusal is an Error and has already stopped the run; what
+		// the Parameters go on being enriched FOR is everything an Editor draws
+		// off the tree beside it.
+		it("should keep enriching a refused benchmark's Parameters", () => {
+			let node = testsOf(
+				analyse(
+					`implementation {}
+
+					tests {
+						benchmark "sorting" for any (n: Integer) {
+							expect n::isGreaterThanOrEqualTo(n)
+						}
+					}`,
+				).program.tests?.nodes ?? [],
+			)[0]
+
+			expect(
+				node?.properties?.parameters.map((each) => each.name),
+			).toEqual(["n"])
+		})
+
+		it("should say nothing about an ordinary property test", () => {
+			expect(
+				codesOf(
+					`implementation {}
+
+					tests {
+						test "sorting" for any (n: Integer) {
+							expect n::isGreaterThanOrEqualTo(n)
+						}
+					}`,
+				),
+			).toEqual([])
 		})
 	})
 

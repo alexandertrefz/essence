@@ -724,6 +724,32 @@ tests {
 
 Keep one of them, or write two tests.
 
+### `benchmark-for-any`
+
+A benchmark wrote `for any`. A measurement is comparable only where every run
+does the same work, and a generated value is a different value every case — so
+the body would be timed doing something else each time, and the baseline it is
+held to would be a number about nothing:
+
+```essence
+tests {
+	benchmark "sorting" for any (rows: List<Integer>) {
+		expect rows::sort()::length()::is(rows::length())
+	}
+}
+```
+
+Write the inputs the measurement runs over — a constant above the benchmark, or
+the rows to measure:
+
+```essence
+tests {
+	benchmark "sorts {size} rows" across [100, 10000] (size: Integer) {
+		expect List.of(integersFrom 1, through size)::sort()::length()::is(size)
+	}
+}
+```
+
 ### `snapshot-in-property`
 
 A `matches snapshot` was written in a property test. A property runs its body
