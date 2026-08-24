@@ -6,7 +6,7 @@ import {
 } from "./Generators"
 import { anyIs } from "./internalHelpers"
 import { materialise } from "./List"
-import { createRandomness, seedOf } from "./Randomness"
+import { createEntropy, createRandomness, nextWord, seedOf } from "./Randomness"
 import type { StringType } from "./String"
 import {
 	getStringRepresentation,
@@ -1487,11 +1487,10 @@ export type RunSummary = {
 // NOTE: A seed nobody asked for, as the eight hexadecimal characters `--seed`
 // reads back. It is made HERE rather than left empty so that every run of a
 // property test is a different run, and so that the one that failed can be run
-// again exactly.
+// again exactly. It is an entropy word rather than `Math.random` so the runtime
+// reads the machine through one door.
 export function randomSeed(): string {
-	return Math.floor(Math.random() * 0x1_0000_0000)
-		.toString(16)
-		.padStart(8, "0")
+	return nextWord(createEntropy()).toString(16).padStart(8, "0")
 }
 
 export function runTests(registry: Registry, options: RunOptions): RunSummary {

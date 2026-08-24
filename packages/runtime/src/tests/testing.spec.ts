@@ -15,6 +15,7 @@ import {
 	entry,
 	expected,
 	probe,
+	randomSeed,
 	type Range,
 	registryOf,
 	required,
@@ -1006,5 +1007,14 @@ describe("Terminal capture", () => {
 		)
 
 		expect(captured).toEqual(["inner"])
+	})
+})
+
+describe("The made-up seed", () => {
+	// NOTE: The eight hexadecimal characters are the contract `--seed` reads
+	// back, so the format is pinned here even though the word inside it is the
+	// machine's.
+	test("answers eight hexadecimal characters", () => {
+		expect(randomSeed()).toMatch(/^[0-9a-f]{8}$/)
 	})
 })
