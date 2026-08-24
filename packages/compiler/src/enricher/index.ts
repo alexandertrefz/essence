@@ -17,6 +17,7 @@ import {
 import { VALUE_COMMENT, valueCommentLines } from "../valueComments"
 import { collectAnnotations } from "./annotations"
 import { builtinMembers, builtinProtocols, builtinTypes } from "./builtins"
+import { contractSuite } from "./contracts"
 import {
 	derivePredicateAliases,
 	deriveProvidedPredicateAliases,
@@ -154,6 +155,13 @@ export const enrich = (
 		// "stripped from every build" means — the Program that comes out has
 		// never heard of it. See `common.typed.Program.tests`.
 		tests?: boolean
+		// NOTE: Whether this compile also asked for the CONTRACTS — the goals a
+		// Module's own Namespace declarations promise, synthesized as property
+		// tests and reported beside the written ones. `essence test
+		// --contracts` and the `essence.test.contracts` setting are what ask;
+		// it means nothing without `tests`, which is the mode the section it is
+		// appended to exists in at all. See `contractSuite`.
+		contracts?: boolean
 		// NOTE: What a test's identity spells as its Module where the Scope
 		// carries none of its own. The standard library is the one compile that
 		// is not a graph of Modules — its Choices are deliberately unqualified,
@@ -195,6 +203,7 @@ export const enrich = (
 					program,
 					scope,
 					options.tests,
+					options.contracts,
 					options.source,
 					options.testsPath,
 				),
@@ -285,6 +294,11 @@ function testsSectionOf(
 	program: parser.Program,
 	scope: enricher.Scope,
 	tests: boolean | undefined,
+	// NOTE: Whether this compile also asked for the goals a Module's own
+	// declarations promise — see `contractSuite`. It rides beside `tests`
+	// rather than replacing it: a contract run runs a project's written tests
+	// as well, and a goal is reported in the same manifest they are.
+	contracts: boolean | undefined,
 	source: string | undefined,
 	testsPath?: string,
 ): common.typed.TestsSectionNode | null {
@@ -300,14 +314,13 @@ function testsSectionOf(
 	// through ONE enrichment, in one Scope, and comes out as one manifest.
 	let examples = exampleTestsOf(program, source)
 
-	if (program.tests === null && examples.length === 0) {
+	if (program.tests === null && examples.length === 0 && contracts !== true) {
 		return null
 	}
 
 	let position = program.tests?.position ?? program.implementation.position
 	let written = program.tests?.nodes ?? []
-
-	return enrichTestsSection(
+	let section = enrichTestsSection(
 		{
 			nodeType: "TestsSection",
 			// NOTE: The examples come LAST, so that a file's own tests keep the
@@ -322,6 +335,28 @@ function testsSectionOf(
 		scope,
 		testsPath,
 	)
+
+	if (contracts !== true) {
+		return section
+	}
+
+	// NOTE: AFTER the written walk, and against the Scope the implementation
+	// filled rather than the one the section opened: what a goal names is a
+	// declaration, and a helper a test declared for itself is none of its
+	// business. The suite is appended, so every written item keeps the manifest
+	// index it had.
+	let contractsSuite = contractSuite(
+		program,
+		scope,
+		position,
+		modulePathOf(scope) ?? testsPath ?? null,
+	)
+
+	if (contractsSuite === null) {
+		return program.tests === null && examples.length === 0 ? null : section
+	}
+
+	return { ...section, nodes: [...section.nodes, contractsSuite] }
 }
 
 // NOTE: One Program and the Scope its top level is enriched in. The standard
@@ -348,6 +383,10 @@ export type EnrichProgramsOptions = {
 	// NOTE: Whether this compile asked for the tests — see `enrich`. It covers
 	// every Program of the group: one compile is one mode.
 	tests?: boolean
+	// NOTE: And whether it asked for the contract goals as well — see `enrich`.
+	// One compile is one mode here too: a graph linked for a contract run
+	// synthesizes goals in every Module of it.
+	contracts?: boolean
 	// NOTE: Called at the top of every hoist round, and once more after the
 	// last one, to bind whatever became bindable since — the seam a cycle of
 	// Modules needs: an import across an SCC can only be seeded once the
@@ -462,6 +501,7 @@ const enrichProgramsInner = (
 						program,
 						scope,
 						options.tests,
+						options.contracts,
 						source,
 					),
 					exports: null,

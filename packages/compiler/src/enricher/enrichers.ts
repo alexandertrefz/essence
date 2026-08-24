@@ -3324,7 +3324,7 @@ function reportPropertyParameters(
 // `enclosing` is the Choices already being derived, which is what refuses a
 // Type that contains itself: a descriptor is finite data, and a Choice naming
 // itself in a payload would be an infinite one.
-function deriveGenerator(
+export function deriveGenerator(
 	type: common.Type,
 	scope: enricher.Scope,
 	position: common.Position,
@@ -3640,7 +3640,7 @@ function step(digits: string, by: bigint): string {
 // The Diagnostics are collected and DROPPED: a conjunct this can not rebuild is
 // answered with null, and the refusal is reported once, about the Type, rather
 // than as a puzzle about a call nobody wrote.
-function predicateCheck(
+export function predicateCheck(
 	conjunct: common.PredicateConjunct,
 	refinement: common.RefinementType,
 	binding: string,
@@ -3712,7 +3712,7 @@ function predicateCall(
 		return null
 	}
 
-	let args: Array<parser.ArgumentNode> = []
+	let values: Array<parser.ExpressionNode> = []
 
 	for (let [index, parameter] of parameters.entries()) {
 		let value = predicateArgument(
@@ -3726,18 +3726,7 @@ function predicateCall(
 			return null
 		}
 
-		args.push({
-			nodeType: "Argument",
-			name:
-				parameter.name === null
-					? null
-					: {
-							nodeType: "Identifier",
-							content: parameter.name,
-							position,
-						},
-			value,
-		})
+		values.push(value)
 	}
 
 	let call: parser.MethodInvocationNode = {
@@ -3758,7 +3747,7 @@ function predicateCall(
 			content: conjunct.namespaceName,
 			position,
 		},
-		arguments: args,
+		arguments: invocationArguments(parameters, values, position),
 		position,
 	}
 
@@ -3781,6 +3770,33 @@ function predicateCall(
 				position,
 			}
 		: call
+}
+
+// NOTE: The Arguments of a call the Compiler builds rather than reads: one per
+// Parameter of the signature it is built against, in order, labelled with the
+// Parameter's own EXTERNAL name and written positionally where it has none.
+//
+// Shared by everything that rebuilds a call out of a resolved signature — a
+// refinement's conjunct against a candidate value, and a contract goal against
+// the values it generated — because "how a signature is spelled at a call site"
+// is one fact, and two spellings of it could come to disagree.
+export function invocationArguments(
+	parameters: Array<common.Parameter>,
+	values: Array<parser.ExpressionNode>,
+	position: common.Position,
+): Array<parser.ArgumentNode> {
+	return parameters.map((parameter, index) => ({
+		nodeType: "Argument",
+		name:
+			parameter.name === null
+				? null
+				: {
+						nodeType: "Identifier",
+						content: parameter.name,
+						position,
+					},
+		value: values[index]!,
+	}))
 }
 
 // NOTE: The signatures the conjunct's Method could have been resolved to — the
