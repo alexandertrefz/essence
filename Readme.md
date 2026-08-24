@@ -147,6 +147,14 @@ after it whether or not the search would find it again. A Type whose values carr
 state conforms to `Generatable` and generates itself; a property test over one keeps no counterexamples, since
 there is nothing to write down.
 
+Under `--coverage` a property test searches rather than samples: a case that reached a branch no case of that
+test had reached joins a small pool, and later cases move one Parameter of a kept case instead of drawing
+blind — so a failure gated behind several conditions at once is found by holding the conditions a case already
+met. The search is seeded like everything else, and what a case counts as reaching is measured from the start
+of its own test, so `--seed` replays a `--coverage` run exactly whatever else ran or was filtered out. A plain
+run and a `--coverage` run of one seed draw different cases by design — the instrumented run is the one that
+searches — and whatever either finds, the corpus remembers for both.
+
 A test written `across` a List of rows runs once per row, and `matches snapshot` compares a value against one a
 run recorded — inline in the source, or in `__snapshots__/<File>.es.snap` beside it where the snapshot was
 given a name. An `@example` block in a `§§` comment is a test too, compiled in the file's own scope and

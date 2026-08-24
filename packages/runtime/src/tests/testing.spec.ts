@@ -12,7 +12,8 @@ import {
 	beginCoverageRun,
 	benchmark,
 	benchmarkRows,
-	coverageStamp,
+	beginCoverageSpan,
+	touchedGround,
 	type CorpusStore,
 	coverage,
 	counters,
@@ -1312,28 +1313,40 @@ describe("The coverage counters", () => {
 		expect(report?.points.map((each) => each.count)).toEqual([2, 1])
 	})
 
-	// NOTE: Deltas rather than absolutes — the stamp is one global the whole
-	// spec file shares, exactly as a bundle's tests share it.
-	test("stamps new ground once, however often it is walked", () => {
+	// NOTE: Absolutes, because a span RESETS — that is the whole design: what
+	// a case reaches is measured from the start of its own test, not from
+	// whatever the process has touched before.
+	test("counts a span's new ground once, however often it is walked", () => {
 		let count = counters({
 			module: "/Stamped.es",
 			points: [point(1), point(2)],
 			choices: [],
 		})
-		let opening = coverageStamp()
 
+		beginCoverageSpan()
 		count(0)
 
-		expect(coverageStamp()).toBe(opening + 1)
+		expect(touchedGround()).toBe(1)
 
 		count(0)
 		count(0)
 
-		expect(coverageStamp()).toBe(opening + 1)
+		expect(touchedGround()).toBe(1)
 
 		count(1)
 
-		expect(coverageStamp()).toBe(opening + 2)
+		expect(touchedGround()).toBe(2)
+
+		// NOTE: A new span starts from nothing, and the SAME points count as
+		// fresh ground again — reached is a fact about the span, not about the
+		// bundle.
+		beginCoverageSpan()
+
+		expect(touchedGround()).toBe(0)
+
+		count(0)
+
+		expect(touchedGround()).toBe(1)
 	})
 
 	// NOTE: The inverse of the affected-set map, per test: the run copies the
