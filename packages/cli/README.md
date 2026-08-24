@@ -89,3 +89,14 @@ to the platform's cache directory; every run after it starts about sixty
 milliseconds sooner. `ESSENCE_COMPILER_CACHE` moves that directory — point it
 inside a build's own output to keep it there — and
 `ESSENCE_COMPILER_CACHE=off` turns it off.
+
+`essence test` remembers what each compiled entry answered, under a name made
+from that entry's whole Module graph, the snapshots, baselines and
+counterexamples it compares itself against, the host, and how the run was
+narrowed. A second run over a file nothing touched replays what the first one
+reported rather than running it, and says so beside the tally — `8 of 9
+entries cached`. An entry that failed, one holding a property test, and one that
+recorded a snapshot or a baseline are never remembered, and a focused run is
+not remembered at all; `--update`, `--coverage`, `--bench`, `--seed` and
+`--cases` neither read nor write. `ESSENCE_RESULTS_CACHE` moves the directory
+and `ESSENCE_RESULTS_CACHE=off` turns it off, for a run that has to be live.
