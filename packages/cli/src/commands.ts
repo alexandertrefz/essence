@@ -463,8 +463,13 @@ export const commands: Array<CommandSpec> = [
 				"test reaches, the Compiler is asked to tell one deliberate " +
 				"lie about the code and only the tests that reach it are run " +
 				"again. A mutant nothing notices is named with the sentence " +
-				"that says what was changed. --mutation-limit caps how many " +
-				"are tried and --strict makes a survivor exit non-zero.",
+				"that says what was changed. The baseline is the run this " +
+				"project's own `test` is — goals included, where they are " +
+				"asked for — and it has to be green and unfocused: a focus " +
+				"silences most of the suite, which would report every site " +
+				"the silenced tests cover as one no test reaches. " +
+				"--mutation-limit caps how many are tried and --strict makes " +
+				"a survivor exit non-zero.",
 			"--coverage compiles the tests with counters in them and reports " +
 				"what ran: lines and branches as percentages, Match arms as " +
 				"taken out of total, every branch and arm nothing reached " +

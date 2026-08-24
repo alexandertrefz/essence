@@ -425,6 +425,16 @@ The whole run draws from one seed, minted once and handed to the baseline and to
 every mutant alike, so a property test in a covering set asks the mutant exactly
 the question it asked the code. Two runs at one seed are the same report.
 
+The baseline is the run **this project's own `essence test` is**: the same
+filters, and the same contract goals where the project asks for them, so a
+generated goal reaches sites and kills mutants exactly as a written test does.
+It has to be green, and it has to be unfocused — a focus silences most of the
+suite, and a mutation run reads what ran to learn what reaches where, so a
+focused baseline would report every site the silenced tests cover as one no test
+reaches. A focused run is refused with exit 2 before a mutant is compiled, and
+`--without-optimisation instrument-coverage` is refused outright: without the
+counters there is no table to read.
+
 `--mutation-limit` caps how many mutants are compiled — a mutant costs a compile
 and a run, so a large project is worth narrowing — and the sites are taken in
 file order, so the same limit answers about the same mutants twice. It caps what

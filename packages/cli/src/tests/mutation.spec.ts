@@ -6,7 +6,12 @@ import path from "node:path"
 import type { common } from "@essence-lang/interfaces"
 import type { TestEvent } from "@essence-lang/runtime/Testing"
 
-import { EXIT_FAILURE, EXIT_SUCCESS, EXIT_USAGE } from "../actions"
+import {
+	EXIT_FAILURE,
+	EXIT_FOCUSED,
+	EXIT_SUCCESS,
+	EXIT_USAGE,
+} from "../actions"
 import { emptyOptions, parseArguments } from "../args"
 import { createContext } from "../context"
 import { run } from "../index"
@@ -45,6 +50,25 @@ async function withFiles<Value>(
 		return await body(directory)
 	} finally {
 		rmSync(directory, { recursive: true, force: true })
+	}
+}
+
+// NOTE: A project's settings are read out of the nearest package.json, found by
+// walking up from the WORKING DIRECTORY — so a spec about a configured project
+// has to stand in one. Restored before `withFiles` removes the directory, which
+// is why the two are nested rather than folded together.
+async function within<Value>(
+	directory: string,
+	body: () => Promise<Value>,
+): Promise<Value> {
+	let previous = process.cwd()
+
+	process.chdir(directory)
+
+	try {
+		return await body()
+	} finally {
+		process.chdir(previous)
 	}
 }
 
@@ -205,6 +229,33 @@ const UNCOVERED = [
 	"",
 	"tests {",
 	'	test "uses one of them" {',
+	"		expect used(1)::is(2)",
+	"	}",
+	"}",
+	"",
+].join("\n")
+
+// NOTE: A Namespace Method with no written test at all, whose declared return
+// Type is a refinement a mutant of its body breaks for EVERY receiver. So the
+// only thing that reaches it is the goal its own declaration promises, and what
+// the goal answers is a fact rather than a draw.
+const DECLARED = [
+	"implementation {",
+	"	type Tally = { count: Integer }",
+	"",
+	"	namespace Tally for Tally {",
+	"		floor() -> NonNegativeInteger {",
+	"			<- 0",
+	"		}",
+	"	}",
+	"",
+	"	function used(_ n: Integer) -> Integer {",
+	"		<- n::add(1)",
+	"	}",
+	"}",
+	"",
+	"tests {",
+	'	test "uses the function" {',
 	"		expect used(1)::is(2)",
 	"	}",
 	"}",
@@ -491,18 +542,74 @@ describe("essence test --mutate", () => {
 
 	it("refuses the flags it contradicts", async () => {
 		await withFiles({ "Grading.es": WEAK }, async (directory) => {
-			for (let flag of [
-				"--watch",
-				"--bench",
-				"--coverage",
-				"--update",
-				"--contracts",
-			]) {
+			for (let flag of ["--watch", "--bench", "--coverage", "--update"]) {
 				let { code, err } = await mutate(directory, [flag])
 
 				expect(code).toBe(EXIT_USAGE)
 				expect(err).toContain(`--mutate and ${flag} contradict`)
 			}
+		})
+	})
+
+	// NOTE: The one combination that would leave a run compiling, running and
+	// reporting while answering about nothing at all — no counters, no table,
+	// and every site in the project reported as one no test reaches.
+	it("refuses to be asked for a run with the counters off", async () => {
+		await withFiles({ "Grading.es": WEAK }, async (directory) => {
+			let { code, err } = await mutate(directory, [
+				"--without-optimisation",
+				"instrument-coverage",
+			])
+
+			expect(code).toBe(EXIT_USAGE)
+			expect(err).toContain(
+				"--mutate and --without-optimisation instrument-coverage contradict",
+			)
+		})
+	})
+
+	it("refuses --contracts beside --no-contracts", async () => {
+		await withFiles({ "Grading.es": WEAK }, async (directory) => {
+			let { code, err } = await mutate(directory, [
+				"--contracts",
+				"--no-contracts",
+			])
+
+			expect(code).toBe(EXIT_USAGE)
+			expect(err).toContain("--contracts and --no-contracts contradict")
+		})
+	})
+
+	// NOTE: A focus silences most of the suite, and this run reads what RAN to
+	// learn which tests reach which site — so a focused baseline reports every
+	// site the silenced tests cover as one no test reaches, and takes a score
+	// over whatever the focus left. Refused before a mutant is compiled.
+	it("refuses a focused baseline", async () => {
+		let source = [
+			"implementation {",
+			"	function passes(_ score: Integer) -> Boolean {",
+			"		<- score::isGreaterThan(50)",
+			"	}",
+			"}",
+			"",
+			"tests {",
+			'	test "grades a score" focused {',
+			"		expect passes(90)",
+			"	}",
+			"",
+			'	test "grades another" {',
+			"		expect passes(10)::is(false)",
+			"	}",
+			"}",
+			"",
+		].join("\n")
+
+		await withFiles({ "Grading.es": source }, async (directory) => {
+			let { code, err, out } = await mutate(directory)
+
+			expect(code).toBe(EXIT_FOCUSED)
+			expect(err).toContain("grades a score")
+			expect(out).not.toContain("mutants")
 		})
 	})
 
@@ -529,6 +636,74 @@ describe("essence test --mutate", () => {
 
 			expect(code).toBe(EXIT_FAILURE)
 			expect(err).toContain("a baseline that passes")
+		})
+
+		// NOTE: And under --json the stream says the same thing rather than
+		// nothing. A consumer reading it used to get an empty file and an exit
+		// code: no tally to end on, and no word about which test failed.
+		await withFiles({ "Grading.es": source }, async (directory) => {
+			let { code, out } = await mutate(directory, ["--json"])
+			let events = eventsOf(out)
+
+			expect(code).toBe(EXIT_FAILURE)
+			expect(events.some((event) => event.kind === "test-fail")).toBe(
+				true,
+			)
+			expect(events[events.length - 1]?.kind).toBe("mutation-end")
+			expect(tally(out).sites).toBe(0)
+		})
+	})
+
+	// NOTE: The baseline is what the project's own `essence test` runs, goals
+	// and all. A generated goal is a test like any other — it reaches sites and
+	// it kills mutants — and a run that left it out would report a project that
+	// tests its declarations as testing less than it does. `Tally::floor` has no
+	// written test at all, so the only thing that reaches it is its own goal.
+	it("lets a generated goal kill a mutant", async () => {
+		await withFiles({ "Tally.es": DECLARED }, async (directory) => {
+			let { out } = await mutate(directory, ["--json", "--contracts"])
+			let killed = mutants(out).find(
+				(mutant) => mutant.description === "swap 0 for -1",
+			)
+
+			expect(killed?.status).toBe("killed")
+			expect(killed?.killedBy).toContain("contracts/Tally::floor()")
+		})
+	})
+
+	// NOTE: And the setting says it without the flag, which is what a project
+	// that always tests its declarations has written down. Read out of the
+	// nearest package.json, which is found from the working directory — so the
+	// working directory is what has to move.
+	it("honours a configured project's goals", async () => {
+		await withFiles({ "Tally.es": DECLARED }, async (directory) => {
+			await withFiles(
+				{
+					"Tally.es": DECLARED,
+					"package.json": JSON.stringify({
+						essence: { test: { contracts: true } },
+					}),
+				},
+				async (configured) =>
+					within(configured, async () => {
+						let killed = mutants(
+							(await mutate(configured, ["--json"])).out,
+						).find(
+							(mutant) => mutant.description === "swap 0 for -1",
+						)
+
+						expect(killed?.status).toBe("killed")
+					}),
+			)
+
+			// NOTE: And `--no-contracts` beats the setting, exactly as it does
+			// for `essence test`: the site nothing but a goal reaches is a site
+			// no test reaches again.
+			let plain = mutants(
+				(await mutate(directory, ["--json", "--no-contracts"])).out,
+			).find((mutant) => mutant.description === "swap 0 for -1")
+
+			expect(plain?.status).toBe("uncovered")
 		})
 	})
 })

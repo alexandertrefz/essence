@@ -5,6 +5,7 @@ import { Worker } from "node:worker_threads"
 
 import { canonicalPath } from "@essence-lang/compiler/documents"
 import type { MutationSite } from "@essence-lang/compiler/mutation"
+import { coveragePassName } from "@essence-lang/compiler/optimiser"
 import {
 	type CorpusStore,
 	readCorpus,
@@ -14,7 +15,7 @@ import {
 import type { common } from "@essence-lang/interfaces"
 import { randomSeed, type TestEvent } from "@essence-lang/runtime/Testing"
 
-import { EXIT_FAILURE, EXIT_SUCCESS, EXIT_USAGE } from "./actions"
+import { EXIT_FAILURE, EXIT_FOCUSED, EXIT_SUCCESS, EXIT_USAGE } from "./actions"
 import { optimiserOptionsFor, type OptionValues } from "./args"
 import type { CommandSpec } from "./commands"
 import {
@@ -34,15 +35,18 @@ import type {
 import type { CompileOutcome } from "./pipeline"
 import {
 	claimRegistries,
+	focusedTests,
 	loadBundles,
 	type LoadedSuite,
 	redirectStdout,
+	resolveContracts,
 	resolveFilters,
 	runSuites,
 } from "./test"
 import {
 	collectTestRun,
 	type MutantRecord,
+	renderFocusedTests,
 	renderMutation,
 	renderNoTests,
 	tallyMutants,
@@ -91,11 +95,6 @@ const CONTRADICTIONS: Array<[keyof OptionValues, string, string]> = [
 		"--update",
 		"a mutant that changes a snapshot would be RECORDED, and the run would rewrite the project it was asked about",
 	],
-	[
-		"contracts",
-		"--contracts",
-		"a goal is generated from a declaration, so a mutant of the declaration is a mutant of its own test",
-	],
 ]
 
 function contradiction(options: OptionValues): string | null {
@@ -103,6 +102,28 @@ function contradiction(options: OptionValues): string | null {
 		if (options[flag] === true) {
 			return `--mutate and ${name} contradict each other — ${reason}.`
 		}
+	}
+
+	// NOTE: The same refusal `essence test` makes, made here too, because this
+	// run resolves contracts exactly as that one does and a run that guessed
+	// which of the two was meant would prove either more or less than the
+	// reader asked for.
+	if (options.contracts && options.noContracts) {
+		return "--contracts and --no-contracts contradict each other — say one."
+	}
+
+	// NOTE: Turning the instrumentation pass OFF is the one way to leave a
+	// mutation run compiling, running and reporting while quietly answering
+	// about nothing: no counters means no coverage table, no table means no
+	// test reaches any site, and every site in the project comes back as one no
+	// test reaches. Refused rather than warned about, because the report it
+	// would print is a plausible one.
+	if (options.withoutOptimisation.includes(coveragePassName)) {
+		return (
+			`--mutate and --without-optimisation ${coveragePassName} contradict ` +
+			"each other — the counters are what say which tests reach which " +
+			"site, and without them every site is one no test reaches."
+		)
 	}
 
 	return null
@@ -538,12 +559,41 @@ export async function runMutation(
 		)
 	}
 
+	// NOTE: BOUND before anything redirects it. The baseline is run with stdout
+	// pointed at stderr — a mutated Module's own top-level output belongs to
+	// nobody and may not land in the middle of the stream — and this is the
+	// reference to the real one.
 	let writeEvent = process.stdout.write.bind(process.stdout)
 	let emit = (event: TestEvent): void => {
 		if (context.options.json) {
 			writeEvent(`${JSON.stringify(event)}\n`)
 		}
 	}
+	// NOTE: Every way out that is not the report, answered the same way: the
+	// stream ends with a `mutation-end` whatever happened, so a consumer reading
+	// it is never left waiting for a tally that is not coming. What it carries
+	// where the run learnt nothing is zeros, and the baseline's own events go
+	// out ahead of it — a red baseline under `--json` used to write an empty
+	// stream and exit 1, which told a reader nothing about which test failed.
+	//
+	// NOTE: The baseline's events are replayed HERE rather than streamed as
+	// they happen, and that is the reproducibility claim keeping its shape: a
+	// `test-pass` carries a duration, and a duration is a fact about a machine.
+	// Two runs at one seed write the same stream, and a run that streamed its
+	// baseline live would not.
+	let stopEarly = (code: number, baseline: Array<TestEvent> = []): number => {
+		for (let event of baseline) {
+			emit(event)
+		}
+
+		emit({ schema: 1, kind: "mutation-end", ...tallyMutants([]) })
+
+		return code
+	}
+	let contracts = resolveContracts(
+		context.options,
+		configuration.test.contracts,
+	)
 	let filters = resolveFilters(context.options, configuration.test.skipTags)
 	let inputFileNames = await discoverTestFiles(
 		files,
@@ -551,18 +601,17 @@ export async function runMutation(
 		context.programName,
 		process.cwd(),
 		configuration.test.exclude,
+		contracts,
 	)
 
 	if (inputFileNames.length === 0) {
-		emit({ schema: 1, kind: "mutation-end", ...tallyMutants([]) })
-
 		if (!context.options.json && !context.options.quiet) {
 			context.terminal.out("")
 			context.terminal.out(renderNoTests(files, context.report))
 			context.terminal.out("")
 		}
 
-		return EXIT_SUCCESS
+		return stopEarly(EXIT_SUCCESS)
 	}
 
 	// NOTE: The baseline compiles with the counters IN, whatever the command
@@ -574,10 +623,17 @@ export async function runMutation(
 		...context,
 		options: { ...context.options, coverage: true },
 	}
+	// NOTE: The mode the project's own `essence test` runs in, goals and all —
+	// see `resolveContracts`. A generated goal is a test like any other: it
+	// reaches sites, it kills mutants, and a run that left it out would report a
+	// project that tests its declarations as testing less than it does. The
+	// run's one pinned seed is what keeps the goals answering the same question
+	// of every mutant that they answered of the code.
 	let plan = await planCompilation(instrumented, command, inputFileNames, {
 		emit: true,
 		cacheOutput: true,
 		tests: true,
+		contracts,
 		enumerateMutations: true,
 	})
 	let staging = await mkdtemp(path.join(tmpdir(), "essence-mutate-"))
@@ -607,7 +663,7 @@ export async function runMutation(
 				)} the project did not compile — a mutation run needs a baseline that does`,
 			)
 
-			return EXIT_FAILURE
+			return stopEarly(EXIT_FAILURE)
 		}
 
 		let sources = new Map<string, string>()
@@ -631,6 +687,7 @@ export async function runMutation(
 		let events: Array<TestEvent> = []
 		let restore = redirectStdout()
 		let suites: Array<LoadedSuite>
+		let focused: boolean
 
 		try {
 			let bundles = await loadBundles(
@@ -642,8 +699,7 @@ export async function runMutation(
 			)
 
 			suites = claimRegistries(bundles)
-
-			runSuites(
+			focused = runSuites(
 				suites,
 				suites,
 				filters,
@@ -654,12 +710,14 @@ export async function runMutation(
 				{},
 				{},
 				true,
-			)
+			).focused
 		} finally {
 			restore()
 		}
 
 		let baseline = collectTestRun(events)
+		let sourceOf = (module: string | null): string | null =>
+			module === null ? null : (sources.get(module) ?? null)
 
 		if (baseline.counts.failed > 0) {
 			context.terminal.err(
@@ -672,7 +730,32 @@ export async function runMutation(
 				)}`,
 			)
 
-			return EXIT_FAILURE
+			return stopEarly(EXIT_FAILURE, events)
+		}
+
+		// NOTE: A focused baseline is REFUSED, and not for the reason `essence
+		// test` refuses one at the end of a plain run. A focus silences most of
+		// the suite, and this run reads what ran to learn which tests reach
+		// which site — so every site the silenced tests cover comes back as one
+		// no test reaches, and the score is taken over whatever the focus left.
+		// It is a wrong answer rather than a warning, so it is refused before a
+		// single mutant is compiled, and it is refused under any filter: a
+		// filter is a narrowing the reader asked for, and a leftover `focused`
+		// is one nobody did.
+		if (focused) {
+			if (!context.options.json) {
+				context.terminal.err("")
+
+				for (let block of renderFocusedTests(
+					focusedTests(suites),
+					context.report,
+					sourceOf,
+				)) {
+					context.terminal.err(block)
+				}
+			}
+
+			return stopEarly(EXIT_FOCUSED, events)
 		}
 
 		let attribution = attributionOf(events)
@@ -759,6 +842,7 @@ export async function runMutation(
 					counterexamples,
 					durations,
 					timeoutFor,
+					contracts,
 				}),
 			)
 		}
@@ -773,8 +857,7 @@ export async function runMutation(
 			for (let line of renderMutation(
 				mutants,
 				context.report,
-				(module) =>
-					module === null ? null : (sources.get(module) ?? null),
+				sourceOf,
 				unjudged === 0 ? null : { after: compiled, unjudged },
 			)) {
 				context.terminal.out(line)
@@ -835,6 +918,11 @@ async function judge(work: {
 	// mutant's own wait is measured against — see `mutantTimeout`.
 	durations: Map<string, number>
 	timeoutFor: (baselineMilliseconds: number) => number
+	// NOTE: Whether the goals a Namespace's declarations promise are compiled
+	// into the mutant as well. It has to be the baseline's own answer: a
+	// covering set holding a generated goal is a covering set that names a test
+	// which is not in a bundle compiled without them.
+	contracts: boolean
 }): Promise<MutantRecord> {
 	let byEntry = new Map<string, Array<string>>()
 
@@ -889,6 +977,7 @@ async function judge(work: {
 			// would pay for a table nobody reads.
 			optimisation: optimiserOptionsFor(work.context.options),
 			tests: true,
+			contracts: work.contracts,
 			mutation: {
 				module: work.site.module as string,
 				site: work.site.id,
