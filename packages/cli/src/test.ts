@@ -755,6 +755,17 @@ export async function runTest(
 	// property test at all — a Module with no companion answers with nothing,
 	// which costs one stat per file and saves asking twice.
 	let corpus = await readCorpus(sources.keys())
+
+	// NOTE: A companion that exists but could not be read is said OUT LOUD on
+	// every run: the run replays nothing from it, the writer refuses to touch
+	// it, and a warning nobody prints is a corpus that quietly stopped working.
+	for (let entry of corpus.unreadable) {
+		context.terminal.err(
+			`  ${context.palette.warning(
+				context.theme.symbols.warning,
+			)} ${context.palette.muted(entry.problem)}`,
+		)
+	}
 	// NOTE: One seed for the whole run, made HERE where there is one run: every
 	// bundle draws from it, and every property test folds its own identity in.
 	// So the replay a failure prints reproduces the run rather than the file.
@@ -790,7 +801,11 @@ export async function runTest(
 			emit,
 			context.options.coverage,
 			{ stored, update: context.options.update },
-			{ seed, cases: context.options.cases, counterexamples: corpus },
+			{
+				seed,
+				cases: context.options.cases,
+				counterexamples: corpus.stores,
+			},
 			baselines,
 		)
 		// NOTE: The stream is folded up ONCE, here, and the `run-end` this

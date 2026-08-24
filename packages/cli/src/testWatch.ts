@@ -405,6 +405,14 @@ export async function runTestWatch(
 			// cycle before it recorded.
 			let corpus = await readCorpus(sources.keys())
 
+			for (let entry of corpus.unreadable) {
+				terminal.err(
+					`  ${palette.warning(
+						theme.symbols.warning,
+					)} ${palette.muted(entry.problem)}`,
+				)
+			}
+
 			let { matched } = runSuites(
 				suites,
 				toRun,
@@ -428,7 +436,7 @@ export async function runTestWatch(
 				{
 					seed: context.options.seed ?? randomSeed(),
 					cases: context.options.cases,
-					counterexamples: corpus,
+					counterexamples: corpus.stores,
 				},
 				baselines,
 			)

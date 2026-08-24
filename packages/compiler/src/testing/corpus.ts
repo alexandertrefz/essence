@@ -68,23 +68,28 @@ export type CorpusFile = { schema: number; entries: CorpusStore }
 // It is printed with tab indentation and its keys in name order so that
 // recording one twice writes the same bytes: a diff then shows what changed
 // rather than what moved.
-export function parseCorpusFile(text: string): CorpusStore {
+// NOTE: Null for a file that is not a corpus at all — mangled JSON, a merge
+// conflict, the wrong schema. It is an answer rather than an empty store
+// because the two must never be confused: an empty store is a file the next
+// write may lay a value over, and a mangled one is a file the next write must
+// LEAVE, or ten stored regressions vanish because one merge went wrong.
+export function parseCorpusFile(text: string): CorpusStore | null {
 	let parsed: unknown
 
 	try {
 		parsed = JSON.parse(text)
 	} catch {
-		return {}
+		return null
 	}
 
 	if (!isObject(parsed)) {
-		return {}
+		return null
 	}
 
 	let file = parsed as Partial<CorpusFile>
 
 	if (file.schema !== CORPUS_SCHEMA || !isObject(file.entries)) {
-		return {}
+		return null
 	}
 
 	let entries: CorpusStore = {}
@@ -152,24 +157,59 @@ function isObject(value: unknown): value is Record<string, unknown> {
 // takes. A Module with no companion file has an empty entry rather than none,
 // so that looking one up is always a lookup and never a question about the
 // disk.
-export async function readCorpus(
-	modules: Iterable<string>,
-): Promise<Record<string, CorpusStore>> {
-	let stores: Record<string, CorpusStore> = {}
-
-	for (let module of modules) {
-		stores[module] = await readCorpusFile(corpusFileOf(module))
-	}
-
-	return stores
+// NOTE: What a read found, in two halves: the stores a run consults, and the
+// Modules whose companion EXISTS but could not be read — which the run treats
+// as holding nothing, and the writer refuses to touch. A missing file is an
+// empty store, not an unreadable one: absence is the ordinary state of a
+// Module nothing has failed in.
+export type CorpusReading = {
+	stores: Record<string, CorpusStore>
+	unreadable: Array<{ module: string; problem: string }>
 }
 
-async function readCorpusFile(filePath: string): Promise<CorpusStore> {
-	try {
-		return parseCorpusFile(await readFile(filePath, "utf8"))
-	} catch {
-		return {}
+export async function readCorpus(
+	modules: Iterable<string>,
+): Promise<CorpusReading> {
+	let stores: Record<string, CorpusStore> = {}
+	let unreadable: Array<{ module: string; problem: string }> = []
+
+	for (let module of modules) {
+		let filePath = corpusFileOf(module)
+		let text: string
+
+		try {
+			text = await readFile(filePath, "utf8")
+		} catch (error) {
+			stores[module] = {}
+
+			// NOTE: Only absence is ordinary. A file that is there and cannot
+			// be read is a file the writer must not rewrite from nothing.
+			if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+				unreadable.push({
+					module,
+					problem: `${filePath}: ${describe(error)}`,
+				})
+			}
+
+			continue
+		}
+
+		let parsed = parseCorpusFile(text)
+
+		if (parsed === null) {
+			stores[module] = {}
+			unreadable.push({
+				module,
+				problem: `${filePath}: not a corpus file — fix it or delete it; nothing stored there is replayed, and nothing will be written over it`,
+			})
+
+			continue
+		}
+
+		stores[module] = parsed
 	}
+
+	return { stores, unreadable }
 }
 
 // NOTE: One counterexample to write down, under the Module and key the run
@@ -247,7 +287,7 @@ export function collectCorpusChanges(events: Array<TestEvent>): CorpusChanges {
 // not decode is dropped, because that is a fact about the entry rather than
 // about which tests ran.
 export async function writeCorpus(options: {
-	corpus: Record<string, CorpusStore>
+	corpus: CorpusReading
 	additions: Array<CorpusAddition>
 	removals: Array<CorpusRemoval>
 }): Promise<CorpusWrites> {
@@ -263,14 +303,26 @@ export async function writeCorpus(options: {
 		return noCorpusWrites
 	}
 
+	// NOTE: A companion the read could not make sense of is never written
+	// over: the store this run held for it was EMPTY, and laying one new value
+	// over empty would rewrite the file whole — every counterexample a mangled
+	// file still holds in its bytes, gone for one merge conflict. The file
+	// stays as it is until somebody fixes or deletes it, and the read is what
+	// already said so out loud.
+	let unreadable = new Set(corpus.unreadable.map((entry) => entry.module))
+
 	let problems: Array<string> = []
 	let recorded = 0
 	let dropped = 0
 	let files = 0
 
 	for (let module of modules) {
+		if (unreadable.has(module)) {
+			continue
+		}
+
 		let entries = layOver(
-			corpus[module] ?? {},
+			corpus.stores[module] ?? {},
 			additions.filter((addition) => addition.module === module),
 			removals.filter((removal) => removal.module === module),
 		)
