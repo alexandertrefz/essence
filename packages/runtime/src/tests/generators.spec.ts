@@ -9,6 +9,7 @@ import {
 	GenerationFailure,
 	type Generator,
 	minimal,
+	mutate,
 	type Narrowing,
 	shrink,
 } from "../Generators"
@@ -508,6 +509,322 @@ describe("Generators", () => {
 					]),
 				),
 			).toBeNull()
+		})
+	})
+
+	// NOTE: What the coverage-guided search moves with. A neighbour is ONE step
+	// from a value rather than a fresh case, so what is asserted below is
+	// STRUCTURAL — which part moved and which parts did not — and every count is
+	// over a pinned seed, so the sequence is the same on every machine.
+	describe("what a neighbour of a value is", () => {
+		function neighbours(
+			generator: Generator,
+			value: AnyType,
+			count: number,
+			options: {
+				seed?: string
+				size?: number
+				narrowing?: Narrowing
+			} = {},
+		): Array<AnyType> {
+			let source = sourceOf(options.seed)
+			let moved: Array<AnyType> = []
+
+			for (let index = 0; index < count; index++) {
+				moved.push(
+					mutate(
+						generator,
+						value,
+						source,
+						options.size ?? 12,
+						options.narrowing,
+					),
+				)
+			}
+
+			return moved
+		}
+
+		test("answers the other Boolean", () => {
+			expect(
+				mutate(booleans, createBoolean(true), sourceOf(), 4),
+			).toEqual(createBoolean(false))
+			expect(
+				mutate(booleans, createBoolean(false), sourceOf(), 4),
+			).toEqual(createBoolean(true))
+		})
+
+		// NOTE: A leaf is redrawn rather than nudged — see the NOTE on
+		// `mutate`. What is asserted is that the redraw HAPPENS and stays a
+		// value of the Type, not which number came out.
+		test("redraws an Integer, a Rational and a String", () => {
+			let whole = neighbours(integers, createInteger(0n), 40)
+			let text = neighbours(strings, createString(""), 40)
+			let ratio = neighbours(rationals, createRational(0n, 1n), 40)
+
+			expect(whole.every((value) => tagOf(value) === "Integer")).toBe(
+				true,
+			)
+			expect(whole.some((value) => wholeOf(value) !== 0n)).toBe(true)
+			expect(text.every((value) => tagOf(value) === "String")).toBe(true)
+			expect(text.some((value) => textOf(value) !== "")).toBe(true)
+			expect(ratio.every((value) => tagOf(value) === "Rational")).toBe(
+				true,
+			)
+		})
+
+		// NOTE: The three moves a List has, and the bounds a narrowing puts on
+		// which of them are available at all.
+		test("moves a List's length by one, and never past a bound", () => {
+			let generator: Generator = { kind: "list", item: integers }
+			let value = createList([
+				createInteger(1n),
+				createInteger(2n),
+				createInteger(3n),
+			])
+			let lengths = neighbours(generator, value, 60).map(
+				(moved) => itemsOf(moved).length,
+			)
+
+			expect(lengths.every((length) => Math.abs(length - 3) <= 1)).toBe(
+				true,
+			)
+			expect(lengths).toContain(2)
+			expect(lengths).toContain(3)
+			expect(lengths).toContain(4)
+		})
+
+		test("keeps a List inside the lengths a narrowing admits", () => {
+			let generator: Generator = { kind: "list", item: integers }
+			let value = createList([createInteger(1n), createInteger(2n)])
+			let lengths = neighbours(generator, value, 60, {
+				narrowing: { minimumLength: 2, maximumLength: 3 },
+			}).map((moved) => itemsOf(moved).length)
+
+			expect(lengths.every((length) => length >= 2 && length <= 3)).toBe(
+				true,
+			)
+			expect(lengths).toContain(3)
+		})
+
+		// NOTE: A narrowing that admits exactly one length leaves an empty List
+		// with no neighbour at all, and the function still has to answer.
+		test("answers the value itself where no move is available", () => {
+			let generator: Generator = { kind: "list", item: integers }
+			let moved = mutate(generator, createList([]), sourceOf(), 4, {
+				minimumLength: 0,
+				maximumLength: 0,
+			})
+
+			expect(itemsOf(moved)).toEqual([])
+		})
+
+		// NOTE: THE property a Record's neighbour rests on: everything the case
+		// already reached is kept, one member excepted. The members that did not
+		// move are the very objects the value held — values are immutable, so
+		// sharing them is what "did not move" MEANS.
+		test("moves exactly one member of a Record", () => {
+			let generator: Generator = {
+				kind: "record",
+				members: [
+					{ name: "name", generator: strings },
+					{ name: "count", generator: integers },
+					{ name: "ready", generator: booleans },
+				],
+			}
+			let value = createRecord({
+				name: createString("a"),
+				count: createInteger(1n),
+				ready: createBoolean(false),
+			}) as unknown as Record<string, AnyType>
+			let names = ["name", "count", "ready"]
+			let untouched = new Set<string>()
+
+			for (let moved of neighbours(generator, value as AnyType, 60)) {
+				let holder = moved as unknown as Record<string, AnyType>
+				let kept = names.filter((name) => holder[name] === value[name])
+
+				expect(kept.length).toBeGreaterThanOrEqual(names.length - 1)
+
+				for (let name of kept) {
+					untouched.add(name)
+				}
+			}
+
+			// NOTE: Every member is the moved one sometimes, so the choice is a
+			// choice rather than a fixed member the search never leaves.
+			expect(untouched).toEqual(new Set(names))
+		})
+
+		test("moves one member of a Case and keeps its tag", () => {
+			let generator: Generator = {
+				kind: "case",
+				tag: "Shade#Dark",
+				members: [
+					{ name: "level", generator: integers },
+					{ name: "warm", generator: booleans },
+				],
+			}
+			let value = createCase("Shade#Dark", {
+				level: createInteger(1n),
+				warm: createBoolean(false),
+			}) as unknown as Record<string, AnyType>
+
+			for (let moved of neighbours(generator, value as AnyType, 40)) {
+				let holder = moved as unknown as Record<string, AnyType>
+
+				expect(tagOf(moved)).toBe("Shade#Dark")
+				expect(
+					(holder["level"] === value["level"] ? 1 : 0) +
+						(holder["warm"] === value["warm"] ? 1 : 0),
+				).toBeGreaterThanOrEqual(1)
+			}
+		})
+
+		// NOTE: A payload-free Case is the only value of its own shape, so its
+		// neighbour is itself — built afresh rather than handed back.
+		test("answers a payload-free Case with its own tag", () => {
+			let generator: Generator = {
+				kind: "case",
+				tag: "Ordering#Equal",
+				members: [],
+			}
+
+			expect(
+				mutate(
+					generator,
+					createCase("Ordering#Equal") as unknown as AnyType,
+					sourceOf(),
+					4,
+				),
+			).toEqual(createCase("Ordering#Equal") as unknown as AnyType)
+		})
+
+		// NOTE: One time in four, which at this seed is what the counts below
+		// say. A neighbour that never left its arm would leave the search unable
+		// to cross a Union at all; one that left it half the time would not be a
+		// neighbour.
+		test("usually stays in the arm the value inhabits", () => {
+			let generator: Generator = {
+				kind: "union",
+				members: [
+					{
+						kind: "case",
+						tag: "Optional#Value",
+						members: [{ name: "item", generator: integers }],
+					},
+					{ kind: "case", tag: "Optional#Empty", members: [] },
+				],
+			}
+			let value = createCase("Optional#Value", {
+				item: createInteger(1n),
+			}) as unknown as AnyType
+			let tags = neighbours(generator, value, 200).map(tagOf)
+			let crossed = tags.filter((tag) => tag === "Optional#Empty").length
+
+			expect(crossed).toBeGreaterThan(0)
+			expect(crossed).toBeLessThan(tags.length / 2)
+		})
+
+		// NOTE: A value no arm claims is a value the Union never built, and a
+		// draw is the only honest answer to it.
+		test("draws afresh for a value no arm of a Union claims", () => {
+			let generator: Generator = {
+				kind: "union",
+				members: [
+					{ kind: "case", tag: "Shade#Light", members: [] },
+					{ kind: "case", tag: "Shade#Dark", members: [] },
+				],
+			}
+			let tags = new Set(
+				neighbours(generator, createInteger(1n), 40).map(tagOf),
+			)
+
+			expect(tags).toEqual(new Set(["Shade#Light", "Shade#Dark"]))
+		})
+
+		// NOTE: THE law a refinement's neighbour rests on: the answer is always
+		// one the refinement ADMITS, whether the mutation found it or the fresh
+		// draw behind it did. The checks are run again here rather than trusted.
+		test("answers only what a refinement admits", () => {
+			let generator = refined("EvenInteger", integers, {}, [
+				(value) => ({ value: wholeOf(value) % 2n === 0n }),
+			])
+
+			for (let moved of neighbours(generator, createInteger(0n), 200)) {
+				expect(wholeOf(moved) % 2n).toBe(0n)
+			}
+		})
+
+		test("keeps every bound a refinement's narrowing states", () => {
+			let generator = refined(
+				"NonEmptyList",
+				{ kind: "list", item: integers },
+				{ minimumLength: 1, maximumLength: 3 },
+			)
+			let value = createList([createInteger(1n), createInteger(2n)])
+
+			for (let moved of neighbours(generator, value, 100)) {
+				expect(itemsOf(moved).length).toBeGreaterThanOrEqual(1)
+				expect(itemsOf(moved).length).toBeLessThanOrEqual(3)
+			}
+		})
+
+		// NOTE: A refinement no neighbour of this value satisfies. The draw
+		// behind the attempts is what still answers an admitted value, and it
+		// raises the run's own failure where nothing satisfies the predicate at
+		// all — the same answer `generate` gives.
+		test("refuses a predicate nothing satisfies rather than answering", () => {
+			let generator = refined("Impossible", integers, {}, [
+				() => ({ value: false }),
+			])
+
+			expect(() =>
+				mutate(generator, createInteger(0n), sourceOf(), 4),
+			).toThrow(GenerationFailure)
+		})
+
+		// NOTE: A Namespace's own generator says how to BUILD a value and
+		// nothing about what one is made of, so a neighbour of one is another
+		// value it built.
+		test("asks a Namespace's own generator afresh", () => {
+			let asked = 0
+			let generator: Generator = {
+				kind: "generated",
+				name: "Team",
+				generate: () => {
+					asked += 1
+
+					return createString("Lions")
+				},
+			}
+
+			expect(
+				neighbours(generator, createString("Bears"), 3).map(textOf),
+			).toEqual(["Lions", "Lions", "Lions"])
+			expect(asked).toBe(3)
+		})
+
+		// NOTE: Everything above draws from the source and from nothing else,
+		// which is what makes the whole guided search replay under one seed.
+		test("answers the same sequence for the same seed", () => {
+			let generator: Generator = {
+				kind: "record",
+				members: [
+					{ name: "name", generator: strings },
+					{ name: "count", generator: integers },
+				],
+			}
+			let value = createRecord({
+				name: createString("a"),
+				count: createInteger(1n),
+			})
+			let first = neighbours(generator, value, 20, { seed: "one" })
+			let again = neighbours(generator, value, 20, { seed: "one" })
+			let other = neighbours(generator, value, 20, { seed: "two" })
+
+			expect(first).toEqual(again)
+			expect(first).not.toEqual(other)
 		})
 	})
 
