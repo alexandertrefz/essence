@@ -81,6 +81,14 @@ export type OptionValues = {
 	coverage: boolean
 	coverageReport: CoverageReportFormat | null
 	coverageOut: string | undefined
+	// NOTE: Whether the run asks what its tests would CATCH rather than what
+	// they reached — see the Option. `mutationLimit` caps how many mutants are
+	// compiled, and null means every covered site.
+	mutate: boolean
+	mutationLimit: number | null
+	// NOTE: Whether a surviving mutant fails the run. A score is information, so
+	// `--mutate` alone exits 0 whatever it found.
+	strict: boolean
 	// NOTE: Whether the benchmarks of the run are measured as well. It ADDS to a
 	// run rather than replacing it — everything that would have run still runs
 	// — because a measurement of a body that is wrong is a number about nothing.
@@ -142,6 +150,9 @@ export const emptyOptions: OptionValues = {
 	coverage: false,
 	coverageReport: null,
 	coverageOut: undefined,
+	mutate: false,
+	mutationLimit: null,
+	strict: false,
 	bench: false,
 	contracts: false,
 	noContracts: false,
@@ -362,6 +373,29 @@ function readCases(
 	return count
 }
 
+// NOTE: The same reading as `--cases`, and refused the same way — a limit of
+// zero is a run that would compile nothing and report a score about nothing.
+function readMutationLimit(
+	raw: string | undefined,
+	command: CommandSpec,
+): number | null {
+	if (raw === undefined) {
+		return null
+	}
+
+	let count = Number(raw)
+
+	if (!Number.isSafeInteger(count) || count < 1) {
+		throw new UsageError(
+			`--mutation-limit expects a whole number of at least 1, but got "${raw}".`,
+			command,
+			"Try --mutation-limit 50.",
+		)
+	}
+
+	return count
+}
+
 // NOTE: The format names are the Compiler's, checked here so that a misspelt
 // one is refused rather than written as the other format under the name that
 // was asked for.
@@ -543,6 +577,12 @@ export function parseArguments(
 				command,
 			),
 			coverageOut: values["coverage-out"] as string | undefined,
+			mutate: values.mutate === true,
+			mutationLimit: readMutationLimit(
+				values["mutation-limit"] as string | undefined,
+				command,
+			),
+			strict: values.strict === true,
 			bench: values.bench === true,
 			contracts: values.contracts === true,
 			noContracts: values["no-contracts"] === true,

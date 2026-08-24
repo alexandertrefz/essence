@@ -660,8 +660,17 @@ export async function compileFile(
 			request.sourcemap &&
 			request.sourcemapMode !== "inline" &&
 			request.outputFileName !== null
+		// NOTE: A compile that ENUMERATES may not be served out of the store
+		// either, though what it emits is byte for byte what a plain compile
+		// emits and is remembered as such. The sites are collected while the
+		// Modules are simplified, and a hit skips simplification along with
+		// everything else past it — so a warm cache would answer with the
+		// bundle and no sites at all, and the run would report a project with
+		// nothing in it worth mutating.
 		let cached =
-			store === null ? null : await readBundle(store, key, hasMapFile)
+			store === null || request.enumerateMutations === true
+				? null
+				: await readBundle(store, key, hasMapFile)
 
 		if (cached !== null) {
 			let target = request.outputFileName

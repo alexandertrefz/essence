@@ -235,6 +235,16 @@ async function dispatch(
 			// NOTE: Imported where it is used, like the Formatter and the
 			// Language Server. It reaches the test runtime and the emitter, and
 			// `esc check` must not pay for either.
+			// NOTE: Ahead of `--watch`, because `--mutate` refuses it: the two
+			// are one refusal spelled in one place rather than a branch here
+			// and a message over there. Every contradiction `--mutate` has is
+			// answered by `runMutation`.
+			if (options.mutate) {
+				let { runMutation } = await import("./mutate")
+
+				return runMutation(context, command, files)
+			}
+
 			if (options.watch) {
 				let { runTestWatch } = await import("./testWatch")
 

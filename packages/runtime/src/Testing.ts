@@ -1927,6 +1927,40 @@ export type TestEvent =
 	// meets it has to read it the way it reads every other kind — which for this
 	// one, per the stream's own contract at the top of the union, is to ignore it.
 	| { schema: 1; kind: "results-cached"; entry: string; tests: number }
+	// NOTE: What ONE deliberate lie about the code did — the site it was told
+	// at, the sentence the Compiler's own walker spells for it, and whether any
+	// test noticed. `killedBy` is the id of the first test that failed, null for
+	// every other status; `tests` is how many tests reach the site at all, which
+	// is what makes a survivor readable: a mutant no test covers and a mutant
+	// twelve tests miss are different findings.
+	//
+	// NOTE: Written by the COMMAND LINE and never by the runtime, exactly as
+	// `results-cached` is, and here for exactly the same reason — this union IS
+	// the stream's schema, and a consumer that meets one of these reads it the
+	// way it reads every other kind it does not know, which is to ignore it.
+	| {
+			schema: 1
+			kind: "mutant"
+			module: string | null
+			position: Range
+			operator: string
+			description: string
+			status: "killed" | "survived" | "uncovered" | "invalid"
+			killedBy: string | null
+			tests: number
+	  }
+	// NOTE: The tally of a mutation run, written once where a `run-end` would
+	// stand. `sites` counts every mutant the walker found, whatever became of
+	// it, so the four statuses below it add up to it.
+	| {
+			schema: 1
+			kind: "mutation-end"
+			sites: number
+			killed: number
+			survived: number
+			uncovered: number
+			invalid: number
+	  }
 	| {
 			schema: 1
 			kind: "run-end"

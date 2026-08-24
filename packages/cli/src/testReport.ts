@@ -24,6 +24,7 @@ import {
 	type TestRun,
 	testFailureDiagnostic,
 } from "@essence-lang/compiler/testing"
+import type { common } from "@essence-lang/interfaces"
 
 import type { ReportContext } from "./report"
 import { formatDuration, pluralise } from "./report"
@@ -592,6 +593,178 @@ export function renderTestReport(
 		),
 	}
 }
+
+// #region Mutation
+
+// NOTE: What became of ONE deliberate lie, flat — the same fields the `mutant`
+// event carries, so the report and the stream can not drift into saying
+// different things about one mutant.
+export type MutantRecord = {
+	module: string | null
+	position: common.Position
+	operator: string
+	description: string
+	status: "killed" | "survived" | "uncovered" | "invalid"
+	killedBy: string | null
+	tests: number
+}
+
+// NOTE: The design's own summary line, and a block per SURVIVOR: a mutant
+// nothing noticed is the whole finding, and the count above it is the context
+// it is read in.
+//
+// NOTE: A survivor is rendered the way a regressed benchmark is — a `✗` line
+// naming where and what, and muted lines under it — rather than as a
+// Diagnostic. A Diagnostic carries a code, every code is a promise the
+// documentation keeps, and nothing here is a claim about whether the source
+// compiles. The line of source is quoted underneath so that a reader is shown
+// the site without opening the file, which is the half of an excerpt that was
+// worth keeping.
+export function renderMutation(
+	mutants: Array<MutantRecord>,
+	context: ReportContext,
+	sourceOf: SourceLookup,
+): Array<string> {
+	let { palette, theme } = context
+	let counts = {
+		killed: mutants.filter((each) => each.status === "killed").length,
+		survived: mutants.filter((each) => each.status === "survived").length,
+		uncovered: mutants.filter((each) => each.status === "uncovered").length,
+		invalid: mutants.filter((each) => each.status === "invalid").length,
+	}
+	let lines: Array<string> = [""]
+
+	for (let mutant of mutants) {
+		if (mutant.status !== "survived") {
+			continue
+		}
+
+		lines.push(
+			`${INDENT}${palette.error(theme.symbols.fail)} ${palette.path(
+				siteLabel(mutant),
+			)}  ${mutant.description} ${palette.muted(
+				"— every test still passes",
+			)}`,
+		)
+		lines.push(
+			...excerpt(mutant, sourceOf).map(
+				(line) => `${INDENT}${INDENT}${palette.faint(line)}`,
+			),
+		)
+		lines.push(
+			`${INDENT}${INDENT}${palette.muted(
+				`reached by ${pluralise(mutant.tests, "test")}`,
+			)}`,
+		)
+		lines.push("")
+	}
+
+	// NOTE: Under --verbose the sites nothing reaches are named as well. They
+	// are the coverage report's finding wearing mutation's hat — a line no test
+	// runs is a line no mutant of it could ever be caught on — and they are
+	// listed rather than summarised only where a reader asked for everything.
+	for (let mutant of mutants) {
+		if (
+			!context.verbose ||
+			(mutant.status !== "uncovered" && mutant.status !== "invalid")
+		) {
+			continue
+		}
+
+		lines.push(
+			`${INDENT}${palette.muted(theme.symbols.info)} ${palette.path(
+				siteLabel(mutant),
+			)}  ${palette.muted(
+				`${mutant.description} — ${
+					mutant.status === "uncovered"
+						? "no test reaches this line"
+						: "the mutant did not compile"
+				}`,
+			)}`,
+		)
+	}
+
+	if (lines.length > 1 && lines[lines.length - 1] !== "") {
+		lines.push("")
+	}
+
+	lines.push(renderMutationSummary(mutants.length, counts, context))
+	lines.push("")
+
+	return lines
+}
+
+function renderMutationSummary(
+	sites: number,
+	counts: {
+		killed: number
+		survived: number
+		uncovered: number
+		invalid: number
+	},
+	context: ReportContext,
+): string {
+	let { palette, theme } = context
+	let parts = [
+		palette.number(`${pluralise(sites, "mutant")}`),
+		palette.success(`${counts.killed} killed`),
+	]
+
+	if (counts.survived > 0) {
+		parts.push(palette.error(`${counts.survived} survived`))
+	}
+
+	if (counts.uncovered > 0) {
+		parts.push(
+			palette.muted(
+				`${counts.uncovered} on ${
+					counts.uncovered === 1 ? "a line" : "lines"
+				} no test reaches`,
+			),
+		)
+	}
+
+	if (counts.invalid > 0) {
+		parts.push(palette.muted(`${counts.invalid} did not compile`))
+	}
+
+	// NOTE: The SCORE is what a reader compares between runs, and it is the
+	// share of the mutants that could be judged at all: a site no test reaches
+	// and a mutant that would not compile say nothing about the tests, so
+	// counting them in would move the number for reasons nobody could act on.
+	let judged = counts.killed + counts.survived
+	let score =
+		judged === 0
+			? null
+			: `${Math.round((counts.killed / judged) * 100)}% caught`
+
+	return score === null
+		? ` ${parts.join(`  ${palette.faint(theme.symbols.bullet)}  `)}`
+		: ` ${parts.join(
+				`  ${palette.faint(theme.symbols.bullet)}  `,
+			)}  ${palette.faint(theme.symbols.bullet)}  ${palette.number(score)}`
+}
+
+function siteLabel(mutant: MutantRecord): string {
+	return `${moduleLabel(mutant.module)}:${mutant.position.start.line}`
+}
+
+// NOTE: The one line the site stands on, quoted as the file has it. A site
+// whose source is out of reach — a caller driving this with events alone —
+// simply has none, which is what keeps the block readable either way.
+function excerpt(mutant: MutantRecord, sourceOf: SourceLookup): Array<string> {
+	let sourceText = sourceOf(mutant.module)
+
+	if (sourceText === null) {
+		return []
+	}
+
+	let line = sourceText.split("\n")[mutant.position.start.line - 1]
+
+	return line === undefined ? [] : [line.trim()]
+}
+
+// #endregion
 
 // #region Coverage
 

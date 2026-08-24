@@ -67,30 +67,35 @@ const SITES_PER_LINE = 4
 // and is left out — it is the negation, which a test that checks anything at
 // all already fails, so the mutant would be killed by everything and would
 // distinguish no suite from another.
-const COMPARISON_SWAPS: Record<string, Array<string>> = {
-	isLessThan: ["isLessThanOrEqualTo", "isGreaterThan"],
-	isLessThanOrEqualTo: ["isLessThan"],
-	isGreaterThan: ["isGreaterThanOrEqualTo", "isLessThan"],
-	isGreaterThanOrEqualTo: ["isGreaterThan"],
-}
+//
+// NOTE: Maps rather than object literals, all three of them, and that is not a
+// preference. A Method's name is user text — `toString`, `valueOf`,
+// `constructor` are all perfectly good members — and an object literal answers
+// every one of those out of `Object.prototype` rather than saying it has none.
+const COMPARISON_SWAPS = new Map<string, Array<string>>([
+	["isLessThan", ["isLessThanOrEqualTo", "isGreaterThan"]],
+	["isLessThanOrEqualTo", ["isLessThan"]],
+	["isGreaterThan", ["isGreaterThanOrEqualTo", "isLessThan"]],
+	["isGreaterThanOrEqualTo", ["isGreaterThan"]],
+])
 
 // NOTE: `is` against `isNot` is the one equality rotation there is, and it is
 // the sharpest mutant in the set: a test that asserts a value rather than
 // merely exercising it kills it, and one that does not, does not.
-const EQUALITY_SWAPS: Record<string, Array<string>> = {
-	is: ["isNot"],
-	isNot: ["is"],
-}
+const EQUALITY_SWAPS = new Map<string, Array<string>>([
+	["is", ["isNot"]],
+	["isNot", ["is"]],
+])
 
 // NOTE: Addition against subtraction both ways, and multiplication toward
 // addition one way. The reverse — `add` toward `multiply` — is left out
 // because it agrees with the original wherever the operands are 2 and 2, and a
 // mutant that is sometimes not one is a mutant whose survival says nothing.
-const ARITHMETIC_SWAPS: Record<string, Array<string>> = {
-	add: ["subtract"],
-	subtract: ["add"],
-	multiply: ["add"],
-}
+const ARITHMETIC_SWAPS = new Map<string, Array<string>>([
+	["add", ["subtract"]],
+	["subtract", ["add"]],
+	["multiply", ["add"]],
+])
 
 // #region Enumerating and applying
 
@@ -446,9 +451,9 @@ function memberSwaps(
 }> {
 	let member = withoutOverloadSuffix(node.member.name)
 	let families: Array<[MutationOperator, Array<string>]> = [
-		["equality", EQUALITY_SWAPS[member] ?? []],
-		["comparison", COMPARISON_SWAPS[member] ?? []],
-		["arithmetic", ARITHMETIC_SWAPS[member] ?? []],
+		["equality", EQUALITY_SWAPS.get(member) ?? []],
+		["comparison", COMPARISON_SWAPS.get(member) ?? []],
+		["arithmetic", ARITHMETIC_SWAPS.get(member) ?? []],
 	]
 	let swaps: Array<{
 		operator: MutationOperator
@@ -526,7 +531,13 @@ function swappableMember(
 		return declared.members.has(name) ? name : null
 	}
 
-	let method = declared.methods[target]
+	// NOTE: `hasOwn` and not a bare read, for the reason the tables above are
+	// Maps: `methods["toString"]` answers out of `Object.prototype` for a
+	// Namespace that declares no such Method, and the answer is a Function that
+	// no call site could ever reach.
+	let method = Object.hasOwn(declared.methods, target)
+		? declared.methods[target]
+		: undefined
 
 	if (method === undefined) {
 		return null
@@ -546,7 +557,9 @@ function swappableMember(
 	}
 
 	let replacement = method.overloads[overload]
-	let original = declared.methods[member]
+	let original = Object.hasOwn(declared.methods, member)
+		? declared.methods[member]
+		: undefined
 
 	if (
 		replacement === undefined ||

@@ -456,6 +456,15 @@ export const commands: Array<CommandSpec> = [
 				"project may ask for them by default in the nearest " +
 				"package.json:",
 			'    { "essence": { "test": { "contracts": true } } }',
+			"--mutate answers the question coverage can not: coverage says a " +
+				"line RAN, and mutation says a bug there would be CAUGHT. The " +
+				"project is compiled once with counters in it and run once to " +
+				"learn which tests reach which lines; then, for every site a " +
+				"test reaches, the Compiler is asked to tell one deliberate " +
+				"lie about the code and only the tests that reach it are run " +
+				"again. A mutant nothing notices is named with the sentence " +
+				"that says what was changed. --mutation-limit caps how many " +
+				"are tried and --strict makes a survivor exit non-zero.",
 			"--coverage compiles the tests with counters in them and reports " +
 				"what ran: lines and branches as percentages, Match arms as " +
 				"taken out of total, every branch and arm nothing reached " +
@@ -558,6 +567,42 @@ export const commands: Array<CommandSpec> = [
 					"repaired, or when only the written tests are the " +
 					"question. The flag wins over the setting in both " +
 					"directions, and saying both flags at once is refused.",
+			},
+			{
+				name: "mutate",
+				type: "boolean",
+				summary: "Report which deliberate bugs the tests catch",
+				details:
+					"Compiles the tests once, runs them once to learn which " +
+					"tests reach which lines, and then compiles the project " +
+					"again for every mutant — a comparison rotated a step, a " +
+					"Case swapped for its sibling, an `if` turned inside out, " +
+					"a literal nudged — running only the tests that reach the " +
+					"site. A mutant no test notices is a SURVIVOR, and is " +
+					"named with the sentence that says what was changed. The " +
+					"run is information rather than a verdict and exits 0; " +
+					"--strict makes a survivor a failure.",
+			},
+			{
+				name: "mutation-limit",
+				type: "string",
+				placeholder: "count",
+				summary: "How many mutants --mutate compiles at most",
+				details:
+					"Every covered site by default. A mutant costs a compile " +
+					"and a run of the tests that reach it, so a large project " +
+					"is worth narrowing — the sites are taken in file order, " +
+					"so the same limit answers about the same mutants twice.",
+			},
+			{
+				name: "strict",
+				type: "boolean",
+				summary: "Make a surviving mutant fail the run",
+				details:
+					"A mutation score is information, so --mutate exits 0 " +
+					"whatever it found. This is what a CI job that holds a " +
+					"project to its score asks for: a survivor exits 1, the " +
+					"way a failing test does.",
 			},
 			{
 				name: "coverage",
@@ -673,6 +718,10 @@ export const commands: Array<CommandSpec> = [
 			{
 				command: `${PROGRAM} test --contracts`,
 				description: "Also test what every declaration promises",
+			},
+			{
+				command: `${PROGRAM} test --mutate src/Standings.es`,
+				description: "Ask which deliberate bugs one file's tests catch",
 			},
 		],
 	},

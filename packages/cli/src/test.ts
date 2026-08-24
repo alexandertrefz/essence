@@ -352,6 +352,12 @@ export function runSuites(
 	// counted into the plan and written into the stream in their own place, so a
 	// warm run is the cold one's report and the cold one's stream.
 	replay: ReplayOptions = {},
+	// NOTE: Whether each TEST also says which points IT touched — see
+	// `RunOptions.coverageByTest`. Only `essence test --mutate` asks: it is
+	// what turns "this line ran" into "these tests reach this line", which is
+	// how a mutant is judged by the tests that could possibly notice it. It
+	// costs the points a test actually touched, and nobody pays who did not ask.
+	attribution = false,
 ): {
 	planned: number
 	focused: boolean
@@ -464,6 +470,7 @@ export function runSuites(
 			},
 			filters: runFilters,
 			coverage,
+			coverageByTest: attribution,
 			snapshots: snapshots.stored,
 			benchmarks,
 			update: snapshots.update,
@@ -528,6 +535,41 @@ export function resolveContracts(
 	configured: boolean,
 ): boolean {
 	return options.noContracts ? false : options.contracts || configured
+}
+
+// NOTE: Whether a run may be answered out of the result cache AT ALL, in either
+// direction. `--update` and `--coverage` are runs whose whole point is the file
+// they leave behind; `--bench` measures a machine rather than asking a question
+// about the code; `--seed` and `--cases` say which values a property test
+// draws, and a property test is never remembered anyway. `--mutate` is here for
+// a reason of its own: what it runs is a MUTANT, an entry compiled from a lie
+// about the sources, and a record keyed by the bundle hash of the real ones
+// would claim those tests passed against the code as written.
+//
+// What is NOT here is `--json` — a replay is the same events on the same lines
+// — and the filters, which go into the key instead so that a narrowed run is an
+// answer of its own rather than one that can never be kept.
+//
+// NOTE: `--watch` and the Language Server's session do not come through here
+// and use none of this. A watching run already re-runs only what a save
+// reached, out of bundles it is holding, and answering out of a file would be
+// slower than the loop it replaced.
+export function remembersResults(options: {
+	update: boolean
+	coverage: boolean
+	bench: boolean
+	mutate: boolean
+	seed: string | undefined
+	cases: number | null
+}): boolean {
+	return (
+		!options.update &&
+		!options.coverage &&
+		!options.bench &&
+		!options.mutate &&
+		options.seed === undefined &&
+		options.cases === null
+	)
 }
 
 // NOTE: Whether an entry's own stream may be REMEMBERED, so that the next run
@@ -1042,26 +1084,9 @@ export async function runTest(
 	// So the replay a failure prints reproduces the run rather than the file.
 	let seed = context.options.seed ?? randomSeed()
 
-	// NOTE: The runs that may not be answered out of the result cache, at all,
-	// in either direction. `--update` and `--coverage` are runs whose whole point
-	// is the file they leave behind; `--bench` measures a machine rather than
-	// asking a question about the code; `--seed` and `--cases` say which values a
-	// property test draws, and a property test is never remembered anyway. What
-	// is NOT here is `--json` — a replay is the same events on the same lines —
-	// and the filters, which go into the key instead so that a narrowed run is an
-	// answer of its own rather than one that can never be kept.
-	//
-	// NOTE: `--watch` and the Language Server's session do not come through here
-	// and use none of this. A watching run already re-runs only what a save
-	// reached, out of bundles it is holding, and answering out of a file would be
-	// slower than the loop it replaced.
-	let cachingActive =
-		!context.options.update &&
-		!context.options.coverage &&
-		!context.options.bench &&
-		context.options.seed === undefined &&
-		context.options.cases === null
-	let resultStore = cachingActive ? resultCacheDirectory() : null
+	let resultStore = remembersResults(context.options)
+		? resultCacheDirectory()
+		: null
 	// NOTE: The entries a result cache could answer for at all — one that would
 	// not compile has no answer to remember and no bundle to name one with.
 	let loadable = compilation.outcomes.flatMap((outcome) =>
