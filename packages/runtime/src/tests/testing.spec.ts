@@ -9,6 +9,8 @@ import { createString } from "../String"
 import { inspect, write, withOutputSink } from "../Terminal"
 import {
 	beginCoverageRun,
+	benchmark,
+	benchmarkRows,
 	coverage,
 	counters,
 	createContext,
@@ -69,6 +71,7 @@ function manifest(
 		tags: [],
 		focused: false,
 		skipped: null,
+		benchmark: false,
 		position: nowhere,
 		keywordPosition: nowhere,
 		...overrides,
@@ -833,6 +836,334 @@ describe("The event stream", () => {
 				stream: "error",
 				text: "second\n",
 			},
+		])
+	})
+})
+
+// NOTE: A clock that ticks with the WORK rather than with the wall: a fixed
+// number of milliseconds per run of the body, and nothing at all between two
+// runs. What comes out of a measurement read off it is exactly what the
+// arithmetic says, so every assertion below is about the RUNNER — a spec that
+// timed a real body would be asserting something about this machine today.
+function workClock(milliseconds: number): {
+	clock: () => number
+	tick: () => void
+} {
+	let now = 0
+
+	return {
+		clock: () => now,
+		tick: () => {
+			now += milliseconds
+		},
+	}
+}
+
+type BenchmarkEvent = Extract<TestEvent, { kind: "benchmark" }>
+
+function measure(
+	registry: ReturnType<typeof registryOf>,
+	options: {
+		clock: () => number
+		filters?: Parameters<typeof runTests>[1]["filters"]
+		benchmarks?: Parameters<typeof runTests>[1]["benchmarks"]
+		update?: boolean
+	},
+): {
+	events: Array<TestEvent>
+	measured: Array<BenchmarkEvent>
+	summary: ReturnType<typeof runTests>
+} {
+	let events: Array<TestEvent> = []
+	let summary = runTests(registry, {
+		sink: (event) => events.push(event),
+		now: () => 0,
+		clock: options.clock,
+		filters: options.filters,
+		benchmarks: options.benchmarks,
+		update: options.update,
+	})
+
+	return {
+		events,
+		measured: events.filter(
+			(event): event is BenchmarkEvent => event.kind === "benchmark",
+		),
+		summary,
+	}
+}
+
+// NOTE: One Module holding one benchmark whose body costs the clock one tick.
+// The calibration doubles until a batch takes five milliseconds, which is eight
+// runs of a one-millisecond body — so a measurement of it is one million
+// nanoseconds, every time, on every machine.
+function benchmarkModule(
+	tick: () => void,
+	overrides: Partial<TestManifestEntry> = {},
+): TestModule {
+	return module(
+		[manifest("/bench", { benchmark: true, ...overrides })],
+		(context) => {
+			benchmark(context, 0, null, "doubling", () => {
+				tick()
+				expected(context, 0, true, null)
+			})
+		},
+	)
+}
+
+describe("Benchmarks", () => {
+	test("is left out of a run that did not ask to measure", () => {
+		let { clock } = workClock(1)
+		let registry = registryOf([
+			module(
+				[manifest("/a"), manifest("/bench", { benchmark: true })],
+				() => {},
+			),
+		])
+		let { selections } = selectTests(registry)
+
+		expect(selections[0]?.state).toBe("run")
+		expect(selections[1]).toEqual({
+			test: registry.tests[1]!,
+			state: "deselected",
+			reason: "bench",
+		})
+		expect(measure(registry, { clock }).measured).toEqual([])
+	})
+
+	test("measures it where the run asked, and keeps running the tests", () => {
+		let { clock, tick } = workClock(1)
+		let registry = registryOf([
+			benchmarkModule(tick),
+			module([manifest("/a")], (context) => {
+				entry(context, 0, null, () => {
+					expected(context, 0, true, null)
+				})
+			}),
+		])
+		let { measured, summary } = measure(registry, {
+			clock,
+			filters: { bench: true },
+		})
+
+		expect(measured).toHaveLength(1)
+		expect(summary.passed).toBe(2)
+		expect(summary.deselected).toBe(0)
+	})
+
+	// NOTE: The one door a measurement has without a flag. An Editor's "run this
+	// one" names a test by its id, and naming a benchmark is asking for it.
+	test("measures one somebody named, whatever the run asked for", () => {
+		let { clock, tick } = workClock(1)
+		let registry = registryOf([benchmarkModule(tick)])
+		let { measured } = measure(registry, {
+			clock,
+			filters: { ids: ["/bench"] },
+		})
+
+		expect(measured.map((event) => event.status)).toEqual(["written"])
+	})
+
+	test("calibrates a batch and answers with the time of one run", () => {
+		let { clock, tick } = workClock(1)
+		let { measured } = measure(registryOf([benchmarkModule(tick)]), {
+			clock,
+			filters: { bench: true },
+		})
+
+		expect(measured[0]).toEqual({
+			schema: 1,
+			kind: "benchmark",
+			id: "/bench",
+			name: "/bench",
+			module: "/Season.es",
+			key: "doubling",
+			nanoseconds: 1_000_000,
+			iterations: 8,
+			samples: 7,
+			baseline: null,
+			ratio: null,
+			status: "written",
+		})
+	})
+
+	test("records a measurement nothing had a baseline for", () => {
+		let { clock, tick } = workClock(1)
+		let { measured, summary } = measure(
+			registryOf([benchmarkModule(tick)]),
+			{ clock, filters: { bench: true } },
+		)
+
+		expect(measured[0]?.status).toBe("written")
+		expect(summary.failed).toBe(0)
+	})
+
+	test("fails a measurement that ran away from its baseline", () => {
+		let { clock, tick } = workClock(1)
+		let { events, measured, summary } = measure(
+			registryOf([benchmarkModule(tick)]),
+			{
+				clock,
+				filters: { bench: true },
+				benchmarks: { "/Season.es": { doubling: 500_000 } },
+			},
+		)
+
+		expect(measured[0]).toMatchObject({
+			status: "regressed",
+			baseline: 500_000,
+			ratio: 2,
+		})
+		expect(summary.failed).toBe(1)
+		expect(summary.failedIds).toEqual(["/bench"])
+		expect(
+			events.find((event) => event.kind === "test-fail"),
+		).toMatchObject({ failures: [], error: null })
+	})
+
+	// NOTE: Faster is news rather than a problem, and the baseline stands until
+	// somebody says to move it — a run that quietly recorded every improvement
+	// would ratchet a benchmark down to whatever the fastest machine reached.
+	test("passes a measurement that got faster, and says so", () => {
+		let { clock, tick } = workClock(1)
+		let { measured, summary } = measure(
+			registryOf([benchmarkModule(tick)]),
+			{
+				clock,
+				filters: { bench: true },
+				benchmarks: { "/Season.es": { doubling: 2_000_000 } },
+			},
+		)
+
+		expect(measured[0]).toMatchObject({ status: "improved", ratio: 0.5 })
+		expect(summary.passed).toBe(1)
+		expect(summary.failed).toBe(0)
+	})
+
+	test("says nothing about a measurement inside its band", () => {
+		let { clock, tick } = workClock(1)
+		let { measured, summary } = measure(
+			registryOf([benchmarkModule(tick)]),
+			{
+				clock,
+				filters: { bench: true },
+				benchmarks: { "/Season.es": { doubling: 900_000 } },
+			},
+		)
+
+		expect(measured[0]?.status).toBe("matched")
+		expect(summary.passed).toBe(1)
+	})
+
+	test("records a measurement outside its band where it was told to", () => {
+		let { clock, tick } = workClock(1)
+		let { measured, summary } = measure(
+			registryOf([benchmarkModule(tick)]),
+			{
+				clock,
+				filters: { bench: true },
+				benchmarks: { "/Season.es": { doubling: 500_000 } },
+				update: true,
+			},
+		)
+
+		expect(measured[0]).toMatchObject({ status: "written", ratio: 2 })
+		expect(summary.failed).toBe(0)
+	})
+
+	// NOTE: Timing something that is wrong measures the wrong thing, and the
+	// number would go into a baseline as if it meant something. The body runs
+	// exactly twice: once to be judged, and once to leave the recordings the
+	// report is built from.
+	test("reports a body that did not hold, and never times it", () => {
+		let { clock } = workClock(1)
+		let ran = 0
+		let registry = registryOf([
+			module([manifest("/bench", { benchmark: true })], (context) => {
+				benchmark(context, 0, null, "doubling", () => {
+					ran += 1
+					expected(context, 0, false, null)
+				})
+			}),
+		])
+		let { events, measured, summary } = measure(registry, {
+			clock,
+			filters: { bench: true },
+		})
+
+		expect(measured).toEqual([])
+		expect(ran).toBe(2)
+		expect(summary.failed).toBe(1)
+		expect(events.filter((event) => event.kind === "expect")).toHaveLength(
+			1,
+		)
+	})
+
+	// NOTE: A focus left on a benchmark silences nothing while the run is not
+	// measuring — it would otherwise take a whole project's tests away over
+	// something that was never going to run.
+	test("does not silence the tests with a focus nobody is running", () => {
+		let registry = registryOf([
+			module(
+				[
+					manifest("/a"),
+					manifest("/bench", { benchmark: true, focused: true }),
+				],
+				() => {},
+			),
+		])
+		let plain = selectTests(registry)
+		let measuring = selectTests(registry, { bench: true })
+
+		expect(plain.focused).toBe(false)
+		expect(plain.selections.map((selection) => selection.state)).toEqual([
+			"run",
+			"deselected",
+		])
+		expect(measuring.focused).toBe(true)
+		expect(
+			measuring.selections.map((selection) => selection.state),
+		).toEqual(["deselected", "run"])
+	})
+
+	// NOTE: Every row is a benchmark in its own right, held to a baseline of its
+	// own — the rows share one body and one key, so an entry they overwrote in
+	// turn could only ever match the last row that ran.
+	test("keeps one stored entry per row of a table benchmark", () => {
+		let { clock, tick } = workClock(1)
+		let registry = registryOf([
+			module(
+				[
+					manifest("/rows/0", { benchmark: true, row: 0 }),
+					manifest("/rows/1", { benchmark: true, row: 1 }),
+				],
+				(context) => {
+					benchmarkRows(
+						context,
+						0,
+						[integer(1), integer(2)],
+						null,
+						"sorts {size} rows",
+						() => {
+							tick()
+							expected(context, 0, true, null)
+						},
+					)
+				},
+			),
+		])
+		let { measured } = measure(registry, {
+			clock,
+			filters: { bench: true },
+			benchmarks: {
+				"/Season.es": { "sorts {size} rows [1]": 500_000 },
+			},
+		})
+
+		expect(measured.map((event) => [event.key, event.status])).toEqual([
+			["sorts {size} rows [0]", "written"],
+			["sorts {size} rows [1]", "regressed"],
 		])
 	})
 })
