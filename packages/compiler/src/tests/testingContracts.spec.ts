@@ -386,7 +386,10 @@ describe("Contract tests", () => {
 			expect(messages).toEqual(["ungeneratable-contract"])
 		})
 
-		it("leaves a generic Method alone", () => {
+		// NOTE: Without a remark, deliberately: the rule is documented, and the
+		// only help a remark could offer — a Generatable conformance — could
+		// never make a generic Method eligible.
+		it("leaves a generic Method alone, and says nothing about it", () => {
 			expect(
 				namesOf(
 					moduleOf(`	namespace Counting for Integer {
@@ -405,7 +408,69 @@ describe("Contract tests", () => {
 		}
 	}`),
 				),
-			).toEqual(["ungeneratable-contract"])
+			).toEqual([])
+		})
+
+		// NOTE: The Scope answers with the MERGED Namespace, so without the
+		// own-members filter a second declaration of one name would goal an
+		// inherited Method once per statement — one spelled name, twice in one
+		// manifest, colliding in everything the identity anchors.
+		// NOTE: A second same-file declaration of one Namespace is its own
+		// compile error, but the enrichment carries on — and the Scope answers
+		// BOTH statements with the SURVIVING Namespace, so without the
+		// own-members filter its Methods would goal once per statement: one
+		// spelled name, twice in one manifest, colliding in everything the
+		// identity anchors. The same filter is what keeps a Module that
+		// EXTENDS an imported Namespace — the legal, cross-Module spelling of
+		// this shape — from re-goaling the base Module's Methods under names
+		// the base already answers for.
+		it("goals each statement's own members, never the merged table", () => {
+			let { program, diagnostics } = analyse(
+				moduleOf(`	namespace Counting for Integer {
+		up() -> Integer {
+			<- @::add(1)
+		}
+	}
+
+	namespace Counting for Integer {
+		down() -> Integer {
+			<- @::subtract(1)
+		}
+	}`),
+			)
+
+			expect(
+				diagnostics.map((diagnostic) => diagnostic.message),
+			).toContain("Variable 'Counting' is already declared")
+			expect(
+				(suiteOf(program)?.nodes ?? []).map(
+					(node) => (node as common.typed.TestNode).identity.name,
+				),
+			).toEqual(["Counting::down()"])
+		})
+
+		it("refuses a written suite under the synthesized name", () => {
+			let { diagnostics } = analyse(
+				`implementation {
+	namespace Counting for Integer {
+		up() -> Integer {
+			<- @::add(1)
+		}
+	}
+}
+
+tests {
+	suite "contracts" {
+		test "mine" {
+			expect true
+		}
+	}
+}`,
+			)
+
+			expect(diagnostics.map((diagnostic) => diagnostic.code)).toContain(
+				"reserved-suite-name",
+			)
 		})
 	})
 

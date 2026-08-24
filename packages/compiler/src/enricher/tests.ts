@@ -490,6 +490,47 @@ function identityKey(steps: Array<string>): string {
 		.join("/")
 }
 
+// NOTE: The suite names the Enricher fills itself — `examples` from a file's
+// documentation, `contracts` from a run's declarations. A written suite under
+// one of those names would share the synthesized suite's identity, and with it
+// the corpus, the seeds and the focus that identity anchors — a collision the
+// author can not see, so it is refused where the synthesis happens rather
+// than diagnosed as a duplicate of a suite no source holds.
+export function refuseReservedSuite(
+	nodes: Array<parser.TestsNode>,
+	name: string,
+	fills: string,
+): boolean {
+	let taken = false
+
+	for (let node of nodes) {
+		if (node.nodeType !== "Suite" || nameTemplate(node.name) !== name) {
+			continue
+		}
+
+		taken = true
+		reportError(
+			`The suite name '${name}' is taken by ${fills}`,
+			node.name.position,
+			{
+				code: "reserved-suite-name",
+				labels: [
+					primary(
+						node.name.position,
+						"this names the synthesized suite",
+					),
+				],
+				notes: [
+					`Under this compile the Enricher fills a suite called '${name}' with ${fills}, and two suites of one name share everything their identity anchors — stored counterexamples, seeds, and the Editor's focus.`,
+				],
+				helps: ["Call this suite something else."],
+			},
+		)
+	}
+
+	return taken
+}
+
 // NOTE: Two tests of one suite that are called the same thing are one test
 // twice as far as everything durable is concerned — they share an identity, so
 // they share a snapshot, a baseline and a stored counterexample. Reported per

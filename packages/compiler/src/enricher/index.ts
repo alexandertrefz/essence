@@ -17,7 +17,7 @@ import {
 import { VALUE_COMMENT, valueCommentLines } from "../valueComments"
 import { collectAnnotations } from "./annotations"
 import { builtinMembers, builtinProtocols, builtinTypes } from "./builtins"
-import { contractSuite } from "./contracts"
+import { CONTRACT_SUITE, contractSuite } from "./contracts"
 import {
 	derivePredicateAliases,
 	deriveProvidedPredicateAliases,
@@ -54,6 +54,7 @@ import {
 	nameTemplate,
 	noModifiers,
 	refuseDuplicateNames,
+	refuseReservedSuite,
 	resolveTestModifiers,
 	type TestModifiers,
 } from "./tests"
@@ -320,6 +321,17 @@ function testsSectionOf(
 
 	let position = program.tests?.position ?? program.implementation.position
 	let written = program.tests?.nodes ?? []
+	// NOTE: A written suite under a name a synthesis fills is refused, and the
+	// synthesis dropped with it — appending the twin anyway would let the walk
+	// below report the same collision a second time, as a duplicate of a suite
+	// no source holds.
+	let examplesTaken =
+		examples.length > 0 &&
+		refuseReservedSuite(
+			written,
+			"examples",
+			"this file's '@example' blocks",
+		)
 	let section = enrichTestsSection(
 		{
 			nodeType: "TestsSection",
@@ -327,7 +339,7 @@ function testsSectionOf(
 			// indices they had — and read first, which is the order they were
 			// written in.
 			nodes:
-				examples.length === 0
+				examples.length === 0 || examplesTaken
 					? written
 					: [...written, exampleSuite(examples, position)],
 			position,
@@ -337,6 +349,16 @@ function testsSectionOf(
 	)
 
 	if (contracts !== true) {
+		return section
+	}
+
+	if (
+		refuseReservedSuite(
+			written,
+			CONTRACT_SUITE,
+			"the goals this run's declarations promise",
+		)
+	) {
 		return section
 	}
 
