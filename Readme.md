@@ -166,6 +166,14 @@ writes a file beside the table.
 `--json` writes the run as one JSON event per line. A project skips tags by default by naming them in the
 nearest `package.json`, under `{ "essence": { "test": { "skipTags": ["slow"] } } }`.
 
+A run remembers what every compiled entry answered, under a name made from that entry's whole module graph, the
+snapshots, baselines and counterexamples it compares itself against, the host, and how the run was narrowed —
+so a second run over a file nothing touched replays what the first one reported instead of running it, and says
+`8 of 9 entries cached` beside the tally. The language is pure, so that is exact: the only things a test's
+outcome can turn on are all in the name. An entry that failed, one holding a property test, and one that
+recorded a snapshot or a baseline are never kept, and a focused run is not kept at all.
+`ESSENCE_RESULTS_CACHE=off` turns it off for a run that has to be live.
+
 The same runner is live in an editor: the Language Server keeps one test session per workspace and re-runs what
 an edit reached, on the unsaved buffer, and pushes the batch over a custom notification. The VS Code extension
 draws it as a Test Explorer, as marks down the gutter, and as the values a run recorded beside the lines that
