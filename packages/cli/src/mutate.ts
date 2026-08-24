@@ -6,6 +6,10 @@ import { Worker } from "node:worker_threads"
 import { canonicalPath } from "@essence-lang/compiler/documents"
 import type { MutationSite } from "@essence-lang/compiler/mutation"
 import { coveragePassName } from "@essence-lang/compiler/optimiser"
+// NOTE: The span predicates from the pass whose points they describe — see the
+// note beside them. The join is only correct while the two sides agree about
+// what "holds" and "overlaps" mean, and one spelling is how they agree.
+import { holds, overlaps } from "@essence-lang/compiler/optimiser/coverage"
 import {
 	type CorpusStore,
 	readCorpus,
@@ -27,18 +31,20 @@ import {
 import { readProjectConfiguration } from "./configuration"
 import type { CLIContext } from "./context"
 import { discoverTestFiles } from "./discovery"
+import { GLOB_PATTERN } from "./inputs"
 import type {
 	MutantPhase,
 	MutantWorkerRequest,
 	MutantWorkerResponse,
 } from "./mutantWorker"
 import type { CompileOutcome } from "./pipeline"
+import { workerFileName } from "./pool"
+import { redirectStdout, rendered } from "./running"
 import {
 	claimRegistries,
 	focusedTests,
 	loadBundles,
 	type LoadedSuite,
-	redirectStdout,
 	resolveContracts,
 	resolveFilters,
 	runSuites,
@@ -175,21 +181,6 @@ export function attributionOf(
 	return byModule
 }
 
-function before(left: common.Cursor, right: common.Cursor): boolean {
-	return (
-		left.line < right.line ||
-		(left.line === right.line && left.column < right.column)
-	)
-}
-
-function holds(outer: common.Position, inner: common.Position): boolean {
-	return !before(inner.start, outer.start) && !before(outer.end, inner.end)
-}
-
-function overlaps(left: common.Position, right: common.Position): boolean {
-	return !before(left.end, right.start) && !before(right.end, left.start)
-}
-
 // NOTE: Which points of a Module's table stand over a site. Every point whose
 // span HOLDS the site is one — a site inside a Statement inside a branch inside
 // a Method body is covered by each of them, and a test that reached any of them
@@ -294,15 +285,6 @@ export function mutantTimeout(baselineMilliseconds: number): number {
 	)
 }
 
-// NOTE: The Worker is booted as whatever this module is running as — the
-// TypeScript source under Bun in the workspace, the compiled JavaScript in the
-// published package, where no `mutantWorker.ts` exists to boot. The same
-// question `workerFileName` answers for the compile pool, asked again here
-// because it is about THIS file's own extension.
-export function mutantWorkerFileName(moduleURL: string): string {
-	return moduleURL.endsWith(".ts") ? "./mutantWorker.ts" : "./mutantWorker.js"
-}
-
 // NOTE: Whether the Worker that answered this way is still worth keeping. One
 // that crashed on a bundle caught its own error and is as good as it was; one
 // that was TERMINATED mid-spin, one that died, and one whose port would not
@@ -312,8 +294,11 @@ function keepsWorker(phase: MutantPhase | null): boolean {
 }
 
 function createMutantRunner(): MutantRunner {
+	// NOTE: Asked of THIS module's own URL, because that is what says whether
+	// the package is running as sources or as what was published — see
+	// `workerFileName`, which the compile pool asks the same question of.
 	let workerURL = new URL(
-		mutantWorkerFileName(import.meta.url),
+		workerFileName(import.meta.url, "mutantWorker"),
 		import.meta.url,
 	)
 	let worker: Worker | null = null
@@ -390,12 +375,7 @@ function createMutantRunner(): MutantRunner {
 				// learnt from. The thread is dropped either way, so the next
 				// mutant boots a fresh one.
 				let onError = (error: unknown): void => {
-					failed(
-						error instanceof Error
-							? (error.stack ?? error.message)
-							: String(error),
-						"worker",
-					)
+					failed(rendered(error), "worker")
 				}
 				// NOTE: The listener without which this whole Promise could
 				// never settle. A Worker can go away without ever raising an
@@ -453,7 +433,10 @@ type MutantStatus = MutantRecord["status"]
 //
 // NOTE: A glob is read down to its literal head — `src/*.es` scopes to `src` —
 // rather than expanded a second time. What is being answered is "is this Module
-// one the reader pointed at", and the head is what they pointed at.
+// one the reader pointed at", and the head is what they pointed at. WHAT counts
+// as a glob character is the resolver's own answer, imported rather than
+// restated: a second spelling that disagreed about `]` or `}` would scope a run
+// to a directory nobody named.
 //
 // NOTE: CANONICAL, because the other side of the comparison is: a Module names
 // itself by the path the graph resolved, symlinks followed and casing as the
@@ -465,7 +448,7 @@ export function mutationScope(
 	workingDirectory: string,
 ): Array<string> {
 	return patterns.map((pattern) => {
-		let magic = pattern.search(/[*?[{]/)
+		let magic = pattern.search(GLOB_PATTERN)
 		let literal =
 			magic === -1
 				? pattern
@@ -704,12 +687,12 @@ export async function runMutation(
 				suites,
 				filters,
 				(event) => events.push(event),
-				true,
+				// NOTE: The counters, AND what each test touched of them —
+				// which is the whole of what turns "this line ran" into "these
+				// tests reach this site".
+				{ byTest: true },
 				{ stored },
 				{ seed, cases: context.options.cases, counterexamples },
-				{},
-				{},
-				true,
 			).focused
 		} finally {
 			restore()

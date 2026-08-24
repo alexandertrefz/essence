@@ -390,8 +390,29 @@ export function flatten<T = any>(array: Array<T | Array<T>>): Array<T> {
 	}, [])
 }
 
+// NOTE: The suffix the Simplifier mangles an Overload's name with, spelled once
+// for the two Functions that write it and read it back.
+const OVERLOAD_SUFFIX = "__overload$"
+
 export function resolveOverloadedMethodName(name: string, index: number) {
-	return `${name}__overload$${index + 1}`
+	return `${name}${OVERLOAD_SUFFIX}${index + 1}`
+}
+
+// NOTE: And the inverse: the Overload slot a mangled name names, counting from
+// zero, or null where the name carries no suffix at all — which is what a
+// Method with one Overload emits. Beside the Function that writes the name,
+// because a suffix written in one place and read in another is a suffix two
+// places have to agree about.
+export function overloadIndexOf(name: string): number | null {
+	let suffix = name.indexOf(OVERLOAD_SUFFIX)
+
+	if (suffix === -1) {
+		return null
+	}
+
+	let index = Number(name.slice(suffix + OVERLOAD_SUFFIX.length))
+
+	return Number.isInteger(index) && index > 0 ? index - 1 : null
 }
 
 // NOTE: The hidden trailing Parameter a Protocol-bounded Type Parameter adds to

@@ -15,13 +15,13 @@ import {
 import { readProjectConfiguration } from "./configuration"
 import type { CLIContext } from "./context"
 import { discoverTestFiles } from "./discovery"
+import { redirectStdout } from "./running"
 import {
 	claimRegistries,
 	type LoadedBundle,
 	type LoadedSuite,
 	loadBundles,
 	printReport,
-	redirectStdout,
 	reportUnmatchedFilter,
 	resolveContracts,
 	resolveFilters,

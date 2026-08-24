@@ -22,6 +22,7 @@
 		"./simplifier": "./src/simplifier/index.ts",
 		"./testing": "./src/testing/index.ts",
 		"./optimiser": "./src/optimiser/index.ts",
+		"./optimiser/coverage": "./src/optimiser/passes/instrumentCoverage.ts",
 		"./rewriter": "./src/rewriter/index.ts",
 		"./rewriter/emitTarget": "./src/rewriter/emitTarget.ts",
 		"./bundler": "./src/bundler/index.ts",

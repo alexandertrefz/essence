@@ -421,15 +421,28 @@ function scopeAt(
 	return found
 }
 
-function holds(outer: common.Position, inner: common.Position): boolean {
-	return !before(inner.start, outer.start) && !before(outer.end, inner.end)
-}
-
-function before(left: common.Cursor, right: common.Cursor): boolean {
+// NOTE: How two spans of one file stand to each other, spelled HERE because a
+// coverage point's span is this pass's own — the span of the Node it stood in
+// front of. `essence test --mutate` joins its mutation sites onto these points
+// by position, and agreement with this pass about what "holds" and "overlaps"
+// mean IS that join's correctness. A second spelling over there would be a
+// second answer waiting to happen.
+export function before(left: common.Cursor, right: common.Cursor): boolean {
 	return (
 		left.line < right.line ||
 		(left.line === right.line && left.column < right.column)
 	)
+}
+
+export function holds(outer: common.Position, inner: common.Position): boolean {
+	return !before(inner.start, outer.start) && !before(outer.end, inner.end)
+}
+
+export function overlaps(
+	left: common.Position,
+	right: common.Position,
+): boolean {
+	return !before(left.end, right.start) && !before(right.end, left.start)
 }
 
 // NOTE: The overload suffix the Simplifier mangles a Method's name with is not
