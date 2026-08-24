@@ -113,11 +113,22 @@ describe("Generators", () => {
 		})
 
 		// NOTE: One draw in eight is taken from a far wider window, which is
-		// what meets an assumption a small number never breaks.
+		// what meets an assumption a small number never breaks. The window has a
+		// ceiling as well, a hundred spans, because what a draw is fed to can
+		// grow far faster than the draw — a power's digits, a range's items.
 		test("draws an Integer past what a small window holds", () => {
 			let drawn = draw(integers, 200).map(wholeOf)
 
-			expect(drawn.some((value) => value > 1_000_000n)).toBe(true)
+			expect(drawn.some((value) => value > 1_000n)).toBe(true)
+		})
+
+		test("draws no Integer past a hundred spans", () => {
+			let drawn = draw(integers, 2_000, { size: 49 }).map(wholeOf)
+			let span = 49n * 4n + 8n
+
+			for (let value of drawn) {
+				expect(value >= -span * 100n && value <= span * 100n).toBe(true)
+			}
 		})
 
 		test("answers both Booleans", () => {

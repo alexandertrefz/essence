@@ -1993,7 +1993,7 @@ describe("The coverage-guided search", () => {
 		let ungated = search(pairing({ instrumented: true, gated: false }))
 
 		expect(guided.found).toBe(true)
-		expect(guided.cases).toBe(806)
+		expect(guided.cases).toBe(476)
 		expect(ungated.found).toBe(false)
 		expect(ungated.cases).toBe(BUDGET)
 	})
@@ -2009,7 +2009,7 @@ describe("The coverage-guided search", () => {
 		let blind = search(pairing({ instrumented: false, gated: false }))
 
 		expect(guided.found).toBe(true)
-		expect(guided.cases).toBe(806)
+		expect(guided.cases).toBe(476)
 		expect(blind.found).toBe(false)
 		expect(blind.cases).toBe(BUDGET)
 	})
@@ -2051,7 +2051,7 @@ describe("The coverage-guided search", () => {
 		let control = search(narrow(), { seed: "2fedcba2" })
 
 		expect(seeded.found).toBe(true)
-		expect(seeded.cases).toBe(339)
+		expect(seeded.cases).toBe(510)
 		// NOTE: The same run without the corpus. Nothing ever draws the value
 		// the guard names, so the gated point is never counted, the pool never
 		// holds a case worth searching around, and the conjunction is never met.

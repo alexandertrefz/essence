@@ -188,6 +188,16 @@ function drawMembers(
 // inside a window that grows with the size otherwise. One draw in eight is
 // taken from a much wider window, because the assumptions an Integer breaks are
 // usually about a value no small window holds.
+//
+// NOTE: The wide window reaches a hundred spans, twenty thousand at full size,
+// and no further. A value is not what grows past that — every one of them is
+// a handful of bits — but what a value is fed to can: a power's digits and a
+// range's items both grow with the Integer itself. A JavaScript engine holds
+// a BigInt of about a million bits and no more, and a hundred spans raised to
+// a hundred spans stays well inside that, where a draw in the hundred
+// thousands is already past it — and a draw in the billions asks `List.of`
+// for a List nobody was going to build. The assumptions a small number never
+// breaks are all broken by twenty thousand as well.
 function drawWhole(
 	source: RandomnessType,
 	size: number,
@@ -195,7 +205,7 @@ function drawWhole(
 ): bigint {
 	let span = BigInt(size) * 4n + 8n
 	let wide = below(source, 8) === 0
-	let reach = wide ? span * 100_000_000n : span
+	let reach = wide ? span * 100n : span
 	let low = narrowing.atLeast === undefined ? null : BigInt(narrowing.atLeast)
 	let high = narrowing.atMost === undefined ? null : BigInt(narrowing.atMost)
 	let lowest = low ?? (high === null ? -reach : high - reach)
