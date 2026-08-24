@@ -117,6 +117,11 @@ export type CompileRequest = {
 	// because linking is where it is read, so a request that sets this must be
 	// compiled through a Session that was opened with it.
 	tests?: boolean
+	// NOTE: And whether it asked for the goals a Module's own Namespace
+	// declarations promise. Everything `tests` says applies word for word: it
+	// changes what is enriched out of the very same sources, so it joins the
+	// key, and the Session is what carries it into the Enricher.
+	contracts?: boolean
 }
 
 // NOTE: One file of the compiled graph, with the text its Diagnostics are
@@ -513,6 +518,7 @@ async function enrichDeclarations(
 	let enriched = await timeline.run("enrich", () =>
 		enrichDocument(parsed.program, request.inputFileName, {
 			tests: request.tests,
+			contracts: request.contracts,
 			source: read.sourceText,
 		}),
 	)
@@ -531,6 +537,7 @@ export async function compileFile(
 	report?: ProgressReporter,
 	session: CompileSession = createCompileSession([request.inputFileName], {
 		tests: request.tests,
+		contracts: request.contracts,
 	}),
 ): Promise<CompileOutcome> {
 	let started = performance.now()

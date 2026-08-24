@@ -39,6 +39,9 @@ export type CompilationPlan = {
 	// passed per file because it decides how the whole run is compiled — the
 	// Session every entry is linked through opens in this mode.
 	tests?: boolean
+	// NOTE: And whether it asked for the contract goals as well, which is the
+	// same kind of fact about the same Session — see `createCompileSession`.
+	contracts?: boolean
 }
 
 export type CompilationResult = {
@@ -51,7 +54,12 @@ export async function planCompilation(
 	context: CLIContext,
 	command: CommandSpec,
 	patterns: Array<string>,
-	options: { emit: boolean; cacheOutput?: boolean; tests?: boolean },
+	options: {
+		emit: boolean
+		cacheOutput?: boolean
+		tests?: boolean
+		contracts?: boolean
+	},
 ): Promise<CompilationPlan> {
 	let inputFileNames = await resolveInputFiles(
 		patterns,
@@ -89,6 +97,7 @@ export async function planCompilation(
 			? createWorkerPool(workerCount)
 			: createInlineDispatcher(),
 		tests: options.tests,
+		contracts: options.contracts,
 	}
 }
 
@@ -108,7 +117,10 @@ export async function runCompilation(
 	// NOTE: The whole run's entries first, and only then the requests. A Module
 	// is compiled as a graph, and the graphs of a batch overlap: which files are
 	// going to be asked for decides how many times each of them is read.
-	plan.dispatcher.begin(plan.inputFileNames, { tests: plan.tests })
+	plan.dispatcher.begin(plan.inputFileNames, {
+		tests: plan.tests,
+		contracts: plan.contracts,
+	})
 
 	let tasks = plan.inputFileNames.map<Task>((fileName) => ({
 		id: fileName,
@@ -138,6 +150,7 @@ export async function runCompilation(
 					optimisation: optimiserOptionsFor(context.options),
 					embed: context.options.embed,
 					tests: plan.tests,
+					contracts: plan.contracts,
 				},
 				(stage) => {
 					progress.update(inputFileName, {

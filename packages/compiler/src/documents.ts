@@ -149,6 +149,10 @@ export function enrichDocument(
 	options: {
 		annotations?: boolean
 		tests?: boolean
+		// NOTE: And whether it asked for the goals the document's own Namespace
+		// declarations promise — see `enrich`'s own `contracts`. It means
+		// nothing without `tests`.
+		contracts?: boolean
 		// NOTE: The document's own text, which only a test compile reads — an
 		// `@example` block is compiled out of the file's own lines. See
 		// `enrich`'s own `source`.

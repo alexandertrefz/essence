@@ -9,6 +9,7 @@ import {
 	parseDocument,
 } from "@essence-lang/compiler/documents"
 import { hasDocumentationExamples } from "@essence-lang/compiler/enricher/examples"
+import type { parser } from "@essence-lang/interfaces"
 
 import { UsageError } from "./args"
 import { type CommandSpec, DEFAULT_PROGRAM_NAME } from "./commands"
@@ -44,6 +45,12 @@ const TESTS_SUFFIX = ".tests.es"
 // rule a file OUT — an `@example` may perfectly well be prose — so what follows
 // it is a parse.
 const EXAMPLE_TAG = "@example"
+
+// NOTE: And the word a file has to write before a contract run can find
+// anything to test in it. Like the two above it can only rule a file OUT — the
+// word may be written in a Comment, or be a Constant's name — so what follows
+// it is a parse.
+const NAMESPACE_KEYWORD = "namespace"
 
 export function namesTests(filePath: string): boolean {
 	return path.basename(filePath).endsWith(TESTS_SUFFIX)
@@ -133,7 +140,15 @@ async function collectEssenceFiles(
 // WALK turned up is one nobody mentioned, so it is kept only when it plainly
 // holds tests — an unrelated broken source under the working directory is not
 // what `essence test` was asked about.
-async function keepsFile(filePath: string, named: boolean): Promise<boolean> {
+async function keepsFile(
+	filePath: string,
+	named: boolean,
+	// NOTE: Whether the run reads a Namespace declaration as tests too — see
+	// `--contracts`. It widens what a WALK keeps, because a file whose goals a
+	// run is about to synthesize is a file with tests whether or not anybody
+	// wrote a `tests { … }` block in it. A project's ordinary run is untouched.
+	contracts: boolean,
+): Promise<boolean> {
 	if (namesTests(filePath)) {
 		return true
 	}
@@ -156,7 +171,8 @@ async function keepsFile(filePath: string, named: boolean): Promise<boolean> {
 	if (
 		!named &&
 		!sourceText.includes("tests") &&
-		!sourceText.includes(EXAMPLE_TAG)
+		!sourceText.includes(EXAMPLE_TAG) &&
+		!(contracts && sourceText.includes(NAMESPACE_KEYWORD))
 	) {
 		return false
 	}
@@ -170,7 +186,18 @@ async function keepsFile(filePath: string, named: boolean): Promise<boolean> {
 		// and a project's documentation is the last place a drifting example
 		// should be allowed to sit unrun.
 		hasDocumentationExamples(parsed.program) ||
+		// NOTE: And under `--contracts` a Namespace declaration promises
+		// something too — every Method of it states the property its return
+		// Type holds. A file of nothing but declarations is exactly the file
+		// those goals are worth most in.
+		(contracts && declaresNamespace(parsed.program)) ||
 		(named && containsErrors(parsed.diagnostics))
+	)
+}
+
+function declaresNamespace(program: parser.Program): boolean {
+	return program.implementation.nodes.some(
+		(node) => node.nodeType === "NamespaceDefinitionStatement",
 	)
 }
 
@@ -187,6 +214,8 @@ export async function discoverTestFiles(
 	// and answering "there is a setting" to a direct question would be the
 	// worse reading of both.
 	exclude: Array<string> = [],
+	// NOTE: Whether this run reads a declaration as a test — see `keepsFile`.
+	contracts: boolean = false,
 ): Promise<Array<string>> {
 	let walked = new Set<string>()
 	let named = new Set<string>()
@@ -247,7 +276,7 @@ export async function discoverTestFiles(
 	let kept: Array<string> = []
 
 	for (let candidate of candidates) {
-		if (await keepsFile(candidate, named.has(candidate))) {
+		if (await keepsFile(candidate, named.has(candidate), contracts)) {
 			kept.push(candidate)
 		}
 	}

@@ -2,15 +2,17 @@ import { readFile } from "node:fs/promises"
 import * as path from "node:path"
 
 // NOTE: Essence has no project file, and this is deliberately not the moment to
-// invent one. What a project needs to say about its tests today is two lists —
-// the tags a plain run leaves out, and the directories a walk stays out of —
-// and every Essence project that is more than one file already has a
+// invent one. What a project needs to say about its tests today is two lists
+// and a flag — the tags a plain run leaves out, the directories a walk stays
+// out of, and whether the declarations' own goals run — and every Essence
+// project that is more than one file already has a
 // `package.json`, because that is what installs the compiler. So the settings
 // live there, under an `essence` key that a later project file can adopt whole:
 //
 //     { "essence": { "test": {
 //         "skipTags": ["slow"],
-//         "exclude": ["fixtures/broken"]
+//         "exclude": ["fixtures/broken"],
+//         "contracts": true
 //     } } }
 //
 // NOTE: The NEAREST `package.json` that says something about Essence, walking
@@ -26,6 +28,12 @@ export type TestConfiguration = {
 	// still compiled and still reported: what this excludes is the walk, which
 	// is the half nobody asked for by name.
 	exclude: Array<string>
+	// NOTE: Whether every run of this project also tests what its declarations
+	// promise — see `--contracts`. A project whose goals are worth running is a
+	// project whose goals are worth running every time, and `--contracts` is
+	// then the flag for asking about a project that did not say so. The two are
+	// a union: either one turns the goals on.
+	contracts: boolean
 }
 
 export type ProjectConfiguration = {
@@ -42,7 +50,7 @@ export type ProjectConfiguration = {
 
 export const noConfiguration: ProjectConfiguration = {
 	filePath: null,
-	test: { skipTags: [], exclude: [] },
+	test: { skipTags: [], exclude: [], contracts: false },
 	problems: [],
 }
 
@@ -111,6 +119,34 @@ function readExclusions(
 	)
 }
 
+// NOTE: The one setting here that is a plain yes or no. It is read the way the
+// lists are — a shape nobody can use is a problem the run says out loud and
+// then ignores, because a project should not fail to run its tests over a key
+// it added wrongly, and silence would leave the author believing their goals
+// are running when they are not.
+function readContracts(
+	test: Record<string, unknown>,
+	filePath: string,
+	problems: Array<string>,
+): boolean {
+	let contracts = test.contracts
+
+	if (contracts === undefined) {
+		return false
+	}
+
+	if (typeof contracts !== "boolean") {
+		problems.push(
+			`${filePath}: "essence.test.contracts" is not true or false, so ` +
+				"the contract goals are left out.",
+		)
+
+		return false
+	}
+
+	return contracts
+}
+
 async function readManifest(filePath: string): Promise<unknown | undefined> {
 	let contents: string
 
@@ -142,7 +178,7 @@ export async function readProjectConfiguration(
 			if (!isRecord(manifest.essence)) {
 				return {
 					filePath,
-					test: { skipTags: [], exclude: [] },
+					test: { skipTags: [], exclude: [], contracts: false },
 					problems: [
 						`${filePath}: "essence" is not an object, so no ` +
 							"settings were read from it.",
@@ -156,7 +192,7 @@ export async function readProjectConfiguration(
 			if (!isRecord(written)) {
 				return {
 					filePath,
-					test: { skipTags: [], exclude: [] },
+					test: { skipTags: [], exclude: [], contracts: false },
 					problems: [
 						`${filePath}: "essence.test" is not an object, so no ` +
 							"test settings were read from it.",
@@ -169,6 +205,7 @@ export async function readProjectConfiguration(
 				test: {
 					skipTags: readSkipTags(written, filePath, problems),
 					exclude: readExclusions(written, filePath, problems),
+					contracts: readContracts(written, filePath, problems),
 				},
 				problems,
 			}

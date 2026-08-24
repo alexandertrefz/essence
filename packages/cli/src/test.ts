@@ -517,6 +517,19 @@ export function resolveFilters(
 	}
 }
 
+// NOTE: A union rather than an override, unlike the tags above: the flag asks
+// for the goals of a project that never said it wanted them, and the setting
+// asks for them every run. Neither is the other's exception, and a project that
+// configured them has no reason to be able to turn them off from the command
+// line — a run without its own contracts is a run that proves less about the
+// same code.
+export function resolveContracts(
+	options: { contracts: boolean },
+	configured: boolean,
+): boolean {
+	return options.contracts || configured
+}
+
 // NOTE: Whether an entry's own stream may be REMEMBERED, so that the next run
 // over the same code, the same stores and the same filters can replay it
 // instead of running it. The replay claims that these tests passed, were skipped
@@ -869,6 +882,10 @@ export async function runTest(
 	}
 
 	let filters = resolveFilters(context.options, configuration.test.skipTags)
+	let contracts = resolveContracts(
+		context.options,
+		configuration.test.contracts,
+	)
 	let writeEvent = process.stdout.write.bind(process.stdout)
 	let events: Array<TestEvent> = []
 	// NOTE: The same stream a second time, bucketed by the entry that produced
@@ -902,6 +919,7 @@ export async function runTest(
 		context.programName,
 		process.cwd(),
 		configuration.test.exclude,
+		contracts,
 	)
 
 	if (inputFileNames.length === 0) {
@@ -930,6 +948,7 @@ export async function runTest(
 		emit: true,
 		cacheOutput: true,
 		tests: true,
+		contracts,
 	})
 	let compilation
 

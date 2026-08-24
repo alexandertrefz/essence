@@ -23,7 +23,7 @@ import { createContext } from "../context"
 import { discoverTestFiles, namesTests } from "../discovery"
 import { run } from "../index"
 import type { ReportContext } from "../report"
-import { resolveFilters } from "../test"
+import { resolveContracts, resolveFilters } from "../test"
 import {
 	collectTestRun,
 	focusedTestsDiagnostic,
@@ -513,6 +513,41 @@ describe("essence test — project configuration", () => {
 				)
 
 				expect(found).toHaveLength(1)
+			},
+		)
+	})
+
+	it("reads whether a project tests what its declarations promise", async () => {
+		await withFiles(
+			{
+				"package.json": JSON.stringify({
+					essence: { test: { contracts: true } },
+				}),
+			},
+			async (directory) => {
+				let configuration = await readProjectConfiguration(directory)
+
+				expect(configuration.test.contracts).toBe(true)
+				expect(configuration.problems).toEqual([])
+			},
+		)
+	})
+
+	it("leaves the contract goals out where the setting is the wrong shape", async () => {
+		await withFiles(
+			{
+				"package.json": JSON.stringify({
+					essence: { test: { contracts: "yes" } },
+				}),
+			},
+			async (directory) => {
+				let configuration = await readProjectConfiguration(directory)
+
+				expect(configuration.test.contracts).toBe(false)
+				expect(configuration.problems).toHaveLength(1)
+				expect(configuration.problems[0]).toContain(
+					"essence.test.contracts",
+				)
 			},
 		)
 	})
@@ -1992,6 +2027,141 @@ describe("essence test — property tests", () => {
 
 		expect(options.seed).toBe("beef")
 		expect(options.cases).toBe(7)
+	})
+})
+
+// NOTE: What `--contracts` looks like from the command line: the goals a
+// project's own declarations promise, run beside the tests it wrote and
+// reported under a suite nobody typed.
+describe("essence test --contracts", () => {
+	const declarations = [
+		"implementation {",
+		"\ttype Positive = Integer where @::isGreaterThan(0)",
+		"",
+		"\tnamespace Counting for Integer {",
+		"\t\tup() -> Positive {",
+		"\t\t\t<- 1",
+		"\t\t}",
+		"\t}",
+		"}",
+		"",
+		"tests {",
+		'\ttest "counts" {',
+		"\t\texpect 1::isGreaterThan(0)",
+		"\t}",
+		"}",
+		"",
+	].join("\n")
+
+	// NOTE: A file with nothing but declarations in it, which a plain run does
+	// not even look at — and which is exactly the file a contract run exists
+	// for.
+	const undocumented = [
+		"implementation {",
+		"\ttype Positive = Integer where @::isGreaterThan(0)",
+		"",
+		"\tnamespace Counting for Integer {",
+		"\t\tup() -> Positive {",
+		"\t\t\t<- 1",
+		"\t\t}",
+		"\t}",
+		"}",
+		"",
+	].join("\n")
+
+	it("runs the goals a Namespace's declarations promise", async () => {
+		await withFiles({ "Counting.es": declarations }, async (directory) => {
+			let { code, out } = await runTests(directory, ["--contracts"])
+
+			expect(code).toBe(EXIT_SUCCESS)
+			expect(out).toContain("contracts")
+			expect(out).toContain("Counting::up()")
+			expect(out).toContain("2 passed")
+		})
+	})
+
+	it("finds a file that declares but writes no tests", async () => {
+		await withFiles({ "Counting.es": undocumented }, async (directory) => {
+			let plain = await runTests(directory)
+			let goals = await runTests(directory, ["--contracts"])
+
+			expect(plain.out).toContain("no tests in")
+			expect(goals.code).toBe(EXIT_SUCCESS)
+			expect(goals.out).toContain("Counting::up()")
+		})
+	})
+
+	// NOTE: The setting is read from the nearest `package.json` walking up from
+	// the working directory rather than from the directory a run was pointed
+	// at, so the union is asserted where it is decided rather than through a
+	// process this spec would have to move.
+	it("takes the flag and the project's own setting as a union", () => {
+		expect(resolveContracts({ contracts: false }, true)).toBe(true)
+		expect(resolveContracts({ contracts: true }, false)).toBe(true)
+		expect(resolveContracts({ contracts: false }, false)).toBe(false)
+	})
+
+	// NOTE: THE cache-key claim. A contract compile enriches a suite that is
+	// not in the file at all, out of sources that are byte for byte the same —
+	// so the graph's own hash can not tell the two bundles apart, and a plain
+	// run handed the contract run's bundle would report goals nobody asked for.
+	it("does not serve a contract bundle to a plain run", async () => {
+		await withFiles({ "Counting.es": declarations }, async (directory) => {
+			let goals = await runTests(directory, ["--contracts"])
+			let plain = await runTests(directory)
+
+			expect(goals.out).toContain("Counting::up()")
+			expect(plain.out).not.toContain("Counting::up()")
+			expect(plain.out).not.toContain("contracts")
+			expect(plain.out).toContain("1 passed")
+		})
+	})
+
+	// NOTE: Said once per Namespace, and quietly — an `information` Diagnostic
+	// rather than a failure, because a Method nothing can build a goal for is
+	// not a mistake anybody made.
+	it("says once which Methods got no goal", async () => {
+		await withFiles(
+			{
+				"Reading.es": [
+					"implementation {",
+					"\tnamespace Reading for String {",
+					"\t\twith(each read: (_ text: String) -> Integer) -> Integer {",
+					"\t\t\t<- read(@)",
+					"\t\t}",
+					"",
+					"\t\tagain(each read: (_ text: String) -> Integer) -> Integer {",
+					"\t\t\t<- read(@)",
+					"\t\t}",
+					"\t}",
+					"}",
+					"",
+					"tests {",
+					'\ttest "reads" {',
+					"\t\texpect true",
+					"\t}",
+					"}",
+					"",
+				].join("\n"),
+			},
+			async (directory) => {
+				let { code, err } = await runTests(directory, ["--contracts"])
+
+				expect(code).toBe(EXIT_SUCCESS)
+				expect(err).toContain("ungeneratable-contract")
+				expect(err).toContain("2 Methods of 'Reading' got no contract")
+			},
+		)
+	})
+
+	it("reads the flag off the command line", () => {
+		expect(
+			parseArguments(["test", "--contracts"], "essence").options
+				.contracts,
+		).toBe(true)
+		expect(parseArguments(["test"], "essence").options.contracts).toBe(
+			false,
+		)
 	})
 })
 

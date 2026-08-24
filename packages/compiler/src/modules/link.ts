@@ -535,6 +535,10 @@ export type LinkOptions = {
 	// test` and the Editor's test session set it; a build and a run leave every
 	// `tests { … }` block in the graph parsed and unenriched.
 	tests?: boolean
+	// NOTE: And whether it asked for the contract goals as well — see `enrich`.
+	// One graph is linked in one mode, so every Module of it synthesizes the
+	// goals its own declarations promise.
+	contracts?: boolean
 }
 
 export function linkModuleGraph(
@@ -792,6 +796,7 @@ function linkGroup(
 			annotationsFor:
 				annotationsIndex === -1 ? undefined : annotationsIndex,
 			tests: options.tests,
+			contracts: options.contracts,
 		},
 	)
 
