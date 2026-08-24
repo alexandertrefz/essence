@@ -17,6 +17,7 @@
 		"./enricher/stdlib": "./src/enricher/stdlib.ts",
 		"./enricher/tests": "./src/enricher/tests.ts",
 		"./modules": "./src/modules/index.ts",
+		"./mutation": "./src/mutation/index.ts",
 		"./validator": "./src/validator/index.ts",
 		"./simplifier": "./src/simplifier/index.ts",
 		"./testing": "./src/testing/index.ts",
