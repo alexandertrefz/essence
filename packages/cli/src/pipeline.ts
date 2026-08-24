@@ -13,6 +13,7 @@ import {
 	parseDocument,
 } from "@essence-lang/compiler/documents"
 import type { ExportSurface } from "@essence-lang/compiler/modules"
+import type { MutationSite } from "@essence-lang/compiler/mutation"
 import {
 	defaultOptimiserOptions,
 	type OptimiserOptions,
@@ -116,6 +117,20 @@ export type CompileRequest = CompileMode & {
 	// is written beside it. It changes the bytes as well, so it joins the key
 	// too.
 	embed?: boolean
+	// NOTE: Whether every Module of this compile is asked what mutations it
+	// admits, which the outcome then carries — see `CompileOutcome.mutations`.
+	// Only `essence test --mutate`'s baseline asks, and it costs one walk of
+	// each simplified Program.
+	enumerateMutations?: boolean
+	// NOTE: The one deliberate lie this compile tells, by the Module it is told
+	// about and the site's id in that Module's walk — see `applyMutation`. The
+	// rewrite lands post-simplify and pre-optimise, which is where the sites
+	// were enumerated, so an id means the same Node in both directions.
+	//
+	// NOTE: It does NOT join the bundle key, because a mutated compile has no
+	// business in the bundle cache at all — see `compileFile`, which bypasses
+	// the store in both directions the moment this is set.
+	mutation?: { module: string; site: number }
 }
 
 // NOTE: One file of the compiled graph, with the text its Diagnostics are
@@ -151,6 +166,13 @@ export type CompileOutcome = {
 	// for THIS entry: a run over twenty files is warm when every one of them
 	// was.
 	cached: boolean
+	// NOTE: What every Module this entry reaches could be lied about, for a
+	// compile that ASKED — absent otherwise, which is every compile but a
+	// mutation run's baseline. A Module two entries reach is enumerated under
+	// each of them, and the sites are identical: the walk is a function of the
+	// simplified Program, and one Program is one Module's. Whoever folds them
+	// keys by Module.
+	mutations?: Array<MutationSite>
 }
 
 export type ProgressReporter = (stage: StageName) => void
@@ -610,12 +632,28 @@ export async function compileFile(
 		// by the time a hit skips the rest. A hit is a shortcut through the
 		// emitter and never through the front half — which is also what keeps
 		// `esc watch` able to report the graph it is watching.
-		let store = bundleCacheDirectory()
-		let key = bundleKey(
-			request,
-			front.entryPath,
-			new Map(modules.map((module) => [module.fileName, module])),
-		)
+		//
+		// NOTE: A MUTATED compile has no store at all, in either direction. Its
+		// bundle is a lie told once and thrown away — remembering it would let
+		// a later run be handed a mutant under a name that promises the
+		// Program, and reading from the store would hand this compile the
+		// unmutated world's answer and report every test as failing to notice a
+		// mutant that was never emitted.
+		let store =
+			request.mutation === undefined ? bundleCacheDirectory() : null
+		// NOTE: And no name, where nothing is going to be looked up or written
+		// under one. The key is a hash of every source of the graph, which is
+		// not free, and a mutant run computes it hundreds of times for nothing.
+		let key =
+			store === null && request.outputFileName !== null
+				? ""
+				: bundleKey(
+						request,
+						front.entryPath,
+						new Map(
+							modules.map((module) => [module.fileName, module]),
+						),
+					)
 		// NOTE: Only a linked map is a second file. An inline one rides in the
 		// bundle, and there is nothing beside it to look for.
 		let hasMapFile =
@@ -653,6 +691,14 @@ export async function compileFile(
 		// the CLI's own — the Session's caches, and the timings this file
 		// reports.
 		let { emitBundle } = await import("@essence-lang/compiler/embed")
+		// NOTE: Reached the same way and for the same reason — a build must not
+		// pay for a walker only a mutation run calls.
+		let mutating =
+			request.mutation !== undefined ||
+			request.enumerateMutations === true
+		let mutation = mutating
+			? await import("@essence-lang/compiler/mutation")
+			: null
 		let embedding =
 			request.embed === true
 				? (await import("@essence-lang/compiler/embed/bridge"))
@@ -663,6 +709,47 @@ export async function compileFile(
 		// scratch name is only ever the one it keeps, because a clean emit is
 		// spawned out of the cache entry it becomes.
 		let emitFileName = request.outputFileName ?? scratchBundlePath(key)
+		// NOTE: Which file each typed Program is, which the emitter does not
+		// carry — the two lists are parallel and this is where they still are.
+		let names = new Map(
+			programs.map((program, index) => [
+				program,
+				modules[index]!.fileName,
+			]),
+		)
+		let mutations: Array<MutationSite> = []
+		// NOTE: The simplify seam is where the CLI already substitutes its own
+		// answer, and a mutant is the same substitution: what is handed on is
+		// the Program THIS compile is about. It is also exactly the moment the
+		// design asks for — after simplification, before the Optimiser — so a
+		// site stands where the author wrote it and no counter the
+		// instrumentation added can be mistaken for one.
+		//
+		// NOTE: The Session's own cache is left holding the UNMUTATED Program,
+		// because `applyMutation` answers with a fresh one. Every other entry
+		// of the run compiled through this Session is untouched.
+		let simplify: NonNullable<
+			Parameters<typeof emitBundle>[1]
+		>["simplify"] = (program, options) => {
+			let simplified = session.simplify(program, options)
+
+			if (mutation === null) {
+				return simplified
+			}
+
+			let fileName = names.get(program) ?? null
+
+			if (request.enumerateMutations === true) {
+				mutations.push(
+					...mutation.enumerateMutations(simplified, fileName),
+				)
+			}
+
+			return request.mutation !== undefined &&
+				fileName === request.mutation.module
+				? mutation.applyMutation(simplified, request.mutation.site)
+				: simplified
+		}
 		let bundled = await emitBundle(
 			{
 				modules: programs.map((program, index) => ({
@@ -691,7 +778,7 @@ export async function compileFile(
 				transformSources: embedding,
 			},
 			{
-				simplify: session.simplify,
+				simplify,
 				optimise: session.optimise,
 				stage: (name, work) => timeline.run(name, work),
 			},
@@ -740,6 +827,7 @@ export async function compileFile(
 			outputFileName,
 			bytes: emitted.contents.byteLength,
 			gzipBytes: gzipSync(emitted.contents).byteLength,
+			...(request.enumerateMutations === true ? { mutations } : {}),
 		})
 	} catch (error) {
 		// NOTE: A throw that reaches here is a Compiler bug rather than a
