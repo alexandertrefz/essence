@@ -59,6 +59,9 @@ declarations {
 			§§ Answers the exact sum of the two Transcendentals.
 			§§
 			§§ The π and e parts can cancel, which leaves a Rational.
+			§§
+			§§ @param _ — the Transcendental to add
+			§§ @returns — the exact sum, a Rational or a Transcendental.
 			(_ other: Transcendental) -> Rational | Transcendental
 		}
 
@@ -157,6 +160,9 @@ declarations {
 			§§ Answers the exact quotient of the two Transcendentals.
 			§§
 			§§ Proportional values answer a Rational: `Tau::divide(by Pi)` is `2`. Anything else is empty, including π divided by e.
+			§§
+			§§ @param by — the Transcendental to divide by
+			§§ @returns — the quotient, or nothing when the two are not proportional.
 			(by other: Transcendental) -> Optional<Rational>
 
 			§§ Answers the exact quotient of the Transcendental and an Integer.

@@ -216,12 +216,16 @@ declarations {
 		§§
 		§§ The comparison is in lowest terms, so `1/2` equals `2/4`. A Rational equals an Integer when it is whole and its numerator is that Integer.
 		overload is {
+			§§ Answers whether the Rational has the same value as another Rational.
+			§§
 			§§ @param _ — the Rational to compare against
 			§§ @returns — `true` when both are equal.
 			(_ other: Rational) -> Boolean {
 				<- @::compare(to other)::is(#Equal)
 			}
 
+			§§ Answers whether the Rational has the same value as an Integer.
+			§§
 			§§ @param _ — the Integer to compare against
 			§§ @returns — `true` when the Rational is whole and its numerator is that Integer.
 			(_ other: Integer) -> Boolean {
@@ -238,12 +242,16 @@ declarations {
 		§§
 		§§ A Rational that is not whole differs from every Integer.
 		overload isNot {
+			§§ Answers whether the Rational differs from another Rational.
+			§§
 			§§ @param _ — the Rational to compare against
 			§§ @returns — `true` when the two differ.
 			(_ other: Rational) -> Boolean {
 				<- @::is(other)::negate()
 			}
 
+			§§ Answers whether the Rational differs from an Integer.
+			§§
 			§§ @param _ — the Integer to compare against
 			§§ @returns — `true` when the two differ.
 			(_ other: Integer) -> Boolean {
@@ -286,7 +294,12 @@ declarations {
 				}
 			}
 
+			§§ Answers the Rational as a decimal, or as a fraction, in the named format.
+			§§
+			§§ The `#Decimal` format writes the expansion, to at most 80 digits, and the `#Fraction` format writes `3/4`. A whole Rational prints its numerator alone in either.
+			§§
 			§§ @param as — the form to represent the Rational in
+			§§ @returns — the String representation of the Rational.
 			(as format: NumberFormat) -> String
 
 			§ Native beside the entry above, and written on the same long
@@ -300,6 +313,7 @@ declarations {
 			§§
 			§§ @param as — the form to represent the Rational in
 			§§ @param places — how many digits to write after the point
+			§§ @returns — the String representation of the Rational.
 			(as format: NumberFormat, places count: Integer) -> String
 		}
 
