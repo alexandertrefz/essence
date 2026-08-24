@@ -218,6 +218,12 @@ export type TestRun = {
 	counts: TestCounts
 	duration: number
 	focused: boolean
+	// NOTE: How many ENTRIES of the run were replayed out of a result cache
+	// rather than run. It is a fact about the stream rather than about a test —
+	// every test in a replayed entry reads exactly as it did when it ran — so it
+	// is counted here and reported beside the tally rather than against any
+	// record.
+	cached: number
 }
 
 export const emptyRun: TestRun = {
@@ -231,6 +237,7 @@ export const emptyRun: TestRun = {
 	},
 	duration: 0,
 	focused: false,
+	cached: 0,
 }
 
 // NOTE: The event stream folded back into one record per test, in the order the
@@ -242,6 +249,7 @@ export function collectTestRun(events: Array<TestEvent>): TestRun {
 	let tests: Array<TestRecord> = []
 	let duration = 0
 	let focused = false
+	let cached = 0
 
 	let record = (
 		id: string,
@@ -381,6 +389,13 @@ export function collectTestRun(events: Array<TestEvent>): TestRun {
 
 				break
 			}
+			// NOTE: Counted rather than skipped. The events after it are an
+			// entry's own, replayed verbatim, so every record they fold into is
+			// the record that entry produced — what this adds to the fold is only
+			// that the run did not have to produce it again.
+			case "results-cached":
+				cached += 1
+				break
 			case "run-end":
 				duration += event.duration
 				focused = focused || event.focused
@@ -418,7 +433,7 @@ export function collectTestRun(events: Array<TestEvent>): TestRun {
 		}
 	}
 
-	return { tests, counts, duration, focused }
+	return { tests, counts, duration, focused, cached }
 }
 
 function samePosition(left: common.Position, right: common.Position): boolean {

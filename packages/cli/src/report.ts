@@ -74,8 +74,15 @@ export function countDiagnostics(diagnostics: Array<common.Diagnostic>): {
 	return { errors, warnings }
 }
 
-export function pluralise(count: number, singular: string): string {
-	return count === 1 ? `${count} ${singular}` : `${count} ${singular}s`
+// NOTE: An `s` unless the caller says otherwise, which covers every word the
+// report has needed so far and leaves the one that does not — `entry` — a way to
+// say so rather than a rule of its own somewhere else.
+export function pluralise(
+	count: number,
+	singular: string,
+	plural = `${singular}s`,
+): string {
+	return count === 1 ? `${count} ${singular}` : `${count} ${plural}`
 }
 
 function padVisible(text: string, width: number): string {
