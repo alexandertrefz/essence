@@ -34,7 +34,7 @@ import {
 	type TestModule,
 } from "@essence-lang/runtime/Testing"
 
-import { EXIT_FAILURE, EXIT_FOCUSED, EXIT_SUCCESS } from "./actions"
+import { EXIT_FAILURE, EXIT_FOCUSED, EXIT_SUCCESS, EXIT_USAGE } from "./actions"
 import type { CommandSpec } from "./commands"
 import {
 	hasFailures,
@@ -517,17 +517,17 @@ export function resolveFilters(
 	}
 }
 
-// NOTE: A union rather than an override, unlike the tags above: the flag asks
-// for the goals of a project that never said it wanted them, and the setting
-// asks for them every run. Neither is the other's exception, and a project that
-// configured them has no reason to be able to turn them off from the command
-// line — a run without its own contracts is a run that proves less about the
-// same code.
+// NOTE: `--contracts` unions with the setting — the flag asks for the goals of
+// a project that never said it wanted them, and the setting asks for them every
+// run — and `--no-contracts` beats both: a project that configured goals still
+// needs a plain run on demand, while a broken declaration is repaired or when
+// only the written tests are the question. Both flags at once is a
+// contradiction the caller refuses before anything runs.
 export function resolveContracts(
-	options: { contracts: boolean },
+	options: { contracts: boolean; noContracts: boolean },
 	configured: boolean,
 ): boolean {
-	return options.contracts || configured
+	return options.noContracts ? false : options.contracts || configured
 }
 
 // NOTE: Whether an entry's own stream may be REMEMBERED, so that the next run
@@ -871,6 +871,17 @@ export async function runTest(
 	command: CommandSpec,
 	files: Array<string>,
 ): Promise<number> {
+	// NOTE: Refused before anything runs — the two flags contradict, and a run
+	// that guessed which one was meant would prove either more or less than the
+	// reader asked for.
+	if (context.options.contracts && context.options.noContracts) {
+		context.terminal.err(
+			"--contracts and --no-contracts contradict each other — say one.",
+		)
+
+		return EXIT_USAGE
+	}
+
 	let configuration = await readProjectConfiguration()
 
 	for (let problem of configuration.problems) {

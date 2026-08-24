@@ -548,6 +548,18 @@ export const commands: Array<CommandSpec> = [
 					"could build a goal for is named once per Namespace.",
 			},
 			{
+				name: "no-contracts",
+				type: "boolean",
+				summary: "Run without goals whatever the project configured",
+				details:
+					"The way out of `essence.test.contracts` for one run: a " +
+					"project that always tests its declarations still gets a " +
+					"plain run on demand — while a broken declaration is " +
+					"repaired, or when only the written tests are the " +
+					"question. The flag wins over the setting in both " +
+					"directions, and saying both flags at once is refused.",
+			},
+			{
 				name: "coverage",
 				type: "boolean",
 				summary: "Report what the tests reached",
