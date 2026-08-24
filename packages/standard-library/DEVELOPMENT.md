@@ -287,8 +287,8 @@ groups, in this order:
    `doesNotContain`.
 5. **Accessors** — the Methods that answer a named part of the receiver:
    `length`, `numerator`, `denominator`, `absolute`, `item(at:)`, `firstItem`,
-   `lastItem`, `firstIndex`, `lastIndex`, `enumerate`, `indices`, `keys`,
-   `characters`, `words`, `lines`, `character(at:)`, `value(defaultingTo:)`.
+   `lastItem`, `firstIndex`, `lastIndex`, `indices`, `keys`, `characters`,
+   `words`, `lines`, `character(at:)`, `value(defaultingTo:)`.
 6. **Transforms, and everything else** — `negate`, `round`, `clamp`,
    `reciprocal`, `map`, `reduce`, `everyItem`, `sort`, `slice`, `append`,
    `join`, `split`, `trim`, `pad`, `flatten`, `andThen`.
@@ -320,9 +320,9 @@ neither is. **An answer of `Boolean` makes a Method a predicate wherever it
 stands**, so `Boolean`'s own `negate`, `and`, `or` and `exclusiveOr` sit in
 group 4 rather than among the transforms. And **`reciprocal` is a transform**:
 it BUILDS a Rational out of the receiver rather than reading a part of one,
-which is what an accessor does. An Overload counts as a predicate only when
-every one of its entries answers a `Boolean`.
-
+which is what an accessor does. `enumerate` is one for the same reason: the
+Records it answers are built out of the List rather than held by it. An Overload
+counts as a predicate only when every one of its entries answers a `Boolean`.
 The order is visible to a reader of the LANGUAGE too. Completion offers a
 Namespace's members in the order the file declares them, so
 `packages/language-server/src/tests/completion.spec.ts` spells two of these lists

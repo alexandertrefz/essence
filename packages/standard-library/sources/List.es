@@ -582,13 +582,6 @@ declarations {
 		§ `@::indices()::map(…)`, which reads every item back through
 		§ `item(at:)` and builds an Optional per item to take apart again.
 
-		§§ Answers every item beside the position it stands at.
-		§§
-		§§ The position counts from zero. The empty List answers no entries.
-		§§
-		§§ @returns — the List of Records, each holding a position under `index` and the item at it under `item`.
-		enumerate() -> List<{ index: Integer, item: ItemType }>
-
 		§§ Answers the positions the List has, in order.
 		§§
 		§§ The positions count from zero and stop before the length. The empty List answers no positions.
@@ -597,6 +590,13 @@ declarations {
 		indices() -> List<Integer> {
 			<- List.of(integersFrom 0, upTo @::length())
 		}
+
+		§§ Answers every item beside the position it stands at.
+		§§
+		§§ The position counts from zero. The empty List answers no entries.
+		§§
+		§§ @returns — the List of Records, each holding a position under `index` and the item at it under `item`.
+		enumerate() -> List<{ index: Integer, item: ItemType }>
 
 		§§ Answers a new List without the first item, or without the given number of leading items.
 		§§
@@ -1352,13 +1352,6 @@ declarations {
 		§ `List.of(integersFrom:through:)`, which promises that already. It
 		§ carries a proof another Method holds rather than minting one.
 
-		§§ Answers every item beside the position it stands at.
-		§§
-		§§ The position counts from zero.
-		§§
-		§§ @returns — the List of Records, each holding a position under `index` and the item at it under `item`. It is never empty.
-		enumerate() -> NonEmptyList<{ index: Integer, item: ItemType }>
-
 		§§ Answers the positions the List has, in order.
 		§§
 		§§ The positions count from zero and stop before the length.
@@ -1367,6 +1360,13 @@ declarations {
 		indices() -> NonEmptyList<Integer> {
 			<- List.of(integersFrom 0, through @::length()::subtract(1))
 		}
+
+		§§ Answers every item beside the position it stands at.
+		§§
+		§§ The position counts from zero.
+		§§
+		§§ @returns — the List of Records, each holding a position under `index` and the item at it under `item`. It is never empty.
+		enumerate() -> NonEmptyList<{ index: Integer, item: ItemType }>
 
 		§ Removing duplicates keeps the first of every group of equal items, so
 		§ it keeps at least one of whatever it was handed.
