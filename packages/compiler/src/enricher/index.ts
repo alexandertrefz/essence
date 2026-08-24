@@ -1915,6 +1915,7 @@ const enrichTest = (
 		focused: modifiers.focused,
 		table,
 		properties,
+		cases: null,
 		body,
 		keywordPosition: node.keywordPosition,
 		position: node.position,

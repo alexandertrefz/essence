@@ -141,6 +141,11 @@ export type TestManifestEntry = {
 	// — a benchmark is timed, which is work nobody asked an ordinary run to do,
 	// so it runs under `--bench` or where somebody named it by id.
 	benchmark: boolean
+	// NOTE: How many cases this entry's property runs where the command line
+	// says nothing, and null to take the run's own count — a synthesized
+	// contract goal's budget rides here so the runtime need never know where
+	// an entry came from.
+	cases: number | null
 	// NOTE: The identity WITHOUT the Module path, spelled by
 	// `relativeIdentityKey` — for a row of a table, with the row as its last
 	// step. It is what everything stored BESIDE the file is keyed by (a

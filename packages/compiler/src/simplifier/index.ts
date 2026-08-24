@@ -1876,6 +1876,7 @@ function manifestEntry(
 		focused: node.focused !== null,
 		skipped: node.skipped === null ? null : node.skipped.reason,
 		benchmark: node.form === "benchmark",
+		cases: node.cases,
 		position: node.position,
 		keywordPosition: node.keywordPosition,
 	}
