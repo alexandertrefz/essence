@@ -19,6 +19,11 @@
 		"body": ["test \"${1:what it proves}\" {", "\texpect $0", "}"],
 		"description": "A test — one named body of assertions."
 	},
+	"benchmark": {
+		"prefix": "benchmark",
+		"body": ["benchmark \"${1:what it measures}\" {", "\t$0", "}"],
+		"description": "A benchmark — one named body, timed rather than judged."
+	},
 	"suite": {
 		"prefix": "suite",
 		"body": ["suite \"${1:name}\" {", "\t$0", "}"],

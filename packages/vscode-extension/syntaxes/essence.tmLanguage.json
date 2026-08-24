@@ -263,8 +263,8 @@
 					"name": "storage.type.essence"
 				},
 				{
-					"comment": "A `test` or a `suite` opens where the String Literal naming it follows — which is the Parser's own rule, and what keeps `constant test = 5` unlit.",
-					"match": "\\b(test|suite)\\b(?=[ \\t]+\")",
+					"comment": "A `test`, a `suite` or a `benchmark` opens where the String Literal naming it follows — which is the Parser's own rule, and what keeps `constant test = 5` unlit.",
+					"match": "\\b(test|suite|benchmark)\\b(?=[ \\t]+\")",
 					"name": "storage.type.essence"
 				},
 				{

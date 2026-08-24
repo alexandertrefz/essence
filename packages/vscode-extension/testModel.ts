@@ -107,6 +107,12 @@ export type TestSite = {
 	tags: Array<string>
 	focused: boolean
 	skipped: string | null
+	// NOTE: Whether the item was written as a `benchmark` rather than as a
+	// `test`. The session runs without `--bench`, so one arrives deselected for
+	// the reason `bench`; this is the fact about the ITEM, which is what an
+	// Explorer draws it by. Optional, because a Server built before it existed
+	// sends sites without it.
+	benchmark?: boolean
 }
 
 // NOTE: What the run's counters counted, one point at a time — where it stands,
@@ -281,6 +287,12 @@ function emptyRecord(id: string, name: string): TestRecord {
 // drawn by the Server, as inlay hints, at the end of the line that produced
 // them; a decoration of our own on the same line would be a second answer to one
 // question — see `README.md`.
+//
+// NOTE: So are `benchmark` events, for now. A session runs without `--bench`,
+// so the only one that ever arrives is a benchmark somebody asked to run by id
+// — and what the run says about it, pass or fail, already reaches an Explorer
+// through the ordinary pair of events. Drawing the measurement beside it is
+// worth doing and is not done here yet.
 export function foldEvents(events: Array<TestEvent>): Array<TestRecord> {
 	let byId = new Map<string, TestRecord>()
 	let record = (

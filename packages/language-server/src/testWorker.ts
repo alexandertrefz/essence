@@ -118,6 +118,7 @@ function sitesOf(registry: Registry, entry: string): Array<TestSite> {
 		tags: test.tags,
 		focused: test.focused,
 		skipped: test.skipped,
+		benchmark: test.benchmark,
 	}))
 }
 

@@ -258,6 +258,47 @@ drifts from the code fails a run rather than quietly lying in hover text:
 pointsPerGame() -> Rational {
 ```
 
+## Benchmarks
+
+A `benchmark` is a test whose body is **timed** rather than judged. It takes the
+same name, the same Modifiers and the same `across` rows a test takes — what
+differs is what running it means:
+
+```essence
+benchmark "ranks a full division" {
+	expect Standings.ranked(division)::length()::is(20)
+}
+```
+
+Measuring a body takes hundreds of runs of it, so a benchmark is left out of an
+ordinary run and counted as deselected — the tree says `only with --bench` where
+it would have run. `essence test --bench` measures them **as well as** running
+the tests, because a measurement of a body that is wrong is a number about
+nothing: a benchmark whose assertions do not hold is reported as the failure it
+is and never timed.
+
+The body is run in batches until one takes long enough for the clock to have
+something to say, several batches are taken, and the middle one answers. What
+comes out is the time of a single run, and the first measurement is recorded as
+a baseline in `__benchmarks__/<File>.es.bench` beside the source:
+
+```
+benchmark "ranks a full division"
+	1204833 ns
+```
+
+Later runs compare against it. A quarter slower **fails** — a benchmark says
+what a body may cost the way an assertion says what it may answer — and the
+report carries both times and the one command that accepts the new one. A fifth
+faster passes and says so, but does not move the baseline on its own: a fast
+machine would otherwise ratchet the number down for everybody.
+`essence test --bench --update` records what this run measured. A benchmark
+written `across` rows keeps a baseline per row, numbered the way a table test's
+snapshot is.
+
+`for any` is refused here. A measurement is comparable only where every run does
+the same work, and a generated value changes the work every case.
+
 ## Conventions worth keeping
 
 None of these are enforced. They are what the repository itself does.
