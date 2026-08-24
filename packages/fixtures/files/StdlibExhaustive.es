@@ -2147,6 +2147,11 @@ third"::lines())
 		{ ratio = 1/2::add(1/2) }::toString(),
 	)
 
+	§ A List member is the second piece the two renderings disagree about.
+	§ `List::toString` answers `[1, 2]`, so a Record holding that List says the
+	§ same about it, where `Terminal.inspect` keeps the structural `[ 1, 2 ]`.
+	show("Record.toString() [List member]", { items = [1, 2] }::toString())
+
 	§ ——— List —————————————————————————————————————————————————————————————
 	show(
 		"List.is<ItemType is Equatable>(_ List<ItemType>)",
@@ -2857,8 +2862,8 @@ third"::lines())
 		singleNumber::join(with ", "),
 	)
 	§ LOAD-BEARING: `partition` returns a Record, and its printed form
-	§ `{ matching = [ 2, 4 ], rest = [ 3, 1, 1 ] }` sits at forty-three
-	§ characters — seventeen under the sixty at which `getStringRepresentation`
+	§ `{ matching = [2, 4], rest = [3, 1, 1] }` sits at thirty-nine
+	§ characters — twenty-one under the sixty at which `getStringRepresentation`
 	§ trips its field-doubling bug and wraps across lines. A larger `numbers`
 	§ List here would cross that line and break the golden. Keep it short.
 	show(
