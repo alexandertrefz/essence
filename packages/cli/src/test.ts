@@ -223,7 +223,11 @@ export function claimRegistries(
 // NOTE: Every test the run was narrowed to, so that the refusal at the end can
 // point at each of them. A skipped test's `focused` narrows nothing — it does
 // not run either way — and is not what has to go.
-function focusedTests(suites: Array<LoadedSuite>): Array<FocusedTest> {
+//
+// NOTE: Exported for `--mutate`, which refuses a focused baseline outright and
+// names the same tests in the same words — a reader meets one refusal spelled
+// once, whichever of the two runs they asked for.
+export function focusedTests(suites: Array<LoadedSuite>): Array<FocusedTest> {
 	return suites.flatMap((suite) =>
 		suite.registry.tests
 			.filter((test) => test.entry.focused && test.entry.skipped === null)

@@ -148,6 +148,13 @@ const emptyNamespaces: DeclaredNamespaces = {
 	nested: new Set(),
 }
 
+// NOTE: The instrumentation pass by NAME, spelled once, for the caller that has
+// to refuse being asked to turn it off. `essence test --mutate` reads the
+// counters this pass writes to learn which tests reach which site, so a run that
+// disabled it would report every site in the project as one no test reaches —
+// see the refusal in `mutate.ts`.
+export const coveragePassName: string = instrumentCoverage.name
+
 export const optimiserPassNames: ReadonlyArray<string> = optimiserPasses.map(
 	(pass) => pass.name,
 )
