@@ -20,11 +20,18 @@ const essence = fileURLToPath(
 )
 
 let bundleCache = mkdtempSync(path.join(tmpdir(), "essence-watch-cache-"))
+// NOTE: A watching session reads no result cache — it holds the bundles it has
+// already loaded — but the sessions here are CHILD processes and inherit this
+// environment, so the variable is pointed somewhere harmless all the same.
+let resultCache = mkdtempSync(path.join(tmpdir(), "essence-watch-results-"))
 let previousCache: string | undefined
+let previousResults: string | undefined
 
 beforeAll(() => {
 	previousCache = process.env.ESSENCE_CLI_CACHE
+	previousResults = process.env.ESSENCE_RESULTS_CACHE
 	process.env.ESSENCE_CLI_CACHE = bundleCache
+	process.env.ESSENCE_RESULTS_CACHE = resultCache
 })
 
 afterAll(() => {
@@ -34,7 +41,14 @@ afterAll(() => {
 		process.env.ESSENCE_CLI_CACHE = previousCache
 	}
 
+	if (previousResults === undefined) {
+		delete process.env.ESSENCE_RESULTS_CACHE
+	} else {
+		process.env.ESSENCE_RESULTS_CACHE = previousResults
+	}
+
 	rmSync(bundleCache, { recursive: true, force: true })
+	rmSync(resultCache, { recursive: true, force: true })
 })
 
 describe("The affected set", () => {

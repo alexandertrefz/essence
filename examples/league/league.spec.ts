@@ -19,11 +19,16 @@ const ESSENCE = path.join(
 )
 
 // NOTE: A bundle cache of this run's own, so that a spec compiling the example
-// neither answers out of the user's cache nor fills it.
+// neither answers out of the user's cache nor fills it — and a result cache
+// beside it, for the same reason and one more: this spec runs `essence test` in
+// the example's OWN directory, so an answer left in the user's store would be
+// replayed by the next run a reader does there by hand.
 const cache = mkdtempSync(path.join(tmpdir(), "essence-league-cache-"))
+const results = mkdtempSync(path.join(tmpdir(), "essence-league-results-"))
 
 afterAll(() => {
 	rmSync(cache, { recursive: true, force: true })
+	rmSync(results, { recursive: true, force: true })
 })
 
 function test(
@@ -34,7 +39,11 @@ function test(
 		[process.execPath, ESSENCE, "test", ...essenceArguments, "--no-color"],
 		{
 			cwd: directory,
-			env: { ...process.env, ESSENCE_CLI_CACHE: cache },
+			env: {
+				...process.env,
+				ESSENCE_CLI_CACHE: cache,
+				ESSENCE_RESULTS_CACHE: results,
+			},
 			stdout: "pipe",
 			stderr: "pipe",
 		},
@@ -76,7 +85,11 @@ describe("examples/league", () => {
 				],
 				{
 					cwd: EXAMPLE,
-					env: { ...process.env, ESSENCE_CLI_CACHE: cache },
+					env: {
+						...process.env,
+						ESSENCE_CLI_CACHE: cache,
+						ESSENCE_RESULTS_CACHE: results,
+					},
 					stdout: "pipe",
 					stderr: "pipe",
 				},
