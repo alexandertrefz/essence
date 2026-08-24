@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
 import { createBoolean } from "../Boolean"
+import { decode, type Generator } from "../Generators"
 import { createInteger } from "../Integer"
 import { createList } from "../List"
 import { createRecord } from "../Record"
@@ -11,16 +12,20 @@ import {
 	beginCoverageRun,
 	benchmark,
 	benchmarkRows,
+	type CorpusStore,
 	coverage,
 	counters,
 	createContext,
 	entry,
 	expected,
 	probe,
+	properties,
+	type PropertyParameter,
 	randomSeed,
 	type Range,
 	registryOf,
 	required,
+	type RunOptions,
 	runTests,
 	selectTests,
 	type Span,
@@ -1347,5 +1352,289 @@ describe("The made-up seed", () => {
 	// machine's.
 	test("answers eight hexadecimal characters", () => {
 		expect(randomSeed()).toMatch(/^[0-9a-f]{8}$/)
+	})
+})
+
+// NOTE: The failing-example corpus, driven the way the emitted JavaScript
+// drives it: a property test is `properties` standing where it was written, and
+// what a run was told about the values it has failed on before is one more
+// member of `RunOptions`.
+describe("The failing-example corpus", () => {
+	const integers: Generator = { kind: "integer" }
+	const whole = (digits: string) =>
+		({ kind: "integer", value: digits }) as const
+
+	function wholeOf(value: AnyType): bigint {
+		return BigInt((value as unknown as { value: number | bigint }).value)
+	}
+
+	// NOTE: One property test whose body decides for itself whether the case
+	// held, so that no assertion below depends on which value was drawn.
+	function property(
+		holds: (value: AnyType) => boolean,
+		options: {
+			overrides?: Partial<TestManifestEntry>
+			parameter?: PropertyParameter
+			seen?: Array<AnyType>
+		} = {},
+	): TestModule {
+		let parameter = options.parameter ?? {
+			name: "n",
+			generator: integers,
+		}
+
+		return module(
+			[manifest("/a", { name: "stays small", ...options.overrides })],
+			(context) => {
+				properties(context, 0, null, [parameter], (value) => {
+					options.seen?.push(value!)
+					expected(context, 0, holds(value!), null)
+				})
+			},
+		)
+	}
+
+	function runWith(
+		one: TestModule,
+		options: Partial<RunOptions> = {},
+	): Array<TestEvent> {
+		let events: Array<TestEvent> = []
+
+		runTests(registryOf([one]), {
+			sink: (event) => events.push(event),
+			now: () => 0,
+			seed: "deadbeef",
+			cases: 5,
+			...options,
+		})
+
+		return events
+	}
+
+	function reported(
+		events: Array<TestEvent>,
+	): Extract<TestEvent, { kind: "property" }> {
+		let event = events.find((each) => each.kind === "property")
+
+		expect(event).toBeDefined()
+
+		return event as Extract<TestEvent, { kind: "property" }>
+	}
+
+	function corpus(entries: CorpusStore): Record<string, CorpusStore> {
+		return { "/Season.es": entries }
+	}
+
+	// NOTE: THE point of a corpus. A value a search found once is the first
+	// thing the next run asks about, so the regression is caught before any
+	// randomness is spent — and reported as the value that is known to find it
+	// rather than as whatever a fresh hundred cases turn up.
+	test("re-runs a stored counterexample before it draws anything", () => {
+		let seen: Array<AnyType> = []
+		let events = runWith(
+			property(() => false, { seen }),
+			{
+				counterexamples: corpus({
+					"stays small": [
+						{ values: [{ name: "n", data: whole("500") }] },
+					],
+				}),
+			},
+		)
+
+		expect(reported(events)).toMatchObject({
+			cases: 0,
+			replayed: 1,
+			stale: [],
+			fromCorpus: true,
+		})
+		expect(wholeOf(seen[0]!)).toBe(500n)
+		expect(kinds(events)).toContain("test-fail")
+	})
+
+	// NOTE: Still shrunk, rather than reported as it was stored: the code has
+	// changed since the entry was written down, and it may now fail on
+	// something smaller than what broke it the first time.
+	test("shrinks a replayed failure the way it shrinks a drawn one", () => {
+		let events = runWith(
+			property(() => false),
+			{
+				counterexamples: corpus({
+					"stays small": [
+						{ values: [{ name: "n", data: whole("500") }] },
+					],
+				}),
+			},
+		)
+
+		expect(reported(events).counterexample).toEqual([
+			{ name: "n", value: "0" },
+		])
+	})
+
+	test("draws its cases where every stored counterexample holds", () => {
+		let events = runWith(
+			property(() => true),
+			{
+				counterexamples: corpus({
+					"stays small": [
+						{ values: [{ name: "n", data: whole("500") }] },
+					],
+				}),
+			},
+		)
+
+		expect(reported(events)).toMatchObject({
+			cases: 5,
+			replayed: 1,
+			stale: [],
+			fromCorpus: false,
+			counterexample: null,
+			encoded: null,
+		})
+		expect(kinds(events)).toContain("test-pass")
+	})
+
+	test("runs the stored cases in the order they were stored", () => {
+		let seen: Array<AnyType> = []
+
+		runWith(
+			property(() => true, { seen }),
+			{
+				cases: 0,
+				counterexamples: corpus({
+					"stays small": [
+						{ values: [{ name: "n", data: whole("7") }] },
+						{ values: [{ name: "n", data: whole("9") }] },
+					],
+				}),
+			},
+		)
+
+		expect(seen.map(wholeOf)).toEqual([7n, 9n])
+	})
+
+	// NOTE: The Types moved under the entry — here a Parameter that is a String
+	// now and held an Integer when it was written down. It is not a
+	// counterexample and not a failure: it is an entry the runner drops.
+	test("says which stored entries no longer read back", () => {
+		let events = runWith(
+			property(() => true, {
+				parameter: { name: "n", generator: { kind: "string" } },
+			}),
+			{
+				counterexamples: corpus({
+					"stays small": [
+						{ values: [{ name: "n", data: whole("500") }] },
+						{
+							values: [
+								{
+									name: "n",
+									data: { kind: "string", value: "held" },
+								},
+							],
+						},
+					],
+				}),
+			},
+		)
+
+		expect(reported(events)).toMatchObject({
+			cases: 5,
+			replayed: 1,
+			stale: [0],
+			fromCorpus: false,
+		})
+	})
+
+	test("refuses a stored entry whose Parameters are no longer these", () => {
+		let events = runWith(
+			property(() => true),
+			{
+				counterexamples: corpus({
+					"stays small": [
+						{ values: [{ name: "count", data: whole("1") }] },
+						{ values: [] },
+						{
+							values: [
+								{ name: "n", data: whole("1") },
+								{ name: "m", data: whole("2") },
+							],
+						},
+					],
+				}),
+			},
+		)
+
+		expect(reported(events)).toMatchObject({
+			replayed: 0,
+			stale: [0, 1, 2],
+		})
+	})
+
+	test("writes the shrunk counterexample down on a fresh failure", () => {
+		let event = reported(runWith(property(() => false)))
+
+		expect(event).toMatchObject({ fromCorpus: false, replayed: 0 })
+		expect(event.encoded).toEqual([{ name: "n", data: whole("0") }])
+		expect(decode(integers, event.encoded![0]!.data)).toEqual(
+			createInteger(0n),
+		)
+	})
+
+	// NOTE: A Namespace's own generator says how to BUILD a value and nothing
+	// about what one is made of, so there is nothing to write down — and one
+	// such Parameter costs the whole test its corpus, because half a case is
+	// not a case.
+	test("writes nothing down for a Parameter a Namespace generates", () => {
+		let event = reported(
+			runWith(
+				property(() => false, {
+					parameter: {
+						name: "team",
+						generator: {
+							kind: "generated",
+							name: "Team",
+							generate: () => string("Lions"),
+						},
+					},
+				}),
+			),
+		)
+
+		expect(event.counterexample).toEqual([
+			{ name: "team", value: '"Lions"' },
+		])
+		expect(event.encoded).toBeNull()
+	})
+
+	// NOTE: The key the Compiler's `relativeIdentityKey` spells, worked out
+	// again here because a bundle imports nothing from the Compiler. The two
+	// are pinned to each other by this string and its twin in the Compiler's
+	// own spec.
+	test("names an entry by the identity without the Module step", () => {
+		let event = reported(
+			runWith(
+				property(() => true, {
+					overrides: {
+						name: "a/b",
+						suitePath: ["table"],
+						row: 2,
+					},
+				}),
+			),
+		)
+
+		expect(event.module).toBe("/Season.es")
+		expect(event.key).toBe("table/a\\/b/2")
+	})
+
+	test("replays nothing where the run was told about nothing", () => {
+		expect(reported(runWith(property(() => true)))).toMatchObject({
+			cases: 5,
+			replayed: 0,
+			stale: [],
+			fromCorpus: false,
+		})
 	})
 })
