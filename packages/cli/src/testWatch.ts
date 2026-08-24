@@ -29,12 +29,15 @@ import {
 	writeCoverageReport,
 } from "./test"
 import {
+	collectBenchmarks,
 	collectCoverage,
 	collectSnapshots,
 	collectTestRun,
 	emptyCoverage,
+	readBenchmarks,
 	readSnapshots,
 	renderNoTests,
+	writeBenchmarks,
 	writeSnapshots,
 } from "./testReport"
 import { createDependentsIndex, createSourceWatcher } from "./watcher"
@@ -387,6 +390,12 @@ export async function runTestWatch(
 			// snapshot" — and the entries it compares against have to be the
 			// ones on disk now.
 			let stored = await readSnapshots(sources.keys())
+			// NOTE: And the baselines, afresh and for the same reason — a
+			// `--bench --update` in another terminal moves them under a
+			// watching session.
+			let baselines = context.options.bench
+				? await readBenchmarks(sources.keys())
+				: {}
 
 			let { matched } = runSuites(
 				suites,
@@ -412,6 +421,7 @@ export async function runTestWatch(
 					seed: context.options.seed ?? randomSeed(),
 					cases: context.options.cases,
 				},
+				baselines,
 			)
 
 			reportUnmatchedFilter(context, filters.filter, matched)
@@ -447,7 +457,16 @@ export async function runTestWatch(
 						.writeInlineSnapshots,
 			})
 
-			for (let problem of written.problems) {
+			// NOTE: This cycle's own measurements, for the same reason — a
+			// baseline recorded two saves ago is on disk already.
+			let recorded = await writeBenchmarks({
+				benchmarks: collectBenchmarks(
+					cycleEvents(toRun.map((suite) => suite.inputFileName)),
+				),
+				stored: baselines,
+			})
+
+			for (let problem of [...written.problems, ...recorded.problems]) {
 				terminal.err(
 					`  ${palette.warning(
 						theme.symbols.warning,
@@ -509,7 +528,15 @@ export async function runTestWatch(
 					)}  ${palette.faint(timestamp())}`,
 				)
 
-				printReport(context, run, sources, coverage, written, cacheWarm)
+				printReport(
+					context,
+					run,
+					sources,
+					coverage,
+					written,
+					cacheWarm,
+					recorded,
+				)
 				footer()
 			}
 

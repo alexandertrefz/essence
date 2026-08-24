@@ -81,9 +81,14 @@ export type OptionValues = {
 	coverage: boolean
 	coverageReport: CoverageReportFormat | null
 	coverageOut: string | undefined
+	// NOTE: Whether the benchmarks of the run are measured as well. It ADDS to a
+	// run rather than replacing it — everything that would have run still runs
+	// — because a measurement of a body that is wrong is a number about nothing.
+	bench: boolean
 	// NOTE: Whether a snapshot that DIFFERS is recorded rather than reported.
 	// One nothing has recorded is written either way — the first run of a new
-	// snapshot is what records it.
+	// snapshot is what records it. A benchmark reads it the same way: a
+	// measurement outside its band is recorded rather than failed.
 	update: boolean
 	// NOTE: What every property test draws from, and how many values each of
 	// them runs for. A run with no seed makes one up and reports it beside
@@ -132,6 +137,7 @@ export const emptyOptions: OptionValues = {
 	coverage: false,
 	coverageReport: null,
 	coverageOut: undefined,
+	bench: false,
 	update: false,
 	seed: undefined,
 	cases: null,
@@ -530,6 +536,7 @@ export function parseArguments(
 				command,
 			),
 			coverageOut: values["coverage-out"] as string | undefined,
+			bench: values.bench === true,
 			update: values.update === true,
 			seed: values.seed as string | undefined,
 			cases: readCases(values.cases as string | undefined, command),

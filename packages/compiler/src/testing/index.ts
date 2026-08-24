@@ -1,6 +1,7 @@
 import type { common } from "@essence-lang/interfaces"
 import type { OutputStream } from "@essence-lang/runtime/Terminal"
 import type {
+	BenchmarkStatus,
 	DiffLine,
 	FailureEvent,
 	ProbedValue,
@@ -69,6 +70,10 @@ export type TestRecord = {
 	// they were drawn from, and the smallest failing value the shrink reached.
 	// Null for every test that is not a property test.
 	property: PropertyRecord | null
+	// NOTE: What a benchmark measured, and what it was held to. Null for every
+	// test that is not one — and for a benchmark whose body did not hold, which
+	// is reported as the failure it is and never timed.
+	benchmark: BenchmarkRecord | null
 }
 
 // NOTE: One property test's run of cases, as the report reads it. It is written
@@ -84,6 +89,49 @@ export type PropertyRecord = {
 	seed: string
 	shrinks: number
 	counterexample: Array<PropertyCounterexample> | null
+}
+
+// NOTE: One benchmark as the run reported it — what it measured, what it was
+// measured out of, and what it was held to. `key` is the entry of `module`'s
+// own `__benchmarks__` companion, numbered by the row that recorded it where
+// the benchmark takes rows.
+export type BenchmarkRecord = {
+	id: string
+	module: string | null
+	key: string
+	nanoseconds: number
+	iterations: number
+	samples: number
+	baseline: number | null
+	ratio: number | null
+	status: BenchmarkStatus
+}
+
+// NOTE: Every measurement a run took, in the order the tests ran. The command
+// line writes the new baselines down out of these; the report reads the same
+// events, so what one of them writes is what the other says was written.
+export function collectBenchmarks(
+	events: Array<TestEvent>,
+): Array<BenchmarkRecord> {
+	let benchmarks: Array<BenchmarkRecord> = []
+
+	for (let event of events) {
+		if (event.kind === "benchmark") {
+			benchmarks.push({
+				id: event.id,
+				module: event.module,
+				key: event.key,
+				nanoseconds: event.nanoseconds,
+				iterations: event.iterations,
+				samples: event.samples,
+				baseline: event.baseline,
+				ratio: event.ratio,
+				status: event.status,
+			})
+		}
+	}
+
+	return benchmarks
 }
 
 // NOTE: One `matches snapshot` as the run reported it. `name` is null for an
@@ -188,6 +236,7 @@ export function collectTestRun(events: Array<TestEvent>): TestRun {
 				probes: [],
 				snapshots: [],
 				property: null,
+				benchmark: null,
 			}
 			byId.set(id, existing)
 			tests.push(existing)
@@ -281,6 +330,25 @@ export function collectTestRun(events: Array<TestEvent>): TestRun {
 						seed: event.seed,
 						shrinks: event.shrinks,
 						counterexample: event.counterexample,
+					}
+				}
+
+				break
+			}
+			case "benchmark": {
+				let held = byId.get(event.id)
+
+				if (held !== undefined) {
+					held.benchmark = {
+						id: event.id,
+						module: event.module,
+						key: event.key,
+						nanoseconds: event.nanoseconds,
+						iterations: event.iterations,
+						samples: event.samples,
+						baseline: event.baseline,
+						ratio: event.ratio,
+						status: event.status,
 					}
 				}
 
@@ -466,9 +534,82 @@ export function testFailureDiagnostic(
 			common.DiagnosticLabel,
 			...Array<common.DiagnosticLabel>,
 		],
-		notes: [...propertyNotes(test), ...comparisonNotes(failure)],
-		helps: [...propertyHelps(test), ...comparisonHelps(failure)],
+		notes: [
+			...propertyNotes(test),
+			...benchmarkNotes(test),
+			...comparisonNotes(failure),
+		],
+		helps: [
+			...propertyHelps(test),
+			...benchmarkHelps(test),
+			...comparisonHelps(failure),
+		],
 	}
+}
+
+// NOTE: A measurement, in the largest unit it still reads as a number in.
+// Nanoseconds are whole — a fraction of one says nothing anybody can act on —
+// and everything above them keeps two decimals, so two runs of one benchmark
+// are told apart by the digits rather than by the unit.
+export function formatNanoseconds(nanoseconds: number): string {
+	if (nanoseconds < 1_000) {
+		return `${nanoseconds} ns`
+	}
+
+	if (nanoseconds < 1_000_000) {
+		return `${(nanoseconds / 1_000).toFixed(2)} µs`
+	}
+
+	if (nanoseconds < 1_000_000_000) {
+		return `${(nanoseconds / 1_000_000).toFixed(2)} ms`
+	}
+
+	return `${(nanoseconds / 1_000_000_000).toFixed(2)} s`
+}
+
+// NOTE: How far a measurement moved, as the multiple a reader compares against
+// the band rather than as two numbers they have to divide. Null where there was
+// nothing to move from.
+function benchmarkChange(benchmark: BenchmarkRecord): string | null {
+	let ratio = benchmark.ratio
+
+	if (ratio === null || benchmark.baseline === null) {
+		return null
+	}
+
+	return ratio >= 1
+		? `${ratio.toFixed(1)}× slower than its baseline (${formatNanoseconds(
+				benchmark.nanoseconds,
+			)}, was ${formatNanoseconds(benchmark.baseline)})`
+		: `${(1 / ratio).toFixed(1)}× faster than its baseline (${formatNanoseconds(
+				benchmark.nanoseconds,
+			)}, was ${formatNanoseconds(benchmark.baseline)})`
+}
+
+// NOTE: What a benchmark adds to a failure: the measurement, and how far it is
+// from what was recorded. It reads beside a property test's counterexample and
+// for the same reason — what the assertions below say is about a run whose cost
+// the reader has just been told.
+export function benchmarkNotes(test: TestRecord): Array<string> {
+	let benchmark = test.benchmark
+
+	if (benchmark === null || benchmark.status !== "regressed") {
+		return []
+	}
+
+	let change = benchmarkChange(benchmark)
+
+	return change === null ? [] : [change]
+}
+
+// NOTE: The one thing to DO about a measurement that moved — a benchmark that
+// got slower is either a regression or a change somebody meant, and the second
+// is one command away. The same sentence a snapshot that differs is answered
+// with, because it is the same question.
+export function benchmarkHelps(test: TestRecord): Array<string> {
+	return test.benchmark?.status === "regressed"
+		? ["If the new time is right, record it: essence test --bench --update"]
+		: []
 }
 
 // NOTE: What a property test's failure adds to the report: how many cases ran
@@ -570,6 +711,19 @@ export function focusedTestsDiagnostic(
 	}
 }
 
+// NOTE: A benchmark's baselines are read and written next door, exactly as
+// snapshots are, and re-exported here for the same reason.
+export {
+	BENCHMARK_DIRECTORY,
+	benchmarkFileOf,
+	type BenchmarkStore,
+	type BenchmarkWrites,
+	noBenchmarkWrites,
+	parseBenchmarkFile,
+	printBenchmarkFile,
+	readBenchmarks,
+	writeBenchmarks,
+} from "./benchmarks"
 // NOTE: Coverage is folded, weighed and written out next door, and re-exported
 // here so that everything about a test run is still reached through one name.
 export {

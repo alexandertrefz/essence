@@ -442,6 +442,13 @@ export const commands: Array<CommandSpec> = [
 				"the editor's live session reads. Diagnostics stay on stderr. " +
 				"Under --watch the stream carries on, one run-start … run-end " +
 				"per re-run.",
+			"--bench measures the benchmarks as well. A benchmark is timed " +
+				"rather than judged, which takes hundreds of runs of its body " +
+				"— so it is left out of an ordinary run and counted as " +
+				"deselected. The first measurement is recorded as a baseline " +
+				"in __benchmarks__ beside the source; later runs compare " +
+				"against it, and one a quarter slower FAILS. Accept a new " +
+				"time with --bench --update.",
 			"--coverage compiles the tests with counters in them and reports " +
 				"what ran: lines and branches as percentages, Match arms as " +
 				"taken out of total, every branch and arm nothing reached " +
@@ -502,6 +509,19 @@ export const commands: Array<CommandSpec> = [
 				details:
 					"Repeatable, and it wins over --tag. Tests left out are " +
 					"counted rather than failed.",
+			},
+			{
+				name: "bench",
+				type: "boolean",
+				summary: "Measure the benchmarks as well as running the tests",
+				details:
+					'Every `benchmark "…" { … }` is timed: its body is run in ' +
+					"batches until one takes long enough to measure, several " +
+					"batches are taken, and the middle one answers. The time " +
+					"of a single run is compared against the baseline in " +
+					"__benchmarks__ beside the source — a quarter slower fails " +
+					"the test, a fifth faster passes and says so, and a " +
+					"benchmark nothing has recorded records one and passes.",
 			},
 			{
 				name: "coverage",
@@ -609,6 +629,10 @@ export const commands: Array<CommandSpec> = [
 			{
 				command: `${PROGRAM} test --update`,
 				description: "Accept every snapshot this run produced",
+			},
+			{
+				command: `${PROGRAM} test --bench`,
+				description: "Measure the benchmarks against their baselines",
 			},
 		],
 	},

@@ -6,13 +6,19 @@ import { format } from "node:util"
 
 import { displayPath } from "@essence-lang/compiler/diagnostics/render"
 import {
+	type BenchmarkStore,
+	type BenchmarkWrites,
+	collectBenchmarks,
 	collectSnapshots,
 	coverageReportFileName,
 	hasCoverage,
+	noBenchmarkWrites,
 	noWrites,
+	readBenchmarks,
 	readSnapshots,
 	type SnapshotStore,
 	type SnapshotWrites,
+	writeBenchmarks,
 	writeSnapshots,
 } from "@essence-lang/compiler/testing"
 import {
@@ -95,6 +101,11 @@ export type TestFilters = {
 	filter: string | null
 	tags: Array<string>
 	skipTags: Array<string>
+	// NOTE: Whether the benchmarks of the run are measured. It is a FILTER
+	// rather than a mode: a benchmark nobody asked to measure is deselected
+	// through the same selection everything else goes through, so the report
+	// says why it did not run in the place it would have run.
+	bench: boolean
 }
 
 function claimModules(
@@ -261,6 +272,12 @@ export function runSuites(
 	// draw from the same one — which is what makes the replay a report prints
 	// reproduce a whole run and not just one file of it.
 	properties: PropertyOptions = {},
+	// NOTE: The baselines every benchmark of the run is held to, keyed by
+	// Module — read off disk here, like the snapshots above, because a bundle
+	// reads nothing. Whether a measurement outside its band is RECORDED rather
+	// than failed is `snapshots.update`: it is one flag, and a run that accepts
+	// what it produced accepts all of it.
+	benchmarks: Record<string, BenchmarkStore> = {},
 ): { planned: number; focused: boolean; matched: number } {
 	let selected = all.map((suite) =>
 		suite.tests.select(suite.registry, filters),
@@ -303,6 +320,7 @@ export function runSuites(
 			filters: runFilters,
 			coverage,
 			snapshots: snapshots.stored,
+			benchmarks,
 			update: snapshots.update,
 			seed: properties.seed,
 			cases: properties.cases ?? undefined,
@@ -332,6 +350,7 @@ export function resolveFilters(
 		filter: string | undefined
 		tag: Array<string>
 		skipTag: Array<string>
+		bench?: boolean
 	},
 	configured: Array<string>,
 ): TestFilters {
@@ -343,7 +362,12 @@ export function resolveFilters(
 		]),
 	]
 
-	return { filter: options.filter ?? null, tags, skipTags }
+	return {
+		filter: options.filter ?? null,
+		tags,
+		skipTags,
+		bench: options.bench === true,
+	}
 }
 
 // NOTE: A run nobody narrowed — no filter, no tags — is what CI runs, and it is
@@ -459,6 +483,10 @@ export function printReport(
 	// note at the end of the summary, and it is the difference between a fast
 	// run and a fast run that also compiled the project.
 	cacheWarm = false,
+	// NOTE: What the run recorded as baselines, which is what a snapshot count
+	// is beside it: a measurement written for the first time is a pass that
+	// left something on disk, and a reader has to be told without going to look.
+	baselines: BenchmarkWrites = noBenchmarkWrites,
 ): void {
 	let { failures, summary, tree } = renderTestReport(
 		run,
@@ -466,6 +494,7 @@ export function printReport(
 		(module) => (module === null ? null : (sources.get(module) ?? null)),
 		snapshots.recorded,
 		cacheWarm,
+		baselines.recorded,
 	)
 
 	if (!context.options.quiet && tree !== "") {
@@ -667,6 +696,12 @@ export async function runTest(
 	// NOTE: Read before the run and handed over whole: a stored snapshot is a
 	// file, and the runtime is a bundle that reads none.
 	let stored = await readSnapshots(sources.keys())
+	// NOTE: The same, and only where the run is measuring — a run with no
+	// benchmark in it would otherwise stat a `__benchmarks__` directory per
+	// Module to be told what it already knows.
+	let baselines = context.options.bench
+		? await readBenchmarks(sources.keys())
+		: {}
 	// NOTE: One seed for the whole run, made HERE where there is one run: every
 	// bundle draws from it, and every property test folds its own identity in.
 	// So the replay a failure prints reproduces the run rather than the file.
@@ -703,6 +738,7 @@ export async function runTest(
 			context.options.coverage,
 			{ stored, update: context.options.update },
 			{ seed, cases: context.options.cases },
+			baselines,
 		)
 		// NOTE: The stream is folded up ONCE, here, and the `run-end` this
 		// writes carries the counts it found. Re-reading the stream afterwards
@@ -756,7 +792,16 @@ export async function runTest(
 				.writeInlineSnapshots,
 	})
 
-	for (let problem of written.problems) {
+	// NOTE: Beside the snapshots, and before the report for the same reason —
+	// what the summary says was recorded is on disk by the time a reader looks.
+	// A run that measured nothing has nothing to write, so a run without
+	// `--bench` never touches a baseline however it was asked to update.
+	let recorded = await writeBenchmarks({
+		benchmarks: collectBenchmarks(events),
+		stored: baselines,
+	})
+
+	for (let problem of [...written.problems, ...recorded.problems]) {
 		context.terminal.err(
 			`  ${context.palette.warning(
 				context.theme.symbols.warning,
@@ -765,7 +810,15 @@ export async function runTest(
 	}
 
 	if (!context.options.json) {
-		printReport(context, run, sources, coverage, written, cacheWarm)
+		printReport(
+			context,
+			run,
+			sources,
+			coverage,
+			written,
+			cacheWarm,
+			recorded,
+		)
 	}
 
 	await writeCoverageReport(context, coverage)

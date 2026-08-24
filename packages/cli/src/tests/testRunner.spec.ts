@@ -525,13 +525,23 @@ describe("essence test — project configuration", () => {
 			resolveFilters({ filter: undefined, tag: ["slow"], skipTag: [] }, [
 				"slow",
 			]),
-		).toEqual({ filter: null, tags: ["slow"], skipTags: [] })
+		).toEqual({
+			filter: null,
+			tags: ["slow"],
+			skipTags: [],
+			bench: false,
+		})
 
 		expect(
 			resolveFilters({ filter: undefined, tag: [], skipTag: [] }, [
 				"slow",
 			]),
-		).toEqual({ filter: null, tags: [], skipTags: ["slow"] })
+		).toEqual({
+			filter: null,
+			tags: [],
+			skipTags: ["slow"],
+			bench: false,
+		})
 	})
 })
 
@@ -1364,6 +1374,122 @@ describe("the test reporter", () => {
 
 		expect(diagnostic.labels).toHaveLength(1)
 	})
+
+	// NOTE: The reporting half of a benchmark, driven off events rather than off
+	// a clock — what a measurement looks like in the tree, in the failures and
+	// in the tally is the report's business, and asserting it against a real one
+	// would be asserting something about this machine today.
+	function measured(
+		status: "written" | "matched" | "regressed" | "improved",
+		nanoseconds: number,
+		baseline: number | null,
+	): Array<TestEvent> {
+		return [
+			{
+				schema: 1,
+				kind: "test-start",
+				id: "/Sorting.es/sorts",
+				name: "sorts ten thousand rows",
+				suitePath: [],
+				module: "/Sorting.es",
+				row: null,
+			},
+			{
+				schema: 1,
+				kind: "benchmark",
+				id: "/Sorting.es/sorts",
+				name: "sorts ten thousand rows",
+				module: "/Sorting.es",
+				key: "sorts ten thousand rows",
+				nanoseconds,
+				iterations: 64,
+				samples: 7,
+				baseline,
+				ratio: baseline === null ? null : nanoseconds / baseline,
+				status,
+			},
+			status === "regressed"
+				? {
+						schema: 1,
+						kind: "test-fail",
+						id: "/Sorting.es/sorts",
+						name: "sorts ten thousand rows",
+						duration: 1,
+						expectations: 1,
+						failures: [],
+						error: null,
+					}
+				: {
+						schema: 1,
+						kind: "test-pass",
+						id: "/Sorting.es/sorts",
+						name: "sorts ten thousand rows",
+						duration: 1,
+						expectations: 1,
+					},
+		]
+	}
+
+	it("says what a benchmark measured, in the unit it reads in", () => {
+		let run = collectTestRun(measured("written", 1_230_000, null))
+
+		expect(renderTestTree(run, reportContext).join("\n")).toContain(
+			"1.23 ms",
+		)
+	})
+
+	it("says how much faster a benchmark got, and how to record it", () => {
+		let run = collectTestRun(measured("improved", 1_000_000, 1_400_000))
+
+		expect(renderTestTree(run, reportContext).join("\n")).toContain(
+			"1.4× faster — record it with --bench --update",
+		)
+	})
+
+	it("says how far a benchmark ran away from its baseline", () => {
+		let run = collectTestRun(measured("regressed", 2_100_000, 1_500_000))
+		let failures = renderTestFailures(run, reportContext, () => null).join(
+			"\n",
+		)
+
+		expect(run.counts.failed).toBe(1)
+		expect(failures).toContain(
+			"1.4× slower than its baseline (2.10 ms, was 1.50 ms)",
+		)
+		expect(failures).toContain(
+			"If the new time is right, record it: essence test --bench --update",
+		)
+	})
+
+	it("counts the baselines a run wrote", () => {
+		let run = collectTestRun(measured("written", 1_000_000, null))
+
+		expect(renderTestSummary(run, reportContext, 0, false, 1)).toContain(
+			"1 baseline written",
+		)
+		expect(renderTestSummary(run, reportContext)).not.toContain(
+			"baseline written",
+		)
+	})
+
+	it("says why a benchmark nobody asked to measure did not run", () => {
+		let run = collectTestRun([
+			{
+				schema: 1,
+				kind: "test-deselected",
+				id: "/Sorting.es/sorts",
+				name: "sorts ten thousand rows",
+				suitePath: [],
+				module: "/Sorting.es",
+				reason: "bench",
+				row: null,
+			},
+		])
+
+		expect(
+			renderTestTree(run, { ...reportContext, verbose: true }).join("\n"),
+		).toContain("only with --bench")
+	})
 })
 
 // #endregion
@@ -1780,6 +1906,183 @@ describe("essence test — property tests", () => {
 
 		expect(options.seed).toBe("beef")
 		expect(options.cases).toBe(7)
+	})
+})
+
+// NOTE: What a benchmark looks like from the command line. Nothing here asserts
+// a TIME: the times are the machine's, and a spec that read one would be a
+// scheduled flake. What is asserted is what the run WROTE, what it did with a
+// baseline it was handed, and what a run that did not ask to measure says
+// instead — and every baseline it is handed is written by this spec, so the
+// status a measurement reaches is arithmetic rather than luck.
+describe("essence test — benchmarks", () => {
+	const benchmarks = [
+		"implementation {",
+		"\tfunction double(_ value: Integer) -> Integer {",
+		"\t\t<- value::add(value)",
+		"\t}",
+		"}",
+		"",
+		"tests {",
+		'\ttest "doubles" {',
+		"\t\texpect double(2)::is(4)",
+		"\t}",
+		"",
+		'\tbenchmark "doubling" {',
+		"\t\texpect double(500)::is(1000)",
+		"\t}",
+		"}",
+		"",
+	].join("\n")
+
+	function baselineFile(directory: string): string {
+		return path.join(directory, "__benchmarks__", "Doubling.es.bench")
+	}
+
+	// NOTE: A baseline the spec chose rather than one a run measured, so that
+	// what the next run reports is decided here. Anything a real body measures
+	// is far away from both of the numbers used below.
+	function recordBaseline(directory: string, nanoseconds: number): void {
+		let filePath = baselineFile(directory)
+
+		mkdirSync(path.dirname(filePath), { recursive: true })
+		writeFileSync(
+			filePath,
+			['benchmark "doubling"', `\t${nanoseconds} ns`, ""].join("\n"),
+		)
+	}
+
+	it("leaves the benchmarks out of a run that did not ask for them", async () => {
+		await withFiles({ "Doubling.es": benchmarks }, async (directory) => {
+			let { code, out } = await runTests(directory, ["--verbose"])
+
+			expect(code).toBe(EXIT_SUCCESS)
+			expect(out).toContain("1 passed")
+			expect(out).toContain("only with --bench")
+			expect(existsSync(baselineFile(directory))).toBe(false)
+		})
+	})
+
+	it("measures them where it was asked, and records what it found", async () => {
+		await withFiles({ "Doubling.es": benchmarks }, async (directory) => {
+			let { code, out } = await runTests(directory, ["--bench"])
+
+			expect(code).toBe(EXIT_SUCCESS)
+			expect(out).toContain("2 passed")
+			expect(out).toContain("1 baseline written")
+
+			let written = readFileSync(baselineFile(directory), "utf8")
+
+			expect(written).toContain('benchmark "doubling"')
+			expect(written).toMatch(/\n\t\d+ ns\n/)
+		})
+	})
+
+	it("fails a measurement that ran away from what was recorded", async () => {
+		await withFiles({ "Doubling.es": benchmarks }, async (directory) => {
+			recordBaseline(directory, 1)
+
+			let { code, err } = await runTests(directory, ["--bench"])
+
+			expect(code).toBe(EXIT_FAILURE)
+			expect(err).toContain("slower than its baseline")
+			expect(err).toContain("essence test --bench --update")
+			expect(readFileSync(baselineFile(directory), "utf8")).toContain(
+				"\t1 ns",
+			)
+		})
+	})
+
+	it("records a measurement outside its band when it is told to", async () => {
+		await withFiles({ "Doubling.es": benchmarks }, async (directory) => {
+			recordBaseline(directory, 1)
+
+			let { code } = await runTests(directory, ["--bench", "--update"])
+
+			expect(code).toBe(EXIT_SUCCESS)
+			expect(readFileSync(baselineFile(directory), "utf8")).not.toContain(
+				"\t1 ns",
+			)
+		})
+	})
+
+	// NOTE: Faster is news rather than a problem, and the baseline stands until
+	// somebody moves it — ten seconds a run is a baseline nothing on any machine
+	// will fail to beat.
+	it("passes a measurement that got faster, and records nothing", async () => {
+		await withFiles({ "Doubling.es": benchmarks }, async (directory) => {
+			recordBaseline(directory, 10_000_000_000)
+
+			let { code, out } = await runTests(directory, ["--bench"])
+
+			expect(code).toBe(EXIT_SUCCESS)
+			expect(out).toContain("faster — record it with --bench --update")
+			expect(out).not.toContain("baseline written")
+			expect(readFileSync(baselineFile(directory), "utf8")).toContain(
+				"\t10000000000 ns",
+			)
+		})
+	})
+
+	// NOTE: `--update` is one flag, and a run that did not ask to measure has
+	// measured nothing — so there is nothing for it to record either way.
+	it("touches no baseline in a run that is not measuring", async () => {
+		await withFiles({ "Doubling.es": benchmarks }, async (directory) => {
+			recordBaseline(directory, 1)
+
+			let { code } = await runTests(directory, ["--update"])
+
+			expect(code).toBe(EXIT_SUCCESS)
+			expect(readFileSync(baselineFile(directory), "utf8")).toContain(
+				"\t1 ns",
+			)
+		})
+	})
+
+	it("keeps a stored entry a narrowed run never measured", async () => {
+		await withFiles({ "Doubling.es": benchmarks }, async (directory) => {
+			await runTests(directory, ["--bench"])
+
+			let filePath = baselineFile(directory)
+
+			writeFileSync(
+				filePath,
+				`${readFileSync(filePath, "utf8")}benchmark "gone"\n\t7 ns\n`,
+			)
+
+			await runTests(directory, ["--bench", "--update"])
+
+			expect(readFileSync(filePath, "utf8")).toContain('benchmark "gone"')
+		})
+	})
+
+	it("carries the measurement on the event stream", async () => {
+		await withFiles({ "Doubling.es": benchmarks }, async (directory) => {
+			let { out } = await runTests(directory, ["--bench", "--json"])
+			let events = out
+				.split("\n")
+				.filter((line) => line.length > 0)
+				.map((line) => JSON.parse(line) as TestEvent)
+			let [measured] = events.filter(
+				(event) => event.kind === "benchmark",
+			)
+
+			expect(measured).toMatchObject({
+				schema: 1,
+				kind: "benchmark",
+				key: "doubling",
+				status: "written",
+				baseline: null,
+				samples: 7,
+			})
+		})
+	})
+
+	it("reads the flag off the command line", () => {
+		expect(
+			parseArguments(["test", "--bench"], "essence").options.bench,
+		).toBe(true)
+		expect(parseArguments(["test"], "essence").options.bench).toBe(false)
 	})
 })
 

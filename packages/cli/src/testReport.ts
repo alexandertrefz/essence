@@ -4,12 +4,15 @@ import {
 	renderDiagnostic,
 } from "@essence-lang/compiler/diagnostics/render"
 import {
+	benchmarkHelps,
+	benchmarkNotes,
 	caseNameOf,
 	type CoverageRatio,
 	type CoverageSummary,
 	type FileCoverage,
 	type FocusedTest,
 	focusedTestsDiagnostic,
+	formatNanoseconds,
 	hasCoverage,
 	isReported,
 	percentageOf,
@@ -33,6 +36,8 @@ import { formatDuration, pluralise } from "./report"
 // NOTE: Re-exported so that everything about a test RUN is still reached
 // through one name from inside the command line, wherever it is defined.
 export {
+	type BenchmarkRecord,
+	collectBenchmarks,
 	collectCoverage,
 	collectSnapshots,
 	collectTestRun,
@@ -42,6 +47,7 @@ export {
 	type FocusedTest,
 	focusedTestsDiagnostic,
 	type PropertyRecord,
+	readBenchmarks,
 	readSnapshots,
 	type SnapshotRecord,
 	type TestCounts,
@@ -51,6 +57,7 @@ export {
 	testFailureDiagnostic,
 	toCoverageJson,
 	toLcov,
+	writeBenchmarks,
 	writeSnapshots,
 } from "@essence-lang/compiler/testing"
 
@@ -81,6 +88,8 @@ function deselectionWord(reason: string | null): string {
 			return "not focused"
 		case "tag":
 			return "left out by tag"
+		case "bench":
+			return "only with --bench"
 		default:
 			return "filtered out"
 	}
@@ -117,7 +126,40 @@ function testLine(test: TestRecord, context: ReportContext): string {
 			? ""
 			: palette.faint(`  (${pluralise(test.property.cases, "case")})`)
 
-	return `${symbol} ${name}${cases}${detail}`
+	return `${symbol} ${name}${cases}${measurement(test, context)}${detail}`
+}
+
+// NOTE: What a benchmark cost, beside its own line — the number IS the answer,
+// so it is shown whether the measurement held to its baseline or not, and it is
+// the only thing that tells a benchmark apart from a test in the tree.
+//
+// NOTE: An improvement says what to do about it. A run does not move a baseline
+// on its own — a fast machine would otherwise ratchet the number down for
+// everybody — so the news comes with the command that records it.
+function measurement(test: TestRecord, context: ReportContext): string {
+	let benchmark = test.benchmark
+
+	if (
+		benchmark === null ||
+		(test.state !== "passed" && test.state !== "failed")
+	) {
+		return ""
+	}
+
+	let { palette, theme } = context
+	let time = palette.faint(
+		`  ${theme.symbols.bullet} ${formatNanoseconds(benchmark.nanoseconds)}`,
+	)
+
+	if (benchmark.status !== "improved" || benchmark.ratio === null) {
+		return time
+	}
+
+	return `${time}${palette.muted(
+		`  ${theme.symbols.bullet} ${(1 / benchmark.ratio).toFixed(
+			1,
+		)}× faster — record it with --bench --update`,
+	)}`
 }
 
 // NOTE: What the tree shows without being asked. A deselected test is counted
@@ -218,6 +260,10 @@ export function renderTestSummary(
 	// duration beside it is the RUN's, and a reader comparing two runs of the
 	// same project deserves to know that one of them also compiled it.
 	cacheWarm = false,
+	// NOTE: What the run recorded as baselines, which is what the snapshot
+	// count beside it is: a measurement written for the first time is a pass
+	// that left something on disk.
+	baselines = 0,
 ): string {
 	let { palette, theme } = context
 	let { counts } = run
@@ -245,6 +291,10 @@ export function renderTestSummary(
 
 	if (snapshots > 0) {
 		parts.push(palette.muted(`${pluralise(snapshots, "snapshot")} written`))
+	}
+
+	if (baselines > 0) {
+		parts.push(palette.muted(`${pluralise(baselines, "baseline")} written`))
 	}
 
 	let tail = ` ${parts.join("  ")}  ${palette.faint(
@@ -363,6 +413,28 @@ export function renderTestFailures(
 			)
 		}
 
+		// NOTE: A measurement that ran away from its baseline failed no
+		// assertion, so there is no span to underline and no Diagnostic to
+		// draw. What a reader needs is the two numbers and the one command that
+		// accepts the new one — written through the same pair of Functions the
+		// Diagnostic above carries them with, so the sentence exists once.
+		if (test.benchmark?.status === "regressed") {
+			lines.push(
+				`${INDENT}${palette.error(theme.symbols.fail)} ${palette.error(
+					[...test.suitePath, test.name].join(" › "),
+				)} ${palette.muted("is slower than it was")}`,
+			)
+			lines.push(
+				...benchmarkNotes(test).map(
+					(note) => `${INDENT}${INDENT}${palette.muted(note)}`,
+				),
+				...benchmarkHelps(test).map(
+					(help) => `${INDENT}${INDENT}${palette.muted(help)}`,
+				),
+				"",
+			)
+		}
+
 		if (test.error !== null) {
 			lines.push(
 				`${INDENT}${palette.error(theme.symbols.fail)} ${palette.error(
@@ -462,11 +534,18 @@ export function renderTestReport(
 	sourceOf: SourceLookup,
 	snapshots = 0,
 	cacheWarm = false,
+	baselines = 0,
 ): { tree: string; failures: string; summary: string } {
 	return {
 		tree: renderTestTree(run, context).join("\n"),
 		failures: renderTestFailures(run, context, sourceOf).join("\n"),
-		summary: renderTestSummary(run, context, snapshots, cacheWarm),
+		summary: renderTestSummary(
+			run,
+			context,
+			snapshots,
+			cacheWarm,
+			baselines,
+		),
 	}
 }
 
