@@ -149,6 +149,14 @@ function emitterKey(request: CompileRequest): string {
 		shape.push("tests")
 	}
 
+	// NOTE: And the goals, for the very same reason and out of the very same
+	// sources: `--contracts` enriches a suite that is not in the file at all.
+	// Without it a plain `essence test` would be handed the bundle the contract
+	// run wrote — and would run, and report, goals nobody asked for.
+	if (request.contracts === true) {
+		shape.push("contracts")
+	}
+
 	if (!request.sourcemap) {
 		shape.push("no-map")
 	} else if (

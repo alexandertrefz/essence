@@ -66,12 +66,12 @@ export type CompileDispatcher = {
 	// what a Module compiles as, and a graph is shared: the dispatcher has to
 	// know the whole invocation to load each file once, and the whole
 	// invocation is only known here.
-	// NOTE: `tests` is the compile MODE of the whole run — see
-	// `createCompileSession`. It travels with the entries rather than with each
-	// request because it is what the Session is opened in.
+	// NOTE: `tests` and `contracts` are the compile MODE of the whole run — see
+	// `createCompileSession`. They travel with the entries rather than with each
+	// request because they are what the Session is opened in.
 	begin: (
 		inputFileNames: Array<string>,
-		options?: { tests?: boolean },
+		options?: { tests?: boolean; contracts?: boolean },
 	) => void
 	compile: (
 		request: CompileRequest,
@@ -255,6 +255,7 @@ export function createWorkerPool(size: number): CompileDispatcher {
 	// after `begin` has been and gone. An ordinary run boots every one of its
 	// workers that way, so this is the copy nearly all of them are opened from.
 	let tests = false
+	let contracts = false
 
 	// NOTE: The one place a worker is told what run it is in, for both moments
 	// it can be told: `begin` reaches the slots that are already up, `spawn`
@@ -264,6 +265,7 @@ export function createWorkerPool(size: number): CompileDispatcher {
 		type: "begin",
 		entries: slot.entries,
 		tests,
+		contracts,
 	})
 
 	let spawn = (slot: Slot): Worker => {
@@ -387,6 +389,7 @@ export function createWorkerPool(size: number): CompileDispatcher {
 			active = Math.max(1, Math.min(size, groups.length))
 			assignment = assignSlots(slots, active, groups)
 			tests = options?.tests === true
+			contracts = options?.contracts === true
 
 			// NOTE: A worker that already ran carries the Session of the
 			// previous run — a watch rebuild is a new run over new files, and

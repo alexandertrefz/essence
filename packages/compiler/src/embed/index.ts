@@ -97,6 +97,11 @@ export type EmbedOptions = {
 	// changes the emitted bytes, so it joins `bundleHash` rather than being
 	// trusted to the caller.
 	tests?: boolean
+	// NOTE: And whether it asked for the goals a Module's own Namespace
+	// declarations promise — see `enrich`'s own `contracts`. It changes the
+	// emitted bytes exactly as `tests` does, so it joins `bundleHash` beside
+	// it, and it means nothing without `tests`.
+	contracts?: boolean
 	optimisation?: OptimiserOptions
 	transformSources?: (sources: ModuleSources) => ModuleSources
 	// NOTE: What the HOST puts into the bundle beyond the sources, named. A
@@ -217,7 +222,10 @@ export function linkToMemory(
 		return parsed
 	}
 
-	let linked = linkModuleGraph(front.graph, { tests: options.tests })
+	let linked = linkModuleGraph(front.graph, {
+		tests: options.tests,
+		contracts: options.contracts,
+	})
 
 	return answer(
 		linked.modules.get(front.entry)?.surface ?? emptySurface(),
@@ -365,7 +373,10 @@ function validateGraph(
 		return { stopped: parsed }
 	}
 
-	let linked = linkModuleGraph(front.graph, { tests: options.tests })
+	let linked = linkModuleGraph(front.graph, {
+		tests: options.tests,
+		contracts: options.contracts,
+	})
 	let modules = [...linked.modules.values()]
 	let surface = linked.modules.get(front.entry)?.surface ?? emptySurface()
 	// NOTE: Copied rather than pointed at, because validation appends to these
@@ -472,6 +483,11 @@ function readSources(entryPath: string, options: EmbedOptions): ReadSources {
 				options.emitterKey ?? "",
 				emitTargetKey(options.emit ?? BUNDLE_TARGET),
 				options.tests === true ? "tests" : "",
+				// NOTE: And the goals, which are more emitted tests over the
+				// same sources again. Nothing where they were not asked for, so
+				// every hash spelled before there were contracts to ask for
+				// still names the same bytes.
+				options.contracts === true ? "contracts" : "",
 			]
 				.filter((part) => part !== "")
 				.join("|"),

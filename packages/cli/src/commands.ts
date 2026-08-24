@@ -449,6 +449,13 @@ export const commands: Array<CommandSpec> = [
 				"in __benchmarks__ beside the source; later runs compare " +
 				"against it, and one a quarter slower FAILS. Accept a new " +
 				"time with --bench --update.",
+			"--contracts tests what the declarations themselves promise: one " +
+				"generated goal per Namespace Method, calling it with values " +
+				"drawn from the declared Types and expecting the answer to " +
+				"hold every conjunct of the return Type's refinement. A " +
+				"project may ask for them by default in the nearest " +
+				"package.json:",
+			'    { "essence": { "test": { "contracts": true } } }',
 			"--coverage compiles the tests with counters in them and reports " +
 				"what ran: lines and branches as percentages, Match arms as " +
 				"taken out of total, every branch and arm nothing reached " +
@@ -522,6 +529,23 @@ export const commands: Array<CommandSpec> = [
 					"__benchmarks__ beside the source — a quarter slower fails " +
 					"the test, a fifth faster passes and says so, and a " +
 					"benchmark nothing has recorded records one and passes.",
+			},
+			{
+				name: "contracts",
+				type: "boolean",
+				summary: "Test what a Namespace's own declarations promise",
+				details:
+					"A checked refinement is a property, and a Method that " +
+					"writes one in its return Type has already stated the " +
+					"property its answer holds. This runs it: the receiver and " +
+					"every Argument are generated from the declared Types, the " +
+					"Method is called, and the answer is expected to hold each " +
+					"conjunct the return Type promises. A Method that never " +
+					"comes back fails its goal whatever it declared — a " +
+					"signature is a promise to answer over the domain it " +
+					"names. The goals are reported under a `contracts` suite " +
+					"beside the tests the project wrote, and a Method nothing " +
+					"could build a goal for is named once per Namespace.",
 			},
 			{
 				name: "coverage",
@@ -633,6 +657,10 @@ export const commands: Array<CommandSpec> = [
 			{
 				command: `${PROGRAM} test --bench`,
 				description: "Measure the benchmarks against their baselines",
+			},
+			{
+				command: `${PROGRAM} test --contracts`,
+				description: "Also test what every declaration promises",
 			},
 		],
 	},

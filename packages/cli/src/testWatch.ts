@@ -23,6 +23,7 @@ import {
 	printReport,
 	redirectStdout,
 	reportUnmatchedFilter,
+	resolveContracts,
 	resolveFilters,
 	runSuites,
 	type TestFilters,
@@ -96,6 +97,10 @@ export async function runTestWatch(
 		context.options,
 		configuration.test.skipTags,
 	)
+	let contracts = resolveContracts(
+		context.options,
+		configuration.test.contracts,
+	)
 	let writeEvent = process.stdout.write.bind(process.stdout)
 	let inputFileNames = await discoverTestFiles(
 		files,
@@ -103,11 +108,13 @@ export async function runTestWatch(
 		context.programName,
 		process.cwd(),
 		configuration.test.exclude,
+		contracts,
 	)
 	let plan = await planCompilation(context, command, inputFileNames, {
 		emit: true,
 		cacheOutput: true,
 		tests: true,
+		contracts,
 	})
 	// NOTE: One staging root for the whole session, with a directory per cycle
 	// inside it. Bun's resolver remembers what a directory held the first time
@@ -220,6 +227,7 @@ export async function runTestWatch(
 			context.programName,
 			process.cwd(),
 			configuration.test.exclude,
+			contracts,
 		)
 		let added = found.filter(
 			(fileName) => !inputFileNames.includes(fileName),

@@ -51,12 +51,14 @@ async function compileAll(
 		cacheOutput?: boolean
 		sourcemapMode?: "linked" | "inline"
 		tests?: boolean
+		contracts?: boolean
 	},
 ): Promise<CompilationResult> {
 	let plan = await planCompilation(context, command, files, {
 		emit: options.emit,
 		cacheOutput: options.cacheOutput,
 		tests: options.tests,
+		contracts: options.contracts,
 	})
 
 	try {
@@ -126,6 +128,12 @@ export async function runCheck(
 	// and would have said nothing, which left the one command a CI runs to be
 	// told about its code silent about a third of the file. It is also what the
 	// editor already types, so the two agree.
+	//
+	// NOTE: WITHOUT the contract goals, which `essence test --contracts` is
+	// what asks for. A goal is a test to RUN, and synthesizing one costs a
+	// speculative enrichment per Method and a remark about every Method that
+	// could not have one — none of which says anything about whether the file
+	// in hand is correct.
 	let result = await compileAll(context, command, files, {
 		emit: false,
 		tests: true,

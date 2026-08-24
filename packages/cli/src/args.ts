@@ -85,6 +85,10 @@ export type OptionValues = {
 	// run rather than replacing it — everything that would have run still runs
 	// — because a measurement of a body that is wrong is a number about nothing.
 	bench: boolean
+	// NOTE: Whether the run also tests what a Namespace's own declarations
+	// promise — see the Option. It ADDS to a run the way `bench` does: every
+	// written test still runs, and the synthesized goals run beside them.
+	contracts: boolean
 	// NOTE: Whether a snapshot that DIFFERS is recorded rather than reported.
 	// One nothing has recorded is written either way — the first run of a new
 	// snapshot is what records it. A benchmark reads it the same way: a
@@ -138,6 +142,7 @@ export const emptyOptions: OptionValues = {
 	coverageReport: null,
 	coverageOut: undefined,
 	bench: false,
+	contracts: false,
 	update: false,
 	seed: undefined,
 	cases: null,
@@ -537,6 +542,7 @@ export function parseArguments(
 			),
 			coverageOut: values["coverage-out"] as string | undefined,
 			bench: values.bench === true,
+			contracts: values.contracts === true,
 			update: values.update === true,
 			seed: values.seed as string | undefined,
 			cases: readCases(values.cases as string | undefined, command),
