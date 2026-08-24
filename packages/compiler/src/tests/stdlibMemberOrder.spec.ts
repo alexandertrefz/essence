@@ -55,7 +55,9 @@ const ARITHMETIC_ORDER = [
 // NOTE: Spelled out rather than derived, because an accessor is named for the
 // part it answers and no signature says that. `reciprocal` is deliberately
 // absent: it BUILDS a Rational out of the receiver rather than reading a part
-// of it, which is a transform.
+// of it, which is a transform. `enumerate` is absent for the same reason: the
+// Records it answers are built out of the List rather than held by it, and it
+// is the one member here named with a verb.
 const ACCESSORS = new Set([
 	"length",
 	"numerator",
@@ -66,7 +68,6 @@ const ACCESSORS = new Set([
 	"lastItem",
 	"firstIndex",
 	"lastIndex",
-	"enumerate",
 	"indices",
 	"keys",
 	"characters",
