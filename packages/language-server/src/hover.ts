@@ -93,7 +93,12 @@ export function findHover(
 	cursor: common.Cursor,
 	parserProgram: parser.Program | null = null,
 	annotations: Array<common.TypeAnnotation> = [],
+	text: string | null = null,
 ): HoverInfo | null {
+	if (text !== null && isInMargin(text, cursor)) {
+		return null
+	}
+
 	let state: State = {
 		cursor,
 		best: null,
@@ -124,6 +129,26 @@ export function findHover(
 	visitAnnotations(annotations, state)
 
 	return state.best
+}
+
+// NOTE: A line's margins have no hover — its indentation, the blank after its
+// last character, the whole of a blank line. The smallest node containing the
+// cursor is otherwise whatever spans the gap, and a reader pointing past the
+// end of a line or into the indentation of a body is asking about nothing. A
+// space BETWEEN two tokens on a line is another matter: it is part of what
+// spans them — `a + b`, a Record Literal, a String — and answers as that.
+export function isInMargin(text: string, cursor: common.Cursor): boolean {
+	let line = text.split("\n")[cursor.line - 1] ?? ""
+	let index = cursor.column - 1
+
+	if ((line[index] ?? "").trim() !== "") {
+		return false
+	}
+
+	return (
+		line.slice(0, index).trim() === "" ||
+		line.slice(index + 1).trim() === ""
+	)
 }
 
 // NOTE: Every Type annotation the Enricher resolved, paired with what it
