@@ -10,6 +10,18 @@
 - Every mark down the gutter — a test's lines and a coverage run's alike — is
   a rounded square rather than a bar, so it reads apart from the bar a
   source-control gutter draws beside a changed line.
+- The Problems panel now lists the whole workspace rather than the documents
+  you happen to have open. The project is analysed from the files nothing
+  imports — one pass over such a file judges every Module beneath it — so a
+  mistake in a file nobody has opened is there from the moment the folder is,
+  and a Module a cycle leaves with nothing above it is analysed from the
+  closest thing to a root it has. The panel fills in a file at a time rather
+  than all at once, so a Hover or a Completion in the document you just opened
+  is answered while the rest of the project is still being looked at. Closing
+  a file no longer takes its squiggles down with it, since what they say is
+  what the file on disk says; deleting the file does.
+- With coverage on, an edit re-runs only the tests that reached the changed
+  lines; unaffected test files are left standing.
 
 ## [0.5.0]
 

@@ -90,6 +90,40 @@ describe("The Server's live test session", () => {
 		)
 	}, 60_000)
 
+	// NOTE: A file writing NEITHER Module section is judged by an entry of its
+	// own rather than by the graph that reaches it — the graph's answer for such
+	// a file is dropped — so the root above it publishes nothing for it, and its
+	// own entry is what carries what a run found there. It has to run for every
+	// batch that reached it, cached analysis or not: an entry that does not run
+	// publishes nothing, and results arriving move nothing about the source.
+	//
+	// The state is the ordinary one for a file whose `export` block is still
+	// being written, which is a file somebody is very likely running the tests
+	// of.
+	it("publishes a test-failed Diagnostic for a dependency that writes neither section", async () => {
+		let sectionless = [
+			"implementation {",
+			"\tconstant used = 1",
+			"}",
+			"",
+			failing,
+		].join("\n")
+		let { session, pathOf } = await openWorkspace(
+			{
+				"Season.tests.es": sectionless,
+				"Main.es": `import {\n\tused from "./Season.tests.es"\n}\n\nimplementation {\n\tconstant seen = 1\n}\n`,
+			},
+			"Main.es",
+		)
+
+		await session.waitForTestRuns(1)
+		await session.settle()
+
+		expect(session.codesFor(pathOf("Season.tests.es"))).toContain(
+			"test-failed",
+		)
+	}, 60_000)
+
 	it("clears the Diagnostic once the test holds again", async () => {
 		let { session, pathOf } = await openWorkspace(
 			{ "Season.tests.es": failing },
@@ -233,6 +267,68 @@ describe("The Server's live test session", () => {
 
 		expect(session.codesFor(pathOf("Season.tests.es"))).toContain(
 			"test-failed",
+		)
+	}, 60_000)
+
+	// NOTE: What a file's tags say is a fact about the WHOLE workspace, so the
+	// list published for one can move while its own text sits still — and a file
+	// writing neither Module section has nothing but its own entry to publish it.
+	// That entry has to run for every batch that reached the file, whether or
+	// not its analysis is still cached, which is the difference between "nothing
+	// has judged this" and "nothing ever judges this".
+	it("re-publishes a section-less dependency when another file's tags move", async () => {
+		let tagged = (tag: string) =>
+			[
+				"tests {",
+				`\ttest "one" tagged ${tag} { expect true }`,
+				`\ttest "two" tagged ${tag} { expect true }`,
+				"}",
+				"",
+			].join("\n")
+		let main = (tag: string) =>
+			[
+				"import {",
+				'\tused from "./Season.tests.es"',
+				"}",
+				"",
+				"implementation {",
+				"\tconstant seen = 1",
+				"}",
+				"",
+				tagged(tag),
+			].join("\n")
+		let { session, pathOf } = await openWorkspace(
+			{
+				"Season.tests.es": [
+					"implementation {",
+					"\tconstant used = 1",
+					"}",
+					"",
+					"tests {",
+					'\ttest "three" tagged netwrok { expect true }',
+					"}",
+					"",
+				].join("\n"),
+				"Main.es": main("slow"),
+			},
+			"Main.es",
+		)
+
+		await session.waitForTestRuns(1)
+		await session.settle()
+
+		expect(session.codesFor(pathOf("Season.tests.es"))).not.toContain(
+			"similar-tags",
+		)
+
+		// NOTE: In the IMPORTER, so nothing about the section-less file moves —
+		// its analysis stays cached, and the only thing that changed about it is
+		// what the workspace's other tags now look like.
+		await session.change(pathOf("Main.es"), main("network"))
+		await session.settle(800)
+
+		expect(session.codesFor(pathOf("Season.tests.es"))).toContain(
+			"similar-tags",
 		)
 	}, 60_000)
 

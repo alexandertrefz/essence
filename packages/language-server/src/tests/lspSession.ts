@@ -106,6 +106,7 @@ export function startSession() {
 	// it leaves behind, and it is exactly what a client pays for.
 	let publishLog: Array<{ uri: string; version?: number }> = []
 	let testRuns: Array<TestRunNotification> = []
+	let watchers: Array<{ stop: () => void }> = []
 
 	// NOTE: The custom notification the test session pushes. Kept as a log
 	// rather than as a latest-value, because what a client pays for is every
@@ -248,6 +249,105 @@ export function startSession() {
 		publishCount: () => publishCount,
 		publishesSince: (mark: number) => publishLog.slice(mark),
 		publishMark: () => publishLog.length,
+		// NOTE: Waits until the Server has linked COUNT graphs since a mark,
+		// rather than for a length of time — what a link costs is a fact about
+		// the machine, and what a test wants to say is "once the analysis has
+		// started". The tally is a module-level counter inside this process, so
+		// unlike a publish there is no wire between the fact and the reading of
+		// it.
+		//
+		// Polled on a macrotask deliberately: the analysis loop hands the event
+		// loop back between two of its callbacks (see `armSweepChunk`), so a poll
+		// that is itself a macrotask wakes up once per callback and sees the
+		// Server one whole analysis at a time. A microtask would spin between two
+		// of them and see nothing move.
+		waitForLinks: async (
+			before: CompilationTally,
+			count: number,
+			timeout = 30_000,
+		) => {
+			let deadline = Date.now() + timeout
+
+			while (
+				compilationCounts.links - before.links < count &&
+				Date.now() < deadline
+			) {
+				await new Promise<void>((resolve) => {
+					setImmediate(resolve)
+				})
+			}
+
+			return compilationCounts.links - before.links
+		},
+		// NOTE: The most graphs the Server linked inside ONE turn of the event
+		// loop, watched from the moment this is called until it is stopped. What
+		// a test that types mid-sweep wants to say is that the change batch took
+		// the roots reaching the change and not the ones the queue still owes,
+		// and the fact that distinguishes those two is the SHAPE of the work
+		// rather than its amount: a chunked sweep advances the tally by one root
+		// per callback, and a batch that swallowed the queue advances it by a
+		// project's worth inside a single one. Read that way the reading is a
+		// fact about the loop rather than about how fast a link is — the total
+		// at any given instant is the drain rate racing the debounce, and that
+		// one moves with the machine.
+		//
+		// Polled on a macrotask for the reason `waitForLinks` is, and it reads
+		// two in the turn a due window fires in: timers run before the check
+		// phase, so the batch's link and the sweep's next root land between the
+		// same two polls.
+		watchLinkBursts: () => {
+			let most = 0
+			let previous = compilationCounts.links
+			let watching = true
+			let watch = async () => {
+				while (watching) {
+					await new Promise<void>((resolve) => {
+						setImmediate(resolve)
+					})
+
+					let now = compilationCounts.links
+
+					most = Math.max(most, now - previous)
+					previous = now
+				}
+			}
+
+			void watch()
+
+			let watcher = {
+				most: () => most,
+				stop: () => {
+					watching = false
+				},
+			}
+
+			watchers.push(watcher)
+
+			return watcher
+		},
+		// NOTE: The same kind of wait over the WIRE rather than over the tally:
+		// what a test that has just typed something waits for is the answer to
+		// what it typed, and everything else arriving is the Server doing its
+		// other work beside it. The mark is where to start looking, since the
+		// file has usually been published for already.
+		waitForPublishOf: async (
+			filePath: string,
+			mark: number,
+			timeout = 30_000,
+		) => {
+			let uri = uriOf(filePath)
+			let deadline = Date.now() + timeout
+			let arrived = () =>
+				publishLog.slice(mark).some((entry) => entry.uri === uri)
+
+			while (!arrived() && Date.now() < deadline) {
+				await new Promise<void>((resolve) => {
+					setImmediate(resolve)
+				})
+			}
+
+			return arrived()
+		},
 		resetCounts: resetCompilationCounts,
 		counts: currentTally,
 		tallySince: tallyOf,
@@ -257,9 +357,13 @@ export function startSession() {
 		// Editor spends its time in.
 		settle: (milliseconds = 400) =>
 			new Promise<void>((resolve) => setTimeout(resolve, milliseconds)),
-		// NOTE: Every document is closed first, which is what cancels the
-		// analyses still pending for them — a debounced analysis that fires
-		// after the connection is gone throws where nothing can catch it.
+		// NOTE: Every document is closed first, which is what hands each of them
+		// back to disk the way a closing Editor does — and closing SCHEDULES an
+		// analysis rather than cancelling one, since what a file on disk says is
+		// still true once its buffer is gone. What cancels the window is the
+		// shutdown request below: a debounced analysis firing after the
+		// connection has gone publishes into nothing, and a throw out of a timer
+		// callback is the process (see `connection.onShutdown`).
 		//
 		// The connections are disposed and the pipes deliberately are NOT.
 		// `createConnection` installs `process.exit` on its input stream's `end`
@@ -267,6 +371,14 @@ export function startSession() {
 		// here, where closing a pipe would take the test runner with it. A
 		// PassThrough holds nothing open on its own.
 		dispose: async () => {
+			// NOTE: Every watcher stopped first. A poll that re-arms itself on
+			// `setImmediate` holds the loop open for as long as it runs, and a
+			// test that threw before it stopped its own would leave the runner
+			// spinning rather than reporting the failure.
+			for (let watcher of watchers) {
+				watcher.stop()
+			}
+
 			for (let filePath of versions.keys()) {
 				await close(filePath)
 			}

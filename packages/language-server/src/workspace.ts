@@ -275,6 +275,19 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 				continue
 			}
 
+			// NOTE: A file that writes neither section is the exception, and it
+			// is a real one — it is the state a Module is in while it is being
+			// written, and the file the reader is typing an `export` block into
+			// is one an importer already names. Such a file can not mention
+			// anything declared anywhere else, and what a graph reaching it made
+			// of it is DROPPED (see `analyseGraphFrom`), so everything held here
+			// was computed from its own text alone. An edit next door can not
+			// have moved it, and dropping it anyway is an enrichment per
+			// keystroke in the importer, for ever.
+			if (!isModule(entry.program, affected)) {
+				continue
+			}
+
 			entry.index = null
 			entry.enriched = null
 			entry.enrichmentAttempted = false
@@ -427,7 +440,7 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 
 	// NOTE: Every recorded edge brought up to the text as it is now, which is
 	// what a walk that has to be EXACT needs — a rename, a reference search, the
-	// set of documents an edit obliges the Server to publish again.
+	// roots an edit obliges the Server to analyse again.
 	//
 	// Drained rather than iterated: reading one file's entries parses it, and a
 	// parse is what makes the NEXT file's edges knowable. The delete is what
@@ -502,7 +515,8 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 	// that merely SHARES a dependency with this one imports nothing from it, so
 	// nothing it means can have moved. Answering with the undirected component
 	// would make one keystroke in a Module thirty files import cost thirty graph
-	// links — one per open sibling, since no sibling's graph contains another's.
+	// links — one per sibling, since no sibling's graph contains another's, and
+	// whether anything has them open makes no difference to that now.
 	function dependentsOf(filePath: string): Array<string> {
 		refreshAllEdges()
 
@@ -527,6 +541,132 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 		}
 
 		return [...found]
+	}
+
+	// NOTE: These files and everything they reach through entries, LIVE files
+	// only. A specifier naming a file that is not there records an edge all the
+	// same (see `analyseGraphFrom`), and nothing is covered by one: the file it
+	// names has no text to judge.
+	function reachFrom(
+		entryPaths: Iterable<string>,
+		live: Set<string>,
+	): Set<string> {
+		let reached = new Set<string>()
+		let pending: Array<string> = []
+
+		for (let entryPath of entryPaths) {
+			if (live.has(entryPath) && !reached.has(entryPath)) {
+				reached.add(entryPath)
+				pending.push(entryPath)
+			}
+		}
+
+		while (pending.length > 0) {
+			let current = pending.shift()!
+
+			for (let dependency of outEdges.get(current) ?? []) {
+				if (reached.has(dependency) || !live.has(dependency)) {
+					continue
+				}
+
+				reached.add(dependency)
+				pending.push(dependency)
+			}
+		}
+
+		return reached
+	}
+
+	// NOTE: The files a whole workspace can be analysed FROM: the smallest set
+	// whose graphs cover every file of it. A root is a file nothing imports,
+	// which is where a dependency graph starts — analysing one links every
+	// Module beneath it and fills this cache for all of them, so the roots
+	// between them judge every file the workspace holds, whether or not anything
+	// has it open. That is what lets the Server report on a project rather than
+	// on a set of tabs.
+	//
+	// The second half is what "closest to root" means. A cycle nobody imports
+	// has no member without an in-edge, so the first half covers none of it; the
+	// file of it that reaches the most others is taken as the entry, and again
+	// until nothing is left over. Deliberately the greatest reach rather than
+	// any member: an entry is where the Diagnostics about what the graph could
+	// not READ land, and the file that sees the most has the most to say.
+	//
+	// A walk of the edges and nothing else — no enrichment, and no parse beyond
+	// the ones `refreshAllEdges` pays for. Sorted, because which entry a batch
+	// starts from is a cost, and a test may not have to guess at it.
+	function roots(): Array<string> {
+		refreshAllEdges()
+
+		let known = [...knownFiles()].filter(
+			(filePath) => fileOf(filePath) !== null,
+		)
+
+		known.sort()
+
+		let live = new Set(known)
+		// NOTE: A file whose text can not be read imports nothing — it was
+		// deleted, or it is a standard library source this Workspace
+		// deliberately holds nothing for. Counting one as an importer would
+		// leave everything it names covered by nobody.
+		let chosen = known.filter((filePath) =>
+			[...(inEdges.get(filePath) ?? [])].every(
+				(importer) => !live.has(importer),
+			),
+		)
+		let reaches = new Map<string, Set<string>>()
+		let reachOf = (filePath: string): Set<string> => {
+			let reached = reaches.get(filePath)
+
+			if (reached === undefined) {
+				reached = reachFrom([filePath], live)
+				reaches.set(filePath, reached)
+			}
+
+			return reached
+		}
+		let covered = reachFrom(chosen, live)
+
+		while (covered.size < known.length) {
+			let uncovered = known.filter((filePath) => !covered.has(filePath))
+			let closest = uncovered[0]!
+
+			for (let candidate of uncovered) {
+				if (reachOf(candidate).size > reachOf(closest).size) {
+					closest = candidate
+				}
+			}
+
+			chosen.push(closest)
+
+			for (let reached of reachOf(closest)) {
+				covered.add(reached)
+			}
+		}
+
+		return chosen.sort()
+	}
+
+	// NOTE: The roots of the graphs an edit to these files can have moved the
+	// meaning of, which is what the Server owes an analysis to — never all of
+	// them. `invalidateEnrichment` drops the whole UNDIRECTED component, but a
+	// root that does not reach the edited file was judged against text that did
+	// not move, so re-linking it would find exactly what it found before: one
+	// keystroke in a Module thirty files import must not cost a link for every
+	// root that merely shares a dependency with them.
+	function rootsReaching(filePaths: Iterable<string>): Array<string> {
+		let chosen = new Set(roots())
+		let reaching = new Set<string>()
+
+		for (let filePath of filePaths) {
+			for (let dependent of dependentsOf(filePath)) {
+				if (chosen.has(dependent)) {
+					reaching.add(dependent)
+				}
+			}
+		}
+
+		return [...reaching].sort()
 	}
 
 	function fileOf(filePath: string): FileEntry | null {
@@ -680,6 +820,38 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 		}
 
 		return cachedAnalysis(entry)
+	}
+
+	// NOTE: Whether this file's Diagnostics are cached for the text it holds
+	// NOW, asked without producing any. What it answers is COVERAGE: the Server
+	// analyses a workspace from its roots, and a root that could not be read —
+	// or whose graph could not read one of its Modules — leaves files beneath it
+	// that nothing has judged. Those are analysed as entries of their own, and
+	// this is how they are found. The guard is `fileOf`'s cache test, minus the
+	// half that reads and parses.
+	function isAnalysed(filePath: string): boolean {
+		let open = openDocument(filePath)
+		let cached = files.get(filePath)
+
+		return (
+			cached !== undefined &&
+			cached.diagnostics !== null &&
+			cached.version === (open?.version ?? diskVersion) &&
+			(open === undefined || cached.sourceText === open.text)
+		)
+	}
+
+	// NOTE: Whether a graph that reaches this file is what judges it. A file
+	// writing NEITHER section is a Program of its own everywhere in this Server,
+	// so `analyseGraphFrom` drops what the graph made of it and this cache holds
+	// nothing for it afterwards — which is not the same thing as nothing having
+	// judged it, and the difference is what the Server's coverage check would
+	// otherwise get wrong. One rule, asked here rather than re-derived, so that
+	// the two can not drift apart.
+	function isModuleFile(filePath: string): boolean {
+		let entry = fileOf(filePath)
+
+		return entry !== null && isModule(entry.program, filePath)
 	}
 
 	function cachedAnalysis(entry: FileEntry): Analysis {
@@ -1298,12 +1470,16 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 		sourceOf,
 		indexOf,
 		analysisOf,
+		isAnalysed,
+		isModuleFile,
 		documentOf,
 		enrichedOf,
 		annotationsOf,
 		dependenciesOf,
 		componentOf,
 		dependentsOf,
+		roots,
+		rootsReaching,
 		exportsOf,
 		exportersOf,
 		offersFor,
