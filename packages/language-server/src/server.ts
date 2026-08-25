@@ -1089,6 +1089,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 			toCursor(params.position),
 			parsed.program,
 			parsed.annotations,
+			documents.get(params.textDocument.uri)?.getText() ?? null,
 		)
 
 		if (hover === null) {

@@ -14,7 +14,7 @@ function hoverInfo(source: string, cursor: common.Cursor) {
 		annotations: true,
 	})
 
-	return findHover(enrichedProgram, cursor, program, annotations)
+	return findHover(enrichedProgram, cursor, program, annotations, source)
 }
 
 function hover(source: string, cursor: common.Cursor): string | null {
@@ -466,6 +466,47 @@ describe("Hover", () => {
 // NOTE: The typed AST erases annotations — a resolved Type carries no Position
 // — so before the annotation index every one of these answered with the
 // enclosing declaration, whatever it was aimed at.
+// NOTE: A line's margins have no hover — its indentation, the blank after its
+// last character, a blank line — while a space BETWEEN two tokens belongs to
+// whatever spans them and answers as that.
+describe("Hover in a line's margins", () => {
+	const source = [
+		"implementation {",
+		// NOTE: Three trailing spaces after the call.
+		"\tconstant total = 1::add(2)   ",
+		"\tconstant person = {",
+		'\t\tname = "Ada Lovelace",',
+		"",
+		"\t\tage = 36,",
+		"\t}",
+		"}",
+	].join("\n")
+
+	it("says nothing in the indentation", () => {
+		expect(hover(source, { line: 2, column: 1 })).toBeNull()
+		expect(hover(source, { line: 6, column: 2 })).toBeNull()
+	})
+
+	it("says nothing after the last character of a line", () => {
+		expect(hover(source, { line: 2, column: 29 })).toBeNull()
+		expect(hover(source, { line: 2, column: 40 })).toBeNull()
+	})
+
+	it("says nothing on a blank line inside a Literal", () => {
+		expect(hover(source, { line: 5, column: 1 })).toBeNull()
+		expect(hover(source, { line: 6, column: 3 })).toBe(
+			"{ name: String, age: Integer }",
+		)
+	})
+
+	it("answers between two tokens with what spans them", () => {
+		// NOTE: The space between `constant` and `total` is in the
+		// declaration's head, and the head answers for it.
+		expect(hover(source, { line: 2, column: 10 })).toBe("total: Integer")
+		expect(hover(source, { line: 4, column: 14 })).toBe("String")
+	})
+})
+
 describe("Hover of Type annotations", () => {
 	it("should describe a Function's Parameter and return annotations", () => {
 		let source = [
