@@ -1314,6 +1314,27 @@ describe("The coverage counters", () => {
 		expect(report?.points.map((each) => each.count)).toEqual([2, 1])
 	})
 
+	// NOTE: A point touched before the first run began — a top-level Statement
+	// running as the Module loads — is credited to no test's span, but it did
+	// run. `beginCoverageRun` freezes that as the baseline, and the report names
+	// those points apart so a consumer mapping a change to its tests knows an
+	// edit there could move a test that only read the load-time result.
+	test("names the points a Module ran at load", () => {
+		let count = counters({
+			module: "/Loaded.es",
+			points: [point(1), point(2), point(3)],
+			choices: [],
+		})
+
+		count(0)
+		count(2)
+		beginCoverageRun()
+
+		let report = coverage().find((each) => each.module === "/Loaded.es")
+
+		expect(report?.loaded).toEqual([0, 2])
+	})
+
 	// NOTE: Absolutes, because a span RESETS — that is the whole design: what
 	// a case reaches is measured from the start of its own test, not from
 	// whatever the process has touched before.

@@ -239,6 +239,13 @@ async function runEntry(
 			// NOTE: A bundle with no counters in it answers with nothing, so
 			// asking costs a run that was not instrumented exactly nothing.
 			coverage: request.coverage,
+			// NOTE: Attribution — which test touched which point — rides on the
+			// same instrumented run, so a session that counts also learns which
+			// tests reach which lines, at the cost of one `test-coverage` event
+			// per test per Module it touched. It is what lets a change re-run the
+			// tests it reached rather than every test of the file. Free when
+			// coverage is off, because then there are no counters to attribute.
+			coverageByTest: request.coverage,
 			snapshots: stored,
 			update: request.update,
 		})
