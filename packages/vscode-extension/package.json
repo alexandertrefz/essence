@@ -152,7 +152,7 @@
 				"essence.tests.coverage": {
 					"type": "boolean",
 					"default": false,
-					"markdownDescription": "Count what each run reaches, and report it: lines and branches in the coverage view, the lines nothing ran marked in the gutter, and — because the language is exhaustive — every `match` arm no value took and every Case of a `choice` no test ever built, as declarations. Off by default: instrumenting compiles a different bundle from the one a build produces and makes the program do more work on every keystroke. Running the tests with coverage from the Test Explorer turns it on.",
+					"markdownDescription": "Count what each run reaches, and report it: lines and branches in the coverage view, the lines nothing ran marked in the gutter, and — because the language is exhaustive — every `match` arm no value took and every Case of a `choice` no test ever built, as declarations. It also lets an edit re-run only the tests that reached the changed lines, since the counters record which test touched which line. Off by default: instrumenting compiles a different bundle from the one a build produces and makes the program do more work on every keystroke. Running the tests with coverage from the Test Explorer turns it on.",
 					"scope": "resource"
 				},
 				"essence.tests.debounce": {

@@ -127,6 +127,12 @@ Development Host, over a workspace holding at least two files that write
   Case of a `choice` with a tick or a cross. Turning the setting off again
   stops the counting and takes every square down on the next cycle. The output
   channel writes a second line per cycle with the two percentages.
+- With coverage on, editing WITHIN a line of a source file (change a literal,
+  keep the line count the same) re-runs only the tests that reached that line —
+  the output channel's cycle line names fewer tests, and a test file whose tests
+  do not reach the change is not re-run. Adding or removing a line, editing a
+  top-level Constant, or having coverage off re-runs the whole reached set. A
+  narrowed cycle leaves the gutter squares where they were.
 - A test written `across` a List of rows is listed once per row, under a node
   named by the template, and each row's item shows the name that row renders.
   ▶ beside the template runs every row; ▶ beside one row runs only it.
