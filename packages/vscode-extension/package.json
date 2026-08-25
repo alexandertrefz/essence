@@ -43,9 +43,6 @@
 		}
 	},
 	"main": "./dist/extension.js",
-	"activationEvents": [
-		"onLanguage:essence"
-	],
 	"scripts": {
 		"build": "bun run build:server && bun run build:extension",
 		"build:server": "bun buildServer.js",
