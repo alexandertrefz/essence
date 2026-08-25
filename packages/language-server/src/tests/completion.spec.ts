@@ -257,6 +257,57 @@ describe("Completion", () => {
 			])
 		})
 
+		// NOTE: The head of an `if` closed with the brackets alone is an `if`
+		// with no body, which the Parser drops whole — and the member access
+		// with it. A further reading gives it one.
+		it("should work in the head of an if", () => {
+			let source = [
+				"implementation {",
+				"\tconstant cell = { alive = true, age = 3 }",
+				"\tfunction check() -> Boolean {",
+				"\t\tif cell.",
+				"\t\t<- true",
+				"\t}",
+				"}",
+			].join("\n")
+
+			expect(labelsOf(source, { line: 4, column: 11 })).toEqual([
+				"alive",
+				"age",
+			])
+		})
+
+		it("should work in the head of an else if", () => {
+			let source = [
+				"implementation {",
+				"\tconstant cell = { alive = true, age = 3 }",
+				"\tif true {",
+				"\t} else if cell.",
+				"}",
+			].join("\n")
+
+			expect(labelsOf(source, { line: 4, column: 17 })).toEqual([
+				"alive",
+				"age",
+			])
+		})
+
+		// NOTE: A `match` wants its return Type before its block, so its head
+		// is a reading of its own.
+		it("should work in the head of a match", () => {
+			let source = [
+				"implementation {",
+				"\tconstant cell = { alive = true, age = 3 }",
+				"\tconstant answer = match cell.",
+				"}",
+			].join("\n")
+
+			expect(labelsOf(source, { line: 3, column: 31 })).toEqual([
+				"alive",
+				"age",
+			])
+		})
+
 		it("should carry the member's Type as detail", () => {
 			let source = [
 				"implementation {",

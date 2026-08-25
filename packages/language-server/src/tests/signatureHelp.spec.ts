@@ -23,6 +23,26 @@ describe("Signature Help", () => {
 		expect(help?.activeParameter).toBe(0)
 	})
 
+	// NOTE: The head of an `if` closed with the brackets alone is an `if`
+	// with no body, which the Parser drops whole — and the call with it.
+	it("should show a signature in the head of an if", () => {
+		let source = [
+			"implementation {",
+			"\tfunction greet (subject: String) -> Boolean {",
+			"\t\t<- true",
+			"\t}",
+			"\tif greet(",
+			"}",
+		].join("\n")
+
+		let help = findSignatureHelp(source, { line: 5, column: 11 })
+
+		expect(help?.signatures[0].label).toBe(
+			"greet(subject: String) -> Boolean",
+		)
+		expect(help?.activeParameter).toBe(0)
+	})
+
 	it("should advance the active Parameter across commas", () => {
 		let source = [
 			"implementation {",
