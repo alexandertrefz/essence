@@ -753,3 +753,497 @@ describe("The Language Server's test session", () => {
 		}
 	}, 60_000)
 })
+
+// NOTE: The line-level narrowing, driven end to end. Two functions live in one
+// Module, each reached by its own test file, so a change to one function's body
+// reaches one test and not the other — which is the whole reason to re-run a few
+// tests rather than every test of every file that imports what changed. This
+// needs its own graph (the shared `harness` knows only `Library.es`), so the
+// session is built here with the Workspace answers this graph gives.
+describe("A session narrowing a change to the tests it reached", () => {
+	const mathsSource = [
+		"implementation {",
+		"\tfunction double(_ n: Integer) -> Integer {",
+		"\t\t<- n::multiply(with 2)",
+		"\t}",
+		"",
+		"\tfunction triple(_ n: Integer) -> Integer {",
+		"\t\t<- n::multiply(with 3)",
+		"\t}",
+		"}",
+		"",
+		"export {",
+		"\tdouble",
+		"\ttriple",
+		"}",
+		"",
+	].join("\n")
+
+	const doublesSource = [
+		"import {",
+		'\tdouble from "./Maths.es"',
+		"}",
+		"",
+		"tests {",
+		'\ttest "doubles" {',
+		"\t\texpect double(2)::is(4)",
+		"\t}",
+		"}",
+		"",
+	].join("\n")
+
+	const triplesSource = [
+		"import {",
+		'\ttriple from "./Maths.es"',
+		"}",
+		"",
+		"tests {",
+		'\ttest "triples" {',
+		"\t\texpect triple(2)::is(6)",
+		"\t}",
+		"}",
+		"",
+	].join("\n")
+
+	let maths: string
+	let doublesFile: string
+	let triplesFile: string
+
+	beforeAll(() => {
+		maths = path.join(root, "Maths.es")
+		doublesFile = path.join(root, "Doubles.tests.es")
+		triplesFile = path.join(root, "Triples.tests.es")
+
+		writeFileSync(maths, mathsSource)
+		writeFileSync(doublesFile, doublesSource)
+		writeFileSync(triplesFile, triplesSource)
+	})
+
+	// NOTE: The real session and Worker, wired for this graph: the two test files
+	// are the entries, and a change to `Maths.es` reaches both. Mirrors `harness`,
+	// which cannot be reused because its `dependentsOf` is spelled for the shared
+	// fixture.
+	function mathsHarness(): {
+		session: TestSession
+		notifications: Array<TestRunNotification>
+		overlays: Record<string, string>
+		problems: Array<string>
+		waitForRuns: (count: number) => Promise<void>
+	} {
+		let notifications: Array<TestRunNotification> = []
+		let overlays: Record<string, string> = {}
+		let problems: Array<string> = []
+		let live = createTestSession({
+			onProblem: (filePath, problem) =>
+				problems.push(`${filePath}: ${problem}`),
+			testFiles: () => [doublesFile, triplesFile],
+			dependentsOf: (filePath) =>
+				filePath === maths
+					? [maths, doublesFile, triplesFile]
+					: [filePath],
+			overlays: () => overlays,
+			notify: (notification) => notifications.push(notification),
+			onResults: () => {},
+			debounce: 20,
+		})
+
+		return {
+			session: live,
+			notifications,
+			overlays,
+			problems,
+			async waitForRuns(count: number): Promise<void> {
+				let deadline = Date.now() + 30_000
+				let ended = () =>
+					notifications.filter(
+						(notification) => notification.kind === "end",
+					).length
+
+				while (ended() < count && Date.now() < deadline) {
+					await new Promise((resolve) => setTimeout(resolve, 25))
+				}
+			},
+		}
+	}
+
+	let endNotifications = (live: ReturnType<typeof mathsHarness>) =>
+		live.notifications.filter((notification) => notification.kind === "end")
+
+	it("re-runs only the test whose reached line changed", async () => {
+		let live = mathsHarness()
+
+		try {
+			// NOTE: The overlay is set BEFORE coverage is switched on, so the whole
+			// run's snapshot holds the text the attribution's Positions are in.
+			live.overlays[maths] = mathsSource
+			live.session.setCoverage(true)
+
+			await live.waitForRuns(1)
+
+			let doublesId = live.session.recordsFor(doublesFile)[0]?.id
+			let triplesId = live.session.recordsFor(triplesFile)[0]?.id
+
+			expect(doublesId).toBeDefined()
+			expect(triplesId).toBeDefined()
+
+			// NOTE: An in-line edit to `double`'s body — same line count, a literal
+			// changed — so nothing moved and the change can be mapped.
+			live.overlays[maths] = mathsSource.replace("with 2", "with 4")
+			live.session.changed([maths])
+
+			await live.waitForRuns(2)
+
+			let narrowed = endNotifications(live)[1]
+
+			expect(narrowed).toMatchObject({ reason: "change" })
+			expect(narrowed?.ids).toContain(doublesId)
+			expect(narrowed?.ids).not.toContain(triplesId)
+		} finally {
+			await live.session.dispose()
+		}
+	}, 60_000)
+
+	it("leaves the unaffected file's result exactly as it was", async () => {
+		let live = mathsHarness()
+
+		try {
+			live.overlays[maths] = mathsSource
+			live.session.setCoverage(true)
+
+			await live.waitForRuns(1)
+
+			live.overlays[maths] = mathsSource.replace("with 2", "with 4")
+			live.session.changed([maths])
+
+			await live.waitForRuns(2)
+
+			// NOTE: `double` re-ran and now fails (2 doubled by four is eight), the
+			// proof it was reached; `triple` was never touched, so its passing
+			// result from the whole run still stands — the narrowed cycle skipped
+			// it rather than reporting it deselected over its own result.
+			expect(
+				live.session
+					.recordsFor(doublesFile)
+					.map((record) => record.state),
+			).toEqual(["failed"])
+			expect(
+				live.session
+					.recordsFor(triplesFile)
+					.map((record) => [record.name, record.state]),
+			).toEqual([["triples", "passed"]])
+		} finally {
+			await live.session.dispose()
+		}
+	}, 60_000)
+
+	it("runs whole for an edit that adds a line", async () => {
+		let live = mathsHarness()
+
+		try {
+			live.overlays[maths] = mathsSource
+			live.session.setCoverage(true)
+
+			await live.waitForRuns(1)
+
+			// NOTE: A line inserted moves every point below it, so the attribution's
+			// coordinates no longer describe the file and there is nothing honest to
+			// narrow across — the reach runs whole.
+			live.overlays[maths] = mathsSource.replace(
+				"implementation {\n",
+				"implementation {\n\n",
+			)
+			live.session.changed([maths])
+
+			await live.waitForRuns(2)
+
+			let whole = endNotifications(live)[1]
+
+			expect(whole).toMatchObject({ reason: "change" })
+			expect(whole?.ids).toEqual([])
+			expect([...(whole?.files ?? [])].sort()).toEqual(
+				[doublesFile, triplesFile].sort(),
+			)
+		} finally {
+			await live.session.dispose()
+		}
+	}, 60_000)
+
+	it("keeps the coverage picture across a narrowed cycle", async () => {
+		let live = mathsHarness()
+
+		try {
+			live.overlays[maths] = mathsSource
+			live.session.setCoverage(true)
+
+			await live.waitForRuns(1)
+
+			live.overlays[maths] = mathsSource.replace("with 2", "with 4")
+			live.session.changed([maths])
+
+			await live.waitForRuns(2)
+
+			// NOTE: A narrowed cycle counts only the tests it ran, so it carries no
+			// per-file coverage — repainting the gutter grey on the cheap keystroke
+			// is exactly what must not happen. What the whole run counted still
+			// stands, so the module is still reported.
+			expect(endNotifications(live)[1]?.coverage.files).toEqual([])
+			expect(
+				live.session.coverage().files.map((file) => file.module),
+			).toContain(maths)
+		} finally {
+			await live.session.dispose()
+		}
+	}, 60_000)
+
+	it("runs whole for the same edit when coverage is off", async () => {
+		let live = mathsHarness()
+
+		try {
+			// NOTE: No `setCoverage` — the default. Nothing is attributed, so a
+			// line has nothing to map to and the change runs whole. Narrowing rides
+			// entirely on coverage.
+			live.session.runAll("open")
+
+			await live.waitForRuns(1)
+
+			live.overlays[maths] = mathsSource.replace("with 2", "with 4")
+			live.session.changed([maths])
+
+			await live.waitForRuns(2)
+
+			let whole = endNotifications(live)[1]
+
+			expect(whole).toMatchObject({ reason: "change" })
+			expect(whole?.ids).toEqual([])
+		} finally {
+			await live.session.dispose()
+		}
+	}, 60_000)
+})
+
+// NOTE: The same double/triple source the narrowing describe uses, reused by the
+// property and focus fixtures below — two functions on different lines, so a
+// change to one is a change the attribution can place on one test's ground and
+// not another's.
+const numbersSource = [
+	"implementation {",
+	"\tfunction double(_ n: Integer) -> Integer {",
+	"\t\t<- n::multiply(with 2)",
+	"\t}",
+	"",
+	"\tfunction triple(_ n: Integer) -> Integer {",
+	"\t\t<- n::multiply(with 3)",
+	"\t}",
+	"}",
+	"",
+	"export {",
+	"\tdouble",
+	"\ttriple",
+	"}",
+	"",
+].join("\n")
+
+// NOTE: The real session and Worker for one source Module and its test entries,
+// with coverage-driven narrowing wired the way this graph's Workspace would
+// answer — a change to the source reaches every entry. Mirrors `harness`, which
+// cannot be reused because its `dependentsOf` is spelled for the shared fixture.
+function coverageSession(
+	sourceModule: string,
+	entries: Array<string>,
+): {
+	session: TestSession
+	notifications: Array<TestRunNotification>
+	overlays: Record<string, string>
+	waitForRuns: (count: number) => Promise<void>
+} {
+	let notifications: Array<TestRunNotification> = []
+	let overlays: Record<string, string> = {}
+	let live = createTestSession({
+		testFiles: () => entries,
+		dependentsOf: (filePath) =>
+			filePath === sourceModule ? [sourceModule, ...entries] : [filePath],
+		overlays: () => overlays,
+		notify: (notification) => notifications.push(notification),
+		onResults: () => {},
+		debounce: 20,
+	})
+
+	return {
+		session: live,
+		notifications,
+		overlays,
+		async waitForRuns(count: number): Promise<void> {
+			let deadline = Date.now() + 30_000
+			let ended = () =>
+				notifications.filter(
+					(notification) => notification.kind === "end",
+				).length
+
+			while (ended() < count && Date.now() < deadline) {
+				await new Promise((resolve) => setTimeout(resolve, 25))
+			}
+		},
+	}
+}
+
+// NOTE: Fix 1 — a property test draws fresh values every run, so its attribution
+// is one run's sample of the lines it COULD touch, not the whole of them.
+// `narrowingFor` unions in every property of the reached entries whatever the
+// change touched, rather than trusting a sample to say a property was untouched.
+describe("A session re-running a property whatever a change touched", () => {
+	// NOTE: One entry with a property over `double` and a unit test over `triple`
+	// — two tests of one file, each reaching a different line of the source.
+	const mixedSource = [
+		"import {",
+		'\tdouble from "./PropMaths.es"',
+		'\ttriple from "./PropMaths.es"',
+		"}",
+		"",
+		"tests {",
+		'\ttest "doubling adds a number to itself" for any (n: Integer) {',
+		"\t\texpect double(n)::is(n::add(n))",
+		"\t}",
+		"",
+		'\ttest "triples" {',
+		"\t\texpect triple(2)::is(6)",
+		"\t}",
+		"}",
+		"",
+	].join("\n")
+
+	let propMaths: string
+	let mixedFile: string
+
+	beforeAll(() => {
+		propMaths = path.join(root, "PropMaths.es")
+		mixedFile = path.join(root, "Mixed.tests.es")
+
+		writeFileSync(propMaths, numbersSource)
+		writeFileSync(mixedFile, mixedSource)
+	})
+
+	it("re-runs a property alongside the unit test whose line changed", async () => {
+		let live = coverageSession(propMaths, [mixedFile])
+
+		try {
+			live.overlays[propMaths] = numbersSource
+			live.session.setCoverage(true)
+
+			await live.waitForRuns(1)
+
+			let unitId = live.session
+				.recordsFor(mixedFile)
+				.find((record) => record.name === "triples")?.id
+			let propertyId = live.session
+				.eventsFor(mixedFile)
+				.find((event) => event.kind === "property")?.id
+
+			expect(unitId).toBeDefined()
+			expect(propertyId).toBeDefined()
+
+			// NOTE: An in-line edit to `triple`'s body — the line only the unit
+			// test reached. The property samples `double` and never touched this
+			// line, yet it is re-run anyway.
+			live.overlays[propMaths] = numbersSource.replace("with 3", "with 5")
+			live.session.changed([propMaths])
+
+			await live.waitForRuns(2)
+
+			let narrowed = live.notifications
+				.filter((notification) => notification.kind === "end")
+				.at(1)
+
+			expect(narrowed).toMatchObject({ reason: "change" })
+			expect(narrowed?.ids).toContain(unitId)
+			expect(narrowed?.ids).toContain(propertyId)
+		} finally {
+			await live.session.dispose()
+		}
+	}, 60_000)
+})
+
+// NOTE: Fix 2 — a cycle that SILENCED a live test with a focus never ran it, so
+// its lines look like dead code in the attribution. `receive` refuses to build
+// attribution from such a cycle (a `test-deselected` with reason "not-focused"),
+// so the entry stays out of the fresh set and the next change runs whole rather
+// than narrowing off the truncated picture.
+describe("A session that silenced a test with a focus", () => {
+	// NOTE: A focused test beside a plain sibling. While the focus stands only the
+	// focused test runs, so the sibling's own lines are never counted in the one
+	// cycle that ran.
+	const focusedSource = [
+		"import {",
+		'\tdouble from "./FocusMaths.es"',
+		'\ttriple from "./FocusMaths.es"',
+		"}",
+		"",
+		"tests {",
+		'\ttest "doubles" focused {',
+		"\t\texpect double(2)::is(4)",
+		"\t}",
+		"",
+		'\ttest "triples" {',
+		"\t\texpect triple(2)::is(6)",
+		"\t}",
+		"}",
+		"",
+	].join("\n")
+
+	let focusMaths: string
+	let focusedFile: string
+
+	beforeAll(() => {
+		focusMaths = path.join(root, "FocusMaths.es")
+		focusedFile = path.join(root, "Focused.tests.es")
+
+		writeFileSync(focusMaths, numbersSource)
+		writeFileSync(focusedFile, focusedSource)
+	})
+
+	it("runs whole rather than narrow off a focus-truncated attribution", async () => {
+		let live = coverageSession(focusMaths, [focusedFile])
+
+		try {
+			live.overlays[focusMaths] = numbersSource
+			live.session.setCoverage(true)
+
+			// NOTE: The whole cycle runs only the focused "doubles" and deselects
+			// "triples" as not-focused, so no attribution is built for this entry.
+			await live.waitForRuns(1)
+
+			// NOTE: The focus took effect — "doubles" ran and "triples" was
+			// silenced — which is the very condition that leaves the attribution
+			// truncated. Asserted so this test can not false-pass on a source that
+			// failed to compile or a focus keyword that did nothing.
+			expect(
+				live.session
+					.recordsFor(focusedFile)
+					.map((record) => [record.name, record.state]),
+			).toEqual([
+				["doubles", "passed"],
+				["triples", "not-focused"],
+			])
+
+			// NOTE: An in-line edit to the focused test's own covered line. Were the
+			// truncated attribution trusted it would narrow to "doubles" alone; the
+			// fix keeps the entry out of the fresh set, so the change runs WHOLE and
+			// the end notification carries no narrowing.
+			live.overlays[focusMaths] = numbersSource.replace(
+				"with 2",
+				"with 4",
+			)
+			live.session.changed([focusMaths])
+
+			await live.waitForRuns(2)
+
+			let whole = live.notifications
+				.filter((notification) => notification.kind === "end")
+				.at(1)
+
+			expect(whole).toMatchObject({ reason: "change" })
+			expect(whole?.ids).toEqual([])
+		} finally {
+			await live.session.dispose()
+		}
+	}, 60_000)
+})
