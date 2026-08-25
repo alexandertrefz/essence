@@ -42,11 +42,11 @@ describe("the debugger contribution", () => {
 		}
 	})
 
-	// NOTE: VS Code derives the debug activation events from the `debuggers`
-	// contribution itself, so none may be spelled out — a spelled-out one is
-	// the warning the manifest linter raises.
-	it("relies on the generated debug activation events", () => {
-		expect(manifest.activationEvents).toEqual(["onLanguage:essence"])
+	// NOTE: VS Code derives every activation event this extension needs from
+	// its contributions — the language and the debugger both — so none may be
+	// spelled out: a spelled-out one is the warning the manifest linter raises.
+	it("relies on the generated activation events", () => {
+		expect(manifest).not.toHaveProperty("activationEvents")
 	})
 
 	// NOTE: Every one of these settings names an executable to spawn, so every
