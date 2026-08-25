@@ -761,6 +761,14 @@ export function focusedTestsDiagnostic(
 	}
 }
 
+// NOTE: The coverage-attribution join lives next door so the Language Server
+// can reach it without a dependency edge to the CLI, and is re-exported here so
+// everything about a test run is still reached through one name.
+export {
+	attributionOf,
+	coveringPoints,
+	type ModuleAttribution,
+} from "./attribution"
 // NOTE: A benchmark's baselines are read and written next door, exactly as
 // snapshots are, and re-exported here for the same reason.
 export {

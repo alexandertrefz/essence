@@ -1,6 +1,5 @@
 import { describe, expect, it } from "bun:test"
 
-import type { common } from "@essence-lang/interfaces"
 import type { TestEvent } from "@essence-lang/runtime/Testing"
 
 import {
@@ -13,7 +12,6 @@ import { emptyOptions, parseArguments } from "../args"
 import { createContext } from "../context"
 import { run } from "../index"
 import {
-	coveringPoints,
 	isInScope,
 	type MutationInternals,
 	mutantTimeout,
@@ -761,50 +759,6 @@ describe("The mutation report", () => {
 			"the run never came back, and was stopped",
 		)
 		expect(rendered([mutant("hung")])).not.toContain("never came back")
-	})
-})
-
-describe("The attribution join", () => {
-	let at = (
-		startLine: number,
-		startColumn: number,
-		endLine: number,
-		endColumn: number,
-	): common.Position => ({
-		start: { line: startLine, column: startColumn },
-		end: { line: endLine, column: endColumn },
-	})
-
-	it("takes every point whose span holds the site", () => {
-		let points = [at(1, 1, 9, 1), at(3, 1, 3, 20), at(20, 1, 20, 5)]
-
-		expect(coveringPoints(points, at(3, 4, 3, 10))).toEqual([0, 1])
-	})
-
-	// NOTE: The fallback, and the reason it is EVERY overlap: a site the
-	// Simplifier trimmed differently from the Node the counter stands in front
-	// of overlaps rather than nests, and answering with nothing would report a
-	// well-tested site as one no test reaches.
-	it("falls back to every overlapping span", () => {
-		let points = [at(1, 1, 4, 30), at(3, 1, 4, 8), at(9, 1, 9, 5)]
-
-		expect(coveringPoints(points, at(4, 6, 5, 2))).toEqual([0, 1])
-	})
-
-	// NOTE: A site that STRADDLES two points is reached by whatever reached
-	// either of them: neither span holds it, and the tests of the narrower one
-	// alone are a covering set with a test missing — which is a survivor nobody
-	// can trust.
-	it("takes both points a site straddles", () => {
-		let points = [at(3, 1, 3, 20), at(3, 25, 4, 4)]
-
-		expect(coveringPoints(points, at(3, 15, 3, 30))).toEqual([0, 1])
-	})
-
-	it("answers with nothing where no point comes near", () => {
-		let points = [at(1, 1, 2, 4), at(9, 1, 9, 5)]
-
-		expect(coveringPoints(points, at(5, 1, 5, 9))).toEqual([])
 	})
 })
 
