@@ -19,6 +19,26 @@ export type StubRange = {
 	endCharacter: number
 }
 
+// NOTE: The value class the view builds ranges with.
+class StubRangeValue implements StubRange {
+	startLine: number
+	startCharacter: number
+	endLine: number
+	endCharacter: number
+
+	constructor(
+		startLine: number,
+		startCharacter: number,
+		endLine: number,
+		endCharacter: number,
+	) {
+		this.startLine = startLine
+		this.startCharacter = startCharacter
+		this.endLine = endLine
+		this.endCharacter = endCharacter
+	}
+}
+
 export class StubTestItem {
 	id: string
 	label: string
@@ -430,24 +450,7 @@ export function createStub(): Stub {
 			file: uriOf,
 			parse: (value: string) => ({ ...uriOf(value), scheme: "data" }),
 		},
-		Range: class {
-			startLine: number
-			startCharacter: number
-			endLine: number
-			endCharacter: number
-
-			constructor(
-				startLine: number,
-				startCharacter: number,
-				endLine: number,
-				endCharacter: number,
-			) {
-				this.startLine = startLine
-				this.startCharacter = startCharacter
-				this.endLine = endLine
-				this.endCharacter = endCharacter
-			}
-		},
+		Range: StubRangeValue,
 		Location: class {
 			uri: StubUri
 			range: StubRange
