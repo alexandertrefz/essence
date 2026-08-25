@@ -154,6 +154,15 @@ workspace — instrumenting compiles a different bundle from the one a build
 produces and makes the program do more work on every keystroke, so it stays off
 until it is asked for, and turning the setting off stops it.
 
+With coverage on, an edit re-runs only the tests that reached the lines you
+changed, and the test files whose tests did not are left standing. It is the
+same picture the counters keep, read backwards: a line knows which tests
+touched it. This stays out of your way where it could mislead — an edit that
+adds or removes a line, or lands on a top-level Constant a whole file leans on,
+runs everything, and so does the first run of a file and anything with coverage
+off. A narrowed run leaves the coverage marks exactly where the last whole run
+put them, so nothing repaints on the keystroke it was meant to make cheap.
+
 Four settings, all read by the server: `essence.tests.enabled` stops the
 automatic runs while leaving every gesture above working — a run you ask for
 still runs, and still says what it found — `essence.tests.skipTags` names tags
