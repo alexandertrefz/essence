@@ -114,11 +114,18 @@ const analysisDebounceInMilliseconds = 200
 // the socket. A macrotask, deliberately — a microtask runs before any I/O, so
 // yielding to one would prove nothing.
 //
-// This is the ONLY place this Server suspends. Every stage of the Compiler
+// This is the only place a REQUEST suspends. Every stage of the Compiler
 // collects its Diagnostics into module level state, which is safe exactly as
 // long as no two collections interleave: a handler may suspend BEFORE it starts
 // compiling and never inside. The debounced analysis is a timer callback that
 // runs to completion, so it can not interleave either.
+//
+// The workspace sweep suspends as well, and for the same reason this does: it
+// analyses one root per callback and hands the loop back between two of them
+// (see `armSweepChunk`), so a request that arrives during it waits for the root
+// being analysed rather than for the whole project. Between two roots and never
+// inside one — whole analyses interleave with whole handlers, which is exactly
+// what the collector allows.
 function yieldToConnection(): Promise<void> {
 	return new Promise((resolve) => {
 		setImmediate(resolve)
@@ -226,23 +233,82 @@ function defaultConnection(): Connection {
 export function startServer(options: { connection?: Connection } = {}) {
 	let connection = options.connection ?? defaultConnection()
 	let documents = new TextDocuments(TextDocument)
-	// NOTE: ONE timer for every document waiting to be analysed, rather than one
+	// NOTE: ONE timer for every file waiting to be analysed, rather than one
 	// each, so that a burst of keystrokes and a branch switch that touched forty
 	// files both come out as a single window — and inside that window the
-	// documents are analysed in an order that makes their graphs overlap instead
+	// entries are analysed in an order that makes their graphs overlap instead
 	// of repeat (see `analysisOrder`).
 	//
-	// The DEADLINE is per document all the same, and the timer is armed for the
-	// earliest of them. One timer that every keystroke restarts is a document
-	// that never gets analysed while another one is being typed in: at one
-	// keystroke per debounce, which is ordinary typing, the file the reader is
-	// not in waits for them to stop, and nothing bounds how long that is.
-	let pendingAnalyses = new Map<string, number>()
+	// The DEADLINE is per file all the same, and the timer is armed for the
+	// earliest of them. One timer that every keystroke restarts is a file that
+	// never gets analysed while another one is being typed in: at one keystroke
+	// per debounce, which is ordinary typing, the file the reader is not in
+	// waits for them to stop, and nothing bounds how long that is.
+	//
+	// NOTE: What is pending is the file that CHANGED, not the analysis that will
+	// cover it — the unit of analysis is a ROOT of the workspace's dependency
+	// graph, and which roots reach a changed file is worked out when the window
+	// fires. That walk reads the entries of every file whose text moved, which
+	// means parsing them, and a parse per keystroke is the cost this whole cache
+	// exists to remove.
+	let pendingChanges = new Map<string, number>()
+	// NOTE: The deadline of a whole-workspace sweep — every root rather than the
+	// ones reaching a change. Null when none is waiting. It has no file of its
+	// own to be pending for, because what it covers is not a change: it is the
+	// answer to "what does this project say", asked at startup and whenever the
+	// set of folders moves.
+	let pendingSweep: number | null = null
 	let analysisTimer: ReturnType<typeof setTimeout> | null = null
-	// NOTE: The document the last keystroke landed in, which is the one a Hover is
+	// NOTE: What a sweep that has STARTED still owes, biggest graph first — one
+	// entry per callback rather than every root inside one. A project shaped like
+	// forty test files over one library is forty roots and therefore forty links,
+	// and the count is inherent: each of those files is a graph of its own. What
+	// is not inherent is doing them all without letting go — every request the
+	// Editor sends while that ran waited for the last of them, and the first
+	// thing an Editor does with a workspace it just opened is ask about the
+	// document it restored.
+	//
+	// So the queue is drained a root at a time (see `armSweepChunk`), and what
+	// a Hover arriving mid-sweep waits for is one more root rather than all of
+	// them.
+	let sweepQueue: Array<string> = []
+	// NOTE: What the queued entries are expected to cover, walked once when the
+	// queue is built — the order the queue runs in is read off it, and so is the
+	// coverage each entry is asked about the moment it has run.
+	let sweepReaches = new Map<string, Set<string>>()
+	// NOTE: Which half of the sweep the queue is holding: its entries, or the
+	// files those entries were supposed to judge and did not. The second half
+	// RUNS once the first has drained, exactly as `analyseBatch` runs its
+	// fallbacks once every entry of a batch has — a file one root could not read
+	// is often one the root beside it can, and the root beside it is still
+	// queued. A fallback per entry instead would publish an entry's worth of
+	// second opinions about files the entry after it settles, and the sweep would
+	// cost more than the single callback it replaced, which is the one thing this
+	// may not do.
+	//
+	// WHICH files they are is a different question and is asked earlier, entry by
+	// entry — see `sweepUncovered`.
+	let sweepPhase: "entries" | "fallbacks" = "entries"
+	// NOTE: What the queue's entries were supposed to judge and did not, each of
+	// them recorded by the callback of the entry that was supposed to — see
+	// `uncoveredIn` for why it can not be asked at the end.
+	let sweepUncovered = new Set<string>()
+	// NOTE: The URIs the sweep's entries have stopped reporting on, held until
+	// the queue is empty — the same rule `analyseBatch` follows, over a batch
+	// that now spans callbacks. Deliberately not cleared when a sweep REPLACES
+	// another: what the abandoned one let go is still owed a clear, and the queue
+	// taking over is what will finally give it one.
+	let sweepDropped = new Set<string>()
+	// NOTE: The focus the sweep started with, carried by every one of its
+	// callbacks. A batch collects the annotations of ONE Module and a root once
+	// analysed is never re-linked to collect them again, so the file a keystroke
+	// landed in has to be named to the whole queue or to none of it.
+	let sweepFocus: string | undefined
+	let sweepChunk: ReturnType<typeof setImmediate> | null = null
+	// NOTE: The file the last keystroke landed in, which is the one a Hover is
 	// about to be asked over — see `annotationsFor`. Deliberately not the first
-	// entry of `pendingAnalyses`: that is whichever document opened the window, so
-	// a burst crossing files would collect the annotations for the file the reader
+	// entry of `pendingChanges`: that is whichever file opened the window, so a
+	// burst crossing files would collect the annotations for the file the reader
 	// has already left, and the Hover that follows would pay for its own link.
 	let analysisFocus: string | null = null
 	// NOTE: An open document by its canonical path, which is what the workspace
@@ -267,15 +333,21 @@ export function startServer(options: { connection?: Connection } = {}) {
 		// that compiles and instruments them is still a Workspace of its own.
 		tests: true,
 	})
-	// NOTE: Which URIs this Server has published Diagnostics to, by the document
-	// whose analysis produced them. Publishing a dependency's Diagnostics means
-	// owning them: nothing else will clear a squiggle in a file nobody has open,
-	// so a URI that drops out of an analysis is sent an explicitly empty set —
-	// unless another open document still reports on it.
+	// NOTE: Which URIs this Server has published Diagnostics to, by the ENTRY
+	// whose analysis produced them — a root of the workspace's dependency graph,
+	// a file analysed on its own because the root above it could not be read, or
+	// an open document no root will ever reach. Keyed by canonical path rather
+	// than by URI, since most entries are files nothing has open and so have no
+	// document URI to be named by.
+	//
+	// Publishing a file's Diagnostics means owning them: nothing else will clear
+	// a squiggle in a file nobody has open, so a URI that drops out of an
+	// analysis is sent an explicitly empty set — unless another entry still
+	// reports on it.
 	let publishedByEntry = new Map<string, Set<string>>()
 	// NOTE: The list each URI was last SENT, so an unchanged one is not sent
-	// again. Kept by URI rather than by entry because two open documents can both
-	// report on one dependency, and what the client holds for it is one list.
+	// again. Kept by URI rather than by entry because two roots can both reach
+	// one dependency, and what the client holds for it is one list.
 	let publishedContent = new Map<string, string>()
 	// NOTE: Whether Type Hints are served — the client's
 	// `essence.inlayHints.enabled`. True until a client says otherwise, so an
@@ -319,14 +391,21 @@ export function startServer(options: { connection?: Connection } = {}) {
 		// NOTE: New results mean new `test-failed` Diagnostics, and those are
 		// published BESIDE the analysis's own — one list per URI is what the
 		// protocol has, so the two are merged where the analysis publishes.
+		//
+		// NOTE: Through the entries that report on those files rather than
+		// through the files themselves, because that is who owns their URIs.
+		// The analyses are cache reads whenever nothing is pending — a run
+		// finishing moves no source — and misses whenever this lands inside a
+		// window a keystroke opened, since that keystroke dropped the whole
+		// component's enrichment.
+		//
+		// NOTE: With the focus the Server is holding, for that second case: an
+		// entry analysed without it collects the annotations of the wrong
+		// Module, and a root once analysed is never re-linked to collect them
+		// again — the Hover the reader is about to ask for would pay for a link
+		// of its own.
 		onResults: (filePaths) => {
-			for (let filePath of filePaths) {
-				let uri = openPaths.get(filePath)
-
-				if (uri !== undefined && documents.get(uri) !== undefined) {
-					analyseAndPublish(uri)
-				}
-			}
+			analyseBatch(entriesFor([...filePaths]), analysisFocus ?? undefined)
 
 			connection.languages.inlayHint.refresh().catch(() => {})
 		},
@@ -553,6 +632,13 @@ export function startServer(options: { connection?: Connection } = {}) {
 		// to its initialize request.
 		session.runAll("open")
 
+		// NOTE: The whole project, analysed from the files nothing imports, so
+		// that the Problems panel lists what the workspace holds rather than
+		// what happens to be open. Debounced like everything else, so a client
+		// that opens six documents on restore pays for one window rather than
+		// seven.
+		scheduleSweep()
+
 		connection.workspace.onDidChangeWorkspaceFolders((event) => {
 			let folders = new Set(workspace.folders())
 
@@ -567,6 +653,11 @@ export function startServer(options: { connection?: Connection } = {}) {
 			workspace.setFolders([...folders])
 			tags = null
 			session.runAll("open")
+			// NOTE: A folder arriving brings a project's worth of files nothing
+			// has ever analysed, and a folder leaving takes the owners of every
+			// squiggle in it — both are answered by working the roots out again
+			// from scratch.
+			scheduleSweep()
 		})
 	})
 
@@ -642,6 +733,31 @@ export function startServer(options: { connection?: Connection } = {}) {
 	)
 
 	connection.onShutdown(() => {
+		// NOTE: The window goes with the client. An analysis is scheduled for
+		// every file a closing Editor hands back to disk, and one that fires
+		// after the connection is gone publishes into nothing — a throw out of a
+		// timer callback is the process.
+		if (analysisTimer !== null) {
+			clearTimeout(analysisTimer)
+			analysisTimer = null
+		}
+
+		// NOTE: And the sweep in flight with it. It is a queue rather than one
+		// callback now, so a shutdown that lands in the middle of one has a
+		// callback armed and a project's worth of roots still to publish for a
+		// client that has gone.
+		if (sweepChunk !== null) {
+			clearImmediate(sweepChunk)
+			sweepChunk = null
+		}
+
+		pendingChanges.clear()
+		pendingSweep = null
+		sweepQueue = []
+		sweepReaches = new Map()
+		sweepUncovered.clear()
+		sweepDropped.clear()
+
 		void session.dispose()
 	})
 
@@ -663,22 +779,23 @@ export function startServer(options: { connection?: Connection } = {}) {
 		tags = null
 		session.changed(changed)
 
-		// NOTE: A file changing on disk changes the graph every open document
-		// sits in, and an analysis is the only thing that ever publishes: the
-		// Diagnostics an importer owns for a dependency nobody has open are
-		// cleared by that importer being analysed again, which no keystroke is
-		// going to ask for. Every open document, rather than the importers of
-		// what changed, because a file that did not exist a moment ago is
-		// exactly what an unresolved import was waiting for.
+		// NOTE: A file changing on disk changes the graphs it sits in, and an
+		// analysis is the only thing that ever publishes: the Diagnostics an
+		// entry owns for a file beneath it are cleared by that entry being
+		// analysed again, which no keystroke is going to ask for.
 		//
-		// NOTE: N documents scheduled is not N analyses. They go through the
-		// same debounce every keystroke does, so a checkout switching branches
-		// under the Editor coalesces into one window — and inside it the first
-		// document that runs fills the cache for every other Module of its
-		// component, which the rest then read.
-		for (let document of documents.all()) {
-			scheduleAnalysis(document.uri)
-		}
+		// The roots REACHING what changed, rather than every root, and that
+		// covers a file that did not exist a moment ago as well: the importer
+		// waiting for it recorded an edge to it by the specifier it wrote, while
+		// the file was still missing, so the walk finds that importer's root the
+		// moment the file appears.
+		//
+		// NOTE: N files changed is not N analyses. They go through the same
+		// debounce every keystroke does, so a checkout switching branches under
+		// the Editor coalesces into one window — and inside it one root's
+		// analysis fills the cache for every Module of its graph, which the
+		// roots beside it then read.
+		scheduleAnalysis(changed)
 	})
 
 	// NOTE: Every request that answers ABOUT a document comes through here, and
@@ -706,6 +823,8 @@ export function startServer(options: { connection?: Connection } = {}) {
 		let filePath = documentFilePath(uri)
 
 		if (workspace.programOf(filePath) !== null) {
+			anchorAtRoot(filePath, options.cancellation)
+
 			let cached = workspace.documentOf(filePath, {
 				cancellation: options.cancellation,
 			})
@@ -749,12 +868,45 @@ export function startServer(options: { connection?: Connection } = {}) {
 		return { program, enrichedProgram, annotations, index: null }
 	}
 
+	// NOTE: A request that has to compile pays for the graph the WINDOW behind it
+	// is going to link anyway, rather than for the smaller one this document
+	// would need on its own. Both would be paid: the Editor asks for Semantic
+	// Tokens, Code Actions and a Hover inside the same 200 ms in which the
+	// analysis of the root above this file is already due, and the root's graph
+	// holds this document — so the document's own link is work that the link
+	// after it repeats. Anchored here, the window that follows is a cache read.
+	//
+	// Only when this file's own analysis is NOT cached, which is the only case
+	// where a request was going to compile at all — a Hover in a settled
+	// workspace still costs nothing. Any root reaching the file will do, since
+	// each of their graphs holds it, and the first is taken: `rootsReaching` is
+	// sorted, so which one that is does not depend on the order the Editor
+	// happened to ask in.
+	function anchorAtRoot(filePath: string, cancellation?: Cancellation): void {
+		if (workspace.isAnalysed(filePath)) {
+			return
+		}
+
+		let [root] = workspace.rootsReaching([filePath])
+
+		if (root === undefined || root === filePath) {
+			return
+		}
+
+		workspace.analysisOf(root, {
+			annotationsFor: filePath,
+			cancellation,
+		})
+	}
+
 	// NOTE: Whether a request is still worth answering, checked after the one
-	// suspension this Server makes. Two ways it stops being worth answering: the
-	// Editor cancelled it, or the document moved on. A request is answered on
-	// the version it named or not at all — its Positions belong to that version,
-	// and an answer measured against a later one points at whatever moved into
-	// their place.
+	// suspension a REQUEST makes (see `yieldToConnection`, which the workspace
+	// sweep suspends beside it — between two roots and never inside one, which
+	// is why the two of them can be in flight at once). Two ways it stops being
+	// worth answering: the Editor cancelled it, or the document moved on. A
+	// request is answered on the version it named or not at all — its Positions
+	// belong to that version, and an answer measured against a later one points
+	// at whatever moved into their place.
 	async function isCurrent(
 		uri: string,
 		token: CancellationToken,
@@ -1614,13 +1766,14 @@ export function startServer(options: { connection?: Connection } = {}) {
 		}
 	})
 
-	// NOTE: A URI is cleared only once NO open document's analysis still reports
-	// on it. Two importers of one broken Module both publish its Diagnostics,
-	// and closing one of them must not wipe the squiggles the other is still
-	// answering for.
-	function claimedElsewhere(entryUri: string, targetUri: string): boolean {
-		for (let [otherUri, published] of publishedByEntry) {
-			if (otherUri !== entryUri && published.has(targetUri)) {
+	// NOTE: A URI is cleared only once NO other entry's analysis still reports
+	// on it. Two roots whose graphs both reach one broken Module both publish
+	// its Diagnostics, and retiring one of them must not wipe the squiggles the
+	// other is still answering for. Asked without an exception too, for a URI
+	// whose owner has just gone: nobody left is what makes it clearable.
+	function claimedElsewhere(targetUri: string, exceptPath?: string): boolean {
+		for (let [entryPath, published] of publishedByEntry) {
+			if (entryPath !== exceptPath && published.has(targetUri)) {
 				return true
 			}
 		}
@@ -1628,16 +1781,24 @@ export function startServer(options: { connection?: Connection } = {}) {
 		return false
 	}
 
-	// NOTE: Only what CHANGED goes over the wire. Refreshing a dependent whose
-	// meaning moved is the point of expanding a batch to them; re-sending it the
-	// same list it already has is a message and a client-side rebuild for a file
-	// the reader is not even in, and a keystroke in a Module several open files
-	// import produces one of those per file.
+	// NOTE: Where a file's Diagnostics go: the document's own URI while
+	// something has it open, so the Editor ties them to the buffer it is
+	// showing, and the path's own URI otherwise — which is what makes a mistake
+	// in a file nobody opened visible in the Problems panel at all.
+	function uriFor(filePath: string): string {
+		return openPaths.get(filePath) ?? uriOf(filePath)
+	}
+
+	// NOTE: Only what CHANGED goes over the wire. Refreshing a file whose
+	// meaning moved is the point of analysing the root above it; re-sending it
+	// the same list it already has is a message and a client-side rebuild for a
+	// file the reader is not even in, and a workspace-wide analysis produces one
+	// of those per file it holds.
 	//
 	// NOTE: The `version` is the buffer the list was computed against, which is
 	// what lets a client throw away a publish that raced a keystroke — the one
-	// window a debounce widens. Absent for a dependency nobody has open: there is
-	// no version to name, and its content came off disk.
+	// window a debounce widens. Absent for a file nobody has open: there is no
+	// version to name, and its content came off disk.
 	function publish(uri: string, diagnostics: Array<common.Diagnostic>): void {
 		let sent = diagnostics.map((diagnostic) =>
 			toLspDiagnostic(diagnostic, uri),
@@ -1649,106 +1810,522 @@ export function startServer(options: { connection?: Connection } = {}) {
 		}
 
 		publishedContent.set(uri, signature)
-		connection.sendDiagnostics({
-			uri,
-			version: documents.get(uri)?.version,
-			diagnostics: sent,
-		})
+		// NOTE: A connection that has gone away fails BOTH ways — it throws
+		// where it has been closed or disposed, and the write itself rejects
+		// where the pipe went first — and every publish here is inside a
+		// callback of the analysis loop, where either one is the process rather
+		// than a failed request. A sweep sends one of these per file in the
+		// workspace, so an Editor quitting mid-sweep is the ordinary way to
+		// reach the second. Exactly as `notify` handles it.
+		try {
+			void connection
+				.sendDiagnostics({
+					uri,
+					version: documents.get(uri)?.version,
+					diagnostics: sent,
+				})
+				.catch(() => {})
+		} catch {}
 	}
 
+	// NOTE: A URI this entry has stopped reporting on is not cleared here but
+	// COLLECTED, and cleared by `retireEntries` once every analysis of the batch
+	// has published — or, for a sweep and for whatever fires while one is in
+	// flight, once its queue has emptied, which is the same moment reached over
+	// more callbacks. The two are the same question asked at different moments,
+	// and only the later one has an answer: an entry that drops a file has
+	// usually dropped it TO somebody — a Module promoted to a root of its own
+	// owns what it used to be lent — and which of them runs first is decided by
+	// reach, which is to say by nothing that knows about hand-overs.
 	function publishAnalysis(
-		entryUri: string,
+		entryPath: string,
 		results: Map<string, Array<common.Diagnostic>>,
+		dropped: Set<string>,
 	) {
 		for (let [targetUri, diagnostics] of results) {
 			publish(targetUri, diagnostics)
 		}
 
-		for (let staleUri of publishedByEntry.get(entryUri) ?? []) {
-			if (results.has(staleUri) || claimedElsewhere(entryUri, staleUri)) {
+		for (let staleUri of publishedByEntry.get(entryPath) ?? []) {
+			if (results.has(staleUri)) {
 				continue
 			}
 
-			publish(staleUri, [])
+			dropped.add(staleUri)
 		}
 
-		publishedByEntry.set(entryUri, new Set(results.keys()))
+		publishedByEntry.set(entryPath, new Set(results.keys()))
 	}
 
-	// NOTE: The documents whose graph reaches the most others first. One analysis
-	// fills the cache for every Module its graph touched, so analysing a
-	// dependency BEFORE the file importing it links the same Modules twice —
-	// once as a graph of their own, and once again inside the larger one. The
-	// order is what makes a batch cost one link per graph ROOT rather than one
-	// per document — a document nothing else in the batch imports pays for its
-	// own link and every document below it in that graph reads the result. Read
-	// off the parses, which are cached.
-	function analysisOrder(uris: Array<string>): Array<string> {
-		let reachOf = (uri: string): number => {
-			let reached = new Set<string>()
-			let pending = [documentFilePath(uri)]
+	// NOTE: Everything an entry's graph is expected to cover — the entry and its
+	// transitive dependencies, read off the parses the Workspace already holds.
+	// Two things ride on it: the order a batch runs in, and which files a batch
+	// was supposed to have judged.
+	function reachOf(filePath: string): Set<string> {
+		let reached = new Set<string>([filePath])
+		let pending = [filePath]
 
-			while (pending.length > 0) {
-				let current = pending.shift()!
+		while (pending.length > 0) {
+			let current = pending.shift()!
 
-				for (let dependency of workspace
-					.dependenciesOf(current)
-					.values()) {
-					if (reached.has(dependency)) {
-						continue
-					}
-
-					reached.add(dependency)
-					pending.push(dependency)
+			for (let dependency of workspace.dependenciesOf(current).values()) {
+				if (reached.has(dependency)) {
+					continue
 				}
+
+				reached.add(dependency)
+				pending.push(dependency)
 			}
-
-			return reached.size
 		}
-		let reach = new Map(uris.map((uri) => [uri, reachOf(uri)]))
 
-		return [...uris].sort(
-			(left, right) => reach.get(right)! - reach.get(left)!,
+		return reached
+	}
+
+	// NOTE: What each entry of a batch is expected to cover, walked ONCE for the
+	// two things that read it — the order the batch runs in, and which of those
+	// files it turned out to have judged. Each is a transitive walk per entry,
+	// and a batch is every root that reaches an edited Module.
+	function reachesOf(filePaths: Iterable<string>): Map<string, Set<string>> {
+		return new Map(
+			[...filePaths].map((filePath) => [filePath, reachOf(filePath)]),
 		)
 	}
 
-	// NOTE: Every open document that IMPORTS what changed, because an edit to a
-	// Module changes what its dependents mean — their published Diagnostics go
-	// stale with it, and nothing else will ever refresh them, since no keystroke
-	// is going to land in those files.
+	// NOTE: The entries whose graphs reach the most files first. One analysis
+	// fills the cache for every Module its graph touched, so analysing a
+	// dependency BEFORE the file importing it links the same Modules twice —
+	// once as a graph of their own, and once again inside the larger one.
 	//
-	// Dependents rather than the whole undirected component, which is the only
-	// set that is both sufficient and paid for. A file that merely shares a
-	// dependency with the edited one imports nothing from it, so its Diagnostics
-	// provably can not have moved — and it is its own graph root, whose link no
-	// other document's graph subsumes. Expanding to the component therefore cost
-	// one link per open sibling: thirty tabs on one shared Module, thirty links,
-	// on the keystroke path.
+	// No root's graph holds another root, so for a batch of roots this settles
+	// nothing and costs nothing beyond the walk above. It is the coverage
+	// fallback below whose entries overlap: one of them standing above another
+	// in the same broken graph is the ordinary case, and analysing that one
+	// first is what keeps the rest to a cache read.
+	function analysisOrder(reaches: Map<string, Set<string>>): Array<string> {
+		return [...reaches.keys()].sort(
+			(left, right) => reaches.get(right)!.size - reaches.get(left)!.size,
+		)
+	}
+
+	// NOTE: An open document no root's graph will ever reach: a standard library
+	// source, which the Workspace deliberately holds nothing for, and a buffer
+	// outside the workspace folders, which no discovery walk finds. Those are
+	// entries of their own — analysed on their own, exactly as every open
+	// document used to be, because nothing else is ever going to report on them.
+	function needsOwnEntry(filePath: string): boolean {
+		return (
+			!workspace.knownFiles().has(filePath) ||
+			workspace.programOf(filePath) === null
+		)
+	}
+
+	// NOTE: What has to be analysed to cover a set of changed files. Three
+	// kinds, and each of them is a file nothing else in the batch answers for:
 	//
-	// Expanded when the window FIRES rather than when the keystroke arrives: the
-	// walk reads the file's entries, which means parsing it, and a parse per
-	// keystroke is the cost this whole cache exists to remove.
-	function withOpenDependents(uris: Array<string>): Array<string> {
-		let expanded = new Set(uris)
+	//   • the roots of the graphs REACHING them, and never all the roots — one
+	//     that reaches none of them was judged against text that did not move;
+	//   • every root nothing has ever analysed, which is how a file PROMOTED to
+	//     one is found. A root is made by an in-edge going away — an import
+	//     deleted, an importer deleted — so a promoted root reaches nothing that
+	//     changed: it is what stopped being reached. Nothing would ever schedule
+	//     it, while the analysis of the file that let it go clears everything it
+	//     used to own, and a broken Module would go quiet while still broken;
+	//   • an open document no root will ever reach whose graph holds one of the
+	//     changed files. A buffer outside the workspace folders is nobody's
+	//     dependency and no discovery walk finds it, so no root is ever going to
+	//     refresh it when what it imports moves.
+	function entriesFor(filePaths: Array<string>): Array<string> {
+		let entries = new Set(workspace.rootsReaching(filePaths))
+		let changed = new Set(filePaths)
+		// NOTE: Except the roots a sweep in flight still owes an analysis to.
+		// Every one of those has published nothing yet, so the scan below would
+		// read the whole remaining sweep as newly promoted and pull it into this
+		// batch — which is the one callback the chunking exists to break up, and
+		// the file the reader is typing in would wait behind the rest of the
+		// project again. They are not forgotten: they are queued, and the queue
+		// drops whatever this batch analyses (see `analyseBatch`).
+		let queued = new Set(sweepQueue)
 
-		for (let uri of uris) {
-			for (let filePath of workspace.dependentsOf(
-				documentFilePath(uri),
-			)) {
-				let openUri = openPaths.get(filePath)
+		// NOTE: By whether it has ever PUBLISHED rather than by whether its
+		// analysis is cached. `invalidateEnrichment` drops the whole UNDIRECTED
+		// component, so after one keystroke every root that merely shares a
+		// dependency with the edited file reports as unanalysed — and scheduling
+		// those is the fan-out this whole batch is shaped to avoid. An entry is
+		// kept for as long as its file is a root (see `retireEntries`), so what
+		// this finds is only ever a root that has never been one.
+		for (let root of workspace.roots()) {
+			if (!publishedByEntry.has(root) && !queued.has(root)) {
+				entries.add(root)
+			}
+		}
 
-				if (openUri !== undefined && documents.get(openUri)) {
-					expanded.add(openUri)
+		for (let filePath of openPaths.keys()) {
+			if (!needsOwnEntry(filePath)) {
+				continue
+			}
+
+			for (let reached of reachOf(filePath)) {
+				if (changed.has(reached)) {
+					entries.add(filePath)
+					break
 				}
 			}
 		}
 
-		return [...expanded]
+		return [...entries]
 	}
 
-	function scheduleAnalysis(uri: string) {
-		pendingAnalyses.set(uri, Date.now() + analysisDebounceInMilliseconds)
-		analysisFocus = uri
+	// NOTE: Every root of the workspace, which between them cover every file of
+	// it. This is what makes the Problems panel the project's rather than the
+	// open documents': once the roots have been analysed every file has
+	// Diagnostics, and the Server publishes all of them.
+	function everyEntry(): Array<string> {
+		let entries = new Set(workspace.roots())
+
+		for (let filePath of openPaths.keys()) {
+			if (needsOwnEntry(filePath)) {
+				entries.add(filePath)
+			}
+		}
+
+		return [...entries]
+	}
+
+	// NOTE: One batch of analyses, start to finish, inside one timer callback.
+	// Three steps, in this order and for this reason:
+	//
+	//   • the entries, biggest graph first, each of them filling the cache for
+	//     every Module it reached;
+	//   • then whatever they were supposed to cover and did not — a root that
+	//     threw, a graph that could not read one of its Modules, a dependency
+	//     writing neither section. Without this a broken root hides every file
+	//     beneath it, and every one of those files used to analyse itself;
+	//   • then everything the batch stopped reporting on: the entries that
+	//     answer for nothing any more, and the URIs the surviving ones let go.
+	//     Both are cleared AFTER every analysis has published, so a file
+	//     changing hands is never briefly clear — and after a sweep in flight
+	//     has emptied its queue too, since mid-queue the root taking a file over
+	//     is usually one of the roots still waiting for a callback (see
+	//     `retireEntries`).
+	//
+	// This is the path a CHANGE takes, and it stays one callback on purpose: it
+	// is the roots reaching the file the reader is typing in, and the answer they
+	// produce is the one the Editor is waiting for. A whole-workspace sweep is
+	// the same three steps spread over a callback each — see `startSweep`.
+	function analyseBatch(entries: Array<string>, focus?: string): void {
+		let reaches = reachesOf(entries)
+		// NOTE: The URIs the batch's entries stopped reporting on, cleared once
+		// at the end rather than as each entry finds them — see
+		// `publishAnalysis`.
+		let dropped = new Set<string>()
+		let analysed = new Set<string>()
+
+		for (let entryPath of analysisOrder(reaches)) {
+			analyseAndPublish(entryPath, focus, dropped)
+			analysed.add(entryPath)
+		}
+
+		for (let uncovered of analysisOrder(reachesOf(uncoveredBy(reaches)))) {
+			// NOTE: An entry that ran meanwhile may have covered it after all —
+			// the fallbacks are worked out once, before any of them runs, and
+			// one of them standing above another is the ordinary case.
+			if (!needsOwnAnalysis(uncovered)) {
+				continue
+			}
+
+			analyseAndPublish(uncovered, focus, dropped)
+			analysed.add(uncovered)
+		}
+
+		// NOTE: An entry a sweep still owed and this batch has just run is owed
+		// no longer. Analysing it again would be a cache read, and publishing it
+		// again would be a second message for a list that did not move — the
+		// dedup would swallow it, but the queue is what the change batch is
+		// deliberately not doing all at once, and leaving a done root in it says
+		// the opposite.
+		if (sweepQueue.length > 0) {
+			sweepQueue = sweepQueue.filter(
+				(entryPath) => !analysed.has(entryPath),
+			)
+		}
+
+		retireEntries(dropped)
+	}
+
+	// NOTE: A whole-workspace sweep, QUEUED rather than run. Everything a batch
+	// does, in the same order and for the same reasons — the entries biggest
+	// graph first, then whatever they were supposed to cover and did not, then
+	// what the whole of it stopped reporting on — with the loop handed back
+	// between two entries.
+	//
+	// It REPLACES whatever a previous sweep had left, because that is what asks
+	// for one: the folders moved, and the roots the old queue held are the roots
+	// of a workspace that is not this one.
+	function startSweep(focus: string | undefined): void {
+		sweepReaches = reachesOf(everyEntry())
+		sweepQueue = analysisOrder(sweepReaches)
+		sweepUncovered = new Set()
+		sweepPhase = "entries"
+		sweepFocus = focus
+
+		armSweepChunk()
+	}
+
+	// NOTE: The next entry of the sweep, one macrotask from now. A macrotask
+	// deliberately, and for the same reason `yieldToConnection` is one: a
+	// microtask runs before any I/O, so a sweep that yielded to one would still
+	// be a sweep nothing can interrupt. `setImmediate` runs after the loop has
+	// been through its poll, which is where the request the Editor is waiting on
+	// is read and answered.
+	//
+	// At most one is ever armed. A batch firing mid-sweep does not arm another —
+	// it has its own timer, it runs to completion, and the callback already
+	// waiting picks up whatever it left in the queue.
+	function armSweepChunk(): void {
+		if (sweepChunk !== null) {
+			return
+		}
+
+		sweepChunk = setImmediate(() => {
+			sweepChunk = null
+			runSweepChunk()
+		})
+	}
+
+	// NOTE: One entry of the sweep, start to finish. Analysing a root is
+	// synchronous and atomic — it publishes before it returns — so the sweep is
+	// interruptible between two entries and never inside one, which is the whole
+	// safety argument: the Compiler collects its Diagnostics into module level
+	// state, and what may not interleave is two COMPILATIONS. A request handler
+	// suspends before it compiles and never after (see `yieldToConnection`), so
+	// whole units interleaving is exactly what is allowed.
+	function runSweepChunk(): void {
+		let entryPath = sweepQueue.shift()
+
+		if (entryPath === undefined) {
+			if (sweepPhase === "entries") {
+				sweepPhase = "fallbacks"
+				sweepQueue = analysisOrder(reachesOf(sweepUncovered))
+				sweepReaches = new Map()
+				sweepUncovered = new Set()
+
+				armSweepChunk()
+
+				return
+			}
+
+			// NOTE: Retirement once, at the end, rather than after every entry.
+			// It is the cheaper of the two — it works the roots out again and
+			// walks everything published — and it is the only correct one:
+			// retiring an entry before the entry taking its files over has run
+			// is the flicker the whole hand-over rule exists to prevent, and
+			// mid-sweep the entry taking over is usually still in the queue.
+			retireEntries(sweepDropped)
+			sweepDropped.clear()
+			sweepFocus = undefined
+
+			return
+		}
+
+		if (sweepPhase === "entries") {
+			analyseAndPublish(entryPath, sweepFocus, sweepDropped)
+
+			// NOTE: What this entry was supposed to judge and did not, collected
+			// now and analysed once the queue's entries have all run — a file one
+			// root could not read is often one the root beside it can, and the
+			// root beside it is still queued.
+			for (let filePath of uncoveredIn(
+				sweepReaches.get(entryPath) ?? [],
+			)) {
+				sweepUncovered.add(filePath)
+			}
+		} else if (needsOwnAnalysis(entryPath)) {
+			// NOTE: A fallback worked out before the queue reached it may have
+			// been covered since — by a later entry of the sweep, or by a change
+			// batch that ran between two of these callbacks. Asked again for the
+			// same reason `analyseBatch` asks.
+			analyseAndPublish(entryPath, sweepFocus, sweepDropped)
+		}
+
+		armSweepChunk()
+	}
+
+	// NOTE: The files these entries were supposed to judge and did not, which is
+	// "the closest to root we can actually analyse" — the fallback that keeps
+	// one unreadable file from hiding a whole project beneath it. A file the
+	// Workspace holds nothing for is left out: a specifier naming a file that is
+	// not there records an edge all the same, and there is no text to judge at
+	// the end of it.
+	//
+	// Two shapes reach it. A root the Compiler threw on, or a graph that could
+	// not read one of its Modules, is the one it was written for. The other is
+	// ordinary and permanent: a dependency writing NEITHER Module section is
+	// judged as itself rather than as part of anybody's graph (see
+	// `analyseGraphFrom`), so the graph that reached it leaves this cache
+	// holding nothing for it, and analysing it here is how it gets an answer of
+	// its own — which is the answer every request over it reads.
+	function uncoveredBy(reaches: Map<string, Set<string>>): Array<string> {
+		let uncovered = new Set<string>()
+
+		for (let reached of reaches.values()) {
+			for (let filePath of uncoveredIn(reached)) {
+				uncovered.add(filePath)
+			}
+		}
+
+		return [...uncovered]
+	}
+
+	// NOTE: The same question about ONE entry's reach, which is how a sweep asks
+	// it: right after the entry ran, rather than once the whole queue has. What
+	// this reads is whether an analysis is CACHED, and a keystroke landing
+	// between two entries of a sweep drops the enrichment of a whole undirected
+	// component — so asked at the end of a queue that a reader typed into, every
+	// file the sweep already judged answers "uncovered" and the sweep would
+	// re-analyse the project one file at a time. Asked while the entry that was
+	// supposed to cover it has only just returned, the answer means what it says.
+	function uncoveredIn(reached: Iterable<string>): Array<string> {
+		let uncovered: Array<string> = []
+
+		for (let filePath of reached) {
+			if (
+				!needsOwnAnalysis(filePath) ||
+				workspace.programOf(filePath) === null
+			) {
+				continue
+			}
+
+			uncovered.push(filePath)
+		}
+
+		return uncovered
+	}
+
+	// NOTE: Whether this file still needs an entry of its OWN in a batch that
+	// reached it. Two reasons it does, and they are not the same reason. Nothing
+	// has judged it — a root the Compiler threw on, a graph that could not read
+	// one of its Modules — or no graph ever judges it, because it writes neither
+	// Module section and is enriched as a Program of its own.
+	//
+	// The second stays true however recently it was analysed, which is why this
+	// is not simply `isAnalysed`: its entry is what OWNS its URI, and an entry
+	// that does not run publishes nothing — not its Diagnostics and not the
+	// `test-failed` ones a run beside it has just produced. Running it is a
+	// cache read when nothing about the file moved, and the dedup keeps the
+	// wire quiet.
+	function needsOwnAnalysis(filePath: string): boolean {
+		return (
+			!workspace.isAnalysed(filePath) || !workspace.isModuleFile(filePath)
+		)
+	}
+
+	// NOTE: An entry stops owning what it published once it has stopped being
+	// one: a root something now imports, a coverage fallback whose root can be
+	// read again, a file that was deleted. It is retired only when somebody else
+	// answers for its own URI or there is nothing left to answer about, because
+	// the alternative is a file whose squiggles vanish while it is still broken
+	// — its Diagnostics came off disk, and they are true whether or not anything
+	// has it open.
+	//
+	// Run AFTER the batch's analyses, so the new owner's publish precedes the
+	// old one's clear: the dedup then keeps the wire quiet rather than sending a
+	// list and its erasure. `dropped` is the other half of the same rule — the
+	// URIs the surviving entries stopped reporting on, held back for exactly as
+	// long, and cleared here only if nobody took them over.
+	//
+	// A sweep runs this once, after its LAST entry rather than after each of
+	// them, for that same reason: mid-queue the entry taking a file over is
+	// usually one of the roots still waiting to be analysed. Which is also why a
+	// batch that fires MID-sweep hands its orphans to that same moment rather
+	// than clearing them itself — see below.
+	function retireEntries(dropped: Set<string>): void {
+		let roots = new Set(workspace.roots())
+		let retiring = new Set<string>()
+
+		for (let entryPath of publishedByEntry.keys()) {
+			// NOTE: A current root answers for its whole graph, and an open
+			// document no root reaches answers for itself for as long as it is
+			// open. Nothing else is going to publish for either.
+			if (
+				roots.has(entryPath) ||
+				(openPaths.has(entryPath) && needsOwnEntry(entryPath))
+			) {
+				continue
+			}
+
+			if (
+				claimedElsewhere(uriFor(entryPath), entryPath) ||
+				!workspace.knownFiles().has(entryPath) ||
+				workspace.programOf(entryPath) === null
+			) {
+				retiring.add(entryPath)
+			}
+		}
+
+		let orphaned = new Set(dropped)
+
+		// NOTE: Every retirement is recorded before any of them publishes, so
+		// that two entries owning each other's URIs do not each conclude the
+		// other is still answering. What survives is what the entries left over
+		// own.
+		for (let entryPath of retiring) {
+			for (let targetUri of publishedByEntry.get(entryPath) ?? []) {
+				orphaned.add(targetUri)
+			}
+
+			publishedByEntry.delete(entryPath)
+		}
+
+		// NOTE: And held rather than made while a sweep still has a callback
+		// armed, because what `claimedElsewhere` reads is what has PUBLISHED and
+		// mid-queue that is a fraction of the project. A keystroke that takes a
+		// dependency away from the file it is in orphans that dependency's URI
+		// while the root taking it over is one of the roots still waiting for a
+		// callback — and clearing it there is the flicker this whole rule exists
+		// to prevent, a squiggle going out and coming back a project's worth of
+		// roots later. Handed to the sweep's own set, it is decided once at the
+		// end of the queue, which is the moment the question has an answer.
+		if (sweepChunk !== null) {
+			for (let targetUri of orphaned) {
+				sweepDropped.add(targetUri)
+			}
+
+			return
+		}
+
+		for (let targetUri of orphaned) {
+			if (claimedElsewhere(targetUri)) {
+				continue
+			}
+
+			publish(targetUri, [])
+		}
+	}
+
+	// NOTE: The files whose Diagnostics a change may have moved. Which roots
+	// have to run to answer for them is worked out when the window fires — see
+	// `pendingChanges`.
+	function scheduleAnalysis(filePaths: Iterable<string>, focus?: string) {
+		let deadline = Date.now() + analysisDebounceInMilliseconds
+
+		for (let filePath of filePaths) {
+			pendingChanges.set(filePath, deadline)
+		}
+
+		if (focus !== undefined) {
+			analysisFocus = focus
+		}
+
+		armAnalysis()
+	}
+
+	// NOTE: Every root of the workspace, once the window fires — and then a
+	// callback each, rather than all of them in the one that fired (see
+	// `startSweep`). What a sweep covers is not a change, which is why it names
+	// no file: it is the whole project, asked for at startup and whenever the
+	// folders move.
+	function scheduleSweep() {
+		pendingSweep = Date.now() + analysisDebounceInMilliseconds
 		armAnalysis()
 	}
 
@@ -1759,19 +2336,25 @@ export function startServer(options: { connection?: Connection } = {}) {
 	// link per graph root instead of splitting a fan-out into one window each.
 	// A document still being typed in pays at most one extra analysis per other
 	// document that came due, and its own debounce starts again from there.
+	//
+	// NOTE: A window that comes due mid-sweep is answered ahead of what the
+	// sweep has left, because the sweep gives the loop back between two of its
+	// entries and a timer that is due is what the loop reaches first. That is the
+	// order this Server wants: the file the reader is typing in must not wait for
+	// a project it is not part of.
 	function armAnalysis() {
 		if (analysisTimer !== null) {
 			clearTimeout(analysisTimer)
 			analysisTimer = null
 		}
 
-		if (pendingAnalyses.size === 0) {
+		if (pendingChanges.size === 0 && pendingSweep === null) {
 			return
 		}
 
-		let due = Infinity
+		let due = pendingSweep ?? Infinity
 
-		for (let deadline of pendingAnalyses.values()) {
+		for (let deadline of pendingChanges.values()) {
 			due = Math.min(due, deadline)
 		}
 
@@ -1780,77 +2363,96 @@ export function startServer(options: { connection?: Connection } = {}) {
 				analysisTimer = null
 
 				let focus = analysisFocus ?? undefined
-				let scheduled = analysisOrder(
-					withOpenDependents([...pendingAnalyses.keys()]),
-				)
+				let changed = [...pendingChanges.keys()]
+				let sweeping = pendingSweep !== null
 
-				pendingAnalyses.clear()
+				pendingChanges.clear()
+				pendingSweep = null
 				analysisFocus = null
 
-				for (let scheduledUri of scheduled) {
-					analyseAndPublish(scheduledUri, focus)
+				// NOTE: A sweep subsumes whatever changed alongside it — every
+				// root covers every file, the changed ones included.
+				if (sweeping) {
+					startSweep(focus)
+				} else {
+					analyseBatch(entriesFor(changed), focus)
 				}
 			},
 			Math.max(0, due - Date.now()),
 		)
 	}
 
-	function analyseAndPublish(uri: string, focus?: string) {
-		let document = documents.get(uri)
-
-		if (document === undefined) {
-			return
-		}
-
-		// NOTE: The Diagnostics collector is module-level state, so documents
-		// are analysed strictly one at a time — every batched analysis runs to
-		// completion inside one timer callback, which guarantees that, and it is
-		// the reason a request may only suspend before it compiles anything (see
-		// `yieldToConnection`).
+	function analyseAndPublish(
+		filePath: string,
+		focus: string | undefined,
+		dropped: Set<string>,
+	) {
+		// NOTE: The Diagnostics collector is module-level state, so entries are
+		// analysed strictly one at a time — every call here runs to completion
+		// inside the callback that made it, whether that is a change batch or one
+		// entry of a sweep, and it is the reason a request may only suspend
+		// before it compiles anything (see `yieldToConnection`).
 		//
 		// NOTE: Through the Workspace, so that this WRITES the cache every
-		// request reads: one analysis fills the entry for this document and for
+		// request reads: one analysis fills the entry for this file and for
 		// every other Module of its graph, and a Hover that already paid for one
-		// finds it here rather than paying again. A document the Workspace holds
-		// nothing for — a standard library source — is analysed on its own,
-		// exactly as it was.
-		let analysis =
-			workspace.analysisOf(documentFilePath(uri), {
-				annotationsFor:
-					focus === undefined ? undefined : documentFilePath(focus),
-			}) ??
-			analyseDocument(document.getText(), uri, {
+		// finds it here rather than paying again.
+		let uri = openPaths.get(filePath)
+		let document = uri === undefined ? undefined : documents.get(uri)
+		let analysis = workspace.analysisOf(filePath, { annotationsFor: focus })
+
+		// NOTE: The fallback is not a fast path for anything — it is the answer
+		// for the documents the Workspace deliberately holds nothing for: a
+		// standard library source, and a buffer whose path can not be read. Both
+		// were always analysed on their own. A file nobody has open that the
+		// Workspace holds nothing for is not a file at all, and there is nothing
+		// to say about it.
+		if (analysis === null) {
+			if (uri === undefined || document === undefined) {
+				return
+			}
+
+			analysis = analyseDocument(document.getText(), uri, {
 				host: workspace.host,
 				// NOTE: As the Workspace itself has it — a document it holds
 				// nothing for still has its `tests { … }` block typed.
 				tests: true,
 			})
+		}
+
+		// NOTE: Under each file's OWN URI, dependencies included and whether or
+		// not anything has them open. A Module's Diagnostics depend on that
+		// Module and on what it reaches and on nothing else, so what the root
+		// that happened to load the graph says about a file is exactly what the
+		// file would say about itself — which is what lets one analysis speak
+		// for a whole project.
 		let results = new Map<string, Array<common.Diagnostic>>([
 			[
-				uri,
-				[
-					...analysis.diagnostics,
-					...testDiagnosticsFor(documentFilePath(uri)),
-				],
+				uriFor(filePath),
+				[...analysis.diagnostics, ...testDiagnosticsFor(filePath)],
 			],
 		])
 
-		// NOTE: A dependency's Diagnostics are published under ITS OWN URI,
-		// which is what makes a mistake in a file nobody has open visible at
-		// all. An open document reports on itself, so its own entry is left to
-		// its own analysis rather than overwritten by an importer's view of it.
-		for (let [filePath, diagnostics] of analysis.dependencies) {
-			let dependencyUri = uriOf(filePath)
-
-			if (documents.get(dependencyUri) === undefined) {
-				results.set(dependencyUri, [
-					...diagnostics,
-					...testDiagnosticsFor(filePath),
-				])
+		for (let [dependencyPath, diagnostics] of analysis.dependencies) {
+			// NOTE: Except a dependency writing NEITHER Module section, whose
+			// own answer is not this one. The graph enriches such a file under a
+			// Module path and the Workspace drops what it made of it — so the
+			// list here is a second opinion about a file that has its own, the
+			// two can differ, and publishing both is a Problems panel that
+			// changes twice per keystroke in the importer. `uncoveredBy` sends
+			// it to an entry of its own, which is where its own answer comes
+			// from and what every request over it reads.
+			if (!workspace.isModuleFile(dependencyPath)) {
+				continue
 			}
+
+			results.set(uriFor(dependencyPath), [
+				...diagnostics,
+				...testDiagnosticsFor(dependencyPath),
+			])
 		}
 
-		publishAnalysis(uri, results)
+		publishAnalysis(filePath, results, dropped)
 	}
 
 	// NOTE: `onDidChangeContent` also fires when a document is opened.
@@ -1860,7 +2462,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 		openPaths.set(filePath, event.document.uri)
 		workspace.changed(filePath)
 		tags = null
-		scheduleAnalysis(event.document.uri)
+		scheduleAnalysis([filePath], filePath)
 		// NOTE: On the UNSAVED buffer, exactly as the analysis is. What a
 		// reader is looking at is what the session answers for; a file on disk
 		// nobody has open is answered for out of the file.
@@ -1868,8 +2470,6 @@ export function startServer(options: { connection?: Connection } = {}) {
 	})
 
 	documents.onDidClose((event) => {
-		pendingAnalyses.delete(event.document.uri)
-
 		let filePath = documentFilePath(event.document.uri)
 
 		openPaths.delete(filePath)
@@ -1878,25 +2478,18 @@ export function startServer(options: { connection?: Connection } = {}) {
 		// truth again.
 		workspace.changed(filePath)
 
-		// NOTE: Everything this document's analysis was publishing goes with it,
-		// its own URI included — an empty set for each, unless another open
-		// document still reports on it.
-		publishAnalysis(event.document.uri, new Map())
-		publish(event.document.uri, [])
-		publishedByEntry.delete(event.document.uri)
-
-		// NOTE: The file is a dependency again rather than a document, and its
-		// Diagnostics are now an importer's to publish — so an importer has to
-		// run. Nothing else will ask it to: no keystroke is going to land in a
-		// file the reader just closed, and without this a Module closed while
-		// broken keeps its squiggles cleared for as long as the session lasts.
-		for (let dependent of workspace.dependentsOf(filePath)) {
-			let openUri = openPaths.get(dependent)
-
-			if (openUri !== undefined) {
-				scheduleAnalysis(openUri)
-			}
-		}
+		// NOTE: Nothing is cleared, and that is the change: what this file's
+		// Diagnostics say is still true the moment its buffer goes, because they
+		// are what the file on disk says. The Problems panel reports on a
+		// workspace rather than on a set of tabs, so a Module closed while
+		// broken keeps its squiggles.
+		//
+		// What has to happen is that the roots reaching it run again, against
+		// the file rather than against the buffer — nothing else will ask them
+		// to, since no keystroke is going to land in a file the reader just
+		// closed. A closed document that no root reaches owned its own
+		// Diagnostics and is retired by the same batch.
+		scheduleAnalysis([filePath])
 	})
 
 	documents.listen(connection)
