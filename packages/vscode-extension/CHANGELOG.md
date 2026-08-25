@@ -6,6 +6,13 @@ Tests, live. Essence has a `tests { … }` section and an `essence test`
 runner; this release is the editor half of it — the workspace's tests
 running as you type, and everything they found where you are looking.
 
+The language moved as well: default values on Parameters and on the
+members of a Record or a Case payload, shorthand members and member paths,
+Protocols that provide Methods and extend one another, refinements a
+written value proves on its own, and a standard library two audits
+renamed, extended and documented end to end. The bundled toolchain moves to
+0.3.0 in lockstep, and everything the editor does speaks the new surface.
+
 - The Testing view lists every test the workspace holds, off the compiled
   Module's own manifest rather than off a run: a test that has never run is
   listed, on the line it was written on, and a file that stops compiling
@@ -27,7 +34,8 @@ running as you type, and everything they found where you are looking.
   Problems with the labels `essence test` prints. Two tag Diagnostics no
   single compile could state come with it: `similar-tags` on the rarer of two
   tags one typo apart, with a rename, and `lonely-tag` where exactly one test
-  carries one.
+  carries one. A `focused` test left in a file is `focused-tests-remain`,
+  with a Quick Fix that takes the focus off.
 - **Run with Coverage** counts what a run reaches. Lines and branches go to
   VS Code's coverage view, the lines nothing ran are marked down the gutter,
   and every `match` arm no value took and every Case of a `choice` no test
@@ -56,6 +64,11 @@ running as you type, and everything they found where you are looking.
   smallest values that still fail, one per line, above the assertion — and the
   seed they were drawn from, as the `essence test --seed` that draws them
   again in a terminal.
+- A `benchmark` in the tests section is lit and has a snippet, and the
+  Testing view lists it beside the tests it stands among. A cycle leaves it
+  deselected — a measurement is not something an edit should cost — and
+  running it from its ▶ measures it. The measurement itself is not drawn
+  beside it yet.
 - **Accept snapshot** appears above a test whose last run left a snapshot to
   accept: one nothing had recorded, or one that differs. It re-runs that test
   and records what it finds — a `__snapshots__` companion is written beside
@@ -83,6 +96,75 @@ running as you type, and everything they found where you are looking.
   directory searched to the Essence output channel, and recognises the bare
   launchd PATH on macOS — VS Code having given up on reading the shell
   environment — which only a full relaunch fixes.
+- A Parameter may carry a default value — `(_ description: String = "")`
+  — and a call may leave it out. A Record Parameter's default is a Record,
+  partial allowed, that fills in what the caller did not write, and a Case
+  payload's members default the same way. The editor says which Arguments
+  and which members a call may leave out, and every walk it does reaches
+  into a default's own Expression.
+- A Record literal takes a shorthand member, `{ width }` for
+  `{ width = width }`; a member path stands wherever a Function from the
+  Record is expected — `rows::sort(on .tag)`, `boxes::map(.value)` — and
+  `with` takes a dotted key to update a nested member:
+  `{ config with server.port = 8080 }`. Completion offers the members a
+  leading dot can name, renaming either end of a shorthand member writes it
+  out, and renaming any step of a path renames it there.
+- A Protocol Method may carry a body, and a Protocol may extend another:
+  `protocol Orderable is Comparable` provides `isLessThan`,
+  `isGreaterThan`, `isBetween`, `clamp` and the rest off one `compare(to:)`,
+  and Equatable provides `isNot` off `is`. A conforming Namespace inherits
+  the bodies and may override one. Completion offers the provided Methods,
+  go to definition on a call leads to the Protocol that wrote the body, and
+  a provided Method that clashes with a declared one is refused where both
+  can be pointed at.
+- Printable is derived for a Choice of payload-free Cases, so no
+  `toString` has to be written for one; a whole Rational prints bare, `3`
+  rather than `3/1`; and a List prints the way a Program writes one down,
+  Strings quoted.
+- Refinements, more of them, proven more widely. `NonEmptyString`,
+  `NonNegativeInteger`, `PositiveInteger`, `NonZeroRational` and
+  `NonEmptyKeyedNumberList` join `NonZeroInteger` and `NonEmptyList`, and
+  the Methods that spend a proof answer bare: a proven List's `firstItem`
+  and `highestItem`, a proven divisor's `divide(by:)`, a proven exponent's
+  `raise`. A written value proves its own predicates — `[1, 2, 3]` is a
+  `NonEmptyList` where it stands — a proof survives being a Type Argument,
+  a Program's own predicate aliases take Arguments, and what a predicate's
+  body says decides what its complement admits. A fallback a proof makes
+  unreachable is a Warning, `fallback-never-used`, with a Quick Fix that
+  removes it; completion on a written receiver offers the Methods its proof
+  unlocks; and hover on a predicate says what it is read for.
+- The standard library, after two audits. Renamed: `greatest…` is
+  `highest…`, `value(withDefault:)` is `value(defaultingTo:)`,
+  `hasAnyContent` is `hasCharacters`, `toString(formatAs:)` is
+  `toString(as:)`, and `hasItems` quantifies while `everyItem(where:)`
+  filters. New: `enumerate`, `indices`, `firstItems`, `lastItems`,
+  `lastIndex(where:)`, `group(on:)`, `sort(on:)`, `sort(in #Descending)`,
+  `OptionalList::values`, `String::count(of:)`, `Optional::andThen`,
+  `Integer::isMultiple(of:)` and a `Rational::round` to a number of places.
+  Every answer that can be empty has a `defaultingTo:` entry, `clamp` and
+  `isBetween` take their bounds either way round, `sort` is stable and
+  says so, and every Overload entry is documented — which is what hover
+  reads.
+- Faster, all through. An Integer stays a JavaScript number until it
+  leaves safe range, a List shares storage across versions and copies only
+  what an edit touches, a repeated build answers out of a bundle cache, and
+  the enriched standard library is kept on disk between runs. The Language
+  Server answers every request from one analysis cache: a document the
+  editor only moved through is no longer re-compiled, and a closed Module's
+  Diagnostics reach the editor through its importers.
+- Formatting, after an audit: a list keeps its comments where they were
+  and hugs a block only when it fits, a Function Type too wide for its line
+  breaks, a run of static properties lines up its `=`, an `else` holding a
+  single `if` stays a block, a header breaks around a trailing default that
+  reads on one line, and CRLF sources are accepted.
+- `esc build --embed` builds a Module a JavaScript host loads through
+  `@essence-lang/client`: one constructor per Case of every exported
+  Choice, a JavaScript Function where the Module declares one, a
+  payload-free Choice spelled as a union of string literals in the `.d.ts`,
+  and a Bun plugin beside the Vite one, so a `.es` import works under both
+  and a dev server forgets only what an edit reached. `Terminal` writes
+  through the console on a host without streams, so a bundle runs on Deno
+  unchanged.
 
 ## [0.4.0]
 
