@@ -127,5 +127,41 @@ export function probeSourcesFor(headText: string, suffix = ""): Array<string> {
 		sources.push(`${headText}${suffix}${closingSuffixFor(stack, index)}`)
 	}
 
-	return sources
+	for (let block of BLOCKS) {
+		sources.push(`${headText}${suffix}${blockSuffixFor(stack, block)}`)
+	}
+
+	// NOTE: Two readings can spell the same source — a declaration reading of
+	// the outermost `(` and the `match` reading of a head that opened one —
+	// and a reading costs a parse and an enrichment; the same one twice is
+	// the same answer twice.
+	return [...new Set(sources)]
+}
+
+// NOTE: The two tails a Statement's HEAD can be waiting for: an `if` wants a
+// block, a `match` wants its return Type and then one — `-> {} {}` again, the
+// shortest complete tail there is.
+const BLOCKS = [" {}", " -> {} {}"]
+
+// NOTE: The readings for a cursor in the head of a Statement that needs a
+// block — `if cell.`, `match cell.` — where closing the brackets alone leaves
+// an `if` with no body, which the Parser drops whole, and with it the member
+// access the cursor is in. The block goes after whatever brackets the head
+// itself opened and before the first `}`: `if greet(` closes to `if greet()
+// {}` and not to `if greet( {})`, and a head can not hold an unclosed `{` of
+// its own, since a block is exactly what it is waiting for.
+function blockSuffixFor(stack: Array<string>, block: string): string {
+	let suffix = ""
+	let opened = false
+
+	for (let index = stack.length - 1; index >= 0; index--) {
+		if (!opened && stack[index] === "{") {
+			suffix += block
+			opened = true
+		}
+
+		suffix += closers[stack[index]!]
+	}
+
+	return opened ? suffix : `${suffix}${block}`
 }
