@@ -302,8 +302,8 @@
 		]
 	},
 	"devDependencies": {
-		"@essence-lang/language-server": "0.2.0",
-		"@essence-lang/standard-library": "0.2.0",
+		"@essence-lang/language-server": "0.3.0",
+		"@essence-lang/standard-library": "0.3.0",
 		"@vscode/vsce": "3.9.2",
 		"vscode-languageclient": "9.0.1"
 	}
