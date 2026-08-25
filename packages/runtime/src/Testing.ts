@@ -302,6 +302,14 @@ export type CoverageReport = {
 	module: string | null
 	points: Array<CoveredPoint>
 	choices: Array<CoverageChoice>
+	// NOTE: The indices of the points a Module executed simply by being LOADED —
+	// a top-level Constant's initializer, code a suite's setup runs before any
+	// test. Their hits land in `counts` but in no test's span (the span opens
+	// after load), so per-test attribution cannot credit them to anyone. A
+	// consumer that maps a change back to the tests that reached it needs to know
+	// these apart: an edit to one can change a test that read the load-time
+	// result without ever re-entering the point.
+	loaded: Array<number>
 }
 
 export function coverage(): Array<CoverageReport> {
@@ -312,6 +320,16 @@ export function coverage(): Array<CoverageReport> {
 			count: record.counts[index] ?? 0,
 		})),
 		choices: record.module.choices,
+		// NOTE: `baseline` is what loading the bundle had counted before the
+		// first test span — so a point non-zero there ran at load. Null only
+		// before the first `beginCoverageRun`, which every counted run calls at
+		// its start, so by the time a report is read it is set.
+		loaded:
+			record.baseline === null
+				? []
+				: record.baseline.flatMap((count, index) =>
+						count > 0 ? [index] : [],
+					),
 	}))
 }
 
@@ -1904,6 +1922,11 @@ export type TestEvent =
 			module: string | null
 			points: Array<CoveredPoint>
 			choices: Array<CoverageChoice>
+			// NOTE: The indices of points executed at LOAD, credited to no test
+			// — see `CoverageReport.loaded`. Optional so a stream written before
+			// it existed, or a report built by hand, still reads: absent means
+			// "not told", which a consumer treats as none.
+			loaded?: Array<number>
 	  }
 	// NOTE: The points ONE test touched in one instrumented Module, by index
 	// into that Module's coverage table — written per test, and only where the
@@ -2320,6 +2343,7 @@ export function runTests(registry: Registry, options: RunOptions): RunSummary {
 				module: report.module,
 				points: report.points,
 				choices: report.choices,
+				loaded: report.loaded,
 			})
 		}
 	}

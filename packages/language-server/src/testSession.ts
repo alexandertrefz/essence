@@ -16,6 +16,11 @@ import type { common } from "@essence-lang/interfaces"
 import type { TestEvent } from "@essence-lang/runtime/Testing"
 
 import {
+	affectedTests,
+	buildAttribution,
+	type EntryAttribution,
+} from "./affected"
+import {
 	TEST_RUN_VERSION,
 	type TestRunNotification,
 	type TestSite,
@@ -144,6 +149,14 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 	// says nothing about the rest, so what is held — and what is sent — is the
 	// project's picture rather than the save's.
 	let coverage: CoverageSummary = emptyCoverage
+	// NOTE: One entry's attribution — which of its tests reached which points —
+	// built from its last UNNARROWED cycle, so every index lines up with one
+	// compile's table. `freshEntries` is which of them are trustworthy for
+	// narrowing: an entry drops out the moment it runs narrowed or fails to
+	// compile, and earns its place back on the next whole run. Both are empty
+	// unless coverage is on; there is nothing to attribute otherwise.
+	let entryAttribution = new Map<string, EntryAttribution>()
+	let freshEntries = new Set<string>()
 	let disposed = false
 	let worker: Worker | null = null
 	let runCounter = 0
@@ -183,6 +196,16 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 		// against rather than left standing as something to accept.
 		update: boolean
 		compiled: boolean
+		// NOTE: Whether THIS cycle was instrumented, captured at its start so a
+		// setting toggled mid-flight does not make the run look like something
+		// it was not — an uninstrumented run's entries must never be trusted as
+		// attribution just because coverage was turned on while they were in
+		// the air.
+		coverage: boolean
+		// NOTE: The open buffers as this cycle compiled them, kept so the next
+		// change can be measured against the text the attribution was built on
+		// — the coordinates its point Positions are in.
+		snapshot: Record<string, string>
 	} | null = null
 
 	function testFiles(): Array<string> {
@@ -251,17 +274,26 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 			// batch carries a deselection for every test that did not run, and
 			// adopting those would turn "run this one" into "forget the others"
 			// — which is not what a Run lens above one test means.
+			// NOTE: The attribution below reads the RAW batch (it wants the
+			// `test-coverage` events); everything the session STORES and sends
+			// on has them stripped. They are the session's own bookkeeping —
+			// the client folds them into nothing and the notification would only
+			// carry their weight, one per test per Module, on every coverage
+			// cycle.
+			let visible = message.events.filter(
+				(event) => event.kind !== "test-coverage",
+			)
 			let narrowed = inFlight.ids
 			let events =
 				narrowed.length === 0
-					? message.events
+					? visible
 					: [
 							...(eventsByEntry.get(message.entry) ?? []).filter(
 								(event) =>
 									!("id" in event) ||
 									!narrowed.includes(event.id),
 							),
-							...message.events.filter(
+							...visible.filter(
 								(event) =>
 									"id" in event &&
 									narrowed.includes(event.id),
@@ -269,8 +301,51 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 						]
 
 			eventsByEntry.set(message.entry, events)
-			inFlight.events.push(...message.events)
+			inFlight.events.push(...visible)
 			inFlight.sites.push(...message.sites)
+
+			// NOTE: An entry earns a fresh attribution only from an UNNARROWED
+			// clean cycle under coverage — one where all of its tests ran against
+			// one table. A narrowed cycle refreshes only some tests, and a failed
+			// one refreshes none, so either drops the entry out of `freshEntries`
+			// until a whole run settles it again. So does a cycle that SILENCED a
+			// live test with a focus: the silenced test never ran, so its own
+			// lines look like dead code in the attribution, and narrowing off
+			// that truncated picture would skip it once the focus is lifted. The
+			// snapshot is the text the table's Positions are in, kept so a later
+			// change is measured against the same coordinates.
+			let silenced = visible.some(
+				(event) =>
+					event.kind === "test-deselected" &&
+					event.reason === "not-focused",
+			)
+
+			if (
+				inFlight.coverage &&
+				message.compiled &&
+				inFlight.ids.length === 0 &&
+				!silenced
+			) {
+				let byModule = buildAttribution(message.events)
+				let text = new Map<string, string>()
+
+				for (let module of byModule.keys()) {
+					let source = inFlight.snapshot[module]
+
+					if (source !== undefined) {
+						text.set(module, source)
+					}
+				}
+
+				entryAttribution.set(message.entry, {
+					entry: message.entry,
+					byModule,
+					text,
+				})
+				freshEntries.add(message.entry)
+			} else {
+				freshEntries.delete(message.entry)
+			}
 
 			if (message.focused) {
 				focusedEntries.add(message.entry)
@@ -316,13 +391,26 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 		}
 
 		let folded = collectTestRun(run.events)
-		let counted = coverageEnabled
-			? collectCoverage(run.events)
-			: emptyCoverage
+		// NOTE: A NARROWED cycle counts only the tests it ran, so its coverage is
+		// a partial picture of every Module it touched — adopting it would repaint
+		// a covered line grey on the very keystroke that was meant to be cheap. It
+		// is a change WITHIN existing lines that a cycle is narrowed for (a
+		// line-adding edit runs whole), so nothing MOVED: the picture the last
+		// whole run left sits on the right lines, and this cycle leaves it exactly
+		// as it was. Its COUNTS may be a keystroke stale — a line whose content
+		// changed still wears the mark it last earned — until the next whole run
+		// recomputes it, which the freshness rule makes the very next change.
+		let narrowedCycle = run.ids.length > 0
+		let counted =
+			coverageEnabled && !narrowedCycle
+				? collectCoverage(run.events)
+				: emptyCoverage
 
-		coverage = coverageEnabled
-			? mergeCoverage(coverage, counted)
-			: emptyCoverage
+		if (!coverageEnabled) {
+			coverage = emptyCoverage
+		} else if (!narrowedCycle) {
+			coverage = mergeCoverage(coverage, counted)
+		}
 
 		options.notify({
 			version: TEST_RUN_VERSION,
@@ -405,6 +493,10 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 		runCounter += 1
 
 		let run = runCounter
+		// NOTE: One read of the open buffers, shared by the request the Worker
+		// compiles and the attribution built from what it answers — so the text
+		// an entry's table is measured in is exactly the text it ran.
+		let snapshot = options.overlays()
 
 		inFlight = {
 			run,
@@ -417,6 +509,8 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 			rewrites: [],
 			update,
 			compiled: true,
+			coverage: coverageEnabled,
+			snapshot,
 		}
 
 		options.notify({
@@ -438,7 +532,7 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 			kind: "run",
 			run,
 			entries,
-			overlays: options.overlays(),
+			overlays: snapshot,
 			// NOTE: A focus anywhere in the workspace silences everything else,
 			// exactly as it does on the command line — and a Worker message
 			// knows one bundle, so what the LAST run found is what the next one
@@ -498,12 +592,20 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 			timer = null
 
 			let known = new Set(testFiles())
-
-			for (let entry of reached([...changedFiles])) {
-				dirty.add(entry)
-			}
+			let changed = [...changedFiles]
 
 			changedFiles.clear()
+
+			// NOTE: Whatever was already waiting — an update re-run, entries a
+			// run in flight deferred — is NOT this window's change, and a cycle
+			// carrying any of it cannot be narrowed to this change's tests. Held
+			// apart so the narrowing below only runs when the whole cycle IS the
+			// reach of `changed`.
+			let deferred = new Set(dirty)
+
+			for (let entry of reached(changed)) {
+				dirty.add(entry)
+			}
 
 			// NOTE: A file that stopped existing, or stopped writing tests,
 			// stops being reported on.
@@ -511,14 +613,96 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 				if (!known.has(entry)) {
 					eventsByEntry.delete(entry)
 					focusedEntries.delete(entry)
+					entryAttribution.delete(entry)
+					freshEntries.delete(entry)
 				}
 			}
 
 			let entries = [...dirty].filter((entry) => known.has(entry))
 
 			dirty.clear()
-			start(entries, "change", [])
+
+			// NOTE: The tests within those files the change actually reached, or
+			// null to run them whole — which is every case the attribution cannot
+			// speak for. Only when the cycle is exactly the reach of this change,
+			// so an unrelated deferred entry is never narrowed away.
+			let ids =
+				deferred.size === 0 ? narrowingFor(entries, changed) : null
+
+			start(entries, "change", ids ?? [])
 		}, debounce)
+	}
+
+	// NOTE: Which of a change's reached tests to re-run, or null for "run them
+	// whole". Null whenever the attribution cannot be trusted to name the
+	// complete set: coverage off (nothing is attributed), any reached entry not
+	// freshly settled, or `affectedTests` refusing the change. Every rung that
+	// answers "run more" is the safe one — a test whose reached lines did not
+	// change cannot change its verdict, which is the same ground a whole-file
+	// re-run already stands on.
+	//
+	// NOTE: The exception to that ground is a PROPERTY test, which draws fresh
+	// values every run and reaches different lines each time — its attribution
+	// is one run's sample, not the whole of what it could touch. So a narrowed
+	// cycle re-runs every property of the reached entries regardless of where
+	// the change fell, exactly as a whole-file run would have, rather than
+	// trusting a sample to say it was untouched.
+	function narrowingFor(
+		entries: Array<string>,
+		changed: Array<string>,
+	): Array<string> | null {
+		if (!coverageEnabled || entries.length === 0) {
+			return null
+		}
+
+		let attributions: Array<EntryAttribution> = []
+
+		for (let entry of entries) {
+			let attribution = entryAttribution.get(entry)
+
+			if (!freshEntries.has(entry) || attribution === undefined) {
+				return null
+			}
+
+			attributions.push(attribution)
+		}
+
+		let overlays = options.overlays()
+		let affected = affectedTests(
+			attributions,
+			changed,
+			(file) => overlays[file],
+			(entry, file) => options.dependentsOf(file).includes(entry),
+		)
+
+		if (affected === null) {
+			return null
+		}
+
+		let properties = propertyIdsOf(entries)
+
+		return properties.length === 0
+			? affected
+			: [...new Set([...affected, ...properties])]
+	}
+
+	// NOTE: The property tests of some entries, read off the events they last
+	// emitted — a `property` event carries the id of the test it is about. They
+	// re-run on every narrowed cycle, whatever the change, because their result
+	// is a fact about a sample of drawn values rather than about a fixed set of
+	// lines.
+	function propertyIdsOf(entries: Array<string>): Array<string> {
+		let ids: Array<string> = []
+
+		for (let entry of entries) {
+			for (let event of eventsByEntry.get(entry) ?? []) {
+				if (event.kind === "property") {
+					ids.push(event.id)
+				}
+			}
+		}
+
+		return ids
 	}
 
 	return {
@@ -603,6 +787,8 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 
 				eventsByEntry.clear()
 				focusedEntries.clear()
+				entryAttribution.clear()
+				freshEntries.clear()
 				inFlight = null
 				void worker?.terminate()
 				worker = null
@@ -642,8 +828,11 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 			// NOTE: What was counted under the old setting is thrown away
 			// rather than kept: an instrumented compile and a plain one are
 			// different bundles, and half a project's coverage laid under the
-			// other half's would be a picture of neither.
+			// other half's would be a picture of neither. The attribution goes
+			// with it — it is read off the same instrumented run.
 			coverage = emptyCoverage
+			entryAttribution.clear()
+			freshEntries.clear()
 
 			this.runAll("settings")
 		},
