@@ -197,6 +197,46 @@ function profileNamed(label: string) {
 	return stub.controller.profiles.find((profile) => profile.label === label)
 }
 
+// NOTE: A gutter icon is an SVG baked into a data URI, and its fill is the
+// only thing that tells one square from another — which is exactly what a reader
+// goes by.
+function colourOf(decoration: { options: Record<string, unknown> }): string {
+	let icon = decoration.options.gutterIconPath as
+		| { fsPath: string }
+		| undefined
+
+	if (icon === undefined) {
+		return ""
+	}
+
+	let svg = Buffer.from(icon.fsPath.split(",")[1] ?? "", "base64").toString()
+
+	return /fill="(#[0-9a-f]{6})"/.exec(svg)?.[1] ?? ""
+}
+
+// NOTE: The lines drawn on one editor, by the colour they were drawn in; VS
+// Code's lines, so 0-based.
+function drawnByColour(editor: {
+	drawn: Map<unknown, Array<unknown>>
+}): Map<string, Array<number>> {
+	let byColour = new Map<string, Array<number>>()
+
+	for (let [type, ranges] of editor.drawn) {
+		if (ranges.length === 0) {
+			continue
+		}
+
+		let colour = colourOf(type as { options: Record<string, unknown> })
+
+		byColour.set(
+			colour,
+			ranges.map((range) => (range as { startLine: number }).startLine),
+		)
+	}
+
+	return byColour
+}
+
 beforeEach(() => {
 	stub.reset()
 })
@@ -632,26 +672,37 @@ describe("the coverage it draws", () => {
 		])
 	})
 
-	it("marks the lines nothing reached in the gutter", () => {
+	// NOTE: Three colours down the gutter, one per line the counters know
+	// about — green where the tests ran it, grey where nothing did, amber where
+	// it ran but not whole. VS Code's lines are 0-based.
+	it("marks every counted line in the gutter by what ran on it", () => {
 		let session = live()
 		let editor = stub.editor(SOURCE)
 
 		session.view.handle(batch({ sites: [site()], coverage: coverage() }))
 
-		let uncovered = stub.decorations.find(
-			(decoration) => decoration.options.gutterIconPath !== undefined,
+		let drawn = drawnByColour(editor)
+
+		expect(drawn.get("#3fb950")).toEqual([2])
+		expect(drawn.get("#8b949e")).toEqual([3, 8])
+		expect(drawn.get("#d29922")).toEqual([4])
+	})
+
+	it("takes the marks down when the counting is turned off", () => {
+		let session = live()
+		let editor = stub.editor(SOURCE)
+
+		session.view.handle(batch({ sites: [site()], coverage: coverage() }))
+		session.view.handle(
+			batch({
+				run: 2,
+				reason: "settings",
+				sites: [site()],
+				coverage: { files: [], choices: [] },
+			}),
 		)
 
-		expect(uncovered).toBeDefined()
-
-		let drawn = [...editor.drawn.entries()].flatMap(([, ranges]) => ranges)
-
-		// NOTE: Line 4 is the one nothing reached; VS Code's lines are 0-based.
-		expect(
-			drawn.some(
-				(range) => (range as { startLine: number }).startLine === 3,
-			),
-		).toBe(true)
+		expect(drawnByColour(editor).size).toBe(0)
 	})
 
 	it("says what it counted in the output channel", () => {

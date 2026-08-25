@@ -5,6 +5,7 @@ import {
 	debugConfigurationsFor,
 	type CoveragePoint,
 	coverageLinesOf,
+	coverageMarksOf,
 	coverageOf,
 	type CoverageSummary,
 	createState,
@@ -19,7 +20,6 @@ import {
 	forgetFile,
 	messagesOf,
 	outputOf,
-	uncoveredLinesOf,
 	type Span,
 	suiteKey,
 	tagsOf,
@@ -1076,6 +1076,50 @@ describe("coverage on a batch", () => {
 		expect(coverageOf(state, SOURCE)).toBeNull()
 		expect(state.coverage.choices).toEqual([])
 	})
+
+	// NOTE: The Server runs everything when a setting changes and throws its
+	// own coverage away first, so what such a cycle carries is the whole
+	// answer — and a cycle carrying nothing is the news that the counting was
+	// turned off, which the marks have to hear.
+	it("is replaced whole by a cycle that ran everything", () => {
+		let state = createState()
+
+		applyBatch(state, batch({ coverage: coverage() }))
+		applyBatch(
+			state,
+			batch({
+				run: 2,
+				reason: "settings",
+				coverage: {
+					files: [
+						{
+							module: "/repo/Other.es",
+							lines: { covered: 1, total: 1 },
+							branches: { covered: 0, total: 0 },
+							cases: { covered: 0, total: 0 },
+							missed: [],
+							points: [],
+						},
+					],
+					choices: [],
+				},
+			}),
+		)
+
+		expect(coverageOf(state, SOURCE)).toBeNull()
+		expect(coverageOf(state, "/repo/Other.es")).not.toBeNull()
+
+		applyBatch(
+			state,
+			batch({
+				run: 3,
+				reason: "settings",
+				coverage: { files: [], choices: [] },
+			}),
+		)
+
+		expect(state.coverage.files).toEqual([])
+	})
 })
 
 describe("what a coverage view draws", () => {
@@ -1105,13 +1149,47 @@ describe("what a coverage view draws", () => {
 		])
 	})
 
+	it("names what stands on a line and never ran", () => {
+		let file = coverage().files[0]!
+		let line = coverageLinesOf(file).find((each) => each.line === 7)
+
+		expect(line?.missed).toEqual([{ kind: "branch", label: "else" }])
+	})
+
 	it("merges the lines nothing reached into runs", () => {
 		let file = coverage().files[0]!
 
-		expect(uncoveredLinesOf(file)).toEqual([
+		expect(coverageMarksOf(file).uncovered).toEqual([
 			{ start: 4, end: 5 },
 			{ start: 9, end: 9 },
 		])
+	})
+
+	it("marks a line the tests ran whole as covered", () => {
+		let file = coverage().files[0]!
+
+		expect(coverageMarksOf(file).covered).toEqual([{ start: 3, end: 3 }])
+	})
+
+	// NOTE: The `if` ran and the `else` never did, on one line — which is
+	// neither covered nor uncovered, and a mark that said either would be
+	// wrong.
+	it("marks a line that ran but not whole as partial", () => {
+		let file = coverage().files[0]!
+
+		expect(coverageMarksOf(file).partial).toEqual([{ start: 7, end: 7 }])
+	})
+
+	// NOTE: A Case built at a line is an Expression, and the Statement it
+	// stands in is counted already — the same rule the ratios were counted
+	// under.
+	it("draws nothing for a line only a construction stands on", () => {
+		let marks = coverageMarksOf(coverage().files[0]!)
+		let lines = [...marks.covered, ...marks.uncovered, ...marks.partial]
+
+		expect(
+			lines.some((range) => range.start <= 11 && 11 <= range.end),
+		).toBe(false)
 	})
 
 	it("answers every arm and every Case as a declaration", () => {

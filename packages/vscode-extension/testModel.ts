@@ -411,8 +411,9 @@ export type ClientState = {
 	// those are two different sets: one cycle runs `Foo.tests.es` and counts
 	// `Foo.es`. The files a batch carries are laid over what is here, keyed by
 	// module — a cycle covers what a change reached and says nothing about the
-	// rest — while the Choices replace what is here, because the Server works
-	// that answer out across the whole run and nobody should work it out twice.
+	// rest — unless the cycle ran EVERYTHING, when they replace it; the Choices
+	// replace what is here either way, because the Server works that answer
+	// out across the whole run and nobody should work it out twice.
 	coverage: CoverageSummary
 }
 
@@ -537,9 +538,16 @@ export function applyBatch(
 	let covered: Array<string> = []
 
 	if (notification.coverage !== undefined) {
-		let counted = new Map(
-			state.coverage.files.map((file) => [file.module, file]),
-		)
+		// NOTE: A cycle that ran everything is the whole answer, and what it
+		// carries replaces what is held rather than being laid over it. The
+		// Server runs everything when a setting changes, and throws its own
+		// coverage away first — so a `settings` cycle carrying no files is the
+		// news that `essence.tests.coverage` was turned off, and a mark left
+		// standing after it would be yesterday's answer in today's colours.
+		let held: Array<FileCoverage> = wholeRun(notification)
+			? []
+			: state.coverage.files
+		let counted = new Map(held.map((file) => [file.module, file]))
 
 		for (let file of notification.coverage.files) {
 			counted.set(file.module, file)
@@ -556,6 +564,12 @@ export function applyBatch(
 	}
 
 	return { kind: "end", files: [...notification.files], changed, covered }
+}
+
+// NOTE: The two reasons a cycle covers every test file the workspace holds —
+// the first run of a session, and the run after a setting changed.
+function wholeRun(notification: TestRunNotification): boolean {
+	return notification.reason === "open" || notification.reason === "settings"
 }
 
 // NOTE: A file the workspace no longer holds tests for. The session stops
@@ -977,9 +991,19 @@ export type CoverageLine = {
 	// `if`, `else`, `case #Postponed`. VS Code draws them as the branch detail
 	// of the statement they are on.
 	branches: Array<CoverageBranch>
+	// NOTE: What stands on this line and never ran. Empty on a line that ran
+	// whole; on a line that ran at all it is the difference between covered
+	// and PARTLY covered — a one-line `if` whose `else` nothing took, an `if`
+	// with no `else` whose condition was never false, an arm nothing reached.
+	missed: Array<CoverageMiss>
 }
 
 export type CoverageBranch = { line: number; label: string; count: number }
+
+export type CoverageMiss = {
+	kind: "statement" | "branch" | "case"
+	label: string
+}
 
 // NOTE: A thing that either RAN or did not, named — a Match arm, a Choice Case.
 // It is what VS Code calls a declaration, which is the right shape for it: an
@@ -1005,7 +1029,7 @@ export function coverageLinesOf(file: FileCoverage): Array<CoverageLine> {
 		let existing = lines.get(line)
 
 		if (existing === undefined) {
-			existing = { line, count: 0, branches: [] }
+			existing = { line, count: 0, branches: [], missed: [] }
 			lines.set(line, existing)
 		}
 
@@ -1025,6 +1049,10 @@ export function coverageLinesOf(file: FileCoverage): Array<CoverageLine> {
 		// is what the ratios beside them were counted under.
 		entry.count = Math.max(entry.count, point.count)
 
+		if (point.count === 0) {
+			entry.missed.push({ kind: point.kind, label: point.label })
+		}
+
 		if (point.kind === "branch") {
 			entry.branches.push({
 				line,
@@ -1037,17 +1065,48 @@ export function coverageLinesOf(file: FileCoverage): Array<CoverageLine> {
 	return [...lines.values()].sort((left, right) => left.line - right.line)
 }
 
-// NOTE: The lines nothing reached, in the same shape the test marks answer in —
-// ranges rather than lines, so a caller draws both the same way. Adjacent lines
-// are merged, which is what makes a run of never-executed lines one thing to
-// read rather than nine.
-export function uncoveredLinesOf(file: FileCoverage): Array<LineRange> {
-	let uncovered = coverageLinesOf(file)
-		.filter((line) => line.count === 0)
-		.map((line) => line.line)
+// NOTE: What the gutter draws beside a counted file — the three answers a line
+// can give, in the same shape the test marks answer in, so a caller draws both
+// the same way. A line ran or it did not; and a line that ran may still hold
+// something that never did — a one-line `if` whose `else` nothing took, an arm
+// nothing reached — which is the one answer neither of the other two could
+// give. WHICH thing it was is the coverage view's to say, under the statement's
+// branches; a square in a gutter can say "partly" and no more.
+export type CoverageMarks = {
+	covered: Array<LineRange>
+	partial: Array<LineRange>
+	uncovered: Array<LineRange>
+}
+
+export function coverageMarksOf(file: FileCoverage): CoverageMarks {
+	let covered: Array<number> = []
+	let partial: Array<number> = []
+	let uncovered: Array<number> = []
+
+	for (let line of coverageLinesOf(file)) {
+		if (line.count === 0) {
+			uncovered.push(line.line)
+		} else if (line.missed.length === 0) {
+			covered.push(line.line)
+		} else {
+			partial.push(line.line)
+		}
+	}
+
+	return {
+		covered: runsOf(covered),
+		partial: runsOf(partial),
+		uncovered: runsOf(uncovered),
+	}
+}
+
+// NOTE: Adjacent lines merged into ranges, which is what makes a run of
+// never-executed lines one thing to read rather than nine. The lines arrive
+// sorted, which `coverageLinesOf` sees to.
+function runsOf(lines: Array<number>): Array<LineRange> {
 	let ranges: Array<LineRange> = []
 
-	for (let line of uncovered) {
+	for (let line of lines) {
 		let last = ranges[ranges.length - 1]
 
 		if (last !== undefined && last.end === line - 1) {

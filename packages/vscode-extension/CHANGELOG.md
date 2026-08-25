@@ -1,5 +1,16 @@
 # Change Log
 
+## [Unreleased]
+
+- The gutter now says what a coverage run reached, line by line: green where
+  the tests ran a line, grey where nothing did, and amber where they ran it
+  but not whole — a one-line `if` whose `else` nothing took, an `if` with no
+  `else` whose condition was never false, a `match` arm no value reached.
+  Turning `essence.tests.coverage` off takes the marks down with it.
+- Every mark down the gutter — a test's lines and a coverage run's alike — is
+  a rounded square rather than a bar, so it reads apart from the bar a
+  source-control gutter draws beside a changed line.
+
 ## [0.5.0]
 
 Tests, live. Essence has a `tests { … }` section and an `essence test`

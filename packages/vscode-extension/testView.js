@@ -5,6 +5,7 @@ import * as vscode from "vscode"
 import {
 	applyBatch,
 	coverageLinesOf,
+	coverageMarksOf,
 	coverageOf,
 	createState,
 	debugConfigurationsFor,
@@ -20,7 +21,6 @@ import {
 	tagsOf,
 	TEST_RUN_VERSION,
 	treeOf,
-	uncoveredLinesOf,
 } from "./testModel.js"
 
 // NOTE: The half of the Test Explorer that talks to VS Code. Everything it
@@ -39,14 +39,19 @@ import {
 // NOTE: The colours are baked into the icons rather than taken from the theme: a
 // gutter icon is an image, and VS Code has no themable one. These are the values
 // its own testing icons use, which read on a light and a dark background alike.
+//
+// NOTE: Coverage is drawn in three of the same colours, because it is the same
+// news about different lines: the green of a passing test for a line the tests
+// ran, the amber of a test something silenced for a line they ran but not
+// whole, and the grey of a skipped test for a line nothing ran. A fourth colour
+// in the gutter would be a fourth thing to learn.
 const COLOURS = {
 	passed: "#3fb950",
 	failed: "#f85149",
 	skipped: "#8b949e",
 	notFocused: "#d29922",
-	// NOTE: The same grey a skipped test is marked in, at half the width — a
-	// line nothing ran and a test nobody ran are the same news about different
-	// things, and a third colour in the gutter would be a third thing to learn.
+	covered: "#3fb950",
+	partial: "#d29922",
 	uncovered: "#8b949e",
 }
 
@@ -56,29 +61,38 @@ function icon(svg) {
 	)
 }
 
-// NOTE: A bar down the gutter beside the LINES OF A TEST, rather than a dot on
-// its first line. VS Code's own Testing gutter already owns that first line — it
-// draws the run/pass/fail icon there — and a second icon on it would be two
+// NOTE: A square beside each of the LINES OF A TEST, rather than a mark on its
+// first line alone. VS Code's own Testing gutter already owns that first line —
+// it draws the run/pass/fail icon there — and a second icon on it would be two
 // answers to one question. What it does not draw is the body, which is what a
 // reader scrolling a file is looking at.
-function bar(colour) {
+//
+// NOTE: A square and not a bar, because a bar in a gutter already means
+// something: it is what a source-control gutter draws beside a changed line,
+// and a green bar that meant "passed" here and "added" two columns over would
+// be read as the second. A square is the shape a coverage gutter is read in.
+//
+// NOTE: Both glyphs are drawn in the same 18-unit box, which `contain` scales
+// to the glyph margin's cell — so the square and the dot keep their sizes
+// relative to each other whatever the line height is.
+function square(colour) {
 	return icon(
-		`<svg xmlns="http://www.w3.org/2000/svg" width="6" height="18">` +
-			`<rect x="2" y="0" width="2" height="18" fill="${colour}"/></svg>`,
+		`<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18">` +
+			`<rect x="5" y="5" width="8" height="8" rx="2" fill="${colour}"/></svg>`,
 	)
 }
 
 function dot(colour) {
 	return icon(
-		`<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10">` +
-			`<circle cx="5" cy="5" r="3.5" fill="${colour}"/></svg>`,
+		`<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18">` +
+			`<circle cx="9" cy="9" r="4.5" fill="${colour}"/></svg>`,
 	)
 }
 
 function createDecorations() {
 	let gutter = (colour) =>
 		vscode.window.createTextEditorDecorationType({
-			gutterIconPath: bar(colour),
+			gutterIconPath: square(colour),
 			gutterIconSize: "contain",
 			isWholeLine: true,
 			rangeBehavior: vscode.DecorationRangeBehavior.ClosedClosed,
@@ -89,8 +103,8 @@ function createDecorations() {
 		failed: gutter(COLOURS.failed),
 		skipped: gutter(COLOURS.skipped),
 		notFocused: gutter(COLOURS.notFocused),
-		// NOTE: The one line inside a test that failed, which the test's own bar
-		// cannot point at. A dot rather than a bar, so the two read apart at a
+		// NOTE: The one line inside a test that failed, which the test's own
+		// square cannot point at. A dot rather than a square, so the two read apart at a
 		// glance, and it reaches the overview ruler because a failure scrolled
 		// off the screen is the one a reader is looking for.
 		expects: vscode.window.createTextEditorDecorationType({
@@ -100,16 +114,17 @@ function createDecorations() {
 			overviewRulerLane: vscode.OverviewRulerLane.Right,
 			rangeBehavior: vscode.DecorationRangeBehavior.ClosedClosed,
 		}),
-		// NOTE: A line nothing ran. VS Code's own coverage view draws this too
-		// — once a reader has opened it — and this is drawn whether or not they
-		// have: what a coverage run is FOR is being told, while reading the
-		// file, that a line was never reached.
-		uncovered: vscode.window.createTextEditorDecorationType({
-			gutterIconPath: bar(COLOURS.uncovered),
-			gutterIconSize: "contain",
-			isWholeLine: true,
-			rangeBehavior: vscode.DecorationRangeBehavior.ClosedClosed,
-		}),
+		// NOTE: What a coverage run counted, line by line. VS Code's own
+		// coverage view draws this too — once a reader has opened it — and this
+		// is drawn whether or not they have: what a coverage run is FOR is being
+		// told, while reading the file, what the tests reached. Three marks: a
+		// line the tests ran, a line they ran but not whole — a branch on it
+		// nothing took, an arm nothing reached; which, the coverage view says
+		// under the statement's branches, since a square can not — and a line
+		// nothing ran.
+		covered: gutter(COLOURS.covered),
+		partial: gutter(COLOURS.partial),
+		uncovered: gutter(COLOURS.uncovered),
 	}
 }
 
@@ -527,10 +542,16 @@ export function createTestView(options) {
 		)
 
 		let coverage = coverageOf(state, editor.document.uri.fsPath)
+		let counted =
+			coverage === null
+				? { covered: [], partial: [], uncovered: [] }
+				: coverageMarksOf(coverage)
 
+		editor.setDecorations(decorations.covered, lineRanges(counted.covered))
+		editor.setDecorations(decorations.partial, lineRanges(counted.partial))
 		editor.setDecorations(
 			decorations.uncovered,
-			coverage === null ? [] : lineRanges(uncoveredLinesOf(coverage)),
+			lineRanges(counted.uncovered),
 		)
 	}
 

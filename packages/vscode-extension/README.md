@@ -138,12 +138,16 @@ text of its own beside them. They are inlay hints in the full sense, so
 one line — what it covered, what it found, how long it took, and whether
 something would not compile.
 
-**Run with Coverage** turns the counters on. Lines and branches appear in VS
-Code's coverage view, the lines nothing ran are marked down the gutter whether
-or not that view is open, and the part a line counter has no words for is
-reported as declarations: every `match` arm no value took, and every Case of a
-`choice` no test ever built. Because the language is exhaustive, those are
-complete statements rather than estimates.
+**Run with Coverage** turns the counters on. From then on every line the
+counters know about carries a mark down the gutter, whether or not the coverage
+view is open — green where the tests ran it, grey where nothing did, and amber
+where they ran it but not whole: a one-line `if` whose `else` nothing took, an
+`if` with no `else` whose condition was never false, a `match` arm no value
+reached — which part, the coverage view says under the statement's branches.
+Lines and branches appear in that view as well, and the part a line counter has
+no words for is reported as declarations: every `match` arm no value took, and
+every Case of a `choice` no test ever built. Because the language is
+exhaustive, those are complete statements rather than estimates.
 
 Coverage rides `essence.tests.coverage`, which the gesture turns on for the
 workspace — instrumenting compiles a different bundle from the one a build
