@@ -27,14 +27,6 @@
  * the one liberty a fragment takes. `essence format` leaves them exactly as they
  * are written here.
  *
- * THE ARITHMETIC SAMPLE IS THE ONE EXCEPTION, and deliberately so: it is
- * written in decimal literals, which are planned and not in the language yet.
- * `essence check` answers `Expected an Identifier but found '1'` at the `0.1`,
- * because `0.` starts a member access today. The shape around them is already
- * right — a literal receiver takes a Method, so `1/10::add(2/10)::is(3/10)`
- * passes — so the sample starts passing the day the literals land. Until then
- * it is the page's one unchecked claim; the other three hold.
- *
  * The two decorative layers sit in `.page__backdrop`, which deliberately has
  * no `overflow` of its own: an overflow on an ancestor of the sticky header
  * would make it stick to that box instead of the viewport.

@@ -106,6 +106,7 @@
 				"constant.numeric",
 				"constant.numeric.integer",
 				"constant.numeric.fraction",
+				"constant.numeric.decimal",
 				"constant.language",
 				"constant.other",
 				"constant.character"

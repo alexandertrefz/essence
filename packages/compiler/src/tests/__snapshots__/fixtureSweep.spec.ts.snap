@@ -396,3 +396,14 @@ tests/
   Lexer.es
 4 files, 2 directories"
 `;
+
+exports[`Fixture Sweep DecimalLiterals.es should print what it printed before 1`] = `
+"true
+1999/100
+"19.99"
+true
+true
+"2"
+1/2
+2"
+`;

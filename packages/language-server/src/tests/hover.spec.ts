@@ -131,9 +131,20 @@ describe("Hover", () => {
 	})
 
 	it("should describe literals", () => {
-		let source = ["implementation {", "\tconstant a = 42", "}"].join("\n")
+		let source = [
+			"implementation {",
+			"\tconstant a = 42",
+			"\tconstant b = 0.75",
+			"}",
+		].join("\n")
 
 		expect(hover(source, { line: 2, column: 15 })).toBe("Integer")
+		// NOTE: A decimal is one Rational Literal rather than an Integer and a
+		// member path, so a cursor past the dot answers the same as one before
+		// it — which is what a Hover over `0.75` would get wrong if the dot
+		// still opened an access.
+		expect(hover(source, { line: 3, column: 15 })).toBe("Rational")
+		expect(hover(source, { line: 3, column: 17 })).toBe("Rational")
 	})
 
 	it("should describe an aliased Union Type by its Alias's name", () => {

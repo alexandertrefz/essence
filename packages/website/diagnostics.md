@@ -53,8 +53,32 @@ A `{` was never closed. Only the innermost torn-open block reports — a missing
 ### `invalid-number`
 
 A Number Literal holds something that is not a digit — `0xFF`, `0b101`, `1e5`.
-Essence has no hexadecimal, binary or exponent form; a Number is written in
-decimal digits, grouped with `_` where that helps.
+Essence has no hexadecimal, binary or exponent form; a Number is written in the
+digits `0` through `9`, grouped with `_` where that helps, with a fractional
+part written behind a `.`.
+
+### `mixed-rational-literal`
+
+A Rational Literal was written as a fraction and as a decimal at once —
+`1.5/2`, `1/2.5`. The two are spellings of the same thing: `3/4` and `0.75` are
+one Rational, and a Literal that carries both says it twice and leaves it to
+the reader which digits belong to which.
+
+Write one of them. The whole Literal is dropped rather than its tail alone, so
+what is left behind is never read as a Statement of its own.
+
+### `partial-decimal-literal`
+
+A decimal Literal was written with one side of its point empty — `.5`, or `1.`
+at the end of a line. A decimal joins an Integer, a `.` and the digits behind
+it, all three written flush, and neither half stands for a Rational on its own.
+
+Write both sides: `0.5`, `1.0`. Dropping the `.` is the other answer where a
+whole Number was what was meant.
+
+A `.` that is not followed flush by digits is untouched by this, and means what
+it always did: `1.foo` reads a member off an Integer, and `.price` is a member
+path.
 
 ### `invalid-escape`
 

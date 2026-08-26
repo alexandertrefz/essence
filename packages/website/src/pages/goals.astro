@@ -18,14 +18,7 @@
  *     saying the same thing twice. It stays where it means the language or the
  *     engine rather than the codebase you are integrating with.
  *   - Everything under "What should be easy" exists today, and nothing planned
- *     is described in the present tense. The arithmetic sample is the single
- *     exception, and the same one the landing page takes: it is written in
- *     decimal literals, which are planned and not in the language yet, so
- *     `essence check` answers `Expected an Identifier but found '1'` at the
- *     `0.1` — `0.` starts a member access today. Only the spelling is ahead of
- *     the compiler; a literal receiver already takes a Method, so the same
- *     sample passes as `1/10::add(2/10)::is(3/10)`, which is how it was written
- *     until the literals were decided on.
+ *     is described in the present tense.
  *   - The non-goals are not invented for this page: each one is grounded in
  *     something the language already does or in the compile target it chose.
  *     They are deliberately not framed as consequences of the

@@ -1957,6 +1957,21 @@ describe("formatter", () => {
 				)
 			})
 
+			// NOTE: A decimal is one Literal and is measured as one — the
+			// point inside it is not a `=` and not a break, so a run of
+			// Declarations holding decimals lines up like any other.
+			it("lines up a run of decimal values", () => {
+				expect(
+					equalsOf(
+						block(
+							"constant rate = 0.75",
+							"constant owed = -0.5",
+							"constant big = 1_000.5",
+						),
+					),
+				).toEqual([15, 15, 15])
+			})
+
 			it("does not align a run of one", () => {
 				expect(
 					formatted(block("constant a = 1", "Terminal.inspect(a)")),
@@ -2212,6 +2227,36 @@ describe("formatter", () => {
 		// written flush — `1 / 2` is not `1/2`.
 		it("keeps a Rational's parts flush", () => {
 			roundTrips("implementation {\n\tconstant a = 1/2\n}\n", "1/2")
+		})
+
+		// NOTE: The decimal spelling of a Rational is the author's, and the
+		// node keeps none of it — `0.75` and `3/4` build the same numerator and
+		// denominator, and `1.50` builds one no digit of which is written the
+		// way it was. The printer slices the SOURCE for a Number Literal, which
+		// is what carries the spelling through; this holds it to that. The
+		// underscores and the sign come along for the same ride, and the point
+		// has to stay flush against both digit runs or the Literal is not one.
+		it("keeps a decimal exactly as it was written", () => {
+			let source = [
+				"implementation {",
+				"\tconstant rate  = 0.75",
+				"\tconstant big   = 1_000.5",
+				"\tconstant owed  = -0.5",
+				"\tconstant scale = 1.50",
+				"",
+				"\tTerminal.inspect(19.99::toString(as #Decimal))",
+				"}",
+				"",
+			].join("\n")
+			let result = format(source)
+
+			// NOTE: A parse error would leave the source untouched too, so the
+			// refusal is asked about first — otherwise this passes on a file
+			// the formatter never read.
+			expect(result.refusal).toBeNull()
+			expect(result.changed).toBe(false)
+			expect(result.text).toBe(source)
+			expect(format(result.text).text).toBe(source)
 		})
 
 		// NOTE: Adjacency is what tells `Choice#Case` from an Argument label

@@ -36,6 +36,16 @@ implementation {
 	§ everything after it still lex.
 	constant labelled = "answer: { 42 § the answer }"
 
+	§ mixed-rational-literal — a fraction and a decimal are two spellings of one
+	§ Rational, so a Literal written both ways says the same thing twice and
+	§ leaves it to the reader which digits belong to which.
+	constant mixed = 1.5/2
+
+	§ partial-decimal-literal — a decimal joins an Integer, a '.' and the digits
+	§ behind it, all three written flush, and neither half of that stands for a
+	§ Rational on its own.
+	constant half = .5
+
 	§ nesting-too-deep — the Parser reads nesting by recursion, so past 1024
 	§ levels it refuses with a report where the bare recursion would overflow
 	§ the call stack. The line below nests 1100 Lists deep.
