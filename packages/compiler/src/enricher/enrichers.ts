@@ -61,6 +61,7 @@ import {
 	admissionOfWrittenValue,
 	admittedTypeOf,
 	describePredicate,
+	fitsWritten,
 	reducedRationalSpelling,
 	refinementInside,
 } from "../helpers/predicateEval"
@@ -3143,9 +3144,35 @@ function enrichTableRows(
 			)
 		}
 
-		return node.values.map((value) =>
-			enrichExpression(value, scope, declaredType),
-		)
+		return node.values.map((value) => {
+			let row = enrichExpression(value, scope, declaredType)
+
+			// NOTE: The one place a row is ever checked. A row is neither an
+			// Argument nor a Declaration, so nothing else holds it to anything —
+			// the declared Type reaches `enrichExpression` as a HINT, which only
+			// ever resolves a bare Case and refuses nothing. A row that slipped
+			// through reached the runtime under a Type it does not have: the body
+			// read it as the Parameter declared, and an interpolated name printed
+			// it that way before the body ever ran.
+			//
+			// NOTE: Asked as `fitsWritten` rather than as `matchesType`, because
+			// a row is WRITTEN where it stands and carries the evidence of a
+			// written value: `across [1, 2] (n: NonZeroInteger)` decides the
+			// predicate on each row while compiling, exactly as the identical
+			// Argument or Declaration does. Assignability alone can not see
+			// that, and a row Parameter carrying a refinement would refuse every
+			// row a reader could write.
+			if (
+				declaredType !== null &&
+				!typeContainsError(declaredType) &&
+				!typeContainsError(row.type) &&
+				!fitsWritten(declaredType, row)
+			) {
+				reportRowTypeMismatch(row, declaredType)
+			}
+
+			return row
+		})
 	}
 
 	reportError(
@@ -3164,6 +3191,34 @@ function enrichTableRows(
 	)
 
 	return []
+}
+
+// NOTE: Reported once per row rather than once per table, because every row is
+// a test of its own — a reader fixes the row that is wrong, and a table of forty
+// says which one that is.
+function reportRowTypeMismatch(
+	row: common.typed.ExpressionNode,
+	declaredType: common.Type,
+): void {
+	reportError("This row does not fit the row Parameter", row.position, {
+		code: "table-row-type-mismatch",
+		labels: [
+			primary(
+				row.position,
+				`this is ${withArticle(describeType(row.type))}`,
+			),
+		],
+		notes: [
+			`The row Parameter is declared as ${describeType(
+				declaredType,
+			)}, and that is the Type the body — and an interpolated name — reads every row under.`,
+		],
+		helps: [
+			`Write a row of Type ${describeType(
+				declaredType,
+			)}, or widen the row Parameter's Type to one this row is a value of.`,
+		],
+	})
 }
 
 // NOTE: `for any (a: Integer, b: NonEmptyList<String>)` — the Parameters a

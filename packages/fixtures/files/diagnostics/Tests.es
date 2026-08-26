@@ -83,6 +83,13 @@ tests {
 		expect a::isLessThan(b)
 	}
 
+	§ table-row-type-mismatch — a row is a value of what the Parameter declared,
+	§ and nothing else ever checks one: the body reads every row under that Type,
+	§ and an interpolated name prints one that way before the body has run at all.
+	test "reads {n}" across ["one"] (n: Integer) {
+		expect n::isGreaterThan(0)
+	}
+
 	§ snapshot-not-printable — a snapshot records what a value LOOKS like,
 	§ which is what `Printable::toString` answers, so a value with no such
 	§ answer has nothing to record.

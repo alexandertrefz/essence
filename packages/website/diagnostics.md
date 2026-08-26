@@ -654,6 +654,32 @@ tests {
 
 Write `({ a, b }: Row)` instead, or `(row: Row)` and read `row.a`.
 
+### `table-row-type-mismatch`
+
+A row is not a value of the Type the row Parameter declares. Nothing else ever
+checks a row: it is neither an Argument nor a Declaration, and the declared Type
+reaches the rows only as the hint that lets a bare Case stand in one. The body
+reads every row under that Type — and an interpolated name prints one that way
+before the body has run at all:
+
+```essence
+tests {
+	§ `1` is an Integer, and the name prints it the way a Rational prints
+	test "halves {n}" across [{ n = 1 }] ({ n }: { n: Rational }) {
+		expect n::isNot(0/1)
+	}
+}
+```
+
+Write the row as the Type says — `{ n = 1/1 }` here — or widen the Parameter to
+a Type the row is a value of, such as `{ n: Number }`. Each row is reported on
+its own, so a table of forty says which of them is wrong.
+
+A row is held to what a written value is held to everywhere else, which is
+assignability plus the evidence it carries of its own: `across [1, 2] (n:
+NonZeroInteger)` decides the predicate on each row while compiling and is
+admitted, and a `0` written beside them is what this reports.
+
 ### `snapshot-not-printable`
 
 `matches snapshot` records what a value LOOKS like, which is what

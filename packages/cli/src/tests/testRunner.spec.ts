@@ -171,6 +171,24 @@ const failing = [
 	"",
 ].join("\n")
 
+// NOTE: A table test whose row is not a value of what its Parameter declares,
+// and whose NAME interpolates that row. Nothing but the Enricher ever checks a
+// row, and this shape of a mistyped one did not merely fail: the name asked
+// `Rational::toString` how to print an Integer before the body had run at all,
+// and the reduction of a pair of members it does not carry spun forever.
+const interpolatedRow = [
+	"implementation {}",
+	"",
+	"tests {",
+	'\ttest "row {value}" across [',
+	"\t\t{ value = 3 },",
+	"\t] ({ value }: { value: Rational }) {",
+	"\t\texpect value::isNot(0/1)",
+	"\t}",
+	"}",
+	"",
+].join("\n")
+
 // NOTE: A Module another one imports from, so that two entries reach one
 // tests section.
 const exporting = [
@@ -803,6 +821,42 @@ describe("essence test — running", () => {
 				expect(err).toContain("Broken.tests.es did not compile")
 				expect(out).toContain("doubles a positive number")
 				expect(code).toBe(EXIT_FAILURE)
+			},
+		)
+	})
+
+	// NOTE: Spawned rather than run in process, and on a clock. What this is
+	// about is a run that FINISHES, and the hang it guards against was a
+	// synchronous loop on the very thread a spec runs on — an in-process one
+	// would take the whole suite down with it instead of failing, and no
+	// timeout a test runner offers can interrupt a loop that never yields.
+	it("finishes on a mistyped row a test name interpolates", async () => {
+		await withFiles(
+			{ "Rows.tests.es": interpolatedRow },
+			async (directory) => {
+				let binary = fileURLToPath(
+					import.meta.resolve("../../bin/essence"),
+				)
+				let result = spawnSync(
+					process.execPath,
+					[binary, "test", directory, "--no-color", "--jobs", "1"],
+					{
+						encoding: "utf-8",
+						env: { ...process.env },
+						timeout: 60_000,
+						// NOTE: The loop this guards against yields to
+						// nothing, so the child is killed outright rather
+						// than asked to stop.
+						killSignal: "SIGKILL",
+					},
+				)
+
+				// NOTE: A killed child is the hang itself — `status` is null
+				// there, so the exit code below would pass it by.
+				expect(result.signal).toBeNull()
+				expect(result.stderr).toContain("table-row-type-mismatch")
+				expect(result.stderr).toContain("did not compile")
+				expect(result.status).toBe(EXIT_FAILURE)
 			},
 		)
 	})

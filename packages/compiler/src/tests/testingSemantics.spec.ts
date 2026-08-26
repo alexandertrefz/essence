@@ -1013,6 +1013,206 @@ describe("Tests Section Semantics", () => {
 			).toEqual(["table-parameters"])
 		})
 
+		// NOTE: The rows are the one thing about a table test that nothing else
+		// would ever check. A row is neither an Argument nor a Declaration, and
+		// the Type the Parameter declares reaches them as the HINT that resolves
+		// a bare Case — which refuses nothing. A row that slipped through
+		// reached the runtime as a Type it is not.
+		it("should refuse a row that does not fit what the Parameter declares", () => {
+			expect(
+				codesOf(
+					`implementation {}
+
+					tests {
+						test "rows" across ["x"] (n: Integer) {
+							expect n::isGreaterThan(0)
+						}
+					}`,
+				),
+			).toEqual(["table-row-type-mismatch"])
+		})
+
+		// NOTE: A Pattern Parameter declares its Type in the very same place a
+		// named one does, and binds every name off what it declared — so a row
+		// that does not fit is the same mistake, told the same way.
+		it("should refuse a row a Pattern Parameter takes apart", () => {
+			expect(
+				codesOf(
+					`implementation {}
+
+					tests {
+						test "rows" across [
+							{ value = "not a number" },
+						] ({ value }: { value: Rational }) {
+							expect value::isNot(0/1)
+						}
+					}`,
+				),
+			).toEqual(["table-row-type-mismatch"])
+		})
+
+		// NOTE: The shape that HUNG rather than crashed. An Integer stands
+		// where a Rational was declared, and the name interpolates the row — so
+		// `Rational::toString` was handed an Integer before the body had run at
+		// all, and reduced a pair of members it does not carry forever.
+		it("should refuse an Integer row where a Rational was declared", () => {
+			expect(
+				codesOf(
+					`implementation {}
+
+					tests {
+						test "row {value}" across [
+							{ value = 3 },
+						] ({ value }: { value: Rational }) {
+							expect value::isNot(0/1)
+						}
+					}`,
+				),
+			).toEqual(["table-row-type-mismatch"])
+		})
+
+		it("should say nothing about rows that fit", () => {
+			expect(
+				codesOf(
+					`implementation {}
+
+					tests {
+						test "row {value}" across [
+							{ value = 1/2 },
+							{ value = 3/4 },
+						] ({ value }: { value: Rational }) {
+							expect value::isNot(0/1)
+						}
+					}`,
+				),
+			).toEqual([])
+		})
+
+		// NOTE: Held to assignability and not to identity, the way every other
+		// value in the language is: an Integer is a value of `Number`, and a
+		// row is admitted by the same rule that admits an Argument.
+		it("should admit a row of a Type the declared one contains", () => {
+			expect(
+				codesOf(
+					`implementation {}
+
+					tests {
+						test "rows" across [
+							{ value = 3 },
+							{ value = 1/2 },
+						] ({ value }: { value: Number }) {
+							expect true
+						}
+					}`,
+				),
+			).toEqual([])
+		})
+
+		// NOTE: A row is WRITTEN where it stands, and a written value carries
+		// evidence of its own: a refinement's predicate is decided while
+		// compiling, exactly as it is for the identical Argument or
+		// Declaration. Asked as assignability alone, a refined row Parameter
+		// would refuse every row a reader could write.
+		it("should admit a written row that answers a refinement", () => {
+			expect(
+				codesOf(
+					`implementation {}
+
+					tests {
+						test "numbers" across [1, 2, 3] (n: NonZeroInteger) {
+							expect n::isNot(0)
+						}
+
+						test "lists" across [[1, 2]] (items: NonEmptyList<Integer>) {
+							expect items::hasItems()
+						}
+
+						test "items" across [[1, 2]] (xs: List<NonZeroInteger>) {
+							expect xs::hasItems()
+						}
+					}`,
+				),
+			).toEqual([])
+		})
+
+		// NOTE: Decided and not assumed — the row that answers the predicate is
+		// admitted and the one beside it that does not is still refused.
+		it("should refuse a written row that fails a refinement", () => {
+			expect(
+				codesOf(
+					`implementation {}
+
+					tests {
+						test "numbers" across [1, 0] (n: NonZeroInteger) {
+							expect n::isNot(0)
+						}
+					}`,
+				),
+			).toEqual(["table-row-type-mismatch"])
+		})
+
+		// NOTE: Nothing to hold a row to where the Parameter declares nothing.
+		// The row Type is worked out FROM the rows there, so every one of them
+		// fits it by construction — including a table whose rows disagree,
+		// which is a Union and not a mistake.
+		it("should say nothing where the Parameter declares no Type", () => {
+			expect(
+				codesOf(
+					`implementation {}
+
+					tests {
+						test "rows" across [1, "two"] (row) {
+							expect true
+						}
+					}`,
+				),
+			).toEqual([])
+		})
+
+		// NOTE: One Diagnostic per row rather than one per table — every row is
+		// a test of its own, and a table of forty has to say which of them is
+		// wrong.
+		it("should report every row that does not fit, on its own", () => {
+			let diagnostics = diagnosticsOf(
+				`implementation {}
+
+				tests {
+					test "rows" across [
+						"x",
+						"y",
+					] (n: Integer) {
+						expect n::isGreaterThan(0)
+					}
+				}`,
+			)
+
+			expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+				"table-row-type-mismatch",
+				"table-row-type-mismatch",
+			])
+			expect(
+				diagnostics.map(
+					(diagnostic) => diagnostic.position?.start.line,
+				),
+			).toEqual([5, 6])
+		})
+
+		// NOTE: A benchmark's rows are read by the very same enrichment, so
+		// what refuses a row of a test refuses a row of a measurement.
+		it("should refuse a mistyped row of a benchmark", () => {
+			expect(
+				codesOf(
+					`implementation {}
+
+					tests {
+						benchmark "counts" across ["x"] (n: Integer) {
+							expect n::isGreaterThan(0)
+						}
+					}`,
+				),
+			).toEqual(["table-row-type-mismatch"])
+		})
+
 		// NOTE: The rows and the Constants a Pattern Parameter binds off them are
 		// Statements of the test like any other, and the Validator has to walk
 		// them: a non-exhaustive `match` in a row would otherwise compile in
