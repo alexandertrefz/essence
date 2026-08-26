@@ -16,14 +16,28 @@ export class EssenceRational {
 	readonly numerator: bigint
 	readonly denominator: bigint
 
-	constructor(numerator: bigint, denominator: bigint = 1n) {
-		if (denominator === 0n) {
+	// NOTE: The parts are checked before `reduced` ever sees them, because
+	// `reduced` is the RUNTIME's canonicaliser — typed code that trusts the
+	// Enricher, and the one thing a host reaches that was never written to be
+	// handed a value from outside the language. Given a number where a bigint
+	// belongs it answers nothing a host can use: a part beside a bigint one
+	// throws out of `a % b`, from a stack that names the runtime rather than
+	// the call that was written, and a pair of numbers reduces to parts that
+	// are `NaN` — a Rational in name, which every later read of it believes.
+	// This constructor is the only door into it a host has, so it is where
+	// every part is answered for, while the caller still has a stack that names
+	// its own call.
+	constructor(numerator: bigint | number, denominator: bigint | number = 1n) {
+		let top = rationalPart(numerator, "numerator")
+		let bottom = rationalPart(denominator, "denominator")
+
+		if (bottom === 0n) {
 			throw new RangeError(
 				"A Rational can not have a denominator of zero.",
 			)
 		}
 
-		let parts = reduced(numerator, denominator)
+		let parts = reduced(top, bottom)
 
 		this.numerator = parts.numerator
 		this.denominator = parts.denominator
@@ -102,6 +116,67 @@ export class EssenceRational {
 			this.denominator === other.denominator
 		)
 	}
+}
+
+// NOTE: One part of a Rational as the pair holds it, which is a bigint and
+// nothing else.
+//
+// NOTE: A plain number is admitted where it is exactly a whole one a double
+// holds — `new EssenceRational(1, 2)` is the pair a host would write, and
+// asking it for `1n` and `2n` would be a ceremony that buys nothing. Every
+// other finite number is refused rather than rounded: `1.5` is not a whole
+// number at all, and `2 ** 53 + 1` is a double that had already lost the value
+// it was written as before it arrived. What a double HOLDS is `fromNumber`'s
+// answer, and it is named rather than applied here — reading `0.1` as a tenth
+// would claim a precision the number never had, which is the very thing
+// `fromNumber` exists to refuse.
+function rationalPart(value: bigint | number, role: string): bigint {
+	if (typeof value === "bigint") {
+		return value
+	}
+
+	if (typeof value === "number") {
+		if (Number.isSafeInteger(value)) {
+			return BigInt(value)
+		}
+
+		// NOTE: `NaN` and the infinities are turned away before the pointer
+		// below, on the ground `fromNumber` turns them away on and with the
+		// Error it uses. There is no Rational of them at all, so sending a host
+		// to the door that answers what a double holds would be sending it to
+		// one that refuses them too — and one refusal of the same thing in two
+		// kinds of Error is what a host catching only one of them pays for.
+		if (!Number.isFinite(value)) {
+			throw new RangeError(
+				`A Rational's ${role} has to be finite, and '${value}' is not.`,
+			)
+		}
+
+		throw new TypeError(
+			`A Rational's ${role} has to be a whole number a double holds exactly, and '${value}' is not — 'EssenceRational.fromNumber' is what answers the exact value of a double.`,
+		)
+	}
+
+	throw new TypeError(
+		`A Rational's ${role} has to be a bigint or a whole number, and this is ${kindOf(value)}.`,
+	)
+}
+
+// NOTE: What the value IS, for the second half of that Error — its kind and
+// never the value itself, which is the sort of thing that turns out to be a
+// megabyte of JSON, or a Symbol that throws on being spelled at all.
+function kindOf(value: unknown): string {
+	if (value === undefined) {
+		return "nothing"
+	}
+
+	if (value === null) {
+		return "null"
+	}
+
+	return /^[aeiou]/.test(typeof value)
+		? `an ${typeof value}`
+		: `a ${typeof value}`
 }
 
 // NOTE: The largest integer every one of whose neighbours a double still tells
