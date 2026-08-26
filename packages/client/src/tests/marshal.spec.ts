@@ -683,6 +683,67 @@ describe("Numbers", () => {
 		expect(() => EssenceRational.fromNumber(Infinity)).toThrow(RangeError)
 	})
 
+	// NOTE: A host writes the pair, and asking it for `1n` and `2n` where `1`
+	// and `2` say the same thing buys nothing.
+	it("takes whole numbers as the parts they are", () => {
+		expect(new EssenceRational(1, 2).toString()).toBe("1/2")
+		expect(new EssenceRational(3).toString()).toBe("3")
+		expect(
+			new EssenceRational(-4, 8).equals(new EssenceRational(-1n, 2n)),
+		).toBe(true)
+	})
+
+	// NOTE: `reduced` is the RUNTIME's canonicaliser, and the runtime is typed
+	// code that trusts the Enricher. Handed a number where a bigint belongs it
+	// answers nothing a host can use: beside a bigint it throws out of `a % b`,
+	// from a stack that names the runtime rather than the call that was
+	// written, and beside another number it reduces to parts nobody meant. A
+	// host reaches it through this constructor and nowhere else, so this is
+	// where a mistyped part is answered for.
+	it("refuses a part that is not a whole number", () => {
+		expect(() => new EssenceRational(1.5)).toThrow(TypeError)
+		expect(() => new EssenceRational(1n, 2.5)).toThrow(TypeError)
+		// NOTE: A double past 2 ** 53 has already lost the value it was written
+		// as, so taking it would hand back a Rational of a number nobody meant.
+		expect(() => new EssenceRational(2 ** 53)).toThrow(TypeError)
+	})
+
+	// NOTE: There is no Rational of `NaN` or of an infinity at all, which is
+	// what `fromNumber` says of them as well — so they are refused on the same
+	// ground and with the same Error it refuses them with, rather than sent to
+	// a door that turns them away too.
+	it("refuses a part that is not finite, as 'fromNumber' does", () => {
+		expect(() => new EssenceRational(Number.NaN)).toThrow(RangeError)
+		expect(() => new EssenceRational(Infinity)).toThrow(RangeError)
+		expect(() => new EssenceRational(1n, -Infinity)).toThrow(/finite/)
+	})
+
+	// NOTE: Two numbers is the one pair that gets PAST the mixing every case
+	// above dies on, since `a % b` of two numbers is a number: `reduced` runs
+	// to the end of its loop on it and answers a Rational whose parts are
+	// `NaN`, and before that loop was written to fall out of such a pair it ran
+	// forever. These throws are the only thing standing in front of it.
+	it("refuses a pair that is two numbers", () => {
+		expect(() => new EssenceRational(Number.NaN, 2)).toThrow(RangeError)
+		expect(() => new EssenceRational(0.1, 0.3)).toThrow(TypeError)
+		expect(() => new EssenceRational(1.5, 2.5)).toThrow(TypeError)
+	})
+
+	it("refuses a part that is no number at all", () => {
+		expect(() => new EssenceRational("1" as never)).toThrow(TypeError)
+		expect(() => new EssenceRational(1n, {} as never)).toThrow(TypeError)
+		expect(() => new EssenceRational(null as never)).toThrow(TypeError)
+		expect(() => new EssenceRational(undefined as never)).toThrow(TypeError)
+	})
+
+	// NOTE: Named in the message, because a host that wrote `0.1` wants the
+	// value the double HOLDS and there is no other door to it.
+	it("names 'fromNumber' where a double was meant", () => {
+		expect(() => new EssenceRational(0.1)).toThrow(
+			/EssenceRational\.fromNumber/,
+		)
+	})
+
 	it("is equal by its canonical parts", () => {
 		expect(
 			new EssenceRational(2n, 4n).equals(new EssenceRational(1n, 2n)),

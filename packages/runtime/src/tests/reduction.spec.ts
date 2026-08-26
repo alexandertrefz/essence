@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test"
+import { spawnSync } from "node:child_process"
 
+import { reduced } from "../bigRational"
 import { createInteger } from "../Integer"
 import { anyIs } from "../internalHelpers"
 import { decimal, fraction } from "../NumberFormat"
@@ -166,5 +168,78 @@ describe("remembered lowest terms", () => {
 				createRecord({ ratio: createRational(2n, 1n) }),
 			),
 		).toBeTrue()
+	})
+})
+
+// NOTE: `reduced` is typed code that trusts the Enricher, and nothing in the
+// language can hand it a pair that is not two bigints. A hole in the Enricher
+// once did, and what came of it was not a wrong answer anybody could read: the
+// Euclid loop compared a `NaN` remainder against `0n` forever, and the run
+// stopped responding. The loop asks `b > 0n` for that reason, and this is what
+// says so.
+describe("a pair that is no pair of bigints", () => {
+	// NOTE: Spawned rather than called here, and on a clock. What this is about
+	// is a call that RETURNS — a synchronous loop on the very thread a spec runs
+	// on would take the whole suite down with it instead of failing, and no
+	// timeout a test runner offers can interrupt one that never yields. The
+	// test is given the longer budget of the two, so that a spin is answered by
+	// the assertion on the killed child rather than by a runner saying only
+	// that time ran out.
+	test("is reduced to an answer rather than spun on", () => {
+		let module = import.meta.resolve("../bigRational")
+		let result = spawnSync(
+			process.execPath,
+			[
+				"--eval",
+				[
+					`let { reduced } = await import(${JSON.stringify(module)})`,
+					"reduced(Number.NaN, 2)",
+					"reduced(0.1, 0.3)",
+					"reduced(undefined, undefined)",
+					'console.log("answered")',
+				].join("\n"),
+			],
+			{
+				encoding: "utf-8",
+				timeout: 20_000,
+				// NOTE: The loop this guards against yields to nothing, so the
+				// child is killed outright rather than asked to stop.
+				killSignal: "SIGKILL",
+			},
+		)
+
+		// NOTE: A killed child is the spin itself — `status` is null there, so
+		// the exit code below would pass it by.
+		expect(result.signal).toBeNull()
+		expect(result.stdout).toContain("answered")
+		expect(result.status).toBe(0)
+	}, 30_000)
+
+	// NOTE: And the guard is the same question of the bigints the loop is
+	// written for, which is what lets it be free: `b` is an absolute value and
+	// a remainder of one, so `> 0n` and `!== 0n` part company nowhere a
+	// Rational goes.
+	test("changes nothing about a pair that is one", () => {
+		let cases: Array<[bigint, bigint, bigint, bigint]> = [
+			[12n, 18n, 2n, 3n],
+			[-12n, 18n, -2n, 3n],
+			[12n, -18n, -2n, 3n],
+			[-12n, -18n, 2n, 3n],
+			[0n, 5n, 0n, 1n],
+			[7n, 1n, 7n, 1n],
+			[10n ** 40n * 6n, 10n ** 40n * 4n, 3n, 2n],
+		]
+
+		for (let [
+			builtNumerator,
+			builtDenominator,
+			reducedNumerator,
+			reducedDenominator,
+		] of cases) {
+			expect(reduced(builtNumerator, builtDenominator)).toEqual({
+				numerator: reducedNumerator,
+				denominator: reducedDenominator,
+			})
+		}
 	})
 })

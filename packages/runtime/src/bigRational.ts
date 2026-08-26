@@ -13,11 +13,22 @@ export type BigRational = { numerator: bigint; denominator: bigint }
 // NOTE: Euclid's, through a temporary rather than a destructured swap: the
 // swap allocated an Array per turn, and this loop is what every reduction runs
 // — several turns for every arithmetic operation on a Rational.
+//
+// NOTE: `b > 0n` rather than `b !== 0n`, which is the same question of the
+// bigints this is written for — `b` is an absolute value and a remainder of
+// one, so it is never negative — and the same single comparison to make. What
+// the two are not the same about is a pair that is no pair of bigints at all.
+// Nothing in the language can hand one over: the Enricher is what says these
+// are Rational parts. But a hole in it used to reach here, and `NaN % 2` is
+// `NaN` forever, so `!==` spun until the process was killed while `>` — false
+// against `NaN`, as every relational comparison is — falls out and answers.
+// The next hole of that kind is a wrong answer somebody can read rather than a
+// run that stops responding.
 function greatestCommonDivisor(first: bigint, second: bigint): bigint {
 	let a = first < 0n ? -first : first
 	let b = second < 0n ? -second : second
 
-	while (b !== 0n) {
+	while (b > 0n) {
 		let remainder = a % b
 
 		a = b
