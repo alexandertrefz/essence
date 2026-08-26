@@ -223,6 +223,7 @@ export type DiagnosticCode =
 	| "table-not-written"
 	| "table-without-rows"
 	| "table-parameters"
+	| "table-row-type-mismatch"
 	| "snapshot-not-printable"
 	| "inline-snapshot-in-table"
 	| "property-parameters"

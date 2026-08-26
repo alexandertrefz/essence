@@ -1701,11 +1701,24 @@ Error: A table test takes one row at a time
     │ Note: Each item of the List is one row, and one row is one value — a test that wanted several values per row would say so by writing a Record.
 ────╯
 
+[table-row-type-mismatch]
+Error: This row does not fit the row Parameter
+    ╭─┤ Tests.es:89:27 │
+    │
+ 89 │     test "reads {n}" across ["one"] (n: Integer) {
+    │                              ──┬──  
+    │                                ╰──── this is a String
+    │ 
+    │ Help: Write a row of Type Integer, or widen the row Parameter's Type to one this row is a value of.
+    │ 
+    │ Note: The row Parameter is declared as Integer, and that is the Type the body — and an interpolated name — reads every row under.
+────╯
+
 [snapshot-not-printable]
 Error: Colour#Red can not be recorded as a snapshot
-    ╭─┤ Tests.es:90:10 │
+    ╭─┤ Tests.es:97:10 │
     │
- 90 │        expect Colour#Red matches snapshot
+ 97 │        expect Colour#Red matches snapshot
     │               ─────┬────  
     │                    ╰────── this is Colour#Red, which is not Printable
     │ 
@@ -1717,22 +1730,22 @@ Error: Colour#Red can not be recorded as a snapshot
 
 [property-parameters]
 Error: A generated Parameter has to write its Type
-    ╭─┤ Tests.es:96:39 │
-    │
- 96 │     test "over anything at all" for any (n) {
-    │                                          ▲  
-    │                                          ╰── nothing here says what to generate
-    │ 
-    │ Help: Write the Type: 'for any (n: Integer)'.
-    │ 
-    │ Note: The Type is the whole of what a generator is derived from.
-────╯
+     ╭─┤ Tests.es:103:39 │
+     │
+ 103 │     test "over anything at all" for any (n) {
+     │                                          ▲  
+     │                                          ╰── nothing here says what to generate
+     │ 
+     │ Help: Write the Type: 'for any (n: Integer)'.
+     │ 
+     │ Note: The Type is the whole of what a generator is derived from.
+─────╯
 
 [ungeneratable-type]
 Error: Nothing can generate a (_ String) -> Integer
-     ╭─┤ Tests.es:102:34 │
+     ╭─┤ Tests.es:109:34 │
      │
- 102 │     test "over a Function" for any (read: (_: String) -> Integer) {
+ 109 │     test "over a Function" for any (read: (_: String) -> Integer) {
      │                                     ──────────────┬─────────────  
      │                                                   ╰─────────────── nothing knows how to build a (_ String) -> Integer
      │ 
@@ -1743,9 +1756,9 @@ Error: Nothing can generate a (_ String) -> Integer
 
 [contradictory-test-forms]
 Error: A test runs written rows or generated values, not both
-     ╭─┤ Tests.es:109:56 │
+     ╭─┤ Tests.es:116:56 │
      │
- 109 │     test "over rows and values" across [1] (row: Integer) for any (n: Integer) {
+ 116 │     test "over rows and values" across [1] (row: Integer) for any (n: Integer) {
      │                                 ───┬──                    ─┬─  
      │                                    ╰───────────────────────│─── and this runs the rows
      │                                                            │   
@@ -1758,9 +1771,9 @@ Error: A test runs written rows or generated values, not both
 
 [snapshot-in-property]
 Error: A property test can not record a snapshot
-     ╭─┤ Tests.es:116:24 │
+     ╭─┤ Tests.es:123:24 │
      │
- 116 │        expect n::toString() matches snapshot from "drawn"
+ 123 │        expect n::toString() matches snapshot from "drawn"
      │                             ──────────────┬──────────────  
      │                                           ╰──────────────── every case would record here
      │ 
@@ -1771,9 +1784,9 @@ Error: A property test can not record a snapshot
 
 [benchmark-for-any]
 Error: A benchmark times written work, not generated values
-     ╭─┤ Tests.es:121:23 │
+     ╭─┤ Tests.es:128:23 │
      │
- 121 │     benchmark "counting" for any (n: Integer) {
+ 128 │     benchmark "counting" for any (n: Integer) {
      │     ────┬────            ─┬─  
      │         ╰─────────────────│─── and this asks for a timing
      │                           │   
@@ -1786,13 +1799,13 @@ Error: A benchmark times written work, not generated values
 
 [duplicate-test-name]
 Error: There is already a test called 'counts a win' here
-     ╭─┤ Tests.es:133:8 │
+     ╭─┤ Tests.es:140:8 │
      │
- 129 │        test "counts a win" {
+ 136 │        test "counts a win" {
      │             ───────┬──────  
      │                    ╰──────── the other test is here
      │ 
- 133 │        test "counts a win" {
+ 140 │        test "counts a win" {
      │             ───────┬──────  
      │                    ╰──────── this name is taken
      │ 
@@ -1801,7 +1814,7 @@ Error: There is already a test called 'counts a win' here
      │ Note: What a test is called, together with the suites around it, is what identifies it — to a snapshot, to a stored counterexample, and to the Editor.
 ─────╯
 
-─── 15 errors
+─── 16 errors
 "
 `;
 
