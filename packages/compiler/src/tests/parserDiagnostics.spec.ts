@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test"
 
-import type { parser } from "@essence-lang/interfaces"
+import type { common, parser } from "@essence-lang/interfaces"
 
 import { containsErrors } from "../diagnostics/index"
 import { parseWithDiagnostics } from "../parser/index"
@@ -867,6 +867,150 @@ greet() -> String { <- @ }
 
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].code).toBe("syntax-error")
+		})
+
+		// NOTE: `{ x = .5 }` is read as a Record Literal first and as a
+		// Combination second, and it is the FIRST reading that meets the
+		// half-written decimal. A refusal carrying a code is a verdict about
+		// the text rather than "this reading was not the one written", so the
+		// speculation lets it through instead of giving it back: without that
+		// the author was answered "Expected 'with' but found '='" — a message
+		// from the reading that never reached the Literal at all.
+		it("should let a coded refusal out of the reading that met it", () => {
+			let { diagnostics } = parseWithDiagnostics(
+				"implementation { constant a = { x = .5 } }",
+			)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("partial-decimal-literal")
+			expect(diagnostics[0].message).toBe(
+				"A decimal Literal has digits on both sides of the dot",
+			)
+			expect(diagnostics[0].position).toEqual({
+				start: { line: 1, column: 37 },
+				end: { line: 1, column: 39 },
+			})
+		})
+
+		it("should refuse every half-written Rational in a member value", () => {
+			let members: Array<[string, common.DiagnosticCode]> = [
+				["{ x = .5 }", "partial-decimal-literal"],
+				["{ x = 1. }", "partial-decimal-literal"],
+				["{ x = 1.5/2 }", "mixed-rational-literal"],
+				["{ x = 1/2.5 }", "mixed-rational-literal"],
+			]
+
+			for (let [member, code] of members) {
+				let { diagnostics } = parseWithDiagnostics(
+					`implementation { constant a = ${member} }`,
+				)
+
+				expect(diagnostics).toHaveLength(1)
+				expect(diagnostics[0].code).toBe(code)
+			}
+		})
+
+		// NOTE: The constructs a Record Literal stands inside — an Argument, a
+		// Case payload, a typed Record Literal, an item of a List, the members
+		// of a `with` — each of which reads it through at least one
+		// speculation, and one that nests two of them, where the refusal has
+		// to travel out of both to be reported once.
+		it("should refuse it wherever the Record Literal stands", () => {
+			let expressions = [
+				"f({ x = .5 })",
+				"f(g({ x = .5 }))",
+				"#Full({ x = .5 })",
+				"Point ~> { x = .5 }",
+				"[{ x = .5 }]",
+				"{ base with x = .5 }",
+			]
+
+			for (let expression of expressions) {
+				let { diagnostics } = parseWithDiagnostics(
+					`implementation { constant a = ${expression} }`,
+				)
+
+				expect(diagnostics).toHaveLength(1)
+				expect(diagnostics[0].code).toBe("partial-decimal-literal")
+			}
+		})
+
+		// NOTE: `require MATCHER = EXPR` reads its Matcher speculatively and
+		// reads an Expression where that is not what was written, so a Record
+		// Matcher's member values stand behind a speculation too — and both
+		// readings meet the same Literal.
+		it("should refuse a half-written decimal in a Record Matcher", () => {
+			let { diagnostics } = parseWithDiagnostics(
+				`implementation { }
+				tests {
+					test "prices" {
+						require { price = 1. } = order
+					}
+				}`,
+			)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("partial-decimal-literal")
+		})
+
+		// NOTE: A path is refused where it is READ, which inside a member
+		// value is inside the Record Literal reading.
+		it("should refuse a call on a path in a member value", () => {
+			for (let member of [
+				"{ x = .price::rounded() }",
+				"{ x = .total() }",
+			]) {
+				let { diagnostics } = parseWithDiagnostics(
+					`implementation { constant a = ${member} }`,
+				)
+
+				expect(diagnostics).toHaveLength(1)
+				expect(diagnostics[0].code).toBe("path-is-members-only")
+			}
+		})
+
+		// NOTE: The other half of the rule. A generic failure IS "this reading
+		// was not the one written", so it is still given back and the readings
+		// behind it still run — these two are refused by the LAST of them, and
+		// its message is the one that has always been reported.
+		it("should still give a generic failure back to the next reading", () => {
+			for (let member of ["{ x = ] }", "{ x = y. }"]) {
+				let { diagnostics } = parseWithDiagnostics(
+					`implementation { constant a = ${member} }`,
+				)
+
+				expect(diagnostics).toHaveLength(1)
+				expect(diagnostics[0].code).toBe("syntax-error")
+				expect(diagnostics[0].message).toBe(
+					"Expected 'with' but found '='.",
+				)
+			}
+		})
+
+		// NOTE: The shapes the speculations are there for, read together so
+		// that one of them turning into an error is a failure here rather than
+		// a snapshot nobody looks at twice.
+		it("should still read the shapes the speculations are there for", () => {
+			let { program, diagnostics } = parseWithDiagnostics(
+				`implementation {
+					constant a = { x = 1 }
+					constant b = { a with x = 2 }
+					constant c = Point ~> { x = 3 }
+					constant d = Holder<Integer>#Full(1)
+				}`,
+			)
+
+			expect(diagnostics).toEqual([])
+			expect(
+				program.implementation.nodes.map(
+					(node) => declaredValue(node)?.nodeType,
+				),
+			).toEqual([
+				"RecordValue",
+				"Combination",
+				"RecordValue",
+				"CaseValue",
+			])
 		})
 	})
 })

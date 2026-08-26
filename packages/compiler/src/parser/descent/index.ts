@@ -16,6 +16,7 @@ import {
 	describeToken,
 	fail,
 	ParseError,
+	refusesTheText,
 	TokenStream,
 	type TokenStreamState,
 } from "./tokenStream"
@@ -3759,10 +3760,12 @@ class DescentParser {
 
 	// NOTE: The steps after a key's first Identifier, or null where the key is
 	// a plain name — which is what tells the two apart everywhere below. Every
-	// key position reads a path, a plain Record Literal's included: refusing it
-	// here would put the refusal inside the speculative first reading of
-	// `parseRecordLiteralOrCombination`, where it is rewound, and the author
-	// would be told 'Expected with' instead of what a path key is.
+	// key position reads a path, a plain Record Literal's included: this is
+	// the one key list the Parser has, read for a Record Literal, for the
+	// members of a `with` and for a default alike, so it can not tell from
+	// here which of them it is inside of. What a path key needs is a value
+	// already under it to reach into, and that is what the Enricher refuses it
+	// for — `path-key-outside-combination` — with the whole Record in hand.
 	//
 	// One Token of lookahead settles `.{`: after a step's dot, a `{` opens a
 	// braced descend and an Identifier continues the path. A member name is
@@ -5441,6 +5444,48 @@ class DescentParser {
 	// the stream standing behind it: the Matcher of `require MATCHER = EXPR`
 	// is told from an Expression by the `=` behind it and by nothing inside
 	// it, so text that read as a Matcher was not necessarily written as one.
+	//
+	// NOTE: A CODED refusal is not a failed reading — see `refusesTheText`. It
+	// is a verdict about text that was written, and no other reading of that
+	// text is going to ACCEPT it: `.5` is half a decimal wherever it stands.
+	// The readings a speculation would hand it back to either refuse it in the
+	// same words, as every one that reads its member values with the Expression
+	// parser does, or fail on it in worse ones — a Record Matcher reads its
+	// member values as written literals, and a `.` is no literal at all, so it
+	// says only "Expected a literal value". So a coded refusal is re-raised to
+	// the Statement loop that reports it, instead of being given back for a
+	// second reading to answer for it: `{ x = .5 }` used to be answered with
+	// "Expected 'with' but found '='".
+	//
+	// What the re-raise leaves behind is the mirror of what a rewind leaves:
+	//
+	//   - The Tokens stay where the refusal stood. A refusal site reads what it
+	//     is refusing before it throws — the digits behind a `.`, the fraction
+	//     behind a `1.5/`, the `::` behind a member path — on purpose, so that
+	//     no tail of it is read again as a Statement of its own. Rewinding to
+	//     the start of the speculation would hand that tail back to
+	//     resynchronisation.
+	//
+	//     Those are the refusals that reach here at all. Of the rest,
+	//     `nesting-too-deep` is given back by name, being about the reading
+	//     rather than about the text, and every other one is raised in a
+	//     Statement position — a Matcher behind an `is`, a snapshot behind a
+	//     Matcher, a `test` outside a tests section — where the Statement loop
+	//     it stands in reports and resynchronises it before any enclosing
+	//     speculation hears of it.
+	//   - The suppression latch is RESTORED, which is what a rewind does and
+	//     the whole of what this has to do: a re-raise leaves the state a
+	//     rewind leaves, the Tokens excepted. The attempt can not have set it —
+	//     the latch goes up where the input has ENDED, and every coded refusal
+	//     peeks a Token before it throws — so this is the mirror of the line
+	//     below rather than a hazard of its own. Restored, it still holds
+	//     wherever it was already set before the speculation: there the refusal
+	//     is a cascade of a Diagnostic that has been reported.
+	//   - The Diagnostics are REWOUND. What the abandoned reading reported on
+	//     the way to the refusal is still about a shape the Program was never
+	//     in, and the Statement holding them is dropped whole. The refusal
+	//     itself travels in the ParseError rather than in the collection, so
+	//     it is untouched by this — leaving exactly one Diagnostic for it.
 	protected speculate<T>(
 		parseAttempt: () => T,
 		keeps: () => boolean,
@@ -5457,6 +5502,13 @@ class DescentParser {
 			}
 		} catch (error) {
 			if (!(error instanceof ParseError)) {
+				throw error
+			}
+
+			if (refusesTheText(error)) {
+				this.suppressDiagnostics = savedSuppressDiagnostics
+				rewindDiagnostics(diagnosticMark)
+
 				throw error
 			}
 		}

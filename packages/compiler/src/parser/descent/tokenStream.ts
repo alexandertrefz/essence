@@ -57,6 +57,27 @@ export class ParseError {
 	}
 }
 
+// NOTE: The codes a speculation gives back when it rewinds, rather than
+// letting them through to the Statement loop. `syntax-error` is the generic
+// failure — "this reading was not the one written" — which is the whole point
+// of speculating, and `nesting-too-deep` is about the READING rather than
+// about the text: a speculation recurs a level deeper than the reading it
+// stands in for, so an attempt can exhaust the depth budget where the reading
+// that is kept fits inside it, and re-raising it would refuse a Program this
+// Parser accepts. Every other code is a refusal of text that WAS written, and
+// no other reading of that text is going to accept it.
+const rewoundCodes: Set<common.DiagnosticCode> = new Set([
+	"syntax-error",
+	"nesting-too-deep",
+])
+
+// NOTE: Whether a ParseError is a verdict about the text — a refusal that
+// stands whichever reading of the surrounding construct is taken — as opposed
+// to one reading saying it was not the one written.
+export function refusesTheText(error: ParseError): boolean {
+	return !rewoundCodes.has(error.code)
+}
+
 // NOTE: All parse failures are routed through this single helper. The
 // statement loops catch the resulting ParseError, report it as a Diagnostic
 // and resynchronise.
