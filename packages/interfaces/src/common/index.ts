@@ -185,6 +185,8 @@ export type DiagnosticCode =
 	| "unclosed-string"
 	| "unclosed-block"
 	| "invalid-number"
+	| "mixed-rational-literal"
+	| "partial-decimal-literal"
 	| "invalid-escape"
 	| "comment-in-hole"
 	| "nesting-too-deep"

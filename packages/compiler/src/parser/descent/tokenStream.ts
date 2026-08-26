@@ -341,7 +341,7 @@ export class TokenStream {
 				code: "invalid-number",
 				labels: [primary(error.position, "this is not a Number")],
 				notes: [
-					"A Number is written in decimal digits, grouped with '_' where that helps — 1_000_000.",
+					"A Number is written in the digits '0' through '9', grouped with '_' where that helps, with a fractional part written behind a '.' — 1_000_000, 19.99.",
 				],
 				helps: [
 					"Essence has no hexadecimal, binary or exponent form; write the value in digits.",

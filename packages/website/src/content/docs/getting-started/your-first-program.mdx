@@ -59,7 +59,10 @@ Five things are worth naming before you run it:
   declare methods the runtime implements.
 - **`§` starts a comment**, and `§§` a documentation comment. There is no `//`.
 - **`1/3` is a literal**, not a division that has already happened. It is a
-  `Rational`, kept exact and in lowest terms.
+  `Rational`, kept exact and in lowest terms. `0.75` is a second way to write
+  one — exactly the decimal it names, with no scale to it, so `1.50` and `1.5`
+  are one value — and it prints as the fraction `3/4` unless you ask for
+  `toString(as #Decimal)`.
 - **`::` calls a method on a value.** `oneThird::add(twoThirds)` is the same
   call as `Rational.add(oneThird, twoThirds)`.
 - **`{sum}` is an interpolation hole**, and it takes an expression rather than

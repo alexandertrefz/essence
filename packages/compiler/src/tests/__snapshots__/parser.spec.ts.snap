@@ -22565,3 +22565,253 @@ exports[`Parser Statements FunctionStatements should parse FunctionLiterals with
   "tests": null,
 }
 `;
+
+exports[`Parser Expressions Literals DecimalLiterals should parse DecimalLiterals 1`] = `
+{
+  "exports": null,
+  "implementation": {
+    "nodeType": "ImplementationSection",
+    "nodes": [
+      {
+        "denominator": "100",
+        "nodeType": "RationalValue",
+        "numerator": "75",
+        "position": {
+          "end": {
+            "column": 22,
+            "line": 1,
+          },
+          "start": {
+            "column": 18,
+            "line": 1,
+          },
+        },
+      },
+    ],
+    "position": {
+      "end": {
+        "column": 24,
+        "line": 1,
+      },
+      "start": {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "imports": null,
+  "kind": "implementation",
+  "nodeType": "Program",
+  "position": {
+    "end": {
+      "column": 24,
+      "line": 1,
+    },
+    "start": {
+      "column": 1,
+      "line": 1,
+    },
+  },
+  "tests": null,
+}
+`;
+
+exports[`Parser Expressions Literals DecimalLiterals should parse DecimalLiterals with underscores 1`] = `
+{
+  "exports": null,
+  "implementation": {
+    "nodeType": "ImplementationSection",
+    "nodes": [
+      {
+        "denominator": "10000",
+        "nodeType": "RationalValue",
+        "numerator": "10000001",
+        "position": {
+          "end": {
+            "column": 29,
+            "line": 1,
+          },
+          "start": {
+            "column": 18,
+            "line": 1,
+          },
+        },
+      },
+    ],
+    "position": {
+      "end": {
+        "column": 31,
+        "line": 1,
+      },
+      "start": {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "imports": null,
+  "kind": "implementation",
+  "nodeType": "Program",
+  "position": {
+    "end": {
+      "column": 31,
+      "line": 1,
+    },
+    "start": {
+      "column": 1,
+      "line": 1,
+    },
+  },
+  "tests": null,
+}
+`;
+
+exports[`Parser Expressions Literals DecimalLiterals should parse negative DecimalLiterals 1`] = `
+{
+  "exports": null,
+  "implementation": {
+    "nodeType": "ImplementationSection",
+    "nodes": [
+      {
+        "denominator": "10",
+        "nodeType": "RationalValue",
+        "numerator": "-5",
+        "position": {
+          "end": {
+            "column": 22,
+            "line": 1,
+          },
+          "start": {
+            "column": 18,
+            "line": 1,
+          },
+        },
+      },
+    ],
+    "position": {
+      "end": {
+        "column": 24,
+        "line": 1,
+      },
+      "start": {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "imports": null,
+  "kind": "implementation",
+  "nodeType": "Program",
+  "position": {
+    "end": {
+      "column": 24,
+      "line": 1,
+    },
+    "start": {
+      "column": 1,
+      "line": 1,
+    },
+  },
+  "tests": null,
+}
+`;
+
+exports[`Parser Expressions Literals DecimalLiterals should parse whole DecimalLiterals 1`] = `
+{
+  "exports": null,
+  "implementation": {
+    "nodeType": "ImplementationSection",
+    "nodes": [
+      {
+        "denominator": "10",
+        "nodeType": "RationalValue",
+        "numerator": "20",
+        "position": {
+          "end": {
+            "column": 21,
+            "line": 1,
+          },
+          "start": {
+            "column": 18,
+            "line": 1,
+          },
+        },
+      },
+    ],
+    "position": {
+      "end": {
+        "column": 23,
+        "line": 1,
+      },
+      "start": {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "imports": null,
+  "kind": "implementation",
+  "nodeType": "Program",
+  "position": {
+    "end": {
+      "column": 23,
+      "line": 1,
+    },
+    "start": {
+      "column": 1,
+      "line": 1,
+    },
+  },
+  "tests": null,
+}
+`;
+
+exports[`Parser Expressions Literals DecimalLiterals should parse DecimalLiterals with a trailing zero 1`] = `
+{
+  "exports": null,
+  "implementation": {
+    "nodeType": "ImplementationSection",
+    "nodes": [
+      {
+        "denominator": "100",
+        "nodeType": "RationalValue",
+        "numerator": "150",
+        "position": {
+          "end": {
+            "column": 22,
+            "line": 1,
+          },
+          "start": {
+            "column": 18,
+            "line": 1,
+          },
+        },
+      },
+    ],
+    "position": {
+      "end": {
+        "column": 24,
+        "line": 1,
+      },
+      "start": {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "imports": null,
+  "kind": "implementation",
+  "nodeType": "Program",
+  "position": {
+    "end": {
+      "column": 24,
+      "line": 1,
+    },
+    "start": {
+      "column": 1,
+      "line": 1,
+    },
+  },
+  "tests": null,
+}
+`;

@@ -533,6 +533,11 @@ export class Lexer {
 	// anything the author could act on. The Token still carries only its leading
 	// digits, so every later stage sees a well-formed Number and reports its own
 	// problems rather than failing on text no Number can hold.
+	//
+	// NOTE: The `.` of a decimal is a Token of its own and no business of this
+	// scanner's. The Parser joins `0`, `.` and `75` into one Rational Literal
+	// where the three are written flush, exactly the way it joins `3`, `/` and
+	// `4` — so at this level a Number Literal really is digits and nothing else.
 	protected lexNumber(): Token {
 		let data = this.data
 		let start = this.index

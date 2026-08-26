@@ -264,6 +264,231 @@ _ 2
 		})
 	})
 
+	// NOTE: A decimal is a Rational written a second way, so what these hold
+	// the Parser to is the FRACTION each spelling stands for — there is no
+	// Node of its own to check, and no scale on the side: `1.50` and `1.5` are
+	// two ways of writing one value, and both reduce to it on read.
+	describe("Decimal Literals", () => {
+		let numberOf = (source: string) =>
+			declaredValue(
+				firstNode(`implementation { constant a = ${source} }`),
+			)
+
+		it("should read a decimal as its fraction", () => {
+			expect(numberOf("0.75")).toMatchObject({
+				nodeType: "RationalValue",
+				numerator: "75",
+				denominator: "100",
+			})
+			expect(numberOf("19.99")).toMatchObject({
+				nodeType: "RationalValue",
+				numerator: "1999",
+				denominator: "100",
+			})
+		})
+
+		it("should keep the sign on the numerator", () => {
+			expect(numberOf("-0.5")).toMatchObject({
+				nodeType: "RationalValue",
+				numerator: "-5",
+				denominator: "10",
+			})
+		})
+
+		// NOTE: `2.0` is a Rational the way `4/2` is one — the spelling says
+		// what was written, and the runtime reduces it on read.
+		it("should read a whole decimal as a Rational", () => {
+			expect(numberOf("2.0")).toMatchObject({
+				nodeType: "RationalValue",
+				numerator: "20",
+				denominator: "10",
+			})
+		})
+
+		// NOTE: No scale is kept, so `1.50` and `1.5` are the same value —
+		// which is what makes `1.50::is(1.5)` true.
+		it("should keep a trailing zero out of the value", () => {
+			expect(numberOf("1.50")).toMatchObject({
+				nodeType: "RationalValue",
+				numerator: "150",
+				denominator: "100",
+			})
+		})
+
+		it("should join '_' groups on both sides of the point", () => {
+			expect(numberOf("1_000.000_1")).toMatchObject({
+				nodeType: "RationalValue",
+				numerator: "10000001",
+				denominator: "10000",
+			})
+		})
+
+		// NOTE: The numerator goes through `BigInt`, because every stage
+		// behind the Parser reads it as plain digits — the Optimiser folds a
+		// Literal only where it matches `/^-?[0-9]+$/`, and the Rewriter hands
+		// the string straight to `BigInt`.
+		it("should normalise a leading zero out of the numerator", () => {
+			expect(numberOf("0.05")).toMatchObject({
+				nodeType: "RationalValue",
+				numerator: "5",
+				denominator: "100",
+			})
+		})
+
+		it("should leave no sign on a zero", () => {
+			expect(numberOf("-0.0")).toMatchObject({
+				nodeType: "RationalValue",
+				numerator: "0",
+				denominator: "10",
+			})
+		})
+
+		it("should span the Literal from its sign to its last digit", () => {
+			let { diagnostics } = parseWithDiagnostics(
+				"implementation { constant a = -0.5 }",
+			)
+
+			expect(diagnostics).toEqual([])
+			expect(numberOf("-0.5")).toMatchObject({
+				position: {
+					start: { line: 1, column: 31 },
+					end: { line: 1, column: 35 },
+				},
+			})
+		})
+
+		it("should refuse a fraction written onto a decimal", () => {
+			let { diagnostics } = parseWithDiagnostics(
+				"implementation { constant a = 1.5/2 }",
+			)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("mixed-rational-literal")
+			expect(diagnostics[0].labels[0]?.message).toBe(
+				"'/' can not follow a decimal",
+			)
+			// NOTE: The whole Literal is underlined, not the tail alone — the
+			// tail is read before it is refused so that nothing is left behind
+			// to be read again as a Statement of its own.
+			expect(diagnostics[0].position).toEqual({
+				start: { line: 1, column: 31 },
+				end: { line: 1, column: 36 },
+			})
+		})
+
+		it("should refuse a decimal written onto a fraction", () => {
+			let { diagnostics } = parseWithDiagnostics(
+				"implementation { constant a = 1/2.5 }",
+			)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("mixed-rational-literal")
+			expect(diagnostics[0].labels[0]?.message).toBe(
+				"'.' can not follow a fraction",
+			)
+		})
+
+		it("should refuse a decimal with nothing before the point", () => {
+			let { diagnostics } = parseWithDiagnostics(
+				"implementation { constant a = .5 }",
+			)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("partial-decimal-literal")
+			expect(diagnostics[0].message).toBe(
+				"A decimal Literal has digits on both sides of the dot",
+			)
+			expect(diagnostics[0].labels[0]?.message).toBe(
+				"nothing stands before the point",
+			)
+			expect(diagnostics[0].helps).toContain(
+				"Write the digits before the point: '0.5'.",
+			)
+		})
+
+		it("should refuse a decimal with nothing behind the point", () => {
+			let { diagnostics } = parseWithDiagnostics(
+				"implementation { constant a = 1. }",
+			)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("partial-decimal-literal")
+			expect(diagnostics[0].labels[0]?.message).toBe(
+				"no digits stand flush behind the point",
+			)
+			expect(diagnostics[0].helps).toContain(
+				"Write the digits behind the point: '1.0'.",
+			)
+		})
+
+		// NOTE: The digits have to be flush against the point, exactly as the
+		// denominator of `1/2` has to be flush against the `/`.
+		it("should refuse digits pushed off the point", () => {
+			let { diagnostics } = parseWithDiagnostics(
+				"implementation { constant a = 1. 5 }",
+			)
+
+			expect(diagnostics[0].code).toBe("partial-decimal-literal")
+		})
+
+		it("should not read a spaced '.' as a decimal point", () => {
+			for (let source of ["1 . 5", "1 .5"]) {
+				let { program, diagnostics } = parseWithDiagnostics(
+					`implementation { constant a = ${source} }`,
+				)
+
+				expect(containsErrors(diagnostics)).toBe(true)
+				expect(
+					diagnostics.some(
+						(diagnostic) =>
+							diagnostic.code === "partial-decimal-literal",
+					),
+				).toBe(false)
+				expect(
+					JSON.stringify(program.implementation.nodes),
+				).not.toContain("RationalValue")
+			}
+		})
+
+		// NOTE: The reading a decimal must not take away. A flush `.` behind
+		// an Integer opened a Lookup long before decimals existed, and it
+		// still does wherever a member name rather than digits follows it.
+		it("should still read a flush member off an Integer", () => {
+			let { program, diagnostics } = parseWithDiagnostics(
+				"implementation { constant a = 1.foo }",
+			)
+
+			expect(diagnostics).toEqual([])
+			expect(
+				declaredValue(program.implementation.nodes[0]),
+			).toMatchObject({ nodeType: "Lookup" })
+		})
+
+		it("should still read a flush member off a fraction", () => {
+			let { program, diagnostics } = parseWithDiagnostics(
+				"implementation { constant a = 1/2.foo }",
+			)
+
+			expect(diagnostics).toEqual([])
+			expect(
+				declaredValue(program.implementation.nodes[0]),
+			).toMatchObject({ nodeType: "Lookup" })
+		})
+
+		// NOTE: A `.` that opens an Expression is still a member path — the
+		// refusal above it reads the digits, and nothing else.
+		it("should still read a member path", () => {
+			let { program, diagnostics } = parseWithDiagnostics(
+				"implementation { constant a = .price }",
+			)
+
+			expect(diagnostics).toEqual([])
+			expect(
+				declaredValue(program.implementation.nodes[0]),
+			).toMatchObject({ nodeType: "MemberPath" })
+		})
+	})
+
 	describe("Record Matchers", () => {
 		it("should report a member value that is not a literal", () => {
 			let { diagnostics } = parseWithDiagnostics(

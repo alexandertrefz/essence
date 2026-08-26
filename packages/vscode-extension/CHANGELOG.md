@@ -22,6 +22,10 @@
   what the file on disk says; deleting the file does.
 - With coverage on, an edit re-runs only the tests that reached the changed
   lines; unaffected test files are left standing.
+- A decimal Literal is lit as the one number it is: `0.75`, `19.99` and
+  `1_000.5` colour whole rather than as an Integer that stops at the dot.
+  A member path off a whole number, `1.foo`, reads exactly as it did — the
+  rule wants digits on both sides.
 
 ## [0.5.0]
 

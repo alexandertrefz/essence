@@ -237,6 +237,19 @@ function isAdjacent(left: common.Position, right: common.Position): boolean {
 	)
 }
 
+// NOTE: The numerator of a decimal — the two written digit runs read as one
+// number over a power of ten. Normalised through `BigInt` so what comes out is
+// plain digits: no leading zeros (`0.05` is `5/100`) and no sign on a zero
+// (`-0.0` is `0/10`). Every stage behind the Parser reads these strings as
+// digits and nothing else — the Optimiser folds them by a `/^-?[0-9]+$/` test,
+// and the Rewriter hands them straight to `BigInt`.
+function decimalNumerator(whole: string, fraction: string): string {
+	let negative = whole.startsWith("-")
+	let magnitude = BigInt(`${negative ? whole.slice(1) : whole}${fraction}`)
+
+	return magnitude === 0n ? "0" : `${negative ? "-" : ""}${magnitude}`
+}
+
 // NOTE: The parser reads nesting by recursion, one call level per written
 // level, so a Program that nests deeply enough would overflow the call stack
 // and crash without a report. The guard refuses it with one instead, well
@@ -2968,6 +2981,9 @@ class DescentParser {
 	// Lookup chain reads its own.
 	protected parseMemberPath(): parser.MemberPathNode {
 		let dot = this.tokens.expect(TokenType.SymbolDot)
+
+		this.refusePartialDecimal(dot)
+
 		let steps = [this.parseIdentifier()]
 
 		while (this.tokens.peek()?.type === TokenType.SymbolDot) {
@@ -4048,18 +4064,179 @@ class DescentParser {
 			this.tokens.next()
 
 			let denominator = this.parseInteger()
+			let position = {
+				start: numerator.position.start,
+				end: denominator.position.end,
+			}
+
+			this.refuseMixedRational(
+				position,
+				TokenType.SymbolDot,
+				"'.' can not follow a fraction",
+			)
 
 			return generators.rationalValueNode(
 				numerator.value,
 				denominator.value,
+				position,
+			)
+		}
+
+		let decimal = this.parseDecimalTail(numerator)
+
+		if (decimal !== null) {
+			return decimal
+		}
+
+		return generators.integerValueNode(numerator.value, numerator.position)
+	}
+
+	// NOTE: `0.75` is one Rational Literal for the reason `3/4` is — the
+	// Integer, the `.` and the digits behind it are written flush, and a `.`
+	// that stands apart from either side is the member access it has always
+	// been. So `1.foo` still reads a member off an Integer, and `1 . 5` is
+	// still two things with a broken `.` between them. Answers `null` where
+	// what follows is not a decimal at all, so the Integer stands on its own.
+	//
+	// NOTE: There is no scale — `1.50` is `150/100`, which the runtime reduces
+	// on read, so `1.50 is 1.5`. A decimal is a way of WRITING a Rational and
+	// not a Type of its own, and a Rational has no memory of how it was
+	// written.
+	protected parseDecimalTail(whole: {
+		value: string
+		position: common.Position
+	}): parser.RationalValueNode | null {
+		let dot = this.tokens.peek()
+
+		if (
+			dot?.type !== TokenType.SymbolDot ||
+			!isAdjacent(whole.position, dot.position)
+		) {
+			return null
+		}
+
+		let following = this.tokens.peek(1)
+		let flush =
+			following !== undefined &&
+			isAdjacent(dot.position, following.position)
+
+		if (!flush || following?.type !== TokenType.LiteralNumber) {
+			// NOTE: A flush Identifier behind the point is the Lookup it was
+			// before decimals existed — `1.foo` reads a member. Everything
+			// else is half a decimal: `1.` at the end of a line, `1. 5` with
+			// the digits pushed off the point.
+			if (flush && isIdentifierToken(following)) {
+				return null
+			}
+
+			throw new ParseError(
+				"A decimal Literal has digits on both sides of the dot",
+				{ start: whole.position.start, end: dot.position.end },
+				"no digits stand flush behind the point",
 				{
-					start: numerator.position.start,
-					end: denominator.position.end,
+					code: "partial-decimal-literal",
+					notes: [
+						"A decimal Literal joins an Integer, a '.' and the digits behind it, all three written flush — so a '.' written flush against an Integer is the point of a decimal rather than a member access, and there is no reading of it with one side empty.",
+					],
+					helps: [
+						"Write the digits behind the point: '1.0'.",
+						"Or drop the '.' — a whole Number is written on its own.",
+					],
 				},
 			)
 		}
 
-		return generators.integerValueNode(numerator.value, numerator.position)
+		this.tokens.next()
+
+		let fraction = this.parseDigitRun()
+		let position = {
+			start: whole.position.start,
+			end: fraction.position.end,
+		}
+
+		this.refuseMixedRational(
+			position,
+			TokenType.SymbolSlash,
+			"'/' can not follow a decimal",
+		)
+
+		return generators.rationalValueNode(
+			decimalNumerator(whole.value, fraction.value),
+			(10n ** BigInt(fraction.value.length)).toString(),
+			position,
+		)
+	}
+
+	// NOTE: `1.5/2` and `1/2.5` — a Rational written both ways at once. The
+	// tail is READ before it is refused, the way an `expect` Matcher is: what
+	// is dropped is then the whole Literal, rather than a tail of it left
+	// behind to be read again as a Statement of its own.
+	protected refuseMixedRational(
+		literal: common.Position,
+		symbolType: lexer.TokenType,
+		label: string,
+	): void {
+		let symbol = this.tokens.peek()
+		let tailStart = this.tokens.peek(1)
+
+		if (
+			symbol?.type !== symbolType ||
+			tailStart?.type !== TokenType.LiteralNumber ||
+			!isAdjacent(literal, symbol.position) ||
+			!isAdjacent(symbol.position, tailStart.position)
+		) {
+			return
+		}
+
+		this.tokens.next()
+
+		let tail = this.parseDigitRun()
+
+		throw new ParseError(
+			"A Rational Literal is a fraction or a decimal, not both",
+			{ start: literal.start, end: tail.position.end },
+			label,
+			{
+				code: "mixed-rational-literal",
+				notes: [
+					"A fraction and a decimal are two spellings of one Rational — '3/4' and '0.75' are the same value — so a Literal written both ways says the same thing twice, and leaves it to the reader which parts belong to which.",
+				],
+				helps: [
+					"Write the fraction — '3/4' — or the decimal — '0.75'.",
+				],
+			},
+		)
+	}
+
+	// NOTE: `.5` — the half of a decimal that is missing its whole part. It
+	// arrives here because a `.` opens a member path, and the message a path
+	// gives ("expected an Identifier") is about the wrong thing entirely: the
+	// digits are not a member name that came out wrong, they are the Literal's
+	// own fractional part.
+	protected refusePartialDecimal(dot: Token): void {
+		let digits = this.tokens.peek()
+
+		if (
+			digits?.type !== TokenType.LiteralNumber ||
+			!isAdjacent(dot.position, digits.position)
+		) {
+			return
+		}
+
+		let fraction = this.parseDigitRun()
+
+		throw new ParseError(
+			"A decimal Literal has digits on both sides of the dot",
+			{ start: dot.position.start, end: fraction.position.end },
+			"nothing stands before the point",
+			{
+				code: "partial-decimal-literal",
+				notes: [
+					"A '.' that opens an Expression is a member path — '.price' reads a member off the value it is handed — and digits can not name a member, so this is a decimal missing its whole part rather than a path.",
+				],
+				helps: ["Write the digits before the point: '0.5'."],
+			},
+		)
 	}
 
 	protected parseInteger(): { value: string; position: common.Position } {
@@ -4068,6 +4245,26 @@ class DescentParser {
 			dash = this.tokens.next()
 		}
 
+		let digits = this.parseDigitRun()
+
+		if (dash === null) {
+			return digits
+		}
+
+		return {
+			value: `-${digits.value}`,
+			position: {
+				start: dash.position.start,
+				end: digits.position.end,
+			},
+		}
+	}
+
+	// NOTE: The digits of one Number, `_` groups joined. Split out of
+	// `parseInteger` because a decimal has TWO runs and only the first of them
+	// may carry a sign — `0.-5` is not a Number, and reading the fractional
+	// part with `parseInteger` is what would have made it one.
+	protected parseDigitRun(): { value: string; position: common.Position } {
 		let firstPart = this.tokens.expect(TokenType.LiteralNumber)
 
 		let value = firstPart.value
@@ -4097,14 +4294,13 @@ class DescentParser {
 			lastPart = part
 		}
 
-		let end = lastPart.position.end
-		let start = firstPart.position.start
-		if (dash !== null) {
-			value = `-${value}`
-			start = dash.position.start
+		return {
+			value,
+			position: {
+				start: firstPart.position.start,
+				end: lastPart.position.end,
+			},
 		}
-
-		return { value, position: { start, end } }
 	}
 
 	protected parseListLiteral(): parser.ListValueNode {

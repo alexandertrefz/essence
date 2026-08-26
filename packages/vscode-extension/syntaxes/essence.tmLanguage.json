@@ -43,6 +43,9 @@
 			"include": "#fraction"
 		},
 		{
+			"include": "#decimal"
+		},
+		{
 			"include": "#number"
 		},
 		{
@@ -308,6 +311,11 @@
 			"comment": "The sign carries the lookbehind rather than the whole Literal: `<-5` returns a five, and reading the `-` of `<-` as its sign would leave the digit unlit.",
 			"match": "(?:(?<![<~-])-)?[0-9][0-9_]*/-?[0-9][0-9_]*",
 			"name": "constant.numeric.fraction.essence"
+		},
+		"decimal": {
+			"comment": "Digits on both sides of the dot, which is what keeps `1.foo` an Integer and a member path; the rule comes before `number` so that a decimal is lit whole rather than as an Integer that stops at the dot.",
+			"match": "(?:(?<![<~-])-)?[0-9][0-9_]*\\.[0-9][0-9_]*",
+			"name": "constant.numeric.decimal.essence"
 		},
 		"number": {
 			"match": "(?:(?<![<~-])-)?[0-9][0-9_]*",

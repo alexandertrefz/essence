@@ -1274,6 +1274,44 @@ describe("Parser", () => {
 				})
 			})
 
+			// NOTE: A decimal is a second spelling of a Rational and nothing
+			// else — there is no DecimalValue Node, and no scale kept on the
+			// side, so what these snapshots pin is the fraction each spelling
+			// stands for.
+			describe("DecimalLiterals", () => {
+				it("should parse DecimalLiterals", () => {
+					let input: parser.Program = parse("implementation { 0.75 }")
+
+					expect(input).toMatchSnapshot()
+				})
+
+				it("should parse DecimalLiterals with underscores", () => {
+					let input: parser.Program = parse(
+						"implementation { 1_000.000_1 }",
+					)
+
+					expect(input).toMatchSnapshot()
+				})
+
+				it("should parse negative DecimalLiterals", () => {
+					let input: parser.Program = parse("implementation { -0.5 }")
+
+					expect(input).toMatchSnapshot()
+				})
+
+				it("should parse whole DecimalLiterals", () => {
+					let input: parser.Program = parse("implementation { 2.0 }")
+
+					expect(input).toMatchSnapshot()
+				})
+
+				it("should parse DecimalLiterals with a trailing zero", () => {
+					let input: parser.Program = parse("implementation { 1.50 }")
+
+					expect(input).toMatchSnapshot()
+				})
+			})
+
 			describe("ListLiterals", () => {
 				it("should parse an empty List", () => {
 					let input: parser.Program = parse("implementation { [] }")
