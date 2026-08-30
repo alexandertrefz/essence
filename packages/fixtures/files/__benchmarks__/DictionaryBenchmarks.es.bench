@@ -1,0 +1,42 @@
+§ Baselines recorded by `essence test --bench`. They are read back on every
+§ measuring run, so a change here is a change to what the benchmarks are
+§ held to. Rewrite them with `essence test --bench --update`.
+
+benchmark "A List becoming a Dictionary/groups ten thousand items"
+	396000 ns
+
+benchmark "A List becoming a Dictionary/tallies ten thousand items"
+	292000 ns
+
+benchmark "A List of entries/counts a thousand keys"
+	4740000 ns
+
+benchmark "A List of entries/looks a thousand keys up"
+	4110000 ns
+
+benchmark "Dictionary/counts a thousand keys"
+	78000 ns
+
+benchmark "Dictionary/counts ten thousand keys"
+	786000 ns
+
+benchmark "Dictionary/looks a thousand keys up"
+	35000 ns
+
+benchmark "Dictionary/looks ten thousand keys up"
+	322000 ns
+
+benchmark "Dictionary/prints ten thousand entries"
+	730000 ns
+
+benchmark "Dictionary/sets ten thousand keys"
+	560000 ns
+
+benchmark "Dictionary/writes a hundred Dictionaries from one"
+	39300000 ns
+
+benchmark "Record keys/builds a thousand"
+	8400000 ns
+
+benchmark "Record keys/looks a thousand up"
+	9200000 ns
