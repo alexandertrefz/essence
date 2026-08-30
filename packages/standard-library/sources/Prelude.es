@@ -10,6 +10,7 @@ export {
 	Algebraic               from "./Algebraic.es"
 	Boolean                 from "./Boolean.es"
 	Comparable              from "./Comparable.es"
+	Dictionary              from "./Dictionary.es"
 	Integer                 from "./Integer.es"
 	NonNegativeInteger      from "./Integer.es"
 	NonZeroInteger          from "./Integer.es"

@@ -3552,6 +3552,270 @@ third"::lines())
 		provenRows::sum(on .n),
 	)
 
+	§ ——— Dictionary ———————————————————————————————————————————————————————
+	§ The second container, and the first Type with two Type Parameters. Every
+	§ Dictionary printed here reads the way one is written — `["a" = 1]`, and
+	§ `[=]` for the empty one — because `show` renders through the Printable
+	§ conformance, which a Dictionary has whenever its keys and its values do.
+	§
+	§ `Dictionary.of` reads both of its Type Arguments off the entries it is
+	§ handed, and an empty List of entries carries neither — so the receiver
+	§ this section builds its `[empty]` answers from is a List annotated where
+	§ it stands. Written down, the empty Dictionary is `[=]`.
+	constant noPairs: List<{ key: String, value: Integer }> = []
+	constant ages          = Dictionary.of([
+		{ key = "alex", value = 39 },
+		{ key = "sam", value = 25 },
+	])
+	constant noAges        = Dictionary.of(noPairs)
+	constant raises        = Dictionary.of([
+		{ key = "sam", value = 1 },
+		{ key = "kim", value = 2 },
+	])
+	§ The same entries in the other order. Equality is order-insensitive, so
+	§ this is the receiver that says so.
+	constant agesReordered = Dictionary.of([
+		{ key = "sam", value = 25 },
+		{ key = "alex", value = 39 },
+	])
+	constant codes         = Dictionary.of([{ key = "a", value = "b" }])
+
+	show(
+		"Dictionary.of<ValueType, KeyType is Equatable>(_ List<\{ key: KeyType, value: ValueType \}>)",
+		Dictionary.of([
+			{ key = "alex", value = 39 },
+			{ key = "sam", value = 25 },
+		]),
+	)
+	§ A later entry with a key already there wins, and the key keeps the place
+	§ its first occurrence gave it.
+	show(
+		"Dictionary.of<ValueType, KeyType is Equatable>(_ List<\{ key: KeyType, value: ValueType \}>) [duplicate key]",
+		Dictionary.of([
+			{ key = "alex", value = 39 },
+			{ key = "sam", value = 25 },
+			{ key = "alex", value = 40 },
+		]),
+	)
+	show(
+		"Dictionary.of<ValueType, KeyType is Equatable>(_ List<\{ key: KeyType, value: ValueType \}>) [empty]",
+		Dictionary.of(noPairs),
+	)
+	show(
+		"Dictionary.is<KeyType is Equatable, ValueType is Equatable>(_ Dictionary<KeyType, ValueType>)",
+		ages::is(ages),
+	)
+	show(
+		"Dictionary.is<KeyType is Equatable, ValueType is Equatable>(_ Dictionary<KeyType, ValueType>) [reordered]",
+		ages::is(agesReordered),
+	)
+	show(
+		"Dictionary.is<KeyType is Equatable, ValueType is Equatable>(_ Dictionary<KeyType, ValueType>) [differing]",
+		ages::is(raises),
+	)
+	show(
+		"Dictionary.is<KeyType is Equatable, ValueType is Equatable>(_ Dictionary<KeyType, ValueType>) [both empty]",
+		noAges::is(Dictionary.of(noPairs)),
+	)
+	show(
+		"Dictionary.isNot(_ Dictionary<KeyType, ValueType>)",
+		ages::isNot(raises),
+	)
+	show(
+		"Dictionary.isNot(_ Dictionary<KeyType, ValueType>) [equal]",
+		ages::isNot(agesReordered),
+	)
+	show(
+		"Dictionary.toString<KeyType is Printable, ValueType is Printable>()",
+		ages::toString(),
+	)
+	§ The empty Dictionary reads `[=]`, which is what tells it from the empty
+	§ List, and a String is quoted on either side of the `=`.
+	show(
+		"Dictionary.toString<KeyType is Printable, ValueType is Printable>() [empty]",
+		noAges::toString(),
+	)
+	show(
+		"Dictionary.toString<KeyType is Printable, ValueType is Printable>() [String values]",
+		codes::toString(),
+	)
+	show("Dictionary.isEmpty<KeyType, ValueType>()", ages::isEmpty())
+	show("Dictionary.isEmpty<KeyType, ValueType>() [empty]", noAges::isEmpty())
+	show("Dictionary.hasEntries<KeyType, ValueType>()", ages::hasEntries())
+	show(
+		"Dictionary.hasEntries<KeyType, ValueType>() [empty]",
+		noAges::hasEntries(),
+	)
+	show(
+		"Dictionary.hasKey<ValueType, KeyType is Equatable>(_ KeyType)",
+		ages::hasKey("alex"),
+	)
+	show(
+		"Dictionary.hasKey<ValueType, KeyType is Equatable>(_ KeyType) [absent]",
+		ages::hasKey("kim"),
+	)
+	show("Dictionary.length<KeyType, ValueType>()", ages::length())
+	show("Dictionary.length<KeyType, ValueType>() [empty]", noAges::length())
+	show(
+		"Dictionary.value<ValueType, KeyType is Equatable>(at: KeyType)",
+		ages::value(at "alex"),
+	)
+	show(
+		"Dictionary.value<ValueType, KeyType is Equatable>(at: KeyType) [absent]",
+		ages::value(at "kim"),
+	)
+	show(
+		"Dictionary.value<ValueType, KeyType is Equatable>(at: KeyType, defaultingTo: ValueType)",
+		ages::value(at "alex", defaultingTo 0),
+	)
+	show(
+		"Dictionary.value<ValueType, KeyType is Equatable>(at: KeyType, defaultingTo: ValueType) [absent]",
+		ages::value(at "kim", defaultingTo 0),
+	)
+	show("Dictionary.keys<KeyType, ValueType>()", ages::keys())
+	show("Dictionary.keys<KeyType, ValueType>() [empty]", noAges::keys())
+	show("Dictionary.values<KeyType, ValueType>()", ages::values())
+	show("Dictionary.entries<KeyType, ValueType>()", ages::entries())
+	show(
+		"Dictionary.set<ValueType, KeyType is Equatable>(_ KeyType, to: ValueType)",
+		ages::set("kim", to 7),
+	)
+	§ A key that is already there keeps the place it had, wherever the new
+	§ value came from.
+	show(
+		"Dictionary.set<ValueType, KeyType is Equatable>(_ KeyType, to: ValueType) [overwrite keeps its place]",
+		ages::set("alex", to 40),
+	)
+	§ And a key that was REMOVED lands at the end when it comes back, which is
+	§ the other half of the same rule.
+	show(
+		"Dictionary.set<ValueType, KeyType is Equatable>(_ KeyType, to: ValueType) [set again after a removal]",
+		ages::remove(at "alex")::set("alex", to 40),
+	)
+	show(
+		"Dictionary.update<ValueType, KeyType is Equatable>(at: KeyType, with: (_ ValueType) -> ValueType)",
+		ages::update(at "alex", with (age) { <- age::add(1) }),
+	)
+	show(
+		"Dictionary.update<ValueType, KeyType is Equatable>(at: KeyType, with: (_ ValueType) -> ValueType) [absent]",
+		ages::update(at "kim", with (age) { <- age::add(1) }),
+	)
+	show(
+		"Dictionary.update<ValueType, KeyType is Equatable>(at: KeyType, defaultingTo: ValueType, with: (_ ValueType) -> ValueType)",
+		ages::update(at "alex", defaultingTo 0, with (age) { <- age::add(1) }),
+	)
+	show(
+		"Dictionary.update<ValueType, KeyType is Equatable>(at: KeyType, defaultingTo: ValueType, with: (_ ValueType) -> ValueType) [absent]",
+		ages::update(at "kim", defaultingTo 0, with (age) { <- age::add(1) }),
+	)
+	show(
+		"Dictionary.remove<ValueType, KeyType is Equatable>(at: KeyType)",
+		ages::remove(at "alex"),
+	)
+	show(
+		"Dictionary.remove<ValueType, KeyType is Equatable>(at: KeyType) [absent]",
+		ages::remove(at "kim"),
+	)
+	§ Every callback here is handed the entry Record, so a Pattern takes it
+	§ apart where it stands.
+	show(
+		"Dictionary.removeEvery<ValueType, KeyType is Equatable>(where: (_ \{ key: KeyType, value: ValueType \}) -> Boolean)",
+		ages::removeEvery(where ({ key, value }) {
+			<- value::isGreaterThan(30)
+		}),
+	)
+	show(
+		"Dictionary.removeEvery<ValueType, KeyType is Equatable>(where: (_ \{ key: KeyType, value: ValueType \}) -> Boolean) [nothing accepted]",
+		ages::removeEvery(where ({ key, value }) { <- key::is("nobody") }),
+	)
+	show(
+		"Dictionary.everyEntry<ValueType, KeyType is Equatable>(where: (_ \{ key: KeyType, value: ValueType \}) -> Boolean)",
+		ages::everyEntry(where ({ key, value }) {
+			<- value::isGreaterThan(30)
+		}),
+	)
+	show(
+		"Dictionary.everyEntry<ValueType, KeyType is Equatable>(where: (_ \{ key: KeyType, value: ValueType \}) -> Boolean) [nothing accepted]",
+		ages::everyEntry(where ({ key, value }) { <- key::is("nobody") }),
+	)
+	show(
+		"Dictionary.map<KeyType, ValueType, Result>(_ (_ \{ key: KeyType, value: ValueType \}) -> Result)",
+		ages::map(({ key, value }) { <- "{key}:{value}" }),
+	)
+	show(
+		"Dictionary.map<KeyType, ValueType, Result>(_ (_ \{ key: KeyType, value: ValueType \}) -> Result) [empty]",
+		noAges::map(({ key, value }) { <- "{key}:{value}" }),
+	)
+	§ The Argument wins on a key both hold, and a key only the Argument holds
+	§ is added at the end.
+	show(
+		"Dictionary.merge<ValueType, KeyType is Equatable>(with: Dictionary<KeyType, ValueType>)",
+		ages::merge(with raises),
+	)
+	show(
+		"Dictionary.merge<ValueType, KeyType is Equatable>(with: Dictionary<KeyType, ValueType>) [empty argument]",
+		ages::merge(with noAges),
+	)
+	§ Unless the caller says otherwise. The Function is handed the receiver's
+	§ value first and the Argument's second.
+	show(
+		"Dictionary.merge<ValueType, KeyType is Equatable>(with: Dictionary<KeyType, ValueType>, choosing: (_ ValueType, _ ValueType) -> ValueType)",
+		ages::merge(with raises, choosing (mine, theirs) {
+			<- mine::add(theirs)
+		}),
+	)
+	§ Merging INTO the empty Dictionary is the Argument, entry for entry: the
+	§ receiver holds no key for the Argument to lose one to.
+	show(
+		"Dictionary.merge<ValueType, KeyType is Equatable>(with: Dictionary<KeyType, ValueType>) [empty receiver]",
+		noAges::merge(with ages),
+	)
+
+	§ The edges the pairs above stop one short of. A check that accepts EVERY
+	§ entry answers the empty Dictionary, and the empty Dictionary has parts to
+	§ answer with as much as any other.
+	show(
+		"Dictionary.removeEvery<ValueType, KeyType is Equatable>(where: (_ \{ key: KeyType, value: ValueType \}) -> Boolean) [everything accepted]",
+		ages::removeEvery(where ({ key, value }) {
+			<- value::isGreaterThan(0)
+		}),
+	)
+	show("Dictionary.values<KeyType, ValueType>() [empty]", noAges::values())
+	show("Dictionary.entries<KeyType, ValueType>() [empty]", noAges::entries())
+
+	§ A Dictionary is Printable whenever its keys and its values are, and a
+	§ Dictionary is one of the values that can be — so a Dictionary of
+	§ Dictionaries prints as the brackets it is written in, all the way down.
+	constant nestedAges = ["held" = ages, "none" = noAges]
+
+	show(
+		"Dictionary.toString<KeyType is Printable, ValueType is Printable>() [nested]",
+		nestedAges::toString(),
+	)
+
+	§ Two keys are ONE key when the keys' own `is` says so, and under a
+	§ covering `Number` that crosses the kinds: `3/1` is the Integer `3`, so
+	§ setting it overwrites rather than adds.
+	constant threes: Dictionary<Number, String> = [3 = "integer"]
+
+	show(
+		"Dictionary.set<ValueType, KeyType is Equatable>(_ KeyType, to: ValueType) [a whole Rational is its Integer]",
+		threes::set(3/1, to "rational"),
+	)
+
+	§ A key with no canonical encoding — a Record — is found by asking the
+	§ Record's own `is` of every key the Dictionary holds. It costs a walk
+	§ rather than a lookup, and nothing about it is visible from here.
+	constant seats: Dictionary<{ row: Integer, seat: Integer }, String> = [
+		{ row = 1, seat = 2 } = "alex",
+		{ row = 4, seat = 1 } = "sam",
+	]
+
+	show(
+		"Dictionary.value<ValueType, KeyType is Equatable>(at: KeyType) [Record key]",
+		seats::value(at { row = 4, seat = 1 }),
+	)
+
 	§ ——— loop ————————————————————————————————————————————————————————————
 	§ The free-Function loop family. `loop` belongs to no Namespace, so its
 	§ labels carry no prefix — the coverage net learns them from the member

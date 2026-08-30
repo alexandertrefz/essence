@@ -4,6 +4,7 @@ import type { common } from "@essence-lang/interfaces"
 import * as algebraic from "@essence-lang/runtime/Algebraic"
 import * as boolean from "@essence-lang/runtime/Boolean"
 import * as caseSensitivity from "@essence-lang/runtime/CaseSensitivity"
+import * as dictionary from "@essence-lang/runtime/Dictionary"
 import * as functions from "@essence-lang/runtime/functions"
 import * as integer from "@essence-lang/runtime/Integer"
 import * as integerList from "@essence-lang/runtime/IntegerList"
@@ -38,7 +39,7 @@ import * as string from "@essence-lang/runtime/String"
 import * as terminal from "@essence-lang/runtime/Terminal"
 import * as transcendental from "@essence-lang/runtime/Transcendental"
 
-import { builtinNamespaces } from "../enricher/builtins"
+import { builtinMemberOrder, builtinNamespaces } from "../enricher/builtins"
 import { loadStdlib } from "../enricher/stdlib"
 import { resolveOverloadedMethodName } from "../helpers/index"
 import { runtimeNamespaceNames } from "../rewriter/index"
@@ -83,6 +84,7 @@ const runtimeModules: Record<string, Record<string, unknown>> = {
 	NonEmptyNumberList: nonEmptyNumberList,
 	KeyedNumberList: keyedNumberList,
 	NonEmptyKeyedNumberList: nonEmptyKeyedNumberList,
+	Dictionary: dictionary,
 	Randomness: randomness,
 }
 
@@ -152,6 +154,55 @@ describe("Builtins", () => {
 		expect(imported).toEqual(declared)
 		// NOTE: This spec's own module table agrees with the Rewriter's list.
 		expect(tabled).toEqual(imported)
+	})
+
+	// NOTE: `builtinMemberOrder` decides which Namespace claims a shared Method
+	// name for Completion, and `Dictionary` sits after every List Namespace on
+	// the strength of a claim its own NOTE makes: the names it shares are
+	// shared harmlessly, because no value reaches a Dictionary Namespace and
+	// one of theirs at once. The names themselves are written down there, and a
+	// list written down in a comment goes stale in silence — so it is held to
+	// what the standard library actually declares.
+	it("shares exactly the Method names its NOTE names", () => {
+		let namespaces = new Map(
+			loadStdlib().namespaces.map((namespace) => [
+				namespace.name,
+				namespace,
+			]),
+		)
+		let dictionary = namespaces.get("Dictionary")
+
+		expect(dictionary).toBeDefined()
+
+		let mine = new Set(Object.keys(dictionary!.methods))
+		let shared = new Set<string>()
+
+		for (let name of builtinMemberOrder.slice(
+			0,
+			builtinMemberOrder.indexOf("Dictionary"),
+		)) {
+			for (let member of Object.keys(
+				namespaces.get(name)?.methods ?? {},
+			)) {
+				if (mine.has(member)) {
+					shared.add(member)
+				}
+			}
+		}
+
+		expect([...shared].sort()).toEqual([
+			"is",
+			"isEmpty",
+			"keys",
+			"length",
+			"map",
+			"of",
+			"remove",
+			"removeEvery",
+			"toString",
+			"value",
+			"values",
+		])
 	})
 
 	// NOTE: The Enricher's tables promise a Method exists; the runtime module
