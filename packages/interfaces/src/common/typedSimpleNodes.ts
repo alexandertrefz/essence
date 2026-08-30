@@ -769,6 +769,12 @@ export type DefineArm = {
 	// it, and `essence test --mutate` leaves an arm standing behind a doorway
 	// alone — and neither of them could answer it for itself.
 	narrows: boolean
+	// NOTE: And its sister claim, about what this arm's Condition left the arms
+	// BELOW it. Kept apart from `narrows` for the reason the typed Node keeps
+	// them apart: neither implies the other. `instrument-coverage` marks the
+	// `otherwise` arm's point with it, and `--mutate` reads both before it will
+	// move an arm's answer anywhere.
+	narrowsBelow: boolean
 }
 
 // #endregion

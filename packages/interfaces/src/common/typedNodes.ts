@@ -656,6 +656,18 @@ export type DefineArm = {
 	// narrowing is read off the typed Condition and checked refinements are
 	// erased before anything downstream sees a Program.
 	narrows: boolean
+	// NOTE: And that it established something for the arms BELOW it — the
+	// complement every later Condition, every later value and the `otherwise`
+	// value were read under. A SECOND claim rather than the same one twice:
+	// neither implies the other, and `d::is(0)` is the plain case of the
+	// difference — it proves nothing about `d` where it holds and proves
+	// `NonZeroInteger` where it does not.
+	//
+	// It is what makes "may this arm's answer be moved" answerable. Everything
+	// below the Enricher reads a `define` as a ladder of Expressions with no
+	// evidence anywhere in it, and a reader that moved an arm on the strength
+	// of that would run a value against a refinement nobody proved.
+	narrowsBelow: boolean
 	position: Position
 }
 

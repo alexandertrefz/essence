@@ -3631,17 +3631,25 @@ export function enrichDefine(
 			report(diagnostic)
 		}
 
+		// NOTE: What this arm's Condition leaves the arms BELOW it, computed
+		// once and read twice — the Scope the next arm is enriched in, and the
+		// claim the Node carries that it established anything at all. The two
+		// were always one answer; only the second of them used to be thrown
+		// away.
+		let complements = narrowingsFor(
+			complementEvidence(condition, armScope),
+			armScope,
+		)
+
 		arms.push({
 			value,
 			condition,
 			narrows: narrowings.length > 0,
+			narrowsBelow: complements.length > 0,
 			position: arm.position,
 		})
 
-		armScope = scopeShadowing(
-			narrowingsFor(complementEvidence(condition, armScope), armScope),
-			armScope,
-		)
+		armScope = scopeShadowing(complements, armScope)
 	}
 
 	// NOTE: The `otherwise` arm is reached by a value every Condition declined,
