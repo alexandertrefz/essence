@@ -325,6 +325,9 @@ export type DiagnosticCode =
 	| "refinement-as-matcher"
 	| "match-on-non-union"
 	| "literal-match-shape"
+	// Define Expressions — a definition by cases.
+	| "define-without-otherwise"
+	| "unreachable-define-arm"
 	// Protocols and conformance.
 	| "protocol-as-value"
 	| "protocol-as-type"

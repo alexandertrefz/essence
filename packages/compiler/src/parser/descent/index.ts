@@ -3226,12 +3226,23 @@ class DescentParser {
 			// every value has a Condition on it has nothing to answer with when
 			// they all decline. The Node has no shape for that, which is what
 			// makes every `define` downstream total by construction.
+			//
+			// NOTE: Coded, which is what makes the refusal SURVIVE a
+			// speculation — `refusesTheText` reads the code, and the generic
+			// `syntax-error` this used to carry is one of the two a speculation
+			// gives back. A `define` missing its `otherwise` arm is a verdict
+			// about text that was written: no other reading of those braces is
+			// going to find the arm that is not there. `{ found = define { as 1
+			// if flag } }` used to be answered with "Expected 'with' but found
+			// '='", which is the Dictionary reading behind the Record one
+			// speaking for text the Record reading had already judged.
 			if (otherwise === null) {
 				throw new ParseError(
 					"This 'define' has no 'otherwise' arm",
 					position,
 					"every value here has a condition on it",
 					{
+						code: "define-without-otherwise",
 						notes: [
 							"A 'define' answers with a value wherever it stands, so one of its arms has to be the one that always holds.",
 						],
@@ -3276,11 +3287,33 @@ class DescentParser {
 			try {
 				let keyword = this.tokens.expect(TokenType.KeywordAs)
 
-				if (otherwise !== null) {
-					fail(
-						"This arm stands below the 'otherwise' arm",
-						keyword.position,
-						"nothing here can ever be reached",
+				// NOTE: Reported here and DROPPED rather than thrown, which is
+				// the one refusal this loop answers for itself. The arm reads
+				// perfectly well — what is wrong with it is where it stands —
+				// so the text below it is still text this Parser can read, and
+				// a thrown refusal would take the whole Statement the `define`
+				// stands in with it: every use of the Constant it declares then
+				// names nothing, which is a great many Diagnostics for one
+				// misplaced arm. Never recording it is what keeps the Node's
+				// "the `otherwise` arm is last" invariant.
+				let unreachable = otherwise !== null
+
+				if (unreachable) {
+					this.reportParseError(
+						new ParseError(
+							"This arm stands below the 'otherwise' arm",
+							keyword.position,
+							"nothing here can ever be reached",
+							{
+								code: "unreachable-define-arm",
+								notes: [
+									"The 'otherwise' arm is the one that always holds, so a 'define' answers there whenever it gets that far.",
+								],
+								helps: [
+									"Move this arm above the 'otherwise' arm, or delete it.",
+								],
+							},
+						),
 					)
 				}
 
@@ -3290,26 +3323,30 @@ class DescentParser {
 				if (follower.type === TokenType.KeywordOtherwise) {
 					this.tokens.next()
 
-					otherwise = {
-						value,
-						position: {
-							start: keyword.position.start,
-							end: follower.position.end,
-						},
+					if (!unreachable) {
+						otherwise = {
+							value,
+							position: {
+								start: keyword.position.start,
+								end: follower.position.end,
+							},
+						}
 					}
 				} else if (follower.type === TokenType.KeywordIf) {
 					this.tokens.next()
 
 					let condition = this.parseExpression()
 
-					arms.push({
-						value,
-						condition,
-						position: {
-							start: keyword.position.start,
-							end: condition.position.end,
-						},
-					})
+					if (!unreachable) {
+						arms.push({
+							value,
+							condition,
+							position: {
+								start: keyword.position.start,
+								end: condition.position.end,
+							},
+						})
+					}
 				} else {
 					fail(
 						`Expected 'if' or 'otherwise' but found ${describeToken(follower)}.`,

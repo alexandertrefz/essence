@@ -2054,6 +2054,29 @@ leave the Match with no answer:
   a value, one carrying a Guard, or one whose Type does not accept everything
   that reaches it.
 
+## Define Expressions
+
+### `define-without-otherwise`
+
+Every value in a `define` carries a Condition, so nothing is left to answer with
+when they all decline.
+
+A `define` answers with a value wherever it stands — there is no falling off the
+end of one the way a Function body can fall off its own — so one of its arms has
+to be the arm that always holds. Write it as `as <value> otherwise`, last.
+
+The Node has no shape for a missing `otherwise` arm at all: the Parser refuses
+the text rather than building one, which is what makes every `define` the rest
+of the Compiler ever sees total by construction.
+
+### `unreachable-define-arm`
+
+An arm stands below the `otherwise` arm. The arms are tried in the order they
+were written and the `otherwise` arm is the one that always holds, so a `define`
+answers there whenever it gets that far and nothing below it can ever run.
+
+Move the arm above the `otherwise` arm, or delete it.
+
 ## Protocols
 
 ### `protocol-as-value`
