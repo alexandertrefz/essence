@@ -57,12 +57,44 @@ export function stripNoise(text: string): string {
 
 const closers: Record<string, string> = { "{": "}", "(": ")", "[": "]" }
 
-function openBrackets(text: string): Array<string> {
-	let stack: Array<string> = []
+// NOTE: `opensDefine` says this `{` is a `define`'s own block rather than any
+// other kind — a Record Literal, a Function body, a block an arm's VALUE opened.
+// The arm tails belong at the end of that block and nowhere else, and the
+// innermost `{` is only the same brace while an arm holds none of its own.
+type OpenBracket = {
+	opener: string
+	opensDefine: boolean
+}
+
+// NOTE: The Keyword is read as a whole word — `redefine` opens no `define` — off
+// text `stripNoise` has already blanked every String and Comment out of. It is
+// claimed by the next `{`, which is that `define`'s block: `define -> Type {`
+// writes a Type between the two and no brace, so nothing else can take it.
+function openBrackets(text: string): Array<OpenBracket> {
+	let stack: Array<OpenBracket> = []
+	let word = ""
+	let pendingDefine = false
 
 	for (let character of text) {
+		if (/[A-Za-z0-9_]/.test(character)) {
+			word += character
+
+			continue
+		}
+
+		if (word === "define") {
+			pendingDefine = true
+		}
+
+		word = ""
+
 		if (character === "{" || character === "(" || character === "[") {
-			stack.push(character)
+			stack.push({
+				opener: character,
+				opensDefine: character === "{" && pendingDefine,
+			})
+
+			pendingDefine = false
 		} else if (
 			character === "}" ||
 			character === ")" ||
@@ -78,14 +110,16 @@ function openBrackets(text: string): Array<string> {
 // NOTE: `declarationIndex` names the one open `(` to close as a Declaration's
 // parameter list rather than as a call's Argument list — see `probeSourcesFor`.
 function closingSuffixFor(
-	stack: Array<string>,
+	stack: Array<OpenBracket>,
 	declarationIndex: number = -1,
 ): string {
 	let suffix = ""
 
 	for (let index = stack.length - 1; index >= 0; index--) {
 		suffix +=
-			index === declarationIndex ? ") -> {} {}" : closers[stack[index]!]
+			index === declarationIndex
+				? ") -> {} {}"
+				: closers[stack[index]!.opener]
 	}
 
 	return suffix
@@ -120,20 +154,24 @@ export function probeSourcesFor(headText: string, suffix = ""): Array<string> {
 	let stack = openBrackets(stripped)
 	let sources = [`${headText}${suffix}${closingSuffixFor(stack)}`]
 
-	let parentheses = stack.flatMap((opener, index) =>
-		opener === "(" ? [index] : [],
+	let parentheses = stack.flatMap((bracket, index) =>
+		bracket.opener === "(" ? [index] : [],
 	)
 
 	for (let index of parentheses.slice(0, MAXIMUM_DECLARATION_READINGS)) {
 		sources.push(`${headText}${suffix}${closingSuffixFor(stack, index)}`)
 	}
 
-	let tails = definePattern.test(stripped)
-		? [...STATEMENT_TAILS, ...DEFINE_TAILS]
-		: STATEMENT_TAILS
-
-	for (let tail of tails) {
+	for (let tail of STATEMENT_TAILS) {
 		sources.push(`${headText}${suffix}${tailSuffixFor(stack, tail)}`)
+	}
+
+	if (definePattern.test(stripped)) {
+		for (let tail of DEFINE_TAILS) {
+			sources.push(
+				`${headText}${suffix}${tailSuffixFor(stack, tail, true)}`,
+			)
+		}
 	}
 
 	// NOTE: Two readings can spell the same source — a declaration reading of
@@ -169,25 +207,67 @@ const DEFINE_TAILS = [" otherwise", " as {} otherwise"]
 // the ones that parse and enrich the document for nothing.
 const definePattern = /\bdefine\b/
 
-// NOTE: Every tail lands in the same place, which is what lets one function
-// write all four: immediately before the closer of the innermost open `{`. For
-// a Statement waiting for a block that is where its block goes — `if greet(`
-// closes to `if greet() {}` and not to `if greet( {})`, and such a head can
-// hold no unclosed `{` of its own, since a block is exactly what it is waiting
-// for. For a `define` arm it is the end of the `define`'s own block, which is
-// that same innermost `{`.
-function tailSuffixFor(stack: Array<string>, tail: string): string {
-	let suffix = ""
-	let opened = false
+// NOTE: A tail is written immediately before the closer of the `{` whose block
+// it finishes. For a Statement waiting for a block that is the innermost open
+// one — `if greet(` closes to `if greet() {}` and not to `if greet( {})`, and
+// such a head can hold no unclosed `{` of its own, since a block is exactly what
+// it is waiting for.
+//
+// A `define` arm's tail belongs at the end of the `define`'s OWN block, which is
+// the innermost `{` only while no half-written arm opened one of its own. `as {
+// name = team.` stands two braces in, and an arm written inside the Record
+// Literal closes nothing — so a cursor there was answered by no reading at all,
+// where the same Record Literal outside a `define` answered. Falls back to the
+// innermost `{` where no open brace is a `define`'s: `definePattern` passes on
+// the Keyword standing anywhere above the cursor, including inside a `define`
+// that has been closed again.
+function tailSuffixFor(
+	stack: Array<OpenBracket>,
+	tail: string,
+	targetsDefine = false,
+): string {
+	let target = innermostIndex(
+		stack,
+		(bracket) => bracket.opener === "{" && bracket.opensDefine,
+	)
 
-	for (let index = stack.length - 1; index >= 0; index--) {
-		if (!opened && stack[index] === "{") {
-			suffix += tail
-			opened = true
-		}
-
-		suffix += closers[stack[index]!]
+	if (target === -1 || !targetsDefine) {
+		target = innermostIndex(stack, (bracket) => bracket.opener === "{")
 	}
 
-	return opened ? suffix : `${suffix}${tail}`
+	let suffix = ""
+
+	for (let index = stack.length - 1; index >= 0; index--) {
+		if (index === target) {
+			suffix += tail
+		} else if (
+			targetsDefine &&
+			index < target &&
+			stack[index]!.opensDefine
+		) {
+			// NOTE: A `define` the target one is written INSIDE is one word
+			// short of closing too — its own arm's value is the `define` below
+			// it, which has just been finished, so `otherwise` is all it wants.
+			suffix += ENCLOSING_DEFINE_TAIL
+		}
+
+		suffix += closers[stack[index]!.opener]
+	}
+
+	return target === -1 ? `${suffix}${tail}` : suffix
+}
+
+const ENCLOSING_DEFINE_TAIL = " otherwise"
+
+function innermostIndex(
+	stack: Array<OpenBracket>,
+	matches: (bracket: OpenBracket) => boolean,
+): number {
+	for (let index = stack.length - 1; index >= 0; index--) {
+		if (matches(stack[index]!)) {
+			return index
+		}
+	}
+
+	return -1
 }
