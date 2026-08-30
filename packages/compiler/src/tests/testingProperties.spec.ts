@@ -358,6 +358,31 @@ describe("Property tests", () => {
 			)
 		})
 
+		// NOTE: `NonEmptyDictionary<KeyType, ValueType> = Dictionary<KeyType,
+		// ValueType> where @::hasEntries()`. A Dictionary is counted in
+		// ENTRIES, so the same `minimumLength` rule a List narrows by is what
+		// says a drawn one holds something — and the key witness rides along
+		// exactly as it does for the unrefined Dictionary above, because what
+		// decides two drawn keys are one key is no different for having a
+		// proof.
+		it("holds the standard library's NonEmptyDictionary by construction", () => {
+			expect(
+				shapeOf(generatorOf("d: NonEmptyDictionary<String, Integer>")),
+			).toEqual({
+				kind: "refined",
+				name: "NonEmptyDictionary",
+				base: {
+					kind: "dictionary",
+					key: { kind: "string" },
+					value: { kind: "integer" },
+					keyConformance: "<String>",
+				},
+				binding: expect.any(String) as unknown as string,
+				checks: 0,
+				narrowing: { minimumLength: 1 },
+			})
+		})
+
 		// NOTE: `NonZeroInteger = Integer where @::isNot(0)`.
 		it("holds the standard library's NonZeroInteger by construction", () => {
 			expect(shapeOf(generatorOf("n: NonZeroInteger"))).toEqual({
@@ -969,6 +994,21 @@ describe("Property tests", () => {
 			let { events } = await run(`tests {
 				test "never empty" for any (items: NonEmptyList<Integer>) {
 					expect items::hasItems()
+				}
+			}`)
+
+			expect(propertyEvents(events)[0]?.counterexample).toBeNull()
+		})
+
+		// NOTE: The same claim over the second container, and the reason it is
+		// worth a case of its own: a Dictionary is narrowed by a length the
+		// generator has to spend on distinct KEYS, so a draw that met the
+		// minimum by repeating one key would answer a Dictionary with fewer
+		// entries than it drew.
+		it("never runs a case with an empty non-empty Dictionary", async () => {
+			let { events } = await run(`tests {
+				test "never empty" for any (d: NonEmptyDictionary<String, Integer>) {
+					expect d::hasEntries()
 				}
 			}`)
 

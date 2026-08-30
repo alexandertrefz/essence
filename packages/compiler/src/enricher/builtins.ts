@@ -150,6 +150,24 @@ export const builtinMemberOrder: Array<string> = [
 	// nothing but where a reader meets it. `builtins.spec.ts` holds this list
 	// to what the standard library declares.
 	"Dictionary",
+	// NOTE: And after it, for the reason every proven Namespace sits after the
+	// one it narrows — a reader meets a Dictionary's own members before the
+	// extra a proof adds. `length`, `keys`, `values`, `entries` and `map` are
+	// named by `Dictionary` too, so `Dictionary` has to be met FIRST, or
+	// Completion on any Dictionary would offer the total answers that only a
+	// proven one can give. What a call RESOLVES to is not decided here: the
+	// refined target beats the base one regardless of this order.
+	"NonEmptyDictionary",
+	// NOTE: The bridge from the first container to the second, and its proven
+	// twin after it for the same reason. Both target a LIST — `List<ItemType>`
+	// and the proven form of it — so they sit with the Dictionary Namespaces a
+	// reader finds them beside in `Dictionary.es` rather than with the List
+	// ones, which costs nothing: neither shares a Method name with any
+	// Namespace above, so the position decides only where `groupedBy` and
+	// `tallied` are offered, which is after every List Namespace's own members
+	// either way.
+	"GroupedList",
+	"GroupedNonEmptyList",
 	// NOTE: Last, and not because it is newest. `Randomness` targets a Type
 	// nothing else targets and shares not one Method name with the Namespaces
 	// above it, so its position decides nothing at all — and a reader of this
@@ -200,6 +218,12 @@ export const builtinTypeOrder: Array<string> = [
 	// Types together, and `Dictionary` is the second of them. It shares not one
 	// name with anything above it, so `closestMatch` has no tie here to break.
 	"Dictionary",
+	// NOTE: Directly after the Type it refines, for the reason `NonEmptyList`
+	// sits directly after `List` — a reader of this table meets `Dictionary`
+	// and then what a Dictionary can be proven to be, and `closestMatch` breaks
+	// a tie on the FIRST candidate, so a typo near both still reads as the base
+	// Type.
+	"NonEmptyDictionary",
 	"Irrational",
 	"Number",
 	"Optional",

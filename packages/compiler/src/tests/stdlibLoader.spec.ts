@@ -1405,6 +1405,13 @@ describe("Standard Library Loader", () => {
 			// NOTE: The second container, listed after the first one whole —
 			// see `builtinMemberOrder`.
 			"Dictionary",
+			// NOTE: And the Namespace a Dictionary reaches with the proof in
+			// hand, after the one it narrows — see `builtinMemberOrder`.
+			"NonEmptyDictionary",
+			// NOTE: And the bridge from the first container to the second,
+			// with its proven twin after it — see `builtinMemberOrder`.
+			"GroupedList",
+			"GroupedNonEmptyList",
 			"Randomness",
 		])
 	})
@@ -1958,8 +1965,8 @@ describe("Standard Library Loader", () => {
 	// `isEmpty`, `isEven`, `isWholeNumber` and the strict comparisons written
 	// on `compare` stay here. So does `isBetween`, written as two comparisons
 	// joined over whichever of its two bounds is the lower, and
-	// `hasItems(where:)` and `hasOnlyItems(where:)`, whose Argument is a
-	// Function.
+	// `hasItems(where:)`, `hasOnlyItems(where:)` and `hasEntries(where:)`,
+	// whose Argument is a Function.
 	it("reads every predicate the standard library writes off its body", () => {
 		let stdlib = loadStdlib()
 		let aliases: Array<string> = []
@@ -2061,6 +2068,9 @@ describe("Standard Library Loader", () => {
 			"Boolean::is",
 			"Boolean::negate",
 			"Boolean::or",
+			// NOTE: The quantified entry of `hasEntries`, whose Argument is a
+			// Function — the bare entry beside it is the alias above.
+			"Dictionary::hasEntries",
 			// NOTE: A chain, so it is a question of its own — `hasKey` asks
 			// the Optional a lookup answers whether it holds anything.
 			"Dictionary::hasKey",

@@ -1114,6 +1114,18 @@ export function enrichCombination(
 	// NOTE: A refined base updates exactly as its base does — what the update
 	// answers is a Dictionary, never the refinement, because a key set into it
 	// can not be proof of anything the refinement asked.
+	//
+	// NOTE: What the update proves for ITSELF is a separate question, and it is
+	// asked where every written value's is: the brackets of an update that sets
+	// an entry are a lower bound on what the answer holds, so it proves the
+	// COUNT — that the answer holds an entry — and that is the whole of what it
+	// proves. A written Dictionary proves more, because `admittedDictionaryTypeOf`
+	// reads what stands in each of the slots it writes down: `["a" = [1]]` is
+	// admitted into `NonEmptyDictionary<String, NonEmptyList<Integer>>`, and
+	// `[base with "a" = [1]]` is refused there even where the base's own value
+	// slot is Unknown — because what the base holds under its OTHER keys is not
+	// the brackets' to say. See `literalValueOf` in
+	// `helpers/predicateEval.ts`.
 	let baseType = lhs.type.type === "Refinement" ? lhs.type.base : lhs.type
 
 	if (baseType.type === "Dictionary") {
@@ -8567,11 +8579,21 @@ function provenLiteralReceiverType(
 	return remembered
 }
 
-// NOTE: The receiver Node carrying whatever it proved about itself. Only the five
-// written shapes a refinement may be written ON are ever refined — an Integer, a
-// Rational, a String, a List and a Dictionary — and the switch is what says so in
-// the Types rather than in a comment: every other Expression comes back as
-// itself, untouched and unallocated.
+// NOTE: The receiver Node carrying whatever it proved about itself. Six Node
+// kinds are ever refined and no others — an Integer, a Rational, a String, a
+// List and a Dictionary written down, and an update of a Dictionary — and the
+// switch is what says so in the Types rather than in a comment: every other
+// Expression comes back as itself, untouched and unallocated.
+//
+// Six Nodes over FIVE Types, which is not a miscount. `isRefinableBase` names
+// the Types a refinement may be written ON — Integer, Rational, String, List,
+// Dictionary — and a Dictionary reaches this switch by two Nodes, the literal
+// and the update, because both are written shapes a lower bound can be read off.
+//
+// NOTE: A Combination is the one of the six that is not a Literal. Its brackets
+// say what was set into it and nothing about the base it was set into, so what
+// it proves is what a lower bound proves; `literalValueOf` is where that is
+// stated and where a question the bound can not decide is refused.
 //
 // A written Boolean is not among them, though `literalValueOf` reads one: it is
 // read because it can stand as a written List's ITEM, and `isRefinableBase`
@@ -8596,6 +8618,8 @@ function writtenReceiver(
 		case "ListValue":
 			return { ...base, type: refinement }
 		case "DictionaryValue":
+			return { ...base, type: refinement }
+		case "Combination":
 			return { ...base, type: refinement }
 		default:
 			return base
@@ -13988,7 +14012,7 @@ function refinementSkeletonAdmissible(
 				code: "invalid-refinement-predicate",
 				labels: [primary(node.type.position, `this is ${described}`)],
 				notes: [
-					"A checked refinement is written on an Integer, a Rational, a String or an applied List — 'List<String>', never a bare 'List'.",
+					"A checked refinement is written on an Integer, a Rational, a String, an applied List or an applied Dictionary — 'List<String>', never a bare 'List'.",
 				],
 				helps: [`Drop the 'where' clause from '${node.name.content}'.`],
 			},

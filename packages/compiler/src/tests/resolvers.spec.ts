@@ -1184,15 +1184,20 @@ describe("Resolvers", () => {
 			// List reaches it — what makes its aggregates keyed is the
 			// Function they take, not the items. It is offered on both halves
 			// for that reason, and says nothing about the refinement either
-			// way. `NonEmptyKeyedNumberList` is that same rule one rung up:
-			// its target is any PROVEN List, so it joins the refined half and
-			// no other.
-			expect(base).toEqual(["List", "KeyedNumberList"])
+			// way. `GroupedList` is the same shape a second time: the bridge
+			// to a Dictionary is about what a List BECOMES rather than about
+			// what it holds, so its target is the widest one there is.
+			// `NonEmptyKeyedNumberList` and `GroupedNonEmptyList` are that
+			// rule one rung up: each targets any PROVEN List, so both join the
+			// refined half and neither joins the base one.
+			expect(base).toEqual(["List", "KeyedNumberList", "GroupedList"])
 			expect(refined).toEqual([
 				"List",
 				"NonEmptyList",
 				"KeyedNumberList",
 				"NonEmptyKeyedNumberList",
+				"GroupedList",
+				"GroupedNonEmptyList",
 			])
 		})
 

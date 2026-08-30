@@ -479,12 +479,39 @@ export type DictionaryNatives = {
 	values: <KeyType extends AnyType, ValueType extends AnyType>(self: DictionaryType<KeyType, ValueType>) => ListType<ValueType>
 	// entries<KeyType, ValueType>() -> List<{ key: KeyType, value: ValueType }>
 	entries: <KeyType extends AnyType, ValueType extends AnyType>(self: DictionaryType<KeyType, ValueType>) => ListType<RecordType & { key: KeyType; value: ValueType }>
-	// set<ValueType, KeyType is Equatable>(_: KeyType, to: ValueType) -> Dictionary<KeyType, ValueType>
+	// set<ValueType, KeyType is Equatable>(_: KeyType, to: ValueType) -> NonEmptyDictionary
 	set: <ValueType extends AnyType, KeyType extends AnyType>(self: DictionaryType<KeyType, ValueType>, argument1: KeyType, to: ValueType, KeyType__conformance: EquatableConformance<KeyType>) => DictionaryType<KeyType, ValueType>
 	// remove<ValueType, KeyType is Equatable>(at: KeyType) -> Dictionary<KeyType, ValueType>
 	remove: <ValueType extends AnyType, KeyType extends AnyType>(self: DictionaryType<KeyType, ValueType>, at: KeyType, KeyType__conformance: EquatableConformance<KeyType>) => DictionaryType<KeyType, ValueType>
 	// map<KeyType, ValueType, Result>(_: (_: { key: KeyType, value: ValueType }) -> Result) -> Dictionary<KeyType, Result>
 	map: <KeyType extends AnyType, ValueType extends AnyType, Result extends AnyType>(self: DictionaryType<KeyType, ValueType>, argument1: (argument0: RecordType & { key: KeyType; value: ValueType }) => Result) => DictionaryType<KeyType, Result>
+}
+
+export type NonEmptyDictionaryNatives = {
+	// length<KeyType, ValueType>() -> NonZeroInteger
+	length: <KeyType extends AnyType, ValueType extends AnyType>(self: DictionaryType<KeyType, ValueType>) => IntegerType
+	// keys<KeyType, ValueType>() -> NonEmptyList
+	keys: <KeyType extends AnyType, ValueType extends AnyType>(self: DictionaryType<KeyType, ValueType>) => ListType<KeyType>
+	// values<KeyType, ValueType>() -> NonEmptyList
+	values: <KeyType extends AnyType, ValueType extends AnyType>(self: DictionaryType<KeyType, ValueType>) => ListType<ValueType>
+	// entries<KeyType, ValueType>() -> NonEmptyList
+	entries: <KeyType extends AnyType, ValueType extends AnyType>(self: DictionaryType<KeyType, ValueType>) => ListType<RecordType & { key: KeyType; value: ValueType }>
+	// map<KeyType, ValueType, Result>(_: (_: { key: KeyType, value: ValueType }) -> Result) -> NonEmptyDictionary
+	map: <KeyType extends AnyType, ValueType extends AnyType, Result extends AnyType>(self: DictionaryType<KeyType, ValueType>, argument1: (argument0: RecordType & { key: KeyType; value: ValueType }) => Result) => DictionaryType<KeyType, Result>
+}
+
+export type GroupedListNatives = {
+	// groupedBy<ItemType, KeyType is Equatable>(key: (_: ItemType) -> KeyType) -> Dictionary<KeyType, NonEmptyList>
+	groupedBy: <ItemType extends AnyType, KeyType extends AnyType>(self: ListType<ItemType>, key: (argument0: ItemType) => KeyType, KeyType__conformance: EquatableConformance<KeyType>) => DictionaryType<KeyType, ListType<ItemType>>
+	// tallied<ItemType is Equatable>() -> Dictionary<ItemType, PositiveInteger>
+	tallied: <ItemType extends AnyType>(self: ListType<ItemType>, ItemType__conformance: EquatableConformance<ItemType>) => DictionaryType<ItemType, IntegerType>
+}
+
+export type GroupedNonEmptyListNatives = {
+	// groupedBy<ItemType, KeyType is Equatable>(key: (_: ItemType) -> KeyType) -> NonEmptyDictionary
+	groupedBy: <ItemType extends AnyType, KeyType extends AnyType>(self: ListType<ItemType>, key: (argument0: ItemType) => KeyType, KeyType__conformance: EquatableConformance<KeyType>) => DictionaryType<KeyType, ListType<ItemType>>
+	// tallied<ItemType is Equatable>() -> NonEmptyDictionary
+	tallied: <ItemType extends AnyType>(self: ListType<ItemType>, ItemType__conformance: EquatableConformance<ItemType>) => DictionaryType<ItemType, IntegerType>
 }
 
 export type RandomnessNatives = {
@@ -801,7 +828,7 @@ export const $NonEmptyKeyedNumberListAbsent: AssertNoEssenceExports<typeof impor
 
 declare const DictionaryModule: typeof import("./Dictionary")
 export const $Dictionary: DictionaryNatives = DictionaryModule
-export const $DictionaryAbsent: AssertNoEssenceExports<typeof import("./Dictionary"), "hasEntries" | "hasKey" | "value__overload$2" | "update__overload$1" | "update__overload$2" | "removeEvery" | "everyEntry" | "merge__overload$1" | "merge__overload$2"> = true
+export const $DictionaryAbsent: AssertNoEssenceExports<typeof import("./Dictionary"), "hasEntries__overload$1" | "hasEntries__overload$2" | "hasKey" | "value__overload$2" | "update__overload$1" | "update__overload$2" | "removeEvery" | "everyEntry" | "merge__overload$1" | "merge__overload$2"> = true
 export const $DictionaryArity: AssertArities<typeof import("./Dictionary"), {
 	of: 2
 	is: 4
@@ -815,6 +842,30 @@ export const $DictionaryArity: AssertArities<typeof import("./Dictionary"), {
 	set: 4
 	remove: 3
 	map: 2
+}> = true
+
+declare const NonEmptyDictionaryModule: typeof import("./NonEmptyDictionary")
+export const $NonEmptyDictionary: NonEmptyDictionaryNatives = NonEmptyDictionaryModule
+export const $NonEmptyDictionaryArity: AssertArities<typeof import("./NonEmptyDictionary"), {
+	length: 1
+	keys: 1
+	values: 1
+	entries: 1
+	map: 2
+}> = true
+
+declare const GroupedListModule: typeof import("./GroupedList")
+export const $GroupedList: GroupedListNatives = GroupedListModule
+export const $GroupedListArity: AssertArities<typeof import("./GroupedList"), {
+	groupedBy: 3
+	tallied: 2
+}> = true
+
+declare const GroupedNonEmptyListModule: typeof import("./GroupedNonEmptyList")
+export const $GroupedNonEmptyList: GroupedNonEmptyListNatives = GroupedNonEmptyListModule
+export const $GroupedNonEmptyListArity: AssertArities<typeof import("./GroupedNonEmptyList"), {
+	groupedBy: 3
+	tallied: 2
 }> = true
 
 declare const RandomnessModule: typeof import("./Randomness")

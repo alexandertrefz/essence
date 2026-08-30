@@ -106,4 +106,56 @@ implementation {
 	]
 
 	Terminal.inspect(seats::value(at { row = 4, seat = 1 })) § Optional#Value("grace")
+
+	§ `hasEntries(where:)` asks the same question of an entry rather than of
+	§ the whole Dictionary, and stops at the entry that decides the answer.
+	Terminal.inspect(
+		loans::hasEntries(where ({ key, value }) {
+			<- value::isGreaterThan(2)
+		}),
+	) § true
+
+	§ A Dictionary written down with an entry in it is proven to have one, and
+	§ so is one an update set an entry into. That proof is a Type of its own —
+	§ `NonEmptyDictionary` — and the Methods it changes answer better for it:
+	§ counting can not answer zero, and the three halves a Dictionary is read
+	§ as can not answer the empty List.
+	constant shelf: NonEmptyDictionary<String, Integer> = ["ada" = 2]
+
+	Terminal.inspect(shelf::keys()::firstItem()) § "ada", and no Optional
+	Terminal.inspect(shelf::entries()::firstItem().value) § 2
+
+	§ Setting a key answers the proof, whatever it was handed. An empty
+	§ Dictionary with a key set into it is not empty.
+	constant nobody: Dictionary<String, Integer> = [=]
+
+	Terminal.inspect(nobody::set("ada", to 1)::values()::firstItem()) § 1
+
+	§ A Dictionary a Program is handed carries no proof, so it goes through an
+	§ `if` to reach the same Methods. The `if` narrows a Constant, which can
+	§ not be assigned something else inside the branch that asked.
+	constant outNow = loans
+
+	if outNow::hasEntries() {
+		Terminal.inspect(outNow::keys()::firstItem()) § "ada"
+	} else {
+		Terminal.inspect("nothing is out")
+	}
+
+	§ The bridges: a List becomes a Dictionary keyed by something read off its
+	§ items. Every group holds an item and every count is above zero, so the
+	§ groups answer a first item bare.
+	constant returns = [
+		{ title = "Emma", borrower = "ada" },
+		{ title = "Mill", borrower = "grace" },
+		{ title = "Ruth", borrower = "ada" },
+	]
+
+	Terminal.inspect(
+		returns
+			::groupedBy(key (loan) { <- loan.borrower })
+			::map(({ key, value }) { <- value::firstItem().title }),
+	) § [ "ada" = "Emma", "grace" = "Mill" ]
+
+	Terminal.inspect(["ada", "grace", "ada"]::tallied()) § [ "ada" = 2, "grace" = 1 ]
 }

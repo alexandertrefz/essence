@@ -448,5 +448,14 @@ true
 ]
 true
 true
-Optional#Value("grace")"
+Optional#Value("grace")
+true
+"ada"
+2
+1
+"ada"
+[ "ada" = "Emma", "grace" = "Mill" ]
+[ "ada" = 2, "grace" = 1 ]"
 `;
+
+exports[`Fixture Sweep DictionaryBenchmarks.es should print what it printed before 1`] = `""`;

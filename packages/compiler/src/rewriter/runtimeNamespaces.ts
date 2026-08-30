@@ -50,5 +50,8 @@ export const runtimeNamespaceNames = [
 	"KeyedNumberList",
 	"NonEmptyKeyedNumberList",
 	"Dictionary",
+	"NonEmptyDictionary",
+	"GroupedList",
+	"GroupedNonEmptyList",
 	"Randomness",
 ]

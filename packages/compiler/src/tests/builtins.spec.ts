@@ -6,12 +6,15 @@ import * as boolean from "@essence-lang/runtime/Boolean"
 import * as caseSensitivity from "@essence-lang/runtime/CaseSensitivity"
 import * as dictionary from "@essence-lang/runtime/Dictionary"
 import * as functions from "@essence-lang/runtime/functions"
+import * as groupedList from "@essence-lang/runtime/GroupedList"
+import * as groupedNonEmptyList from "@essence-lang/runtime/GroupedNonEmptyList"
 import * as integer from "@essence-lang/runtime/Integer"
 import * as integerList from "@essence-lang/runtime/IntegerList"
 import * as keyedNumberList from "@essence-lang/runtime/KeyedNumberList"
 import * as list from "@essence-lang/runtime/List"
 import * as nestedList from "@essence-lang/runtime/NestedList"
 import * as nestedOptional from "@essence-lang/runtime/NestedOptional"
+import * as nonEmptyDictionary from "@essence-lang/runtime/NonEmptyDictionary"
 import * as nonEmptyIntegerList from "@essence-lang/runtime/NonEmptyIntegerList"
 import * as nonEmptyKeyedNumberList from "@essence-lang/runtime/NonEmptyKeyedNumberList"
 import * as nonEmpty from "@essence-lang/runtime/NonEmptyList"
@@ -85,6 +88,9 @@ const runtimeModules: Record<string, Record<string, unknown>> = {
 	KeyedNumberList: keyedNumberList,
 	NonEmptyKeyedNumberList: nonEmptyKeyedNumberList,
 	Dictionary: dictionary,
+	NonEmptyDictionary: nonEmptyDictionary,
+	GroupedList: groupedList,
+	GroupedNonEmptyList: groupedNonEmptyList,
 	Randomness: randomness,
 }
 

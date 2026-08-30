@@ -479,13 +479,24 @@ function spellScalar(scalar: string | boolean): string {
 // a single conjunct is asked: a value the Compiler can not see at all is not a
 // value it may decide anything about, and a List is the one shape it can see
 // something about without seeing the whole of it.
+//
+// NOTE: `whole` is what tells a written Dictionary from an UPDATE of one. A
+// literal names every entry it holds; an update names the entries it sets and
+// stands on a base whose own entries the Compiler can not see. So an update's
+// brackets are a LOWER BOUND — at least these entries, and whatever the base
+// holds besides — and the flag is what keeps every reader of one from mistaking
+// it for the other. Only a question the bound alone decides may be asked of a
+// value that is not whole, which is what `isEmpty` checks before it answers: a
+// Dictionary with an entry written into it is not empty however many the base
+// held, and a Dictionary with none written into it is a question about the
+// base, which is not here.
 type LiteralValue =
 	| { kind: "Integer"; value: bigint }
 	| { kind: "Rational"; numerator: bigint; denominator: bigint }
 	| { kind: "String"; value: string }
 	| { kind: "Boolean"; value: boolean }
 	| { kind: "List"; items: Array<LiteralItem> }
-	| { kind: "Dictionary"; entries: Array<LiteralEntry> }
+	| { kind: "Dictionary"; entries: Array<LiteralEntry>; whole: boolean }
 
 type LiteralItem = LiteralValue | { kind: "Opaque" }
 
@@ -581,12 +592,21 @@ const LIST_PREDICATES: Record<string, PredicateEvaluator> = {
 // NOTE: And the Dictionary's one question, on the same terms: `hasEntries` is
 // `@::isEmpty()::negate()`, so it arrives here as this row with the flag turned
 // over and is no row of its own. What the brackets say is how many entries were
-// written, which is the whole of what either predicate reads.
+// written, which is the whole of what either predicate reads — and for an
+// UPDATE that is a lower bound rather than a count, which is what `whole` says
+// and what leaves an update naming no entry undecided.
 const DICTIONARY_PREDICATES: Record<string, PredicateEvaluator> = {
-	isEmpty: (value, args) =>
-		value.kind !== "Dictionary" || args.length !== 0
-			? null
-			: value.entries.length === 0,
+	isEmpty: (value, args) => {
+		if (value.kind !== "Dictionary" || args.length !== 0) {
+			return null
+		}
+
+		if (value.entries.length > 0) {
+			return false
+		}
+
+		return value.whole ? true : null
+	},
 }
 
 // #region Rational literals
@@ -944,6 +964,18 @@ function stringScalar(scalar: string | boolean): string | null {
 	return typeof parsed === "string" ? parsed : null
 }
 
+// NOTE: One bracket list's entries, both halves read as items. The literal and
+// the update share it because they share the list — an update's key list is a
+// literal's, on the same terms and with the same opaque halves.
+function entriesOf(
+	value: common.typed.DictionaryValueNode,
+): Array<LiteralEntry> {
+	return value.entries.map((entry) => ({
+		key: literalValueOf(entry.key) ?? OPAQUE_ITEM,
+		value: literalValueOf(entry.value) ?? OPAQUE_ITEM,
+	}))
+}
+
 function literalValueOf(
 	value: common.typed.ExpressionNode,
 ): LiteralValue | null {
@@ -984,11 +1016,29 @@ function literalValueOf(
 		case "DictionaryValue":
 			return {
 				kind: "Dictionary",
-				entries: value.entries.map((entry) => ({
-					key: literalValueOf(entry.key) ?? OPAQUE_ITEM,
-					value: literalValueOf(entry.value) ?? OPAQUE_ITEM,
-				})),
+				entries: entriesOf(value),
+				whole: true,
 			}
+		// NOTE: `[ages with "kim" = 7]` — the one written shape whose brackets
+		// say something about a value they do not hold the whole of. The
+		// entries it sets are there in the source, one pair each, exactly as a
+		// literal's are, and the base stands behind them unread. So it is read
+		// as those entries and marked not whole, which is what lets a
+		// Dictionary an update wrote into be proven to hold something and
+		// leaves every question about the base unanswered.
+		//
+		// Only the form that SETS entries. `[ages with others]` merges a whole
+		// Dictionary in, and how many entries that one holds is a question
+		// about a value rather than about the brackets.
+		case "Combination":
+			return value.type.type === "Dictionary" &&
+				value.rhs.nodeType === "DictionaryValue"
+				? {
+						kind: "Dictionary",
+						entries: entriesOf(value.rhs),
+						whole: false,
+					}
+				: null
 		default:
 			return null
 	}

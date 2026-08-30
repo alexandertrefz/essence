@@ -530,8 +530,42 @@ describe("Bundle Size", () => {
 	// every Program whether it holds a Dictionary or not, and a `Dictionary.ts`
 	// grown top-level side effects, which would pin the whole store into the
 	// two files above.
+	// NOTE: 45,683 now, up 5,299, and the ceiling moves to 46,700 to keep the
+	// kilobyte of headroom the rest of this file keeps. Two figures make the
+	// rise and only one of them is a change to the library: 188 is what
+	// `Dictionary.ts` costs for having been split, and every Program that
+	// builds a Dictionary at all pays it. The search for the slot a key
+	// already has in a fresh store, and the slot opened where it has none, are
+	// two Functions now rather than one body inside `addToFreshStore` — because
+	// the two grouping natives fold into a store the same way `of` fills one,
+	// and writing that search twice is the thing the split is here to avoid.
+	//
+	// The other 5,111 are what this fixture now DOES. It asks
+	// `hasEntries(where:)`, which is written on `reduce`'s early-stopping entry
+	// and brings the `Step` Cases behind it; it reads the count and the three
+	// halves a proof changes, which brings `NonEmptyList::firstItem`; and it
+	// crosses both bridges, which is the largest single piece at about three
+	// and a half kilobytes — the two natives, the store doors they gather
+	// through, and the List of Records it groups.
+	//
+	// NOTE: What this ceiling is here to catch did not move at all.
+	// `Everyday.es` and `Irrational.es` measure 73,870 and 37,017, byte for
+	// byte what they measured before, so `NonEmptyDictionary`, `GroupedList`
+	// and `GroupedNonEmptyList` are shaken away whole from a Program that names
+	// none of them. That is what three more runtime modules in every Program's
+	// head had to be.
+	//
+	// NOTE: 45,846 now, up 163, and the ceiling STAYS at 46,700 — 854 of
+	// headroom. `slotInFreshStore` gained the fallthrough `slotHolding` has:
+	// an encoded key the index cannot answer for now asks the witness about the
+	// slots that carry no encoding, where before it answered that the key was
+	// not there. What that was resting on is a theorem about the standard
+	// library's own `is` rather than about the store — see the NOTE over the
+	// Function — and 163 bytes is the whole price of not resting on it.
+	// `Everyday.es` and `Irrational.es` are untouched at 73,870 and 37,017: a
+	// Program that builds no Dictionary reaches none of it.
 	it("charges a Dictionary Program for the container it uses", async () => {
-		expect(await bundleSizeOf("Dictionary.es")).toBeLessThan(41_400)
+		expect(await bundleSizeOf("Dictionary.es")).toBeLessThan(46_700)
 	})
 
 	// NOTE: The same claim for a bundle of several Modules, where it is far

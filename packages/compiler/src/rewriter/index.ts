@@ -3965,7 +3965,20 @@ function contextualArgumentOverrides(
 function rewriteCombination(
 	node: common.typedSimple.CombinationNode,
 ): estree.Expression {
-	if (node.type.type === "Dictionary") {
+	// NOTE: The BASE is what says which of the two updates this is, read through
+	// the same erasure `enrichCombination` reads it through — that is where the
+	// two were told apart in the first place, and asking the same question the
+	// same way here is what keeps the two answers from ever disagreeing.
+	//
+	// The Combination's OWN Type would be one erasure short of it. A written
+	// receiver carries the proof it made of itself, and `[base with "a" = 1]`
+	// standing where a `NonEmptyDictionary` is wanted is exactly that: a
+	// Dictionary update wearing a Refinement, which reads as no Dictionary at
+	// all and would be `Object.assign`ed as though it were a Record.
+	let baseType =
+		node.lhs.type.type === "Refinement" ? node.lhs.type.base : node.lhs.type
+
+	if (baseType.type === "Dictionary") {
 		return rewriteDictionaryCombination(node)
 	}
 
