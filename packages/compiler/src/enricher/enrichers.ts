@@ -307,7 +307,7 @@ export function enrichCalleeExpression(
 		case "Match":
 			return enrichMatch(node, scope)
 		case "Define":
-			return enrichDefine(node, scope)
+			return enrichDefine(node, scope, expectedType)
 		case "CaseValue":
 			return enrichCaseValue(node, scope, expectedType)
 	}
@@ -3533,44 +3533,144 @@ export function enrichMatch(
 	}
 }
 
-// NOTE: Every Condition and every value is read in the very Scope the `define`
-// stands in. An arm declares nothing and binds nothing, so there is no child
-// Scope for one to be read in — and what an arm's Condition proves is not
-// carried down to the arms below it either, which is why they are all read
-// alike.
+// NOTE: An arm is reached only where every Condition ABOVE it answered `false`,
+// so the complements of those Conditions hold throughout it — and its own
+// Condition holds throughout its value. That is the `else if` chain's rule
+// exactly, asked of a chain that answers with values rather than with bodies,
+// and it is read through the very machinery an `if` narrows through.
 //
-// NOTE: The arms are read in the order they were WRITTEN — the value of an arm
-// before its Condition — so the Diagnostics come out in the order a reader of
-// the file meets the problems.
+// An arm still declares nothing and binds nothing. What it is read in is a
+// SHADOW Scope, which the Enricher declares and no author can spell — so the
+// one thing a child Scope buys an `if` body, a name of its own to re-declare,
+// is a thing an arm has no way to want.
+//
+// NOTE: A Condition joined by `::and()` leaves the arms below it nothing:
+// `complementEvidence` refuses a conjunction outright, because a conjunction
+// answering `false` says that one of its questions failed and nothing about
+// which. Its own arm still narrows by both halves.
+//
+// NOTE: The arrow beats the position beats the arms. `define -> Type` is a
+// claim about the `define` itself; the position around it — a Declaration's
+// annotation, a Record member, a `<-` — is a claim about what may stand there;
+// and only where neither says anything do the arms decide, through the Union of
+// what they answer with. Whichever of the two spoke is pushed INTO every arm as
+// its expected Type, which is what lets a bare `#Empty` arm resolve at all.
 export function enrichDefine(
 	node: parser.DefineNode,
 	scope: enricher.Scope,
+	expectedType: common.Type | null = null,
 ): common.typed.DefineNode {
-	let arms = node.arms.map((arm) => ({
-		value: enrichExpression(arm.value, scope),
-		condition: enrichExpression(arm.condition, scope),
-		position: arm.position,
-	}))
+	let declaredType =
+		node.returnType === null ? null : resolveType(node.returnType, scope)
+	let answerType = declaredType ?? expectedType
+	// NOTE: The Scope the NEXT arm is read in — the one it stands in plus every
+	// complement the arms above it left behind. A complement that established
+	// nothing leaves it untouched, so a `define` nobody narrows anything in is
+	// read in the one Scope it always was.
+	let armScope = scope
+	let arms: Array<common.typed.DefineArm> = []
+	// NOTE: The first arm that could not decide a Type with nothing to hand it
+	// one, which is what `define-without-answer-type` reports on. Held rather
+	// than reported on the spot, because the Diagnostic is about the `define`
+	// and belongs after the arm's own.
+	let undecided: common.typed.ExpressionNode | null = null
+
+	let enrichAnswer = (
+		value: parser.ExpressionNode,
+		valueScope: enricher.Scope,
+	): common.typed.ExpressionNode => {
+		if (answerType !== null) {
+			return enrichExpression(value, valueScope, answerType)
+		}
+
+		// NOTE: Watched rather than inspected afterwards, because "this arm
+		// could not decide a Type" is not a question the typed Node answers: a
+		// Case whose name nobody declares is an Error too, and the fix for that
+		// one is to spell the Case, not to write an arrow. What separates them
+		// is which Diagnostic was reported, so that is what is read — and the
+		// Diagnostics are handed straight on, in the order they were raised.
+		let answer = collectDiagnostics(() =>
+			enrichExpression(value, valueScope),
+		)
+
+		for (let diagnostic of answer.diagnostics) {
+			report(diagnostic)
+		}
+
+		if (
+			undecided === null &&
+			answer.diagnostics.some(
+				(diagnostic) => diagnostic.code === "undecided-type-arguments",
+			)
+		) {
+			undecided = answer.result
+		}
+
+		return answer.result
+	}
+
+	for (let arm of node.arms) {
+		// NOTE: The Condition is TYPED before the value, because what an arm
+		// narrows is read off the TYPED Condition — the same reason
+		// `enrichIfElseStatementNode` types its own before either branch Scope
+		// exists. It is WRITTEN after the value though, and a reader meets the
+		// two halves of `as VALUE if CONDITION` in the order they stand on the
+		// line, so its Diagnostics are held back and reported behind the
+		// value's. The two orderings disagree about nothing else.
+		let asked = collectDiagnostics(() =>
+			enrichExpression(arm.condition, armScope),
+		)
+		let condition = asked.result
+		let narrowings = trueBranchNarrowings(condition, armScope)
+		let value = enrichAnswer(
+			arm.value,
+			scopeShadowing(narrowings, armScope),
+		)
+
+		for (let diagnostic of asked.diagnostics) {
+			report(diagnostic)
+		}
+
+		arms.push({
+			value,
+			condition,
+			narrows: narrowings.length > 0,
+			position: arm.position,
+		})
+
+		armScope = scopeShadowing(
+			narrowingsFor(complementEvidence(condition, armScope), armScope),
+			armScope,
+		)
+	}
+
+	// NOTE: The `otherwise` arm is reached by a value every Condition declined,
+	// so it holds every complement and no positive evidence of its own.
 	let otherwise = {
-		value: enrichExpression(node.otherwise.value, scope),
+		value: enrichAnswer(node.otherwise.value, armScope),
 		position: node.otherwise.position,
 	}
 
-	// NOTE: What the arrow declared where `define -> Type { … }` wrote one, and
-	// the Union of what the arms answer with where it did not — the `otherwise`
-	// arm's own Type among them, since it is one of the answers.
+	// NOTE: The Union of what the arms answer with — the `otherwise` arm's own
+	// Type among them, since it is one of the answers — and only where nothing
+	// else decided. Where something did, THAT is the answer Type: every arm was
+	// read against it, and a bare Case arm has no Type of its own to union in.
 	//
 	// `unionOfTypes` answers null only for an empty list of Types, which this
 	// can never be: a `define` without an `otherwise` arm is not a Node the
 	// Parser can build. The fallback is written out rather than asserted away
 	// all the same.
 	let type =
-		node.returnType === null
-			? (unionOfTypes([
-					...arms.map((arm) => arm.value.type),
-					otherwise.value.type,
-				]) ?? otherwise.value.type)
-			: resolveType(node.returnType, scope)
+		answerType ??
+		unionOfTypes([
+			...arms.map((arm) => arm.value.type),
+			otherwise.value.type,
+		]) ??
+		otherwise.value.type
+
+	if (undecided !== null) {
+		reportUndecidedAnswerType(node, undecided)
+	}
 
 	return {
 		nodeType: "Define",
@@ -3579,6 +3679,35 @@ export function enrichDefine(
 		position: node.position,
 		type,
 	}
+}
+
+// NOTE: An arm answered with something that decides no Type of its own — a bare
+// Case, whose Type Arguments are applied by the position around it and never
+// inferred — and the `define` had no Type to hand it. The arm's own Diagnostic
+// names the Case and the Type Parameters left over; this one names the
+// construct that could have answered them, because the help the other offers
+// ("annotate the Declaration") is one an Argument position does not have.
+function reportUndecidedAnswerType(
+	node: parser.DefineNode,
+	undecided: common.typed.ExpressionNode,
+): void {
+	reportError("Nothing decides what this 'define' answers", node.position, {
+		code: "define-without-answer-type",
+		labels: [
+			primary(node.position, "this 'define' has no answer Type"),
+			secondary(
+				undecided.position,
+				"this arm has none of its own to lend it",
+			),
+		],
+		notes: [
+			"A 'define' takes its answer Type from its arrow, from the position it stands in, or from what its arms answer with — and an arm that decides no Type Arguments of its own leaves nothing to take.",
+			"An Argument position hands nothing down: a call picks its Overload BY the Arguments, so no Parameter Type is decided before they are read.",
+		],
+		helps: [
+			"Write the answer Type on the 'define' itself: 'define -> Type { … }'.",
+		],
+	})
 }
 
 // #endregion

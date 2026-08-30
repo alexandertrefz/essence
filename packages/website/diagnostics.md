@@ -2077,6 +2077,31 @@ answers there whenever it gets that far and nothing below it can ever run.
 
 Move the arm above the `otherwise` arm, or delete it.
 
+### `define-without-answer-type`
+
+Nothing decides what a `define` answers. It takes its answer Type from three
+places — the arrow it was written with, the position it stands in, or what its
+arms answer with — and none of the three said anything:
+
+```essence
+constant fetched = define {
+	as #Empty      if skipped
+	as #Value(row) otherwise
+}
+```
+
+A Choice's Type Parameters are applied and never inferred, so a bare `#Empty`
+decides no Type of its own and the arms have nothing to take a Union of. The
+arm's own `undecided-type-arguments` names the Case and the Type Parameters left
+over; this one names the construct that could have answered them.
+
+Write the answer Type on the `define` itself, as `define -> Optional<Row> { … }`
+— it is pushed into every arm as that arm's expected Type. Annotating the
+Declaration works too wherever there is one, but an ARGUMENT position hands
+nothing down: a call picks its Overload BY the Arguments, so no Parameter Type
+is decided before they are read, and a `define` standing in one has to write the
+arrow.
+
 ## Protocols
 
 ### `protocol-as-value`

@@ -650,6 +650,12 @@ export interface DefineNode {
 export type DefineArm = {
 	value: ExpressionNode
 	condition: ExpressionNode
+	// NOTE: That this arm's Condition ESTABLISHED something — the same claim
+	// `IfElseStatementNode.narrows` makes, and recorded here for the same
+	// reason: the Enricher is the only stage that can know it, since a
+	// narrowing is read off the typed Condition and checked refinements are
+	// erased before anything downstream sees a Program.
+	narrows: boolean
 	position: Position
 }
 

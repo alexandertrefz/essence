@@ -328,6 +328,7 @@ export type DiagnosticCode =
 	// Define Expressions — a definition by cases.
 	| "define-without-otherwise"
 	| "unreachable-define-arm"
+	| "define-without-answer-type"
 	// Protocols and conformance.
 	| "protocol-as-value"
 	| "protocol-as-type"
