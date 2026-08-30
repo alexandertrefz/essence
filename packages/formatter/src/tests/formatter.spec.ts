@@ -587,11 +587,6 @@ describe("formatter", () => {
 		})
 	})
 
-	// NOTE: `{ a }` and `{ a = a }` mean the same thing and are written
-	// differently, and `{ base with { a } }` and `{ base with a = a }` are not
-	// even the same parse. The Formatter keeps whichever was written, in both
-	// directions — the AST gate catches a dropped or invented `shorthand`
-	// already, and these pin the layout it comes out in.
 	// NOTE: A `define` is a table of cases, so it is written one arm to a line
 	// whatever it would fit on — the shape a reader scans down. Lining the `if`
 	// column up across a run of arms is a separate question and not asked here.
@@ -701,6 +696,11 @@ describe("formatter", () => {
 		})
 	})
 
+	// NOTE: `{ a }` and `{ a = a }` mean the same thing and are written
+	// differently, and `{ base with { a } }` and `{ base with a = a }` are not
+	// even the same parse. The Formatter keeps whichever was written, in both
+	// directions — the AST gate catches a dropped or invented `shorthand`
+	// already, and these pin the layout it comes out in.
 	describe("Property shorthand", () => {
 		let block = (...lines: Array<string>) =>
 			["implementation {", ...lines, "}", ""].join("\n")
