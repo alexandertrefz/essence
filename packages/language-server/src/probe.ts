@@ -116,7 +116,8 @@ export function buildProbeSource(headText: string, suffix = ""): string {
 const MAXIMUM_DECLARATION_READINGS = 2
 
 export function probeSourcesFor(headText: string, suffix = ""): Array<string> {
-	let stack = openBrackets(stripNoise(headText))
+	let stripped = stripNoise(headText)
+	let stack = openBrackets(stripped)
 	let sources = [`${headText}${suffix}${closingSuffixFor(stack)}`]
 
 	let parentheses = stack.flatMap((opener, index) =>
@@ -127,8 +128,12 @@ export function probeSourcesFor(headText: string, suffix = ""): Array<string> {
 		sources.push(`${headText}${suffix}${closingSuffixFor(stack, index)}`)
 	}
 
-	for (let block of BLOCKS) {
-		sources.push(`${headText}${suffix}${blockSuffixFor(stack, block)}`)
+	let tails = definePattern.test(stripped)
+		? [...STATEMENT_TAILS, ...DEFINE_TAILS]
+		: STATEMENT_TAILS
+
+	for (let tail of tails) {
+		sources.push(`${headText}${suffix}${tailSuffixFor(stack, tail)}`)
 	}
 
 	// NOTE: Two readings can spell the same source — a declaration reading of
@@ -138,30 +143,51 @@ export function probeSourcesFor(headText: string, suffix = ""): Array<string> {
 	return [...new Set(sources)]
 }
 
-// NOTE: The two tails a Statement's HEAD can be waiting for: an `if` wants a
-// block, a `match` wants its return Type and then one — `-> {} {}` again, the
-// shortest complete tail there is.
-const BLOCKS = [" {}", " -> {} {}"]
+// NOTE: The tails a Statement's HEAD can be waiting for: an `if` wants a block,
+// a `match` wants its return Type and then one — `-> {} {}`, the shortest
+// complete tail there is.
+const STATEMENT_TAILS = [" {}", " -> {} {}"]
 
-// NOTE: The readings for a cursor in the head of a Statement that needs a
-// block — `if cell.`, `match cell.` — where closing the brackets alone leaves
-// an `if` with no body, which the Parser drops whole, and with it the member
-// access the cursor is in. The block goes after whatever brackets the head
-// itself opened and before the first `}`: `if greet(` closes to `if greet()
-// {}` and not to `if greet( {})`, and a head can not hold an unclosed `{` of
-// its own, since a block is exactly what it is waiting for.
-function blockSuffixFor(stack: Array<string>, block: string): string {
+// NOTE: The tails that finish the `define` a head stands INSIDE. An arm is
+// written `as VALUE if CONDITION` and the block has to end in an `otherwise`
+// arm, so a cursor in a value is one word short of an arm that closes the
+// block, and a cursor in a Condition is one whole arm short of it — `as {}
+// otherwise`, the shortest arm there is. Neither is optional the way a `match`
+// return Type is: a `define` with no `otherwise` arm is REFUSED, so without
+// these readings the Parser drops the whole Statement the cursor is in, and
+// with it the member access being written.
+const DEFINE_TAILS = [" otherwise", " as {} otherwise"]
+
+// NOTE: What says the arm readings are worth building. `define` is a reserved
+// Keyword and `stripNoise` has already blanked every String and Comment, so the
+// word standing anywhere above the cursor means a `define` was opened there —
+// possibly one already closed again, which is why this is a cheap test that can
+// never turn away a head that needs the arm readings rather than a reading of
+// where the cursor stands. What it buys is that a cursor no reading explains in
+// a file with no `define` above it pays what it always paid: the readings are
+// tried in turn until one answers, so the ones nothing answers with are exactly
+// the ones that parse and enrich the document for nothing.
+const definePattern = /\bdefine\b/
+
+// NOTE: Every tail lands in the same place, which is what lets one function
+// write all four: immediately before the closer of the innermost open `{`. For
+// a Statement waiting for a block that is where its block goes — `if greet(`
+// closes to `if greet() {}` and not to `if greet( {})`, and such a head can
+// hold no unclosed `{` of its own, since a block is exactly what it is waiting
+// for. For a `define` arm it is the end of the `define`'s own block, which is
+// that same innermost `{`.
+function tailSuffixFor(stack: Array<string>, tail: string): string {
 	let suffix = ""
 	let opened = false
 
 	for (let index = stack.length - 1; index >= 0; index--) {
 		if (!opened && stack[index] === "{") {
-			suffix += block
+			suffix += tail
 			opened = true
 		}
 
 		suffix += closers[stack[index]!]
 	}
 
-	return opened ? suffix : `${suffix}${block}`
+	return opened ? suffix : `${suffix}${tail}`
 }

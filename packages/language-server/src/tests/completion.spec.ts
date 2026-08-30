@@ -2277,10 +2277,73 @@ describe("Case completion inside a Case payload default", () => {
 	})
 })
 
-// NOTE: A `#` keeps the whole document — the probe writes a stand-in Case where
-// the sigil is rather than truncating — so this reads the expected Type off the
-// arm itself.
-describe("Case completion inside a define arm", () => {
+// NOTE: A cursor in an arm stands in a `define` that has not been written to its
+// end, and a `define` with no `otherwise` arm is REFUSED rather than recovered
+// from — so every reading below rests on the arm tails `probe.ts` appends. Both
+// halves of an arm are covered: `as VALUE if CONDITION` is two Expression
+// positions, and the tail that closes the block differs between them.
+describe("Completion inside a define arm", () => {
+	it("should complete a Method on a receiver in an arm's value", () => {
+		let source = [
+			"implementation {",
+			"\tfunction shout (_ name: String) -> String {",
+			"\t\t<- define {",
+			"\t\t\tas name::",
+			'\t\t\tas "" otherwise',
+			"\t\t}",
+			"\t}",
+			"}",
+		].join("\n")
+
+		let labels = labelsOf(source, { line: 4, column: 13 })
+
+		expect(labels).toContain("isEmpty")
+		expect(labels).toContain("hasCharacters")
+	})
+
+	it("should complete a Method on a receiver in an arm's condition", () => {
+		let source = [
+			"implementation {",
+			"\tfunction grade (_ score: Integer) -> String {",
+			"\t\t<- define {",
+			'\t\t\tas "A" if score::',
+			'\t\t\tas "F" otherwise',
+			"\t\t}",
+			"\t}",
+			"}",
+		].join("\n")
+
+		let labels = labelsOf(source, { line: 4, column: 21 })
+
+		expect(labels).toContain("add")
+		expect(labels).toContain("isNot")
+	})
+
+	// NOTE: The `otherwise` arm's own value is the LAST thing written, so the
+	// head truncated at the cursor has lost the word that closes the block —
+	// which is the reading ` otherwise` is there for.
+	it("should complete a member in the otherwise arm's value", () => {
+		let source = [
+			"implementation {",
+			"\ttype Team = { name: String, points: Integer }",
+			"\tfunction show (_ team: Team) -> String {",
+			"\t\t<- define {",
+			'\t\t\tas "none" if true',
+			"\t\t\tas team.",
+			"\t\t}",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(labelsOf(source, { line: 6, column: 12 })).toEqual([
+			"name",
+			"points",
+		])
+	})
+
+	// NOTE: A `#` keeps the whole document — the probe writes a stand-in Case
+	// where the sigil is rather than truncating — so this reads the expected
+	// Type off the arm, not off a padded tail.
 	it("should offer the expected Choice's Cases in an arm's value", () => {
 		let source = [
 			"implementation {",

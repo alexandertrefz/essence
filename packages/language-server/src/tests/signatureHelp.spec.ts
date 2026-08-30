@@ -469,3 +469,53 @@ describe("Signature Help for a standard library Method", () => {
 		})
 	})
 })
+
+// NOTE: `as bump(` IS a call being written, and the head truncated at the
+// cursor has lost the rest of its arm — so this rests on the arm tails
+// `probe.ts` appends, exactly as the `if` head above rests on its block tail.
+describe("Signature Help inside a define arm", () => {
+	let source = [
+		"implementation {",
+		"\tfunction bump (_ value: Integer, by amount: Integer) -> Integer {",
+		"\t\t<- value",
+		"\t}",
+		"\tfunction grade (_ score: Integer) -> Integer {",
+		"\t\t<- define {",
+		"\t\t\tas bump(score, ",
+		"\t\t\tas 0 otherwise",
+		"\t\t}",
+		"\t}",
+		"}",
+	].join("\n")
+
+	it("should show a signature for a call in an arm's value", () => {
+		let help = findSignatureHelp(source, { line: 7, column: 19 })
+
+		expect(help?.signatures[0].label).toBe(
+			"bump(_ Integer, by: Integer) -> Integer",
+		)
+		expect(help?.activeParameter).toBe(1)
+	})
+
+	it("should show a signature for a call in an arm's condition", () => {
+		let conditioned = [
+			"implementation {",
+			"\tfunction passes (_ value: Integer, by amount: Integer) -> Boolean {",
+			"\t\t<- true",
+			"\t}",
+			"\tfunction grade (_ score: Integer) -> Integer {",
+			"\t\t<- define {",
+			"\t\t\tas 1 if passes(score, ",
+			"\t\t\tas 0 otherwise",
+			"\t\t}",
+			"\t}",
+			"}",
+		].join("\n")
+
+		let help = findSignatureHelp(conditioned, { line: 7, column: 26 })
+
+		expect(help?.signatures[0].label).toBe(
+			"passes(_ Integer, by: Integer) -> Boolean",
+		)
+	})
+})
