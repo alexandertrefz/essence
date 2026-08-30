@@ -61,8 +61,8 @@ Counts what ran, where the caller asked to be told.
 
 `essence test --coverage` compiles a project with this pass on; every other
 compile finds it a no-op. It writes a counter in front of every Statement, one
-into each side of every `if`, one into every `match` arm and one around every
-Choice Case a source constructs — and a table beside them saying where each of
+into each side of every `if`, one around every arm of a `define`, one into every
+`match` arm and one around every Choice Case a source constructs — and a table beside them saying where each of
 those stands, what kind of thing it counts and what to call it. The test runtime
 holds the counts, and the runner reports them.
 

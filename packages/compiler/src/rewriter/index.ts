@@ -2430,9 +2430,9 @@ function rewriteConditionalStatement(
 
 // NOTE: What JavaScript is asked. An Essence Boolean is an object, and every
 // object is true, so the question is the `value` it holds — unless
-// `lower-matches-to-statements` found the question already asked in JavaScript's
-// own terms, in which case the Expression IS the question and reading `.value`
-// off a raw boolean would be `undefined`.
+// `unbox-conditions` found the question already asked in JavaScript's own
+// terms, in which case the Expression IS the question and reading `.value` off
+// a raw boolean would be `undefined`.
 function conditionTest(
 	node: common.typedSimple.ConditionalStatementNode,
 ): estree.Expression {
@@ -5357,11 +5357,11 @@ function rewriteMatch(
 // is no fall-through here and no throw to end it with.
 //
 // NOTE: An Essence Boolean is an object and every object is true, so what
-// JavaScript is asked is the `value` the Condition holds — unless a pass has
-// already left the question asked in JavaScript's own terms, which is what
-// `conditionIsRaw` says. Reading `.value` off a raw boolean would be
-// `undefined`, and `undefined` is false: every arm would decline and every
-// `define` would answer with its `otherwise`.
+// JavaScript is asked is the `value` the Condition holds — unless
+// `unbox-conditions` has already left the question asked in JavaScript's own
+// terms, which is what `conditionIsRaw` says. Reading `.value` off a raw
+// boolean would be `undefined`, and `undefined` is false: every arm would
+// decline and every `define` would answer with its `otherwise`.
 function rewriteDefine(node: common.typedSimple.DefineNode): estree.Expression {
 	let chain = rewriteExpression(node.otherwise)
 
@@ -7553,8 +7553,9 @@ function itemAt(items: string, position: string): estree.MemberExpression {
 
 // NOTE: The raw JavaScript boolean a predicate's answer decides by — and, where
 // the answer is a Boolean an earlier pass BUILT out of a JavaScript test, the
-// test it was built from. It is the same collapse an `if` performs on its
-// condition, in the one other place a Boolean is built only to be read back.
+// test it was built from. It is the same collapse `unbox-conditions` performs
+// on a condition, in the one other place a Boolean is built only to be read
+// back.
 function rawAnswer(answer: LoopAnswer): estree.Expression {
 	let node = answer.node
 
