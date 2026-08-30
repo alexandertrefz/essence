@@ -27,6 +27,7 @@ import { escapeNameForEvaluation } from "./names"
 import {
 	type DescribedValue,
 	DESCRIBE_BATCH_SOURCE,
+	DICTIONARY_ENTRIES_SOURCE,
 	LIST_ITEMS_SOURCE,
 } from "./render"
 import { blackboxPositions } from "./stepping"
@@ -61,6 +62,20 @@ export const adapterCapabilities: DebugProtocol.Capabilities = {
 		},
 	],
 }
+
+// NOTE: The object group every handle the Variables view mints in the debuggee
+// belongs to. A row expands through one `callFunctionOn` that BUILDS an array
+// over there, and `Runtime.getProperties` wraps what it answers in the group of
+// the object it was asked about — so naming the group on that one call is what
+// puts the entry Records read back off the array into it too.
+//
+// NOTE: It is the Dictionary path this is really about. A List's items are the
+// Program's OWN values, reachable from the box a reader is looking at whether
+// the debugger holds a handle to them or not; a Dictionary's entries are minted
+// by `essenceDictionaryEntries` and nothing but the handle holds them. Released
+// nowhere, a session that opened one Dictionary row per pause would leave one
+// Record per entry standing in the debuggee for as long as it ran.
+const VARIABLE_OBJECT_GROUP = "essence-variables"
 
 export type AdapterOptions = {
 	// NOTE: What compiling means is the host's to say — `essence dap` injects
@@ -113,10 +128,10 @@ type PausedParameters = {
 }
 
 // NOTE: What a `variablesReference` stands for: a scope's bindings, an
-// object's own members, or a List — whose items are the ones its view holds,
-// which the debuggee has to be asked for.
+// object's own members, or a List or a Dictionary — whose items and entries are
+// the ones its view holds, which the debuggee has to be asked for.
 type VariableContainer = {
-	kind: "scope" | "members" | "list"
+	kind: "scope" | "members" | "list" | "dictionary"
 	objectId: string
 }
 
@@ -325,6 +340,7 @@ export class EssenceDebugSession extends DebugSession {
 
 		this.lastPause = params
 		this.variableHandles.reset()
+		this.releaseVariableObjects()
 
 		let reason =
 			params.reason === "exception"
@@ -732,16 +748,24 @@ export class EssenceDebugSession extends DebugSession {
 				(entry) => !entry.name.startsWith("Symbol("),
 			)
 		} else {
-			// NOTE: A List's items are NOT its inner array's. That array is
-			// shared with the other boxes of its chain and can run past what
-			// this box views, and a box that was prepended to holds a second,
-			// reversed run in front of it — so the debuggee is asked for the
-			// logical items, in order, as an array of its own, and those are
-			// what the row expands to. A List that will not answer expands to
-			// nothing rather than to items it does not have. The box's own
-			// properties are never read here: the inner array is the one thing
-			// they hold that must not be shown.
-			let items = await this.listItems(container.objectId)
+			// NOTE: A List's items are NOT its inner array's, and a
+			// Dictionary's entries are not its store's slots. Both hold a
+			// structure SHARED with the other boxes of their chain: a List's
+			// array can run past what this box views and a box that was
+			// prepended to holds a second, reversed run in front of it, while a
+			// store carries versions stamped past this box's generation and
+			// tombstoned slots for the keys it no longer holds. So the debuggee
+			// is asked for the logical items, in order, as an array of its own,
+			// and those are what the row expands to. A box that will not answer
+			// expands to nothing rather than to items it does not have. The
+			// box's own properties are never read here: the inner array and the
+			// store are the one thing they hold that must not be shown.
+			let items = await this.viewedItems(
+				container.objectId,
+				container.kind === "list"
+					? LIST_ITEMS_SOURCE
+					: DICTIONARY_ENTRIES_SOURCE,
+			)
 
 			if (items === null) {
 				entries = []
@@ -769,9 +793,12 @@ export class EssenceDebugSession extends DebugSession {
 				let reference = 0
 
 				if (entry.value.objectId !== undefined) {
-					if (description.kind === "list") {
+					if (
+						description.kind === "list" ||
+						description.kind === "dictionary"
+					) {
 						reference = this.variableHandles.create({
-							kind: "list",
+							kind: description.kind,
 							objectId: entry.value.objectId,
 						})
 					} else if (
@@ -822,10 +849,14 @@ export class EssenceDebugSession extends DebugSession {
 		}
 	}
 
-	// NOTE: The List, handed to itself as the call's argument, answers a fresh
-	// array of the items its view holds — kept over there, by reference, so
-	// that every item is still the live value the row below it expands.
-	private async listItems(objectId: string): Promise<string | null> {
+	// NOTE: The box, handed to itself as the call's argument, answers a fresh
+	// array of what its view holds — a List's items, a Dictionary's entries —
+	// kept over there, by reference, so that every one of them is still the
+	// live value the row below it expands.
+	private async viewedItems(
+		objectId: string,
+		source: string,
+	): Promise<string | null> {
 		let debuggee = this.debuggee
 
 		if (debuggee === null) {
@@ -837,8 +868,9 @@ export class EssenceDebugSession extends DebugSession {
 				"Runtime.callFunctionOn",
 				{
 					objectId,
-					functionDeclaration: LIST_ITEMS_SOURCE,
+					functionDeclaration: source,
 					arguments: [{ objectId }],
+					objectGroup: VARIABLE_OBJECT_GROUP,
 				},
 			)
 
@@ -846,6 +878,22 @@ export class EssenceDebugSession extends DebugSession {
 		} catch {
 			return null
 		}
+	}
+
+	// NOTE: Everything this pane pinned over there, let go where the handles
+	// naming it are dropped — a new pause and a resume, which are the two
+	// moments a `variablesReference` stops meaning anything. The array itself is
+	// released as soon as it has been read; what this is for is what was read
+	// OUT of it, which `getProperties` handed back in this same group.
+	private releaseVariableObjects(): void {
+		this.debuggee?.cdp
+			.send("Runtime.releaseObjectGroup", {
+				objectGroup: VARIABLE_OBJECT_GROUP,
+			})
+			.catch(() => {
+				// NOTE: A debuggee that has minted nothing yet, or a session
+				// closing under us. There is nothing to let go either way.
+			})
 	}
 
 	private async releaseObject(objectId: string): Promise<void> {
@@ -1037,9 +1085,9 @@ export class EssenceDebugSession extends DebugSession {
 		let reference = 0
 
 		if (value.objectId !== undefined && described !== undefined) {
-			if (described.kind === "list") {
+			if (described.kind === "list" || described.kind === "dictionary") {
 				reference = this.variableHandles.create({
-					kind: "list",
+					kind: described.kind,
 					objectId: value.objectId,
 				})
 			} else if (
@@ -1078,6 +1126,7 @@ export class EssenceDebugSession extends DebugSession {
 		this.lastPause = null
 		this.presentedFrames = []
 		this.variableHandles.reset()
+		this.releaseVariableObjects()
 		await this.debuggee?.cdp.send("Debugger.resume").catch(() => {
 			// NOTE: A resume can race the program's own exit; the exit path
 			// already reports what happened.
