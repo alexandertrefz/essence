@@ -39,10 +39,21 @@ They average 15/7 points a game — 2.14 to two places — and have won 57% of t
   scored, name — so `Standings.ranked` is one `sort()` with no comparison
   passed. `is Printable` on `Fixture` and `Outcome` lets a fixture print itself
   and a form guide join into `WDLDW`.
-- **Every count is a fold.** The table is `teams::map` over
-  `fixtures::reduce`, and each Case of a fixture is taken apart by a Pattern
-  into exactly the names the arm needs. Recording a result is one Record
-  update, `{ @ with … }`.
+- **Every count is a fold.** The season is walked once, `fixtures::reduce`,
+  and each Case of a fixture is taken apart by a Pattern into exactly the
+  names the arm needs. Recording a result is one Record update,
+  `{ @ with … }`.
+- **A Dictionary where the data is keyed.** The rows are worked out in a
+  `Dictionary<Team, Standing>`, so a fixture reaches the two rows it changes
+  instead of every row being asked about every fixture. `Dictionary.of` builds
+  the blank table out of the teams, `update(at:with:)` records a result — and
+  it answers the table unchanged where the key holds nothing, which is what
+  makes a fixture between teams this table is not about change nothing. A
+  `Team` is a Record, and a Record is a key like any other: it is found by
+  asking the Record's own `is`. The rows are then read back through the teams,
+  which is what carries the proof that the table has rows.
+  [`Season.tests.es`](Season.tests.es) keys the finished table by team code
+  the same way, so a test asks for a row by name and gets an `Optional`.
 - **Refinements instead of Optionals.** `teams` is a `NonEmptyList<Team>` —
   writing the items down is the proof — so `Standings.leader(of:)` answers a
   `Standing` rather than an `Optional`, and `pointsPerGame` divides by `played`

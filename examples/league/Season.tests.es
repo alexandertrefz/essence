@@ -19,6 +19,16 @@ tests {
 	)
 	constant leader = Standings.leader(of table)
 
+	§ A table is read by hand by team, and a row is found by asking the whole
+	§ List for the one whose code matches. Keyed by the code once, every test
+	§ that wants a row asks for it by name — and a lookup answers an Optional,
+	§ because a code the table has no row for holds nothing.
+	constant byCode = Dictionary.of(
+		table::map((standing) {
+			<- { key = standing.team.code, value = standing }
+		}),
+	)
+
 	suite "the season as it stands" {
 		test "is led by Riverside" {
 			expect leader.team.name::is("Riverside")
@@ -38,17 +48,13 @@ tests {
 		}
 
 		test "counts a postponed fixture for nobody" {
-			require #Value(kestrel) = table::firstItem(where (standing) {
-				<- standing.team.code::is("KES")
-			})
+			require #Value(kestrel) = byCode::value(at "KES")
 
 			expect kestrel.played::is(6)
 		}
 
 		test "gives the forfeit to Ashgrove and takes it off Old Quarry" {
-			require #Value(quarry) = table::firstItem(where (standing) {
-				<- standing.team.code::is("OLD")
-			})
+			require #Value(quarry) = byCode::value(at "OLD")
 
 			expect quarry.lost::is(6)
 			expect quarry.points::is(1)
