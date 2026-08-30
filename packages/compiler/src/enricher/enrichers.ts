@@ -3693,8 +3693,16 @@ export function enrichDefine(
 // Case, whose Type Arguments are applied by the position around it and never
 // inferred — and the `define` had no Type to hand it. The arm's own Diagnostic
 // names the Case and the Type Parameters left over; this one names the
-// construct that could have answered them, because the help the other offers
-// ("annotate the Declaration") is one an Argument position does not have.
+// construct that could have answered them.
+//
+// NOTE: The Argument position is a CAVEAT on the second help and not a claim
+// about where this `define` stands. Nothing here can tell the two apart — a
+// `define` in an Argument position and one declared with no annotation are
+// handed the same nothing, because a call picks its Overload BY the Arguments —
+// so it used to be stated as a Note, and read as an account of a plain
+// `constant x = define { … }` that no Argument list is anywhere near. The arrow
+// is what always works, so it leads; annotating the Declaration is the other
+// answer, and it comes with the one position that does not have it.
 function reportUndecidedAnswerType(
 	node: parser.DefineNode,
 	undecided: common.typed.ExpressionNode,
@@ -3710,10 +3718,10 @@ function reportUndecidedAnswerType(
 		],
 		notes: [
 			"A 'define' takes its answer Type from its arrow, from the position it stands in, or from what its arms answer with — and an arm that decides no Type Arguments of its own leaves nothing to take.",
-			"An Argument position hands nothing down: a call picks its Overload BY the Arguments, so no Parameter Type is decided before they are read.",
 		],
 		helps: [
-			"Write the answer Type on the 'define' itself: 'define -> Type { … }'.",
+			"Write the answer Type on the 'define' itself: 'define -> Type { … }' — it is pushed into every arm.",
+			"Or annotate the Declaration it stands in, where it stands in one. An Argument position hands nothing down: a call picks its Overload BY the Arguments, so no Parameter Type is decided before they are read.",
 		],
 	})
 }

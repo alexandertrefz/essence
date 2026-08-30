@@ -522,6 +522,26 @@ describe("Parser Recovery", () => {
 		}
 	})
 
+	// NOTE: The same refusal about different text. "Every value here has a
+	// condition on it" is a remark about the values that were WRITTEN, and an
+	// empty block wrote none — it is short of every arm, not of the last one.
+	it("should refuse an empty define in its own words", () => {
+		let { diagnostics } = parseWithDiagnostics(
+			`implementation {
+				constant grade = define { }
+			}`,
+		)
+
+		expect(diagnostics).toHaveLength(1)
+		expect(diagnostics[0].code).toBe("define-without-otherwise")
+		expect(diagnostics[0].labels[0]?.message).toBe(
+			"there are no arms here at all",
+		)
+		expect(diagnostics[0].helps).toEqual([
+			"Write an arm: 'as <value> otherwise'.",
+		])
+	})
+
 	// NOTE: Reported and DROPPED rather than thrown, which is what keeps the
 	// `define` and the Statement it stands in: the arm reads perfectly well, and
 	// what is wrong with it is where it stands.

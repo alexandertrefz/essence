@@ -9376,8 +9376,41 @@ describe("Enricher", () => {
 					"this arm has none of its own to lend it",
 				)
 				expect(diagnostics[1].helps).toEqual([
-					"Write the answer Type on the 'define' itself: 'define -> Type { … }'.",
+					"Write the answer Type on the 'define' itself: 'define -> Type { … }' — it is pushed into every arm.",
+					"Or annotate the Declaration it stands in, where it stands in one. An Argument position hands nothing down: a call picks its Overload BY the Arguments, so no Parameter Type is decided before they are read.",
 				])
+			})
+
+			// NOTE: The Argument position is a CAVEAT on the second help and not
+			// an account of where the `define` stands — nothing here can tell an
+			// Argument from a Declaration with no annotation, since both hand the
+			// same nothing down. Stated as a Note it read as a remark about the
+			// Declaration below, which no Argument list is anywhere near, and it
+			// withheld the help that annotating that Declaration is the fix.
+			it("should offer the Declaration the arrow is an alternative to", () => {
+				let diagnostics = diagnosticsFor(`implementation {
+					constant flag = true
+
+					constant fetched = ${ARMS}
+				}`)
+
+				expect(
+					diagnostics.map((diagnostic) => diagnostic.code),
+				).toEqual([
+					"undecided-type-arguments",
+					"define-without-answer-type",
+				])
+				expect(diagnostics[1].notes).toHaveLength(1)
+				expect(
+					diagnostics[1].notes.some((note) =>
+						note.includes("An Argument position"),
+					),
+				).toBe(false)
+				expect(
+					diagnostics[1].helps.some((help) =>
+						help.includes("annotate the Declaration"),
+					),
+				).toBe(true)
 			})
 
 			it("should reach an Argument through the arrow", () => {
