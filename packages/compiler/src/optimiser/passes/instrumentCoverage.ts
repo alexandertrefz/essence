@@ -72,14 +72,21 @@ function instrument(
 		return points.length - 1
 	}
 
+	// NOTE: Both forms of the Node, in one place, because which one a point
+	// needs is a fact about WHERE it stands rather than about what it counts. A
+	// Statement position takes a counter standing on its own, which is the
+	// value-less form; an Expression position takes the WRAPPING form, which
+	// counts and then answers with the very value it was handed. An arm of a
+	// `define` has no body to write a Statement into and is the second kind.
 	let counter = (
 		point: number,
 		position: common.Position,
+		value: common.typedSimple.ExpressionNode | null = null,
 	): common.typedSimple.CoverageCounterNode => ({
 		nodeType: "CoverageCounter",
 		point,
-		value: null,
-		type: { type: "Record", members: {} },
+		value,
+		type: value === null ? { type: "Record", members: {} } : value.type,
 		position,
 	})
 
@@ -136,6 +143,7 @@ type Mark = (
 type Counter = (
 	point: number,
 	position: common.Position,
+	value?: common.typedSimple.ExpressionNode | null,
 ) => common.typedSimple.CoverageCounterNode
 
 // NOTE: One counter in front of every Statement a reader wrote. Declarations
@@ -245,7 +253,74 @@ function instrumentExpression(
 		return { ...node, handlers: instrumentHandlers(node, mark, counter) }
 	}
 
+	if (node.nodeType === "Define") {
+		return instrumentArms(node, mark, counter)
+	}
+
 	return instrumentConstruction(node, mark)
+}
+
+// NOTE: An arm is a BRANCH — the same kind an `if` writes, with the same two
+// labels, because that is what an arm is: a question, a path taken where it
+// holds and a fallback below it where it does not. So it rolls into the branch
+// coverage a report already writes and neither the report nor the runtime has to
+// hear that `define` exists.
+//
+// NOTE: The WRAPPING form of the counter, and it has to be. Every other point in
+// this pass is a Statement prepended to a body; an arm has no body — both halves
+// of it are Expressions — so the counter stands AROUND the value the arm answers
+// with and answers with it in turn. `instrumentConstruction` is the other user
+// of that form, for the same reason.
+//
+// NOTE: Positioned at the arm's ANSWER rather than at the whole arm, which is
+// the same line `instrumentStatement` draws: a branch's point stands where its
+// body starts, not where its `if` was written. It is also the only Position in
+// reach — the span an arm was written across is a question about the source that
+// nothing below the Simplifier asks, and so nothing below it carries.
+//
+// NOTE: `refinement` rides the arm's own claim, and the `otherwise` arm rides
+// what the arms ABOVE it left behind — it is reached by a value every one of
+// their Conditions declined, so it stands behind a doorway exactly when one of
+// those complements established something. The same reading
+// `instrumentStatement` gives an `else`, asked of the claim that is actually
+// about the fallback.
+function instrumentArms(
+	node: common.typedSimple.DefineNode,
+	mark: Mark,
+	counter: Counter,
+): common.typedSimple.DefineNode {
+	let narrows = node.arms.some((arm) => arm.narrowsBelow)
+	let arms = node.arms.map((arm) => {
+		let position = arm.value.position
+
+		if (position === undefined) {
+			return arm
+		}
+
+		return {
+			...arm,
+			value: counter(
+				mark("branch", "if", position, { refinement: arm.narrows }),
+				position,
+				arm.value,
+			),
+		}
+	})
+	let position = node.otherwise.position
+
+	if (position === undefined) {
+		return { ...node, arms }
+	}
+
+	return {
+		...node,
+		arms,
+		otherwise: counter(
+			mark("branch", "otherwise", position, { refinement: narrows }),
+			position,
+			node.otherwise,
+		),
+	}
 }
 
 function instrumentHandlers(
