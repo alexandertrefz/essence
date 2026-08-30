@@ -718,19 +718,45 @@ describe("formatter", () => {
 			)
 		})
 
+		// NOTE: An arm wider than a line breaks in front of its `if` wherever
+		// it stands, so the column its head would hold open is one nothing
+		// occupies — it is out of the run, and the arms around it line up with
+		// one another.
+		it("leaves an arm too wide for any line out of the run", () => {
+			roundTrips(
+				block(
+					"\tconstant grade = define {",
+					'\t\tas "short" if value::is("a")',
+					'\t\tas "aaaaaaaaaaaaaaaa"',
+					'\t\t\tif value::is("cccccccccccccccccccccccccccccccccccccccccccccccccccc")',
+					'\t\tas "mid"   if value::is("b")',
+					'\t\tas "x"     otherwise',
+					"\t}",
+				),
+			)
+		})
+
 		// NOTE: The padding of an arm that breaks is written in front of the
 		// break, where it holds no column open and the line-end trimming takes
 		// it away. A stranded run of spaces at the end of a line would be
 		// invisible here and fatal to the second pass, which is what the
 		// explicit check is for.
+		//
+		// NOTE: Written inside a Function, which is the one place these arms
+		// can be in the run and break anyway: each of them FITS a line, so the
+		// printer keeps it in the column, and none of them fits the line it
+		// starts four indents in. An arm too wide for any line is out of the
+		// run and never padded at all.
 		it("takes the padding of a broken arm away with the break", () => {
 			let source = block(
-				"\tconstant grade = define {",
-				'\t\tas "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"',
-				"\t\t\tif score::isGreaterThanOrEqualTo(90)",
-				'\t\tas "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"',
-				"\t\t\tif score::isGreaterThanOrEqualTo(80)",
-				'\t\tas "ccccccccccccccccccccccccccccccccccccccccccc"   otherwise',
+				"\tconstant grade = (_ score: Integer) -> String {",
+				"\t\t<- define {",
+				'\t\t\tas "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"',
+				"\t\t\t\tif score::isGreaterThanOrEqualTo(90)",
+				'\t\t\tas "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"',
+				"\t\t\t\tif score::isGreaterThanOrEqualTo(80)",
+				'\t\t\tas "cccccccccccccccccccccccccccccc"   otherwise',
+				"\t\t}",
 				"\t}",
 			)
 

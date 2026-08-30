@@ -1,13 +1,13 @@
 import { parseDocument } from "@essence-lang/compiler/documents"
 import type { common, parser } from "@essence-lang/interfaces"
 
-import { printDoc } from "./doc"
+import { printDoc, WIDTH } from "./doc"
 import { Printer } from "./printer"
 import { canonicalSections, sectionSpans } from "./sections"
 import { SourceText } from "./source"
 import { collectComments, commentAnchors, TriviaCursor } from "./trivia"
 
-export const WIDTH = 80
+export { WIDTH }
 
 export type Refusal = {
 	// NOTE: `syntax` means the source never parsed; `unsafe` means it did, was

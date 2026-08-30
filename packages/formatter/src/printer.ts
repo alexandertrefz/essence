@@ -21,6 +21,7 @@ import {
 	text,
 	type TextDoc,
 	verbatim,
+	WIDTH,
 } from "./doc"
 import { compareExportEntries, compareImportEntries } from "./sections"
 import type { SourceText } from "./source"
@@ -2329,7 +2330,12 @@ export class Printer {
 			position: common.Position,
 			write: (padding: TextDoc) => {
 				doc: Doc
-				headWidth: number | null
+				// NOTE: Where this arm stands in the run: the width of the head
+				// its case is written after, `"apart"` where its case is
+				// written somewhere no column reaches and the table goes on
+				// around it, or `"ends"` where the arm interrupts the table
+				// itself and the arms below start a run of their own.
+				column: number | "apart" | "ends"
 			},
 		) => {
 			for (let comment of this.trivia.takeBefore(position.start.line)) {
@@ -2341,14 +2347,18 @@ export class Printer {
 			let written = write(padding)
 			let doc = written.doc
 
-			// NOTE: An answer with no width to report ends the run rather than
-			// joining it. There is no column to measure it against, and every
-			// sibling padded out to one would be lining up on an `if` that is
-			// nowhere near the answer that reached it.
-			if (written.headWidth === null) {
+			// NOTE: An arm whose case is not written in the column is no part
+			// of the run — every sibling padded out to its head would be lining
+			// up on an `if` that is nowhere near the answer that reached it. It
+			// ENDS the run only where its answer opens a block: the arms under
+			// that answer's closing brace start again below it, and one column
+			// carried across it would run through two tables. An arm that is
+			// merely too wide for a line is one row of the one table, and the
+			// rows either side of it keep their column.
+			if (typeof written.column === "number") {
+				run.push({ headWidth: written.column, padding })
+			} else if (written.column === "ends") {
 				closeRun()
-			} else {
-				run.push({ headWidth: written.headWidth, padding })
 			}
 
 			if (trailing !== null) {
@@ -2376,7 +2386,7 @@ export class Printer {
 							text(" if "),
 							condition,
 						]),
-						headWidth,
+						column: "ends",
 					}
 				}
 
@@ -2393,7 +2403,9 @@ export class Printer {
 				// ANSWER does not: its `if` is written in the column like every
 				// other one, and only what follows the brace is on lines of its
 				// own.
-				if (flatWidth(condition) === null) {
+				let conditionWidth = flatWidth(condition)
+
+				if (conditionWidth === null) {
 					return {
 						doc: concat([
 							text("as "),
@@ -2402,7 +2414,7 @@ export class Printer {
 							text(" if "),
 							condition,
 						]),
-						headWidth,
+						column: headWidth,
 					}
 				}
 
@@ -2413,6 +2425,18 @@ export class Printer {
 				// padding sits in front of the break, where the line-end
 				// trimming takes it away the moment it is not holding a column
 				// open.
+				//
+				// NOTE: An arm wider than a LINE breaks there wherever it is
+				// written, so it reports no width and leaves the run: its `if`
+				// is on a line of its own, and the column its head would hold
+				// open is one that nothing occupies. The layout decides every
+				// other break, and an arm that fits a line and breaks anyway
+				// because of the column it starts at is not seen from here —
+				// that arm stays in the run and holds it one head too wide,
+				// which is the same misalignment in the one case the printer
+				// can not tell apart from an arm that fits.
+				let armWidth = headWidth + stringWidth(" if ") + conditionWidth
+
 				return {
 					doc: group(
 						concat([
@@ -2422,7 +2446,7 @@ export class Printer {
 							indent(concat([line, text("if "), condition])),
 						]),
 					),
-					headWidth,
+					column: armWidth > WIDTH ? "apart" : headWidth,
 				}
 			})
 		}
@@ -2434,10 +2458,22 @@ export class Printer {
 		// because of the answer that is still on it.
 		pushArm(node.otherwise.position, (padding) => {
 			let answer = this.printExpression(node.otherwise.value)
+			let headWidth = flatWidth(concat([text("as "), answer]))
 
+			// NOTE: `otherwise` is written against the end of its answer
+			// wherever that ends up, so an answer that gives way inside itself
+			// carries the keyword down with it — and the padding in front of it
+			// lands mid-line, at the end of a line no column runs through. An
+			// answer with no flat width at all opens a block, and ends the run
+			// for the reason an arm's does.
 			return {
 				doc: concat([text("as "), answer, padding, text(" otherwise")]),
-				headWidth: flatWidth(concat([text("as "), answer])),
+				column:
+					headWidth === null
+						? "ends"
+						: headWidth + stringWidth(" otherwise") > WIDTH
+							? "apart"
+							: headWidth,
 			}
 		})
 

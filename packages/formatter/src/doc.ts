@@ -9,6 +9,14 @@
 // against and the one the editors are configured for.
 export const TAB_WIDTH = 4
 
+// NOTE: The columns a line is laid out to. `printDoc` is handed the width it
+// works to rather than reading this — the algebra itself has no opinion about
+// how wide a page is — and this is the width the corpus is written to, which is
+// why it sits beside the tab it is measured in. The printer reads it to answer
+// the one question that is about the line rather than about the column: whether
+// something is too wide to be written on one WHEREVER it stands.
+export const WIDTH = 80
+
 // NOTE: Named, and returned by `text`, so that a caller holding one can write
 // to its `value` later. The `match` Handler alignment does exactly that: it
 // lays a Handler out before it knows how wide its siblings are, and fills the
