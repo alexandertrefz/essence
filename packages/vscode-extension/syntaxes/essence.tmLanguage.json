@@ -249,7 +249,7 @@
 			}
 		},
 		"controlKeyword": {
-			"comment": "`define` and `otherwise` are reserved Keywords like the rest of these, so both light on the word alone. The third word an arm is written with, `as`, is not — it is scoped under the contextual rules below.",
+			"comment": "`define` is a reserved Keyword, so it lights on the word alone. `otherwise` is a valid Identifier — as `case` and `with` on this list already are — and is lit here anyway for the same reason they are: telling an arm's terminator from a name spelled the same would need to know what block the line stands in, which a grammar of regexes can not see, and the word all but always ends an arm where it is written. An editor that asks for Semantic Tokens recolours a name spelled that way anyway, because those are read off what an Identifier resolves to. The third word an arm is written with, `as`, is not here — it is scoped under the contextual rules below.",
 			"match": "\\b(if|else|match|case|define|otherwise|for|with)\\b",
 			"name": "keyword.control.essence"
 		},

@@ -187,6 +187,10 @@ const statementKeywords = [
 // is ever waiting for one. Offering them would need a reading of what block the
 // cursor stands in and how much of its arm is already written — which is the
 // analysis the NOTE on `keywordCompletions` declines to do.
+//
+// Both are Identifiers as well, so a cursor that wants the word as a NAME is
+// already answered: it is offered by whatever declared it, the way every other
+// name in Scope is.
 const expressionKeywords = ["match", "define", "true", "false", "nothing"]
 
 export function findCompletions(
