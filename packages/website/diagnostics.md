@@ -1144,8 +1144,9 @@ arrow, the position around the `define`, or the arms themselves decided it.
 
 ### `condition-not-boolean`
 
-An `if` Condition, or a `match` Case's `where` Guard, is not a Boolean. Essence
-has no truthiness; a Condition must be a Boolean and nothing else.
+An `if` Condition, a `match` Case's `where` Guard, or a `define` arm's Condition
+is not a Boolean. Essence has no truthiness; a Condition must be a Boolean and
+nothing else.
 
 ### `constant-reassignment`
 
