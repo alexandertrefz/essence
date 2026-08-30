@@ -2386,6 +2386,79 @@ Error: A Dictionary entry is written with '='
 "
 `;
 
+exports[`Diagnostic Showcase DefineAnswers.es should render the same report every time 1`] = `
+"[undecided-type-arguments]
+Error: Nothing decides the Type Arguments of '#Empty'
+    ╭─┤ DefineAnswers.es:22:6 │
+    │
+ 22 │        as #Empty if skipped
+    │           ───┬──  
+    │              ╰──── no Type Arguments here, and nothing around it decides them
+    │ 
+    │ Help 1: Annotate the declaration: 'constant left: Optional<ItemType> = #Empty'.
+    │ Help 2: Or apply the Type Arguments: 'Optional<ItemType>#Empty'.
+    │ 
+    │ Note 1: 'Optional' takes 1 Type Parameter: 'ItemType'.
+    │ Note 2: A Choice's Type Parameters are applied, never inferred — the payload is checked against them, it does not choose them.
+────╯
+
+[define-without-answer-type]
+Error: Nothing decides what this 'define' answers
+    ╭─┤ DefineAnswers.es:21:21 │
+    │
+ 21 │ ╭─▶     constant fetched = define {
+ 22 │ │          as #Empty if skipped
+    │ │             ───┬──  
+    │ │                ╰──── this arm has none of its own to lend it
+    ┆ ┆   
+ 24 │ ├─▶     }
+    │ │           
+    │ ╰─────────── this 'define' has no answer Type
+    │ 
+    │ Help: Write the answer Type on the 'define' itself: 'define -> Type { … }'.
+    │ 
+    │ Note 1: A 'define' takes its answer Type from its arrow, from the position it stands in, or from what its arms answer with — and an arm that decides no Type Arguments of its own leaves nothing to take.
+    │ Note 2: An Argument position hands nothing down: a call picks its Overload BY the Arguments, so no Parameter Type is decided before they are read.
+────╯
+
+[undecided-type-arguments]
+Error: Nothing decides the Type Arguments of '#Empty'
+    ╭─┤ DefineAnswers.es:30:6 │
+    │
+ 30 │        as #Empty if skipped
+    │           ───┬──  
+    │              ╰──── no Type Arguments here, and nothing around it decides them
+    │ 
+    │ Help 1: Annotate the declaration: 'constant left: Optional<ItemType> = #Empty'.
+    │ Help 2: Or apply the Type Arguments: 'Optional<ItemType>#Empty'.
+    │ 
+    │ Note 1: 'Optional' takes 1 Type Parameter: 'ItemType'.
+    │ Note 2: A Choice's Type Parameters are applied, never inferred — the payload is checked against them, it does not choose them.
+────╯
+
+[define-without-answer-type]
+Error: Nothing decides what this 'define' answers
+    ╭─┤ DefineAnswers.es:29:25 │
+    │
+ 29 │ ╭─▶     constant total = count(define {
+ 30 │ │          as #Empty if skipped
+    │ │             ───┬──  
+    │ │                ╰──── this arm has none of its own to lend it
+    ┆ ┆   
+ 32 │ ├─▶     })
+    │ │            
+    │ ╰──────────── this 'define' has no answer Type
+    │ 
+    │ Help: Write the answer Type on the 'define' itself: 'define -> Type { … }'.
+    │ 
+    │ Note 1: A 'define' takes its answer Type from its arrow, from the position it stands in, or from what its arms answer with — and an arm that decides no Type Arguments of its own leaves nothing to take.
+    │ Note 2: An Argument position hands nothing down: a call picks its Overload BY the Arguments, so no Parameter Type is decided before they are read.
+────╯
+
+─── 4 errors
+"
+`;
+
 exports[`Diagnostic Showcase DefineSyntax.es should render the same report every time 1`] = `
 "[define-without-otherwise]
 Error: This 'define' has no 'otherwise' arm

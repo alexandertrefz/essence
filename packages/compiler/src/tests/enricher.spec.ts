@@ -7068,74 +7068,75 @@ describe("Enricher", () => {
 		})
 	})
 
+	// NOTE: The Types every use of a name is enriched to, in the order a walk
+	// over the Program finds them — which is how a test asks what a branch
+	// narrowed a binding to without reaching through the Statements around it
+	// by hand. Reflective on purpose: what the narrowed use happens to sit
+	// inside is not what any assertion below is about.
+	//
+	// Declared at this level rather than inside one describe, because a `define`
+	// arm narrows through the very same machinery and a test of one asks exactly
+	// this question of it: what Type did this name have where it was read.
+	function readTypesOf(source: string, name: string): Array<string> {
+		let { program, diagnostics } = enrichSource(source)
+
+		expect(diagnostics).toEqual([])
+
+		let types: Array<string> = []
+		let seen = new Set<object>()
+
+		let walk = (value: unknown): void => {
+			if (
+				value === null ||
+				typeof value !== "object" ||
+				seen.has(value)
+			) {
+				return
+			}
+
+			seen.add(value)
+
+			if (Array.isArray(value)) {
+				for (let item of value) {
+					walk(item)
+				}
+
+				return
+			}
+
+			let record = value as Record<string, unknown>
+
+			if (record.nodeType === "Identifier" && record.content === name) {
+				types.push(printType(record.type as common.Type))
+			}
+
+			for (let child of Object.values(record)) {
+				walk(child)
+			}
+		}
+
+		walk(program)
+
+		return types
+	}
+
+	// NOTE: Every source that asks this puts the use it is about LAST, so that
+	// is the narrowed one.
+	function narrowedTypeOf(source: string, name: string): string {
+		let types = readTypesOf(source, name)
+
+		if (types.length === 0) {
+			throw new Error(`Nothing named '${name}' is read anywhere.`)
+		}
+
+		return types[types.length - 1]
+	}
+
 	// NOTE: What makes a doorway writable — an `if` whose condition asks a
 	// declared refinement's question narrows the binding it asked it of. Nothing
 	// here reaches the typed tree: a narrowing is a shadow declaration in an
 	// Enricher Scope, and what it is worth is the resolution it changes.
 	describe("Refinement flow narrowing", () => {
-		// NOTE: The Types every use of a name is enriched to, in the order a walk
-		// over the Program finds them — which is how a test asks what a branch
-		// narrowed a binding to without reaching through the Statements around it
-		// by hand. Reflective on purpose: what the narrowed use happens to sit
-		// inside is not what any assertion below is about.
-		function readTypesOf(source: string, name: string): Array<string> {
-			let { program, diagnostics } = enrichSource(source)
-
-			expect(diagnostics).toEqual([])
-
-			let types: Array<string> = []
-			let seen = new Set<object>()
-
-			let walk = (value: unknown): void => {
-				if (
-					value === null ||
-					typeof value !== "object" ||
-					seen.has(value)
-				) {
-					return
-				}
-
-				seen.add(value)
-
-				if (Array.isArray(value)) {
-					for (let item of value) {
-						walk(item)
-					}
-
-					return
-				}
-
-				let record = value as Record<string, unknown>
-
-				if (
-					record.nodeType === "Identifier" &&
-					record.content === name
-				) {
-					types.push(printType(record.type as common.Type))
-				}
-
-				for (let child of Object.values(record)) {
-					walk(child)
-				}
-			}
-
-			walk(program)
-
-			return types
-		}
-
-		// NOTE: Every source below puts the use it is about LAST, so this is the
-		// narrowed one.
-		function narrowedTypeOf(source: string, name: string): string {
-			let types = readTypesOf(source, name)
-
-			if (types.length === 0) {
-				throw new Error(`Nothing named '${name}' is read anywhere.`)
-			}
-
-			return types[types.length - 1]
-		}
-
 		it("should narrow a Constant the condition proved the predicate of", () => {
 			expect(
 				narrowedTypeOf(
@@ -9023,6 +9024,376 @@ describe("Enricher", () => {
 				expect(readTypesOf(source, "items").slice(-1)).toEqual([
 					"NonEmptyList<Even>",
 				])
+			})
+		})
+	})
+
+	// NOTE: A `define` reads its arms in the Scope it stands in, and every arm
+	// carries a doorway of its own: the complements of the Conditions above it,
+	// which is what reaching it proves, and its own Condition on top. The same
+	// machinery an `if` narrows through, so what is asked here is what a `define`
+	// does with it and not whether the machinery works.
+	//
+	// The answer Type is the other half — the arrow, the position around the
+	// `define`, or the arms, in that order.
+	describe("Define Expressions", () => {
+		// NOTE: A `define` standing where nothing hands a Type down, so the arms
+		// are what decide it. Written out per test because what the arms answer
+		// with is the point of most of them.
+		function defineTypeOf(source: string): string {
+			return printType(lastConstantValue(source).type)
+		}
+
+		describe("Flow narrowing", () => {
+			// NOTE: `divide` is what the narrowing is worth: the entry taking a
+			// NonZeroInteger answers the quotient itself, where the one taking a
+			// plain Integer answers an Optional it might be empty of. So the arm
+			// Types say which of the two the receiver reached.
+			it("should narrow an arm from the complement of the arm above it", () => {
+				let source = `implementation {
+					constant d = 3
+
+					constant quotient = define {
+						as 0/1 if d::is(0)
+						as 1::divide(by d) if d::isOdd()
+						as 0/1 otherwise
+					}
+				}`
+
+				// NOTE: Four uses, in the order a walk meets them: the
+				// Declaration's own name, the first arm's Condition — which
+				// stands above every complement and so narrows nothing — and
+				// then the second arm's value and its Condition, both of them
+				// read past the first arm's `false`.
+				expect(diagnosticsFor(source)).toEqual([])
+				expect(readTypesOf(source, "d")).toEqual([
+					"Integer",
+					"Integer",
+					"NonZeroInteger",
+					"NonZeroInteger",
+				])
+			})
+
+			// NOTE: The value of the second arm is read in the Scope its own
+			// Condition opens, which stands on the complement above it — so the
+			// two doorways compose rather than replacing one another.
+			it("should narrow an arm by its own Condition as well", () => {
+				expect(
+					defineTypeOf(`implementation {
+						constant d = 3
+
+						constant quotient = define {
+							as 0/1 if d::isZero()
+							as 1::divide(by d) otherwise
+						}
+					}`),
+				).toBe("Rational")
+			})
+
+			// NOTE: The `otherwise` arm is reached by a value every Condition
+			// declined, so it holds every complement — and no positive evidence,
+			// having asked nothing of its own.
+			it("should let the otherwise arm see every complement", () => {
+				let source = `implementation {
+					constant d = 3
+
+					constant quotient = define {
+						as 0/1 if d::is(0)
+						as 1/1 if d::isGreaterThan(100)
+						as 1::divide(by d) otherwise
+					}
+				}`
+
+				expect(diagnosticsFor(source)).toEqual([])
+				expect(narrowedTypeOf(source, "d")).toBe("NonZeroInteger")
+			})
+
+			// NOTE: A conjunction answering `false` says that ONE of its questions
+			// failed and nothing about which, so it leaves the arms below it
+			// nothing at all. Its own arm still narrows by both halves — this is a
+			// limitation of the complement, not of the evidence.
+			it("should leave no complement behind a conjunction", () => {
+				let source = `implementation {
+					constant d = 3
+
+					constant quotient = define {
+						as 0/1 if d::is(0)::and(d::isOdd())
+						as 1::divide(by d) otherwise
+					}
+				}`
+
+				expect(diagnosticsFor(source)).toEqual([])
+				expect(narrowedTypeOf(source, "d")).toBe("Integer")
+			})
+
+			// NOTE: Recorded per arm, because each arm asks a question of its own
+			// — and only the Enricher can say so, checked refinements being erased
+			// before anything downstream sees a Program.
+			it("should record which arms narrow", () => {
+				let { program, diagnostics } = enrichSource(`implementation {
+					constant d = 3
+
+					constant quotient = define {
+						as 0/1 if d::isGreaterThan(100)
+						as 1/1 if d::isNot(0)
+						as 0/1 otherwise
+					}
+				}`)
+
+				expect(diagnostics).toEqual([])
+
+				let value = program.implementation.nodes
+					.filter(
+						(node) =>
+							node.nodeType === "ConstantDeclarationStatement",
+					)
+					.at(-1)!.value
+
+				expect(value.nodeType).toBe("Define")
+
+				if (value.nodeType === "Define") {
+					expect(value.arms.map((arm) => arm.narrows)).toEqual([
+						false,
+						true,
+					])
+				}
+			})
+		})
+
+		// NOTE: A bare `#Empty` decides no Type of its own — a Choice's Type
+		// Parameters are applied and never inferred — so a `define` whose arms
+		// answer with one compiles exactly where the position around it hands a
+		// Type down, and nowhere else. That is what every source here asks.
+		describe("The answer Type from context", () => {
+			const ARMS = `define {
+					as #Empty if flag
+					as #Value(1) otherwise
+				}`
+
+			it("should take it from an annotated Constant", () => {
+				expect(
+					diagnosticsFor(`implementation {
+						constant flag = true
+						constant found: Optional<Integer> = ${ARMS}
+					}`),
+				).toEqual([])
+			})
+
+			it("should take it from an annotated Variable", () => {
+				expect(
+					diagnosticsFor(`implementation {
+						constant flag = true
+						variable found: Optional<Integer> = ${ARMS}
+					}`),
+				).toEqual([])
+			})
+
+			it("should take it from an Assignment's target", () => {
+				expect(
+					diagnosticsFor(`implementation {
+						constant flag = true
+						variable found: Optional<Integer> = #Value(0)
+
+						found = ${ARMS}
+					}`),
+				).toEqual([])
+			})
+
+			it("should take it from the declared return Type", () => {
+				expect(
+					diagnosticsFor(`implementation {
+						constant flag = true
+
+						function pick () -> Optional<Integer> {
+							<- ${ARMS}
+						}
+					}`),
+				).toEqual([])
+			})
+
+			// NOTE: A Match Handler's `<-` reaches the same rail through the
+			// Match's own declared return Type.
+			it("should take it from a Match's declared return Type", () => {
+				expect(
+					diagnosticsFor(`implementation {
+						constant flag = true
+						constant n: Integer | String = 1
+
+						constant found = match n -> Optional<Integer> {
+							case Integer { <- ${ARMS} }
+							case String  { <- #Empty }
+						}
+					}`),
+				).toEqual([])
+			})
+
+			it("should take it from a Record member", () => {
+				expect(
+					diagnosticsFor(`implementation {
+						constant flag = true
+						constant row: { found: Optional<Integer> } = {
+							found = ${ARMS},
+						}
+					}`),
+				).toEqual([])
+			})
+
+			it("should take it from a List item", () => {
+				expect(
+					diagnosticsFor(`implementation {
+						constant flag = true
+						constant found: List<Optional<Integer>> = [${ARMS}]
+					}`),
+				).toEqual([])
+			})
+
+			it("should take it from a Dictionary value", () => {
+				expect(
+					diagnosticsFor(`implementation {
+						constant flag = true
+						constant found: Dictionary<String, Optional<Integer>> = [
+							"a" = ${ARMS},
+						]
+					}`),
+				).toEqual([])
+			})
+
+			it("should take it from a Parameter's default", () => {
+				expect(
+					diagnosticsFor(`implementation {
+						constant flag = true
+
+						function pick (
+							_ found: Optional<Integer> = ${ARMS},
+						) -> Integer {
+							<- 1
+						}
+					}`),
+				).toEqual([])
+			})
+
+			// NOTE: The rows of a table test are read against what the row
+			// Parameter declared, which is the same hand-down every position
+			// above makes — asked with the tests section enriched, since that is
+			// the only mode that reads one at all.
+			it("should take it from a table test's row Parameter", () => {
+				expect(
+					enrich(
+						parse(`implementation {
+							constant flag = true
+						}
+
+						tests {
+							test "row" across [
+								${ARMS},
+							] (row: Optional<Integer>) {
+								expect row::hasValue()
+							}
+						}`),
+						{ tests: true },
+					).diagnostics,
+				).toEqual([])
+			})
+
+			// NOTE: An Argument is the one position that hands nothing down — a
+			// call picks its Overload BY the Arguments, so no Parameter Type is
+			// decided before they are read. The arrow is what a `define` standing
+			// in one has instead, and the Diagnostic is what says so.
+			it("should not reach an Argument, and say what to write instead", () => {
+				let diagnostics = diagnosticsFor(`implementation {
+					constant flag = true
+
+					function count (_ found: Optional<Integer>) -> Integer {
+						<- 1
+					}
+
+					constant total = count(${ARMS})
+				}`)
+
+				// NOTE: Both, and in that order. The Case's own Diagnostic names
+				// the Type Parameters left over and offers to annotate the
+				// Declaration — which is a help there IS no Declaration for
+				// here, and the `define`'s own is what supplies the one that
+				// works.
+				expect(
+					diagnostics.map((diagnostic) => diagnostic.code),
+				).toEqual([
+					"undecided-type-arguments",
+					"define-without-answer-type",
+				])
+				expect(diagnostics[1].severity).toBe("error")
+				expect(diagnostics[1].labels[0]?.message).toBe(
+					"this 'define' has no answer Type",
+				)
+				expect(diagnostics[1].labels[1]?.message).toBe(
+					"this arm has none of its own to lend it",
+				)
+				expect(diagnostics[1].helps).toEqual([
+					"Write the answer Type on the 'define' itself: 'define -> Type { … }'.",
+				])
+			})
+
+			it("should reach an Argument through the arrow", () => {
+				expect(
+					diagnosticsFor(`implementation {
+						constant flag = true
+
+						function count (_ found: Optional<Integer>) -> Integer {
+							<- 1
+						}
+
+						constant total = count(define -> Optional<Integer> {
+							as #Empty if flag
+							as #Value(1) otherwise
+						})
+					}`),
+				).toEqual([])
+			})
+		})
+
+		describe("The answer Type from the arrow and the arms", () => {
+			// NOTE: The arrow is a claim about the `define` itself and the
+			// position around it is a claim about what may stand there, so the
+			// arrow is the narrower of the two and wins.
+			it("should let the arrow beat the position", () => {
+				expect(
+					defineTypeOf(`implementation {
+						constant flag = true
+
+						constant scored: Integer | String = define -> Integer {
+							as 1 if flag
+							as 2 otherwise
+						}
+					}`),
+				).toBe("Integer")
+			})
+
+			it("should take the position's Type where there is no arrow", () => {
+				expect(
+					defineTypeOf(`implementation {
+						constant flag = true
+
+						constant scored: Integer | String = define {
+							as 1 if flag
+							as 2 otherwise
+						}
+					}`),
+				).toBe("Integer | String")
+			})
+
+			// NOTE: The `otherwise` arm's own Type is among them, being one of
+			// the answers.
+			it("should union the arms where neither says anything", () => {
+				expect(
+					defineTypeOf(`implementation {
+						constant flag = true
+
+						constant scored = define {
+							as 1 if flag
+							as "none" otherwise
+						}
+					}`),
+				).toBe("Integer | String")
 			})
 		})
 	})
