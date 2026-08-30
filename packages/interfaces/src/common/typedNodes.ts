@@ -10,6 +10,7 @@ import type {
 	FunctionType,
 	GenericAliasType,
 	IntegerType,
+	DictionaryType,
 	ListType,
 	NamespaceType,
 	Position,
@@ -191,6 +192,25 @@ export type TestGenerator =
 	| { kind: "rational" }
 	| { kind: "string" }
 	| { kind: "list"; item: TestGenerator }
+	// NOTE: Two generators, drawn independently — a Dictionary's keys and its
+	// values are separate slots. What is drawn is a small number of entries;
+	// duplicate keys collapse the way a written `Dictionary.of` collapses them,
+	// so a drawn Dictionary may hold fewer entries than were drawn for it.
+	//
+	// NOTE: `keyConformance` is the key Type's own Equatable witness — the very
+	// one a written `Dictionary.of` at a call site would be handed. It has to
+	// travel with the plan, because "duplicate keys collapse" is a claim about
+	// the KEYS' `is` and a Namespace may write its own: without it a drawn
+	// Dictionary holds two entries the Program calls one key, and every Method
+	// that looks one up reaches the first of them while `length()` counts both.
+	// Absent only where no key Type was applied — a bare `Dictionary`, whose
+	// keys are drawn from the Type Parameter ladder.
+	| {
+			kind: "dictionary"
+			key: TestGenerator
+			value: TestGenerator
+			keyConformance?: Conformance
+	  }
 	| { kind: "record"; members: Array<TestGeneratorMember> }
 	// NOTE: `tag` is the `Choice#Case` spelling every Case value carries at
 	// run time, which is what a construction needs and what a shrink compares.
@@ -381,6 +401,7 @@ export type ValueNode =
 	| BooleanValueNode
 	| FunctionValueNode
 	| ListValueNode
+	| DictionaryValueNode
 
 export type RecordValueNode = {
 	nodeType: "RecordValue"
@@ -499,6 +520,32 @@ export type ListValueNode = {
 	type: ListType | RefinementType
 }
 
+export type DictionaryEntryNode = {
+	key: ExpressionNode
+	value: ExpressionNode
+	position: Position
+}
+
+// NOTE: Refined as a receiver, exactly as a written List is — `["a" = 1]` can
+// prove its own count, which is what a `NonEmptyDictionary` will be admitted by.
+export type DictionaryValueNode = {
+	nodeType: "DictionaryValue"
+	entries: Array<DictionaryEntryNode>
+	position: Position
+	type: DictionaryType | RefinementType
+	// NOTE: The Equatable witness the construction compares its keys through,
+	// resolved for the key Type the entries decided exactly as a bounded Method
+	// call resolves the witness for its own bound Type Parameter.
+	//
+	// `null` for the EMPTY Dictionary, which has no key to compare and so needs
+	// no witness at all — and null as well where the bound went unsatisfied,
+	// which is a Diagnostic and a Program that never reaches emission. It is
+	// also null on the key list of an UPDATE (`[ages with "kim" = 7]`): the
+	// keys there are compared against the base's, so the witness that update
+	// needs is the BASE's, and it is recorded on the Combination Node instead.
+	keyConformance: Conformance | null
+}
+
 export interface LookupNode {
 	nodeType: "Lookup"
 	base: ExpressionNode
@@ -534,6 +581,11 @@ export interface CombinationNode {
 	rhs: ExpressionNode
 	position: Position
 	type: Type
+	// NOTE: Set only on a DICTIONARY update — `[ages with "kim" = 7]` and
+	// `[ages with other]` — and holding the Equatable witness for the BASE's
+	// key Type, which is the Type every key written in the update is compared
+	// against. A Record update compares nothing and carries none.
+	keyConformance?: Conformance
 }
 
 // NOTE: `matcher` is the Type a Handler binds `@` to. `literal` and `guard`

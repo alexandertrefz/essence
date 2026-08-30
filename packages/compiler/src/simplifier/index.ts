@@ -112,6 +112,7 @@ function simplifyImplementationNode(
 		case "BooleanValue":
 		case "FunctionValue":
 		case "ListValue":
+		case "DictionaryValue":
 		case "Lookup":
 		case "Identifier":
 		case "Self":
@@ -168,6 +169,8 @@ function simplifyExpression(
 			return simplifyFunctionValue(node)
 		case "ListValue":
 			return simplifyListValue(node)
+		case "DictionaryValue":
+			return simplifyDictionaryValue(node)
 		case "Lookup":
 			return simplifyLookup(node)
 		case "Identifier":
@@ -520,6 +523,14 @@ function simplifyCombination(
 		nodeType: "Combination",
 		lhs: simplifyExpression(node.lhs),
 		rhs: simplifyExpression(node.rhs),
+		// NOTE: A Dictionary update's witness, carried the same way the
+		// literal's is. Written only where there is one, so a Record update
+		// stays the Node it has always been.
+		...(node.keyConformance === undefined
+			? {}
+			: {
+					keyConformance: conformanceExpression(node.keyConformance),
+				}),
 		type: node.type,
 		position: node.position,
 	}
@@ -637,6 +648,28 @@ function simplifyListValue(
 	return {
 		nodeType: "ListValue",
 		values: node.values.map((expr) => simplifyExpression(expr)),
+		type: writtenValueType(node.type),
+		position: node.position,
+	}
+}
+
+// NOTE: The witness travels with the literal, turned into the same Expression a
+// bounded call's hidden Argument becomes — a ConformanceValue for a resolved
+// Namespace, an Identifier for a bound forwarded from a Method's own Parameter.
+// The empty Dictionary carries none: there is no key in it to compare.
+function simplifyDictionaryValue(
+	node: common.typed.DictionaryValueNode,
+): common.typedSimple.DictionaryValueNode {
+	return {
+		nodeType: "DictionaryValue",
+		entries: node.entries.map((entry) => ({
+			key: simplifyExpression(entry.key),
+			value: simplifyExpression(entry.value),
+		})),
+		keyConformance:
+			node.keyConformance === null
+				? null
+				: conformanceExpression(node.keyConformance),
 		type: writtenValueType(node.type),
 		position: node.position,
 	}
@@ -1822,6 +1855,19 @@ function simplifyTestGenerator(
 				kind: "list",
 				item: simplifyTestGenerator(generator.item),
 			}
+		case "dictionary":
+			return {
+				kind: "dictionary",
+				key: simplifyTestGenerator(generator.key),
+				value: simplifyTestGenerator(generator.value),
+				...(generator.keyConformance === undefined
+					? {}
+					: {
+							keyConformance: conformanceExpression(
+								generator.keyConformance,
+							),
+						}),
+			}
 		case "record":
 			return {
 				kind: "record",
@@ -2359,6 +2405,14 @@ function instrumentChildren(
 			}
 		case "ListValue":
 			return { ...node, values: node.values.map((value) => walk(value)) }
+		case "DictionaryValue":
+			return {
+				...node,
+				entries: node.entries.map((entry) => ({
+					key: walk(entry.key),
+					value: walk(entry.value),
+				})),
+			}
 		case "CaseValue":
 			return node.value === null
 				? node

@@ -328,6 +328,18 @@ function describeBody(
 				of: describeWith(type.itemType, context, printing),
 				shown,
 			}
+		// NOTE: Named rather than left to the catch-all below, so the refusal
+		// says which Type it is about. A Dictionary has no JavaScript shape to
+		// be built from or handed out as yet — its box is a shared store with a
+		// generation stamp, and the key encoding a marshaller would have to
+		// rebuild is the runtime's own — so it crosses in neither direction, and
+		// `bridge.ts` grows nothing until it does.
+		case "Dictionary":
+			return {
+				kind: "refused",
+				why: `${shown} can not be marshalled yet — a Dictionary has no JavaScript shape it crosses as.`,
+				shown,
+			}
 		case "Record":
 			return {
 				kind: "record",

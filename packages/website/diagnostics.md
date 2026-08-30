@@ -134,6 +134,22 @@ not. An update takes either a key list or one Expression and never both, so a
 list that also carries a computed key — `{ game with board = board, history =
 game.history::removeLast() }` — has no shorthand spelling at all.
 
+### `dictionary-entry-syntax`
+
+A Dictionary entry was written some other way than `key = value`. `["a": 1]` and
+`["a" -> 1]` write another language's separator, `["a" = 1, "b"]` writes a key
+with no value, and `[1 = 2 = 3]` leaves out the comma between two entries.
+
+One pair of brackets writes three things — a List, a Dictionary and a Dictionary
+update — and one Token past the first Expression is what tells them apart, so a
+bracket list that meant to write entries and spelled the separator some other way
+never becomes a Dictionary at all. Left alone it reports as a bracket that did
+not close, which is a message about the wrong Token entirely.
+
+A key is a VALUE and never a name, so there is no shorthand: `[d with a, b]` is
+refused as `shorthand-in-combination`, and an update takes either a key list or
+ONE whole Dictionary to merge in.
+
 ### `shorthand-on-path-key`
 
 A dotted key in an update was written with no value — `{ config with
@@ -1278,13 +1294,55 @@ level below it and is unaffected.
 ### `uncombinable-types`
 
 The `<>` combination operator was given something it can not combine — both
-sides must be Records or Namespaces.
+sides must be Records, Namespaces or Dictionaries.
+
+A bare `Dictionary` or `List` is not one of them. It is a Type nothing applied
+Arguments to, and what it is missing is exactly what would make it updatable, so
+the Help names it: write `Dictionary<String, Integer>` and the update is read.
+
+### `wrong-update-brackets`
+
+An update was written in braces where its base wants brackets, or in brackets
+where its base wants braces. A Record is updated in braces — `{ config with port
+= 2 }` — and a Dictionary in brackets — `[ages with "kim" = 7]`.
+
+It is reported from two places. Where the base's Type says which pair was wanted,
+the Enricher reports it. Where the key list itself gives the form away —
+`{ ages with "alex" = 40 }`, whose key is a written VALUE and so can only be a
+Dictionary's — the Parser reports it, because no reading of that text reaches the
+Enricher at all.
+
+The two are not two spellings of one form. A Record's keys are the member names
+it declares, so an update may only set members it already has; a Dictionary's
+keys are values of its key Type, so an update may set a key it has never held.
+Writing one in the other's brackets is therefore a different form and not a
+different style, and it is refused rather than read as the form it looks like.
+
+### `duplicate-key`
+
+Two entries of one Dictionary Literal are the same key written twice. A
+Dictionary holds one value per key, so the second entry would take the first
+one's place and nothing would say the first was ever there.
+
+The key is the VALUE and not the characters it was written with: `2/4` and `1/2`
+are one key, `3/1` and `3` are one key, and two spellings of one String are one
+key, because String equality is canonical equivalence. A key the Compiler can
+not compare as written — a name, a call — is left alone and decided while the
+Program runs, where a later duplicate wins.
+
+Keys that repeat ACROSS the base and the entries of an update — `[ages with
+"alex" = 40]` where `ages` already holds `"alex"` — are not duplicates at all:
+overriding is what an update is for.
 
 ### `partial-type-mismatch`
 
 The right hand side of a combination is not a Partial of the left hand side. An
 update may only set members the original already has, with the Types it declared
 for them.
+
+Over a Dictionary it says the same thing about an entry: a key has to be of the
+Dictionary's key Type and a value of its value Type, and a whole Dictionary
+merged in with `[base with other]` has to hold both.
 
 A member whose Type is itself a Record is set as a WHOLE by a plain key:
 `{ config with server = { … } }` replaces `server`, and every member of the new
@@ -1885,6 +1943,22 @@ Only the empty List crosses over; every List with items still reaches the Case
 its items belong to. Guard the Cases with `where @::hasItems()` and answer for
 the empty List in a Case of its own, or, for a Method Invocation, narrow the
 receiver with a Match before calling the Method.
+
+### `empty-dictionary-overlap`
+
+A Warning, and the empty Dictionary's half of `empty-list-overlap`: an earlier
+`case` — or an earlier dispatch branch — answers for this one's EMPTY
+Dictionaries. Key and value Types erase before a Match runs, so a Dictionary
+Matcher asks about the entries the value holds, and an empty Dictionary holds
+none, which makes it a value of every Dictionary Type there is.
+`case Dictionary<String, Integer>` above `case Dictionary<Integer, String>`
+therefore runs for an empty `Dictionary<Integer, String>`.
+
+Only the empty Dictionary crosses over; every Dictionary with entries still
+reaches the Case its entries belong to. Guard the Cases with
+`where @::hasEntries()` and answer for the empty Dictionary in a Case of its own,
+or, for a Method Invocation, narrow the receiver with a Match before calling the
+Method.
 
 ### `refinement-as-matcher`
 

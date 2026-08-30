@@ -28,6 +28,7 @@ import {
 const RUNTIME_TYPE_MODULES: Record<string, string> = {
 	AlgebraicType: "./Algebraic",
 	BooleanType: "./Boolean",
+	DictionaryType: "./Dictionary",
 	IntegerType: "./Integer",
 	ListType: "./List",
 	NumberType: "./Number",
@@ -206,7 +207,8 @@ function parameterName(name: string | null, index: number): string {
 
 // NOTE: Maps one Essence Type to its TypeScript runtime type. Throws, naming
 // the site, on any variant it can not render — a silent `any` would defeat the
-// whole check. `Unknown`, `Error`, an unapplied `GenericList`/`GenericAlias` and
+// whole check. `Unknown`, `Error`, an unapplied
+// `GenericList`/`GenericDictionary`/`GenericAlias` and
 // the like never occur in a resolved standard library signature; if one does,
 // this is where it surfaces.
 function mapType(
@@ -239,6 +241,13 @@ function mapType(
 		case "List":
 			ctx.used.add("ListType")
 			return `ListType<${mapType(type.itemType, ctx, where)}>`
+		case "Dictionary":
+			ctx.used.add("DictionaryType")
+			return `DictionaryType<${mapType(
+				type.keyType,
+				ctx,
+				where,
+			)}, ${mapType(type.valueType, ctx, where)}>`
 		// NOTE: A checked refinement erases to its base before anything runs, so
 		// a native written against one is handed exactly the runtime type its
 		// base has — a `NonZeroInteger` Parameter is an `IntegerType`. The
@@ -430,6 +439,10 @@ function describeEssenceType(type: common.Type | common.GenericUse): string {
 			return "Randomness"
 		case "List":
 			return `List<${describeEssenceType(type.itemType)}>`
+		case "Dictionary":
+			return `Dictionary<${describeEssenceType(
+				type.keyType,
+			)}, ${describeEssenceType(type.valueType)}>`
 		// NOTE: Named, not spelled out — the comment is there so an Overload
 		// reorder reads as a diff, and the alias is what the Declaration wrote.
 		case "Refinement":

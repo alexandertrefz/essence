@@ -2454,6 +2454,7 @@ exports[`Parser Expressions Combination should parse inline combinations 1`] = `
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "bare": true,
         "lhs": {
           "content": "base",
           "nodeType": "Identifier",
@@ -2562,6 +2563,7 @@ exports[`Parser Expressions Combination should parse inline combinations with tr
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "bare": true,
         "lhs": {
           "content": "base",
           "nodeType": "Identifier",
@@ -2670,6 +2672,7 @@ exports[`Parser Expressions Combination should parse inline combinations with mu
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "bare": true,
         "lhs": {
           "content": "base",
           "nodeType": "Identifier",

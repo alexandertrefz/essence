@@ -85,15 +85,31 @@ function generatorOf(
 // NOTE: The generator with its Expressions replaced by a word, because what
 // this asks about is the SHAPE — an enriched Expression is a tree nobody wants
 // to read in an assertion.
+// NOTE: A witness is a whole resolved conformance and reads as a wall of method
+// names, so it is shown as the NAMESPACE it resolved to — which is the only
+// thing about it these tests are claims about: whose `is` a drawn Dictionary
+// compares its keys with.
 function shapeOf(generator: common.typed.TestGenerator): unknown {
 	return JSON.parse(
-		JSON.stringify(generator, (key, value: unknown) =>
-			key === "call"
-				? "<call>"
-				: key === "checks"
-					? (value as Array<unknown>).length
-					: value,
-		),
+		JSON.stringify(generator, (key, value: unknown) => {
+			if (key === "call") {
+				return "<call>"
+			}
+
+			if (key === "checks") {
+				return (value as Array<unknown>).length
+			}
+
+			if (key === "keyConformance") {
+				let source = (value as common.Conformance).source
+
+				return source.kind === "namespace"
+					? `<${source.name}>`
+					: `<parameter ${source.name}>`
+			}
+
+			return value
+		}),
 	) as unknown
 }
 
@@ -190,6 +206,49 @@ describe("Property tests", () => {
 			expect(shapeOf(generatorOf("items: List<String>"))).toEqual({
 				kind: "list",
 				item: { kind: "string" },
+			})
+		})
+
+		// NOTE: Both slots, drawn apart — a Dictionary is the first Type with
+		// two of them, and what the derivation must not do is read one off the
+		// other.
+		it("derives a Dictionary from both of its slots", () => {
+			expect(
+				shapeOf(generatorOf("entries: Dictionary<String, Integer>")),
+			).toEqual({
+				kind: "dictionary",
+				key: { kind: "string" },
+				value: { kind: "integer" },
+				// NOTE: And the key Type's own Equatable rides along, because a
+				// Dictionary's keys are compared by it and the drawn one has to
+				// agree with the written one about which two keys are one key.
+				keyConformance: "<String>",
+			})
+		})
+
+		// NOTE: A bare Dictionary decides neither slot, so BOTH take the ladder
+		// an unapplied generic's items take — see the List test below, which is
+		// the same answer for the one slot a List has.
+		it("derives a bare Dictionary as that ladder in both slots", () => {
+			let ladder = {
+				kind: "union",
+				members: [
+					{ kind: "integer" },
+					{ kind: "string" },
+					{
+						kind: "record",
+						members: [
+							{ name: "name", generator: { kind: "string" } },
+							{ name: "count", generator: { kind: "integer" } },
+						],
+					},
+				],
+			}
+
+			expect(shapeOf(generatorOf("entries: Dictionary"))).toEqual({
+				kind: "dictionary",
+				key: ladder,
+				value: ladder,
 			})
 		})
 
@@ -746,6 +805,75 @@ describe("Property tests", () => {
 			expect(property?.cases).toBe(100)
 			expect(property?.counterexample).toBeNull()
 			expect(property?.seed).toBe("deadbeef")
+			expect(events.some((event) => event.kind === "test-pass")).toBe(
+				true,
+			)
+		})
+
+		// NOTE: THE claim a drawn Dictionary has to keep. A Dictionary's keys
+		// are compared by the keys' OWN `is` — that is the ratified design,
+		// and every construction the Compiler emits threads a witness for it —
+		// so a key Type whose Namespace writes its own `is` decides which two
+		// drawn keys are ONE key. Built through a universal comparison instead,
+		// a drawn Dictionary holds two entries the Program calls one key: every
+		// Method that looks one up reaches the first of them and `length()`
+		// counts both.
+		//
+		// A fixed seed and a fixed case count, so the run is the same run every
+		// time. The property is a claim about EVERY drawn Dictionary, so any
+		// seed that finds a counterexample is as good as another; this one
+		// found one in a few cases.
+		it("draws a Dictionary through the key Type's own equality", async () => {
+			let { events } = await run(
+				`implementation {
+					type Tag = { name: String, note: String }
+
+					namespace Tags for Tag is Equatable {
+						is(_ other: Tag) -> Boolean { <- @.name::is(other.name) }
+					}
+
+					function distinctKeys(of d: Dictionary<Tag, Integer>) -> Integer {
+						constant none: List<Tag> = []
+
+						<- d::keys()::reduce(startingWith none, (seen, key) {
+							if seen::contains(key) {
+								<- seen
+							} else {
+								<- seen::append(key)
+							}
+						})::length()
+					}
+				}
+
+				tests {
+					test "one value per key" for any (d: Dictionary<Tag, Integer>) {
+						expect distinctKeys(of d)::is(d::length())
+					}
+				}`,
+				{ seed: "8fb9735e", cases: 200 },
+			)
+			let [property] = propertyEvents(events)
+
+			expect(property?.counterexample).toBeNull()
+			expect(events.some((event) => event.kind === "test-pass")).toBe(
+				true,
+			)
+		})
+
+		// NOTE: The Dictionary generator end to end — derived, lowered, emitted
+		// and interpreted. What is under test is that a hundred cases BUILD one
+		// and the run reports on them rather than throwing somewhere in the
+		// interpreter.
+		it("draws a Dictionary for every case of a property", async () => {
+			let { events } = await run(`tests {
+				test "a Dictionary can be drawn" for any (entries: Dictionary<String, Integer>) {
+					expect true
+				}
+			}`)
+			let [property] = propertyEvents(events)
+
+			expect(property?.cases).toBe(100)
+			expect(property?.counterexample).toBeNull()
 			expect(events.some((event) => event.kind === "test-pass")).toBe(
 				true,
 			)

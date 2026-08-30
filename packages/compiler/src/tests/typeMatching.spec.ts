@@ -101,6 +101,99 @@ describe("Type matching", () => {
 		})
 	})
 
+	// NOTE: The same two rules for the two-slot container, and the one they do
+	// not share: a Dictionary is compared SLOT BY SLOT, so two of them agreeing
+	// on their keys and disagreeing on their values are two Types. Every
+	// Dictionary here arrives as a Parameter — slice 1 builds one only through
+	// `Dictionary.of`, which the standard library does not declare yet.
+	describe("Dictionary annotations", () => {
+		it("should accept a Dictionary of the same two slots", () => {
+			expect(
+				errorsFor(`implementation {
+					function keep(_ entries: Dictionary<String, Integer>) -> Boolean {
+						<- true
+					}
+
+					function pass(_ entries: Dictionary<String, Integer>) -> Boolean {
+						<- keep(entries)
+					}
+				}`),
+			).toEqual([])
+		})
+
+		it("should not accept a Dictionary whose values differ", () => {
+			let errors = errorsFor(`implementation {
+				function keep(_ entries: Dictionary<String, String>) -> Boolean {
+					<- true
+				}
+
+				function pass(_ entries: Dictionary<String, Integer>) -> Boolean {
+					<- keep(entries)
+				}
+			}`)
+
+			expect(errors).toHaveLength(1)
+			expect(errors[0].code).toBe("argument-type-mismatch")
+		})
+
+		it("should not accept a Dictionary whose keys differ", () => {
+			let errors = errorsFor(`implementation {
+				function keep(_ entries: Dictionary<Integer, Integer>) -> Boolean {
+					<- true
+				}
+
+				function pass(_ entries: Dictionary<String, Integer>) -> Boolean {
+					<- keep(entries)
+				}
+			}`)
+
+			expect(errors).toHaveLength(1)
+			expect(errors[0].code).toBe("argument-type-mismatch")
+		})
+
+		it("should accept a Dictionary of anything where a bare one is asked for", () => {
+			expect(
+				errorsFor(`implementation {
+					function keep(_ entries: Dictionary) -> Boolean {
+						<- true
+					}
+
+					function pass(_ entries: Dictionary<String, Integer>) -> Boolean {
+						<- keep(entries)
+					}
+				}`),
+			).toEqual([])
+		})
+
+		it("should not let a bare Dictionary satisfy a Dictionary of something", () => {
+			let errors = errorsFor(`implementation {
+				function keep(_ entries: Dictionary<String, Integer>) -> Boolean {
+					<- true
+				}
+
+				function pass(_ entries: Dictionary) -> Boolean {
+					<- keep(entries)
+				}
+			}`)
+
+			expect(errors).toHaveLength(1)
+			expect(errors[0].code).toBe("argument-type-mismatch")
+		})
+
+		it("should not accept a List where a Dictionary is asked for", () => {
+			let errors = errorsFor(`implementation {
+				function keep(_ entries: Dictionary<String, Integer>) -> Boolean {
+					<- true
+				}
+
+				constant answered = keep([1, 2])
+			}`)
+
+			expect(errors).toHaveLength(1)
+			expect(errors[0].code).toBe("argument-type-mismatch")
+		})
+	})
+
 	describe("Union member inference", () => {
 		// NOTE: Matching the Argument against the first member binds
 		// `T := String` off `left` and THEN fails on `right`. That binding is

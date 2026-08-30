@@ -312,6 +312,17 @@ export function listValueNode(
 	}
 }
 
+export function dictionaryValueNode(
+	entries: Array<parser.DictionaryEntryNode>,
+	position: common.Position,
+): parser.DictionaryValueNode {
+	return {
+		nodeType: "DictionaryValue",
+		entries,
+		position,
+	}
+}
+
 export function lookup(
 	base: parser.ExpressionNode,
 	member: parser.IdentifierNode,
@@ -362,15 +373,22 @@ export function caseValueNode(
 	}
 }
 
+// NOTE: `brackets` and `bare` are written onto the Node only where they hold, so
+// a braced update merging a whole value — every update there was before
+// Dictionaries — builds exactly the Node it always built. See
+// `parser.CombinationNode.brackets` and `.bare`.
 export function combination(
 	lhs: parser.ExpressionNode,
 	rhs: parser.ExpressionNode,
 	position: common.Position,
+	form: { brackets?: boolean; bare?: boolean } = {},
 ): parser.CombinationNode {
 	return {
 		nodeType: "Combination",
 		lhs,
 		rhs,
+		...(form.brackets === true ? { brackets: true as const } : {}),
+		...(form.bare === true ? { bare: true as const } : {}),
 		position,
 	}
 }

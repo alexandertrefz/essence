@@ -2203,3 +2203,169 @@ Warning: This Statement runs in an order the cycle does not state
 ─── 1 warning
 "
 `;
+
+exports[`Diagnostic Showcase Dictionaries.es should render the same report every time 1`] = `
+"[duplicate-key]
+Error: This key is written twice
+    ╭─┤ Dictionaries.es:12:33 │
+    │
+ 12 │     constant twice = ["alex" = 39, "alex" = 40]
+    │                       ───┬──       ───┬──  
+    │                          ╰────────────│──── first written here
+    │                                       │    
+    │                                       ╰──── written a second time here
+    │ 
+    │ Help: Keep one entry for the key.
+    │ 
+    │ Note: A Dictionary holds one value per key, so the second entry would take the first one's place and nothing would say the first was ever there.
+────╯
+
+[duplicate-key]
+Error: This key is written twice
+    ╭─┤ Dictionaries.es:13:32 │
+    │
+ 13 │     constant halves = [1/2 = "a", 2/4 = "b"]
+    │                        ─┬─        ─┬─  
+    │                         ╰──────────│─── first written here
+    │                                    │   
+    │                                    ╰─── written a second time here
+    │ 
+    │ Help: Keep one entry for the key.
+    │ 
+    │ Note: A Dictionary holds one value per key, so the second entry would take the first one's place and nothing would say the first was ever there.
+────╯
+
+[wrong-update-brackets]
+Error: A Record is updated in braces
+    ╭─┤ Dictionaries.es:18:19 │
+    │
+ 18 │     constant moved = [config with port = 90]
+    │                      ────┬──────┬───────────  
+    │                          ╰──────│───────────── this is a { port: Integer, host: String }
+    │                                 │             
+    │                                 ╰───────────── this update is written in brackets
+    │ 
+    │ Help: Write the update in braces: '{ base with member = value }'.
+    │ 
+    │ Note: A Record's keys are the member names it declares, and a Dictionary's are values of its key Type — so the two are written differently and never interchangeably.
+────╯
+
+[wrong-update-brackets]
+Error: A Dictionary is updated in brackets
+    ╭─┤ Dictionaries.es:19:20 │
+    │
+ 19 │     constant merged = { ages with ages }
+    │                       ────┬────┬────────  
+    │                           ╰────│────────── this is a Dictionary<String, Integer>
+    │                                │          
+    │                                ╰────────── this update is written in braces
+    │ 
+    │ Help: Write the update in brackets: '[base with "key" = value]'.
+    │ 
+    │ Note: A Record's keys are the member names it declares, and a Dictionary's are values of its key Type — so the two are written differently and never interchangeably.
+────╯
+
+[partial-type-mismatch]
+Error: This is not a key the Dictionary can hold
+    ╭─┤ Dictionaries.es:23:33 │
+    │
+ 23 │     constant wrongKey = [ages with 1 = 40]
+    │                          ──┬─      ▲  
+    │                            ╰───────│── this is a Dictionary<String, Integer>
+    │                                    │  
+    │                                    ╰── this is an Integer
+    │ 
+    │ Note: An update may only set keys of the Dictionary's key Type, with the Type it declared for its values.
+────╯
+
+[partial-type-mismatch]
+Error: This is not a value the Dictionary holds
+    ╭─┤ Dictionaries.es:24:43 │
+    │
+ 24 │     constant wrongValue = [ages with "kim" = "seven"]
+    │                            ──┬─              ───┬───  
+    │                              ╰──────────────────│───── this is a Dictionary<String, Integer>
+    │                                                 │     
+    │                                                 ╰───── this is a String
+    │ 
+    │ Note: An update may only set keys of the Dictionary's key Type, with the Type it declared for its values.
+────╯
+
+[partial-type-mismatch]
+Error: This is not a Dictionary the update can merge in
+    ╭─┤ Dictionaries.es:28:29 │
+    │
+ 28 │     constant both = [ages with names]
+    │                      ──┬─      ──┬──  
+    │                        ╰─────────│──── this is a Dictionary<String, Integer>
+    │                                  │    
+    │                                  ╰──── this is a Dictionary<String, String>
+    │ 
+    │ Help: Write the entries to set instead: '[base with "key" = value]'.
+    │ 
+    │ Note: A whole-value update merges one Dictionary into another, so what is merged in has to hold the same key and value Types. The Argument wins on a key both hold.
+────╯
+
+─── 7 errors
+"
+`;
+
+exports[`Diagnostic Showcase DictionarySyntax.es should render the same report every time 1`] = `
+"[syntax-error]
+Error: An update says what it changes
+    ╭─┤ DictionarySyntax.es:11:29 │
+    │
+ 11 │     constant unchanged = [ages with]
+    │                                ──┬─  
+    │                                  ╰─── nothing follows this 'with'
+    │ 
+    │ Help 1: Write the entries the update sets, or the Dictionary it merges in.
+    │ Help 2: Or drop the update and write the Dictionary on its own.
+    │ 
+    │ Note: A Dictionary update writes either the entries it sets — '[ages with "kim" = 7]' — or a whole Dictionary to merge in — '[ages with other]'.
+────╯
+
+[syntax-error]
+Error: A key that is a value belongs to a Dictionary
+    ╭─┤ DictionarySyntax.es:15:22 │
+    │
+ 15 │     constant braced = { "alex" = 39 }
+    │                         ───┬──  
+    │                            ╰──── this key is a value, not a member name
+    │ 
+    │ Help 1: Write it in brackets: '["a" = 1]'.
+    │ Help 2: Or name the member, if a Record is what was meant: '{ a = 1 }'.
+    │ 
+    │ Note: Braces write a Record, whose keys are the member names it declares. A key that is a value is a Dictionary's, and a Dictionary is written in brackets.
+────╯
+
+[wrong-update-brackets]
+Error: A key that is a value belongs to a Dictionary
+    ╭─┤ DictionarySyntax.es:19:31 │
+    │
+ 19 │     constant older = { ages with "alex" = 40 }
+    │                                  ───┬──  
+    │                                     ╰──── this key is a value, not a member name
+    │ 
+    │ Help 1: Write the update in brackets: '[base with "a" = 1]'.
+    │ Help 2: Or name the member, if a Record is what was meant: '{ base with a = 1 }'.
+    │ 
+    │ Note: Braces update a Record, whose keys are the member names it declares. A key that is a value is a Dictionary's, and a Dictionary is updated in brackets.
+────╯
+
+[dictionary-entry-syntax]
+Error: A Dictionary entry is written with '='
+    ╭─┤ DictionarySyntax.es:23:27 │
+    │
+ 23 │     constant colons = ["alex": 39]
+    │                              ▲  
+    │                              ╰── expected '=' and found ':'
+    │ 
+    │ Help: Write '=' in place of ':'.
+    │ 
+    │ Note: An entry is 'key = value', and a Dictionary is a bracket list of them: '["a" = 1, "b" = 2]'.
+────╯
+
+─── 4 errors
+"
+`;

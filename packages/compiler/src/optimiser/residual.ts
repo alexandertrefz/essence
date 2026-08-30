@@ -516,6 +516,9 @@ function runtimeTagOf(type: common.Type): string | null {
 		case "List":
 		case "GenericList":
 			return "List"
+		case "Dictionary":
+		case "GenericDictionary":
+			return "Dictionary"
 		case "Function":
 			return "Function"
 		case "Case":
@@ -573,9 +576,18 @@ function checkIsTagAlone(matcher: common.Type): boolean {
 		case "Transcendental":
 		case "Randomness":
 		case "GenericList":
+		case "GenericDictionary":
 			return true
 		case "List":
 			return matcher.itemType.type === "Unknown"
+		// NOTE: BOTH slots, because either one that names a Type is a walk of
+		// the entries the runtime still has to make — a `Dictionary<String,
+		// Unknown>` Matcher checks every key, so the tag is not its whole check.
+		case "Dictionary":
+			return (
+				matcher.keyType.type === "Unknown" &&
+				matcher.valueType.type === "Unknown"
+			)
 		// NOTE: A Record naming no member is the unit Type `{}`, which every
 		// Record satisfies — so the tag is the whole check, exactly as it is
 		// for a payload-less Case. A Record naming any member is not: its tag
@@ -715,6 +727,37 @@ function checkIsImplied(matcher: common.Type, valueType: common.Type): boolean {
 				valueType.type === "List" &&
 				checkIsImplied(matcher.itemType, valueType.itemType)
 			)
+		// NOTE: The unapplied `Dictionary` names neither slot, so any Dictionary
+		// passes — the runtime stops at the kind, exactly as it does for a bare
+		// List.
+		case "GenericDictionary":
+			return (
+				valueType.type === "Dictionary" ||
+				valueType.type === "GenericDictionary"
+			)
+		case "Dictionary": {
+			// NOTE: Slot by slot, and an Unknown slot is the tag-only question
+			// again for that HALF: a `Dictionary<Unknown, Integer>` Matcher
+			// promises nothing about the keys and walks every value, so the keys
+			// pass for any Dictionary while the values have to be implied. A
+			// value whose own slot is unknown (`GenericDictionary`, or a slot
+			// left Unknown) can not be promised to pass a slot that is checked.
+			let keysImplied =
+				matcher.keyType.type === "Unknown" ||
+				(valueType.type === "Dictionary" &&
+					checkIsImplied(matcher.keyType, valueType.keyType))
+			let valuesImplied =
+				matcher.valueType.type === "Unknown" ||
+				(valueType.type === "Dictionary" &&
+					checkIsImplied(matcher.valueType, valueType.valueType))
+
+			return (
+				(valueType.type === "Dictionary" ||
+					valueType.type === "GenericDictionary") &&
+				keysImplied &&
+				valuesImplied
+			)
+		}
 		// NOTE: A Record Matcher is structural and OPEN: the value has to carry
 		// every member the Matcher names, and may carry more.
 		case "Record":

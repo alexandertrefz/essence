@@ -40,6 +40,17 @@ export const genericListType: common.GenericListType = {
 	generics: [{ name: "ItemType", defaultType: { type: "Unknown" } }],
 }
 
+// NOTE: The same for `Dictionary`, which `Dictionary<Key, Value>` applies. Both
+// defaults are Unknown and are decided SEPARATELY — a bare `Dictionary` has
+// decided neither slot, and nothing may read one from the other.
+export const genericDictionaryType: common.GenericDictionaryType = {
+	type: "GenericDictionary",
+	generics: [
+		{ name: "KeyType", defaultType: { type: "Unknown" } },
+		{ name: "ValueType", defaultType: { type: "Unknown" } },
+	],
+}
+
 // NOTE: The Type Scope a standard library file starts from, before a single
 // line of it has been read.
 export const primitiveTypes: Record<string, common.Type> = {
@@ -52,4 +63,5 @@ export const primitiveTypes: Record<string, common.Type> = {
 	Randomness: randomnessType,
 	Record: recordType,
 	List: genericListType,
+	Dictionary: genericDictionaryType,
 }

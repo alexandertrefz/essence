@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test"
 
 import * as algebraic from "@essence-lang/runtime/Algebraic"
 import { createBoolean } from "@essence-lang/runtime/Boolean"
+import { createDictionary } from "@essence-lang/runtime/Dictionary"
 import * as integer from "@essence-lang/runtime/Integer"
 import {
 	anyIs,
@@ -370,6 +371,103 @@ describe("Runtime Internals", () => {
 					}) as unknown as AnyType,
 				).value,
 			).toBeTrue()
+		})
+
+		// NOTE: The `dictionary` node, which is the first descriptor with TWO
+		// children — a Dictionary's keys and its values are separate slots, and
+		// either may be the Type Parameter. What the node has to do is send each
+		// slot to its own child and compare the entries order-insensitively,
+		// which is what a Dictionary's equality is.
+		describe("the Dictionary node of a derived generic Choice equality", () => {
+			// NOTE: The witness a hand-built Dictionary is keyed by. It is the
+			// runtime's own comparison, so what the descriptor's `w` node does
+			// is visible against it rather than hidden behind it.
+			const anyEquatable = {
+				is: (a: AnyType, b: AnyType) => createBoolean(anyIs(a, b)),
+			}
+			const held = (entries: Array<[AnyType, AnyType]>) =>
+				createCase("Wrapper#Held", {
+					v: createDictionary(entries, anyEquatable),
+				}) as unknown as AnyType
+
+			// NOTE: A witness that calls every pair of keys equal. Nothing a
+			// Program declares would, and that is the point: `anyIs` says these
+			// keys differ, so an answer of `true` can only have come THROUGH the
+			// witness the `key` child names.
+			const everyKeyEqual = {
+				is: () => createBoolean(true),
+			}
+
+			it("routes the keys through the witness the key node names", () => {
+				let isEqual = boundChoiceIs({
+					"Wrapper#Held": {
+						v: {
+							k: "dictionary",
+							key: { k: "w", i: 0 },
+							value: { k: "eq" },
+						},
+					},
+				})
+
+				expect(
+					isEqual(
+						held([[text("alex"), whole(39n)]]),
+						held([[text("sam"), whole(39n)]]),
+						everyKeyEqual,
+					).value,
+				).toBeTrue()
+
+				// NOTE: And the VALUES still decide, through their own child.
+				expect(
+					isEqual(
+						held([[text("alex"), whole(39n)]]),
+						held([[text("sam"), whole(40n)]]),
+						everyKeyEqual,
+					).value,
+				).toBeFalse()
+			})
+
+			it("compares the entries whatever order they were written in", () => {
+				let isEqual = boundChoiceIs({
+					"Wrapper#Held": {
+						v: {
+							k: "dictionary",
+							key: { k: "eq" },
+							value: { k: "eq" },
+						},
+					},
+				})
+
+				expect(
+					isEqual(
+						held([
+							[text("alex"), whole(39n)],
+							[text("sam"), whole(25n)],
+						]),
+						held([
+							[text("sam"), whole(25n)],
+							[text("alex"), whole(39n)],
+						]),
+					).value,
+				).toBeTrue()
+			})
+
+			it("answers unequal for Dictionaries of differing lengths", () => {
+				let isEqual = boundChoiceIs({
+					"Wrapper#Held": {
+						v: {
+							k: "dictionary",
+							key: { k: "eq" },
+							value: { k: "eq" },
+						},
+					},
+				})
+
+				expect(
+					isEqual(held([]), held([[text("alex"), whole(39n)]])).value,
+				).toBeFalse()
+				expect(isEqual(held([]), held([])).value).toBeTrue()
+			})
 		})
 
 		// NOTE: The Enricher shapes every Parameter-naming arm but one, so a

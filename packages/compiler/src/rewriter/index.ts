@@ -2568,6 +2568,8 @@ function rewriteExpressionByKind(
 			return rewriteFunctionValue(node)
 		case "ListValue":
 			return rewriteListValue(node)
+		case "DictionaryValue":
+			return rewriteDictionaryValue(node)
 		case "Lookup":
 			return rewriteLookup(node)
 		case "Identifier":
@@ -3426,6 +3428,55 @@ function rewriteCaseValue(
 	}
 }
 
+// NOTE: The standard library's own Namespaces whose `Equatable::is` is
+// STRUCTURAL — it asks what the value IS and nothing else, which is exactly what
+// the Dictionary runtime's canonical key encoding stands in for. A String is its
+// characters, an Integer is its number, a Rational is its reduced pair, a
+// Boolean is one of two values, and `Number` covers the three numeric kinds by
+// the same rule.
+//
+// A refinement of one of those is not on the list and does not need to be: it
+// declares no `is` of its own, so its conformance RESOLVES to the base
+// Namespace's and arrives here under the base's name — `NonEmptyString` emits
+// `String`'s witness. What a user Namespace writes never resolves to one of
+// these, which is the whole point: `namespace Loose for NonEmptyString is
+// Equatable` arrives as `Loose`, is not branded, and the runtime scans its slots
+// through the witness instead of trusting an encoding that would call two of its
+// keys distinct.
+const structurallyEquatableNamespaces = new Set([
+	"String",
+	"Integer",
+	"Rational",
+	"Boolean",
+	"Number",
+])
+
+// NOTE: Whether this witness is one of those, and is the EQUATABLE one — a
+// Namespace conforms to several Protocols and only the Equatable witness is ever
+// handed to a Dictionary. `Equatable` declares exactly `is` and `isNot`, so the
+// two names it fulfils, wherever they come from, are what identify it.
+//
+// Conditional conformances are excluded outright. None of the five is one, and
+// `boundConformance` walks a witness's entries and curries each as a FUNCTION —
+// a `structural: true` standing among them would be called.
+function isStructurallyEquatable(
+	node: common.typedSimple.ConformanceValueNode,
+): boolean {
+	if (
+		!structurallyEquatableNamespaces.has(node.namespaceName) ||
+		node.conditions.length > 0
+	) {
+		return false
+	}
+
+	let fulfilled = new Set([
+		...Object.keys(node.methodMap),
+		...Object.keys(node.providedMethods ?? {}),
+	])
+
+	return fulfilled.size === 2 && fulfilled.has("is") && fulfilled.has("isNot")
+}
+
 // NOTE: A conformance value is an object literal that maps each Protocol
 // Method's emitted name onto the conforming Namespace's fulfilling Method —
 // `{ compare: Integer.compare, … }`. This works uniformly for user
@@ -3453,9 +3504,32 @@ function rewriteConformanceValue(
 		),
 	}
 
+	// NOTE: The brand a Dictionary reads. Its runtime encodes a key of an
+	// encodable kind into one Map lookup, and that shortcut is only sound while
+	// the key Type's `is` is the structural one this witness fulfils — so the
+	// witness says so, rather than the runtime guessing from a tag it can not
+	// tell an override by. A witness without the brand sends every lookup down
+	// the scan path, which asks `conformance.is` and is right for any `is` at
+	// all. See `encodeKey` in `packages/runtime/src/Dictionary.ts`.
+	//
+	// It rides on the method map so it survives `providedConformance`, which
+	// spreads this object into the witness it builds.
+	if (isStructurallyEquatable(node)) {
+		methodMap.properties.push({
+			type: "Property",
+			key: memberKey("structural"),
+			value: { type: "Literal", value: true },
+			kind: "init",
+			method: false,
+			shorthand: false,
+			computed: false,
+		})
+	}
+
 	// NOTE: An unconditional conformance with nothing provided is exactly the
 	// plain method-map object literal — kept byte-identical so its emit
-	// snapshots do not churn. A conditional one wraps it in
+	// snapshots do not churn, the brand above being the one thing that may
+	// stand in it. A conditional one wraps it in
 	// `$type.boundConformance(<map>, [<witnesses>])`, which curries each `where`
 	// condition's witness onto every Method so the bounded runtime helpers
 	// receive them as hidden trailing Arguments.
@@ -3891,6 +3965,10 @@ function contextualArgumentOverrides(
 function rewriteCombination(
 	node: common.typedSimple.CombinationNode,
 ): estree.Expression {
+	if (node.type.type === "Dictionary") {
+		return rewriteDictionaryCombination(node)
+	}
+
 	if (!isRecordLiteral(node.rhs) && node.rhs.type.type === "Record") {
 		return projectedCombination(
 			node.lhs,
@@ -3924,6 +4002,71 @@ function rewriteCombination(
 			rewriteExpression(node.rhs),
 		],
 	}
+}
+
+// NOTE: A Dictionary update, emitted as the calls an author could have written
+// by hand: `[ages with "kim" = 7, "sam" = 9]` is `set` over `set`, and
+// `[ages with other]` is `merge(with other)`. Neither is a merge of two objects
+// the way a Record's is — a Dictionary is a store with an order and a
+// generation, so the only way to add to one is to ask it to.
+//
+// The witness is the BASE's, carried on the Combination, and every call in the
+// chain is handed the same one: what each `set` compares its key against is the
+// keys the store already holds.
+function rewriteDictionaryCombination(
+	node: common.typedSimple.CombinationNode,
+): estree.Expression {
+	// NOTE: A witness is written on every Dictionary update whose key Type is
+	// decided, which is every update a valid Program writes. `null` stands for
+	// the one that is not — an update over a Dictionary nothing has yet said
+	// the key Type of, which holds no key for a comparison to reach.
+	//
+	// NOTE: Rewritten once per call rather than once and shared, so no two
+	// positions of the emitted tree hold the same Node. `pool-constants` is
+	// what keeps that from being a method map written out per entry: the
+	// witness it reaches is a reference to the one const by then.
+	let witness = (): estree.Expression =>
+		node.keyConformance === undefined
+			? { type: "Literal", value: null }
+			: rewriteExpression(node.keyConformance)
+
+	if (node.rhs.nodeType !== "DictionaryValue") {
+		return {
+			type: "CallExpression",
+			optional: false,
+			// NOTE: `merge` is written in Essence and reached by name through
+			// the one helper every emission site routes through, so the search
+			// that decides which standard library consts a Module carries finds
+			// this call exactly as it finds a written one. The name is the
+			// standard library's own — `merge`'s FIRST entry, the one taking
+			// only `with` — and `Dictionary.es` is where the two are kept in
+			// step.
+			callee: namespaceMember("Dictionary", "merge__overload$1"),
+			arguments: [
+				rewriteExpression(node.lhs),
+				rewriteExpression(node.rhs),
+				witness(),
+			],
+		}
+	}
+
+	let built = rewriteExpression(node.lhs)
+
+	for (let entry of node.rhs.entries) {
+		built = {
+			type: "CallExpression",
+			optional: false,
+			callee: namespaceMember("Dictionary", "set"),
+			arguments: [
+				built,
+				rewriteExpression(entry.key),
+				rewriteExpression(entry.value),
+				witness(),
+			],
+		}
+	}
+
+	return built
 }
 
 // NOTE: A Record literal, in either of the two spellings a Combination's
@@ -4308,6 +4451,45 @@ function rewriteListValue(
 				type: "ArrayExpression",
 				elements: node.values.map((expr) => rewriteExpression(expr)),
 			},
+		],
+	}
+}
+
+// NOTE: The written Dictionary, handed to the runtime as the pairs it was
+// written as and the witness its keys are compared through. `createDictionary`
+// is a literal constructor and names its Namespace directly, exactly as
+// `List.createList` does above and for the same reason: it is no Method any
+// standard library file declares, so it can never be Essence-implemented and
+// never goes through `namespaceMember`.
+//
+// NOTE: The empty Dictionary hands over `null` where a witness would be. It is
+// the one construction that compares nothing — there is no key in the store for
+// a written key to be measured against — and `createDictionary` reads the
+// witness only inside the loop over the pairs, which does not run.
+function rewriteDictionaryValue(
+	node: common.typedSimple.DictionaryValueNode,
+): estree.CallExpression {
+	return {
+		type: "CallExpression",
+		optional: false,
+		callee: memberRead(
+			{ type: "Identifier", name: "Dictionary" },
+			"createDictionary",
+		),
+		arguments: [
+			{
+				type: "ArrayExpression",
+				elements: node.entries.map((entry) => ({
+					type: "ArrayExpression",
+					elements: [
+						rewriteExpression(entry.key),
+						rewriteExpression(entry.value),
+					],
+				})),
+			},
+			node.keyConformance === null
+				? { type: "Literal", value: null }
+				: rewriteExpression(node.keyConformance),
 		],
 	}
 }
@@ -7986,6 +8168,27 @@ function testGenerator(
 	switch (generator.kind) {
 		case "list":
 			properties.push(property("item", testGenerator(generator.item)))
+
+			break
+		case "dictionary":
+			properties.push(
+				property("key", testGenerator(generator.key)),
+				property("value", testGenerator(generator.value)),
+			)
+
+			// NOTE: The key Type's Equatable witness, where one was resolved —
+			// what every drawn Dictionary is built through, so that two keys the
+			// Program calls one key are one key here too. Absent for a bare
+			// `Dictionary`, and the runtime falls back to its universal
+			// comparison there.
+			if (generator.keyConformance !== undefined) {
+				properties.push(
+					property(
+						"keyConformance",
+						rewriteExpression(generator.keyConformance),
+					),
+				)
+			}
 
 			break
 		case "record":

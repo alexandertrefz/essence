@@ -183,6 +183,12 @@ export function describeType(type: common.Type): string {
 			return `List<${describeType(type.itemType)}>`
 		case "GenericList":
 			return "List"
+		case "Dictionary":
+			return `Dictionary<${describeType(type.keyType)}, ${describeType(
+				type.valueType,
+			)}>`
+		case "GenericDictionary":
+			return "Dictionary"
 		case "Record":
 			return `{ ${Object.entries(type.members)
 				.map(
@@ -1199,6 +1205,18 @@ export function applyGenericBindings(
 				? type
 				: { type: "List", itemType }
 		}
+		// NOTE: Both slots substituted, and the identity check asks about both:
+		// a `Dictionary<String, T>` comes back as itself while `T` is unbound,
+		// which is what keeps a Type nothing changed comparing by reference for
+		// every reader downstream.
+		case "Dictionary": {
+			let keyType = applyGenericBindings(type.keyType, bindings)
+			let valueType = applyGenericBindings(type.valueType, bindings)
+
+			return keyType === type.keyType && valueType === type.valueType
+				? type
+				: { type: "Dictionary", keyType, valueType }
+		}
 		// NOTE: A refinement's conjuncts are keys rather than Types, so only the
 		// base can hold a Generic — `NonEmptyList<Item>`'s `List<Item>` is where one
 		// does. The conjuncts travel along BY REFERENCE and unsubstituted, which is
@@ -2136,14 +2154,23 @@ export function canonicalPredicateConjuncts(
 // Unknown also occurs as the DECLARED default of `List`'s Type Parameter, and a
 // walk that reads every field would call every bare `List` undecided. Only the
 // places a Type ARGUMENT can end up in are looked at — a List's items, a
-// Record's members, a Union's arms — which is also what keeps a Choice's
-// self-referential payload from looping.
+// Dictionary's keys and values, a Record's members, a Union's arms — which is
+// also what keeps a Choice's self-referential payload from looping.
 export function typeContainsUnknown(type: common.Type): boolean {
 	switch (type.type) {
 		case "Unknown":
 			return true
 		case "List":
 			return typeContainsUnknown(type.itemType)
+		// NOTE: Either slot undecided leaves the Type undecided — there is one
+		// answer to "is anything here still open?", and two slots to ask it of.
+		// `GenericDictionary` is left out for the reason a bare `List` is: its
+		// Unknowns are DECLARED defaults, not slots waiting on an answer.
+		case "Dictionary":
+			return (
+				typeContainsUnknown(type.keyType) ||
+				typeContainsUnknown(type.valueType)
+			)
 		case "Record":
 			return Object.values(type.members).some(typeContainsUnknown)
 		case "UnionType":
@@ -2194,6 +2221,20 @@ export function resolveUnknownSlots(
 				return itemType === stored.itemType
 					? stored
 					: { type: "List", itemType }
+			}
+
+			// NOTE: Each slot pinned INDEPENDENTLY, which is the whole of what
+			// a second slot changes here: a `Dictionary<Unknown, Unknown>` that
+			// meets a `Dictionary<String, Unknown>` keeps its undecided values
+			// and gains its keys. Nothing may read one slot from the other.
+			if (stored.type === "Dictionary" && value.type === "Dictionary") {
+				let keyType = resolve(stored.keyType, value.keyType)
+				let valueType = resolve(stored.valueType, value.valueType)
+
+				return keyType === stored.keyType &&
+					valueType === stored.valueType
+					? stored
+					: { type: "Dictionary", keyType, valueType }
 			}
 
 			if (stored.type === "Record" && value.type === "Record") {
@@ -2887,6 +2928,17 @@ function isLessSpecific(left: common.Type, right: common.Type): boolean {
 		return isLessSpecific(left.itemType, right.itemType)
 	}
 
+	// NOTE: Slot-wise, and it takes only ONE slot to say less — a
+	// `Dictionary<Unknown, Integer>` beside a `Dictionary<String, Integer>`
+	// spells less out and yields to it, exactly as the empty List's placeholder
+	// yields to the concrete item Type beside it.
+	if (left.type === "Dictionary" && right.type === "Dictionary") {
+		return (
+			isLessSpecific(left.keyType, right.keyType) ||
+			isLessSpecific(left.valueType, right.valueType)
+		)
+	}
+
 	return false
 }
 
@@ -3227,6 +3279,36 @@ function matchTypes(
 		}
 
 		return matchTypes(lhs.itemType, rhs.itemType, context, NESTED)
+	}
+
+	// NOTE: The bare-container rule again, unchanged by the second slot — a
+	// bare `Dictionary` demands nothing of either, so it accepts every one, and
+	// the reverse direction is the Unknown-slot rule below rather than this one.
+	if (
+		lhs.type === "GenericDictionary" &&
+		(rhs.type === "GenericDictionary" || rhs.type === "Dictionary")
+	) {
+		return true
+	}
+
+	if (lhs.type === "Dictionary" && rhs.type === "Dictionary") {
+		// NOTE: The empty-List rule applied to each slot SEPARATELY. An empty
+		// Dictionary decides neither, so it is assignable to any Dictionary the
+		// way an empty List Literal is assignable to any List — and a slot that
+		// was decided is still checked, so a `Dictionary<Unknown, Integer>`
+		// fits `Dictionary<String, Integer>` and not `Dictionary<String,
+		// String>`. Reading the two slots together would have made a
+		// half-decided Dictionary either wholly opaque or wholly checked, and
+		// both throw away what the other slot says.
+		let keysMatch =
+			rhs.keyType.type === "Unknown" ||
+			matchTypes(lhs.keyType, rhs.keyType, context, NESTED)
+
+		return (
+			keysMatch &&
+			(rhs.valueType.type === "Unknown" ||
+				matchTypes(lhs.valueType, rhs.valueType, context, NESTED))
+		)
 	}
 
 	if (lhs.type === "String" && rhs.type === "String") {

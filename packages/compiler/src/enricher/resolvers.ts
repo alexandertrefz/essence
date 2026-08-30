@@ -103,6 +103,7 @@ function describeTypesForCombination(type: common.Type): string {
 		case "Error":
 			return "Error Types"
 		case "GenericList":
+		case "GenericDictionary":
 		case "GenericAlias":
 		case "GenericUse":
 			return "Generic Types"
@@ -116,6 +117,8 @@ function describeTypesForCombination(type: common.Type): string {
 			return "Namespaces"
 		case "List":
 			return "Lists"
+		case "Dictionary":
+			return "Dictionaries"
 		case "Boolean":
 			return "Booleans"
 		case "Integer":
@@ -146,6 +149,24 @@ function describeTypesForCombination(type: common.Type): string {
 	}
 }
 
+// NOTE: A container Type nothing applied Type Arguments to — the `Dictionary` of
+// `constant d: Dictionary = ["a" = 1]`, which is accepted exactly as a bare
+// `List` is. Updating one is refused as a "Generic Type", and what is missing is
+// the very thing that would make it updatable, so the Help names it: a
+// Dictionary is combinable and this one is not, which is a difference about the
+// Arguments and about nothing else.
+function unappliedGenericHelps(type: common.Type): Array<string> {
+	if (type.type === "GenericDictionary") {
+		return ["Write the Types it holds: 'Dictionary<String, Integer>'."]
+	}
+
+	if (type.type === "GenericList") {
+		return ["Write the Type it holds: 'List<Integer>'."]
+	}
+
+	return []
+}
+
 // NOTE: The result Type of a Combination, computed from its operands' already
 // enriched Types. It only needs the operand Positions, to point the Diagnostics
 // at.
@@ -171,7 +192,10 @@ export function combinationTypeOf(
 						`this is ${withArticle(describeType(lhsType))}`,
 					),
 				],
-				notes: ["Only Records and Namespaces can be combined."],
+				notes: [
+					"Only Records, Namespaces and Dictionaries can be combined.",
+				],
+				helps: unappliedGenericHelps(lhsType),
 			},
 		)
 
@@ -190,7 +214,10 @@ export function combinationTypeOf(
 						`this is ${withArticle(describeType(rhsType))}`,
 					),
 				],
-				notes: ["Only Records and Namespaces can be combined."],
+				notes: [
+					"Only Records, Namespaces and Dictionaries can be combined.",
+				],
+				helps: unappliedGenericHelps(rhsType),
 			},
 		)
 
@@ -1735,9 +1762,9 @@ function choiceTypeOf(
 }
 
 // NOTE: Whether a Type mentions any of the named Type Parameters — a bare
-// GenericUse of one, or one buried in a List item, Record member, Case payload
-// or Union arm. Decides whether a payload member compares structurally or
-// routes through a witness.
+// GenericUse of one, or one buried in a List item, a Dictionary key or value,
+// a Record member, a Case payload or a Union arm. Decides whether a payload
+// member compares structurally or routes through a witness.
 function typeMentionsGenerics(
 	type: common.Type,
 	generics: Set<string>,
@@ -1747,6 +1774,14 @@ function typeMentionsGenerics(
 			return generics.has(type.name)
 		case "List":
 			return typeMentionsGenerics(type.itemType, generics)
+		// NOTE: Either slot on its own is enough — a `Dictionary<String, T>`
+		// mentions `T` as much as a `Dictionary<T, String>` does, and both have
+		// to be compared through a witness rather than structurally.
+		case "Dictionary":
+			return (
+				typeMentionsGenerics(type.keyType, generics) ||
+				typeMentionsGenerics(type.valueType, generics)
+			)
 		case "Record":
 		case "Case":
 			return Object.values(type.members).some((member) =>
@@ -1836,6 +1871,12 @@ function runtimeTagOf(type: common.Type): string | null {
 		case "List":
 		case "GenericList":
 			return "List"
+		// NOTE: Both spellings again, and for the reason the two List ones share
+		// a cell: the tag is what a VALUE carries, and a bare `Dictionary` and
+		// an applied one are carried by the same values.
+		case "Dictionary":
+		case "GenericDictionary":
+			return "Dictionary"
 		case "Case":
 			return `${type.choice}#${type.name}`
 		// NOTE: A refinement's values ARE its base's values — nothing about the
@@ -1873,6 +1914,29 @@ function describeMember(
 				k: "list",
 				of: describeMember(
 					type.itemType,
+					constrainedOrder,
+					generics,
+					bindings,
+					position,
+				),
+			}
+		// NOTE: Each slot described on its own, because each is decided on its
+		// own — a `Dictionary<T, Integer>` routes its keys through `T`'s witness
+		// and compares its values structurally, and the node that says so needs
+		// both halves. A slot naming no Type Parameter is described as `eq` by
+		// the guard at the top of this function, exactly as a List item is.
+		case "Dictionary":
+			return {
+				k: "dictionary",
+				key: describeMember(
+					type.keyType,
+					constrainedOrder,
+					generics,
+					bindings,
+					position,
+				),
+				value: describeMember(
+					type.valueType,
 					constrainedOrder,
 					generics,
 					bindings,
@@ -2227,6 +2291,12 @@ function runtimeShapeOf(type: common.Type): common.Type {
 			}
 		case "List":
 			return { type: "List", itemType: runtimeShapeOf(type.itemType) }
+		case "Dictionary":
+			return {
+				type: "Dictionary",
+				keyType: runtimeShapeOf(type.keyType),
+				valueType: runtimeShapeOf(type.valueType),
+			}
 		case "Case":
 			return {
 				type: "Case",
@@ -4406,8 +4476,8 @@ export function resolveGenericTypeDeclarationType(
 }
 
 // NOTE: The whole of what applying Type Arguments to a base Type means — the
-// arity check, the bounds, the List normalisation and the refusal of a Type
-// that takes none. An annotation's `Holder<Integer>` and a value's
+// arity check, the bounds, the builtin containers' normalisation and the
+// refusal of a Type that takes none. An annotation's `Holder<Integer>` and a value's
 // `Holder<Integer>#Full` are the same application, and reaching this from both
 // is what keeps them held to the same promises rather than to two
 // implementations that drift.
@@ -4447,6 +4517,44 @@ export function applyTypeArguments(
 		return {
 			type: "List",
 			itemType: resolveType(typeArguments[0], scope),
+		}
+	}
+
+	// NOTE: The same normalisation for the two-slot container, and the same
+	// recovery: a wrong count is reported and then a Dictionary is built out of
+	// whatever WAS written, so the Declaration underneath it still resolves
+	// against something rather than cascading Errors out of one miscount. Each
+	// slot recovers on its own — `Dictionary<String>` keeps the key it was given
+	// and leaves the value an Error.
+	if (baseType.type === "GenericDictionary") {
+		if (typeArguments.length !== 2) {
+			reportError("Dictionary takes exactly 2 Type Arguments", position, {
+				code: "wrong-type-argument-count",
+				labels: [
+					primary(
+						position,
+						`${countOf(typeArguments.length, "Type Argument")} given`,
+					),
+				],
+			})
+
+			return {
+				type: "Dictionary",
+				keyType:
+					typeArguments.length > 0
+						? resolveType(typeArguments[0], scope)
+						: { type: "Error" },
+				valueType:
+					typeArguments.length > 1
+						? resolveType(typeArguments[1], scope)
+						: { type: "Error" },
+			}
+		}
+
+		return {
+			type: "Dictionary",
+			keyType: resolveType(typeArguments[0], scope),
+			valueType: resolveType(typeArguments[1], scope),
 		}
 	}
 
@@ -4975,6 +5083,12 @@ function buildNamespaceIndex(
 			// NOTE: The two List spellings match each other, so they share a
 			// bucket rather than being told apart here.
 			pushInto(index.byKind, "List", entry)
+		} else if (
+			targetType.type === "Dictionary" ||
+			targetType.type === "GenericDictionary"
+		) {
+			// NOTE: And the two Dictionary spellings, for the same reason.
+			pushInto(index.byKind, "Dictionary", entry)
 		} else if (targetType.type === "Record") {
 			let rarest: string | null = null
 			let rarestCount = Infinity
@@ -5089,6 +5203,16 @@ function collectKindCandidates(
 		return
 	}
 
+	if (
+		baseType.type === "Dictionary" ||
+		baseType.type === "GenericDictionary"
+	) {
+		// NOTE: And the two Dictionary spellings, for the same reason.
+		pushBucket(buckets, index.byKind.get("Dictionary"))
+
+		return
+	}
+
 	pushBucket(buckets, index.byKind.get(baseType.type))
 }
 
@@ -5180,6 +5304,8 @@ type TargetingAnswers = {
 // NOTE: The Types with no fields but `type` — see `common.Type`. `List` is NOT
 // here (its `itemType` is part of it), and neither is `GenericList`, whose
 // `generics` is fixed today but is a field a receiver could come to differ in.
+// `Dictionary` and `GenericDictionary` are out for exactly those two reasons,
+// twice over — the two slots are part of the applied Type.
 const tagOnlyTypes: ReadonlySet<string> = new Set([
 	"Unknown",
 	"Error",

@@ -192,6 +192,7 @@ export type DiagnosticCode =
 	| "nesting-too-deep"
 	| "redundant-parameter-label"
 	| "shorthand-in-combination"
+	| "dictionary-entry-syntax"
 	| "shorthand-on-path-key"
 	| "empty-path-group"
 	| "path-is-members-only"
@@ -273,6 +274,8 @@ export type DiagnosticCode =
 	| "path-key-without-default"
 	| "path-on-computed-value"
 	| "uncombinable-types"
+	| "wrong-update-brackets"
+	| "duplicate-key"
 	| "partial-type-mismatch"
 	| "wrong-type-argument-count"
 	| "type-not-generic"
@@ -317,6 +320,7 @@ export type DiagnosticCode =
 	| "unreachable-case"
 	| "erased-case-conflict"
 	| "empty-list-overlap"
+	| "empty-dictionary-overlap"
 	| "refinement-as-matcher"
 	| "match-on-non-union"
 	| "literal-match-shape"
@@ -520,6 +524,26 @@ export type ListType = {
 	itemType: Type
 }
 
+// NOTE: The second builtin generic container, and the first taking TWO Type
+// Parameters — which is the only thing that makes it more than a List with a
+// second slot. Everywhere a List's `itemType` is read, decided or substituted,
+// a Dictionary's two slots are read, decided and substituted INDEPENDENTLY:
+// `Dictionary<Unknown, Integer>` has decided its values and not its keys, and
+// nothing may pin one slot from what the other says.
+export type GenericDictionaryType = {
+	type: "GenericDictionary"
+	generics: [
+		{ name: "KeyType"; defaultType: { type: "Unknown" } },
+		{ name: "ValueType"; defaultType: { type: "Unknown" } },
+	]
+}
+
+export type DictionaryType = {
+	type: "Dictionary"
+	keyType: Type
+	valueType: Type
+}
+
 export type Parameter = {
 	type: Type | GenericUse
 	name: string | null
@@ -639,6 +663,7 @@ export type PrimitiveType =
 	| RecordType
 	| CaseType
 	| ListType
+	| DictionaryType
 	| FunctionType
 	| NamespaceType
 
@@ -932,6 +957,13 @@ export type DescriptorNode =
 	| { k: "eq" }
 	| { k: "w"; i: number }
 	| { k: "list"; of: DescriptorNode }
+	// NOTE: Two nodes rather than one, because a Dictionary's keys and its
+	// values are separate slots and either may be the Type Parameter — a
+	// `Dictionary<T, String>` payload routes its keys through the witness and
+	// compares its values structurally. The runtime walks the box's live view
+	// and compares entry by entry, which is the reading every other Dictionary
+	// reader takes.
+	| { k: "dictionary"; key: DescriptorNode; value: DescriptorNode }
 	| { k: "record"; m: Record<string, DescriptorNode> }
 	| { k: "case"; m: Record<string, DescriptorNode> }
 	// NOTE: A Union-typed payload member — its arms are claimed at runtime by
@@ -1036,6 +1068,7 @@ export type Type =
 	| UnionType
 	| MethodType
 	| GenericListType
+	| GenericDictionaryType
 	| GenericAliasType
 	| GenericUse
 	| RefinementType

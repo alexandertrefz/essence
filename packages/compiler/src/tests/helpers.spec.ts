@@ -45,6 +45,7 @@ import {
 	recordDefaultNesting,
 	refinementWithTypeArguments,
 	resolveOverloadedMethodName,
+	resolveUnknownSlots,
 	second,
 	stripPosition,
 	stripPositionFromArray,
@@ -3606,5 +3607,215 @@ describe("Matching a signature that promises a default", () => {
 	// would have filled one in never has to.
 	it("should accept a defaulted signature where none was promised", () => {
 		expect(matchesType(plain, promising)).toBe(true)
+	})
+})
+
+// NOTE: The two-slot container, asked of the helpers directly. Nothing a Program
+// can write builds a Dictionary with an UNDECIDED slot yet — there is no literal
+// syntax until slice 2 — and the whole of what a second slot changes is that the
+// two are decided, substituted and compared apart, so the rules are written down
+// here where both halves can be spelled.
+describe("Dictionary Types", () => {
+	let bare: common.GenericDictionaryType = {
+		type: "GenericDictionary",
+		generics: [
+			{ name: "KeyType", defaultType: { type: "Unknown" } },
+			{ name: "ValueType", defaultType: { type: "Unknown" } },
+		],
+	}
+
+	function dictionary(
+		keyType: common.Type,
+		valueType: common.Type,
+	): common.DictionaryType {
+		return { type: "Dictionary", keyType, valueType }
+	}
+
+	let unknown: common.Type = { type: "Unknown" }
+	let string: common.Type = { type: "String" }
+	let integer: common.Type = { type: "Integer" }
+
+	describe("describeType", () => {
+		it("should spell both slots of an applied Dictionary", () => {
+			expect(describeType(dictionary(string, integer))).toBe(
+				"Dictionary<String, Integer>",
+			)
+		})
+
+		it("should spell a bare Dictionary as its name alone", () => {
+			expect(describeType(bare)).toBe("Dictionary")
+		})
+	})
+
+	describe("matchesType", () => {
+		it("should accept a Dictionary of the same two slots", () => {
+			expect(
+				matchesType(
+					dictionary(string, integer),
+					dictionary(string, integer),
+				),
+			).toBe(true)
+		})
+
+		it("should refuse a Dictionary whose values differ", () => {
+			expect(
+				matchesType(
+					dictionary(string, integer),
+					dictionary(string, string),
+				),
+			).toBe(false)
+		})
+
+		it("should refuse a Dictionary whose keys differ", () => {
+			expect(
+				matchesType(
+					dictionary(string, integer),
+					dictionary(integer, integer),
+				),
+			).toBe(false)
+		})
+
+		// NOTE: The empty-Dictionary rule, which is the empty List Literal's
+		// rule applied to each slot on its own — an undecided slot is a slot
+		// nothing has decided, so it fits whatever the expected Type decided.
+		it("should accept a Dictionary with both slots undecided", () => {
+			expect(
+				matchesType(
+					dictionary(string, integer),
+					dictionary(unknown, unknown),
+				),
+			).toBe(true)
+		})
+
+		it("should accept a Dictionary with only its values undecided", () => {
+			expect(
+				matchesType(
+					dictionary(string, integer),
+					dictionary(string, unknown),
+				),
+			).toBe(true)
+		})
+
+		// NOTE: And the half that IS decided is still checked — which is what
+		// reading the slots apart buys. Reading them together would have taken
+		// this Dictionary for the one above.
+		it("should still check the slot the value decided", () => {
+			expect(
+				matchesType(
+					dictionary(string, integer),
+					dictionary(unknown, string),
+				),
+			).toBe(false)
+		})
+
+		it("should let a bare Dictionary accept every applied one", () => {
+			expect(matchesType(bare, dictionary(string, integer))).toBe(true)
+			expect(matchesType(bare, bare)).toBe(true)
+		})
+
+		// NOTE: The reverse does NOT hold, for the reason a bare `List` does not
+		// satisfy a `List<Integer>`: a bare Dictionary promises nothing about
+		// either slot.
+		it("should refuse a bare Dictionary where an applied one is asked for", () => {
+			expect(matchesType(dictionary(string, integer), bare)).toBe(false)
+		})
+
+		it("should not match a Dictionary against a List of anything", () => {
+			expect(
+				matchesType(dictionary(string, integer), {
+					type: "List",
+					itemType: string,
+				}),
+			).toBe(false)
+		})
+	})
+
+	describe("applyGenericBindings", () => {
+		it("should substitute both slots", () => {
+			let bindings = new Map<string, common.Type>([
+				["Key", string],
+				["Value", integer],
+			])
+
+			expect(
+				applyGenericBindings(
+					dictionary(
+						{ type: "GenericUse", name: "Key" },
+						{ type: "GenericUse", name: "Value" },
+					),
+					bindings,
+				),
+			).toEqual(dictionary(string, integer))
+		})
+
+		// NOTE: A Type nothing changed comes back AS ITSELF, which is what every
+		// identity check downstream reads — so a half-bound Dictionary has to be
+		// a fresh object and a wholly unbound one has to not be.
+		it("should answer the very same Type when neither slot is bound", () => {
+			let written = dictionary(
+				{ type: "GenericUse", name: "Key" },
+				{ type: "GenericUse", name: "Value" },
+			)
+
+			expect(applyGenericBindings(written, new Map())).toBe(written)
+		})
+
+		it("should substitute one slot and leave the other open", () => {
+			let bindings = new Map<string, common.Type>([["Value", integer]])
+
+			expect(
+				applyGenericBindings(
+					dictionary(
+						{ type: "GenericUse", name: "Key" },
+						{ type: "GenericUse", name: "Value" },
+					),
+					bindings,
+				),
+			).toEqual(dictionary({ type: "GenericUse", name: "Key" }, integer))
+		})
+	})
+
+	describe("typeContainsUnknown", () => {
+		it("should answer for either slot on its own", () => {
+			expect(typeContainsUnknown(dictionary(unknown, integer))).toBe(true)
+			expect(typeContainsUnknown(dictionary(string, unknown))).toBe(true)
+			expect(typeContainsUnknown(dictionary(string, integer))).toBe(false)
+		})
+
+		// NOTE: A bare Dictionary's Unknowns are DECLARED defaults rather than
+		// slots waiting on an answer, exactly as a bare List's are.
+		it("should not call a bare Dictionary undecided", () => {
+			expect(typeContainsUnknown(bare)).toBe(false)
+		})
+	})
+
+	describe("resolveUnknownSlots", () => {
+		it("should pin both slots from a Type that decided them", () => {
+			expect(
+				resolveUnknownSlots(
+					dictionary(unknown, unknown),
+					dictionary(string, integer),
+				),
+			).toEqual(dictionary(string, integer))
+		})
+
+		// NOTE: Independently — the slot the value decided is pinned and the one
+		// it did not is left open, rather than both being decided or neither.
+		it("should pin one slot without touching the other", () => {
+			expect(
+				resolveUnknownSlots(
+					dictionary(unknown, unknown),
+					dictionary(string, unknown),
+				),
+			).toEqual(dictionary(string, unknown))
+		})
+
+		it("should leave a slot that already decided something alone", () => {
+			let stored = dictionary(string, integer)
+
+			expect(
+				resolveUnknownSlots(stored, dictionary(integer, string)),
+			).toBe(stored)
+		})
 	})
 })

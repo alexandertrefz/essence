@@ -6,6 +6,7 @@ import type {
 	RationalType,
 	FunctionType,
 	IntegerType,
+	DictionaryType,
 	ListType,
 	NamespaceType,
 	Position,
@@ -246,6 +247,15 @@ export type TestGenerator =
 	| { kind: "rational" }
 	| { kind: "string" }
 	| { kind: "list"; item: TestGenerator }
+	// NOTE: As on the Enricher's generator — the key Type's own Equatable
+	// witness, lowered to the Expression the Rewriter emits. See
+	// `common.typed.TestGenerator`.
+	| {
+			kind: "dictionary"
+			key: TestGenerator
+			value: TestGenerator
+			keyConformance?: ExpressionNode
+	  }
 	| { kind: "record"; members: Array<TestGeneratorMember> }
 	| { kind: "case"; tag: string; members: Array<TestGeneratorMember> }
 	| { kind: "union"; members: Array<TestGenerator> }
@@ -552,6 +562,7 @@ export type ValueNode =
 	| BooleanValueNode
 	| FunctionValueNode
 	| ListValueNode
+	| DictionaryValueNode
 
 export type RecordValueNode = {
 	nodeType: "RecordValue"
@@ -623,6 +634,28 @@ export type ListValueNode = {
 	position?: Position
 }
 
+export type DictionaryEntryNode = {
+	key: ExpressionNode
+	value: ExpressionNode
+}
+
+// NOTE: The written Dictionary, reduced to what the emitted construction needs
+// — the pairs in written order and the witness their keys are compared through.
+// The Positions the entries were written at are gone with everything else the
+// Simplifier drops: the whole literal maps to one source span, exactly as a
+// written List does.
+export type DictionaryValueNode = {
+	nodeType: "DictionaryValue"
+	entries: Array<DictionaryEntryNode>
+	// NOTE: The witness as an Expression, because that is what it is by here: a
+	// resolved Namespace has become a ConformanceValue and a forwarded bound
+	// has stayed the Identifier naming the hidden Parameter it arrived in.
+	// `null` for the empty Dictionary, which compares nothing.
+	keyConformance: ExpressionNode | null
+	type: DictionaryType
+	position?: Position
+}
+
 export interface LookupNode {
 	nodeType: "Lookup"
 	base: ExpressionNode
@@ -651,6 +684,10 @@ export interface CombinationNode {
 	rhs: ExpressionNode
 	type: Type
 	position?: Position
+	// NOTE: As on the typed Node — set only on a Dictionary update, holding the
+	// witness the base's keys are compared through. A Record update carries
+	// none, and emits the `Object.assign` it always did.
+	keyConformance?: ExpressionNode
 }
 
 export interface MatchNode {
