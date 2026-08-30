@@ -46,6 +46,26 @@ describe("the define arm readings", () => {
 		expect(sources).toHaveLength(3)
 	})
 
+	// NOTE: The arm tails are aimed at the `define`'s OWN block. A brace an arm
+	// opened stands inside it, and an arm written in THAT closes nothing.
+	it("closes the define's block and not a brace its arm opened", () => {
+		let inArmBrace = [
+			"implementation {",
+			"\tfunction show (_ team: Team) -> { label: String } {",
+			"\t\t<- define {",
+			"\t\t\tas { label = team",
+		].join("\n")
+
+		let sources = probeSourcesFor(inArmBrace, "::lspProbeMember()")
+
+		expect(
+			sources.some((source) => source.endsWith("} otherwise}}}")),
+		).toBe(true)
+		expect(
+			sources.some((source) => source.endsWith(" otherwise}}}}")),
+		).toBe(false)
+	})
+
 	// NOTE: `stripNoise` blanks Strings and Comments before the Keyword is
 	// looked for, so a `define` that is only ever mentioned costs nothing.
 	it("reads no define out of a String or a Comment", () => {

@@ -2356,6 +2356,52 @@ describe("Completion inside a define arm", () => {
 		])
 	})
 
+	// NOTE: An arm's own halves may open braces of their own, and then the
+	// innermost `{` is no longer the `define`'s — writing the tail there closes
+	// the Record Literal being typed with an arm inside it, which finishes
+	// nothing, so the Parser dropped the Statement and the cursor was answered
+	// by no reading at all. The `define`'s block is the one the tail belongs at
+	// the end of, whether or not it is the innermost.
+	it("should complete inside a brace an arm's value opened", () => {
+		let source = [
+			"implementation {",
+			"\ttype Team = { name: String, points: Integer }",
+			"\tfunction show (_ team: Team) -> { label: String } {",
+			"\t\t<- define {",
+			"\t\t\tas { label = team.",
+			"\t\t}",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(labelsOf(source, { line: 5, column: 22 })).toEqual([
+			"name",
+			"points",
+		])
+	})
+
+	// NOTE: And a `define` written inside an arm of another one wants both
+	// blocks closed — the inner by the tail the cursor needs, the outer by the
+	// `otherwise` its own arm is one word short of.
+	it("should complete inside a define written inside an arm", () => {
+		let source = [
+			"implementation {",
+			"\ttype Team = { name: String, points: Integer }",
+			"\tfunction show (_ team: Team) -> String {",
+			"\t\t<- define {",
+			"\t\t\tas define {",
+			"\t\t\t\tas team.",
+			"\t\t}",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(labelsOf(source, { line: 6, column: 13 })).toEqual([
+			"name",
+			"points",
+		])
+	})
+
 	// NOTE: A `#` keeps the whole document — the probe writes a stand-in Case
 	// where the sigil is rather than truncating — so this reads the expected
 	// Type off the arm, not off a padded tail.
