@@ -841,6 +841,12 @@ function simplifyDefine(
 			// asked in JavaScript's own terms. The Simplifier states what the
 			// Program says and nothing about how it is tested.
 			conditionIsRaw: false,
+			// NOTE: Carried down untouched. The Enricher is the only stage that
+			// can say whether an arm's Condition established anything, and by
+			// here the refinement it established has been erased — so a reader
+			// below this point either finds the claim on the Node or can not
+			// ask the question at all.
+			narrows: arm.narrows,
 		})),
 		otherwise: simplifyExpression(node.otherwise.value),
 		type: node.type,
