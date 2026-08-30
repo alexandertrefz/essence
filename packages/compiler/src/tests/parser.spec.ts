@@ -1470,6 +1470,113 @@ describe("Parser", () => {
 
 				expect(input).toMatchSnapshot()
 			})
+
+			// NOTE: `otherwise` is a valid Identifier, so an arm may answer
+			// with a value spelled the same as the word that ends the arm. The
+			// two readings never meet: an arm's value stops at the word
+			// whatever the word is, and the loop then reads the Token AFTER
+			// the value to say which arm it just read.
+			it("should parse an arm whose value is a name spelled otherwise", () => {
+				let { program, diagnostics } = parseWithDiagnostics(
+					`implementation {
+						constant grade = define {
+							as otherwise if flag
+							as otherwise otherwise
+						}
+					}`,
+				)
+
+				expect(diagnostics).toEqual([])
+
+				let node = program.implementation.nodes[0]
+
+				if (node.nodeType === "ConstantDeclarationStatement") {
+					expect(node.value).toMatchObject({
+						nodeType: "Define",
+						arms: [
+							{
+								value: {
+									nodeType: "Identifier",
+									content: "otherwise",
+								},
+								condition: {
+									nodeType: "Identifier",
+									content: "flag",
+								},
+							},
+						],
+						otherwise: {
+							value: {
+								nodeType: "Identifier",
+								content: "otherwise",
+							},
+						},
+					})
+				}
+			})
+
+			it("should parse an arm whose value calls a Method named otherwise", () => {
+				let { program, diagnostics } = parseWithDiagnostics(
+					`implementation {
+						constant grade = define {
+							as value::otherwise(0) if flag
+							as value::otherwise(1) otherwise
+						}
+					}`,
+				)
+
+				expect(diagnostics).toEqual([])
+
+				let node = program.implementation.nodes[0]
+
+				if (node.nodeType === "ConstantDeclarationStatement") {
+					expect(node.value).toMatchObject({
+						nodeType: "Define",
+						arms: [
+							{
+								value: {
+									nodeType: "MethodInvocation",
+									member: { content: "otherwise" },
+								},
+							},
+						],
+						otherwise: {
+							value: {
+								nodeType: "MethodInvocation",
+								member: { content: "otherwise" },
+							},
+						},
+					})
+				}
+			})
+
+			it("should parse an arm whose value is a Record with an otherwise member", () => {
+				let { program, diagnostics } = parseWithDiagnostics(
+					`implementation {
+						constant grade = define {
+							as { otherwise = 1 } if flag
+							as { otherwise = 2 } otherwise
+						}
+					}`,
+				)
+
+				expect(diagnostics).toEqual([])
+
+				let node = program.implementation.nodes[0]
+
+				if (
+					node.nodeType === "ConstantDeclarationStatement" &&
+					node.value.nodeType === "Define"
+				) {
+					expect(node.value.arms).toHaveLength(1)
+					expect(node.value.arms[0].value.nodeType).toBe(
+						"RecordValue",
+					)
+					expect(node.value.otherwise.value.nodeType).toBe(
+						"RecordValue",
+					)
+				}
+			})
 		})
 	})
 
@@ -3796,6 +3903,121 @@ export { Rectangle from "./Geometry.es" }`,
 					"TypeAliasStatement",
 					"NamespaceDefinitionStatement",
 				])
+			})
+
+			// NOTE: `otherwise` is a name like the rest of these, which is
+			// what keeps a Method spelled that way available — the standard
+			// library had an `Optional::otherwise` until it was renamed. The
+			// word ends a `define` arm only where an arm's value has already
+			// ended, so nothing about the two readings overlaps.
+			it("should read otherwise as a Method name", () => {
+				let { program, diagnostics } = parseWithDiagnostics(
+					"implementation { value::otherwise(0) }",
+				)
+
+				expect(diagnostics).toEqual([])
+
+				let node = program.implementation.nodes[0]
+
+				expect(node.nodeType).toBe("MethodInvocation")
+
+				if (node.nodeType === "MethodInvocation") {
+					expect(node.member.content).toBe("otherwise")
+				}
+			})
+
+			it("should read otherwise as a Record member and as a Lookup", () => {
+				let { program, diagnostics } = parseWithDiagnostics(
+					`implementation {
+						constant r = { otherwise = 1 }
+						constant read = r.otherwise
+					}`,
+				)
+
+				expect(diagnostics).toEqual([])
+
+				let [record, lookup] = program.implementation.nodes
+
+				if (record.nodeType === "ConstantDeclarationStatement") {
+					expect(record.value).toMatchObject({
+						nodeType: "RecordValue",
+						members: {
+							otherwise: {
+								value: { nodeType: "IntegerValue", value: "1" },
+							},
+						},
+					})
+				}
+
+				if (lookup.nodeType === "ConstantDeclarationStatement") {
+					expect(lookup.value).toMatchObject({
+						nodeType: "Lookup",
+						member: { content: "otherwise" },
+					})
+				}
+			})
+
+			it("should read otherwise as a declared name", () => {
+				let { program, diagnostics } = parseWithDiagnostics(
+					`implementation {
+						variable otherwise = 1
+						otherwise = 2
+					}`,
+				)
+
+				expect(diagnostics).toEqual([])
+				expect(
+					program.implementation.nodes.map((node) => node.nodeType),
+				).toEqual([
+					"VariableDeclarationStatement",
+					"VariableAssignmentStatement",
+				])
+			})
+
+			it("should read otherwise as a Parameter label and name", () => {
+				let { program, diagnostics } = parseWithDiagnostics(
+					`implementation {
+						function fallback(otherwise value: Integer) -> Integer {
+							<- value
+						}
+					}`,
+				)
+
+				expect(diagnostics).toEqual([])
+
+				let node = program.implementation.nodes[0]
+
+				expect(node.nodeType).toBe("FunctionStatement")
+
+				if (node.nodeType === "FunctionStatement") {
+					expect(
+						node.value.parameters.map(
+							(parameter) => parameter.externalName?.content,
+						),
+					).toEqual(["otherwise"])
+					expect(
+						node.value.parameters.map(
+							(parameter) =>
+								parameterInternalName(parameter)?.content,
+						),
+					).toEqual(["value"])
+				}
+			})
+
+			// NOTE: `define` is NOT a name, and the difference is the Token
+			// behind the word. An Identifier with a `{` behind it already
+			// parses — a name, and the Record literal below it — so a
+			// contextual `define` would quietly read two Statements as one
+			// block. An `otherwise` has no such reading to take away.
+			it("should keep define reserved", () => {
+				let { diagnostics } = parseWithDiagnostics(
+					"implementation { constant define = 1 }",
+				)
+
+				expect(containsErrors(diagnostics)).toBe(true)
+				expect(diagnostics[0].message).toBe(
+					"Expected an Identifier but found 'define'.",
+				)
 			})
 
 			// NOTE: A section is recognised by its Keyword AND its `{`, so a lone

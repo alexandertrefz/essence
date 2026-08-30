@@ -698,6 +698,11 @@ describe("Lexer", () => {
 			expect(stripPosition(lexer.next())).toEqual(output)
 		})
 
+		// NOTE: A Keyword to the Lexer and a name to the Parser — `otherwise`
+		// is on `identifierTokenTypes`, so `constant otherwise = 1` and
+		// `value::otherwise(0)` are the Program they read as. The word is
+		// lexed as itself either way; where it stands is what decides, and
+		// nothing here should be changed to make it an `Identifier` Token.
 		it("should lex otherwise", () => {
 			let lexer = new Lexer()
 			let input: string
