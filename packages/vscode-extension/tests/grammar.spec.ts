@@ -61,6 +61,27 @@ describe("the define grammar", () => {
 		expect(armAs.test("\tconstant { x as y } = point")).toBe(false)
 		expect(armAs.test("\tnormalize(as #ComposedCanonical)")).toBe(false)
 	})
+
+	// NOTE: An Argument label stands at the head of its line too, whenever the
+	// Formatter explodes the Argument list it belongs to — the line below is
+	// this repo's own `StdlibExhaustive.es`, written by `esfmt`. What tells it
+	// from an arm is the trailing comma the Formatter ends every exploded
+	// Argument with, which an arm never carries.
+	it("leaves a line-initial Argument label unlit", () => {
+		expect(
+			armAs.test("\t\tas NormalizationForm#DecomposedCanonical,"),
+		).toBe(false)
+		expect(armAs.test('\t\tas "a name",')).toBe(false)
+		expect(armAs.test("\t\tas #Sensitive,")).toBe(false)
+	})
+
+	// NOTE: And the arm shapes the comma test must not turn away with it — a
+	// Condition, an `otherwise`, and a value that carries on past the line.
+	it("still lights an arm whose line ends in anything else", () => {
+		expect(armAs.test("\t\t\tas [1, 2] if flag")).toBe(true)
+		expect(armAs.test("\t\t\tas f(a, b) otherwise")).toBe(true)
+		expect(armAs.test("\t\t\tas define {")).toBe(true)
+	})
 })
 
 // NOTE: What a tab stop's placeholder stands as before anything is typed —
