@@ -141,6 +141,16 @@
 		"body": ["case ${1:Matcher} where ${2:condition} { <- ${0:value} }"],
 		"description": "A guarded case handler within a match expression."
 	},
+	"define": {
+		"prefix": "define",
+		"body": [
+			"define {",
+			"\tas ${1:value} if ${2:condition}",
+			"\tas ${0:value} otherwise",
+			"}"
+		],
+		"description": "A definition by cases."
+	},
 	"if": {
 		"prefix": "if",
 		"body": ["if ${1:condition} {", "\t$0", "}"],
