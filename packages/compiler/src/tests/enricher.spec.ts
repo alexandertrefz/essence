@@ -9158,6 +9158,53 @@ describe("Enricher", () => {
 					])
 				}
 			})
+
+			// NOTE: The SECOND claim, and the reason it is a second one:
+			// `isEmpty` establishes nothing about a String where it holds and
+			// proves `NonEmptyString` where it does not, while `isGreaterThan(0)`
+			// proves `PositiveInteger` for its own arm and leaves the arm below
+			// it nothing. Neither flag implies the other in either direction,
+			// which is why a reader that may not move an arm has to ask both.
+			it("should record which arms narrow the arms BELOW them", () => {
+				let { program, diagnostics } = enrichSource(`implementation {
+					function pieces(_ text: String, on separator: String) -> List<String> {
+						<- define {
+							as [text] if separator::isEmpty()
+							as text::split(on separator) otherwise
+						}
+					}
+
+					function shrunk(_ n: Integer) -> Integer {
+						<- define {
+							as n::subtract(1) if n::isGreaterThan(0)
+							as 0 otherwise
+						}
+					}
+				}`)
+
+				expect(diagnostics).toEqual([])
+
+				let defines = program.implementation.nodes.flatMap((node) => {
+					if (node.nodeType !== "FunctionStatement") {
+						return []
+					}
+
+					let answer = node.value.body.at(-1)
+
+					return answer?.nodeType === "ReturnStatement" &&
+						answer.expression.nodeType === "Define"
+						? [answer.expression]
+						: []
+				})
+
+				expect(
+					defines.map((define) =>
+						define.arms.map(
+							(arm) => `${arm.narrows} ${arm.narrowsBelow}`,
+						),
+					),
+				).toEqual([["false true"], ["true false"]])
+			})
 		})
 
 		// NOTE: A bare `#Empty` decides no Type of its own — a Choice's Type
