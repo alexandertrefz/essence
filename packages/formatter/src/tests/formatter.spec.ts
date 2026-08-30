@@ -757,6 +757,56 @@ describe("formatter", () => {
 			)
 		})
 
+		// NOTE: A CONDITION that lays itself out over several lines keeps its
+		// `if` on the answer's line for the same reason an ANSWER that does
+		// keeps its own: the brace opens right after the `if`, and nothing in
+		// front of that brace needs the room a break would buy. The arm stays
+		// in the run, its `if` written in the column like every other one.
+		it("keeps the if on the line when the condition opens a block", () => {
+			roundTrips(
+				block(
+					"\tconstant grade = define {",
+					'\t\tas "yes" if define -> Boolean {',
+					"\t\t\tas c     if c",
+					"\t\t\tas false otherwise",
+					"\t\t}",
+					'\t\tas "no"  otherwise',
+					"\t}",
+				),
+			)
+		})
+
+		it("keeps the if on the line when the condition is a match", () => {
+			roundTrips(
+				block(
+					"\tconstant grade = define {",
+					'\t\tas "yes" if match value -> Boolean {',
+					"\t\t\tcase 1 { <- true }",
+					"\t\t\tcase _ { <- false }",
+					"\t\t}",
+					'\t\tas "no"  otherwise',
+					"\t}",
+				),
+			)
+		})
+
+		// NOTE: A trailing callback in a Condition hugs the call it is written
+		// in, which it can only do with the `if` in front of it on the line.
+		it("lets a Condition's trailing callback hug", () => {
+			roundTrips(
+				block(
+					"\tconstant grade = define {",
+					'\t\tas "yes" if scores::hasItems(onlyWhere (score) {',
+					"\t\t\tconstant doubled = score::multiplyWith(2)",
+					"",
+					"\t\t\t<- doubled::isGreaterThan(100)",
+					"\t\t})",
+					'\t\tas "no"  otherwise',
+					"\t}",
+				),
+			)
+		})
+
 		// NOTE: `otherwise` never breaks away from its answer: there is nothing
 		// after it for a break to buy room for, so the answer gives way inside
 		// itself instead.
