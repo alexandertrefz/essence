@@ -755,9 +755,9 @@ describe("Parser Recovery", () => {
 						as 1 if flag`,
 			)
 
-			expect(
-				diagnostics.map((diagnostic) => diagnostic.code),
-			).toEqual(["unclosed-block"])
+			expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+				"unclosed-block",
+			])
 		})
 	})
 

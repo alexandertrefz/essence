@@ -3221,8 +3221,7 @@ class DescentParser {
 			// `otherwise` arm" and "this Parser never got to where one would
 			// stand". `parseClosingBrace` answers with a Position either way, so
 			// the question has to be asked of the Token.
-			let closed =
-				this.tokens.peek()?.type === TokenType.SymbolRightBrace
+			let closed = this.tokens.peek()?.type === TokenType.SymbolRightBrace
 			let closingPosition = this.parseClosingBrace(leftBrace.position)
 			let position = {
 				start: keyword.position.start,
