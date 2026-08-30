@@ -4270,6 +4270,168 @@ declarations {
 		})
 	})
 
+	// NOTE: A Guard names a Handler's binding through the `@.member` it stands
+	// for, because the Constant the body reads it through does not exist yet
+	// where a Guard runs. A `define` in that Guard NARROWS the binding, and a
+	// narrowing is a shadow declaration of the very same name — so the arm below
+	// it has to go on reading `@.member` and not the bare name, which is a name
+	// JavaScript either has never heard of or, worse, has heard of from
+	// somewhere else entirely.
+	//
+	// Every source here runs the value through `divide(by:)`, whose total
+	// Overload takes a `NonZeroInteger` — so the narrowing is what makes the
+	// Program compile at all, and the answer it prints is what says which value
+	// it divided.
+	describe("a define inside a Match Guard", () => {
+		it("reads the Handler's binding through the '@' its Guard lent it", async () => {
+			expect(
+				await run(`
+					implementation {
+						function quotientIsLarge(_ value: Optional<Integer>) -> String {
+							<- match value -> String {
+								case #Value(count) where define {
+									as 100::divide(by count)::isGreaterThan(10) if count::isNot(0)
+									as false otherwise
+								} {
+									<- "large"
+								}
+
+								case #Value(count) {
+									<- "small"
+								}
+
+								case #Empty {
+									<- "nothing"
+								}
+							}
+						}
+
+						Terminal.inspect(quotientIsLarge(#Value(5)))
+						Terminal.inspect(quotientIsLarge(#Value(0)))
+						Terminal.inspect(quotientIsLarge(#Empty))
+					}
+				`),
+			).toEqual(['"large"', '"small"', '"nothing"'])
+		})
+
+		// NOTE: The silent half of the same mistake. Emitted as a bare name, the
+		// arm read the Parameter the binding shadows — a Constant that exists,
+		// holds a different value, and divides without complaining. 100 over the
+		// outer 1 is large where 100 over the bound 50 is not.
+		it("does not read an outer name the binding shadows", async () => {
+			expect(
+				await run(`
+					implementation {
+						constant quotientIsLarge = (_ count: Integer, _ value: Optional<Integer>) -> String {
+							<- match value -> String {
+								case #Value(count) where define {
+									as 100::divide(by count)::isGreaterThan(10) if count::isNot(0)
+									as false otherwise
+								} {
+									<- "large"
+								}
+
+								case _ {
+									<- "small"
+								}
+							}
+						}
+
+						Terminal.inspect(quotientIsLarge(1, #Value(50)))
+					}
+				`),
+			).toEqual(['"small"'])
+		})
+
+		// NOTE: And the outer name need not even be a Number. The shadow types
+		// what it declares by what the Guard proved of `@.n`, so a String
+		// Constant of that name compiled clean and reached the stdlib as a
+		// `NonZeroInteger` — where it threw out of `BigInt`.
+		it("does not read an outer name of another Type", async () => {
+			expect(
+				await run(`
+					implementation {
+						constant n = "not a Number at all"
+
+						constant quotientIsLarge = (_ value: Optional<{ n: Integer }>) -> String {
+							<- match value -> String {
+								case #Value({ n }) where define {
+									as 100::divide(by n)::isGreaterThan(10) if n::isNot(0)
+									as false otherwise
+								} {
+									<- "large"
+								}
+
+								case _ {
+									<- "small"
+								}
+							}
+						}
+
+						Terminal.inspect(quotientIsLarge(#Value({ n = 50 })))
+					}
+				`),
+			).toEqual(['"small"'])
+		})
+
+		// NOTE: An `otherwise` arm holds the complements of every Condition above
+		// it, which is a narrowing like any other and was lost the same way.
+		it("reads it through '@' in the otherwise arm too", async () => {
+			expect(
+				await run(`
+					implementation {
+						function quotientIsLarge(_ value: Optional<Integer>) -> String {
+							<- match value -> String {
+								case #Value(count) where define {
+									as false if count::is(0)
+									as 100::divide(by count)::isGreaterThan(10) otherwise
+								} {
+									<- "large"
+								}
+
+								case _ {
+									<- "small"
+								}
+							}
+						}
+
+						Terminal.inspect(quotientIsLarge(#Value(5)))
+						Terminal.inspect(quotientIsLarge(#Value(0)))
+					}
+				`),
+			).toEqual(['"large"', '"small"'])
+		})
+
+		// NOTE: The counterpart that was always right, pinned so it stays that
+		// way: in the BODY the binding is a Constant the Program can name, and a
+		// `define` there narrows it under that name.
+		it("still narrows the same binding in the Handler's body", async () => {
+			expect(
+				await run(`
+					implementation {
+						function quotient(_ value: Optional<Integer>) -> String {
+							<- match value -> String {
+								case #Value(count) {
+									<- define {
+										as 100::divide(by count)::toString() if count::isNot(0)
+										as "undefined" otherwise
+									}
+								}
+
+								case #Empty {
+									<- "nothing"
+								}
+							}
+						}
+
+						Terminal.inspect(quotient(#Value(5)))
+						Terminal.inspect(quotient(#Value(0)))
+					}
+				`),
+			).toEqual(['"20"', '"undefined"'])
+		})
+	})
+
 	// NOTE: The doorway nobody has to write. A Match on a bare Integer takes the
 	// VALUE apart, and its Cases are evidence in both directions: the Case
 	// answering for the rest is reached only by a value none of the Cases above it
