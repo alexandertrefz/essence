@@ -207,51 +207,79 @@ implementation {
 		§§ were given — `ranked` puts it in table order. A postponed fixture
 		§§ has nothing to record and changes no row.
 		§§
-		§§ Every team folds the whole season into its own row: the fixture a
-		§§ team is not part of leaves the row as it was, and a Match on the
-		§§ Fixture takes each Case apart into exactly the names it needs.
+		§§ The rows are held in a Dictionary keyed by the team while they are
+		§§ being worked out, so the season is walked ONCE and each fixture
+		§§ reaches the two rows it changes. A Match on the Fixture takes each
+		§§ Case apart into exactly the names it needs, and `update(at:with:)`
+		§§ answers the Dictionary it was handed where the key holds nothing —
+		§§ so a fixture between teams this table is not about changes nothing,
+		§§ which is what an `else` had to say when every row was asked about
+		§§ every fixture.
 		static compute(
 			from fixtures: List<Fixture>,
 			among teams: NonEmptyList<Team>,
 		) -> NonEmptyList<Standing> {
-			<- teams::map((team) {
-				<- fixtures::reduce(
-					startingWith Standings.blank(of { team }),
-					(standing, fixture) {
-						<- match fixture -> Standing {
-							case #Played({ home, away, homeGoals, awayGoals }) {
-								if home::is(team) {
+			§ A Team is a Record, and a Record is a key like any other: it is
+			§ found by asking the Record's own `is`. `Dictionary.of` builds
+			§ the starting table out of the entries a caller already has in
+			§ hand — one blank row per team, in the order they were given.
+			constant blanks = Dictionary.of(
+				teams::map((team) {
+					<- { key = team, value = Standings.blank(of { team }) }
+				}),
+			)
+
+			constant rows = fixtures::reduce(
+				startingWith blanks,
+				(table, fixture) {
+					<- match fixture -> Dictionary<Team, Standing> {
+						case #Played({ home, away, homeGoals, awayGoals }) {
+							<- table
+								::update(at home, with (standing) {
 									<- standing::record(
 										scored homeGoals,
 										conceded awayGoals,
 									)
-								} else if away::is(team) {
+								})
+								::update(at away, with (standing) {
 									<- standing::record(
 										scored awayGoals,
 										conceded homeGoals,
 									)
-								} else {
-									<- standing
-								}
-							}
-							case #Forfeited({ by, against }) {
-								if by::is(team) {
+								})
+						}
+						case #Forfeited({ by, against })                   {
+							<- table
+								::update(at by, with (standing) {
 									<- standing::record(
 										scored 0,
 										conceded forfeitGoals,
 									)
-								} else if against::is(team) {
+								})
+								::update(at against, with (standing) {
 									<- standing::record(
 										scored forfeitGoals,
 										conceded 0,
 									)
-								} else {
-									<- standing
-								}
-							}
-							case #Postponed { <- standing }
+								})
 						}
-					},
+						case #Postponed                                    {
+							<- table
+						}
+					}
+				},
+			)
+
+			§ The rows read back in the order the teams were given, which is
+			§ the order they were set in and so the order the Dictionary holds
+			§ them. Reading them out through the teams rather than through
+			§ `values()` is what carries the proof: a `map` over a List with
+			§ something in it answers a List with something in it, and the
+			§ fallback is the row a team the season never mentions would have.
+			<- teams::map((team) {
+				<- rows::value(
+					at team,
+					defaultingTo Standings.blank(of { team }),
 				)
 			})
 		}
