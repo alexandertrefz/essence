@@ -2468,10 +2468,10 @@ Error: Nothing decides what this 'define' answers
     │ │           
     │ ╰─────────── this 'define' has no answer Type
     │ 
-    │ Help: Write the answer Type on the 'define' itself: 'define -> Type { … }'.
+    │ Help 1: Write the answer Type on the 'define' itself: 'define -> Type { … }' — it is pushed into every arm.
+    │ Help 2: Or annotate the Declaration it stands in, where it stands in one. An Argument position hands nothing down: a call picks its Overload BY the Arguments, so no Parameter Type is decided before they are read.
     │ 
-    │ Note 1: A 'define' takes its answer Type from its arrow, from the position it stands in, or from what its arms answer with — and an arm that decides no Type Arguments of its own leaves nothing to take.
-    │ Note 2: An Argument position hands nothing down: a call picks its Overload BY the Arguments, so no Parameter Type is decided before they are read.
+    │ Note: A 'define' takes its answer Type from its arrow, from the position it stands in, or from what its arms answer with — and an arm that decides no Type Arguments of its own leaves nothing to take.
 ────╯
 
 [undecided-type-arguments]
@@ -2502,10 +2502,10 @@ Error: Nothing decides what this 'define' answers
     │ │            
     │ ╰──────────── this 'define' has no answer Type
     │ 
-    │ Help: Write the answer Type on the 'define' itself: 'define -> Type { … }'.
+    │ Help 1: Write the answer Type on the 'define' itself: 'define -> Type { … }' — it is pushed into every arm.
+    │ Help 2: Or annotate the Declaration it stands in, where it stands in one. An Argument position hands nothing down: a call picks its Overload BY the Arguments, so no Parameter Type is decided before they are read.
     │ 
-    │ Note 1: A 'define' takes its answer Type from its arrow, from the position it stands in, or from what its arms answer with — and an arm that decides no Type Arguments of its own leaves nothing to take.
-    │ Note 2: An Argument position hands nothing down: a call picks its Overload BY the Arguments, so no Parameter Type is decided before they are read.
+    │ Note: A 'define' takes its answer Type from its arrow, from the position it stands in, or from what its arms answer with — and an arm that decides no Type Arguments of its own leaves nothing to take.
 ────╯
 
 ─── 4 errors

@@ -3221,8 +3221,7 @@ class DescentParser {
 			// `otherwise` arm" and "this Parser never got to where one would
 			// stand". `parseClosingBrace` answers with a Position either way, so
 			// the question has to be asked of the Token.
-			let closed =
-				this.tokens.peek()?.type === TokenType.SymbolRightBrace
+			let closed = this.tokens.peek()?.type === TokenType.SymbolRightBrace
 			let closingPosition = this.parseClosingBrace(leftBrace.position)
 			let position = {
 				start: keyword.position.start,
@@ -3268,18 +3267,30 @@ class DescentParser {
 			// if flag } }` used to be answered with "Expected 'with' but found
 			// '='", which is the Dictionary reading behind the Record one
 			// speaking for text the Record reading had already judged.
+			//
+			// NOTE: An EMPTY block is the same refusal about different text, so
+			// it is told apart in the label and in the help rather than given a
+			// code of its own. "Every value here has a condition on it" is a
+			// remark about the values that were written, and a `define { }`
+			// wrote none — it is short of every arm, not of the last one.
 			if (otherwise === null) {
+				let empty = arms.length === 0
+
 				throw new ParseError(
 					"This 'define' has no 'otherwise' arm",
 					position,
-					"every value here has a condition on it",
+					empty
+						? "there are no arms here at all"
+						: "every value here has a condition on it",
 					{
 						code: "define-without-otherwise",
 						notes: [
 							"A 'define' answers with a value wherever it stands, so one of its arms has to be the one that always holds.",
 						],
 						helps: [
-							"Write the last arm as 'as <value> otherwise'.",
+							empty
+								? "Write an arm: 'as <value> otherwise'."
+								: "Write the last arm as 'as <value> otherwise'.",
 						],
 					},
 				)
