@@ -1,9 +1,12 @@
 import { describe, expect, it } from "bun:test"
+import { readFileSync } from "node:fs"
+
 import grammar from "../syntaxes/essence.tmLanguage.json"
 
-// NOTE: The grammar is data an Editor reads, not code anything type-checks — a
-// rule that never matches lights nothing and says so nowhere, which is the same
-// silent failure `contribution.spec.ts` pins the manifest against.
+// NOTE: The grammar and the snippets are data an Editor reads, not code
+// anything type-checks — a rule that never matches lights nothing and says so
+// nowhere, which is the same silent failure `contribution.spec.ts` pins the
+// manifest against.
 //
 // NOTE: The rules are read here with JavaScript's own RegExp rather than with
 // Oniguruma, which is what VS Code runs them through. The two agree on
@@ -57,5 +60,45 @@ describe("the define grammar", () => {
 	it("leaves a Pattern binder to the rule written for it", () => {
 		expect(armAs.test("\tconstant { x as y } = point")).toBe(false)
 		expect(armAs.test("\tnormalize(as #ComposedCanonical)")).toBe(false)
+	})
+})
+
+// NOTE: What a tab stop's placeholder stands as before anything is typed —
+// which is the text a column in the body is aligned against.
+function rendered(line: string): string {
+	return line.replace(/\$\{\d+:([^}]*)\}/g, "$1")
+}
+
+// NOTE: Read and parsed rather than imported: `.code-snippets` is strict JSON
+// under a name no bundler knows, and an import of it lands as nothing at all.
+let snippets = JSON.parse(
+	readFileSync(
+		new URL("../snippets/essence.code-snippets", import.meta.url),
+		"utf8",
+	),
+) as Record<string, { prefix: string; body: Array<string> }>
+
+describe("the define snippet", () => {
+	let snippet = snippets.define!
+
+	it("writes a block that ends in an otherwise arm", () => {
+		expect(snippet.prefix).toBe("define")
+		expect(rendered(snippet.body.join("\n"))).toBe(
+			[
+				"define {",
+				"\tas value if condition",
+				"\tas value otherwise",
+				"}",
+			].join("\n"),
+		)
+	})
+
+	// NOTE: The `match` snippet pads its second Matcher so that both case
+	// braces stand in one column; an arm's two Keywords are the same question,
+	// asked of `if` and `otherwise`.
+	it("stands if and otherwise in one column", () => {
+		let [, arm, otherwise] = snippet.body.map(rendered)
+
+		expect(arm!.indexOf(" if ")).toBe(otherwise!.indexOf(" otherwise"))
 	})
 })
