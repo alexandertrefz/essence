@@ -62,6 +62,22 @@ const SOURCE = [
 	"",
 ].join("\n")
 
+// NOTE: A ladder that narrows nothing, which is what leaves its arms free to
+// be moved. Its own file rather than a Function added to `SOURCE`, because every
+// expectation up there names a line.
+const DEFINE_SOURCE = [
+	"implementation {",
+	"	function grade(_ score: Integer) -> String {",
+	"		<- define {",
+	'			as "A" if score::isGreaterThanOrEqualTo(90)',
+	'			as "B" if score::isGreaterThanOrEqualTo(80)',
+	'			as "F" otherwise',
+	"		}",
+	"	}",
+	"}",
+	"",
+].join("\n")
+
 function simplified(source: string = SOURCE) {
 	let parsed = parseWithDiagnostics(source)
 
@@ -272,6 +288,80 @@ describe("Mutation sites", () => {
 		])
 	})
 
+	// NOTE: One lie per arm of a ladder — this arm answers where nothing
+	// matched, and the fallback answers where this arm held. It is the `define`
+	// reading of the branch swap: an arm and the `otherwise` below it ARE an
+	// `if` and its `else`.
+	it("offers one swap for every arm of a define", () => {
+		// NOTE: Both at the line the `define` opens with, which is what keeps
+		// the per-line cap from eating them: an arm's own line already spends
+		// its four sites on the literals and rotations of the Condition
+		// standing beside the answer.
+		expect(only(sitesOf(DEFINE_SOURCE), "branch")).toEqual([
+			"3 swap arm 1's answer for the 'otherwise' one",
+			"3 swap arm 2's answer for the 'otherwise' one",
+		])
+	})
+
+	// NOTE: And the Conditions of that ladder are mutated like any other call,
+	// because nothing in it establishes anything — a comparison against a
+	// written bound is the site a ladder most wants.
+	it("still rotates the comparisons a define asks", () => {
+		// NOTE: One rotation per arm rather than two, because the cap has
+		// already spent three of that line's four sites on the nudges of the
+		// bound the Condition compares against.
+		expect(only(sitesOf(DEFINE_SOURCE), "comparison")).toEqual([
+			"4 swap ::isGreaterThanOrEqualTo for ::isGreaterThan",
+			"5 swap ::isGreaterThanOrEqualTo for ::isGreaterThan",
+		])
+	})
+
+	// NOTE: Every arm below the first is read in a Scope holding the complements
+	// of the Conditions above it, and every arm's own value is read behind
+	// whatever its Condition established — so an answer moved out from under the
+	// Condition that typed it runs against a refinement nobody proved. BOTH
+	// claims are asked, because they are two claims: `separator::isEmpty()`
+	// establishes nothing for its own arm and is exactly what lets the arm below
+	// it call `split`.
+	it("offers nothing at a define whose arms narrow anything", () => {
+		let source = [
+			"implementation {",
+			"	function pieces(_ text: String, on separator: String) -> List<String> {",
+			"		<- define {",
+			"			as [text] if separator::isEmpty()",
+			"			as text::split(on separator) otherwise",
+			"		}",
+			"	}",
+			"",
+			"	function shrunk(_ n: Integer) -> Integer {",
+			"		<- define {",
+			"			as n::subtract(1) if n::isGreaterThan(0)",
+			"			as 0 otherwise",
+			"		}",
+			"	}",
+			"}",
+			"",
+		].join("\n")
+		let sites = sitesOf(source)
+
+		expect(only(sites, "branch")).toEqual([])
+		expect(only(sites, "comparison")).toEqual([])
+		expect(only(sites, "arithmetic")).toEqual([])
+		// NOTE: And the literals of that arm are still sites, which is what says
+		// the refusal is about the QUESTION being asked rather than about the
+		// lines it is asked on. In the walk's own order, which reads an arm's
+		// Condition before the answer beside it: the `0` of `isGreaterThan(0)`
+		// comes first and the `1` of `subtract(1)` after it.
+		expect(only(sites, "integer")).toEqual([
+			"11 swap 0 for 1",
+			"11 swap 0 for -1",
+			"11 swap 1 for 2",
+			"11 swap 1 for 0",
+			"12 swap 0 for 1",
+			"12 swap 0 for -1",
+		])
+	})
+
 	// NOTE: The Arguments a call site wrote are handed on UNTOUCHED, so a swap
 	// onto a Method that takes a different number of them crashes wherever it
 	// runs — which a mutation run would record as a kill the tests never
@@ -443,6 +533,28 @@ describe("Applying a mutation", () => {
 
 		expect(javaScript).toContain("function best()")
 		expect(javaScript.split("function best()")[1]).toContain("Outcome#Draw")
+	})
+
+	// NOTE: The chain with two of its answers exchanged, and nothing else about
+	// it moved — the same Conditions in the same order, so what the mutant lies
+	// about is which arm answers.
+	it("emits the swapped define answer", () => {
+		let javaScript = emitted(
+			siteFor(
+				"swap arm 1's answer for the 'otherwise' one",
+				DEFINE_SOURCE,
+			).id,
+			DEFINE_SOURCE,
+		)
+		let body = javaScript.split("function grade(score)")[1] as string
+
+		expect(body).toContain('createString("F")')
+		expect(body.indexOf('createString("F")')).toBeLessThan(
+			body.indexOf('createString("B")'),
+		)
+		expect(body.lastIndexOf('createString("A")')).toBeGreaterThan(
+			body.indexOf('createString("B")'),
+		)
 	})
 
 	it("emits the swapped branches", () => {

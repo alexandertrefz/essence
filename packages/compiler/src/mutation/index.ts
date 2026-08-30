@@ -21,7 +21,8 @@ import { rewriteNodes } from "../optimiser/walk"
 // that is the whole discipline: a mutated Program is never enriched again, so
 // nothing downstream would catch a lie that does not typecheck. A Case swap
 // demands the identical member-name shape, a literal nudge answers the same
-// Type, a branch swap moves Statements that were already there, and a member
+// Type, a branch swap moves Statements that were already there, a `define` arm
+// swap permutes the very values whose Union is the answer Type, and a member
 // swap is refused outright unless the Namespace it is aimed at declares the
 // name AT THE SAME ARITY, or the Protocol that answered the call wrote a body
 // for it — see `swappableMember`. Where a site can not be shown to be sound it
@@ -347,8 +348,91 @@ function mutateExpression(
 			return offer(node, position, integerNudges(node))
 		case "CaseValue":
 			return offer(node, position, caseSwaps(node, context))
+		case "Define":
+			return mutateDefine(node, offer)
 		default:
 			return node
+	}
+}
+
+// NOTE: A ladder's own lie: one arm answers where nothing matched, and the
+// fallback answers where that arm held. It is the `define` reading of
+// `mutateStatement`'s branch swap — an arm and the `otherwise` below it ARE an
+// `if` and its `else` — and it is the mutant a ladder needs, because the
+// question a ladder gets wrong is which arm answers rather than what any one of
+// them says.
+//
+// NOTE: TYPE-SHAPED by construction, and it is worth writing down why, because
+// the arms of a `define` need not share a Type. Where an arrow or the position
+// around the `define` decided the answer Type, every arm was read against it and
+// any two of them may trade places. Where the ARMS decided it, the Type is the
+// Union of exactly these values — and a swap PERMUTES that list rather than
+// changing it, so the Union is the same Union and each value carries its own
+// Type along with it. Neither reading can be broken by moving an answer.
+//
+// NOTE: What CAN break it is evidence. Every arm below the first is read in a
+// Scope holding the complements of the Conditions above it, and every arm's own
+// value is read behind whatever its Condition established — so an answer moved
+// out from under the Condition that typed it would run against a refinement
+// nobody proved. That is the same refusal `mutateStatement` makes of a narrowing
+// `if`, and it is made of BOTH claims here: an arm that narrows nothing itself
+// may still be the one whose complement the `otherwise` value was written
+// against.
+//
+// NOTE: One candidate per ARM, so a ladder of four is four lies a reader can
+// tell apart rather than one — but all of them at the `define`'s OWN Position
+// rather than at the answer that moves, which is a decision about the per-line
+// cap. An arm's line carries its Condition too: `as "A" if score::isGreater\
+// ThanOrEqualTo(90)` already spends three literal nudges and two rotations
+// there, and a sixth site on that line is dropped. That is the cap working as
+// written, and it would have meant this operator never appearing on the
+// commonest ladder there is. The line a `define` opens with holds nothing else.
+//
+// NOTE: Which arm moved is then the DESCRIPTION's to say, counted from one as a
+// reader counts them. The Position is the `define`, so a report points at the
+// ladder and the sentence points into it.
+function mutateDefine(
+	node: common.typedSimple.DefineNode,
+	offer: Offer,
+): common.typedSimple.ExpressionNode {
+	let position = node.position
+
+	// NOTE: A `define` the Simplifier built rather than one the source wrote —
+	// the same line every other site here draws, and a report can not point at
+	// one.
+	if (position === undefined) {
+		return node
+	}
+
+	if (node.arms.some((arm) => arm.narrows || arm.narrowsBelow)) {
+		return node
+	}
+
+	return offer(
+		node,
+		position,
+		node.arms.map((_, index) => ({
+			operator: "branch" as const,
+			description: `swap arm ${index + 1}'s answer for the 'otherwise' one`,
+			rewrite: (): common.typedSimple.ExpressionNode =>
+				swappedAnswer(node, index),
+		})),
+	)
+}
+
+// NOTE: Built from the Node this walk was HANDED rather than from whatever the
+// loop above is holding, which is right because at most one candidate of the
+// whole walk is ever taken: a mutant is one lie about one Program.
+function swappedAnswer(
+	node: common.typedSimple.DefineNode,
+	index: number,
+): common.typedSimple.DefineNode {
+	return {
+		...node,
+		arms: node.arms.map((arm, at) =>
+			at === index ? { ...arm, value: node.otherwise } : arm,
+		),
+		otherwise: node.arms[index]!.value,
 	}
 }
 
@@ -668,10 +752,11 @@ type MutationContext = {
 	// among the Cases this one builds.
 	choices: Map<string, Array<common.CaseType>>
 	// NOTE: Every Node the condition of a NARROWING `if` is written out of, the
-	// condition itself included. It is one set because it answers one question
-	// asked in two places — see `mutateStatement` and `memberSwaps` — and it is
+	// condition itself included — and every Node of a narrowing `define` arm's
+	// Condition beside them. It is one set because it answers one question asked
+	// in two places — see `mutateStatement` and `memberSwaps` — and it is
 	// gathered here because the walk that offers sites reaches a condition's
-	// Nodes before it reaches the `if` they belong to.
+	// Nodes before it reaches the `if` or the arm they belong to.
 	narrowed: Set<common.typedSimple.ExpressionNode>
 }
 
@@ -764,6 +849,19 @@ function readContext(program: common.typedSimple.Program): MutationContext {
 					node.type.type === "Case"
 				) {
 					remember(node.type)
+				}
+
+				// NOTE: And an arm's Condition the same way, asked of BOTH
+				// claims. A swap inside `separator::isEmpty()` would leave the
+				// arm below it reading a `NonEmptyString` nobody proved, and
+				// that arm's Condition establishes nothing for its own answer —
+				// so the claim that refuses it is the one about the arms below.
+				if (node.nodeType === "Define") {
+					for (let arm of node.arms) {
+						if (arm.narrows || arm.narrowsBelow) {
+							collectCondition(program, arm.condition, narrowed)
+						}
+					}
 				}
 
 				return node
