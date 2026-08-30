@@ -1905,6 +1905,9 @@ export class Printer {
 			case "Match":
 				return this.printMatch(node)
 
+			case "Define":
+				return this.printDefine(node)
+
 			case "CaseValue":
 				return this.printCaseValue(node)
 
@@ -2265,6 +2268,78 @@ export class Printer {
 			this.printExpression(node.value),
 			text(" -> "),
 			this.printType(node.returnType),
+			text(" "),
+			this.block(entries, null, false, opening),
+		])
+	}
+
+	// NOTE: One arm to a line, always — a `define` is a table of cases, and one
+	// written flat would be a worse `if`. Every arm carries the Position it was
+	// written across, so the Comments around it are claimed from its own lines
+	// rather than looked for in the source the way a Match Handler's are.
+	//
+	// NOTE: Lining the `if` column up across the arms is a question for later.
+	// What is here is the shape and nothing else.
+	private printDefine(node: parser.DefineNode): Doc {
+		let entries: Array<Entry> = []
+
+		// NOTE: A Comment trailing the `define`'s own `{` — claimed before the
+		// arms are walked, or the first arm's `takeBefore` would stall on it
+		// and it would be flushed out below the whole `define`.
+		let opening = this.trivia.claimTrailingOn(
+			this.braceLine(
+				node.position.start.line,
+				node.arms[0]?.position.start.line ??
+					node.otherwise.position.start.line,
+				node.position.end.line,
+			),
+		)
+
+		// NOTE: `head` is a thunk rather than a Doc, because the trivia cursor
+		// walks the source in order and the arm's own Expressions walk it too:
+		// the Comments written ABOVE an arm have to be claimed before anything
+		// inside it is printed, or a Method chain in the arm claims them and
+		// writes them into the middle of itself. The trailing Comment is
+		// claimed first for the same reason, and for the one `claimTrailingOn`
+		// states — the outermost node ending on a line is the one that keeps
+		// the note written at the end of it.
+		let pushArm = (position: common.Position, head: () => Array<Doc>) => {
+			for (let comment of this.trivia.takeBefore(position.start.line)) {
+				entries.push(this.commentEntry(comment))
+			}
+
+			let trailing = this.trivia.claimTrailingOn(position.end.line)
+			let doc = concat(head())
+
+			if (trailing !== null) {
+				doc = concat([doc, lineSuffix(" " + trailing.text)])
+			}
+
+			entries.push({ ...positionLines(position), doc })
+		}
+
+		for (let arm of node.arms) {
+			pushArm(arm.position, () => [
+				text("as "),
+				this.printExpression(arm.value),
+				text(" if "),
+				this.printExpression(arm.condition),
+			])
+		}
+
+		pushArm(node.otherwise.position, () => [
+			text("as "),
+			this.printExpression(node.otherwise.value),
+			text(" otherwise"),
+		])
+
+		this.flushBefore(node.position.end.line, entries)
+
+		return concat([
+			text("define"),
+			node.returnType === null
+				? EMPTY
+				: concat([text(" -> "), this.printType(node.returnType)]),
 			text(" "),
 			this.block(entries, null, false, opening),
 		])
@@ -3216,7 +3291,11 @@ function memberKey(member: parser.RecordValueMemberNode): string {
 // NOTE: An Expression that can open a block of its own to break inside —
 // the two kinds `printParameterList` hugs whatever width they print at.
 function opensBlock(node: parser.ExpressionNode): boolean {
-	return node.nodeType === "Match" || node.nodeType === "FunctionValue"
+	return (
+		node.nodeType === "Match" ||
+		node.nodeType === "Define" ||
+		node.nodeType === "FunctionValue"
+	)
 }
 
 // NOTE: An Expression that lays itself out over several lines and closes with
@@ -3224,6 +3303,7 @@ function opensBlock(node: parser.ExpressionNode): boolean {
 function isBlockLike(node: parser.ExpressionNode): boolean {
 	return (
 		node.nodeType === "Match" ||
+		node.nodeType === "Define" ||
 		node.nodeType === "FunctionValue" ||
 		node.nodeType === "RecordValue" ||
 		node.nodeType === "ListValue" ||

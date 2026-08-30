@@ -22818,3 +22818,1516 @@ exports[`Parser Expressions Literals DecimalLiterals should parse DecimalLiteral
   "tests": null,
 }
 `;
+
+exports[`Parser Expressions Define should parse a define Expression 1`] = `
+{
+  "exports": null,
+  "implementation": {
+    "nodeType": "ImplementationSection",
+    "nodes": [
+      {
+        "documentation": null,
+        "name": {
+          "content": "grade",
+          "nodeType": "Identifier",
+          "position": {
+            "end": {
+              "column": 21,
+              "line": 2,
+            },
+            "start": {
+              "column": 16,
+              "line": 2,
+            },
+          },
+        },
+        "nodeType": "ConstantDeclarationStatement",
+        "position": {
+          "end": {
+            "column": 8,
+            "line": 6,
+          },
+          "start": {
+            "column": 7,
+            "line": 2,
+          },
+        },
+        "type": null,
+        "value": {
+          "arms": [
+            {
+              "condition": {
+                "arguments": [
+                  {
+                    "name": null,
+                    "nodeType": "Argument",
+                    "value": {
+                      "nodeType": "IntegerValue",
+                      "position": {
+                        "end": {
+                          "column": 50,
+                          "line": 3,
+                        },
+                        "start": {
+                          "column": 48,
+                          "line": 3,
+                        },
+                      },
+                      "value": "90",
+                    },
+                  },
+                ],
+                "base": {
+                  "content": "score",
+                  "nodeType": "Identifier",
+                  "position": {
+                    "end": {
+                      "column": 23,
+                      "line": 3,
+                    },
+                    "start": {
+                      "column": 18,
+                      "line": 3,
+                    },
+                  },
+                },
+                "member": {
+                  "content": "isGreaterThanOrEqualTo",
+                  "nodeType": "Identifier",
+                  "position": {
+                    "end": {
+                      "column": 47,
+                      "line": 3,
+                    },
+                    "start": {
+                      "column": 25,
+                      "line": 3,
+                    },
+                  },
+                },
+                "namespaceSpecifier": null,
+                "nodeType": "MethodInvocation",
+                "position": {
+                  "end": {
+                    "column": 51,
+                    "line": 3,
+                  },
+                  "start": {
+                    "column": 18,
+                    "line": 3,
+                  },
+                },
+              },
+              "position": {
+                "end": {
+                  "column": 51,
+                  "line": 3,
+                },
+                "start": {
+                  "column": 8,
+                  "line": 3,
+                },
+              },
+              "value": {
+                "nodeType": "StringValue",
+                "position": {
+                  "end": {
+                    "column": 14,
+                    "line": 3,
+                  },
+                  "start": {
+                    "column": 11,
+                    "line": 3,
+                  },
+                },
+                "value": "A",
+              },
+            },
+            {
+              "condition": {
+                "arguments": [
+                  {
+                    "name": null,
+                    "nodeType": "Argument",
+                    "value": {
+                      "nodeType": "IntegerValue",
+                      "position": {
+                        "end": {
+                          "column": 50,
+                          "line": 4,
+                        },
+                        "start": {
+                          "column": 48,
+                          "line": 4,
+                        },
+                      },
+                      "value": "80",
+                    },
+                  },
+                ],
+                "base": {
+                  "content": "score",
+                  "nodeType": "Identifier",
+                  "position": {
+                    "end": {
+                      "column": 23,
+                      "line": 4,
+                    },
+                    "start": {
+                      "column": 18,
+                      "line": 4,
+                    },
+                  },
+                },
+                "member": {
+                  "content": "isGreaterThanOrEqualTo",
+                  "nodeType": "Identifier",
+                  "position": {
+                    "end": {
+                      "column": 47,
+                      "line": 4,
+                    },
+                    "start": {
+                      "column": 25,
+                      "line": 4,
+                    },
+                  },
+                },
+                "namespaceSpecifier": null,
+                "nodeType": "MethodInvocation",
+                "position": {
+                  "end": {
+                    "column": 51,
+                    "line": 4,
+                  },
+                  "start": {
+                    "column": 18,
+                    "line": 4,
+                  },
+                },
+              },
+              "position": {
+                "end": {
+                  "column": 51,
+                  "line": 4,
+                },
+                "start": {
+                  "column": 8,
+                  "line": 4,
+                },
+              },
+              "value": {
+                "nodeType": "StringValue",
+                "position": {
+                  "end": {
+                    "column": 14,
+                    "line": 4,
+                  },
+                  "start": {
+                    "column": 11,
+                    "line": 4,
+                  },
+                },
+                "value": "B",
+              },
+            },
+          ],
+          "nodeType": "Define",
+          "otherwise": {
+            "position": {
+              "end": {
+                "column": 24,
+                "line": 5,
+              },
+              "start": {
+                "column": 8,
+                "line": 5,
+              },
+            },
+            "value": {
+              "nodeType": "StringValue",
+              "position": {
+                "end": {
+                  "column": 14,
+                  "line": 5,
+                },
+                "start": {
+                  "column": 11,
+                  "line": 5,
+                },
+              },
+              "value": "F",
+            },
+          },
+          "position": {
+            "end": {
+              "column": 8,
+              "line": 6,
+            },
+            "start": {
+              "column": 24,
+              "line": 2,
+            },
+          },
+          "returnType": null,
+        },
+      },
+    ],
+    "position": {
+      "end": {
+        "column": 7,
+        "line": 7,
+      },
+      "start": {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "imports": null,
+  "kind": "implementation",
+  "nodeType": "Program",
+  "position": {
+    "end": {
+      "column": 7,
+      "line": 7,
+    },
+    "start": {
+      "column": 1,
+      "line": 1,
+    },
+  },
+  "tests": null,
+}
+`;
+
+exports[`Parser Expressions Define should parse a define Expression with a declared answer Type 1`] = `
+{
+  "exports": null,
+  "implementation": {
+    "nodeType": "ImplementationSection",
+    "nodes": [
+      {
+        "documentation": null,
+        "name": {
+          "content": "grade",
+          "nodeType": "Identifier",
+          "position": {
+            "end": {
+              "column": 21,
+              "line": 2,
+            },
+            "start": {
+              "column": 16,
+              "line": 2,
+            },
+          },
+        },
+        "nodeType": "ConstantDeclarationStatement",
+        "position": {
+          "end": {
+            "column": 8,
+            "line": 5,
+          },
+          "start": {
+            "column": 7,
+            "line": 2,
+          },
+        },
+        "type": null,
+        "value": {
+          "arms": [
+            {
+              "condition": {
+                "arguments": [
+                  {
+                    "name": null,
+                    "nodeType": "Argument",
+                    "value": {
+                      "nodeType": "IntegerValue",
+                      "position": {
+                        "end": {
+                          "column": 50,
+                          "line": 3,
+                        },
+                        "start": {
+                          "column": 48,
+                          "line": 3,
+                        },
+                      },
+                      "value": "90",
+                    },
+                  },
+                ],
+                "base": {
+                  "content": "score",
+                  "nodeType": "Identifier",
+                  "position": {
+                    "end": {
+                      "column": 23,
+                      "line": 3,
+                    },
+                    "start": {
+                      "column": 18,
+                      "line": 3,
+                    },
+                  },
+                },
+                "member": {
+                  "content": "isGreaterThanOrEqualTo",
+                  "nodeType": "Identifier",
+                  "position": {
+                    "end": {
+                      "column": 47,
+                      "line": 3,
+                    },
+                    "start": {
+                      "column": 25,
+                      "line": 3,
+                    },
+                  },
+                },
+                "namespaceSpecifier": null,
+                "nodeType": "MethodInvocation",
+                "position": {
+                  "end": {
+                    "column": 51,
+                    "line": 3,
+                  },
+                  "start": {
+                    "column": 18,
+                    "line": 3,
+                  },
+                },
+              },
+              "position": {
+                "end": {
+                  "column": 51,
+                  "line": 3,
+                },
+                "start": {
+                  "column": 8,
+                  "line": 3,
+                },
+              },
+              "value": {
+                "nodeType": "StringValue",
+                "position": {
+                  "end": {
+                    "column": 14,
+                    "line": 3,
+                  },
+                  "start": {
+                    "column": 11,
+                    "line": 3,
+                  },
+                },
+                "value": "A",
+              },
+            },
+          ],
+          "nodeType": "Define",
+          "otherwise": {
+            "position": {
+              "end": {
+                "column": 24,
+                "line": 4,
+              },
+              "start": {
+                "column": 8,
+                "line": 4,
+              },
+            },
+            "value": {
+              "nodeType": "StringValue",
+              "position": {
+                "end": {
+                  "column": 14,
+                  "line": 4,
+                },
+                "start": {
+                  "column": 11,
+                  "line": 4,
+                },
+              },
+              "value": "F",
+            },
+          },
+          "position": {
+            "end": {
+              "column": 8,
+              "line": 5,
+            },
+            "start": {
+              "column": 24,
+              "line": 2,
+            },
+          },
+          "returnType": {
+            "nodeType": "IdentifierTypeDeclaration",
+            "position": {
+              "end": {
+                "column": 40,
+                "line": 2,
+              },
+              "start": {
+                "column": 34,
+                "line": 2,
+              },
+            },
+            "type": {
+              "content": "String",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 40,
+                  "line": 2,
+                },
+                "start": {
+                  "column": 34,
+                  "line": 2,
+                },
+              },
+            },
+          },
+        },
+      },
+    ],
+    "position": {
+      "end": {
+        "column": 7,
+        "line": 6,
+      },
+      "start": {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "imports": null,
+  "kind": "implementation",
+  "nodeType": "Program",
+  "position": {
+    "end": {
+      "column": 7,
+      "line": 6,
+    },
+    "start": {
+      "column": 1,
+      "line": 1,
+    },
+  },
+  "tests": null,
+}
+`;
+
+exports[`Parser Expressions Define should parse a define Expression that is nothing but its otherwise arm 1`] = `
+{
+  "exports": null,
+  "implementation": {
+    "nodeType": "ImplementationSection",
+    "nodes": [
+      {
+        "documentation": null,
+        "name": {
+          "content": "grade",
+          "nodeType": "Identifier",
+          "position": {
+            "end": {
+              "column": 21,
+              "line": 2,
+            },
+            "start": {
+              "column": 16,
+              "line": 2,
+            },
+          },
+        },
+        "nodeType": "ConstantDeclarationStatement",
+        "position": {
+          "end": {
+            "column": 8,
+            "line": 4,
+          },
+          "start": {
+            "column": 7,
+            "line": 2,
+          },
+        },
+        "type": null,
+        "value": {
+          "arms": [],
+          "nodeType": "Define",
+          "otherwise": {
+            "position": {
+              "end": {
+                "column": 24,
+                "line": 3,
+              },
+              "start": {
+                "column": 8,
+                "line": 3,
+              },
+            },
+            "value": {
+              "nodeType": "StringValue",
+              "position": {
+                "end": {
+                  "column": 14,
+                  "line": 3,
+                },
+                "start": {
+                  "column": 11,
+                  "line": 3,
+                },
+              },
+              "value": "F",
+            },
+          },
+          "position": {
+            "end": {
+              "column": 8,
+              "line": 4,
+            },
+            "start": {
+              "column": 24,
+              "line": 2,
+            },
+          },
+          "returnType": null,
+        },
+      },
+    ],
+    "position": {
+      "end": {
+        "column": 7,
+        "line": 5,
+      },
+      "start": {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "imports": null,
+  "kind": "implementation",
+  "nodeType": "Program",
+  "position": {
+    "end": {
+      "column": 7,
+      "line": 5,
+    },
+    "start": {
+      "column": 1,
+      "line": 1,
+    },
+  },
+  "tests": null,
+}
+`;
+
+exports[`Parser Expressions Define should parse a define Expression as an Argument 1`] = `
+{
+  "exports": null,
+  "implementation": {
+    "nodeType": "ImplementationSection",
+    "nodes": [
+      {
+        "arguments": [
+          {
+            "name": null,
+            "nodeType": "Argument",
+            "value": {
+              "arms": [
+                {
+                  "condition": {
+                    "content": "flag",
+                    "nodeType": "Identifier",
+                    "position": {
+                      "end": {
+                        "column": 20,
+                        "line": 3,
+                      },
+                      "start": {
+                        "column": 16,
+                        "line": 3,
+                      },
+                    },
+                  },
+                  "position": {
+                    "end": {
+                      "column": 20,
+                      "line": 3,
+                    },
+                    "start": {
+                      "column": 8,
+                      "line": 3,
+                    },
+                  },
+                  "value": {
+                    "nodeType": "IntegerValue",
+                    "position": {
+                      "end": {
+                        "column": 12,
+                        "line": 3,
+                      },
+                      "start": {
+                        "column": 11,
+                        "line": 3,
+                      },
+                    },
+                    "value": "1",
+                  },
+                },
+              ],
+              "nodeType": "Define",
+              "otherwise": {
+                "position": {
+                  "end": {
+                    "column": 22,
+                    "line": 4,
+                  },
+                  "start": {
+                    "column": 8,
+                    "line": 4,
+                  },
+                },
+                "value": {
+                  "nodeType": "IntegerValue",
+                  "position": {
+                    "end": {
+                      "column": 12,
+                      "line": 4,
+                    },
+                    "start": {
+                      "column": 11,
+                      "line": 4,
+                    },
+                  },
+                  "value": "0",
+                },
+              },
+              "position": {
+                "end": {
+                  "column": 8,
+                  "line": 5,
+                },
+                "start": {
+                  "column": 14,
+                  "line": 2,
+                },
+              },
+              "returnType": null,
+            },
+          },
+        ],
+        "name": {
+          "content": "report",
+          "nodeType": "Identifier",
+          "position": {
+            "end": {
+              "column": 13,
+              "line": 2,
+            },
+            "start": {
+              "column": 7,
+              "line": 2,
+            },
+          },
+        },
+        "nodeType": "FunctionInvocation",
+        "position": {
+          "end": {
+            "column": 9,
+            "line": 5,
+          },
+          "start": {
+            "column": 7,
+            "line": 2,
+          },
+        },
+      },
+    ],
+    "position": {
+      "end": {
+        "column": 7,
+        "line": 6,
+      },
+      "start": {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "imports": null,
+  "kind": "implementation",
+  "nodeType": "Program",
+  "position": {
+    "end": {
+      "column": 7,
+      "line": 6,
+    },
+    "start": {
+      "column": 1,
+      "line": 1,
+    },
+  },
+  "tests": null,
+}
+`;
+
+exports[`Parser Expressions Define should parse a define Expression as a Record member's value 1`] = `
+{
+  "exports": null,
+  "implementation": {
+    "nodeType": "ImplementationSection",
+    "nodes": [
+      {
+        "documentation": null,
+        "name": {
+          "content": "row",
+          "nodeType": "Identifier",
+          "position": {
+            "end": {
+              "column": 19,
+              "line": 2,
+            },
+            "start": {
+              "column": 16,
+              "line": 2,
+            },
+          },
+        },
+        "nodeType": "ConstantDeclarationStatement",
+        "position": {
+          "end": {
+            "column": 8,
+            "line": 7,
+          },
+          "start": {
+            "column": 7,
+            "line": 2,
+          },
+        },
+        "type": null,
+        "value": {
+          "members": {
+            "grade": {
+              "name": {
+                "content": "grade",
+                "nodeType": "Identifier",
+                "position": {
+                  "end": {
+                    "column": 13,
+                    "line": 3,
+                  },
+                  "start": {
+                    "column": 8,
+                    "line": 3,
+                  },
+                },
+              },
+              "value": {
+                "arms": [
+                  {
+                    "condition": {
+                      "content": "flag",
+                      "nodeType": "Identifier",
+                      "position": {
+                        "end": {
+                          "column": 21,
+                          "line": 4,
+                        },
+                        "start": {
+                          "column": 17,
+                          "line": 4,
+                        },
+                      },
+                    },
+                    "position": {
+                      "end": {
+                        "column": 21,
+                        "line": 4,
+                      },
+                      "start": {
+                        "column": 9,
+                        "line": 4,
+                      },
+                    },
+                    "value": {
+                      "nodeType": "IntegerValue",
+                      "position": {
+                        "end": {
+                          "column": 13,
+                          "line": 4,
+                        },
+                        "start": {
+                          "column": 12,
+                          "line": 4,
+                        },
+                      },
+                      "value": "1",
+                    },
+                  },
+                ],
+                "nodeType": "Define",
+                "otherwise": {
+                  "position": {
+                    "end": {
+                      "column": 23,
+                      "line": 5,
+                    },
+                    "start": {
+                      "column": 9,
+                      "line": 5,
+                    },
+                  },
+                  "value": {
+                    "nodeType": "IntegerValue",
+                    "position": {
+                      "end": {
+                        "column": 13,
+                        "line": 5,
+                      },
+                      "start": {
+                        "column": 12,
+                        "line": 5,
+                      },
+                    },
+                    "value": "0",
+                  },
+                },
+                "position": {
+                  "end": {
+                    "column": 9,
+                    "line": 6,
+                  },
+                  "start": {
+                    "column": 16,
+                    "line": 3,
+                  },
+                },
+                "returnType": null,
+              },
+            },
+          },
+          "nodeType": "RecordValue",
+          "position": {
+            "end": {
+              "column": 8,
+              "line": 7,
+            },
+            "start": {
+              "column": 22,
+              "line": 2,
+            },
+          },
+          "type": null,
+        },
+      },
+    ],
+    "position": {
+      "end": {
+        "column": 7,
+        "line": 8,
+      },
+      "start": {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "imports": null,
+  "kind": "implementation",
+  "nodeType": "Program",
+  "position": {
+    "end": {
+      "column": 7,
+      "line": 8,
+    },
+    "start": {
+      "column": 1,
+      "line": 1,
+    },
+  },
+  "tests": null,
+}
+`;
+
+exports[`Parser Expressions Define should parse a define Expression inside a Match Handler's body 1`] = `
+{
+  "exports": null,
+  "implementation": {
+    "nodeType": "ImplementationSection",
+    "nodes": [
+      {
+        "handlers": [
+          {
+            "body": [
+              {
+                "expression": {
+                  "arms": [
+                    {
+                      "condition": {
+                        "content": "flag",
+                        "nodeType": "Identifier",
+                        "position": {
+                          "end": {
+                            "column": 22,
+                            "line": 5,
+                          },
+                          "start": {
+                            "column": 18,
+                            "line": 5,
+                          },
+                        },
+                      },
+                      "position": {
+                        "end": {
+                          "column": 22,
+                          "line": 5,
+                        },
+                        "start": {
+                          "column": 10,
+                          "line": 5,
+                        },
+                      },
+                      "value": {
+                        "nodeType": "IntegerValue",
+                        "position": {
+                          "end": {
+                            "column": 14,
+                            "line": 5,
+                          },
+                          "start": {
+                            "column": 13,
+                            "line": 5,
+                          },
+                        },
+                        "value": "1",
+                      },
+                    },
+                  ],
+                  "nodeType": "Define",
+                  "otherwise": {
+                    "position": {
+                      "end": {
+                        "column": 24,
+                        "line": 6,
+                      },
+                      "start": {
+                        "column": 10,
+                        "line": 6,
+                      },
+                    },
+                    "value": {
+                      "nodeType": "IntegerValue",
+                      "position": {
+                        "end": {
+                          "column": 14,
+                          "line": 6,
+                        },
+                        "start": {
+                          "column": 13,
+                          "line": 6,
+                        },
+                      },
+                      "value": "0",
+                    },
+                  },
+                  "position": {
+                    "end": {
+                      "column": 10,
+                      "line": 7,
+                    },
+                    "start": {
+                      "column": 12,
+                      "line": 4,
+                    },
+                  },
+                  "returnType": null,
+                },
+                "nodeType": "ReturnStatement",
+                "position": {
+                  "end": {
+                    "column": 10,
+                    "line": 7,
+                  },
+                  "start": {
+                    "column": 9,
+                    "line": 4,
+                  },
+                },
+              },
+            ],
+            "guard": null,
+            "matcher": {
+              "nodeType": "IdentifierTypeDeclaration",
+              "position": {
+                "end": {
+                  "column": 20,
+                  "line": 3,
+                },
+                "start": {
+                  "column": 13,
+                  "line": 3,
+                },
+              },
+              "type": {
+                "content": "Integer",
+                "nodeType": "Identifier",
+                "position": {
+                  "end": {
+                    "column": 20,
+                    "line": 3,
+                  },
+                  "start": {
+                    "column": 13,
+                    "line": 3,
+                  },
+                },
+              },
+            },
+          },
+        ],
+        "nodeType": "Match",
+        "position": {
+          "end": {
+            "column": 8,
+            "line": 9,
+          },
+          "start": {
+            "column": 7,
+            "line": 2,
+          },
+        },
+        "returnType": {
+          "nodeType": "IdentifierTypeDeclaration",
+          "position": {
+            "end": {
+              "column": 29,
+              "line": 2,
+            },
+            "start": {
+              "column": 22,
+              "line": 2,
+            },
+          },
+          "type": {
+            "content": "Integer",
+            "nodeType": "Identifier",
+            "position": {
+              "end": {
+                "column": 29,
+                "line": 2,
+              },
+              "start": {
+                "column": 22,
+                "line": 2,
+              },
+            },
+          },
+        },
+        "value": {
+          "content": "value",
+          "nodeType": "Identifier",
+          "position": {
+            "end": {
+              "column": 18,
+              "line": 2,
+            },
+            "start": {
+              "column": 13,
+              "line": 2,
+            },
+          },
+        },
+      },
+    ],
+    "position": {
+      "end": {
+        "column": 7,
+        "line": 10,
+      },
+      "start": {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "imports": null,
+  "kind": "implementation",
+  "nodeType": "Program",
+  "position": {
+    "end": {
+      "column": 7,
+      "line": 10,
+    },
+    "start": {
+      "column": 1,
+      "line": 1,
+    },
+  },
+  "tests": null,
+}
+`;
+
+exports[`Parser Expressions Define should parse a define Expression inside a define Expression 1`] = `
+{
+  "exports": null,
+  "implementation": {
+    "nodeType": "ImplementationSection",
+    "nodes": [
+      {
+        "documentation": null,
+        "name": {
+          "content": "grade",
+          "nodeType": "Identifier",
+          "position": {
+            "end": {
+              "column": 21,
+              "line": 2,
+            },
+            "start": {
+              "column": 16,
+              "line": 2,
+            },
+          },
+        },
+        "nodeType": "ConstantDeclarationStatement",
+        "position": {
+          "end": {
+            "column": 8,
+            "line": 8,
+          },
+          "start": {
+            "column": 7,
+            "line": 2,
+          },
+        },
+        "type": null,
+        "value": {
+          "arms": [
+            {
+              "condition": {
+                "content": "flag",
+                "nodeType": "Identifier",
+                "position": {
+                  "end": {
+                    "column": 17,
+                    "line": 6,
+                  },
+                  "start": {
+                    "column": 13,
+                    "line": 6,
+                  },
+                },
+              },
+              "position": {
+                "end": {
+                  "column": 17,
+                  "line": 6,
+                },
+                "start": {
+                  "column": 8,
+                  "line": 3,
+                },
+              },
+              "value": {
+                "arms": [
+                  {
+                    "condition": {
+                      "content": "inner",
+                      "nodeType": "Identifier",
+                      "position": {
+                        "end": {
+                          "column": 22,
+                          "line": 4,
+                        },
+                        "start": {
+                          "column": 17,
+                          "line": 4,
+                        },
+                      },
+                    },
+                    "position": {
+                      "end": {
+                        "column": 22,
+                        "line": 4,
+                      },
+                      "start": {
+                        "column": 9,
+                        "line": 4,
+                      },
+                    },
+                    "value": {
+                      "nodeType": "IntegerValue",
+                      "position": {
+                        "end": {
+                          "column": 13,
+                          "line": 4,
+                        },
+                        "start": {
+                          "column": 12,
+                          "line": 4,
+                        },
+                      },
+                      "value": "1",
+                    },
+                  },
+                ],
+                "nodeType": "Define",
+                "otherwise": {
+                  "position": {
+                    "end": {
+                      "column": 23,
+                      "line": 5,
+                    },
+                    "start": {
+                      "column": 9,
+                      "line": 5,
+                    },
+                  },
+                  "value": {
+                    "nodeType": "IntegerValue",
+                    "position": {
+                      "end": {
+                        "column": 13,
+                        "line": 5,
+                      },
+                      "start": {
+                        "column": 12,
+                        "line": 5,
+                      },
+                    },
+                    "value": "2",
+                  },
+                },
+                "position": {
+                  "end": {
+                    "column": 9,
+                    "line": 6,
+                  },
+                  "start": {
+                    "column": 11,
+                    "line": 3,
+                  },
+                },
+                "returnType": null,
+              },
+            },
+          ],
+          "nodeType": "Define",
+          "otherwise": {
+            "position": {
+              "end": {
+                "column": 22,
+                "line": 7,
+              },
+              "start": {
+                "column": 8,
+                "line": 7,
+              },
+            },
+            "value": {
+              "nodeType": "IntegerValue",
+              "position": {
+                "end": {
+                  "column": 12,
+                  "line": 7,
+                },
+                "start": {
+                  "column": 11,
+                  "line": 7,
+                },
+              },
+              "value": "0",
+            },
+          },
+          "position": {
+            "end": {
+              "column": 8,
+              "line": 8,
+            },
+            "start": {
+              "column": 24,
+              "line": 2,
+            },
+          },
+          "returnType": null,
+        },
+      },
+    ],
+    "position": {
+      "end": {
+        "column": 7,
+        "line": 9,
+      },
+      "start": {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "imports": null,
+  "kind": "implementation",
+  "nodeType": "Program",
+  "position": {
+    "end": {
+      "column": 7,
+      "line": 9,
+    },
+    "start": {
+      "column": 1,
+      "line": 1,
+    },
+  },
+  "tests": null,
+}
+`;
+
+exports[`Parser Expressions Define should parse arms written on one line 1`] = `
+{
+  "exports": null,
+  "implementation": {
+    "nodeType": "ImplementationSection",
+    "nodes": [
+      {
+        "documentation": null,
+        "name": {
+          "content": "grade",
+          "nodeType": "Identifier",
+          "position": {
+            "end": {
+              "column": 21,
+              "line": 2,
+            },
+            "start": {
+              "column": 16,
+              "line": 2,
+            },
+          },
+        },
+        "nodeType": "ConstantDeclarationStatement",
+        "position": {
+          "end": {
+            "column": 62,
+            "line": 2,
+          },
+          "start": {
+            "column": 7,
+            "line": 2,
+          },
+        },
+        "type": null,
+        "value": {
+          "arms": [
+            {
+              "condition": {
+                "content": "flag",
+                "nodeType": "Identifier",
+                "position": {
+                  "end": {
+                    "column": 45,
+                    "line": 2,
+                  },
+                  "start": {
+                    "column": 41,
+                    "line": 2,
+                  },
+                },
+              },
+              "position": {
+                "end": {
+                  "column": 45,
+                  "line": 2,
+                },
+                "start": {
+                  "column": 33,
+                  "line": 2,
+                },
+              },
+              "value": {
+                "nodeType": "IntegerValue",
+                "position": {
+                  "end": {
+                    "column": 37,
+                    "line": 2,
+                  },
+                  "start": {
+                    "column": 36,
+                    "line": 2,
+                  },
+                },
+                "value": "1",
+              },
+            },
+          ],
+          "nodeType": "Define",
+          "otherwise": {
+            "position": {
+              "end": {
+                "column": 60,
+                "line": 2,
+              },
+              "start": {
+                "column": 46,
+                "line": 2,
+              },
+            },
+            "value": {
+              "nodeType": "IntegerValue",
+              "position": {
+                "end": {
+                  "column": 50,
+                  "line": 2,
+                },
+                "start": {
+                  "column": 49,
+                  "line": 2,
+                },
+              },
+              "value": "0",
+            },
+          },
+          "position": {
+            "end": {
+              "column": 62,
+              "line": 2,
+            },
+            "start": {
+              "column": 24,
+              "line": 2,
+            },
+          },
+          "returnType": null,
+        },
+      },
+    ],
+    "position": {
+      "end": {
+        "column": 7,
+        "line": 3,
+      },
+      "start": {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "imports": null,
+  "kind": "implementation",
+  "nodeType": "Program",
+  "position": {
+    "end": {
+      "column": 7,
+      "line": 3,
+    },
+    "start": {
+      "column": 1,
+      "line": 1,
+    },
+  },
+  "tests": null,
+}
+`;

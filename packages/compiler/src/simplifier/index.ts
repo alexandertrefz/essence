@@ -117,6 +117,7 @@ function simplifyImplementationNode(
 		case "Identifier":
 		case "Self":
 		case "Match":
+		case "Define":
 		case "CaseValue":
 			return simplifyExpression(node)
 		case "ConstantDeclarationStatement":
@@ -179,6 +180,8 @@ function simplifyExpression(
 			return simplifySelf(node)
 		case "Match":
 			return simplifyMatch(node)
+		case "Define":
+			return simplifyDefine(node)
 		case "CaseValue":
 			return simplifyCaseValue(node)
 	}
@@ -812,6 +815,34 @@ function simplifyMatch(
 		// fall-through that names a Compiler bug — until an Optimiser pass can
 		// say which Handler the end of the chain IS.
 		finalHandlerIsElse: false,
+		type: node.type,
+		position: node.position,
+	}
+}
+
+// NOTE: No static barrier to lift, unlike a Match: an arm is an Expression of
+// the surrounding body and `@` written in one is the receiver, exactly as it is
+// in the Expression a `define` was written inside.
+//
+// NOTE: Fresh arms, never the typed ones written back into. The Simplifier is a
+// pure reader of the typed Program — the standard library's is a process-wide
+// value handed out again and again — and `simplifierInput.spec.ts` holds it to
+// that by simplifying one Program twice.
+function simplifyDefine(
+	node: common.typed.DefineNode,
+): common.typedSimple.DefineNode {
+	return {
+		nodeType: "Define",
+		arms: node.arms.map((arm) => ({
+			value: simplifyExpression(arm.value),
+			condition: simplifyExpression(arm.condition),
+			// NOTE: An Essence Boolean, which the Rewriter reads the JavaScript
+			// one out of — until an Optimiser pass finds the question already
+			// asked in JavaScript's own terms. The Simplifier states what the
+			// Program says and nothing about how it is tested.
+			conditionIsRaw: false,
+		})),
+		otherwise: simplifyExpression(node.otherwise.value),
 		type: node.type,
 		position: node.position,
 	}

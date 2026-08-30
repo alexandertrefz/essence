@@ -428,6 +428,131 @@ describe("Parser Recovery", () => {
 		expect(diagnostics[0].labels[0]?.message).toBe("expected 'is' here")
 	})
 
+	// NOTE: A `define` arm is recovered from by its own loop rather than by the
+	// Statement resynchronisation — an `as` is no Statement start, so the shared
+	// one would skip every arm below the broken one and the `define` would then
+	// be refused for an `otherwise` arm that WAS written.
+	it("should keep reading arms after a broken define arm", () => {
+		let { program, diagnostics } = parseWithDiagnostics(
+			`implementation {
+				constant grade = define {
+					as if flag
+					as 2 if other
+					as 0 otherwise
+				}
+			}`,
+		)
+
+		expect(diagnostics).toHaveLength(1)
+		expect(diagnostics[0].severity).toBe("error")
+		expect(diagnostics[0].message).toBe(
+			"Expected an Expression but found 'if'.",
+		)
+
+		let nodes = program.implementation.nodes
+
+		expect(nodes).toHaveLength(1)
+		expect(nodes[0].nodeType).toBe("ConstantDeclarationStatement")
+
+		if (
+			nodes[0].nodeType === "ConstantDeclarationStatement" &&
+			nodes[0].value.nodeType === "Define"
+		) {
+			expect(nodes[0].value.arms).toHaveLength(1)
+			expect(nodes[0].value.arms[0].condition.nodeType).toBe("Identifier")
+			expect(nodes[0].value.otherwise.value.nodeType).toBe("IntegerValue")
+		}
+	})
+
+	// NOTE: A broken arm that opened braces of its own is skipped over whole,
+	// exactly as a broken Statement is — the arm below it is read, not the
+	// leftovers of the one above.
+	it("should skip a broken define arm's own braces", () => {
+		let { program, diagnostics } = parseWithDiagnostics(
+			`implementation {
+				constant grade = define {
+					as { a = } if flag
+					as 2 if other
+					as 0 otherwise
+				}
+			}`,
+		)
+
+		expect(diagnostics).toHaveLength(1)
+		expect(diagnostics[0].severity).toBe("error")
+
+		let nodes = program.implementation.nodes
+
+		expect(nodes).toHaveLength(1)
+
+		if (
+			nodes[0].nodeType === "ConstantDeclarationStatement" &&
+			nodes[0].value.nodeType === "Define"
+		) {
+			expect(nodes[0].value.arms).toHaveLength(1)
+		}
+	})
+
+	it("should refuse a define with no otherwise arm and carry on", () => {
+		let { program, diagnostics } = parseWithDiagnostics(
+			`implementation {
+				constant grade = define {
+					as 1 if flag
+				}
+				constant y = 3
+			}`,
+		)
+
+		expect(diagnostics).toHaveLength(1)
+		expect(diagnostics[0].severity).toBe("error")
+		expect(diagnostics[0].message).toBe(
+			"This 'define' has no 'otherwise' arm",
+		)
+
+		let nodes = program.implementation.nodes
+
+		expect(nodes).toHaveLength(1)
+
+		if (nodes[0].nodeType === "ConstantDeclarationStatement") {
+			expect((nodes[0].name as parser.IdentifierNode).content).toBe("y")
+		}
+	})
+
+	it("should refuse an arm written below the otherwise arm", () => {
+		let { diagnostics } = parseWithDiagnostics(
+			`implementation {
+				constant grade = define {
+					as 1 if flag
+					as 0 otherwise
+					as 2 if other
+				}
+			}`,
+		)
+
+		expect(diagnostics).toHaveLength(1)
+		expect(diagnostics[0].severity).toBe("error")
+		expect(diagnostics[0].message).toBe(
+			"This arm stands below the 'otherwise' arm",
+		)
+	})
+
+	// NOTE: A coded refusal is a verdict about the text, so it is raised out of
+	// the arm loop to the Statement loop that reports such things — reporting it
+	// here and reading on would answer the same text twice.
+	it("should let a coded refusal out of a define arm", () => {
+		let { diagnostics } = parseWithDiagnostics(
+			`implementation {
+				constant grade = define {
+					as .5 if flag
+					as 0 otherwise
+				}
+			}`,
+		)
+
+		expect(diagnostics).toHaveLength(1)
+		expect(diagnostics[0].code).toBe("partial-decimal-literal")
+	})
+
 	it("should recover from a broken Generic list", () => {
 		let { program, diagnostics } = parseWithDiagnostics(
 			`implementation {

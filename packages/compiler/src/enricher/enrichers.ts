@@ -210,6 +210,7 @@ export function enrichNode(
 		case "Identifier":
 		case "Self":
 		case "Match":
+		case "Define":
 		case "CaseValue":
 			return [enrichExpression(node, scope)]
 		case "ConstantDeclarationStatement":
@@ -305,6 +306,8 @@ export function enrichCalleeExpression(
 			return enrichSelf(node, scope)
 		case "Match":
 			return enrichMatch(node, scope)
+		case "Define":
+			return enrichDefine(node, scope)
 		case "CaseValue":
 			return enrichCaseValue(node, scope, expectedType)
 	}
@@ -3527,6 +3530,54 @@ export function enrichMatch(
 		}),
 		position: node.position,
 		type: returnType,
+	}
+}
+
+// NOTE: Every Condition and every value is read in the very Scope the `define`
+// stands in. An arm declares nothing and binds nothing, so there is no child
+// Scope for one to be read in — and what an arm's Condition proves is not
+// carried down to the arms below it either, which is why they are all read
+// alike.
+//
+// NOTE: The arms are read in the order they were WRITTEN — the value of an arm
+// before its Condition — so the Diagnostics come out in the order a reader of
+// the file meets the problems.
+export function enrichDefine(
+	node: parser.DefineNode,
+	scope: enricher.Scope,
+): common.typed.DefineNode {
+	let arms = node.arms.map((arm) => ({
+		value: enrichExpression(arm.value, scope),
+		condition: enrichExpression(arm.condition, scope),
+		position: arm.position,
+	}))
+	let otherwise = {
+		value: enrichExpression(node.otherwise.value, scope),
+		position: node.otherwise.position,
+	}
+
+	// NOTE: What the arrow declared where `define -> Type { … }` wrote one, and
+	// the Union of what the arms answer with where it did not — the `otherwise`
+	// arm's own Type among them, since it is one of the answers.
+	//
+	// `unionOfTypes` answers null only for an empty list of Types, which this
+	// can never be: a `define` without an `otherwise` arm is not a Node the
+	// Parser can build. The fallback is written out rather than asserted away
+	// all the same.
+	let type =
+		node.returnType === null
+			? (unionOfTypes([
+					...arms.map((arm) => arm.value.type),
+					otherwise.value.type,
+				]) ?? otherwise.value.type)
+			: resolveType(node.returnType, scope)
+
+	return {
+		nodeType: "Define",
+		arms,
+		otherwise,
+		position: node.position,
+		type,
 	}
 }
 
@@ -6974,6 +7025,19 @@ function writtenKeyLookup(
 		// bodies, and the walk stops at a body.
 		case "Match":
 			return writtenKeyLookup(node.value, check)
+		// NOTE: What a `define` evaluates first and unconditionally — its first
+		// arm's Condition, or the `otherwise` value where it has no arms at all
+		// — which is the standing a Match's subject has. Everything else in one
+		// is reached only once a Condition has answered, and a place reached
+		// conditionally is a body by another name: the walk stops at those.
+		case "Define": {
+			let first = node.arms[0]
+
+			return writtenKeyLookup(
+				first === undefined ? node.otherwise.value : first.condition,
+				check,
+			)
+		}
 		case "ConstantDeclarationStatement":
 		case "VariableDeclarationStatement":
 		case "VariableAssignmentStatement":

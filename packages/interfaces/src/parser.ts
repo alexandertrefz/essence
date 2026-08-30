@@ -220,6 +220,7 @@ export type ExpressionNode =
 	| IdentifierNode
 	| CombinationNode
 	| MatchNode
+	| DefineNode
 	| CaseValueNode
 
 // NOTE: `ChoiceName#CaseName` with an optional payload —
@@ -452,6 +453,46 @@ export interface MatchNode {
 		guard: ExpressionNode | null
 		body: Array<ImplementationNode>
 	}>
+	position: Position
+}
+
+// NOTE: `define { as "A" if score::isGreaterThan(90) … as "F" otherwise }` — a
+// definition by cases. The arms are tried in the order they were written and
+// the Expression answers with the value of the first whose Condition holds, or
+// with the `otherwise` arm's value when none of them does.
+//
+// It declares nothing and binds nothing: an arm is one Expression, read in the
+// very Scope the `define` stands in. That is what keeps it an Expression rather
+// than a second spelling of `match`, which runs Statements and so can only
+// stand where a body may.
+//
+// `returnType` is the answer Type where `define -> Type { … }` wrote one, and
+// null where it is left to the arms to say.
+//
+// NOTE: The `otherwise` arm is a field of its own rather than an arm with no
+// Condition, so that "there is exactly one, and it is last" holds of every Node
+// that can be BUILT — rather than being a rule the Parser keeps and every
+// reader downstream has to trust it kept.
+export interface DefineNode {
+	nodeType: "Define"
+	returnType: TypeDeclarationNode | null
+	arms: Array<DefineArmNode>
+	otherwise: DefineOtherwiseNode
+	position: Position
+}
+
+// NOTE: Each arm carries the Position it was written across — `as` to the end
+// of its Condition. A Match Handler carries none, and every reader of one pays
+// for that by going back to the source to find the lines it spans; an arm is
+// cheap to position and there is no reason to repeat that.
+export interface DefineArmNode {
+	value: ExpressionNode
+	condition: ExpressionNode
+	position: Position
+}
+
+export interface DefineOtherwiseNode {
+	value: ExpressionNode
 	position: Position
 }
 

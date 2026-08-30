@@ -412,6 +412,21 @@ export function match(
 	}
 }
 
+export function define(
+	returnType: parser.TypeDeclarationNode | null,
+	arms: Array<parser.DefineArmNode>,
+	otherwise: parser.DefineOtherwiseNode,
+	position: common.Position,
+): parser.DefineNode {
+	return {
+		nodeType: "Define",
+		returnType,
+		arms,
+		otherwise,
+		position,
+	}
+}
+
 export function wildcardMatcher(
 	position: common.Position,
 ): parser.WildcardMatcherNode {

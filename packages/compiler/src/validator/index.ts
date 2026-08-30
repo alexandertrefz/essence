@@ -268,6 +268,7 @@ function validateImplementationNode(
 		case "Identifier":
 		case "Self":
 		case "Match":
+		case "Define":
 		case "CaseValue":
 			return validateExpression(node)
 		case "ConstantDeclarationStatement":
@@ -304,6 +305,8 @@ function validateExpression(
 			return validateIdentifier(node)
 		case "Match":
 			return validateMatch(node)
+		case "Define":
+			return validateDefine(node)
 		case "CaseValue":
 			return validateCaseValue(node)
 		case "FunctionValue":
@@ -1425,6 +1428,27 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 
 		validateDefiniteReturn(handlerContext, node.position)
 	}
+
+	return node
+}
+
+// NOTE: Nothing here walks sub-Expressions on its own — every Validator recurs
+// by hand — so an arm this does not visit is an arm nothing validates at all.
+// Both halves of every arm are Expressions the Program evaluates, and the
+// `otherwise` arm's value is one as much as the rest.
+function validateDefine(
+	node: common.typed.DefineNode,
+): common.typed.DefineNode {
+	for (let arm of node.arms) {
+		validateExpression(arm.value)
+
+		// NOTE: An arm's Condition picks the path exactly as an `if` does, and
+		// is held to what every other Condition is held to: Essence has no
+		// truthiness, so only a Boolean may decide.
+		validateCondition(arm.condition, "A Define Condition")
+	}
+
+	validateExpression(node.otherwise.value)
 
 	return node
 }

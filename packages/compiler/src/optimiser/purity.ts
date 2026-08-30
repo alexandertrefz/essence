@@ -109,6 +109,21 @@ export function isPureExpression(
 		// than half-read.
 		case "Match":
 			return false
+		// NOTE: A `define` is arms and nothing else, and every half of every arm
+		// is an Expression — there is no body of Statements for an assignment to
+		// hide in, which is the whole of what a Match is refused for. So it is
+		// exactly as pure as what was written into it.
+		//
+		// NOTE: Every part is weighed, the Conditions below the one that holds
+		// among them, even though those never run. The question asked here is
+		// whether the WHOLE Expression may be left unevaluated, and a Condition
+		// that would have printed on the way to deciding is a reason it may not.
+		case "Define":
+			return (
+				node.arms.every(
+					(arm) => isPure(arm.condition) && isPure(arm.value),
+				) && isPure(node.otherwise)
+			)
 		// NOTE: An instrumented point WRITES — into the trace buffer of the
 		// context the test is running under — so it is never pure, whatever
 		// stands inside it. Answering otherwise would let a pass pool one,
