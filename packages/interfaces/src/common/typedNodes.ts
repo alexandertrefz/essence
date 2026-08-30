@@ -332,6 +332,7 @@ export type ExpressionNode =
 	| SelfNode
 	| CombinationNode
 	| MatchNode
+	| DefineNode
 	| CaseValueNode
 
 // NOTE: `choice` carries the Choice's Union Type, `caseName` the CaseType —
@@ -626,6 +627,35 @@ export interface MatchNode {
 	}>
 	position: Position
 	type: Type
+}
+
+// NOTE: `define { as … if … as … otherwise }`, typed. Every Condition and every
+// value was read in the Scope the `define` stands in — an arm neither declares
+// nor binds, so there is nothing here to say which Scope an arm was read in.
+//
+// `type` is what the arrow declared where `define -> Type { … }` wrote one, and
+// the Union of what the arms answer with where it did not — which is why the
+// written Type does not survive as a field of its own: there is one answer Type
+// and this is it.
+export interface DefineNode {
+	nodeType: "Define"
+	arms: Array<DefineArm>
+	otherwise: DefineOtherwiseArm
+	position: Position
+	type: Type
+}
+
+// NOTE: The Position is the whole arm, as it is on the Parser's Node — what a
+// Diagnostic about one arm underlines.
+export type DefineArm = {
+	value: ExpressionNode
+	condition: ExpressionNode
+	position: Position
+}
+
+export type DefineOtherwiseArm = {
+	value: ExpressionNode
+	position: Position
 }
 
 // #endregion

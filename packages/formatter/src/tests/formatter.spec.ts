@@ -587,6 +587,115 @@ describe("formatter", () => {
 		})
 	})
 
+	// NOTE: A `define` is a table of cases, so it is written one arm to a line
+	// whatever it would fit on — the shape a reader scans down. Lining the `if`
+	// column up across a run of arms is a separate question and not asked here.
+	describe("Define", () => {
+		it("round-trips a define written the way it is printed", () => {
+			let source = [
+				"implementation {",
+				"\tconstant grade = define {",
+				'\t\tas "A" if score::isGreaterThanOrEqualTo(90)',
+				'\t\tas "B" if score::isGreaterThanOrEqualTo(80)',
+				'\t\tas "F" otherwise',
+				"\t}",
+				"}",
+				"",
+			].join("\n")
+
+			let result = format(source)
+
+			expect(result.refusal).toBeNull()
+			expect(result.text).toBe(source)
+		})
+
+		it("round-trips a declared answer Type", () => {
+			let source = [
+				"implementation {",
+				"\tconstant grade = define -> String {",
+				'\t\tas "A" if score::isGreaterThanOrEqualTo(90)',
+				'\t\tas "F" otherwise',
+				"\t}",
+				"}",
+				"",
+			].join("\n")
+
+			let result = format(source)
+
+			expect(result.refusal).toBeNull()
+			expect(result.text).toBe(source)
+		})
+
+		it("writes a define written flat one arm to a line", () => {
+			let result = format(
+				[
+					"implementation {",
+					"\tconstant grade = define { as 1 if flag as 0 otherwise }",
+					"}",
+					"",
+				].join("\n"),
+			)
+
+			expect(result.refusal).toBeNull()
+			expect(result.text).toBe(
+				[
+					"implementation {",
+					"\tconstant grade = define {",
+					"\t\tas 1 if flag",
+					"\t\tas 0 otherwise",
+					"\t}",
+					"}",
+					"",
+				].join("\n"),
+			)
+		})
+
+		// NOTE: Every place a Comment can sit in a `define` — after the `{`,
+		// above an arm, at the end of an arm's line, and below the last arm.
+		// The safety gate compares each Comment's place among the Tokens around
+		// it, so a Comment claimed in the wrong order refuses the whole file.
+		it("keeps the Comments written around its arms", () => {
+			let source = [
+				"implementation {",
+				"\tconstant grade = define { § the bands",
+				"\t\t§ the top one",
+				'\t\tas "A" if score::isGreaterThanOrEqualTo(90) § and no higher',
+				"",
+				'\t\tas "F" otherwise',
+				"\t\t§ nothing below it",
+				"\t}",
+				"}",
+				"",
+			].join("\n")
+
+			let result = format(source)
+
+			expect(result.refusal).toBeNull()
+			expect(result.text).toBe(source)
+		})
+
+		it("is idempotent over a define inside a define", () => {
+			let once = format(
+				[
+					"implementation {",
+					"\tconstant grade = define {",
+					"\t\tas define {",
+					'\t\t\tas "one" if value::is(1)',
+					'\t\t\tas "many" otherwise',
+					"\t\t} if value::isPositive()",
+					'\t\tas "none" otherwise',
+					"\t}",
+					"}",
+					"",
+				].join("\n"),
+			)
+			let twice = format(once.text)
+
+			expect(once.refusal).toBeNull()
+			expect(twice.text).toBe(once.text)
+		})
+	})
+
 	// NOTE: `{ a }` and `{ a = a }` mean the same thing and are written
 	// differently, and `{ base with { a } }` and `{ base with a = a }` are not
 	// even the same parse. The Formatter keeps whichever was written, in both

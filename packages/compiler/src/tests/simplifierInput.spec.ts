@@ -37,6 +37,10 @@ const SOURCE = `implementation {
 		while (count) { <- count::isLessThan(3) },
 		step (count) { <- count::add(1) },
 	)
+	constant graded = define {
+		as "high" if power::isGreaterThanOrEqualTo(100)
+		as "low" otherwise
+	}
 }`
 
 function valueOf(

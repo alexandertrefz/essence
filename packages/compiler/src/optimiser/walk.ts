@@ -902,6 +902,28 @@ function walkChildren(
 
 			return { ...node, value, handlers }
 		}
+		// NOTE: Walked in EVALUATION order — each arm's Condition, then that
+		// arm's value, and the `otherwise` value last. The source writes an arm
+		// the other way round, `as VALUE if CONDITION`, and this is the one
+		// reading where the difference is worth anything: a pass that hoists or
+		// pools work reads the order the Program runs in off this walk.
+		case "Define": {
+			let arms = mapArray(node.arms, (arm) => {
+				let condition = walkExpression(arm.condition, rewrites)
+				let value = walkExpression(arm.value, rewrites)
+
+				return condition === arm.condition && value === arm.value
+					? arm
+					: { ...arm, condition, value }
+			})
+			let otherwise = walkExpression(node.otherwise, rewrites)
+
+			if (arms === node.arms && otherwise === node.otherwise) {
+				return node
+			}
+
+			return { ...node, arms, otherwise }
+		}
 		case "ConformanceValue": {
 			let conditions = mapArray(node.conditions, (condition) =>
 				walkExpression(condition, rewrites),

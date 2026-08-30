@@ -2576,6 +2576,8 @@ function rewriteExpressionByKind(
 			return rewriteIdentifier(node)
 		case "Match":
 			return rewriteMatch(node)
+		case "Define":
+			return rewriteDefine(node)
 		case "ConformanceValue":
 			return rewriteConformanceValue(node)
 		case "CaseValue":
@@ -5338,6 +5340,44 @@ function rewriteMatch(
 		arguments: [rewriteExpression(node.value)],
 		optional: false,
 	}
+}
+
+// NOTE: A chain of JavaScript conditionals and nothing else:
+//
+//   score.value >= 90 ? "A" : score.value >= 80 ? "B" : "F"
+//
+// No Function to call and no block to fall out of, which is the whole point of
+// the Node — a Match holds Statements and so must be emitted as a body, while
+// every half of every `define` arm is an Expression that JavaScript can say
+// where it stands.
+//
+// The arms are folded back to front, so each conditional becomes the
+// `alternate` of the one written above it and the first arm is tested first.
+// The `otherwise` value is the tail, which is what makes the chain total: there
+// is no fall-through here and no throw to end it with.
+//
+// NOTE: An Essence Boolean is an object and every object is true, so what
+// JavaScript is asked is the `value` the Condition holds — unless a pass has
+// already left the question asked in JavaScript's own terms, which is what
+// `conditionIsRaw` says. Reading `.value` off a raw boolean would be
+// `undefined`, and `undefined` is false: every arm would decline and every
+// `define` would answer with its `otherwise`.
+function rewriteDefine(node: common.typedSimple.DefineNode): estree.Expression {
+	let chain = rewriteExpression(node.otherwise)
+
+	for (let index = node.arms.length - 1; index >= 0; index--) {
+		let arm = node.arms[index]!
+		let condition = rewriteExpression(arm.condition)
+
+		chain = {
+			type: "ConditionalExpression",
+			test: arm.conditionIsRaw ? condition : valueRead(condition),
+			consequent: rewriteExpression(arm.value),
+			alternate: chain,
+		}
+	}
+
+	return chain
 }
 
 // #endregion

@@ -82,6 +82,7 @@ const expressionStartTokenTypes = new Set([
 	TokenType.SymbolLeftAngle,
 	TokenType.SymbolLeftBrace,
 	TokenType.KeywordMatch,
+	TokenType.KeywordDefine,
 	TokenType.LiteralString,
 	TokenType.LiteralStringStart,
 	TokenType.LiteralNumber,
@@ -2948,6 +2949,8 @@ class DescentParser {
 				return this.parseCaseValue()
 			case TokenType.KeywordMatch:
 				return this.parseMatch()
+			case TokenType.KeywordDefine:
+				return this.parseDefine()
 			case TokenType.SymbolAt:
 				this.tokens.next()
 				return generators.self(token.position)
@@ -3191,6 +3194,191 @@ class DescentParser {
 			start: keyword.position.start,
 			end: closingPosition.end,
 		})
+	}
+
+	// NOTE: `define { as VALUE if CONDITION … as VALUE otherwise }`. The arms
+	// are told apart by their `as` and by nothing else — a line break is
+	// invisible to this Parser, so nothing about the layout may be relied on —
+	// and that is enough because an Expression ends at the first Token that can
+	// not carry it on. Neither `if` nor `otherwise` is one of the three that
+	// can, so `as 0 if x::isZero()` and `as 10 otherwise` each read to their
+	// end without a lookahead.
+	//
+	// NOTE: The arrow is optional, and a `define` that writes none leaves its
+	// answer Type to its arms.
+	protected parseDefine(): parser.DefineNode {
+		let keyword = this.tokens.expect(TokenType.KeywordDefine)
+		let returnType = this.parseOptionalReturnType(true)
+
+		this.enterNesting()
+
+		try {
+			let leftBrace = this.tokens.expect(TokenType.SymbolLeftBrace)
+			let { arms, otherwise } = this.parseDefineArms()
+			let closingPosition = this.parseClosingBrace(leftBrace.position)
+			let position = {
+				start: keyword.position.start,
+				end: closingPosition.end,
+			}
+
+			// NOTE: Refused here rather than represented as an absent arm: a
+			// `define` answers with a value wherever it stands, and one whose
+			// every value has a Condition on it has nothing to answer with when
+			// they all decline. The Node has no shape for that, which is what
+			// makes every `define` downstream total by construction.
+			if (otherwise === null) {
+				throw new ParseError(
+					"This 'define' has no 'otherwise' arm",
+					position,
+					"every value here has a condition on it",
+					{
+						notes: [
+							"A 'define' answers with a value wherever it stands, so one of its arms has to be the one that always holds.",
+						],
+						helps: [
+							"Write the last arm as 'as <value> otherwise'.",
+						],
+					},
+				)
+			}
+
+			return generators.define(returnType, arms, otherwise, position)
+		} finally {
+			this.nestingDepth--
+		}
+	}
+
+	// NOTE: Its own loop rather than `parseStatementList`, because the
+	// resynchronisation that one does scans for a Statement start and an `as`
+	// is not one — a broken arm would swallow every arm below it, and a
+	// `define` that lost its `otherwise` that way would be refused for a
+	// mistake nobody made. So a broken arm is skipped up to the next `as` at
+	// this `define`'s own brace depth, and the arms below it are read.
+	protected parseDefineArms(): {
+		arms: Array<parser.DefineArmNode>
+		otherwise: parser.DefineOtherwiseNode | null
+	} {
+		let arms: Array<parser.DefineArmNode> = []
+		let otherwise: parser.DefineOtherwiseNode | null = null
+
+		while (true) {
+			let token = this.tokens.peek()
+
+			if (
+				token === undefined ||
+				token.type === TokenType.SymbolRightBrace
+			) {
+				break
+			}
+
+			let startState = this.tokens.save()
+
+			try {
+				let keyword = this.tokens.expect(TokenType.KeywordAs)
+
+				if (otherwise !== null) {
+					fail(
+						"This arm stands below the 'otherwise' arm",
+						keyword.position,
+						"nothing here can ever be reached",
+					)
+				}
+
+				let value = this.parseExpression()
+				let follower = this.peekOrFail("'if' or 'otherwise'")
+
+				if (follower.type === TokenType.KeywordOtherwise) {
+					this.tokens.next()
+
+					otherwise = {
+						value,
+						position: {
+							start: keyword.position.start,
+							end: follower.position.end,
+						},
+					}
+				} else if (follower.type === TokenType.KeywordIf) {
+					this.tokens.next()
+
+					let condition = this.parseExpression()
+
+					arms.push({
+						value,
+						condition,
+						position: {
+							start: keyword.position.start,
+							end: condition.position.end,
+						},
+					})
+				} else {
+					fail(
+						`Expected 'if' or 'otherwise' but found ${describeToken(follower)}.`,
+						follower.position,
+						"expected 'if' or 'otherwise'",
+					)
+				}
+			} catch (error) {
+				// NOTE: A CODED refusal is a verdict about the text and not a
+				// reading that failed — see `refusesTheText` — so it is raised
+				// to the Statement loop that reports such things, exactly as a
+				// speculation raises one, rather than being reported here and
+				// recovered from as a broken arm.
+				if (error instanceof ParseError && refusesTheText(error)) {
+					throw error
+				}
+
+				this.recoverFromDefineArm(error, startState)
+			}
+		}
+
+		return { arms, otherwise }
+	}
+
+	protected recoverFromDefineArm(
+		error: unknown,
+		startState: TokenStreamState,
+	): void {
+		this.reportParseError(error)
+		this.resynchroniseToArm(startState.braceDepth)
+
+		// NOTE: Guarantee progress, for the reason `recoverFromError` does —
+		// an arm that consumed no Token and resynchronised to where it started
+		// would be read again forever.
+		if (
+			this.tokens.save().index === startState.index &&
+			!this.tokens.isAtEnd()
+		) {
+			this.tokens.next()
+		}
+	}
+
+	// NOTE: Skips to the next arm's `as`, or to the `}` that closes the
+	// `define`, at the brace depth the broken arm started on — braces the
+	// broken arm opened itself are skipped over entirely, as they are for a
+	// Statement.
+	protected resynchroniseToArm(targetDepth: number): void {
+		while (true) {
+			let token = this.tokens.peek()
+
+			if (token === undefined) {
+				// NOTE: Every further error would be a cascade of the one just
+				// reported, as it is for a Statement that ran into the end of
+				// the input.
+				this.suppressDiagnostics = true
+
+				return
+			}
+
+			if (
+				this.tokens.depth <= targetDepth &&
+				(token.type === TokenType.SymbolRightBrace ||
+					token.type === TokenType.KeywordAs)
+			) {
+				return
+			}
+
+			this.tokens.next()
+		}
 	}
 
 	// NOTE: `_` is a wildcard only here — everywhere else it marks a labelless

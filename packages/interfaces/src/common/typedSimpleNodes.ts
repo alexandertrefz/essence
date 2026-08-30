@@ -365,6 +365,7 @@ export type ExpressionNode =
 	| IdentifierNode
 	| CombinationNode
 	| MatchNode
+	| DefineNode
 	| ConformanceValueNode
 	| CaseValueNode
 	| TestTraceNode
@@ -731,6 +732,35 @@ export type MatchHandler = {
 	memberTests: Record<string, ExpressionNode> | null
 	guard: ExpressionNode | null
 	body: Array<ImplementationNode>
+}
+
+// NOTE: `define { as … if … as … otherwise }`, simplified. It stays one
+// Expression all the way to emission — the Rewriter folds the arms into a chain
+// of JavaScript conditionals with the `otherwise` value at the tail — because
+// every arm IS an Expression and none of them needs a Statement to be said.
+// That is the whole difference from a Match, which holds Statements and is
+// lowered to them.
+export interface DefineNode {
+	nodeType: "Define"
+	arms: Array<DefineArm>
+	otherwise: ExpressionNode
+	type: Type
+	position?: Position
+}
+
+// NOTE: The `otherwise` value is a bare Expression rather than the little
+// Record the two layers above hold, because everything they carry it for — the
+// span it was written across — is a question about the source that nothing
+// downstream of here asks.
+export type DefineArm = {
+	value: ExpressionNode
+	condition: ExpressionNode
+	// NOTE: The same claim `ConditionalStatementNode.conditionIsRaw` makes, kept
+	// per arm because each arm asks a question of its own: an Essence Boolean is
+	// an object and every object is true, so the Rewriter reads the JavaScript
+	// boolean out of it — unless a pass has already found the question asked in
+	// JavaScript's own terms. False is the Simplifier's own answer.
+	conditionIsRaw: boolean
 }
 
 // #endregion

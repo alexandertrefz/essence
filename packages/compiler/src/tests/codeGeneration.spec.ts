@@ -677,6 +677,83 @@ describe("Code Generation", () => {
 		})
 	})
 
+	// NOTE: A `define` holds no Statements — every half of every arm is an
+	// Expression — so it is emitted as the chain of JavaScript conditionals it
+	// is, where a Match is emitted as a Function holding Statements and called
+	// at once. That is the whole reason the Node exists.
+	describe("Define", () => {
+		it("answers with the first arm whose Condition holds", async () => {
+			expect(
+				await run(`
+					implementation {
+						constant grade = (_ score: Integer) -> String {
+							<- define {
+								as "A" if score::isGreaterThanOrEqualTo(90)
+								as "B" if score::isGreaterThanOrEqualTo(80)
+								as "F" otherwise
+							}
+						}
+
+						Terminal.inspect(grade(95))
+						Terminal.inspect(grade(85))
+						Terminal.inspect(grade(20))
+					}
+				`),
+			).toEqual(['"A"', '"B"', '"F"'])
+		})
+
+		it("answers through a define written inside a define", async () => {
+			expect(
+				await run(`
+					implementation {
+						constant sign = (_ value: Integer) -> String {
+							<- define -> String {
+								as define {
+									as "one" if value::is(1)
+									as "many" otherwise
+								} if value::isPositive()
+								as "none" otherwise
+							}
+						}
+
+						Terminal.inspect(sign(1))
+						Terminal.inspect(sign(7))
+						Terminal.inspect(sign(0))
+					}
+				`),
+			).toEqual(['"one"', '"many"', '"none"'])
+		})
+
+		it("emits a chain of conditionals rather than a Function to call", () => {
+			let generated = generate(
+				`implementation {
+					variable score: Integer = 95
+
+					Terminal.inspect(define {
+						as "A" if score::isGreaterThanOrEqualTo(90)
+						as "B" if score::isGreaterThanOrEqualTo(80)
+						as "F" otherwise
+					})
+				}`,
+				undefined,
+				unoptimisedOptions,
+			)
+
+			// NOTE: Read with the Optimiser off, so the Conditions stay the
+			// calls the Program wrote and the chain is the only thing the shape
+			// of the output is about. The `.value` on each is the Essence
+			// Boolean being asked as a JavaScript one — an Essence Boolean is an
+			// object, and every object is true.
+			expect(generated).toContain('.value ? String.createString("A") : ')
+			expect(generated).toContain(
+				'.value ? String.createString("B") : String.createString("F")',
+			)
+
+			expect(generated).not.toContain("(function")
+			expect(generated).not.toContain("=>")
+		})
+	})
+
 	describe("Record Matchers", () => {
 		// NOTE: Regression test — matching a Record used to fall through the
 		// runtime Type check entirely, so `case { a: Integer }` compiled

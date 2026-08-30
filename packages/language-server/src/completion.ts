@@ -667,6 +667,22 @@ function findProbeReceiverInNode(
 
 			return null
 		}
+		case "Define": {
+			for (let arm of node.arms) {
+				// NOTE: Searched in the order the arm was WRITTEN — `as VALUE
+				// if CONDITION` — because the probe is looked for where it was
+				// typed, not where it is evaluated.
+				let found =
+					findProbeReceiverInNode(arm.value) ??
+					findProbeReceiverInNode(arm.condition)
+
+				if (found !== null) {
+					return found
+				}
+			}
+
+			return findProbeReceiverInNode(node.otherwise.value)
+		}
 		case "RecordValue": {
 			for (let member of Object.values(node.members)) {
 				let found = findProbeReceiverInNode(member)

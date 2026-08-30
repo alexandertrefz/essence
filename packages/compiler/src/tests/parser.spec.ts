@@ -1354,6 +1354,123 @@ describe("Parser", () => {
 				expect(input).toMatchSnapshot()
 			})
 		})
+
+		describe("Define", () => {
+			it("should parse a define Expression", () => {
+				let input: parser.Program = parse(
+					`implementation {
+						constant grade = define {
+							as "A" if score::isGreaterThanOrEqualTo(90)
+							as "B" if score::isGreaterThanOrEqualTo(80)
+							as "F" otherwise
+						}
+					}`,
+				)
+
+				expect(input).toMatchSnapshot()
+			})
+
+			it("should parse a define Expression with a declared answer Type", () => {
+				let input: parser.Program = parse(
+					`implementation {
+						constant grade = define -> String {
+							as "A" if score::isGreaterThanOrEqualTo(90)
+							as "F" otherwise
+						}
+					}`,
+				)
+
+				expect(input).toMatchSnapshot()
+			})
+
+			// NOTE: An `otherwise` arm on its own is a whole `define` — every
+			// value it could answer with is the one that always holds.
+			it("should parse a define Expression that is nothing but its otherwise arm", () => {
+				let input: parser.Program = parse(
+					`implementation {
+						constant grade = define {
+							as "F" otherwise
+						}
+					}`,
+				)
+
+				expect(input).toMatchSnapshot()
+			})
+
+			it("should parse a define Expression as an Argument", () => {
+				let input: parser.Program = parse(
+					`implementation {
+						report(define {
+							as 1 if flag
+							as 0 otherwise
+						})
+					}`,
+				)
+
+				expect(input).toMatchSnapshot()
+			})
+
+			it("should parse a define Expression as a Record member's value", () => {
+				let input: parser.Program = parse(
+					`implementation {
+						constant row = {
+							grade = define {
+								as 1 if flag
+								as 0 otherwise
+							},
+						}
+					}`,
+				)
+
+				expect(input).toMatchSnapshot()
+			})
+
+			it("should parse a define Expression inside a Match Handler's body", () => {
+				let input: parser.Program = parse(
+					`implementation {
+						match value -> Integer {
+							case Integer {
+								<- define {
+									as 1 if flag
+									as 0 otherwise
+								}
+							}
+						}
+					}`,
+				)
+
+				expect(input).toMatchSnapshot()
+			})
+
+			it("should parse a define Expression inside a define Expression", () => {
+				let input: parser.Program = parse(
+					`implementation {
+						constant grade = define {
+							as define {
+								as 1 if inner
+								as 2 otherwise
+							} if flag
+							as 0 otherwise
+						}
+					}`,
+				)
+
+				expect(input).toMatchSnapshot()
+			})
+
+			// NOTE: A line break is invisible to the Parser, so nothing about
+			// the layout tells one arm from the next — the `as` does, and the
+			// end of an Expression is the first Token that can not carry it on.
+			it("should parse arms written on one line", () => {
+				let input: parser.Program = parse(
+					`implementation {
+						constant grade = define { as 1 if flag as 0 otherwise }
+					}`,
+				)
+
+				expect(input).toMatchSnapshot()
+			})
+		})
 	})
 
 	describe("Statements", () => {
