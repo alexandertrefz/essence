@@ -6,6 +6,7 @@ import {
 import type { common } from "@essence-lang/interfaces"
 
 import { typedAssertionExpressions } from "./assertionChildren"
+import { defineConditions, defineValues } from "./defineArmChildren"
 import { typedHandlerExpressions } from "./matchHandlerChildren"
 import { contains, isSmaller } from "./positions"
 import { typedProgramBodies } from "./sections"
@@ -254,6 +255,21 @@ function visitNode(
 				}
 
 				visitBody(handler.body, expected, state)
+			}
+
+			return
+		// NOTE: Every arm's value answers the whole `define`, so each stands
+		// where the `define` stands and is held to what that position expects —
+		// which is what completes a member name inside `as { … } if …`. A
+		// Condition is a Boolean and expects no Record shape of its own, as a
+		// Guard does not.
+		case "Define":
+			for (let value of defineValues(node)) {
+				visitNode(value, expected, state)
+			}
+
+			for (let condition of defineConditions(node)) {
+				visitNode(condition, null, state)
 			}
 
 			return

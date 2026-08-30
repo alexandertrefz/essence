@@ -402,3 +402,44 @@ describe("Call Hierarchy of a call written in a default", () => {
 		])
 	})
 })
+
+// NOTE: A `define` is Expressions and nothing else, so a Function called only
+// from an arm would be reported as called by nobody by a walk with no case for
+// one.
+describe("Call Hierarchy inside a define", () => {
+	let source = [
+		"implementation {",
+		"\tfunction passes (_ score: Integer) -> Boolean {",
+		"\t\t<- true",
+		"\t}",
+		"\tfunction fallback () -> String {",
+		'\t\t<- "F"',
+		"\t}",
+		"\tfunction grade (_ score: Integer) -> String {",
+		"\t\t<- define {",
+		'\t\t\tas "A" if passes(score)',
+		"\t\t\tas fallback() otherwise",
+		"\t\t}",
+		"\t}",
+		"}",
+	].join("\n")
+
+	it("should find the caller of a Function called from an arm's condition", () => {
+		expect(summarise(incoming(source, { line: 2, column: 11 }))).toEqual([
+			{
+				name: "grade",
+				kind: "function",
+				container: null,
+				calls: 1,
+			},
+		])
+	})
+
+	it("should list both arms' calls as outgoing from the caller", () => {
+		expect(
+			summarise(outgoing(source, { line: 8, column: 11 })).map(
+				(entry) => entry.name,
+			),
+		).toEqual(["passes", "fallback"])
+	})
+})

@@ -934,3 +934,26 @@ describe("Code Actions", () => {
 		})
 	})
 })
+
+// NOTE: The refactor walk reaches Record literals wherever they are written,
+// and an arm's value is one more such place — a `define` holds Expressions and
+// no body at all, so a walk with no case for it reaches none of them.
+describe("Code Actions inside a define arm", () => {
+	it("should offer the shorthand refactor on a literal in an arm's value", () => {
+		let lines = [
+			"implementation {",
+			"\tconstant x = 1",
+			"\tconstant chosen = define {",
+			"\t\tas { x = x } if true",
+			"\t\tas { x = 0 } otherwise",
+			"\t}",
+			"}",
+		]
+
+		expect(
+			titles(actionsOf(lines)).filter((title) =>
+				title.startsWith("Shorten to"),
+			),
+		).toEqual(["Shorten to 'x'"])
+	})
+})

@@ -97,3 +97,33 @@ describe("Argument context inside an update", () => {
 		})
 	})
 })
+
+// NOTE: Every arm's value answers the whole `define`, so it is held to what the
+// position expects — which is what completes a member name inside one.
+describe("Argument context inside a define arm", () => {
+	let source = [
+		"implementation {",
+		"\ttype Point = { x: Integer, y: Integer }",
+		"",
+		"\tconstant origin: Point = define {",
+		"\t\tas { x = 0, y = 0 } if true",
+		"\t\tas { x = 1, y = 1 } otherwise",
+		"\t}",
+		"}",
+	].join("\n")
+
+	it("should offer the expected Record's members in an arm's value", () => {
+		let context = contextAt(source, { line: 5, column: 8 })
+
+		expect(context?.kind).toBe("record")
+		expect(context).toMatchObject({
+			memberTypes: { x: { type: "Integer" }, y: { type: "Integer" } },
+		})
+	})
+
+	it("should offer them in the otherwise arm's value too", () => {
+		let context = contextAt(source, { line: 6, column: 8 })
+
+		expect(context?.kind).toBe("record")
+	})
+})

@@ -6,6 +6,7 @@ import {
 import type { common, parser } from "@essence-lang/interfaces"
 
 import { assertionExpressions } from "./assertionChildren"
+import { defineExpressions } from "./defineArmChildren"
 import { programSections } from "./sections"
 
 // NOTE: Folding is derived from the Parser AST, so it keeps working while the
@@ -242,6 +243,20 @@ function collectFromNode(
 				}
 
 				collectFromBody(handler.body, ranges)
+			}
+
+			return
+		// NOTE: The block folds, an arm does not. An arm has a Position of its
+		// own and could be handed out as a range, but folding is a brace's
+		// affair — the last line is dropped so the closing brace stays
+		// visible, and an arm has none to leave behind. What is inside one
+		// still folds: a Record or a Function literal written across lines is
+		// laid out the same in an arm as anywhere else.
+		case "Define":
+			addRange(ranges, node.position)
+
+			for (let expression of defineExpressions(node)) {
+				collectFromNode(expression, ranges)
 			}
 
 			return

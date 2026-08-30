@@ -562,3 +562,33 @@ describe("Semantic Tokens of a Case written in a payload default", () => {
 		})
 	})
 })
+
+describe("Semantic Tokens inside a define", () => {
+	let source = [
+		"implementation {",
+		"\tchoice Grade {",
+		"\t\tPass,",
+		"\t\tFail,",
+		"\t}",
+		"",
+		"\tfunction grade (_ score: Integer) -> Grade {",
+		"\t\t<- define {",
+		"\t\t\tas #Pass if score::isGreaterThan(90)",
+		"\t\t\tas #Fail otherwise",
+		"\t\t}",
+		"\t}",
+		"}",
+	].join("\n")
+
+	// NOTE: A Case resolves through its Choice rather than through a Scope, so
+	// it is the one construct coloured off the Parser AST — which means the
+	// walk has to reach both halves of an arm on its own.
+	it("should classify a Case written in an arm's value as an enumMember", () => {
+		expect(tokenAt(source, 9, 8)?.type).toBe("enumMember")
+		expect(tokenAt(source, 10, 8)?.type).toBe("enumMember")
+	})
+
+	it("should classify a Parameter read in an arm's condition", () => {
+		expect(tokenAt(source, 9, 16)?.type).toBe("parameter")
+	})
+})

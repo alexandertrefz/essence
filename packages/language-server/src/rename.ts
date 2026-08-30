@@ -14,6 +14,7 @@ import {
 } from "@essence-lang/compiler/helpers"
 import type { common, parser } from "@essence-lang/interfaces"
 
+import { defineExpressions } from "./defineArmChildren"
 import { typedHandlerExpressions } from "./matchHandlerChildren"
 import { methodsOf, nativeSignaturesOf } from "./namespaceMembers"
 import {
@@ -1395,6 +1396,18 @@ function walkNode(
 			}
 
 			return
+		// NOTE: No child Scope, unlike the Match above: a `define` declares
+		// nothing and binds nothing, so every arm is read in the very Scope the
+		// Keyword stands in. The only name a rename could have to touch outside
+		// the arms is the one an explicit `define -> Type` wrote.
+		case "Define":
+			walkTypeDeclaration(node.returnType, scope, context)
+
+			for (let expression of defineExpressions(node)) {
+				walkNode(expression, scope, context)
+			}
+
+			return
 		case "RecordValue":
 			if (node.type !== null) {
 				walkTypeDeclaration(node.type, scope, context)
@@ -2640,6 +2653,12 @@ function walkTypedNode(
 				}
 
 				walkTypedBody(handler.body, context)
+			}
+
+			return
+		case "Define":
+			for (let expression of defineExpressions(node)) {
+				walkTypedNode(expression, context)
 			}
 
 			return

@@ -635,3 +635,24 @@ describe("An Inlay Hint for a defaulted signature read as a value", () => {
 		expect(parseWithDiagnostics(annotated).diagnostics).toEqual([])
 	})
 })
+
+// NOTE: An arm declares nothing to annotate, but a contextually typed Function
+// literal written as an arm's value shows its Types nowhere in the source —
+// which is exactly the case a Hint answers.
+describe("Inlay Hints inside a define", () => {
+	it("should annotate a contextual Function literal in an arm's value", () => {
+		let source = [
+			"implementation {",
+			"\tconstant kept = define {",
+			"\t\tas [1]::removeEvery(where (item) { <- true }) if true",
+			"\t\tas [1] otherwise",
+			"\t}",
+			"}",
+		].join("\n")
+
+		let labels = hintsOf(source).map((hint) => hint.label)
+
+		expect(labels).toContain(": Integer")
+		expect(labels).toContain(" -> Boolean")
+	})
+})

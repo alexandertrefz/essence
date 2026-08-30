@@ -27,6 +27,11 @@ import {
 	qualifiedCallSnippetsFor,
 } from "./callSnippets"
 import { enrichDocument, parseDocument } from "./compilation"
+import {
+	defineConditions,
+	defineExpressions,
+	defineValues,
+} from "./defineArmChildren"
 import { describe, documentationOf } from "./documentation"
 import { typedHandlerExpressions } from "./matchHandlerChildren"
 import { matchingNamespaces } from "./namespaces"
@@ -668,20 +673,18 @@ function findProbeReceiverInNode(
 			return null
 		}
 		case "Define": {
-			for (let arm of node.arms) {
-				// NOTE: Searched in the order the arm was WRITTEN — `as VALUE
-				// if CONDITION` — because the probe is looked for where it was
-				// typed, not where it is evaluated.
-				let found =
-					findProbeReceiverInNode(arm.value) ??
-					findProbeReceiverInNode(arm.condition)
+			// NOTE: Searched in the order the arms were WRITTEN — `as VALUE if
+			// CONDITION` — because the probe is looked for where it was typed,
+			// not where it is evaluated.
+			for (let expression of defineExpressions(node)) {
+				let found = findProbeReceiverInNode(expression)
 
 				if (found !== null) {
 					return found
 				}
 			}
 
-			return findProbeReceiverInNode(node.otherwise.value)
+			return null
 		}
 		case "RecordValue": {
 			for (let member of Object.values(node.members)) {
@@ -1531,6 +1534,20 @@ function analyseCaseProbe(program: common.typed.Program): {
 				}
 
 				return
+			// NOTE: Every arm's value answers the whole `define`, so each is
+			// read against the Type the position expects of it — which is what
+			// puts a Choice in reach of a bare `#` in an arm. A Condition is a
+			// Boolean and expects nothing of its own, exactly as a Guard does.
+			case "Define":
+				for (let value of defineValues(node)) {
+					visitNode(value, expectedType)
+				}
+
+				for (let condition of defineConditions(node)) {
+					visitNode(condition, null)
+				}
+
+				return
 			case "RecordValue":
 				// NOTE: Each member is read against the Type the position
 				// EXPECTS of it, exactly as a List's items are just above —
@@ -1949,6 +1966,12 @@ function describeDeclarations(
 					}
 
 					visitBody(handler.body)
+				}
+
+				return
+			case "Define":
+				for (let expression of defineExpressions(node)) {
+					visitNode(expression)
 				}
 
 				return

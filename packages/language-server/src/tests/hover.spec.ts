@@ -1600,3 +1600,41 @@ describe("Hover over a written receiver", () => {
 		expect(hover(source, { line: 3, column: 19 })).toBe("two: Integer")
 	})
 })
+
+// NOTE: A `define` in a nested position rather than at a `<-`: the enclosing
+// Statement then answers with a Type of its own, so an assertion here is about
+// what this walk reaches rather than about what happens to span the cursor.
+describe("Hover inside a define", () => {
+	let source = [
+		"implementation {",
+		"\tfunction grade (_ score: Integer) -> String {",
+		"\t\tconstant band = define {",
+		"\t\t\tas 1 if score::isGreaterThan(90)",
+		"\t\t\tas 0 otherwise",
+		"\t\t}",
+		"",
+		"\t\t<- band::toString()",
+		"\t}",
+		"}",
+	].join("\n")
+
+	// NOTE: The whole Expression answers with one Type, so the Keyword says
+	// what it produces — the same answer a `match` gives.
+	it("should answer the Keyword with the Type the arms produce", () => {
+		expect(hover(source, { line: 3, column: 19 })).toBe("Integer")
+	})
+
+	it("should answer a name written in an arm's condition", () => {
+		expect(hover(source, { line: 4, column: 12 })).toBe("score: Integer")
+	})
+
+	it("should answer a Method called in an arm's condition", () => {
+		expect(hover(source, { line: 4, column: 19 })).toBe(
+			"isGreaterThan(_ Integer) -> Boolean",
+		)
+	})
+
+	it("should answer a value written in the otherwise arm", () => {
+		expect(hover(source, { line: 5, column: 7 })).toBe("Integer")
+	})
+})

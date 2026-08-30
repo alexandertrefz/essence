@@ -6,6 +6,7 @@ import {
 import type { common, parser } from "@essence-lang/interfaces"
 
 import { assertionExpressions } from "./assertionChildren"
+import { defineExpressions } from "./defineArmChildren"
 import { methodsOf, nativeSignaturesOf } from "./namespaceMembers"
 import { type DeclarationKind, indexProgram, type ProgramIndex } from "./rename"
 import { programBodies } from "./sections"
@@ -274,6 +275,14 @@ function collectCasesFromNode(
 				}
 
 				collectCases(handler.body, tokens)
+			}
+
+			return
+		// NOTE: An arm holds Case values like any other Expression — `as
+		// #Empty if …` colours as a Case and not as a name.
+		case "Define":
+			for (let expression of defineExpressions(node)) {
+				collectCasesFromNode(expression, tokens)
 			}
 
 			return

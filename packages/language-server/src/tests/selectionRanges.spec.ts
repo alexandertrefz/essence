@@ -201,3 +201,57 @@ describe("Selection Ranges inside a Case payload default", () => {
 		})
 	})
 })
+
+// NOTE: An arm has a Position of its own covering `as VALUE if CONDITION`, so
+// it stands on the chain between what is written in it and the whole `define` —
+// the same answer a Dictionary entry gets, and one a Match Handler can not give.
+describe("Selection Ranges inside a define", () => {
+	let source = [
+		"implementation {",
+		"\tfunction grade (_ score: Integer) -> String {",
+		"\t\t<- define {",
+		'\t\t\tas "A" if score::isGreaterThan(90)',
+		'\t\t\tas "F" otherwise',
+		"\t\t}",
+		"\t}",
+		"}",
+	].join("\n")
+
+	let arm = {
+		start: { line: 4, column: 4 },
+		end: { line: 4, column: 38 },
+	}
+	let block = {
+		start: { line: 3, column: 6 },
+		end: { line: 6, column: 4 },
+	}
+
+	it("should widen from a name in a condition to its arm and then the block", () => {
+		let ranges = selectionRangesOf(source, { line: 4, column: 14 })
+		let armIndex = ranges.findIndex(
+			(range) =>
+				range.start.line === arm.start.line &&
+				range.start.column === arm.start.column,
+		)
+		let blockIndex = ranges.findIndex(
+			(range) =>
+				range.start.line === block.start.line &&
+				range.start.column === block.start.column,
+		)
+
+		expect(ranges).toContainEqual(arm)
+		expect(ranges).toContainEqual(block)
+		// NOTE: Innermost first, so the arm stands in front of the block it is
+		// an arm of.
+		expect(armIndex).toBeLessThan(blockIndex)
+	})
+
+	it("should hand out the otherwise arm as its own range", () => {
+		expect(
+			selectionRangesOf(source, { line: 5, column: 8 }),
+		).toContainEqual({
+			start: { line: 5, column: 4 },
+			end: { line: 5, column: 20 },
+		})
+	})
+})
