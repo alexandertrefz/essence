@@ -2135,3 +2135,66 @@ describe("Rename of a name a Case payload default reads", () => {
 		})
 	})
 })
+
+// NOTE: A `define` opens no Scope of its own — an arm is read in the very Scope
+// the Keyword stands in — so every name written in one is an occurrence of a
+// Declaration made outside it.
+describe("Rename inside a define", () => {
+	it("should rename a Parameter read in both halves of an arm", () => {
+		let source = [
+			"implementation {",
+			"\tfunction grade (_ score: Integer) -> String {",
+			"\t\t<- define {",
+			"\t\t\tas score::toString() if score::isGreaterThan(90)",
+			'\t\t\tas "F" otherwise',
+			"\t\t}",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(rename(source, { line: 4, column: 7 }, "points")).toBe(
+			[
+				"implementation {",
+				"\tfunction grade (_ points: Integer) -> String {",
+				"\t\t<- define {",
+				"\t\t\tas points::toString() if points::isGreaterThan(90)",
+				'\t\t\tas "F" otherwise',
+				"\t\t}",
+				"\t}",
+				"}",
+			].join("\n"),
+		)
+	})
+
+	it("should rename a Function called from the otherwise arm's value", () => {
+		let source = [
+			"implementation {",
+			"\tfunction fallback () -> String {",
+			'\t\t<- "F"',
+			"\t}",
+			"\tfunction grade (_ score: Integer) -> String {",
+			"\t\t<- define {",
+			'\t\t\tas "A" if score::isGreaterThan(90)',
+			"\t\t\tas fallback() otherwise",
+			"\t\t}",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(rename(source, { line: 8, column: 7 }, "lowest")).toBe(
+			[
+				"implementation {",
+				"\tfunction lowest () -> String {",
+				'\t\t<- "F"',
+				"\t}",
+				"\tfunction grade (_ score: Integer) -> String {",
+				"\t\t<- define {",
+				'\t\t\tas "A" if score::isGreaterThan(90)',
+				"\t\t\tas lowest() otherwise",
+				"\t\t}",
+				"\t}",
+				"}",
+			].join("\n"),
+		)
+	})
+})

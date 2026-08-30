@@ -11,6 +11,7 @@ import {
 import type { common, parser } from "@essence-lang/interfaces"
 
 import { typedAssertionExpressions } from "./assertionChildren"
+import { defineExpressions } from "./defineArmChildren"
 import { typedHandlerExpressions } from "./matchHandlerChildren"
 import { isAtOrBefore } from "./positions"
 import { typedProgramBodies } from "./sections"
@@ -236,6 +237,11 @@ function symbolsOfNode(
 					...symbolsOfBody(handler.body),
 				]),
 			]
+		// NOTE: An arm declares nothing itself — that is the whole point of a
+		// `define` — but a Function literal written as one of its values
+		// outlines like any other.
+		case "Define":
+			return defineExpressions(node).flatMap(symbolsOfNode)
 		case "FunctionValue":
 			return symbolsOfBody(node.value.body)
 		case "FunctionInvocation":
@@ -712,6 +718,15 @@ function collectDetail(
 				}
 
 				collectDetails(handler.body, details)
+			}
+
+			return
+		// NOTE: The Parser walk above outlines whatever an arm's value
+		// declares, so this one has to reach the same Nodes — otherwise those
+		// entries are the only ones in the outline with no Type beside them.
+		case "Define":
+			for (let expression of defineExpressions(node)) {
+				collectDetail(expression, details)
 			}
 
 			return

@@ -17,6 +17,7 @@ import {
 } from "@essence-lang/compiler/printType"
 import type { common, parser } from "@essence-lang/interfaces"
 
+import { defineExpressions } from "./defineArmChildren"
 import { documentationOf, renderDocumentation } from "./documentation"
 import { typedHandlerExpressions } from "./matchHandlerChildren"
 import { contains, isSmaller } from "./positions"
@@ -745,6 +746,18 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 				}
 
 				visitBody(handler.body, state)
+			}
+
+			return
+		// NOTE: The whole `define` answers with one Type — what the arrow
+		// declared, or the Union of what its arms answer with — so a Hover on
+		// the Keyword says what the Expression produces, exactly as one on a
+		// `match` does. An arm carries no Type of its own beyond its value's.
+		case "Define":
+			consider(state, node.position, node.type, null)
+
+			for (let expression of defineExpressions(node)) {
+				visitNode(expression, state)
 			}
 
 			return

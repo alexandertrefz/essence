@@ -215,3 +215,48 @@ describe("Folding Ranges inside a Case payload default", () => {
 		})
 	})
 })
+
+describe("Folding a define", () => {
+	let source = [
+		"implementation {",
+		"\tfunction grade (_ score: Integer) -> String {",
+		"\t\t<- define {",
+		'\t\t\tas "A" if score::isGreaterThan(90)',
+		'\t\t\tas "F" otherwise',
+		"\t\t}",
+		"\t}",
+		"}",
+	].join("\n")
+
+	it("should fold the block, stopping before the closing brace", () => {
+		expect(foldingRangesOf(source)).toContainEqual({
+			startLine: 3,
+			endLine: 5,
+		})
+	})
+
+	// NOTE: An arm has a Position of its own and could be handed out, but
+	// folding is a brace's affair — the block, the Function around it and the
+	// implementation are the three folds this file has.
+	it("should hand out no range for an arm of its own", () => {
+		expect(foldingRangesOf(source)).toHaveLength(3)
+	})
+
+	it("should fold a Record literal written as an arm's value", () => {
+		let source = [
+			"implementation {",
+			"\tconstant chosen = define {",
+			"\t\tas {",
+			'\t\t\tname = "Ada",',
+			"\t\t} if true",
+			'\t\tas { name = "nobody" } otherwise',
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(foldingRangesOf(source)).toContainEqual({
+			startLine: 3,
+			endLine: 4,
+		})
+	})
+})

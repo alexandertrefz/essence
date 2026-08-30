@@ -9,6 +9,7 @@ import {
 	assertionExpressions,
 	typedAssertionExpressions,
 } from "./assertionChildren"
+import { defineExpressions } from "./defineArmChildren"
 import { typedHandlerExpressions } from "./matchHandlerChildren"
 import { isAtOrBefore } from "./positions"
 import {
@@ -414,6 +415,12 @@ function collectItemsFromNode(
 			}
 
 			return
+		case "Define":
+			for (let expression of defineExpressions(node)) {
+				collectItemsFromNode(expression, container, items)
+			}
+
+			return
 		case "RecordValue":
 			for (let member of Object.values(node.members)) {
 				collectItemsFromNode(memberExpression(member), container, items)
@@ -813,6 +820,15 @@ function visitNode(
 				}
 
 				visitBody(handler.body, caller, context, sites)
+			}
+
+			return
+		// NOTE: A `define` is Expressions and nothing else, so a Function called
+		// exclusively from a Condition would be reported as called by nobody by
+		// a walk that had no case here.
+		case "Define":
+			for (let expression of defineExpressions(node)) {
+				visitNode(expression, caller, context, sites)
 			}
 
 			return

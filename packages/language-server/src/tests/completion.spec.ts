@@ -2276,3 +2276,31 @@ describe("Case completion inside a Case payload default", () => {
 		})
 	})
 })
+
+// NOTE: A `#` keeps the whole document — the probe writes a stand-in Case where
+// the sigil is rather than truncating — so this reads the expected Type off the
+// arm itself.
+describe("Case completion inside a define arm", () => {
+	it("should offer the expected Choice's Cases in an arm's value", () => {
+		let source = [
+			"implementation {",
+			"\tchoice Grade {",
+			"\t\tPass,",
+			"\t\tFail,",
+			"\t}",
+			"",
+			"\tfunction grade (_ score: Integer) -> Grade {",
+			"\t\t<- define {",
+			"\t\t\tas # if score::isGreaterThan(90)",
+			"\t\t\tas #Fail otherwise",
+			"\t\t}",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(labelsOf(source, { line: 9, column: 8 })).toEqual([
+			"Pass",
+			"Fail",
+		])
+	})
+})

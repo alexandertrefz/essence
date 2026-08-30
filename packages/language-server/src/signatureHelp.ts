@@ -13,6 +13,7 @@ import type { common } from "@essence-lang/interfaces"
 import type { DocumentAnalysis } from "./analyse"
 import { typedAssertionExpressions } from "./assertionChildren"
 import { enrichDocument, parseDocument } from "./compilation"
+import { defineExpressions } from "./defineArmChildren"
 import { describe, documentationOf } from "./documentation"
 import { typedHandlerExpressions } from "./matchHandlerChildren"
 import { matchingNamespaces } from "./namespaces"
@@ -600,6 +601,14 @@ function findEnclosingInvocation(
 					}
 
 					visitBody(handler.body)
+				}
+
+				return
+			// NOTE: `as total(` IS a call being written, so a cursor inside an
+			// arm has a signature to help with exactly as one in a body does.
+			case "Define":
+				for (let expression of defineExpressions(node)) {
+					visitNode(expression)
 				}
 
 				return

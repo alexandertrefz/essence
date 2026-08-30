@@ -512,3 +512,29 @@ describe("The export block", () => {
 		expect(symbols[2]?.detail).toBe("skipped")
 	})
 })
+
+// NOTE: A `define` declares nothing itself, so what the outline has to reach
+// inside one is whatever a Function literal written as an arm's value declares.
+describe("Document Symbols inside a define", () => {
+	let source = [
+		"implementation {",
+		"\tconstant chosen = define {",
+		"\t\tas (_ value: Integer) -> Integer {",
+		"\t\t\tconstant doubled = value",
+		"\t\t\t<- doubled",
+		"\t\t} if true",
+		"\t\tas (_ value: Integer) -> Integer { <- value } otherwise",
+		"\t}",
+		"}",
+	].join("\n")
+
+	it("should outline a declaration inside an arm's value", () => {
+		expect(
+			flatten(symbolsOf(source)).map((symbol) => symbol.name),
+		).toContain("doubled")
+	})
+
+	it("should put the inferred Type beside it", () => {
+		expect(detailOf(detailedSymbolsOf(source), "doubled")).toBe("Integer")
+	})
+})

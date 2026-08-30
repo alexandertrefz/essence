@@ -3,6 +3,7 @@ import { printType } from "@essence-lang/compiler/printType"
 import type { common } from "@essence-lang/interfaces"
 
 import { typedAssertionExpressions } from "./assertionChildren"
+import { defineExpressions } from "./defineArmChildren"
 import { typedHandlerExpressions } from "./matchHandlerChildren"
 import { typedProgramBodies } from "./sections"
 
@@ -184,6 +185,16 @@ function visitNode(
 				}
 
 				visitBody(handler.body, hints)
+			}
+
+			return
+		// NOTE: An arm declares nothing to annotate, but a Function literal
+		// written as one of its values takes its Types from the position it
+		// fills and shows them nowhere in the source — exactly the case a hint
+		// answers.
+		case "Define":
+			for (let expression of defineExpressions(node)) {
+				visitNode(expression, hints)
 			}
 
 			return

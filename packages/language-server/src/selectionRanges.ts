@@ -6,6 +6,7 @@ import {
 import type { common, parser } from "@essence-lang/interfaces"
 
 import { assertionExpressions } from "./assertionChildren"
+import { defineArmExpressions } from "./defineArmChildren"
 import { matcherValueExpressions } from "./matchHandlerChildren"
 import { contains } from "./positions"
 import { type ParserSection, programSections } from "./sections"
@@ -243,6 +244,30 @@ function collectFromNode(
 				}
 
 				collectFromBody(handler.body, cursor, chain)
+			}
+
+			return
+		// NOTE: The ARM stands on the chain between what is written in it and
+		// the whole `define`, for the reason a Dictionary entry does below: an
+		// arm has a Position of its own covering `as VALUE if CONDITION`, so
+		// widening from `total` reaches the arm it answers in before it reaches
+		// the braces. A Match Handler carries no Position and can not do this.
+		case "Define":
+			for (let arm of node.arms) {
+				if (!contains(arm.position, cursor)) {
+					continue
+				}
+
+				chain.push(arm.position)
+
+				for (let expression of defineArmExpressions(arm)) {
+					descend(expression, cursor, chain)
+				}
+			}
+
+			if (contains(node.otherwise.position, cursor)) {
+				chain.push(node.otherwise.position)
+				descend(node.otherwise.value, cursor, chain)
 			}
 
 			return

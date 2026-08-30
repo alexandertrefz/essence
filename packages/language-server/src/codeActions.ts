@@ -8,6 +8,7 @@ import type { common, parser } from "@essence-lang/interfaces"
 import { type Analysis, analyseDocument, documentFilePath } from "./analyse"
 import { assertionExpressions } from "./assertionChildren"
 import { insertImportEdit, relativeSpecifier } from "./autoImport"
+import { defineExpressions } from "./defineArmChildren"
 import { findInlayHints } from "./inlayHints"
 import { matcherValueExpressions } from "./matchHandlerChildren"
 import { methodsOf, nativeSignaturesOf } from "./namespaceMembers"
@@ -1375,6 +1376,15 @@ function walkNode(
 				}
 
 				walkBody(handler.body, visit)
+			}
+
+			return
+		// NOTE: An arm holds the Expressions the same Quick Fixes apply to as
+		// any body's — an unknown name in one takes the same suggestion, an
+		// auto-import the same edit.
+		case "Define":
+			for (let expression of defineExpressions(node)) {
+				walkNode(expression, visit)
 			}
 
 			return
