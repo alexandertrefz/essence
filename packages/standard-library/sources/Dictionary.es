@@ -1,12 +1,28 @@
 import {
-	Boolean   from "./Boolean.es"
-	List      from "./List.es"
-	Optional  from "./Optional.es"
-	Equatable from "./Protocols.es"
-	Printable from "./Protocols.es"
+	Boolean         from "./Boolean.es"
+	NonZeroInteger  from "./Integer.es"
+	PositiveInteger from "./Integer.es"
+	List            from "./List.es"
+	NonEmptyList    from "./List.es"
+	Optional        from "./Optional.es"
+	Equatable       from "./Protocols.es"
+	Printable       from "./Protocols.es"
 }
 
 declarations {
+
+	§ The Dictionaries that have something in them. It is a checked refinement:
+	§ the predicate is what a value has to be proven to satisfy, and the proof is
+	§ what the Type carries.
+	§
+	§ Three routes reach the proof. A Dictionary written down with an entry in it
+	§ is its own proof, and so is an update that sets one. A Dictionary a Program
+	§ is handed goes through an `if` asking `hasEntries`. And `set` puts an entry
+	§ into whatever it was given, so it answers with this Type.
+	§
+	§ The predicate asks nothing about the key Type or the value Type. One
+	§ predicate serves every Dictionary, and both Type Arguments stay in the base.
+	type NonEmptyDictionary<KeyType, ValueType> = Dictionary<KeyType, ValueType> where @::hasEntries()
 
 	§ The keyed collection, and everything that reads or rebuilds one. Every
 	§ Method here is a Query: a Dictionary is never changed in place, and a new
@@ -63,16 +79,53 @@ declarations {
 		§§ @returns — `true` for the empty Dictionary.
 		isEmpty() -> Boolean
 
-		§§ Answers whether the Dictionary has at least one entry.
+		§ The quantified entry folds a Boolean over the entries, on `reduce`'s
+		§ early-stopping entry, so the walk stops at the entry that decides the
+		§ answer. Written on `everyEntry(where:)` it would build a whole
+		§ Dictionary per call and then ask whether it holds anything.
+		§
+		§ Only the check stops early. The fold sees its first entry after
+		§ `entries()` has built one Record per entry, so the Method allocates for
+		§ the whole Dictionary whatever it answers. No other spelling exists here. A
+		§ Dictionary has no `reduce` of its own, and a walk that stopped before
+		§ the List was built would be a native.
+
+		§§ Answers whether the Dictionary has an entry, or has an entry the check accepts.
 		§§
-		§§ It is the opposite of `isEmpty`.
-		§§
-		§§ @returns — `true` when the Dictionary is not empty.
-		hasEntries() -> Boolean {
-			§ This body is read as well as run. A predicate written as one call
-			§ on `@` is that call, so a refinement written on either name is one
-			§ Type. See DEVELOPMENT.md, Why bodies look the way they do.
-			<- @::isEmpty()::negate()
+		§§ @returns — `true` when the Dictionary has an entry, or when the check accepts an entry.
+		overload hasEntries {
+			§§ Answers whether the Dictionary has at least one entry.
+			§§
+			§§ It is the opposite of `isEmpty`.
+			§§
+			§§ @returns — `true` when the Dictionary is not empty.
+			() -> Boolean {
+				§ This body is read as well as run. A predicate written as one
+				§ call on `@` is that call. So a refinement written on either
+				§ name is one Type, and the `else` of an `if` asking `isEmpty`
+				§ proves `NonEmptyDictionary`. See DEVELOPMENT.md, Why bodies
+				§ look the way they do.
+				<- @::isEmpty()::negate()
+			}
+
+			§§ Answers whether the check accepts at least one entry.
+			§§
+			§§ The walk stops at the first accepted entry. The empty Dictionary has no entry to accept, so it answers `false`.
+			§§
+			§§ @param where — the check each entry is offered to
+			§§ @returns — `true` when the check accepts an entry.
+			(
+				where check: (_: { key: KeyType, value: ValueType }) -> Boolean,
+			) -> Boolean {
+				<- @::entries()
+					::reduce(startingWith false, step (found, entry) {
+						if check(entry) {
+							<- #Done(true)
+						} else {
+							<- #Continue(found)
+						}
+					})
+			}
 		}
 
 		§§ Answers whether the Dictionary holds a value for the given key.
@@ -140,15 +193,15 @@ declarations {
 
 		§§ Answers a new Dictionary with the given key holding the given value.
 		§§
-		§§ A key that is already there keeps its place and takes the new value. A key that is not there is added at the end. Equality is the keys' own `is`.
+		§§ A key that is already there keeps its place and takes the new value. A key that is not there is added at the end. Equality is the keys' own `is`. The answer holds the entry that was set, so it is never empty.
 		§§
 		§§ @param _ — the key to set
 		§§ @param to — the value the key holds
-		§§ @returns — the Dictionary with that entry.
+		§§ @returns — the Dictionary with that entry, which certainly has an entry.
 		set<infer KeyType is Equatable>(
 			_ key: KeyType,
 			to value: ValueType,
-		) -> Dictionary<KeyType, ValueType>
+		) -> NonEmptyDictionary<KeyType, ValueType>
 
 		§§ Answers a new Dictionary with the given key's value transformed.
 		§§
@@ -318,8 +371,136 @@ declarations {
 			}
 		}
 	}
+
+	§ The Methods the proof changes. A NonEmptyDictionary already answers every
+	§ Method of `Dictionary`. A Namespace of its own is for the Methods that
+	§ answer better for having the proof.
+	§
+	§ Four spend it, and each is `Dictionary`'s own native under this
+	§ Namespace's name. The `length` entry answers a `NonZeroInteger`. The three
+	§ halves a Dictionary is read as answer a `NonEmptyList`. There is one key,
+	§ one value and one entry for every entry the receiver holds. The fifth
+	§ entry, `map`, carries the proof rather than spending it, for the reason
+	§ `NonEmptyList::map` does: one transformed value for every entry.
+	§
+	§ Every entry is native, because the promise can not be said in Essence.
+	§ Written `<- @::length()` on a proven receiver, it is this very Method, and
+	§ the Validator refuses it as `infinite-recursion`. See DEVELOPMENT.md, A
+	§ receiver narrowed by evidence.
+	§
+	§ The `set` entry is absent for the opposite reason. It answers a
+	§ `NonEmptyDictionary` on `Dictionary` itself, whatever it was handed, as
+	§ `List::append(_:)` does.
+	§
+	§ `update` and `merge` are absent for neither reason: they do not carry the
+	§ proof, and a proven receiver comes out of either one unproven. Both keep
+	§ a Dictionary non-empty all the same, since an update rewrites a value and
+	§ a merge only ever adds. So a twin here could carry the proof honestly,
+	§ written in Essence over `set`, whose answer is proven. It is deferred:
+	§ four copied bodies and their golden lines weigh more than a proof one
+	§ `if` takes back.
+	namespace NonEmptyDictionary<infer KeyType, infer ValueType> for NonEmptyDictionary<KeyType, ValueType> {
+		§§ Answers how many entries the Dictionary has, which is at least one.
+		§§
+		§§ @returns — the number of entries, which is never zero.
+		length() -> NonZeroInteger
+
+		§§ Answers the keys, in the order they were first set.
+		§§
+		§§ @returns — the List of keys, which certainly has something in it.
+		keys() -> NonEmptyList<KeyType>
+
+		§§ Answers the values, in the order their keys were first set.
+		§§
+		§§ @returns — the List of values, which certainly has something in it.
+		values() -> NonEmptyList<ValueType>
+
+		§§ Answers the entries, in the order their keys were first set.
+		§§
+		§§ Each entry is a Record of a `key` and a `value`, which a Pattern can take apart.
+		§§
+		§§ @returns — the List of entries, which certainly has something in it.
+		entries() -> NonEmptyList<{ key: KeyType, value: ValueType }>
+
+		§§ Answers a new Dictionary with the given transform applied to every entry.
+		§§
+		§§ The keys are kept, and what the transform answers becomes the value of the entry it was handed. The answer holds the same keys in the same order.
+		§§
+		§§ @param _ — the transform each entry is handed to
+		§§ @returns — the Dictionary of transformed values, which certainly has an entry.
+		map<infer Result>(
+			_ transform: (_: { key: KeyType, value: ValueType }) -> Result,
+		) -> NonEmptyDictionary<KeyType, Result>
+	}
+
+	§ The bridge from the first container to the second, and the two Methods
+	§ that cross it. Neither is a Method of `List`. What a List becomes here is
+	§ a Dictionary, so the file that owns the answer owns them. That is why
+	§ `NumberList.es` owns the aggregates a List of Numbers answers.
+	§
+	§ The name says what the receiver becomes, which is what a reader of a
+	§ grouping call has to be told. A `DictionaryList` would name the answer and
+	§ leave the receiver unsaid. Its target is `List<ItemType>`, the widest
+	§ there is, which is `KeyedNumberList`'s target too. It shares no Method
+	§ name with any Namespace a List reaches. So the target decides nothing
+	§ here, and the name is the whole of what a reader has.
+	§
+	§ Both are native, and neither could be anything else. Grouping promises
+	§ each group has an item in it, and tallying promises each count is above
+	§ zero. An Essence body building either out of `set` and `append` would
+	§ answer a bare `Dictionary` of bare Lists.
+	namespace GroupedList<infer ItemType> for List<ItemType> {
+		§§ Answers the items grouped under the key the given Function reads off each one.
+		§§
+		§§ The groups stand in the order their keys first appear, and the items of a group keep the order they had. Equality is the keys' own `is`.
+		§§
+		§§ @param key — the key read off each item
+		§§ @returns — the Dictionary of groups, each of which has an item in it.
+		groupedBy<infer KeyType is Equatable>(
+			key keyOf: (_: ItemType) -> KeyType,
+		) -> Dictionary<KeyType, NonEmptyList<ItemType>>
+
+		§§ Answers how many times each item occurs.
+		§§
+		§§ The items stand in the order they first appear. Equality is the items' own `is`.
+		§§
+		§§ @returns — the Dictionary of counts, each of which is above zero.
+		tallied<infer ItemType is Equatable>() -> Dictionary<ItemType, PositiveInteger>
+	}
+
+	§ The same two crossings with the receiver's proof in hand, and the one
+	§ thing that proof changes. A List with an item in it puts that item in a
+	§ group, so the Dictionary it answers holds an entry. Neither entry above
+	§ can promise that, because the empty List groups into the empty Dictionary
+	§ and tallies into it too.
+	§
+	§ It mirrors `GroupedList`, and sits after it for the reason every proven
+	§ Namespace sits after the one it narrows. Both entries are `GroupedList`'s
+	§ own natives under this Namespace's names, so the two are one Function
+	§ under two names and can not come apart.
+	namespace GroupedNonEmptyList<infer ItemType> for NonEmptyList<ItemType> {
+		§§ Answers the items grouped under the key the given Function reads off each one.
+		§§
+		§§ The groups stand in the order their keys first appear, and the items of a group keep the order they had. Equality is the keys' own `is`.
+		§§
+		§§ @param key — the key read off each item
+		§§ @returns — the Dictionary of groups, which certainly has a group in it.
+		groupedBy<infer KeyType is Equatable>(
+			key keyOf: (_: ItemType) -> KeyType,
+		) -> NonEmptyDictionary<KeyType, NonEmptyList<ItemType>>
+
+		§§ Answers how many times each item occurs.
+		§§
+		§§ The items stand in the order they first appear. Equality is the items' own `is`.
+		§§
+		§§ @returns — the Dictionary of counts, which certainly has a count in it.
+		tallied<infer ItemType is Equatable>() -> NonEmptyDictionary<ItemType, PositiveInteger>
+	}
 }
 
 export {
 	Dictionary
+	GroupedList
+	GroupedNonEmptyList
+	NonEmptyDictionary
 }

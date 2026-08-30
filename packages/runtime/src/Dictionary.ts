@@ -528,10 +528,12 @@ function boxAt<Key extends AnyType, Value extends AnyType>(
 	return { [typeKeySymbol]: "Dictionary", store, generation, length }
 }
 
-// NOTE: The builder every construction path shares — `of`, `createDictionary`
-// and `map` each fill a store of their own and hand it over. Every slot it
-// opens carries one version at generation zero, so the finished store is
-// already in the shape a repack would leave it in.
+// NOTE: The builder every construction path shares — `of`, `createDictionary`,
+// `map` and `freshStore`, the door the gathering natives come through, each
+// fill a store of their own and hand it over, so `groupedBy` and `tallied`
+// reach it through that last one. Every slot it opens carries one version at
+// generation zero, so the finished store is already in the shape a repack would
+// leave it in.
 function emptyStore<Key extends AnyType, Value extends AnyType>(): Store<
 	Key,
 	Value
@@ -546,6 +548,85 @@ function emptyStore<Key extends AnyType, Value extends AnyType>(): Store<
 	}
 }
 
+// NOTE: The slot a key already has in a store nobody else holds yet, found the
+// three ways `slotHolding` finds one — under its encoding, by asking the
+// witness about every slot, or, after an encoding the index cannot answer for,
+// by asking it about the slots that carry no encoding of their own. There is no
+// generation to test: every version in such a store is stamped zero and every
+// slot is live, which is what separates this from the reader that serves the
+// boxes.
+//
+// NOTE: That third way is the one a fresh store looks like it could do without,
+// and may not. One witness fills the whole of such a store, but a witness may
+// cover kinds that encode and kinds that do not — a branded `Number` one covers
+// the Integer and the Rational, which encode, and the Algebraic and the
+// Transcendental, which scan — so the slots it opens are MIXED, and an encoded
+// key missing from the index may still be the key an unencoded slot holds. That
+// no such pair is equal today is a theorem about the standard library's own
+// `is` rather than about this file: an Algebraic and a Transcendental are
+// provably irrational and so equal no Rational. Leaning on it here would make a
+// sixth branded kind that crossed the line open two slots for one key, silently.
+// The fallthrough costs one integer compare on the ordinary store, where nothing
+// is unencoded at all.
+function slotInFreshStore<Key extends AnyType, Value extends AnyType>(
+	store: Store<Key, Value>,
+	key: Key,
+	encoded: EncodedKey | null,
+	conformance: EquatableWitness<Key> | null,
+): Slot<Key, Value> | undefined {
+	if (encoded !== null) {
+		let slot = slotUnder(store, encoded)
+
+		if (slot !== undefined) {
+			return slot
+		}
+
+		if (store.unencoded === 0) {
+			return undefined
+		}
+	}
+
+	if (conformance === null) {
+		return undefined
+	}
+
+	// NOTE: Every slot for a key with no encoding, and only the unencoded ones
+	// for a key that has one — the same two cases, and the same one test,
+	// `slotHolding` walks its slots under.
+	let slots = store.slots
+
+	for (let index = 0; index < slots.length; index++) {
+		let slot = slots[index]
+
+		if (
+			(encoded === null || slot.encoded === null) &&
+			conformance.is(slot.key, key).value
+		) {
+			return slot
+		}
+	}
+
+	return undefined
+}
+
+// NOTE: A slot opened at the end of a store nobody else holds yet, carrying one
+// version at generation zero — the shape a repack would leave it in.
+function openFreshSlot<Key extends AnyType, Value extends AnyType>(
+	store: Store<Key, Value>,
+	key: Key,
+	encoded: EncodedKey | null,
+	value: Value,
+): void {
+	let slot: Slot<Key, Value> = {
+		key,
+		encoded,
+		versions: [{ value, generation: 0 }],
+	}
+
+	store.slots.push(slot)
+	fileSlot(store, slot)
+}
+
 // NOTE: One entry added to a store nobody else holds yet. A key already in it
 // wins later and keeps its place: the value is written over the version that is
 // there rather than pushed after it, which is both what `Dictionary.of` promises
@@ -558,40 +639,15 @@ function addToFreshStore<Key extends AnyType, Value extends AnyType>(
 	conformance: EquatableWitness<Key> | null,
 ): void {
 	let encoded = encodeKey(key, conformance)
+	let existing = slotInFreshStore(store, key, encoded, conformance)
 
-	if (encoded !== null) {
-		let existing = slotUnder(store, encoded)
+	if (existing !== undefined) {
+		existing.versions[0].value = value
 
-		if (existing !== undefined) {
-			existing.versions[0].value = value
-
-			return
-		}
-	} else if (conformance !== null) {
-		// NOTE: Every slot rather than the unencoded ones, for the reason
-		// `slotHolding` gives — though in a store one witness filled from
-		// nothing, they are the same slots.
-		let slots = store.slots
-
-		for (let index = 0; index < slots.length; index++) {
-			let slot = slots[index]
-
-			if (conformance.is(slot.key, key).value) {
-				slot.versions[0].value = value
-
-				return
-			}
-		}
+		return
 	}
 
-	let slot: Slot<Key, Value> = {
-		key,
-		encoded,
-		versions: [{ value, generation: 0 }],
-	}
-
-	store.slots.push(slot)
-	fileSlot(store, slot)
+	openFreshSlot(store, key, encoded, value)
 }
 
 // NOTE: The door a host or the Compiler's own emitted code comes through, and
@@ -612,6 +668,57 @@ export function createDictionary<Key extends AnyType, Value extends AnyType>(
 		addToFreshStore(store, entry[0], entry[1], conformance)
 	}
 
+	return boxAt(store, 0, store.slots.length)
+}
+
+// NOTE: The three doors a native that GATHERS a Dictionary comes through, and
+// the reason they are here rather than in the module that gathers. A grouping
+// walks its source once and folds each item into the entry its key already has,
+// which no door above spells: `createDictionary` is handed the entries finished.
+// Opening the store, folding into it and sealing it are the whole of what such a
+// native needs, and keeping the three here keeps the slots, the two indexes and
+// the version stamps in one file — see `GroupedList.ts`, the only caller.
+export function freshStore<Key extends AnyType, Value extends AnyType>(): Store<
+	Key,
+	Value
+> {
+	registerDictionaryKind()
+
+	return emptyStore()
+}
+
+// NOTE: One item folded into the entry its key stands at, or a new entry opened
+// at the end for a key that has none. `combine` is handed what the key holds and
+// answers what it holds next; `seed` answers what a key opens with. The two are
+// apart because a group's first item and its later ones are different questions
+// — the first BUILDS the accumulator and the rest add to one.
+export function foldIntoFreshStore<Key extends AnyType, Value extends AnyType>(
+	store: Store<Key, Value>,
+	key: Key,
+	conformance: EquatableWitness<Key> | null,
+	seed: () => Value,
+	combine: (held: Value) => Value,
+): void {
+	let encoded = encodeKey(key, conformance)
+	let existing = slotInFreshStore(store, key, encoded, conformance)
+
+	if (existing !== undefined) {
+		// NOTE: Nothing in such a store is a tombstone — `remove` is the only
+		// thing that writes one, and it writes on a box rather than here.
+		existing.versions[0].value = combine(
+			existing.versions[0].value as Value,
+		)
+
+		return
+	}
+
+	openFreshSlot(store, key, encoded, seed())
+}
+
+export function dictionaryOverFreshStore<
+	Key extends AnyType,
+	Value extends AnyType,
+>(store: Store<Key, Value>): DictionaryType<Key, Value> {
 	return boxAt(store, 0, store.slots.length)
 }
 

@@ -3646,6 +3646,26 @@ third"::lines())
 		"Dictionary.hasEntries<KeyType, ValueType>() [empty]",
 		noAges::hasEntries(),
 	)
+	§ The quantified entry stops at the entry that decides the answer, and the
+	§ empty Dictionary has none to offer the check.
+	show(
+		"Dictionary.hasEntries<KeyType, ValueType>(where: (_ \{ key: KeyType, value: ValueType \}) -> Boolean)",
+		ages::hasEntries(where ({ key, value }) {
+			<- value::isGreaterThan(30)
+		}),
+	)
+	show(
+		"Dictionary.hasEntries<KeyType, ValueType>(where: (_ \{ key: KeyType, value: ValueType \}) -> Boolean) [nothing accepted]",
+		ages::hasEntries(where ({ key, value }) {
+			<- value::isGreaterThan(99)
+		}),
+	)
+	show(
+		"Dictionary.hasEntries<KeyType, ValueType>(where: (_ \{ key: KeyType, value: ValueType \}) -> Boolean) [empty]",
+		noAges::hasEntries(where ({ key, value }) {
+			<- value::isGreaterThan(0)
+		}),
+	)
 	show(
 		"Dictionary.hasKey<ValueType, KeyType is Equatable>(_ KeyType)",
 		ages::hasKey("alex"),
@@ -3814,6 +3834,113 @@ third"::lines())
 	show(
 		"Dictionary.value<ValueType, KeyType is Equatable>(at: KeyType) [Record key]",
 		seats::value(at { row = 4, seat = 1 }),
+	)
+
+	§ ——— NonEmptyDictionary ———————————————————————————————————————————————
+	§ The Methods a Dictionary has to have been PROVEN to answer. A Dictionary
+	§ written down with an entry in it is its own proof, so the receiver is
+	§ declared and nothing stands in front of these calls asking anything.
+	constant provenAges: NonEmptyDictionary<String, Integer> = [
+		"alex" = 39,
+		"sam" = 25,
+	]
+
+	show(
+		"NonEmptyDictionary.length<KeyType, ValueType>()",
+		provenAges::length(),
+	)
+	show("NonEmptyDictionary.keys<KeyType, ValueType>()", provenAges::keys())
+	show(
+		"NonEmptyDictionary.values<KeyType, ValueType>()",
+		provenAges::values(),
+	)
+	show(
+		"NonEmptyDictionary.entries<KeyType, ValueType>()",
+		provenAges::entries(),
+	)
+	§ Each of the three halves carries its own proof into the answer, which is
+	§ what a total `firstItem` reads off it.
+	show(
+		"NonEmptyDictionary.keys<KeyType, ValueType>() [proof carried]",
+		provenAges::keys()::firstItem(),
+	)
+	show(
+		"NonEmptyDictionary.values<KeyType, ValueType>() [proof carried]",
+		provenAges::values()::firstItem(),
+	)
+	show(
+		"NonEmptyDictionary.entries<KeyType, ValueType>() [proof carried]",
+		provenAges::entries()::firstItem().key,
+	)
+	show(
+		"NonEmptyDictionary.map<KeyType, ValueType, Result>(_ (_ \{ key: KeyType, value: ValueType \}) -> Result)",
+		provenAges::map(({ key, value }) { <- value::add(1) }),
+	)
+	show(
+		"NonEmptyDictionary.map<KeyType, ValueType, Result>(_ (_ \{ key: KeyType, value: ValueType \}) -> Result) [proof carried]",
+		provenAges::map(({ key, value }) { <- value::add(1) })::length(),
+	)
+	§ Setting a key answers this Type on `Dictionary` itself, whatever it was
+	§ handed, so even the empty Dictionary answers a proven one.
+	show(
+		"Dictionary.set<ValueType, KeyType is Equatable>(_ KeyType, to: ValueType) [the answer is proven]",
+		noAges::set("kim", to 7)::length(),
+	)
+
+	§ ——— GroupedList ——————————————————————————————————————————————————————
+	§ The bridge from the first container to the second: the receiver is a
+	§ List and the answer is a Dictionary. Each group holds an item and each
+	§ count is above zero, which only the native that built them can promise.
+	§
+	§ The receivers here are computed, because a List written where it stands
+	§ proves its own count and would reach the proven Namespace below instead.
+	constant seatedGuests = [
+		{ name = "alex", home = "north" },
+		{ name = "sam", home = "south" },
+		{ name = "kim", home = "north" },
+	]
+	constant votes        = ["a", "b", "a", "c", "a"]
+	constant noVotes: List<String> = []
+
+	show(
+		"GroupedList.groupedBy<ItemType, KeyType is Equatable>(key: (_ ItemType) -> KeyType)",
+		seatedGuests
+			::groupedBy(key (guest) { <- guest.home })
+			::map(({ key, value }) {
+				<- value::map((guest) { <- guest.name })
+			}),
+	)
+	show(
+		"GroupedList.groupedBy<ItemType, KeyType is Equatable>(key: (_ ItemType) -> KeyType) [empty]",
+		noVotes::groupedBy(key (vote) { <- vote }),
+	)
+	§ Every group holds at least one item, which is what a total `firstItem`
+	§ read off a group says.
+	show(
+		"GroupedList.groupedBy<ItemType, KeyType is Equatable>(key: (_ ItemType) -> KeyType) [proven groups]",
+		votes
+			::groupedBy(key (vote) { <- vote })
+			::map(({ key, value }) { <- value::firstItem() }),
+	)
+	show("GroupedList.tallied<ItemType is Equatable>()", votes::tallied())
+	show(
+		"GroupedList.tallied<ItemType is Equatable>() [empty]",
+		noVotes::tallied(),
+	)
+
+	§ ——— GroupedNonEmptyList ——————————————————————————————————————————————
+	§ The same two crossings with the receiver's proof in hand. A List with an
+	§ item in it puts that item in a group, so the Dictionary each answers
+	§ holds an entry — which is what the total `length` reads off it.
+	constant provenVotes: NonEmptyList<String> = ["a", "b", "a"]
+
+	show(
+		"GroupedNonEmptyList.groupedBy<ItemType, KeyType is Equatable>(key: (_ ItemType) -> KeyType)",
+		provenVotes::groupedBy(key (vote) { <- vote })::length(),
+	)
+	show(
+		"GroupedNonEmptyList.tallied<ItemType is Equatable>()",
+		provenVotes::tallied()::length(),
 	)
 
 	§ ——— loop ————————————————————————————————————————————————————————————

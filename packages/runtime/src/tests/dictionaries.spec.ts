@@ -20,9 +20,11 @@ import {
 	value__overload$1 as valueAt,
 	values as valuesOf,
 } from "../Dictionary"
+import { groupedBy, tallied } from "../GroupedList"
 import type { IntegerType } from "../Integer"
 import { createInteger } from "../Integer"
 import { anyIs, boundChoiceIs } from "../internalHelpers"
+import type { ListType } from "../List"
 import {
 	createList,
 	materialise,
@@ -1497,6 +1499,138 @@ describe("map", () => {
 
 		expect(lengthOf(mapped).value).toBe(0)
 		expect(writtenForm(mapped)).toBe("[=]")
+	})
+})
+
+// NOTE: The two natives that GATHER a Dictionary rather than being handed one
+// — `GroupedList.groupedBy` and `GroupedList.tallied`
+// (`packages/standard-library/sources/Dictionary.es`). They build through this
+// module's own fresh-store doors, so what is asked of them here is what is
+// asked of every other construction: which entries are live, in what order, and
+// that the answer is a store of its own a write may be made on.
+describe("grouping a List", () => {
+	const listOf = (...items: Array<AnyType>) => createList([...items])
+
+	const groupText = (item: AnyType) => text(textOf(item).slice(0, 1))
+
+	test("opens a group where its key is first met and appends to it after", () => {
+		let grouped = groupedBy(
+			listOf(text("apple"), text("banana"), text("avocado")),
+			groupText,
+			equality,
+		)
+
+		expect(keysOf(grouped).value.map(textOf)).toEqual(["a", "b"])
+		expect(
+			valuesOf(grouped).value.map((group) =>
+				materialise(group as ListType<AnyType>).map(textOf),
+			),
+		).toEqual([["apple", "avocado"], ["banana"]])
+	})
+
+	// NOTE: A List built at the FRONT holds its first items in a second run,
+	// stored reversed, so a native that read the backing Array would group them
+	// backwards. What decides the order here is the logical walk.
+	test("walks a List built at both ends in its logical order", () => {
+		let grouped = groupedBy(
+			prepend(listOf(text("banana"), text("avocado")), text("apple")),
+			groupText,
+			equality,
+		)
+
+		expect(keysOf(grouped).value.map(textOf)).toEqual(["a", "b"])
+		expect(
+			materialise(valuesOf(grouped).value[0] as ListType<AnyType>).map(
+				textOf,
+			),
+		).toEqual(["apple", "avocado"])
+	})
+
+	test("the empty List groups into the empty Dictionary", () => {
+		let grouped = groupedBy(createList([]), groupText, equality)
+
+		expect(lengthOf(grouped).value).toBe(0)
+		expect(writtenForm(grouped)).toBe("[=]")
+	})
+
+	// NOTE: A key of a kind that does not encode takes the scan path, exactly
+	// as it does for every other Dictionary native — the group is found by
+	// asking the witness about the slots standing.
+	test("groups under a key that is found by asking the witness", () => {
+		let grouped = groupedBy(
+			listOf(integer(1), integer(2), integer(3), integer(4)),
+			(item) =>
+				createRecord({
+					id: createBoolean(numberOf(item) % 2 === 0),
+				}),
+			byIdentifier,
+		)
+
+		expect(lengthOf(grouped).value).toBe(2)
+		expect(
+			valuesOf(grouped).value.map((group) =>
+				materialise(group as ListType<AnyType>).map(numberOf),
+			),
+		).toEqual([
+			[1, 3],
+			[2, 4],
+		])
+	})
+
+	test("counts each item, in the order the items are first met", () => {
+		let counted = tallied(
+			listOf(text("a"), text("b"), text("a"), text("c"), text("a")),
+			equality,
+		)
+
+		expect(writtenForm(counted)).toBe(`["a" = 3, "b" = 1, "c" = 1]`)
+		expect(lengthOf(tallied(createList([]), equality)).value).toBe(0)
+	})
+
+	// NOTE: Two items that are ONE item to the language are one entry here, and
+	// the one that arrived first is the one the entry keeps — the same rule
+	// every other construction follows. `3` and `3/1` are the pair the
+	// cross-kind encoding is written for.
+	test("counts two spellings of one value as one item", () => {
+		let counted = tallied(
+			listOf(integer(3), createRational(3n, 1n), integer(4)),
+			equality,
+		)
+
+		expect(writtenForm(counted)).toBe("[3 = 2, 4 = 1]")
+	})
+
+	// NOTE: An unbranded witness is the shape a Namespace-written `is` arrives
+	// in, and it decides which two items are one item. Two Strings that differ
+	// only in case are one key to this one, so the tally counts them together
+	// and keeps the spelling that arrived first.
+	test("counts through a witness a Namespace wrote", () => {
+		let counted = tallied(
+			listOf(text("Ada"), text("ada"), text("Grace")),
+			looseText,
+		)
+
+		expect(writtenForm(counted)).toBe(`["Ada" = 2, "Grace" = 1]`)
+	})
+
+	// NOTE: What a gathered Dictionary has to be: an ordinary one. It is built
+	// at generation zero with one version per slot, which is the shape a repack
+	// leaves a store in, so a write on it is a tip write like any other.
+	test("answers a store of its own that can be written to", () => {
+		let counted = tallied(listOf(text("a"), text("b"), text("a")), equality)
+
+		// NOTE: Asked before anything is written, because `dead` is a property
+		// of the STORE at its tip and the writes below share this one.
+		expect(counted.generation).toBe(0)
+		expect(counted.store.generation).toBe(0)
+		expect(counted.store.dead).toBe(0)
+
+		let written = setAt(counted, text("a"), integer(9), equality)
+		let removed = removeAt(counted, text("a"), equality)
+
+		expect(writtenForm(counted)).toBe(`["a" = 2, "b" = 1]`)
+		expect(writtenForm(written)).toBe(`["a" = 9, "b" = 1]`)
+		expect(writtenForm(removed)).toBe(`["b" = 1]`)
 	})
 })
 

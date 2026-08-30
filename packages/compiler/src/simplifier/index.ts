@@ -531,7 +531,7 @@ function simplifyCombination(
 			: {
 					keyConformance: conformanceExpression(node.keyConformance),
 				}),
-		type: node.type,
+		type: writtenValueType(node.type),
 		position: node.position,
 	}
 }
@@ -548,11 +548,11 @@ function simplifyRecordValue(
 }
 
 // NOTE: A written value's own kind, with the proof a RECEIVER position gave it
-// taken back off. Only four Node kinds can carry one and only in that one
+// taken back off. Only six Node kinds can carry one and only in that one
 // position — see `writtenReceiver` in the Enricher — and by here it has done the
 // whole of its work: which Namespace and which entry the call reached is already
 // written into the Invocation Node. The Optimiser erases every other refinement
-// on its way in, and these four are erased here instead so that the simplified
+// on its way in, and these six are erased here instead so that the simplified
 // Node keeps saying an Integer is an Integer.
 function writtenValueType<Kind extends common.Type>(
 	type: Kind | common.RefinementType,
