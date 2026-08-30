@@ -150,7 +150,7 @@ describe("NonEmptyDictionary", () => {
 						}
 					}
 
-					function otherwise(_ d: Dictionary<String, Integer>) -> String {
+					function inverted(_ d: Dictionary<String, Integer>) -> String {
 						if d::isEmpty() {
 							<- "nothing"
 						} else {
@@ -163,8 +163,8 @@ describe("NonEmptyDictionary", () => {
 
 					Terminal.inspect(counted(held))
 					Terminal.inspect(counted(none))
-					Terminal.inspect(otherwise(held))
-					Terminal.inspect(otherwise(none))
+					Terminal.inspect(inverted(held))
+					Terminal.inspect(inverted(none))
 				}`),
 			).toEqual(['"a"', '"nothing"', '"a"', '"nothing"'])
 		})
