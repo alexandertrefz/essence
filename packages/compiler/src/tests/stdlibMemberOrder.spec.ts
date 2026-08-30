@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test"
+import { readFileSync } from "node:fs"
 import * as path from "node:path"
 
 import type { common } from "@essence-lang/interfaces"
@@ -70,6 +71,12 @@ const ACCESSORS = new Set([
 	"lastIndex",
 	"indices",
 	"keys",
+	// NOTE: A Dictionary's two other halves, beside the keys it shares
+	// with `Record`. An entry is the pair a Dictionary is written in terms
+	// of rather than a Record built out of one, which is what separates
+	// `entries` from `enumerate`.
+	"values",
+	"entries",
 	"characters",
 	"words",
 	"lines",
@@ -287,6 +294,30 @@ describe("Standard Library Member Order", () => {
 
 	it("should declare each Namespace's members in group order", () => {
 		expect(outOfOrderMembers().join("\n")).toBe("")
+	})
+
+	// NOTE: The rulebook a next editor reads and the set this file classifies
+	// by are two spellings of one list, and only one of them fails a test when
+	// it goes stale. So the rulebook is held to the set: an accessor added here
+	// has to be written there too, or the next reader is given a list that has
+	// quietly stopped being the list.
+	it("should name every accessor in DEVELOPMENT.md", () => {
+		let development = readFileSync(
+			path.resolve(
+				import.meta.dirname,
+				"../../../standard-library/DEVELOPMENT.md",
+			),
+			"utf8",
+		)
+		let section = development.slice(
+			development.indexOf("5. **Accessors**"),
+			development.indexOf("6. **Transforms"),
+		)
+		let missing = [...ACCESSORS].filter(
+			(name) => !section.includes(`\`${name}`),
+		)
+
+		expect(missing).toEqual([])
 	})
 
 	it("should declare the Protocol witnesses in the stated order", () => {

@@ -483,6 +483,15 @@ describe("Stdlib Call Graph", () => {
 			"Algebraic.subtract__overload$4",
 			"Boolean.exclusiveOr",
 			"Boolean.toString",
+			"Dictionary.everyEntry",
+			"Dictionary.hasEntries",
+			"Dictionary.hasKey",
+			"Dictionary.merge__overload$1",
+			"Dictionary.merge__overload$2",
+			"Dictionary.removeEvery",
+			"Dictionary.update__overload$1",
+			"Dictionary.update__overload$2",
+			"Dictionary.value__overload$2",
 			"Equatable.isNot",
 			// NOTE: `Exact` is a helper Namespace of `Number.es` that
 			// `Prelude.es` does not re-export, so it is no builtin — but it is

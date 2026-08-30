@@ -407,3 +407,46 @@ true
 1/2
 2"
 `;
+
+exports[`Fixture Sweep Dictionary.es should print what it printed before 1`] = `
+"[ "ada" = 2, "grace" = 1 ]
+[ "ada" = 3, "grace" = 1, "alan" = 1 ]
+[ "ada" = 3, "grace" = 2, "alan" = 1, "kim" = 1 ]
+[ "ada" = 3, "grace" = 1, "alan" = 1 ]
+true
+Optional#Value(1)
+Optional#Empty
+0
+true
+[ "ada" = 3, "grace" = 2, "alan" = 1, "brian" = 1 ]
+[ "ada", "grace", "alan", "brian" ]
+[ 3, 2, 1, 1 ]
+[
+    { key = "ada", value = 3 },
+    { key = "grace", value = 2 },
+    { key = "alan", value = 1 },
+    { key = "brian", value = 1 }
+]
+4
+[ "ada" = 3, "grace" = 2 ]
+[ "ada" = 3, "grace" = 2 ]
+[ "ada" = "ada has 3", "kim" = "kim has 1" ]
+[ "grace" = 2, "alan" = 1, "brian" = 1, "ada" = 1 ]
+[
+    "ada" = 1,
+    "grace" = 2,
+    "alan" = 1,
+    "brian" = 1,
+    "kim" = 4
+]
+[
+    "ada" = 2,
+    "grace" = 2,
+    "alan" = 1,
+    "brian" = 1,
+    "kim" = 4
+]
+true
+true
+Optional#Value("grace")"
+`;

@@ -139,6 +139,17 @@ export const builtinMemberOrder: Array<string> = [
 	// target for the same reason. All this order decides is where the one
 	// `average` lands in the list.
 	"NonEmptyKeyedNumberList",
+	// NOTE: After the List Namespaces, because a Dictionary is the second
+	// container and a reader of this list meets the first one whole before it.
+	// It shares plenty of Method names with them — `of`, `is`, `toString`,
+	// `isEmpty`, `length`, `map`, `remove` and `removeEvery` with `List`,
+	// `value` with `Optional`, `values` with `OptionalList`, `keys` with
+	// `Record` — and shares them harmlessly, because no value reaches a
+	// Dictionary Namespace and one of theirs at once: this target is a
+	// Dictionary and every target above it is not. So the position decides
+	// nothing but where a reader meets it. `builtins.spec.ts` holds this list
+	// to what the standard library declares.
+	"Dictionary",
 	// NOTE: Last, and not because it is newest. `Randomness` targets a Type
 	// nothing else targets and shares not one Method name with the Namespaces
 	// above it, so its position decides nothing at all — and a reader of this
@@ -184,6 +195,11 @@ export const builtinTypeOrder: Array<string> = [
 	// then what a List can be proven to be, and `closestMatch` breaks a tie on
 	// the FIRST candidate, so a typo near both still reads as the base Type.
 	"NonEmptyList",
+	// NOTE: After the List family rather than beside `Record`, though its
+	// vocabulary borrows from both — a reader of this table meets the container
+	// Types together, and `Dictionary` is the second of them. It shares not one
+	// name with anything above it, so `closestMatch` has no tie here to break.
+	"Dictionary",
 	"Irrational",
 	"Number",
 	"Optional",

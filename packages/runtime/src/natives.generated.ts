@@ -13,6 +13,7 @@
 
 import type { AlgebraicType } from "./Algebraic"
 import type { BooleanType } from "./Boolean"
+import type { DictionaryType } from "./Dictionary"
 import type { IntegerType } from "./Integer"
 import type { ListType } from "./List"
 import type { NormalizationFormType } from "./NormalizationForm"
@@ -459,6 +460,33 @@ export type NonEmptyKeyedNumberListNatives = {
 
 }
 
+export type DictionaryNatives = {
+	// static of<ValueType, KeyType is Equatable>(_: List<{ key: KeyType, value: ValueType }>) -> Dictionary<KeyType, ValueType>
+	of: <ValueType extends AnyType, KeyType extends AnyType>(argument0: ListType<RecordType & { key: KeyType; value: ValueType }>, KeyType__conformance: EquatableConformance<KeyType>) => DictionaryType<KeyType, ValueType>
+	// is<KeyType is Equatable, ValueType is Equatable>(_: Dictionary<KeyType, ValueType>) -> Boolean
+	is: <KeyType extends AnyType, ValueType extends AnyType>(self: DictionaryType<KeyType, ValueType>, argument1: DictionaryType<KeyType, ValueType>, KeyType__conformance: EquatableConformance<KeyType>, ValueType__conformance: EquatableConformance<ValueType>) => BooleanType
+	// toString<KeyType is Printable, ValueType is Printable>() -> String
+	toString: <KeyType extends AnyType, ValueType extends AnyType>(self: DictionaryType<KeyType, ValueType>, KeyType__conformance: PrintableConformance<KeyType>, ValueType__conformance: PrintableConformance<ValueType>) => StringType
+	// isEmpty<KeyType, ValueType>() -> Boolean
+	isEmpty: <KeyType extends AnyType, ValueType extends AnyType>(self: DictionaryType<KeyType, ValueType>) => BooleanType
+	// length<KeyType, ValueType>() -> Integer
+	length: <KeyType extends AnyType, ValueType extends AnyType>(self: DictionaryType<KeyType, ValueType>) => IntegerType
+	// value<ValueType, KeyType is Equatable>(at: KeyType) -> Optional<ValueType>
+	value__overload$1: <ValueType extends AnyType, KeyType extends AnyType>(self: DictionaryType<KeyType, ValueType>, at: KeyType, KeyType__conformance: EquatableConformance<KeyType>) => OptionalType<ValueType>
+	// keys<KeyType, ValueType>() -> List<KeyType>
+	keys: <KeyType extends AnyType, ValueType extends AnyType>(self: DictionaryType<KeyType, ValueType>) => ListType<KeyType>
+	// values<KeyType, ValueType>() -> List<ValueType>
+	values: <KeyType extends AnyType, ValueType extends AnyType>(self: DictionaryType<KeyType, ValueType>) => ListType<ValueType>
+	// entries<KeyType, ValueType>() -> List<{ key: KeyType, value: ValueType }>
+	entries: <KeyType extends AnyType, ValueType extends AnyType>(self: DictionaryType<KeyType, ValueType>) => ListType<RecordType & { key: KeyType; value: ValueType }>
+	// set<ValueType, KeyType is Equatable>(_: KeyType, to: ValueType) -> Dictionary<KeyType, ValueType>
+	set: <ValueType extends AnyType, KeyType extends AnyType>(self: DictionaryType<KeyType, ValueType>, argument1: KeyType, to: ValueType, KeyType__conformance: EquatableConformance<KeyType>) => DictionaryType<KeyType, ValueType>
+	// remove<ValueType, KeyType is Equatable>(at: KeyType) -> Dictionary<KeyType, ValueType>
+	remove: <ValueType extends AnyType, KeyType extends AnyType>(self: DictionaryType<KeyType, ValueType>, at: KeyType, KeyType__conformance: EquatableConformance<KeyType>) => DictionaryType<KeyType, ValueType>
+	// map<KeyType, ValueType, Result>(_: (_: { key: KeyType, value: ValueType }) -> Result) -> Dictionary<KeyType, Result>
+	map: <KeyType extends AnyType, ValueType extends AnyType, Result extends AnyType>(self: DictionaryType<KeyType, ValueType>, argument1: (argument0: RecordType & { key: KeyType; value: ValueType }) => Result) => DictionaryType<KeyType, Result>
+}
+
 export type RandomnessNatives = {
 	// boolean() -> Boolean
 	boolean: (self: RandomnessType) => BooleanType
@@ -770,6 +798,24 @@ export const $KeyedNumberListAbsent: AssertNoEssenceExports<typeof import("./Key
 declare const NonEmptyKeyedNumberListModule: typeof import("./NonEmptyKeyedNumberList")
 export const $NonEmptyKeyedNumberList: NonEmptyKeyedNumberListNatives = NonEmptyKeyedNumberListModule
 export const $NonEmptyKeyedNumberListAbsent: AssertNoEssenceExports<typeof import("./NonEmptyKeyedNumberList"), "average"> = true
+
+declare const DictionaryModule: typeof import("./Dictionary")
+export const $Dictionary: DictionaryNatives = DictionaryModule
+export const $DictionaryAbsent: AssertNoEssenceExports<typeof import("./Dictionary"), "hasEntries" | "hasKey" | "value__overload$2" | "update__overload$1" | "update__overload$2" | "removeEvery" | "everyEntry" | "merge__overload$1" | "merge__overload$2"> = true
+export const $DictionaryArity: AssertArities<typeof import("./Dictionary"), {
+	of: 2
+	is: 4
+	toString: 3
+	isEmpty: 1
+	length: 1
+	value__overload$1: 3
+	keys: 1
+	values: 1
+	entries: 1
+	set: 4
+	remove: 3
+	map: 2
+}> = true
 
 declare const RandomnessModule: typeof import("./Randomness")
 export const $Randomness: RandomnessNatives = RandomnessModule

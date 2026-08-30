@@ -287,8 +287,9 @@ groups, in this order:
    `doesNotContain`.
 5. **Accessors** — the Methods that answer a named part of the receiver:
    `length`, `numerator`, `denominator`, `absolute`, `item(at:)`, `firstItem`,
-   `lastItem`, `firstIndex`, `lastIndex`, `indices`, `keys`, `characters`,
-   `words`, `lines`, `character(at:)`, `value(defaultingTo:)`.
+   `lastItem`, `firstIndex`, `lastIndex`, `indices`, `keys`, `values`,
+   `entries`, `characters`, `words`, `lines`, `character(at:)`,
+   `value(defaultingTo:)`.
 6. **Transforms, and everything else** — `negate`, `round`, `clamp`,
    `reciprocal`, `map`, `reduce`, `everyItem`, `sort`, `slice`, `append`,
    `join`, `split`, `trim`, `pad`, `flatten`, `andThen`.
@@ -683,7 +684,8 @@ A new Namespace is a new runtime module. The Simplifier emits
    asserts, which reads the same list back.
 
 A Namespace that also declares a **Type** — a `choice`, as `Ordering` and `Side`
-do — needs a sixth: a place in `builtinTypeOrder`, beside `builtinMemberOrder`.
+do, or a primitive Type of its own as `List` and `Dictionary` have — needs a
+sixth: a place in `builtinTypeOrder`, beside `builtinMemberOrder`.
 
 Its own members go in the order every Namespace here declares them — see
 [Member order](#member-order).

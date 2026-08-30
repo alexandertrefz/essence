@@ -1089,6 +1089,7 @@ describe("Standard Library Loader", () => {
 			"Transcendental",
 			"Boolean",
 			"Record",
+			"Dictionary",
 			"Step",
 			"Side",
 			"CaseSensitivity",
@@ -1401,6 +1402,9 @@ describe("Standard Library Loader", () => {
 			// widest List there is — see `builtinMemberOrder`.
 			"KeyedNumberList",
 			"NonEmptyKeyedNumberList",
+			// NOTE: The second container, listed after the first one whole —
+			// see `builtinMemberOrder`.
+			"Dictionary",
 			"Randomness",
 		])
 	})
@@ -2023,6 +2027,7 @@ describe("Standard Library Loader", () => {
 		// negated over the bound they were handed.
 		expect([...new Set(aliases)].sort()).toEqual([
 			"Boolean::exclusiveOr -> not Boolean::is(#0)",
+			"Dictionary::hasEntries -> not Dictionary::isEmpty()",
 			"Integer::isGreaterThanOrEqualTo -> not Integer::isLessThan(#0)",
 			"Integer::isLessThanOrEqualTo -> not Integer::isGreaterThan(#0)",
 			"Integer::isNegative -> Integer::isLessThan(0)",
@@ -2056,6 +2061,11 @@ describe("Standard Library Loader", () => {
 			"Boolean::is",
 			"Boolean::negate",
 			"Boolean::or",
+			// NOTE: A chain, so it is a question of its own — `hasKey` asks
+			// the Optional a lookup answers whether it holds anything.
+			"Dictionary::hasKey",
+			"Dictionary::is",
+			"Dictionary::isEmpty",
 			"Integer::is",
 			"Integer::isEven",
 			"Integer::isGreaterThan",

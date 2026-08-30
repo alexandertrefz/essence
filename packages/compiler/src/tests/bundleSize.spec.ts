@@ -375,8 +375,34 @@ describe("Bundle Size", () => {
 	// rather than the 72,600 it records, because `isBetween` landed before it
 	// here and not on the branch it was measured on. The fall itself is the
 	// same shape: 11 rather than 59.
+	// NOTE: 74,806 now, up 1,506 from the 73,300 recorded, and the ceiling
+	// moves to 75,900 to put back the kilobyte of headroom the rest of this
+	// file keeps. Two figures make the rise and only one of them is a change:
+	// the base commit measures 73,525, so 225 is drift that arrived on master
+	// without a NOTE, and 1,281 is Dictionary. Every byte of that 1,281 is what
+	// PRINTING a Dictionary costs, and every Program that prints anything at
+	// all pays it: `getStringRepresentation` gained an arm for the written
+	// form, and it reads a box through the `everyLiveEntry` and `liveEntriesOf`
+	// pair, which the Type Module holds and no printing Program carried before.
+	// Nothing else Dictionary added reaches this file — the Namespace, its
+	// natives and the store are shaken away whole, which is the shakeability
+	// this ceiling exists to watch.
+	//
+	// NOTE: 73,870 now, DOWN 936, and the ceiling comes down to 74,900 with it
+	// — a ceiling two kilobytes above the measurement stops catching what this
+	// one is for. The arithmetic is worth writing out, because the fall is a
+	// design change rather than a deletion: 74,806 − 936 is 73,870, and against
+	// the 73,525 the base commit measured that leaves 345. Those 345 are all a
+	// Program that holds no Dictionary carries of one now — the KIND REGISTRY
+	// (`registry.ts`: a `Map`, `kindOf`, and the line the printer probes it
+	// with) — where the 1,281 above were the whole written form and the live
+	// view behind it. The rendering moved into `Dictionary.ts`, which registers
+	// it from the three doors a Dictionary is built through, so it rides in
+	// with the container and nowhere else. The same move took the Dictionary
+	// arms out of the universal equality and the test runtime's structural
+	// difference; neither reaches this file, so neither is in the figure.
 	it("keeps Everyday.es from dragging in the whole numeric tower", async () => {
-		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(74_400)
+		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(74_900)
 	})
 
 	// NOTE: Measured 42,719 bytes; a reintroduced `Number` spread was 54,849.
@@ -477,8 +503,35 @@ describe("Bundle Size", () => {
 	// gives 28 back: this file prints the `squareRoot` of a negative, and
 	// `Optional::toString` is a native now rather than a body written on a hole.
 	// Nothing else the campaign added is reached at all.
+	// NOTE: 37,973 now, up 1,506 from the 36,467 recorded, and the ceiling
+	// moves to 39,000 for the same reason and by the same split as Everyday's:
+	// 225 of drift and 1,281 of Dictionary. The two files rise by exactly the
+	// same amount, which is the honest shape of this one — what printing a
+	// Dictionary costs is a fixed piece of the runtime rather than anything
+	// either Program does, and neither of them names a Dictionary at all.
+	//
+	// NOTE: 37,017 now, down 956, and the ceiling comes down to 38,000. The
+	// same fall as Everyday's and for the same reason — 37,973 − 956 is 37,017,
+	// which is 325 above the 36,692 this file measured before Dictionary, and
+	// those 325 are the kind registry and the printer's probe of it. It is
+	// twenty fewer bytes than Everyday pays for the same thing, which is
+	// escodegen's indentation and nothing else.
 	it("keeps Irrational.es from dragging in the whole numeric tower", async () => {
-		expect(await bundleSizeOf("Irrational.es")).toBeLessThan(37_500)
+		expect(await bundleSizeOf("Irrational.es")).toBeLessThan(38_000)
+	})
+
+	// NOTE: And the other side of that trade, recorded rather than merely
+	// implied: what a Program that DOES hold a Dictionary carries. Measured
+	// 40,384 bytes for the fixture that walks the whole Namespace — the store,
+	// every native the file reaches, the written form, the kind registry and
+	// the registration that fills it. The ceiling keeps the kilobyte of
+	// headroom the rest of this file keeps; what it is here to catch is the
+	// registry being bypassed, which would put the rendering back in front of
+	// every Program whether it holds a Dictionary or not, and a `Dictionary.ts`
+	// grown top-level side effects, which would pin the whole store into the
+	// two files above.
+	it("charges a Dictionary Program for the container it uses", async () => {
+		expect(await bundleSizeOf("Dictionary.es")).toBeLessThan(41_400)
 	})
 
 	// NOTE: The same claim for a bundle of several Modules, where it is far
