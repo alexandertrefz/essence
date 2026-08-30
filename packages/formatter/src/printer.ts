@@ -2380,6 +2380,32 @@ export class Printer {
 					}
 				}
 
+				// NOTE: A CONDITION that lays itself out over several lines
+				// keeps the `if` in front of it on the answer's line, for the
+				// reason the answer above has its own: `if match … {` opens its
+				// block right there, and nothing in front of that brace needs
+				// the room a break would buy. A trailing callback in the
+				// Condition can only hug the call it is written in this way,
+				// and a break in front of the `if` left it nothing to hug
+				// against.
+				//
+				// The arm stays in the run, where an arm with a block-like
+				// ANSWER does not: its `if` is written in the column like every
+				// other one, and only what follows the brace is on lines of its
+				// own.
+				if (flatWidth(condition) === null) {
+					return {
+						doc: concat([
+							text("as "),
+							answer,
+							padding,
+							text(" if "),
+							condition,
+						]),
+						headWidth,
+					}
+				}
+
 				// NOTE: An arm too long for the line breaks before its `if` —
 				// the one seam in it that is not inside one of the two
 				// Expressions. The answer keeps the line it was introduced on,
