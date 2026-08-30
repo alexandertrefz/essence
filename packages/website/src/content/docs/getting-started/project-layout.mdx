@@ -165,8 +165,9 @@ A test written `for any (…)` declares typed Parameters, and the runner generat
 a value of each Type once per case — a hundred cases by default. This is where
 the type system pays out: the generator is derived from the Type, structurally.
 A Record is built member by member, a Choice is built Case by Case, a List from
-its item Type, and a checked refinement is honoured, so a `NonEmptyList` is
-never empty and a `NonZeroInteger` is never zero:
+its item Type, a Dictionary from its key and value Types, and a checked
+refinement is honoured, so a `NonEmptyList` is never empty and a
+`NonZeroInteger` is never zero:
 
 ```essence
 test "add commutes" for any (a: Integer, b: Integer) {
