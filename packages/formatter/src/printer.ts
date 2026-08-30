@@ -2217,7 +2217,14 @@ export class Printer {
 			let trailing = this.trivia.claimTrailingOn(closeLine)
 
 			let matcher = this.printMatcher(handler.matcher)
-			let matcherText = renderFlat(matcher) ?? ""
+			// NOTE: Asked as a flat WIDTH rather than as a flat rendering
+			// measured afterwards, because a Matcher holding a String written
+			// across several lines has no width at all: the flat rendering
+			// hands that String back whole, newlines and all, and measuring it
+			// reports a column no brace in the output ever reaches — every
+			// sibling padded out to one there is padded past the end of the
+			// line.
+			let matcherWidth = flatWidth(matcher)
 			let padding = text("")
 
 			let head: Array<Doc> = [text("case "), matcher]
@@ -2247,14 +2254,19 @@ export class Printer {
 
 			entries.push({ startLine, endLine: closeLine, doc })
 
-			// NOTE: A run is consecutive Handlers that all stay on one line and
-			// none of which is guarded. A `where` clause is an arbitrary
+			// NOTE: A run is consecutive Handlers that all stay on one line,
+			// none of which is guarded, and each of whose Matchers has a width
+			// to line the run up on. A `where` clause is an arbitrary
 			// Expression — usually the longest thing in the `match` — and
 			// padding every sibling out to it would push the braces off to the
 			// right rather than line them up. One that breaks ends the run for
 			// the same reason it is not in it.
-			if (handler.guard === null && renderFlat(body) !== null) {
-				run.push({ matcherWidth: stringWidth(matcherText), padding })
+			if (
+				handler.guard === null &&
+				matcherWidth !== null &&
+				renderFlat(body) !== null
+			) {
+				run.push({ matcherWidth, padding })
 			} else {
 				closeRun()
 			}

@@ -588,6 +588,37 @@ describe("formatter", () => {
 		})
 	})
 
+	// NOTE: The braces of a run of Handlers are written in one column, which is
+	// measured from each Matcher's flat rendering — and a Matcher holding a
+	// String written across several lines has no such width: the flat rendering
+	// hands the String back whole, newlines and all, and the column it reports
+	// is one no brace in the output reaches.
+	describe("Match", () => {
+		let block = (...lines: Array<string>) =>
+			["implementation {", ...lines, "}", ""].join("\n")
+
+		it("leaves a Matcher written across lines out of the run", () => {
+			let source = block(
+				"\tconstant out = match value -> Integer {",
+				'\t\tcase "hello',
+				'world" { <- 1 }',
+				'\t\tcase "b" { <- 2 }',
+				"\t\tcase _   { <- 3 }",
+				"\t}",
+			)
+
+			let once = format(source)
+
+			expect(once.refusal).toBeNull()
+			expect(once.text).toBe(source)
+
+			let twice = format(once.text)
+
+			expect(twice.refusal).toBeNull()
+			expect(twice.text).toBe(once.text)
+		})
+	})
+
 	// NOTE: A `define` is a table of cases, so it is written one arm to a line
 	// whatever it would fit on — the shape a reader scans down — and the `if` of
 	// a run of adjacent arms is written in one column, `otherwise` among them.
