@@ -7,10 +7,12 @@ import { type RawSourceMap, SourceMapConsumer } from "source-map"
 
 import { bundle, moduleSpecifier, PRELUDE_SPECIFIER } from "../bundler/index"
 import { containsErrors } from "../diagnostics/index"
+import { enrich } from "../enricher/index"
 import { loadModuleGraph } from "../modules/graph"
 import { diskModuleHost } from "../modules/host"
 import { linkModuleGraph } from "../modules/link"
-import { optimise } from "../optimiser/index"
+import { optimise, unoptimisedOptions } from "../optimiser/index"
+import { parseWithDiagnostics } from "../parser/index"
 import { type ModuleInput, rewriteModules } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
@@ -47,6 +49,42 @@ function moduleInputs(): {
 	})
 
 	return { inputs, entryPath: linked.entryPath, texts }
+}
+
+// NOTE: One source, compiled the way `essence dap` compiles a debug session —
+// every pass off, so what is stepped through is the Program as it was written.
+// A Module of its own rather than a line added to the `modules` fixtures, whose
+// text every expectation above is read out of.
+function unoptimisedModule(
+	filePath: string,
+	source: string,
+): { text: string; map: RawSourceMap } {
+	let parsed = parseWithDiagnostics(source)
+
+	expect(containsErrors(parsed.diagnostics)).toBe(false)
+
+	let enriched = enrich(parsed.program, { modulePath: filePath })
+
+	expect(containsErrors(enriched.diagnostics)).toBe(false)
+	expect(containsErrors(validate(enriched.program))).toBe(false)
+
+	let generated = rewriteModules(
+		[
+			{
+				filePath,
+				program: optimise(
+					simplify(enriched.program, { source }),
+					unoptimisedOptions,
+				),
+				sourceText: source,
+			},
+		],
+		filePath,
+		{ sourcemap: true, optimiser: unoptimisedOptions },
+	)
+	let text = generated.sources.get(generated.entry)!
+
+	return { text, map: decodeInlineMap(text) }
 }
 
 const inlineMapPrefix = "//# sourceMappingURL=data:application/json;base64,"
@@ -173,6 +211,82 @@ describe("Source Maps", () => {
 		})
 
 		expect(mappedBandLines).toEqual([])
+	})
+
+	// NOTE: A `define` is emitted as a chain of JavaScript conditionals on ONE
+	// line, so every arm of it maps back through a COLUMN rather than through a
+	// line of its own — which is the whole of what makes stepping through one in
+	// a debugger land where the arm was written rather than at the top of the
+	// ladder. Read with every pass off, because that is what `essence dap`
+	// compiles a session with.
+	it("maps each arm of a define back to the arm it was written as", () => {
+		let filePath = join(tmpdir(), "essence-sourcemaps", "Grade.es")
+		let source = `implementation {
+	function grade(_ score: Integer) -> String {
+		<- define {
+			as "A" if score::isGreaterThanOrEqualTo(90)
+			as "B" if score::isGreaterThanOrEqualTo(80)
+			as "F" otherwise
+		}
+	}
+
+	Terminal.print(grade(95))
+}
+`
+		let { text, map } = unoptimisedModule(filePath, source)
+		let lines = text.split("\n")
+		let chainLine = lines.findIndex((line) => line.includes('"A"')) + 1
+
+		expect(chainLine).toBeGreaterThan(0)
+
+		// NOTE: Where each arm's ANSWER stands in the emitted chain, read as a
+		// span rather than as one column: escodegen writes a mapping at the
+		// token boundaries of the Node it was given, and which of them a
+		// debugger's own query lands on is its business. What has to hold is
+		// that every mapping over an arm's answer names THAT arm and no other.
+		let answers = ["A", "B", "F"]
+		let spans = new Map(
+			answers.map((answer) => {
+				let emitted = `String.createString("${answer}")`
+				let start = lines[chainLine - 1]!.indexOf(emitted)
+
+				expect(start).toBeGreaterThan(-1)
+
+				return [answer, { start, end: start + emitted.length }]
+			}),
+		)
+		let found = new Map(
+			answers.map((answer) => [answer, new Set<number>()]),
+		)
+		let consumer = new SourceMapConsumer(map)
+
+		consumer.eachMapping((mapping) => {
+			if (
+				mapping.generatedLine !== chainLine ||
+				mapping.originalLine === null
+			) {
+				return
+			}
+
+			for (let [answer, span] of spans) {
+				if (
+					mapping.generatedColumn >= span.start &&
+					mapping.generatedColumn < span.end
+				) {
+					found.get(answer)!.add(mapping.originalLine)
+				}
+			}
+		})
+
+		// NOTE: The lines the arms are written on, found in the source rather
+		// than hardcoded, so an edited fixture moves the expectation with it.
+		let sourceLines = source.split("\n")
+		let lineOf = (answer: string): number =>
+			sourceLines.findIndex((line) => line.includes(`as "${answer}"`)) + 1
+
+		expect(answers.map((answer) => [...found.get(answer)!].sort())).toEqual(
+			answers.map((answer) => [lineOf(answer)]),
+		)
 	})
 
 	it("emits no comment at all when no map was asked for", () => {
