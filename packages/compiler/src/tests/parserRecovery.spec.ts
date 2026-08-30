@@ -505,8 +505,12 @@ describe("Parser Recovery", () => {
 
 		expect(diagnostics).toHaveLength(1)
 		expect(diagnostics[0].severity).toBe("error")
+		expect(diagnostics[0].code).toBe("define-without-otherwise")
 		expect(diagnostics[0].message).toBe(
 			"This 'define' has no 'otherwise' arm",
+		)
+		expect(diagnostics[0].labels[0]?.message).toBe(
+			"every value here has a condition on it",
 		)
 
 		let nodes = program.implementation.nodes
@@ -518,22 +522,64 @@ describe("Parser Recovery", () => {
 		}
 	})
 
+	// NOTE: Reported and DROPPED rather than thrown, which is what keeps the
+	// `define` and the Statement it stands in: the arm reads perfectly well, and
+	// what is wrong with it is where it stands.
 	it("should refuse an arm written below the otherwise arm", () => {
-		let { diagnostics } = parseWithDiagnostics(
+		let { program, diagnostics } = parseWithDiagnostics(
 			`implementation {
 				constant grade = define {
 					as 1 if flag
 					as 0 otherwise
 					as 2 if other
 				}
+
+				constant y = 3
 			}`,
 		)
 
 		expect(diagnostics).toHaveLength(1)
 		expect(diagnostics[0].severity).toBe("error")
+		expect(diagnostics[0].code).toBe("unreachable-define-arm")
 		expect(diagnostics[0].message).toBe(
 			"This arm stands below the 'otherwise' arm",
 		)
+		expect(diagnostics[0].labels[0]?.message).toBe(
+			"nothing here can ever be reached",
+		)
+
+		let nodes = program.implementation.nodes
+
+		expect(nodes).toHaveLength(2)
+
+		if (
+			nodes[0].nodeType === "ConstantDeclarationStatement" &&
+			nodes[0].value.nodeType === "Define"
+		) {
+			// NOTE: The unreachable arm is never recorded, which is what keeps
+			// "the `otherwise` arm is last" true of every Node that can be
+			// built rather than of the ones the Parser happened to like.
+			expect(nodes[0].value.arms).toHaveLength(1)
+		}
+	})
+
+	// NOTE: A `define` missing its `otherwise` arm inside a SPECULATION. The
+	// refusal used to carry the generic `syntax-error`, which `rewoundCodes`
+	// hands back — so the Record reading rewound, the Dictionary reading behind
+	// it answered for the same text, and what a reader was told about a `define`
+	// with no `otherwise` arm was "Expected 'with' but found '='". With a code of
+	// its own `refusesTheText` raises it instead, and the verdict survives.
+	it("should raise a define refusal out of a speculation", () => {
+		let { diagnostics } = parseWithDiagnostics(
+			`implementation {
+				constant row = { found = define {
+					as 1 if flag
+				} }
+			}`,
+		)
+
+		expect(diagnostics).toHaveLength(1)
+		expect(diagnostics[0].code).toBe("define-without-otherwise")
 	})
 
 	// NOTE: A coded refusal is a verdict about the text, so it is raised out of

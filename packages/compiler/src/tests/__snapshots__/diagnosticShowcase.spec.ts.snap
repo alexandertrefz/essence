@@ -2385,3 +2385,36 @@ Error: A Dictionary entry is written with '='
 ─── 4 errors
 "
 `;
+
+exports[`Diagnostic Showcase DefineSyntax.es should render the same report every time 1`] = `
+"[define-without-otherwise]
+Error: This 'define' has no 'otherwise' arm
+    ╭─┤ DefineSyntax.es:13:19 │
+    │
+ 13 │ ╭─▶     constant grade = define {
+    ┆ ┆   
+ 15 │ ├─▶     }
+    │ │           
+    │ ╰─────────── every value here has a condition on it
+    │ 
+    │ Help: Write the last arm as 'as <value> otherwise'.
+    │ 
+    │ Note: A 'define' answers with a value wherever it stands, so one of its arms has to be the one that always holds.
+────╯
+
+[unreachable-define-arm]
+Error: This arm stands below the 'otherwise' arm
+    ╭─┤ DefineSyntax.es:22:3 │
+    │
+ 22 │        as "low" if score::isLessThan(10)
+    │        ─┐  
+    │         ╰── nothing here can ever be reached
+    │ 
+    │ Help: Move this arm above the 'otherwise' arm, or delete it.
+    │ 
+    │ Note: The 'otherwise' arm is the one that always holds, so a 'define' answers there whenever it gets that far.
+────╯
+
+─── 2 errors
+"
+`;
