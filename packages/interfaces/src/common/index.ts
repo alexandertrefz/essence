@@ -329,6 +329,7 @@ export type DiagnosticCode =
 	| "define-without-otherwise"
 	| "unreachable-define-arm"
 	| "define-without-answer-type"
+	| "define-without-cases"
 	// Protocols and conformance.
 	| "protocol-as-value"
 	| "protocol-as-type"

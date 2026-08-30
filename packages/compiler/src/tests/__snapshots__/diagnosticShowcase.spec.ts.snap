@@ -2386,6 +2386,59 @@ Error: A Dictionary entry is written with '='
 "
 `;
 
+exports[`Diagnostic Showcase Define.es should render the same report every time 1`] = `
+"[define-without-cases]
+Warning: This 'define' has no cases
+    ╭─┤ Define.es:17:21 │
+    │
+ 17 │ ╭─▶     constant unrated = define {
+    ┆ ┆   
+ 19 │ ├─▶     }
+    │ │           
+    │ ╰─────────── nothing here is decided by cases
+    │ 
+    │ Help: Write the 'otherwise' value on its own, or add the arms this 'define' was going to ask.
+    │ 
+    │ Note: A 'define' answers with the value of the first arm whose Condition holds — and the 'otherwise' arm is the one that holds when none of them did.
+────╯
+
+[return-type-mismatch]
+Error: This arm does not answer with the Type this 'define' has
+    ╭─┤ Define.es:24:6 │
+    │
+ 24 │        as "A" if score::isGreaterThanOrEqualTo(90)
+    │           ─┬─  
+    │            ╰─── this is a String
+    │ 
+    │ Note: This 'define' answers Integer.
+────╯
+
+[return-type-mismatch]
+Error: This arm does not answer with the Type this 'define' has
+    ╭─┤ Define.es:32:6 │
+    │
+ 32 │        as 1 if score::isGreaterThanOrEqualTo(90)
+    │           ▲  
+    │           ╰── this is an Integer
+    │ 
+    │ Note: This 'define' answers String.
+────╯
+
+[condition-not-boolean]
+Error: A Define Condition has to be a Boolean
+    ╭─┤ Define.es:39:16 │
+    │
+ 39 │        as "some" if score
+    │                     ──┬──  
+    │                       ╰──── this is an Integer
+    │ 
+    │ Note: Essence has no truthiness — only a Boolean can be a Condition.
+────╯
+
+─── 3 errors, 1 warning
+"
+`;
+
 exports[`Diagnostic Showcase DefineAnswers.es should render the same report every time 1`] = `
 "[undecided-type-arguments]
 Error: Nothing decides the Type Arguments of '#Empty'
