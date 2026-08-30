@@ -764,6 +764,18 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 			}
 
 			return
+		// NOTE: The literal answers with its own Type, exactly as a written List
+		// does — `Dictionary<String, Integer>` over the brackets, and whatever
+		// each key and value is over itself.
+		case "DictionaryValue":
+			consider(state, node.position, node.type, null)
+
+			for (let entry of node.entries) {
+				visitNode(entry.key, state)
+				visitNode(entry.value, state)
+			}
+
+			return
 		case "InterpolatedStringValue":
 			consider(state, node.position, node.type, null)
 

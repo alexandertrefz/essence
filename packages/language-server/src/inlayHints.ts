@@ -199,6 +199,13 @@ function visitNode(
 			}
 
 			return
+		case "DictionaryValue":
+			for (let entry of node.entries) {
+				visitNode(entry.key, hints)
+				visitNode(entry.value, hints)
+			}
+
+			return
 		case "InterpolatedStringValue":
 			for (let segment of node.segments) {
 				if (segment.kind === "expression") {

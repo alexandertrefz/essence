@@ -689,6 +689,19 @@ function findProbeReceiverInNode(
 
 			return null
 		}
+		case "DictionaryValue": {
+			for (let entry of node.entries) {
+				let found =
+					findProbeReceiverInNode(entry.key) ??
+					findProbeReceiverInNode(entry.value)
+
+				if (found !== null) {
+					return found
+				}
+			}
+
+			return null
+		}
 		case "InterpolatedStringValue": {
 			for (let segment of node.segments) {
 				if (segment.kind !== "expression") {
@@ -1529,6 +1542,22 @@ function analyseCaseProbe(program: common.typed.Program): {
 
 				return
 			}
+			// NOTE: Each half against the SLOT it stands in, which is what puts
+			// a Choice in reach of a bare `#` in either — the Cases of
+			// `Dictionary<Suit, Integer>`'s key Type in a key, and of its value
+			// Type in a value. The same decision a List's item position makes,
+			// twice.
+			case "DictionaryValue": {
+				let dictionary =
+					expectedType?.type === "Dictionary" ? expectedType : null
+
+				for (let entry of node.entries) {
+					visitNode(entry.key, dictionary?.keyType ?? null)
+					visitNode(entry.value, dictionary?.valueType ?? null)
+				}
+
+				return
+			}
 			case "InterpolatedStringValue":
 				for (let segment of node.segments) {
 					if (segment.kind === "expression") {
@@ -1916,6 +1945,13 @@ function describeDeclarations(
 			case "ListValue":
 				for (let value of node.values) {
 					visitNode(value)
+				}
+
+				return
+			case "DictionaryValue":
+				for (let entry of node.entries) {
+					visitNode(entry.key)
+					visitNode(entry.value)
 				}
 
 				return

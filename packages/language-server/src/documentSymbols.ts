@@ -258,6 +258,11 @@ function symbolsOfNode(
 			)
 		case "ListValue":
 			return node.values.flatMap(symbolsOfNode)
+		case "DictionaryValue":
+			return node.entries.flatMap((entry) => [
+				...symbolsOfNode(entry.key),
+				...symbolsOfNode(entry.value),
+			])
 		case "InterpolatedStringValue":
 			return node.segments.flatMap((segment) =>
 				segment.kind === "expression"
@@ -737,6 +742,13 @@ function collectDetail(
 		case "ListValue":
 			for (let value of node.values) {
 				collectDetail(value, details)
+			}
+
+			return
+		case "DictionaryValue":
+			for (let entry of node.entries) {
+				collectDetail(entry.key, details)
+				collectDetail(entry.value, details)
 			}
 
 			return

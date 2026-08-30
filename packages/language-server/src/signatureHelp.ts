@@ -615,6 +615,13 @@ function findEnclosingInvocation(
 				}
 
 				return
+			case "DictionaryValue":
+				for (let entry of node.entries) {
+					visitNode(entry.key)
+					visitNode(entry.value)
+				}
+
+				return
 			case "InterpolatedStringValue":
 				for (let segment of node.segments) {
 					if (segment.kind === "expression") {
