@@ -19,6 +19,7 @@ import { lowerScalarOperations } from "./passes/lowerScalarOperations"
 import { lowerUnitCaseEquality } from "./passes/lowerUnitCaseEquality"
 import { poolConstants } from "./passes/poolConstants"
 import { pruneDeadMatchArms } from "./passes/pruneDeadMatchArms"
+import { unboxConditions } from "./passes/unboxConditions"
 
 // NOTE: The Optimiser is a registry of NAMED passes, run in one fixed order.
 // Every transform the Compiler performs on a simplified Program is one of them,
@@ -127,6 +128,11 @@ export const optimiserPasses: ReadonlyArray<OptimiserPass> = [
 	compileUnionDispatch,
 	devirtualiseWitnesses,
 	lowerMatchesToStatements,
+	// NOTE: Straight after it, which is where the collapse it used to perform
+	// itself already stood: every pass that BUILDS an `essence-boolean` runs
+	// above, and every pass below reads a condition that is already the test it
+	// was built from.
+	unboxConditions,
 	inlineLoops,
 	buildListsInPlace,
 	foldConstants,
