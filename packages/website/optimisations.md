@@ -286,12 +286,10 @@ stops carrying those bodies at all. `Orderable`'s provided bodies are the
 exception, and have to be: their receiver is `Self`, which is no kind in
 particular until a conformance says so, so they stay calls and lower nothing.
 
-A lowered Boolean used as the Program's own `if` is not read back off the
-Boolean it builds — `(a.value < b.value ? Boolean.trueInstance :
-Boolean.falseInstance).value` is `a.value < b.value`. A condition is a
-Statement's question rather than an Expression's, so that collapse belongs to
-`lower-matches-to-statements` and is documented there; with THAT pass off, the
-Boolean is built and read back exactly as written here.
+A lowered Boolean used as a condition is not read back off the Boolean it builds
+— `(a.value < b.value ? Boolean.trueInstance : Boolean.falseInstance).value` is
+`a.value < b.value`. That collapse is `unbox-conditions` and is documented there;
+with THAT pass off, the Boolean is built and read back exactly as written here.
 
 ### `compile-union-dispatch`
 
@@ -535,8 +533,8 @@ thing that would otherwise be emitted for no reason. A Return that answers with
 a call is kept and evaluated; only the last Statement of a body is ever
 considered, because a Return anywhere else is control flow as well as an answer.
 
-Two more things ride with this pass, because both are about what a Statement
-can say that an Expression can not:
+One more thing rides with this pass, because it is about what a Statement can
+say that an Expression can not:
 
 **A compiled Union dispatch that holds operands is lifted too.**
 `compile-union-dispatch` evaluates the receiver and the shared Arguments once,
@@ -547,15 +545,44 @@ block and the arrow is gone. The block is not decoration: a chain numbers its
 names from zero, so two chains lifted into one Scope would otherwise declare one
 name twice.
 
-**A lowered Boolean consumed by an `if` is collapsed.** A condition is read as
-`condition.value`, because an Essence Boolean is an object and every object is
-true — so `if a::isLessThan(b)`, which `lower-scalar-operations` had already
-reduced to a JavaScript comparison, ended up as
-`(a.value < b.value ? Boolean.trueInstance : Boolean.falseInstance).value`. Where
-the condition IS such a lowering, the test it was built from is what the `if`
-asks and the Boolean between them is never built. Only that exact shape is
-collapsed: a condition that is anything else is a value, and its `value` is what
-JavaScript has to be asked.
+### `unbox-conditions`
+
+Asks a question that was already lowered, instead of the Boolean built around it.
+
+Essence has no truthiness: a condition is a Boolean and nothing else. An Essence
+Boolean is an object, and every object is true, so what JavaScript is asked is
+the `value` that object holds. Where the Boolean is one `lower-scalar-operations`
+BUILT out of a comparison it had already reduced, the two steps meet and cancel:
+
+```js
+if ((a.value < b.value ? Boolean.trueInstance : Boolean.falseInstance).value)
+```
+
+is asking `a.value < b.value` the long way round, and that is what this pass
+writes instead.
+
+```js
+if (a.value < b.value)
+```
+
+**Both kinds of condition, because a condition is a condition wherever it is
+written.** An `if` holds one. A `define` holds one per arm, and an arm's is the
+same Boolean built for the same reason — the Rewriter reads `.value` off it
+exactly as an `if` does — so `define { as "A" if score::isGreaterThanOrEqualTo(90)
+… }` emits `score.value >= 90 ? "A" : …` rather than boxing the comparison and
+unboxing it on the same line.
+
+**Only that exact shape.** A condition that is anything else — a Method a
+Namespace wrote, a name, a Record member — is an Essence value, and its `value`
+is what JavaScript has to be asked. Reading `.value` off a raw boolean would
+answer `undefined`, which is false, and every condition in the Program would
+quietly decline.
+
+Safe because nothing is required of it: a condition carries a flag saying whether
+it has already been reduced, the Simplifier sets that flag false, and false is
+the reading that builds the Boolean and takes it apart. With this pass off the
+Program asks the same questions and gets the same answers, one allocation per
+question the worse for it.
 
 ### `inline-loops`
 

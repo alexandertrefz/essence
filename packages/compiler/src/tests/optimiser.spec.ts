@@ -3898,7 +3898,9 @@ describe("Optimiser", () => {
 				expect(generated).not.toContain("$dispatch_0")
 			})
 		})
+	})
 
+	describe("unbox-conditions", () => {
 		describe("a condition that was already lowered", () => {
 			it("asks the test rather than the Boolean it built", () => {
 				let generated = generate(conditions)
@@ -3920,9 +3922,7 @@ describe("Optimiser", () => {
 				expect(
 					generate(conditions, {
 						enabled: true,
-						disabledPasses: new Set([
-							"lower-matches-to-statements",
-						]),
+						disabledPasses: new Set(["unbox-conditions"]),
 					}),
 				).toContain(
 					"if ((a.value < b.value ? Boolean.trueInstance : Boolean.falseInstance).value) {",
@@ -3932,10 +3932,83 @@ describe("Optimiser", () => {
 			it("prints the same thing with the pass off", async () => {
 				expect(
 					await expectSamePrintedOutput(
-						"lower-matches-to-statements",
+						"unbox-conditions",
 						conditions,
 					),
 				).toEqual(['"less"', '"yes"'])
+			})
+		})
+
+		// NOTE: The other half of the same rewrite. An arm's Condition is a
+		// Boolean read exactly as an `if`'s is, and before this pass reached one
+		// a `define` paid for a Boolean built and taken apart on every arm it
+		// tested — which is the one shape the Node exists to avoid.
+		describe("a define arm's condition", () => {
+			const ladder = `implementation {
+	constant score = 95
+
+	Terminal.inspect(define {
+		as "A" if score::isGreaterThanOrEqualTo(90)
+		as "B" if score::isGreaterThanOrEqualTo(80)
+		as "F" otherwise
+	})
+}`
+
+			it("asks the test rather than the Boolean it built", () => {
+				let generated = generate(ladder)
+
+				// NOTE: The whole chain, in one match: two raw comparisons and
+				// three answers, with nothing between a test and the `?` that
+				// reads it. `pool-constants` has put every literal behind a
+				// reference by the time this is emitted, so the names are read
+				// as the pattern they are rather than written out.
+				expect(generated).toMatch(
+					/score\.value >= \$pool_\d+\.value \? \$pool_\d+ : score\.value >= \$pool_\d+\.value \? \$pool_\d+ : \$pool_\d+/,
+				)
+				expect(generated).not.toContain("Boolean.falseInstance).value")
+			})
+
+			it("reads the value of a Condition the Program computes", () => {
+				// NOTE: A Condition nothing lowered stays a value, and its
+				// `value` is what the ternary has to be asked — reading `.value`
+				// off a raw boolean would answer `undefined`, and every arm
+				// would decline.
+				let generated = generate(`implementation {
+	namespace Flags for Boolean {
+		§§ Answers the Boolean it is called on.
+		§§
+		§§ @returns — the Boolean.
+		itself() -> Boolean {
+			<- @
+		}
+	}
+
+	constant yes = true
+
+	Terminal.inspect(define {
+		as "yes" if yes::itself()
+		as "no" otherwise
+	})
+}`)
+
+				expect(generated).toContain("Flags.itself(yes).value ?")
+			})
+
+			it("builds the Boolean again when it is turned off", () => {
+				expect(
+					generate(ladder, {
+						enabled: true,
+						disabledPasses: new Set(["unbox-conditions"]),
+					}),
+				).toContain(
+					"? Boolean.trueInstance : Boolean.falseInstance).value ?",
+				)
+			})
+
+			it("prints the same thing with the pass off", async () => {
+				expect(
+					await expectSamePrintedOutput("unbox-conditions", ladder),
+				).toEqual(['"A"'])
 			})
 		})
 	})
