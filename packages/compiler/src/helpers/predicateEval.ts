@@ -90,6 +90,13 @@ export function admittedTypeOf(
 	}
 
 	if (
+		expected.type === "Dictionary" &&
+		value.nodeType === "DictionaryValue"
+	) {
+		return admittedDictionaryTypeOf(expected, value)
+	}
+
+	if (
 		expected.type !== "List" ||
 		value.nodeType !== "ListValue" ||
 		!refinementInside(expected.itemType)
@@ -116,6 +123,55 @@ export function admittedTypeOf(
 		: { type: "List", itemType: buildUnion(itemTypes) }
 }
 
+// NOTE: The written Dictionary asked the same question the written List is
+// asked, once per SLOT: `["a" = [1]]` is a `Dictionary<String,
+// NonEmptyList<Integer>>` because the brackets around the `1` are right there,
+// one pair per entry. Both slots are walked rather than only the values,
+// because a key is a written Expression in exactly the way a value is and
+// nothing about the shape says otherwise.
+//
+// The empty Dictionary decides nothing, exactly as the empty List does — both
+// slots are Unknown, which every Dictionary Type already accepts.
+function admittedDictionaryTypeOf(
+	expected: common.DictionaryType,
+	value: common.typed.DictionaryValueNode,
+): common.Type | null {
+	if (
+		value.entries.length === 0 ||
+		!(
+			refinementInside(expected.keyType) ||
+			refinementInside(expected.valueType)
+		)
+	) {
+		return null
+	}
+
+	let keyTypes: Array<common.Type> = []
+	let valueTypes: Array<common.Type> = []
+
+	for (let entry of value.entries) {
+		let key = admittedTypeOf(expected.keyType, entry.key)
+		let held = admittedTypeOf(expected.valueType, entry.value)
+
+		if (
+			(key === null && !matchesType(expected.keyType, entry.key.type)) ||
+			(held === null &&
+				!matchesType(expected.valueType, entry.value.type))
+		) {
+			return null
+		}
+
+		keyTypes.push(key ?? entry.key.type)
+		valueTypes.push(held ?? entry.value.type)
+	}
+
+	return {
+		type: "Dictionary",
+		keyType: buildUnion(keyTypes),
+		valueType: buildUnion(valueTypes),
+	}
+}
+
 // NOTE: Whether a written value fits where it stands — assignability, plus the
 // evidence a written value carries of its own. Every position that measures a
 // value against a Type it did not resolve asks this rather than `matchesType`.
@@ -137,45 +193,100 @@ export function fitsWritten(
 export function refinementInside(type: common.Type): boolean {
 	return (
 		type.type === "Refinement" ||
-		(type.type === "List" && refinementInside(type.itemType))
+		(type.type === "List" && refinementInside(type.itemType)) ||
+		(type.type === "Dictionary" &&
+			(refinementInside(type.keyType) ||
+				refinementInside(type.valueType)))
 	)
 }
 
-// NOTE: The first written item that did not answer the question its position
-// asks, and that question — what a Diagnostic points at when a List is refused
-// for something one item in it did not prove. `null` where the refusal is about
-// the List itself, which is what every site already reports.
+// NOTE: What a written part that did not fit is reported as — the part, the
+// question it left unanswered, and WHAT it is inside the value it was written
+// in. `part` is what a Diagnostic calls it: a List holds items, a Dictionary
+// holds keys and values, and calling a key an item is calling it the wrong
+// thing in a message whose whole job is to say which one it is.
+export type UnadmittedWrittenPart = {
+	value: common.typed.ExpressionNode
+	refinement: common.RefinementType
+	part: "item" | "key" | "value"
+}
+
+// NOTE: The first written part that did not answer the question its position
+// asks, and that question — what a Diagnostic points at when a written
+// container is refused for something inside it. `null` where the refusal is
+// about the container itself, which is what every site already reports.
 export function unadmittedWrittenItem(
 	expected: common.Type,
 	value: common.typed.ExpressionNode,
-): {
-	value: common.typed.ExpressionNode
-	refinement: common.RefinementType
-} | null {
-	let listType = expected.type === "Refinement" ? expected.base : expected
+): UnadmittedWrittenPart | null {
+	let container = expected.type === "Refinement" ? expected.base : expected
+
+	// NOTE: A Dictionary's entries are walked in written order and each entry
+	// KEY before its value, so the report points at the first thing a reader
+	// would have written — the same rule as a List's items, over two slots
+	// instead of one.
+	if (
+		container.type === "Dictionary" &&
+		value.nodeType === "DictionaryValue"
+	) {
+		for (let entry of value.entries) {
+			if (!fitsWritten(container.keyType, entry.key)) {
+				return unadmittedWrittenPart(
+					container.keyType,
+					entry.key,
+					"key",
+				)
+			}
+
+			if (!fitsWritten(container.valueType, entry.value)) {
+				return unadmittedWrittenPart(
+					container.valueType,
+					entry.value,
+					"value",
+				)
+			}
+		}
+
+		return null
+	}
 
 	if (
-		listType.type !== "List" ||
+		container.type !== "List" ||
 		value.nodeType !== "ListValue" ||
-		!refinementInside(listType.itemType)
+		!refinementInside(container.itemType)
 	) {
 		return null
 	}
 
 	for (let item of value.values) {
-		if (fitsWritten(listType.itemType, item)) {
+		if (fitsWritten(container.itemType, item)) {
 			continue
 		}
 
-		return (
-			unadmittedWrittenItem(listType.itemType, item) ??
-			(listType.itemType.type === "Refinement"
-				? { value: item, refinement: listType.itemType }
-				: null)
-		)
+		return unadmittedWrittenPart(container.itemType, item, "item")
 	}
 
 	return null
+}
+
+// NOTE: The deepest thing inside a part that did not fit, or the part itself
+// where the slot named a refinement. `null` where the slot named none, which is
+// the refusal every site already reports about the whole value.
+//
+// A part deeper in carries ITS own word — the offending value of a Dictionary
+// inside a List is a value and not an item — so the name travels with whatever
+// the walk finally points at rather than with where the walk started.
+function unadmittedWrittenPart(
+	expected: common.Type,
+	part: common.typed.ExpressionNode,
+	name: "item" | "key" | "value",
+): UnadmittedWrittenPart | null {
+	return (
+		unadmittedWrittenItem(expected, part) ??
+		(expected.type === "Refinement"
+			? { value: part, refinement: expected, part: name }
+			: null)
+	)
 }
 
 // NOTE: The same question asked of MANY refinements at once, with the value read
@@ -374,8 +485,15 @@ type LiteralValue =
 	| { kind: "String"; value: string }
 	| { kind: "Boolean"; value: boolean }
 	| { kind: "List"; items: Array<LiteralItem> }
+	| { kind: "Dictionary"; entries: Array<LiteralEntry> }
 
 type LiteralItem = LiteralValue | { kind: "Opaque" }
+
+// NOTE: One written entry, both halves read as items — a key or a value the
+// Compiler can not see is opaque exactly as a List's item is, and for the same
+// reason: what the brackets say is how many entries there are, whatever stands
+// inside them.
+type LiteralEntry = { key: LiteralItem; value: LiteralItem }
 
 const OPAQUE_ITEM: LiteralItem = { kind: "Opaque" }
 
@@ -458,6 +576,17 @@ const STRING_PREDICATES: Record<string, PredicateEvaluator> = {
 const LIST_PREDICATES: Record<string, PredicateEvaluator> = {
 	// NOTE: `hasItems` is this one negated, exactly as on a String.
 	isEmpty: listQuestion((items) => items.length === 0),
+}
+
+// NOTE: And the Dictionary's one question, on the same terms: `hasEntries` is
+// `@::isEmpty()::negate()`, so it arrives here as this row with the flag turned
+// over and is no row of its own. What the brackets say is how many entries were
+// written, which is the whole of what either predicate reads.
+const DICTIONARY_PREDICATES: Record<string, PredicateEvaluator> = {
+	isEmpty: (value, args) =>
+		value.kind !== "Dictionary" || args.length !== 0
+			? null
+			: value.entries.length === 0,
 }
 
 // #region Rational literals
@@ -691,6 +820,7 @@ const PREDICATES: Record<string, PredicateEvaluator> = {
 	...keyedByNamespace("Rational", RATIONAL_QUESTIONS),
 	...keyedByNamespace("String", STRING_PREDICATES),
 	...keyedByNamespace("List", LIST_PREDICATES),
+	...keyedByNamespace("Dictionary", DICTIONARY_PREDICATES),
 }
 
 function keyedByNamespace(
@@ -847,6 +977,17 @@ function literalValueOf(
 				items: value.values.map(
 					(item) => literalValueOf(item) ?? OPAQUE_ITEM,
 				),
+			}
+		// NOTE: Never `null` either, and for the same reason: `[=]` and
+		// `["a" = 1]` say how many entries they hold in the brackets, whatever
+		// the Compiler can make of the keys and values inside them.
+		case "DictionaryValue":
+			return {
+				kind: "Dictionary",
+				entries: value.entries.map((entry) => ({
+					key: literalValueOf(entry.key) ?? OPAQUE_ITEM,
+					value: literalValueOf(entry.value) ?? OPAQUE_ITEM,
+				})),
 			}
 		default:
 			return null

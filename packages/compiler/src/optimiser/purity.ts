@@ -69,6 +69,14 @@ export function isPureExpression(
 			return Object.values(node.members).every(isPure)
 		case "ListValue":
 			return node.values.every(isPure)
+		// NOTE: A Dictionary is pure exactly when everything written inside it
+		// is. Building one compares the keys — through the witness, which is a
+		// method map and runs nothing — and stores them, so the construction
+		// itself has nothing to it.
+		case "DictionaryValue":
+			return node.entries.every(
+				(entry) => isPure(entry.key) && isPure(entry.value),
+			)
 		case "CaseValue":
 			return node.value === null || isPure(node.value)
 		case "Combination":

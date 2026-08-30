@@ -238,6 +238,52 @@ function isAdjacent(left: common.Position, right: common.Position): boolean {
 	)
 }
 
+// NOTE: What a reader wrote between a key and its value when they did not write
+// `=`. Only the two spellings other languages use are named — `:` and `->` —
+// because those are the ones somebody reaches for on purpose; every other Token
+// standing there is a Program that went wrong somewhere else, and claiming it
+// meant to write an entry would send the reader after the wrong edit.
+function writtenSeparatorLexeme(
+	found: Token,
+	next: Token | undefined,
+): string | null {
+	if (found.type === TokenType.SymbolColon) {
+		return ":"
+	}
+
+	if (
+		found.type === TokenType.SymbolDash &&
+		next?.type === TokenType.SymbolRightAngle &&
+		isAdjacent(found.position, next.position)
+	) {
+		return "->"
+	}
+
+	return null
+}
+
+// NOTE: An Expression that can only ever be a VALUE, which is what tells a
+// Dictionary's key from a Record's member name. Everything else — a name, a
+// member read, a call — may be either the base of an update or, for a name, a
+// member whose value simply did not parse, and neither is a mistake this can
+// speak about. See `parseRecordLiteralOrCombination`.
+function writesAValueKey(node: parser.ExpressionNode): boolean {
+	switch (node.nodeType) {
+		case "StringValue":
+		case "InterpolatedStringValue":
+		case "IntegerValue":
+		case "RationalValue":
+		case "BooleanValue":
+		case "CaseValue":
+		case "ListValue":
+		case "DictionaryValue":
+		case "RecordValue":
+			return true
+		default:
+			return false
+	}
+}
+
 // NOTE: The numerator of a decimal — the two written digit runs read as one
 // number over a power of ten. Normalised through `BigInt` so what comes out is
 // plain digits: no leading zeros (`0.05` is `5/100`) and no sign on a zero
@@ -2920,7 +2966,7 @@ class DescentParser {
 				this.tokens.next()
 				return generators.booleanValueNode(false, token.position)
 			case TokenType.SymbolLeftBracket:
-				return this.parseListLiteral()
+				return this.parseListOrDictionaryLiteral()
 			case TokenType.SymbolLeftParen: {
 				// NOTE: The only Function literal whose annotations may be
 				// omitted — in expression position there can be an expected
@@ -3564,6 +3610,35 @@ class DescentParser {
 
 		let lhs = this.parseExpression()
 
+		// NOTE: `{ "a" = 1 }` — a Dictionary written in a Record's braces. Only
+		// a WRITTEN VALUE is refused here, and never a name: `{ x = ] }` also
+		// reaches this line, because a member whose value does not parse throws
+		// the whole Record reading away, and `x` there is a member name whose
+		// value is broken rather than a key that is a value. What a value key
+		// spells is a Dictionary and nothing else, so it is reported here,
+		// where what was written is still in hand, rather than as "expected
+		// 'with'" about a Token nobody meant.
+		if (
+			this.tokens.peek()?.type === TokenType.SymbolEqual &&
+			writesAValueKey(lhs)
+		) {
+			throw new ParseError(
+				"A key that is a value belongs to a Dictionary",
+				lhs.position,
+				"this key is a value, not a member name",
+				{
+					code: "syntax-error",
+					notes: [
+						"Braces write a Record, whose keys are the member names it declares. A key that is a value is a Dictionary's, and a Dictionary is written in brackets.",
+					],
+					helps: [
+						"Write it in brackets: '[\"a\" = 1]'.",
+						"Or name the member, if a Record is what was meant: '{ a = 1 }'.",
+					],
+				},
+			)
+		}
+
 		this.tokens.expect(TokenType.KeywordWith)
 
 		let combinationOfKeys = (allowShorthand: boolean) =>
@@ -3583,6 +3658,7 @@ class DescentParser {
 						start: leftBrace.position.start,
 						end: rightBrace.position.end,
 					},
+					{ bare: true },
 				)
 			})
 
@@ -3627,6 +3703,41 @@ class DescentParser {
 		}
 
 		let rhs = this.parseExpression()
+
+		// NOTE: `{ ages with "alex" = 40 }` — a Dictionary update written in a
+		// Record's braces, which is the same mistake the head of a braced
+		// literal catches one Token earlier and it is caught by the same test:
+		// a key that is a WRITTEN VALUE with an `=` behind it spells a
+		// Dictionary and nothing else. Left alone this reports
+		// `Expected '}' but found '='` about a Token nobody meant, which is
+		// exactly what the check above exists to prevent — it just never ran
+		// here, because the `with` had already been read past.
+		//
+		// It is reported after the three readings have been thrown away rather
+		// than before them, so a Record update still reads as one: `port` is a
+		// member name and no value, and `{ base with other }` is an Expression
+		// the first two readings claim.
+		if (
+			this.tokens.peek()?.type === TokenType.SymbolEqual &&
+			writesAValueKey(rhs)
+		) {
+			throw new ParseError(
+				"A key that is a value belongs to a Dictionary",
+				rhs.position,
+				"this key is a value, not a member name",
+				{
+					code: "wrong-update-brackets",
+					notes: [
+						"Braces update a Record, whose keys are the member names it declares. A key that is a value is a Dictionary's, and a Dictionary is updated in brackets.",
+					],
+					helps: [
+						"Write the update in brackets: '[base with \"a\" = 1]'.",
+						"Or name the member, if a Record is what was meant: '{ base with a = 1 }'.",
+					],
+				},
+			)
+		}
+
 		let rightBrace = this.tokens.expect(TokenType.SymbolRightBrace)
 
 		return generators.combination(lhs, rhs, {
@@ -3687,6 +3798,11 @@ class DescentParser {
 	// Combination's key list does not, because a bare name after `with` is
 	// already the whole value being merged in. The one flag is what keeps
 	// `{ base with other }` from silently turning into "set member `other`".
+	//
+	// NOTE: A Dictionary's key list has no shorthand at all, in a literal or in
+	// an update — `["a" = 1]` writes a key that is a VALUE, and a bare name
+	// there is that value and not short for anything. See
+	// `parseDictionaryUpdate`.
 	protected parseKeyValuePairList(
 		allowShorthand: boolean,
 	): ReturnType<typeof generators.buildKeyValuePairList> {
@@ -4306,23 +4422,85 @@ class DescentParser {
 		}
 	}
 
-	protected parseListLiteral(): parser.ListValueNode {
+	// NOTE: One pair of brackets writes three things — a List, a Dictionary and
+	// a Dictionary update — and which of them it is, is settled by ONE Token of
+	// lookahead past the first Expression rather than by speculation: an `=`
+	// after it makes the Expression a KEY, a `with` after it makes it a BASE,
+	// and a comma or a `]` leaves it the item it has always been. Nothing is
+	// ever read twice, so an error inside a long literal is reported where it
+	// stands instead of surfacing as "not a List either".
+	//
+	// The empty pair is decided before anything is read at all: `[]` is the
+	// empty List and `[=]` the empty Dictionary, and the `=` is what tells them
+	// apart because neither holds anything else to tell them apart by.
+	protected parseListOrDictionaryLiteral():
+		| parser.ListValueNode
+		| parser.DictionaryValueNode
+		| parser.CombinationNode {
 		let leftBracket = this.tokens.expect(TokenType.SymbolLeftBracket)
 
-		let values: Array<parser.ExpressionNode> = []
+		if (this.tokens.peek()?.type === TokenType.SymbolEqual) {
+			this.tokens.next()
 
-		if (this.tokens.peek()?.type !== TokenType.SymbolRightBracket) {
-			values.push(this.parseExpression())
+			let rightBracket = this.tokens.expect(TokenType.SymbolRightBracket)
 
-			while (this.tokens.peek()?.type === TokenType.SymbolComma) {
-				this.tokens.next()
+			return generators.dictionaryValueNode([], {
+				start: leftBracket.position.start,
+				end: rightBracket.position.end,
+			})
+		}
 
-				if (this.tokens.peek()?.type === TokenType.SymbolRightBracket) {
-					break
-				}
+		if (this.tokens.peek()?.type === TokenType.SymbolRightBracket) {
+			let rightBracket = this.tokens.next()
 
-				values.push(this.parseExpression())
+			return generators.listValueNode([], {
+				start: leftBracket.position.start,
+				end: rightBracket.position.end,
+			})
+		}
+
+		let first = this.parseExpression()
+
+		if (this.tokens.peek()?.type === TokenType.SymbolEqual) {
+			let entries = this.parseDictionaryEntries(first)
+
+			this.refuseTrailingEntrySeparator()
+
+			let rightBracket = this.tokens.expect(TokenType.SymbolRightBracket)
+
+			return generators.dictionaryValueNode(entries, {
+				start: leftBracket.position.start,
+				end: rightBracket.position.end,
+			})
+		}
+
+		if (this.tokens.peek()?.type === TokenType.KeywordWith) {
+			return this.parseDictionaryUpdate(leftBracket, first)
+		}
+
+		// NOTE: The reading is a List from here on, and it stays one — but a
+		// separator standing where the `]` belongs says the brackets were meant
+		// to hold entries, and `["a": 1]` reported as "expected ']'" sends the
+		// reader after the bracket rather than after the colon.
+		let afterFirst = this.tokens.peek()
+
+		if (
+			afterFirst !== undefined &&
+			writtenSeparatorLexeme(afterFirst, this.tokens.peek(1)) !== null
+		) {
+			this.refuseDictionaryEntry(first)
+		}
+
+		let values: Array<parser.ExpressionNode> = [first]
+
+		while (this.tokens.peek()?.type === TokenType.SymbolComma) {
+			this.tokens.next()
+
+			if (this.tokens.peek()?.type === TokenType.SymbolRightBracket) {
+				break
 			}
+
+			values.push(this.parseExpression())
 		}
 
 		let rightBracket = this.tokens.expect(TokenType.SymbolRightBracket)
@@ -4331,6 +4509,228 @@ class DescentParser {
 			start: leftBracket.position.start,
 			end: rightBracket.position.end,
 		})
+	}
+
+	// NOTE: `[1 = 2 = 3]` — a second `=` where the comma between two entries
+	// belongs. The entry list read exactly what was written and stopped, so
+	// what is left is a bracket that did not close, and that is what a reader
+	// would be told about. The `=` is the Token the mistake is at.
+	protected refuseTrailingEntrySeparator(): void {
+		let found = this.tokens.peek()
+
+		if (found?.type !== TokenType.SymbolEqual) {
+			return
+		}
+
+		throw new ParseError(
+			"A Dictionary's entries are separated by commas",
+			found.position,
+			"this entry already has its value",
+			{
+				code: "dictionary-entry-syntax",
+				notes: [
+					"An entry is 'key = value', and a bracket list holds one after another: '[1 = 2, 3 = 4]'.",
+				],
+				helps: ["Write a comma before the next key."],
+			},
+		)
+	}
+
+	// NOTE: The rest of a Dictionary Literal, entered with the first key
+	// already read and the `=` still ahead. A trailing comma is allowed exactly
+	// where a List allows one, and for the same reason: a list of things laid
+	// out one to a line grows by a line rather than by a line and an edit above
+	// it.
+	protected parseDictionaryEntries(
+		firstKey: parser.ExpressionNode,
+	): Array<parser.DictionaryEntryNode> {
+		let entries = [this.parseDictionaryEntry(firstKey)]
+
+		while (this.tokens.peek()?.type === TokenType.SymbolComma) {
+			this.tokens.next()
+
+			if (this.tokens.peek()?.type === TokenType.SymbolRightBracket) {
+				break
+			}
+
+			entries.push(this.parseDictionaryEntry(this.parseExpression()))
+		}
+
+		return entries
+	}
+
+	// NOTE: The `= value` half, read with the key already in hand — which is
+	// what lets the `=` be expected here rather than guessed at: every caller
+	// arrives having seen one, or having read a key that has to be followed by
+	// one, and the refusal below reports at the Token the reader is standing on.
+	protected parseDictionaryEntry(
+		key: parser.ExpressionNode,
+	): parser.DictionaryEntryNode {
+		if (this.tokens.peek()?.type !== TokenType.SymbolEqual) {
+			this.refuseDictionaryEntry(key)
+		}
+
+		this.tokens.next()
+
+		let value = this.parseExpression()
+
+		return {
+			key,
+			value,
+			position: { start: key.position.start, end: value.position.end },
+		}
+	}
+
+	// NOTE: The near misses of an entry, which are the shapes a reader who
+	// knows another language's dictionary writes: `["a": 1]`, `["a" -> 1]` and
+	// `["a" = 1, "b"]`. None of them is a reading this Parser has, so left
+	// alone every one of them is reported as the `]` or the `=` that did not
+	// come — a message about a bracket, in a line whose mistake is the
+	// separator between a key and its value.
+	//
+	// The separator is named where one was written, because that is the edit:
+	// `:` becomes `=`. Where nothing at all follows the key, the key is what is
+	// underlined, because the missing half is its value.
+	protected refuseDictionaryEntry(key: parser.ExpressionNode): never {
+		let note =
+			"An entry is 'key = value', and a Dictionary is a bracket list of them: '[\"a\" = 1, \"b\" = 2]'."
+		let found = this.tokens.peek()
+		let separator =
+			found === undefined
+				? null
+				: writtenSeparatorLexeme(found, this.tokens.peek(1))
+
+		if (found !== undefined && separator !== null) {
+			throw new ParseError(
+				"A Dictionary entry is written with '='",
+				found.position,
+				`expected '=' and found '${separator}'`,
+				{
+					code: "dictionary-entry-syntax",
+					notes: [note],
+					helps: [`Write '=' in place of '${separator}'.`],
+				},
+			)
+		}
+
+		throw new ParseError(
+			"A Dictionary entry is written with '='",
+			key.position,
+			"this key is written with no value",
+			{
+				code: "dictionary-entry-syntax",
+				notes: [note],
+				helps: ["Write the value the key holds: 'key = value'."],
+			},
+		)
+	}
+
+	// NOTE: `[ages with "kim" = 7]` and `[ages with other]` — the two halves of
+	// the update form, told apart by ONE Token past the Expression after the
+	// `with`, exactly as the literal itself is: an `=` makes it the first key,
+	// and anything else leaves it the whole Dictionary being merged in.
+	//
+	// NOTE: There is no SHORTHAND here and there is not going to be one. A bare
+	// name after a Record's `with` is already the whole value being merged
+	// (`{ config with other }`), and the same name after a Dictionary's `with`
+	// is the same thing — so `[d with a]` merges `a` and never means
+	// `[d with a = a]`. A Dictionary's key is a VALUE rather than a name, and
+	// there is nothing for a name to be short for. See
+	// `parseKeyValuePairList`'s `allowShorthand`, which is the braced half of
+	// this rule.
+	protected parseDictionaryUpdate(
+		leftBracket: Token,
+		base: parser.ExpressionNode,
+	): parser.CombinationNode {
+		let withKeyword = this.tokens.expect(TokenType.KeywordWith)
+
+		if (this.tokens.peek()?.type === TokenType.SymbolRightBracket) {
+			// NOTE: The label ends at the `with` and not at the `]` behind it.
+			// What the reader is being told about is the keyword and the
+			// nothing after it, and underlining the bracket too reads as a
+			// claim about the bracket — which is the one Token here that is
+			// exactly where it belongs.
+			throw new ParseError(
+				"An update says what it changes",
+				withKeyword.position,
+				"nothing follows this 'with'",
+				{
+					code: "syntax-error",
+					notes: [
+						"A Dictionary update writes either the entries it sets — '[ages with \"kim\" = 7]' — or a whole Dictionary to merge in — '[ages with other]'.",
+					],
+					helps: [
+						"Write the entries the update sets, or the Dictionary it merges in.",
+						"Or drop the update and write the Dictionary on its own.",
+					],
+				},
+			)
+		}
+
+		let first = this.parseExpression()
+
+		if (this.tokens.peek()?.type === TokenType.SymbolEqual) {
+			let entries = this.parseDictionaryEntries(first)
+			// NOTE: The key list spans the keys and nothing else — the brackets
+			// belong to the Combination, which is the Node they open and close.
+			// Exactly what a braced update's key list spans; see
+			// `buildKeyValuePairList`.
+			let keys = generators.dictionaryValueNode(entries, {
+				start: entries[0].position.start,
+				end: entries[entries.length - 1].position.end,
+			})
+
+			this.refuseTrailingEntrySeparator()
+
+			let rightBracket = this.tokens.expect(TokenType.SymbolRightBracket)
+
+			return generators.combination(
+				base,
+				keys,
+				{
+					start: leftBracket.position.start,
+					end: rightBracket.position.end,
+				},
+				{ brackets: true, bare: true },
+			)
+		}
+
+		// NOTE: `[d with a, b]` — a comma-separated list of bare names, which is
+		// the shorthand this form does not have and is never going to. Reported
+		// here rather than left as "expected ']'" for the reason the braced
+		// half reports `shorthand-in-combination`: the comma says the author
+		// meant a key list, and what they have to be told is that a key is a
+		// value and there is nothing for a name to be short for.
+		if (this.tokens.peek()?.type === TokenType.SymbolComma) {
+			throw new ParseError(
+				"A bare name is not a key in an update",
+				first.position,
+				"this names no value to set",
+				{
+					code: "shorthand-in-combination",
+					notes: [
+						"A Dictionary update writes either the entries it sets — '[ages with \"kim\" = 7]' — or ONE whole Dictionary to merge in — '[ages with other]'.",
+						"A key is a value rather than a name, so there is nothing for a bare name to be short for.",
+					],
+					helps: [
+						"Write each entry: '[d with a = 1, b = 2]'.",
+						"Or merge one whole Dictionary: '[d with other]'.",
+					],
+				},
+			)
+		}
+
+		let rightBracket = this.tokens.expect(TokenType.SymbolRightBracket)
+
+		return generators.combination(
+			base,
+			first,
+			{
+				start: leftBracket.position.start,
+				end: rightBracket.position.end,
+			},
+			{ brackets: true },
+		)
 	}
 
 	// NOTE: `ownsDocumentation` is false for a literal in EXPRESSION position.

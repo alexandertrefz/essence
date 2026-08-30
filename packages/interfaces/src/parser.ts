@@ -269,6 +269,7 @@ export type ValueNode =
 	| BooleanValueNode
 	| FunctionValueNode
 	| ListValueNode
+	| DictionaryValueNode
 
 // NOTE: Record members keep their name as a full IdentifierNode — the
 // Language Server needs the name's Position for renaming.
@@ -356,6 +357,26 @@ export type ListValueNode = {
 	position: Position
 }
 
+// NOTE: One `key = value` of a Dictionary Literal. Both halves are ordinary
+// Expressions — a Dictionary's key is a VALUE, not a name, which is the whole
+// difference between `["a" = 1]` and `{ a = 1 }` — so neither is an Identifier
+// Node and neither is renamed with anything.
+export type DictionaryEntryNode = {
+	key: ExpressionNode
+	value: ExpressionNode
+	position: Position
+}
+
+// NOTE: `["alex" = 39, "sam" = 25]` and `[=]`, the empty one. The entries are a
+// LIST rather than a name-keyed Record — two written keys may well be the same
+// value without being the same text, and the order they were written in is the
+// order the Dictionary holds them in, so nothing here may be keyed or sorted.
+export type DictionaryValueNode = {
+	nodeType: "DictionaryValue"
+	entries: Array<DictionaryEntryNode>
+	position: Position
+}
+
 export interface LookupNode {
 	nodeType: "Lookup"
 	base: ExpressionNode
@@ -392,6 +413,30 @@ export interface CombinationNode {
 	nodeType: "Combination"
 	lhs: ExpressionNode
 	rhs: ExpressionNode
+	// NOTE: Set where the update was written in BRACKETS — `[ages with "kim" =
+	// 7]`, the Dictionary spelling — and absent where it was written in braces,
+	// which is every Record update and every Combination that existed before
+	// Dictionaries did. The two spellings mean different things and no Node
+	// shape says which was written: a whole-value update (`[ages with other]`,
+	// `{ config with other }`) is one Expression after the `with` either way,
+	// so without this the Formatter could not print back what it read and the
+	// Enricher could not tell a base that wants the other pair of brackets.
+	//
+	// Absent rather than false so nothing that compares two ASTs — the
+	// Formatter's safety gate above all — sees a key appear where none was
+	// written, which is the rule `shorthand` and `merged` are kept by.
+	brackets?: true
+	// NOTE: Set where the update's right side is its own BARE key list —
+	// `[ages with "kim" = 7]` and `{ config with port = 1 }` — and absent where
+	// a whole value was written there, key list or not: `[ages with ["kim" =
+	// 7]]` brought brackets of its own and merges that Dictionary in.
+	//
+	// The two readings build the same Node kind and differ by a Position alone,
+	// so nothing that reads the tree could tell them apart and the Formatter
+	// used to ask the SOURCE — which a key that is itself written in brackets
+	// answers wrong, since a bare key list's Position starts at its first key.
+	// The Parser is the one place that knows, so the Parser says.
+	bare?: true
 	position: Position
 }
 

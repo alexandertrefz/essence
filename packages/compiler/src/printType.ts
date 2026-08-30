@@ -55,6 +55,12 @@ export function printType(type: common.Type): string {
 			return `List<${printType(type.itemType)}>`
 		case "GenericList":
 			return "List"
+		case "Dictionary":
+			return `Dictionary<${printType(type.keyType)}, ${printType(
+				type.valueType,
+			)}>`
+		case "GenericDictionary":
+			return "Dictionary"
 		case "Record": {
 			let members = Object.entries(type.members).map(
 				([memberName, memberType]) =>

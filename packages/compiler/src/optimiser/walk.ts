@@ -214,6 +214,23 @@ function walkGenerator(
 		return item === generator.item ? generator : { ...generator, item }
 	}
 
+	if (generator.kind === "dictionary") {
+		let key = walkGenerator(generator.key, rewrites)
+		let value = walkGenerator(generator.value, rewrites)
+		let keyConformance = walkWitness(generator.keyConformance, rewrites)
+
+		return key === generator.key &&
+			value === generator.value &&
+			keyConformance === generator.keyConformance
+			? generator
+			: {
+					...generator,
+					key,
+					value,
+					...(keyConformance === undefined ? {} : { keyConformance }),
+				}
+	}
+
 	if (generator.kind === "record" || generator.kind === "case") {
 		let members = mapArray(generator.members, (member) => {
 			let walked = walkGenerator(member.generator, rewrites)
@@ -790,12 +807,22 @@ function walkChildren(
 		case "Combination": {
 			let lhs = walkExpression(node.lhs, rewrites)
 			let rhs = walkExpression(node.rhs, rewrites)
+			let keyConformance = walkWitness(node.keyConformance, rewrites)
 
-			if (lhs === node.lhs && rhs === node.rhs) {
+			if (
+				lhs === node.lhs &&
+				rhs === node.rhs &&
+				keyConformance === node.keyConformance
+			) {
 				return node
 			}
 
-			return { ...node, lhs, rhs }
+			return {
+				...node,
+				lhs,
+				rhs,
+				...(keyConformance === undefined ? {} : { keyConformance }),
+			}
 		}
 		case "RecordValue": {
 			let members = mapRecord(node.members, (value) =>
@@ -836,6 +863,29 @@ function walkChildren(
 			)
 
 			return values === node.values ? node : { ...node, values }
+		}
+		case "DictionaryValue": {
+			let entries = mapArray(node.entries, (entry) => {
+				let key = walkExpression(entry.key, rewrites)
+				let value = walkExpression(entry.value, rewrites)
+
+				return key === entry.key && value === entry.value
+					? entry
+					: { key, value }
+			})
+			let keyConformance =
+				node.keyConformance === null
+					? null
+					: walkExpression(node.keyConformance, rewrites)
+
+			if (
+				entries === node.entries &&
+				keyConformance === node.keyConformance
+			) {
+				return node
+			}
+
+			return { ...node, entries, keyConformance }
 		}
 		case "Lookup": {
 			let base = walkExpression(node.base, rewrites)
@@ -900,6 +950,19 @@ function walkChildren(
 		case "Identifier":
 			return node
 	}
+}
+
+// NOTE: A conformance witness a Node carries beside its Expressions, walked
+// exactly as the hidden trailing Arguments of a bounded CALL are — those ride in
+// the Argument list and are walked with it, and these would be invisible to
+// every pass without this. `pool-constants` is what most wants to see them: a
+// witness is a method map built at every site it stands at, and one const
+// answering for all of them is what that pass is for.
+function walkWitness(
+	witness: common.typedSimple.ExpressionNode | undefined,
+	rewrites: NodeRewrites,
+): common.typedSimple.ExpressionNode | undefined {
+	return witness === undefined ? undefined : walkExpression(witness, rewrites)
 }
 
 // NOTE: A Match's Handlers, walked the same whether the Match is still an

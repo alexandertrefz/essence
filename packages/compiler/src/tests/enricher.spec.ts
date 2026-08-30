@@ -9991,4 +9991,274 @@ describe("Enricher", () => {
 			)
 		})
 	})
+
+	// NOTE: The Dictionary Type as a Program can reach it — the annotation, the
+	// arity, assignability between two of them, and a user Namespace written for
+	// one. Nothing here constructs a Dictionary: slice 1 builds one only through
+	// `Dictionary.of`, which the standard library does not declare yet, so every
+	// Dictionary a test can get hold of arrives as a Parameter.
+	describe("Dictionary Types", () => {
+		function parameterTypeOf(source: string, methodName: string): string {
+			let { program, diagnostics } = enrichSource(source)
+
+			expect(diagnostics).toEqual([])
+
+			for (let node of program.implementation.nodes) {
+				if (node.nodeType !== "NamespaceDefinitionStatement") {
+					continue
+				}
+
+				let method = node.type.methods[methodName]
+
+				expect(method?.type).toBe("SimpleMethod")
+
+				// NOTE: Parameter 0 is the injected receiver, so the one the
+				// Declaration wrote is the second.
+				return printType(
+					(method as common.SimpleMethodType).parameterTypes[1]!
+						.type as common.Type,
+				)
+			}
+
+			throw new Error("No Namespace in the Program")
+		}
+
+		// NOTE: Every plan a derived `Equatable` left on the tree. The Invocation
+		// carries it, not the Conformance beside it — `collectConformances` above
+		// looks for the other shape — so this is its own walk.
+		function derivedDescriptorsIn(
+			value: unknown,
+		): Array<common.DerivedEquatableDescriptor> {
+			let found: Array<common.DerivedEquatableDescriptor> = []
+			let seen = new WeakSet<object>()
+
+			let visit = (node: unknown) => {
+				if (Array.isArray(node)) {
+					for (let element of node) {
+						visit(element)
+					}
+
+					return
+				}
+
+				if (
+					node === null ||
+					typeof node !== "object" ||
+					seen.has(node)
+				) {
+					return
+				}
+
+				seen.add(node)
+
+				let record = node as Record<string, unknown>
+
+				if (record.derivedDescriptor !== undefined) {
+					found.push(
+						record.derivedDescriptor as common.DerivedEquatableDescriptor,
+					)
+				}
+
+				for (let key of Object.keys(record)) {
+					visit(record[key])
+				}
+			}
+
+			visit(value)
+
+			return found
+		}
+
+		it("should resolve and print an applied Dictionary annotation", () => {
+			expect(
+				parameterTypeOf(
+					`implementation {
+						namespace Ages for Integer {
+							count(_ entries: Dictionary<String, Integer>) -> Integer {
+								<- 0
+							}
+						}
+					}`,
+					"count",
+				),
+			).toBe("Dictionary<String, Integer>")
+		})
+
+		it("should resolve a nested Dictionary through both slots", () => {
+			expect(
+				parameterTypeOf(
+					`implementation {
+						namespace Ages for Integer {
+							count(_ entries: Dictionary<String, List<Dictionary<Integer, Boolean>>>) -> Integer {
+								<- 0
+							}
+						}
+					}`,
+					"count",
+				),
+			).toBe("Dictionary<String, List<Dictionary<Integer, Boolean>>>")
+		})
+
+		it("should resolve a bare Dictionary annotation", () => {
+			expect(
+				parameterTypeOf(
+					`implementation {
+						namespace Ages for Integer {
+							count(_ entries: Dictionary) -> Integer {
+								<- 0
+							}
+						}
+					}`,
+					"count",
+				),
+			).toBe("Dictionary")
+		})
+
+		// NOTE: Two Type Arguments exactly, reported the way `List` reports one
+		// — the same code, the same shape, and a Type built out of whatever WAS
+		// written so the Declaration underneath does not cascade.
+		it("should report too few Type Arguments", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				namespace Ages for Integer {
+					count(_ entries: Dictionary<String>) -> Integer {
+						<- 0
+					}
+				}
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("wrong-type-argument-count")
+			expect(diagnostics[0].message).toBe(
+				"Dictionary takes exactly 2 Type Arguments",
+			)
+		})
+
+		it("should report too many Type Arguments", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				namespace Ages for Integer {
+					count(_ entries: Dictionary<String, Integer, Boolean>) -> Integer {
+						<- 0
+					}
+				}
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("wrong-type-argument-count")
+			expect(diagnostics[0].message).toBe(
+				"Dictionary takes exactly 2 Type Arguments",
+			)
+		})
+
+		// NOTE: The Namespace index buckets both Dictionary spellings under one
+		// key, exactly as it buckets the two List ones — so a Namespace written
+		// `for Dictionary<Key, Value>` is a candidate for a
+		// `Dictionary<String, Integer>` receiver and its Type Parameters bind
+		// off that receiver, slot by slot.
+		it("should find a Namespace written for a Dictionary", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					namespace Boxes<infer Key, infer Value> for Dictionary<Key, Value> {
+						sample(_ key: Key, to value: Value) -> Boolean {
+							<- true
+						}
+					}
+
+					function check(_ entries: Dictionary<String, Integer>) -> Boolean {
+						<- entries::sample("alex", to 39)
+					}
+				}`),
+			).toEqual([])
+		})
+
+		it("should bind each slot of the receiver to its own Type Parameter", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				namespace Boxes<infer Key, infer Value> for Dictionary<Key, Value> {
+					sample(_ key: Key, to value: Value) -> Boolean {
+						<- true
+					}
+				}
+
+				function check(_ entries: Dictionary<String, Integer>) -> Boolean {
+					<- entries::sample(39, to "alex")
+				}
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("no-matching-overload")
+		})
+
+		it("should answer a Method with the receiver's own slot Types", () => {
+			expect(
+				printType(
+					lastConstantValue(`implementation {
+						namespace Boxes<infer Key, infer Value> for Dictionary<Key, Value> {
+							anyKey() -> Optional<Key> {
+								<- #Empty
+							}
+						}
+
+						function check(_ entries: Dictionary<String, Integer>) -> Optional<String> {
+							<- entries::anyKey()
+						}
+
+						constant checker = check
+					}`).type,
+				),
+			).toBe("(_ Dictionary<String, Integer>) -> Optional<String>")
+		})
+
+		// NOTE: A Dictionary in a generic Choice's payload — the descriptor its
+		// derived `Equatable` follows at run time. The two slots are described
+		// APART: `String` names no Type Parameter and compares structurally,
+		// while `Value` routes through the witness at its declaration-order
+		// index. Reading the slots together would have compared the whole
+		// Dictionary structurally, which for a box reading through a shared
+		// store is not equality at all.
+		it("describes each slot of a Dictionary in a generic Choice's payload", () => {
+			let { program, diagnostics } = enrichSource(`implementation {
+				choice Holder<Value> {
+					Held { entries: Dictionary<String, Value> },
+					Blank,
+				}
+
+				function same(_ a: Holder<Integer>, _ b: Holder<Integer>) -> Boolean {
+					<- a::is(b)
+				}
+			}`)
+
+			expect(diagnostics).toEqual([])
+
+			let descriptors = derivedDescriptorsIn(program)
+
+			expect(descriptors).toHaveLength(1)
+			expect(descriptors[0]).toEqual({
+				"Holder#Held": {
+					entries: {
+						k: "dictionary",
+						key: { k: "eq" },
+						value: { k: "w", i: 0 },
+					},
+				},
+				"Holder#Blank": {},
+			})
+		})
+
+		// NOTE: A Namespace targeting a Dictionary must not answer for a List,
+		// which is what buckets keyed by kind are for — the two spellings share
+		// one bucket with each other and with nothing else.
+		it("should not offer a Dictionary Namespace to a List receiver", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				namespace Boxes<infer Key, infer Value> for Dictionary<Key, Value> {
+					sample(_ key: Key, to value: Value) -> Boolean {
+						<- true
+					}
+				}
+
+				constant answered = [1, 2]::sample(1, to 2)
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("unknown-method")
+		})
+	})
 })

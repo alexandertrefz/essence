@@ -354,4 +354,57 @@ describe("printType", () => {
 			)
 		})
 	})
+
+	// NOTE: The one Hover-facing thing a second Type Parameter changes: both
+	// slots are printed, in declaration order, and a bare Dictionary prints as
+	// its name alone the way a bare List does.
+	describe("Dictionaries", () => {
+		it("should print both slots of an applied Dictionary", () => {
+			expect(
+				printType({
+					type: "Dictionary",
+					keyType: string,
+					valueType: integer,
+				}),
+			).toBe("Dictionary<String, Integer>")
+		})
+
+		it("should print a nested Dictionary through both slots", () => {
+			expect(
+				printType({
+					type: "Dictionary",
+					keyType: string,
+					valueType: {
+						type: "Dictionary",
+						keyType: integer,
+						valueType: { type: "List", itemType: string },
+					},
+				}),
+			).toBe("Dictionary<String, Dictionary<Integer, List<String>>>")
+		})
+
+		it("should print an unapplied Dictionary as its name", () => {
+			expect(
+				printType({
+					type: "GenericDictionary",
+					generics: [
+						{ name: "KeyType", defaultType: { type: "Unknown" } },
+						{ name: "ValueType", defaultType: { type: "Unknown" } },
+					],
+				}),
+			).toBe("Dictionary")
+		})
+
+		// NOTE: A slot still holding a Type Parameter prints under the name the
+		// source wrote, which is what a Hover inside a generic Namespace shows.
+		it("should print an open slot under its Parameter's name", () => {
+			expect(
+				printType({
+					type: "Dictionary",
+					keyType: genericUse("Key"),
+					valueType: genericUse("Value"),
+				}),
+			).toBe("Dictionary<Key, Value>")
+		})
+	})
 })

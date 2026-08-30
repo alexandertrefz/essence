@@ -186,6 +186,11 @@ function validateGenerator(generator: common.typed.TestGenerator): void {
 			validateGenerator(generator.item)
 
 			return
+		case "dictionary":
+			validateGenerator(generator.key)
+			validateGenerator(generator.value)
+
+			return
 		case "record":
 		case "case":
 			for (let member of generator.members) {
@@ -258,6 +263,7 @@ function validateImplementationNode(
 		case "BooleanValue":
 		case "FunctionValue":
 		case "ListValue":
+		case "DictionaryValue":
 		case "Lookup":
 		case "Identifier":
 		case "Self":
@@ -308,6 +314,8 @@ function validateExpression(
 			return validateRecordValue(node)
 		case "ListValue":
 			return validateListValue(node)
+		case "DictionaryValue":
+			return validateDictionaryValue(node)
 		case "InterpolatedStringValue":
 			return validateInterpolatedStringValue(node)
 		case "Combination":
@@ -781,15 +789,29 @@ function validateDispatchCases(
 			}
 
 			if (overlapsAtRuntime(earlierType, laterType)) {
+				// NOTE: Which container's empty value crosses. The dispatch
+				// question is `overlapsAtRuntime` and it is asked of every pair,
+				// so a pair that crosses through neither container keeps the
+				// List's wording it has always had — this only tells the reader
+				// about a Dictionary where a Dictionary is what crosses.
+				let dictionary =
+					emptyCrossoverKind(earlierType, laterType) === "Dictionary"
+
 				reportWarning(
-					`The branch for ${describeType(laterType)} never sees an empty List`,
+					dictionary
+						? `The branch for ${describeType(laterType)} never sees an empty Dictionary`
+						: `The branch for ${describeType(laterType)} never sees an empty List`,
 					node.member.position,
 					{
-						code: "empty-list-overlap",
+						code: dictionary
+							? "empty-dictionary-overlap"
+							: "empty-list-overlap",
 						labels: [
 							primary(
 								node.member.position,
-								`an empty List fits ${describeType(earlierType)} too, and that branch is tried first`,
+								dictionary
+									? `an empty Dictionary fits ${describeType(earlierType)} too, and that branch is tried first`
+									: `an empty List fits ${describeType(earlierType)} too, and that branch is tried first`,
 							),
 							secondary(
 								node.base.position,
@@ -797,7 +819,9 @@ function validateDispatchCases(
 							),
 						],
 						notes: [
-							"Item Types erase before a branch is picked, so a List is placed by the items it holds — and an empty List holds none, which makes it a value of every List Type there is.",
+							dictionary
+								? "Key and value Types erase before a branch is picked, so a Dictionary is placed by the entries it holds — and an empty Dictionary holds none, which makes it a value of every Dictionary Type there is."
+								: "Item Types erase before a branch is picked, so a List is placed by the items it holds — and an empty List holds none, which makes it a value of every List Type there is.",
 						],
 						helps: [
 							"Narrow the value with a Match Expression before calling the Method.",
@@ -1315,7 +1339,7 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 					)
 				}
 			} else {
-				reportEmptyListOverlap(
+				reportEmptyContainerOverlap(
 					node,
 					handlerIndex,
 					matchedMemberIndices,
@@ -1405,19 +1429,25 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 	return node
 }
 
-// NOTE: A Case that an earlier one takes EMPTY LISTS from without covering it:
-// an empty List fits every List Matcher, so `case List<String>` above `case
-// List<Integer>` answers for an empty `List<Integer>` and this Case never sees
-// one. Nothing said so before, in either direction — the Validator called the
-// two unrelated and the runtime took the earlier branch. Only that crossover
-// is reported here: a Matcher that narrows a member by Type overlaps the Cases
-// below it too, but the values it takes are exactly the ones it names, which
-// is Cases being tried in order and nothing to warn about.
+// NOTE: A Case that an earlier one takes the EMPTY VALUES of a container from
+// without covering it: an empty List fits every List Matcher, so
+// `case List<String>` above `case List<Integer>` answers for an empty
+// `List<Integer>` and this Case never sees one. Nothing said so before, in
+// either direction — the Validator called the two unrelated and the runtime took
+// the earlier branch. Only that crossover is reported here: a Matcher that
+// narrows a member by Type overlaps the Cases below it too, but the values it
+// takes are exactly the ones it names, which is Cases being tried in order and
+// nothing to warn about.
+//
+// NOTE: The empty DICTIONARY crosses in exactly the same way and is reported in
+// exactly the same place, under a Warning of its own — a Dictionary reader is
+// told about its two slots and helped with `hasEntries()`, where a List reader
+// is told about item Types and helped with `hasItems()`.
 //
 // NOTE: One Diagnostic per Handler, on the first earlier Case that overlaps it.
 // Members the earlier Case takes ENTIRELY are none of this: those are the
 // dead-Case reports above, and this Handler still runs for the rest.
-function reportEmptyListOverlap(
+function reportEmptyContainerOverlap(
 	node: common.typed.MatchNode,
 	handlerIndex: number,
 	matchedMemberIndices: Array<number>,
@@ -1437,19 +1467,26 @@ function reportEmptyListOverlap(
 		for (let memberIndex of matchedMemberIndices) {
 			let memberType = memberTypes[memberIndex]
 
-			if (
+			let crossover =
 				acceptsAllAtRuntime(earlierMatcher, memberType) ||
-				!overlapsAtRuntime(earlierMatcher, memberType) ||
-				!overlapsThroughEmptyList(earlierMatcher, memberType)
-			) {
+				!overlapsAtRuntime(earlierMatcher, memberType)
+					? null
+					: emptyCrossoverKind(earlierMatcher, memberType)
+
+			if (crossover === null) {
 				continue
 			}
 
 			reportWarning(
-				"This Case never sees an empty List",
+				crossover === "List"
+					? "This Case never sees an empty List"
+					: "This Case never sees an empty Dictionary",
 				handler.matcherPosition,
 				{
-					code: "empty-list-overlap",
+					code:
+						crossover === "List"
+							? "empty-list-overlap"
+							: "empty-dictionary-overlap",
 					labels: [
 						primary(
 							handler.matcherPosition,
@@ -1462,10 +1499,14 @@ function reportEmptyListOverlap(
 					],
 					notes: [
 						"Cases are tried in order, and the first one that fits wins.",
-						"Item Types erase before a Match runs, so a List Matcher asks about the items the value holds — and an empty List holds none, which makes it a value of every List Type there is.",
+						crossover === "List"
+							? "Item Types erase before a Match runs, so a List Matcher asks about the items the value holds — and an empty List holds none, which makes it a value of every List Type there is."
+							: "Key and value Types erase before a Match runs, so a Dictionary Matcher asks about the entries the value holds — and an empty Dictionary holds none, which makes it a value of every Dictionary Type there is.",
 					],
 					helps: [
-						"Guard the Cases with 'where @::hasItems()' and answer for the empty List in a Case of its own.",
+						crossover === "List"
+							? "Guard the Cases with 'where @::hasItems()' and answer for the empty List in a Case of its own."
+							: "Guard the Cases with 'where @::hasEntries()' and answer for the empty Dictionary in a Case of its own.",
 					],
 				},
 			)
@@ -1843,6 +1884,22 @@ export function acceptsAllAtRuntime(
 		)
 	}
 
+	// NOTE: A Dictionary Matcher is answered by the entries the value HOLDS, as
+	// a List Matcher is answered by its items — the tag first, then each slot on
+	// its own terms.
+	if (isRuntimeDictionary(matcher) && isRuntimeDictionary(memberType)) {
+		return (
+			slotAcceptsAllAtRuntime(
+				runtimeKeyType(matcher),
+				runtimeKeyType(memberType),
+			) &&
+			slotAcceptsAllAtRuntime(
+				runtimeValueType(matcher),
+				runtimeValueType(memberType),
+			)
+		)
+	}
+
 	return false
 }
 
@@ -1912,38 +1969,55 @@ export function overlapsAtRuntime(
 		return true
 	}
 
+	// NOTE: And the empty Dictionary, which holds no entry to disagree about
+	// either of its slots over.
+	if (isRuntimeDictionary(matcher) && isRuntimeDictionary(memberType)) {
+		return true
+	}
+
 	return false
 }
 
 // NOTE: Whether the values that cross from `memberType` into `matcher` are the
-// EMPTY LISTS — a List Matcher somewhere in the overlap whose own item Type
-// does not take the member's. That crossover is the one `overlapsAtRuntime`
-// exists to see, and the one worth a warning: every other partial overlap is a
-// Matcher taking exactly the values it names, in order, as Matchers do.
-function overlapsThroughEmptyList(
+// EMPTY ones of a container — a Matcher somewhere in the overlap whose own slots
+// do not take the member's. That crossover is the one `overlapsAtRuntime` exists
+// to see, and the one worth a warning: every other partial overlap is a Matcher
+// taking exactly the values it names, in order, as Matchers do.
+//
+// NOTE: The empty DICTIONARY crosses in exactly the same way, and is asked about
+// under its own `kind` rather than folded into the List's answer. The two
+// Warnings are not one Warning — a List reader is told about item Types and
+// helped with `hasItems()`, and a Dictionary reader about its two slots and
+// `hasEntries()` — so what is shared is the WALK and not the text. One walk,
+// two leaves, and no way for the pair to drift apart.
+function overlapsThroughEmptyContainer(
 	matcher: common.Type,
 	memberType: common.Type,
+	kind: EmptyCrossover,
 ): boolean {
 	if (matcher.type === "Refinement" || memberType.type === "Refinement") {
-		return overlapsThroughEmptyList(
+		return overlapsThroughEmptyContainer(
 			eraseRefinements(matcher),
 			eraseRefinements(memberType),
+			kind,
 		)
 	}
 
-	if (isRuntimeList(matcher) && isRuntimeList(memberType)) {
+	let isContainer = kind === "List" ? isRuntimeList : isRuntimeDictionary
+
+	if (isContainer(matcher) && isContainer(memberType)) {
 		return !acceptsAllAtRuntime(matcher, memberType)
 	}
 
 	if (memberType.type === "UnionType") {
 		return flattenUnionMembers(memberType).some((armType) =>
-			overlapsThroughEmptyList(matcher, armType),
+			overlapsThroughEmptyContainer(matcher, armType, kind),
 		)
 	}
 
 	if (matcher.type === "UnionType") {
 		return flattenUnionMembers(matcher).some((armType) =>
-			overlapsThroughEmptyList(armType, memberType),
+			overlapsThroughEmptyContainer(armType, memberType, kind),
 		)
 	}
 
@@ -1954,14 +2028,35 @@ function overlapsThroughEmptyList(
 		return Object.entries(matcher.members).some(
 			([name, memberMatcher]) =>
 				Object.hasOwn(memberType.members, name) &&
-				overlapsThroughEmptyList(
+				overlapsThroughEmptyContainer(
 					memberMatcher,
 					memberType.members[name],
+					kind,
 				),
 		)
 	}
 
 	return false
+}
+
+// NOTE: Which container's empty value crosses, or null where nothing does. A
+// List is asked about FIRST, so a Program that crosses through both — a Record
+// holding one of each — reports the List's Warning it has always reported.
+type EmptyCrossover = "List" | "Dictionary"
+
+function emptyCrossoverKind(
+	matcher: common.Type,
+	memberType: common.Type,
+): EmptyCrossover | null {
+	if (overlapsThroughEmptyContainer(matcher, memberType, "List")) {
+		return "List"
+	}
+
+	if (overlapsThroughEmptyContainer(matcher, memberType, "Dictionary")) {
+		return "Dictionary"
+	}
+
+	return null
 }
 
 function membersAcceptAllAtRuntime(
@@ -1998,6 +2093,41 @@ function isRuntimeList(type: common.Type): boolean {
 
 function runtimeItemType(type: common.Type): common.Type {
 	return type.type === "List" ? type.itemType : { type: "Unknown" }
+}
+
+// NOTE: The same pair for the Dictionary, whose bare spelling names neither of
+// its slots — so both read as Unknown, which is what the checks above ask for
+// when they mean "this says nothing about that half".
+function isRuntimeDictionary(type: common.Type): boolean {
+	return type.type === "Dictionary" || type.type === "GenericDictionary"
+}
+
+function runtimeKeyType(type: common.Type): common.Type {
+	return type.type === "Dictionary" ? type.keyType : { type: "Unknown" }
+}
+
+function runtimeValueType(type: common.Type): common.Type {
+	return type.type === "Dictionary" ? type.valueType : { type: "Unknown" }
+}
+
+// NOTE: One slot of a Dictionary, asked exactly as `acceptsAllAtRuntime` asks a
+// List's items — the Matcher naming nothing there takes every value, and a
+// member whose own slot is undecided could hold anything, so it is not all of
+// anything. The two slots are asked SEPARATELY and both have to answer, which is
+// what keeps `Dictionary<String, Unknown>` from passing for `Dictionary<String,
+// Integer>` on the strength of its keys.
+function slotAcceptsAllAtRuntime(
+	matcherSlot: common.Type,
+	memberSlot: common.Type,
+): boolean {
+	if (matcherSlot.type === "Unknown") {
+		return true
+	}
+
+	return (
+		memberSlot.type !== "Unknown" &&
+		acceptsAllAtRuntime(matcherSlot, memberSlot)
+	)
 }
 
 // NOTE: Whether the payload is present and matches is checked here rather
@@ -2220,6 +2350,23 @@ function validateListValue(
 	for (let value of node.values) {
 		validateExpression(value)
 		validateNoBoundFunctionValue(value)
+	}
+
+	return node
+}
+
+// NOTE: Both halves of every entry, on the same terms a List's items are held
+// to: a value whose Type carries hidden conformance Parameters can not be
+// stored, because storing it is what makes it travel away from the call that
+// filled them.
+function validateDictionaryValue(
+	node: common.typed.DictionaryValueNode,
+): common.typed.DictionaryValueNode {
+	for (let entry of node.entries) {
+		validateExpression(entry.key)
+		validateNoBoundFunctionValue(entry.key)
+		validateExpression(entry.value)
+		validateNoBoundFunctionValue(entry.value)
 	}
 
 	return node
@@ -2931,14 +3078,14 @@ function refinementEvidence(
 				labels: [
 					secondary(
 						refused.value.position,
-						`this item is ${withArticle(describeType(refused.value.type))}`,
+						`this ${refused.part} is ${withArticle(describeType(refused.value.type))}`,
 					),
 				],
 				notes: [
-					`Every item has to be ${withArticle(spelling)}, and every value of that Type has been proven to answer '${predicate}'.`,
+					`Every ${refused.part} has to be ${withArticle(spelling)}, and every value of that Type has been proven to answer '${predicate}'.`,
 				],
 				helps: [
-					`Check '${predicate}' on the item in an 'if' or a 'match', or write an item that already has Type '${spelling}'.`,
+					`Check '${predicate}' on the ${refused.part} in an 'if' or a 'match', or write ${refused.part === "item" ? "an item" : `a ${refused.part}`} that already has Type '${spelling}'.`,
 				],
 			}
 		}

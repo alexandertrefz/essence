@@ -204,6 +204,7 @@ export function enrichNode(
 		case "BooleanValue":
 		case "FunctionValue":
 		case "ListValue":
+		case "DictionaryValue":
 		case "Lookup":
 		case "MemberPath":
 		case "Identifier":
@@ -292,6 +293,8 @@ export function enrichCalleeExpression(
 			return enrichFunctionValue(node, scope)
 		case "ListValue":
 			return enrichListValue(node, scope, expectedType)
+		case "DictionaryValue":
+			return enrichDictionaryValue(node, scope, expectedType)
 		case "Lookup":
 			return enrichLookup(node, scope)
 		case "MemberPath":
@@ -1108,6 +1111,25 @@ export function enrichCombination(
 	scope: enricher.Scope,
 ): common.typed.CombinationNode {
 	let lhs = enrichExpression(node.lhs, scope)
+	// NOTE: A refined base updates exactly as its base does — what the update
+	// answers is a Dictionary, never the refinement, because a key set into it
+	// can not be proof of anything the refinement asked.
+	let baseType = lhs.type.type === "Refinement" ? lhs.type.base : lhs.type
+
+	if (baseType.type === "Dictionary") {
+		return enrichDictionaryCombination(node, lhs, baseType, scope)
+	}
+
+	// NOTE: Brackets over a base that is no Dictionary. Reported here and
+	// answered with the base's own Type, because the ordinary reading below
+	// would measure a Dictionary against a Record's members and report a second
+	// time about a Partial nobody wrote.
+	if (node.brackets === true && baseType.type === "Record") {
+		reportUpdateBrackets(node, lhs, baseType)
+
+		return combinationOfWrongBrackets(node, lhs, scope)
+	}
+
 	let keys = node.rhs
 
 	if (keys.nodeType === "RecordValue" && hasPathKeys(keys)) {
@@ -1138,6 +1160,294 @@ export function enrichCombination(
 			node.lhs.position,
 			node.rhs.position,
 		),
+	}
+}
+
+// NOTE: `[ages with "kim" = 7]` and `[ages with other]` — an update over a
+// Dictionary, which is a construction rather than a merge of member lists: the
+// first sets the entries it names, the second merges a whole Dictionary in with
+// the ARGUMENT winning on a shared key. Both answer the base's Dictionary Type,
+// and both are checked against the base's slots rather than against each other.
+//
+// A slot the base left Unknown — `[=]` assigned and then updated — is decided by
+// the update, exactly as an assignment decides it. Nothing is checked against an
+// Unknown slot for the same reason nothing is checked against an empty List's
+// item Type: there is no Type there yet to check against.
+function enrichDictionaryCombination(
+	node: parser.CombinationNode,
+	lhs: common.typed.ExpressionNode,
+	baseType: common.DictionaryType,
+	scope: enricher.Scope,
+): common.typed.CombinationNode {
+	if (reportUpdateBrackets(node, lhs, baseType)) {
+		return combinationOfWrongBrackets(node, lhs, scope)
+	}
+
+	let declaredKeyType =
+		baseType.keyType.type === "Unknown" ? null : baseType.keyType
+	let declaredValueType =
+		baseType.valueType.type === "Unknown" ? null : baseType.valueType
+
+	let rhs =
+		node.rhs.nodeType === "DictionaryValue"
+			? enrichDictionaryUpdateKeys(
+					node.rhs,
+					scope,
+					declaredKeyType,
+					declaredValueType,
+				)
+			: enrichExpression(node.rhs, scope, baseType)
+
+	let merged =
+		rhs.nodeType === "DictionaryValue"
+			? rhs.type
+			: reportUnmergeableDictionary(node, baseType, rhs)
+
+	let type: common.DictionaryType = {
+		type: "Dictionary",
+		keyType: declaredKeyType ?? dictionarySlotOf(merged, "keyType"),
+		valueType: declaredValueType ?? dictionarySlotOf(merged, "valueType"),
+	}
+
+	if (rhs.nodeType === "DictionaryValue") {
+		reportUnsettableEntries(rhs, declaredKeyType, declaredValueType, lhs)
+	}
+
+	// NOTE: The witness is the BASE's, not the update's: what the emitted `set`
+	// compares a written key against is the keys the Dictionary already holds,
+	// and those are of the base's key Type. An update whose base decided no key
+	// Type takes the one its own entries decided, which is the Type the answer
+	// has — and an update that decided neither has no key anywhere for anything
+	// to be compared against, so it is asked for nothing.
+	let keyConformance =
+		type.keyType.type === "Unknown"
+			? null
+			: equatableKeyConformance(type.keyType, scope, node.position)
+
+	return {
+		nodeType: "Combination",
+		lhs,
+		rhs,
+		position: node.position,
+		type,
+		...(keyConformance === null ? {} : { keyConformance }),
+	}
+}
+
+// NOTE: The key list of an update — one bracket list, enriched exactly as a
+// literal's is, but carrying no witness of its own: what compares these keys is
+// the base's Equatable, recorded on the Combination. See
+// `typed.DictionaryValueNode.keyConformance`.
+function enrichDictionaryUpdateKeys(
+	node: parser.DictionaryValueNode,
+	scope: enricher.Scope,
+	expectedKeyType: common.Type | null,
+	expectedValueType: common.Type | null,
+): common.typed.DictionaryValueNode {
+	let entries = enrichDictionaryEntries(
+		node.entries,
+		scope,
+		expectedKeyType,
+		expectedValueType,
+	)
+
+	return {
+		nodeType: "DictionaryValue",
+		entries,
+		position: node.position,
+		type: {
+			type: "Dictionary",
+			keyType: listItemTypeOf(entries.map((entry) => entry.key.type)),
+			valueType: listItemTypeOf(entries.map((entry) => entry.value.type)),
+		},
+		keyConformance: null,
+	}
+}
+
+function dictionarySlotOf(
+	type: common.Type,
+	slot: "keyType" | "valueType",
+): common.Type {
+	return type.type === "Dictionary" ? type[slot] : { type: "Unknown" }
+}
+
+// NOTE: Each entry of an update measured against the slot it is being written
+// into. The Diagnostic points at the half that did not fit rather than at the
+// whole update, which a Record's `partial-type-mismatch` can not do — its keys
+// are names and the mismatch is about the SET of them.
+function reportUnsettableEntries(
+	rhs: common.typed.DictionaryValueNode,
+	keyType: common.Type | null,
+	valueType: common.Type | null,
+	lhs: common.typed.ExpressionNode,
+): void {
+	for (let entry of rhs.entries) {
+		if (keyType !== null && !fitsWritten(keyType, entry.key)) {
+			reportError(
+				"This is not a key the Dictionary can hold",
+				entry.key.position,
+				{
+					code: "partial-type-mismatch",
+					labels: [
+						primary(
+							entry.key.position,
+							`this is ${withArticle(describeType(entry.key.type))}`,
+						),
+						secondary(
+							lhs.position,
+							`this is ${withArticle(describeType(lhs.type))}`,
+						),
+					],
+					notes: [
+						"An update may only set keys of the Dictionary's key Type, with the Type it declared for its values.",
+					],
+				},
+			)
+		}
+
+		if (valueType !== null && !fitsWritten(valueType, entry.value)) {
+			reportError(
+				"This is not a value the Dictionary holds",
+				entry.value.position,
+				{
+					code: "partial-type-mismatch",
+					labels: [
+						primary(
+							entry.value.position,
+							`this is ${withArticle(describeType(entry.value.type))}`,
+						),
+						secondary(
+							lhs.position,
+							`this is ${withArticle(describeType(lhs.type))}`,
+						),
+					],
+					notes: [
+						"An update may only set keys of the Dictionary's key Type, with the Type it declared for its values.",
+					],
+				},
+			)
+		}
+	}
+}
+
+// NOTE: The whole-value form's one demand — what is merged in has to be a
+// Dictionary the base could hold, which is the same question an assignment
+// asks. Answers the Type the merge decided, so that a base with Unknown slots
+// takes them from the value merged into it.
+function reportUnmergeableDictionary(
+	node: parser.CombinationNode,
+	baseType: common.DictionaryType,
+	rhs: common.typed.ExpressionNode,
+): common.Type {
+	if (rhs.type.type === "Error" || matchesType(baseType, rhs.type)) {
+		return rhs.type
+	}
+
+	reportError(
+		"This is not a Dictionary the update can merge in",
+		node.rhs.position,
+		{
+			code: "partial-type-mismatch",
+			labels: [
+				primary(
+					node.rhs.position,
+					`this is ${withArticle(describeType(rhs.type))}`,
+				),
+				secondary(
+					node.lhs.position,
+					`this is ${withArticle(describeType(baseType))}`,
+				),
+			],
+			notes: [
+				"A whole-value update merges one Dictionary into another, so what is merged in has to hold the same key and value Types. The Argument wins on a key both hold.",
+			],
+			helps: [
+				"Write the entries to set instead: '[base with \"key\" = value]'.",
+			],
+		},
+	)
+
+	return { type: "Error" }
+}
+
+// NOTE: Brackets and braces are not two spellings of one form: `{ … }` updates a
+// RECORD, whose keys are names it already declares, and `[ … ]` updates a
+// DICTIONARY, whose keys are values it may never have held. So the pair that was
+// written says which of the two was meant, and a base that wants the other pair
+// is told which — rather than being measured against a form it is not in and
+// reported as a mismatch of Types.
+function reportUpdateBrackets(
+	node: parser.CombinationNode,
+	lhs: common.typed.ExpressionNode,
+	baseType: common.Type,
+): boolean {
+	let wantsBrackets = baseType.type === "Dictionary"
+
+	if (wantsBrackets === (node.brackets === true)) {
+		return false
+	}
+
+	reportError(
+		wantsBrackets
+			? "A Dictionary is updated in brackets"
+			: "A Record is updated in braces",
+		node.position,
+		{
+			code: "wrong-update-brackets",
+			labels: [
+				primary(
+					node.position,
+					wantsBrackets
+						? "this update is written in braces"
+						: "this update is written in brackets",
+				),
+				secondary(
+					node.lhs.position,
+					`this is ${withArticle(describeType(lhs.type))}`,
+				),
+			],
+			notes: [
+				"A Record's keys are the member names it declares, and a Dictionary's are values of its key Type — so the two are written differently and never interchangeably.",
+			],
+			helps: [
+				wantsBrackets
+					? "Write the update in brackets: '[base with \"key\" = value]'."
+					: "Write the update in braces: '{ base with member = value }'.",
+			],
+		},
+	)
+
+	return true
+}
+
+// NOTE: The update was written in the other pair, which `wrong-update-brackets`
+// has just said. Whatever stands after the `with` is then read under a form
+// nobody wrote — a Record's member names as Expressions, a Dictionary's entries
+// as a Partial — and every Diagnostic that reading produces is about a mistake
+// the reader did not make: `[config with port = 90]` reported `unknown-name
+// 'port'` beside it, and `{ ages with alex = 40 }` a `partial-type-mismatch`
+// that contradicts the Help above it.
+//
+// So the right side is enriched for its NODES alone, with what it reported
+// thrown away — the Language Server still wants a typed tree to hover and
+// complete inside — and the Combination answers the base's own Type. The shape
+// is wrong; nothing downstream should be told a second story about what it
+// holds.
+function combinationOfWrongBrackets(
+	node: parser.CombinationNode,
+	lhs: common.typed.ExpressionNode,
+	scope: enricher.Scope,
+): common.typed.CombinationNode {
+	let { result: rhs } = collectDiagnostics(() =>
+		enrichExpression(node.rhs, scope),
+	)
+
+	return {
+		nodeType: "Combination",
+		lhs,
+		rhs,
+		position: node.position,
+		type: lhs.type,
 	}
 }
 
@@ -2182,9 +2492,17 @@ function reportUninferableCapture(
 	}
 
 	let declarationPosition = declaringScope.declarations[node.content] ?? null
+	// NOTE: A Dictionary has no item Type — it has two slots, and an empty
+	// `[=]` decides neither — so the sentence a List is refused with is not a
+	// sentence about one. The Help above all: 'variable ages: List<Integer> =
+	// []' written under a Declaration whose value is `[=]` is advice that does
+	// not compile.
+	let dictionary = type.type === "Dictionary"
 
 	reportError(
-		`'${node.content}' is captured before its item Type is decided`,
+		dictionary
+			? `'${node.content}' is captured before its key and value Types are decided`
+			: `'${node.content}' is captured before its item Type is decided`,
 		node.position,
 		{
 			code: "uninferable-item-type",
@@ -2203,10 +2521,14 @@ function reportUninferableCapture(
 						]),
 			],
 			notes: [
-				"An empty List Literal leaves its item Type unknown until an assignment decides it, and this Function was checked before that happened.",
+				dictionary
+					? "An empty Dictionary Literal leaves its key and value Types unknown until an assignment decides them, and this Function was checked before that happened."
+					: "An empty List Literal leaves its item Type unknown until an assignment decides it, and this Function was checked before that happened.",
 			],
 			helps: [
-				`Annotate the declaration — 'variable ${node.content}: List<Integer> = []' — so the Function is checked against the Type it will hold.`,
+				dictionary
+					? `Annotate the declaration — 'variable ${node.content}: Dictionary<String, Integer> = [=]' — so the Function is checked against the Types it will hold.`
+					: `Annotate the declaration — 'variable ${node.content}: List<Integer> = []' — so the Function is checked against the Type it will hold.`,
 			],
 		},
 	)
@@ -2235,6 +2557,221 @@ export function enrichListValue(
 			type: "List",
 			itemType: listItemTypeOf(values.map((value) => value.type)),
 		},
+	}
+}
+
+// NOTE: `["alex" = 39, "sam" = 25]` and `[=]` — the second written container,
+// and the first with two Types to decide. Both slots are decided the way a
+// List's one is: the Union of the distinct written Types, in first-seen order,
+// and Unknown where nothing was written, which is the slot every Dictionary
+// Type accepts until an assignment pins it.
+//
+// NOTE: A written Dictionary COMPARES its keys, which a written List never
+// does — so a literal with entries in it carries an Equatable witness, resolved
+// here and emitted as the trailing Argument of the construction. That is the
+// whole of what makes this more than a List with two Expressions per item.
+export function enrichDictionaryValue(
+	node: parser.DictionaryValueNode,
+	scope: enricher.Scope,
+	expectedType: common.Type | null = null,
+): common.typed.DictionaryValueNode {
+	let expected = expectedDictionarySlots(expectedType)
+	let entries = enrichDictionaryEntries(
+		node.entries,
+		scope,
+		expected?.keyType ?? null,
+		expected?.valueType ?? null,
+	)
+	let type: common.DictionaryType = {
+		type: "Dictionary",
+		keyType: listItemTypeOf(entries.map((entry) => entry.key.type)),
+		valueType: listItemTypeOf(entries.map((entry) => entry.value.type)),
+	}
+
+	return {
+		nodeType: "DictionaryValue",
+		entries,
+		position: node.position,
+		type,
+		// NOTE: The empty Dictionary is asked for no witness. Its key Type is
+		// Unknown, which conforms to nothing, and there is no key in it for
+		// anything to be compared against — so asking would report a bound
+		// nobody wrote about a Type nobody decided.
+		keyConformance:
+			entries.length === 0
+				? null
+				: equatableKeyConformance(type.keyType, scope, node.position),
+	}
+}
+
+// NOTE: One bracket list's entries, enriched and checked for keys that are the
+// same value written twice. Shared by the literal and by the key list of an
+// update, which is one bracket list on the same terms — an entry written twice
+// there is the same mistake, and the base is no part of it.
+function enrichDictionaryEntries(
+	entries: Array<parser.DictionaryEntryNode>,
+	scope: enricher.Scope,
+	expectedKeyType: common.Type | null,
+	expectedValueType: common.Type | null,
+): Array<common.typed.DictionaryEntryNode> {
+	// NOTE: Each half stands in the slot the Dictionary is expected to have, so
+	// a bare `#Red` resolves under a `Dictionary<Suit, Integer>` exactly as it
+	// does under a `List<Suit>` — the same decision the annotation makes for a
+	// Case written directly beneath it.
+	let enriched = entries.map((entry) => ({
+		key: enrichExpression(entry.key, scope, expectedKeyType),
+		value: enrichExpression(entry.value, scope, expectedValueType),
+		position: entry.position,
+	}))
+
+	reportDuplicateKeys(enriched)
+
+	return enriched
+}
+
+// NOTE: What the key and value positions of an expected Type want, for the
+// Expressions that react to one — the twin of `expectedListItemType`, unwrapping
+// a Union the same way and answering `null` where nothing there is a Dictionary
+// at all. Both slots come back together because one walk answers both, and a
+// Literal always asks for both.
+function expectedDictionarySlots(
+	expectedType: common.Type | null,
+): { keyType: common.Type; valueType: common.Type } | null {
+	if (expectedType === null) {
+		return null
+	}
+
+	let dictionaries = unionArmsOf(expectedType).flatMap((member) =>
+		member.type === "Dictionary" ? [member] : [],
+	)
+
+	if (dictionaries.length === 0) {
+		return null
+	}
+
+	return {
+		keyType: buildUnion(
+			dictionaries.map((dictionary) => dictionary.keyType),
+		),
+		valueType: buildUnion(
+			dictionaries.map((dictionary) => dictionary.valueType),
+		),
+	}
+}
+
+// NOTE: The Equatable witness a construction compares its keys through,
+// resolved exactly as a bounded Method call resolves the witness for its own
+// bound Type Parameter — because that is what a written Dictionary is. The same
+// `resolveConformances` answers `Dictionary.of`'s bound, so a key Type refused
+// here is refused there, in the same words: `unsatisfied-bound` where no
+// Namespace conforms, `unsatisfied-conformance-condition` where a conditional
+// conformance's `where` did not hold, each naming the key Type in its notes.
+//
+// `null` where the bound went unsatisfied, which is a reported Program that
+// never reaches emission.
+function equatableKeyConformance(
+	keyType: common.Type,
+	scope: enricher.Scope,
+	position: common.Position,
+): common.Conformance | null {
+	return (
+		resolveConformances(
+			[
+				{
+					name: "KeyType",
+					infer: true,
+					defaultType: null,
+					constraint: "Equatable",
+				},
+			],
+			new Map([["KeyType", keyType]]),
+			scope,
+			position,
+		)[0] ?? null
+	)
+}
+
+// NOTE: Two keys in ONE bracket list that are the same value. The runtime rule
+// is that a later duplicate wins, and that rule is for keys worked out while
+// the Program runs — a key written down twice is not a rule being used, it is
+// one of the two entries being lost, silently, in a list short enough to read.
+//
+// Only keys the Compiler can compare AS WRITTEN are reported. Anything else is
+// left to the runtime rule, which is the honest division: the Compiler refuses
+// what it can see and promises nothing about what it can not.
+function reportDuplicateKeys(
+	entries: Array<common.typed.DictionaryEntryNode>,
+): void {
+	let seen = new Map<string, common.typed.DictionaryEntryNode>()
+
+	for (let entry of entries) {
+		let identity = writtenKeyIdentity(entry.key)
+
+		if (identity === null) {
+			continue
+		}
+
+		let first = seen.get(identity)
+
+		if (first === undefined) {
+			seen.set(identity, entry)
+
+			continue
+		}
+
+		reportError("This key is written twice", entry.key.position, {
+			code: "duplicate-key",
+			labels: [
+				primary(entry.key.position, "written a second time here"),
+				secondary(first.key.position, "first written here"),
+			],
+			notes: [
+				"A Dictionary holds one value per key, so the second entry would take the first one's place and nothing would say the first was ever there.",
+			],
+			helps: ["Keep one entry for the key."],
+		})
+	}
+}
+
+// NOTE: What makes two written keys THE SAME key, or null for a key this can
+// not decide. It is the compile-time half of the runtime's canonical key
+// encoding and agrees with it kind by kind: a String is compared NFC-normalised
+// because Essence's String equality is canonical equivalence, a Rational is
+// compared in lowest terms because `2/4` and `1/2` are one number, and a whole
+// Rational is compared as the Integer it is because `3/1` and `3` encode to one
+// key.
+//
+// A unit Case is its tag. A Case with a payload is not read at all: a Namespace
+// may write its own `is` for a Choice, so two payloads that look alike need not
+// be one key — which is the very reason the runtime puts such keys on the scan
+// path rather than encoding them.
+function writtenKeyIdentity(key: common.typed.ExpressionNode): string | null {
+	switch (key.nodeType) {
+		case "IntegerValue":
+			return /^-?\d+$/.test(key.value)
+				? `Integer ${BigInt(key.value)}`
+				: null
+		case "RationalValue": {
+			let spelling = reducedRationalSpelling(
+				key.numerator,
+				key.denominator,
+			)
+			let whole = spelling.match(/^(-?\d+)\/1$/)
+
+			return whole === null
+				? `Rational ${spelling}`
+				: `Integer ${whole[1]}`
+		}
+		case "StringValue":
+			return `String ${JSON.stringify(key.value.normalize("NFC"))}`
+		case "BooleanValue":
+			return `Boolean ${key.value}`
+		case "CaseValue":
+			return key.value === null && key.type.type === "Case"
+				? `Case ${key.type.choice}#${key.type.name}`
+				: null
+		default:
+			return null
 	}
 }
 
@@ -3414,6 +3951,65 @@ export function deriveGenerator(
 		// whatever a Type Parameter admits, which is the ladder below.
 		case "GenericList":
 			return { kind: "list", item: anyValueGenerator() }
+		case "Dictionary": {
+			let key = deriveGenerator(type.keyType, scope, position, enclosing)
+
+			if (key === null) {
+				return null
+			}
+
+			let value = deriveGenerator(
+				type.valueType,
+				scope,
+				position,
+				enclosing,
+			)
+
+			// NOTE: Both slots or nothing — a Dictionary whose values can not be
+			// built is no more generatable than one whose keys can not be, and
+			// the refusal was already reported by whichever half answered null.
+			if (value === null) {
+				return null
+			}
+
+			// NOTE: The key Type's OWN Equatable, resolved here exactly as a
+			// written `Dictionary.of` resolves it at its call site — which is
+			// what makes a drawn Dictionary hold the keys a Program would call
+			// distinct, rather than the ones a universal comparison would. A
+			// Namespace writing its own `is` is the whole reason this has to
+			// travel: `namespace Tags for Tag is Equatable` says two Tags with
+			// one `name` are ONE key, and a plan without the witness draws two.
+			//
+			// A witness a Type PARAMETER carries is not one of these. It is a
+			// name bound at a call site, and a generator is emitted in the tests
+			// section where no such name stands — so the plan carries nothing
+			// and the runtime's universal comparison stands in, which is what a
+			// Type Parameter's ladder of drawn values wants anyway.
+			let keyConformance = equatableKeyConformance(
+				type.keyType,
+				scope,
+				position,
+			)
+
+			return {
+				kind: "dictionary",
+				key,
+				value,
+				...(keyConformance === null ||
+				keyConformance.source.kind === "parameter"
+					? {}
+					: { keyConformance }),
+			}
+		}
+		// NOTE: A Dictionary nothing applied Type Arguments to — both slots are
+		// whatever a Type Parameter admits, for the reason a bare List's items
+		// are.
+		case "GenericDictionary":
+			return {
+				kind: "dictionary",
+				key: anyValueGenerator(),
+				value: anyValueGenerator(),
+			}
 		// NOTE: A Type Parameter, which stands for whatever a use site
 		// instantiates it with. The ladder is what the design asks for: a
 		// generic instantiates over an Integer, a String and a small Record,
@@ -3642,8 +4238,15 @@ function narrowedBy(
 		}
 	}
 
+	// NOTE: A Dictionary is counted in ENTRIES rather than items or characters,
+	// and `minimumLength`/`maximumLength` say exactly that about it — the field
+	// names are the narrowing's, and what a length is belongs to the Type. This
+	// is what lets slice 3's `NonEmptyDictionary` draw a Dictionary that holds
+	// something rather than draw and throw away.
 	if (
-		(base.type === "List" || base.type === "String") &&
+		(base.type === "List" ||
+			base.type === "String" ||
+			base.type === "Dictionary") &&
 		conjunct.args.length === 0 &&
 		conjunct.methodName === "isEmpty"
 	) {
@@ -3913,6 +4516,41 @@ function predicateSignatures(
 		: [method]
 }
 
+// NOTE: What a Type Parameter in a Method's signature stands for, resolved
+// against what the refinement is ABOUT — and null where the base says nothing
+// about the name, which leaves the Parameter as it was declared.
+//
+// `Self` is the base: `Equatable::isNot(_ other: Self)` over an Integer takes an
+// Integer. A List Method's Parameter is the item Type the base was applied with,
+// whatever the Method spelled it — a List has ONE slot, so there is nothing else
+// it could stand for.
+//
+// NOTE: A Dictionary has TWO, so the name is what tells them apart and a
+// Parameter spelled anything else is left alone rather than guessed at. The one
+// place a second slot changes an answer that a first slot could give blind.
+function refinementBaseGeneric(
+	name: string,
+	base: common.Type,
+): common.Type | null {
+	if (name === "Self") {
+		return base
+	}
+
+	if (base.type === "List") {
+		return base.itemType
+	}
+
+	if (base.type === "Dictionary") {
+		return name === "KeyType"
+			? base.keyType
+			: name === "ValueType"
+				? base.valueType
+				: null
+	}
+
+	return null
+}
+
 // NOTE: One stable scalar as the Literal it was written as. A conjunct keeps an
 // Integer's digits and a String's characters in the one field, so the Parameter
 // is what says which of the two is in hand — the same reading the Enricher gave
@@ -3923,17 +4561,9 @@ function predicateArgument(
 	base: common.Type,
 	position: common.Position,
 ): parser.ExpressionNode | null {
-	// NOTE: A Type Parameter in the Method's signature, resolved against what
-	// the refinement is ABOUT: `Self` is the base — `Equatable::isNot(_ other:
-	// Self)` over an Integer takes an Integer — and a List Method's `ItemType`
-	// is the item Type the base was applied with.
 	let type =
 		declared.type === "GenericUse"
-			? declared.name === "Self"
-				? base
-				: base.type === "List"
-					? base.itemType
-					: declared
+			? (refinementBaseGeneric(declared.name, base) ?? declared)
 			: declared
 
 	if (typeof argument === "boolean") {
@@ -4429,6 +5059,7 @@ const parameterlessValues = new Set([
 	"RationalValue",
 	"BooleanValue",
 	"ListValue",
+	"DictionaryValue",
 	"CaseValue",
 ])
 
@@ -7663,6 +8294,14 @@ function spellingIdentifies(type: common.Type): boolean {
 			return true
 		case "List":
 			return spellingIdentifies(type.itemType)
+		// NOTE: Both slots, because `describeType` prints both — a spelling that
+		// tells one Dictionary from another has to be a spelling that tells both
+		// of its slots apart.
+		case "Dictionary":
+			return (
+				spellingIdentifies(type.keyType) &&
+				spellingIdentifies(type.valueType)
+			)
 		default:
 			return false
 	}
@@ -7928,11 +8567,11 @@ function provenLiteralReceiverType(
 	return remembered
 }
 
-// NOTE: The receiver Node carrying whatever it proved about itself. Only the four
+// NOTE: The receiver Node carrying whatever it proved about itself. Only the five
 // written shapes a refinement may be written ON are ever refined — an Integer, a
-// Rational, a String and a List — and the switch is what says so in the Types
-// rather than in a comment: every other Expression comes back as itself,
-// untouched and unallocated.
+// Rational, a String, a List and a Dictionary — and the switch is what says so in
+// the Types rather than in a comment: every other Expression comes back as
+// itself, untouched and unallocated.
 //
 // A written Boolean is not among them, though `literalValueOf` reads one: it is
 // read because it can stand as a written List's ITEM, and `isRefinableBase`
@@ -7955,6 +8594,8 @@ function writtenReceiver(
 		case "StringValue":
 			return { ...base, type: refinement }
 		case "ListValue":
+			return { ...base, type: refinement }
+		case "DictionaryValue":
 			return { ...base, type: refinement }
 		default:
 			return base
@@ -9026,8 +9667,38 @@ function reportUnboundGenerics(
 	unboundGenerics: Array<string>,
 	position: common.Position,
 	typer: ArgumentTyper,
+	receiver: parser.ExpressionNode | null = null,
 ): void {
-	if (typer.hasErrorArgument()) {
+	if (typer.hasErrorArgument() || unboundGenerics.length === 0) {
+		return
+	}
+
+	// NOTE: `[=]::length()` binds neither of a Dictionary's two Type
+	// Parameters, and one report per Parameter is the same sentence twice about
+	// one pair of brackets — with a Help that can not be followed, since
+	// `length` takes no Type Argument to write. The empty Dictionary is one
+	// mistake with one fix: say what the brackets do not decide, and name the
+	// annotation that decides it.
+	if (
+		receiver?.nodeType === "DictionaryValue" &&
+		receiver.entries.length === 0
+	) {
+		reportError(
+			`Type Parameters ${unboundGenerics
+				.map((name) => `'${name}'`)
+				.join(" and ")} could not be inferred`,
+			position,
+			{
+				code: "uninferable-type-parameter",
+				labels: [
+					primary(position, "nothing here determines what it holds"),
+				],
+				helps: [
+					"Annotate the declaration — 'constant d: Dictionary<String, Integer> = [=]'.",
+				],
+			},
+		)
+
 		return
 	}
 
@@ -10051,6 +10722,7 @@ function resolveMethodInvocation(
 			resolvedMethod.unboundGenerics,
 			node.position,
 			typer,
+			node.base,
 		)
 
 		// NOTE: The Overload was selected while this Namespace was probed; what
@@ -10383,6 +11055,7 @@ function resolveUnionMethodDispatch(
 				resolvedMethod.unboundGenerics,
 				node.position,
 				typer,
+				node.base,
 			)
 		}
 
@@ -13392,12 +14065,20 @@ export function resolveRefinementConjuncts(
 // OPAQUE while the predicate is read is what keeps the conjuncts item-agnostic: a
 // predicate about the items (`@::contains(0)`) is refused by ordinary typechecking,
 // and the ones that survive ask nothing a Type Argument could answer differently.
+//
+// NOTE: An APPLIED Dictionary is the fifth, and it is here on exactly the List's
+// terms — `Dictionary<Key, Value>` with both slots still Type Parameters is what
+// `NonEmptyDictionary` is written on, and a predicate that could ask about
+// either slot is refused by ordinary typechecking before it reaches a conjunct.
+// A bare `Dictionary` is refused for the reason a bare `List` is: nothing has
+// decided what is in it.
 function isRefinableBase(type: common.Type): boolean {
 	return (
 		type.type === "Integer" ||
 		type.type === "Rational" ||
 		type.type === "String" ||
-		type.type === "List"
+		type.type === "List" ||
+		type.type === "Dictionary"
 	)
 }
 
