@@ -120,6 +120,49 @@ tests {
 }
 `
 
+// NOTE: A `define` of its own rather than an arm added to `fixtures`, because
+// every expectation up there is read off a line number and a `define` written
+// into it would move all of them. The ladder narrows nothing; `narrowingArms`
+// below is the one that does.
+const defineArms = `implementation {
+	function grade(_ score: Integer) -> String {
+		<- define {
+			as "A" if score::isGreaterThanOrEqualTo(90)
+			as "B" if score::isGreaterThanOrEqualTo(80)
+			as "F" otherwise
+		}
+	}
+}
+
+tests {
+	test "grades a middling score" {
+		expect grade(85)::is("B")
+	}
+}
+`
+
+// NOTE: The two claims an arm's Condition can make, one `define` each and
+// pointing opposite ways. `separator::isEmpty()` establishes nothing where it
+// HOLDS and proves `NonEmptyString` where it does not — which is what lets the
+// `otherwise` arm call `split`. `n::isGreaterThan(0)` is the other way round: it
+// proves `PositiveInteger` for its own arm and leaves the arm below it nothing.
+const narrowingArms = `implementation {
+	function pieces(_ text: String, on separator: String) -> List<String> {
+		<- define {
+			as [text] if separator::isEmpty()
+			as text::split(on separator) otherwise
+		}
+	}
+
+	function shrunk(_ n: Integer) -> Integer {
+		<- define {
+			as n::subtract(1) if n::isGreaterThan(0)
+			as 0 otherwise
+		}
+	}
+}
+`
+
 describe("The coverage instrumentation pass", () => {
 	it("writes nothing at all unless the caller asked for it", () => {
 		let program = instrumented(fixtures, defaultOptimiserOptions)
@@ -188,6 +231,60 @@ describe("The coverage instrumentation pass", () => {
 			"Standings::points › case #Postponed",
 			"Standings::points › case #Forfeited",
 		])
+	})
+
+	// NOTE: An arm IS a branch — one question, the path taken where it holds and
+	// the fallback below it where it does not — so it is counted as one, under
+	// the two labels an `if` already writes. Nothing in `testing/coverage.ts`
+	// hears that `define` exists.
+	it("counts every arm of a define, and the otherwise arm below them", () => {
+		expect(labelsOf(instrumented(defineArms), "branch")).toEqual([
+			"grade › if",
+			"grade › if",
+			"grade › otherwise",
+		])
+	})
+
+	it("leaves an arm that established nothing unmarked", () => {
+		let branches = pointsOf(instrumented(defineArms)).filter(
+			(point) => point.kind === "branch",
+		)
+
+		expect(branches).toHaveLength(3)
+		expect(branches.every((point) => point.refinement)).toBe(false)
+	})
+
+	// NOTE: An arm's own claim and what it leaves the arm below it are two
+	// claims, and neither implies the other — so each counter is marked with the
+	// one that is about the path IT counts, and this is the `define` pair that
+	// tells them apart in both directions.
+	it("marks an arm and its fallback by the claim about each", () => {
+		let branches = pointsOf(instrumented(narrowingArms)).filter(
+			(point) => point.kind === "branch",
+		)
+
+		expect(
+			branches.map((point) => [point.scope, point.refinement]),
+		).toEqual([
+			["pieces", false],
+			["pieces", true],
+			["shrunk", true],
+			["shrunk", false],
+		])
+	})
+
+	// NOTE: An arm has no body to write a Statement into, so its counter is the
+	// WRAPPING form — it counts and answers with the very value it was handed,
+	// which is what leaves the chain a chain rather than a Function to call.
+	// `pool-constants` has put the answers behind references by then, so what is
+	// read here is the call around each of them.
+	it("wraps an arm's answer rather than standing in front of it", () => {
+		let generated = rewrite(instrumented(defineArms), coverageOptions)
+
+		expect(generated).toMatch(
+			/\? \$cover\(0, \$pool_\d+\) : .* \? \$cover\(1, \$pool_\d+\) : \$cover\(2, \$pool_\d+\)/,
+		)
+		expect(generated).not.toContain("(function")
 	})
 
 	it("counts a Case construction, and names the tag it builds", () => {
@@ -448,6 +545,22 @@ describe("A run that asked for coverage", () => {
 				["else", true],
 			],
 		)
+	})
+
+	it("counts the arm of a define a test took", async () => {
+		let { coverage } = await runWithCoverage(defineArms)
+		let branches = coverage.points.filter(
+			(point) => point.kind === "branch",
+		)
+
+		// NOTE: 85 declines the first arm and is answered by the second, so the
+		// `otherwise` arm below them was never reached — which is the whole of
+		// what branch coverage over a ladder is for.
+		expect(branches.map((point) => [point.label, point.count])).toEqual([
+			["if", 0],
+			["if", 1],
+			["otherwise", 0],
+		])
 	})
 
 	it("says which Cases of a Choice nothing built", async () => {
