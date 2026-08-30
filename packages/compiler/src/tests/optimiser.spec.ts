@@ -3939,6 +3939,64 @@ describe("Optimiser", () => {
 			})
 		})
 
+		// NOTE: The whole registry over the shape that reaches the most of it:
+		// Integer arms inside an Integer operation. `lower-scalar-operations`
+		// leaves each arm a GUARDED arithmetic — a Conditional whose consequent
+		// is a written-out Integer — and the Rewriter's `unboxedInteger` reads a
+		// Conditional by rewriting BOTH of its arms where that consequent is one
+		// of those. A `define` is a Conditional too, so it walks straight into
+		// that reading, and what has to hold is that it is read as an Integer
+		// rather than taken apart as a guarded operation it is not.
+		describe("a define with Integer arms, under every pass", () => {
+			const stepped = `implementation {
+	function stepped(_ n: Integer, by step: Integer) -> Integer {
+		<- n::add(define {
+			as step::multiply(with 2) if n::isGreaterThan(10)
+			as step if n::isGreaterThan(0)
+			as 0::subtract(step) otherwise
+		})
+	}
+
+	Terminal.inspect(stepped(20, by 3))
+	Terminal.inspect(stepped(5, by 3))
+	Terminal.inspect(stepped(0, by 3))
+}`
+
+			it("answers the same with every pass on as with them all off", async () => {
+				expect(await outputOf(generate(stepped))).toEqual([
+					"26",
+					"8",
+					"-3",
+				])
+				expect(
+					await outputOf(
+						generate(stepped, {
+							enabled: false,
+							disabledPasses: new Set(),
+						}),
+					),
+				).toEqual(["26", "8", "-3"])
+			})
+
+			it("reads the chain as the Integer it answers with", () => {
+				// NOTE: The whole chain PARENTHESISED and read through one
+				// `.value`, which is exactly what says it was read as a value
+				// rather than mistaken for a guarded arithmetic and rewritten
+				// arm by arm — that reading would have written the first arm's
+				// raw value where the parenthesis stands. A guarded arm keeps
+				// its own box inside, because a guarded arm is not the chain's
+				// consequent: the Conditional holding it is.
+				let body = generate(stepped).split(
+					"function stepped(n, step)",
+				)[1] as string
+
+				expect(body).toMatch(
+					/return Integer\.sum\(n\.value, \(n\.value > .*\)\.value\);/s,
+				)
+				expect(body).toContain('[$type.typeKeySymbol]: "Integer"')
+			})
+		})
+
 		// NOTE: The other half of the same rewrite. An arm's Condition is a
 		// Boolean read exactly as an `if`'s is, and before this pass reached one
 		// a `define` paid for a Boolean built and taken apart on every arm it
