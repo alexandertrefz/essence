@@ -789,6 +789,241 @@ describe("Dictionary literals", () => {
 		})
 	})
 
+	// NOTE: `hasKey` is `@::value(at key)::hasValue()` and nothing else, so a
+	// branch guarded by one and opening with that same lookup walks the
+	// Dictionary twice for one answer. What is worth pinning is not the
+	// Warning on its own but the line either side of it: every way the
+	// repetition stops being something a reader can SEE is a way the Warning
+	// has to go quiet, because a style lint that fires on a Program somebody
+	// wrote deliberately is worse than no lint at all.
+	describe("the redundant key check", () => {
+		const ages = '\tconstant ages = ["alex" = 39, "sam" = 25]'
+
+		it("warns where the branch reads the key it was guarded by", () => {
+			expect(
+				codesFor(
+					block(
+						ages,
+						'\tif ages::hasKey("alex") {',
+						'\t\tconstant age = ages::value(at "alex", defaultingTo 0)',
+						"\t}",
+					),
+				),
+			).toEqual(["redundant-key-check"])
+		})
+
+		// NOTE: Both entries of the `value` Overload count. The one that
+		// answers an Optional is the shape the Help points AT — and it is
+		// still one lookup too many while the `if` stands in front of it.
+		it("warns where the branch asks for the Optional itself", () => {
+			expect(
+				codesFor(
+					block(
+						ages,
+						'\tif ages::hasKey("alex") {',
+						'\t\tTerminal.inspect(ages::value(at "alex"))',
+						"\t}",
+					),
+				),
+			).toEqual(["redundant-key-check"])
+		})
+
+		it("warns where the key is a name rather than a literal", () => {
+			expect(
+				codesFor(
+					block(
+						ages,
+						'\tconstant who = "alex"',
+						"\tif ages::hasKey(who) {",
+						"\t\tconstant age = ages::value(at who, defaultingTo 0)",
+						"\t}",
+					),
+				),
+			).toEqual(["redundant-key-check"])
+		})
+
+		it("warns where the key is a member path", () => {
+			expect(
+				codesFor(
+					block(
+						ages,
+						'\tconstant person = { name = "alex" }',
+						"\tif ages::hasKey(person.name) {",
+						"\t\tconstant age = ages::value(at person.name, defaultingTo 0)",
+						"\t}",
+					),
+				),
+			).toEqual(["redundant-key-check"])
+		})
+
+		// NOTE: An `else` changes nothing about the branch the `if` opens —
+		// and the `match` the Help asks for is exactly the two-armed shape an
+		// `if`/`else` around one lookup was reaching for.
+		it("warns in the true branch of an if/else", () => {
+			expect(
+				codesFor(
+					block(
+						ages,
+						'\tif ages::hasKey("alex") {',
+						'\t\tconstant age = ages::value(at "alex", defaultingTo 0)',
+						"\t} else {",
+						'\t\tTerminal.print("nobody")',
+						"\t}",
+					),
+				),
+			).toEqual(["redundant-key-check"])
+		})
+
+		it("says what was asked and where it was answered", () => {
+			let [diagnostic] = diagnosticsFor(
+				block(
+					ages,
+					'\tif ages::hasKey("alex") {',
+					'\t\tconstant age = ages::value(at "alex", defaultingTo 0)',
+					"\t}",
+				),
+			)
+
+			expect(diagnostic.severity).toBe("warning")
+			expect(diagnostic.message).toBe("This key is looked up twice")
+			expect(diagnostic.labels).toMatchObject([
+				{ kind: "primary", message: "asked here" },
+				{ kind: "secondary", message: "and answered here" },
+			])
+			expect(diagnostic.notes).toEqual([
+				"'hasKey' is a lookup of its own — it asks the Dictionary for the key's value and answers whether it found one.",
+			])
+			expect(diagnostic.helps).toEqual([
+				"Ask 'value(at:)' once and match its Optional, or use 'value(at:defaultingTo:)' or 'update(at:with:)'.",
+			])
+		})
+
+		it("stays silent where the branch reads another Dictionary", () => {
+			expect(
+				codesFor(
+					block(
+						ages,
+						'\tconstant scores = ["alex" = 1]',
+						'\tif ages::hasKey("alex") {',
+						'\t\tconstant score = scores::value(at "alex", defaultingTo 0)',
+						"\t}",
+					),
+				),
+			).toEqual([])
+		})
+
+		it("stays silent where the branch reads another key", () => {
+			expect(
+				codesFor(
+					block(
+						ages,
+						'\tif ages::hasKey("alex") {',
+						'\t\tconstant age = ages::value(at "sam", defaultingTo 0)',
+						"\t}",
+					),
+				),
+			).toEqual([])
+		})
+
+		// NOTE: The branch is entered by the key being ABSENT, so the lookup
+		// under it is the first one there is.
+		it("stays silent where the check is negated", () => {
+			expect(
+				codesFor(
+					block(
+						ages,
+						'\tif ages::hasKey("alex")::negate() {',
+						'\t\tconstant age = ages::value(at "alex", defaultingTo 0)',
+						"\t}",
+					),
+				),
+			).toEqual([])
+		})
+
+		it("stays silent where the check is part of a larger question", () => {
+			expect(
+				codesFor(
+					block(
+						ages,
+						'\tif ages::hasKey("alex")::and(ages::hasKey("sam")) {',
+						'\t\tconstant age = ages::value(at "alex", defaultingTo 0)',
+						"\t}",
+					),
+				),
+			).toEqual([])
+		})
+
+		// NOTE: Two calls that answer the same key are not two spellings of
+		// one key — nothing a reader reads says the second call answers what
+		// the first one did, and the Warning would be claiming it does.
+		it("stays silent where the key is worked out", () => {
+			expect(
+				codesFor(
+					block(
+						ages,
+						'\tconstant keyOf = (_ index: Integer) -> String { <- "alex" }',
+						"\tif ages::hasKey(keyOf(1)) {",
+						"\t\tconstant age = ages::value(at keyOf(1), defaultingTo 0)",
+						"\t}",
+					),
+				),
+			).toEqual([])
+		})
+
+		// NOTE: The same rule from the receiver's side. Two written updates
+		// are two Dictionaries built one after the other, and holding the
+		// first call's answer says nothing about the second one's.
+		it("stays silent where the receiver is worked out", () => {
+			expect(
+				codesFor(
+					block(
+						ages,
+						'\tif [ages with "kim" = 7]::hasKey("alex") {',
+						'\t\tconstant age = [ages with "kim" = 7]::value(at "alex", defaultingTo 0)',
+						"\t}",
+					),
+				),
+			).toEqual([])
+		})
+
+		// NOTE: Everything past the first Statement could be what the branch
+		// was entered FOR — a lookup after a line that acted on the key being
+		// there is a second question rather than the first one repeated.
+		it("stays silent where the lookup is not the first Statement", () => {
+			expect(
+				codesFor(
+					block(
+						ages,
+						'\tif ages::hasKey("alex") {',
+						'\t\tTerminal.print("found")',
+						'\t\tconstant age = ages::value(at "alex", defaultingTo 0)',
+						"\t}",
+					),
+				),
+			).toEqual([])
+		})
+
+		// NOTE: And the boundary that makes the Statement above the whole of
+		// what is read: the walk stops at a body. A lookup inside a Function
+		// literal runs whenever the Function is called, which is not here, so
+		// nothing says the guard's answer is still the answer.
+		it("stays silent where the lookup is inside a body", () => {
+			expect(
+				codesFor(
+					block(
+						ages,
+						'\tif ages::hasKey("alex") {',
+						"\t\tconstant read = () -> Integer {",
+						'\t\t\t<- ages::value(at "alex", defaultingTo 0)',
+						"\t\t}",
+						"\t\tTerminal.inspect(read())",
+						"\t}",
+					),
+				),
+			).toEqual([])
+		})
+	})
+
 	describe("emission", () => {
 		it("builds a literal through createDictionary", () => {
 			expect(

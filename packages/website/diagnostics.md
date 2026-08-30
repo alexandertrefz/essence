@@ -1614,6 +1614,41 @@ RECEIVER both — so `[1, 2, 3]::firstItem(defaultingTo 0)` is warned about too:
 the brackets say the List holds an item, `firstItem()` answers one, and the `0`
 is as dead as it is beside the `scores` above.
 
+### `redundant-key-check`
+
+A Warning: an `if` guarded by `hasKey` opens with the very lookup it guards, so
+the same key is asked for twice.
+
+```essence
+if ages::hasKey("alex") {
+	constant age = ages::value(at "alex", defaultingTo 0)
+}
+```
+
+`hasKey` is not a cheap test in front of an expensive lookup — it IS the lookup.
+Its body is `@::value(at key)::hasValue()`, so the branch above walks the
+Dictionary once to learn that an answer exists and a second time to read it,
+and the first answer is thrown away between the two lines.
+
+The Optional the lookup would have answered says both things at once, which is
+what the Help offers instead: match `ages::value(at "alex")` apart and the
+`#Value(age)` arm is the branch, with the key looked up once. Where a fallback
+would do, `value(at:defaultingTo:)` needs no `if` at all, and where the branch
+exists to write a new value back, `update(at:with:)` is the whole of it.
+
+Only a repetition a reader can see is reported. The condition has to BE the
+check — a negated one, or one `and`ed with something beside it, is entered for
+more than the key being there. The receiver has to be a NAME, since an
+Expression worked out twice need not answer the same Dictionary. The key has to
+be written the same way both times and to hold no call, so `key`, `"alex"`,
+`#Red` and `entry.name` are compared while `keys::firstItem()` is not. And the
+lookup has to stand in the branch's FIRST Statement: everything after it could
+be what the branch was entered for, and nothing before it can run at all, which
+is why a Variable receiver is as safe here as a Constant.
+
+No Quick Fix. The rewrite is a `match` around the branch's whole body, which is
+more than an edit to the lines the Warning underlines.
+
 ## Choices
 
 ### `empty-choice`

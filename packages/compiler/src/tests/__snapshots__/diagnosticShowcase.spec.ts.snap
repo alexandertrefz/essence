@@ -2306,7 +2306,23 @@ Error: This is not a Dictionary the update can merge in
     │ Note: A whole-value update merges one Dictionary into another, so what is merged in has to hold the same key and value Types. The Argument wins on a key both hold.
 ────╯
 
-─── 7 errors
+[redundant-key-check]
+Warning: This key is looked up twice
+    ╭─┤ Dictionaries.es:34:5 │
+    │
+ 34 │     if ages::hasKey("alex") {
+    │        ──────────┬─────────  
+    │                  ╰─────────── asked here
+ 35 │        constant age = ages::value(at "alex", defaultingTo 0)
+    │                       ───────────────────┬──────────────────  
+    │                                          ╰──────────────────── and answered here
+    │ 
+    │ Help: Ask 'value(at:)' once and match its Optional, or use 'value(at:defaultingTo:)' or 'update(at:with:)'.
+    │ 
+    │ Note: 'hasKey' is a lookup of its own — it asks the Dictionary for the key's value and answers whether it found one.
+────╯
+
+─── 7 errors, 1 warning
 "
 `;
 

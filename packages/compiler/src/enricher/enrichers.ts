@@ -6744,12 +6744,15 @@ export function enrichIfElseStatementNode(
 	let narrowings = trueBranchNarrowings(condition, scope)
 	let trueScope = branchScope(narrowings, scope)
 	let falseScope = falseBranchScope(condition, scope)
+	let trueBody = node.trueBody.flatMap((node) => enrichNode(node, trueScope))
+
+	reportRedundantKeyCheck(condition, trueBody)
 
 	return {
 		nodeType: "IfElseStatement",
 		condition,
 		narrows: narrowings.length > 0,
-		trueBody: node.trueBody.flatMap((node) => enrichNode(node, trueScope)),
+		trueBody,
 		falseBody: node.falseBody.flatMap((node) =>
 			enrichNode(node, falseScope),
 		),
@@ -6764,14 +6767,272 @@ export function enrichIfStatement(
 	let condition = enrichExpression(node.condition, scope)
 	let narrowings = trueBranchNarrowings(condition, scope)
 	let bodyScope = branchScope(narrowings, scope)
+	let body = node.body.flatMap((node) => enrichNode(node, bodyScope))
+
+	reportRedundantKeyCheck(condition, body)
 
 	return {
 		nodeType: "IfStatement",
 		condition,
 		narrows: narrowings.length > 0,
-		body: node.body.flatMap((node) => enrichNode(node, bodyScope)),
+		body,
 		position: node.position,
 	}
+}
+
+// NOTE: The Argument label a Dictionary lookup writes its key under, and the
+// one both entries of the `value` Overload share.
+const keyArgumentLabel = "at"
+
+// NOTE: `hasKey` is not a cheap test standing in front of an expensive lookup —
+// it IS the lookup. Its body is `@::value(at key)::hasValue()` and nothing
+// else, so a branch guarded by one and opening with that same `value(at:)` asks
+// the Dictionary for the same key twice and throws the first answer away. What
+// the second call comes back with is already the whole of what the first one
+// learned, which is why the Help is to keep that answer rather than to ask for
+// it again.
+//
+// Only a shape a reader could have written the other way is reported, and each
+// of the conditions is one of the ways "the same lookup twice" stops being
+// something a reader can SEE:
+//
+// The condition has to BE the check. A negated one, or one `and`ed with
+// something beside it, is an Invocation of `negate` or of `and` whose base
+// happens to be a `hasKey` — a different shape, and rightly so, since neither
+// branch is entered by the key being there alone.
+//
+// The receiver has to be a NAME. An arbitrary Expression is a second
+// COMPUTATION as well as a second lookup, and two Dictionaries worked out one
+// after the other need not even be the same Dictionary.
+//
+// The key has to be written the same way both times and to hold no call. `key`
+// and `keys::firstItem()` may well be one key, but nothing a reader reads says
+// so, and a key that calls something is a repetition this Warning has nothing
+// to say about.
+//
+// And the lookup has to stand in the branch's FIRST Statement, with the walk
+// stopping at every body it meets — a Function literal's, a Match Handler's.
+// Nothing can run between the two calls then, which is what answers the
+// question a Variable receiver would otherwise raise: there is nowhere to
+// reassign it from, so a Variable is as safe here as a Constant.
+function reportRedundantKeyCheck(
+	condition: common.typed.ExpressionNode,
+	body: Array<common.typed.ImplementationNode>,
+): void {
+	let check = writtenKeyCheck(condition)
+	let first = body[0]
+
+	if (check === null || first === undefined) {
+		return
+	}
+
+	let lookup = writtenKeyLookup(first, check)
+
+	if (lookup === null) {
+		return
+	}
+
+	reportWarning("This key is looked up twice", condition.position, {
+		code: "redundant-key-check",
+		labels: [
+			primary(condition.position, "asked here"),
+			secondary(lookup.position, "and answered here"),
+		],
+		notes: [
+			"'hasKey' is a lookup of its own — it asks the Dictionary for the key's value and answers whether it found one.",
+		],
+		helps: [
+			"Ask 'value(at:)' once and match its Optional, or use 'value(at:defaultingTo:)' or 'update(at:with:)'.",
+		],
+	})
+}
+
+// NOTE: The name the guarded Dictionary is written under and the spelling of
+// the key it was asked about — everything the branch below it has to repeat
+// before anything is said.
+type WrittenKeyCheck = { receiver: string; key: string }
+
+// NOTE: A condition that is exactly one `hasKey` on a Dictionary named by a
+// Constant or a Variable, and null for every other condition there is.
+function writtenKeyCheck(
+	condition: common.typed.ExpressionNode,
+): WrittenKeyCheck | null {
+	if (
+		condition.nodeType !== "MethodInvocation" ||
+		condition.member.name !== "hasKey" ||
+		condition.base.nodeType !== "Identifier" ||
+		refinableBaseTag(condition.base.type) !== "Dictionary" ||
+		condition.arguments.length !== 1
+	) {
+		return null
+	}
+
+	let key = writtenKeySpelling(condition.arguments[0]!.value)
+
+	return key === null ? null : { receiver: condition.base.content, key }
+}
+
+// NOTE: How a key was WRITTEN, as a String two occurrences of it can be
+// compared by — and null for a key that was worked out rather than written
+// down. A literal, a name, a bare Case and a member path of a name are the
+// whole of it: each reads the same way both times, and none of them can run
+// anything on the way. Everything else — a call, a String with a hole in it, a
+// written List or Record, a Case carrying a payload — answers null, so that
+// "the same key" stays something a reader sees rather than something the
+// Compiler worked out for them.
+function writtenKeySpelling(node: common.typed.ExpressionNode): string | null {
+	switch (node.nodeType) {
+		case "StringValue":
+			return `string:${node.value}`
+		case "IntegerValue":
+			return `integer:${node.value}`
+		case "RationalValue":
+			return `rational:${node.numerator}/${node.denominator}`
+		case "BooleanValue":
+			return `boolean:${node.value}`
+		case "Identifier":
+			return `name:${node.content}`
+		case "CaseValue":
+			return node.value === null
+				? `case:${node.choice?.content ?? ""}#${node.caseName.content}`
+				: null
+		case "Lookup":
+			// NOTE: A path off a NAME, which is what keeps the base of the
+			// chain something that is merely read. A member reached off
+			// anything else was reached off a value some Expression produced.
+			if (
+				node.base.nodeType !== "Identifier" &&
+				node.base.nodeType !== "Lookup"
+			) {
+				return null
+			}
+
+			let base = writtenKeySpelling(node.base)
+
+			return base === null ? null : `${base}.${node.member.content}`
+		default:
+			return null
+	}
+}
+
+// NOTE: The `value(at:)` the guard has already asked, found anywhere in the
+// Statement's own Expressions. Every Node kind is named, the way the
+// Optimiser's walk names them, because the two kinds this leaves out are left
+// out ON PURPOSE — a Function literal's body and a Match Handler's both run
+// somewhere this rule can not see, and a Statement kind added later should have
+// to say which of the two it is rather than quietly join the second.
+function writtenKeyLookup(
+	node: common.typed.ImplementationNode,
+	check: WrittenKeyCheck,
+): common.typed.MethodInvocationNode | null {
+	switch (node.nodeType) {
+		case "MethodInvocation":
+			if (isKeyLookup(node, check)) {
+				return node
+			}
+
+			return firstWrittenKeyLookup(
+				[
+					node.base,
+					...node.arguments.map((argument) => argument.value),
+				],
+				check,
+			)
+		case "FunctionInvocation":
+			return firstWrittenKeyLookup(
+				[
+					node.name,
+					...node.arguments.map((argument) => argument.value),
+				],
+				check,
+			)
+		case "Lookup":
+			return writtenKeyLookup(node.base, check)
+		case "Combination":
+			return firstWrittenKeyLookup([node.lhs, node.rhs], check)
+		case "CaseValue":
+			return node.value === null
+				? null
+				: writtenKeyLookup(node.value, check)
+		case "RecordValue":
+			return firstWrittenKeyLookup(Object.values(node.members), check)
+		case "ListValue":
+			return firstWrittenKeyLookup(node.values, check)
+		case "DictionaryValue":
+			return firstWrittenKeyLookup(
+				node.entries.flatMap((entry) => [entry.key, entry.value]),
+				check,
+			)
+		case "InterpolatedStringValue":
+			return firstWrittenKeyLookup(
+				node.segments.flatMap((segment) =>
+					segment.kind === "expression" ? [segment.expression] : [],
+				),
+				check,
+			)
+		// NOTE: The subject is read where the Match stands. Its Handlers are
+		// bodies, and the walk stops at a body.
+		case "Match":
+			return writtenKeyLookup(node.value, check)
+		case "ConstantDeclarationStatement":
+		case "VariableDeclarationStatement":
+		case "VariableAssignmentStatement":
+		case "ExpectStatement":
+		case "RequireStatement":
+			return writtenKeyLookup(node.value, check)
+		case "ReturnStatement":
+			return writtenKeyLookup(node.expression, check)
+		case "IfStatement":
+		case "IfElseStatement":
+			return writtenKeyLookup(node.condition, check)
+		case "Identifier":
+		case "Self":
+		case "StringValue":
+		case "IntegerValue":
+		case "RationalValue":
+		case "BooleanValue":
+		case "FunctionValue":
+		case "NamespaceDefinitionStatement":
+		case "ProtocolDeclarationStatement":
+		case "TypeAliasStatement":
+		case "ChoiceDeclarationStatement":
+		case "FunctionStatement":
+			return null
+	}
+}
+
+function firstWrittenKeyLookup(
+	nodes: Array<common.typed.ImplementationNode>,
+	check: WrittenKeyCheck,
+): common.typed.MethodInvocationNode | null {
+	for (let node of nodes) {
+		let found = writtenKeyLookup(node, check)
+
+		if (found !== null) {
+			return found
+		}
+	}
+
+	return null
+}
+
+// NOTE: Both entries of the `value` Overload count — the one that answers an
+// Optional and the one that takes a `defaultingTo` — because the guard is
+// redundant either way, and the two are one another's alternatives in the Help.
+function isKeyLookup(
+	node: common.typed.MethodInvocationNode,
+	check: WrittenKeyCheck,
+): boolean {
+	let key = node.arguments[0]
+
+	return (
+		node.member.name === "value" &&
+		node.base.nodeType === "Identifier" &&
+		node.base.content === check.receiver &&
+		key !== undefined &&
+		key.name === keyArgumentLabel &&
+		writtenKeySpelling(key.value) === check.key
+	)
 }
 
 export function enrichReturnStatement(
