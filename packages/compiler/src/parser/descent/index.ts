@@ -1233,7 +1233,7 @@ class DescentParser {
 			throw error
 		}
 
-		if (this.suppressDiagnostics) {
+		if (this.suppressDiagnostics || error.reported) {
 			return
 		}
 
@@ -3214,11 +3214,43 @@ class DescentParser {
 
 		try {
 			let leftBrace = this.tokens.expect(TokenType.SymbolLeftBrace)
-			let { arms, otherwise } = this.parseDefineArms()
+			let { arms, otherwise, recovered } = this.parseDefineArms()
+			// NOTE: Read BEFORE the brace is taken, because a `define` whose
+			// block the input ended inside of is one whose arms were not read to
+			// their end either — and that is the difference between "there is no
+			// `otherwise` arm" and "this Parser never got to where one would
+			// stand". `parseClosingBrace` answers with a Position either way, so
+			// the question has to be asked of the Token.
+			let closed =
+				this.tokens.peek()?.type === TokenType.SymbolRightBrace
 			let closingPosition = this.parseClosingBrace(leftBrace.position)
 			let position = {
 				start: keyword.position.start,
 				end: closingPosition.end,
+			}
+
+			// NOTE: A totality refusal is only worth making when the arms were
+			// read CLEANLY. An arm loop that recovered skipped text on its way to
+			// the next `as`, and an `otherwise` arm standing in what it skipped is
+			// an arm that was written — so its absence proves nothing, and saying
+			// "every value here has a condition on it" of a block that visibly
+			// ends in `otherwise` is a refusal for a mistake nobody made. The same
+			// holds for a block the input ended inside of, and for a `define`
+			// nested past the depth budget, whose `nesting-too-deep` is recovered
+			// from like any other broken arm.
+			//
+			// The `define` still can not be built — there is no arm to answer
+			// with — so the Statement it stands in is dropped, as a broken
+			// Statement always is. What went wrong has been reported already, by
+			// the loop that recovered from it, and the throw says so rather than
+			// adding a second account of one mistake.
+			if (otherwise === null && (recovered || !closed)) {
+				throw new ParseError(
+					"This 'define' could not be read to its end",
+					position,
+					null,
+					{ reported: true },
+				)
 			}
 
 			// NOTE: Refused here rather than represented as an absent arm: a
@@ -3268,9 +3300,13 @@ class DescentParser {
 	protected parseDefineArms(): {
 		arms: Array<parser.DefineArmNode>
 		otherwise: parser.DefineOtherwiseNode | null
+		recovered: boolean
 	} {
 		let arms: Array<parser.DefineArmNode> = []
 		let otherwise: parser.DefineOtherwiseNode | null = null
+		// NOTE: Whether any arm was recovered from, which is what says how much
+		// the arms below it are worth as evidence — see `parseDefine`.
+		let recovered = false
 
 		while (true) {
 			let token = this.tokens.peek()
@@ -3365,10 +3401,11 @@ class DescentParser {
 				}
 
 				this.recoverFromDefineArm(error, startState)
+				recovered = true
 			}
 		}
 
-		return { arms, otherwise }
+		return { arms, otherwise, recovered }
 	}
 
 	protected recoverFromDefineArm(
@@ -3376,7 +3413,17 @@ class DescentParser {
 		startState: TokenStreamState,
 	): void {
 		this.reportParseError(error)
-		this.resynchroniseToArm(startState.braceDepth)
+
+		// NOTE: Only an arm that READ something has leftovers to skip. One that
+		// failed on its very first Token — a `{` where an `as` belongs — read
+		// nothing, so there is nothing between here and the next arm, and
+		// scanning for one would step INTO whatever that Token opens and skip
+		// every arm below it, the `define`'s own `}`, and the block it stands
+		// in. Dropping the one Token is the whole of the recovery there, and it
+		// is what the progress guarantee below does anyway.
+		if (this.tokens.save().index !== startState.index) {
+			this.resynchroniseToArm(startState.braceDepth)
+		}
 
 		// NOTE: Guarantee progress, for the reason `recoverFromError` does —
 		// an arm that consumed no Token and resynchronised to where it started
@@ -6131,6 +6178,20 @@ class DescentParser {
 			}
 
 			if (refusesTheText(error)) {
+				// NOTE: A REPORTED refusal keeps both, which is the one place
+				// the two paragraphs above do not hold. Its account travels in
+				// the Diagnostic collection rather than in the ParseError —
+				// the loop that made it recovered and read on, so there was
+				// nothing left to throw — and rewinding would leave the
+				// Statement dropped with nothing said about why. It is also
+				// the one refusal that does NOT peek a Token before it throws,
+				// so the latch may be one the attempt itself set over an input
+				// that has ended, and restoring it would ask every enclosing
+				// block to report a cascade of that.
+				if (error.reported) {
+					throw error
+				}
+
 				this.suppressDiagnostics = savedSuppressDiagnostics
 				rewindDiagnostics(diagnosticMark)
 

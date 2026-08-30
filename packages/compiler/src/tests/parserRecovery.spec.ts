@@ -599,6 +599,148 @@ describe("Parser Recovery", () => {
 		expect(diagnostics[0].code).toBe("partial-decimal-literal")
 	})
 
+	// NOTE: A totality refusal is a claim about text that was READ, so the arm
+	// loop's own recovery is what decides whether it may be made at all. Every
+	// source below visibly ends in an `otherwise` arm, or never got as far as
+	// where one would stand — and used to be told that every value in it has a
+	// condition on it.
+	describe("a define whose arms were not read cleanly", () => {
+		// NOTE: The arm opens a `{` it never closes, so the `}` the author wrote
+		// for the `define` closes the Record instead and resynchronisation
+		// carries on past the arm below it. What is left of the file is one
+		// brace short whichever way it is read, so the Statement goes — but the
+		// one Diagnostic about it is the one that is true.
+		it("should not refuse an otherwise arm its own recovery skipped", () => {
+			let { diagnostics } = parseWithDiagnostics(
+				`implementation {
+					constant flag = true
+					constant x = define {
+						as { a = 1 if flag
+						as 2 otherwise
+					}
+					Terminal.print("after")
+				}`,
+			)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("syntax-error")
+			expect(diagnostics[0].message).toBe(
+				"Expected 'with' but found '='.",
+			)
+		})
+
+		// NOTE: A Token where an `as` belongs read NOTHING, so there are no
+		// leftovers between it and the next arm — and scanning for one stepped
+		// into the brace it opens, skipped the `define`'s own `}`, ate the
+		// `implementation` block's, and then reported that block as never
+		// closed. Everything below the `define` is still text this Parser can
+		// read.
+		it("should keep the block a stray brace below the arms stands in", () => {
+			let { program, diagnostics } = parseWithDiagnostics(
+				`implementation {
+					constant flag = true
+					constant x = define {
+						as 1 if flag
+						as 2 otherwise
+						{
+					}
+					Terminal.print("after")
+				}`,
+			)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("syntax-error")
+			expect(diagnostics[0].message).toBe("Expected 'as' but found '{'.")
+			expect(
+				program.implementation.nodes.map((node) => node.nodeType),
+			).toEqual([
+				"ConstantDeclarationStatement",
+				"ConstantDeclarationStatement",
+				"FunctionInvocation",
+			])
+		})
+
+		// NOTE: `nesting-too-deep` is about the READING rather than about the
+		// text — a speculation hands it back by name — so the arm loop recovers
+		// from it like any other broken arm, and the arms it skipped on the way
+		// out are no evidence about what was written either.
+		it("should not refuse a define its own depth budget broke", () => {
+			let nested = "1"
+
+			for (let level = 0; level < 600; level++) {
+				nested = `define { as ${nested} if flag as 0 otherwise }`
+			}
+
+			let { diagnostics } = parseWithDiagnostics(
+				`implementation {
+					constant flag = true
+					constant x = define {
+						as ${nested} if flag
+						as 9 otherwise
+					}
+				}`,
+			)
+
+			expect(
+				diagnostics.map((diagnostic) => diagnostic.code),
+			).not.toContain("define-without-otherwise")
+			expect(
+				diagnostics.every(
+					(diagnostic) => diagnostic.code === "nesting-too-deep",
+				),
+			).toBe(true)
+		})
+
+		// NOTE: The arm loop is a RECOVERY loop and not a candidate reading, so
+		// what it reports is a verdict about text that was written — and a
+		// speculation the refusal escapes must not rewind it. The same `define`
+		// in and out of a Record literal used to be answered differently: inside
+		// one, the broken arm's Diagnostic was rewound and only the refusal
+		// behind it survived.
+		it("should report a broken arm the same inside a speculation", () => {
+			const ARMS = `define {
+						as ] if flag
+					}`
+
+			let bare = parseWithDiagnostics(
+				`implementation {
+					constant flag = true
+					constant x = ${ARMS}
+				}`,
+			)
+			let speculated = parseWithDiagnostics(
+				`implementation {
+					constant flag = true
+					constant x = { found = ${ARMS} }
+				}`,
+			)
+
+			expect(
+				bare.diagnostics.map((diagnostic) => diagnostic.code),
+			).toEqual(["syntax-error"])
+			expect(
+				speculated.diagnostics.map((diagnostic) => diagnostic.message),
+			).toEqual(bare.diagnostics.map((diagnostic) => diagnostic.message))
+		})
+
+		// NOTE: The refusal used to be thrown from BEHIND `parseClosingBrace`,
+		// which is the one place a coded refusal peeks no Token — so it spoke
+		// for an input that had ENDED, and the accurate `unclosed-block` the
+		// brace had just reported was rewound by the speculation it escaped.
+		it("should keep the unclosed block a define ran to the end of", () => {
+			let { diagnostics } = parseWithDiagnostics(
+				`implementation {
+					constant flag = true
+					constant x = { found = define {
+						as 1 if flag`,
+			)
+
+			expect(
+				diagnostics.map((diagnostic) => diagnostic.code),
+			).toEqual(["unclosed-block"])
+		})
+	})
+
 	it("should recover from a broken Generic list", () => {
 		let { program, diagnostics } = parseWithDiagnostics(
 			`implementation {

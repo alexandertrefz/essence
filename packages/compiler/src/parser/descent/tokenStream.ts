@@ -37,6 +37,13 @@ export class ParseError {
 	code: common.DiagnosticCode
 	notes: Array<string>
 	helps: Array<string>
+	// NOTE: Whether what went wrong here has already been said. A recovery loop
+	// reports the failure it recovered FROM and then discovers that what it
+	// recovered INTO can not be built — the loop's own Diagnostic is the whole
+	// account of that, so the throw which drops the Statement carries this and
+	// `reportParseError` stays quiet rather than saying the same thing twice in
+	// different words.
+	reported: boolean
 
 	constructor(
 		message: string,
@@ -46,6 +53,7 @@ export class ParseError {
 			code?: common.DiagnosticCode
 			notes?: Array<string>
 			helps?: Array<string>
+			reported?: boolean
 		} = {},
 	) {
 		this.message = message
@@ -54,6 +62,7 @@ export class ParseError {
 		this.code = details.code ?? "syntax-error"
 		this.notes = details.notes ?? []
 		this.helps = details.helps ?? []
+		this.reported = details.reported ?? false
 	}
 }
 
@@ -74,8 +83,12 @@ const rewoundCodes: Set<common.DiagnosticCode> = new Set([
 // NOTE: Whether a ParseError is a verdict about the text — a refusal that
 // stands whichever reading of the surrounding construct is taken — as opposed
 // to one reading saying it was not the one written.
+//
+// An already REPORTED failure is one by definition: a recovery loop read the
+// text, judged it, and said so. Handing that back for a second reading would
+// answer for text this Parser has already spoken about.
 export function refusesTheText(error: ParseError): boolean {
-	return !rewoundCodes.has(error.code)
+	return error.reported || !rewoundCodes.has(error.code)
 }
 
 // NOTE: All parse failures are routed through this single helper. The
