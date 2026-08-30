@@ -1657,10 +1657,25 @@ describe("Completion", () => {
 
 			expect(keywordsOf(source, { line: 2, column: 19 })).toEqual([
 				"match",
+				"define",
 				"true",
 				"false",
 				"nothing",
 			])
+		})
+
+		// NOTE: `as` and `otherwise` are the middle and the end of a `define`
+		// arm rather than the start of an Expression, and this list is the
+		// starts — see the NOTE on `expressionKeywords`.
+		it("should not offer the words a define arm is continued with", () => {
+			let source = ["implementation {", "\tconstant value = ", "}"].join(
+				"\n",
+			)
+
+			let keywords = keywordsOf(source, { line: 2, column: 19 })
+
+			expect(keywords).not.toContain("as")
+			expect(keywords).not.toContain("otherwise")
 		})
 
 		it("should not offer Keywords after a dot", () => {

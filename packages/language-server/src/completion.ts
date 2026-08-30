@@ -180,7 +180,14 @@ const statementKeywords = [
 
 // NOTE: What `parsePrimaryExpression` accepts as the start of an Expression —
 // every other Keyword it reads there is an Identifier in disguise.
-const expressionKeywords = ["match", "true", "false", "nothing"]
+//
+// NOTE: `as` and `otherwise` are absent, and not for the reason the Keywords
+// below are offered where they will not parse. Those all START something; these
+// two are the middle and the end of an arm, and no cursor this list is asked at
+// is ever waiting for one. Offering them would need a reading of what block the
+// cursor stands in and how much of its arm is already written — which is the
+// analysis the NOTE on `keywordCompletions` declines to do.
+const expressionKeywords = ["match", "define", "true", "false", "nothing"]
 
 export function findCompletions(
 	documentText: string,
