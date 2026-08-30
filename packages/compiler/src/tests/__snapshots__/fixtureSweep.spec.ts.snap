@@ -459,3 +459,17 @@ true
 `;
 
 exports[`Fixture Sweep DictionaryBenchmarks.es should print what it printed before 1`] = `""`;
+
+exports[`Fixture Sweep Define.es should print what it printed before 1`] = `
+"A
+B
+F
+hold on to your hat
+Value(7)
+Empty
+exactly one
+several
+none at all
+["a", "b", "c"]
+["a-b-c"]"
+`;
