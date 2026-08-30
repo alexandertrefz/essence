@@ -266,6 +266,16 @@ function visitNode(
 
 			return
 		}
+		case "DictionaryValue": {
+			let dictionary = expected?.type === "Dictionary" ? expected : null
+
+			for (let entry of node.entries) {
+				visitNode(entry.key, dictionary?.keyType ?? null, state)
+				visitNode(entry.value, dictionary?.valueType ?? null, state)
+			}
+
+			return
+		}
 		case "InterpolatedStringValue":
 			for (let segment of node.segments) {
 				if (segment.kind === "expression") {

@@ -166,6 +166,8 @@ function actionsFor(
 			return listed(removeFallbackAction(diagnostic, lines))
 		case "focused-tests-remain":
 			return listed(removeFocusedAction(diagnostic, lines))
+		case "wrong-update-brackets":
+			return listed(updateBracketsAction(diagnostic, lines))
 		default:
 			return []
 	}
@@ -696,6 +698,122 @@ function removeFocusedAction(
 				newText: "",
 			},
 		],
+	}
+}
+
+// NOTE: The most mechanical fix the language has: an update written in the
+// wrong pair, and the right one is the other pair. Two edits rather than one
+// replacement of the whole span, so that everything between the brackets — a
+// key list running over ten lines, the Comments inside it — is left exactly as
+// it was written.
+//
+// Which direction is read off the BUFFER rather than off the Diagnostic's
+// message: the message is prose this file reserves the right to reword, and the
+// character that was typed is the fact. That also turns the Parser's own
+// `wrong-update-brackets` away — it spans a key rather than a whole update, so
+// nothing there opens with a bracket at all.
+function updateBracketsAction(
+	diagnostic: common.Diagnostic & { position: common.Position },
+	lines: Array<string>,
+): CodeActionEntry | null {
+	let written = sliceOf(lines, diagnostic.position)
+	let opened = written.at(0)
+	let closed = written.at(-1)
+
+	if (
+		(opened !== "{" || closed !== "}") &&
+		(opened !== "[" || closed !== "]")
+	) {
+		return null
+	}
+
+	let toBrackets = opened === "{"
+
+	return {
+		title: toBrackets
+			? "Write the update in brackets"
+			: "Write the update in braces",
+		kind: "quickfix",
+		diagnosticCode: diagnostic.code,
+		diagnosticPosition: diagnostic.position,
+		isPreferred: true,
+		edits: [
+			openingBracketEdit(
+				lines,
+				diagnostic.position.start,
+				toBrackets ? "[" : "{",
+			),
+			closingBracketEdit(
+				lines,
+				diagnostic.position.end,
+				toBrackets ? "]" : "}",
+			),
+		],
+	}
+}
+
+// NOTE: The opening bracket and the horizontal space beside it. The PADDING is
+// part of each spelling — `{ config with port = 1 }` pads and `[ages with "kim"
+// = 7]` does not, which is the rule a Literal of each is printed by — so it is
+// swapped along with the bracket rather than left standing beside the other one.
+//
+// An update laid out over several lines has NOTHING after its opening bracket.
+// The break under it is layout rather than padding, so it stays where it is and
+// the swap is the one character.
+function openingBracketEdit(
+	lines: Array<string>,
+	start: common.Cursor,
+	bracket: "[" | "{",
+): CodeActionEdit {
+	let line = lineAt(lines, start.line)
+	let column = start.column + 1
+
+	if (line.slice(start.column).trim() === "") {
+		return {
+			range: { start, end: { line: start.line, column } },
+			newText: bracket,
+		}
+	}
+
+	while (line[column - 1] === " " || line[column - 1] === "\t") {
+		column += 1
+	}
+
+	return {
+		range: { start, end: { line: start.line, column } },
+		newText: bracket === "{" ? "{ " : "[",
+	}
+}
+
+// NOTE: And the other end. `end` runs one past the bracket, as every Position
+// does — and where nothing but space stands before it on its line, that space is
+// the INDENTATION of a closing line rather than the padding, so it is left where
+// it is and no padding is written back.
+function closingBracketEdit(
+	lines: Array<string>,
+	end: common.Cursor,
+	bracket: "]" | "}",
+): CodeActionEdit {
+	let line = lineAt(lines, end.line)
+	let column = end.column - 1
+
+	if (line.slice(0, end.column - 2).trim() === "") {
+		return {
+			range: { start: { line: end.line, column }, end },
+			newText: bracket,
+		}
+	}
+
+	while (
+		column > 1 &&
+		(line[column - 2] === " " || line[column - 2] === "\t")
+	) {
+		column -= 1
+	}
+
+	return {
+		range: { start: { line: end.line, column }, end },
+		newText: bracket === "}" ? " }" : "]",
 	}
 }
 
@@ -1273,6 +1391,13 @@ function walkNode(
 		case "ListValue":
 			for (let value of node.values) {
 				walkNode(value, visit)
+			}
+
+			return
+		case "DictionaryValue":
+			for (let entry of node.entries) {
+				walkNode(entry.key, visit)
+				walkNode(entry.value, visit)
 			}
 
 			return

@@ -359,6 +359,13 @@ function collectCasesFromNode(
 			}
 
 			return
+		case "DictionaryValue":
+			for (let entry of node.entries) {
+				collectCasesFromNode(entry.key, tokens)
+				collectCasesFromNode(entry.value, tokens)
+			}
+
+			return
 		case "InterpolatedStringValue":
 			for (let segment of node.segments) {
 				if (segment.kind === "expression") {

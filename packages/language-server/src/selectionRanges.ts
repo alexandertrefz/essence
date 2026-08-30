@@ -265,6 +265,24 @@ function collectFromNode(
 			}
 
 			return
+		case "DictionaryValue":
+			// NOTE: The ENTRY stands on the chain between the key or value and
+			// the whole literal, because a Dictionary entry is the one
+			// member-shaped Node in the language that has a Position of its own
+			// covering `key = value`. A Record member has none, which is why a
+			// Record can not do this and a Dictionary can: widening from `39`
+			// reaches `"alex" = 39` before it reaches the brackets.
+			for (let entry of node.entries) {
+				if (!contains(entry.position, cursor)) {
+					continue
+				}
+
+				chain.push(entry.position)
+				descend(entry.key, cursor, chain)
+				descend(entry.value, cursor, chain)
+			}
+
+			return
 		case "InterpolatedStringValue":
 			for (let segment of node.segments) {
 				if (segment.kind === "expression") {

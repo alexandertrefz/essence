@@ -266,6 +266,15 @@ function collectFromNode(
 			}
 
 			return
+		case "DictionaryValue":
+			addRange(ranges, node.position)
+
+			for (let entry of node.entries) {
+				collectFromNode(entry.key, ranges)
+				collectFromNode(entry.value, ranges)
+			}
+
+			return
 		case "InterpolatedStringValue":
 			for (let segment of node.segments) {
 				if (segment.kind === "expression") {

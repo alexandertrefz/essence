@@ -426,6 +426,13 @@ function collectItemsFromNode(
 			}
 
 			return
+		case "DictionaryValue":
+			for (let entry of node.entries) {
+				collectItemsFromNode(entry.key, container, items)
+				collectItemsFromNode(entry.value, container, items)
+			}
+
+			return
 		case "InterpolatedStringValue":
 			for (let segment of node.segments) {
 				if (segment.kind === "expression") {
@@ -818,6 +825,13 @@ function visitNode(
 		case "ListValue":
 			for (let value of node.values) {
 				visitNode(value, caller, context, sites)
+			}
+
+			return
+		case "DictionaryValue":
+			for (let entry of node.entries) {
+				visitNode(entry.key, caller, context, sites)
+				visitNode(entry.value, caller, context, sites)
 			}
 
 			return
