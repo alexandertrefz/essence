@@ -81,8 +81,9 @@ met.
 mutation says a bug there would be caught. The compiler changes the code on
 purpose, one deliberate lie at a time — a comparison rotated a single step, `is`
 against `isNot`, addition against subtraction, a Boolean flipped, an `if` turned
-inside out, an Integer literal nudged, a Case construction swapped for a sibling
-Case of its own Choice — and runs only the tests that reach the site to see
+inside out, an arm of a `define` answering where nothing matched, an Integer
+literal nudged, a Case construction swapped for a sibling Case of its own
+Choice — and runs only the tests that reach the site to see
 whether any of them notices. The lies are told on the typed program, so each
 mutant still typechecks; a site no test reaches is counted apart and never
 compiled. A mutant that crashes counts as killed, and one whose run never comes

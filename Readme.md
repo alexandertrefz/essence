@@ -174,8 +174,8 @@ writes a file beside the table.
 
 `--mutate` asks the question coverage cannot: coverage says a line ran, mutation says a bug there would be
 caught. The compiler changes the code on purpose, one deliberate lie at a time — a comparison rotated a single
-step, `is` against `isNot`, an `if` turned inside out, a literal nudged, a Case construction swapped for a
-sibling Case of its own Choice — and runs only the tests that reach the line to see whether any notices. The
+step, `is` against `isNot`, an `if` turned inside out, an arm of a `define` answering where nothing matched, a
+literal nudged, a Case construction swapped for a sibling Case of its own Choice — and runs only the tests that reach the line to see whether any notices. The
 lies are told on the typed program, so every one of them still typechecks, and the closed set of Cases makes
 "no test notices this being a `#Draw`" a complete statement rather than a guess. A site no test reaches is
 counted apart and never compiled. The run draws from one seed throughout, so a property test asks a mutant
