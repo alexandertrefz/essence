@@ -41,6 +41,17 @@ type NamespaceBodyNode = Parameters<
 // `normalize(as #ComposedCanonical)`), so they can only ever be Keywords where
 // a Module section is being read.
 //
+// NOTE: `otherwise` is here and `define` is not, though the two words arrived
+// together. An `otherwise` only ever stands where an Expression has already
+// ENDED — none of the three Tokens that carry one on is a word — so the arm
+// loop tells the terminator from a name by the place it stands in, and no text
+// that parses today reads differently for it. `define` has no such footing: an
+// Identifier with a `{` behind it already parses, as a name and the Record
+// literal below it, so a contextual `define` would quietly turn two Statements
+// into one block. And `otherwise` is a name somebody will want —
+// `Optional::otherwise` was a Method of the standard library's own until it
+// was renamed — which reserving the word outright would forbid forever.
+//
 // NOTE: A Set rather than an Array, here and for the two lists below. Each is
 // asked of a Token, in a loop over every Token — a scan of ten strings per
 // question is what a membership test costs when it is written as one.
@@ -61,6 +72,7 @@ const identifierTokenTypes = new Set([
 	TokenType.KeywordBenchmark,
 	TokenType.KeywordExpect,
 	TokenType.KeywordRequire,
+	TokenType.KeywordOtherwise,
 ])
 
 function isIdentifierToken(token: Token | undefined): boolean {
@@ -3014,6 +3026,7 @@ class DescentParser {
 			case TokenType.KeywordBenchmark:
 			case TokenType.KeywordExpect:
 			case TokenType.KeywordRequire:
+			case TokenType.KeywordOtherwise:
 				return this.parseIdentifier()
 			default:
 				fail(
@@ -3203,6 +3216,14 @@ class DescentParser {
 	// not carry it on. Neither `if` nor `otherwise` is one of the three that
 	// can, so `as 0 if x::isZero()` and `as 10 otherwise` each read to their
 	// end without a lookahead.
+	//
+	// NOTE: Which is also what lets `otherwise` be a name — it is on
+	// `identifierTokenTypes` — without the two readings ever meeting. An arm's
+	// value stops at the word whatever the word is, so `as otherwise otherwise`
+	// answers with the value called `otherwise` and ends where the loop reads
+	// the terminator, and `as otherwise if flag` is that same value under a
+	// Condition. The arm loop decides by the Token it finds AFTER the value,
+	// and a name in value position is never that Token.
 	//
 	// NOTE: The arrow is optional, and a `define` that writes none leaves its
 	// answer Type to its arms.
