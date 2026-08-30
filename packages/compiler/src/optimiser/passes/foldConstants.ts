@@ -86,6 +86,15 @@ export const foldConstants: OptimiserPass = {
 const MAXIMUM_FOLDED_DIGITS = 4096
 const MAXIMUM_FOLDED_MAGNITUDE = 10n ** BigInt(MAXIMUM_FOLDED_DIGITS)
 
+// NOTE: A `define` is not among these, deliberately. Folding an arm whose
+// Condition is decided would drop the arms below it — and the only Condition
+// this pass could ever find decided in one is a `true` or a `false` the AUTHOR
+// wrote: nothing here folds through a name a Program bound, and every Condition
+// an earlier pass lowered has already been unwrapped by `unbox-conditions` into
+// a RAW test, which the rule below never folds. `as VALUE if true` is the shape
+// the Node exists to avoid, nothing in the repository writes one, and the fold
+// would trade an arm a coverage counter stands in for an emission nobody
+// produces. An `if` is left alone for exactly the same reasons.
 function fold(
 	node: common.typedSimple.ExpressionNode,
 	shadowed: ReadonlySet<string>,
