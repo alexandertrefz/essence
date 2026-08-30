@@ -1,11 +1,29 @@
 import { createBoolean } from "./Boolean"
+import {
+	createDictionary,
+	type EquatableWitness,
+	set as setAt,
+} from "./Dictionary"
 import { createInteger } from "./Integer"
+import { anyIs } from "./internalHelpers"
 import { createList, viewOf } from "./List"
-import { type RandomnessType, below, bigBetween, character } from "./Randomness"
+import {
+	type RandomnessType,
+	below,
+	bigBetween,
+	character,
+	createRandomness,
+} from "./Randomness"
 import { createRational } from "./Rational"
 import { createRecord } from "./Record"
 import { createString } from "./String"
-import { type AnyType, createCase, typeKeySymbol } from "./type"
+import {
+	type AnyDictionary,
+	type AnyType,
+	createCase,
+	liveEntriesOf,
+	typeKeySymbol,
+} from "./type"
 
 // NOTE: THE generator interpreter a property test runs on. What the Compiler
 // emits is a DESCRIPTION of a Type — this file is the one place that turns such
@@ -40,6 +58,16 @@ export type Generator =
 	| { kind: "rational" }
 	| { kind: "string" }
 	| { kind: "list"; item: Generator }
+	// NOTE: `keyConformance` is the key Type's own Equatable witness, carried
+	// from the call site the Compiler derived this plan at. It decides which
+	// drawn keys are ONE key, which is what a Dictionary is built by — see
+	// `dictionaryOf`.
+	| {
+			kind: "dictionary"
+			key: Generator
+			value: Generator
+			keyConformance?: EquatableWitness<AnyType>
+	  }
 	| { kind: "record"; members: Array<GeneratorMember> }
 	| { kind: "case"; tag: string; members: Array<GeneratorMember> }
 	| { kind: "union"; members: Array<Generator> }
@@ -55,6 +83,43 @@ export type Generator =
 			name: string
 			generate: (source: RandomnessType) => AnyType
 	  }
+
+// NOTE: The witness a Dictionary is built with where the PLAN carries none.
+// The Compiler resolves the key Type's Equatable conformance at the site it
+// derived the plan from and carries it as `keyConformance`, which is the one
+// answer that can not be wrong — a Namespace may write an `is` of its own, and
+// two keys it calls equal are one key however they are spelled.
+//
+// NOTE: Where no plan carries one, this stands in: the universal comparison,
+// branded `structural` because for every kind whose keys encode it decides
+// exactly what the standard library's own `is` decides — which is the claim the
+// encoding itself is written on. What it can not stand in for is a written
+// `is`, and that is why the plan carries one.
+const drawnKeyEquatable: EquatableWitness<AnyType> = {
+	is: (a: AnyType, b: AnyType) => createBoolean(anyIs(a, b)),
+	isNot: (a: AnyType, b: AnyType) => createBoolean(!anyIs(a, b)),
+	structural: true,
+}
+
+// NOTE: The entries of a drawn Dictionary, in insertion order — the same live
+// view every other reader of a box takes, read through the runtime's Type Module
+// so that this one is not a second reading of the same rule.
+function entriesOf(value: AnyType): Array<[AnyType, AnyType]> {
+	return liveEntriesOf(value as AnyDictionary)
+}
+
+function witnessOf(generator: {
+	keyConformance?: EquatableWitness<AnyType>
+}): EquatableWitness<AnyType> {
+	return generator.keyConformance ?? drawnKeyEquatable
+}
+
+function dictionaryOf(
+	entries: Array<[AnyType, AnyType]>,
+	conformance: EquatableWitness<AnyType>,
+): AnyType {
+	return createDictionary(entries, conformance) as AnyType
+}
 
 // NOTE: What a refinement whose predicate nothing could satisfy answers with.
 // It is a failure of the RUN rather than of the property: the test asserted
@@ -79,6 +144,13 @@ const REFINEMENT_ATTEMPTS = 500
 // whatever the case number grew the size to. A property that needs a bigger one
 // says so by building it.
 const MAXIMUM_LENGTH = 64
+
+// NOTE: How many keys a step that ADDS an entry, and a smallest Dictionary that
+// needs more than one key, may draw before they give up on finding one the
+// Dictionary does not already hold. Each attempt draws a little larger than the
+// last, so the count is a bound on a search that widens rather than a number of
+// tries at one size.
+const ADDITION_ATTEMPTS = 16
 
 // #endregion
 
@@ -111,6 +183,24 @@ export function generate(
 			}
 
 			return createList(items)
+		}
+		// NOTE: The key and the value drawn independently, entry by entry. A key
+		// drawn twice OVERWRITES, exactly as a written `Dictionary.of` collapses
+		// a repeated key — so what comes out may hold fewer entries than were
+		// drawn for it, and a narrowing that asks for a minimum length is held to
+		// by the admission check rather than by the draw.
+		case "dictionary": {
+			let length = drawLength(source, size, narrowing)
+			let entries: Array<[AnyType, AnyType]> = []
+
+			for (let index = 0; index < length; index++) {
+				entries.push([
+					generate(generator.key, source, size),
+					generate(generator.value, source, size),
+				])
+			}
+
+			return dictionaryOf(entries, witnessOf(generator))
 		}
 		case "record":
 			return createRecord(drawMembers(generator.members, source, size))
@@ -384,12 +474,18 @@ function inside(narrowing: Narrowing, value: AnyType): boolean {
 		)
 	}
 
+	// NOTE: A Dictionary is counted in ENTRIES, which is what its `length()`
+	// answers and what a `minimumLength` narrowing means about one. The box
+	// carries that count for the generation it sees, so nothing has to be walked
+	// to read it.
 	let length =
 		key === "String"
 			? [...(value as unknown as { value: string }).value].length
 			: key === "List"
 				? viewOf(value as Parameters<typeof viewOf>[0]).total
-				: null
+				: key === "Dictionary"
+					? (value as AnyDictionary).length
+					: null
 
 	if (length === null) {
 		return true
@@ -453,6 +549,8 @@ export function mutate(
 			return createString(drawCharacters(source, size, narrowing))
 		case "list":
 			return mutateList(generator.item, value, source, size, narrowing)
+		case "dictionary":
+			return mutateDictionary(generator, value, source, size, narrowing)
 		case "record":
 			return mutateMembers(
 				generator.members,
@@ -573,6 +671,107 @@ function mutateList(
 	])
 }
 
+// NOTE: A Dictionary's neighbour: one entry's VALUE redrawn, one entry dropped,
+// or one entry added. Which of the three is a seeded choice among the ones the
+// narrowing leaves available, exactly as a List's is.
+//
+// NOTE: A key is never moved. A Dictionary is read BY its keys, so redrawing one
+// is not a step from the value — every lookup the property makes would miss, and
+// what came back would be a different Dictionary rather than a neighbouring one.
+// What a step does keep is the key set; what it moves is what is under a key.
+function mutateDictionary(
+	generator: {
+		key: Generator
+		value: Generator
+		keyConformance?: EquatableWitness<AnyType>
+	},
+	value: AnyType,
+	source: RandomnessType,
+	size: number,
+	narrowing: Narrowing,
+): AnyType {
+	let conformance = witnessOf(generator)
+	let entries = entriesOf(value)
+	let { lowest, highest } = lengthBounds(narrowing, size)
+	let moves: Array<"redraw" | "drop" | "add"> = []
+
+	if (entries.length > 0) {
+		moves.push("redraw")
+	}
+
+	if (entries.length > lowest) {
+		moves.push("drop")
+	}
+
+	if (entries.length < highest) {
+		moves.push("add")
+	}
+
+	let move: "redraw" | "drop" | "add" | undefined =
+		moves[below(source, moves.length)]
+
+	// NOTE: A move that ADDS has to draw a key the Dictionary does not already
+	// hold: a key it holds is an OVERWRITE, which leaves the length where it
+	// was and is the redraw move under another name — so the step would not
+	// have been a step. Each draw is offered to the Dictionary itself, so the
+	// question "is this key already held" is asked by the equality the entries
+	// are organised by rather than by a second one written here.
+	//
+	// NOTE: The draw grows with each attempt, because a key drawn small is
+	// drawn from few values — a Boolean key has two, and a Dictionary holding
+	// both has no key left to add. Where every attempt collides the step falls
+	// back to another move rather than answering the value it was handed.
+	if (move === "add") {
+		for (let attempt = 0; attempt < ADDITION_ATTEMPTS; attempt++) {
+			let grown = dictionaryOf(
+				[
+					...entries,
+					[
+						generate(generator.key, source, size + attempt),
+						generate(generator.value, source, size),
+					],
+				],
+				conformance,
+			)
+
+			if ((grown as AnyDictionary).length > entries.length) {
+				return grown
+			}
+		}
+
+		move = moves.includes("redraw")
+			? "redraw"
+			: moves.includes("drop")
+				? "drop"
+				: undefined
+	}
+
+	// NOTE: A narrowing that pins the length to nothing at all leaves an empty
+	// Dictionary with no neighbour, which is the one value it can answer with.
+	if (move === undefined) {
+		return dictionaryOf(entries, conformance)
+	}
+
+	if (move === "redraw") {
+		let index = below(source, entries.length)
+		let moved: Array<[AnyType, AnyType]> = [...entries]
+
+		moved[index] = [
+			entries[index]![0],
+			generate(generator.value, source, size),
+		]
+
+		return dictionaryOf(moved, conformance)
+	}
+
+	let index = below(source, entries.length)
+
+	return dictionaryOf(
+		[...entries.slice(0, index), ...entries.slice(index + 1)],
+		conformance,
+	)
+}
+
 // NOTE: ONE member moved and every other one kept exactly as it stands. Sharing
 // them is safe because every value here is immutable, and it is the POINT: what
 // a neighbour is for is holding on to everything the case already reached while
@@ -676,6 +875,8 @@ export function shrink(
 			).map((text) => createString(text))
 		case "list":
 			return shrinkList(generator.item, value, narrowing)
+		case "dictionary":
+			return shrinkDictionary(generator, value, narrowing)
 		case "record":
 			return shrinkMembers(generator.members, value, (members) =>
 				createRecord(members),
@@ -740,6 +941,30 @@ export function minimal(
 
 			return createList(items)
 		}
+		// NOTE: As many entries as the narrowing demands and no more, all under
+		// the smallest value there is and each under a key of its own — which is
+		// the one place a smallest Dictionary has to build keys at all. DISTINCT
+		// keys are what a length needs, and where the key Type has too few
+		// values to make that many it answers nothing rather than answering a
+		// shorter Dictionary than it promised.
+		case "dictionary": {
+			let length = Math.max(0, narrowing.minimumLength ?? 0)
+			let conformance = witnessOf(generator)
+
+			if (length === 0) {
+				return dictionaryOf([], conformance)
+			}
+
+			let keys = smallestKeys(generator, length, conformance)
+			let held = minimal(generator.value)
+
+			return keys === null || held === null
+				? null
+				: dictionaryOf(
+						keys.map((key) => [key, held]),
+						conformance,
+					)
+		}
 		case "record": {
 			let members = minimalMembers(generator.members)
 
@@ -780,6 +1005,55 @@ export function minimal(
 		case "generated":
 			return null
 	}
+}
+
+// NOTE: AS MANY DISTINCT KEYS AS A LENGTH DEMANDS, the first of them the
+// smallest key there is. The rest are drawn rather than derived, because
+// "smaller" is an ordering the language owns for numbers and not for keys —
+// there is no next Record after the smallest one — and a drawn key is at least
+// a key the generator says is possible. The source is seeded fixedly, so the
+// same Dictionary comes back every time this is asked.
+//
+// NOTE: Distinctness is decided by a Dictionary rather than by a comparison
+// written here: each candidate is offered to `set`, and a key already held
+// leaves the length where it was. That is the key Type's OWN equality, witness
+// and all, which is the only answer that can not disagree with the Dictionary
+// the keys are for.
+function smallestKeys(
+	generator: { key: Generator },
+	count: number,
+	conformance: EquatableWitness<AnyType>,
+): Array<AnyType> | null {
+	let first = minimal(generator.key)
+
+	if (first === null) {
+		return null
+	}
+
+	let keys = [first]
+
+	if (count === 1) {
+		return keys
+	}
+
+	let source = createRandomness(1)
+	let held = createDictionary([[first, first]], conformance)
+
+	for (
+		let attempt = 0;
+		keys.length < count && attempt < ADDITION_ATTEMPTS * count;
+		attempt++
+	) {
+		let drawn = generate(generator.key, source, attempt)
+		let grown = setAt(held, drawn, drawn, conformance)
+
+		if (grown.length > held.length) {
+			keys.push(drawn)
+			held = grown
+		}
+	}
+
+	return keys.length === count ? keys : null
 }
 
 function minimalMembers(
@@ -981,6 +1255,57 @@ function shrinkList(
 	return candidates.map((entries) => createList(entries))
 }
 
+// NOTE: A Dictionary shrinks the way a List does — fewer entries first, then a
+// smaller value under a kept key — with one difference the keys force: a KEY is
+// never shrunk. Two keys that shrink towards the same smaller key would collapse
+// into one entry, so the candidate would be a Dictionary of another LENGTH, and
+// a counterexample that lost an entry on the way down is a report about a value
+// the property never saw. The values carry the digits a reader has to read, and
+// they shrink freely.
+function shrinkDictionary(
+	generator: {
+		key: Generator
+		value: Generator
+		keyConformance?: EquatableWitness<AnyType>
+	},
+	value: AnyType,
+	narrowing: Narrowing,
+): Array<AnyType> {
+	let entries = entriesOf(value)
+	let lowest = Math.max(0, narrowing.minimumLength ?? 0)
+	let candidates: Array<Array<[AnyType, AnyType]>> = []
+
+	if (entries.length > lowest) {
+		candidates.push(entries.slice(0, lowest))
+
+		let half = Math.max(lowest, Math.floor(entries.length / 2))
+
+		candidates.push(entries.slice(0, half))
+		candidates.push(entries.slice(entries.length - half))
+
+		for (let index = 0; index < entries.length; index++) {
+			candidates.push([
+				...entries.slice(0, index),
+				...entries.slice(index + 1),
+			])
+		}
+	}
+
+	for (let index = 0; index < entries.length; index++) {
+		for (let smaller of shrink(generator.value, entries[index]![1])) {
+			candidates.push([
+				...entries.slice(0, index),
+				[entries[index]![0], smaller],
+				...entries.slice(index + 1),
+			])
+		}
+	}
+
+	return candidates.map((shrunk) =>
+		dictionaryOf(shrunk, witnessOf(generator)),
+	)
+}
+
 function shrinkMembers(
 	members: Array<GeneratorMember>,
 	value: AnyType,
@@ -1076,6 +1401,23 @@ function claims(generator: Generator, value: AnyType): boolean {
 
 			return items.length === 0 || claims(generator.item, items[0]!)
 		}
+		case "dictionary": {
+			if (key !== "Dictionary") {
+				return false
+			}
+
+			// NOTE: One entry deep, as a List arm asks about one item — far
+			// enough to tell two arms of a written Union apart, and an empty
+			// Dictionary has nothing to be told apart by, so it is claimed.
+			let entries = entriesOf(value)
+			let first = entries[0]
+
+			return (
+				first === undefined ||
+				(claims(generator.key, first[0]) &&
+					claims(generator.value, first[1]))
+			)
+		}
 		case "record": {
 			if (key !== "Record") {
 				return false
@@ -1135,6 +1477,11 @@ function complexity(generator: Generator): number {
 			return 5 + complexity(generator.item)
 		case "record":
 			return 6 + membersComplexity(generator.members)
+		// NOTE: The most complicated structure there is to read, because an entry
+		// is a key AND a value: a reader has to hold the pairing in their head
+		// as well as both parts of it.
+		case "dictionary":
+			return 8 + complexity(generator.key) + complexity(generator.value)
 		case "union":
 			return generator.members.length === 0
 				? 0
@@ -1198,6 +1545,14 @@ export type EncodedValue =
 	| { kind: "rational"; numerator: string; denominator: string }
 	| { kind: "string"; value: string }
 	| { kind: "list"; items: Array<EncodedValue> }
+	// NOTE: A LIST of pairs rather than a record keyed by the key, because a key
+	// is a value of any Type at all — a Record, a Case, a Rational — and only
+	// some of those spell as a JSON member name. The pairs are written in the
+	// Dictionary's own order, which is what reading them back rebuilds.
+	| {
+			kind: "dictionary"
+			entries: Array<{ key: EncodedValue; value: EncodedValue }>
+	  }
 	| { kind: "record"; members: Record<string, EncodedValue> }
 	| { kind: "case"; tag: string; members: Record<string, EncodedValue> }
 	// NOTE: Which ARM of a Union the value belongs to, by its index among them.
@@ -1260,6 +1615,22 @@ export function encode(
 			}
 
 			return { kind: "list", items }
+		}
+		case "dictionary": {
+			let entries: Array<{ key: EncodedValue; value: EncodedValue }> = []
+
+			for (let [key, held] of entriesOf(value)) {
+				let encodedKey = encode(generator.key, key)
+				let encodedValue = encode(generator.value, held)
+
+				if (encodedKey === null || encodedValue === null) {
+					return null
+				}
+
+				entries.push({ key: encodedKey, value: encodedValue })
+			}
+
+			return { kind: "dictionary", entries }
 		}
 		case "record": {
 			let members = encodeMembers(generator.members, value)
@@ -1400,6 +1771,33 @@ export function decode(
 			}
 
 			return createList(items)
+		}
+		case "dictionary": {
+			if (data.kind !== "dictionary" || !Array.isArray(data.entries)) {
+				return null
+			}
+
+			let entries: Array<[AnyType, AnyType]> = []
+
+			for (let entry of data.entries) {
+				// NOTE: Nothing is trusted, here least of all — a pair missing
+				// either half is a Dictionary that lost an entry rather than one
+				// that held a shorter one.
+				if (typeof entry !== "object" || entry === null) {
+					return null
+				}
+
+				let key = decode(generator.key, entry.key)
+				let value = decode(generator.value, entry.value)
+
+				if (key === null || value === null) {
+					return null
+				}
+
+				entries.push([key, value])
+			}
+
+			return dictionaryOf(entries, witnessOf(generator))
 		}
 		case "record": {
 			if (data.kind !== "record") {
