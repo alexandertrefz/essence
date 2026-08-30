@@ -761,6 +761,14 @@ export type DefineArm = {
 	// boolean out of it — unless a pass has already found the question asked in
 	// JavaScript's own terms. False is the Simplifier's own answer.
 	conditionIsRaw: boolean
+	// NOTE: And the same claim `ConditionalStatementNode.narrows` makes, carried
+	// down from the typed Node rather than worked out again: what an arm's
+	// Condition established is read off the TYPED Condition, and checked
+	// refinements are erased before the first Optimiser pass sees a Program.
+	// Two readers ask for it — `instrument-coverage` marks the arm's point with
+	// it, and `essence test --mutate` leaves an arm standing behind a doorway
+	// alone — and neither of them could answer it for itself.
+	narrows: boolean
 }
 
 // #endregion
