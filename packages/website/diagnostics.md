@@ -1137,7 +1137,10 @@ may SAY is narrower than what a Parameter's default may say — see
 
 ### `return-type-mismatch`
 
-A `<-` yields a value that does not match the declared return Type.
+A `<-` yields a value that does not match the declared return Type — or an arm
+of a `define` answers with a value that does not fit the `define`'s answer Type.
+An arm is what a `define` returns, and it is held to the answer Type whether the
+arrow, the position around the `define`, or the arms themselves decided it.
 
 ### `condition-not-boolean`
 
@@ -2101,6 +2104,19 @@ Declaration works too wherever there is one, but an ARGUMENT position hands
 nothing down: a call picks its Overload BY the Arguments, so no Parameter Type
 is decided before they are read, and a `define` standing in one has to write the
 arrow.
+
+### `define-without-cases`
+
+A Warning: a `define` whose only arm is the `otherwise` arm. It asks nothing, so
+it is the value it answers with written the long way round, and every reader who
+meets it has to read the braces before they find that out.
+
+Never an Error, because this is exactly the shape a ladder has while it is being
+written. It is tagged `unnecessary` instead, so clients grey the `define` out
+rather than underline it — what is wrong with it is that it does nothing.
+
+Write the `otherwise` value on its own, or add the arms the `define` was going
+to ask.
 
 ## Protocols
 

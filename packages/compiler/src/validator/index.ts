@@ -1439,7 +1439,10 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 function validateDefine(
 	node: common.typed.DefineNode,
 ): common.typed.DefineNode {
+	reportCaselessDefine(node)
+
 	for (let arm of node.arms) {
+		checkDefineAnswer(node, arm.value)
 		validateExpression(arm.value)
 
 		// NOTE: An arm's Condition picks the path exactly as an `if` does, and
@@ -1448,9 +1451,83 @@ function validateDefine(
 		validateCondition(arm.condition, "A Define Condition")
 	}
 
+	checkDefineAnswer(node, node.otherwise.value)
 	validateExpression(node.otherwise.value)
 
 	return node
+}
+
+// NOTE: A `define` whose only arm is the `otherwise` one asks nothing. It is
+// the value it answers with, written the long way round, and every reader who
+// meets it has to read the braces before they find that out.
+//
+// A Warning, and never anything more: this is exactly the shape a ladder has
+// while it is being written, and an Error here would refuse a file half way
+// through the edit that fixes it. Tagged `unnecessary` so that clients grey the
+// `define` out rather than underline it — what is wrong with it is that it does
+// nothing, not that it is wrong.
+//
+// The Validator rather than the Parser, because the Node is perfectly
+// well-formed: it has the one arm every `define` must have, and this is a
+// judgment about what that arm is worth rather than about how it was written.
+function reportCaselessDefine(node: common.typed.DefineNode): void {
+	if (node.arms.length > 0) {
+		return
+	}
+
+	reportWarning("This 'define' has no cases", node.position, {
+		code: "define-without-cases",
+		labels: [primary(node.position, "nothing here is decided by cases")],
+		tags: ["unnecessary"],
+		notes: [
+			"A 'define' answers with the value of the first arm whose Condition holds — and the 'otherwise' arm is the one that holds when none of them did.",
+		],
+		helps: [
+			"Write the 'otherwise' value on its own, or add the arms this 'define' was going to ask.",
+		],
+	})
+}
+
+// NOTE: Every arm answers where the `define` stands, so every arm is held to
+// the `define`'s answer Type. Asked of the Type whatever decided it: where the
+// arms decided it themselves it is the Union of exactly these values and each
+// of them fits by construction, so one check covers the arrow and the position
+// around the `define` without the Node having to say which of them spoke.
+//
+// NOTE: Reported at the arm's VALUE, which is the part a reader can change —
+// the arrow's Type has no Position of its own, and the position around a
+// `define` is a Declaration's annotation somewhere above it. Same reason a `<-`
+// is reported where it is, and the same code: an arm is what a `define`
+// returns.
+function checkDefineAnswer(
+	node: common.typed.DefineNode,
+	value: common.typed.ExpressionNode,
+): void {
+	if (fitsExpectedType(node.type, value)) {
+		return
+	}
+
+	let evidence = refinementEvidence(node.type, value)
+
+	reportError(
+		"This arm does not answer with the Type this 'define' has",
+		value.position,
+		{
+			code: "return-type-mismatch",
+			labels: [
+				primary(
+					value.position,
+					`this is ${withArticle(describeType(value.type))}`,
+				),
+				...evidence.labels,
+			],
+			notes: [
+				`This 'define' answers ${describeType(node.type)}.`,
+				...evidence.notes,
+			],
+			helps: evidence.helps,
+		},
+	)
 }
 
 // NOTE: A Case that an earlier one takes the EMPTY VALUES of a container from

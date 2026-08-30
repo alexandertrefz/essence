@@ -4063,3 +4063,124 @@ describe("A path key merged into a default", () => {
 		).toEqual([])
 	})
 })
+
+// NOTE: A `define` answers with a value wherever it stands, and every arm is one
+// of the answers — so every arm is held to the answer Type, whichever of the
+// three decided it. The one thing the Validator can say about the SHAPE of a
+// `define` lives here too: a ladder with no rungs is a value written the long
+// way round.
+describe("A definition by cases", () => {
+	it("should warn about a define whose only arm is the otherwise arm", () => {
+		let diagnostics = diagnosticsFor(`implementation {
+			constant grade = define {
+				as "unrated" otherwise
+			}
+		}`)
+
+		expect(diagnostics).toHaveLength(1)
+		expect(diagnostics[0].severity).toBe("warning")
+		expect(diagnostics[0].code).toBe("define-without-cases")
+		expect(diagnostics[0].labels[0]?.message).toBe(
+			"nothing here is decided by cases",
+		)
+	})
+
+	// NOTE: Greyed out rather than underlined — what is wrong with it is that it
+	// does nothing, and this is exactly the shape a ladder has while it is being
+	// written.
+	it("should tag the define as unnecessary", () => {
+		let diagnostics = diagnosticsFor(`implementation {
+			constant grade = define {
+				as "unrated" otherwise
+			}
+		}`)
+
+		expect(diagnostics[0].tags).toEqual(["unnecessary"])
+	})
+
+	it("should stay silent once the define asks something", () => {
+		expect(
+			diagnosticsFor(`implementation {
+				constant score = 91
+
+				constant grade = define {
+					as "A" if score::isGreaterThanOrEqualTo(90)
+					as "unrated" otherwise
+				}
+			}`),
+		).toEqual([])
+	})
+
+	it("should refuse an arm the arrow's Type does not accept", () => {
+		let source = `implementation {
+			constant score = 91
+
+			constant grade = define -> Integer {
+				as "A" if score::isGreaterThanOrEqualTo(90)
+				as 0 otherwise
+			}
+		}`
+		let diagnostics = diagnosticsFor(source)
+
+		expect(diagnostics).toHaveLength(1)
+		expect(diagnostics[0].severity).toBe("error")
+		expect(diagnostics[0].code).toBe("return-type-mismatch")
+		expect(diagnostics[0].labels[0]?.message).toBe("this is a String")
+		expect(underlinedBy(source, diagnostics[0].labels[0])).toBe(`"A"`)
+		expect(diagnostics[0].notes).toEqual(["This 'define' answers Integer."])
+	})
+
+	// NOTE: The `otherwise` arm is an answer like any other, and the position
+	// around the `define` decides the Type just as the arrow does — so the same
+	// check catches both without the Node having to say which of them spoke.
+	it("should refuse an otherwise arm the position's Type does not accept", () => {
+		let source = `implementation {
+			constant score = 91
+
+			constant grade: String = define {
+				as "A" if score::isGreaterThanOrEqualTo(90)
+				as 0 otherwise
+			}
+		}`
+		let diagnostics = diagnosticsFor(source)
+
+		expect(diagnostics).toHaveLength(1)
+		expect(diagnostics[0].code).toBe("return-type-mismatch")
+		expect(underlinedBy(source, diagnostics[0].labels[0])).toBe("0")
+	})
+
+	// NOTE: Where the arms decided the answer Type themselves it is the Union of
+	// exactly these values, so every one of them fits by construction — the
+	// check can not fire, and a `define` inferring a Union is not a mistake.
+	it("should stay silent where the arms decided the Type themselves", () => {
+		expect(
+			diagnosticsFor(`implementation {
+				constant score = 91
+
+				constant grade = define {
+					as "A" if score::isGreaterThanOrEqualTo(90)
+					as 0 otherwise
+				}
+			}`),
+		).toEqual([])
+	})
+
+	// NOTE: An arm's Condition picks the path exactly as an `if` does, and is
+	// held to what every Condition is held to.
+	it("should refuse a Condition that is not a Boolean", () => {
+		let diagnostics = diagnosticsFor(`implementation {
+			constant score = 91
+
+			constant grade = define {
+				as "A" if score
+				as "unrated" otherwise
+			}
+		}`)
+
+		expect(diagnostics).toHaveLength(1)
+		expect(diagnostics[0].code).toBe("condition-not-boolean")
+		expect(diagnostics[0].message).toBe(
+			"A Define Condition has to be a Boolean",
+		)
+	})
+})
