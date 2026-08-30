@@ -746,6 +746,37 @@ describe("Code Generation", () => {
 			).toEqual(["Optional#Value(1)"])
 		})
 
+		// NOTE: `otherwise` is a valid Identifier, so a Method may be named it
+		// — `Optional::otherwise` was one of the standard library's own until
+		// it was renamed. Here the word is a Method's name and an arm's
+		// terminator inside the same `define`, and each reads where it stands.
+		it("answers through a Method named otherwise", async () => {
+			expect(
+				await run(`
+					implementation {
+						namespace Fallback for Integer {
+							otherwise(_ fallback: Integer) -> Integer {
+								<- define {
+									as @ if @::isPositive()
+									as fallback otherwise
+								}
+							}
+						}
+
+						constant grade = (_ score: Integer) -> Integer {
+							<- define {
+								as score::otherwise(1) if score::isNegative()
+								as score::otherwise(2) otherwise
+							}
+						}
+
+						Terminal.inspect(grade(-3))
+						Terminal.inspect(grade(4))
+					}
+				`),
+			).toEqual(["1", "4"])
+		})
+
 		it("emits a chain of conditionals rather than a Function to call", () => {
 			let generated = generate(
 				`implementation {

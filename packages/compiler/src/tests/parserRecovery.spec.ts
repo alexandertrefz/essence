@@ -493,6 +493,44 @@ describe("Parser Recovery", () => {
 		}
 	})
 
+	// NOTE: `otherwise` is a valid Identifier, so `as otherwise` is an arm whose
+	// VALUE is a name and whose follower never came — the same reading `as 1`
+	// gets, and the same message. What is missing is the word that says which
+	// arm it is, and that is what the Diagnostic is about: blaming the value
+	// would send the reader after the wrong edit. The arm below it still reads,
+	// so the `define` keeps the `otherwise` arm that WAS written.
+	it("should ask for a follower where an arm's value is a name spelled otherwise", () => {
+		let { program, diagnostics } = parseWithDiagnostics(
+			`implementation {
+				constant grade = define {
+					as otherwise
+					as 0 otherwise
+				}
+			}`,
+		)
+
+		expect(diagnostics).toHaveLength(1)
+		expect(diagnostics[0].severity).toBe("error")
+		expect(diagnostics[0].message).toBe(
+			"Expected 'if' or 'otherwise' but found 'as'.",
+		)
+		expect(diagnostics[0].labels[0]?.message).toBe(
+			"expected 'if' or 'otherwise'",
+		)
+
+		let nodes = program.implementation.nodes
+
+		expect(nodes).toHaveLength(1)
+
+		if (
+			nodes[0].nodeType === "ConstantDeclarationStatement" &&
+			nodes[0].value.nodeType === "Define"
+		) {
+			expect(nodes[0].value.arms).toHaveLength(0)
+			expect(nodes[0].value.otherwise.value.nodeType).toBe("IntegerValue")
+		}
+	})
+
 	it("should refuse a define with no otherwise arm and carry on", () => {
 		let { program, diagnostics } = parseWithDiagnostics(
 			`implementation {
