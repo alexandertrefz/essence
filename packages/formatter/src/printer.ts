@@ -2439,14 +2439,14 @@ export class Printer {
 				// open.
 				//
 				// NOTE: An arm wider than a LINE breaks there wherever it is
-				// written, so it reports no width and leaves the run: its `if`
-				// is on a line of its own, and the column its head would hold
-				// open is one that nothing occupies. The layout decides every
-				// other break, and an arm that fits a line and breaks anyway
-				// because of the column it starts at is not seen from here —
-				// that arm stays in the run and holds it one head too wide,
-				// which is the same misalignment in the one case the printer
-				// can not tell apart from an arm that fits.
+				// written, so it stands apart from the run: its `if` is on a
+				// line of its own, and the column its head would hold open is
+				// one that nothing occupies. The layout decides every other
+				// break, and an arm that fits a line and breaks anyway because
+				// of the column it starts at is not seen from here — that arm
+				// stays in the run and holds it one head too wide, which is the
+				// same misalignment in the one case the printer can not tell
+				// apart from an arm that fits.
 				let armWidth = headWidth + stringWidth(" if ") + conditionWidth
 
 				return {
