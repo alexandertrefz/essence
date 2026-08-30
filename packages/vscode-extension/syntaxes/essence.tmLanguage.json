@@ -249,7 +249,8 @@
 			}
 		},
 		"controlKeyword": {
-			"match": "\\b(if|else|match|case|for|with)\\b",
+			"comment": "`define` and `otherwise` are reserved Keywords like the rest of these, so both light on the word alone. The third word an arm is written with, `as`, is not — it is scoped under the contextual rules below.",
+			"match": "\\b(if|else|match|case|define|otherwise|for|with)\\b",
 			"name": "keyword.control.essence"
 		},
 		"contextualKeyword": {
@@ -283,6 +284,15 @@
 					"comment": "`expect` and `require` open an assertion where an Expression follows them. The excluded characters are what a name called `expect` is followed by instead — `constant expect = 6`, `expect::is(6)`, `f(expect)`.",
 					"match": "\\b(expect|require)\\b(?=[ \\t]+[^\\s=,:)\\]}])",
 					"name": "keyword.control.essence"
+				},
+				{
+					"comment": "`as` opens a `define` arm — `as \"A\" if score::isAbove(90)` — where the rule below can never light it: that one wants an Identifier character immediately in front, and an arm head has a line break and an indent there instead. An arm reads as an arm, so it is lit as one, and as control flow rather than as a binder. The grammar is regex only and can not see that this line stands inside a `define` block, so line start is what stands in for it — which also lights any other line-initial `as`, a shape that occurs nowhere in the corpus. What may follow is where an arm's value starts, which unlike a binder's may be a String or a Case; the excluded characters are what a line beginning with a name spelled `as` is followed by instead. The whitespace turns most of those away on its own — `as::length()` and `as.member` have none — so what is left to exclude is an assignment to a name called `as`.",
+					"match": "^[ \\t]*(as)\\b(?=[ \\t]+[^\\s=,)\\]}])",
+					"captures": {
+						"1": {
+							"name": "keyword.control.essence"
+						}
+					}
 				},
 				{
 					"comment": "`as` binds a Pattern's member under another name — `{ x as y }`, `{ origin as { x, y } }` — or names the whole value, `{ x, y } as point`. It is an Argument label as well, so `normalize(as #ComposedCanonical)` is a call and not a Pattern, and only what sits on BOTH sides tells the two apart: a label opens its Argument, so a `(`, a comma or the head of the line precedes it, where a binder follows what it binds — a member name, the `>` closing the Type that member was constrained to, or the Pattern's own `}`. What may follow is the Parser's own two-Token rule verbatim, a name or a nested Pattern and nothing else, which leaves `{ as }` and the trailing name of `{ as as as }` unlit as the Identifiers they are. The whitespace is matched rather than looked behind because Oniguruma looks back a fixed number of characters only. NOTE: A binder written on the line below what it binds stays unlit, and a value NAMED `as` in front of a block — `if as { … }` — lights as though it were a binder. Both need the Parser to tell, which one line read by one regex is not.",
