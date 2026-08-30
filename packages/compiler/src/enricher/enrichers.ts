@@ -8231,6 +8231,17 @@ function falseBranchScope(
 // told the name is already declared, by a declaration nobody wrote and no
 // Diagnostic can point at. The body's own Scope nests INSIDE this one, so its
 // declarations shadow the shadows exactly as they shadow anything else.
+//
+// NOTE: A shadow says something new about what a name's value IS and nothing at
+// all about where that value is READ FROM, so an alias the shadowed name carries
+// is carried onto the shadow with it. `selfMemberAliases` is consulted on the
+// Scope that DECLARES a name and on no other, and the shadow is now that Scope:
+// left off, a name lent to a Match Guard as `@.member` went back to being a bare
+// Identifier the moment anything inside that Guard narrowed it — a name that
+// does not exist where a Guard runs, carrying a refinement proved of `@.member`
+// and reading whatever else in the file happened to be spelled the same way. A
+// `define` is the first construct that can narrow inside a Guard at all, so
+// nothing exercised this before it.
 function scopeShadowing(
 	narrowings: Array<Narrowing>,
 	scope: enricher.Scope,
@@ -8242,6 +8253,14 @@ function scopeShadowing(
 	let narrowScope = childScope(scope)
 
 	for (let narrowing of narrowings) {
+		let alias = findDeclaringScope(narrowing.name, scope)
+			?.selfMemberAliases?.[narrowing.name]
+
+		if (alias !== undefined) {
+			;(narrowScope.selfMemberAliases ??= scopeMap())[narrowing.name] =
+				alias
+		}
+
 		declareVariableInScope(
 			narrowing.name,
 			narrowing.type,
