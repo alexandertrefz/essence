@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
 import { createBoolean } from "../Boolean"
+import { createDictionary } from "../Dictionary"
 import {
 	decode,
 	encode,
@@ -20,7 +21,7 @@ import { createRandomness, type RandomnessType, seedOf } from "../Randomness"
 import { createRational } from "../Rational"
 import { createRecord } from "../Record"
 import { createString } from "../String"
-import { type AnyType, createCase, typeKeySymbol } from "../type"
+import { type AnyType, createCase, liveEntriesOf, typeKeySymbol } from "../type"
 
 // NOTE: The generator interpreter as a unit — what it BUILDS and what it makes
 // smaller — driven directly rather than through a compile. What the Compiler
@@ -74,6 +75,21 @@ function itemsOf(value: AnyType): Array<AnyType> {
 
 function tagOf(value: AnyType): string {
 	return (value as unknown as Record<symbol, string>)[typeKeySymbol]!
+}
+
+// NOTE: The witness a Dictionary built here is handed. `Generators.ts` builds
+// its own drawn Dictionaries through the same universal comparison, so this is
+// what a drawn one was keyed by and what a hand-built one has to agree with.
+const anyEquatable = {
+	is: (a: AnyType, b: AnyType) => createBoolean(anyIs(a, b)),
+}
+
+function dictionaryOf(entries: Array<[AnyType, AnyType]>): AnyType {
+	return createDictionary(entries, anyEquatable) as AnyType
+}
+
+function entriesOf(value: AnyType): Array<[AnyType, AnyType]> {
+	return liveEntriesOf(value as Parameters<typeof liveEntriesOf>[0])
 }
 
 const integers: Generator = { kind: "integer" }
@@ -212,6 +228,35 @@ describe("Generators", () => {
 
 			expect(value).toBe(
 				createCase("Ordering#Equal") as unknown as AnyType,
+			)
+		})
+
+		// NOTE: The two slots drawn apart, and the one thing collapsing a
+		// repeated key does to a draw: what comes out may hold FEWER entries
+		// than were drawn for it, so the count is never asserted — only that
+		// every entry is a key and a value of the Types the slots named.
+		test("draws a Dictionary of the two slots it was given", () => {
+			let generator: Generator = {
+				kind: "dictionary",
+				key: strings,
+				value: integers,
+			}
+			let drawn = draw(generator, 12)
+
+			expect(drawn.every((value) => tagOf(value) === "Dictionary")).toBe(
+				true,
+			)
+			expect(
+				drawn.every((value) =>
+					entriesOf(value).every(
+						([key, held]) =>
+							tagOf(key) === "String" &&
+							tagOf(held) === "Integer",
+					),
+				),
+			).toBe(true)
+			expect(drawn.some((value) => entriesOf(value).length > 0)).toBe(
+				true,
 			)
 		})
 
@@ -464,6 +509,152 @@ describe("Generators", () => {
 		})
 	})
 
+	describe("what a Dictionary shrinks to", () => {
+		const ages: Generator = {
+			kind: "dictionary",
+			key: strings,
+			value: integers,
+		}
+
+		function named(value: AnyType): Array<string> {
+			return entriesOf(value).map(([key]) => textOf(key))
+		}
+
+		test("drops entries and shrinks the values it keeps", () => {
+			let value = dictionaryOf([
+				[createString("alex"), createInteger(39n)],
+				[createString("sam"), createInteger(25n)],
+			])
+			let candidates = shrink(ages, value)
+
+			expect(
+				candidates.some((candidate) => named(candidate).length === 0),
+			).toBe(true)
+			expect(
+				candidates.some((candidate) => named(candidate).length === 1),
+			).toBe(true)
+			expect(
+				candidates.some((candidate) =>
+					entriesOf(candidate).some(
+						([, held]) => wholeOf(held) === 0n,
+					),
+				),
+			).toBe(true)
+		})
+
+		// NOTE: THE claim a shrunk Dictionary rests on. Two keys shrinking
+		// towards one key would collapse into a single entry, so a candidate
+		// would be a Dictionary of another LENGTH than the shrink meant to
+		// answer — a report about a value the property never saw.
+		test("never rewrites a key", () => {
+			let value = dictionaryOf([
+				[createString("alex"), createInteger(39n)],
+				[createString("sam"), createInteger(25n)],
+			])
+
+			for (let candidate of shrink(ages, value)) {
+				for (let key of named(candidate)) {
+					expect(["alex", "sam"]).toContain(key)
+				}
+			}
+		})
+
+		test("answers nothing for a Dictionary already empty", () => {
+			expect(shrink(ages, dictionaryOf([]))).toEqual([])
+		})
+	})
+
+	// NOTE: WHICH KEYS ARE ONE KEY is not a question a generator can answer out
+	// of the shape it was told to draw: a Namespace may write an `is` for the
+	// key Type, and two keys it calls equal are one entry however they are
+	// spelled. So the plan carries the key Type's own Equatable witness, and
+	// everything here that builds a Dictionary builds through it.
+	describe("the witness a drawn Dictionary is built by", () => {
+		// NOTE: A key generator that answers the two spellings of one name in
+		// turn, and a witness that calls them equal — the shape a user
+		// Namespace `for NonEmptyString is Equatable` leaves behind. It counts
+		// rather than draws so that the two spellings are what a draw of two
+		// keys meets, whatever the source answers.
+		let spelling = 0
+
+		const spellings: Generator = {
+			kind: "generated",
+			name: "Name",
+			generate: () => createString(spelling++ % 2 === 0 ? "Ada" : "ada"),
+		}
+
+		const looseText = {
+			is: (first: AnyType, second: AnyType) =>
+				createBoolean(
+					textOf(first).toLowerCase() ===
+						textOf(second).toLowerCase(),
+				),
+		}
+
+		test("two keys the witness calls equal are one entry", () => {
+			spelling = 0
+
+			let withWitness = generate(
+				{
+					kind: "dictionary",
+					key: spellings,
+					value: integers,
+					keyConformance: looseText,
+				},
+				sourceOf(),
+				8,
+				{ minimumLength: 2, maximumLength: 2 },
+			)
+
+			expect(entriesOf(withWitness).length).toBe(1)
+
+			spelling = 0
+
+			let withoutWitness = generate(
+				{ kind: "dictionary", key: spellings, value: integers },
+				sourceOf(),
+				8,
+				{ minimumLength: 2, maximumLength: 2 },
+			)
+
+			expect(entriesOf(withoutWitness).length).toBe(2)
+		})
+
+		test("a shrunk and a moved Dictionary are built through it too", () => {
+			let generator: Generator = {
+				kind: "dictionary",
+				key: strings,
+				value: integers,
+				keyConformance: looseText,
+			}
+			let value = createDictionary(
+				[
+					[createString("Ada"), createInteger(1n)],
+					[createString("Bob"), createInteger(2n)],
+				],
+				looseText,
+			) as AnyType
+
+			for (let candidate of shrink(generator, value)) {
+				expect(
+					entriesOf(candidate).map(([key]) =>
+						textOf(key).toLowerCase(),
+					),
+				).toEqual([
+					...new Set(
+						entriesOf(candidate).map(([key]) =>
+							textOf(key).toLowerCase(),
+						),
+					),
+				])
+			}
+
+			let moved = mutate(generator, value, sourceOf(), 8)
+
+			expect(entriesOf(moved).length).toBeGreaterThan(0)
+		})
+	})
+
 	describe("the smallest value a generator can build", () => {
 		test("answers zero, the empty String and the empty List", () => {
 			expect(minimal(integers)).toEqual(createInteger(0n))
@@ -471,6 +662,64 @@ describe("Generators", () => {
 			expect(itemsOf(minimal({ kind: "list", item: integers })!)).toEqual(
 				[],
 			)
+		})
+
+		// NOTE: An empty Dictionary needs no key at all, which is why the
+		// smallest one can always be built while the smallest NON-empty one
+		// needs both slots to have a smallest value of their own.
+		test("answers the empty Dictionary", () => {
+			expect(
+				entriesOf(
+					minimal({
+						kind: "dictionary",
+						key: strings,
+						value: integers,
+					})!,
+				),
+			).toEqual([])
+		})
+
+		// NOTE: A length above one is a length in DISTINCT keys, which is what
+		// a `NonEmptyDictionary` of more than one entry asks for. The smallest
+		// key is one of them and the rest are drawn, because "smaller" is an
+		// ordering the language owns for numbers and not for keys.
+		test("answers as many distinct keys as a minimum length asks for", () => {
+			for (let length of [1, 2, 5]) {
+				let smallest = minimal(
+					{ kind: "dictionary", key: strings, value: integers },
+					{ minimumLength: length },
+				)
+
+				expect(smallest).not.toBeNull()
+
+				let entries = entriesOf(smallest!)
+
+				expect(entries.length).toBe(length)
+				expect(new Set(entries.map(([key]) => textOf(key))).size).toBe(
+					length,
+				)
+				expect(entries.every(([, held]) => wholeOf(held) === 0n)).toBe(
+					true,
+				)
+			}
+		})
+
+		// NOTE: And where the key Type has too few values to make that many, it
+		// answers nothing rather than a Dictionary shorter than it promised. A
+		// Boolean has two.
+		test("answers nothing where the key Type has too few values", () => {
+			expect(
+				minimal(
+					{ kind: "dictionary", key: booleans, value: integers },
+					{ minimumLength: 2 },
+				),
+			).not.toBeNull()
+			expect(
+				minimal(
+					{ kind: "dictionary", key: booleans, value: integers },
+					{ minimumLength: 3 },
+				),
+			).toBeNull()
 		})
 
 		test("answers the shortest value a narrowing admits", () => {
@@ -690,6 +939,66 @@ describe("Generators", () => {
 						(holder["warm"] === value["warm"] ? 1 : 0),
 				).toBeGreaterThanOrEqual(1)
 			}
+		})
+
+		// NOTE: A step that ADDS has to draw a key the Dictionary does not
+		// already hold. A key it holds is an overwrite, which leaves the length
+		// where it was — so the move would have been the redraw move under
+		// another name, and the search would grow a Dictionary half as often as
+		// it means to. A Boolean key has two values, so a one-entry Dictionary
+		// collides on every second draw; over ninety neighbours at this seed
+		// twenty-three grow, where taking the first draw whatever it was grew
+		// eleven and turned the other twenty into a second way of redrawing a
+		// value.
+		test("a step that adds an entry draws a key the Dictionary lacks", () => {
+			let generator: Generator = {
+				kind: "dictionary",
+				key: booleans,
+				value: integers,
+			}
+			let value = dictionaryOf([[createBoolean(true), createInteger(1n)]])
+			let lengths = neighbours(generator, value, 90).map(
+				(moved) => entriesOf(moved).length,
+			)
+
+			expect(
+				lengths.filter((length) => length === 2).length,
+			).toBeGreaterThan(18)
+			expect(
+				lengths.filter((length) => length === 0).length,
+			).toBeGreaterThan(0)
+			expect(
+				lengths.filter((length) => length === 1).length,
+			).toBeGreaterThan(0)
+		})
+
+		// NOTE: And where the key Type has no value left to draw, the step
+		// falls back to a move that is available rather than answering the
+		// value it was handed. Both Booleans are held here and the length is
+		// pinned from below, so every neighbour is a redrawn value under a key
+		// that was already there.
+		test("a step falls back where every key its Type has is held", () => {
+			let generator: Generator = {
+				kind: "dictionary",
+				key: booleans,
+				value: integers,
+			}
+			let value = dictionaryOf([
+				[createBoolean(true), createInteger(1n)],
+				[createBoolean(false), createInteger(2n)],
+			])
+			let moved = neighbours(generator, value, 90, {
+				narrowing: { minimumLength: 2, maximumLength: 3 },
+			})
+
+			expect(
+				moved.every((each) => entriesOf(each).length === 2),
+			).toBeTrue()
+			expect(
+				moved.some((each) =>
+					entriesOf(each).some(([, held]) => wholeOf(held) !== 1n),
+				),
+			).toBeTrue()
 		})
 
 		// NOTE: A payload-free Case is the only value of its own shape, so its
@@ -999,6 +1308,19 @@ describe("Generators", () => {
 				"a Case carrying none",
 				optionals,
 				createCase("Optional#Empty") as unknown as AnyType,
+			],
+			[
+				"the empty Dictionary",
+				{ kind: "dictionary", key: strings, value: integers },
+				dictionaryOf([]),
+			],
+			[
+				"a Dictionary of several entries",
+				{ kind: "dictionary", key: strings, value: integers },
+				dictionaryOf([
+					[createString("alex"), createInteger(39n)],
+					[createString("sam"), createInteger(25n)],
+				]),
 			],
 			["a refined Integer", evens, createInteger(12n)],
 			[

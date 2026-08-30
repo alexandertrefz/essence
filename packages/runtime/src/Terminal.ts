@@ -3,6 +3,7 @@ import { toString as integerToString } from "./Integer"
 import { materialise } from "./List"
 import { formatAsRational, type RationalType } from "./Rational"
 import type { RecordType } from "./Record"
+import { kindOf, singleLineMaxLength } from "./registry"
 import type { StreamType } from "./Stream"
 import { quoted, type StringType } from "./String"
 import { toString as transcendentalToString } from "./Transcendental"
@@ -20,8 +21,6 @@ import { type AnyType, typeKeySymbol } from "./type"
 // readers ask it a question of the same shape outside a Program:
 // `Record.toString`, which asks for the printable form, and the Debug Adapter,
 // whose variables pane shows a value the way a `Terminal.inspect` would.
-
-const singleLineMaxLength = 60
 
 // NOTE: Two readers, one walk. `Terminal.inspect` asks for the STRUCTURAL
 // rendering — what a value IS — and `Record.toString` asks for the PRINTABLE
@@ -196,6 +195,24 @@ export function getStringRepresentation(
 			listPadding,
 		)}`
 	} else {
+		// NOTE: A kind the walk above does not know may still have said how it
+		// is rendered — the registry in `registry.ts` is where a container's
+		// own module leaves that, and probing it HERE is what keeps the arms
+		// above the whole cost of printing for a Program that holds none. A
+		// Dictionary is the one such kind today, and its arm cost every Program
+		// that printed anything 1,281 bytes before it moved.
+		let kind = kindOf(obj[typeKeySymbol])
+
+		if (kind !== undefined) {
+			return kind.render(
+				obj,
+				indentLevel,
+				rationalForm,
+				listPadding,
+				getStringRepresentation,
+			)
+		}
+
 		// NOTE: Unreachable for any value the Compiler emits — every Essence
 		// value carries one of the tags above. It answers rather than throws
 		// because a printer that crashes takes the Program with it, and what a

@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
 import { createBoolean } from "../Boolean"
+import { createDictionary } from "../Dictionary"
 import { createInteger } from "../Integer"
 import { anyIs, anyIsNot } from "../internalHelpers"
 import { createList } from "../List"
@@ -120,5 +121,128 @@ describe("reflexive equality", () => {
 			anyIs(asValue(createCase("Colour#Red")), createRecord({})),
 		).toBeFalse()
 		expect(anyIs(functionValue(), createRecord({}))).toBeFalse()
+	})
+})
+
+// NOTE: The universal comparison for a Dictionary, which is the one it can not
+// answer structurally: a box reads through a SHARED store stamped with a
+// generation, so two boxes holding the very same entries need not hold the same
+// slots, versions or generation. What `anyIs` asks instead is what the design
+// says two Dictionaries mean by equal — the same key set, and an equal value
+// under each key, in whatever order they were written.
+describe("comparing two Dictionaries", () => {
+	// NOTE: The witness a hand-built Dictionary is keyed by here. `anyIs` uses
+	// no witness of its own — there is none to hand it — so it recurses through
+	// this same universal comparison, exactly as it does for a List's items.
+	const anyEquatable = {
+		is: (a: AnyType, b: AnyType) => createBoolean(anyIs(a, b)),
+	}
+
+	function dictionaryOf(entries: Array<[AnyType, AnyType]>): AnyType {
+		return createDictionary(entries, anyEquatable) as AnyType
+	}
+
+	let alex = createString("alex")
+	let sam = createString("sam")
+
+	test("two Dictionaries built the same way are equal", () => {
+		expect(
+			anyIs(
+				dictionaryOf([
+					[alex, createInteger(39n)],
+					[sam, createInteger(25n)],
+				]),
+				dictionaryOf([
+					[alex, createInteger(39n)],
+					[sam, createInteger(25n)],
+				]),
+			),
+		).toBeTrue()
+	})
+
+	test("the order the entries were written in does not decide", () => {
+		expect(
+			anyIs(
+				dictionaryOf([
+					[alex, createInteger(39n)],
+					[sam, createInteger(25n)],
+				]),
+				dictionaryOf([
+					[sam, createInteger(25n)],
+					[alex, createInteger(39n)],
+				]),
+			),
+		).toBeTrue()
+	})
+
+	test("a differing value under a shared key is unequal", () => {
+		expect(
+			anyIs(
+				dictionaryOf([[alex, createInteger(39n)]]),
+				dictionaryOf([[alex, createInteger(40n)]]),
+			),
+		).toBeFalse()
+	})
+
+	test("a key one of them does not hold is unequal", () => {
+		expect(
+			anyIs(
+				dictionaryOf([[alex, createInteger(39n)]]),
+				dictionaryOf([[sam, createInteger(39n)]]),
+			),
+		).toBeFalse()
+	})
+
+	test("a Dictionary holding more entries is unequal", () => {
+		expect(
+			anyIs(
+				dictionaryOf([[alex, createInteger(39n)]]),
+				dictionaryOf([
+					[alex, createInteger(39n)],
+					[sam, createInteger(25n)],
+				]),
+			),
+		).toBeFalse()
+	})
+
+	test("the empty Dictionary is equal to the empty Dictionary", () => {
+		expect(anyIs(dictionaryOf([]), dictionaryOf([]))).toBeTrue()
+		expect(
+			anyIs(dictionaryOf([]), dictionaryOf([[alex, createInteger(1n)]])),
+		).toBeFalse()
+	})
+
+	// NOTE: A Dictionary held INSIDE something else is where the structural
+	// fallback used to answer wrongly — a Record carrying one compared its
+	// stores field by field, so a value stopped being equal to its own copy the
+	// moment it was wrapped.
+	test("a Record holding one compares by the entries it holds", () => {
+		expect(
+			anyIs(
+				createRecord({
+					ages: dictionaryOf([[alex, createInteger(39n)]]),
+				}),
+				createRecord({
+					ages: dictionaryOf([[alex, createInteger(39n)]]),
+				}),
+			),
+		).toBeTrue()
+	})
+
+	// NOTE: Keys and values compare through the very same universal comparison,
+	// so an Integer key and the Rational spelling of it are ONE key — which is
+	// what `Number.is` promises about them everywhere else.
+	test("keys compare by value rather than by spelling", () => {
+		expect(
+			anyIs(
+				dictionaryOf([[createInteger(3n), createString("three")]]),
+				dictionaryOf([[createRational(3n, 1n), createString("three")]]),
+			),
+		).toBeTrue()
+	})
+
+	test("a Dictionary is not equal to a List or a Record", () => {
+		expect(anyIs(dictionaryOf([]), createList([]))).toBeFalse()
+		expect(anyIs(dictionaryOf([]), createRecord({}))).toBeFalse()
 	})
 })

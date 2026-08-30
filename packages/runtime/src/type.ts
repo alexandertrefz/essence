@@ -2,6 +2,7 @@ import type { common } from "@essence-lang/interfaces"
 
 import type { AlgebraicType } from "./Algebraic"
 import type { BooleanType } from "./Boolean"
+import type { DictionaryType } from "./Dictionary"
 import type { IntegerType } from "./Integer"
 import type { ListType } from "./List"
 import type { OrderingType } from "./Ordering"
@@ -213,6 +214,7 @@ export function createCase(
 export type AnyType =
 	| RecordType
 	| ListType<any>
+	| DictionaryType<any, any>
 	| StringType
 	| IntegerType
 	| RationalType
@@ -226,6 +228,82 @@ export type AnyType =
 	// the Type test below can NAME it rather than fall to their "unknown value"
 	// arms.
 	| RandomnessType
+
+// NOTE: A Dictionary box holding Essence values, which is the only Dictionary
+// anything outside the Dictionary Module ever has in hand. It is named here so
+// that the readers of a box — the check below, the universal equality, the
+// property-test generators — share one spelling rather than each reaching into
+// the Dictionary Module for a type of their own.
+export type AnyDictionary = DictionaryType<AnyType, AnyType>
+
+// NOTE: Whether every LIVE entry of a Dictionary box answers `check`, stopping
+// at the first that does not.
+//
+// NOTE: The live view is the whole of what any Dictionary reader ever sees, and
+// it is spelled out here rather than reached for in the Dictionary Module for
+// the reason the List walk below reads a List's runs itself: this Module is the
+// one EVERY Program carries, and importing the container it is asked about would
+// tie the two together in a cycle. The rule is `store.slots` in insertion order,
+// and for each slot the NEWEST version the box's generation can see — an older
+// one is not what this box holds, and a slot with no visible version at all was
+// written after it.
+//
+// NOTE: A tombstone — the version a removal pushes — is recognised as a SYMBOL
+// rather than by importing the one the Dictionary Module exports, which would be
+// the very value import the paragraph above refuses. Nothing else a version can
+// hold is one: every Essence value is an object, or a Function.
+export function everyLiveEntry(
+	dictionary: AnyDictionary,
+	check: (key: AnyType, value: AnyType) => boolean,
+): boolean {
+	// NOTE: The generation is READ ONCE, before the walk, for the reason the
+	// natives fix their counts before theirs: `check` may be user code, and a
+	// write made from inside it can move the very box being walked onto a store
+	// of its own — which the Dictionary Module does whenever a write on a stale
+	// box repacks. The view this walk answers for is the one it started on.
+	let generation = dictionary.generation
+
+	for (let slot of dictionary.store.slots) {
+		let versions = slot.versions
+
+		for (let index = versions.length - 1; index >= 0; index--) {
+			let version = versions[index]!
+
+			if (version.generation > generation) {
+				continue
+			}
+
+			if (
+				typeof version.value !== "symbol" &&
+				!check(slot.key, version.value)
+			) {
+				return false
+			}
+
+			break
+		}
+	}
+
+	return true
+}
+
+// NOTE: The live view materialised, for the readers that have to LOOK an entry
+// up rather than walk past it — a Dictionary's equality is order-insensitive, so
+// it holds one side while it searches the other. It lives beside the walk above
+// so there is one reading of what a box holds rather than two that must agree.
+export function liveEntriesOf(
+	dictionary: AnyDictionary,
+): Array<[AnyType, AnyType]> {
+	let entries: Array<[AnyType, AnyType]> = []
+
+	everyLiveEntry(dictionary, (key, value) => {
+		entries.push([key, value])
+
+		return true
+	})
+
+	return entries
+}
 
 export function isValueOfType(value: AnyType, type: common.Type): boolean {
 	if (type.type === "Randomness") {
@@ -300,6 +378,42 @@ export function isValueOfType(value: AnyType, type: common.Type): boolean {
 		}
 
 		return true
+	} else if (
+		type.type === "Dictionary" ||
+		type.type === "GenericDictionary"
+	) {
+		if (value[typeKeySymbol] !== "Dictionary") {
+			return false
+		}
+
+		// NOTE: Both slot Types erase, exactly as a List's item Type does —
+		// narrowing a Dictionary means looking at the entries it happens to
+		// hold. Every entry has to fit, so the empty Dictionary fits any
+		// Dictionary Matcher, the way an empty List fits any List one.
+		//
+		// NOTE: And each slot stops at the tag ON ITS OWN. A bare `Dictionary`
+		// names neither, so it is the tag and nothing else; a `Dictionary<String,
+		// Unknown>` checks every key and asks nothing of the values. Reading the
+		// two together would have made a half-decided Matcher either walk for a
+		// slot it says nothing about or skip one it does.
+		if (type.type !== "Dictionary") {
+			return true
+		}
+
+		let keyType = type.keyType
+		let valueType = type.valueType
+
+		if (keyType.type === "Unknown" && valueType.type === "Unknown") {
+			return true
+		}
+
+		return everyLiveEntry(
+			value as AnyDictionary,
+			(key, held) =>
+				(keyType.type === "Unknown" || isValueOfType(key, keyType)) &&
+				(valueType.type === "Unknown" ||
+					isValueOfType(held, valueType)),
+		)
 	} else if (type.type === "Case") {
 		// NOTE: Nominal first — the tag says which Case, and a structurally
 		// identical plain Record is not this Case however its members line up.

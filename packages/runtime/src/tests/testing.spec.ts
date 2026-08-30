@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
 import { createBoolean } from "../Boolean"
+import { createDictionary } from "../Dictionary"
 import { decode, type Generator } from "../Generators"
 import { createInteger } from "../Integer"
 import { createList } from "../List"
@@ -47,6 +48,16 @@ import { type AnyType, createCase } from "../type"
 
 const integer = (value: number) => createInteger(BigInt(value))
 const string = (value: string) => createString(value)
+
+// NOTE: The keys handed in here are distinct Strings, so the witness
+// `createDictionary` asks about them never decides anything — a Dictionary of
+// distinct keys does not depend on what it answers, and
+// `dictionaries.spec.ts` is where equality itself is asked.
+const dictionary = (...pairs: Array<[string, AnyType]>) =>
+	createDictionary(
+		pairs.map(([key, value]) => [string(key), value] as [AnyType, AnyType]),
+		{ is: () => createBoolean(false) },
+	) as unknown as AnyType
 
 // NOTE: A Case value is deliberately not part of `AnyType` — its `[typeKey]:
 // string` would defeat the tag narrowing every runtime helper rests on — so a
@@ -312,6 +323,42 @@ describe("The structural diff", () => {
 			{ kind: "same", text: "    1," },
 			{ kind: "left", text: "    2," },
 			{ kind: "right", text: "    3," },
+			{ kind: "same", text: "]" },
+		])
+	})
+
+	// NOTE: A Dictionary is walked BY ITS KEYS rather than by position, because
+	// that is what it is read by — so a value that moved is shown under the key
+	// that holds it, and a key only one side has arrives on a line of its own.
+	// The `key = value` shape inside brackets is the written form, which is what
+	// `getStringRepresentation` answers for a whole Dictionary too.
+	test("walks a Dictionary key by key", () => {
+		let left = dictionary(
+			["team", string("Lions")],
+			["points", integer(19)],
+		)
+		let right = dictionary(
+			["team", string("Lions")],
+			["points", integer(16)],
+		)
+
+		expect(structuralDiff(left, right)).toEqual([
+			{ kind: "same", text: "[" },
+			{ kind: "same", text: '    "team" = "Lions",' },
+			{ kind: "left", text: '    "points" = 19,' },
+			{ kind: "right", text: '    "points" = 16,' },
+			{ kind: "same", text: "]" },
+		])
+	})
+
+	test("names a Dictionary key only one of them holds", () => {
+		let left = dictionary(["team", string("Lions")])
+		let right = dictionary(["points", integer(16)])
+
+		expect(structuralDiff(left, right)).toEqual([
+			{ kind: "same", text: "[" },
+			{ kind: "left", text: '    "team" = "Lions",' },
+			{ kind: "right", text: '    "points" = 16,' },
 			{ kind: "same", text: "]" },
 		])
 	})

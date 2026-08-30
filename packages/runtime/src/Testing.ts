@@ -19,6 +19,7 @@ import {
 	nextWord,
 	seedOf,
 } from "./Randomness"
+import { kindOf } from "./registry"
 import type { StringType } from "./String"
 import {
 	getStringRepresentation,
@@ -1596,6 +1597,28 @@ function diffValue(
 			`]${suffix}`,
 			false,
 		)
+	}
+
+	// NOTE: A kind neither arm above names may still have said how it is taken
+	// apart — the registry in `registry.ts` is where a container's own module
+	// leaves that, and probing it here rather than writing an arm is what keeps
+	// a container's difference in the container's module. A Dictionary is the
+	// one such kind today: it is walked BY ITS KEYS, which is what it is read
+	// by — so a difference shows the one entry that moved surrounded by the
+	// ones that did not, and an entry only one side holds arrives on a line of
+	// its own.
+	if (sameTag(left, right)) {
+		let kind = kindOf(String(left[typeKeySymbol]))
+
+		if (kind !== undefined) {
+			return diffEntries(
+				kind.parts(left, render),
+				kind.parts(right, render),
+				indent,
+				`${label}${kind.open}`,
+				`${kind.close}${suffix}`,
+			)
+		}
 	}
 
 	if (isCase(left) && isCase(right) && sameTag(left, right)) {

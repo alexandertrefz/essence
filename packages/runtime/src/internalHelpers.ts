@@ -9,6 +9,7 @@ import { itemOfView, viewOf } from "./List"
 import type { RationalType } from "./Rational"
 import type { RecordType } from "./Record"
 import { is as recordIs } from "./Record"
+import { kindOf } from "./registry"
 import type { StringType } from "./String"
 import { createString, normalisedFormOf } from "./String"
 import type { TranscendentalType } from "./Transcendental"
@@ -248,7 +249,22 @@ export function anyIs(a: AnyType, b: AnyType): boolean {
 
 			return true
 		}
-		default:
+		default: {
+			// NOTE: A kind no cell above names may still have said how two of
+			// its values compare — the registry in `registry.ts` is where a
+			// container's own module leaves that, and probing it HERE is what
+			// keeps this ladder the whole cost of equality for a Program that
+			// holds none of them. A Dictionary is the one such kind today: it
+			// is compared by the entries it holds rather than by the slots,
+			// versions and generation a box is made of, so falling through to
+			// the structural comparison below would have made a Dictionary
+			// unequal to its own copy.
+			let kind = kindOf(aTag)
+
+			if (kind !== undefined) {
+				return kind.equals(a, b, anyIs)
+			}
+
 			// NOTE: Case values (`Ordering#Less`, `CalculatorOperation#Add`) —
 			// the tag decides the Case (nominal) and it has already decided,
 			// since the two tags are the same one; the payload members compare
@@ -260,6 +276,7 @@ export function anyIs(a: AnyType, b: AnyType): boolean {
 						b as unknown as RecordType,
 					).value
 				: false
+		}
 	}
 }
 
@@ -310,6 +327,7 @@ type DescriptorNode =
 	| { k: "eq" }
 	| { k: "w"; i: number }
 	| { k: "list"; of: DescriptorNode }
+	| { k: "dictionary"; key: DescriptorNode; value: DescriptorNode }
 	| { k: "record"; m: Record<string, DescriptorNode> }
 	| { k: "case"; m: Record<string, DescriptorNode> }
 	// NOTE: `shape` is carried by exactly the arms one tag can not tell apart —
@@ -436,6 +454,28 @@ function memberEqual(
 			}
 
 			return true
+		}
+		case "dictionary": {
+			// NOTE: Answered by the kind registry rather than here, for the
+			// reason `anyIs` probes it: this walk is carried by every Program
+			// whose Choice or Record holds a Type Parameter, and the
+			// order-insensitive matching a Dictionary needs is a dozen lines
+			// that belong to the container. `kindOf` can only answer nothing
+			// where no Dictionary was ever built, and a descriptor naming one
+			// is a Program that builds one.
+			let kind = kindOf((a as AnyType)[typeKeySymbol])
+
+			return (
+				kind !== undefined &&
+				kind.equalsBy(
+					a,
+					b,
+					(first, second) =>
+						memberEqual(first, second, node.key, witnesses),
+					(first, second) =>
+						memberEqual(first, second, node.value, witnesses),
+				)
+			)
 		}
 		case "record":
 			return membersEqual(a, b, node.m, witnesses)
