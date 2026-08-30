@@ -2092,11 +2092,26 @@ export class Printer {
 		])
 	}
 
+	// NOTE: The brackets are read off the NODE and never guessed at: `[d with
+	// other]` and `{ record with other }` are the same shape with different
+	// meanings, and printing one as the other would rewrite what the file says.
+	// See `parser.CombinationNode.brackets`.
 	private printCombination(node: parser.CombinationNode): Doc {
-		let bare =
-			node.rhs.nodeType === "RecordValue" &&
-			node.rhs.type === null &&
-			!this.source.slice(node.rhs.position).trimStart().startsWith("{")
+		let brackets = node.brackets === true
+		// NOTE: Whether the right side is the update's OWN key list rather than
+		// a whole value merged into it. The two are the same Node kind — `[ages
+		// with "kim" = 7]` and `[ages with ["kim" = 7]]` both hold a Dictionary
+		// there, and the braced pair both hold a Record — and they differ by a
+		// Position and by nothing else, so the safety gate would not catch
+		// printing one as the other and what that would do is delete or invent
+		// a pair of brackets somebody wrote.
+		//
+		// So the Parser says: it is the one place that knows which reading it
+		// took. Asking the SOURCE instead is what this used to do, and a key
+		// that is itself written in brackets answered it wrong — a bare key
+		// list's Position starts at its FIRST KEY, so `[d with [3, 4] = "b"]`
+		// read as a whole value and printed as `[d with [[3, 4] = "b"]]`.
+		let bare = node.bare === true
 
 		// NOTE: A Combination too wide for its line opens like a Record: the
 		// base on a line of its own, the members it overrides indented below
@@ -2106,25 +2121,33 @@ export class Printer {
 			? indent(
 					concat([
 						line,
-						this.recordInterior(node.rhs as parser.RecordValueNode)
-							.interior,
+						node.rhs.nodeType === "DictionaryValue"
+							? this.dictionaryInterior(node.rhs).interior
+							: this.recordInterior(
+									node.rhs as parser.RecordValueNode,
+								).interior,
 					]),
 				)
 			: concat([text(" "), this.printExpression(node.rhs)])
 
+		// NOTE: Brackets hold no padding and braces do — `[ages with "kim" = 7]`
+		// beside `{ config with port = 1 }` — which is the same rule a Literal
+		// of each is printed by: `["a", "b"]` and `{ a = 1, b = 2 }`.
+		let opening = brackets ? softline : line
+
 		return group(
 			concat([
-				text("{"),
+				text(brackets ? "[" : "{"),
 				indent(
 					concat([
-						line,
+						opening,
 						this.printExpression(node.lhs),
 						text(" with"),
 						right,
 					]),
 				),
-				line,
-				text("}"),
+				opening,
+				text(brackets ? "]" : "}"),
 			]),
 		)
 	}
@@ -2326,6 +2349,9 @@ export class Printer {
 
 			case "ListValue":
 				return this.printList(node)
+
+			case "DictionaryValue":
+				return this.printDictionary(node)
 
 			case "FunctionValue":
 				return this.printFunctionDefinition(
@@ -2577,6 +2603,63 @@ export class Printer {
 			]),
 			{ shouldBreak: commented, expandable: true },
 		)
+	}
+
+	// NOTE: A Dictionary is a list of THINGS and never fills the way a List of
+	// Numbers does — `"alex" = 39` is two values and a `=`, which nobody reads
+	// four to a line — so it breaks one entry to a line like every other list.
+	// Everything else about the layout is a List's, down to the trailing comma
+	// and to a Comment among the entries forcing the break.
+	//
+	// `[=]` is one token to a reader and prints as one: there is nothing inside
+	// it to lay out, and the `=` is what says it is a Dictionary rather than the
+	// empty List.
+	private printDictionary(node: parser.DictionaryValueNode): Doc {
+		if (node.entries.length === 0) {
+			return text("[=]")
+		}
+
+		let { interior, commented } = this.dictionaryInterior(node)
+
+		return group(
+			concat([
+				text("["),
+				indent(concat([softline, interior])),
+				softline,
+				text("]"),
+			]),
+			{ shouldBreak: commented, expandable: true },
+		)
+	}
+
+	// NOTE: The entries alone, without the brackets — which the Literal above
+	// writes and an update writes for itself, exactly as `recordInterior` serves
+	// both a Record Literal and the key list after a `with`.
+	private dictionaryInterior(node: parser.DictionaryValueNode): {
+		interior: Doc
+		commented: boolean
+	} {
+		let items = this.listItems(
+			node.entries,
+			(entry) => entry.position,
+			(entry) => this.printDictionaryEntry(entry),
+		)
+
+		return this.listInterior(
+			items,
+			this.trivia.takeBefore(node.position.end.line),
+		)
+	}
+
+	// NOTE: `key = value`, the Record member's shape with an Expression where
+	// the member's name stands. Both halves are printed rather than sliced: a
+	// key is an Expression like any other and lays itself out like one.
+	private printDictionaryEntry(entry: parser.DictionaryEntryNode): Doc {
+		return concat([
+			this.printExpression(entry.key),
+			text(" = "),
+			this.printExpression(entry.value),
+		])
 	}
 
 	// #endregion
@@ -3144,6 +3227,7 @@ function isBlockLike(node: parser.ExpressionNode): boolean {
 		node.nodeType === "FunctionValue" ||
 		node.nodeType === "RecordValue" ||
 		node.nodeType === "ListValue" ||
+		node.nodeType === "DictionaryValue" ||
 		node.nodeType === "Combination"
 	)
 }

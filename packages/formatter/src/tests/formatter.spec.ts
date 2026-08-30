@@ -91,6 +91,7 @@ const REFUSED = new Set([
 	"diagnostics/MemberPathSyntax.es",
 	"diagnostics/RecordShorthand.es",
 	"diagnostics/PathKeySyntax.es",
+	"diagnostics/DictionarySyntax.es",
 	"diagnostics/TestsSyntax.es",
 ])
 
