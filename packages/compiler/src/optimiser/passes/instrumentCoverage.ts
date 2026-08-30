@@ -281,9 +281,11 @@ function instrumentExpression(
 // NOTE: `refinement` rides the arm's own claim, and the `otherwise` arm rides
 // what the arms ABOVE it left behind — it is reached by a value every one of
 // their Conditions declined, so it stands behind a doorway exactly when one of
-// those complements established something. The same reading
-// `instrumentStatement` gives an `else`, asked of the claim that is actually
-// about the fallback.
+// those complements established something. That is a reading of its own and not
+// the one `instrumentStatement` gives an `else`: an `if` marks BOTH halves with
+// the Conditional's single `narrows`, where an arm carries a claim apart from
+// its neighbours and the fallback carries their complements. The same question —
+// whether this path is a doorway — answered from the evidence each shape has.
 function instrumentArms(
 	node: common.typedSimple.DefineNode,
 	mark: Mark,

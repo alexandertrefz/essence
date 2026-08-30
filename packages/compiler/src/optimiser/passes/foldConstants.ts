@@ -87,14 +87,21 @@ const MAXIMUM_FOLDED_DIGITS = 4096
 const MAXIMUM_FOLDED_MAGNITUDE = 10n ** BigInt(MAXIMUM_FOLDED_DIGITS)
 
 // NOTE: A `define` is not among these, deliberately. Folding an arm whose
-// Condition is decided would drop the arms below it — and the only Condition
-// this pass could ever find decided in one is a `true` or a `false` the AUTHOR
-// wrote: nothing here folds through a name a Program bound, and every Condition
-// an earlier pass lowered has already been unwrapped by `unbox-conditions` into
-// a RAW test, which the rule below never folds. `as VALUE if true` is the shape
-// the Node exists to avoid, nothing in the repository writes one, and the fold
-// would trade an arm a coverage counter stands in for an emission nobody
-// produces. An `if` is left alone for exactly the same reasons.
+// Condition is decided would drop the arms below it, and what it would buy is
+// an emission nobody produces: `as VALUE if true` is the shape the Node exists
+// to avoid, nothing in the repository writes one, and the arm it would drop is
+// one a coverage counter stands in. An `if` is left alone for exactly the same
+// reasons.
+//
+// NOTE: The Condition itself is folded like any other Expression, and neither
+// reading of it asks whether another pass ran. A lowered Condition is an
+// `essence-boolean` around a raw test: unboxed, it IS that raw test and the
+// rule below never folds one, so there is nothing here to fold; still boxed, it
+// folds to a Boolean the Rewriter reads `.value` off, which is what a Condition
+// nobody unboxed has always been emitted as. Either way the Node keeps every arm
+// it was written with, and the same collapse stands at the same point in the
+// order for an `if` — this is that story over again rather than one the `define`
+// brought with it.
 function fold(
 	node: common.typedSimple.ExpressionNode,
 	shadowed: ReadonlySet<string>,
