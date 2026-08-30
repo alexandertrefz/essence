@@ -298,6 +298,7 @@ export type DiagnosticCode =
 	| "indistinguishable-default-parameter"
 	| "ambiguous-overload-default"
 	| "fallback-never-used"
+	| "redundant-key-check"
 	// Choices and their Cases.
 	| "empty-choice"
 	| "unknown-case"
