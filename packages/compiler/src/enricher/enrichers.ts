@@ -3562,6 +3562,12 @@ export function enrichDefine(
 ): common.typed.DefineNode {
 	let declaredType =
 		node.returnType === null ? null : resolveType(node.returnType, scope)
+	// NOTE: The Type every arm is READ AGAINST, which is not what the `define`
+	// answers with — pushing a Type into the arms and answering with it are two
+	// different things. This is the pushing: it is what lets a bare Case arm
+	// resolve against the Choice the position named, and a position may push
+	// down a Type no value ever has, an offer of two spellings among them. What
+	// the `define` answers with is settled below, off the arms.
 	let answerType = declaredType ?? expectedType
 	// NOTE: The Scope the NEXT arm is read in — the one it stands in plus every
 	// complement the arms above it left behind. A complement that established
@@ -3659,21 +3665,26 @@ export function enrichDefine(
 		position: node.otherwise.position,
 	}
 
-	// NOTE: The Union of what the arms answer with — the `otherwise` arm's own
-	// Type among them, since it is one of the answers — and only where nothing
-	// else decided. Where something did, THAT is the answer Type: every arm was
-	// read against it, and a bare Case arm has no Type of its own to union in.
+	// NOTE: Every value this `define` answers with, the `otherwise` arm's among
+	// them: it is one of the answers, and everything below asks the same
+	// question of all of them.
+	let answers = [...arms.map((arm) => arm.value), otherwise.value]
+
+	// NOTE: The arrow first, because it is a CLAIM about this `define` and the
+	// position around it is only an OFFER — `settledAnswerType` is what reads
+	// the offer, and a claim is not read but taken. Then the Union of what the
+	// arms answer with, where neither said anything.
 	//
 	// `unionOfTypes` answers null only for an empty list of Types, which this
 	// can never be: a `define` without an `otherwise` arm is not a Node the
 	// Parser can build. The fallback is written out rather than asserted away
 	// all the same.
 	let type =
-		answerType ??
-		unionOfTypes([
-			...arms.map((arm) => arm.value.type),
-			otherwise.value.type,
-		]) ??
+		declaredType ??
+		(expectedType === null
+			? null
+			: settledAnswerType(expectedType, answers)) ??
+		unionOfTypes(answers.map((answer) => answer.type)) ??
 		otherwise.value.type
 
 	if (undecided !== null) {
@@ -3687,6 +3698,60 @@ export function enrichDefine(
 		position: node.position,
 		type,
 	}
+}
+
+// NOTE: What a `define` answers with where the position around it spoke. A
+// position OFFERS rather than claims, and an anonymous Union offers each of its
+// members: a Case payload slot offers the one-member Record and the member's own
+// Type at once — two spellings of one payload, which is exactly what
+// `expectedPayloadType` hands down — and a Declaration annotated
+// `Integer | String` offers either of the two. What the `define` answers with is
+// the offers its arms TOOK.
+//
+// Pushing the offer into the arms and answering with it are two different
+// things, and this is the second of them. A ladder of Integers under a payload
+// slot is read against both spellings and answers Integer, which
+// `wrapSingleMemberShorthand` then wraps into the Record the Case carries; the
+// whole offer taken as the answer said `{ item: Integer } | Integer`, which is
+// neither spelling and fits no Case at all.
+//
+// A NAMED Union is one Type and not a list of offers — its name is its spelling,
+// the same reading `buildUnion` gives one — so it is taken whole, and so is
+// every Type that is no Union.
+//
+// The whole offer stands where an ARM took none of it: that arm disagrees with
+// the position, and the Validator holds every arm to this Type. Narrowing here
+// would hold the disagreeing arm to the offers the OTHER arms took and report it
+// against something the position never said.
+function settledAnswerType(
+	expectedType: common.Type,
+	answers: Array<common.typed.ExpressionNode>,
+): common.Type {
+	let offered =
+		expectedType.type === "UnionType" &&
+		expectedType.name === undefined &&
+		expectedType.alias === undefined
+			? expectedType.types
+			: [expectedType]
+
+	if (offered.length < 2) {
+		return expectedType
+	}
+
+	let taken = offered.filter((offer) =>
+		answers.some((answer) => fitsWritten(offer, answer)),
+	)
+
+	if (
+		taken.length === offered.length ||
+		!answers.every((answer) =>
+			taken.some((offer) => fitsWritten(offer, answer)),
+		)
+	) {
+		return expectedType
+	}
+
+	return buildUnion(taken)
 }
 
 // NOTE: An arm answered with something that decides no Type of its own — a bare

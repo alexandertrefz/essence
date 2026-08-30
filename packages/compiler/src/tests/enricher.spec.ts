@@ -9448,6 +9448,10 @@ describe("Enricher", () => {
 				).toBe("Integer")
 			})
 
+			// NOTE: The position OFFERS where the arrow claims, and an
+			// anonymous Union offers each of its members — so what a `define`
+			// answers with is the offers its arms took. Both are taken here,
+			// which is the annotation over again.
 			it("should take the position's Type where there is no arrow", () => {
 				expect(
 					defineTypeOf(`implementation {
@@ -9455,7 +9459,43 @@ describe("Enricher", () => {
 
 						constant scored: Integer | String = define {
 							as 1 if flag
+							as "none" otherwise
+						}
+					}`),
+				).toBe("Integer | String")
+			})
+
+			// NOTE: A ladder of Integers under `Integer | String` answers
+			// Integer, and nothing is lost by that: the position said either may
+			// stand there, and an Integer is one of them. Adopting the whole
+			// offer instead is what refused a `define` in a one-member Case
+			// payload, whose position offers two SPELLINGS of one payload.
+			it("should answer with only the offers its arms took", () => {
+				expect(
+					defineTypeOf(`implementation {
+						constant flag = true
+
+						constant scored: Integer | String = define {
+							as 1 if flag
 							as 2 otherwise
+						}
+					}`),
+				).toBe("Integer")
+			})
+
+			// NOTE: An arm that took none of the offers disagrees with the
+			// POSITION, and every arm is held to the Type the `define` answers
+			// with — so the whole offer stands, and the Validator reports the
+			// disagreement against what the position actually said rather than
+			// against the offers the other arms happened to take.
+			it("should keep the whole offer where an arm took none of it", () => {
+				expect(
+					defineTypeOf(`implementation {
+						constant flag = true
+
+						constant scored: Integer | String = define {
+							as 1 if flag
+							as true otherwise
 						}
 					}`),
 				).toBe("Integer | String")
@@ -9474,6 +9514,110 @@ describe("Enricher", () => {
 						}
 					}`),
 				).toBe("Integer | String")
+			})
+		})
+
+		// NOTE: A one-member Case's payload slot offers two spellings of one
+		// payload at once — the Record the Case carries and the member's own
+		// Type — and the value settles which of them it is. A `define` that
+		// answered with BOTH settled nothing: it fitted neither spelling, and
+		// every single-member Case in the language refused one.
+		describe("The answer Type inside a Case payload", () => {
+			// NOTE: The Type the payload reached the Case with. A one-member
+			// shorthand is wrapped into the Record the Case carries, so this is
+			// that Record either way — and `lastConstantValue` asks for a clean
+			// Program on the way past.
+			function payloadTypeOf(source: string): string {
+				let value = lastConstantValue(source)
+
+				if (value.nodeType !== "CaseValue" || value.value === null) {
+					throw new Error(
+						"Last Constant is no Case carrying a payload.",
+					)
+				}
+
+				return printType(value.value.type)
+			}
+
+			it("should answer with the member's Type in a one-member Case", () => {
+				expect(
+					payloadTypeOf(`implementation {
+						constant n = 4
+
+						constant maybe: Optional<Integer> = #Value(define {
+							as 1 if n::isEven()
+							as 2 otherwise
+						})
+					}`),
+				).toBe("{ item: Integer }")
+			})
+
+			it("should answer with the Record a multi-member Case carries", () => {
+				expect(
+					payloadTypeOf(`implementation {
+						choice Span {
+							Range { from: Integer, to: Integer },
+							Whole,
+						}
+
+						constant flag = true
+
+						constant span: Span = #Range(define {
+							as { from = 1, to = 2 } if flag
+							as { from = 3, to = 4 } otherwise
+						})
+					}`),
+				).toBe("{ from: Integer, to: Integer }")
+			})
+
+			// NOTE: The Record spelling written out, which the shorthand is only
+			// a shorter way of saying — the `define` stands in the member's own
+			// position there and never sees the two spellings at all.
+			it("should read the long form as it always did", () => {
+				expect(
+					payloadTypeOf(`implementation {
+						constant flag = true
+
+						constant maybe: Optional<Integer> = #Value({
+							item = define {
+								as 1 if flag
+								as 2 otherwise
+							}
+						})
+					}`),
+				).toBe("{ item: Integer }")
+			})
+
+			it("should take an arrow inside a payload", () => {
+				expect(
+					payloadTypeOf(`implementation {
+						constant flag = true
+
+						constant maybe: Optional<Integer> = #Value(define -> Integer {
+							as 1 if flag
+							as 2 otherwise
+						})
+					}`),
+				).toBe("{ item: Integer }")
+			})
+
+			// NOTE: The other direction — a `define` whose arms are bare Cases
+			// answers with the Choice the position named, because a bare Case
+			// decides no Type Arguments of its own and the offer is what it is
+			// read against. Pushing the position's Type into the arms is what
+			// this needs, and it is untouched by what the `define` then answers
+			// with.
+			it("should let a bare Case arm resolve from the position", () => {
+				expect(
+					defineTypeOf(`implementation {
+						constant flag = true
+
+						constant maybe: Optional<Integer> = define {
+							as #Value(1) if flag
+							as #Empty otherwise
+						}
+					}`),
+				).toBe("Optional<Integer>")
 			})
 		})
 	})

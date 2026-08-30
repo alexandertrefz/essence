@@ -724,6 +724,28 @@ describe("Code Generation", () => {
 			).toEqual(['"one"', '"many"', '"none"'])
 		})
 
+		// NOTE: The payload slot of a one-member Case offers the Record the
+		// Case carries and the member's own Type at once, and the `define`
+		// settles which of them it answers with — so what reaches the runtime
+		// is the member's value, wrapped into the Record exactly as
+		// `#Value(1)` is.
+		it("answers with the payload of a one-member Case", async () => {
+			expect(
+				await run(`
+					implementation {
+						constant n = 4
+
+						constant maybe: Optional<Integer> = #Value(define {
+							as 1 if n::isEven()
+							as 2 otherwise
+						})
+
+						Terminal.inspect(maybe)
+					}
+				`),
+			).toEqual(["Optional#Value(1)"])
+		})
+
 		it("emits a chain of conditionals rather than a Function to call", () => {
 			let generated = generate(
 				`implementation {
