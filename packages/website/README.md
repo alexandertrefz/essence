@@ -27,7 +27,7 @@ package's own `tsconfig.json` type-checks `src/` for the editor.
 | `astro.config.ts` | site URL, MDX, and the Shiki setup |
 | `src/content.config.ts` | the `docs` collection's schema |
 | `src/content/docs/` | the published documentation pages, by section |
-| `diagnostics.md`, `optimisations.md`, `protocols.md`, `records.md` | the reference pages the doc gates hold to account, not yet published |
+| `diagnostics.md`, `dictionaries.md`, `optimisations.md`, `protocols.md`, `records.md` | the reference pages the doc gates hold to account, not yet published |
 | `src/layouts/`, `src/components/` | the page shells and the design's parts |
 | `src/styles/` | `tokens.css` (both themes), `base.css`, `prose.css`, `shiki.css` |
 | `src/lib/` | navigation, site constants, the two Shiki theme JSONs |
@@ -67,7 +67,7 @@ being re-verified against the current compiler before they go up — several of
 their samples were written against an older standard library. The routes the
 chrome will point at when they land are listed in `src/lib/site.ts`.
 
-The four markdown pages at the root of this package are the reference the doc
+The five markdown pages at the root of this package are the reference the doc
 gates read. They stay where they are, unpublished, until their Astro
 counterparts land, so the gates keep holding.
 
