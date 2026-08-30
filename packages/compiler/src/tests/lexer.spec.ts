@@ -682,6 +682,38 @@ describe("Lexer", () => {
 			expect(stripPosition(lexer.next())).toEqual(output)
 		})
 
+		it("should lex define", () => {
+			let lexer = new Lexer()
+			let input: string
+			let output: SimpleToken
+
+			input = "define"
+			output = {
+				value: "define",
+				type: TokenType.KeywordDefine,
+			}
+
+			lexer.reset(input)
+
+			expect(stripPosition(lexer.next())).toEqual(output)
+		})
+
+		it("should lex otherwise", () => {
+			let lexer = new Lexer()
+			let input: string
+			let output: SimpleToken
+
+			input = "otherwise"
+			output = {
+				value: "otherwise",
+				type: TokenType.KeywordOtherwise,
+			}
+
+			lexer.reset(input)
+
+			expect(stripPosition(lexer.next())).toEqual(output)
+		})
+
 		it("should lex with", () => {
 			let lexer = new Lexer()
 			let input: string

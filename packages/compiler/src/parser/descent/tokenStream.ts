@@ -124,6 +124,8 @@ const tokenTypeLexemes: { [tokenType in lexer.TokenType]?: string } = {
 	[TokenType.KeywordOverload]: "overload",
 	[TokenType.KeywordMatch]: "match",
 	[TokenType.KeywordCase]: "case",
+	[TokenType.KeywordDefine]: "define",
+	[TokenType.KeywordOtherwise]: "otherwise",
 	[TokenType.KeywordWith]: "with",
 	[TokenType.KeywordNamespace]: "namespace",
 	[TokenType.KeywordProtocol]: "protocol",
