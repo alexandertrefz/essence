@@ -588,65 +588,249 @@ describe("formatter", () => {
 	})
 
 	// NOTE: A `define` is a table of cases, so it is written one arm to a line
-	// whatever it would fit on — the shape a reader scans down. Lining the `if`
-	// column up across a run of arms is a separate question and not asked here.
+	// whatever it would fit on — the shape a reader scans down — and the `if` of
+	// a run of adjacent arms is written in one column, `otherwise` among them.
 	describe("Define", () => {
-		it("round-trips a define written the way it is printed", () => {
-			let source = [
-				"implementation {",
-				"\tconstant grade = define {",
-				'\t\tas "A" if score::isGreaterThanOrEqualTo(90)',
-				'\t\tas "B" if score::isGreaterThanOrEqualTo(80)',
-				'\t\tas "F" otherwise',
-				"\t}",
-				"}",
-				"",
-			].join("\n")
+		let block = (...lines: Array<string>) =>
+			["implementation {", ...lines, "}", ""].join("\n")
 
-			let result = format(source)
+		// NOTE: Every source here is written the way the printer writes it, so
+		// the source IS the expected output. Formatted twice on top of that,
+		// because a column that shifts on the second pass is caught by the
+		// gate as a refusal — which says that something moved, and nothing at
+		// all about which column it was.
+		let roundTrips = (source: string) => {
+			let once = format(source)
 
-			expect(result.refusal).toBeNull()
-			expect(result.text).toBe(source)
+			expect(once.refusal).toBeNull()
+			expect(once.text).toBe(source)
+
+			let twice = format(once.text)
+
+			expect(twice.refusal).toBeNull()
+			expect(twice.text).toBe(once.text)
+		}
+
+		it("lines the if column up across a run of arms", () => {
+			roundTrips(
+				block(
+					"\tconstant grade = define {",
+					'\t\tas "A"       if score::isGreaterThanOrEqualTo(90)',
+					'\t\tas "B"       if score::isGreaterThanOrEqualTo(80)',
+					'\t\tas "unrated" otherwise',
+					"\t}",
+				),
+			)
 		})
 
-		it("round-trips a declared answer Type", () => {
-			let source = [
-				"implementation {",
-				"\tconstant grade = define -> String {",
-				'\t\tas "A" if score::isGreaterThanOrEqualTo(90)',
-				'\t\tas "F" otherwise',
-				"\t}",
-				"}",
-				"",
-			].join("\n")
-
-			let result = format(source)
-
-			expect(result.refusal).toBeNull()
-			expect(result.text).toBe(source)
-		})
-
-		it("writes a define written flat one arm to a line", () => {
+		it("pads a run written without its column", () => {
 			let result = format(
-				[
-					"implementation {",
-					"\tconstant grade = define { as 1 if flag as 0 otherwise }",
-					"}",
-					"",
-				].join("\n"),
+				block(
+					"\tconstant grade = define {",
+					'\t\tas "A" if score::isGreaterThanOrEqualTo(90)',
+					'\t\tas "unrated" otherwise',
+					"\t}",
+				),
 			)
 
 			expect(result.refusal).toBeNull()
 			expect(result.text).toBe(
-				[
-					"implementation {",
+				block(
+					"\tconstant grade = define {",
+					'\t\tas "A"       if score::isGreaterThanOrEqualTo(90)',
+					'\t\tas "unrated" otherwise',
+					"\t}",
+				),
+			)
+		})
+
+		it("round-trips a declared answer Type", () => {
+			roundTrips(
+				block(
+					"\tconstant grade = define -> String {",
+					'\t\tas "A"       if score::isGreaterThanOrEqualTo(90)',
+					'\t\tas "unrated" otherwise',
+					"\t}",
+				),
+			)
+		})
+
+		it("writes a define written flat one arm to a line", () => {
+			let result = format(
+				block(
+					"\tconstant grade = define { as 1 if flag as 0 otherwise }",
+				),
+			)
+
+			expect(result.refusal).toBeNull()
+			expect(result.text).toBe(
+				block(
 					"\tconstant grade = define {",
 					"\t\tas 1 if flag",
 					"\t\tas 0 otherwise",
 					"\t}",
-					"}",
+				),
+			)
+		})
+
+		// NOTE: `otherwise` is the last arm's case, so the arm is in the run
+		// and a `define` that has only that arm is a run of one — which
+		// `alignRun` leaves alone, the way it leaves a lone Declaration alone.
+		it("leaves a define of one arm unpadded", () => {
+			roundTrips(
+				block(
+					"\tconstant grade = define {",
+					"\t\tas 1 otherwise",
+					"\t}",
+				),
+			)
+		})
+
+		// NOTE: `alignRun`'s own rule, reached through a `define`: a run whose
+		// answers span more than `MAX_ALIGNMENT_PADDING` is split into blocks
+		// that each line up on their own, rather than dragging the short ones
+		// across the line to meet the wide ones.
+		it("splits a run whose answers are too far apart in width", () => {
+			roundTrips(
+				block(
+					"\tconstant grade = define {",
+					'\t\tas "a"  if one',
+					'\t\tas "bb" if two',
+					'\t\tas "a rather wider answer"   if three',
+					'\t\tas "another wide-ish answer" if four',
+					'\t\tas "F" otherwise',
+					"\t}",
+				),
+			)
+		})
+
+		it("breaks before the if when the arm runs past the width", () => {
+			roundTrips(
+				block(
+					"\tconstant grade = define {",
+					'\t\tas "an answer that runs on and on and on and on"',
+					"\t\t\tif score::isGreaterThanOrEqualTo(90)",
+					'\t\tas "B" if score::isGreaterThanOrEqualTo(80)',
+					'\t\tas "F" otherwise',
+					"\t}",
+				),
+			)
+		})
+
+		// NOTE: The padding of an arm that breaks is written in front of the
+		// break, where it holds no column open and the line-end trimming takes
+		// it away. A stranded run of spaces at the end of a line would be
+		// invisible here and fatal to the second pass, which is what the
+		// explicit check is for.
+		it("takes the padding of a broken arm away with the break", () => {
+			let source = block(
+				"\tconstant grade = define {",
+				'\t\tas "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"',
+				"\t\t\tif score::isGreaterThanOrEqualTo(90)",
+				'\t\tas "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"',
+				"\t\t\tif score::isGreaterThanOrEqualTo(80)",
+				'\t\tas "ccccccccccccccccccccccccccccccccccccccccccc"   otherwise',
+				"\t}",
+			)
+
+			roundTrips(source)
+			expect(format(source).text).not.toMatch(/[ \t]\n/)
+		})
+
+		// NOTE: An answer that lays itself out over several lines has no column
+		// to be measured against, so it ends the run — and keeps its own `if`
+		// against the brace it closes with, the way an `else` is written.
+		it("ends the run at an answer that opens a block", () => {
+			roundTrips(
+				block(
+					"\tconstant grade = define {",
+					'\t\tas "aa" if one',
+					"\t\tas match value -> String {",
+					'\t\t\tcase 1 { <- "one" }',
+					'\t\t\tcase _ { <- "other" }',
+					"\t\t} if two",
+					'\t\tas "cccc" if three',
+					'\t\tas "F"    otherwise',
+					"\t}",
+				),
+			)
+		})
+
+		// NOTE: `otherwise` never breaks away from its answer: there is nothing
+		// after it for a break to buy room for, so the answer gives way inside
+		// itself instead.
+		it("keeps otherwise on the line its answer ends on", () => {
+			roundTrips(
+				block(
+					"\tconstant grade = define {",
+					'\t\tas "a" if one',
+					"\t\tas someCall(",
+					"\t\t\talpha,",
+					"\t\t\tbeta,",
+					"\t\t\tgamma,",
+					"\t\t\tdelta,",
+					"\t\t\tepsilon,",
+					"\t\t\tzeta,",
+					"\t\t\teta,",
+					"\t\t\ttheta,",
+					"\t\t) otherwise",
+					"\t}",
+				),
+			)
+		})
+
+		it("aligns a define hugged as a trailing Argument", () => {
+			roundTrips(
+				block(
+					"\tconstant grade = scores::map(define {",
+					'\t\tas "A"       if score::isGreaterThanOrEqualTo(90)',
+					'\t\tas "unrated" otherwise',
+					"\t})",
+				),
+			)
+		})
+
+		it("aligns a define inside a define", () => {
+			roundTrips(
+				block(
+					"\tconstant grade = define {",
+					"\t\tas define {",
+					'\t\t\tas "one"  if value::is(1)',
+					'\t\t\tas "many" otherwise',
+					"\t\t} if value::isPositive()",
+					'\t\tas "none" otherwise',
+					"\t}",
+				),
+			)
+		})
+
+		// NOTE: A blank line between two Declarations ends their alignment run,
+		// because it is how an author says that two groups of them are not one.
+		// Two arms are two rows of one table, and no amount of space between
+		// them makes the table two tables.
+		it("keeps a blank line from ending the run", () => {
+			roundTrips(
+				block(
+					"\tconstant grade = define {",
+					'\t\tas "A"       if one',
 					"",
-				].join("\n"),
+					'\t\tas "unrated" otherwise',
+					"\t}",
+				),
+			)
+		})
+
+		// NOTE: A trailing Comment is written as a line suffix and never
+		// measured, so how long the note at the end of an arm is must not be
+		// what decides the column in front of it.
+		it("keeps a Comment at the end of an arm out of the column", () => {
+			roundTrips(
+				block(
+					"\tconstant grade = define {",
+					'\t\tas "A"       if one § the top',
+					'\t\tas "unrated" otherwise § the rest',
+					"\t}",
+				),
 			)
 		})
 
@@ -655,44 +839,17 @@ describe("formatter", () => {
 		// The safety gate compares each Comment's place among the Tokens around
 		// it, so a Comment claimed in the wrong order refuses the whole file.
 		it("keeps the Comments written around its arms", () => {
-			let source = [
-				"implementation {",
-				"\tconstant grade = define { § the bands",
-				"\t\t§ the top one",
-				'\t\tas "A" if score::isGreaterThanOrEqualTo(90) § and no higher',
-				"",
-				'\t\tas "F" otherwise',
-				"\t\t§ nothing below it",
-				"\t}",
-				"}",
-				"",
-			].join("\n")
-
-			let result = format(source)
-
-			expect(result.refusal).toBeNull()
-			expect(result.text).toBe(source)
-		})
-
-		it("is idempotent over a define inside a define", () => {
-			let once = format(
-				[
-					"implementation {",
-					"\tconstant grade = define {",
-					"\t\tas define {",
-					'\t\t\tas "one" if value::is(1)',
-					'\t\t\tas "many" otherwise',
-					"\t\t} if value::isPositive()",
-					'\t\tas "none" otherwise',
-					"\t}",
-					"}",
+			roundTrips(
+				block(
+					"\tconstant grade = define { § the bands",
+					"\t\t§ the top one",
+					'\t\tas "A"       if score::isGreaterThanOrEqualTo(90) § and no higher',
 					"",
-				].join("\n"),
+					'\t\tas "unrated" otherwise',
+					"\t\t§ nothing below it",
+					"\t}",
+				),
 			)
-			let twice = format(once.text)
-
-			expect(once.refusal).toBeNull()
-			expect(twice.text).toBe(once.text)
 		})
 	})
 

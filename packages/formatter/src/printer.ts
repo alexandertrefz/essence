@@ -2278,10 +2278,28 @@ export class Printer {
 	// written across, so the Comments around it are claimed from its own lines
 	// rather than looked for in the source the way a Match Handler's are.
 	//
-	// NOTE: Lining the `if` column up across the arms is a question for later.
-	// What is here is the shape and nothing else.
+	// NOTE: The `if` of a run of adjacent arms is written in one column, the way
+	// a `match` lines its Handlers' braces up and for the same reason: an arm is
+	// a row of two cells — the answer, and the case that reaches it — and the
+	// second cell is the one a reader scans down. The `otherwise` arm is in the
+	// run: `otherwise` IS its case, written where every other arm's case is
+	// written, and holding it out would leave the last answer — often the widest
+	// of them, since it is the general one — as the one thing in the block that
+	// no column runs through.
+	//
+	// NOTE: A blank line between two arms does not end the run, the way it ends
+	// a run of Declarations. Two Declarations separated by one are two groups
+	// the author kept apart; two arms of a `define` are two rows of one table,
+	// and no amount of space between them makes the table two tables.
 	private printDefine(node: parser.DefineNode): Doc {
 		let entries: Array<Entry> = []
+		let run: Array<AlignedAssignment> = []
+
+		let closeRun = () => {
+			alignRun(run)
+
+			run = []
+		}
 
 		// NOTE: A Comment trailing the `define`'s own `{` — claimed before the
 		// arms are walked, or the first arm's `takeBefore` would stall on it
@@ -2295,7 +2313,7 @@ export class Printer {
 			),
 		)
 
-		// NOTE: `head` is a thunk rather than a Doc, because the trivia cursor
+		// NOTE: `write` is a thunk rather than a Doc, because the trivia cursor
 		// walks the source in order and the arm's own Expressions walk it too:
 		// the Comments written ABOVE an arm have to be claimed before anything
 		// inside it is printed, or a Method chain in the arm claims them and
@@ -2303,13 +2321,35 @@ export class Printer {
 		// claimed first for the same reason, and for the one `claimTrailingOn`
 		// states — the outermost node ending on a line is the one that keeps
 		// the note written at the end of it.
-		let pushArm = (position: common.Position, head: () => Array<Doc>) => {
+		//
+		// NOTE: The padding an arm carries to its block's column is handed to
+		// the thunk rather than taken back from it, because the arm decides
+		// where in itself it goes and the run only decides how wide it is.
+		let pushArm = (
+			position: common.Position,
+			write: (padding: TextDoc) => {
+				doc: Doc
+				headWidth: number | null
+			},
+		) => {
 			for (let comment of this.trivia.takeBefore(position.start.line)) {
 				entries.push(this.commentEntry(comment))
 			}
 
 			let trailing = this.trivia.claimTrailingOn(position.end.line)
-			let doc = concat(head())
+			let padding = text("")
+			let written = write(padding)
+			let doc = written.doc
+
+			// NOTE: An answer with no width to report ends the run rather than
+			// joining it. There is no column to measure it against, and every
+			// sibling padded out to one would be lining up on an `if` that is
+			// nowhere near the answer that reached it.
+			if (written.headWidth === null) {
+				closeRun()
+			} else {
+				run.push({ headWidth: written.headWidth, padding })
+			}
 
 			if (trailing !== null) {
 				doc = concat([doc, lineSuffix(" " + trailing.text)])
@@ -2319,19 +2359,63 @@ export class Printer {
 		}
 
 		for (let arm of node.arms) {
-			pushArm(arm.position, () => [
-				text("as "),
-				this.printExpression(arm.value),
-				text(" if "),
-				this.printExpression(arm.condition),
-			])
+			pushArm(arm.position, (padding) => {
+				let answer = this.printExpression(arm.value)
+				let headWidth = flatWidth(concat([text("as "), answer]))
+				let condition = this.printExpression(arm.condition)
+
+				// NOTE: An answer that lays itself out over several lines keeps
+				// its `if` against the brace it closes with — `} if …`, the way
+				// an `else` is written. Nothing is left of that brace for a
+				// break to buy room for, and the arm is out of the run anyway.
+				if (headWidth === null) {
+					return {
+						doc: concat([
+							text("as "),
+							answer,
+							text(" if "),
+							condition,
+						]),
+						headWidth,
+					}
+				}
+
+				// NOTE: An arm too long for the line breaks before its `if` —
+				// the one seam in it that is not inside one of the two
+				// Expressions. The answer keeps the line it was introduced on,
+				// and the case gets the whole width of the next one. The
+				// padding sits in front of the break, where the line-end
+				// trimming takes it away the moment it is not holding a column
+				// open.
+				return {
+					doc: group(
+						concat([
+							text("as "),
+							answer,
+							padding,
+							indent(concat([line, text("if "), condition])),
+						]),
+					),
+					headWidth,
+				}
+			})
 		}
 
-		pushArm(node.otherwise.position, () => [
-			text("as "),
-			this.printExpression(node.otherwise.value),
-			text(" otherwise"),
-		])
+		// NOTE: `otherwise` never breaks away from its answer, where an `if`
+		// does. Breaking before `if` moves a whole Condition onto a line of its
+		// own and buys the room to write it; breaking before `otherwise` moves
+		// one bare Keyword down and buys nothing — the line is only long
+		// because of the answer that is still on it.
+		pushArm(node.otherwise.position, (padding) => {
+			let answer = this.printExpression(node.otherwise.value)
+
+			return {
+				doc: concat([text("as "), answer, padding, text(" otherwise")]),
+				headWidth: flatWidth(concat([text("as "), answer])),
+			}
+		})
+
+		closeRun()
 
 		this.flushBefore(node.position.end.line, entries)
 
@@ -3125,6 +3209,18 @@ function alignRun(run: Array<AlignedAssignment>): void {
 	}
 
 	flushBlock(run.length)
+}
+
+// NOTE: How wide a Doc reads on one line, or null when it has no such width —
+// it can never be on one line at all, or it holds a multi-line String Literal,
+// which `renderFlat` hands back whole, newlines and all, and which would report
+// a column no line in the output ever reaches.
+function flatWidth(doc: Doc): number | null {
+	let written = renderFlat(doc)
+
+	return written === null || written.includes("\n")
+		? null
+		: stringWidth(written)
 }
 
 // NOTE: The Statements written as `… = …`, which are the ones an alignment run
