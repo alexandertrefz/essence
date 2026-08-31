@@ -108,12 +108,10 @@ implementation {
 
 	§ Volume discount by items in the order.
 	function volumeRate(items: Integer) -> Rational {
-		if items::isGreaterThanOrEqualTo(25) {
-			<- 10/100
-		} else if items::isGreaterThanOrEqualTo(10) {
-			<- 5/100
-		} else {
-			<- 0/1
+		<- define {
+			as 10/100 if items::isGreaterThanOrEqualTo(25)
+			as 5/100  if items::isGreaterThanOrEqualTo(10)
+			as 0/1    otherwise
 		}
 	}
 
