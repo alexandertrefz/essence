@@ -125,12 +125,6 @@ function closingSuffixFor(
 	return suffix
 }
 
-// NOTE: `suffix` is inserted before the closing brackets — e.g. a synthetic
-// member access, or nothing at all when the head alone just needs closing.
-export function buildProbeSource(headText: string, suffix = ""): string {
-	return `${headText}${suffix}${closingSuffixFor(openBrackets(stripNoise(headText)))}`
-}
-
 // NOTE: Closing brackets alone are not enough when one of the open ones is a
 // DECLARATION's parameter list, which is where a `= expression` default is
 // written: `function greet(_ name: String = person` closed with `)}` is a

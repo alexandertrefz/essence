@@ -14,11 +14,6 @@ import { type CommandSpec, DEFAULT_PROGRAM_NAME } from "./commands"
 // two ideas of which files a run was pointed at.
 export const GLOB_PATTERN = /[*?[\]{}]/
 
-export type ResolvedInput = {
-	fileName: string
-	bytes: number
-}
-
 export function looksLikeGlob(value: string): boolean {
 	return GLOB_PATTERN.test(value)
 }
