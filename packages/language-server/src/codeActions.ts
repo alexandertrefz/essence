@@ -24,7 +24,7 @@ import type { Workspace } from "./workspace"
 // same reason; the client's own Diagnostics are only ever used to attach the
 // originating one to the action it produced.
 
-export type CodeActionEdit = {
+type CodeActionEdit = {
 	// NOTE: An insertion is a zero-width range — `start` and `end` at the
 	// same Cursor — so there is one edit shape rather than two.
 	range: common.Position

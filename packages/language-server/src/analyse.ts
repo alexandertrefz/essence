@@ -59,7 +59,7 @@ export type DocumentAnalysis = {
 	index: ProgramIndex | null
 }
 
-export type AnalysisOptions = {
+type AnalysisOptions = {
 	// NOTE: The Editor's open documents answer before disk does — an unsaved
 	// buffer is the only truthful version of a file, and a dependency being
 	// edited in another tab is exactly the case the graph has to see. The entry

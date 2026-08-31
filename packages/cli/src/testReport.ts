@@ -409,7 +409,7 @@ function withoutFrames(error: string): string {
 	return frames === -1 ? error : lines.slice(0, frames).join("\n")
 }
 
-export type SourceLookup = (module: string | null) => string | null
+type SourceLookup = (module: string | null) => string | null
 
 // NOTE: Every failure of a run, rendered. A test whose module's source is not
 // in reach — nothing in a CLI run, but a caller driving the reporter with
@@ -609,7 +609,7 @@ export type MutantRecord = {
 	tests: number
 }
 
-export type MutantCounts = {
+type MutantCounts = {
 	sites: number
 	killed: number
 	survived: number

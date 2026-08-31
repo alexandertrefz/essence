@@ -31,7 +31,7 @@ const MODE_FACETS = [
 	"contracts",
 ] as const
 
-export type CompileModeFacet = (typeof MODE_FACETS)[number]
+type CompileModeFacet = (typeof MODE_FACETS)[number]
 
 export type CompileMode = { [Facet in CompileModeFacet]?: boolean }
 

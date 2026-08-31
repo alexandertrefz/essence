@@ -21,7 +21,7 @@ import * as path from "node:path"
 // stopping at it would make the setting unreachable from exactly the
 // directories a person runs tests in.
 
-export type TestConfiguration = {
+type TestConfiguration = {
 	skipTags: Array<string>
 	// NOTE: Absolute paths a discovery walk never descends into, resolved
 	// against the manifest that named them. A file NAMED on the command line is
@@ -36,7 +36,7 @@ export type TestConfiguration = {
 	contracts: boolean
 }
 
-export type ProjectConfiguration = {
+type ProjectConfiguration = {
 	// NOTE: The file the settings were read from, for `--verbose` and for the
 	// message that says a setting was ignored. Null when nothing said anything.
 	filePath: string | null
@@ -55,7 +55,7 @@ function emptyTestConfiguration(): TestConfiguration {
 	return { skipTags: [], exclude: [], contracts: false }
 }
 
-export const noConfiguration: ProjectConfiguration = {
+const noConfiguration: ProjectConfiguration = {
 	filePath: null,
 	test: emptyTestConfiguration(),
 	problems: [],

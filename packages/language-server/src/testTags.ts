@@ -20,13 +20,13 @@ import type { common, parser } from "@essence-lang/interfaces"
 const MAXIMUM_DISTANCE = 2
 
 // NOTE: The tag's own span, so a rename edits the word and not the Modifier.
-export type TagSite = {
+type TagSite = {
 	tag: string
 	filePath: string
 	position: common.Position
 }
 
-export type TagUsage = {
+type TagUsage = {
 	tag: string
 	// NOTE: How many TESTS carry it, which is not how many places wrote it: a
 	// `suite "…" tagged slow` holding four tests is one site and four tests,
@@ -39,7 +39,7 @@ export type TagUsage = {
 // was written. A test's effective tags are its own plus every enclosing suite's
 // — the same rule the Enricher applies — because a tag on a suite is a tag on
 // what is under it.
-export function tagSitesOf(
+function tagSitesOf(
 	filePath: string,
 	program: parser.Program,
 ): Array<Array<TagSite>> {

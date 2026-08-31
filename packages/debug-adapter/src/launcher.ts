@@ -6,7 +6,7 @@ import { type ChildProcess, spawn } from "node:child_process"
 // "For help" follow-up) that is the runtime's own and must not be shown as
 // program output.
 
-export type LaunchedProgram = {
+type LaunchedProgram = {
 	child: ChildProcess
 	webSocketUrl: string
 }

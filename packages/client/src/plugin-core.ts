@@ -203,7 +203,7 @@ export type CompiledModule = {
 // NOTE: One file's emitted JavaScript, with the graph it came out of — the
 // latter so that a host asked for this module alone still watches every source
 // a change to which would change it.
-export type ServedModule = {
+type ServedModule = {
 	code: string
 	files: Array<string>
 }

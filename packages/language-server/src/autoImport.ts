@@ -21,7 +21,7 @@ export type ImportEdit = {
 	newText: string
 }
 
-export type ImportEntry = {
+type ImportEntry = {
 	// NOTE: The name the other Module publishes, never the local one.
 	name: string
 	alias: string | null

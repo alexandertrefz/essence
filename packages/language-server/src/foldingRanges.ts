@@ -14,7 +14,7 @@ import { programSections } from "./sections"
 // worth folding, and the last line is excluded so that the closing brace
 // stays visible when the range is collapsed.
 
-export type FoldingRange = {
+type FoldingRange = {
 	startLine: number
 	endLine: number
 }

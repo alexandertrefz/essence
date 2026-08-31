@@ -2,7 +2,7 @@ import { format } from "@essence-lang/formatter"
 
 // NOTE: The shape the LSP wants back, kept structural so this module needs
 // nothing from `vscode-languageserver` and can be tested on its own.
-export type FormattingEdit = {
+type FormattingEdit = {
 	range: {
 		start: { line: number; character: number }
 		end: { line: number; character: number }
@@ -15,7 +15,7 @@ export type FormattingEdit = {
 // and worth saying out loud. A syntax refusal stays silent: it is most
 // keystrokes and every format-on-save of a file caught mid-edit, and the
 // Diagnostics already say what is wrong.
-export type FormattingResult = {
+type FormattingResult = {
 	edits: Array<FormattingEdit> | null
 	warning: string | null
 }

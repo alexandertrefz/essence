@@ -139,7 +139,7 @@ export type HoistedTypes = Map<
 // head may end on, in any order; the one reaching furthest wins, and absent
 // ones are skipped — an unannotated Constant ends on its name, an annotated one
 // on its annotation.
-export function headPositionOf(
+function headPositionOf(
 	position: common.Position,
 	parts: Array<common.Position | null | undefined>,
 ): common.Position {
@@ -166,7 +166,7 @@ export function headPositionOf(
 // Type Parameter list outside it, and a FunctionDefinition carries no Position
 // at all. Hover needs it to anchor a Method or a Function literal to what it
 // declares rather than to what it contains.
-export function signatureHeadPositionOf(
+function signatureHeadPositionOf(
 	definition: parser.FunctionDefinitionNode,
 ): common.Position {
 	let start = (
@@ -266,7 +266,7 @@ export function enrichExpression(
 // is the one position a default still applies in. `Terminal.print("…")` is a
 // Lookup in exactly the shape `constant print = Terminal.print` is, and the
 // difference between them is which of these two the Invocation asked for.
-export function enrichCalleeExpression(
+function enrichCalleeExpression(
 	node: parser.ExpressionNode,
 	scope: enricher.Scope,
 	expectedType: common.Type | null = null,
@@ -400,7 +400,7 @@ function requiredParameters(
 	)
 }
 
-export function enrichCaseValue(
+function enrichCaseValue(
 	node: parser.CaseValueNode,
 	scope: enricher.Scope,
 	expectedType: common.Type | null = null,
@@ -1009,7 +1009,7 @@ function payloadStandsForCase(
 	return payloadFitsCase(caseType, value.type, value)
 }
 
-export function enrichMethodInvocation(
+function enrichMethodInvocation(
 	node: parser.MethodInvocationNode,
 	scope: enricher.Scope,
 ): common.typed.MethodInvocationNode {
@@ -1073,7 +1073,7 @@ export function enrichMethodInvocation(
 	}
 }
 
-export function enrichFunctionInvocation(
+function enrichFunctionInvocation(
 	node: parser.FunctionInvocationNode,
 	scope: enricher.Scope,
 ): common.typed.FunctionInvocationNode {
@@ -1909,7 +1909,7 @@ function shadowSelfTypeGenerics(
 	return applyGenericBindings(selfType, bindings)
 }
 
-export function enrichGenericDeclarationNode(
+function enrichGenericDeclarationNode(
 	node: parser.GenericDeclarationNode,
 	scope: enricher.Scope,
 ): common.typed.GenericDeclarationNode {
@@ -1925,7 +1925,7 @@ export function enrichGenericDeclarationNode(
 	}
 }
 
-export function enrichFunctionDefinition(
+function enrichFunctionDefinition(
 	node: parser.FunctionDefinitionNode,
 	scope: enricher.Scope,
 ): common.typed.FunctionDefinitionNode {
@@ -2012,7 +2012,7 @@ function withInjectedBounds(
 	}
 }
 
-export function enrichMethodFunctionValue(
+function enrichMethodFunctionValue(
 	node: parser.SimpleMethod | parser.StaticMethod,
 	scope: enricher.Scope,
 	selfType: common.Type | null,
@@ -2045,7 +2045,7 @@ export function enrichMethodFunctionValue(
 	}
 }
 
-export function enrichMethodsFunctionValue(
+function enrichMethodsFunctionValue(
 	node: parser.OverloadedMethod | parser.OverloadedStaticMethod,
 	scope: enricher.Scope,
 	selfType: common.Type | null,
@@ -2079,7 +2079,7 @@ export function enrichMethodsFunctionValue(
 	return results
 }
 
-export function enrichRecordValue(
+function enrichRecordValue(
 	node: parser.RecordValueNode,
 	scope: enricher.Scope,
 	expectedType: common.Type | null = null,
@@ -2231,7 +2231,7 @@ function mergedLevel(
 	return { members, memberPositions }
 }
 
-export function enrichStringValue(
+function enrichStringValue(
 	node: parser.StringValueNode,
 	_scope: enricher.Scope,
 ): common.typed.StringValueNode {
@@ -2249,7 +2249,7 @@ export function enrichStringValue(
 // does. A hole whose Type has no such conformance — an `Optional`, a bare
 // structural Union — is refused with `interpolation-not-printable`, and a
 // placeholder `parameter` witness keeps the rest of the enrichment going.
-export function enrichInterpolatedStringValue(
+function enrichInterpolatedStringValue(
 	node: parser.InterpolatedStringValueNode,
 	scope: enricher.Scope,
 ): common.typed.InterpolatedStringValueNode {
@@ -2400,7 +2400,7 @@ function reportRedundantInterpolatedToString(
 	)
 }
 
-export function enrichIntegerValue(
+function enrichIntegerValue(
 	node: parser.IntegerValueNode,
 	_scope: enricher.Scope,
 ): common.typed.IntegerValueNode {
@@ -2412,7 +2412,7 @@ export function enrichIntegerValue(
 	}
 }
 
-export function enrichRationalValue(
+function enrichRationalValue(
 	node: parser.RationalValueNode,
 	_scope: enricher.Scope,
 ): common.typed.RationalValueNode {
@@ -2425,7 +2425,7 @@ export function enrichRationalValue(
 	}
 }
 
-export function enrichBooleanValue(
+function enrichBooleanValue(
 	node: parser.BooleanValueNode,
 	_scope: enricher.Scope,
 ): common.typed.BooleanValueNode {
@@ -2437,7 +2437,7 @@ export function enrichBooleanValue(
 	}
 }
 
-export function enrichFunctionValue(
+function enrichFunctionValue(
 	node: parser.FunctionValueNode,
 	scope: enricher.Scope,
 ): common.typed.FunctionValueNode {
@@ -2549,7 +2549,7 @@ function reportUninferableCapture(
 	)
 }
 
-export function enrichListValue(
+function enrichListValue(
 	node: parser.ListValueNode,
 	scope: enricher.Scope,
 	expectedType: common.Type | null = null,
@@ -2585,7 +2585,7 @@ export function enrichListValue(
 // does — so a literal with entries in it carries an Equatable witness, resolved
 // here and emitted as the trailing Argument of the construction. That is the
 // whole of what makes this more than a List with two Expressions per item.
-export function enrichDictionaryValue(
+function enrichDictionaryValue(
 	node: parser.DictionaryValueNode,
 	scope: enricher.Scope,
 	expectedType: common.Type | null = null,
@@ -2790,7 +2790,7 @@ function writtenKeyIdentity(key: common.typed.ExpressionNode): string | null {
 	}
 }
 
-export function enrichLookup(
+function enrichLookup(
 	node: parser.LookupNode,
 	scope: enricher.Scope,
 ): common.typed.LookupNode {
@@ -2843,7 +2843,7 @@ export function enrichLookup(
 // a line of code in any of them, so a refactor that handed every Node the
 // path's span would break four features at once and no test of this file would
 // notice.
-export function enrichMemberPath(
+function enrichMemberPath(
 	node: parser.MemberPathNode,
 	_scope: enricher.Scope,
 	expectedType: common.Type | null = null,
@@ -2958,7 +2958,7 @@ function memberPathStepType(
 }
 
 // NOTE: How a path is WRITTEN, for the Diagnostics that quote it back.
-export function memberPathSpelling(node: parser.MemberPathNode): string {
+function memberPathSpelling(node: parser.MemberPathNode): string {
 	return `.${node.steps.map((step) => step.content).join(".")}`
 }
 
@@ -3107,7 +3107,7 @@ function memberPathSignature(
 	}
 }
 
-export function enrichIdentifier(
+function enrichIdentifier(
 	node: parser.IdentifierNode,
 	scope: enricher.Scope,
 	type: common.Type = resolveIdentifierType(node, scope),
@@ -3151,7 +3151,7 @@ function enrichIdentifierExpression(
 	)
 }
 
-export function enrichSelf(
+function enrichSelf(
 	node: parser.SelfNode,
 	scope: enricher.Scope,
 	type: common.Type = resolveSelfType(node, scope),
@@ -3362,7 +3362,7 @@ function resolveMatcher(
 	}
 }
 
-export function enrichMatch(
+function enrichMatch(
 	node: parser.MatchNode,
 	scope: enricher.Scope,
 ): common.typed.MatchNode {
@@ -3555,7 +3555,7 @@ export function enrichMatch(
 // and only where neither says anything do the arms decide, through the Union of
 // what they answer with. Whichever of the two spoke is pushed INTO every arm as
 // its expected Type, which is what lets a bare `#Empty` arm resolve at all.
-export function enrichDefine(
+function enrichDefine(
 	node: parser.DefineNode,
 	scope: enricher.Scope,
 	expectedType: common.Type | null = null,
@@ -5061,7 +5061,7 @@ function enrichSnapshotValue(
 	}
 }
 
-export function enrichAssertionStatement(
+function enrichAssertionStatement(
 	node: parser.ExpectStatementNode | parser.RequireStatementNode,
 	scope: enricher.Scope,
 ): Array<common.typed.ImplementationNode> {
@@ -5389,7 +5389,7 @@ function enrichDeclarationStatement(
 	]
 }
 
-export function enrichConstantDeclarationStatement(
+function enrichConstantDeclarationStatement(
 	node: parser.ConstantDeclarationStatementNode,
 	name: parser.IdentifierNode,
 	scope: enricher.Scope,
@@ -5438,7 +5438,7 @@ function recordConstantValue(
 	}
 }
 
-export function enrichVariableDeclarationStatement(
+function enrichVariableDeclarationStatement(
 	node: parser.VariableDeclarationStatementNode,
 	name: parser.IdentifierNode,
 	scope: enricher.Scope,
@@ -5687,7 +5687,7 @@ function reportPatternMemberMismatch(
 	)
 }
 
-export function enrichVariableAssignmentStatement(
+function enrichVariableAssignmentStatement(
 	node: parser.VariableAssignmentStatementNode,
 	scope: enricher.Scope,
 ): common.typed.VariableAssignmentStatementNode {
@@ -5769,7 +5769,7 @@ function narrowUnknownSlots(
 	}
 }
 
-export function enrichNamespaceDefinitionStatement(
+function enrichNamespaceDefinitionStatement(
 	node: parser.NamespaceDefinitionStatementNode,
 	scope: enricher.Scope,
 	hoistedType?: common.NamespaceType,
@@ -6264,7 +6264,7 @@ function retainNamespaceBounds(
 	}
 }
 
-export function enrichProtocolDeclarationStatement(
+function enrichProtocolDeclarationStatement(
 	node: parser.ProtocolDeclarationStatementNode,
 	scope: enricher.Scope,
 	hoistedType?: common.ProtocolType,
@@ -6467,7 +6467,7 @@ function reportInferredTypeParameters(
 	}
 }
 
-export function enrichTypeAliasStatement(
+function enrichTypeAliasStatement(
 	node: parser.TypeAliasStatementNode,
 	scope: enricher.Scope,
 	hoistedType?: common.Type,
@@ -6534,7 +6534,7 @@ function enrichAliasPredicate(
 	).result
 }
 
-export function enrichChoiceDeclarationStatement(
+function enrichChoiceDeclarationStatement(
 	node: parser.ChoiceDeclarationStatementNode,
 	scope: enricher.Scope,
 	hoistedType?: common.UnionType | common.GenericAliasType,
@@ -6994,7 +6994,7 @@ function declarationLabel(
 // TYPED condition — which Namespace answered each question, which Overload of it,
 // and what the receiver's Type was where it was asked — and none of that is
 // knowable from the Node the Parser produced.
-export function enrichIfElseStatementNode(
+function enrichIfElseStatementNode(
 	node: parser.IfElseStatementNode,
 	scope: enricher.Scope,
 ): common.typed.IfElseStatementNode {
@@ -7024,7 +7024,7 @@ export function enrichIfElseStatementNode(
 	}
 }
 
-export function enrichIfStatement(
+function enrichIfStatement(
 	node: parser.IfStatementNode,
 	scope: enricher.Scope,
 ): common.typed.IfStatementNode {
@@ -7312,7 +7312,7 @@ function isKeyLookup(
 	)
 }
 
-export function enrichReturnStatement(
+function enrichReturnStatement(
 	node: parser.ReturnStatementNode,
 	scope: enricher.Scope,
 ): common.typed.ReturnStatementNode {
@@ -7346,7 +7346,7 @@ function findExpectedReturnType(scope: enricher.Scope): common.Type | null {
 	return null
 }
 
-export function enrichFunctionStatement(
+function enrichFunctionStatement(
 	node: parser.FunctionStatementNode,
 	scope: enricher.Scope,
 	hoistedType?: common.FunctionType,
@@ -12425,7 +12425,7 @@ function functionInvocationEntry(overloadedMethodIndex: number | null): string {
 // NOTE: Resolves `ChoiceName#CaseName` to the Case's Type. The Choice's name
 // resolves through the ordinary Type scope, so a Type Alias of a Choice works
 // too (`type Op = CalculatorOperation` admits `Op#Add`).
-export function resolveCaseReference(
+function resolveCaseReference(
 	choice: parser.IdentifierNode,
 	caseName: parser.IdentifierNode,
 	scope: enricher.Scope,
@@ -12529,7 +12529,7 @@ function findCaseTypesInScope(scope: enricher.Scope): Array<common.CaseType> {
 	return [...cases.values()]
 }
 
-export function resolveBareCaseReference(
+function resolveBareCaseReference(
 	caseName: parser.IdentifierNode,
 	scope: enricher.Scope,
 ): common.CaseType | common.ErrorType {
@@ -12614,9 +12614,9 @@ function resolveCaseInExpectedType(
 // than about the Type its payload is expected to be, so that the answer can be
 // kept per candidate and the candidate that wins can be committed without
 // reading its payload a second time.
-export type PayloadReader = (under: common.Type) => common.Type | null
+type PayloadReader = (under: common.Type) => common.Type | null
 
-export function resolveCaseValueType(
+function resolveCaseValueType(
 	node: parser.CaseValueNode,
 	scope: enricher.Scope,
 	expectedType: common.Type | null = null,
@@ -13761,7 +13761,7 @@ function selfPathLookup(
 // value's own Union — the Case's name never has to be in scope by itself.
 // Ambiguity (two Choices in one Union sharing a Case name) asks for the
 // prefixed form instead of guessing.
-export function resolveCaseMatcherType(
+function resolveCaseMatcherType(
 	node: parser.CaseMatcherNode,
 	valueType: common.Type,
 	scope: enricher.Scope,
@@ -13883,7 +13883,7 @@ export function resolveCaseMatcherType(
 	return { type: "Error" }
 }
 
-export function resolveFunctionValueType(
+function resolveFunctionValueType(
 	node: parser.FunctionValueNode,
 	scope: enricher.Scope,
 	expectedType: common.Type | null = null,
@@ -13905,7 +13905,7 @@ export function resolveFunctionValueType(
 // A literal that is not an Argument was never matched against anything, so
 // nothing recorded it. Its annotations can only have come from its own body,
 // and this is the first and last chance to work them out.
-export function contextualFunctionTypeOf(
+function contextualFunctionTypeOf(
 	node: parser.FunctionDefinitionNode,
 	scope: enricher.Scope,
 ): common.FunctionType | undefined {
@@ -14141,7 +14141,7 @@ function decidedContext(recorded: RecordedCaseValueContext): common.Type {
 // the position as the finished call decided it. A Type Parameter that nothing
 // ever bound is left standing, which is the undecided state
 // `mentionsUnsolvedTypeParameter` answers for and the call reports for itself.
-export function recordedContextualCaseValueType(
+function recordedContextualCaseValueType(
 	node: parser.CaseValueNode,
 ): common.Type | undefined {
 	let recorded = recordedCaseValueContext(node)

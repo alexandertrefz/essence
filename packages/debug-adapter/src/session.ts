@@ -84,7 +84,7 @@ export type AdapterOptions = {
 	compile?: CompileFunction
 }
 
-export type EssenceLaunchArguments = DebugProtocol.LaunchRequestArguments & {
+type EssenceLaunchArguments = DebugProtocol.LaunchRequestArguments & {
 	program?: string
 	// NOTE: A precompiled bundle, its `.map` beside it — the way to debug
 	// without compiling, and the way a host without a compiler still works.
@@ -106,7 +106,7 @@ export type EssenceLaunchArguments = DebugProtocol.LaunchRequestArguments & {
 
 // NOTE: The emitted bundle runs on one thread; DAP still speaks in thread
 // ids, so there is exactly one, and it is this.
-export const MAIN_THREAD_ID = 1
+const MAIN_THREAD_ID = 1
 
 type Debuggee = {
 	child: ChildProcess

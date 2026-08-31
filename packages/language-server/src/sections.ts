@@ -26,7 +26,7 @@ import { isSamePosition } from "./positions"
 // of interpolating one. Everything that does not care about Scopes reads the
 // two together through `programBodies`.
 
-export type SectionKind = "implementation" | "tests" | "suite" | "test"
+type SectionKind = "implementation" | "tests" | "suite" | "test"
 
 export type ParserSection = {
 	kind: SectionKind
@@ -49,7 +49,7 @@ export type ParserSection = {
 	parent: ParserSection | null
 }
 
-export type TypedSection = {
+type TypedSection = {
 	kind: SectionKind
 	head: Array<common.typed.ImplementationNode>
 	nodes: Array<common.typed.ImplementationNode>

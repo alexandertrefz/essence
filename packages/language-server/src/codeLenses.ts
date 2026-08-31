@@ -55,7 +55,7 @@ function identitiesOf(
 // client, because the structural identity of a test is the Compiler's business
 // and no client should be spelling one.
 
-export type TestLensCommand =
+type TestLensCommand =
 	// NOTE: The three the extension must bind. `essence.test.run` runs the ids;
 	// `essence.test.debug` runs them under the debug adapter;
 	// `essence.test.acceptSnapshot` re-runs them and RECORDS whatever they
@@ -65,7 +65,7 @@ export type TestLensCommand =
 	// three commands and reads one shape.
 	"essence.test.run" | "essence.test.debug" | "essence.test.acceptSnapshot"
 
-export type TestLensArguments = {
+type TestLensArguments = {
 	// NOTE: Structural ids, exactly as every event spells them. A suite carries
 	// the ids of the tests under it; a test carries its own.
 	ids: Array<string>
@@ -77,7 +77,7 @@ export type TestLensArguments = {
 	title: string
 }
 
-export type TestLens = {
+type TestLens = {
 	// NOTE: The keyword's own span. A client renders the lens on the line it
 	// starts on.
 	position: common.Position

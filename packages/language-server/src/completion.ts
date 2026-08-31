@@ -76,7 +76,7 @@ export type CompletionKind = DeclarationKind | "case" | "keyword"
 // order it was handed, so the ranking is carried by every entry: what is
 // nearest the cursor's own Scope first, what is merely part of the language
 // last.
-export const completionTiers = {
+const completionTiers = {
 	local: 1,
 	member: 2,
 	document: 3,
@@ -117,7 +117,7 @@ export type CompletionEntry = {
 // Types behind the ones that are Namespaces — the second is what a Method
 // Completion matches against a receiver, and it costs an enrichment per
 // exporting Module, so the two are asked for separately.
-export type WorkspaceCompletions = {
+type WorkspaceCompletions = {
 	offers: Array<WorkspaceOffer>
 	namespaces: Array<{
 		offer: WorkspaceOffer

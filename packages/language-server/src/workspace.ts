@@ -61,7 +61,7 @@ export type OpenDocument = {
 	version: number
 }
 
-export type WorkspaceOptions = {
+type WorkspaceOptions = {
 	// NOTE: The Editor's buffers, which win over disk — an unsaved file is the
 	// only truthful version of itself, and the version is what tells a cached
 	// parse from a stale one.
@@ -103,7 +103,7 @@ export type WorkspaceSymbol = {
 	occurrences: Array<WorkspaceOccurrence>
 }
 
-export type WorkspaceExport = {
+type WorkspaceExport = {
 	// NOTE: The name the Module publishes it under, which is what an importer
 	// writes — never the name the declaration was given at home.
 	name: string

@@ -24,7 +24,7 @@ import { programBodies } from "./sections"
 // through their Choice instead of through a Scope, so nothing ever binds them
 // to a Declaration. They are collected from the Parser AST instead.
 
-export type SemanticTokenType =
+type SemanticTokenType =
 	| "namespace"
 	| "type"
 	| "typeParameter"
@@ -35,7 +35,7 @@ export type SemanticTokenType =
 	| "method"
 	| "enumMember"
 
-export type SemanticTokenModifier =
+type SemanticTokenModifier =
 	| "declaration"
 	| "readonly"
 	| "static"
@@ -64,7 +64,7 @@ export const semanticTokenModifiers: Array<SemanticTokenModifier> = [
 	"defaultLibrary",
 ]
 
-export type SemanticToken = {
+type SemanticToken = {
 	line: number
 	column: number
 	length: number

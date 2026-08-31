@@ -148,7 +148,7 @@ function exportingEverything(program: parser.Program): parser.Program {
 // NOTE: Methods and Properties are kept in separate maps rather than one flat
 // record — nothing stops a Namespace from having a Property and a Method of
 // the same name, and one flat record would silently lose one of them.
-export type NamespaceNativeBindings = {
+type NamespaceNativeBindings = {
 	methods: Record<string, Array<boolean>>
 	properties: Record<string, boolean>
 }
@@ -163,13 +163,13 @@ export type NativeBindings = Record<string, NamespaceNativeBindings>
 // the sole inhabitant. The Rewriter reads this to tell a native free
 // Function (a read off the runtime `functions` module) from an Essence-bodied
 // one, and `generateNatives` renders the module's contract from it.
-export type FunctionBindings = Record<string, Array<boolean>>
+type FunctionBindings = Record<string, Array<boolean>>
 
 // NOTE: Milliseconds spent in each stage of the load. The standard library is
 // read once per process and everything downstream waits on it, so what it
 // costs belongs in the same Timeline the CLI already draws for a compilation
 // — this is the shape that feeds it. Not wired to the CLI yet.
-export type StdlibTiming = {
+type StdlibTiming = {
 	parse: number
 	enrich: number
 	validate: number
@@ -179,7 +179,7 @@ export type StdlibTiming = {
 // NOTE: One standard library file, already parsed. The loader's core takes
 // these rather than a directory, so that the failure paths and the shapes it
 // produces can be driven from synthetic sources in a test.
-export type StdlibSource = {
+type StdlibSource = {
 	fileName: string
 	sourceText: string
 	program: parser.Program

@@ -12,7 +12,7 @@ const ELAPSED_THRESHOLD = 1000
 const unicodeFrames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
 const asciiFrames = ["-", "\\", "|", "/"]
 
-export type TaskStatus = "waiting" | "active" | "success" | "error" | "warning"
+type TaskStatus = "waiting" | "active" | "success" | "error" | "warning"
 
 export type Task = {
 	id: string
@@ -22,7 +22,7 @@ export type Task = {
 	startedAt?: number
 }
 
-export type ProgressOptions = {
+type ProgressOptions = {
 	terminal: Terminal
 	theme: Theme
 	palette: Palette

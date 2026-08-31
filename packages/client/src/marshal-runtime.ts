@@ -2901,7 +2901,7 @@ function admitsAbsence(descriptor: Descriptor): boolean {
 // unit Choice's Case is not an object at all, being the string it crosses as.
 // What it decides is whether a single labelled Parameter's labelled call is
 // ambiguous — see `labelsOf`.
-export function admitsRecord(descriptor: Descriptor): boolean {
+function admitsRecord(descriptor: Descriptor): boolean {
 	switch (descriptor.kind) {
 		case "record":
 			return true

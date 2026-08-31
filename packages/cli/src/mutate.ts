@@ -139,7 +139,7 @@ function contradiction(options: OptionValues): string | null {
 
 // NOTE: The tests that reach a site, in the order the RUN met them, so that a
 // report names the same killer twice and a Worker is handed the same list.
-export function coveringTests(
+function coveringTests(
 	site: MutationSite,
 	attribution: Map<string, ModuleAttribution>,
 	order: Map<string, number>,

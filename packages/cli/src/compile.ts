@@ -35,7 +35,7 @@ import { Progress, type Task } from "./spinner"
 // NOTE: The compile MODE is PLANNED rather than passed per file, because it
 // decides how the whole run is compiled — the Session every entry is linked
 // through opens in it. See `CompileMode`.
-export type CompilationPlan = CompileMode & {
+type CompilationPlan = CompileMode & {
 	inputFileNames: Array<string>
 	outputs: Map<string, string> | null
 	dispatcher: CompileDispatcher

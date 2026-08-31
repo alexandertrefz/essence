@@ -162,7 +162,7 @@ function stageBar(
 	return palette.accent(theme.symbols.bar.repeat(filled))
 }
 
-export function renderStageBreakdown(
+function renderStageBreakdown(
 	outcome: CompileOutcome,
 	context: ReportContext,
 ): Array<string> {

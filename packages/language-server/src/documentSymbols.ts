@@ -33,7 +33,7 @@ import { typedProgramBodies } from "./sections"
 // their names. Without one every detail stays null and the outline is exactly
 // what it is without Types — which is the whole point of the Parser-only rule.
 
-export type DocumentSymbolKind =
+type DocumentSymbolKind =
 	| "constant"
 	| "variable"
 	| "function"

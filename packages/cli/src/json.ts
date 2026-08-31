@@ -8,7 +8,7 @@ import { type CompileOutcome, ownDiagnostics } from "./pipeline"
 // internal Position shape — and every field is present on every entry, so a
 // reader never has to distinguish "absent" from "not applicable".
 
-export type JSONDiagnostic = {
+type JSONDiagnostic = {
 	file: string
 	severity: common.DiagnosticSeverity
 	message: string
@@ -19,7 +19,7 @@ export type JSONDiagnostic = {
 	endColumn: number | null
 }
 
-export type JSONFile = {
+type JSONFile = {
 	input: string
 	output: string | null
 	ok: boolean

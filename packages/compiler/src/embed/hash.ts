@@ -7,7 +7,7 @@ import { readStdlibFiles } from "@essence-lang/standard-library"
 
 import { type OptimiserOptions, optimiserOptionsKey } from "../optimiser/index"
 
-export type BundleHashParts = {
+type BundleHashParts = {
 	entryPath: string
 	// NOTE: Only what each Module is spelled and what it SAYS. A parsed graph
 	// answers this and so does a linked one, which is what lets a caller hash

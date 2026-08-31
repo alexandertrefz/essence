@@ -26,7 +26,7 @@ import type { CoveredPoint, TestEvent } from "@essence-lang/runtime/Testing"
 // pruned) apart from one reached at LOAD (a top-level Constant, a suite's
 // setup) that no single test can be credited with — and those two must be
 // treated differently, see `affectedTests`.
-export type ModulePoints = {
+type ModulePoints = {
 	points: Array<CoveredPoint>
 	tests: Array<Set<string>>
 	// NOTE: The point indices this Module ran simply by being LOADED — reached

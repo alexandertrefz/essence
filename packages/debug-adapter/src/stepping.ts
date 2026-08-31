@@ -7,7 +7,7 @@ import type { BundleMap } from "./maps"
 // territory a step passes straight through. Breakpoints inside blackboxed
 // ranges still hit; only stepping is carried over them.
 
-export type ScriptPosition = {
+type ScriptPosition = {
 	lineNumber: number
 	columnNumber: number
 }
