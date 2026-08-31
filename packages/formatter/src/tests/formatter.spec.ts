@@ -707,7 +707,7 @@ describe("formatter", () => {
 
 		// NOTE: `otherwise` is the last arm's case, so the arm is in the run
 		// and a `define` that has only that arm is a run of one — which
-		// `alignRun` leaves alone, the way it leaves a lone Declaration alone.
+		// a run leaves alone, the way it leaves a lone Declaration alone.
 		it("leaves a define of one arm unpadded", () => {
 			roundTrips(
 				block(
@@ -718,7 +718,7 @@ describe("formatter", () => {
 			)
 		})
 
-		// NOTE: `alignRun`'s own rule, reached through a `define`: a run whose
+		// NOTE: The run's own blocking rule, through a `define`: a run whose
 		// answers span more than `MAX_ALIGNMENT_PADDING` is split into blocks
 		// that each line up on their own, rather than dragging the short ones
 		// across the line to meet the wide ones.
