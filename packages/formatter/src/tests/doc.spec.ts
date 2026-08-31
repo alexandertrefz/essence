@@ -1,6 +1,8 @@
 import { describe, expect, it } from "bun:test"
 
 import {
+	alignmentRun,
+	alignmentSlot,
 	breakParent,
 	concat,
 	conditionalGroup,
@@ -11,6 +13,7 @@ import {
 	ifBreak,
 	indent,
 	join,
+	joinAlignment,
 	line,
 	lineSuffix,
 	printDoc,
@@ -18,6 +21,33 @@ import {
 	text,
 	verbatim,
 } from "../doc"
+
+// NOTE: A run of lines, each of them a head, the padding that carries it to
+// the run's column, and a tail. `fit` is what the whole line must fit for its
+// padding to be worth writing — a `define` arm reports one, because an arm
+// that breaks writes the very word the column runs through on a line of its
+// own; an assignment reports none, because its `=` never leaves its head's
+// line however far the value runs on.
+function alignedLines(
+	maxSpan: number,
+	lines: Array<[head: string, tail: string, fit: number | null]>,
+): Doc {
+	let run = alignmentRun(maxSpan)
+
+	return join(
+		hardline,
+		lines.map(([head, tail, fit]) => {
+			let padding = alignmentSlot()
+
+			joinAlignment(run, padding, {
+				headWidth: head.length,
+				fitWidth: fit,
+			})
+
+			return concat([text(head), padding, text(tail)])
+		}),
+	)
+}
 
 // NOTE: The shape every list-like construct in the printer uses — an opening
 // bracket, comma separated entries that break one per line, and a trailing
@@ -241,6 +271,103 @@ describe("doc", () => {
 			)
 
 			expect(printDoc(doc, 80)).toBe("[\n\tfirst, § one\n\tsecond,\n]")
+		})
+	})
+
+	describe("alignment", () => {
+		it("pads every line of a run out to its widest head", () => {
+			expect(
+				printDoc(
+					alignedLines(12, [
+						["ab", " = 1", null],
+						["abcd", " = 2", null],
+					]),
+					80,
+				),
+			).toBe("ab   = 1\nabcd = 2")
+		})
+
+		it("leaves a run of one unpadded", () => {
+			expect(printDoc(alignedLines(12, [["ab", " = 1", null]]), 80)).toBe(
+				"ab = 1",
+			)
+		})
+
+		// NOTE: A head further from its neighbours than the run's span starts a
+		// block of its own rather than dragging every sibling out to meet it.
+		it("splits a run into blocks its heads span", () => {
+			expect(
+				printDoc(
+					alignedLines(12, [
+						["a", " = 1", null],
+						["bb", " = 2", null],
+						["cccccccccccccccccccc", " = 3", null],
+					]),
+					80,
+				),
+			).toBe("a  = 1\nbb = 2\ncccccccccccccccccccc = 3")
+		})
+
+		// NOTE: The column a run stands at is the renderer's to know, and the
+		// same run resolves differently at two of them: with the whole page to
+		// itself the first line takes its padding, and two indents in the
+		// padding would carry it past the width — so it is out of the run, and
+		// what is left is a block of one and unpadded.
+		it("resolves one run against the room it is reached with", () => {
+			let atRoot = alignedLines(12, [
+				["ab", " if " + "x".repeat(64), 70],
+				["abcdefghij", " if x", 16],
+			])
+			let indented = alignedLines(12, [
+				["ab", " if " + "x".repeat(64), 70],
+				["abcdefghij", " if x", 16],
+			])
+
+			expect(printDoc(atRoot, 80).split("\n")[0]).toBe(
+				"ab" + " ".repeat(8) + " if " + "x".repeat(64),
+			)
+			expect(printDoc(indent(indent(indented)), 80).split("\n")[0]).toBe(
+				"ab if " + "x".repeat(64),
+			)
+		})
+
+		// NOTE: Taking one line out is not the end of it — the two lines either
+		// side of it become one block, which can widen the padding of a line
+		// that fit before. The pass runs again until nothing more comes out.
+		it("takes a line out that the padding alone would break", () => {
+			expect(
+				printDoc(
+					alignedLines(12, [
+						["ab", " if " + "x".repeat(74), 80],
+						["abcdefghij", " if x", 16],
+						["abcdef", " if x", 12],
+					]),
+					80,
+				),
+			).toBe(
+				[
+					"ab if " + "x".repeat(74),
+					"abcdefghij if x",
+					"abcdef     if x",
+				].join("\n"),
+			)
+		})
+
+		// NOTE: A line that reports no width holds its column however long it
+		// runs — nothing about the room it stands in can move the thing the
+		// column is drawn through.
+		it("keeps a line with no width of its own in the run", () => {
+			expect(
+				printDoc(
+					indent(
+						alignedLines(12, [
+							["ab", " = " + "x".repeat(90), null],
+							["abcd", " = 2", null],
+						]),
+					),
+					80,
+				),
+			).toBe("ab   = " + "x".repeat(90) + "\n\tabcd = 2")
 		})
 	})
 
