@@ -99,12 +99,10 @@ implementation {
 	§§ Won once a 2048 tile has been made — and a won game may go on — over
 	§§ once no push would change the board, playing otherwise.
 	function status(_ game: Game) -> Status {
-		if game.won {
-			<- #Won
-		} else if game.board::hasMoves() {
-			<- #Playing
-		} else {
-			<- #Over
+		<- define {
+			as #Won     if game.won
+			as #Playing if game.board::hasMoves()
+			as #Over    otherwise
 		}
 	}
 
