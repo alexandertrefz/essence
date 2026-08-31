@@ -169,12 +169,10 @@ implementation {
 		_ scored: Integer,
 		against conceded: Integer,
 	) -> Outcome {
-		if scored::isGreaterThan(conceded) {
-			<- #Win
-		} else if scored::is(conceded) {
-			<- #Draw
-		} else {
-			<- #Loss
+		<- define {
+			as #Win  if scored::isGreaterThan(conceded)
+			as #Draw if scored::is(conceded)
+			as #Loss otherwise
 		}
 	}
 
