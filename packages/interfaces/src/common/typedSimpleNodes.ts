@@ -1512,6 +1512,16 @@ export interface ConditionalStatementNode {
 	// through simplification because `instrument-coverage` reads it and
 	// checked refinements are erased before any pass runs.
 	narrows: boolean
+	// NOTE: And its sister claim, about what the condition established for the
+	// branch it answered `false` in. Kept apart from `narrows` for the reason
+	// the typed Node keeps them apart: neither implies the other.
+	// `instrument-coverage` marks the `else` half's point with it, and
+	// `essence test --mutate` reads both before it will swap two bodies.
+	//
+	// An `if` with no `else` carries `false` here, and that is the honest
+	// answer rather than a stand-in: there is no false body, so nothing was
+	// ever read under the complement.
+	narrowsFalse: boolean
 	// NOTE: That `condition` is a RAW JavaScript boolean rather than an Essence
 	// Boolean, so the Rewriter emits it as the `if`'s question instead of
 	// reading `.value` off it — `lower-matches-to-statements` sets it where the

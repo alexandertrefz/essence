@@ -291,7 +291,10 @@ function mutateStatement(
 	// NOTE: Asked of the CONDITION rather than of `node.narrows`, because the
 	// same refusal has to reach the member swaps inside that condition and a
 	// swap is offered at a Node the walk has already passed by the time this
-	// runs. One set answers both — see `narrowingConditions`.
+	// runs. One set answers both — see `readContext`, which is also where the
+	// SECOND claim is asked: a condition narrows the branch it opens, the
+	// branch it declines, or both, and a body may be moved only where it
+	// narrows neither.
 	if (context.narrowed.has(node.condition)) {
 		return node
 	}
@@ -753,10 +756,12 @@ type MutationContext = {
 	choices: Map<string, Array<common.CaseType>>
 	// NOTE: Every Node the condition of a NARROWING `if` is written out of, the
 	// condition itself included — and every Node of a narrowing `define` arm's
-	// Condition beside them. It is one set because it answers one question asked
-	// in two places — see `mutateStatement` and `memberSwaps` — and it is
-	// gathered here because the walk that offers sites reaches a condition's
-	// Nodes before it reaches the `if` or the arm they belong to.
+	// Condition beside them. Narrowing in EITHER direction, its own branch or
+	// the one below it, because a body may only be moved where nothing was
+	// proven for either. It is one set because it answers one question asked in
+	// two places — see `mutateStatement` and `memberSwaps` — and it is gathered
+	// here because the walk that offers sites reaches a condition's Nodes before
+	// it reaches the `if` or the arm they belong to.
 	narrowed: Set<common.typedSimple.ExpressionNode>
 }
 
@@ -837,7 +842,18 @@ function readContext(program: common.typedSimple.Program): MutationContext {
 				// NOTE: `narrows` is spelled HERE and nowhere else. What the
 				// walk needs is not "is this `if` a doorway" but "may this Node
 				// be mutated", and the two are one question with one answer.
-				if (node.nodeType === "ConditionalStatement" && node.narrows) {
+				//
+				// NOTE: BOTH claims, for the reason the arms below are asked
+				// both: a condition that establishes nothing where it holds may
+				// be the very one an `else` was typed against.
+				// `separator::isEmpty()` proves `NonEmptyString` where it
+				// FAILS, so swapping the bodies it stands over — or asking a
+				// different question there — moves the `else` out from under
+				// the only proof it had.
+				if (
+					node.nodeType === "ConditionalStatement" &&
+					(node.narrows || node.narrowsFalse)
+				) {
 					collectCondition(program, node.condition, narrowed)
 				}
 

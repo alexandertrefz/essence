@@ -9026,6 +9026,60 @@ describe("Enricher", () => {
 				])
 			})
 		})
+
+		// NOTE: The one thing about a narrowing that DOES reach the typed tree
+		// — the two claims a Conditional carries about what its condition
+		// established, which nothing below the Enricher could work out for
+		// itself: a narrowing is read off the typed condition and checked
+		// refinements are erased before the Simplifier hands anything on.
+		// `instrument-coverage` marks each half of the branch with the claim
+		// about that half, and `--mutate` reads both before it will swap two
+		// bodies.
+		describe("The claims a Conditional carries", () => {
+			// NOTE: Two claims and not the same one twice, in both directions.
+			// `isEmpty` establishes nothing about a String where it holds and
+			// proves `NonEmptyString` where it does not, while
+			// `isGreaterThan(0)` proves `PositiveInteger` for the branch it
+			// opens and leaves the `else` nothing. Neither implies the other,
+			// which is why a reader that may not swap two bodies has to ask
+			// both.
+			it("should record what the condition proved for each branch", () => {
+				let { program, diagnostics } = enrichSource(`implementation {
+					function pieces(_ text: String, on separator: String) -> NonEmptyList<String> {
+						if separator::isEmpty() {
+							<- [text]
+						} else {
+							<- text::split(on separator)
+						}
+					}
+
+					function shrunk(_ n: Integer) -> Integer {
+						if n::isGreaterThan(0) {
+							<- n::subtract(1)
+						} else {
+							<- 0
+						}
+					}
+				}`)
+
+				expect(diagnostics).toEqual([])
+
+				let branches = program.implementation.nodes.flatMap((node) =>
+					node.nodeType === "FunctionStatement"
+						? node.value.body.filter(
+								(statement) =>
+									statement.nodeType === "IfElseStatement",
+							)
+						: [],
+				)
+
+				expect(
+					branches.map(
+						(branch) => `${branch.narrows} ${branch.narrowsFalse}`,
+					),
+				).toEqual(["false true", "true false"])
+			})
+		})
 	})
 
 	// NOTE: A `define` reads its arms in the Scope it stands in, and every arm

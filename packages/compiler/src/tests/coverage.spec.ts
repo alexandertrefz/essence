@@ -163,6 +163,29 @@ const narrowingArms = `implementation {
 }
 `
 
+// NOTE: The same two claims an `if` can make, and pointing opposite ways for the
+// reason `narrowingArms` gives — an arm and the `otherwise` below it ARE an `if`
+// and its `else`, so the pair that tells the claims apart is written twice, once
+// in each shape.
+const narrowingBranches = `implementation {
+	function pieces(_ text: String, on separator: String) -> NonEmptyList<String> {
+		if separator::isEmpty() {
+			<- [text]
+		} else {
+			<- text::split(on separator)
+		}
+	}
+
+	function shrunk(_ n: Integer) -> Integer {
+		if n::isGreaterThan(0) {
+			<- n::subtract(1)
+		} else {
+			<- 0
+		}
+	}
+}
+`
+
 describe("The coverage instrumentation pass", () => {
 	it("writes nothing at all unless the caller asked for it", () => {
 		let program = instrumented(fixtures, defaultOptimiserOptions)
@@ -205,6 +228,31 @@ describe("The coverage instrumentation pass", () => {
 		)
 
 		expect(branches.every((point) => point.refinement)).toBe(true)
+	})
+
+	// NOTE: What a condition proves where it HOLDS and what it proves where it
+	// fails are two claims, and neither implies the other — so each half of the
+	// branch is marked with the one that is about the path IT counts. This is
+	// the pair that tells them apart in both directions: `separator::isEmpty()`
+	// establishes nothing for the branch it opens and proves `NonEmptyString`
+	// for the `else`, and `n::isGreaterThan(0)` is the other way round.
+	it("marks each half of a branch by the claim about it", () => {
+		let branches = pointsOf(instrumented(narrowingBranches)).filter(
+			(point) => point.kind === "branch",
+		)
+
+		expect(
+			branches.map((point) => [
+				point.scope,
+				point.label,
+				point.refinement,
+			]),
+		).toEqual([
+			["pieces", "if", false],
+			["pieces", "else", true],
+			["shrunk", "if", true],
+			["shrunk", "else", false],
+		])
 	})
 
 	it("leaves a branch that established nothing unmarked", () => {

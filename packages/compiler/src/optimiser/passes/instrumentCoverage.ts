@@ -197,10 +197,17 @@ function countsAsStatement(
 
 // NOTE: Both sides of every Conditional, counted apart — which is what branch
 // coverage IS, and why an `if` with no `else` still gets one: "the condition
-// was never false" is the thing worth being told. `narrows` rides along on both
-// halves, because a branch whose condition established something is a doorway,
+// was never false" is the thing worth being told.
+//
+// NOTE: Each half is marked with the claim about the path IT counts — the
+// condition's own for the `if`, and what the condition left its `else` for the
+// other — because a branch whose condition established something is a doorway,
 // and the question a report asks about a doorway is exactly whether the guarded
-// path and the fallback were each reached.
+// path and the fallback were each reached. The two claims are two claims and
+// neither implies the other: `played::isNot(0)` opens a doorway and leaves its
+// `else` an ordinary fallback, and `separator::isEmpty()` does the opposite. It
+// is the reading `instrumentArms` gives a `define`, which the single `narrows`
+// this used to mark both halves with could not.
 function instrumentStatement(
 	node: common.typedSimple.ImplementationNode,
 	mark: Mark,
@@ -230,7 +237,7 @@ function instrumentStatement(
 		falseBody: [
 			counter(
 				mark("branch", "else", falsePosition, {
-					refinement: node.narrows,
+					refinement: node.narrowsFalse,
 				}),
 				falsePosition,
 			),
@@ -281,11 +288,11 @@ function instrumentExpression(
 // NOTE: `refinement` rides the arm's own claim, and the `otherwise` arm rides
 // what the arms ABOVE it left behind — it is reached by a value every one of
 // their Conditions declined, so it stands behind a doorway exactly when one of
-// those complements established something. That is a reading of its own and not
-// the one `instrumentStatement` gives an `else`: an `if` marks BOTH halves with
-// the Conditional's single `narrows`, where an arm carries a claim apart from
-// its neighbours and the fallback carries their complements. The same question —
-// whether this path is a doorway — answered from the evidence each shape has.
+// those complements established something. It is the reading
+// `instrumentStatement` gives an `if` and its `else`, asked of a shape with more
+// than two paths in it: each point marked by the claim about the path it counts,
+// and the fallback marked by what every Condition above it left behind rather
+// than by any one of them.
 function instrumentArms(
 	node: common.typedSimple.DefineNode,
 	mark: Mark,

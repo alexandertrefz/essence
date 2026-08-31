@@ -288,6 +288,76 @@ describe("Mutation sites", () => {
 		])
 	})
 
+	// NOTE: The other direction of the same refusal, and it is a SECOND claim
+	// rather than the same one twice: a condition can establish something for
+	// the branch it answered `false` in and nothing at all for the one it
+	// opens. `separator::isEmpty()` proves nothing about a String where it
+	// holds and proves `NonEmptyString` where it does not — which is the whole
+	// reason the `else` may call the `split` that answers a `NonEmptyList` —
+	// and a swap moves that call out from under the proof.
+	it("offers nothing at an if whose condition narrows its else", () => {
+		let source = [
+			"implementation {",
+			"	function pieces(_ text: String, on separator: String) -> NonEmptyList<String> {",
+			"		if separator::isEmpty() {",
+			"			<- [text]",
+			"		} else {",
+			"			<- text::split(on separator)",
+			"		}",
+			"	}",
+			"",
+			"	function share(_ total: Integer, by divisor: Integer) -> Rational {",
+			"		if divisor::isLessThanOrEqualTo(0) {",
+			"			<- 0/1",
+			"		} else {",
+			"			<- total::divide(by divisor)",
+			"		}",
+			"	}",
+			"}",
+			"",
+		].join("\n")
+		let sites = sitesOf(source)
+
+		expect(only(sites, "branch")).toEqual([])
+		// NOTE: And the refusal reaches INSIDE such a condition, exactly as it
+		// reaches inside a narrowing one. `divisor::isLessThanOrEqualTo(0)` is
+		// what proves the `PositiveInteger` the `else` divides by, and either
+		// rotation of it leaves that division without its proof.
+		expect(only(sites, "comparison")).toEqual([])
+		// NOTE: The literals of that condition are still sites, which is what
+		// says the refusal is about the QUESTION being asked rather than about
+		// the line it is asked on.
+		expect(only(sites, "integer")).toEqual([
+			"11 swap 0 for 1",
+			"11 swap 0 for -1",
+		])
+	})
+
+	// NOTE: And an `if` with no `else` is still a site, however its condition
+	// narrows. There is no body standing under the complement, so there is
+	// nothing there to move out from under a proof — and the swap, which turns
+	// the condition inside out, moves a body that was read under no evidence
+	// into a branch that holds some. The claim the Simplifier carries for one
+	// is `false` because there was no false body to read.
+	it("still inverts an if with no else whose condition narrows below", () => {
+		let source = [
+			"implementation {",
+			"	function width(_ text: String, on separator: String) -> Integer {",
+			"		if separator::isEmpty() {",
+			"			<- 0",
+			"		}",
+			"",
+			"		<- text::length()",
+			"	}",
+			"}",
+			"",
+		].join("\n")
+
+		expect(only(sitesOf(source), "branch")).toEqual([
+			"3 swap the branches of this if",
+		])
+	})
+
 	// NOTE: One lie per arm of a ladder — this arm answers where nothing
 	// matched, and the fallback answers where this arm held. It is the `define`
 	// reading of the branch swap: an arm and the `otherwise` below it ARE an
