@@ -8617,21 +8617,34 @@ function coverageChoices(
 	}
 }
 
-// NOTE: One counter. Standing on its own it counts and answers with nothing;
-// wrapping a Case construction it counts and answers with the very value, so
-// what the Expression evaluates to is unchanged.
+// NOTE: One counter, in the three shapes a point can need. Standing on its own
+// it counts and answers with nothing; around a Case construction it counts and
+// answers with the very value; in front of a `define` arm's answer it is a
+// sequence, which counts and then answers with the value beside it. The last two
+// leave what the Expression evaluates to unchanged, and differ only in whether
+// the count lands before the value is built — see `CoverageCounterNode.leads`.
 function rewriteCoverageCounter(
 	node: common.typedSimple.CoverageCounterNode,
 ): estree.Expression {
-	return {
+	let count = (
+		args: Array<estree.Expression>,
+	): estree.SimpleCallExpression => ({
 		type: "CallExpression",
 		optional: false,
 		callee: coverageCounter(),
-		arguments:
-			node.value === null
-				? [numberLiteral(node.point)]
-				: [numberLiteral(node.point), rewriteExpression(node.value)],
+		arguments: args,
+	})
+	let point = numberLiteral(node.point)
+
+	if (node.value === null) {
+		return count([point])
 	}
+
+	let value = rewriteExpression(node.value)
+
+	return node.leads
+		? { type: "SequenceExpression", expressions: [count([point]), value] }
+		: count([point, value])
 }
 
 // NOTE: An instrumented point, which answers with the very value it recorded —

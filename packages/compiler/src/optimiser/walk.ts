@@ -953,8 +953,9 @@ function walkChildren(
 		}
 		// NOTE: And a coverage counter the same way, where it holds anything at
 		// all: a counter standing on its own in a Statement position holds no
-		// Expression, and one wrapping a Case construction is transparent to
-		// every reading but the one that emits it.
+		// Expression, and one that answers with a value — around a Case
+		// construction, or in front of a `define` arm's answer — is transparent
+		// to every reading but the one that emits it.
 		case "CoverageCounter": {
 			let value =
 				node.value === null

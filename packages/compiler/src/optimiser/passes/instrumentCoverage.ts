@@ -25,6 +25,14 @@ import { rewriteNodes } from "../walk"
 // taken. Which it is: a branch nothing can enter was never entered. Nothing is
 // ever counted that did not run, which is the direction that matters.
 //
+// NOTE: Which is also what settles where a counter stands relative to the value
+// it answers with. A point counting that a PATH was taken is written in front of
+// the value — taking the path is the whole of what it claims, and a value that
+// throws while it is built was still the value that path chose. A point counting
+// that a VALUE was built is written around it, so a construction that threw
+// halfway counts nothing. Both readings say only what happened; see
+// `CoverageCounterNode.leads`.
+//
 // NOTE: A counter is impure (`purity.ts`), so no pass pools one, hoists it out
 // of the branch it belongs to, or drops it where the value it answers with is
 // unread.
@@ -75,17 +83,24 @@ function instrument(
 	// NOTE: Both forms of the Node, in one place, because which one a point
 	// needs is a fact about WHERE it stands rather than about what it counts. A
 	// Statement position takes a counter standing on its own, which is the
-	// value-less form; an Expression position takes the WRAPPING form, which
-	// counts and then answers with the very value it was handed. An arm of a
-	// `define` has no body to write a Statement into and is the second kind.
+	// value-less form; an Expression position takes one that answers with the
+	// very value it was handed. An arm of a `define` has no body to write a
+	// Statement into and is the second kind.
+	//
+	// NOTE: The valued form counts on either side of the value, and which side
+	// is a claim about what the point MEANS — `leads` is what says so, see
+	// `CoverageCounterNode`. It defaults to the side a value-less counter never
+	// reads, so the calls that spell it are the ones it is a claim about.
 	let counter = (
 		point: number,
 		position: common.Position,
 		value: common.typedSimple.ExpressionNode | null = null,
+		leads = false,
 	): common.typedSimple.CoverageCounterNode => ({
 		nodeType: "CoverageCounter",
 		point,
 		value,
+		leads,
 		type: value === null ? { type: "Record", members: {} } : value.type,
 		position,
 	})
@@ -144,6 +159,7 @@ type Counter = (
 	point: number,
 	position: common.Position,
 	value?: common.typedSimple.ExpressionNode | null,
+	leads?: boolean,
 ) => common.typedSimple.CoverageCounterNode
 
 // NOTE: One counter in front of every Statement a reader wrote. Declarations
@@ -312,6 +328,7 @@ function instrumentArms(
 				mark("branch", "if", position, { refinement: arm.narrows }),
 				position,
 				arm.value,
+				true,
 			),
 		}
 	})
@@ -328,6 +345,7 @@ function instrumentArms(
 			mark("branch", "otherwise", position, { refinement: narrows }),
 			position,
 			node.otherwise,
+			true,
 		),
 	}
 }
@@ -378,6 +396,12 @@ function instrumentConstruction(
 			tag: node.tag,
 		}),
 		value: node,
+		// NOTE: AROUND the construction rather than in front of it, because what
+		// this point claims is that the Case was built — a payload that threw
+		// halfway built none, and counting one that was not built is the
+		// direction this pass never goes. An arm is the other reading: it counts
+		// a path that was taken, which taking it settles.
+		leads: false,
 		type: node.type,
 		position: node.position,
 	}
