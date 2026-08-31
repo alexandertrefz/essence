@@ -2413,6 +2413,16 @@ function isTraceable(node: common.typedSimple.ExpressionNode): boolean {
 // those. A Function literal's body is not among them — it is a closure the
 // assertion builds and does not run — and neither is a Match Handler's, which
 // is Statements. A witness is references to Methods and never a call of one.
+//
+// NOTE: A `match` is left ALONE, subject and all, and that is a decision rather
+// than the omission a `define` was. The two things a reader wants of one are
+// which arm ran and what it answered, and both are Statements this walker can
+// not reach — so the whole of what could be traced here is the subject, which
+// would report what went into a `match` and never what came out of it. A half
+// reading reads like a bug in the report. Tracing one properly wants a
+// Statement-aware walker, the way `instrument-coverage` marks a Handler's body
+// where it stands, and that is a change of shape rather than a case added to
+// this switch.
 function instrumentChildren(
 	node: common.typedSimple.ExpressionNode,
 	walk: (
@@ -2462,6 +2472,27 @@ function instrumentChildren(
 			return node.value === null
 				? node
 				: { ...node, value: walk(node.value) }
+		// NOTE: Every Condition and every answer of a `define`, which is a
+		// ladder of Expressions all the way down — so it is the one branching
+		// construct this walker can reach INTO, and an assertion is exactly
+		// where one gets written. What each Condition answered and what the arm
+		// that held answered with is the whole of what the ladder did, and a
+		// report used to show none of it.
+		//
+		// NOTE: An arm nobody took builds nothing and so records nothing. That
+		// is a point behaving as points behave rather than a hole in one: a
+		// trace is a recording made where a value was built, so what a report
+		// shows is the values that were.
+		case "Define":
+			return {
+				...node,
+				arms: node.arms.map((arm) => ({
+					...arm,
+					condition: walk(arm.condition),
+					value: walk(arm.value),
+				})),
+				otherwise: walk(node.otherwise),
+			}
 		case "InterpolatedStringValue":
 			return {
 				...node,
