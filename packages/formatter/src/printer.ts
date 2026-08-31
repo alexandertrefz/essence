@@ -1,6 +1,10 @@
 import type { common, parser } from "@essence-lang/interfaces"
 
 import {
+	type AlignDoc,
+	type AlignmentItem,
+	alignmentRun,
+	alignmentSlot,
 	breakParent,
 	concat,
 	conditionalGroup,
@@ -12,6 +16,7 @@ import {
 	ifBreak,
 	indent,
 	join,
+	joinAlignment,
 	line,
 	lineSuffix,
 	renderFlat,
@@ -19,9 +24,7 @@ import {
 	stringWidth,
 	TAB_WIDTH,
 	text,
-	type TextDoc,
 	verbatim,
-	WIDTH,
 } from "./doc"
 import { compareExportEntries, compareImportEntries } from "./sections"
 import type { SourceText } from "./source"
@@ -46,6 +49,13 @@ const EMPTY = text("")
 // meet it — a group of short Declarations above the wide typed ones is the usual
 // case, and each lines up on its own.
 const MAX_ALIGNMENT_PADDING = 12
+
+// NOTE: A `match` puts every Handler of a run in one column however far apart
+// their Matchers read. The blocking a run of Declarations gets is for the one
+// wide typed Declaration written among short ones — a shape a `match` does not
+// have, since every Matcher in one is a case of the same value, and a Handler
+// dropped out of the column would read as belonging to some other `match`.
+const UNBLOCKED_ALIGNMENT = Number.POSITIVE_INFINITY
 
 function positionLines(position: common.Position): {
 	startLine: number
@@ -167,14 +177,12 @@ export class Printer {
 	private implementationEntries(
 		nodes: Array<parser.TestsNode>,
 	): Array<Entry> {
-		let run: Array<AlignedAssignment> = []
+		let run = alignmentRun(MAX_ALIGNMENT_PADDING)
 		let kind: AssignmentKind | null = null
 		let previousEnd: number | null = null
 
 		let closeRun = () => {
-			alignRun(run)
-
-			run = []
+			run = alignmentRun(MAX_ALIGNMENT_PADDING)
 			kind = null
 		}
 
@@ -203,7 +211,7 @@ export class Printer {
 					closeRun()
 				}
 
-				let padding = text("")
+				let padding = alignmentSlot()
 				let printed = this.printAssignment(assignment, padding)
 
 				if (printed.headWidth === null || !printed.flat) {
@@ -213,7 +221,15 @@ export class Printer {
 				}
 
 				kind = assignmentKind(assignment)
-				run.push({ headWidth: printed.headWidth, padding })
+				joinAlignment(run, padding, {
+					headWidth: printed.headWidth,
+					// NOTE: The `=` is written after the head wherever the
+					// head ends, and a value too wide for the line gives way
+					// inside itself rather than moving down — so an assignment
+					// holds its column however far its line runs on, and the
+					// room the run stands in never takes it out.
+					fitWidth: null,
+				})
 
 				return printed.doc
 			},
@@ -1165,12 +1181,11 @@ export class Printer {
 		// NOTE: Adjacent `static` properties line their `=` up like a run of
 		// Declarations does, and the run ends where that one's does: at a
 		// Method, at a blank line, or at a value that can not be on one line.
-		let run: Array<AlignedAssignment> = []
+		let run = alignmentRun(MAX_ALIGNMENT_PADDING)
 		let previousEnd: number | null = null
 
 		let closeRun = () => {
-			alignRun(run)
-			run = []
+			run = alignmentRun(MAX_ALIGNMENT_PADDING)
 		}
 
 		let entries = this.entriesFor(
@@ -1200,7 +1215,7 @@ export class Printer {
 					closeRun()
 				}
 
-				let padding = text("")
+				let padding = alignmentSlot()
 				let printed = this.printProperty(member.property, padding)
 
 				if (printed.headWidth === null || !printed.flat) {
@@ -1209,7 +1224,13 @@ export class Printer {
 					return printed.doc
 				}
 
-				run.push({ headWidth: printed.headWidth, padding })
+				// NOTE: A width-free column, for the reason a Declaration's
+				// is: the `=` of a `static` property never moves off the line
+				// its head is written on either.
+				joinAlignment(run, padding, {
+					headWidth: printed.headWidth,
+					fitWidth: null,
+				})
 
 				return printed.doc
 			},
@@ -2162,7 +2183,7 @@ export class Printer {
 	// known.
 	private printMatch(node: parser.MatchNode): Doc {
 		let entries: Array<Entry> = []
-		let run: Array<AlignedHandler> = []
+		let run = alignmentRun(UNBLOCKED_ALIGNMENT)
 
 		// NOTE: A Comment trailing the `match`'s own `{` — claimed before the
 		// Handlers are walked, or the first Handler's `takeBefore` would stall
@@ -2175,22 +2196,8 @@ export class Printer {
 			),
 		)
 
-		// NOTE: Padding is only worth writing where it lines something up, so a
-		// run of one is left alone.
 		let closeRun = () => {
-			if (run.length > 1) {
-				let widest = Math.max(
-					...run.map((handler) => handler.matcherWidth),
-				)
-
-				for (let handler of run) {
-					handler.padding.value = " ".repeat(
-						widest - handler.matcherWidth,
-					)
-				}
-			}
-
-			run = []
+			run = alignmentRun(UNBLOCKED_ALIGNMENT)
 		}
 
 		for (let [index, handler] of node.handlers.entries()) {
@@ -2225,7 +2232,7 @@ export class Printer {
 			// sibling padded out to one there is padded past the end of the
 			// line.
 			let matcherWidth = flatWidth(matcher)
-			let padding = text("")
+			let padding = alignmentSlot()
 
 			let head: Array<Doc> = [text("case "), matcher]
 
@@ -2266,7 +2273,14 @@ export class Printer {
 				matcherWidth !== null &&
 				renderFlat(body) !== null
 			) {
-				run.push({ matcherWidth, padding })
+				joinAlignment(run, padding, {
+					headWidth: matcherWidth,
+					// NOTE: The `{` is written after the Matcher whether or
+					// not what follows it fits — a Handler that breaks opens
+					// its brace in the column all the same — so no room the
+					// run stands in takes this one out of it.
+					fitWidth: null,
+				})
 			} else {
 				closeRun()
 			}
@@ -2306,12 +2320,10 @@ export class Printer {
 	// and no amount of space between them makes the table two tables.
 	private printDefine(node: parser.DefineNode): Doc {
 		let entries: Array<Entry> = []
-		let run: Array<AlignedAssignment> = []
+		let run = alignmentRun(MAX_ALIGNMENT_PADDING)
 
 		let closeRun = () => {
-			alignRun(run)
-
-			run = []
+			run = alignmentRun(MAX_ALIGNMENT_PADDING)
 		}
 
 		// NOTE: A Comment trailing the `define`'s own `{` — claimed before the
@@ -2340,14 +2352,14 @@ export class Printer {
 		// where in itself it goes and the run only decides how wide it is.
 		let pushArm = (
 			position: common.Position,
-			write: (padding: TextDoc) => {
+			write: (padding: AlignDoc) => {
 				doc: Doc
-				// NOTE: Where this arm stands in the run: the width of the head
-				// its case is written after, `"apart"` where its case is
-				// written somewhere no column reaches and the table goes on
-				// around it, or `"ends"` where the arm interrupts the table
-				// itself and the arms below start a run of their own.
-				column: number | "apart" | "ends"
+				// NOTE: What this arm brings to the run — the width of the
+				// head its case is written after, and the width the whole arm
+				// reads flat, which is what the run takes an arm out on — or
+				// `"ends"` where the arm interrupts the table itself and the
+				// arms below start a run of their own.
+				column: AlignmentItem | "ends"
 			},
 		) => {
 			for (let comment of this.trivia.takeBefore(position.start.line)) {
@@ -2355,22 +2367,21 @@ export class Printer {
 			}
 
 			let trailing = this.trivia.claimTrailingOn(position.end.line)
-			let padding = text("")
+			let padding = alignmentSlot()
 			let written = write(padding)
 			let doc = written.doc
 
-			// NOTE: An arm whose case is not written in the column is no part
-			// of the run — every sibling padded out to its head would be lining
-			// up on an `if` that is nowhere near the answer that reached it. It
-			// ENDS the run only where its answer opens a block: the arms under
-			// that answer's closing brace start again below it, and one column
-			// carried across it would run through two tables. An arm that is
-			// merely too wide for a line is one row of the one table, and the
-			// rows either side of it keep their column.
-			if (typeof written.column === "number") {
-				run.push({ headWidth: written.column, padding })
-			} else if (written.column === "ends") {
+			// NOTE: An arm ENDS the run where its answer opens a block: the
+			// arms under that answer's closing brace start again below it, and
+			// one column carried across it would run through two tables. An
+			// arm that is merely too wide for the line it stands on is one row
+			// of the one table — it joins the run like any other, and the run
+			// takes it back out once the column it stands at is known, leaving
+			// the rows either side of it lined up with each other.
+			if (written.column === "ends") {
 				closeRun()
+			} else {
+				joinAlignment(run, padding, written.column)
 			}
 
 			if (trailing !== null) {
@@ -2426,7 +2437,21 @@ export class Printer {
 							text(" if "),
 							condition,
 						]),
-						column: headWidth,
+						// NOTE: The width asked of this arm is its answer and
+						// the `if` alone. A Condition that opens a block has
+						// no flat width to add — that is what put the arm on
+						// this path — but the answer in front of it can still
+						// be too wide to stay on one line, and an answer that
+						// gives way carries the `if` down to the end of what
+						// it broke into, which is nowhere near the column. The
+						// arm is left in the run wherever that much fits: what
+						// the Condition writes before ITS first break can only
+						// make the line longer, so every arm this takes out is
+						// one that would have broken.
+						column: {
+							headWidth,
+							fitWidth: headWidth + stringWidth(" if "),
+						},
 					}
 				}
 
@@ -2438,17 +2463,15 @@ export class Printer {
 				// trimming takes it away the moment it is not holding a column
 				// open.
 				//
-				// NOTE: An arm wider than a LINE breaks there wherever it is
-				// written, so it stands apart from the run: its `if` is on a
-				// line of its own, and the column its head would hold open is
-				// one that nothing occupies. The layout decides every other
-				// break, and an arm that fits a line and breaks anyway because
-				// of the column it starts at is not seen from here — that arm
-				// stays in the run and holds it one head too wide, which is the
-				// same misalignment in the one case the printer can not tell
-				// apart from an arm that fits.
-				let armWidth = headWidth + stringWidth(" if ") + conditionWidth
-
+				// NOTE: An arm that breaks stands apart from the run: its `if`
+				// is on a line of its own, and the column its head would hold
+				// open is one that nothing occupies. WHICH arms those are is
+				// the run's own question rather than one answered here — an
+				// arm breaks against the room left by the column the whole
+				// `define` stands at, and against the padding the run would
+				// give it, neither of which is known until the run is reached.
+				// All that is reported here is what the arm reads flat, which
+				// is exactly what the renderer measures it by.
 				return {
 					doc: group(
 						concat([
@@ -2458,7 +2481,11 @@ export class Printer {
 							indent(concat([line, text("if "), condition])),
 						]),
 					),
-					column: armWidth > WIDTH ? "apart" : headWidth,
+					column: {
+						headWidth,
+						fitWidth:
+							headWidth + stringWidth(" if ") + conditionWidth,
+					},
 				}
 			})
 		}
@@ -2475,17 +2502,20 @@ export class Printer {
 			// NOTE: `otherwise` is written against the end of its answer
 			// wherever that ends up, so an answer that gives way inside itself
 			// carries the keyword down with it — and the padding in front of it
-			// lands mid-line, at the end of a line no column runs through. An
-			// answer with no flat width at all opens a block, and ends the run
-			// for the reason an arm's does.
+			// lands mid-line, at the end of a line no column runs through. That
+			// is what the flat width reported here is for: an answer with no
+			// room to stay on one line takes its arm out of the run. An answer
+			// with no flat width at all opens a block, and ends the run for the
+			// reason an arm's does.
 			return {
 				doc: concat([text("as "), answer, padding, text(" otherwise")]),
 				column:
 					headWidth === null
 						? "ends"
-						: headWidth + stringWidth(" otherwise") > WIDTH
-							? "apart"
-							: headWidth,
+						: {
+								headWidth,
+								fitWidth: headWidth + stringWidth(" otherwise"),
+							},
 			}
 		})
 
@@ -3172,21 +3202,6 @@ export class Printer {
 	// #endregion
 }
 
-// NOTE: One Handler's share of an alignment run — how wide its Matcher reads,
-// and the Doc node its padding is written into once the run is complete.
-type AlignedHandler = {
-	matcherWidth: number
-	padding: TextDoc
-}
-
-// NOTE: The same, for one assignment of a run of them: how wide it reads left
-// of its `=`, and the slot the padding that carries it to its block's column is
-// written into.
-type AlignedAssignment = {
-	headWidth: number
-	padding: TextDoc
-}
-
 // NOTE: One item of a bracketed list with the Comments written around it.
 type ListItem = {
 	doc: Doc
@@ -3231,59 +3246,6 @@ type AssignmentNode =
 	| parser.ConstantDeclarationStatementNode
 	| parser.VariableDeclarationStatementNode
 	| parser.VariableAssignmentStatementNode
-
-// NOTE: Writes the padding of a run of assignments — a Statement's or a
-// Namespace's `static` properties, which line up the same way. The run is
-// broken into blocks that each line up on their own `=`, so a long typed
-// Declaration among short ones does not drag every sibling's `=` across the
-// line to meet it: a block is a maximal stretch of adjacent members whose
-// heads span no more than `MAX_ALIGNMENT_PADDING` — the widest minus the
-// narrowest — measured that way rather than against the neighbour above,
-// which would let a slow ramp of widths pad the first member far past the
-// budget. Greedy left to right rather than optimal, because a greedy pass is
-// stable under a second run and an optimal partition need not be. A block of
-// one is left unpadded.
-function alignRun(run: Array<AlignedAssignment>): void {
-	let start = 0
-	let narrowest = 0
-	let widest = 0
-
-	let flushBlock = (end: number) => {
-		if (end - start > 1) {
-			for (let index = start; index < end; index++) {
-				let assignment = run[index] as AlignedAssignment
-
-				assignment.padding.value = " ".repeat(
-					widest - assignment.headWidth,
-				)
-			}
-		}
-
-		start = end
-	}
-
-	for (let index = 0; index < run.length; index++) {
-		let width = (run[index] as AlignedAssignment).headWidth
-
-		if (
-			index > start &&
-			Math.max(widest, width) - Math.min(narrowest, width) >
-				MAX_ALIGNMENT_PADDING
-		) {
-			flushBlock(index)
-		}
-
-		if (index === start) {
-			narrowest = width
-			widest = width
-		} else {
-			narrowest = Math.min(narrowest, width)
-			widest = Math.max(widest, width)
-		}
-	}
-
-	flushBlock(run.length)
-}
 
 // NOTE: How wide a Doc reads on one line, or null when it has no such width —
 // it can never be on one line at all, or it holds a multi-line String Literal,

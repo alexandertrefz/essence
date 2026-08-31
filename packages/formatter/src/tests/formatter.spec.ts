@@ -767,18 +767,21 @@ describe("formatter", () => {
 			)
 		})
 
-		// NOTE: The padding of an arm that breaks is written in front of the
+		// NOTE: Each of these arms FITS a line and none of them fits the line
+		// it starts three indents in, so each breaks in front of its `if` —
+		// and an arm that breaks writes its `if` below the column rather than
+		// in it. The run is resolved against the room it is reached with, so
+		// those two arms are out of it, and the `otherwise` that is left is a
+		// block of one and unpadded. Before the run knew its own column, they
+		// stayed in and held it open at their heads: the `otherwise` was
+		// padded out to a column that nothing in the whole `define` occupied.
+		//
+		// The padding of an arm that breaks anyway is written in front of the
 		// break, where it holds no column open and the line-end trimming takes
 		// it away. A stranded run of spaces at the end of a line would be
 		// invisible here and fatal to the second pass, which is what the
 		// explicit check is for.
-		//
-		// NOTE: Written inside a Function, which is the one place these arms
-		// can be in the run and break anyway: each of them FITS a line, so the
-		// printer keeps it in the column, and none of them fits the line it
-		// starts four indents in. An arm too wide for any line is out of the
-		// run and never padded at all.
-		it("takes the padding of a broken arm away with the break", () => {
+		it("leaves the arms the column it stands at breaks out of the run", () => {
 			let source = block(
 				"\tconstant grade = (_ score: Integer) -> String {",
 				"\t\t<- define {",
@@ -786,13 +789,58 @@ describe("formatter", () => {
 				"\t\t\t\tif score::isGreaterThanOrEqualTo(90)",
 				'\t\t\tas "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"',
 				"\t\t\t\tif score::isGreaterThanOrEqualTo(80)",
-				'\t\t\tas "cccccccccccccccccccccccccccccc"   otherwise',
+				'\t\t\tas "cccccccccccccccccccccccccccccc" otherwise',
 				"\t\t}",
 				"\t}",
 			)
 
 			roundTrips(source)
 			expect(format(source).text).not.toMatch(/[ \t]\n/)
+		})
+
+		// NOTE: The same thing four indents in, where the `define` is written,
+		// and with the wide arm in the middle of the table rather than above
+		// it: the arms either side of one that breaks are one table still, and
+		// they line up on the widest head that a column actually runs through.
+		it("lines the arms either side of a broken one up without it", () => {
+			roundTrips(
+				[
+					"implementation {",
+					"\tnamespace Grades for Integer {",
+					"\t\tband() -> String {",
+					"\t\t\t<- define {",
+					'\t\t\t\tas "bbbbbbbbbbbbbbbbbbbb" if @::isGreaterThan(80)',
+					'\t\t\t\tas "aaaaaaaaaaaaaaaaaaaaaaaa"',
+					"\t\t\t\t\tif @::isGreaterThanOrEqualTo(9_000_000_000)",
+					'\t\t\t\tas "cccccccccccccccc"     otherwise',
+					"\t\t\t}",
+					"\t\t}",
+					"\t}",
+					"}",
+					"",
+				].join("\n"),
+			)
+		})
+
+		// NOTE: An arm is taken out of the run for the padding it would carry
+		// as readily as for the column the run stands at — the two are one
+		// question. This one fits its line by two columns with no padding and
+		// runs six past it with the eight the widest head would give it, so
+		// keeping it in the run would be tearing a line in two to line up a
+		// word that the tear then moves. It keeps its line and its own column
+		// instead, and the two arms below it line up without it.
+		it("leaves an arm out rather than let its padding break it", () => {
+			roundTrips(
+				block(
+					"\tconstant grade = (_ score: Integer) -> String {",
+					"\t\t<- define {",
+					'\t\t\tas "aaaaa" if score::isGreaterThanOrEqualTo(9_000_000_000_000_000)',
+					'\t\t\tas "bbbbbbbbbbbbb" if score::isGreaterThan(80)',
+					'\t\t\tas "ccccccc"       otherwise',
+					"\t\t}",
+					"\t}",
+				),
+			)
 		})
 
 		// NOTE: An answer that lays itself out over several lines has no column

@@ -17,14 +17,48 @@ export const TAB_WIDTH = 4
 // something is too wide to be written on one WHEREVER it stands.
 export const WIDTH = 80
 
-// NOTE: Named, and returned by `text`, so that a caller holding one can write
-// to its `value` later. The `match` Handler alignment does exactly that: it
-// lays a Handler out before it knows how wide its siblings are, and fills the
-// padding in once the run has ended.
-export type TextDoc = { kind: "text"; value: string; verbatim: boolean }
+// NOTE: One line's share of an alignment run: how wide it reads left of the
+// column the run lines up on, and how wide the whole of it reads flat.
+//
+// `fitWidth` is what says whether the padding is worth writing at the column
+// the run turns out to stand at — a line whose padded width runs past the page
+// breaks, and a line that breaks may put the very thing the column is drawn
+// through onto a line of its own. It is null where a break can not take the
+// column away: an assignment's `=` and a `match` Handler's `{` are written
+// after their head wherever that head ends, and only what follows them is ever
+// moved down, so they hold their column however far the line runs on.
+export type AlignmentItem = {
+	headWidth: number
+	fitWidth: number | null
+}
+
+// NOTE: A run of sibling lines lining one column up, resolved by the renderer
+// rather than by whoever built it: how much padding each line carries is a
+// question about the column the run STANDS at, and nothing knows that column
+// until the run is reached.
+//
+// `maxSpan` is the most padding a line is worth carrying to reach its block's
+// column; `resolved` remembers the answer per amount of room the run was
+// reached with, because the renderer asks for it once to measure a line and
+// again to write it.
+export type AlignmentRun = {
+	items: Array<AlignmentItem>
+	maxSpan: number
+	resolved: Map<number, Array<number>>
+}
+
+// NOTE: The padding one line carries to its run's column. It is handed to the
+// printer before anyone knows whether the line joins a run at all, and
+// `joinAlignment` is what puts it in one — a slot that joined none is written
+// as nothing, the way an unpadded line always was.
+export type AlignDoc = {
+	kind: "align"
+	run: AlignmentRun | null
+	index: number
+}
 
 export type Doc =
-	| TextDoc
+	| { kind: "text"; value: string; verbatim: boolean }
 	| { kind: "concat"; parts: Array<Doc> }
 	// NOTE: One node covers all three break kinds. `soft` renders as nothing
 	// rather than a space when the group is flat; `hard` never renders flat at
@@ -74,6 +108,10 @@ export type Doc =
 	// after the item that runs out is broken. `parts` alternates item,
 	// separator, item, … — the separators are `line`s or things holding one.
 	| { kind: "fill"; parts: Array<Doc> }
+	// NOTE: Zero width until the renderer reaches it, which is the whole point
+	// of it: the run it belongs to is resolved against the room the line was
+	// reached with, and no one holding a Doc knows that room.
+	| AlignDoc
 
 // NOTE: `hug` and `expand` are measuring modes only, never modes the renderer
 // prints in. A `conditional` measures its first state in `hug` mode, which is
@@ -90,14 +128,14 @@ type Command = [indent: number, mode: Mode, doc: Doc]
 // Literal's spaces alone.
 type Segment = { value: string; verbatim: boolean }
 
-export function text(value: string): TextDoc {
+export function text(value: string): Doc {
 	return { kind: "text", value, verbatim: false }
 }
 
 // NOTE: Text the renderer hands through untouched — a String Literal sliced
 // back out of the source, or a Comment. Trailing spaces in it are characters
 // of the file rather than layout, so the line-end trimming stops at it.
-export function verbatim(value: string): TextDoc {
+export function verbatim(value: string): Doc {
 	return { kind: "text", value, verbatim: true }
 }
 
@@ -155,6 +193,147 @@ export function lineSuffix(value: string): Doc {
 
 export function fill(parts: Array<Doc>): Doc {
 	return { kind: "fill", parts }
+}
+
+// NOTE: Named, and mutable, for the reason `text` is: a line is laid out
+// before it is known which run it belongs to, or whether it belongs to one.
+export function alignmentSlot(): AlignDoc {
+	return { kind: "align", run: null, index: -1 }
+}
+
+export function alignmentRun(maxSpan: number): AlignmentRun {
+	return { items: [], maxSpan, resolved: new Map() }
+}
+
+// NOTE: Puts one line in a run, which is what gives its slot a padding to
+// write. Everything a run needs is settled while the Doc is built; nothing
+// here is touched again once the renderer has started.
+export function joinAlignment(
+	run: AlignmentRun,
+	slot: AlignDoc,
+	item: AlignmentItem,
+): void {
+	slot.run = run
+	slot.index = run.items.length
+
+	run.items.push(item)
+}
+
+// NOTE: How much padding each line of a run carries when the run is reached
+// with `room` columns left of the page — the width of the page, less the
+// indentation the run stands at.
+//
+// A line whose padded width runs past that room breaks, and a line that breaks
+// need not keep the thing the column is drawn through on its head's line: a
+// `define` arm writes its `if` below, where no column reaches it, while every
+// sibling is padded out to a column it no longer stands in. Such a line is
+// taken out of the run, and the lines either side of it line up without it.
+// This is what can not be settled where the run is built: whether a line fits
+// is a question about the column it starts at.
+//
+// Taking one line out never widens another line's block on its own, but it
+// does join the two lines either side of it into one, which can — so the pass
+// runs again until nothing more comes out. It always ends: a line is only ever
+// taken out, never put back.
+//
+// Blocks are greedy left to right rather than optimal, because a greedy pass
+// is stable under a second run and an optimal partition need not be: a block
+// is a maximal stretch of adjacent lines whose heads span no more than
+// `maxSpan` — the widest minus the narrowest — measured that way rather than
+// against the neighbour above, which would let a slow ramp of widths pad the
+// first line far past the budget. A block of one is left unpadded.
+function resolveAlignment(run: AlignmentRun, room: number): Array<number> {
+	let remembered = run.resolved.get(room)
+
+	if (remembered !== undefined) {
+		return remembered
+	}
+
+	let items = run.items
+	let padding = items.map(() => 0)
+	let taken = items.map(() => false)
+
+	for (;;) {
+		padding.fill(0)
+
+		let members: Array<number> = []
+
+		for (let index = 0; index < items.length; index++) {
+			if (!taken[index]) {
+				members.push(index)
+			}
+		}
+
+		let start = 0
+		let narrowest = 0
+		let widest = 0
+
+		let flushBlock = (end: number) => {
+			if (end - start > 1) {
+				for (let at = start; at < end; at++) {
+					let index = members[at] as number
+
+					padding[index] =
+						widest - (items[index] as AlignmentItem).headWidth
+				}
+			}
+
+			start = end
+		}
+
+		for (let at = 0; at < members.length; at++) {
+			let width = (items[members[at] as number] as AlignmentItem)
+				.headWidth
+
+			if (
+				at > start &&
+				Math.max(widest, width) - Math.min(narrowest, width) >
+					run.maxSpan
+			) {
+				flushBlock(at)
+			}
+
+			if (at === start) {
+				narrowest = width
+				widest = width
+			} else {
+				narrowest = Math.min(narrowest, width)
+				widest = Math.max(widest, width)
+			}
+		}
+
+		flushBlock(members.length)
+
+		let dropped = false
+
+		for (let index of members) {
+			let item = items[index] as AlignmentItem
+
+			if (
+				item.fitWidth !== null &&
+				item.fitWidth + (padding[index] as number) > room
+			) {
+				taken[index] = true
+				dropped = true
+			}
+		}
+
+		if (!dropped) {
+			break
+		}
+	}
+
+	run.resolved.set(room, padding)
+
+	return padding
+}
+
+function alignmentPadding(slot: AlignDoc, room: number): number {
+	if (slot.run === null) {
+		return 0
+	}
+
+	return resolveAlignment(slot.run, room)[slot.index] ?? 0
 }
 
 export function join(separator: Doc, parts: Array<Doc>): Doc {
@@ -261,6 +440,15 @@ export function renderFlat(doc: Doc): string | null {
 					commands.push(current.parts[index] as Doc)
 				}
 				break
+
+			// NOTE: Padding has no width until the column it is written at is
+			// known, and there is no column here. Every reader of a flat
+			// rendering that could hold one asks whether the Doc can be on one
+			// line at all rather than how wide it reads — a Doc whose OWN
+			// width is measured is a head, and a head is written left of the
+			// padding rather than around it.
+			case "align":
+				break
 		}
 	}
 
@@ -343,6 +531,9 @@ function propagateBreaks(doc: Doc): boolean {
 
 			return broken
 		}
+
+		case "align":
+			return false
 	}
 }
 
@@ -350,10 +541,15 @@ function propagateBreaks(doc: Doc): boolean {
 // still queued matter as much as the candidate does — `(a, b)` fits only if the
 // `)` that follows it fits too — so the scan continues into `restCommands`
 // until it reaches a break, which is where the line would end anyway.
+//
+// `width` is the width of the page rather than what is left of the line: an
+// alignment run is resolved against the room its line was reached with, and
+// that is the page less the indentation, not the columns still free here.
 function fits(
 	next: Command,
 	restCommands: Array<Command>,
 	remaining: number,
+	width: number,
 ): boolean {
 	let restIndex = restCommands.length
 	let commands: Array<Command> = [next]
@@ -464,6 +660,16 @@ function fits(
 					])
 				}
 				break
+
+			// NOTE: Measured exactly as the renderer will write it: both ask
+			// the run for the same room, so a line the run keeps is one the
+			// renderer is bound to leave flat.
+			case "align":
+				remaining -= alignmentPadding(
+					doc,
+					width - commandIndent * TAB_WIDTH,
+				)
+				break
 		}
 	}
 
@@ -529,7 +735,7 @@ export function printDoc(doc: Doc, width: number): string {
 				if (
 					!current.shouldBreak &&
 					(mode === "flat" ||
-						fits(flat, commands, width - column) ||
+						fits(flat, commands, width - column, width) ||
 						(current.breakIfTailFits !== null &&
 							!(
 								column < width &&
@@ -541,6 +747,7 @@ export function printDoc(doc: Doc, width: number): string {
 									],
 									commands,
 									width - commandIndent * TAB_WIDTH,
+									width,
 								)
 							)))
 				) {
@@ -589,6 +796,7 @@ export function printDoc(doc: Doc, width: number): string {
 						[commandIndent, "hug", states[0] as Doc],
 						commands,
 						width - column,
+						width,
 					)
 				) {
 					commands.push(first)
@@ -613,6 +821,7 @@ export function printDoc(doc: Doc, width: number): string {
 							[commandIndent, "hug", states[index] as Doc],
 							commands,
 							width - column,
+							width,
 						)
 					) {
 						chosen = candidate
@@ -650,7 +859,7 @@ export function printDoc(doc: Doc, width: number): string {
 				]
 
 				let contentFlat: Command = [commandIndent, "flat", content]
-				let contentFits = fits(contentFlat, [], width - column)
+				let contentFits = fits(contentFlat, [], width - column, width)
 
 				if (separator === undefined) {
 					commands.push(
@@ -676,6 +885,7 @@ export function printDoc(doc: Doc, width: number): string {
 						],
 						[],
 						width - column,
+						width,
 					)
 
 				commands.push(remaining)
@@ -689,6 +899,19 @@ export function printDoc(doc: Doc, width: number): string {
 						? contentFlat
 						: [commandIndent, "break", content],
 				)
+				break
+			}
+
+			case "align": {
+				let padding = " ".repeat(
+					alignmentPadding(
+						current,
+						width - commandIndent * TAB_WIDTH,
+					),
+				)
+
+				out.push({ value: padding, verbatim: false })
+				column += padding.length
 				break
 			}
 		}
