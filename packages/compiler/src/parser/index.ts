@@ -8,4 +8,4 @@ export {
 	type ParserOptions,
 	parse,
 	parseWithDiagnostics,
-} from "./descent/index"
+} from "./descent/parse"

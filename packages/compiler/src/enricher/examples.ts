@@ -1,7 +1,7 @@
 import type { common, parser } from "@essence-lang/interfaces"
 
 import { report } from "../diagnostics/index"
-import { parseTestBody } from "../parser/descent/index"
+import { parseTestBody } from "../parser/descent/parse"
 import { documentationPrefix } from "../parser/documentation"
 
 // NOTE: `@example` blocks, turned into the tests they are. What is written
