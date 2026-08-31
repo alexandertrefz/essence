@@ -14,7 +14,8 @@ import {
 	derivedEquatableNamespaceName,
 	derivedPrintableNamespaceName,
 } from "../enricher/resolvers"
-import { openArgumentHoles, typeContainsRefinement } from "../helpers/index"
+import { openArgumentHoles } from "../helpers/defaults"
+import { typeContainsRefinement } from "../helpers/types"
 import {
 	defaultOptimiserOptions,
 	type OptimiserOptions,

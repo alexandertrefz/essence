@@ -1,7 +1,7 @@
 import type { common } from "@essence-lang/interfaces"
 
 import { builtinNamespaces, builtinProtocols } from "../enricher/builtins"
-import { overloadIndexOf, resolveOverloadedMethodName } from "../helpers/index"
+import { overloadIndexOf, resolveOverloadedMethodName } from "../helpers/types"
 import { withoutOverloadSuffix } from "../optimiser/purity"
 import { rewriteNodes } from "../optimiser/walk"
 

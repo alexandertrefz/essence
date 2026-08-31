@@ -1,6 +1,6 @@
 import type { common } from "@essence-lang/interfaces"
 
-import { describeType, displayChoiceName } from "../../helpers/index"
+import { describeType, displayChoiceName } from "../../helpers/describe"
 import type { OptimiserPass } from "../index"
 import { rewriteNodes } from "../walk"
 

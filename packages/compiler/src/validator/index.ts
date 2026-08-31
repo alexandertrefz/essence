@@ -7,35 +7,36 @@ import {
 	reportWarning,
 	secondary,
 } from "../diagnostics/index"
-import { eraseRefinements } from "../helpers/eraseRefinements"
+import { caseDefaults, parameterDefaults } from "../helpers/defaults"
 import {
-	bodyDefinitelyReturns,
-	isUnitType,
-	conformanceParameterName,
 	countOf,
-	createFreshenedInference,
 	describeParameter,
 	describeSignature,
 	describeType,
-	flattenUnionMembers,
-	isMergedLevel,
-	isPartialOf,
-	mergedRecordType,
-	type MatchableArgument,
-	matchArguments,
-	matchesType,
-	missingRecordMembers,
-	caseDefaults,
-	parameterDefaults,
-	typeContainsError,
 	withArticle,
-} from "../helpers/index"
+} from "../helpers/describe"
+import { eraseRefinements } from "../helpers/eraseRefinements"
+import { conformanceParameterName } from "../helpers/names"
 import {
 	admittedTypeOf,
 	describePredicate,
 	fitsWritten,
 	unadmittedWrittenItem,
 } from "../helpers/predicateEval"
+import { bodyDefinitelyReturns } from "../helpers/returns"
+import {
+	createFreshenedInference,
+	flattenUnionMembers,
+	isMergedLevel,
+	isPartialOf,
+	isUnitType,
+	matchArguments,
+	matchesType,
+	mergedRecordType,
+	missingRecordMembers,
+	type MatchableArgument,
+	typeContainsError,
+} from "../helpers/types"
 
 type CurrentFunctionContext = common.typed.FunctionDefinitionNode | null
 

@@ -8,7 +8,7 @@ import {
 	derivedEquatableNamespace,
 	derivedPrintableNamespace,
 } from "../enricher/resolvers"
-import { computeConformanceMethodMap } from "../helpers/index"
+import { computeConformanceMethodMap } from "../helpers/conformance"
 import { parse } from "../parser/index"
 import { printType } from "../printType"
 

@@ -18,7 +18,7 @@ import {
 } from "@essence-lang/runtime/type"
 
 import { loadStdlib } from "../enricher/stdlib"
-import { applyGenericBindings } from "../helpers/index"
+import { applyGenericBindings } from "../helpers/types"
 import { acceptsAllAtRuntime, overlapsAtRuntime } from "../validator/index"
 
 // NOTE: The Validator decides which Handlers of a Match can run by asking what

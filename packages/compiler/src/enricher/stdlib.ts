@@ -6,7 +6,7 @@ import {
 
 import { throughSnapshot } from "../cache/snapshot"
 import { renderDiagnostics } from "../diagnostics/render"
-import { patternBindings } from "../helpers/index"
+import { patternBindings } from "../helpers/patterns"
 import {
 	linkModuleGraph,
 	loadModuleGraphOver,

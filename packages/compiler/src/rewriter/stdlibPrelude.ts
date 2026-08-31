@@ -3,7 +3,7 @@ import type { common } from "@essence-lang/interfaces"
 import { throughSnapshot } from "../cache/snapshot"
 import type { NativeBindings, Stdlib } from "../enricher/stdlib"
 import { isCanonicalStdlib, loadStdlib } from "../enricher/stdlib"
-import { resolveOverloadedMethodName } from "../helpers/index"
+import { resolveOverloadedMethodName } from "../helpers/types"
 import {
 	defaultOptimiserOptions,
 	optimise,

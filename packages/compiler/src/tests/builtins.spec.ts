@@ -44,7 +44,7 @@ import * as transcendental from "@essence-lang/runtime/Transcendental"
 
 import { builtinMemberOrder, builtinNamespaces } from "../enricher/builtins"
 import { loadStdlib } from "../enricher/stdlib"
-import { resolveOverloadedMethodName } from "../helpers/index"
+import { resolveOverloadedMethodName } from "../helpers/types"
 import { runtimeNamespaceNames } from "../rewriter/index"
 import { nativeArity } from "../tools/generateNatives"
 

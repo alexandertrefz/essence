@@ -1,7 +1,7 @@
 import type { common, parser } from "@essence-lang/interfaces"
 
 import { primary, reportError, secondary } from "../diagnostics/index"
-import { closestMatch } from "../helpers/index"
+import { closestMatch } from "../helpers/suggest"
 
 // NOTE: What a `test` and a `suite` may be Modified BY, and what each of those
 // Modifiers means. The Parser reads a Modifier generically — a name and the

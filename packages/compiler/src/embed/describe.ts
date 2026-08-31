@@ -1,9 +1,7 @@
 import type { common } from "@essence-lang/interfaces"
 
-import {
-	displayChoiceName,
-	resolveOverloadedMethodName,
-} from "../helpers/index"
+import { displayChoiceName } from "../helpers/describe"
+import { resolveOverloadedMethodName } from "../helpers/types"
 import type { ExportSurface } from "../modules/link"
 import { printSignature, printType } from "../printType"
 import {

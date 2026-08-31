@@ -10,34 +10,39 @@ import {
 	secondary,
 } from "../diagnostics/index"
 import {
+	computeConformanceMethodMap,
+	conformanceKey,
+	providedMethodProtocol,
+} from "../helpers/conformance"
+import { recordDefaultMembers, recordDefaultNesting } from "../helpers/defaults"
+import {
+	choiceIdentity,
+	countOf,
+	describeType,
+	displayChoiceName,
+	withArticle,
+} from "../helpers/describe"
+import {
+	conformanceParameterName,
+	parameterInternalName,
+} from "../helpers/names"
+import { closestMatch } from "../helpers/suggest"
+import {
 	applyGenericBindings,
 	borrowedGenericName,
 	buildUnion,
-	choiceIdentity,
-	computeConformanceMethodMap,
-	providedMethodProtocol,
-	closestMatch,
-	conformanceKey,
-	conformanceParameterName,
-	countOf,
 	createInferenceContext,
-	describeType,
-	displayChoiceName,
 	filterMostSpecificByTarget,
 	flattenUnionMembers,
-	type GenericBindings,
 	isPartialOf,
 	matchesType,
 	matchesTypeWithBindings,
-	type NamespaceTarget,
-	parameterInternalName,
-	recordDefaultMembers,
-	recordDefaultNesting,
 	refinementWithTypeArguments,
+	type GenericBindings,
+	type NamespaceTarget,
 	typeContainsError,
 	typeMentionsGeneric,
-	withArticle,
-} from "../helpers/index"
+} from "../helpers/types"
 import { recordAnnotation } from "./annotations"
 import { childScope, modulePathOf } from "./scope"
 

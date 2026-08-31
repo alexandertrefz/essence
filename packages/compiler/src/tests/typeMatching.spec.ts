@@ -3,13 +3,13 @@ import { describe, expect, it } from "bun:test"
 import type { common } from "@essence-lang/interfaces"
 
 import { enrich } from "../enricher/index"
+import { describeType } from "../helpers/describe"
 import {
 	buildUnion,
 	createInferenceContext,
-	describeType,
 	matchesType,
 	matchesTypeWithBindings,
-} from "../helpers/index"
+} from "../helpers/types"
 import { parse } from "../parser/index"
 import { printCaseWithPayload, printType } from "../printType"
 import { validate } from "../validator/index"

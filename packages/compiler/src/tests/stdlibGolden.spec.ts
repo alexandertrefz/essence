@@ -13,7 +13,7 @@ import {
 	derivedPrintableNamespace,
 } from "../enricher/resolvers"
 import { loadStdlib } from "../enricher/stdlib"
-import { applyGenericBindings } from "../helpers/index"
+import { applyGenericBindings } from "../helpers/types"
 import { optimise } from "../optimiser/index"
 import { parseWithDiagnostics } from "../parser/index"
 import { printSignature, signaturesOf } from "../printType"

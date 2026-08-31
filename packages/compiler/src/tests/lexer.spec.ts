@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test"
 
 import { lexer } from "@essence-lang/interfaces"
 
-import { stripPosition, stripPositionFromArray } from "../helpers/index"
+import { stripPosition, stripPositionFromArray } from "../helpers/nodes"
 import { Lexer } from "../lexer/index"
 
 const TokenType = lexer.TokenType
