@@ -100,19 +100,17 @@ declarations {
 			§ value, one call deeper. The ladder is written out instead, so
 			§ the Method answers without calling itself.
 			if lowest::isGreaterThan(highest) {
-				if @::isLessThan(highest) {
-					<- highest
-				} else if @::isGreaterThan(lowest) {
-					<- lowest
-				} else {
-					<- @
+				<- define {
+					as highest if @::isLessThan(highest)
+					as lowest  if @::isGreaterThan(lowest)
+					as @       otherwise
 				}
-			} else if @::isLessThan(lowest) {
-				<- lowest
-			} else if @::isGreaterThan(highest) {
-				<- highest
 			} else {
-				<- @
+				<- define {
+					as lowest  if @::isLessThan(lowest)
+					as highest if @::isGreaterThan(highest)
+					as @       otherwise
+				}
 			}
 		}
 	}

@@ -670,12 +670,10 @@ declarations {
 			§ length makes the subtraction go negative, and `slice` would read
 			§ that as a position counting back from the end. Both ends are
 			§ answered here instead.
-			if count::isLessThan(1) {
-				<- @
-			} else if count::isGreaterThanOrEqualTo(@::length()) {
-				<- []
-			} else {
-				<- @::slice(to @::length()::subtract(count))
+			<- define {
+				as @  if count::isLessThan(1)
+				as [] if count::isGreaterThanOrEqualTo(@::length())
+				as @::slice(to @::length()::subtract(count)) otherwise
 			}
 		}
 
