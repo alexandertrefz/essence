@@ -464,7 +464,7 @@ describe("The bridges from a List", () => {
 	})
 })
 
-// NOTE: `writtenValueType` in `simplifier/index.ts` takes the proof a written
+// NOTE: `writtenValueType` in `simplifier/simplify.ts` takes the proof a written
 // value carries back off it, so the simplified Node keeps saying what it holds.
 // Six Node kinds carry one, and the update of a Dictionary is the one that is
 // not a Literal — the one to hold to the rule, because a Rewriter that told a

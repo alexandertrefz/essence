@@ -42,7 +42,6 @@ export function createValue<Item extends AnyType>(item: Item): ValueType<Item> {
 // NOTE: The `#` sigil is left out, as `Ordering` prints `Less`. A rendering
 // names the Case; it does not quote the Expression that builds it. The
 // parentheses stay: without them `#Value("Empty")` and `#Empty` read alike.
-// biome-ignore lint/suspicious/noShadowRestrictedNames: This is a runtime function
 export function toString<Item extends AnyType>(
 	optional: OptionalType<Item>,
 	conformance: {
