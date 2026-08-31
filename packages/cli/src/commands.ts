@@ -20,7 +20,7 @@ export function withProgramName(text: string, programName: string): string {
 	return text.replaceAll(PROGRAM, programName)
 }
 
-export type OptionType = "string" | "boolean"
+type OptionType = "string" | "boolean"
 
 export type OptionSpec = {
 	name: string

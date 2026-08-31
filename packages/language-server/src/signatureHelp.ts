@@ -43,19 +43,19 @@ import { typedProgramNodes } from "./sections"
 // Labels carry the callee's name, so what is shown is the whole contract of
 // the call being written — `append(_ String) -> String`, not a bare signature.
 
-export type SignatureHelpInfo = {
+type SignatureHelpInfo = {
 	signatures: Array<SignatureInfo>
 	activeSignature: number
 	activeParameter: number
 }
 
-export type SignatureInfo = {
+type SignatureInfo = {
 	label: string
 	documentation: string | null
 	parameters: Array<ParameterInfo>
 }
 
-export type ParameterInfo = {
+type ParameterInfo = {
 	range: ParameterRange
 	documentation: string | null
 }

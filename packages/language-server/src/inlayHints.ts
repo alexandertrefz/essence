@@ -33,7 +33,7 @@ export type InlayHint = {
 
 // NOTE: An insertion, so a Cursor rather than a Position — the annotation goes
 // where the Hint is shown and replaces nothing.
-export type InlayHintEdit = {
+type InlayHintEdit = {
 	position: common.Cursor
 	newText: string
 }

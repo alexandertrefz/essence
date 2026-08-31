@@ -6,7 +6,7 @@ import type { BundleMap, GeneratedPosition } from "./maps"
 // and removes it when the same source is asked about again; this module only
 // translates.
 
-export type PlannedBreakpoint = {
+type PlannedBreakpoint = {
 	// NOTE: What the client asked for, answered back in request order.
 	requestedLine: number
 	verified: boolean

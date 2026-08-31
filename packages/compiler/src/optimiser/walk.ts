@@ -33,7 +33,7 @@ type ArgumentNode = common.typedSimple.ArgumentNode
 // NOTE: What a pass hands the walk: one Expression in, its replacement out. An
 // answer that IS the argument means "leave this one alone", which is how the
 // structural sharing above is kept.
-export type ExpressionRewrite = (node: ExpressionNode) => ExpressionNode
+type ExpressionRewrite = (node: ExpressionNode) => ExpressionNode
 
 // NOTE: And the same for a Statement — one Node standing in a Statement
 // POSITION in, its replacement out. "Statement position" is the whole of what
@@ -41,7 +41,7 @@ export type ExpressionRewrite = (node: ExpressionNode) => ExpressionNode
 // effects stands in one, and a Match written that way is exactly what
 // `lower-matches-to-statements` is looking for. Such a Node is offered to BOTH
 // hooks, the Expression one first, because it is both things at once.
-export type StatementRewrite = (node: ImplementationNode) => ImplementationNode
+type StatementRewrite = (node: ImplementationNode) => ImplementationNode
 
 // NOTE: And the same for a BODY — every place a run of Statements stands, which
 // is a Program's own nodes, a Function's body, a Match Handler's, a Conditional's
@@ -53,7 +53,7 @@ export type StatementRewrite = (node: ImplementationNode) => ImplementationNode
 // NOTE: Offered AFTER every Statement in it has been walked, like everything
 // else here, and expected to answer with the array it was GIVEN where it changes
 // nothing — the structural sharing the rest of this file keeps rests on it.
-export type BodyRewrite = (
+type BodyRewrite = (
 	nodes: Array<ImplementationNode>,
 ) => Array<ImplementationNode>
 
@@ -61,7 +61,7 @@ export type BodyRewrite = (
 // offered by ONE walk: `elide-final-match-test` reads a Match that is still an
 // Expression and one that has been lowered to a Statement, and two walks would
 // be two chances to disagree about what was reached.
-export type NodeRewrites = {
+type NodeRewrites = {
 	expression?: ExpressionRewrite
 	statement?: StatementRewrite
 	body?: BodyRewrite

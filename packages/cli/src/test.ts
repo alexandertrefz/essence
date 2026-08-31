@@ -104,7 +104,7 @@ export type LoadedSuite = LoadedBundle & { registry: Registry }
 // NOTE: One entry whose whole answer a run already held, ready to be written
 // back into the stream in place of running it. `tests` is what that entry
 // PLANNED, which the run's `run-start` has to count as its own.
-export type CachedEntry = {
+type CachedEntry = {
 	inputFileName: string
 	tests: number
 	events: Array<TestEvent>
@@ -116,7 +116,7 @@ export type CachedEntry = {
 // warm run and a cold one are the same report in the same order and the same
 // stream line for line. That is the whole claim a replay makes, and a reader
 // comparing two runs is the one it is made to.
-export type ReplayOptions = {
+type ReplayOptions = {
 	entries?: Array<CachedEntry>
 	// NOTE: Every entry of the run by name, replayed and live alike. Empty for a
 	// caller that replays nothing, which then runs what it was handed in the
@@ -128,7 +128,7 @@ export type ReplayOptions = {
 // and how many its `--filter` matched. Both are facts about the selection rather
 // than about the run, and both are what a result cache writes down so that a
 // replay can answer them without a bundle.
-export type EntrySelection = {
+type EntrySelection = {
 	inputFileName: string
 	planned: number
 	matched: number
@@ -140,7 +140,7 @@ export type EntrySelection = {
 // beside the sources. It travels with the seed rather than beside it because
 // what it decides is the same thing: which values a property test is asked
 // about.
-export type PropertyOptions = {
+type PropertyOptions = {
 	seed?: string
 	cases?: number | null
 	counterexamples?: Record<string, CorpusStore>
@@ -148,7 +148,7 @@ export type PropertyOptions = {
 
 // NOTE: What a run knows about snapshots before it starts: the stored entries
 // of every Module in it, and whether one that differs is to be recorded.
-export type SnapshotOptions = {
+type SnapshotOptions = {
 	stored?: Record<string, SnapshotStore>
 	update?: boolean
 }
@@ -166,7 +166,7 @@ export type SnapshotOptions = {
 // beside the table rather than as a parameter of its own because it is a fact
 // about the SAME counters, and a caller that wanted it and not them would be
 // asking for the impossible.
-export type CoverageOptions = {
+type CoverageOptions = {
 	byTest?: boolean
 }
 
@@ -189,7 +189,7 @@ export type TestFilters = {
 // entry claimed and read them back without the bundle. What a claim is keyed by
 // has to be one spelling, or a record written under one would be checked against
 // the other.
-export function moduleKeyOf(module: TestModule): string {
+function moduleKeyOf(module: TestModule): string {
 	return module.module ?? module.tests[0]?.id ?? ""
 }
 
@@ -612,7 +612,7 @@ export function remembersResults(options: {
 // NOTE: A deselection by tag, by filter or by `bench`, and a skip, are all
 // deterministic functions of the manifest and of the filters in the key, so
 // they are remembered like a pass.
-export function isRemembered(events: Array<TestEvent>): boolean {
+function isRemembered(events: Array<TestEvent>): boolean {
 	return events.every((event) => {
 		switch (event.kind) {
 			case "test-fail":
@@ -636,7 +636,7 @@ export function isRemembered(events: Array<TestEvent>): boolean {
 // Module whose owner moved would be reported twice or by nobody. A hit knows
 // its own Modules because the record wrote them down and the bundle hash that
 // names the record pins them; a miss has been loaded and can be asked.
-export function planClaims(
+function planClaims(
 	entries: Array<{ inputFileName: string; modules: Array<string> }>,
 ): Map<string, Array<string>> {
 	let claimed = new Set<string>()
@@ -678,7 +678,7 @@ function isPlainRun(filters: TestFilters, explicitSkipTags: number): boolean {
 	)
 }
 
-export function reportUnknownTags(
+function reportUnknownTags(
 	context: CLIContext,
 	suites: Array<LoadedSuite>,
 	named: Array<string>,
@@ -737,7 +737,7 @@ export function reportUnmatchedFilter(
 // counts what the FILTER matched — see `selectTests` — so the warning above
 // stays quiet, and the plain tree does not list a deselection; without this
 // sentence the run ends green with the reader's target never run.
-export function reportBenchOnlyFilter(
+function reportBenchOnlyFilter(
 	context: CLIContext,
 	run: TestRun,
 	filter: string | null,

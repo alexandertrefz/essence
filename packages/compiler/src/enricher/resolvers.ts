@@ -83,7 +83,7 @@ function resolveTypeDeclaration(
 	}
 }
 
-export function resolveFunctionTypeDeclarationType(
+function resolveFunctionTypeDeclarationType(
 	node: parser.FunctionTypeDeclarationNode,
 	scope: enricher.Scope,
 ): common.FunctionType {
@@ -1495,7 +1495,7 @@ export function specializedNamespacesFor(
 // conditions); a failure carries the because-chain, outermost first, or an
 // empty chain when the failure was already reported (ambiguity, a
 // nonconforming Namespace) and must stay silent.
-export type ConformanceSolveResult =
+type ConformanceSolveResult =
 	| { ok: true; source: common.ConformanceSource }
 	| { ok: false; chain: Array<string> }
 
@@ -2357,7 +2357,7 @@ function describeMembers(
 // reported, and null says to build it silently. Only a settled call site passes
 // one: a conformance solve reaches here speculatively and memoised, and the
 // Diagnostic it would report belongs to whatever call the witness is for.
-export function derivedEquatableDescriptor(
+function derivedEquatableDescriptor(
 	alias: common.GenericAliasType,
 	typeArguments: Array<common.Type>,
 	position: common.Position | null,
@@ -2823,7 +2823,7 @@ function providedMethodsOf(result: {
 // A Protocol extension is a promise about its conformers, so `is Orderable`
 // answers an `is Comparable` bound — the transitive ancestor list a Protocol
 // carries is exactly this question, written flat.
-export function protocolGrants(
+function protocolGrants(
 	declared: string,
 	wanted: string,
 	scope: enricher.Scope,
@@ -2842,7 +2842,7 @@ export function protocolGrants(
 // fulfilling Method's own bound, bound to a Scope. The helper is Scope-free by
 // design, so the one place that knows how Protocols extend each other hands the
 // answer in rather than the helper reaching for it.
-export function conformanceGrantsIn(
+function conformanceGrantsIn(
 	scope: enricher.Scope,
 ): (declared: string, wanted: string) => boolean {
 	return (declared, wanted) => protocolGrants(declared, wanted, scope)
@@ -2855,7 +2855,7 @@ export function conformanceGrantsIn(
 // descendant's is what a direct call runs. The most DERIVED provider among the
 // conformer's Protocols is the one both spellings then agree on, which is the
 // same descendant-wins rule the two call-side walks already run.
-export function conformanceProvidersIn(
+function conformanceProvidersIn(
 	protocolNames: Iterable<string>,
 	scope: enricher.Scope,
 ): (methodName: string) => string | null {
@@ -4369,7 +4369,7 @@ function applyGenericAlias(
 	return appliedType
 }
 
-export function resolveIdentifierTypeDeclarationType(
+function resolveIdentifierTypeDeclarationType(
 	node: parser.IdentifierTypeDeclarationNode,
 	scope: enricher.Scope,
 ): common.Type {
@@ -4412,7 +4412,7 @@ export function resolveIdentifierTypeDeclarationType(
 
 // NOTE: Members that subsume one another collapse and anonymous nested Unions
 // flatten in; a named one keeps its name. See `buildUnion`.
-export function resolveUnionTypeDeclarationType(
+function resolveUnionTypeDeclarationType(
 	node: parser.UnionTypeDeclarationNode,
 	scope: enricher.Scope,
 ): common.Type {
@@ -4425,7 +4425,7 @@ export function resolveUnionTypeDeclarationType(
 	return buildUnion(resolvedTypes)
 }
 
-export function resolveRecordTypeDeclarationType(
+function resolveRecordTypeDeclarationType(
 	node: parser.RecordTypeDeclarationNode,
 	scope: enricher.Scope,
 ): common.RecordType {
@@ -4728,7 +4728,7 @@ export function findProtocolInScope(
 // winning — the shadowing rule the Namespace enumeration follows. Asked only
 // where a Method call found nothing written, so that a Protocol's provided
 // Methods can be offered as the fallback they are.
-export function allProtocolsInScope(
+function allProtocolsInScope(
 	scope: enricher.Scope,
 ): Array<common.ProtocolType> {
 	let found = new Map<string, common.ProtocolType>()
@@ -6048,7 +6048,7 @@ export function reportDocumentationParameters(
 // the Declaration as a whole, which is what most of them do; asking for a line
 // per Parameter everywhere is the next notch to tighten, and it belongs beside
 // the `undocumented` walk below.
-export type DocumentationStrictness = "lenient" | "strict"
+type DocumentationStrictness = "lenient" | "strict"
 
 export const documentationStrictness: DocumentationStrictness = "strict"
 
@@ -6061,7 +6061,7 @@ export type DocumentedParameter = {
 	internalName: string | null
 }
 
-export type DocumentationParameterProblem =
+type DocumentationParameterProblem =
 	// NOTE: A line past the end of the Parameter list.
 	| { kind: "unknown"; index: number }
 	// NOTE: A line naming something other than the Parameter at its position.

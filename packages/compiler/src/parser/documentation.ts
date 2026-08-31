@@ -52,7 +52,7 @@ export type DocumentationProblem = {
 	position: common.Position
 }
 
-export type ParsedDocumentation = {
+type ParsedDocumentation = {
 	documentation: common.Documentation
 	problems: Array<DocumentationProblem>
 }

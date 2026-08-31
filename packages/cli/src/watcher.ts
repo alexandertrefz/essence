@@ -38,7 +38,7 @@ export const DEFAULT_POLL = 500
 // reaches — a dependency is never rebuilt as an entry of its own, because what
 // it changes is the output of the Modules that import it. A file two entries
 // reach wakes both.
-export type DependentsIndex = {
+type DependentsIndex = {
 	record(entry: string, fileNames: Array<string>): void
 	entriesFor(fileNames: Array<string>): Array<string>
 	files(): Array<string>
@@ -87,7 +87,7 @@ export function createDependentsIndex(): DependentsIndex {
 	}
 }
 
-export type SourceWatcher = {
+type SourceWatcher = {
 	// NOTE: Adds files to the watched set — the graphs GROW, because an import
 	// written during a session brings a directory with it and a session that
 	// never watched it would stop noticing saves there.
@@ -98,7 +98,7 @@ export type SourceWatcher = {
 	close(): void
 }
 
-export type SourceWatcherOptions = {
+type SourceWatcherOptions = {
 	onChange: (changed: Array<string>) => void
 	// NOTE: Something happened in a watched directory and no watched file
 	// changed — which is what the CREATION of a file looks like from in here,
@@ -120,7 +120,7 @@ export type SourceWatcherOptions = {
 }
 
 // NOTE: What `fs.watch` answers with, as far as this file reads it.
-export type DirectoryWatcher = {
+type DirectoryWatcher = {
 	close(): void
 	on(event: "error", listener: (error: unknown) => void): unknown
 }

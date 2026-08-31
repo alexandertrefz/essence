@@ -43,7 +43,7 @@ type Component = {
 	linked: Map<string, LinkedModule> | null
 }
 
-export type SessionRead =
+type SessionRead =
 	| { filePath: string; sourceText: string }
 	| { filePath: string; error: unknown }
 

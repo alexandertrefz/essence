@@ -18,7 +18,7 @@ import { format, type FormatResult, guarded } from "./index"
 // What holds the splice honest is the check below — the rewritten source is
 // parsed again, and every slot has to hold exactly the text it was given.
 
-export type SnapshotUpdate = {
+type SnapshotUpdate = {
 	// NOTE: Where the recorded value stands, or would stand — the `snapshot`
 	// Keyword's own span where the source has never held one. It comes off the
 	// run's own event, which the Compiler filled from the span table.
@@ -26,7 +26,7 @@ export type SnapshotUpdate = {
 	text: string
 }
 
-export type SnapshotWrite = FormatResult & {
+type SnapshotWrite = FormatResult & {
 	// NOTE: How many of the updates found the slot they name. Fewer than were
 	// handed over means the file moved under the run — nothing is written at a
 	// Position that now means something else.
@@ -172,7 +172,7 @@ function writeUnguarded(
 // A newline is `\n` rather than a line of its own: Essence has no multi-line
 // String Literal, so a recorded value that spans lines is spelled on one — and
 // a value long enough for that to read badly is what a STORED snapshot is for.
-export function literalOf(text: string): string {
+function literalOf(text: string): string {
 	return `"${text
 		.replaceAll("\\", "\\\\")
 		.replaceAll('"', '\\"')

@@ -54,7 +54,7 @@ export type CallHierarchyItem = {
 	selectionRange: common.Position
 }
 
-export type CallSite = {
+type CallSite = {
 	caller: CallHierarchyItem
 	callee: CallHierarchyItem
 	// NOTE: Where the callee's name is written at the call site — what an

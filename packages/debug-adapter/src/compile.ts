@@ -30,7 +30,7 @@ export type CompileResult = {
 // it is the debugger's own: a session stepping through a test needs the
 // `tests { … }` block a build drops, because the block IS the code it steps
 // through.
-export type CompileOptions = {
+type CompileOptions = {
 	tests?: boolean
 }
 

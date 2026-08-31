@@ -17,16 +17,16 @@ import type { common } from "@essence-lang/interfaces"
 export const booleanType: common.BooleanType = { type: "Boolean" }
 export const stringType: common.StringType = { type: "String" }
 export const integerType: common.IntegerType = { type: "Integer" }
-export const rationalType: common.RationalType = { type: "Rational" }
-export const algebraicType: common.AlgebraicType = { type: "Algebraic" }
-export const transcendentalType: common.TranscendentalType = {
+const rationalType: common.RationalType = { type: "Rational" }
+const algebraicType: common.AlgebraicType = { type: "Algebraic" }
+const transcendentalType: common.TranscendentalType = {
 	type: "Transcendental",
 }
 // NOTE: The source a property test generates its values from. It has no
 // declaration anywhere for the reason the tags above have none: nothing a
 // `type`, `choice` or `protocol` could say produces a value that carries state
 // only the runtime can read.
-export const randomnessType: common.RandomnessType = { type: "Randomness" }
+const randomnessType: common.RandomnessType = { type: "Randomness" }
 // NOTE: The open Record Type — `{}` members, which every Record is assignable
 // to. It is the receiver Type the Record Namespace targets, and it is also the
 // UNIT Type: a Function that answers nothing useful promises a Record with no
@@ -35,7 +35,7 @@ export const recordType: common.RecordType = { type: "Record", members: {} }
 
 // NOTE: `List` names the unapplied List Type — `List<Item>` applies it. The
 // default keeps a bare `List` annotation meaningful.
-export const genericListType: common.GenericListType = {
+const genericListType: common.GenericListType = {
 	type: "GenericList",
 	generics: [{ name: "ItemType", defaultType: { type: "Unknown" } }],
 }
@@ -43,7 +43,7 @@ export const genericListType: common.GenericListType = {
 // NOTE: The same for `Dictionary`, which `Dictionary<Key, Value>` applies. Both
 // defaults are Unknown and are decided SEPARATELY — a bare `Dictionary` has
 // decided neither slot, and nothing may read one from the other.
-export const genericDictionaryType: common.GenericDictionaryType = {
+const genericDictionaryType: common.GenericDictionaryType = {
 	type: "GenericDictionary",
 	generics: [
 		{ name: "KeyType", defaultType: { type: "Unknown" } },

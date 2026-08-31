@@ -52,7 +52,7 @@ const debounceInMilliseconds = 450
 // their session back within a cup of coffee's inattention.
 const deadlineInMilliseconds = 60_000
 
-export type TestSessionOptions = {
+type TestSessionOptions = {
 	// NOTE: Every `.es` file the workspace knows, and — for each of them —
 	// whether it wrote a `tests { … }` block and which files a change to it
 	// reaches. The session asks rather than searches: the Workspace already
@@ -130,7 +130,7 @@ export type TestSession = {
 // NOTE: The Worker lives beside this file as source in the repository, and
 // beside the Server as a bundle in the extension. `buildServer.js` writes the
 // second; nothing writes the first, because Bun and Node both run the source.
-export function defaultWorkerPath(): string {
+function defaultWorkerPath(): string {
 	let bundled = fileURLToPath(new URL("./testWorker.js", import.meta.url))
 
 	return existsSync(bundled)

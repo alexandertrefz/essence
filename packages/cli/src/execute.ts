@@ -8,7 +8,7 @@ import { formatDuration } from "./report"
 // was started by Bun and Node when it was started by Node, which keeps `esc
 // run` working without a hardcoded runtime name.
 
-export type ExecutionResult = {
+type ExecutionResult = {
 	code: number
 	duration: number
 }

@@ -14,7 +14,7 @@ import type { common } from "@essence-lang/interfaces"
 
 import { countOf } from "../helpers/index"
 
-export interface RenderOptions {
+interface RenderOptions {
 	color?: boolean
 }
 

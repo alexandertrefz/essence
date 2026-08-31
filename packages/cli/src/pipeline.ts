@@ -45,7 +45,7 @@ import { type CompileSession, createCompileSession } from "./session"
 // sizes, which stage a compilation stopped at — is produced here, so the two
 // paths can never drift into reporting different things.
 
-export const stageNames = [
+const stageNames = [
 	"read",
 	"parse",
 	"enrich",
@@ -71,7 +71,7 @@ export const stageLabels: Record<StageName, string> = {
 	write: "writing",
 }
 
-export type StageTiming = {
+type StageTiming = {
 	name: StageName
 	duration: number
 }
@@ -175,7 +175,7 @@ export type CompileOutcome = {
 	mutations?: Array<MutationSite>
 }
 
-export type ProgressReporter = (stage: StageName) => void
+type ProgressReporter = (stage: StageName) => void
 
 // NOTE: What a Descriptor is written under beside its bundle: `app.js` and
 // `app.descriptor.json`. `@essence-lang/client`'s `loadPrebuilt` defaults to the

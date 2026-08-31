@@ -162,7 +162,7 @@ function isObject(value: unknown): value is Record<string, unknown> {
 // as holding nothing, and the writer refuses to touch. A missing file is an
 // empty store, not an unreadable one: absence is the ordinary state of a
 // Module nothing has failed in.
-export type CorpusReading = {
+type CorpusReading = {
 	stores: Record<string, CorpusStore>
 	unreadable: Array<{ module: string; problem: string }>
 }

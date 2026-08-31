@@ -41,7 +41,7 @@ export type AlignmentItem = {
 // column; `resolved` remembers the answer per amount of room the run was
 // reached with, because the renderer asks for it once to measure a line and
 // again to write it.
-export type AlignmentRun = {
+type AlignmentRun = {
 	items: Array<AlignmentItem>
 	maxSpan: number
 	resolved: Map<number, Array<number>>

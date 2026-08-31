@@ -54,7 +54,7 @@ import {
 // so the list is not a promise this file may keep on its own: the census in
 // `stdlibLoader.spec.ts` is the whole of it, and a body rewritten to stop
 // forwarding puts a question here that nothing can decide.
-export function admittedByEvaluation(
+function admittedByEvaluation(
 	refinement: common.RefinementType,
 	value: common.typed.ExpressionNode,
 ): boolean {
@@ -205,7 +205,7 @@ export function refinementInside(type: common.Type): boolean {
 // in. `part` is what a Diagnostic calls it: a List holds items, a Dictionary
 // holds keys and values, and calling a key an item is calling it the wrong
 // thing in a message whose whole job is to say which one it is.
-export type UnadmittedWrittenPart = {
+type UnadmittedWrittenPart = {
 	value: common.typed.ExpressionNode
 	refinement: common.RefinementType
 	part: "item" | "key" | "value"

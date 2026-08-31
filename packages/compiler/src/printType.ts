@@ -220,7 +220,7 @@ export function printSignatureSummary(
 // NOTE: Whether a Parameter a call may leave out is MARKED. On for a signature
 // shown to a reader — a Hover, Signature Help, a Document Symbol — and off for a
 // Type printed where source could be written; see `printType`.
-export type SignaturePrinting = { marksOmittable?: boolean }
+type SignaturePrinting = { marksOmittable?: boolean }
 
 export function printSignature(
 	functionType: common.BaseFunction,
@@ -236,7 +236,7 @@ export function printSignature(
 // identically printed Parameters — `(_ Integer, _ Integer)` is common.
 export type ParameterRange = [number, number]
 
-export type SignatureDescription = {
+type SignatureDescription = {
 	label: string
 	parameters: Array<ParameterRange>
 }

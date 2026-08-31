@@ -68,7 +68,7 @@ export type DeclarationKind =
 // occurrence writes `[null]` over the Identifier it was found at, which is why
 // nothing but a shorthand — a Pattern's binder and a Record Literal's member —
 // carries any of this.
-export type RenameText = Array<string | null>
+type RenameText = Array<string | null>
 
 export type RenameEdit = {
 	// NOTE: The span the edit replaces. An EMPTY span INSERTS, which is what
@@ -228,7 +228,7 @@ type WalkContext = {
 	scopes: Array<ScopeRange>
 }
 
-export type ExternalMemberReference = {
+type ExternalMemberReference = {
 	// NOTE: The name the Namespace is reachable under HERE — an aliased import
 	// binds a copy of the Namespace Type carrying its local name, which is what
 	// the resolved Invocation names.

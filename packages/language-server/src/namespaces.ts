@@ -39,7 +39,7 @@ export function builtinProtocols(): Array<common.ProtocolType> {
 	return Object.values(builtinProtocolTable())
 }
 
-export function targetTypeMatches(
+function targetTypeMatches(
 	namespace: common.NamespaceType,
 	baseType: common.Type,
 ): boolean {
@@ -502,7 +502,7 @@ function collectNamespaceTypesInBody(
 	}
 }
 
-export function collectProtocolTypes(
+function collectProtocolTypes(
 	documentText: string,
 	documentPath?: string,
 	document: DocumentAnalysis | null = null,

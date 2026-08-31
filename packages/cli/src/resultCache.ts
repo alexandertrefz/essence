@@ -106,7 +106,7 @@ export function hostKey(): string {
 // and the `.json` a Module's tests compare themselves against. A file that is
 // not there is the empty string rather than an absence, so that deleting a
 // stored snapshot is a different key rather than the same one.
-export type StorePart = { label: string; text: string }
+type StorePart = { label: string; text: string }
 
 const STORE_KINDS: Array<[kind: string, fileOf: (module: string) => string]> = [
 	["snapshots", snapshotFileOf],
@@ -114,7 +114,7 @@ const STORE_KINDS: Array<[kind: string, fileOf: (module: string) => string]> = [
 	["counterexamples", corpusFileOf],
 ]
 
-export type StoreReader = (
+type StoreReader = (
 	modules: Iterable<string>,
 ) => Promise<Array<StorePart>>
 

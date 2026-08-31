@@ -157,7 +157,7 @@ const tokenTypeLexemes: { [tokenType in lexer.TokenType]?: string } = {
 	[TokenType.KeywordRequire]: "require",
 }
 
-export function describeTokenType(tokenType: lexer.TokenType): string {
+function describeTokenType(tokenType: lexer.TokenType): string {
 	let lexeme = tokenTypeLexemes[tokenType]
 
 	if (lexeme !== undefined) {

@@ -37,7 +37,7 @@ import {
 // Overload set that has not been narrowed to one candidate spells out every
 // Overload on its own line instead of combining them into a single Type.
 
-export type HoverInfo = {
+type HoverInfo = {
 	position: common.Position
 	content: string
 	documentation: string | null
@@ -138,7 +138,7 @@ export function findHover(
 // end of a line or into the indentation of a body is asking about nothing. A
 // space BETWEEN two tokens on a line is another matter: it is part of what
 // spans them — `a + b`, a Record Literal, a String — and answers as that.
-export function isInMargin(text: string, cursor: common.Cursor): boolean {
+function isInMargin(text: string, cursor: common.Cursor): boolean {
 	let line = text.split("\n")[cursor.line - 1] ?? ""
 	let index = cursor.column - 1
 
