@@ -1,6 +1,6 @@
 // NOTE: The Rewriter's naming, read backwards — what a JavaScript frame or
 // binding is called in Essence. Every rule here mirrors one in
-// `packages/compiler/src/rewriter/index.ts`, and each is injective there, so
+// `packages/compiler/src/rewriter/rewrite.ts`, and each is injective there, so
 // reading them back cannot guess wrong: `$user_` mangling keeps `[A-Za-z0-9$]`
 // and writes every other character as `_<hex>_` (no Essence identifier
 // contains `_` — the Lexer reads it as a Symbol); a reserved word is

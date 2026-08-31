@@ -313,7 +313,7 @@ function typeDeclarationNamesChoice(
 // diagnosed and resolved to Error rather than to a real Type. This owns the
 // DIRECT self-naming of a generic Choice and nothing else — every other
 // recursive shape is caught before the hoist rounds by the cycle pre-pass in
-// `enricher/index.ts`, which reports `recursive-type-declaration` and leaves
+// `enricher/enrich.ts`, which reports `recursive-type-declaration` and leaves
 // this one shape alone.
 function resolveGenericCaseMembers(
 	payload: parser.RecordTypeDeclarationNode | null,

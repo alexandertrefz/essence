@@ -50,7 +50,6 @@ export function paint(text: string, color: Color | null): string {
 	return `\x1b[${foregroundCode(color)}m${text}\x1b[0m`
 }
 
-// biome-ignore lint/suspicious/noControlCharactersInRegex: matching ANSI escape sequences is the point
 const ANSI_PATTERN = /\x1b\[[0-9;]*m/g
 
 export function stripAnsi(text: string): string {

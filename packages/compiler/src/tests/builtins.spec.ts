@@ -96,7 +96,7 @@ const runtimeModules: Record<string, Record<string, unknown>> = {
 
 // NOTE: What the Simplifier will emit for a declared Method — the bare name for
 // a single signature, `name__overload$N` for each overload of an Overloaded
-// one (`simplifier/index.ts:142`). The index is the one the Method was WRITTEN
+// one (`resolveOverloadedMethodName`). The index is the one it was WRITTEN
 // at, natives included, which is exactly how `nativeBindings` is indexed too.
 // Each name carries the arity the runtime convention will call it with, from the
 // generator's own `nativeArity`, so the two checks can never disagree about it.

@@ -93,7 +93,6 @@ export function is(
 // holding that List has to say the same thing about it. The layout is still the
 // structural one — members as `name = value`, a String member quoted — which is
 // what `Record.es` promises.
-// biome-ignore lint/suspicious/noShadowRestrictedNames: This is a runtime function
 export function toString(recordInstance: RecordType): StringType {
 	return createString(
 		getStringRepresentation(recordInstance, 0, formatAsFraction, ""),

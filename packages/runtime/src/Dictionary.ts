@@ -811,7 +811,6 @@ export function is<Key extends AnyType, Value extends AnyType>(
 // reads as a key rather than as nothing at all, and a value that is a String
 // reads as one. Keys and values are Printable through their own Namespaces, so
 // each side is rendered with its own witness.
-// biome-ignore lint/suspicious/noShadowRestrictedNames: This is a runtime function
 export function toString<Key extends AnyType, Value extends AnyType>(
 	dictionary: DictionaryType<Key, Value>,
 	keyConformance: PrintableWitness<Key>,

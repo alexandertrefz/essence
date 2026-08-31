@@ -11,7 +11,7 @@
 //
 // NOTE: A file of its own, rather than a const in the Rewriter that owns it,
 // because the Optimiser asks the same question and asking it through
-// `rewriter/index` would close a cycle: the Rewriter reads the standard library
+// `rewriter/rewrite` would close a cycle: the Rewriter reads the standard library
 // prelude, the prelude is optimised, and the Optimiser would read the Rewriter.
 // Nothing is imported here, so nothing can.
 export const runtimeNamespaceNames = [

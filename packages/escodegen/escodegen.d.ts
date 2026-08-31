@@ -3,7 +3,7 @@
 // this one. They cover upstream's documented option surface; the shape the
 // undocumented `sourceMapWithCode` mode answers with is asserted at the
 // compiler's one call site instead (see `generateProgram` in
-// `packages/compiler/src/rewriter/index.ts`).
+// `packages/compiler/src/rewriter/rewrite.ts`).
 
 export interface IndentOptions {
 	style?: string

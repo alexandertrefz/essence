@@ -538,14 +538,8 @@ export type UnionMethodDispatchCase = {
 	// derived Equatable — the Rewriter then emits
 	// `$helpers.boundChoiceIs(<descriptor>)` for the branch's Method.
 	derivedDescriptor?: DerivedEquatableDescriptor
-	// NOTE: The Protocol that PROVIDED this Method, when one did. `base`/
-	// `namespaceName` is the Namespace whose conformance put the Method in
-	// reach — `Integer` for `5::isNot(3)` — and that Namespace declares no
-	// Method of the name, so this is what sends the emission to the one const
-	// every conformer shares. It is a flag rather than a name comparison
-	// because a Program may declare `protocol Integer` beside the standard
-	// library's `Integer` Namespace, and a name alone can not say which
-	// answered.
+	// NOTE: The Protocol that provided this branch's Method, read exactly as
+	// `MethodInvocationNode.providedBy` above.
 	providedBy?: string
 }
 
