@@ -164,8 +164,8 @@ export class Printer {
 	// assignments written in one column — the same alignment a `match` gives its
 	// Handlers' braces, and built the same way: each Statement is laid out in
 	// source order, because that is the order the trivia cursor is walked in,
-	// and the padding is written into a Doc node kept aside for it once the
-	// widths of a whole run are known.
+	// and each joins the run through a padding slot of its own, which the
+	// renderer fills once it knows the column the run stands at.
 	//
 	// A run ends wherever the column would stop meaning anything: at a Statement
 	// that is not an assignment; at a blank line, which is how the author says
@@ -256,9 +256,9 @@ export class Printer {
 	// Statement outside it, so unless the block writes it, nothing does. It
 	// also runs to the end of its line, which is what rules the flat shape out.
 	// NOTE: `prefix` is written before the `{` but lives INSIDE the group, so
-	// an `ifBreak` in it answers to this block's own decision. That is what
-	// lets a `match` Handler's alignment padding disappear the moment the
-	// Handler stops fitting on one line.
+	// it is measured with the block it opens — which is what a `match`
+	// Handler's alignment padding has to be, or a Handler would be offered a
+	// flat shape that its own padding then pushes past the width.
 	private block(
 		entries: Array<Entry>,
 		openLine: number | null,
@@ -2178,9 +2178,8 @@ export class Printer {
 	}
 
 	// NOTE: Handlers are built in source order, because that is the order the
-	// trivia cursor is walked in, and only then aligned — the padding is written
-	// into a Doc node kept aside for it, once the widths of a whole run are
-	// known.
+	// trivia cursor is walked in, and only then aligned — each carries a
+	// padding slot into the run, which the renderer fills.
 	private printMatch(node: parser.MatchNode): Doc {
 		let entries: Array<Entry> = []
 		let run = alignmentRun(UNBLOCKED_ALIGNMENT)
@@ -2459,9 +2458,9 @@ export class Printer {
 				// the one seam in it that is not inside one of the two
 				// Expressions. The answer keeps the line it was introduced on,
 				// and the case gets the whole width of the next one. The
-				// padding sits in front of the break, where the line-end
-				// trimming takes it away the moment it is not holding a column
-				// open.
+				// padding is written in front of that break, where it holds no
+				// column open: an arm that breaks is one the run took out and
+				// left unpadded, and the line-end trimming stands behind that.
 				//
 				// NOTE: An arm that breaks stands apart from the run: its `if`
 				// is on a line of its own, and the column its head would hold
