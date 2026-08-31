@@ -321,18 +321,31 @@ describe("The coverage instrumentation pass", () => {
 		])
 	})
 
-	// NOTE: An arm has no body to write a Statement into, so its counter is the
-	// WRAPPING form — it counts and answers with the very value it was handed,
-	// which is what leaves the chain a chain rather than a Function to call.
-	// `pool-constants` has put the answers behind references by then, so what is
-	// read here is the call around each of them.
-	it("wraps an arm's answer rather than standing in front of it", () => {
+	// NOTE: An arm has no body to write a Statement into, so its counter goes
+	// INSIDE the Expression — in front of the answer rather than around it,
+	// which is what makes an arm count when it is TAKEN. It is the reading the
+	// Statement in front of an `if` body already gives: the branch is counted on
+	// the way in, so an answer that throws while it is built was still the arm
+	// the ladder chose. `pool-constants` has put the answers behind references
+	// by then, so what is read here is the pair around each of them.
+	it("counts an arm before it builds the answer", () => {
 		let generated = rewrite(instrumented(defineArms), coverageOptions)
 
 		expect(generated).toMatch(
-			/\? \$cover\(0, \$pool_\d+\) : .* \? \$cover\(1, \$pool_\d+\) : \$cover\(2, \$pool_\d+\)/,
+			/\? \(\$cover\(0\), \$pool_\d+\) : .* \? \(\$cover\(1\), \$pool_\d+\) : \(\$cover\(2\), \$pool_\d+\)/,
 		)
 		expect(generated).not.toContain("(function")
+	})
+
+	// NOTE: And a construction counts AFTER the value, which is the other half
+	// of the same rule rather than an inconsistency with it. What that point
+	// claims is that a `#Played` was BUILT, and a payload that threw halfway
+	// built none — so counting one in front of the value it counts would count
+	// something that did not happen, the one direction this pass never goes.
+	it("counts a construction only once it is built", () => {
+		let generated = rewrite(instrumented(fixtures), coverageOptions)
+
+		expect(generated).toMatch(/const sample = \$cover\(\d+, \{/)
 	})
 
 	it("counts a Case construction, and names the tag it builds", () => {

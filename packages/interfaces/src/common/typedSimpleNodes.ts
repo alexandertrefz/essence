@@ -405,14 +405,24 @@ export interface TestTraceNode {
 //
 // NOTE: `value` is null in Statement position, where the counter stands on its
 // own. It is set where a counter has to answer with something — a Choice Case
-// built inside an Expression — and the emitted call answers with the very value
-// it was handed, so wrapping an Expression in one changes nothing about what it
-// evaluates to.
+// built inside an Expression, an arm of a `define` — and what is emitted answers
+// with the very value it was handed, so putting an Expression behind one changes
+// nothing about what it evaluates to.
 export interface CoverageCounterNode {
 	nodeType: "CoverageCounter"
 	// NOTE: Indexes the Module's coverage table — see `CoverageSectionNode`.
 	point: number
 	value: ExpressionNode | null
+	// NOTE: Whether the counter runs BEFORE the value it answers with, which is
+	// the difference between counting that a path was TAKEN and counting that a
+	// value was BUILT. A `define` arm's counter leads: the arm is counted on the
+	// way in, exactly as the Statement in front of an `if` body counts its
+	// branch on the way in, so an answer that threw while it was built was still
+	// the arm the ladder chose. A Case construction's does not: what that point
+	// claims is that a Case was built, and a payload that threw halfway built
+	// none. A counter with no value never reads this — one standing on its own
+	// is already in front of what it counts.
+	leads: boolean
 	type: Type
 	position?: Position
 }
