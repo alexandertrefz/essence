@@ -7520,16 +7520,6 @@ function findDeclaringScope(
 	return null
 }
 
-// NOTE: Where the name a use refers to was declared, or null when it was
-// declared by the Compiler rather than in this file. What lets a Diagnostic
-// about a use point back at the declaration that constrains it.
-export function findDeclarationPosition(
-	name: string,
-	scope: enricher.Scope,
-): common.Position | null {
-	return findDeclaringScope(name, scope)?.declarations[name] ?? null
-}
-
 function declareTypeInScope(
 	identifier: parser.IdentifierNode | string,
 	type: common.Type,

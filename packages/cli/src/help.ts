@@ -4,7 +4,6 @@ import {
 	findCommand,
 	globalOptions,
 	type OptionSpec,
-	optionsFor,
 	PROGRAM,
 	visibleOptions,
 	withProgramName,
@@ -388,8 +387,4 @@ export function renderUsageLine(
 	return `${INDENT}${context.palette.muted("Usage:")} ${context.palette.accent(
 		named(command.usage[0], context),
 	)}`
-}
-
-export function allOptionNames(command: CommandSpec): Array<string> {
-	return optionsFor(command).map((option) => option.name)
 }

@@ -1024,12 +1024,6 @@ export interface RecordTypeDeclarationNode {
 	position: Position
 }
 
-export interface ListTypeDeclarationNode {
-	nodeType: "ListTypeDeclaration"
-	type: TypeDeclarationNode
-	position: Position
-}
-
 export interface UnionTypeDeclarationNode {
 	nodeType: "UnionTypeDeclaration"
 	types: Array<TypeDeclarationNode>

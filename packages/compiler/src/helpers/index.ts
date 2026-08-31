@@ -365,37 +365,6 @@ export function stripPosition(
 	return undefined
 }
 
-export function symbol(array: Array<{ position: common.Position }>) {
-	return { position: array[0].position }
-}
-
-export function first<T = any>(array: Array<T>) {
-	return array[0]
-}
-
-export function second<T = any>(array: Array<T>) {
-	return array[1]
-}
-
-export function third<T = any>(array: Array<T>) {
-	return array[2]
-}
-
-export function flatten<T = any>(array: Array<T | Array<T>>): Array<T> {
-	return array.reduce<Array<T>>((prev, curr) => {
-		let result: Array<T>
-
-		if (Array.isArray(curr)) {
-			result = prev.concat(curr)
-		} else {
-			prev.push(curr)
-			result = prev
-		}
-
-		return result
-	}, [])
-}
-
 // NOTE: The suffix the Simplifier mangles an Overload's name with, spelled once
 // for the two Functions that write it and read it back.
 const OVERLOAD_SUFFIX = "__overload$"

@@ -694,7 +694,7 @@ export function lookupTypeOf(
 // shadow everything else.
 //
 // A Program with no default anywhere never sets a barrier, so this is the same
-// walk `findVariableInScope` is, one `undefined` check per Scope longer.
+// walk an ordinary name lookup is, one `undefined` check per Scope longer.
 type BarredName = enricher.BarredParameterName & {
 	reads: "own" | "later" | "pattern"
 }
@@ -4684,29 +4684,6 @@ export function suggestionData(suggestion: string | null): {
 	return suggestion === null
 		? {}
 		: { data: { kind: "suggestion", suggestion } }
-}
-
-// NOTE: `Object.hasOwn`, not a plain index — as in `findTypeInScope` below.
-// A name that happens to spell a member of `Object.prototype` (`toString`,
-// `valueOf`, `constructor`) would otherwise resolve to a JavaScript function
-// nobody declared, and an undeclared `toString` would type-check.
-export function findVariableInScope(
-	name: string,
-	scope: enricher.Scope,
-): common.Type | null {
-	let searchScope: enricher.Scope | null = scope
-
-	while (true) {
-		if (searchScope === null) {
-			return null
-		}
-
-		if (Object.hasOwn(searchScope.members, name)) {
-			return searchScope.members[name]
-		} else {
-			searchScope = searchScope.parent
-		}
-	}
 }
 
 export function findTypeInScope(
