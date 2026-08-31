@@ -484,7 +484,11 @@ describe("The simplified update", () => {
 		while (pending.length > 0) {
 			let value = pending.pop()
 
-			if (typeof value !== "object" || value === null || seen.has(value)) {
+			if (
+				typeof value !== "object" ||
+				value === null ||
+				seen.has(value)
+			) {
 				continue
 			}
 
@@ -515,7 +519,10 @@ describe("The simplified update", () => {
 
 		validate(enriched.program)
 
-		let combinations = nodesOfKind(simplify(enriched.program), "Combination")
+		let combinations = nodesOfKind(
+			simplify(enriched.program),
+			"Combination",
+		)
 
 		expect(combinations).toHaveLength(1)
 		expect((combinations[0]!.type as common.Type).type).toBe("Dictionary")

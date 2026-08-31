@@ -459,7 +459,9 @@ describe("a debug session", () => {
 				(variable) => variable.name === "older",
 			)!
 
-			expect(secondOlder.value).toBe('[ "ada" = 1, "sam" = 25, "alex" = 40 ]')
+			expect(secondOlder.value).toBe(
+				'[ "ada" = 1, "sam" = 25, "alex" = 40 ]',
+			)
 
 			let secondEntries = (
 				await client.variablesRequest({
