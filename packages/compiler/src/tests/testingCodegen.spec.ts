@@ -553,6 +553,54 @@ describe("Test codegen — running what was emitted", () => {
 		})
 	})
 
+	// NOTE: A `define` is the one construct written IN expression position that
+	// asks questions of its own, and an assertion is exactly where one will be
+	// written — so a reader is shown what each Condition answered and what the
+	// arm that held answered with, the same as if they had been written beside
+	// the assertion rather than inside it. Nothing about the ladder itself is
+	// reported: an arm nobody took evaluates nothing and traces nothing.
+	it("explains a failure through the arms of a define", async () => {
+		let { events } = await run(`implementation {
+			function grade(_ score: Integer) -> String {
+				<- define {
+					as "A" if score::isGreaterThanOrEqualTo(90)
+					as "B" otherwise
+				}
+			}
+		}
+
+		tests {
+			test "one" {
+				expect define {
+					as grade(85) if grade(95)::is("A")
+					as "nope" otherwise
+				}::is("A")
+			}
+		}`)
+		let failure = eventsOf(events, "test-fail")[0]
+
+		expect(
+			failure?.kind === "test-fail"
+				? failure.failures[0]?.values.map((value) => [
+						value.span?.source,
+						value.value,
+					])
+				: null,
+		).toEqual([
+			["grade(95)", '"A"'],
+			['grade(95)::is("A")', "true"],
+			["grade(85)", '"B"'],
+			// NOTE: The ladder's own value, which the assertion records the way
+			// it records any asserted Expression — spelled across the four
+			// lines it was written on.
+			[
+				'define {\n\t\t\t\t\tas grade(85) if grade(95)::is("A")\n\t\t\t\t\tas "nope" otherwise\n\t\t\t\t}',
+				'"B"',
+			],
+			['"A"', '"A"'],
+		])
+	})
+
 	// NOTE: `require MATCHER = EXPR` asserts a Matcher's test over a value held
 	// under a name, so there is no expression tree at the assertion to take
 	// apart — the subject is the Statement in front of it, and that is what is
