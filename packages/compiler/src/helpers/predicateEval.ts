@@ -8,7 +8,7 @@ import {
 	matchesType,
 	matchesTypeWithBindings,
 	provenConjuncts,
-} from "./index"
+} from "./types"
 
 // NOTE: Whether a value is admitted into a refinement by DECIDING its predicate
 // here, while compiling. A refinement normally needs a branch in front of it —

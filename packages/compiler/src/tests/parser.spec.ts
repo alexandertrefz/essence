@@ -3,7 +3,7 @@ import { describe, expect, it } from "bun:test"
 import type { parser } from "@essence-lang/interfaces"
 
 import { containsErrors } from "../diagnostics/index"
-import { parameterInternalName } from "../helpers/index"
+import { parameterInternalName } from "../helpers/names"
 import { parse, parseWithDiagnostics } from "../parser/index"
 
 describe("Parser", () => {

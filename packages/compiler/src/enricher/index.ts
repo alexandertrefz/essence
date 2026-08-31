@@ -14,7 +14,7 @@ import {
 	closePendingRefinementCopies,
 	openPendingRefinementCopies,
 	pendingRefinementCopiesOf,
-} from "../helpers/index"
+} from "../helpers/types"
 import { VALUE_COMMENT, valueCommentLines } from "../valueComments"
 import { collectAnnotations } from "./annotations"
 import { builtinMembers, builtinProtocols, builtinTypes } from "./builtins"

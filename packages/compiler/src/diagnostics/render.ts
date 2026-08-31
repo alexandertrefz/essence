@@ -12,7 +12,7 @@ import {
 } from "@essence-lang/ariadne"
 import type { common } from "@essence-lang/interfaces"
 
-import { countOf } from "../helpers/index"
+import { countOf } from "../helpers/describe"
 
 interface RenderOptions {
 	color?: boolean

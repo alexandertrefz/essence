@@ -6,7 +6,7 @@ import {
 	primary,
 	reportInformation,
 } from "../diagnostics/index"
-import { countOf } from "../helpers/index"
+import { countOf } from "../helpers/describe"
 import {
 	deriveGenerator,
 	enrichExpression,

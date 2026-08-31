@@ -5,10 +5,8 @@ import type { common } from "@essence-lang/interfaces"
 import { RUNTIME_DIRECTORY } from "@essence-lang/runtime"
 
 import { loadStdlib, type Stdlib } from "../enricher/stdlib"
-import {
-	conformanceParameterName,
-	resolveOverloadedMethodName,
-} from "../helpers/index"
+import { conformanceParameterName } from "../helpers/names"
+import { resolveOverloadedMethodName } from "../helpers/types"
 
 // NOTE: The renderer that turns the loaded standard library into a checked-in
 // TypeScript contract for the runtime bindings — `@essence-lang/runtime`.

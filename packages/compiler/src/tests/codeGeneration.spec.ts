@@ -17,7 +17,7 @@ import {
 	type Stdlib,
 	useStdlib,
 } from "../enricher/stdlib"
-import { resolveOverloadedMethodName } from "../helpers/index"
+import { resolveOverloadedMethodName } from "../helpers/types"
 import {
 	defaultOptimiserOptions,
 	optimise,

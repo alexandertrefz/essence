@@ -2,9 +2,9 @@ import type { common } from "@essence-lang/interfaces"
 
 import {
 	displayChoiceName,
-	displayedRefinementArguments,
 	displayGenericName,
-} from "./helpers/index"
+	displayedRefinementArguments,
+} from "./helpers/describe"
 
 // NOTE: A human-oriented Type printer for Hovers. The Validator's
 // `describeType` is its Diagnostics-oriented sibling — unlike it, this one

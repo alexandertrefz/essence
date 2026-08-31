@@ -2,14 +2,13 @@ import type { common } from "@essence-lang/interfaces"
 
 import { relativeIdentityKey, testIdentityKey } from "../enricher/tests"
 import {
-	bodyDefinitelyReturns,
-	conformanceParameterName,
-	isMergedLevel,
 	openArgumentHoles,
 	recordDefaultMembers,
 	recordDefaultNesting,
-	resolveOverloadedMethodName,
-} from "../helpers/index"
+} from "../helpers/defaults"
+import { conformanceParameterName } from "../helpers/names"
+import { bodyDefinitelyReturns } from "../helpers/returns"
+import { isMergedLevel, resolveOverloadedMethodName } from "../helpers/types"
 import { valueCommentLines } from "../valueComments"
 
 // NOTE: What the Simplifier needs to know beyond the Program, which today is

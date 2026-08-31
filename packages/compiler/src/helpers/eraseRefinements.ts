@@ -14,7 +14,7 @@ import type { common } from "@essence-lang/interfaces"
 // one is a refinement reaching the Rewriter, so what it needs is not a list to
 // keep up to date but the guarantee that no field can be forgotten — including
 // the fields of a Node kind, an intrinsic or a Type shape a later work package
-// adds. `typeWalkFinds` in `helpers/index.ts` reads a Type the same way and for
+// adds. `typeWalkFinds` in `helpers/types.ts` reads a Type the same way and for
 // the same reason. The Rewriter's ICE guards are the second half of it: if this
 // walk were ever wrong, the compile fails there rather than emitting a Program
 // that carries evidence nobody can read.

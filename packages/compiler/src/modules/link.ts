@@ -13,7 +13,7 @@ import {
 import { enrichPrograms, topLevelScope } from "../enricher/index"
 import { invalidateNamespacesInScope } from "../enricher/resolvers"
 import { countTypeDeclaration } from "../enricher/scope"
-import { patternBindings } from "../helpers/index"
+import { patternBindings } from "../helpers/patterns"
 import type { Module, ModuleGraph } from "./graph"
 
 // NOTE: What a top level declaration was written as, which is what decides the

@@ -114,9 +114,7 @@ const STORE_KINDS: Array<[kind: string, fileOf: (module: string) => string]> = [
 	["counterexamples", corpusFileOf],
 ]
 
-type StoreReader = (
-	modules: Iterable<string>,
-) => Promise<Array<StorePart>>
+type StoreReader = (modules: Iterable<string>) => Promise<Array<StorePart>>
 
 // NOTE: Reads each companion ONCE per run however many entries reach the Module
 // it belongs to. A project where twenty test files import one Module would

@@ -22,16 +22,20 @@ import type {
 	UnknownType,
 } from "@essence-lang/interfaces/common"
 
+import {
+	computeConformanceMethodMap,
+	conformanceKey,
+} from "../helpers/conformance"
+import { recordDefaultNesting } from "../helpers/defaults"
+import { describeType } from "../helpers/describe"
 import { eraseRefinements } from "../helpers/eraseRefinements"
+import { stripPosition, stripPositionFromArray } from "../helpers/nodes"
 import {
 	applyGenericBindings,
 	buildUnion,
 	canonicalPredicateConjuncts,
 	closePendingRefinementCopies,
-	computeConformanceMethodMap,
-	conformanceKey,
 	createInferenceContext,
-	describeType,
 	isPartialOf,
 	matchArguments,
 	matchesType,
@@ -40,17 +44,14 @@ import {
 	openPendingRefinementCopies,
 	pendingRefinementCopiesOf,
 	predicateConjunctKey,
-	recordDefaultNesting,
 	refinementWithTypeArguments,
 	resolveOverloadedMethodName,
 	resolveUnknownSlots,
-	stripPosition,
-	stripPositionFromArray,
 	typeContainsError,
 	typeContainsRefinement,
 	typeContainsUnknown,
 	typeMentionsGeneric,
-} from "../helpers/index"
+} from "../helpers/types"
 
 const TokenType = lexer.TokenType
 type Token = lexer.Token
