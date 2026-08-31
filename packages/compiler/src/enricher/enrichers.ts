@@ -3642,10 +3642,7 @@ export function enrichDefine(
 		// claim the Node carries that it established anything at all. The two
 		// were always one answer; only the second of them used to be thrown
 		// away.
-		let complements = narrowingsFor(
-			complementEvidence(condition, armScope),
-			armScope,
-		)
+		let complements = falseBranchNarrowings(condition, armScope)
 
 		arms.push({
 			value,
@@ -7003,8 +7000,13 @@ export function enrichIfElseStatementNode(
 ): common.typed.IfElseStatementNode {
 	let condition = enrichExpression(node.condition, scope)
 	let narrowings = trueBranchNarrowings(condition, scope)
+	// NOTE: What the condition leaves its `else`, computed once and read twice
+	// — the Scope that branch is enriched in, and the claim the Node carries
+	// that it established anything at all. It was always one answer, and the
+	// second half of it used to go unasked.
+	let complements = falseBranchNarrowings(condition, scope)
 	let trueScope = branchScope(narrowings, scope)
-	let falseScope = falseBranchScope(condition, scope)
+	let falseScope = branchScope(complements, scope)
 	let trueBody = node.trueBody.flatMap((node) => enrichNode(node, trueScope))
 
 	reportRedundantKeyCheck(condition, trueBody)
@@ -7013,6 +7015,7 @@ export function enrichIfElseStatementNode(
 		nodeType: "IfElseStatement",
 		condition,
 		narrows: narrowings.length > 0,
+		narrowsFalse: complements.length > 0,
 		trueBody,
 		falseBody: node.falseBody.flatMap((node) =>
 			enrichNode(node, falseScope),
@@ -8283,18 +8286,19 @@ function branchScope(
 	return childScope(scopeShadowing(narrowings, scope))
 }
 
-// NOTE: And the Scope for the branch the condition answered `false` in. An
-// `else if` needs nothing of its own here: the nested If lives in the `falseBody`
-// Array and is enriched in this very Scope, so it asks its question of the
-// complement and adds to it.
-function falseBranchScope(
+// NOTE: And what it establishes for the branch it answered `false` in, which is
+// the complement of the one question it asked. Answered on its own for the
+// reason the true branch's is: a `define` arm and an `if` each carry the claim,
+// and each needs the narrowings themselves as well.
+//
+// An `else if` needs nothing of its own beyond this: the nested If lives in the
+// `falseBody` Array and is enriched in the Scope these build, so it asks its
+// question of the complement and adds to it.
+function falseBranchNarrowings(
 	condition: common.typed.ExpressionNode,
 	scope: enricher.Scope,
-): enricher.Scope {
-	return branchScope(
-		narrowingsFor(complementEvidence(condition, scope), scope),
-		scope,
-	)
+): Array<Narrowing> {
+	return narrowingsFor(complementEvidence(condition, scope), scope)
 }
 
 // NOTE: The WRAPPER Scope a branch's shadows are declared in, or the Scope itself

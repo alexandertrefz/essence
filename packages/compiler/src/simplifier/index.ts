@@ -1132,6 +1132,11 @@ function simplifyConditional(
 			nodeType: "IfElseStatement",
 			condition: node.condition,
 			narrows: node.narrows,
+			// NOTE: An `if` with no `else` has no false body, so nothing was
+			// ever read under the complement of its condition and the claim
+			// about that branch is `false` rather than unknown. The Enricher
+			// does not work the complement out for one, and this is why.
+			narrowsFalse: false,
 			trueBody: node.body,
 			falseBody: [],
 			position: node.position,
@@ -1143,10 +1148,11 @@ function simplifyConditional(
 	return {
 		nodeType: "ConditionalStatement",
 		condition: simplifyExpression(convertedNode.condition),
-		// NOTE: Carried through untouched — what a branch established was
-		// decided by the Enricher, and the evidence it decided from does not
-		// survive simplification.
+		// NOTE: Carried through untouched, both of them — what a branch
+		// established was decided by the Enricher, and the evidence it decided
+		// from does not survive simplification.
 		narrows: convertedNode.narrows,
+		narrowsFalse: convertedNode.narrowsFalse,
 		// NOTE: An Essence Boolean, which the Rewriter reads the JavaScript one
 		// out of — until an Optimiser pass finds the question already asked in
 		// JavaScript's terms. The Simplifier states what the Program says and

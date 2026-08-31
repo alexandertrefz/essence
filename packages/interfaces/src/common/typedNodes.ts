@@ -1019,6 +1019,18 @@ export interface IfElseStatementNode {
 	nodeType: "IfElseStatement"
 	condition: ExpressionNode
 	narrows: boolean
+	// NOTE: And that the condition established something for the branch it
+	// answered `false` in — the complement the `falseBody` was read under. A
+	// SECOND claim rather than the same one twice, exactly as it is on a
+	// `define` arm: neither implies the other, and `separator::isEmpty()` is
+	// the plain case of the difference — it proves nothing about a String
+	// where it holds and proves `NonEmptyString` where it does not.
+	//
+	// It is what makes "may these two bodies trade places" answerable.
+	// Everything below the Enricher reads a Conditional as two bodies with no
+	// evidence anywhere in it, and a reader that swapped them on the strength
+	// of that would run a body against a refinement nobody proved.
+	narrowsFalse: boolean
 	trueBody: Array<ImplementationNode>
 	falseBody: Array<ImplementationNode>
 	position: Position
