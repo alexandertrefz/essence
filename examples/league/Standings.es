@@ -1,6 +1,8 @@
 import {
-	Fixture from "./Season.es"
-	Team    from "./Season.es"
+	from "./Season.es" {
+		Fixture
+		Team
+	}
 }
 
 implementation {

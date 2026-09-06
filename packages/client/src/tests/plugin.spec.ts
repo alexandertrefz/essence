@@ -297,7 +297,7 @@ export const table = Direction
 	it("hands over one standalone Module for a whole graph", async () => {
 		let directory = project({
 			"Main.es": `import {
-	square from "./Math.es"
+	from "./Math.es" { square }
 }
 
 implementation {
@@ -823,7 +823,7 @@ describe("The Vite plugin", () => {
 	it("answers with a wrapper, and watches every source it was built from", async () => {
 		let directory = project({
 			"Main.es": `import {
-	square from "./Math.es"
+	from "./Math.es" { square }
 }
 
 implementation {
@@ -968,7 +968,7 @@ export {
 		writeFileSync(
 			path.join(directory, "Entry.es"),
 			`import {
-	shared from "./Shared.es"
+	from "./Shared.es" { shared }
 }
 
 implementation {
@@ -1069,8 +1069,8 @@ export {
 		let directory = project({
 			"lib/Shapes.es": SHAPES_MODULE,
 			"app/One.es": `import {
-	Shape  from "../lib/Shapes.es"
-	areaOf from "../lib/Shapes.es"
+	from "../lib/Shapes.es" { Shape }
+	from "../lib/Shapes.es" { areaOf }
 }
 
 implementation {
@@ -1082,8 +1082,8 @@ export {
 }
 `,
 			"Two.es": `import {
-	Shape  from "./lib/Shapes.es"
-	areaOf from "./lib/Shapes.es"
+	from "./lib/Shapes.es" { Shape }
+	from "./lib/Shapes.es" { areaOf }
 }
 
 implementation {

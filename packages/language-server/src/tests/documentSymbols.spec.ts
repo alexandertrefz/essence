@@ -439,7 +439,7 @@ describe("The export block", () => {
 				"}",
 				"export {",
 				"\tsquared as square",
-				'\tRectangle from "./Geometry.es"',
+				'\tfrom "./Geometry.es" { Rectangle }',
 				"}",
 			].join("\n"),
 		)

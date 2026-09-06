@@ -1248,7 +1248,7 @@ export {
 }
 `,
 				"Main.es": `import {
-	Shape from "./shapes/Shapes.es"
+	from "./shapes/Shapes.es" { Shape }
 }
 
 implementation {

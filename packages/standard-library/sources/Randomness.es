@@ -1,5 +1,5 @@
 import {
-	NonEmptyList from "./List.es"
+	from "./List.es" { NonEmptyList }
 }
 
 declarations {

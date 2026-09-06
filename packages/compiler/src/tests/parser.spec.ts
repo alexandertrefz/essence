@@ -3423,8 +3423,8 @@ describe("Parser", () => {
 		it("should parse an import section above the implementation", () => {
 			let { program, diagnostics } = parseWithDiagnostics(
 				`import {
-					Rectangle from "./Geometry.es"
-					Circle from "./Geometry.es"
+					from "./Geometry.es" { Rectangle }
+					from "./Geometry.es" { Circle }
 				}
 
 				implementation {
@@ -3461,9 +3461,9 @@ describe("Parser", () => {
 		// framing it may not widen it — each carries its own span instead.
 		it("should keep the Program's Position on the implementation block", () => {
 			let program = parse(
-				`import { Rectangle from "./Geometry.es" }
+				`import { from "./Geometry.es" { Rectangle } }
 implementation { }
-export { Rectangle from "./Geometry.es" }`,
+export { from "./Geometry.es" { Rectangle } }`,
 			)
 
 			expect(program.position).toEqual(program.implementation.position)
@@ -3474,13 +3474,13 @@ export { Rectangle from "./Geometry.es" }`,
 			})
 			expect(program.exports?.position.end).toEqual({
 				line: 3,
-				column: 42,
+				column: 46,
 			})
 		})
 
 		it("should read an import entry's name, source and Position", () => {
 			let entries = importEntries(
-				`import { Rectangle from "./Geometry.es" }
+				`import { from "./Geometry.es" { Rectangle } }
 				implementation { }`,
 			)
 
@@ -3489,14 +3489,14 @@ export { Rectangle from "./Geometry.es" }`,
 			expect(entries[0].source.nodeType).toBe("ModuleSpecifier")
 			expect(entries[0].source.path).toBe("./Geometry.es")
 			expect(entries[0].position).toEqual({
-				start: { line: 1, column: 10 },
-				end: { line: 1, column: 40 },
+				start: { line: 1, column: 33 },
+				end: { line: 1, column: 42 },
 			})
 		})
 
 		it("should read an import entry's alias", () => {
 			let entries = importEntries(
-				`import { PI as Pi from "../math/Math.es" }
+				`import { from "../math/Math.es" { PI as Pi } }
 				implementation { }`,
 			)
 
@@ -3530,7 +3530,7 @@ export { Rectangle from "./Geometry.es" }`,
 		it("should read a re-export entry's source", () => {
 			let entries = exportEntries(
 				`implementation { }
-				export { Rectangle from "./Geometry.es" }`,
+				export { from "./Geometry.es" { Rectangle } }`,
 			)
 
 			expect(entries[0].name.content).toBe("Rectangle")
@@ -3541,7 +3541,7 @@ export { Rectangle from "./Geometry.es" }`,
 		it("should read a renamed re-export entry", () => {
 			let entries = exportEntries(
 				`implementation { }
-				export { Rectangle as Box from "./Geometry.es" }`,
+				export { from "./Geometry.es" { Rectangle as Box } }`,
 			)
 
 			expect(entries[0].name.content).toBe("Rectangle")
@@ -3554,7 +3554,7 @@ export { Rectangle from "./Geometry.es" }`,
 				`implementation { }
 				export {
 					describe
-					Rectangle from "./Geometry.es"
+					from "./Geometry.es" { Rectangle }
 				}`,
 			)
 
@@ -3570,8 +3570,8 @@ export { Rectangle from "./Geometry.es" }`,
 		it("should read an entry named after a Module Keyword", () => {
 			let entries = importEntries(
 				`import {
-					as as as from "./Names.es"
-					from from "./Names.es"
+					from "./Names.es" { as as as }
+					from "./Names.es" { from }
 				}
 				implementation { }`,
 			)
@@ -3585,7 +3585,7 @@ export { Rectangle from "./Geometry.es" }`,
 
 		it("should accept an import section written on one line", () => {
 			let entries = importEntries(
-				`import { A from "./A.es" B from "./B.es" }
+				`import { from "./A.es" { A } from "./B.es" { B } }
 				implementation { }`,
 			)
 
@@ -3599,7 +3599,7 @@ export { Rectangle from "./Geometry.es" }`,
 			it("should keep the entries above a broken one and the implementation below it", () => {
 				let { program, diagnostics } = parseWithDiagnostics(
 					`import {
-						Rectangle from "./Geometry.es"
+						from "./Geometry.es" { Rectangle }
 						Circle "./Geometry.es"
 					}
 
@@ -3614,10 +3614,25 @@ export { Rectangle from "./Geometry.es" }`,
 				expect(program.implementation.nodes).toHaveLength(1)
 			})
 
-			it("should report an export entry whose 'from' carries no specifier", () => {
+			// NOTE: `from` is an Identifier in an export block unless a specifier
+			// follows it, so `from` alone is an entry named `from` — and a group
+			// with a specifier but no braces is the one that is refused.
+			it("should read a bare export entry named 'from'", () => {
 				let { program, diagnostics } = parseWithDiagnostics(
 					`implementation { }
 					export { Rectangle from }`,
+				)
+
+				expect(diagnostics).toEqual([])
+				expect(
+					program.exports?.entries.map((entry) => entry.name.content),
+				).toEqual(["Rectangle", "from"])
+			})
+
+			it("should report a group whose specifier opens no braces", () => {
+				let { program, diagnostics } = parseWithDiagnostics(
+					`implementation { }
+					export { from "./Geometry.es" }`,
 				)
 
 				expect(diagnostics).toHaveLength(1)
@@ -3625,10 +3640,24 @@ export { Rectangle from "./Geometry.es" }`,
 				expect(program.exports?.entries).toEqual([])
 			})
 
+			it("should report an import entry written outside a group", () => {
+				let { program, diagnostics } = parseWithDiagnostics(
+					`import { Rectangle from "./Geometry.es" }
+					implementation { }`,
+				)
+
+				expect(diagnostics).toHaveLength(1)
+				expect(diagnostics[0].code).toBe("syntax-error")
+				expect(diagnostics[0].message).toBe(
+					"Expected 'from' but found 'Rectangle'.",
+				)
+				expect(program.imports?.entries).toEqual([])
+			})
+
 			it("should report a section that is never closed", () => {
 				let { diagnostics } = parseWithDiagnostics(
 					`import {
-						Rectangle from "./Geometry.es"`,
+						from "./Geometry.es" { Rectangle }`,
 				)
 
 				expect(diagnostics[0].code).toBe("unclosed-block")
@@ -3678,7 +3707,7 @@ export { Rectangle from "./Geometry.es" }`,
 				let { program, diagnostics } = parseWithDiagnostics(
 					`implementation { }
 
-					import { Rectangle from "./Geometry.es" }`,
+					import { from "./Geometry.es" { Rectangle } }`,
 				)
 
 				expect(diagnostics).toHaveLength(1)
@@ -3707,9 +3736,9 @@ export { Rectangle from "./Geometry.es" }`,
 
 			it("should keep a well-placed section beside a misplaced one", () => {
 				let { program, diagnostics } = parseWithDiagnostics(
-					`import { A from "./A.es" }
+					`import { from "./A.es" { A } }
 					implementation { }
-					import { B from "./B.es" }`,
+					import { from "./B.es" { B } }`,
 				)
 
 				expect(diagnostics).toHaveLength(1)
@@ -3727,7 +3756,7 @@ export { Rectangle from "./Geometry.es" }`,
 		describe("Declarations Programs", () => {
 			it("should keep an import section in a standard library file", () => {
 				let { program, diagnostics } = parseWithDiagnostics(
-					`import { Rectangle from "./Geometry.es" }
+					`import { from "./Geometry.es" { Rectangle } }
 
 					declarations { }`,
 					{ allowDeclarationsHeader: true },
@@ -3756,7 +3785,7 @@ export { Rectangle from "./Geometry.es" }`,
 
 			it("should keep both sections of a standard library file at once", () => {
 				let { program, diagnostics } = parseWithDiagnostics(
-					`import { A from "./A.es" }
+					`import { from "./A.es" { A } }
 					declarations { }
 					export { B }`,
 					{ allowDeclarationsHeader: true },
@@ -3773,7 +3802,7 @@ export { Rectangle from "./Geometry.es" }`,
 			it("should still refuse a misplaced section in a standard library file", () => {
 				let { program, diagnostics } = parseWithDiagnostics(
 					`declarations { }
-					import { A from "./A.es" }`,
+					import { from "./A.es" { A } }`,
 					{ allowDeclarationsHeader: true },
 				)
 

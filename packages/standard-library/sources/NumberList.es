@@ -1,10 +1,12 @@
 import {
-	Integer      from "./Integer.es"
-	List         from "./List.es"
-	NonEmptyList from "./List.es"
-	Number       from "./Number.es"
-	Optional     from "./Optional.es"
-	Rational     from "./Rational.es"
+	from "./Integer.es" { Integer }
+	from "./List.es" {
+		List
+		NonEmptyList
+	}
+	from "./Number.es" { Number }
+	from "./Optional.es" { Optional }
+	from "./Rational.es" { Rational }
 }
 
 declarations {

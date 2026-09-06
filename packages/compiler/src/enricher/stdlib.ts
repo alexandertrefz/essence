@@ -134,6 +134,7 @@ function exportingEverything(program: parser.Program): parser.Program {
 		...program,
 		exports: {
 			nodeType: "ExportSection",
+			groups: [],
 			entries,
 			position: program.implementation.position,
 		},
@@ -530,7 +531,7 @@ export function loadStdlibFrom(
 	// lookup walks the chain — `findTypeInScope` and `findProtocolInScope` both
 	// do — so `Integer` the Type resolves from anywhere. "Is this name already
 	// taken?" does NOT walk it: the Module linker's `isTaken` reads the own
-	// tables alone, so a file writing `import { Integer from "./Integer.es" }`
+	// tables alone, so a file writing `import { from "./Integer.es" { Integer } }`
 	// would otherwise collide with the TAG rather than with the Namespace it
 	// asked for, be refused as a `duplicate-import`, and lose Integer dispatch
 	// entirely. Every one of the eight tags is also a Namespace some file

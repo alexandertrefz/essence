@@ -61,21 +61,26 @@ export function collectComments(source: string): Array<Comment> {
 	return comments
 }
 
-// NOTE: Where one Module section stands, and where each of its entries was
-// written — in written order, which is the order the Comments around them were
-// claimed in.
+// NOTE: Where one Module section stands, where each of its groups was written,
+// and where each of its entries was — in written order, which is the order the
+// Comments around them were claimed in. An entry's `key` is the specifier of
+// the group it is written in, or nothing for a bare export entry.
 export type SectionSpan = {
 	position: common.Position
-	entries: Array<common.Position>
+	groups: Array<common.Position>
+	entries: Array<{ position: common.Position; key: string }>
 }
 
-// NOTE: One entry's share of a Module section: its own Tokens together with the
-// Comments that ride with it. The chunks of a section are compared as a set,
-// which is what lets the block be sorted while still catching a Comment that
-// changed which entry it belongs to.
+// NOTE: One entry's share of a Module section, and one group's: its own Tokens
+// together with the Comments that ride with it. A group's share is its `from`,
+// its specifier and its braces — the Tokens inside it that are no entry's —
+// with the Comments written against those. The chunks of a section are
+// compared as a set, which is what lets the block be sorted while still
+// catching a Comment that changed which entry or group it belongs to.
 type SectionChunks = {
 	span: SectionSpan
-	chunks: Array<Array<string>>
+	groups: Array<Array<string>>
+	entries: Array<Array<string>>
 	loose: Array<Array<string>>
 }
 
@@ -122,9 +127,11 @@ export function commentAnchors(
 	// difference, and joined per chunk, so that a Comment moving from one entry to
 	// another does.
 	let closeSection = (section: SectionChunks) => {
-		let written = [...section.chunks, ...section.loose].map((chunk) =>
-			chunk.join(" · "),
-		)
+		let written = [
+			...section.groups,
+			...section.entries,
+			...section.loose,
+		].map((chunk) => chunk.join(" · "))
 
 		written.sort()
 		anchors.push(...written)
@@ -161,7 +168,8 @@ export function commentAnchors(
 				pending.shift()
 				open = {
 					span: next,
-					chunks: next.entries.map(() => []),
+					groups: next.groups.map(() => []),
+					entries: next.entries.map((entry) => [entry.key]),
 					loose: [],
 				}
 			}
@@ -203,54 +211,123 @@ export function commentAnchors(
 	return anchors
 }
 
-// NOTE: Which entry a Token inside a Module section rides with, or null for one
-// that keeps its place in the sequence — the `import` Keyword, the braces, and a
-// Comment trailing the `{` itself, none of which the sort can move.
+// NOTE: Which entry or group a Token inside a Module section rides with, or
+// null for one that keeps its place in the sequence — the `import` Keyword, the
+// section's braces, and a Comment trailing the section's `{` itself, none of
+// which the sort can move.
 //
-// The rule is the printer's own: a Comment that starts its line belongs to the
-// entry below it, one that follows code belongs to the entry ending on its line.
+// The rule is the printer's own. Code belongs to the entry it is written in,
+// else to the group. A Comment that follows code belongs to the entry ending
+// on its line, else to the group opening or closing on it — so the note after
+// a group written flat, `from "./A.es" { Amount } § note`, is the entry's. One
+// that starts its line belongs to the entry below it inside the same group,
+// else to the group it is written in, else to the entry or group below it,
+// else to no one.
 function chunkFor(
 	section: SectionChunks,
 	token: lexer.Token,
 	isComment: boolean,
 	lastCodeLine: number,
 ): Array<string> | null {
-	let entries = section.span.entries
+	let { groups, entries } = section.span
 	let start = token.position.start
+
+	let entryChunk = (index: number) => section.entries[index] as Array<string>
+	let groupChunk = (index: number) => section.groups[index] as Array<string>
+
+	let containingGroup = groups.findIndex(
+		(group) =>
+			compareCursors(start, group.start) >= 0 &&
+			compareCursors(start, group.end) < 0,
+	)
 
 	if (!isComment) {
 		for (let index = 0; index < entries.length; index++) {
-			let entry = entries[index] as common.Position
+			let entry = (entries[index] as SectionSpan["entries"][number])
+				.position
 
 			if (
 				compareCursors(start, entry.start) >= 0 &&
 				compareCursors(start, entry.end) < 0
 			) {
-				return section.chunks[index] as Array<string>
+				return entryChunk(index)
 			}
 		}
 
-		return null
+		return containingGroup === -1 ? null : groupChunk(containingGroup)
 	}
 
 	if (lastCodeLine === start.line) {
+		if (start.line === section.span.position.start.line) {
+			return null
+		}
+
 		for (let index = entries.length - 1; index >= 0; index--) {
-			let entry = entries[index] as common.Position
+			let entry = (entries[index] as SectionSpan["entries"][number])
+				.position
 
 			if (entry.end.line === start.line) {
-				return section.chunks[index] as Array<string>
+				return entryChunk(index)
+			}
+		}
+
+		for (let index = 0; index < groups.length; index++) {
+			let group = groups[index] as common.Position
+
+			if (
+				group.start.line === start.line ||
+				group.end.line === start.line
+			) {
+				return groupChunk(index)
 			}
 		}
 
 		return null
 	}
 
+	if (containingGroup !== -1) {
+		let group = groups[containingGroup] as common.Position
+
+		for (let index = 0; index < entries.length; index++) {
+			let entry = (entries[index] as SectionSpan["entries"][number])
+				.position
+
+			if (
+				compareCursors(entry.start, start) > 0 &&
+				compareCursors(entry.start, group.end) < 0
+			) {
+				return entryChunk(index)
+			}
+		}
+
+		return groupChunk(containingGroup)
+	}
+
+	let below: { at: common.Cursor; chunk: Array<string> } | null = null
+
 	for (let index = 0; index < entries.length; index++) {
-		let entry = entries[index] as common.Position
+		let entry = (entries[index] as SectionSpan["entries"][number]).position
 
 		if (compareCursors(entry.start, start) > 0) {
-			return section.chunks[index] as Array<string>
+			below = { at: entry.start, chunk: entryChunk(index) }
+			break
 		}
+	}
+
+	for (let index = 0; index < groups.length; index++) {
+		let group = groups[index] as common.Position
+
+		if (
+			compareCursors(group.start, start) > 0 &&
+			(below === null || compareCursors(group.start, below.at) < 0)
+		) {
+			below = { at: group.start, chunk: groupChunk(index) }
+			break
+		}
+	}
+
+	if (below !== null) {
+		return below.chunk
 	}
 
 	// NOTE: A Comment written below the last entry belongs to no entry at all —

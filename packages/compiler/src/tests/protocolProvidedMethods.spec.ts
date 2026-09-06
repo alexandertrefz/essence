@@ -2297,8 +2297,8 @@ describe("two Protocols of one name", () => {
 				join(directory, "Main.es"),
 				[
 					"import {",
-					'\tloud  from "./A.es"',
-					'\tquiet from "./B.es"',
+					'\tfrom "./A.es" { loud }',
+					'\tfrom "./B.es" { quiet }',
 					"}",
 					"",
 					"implementation {",

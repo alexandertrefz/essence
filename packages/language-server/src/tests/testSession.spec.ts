@@ -43,7 +43,7 @@ const passing = [
 
 const reader = [
 	"import {",
-	'\tdouble from "./Library.es"',
+	'\tfrom "./Library.es" { double }',
 	"}",
 	"",
 	"tests {",
@@ -781,7 +781,7 @@ describe("A session narrowing a change to the tests it reached", () => {
 
 	const doublesSource = [
 		"import {",
-		'\tdouble from "./Maths.es"',
+		'\tfrom "./Maths.es" { double }',
 		"}",
 		"",
 		"tests {",
@@ -794,7 +794,7 @@ describe("A session narrowing a change to the tests it reached", () => {
 
 	const triplesSource = [
 		"import {",
-		'\ttriple from "./Maths.es"',
+		'\tfrom "./Maths.es" { triple }',
 		"}",
 		"",
 		"tests {",
@@ -1095,8 +1095,8 @@ describe("A session re-running a property whatever a change touched", () => {
 	// — two tests of one file, each reaching a different line of the source.
 	const mixedSource = [
 		"import {",
-		'\tdouble from "./PropMaths.es"',
-		'\ttriple from "./PropMaths.es"',
+		'\tfrom "./PropMaths.es" { double }',
+		'\tfrom "./PropMaths.es" { triple }',
 		"}",
 		"",
 		"tests {",
@@ -1173,8 +1173,8 @@ describe("A session that silenced a test with a focus", () => {
 	// cycle that ran.
 	const focusedSource = [
 		"import {",
-		'\tdouble from "./FocusMaths.es"',
-		'\ttriple from "./FocusMaths.es"',
+		'\tfrom "./FocusMaths.es" { double }',
+		'\tfrom "./FocusMaths.es" { triple }',
 		"}",
 		"",
 		"tests {",

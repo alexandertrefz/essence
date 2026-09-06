@@ -59,18 +59,16 @@ export type ModuleGraph = {
 	diagnostics: Array<common.Diagnostic>
 }
 
-// NOTE: Both sections, imports first, in written order. An Export entry carries
-// a specifier only when it is a re-export.
+// NOTE: Both sections, imports first, in written order — one specifier per
+// group, since a group writes its specifier once however many names it holds,
+// and a refused one is refused once.
 function specifiersOf(
 	program: parser.Program,
 ): Array<parser.ModuleSpecifierNode> {
-	let imports = program.imports?.entries.map((entry) => entry.source) ?? []
-	let reExports =
-		program.exports?.entries.flatMap((entry) =>
-			entry.source === null ? [] : [entry.source],
-		) ?? []
-
-	return [...imports, ...reExports]
+	return [
+		...(program.imports?.groups ?? []),
+		...(program.exports?.groups ?? []),
+	].map((group) => group.source)
 }
 
 function reportRejection(

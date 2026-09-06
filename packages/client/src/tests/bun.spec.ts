@@ -36,7 +36,7 @@ export {
 `
 
 const MAIN_MODULE = `import {
-	square from "./Math.es"
+	from "./Math.es" { square }
 }
 
 implementation {
@@ -45,7 +45,7 @@ implementation {
 
 export {
 	answer
-	square from "./Math.es"
+	from "./Math.es" { square }
 }
 `
 
@@ -263,7 +263,7 @@ export const raw = rawSquare(createInteger(3)).value
 		let directory = project({
 			"lib/Math.es": MATH_MODULE("value::multiply(with value)"),
 			"One.es": `import {
-	square from "./lib/Math.es"
+	from "./lib/Math.es" { square }
 }
 
 implementation {
@@ -275,7 +275,7 @@ export {
 }
 `,
 			"Two.es": `import {
-	square from "./lib/Math.es"
+	from "./lib/Math.es" { square }
 }
 
 implementation {

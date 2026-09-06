@@ -26,7 +26,7 @@ import {
 	text,
 	verbatim,
 } from "./doc"
-import { compareExportEntries, compareImportEntries } from "./sections"
+import { compareEntries, compareGroups } from "./sections"
 import type { SourceText } from "./source"
 import type { Comment, TriviaCursor } from "./trivia"
 
@@ -385,12 +385,7 @@ export class Printer {
 		if (program.imports !== null) {
 			parts.push(
 				concat(this.headingComments(program.imports.position)),
-				this.printModuleSection(
-					"import",
-					program.imports.position,
-					program.imports.entries,
-					compareImportEntries,
-				),
+				this.printModuleSection("import", program.imports),
 				hardline,
 			)
 
@@ -455,12 +450,7 @@ export class Printer {
 
 			parts.push(
 				concat(this.headingComments(program.exports.position)),
-				this.printModuleSection(
-					"export",
-					program.exports.position,
-					program.exports.entries,
-					compareExportEntries,
-				),
+				this.printModuleSection("export", program.exports),
 			)
 		}
 
@@ -709,79 +699,56 @@ export class Printer {
 		return parts
 	}
 
-	// NOTE: One Module section, written in canonical order with every `from` in
-	// one column. The entries are read in WRITTEN order — that is the order the
-	// trivia cursor hands Comments out in — and only sorted afterwards, so a
-	// Comment travels with the entry it was written against.
+	// NOTE: One Module section, written in canonical order: an export block's
+	// bare names first, then the groups, and inside a group its names. The
+	// members are walked in WRITTEN order — that is the order the trivia
+	// cursor hands Comments out in — and only sorted afterwards, so a Comment
+	// travels with the entry or group it was written against.
 	//
-	// Alignment is one space past the widest left-hand side among the entries
-	// that carry a `from`, and no other entry counts: an `export { … }` block
-	// lists what a Module declares alongside what it forwards, and padding a
-	// re-export out to the widest local name would push its `from` halfway across
-	// the line rather than line anything up.
-	private printModuleSection<
-		Node extends parser.ImportNode | parser.ExportNode,
-	>(
+	// Nothing in either block is aligned. A column is what made adding one
+	// wide name rewrite every line beside it, and grouping the names under
+	// their `from` is what left nothing to line up.
+	private printModuleSection(
 		keyword: string,
-		position: common.Position,
-		nodes: Array<Node>,
-		compare: (left: Node, right: Node) => number,
+		section: parser.ImportSectionNode | parser.ExportSectionNode,
 	): Doc {
-		let opening = this.trivia.claimTrailingOn(position.start.line)
+		let opening = this.trivia.claimTrailingOn(section.position.start.line)
 
-		let entries = nodes.map((node): SectionEntry<Node> => {
-			let leading = this.trivia.takeBefore(node.position.start.line)
-			let trailing = this.trivia.claimTrailingOn(node.position.end.line)
+		let bare: Array<SectionEntry> = []
+		let groups: Array<SectionGroup> = []
 
-			return { node, leading, trailing, head: entryHead(node) }
-		})
-
-		let loose = this.trivia.takeBefore(position.end.line)
-
-		entries.sort((left, right) => compare(left.node, right.node))
-
-		let widest = 0
-
-		for (let entry of entries) {
-			if (entry.node.source !== null) {
-				widest = Math.max(widest, entry.head.length)
+		for (let member of writtenMembers(section)) {
+			if (member.nodeType === "Export") {
+				bare.push(this.sectionEntry(member))
+			} else {
+				groups.push(this.sectionGroup(member))
 			}
 		}
+
+		let loose = this.trivia.takeBefore(section.position.end.line)
+
+		bare.sort((left, right) => compareEntries(left.node, right.node))
+		groups.sort((left, right) =>
+			compareGroups(groupHead(left), groupHead(right)),
+		)
 
 		let lines: Array<Doc> = []
 
-		for (let entry of entries) {
-			for (let comment of entry.leading) {
+		for (let entry of bare) {
+			lines.push(...this.entryLines(entry))
+		}
+
+		for (let group of groups) {
+			for (let comment of group.leading) {
 				lines.push(verbatim(comment.text))
 			}
 
-			let written = entry.head
-
-			// NOTE: The specifier is written back from the source rather than
-			// from the node, for the same reason every String Literal is — the
-			// Lexer strips the quotes and leaves the escapes unprocessed.
-			if (entry.node.source !== null) {
-				written +=
-					" ".repeat(widest - entry.head.length) +
-					" from " +
-					this.source.slice(entry.node.source.position)
-			}
-
-			let entryDoc: Doc = text(written)
-
-			if (entry.trailing !== null) {
-				entryDoc = concat([
-					entryDoc,
-					lineSuffix(" " + entry.trailing.text),
-				])
-			}
-
-			lines.push(entryDoc)
+			lines.push(this.groupDoc(group))
 		}
 
-		// NOTE: A Comment written below the last entry belongs to no entry, so
-		// nothing carries it — it is written where it stands, above the block's
-		// closing brace.
+		// NOTE: A Comment written below the last member belongs to no member,
+		// so nothing carries it — it is written where it stands, above the
+		// block's closing brace.
 		for (let comment of loose) {
 			lines.push(verbatim(comment.text))
 		}
@@ -799,6 +766,89 @@ export class Printer {
 				opening,
 			),
 		])
+	}
+
+	private sectionEntry(node: parser.ImportNode | parser.ExportNode) {
+		let leading = this.trivia.takeBefore(node.position.start.line)
+		let trailing = this.trivia.claimTrailingOn(node.position.end.line)
+
+		return { node, leading, trailing }
+	}
+
+	// NOTE: The Comments of a group are claimed around its entries: what is
+	// above its `from` line before them, what is below its last entry after
+	// them, and the two that trail its own lines last of all — so that the
+	// note after a group written flat, whose one entry ends on the `from`
+	// line, is the entry's rather than the group's, and stays on the entry's
+	// line if the group is ever written out.
+	private sectionGroup(
+		node: parser.ImportGroupNode | parser.ExportGroupNode,
+	): SectionGroup {
+		let leading = this.trivia.takeBefore(node.position.start.line)
+		let entries = node.entries.map((entry) => this.sectionEntry(entry))
+		let loose = this.trivia.takeBefore(node.position.end.line)
+		let opening = this.trivia.claimTrailingOn(node.position.start.line)
+		let closing = this.trivia.claimTrailingOn(node.position.end.line)
+
+		entries.sort((left, right) => compareEntries(left.node, right.node))
+
+		return { node, leading, opening, entries, loose, closing }
+	}
+
+	private entryLines(entry: SectionEntry): Array<Doc> {
+		let lines: Array<Doc> = []
+
+		for (let comment of entry.leading) {
+			lines.push(verbatim(comment.text))
+		}
+
+		let doc: Doc = text(entryHead(entry.node))
+
+		if (entry.trailing !== null) {
+			doc = concat([doc, lineSuffix(" " + entry.trailing.text)])
+		}
+
+		lines.push(doc)
+
+		return lines
+	}
+
+	// NOTE: `from "./Module.es" { … }`. A group of one name is written on one
+	// line, the way a `case` with one short Statement is; two or more names
+	// stand one to a line, and a Comment inside the braces rules the flat
+	// shape out for the reason it does anywhere else.
+	//
+	// The specifier is written back from the source rather than from the
+	// node, for the same reason every String Literal is — the Lexer strips the
+	// quotes and leaves the escapes unprocessed.
+	private groupDoc(group: SectionGroup): Doc {
+		let lines: Array<Doc> = []
+
+		for (let entry of group.entries) {
+			lines.push(...this.entryLines(entry))
+		}
+
+		for (let comment of group.loose) {
+			lines.push(verbatim(comment.text))
+		}
+
+		let doc: Doc = concat([
+			text("from " + this.source.slice(group.node.source.position) + " "),
+			this.block(
+				lines.map(
+					(line): Entry => ({ startLine: 0, endLine: 0, doc: line }),
+				),
+				null,
+				true,
+				group.opening,
+			),
+		])
+
+		if (group.closing !== null) {
+			doc = concat([doc, lineSuffix(" " + group.closing.text)])
+		}
+
+		return doc
 	}
 
 	// #endregion
@@ -3341,21 +3391,61 @@ function assignmentKind(node: AssignmentNode): AssignmentKind {
 		: "declaration"
 }
 
-// NOTE: One entry of a Module section with everything that rides along when the
-// block is sorted: the Comments written above it, the one trailing it, and
-// `head` — everything written left of the `from`, which is what the block's
-// column is measured against, `PI as Pi` at its full spelling.
-type SectionEntry<Node> = {
-	node: Node
+// NOTE: One name of a Module section with everything that rides along when the
+// block is sorted: the Comments written above it and the one trailing it.
+type SectionEntry = {
+	node: parser.ImportNode | parser.ExportNode
 	leading: Array<Comment>
 	trailing: Comment | null
-	head: string
+}
+
+// NOTE: One group with what rides along with it: the Comments above its
+// `from` line, the one trailing its `{`, its names, the Comments below the
+// last of them, and the one trailing its `}`.
+type SectionGroup = {
+	node: parser.ImportGroupNode | parser.ExportGroupNode
+	leading: Array<Comment>
+	opening: Comment | null
+	entries: Array<SectionEntry>
+	loose: Array<Comment>
+	closing: Comment | null
 }
 
 function entryHead(entry: parser.ImportNode | parser.ExportNode): string {
 	return entry.alias === null
 		? entry.name.content
 		: entry.name.content + " as " + entry.alias.content
+}
+
+// NOTE: The bare entries and the groups of a section in the order they were
+// written, which is the order their Comments have to be claimed in. An import
+// section has no bare entries, and its groups are already that order.
+function writtenMembers(
+	section: parser.ImportSectionNode | parser.ExportSectionNode,
+): Array<parser.ExportNode | parser.ImportGroupNode | parser.ExportGroupNode> {
+	if (section.nodeType === "ImportSection") {
+		return section.groups
+	}
+
+	let members: Array<parser.ExportNode | parser.ExportGroupNode> = [
+		...section.entries.filter((entry) => entry.source === null),
+		...section.groups,
+	]
+
+	return members.sort(
+		(left, right) =>
+			left.position.start.line - right.position.start.line ||
+			left.position.start.column - right.position.start.column,
+	)
+}
+
+// NOTE: What `compareGroups` orders a group by, read off the printer's own
+// group — whose entries are in order by the time it is asked.
+function groupHead(group: SectionGroup) {
+	return {
+		source: group.node.source,
+		entries: group.entries.map((entry) => entry.node),
+	}
 }
 
 type NamespaceMember =

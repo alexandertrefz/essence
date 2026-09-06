@@ -40,31 +40,53 @@ function localName(entry: parser.ImportNode | parser.ExportNode): string {
 	return entry.alias === null ? "" : entry.alias.content
 }
 
-export function compareImportEntries(
-	left: parser.ImportNode,
-	right: parser.ImportNode,
+// NOTE: The order of the names inside one group, and of the bare names of an
+// export block: by the exported name, then by the local one.
+export function compareEntries(
+	left: parser.ImportNode | parser.ExportNode,
+	right: parser.ImportNode | parser.ExportNode,
 ): number {
 	return compareKeys(
-		[left.source.path, left.name.content, localName(left)],
-		[right.source.path, right.name.content, localName(right)],
+		[left.name.content, localName(left)],
+		[right.name.content, localName(right)],
 	)
 }
 
-// NOTE: What a Module declares itself comes first, then what it forwards — a
-// re-export names another file rather than anything in this one, so the two read
-// as separate lists even though they share a block. That is what the leading
-// key says, and it is the only reason it is there.
-export function compareExportEntries(
-	left: parser.ExportNode,
-	right: parser.ExportNode,
-): number {
-	return compareKeys(exportKey(left), exportKey(right))
+// NOTE: What a group is ordered by: its specifier, and the names inside it —
+// the shape of a group node, and of what the printer holds while it lays one
+// out.
+type GroupHead = {
+	source: parser.ModuleSpecifierNode
+	entries: Array<{ name: parser.IdentifierNode }>
 }
 
-function exportKey(entry: parser.ExportNode): Array<string> {
-	return entry.source === null
-		? ["0", "", entry.name.content, localName(entry)]
-		: ["1", entry.source.path, entry.name.content, localName(entry)]
+// NOTE: Groups are ordered by specifier. Two groups written for one file are
+// left as two — merging them would have to decide which of them keeps its
+// Comments — and stand next to each other, ordered by the first name in each,
+// which is where a reader finds them to fold together.
+//
+// Asked of groups whose entries are already in order, since that first name
+// is what they are compared on.
+export function compareGroups(left: GroupHead, right: GroupHead): number {
+	return compareKeys(
+		[left.source.path, left.entries[0]?.name.content ?? ""],
+		[right.source.path, right.entries[0]?.name.content ?? ""],
+	)
+}
+
+// NOTE: Every group with its names in order, and the groups in order among
+// themselves.
+export function sortedGroups<
+	Group extends parser.ImportGroupNode | parser.ExportGroupNode,
+>(groups: Array<Group>): Array<Group> {
+	return groups
+		.map(
+			(group): Group => ({
+				...group,
+				entries: [...group.entries].sort(compareEntries),
+			}),
+		)
+		.sort(compareGroups)
 }
 
 // NOTE: The same Program with both Module sections in canonical order. Sorting
@@ -72,33 +94,49 @@ function exportKey(entry: parser.ExportNode): Array<string> {
 // that compares the AST before and after formatting reads the entry lists in
 // order — so both sides are brought into canonical order before they are
 // compared, rather than the reordering being waved through wholesale.
+//
+// `entries` is rebuilt from the sorted groups, because it is the flat list in
+// written order and the written order is what the sort changes. What a Module
+// declares itself comes first in an export block, then what it forwards — a
+// re-export names another file rather than anything in this one, so the two
+// read as separate lists even though they share a block.
 export function canonicalSections(program: parser.Program): parser.Program {
-	return {
-		...program,
-		imports:
-			program.imports === null
-				? null
-				: {
-						...program.imports,
-						entries: [...program.imports.entries].sort(
-							compareImportEntries,
-						),
-					},
-		exports:
-			program.exports === null
-				? null
-				: {
-						...program.exports,
-						entries: [...program.exports.entries].sort(
-							compareExportEntries,
-						),
-					},
+	let imports = program.imports
+	let exports = program.exports
+
+	if (imports !== null) {
+		let groups = sortedGroups(imports.groups)
+
+		imports = {
+			...imports,
+			groups,
+			entries: groups.flatMap((group) => group.entries),
+		}
 	}
+
+	if (exports !== null) {
+		let groups = sortedGroups(exports.groups)
+		let bare = exports.entries
+			.filter((entry) => entry.source === null)
+			.sort(compareEntries)
+
+		exports = {
+			...exports,
+			groups,
+			entries: [...bare, ...groups.flatMap((group) => group.entries)],
+		}
+	}
+
+	return { ...program, imports, exports }
 }
 
 // NOTE: Read off the Program as it was written, never off a canonicalised copy:
 // the anchor comparison groups each entry with the Comments around it by the
 // same written order the trivia cursor walks.
+//
+// An entry is keyed by the specifier of its group, and a bare export entry by
+// nothing, so that a Comment moving from the `Optional` of one group to the
+// `Optional` of another is still a Comment that moved.
 export function sectionSpans(program: parser.Program): Array<SectionSpan> {
 	let spans: Array<SectionSpan> = []
 
@@ -109,7 +147,11 @@ export function sectionSpans(program: parser.Program): Array<SectionSpan> {
 
 		spans.push({
 			position: section.position,
-			entries: section.entries.map((entry) => entry.position),
+			groups: section.groups.map((group) => group.position),
+			entries: section.entries.map((entry) => ({
+				position: entry.position,
+				key: entry.source === null ? "" : entry.source.path,
+			})),
 		})
 	}
 

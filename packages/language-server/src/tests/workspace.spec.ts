@@ -183,7 +183,7 @@ describe("Workspace", () => {
 				"Geometry.es": geometry,
 				"Main.es": [
 					"import {",
-					'\tRectangle from "./Geometry.es"',
+					'\tfrom "./Geometry.es" { Rectangle }',
 					"}",
 					"",
 					"implementation {",
@@ -278,7 +278,7 @@ describe("Workspace", () => {
 				"Geometry.es": geometry,
 				"Main.es": [
 					"import {",
-					'\tRectangle from "./Geometry.es"',
+					'\tfrom "./Geometry.es" { Rectangle }',
 					"}",
 					"",
 					"implementation {",
@@ -305,7 +305,7 @@ describe("Workspace", () => {
 				"Geometry.es": geometry,
 				"Main.es": [
 					"import {",
-					'\tRectangle from "./Geometry.es"',
+					'\tfrom "./Geometry.es" { Rectangle }',
 					"}",
 					"",
 					"implementation {",
@@ -334,8 +334,8 @@ describe("Workspace", () => {
 	describe("hover through the graph", () => {
 		const main = [
 			"import {",
-			'\tRectangle from "./Geometry.es"',
-			'\tRectangleMeasurable from "./Geometry.es"',
+			'\tfrom "./Geometry.es" { Rectangle }',
+			'\tfrom "./Geometry.es" { RectangleMeasurable }',
 			"}",
 			"",
 			"implementation {",
@@ -388,7 +388,7 @@ describe("Workspace", () => {
 				"Geometry.es": geometry,
 				"Main.es": [
 					"import {",
-					'\tRectangle from "./Geometry.es"',
+					'\tfrom "./Geometry.es" { Rectangle }',
 					"}",
 					"",
 					"implementation {",
@@ -400,7 +400,7 @@ describe("Workspace", () => {
 				].join("\n"),
 				"Other.es": [
 					"import {",
-					'\tRectangle from "./Geometry.es"',
+					'\tfrom "./Geometry.es" { Rectangle }',
 					"}",
 					"",
 					"implementation {",
@@ -435,10 +435,12 @@ describe("Workspace", () => {
 				"\tnamespace RectangleMeasurable for Box {",
 			)
 			expect(renamed?.["Geometry.es"]).toContain("\tBox\n")
-			expect(renamed?.["Main.es"]).toContain('\tBox from "./Geometry.es"')
+			expect(renamed?.["Main.es"]).toContain(
+				'\tfrom "./Geometry.es" { Box }',
+			)
 			expect(renamed?.["Main.es"]).toContain("_ shape: Box")
 			expect(renamed?.["Other.es"]).toContain(
-				'\tBox from "./Geometry.es"',
+				'\tfrom "./Geometry.es" { Box }',
 			)
 		})
 
@@ -468,7 +470,7 @@ describe("Workspace", () => {
 				].join("\n"),
 				"Main.es": [
 					"import {",
-					'\tRectangle from "./Geometry.es"',
+					'\tfrom "./Geometry.es" { Rectangle }',
 					"}",
 					"",
 					"implementation {",
@@ -499,7 +501,7 @@ describe("Workspace", () => {
 				expect(renamed?.["Geometry.es"]).toContain("\tBox\n")
 				expect(renamed?.["Geometry.es"]).not.toContain("Rectangle")
 				expect(renamed?.["Main.es"]).toContain(
-					'\tBox from "./Geometry.es"',
+					'\tfrom "./Geometry.es" { Box }',
 				)
 				expect(renamed?.["Main.es"]).toContain(
 					"Box.of(width 3, height 4)",
@@ -551,7 +553,7 @@ describe("Workspace", () => {
 				"Math.es": math,
 				"Main.es": [
 					"import {",
-					'\tPI as Pi from "./Math.es"',
+					'\tfrom "./Math.es" { PI as Pi }',
 					"}",
 					"",
 					"implementation {",
@@ -572,7 +574,7 @@ describe("Workspace", () => {
 
 			expect(Object.keys(renamed ?? {})).toEqual(["Main.es"])
 			expect(renamed?.["Main.es"]).toContain(
-				'\tPI as Ratio from "./Math.es"',
+				'\tfrom "./Math.es" { PI as Ratio }',
 			)
 			expect(renamed?.["Main.es"]).toContain("with Ratio")
 		})
@@ -582,7 +584,7 @@ describe("Workspace", () => {
 				"Math.es": math,
 				"Main.es": [
 					"import {",
-					'\tPI as Pi from "./Math.es"',
+					'\tfrom "./Math.es" { PI as Pi }',
 					"}",
 					"",
 					"implementation {",
@@ -608,7 +610,7 @@ describe("Workspace", () => {
 				"Math.es",
 			])
 			expect(renamed?.["Main.es"]).toContain(
-				'\tCIRCLE as Pi from "./Math.es"',
+				'\tfrom "./Math.es" { CIRCLE as Pi }',
 			)
 			expect(renamed?.["Main.es"]).toContain("constant doubled = Pi")
 			expect(renamed?.["Math.es"]).toContain(
@@ -625,7 +627,7 @@ describe("Workspace", () => {
 				"Math.es": math,
 				"Main.es": [
 					"import {",
-					'\tsquare from "./Math.es"',
+					'\tfrom "./Math.es" { square }',
 					"}",
 					"",
 					"implementation {",
@@ -650,7 +652,7 @@ describe("Workspace", () => {
 			expect(publicSide?.["Math.es"]).toContain("\tsquared as toSquare")
 			expect(publicSide?.["Math.es"]).toContain("function squared(")
 			expect(publicSide?.["Main.es"]).toContain(
-				'\ttoSquare from "./Math.es"',
+				'\tfrom "./Math.es" { toSquare }',
 			)
 
 			let local = makeWorkspace(files)
@@ -675,8 +677,8 @@ describe("Workspace", () => {
 				"Geometry.es": geometry,
 				"Main.es": [
 					"import {",
-					'\tRectangle from "./Geometry.es"',
-					'\tRectangleMeasurable from "./Geometry.es"',
+					'\tfrom "./Geometry.es" { Rectangle }',
+					'\tfrom "./Geometry.es" { RectangleMeasurable }',
 					"}",
 					"",
 					"implementation {",
@@ -742,9 +744,9 @@ describe("Workspace", () => {
 				"Sizable.es": sizable,
 				"Main.es": [
 					"import {",
-					'\tSizable from "./Sizable.es"',
-					'\tBag from "./Sizable.es"',
-					'\tBags from "./Sizable.es"',
+					'\tfrom "./Sizable.es" { Sizable }',
+					'\tfrom "./Sizable.es" { Bag }',
+					'\tfrom "./Sizable.es" { Bags }',
 					"}",
 					"",
 					"implementation {",
@@ -799,11 +801,50 @@ describe("Workspace", () => {
 	})
 
 	describe("auto-import", () => {
-		it("should insert an entry at its canonical position in an existing block", () => {
+		it("should open a group at its canonical position in an existing block", () => {
 			let source = [
 				"import {",
-				'\tAmount from "./A.es"',
-				'\tRectangle from "./Geometry.es"',
+				'\tfrom "./A.es" { Amount }',
+				'\tfrom "./Geometry.es" { Rectangle }',
+				"}",
+				"",
+				"implementation {",
+				"}",
+				"",
+			].join("\n")
+			let { program } = parseDocument(source)
+
+			let edit = insertImportEdit(source, program, {
+				name: "Box",
+				alias: null,
+				specifier: "./Bounds.es",
+			})
+
+			expect(edit).not.toBeNull()
+			expect(edit?.range.start).toEqual({ line: 3, column: 1 })
+			expect(edit?.newText).toBe('\tfrom "./Bounds.es" { Box }\n')
+
+			// NOTE: Sorted by specifier, so a group for a later file goes below
+			// every group of an earlier one whatever the names are.
+			let last = insertImportEdit(source, program, {
+				name: "PI",
+				alias: "Pi",
+				specifier: "./math/Math.es",
+			})
+
+			expect(last?.range.start).toEqual({ line: 4, column: 1 })
+			expect(last?.newText).toBe('\tfrom "./math/Math.es" { PI as Pi }\n')
+		})
+
+		// NOTE: A group of one name is written flat, and a second name is what
+		// writes it out — so the edit replaces the flat group with the two
+		// names one to a line, in order, which is what the Formatter makes of
+		// a group of two.
+		it("should write a flat group out when a second name joins it", () => {
+			let source = [
+				"import {",
+				'\tfrom "./A.es" { Amount }',
+				'\tfrom "./Geometry.es" { Rectangle } § the shape',
 				"}",
 				"",
 				"implementation {",
@@ -818,20 +859,79 @@ describe("Workspace", () => {
 				specifier: "./Geometry.es",
 			})
 
-			expect(edit).not.toBeNull()
-			expect(edit?.range.start).toEqual({ line: 3, column: 1 })
-			expect(edit?.newText).toBe('\tCircle from "./Geometry.es"\n')
+			expect(edit?.range).toEqual({
+				start: { line: 3, column: 2 },
+				end: { line: 3, column: 36 },
+			})
+			expect(edit?.newText).toBe(
+				'from "./Geometry.es" {\n\t\tCircle\n\t\tRectangle\n\t}',
+			)
 
-			// NOTE: Sorted by specifier FIRST, so an entry from a later file
-			// goes below every entry of an earlier one whatever the names are.
-			let last = insertImportEdit(source, program, {
-				name: "PI",
-				alias: "Pi",
-				specifier: "./math/Math.es",
+			let updated = withInsertedEntry(source, {
+				name: "Circle",
+				alias: null,
+				specifier: "./Geometry.es",
 			})
 
-			expect(last?.range.start).toEqual({ line: 4, column: 1 })
-			expect(last?.newText).toBe('\tPI as Pi from "./math/Math.es"\n')
+			expect(updated).toBe(
+				[
+					"import {",
+					'\tfrom "./A.es" { Amount }',
+					'\tfrom "./Geometry.es" {',
+					"\t\tCircle",
+					"\t\tRectangle",
+					"\t} § the shape",
+					"}",
+					"",
+					"implementation {",
+					"}",
+					"",
+				].join("\n"),
+			)
+		})
+
+		it("should insert a name into a written-out group at its canonical position", () => {
+			let source = [
+				"import {",
+				'\tfrom "./Geometry.es" {',
+				"\t\t§ the shape",
+				"\t\tRectangle",
+				"\t\tarea",
+				"\t}",
+				"}",
+				"",
+				"implementation {",
+				"}",
+				"",
+			].join("\n")
+			let { program } = parseDocument(source)
+
+			let between = insertImportEdit(source, program, {
+				name: "Square",
+				alias: null,
+				specifier: "./Geometry.es",
+			})
+
+			expect(between?.range.start).toEqual({ line: 5, column: 1 })
+			expect(between?.newText).toBe("\t\tSquare\n")
+
+			let first = insertImportEdit(source, program, {
+				name: "Circle",
+				alias: null,
+				specifier: "./Geometry.es",
+			})
+
+			expect(first?.range.start).toEqual({ line: 4, column: 1 })
+			expect(first?.newText).toBe("\t\tCircle\n")
+
+			let last = insertImportEdit(source, program, {
+				name: "perimeter",
+				alias: null,
+				specifier: "./Geometry.es",
+			})
+
+			expect(last?.range.start).toEqual({ line: 6, column: 1 })
+			expect(last?.newText).toBe("\t\tperimeter\n")
 		})
 
 		// NOTE: Applied and reparsed rather than matched against a spelling —
@@ -882,7 +982,7 @@ describe("Workspace", () => {
 
 		it("should insert inline into a block written on one line", () => {
 			let source = [
-				'import { Zeta from "./z.es" }',
+				'import { from "./z.es" { Zeta } }',
 				"",
 				"implementation {",
 				"}",
@@ -923,7 +1023,7 @@ describe("Workspace", () => {
 		it("should refuse to insert an entry the block already holds", () => {
 			let source = [
 				"import {",
-				'\tRectangle from "./Geometry.es"',
+				'\tfrom "./Geometry.es" { Rectangle }',
 				"}",
 				"",
 				"implementation {",
@@ -956,7 +1056,7 @@ describe("Workspace", () => {
 
 			expect(edit?.range.start).toEqual({ line: 1, column: 1 })
 			expect(edit?.newText).toBe(
-				'import {\n\tRectangle from "./Geometry.es"\n}\n\n',
+				'import {\n\tfrom "./Geometry.es" { Rectangle }\n}\n\n',
 			)
 		})
 
@@ -989,7 +1089,7 @@ describe("Workspace", () => {
 				"Import 'Rectangle' from ./Geometry.es",
 			)
 			expect(importAction?.edits[0]?.newText).toBe(
-				'import {\n\tRectangle from "./Geometry.es"\n}\n\n',
+				'import {\n\tfrom "./Geometry.es" { Rectangle }\n}\n\n',
 			)
 		})
 
@@ -1002,7 +1102,7 @@ describe("Workspace", () => {
 				"Geometry.es": geometry,
 				"Main.es": [
 					"import {",
-					'\tRectangle from "./Geometry.es"',
+					'\tfrom "./Geometry.es" { Rectangle }',
 					"}",
 					"",
 					"implementation {",
@@ -1027,13 +1127,15 @@ describe("Workspace", () => {
 			)
 		})
 
-		it("should offer to remove an unused entry, line and all", () => {
+		it("should offer to remove an unused name, line and all", () => {
 			let { workspace, pathOf } = makeWorkspace({
 				"Geometry.es": geometry,
 				"Main.es": [
 					"import {",
-					'\tRectangle from "./Geometry.es"',
-					'\tRectangleMeasurable from "./Geometry.es"',
+					'\tfrom "./Geometry.es" {',
+					"\t\tRectangle",
+					"\t\tRectangleMeasurable",
+					"\t}",
 					"}",
 					"",
 					"implementation {",
@@ -1050,7 +1152,7 @@ describe("Workspace", () => {
 				workspace.sourceOf(mainPath) ?? "",
 				spanOf(
 					workspace.sourceOf(mainPath) ?? "",
-					3,
+					4,
 					"RectangleMeasurable",
 				),
 				mainPath,
@@ -1065,8 +1167,50 @@ describe("Workspace", () => {
 				"Remove the unused import of 'RectangleMeasurable'",
 			)
 			expect(removal?.edits[0]?.range).toEqual({
-				start: { line: 3, column: 1 },
-				end: { line: 4, column: 1 },
+				start: { line: 4, column: 1 },
+				end: { line: 5, column: 1 },
+			})
+		})
+
+		// NOTE: The last name of a group takes the group with it — an empty
+		// `from "./Geometry.es" {}` imports nothing and says so on two lines.
+		it("should remove a whole group with its last unused name", () => {
+			let { workspace, pathOf } = makeWorkspace({
+				"Geometry.es": geometry,
+				"Main.es": [
+					"import {",
+					'\tfrom "./Geometry.es" {',
+					"\t\t§ the witness",
+					"\t\tRectangleMeasurable",
+					"\t}",
+					"}",
+					"",
+					"implementation {",
+					"\tconstant width = 1",
+					"}",
+					"",
+				].join("\n"),
+			})
+
+			let mainPath = pathOf("Main.es")
+			let actions = findCodeActions(
+				workspace.sourceOf(mainPath) ?? "",
+				spanOf(
+					workspace.sourceOf(mainPath) ?? "",
+					4,
+					"RectangleMeasurable",
+				),
+				mainPath,
+				workspace,
+			)
+
+			let removal = actions.find((action) =>
+				action.title.startsWith("Remove the unused import"),
+			)
+
+			expect(removal?.edits[0]?.range).toEqual({
+				start: { line: 2, column: 1 },
+				end: { line: 6, column: 1 },
 			})
 		})
 
@@ -1099,7 +1243,7 @@ describe("Workspace", () => {
 			expect(offered?.detail).toBe("from ./Geometry.es")
 			expect(offered?.tier).toBe(6)
 			expect(offered?.additionalEdits?.[0]?.newText).toBe(
-				'import {\n\tRectangle from "./Geometry.es"\n}\n\n',
+				'import {\n\tfrom "./Geometry.es" { Rectangle }\n}\n\n',
 			)
 		})
 
@@ -1108,7 +1252,7 @@ describe("Workspace", () => {
 				"Geometry.es": geometry,
 				"Main.es": [
 					"import {",
-					'\tRectangle from "./Geometry.es"',
+					'\tfrom "./Geometry.es" { Rectangle }',
 					"}",
 					"",
 					"implementation {",
@@ -1135,7 +1279,7 @@ describe("Workspace", () => {
 					"}",
 					"",
 					"export {",
-					'\tRectangle from "./Geometry.es"',
+					'\tfrom "./Geometry.es" { Rectangle }',
 					"}",
 					"",
 				].join("\n"),
@@ -1170,7 +1314,7 @@ describe("Workspace", () => {
 				"Geometry.es": geometry,
 				"Main.es": [
 					"import {",
-					'\tRectangle from "./Geometry.es"',
+					'\tfrom "./Geometry.es" { Rectangle }',
 					"}",
 					"",
 					"implementation {",
@@ -1212,7 +1356,7 @@ describe("Workspace", () => {
 				].join("\n"),
 				"Main.es": [
 					"import {",
-					'\tanswer from "./Broken.es"',
+					'\tfrom "./Broken.es" { answer }',
 					"}",
 					"",
 					"implementation {",

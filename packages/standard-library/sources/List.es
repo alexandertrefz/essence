@@ -1,14 +1,18 @@
 import {
-	Boolean         from "./Boolean.es"
-	Comparable      from "./Comparable.es"
-	Integer         from "./Integer.es"
-	NonZeroInteger  from "./Integer.es"
-	PositiveInteger from "./Integer.es"
-	Optional        from "./Optional.es"
-	Ordering        from "./Ordering.es"
-	Equatable       from "./Protocols.es"
-	Printable       from "./Protocols.es"
-	Step            from "./Step.es"
+	from "./Boolean.es" { Boolean }
+	from "./Comparable.es" { Comparable }
+	from "./Integer.es" {
+		Integer
+		NonZeroInteger
+		PositiveInteger
+	}
+	from "./Optional.es" { Optional }
+	from "./Ordering.es" { Ordering }
+	from "./Protocols.es" {
+		Equatable
+		Printable
+	}
+	from "./Step.es" { Step }
 }
 
 declarations {

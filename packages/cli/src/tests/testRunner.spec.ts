@@ -214,7 +214,7 @@ const exporting = [
 
 const importing = [
 	"import {",
-	'\tdoubled from "./Rules.es"',
+	'\tfrom "./Rules.es" { doubled }',
 	"}",
 	"",
 	"tests {",
@@ -2611,7 +2611,7 @@ describe("essence test — the result cache", () => {
 
 	const usesLibrary = [
 		"import {",
-		'\ttriple from "./Library.es"',
+		'\tfrom "./Library.es" { triple }',
 		"}",
 		"",
 		"tests {",
@@ -2988,7 +2988,7 @@ describe("essence test — the result cache", () => {
 
 	const reader = [
 		"import {",
-		'\tanswer from "./Shared.es"',
+		'\tfrom "./Shared.es" { answer }',
 		"}",
 		"",
 		"tests {",

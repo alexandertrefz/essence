@@ -93,9 +93,11 @@ let easy = [
 		enabler:
 			"There is no null and nothing to dereference. Absence is the #Empty case of an Optional, and a match over one does not compile until it answers for that case — the check you would have forgotten is the one the compiler insists on.",
 		code: `import {
-	Order        from "./receipts.es"
-	emailReceipt from "./receipts.es"
-	printReceipt from "./receipts.es"
+	from "./receipts.es" {
+		Order
+		emailReceipt
+		printReceipt
+	}
 }
 
 implementation {

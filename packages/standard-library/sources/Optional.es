@@ -1,7 +1,9 @@
 import {
-	Boolean   from "./Boolean.es"
-	Equatable from "./Protocols.es"
-	Printable from "./Protocols.es"
+	from "./Boolean.es" { Boolean }
+	from "./Protocols.es" {
+		Equatable
+		Printable
+	}
 }
 
 declarations {

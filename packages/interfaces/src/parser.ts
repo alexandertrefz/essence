@@ -158,15 +158,31 @@ export type TestModifierArgumentNode =
 // NOTE: `import { … }`, written above the implementation. Every name a Module
 // uses from another one is listed here — including its Namespaces, since
 // importing a Type does not bring the Namespaces written for that Type along.
+//
+// The names are written in groups, one per dependency, and `entries` is the
+// same names flat, in written order: resolution reads a Module's imports as
+// one list and has no use for how the lines were grouped, while the Formatter
+// and the editor lay the groups out and need where each one stands.
 export type ImportSectionNode = {
 	nodeType: "ImportSection"
+	groups: Array<ImportGroupNode>
 	entries: Array<ImportNode>
 	position: Position
 }
 
-// NOTE: `name as alias from "./Module.es"`. `alias` is null when the entry
-// binds the name the dependency exports it under; `name` always stays the
-// exported name, so the two sides of a rename are both still in hand.
+// NOTE: `from "./Module.es" { … }` — every name taken from one dependency,
+// written together. `source` is shared with each entry inside, so an entry
+// still says where it came from on its own.
+export type ImportGroupNode = {
+	nodeType: "ImportGroup"
+	source: ModuleSpecifierNode
+	entries: Array<ImportNode>
+	position: Position
+}
+
+// NOTE: `name as alias`, inside a group. `alias` is null when the entry binds
+// the name the dependency exports it under; `name` always stays the exported
+// name, so the two sides of a rename are both still in hand.
 export type ImportNode = {
 	nodeType: "Import"
 	name: IdentifierNode
@@ -176,9 +192,22 @@ export type ImportNode = {
 }
 
 // NOTE: `export { … }`, written below the implementation. A name is private
-// unless it is listed here.
+// unless it is listed here. What the Module declares is written bare; what it
+// forwards from a dependency is written in a group, the way an import is.
+// `entries` is both kinds flat, in written order, for the reason an import
+// section's is; `groups` is the forwarded ones as they were grouped.
 export type ExportSectionNode = {
 	nodeType: "ExportSection"
+	groups: Array<ExportGroupNode>
+	entries: Array<ExportNode>
+	position: Position
+}
+
+// NOTE: `from "./Module.es" { … }` in an export block — names forwarded from
+// one dependency, written together.
+export type ExportGroupNode = {
+	nodeType: "ExportGroup"
+	source: ModuleSpecifierNode
 	entries: Array<ExportNode>
 	position: Position
 }

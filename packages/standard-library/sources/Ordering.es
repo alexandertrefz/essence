@@ -1,6 +1,8 @@
 import {
-	Equatable from "./Protocols.es"
-	Printable from "./Protocols.es"
+	from "./Protocols.es" {
+		Equatable
+		Printable
+	}
 }
 
 declarations {

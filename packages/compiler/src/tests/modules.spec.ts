@@ -283,12 +283,12 @@ describe("Module Graph", () => {
 		withProject(
 			{
 				"Main.es": `import {
-	Rectangle from "./Geometry.es"
+	from "./Geometry.es" { Rectangle }
 }
 
 ${moduleProgram()}`,
 				"Geometry.es": `import {
-	PI from "./math/Math.es"
+	from "./math/Math.es" { PI }
 }
 
 ${moduleProgram()}`,
@@ -328,13 +328,13 @@ ${moduleProgram()}`,
 		withProject(
 			{
 				"Main.es": `import {
-	Rectangle from "./Facade.es"
+	from "./Facade.es" { Rectangle }
 }
 
 ${moduleProgram()}`,
 				"Facade.es": `${moduleProgram()}
 export {
-	Rectangle from "./Geometry.es"
+	from "./Geometry.es" { Rectangle }
 }
 `,
 				"Geometry.es": moduleProgram(),
@@ -368,18 +368,18 @@ export {
 		let filePath = (name: string) => path.join(directory, name)
 		let host = memoryHost({
 			[filePath("Main.es")]: `import {
-	Rectangle from "./Left.es"
-	Circle from "./Right.es"
+	from "./Left.es" { Rectangle }
+	from "./Right.es" { Circle }
 }
 
 ${moduleProgram()}`,
 			[filePath("Left.es")]: `import {
-	Shape from "./Shape.es"
+	from "./Shape.es" { Shape }
 }
 
 ${moduleProgram()}`,
 			[filePath("Right.es")]: `import {
-	Shape from "./Shape.es"
+	from "./Shape.es" { Shape }
 }
 
 ${moduleProgram()}`,
@@ -410,13 +410,13 @@ ${moduleProgram()}`,
 		withProject(
 			{
 				"Main.es": `import {
-	Rectangle from "./Geometry.es"
-	Circle from "./Geometry.es"
+	from "./Geometry.es" { Rectangle }
+	from "./Geometry.es" { Circle }
 }
 
 ${moduleProgram()}
 export {
-	Square from "./Geometry.es"
+	from "./Geometry.es" { Square }
 }
 `,
 				"Geometry.es": moduleProgram(),
@@ -446,13 +446,13 @@ export {
 		withProject(
 			{
 				"A.es": `import {
-	b from "./B.es"
+	from "./B.es" { b }
 }
 
 ${moduleProgram()}`,
 				"B.es": `import {
-	a from "./A.es"
-	leaf from "./Leaf.es"
+	from "./A.es" { a }
+	from "./Leaf.es" { leaf }
 }
 
 ${moduleProgram()}`,
@@ -483,17 +483,17 @@ ${moduleProgram()}`,
 		withProject(
 			{
 				"A.es": `import {
-	b from "./B.es"
+	from "./B.es" { b }
 }
 
 ${moduleProgram()}`,
 				"B.es": `import {
-	c from "./C.es"
+	from "./C.es" { c }
 }
 
 ${moduleProgram()}`,
 				"C.es": `import {
-	a from "./A.es"
+	from "./A.es" { a }
 }
 
 ${moduleProgram()}`,
@@ -519,7 +519,7 @@ ${moduleProgram()}`,
 		withProject(
 			{
 				"Main.es": `import {
-	broken from "./Broken.es"
+	from "./Broken.es" { broken }
 }
 
 implementation {
@@ -560,8 +560,11 @@ implementation {
 		withProject(
 			{
 				"Main.es": `import {
-	Rectangle from "./Gone.es"
-	Circle from "./Gone.es"
+	from "./Gone.es" {
+		Rectangle
+		Circle
+	}
+	from "./Gone.es" { Square }
 }
 
 ${moduleProgram()}`,
@@ -577,7 +580,8 @@ ${moduleProgram()}`,
 					"Main.es",
 				).diagnostics
 
-				// NOTE: Two entries, two Diagnostics — the second is not
+				// NOTE: Two groups, two Diagnostics — one per specifier written,
+				// however many names the group holds, and the second is not
 				// deduplicated away, because each underlines its own specifier.
 				expect(
 					diagnostics.map((diagnostic) => diagnostic.code),
@@ -586,15 +590,15 @@ ${moduleProgram()}`,
 					"No Module was found at './Gone.es'",
 				)
 				expect(diagnostics[0].position).toEqual({
-					start: { line: 2, column: 17 },
-					end: { line: 2, column: 28 },
+					start: { line: 2, column: 7 },
+					end: { line: 2, column: 18 },
 				})
 				expect(diagnostics[0].labels).toHaveLength(1)
 				expect(diagnostics[0].labels[0]?.kind).toBe("primary")
 				expect(diagnostics[0].notes[0]).toContain(
 					path.join(directory, "Gone.es"),
 				)
-				expect(diagnostics[1].position?.start.line).toBe(3)
+				expect(diagnostics[1].position?.start.line).toBe(6)
 			},
 		)
 	})
@@ -603,10 +607,10 @@ ${moduleProgram()}`,
 		withProject(
 			{
 				"Main.es": `import {
-	Bare from "Geometry.es"
-	Absolute from "/project/Geometry.es"
-	Extensionless from "./Geometry"
-	Own from "./Main.es"
+	from "Geometry.es" { Bare }
+	from "/project/Geometry.es" { Absolute }
+	from "./Geometry" { Extensionless }
+	from "./Main.es" { Own }
 }
 
 ${moduleProgram()}`,
@@ -668,7 +672,7 @@ ${moduleProgram()}`,
 
 			writeFileSync(
 				path.join(directory, "Main.es"),
-				`import {\n\tBoolean from "${specifier}"\n}\n\n${moduleProgram()}`,
+				`import {\n\tfrom "${specifier}" { Boolean }\n}\n\n${moduleProgram()}`,
 			)
 
 			let graph = loadModuleGraph(
@@ -714,8 +718,8 @@ ${moduleProgram()}`,
 		withProject(
 			{
 				"Main.es": `import {
-	Rectangle from "./real/Geometry.es"
-	Circle from "./link/Geometry.es"
+	from "./real/Geometry.es" { Rectangle }
+	from "./link/Geometry.es" { Circle }
 }
 
 ${moduleProgram()}`,
@@ -768,7 +772,7 @@ ${moduleProgram()}`,
 		)
 		let host = memoryHost({
 			[path.join(directory, "Main.es")]: `import {
-	Rectangle from "./Geometry.es"
+	from "./Geometry.es" { Rectangle }
 }
 
 ${moduleProgram()}`,
@@ -926,7 +930,7 @@ export {
 		withProject(
 			{
 				"Main.es": `import {
-	measure as area from "./Geometry.es"
+	from "./Geometry.es" { measure as area }
 }
 
 implementation {
@@ -968,7 +972,7 @@ export {
 		withProject(
 			{
 				"Main.es": `import {
-	Shape from "./Facade.es"
+	from "./Facade.es" { Shape }
 }
 
 implementation {
@@ -982,7 +986,7 @@ implementation {
 				"Facade.es": `implementation {}
 
 export {
-	Rectangle as Shape from "./Inner.es"
+	from "./Inner.es" { Rectangle as Shape }
 }
 `,
 				"Inner.es": `implementation {
@@ -1011,8 +1015,8 @@ export {
 		withProject(
 			{
 				"Main.es": `import {
-	hidden from "./Library.es"
-	absent from "./Library.es"
+	from "./Library.es" { hidden }
+	from "./Library.es" { absent }
 }
 
 implementation {}
@@ -1060,10 +1064,10 @@ export {}
 		withProject(
 			{
 				"Main.es": `import {
-	String from "./Library.es"
-	local from "./Library.es"
-	first from "./Library.es"
-	second as first from "./Library.es"
+	from "./Library.es" { String }
+	from "./Library.es" { local }
+	from "./Library.es" { first }
+	from "./Library.es" { second as first }
 }
 
 implementation {
@@ -1141,8 +1145,8 @@ export {
 		withProject(
 			{
 				"Main.es": `import {
-	Measurable as Sizing from "./Geometry.es"
-	Rectangle from "./Geometry.es"
+	from "./Geometry.es" { Measurable as Sizing }
+	from "./Geometry.es" { Rectangle }
 }
 
 implementation {
@@ -1217,7 +1221,7 @@ export {
 		withProject(
 			{
 				"A.es": `import {
-	halved from "./B.es"
+	from "./B.es" { halved }
 }
 
 implementation {
@@ -1239,8 +1243,8 @@ export {
 }
 `,
 				"B.es": `import {
-	Amount from "./A.es"
-	doubled from "./A.es"
+	from "./A.es" { Amount }
+	from "./A.es" { doubled }
 }
 
 implementation {
@@ -1289,7 +1293,7 @@ export {
 		withProject(
 			{
 				"A.es": `import {
-	Tag from "./C.es"
+	from "./C.es" { Tag }
 }
 
 implementation {
@@ -1308,8 +1312,8 @@ export {
 }
 `,
 				"B.es": `import {
-	Marker from "./A.es"
-	Sizes from "./A.es"
+	from "./A.es" { Marker }
+	from "./A.es" { Sizes }
 }
 
 implementation {
@@ -1327,7 +1331,7 @@ export {
 }
 `,
 				"C.es": `import {
-	Balanced from "./B.es"
+	from "./B.es" { Balanced }
 }
 
 implementation {
@@ -1366,7 +1370,7 @@ export {
 		withProject(
 			{
 				"A.es": `import {
-	SCALE from "./B.es"
+	from "./B.es" { SCALE }
 }
 
 implementation {
@@ -1380,7 +1384,7 @@ export {
 }
 `,
 				"B.es": `import {
-	scaled from "./A.es"
+	from "./A.es" { scaled }
 }
 
 implementation {
@@ -1425,7 +1429,7 @@ export {
 		withProject(
 			{
 				"Main.es": `import {
-	SCALE from "./Settings.es"
+	from "./Settings.es" { SCALE }
 }
 
 implementation {
@@ -1457,7 +1461,7 @@ export {
 		withProject(
 			{
 				"A.es": `import {
-	fromB from "./B.es"
+	from "./B.es" { fromB }
 }
 
 implementation {
@@ -1473,7 +1477,7 @@ export {
 }
 `,
 				"B.es": `import {
-	fromA from "./A.es"
+	from "./A.es" { fromA }
 }
 
 implementation {
@@ -1508,8 +1512,8 @@ export {
 		withProject(
 			{
 				"Main.es": `import {
-	kept from "./Library.es"
-	unread from "./Library.es"
+	from "./Library.es" { kept }
+	from "./Library.es" { unread }
 }
 
 implementation {
@@ -1556,8 +1560,8 @@ export {
 		withProject(
 			{
 				"Main.es": `import {
-	Measurable from "./Geometry.es"
-	Rectangle from "./Geometry.es"
+	from "./Geometry.es" { Measurable }
+	from "./Geometry.es" { Rectangle }
 }
 
 implementation {
@@ -1603,7 +1607,7 @@ export {
 		withProject(
 			{
 				"Main.es": `import {
-	Rectangle from "./Geometry.es"
+	from "./Geometry.es" { Rectangle }
 }
 
 implementation {
@@ -1681,8 +1685,8 @@ export {
 		withProject(
 			{
 				"Main.es": `import {
-	Zulu from "./Zulu.es"
-	Alpha from "./Alpha.es"
+	from "./Zulu.es" { Zulu }
+	from "./Alpha.es" { Alpha }
 }
 
 implementation {
@@ -1751,7 +1755,7 @@ export {
 		withProject(
 			{
 				"Main.es": `import {
-	Rectangle from "./Geometry.es"
+	from "./Geometry.es" { Rectangle }
 }
 
 implementation {
@@ -1827,7 +1831,7 @@ export {
 		withProject(
 			{
 				"Main.es": `import {
-	broken from "./Other.es"
+	from "./Other.es" { broken }
 }
 
 implementation {
@@ -1889,7 +1893,7 @@ export {
 		withProject(
 			{
 				"Main.es": `import {
-	broken from "./Other.es"
+	from "./Other.es" { broken }
 }
 
 implementation {
@@ -1933,7 +1937,7 @@ export {
 		withProject(
 			{
 				"Main.es": `import {
-	Result as Theirs from "./Other.es"
+	from "./Other.es" { Result as Theirs }
 }
 
 implementation {
@@ -2140,7 +2144,7 @@ describe("Module Code Generation", () => {
 		await withBuiltProject(
 			{
 				"Main.es": `import {
-	Amount from "./Dep.es"
+	from "./Dep.es" { Amount }
 }
 
 implementation {
@@ -2193,11 +2197,11 @@ export {
 		await withBuiltProject(
 			{
 				"Main.es": `import {
-	Shape   from "./Shape.es"
-	Square  from "./Square.es"
-	Squares from "./Square.es"
-	Disc    from "./Disc.es"
-	Discs   from "./Disc.es"
+	from "./Shape.es" { Shape }
+	from "./Square.es" { Square }
+	from "./Square.es" { Squares }
+	from "./Disc.es" { Disc }
+	from "./Disc.es" { Discs }
 }
 
 implementation {
@@ -2223,7 +2227,7 @@ export {
 }
 `,
 				"Square.es": `import {
-	Shape from "./Shape.es"
+	from "./Shape.es" { Shape }
 }
 
 implementation {
@@ -2242,7 +2246,7 @@ export {
 }
 `,
 				"Disc.es": `import {
-	Shape from "./Shape.es"
+	from "./Shape.es" { Shape }
 }
 
 implementation {
@@ -2294,8 +2298,8 @@ export {
 		await withBuiltProject(
 			{
 				"Main.es": `import {
-	left  from "./Left.es"
-	right from "./Right.es"
+	from "./Left.es" { left }
+	from "./Right.es" { right }
 }
 
 implementation {
@@ -2304,7 +2308,7 @@ implementation {
 }
 `,
 				"Left.es": `import {
-	shared from "./Shared.es"
+	from "./Shared.es" { shared }
 }
 
 implementation {
@@ -2320,7 +2324,7 @@ export {
 }
 `,
 				"Right.es": `import {
-	shared from "./Shared.es"
+	from "./Shared.es" { shared }
 }
 
 implementation {
@@ -2377,8 +2381,8 @@ export {
 		await withBuiltProject(
 			{
 				"Main.es": `import {
-	Colour as Theirs from "./Other.es"
-	theirRed         from "./Other.es"
+	from "./Other.es" { Colour as Theirs }
+	from "./Other.es" { theirRed }
 }
 
 implementation {
@@ -2450,7 +2454,7 @@ export {
 		await withBuiltProject(
 			{
 				"Main.es": `import {
-	describe from "./Fetching.es"
+	from "./Fetching.es" { describe }
 }
 
 implementation {
@@ -2521,9 +2525,9 @@ export {
 		await withBuiltProject(
 			{
 				"Main.es": `import {
-	connect from "./Connecting.es"
-	Endpoint from "./Connecting.es"
-	describe from "./Connecting.es"
+	from "./Connecting.es" { connect }
+	from "./Connecting.es" { Endpoint }
+	from "./Connecting.es" { describe }
 }
 
 implementation {
@@ -2599,7 +2603,7 @@ export {
 		await withBuiltProject(
 			{
 				"Main.es": `import {
-	Fetch from "./Fetching.es"
+	from "./Fetching.es" { Fetch }
 }
 
 implementation {
@@ -2643,7 +2647,7 @@ export { Fetch }
 		withProject(
 			{
 				"Main.es": `import {
-	standardHeaders from "./Headers.es"
+	from "./Headers.es" { standardHeaders }
 }
 
 implementation {

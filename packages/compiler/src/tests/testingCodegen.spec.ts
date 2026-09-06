@@ -935,7 +935,7 @@ describe("Test codegen — a graph of Modules", () => {
 		writeFileSync(
 			tests,
 			`import {
-				leader from "./Standings.es"
+				from "./Standings.es" { leader }
 			}
 
 			tests {

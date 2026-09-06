@@ -36,7 +36,7 @@ export {
 `
 
 const MAIN_MODULE = `import {
-	square from "./Math.es"
+	from "./Math.es" { square }
 }
 
 implementation {

@@ -1,5 +1,5 @@
 import {
-	Ordering from "./Ordering.es"
+	from "./Ordering.es" { Ordering }
 }
 
 declarations {

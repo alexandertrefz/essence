@@ -108,7 +108,7 @@ export {
 `
 
 const middleSource = `import {
-	Amount from "./Base.es"
+	from "./Base.es" { Amount }
 }
 
 implementation {
@@ -124,16 +124,16 @@ implementation {
 }
 
 export {
-	Amount from "./Base.es"
+	from "./Base.es" { Amount }
 	Money
 	averaged
 }
 `
 
 const topSource = `import {
-	Amount from "./Middle.es"
-	Money from "./Middle.es"
-	averaged from "./Middle.es"
+	from "./Middle.es" { Amount }
+	from "./Middle.es" { Money }
+	from "./Middle.es" { averaged }
 }
 
 implementation {
@@ -163,7 +163,7 @@ const soloSource = `implementation {\n\tconstant solo = 1\n}\n\nexport {\n\tsolo
 // it is the member that is NOT chosen as the entry, so its Diagnostics only
 // reach the Editor because the other member's graph reached it.
 const circleSource = `import {
-	flagged from "./Loop.es"
+	from "./Loop.es" { flagged }
 }
 
 implementation {
@@ -183,7 +183,7 @@ export {
 `
 
 const loopSource = `import {
-	circled from "./Circle.es"
+	from "./Circle.es" { circled }
 }
 
 implementation {
@@ -243,7 +243,7 @@ function heavyFanOut(
 		).join("\n")
 
 		files[`Root${name}.es`] =
-			`import {\n\tshared from "./Shared.es"\n}\n\nimplementation {\n\tconstant seen${name} = shared\n${filler}\n}\n`
+			`import {\n\tfrom "./Shared.es" { shared }\n}\n\nimplementation {\n\tconstant seen${name} = shared\n${filler}\n}\n`
 	}
 
 	return files
@@ -277,12 +277,12 @@ function heavyFanOutOverALibrary(
 		).join("\n")
 		let holdsLibrary = index === roots[0] || index === last
 		let second = holdsLibrary
-			? `\tlibrary from "./Library.es"`
-			: `\tother from "./Other.es"`
+			? `\tfrom "./Library.es" { library }`
+			: `\tfrom "./Other.es" { other }`
 		let held = holdsLibrary ? "library" : "other"
 
 		files[`Root${name}.es`] =
-			`import {\n\tshared from "./Shared.es"\n${second}\n}\n\nimplementation {\n\tconstant seen${name} = shared\n\tconstant held${name} = ${held}\n${filler}\n}\n`
+			`import {\n\tfrom "./Shared.es" { shared }\n${second}\n}\n\nimplementation {\n\tconstant seen${name} = shared\n\tconstant held${name} = ${held}\n${filler}\n}\n`
 	}
 
 	return files
@@ -466,8 +466,8 @@ describe("the analysis cache", () => {
 		open(
 			"Top.es",
 			topSource.replace(
-				'\tAmount from "./Middle.es"',
-				'\tAmount from "./Middle.es"\n\ttag from "./Aside.es"',
+				'\tfrom "./Middle.es" { Amount }',
+				'\tfrom "./Middle.es" { Amount }\n\tfrom "./Aside.es" { tag }',
 			),
 			2,
 		)
@@ -518,7 +518,7 @@ describe("the analysis cache", () => {
 	it("should keep a section-less dependency's own enrichment", () => {
 		let { workspace, pathOf } = workspaceOf({
 			"Plain.es": `implementation {\n\tchoice Colour {\n\t\tRed\n\t\tBlue\n\t}\n}\n`,
-			"Importer.es": `import {\n\tColour from "./Plain.es"\n}\n\nimplementation {\n\tconstant chosen: Colour = #Red\n}\n`,
+			"Importer.es": `import {\n\tfrom "./Plain.es" { Colour }\n}\n\nimplementation {\n\tconstant chosen: Colour = #Red\n}\n`,
 		})
 
 		workspace.analysisOf(pathOf("Importer.es"))
@@ -538,7 +538,7 @@ describe("the analysis cache", () => {
 	// graph that reaches it will never fill it back in.
 	it("should keep a section-less dependency's enrichment through an edit in the importer", () => {
 		let plainSource = `implementation {\n\tchoice Colour {\n\t\tRed\n\t\tBlue\n\t}\n}\n`
-		let importerSource = `import {\n\tColour from "./Plain.es"\n}\n\nimplementation {\n\tconstant chosen: Colour = #Red\n}\n`
+		let importerSource = `import {\n\tfrom "./Plain.es" { Colour }\n}\n\nimplementation {\n\tconstant chosen: Colour = #Red\n}\n`
 		let { workspace, pathOf, open } = workspaceOf({
 			"Plain.es": plainSource,
 			"Importer.es": importerSource,
@@ -575,7 +575,7 @@ describe("the analysis cache", () => {
 	// which is what makes this the worst edge to be missing.
 	it("should invalidate an importer once the file its specifier names appears", () => {
 		let { workspace, root, pathOf } = workspaceOf({
-			"Importer.es": `import {\n\tthing from "./Base.es"\n}\n\nimplementation {\n\tTerminal.print(thing::toString())\n}\n`,
+			"Importer.es": `import {\n\tfrom "./Base.es" { thing }\n}\n\nimplementation {\n\tTerminal.print(thing::toString())\n}\n`,
 		})
 
 		expect(
@@ -602,8 +602,8 @@ describe("the analysis cache", () => {
 	it("should reach a file's dependents without reaching its siblings", () => {
 		let { workspace, pathOf } = workspaceOf({
 			"Shared.es": `implementation {\n\tconstant shared = 1\n}\n\nexport {\n\tshared\n}\n`,
-			"Left.es": `import {\n\tshared from "./Shared.es"\n}\n\nimplementation {\n\tTerminal.print(shared::toString())\n}\n`,
-			"Right.es": `import {\n\tshared from "./Shared.es"\n}\n\nimplementation {\n\tTerminal.print(shared::toString())\n}\n`,
+			"Left.es": `import {\n\tfrom "./Shared.es" { shared }\n}\n\nimplementation {\n\tTerminal.print(shared::toString())\n}\n`,
+			"Right.es": `import {\n\tfrom "./Shared.es" { shared }\n}\n\nimplementation {\n\tTerminal.print(shared::toString())\n}\n`,
 		})
 
 		expect(workspace.dependentsOf(pathOf("Shared.es")).sort()).toEqual(
@@ -653,8 +653,8 @@ describe("the analysis cache", () => {
 	it("should answer with the roots reaching a file rather than every root", () => {
 		let { workspace, pathOf } = workspaceOf({
 			"Shared.es": `implementation {\n\tconstant shared = 1\n}\n\nexport {\n\tshared\n}\n`,
-			"Left.es": `import {\n\tshared from "./Shared.es"\n}\n\nimplementation {\n\tTerminal.print(shared::toString())\n}\n`,
-			"Right.es": `import {\n\tshared from "./Shared.es"\n}\n\nimplementation {\n\tTerminal.print(shared::toString())\n}\n`,
+			"Left.es": `import {\n\tfrom "./Shared.es" { shared }\n}\n\nimplementation {\n\tTerminal.print(shared::toString())\n}\n`,
+			"Right.es": `import {\n\tfrom "./Shared.es" { shared }\n}\n\nimplementation {\n\tTerminal.print(shared::toString())\n}\n`,
 			"Solo.es": soloSource,
 		})
 
@@ -746,7 +746,7 @@ describe("the analysis cache", () => {
 	it("should cache the answer for a document whose analysis threw", () => {
 		let { workspace, pathOf } = workspaceOf({
 			"Deep.es": `${unparseableSource}\nexport {\n\ta\n}\n`,
-			"Uses.es": `import {\n\ta from "./Deep.es"\n}\n\nimplementation {\n\tTerminal.print(a)\n}\n`,
+			"Uses.es": `import {\n\tfrom "./Deep.es" { a }\n}\n\nimplementation {\n\tTerminal.print(a)\n}\n`,
 		})
 
 		resetCompilationCounts()
@@ -1080,7 +1080,7 @@ describe("the Server's request loop", () => {
 	// stale ANSWER are different failures: the Hover said `Error` about a name
 	// that resolves.
 	it("should re-answer an importer once the Module it names is created", async () => {
-		let importerSource = `import {\n\tthing from "./Base.es"\n}\n\nimplementation {\n\tTerminal.print(thing::toString())\n}\n`
+		let importerSource = `import {\n\tfrom "./Base.es" { thing }\n}\n\nimplementation {\n\tTerminal.print(thing::toString())\n}\n`
 		let files = makeSessionWorkspace({ "Importer.es": importerSource })
 		let session = startSession()
 
@@ -1107,7 +1107,7 @@ describe("the Server's request loop", () => {
 
 			let hover = await session.request<Hover | null>(HoverRequest.type, {
 				textDocument: { uri: uriFor(files.pathOf("Importer.es")) },
-				position: positionOf(importerSource, "\tthing from", 1),
+				position: positionOf(importerSource, "{ thing }", 3),
 			})
 
 			expect(JSON.stringify(hover.result)).toContain("Integer")
@@ -1253,7 +1253,7 @@ describe("the Server's request loop", () => {
 
 		for (let index of roots) {
 			fanIn[`Root${index}.es`] =
-				`import {\n\tshared from "./Shared.es"\n}\n\nimplementation {\n\tconstant seen${index} = shared\n}\n`
+				`import {\n\tfrom "./Shared.es" { shared }\n}\n\nimplementation {\n\tconstant seen${index} = shared\n}\n`
 		}
 
 		let files = makeSessionWorkspace(fanIn)
@@ -1314,7 +1314,7 @@ describe("the Server's request loop", () => {
 
 		for (let index of siblings) {
 			fanIn[`Root${index}.es`] =
-				`import {\n\tshared from "./Shared.es"\n}\n\nimplementation {\n\tconstant seen${index} = shared\n}\n`
+				`import {\n\tfrom "./Shared.es" { shared }\n}\n\nimplementation {\n\tconstant seen${index} = shared\n}\n`
 		}
 
 		let files = makeSessionWorkspace(fanIn)
@@ -1351,7 +1351,7 @@ describe("the Server's request loop", () => {
 	// already naming it.
 	it("should publish a section-less dependency's own answer rather than the graph's", async () => {
 		let plain = `implementation {\n\tconstant amount: Integer = "two"\n\tconstant broken = (\n}\n`
-		let importer = `import {\n\tamount from "./Plain.es"\n}\n\nimplementation {\n\tconstant here = 1\n}\n`
+		let importer = `import {\n\tfrom "./Plain.es" { amount }\n}\n\nimplementation {\n\tconstant here = 1\n}\n`
 		let files = makeSessionWorkspace({
 			"Plain.es": plain,
 			"Importer.es": importer,
@@ -1452,7 +1452,7 @@ describe("the Server's request loop", () => {
 	// is the half of that which nothing imports.
 	it("should keep a closed Module's Diagnostics through the documents importing it", async () => {
 		let broken = `implementation {\n\tconstant amount: Integer = "two"\n}\n\nexport {\n\tamount\n}\n`
-		let importer = `import {\n\tamount from "./Broken.es"\n}\n\nimplementation {\n\tTerminal.print(amount::toString())\n}\n`
+		let importer = `import {\n\tfrom "./Broken.es" { amount }\n}\n\nimplementation {\n\tTerminal.print(amount::toString())\n}\n`
 		let files = makeSessionWorkspace({
 			"Broken.es": broken,
 			"Importer.es": importer,
@@ -1825,7 +1825,7 @@ describe("the Server's request loop", () => {
 			await session.change(
 				files.pathOf("Root00.es"),
 				fanOut["Root00.es"]!.replace(
-					'\tlibrary from "./Library.es"\n',
+					'\tfrom "./Library.es" { library }\n',
 					"",
 				).replace(
 					"constant held00 = library",
@@ -1909,7 +1909,7 @@ describe("the Server's request loop", () => {
 	// in the file that could not survive it.
 	it("should refresh an unopened dependent root when a shared Module changes", async () => {
 		let shared = `implementation {\n\tconstant shared = 1\n}\n\nexport {\n\tshared\n}\n`
-		let reader = `import {\n\tshared from "./Shared.es"\n}\n\nimplementation {\n\tTerminal.print(shared::toString())\n}\n`
+		let reader = `import {\n\tfrom "./Shared.es" { shared }\n}\n\nimplementation {\n\tTerminal.print(shared::toString())\n}\n`
 		let files = makeSessionWorkspace({
 			"Shared.es": shared,
 			"Reader.es": reader,
@@ -1947,7 +1947,7 @@ describe("the Server's request loop", () => {
 	// rather than by what reads it.
 	it("should refresh an open buffer outside the folders when what it imports changes", async () => {
 		let base = `implementation {\n\tconstant thing = 1\n}\n\nexport {\n\tthing\n}\n`
-		let outside = `import {\n\tthing from "../inside/Base.es"\n}\n\nimplementation {\n\tconstant seen = thing\n}\n`
+		let outside = `import {\n\tfrom "../inside/Base.es" { thing }\n}\n\nimplementation {\n\tconstant seen = thing\n}\n`
 		let files = makeSessionWorkspace({
 			"inside/Base.es": base,
 			"outside/Outside.es": outside,
@@ -2049,8 +2049,8 @@ describe("the Server's request loop", () => {
 	// that let it go stops reporting on everything underneath it.
 	it("should keep reporting on a Module whose only importer stops importing it", async () => {
 		let leaf = `implementation {\n\tconstant amount: Integer = "two"\n}\n\nexport {\n\tamount\n}\n`
-		let mid = `import {\n\tamount from "./Leaf.es"\n}\n\nimplementation {\n\tconstant here = amount\n}\n\nexport {\n\there\n}\n`
-		let top = `import {\n\there from "./Mid.es"\n}\n\nimplementation {\n\tconstant top = here\n}\n`
+		let mid = `import {\n\tfrom "./Leaf.es" { amount }\n}\n\nimplementation {\n\tconstant here = amount\n}\n\nexport {\n\there\n}\n`
+		let top = `import {\n\tfrom "./Mid.es" { here }\n}\n\nimplementation {\n\tconstant top = here\n}\n`
 		let files = makeSessionWorkspace({
 			"Leaf.es": leaf,
 			"Mid.es": mid,
@@ -2095,8 +2095,8 @@ describe("the Server's request loop", () => {
 	// while every one of them is still true on disk.
 	it("should keep reporting on a Module whose only importer was deleted", async () => {
 		let leaf = `implementation {\n\tconstant amount: Integer = "two"\n}\n\nexport {\n\tamount\n}\n`
-		let mid = `import {\n\tamount from "./Leaf.es"\n}\n\nimplementation {\n\tconstant here = amount\n}\n\nexport {\n\there\n}\n`
-		let top = `import {\n\there from "./Mid.es"\n}\n\nimplementation {\n\tconstant top = here\n}\n`
+		let mid = `import {\n\tfrom "./Leaf.es" { amount }\n}\n\nimplementation {\n\tconstant here = amount\n}\n\nexport {\n\there\n}\n`
+		let top = `import {\n\tfrom "./Mid.es" { here }\n}\n\nimplementation {\n\tconstant top = here\n}\n`
 		let files = makeSessionWorkspace({
 			"Leaf.es": leaf,
 			"Mid.es": mid,
@@ -2140,7 +2140,7 @@ describe("the Server's request loop", () => {
 	// that has just been deleted.
 	it("should keep the Diagnostics of an open Module whose only importer was deleted", async () => {
 		let library = `implementation {\n\tconstant amount: Integer = "two"\n}\n\nexport {\n\tamount\n}\n`
-		let main = `import {\n\tamount from "./Library.es"\n}\n\nimplementation {\n\tconstant here = amount\n}\n`
+		let main = `import {\n\tfrom "./Library.es" { amount }\n}\n\nimplementation {\n\tconstant here = amount\n}\n`
 		let files = makeSessionWorkspace({
 			"Library.es": library,
 			"Main.es": main,
@@ -2180,7 +2180,7 @@ describe("the Server's request loop", () => {
 	it("should hand a file over silently when it stops being a root", async () => {
 		let library = `implementation {\n\tconstant amount: Integer = "two"\n}\n\nexport {\n\tamount\n}\n`
 		let alone = `implementation {\n\tconstant here = 1\n}\n\nexport {\n\there\n}\n`
-		let importing = `import {\n\tamount from "./Library.es"\n}\n\nimplementation {\n\tconstant here = amount\n}\n\nexport {\n\there\n}\n`
+		let importing = `import {\n\tfrom "./Library.es" { amount }\n}\n\nimplementation {\n\tconstant here = amount\n}\n\nexport {\n\there\n}\n`
 		let files = makeSessionWorkspace({
 			"Library.es": library,
 			"Main.es": alone,
@@ -2233,7 +2233,7 @@ describe("the Server's request loop", () => {
 	// the batch has published, and by then somebody else is answering.
 	it("should take a file over silently when it becomes a root", async () => {
 		let library = `implementation {\n\tconstant amount: Integer = "two"\n}\n\nexport {\n\tamount\n}\n`
-		let importing = `import {\n\tamount from "./Library.es"\n}\n\nimplementation {\n\tconstant here = amount\n}\n`
+		let importing = `import {\n\tfrom "./Library.es" { amount }\n}\n\nimplementation {\n\tconstant here = amount\n}\n`
 		let alone = `implementation {\n\tconstant here = 1\n}\n`
 		let files = makeSessionWorkspace({
 			"Library.es": library,
@@ -2304,7 +2304,7 @@ describe("the Server's request loop", () => {
 	// above it was the only root either member had, and losing it leaves two
 	// files importing each other and nothing else.
 	it("should analyse a cycle that loses the file above it", async () => {
-		let above = `import {\n\tcircled from "./Circle.es"\n}\n\nimplementation {\n\tconstant seen = circled(1)\n}\n`
+		let above = `import {\n\tfrom "./Circle.es" { circled }\n}\n\nimplementation {\n\tconstant seen = circled(1)\n}\n`
 		let files = makeSessionWorkspace({ ...cycle, "Above.es": above })
 		let session = startSession()
 
@@ -2342,7 +2342,7 @@ describe("the Server's request loop", () => {
 	// one unreadable file can not hide a project.
 	it("should report on the files beneath a root that could not be read", async () => {
 		let deep = `${unparseableSource}\nexport {\n\ta\n}\n`
-		let uses = `import {\n\ta from "./Deep.es"\n}\n\nimplementation {\n\tTerminal.print(a)\n}\n`
+		let uses = `import {\n\tfrom "./Deep.es" { a }\n}\n\nimplementation {\n\tTerminal.print(a)\n}\n`
 		let files = makeSessionWorkspace({ "Deep.es": deep, "Uses.es": uses })
 		let session = startSession()
 

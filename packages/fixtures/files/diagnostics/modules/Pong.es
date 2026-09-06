@@ -1,5 +1,5 @@
 import {
-	stepped from "./Ping.es"
+	from "./Ping.es" { stepped }
 }
 
 implementation {

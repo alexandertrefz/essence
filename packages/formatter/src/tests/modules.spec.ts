@@ -6,18 +6,18 @@ import { format } from "../index"
 import { sectionSpans } from "../sections"
 import { commentAnchors } from "../trivia"
 
-// NOTE: A whole Program written as the lines it is made of. A Module section is
-// read for the column its `from` Keywords line up in, and a `\n`-escaped string
-// hides exactly that.
+// NOTE: A whole Program written as the lines it is made of, because a Module
+// section is read for how its groups are laid out across lines, and a
+// `\n`-escaped string hides exactly that.
 function source(...lines: Array<string>): string {
 	return lines.join("\n") + "\n"
 }
 
 let formatted = (text: string) => format(text).text
 
-// NOTE: The anchors the safety gate compares, section-aware — the entries of a
-// Module section come out sorted, so they are compared per entry rather than
-// per Token.
+// NOTE: The anchors the safety gate compares, section-aware — the groups and
+// entries of a Module section come out sorted, so they are compared per group
+// and per entry rather than per Token.
 let anchors = (text: string) =>
 	commentAnchors(text, sectionSpans(parseDocument(text).program)).join("\n")
 
@@ -26,14 +26,14 @@ describe("module sections", () => {
 		// NOTE: This order is not a preference: dispatch over imported
 		// Namespaces is defined to follow it, so the sort can never change which
 		// Namespace a Method call resolves to.
-		it("sorts import entries by specifier, then by name", () => {
+		it("sorts groups by specifier", () => {
 			expect(
 				formatted(
 					source(
 						"import {",
-						'\tRectangle from "./Geometry.es"',
-						'\tPI from "../math/Math.es"',
-						'\tCircle from "./Geometry.es"',
+						'\tfrom "./Geometry.es" { Rectangle }',
+						'\tfrom "../math/Math.es" { PI }',
+						'\tfrom "./Bounds.es" { Circle }',
 						"}",
 						"",
 						"implementation {}",
@@ -42,9 +42,39 @@ describe("module sections", () => {
 			).toBe(
 				source(
 					"import {",
-					'\tPI        from "../math/Math.es"',
-					'\tCircle    from "./Geometry.es"',
-					'\tRectangle from "./Geometry.es"',
+					'\tfrom "../math/Math.es" { PI }',
+					'\tfrom "./Bounds.es" { Circle }',
+					'\tfrom "./Geometry.es" { Rectangle }',
+					"}",
+					"",
+					"implementation {}",
+				),
+			)
+		})
+
+		it("sorts the names inside a group", () => {
+			expect(
+				formatted(
+					source(
+						"import {",
+						'\tfrom "./Geometry.es" {',
+						"\t\tRectangle",
+						"\t\tCircle",
+						"\t\tarea",
+						"\t}",
+						"}",
+						"",
+						"implementation {}",
+					),
+				),
+			).toBe(
+				source(
+					"import {",
+					'\tfrom "./Geometry.es" {',
+					"\t\tCircle",
+					"\t\tRectangle",
+					"\t\tarea",
+					"\t}",
 					"}",
 					"",
 					"implementation {}",
@@ -62,7 +92,7 @@ describe("module sections", () => {
 						"}",
 						"",
 						"export {",
-						'\tRectangle from "./Geometry.es"',
+						'\tfrom "./Geometry.es" { Rectangle }',
 						"\tzeta",
 						"\talpha",
 						"}",
@@ -78,49 +108,24 @@ describe("module sections", () => {
 					"export {",
 					"\talpha",
 					"\tzeta",
-					'\tRectangle from "./Geometry.es"',
+					'\tfrom "./Geometry.es" { Rectangle }',
 					"}",
 				),
 			)
 		})
 
-		it("sorts re-exports by specifier, then by name", () => {
-			expect(
-				formatted(
-					source(
-						"implementation {}",
-						"",
-						"export {",
-						'\tRectangle from "./Geometry.es"',
-						'\tPI from "../math/Math.es"',
-						'\tCircle from "./Geometry.es"',
-						"}",
-					),
-				),
-			).toBe(
-				source(
-					"implementation {}",
-					"",
-					"export {",
-					'\tPI        from "../math/Math.es"',
-					'\tCircle    from "./Geometry.es"',
-					'\tRectangle from "./Geometry.es"',
-					"}",
-				),
-			)
-		})
-
-		// NOTE: A blank line the author left between two entries cannot survive
-		// the sort — which two entries the gap would end up between is decided by
-		// the sort rather than by anything the author said.
-		it("drops a blank line written between two entries", () => {
+		// NOTE: Two groups written for one file are left as two — merging them
+		// would have to decide which keeps its Comments — and stand next to each
+		// other, ordered by the first name in each, which is where a reader
+		// finds them to fold together.
+		it("keeps two groups for one file, side by side", () => {
 			expect(
 				formatted(
 					source(
 						"import {",
-						'\tCircle from "./Geometry.es"',
-						"",
-						'\tPI from "../math/Math.es"',
+						'\tfrom "./Geometry.es" { Rectangle }',
+						'\tfrom "./Bounds.es" { Box }',
+						'\tfrom "./Geometry.es" { Circle }',
 						"}",
 						"",
 						"implementation {}",
@@ -129,8 +134,37 @@ describe("module sections", () => {
 			).toBe(
 				source(
 					"import {",
-					'\tPI     from "../math/Math.es"',
-					'\tCircle from "./Geometry.es"',
+					'\tfrom "./Bounds.es" { Box }',
+					'\tfrom "./Geometry.es" { Circle }',
+					'\tfrom "./Geometry.es" { Rectangle }',
+					"}",
+					"",
+					"implementation {}",
+				),
+			)
+		})
+
+		// NOTE: A blank line the author left between two groups cannot survive
+		// the sort — which two groups the gap would end up between is decided by
+		// the sort rather than by anything the author said.
+		it("drops a blank line written between two groups", () => {
+			expect(
+				formatted(
+					source(
+						"import {",
+						'\tfrom "./Geometry.es" { Circle }',
+						"",
+						'\tfrom "../math/Math.es" { PI }',
+						"}",
+						"",
+						"implementation {}",
+					),
+				),
+			).toBe(
+				source(
+					"import {",
+					'\tfrom "../math/Math.es" { PI }',
+					'\tfrom "./Geometry.es" { Circle }',
 					"}",
 					"",
 					"implementation {}",
@@ -139,14 +173,17 @@ describe("module sections", () => {
 		})
 	})
 
-	describe("alignment", () => {
-		it("puts every from one space past the widest left-hand side", () => {
+	// NOTE: A group of one name stays on one line, the way a `case` with one
+	// short Statement does; two or more names stand one to a line. Nothing is
+	// aligned: a column is what made adding one wide name rewrite every line
+	// beside it.
+	describe("shape", () => {
+		it("writes a group of two or more names one to a line", () => {
 			expect(
 				formatted(
 					source(
 						"import {",
-						'\tCircle from "./Geometry.es"',
-						'\tRectangleMeasurable from "./Geometry.es"',
+						'\tfrom "./Geometry.es" { Circle Rectangle }',
 						"}",
 						"",
 						"implementation {}",
@@ -155,8 +192,10 @@ describe("module sections", () => {
 			).toBe(
 				source(
 					"import {",
-					'\tCircle              from "./Geometry.es"',
-					'\tRectangleMeasurable from "./Geometry.es"',
+					'\tfrom "./Geometry.es" {',
+					"\t\tCircle",
+					"\t\tRectangle",
+					"\t}",
 					"}",
 					"",
 					"implementation {}",
@@ -164,15 +203,14 @@ describe("module sections", () => {
 			)
 		})
 
-		// NOTE: `PI as Pi` is one left-hand side, not a name with a suffix — the
-		// column has to clear the whole spelling or the `from` lands inside it.
-		it("measures an aliased entry at its full name as alias spelling", () => {
+		it("writes a group of one name on one line", () => {
 			expect(
 				formatted(
 					source(
 						"import {",
-						'\tPI as Pi from "../math/Math.es"',
-						'\tE from "../math/Math.es"',
+						'\tfrom "./Geometry.es" {',
+						"\t\tRectangle",
+						"\t}",
 						"}",
 						"",
 						"implementation {}",
@@ -181,13 +219,25 @@ describe("module sections", () => {
 			).toBe(
 				source(
 					"import {",
-					'\tE        from "../math/Math.es"',
-					'\tPI as Pi from "../math/Math.es"',
+					'\tfrom "./Geometry.es" { Rectangle }',
 					"}",
 					"",
 					"implementation {}",
 				),
 			)
+		})
+
+		it("lines nothing up", () => {
+			let text = source(
+				"import {",
+				'\tfrom "./A.es" { A }',
+				'\tfrom "./Geometry.es" { RectangleMeasurable }',
+				"}",
+				"",
+				"implementation {}",
+			)
+
+			expect(formatted(text)).toBe(text)
 		})
 
 		it("normalises the spacing around as", () => {
@@ -195,7 +245,7 @@ describe("module sections", () => {
 				formatted(
 					source(
 						"import {",
-						'\tPI    as    Pi from "../math/Math.es"',
+						'\tfrom   "../math/Math.es"   {   PI    as    Pi   }',
 						"}",
 						"",
 						"implementation {}",
@@ -204,7 +254,7 @@ describe("module sections", () => {
 			).toBe(
 				source(
 					"import {",
-					'\tPI as Pi from "../math/Math.es"',
+					'\tfrom "../math/Math.es" { PI as Pi }',
 					"}",
 					"",
 					"implementation {}",
@@ -212,66 +262,28 @@ describe("module sections", () => {
 			)
 		})
 
-		// NOTE: Only the entries that carry a `from` are measured. An
-		// `export { … }` block lists what a Module declares alongside what it
-		// forwards, and padding a re-export out to the widest local name would
-		// push its `from` halfway across the line rather than line anything up.
-		it("does not measure a local export against the from column", () => {
-			expect(
-				formatted(
-					source(
-						"implementation {",
-						"\tconstant somethingWithAVeryLongName = 1",
-						"}",
-						"",
-						"export {",
-						"\tsomethingWithAVeryLongName",
-						'\tRectangle from "./Geometry.es"',
-						"}",
-					),
-				),
-			).toBe(
-				source(
-					"implementation {",
-					"\tconstant somethingWithAVeryLongName = 1",
-					"}",
-					"",
-					"export {",
-					"\tsomethingWithAVeryLongName",
-					'\tRectangle from "./Geometry.es"',
-					"}",
-				),
-			)
-		})
+		it("writes out a group of one name that does not fit on its line", () => {
+			let specifier = '"./' + "deeply/".repeat(8) + 'Geometry.es"'
 
-		it("aligns each block against its own widest entry", () => {
 			expect(
 				formatted(
 					source(
 						"import {",
-						'\tRectangleMeasurable from "./Geometry.es"',
+						"\tfrom " + specifier + " { RectangleMeasurable }",
 						"}",
 						"",
 						"implementation {}",
-						"",
-						"export {",
-						'\tPI from "../math/Math.es"',
-						'\tRectangle from "./Geometry.es"',
-						"}",
 					),
 				),
 			).toBe(
 				source(
 					"import {",
-					'\tRectangleMeasurable from "./Geometry.es"',
+					"\tfrom " + specifier + " {",
+					"\t\tRectangleMeasurable",
+					"\t}",
 					"}",
 					"",
 					"implementation {}",
-					"",
-					"export {",
-					'\tPI        from "../math/Math.es"',
-					'\tRectangle from "./Geometry.es"',
-					"}",
 				),
 			)
 		})
@@ -280,9 +292,11 @@ describe("module sections", () => {
 	describe("idempotence", () => {
 		let canonical = source(
 			"import {",
-			'\tPI as Pi            from "../math/Math.es"',
-			'\tRectangle           from "./Geometry.es"',
-			'\tRectangleMeasurable from "./Geometry.es"',
+			'\tfrom "../math/Math.es" { PI as Pi }',
+			'\tfrom "./Geometry.es" {',
+			"\t\tRectangle",
+			"\t\tRectangleMeasurable",
+			"\t}",
 			"}",
 			"",
 			"implementation {",
@@ -291,7 +305,7 @@ describe("module sections", () => {
 			"",
 			"export {",
 			"\tarea",
-			'\tRectangle from "./Geometry.es"',
+			'\tfrom "./Geometry.es" { Rectangle }',
 			"}",
 		)
 
@@ -302,13 +316,15 @@ describe("module sections", () => {
 			expect(result.changed).toBe(false)
 		})
 
-		it("is a no-op on a block it has already sorted and aligned", () => {
+		it("is a no-op on a block it has already sorted", () => {
 			let once = format(
 				source(
 					"import {",
-					'\tRectangle from "./Geometry.es"',
-					'\tPI as Pi from "../math/Math.es"',
-					'\tRectangleMeasurable from "./Geometry.es"',
+					'\tfrom "./Geometry.es" {',
+					"\t\tRectangleMeasurable",
+					"\t\tRectangle",
+					"\t}",
+					'\tfrom "../math/Math.es" { PI as Pi }',
 					"}",
 					"",
 					"implementation {",
@@ -316,7 +332,7 @@ describe("module sections", () => {
 					"}",
 					"",
 					"export {",
-					'\tRectangle from "./Geometry.es"',
+					'\tfrom "./Geometry.es" { Rectangle }',
 					"\tarea",
 					"}",
 				),
@@ -328,14 +344,14 @@ describe("module sections", () => {
 	})
 
 	describe("comments", () => {
-		it("moves a comment written above an entry along with it", () => {
+		it("moves a comment written above a group along with it", () => {
 			expect(
 				formatted(
 					source(
 						"import {",
-						"\t§ the witness",
-						'\tRectangleMeasurable from "./Geometry.es"',
-						'\tCircle from "./Geometry.es"',
+						"\t§ the shapes",
+						'\tfrom "./Geometry.es" { Rectangle }',
+						'\tfrom "./Bounds.es" { Box }',
 						"}",
 						"",
 						"implementation {}",
@@ -344,9 +360,9 @@ describe("module sections", () => {
 			).toBe(
 				source(
 					"import {",
-					'\tCircle              from "./Geometry.es"',
-					"\t§ the witness",
-					'\tRectangleMeasurable from "./Geometry.es"',
+					'\tfrom "./Bounds.es" { Box }',
+					"\t§ the shapes",
+					'\tfrom "./Geometry.es" { Rectangle }',
 					"}",
 					"",
 					"implementation {}",
@@ -354,34 +370,45 @@ describe("module sections", () => {
 			)
 		})
 
-		it("keeps a trailing comment on the entry it trails", () => {
+		it("moves a comment written above a name along with it", () => {
 			expect(
 				formatted(
 					source(
-						"implementation {}",
-						"",
-						"export {",
-						'\tRectangle from "./Geometry.es" § never bound locally',
-						'\tCircle from "./Geometry.es"',
+						"import {",
+						'\tfrom "./Geometry.es" {',
+						"\t\t§ the witness",
+						"\t\tRectangleMeasurable",
+						"\t\tCircle",
+						"\t}",
 						"}",
+						"",
+						"implementation {}",
 					),
 				),
 			).toBe(
 				source(
-					"implementation {}",
-					"",
-					"export {",
-					'\tCircle    from "./Geometry.es"',
-					'\tRectangle from "./Geometry.es" § never bound locally',
+					"import {",
+					'\tfrom "./Geometry.es" {',
+					"\t\tCircle",
+					"\t\t§ the witness",
+					"\t\tRectangleMeasurable",
+					"\t}",
 					"}",
+					"",
+					"implementation {}",
 				),
 			)
 		})
 
-		it("keeps a comment that trails the block's opening brace", () => {
+		// NOTE: A Comment above the one name of a group rules the flat shape
+		// out — it runs to the end of its line, and nothing can follow it there.
+		it("writes out a group whose one name carries a comment", () => {
 			let text = source(
-				"import { § everything this Module reaches for",
-				'\tA from "./A.es"',
+				"import {",
+				'\tfrom "./Geometry.es" {',
+				"\t\t§ the witness",
+				"\t\tRectangleMeasurable",
+				"\t}",
 				"}",
 				"",
 				"implementation {}",
@@ -390,10 +417,146 @@ describe("module sections", () => {
 			expect(formatted(text)).toBe(text)
 		})
 
-		it("keeps a comment written below the last entry", () => {
+		it("keeps a trailing comment on the name it trails", () => {
+			expect(
+				formatted(
+					source(
+						"implementation {}",
+						"",
+						"export {",
+						'\tfrom "./Geometry.es" {',
+						"\t\tRectangle § never bound locally",
+						"\t\tCircle",
+						"\t}",
+						"}",
+					),
+				),
+			).toBe(
+				source(
+					"implementation {}",
+					"",
+					"export {",
+					'\tfrom "./Geometry.es" {',
+					"\t\tCircle",
+					"\t\tRectangle § never bound locally",
+					"\t}",
+					"}",
+				),
+			)
+		})
+
+		// NOTE: The note after a group written flat is the name's rather than
+		// the group's, so it stays on the name's line if the group is ever
+		// written out — which a Comment above the name is what forces here.
+		it("gives a comment trailing a flat group to its one name", () => {
+			expect(
+				formatted(
+					source(
+						"import {",
+						"\t§ above",
+						'\tfrom "./Geometry.es" { Rectangle } § the note',
+						"}",
+						"",
+						"implementation {}",
+					),
+				),
+			).toBe(
+				source(
+					"import {",
+					"\t§ above",
+					'\tfrom "./Geometry.es" { Rectangle } § the note',
+					"}",
+					"",
+					"implementation {}",
+				),
+			)
+
+			expect(
+				formatted(
+					source(
+						"import {",
+						'\tfrom "./Geometry.es" {',
+						"\t\t§ about the name",
+						"\t\tRectangle } § the note",
+						"}",
+						"",
+						"implementation {}",
+					),
+				),
+			).toBe(
+				source(
+					"import {",
+					'\tfrom "./Geometry.es" {',
+					"\t\t§ about the name",
+					"\t\tRectangle § the note",
+					"\t}",
+					"}",
+					"",
+					"implementation {}",
+				),
+			)
+		})
+
+		it("keeps a comment that trails a group's opening brace", () => {
 			let text = source(
 				"import {",
-				'\tA from "./A.es"',
+				'\tfrom "./Geometry.es" { § the shapes',
+				"\t\tRectangle",
+				"\t}",
+				"}",
+				"",
+				"implementation {}",
+			)
+
+			expect(formatted(text)).toBe(text)
+		})
+
+		it("keeps a comment written below a group's last name", () => {
+			let text = source(
+				"import {",
+				'\tfrom "./Geometry.es" {',
+				"\t\tRectangle",
+				"\t\t§ nothing else from here",
+				"\t}",
+				"}",
+				"",
+				"implementation {}",
+			)
+
+			expect(formatted(text)).toBe(text)
+		})
+
+		it("keeps a comment that trails a group's closing brace", () => {
+			let text = source(
+				"import {",
+				'\tfrom "./Geometry.es" {',
+				"\t\tCircle",
+				"\t\tRectangle",
+				"\t} § the shapes",
+				"}",
+				"",
+				"implementation {}",
+			)
+
+			expect(formatted(text)).toBe(text)
+		})
+
+		it("keeps a comment that trails the block's opening brace", () => {
+			let text = source(
+				"import { § everything this Module reaches for",
+				'\tfrom "./A.es" { A }',
+				"}",
+				"",
+				"implementation {}",
+			)
+
+			expect(formatted(text)).toBe(text)
+		})
+
+		it("keeps a comment written below the last group", () => {
+			let text = source(
+				"import {",
+				'\tfrom "./A.es" { A }',
 				"\t§ nothing else, on purpose",
 				"}",
 				"",
@@ -408,7 +571,7 @@ describe("module sections", () => {
 				"§ about the file",
 				"",
 				"import {",
-				'\tA from "./A.es"',
+				'\tfrom "./A.es" { A }',
 				"}",
 				"",
 				"implementation {}",
@@ -439,9 +602,11 @@ describe("module sections", () => {
 		it("round-trips a Module with both sections and refuses nothing", () => {
 			let text = source(
 				"import {",
-				'\tRectangle from "./Geometry.es"',
-				'\tPI as Pi from "../math/Math.es"',
-				'\tRectangleMeasurable from "./Geometry.es"',
+				'\tfrom "./Geometry.es" {',
+				"\t\tRectangleMeasurable",
+				"\t\tRectangle",
+				"\t}",
+				'\tfrom "../math/Math.es" { PI as Pi }',
 				"}",
 				"",
 				"implementation {",
@@ -460,7 +625,7 @@ describe("module sections", () => {
 				"export {",
 				"\tdescribe",
 				"\tDescribed as RectangleDescribed",
-				'\tRectangle from "./Geometry.es" § re-export, never bound locally',
+				'\tfrom "./Geometry.es" { Rectangle } § re-export, never bound locally',
 				"}",
 			)
 			let result = format(text)
@@ -469,9 +634,11 @@ describe("module sections", () => {
 			expect(result.text).toBe(
 				source(
 					"import {",
-					'\tPI as Pi            from "../math/Math.es"',
-					'\tRectangle           from "./Geometry.es"',
-					'\tRectangleMeasurable from "./Geometry.es"',
+					'\tfrom "../math/Math.es" { PI as Pi }',
+					'\tfrom "./Geometry.es" {',
+					"\t\tRectangle",
+					"\t\tRectangleMeasurable",
+					"\t}",
 					"}",
 					"",
 					"implementation {",
@@ -490,7 +657,7 @@ describe("module sections", () => {
 					"export {",
 					"\tDescribed as RectangleDescribed",
 					"\tdescribe",
-					'\tRectangle from "./Geometry.es" § re-export, never bound locally',
+					'\tfrom "./Geometry.es" { Rectangle } § re-export, never bound locally',
 					"}",
 				),
 			)
@@ -498,23 +665,32 @@ describe("module sections", () => {
 		})
 
 		// NOTE: A sorted block is the one place the Token sequence is allowed to
-		// change, so the anchors are grouped per entry there — and a re-sort with
-		// every Comment still on its own entry has to read as no change at all.
+		// change, so the anchors are grouped per group and per entry there — and
+		// a re-sort with every Comment still on its own owner has to read as no
+		// change at all.
 		it("reads a re-sorted block with its comments intact as unchanged", () => {
 			let written = source(
 				"import {",
 				"\t§ note",
-				'\tB from "./B.es"',
-				'\tA from "./A.es"',
+				'\tfrom "./B.es" {',
+				"\t\t§ second",
+				"\t\tZ",
+				"\t\tA",
+				"\t}",
+				'\tfrom "./A.es" { A }',
 				"}",
 				"",
 				"implementation {}",
 			)
 			let sorted = source(
 				"import {",
-				'\tA from "./A.es"',
+				'\tfrom "./A.es" { A }',
 				"\t§ note",
-				'\tB from "./B.es"',
+				'\tfrom "./B.es" {',
+				"\t\tA",
+				"\t\t§ second",
+				"\t\tZ",
+				"\t}",
 				"}",
 				"",
 				"implementation {}",
@@ -524,23 +700,23 @@ describe("module sections", () => {
 		})
 
 		// NOTE: What the grouping buys: a Comment that ends up against another
-		// entry is still present, still in order, and only which entry it rides
-		// with gives it away.
-		it("still notices a comment that changed which entry it rides with", () => {
+		// owner is still present, still in order, and only which entry or group
+		// it rides with gives it away.
+		it("still notices a comment that changed which group it rides with", () => {
 			let riding = source(
 				"import {",
 				"\t§ note",
-				'\tA from "./A.es"',
-				'\tB from "./B.es"',
+				'\tfrom "./A.es" { A }',
+				'\tfrom "./B.es" { B }',
 				"}",
 				"",
 				"implementation {}",
 			)
 			let moved = source(
 				"import {",
-				'\tA from "./A.es"',
+				'\tfrom "./A.es" { A }',
 				"\t§ note",
-				'\tB from "./B.es"',
+				'\tfrom "./B.es" { B }',
 				"}",
 				"",
 				"implementation {}",
@@ -549,18 +725,99 @@ describe("module sections", () => {
 			expect(anchors(moved)).not.toBe(anchors(riding))
 		})
 
+		it("still notices a comment that changed which name it rides with", () => {
+			let riding = source(
+				"import {",
+				'\tfrom "./A.es" {',
+				"\t\t§ note",
+				"\t\tA",
+				"\t\tB",
+				"\t}",
+				"}",
+				"",
+				"implementation {}",
+			)
+			let moved = source(
+				"import {",
+				'\tfrom "./A.es" {',
+				"\t\tA",
+				"\t\t§ note",
+				"\t\tB",
+				"\t}",
+				"}",
+				"",
+				"implementation {}",
+			)
+
+			expect(anchors(moved)).not.toBe(anchors(riding))
+		})
+
+		// NOTE: The same name written in two groups is two entries, and a
+		// Comment that crossed from one to the other has moved — which is what
+		// keying an entry by its group's specifier is for.
+		it("still notices a comment that crossed between two groups' same name", () => {
+			let riding = source(
+				"import {",
+				'\tfrom "./A.es" {',
+				"\t\t§ note",
+				"\t\tSame",
+				"\t}",
+				'\tfrom "./B.es" { Same }',
+				"}",
+				"",
+				"implementation {}",
+			)
+			let moved = source(
+				"import {",
+				'\tfrom "./A.es" { Same }',
+				'\tfrom "./B.es" {',
+				"\t\t§ note",
+				"\t\tSame",
+				"\t}",
+				"}",
+				"",
+				"implementation {}",
+			)
+
+			expect(anchors(moved)).not.toBe(anchors(riding))
+		})
+
+		it("still notices a comment that moved from a group to its first name", () => {
+			let onGroup = source(
+				"import {",
+				'\tfrom "./A.es" { § note',
+				"\t\tA",
+				"\t}",
+				"}",
+				"",
+				"implementation {}",
+			)
+			let onName = source(
+				"import {",
+				'\tfrom "./A.es" {',
+				"\t\t§ note",
+				"\t\tA",
+				"\t}",
+				"}",
+				"",
+				"implementation {}",
+			)
+
+			expect(anchors(onName)).not.toBe(anchors(onGroup))
+		})
+
 		it("still notices a comment dropped from a block", () => {
 			let written = source(
 				"import {",
 				"\t§ note",
-				'\tA from "./A.es"',
+				'\tfrom "./A.es" { A }',
 				"}",
 				"",
 				"implementation {}",
 			)
 			let dropped = source(
 				"import {",
-				'\tA from "./A.es"',
+				'\tfrom "./A.es" { A }',
 				"}",
 				"",
 				"implementation {}",
@@ -569,14 +826,14 @@ describe("module sections", () => {
 			expect(anchors(dropped)).not.toBe(anchors(written))
 		})
 
-		// NOTE: Grouping per entry does not make the block a place where a
+		// NOTE: Grouping per owner does not make the block a place where a
 		// Comment may end up anywhere — one carried out of it, above the Keyword,
 		// leaves its chunk and shows up in the sequence instead.
 		it("still notices a comment carried out of a block", () => {
 			let inside = source(
 				"import {",
 				"\t§ note",
-				'\tA from "./A.es"',
+				'\tfrom "./A.es" { A }',
 				"}",
 				"",
 				"implementation {}",
@@ -584,7 +841,7 @@ describe("module sections", () => {
 			let above = source(
 				"§ note",
 				"import {",
-				'\tA from "./A.es"',
+				'\tfrom "./A.es" { A }',
 				"}",
 				"",
 				"implementation {}",
@@ -593,15 +850,17 @@ describe("module sections", () => {
 			expect(anchors(above)).not.toBe(anchors(inside))
 		})
 
-		// NOTE: A Comment written between an entry's name and its `from` belongs
-		// to no entry the printer can name, and the gate is what keeps that from
+		// NOTE: A Comment written between a name and its alias belongs to no
+		// owner the printer can name, and the gate is what keeps that from
 		// being formatted anyway.
 		it("leaves a comment written inside an entry's own span alone", () => {
 			let text = source(
 				"import {",
-				"\tRectangle § why",
-				'\tfrom "./Geometry.es"',
-				'\tCircle from "./Geometry.es"',
+				'\tfrom "./Geometry.es" {',
+				"\t\tRectangle § why",
+				"\t\tas Rect",
+				"\t\tCircle",
+				"\t}",
 				"}",
 				"",
 				"implementation {}",
@@ -614,13 +873,14 @@ describe("module sections", () => {
 	})
 
 	describe("what the blocks do not change", () => {
-		it("keeps an entry the author spread over two lines on one", () => {
+		it("gathers a group the author spread over lines", () => {
 			expect(
 				formatted(
 					source(
 						"import {",
-						"\tRectangle",
-						'\tfrom "./Geometry.es"',
+						"\tfrom",
+						'\t"./Geometry.es"',
+						"\t{ Rectangle }",
 						"}",
 						"",
 						"implementation {}",
@@ -629,7 +889,7 @@ describe("module sections", () => {
 			).toBe(
 				source(
 					"import {",
-					'\tRectangle from "./Geometry.es"',
+					'\tfrom "./Geometry.es" { Rectangle }',
 					"}",
 					"",
 					"implementation {}",
@@ -638,30 +898,29 @@ describe("module sections", () => {
 		})
 
 		// NOTE: All four Module Keywords stay spellable as names, so an entry may
-		// be called `as` or `from` — and then the alignment has to measure a
-		// left-hand side that reads like a Keyword.
+		// be called `as` or `from` — in an export block too, where `from` opens
+		// a group only when a specifier follows it.
 		it("writes an entry whose own name is a Module keyword", () => {
-			expect(
-				formatted(
-					source(
-						"import {",
-						'\tas as as from "./A.es"',
-						'\tfrom from "./A.es"',
-						"}",
-						"",
-						"implementation {}",
-					),
-				),
-			).toBe(
-				source(
-					"import {",
-					'\tas as as from "./A.es"',
-					'\tfrom     from "./A.es"',
-					"}",
-					"",
-					"implementation {}",
-				),
+			let text = source(
+				"import {",
+				'\tfrom "./A.es" {',
+				"\t\tas as as",
+				"\t\tfrom",
+				"\t}",
+				"}",
+				"",
+				"implementation {",
+				"\tconstant import = 1",
+				"}",
+				"",
+				"export {",
+				"\tas",
+				"\tfrom",
+				"\timport",
+				"}",
 			)
+
+			expect(formatted(text)).toBe(text)
 		})
 
 		it("keeps an empty block written by hand", () => {

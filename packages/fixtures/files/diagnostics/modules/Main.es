@@ -1,9 +1,11 @@
 import {
-	Circle          from "./Shapes.es"
-	Ellipse         from "./Shapes.es"
-	Rectangle       from "./Shapes.es"
-	area            from "./Shapes.es"
-	area as measure from "./Shapes.es"
+	from "./Shapes.es" {
+		Circle
+		Ellipse
+		Rectangle
+		area
+		area as measure
+	}
 }
 
 implementation {
@@ -17,5 +19,5 @@ implementation {
 
 export {
 	measure
-	Circle from "./Shapes.es"
+	from "./Shapes.es" { Circle }
 }

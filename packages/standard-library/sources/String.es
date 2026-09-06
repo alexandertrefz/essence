@@ -1,13 +1,17 @@
 import {
-	Boolean      from "./Boolean.es"
-	Comparable   from "./Comparable.es"
-	Integer      from "./Integer.es"
-	List         from "./List.es"
-	NonEmptyList from "./List.es"
-	Optional     from "./Optional.es"
-	Ordering     from "./Ordering.es"
-	Equatable    from "./Protocols.es"
-	Printable    from "./Protocols.es"
+	from "./Boolean.es" { Boolean }
+	from "./Comparable.es" { Comparable }
+	from "./Integer.es" { Integer }
+	from "./List.es" {
+		List
+		NonEmptyList
+	}
+	from "./Optional.es" { Optional }
+	from "./Ordering.es" { Ordering }
+	from "./Protocols.es" {
+		Equatable
+		Printable
+	}
 }
 
 declarations {

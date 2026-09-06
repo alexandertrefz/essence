@@ -139,7 +139,7 @@ describe("Compiling To Memory", () => {
 		await withProject(
 			{
 				"Main.es": `import {
-	value from "./Dep.es"
+	from "./Dep.es" { value }
 }
 
 implementation {
@@ -276,7 +276,7 @@ export {
 		it("is the same for the same sources and changes with them", async () => {
 			let sources = {
 				"Main.es": `import {
-	value from "./Dep.es"
+	from "./Dep.es" { value }
 }
 
 implementation {
@@ -441,8 +441,8 @@ export {
 }
 `,
 			"app/One.es": `import {
-	Shape  from "../lib/Shape.es"
-	areaOf from "../lib/Shape.es"
+	from "../lib/Shape.es" { Shape }
+	from "../lib/Shape.es" { areaOf }
 }
 
 implementation {
@@ -455,8 +455,8 @@ export {
 }
 `,
 			"Two.es": `import {
-	Shape  from "./lib/Shape.es"
-	areaOf from "./lib/Shape.es"
+	from "./lib/Shape.es" { Shape }
+	from "./lib/Shape.es" { areaOf }
 }
 
 implementation {

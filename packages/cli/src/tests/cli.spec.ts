@@ -1522,7 +1522,7 @@ const brokenDependency = {
 	].join("\n"),
 	"Main.es": [
 		"import {",
-		'\thalve from "./Dep.es"',
+		'\tfrom "./Dep.es" { halve }',
 		"}",
 		"",
 		"implementation {",
@@ -1549,7 +1549,7 @@ const sharedDependency = {
 	].join("\n"),
 	"Main.es": [
 		"import {",
-		'\thalve from "./Dep.es"',
+		'\tfrom "./Dep.es" { halve }',
 		"}",
 		"",
 		"implementation {",
@@ -2060,7 +2060,7 @@ describe("essence build --embed", () => {
 				].join("\n"),
 				"Main.es": [
 					"import {",
-					'\thalved from "./Dep.es"',
+					'\tfrom "./Dep.es" { halved }',
 					"}",
 					"",
 					"implementation {",

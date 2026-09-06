@@ -1,8 +1,10 @@
 import {
-	Board     from "./Board.es"
-	Cell      from "./Board.es"
-	Direction from "./Board.es"
-	Movement  from "./Board.es"
+	from "./Board.es" {
+		Board
+		Cell
+		Direction
+		Movement
+	}
 }
 
 implementation {
@@ -138,10 +140,12 @@ export {
 	resume
 	status
 	undo
-	Board     from "./Board.es"
-	Cell      from "./Board.es"
-	Direction from "./Board.es"
-	Movement  from "./Board.es"
+	from "./Board.es" {
+		Board
+		Cell
+		Direction
+		Movement
+	}
 }
 
 tests {

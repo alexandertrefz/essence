@@ -1,16 +1,20 @@
 import {
-	Algebraic      from "./Algebraic.es"
-	Boolean        from "./Boolean.es"
-	Integer        from "./Integer.es"
-	List           from "./List.es"
-	NonEmptyList   from "./List.es"
-	Optional       from "./Optional.es"
-	Orderable      from "./Orderable.es"
-	Ordering       from "./Ordering.es"
-	Equatable      from "./Protocols.es"
-	Printable      from "./Protocols.es"
-	Rational       from "./Rational.es"
-	Transcendental from "./Transcendental.es"
+	from "./Algebraic.es" { Algebraic }
+	from "./Boolean.es" { Boolean }
+	from "./Integer.es" { Integer }
+	from "./List.es" {
+		List
+		NonEmptyList
+	}
+	from "./Optional.es" { Optional }
+	from "./Orderable.es" { Orderable }
+	from "./Ordering.es" { Ordering }
+	from "./Protocols.es" {
+		Equatable
+		Printable
+	}
+	from "./Rational.es" { Rational }
+	from "./Transcendental.es" { Transcendental }
 }
 
 declarations {

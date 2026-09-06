@@ -429,57 +429,50 @@ function namespaceImportActions(
 	})
 }
 
-// NOTE: The whole line, and the break that ends it — an entry list has no
+// NOTE: The whole lines, and the break that ends them — an entry list has no
 // delimiters, so what is left behind by deleting the name alone is a blank line
-// in the middle of the block. The Warning points at the LOCAL name, which is the
-// alias where there is one, so the entry is found by that Position rather than
-// by the name it reads.
+// in the middle of the block. The last name of a group takes the group with
+// it, since `from "./A.es" {}` imports nothing and says so on two lines. The
+// Warning points at the LOCAL name, which is the alias where there is one, so
+// the entry is found by that Position rather than by the name it reads.
 function removeImportAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	program: parser.Program,
 	lines: Array<string>,
 ): CodeActionEntry | null {
-	let entry = (program.imports?.entries ?? []).find((candidate) =>
-		isSamePosition(
-			(candidate.alias ?? candidate.name).position,
-			diagnostic.position,
+	let group = (program.imports?.groups ?? []).find((candidate) =>
+		candidate.entries.some((entry) =>
+			isSamePosition(
+				(entry.alias ?? entry.name).position,
+				diagnostic.position,
+			),
 		),
 	)
 
-	if (entry === undefined) {
+	if (group === undefined) {
 		return null
 	}
 
-	let start = { line: entry.position.start.line, column: 1 }
-	let end = { line: entry.position.end.line + 1, column: 1 }
+	let removed =
+		group.entries.length === 1
+			? group.position
+			: group.entries.find((entry) =>
+					isSamePosition(
+						(entry.alias ?? entry.name).position,
+						diagnostic.position,
+					),
+				)!.position
 
-	// NOTE: A last entry has no following line to reach into, so the break
+	let start = { line: removed.start.line, column: 1 }
+	let end = { line: removed.end.line + 1, column: 1 }
+
+	// NOTE: A last line has no following line to reach into, so the break
 	// BEFORE it is taken instead — otherwise the deletion ends past the end of
 	// the document.
 	if (end.line > lines.length) {
-		return {
-			title: `Remove the unused import of '${sliceOf(lines, diagnostic.position)}'`,
-			kind: "quickfix",
-			diagnosticCode: diagnostic.code,
-			diagnosticPosition: diagnostic.position,
-			isPreferred: true,
-			edits: [
-				{
-					range: {
-						start: {
-							line: entry.position.start.line,
-							column: 1,
-						},
-						end: {
-							line: entry.position.end.line,
-							column:
-								lineAt(lines, entry.position.end.line).length +
-								1,
-						},
-					},
-					newText: "",
-				},
-			],
+		end = {
+			line: removed.end.line,
+			column: lineAt(lines, removed.end.line).length + 1,
 		}
 	}
 

@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- An `import { … }` block is written by file: `from "./Season.es" { … }`
+  holds every name taken from that file, one to a line, and a group of one
+  name stays on its line. Auto-import joins the group its Module already
+  has, or opens one; the unused-import fix takes a group down with its last
+  name; a group written out folds.
 - The gutter now says what a coverage run reached, line by line: green where
   the tests ran a line, grey where nothing did, and amber where they ran it
   but not whole — a one-line `if` whose `else` nothing took, an `if` with no

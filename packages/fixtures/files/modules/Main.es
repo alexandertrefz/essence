@@ -1,10 +1,16 @@
 import {
-	Amount              from "./A.es"
-	averaged            from "./A.es"
-	Rectangle           from "./Geometry.es"
-	RectangleMeasurable from "./Geometry.es"
-	PI as Pi            from "./math/Math.es"
-	square              from "./math/Math.es"
+	from "./A.es" {
+		Amount
+		averaged
+	}
+	from "./Geometry.es" {
+		Rectangle
+		RectangleMeasurable
+	}
+	from "./math/Math.es" {
+		PI as Pi
+		square
+	}
 }
 
 implementation {
@@ -26,5 +32,5 @@ implementation {
 
 export {
 	describe
-	Rectangle from "./Geometry.es"
+	from "./Geometry.es" { Rectangle }
 }

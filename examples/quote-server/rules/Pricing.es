@@ -1,6 +1,6 @@
 import {
-	Catalog from "./Catalog.es"
-	Money   from "./Money.es"
+	from "./Catalog.es" { Catalog }
+	from "./Money.es" { Money }
 }
 
 implementation {
@@ -236,8 +236,10 @@ export {
 	Quote
 	Zone
 	quote
-	Product from "./Catalog.es"
-	catalog from "./Catalog.es"
+	from "./Catalog.es" {
+		Product
+		catalog
+	}
 }
 
 tests {

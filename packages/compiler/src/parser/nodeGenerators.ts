@@ -129,11 +129,25 @@ export function testModifier(
 }
 
 export function importSection(
-	entries: Array<parser.ImportNode>,
+	groups: Array<parser.ImportGroupNode>,
 	position: common.Position,
 ): parser.ImportSectionNode {
 	return {
 		nodeType: "ImportSection",
+		groups,
+		entries: groups.flatMap((group) => group.entries),
+		position,
+	}
+}
+
+export function importGroup(
+	source: parser.ModuleSpecifierNode,
+	entries: Array<parser.ImportNode>,
+	position: common.Position,
+): parser.ImportGroupNode {
+	return {
+		nodeType: "ImportGroup",
+		source,
 		entries,
 		position,
 	}
@@ -154,12 +168,32 @@ export function importEntry(
 	}
 }
 
+// NOTE: `members` is the block as written — bare entries and groups in one
+// order — which is what keeps `entries` in written order across both kinds.
 export function exportSection(
-	entries: Array<parser.ExportNode>,
+	members: Array<parser.ExportNode | parser.ExportGroupNode>,
 	position: common.Position,
 ): parser.ExportSectionNode {
 	return {
 		nodeType: "ExportSection",
+		groups: members.flatMap((member) =>
+			member.nodeType === "ExportGroup" ? [member] : [],
+		),
+		entries: members.flatMap((member) =>
+			member.nodeType === "ExportGroup" ? member.entries : [member],
+		),
+		position,
+	}
+}
+
+export function exportGroup(
+	source: parser.ModuleSpecifierNode,
+	entries: Array<parser.ExportNode>,
+	position: common.Position,
+): parser.ExportGroupNode {
+	return {
+		nodeType: "ExportGroup",
+		source,
 		entries,
 		position,
 	}
