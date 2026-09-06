@@ -154,9 +154,7 @@ implementation {
 		Terminal.print("{leader.team.name} would still lead.")
 	} else {
 		Terminal.print(
-			"{supposedLeader.team.name} would lead instead of {
-				leader.team.name
-			}.",
+			"{supposedLeader.team.name} would lead instead of {leader.team.name}.",
 		)
 	}
 

@@ -2806,12 +2806,20 @@ export class Printer {
 	// its closing brace then fits on the line the brace opens. A String too
 	// long for any hole to save is left long, rather than torn open at every
 	// hole for nothing.
+	// NOTE: A hole holding nothing but a name — `{@.played}`, `{count}` — is
+	// never broken either: three lines around one word buy no room worth the
+	// tear, and the String is left to run long. A call in a hole has a shape
+	// of its own to stand on a line, and is still offered the break.
 	private printHole(expression: parser.ExpressionNode): Doc {
 		let doc = this.printExpression(expression)
 		let flat = renderFlat(doc)
 
 		if (flat === null) {
 			return concat([text("{"), doc, text("}")])
+		}
+
+		if (isName(expression)) {
+			return text("{" + flat + "}")
 		}
 
 		return group(
@@ -3339,6 +3347,16 @@ function signatureListPosition(
 
 function isNumberLiteral(node: parser.ExpressionNode): boolean {
 	return node.nodeType === "IntegerValue" || node.nodeType === "RationalValue"
+}
+
+// NOTE: A bare name, or a path of member reads on one — `game.board.cells` —
+// with no call anywhere in it.
+function isName(node: parser.ExpressionNode): boolean {
+	return (
+		node.nodeType === "Identifier" ||
+		node.nodeType === "Self" ||
+		(node.nodeType === "Lookup" && isName(node.base))
+	)
 }
 
 // NOTE: A value with nothing inside it to lay out — the items a List fills
