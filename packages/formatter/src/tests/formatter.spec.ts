@@ -2321,6 +2321,16 @@ describe("formatter", () => {
 			)
 		})
 
+		it("moves matches snapshot to its own line when that keeps the value whole", () => {
+			expect(
+				formatted(
+					'tests {\n\ttest "renders" {\n\t\texpect Table.render(table, titled "After round 7") matches snapshot "a very long snapshot text that goes on"\n\t\texpect Table.render(table, titled "After round 7", showing everyColumn, ruled true) matches snapshot from "rendered"\n\t\texpect short matches snapshot\n\t}\n}\n',
+				),
+			).toBe(
+				'tests {\n\ttest "renders" {\n\t\texpect Table.render(table, titled "After round 7")\n\t\t\tmatches snapshot "a very long snapshot text that goes on"\n\t\texpect Table.render(\n\t\t\ttable,\n\t\t\ttitled "After round 7",\n\t\t\tshowing everyColumn,\n\t\t\truled true,\n\t\t) matches snapshot from "rendered"\n\t\texpect short matches snapshot\n\t}\n}\n',
+			)
+		})
+
 		// NOTE: The corpus writes a blank line after every bodied member by
 		// hand — 1,152 block ends, one exception — so the rule changes nothing
 		// there and guarantees the gap in files the formatter meets cold.
