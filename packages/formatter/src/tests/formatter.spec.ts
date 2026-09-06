@@ -2261,6 +2261,16 @@ describe("formatter", () => {
 			)
 		})
 
+		it("breaks a require's pattern one member per line when it is too wide", () => {
+			expect(
+				formatted(
+					'tests {\n\ttest "prices" {\n\t\trequire #Priced({ subtotal, discount, shipping, tax, total, display }) = quote(order)\n\t\trequire #Value(item) = table::item(at 0)\n\t}\n}\n',
+				),
+			).toBe(
+				'tests {\n\ttest "prices" {\n\t\trequire #Priced({\n\t\t\tsubtotal,\n\t\t\tdiscount,\n\t\t\tshipping,\n\t\t\ttax,\n\t\t\ttotal,\n\t\t\tdisplay,\n\t\t}) = quote(order)\n\t\trequire #Value(item) = table::item(at 0)\n\t}\n}\n',
+			)
+		})
+
 		// NOTE: The corpus writes a blank line after every bodied member by
 		// hand — 1,152 block ends, one exception — so the rule changes nothing
 		// there and guarantees the gap in files the formatter meets cold.
