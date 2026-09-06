@@ -157,9 +157,8 @@ tests {
 
 		§ Printable is what lets a hole in a String take a Fixture directly.
 		test "prints itself into a String that holds one" {
-			expect "Result: {result(lions, 3, 0, tigers)}"::is(
-				"Result: LIO 3–0 TIG",
-			)
+			expect "Result: {result(lions, 3, 0, tigers)}"
+				::is("Result: LIO 3–0 TIG")
 		}
 
 		test "names both sides of a fixture, home side first" {

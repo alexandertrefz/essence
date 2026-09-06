@@ -2431,6 +2431,54 @@ describe("formatter", () => {
 			)
 		})
 
+		// NOTE: A chain of one link used never to break: the link's Argument
+		// list was the only thing on the line that could give way, and
+		// `expect shipping(…)::is(0)` put its `0` on a line of its own.
+		describe("a chain of one link", () => {
+			it("breaks before the link when the head fits its line", () => {
+				expect(
+					formatted(
+						'tests {\n\tsuite "shipping" {\n\t\ttest "charges" {\n\t\t\texpect shipping(to #Domestic, weighing 400, onGoodsWorth 5_000)::is(0)\n\t\t\texpect shipping(to #Overseas, weighing 500, onGoodsWorth 100)::isGreaterThan(shipping(to #Europe, weighing 500, onGoodsWorth 100))\n\t\t\texpect "Result: {result(lions, 3, 0, tigers)}"::is("Result: LIO 3–0 TIG")\n\t\t\tconstant leader = blank::record(scored 3, conceded 0)\n\t\t\tconstant follower = Standings.blank(of { team = tigers })::record(scored 1, conceded 1)\n\t\t}\n\t}\n}\n',
+					),
+				).toBe(
+					'tests {\n\tsuite "shipping" {\n\t\ttest "charges" {\n\t\t\texpect shipping(to #Domestic, weighing 400, onGoodsWorth 5_000)\n\t\t\t\t::is(0)\n\t\t\texpect shipping(to #Overseas, weighing 500, onGoodsWorth 100)\n\t\t\t\t::isGreaterThan(\n\t\t\t\t\tshipping(to #Europe, weighing 500, onGoodsWorth 100),\n\t\t\t\t)\n\t\t\texpect "Result: {result(lions, 3, 0, tigers)}"\n\t\t\t\t::is("Result: LIO 3–0 TIG")\n\t\t\tconstant leader   = blank::record(scored 3, conceded 0)\n\t\t\tconstant follower = Standings.blank(of { team = tigers })\n\t\t\t\t::record(scored 1, conceded 1)\n\t\t}\n\t}\n}\n',
+				)
+			})
+
+			it("hugs a callback on the link's own line once it is there", () => {
+				expect(
+					formatted(
+						'implementation {\n\tconstant keys: List<String> = List.of(integersFrom 0, through 9999)::map((number) { <- "key {number}" })\n\tconstant results: List<Result> = List.of(integersFrom 0, through 9999)::map((number) {\n\t\tconstant team = number::remainder(dividingBy 100)\n\n\t\t<- { team, goals = number::remainder(dividingBy 7) }\n\t})\n}\n',
+					),
+				).toBe(
+					'implementation {\n\tconstant keys: List<String>    = List.of(integersFrom 0, through 9999)\n\t\t::map((number) { <- "key {number}" })\n\tconstant results: List<Result> = List.of(integersFrom 0, through 9999)\n\t\t::map((number) {\n\t\t\tconstant team = number::remainder(dividingBy 100)\n\n\t\t\t<- { team, goals = number::remainder(dividingBy 7) }\n\t\t})\n}\n',
+				)
+			})
+
+			// NOTE: A name dangling above its one link buys nothing — the
+			// link's Arguments still have to break under it — and
+			// `placed::append({` hugging its Record reads better than either.
+			it("keeps a head that is a name fused to its link", () => {
+				expect(
+					formatted(
+						"implementation {\n\tfunction f(_ tile: Integer, placed: List<Integer>, origin: Integer, game: Game, winningTile: Integer) -> Merging {\n\t\t<- {\n\t\t\tplaced = placed::append({ value = tile::multiply(with 2), sources = [origin, origin] }),\n\t\t\twon = game.won::or(slid.board::highest()::isGreaterThanOrEqualTo(winningTile)),\n\t\t\tgained = Integer.parse(denominatorText, defaultingTo 0)::andThen((denominator) { <- Rational.of(numerator::multiply(with signFactor), over denominator) }),\n\t\t}\n\t}\n}\n",
+					),
+				).toBe(
+					"implementation {\n\tfunction f(\n\t\t_ tile: Integer,\n\t\tplaced: List<Integer>,\n\t\torigin: Integer,\n\t\tgame: Game,\n\t\twinningTile: Integer,\n\t) -> Merging {\n\t\t<- {\n\t\t\tplaced = placed::append({\n\t\t\t\tvalue = tile::multiply(with 2),\n\t\t\t\tsources = [origin, origin],\n\t\t\t}),\n\t\t\twon = game.won::or(\n\t\t\t\tslid.board::highest()::isGreaterThanOrEqualTo(winningTile),\n\t\t\t),\n\t\t\tgained = Integer.parse(denominatorText, defaultingTo 0)\n\t\t\t\t::andThen((denominator) {\n\t\t\t\t\t<- Rational.of(\n\t\t\t\t\t\tnumerator::multiply(with signFactor),\n\t\t\t\t\t\tover denominator,\n\t\t\t\t\t)\n\t\t\t\t}),\n\t\t}\n\t}\n}\n",
+				)
+			})
+
+			it("puts an if's brace on its own line when the one link moves down", () => {
+				expect(
+					formatted(
+						"implementation {\n\tfunction g(_ order: Order) -> Boolean {\n\t\tif isAvailable(order.sku, inStock order.quantity)::and(order.paid::and(order.shipped)) {\n\t\t\t<- true\n\t\t}\n\n\t\tif isAvailable(order.sku, inStock order.quantity, forVendor order.vendor)::and(order.paid) {\n\t\t\t<- true\n\t\t}\n\n\t\t<- false\n\t}\n}\n",
+					),
+				).toBe(
+					"implementation {\n\tfunction g(_ order: Order) -> Boolean {\n\t\tif isAvailable(order.sku, inStock order.quantity)\n\t\t\t::and(order.paid::and(order.shipped))\n\t\t{\n\t\t\t<- true\n\t\t}\n\n\t\tif isAvailable(\n\t\t\torder.sku,\n\t\t\tinStock order.quantity,\n\t\t\tforVendor order.vendor,\n\t\t)::and(order.paid) {\n\t\t\t<- true\n\t\t}\n\n\t\t<- false\n\t}\n}\n",
+				)
+			})
+		})
+
 		// NOTE: The corpus writes a blank line after every bodied member by
 		// hand — 1,152 block ends, one exception — so the rule changes nothing
 		// there and guarantees the gap in files the formatter meets cold.

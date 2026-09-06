@@ -273,9 +273,8 @@ tests {
 			scored: Integer,
 			conceded: Integer,
 		) {
-			expect pointsFor(
-				outcomeOf(scored, against conceded),
-			)::isGreaterThanOrEqualTo(0)
+			expect pointsFor(outcomeOf(scored, against conceded))
+				::isGreaterThanOrEqualTo(0)
 		}
 
 		§ A checked refinement is honoured: `NonEmptyList` is never empty and

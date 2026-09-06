@@ -65,9 +65,8 @@ implementation {
 	§ The early-stopping fold — `reduce`'s `step` sibling leaves the walk on the
 	§ first `#Done`, where the plain fold always runs to the end. Here the
 	§ accumulator counts the items seen and stops itself at two.
-	constant firstTwo = [10, 20, 30, 40]::reduce(
-		startingWith 0,
-		step (count, item) {
+	constant firstTwo = [10, 20, 30, 40]
+		::reduce(startingWith 0, step (count, item) {
 			constant next = count::add(1)
 
 			if next::isGreaterThanOrEqualTo(2) {
@@ -75,8 +74,7 @@ implementation {
 			}
 
 			<- #Continue(next)
-		},
-	)
+		})
 
 	Terminal.print(firstTwo) § 2
 }

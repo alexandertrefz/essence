@@ -345,35 +345,28 @@ tests {
 
 	suite "shipping" {
 		test "is free at home on a large enough basket" {
-			expect shipping(to #Domestic, weighing 400, onGoodsWorth 5_000)::is(
-				0,
-			)
+			expect shipping(to #Domestic, weighing 400, onGoodsWorth 5_000)
+				::is(0)
 		}
 
 		test "charges the base rate at home under that" {
-			expect shipping(to #Domestic, weighing 400, onGoodsWorth 4_999)::is(
-				490,
-			)
+			expect shipping(to #Domestic, weighing 400, onGoodsWorth 4_999)
+				::is(490)
 		}
 
 		test "charges for every started 500 g beyond the first" {
 			expect shipping(to #Europe, weighing 500, onGoodsWorth 100)::is(990)
-			expect shipping(to #Europe, weighing 501, onGoodsWorth 100)::is(
-				1_340,
-			)
-			expect shipping(to #Europe, weighing 1_001, onGoodsWorth 100)::is(
-				1_690,
-			)
+			expect shipping(to #Europe, weighing 501, onGoodsWorth 100)
+				::is(1_340)
+			expect shipping(to #Europe, weighing 1_001, onGoodsWorth 100)
+				::is(1_690)
 		}
 
 		test "charges overseas more than it charges Europe" tagged slow {
-			expect shipping(
-				to #Overseas,
-				weighing 500,
-				onGoodsWorth 100,
-			)::isGreaterThan(
-				shipping(to #Europe, weighing 500, onGoodsWorth 100),
-			)
+			expect shipping(to #Overseas, weighing 500, onGoodsWorth 100)
+				::isGreaterThan(
+					shipping(to #Europe, weighing 500, onGoodsWorth 100),
+				)
 		}
 	}
 
