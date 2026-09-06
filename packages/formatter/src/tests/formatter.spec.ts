@@ -2261,6 +2261,38 @@ describe("formatter", () => {
 			)
 		})
 
+		// NOTE: The corpus writes a blank line after every bodied member by
+		// hand — 1,152 block ends, one exception — so the rule changes nothing
+		// there and guarantees the gap in files the formatter meets cold.
+		describe("a blank line after a block", () => {
+			it("writes one after a bodied member, before the next sibling", () => {
+				expect(
+					formatted(
+						"implementation {\n\tnamespace Board for Board {\n\t\ttranspose() -> Board {\n\t\t\t<- @\n\t\t}\n\t\t§§ Docs.\n\t\thighest() -> Integer {\n\t\t\t<- 0\n\t\t}\n\t}\n\tfunction a() -> Integer {\n\t\t<- 1\n\t}\n\tconstant x = 1\n}\n",
+					),
+				).toBe(
+					"implementation {\n\tnamespace Board for Board {\n\t\ttranspose() -> Board {\n\t\t\t<- @\n\t\t}\n\n\t\t§§ Docs.\n\t\thighest() -> Integer {\n\t\t\t<- 0\n\t\t}\n\t}\n\n\tfunction a() -> Integer {\n\t\t<- 1\n\t}\n\n\tconstant x = 1\n}\n",
+				)
+			})
+
+			it("writes one after an if, a choice, a test and a suite", () => {
+				expect(
+					formatted(
+						'implementation {\n\tchoice C {\n\t\tA,\n\t}\n\tfunction f(_ a: Boolean) -> Integer {\n\t\tif a {\n\t\t\t<- 1\n\t\t}\n\t\t<- 2\n\t}\n}\n\ntests {\n\tsuite "s" {\n\t\ttest "a" {\n\t\t\texpect 1::is(1)\n\t\t}\n\t\ttest "b" {\n\t\t\texpect 1::is(1)\n\t\t}\n\t}\n\tconstant x = 1\n}\n',
+					),
+				).toBe(
+					'implementation {\n\tchoice C {\n\t\tA,\n\t}\n\n\tfunction f(_ a: Boolean) -> Integer {\n\t\tif a {\n\t\t\t<- 1\n\t\t}\n\n\t\t<- 2\n\t}\n}\n\ntests {\n\tsuite "s" {\n\t\ttest "a" {\n\t\t\texpect 1::is(1)\n\t\t}\n\n\t\ttest "b" {\n\t\t\texpect 1::is(1)\n\t\t}\n\t}\n\n\tconstant x = 1\n}\n',
+				)
+			})
+
+			it("writes none after a one-line alias, a property or a call", () => {
+				let source =
+					"implementation {\n\ttype Cell = { row: Integer }\n\tconstant a = someFunction(\n\t\twithAnArgument oneThatIsLong,\n\t\tandAnother twoThatIsLonger,\n\t)\n\tconstant b = 2\n\tnamespace N for Cell {\n\t\tstatic empty: Cell = { row = 0 }\n\t\tstatic other: Cell = { row = 1 }\n\t}\n}\n"
+
+				expect(formatted(source)).toBe(source)
+			})
+		})
+
 		// NOTE: An `if` body always opens a block, however short it is. The
 		// corpus writes nine inline ones against a hundred inline `case`
 		// bodies, and a half-flat `else if` chain — one arm on the `if`'s line,
@@ -2567,7 +2599,7 @@ describe("formatter", () => {
 					"implementation {\n\tnamespace Config {\n\t\tstatic a = 1\n\t\tstatic longerName = 2\n\t\tstatic x: Integer = 3\n\n\t\tstatic apart = 4\n\t\tdouble(_ n: Integer) -> Integer { <- n }\n\t\tstatic after = 5\n\t}\n}\n"
 
 				expect(formatted(source)).toBe(
-					"implementation {\n\tnamespace Config {\n\t\tstatic a          = 1\n\t\tstatic longerName = 2\n\t\tstatic x: Integer = 3\n\n\t\tstatic apart = 4\n\t\tdouble(_ n: Integer) -> Integer {\n\t\t\t<- n\n\t\t}\n\t\tstatic after = 5\n\t}\n}\n",
+					"implementation {\n\tnamespace Config {\n\t\tstatic a          = 1\n\t\tstatic longerName = 2\n\t\tstatic x: Integer = 3\n\n\t\tstatic apart = 4\n\t\tdouble(_ n: Integer) -> Integer {\n\t\t\t<- n\n\t\t}\n\n\t\tstatic after = 5\n\t}\n}\n",
 				)
 			})
 
@@ -3199,7 +3231,7 @@ describe("formatter", () => {
 
 		it("leaves a comment trailing the first member's brace where it is", () => {
 			let source =
-				"implementation {\n\ttype Box = { value: Integer }\n\tnamespace BoxOps for Box {\n\t\tdouble() -> Box {\n\t\t\t<- { value = @.value::multiply(with 2) }\n\t\t} § trailing on method close\n\t\ttriple() -> Box {\n\t\t\t<- { value = @.value::multiply(with 3) }\n\t\t}\n\t}\n}\n"
+				"implementation {\n\ttype Box = { value: Integer }\n\tnamespace BoxOps for Box {\n\t\tdouble() -> Box {\n\t\t\t<- { value = @.value::multiply(with 2) }\n\t\t} § trailing on method close\n\n\t\ttriple() -> Box {\n\t\t\t<- { value = @.value::multiply(with 3) }\n\t\t}\n\t}\n}\n"
 			let result = format(source)
 
 			expect(result.refusal).toBeNull()

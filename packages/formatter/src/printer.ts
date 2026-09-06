@@ -38,6 +38,12 @@ type Entry = {
 	startLine: number
 	endLine: number
 	doc: Doc
+	// NOTE: Whether the entry closes with a block of its own — a Function, a
+	// Namespace, a Method with a body, an `if`, a test. A blank line is written
+	// after one whether or not the author left it: the corpus writes one after
+	// every such block by hand, and a reader scanning for the next member
+	// looks for the gap before the name.
+	bodied?: boolean
 }
 
 const EMPTY = text("")
@@ -99,6 +105,7 @@ export class Printer {
 	private layout(entries: Array<Entry>, openLine: number | null): Doc {
 		let parts: Array<Doc> = []
 		let previousEnd = openLine
+		let previousBodied = false
 
 		for (let entry of entries) {
 			if (parts.length > 0) {
@@ -106,14 +113,19 @@ export class Printer {
 			}
 
 			if (
-				previousEnd !== null &&
-				this.source.hasBlankLineBetween(previousEnd, entry.startLine)
+				previousBodied ||
+				(previousEnd !== null &&
+					this.source.hasBlankLineBetween(
+						previousEnd,
+						entry.startLine,
+					))
 			) {
 				parts.push(hardline)
 			}
 
 			parts.push(entry.doc)
 			previousEnd = entry.endLine
+			previousBodied = entry.bodied === true
 		}
 
 		return concat(parts)
@@ -125,13 +137,17 @@ export class Printer {
 	// can be moved but never dropped.
 	private entriesFor<Item>(
 		items: Array<Item>,
-		linesOf: (item: Item) => { startLine: number; endLine: number },
+		linesOf: (item: Item) => {
+			startLine: number
+			endLine: number
+			bodied?: boolean
+		},
 		print: (item: Item) => Doc,
 	): Array<Entry> {
 		let entries: Array<Entry> = []
 
 		for (let item of items) {
-			let { startLine, endLine } = linesOf(item)
+			let { startLine, endLine, bodied } = linesOf(item)
 
 			for (let comment of this.trivia.takeBefore(startLine)) {
 				entries.push(this.commentEntry(comment))
@@ -154,7 +170,7 @@ export class Printer {
 				])
 			}
 
-			entries.push({ startLine, endLine, doc })
+			entries.push({ startLine, endLine, doc, bodied })
 		}
 
 		return entries
@@ -188,7 +204,10 @@ export class Printer {
 
 		let entries = this.entriesFor(
 			nodes,
-			(node) => positionLines(node.position),
+			(node) => ({
+				...positionLines(node.position),
+				bodied: isBodiedStatement(node),
+			}),
 			(node) => {
 				let separated =
 					previousEnd !== null &&
@@ -1243,6 +1262,9 @@ export class Printer {
 			(member) => ({
 				startLine: memberName(member).position.start.line,
 				endLine: this.namespaceMemberEndLine(member),
+				bodied:
+					member.kind === "method" &&
+					isBodiedNamespaceMethod(member.method),
 			}),
 			(member) => {
 				let startLine = memberName(member).position.start.line
@@ -1484,6 +1506,7 @@ export class Printer {
 			(method) => ({
 				startLine: method.name.position.start.line,
 				endLine: protocolMethodEndLine(method),
+				bodied: isBodiedProtocolMethod(method),
 			}),
 			(method) => this.printProtocolMethod(method),
 		)
@@ -1586,7 +1609,10 @@ export class Printer {
 
 		let laid = this.entriesFor(
 			entries,
-			(entry) => positionLines(entry.position),
+			(entry) => ({
+				...positionLines(entry.position),
+				bodied: entry.nodeType === "FunctionValue",
+			}),
 			(entry) =>
 				entry.nodeType === "FunctionValue"
 					? this.printFunctionDefinition(entry.value, entry.position)
@@ -3544,6 +3570,51 @@ function isBlockLike(node: parser.ExpressionNode): boolean {
 		node.nodeType === "DictionaryValue" ||
 		node.nodeType === "Combination"
 	)
+}
+
+// NOTE: A Statement that closes with a block of its own — see `Entry.bodied`.
+// A `type` alias holding a Record Type closes with a brace too, but may as well
+// fit on one line, and a blank line after a one-line alias is not the shape.
+function isBodiedStatement(node: parser.TestsNode): boolean {
+	switch (node.nodeType) {
+		case "FunctionStatement":
+		case "OverloadedFunctionStatement":
+		case "NamespaceDefinitionStatement":
+		case "ChoiceDeclarationStatement":
+		case "ProtocolDeclarationStatement":
+		case "IfStatement":
+		case "IfElseStatement":
+		case "Test":
+		case "Suite":
+			return true
+
+		default:
+			return false
+	}
+}
+
+// NOTE: A bare signature is one line and closes with no brace; every other
+// Method opens a block, an `overload` of signatures included.
+function isBodiedNamespaceMethod(
+	method: parser.NamespaceMethods[string],
+): boolean {
+	return (
+		method.nodeType !== "SimpleMethodSignature" &&
+		method.nodeType !== "StaticMethodSignature"
+	)
+}
+
+function isBodiedProtocolMethod(
+	method: parser.ProtocolMethods[string],
+): boolean {
+	switch (method.nodeType) {
+		case "SimpleProtocolMethod":
+		case "StaticProtocolMethod":
+			return method.signature.body !== null
+
+		default:
+			return true
+	}
 }
 
 function handlerEndLine(handler: parser.MatchNode["handlers"][number]): number {
