@@ -185,11 +185,13 @@ export class Printer {
 	//
 	// A run ends wherever the column would stop meaning anything: at a Statement
 	// that is not an assignment; at a blank line, which is how the author says
-	// that two groups of Declarations are not one; between a Declaration and a
-	// bare reassignment; and at a value that lays itself out over several lines,
-	// for the same reason a guarded `case` is left out of its run. A Comment
-	// does not end a run — it is written between two Statements the author kept
-	// together, and the run is what they wrote.
+	// that two groups of Declarations are not one; and between a Declaration
+	// and a bare reassignment. A value that lays itself out over several lines
+	// does not end it — its `=` is on the head's line like every other, and a
+	// callback or a `match` between two short Declarations left the column
+	// with a hole in it. A Comment does not end a run either — it is written
+	// between two Statements the author kept together, and the run is what
+	// they wrote.
 	private implementationEntries(
 		nodes: Array<parser.TestsNode>,
 	): Array<Entry> {
@@ -233,7 +235,7 @@ export class Printer {
 				let padding = alignmentSlot()
 				let printed = this.printAssignment(assignment, padding)
 
-				if (printed.headWidth === null || !printed.flat) {
+				if (printed.headWidth === null) {
 					closeRun()
 
 					return printed.doc
@@ -1010,12 +1012,13 @@ export class Printer {
 	// alignment run fills in once it knows its block's widest member — so the
 	// head's width is reported back alongside the Doc. It is null when the head
 	// cannot be written on one line at all, which leaves nothing to measure a
-	// column against; `flat` says the same of the value, which is what keeps a
-	// `match` or a Function literal from dragging its neighbours out of true.
+	// column against. The value is not asked: its `=` sits on the head's line
+	// whatever it opens — a `match`, a callback, a List — and a value that
+	// lays itself out below leaves the column it stands in as true as any.
 	private printAssignment(
 		node: AssignmentNode,
 		padding: Doc,
-	): { doc: Doc; headWidth: number | null; flat: boolean } {
+	): { doc: Doc; headWidth: number | null } {
 		let head: Array<Doc> = []
 		let takesApart = false
 
@@ -1059,7 +1062,6 @@ export class Printer {
 		return {
 			doc: concat([...head, padding, text(" = "), value]),
 			headWidth: written === null ? null : stringWidth(written),
-			flat: renderFlat(value) !== null,
 		}
 	}
 
@@ -1291,7 +1293,7 @@ export class Printer {
 				let padding = alignmentSlot()
 				let printed = this.printProperty(member.property, padding)
 
-				if (printed.headWidth === null || !printed.flat) {
+				if (printed.headWidth === null) {
 					closeRun()
 
 					return printed.doc
@@ -1380,7 +1382,7 @@ export class Printer {
 	private printProperty(
 		property: parser.NamespacePropertyNode,
 		padding: Doc,
-	): { doc: Doc; headWidth: number | null; flat: boolean } {
+	): { doc: Doc; headWidth: number | null } {
 		let head: Array<Doc> = [text("static " + property.name.content)]
 
 		if (property.type !== null) {
@@ -1388,7 +1390,7 @@ export class Printer {
 		}
 
 		if (property.value === null) {
-			return { doc: concat(head), headWidth: null, flat: false }
+			return { doc: concat(head), headWidth: null }
 		}
 
 		let written = renderFlat(concat(head))
@@ -1397,7 +1399,6 @@ export class Printer {
 		return {
 			doc: concat([...head, padding, text(" = "), value]),
 			headWidth: written === null ? null : stringWidth(written),
-			flat: renderFlat(value) !== null,
 		}
 	}
 

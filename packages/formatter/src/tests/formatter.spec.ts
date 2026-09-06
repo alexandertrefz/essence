@@ -2311,6 +2311,16 @@ describe("formatter", () => {
 			)
 		})
 
+		it("keeps a value that opens a block in its = run", () => {
+			expect(
+				formatted(
+					"implementation {\n\tconstant total = items::sum()\n\tconstant doubled = items::map((item) {\n\t\tconstant twice = item::multiply(with 2)\n\n\t\t<- twice\n\t})\n\tconstant count = items::length()\n}\n",
+				),
+			).toBe(
+				"implementation {\n\tconstant total   = items::sum()\n\tconstant doubled = items::map((item) {\n\t\tconstant twice = item::multiply(with 2)\n\n\t\t<- twice\n\t})\n\tconstant count   = items::length()\n}\n",
+			)
+		})
+
 		// NOTE: The corpus writes a blank line after every bodied member by
 		// hand — 1,152 block ends, one exception — so the rule changes nothing
 		// there and guarantees the gap in files the formatter meets cold.
@@ -3452,7 +3462,7 @@ describe("formatter", () => {
 				"implementation {\n\tconstant xs = [1, 2, 3]\n\tconstant a = xs::map((n) {\n\t\tconstant m = n\n\t\t<- m\n\t})::filter((n) { <- true })\n}\n"
 
 			expect(formatted(source)).toContain(
-				"constant a = xs\n\t\t::map((n) {\n\t\t\tconstant m = n\n\t\t\t<- m\n\t\t})\n\t\t::filter((n) { <- true })\n",
+				"constant a  = xs\n\t\t::map((n) {\n\t\t\tconstant m = n\n\t\t\t<- m\n\t\t})\n\t\t::filter((n) { <- true })\n",
 			)
 		})
 
