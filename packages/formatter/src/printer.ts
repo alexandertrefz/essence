@@ -975,16 +975,27 @@ export class Printer {
 			])
 		}
 
-		let parts: Array<Doc> = [
-			text(keyword),
-			this.printExpression(node.value),
-		]
+		let value = this.printExpression(node.value)
 
-		if (node.snapshot !== null) {
-			parts.push(this.printSnapshot(node.snapshot))
+		if (node.snapshot === null) {
+			return concat([text(keyword), value])
 		}
 
-		return concat(parts)
+		// NOTE: `matches snapshot …` follows the value on its line, and moves
+		// to a line of its own when that is what lets the value stay whole —
+		// the middle layout is measured up to its break, so it is taken
+		// exactly when the value fits the first line. A value that has to
+		// break anyway keeps the clause against its closing bracket.
+		let snapshot = this.printSnapshot(node.snapshot)
+
+		return concat([
+			text(keyword),
+			conditionalGroup([
+				concat([value, text(" "), snapshot]),
+				concat([value, indent(concat([hardline, snapshot]))]),
+				concat([value, text(" "), snapshot]),
+			]),
+		])
 	}
 
 	// NOTE: `matches snapshot`, `matches snapshot "…"` — the recorded text a
@@ -993,19 +1004,19 @@ export class Printer {
 	private printSnapshot(node: parser.SnapshotNode): Doc {
 		if (node.name !== null) {
 			return concat([
-				text(" matches snapshot from "),
+				text("matches snapshot from "),
 				this.printValue(node.name),
 			])
 		}
 
 		if (node.value !== null) {
 			return concat([
-				text(" matches snapshot "),
+				text("matches snapshot "),
 				this.printValue(node.value),
 			])
 		}
 
-		return text(" matches snapshot")
+		return text("matches snapshot")
 	}
 
 	// NOTE: `padding` is written between the head and the `=`, and is the slot an
