@@ -352,9 +352,8 @@ tests {
 		§ `placed` is what lets a page animate a push rather than redraw it: a
 		§ merged tile names both of the squares it was made from.
 		test "says which squares every tile it placed came from" {
-			expect [2, 0, 0, 2]::slide().placed::is([
-				{ value = 4, sources = [0, 3] },
-			])
+			expect [2, 0, 0, 2]::slide().placed
+				::is([{ value = 4, sources = [0, 3] }])
 		}
 
 		test "answers a row of the length it was handed" {
@@ -423,12 +422,13 @@ tests {
 		§ The journeys come back out of the turn the push went in through, so
 		§ a page reads them against the board it is drawing.
 		test "answers every journey in the board's own coordinates" {
-			expect twoTiles::slide(toward #Right).movements::is([
-				{
-					from = { row = 0, column = 0 },
-					to = { row = 0, column = 3 },
-				},
-			])
+			expect twoTiles::slide(toward #Right).movements
+				::is([
+					{
+						from = { row = 0, column = 0 },
+						to = { row = 0, column = 3 },
+					},
+				])
 		}
 
 		test "leaves a tile that did not travel out of the journeys" {

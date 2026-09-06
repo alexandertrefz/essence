@@ -1169,13 +1169,10 @@ export class Printer {
 	// chain is asked to carry the decision, since it is the one group that
 	// knows whether it broke.
 	private printIfHead(condition: parser.ExpressionNode): Doc {
-		if (
-			condition.nodeType === "MethodInvocation" &&
-			chainLinks(condition).length > 1
-		) {
+		if (condition.nodeType === "MethodInvocation") {
 			return concat([
 				text("if "),
-				this.printMethodChain(condition, ifBreak(hardline, text(" "))),
+				this.printMethodChain(condition, text(" "), hardline),
 			])
 		}
 
@@ -2122,12 +2119,13 @@ export class Printer {
 	// a line of its own: a bare `@`, a `0`, a name no wider than one indent —
 	// so that `xs` and `text` are never left dangling above their own links.
 	//
-	// `suffix` is written inside the group, after the last link, so that it
-	// can answer to whether the chain broke — an `if` puts its `{` on a line
-	// of its own then.
+	// `suffix` is written after the last link, and `brokenSuffix` in its
+	// place when the chain broke — an `if` puts its `{` on a line of its own
+	// then, since the links sit at the body's indent.
 	private printMethodChain(
 		node: parser.MethodInvocationNode,
 		suffix: Doc = EMPTY,
+		brokenSuffix: Doc = suffix,
 	): Doc {
 		let links = chainLinks(node)
 		let current: parser.ExpressionNode = (
@@ -2135,6 +2133,15 @@ export class Printer {
 		).base
 
 		let head = this.printExpression(current)
+
+		// NOTE: Each link's name and its Argument list's layouts, kept beside
+		// the printed link for the one-link chain below, which lays the link
+		// out itself. Built in the one walk over the links, since printing
+		// the Arguments moves the trivia cursor.
+		let linkParts: Array<{
+			name: Doc
+			arguments: ReturnType<Printer["argumentList"]>
+		}> = []
 
 		let items = this.listItems(
 			links,
@@ -2147,11 +2154,12 @@ export class Printer {
 					link.namespaceSpecifier === null
 						? ""
 						: "<" + link.namespaceSpecifier.content + ">"
+				let name = text("::" + specifier + link.member.content)
+				let listed = this.argumentList(link.arguments)
 
-				return concat([
-					text("::" + specifier + link.member.content),
-					this.printArgumentList(link.arguments),
-				])
+				linkParts.push({ name, arguments: listed })
+
+				return concat([name, listed.doc])
 			},
 		)
 
@@ -2159,8 +2167,72 @@ export class Printer {
 			(item) => item.leading.length > 0 || item.trailing !== null,
 		)
 
+		// NOTE: A chain of ONE link never broke: with nothing but the head
+		// and the link, the link's Argument list was what gave way, and
+		// `expect shipping(to a, weighing b)::is(0)` put its `0` on a line of
+		// its own. On a head that is a call, a literal or a member read off
+		// one, the chain is now offered three layouts: fused, with the link
+		// hugging the head's line; broken, the link on a line of its own with
+		// its Arguments hugging or breaking as they would anywhere; and fused
+		// with the head's own Arguments broken, for a head that fits no line
+		// whole. Each is measured up to its first break, so the link moves
+		// down exactly when the head fits its line and the fused shape does
+		// not.
+		//
+		// A head that is a NAME — `placed`, `game.won`, `@` — keeps fusing: a
+		// name dangling above its one link buys nothing, since the link's
+		// Arguments still have to break under it, and `placed::append({`
+		// hugging the Record it appends reads better than either.
 		if (items.length === 1 && !commented) {
-			return concat([head, (items[0] as ListItem).doc, suffix])
+			let link = (items[0] as ListItem).doc
+			let fused = concat([head, link, suffix])
+
+			if (isName(current)) {
+				return fused
+			}
+
+			let { name, arguments: listed } = linkParts[0]!
+
+			// NOTE: The fused layout is measured with the link's Arguments in
+			// their hugged form where a callback or a `match` closes them —
+			// to the block's first line — because a nested `conditional` is
+			// measured flat from outside, and the hug would never be seen to
+			// fit. A Record or List does not qualify it: `::is([` hugging
+			// the head's line would be chosen over the link on a line of its
+			// own with the List whole, and the head's own List would hug
+			// where the link's Record fits.
+			let last = links[0]!.arguments[links[0]!.arguments.length - 1]
+			let fusedHugged =
+				listed.hugged !== null &&
+				last !== undefined &&
+				opensBlock(last.value)
+					? concat([head, name, listed.hugged, suffix])
+					: fused
+
+			// NOTE: A hard break inside a layout does not reach the groups
+			// around the chain — a `conditional` stops it — but a chain whose
+			// callback lays itself out over several lines is not one line of
+			// code, and whatever list holds THIS chain has to break around
+			// it: said with a `breakParent` beside the conditional, exactly
+			// as the Argument list says it.
+			let breaks = renderFlat(head) === null || listed.breaks
+
+			return concat([
+				breaks ? breakParent : EMPTY,
+				conditionalGroup([
+					fusedHugged,
+					concat([
+						head,
+						expand(
+							concat([
+								indent(concat([hardline, link])),
+								brokenSuffix,
+							]),
+						),
+					]),
+					fused,
+				]),
+			])
 		}
 
 		let first = items[0] as ListItem
@@ -2207,9 +2279,14 @@ export class Printer {
 			return concat(parts)
 		})
 
-		return group(concat([head, indent(concat(linkDocs)), suffix]), {
-			shouldBreak: commented,
-		})
+		return group(
+			concat([
+				head,
+				indent(concat(linkDocs)),
+				ifBreak(brokenSuffix, suffix),
+			]),
+			{ shouldBreak: commented },
+		)
 	}
 
 	// NOTE: A call's Arguments, with one exception to breaking one per line: a
@@ -2221,8 +2298,24 @@ export class Printer {
 	// which is what keeps a chain in the first Argument from shattering while
 	// the callback after it hangs on.
 	private printArgumentList(argumentNodes: Array<parser.ArgumentNode>): Doc {
+		return this.argumentList(argumentNodes).doc
+	}
+
+	// NOTE: The list's layouts, kept apart for a one-link chain that lays
+	// the link out itself: `hugged` is the trailing block against its `(`,
+	// measured to the block's first line, and null where nothing hugs;
+	// `broken` is one Argument per line; `breaks` says an Argument holds a
+	// hard break, so whatever holds the call has to break around it.
+	private argumentList(argumentNodes: Array<parser.ArgumentNode>): {
+		doc: Doc
+		hugged: Doc | null
+		broken: Doc
+		breaks: boolean
+	} {
 		if (argumentNodes.length === 0) {
-			return text("()")
+			let doc = text("()")
+
+			return { doc, hugged: null, broken: doc, breaks: false }
 		}
 
 		let items = this.listItems(
@@ -2272,7 +2365,7 @@ export class Printer {
 				(isBlockLike(last.value) && earlierFlat)
 			)
 		) {
-			return broken
+			return { doc: broken, hugged: null, broken, breaks: false }
 		}
 		let hugged = concat([
 			text("("),
@@ -2290,10 +2383,15 @@ export class Printer {
 		// as a `breakParent` beside the conditional, where it does propagate.
 		let breaks = docs.some((doc) => renderFlat(doc) === null)
 
-		return concat([
-			breaks ? breakParent : EMPTY,
-			conditionalGroup([hugged, broken]),
-		])
+		return {
+			doc: concat([
+				breaks ? breakParent : EMPTY,
+				conditionalGroup([hugged, broken]),
+			]),
+			hugged,
+			broken,
+			breaks,
+		}
 	}
 
 	// NOTE: The brackets are read off the NODE and never guessed at: `[d with

@@ -81,9 +81,8 @@ implementation {
 
 	Terminal.print({ grams = 1 }::isBefore({ grams = 2 }))
 	Terminal.print(
-		lightestOf([{ grams = 3 }, { grams = 1 }])::value(defaultingTo {
-			grams = 0,
-		}).grams,
+		lightestOf([{ grams = 3 }, { grams = 1 }])
+			::value(defaultingTo { grams = 0 }).grams,
 	)
 
 	§ The builtin Types conform to the core Protocols — Equatable and

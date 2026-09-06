@@ -97,9 +97,8 @@ declarations {
 				over denominator: Integer,
 				defaultingTo fallback: Rational,
 			) -> Rational {
-				<- Rational.of(numerator, over denominator)::value(
-					defaultingTo fallback,
-				)
+				<- Rational.of(numerator, over denominator)
+					::value(defaultingTo fallback)
 			}
 		}
 
@@ -144,14 +143,13 @@ declarations {
 						constant denominatorText = fractionPieces::lastItem()
 
 						<- Integer.parse(numeratorText)::andThen((numerator) {
-							<- Integer.parse(denominatorText)::andThen(
-								(denominator) {
+							<- Integer.parse(denominatorText)
+								::andThen((denominator) {
 									<- Rational.of(
 										numerator::multiply(with signFactor),
 										over denominator,
 									)
-								},
-							)
+								})
 						})
 					} else if fractionPieces::length()::isNot(1) {
 						<- #Empty

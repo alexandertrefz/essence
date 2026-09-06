@@ -192,9 +192,8 @@ tests {
 		§ Every Function here answers a new Game; this is what makes undo
 		§ free, and it is worth a test of its own rather than a comment.
 		test "leaves the game it was handed alone" {
-			expect place(empty, at { row = 0, column = 0 }, value 2)::isNot(
-				empty,
-			)
+			expect place(empty, at { row = 0, column = 0 }, value 2)
+				::isNot(empty)
 			expect highest(empty)::is(0)
 		}
 	}
@@ -289,12 +288,13 @@ tests {
 
 	suite "the page's two questions" {
 		test "answers where every tile would travel under a push" {
-			expect movements(started, toward #Right)::is([
-				{
-					from = { row = 0, column = 0 },
-					to = { row = 0, column = 3 },
-				},
-			])
+			expect movements(started, toward #Right)
+				::is([
+					{
+						from = { row = 0, column = 0 },
+						to = { row = 0, column = 3 },
+					},
+				])
 		}
 
 		§ The hot-reload hand-over: the identity Function, whose whole point is

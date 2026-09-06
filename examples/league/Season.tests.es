@@ -155,9 +155,8 @@ tests {
 		}
 
 		test "rules the header off across the whole width" {
-			constant lines = Table.render(table, titled "After round 7")::split(
-				on "\n",
-			)
+			constant lines = Table.render(table, titled "After round 7")
+				::split(on "\n")
 
 			require #Value(rule) = lines::item(at 1)
 			require #Value(header) = lines::item(at 2)
@@ -166,9 +165,8 @@ tests {
 		}
 
 		test "titles the table it renders" {
-			expect Table.render(table, titled "After round 7")::starts(
-				with "After round 7",
-			)
+			expect Table.render(table, titled "After round 7")
+				::starts(with "After round 7")
 		}
 
 		test "renders a row for every Standing it is handed" {

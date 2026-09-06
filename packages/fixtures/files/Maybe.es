@@ -50,11 +50,10 @@ implementation {
 
 	constant list = [1, 2, 3]
 
-	constant maybeRational: Maybe<Rational> = asMaybe(
-		list::firstItem(),
-	)::andThen((_ item: Integer) -> Maybe<Rational> {
-		<- #Some(item::multiply(with 1/5))
-	})
+	constant maybeRational: Maybe<Rational> = asMaybe(list::firstItem())
+		::andThen((_ item: Integer) -> Maybe<Rational> {
+			<- #Some(item::multiply(with 1/5))
+		})
 
 	Terminal.inspect(maybeRational) § Maybe#Some(1/5)
 	Terminal.inspect(asMaybe(list::firstItem())::default(to 0)) § 1

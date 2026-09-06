@@ -398,10 +398,8 @@ tests {
 		§ the order a sort puts two rows in is the order the table has them in.
 		test "ranks more points ahead of fewer" {
 			constant leader   = blank::record(scored 3, conceded 0)
-			constant follower = Standings.blank(of { team = tigers })::record(
-				scored 1,
-				conceded 1,
-			)
+			constant follower = Standings.blank(of { team = tigers })
+				::record(scored 1, conceded 1)
 
 			expect leader::compare(to follower)::is(#Less)
 		}

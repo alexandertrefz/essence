@@ -62,9 +62,8 @@ implementation {
 	§ Dictionary.
 	type Result = { team: String, goals: Integer }
 
-	constant keys: List<String> = List.of(integersFrom 0, through 9999)::map(
-		(number) { <- "key {number}" },
-	)
+	constant keys: List<String> = List.of(integersFrom 0, through 9999)
+		::map((number) { <- "key {number}" })
 
 	constant fewKeys: List<String> = keys::firstItems(1000)
 
@@ -94,9 +93,8 @@ implementation {
 
 	constant noEntries: List<Entry> = []
 
-	constant seats: List<Seat> = List.of(integersFrom 0, through 999)::map(
-		(number) { <- { row = number, seat = 1 } },
-	)
+	constant seats: List<Seat> = List.of(integersFrom 0, through 999)
+		::map((number) { <- { row = number, seat = 1 } })
 
 	constant noSeats: Dictionary<Seat, Integer> = [=]
 
@@ -107,14 +105,13 @@ implementation {
 
 	§ Ten thousand results over a hundred teams, so grouping and tallying
 	§ have something to put together rather than one item under every key.
-	constant results: List<Result> = List.of(integersFrom 0, through 9999)::map(
-		(number) {
+	constant results: List<Result> = List.of(integersFrom 0, through 9999)
+		::map((number) {
 			<- {
 				team = "team {number::remainder(dividingBy 100)}",
 				goals = number::remainder(dividingBy 7),
 			}
-		},
-	)
+		})
 
 	constant teams: List<String> = results::map(.team)
 }
@@ -169,9 +166,8 @@ tests {
 		§ so every write after it repacks the entries the base can see before
 		§ writing — which is the cost a fork is measured for.
 		benchmark "writes a hundred Dictionaries from one" {
-			constant forks = List.of(integersFrom 1, through 100)::map(
-				(number) { <- built::set("fork {number}", to number) },
-			)
+			constant forks = List.of(integersFrom 1, through 100)
+				::map((number) { <- built::set("fork {number}", to number) })
 
 			expect forks::length()::is(100)
 		}
