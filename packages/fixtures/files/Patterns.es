@@ -70,8 +70,8 @@ implementation {
 		case #Rectangle({ width, height } as box) {
 			<- width::add(height)::add(box.width)
 		}
-		case #Circle({ radius } as dot)           { <- radius::add(dot.radius) }
-		case #Empty                               { <- 0 }
+		case #Circle({ radius } as dot) { <- radius::add(dot.radius) }
+		case #Empty                     { <- 0 }
 	}) § 10
 
 	§ On a one-member Case the constructor takes that member's value, which is

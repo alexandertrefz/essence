@@ -87,7 +87,7 @@ implementation {
 				2::isGreaterThan(@)
 			}, 1 + √2 = {1::add(@)}"
 		}
-		case Integer   { <- "collapsed" }
+		case Integer { <- "collapsed" }
 	})
 
 	§ `Irrational` names exactly the Union of the two new Types.

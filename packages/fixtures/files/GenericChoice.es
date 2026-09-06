@@ -18,7 +18,7 @@ implementation {
 			step advance: (_ state: State) -> Progress<State, Result>,
 		) -> Result {
 			<- match advance(state) -> Result {
-				case #Going(next)   {
+				case #Going(next) {
 					<- Loop.run(startingWith next, step advance)
 				}
 				case #Stopped(done) { <- done }

@@ -190,7 +190,7 @@ implementation {
 					case #Fine({ line, weightGrams }) {
 						<- #Value({ line, weightGrams })
 					}
-					case #Wrong                       { <- #Empty }
+					case #Wrong { <- #Empty }
 				}
 			})
 			::values()

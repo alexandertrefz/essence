@@ -363,7 +363,7 @@ declarations {
 									to choose(held, entry.value),
 								)
 							}
-							case #Empty       {
+							case #Empty {
 								<- merged::set(entry.key, to entry.value)
 							}
 						}

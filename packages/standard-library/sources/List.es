@@ -1019,7 +1019,7 @@ declarations {
 						<- items::replace(transform(item), at index)
 					}
 
-					case #Empty       { <- items }
+					case #Empty { <- items }
 				}
 			}
 		}
@@ -1250,7 +1250,7 @@ declarations {
 						})
 					}
 
-					case #Empty        {
+					case #Empty {
 						<- gathered::append({ key = itemKey, items = [item] })
 					}
 				}
@@ -1457,7 +1457,7 @@ declarations {
 				constant items = @
 
 				<- match order -> NonEmptyList<ItemType> {
-					case #Ascending  {
+					case #Ascending {
 						<- items::sort(by (first, second) {
 							<- key(first)::compare(to key(second))
 						})
@@ -1516,7 +1516,7 @@ declarations {
 						<- items::replace(transform(item), at index)
 					}
 
-					case #Empty       { <- items }
+					case #Empty { <- items }
 				}
 			}
 		}

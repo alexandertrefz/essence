@@ -2180,9 +2180,17 @@ export class Printer {
 	// NOTE: Handlers are built in source order, because that is the order the
 	// trivia cursor is walked in, and only then aligned — each carries a
 	// padding slot into the run, which the renderer fills.
+	//
+	// NOTE: A Handler that breaks opens a block, and the Handlers under that
+	// block's closing brace start a run of their own — the run is parted at
+	// it, the way a Handler whose body could never be written flat ends it
+	// outright. Kept in the column instead, its `{` would line up with bodies
+	// it does not read as one of, and a short Handler below it would be padded
+	// out to a column that has nothing but that block's brace in it: `case _
+	// { <- game }`, the answer ten columns from the case it answers.
 	private printMatch(node: parser.MatchNode): Doc {
 		let entries: Array<Entry> = []
-		let run = alignmentRun(UNBLOCKED_ALIGNMENT)
+		let run = alignmentRun(UNBLOCKED_ALIGNMENT, { partedByBreaks: true })
 
 		// NOTE: A Comment trailing the `match`'s own `{` — claimed before the
 		// Handlers are walked, or the first Handler's `takeBefore` would stall
@@ -2196,7 +2204,7 @@ export class Printer {
 		)
 
 		let closeRun = () => {
-			run = alignmentRun(UNBLOCKED_ALIGNMENT)
+			run = alignmentRun(UNBLOCKED_ALIGNMENT, { partedByBreaks: true })
 		}
 
 		for (let [index, handler] of node.handlers.entries()) {
@@ -2244,11 +2252,10 @@ export class Printer {
 				handler.matcher.position.end.line,
 				closeLine,
 				true,
-				// NOTE: Padded whether or not this Handler ends up on one line.
-				// A Handler that breaks still opens its brace right after its
-				// Matcher, so it has a brace in the run's column like every
-				// other — and skipping it would leave a gap in the middle of an
-				// otherwise aligned `match`.
+				// NOTE: The padding is written inside the body's group, so the
+				// flat shape is measured with it — see `block`. A Handler the
+				// run takes out is written with none, and breaks as it would
+				// have anyway.
 				padding,
 			)
 
@@ -2261,24 +2268,30 @@ export class Printer {
 			entries.push({ startLine, endLine: closeLine, doc })
 
 			// NOTE: A run is consecutive Handlers that all stay on one line,
-			// none of which is guarded, and each of whose Matchers has a width
-			// to line the run up on. A `where` clause is an arbitrary
-			// Expression — usually the longest thing in the `match` — and
-			// padding every sibling out to it would push the braces off to the
-			// right rather than line them up. One that breaks ends the run for
-			// the same reason it is not in it.
+			// none of which is guarded, and each of which has a width to line
+			// the run up on. A `where` clause is an arbitrary Expression —
+			// usually the longest thing in the `match` — and padding every
+			// sibling out to it would push the braces off to the right rather
+			// than line them up. A body that could never be written flat —
+			// two Statements, a Comment, a String written across lines — ends
+			// the run for the same reason it is not in it.
+			//
+			// A body that merely does not fit where the `match` stands is not
+			// known here: that is a question about the column the run is
+			// reached at, and the run answers it — taking the Handler out and
+			// parting the run at it. All that is reported is what the Handler
+			// reads flat, which is what the run measures it by.
+			let bodyWidth = flatWidth(body)
+
 			if (
 				handler.guard === null &&
 				matcherWidth !== null &&
-				renderFlat(body) !== null
+				bodyWidth !== null
 			) {
 				joinAlignment(run, padding, {
 					headWidth: matcherWidth,
-					// NOTE: The `{` is written after the Matcher whether or
-					// not what follows it fits — a Handler that breaks opens
-					// its brace in the column all the same — so no room the
-					// run stands in takes this one out of it.
-					fitWidth: null,
+					fitWidth:
+						stringWidth("case ") + matcherWidth + 1 + bodyWidth,
 				})
 			} else {
 				closeRun()

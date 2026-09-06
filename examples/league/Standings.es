@@ -246,7 +246,7 @@ implementation {
 									)
 								})
 						}
-						case #Forfeited({ by, against })                   {
+						case #Forfeited({ by, against }) {
 							<- table
 								::update(at by, with (standing) {
 									<- standing::record(
@@ -261,9 +261,7 @@ implementation {
 									)
 								})
 						}
-						case #Postponed                                    {
-							<- table
-						}
+						case #Postponed { <- table }
 					}
 				},
 			)

@@ -112,7 +112,7 @@ declarations {
 				constant text = @
 
 				<- match sensitivity -> Ordering {
-					case #Sensitive   { <- text::compare(to other) }
+					case #Sensitive { <- text::compare(to other) }
 
 					case #Insensitive {
 						<- text::lowercase()::compare(to other::lowercase())

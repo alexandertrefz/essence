@@ -26,9 +26,9 @@ implementation {
 			case #Multiply({ left, right }) {
 				<- #Value(left::multiply(with right))
 			}
-			case #Divide({ left, right })   { <- left::divide(by right) }
-			case #SquareRoot({ number })    { <- number::squareRoot() }
-			case #ClearAll                  { <- #Empty }
+			case #Divide({ left, right }) { <- left::divide(by right) }
+			case #SquareRoot({ number })  { <- number::squareRoot() }
+			case #ClearAll                { <- #Empty }
 		}
 	}
 

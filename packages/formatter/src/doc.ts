@@ -23,10 +23,11 @@ export const WIDTH = 80
 // `fitWidth` is what says whether the padding is worth writing at the column
 // the run turns out to stand at — a line whose padded width runs past the page
 // breaks, and a line that breaks may put the very thing the column is drawn
-// through onto a line of its own. It is null where a break can not take the
-// column away: an assignment's `=` and a `match` Handler's `{` are written
-// after their head wherever that head ends, and only what follows them is ever
-// moved down, so they hold their column however far the line runs on.
+// through onto a line of its own, or, as a `match` Handler's `{` does, open a
+// block the column has no business running through. It is null where a break
+// changes nothing about the column: an assignment's `=` is written after its
+// head wherever that head ends, and only what follows it is ever moved down,
+// so it holds its column however far the line runs on.
 export type AlignmentItem = {
 	headWidth: number
 	fitWidth: number | null
@@ -41,9 +42,17 @@ export type AlignmentItem = {
 // column; `resolved` remembers the answer per amount of room the run was
 // reached with, because the renderer asks for it once to measure a line and
 // again to write it.
+//
+// `partedByBreaks` is whether a line the run takes out for breaking parts it:
+// the lines above that one and the lines below it line up among themselves,
+// and never with each other. A `match` Handler that breaks opens a block, and
+// a column carried across a block would run through two tables — so a `match`
+// is parted where a `define` is not, since a `define` arm that breaks moves
+// its `if` down and opens nothing.
 type AlignmentRun = {
 	items: Array<AlignmentItem>
 	maxSpan: number
+	partedByBreaks: boolean
 	resolved: Map<number, Array<number>>
 }
 
@@ -201,8 +210,11 @@ export function alignmentSlot(): AlignDoc {
 	return { kind: "align", run: null, index: -1 }
 }
 
-export function alignmentRun(maxSpan: number): AlignmentRun {
-	return { items: [], maxSpan, resolved: new Map() }
+export function alignmentRun(
+	maxSpan: number,
+	{ partedByBreaks = false }: { partedByBreaks?: boolean } = {},
+): AlignmentRun {
+	return { items: [], maxSpan, partedByBreaks, resolved: new Map() }
 }
 
 // NOTE: Puts one line in a run, which is what gives its slot a padding to
@@ -227,9 +239,10 @@ export function joinAlignment(
 // need not keep the thing the column is drawn through on its head's line: a
 // `define` arm writes its `if` below, where no column reaches it, while every
 // sibling is padded out to a column it no longer stands in. Such a line is
-// taken out of the run, and the lines either side of it line up without it.
-// This is what can not be settled where the run is built: whether a line fits
-// is a question about the column it starts at.
+// taken out of the run, and the lines either side of it line up without it —
+// with each other, or, in a run that is `partedByBreaks`, each side on its
+// own. This is what can not be settled where the run is built: whether a line
+// fits is a question about the column it starts at.
 //
 // Taking one line out never widens another line's block on its own, but it
 // does join the two lines either side of it into one, which can — so the pass
@@ -256,60 +269,68 @@ function resolveAlignment(run: AlignmentRun, room: number): Array<number> {
 	for (;;) {
 		padding.fill(0)
 
-		let members: Array<number> = []
+		// NOTE: The stretches of lines still in the run that may line up with
+		// each other: all of them, or, where a line taken out parts the run,
+		// those on each side of it.
+		let stretches: Array<Array<number>> = [[]]
 
 		for (let index = 0; index < items.length; index++) {
 			if (!taken[index]) {
-				members.push(index)
+				;(stretches[stretches.length - 1] as Array<number>).push(index)
+			} else if (run.partedByBreaks) {
+				stretches.push([])
 			}
 		}
 
-		let start = 0
-		let narrowest = 0
-		let widest = 0
+		for (let members of stretches) {
+			let start = 0
+			let narrowest = 0
+			let widest = 0
 
-		let flushBlock = (end: number) => {
-			if (end - start > 1) {
-				for (let at = start; at < end; at++) {
-					let index = members[at] as number
+			let flushBlock = (end: number) => {
+				if (end - start > 1) {
+					for (let at = start; at < end; at++) {
+						let index = members[at] as number
 
-					padding[index] =
-						widest - (items[index] as AlignmentItem).headWidth
+						padding[index] =
+							widest - (items[index] as AlignmentItem).headWidth
+					}
+				}
+
+				start = end
+			}
+
+			for (let at = 0; at < members.length; at++) {
+				let width = (items[members[at] as number] as AlignmentItem)
+					.headWidth
+
+				if (
+					at > start &&
+					Math.max(widest, width) - Math.min(narrowest, width) >
+						run.maxSpan
+				) {
+					flushBlock(at)
+				}
+
+				if (at === start) {
+					narrowest = width
+					widest = width
+				} else {
+					narrowest = Math.min(narrowest, width)
+					widest = Math.max(widest, width)
 				}
 			}
 
-			start = end
+			flushBlock(members.length)
 		}
-
-		for (let at = 0; at < members.length; at++) {
-			let width = (items[members[at] as number] as AlignmentItem)
-				.headWidth
-
-			if (
-				at > start &&
-				Math.max(widest, width) - Math.min(narrowest, width) >
-					run.maxSpan
-			) {
-				flushBlock(at)
-			}
-
-			if (at === start) {
-				narrowest = width
-				widest = width
-			} else {
-				narrowest = Math.min(narrowest, width)
-				widest = Math.max(widest, width)
-			}
-		}
-
-		flushBlock(members.length)
 
 		let dropped = false
 
-		for (let index of members) {
+		for (let index = 0; index < items.length; index++) {
 			let item = items[index] as AlignmentItem
 
 			if (
+				!taken[index] &&
 				item.fitWidth !== null &&
 				item.fitWidth + (padding[index] as number) > room
 			) {
@@ -442,11 +463,10 @@ export function renderFlat(doc: Doc): string | null {
 				break
 
 			// NOTE: Padding has no width until the column it is written at is
-			// known, and there is no column here. Every reader of a flat
-			// rendering that could hold one asks whether the Doc can be on one
-			// line at all rather than how wide it reads — a Doc whose OWN
-			// width is measured is a head, and a head is written left of the
-			// padding rather than around it.
+			// known, and there is no column here. A Doc measured around one is
+			// a line whose run takes it out on its flat width, and that width
+			// is the line's own — the padding is exactly the part of it the
+			// run has yet to settle.
 			case "align":
 				break
 		}

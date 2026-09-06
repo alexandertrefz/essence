@@ -36,10 +36,10 @@ implementation {
 				case #Played({ home, away, homeGoals, awayGoals }) {
 					<- "{home.code} {homeGoals}–{awayGoals} {away.code}"
 				}
-				case #Forfeited({ by, against })                   {
+				case #Forfeited({ by, against }) {
 					<- "{by.code} forfeited to {against.code}"
 				}
-				case #Postponed({ home, away })                    {
+				case #Postponed({ home, away }) {
 					<- "{home.code} v {away.code} — postponed"
 				}
 			}
