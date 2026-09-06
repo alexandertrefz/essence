@@ -257,9 +257,14 @@ tests {
 
 	suite "quote" {
 		test "prices an order exactly, cent by cent" {
-			require #Priced({ subtotal, discount, shipping, tax, total, display }) = quote(
-				order,
-			)
+			require #Priced({
+				subtotal,
+				discount,
+				shipping,
+				tax,
+				total,
+				display,
+			}) = quote(order)
 
 			expect subtotal::is(7_780)
 			expect discount::is(778)

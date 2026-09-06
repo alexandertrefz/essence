@@ -954,9 +954,10 @@ export class Printer {
 
 	// NOTE: `expect value` and `require #Value(item) = value`. A Matcher is
 	// written on no assertion but a `require`, and it stands where a
-	// Declaration's name stands — the whole of it on the assertion's own line,
-	// as a Handler's is, so what is taken apart and what it is taken apart into
-	// read as one thing.
+	// Declaration's name stands — and lays itself out as one does: a Pattern
+	// too wide for the line breaks one member per line, exactly as the same
+	// Pattern does after `constant`. A Handler's Matcher is held flat for its
+	// brace column; a `require` has no column to hold.
 	private printAssertion(
 		node: parser.ExpectStatementNode | parser.RequireStatementNode,
 	): Doc {
@@ -966,7 +967,7 @@ export class Printer {
 		if (node.matcher !== null) {
 			return concat([
 				text(keyword),
-				this.printMatcher(node.matcher),
+				this.printMatcher(node.matcher, true),
 				text(" = "),
 				this.printExpression(node.value),
 			])
@@ -3017,7 +3018,9 @@ export class Printer {
 
 	// #region Matchers
 
-	printMatcher(node: parser.MatcherNode): Doc {
+	// NOTE: `breakable` is what `printPattern` takes: false where the Matcher
+	// heads a Handler and its width holds a column open, true on a `require`.
+	printMatcher(node: parser.MatcherNode, breakable = false): Doc {
 		switch (node.nodeType) {
 			case "WildcardMatcher":
 				return text("_")
@@ -3045,14 +3048,14 @@ export class Printer {
 					head,
 					text("("),
 					node.binding.nodeType === "Pattern"
-						? this.printPattern(node.binding, false)
+						? this.printPattern(node.binding, breakable)
 						: text(node.binding.content),
 					text(")"),
 				])
 			}
 
 			case "Pattern":
-				return this.printPattern(node, false)
+				return this.printPattern(node, breakable)
 
 			default:
 				return this.printType(node)
