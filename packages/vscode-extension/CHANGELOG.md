@@ -7,6 +7,11 @@
   name stays on its line. Auto-import joins the group its Module already
   has, or opens one; the unused-import fix takes a group down with its last
   name; a group written out folds.
+- Completion knows the import block. Inside a `from` it offers every Module
+  of the workspace as a path from the file you are in; inside a group it
+  offers what that Module exports; on a line of its own it offers a group
+  for every Module the block does not name yet, and an export block offers
+  the Module's own unexported names there too.
 - The gutter now says what a coverage run reached, line by line: green where
   the tests ran a line, grey where nothing did, and amber where they ran it
   but not whole — a one-line `if` whose `else` nothing took, an `if` with no

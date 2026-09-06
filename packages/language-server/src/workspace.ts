@@ -1285,6 +1285,16 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 		})
 	}
 
+	// NOTE: Every other Module of the workspace as this file would write it in
+	// a `from` — what a specifier is completed from. In canonical order, which
+	// is the order a block lists them in.
+	function specifiersFor(filePath: string): Array<string> {
+		return [...knownFiles()]
+			.filter((candidate) => candidate !== filePath)
+			.map((candidate) => relativeSpecifier(filePath, candidate))
+			.sort()
+	}
+
 	// NOTE: The Namespace Types behind those offers, which is what turns a
 	// Method Completion into an offer to import the Namespace declaring it.
 	// Enriching a Module to answer this is the expensive half, so only the
@@ -1484,6 +1494,7 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 		exportersOf,
 		offersFor,
 		namespaceOffersFor,
+		specifiersFor,
 		symbols,
 		symbolAt,
 		host,
