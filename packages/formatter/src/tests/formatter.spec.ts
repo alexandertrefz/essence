@@ -2331,6 +2331,16 @@ describe("formatter", () => {
 			)
 		})
 
+		it("lines a broken Union alias up under its =", () => {
+			expect(
+				formatted(
+					"implementation {\n\ttype Quote = Priced | Rejected | Pending | Cancelled | Refunded | Disputed | Archived\n\ttype Short = Priced | Rejected\n\tfunction f(_ a: Integer) -> Priced | Rejected | Pending | Cancelled | Refunded | Disputed {\n\t\t<- a\n\t}\n}\n",
+				),
+			).toBe(
+				"implementation {\n\ttype Quote = Priced\n\t           | Rejected\n\t           | Pending\n\t           | Cancelled\n\t           | Refunded\n\t           | Disputed\n\t           | Archived\n\ttype Short = Priced | Rejected\n\tfunction f(\n\t\t_ a: Integer,\n\t) -> Priced | Rejected | Pending | Cancelled | Refunded | Disputed {\n\t\t<- a\n\t}\n}\n",
+			)
+		})
+
 		// NOTE: The corpus writes a blank line after every bodied member by
 		// hand — 1,152 block ends, one exception — so the rule changes nothing
 		// there and guarantees the gap in files the formatter meets cold.
