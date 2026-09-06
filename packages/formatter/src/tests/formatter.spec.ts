@@ -2182,25 +2182,35 @@ describe("formatter", () => {
 		// gives way in, and the text on either side stays whole.
 		it("breaks a String too long for its line at one of its holes", () => {
 			let result = format(
-				'implementation {\n\tfunction f() -> String {\n\t\t<- "the quick brown fox {alpha} jumped over the lazy dog {beta} and away"\n\t}\n}\n',
+				'implementation {\n\tfunction f() -> String {\n\t\t<- "the quick brown fox {alpha::toString()} jumped over the lazy dog {beta::toString()} and away"\n\t}\n}\n',
 			)
 
 			expect(result.refusal).toBeNull()
 			expect(result.text).toContain(
-				'<- "the quick brown fox {alpha} jumped over the lazy dog {\n' +
-					"\t\t\tbeta\n" +
+				'<- "the quick brown fox {alpha::toString()} jumped over the lazy dog {\n' +
+					"\t\t\tbeta::toString()\n" +
 					'\t\t} and away"',
 			)
+		})
+
+		// NOTE: A hole holding nothing but a name is never the one to give:
+		// three lines around one word buy no room worth the tear. The String
+		// runs long instead.
+		it("never breaks a hole that holds only a name", () => {
+			let source =
+				'implementation {\n\tfunction f() -> String {\n\t\t<- "the quick brown fox {alpha} jumped over the lazy dog {beta.value} and away"\n\t}\n}\n'
+
+			expect(format(source).text).toBe(source)
 		})
 
 		// NOTE: Only as far as it has to — the holes that still fit are left
 		// closed up, so a String gives way at one place rather than every place.
 		it("breaks only the holes it has to", () => {
 			let result = format(
-				'implementation {\n\tfunction f() -> String {\n\t\t<- "the quick brown fox {alpha} jumped over the lazy dog {beta} and away"\n\t}\n}\n',
+				'implementation {\n\tfunction f() -> String {\n\t\t<- "the quick brown fox {alpha::toString()} jumped over the lazy dog {beta::toString()} and away"\n\t}\n}\n',
 			)
 
-			expect(result.text).toContain("{alpha}")
+			expect(result.text).toContain("{alpha::toString()}")
 		})
 
 		// NOTE: The hole that gives is the one the line runs out at, so the text
@@ -2215,14 +2225,14 @@ describe("formatter", () => {
 
 		it("gives way at the hole the line runs out at", () => {
 			let result = format(
-				'implementation {\n\tconstant alpha = 1\n\tconstant beta = 2\n\tconstant sentence = "the quick brown fox {alpha} jumped over the very lazy dog {beta} and then away again"\n}\n',
+				'implementation {\n\tconstant alpha = 1\n\tconstant beta = 2\n\tconstant sentence = "the quick brown fox {alpha::toString()} jumped over the very lazy dog {beta::toString()} and then away again"\n}\n',
 			)
 
 			expect(result.refusal).toBeNull()
 			expect(result.text).toContain(
 				'constant sentence = "the quick brown fox {\n' +
-					"\t\talpha\n" +
-					'\t} jumped over the very lazy dog {beta} and then away again"',
+					"\t\talpha::toString()\n" +
+					'\t} jumped over the very lazy dog {beta::toString()} and then away again"',
 			)
 		})
 	})
