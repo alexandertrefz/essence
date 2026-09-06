@@ -2118,9 +2118,8 @@ export class Printer {
 	}
 
 	// NOTE: A call's Arguments, with one exception to breaking one per line: a
-	// trailing `match` or Function literal — or a Record or List that is the
-	// only Argument — is hugged, so its own block gives way rather than the
-	// list around it. Hugging is offered as the first of two layouts and taken
+	// trailing `match`, Function literal, Record or List is hugged, so its
+	// own block gives way rather than the list around it. Hugging is offered as the first of two layouts and taken
 	// only when everything up to the block's opening brace fits: the head and
 	// the earlier Arguments measured whole, the trailing block measured to
 	// its first line. Otherwise the list breaks around every Argument,
@@ -2161,17 +2160,25 @@ export class Printer {
 			argumentNodes.length - 1
 		] as parser.ArgumentNode
 
+		let docs = items.map((item) => item.doc)
+
+		// NOTE: A Record or List hugs after other Arguments only when every
+		// one of those reads on one line: `place(value, at {` — but not
+		// `fallback {}` after a callback whose body already broke, where the
+		// hug would write `}, fallback {})` against the callback's brace.
+		let earlierFlat = docs
+			.slice(0, -1)
+			.every((doc) => renderFlat(doc) !== null)
+
 		if (
 			commented ||
 			!(
 				opensBlock(last.value) ||
-				(isBlockLike(last.value) && argumentNodes.length === 1)
+				(isBlockLike(last.value) && earlierFlat)
 			)
 		) {
 			return broken
 		}
-
-		let docs = items.map((item) => item.doc)
 		let hugged = concat([
 			text("("),
 			join(text(", "), docs.slice(0, -1)),

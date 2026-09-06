@@ -2291,6 +2291,16 @@ describe("formatter", () => {
 			)
 		})
 
+		it("hugs a trailing Record after Arguments that read on one line", () => {
+			expect(
+				formatted(
+					"implementation {\n\tconstant next = game::place(value, at { row = cell.row::add(direction.rowStep), column = cell.column::add(direction.columnStep) })\n\tconstant kept = numbers::transformFirst((item) {\n\t\tconstant doubled = item::multiply(with 2)\n\n\t\t<- doubled\n\t}, fallback {})\n}\n",
+				),
+			).toBe(
+				"implementation {\n\tconstant next = game::place(value, at {\n\t\trow = cell.row::add(direction.rowStep),\n\t\tcolumn = cell.column::add(direction.columnStep),\n\t})\n\tconstant kept = numbers::transformFirst(\n\t\t(item) {\n\t\t\tconstant doubled = item::multiply(with 2)\n\n\t\t\t<- doubled\n\t\t},\n\t\tfallback {},\n\t)\n}\n",
+			)
+		})
+
 		// NOTE: The corpus writes a blank line after every bodied member by
 		// hand — 1,152 block ends, one exception — so the rule changes nothing
 		// there and guarantees the gap in files the formatter meets cold.
