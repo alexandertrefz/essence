@@ -1,6 +1,6 @@
 {
 	"name": "@essence-lang/runtime",
-	"version": "0.3.0",
+	"version": "0.4.0",
 	"description": "The Essence language runtime — the native halves of the standard library, inlined into every compiled Program.",
 	"private": true,
 	"type": "module",

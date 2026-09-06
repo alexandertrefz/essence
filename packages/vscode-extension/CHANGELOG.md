@@ -1,6 +1,38 @@
 # Change Log
 
-## [Unreleased]
+## [0.6.0]
+
+Dictionaries, definitions by cases, and a formatter that reads better.
+The bundled toolchain moves to 0.4.0 in lockstep.
+
+The language moved: a `Dictionary<Key, Value>` Type with its own written
+forms — `["kim" = 7]`, the empty `[=]`, and `[ages with "kim" = 8]` to
+update one — a Record-shaped API, `NonEmptyDictionary`, and the
+`groupedBy` and `tallied` bridges that turn a List into one; a `define`
+Expression that answers by cases — `as #Win if scored::isGreaterThan(conceded)`,
+arm after arm, `as #Loss otherwise` — that narrows each arm by the ones
+above it, takes its Type from context, counts under coverage and is
+mutated like any branch; a decimal Literal, `0.75`, read as the Rational
+it is; and `import` and `export` blocks grouped by the file the names come
+from. `define` and `otherwise` are Keywords now. The compiler warns with
+`redundant-key-check` where an `if` asking `hasKey` opens with the lookup
+it just guarded, holds a table test's rows to the row Parameter's Type,
+refuses a Rational part too large to read rather than spinning on it, and
+lets a coded refusal out of a speculative reading instead of swallowing it.
+
+The formatter was audited for what it made hard to read, and every finding
+shipped: a chain of one link breaks before the link rather than orphaning
+its Argument (`expect shipping(…)` over `::is(0)`), a `require` Pattern too
+wide for its line breaks one member per line, a Case payload hugs through
+the Cases wrapping it, a Record or List hugs after other Arguments, Lists
+of bare Cases fill as Lists of Numbers do, a hole holding only a name is
+never torn open, a value that opens a block stays in its `=` column, a
+broken Union alias lines its pipes up under the `=`, a generic list and a
+refinement's `where` break when the line overflows, `matches snapshot`
+steps down a line when that keeps the value whole, a blank line follows
+every bodied member, and a head whose clauses break — a Guard, a `match`'s
+return Type, a Namespace's `for` and `is` clauses, a Parameter list with
+nothing in it — puts its `{` on a line of its own.
 
 - An `import { … }` block is written by file: `from "./Season.es" { … }`
   holds every name taken from that file, one to a line, and a group of one
@@ -36,6 +68,17 @@
   `1_000.5` colour whole rather than as an Integer that stops at the dot.
   A member path off a whole number, `1.foo`, reads exactly as it did — the
   rule wants digits on both sides.
+- `define` is lit with its arms, offered wherever an Expression may start,
+  and comes with a snippet; a half-written arm is probed like any other
+  half-written thing, so completion inside one answers. A Dictionary
+  Literal hovers, completes a bare Case in key or value position, renames,
+  folds and selects by entry, and takes signature help through either half
+  of one; an update written in the wrong pair of brackets has a Quick Fix
+  that swaps them. The debugger's Variables view prints a Dictionary in its
+  written form and expands it into its entries.
+- Completion answers inside the head of an `if` or a `match`, and a hover
+  past the end of a line's text shows nothing rather than the last thing on
+  it.
 
 ## [0.5.0]
 
