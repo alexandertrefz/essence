@@ -349,6 +349,17 @@ type ModuleSectionRead = {
 	side: "above" | "below"
 }
 
+// NOTE: The Tokens a Statement that begins with a bare name goes on with —
+// a reassignment, a Method call, a member read, a call, an index. See
+// `parseOptionalRefinementPredicate`.
+const STATEMENT_CONTINUATIONS = new Set([
+	TokenType.SymbolEqual,
+	TokenType.SymbolColon,
+	TokenType.SymbolDot,
+	TokenType.SymbolLeftParen,
+	TokenType.SymbolLeftBracket,
+])
+
 class DescentParser {
 	protected tokens: TokenStream
 	protected suppressDiagnostics: boolean
@@ -1741,24 +1752,35 @@ class DescentParser {
 	// (`removeEvery(where …)`) and as a Namespace's conformance conditions — so
 	// it is recognised by content, exactly as `parseOptionalGuard` does it.
 	//
-	// NOTE: Only when the `where` sits on the SAME line as the Type it refines,
-	// which is the rule `parseGenericType` keeps for its `<` and for the same
-	// reason: linebreak Tokens are discarded, so a clause opening the NEXT line
-	// is indistinguishable from one continuing this Type. `type Handler = Reader`
-	// followed by a Statement that begins with the name `where` would otherwise
-	// have its Type read as a refinement of the line above it. A refinement is
-	// always written on one line, so this refuses nothing a Declaration means.
+	// NOTE: On the Type's own line, or on the line after it — linebreak Tokens
+	// are discarded, so a `where` opening the NEXT line has to be told apart
+	// from a Statement that begins with the NAME `where`: `type Handler =
+	// Reader` followed by `where = 3` or `where::check()` must not have its
+	// Type read as a refinement of the line above. A Statement that begins
+	// with a name continues it with `=`, `::`, `.`, `(` or `[`, and a
+	// refinement's `where` is followed by the predicate's first Token on the
+	// same line — so a next-line `where` is the clause exactly when what
+	// follows it on its line is none of those. This is what lets the
+	// formatter move a clause too wide for the Type's line down under it.
 	protected parseOptionalRefinementPredicate(
 		type: parser.TypeDeclarationNode,
 	): parser.ExpressionNode | null {
 		let token = this.tokens.peek()
 
-		if (
-			token?.type !== TokenType.Identifier ||
-			token.value !== "where" ||
-			token.position.start.line !== type.position.end.line
-		) {
+		if (token?.type !== TokenType.Identifier || token.value !== "where") {
 			return null
+		}
+
+		if (token.position.start.line !== type.position.end.line) {
+			let after = this.tokens.peek(1)
+
+			if (
+				after === undefined ||
+				after.position.start.line !== token.position.start.line ||
+				STATEMENT_CONTINUATIONS.has(after.type)
+			) {
+				return null
+			}
 		}
 
 		this.tokens.next()

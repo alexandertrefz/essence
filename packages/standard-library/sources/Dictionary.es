@@ -28,7 +28,8 @@ declarations {
 	§
 	§ The predicate asks nothing about the key Type or the value Type. One
 	§ predicate serves every Dictionary, and both Type Arguments stay in the base.
-	type NonEmptyDictionary<KeyType, ValueType> = Dictionary<KeyType, ValueType> where @::hasEntries()
+	type NonEmptyDictionary<KeyType, ValueType> = Dictionary<KeyType, ValueType>
+		where @::hasEntries()
 
 	§ The keyed collection, and everything that reads or rebuilds one. Every
 	§ Method here is a Query: a Dictionary is never changed in place, and a new

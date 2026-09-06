@@ -2527,29 +2527,54 @@ describe("Parser", () => {
 
 			// NOTE: Linebreak Tokens are discarded, so nothing but the line
 			// numbers can tell a clause continuing this Type from a Statement
-			// that happens to begin with the name `where` — which is why the
-			// Parser reads the clause only on the Type's own line. Two
-			// Statements, and the Alias is not refined.
-			it("should not consume a where on the next line", () => {
+			// that happens to begin with the name `where`. A `where` on the
+			// next line is the clause when what follows it on its own line
+			// begins a predicate, and a Statement when it is the name alone,
+			// or the name going on with `=`, `::`, `.`, `(` or `[`.
+			it("should read a where on the next line followed by its predicate", () => {
 				let program = parse(
 					[
 						"implementation {",
-						"\ttype Handler = Integer",
-						"\twhere",
+						"\ttype NonEmptyDictionary<KeyType, ValueType> = Dictionary<KeyType, ValueType>",
+						"\t\twhere @::hasEntries()",
 						"}",
 					].join("\n"),
 				)
 
-				expect(program.implementation.nodes).toHaveLength(2)
+				expect(program.implementation.nodes).toHaveLength(1)
 				expect(
 					(
 						program.implementation
 							.nodes[0] as parser.TypeAliasStatementNode
-					).predicate,
-				).toBeNull()
-				expect(program.implementation.nodes[1].nodeType).toBe(
-					"Identifier",
-				)
+					).predicate?.nodeType,
+				).toBe("MethodInvocation")
+			})
+
+			it("should not consume a where on the next line that is a Statement", () => {
+				for (let statement of [
+					"where",
+					"where = 3",
+					"where::check()",
+					"where.value",
+					"where(1)",
+				]) {
+					let program = parse(
+						[
+							"implementation {",
+							"\ttype Handler = Integer",
+							"\t" + statement,
+							"}",
+						].join("\n"),
+					)
+
+					expect(program.implementation.nodes).toHaveLength(2)
+					expect(
+						(
+							program.implementation
+								.nodes[0] as parser.TypeAliasStatementNode
+						).predicate,
+					).toBeNull()
+				}
 			})
 
 			// NOTE: Every base the Enricher refuses still PARSES — a refusal that
