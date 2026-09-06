@@ -1,18 +1,22 @@
 import {
-	Algebraic       from "./Algebraic.es"
-	Boolean         from "./Boolean.es"
-	List            from "./List.es"
-	Optional        from "./Optional.es"
-	Orderable       from "./Orderable.es"
-	Ordering        from "./Ordering.es"
-	Equatable       from "./Protocols.es"
-	Printable       from "./Protocols.es"
-	NonZeroRational from "./Rational.es"
-	Rational        from "./Rational.es"
-	Rounding        from "./Rational.es"
-	Step            from "./Step.es"
-	String          from "./String.es"
-	Transcendental  from "./Transcendental.es"
+	from "./Algebraic.es" { Algebraic }
+	from "./Boolean.es" { Boolean }
+	from "./List.es" { List }
+	from "./Optional.es" { Optional }
+	from "./Orderable.es" { Orderable }
+	from "./Ordering.es" { Ordering }
+	from "./Protocols.es" {
+		Equatable
+		Printable
+	}
+	from "./Rational.es" {
+		NonZeroRational
+		Rational
+		Rounding
+	}
+	from "./Step.es" { Step }
+	from "./String.es" { String }
+	from "./Transcendental.es" { Transcendental }
 }
 
 declarations {

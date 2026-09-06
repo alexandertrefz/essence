@@ -138,7 +138,7 @@ describe("Standard Library Loader", () => {
 		let stdlib = load(
 			[
 				"Boxes.es",
-				`import { Optional from "./Fallible.es" }
+				`import { from "./Fallible.es" { Optional } }
 
 				declarations {
 				namespace Boxes <infer ItemType> for List<ItemType> {
@@ -403,7 +403,7 @@ describe("Standard Library Loader", () => {
 		let stdlib = load(
 			[
 				"Namespaces.es",
-				`import { Measurable from "./Protocols.es" }
+				`import { from "./Protocols.es" { Measurable } }
 
 				declarations {
 					namespace Sized for String is Measurable {
@@ -585,8 +585,8 @@ describe("Standard Library Loader", () => {
 			[
 				"Boxes.es",
 				`import {
-					Comparable from "./Ordered.es"
-					Ordering from "./Ordered.es"
+					from "./Ordered.es" { Comparable }
+					from "./Ordered.es" { Ordering }
 				}
 
 				declarations {
@@ -972,7 +972,7 @@ describe("Standard Library Loader", () => {
 			loadStdlibFrom([
 				parseStdlibSource(
 					"Alpha.es",
-					`import { Measurable from "./Zulu.es" }
+					`import { from "./Zulu.es" { Measurable } }
 
 					declarations {
 						namespace Sized for String is Measurable {
@@ -1014,7 +1014,7 @@ describe("Standard Library Loader", () => {
 				`declarations {}
 
 				export {
-					Public from "./Public.es"
+					from "./Public.es" { Public }
 				}`,
 			],
 			[
@@ -1033,7 +1033,7 @@ describe("Standard Library Loader", () => {
 			],
 			[
 				"Public.es",
-				`import { Internal from "./Helpers.es" }
+				`import { from "./Helpers.es" { Internal } }
 
 				declarations {
 					namespace Public for String {
@@ -1115,7 +1115,7 @@ describe("Standard Library Loader", () => {
 		let stdlib = load(
 			[
 				"Counting.es",
-				`import { Integer from "./Integer.es" }
+				`import { from "./Integer.es" { Integer } }
 
 				declarations {
 					namespace Counting for String {
@@ -1216,7 +1216,7 @@ describe("Standard Library Loader", () => {
 		let stdlib = load(
 			[
 				"Constants.es",
-				`import { Echoing from "./Echoing.es" }
+				`import { from "./Echoing.es" { Echoing } }
 
 				declarations {
 				§ The constants.

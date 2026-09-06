@@ -29,6 +29,7 @@ export function findFoldingRanges(
 	// file a reader is done with once they know what it says.
 	if (program.imports !== null) {
 		addRange(ranges, program.imports.position)
+		collectGroups(program.imports.groups, ranges)
 	}
 
 	// NOTE: Every Section folds as the block it is written as — the
@@ -42,9 +43,22 @@ export function findFoldingRanges(
 
 	if (program.exports !== null) {
 		addRange(ranges, program.exports.position)
+		collectGroups(program.exports.groups, ranges)
 	}
 
 	return ranges
+}
+
+// NOTE: A group written out over lines folds on its own — one dependency's
+// names are what a reader is done with once they know which file they come
+// from. A group written flat has nothing to fold, and `addRange` says so.
+function collectGroups(
+	groups: Array<parser.ImportGroupNode | parser.ExportGroupNode>,
+	ranges: Array<FoldingRange>,
+) {
+	for (let group of groups) {
+		addRange(ranges, group.position)
+	}
 }
 
 function addRange(ranges: Array<FoldingRange>, position: common.Position) {

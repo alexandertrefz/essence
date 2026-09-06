@@ -1822,7 +1822,7 @@ describe("formatter", () => {
 		it("writes a file that is nothing but tests without an implementation block", () => {
 			let source = [
 				"import {",
-				'\tx from "./Other.es"',
+				'\tfrom "./Other.es" { x }',
 				"}",
 				"",
 				"tests {",

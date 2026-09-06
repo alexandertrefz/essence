@@ -363,11 +363,9 @@ function brokenDependencyDiagnostics(
 ): Array<common.Diagnostic> {
 	let reported = new Set<string>()
 	let sources: Array<parser.ModuleSpecifierNode> = [
-		...(program.imports?.entries ?? []).map((entry) => entry.source),
-		...(program.exports?.entries ?? []).flatMap((entry) =>
-			entry.source === null ? [] : [entry.source],
-		),
-	]
+		...(program.imports?.groups ?? []),
+		...(program.exports?.groups ?? []),
+	].map((group) => group.source)
 
 	let { diagnostics } = collectDiagnostics(() => {
 		for (let source of sources) {

@@ -1,12 +1,18 @@
 import {
-	Boolean         from "./Boolean.es"
-	Integer         from "./Integer.es"
-	NonZeroInteger  from "./Integer.es"
-	Optional        from "./Optional.es"
-	Equatable       from "./Protocols.es"
-	Printable       from "./Protocols.es"
-	NonZeroRational from "./Rational.es"
-	Rational        from "./Rational.es"
+	from "./Boolean.es" { Boolean }
+	from "./Integer.es" {
+		Integer
+		NonZeroInteger
+	}
+	from "./Optional.es" { Optional }
+	from "./Protocols.es" {
+		Equatable
+		Printable
+	}
+	from "./Rational.es" {
+		NonZeroRational
+		Rational
+	}
 }
 
 declarations {

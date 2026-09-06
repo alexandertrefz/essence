@@ -1,7 +1,7 @@
 import {
-	Boolean    from "./Boolean.es"
-	Comparable from "./Comparable.es"
-	Ordering   from "./Ordering.es"
+	from "./Boolean.es" { Boolean }
+	from "./Comparable.es" { Comparable }
+	from "./Ordering.es" { Ordering }
 }
 
 declarations {

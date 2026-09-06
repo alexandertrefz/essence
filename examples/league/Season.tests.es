@@ -4,13 +4,19 @@
 § the table both of them produce together.
 
 import {
-	Fixture   from "./Season.es"
-	fixtures  from "./Season.es"
-	teams     from "./Season.es"
-	Standing  from "./Standings.es"
-	Standings from "./Standings.es"
-	Decimal   from "./Table.es"
-	Table     from "./Table.es"
+	from "./Season.es" {
+		Fixture
+		fixtures
+		teams
+	}
+	from "./Standings.es" {
+		Standing
+		Standings
+	}
+	from "./Table.es" {
+		Decimal
+		Table
+	}
 }
 
 tests {

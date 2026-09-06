@@ -168,8 +168,8 @@ describe("Folding the Module sections", () => {
 		let ranges = foldingRangesOf(
 			[
 				"import {",
-				'\tRectangle from "./Geometry.es"',
-				'\tCircle from "./Geometry.es"',
+				'\tfrom "./Geometry.es" { Rectangle }',
+				'\tfrom "./Bounds.es" { Box }',
 				"}",
 				"implementation {",
 				"\tconstant one = 1",
@@ -182,6 +182,29 @@ describe("Folding the Module sections", () => {
 
 		expect(ranges).toContainEqual({ startLine: 1, endLine: 3 })
 		expect(ranges).toContainEqual({ startLine: 8, endLine: 9 })
+	})
+
+	// NOTE: A group written out folds on its own; one written flat has no
+	// lines to fold.
+	it("should fold a group written out over lines", () => {
+		let ranges = foldingRangesOf(
+			[
+				"import {",
+				'\tfrom "./Geometry.es" {',
+				"\t\tCircle",
+				"\t\tRectangle",
+				"\t}",
+				'\tfrom "./Bounds.es" { Box }',
+				"}",
+				"implementation {",
+				"\tconstant one = 1",
+				"}",
+			].join("\n"),
+		)
+
+		expect(ranges).toContainEqual({ startLine: 1, endLine: 6 })
+		expect(ranges).toContainEqual({ startLine: 2, endLine: 4 })
+		expect(ranges.filter((range) => range.startLine === 6)).toEqual([])
 	})
 
 	it("should leave a Program that writes neither section alone", () => {

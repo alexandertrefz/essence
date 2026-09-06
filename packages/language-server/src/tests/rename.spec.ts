@@ -1761,7 +1761,7 @@ describe("Rename through the Module sections", () => {
 	it("should rename an import entry together with every use of it", () => {
 		let source = [
 			"import {",
-			'\tRectangle from "./Geometry.es"',
+			'\tfrom "./Geometry.es" { Rectangle }',
 			"}",
 			"implementation {",
 			"\tfunction widthOf(_ shape: Rectangle) -> Integer {",
@@ -1778,14 +1778,14 @@ describe("Rename through the Module sections", () => {
 	it("should rename from the entry as well as from a use", () => {
 		let source = [
 			"import {",
-			'\tsquare from "./Math.es"',
+			'\tfrom "./Math.es" { square }',
 			"}",
 			"implementation {",
 			"\tconstant nine = square(3)",
 			"}",
 		].join("\n")
 
-		expect(rename(source, { line: 2, column: 3 }, "squared")).toBe(
+		expect(rename(source, { line: 2, column: 22 }, "squared")).toBe(
 			source.replaceAll("square", "squared"),
 		)
 	})
@@ -1796,7 +1796,7 @@ describe("Rename through the Module sections", () => {
 	it("should bind an aliased import under its alias alone", () => {
 		let source = [
 			"import {",
-			'\tPI as Pi from "./Math.es"',
+			'\tfrom "./Math.es" { PI as Pi }',
 			"}",
 			"implementation {",
 			"\tconstant doubled = Pi::multiply(with 2/1)",
@@ -1806,7 +1806,7 @@ describe("Rename through the Module sections", () => {
 		expect(rename(source, { line: 5, column: 22 }, "Ratio")).toBe(
 			[
 				"import {",
-				'\tPI as Ratio from "./Math.es"',
+				'\tfrom "./Math.es" { PI as Ratio }',
 				"}",
 				"implementation {",
 				"\tconstant doubled = Ratio::multiply(with 2/1)",
@@ -1838,7 +1838,7 @@ describe("Rename through the Module sections", () => {
 	it("should let a declaration of the same name win over an entry", () => {
 		let source = [
 			"import {",
-			'\tvalue from "./Other.es"',
+			'\tfrom "./Other.es" { value }',
 			"}",
 			"implementation {",
 			"\tconstant value = 1",
@@ -1849,7 +1849,7 @@ describe("Rename through the Module sections", () => {
 		expect(rename(source, { line: 6, column: 21 }, "amount")).toBe(
 			[
 				"import {",
-				'\tvalue from "./Other.es"',
+				'\tfrom "./Other.es" { value }',
 				"}",
 				"implementation {",
 				"\tconstant amount = 1",

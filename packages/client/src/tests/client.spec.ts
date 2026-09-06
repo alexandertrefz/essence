@@ -345,7 +345,7 @@ describe("A Module that does not compile", () => {
 		await withProject(
 			{
 				"Main.es": `import {
-	broken from "./Dep.es"
+	from "./Dep.es" { broken }
 }
 
 implementation {
@@ -451,7 +451,7 @@ function listeners(): {
 }
 
 const COUNTED_MODULE = (answer: number) => `import {
-	square from "./Math.es"
+	from "./Math.es" { square }
 }
 
 implementation {
@@ -706,7 +706,7 @@ describe("Watching a Module", () => {
 						path.join(directory, "Main.es"),
 						COUNTED_MODULE(2).replace(
 							"export {\n\tanswer",
-							'export {\n\tsquare from "./Math.es"\n\tanswer',
+							'export {\n\tfrom "./Math.es" { square }\n\tanswer',
 						),
 					)
 

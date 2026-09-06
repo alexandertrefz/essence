@@ -1,12 +1,18 @@
 import {
-	Boolean         from "./Boolean.es"
-	NonZeroInteger  from "./Integer.es"
-	PositiveInteger from "./Integer.es"
-	List            from "./List.es"
-	NonEmptyList    from "./List.es"
-	Optional        from "./Optional.es"
-	Equatable       from "./Protocols.es"
-	Printable       from "./Protocols.es"
+	from "./Boolean.es" { Boolean }
+	from "./Integer.es" {
+		NonZeroInteger
+		PositiveInteger
+	}
+	from "./List.es" {
+		List
+		NonEmptyList
+	}
+	from "./Optional.es" { Optional }
+	from "./Protocols.es" {
+		Equatable
+		Printable
+	}
 }
 
 declarations {

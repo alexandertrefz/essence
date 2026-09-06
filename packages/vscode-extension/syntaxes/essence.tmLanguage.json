@@ -134,8 +134,8 @@
 			}
 		},
 		"moduleSection": {
-			"comment": "All four of `import`, `export`, `from` and `as` stay valid Identifiers everywhere else — `from` is an Argument label in the standard library — so none of them can be lit on the word alone. The block is what scopes them: it opens at the start of a line with a brace and holds nothing but entries, so `from` and `as` inside it are always the Keywords. Semantic Tokens correct whatever is left.",
-			"begin": "^[ \\t]*\\b(import|export)\\b[ \\t]*(\\{)",
+			"comment": "All four of `import`, `export`, `from` and `as` stay valid Identifiers everywhere else — `from` is an Argument label in the standard library — so none of them can be lit on the word alone. The block is what scopes them: it opens at the very start of a line with a brace and holds nothing but groups and names, so `from` and `as` inside it are always the Keywords. The block ends at a brace written at the very start of a line, because the groups inside it close on indented braces of their own. Semantic Tokens correct whatever is left.",
+			"begin": "^\\b(import|export)\\b[ \\t]*(\\{)",
 			"beginCaptures": {
 				"1": {
 					"name": "keyword.control.import.essence"
@@ -144,7 +144,7 @@
 					"name": "punctuation.section.block.begin.essence"
 				}
 			},
-			"end": "^[ \\t]*(\\})",
+			"end": "^(\\})",
 			"endCaptures": {
 				"1": {
 					"name": "punctuation.section.block.end.essence"
@@ -163,6 +163,14 @@
 				{
 					"match": "\\b(from|as)\\b",
 					"name": "keyword.control.import.essence"
+				},
+				{
+					"match": "\\{",
+					"name": "punctuation.section.block.begin.essence"
+				},
+				{
+					"match": "\\}",
+					"name": "punctuation.section.block.end.essence"
 				},
 				{
 					"include": "#type"

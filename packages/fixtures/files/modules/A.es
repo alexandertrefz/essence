@@ -1,5 +1,5 @@
 import {
-	halved from "./B.es"
+	from "./B.es" { halved }
 }
 
 implementation {

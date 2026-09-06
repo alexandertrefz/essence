@@ -109,7 +109,7 @@ describe("Tests Section", () => {
 		it("should read a file that is nothing but tests", () => {
 			let { program, diagnostics } = parse(
 				`import {
-					x from "./Other.es"
+					from "./Other.es" { x }
 				}
 
 				tests {

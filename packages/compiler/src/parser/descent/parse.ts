@@ -682,73 +682,122 @@ class DescentParser {
 		)
 	}
 
+	// NOTE: An import block holds nothing but groups — every name comes from
+	// somewhere, so every name is written under its `from`.
 	protected parseImportSection(): parser.ImportSectionNode {
 		let keyword = this.tokens.next()
 		let leftBrace = this.tokens.next()
 
-		let entries = this.parseStatementList(() => this.parseImportEntry())
+		let groups = this.parseStatementList(() =>
+			this.parseModuleGroup((source) => this.parseImportEntry(source)),
+		)
 		let closingPosition = this.parseClosingBrace(leftBrace.position)
 
-		return generators.importSection(entries, {
-			start: keyword.position.start,
-			end: closingPosition.end,
-		})
+		return generators.importSection(
+			groups.map((group) =>
+				generators.importGroup(
+					group.source,
+					group.entries,
+					group.position,
+				),
+			),
+			{ start: keyword.position.start, end: closingPosition.end },
+		)
 	}
 
+	// NOTE: An export block lists what the Module declares bare, and what it
+	// forwards in groups. `from` is an ordinary Identifier everywhere else —
+	// a Module may well export something called `from` — so what makes it a
+	// group here is the specifier after it: `from "./Module.es" {`.
 	protected parseExportSection(): parser.ExportSectionNode {
 		let keyword = this.tokens.next()
 		let leftBrace = this.tokens.next()
 
-		let entries = this.parseStatementList(() => this.parseExportEntry())
+		let members = this.parseStatementList(
+			(): parser.ExportNode | parser.ExportGroupNode => {
+				if (
+					this.tokens.peek()?.type === TokenType.KeywordFrom &&
+					this.tokens.peek(1)?.type === TokenType.LiteralString
+				) {
+					let group = this.parseModuleGroup((source) =>
+						this.parseExportEntry(source),
+					)
+
+					return generators.exportGroup(
+						group.source,
+						group.entries,
+						group.position,
+					)
+				}
+
+				return this.parseExportEntry(null)
+			},
+		)
 		let closingPosition = this.parseClosingBrace(leftBrace.position)
 
-		return generators.exportSection(entries, {
+		return generators.exportSection(members, {
 			start: keyword.position.start,
 			end: closingPosition.end,
 		})
 	}
 
-	protected parseImportEntry(): parser.ImportNode {
+	// NOTE: `from "./Module.es" { … }` — the shape both blocks share. The
+	// specifier is read once and handed to every entry inside, so an entry
+	// carries where it came from without the group having to be asked.
+	protected parseModuleGroup<Entry>(
+		parseEntry: (source: parser.ModuleSpecifierNode) => Entry,
+	): {
+		source: parser.ModuleSpecifierNode
+		entries: Array<Entry>
+		position: common.Position
+	} {
+		let keyword = this.tokens.expect(TokenType.KeywordFrom)
+		let source = this.parseModuleSpecifier()
+		let leftBrace = this.tokens.expect(TokenType.SymbolLeftBrace)
+
+		let entries = this.parseStatementList(() => parseEntry(source))
+		let closingPosition = this.parseClosingBrace(leftBrace.position)
+
+		return {
+			source,
+			entries,
+			position: {
+				start: keyword.position.start,
+				end: closingPosition.end,
+			},
+		}
+	}
+
+	protected parseImportEntry(
+		source: parser.ModuleSpecifierNode,
+	): parser.ImportNode {
 		let name = this.parseIdentifier()
 		let alias = this.parseOptionalAlias()
-
-		this.tokens.expect(TokenType.KeywordFrom)
-
-		let source = this.parseModuleSpecifier()
 
 		return generators.importEntry(name, alias, source, {
 			start: name.position.start,
-			end: source.position.end,
+			end: (alias ?? name).position.end,
 		})
 	}
 
-	// NOTE: The `from` clause is what makes an entry a re-export, and it is
-	// optional — a plain name exports something this Program declares. Once
-	// `from` is read the specifier is required, so a `from` with nothing after it
-	// is a Diagnostic rather than a second entry that happens to be named `from`.
-	protected parseExportEntry(): parser.ExportNode {
+	// NOTE: The group an entry is written in is what makes it a re-export; a
+	// bare entry, with no `source`, exports something this Program declares.
+	protected parseExportEntry(
+		source: parser.ModuleSpecifierNode | null,
+	): parser.ExportNode {
 		let name = this.parseIdentifier()
 		let alias = this.parseOptionalAlias()
-		let end = (alias ?? name).position.end
-		let source: parser.ModuleSpecifierNode | null = null
-
-		if (this.tokens.peek()?.type === TokenType.KeywordFrom) {
-			this.tokens.next()
-
-			source = this.parseModuleSpecifier()
-			end = source.position.end
-		}
 
 		return generators.exportEntry(name, alias, source, {
 			start: name.position.start,
-			end,
+			end: (alias ?? name).position.end,
 		})
 	}
 
 	// NOTE: `as` binds the entry under a local name of the author's choosing. It
 	// is only a Keyword here — everywhere else it is an ordinary Identifier, an
 	// Argument label included — so an entry may itself be named `as`, and
-	// `as as from "./Module.es"` renames the imported `as` to `as`.
+	// `as as as` renames the imported `as` to `as`.
 	protected parseOptionalAlias(): parser.IdentifierNode | null {
 		if (this.tokens.peek()?.type !== TokenType.KeywordAs) {
 			return null

@@ -1,6 +1,8 @@
 import {
-	Amount  from "./A.es"
-	doubled from "./A.es"
+	from "./A.es" {
+		Amount
+		doubled
+	}
 }
 
 implementation {

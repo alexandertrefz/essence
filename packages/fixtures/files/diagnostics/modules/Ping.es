@@ -1,5 +1,5 @@
 import {
-	STEP from "./Pong.es"
+	from "./Pong.es" { STEP }
 }
 
 implementation {

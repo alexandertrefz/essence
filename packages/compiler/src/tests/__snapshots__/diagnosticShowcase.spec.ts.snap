@@ -2081,11 +2081,11 @@ Error: 'nowhere' is not declared in this Module
 exports[`Module Diagnostic Showcase Main.es should render the same report every time: Main.es 1`] = `
 "[not-exported]
 Error: 'Circle' is not exported by ./Shapes.es
-   ╭─┤ Main.es:2:2 │
+   ╭─┤ Main.es:3:3 │
    │
- 2 │     Circle          from "./Shapes.es"
-   │     ───┬──  
-   │        ╰──── declared in that Module, but private
+ 3 │        Circle
+   │        ───┬──  
+   │           ╰──── declared in that Module, but private
    │ 
    │ Help: Add 'Circle' to the 'export { … }' block of ./Shapes.es.
    │ 
@@ -2094,11 +2094,11 @@ Error: 'Circle' is not exported by ./Shapes.es
 
 [unknown-export]
 Error: ./Shapes.es declares nothing named 'Ellipse'
-   ╭─┤ Main.es:3:2 │
+   ╭─┤ Main.es:4:3 │
    │
- 3 │     Ellipse         from "./Shapes.es"
-   │     ───┬───  
-   │        ╰───── no such name in that Module
+ 4 │        Ellipse
+   │        ───┬───  
+   │           ╰───── no such name in that Module
    │ 
    │ Help: Check the spelling, and that the specifier names the file you meant.
    │ 
@@ -2107,13 +2107,13 @@ Error: ./Shapes.es declares nothing named 'Ellipse'
 
 [duplicate-import]
 Error: 'measure' is already declared here
-    ╭─┤ Main.es:6:10 │
+    ╭─┤ Main.es:7:11 │
     │
-  6 │     area as measure from "./Shapes.es"
-    │             ───┬───  
-    │                ╰───── this binds 'measure' a second time
+  7 │        area as measure
+    │                ───┬───  
+    │                   ╰───── this binds 'measure' a second time
     │ 
- 13 │     function measure(_ shape: Rectangle) -> Integer {
+ 15 │     function measure(_ shape: Rectangle) -> Integer {
     │              ───┬───  
     │                 ╰───── first declared here
     │ 
@@ -2124,11 +2124,11 @@ Error: 'measure' is already declared here
 
 [not-exported]
 Error: 'Circle' is not exported by ./Shapes.es
-    ╭─┤ Main.es:20:2 │
+    ╭─┤ Main.es:22:23 │
     │
- 20 │     Circle from "./Shapes.es"
-    │     ───┬──  
-    │        ╰──── declared in that Module, but private
+ 22 │     from "./Shapes.es" { Circle }
+    │                          ───┬──  
+    │                             ╰──── declared in that Module, but private
     │ 
     │ Help: Add 'Circle' to the 'export { … }' block of ./Shapes.es.
     │ 
@@ -2137,11 +2137,11 @@ Error: 'Circle' is not exported by ./Shapes.es
 
 [unused-import]
 Warning: 'area' is imported and never used
-   ╭─┤ Main.es:5:2 │
+   ╭─┤ Main.es:6:3 │
    │
- 5 │     area            from "./Shapes.es"
-   │     ──┬─  
-   │       ╰─── nothing reads this name
+ 6 │        area
+   │        ──┬─  
+   │          ╰─── nothing reads this name
    │ 
    │ Help: Remove the entry.
    │ 
@@ -2155,11 +2155,11 @@ Warning: 'area' is imported and never used
 exports[`Module Diagnostic Showcase Ping.es should render the same report every time: Ping.es 1`] = `
 "[cyclic-constant-import]
 Error: Constant 'STEP' is imported across a cycle
-   ╭─┤ Ping.es:2:2 │
+   ╭─┤ Ping.es:2:21 │
    │
- 2 │     STEP from "./Pong.es"
-   │     ──┬─  
-   │       ╰─── this Constant is not readable here
+ 2 │     from "./Pong.es" { STEP }
+   │                        ──┬─  
+   │                          ╰─── this Constant is not readable here
    │ 
    │ Help: Move the Constant into a Module outside the cycle, or expose it as a Function.
    │ 

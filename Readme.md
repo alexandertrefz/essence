@@ -69,14 +69,16 @@ Three larger programs, each with a README saying what it shows and a test keepin
 
 # Modules
 A file is a module. Everything it declares is private until its `export { … }` block lists it, and an
-`import { … }` block above the implementation names what it takes from other files. A specifier is a relative
-path, extension included; `as` renames an entry on either side.
+`import { … }` block above the implementation names what it takes from other files, grouped by the file
+they come from. A specifier is a relative path, extension included; `as` renames a name on either side.
 
 ```
 import {
-	Rectangle           from "./Geometry.es"
-	RectangleMeasurable from "./Geometry.es"
-	PI as Pi            from "./math/Math.es"
+	from "./Geometry.es" {
+		Rectangle
+		RectangleMeasurable
+	}
+	from "./math/Math.es" { PI as Pi }
 }
 
 implementation {
@@ -90,14 +92,16 @@ implementation {
 
 export {
 	describe
-	Rectangle from "./Geometry.es" § re-exported, never bound locally
+	from "./Geometry.es" { Rectangle } § re-exported, never bound locally
 }
 ```
 
-Namespaces are imported by name like everything else: importing `Rectangle` alone does not make `shape::area()`
-resolve, so which methods a receiver has is decided by what the file itself wrote and can never change because
-a dependency grew a namespace. `esfmt` sorts both blocks and lines the `from` keywords up, and dispatch is
-defined over exactly that sorted order, so formatting can not change what a program means.
+A group of one name stays on its line; two or more stand one to a line, so adding or removing a name is a
+one-line change. Namespaces are imported by name like everything else: importing `Rectangle` alone does not
+make `shape::area()` resolve, so which methods a receiver has is decided by what the file itself wrote and can
+never change because a dependency grew a namespace. `esfmt` sorts both blocks — groups by specifier, names
+within a group — and dispatch is defined over exactly that sorted order, so formatting can not change what a
+program means.
 
 A module body runs once, on first import, dependency first. Cycles are allowed for everything that hoists —
 functions, type aliases, choices, protocols and namespaces. A constant imported across one is refused: its

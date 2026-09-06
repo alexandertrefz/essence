@@ -7,54 +7,76 @@
 declarations {}
 
 export {
-	Algebraic               from "./Algebraic.es"
-	Boolean                 from "./Boolean.es"
-	Comparable              from "./Comparable.es"
-	Dictionary              from "./Dictionary.es"
-	GroupedList             from "./Dictionary.es"
-	GroupedNonEmptyList     from "./Dictionary.es"
-	NonEmptyDictionary      from "./Dictionary.es"
-	Integer                 from "./Integer.es"
-	NonNegativeInteger      from "./Integer.es"
-	NonZeroInteger          from "./Integer.es"
-	PositiveInteger         from "./Integer.es"
-	List                    from "./List.es"
-	NestedList              from "./List.es"
-	NonEmptyList            from "./List.es"
-	NonEmptyNestedList      from "./List.es"
-	OptionalList            from "./List.es"
-	SortOrder               from "./List.es"
-	loop                    from "./Loop.es"
-	Irrational              from "./Number.es"
-	Number                  from "./Number.es"
-	IntegerList             from "./NumberList.es"
-	KeyedNumberList         from "./NumberList.es"
-	NonEmptyIntegerList     from "./NumberList.es"
-	NonEmptyKeyedNumberList from "./NumberList.es"
-	NonEmptyNumberList      from "./NumberList.es"
-	NonEmptyRationalList    from "./NumberList.es"
-	NumberList              from "./NumberList.es"
-	RationalList            from "./NumberList.es"
-	NestedOptional          from "./Optional.es"
-	Optional                from "./Optional.es"
-	Orderable               from "./Orderable.es"
-	Ordering                from "./Ordering.es"
-	Equatable               from "./Protocols.es"
-	Printable               from "./Protocols.es"
-	Generatable             from "./Randomness.es"
-	Randomness              from "./Randomness.es"
-	NonZeroRational         from "./Rational.es"
-	NumberFormat            from "./Rational.es"
-	Rational                from "./Rational.es"
-	Rounding                from "./Rational.es"
-	Record                  from "./Record.es"
-	Step                    from "./Step.es"
-	CaseSensitivity         from "./String.es"
-	NonEmptyString          from "./String.es"
-	NormalizationForm       from "./String.es"
-	Side                    from "./String.es"
-	String                  from "./String.es"
-	Stream                  from "./Terminal.es"
-	Terminal                from "./Terminal.es"
-	Transcendental          from "./Transcendental.es"
+	from "./Algebraic.es" { Algebraic }
+	from "./Boolean.es" { Boolean }
+	from "./Comparable.es" { Comparable }
+	from "./Dictionary.es" {
+		Dictionary
+		GroupedList
+		GroupedNonEmptyList
+		NonEmptyDictionary
+	}
+	from "./Integer.es" {
+		Integer
+		NonNegativeInteger
+		NonZeroInteger
+		PositiveInteger
+	}
+	from "./List.es" {
+		List
+		NestedList
+		NonEmptyList
+		NonEmptyNestedList
+		OptionalList
+		SortOrder
+	}
+	from "./Loop.es" { loop }
+	from "./Number.es" {
+		Irrational
+		Number
+	}
+	from "./NumberList.es" {
+		IntegerList
+		KeyedNumberList
+		NonEmptyIntegerList
+		NonEmptyKeyedNumberList
+		NonEmptyNumberList
+		NonEmptyRationalList
+		NumberList
+		RationalList
+	}
+	from "./Optional.es" {
+		NestedOptional
+		Optional
+	}
+	from "./Orderable.es" { Orderable }
+	from "./Ordering.es" { Ordering }
+	from "./Protocols.es" {
+		Equatable
+		Printable
+	}
+	from "./Randomness.es" {
+		Generatable
+		Randomness
+	}
+	from "./Rational.es" {
+		NonZeroRational
+		NumberFormat
+		Rational
+		Rounding
+	}
+	from "./Record.es" { Record }
+	from "./Step.es" { Step }
+	from "./String.es" {
+		CaseSensitivity
+		NonEmptyString
+		NormalizationForm
+		Side
+		String
+	}
+	from "./Terminal.es" {
+		Stream
+		Terminal
+	}
+	from "./Transcendental.es" { Transcendental }
 }

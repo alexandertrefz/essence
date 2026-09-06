@@ -466,7 +466,7 @@ describe("essence test --watch", () => {
 
 	const reader = [
 		"import {",
-		'	double from "./Library.es"',
+		'	from "./Library.es" { double }',
 		"}",
 		"",
 		"tests {",
@@ -634,7 +634,7 @@ describe("essence test --watch", () => {
 		].join("\n")
 		const secondReader = [
 			"import {",
-			'\ttriple from "./Second.es"',
+			'\tfrom "./Second.es" { triple }',
 			"}",
 			"",
 			"tests {",

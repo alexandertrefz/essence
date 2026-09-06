@@ -8,15 +8,15 @@ import type { common, parser } from "@essence-lang/interfaces"
 // because a reader who accepts two of them in a row must not be shown a block
 // that reshuffles itself between the two.
 //
-// The entry goes in at its canonical position — sorted by specifier, then by
-// name — which is the order dispatch is defined over and the order `esfmt`
-// writes the block in. Single-spaced, deliberately: aligning the `from` column
-// is the Formatter's business, it recomputes the width for the whole block on
-// every format, and a guess here would be undone by the next format-on-save.
+// The name goes in at its canonical position — into the group of its Module,
+// sorted by name, or into a new group sorted by specifier — which is the order
+// dispatch is defined over and the order `esfmt` writes the block in.
 
 export type ImportEdit = {
 	// NOTE: An insertion is a zero-width Range — `start` and `end` at the same
-	// Cursor — so this is the same shape a Code Action's edits already are.
+	// Cursor — so this is the same shape a Code Action's edits already are. The
+	// one edit that is not an insertion replaces a group written flat with the
+	// same group written out.
 	range: common.Position
 	newText: string
 }
@@ -40,33 +40,32 @@ export function relativeSpecifier(fromPath: string, toPath: string): string {
 	return relative.startsWith("../") ? relative : `./${relative}`
 }
 
-// NOTE: The canonical order of an import block, matching `compareImportEntries`
-// in the Formatter and the seeding order in the Compiler's linker. Compared by
-// code unit rather than by locale, so every machine agrees on it.
-function compareEntries(left: ImportEntry, right: ImportEntry): number {
-	let keyOf = (entry: ImportEntry) => [
-		entry.specifier,
-		entry.name,
-		entry.alias ?? "",
-	]
-	let leftKey = keyOf(left)
-	let rightKey = keyOf(right)
-
-	for (let index = 0; index < leftKey.length; index++) {
-		if (leftKey[index] !== rightKey[index]) {
-			return (leftKey[index] as string) < (rightKey[index] as string)
-				? -1
-				: 1
-		}
+// NOTE: The canonical order of the names inside a group and of the groups of
+// a block, matching `compareEntries` and `compareGroups` in the Formatter and
+// the seeding order in the Compiler's linker. Compared by code unit rather
+// than by locale, so every machine agrees on it.
+function compareStrings(left: string, right: string): number {
+	if (left === right) {
+		return 0
 	}
 
-	return 0
+	return left < right ? -1 : 1
 }
 
-function spellEntry(entry: ImportEntry): string {
-	let local = entry.alias === null ? "" : ` as ${entry.alias}`
+function compareNames(left: ImportEntry, right: ImportEntry): number {
+	return (
+		compareStrings(left.name, right.name) ||
+		compareStrings(left.alias ?? "", right.alias ?? "")
+	)
+}
 
-	return `${entry.name}${local} from "${entry.specifier}"`
+function spellName(entry: ImportEntry): string {
+	return entry.alias === null ? entry.name : `${entry.name} as ${entry.alias}`
+}
+
+// NOTE: A group of one name, which is how the Formatter writes one.
+function spellGroup(entry: ImportEntry): string {
+	return `from "${entry.specifier}" { ${spellName(entry)} }`
 }
 
 function entryOf(node: parser.ImportNode): ImportEntry {
@@ -91,10 +90,50 @@ function insertionAt(
 	return { range: { start: cursor, end: cursor }, newText }
 }
 
+// NOTE: Whether anything but whitespace is written on `line` before `column`
+// — which is what says a line of its own can not be opened there, and the
+// text has to go inline instead.
+function sharesLine(lines: Array<string>, line: number, column: number) {
+	return /[^ \t]/.test((lines[line - 1] ?? "").slice(0, column - 1))
+}
+
+// NOTE: `spelling` placed among the members of a block or a group: on a line
+// of its own above `successor`, or inline in front of it where it shares its
+// line with the brace that opened the block; below `last` otherwise, and
+// inline after it where the closing brace shares its line.
+function insertAmong(
+	lines: Array<string>,
+	spelling: string,
+	successor: common.Position | null,
+	last: common.Position,
+	closeLine: number,
+): ImportEdit {
+	if (successor !== null) {
+		let line = successor.start.line
+
+		if (sharesLine(lines, line, successor.start.column)) {
+			return insertionAt(line, `${spelling} `, successor.start.column)
+		}
+
+		return insertionAt(line, `${indentationOf(lines, line)}${spelling}\n`)
+	}
+
+	let line = last.end.line
+
+	if (closeLine === line) {
+		return insertionAt(line, ` ${spelling}`, last.end.column)
+	}
+
+	return insertionAt(line + 1, `${indentationOf(lines, line)}${spelling}\n`)
+}
+
 // NOTE: Null when the entry is already there — a Quick Fix that inserts a
 // duplicate is worse than no Quick Fix, and the caller has no other way to know:
 // a name may be imported under an alias, or through a second entry the reader
 // wrote by hand while the Diagnostic it answers was still on screen.
+//
+// The name joins the group already written for its Module where there is one,
+// and opens a group of its own otherwise, at the group's canonical position.
 export function insertImportEdit(
 	sourceText: string,
 	program: parser.Program,
@@ -114,26 +153,32 @@ export function insertImportEdit(
 
 		return insertionAt(
 			line,
-			`${indentation}import {\n${indentation}\t${spellEntry(entry)}\n${indentation}}\n\n`,
+			`${indentation}import {\n${indentation}\t${spellGroup(entry)}\n${indentation}}\n\n`,
 		)
 	}
 
-	let existing = section.entries.map(entryOf)
-
 	if (
-		existing.some(
+		section.entries.some(
 			(candidate) =>
-				candidate.specifier === entry.specifier &&
-				candidate.name === entry.name,
+				candidate.source.path === entry.specifier &&
+				candidate.name.content === entry.name,
 		)
 	) {
 		return null
 	}
 
-	if (section.entries.length === 0) {
+	let group = section.groups.find(
+		(candidate) => candidate.source.path === entry.specifier,
+	)
+
+	if (group !== undefined) {
+		return insertIntoGroup(lines, group, entry)
+	}
+
+	if (section.groups.length === 0) {
 		let line = section.position.start.line
 
-		// NOTE: A one-line `import {}` takes the entry INSIDE its braces — an
+		// NOTE: A one-line `import {}` takes the group INSIDE its braces — an
 		// insertion on the line after the statement lands outside the block,
 		// and the file no longer parses.
 		if (section.position.end.line === line) {
@@ -143,63 +188,75 @@ export function insertImportEdit(
 
 			return insertionAt(
 				line,
-				`${separator}${spellEntry(entry)} `,
+				`${separator}${spellGroup(entry)} `,
 				column,
 			)
 		}
 
-		// NOTE: An empty block still owns two lines, so the entry goes on the
+		// NOTE: An empty block still owns two lines, so the group goes on the
 		// one after the brace rather than replacing anything.
 		return insertionAt(
 			line + 1,
-			`${indentationOf(lines, line)}\t${spellEntry(entry)}\n`,
+			`${indentationOf(lines, line)}\t${spellGroup(entry)}\n`,
 		)
 	}
 
-	let successor = section.entries.find(
-		(candidate) => compareEntries(entry, entryOf(candidate)) < 0,
+	let successor = section.groups.find(
+		(candidate) =>
+			compareStrings(entry.specifier, candidate.source.path) < 0,
 	)
+	let last = section.groups[section.groups.length - 1]!
 
-	if (successor !== undefined) {
-		let line = successor.position.start.line
-		let before = (lines[line - 1] ?? "").slice(
-			0,
-			successor.position.start.column - 1,
-		)
+	return insertAmong(
+		lines,
+		spellGroup(entry),
+		successor?.position ?? null,
+		last.position,
+		section.position.end.line,
+	)
+}
 
-		// NOTE: A successor sharing its line with the opening brace takes the
-		// entry inline, directly in front of it — inserting a line of its own
-		// above would splice the entry before the whole statement.
-		if (/[^ \t]/.test(before)) {
-			return insertionAt(
-				line,
-				`${spellEntry(entry)} `,
-				successor.position.start.column,
-			)
+// NOTE: A group written flat holds one name, and gaining a second is what
+// writes it out — so the whole of it is replaced with the two names one to a
+// line, in order, which is what the Formatter would make of it. A group
+// already written out takes the name on a line of its own at its canonical
+// position, and keeps every Comment it holds.
+function insertIntoGroup(
+	lines: Array<string>,
+	group: parser.ImportGroupNode,
+	entry: ImportEntry,
+): ImportEdit {
+	let position = group.position
+
+	if (
+		position.start.line === position.end.line &&
+		group.entries.length === 1
+	) {
+		let indentation = indentationOf(lines, position.start.line)
+		let names = [entryOf(group.entries[0]!), entry]
+			.sort(compareNames)
+			.map((name) => `${indentation}\t${spellName(name)}`)
+
+		return {
+			range: position,
+			newText: [
+				`from "${entry.specifier}" {`,
+				...names,
+				`${indentation}}`,
+			].join("\n"),
 		}
-
-		return insertionAt(
-			line,
-			`${indentationOf(lines, line)}${spellEntry(entry)}\n`,
-		)
 	}
 
-	let last = section.entries[section.entries.length - 1]!
-	let line = last.position.end.line
+	let successor = group.entries.find(
+		(candidate) => compareNames(entry, entryOf(candidate)) < 0,
+	)
+	let last = group.entries[group.entries.length - 1]!
 
-	// NOTE: The closing brace sharing the last entry's line takes the entry
-	// inline as well, directly after that entry — the line after it is already
-	// outside the block.
-	if (section.position.end.line === line) {
-		return insertionAt(
-			line,
-			` ${spellEntry(entry)}`,
-			last.position.end.column,
-		)
-	}
-
-	return insertionAt(
-		line + 1,
-		`${indentationOf(lines, line)}${spellEntry(entry)}\n`,
+	return insertAmong(
+		lines,
+		spellName(entry),
+		successor?.position ?? null,
+		last.position,
+		position.end.line,
 	)
 }

@@ -1,7 +1,7 @@
 import {
-	Boolean from "./Boolean.es"
-	Integer from "./Integer.es"
-	Step    from "./Step.es"
+	from "./Boolean.es" { Boolean }
+	from "./Integer.es" { Integer }
+	from "./Step.es" { Step }
 }
 
 declarations {

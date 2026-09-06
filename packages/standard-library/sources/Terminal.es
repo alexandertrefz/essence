@@ -1,6 +1,6 @@
 import {
-	Printable from "./Protocols.es"
-	String    from "./String.es"
+	from "./Protocols.es" { Printable }
+	from "./String.es" { String }
 }
 
 declarations {

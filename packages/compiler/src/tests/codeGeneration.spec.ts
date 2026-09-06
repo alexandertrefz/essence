@@ -3895,7 +3895,7 @@ describe("Code Generation", () => {
 				// to the real one — a standard library specifier is matched by
 				// file name against the set being loaded, which is what lets a
 				// library assembled in a test name a file it did not write.
-				const constants = `import { Integer from "./Integer.es" }
+				const constants = `import { from "./Integer.es" { Integer } }
 
 declarations {
 
@@ -3933,7 +3933,7 @@ declarations {
 								filePath.endsWith("Prelude.es")
 									? sourceText.replace(
 											/\n}\s*$/,
-											'\n\tConstants from "./Constants.es"\n}\n',
+											'\n\tfrom "./Constants.es" { Constants }\n}\n',
 										)
 									: sourceText,
 							),

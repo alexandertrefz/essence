@@ -1,6 +1,8 @@
 import {
-	Outcome  from "./Standings.es"
-	Standing from "./Standings.es"
+	from "./Standings.es" {
+		Outcome
+		Standing
+	}
 }
 
 implementation {

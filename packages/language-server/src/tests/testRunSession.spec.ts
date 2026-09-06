@@ -111,7 +111,7 @@ describe("The Server's live test session", () => {
 		let { session, pathOf } = await openWorkspace(
 			{
 				"Season.tests.es": sectionless,
-				"Main.es": `import {\n\tused from "./Season.tests.es"\n}\n\nimplementation {\n\tconstant seen = 1\n}\n`,
+				"Main.es": `import {\n\tfrom "./Season.tests.es" { used }\n}\n\nimplementation {\n\tconstant seen = 1\n}\n`,
 			},
 			"Main.es",
 		)
@@ -288,7 +288,7 @@ describe("The Server's live test session", () => {
 		let main = (tag: string) =>
 			[
 				"import {",
-				'\tused from "./Season.tests.es"',
+				'\tfrom "./Season.tests.es" { used }',
 				"}",
 				"",
 				"implementation {",
