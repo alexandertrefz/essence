@@ -153,5 +153,15 @@ bun run package
 This rebuilds the bundle and produces a `.vsix`. The bundle is included in the
 package even though it is git-ignored, so the published extension is
 self-contained. Publishing to the Marketplace is
-`bunx vsce publish --no-dependencies`, authenticated as the `essence`
-publisher (`bunx vsce login essence`, or the `VSCE_PAT` environment variable).
+
+```sh
+bun run publish
+```
+
+authenticated as the `essence` publisher (`bunx vsce login essence`, or the
+`VSCE_PAT` environment variable). Both scripts pass `--no-dependencies`, and
+a bare `vsce publish` must never be run here: without the flag, vsce asks
+`npm list` for the dependency tree, finds this workspace's link to the
+extension in the repository's `node_modules`, and packs the whole repository
+through it — `.git`, `build/`, every package's sources, some three thousand
+files — or fails on the workspace links before it gets that far.
