@@ -78,13 +78,11 @@ implementation {
 				}
 
 				if quantity::isGreaterThan(stock) {
-					<- #Wrong(
-						#OutOfStock({
-							sku,
-							requested = quantity,
-							available = stock,
-						})
-					)
+					<- #Wrong(#OutOfStock({
+						sku,
+						requested = quantity,
+						available = stock,
+					}))
 				}
 
 				<- #Fine({

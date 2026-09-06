@@ -2271,6 +2271,16 @@ describe("formatter", () => {
 			)
 		})
 
+		it("hugs a Case payload through the Cases wrapping it", () => {
+			expect(
+				formatted(
+					"implementation {\n\tconstant a = #Wrong(#OutOfStock({ sku, requested = quantity, available = stock }))\n\tconstant b = #Fine(#Value(#Value({ sku, requested = quantity, available = stock, note = 1 })))\n\tconstant c = #Value(someFunction(withArgument one, andAnother two, andThird three, more))\n}\n",
+				),
+			).toBe(
+				"implementation {\n\tconstant a = #Wrong(#OutOfStock({\n\t\tsku,\n\t\trequested = quantity,\n\t\tavailable = stock,\n\t}))\n\tconstant b = #Fine(#Value(#Value({\n\t\tsku,\n\t\trequested = quantity,\n\t\tavailable = stock,\n\t\tnote = 1,\n\t})))\n\tconstant c = #Value(\n\t\tsomeFunction(withArgument one, andAnother two, andThird three, more)\n\t)\n}\n",
+			)
+		})
+
 		// NOTE: The corpus writes a blank line after every bodied member by
 		// hand — 1,152 block ends, one exception — so the rule changes nothing
 		// there and guarantees the gap in files the formatter meets cold.

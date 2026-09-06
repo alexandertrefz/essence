@@ -2652,12 +2652,15 @@ export class Printer {
 		// `#Rectangle({ … })` — and otherwise laid out like a one-Argument
 		// list without the trailing comma the grammar does not allow, so a
 		// chain in it breaks inside the parentheses rather than dangling out
-		// of them.
+		// of them. A payload that is itself a Case hugs whenever the payload
+		// at the bottom of the stack does: `#Wrong(#OutOfStock({` opens on
+		// one line and `}))` closes it, where each wrapper laid out as a list
+		// of its own would add a step to a staircase.
 		if (node.value !== null) {
 			let value = this.printExpression(node.value)
 
 			parts.push(
-				isBlockLike(node.value)
+				hugsPayload(node.value)
 					? concat([text("("), value, text(")")])
 					: group(
 							concat([
@@ -3618,6 +3621,18 @@ function isBodiedProtocolMethod(
 		default:
 			return true
 	}
+}
+
+// NOTE: Whether a Case payload is written against its parentheses — a value
+// that lays itself out over several lines and closes with a brace of its own,
+// or a Case wrapping one of those, however deep.
+function hugsPayload(value: parser.ExpressionNode): boolean {
+	return (
+		isBlockLike(value) ||
+		(value.nodeType === "CaseValue" &&
+			value.value !== null &&
+			hugsPayload(value.value))
+	)
 }
 
 function handlerEndLine(handler: parser.MatchNode["handlers"][number]): number {
