@@ -903,11 +903,14 @@ export class Printer {
 				return this.printIfElse(node)
 
 			case "TypeAliasStatement": {
-				let parts: Array<Doc> = [
+				let head = concat([
 					text("type " + node.name.content),
 					this.printGenericList(node.generics),
+				])
+				let parts: Array<Doc> = [
+					head,
 					text(" = "),
-					this.printType(node.type),
+					this.printAliasedType(node.type, head),
 				]
 
 				// NOTE: A checked refinement's `where` clause, on one line with
@@ -3281,6 +3284,34 @@ export class Printer {
 		}
 
 		return written
+	}
+
+	// NOTE: A Union too wide for its alias's line keeps its first member on
+	// the `=` line and writes every other under it, each `|` in the column
+	// of the `=` — the members are the rows of one alias, and one column
+	// runs through all of them:
+	//
+	//     type Quote = Priced
+	//                | Rejected
+	//
+	// The column is spaces past the alias's own indent, the way a run's
+	// padding is, and it exists only while the head reads on one line — a
+	// generic list that broke leaves nothing to line up under.
+	private printAliasedType(node: parser.TypeDeclarationNode, head: Doc): Doc {
+		let headWidth = flatWidth(head)
+
+		if (node.nodeType !== "UnionTypeDeclaration" || headWidth === null) {
+			return this.printType(node)
+		}
+
+		let column = ifBreak(text(" ".repeat(headWidth + 1)), EMPTY)
+
+		return group(
+			join(
+				concat([line, column, text("| ")]),
+				node.types.map((member) => this.printType(member)),
+			),
+		)
 	}
 
 	private printRecordType(node: parser.RecordTypeDeclarationNode): Doc {
