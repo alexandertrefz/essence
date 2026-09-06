@@ -2914,11 +2914,12 @@ export class Printer {
 		])
 	}
 
-	// NOTE: A List of nothing but Numbers is FILLED — as many items to a line
-	// as fit — rather than broken one per line: twenty Numbers are twenty
-	// Numbers, not twenty lines. Anything else — Strings read as a list of
-	// things, one to a line — or a Comment among the items, and it breaks one
-	// per line like every other list.
+	// NOTE: A List of nothing but atoms — Numbers, Booleans, bare Cases — is
+	// FILLED, as many items to a line as fit, rather than broken one per
+	// line: twenty Numbers are twenty Numbers, not twenty lines, and `#Up,
+	// #Down` are as narrow and as scannable as they are. Anything else —
+	// Strings read as a list of things, one to a line — or a Comment among
+	// the items, and it breaks one per line like every other list.
 	private printList(node: parser.ListValueNode): Doc {
 		if (node.values.length === 0) {
 			return text("[]")
@@ -2932,10 +2933,7 @@ export class Printer {
 		let loose = this.trivia.takeBefore(node.position.end.line)
 		let { interior, commented } = this.listInterior(items, loose)
 
-		if (
-			!commented &&
-			node.values.every((value) => isNumberLiteral(value))
-		) {
+		if (!commented && node.values.every((value) => isAtom(value))) {
 			let filled: Array<Doc> = []
 
 			for (let [index, item] of items.entries()) {
@@ -3334,6 +3332,16 @@ function signatureListPosition(
 
 function isNumberLiteral(node: parser.ExpressionNode): boolean {
 	return node.nodeType === "IntegerValue" || node.nodeType === "RationalValue"
+}
+
+// NOTE: A value with nothing inside it to lay out — the items a List fills
+// with. A Case carrying a payload is not one: `#Value(1)` reads as a thing.
+function isAtom(node: parser.ExpressionNode): boolean {
+	return (
+		isNumberLiteral(node) ||
+		node.nodeType === "BooleanValue" ||
+		(node.nodeType === "CaseValue" && node.value === null)
+	)
 }
 
 type AssignmentNode =
