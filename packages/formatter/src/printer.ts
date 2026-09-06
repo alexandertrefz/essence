@@ -280,12 +280,17 @@ export class Printer {
 	// it is measured with the block it opens — which is what a `match`
 	// Handler's alignment padding has to be, or a Handler would be offered a
 	// flat shape that its own padding then pushes past the width.
+	// NOTE: `expandable` marks the flat-shaped group as the one that gives way
+	// when the block is hugged as a call's last Argument — a Function
+	// literal's body. A Handler's body is never hugged and passes false, so
+	// that a measure in `expand` mode reads it flat where it fits.
 	private block(
 		entries: Array<Entry>,
 		openLine: number | null,
 		allowFlat = false,
 		opening: Comment | null = null,
 		prefix: Doc = EMPTY,
+		expandable = allowFlat,
 	): Doc {
 		let brace =
 			opening === null
@@ -298,8 +303,6 @@ export class Printer {
 				: concat([prefix, brace, hardline, text("}")])
 		}
 
-		// NOTE: `expandable`, because this is the group that gives way when a
-		// Function literal is hugged as a call's last Argument.
 		if (allowFlat && opening === null && entries.length === 1) {
 			return group(
 				concat([
@@ -309,7 +312,7 @@ export class Printer {
 					line,
 					text("}"),
 				]),
-				{ expandable: true },
+				{ expandable },
 			)
 		}
 
@@ -335,6 +338,35 @@ export class Printer {
 		allowFlat = false,
 		prefix: Doc = EMPTY,
 	): Doc {
+		let { entries, opening, flatAllowed } = this.bodyEntries(
+			body,
+			headLine,
+			closeLine,
+		)
+
+		return this.block(
+			entries,
+			null,
+			allowFlat && flatAllowed,
+			opening,
+			prefix,
+		)
+	}
+
+	// NOTE: The entries of a body, walked once — the trivia cursor moves as
+	// they are built, so a body that is to be laid out two ways is built here
+	// and wrapped twice by `block`. `flatAllowed` is false where a Comment was
+	// claimed inside the body: there are then more entries than Statements,
+	// and a Comment can never share a line with what follows it.
+	private bodyEntries(
+		body: Array<parser.TestsNode>,
+		headLine: number,
+		closeLine: number,
+	): {
+		entries: Array<Entry>
+		opening: Comment | null
+		flatAllowed: boolean
+	} {
 		let openLine = this.braceLine(
 			headLine,
 			body[0]?.position.start.line ?? null,
@@ -346,16 +378,7 @@ export class Printer {
 
 		this.flushBefore(closeLine, entries)
 
-		// NOTE: A Comment claimed inside the body means there are more entries
-		// than Statements, and a Comment can never share a line with what
-		// follows it — so the flat shape is off the table.
-		return this.block(
-			entries,
-			null,
-			allowFlat && entries.length === body.length,
-			opening,
-			prefix,
-		)
+		return { entries, opening, flatAllowed: entries.length === body.length }
 	}
 
 	// NOTE: The line a block's `{` is written on. It is looked for between the
@@ -654,7 +677,7 @@ export class Printer {
 			text(" "),
 			this.printParameterList(
 				node.parameters,
-				EMPTY,
+				null,
 				node.parameterListPosition,
 			),
 		])
@@ -668,7 +691,7 @@ export class Printer {
 			text("for any "),
 			this.printParameterList(
 				node.parameters,
-				EMPTY,
+				null,
 				node.parameterListPosition,
 			),
 		])
@@ -1208,30 +1231,6 @@ export class Printer {
 			this.printGenericList(node.generics),
 		]
 
-		if (node.targetType !== null) {
-			head.push(text(" for "), this.printType(node.targetType))
-		}
-
-		let headDoc =
-			node.conformsTo.length > 0
-				? group(
-						concat([
-							concat(head),
-							indent(
-								concat([
-									line,
-									join(
-										concat([text(","), line]),
-										node.conformsTo.map((clause) =>
-											this.printConformanceClause(clause),
-										),
-									),
-								]),
-							),
-						]),
-					)
-				: concat(head)
-
 		// NOTE: One written body reaches the AST as two Records — Properties
 		// and Methods — so the order they were written in only survives in
 		// their names' Positions. Re-merging on those is what keeps a `static`
@@ -1329,11 +1328,61 @@ export class Printer {
 
 		this.flushBefore(node.position.end.line, entries)
 
-		return concat([
-			headDoc,
-			text(" "),
-			this.block(entries, null, false, opening),
-		])
+		let headDoc = this.printDeclarationHead(
+			concat(head),
+			node.targetType === null ? null : this.printType(node.targetType),
+			node.conformsTo.map((clause) =>
+				this.printConformanceClause(clause),
+			),
+			entries.length === 0,
+		)
+
+		return concat([headDoc, this.block(entries, null, false, opening)])
+	}
+
+	// NOTE: The head of a Namespace or a Protocol — the name, the `for` clause
+	// and the conformance list — and the space before its `{`. Too wide for
+	// its line, the head breaks in two steps: the `is` clauses go one to a
+	// line first, and the `for` clause moves down only if the name and it
+	// still do not fit together. Either way the `{` then goes on a line of
+	// its own: the clauses are indented one level, which is exactly where
+	// the members go, and a brace at the end of the last clause would leave
+	// the two indistinguishable.
+	//
+	// A body with nothing in it keeps its `{}` on the head's line: there are
+	// no members for the clauses to be confused with.
+	private printDeclarationHead(
+		name: Doc,
+		target: Doc | null,
+		clauses: Array<Doc>,
+		emptyBody: boolean,
+	): Doc {
+		// NOTE: The `for` clause is a group of its own only when there are
+		// clauses to break first; with none, it IS the head, and a head that
+		// does not fit moves it down rather than leaving the `{` alone under
+		// a full line.
+		let forClause =
+			target === null
+				? EMPTY
+				: indent(concat([line, text("for "), target]))
+		let named =
+			clauses.length > 0 && target !== null
+				? group(concat([name, forClause]))
+				: concat([name, forClause])
+
+		let parts: Array<Doc> = [named]
+
+		if (clauses.length > 0) {
+			parts.push(
+				indent(
+					concat([line, join(concat([text(","), line]), clauses)]),
+				),
+			)
+		}
+
+		parts.push(emptyBody ? text(" ") : ifBreak(hardline, text(" ")))
+
+		return group(concat(parts))
 	}
 
 	private printConformanceClause(node: parser.ConformanceClauseNode): Doc {
@@ -1477,31 +1526,6 @@ export class Printer {
 	}
 
 	private printProtocol(node: parser.ProtocolDeclarationStatementNode): Doc {
-		let head: Array<Doc> = [text("protocol " + node.name.content)]
-		// NOTE: The extension list lays out exactly as a Namespace's
-		// conformance list does — one group, breaking to a line per clause when
-		// the head does not fit — because it is the same list, printed by the
-		// same clause printer.
-		let headDoc =
-			node.conformsTo.length > 0
-				? group(
-						concat([
-							concat(head),
-							indent(
-								concat([
-									line,
-									join(
-										concat([text(","), line]),
-										node.conformsTo.map((clause) =>
-											this.printConformanceClause(clause),
-										),
-									),
-								]),
-							),
-						]),
-					)
-				: concat(head)
-
 		let methods = Object.values(node.methods)
 
 		methods.sort(
@@ -1529,11 +1553,19 @@ export class Printer {
 
 		this.flushBefore(node.position.end.line, entries)
 
-		return concat([
-			headDoc,
-			text(" "),
-			this.block(entries, null, false, opening),
-		])
+		// NOTE: The extension list lays out exactly as a Namespace's
+		// conformance list does, because it is the same list, printed by the
+		// same head printer.
+		let headDoc = this.printDeclarationHead(
+			text("protocol " + node.name.content),
+			null,
+			node.conformsTo.map((clause) =>
+				this.printConformanceClause(clause),
+			),
+			entries.length === 0,
+		)
+
+		return concat([headDoc, this.block(entries, null, false, opening)])
 	}
 
 	private printProtocolMethod(method: parser.ProtocolMethods[string]): Doc {
@@ -1590,7 +1622,7 @@ export class Printer {
 
 		return this.printParameterList(
 			signature.parameters,
-			concat([text(" -> "), this.printType(signature.returnType)]),
+			this.printType(signature.returnType),
 			signatureListPosition(signature),
 		)
 	}
@@ -1600,7 +1632,7 @@ export class Printer {
 			this.printGenericList(signature.generics),
 			this.printParameterList(
 				signature.parameters,
-				concat([text(" -> "), this.printType(signature.returnType)]),
+				this.printType(signature.returnType),
 				signatureListPosition(signature),
 			),
 		])
@@ -1662,17 +1694,14 @@ export class Printer {
 			this.printParameterList(
 				definition.parameters,
 				definition.returnType === null
-					? EMPTY
-					: concat([
-							text(" -> "),
-							this.printType(definition.returnType),
-						]),
+					? null
+					: this.printType(definition.returnType),
 				definition.parameterListPosition,
+				true,
 			),
 		)
 
 		parts.push(
-			text(" "),
 			this.bodyBlock(
 				definition.body,
 				position.start.line,
@@ -1690,24 +1719,46 @@ export class Printer {
 	// after it, and Documentation attaches by line adjacency — the docs would
 	// silently detach.
 	//
-	// `suffix` is the return clause, and it lives INSIDE the group so that one
-	// fit decision covers the whole header. Left outside, the list measures
-	// only up to the return Type's first break candidate and stays flat, and
-	// the Union is what gives way — split mid-Type, at the body's indent.
-	// Inside, a header that does not fit breaks its Parameters instead, and
-	// the return Type follows the `)` whole.
+	// `returnType` is written after the list as ` -> Type`, INSIDE the group so
+	// that one fit decision covers the whole header. Left outside, the list
+	// measures only up to the return Type's first break candidate and stays
+	// flat, and the Union is what gives way — split mid-Type, at the body's
+	// indent. Inside, a header that does not fit breaks its Parameters
+	// instead, and the return Type follows the `)` whole. With NO Parameters
+	// there is nothing to break, so the `->` clause itself moves down a line
+	// — and where a body follows, its `{` goes on a line of its own, the
+	// clause being indented to where the body's Statements go.
+	//
+	// `opensBody` says a block follows, and the list writes the space before
+	// its `{` — or the break the case above puts there instead.
 	//
 	// `listPosition` is where the parentheses are, for a Comment written after
 	// the `(` — which belongs above the first Parameter — and the Comments
 	// written above the `)`.
 	private printParameterList(
 		parameters: Array<parser.ParameterNode>,
-		suffix: Doc = EMPTY,
+		returnType: Doc | null = null,
 		listPosition: common.Position | null = null,
+		opensBody = false,
 	): Doc {
+		let bodySpace = opensBody ? text(" ") : EMPTY
+
 		if (parameters.length === 0) {
-			return concat([text("()"), suffix])
+			if (returnType === null) {
+				return concat([text("()"), bodySpace])
+			}
+
+			return group(
+				concat([
+					text("()"),
+					indent(concat([line, text("-> "), returnType])),
+					opensBody ? ifBreak(hardline, text(" ")) : EMPTY,
+				]),
+			)
 		}
+
+		let suffix =
+			returnType === null ? EMPTY : concat([text(" -> "), returnType])
 
 		let first = parameters[0] as parser.ParameterNode
 		let opening =
@@ -1762,19 +1813,23 @@ export class Printer {
 				),
 				text(")"),
 				suffix,
+				bodySpace,
 			])
 		}
 
-		return group(
-			concat([
-				text("("),
-				indent(concat([softline, interior])),
-				softline,
-				text(")"),
-				suffix,
-			]),
-			{ shouldBreak: commented },
-		)
+		return concat([
+			group(
+				concat([
+					text("("),
+					indent(concat([softline, interior])),
+					softline,
+					text(")"),
+					suffix,
+				]),
+				{ shouldBreak: commented },
+			),
+			bodySpace,
+		])
 	}
 
 	// NOTE: The items of a bracketed, comma-separated list — Arguments,
@@ -1957,7 +2012,7 @@ export class Printer {
 			return
 		}
 
-		parts.push(text(" = "), this.printExpression(defaultValue))
+		parts.push(text(" = "), this.printHeldExpression(defaultValue))
 	}
 
 	private printGenericList(
@@ -2152,7 +2207,7 @@ export class Printer {
 				end: argument.value.position.end,
 			}),
 			(argument) => {
-				let value = this.printExpression(argument.value)
+				let value = this.printHeldExpression(argument.value)
 
 				return argument.name === null
 					? value
@@ -2287,7 +2342,12 @@ export class Printer {
 	// it does not read as one of, and a short Handler below it would be padded
 	// out to a column that has nothing but that block's brace in it: `case _
 	// { <- game }`, the answer ten columns from the case it answers.
-	private printMatch(node: parser.MatchNode): Doc {
+	// NOTE: `hugged` is set where the `match` is written against something
+	// that holds it — an Argument, a Parameter's default, a Case payload — and
+	// keeps its head on one line however wide: the head's middle layout puts
+	// the `{` at the line's own indent, which is the right place under a
+	// Statement and the wrong one inside a list.
+	private printMatch(node: parser.MatchNode, hugged = false): Doc {
 		let entries: Array<Entry> = []
 		let run = alignmentRun(UNBLOCKED_ALIGNMENT, { partedByBreaks: true })
 
@@ -2340,25 +2400,55 @@ export class Printer {
 			let matcherWidth = flatWidth(matcher)
 			let padding = alignmentSlot()
 
-			let head: Array<Doc> = [text("case "), matcher]
+			let guard =
+				handler.guard === null
+					? null
+					: concat([
+							text("where "),
+							this.printExpression(handler.guard),
+						])
 
-			if (handler.guard !== null) {
-				head.push(text(" where "), this.printExpression(handler.guard))
-			}
-
-			let body = this.bodyBlock(
+			let {
+				entries: bodyEntries,
+				opening: bodyOpening,
+				flatAllowed,
+			} = this.bodyEntries(
 				handler.body,
 				handler.matcher.position.end.line,
 				closeLine,
-				true,
-				// NOTE: The padding is written inside the body's group, so the
-				// flat shape is measured with it — see `block`. A Handler the
-				// run takes out is written with none, and breaks as it would
-				// have anyway.
+			)
+			// NOTE: The padding is written inside the body's group, so the
+			// flat shape is measured with it — see `block`. A Handler the
+			// run takes out is written with none, and breaks as it would
+			// have anyway.
+			let body = this.block(
+				bodyEntries,
+				null,
+				flatAllowed,
+				bodyOpening,
 				padding,
+				false,
 			)
 
-			let doc = concat([concat(head), text(" "), body])
+			// NOTE: A Guard too wide for the Handler's line moves down a line
+			// whole, since it is one unit and usually the widest thing in the
+			// `match`, and the `{` then goes on a line of its own with the
+			// body broken under it — see `headWithTail`.
+			let doc =
+				guard === null
+					? concat([text("case "), matcher, text(" "), body])
+					: this.headWithTail(
+							concat([text("case "), matcher]),
+							guard,
+							body,
+							this.block(
+								bodyEntries,
+								null,
+								false,
+								bodyOpening,
+								padding,
+							),
+						)
 
 			if (trailing !== null) {
 				doc = concat([doc, lineSuffix(" " + trailing.text)])
@@ -2401,13 +2491,86 @@ export class Printer {
 
 		this.flushBefore(node.position.end.line, entries)
 
+		// NOTE: A head too wide for its line breaks before the `->`, with the
+		// return Type on a line of its own and the `{` on the one after — not
+		// inside the value, whose Argument list is the smallest thing on the
+		// line and used to be what gave way. Offered as the middle of three
+		// layouts, so that a value holding a hugged callback — whose hard
+		// breaks would force a plain group open — keeps `}) -> Type {` whole
+		// whenever its first line fits, as it always did.
+		let head = concat([text("match "), this.printExpression(node.value)])
+		let tail = concat([text("-> "), this.printType(node.returnType)])
+
+		// NOTE: The block stays OUTSIDE the head's layouts: a `conditional`
+		// stops the hard breaks inside it from reaching the groups around it,
+		// and a `match` is one line of code to nothing — the callback or the
+		// Handler holding it has to break around it.
 		return concat([
-			text("match "),
-			this.printExpression(node.value),
-			text(" -> "),
-			this.printType(node.returnType),
-			text(" "),
+			hugged
+				? concat([head, text(" "), tail, text(" ")])
+				: this.headWithTail(head, tail, EMPTY),
 			this.block(entries, null, false, opening),
+		])
+	}
+
+	// NOTE: An Expression written against something that holds it — see
+	// `printMatch`'s `hugged`.
+	private printHeldExpression(node: parser.ExpressionNode): Doc {
+		return node.nodeType === "Match"
+			? this.printMatch(node, true)
+			: this.printExpression(node)
+	}
+
+	// NOTE: A head, the clause that closes it — `match value` and `-> Type`,
+	// `case matcher` and `where guard` — and the block they open. The
+	// layouts, tried in order: head, clause and block on one line; head and
+	// clause on one line over a broken block; the clause on a line of its
+	// own, indented, with the `{` on the line after it and the block broken
+	// under it — the clause is indented to where the block's Statements go,
+	// and a brace at its end would leave the two indistinguishable; and
+	// head and clause on one line with whatever is inside the head giving
+	// way. Each is measured up to its first break, so the clause moves down
+	// exactly when the head line does not fit with it, and not before.
+	// `brokenBody` is the block as the broken layouts write it, where a
+	// Handler's may otherwise be flat.
+	//
+	// `body` is inside the layouts, which stops its hard breaks reaching any
+	// group around the whole — right for a Handler, whose `match` block
+	// carries breaks of its own outside; a `match` passes EMPTY and writes its
+	// block after.
+	//
+	// A layout the renderer picks is printed FLAT past the point its measure
+	// covered, so everything after a layout's first line — the body, and the
+	// clause under its break — is wrapped in `expand`, which prints in break
+	// mode and lets the groups in there decide for themselves. Measured, an
+	// `expand` reads flat up to the first hard break, which is exactly the
+	// first line the layout is chosen on.
+	private headWithTail(
+		head: Doc,
+		tail: Doc,
+		body: Doc,
+		brokenBody: Doc = body,
+	): Doc {
+		let fused = concat([head, text(" "), tail, text(" "), expand(body)])
+		let fusedBroken =
+			brokenBody === body
+				? fused
+				: concat([head, text(" "), tail, text(" "), expand(brokenBody)])
+
+		return conditionalGroup([
+			fused,
+			fusedBroken,
+			concat([
+				head,
+				expand(
+					concat([
+						indent(concat([hardline, tail])),
+						hardline,
+						brokenBody,
+					]),
+				),
+			]),
+			fusedBroken,
 		])
 	}
 
@@ -2679,7 +2842,7 @@ export class Printer {
 		// one line and `}))` closes it, where each wrapper laid out as a list
 		// of its own would add a step to a staircase.
 		if (node.value !== null) {
-			let value = this.printExpression(node.value)
+			let value = this.printHeldExpression(node.value)
 
 			parts.push(
 				hugsPayload(node.value)

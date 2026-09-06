@@ -4,7 +4,8 @@ implementation {
 	§ is. The `where` clause supplies the bound, and the Method body leans on
 	§ it: `compare` on the Items is exactly what the condition proves.
 	namespace Boxes<infer Item> for { value: Item }
-		is Comparable where Item is Comparable {
+		is Comparable where Item is Comparable
+	{
 		compare(to other: { value: Item }) -> Ordering {
 			<- @.value::compare(to other.value)
 		}

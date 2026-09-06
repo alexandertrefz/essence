@@ -424,7 +424,9 @@ declarations {
 	§
 	§ `NonEmptyList::map` carries the proof, and the mean of a proven List of
 	§ Numbers is bare, so the body needs no fallback.
-	namespace NonEmptyKeyedNumberList<infer ItemType> for NonEmptyList<ItemType> {
+	namespace NonEmptyKeyedNumberList<infer ItemType>
+		for NonEmptyList<ItemType>
+	{
 		§§ The mean of what the key reads off every item: their total divided by their count.
 		§§
 		§§ The List has an item, so the answer is the mean itself rather than an Optional.

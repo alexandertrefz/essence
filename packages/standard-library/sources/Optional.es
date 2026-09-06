@@ -34,7 +34,8 @@ declarations {
 	§ Cases that carry none derives a `toString`.
 	namespace Optional<infer ItemType> for Optional<ItemType>
 		is Equatable where ItemType is Equatable,
-		is Printable where ItemType is Printable {
+		is Printable where ItemType is Printable
+	{
 		§ `is` reads at either level. Against another Optional it compares Case
 		§ and payload. Against a bare item it asks whether the Optional holds
 		§ that item: `#Value(x)::is(y)` is `x::is(y)`, and `#Empty::is(y)` is

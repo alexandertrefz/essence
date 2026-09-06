@@ -72,9 +72,9 @@ declarations {
 							§ A digit's value is its position in the
 							§ digit list, and any other character
 							§ refuses the text.
-							<- match "0123456789"::firstIndex(
-								of character,
-							) -> Step<Optional<Integer>, Optional<Integer>> {
+							<- match "0123456789"::firstIndex(of character)
+								-> Step<Optional<Integer>, Optional<Integer>>
+							{
 								case #Empty { <- #Done(#Empty) }
 
 								case #Value(digit) {

@@ -50,9 +50,11 @@ declarations {
 	§ printable exactly when its keys and its values are, and a use site
 	§ solving `Dictionary<KeyType, ValueType> is Equatable` solves both
 	§ conditions.
-	namespace Dictionary<infer KeyType, infer ValueType> for Dictionary<KeyType, ValueType>
+	namespace Dictionary<infer KeyType, infer ValueType>
+		for Dictionary<KeyType, ValueType>
 		is Equatable where KeyType is Equatable, ValueType is Equatable,
-		is Printable where KeyType is Printable, ValueType is Printable {
+		is Printable where KeyType is Printable, ValueType is Printable
+	{
 		§§ Answers a Dictionary built from a List of entries.
 		§§
 		§§ Two entries with equal keys collapse into one. The later value wins, and the key keeps the place of its first occurrence. Equality is the keys' own `is`.
@@ -78,7 +80,8 @@ declarations {
 		§§ Each key and each value is rendered by its own `toString`, and a String is quoted: `["a" = "b"]`. The empty Dictionary answers `[=]`. The empty List answers `[]`, so the two are never the same text. The Method is available whenever the keys and the values conform to `Printable`.
 		§§
 		§§ @returns — the String representation of the Dictionary.
-		toString<infer KeyType is Printable, infer ValueType is Printable>() -> String
+		toString<infer KeyType is Printable, infer ValueType is Printable>()
+			-> String
 
 		§§ Answers whether the Dictionary has no entries at all.
 		§§
@@ -360,9 +363,9 @@ declarations {
 				<- other
 					::entries()
 					::reduce(startingWith mine, (merged, entry) {
-						<- match mine::value(
-							at entry.key,
-						) -> Dictionary<KeyType, ValueType> {
+						<- match mine::value(at entry.key)
+							-> Dictionary<KeyType, ValueType>
+						{
 							case #Value(held) {
 								<- merged::set(
 									entry.key,
@@ -405,7 +408,9 @@ declarations {
 	§ written in Essence over `set`, whose answer is proven. It is deferred:
 	§ four copied bodies and their golden lines weigh more than a proof one
 	§ `if` takes back.
-	namespace NonEmptyDictionary<infer KeyType, infer ValueType> for NonEmptyDictionary<KeyType, ValueType> {
+	namespace NonEmptyDictionary<infer KeyType, infer ValueType>
+		for NonEmptyDictionary<KeyType, ValueType>
+	{
 		§§ Answers how many entries the Dictionary has, which is at least one.
 		§§
 		§§ @returns — the number of entries, which is never zero.
@@ -471,7 +476,8 @@ declarations {
 		§§ The items stand in the order they first appear. Equality is the items' own `is`.
 		§§
 		§§ @returns — the Dictionary of counts, each of which is above zero.
-		tallied<infer ItemType is Equatable>() -> Dictionary<ItemType, PositiveInteger>
+		tallied<infer ItemType is Equatable>()
+			-> Dictionary<ItemType, PositiveInteger>
 	}
 
 	§ The same two crossings with the receiver's proof in hand, and the one
@@ -500,7 +506,8 @@ declarations {
 		§§ The items stand in the order they first appear. Equality is the items' own `is`.
 		§§
 		§§ @returns — the Dictionary of counts, which certainly has a count in it.
-		tallied<infer ItemType is Equatable>() -> NonEmptyDictionary<ItemType, PositiveInteger>
+		tallied<infer ItemType is Equatable>()
+			-> NonEmptyDictionary<ItemType, PositiveInteger>
 	}
 }
 

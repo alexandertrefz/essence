@@ -67,7 +67,8 @@ declarations {
 	namespace List<infer ItemType> for List<ItemType>
 		is Printable where ItemType is Printable,
 		is Equatable where ItemType is Equatable,
-		is Comparable where ItemType is Comparable {
+		is Comparable where ItemType is Comparable
+	{
 		§§ Answers a List holding the given item the given number of times.
 		§§
 		§§ A count of zero or less answers the empty List. A count proven to be above zero answers a List with something in it.
@@ -1378,7 +1379,8 @@ declarations {
 		§§ Equality is the items' own `is`. The Method is available whenever the items conform to `Equatable`.
 		§§
 		§§ @returns — the List without duplicates, which certainly has something in it.
-		removeDuplicates<infer ItemType is Equatable>() -> NonEmptyList<ItemType>
+		removeDuplicates<infer ItemType is Equatable>()
+			-> NonEmptyList<ItemType>
 
 		§ Adding a whole List proves nothing on `List`, because the List added
 		§ can be the empty one. Here the receiver is the proof, and what is
@@ -1599,7 +1601,9 @@ declarations {
 	§
 	§ It mirrors `NestedList`, and sits after it and after `NonEmptyList` for
 	§ the reason every proven Namespace sits after the one it narrows.
-	namespace NonEmptyNestedList<infer ItemType> for NonEmptyList<NonEmptyList<ItemType>> {
+	namespace NonEmptyNestedList<infer ItemType>
+		for NonEmptyList<NonEmptyList<ItemType>>
+	{
 		§§ Answers the inner Lists flattened by one level, into a single List.
 		§§
 		§§ Every inner List's items keep their order.
