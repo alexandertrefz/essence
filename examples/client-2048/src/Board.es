@@ -90,9 +90,9 @@ implementation {
 					§ the merge happens only where the last placed tile is
 					§ open and holds this value.
 					<- match previous -> Merging {
-						case #Value({ value, sources }) where open::and(
-							value::is(tile),
-						) {
+						case #Value({ value, sources })
+							where open::and(value::is(tile))
+						{
 							constant doubled = tile::multiply(with 2)
 
 							<- {

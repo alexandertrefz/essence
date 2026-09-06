@@ -3,7 +3,10 @@ import { readdirSync, readFileSync, statSync } from "node:fs"
 import * as path from "node:path"
 
 import { fixturePath } from "@essence-lang/fixtures"
-import { readStdlibFiles } from "@essence-lang/standard-library"
+import {
+	readStdlibFiles,
+	STDLIB_DIRECTORY,
+} from "@essence-lang/standard-library"
 
 import { format, guarded } from "../index"
 import { commentAnchors } from "../trivia"
@@ -2339,6 +2342,73 @@ describe("formatter", () => {
 			).toBe(
 				"implementation {\n\ttype Quote = Priced\n\t           | Rejected\n\t           | Pending\n\t           | Cancelled\n\t           | Refunded\n\t           | Disputed\n\t           | Archived\n\ttype Short = Priced | Rejected\n\tfunction f(\n\t\t_ a: Integer,\n\t) -> Priced | Rejected | Pending | Cancelled | Refunded | Disputed {\n\t\t<- a\n\t}\n}\n",
 			)
+		})
+
+		// NOTE: The `if` rule — a `{` on a line of its own when the head's
+		// chain breaks — reaches every head whose clauses are indented to the
+		// body's own column: a Handler's Guard, a `match`'s return Type, a
+		// Namespace's or Protocol's `for` and `is` clauses, and a Parameter
+		// list with nothing in it to break before its `->`.
+		describe("a broken head puts its brace on a line of its own", () => {
+			it("moves a Guard down whole and breaks the body under the brace", () => {
+				expect(
+					formatted(
+						"implementation {\n\tfunction merge(_ previous: Optional<Placed>, tile: Integer, open: Boolean) -> Merging {\n\t\t<- match previous -> Merging {\n\t\t\tcase #Value({ value, sources }) where open::and(value::is(tile))::and(sources::isNotEmpty()) {\n\t\t\t\t<- { placed = [], gained = 0, open = false }\n\t\t\t}\n\t\t\tcase #Value({ value }) where open::and(value::is(tile)) { <- { placed = [], gained = 0, open = false } }\n\t\t\tcase #Value({ sources }) where sources::isEmpty() { <- { placed = [], gained = 0, open = false } }\n\t\t\tcase _ { <- { placed = [], gained = 0, open = true } }\n\t\t}\n\t}\n}\n",
+					),
+				).toBe(
+					"implementation {\n\tfunction merge(\n\t\t_ previous: Optional<Placed>,\n\t\ttile: Integer,\n\t\topen: Boolean,\n\t) -> Merging {\n\t\t<- match previous -> Merging {\n\t\t\tcase #Value({ value, sources })\n\t\t\t\twhere open::and(value::is(tile))::and(sources::isNotEmpty())\n\t\t\t{\n\t\t\t\t<- { placed = [], gained = 0, open = false }\n\t\t\t}\n\t\t\tcase #Value({ value }) where open::and(value::is(tile)) {\n\t\t\t\t<- { placed = [], gained = 0, open = false }\n\t\t\t}\n\t\t\tcase #Value({ sources }) where sources::isEmpty() {\n\t\t\t\t<- { placed = [], gained = 0, open = false }\n\t\t\t}\n\t\t\tcase _ { <- { placed = [], gained = 0, open = true } }\n\t\t}\n\t}\n}\n",
+				)
+			})
+
+			it("breaks a match head before its -> rather than inside its value", () => {
+				expect(
+					formatted(
+						'implementation {\n\tfunction digit(_ character: String) -> Step<Optional<Integer>, Optional<Integer>> {\n\t\t<- match "0123456789"::firstIndex(of character) -> Step<Optional<Integer>, Optional<Integer>> {\n\t\t\tcase #Value(index) { <- #Continue(#Value(index)) }\n\t\t\tcase #Empty { <- #Stop(#Empty) }\n\t\t}\n\t}\n\n\tconstant held = items::reduce(startingWith 0, (sum, key) {\n\t\t<- match entries::firstItem(where (entry) { <- entry.key::is(key) }) -> Integer {\n\t\t\tcase #Value({ value }) { <- sum::add(value) }\n\t\t\tcase #Empty { <- sum }\n\t\t}\n\t})\n}\n',
+					),
+				).toBe(
+					'implementation {\n\tfunction digit(\n\t\t_ character: String,\n\t) -> Step<Optional<Integer>, Optional<Integer>> {\n\t\t<- match "0123456789"::firstIndex(of character)\n\t\t\t-> Step<Optional<Integer>, Optional<Integer>>\n\t\t{\n\t\t\tcase #Value(index) { <- #Continue(#Value(index)) }\n\t\t\tcase #Empty        { <- #Stop(#Empty) }\n\t\t}\n\t}\n\n\tconstant held = items::reduce(startingWith 0, (sum, key) {\n\t\t<- match entries::firstItem(where (entry) { <- entry.key::is(key) })\n\t\t\t-> Integer\n\t\t{\n\t\t\tcase #Value({ value }) { <- sum::add(value) }\n\t\t\tcase #Empty            { <- sum }\n\t\t}\n\t})\n}\n',
+				)
+			})
+
+			it("keeps a match head whole where its value holds a hugged callback", () => {
+				let source =
+					"implementation {\n\tconstant total = fewKeys::reduce(startingWith 0, (sum, key) {\n\t\t<- match entries::firstItem(where (entry) {\n\t\t\tconstant wanted = key\n\n\t\t\t<- entry.key::is(wanted)\n\t\t}) -> Integer {\n\t\t\tcase #Value({ value }) { <- sum::add(value) }\n\t\t\tcase #Empty            { <- sum }\n\t\t}\n\t})\n}\n"
+
+				expect(formatted(source)).toBe(source)
+			})
+
+			it("breaks a Namespace head at its is list first, then at its for", () => {
+				expect(
+					formatted(
+						'implementation {\n\tnamespace Standing for Standing is Comparable, is Printable, is Equatable, is Orderable, is Hashable {\n\t\ttoString() -> String {\n\t\t\t<- ""\n\t\t}\n\t}\n\n\tnamespace Empty<infer ItemType> for List<ItemType> is Printable, is Comparable, is Equatable, is Order {}\n\n\tnamespace NonEmptyNestedList<infer ItemType> for NonEmptyList<NonEmptyList<ItemType>> {\n\t\tshort() -> String {\n\t\t\t<- ""\n\t\t}\n\t}\n}\n',
+					),
+				).toBe(
+					'implementation {\n\tnamespace Standing for Standing\n\t\tis Comparable,\n\t\tis Printable,\n\t\tis Equatable,\n\t\tis Orderable,\n\t\tis Hashable\n\t{\n\t\ttoString() -> String {\n\t\t\t<- ""\n\t\t}\n\t}\n\n\tnamespace Empty<infer ItemType> for List<ItemType>\n\t\tis Printable,\n\t\tis Comparable,\n\t\tis Equatable,\n\t\tis Order {}\n\n\tnamespace NonEmptyNestedList<infer ItemType>\n\t\tfor NonEmptyList<NonEmptyList<ItemType>>\n\t{\n\t\tshort() -> String {\n\t\t\t<- ""\n\t\t}\n\t}\n}\n',
+				)
+			})
+
+			it("breaks a Parameter list with nothing in it before its ->", () => {
+				expect(
+					formatted(
+						"implementation {\n\tfunction total() -> Step<Optional<Integer>, Optional<Integer>, Optional<Integer>> {\n\t\t<- 1\n\t}\n}\n",
+					),
+				).toBe(
+					"implementation {\n\tfunction total()\n\t\t-> Step<Optional<Integer>, Optional<Integer>, Optional<Integer>>\n\t{\n\t\t<- 1\n\t}\n}\n",
+				)
+			})
+
+			it("breaks a signature with no Parameters before its ->", () => {
+				let source =
+					"declarations {\n\tnamespace Dictionary<infer KeyType, infer ValueType> for Dictionary<KeyType, ValueType> is Printable where KeyType is Printable, ValueType is Printable {\n\t\ttoString<infer KeyType is Printable, infer ValueType is Printable>() -> String\n\t\tshort() -> String\n\t}\n}\n"
+				let result = format(source, {
+					documentPath: path.join(STDLIB_DIRECTORY, "Probe.es"),
+				})
+
+				expect(result.refusal).toBeNull()
+				expect(result.text).toBe(
+					"declarations {\n\tnamespace Dictionary<infer KeyType, infer ValueType>\n\t\tfor Dictionary<KeyType, ValueType>\n\t\tis Printable where KeyType is Printable, ValueType is Printable\n\t{\n\t\ttoString<infer KeyType is Printable, infer ValueType is Printable>()\n\t\t\t-> String\n\t\tshort() -> String\n\t}\n}\n",
+				)
+			})
 		})
 
 		// NOTE: The corpus writes a blank line after every bodied member by
