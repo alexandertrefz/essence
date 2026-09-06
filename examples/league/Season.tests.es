@@ -106,7 +106,7 @@ tests {
 				case #Forfeited { <- @ }
 			}
 		})
-		constant supposedTable = Standings.ranked(
+		constant supposedTable           = Standings.ranked(
 			Standings.compute(from supposed, among teams),
 		)
 
