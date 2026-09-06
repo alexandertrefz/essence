@@ -2411,6 +2411,26 @@ describe("formatter", () => {
 			})
 		})
 
+		it("breaks a generic list one per line once the name and it overflow", () => {
+			expect(
+				formatted(
+					"implementation {\n\tfunction generic<infer ItemType is Comparable, infer Other is Equatable, infer Key is Comparable>(_ items: List<ItemType>) -> ItemType {\n\t\t<- items::firstItem()\n\t}\n\n\tfunction shorter<infer ItemType is Comparable, infer Other>(_ items: List<ItemType>, other: Other) -> ItemType {\n\t\t<- items::firstItem()\n\t}\n}\n",
+				),
+			).toBe(
+				"implementation {\n\tfunction generic<\n\t\tinfer ItemType is Comparable,\n\t\tinfer Other is Equatable,\n\t\tinfer Key is Comparable,\n\t>(_ items: List<ItemType>) -> ItemType {\n\t\t<- items::firstItem()\n\t}\n\n\tfunction shorter<infer ItemType is Comparable, infer Other>(\n\t\t_ items: List<ItemType>,\n\t\tother: Other,\n\t) -> ItemType {\n\t\t<- items::firstItem()\n\t}\n}\n",
+			)
+		})
+
+		it("moves a refinement's where clause under a Type too wide for it", () => {
+			expect(
+				formatted(
+					"implementation {\n\ttype NonEmptyDictionary<KeyType, ValueType> = Dictionary<KeyType, ValueType> where @::hasEntries()\n\ttype NonZero = Integer where @::isNot(0)\n}\n",
+				),
+			).toBe(
+				"implementation {\n\ttype NonEmptyDictionary<KeyType, ValueType> = Dictionary<KeyType, ValueType>\n\t\twhere @::hasEntries()\n\ttype NonZero = Integer where @::isNot(0)\n}\n",
+			)
+		})
+
 		// NOTE: The corpus writes a blank line after every bodied member by
 		// hand — 1,152 block ends, one exception — so the rule changes nothing
 		// there and guarantees the gap in files the formatter meets cold.

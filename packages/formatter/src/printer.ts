@@ -937,13 +937,21 @@ export class Printer {
 				]
 
 				// NOTE: A checked refinement's `where` clause, on one line with
-				// the Type it refines — the same shape a Match Handler's Guard
-				// prints, and it has to stay one line: the Parser reads the
-				// clause only when the `where` sits on the Type's own line.
+				// the Type it refines while it fits, and on the line under it
+				// — indented, whole — when it does not. The Parser reads a
+				// next-line `where` as the clause whenever what follows it on
+				// its line begins a predicate.
 				if (node.predicate !== null) {
 					parts.push(
-						text(" where "),
-						this.printExpression(node.predicate),
+						group(
+							indent(
+								concat([
+									line,
+									text("where "),
+									this.printExpression(node.predicate),
+								]),
+							),
+						),
 					)
 				}
 
@@ -2038,7 +2046,24 @@ export class Printer {
 			return concat(inner)
 		})
 
-		return concat([text("<"), join(text(", "), parts), text(">")])
+		// NOTE: One Parameter per line when the list does not fit, with a
+		// trailing comma, exactly as a Parameter list breaks — and measured
+		// before the Parameter list that follows, so that list gives way
+		// first and the generics only when the name and they alone overflow.
+		return group(
+			concat([
+				text("<"),
+				indent(
+					concat([
+						softline,
+						join(concat([text(","), line]), parts),
+						ifBreak(text(","), EMPTY),
+					]),
+				),
+				softline,
+				text(">"),
+			]),
+		)
 	}
 
 	// #endregion
