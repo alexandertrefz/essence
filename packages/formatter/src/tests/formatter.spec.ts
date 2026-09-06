@@ -2281,6 +2281,16 @@ describe("formatter", () => {
 			)
 		})
 
+		it("fills a List of bare Cases the way it fills Numbers", () => {
+			expect(
+				formatted(
+					"implementation {\n\tconstant cases = [#Up, #Down, #Left, #Right, #Up, #Down, #Left, #Right, #Up, #Down, #Left, #Right]\n\tconstant held = [#Value(1), #Empty, #Value(3), #Value(4), #Value(5), #Value(6), #Value(7), #Empty]\n}\n",
+				),
+			).toBe(
+				"implementation {\n\tconstant cases = [\n\t\t#Up, #Down, #Left, #Right, #Up, #Down, #Left, #Right, #Up, #Down, #Left,\n\t\t#Right,\n\t]\n\tconstant held  = [\n\t\t#Value(1),\n\t\t#Empty,\n\t\t#Value(3),\n\t\t#Value(4),\n\t\t#Value(5),\n\t\t#Value(6),\n\t\t#Value(7),\n\t\t#Empty,\n\t]\n}\n",
+			)
+		})
+
 		// NOTE: The corpus writes a blank line after every bodied member by
 		// hand — 1,152 block ends, one exception — so the rule changes nothing
 		// there and guarantees the gap in files the formatter meets cold.
