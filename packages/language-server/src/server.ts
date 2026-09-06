@@ -1710,6 +1710,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 				? {
 						offers: workspace.offersFor(filePath),
 						namespaces: workspace.namespaceOffersFor(filePath),
+						specifiers: workspace.specifiersFor(filePath),
 					}
 				: { offers: [], namespaces: [] },
 			// NOTE: The unmodified document, which every one of the three
@@ -2682,6 +2683,7 @@ const completionItemKinds: Record<CompletionKind, CompletionItemKind> = {
 	label: CompletionItemKind.Text,
 	case: CompletionItemKind.EnumMember,
 	keyword: CompletionItemKind.Keyword,
+	module: CompletionItemKind.File,
 }
 
 // NOTE: The kinds that are invoked rather than referred to. This is only the
@@ -2697,6 +2699,11 @@ const callableKinds = new Set<CompletionKind>([
 export function toLspCompletionItem(entry: CompletionEntry): CompletionItem {
 	let callable = entry.snippet != null
 	let fallback = !callable && callableKinds.has(entry.kind)
+	let insertText = callable
+		? entry.snippet
+		: fallback
+			? `${escapeSnippet(entry.label)}($0)`
+			: (entry.insertText ?? null)
 
 	return {
 		label: entry.label,
@@ -2717,13 +2724,23 @@ export function toLspCompletionItem(entry: CompletionEntry): CompletionItem {
 		// through the same escape the resolved snippet is built with — `$` is
 		// an ordinary Identifier character, and an unescaped one in `we$rd`
 		// reads as the snippet variable `$rd` and writes the wrong name.
-		insertText: callable
-			? (entry.snippet ?? undefined)
-			: fallback
-				? `${escapeSnippet(entry.label)}($0)`
-				: undefined,
+		//
+		// NOTE: An entry that names what it replaces is handed over as a text
+		// edit, which is the one form that carries a range. The Editor then
+		// filters it on the text of that range rather than on its own word.
+		insertText:
+			insertText === null || entry.replaces !== undefined
+				? undefined
+				: insertText,
+		textEdit:
+			entry.replaces === undefined
+				? undefined
+				: {
+						range: toLspRange(entry.replaces),
+						newText: insertText ?? entry.label,
+					},
 		insertTextFormat:
-			callable || fallback ? InsertTextFormat.Snippet : undefined,
+			insertText === null ? undefined : InsertTextFormat.Snippet,
 		// NOTE: Accepting a callable inserts the call's parentheses and commas
 		// as snippet text, so the trigger characters Signature Help listens
 		// for are never typed — without this nudge the parameter hints only

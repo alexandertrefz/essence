@@ -33,6 +33,10 @@ import {
 	defineValues,
 } from "./defineArmChildren"
 import { describe, documentationOf } from "./documentation"
+import {
+	moduleSectionCompletions,
+	moduleSectionCursor,
+} from "./importCompletion"
 import { typedHandlerExpressions } from "./matchHandlerChildren"
 import { matchingNamespaces } from "./namespaces"
 import { contains, isAtOrBefore, isSmaller } from "./positions"
@@ -66,11 +70,12 @@ import type { WorkspaceOffer } from "./workspace"
 // carries the receiver's Type in `base.type`, at the Scope the cursor is
 // actually in (its enclosing Function's Parameters, `@`, and so on).
 
-// NOTE: Every rename Declaration kind plus `case` and `keyword` — neither is a
-// lexical Declaration (a Case resolves through its Choice, never a Scope; a
-// Keyword is not a name at all), so neither ever appears in the rename index,
-// but both are offered and need a kind of their own.
-export type CompletionKind = DeclarationKind | "case" | "keyword"
+// NOTE: Every rename Declaration kind plus `case`, `keyword` and `module` —
+// none is a lexical Declaration (a Case resolves through its Choice, never a
+// Scope; a Keyword is not a name at all; a Module is a file), so none ever
+// appears in the rename index, but all three are offered and need a kind of
+// their own.
+export type CompletionKind = DeclarationKind | "case" | "keyword" | "module"
 
 // NOTE: An Editor sorts a Completion list on `sortText` rather than on the
 // order it was handed, so the ranking is carried by every entry: what is
@@ -111,18 +116,29 @@ export type CompletionEntry = {
 	// entry that makes the name resolve at all. The Editor applies these
 	// together with the insertion at the cursor, in one undo step.
 	additionalEdits?: Array<ImportEdit>
+	// NOTE: The text accepting the entry writes, in LSP snippet syntax, where
+	// it is not the label — a group opened with the cursor inside its braces.
+	// Unlike `snippet` it makes no call, so nothing asks for parameter hints.
+	insertText?: string
+	// NOTE: What the insertion replaces, where the Editor's own word would be
+	// the wrong span — a specifier is one word to the block and three to the
+	// Editor, which ends a word at every `.` and `/`.
+	replaces?: common.Position
 }
 
 // NOTE: What a Module the document has not imported offers, and the Namespace
 // Types behind the ones that are Namespaces — the second is what a Method
 // Completion matches against a receiver, and it costs an enrichment per
-// exporting Module, so the two are asked for separately.
-type WorkspaceCompletions = {
+// exporting Module, so the two are asked for separately. `specifiers` is every
+// Module of the workspace as this document would name it, which is what a
+// `from` is completed from.
+export type WorkspaceCompletions = {
 	offers: Array<WorkspaceOffer>
 	namespaces: Array<{
 		offer: WorkspaceOffer
 		namespace: common.NamespaceType
 	}>
+	specifiers?: Array<string>
 }
 
 // NOTE: Must be a valid Identifier on its own — `_` and `-` are Symbols the
@@ -203,6 +219,22 @@ export function findCompletions(
 	let lines = documentText.split("\n")
 	let currentLine = lines[cursor.line - 1] ?? ""
 	let beforeCursor = currentLine.slice(0, cursor.column - 1)
+
+	// NOTE: The Module sections first, and on their own: nothing the modes
+	// below offer is an answer inside `import { … }`, and a name in Scope
+	// written there is a parse error.
+	let sectionCursor = moduleSectionCursor(lines, cursor)
+
+	if (sectionCursor !== null) {
+		return moduleSectionCompletions(
+			sectionCursor,
+			lines,
+			cursor,
+			parseDocument(documentText, documentPath).program,
+			workspace.specifiers ?? [],
+			workspace.offers,
+		)
+	}
 
 	let specifierMatch = specifierTriggerPattern.exec(beforeCursor)
 	let methodMatch =
