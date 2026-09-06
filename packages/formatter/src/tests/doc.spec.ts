@@ -31,8 +31,9 @@ import {
 function alignedLines(
 	maxSpan: number,
 	lines: Array<[head: string, tail: string, fit: number | null]>,
+	partedByBreaks = false,
 ): Doc {
-	let run = alignmentRun(maxSpan)
+	let run = alignmentRun(maxSpan, { partedByBreaks })
 
 	return join(
 		hardline,
@@ -349,6 +350,39 @@ describe("doc", () => {
 					"ab if " + "x".repeat(74),
 					"abcdefghij if x",
 					"abcdef     if x",
+				].join("\n"),
+			)
+		})
+
+		// NOTE: The lines either side of one taken out line up with each other
+		// across it — unless the run is parted by its breaks, where each side
+		// is a run of its own: a `match` Handler that breaks opens a block,
+		// and a column carried across a block would run through two tables.
+		it("parts a run at a line taken out, where asked to", () => {
+			let lines: Array<[string, string, number | null]> = [
+				["a", " { 1 }", 7],
+				["bbb", " { 2 }", 9],
+				["cc", " { " + "x".repeat(74) + " }", 80],
+				["d", " { 3 }", 7],
+				["eeeee", " { 4 }", 11],
+			]
+
+			expect(printDoc(alignedLines(12, lines), 80)).toBe(
+				[
+					"a     { 1 }",
+					"bbb   { 2 }",
+					"cc { " + "x".repeat(74) + " }",
+					"d     { 3 }",
+					"eeeee { 4 }",
+				].join("\n"),
+			)
+			expect(printDoc(alignedLines(12, lines, true), 80)).toBe(
+				[
+					"a   { 1 }",
+					"bbb { 2 }",
+					"cc { " + "x".repeat(74) + " }",
+					"d     { 3 }",
+					"eeeee { 4 }",
 				].join("\n"),
 			)
 		})

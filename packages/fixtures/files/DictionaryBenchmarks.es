@@ -220,9 +220,7 @@ tests {
 							})
 								::append({ key, value = value::add(1) })
 						}
-						case #Empty            {
-							<- held::append({ key, value = 1 })
-						}
+						case #Empty { <- held::append({ key, value = 1 }) }
 					}
 				},
 			)

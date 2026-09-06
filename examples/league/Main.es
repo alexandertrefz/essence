@@ -75,8 +75,8 @@ implementation {
 						margin = homeGoals::subtract(awayGoals)::absolute(),
 					})
 				}
-				case #Forfeited                        { <- #Empty }
-				case #Postponed                        { <- #Empty }
+				case #Forfeited { <- #Empty }
+				case #Postponed { <- #Empty }
 			}
 		})
 		::values()
@@ -87,7 +87,7 @@ implementation {
 		case #Value({ fixture, margin }) {
 			<- "Biggest win: {fixture}, by {counted(margin, "goal")}."
 		}
-		case #Empty                      { <- "No match has been played." }
+		case #Empty { <- "No match has been played." }
 	})
 
 	§ The longest unbeaten run — a question each row answers about itself,
@@ -129,8 +129,8 @@ implementation {
 			case #Postponed({ home, away }) {
 				<- #Played({ home, away, homeGoals = 2 })
 			}
-			case #Played                    { <- @ }
-			case #Forfeited                 { <- @ }
+			case #Played    { <- @ }
+			case #Forfeited { <- @ }
 		}
 	})
 

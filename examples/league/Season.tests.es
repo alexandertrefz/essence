@@ -96,8 +96,8 @@ tests {
 				case #Postponed({ home, away }) {
 					<- #Played({ home, away, homeGoals = 2 })
 				}
-				case #Played                    { <- @ }
-				case #Forfeited                 { <- @ }
+				case #Played    { <- @ }
+				case #Forfeited { <- @ }
 			}
 		})
 		constant supposedTable = Standings.ranked(

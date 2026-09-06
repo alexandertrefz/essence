@@ -71,7 +71,7 @@ declarations {
 							<- match "0123456789"::firstIndex(
 								of character,
 							) -> Step<Optional<Integer>, Optional<Integer>> {
-								case #Empty        { <- #Done(#Empty) }
+								case #Empty { <- #Done(#Empty) }
 
 								case #Value(digit) {
 									<- #Continue(

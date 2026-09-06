@@ -617,6 +617,30 @@ describe("formatter", () => {
 			expect(twice.refusal).toBeNull()
 			expect(twice.text).toBe(once.text)
 		})
+
+		// NOTE: The same for a body holding such a String: the Handler spans
+		// two lines of the output whatever its brace does, and a table does
+		// not carry across a row that does.
+		it("ends the run at a body written across lines", () => {
+			let source = block(
+				"\tconstant out = match value -> String {",
+				'\t\tcase "a" { <- "hello',
+				'world" }',
+				'\t\tcase "bb" { <- "2" }',
+				'\t\tcase _    { <- "3" }',
+				"\t}",
+			)
+
+			let once = format(source)
+
+			expect(once.refusal).toBeNull()
+			expect(once.text).toBe(source)
+
+			let twice = format(once.text)
+
+			expect(twice.refusal).toBeNull()
+			expect(twice.text).toBe(once.text)
+		})
 	})
 
 	// NOTE: A `define` is a table of cases, so it is written one arm to a line
@@ -2324,9 +2348,11 @@ describe("formatter", () => {
 				).toContain("case Integer { ")
 			})
 
-			// NOTE: A Handler that breaks still opens its brace right after its
-			// Matcher, so it keeps its place in the column.
-			it("keeps the column when a case in the middle breaks", () => {
+			// NOTE: A Handler that breaks opens a block, and the column stops
+			// at it: the Handlers above it and the Handlers below it each line
+			// up among themselves. Carried across the block, the column would
+			// line the block's `{` up with bodies it does not read as one of.
+			it("parts the run at a case that breaks", () => {
 				expect(
 					bracesOf(
 						match(
@@ -2335,7 +2361,48 @@ describe("formatter", () => {
 							'case Rational { <- "y" }',
 						),
 					),
-				).toEqual([16, 16, 16])
+				).toEqual([15, 15, 16])
+
+				expect(
+					bracesOf(
+						match(
+							'case #A { <- "x" }',
+							'case Nothing { <- "x" }',
+							'case Integer { <- "a very long body that will certainly not fit on one line" }',
+							'case #B { <- "y" }',
+							'case Rational { <- "y" }',
+						),
+					),
+				).toEqual([15, 15, 15, 16, 16])
+			})
+
+			// NOTE: The shape that asked for this: a wide Handler that breaks
+			// and one short one under it. Padded out to the wide Matcher, the
+			// short Handler's answer stood ten columns from the case it
+			// answers, with nothing in between but the broken block's brace.
+			it("leaves a short case under a broken one unpadded", () => {
+				expect(
+					formatted(
+						match(
+							'case #Value(live) { <- "a very long body that will certainly not fit on one line" }',
+							"case _ { <- 1/2 }",
+						),
+					),
+				).toContain("\t\tcase _ { <- 1/2 }\n")
+			})
+
+			// NOTE: A Handler padded out to a wide sibling can be pushed past
+			// the width by the padding alone. Taken out of the run, it is
+			// written unpadded — and flat, since that is what fits.
+			it("writes a case flat that only its padding would break", () => {
+				let wide =
+					'case #Played({ home, away, homeGoals, awayGoals }) { <- "played" }'
+				let short =
+					'case #Postponed { <- "postponed, and rather long" }'
+
+				expect(formatted(match(wide, short))).toContain(
+					"\t\t" + short + "\n",
+				)
 			})
 
 			it("is stable under a second pass", () => {

@@ -445,7 +445,7 @@ declarations {
 
 				<- integers::reduce(startingWith start, (lowest, integer) {
 					<- match lowest -> Optional<Integer> {
-						case #Empty          { <- #Value(integer) }
+						case #Empty { <- #Value(integer) }
 
 						case #Value(running) {
 							<- #Value(Number.lowestNumber(running, integer))
@@ -465,7 +465,7 @@ declarations {
 
 				<- rationals::reduce(startingWith start, (lowest, rational) {
 					<- match lowest -> Optional<Rational> {
-						case #Empty          { <- #Value(rational) }
+						case #Empty { <- #Value(rational) }
 
 						case #Value(running) {
 							<- #Value(Number.lowestNumber(running, rational))
@@ -677,7 +677,7 @@ declarations {
 
 				<- integers::reduce(startingWith start, (highest, integer) {
 					<- match highest -> Optional<Integer> {
-						case #Empty          { <- #Value(integer) }
+						case #Empty { <- #Value(integer) }
 
 						case #Value(running) {
 							<- #Value(Number.highestNumber(running, integer))
@@ -697,7 +697,7 @@ declarations {
 
 				<- rationals::reduce(startingWith start, (highest, rational) {
 					<- match highest -> Optional<Rational> {
-						case #Empty          { <- #Value(rational) }
+						case #Empty { <- #Value(rational) }
 
 						case #Value(running) {
 							<- #Value(Number.highestNumber(running, rational))
