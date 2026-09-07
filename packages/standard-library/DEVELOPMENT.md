@@ -690,6 +690,17 @@ rule stated there.
   receiver reaches it only where its items ALREADY carry the inner proof:
   `[[1], [2]]::flatten()` answers a `List<Integer>`, because the items of a
   literal are never asked for a predicate of their own.
+- **A refined Method that CARRIES the proof forward is a trap for a witness
+  written over that refinement.** `NonEmptyString::uppercase`, `lowercase`,
+  `reverse` and `repeat` each answer a `NonEmptyString`, and so does
+  `NonEmptyList::reverse`. So a witness body that transforms its receiver and
+  then compares — `@::lowercase()::is(other::lowercase())` inside a
+  `namespace Fold for NonEmptyString is Equatable` — asks a proven String for
+  `is`, which is the very Method being written, and calls itself. Name the base
+  Namespace at the call to stop it: `@::lowercase()::<String>is(…)`. Nothing
+  reports the shape yet. In tail position JavaScriptCore loops rather than
+  overflowing the stack, so the run never ends and never names the file — the
+  cost of finding it once was twenty minutes of a test run printing nothing.
 - **A Type and the Namespace that targets it belong in one file.** `Optional`
   and `Ordering` each declare their Choice and the Namespace over it together;
   splitting them across files works, but leaves the two halves of one idea
