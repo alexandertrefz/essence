@@ -492,5 +492,47 @@ describe("Rationals", () => {
 				}`),
 			).toEqual(['"0"', '"0"'])
 		})
+
+		// NOTE: `Rational::isPositive` is `@::isGreaterThan(0/1)` and
+		// `isNegative` is `@::isLessThan(0/1)` — one call on `@` each, so a
+		// refinement written on either name is the comparison's own Type, and
+		// the guard that asks the comparison proves it. Written as chains over
+		// the numerator, both were questions of their own, and every line here
+		// that hands `r` on was `argument-type-mismatch`: the guard proved
+		// nothing a `PositiveRational` asks for, and a written `3/4` proved it
+		// neither. The `else` of `isPositive` narrows too, to the negation the
+		// alias records, which is what `isLessThanOrEqualTo(0/1)` reads.
+		it("narrows a Rational by its sign through the comparison it is written on", async () => {
+			expect(
+				await run(`implementation {
+					type PositiveRational = Rational where @::isPositive()
+					type NegativeRational = Rational where @::isNegative()
+
+					function keepPositive(_ r: PositiveRational) -> Rational { <- r }
+					function keepNegative(_ r: NegativeRational) -> Rational { <- r }
+
+					constant r = 0/1::subtract(3/4)
+
+					if r::isGreaterThan(0/1) {
+						Terminal.inspect(keepPositive(r))
+					} else {
+						Terminal.inspect("not positive")
+					}
+
+					if r::isLessThan(0/1) {
+						Terminal.inspect(keepNegative(r))
+					}
+
+					if r::isPositive() {
+						Terminal.inspect(keepPositive(r))
+					} else {
+						Terminal.inspect(r::isLessThanOrEqualTo(0/1))
+					}
+
+					Terminal.inspect(keepPositive(3/4))
+					Terminal.inspect(keepNegative(-3/4))
+				}`),
+			).toEqual(['"not positive"', "-3/4", "true", "3/4", "-3/4"])
+		})
 	})
 })
