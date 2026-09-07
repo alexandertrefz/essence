@@ -17,7 +17,8 @@ import { readStdlibFiles } from "@essence-lang/standard-library"
 // A fifth check is about WHERE the prose stands rather than how it reads: every
 // `choice` and every `type` alias here carries a `§§` block, because a `§` note
 // above one is read by the next editor of the file and by nobody who uses the
-// Type.
+// Type. It is guarded by a count of its own, since a scanner that matched
+// nothing would pass it silently.
 //
 // All four rules are live. The documentation pass (Phase 3 of the plan) took
 // every source to zero findings, and a source that breaks one of them again
@@ -67,11 +68,16 @@ type Finding = {
 	detail: string
 }
 
-// NOTE: A `choice` or a `type` alias declared at the top of a `declarations`
-// body. Both are Types a user's Program writes down, so both are read by
-// somebody who never opens this directory, and a `§` note above one reaches
-// nobody but the next editor of the file.
-const declarationPattern = /^\t(choice|type)\s+([A-Za-z][A-Za-z0-9]*)/
+// NOTE: A `choice` or a `type` alias declared in a `declarations` body. Both
+// are Types a user's Program writes down, so both are read by somebody who
+// never opens this directory, and a `§` note above one reaches nobody but the
+// next editor of the file.
+//
+// NOTE: The indentation is not pinned, though every declaration here stands at
+// one tab today. A pattern that reads the indentation would answer nothing for
+// a declaration written at another one, and a rule that silently stops looking
+// is worse than no rule — which is what the count below guards.
+const declarationPattern = /^\s*(choice|type)\s+([A-Za-z][A-Za-z0-9]*)/
 
 // NOTE: One run of Comment lines of the same sigil, with the line each started
 // on. A `§§` run is the block above a Declaration; a `§` run is one note.
@@ -278,8 +284,20 @@ export function proseFindings(): Array<Finding> {
 // Comment line, `§` notes included, because the Parser reads the documentation
 // above the Statement whatever else stands between: a note that explains a
 // decision does not take the block away.
-export function undocumentedDeclarations(): Array<Finding> {
-	let findings: Array<Finding> = []
+export function declaredTypes(): Array<{
+	file: string
+	line: number
+	keyword: string
+	name: string
+	documented: boolean
+}> {
+	let declarations: Array<{
+		file: string
+		line: number
+		keyword: string
+		name: string
+		documented: boolean
+	}> = []
 
 	for (let { filePath, sourceText } of readStdlibFiles()) {
 		let file = path.basename(filePath)
@@ -308,18 +326,28 @@ export function undocumentedDeclarations(): Array<Finding> {
 				}
 			}
 
-			if (!documented) {
-				findings.push({
-					rule: "undocumented-declaration",
-					file,
-					line: index + 1,
-					detail: `${declaration[1]} ${declaration[2]} has no '§§' block`,
-				})
-			}
+			declarations.push({
+				file,
+				line: index + 1,
+				keyword: declaration[1]!,
+				name: declaration[2]!,
+				documented,
+			})
 		}
 	}
 
-	return findings
+	return declarations
+}
+
+export function undocumentedDeclarations(): Array<Finding> {
+	return declaredTypes()
+		.filter((declaration) => !declaration.documented)
+		.map((declaration) => ({
+			rule: "undocumented-declaration" as const,
+			file: declaration.file,
+			line: declaration.line,
+			detail: `${declaration.keyword} ${declaration.name} has no '§§' block`,
+		}))
 }
 
 function findingsFor(rule: Finding["rule"]): Array<Finding> {
@@ -381,6 +409,14 @@ describe("Standard Library Prose", () => {
 				"Two ways: The first is shorter.",
 			])
 		})
+	})
+
+	it("should find the Types the sources declare", () => {
+		// NOTE: The same guard as the one below, for the declaration scanner.
+		// The rule it feeds passes on an empty list, so a pattern that stopped
+		// matching would turn the whole check into a no-op nobody notices.
+		// There are twenty Choices and Type Aliases as this is written.
+		expect(declaredTypes().length).toBeGreaterThanOrEqual(20)
 	})
 
 	it("should find prose to read", () => {
