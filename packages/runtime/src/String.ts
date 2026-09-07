@@ -146,12 +146,22 @@ type MeasuredString = StringType & {
 // NOTE: The segmented view of a String, segmented at most once. The remembered
 // array IS what is handed back rather than a copy of it, so every caller here
 // only ever READS it — one that needs to change it has to copy first.
+//
+// NOTE: A String the ASCII scan accepted is split into its code units instead
+// of being segmented, for the reason `isSingleUnitAscii` gives: each unit IS a
+// cluster, and the text is its own NFC form. That is the same view the
+// Segmenter answers, without the Segmenter. Measured on a 10,800-character
+// ASCII String, best of three: 415 µs to segment against 14 µs to split, and
+// `reverse` reads through here — `slice`, `character(at:)` and `ends` read
+// the units directly for such a String and come here for every other.
 function graphemesIn(string: StringType): Array<string> {
 	let measured = string as MeasuredString
 	let segments = measured[graphemesKey]
 
 	if (segments === undefined) {
-		segments = graphemesOf(string.value)
+		segments = isAsciiIn(string)
+			? string.value.split("")
+			: graphemesOf(string.value)
 		measured[graphemesKey] = segments
 	}
 
@@ -212,6 +222,23 @@ function isAsciiIn(string: StringType): boolean {
 	}
 
 	return answer
+}
+
+// NOTE: A String its maker KNOWS the scan would accept, marked so without the
+// scan and given the count that follows from the mark: its characters are its
+// units. Every Method that maps ASCII to ASCII answers through here — `repeat`,
+// the case mappings, `trim`, `slice`, `character(at:)`, and the pieces of a
+// `split` or a `words` taken off an ASCII receiver — so that a loop measuring
+// what it built does not rescan it. `append` alone writes the two keys itself,
+// for the reason it gives. The caller is answerable for the claim, and the
+// note at each call says why it holds.
+function createAsciiString(value: string): StringType {
+	let string = createString(value) as MeasuredString
+
+	string[isAsciiKey] = true
+	string[graphemeCountKey] = value.length
+
+	return string
 }
 
 // NOTE: The String's NFC form, normalised at most once — what `is` and
@@ -288,12 +315,43 @@ export function append(
 	// for the same reason. Written this way rather than as the sum so that
 	// joining does not reach the counting Method at all, and a Program that
 	// only joins Strings carries no segmenter.
+	//
+	// NOTE: The two keys are written here rather than through
+	// `createAsciiString`, which every other maker uses: a Program that only
+	// interpolates reaches `append`, `isAsciiIn` and `createString` out of
+	// this whole module, and `bundleSize.spec.ts` holds such a Program to the
+	// byte. Routing `append` through the helper pulls the helper in and
+	// measured 124 bytes more, where that ceiling has five bytes of room.
 	if (isAsciiIn(originalString) && isAsciiIn(otherString)) {
 		joined[isAsciiKey] = true
 		joined[graphemeCountKey] = joined.value.length
 	}
 
 	return joined
+}
+
+// NOTE: Whether a run of the separator's characters stands at a position of
+// the view — the one comparison every grapheme-view search below makes, and
+// `split` makes it once per position. A loop rather than `every` over the
+// separator, because of the closure allocated per position: the walk over
+// three hundred lines of thirty-six characters measured 49 µs with `every`
+// and 22 µs with the loop.
+function separatorMatchesAt(
+	characters: Array<string>,
+	separator: Array<string>,
+	index: number,
+): boolean {
+	if (index + separator.length > characters.length) {
+		return false
+	}
+
+	for (let offset = 0; offset < separator.length; offset++) {
+		if (characters[index + offset] !== separator[offset]) {
+			return false
+		}
+	}
+
+	return true
 }
 
 // NOTE: The first of two entries, and the two are the same Function. The
@@ -315,6 +373,25 @@ export function split__overload$1(
 	// — a separator can never land inside a cluster and tear it, and the pieces
 	// come back on cluster boundaries. NFC on both sides means the match is by
 	// canonical equivalence, like `is`.
+	//
+	// NOTE: Two Strings the ASCII scan accepted are split by the JavaScript
+	// intrinsic instead, and that IS the grapheme answer: each unit is a
+	// cluster and neither side has anything to normalise, so a run of the
+	// separator's units is a run of its characters, and `split` finds the
+	// same non-overlapping runs left to right that the walk below finds. A
+	// piece of such a String is such a String, so each is marked ASCII with
+	// its unit count rather than handed a view. Measured per split, best of
+	// three: a 10,800-character ASCII String into 300 lines, 574 µs through
+	// the walk and 14 µs through the intrinsic; a twelve-character one at a
+	// comma, 2.1 µs against 0.05.
+	if (isAsciiIn(originalString) && isAsciiIn(splitterString)) {
+		return createList(
+			originalString.value
+				.split(splitterString.value)
+				.map((piece) => createAsciiString(piece)),
+		)
+	}
+
 	let characters = graphemesIn(originalString)
 
 	if (splitterString.value === "") {
@@ -329,18 +406,12 @@ export function split__overload$1(
 	let index = 0
 
 	while (index < characters.length) {
-		let matches =
-			index + separator.length <= characters.length &&
-			separator.every(
-				(character, offset) => characters[index + offset] === character,
-			)
-
-		if (matches) {
+		if (separatorMatchesAt(characters, separator, index)) {
 			pieces.push(current)
 			current = []
 			index += separator.length
 		} else {
-			current.push(characters[index])
+			current.push(characters[index]!)
 			index++
 		}
 	}
@@ -379,6 +450,13 @@ export function ends(
 	// boundary and by canonical equivalence, exactly as `starts(with:)` does
 	// through `slice`. `starts` stays Essence because its slice begins at zero
 	// and needs no length.
+	//
+	// NOTE: Two ASCII Strings are compared by the intrinsic, for the reason
+	// `split` gives, so the Boolean allocates nothing.
+	if (isAsciiIn(originalString) && isAsciiIn(suffix)) {
+		return createBoolean(originalString.value.endsWith(suffix.value))
+	}
+
 	let characters = graphemesIn(originalString)
 	let suffixCharacters = graphemesIn(suffix)
 
@@ -428,6 +506,22 @@ export function character__overload$1(
 	originalString: StringType,
 	index: IntegerType,
 ): OptionalType<StringType> {
+	// NOTE: An ASCII String is read by unit rather than through the view, for
+	// the reason `split` gives — so reading one character of it builds no
+	// Array of all of them, and the unit is marked ASCII as a piece of a
+	// `split` is. Measured on a 10,800-character ASCII String: 380 µs through
+	// the view, 8 µs here, most of which is the scan.
+	if (isAsciiIn(originalString)) {
+		let text = originalString.value
+		let position = positionFromEnd(index.value, text.length)
+
+		if (position < 0 || position >= text.length) {
+			return createEmpty()
+		}
+
+		return createValue(createAsciiString(text[position]!))
+	}
+
 	let characters = graphemesIn(originalString)
 	let position = positionFromEnd(index.value, characters.length)
 
@@ -449,23 +543,35 @@ export function character__overload$1(
 // NOTE: The answer carries the clusters it was cut into, exactly as a piece of
 // a `split` does — a window of a view is several clusters, and segmenting the
 // joined text afresh does not always read the same ones back.
+//
+// NOTE: An ASCII String is cut by the intrinsic instead, for the reason
+// `split` gives, and the window is marked ASCII: a window of such a String
+// is such a String. Measured on a 10,800-character ASCII String, one slice
+// of 4,990 characters: 394 µs through the view, 8 µs here.
 export function slice(
 	originalString: StringType,
 	from: IntegerType,
 	to: IntegerType,
 ): StringType {
-	let characters = graphemesIn(originalString)
-	let count = characters.length
+	let ascii = isAsciiIn(originalString)
+	let characters = ascii ? null : graphemesIn(originalString)
+	let count = ascii ? originalString.value.length : characters!.length
 	let first = positionFromEnd(from.value, count)
 	let last = positionFromEnd(to.value, count)
 	let start = first < 0 ? 0 : first > count ? count : first
 	let end = last < 0 ? 0 : last > count ? count : last
 
+	if (ascii) {
+		return createAsciiString(
+			end <= start ? "" : originalString.value.slice(start, end),
+		)
+	}
+
 	if (end <= start) {
 		return createSegmentedString([])
 	}
 
-	return createSegmentedString(characters.slice(start, end))
+	return createSegmentedString(characters!.slice(start, end))
 }
 
 // NOTE: Native — the String joined to itself, where the Essence body built a
@@ -486,24 +592,35 @@ export function repeat(
 		return createString("")
 	}
 
-	let repeated = createString(
-		originalString.value.repeat(Number(count.value)),
-	) as MeasuredString
+	let repeated = originalString.value.repeat(Number(count.value))
 
-	if (isAsciiIn(originalString)) {
-		repeated[isAsciiKey] = true
-		repeated[graphemeCountKey] = repeated.value.length
-	}
-
-	return repeated
+	return isAsciiIn(originalString)
+		? createAsciiString(repeated)
+		: createString(repeated)
 }
 
+// NOTE: The ASCII marker rides through both case mappings, and so does the
+// count: every ASCII letter maps to one ASCII letter, so a String the scan
+// accepted maps to one it would accept, of the same length. Anything else is
+// a plain String — `ß` upper-cases to two characters, so neither the mark nor
+// the count survives a mapping outside ASCII. A loop that upper-cases and
+// then measures rescans every answer otherwise: a Program making 20,000
+// `uppercase()::length()` of a 10,800-character String measured 193 ms
+// without the marker and 41 ms with it, 12 ms of each being its startup.
 export function uppercase(originalString: StringType): StringType {
-	return createString(originalString.value.toUpperCase())
+	let mapped = originalString.value.toUpperCase()
+
+	return isAsciiIn(originalString)
+		? createAsciiString(mapped)
+		: createString(mapped)
 }
 
 export function lowercase(originalString: StringType): StringType {
-	return createString(originalString.value.toLowerCase())
+	let mapped = originalString.value.toLowerCase()
+
+	return isAsciiIn(originalString)
+		? createAsciiString(mapped)
+		: createString(mapped)
 }
 
 // NOTE: One native, and the `as:` Parameter is DEFAULTED in `String.es` to
@@ -532,10 +649,20 @@ export function normalize(
 // and the empty pieces a plain split would leave at the ends and between
 // adjacent separators — is dropped. `\s` with the `u` flag is Unicode
 // whitespace; a String of only whitespace has no words.
+//
+// NOTE: Read off the NFC form, as every position Method is, so that the words
+// of a String and the pieces of its `split` are the same text in the same
+// bytes. A word of an ASCII receiver is a run of its units, so each is marked
+// ASCII as a piece of a `split` is.
 export function words(originalString: StringType): ListType<StringType> {
-	let matches = originalString.value.match(/\S+/gu)
+	let matches = normalisedFormOf(originalString).match(/\S+/gu)
+	let ascii = isAsciiIn(originalString)
 
-	return createList((matches ?? []).map((word) => createString(word)))
+	return createList(
+		(matches ?? []).map((word) =>
+			ascii ? createAsciiString(word) : createString(word),
+		),
+	)
 }
 
 // NOTE: The one native behind the whole trim family, where there used to be
@@ -544,15 +671,30 @@ export function words(originalString: StringType): ListType<StringType> {
 // synthesizes for the `at:` Parameter's default, which is `#BothEnds`; nothing
 // here has to know that. Whitespace is whatever JavaScript calls whitespace,
 // which is the Unicode definition.
+//
+// NOTE: Read off the NFC form, for the reason `words` gives, and a trimmed
+// ASCII String is marked ASCII: taking units off either end of such a String
+// leaves such a String. A Program making 20,000 `trim()::length()` of a
+// 10,800-character String measured 174 ms without the marker and 25 ms with
+// it, 12 ms of each being its startup.
 export function trim(originalString: StringType, side: SideType): StringType {
+	let text = normalisedFormOf(originalString)
+	let trimmed: string
+
 	switch (side[typeKeySymbol]) {
 		case "Side#Start":
-			return createString(originalString.value.trimStart())
+			trimmed = text.trimStart()
+			break
 		case "Side#End":
-			return createString(originalString.value.trimEnd())
+			trimmed = text.trimEnd()
+			break
 		default:
-			return createString(originalString.value.trim())
+			trimmed = text.trim()
 	}
+
+	return isAsciiIn(originalString)
+		? createAsciiString(trimmed)
+		: createString(trimmed)
 }
 
 export function compare__overload$1(
