@@ -12,8 +12,8 @@ import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
 // NOTE: The String Methods written in Essence on the native searches —
-// `contains`, `doesNotContain`, `replaceFirst` — run through the whole
-// pipeline as `stdlibSearch.spec.ts` runs its Lists. What these guard
+// `contains`, `doesNotContain`, `replaceFirst` — and `pad`, run through the
+// whole pipeline as `stdlibSearch.spec.ts` runs its Lists. What these guard
 // is not observable at the Type level: an ASCII String and a String the scan
 // refuses take two different routes through the runtime, and every answer
 // below is asked over both, so that the two routes are held to one answer.
@@ -162,6 +162,35 @@ describe("Stdlib String bodies", () => {
 				`"a${family}${family}"`,
 				'"x\\r\\nz"',
 				'"x\\r\\ny"',
+			])
+		})
+	})
+
+	describe("String.pad(to:with:at:)", () => {
+		// NOTE: A padding of several characters is repeated one copy past the
+		// whole copies that fit and then cut to what is needed, so the cut
+		// lands inside a copy wherever the shortfall is not a multiple.
+		it("cuts a multi-character padding to the length needed", async () => {
+			expect(
+				await run(`implementation {
+					Terminal.inspect("7"::pad(to 6, with "abc"))
+					Terminal.inspect("7"::pad(to 4, with "abc", at #End))
+					Terminal.inspect("7"::pad(to 5, with "abc"))
+					Terminal.inspect("ab"::pad(to 8, with "xy", at #BothEnds))
+					Terminal.inspect("ab"::pad(to 9, with "xyz", at #BothEnds))
+					Terminal.inspect("ab"::pad(to 2, with "xyz"))
+					Terminal.inspect("ab"::pad(to 5, with ""))
+					Terminal.inspect("7"::pad(to 4, with "${family}-"))
+				}`),
+			).toEqual([
+				'"abcab7"',
+				'"7abc"',
+				'"abca7"',
+				'"xyxabxyx"',
+				'"xyzabxyzx"',
+				'"ab"',
+				'"ab"',
+				`"${family}-${family}7"`,
 			])
 		})
 	})
