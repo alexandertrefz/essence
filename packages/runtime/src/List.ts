@@ -1017,11 +1017,12 @@ export function insert<ItemType extends AnyType>(
 	return createList(items)
 }
 
-// NOTE: `sort` is one Method with three Overloads, and the two native ones bind
-// by position. `$1` reads the direction and orders by the items' own `compare`,
+// NOTE: `sort` is one Method with three Overloads, all native, binding by
+// position. `$1` reads the direction and orders by the items' own `compare`,
 // whose conformance its `Comparable` bound hands in as the trailing Argument;
 // `$2` takes the comparison outright and needs no direction, since a comparison
-// says which way it runs. Both land on the same walk.
+// says which way it runs; `$3` below orders by a key read off each item. The
+// first two land on the same walk.
 //
 // NOTE: A descending sort hands the SAME comparison the pair the other way
 // round rather than reversing the answer. `Array.sort` is stable, and two items
@@ -1054,17 +1055,85 @@ export function sort__overload$2<ItemType extends AnyType>(
 	// `sort` expects.
 	let sorted = materialise(originalList).slice(0)
 
-	sorted.sort((first, second) => {
-		let ordering = order(first, second)
+	sorted.sort((first, second) => signOf(order(first, second)))
 
-		if (ordering[typeKeySymbol] === "Ordering#Less") {
-			return -1
-		} else if (ordering[typeKeySymbol] === "Ordering#Greater") {
-			return 1
-		} else {
-			return 0
-		}
-	})
+	return createList(sorted)
+}
+
+function signOf(ordering: OrderingType): number {
+	if (ordering[typeKeySymbol] === "Ordering#Less") {
+		return -1
+	} else if (ordering[typeKeySymbol] === "Ordering#Greater") {
+		return 1
+	} else {
+		return 0
+	}
+}
+
+// NOTE: `$3` orders by a KEY read off each item, and the key is read ONCE per
+// item rather than twice per comparison: every key is read into an Array, the
+// POSITIONS are sorted on those keys through the key Type's `compare` — the
+// hidden conformance Argument, as `$1`'s is — and the items are read back out
+// in the order the positions ended in. The Essence body this replaces handed
+// `$2` a comparison calling the key on both sides, which is 2·n·log₂n key reads
+// against n: with a key costing four hundred loop turns, 20,000 rows in
+// scrambled order measured 178 ms that way against 28 ms here, best of three
+// with the subprocess startup inside both, and the hand-written
+// decorate-sort-undecorate through `map` measured 29.
+//
+// NOTE: SORTING POSITIONS rather than an Array of `{ key, item }` Records, and
+// that is what makes a CHEAP key cost nothing: three sorts of 200,000 rows on a
+// member path measured 103 ms through the comparison, 100 ms here, and 131 ms
+// with the Records — one object per item is a heavier debit than the key reads
+// this is here to save. The receiver is read through `materialise` for the same
+// reason `$1` and `$2` read it that way: a flat box hands over the Array it
+// already holds, and a two-run box is combined and demoted once.
+//
+// NOTE: Rows in a strictly descending order are ONE run to `Array.sort`, which
+// finishes them in n comparisons and hides the key's cost entirely — a probe
+// has to scramble its keys, or it measures nothing.
+//
+// NOTE: Stable, as the two beside it are, and for the same reason: a
+// descending sort hands the pairs of keys the other way round rather than
+// reversing the answer. Two items whose keys compare `#Equal` keep the order
+// they had in either direction, because `Array.sort` is stable and the
+// positions it is sorting start out in the receiver's order.
+export function sort__overload$3<ItemType extends AnyType, Key extends AnyType>(
+	originalList: ListType<ItemType>,
+	key: (item: ItemType) => Key,
+	order: SortOrderType,
+	conformance: {
+		compare: (self: Key, other: Key) => OrderingType
+	},
+): ListType<ItemType> {
+	let items = materialise(originalList)
+	let count = items.length
+	// oxlint-disable-next-line unicorn/no-new-array -- the answer's length
+	let keys: Array<Key> = new Array(count)
+	// oxlint-disable-next-line unicorn/no-new-array -- the answer's length
+	let positions: Array<number> = new Array(count)
+
+	for (let index = 0; index < count; index++) {
+		keys[index] = key(items[index])
+		positions[index] = index
+	}
+
+	if (order[typeKeySymbol] === "SortOrder#Descending") {
+		positions.sort((first, second) =>
+			signOf(conformance.compare(keys[second], keys[first])),
+		)
+	} else {
+		positions.sort((first, second) =>
+			signOf(conformance.compare(keys[first], keys[second])),
+		)
+	}
+
+	// oxlint-disable-next-line unicorn/no-new-array -- the answer's length
+	let sorted: Array<ItemType> = new Array(count)
+
+	for (let index = 0; index < count; index++) {
+		sorted[index] = items[positions[index]]
+	}
 
 	return createList(sorted)
 }

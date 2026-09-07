@@ -34,6 +34,7 @@ import {
 	slice,
 	sort__overload$1 as sortByOwnOrder,
 	sort__overload$2 as sortBy,
+	sort__overload$3 as sortOn,
 	split,
 	toString as listToString,
 	viewOf,
@@ -398,6 +399,32 @@ describe("every native against an upgraded receiver", () => {
 		expect(
 			itemsOf(insert(upgraded(), createInteger(9n), createInteger(-1n))),
 		).toEqual([1, 2, 3, 4, 9, 5])
+	})
+
+	// NOTE: The key is read ONCE per item, whichever run the item is in, and
+	// two items whose keys tie keep their order in either direction — which is
+	// what a sort that reversed its answer would break.
+	test("sort on a key reads each key once and keeps ties in order", () => {
+		let reads = 0
+		let key = (item: IntegerType) => {
+			reads++
+
+			return createInteger(Number(item.value) % 2)
+		}
+		let descending = { [typeKeySymbol]: "SortOrder#Descending" } as const
+
+		expect(
+			itemsOf(sortOn(upgraded(), key, ascending, integerOrder)),
+		).toEqual([2, 4, 1, 3, 5])
+		expect(reads).toBe(5)
+		expect(
+			itemsOf(sortOn(upgraded(), key, descending, integerOrder)),
+		).toEqual([1, 3, 5, 2, 4])
+		expect(reads).toBe(10)
+		expect(
+			itemsOf(sortOn(integers(), key, ascending, integerOrder)),
+		).toEqual([])
+		expect(reads).toBe(10)
 	})
 
 	test("split and pair", () => {
