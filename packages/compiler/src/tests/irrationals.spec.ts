@@ -816,6 +816,107 @@ describe("Irrationals", () => {
 				),
 			).toEqual(ordering.less)
 		})
+
+		// NOTE: The bounded comparison's promise, in both directions: two
+		// values a unit of the last place or more apart are told apart, and
+		// empty is answered only for two closer than that. π and e are 0.42
+		// apart, so one decimal place decides them; a value 1/1156 above π that
+		// carries e rather than π is told from π at three places and not at
+		// two; and a difference whose terms cancel is exact at any width.
+		describe("compare(to:withPrecision:)", () => {
+			const at = (
+				first: transcendental.TranscendentalType,
+				second: transcendental.TranscendentalType,
+				digits: bigint,
+			) =>
+				transcendental.compare(
+					first,
+					second,
+					integer.createInteger(digits),
+				)
+
+			const nearPiOnE = transcendental.multiply(
+				number.E,
+				rational.createRational(1156n, 1000n),
+			) as transcendental.TranscendentalType
+
+			it("tells two values a unit of the last place apart", () => {
+				expect(unwrap(at(number.Pi, number.E, 1n))).toEqual(
+					ordering.greater,
+				)
+				expect(unwrap(at(number.E, number.Pi, 1n))).toEqual(
+					ordering.less,
+				)
+				expect(unwrap(at(number.Pi, number.Tau, 1n))).toEqual(
+					ordering.less,
+				)
+				expect(unwrap(at(number.Pi, nearPiOnE, 3n))).toEqual(
+					ordering.less,
+				)
+				expect(unwrap(at(nearPiOnE, number.Pi, 3n))).toEqual(
+					ordering.greater,
+				)
+			})
+
+			// NOTE: Pinned behaviour rather than a promise, as the note above
+			// says: what is promised is that no pair a unit or more apart lands
+			// here.
+			it("answers empty only for two values closer than that", () => {
+				expect(at(number.Pi, nearPiOnE, 2n)[typeKeySymbol]).toBe(
+					"Optional#Empty",
+				)
+				expect(at(nearPiOnE, number.Pi, 2n)[typeKeySymbol]).toBe(
+					"Optional#Empty",
+				)
+				expect(at(number.Pi, nearPiOnE, 1n)[typeKeySymbol]).toBe(
+					"Optional#Empty",
+				)
+			})
+
+			it("compares exactly at any width where the terms cancel", () => {
+				const shifted = transcendental.add(
+					number.Pi,
+					rational.createRational(1n, 10n ** 30n),
+				)
+
+				expect(unwrap(at(number.Pi, number.Pi, 1n))).toEqual(
+					ordering.equal,
+				)
+				expect(unwrap(at(number.Pi, shifted, 1n))).toEqual(
+					ordering.less,
+				)
+				expect(unwrap(at(shifted, number.Pi, 1n))).toEqual(
+					ordering.greater,
+				)
+			})
+
+			// NOTE: The width promise has to survive a large coefficient, since
+			// a base's enclosure is scaled by it: 1000·π against 1000·e + 423
+			// differ by about 0.31, so one place decides them where the plain
+			// enclosure, a dozen units wide before the guard digits, would not.
+			// The empty answer at no places is pinned rather than promised: a
+			// pair closer than a unit can fall either way.
+			it("keeps the interval under a unit for a large coefficient", () => {
+				const thousandPi = transcendental.multiply(
+					number.Pi,
+					integer.createInteger(1000n),
+				) as transcendental.TranscendentalType
+				const thousandE = transcendental.add(
+					transcendental.multiply(
+						number.E,
+						integer.createInteger(1000n),
+					) as transcendental.TranscendentalType,
+					integer.createInteger(423n),
+				)
+
+				expect(unwrap(at(thousandPi, thousandE, 1n))).toEqual(
+					ordering.greater,
+				)
+				expect(at(thousandPi, thousandE, 0n)[typeKeySymbol]).toBe(
+					"Optional#Empty",
+				)
+			})
+		})
 	})
 
 	describe("Number cross-kind semantics", () => {

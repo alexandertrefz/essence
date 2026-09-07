@@ -295,6 +295,8 @@ export type AlgebraicNatives = {
 export type TranscendentalNatives = {
 	// is(_: Transcendental) -> Boolean
 	is: (self: TranscendentalType, argument1: TranscendentalType) => BooleanType
+	// compare(to: Transcendental, withPrecision: PositiveInteger) -> Optional<Ordering>
+	compare: (self: TranscendentalType, to: TranscendentalType, withPrecision: IntegerType) => OptionalType<OrderingType>
 	// toString() -> String
 	toString: (self: TranscendentalType) => StringType
 	// add(_: Integer) -> Transcendental
@@ -767,6 +769,7 @@ export const $Transcendental: TranscendentalNatives = TranscendentalModule
 export const $TranscendentalAbsent: AssertNoEssenceExports<typeof import("./Transcendental"), "subtract__overload$1" | "subtract__overload$2" | "subtract__overload$3" | "divide__overload$4" | "divide__overload$5" | "divide__overload$6"> = true
 export const $TranscendentalArity: AssertArities<typeof import("./Transcendental"), {
 	is: 2
+	compare: 3
 	toString: 1
 	add__overload$1: 2
 	add__overload$2: 2
