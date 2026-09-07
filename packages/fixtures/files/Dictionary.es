@@ -154,9 +154,9 @@ implementation {
 
 	Terminal.inspect(
 		returns
-			::groupedBy(key (loan) { <- loan.borrower })
+			::group(on (loan) { <- loan.borrower })
 			::map(({ key, value }) { <- value::firstItem().title }),
 	) § [ "ada" = "Emma", "grace" = "Mill" ]
 
-	Terminal.inspect(["ada", "grace", "ada"]::tallied()) § [ "ada" = 2, "grace" = 1 ]
+	Terminal.inspect(["ada", "grace", "ada"]::tally()) § [ "ada" = 2, "grace" = 1 ]
 }

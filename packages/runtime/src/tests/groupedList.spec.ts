@@ -15,7 +15,7 @@ import {
 	toString as dictionaryToString,
 	values as valuesOf,
 } from "../Dictionary"
-import { groupedBy, tallied } from "../GroupedList"
+import { group, tally } from "../GroupedList"
 import type { IntegerType } from "../Integer"
 import { createInteger } from "../Integer"
 import { anyIs } from "../internalHelpers"
@@ -227,7 +227,7 @@ const expectGatheredShape = (box: DictionaryType<AnyType, AnyType>) => {
 // second implementation of the store.
 type Group = { key: AnyType; items: Array<AnyType> }
 
-const modelGroupedBy = (
+const modelGroup = (
 	items: Array<AnyType>,
 	keyOf: (item: AnyType) => AnyType,
 	witness: Witness,
@@ -374,17 +374,9 @@ describe("gathering a Dictionary out of a List, against a plain model", () => {
 
 				let list = listOfBothEnds(items, next)
 				let logical = viewedItems(list)
-				let grouped = groupedBy(
-					list,
-					(item) => item,
-					pool.witness as never,
-				)
-				let counted = tallied(list, pool.witness as never)
-				let model = modelGroupedBy(
-					logical,
-					(item) => item,
-					pool.witness,
-				)
+				let grouped = group(list, (item) => item, pool.witness as never)
+				let counted = tally(list, pool.witness as never)
+				let model = modelGroup(logical, (item) => item, pool.witness)
 
 				// NOTE: The KEY BOX the answer keeps is the one that arrived
 				// FIRST, identity and all, which is what says the slot kept its
@@ -469,7 +461,7 @@ describe("gathering a Dictionary out of a List, against a plain model", () => {
 	// `unencoded` stands — would find the one.
 	test("gathers a store of encoded and unencoded slots at once", () => {
 		let root2 = squareRootOf(2n)
-		let counted = tallied(
+		let counted = tally(
 			createList<AnyType>([
 				integer(3),
 				root2,
@@ -511,12 +503,12 @@ describe("gathering a Dictionary out of a List, against a plain model", () => {
 	// something that merely prints like one.
 	test("the empty List gathers into the empty Dictionary", () => {
 		for (let witness of [equality, witnessed, looseText, byIdentifier]) {
-			let grouped = groupedBy(
+			let grouped = group(
 				createList([]),
 				(item) => item,
 				witness as never,
 			)
-			let counted = tallied(createList([]), witness as never)
+			let counted = tally(createList([]), witness as never)
 
 			expect(writtenForm(grouped)).toBe("[=]")
 			expect(writtenForm(counted)).toBe("[=]")
@@ -542,7 +534,7 @@ describe("gathering a Dictionary out of a List, against a plain model", () => {
 			text("blueberry"),
 			text("cherry"),
 		])
-		let grouped = groupedBy(
+		let grouped = group(
 			source,
 			(item) => text((item as StringType).value.slice(0, 1)),
 			equality as never,
@@ -568,7 +560,7 @@ describe("gathering a Dictionary out of a List, against a plain model", () => {
 	// an ordinary one, so a write on it is a tip write, and the box that was
 	// written FROM goes on answering what it answered.
 	test("a gathered Dictionary is a Dictionary a Program may write to", () => {
-		let counted = tallied(
+		let counted = tally(
 			createList<AnyType>([text("a"), text("b"), text("a")]),
 			equality as never,
 		)
@@ -586,7 +578,7 @@ describe("gathering a Dictionary out of a List, against a plain model", () => {
 	// are one item, and the spelling that arrived first is the one the entry
 	// keeps.
 	test("counts two spellings of one Number as one item", () => {
-		let counted = tallied(
+		let counted = tally(
 			createList<AnyType>([
 				createRational(6n, 2n),
 				integer(3),
@@ -603,11 +595,11 @@ describe("gathering a Dictionary out of a List, against a plain model", () => {
 	})
 
 	// NOTE: A key that only the SCAN path finds, counted rather than grouped —
-	// `tallied` hands the item itself over as the key, so a Record item is a
+	// `tally` hands the item itself over as the key, so a Record item is a
 	// Record key and the witness is the only thing that can tell two of them
 	// apart.
 	test("counts Records the way the Namespace that owns them says", () => {
-		let counted = tallied(
+		let counted = tally(
 			createList<AnyType>([
 				createRecord({ id: integer(1), tag: text("first") }),
 				createRecord({ id: integer(2), tag: text("second") }),
@@ -640,8 +632,8 @@ describe("gathering a Dictionary out of a List, against a plain model", () => {
 			text("Grace"),
 			text("ADA"),
 		])
-		let grouped = groupedBy(names, (item) => item, looseText as never)
-		let counted = tallied(names, looseText as never)
+		let grouped = group(names, (item) => item, looseText as never)
+		let counted = tally(names, looseText as never)
 
 		expect(
 			keysOf(grouped).value.map((key) => (key as StringType).value),
@@ -664,7 +656,7 @@ describe("gathering a Dictionary out of a List, against a plain model", () => {
 	// Namespace wrote has to stay unencoded on the other side of it, or a later
 	// lookup would take a fast path the witness never agreed to.
 	test("mapping a gathered Dictionary carries its encodings over", () => {
-		let grouped = groupedBy(
+		let grouped = group(
 			createList<AnyType>([text("Ada"), text("ada"), text("Grace")]),
 			(item) => item,
 			looseText as never,
@@ -680,7 +672,7 @@ describe("gathering a Dictionary out of a List, against a plain model", () => {
 		expectGatheredShape(mapped)
 
 		let branded = mapEntries(
-			tallied(
+			tally(
 				createList<AnyType>([text("a"), text("b"), text("a")]),
 				equality as never,
 			),
@@ -698,7 +690,7 @@ describe("gathering a Dictionary out of a List, against a plain model", () => {
 	// a native gathers by are the SAME shape, so nothing downstream can tell
 	// which built it.
 	test("gathers the shape `createDictionary` builds", () => {
-		let gathered = tallied(
+		let gathered = tally(
 			createList<AnyType>([text("a"), text("b"), text("a")]),
 			equality as never,
 		)

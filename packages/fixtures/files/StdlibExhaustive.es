@@ -2987,35 +2987,6 @@ third"::lines())
 		numbers::lastItems(99),
 	)
 	show("List.lastItems<ItemType>(_ Integer) [empty]", noNumbers::lastItems(2))
-	§ Grouping, over three kinds of key. The first shows the order the groups
-	§ stand in, which is the order their keys were first met. The third reads
-	§ its key with a member path, as `sort(on:)` does, and its items are read
-	§ down to their tags for the reason the `[tie]` lines above are: a Record
-	§ per item would wrap the line.
-	show(
-		"List.group<ItemType, Key is Equatable>(on: (_ ItemType) -> Key)",
-		numbers::group(on (item) { <- item }),
-	)
-	show(
-		"List.group<ItemType, Key is Equatable>(on: (_ ItemType) -> Key) [Boolean key]",
-		numbers::group(on (item) { <- item::isEven() }),
-	)
-	show(
-		"List.group<ItemType, Key is Equatable>(on: (_ ItemType) -> Key) [member path]",
-		tiedRows
-			::group(on .n)
-			::map((found) {
-				<- { key = found.key, tags = found.items::map(.tag) }
-			}),
-	)
-	show(
-		"List.group<ItemType, Key is Equatable>(on: (_ ItemType) -> Key) [one group]",
-		[7]::group(on (item) { <- item }),
-	)
-	show(
-		"List.group<ItemType, Key is Equatable>(on: (_ ItemType) -> Key) [empty]",
-		noNumbers::group(on (item) { <- item }),
-	)
 
 	§ ——— NestedList ———————————————————————————————————————————————————————
 	show("NestedList.flatten<ItemType>()", [[1, 2], [3]]::flatten())
@@ -3903,30 +3874,42 @@ third"::lines())
 	constant noVotes: List<String> = []
 
 	show(
-		"GroupedList.groupedBy<ItemType, KeyType is Equatable>(key: (_ ItemType) -> KeyType)",
+		"GroupedList.group<ItemType, Key is Equatable>(on: (_ ItemType) -> Key)",
 		seatedGuests
-			::groupedBy(key (guest) { <- guest.home })
+			::group(on (guest) { <- guest.home })
 			::map(({ key, value }) {
 				<- value::map((guest) { <- guest.name })
 			}),
 	)
 	show(
-		"GroupedList.groupedBy<ItemType, KeyType is Equatable>(key: (_ ItemType) -> KeyType) [empty]",
-		noVotes::groupedBy(key (vote) { <- vote }),
+		"GroupedList.group<ItemType, Key is Equatable>(on: (_ ItemType) -> Key) [Boolean key]",
+		numbers::group(on (item) { <- item::isEven() }),
+	)
+	show(
+		"GroupedList.group<ItemType, Key is Equatable>(on: (_ ItemType) -> Key) [empty]",
+		noVotes::group(on (vote) { <- vote }),
 	)
 	§ Every group holds at least one item, which is what a total `firstItem`
 	§ read off a group says.
 	show(
-		"GroupedList.groupedBy<ItemType, KeyType is Equatable>(key: (_ ItemType) -> KeyType) [proven groups]",
+		"GroupedList.group<ItemType, Key is Equatable>(on: (_ ItemType) -> Key) [proven groups]",
 		votes
-			::groupedBy(key (vote) { <- vote })
+			::group(on (vote) { <- vote })
 			::map(({ key, value }) { <- value::firstItem() }),
 	)
-	show("GroupedList.tallied<ItemType is Equatable>()", votes::tallied())
+	§ The groups as a List of Records, which is what `entries` recovers. The
+	§ key is read with a member path, as `sort(on:)` reads its key, and the
+	§ items are read down to their tags for the reason the `[tie]` lines above
+	§ are: a Record per item would wrap the line.
 	show(
-		"GroupedList.tallied<ItemType is Equatable>() [empty]",
-		noVotes::tallied(),
+		"GroupedList.group<ItemType, Key is Equatable>(on: (_ ItemType) -> Key) [entries]",
+		tiedRows
+			::group(on .n)
+			::entries()
+			::map(({ key, value }) { <- { key, tags = value::map(.tag) } }),
 	)
+	show("GroupedList.tally<ItemType is Equatable>()", votes::tally())
+	show("GroupedList.tally<ItemType is Equatable>() [empty]", noVotes::tally())
 
 	§ ——— GroupedNonEmptyList ——————————————————————————————————————————————
 	§ The same two crossings with the receiver's proof in hand. A List with an
@@ -3935,12 +3918,12 @@ third"::lines())
 	constant provenVotes: NonEmptyList<String> = ["a", "b", "a"]
 
 	show(
-		"GroupedNonEmptyList.groupedBy<ItemType, KeyType is Equatable>(key: (_ ItemType) -> KeyType)",
-		provenVotes::groupedBy(key (vote) { <- vote })::length(),
+		"GroupedNonEmptyList.group<ItemType, Key is Equatable>(on: (_ ItemType) -> Key)",
+		provenVotes::group(on (vote) { <- vote })::length(),
 	)
 	show(
-		"GroupedNonEmptyList.tallied<ItemType is Equatable>()",
-		provenVotes::tallied()::length(),
+		"GroupedNonEmptyList.tally<ItemType is Equatable>()",
+		provenVotes::tally()::length(),
 	)
 
 	§ ——— loop ————————————————————————————————————————————————————————————

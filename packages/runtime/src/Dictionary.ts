@@ -666,8 +666,8 @@ function boxAt<Key extends AnyType, Value extends AnyType>(
 
 // NOTE: The builder every construction path shares — `of`, `createDictionary`,
 // `map` and `freshStore`, the door the gathering natives come through, each
-// fill a store of their own and hand it over, so `groupedBy` and `tallied`
-// reach it through that last one. Every slot it opens carries one version at
+// fill a store of their own and hand it over, so `group` and `tally` reach it
+// through that last one. Every slot it opens carries one version at
 // generation zero, so the finished store is already in the shape a repack would
 // leave it in.
 function emptyStore<Key extends AnyType, Value extends AnyType>(): Store<

@@ -56,7 +56,7 @@ function gatherItem<Key extends AnyType, ItemType extends AnyType>(
 // items keep the order they had, which is what one forward walk over the logical
 // items gives for free — a key opens its slot where it is first met, and every
 // later item is appended to the group already standing there.
-export function groupedBy<ItemType extends AnyType, Key extends AnyType>(
+export function group<ItemType extends AnyType, Key extends AnyType>(
 	originalList: ListType<ItemType>,
 	keyOf: (item: ItemType) => Key,
 	conformance: EquatableWitness<Key>,
@@ -85,7 +85,7 @@ export function groupedBy<ItemType extends AnyType, Key extends AnyType>(
 // List's length is a JavaScript Array's length — so every count here is a number
 // that `createInteger` keeps as a number, and the bigint half of the hybrid
 // Integer is unreachable.
-export function tallied<ItemType extends AnyType>(
+export function tally<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 	conformance: EquatableWitness<ItemType>,
 ): DictionaryType<ItemType, IntegerType> {

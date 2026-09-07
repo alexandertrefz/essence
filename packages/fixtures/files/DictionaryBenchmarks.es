@@ -23,8 +23,8 @@ implementation {
 	§     printed, `toString()`                         635 µs   63.5 ns/entry
 	§   Dictionary, a hundred writes from ONE base     32.7 ms    327 µs/fork
 	§   A List becoming a Dictionary, ten thousand items
-	§     `tallied()`                                   254 µs   25.4 ns/item
-	§     `groupedBy(key:)`                             337 µs   33.7 ns/item
+	§     `tally()`                                     254 µs   25.4 ns/item
+	§     `group(on:)`                                  337 µs   33.7 ns/item
 	§
 	§   A thousand keys, the same two questions, both containers
 	§                          Dictionary   List of entries    ratio
@@ -397,11 +397,11 @@ tests {
 	§ The two Methods that cross from the first container to the second.
 	suite "A List becoming a Dictionary" {
 		benchmark "tallies ten thousand items" {
-			expect teams::tallied()::length()::is(100)
+			expect teams::tally()::length()::is(100)
 		}
 
 		benchmark "groups ten thousand items" {
-			expect results::groupedBy(key .team)::length()::is(100)
+			expect results::group(on .team)::length()::is(100)
 		}
 	}
 }

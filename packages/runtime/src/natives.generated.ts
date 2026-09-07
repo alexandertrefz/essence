@@ -519,17 +519,17 @@ export type NonEmptyDictionaryNatives = {
 }
 
 export type GroupedListNatives = {
-	// groupedBy<ItemType, KeyType is Equatable>(key: (_: ItemType) -> KeyType) -> Dictionary<KeyType, NonEmptyList>
-	groupedBy: <ItemType extends AnyType, KeyType extends AnyType>(self: ListType<ItemType>, key: (argument0: ItemType) => KeyType, KeyType__conformance: EquatableConformance<KeyType>) => DictionaryType<KeyType, ListType<ItemType>>
-	// tallied<ItemType is Equatable>() -> Dictionary<ItemType, PositiveInteger>
-	tallied: <ItemType extends AnyType>(self: ListType<ItemType>, ItemType__conformance: EquatableConformance<ItemType>) => DictionaryType<ItemType, IntegerType>
+	// group<ItemType, Key is Equatable>(on: (_: ItemType) -> Key) -> Dictionary<Key, NonEmptyList>
+	group: <ItemType extends AnyType, Key extends AnyType>(self: ListType<ItemType>, on: (argument0: ItemType) => Key, Key__conformance: EquatableConformance<Key>) => DictionaryType<Key, ListType<ItemType>>
+	// tally<ItemType is Equatable>() -> Dictionary<ItemType, PositiveInteger>
+	tally: <ItemType extends AnyType>(self: ListType<ItemType>, ItemType__conformance: EquatableConformance<ItemType>) => DictionaryType<ItemType, IntegerType>
 }
 
 export type GroupedNonEmptyListNatives = {
-	// groupedBy<ItemType, KeyType is Equatable>(key: (_: ItemType) -> KeyType) -> NonEmptyDictionary
-	groupedBy: <ItemType extends AnyType, KeyType extends AnyType>(self: ListType<ItemType>, key: (argument0: ItemType) => KeyType, KeyType__conformance: EquatableConformance<KeyType>) => DictionaryType<KeyType, ListType<ItemType>>
-	// tallied<ItemType is Equatable>() -> NonEmptyDictionary
-	tallied: <ItemType extends AnyType>(self: ListType<ItemType>, ItemType__conformance: EquatableConformance<ItemType>) => DictionaryType<ItemType, IntegerType>
+	// group<ItemType, Key is Equatable>(on: (_: ItemType) -> Key) -> NonEmptyDictionary
+	group: <ItemType extends AnyType, Key extends AnyType>(self: ListType<ItemType>, on: (argument0: ItemType) => Key, Key__conformance: EquatableConformance<Key>) => DictionaryType<Key, ListType<ItemType>>
+	// tally<ItemType is Equatable>() -> NonEmptyDictionary
+	tally: <ItemType extends AnyType>(self: ListType<ItemType>, ItemType__conformance: EquatableConformance<ItemType>) => DictionaryType<ItemType, IntegerType>
 }
 
 export type RandomnessNatives = {
@@ -751,7 +751,7 @@ export const $RecordArity: AssertArities<typeof import("./Record"), {
 
 declare const ListModule: typeof import("./List")
 export const $List: ListNatives = ListModule
-export const $ListAbsent: AssertNoEssenceExports<typeof import("./List"), "repeat__overload$1" | "of__overload$2" | "hasItems__overload$1" | "hasItems__overload$2" | "isEmpty" | "contains" | "doesNotContain" | "hasOnlyItems" | "hasNoItems" | "firstItem__overload$1" | "firstItem__overload$2" | "firstItem__overload$3" | "firstItem__overload$4" | "lastItem__overload$1" | "lastItem__overload$2" | "lastItem__overload$3" | "lastItem__overload$4" | "item__overload$2" | "firstIndex__overload$1" | "firstIndex__overload$2" | "firstIndex__overload$3" | "firstIndex__overload$4" | "lastIndex__overload$1" | "lastIndex__overload$2" | "lastIndex__overload$4" | "indices" | "removeFirst" | "removeEvery__overload$1" | "removeEvery__overload$2" | "removeLast" | "removeDuplicates" | "prepend__overload$2" | "count__overload$1" | "count__overload$2" | "replace__overload$1" | "replace__overload$2" | "lowestItem__overload$1" | "lowestItem__overload$2" | "highestItem__overload$1" | "highestItem__overload$2" | "firstItems" | "lastItems" | "group"> = true
+export const $ListAbsent: AssertNoEssenceExports<typeof import("./List"), "repeat__overload$1" | "of__overload$2" | "hasItems__overload$1" | "hasItems__overload$2" | "isEmpty" | "contains" | "doesNotContain" | "hasOnlyItems" | "hasNoItems" | "firstItem__overload$1" | "firstItem__overload$2" | "firstItem__overload$3" | "firstItem__overload$4" | "lastItem__overload$1" | "lastItem__overload$2" | "lastItem__overload$3" | "lastItem__overload$4" | "item__overload$2" | "firstIndex__overload$1" | "firstIndex__overload$2" | "firstIndex__overload$3" | "firstIndex__overload$4" | "lastIndex__overload$1" | "lastIndex__overload$2" | "lastIndex__overload$4" | "indices" | "removeFirst" | "removeEvery__overload$1" | "removeEvery__overload$2" | "removeLast" | "removeDuplicates" | "prepend__overload$2" | "count__overload$1" | "count__overload$2" | "replace__overload$1" | "replace__overload$2" | "lowestItem__overload$1" | "lowestItem__overload$2" | "highestItem__overload$1" | "highestItem__overload$2" | "firstItems" | "lastItems"> = true
 export const $ListArity: AssertArities<typeof import("./List"), {
 	repeat__overload$2: 2
 	of__overload$1: 2
@@ -884,15 +884,15 @@ export const $NonEmptyDictionaryArity: AssertArities<typeof import("./NonEmptyDi
 declare const GroupedListModule: typeof import("./GroupedList")
 export const $GroupedList: GroupedListNatives = GroupedListModule
 export const $GroupedListArity: AssertArities<typeof import("./GroupedList"), {
-	groupedBy: 3
-	tallied: 2
+	group: 3
+	tally: 2
 }> = true
 
 declare const GroupedNonEmptyListModule: typeof import("./GroupedNonEmptyList")
 export const $GroupedNonEmptyList: GroupedNonEmptyListNatives = GroupedNonEmptyListModule
 export const $GroupedNonEmptyListArity: AssertArities<typeof import("./GroupedNonEmptyList"), {
-	groupedBy: 3
-	tallied: 2
+	group: 3
+	tally: 2
 }> = true
 
 declare const RandomnessModule: typeof import("./Randomness")

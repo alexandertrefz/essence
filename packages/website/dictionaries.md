@@ -282,8 +282,8 @@ Two Methods cross from the first container to the second. Neither is a Method
 of `List`: what a List becomes here is a Dictionary, so the file that owns the
 answer owns them.
 
-`groupedBy(key:)` puts the items under a key read off each one. Every group
-holds an item, so a group's `firstItem()` is bare:
+`group(on:)` puts the items under a key read off each one. Every group holds an
+item, so a group's `firstItem()` is bare:
 
 ```essence
 type Loan = { title: String, borrower: String }
@@ -294,18 +294,21 @@ constant loans: List<Loan> = [
 	{ title = "Ruth", borrower = "alex" },
 ]
 
-constant byBorrower = loans::groupedBy(key .borrower)
+constant byBorrower = loans::group(on .borrower)
 
 constant firstOut = byBorrower::map(({ key, value }) {
 	<- value::firstItem().title
 })
 ```
 
-`tallied()` counts how many times each item occurs, and every count is above
+The groups as a List of Records, each holding its `key` and its items under
+`value`, is what `entries()` answers off the result.
+
+`tally()` counts how many times each item occurs, and every count is above
 zero:
 
 ```essence
-constant colours = ["red", "blue", "red"]::tallied()
+constant colours = ["red", "blue", "red"]::tally()
 ```
 
 The groups stand in the order their keys first appear, and the items of a group

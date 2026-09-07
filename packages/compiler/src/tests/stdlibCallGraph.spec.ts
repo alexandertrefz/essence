@@ -566,7 +566,6 @@ describe("Stdlib Call Graph", () => {
 			"List.firstItem__overload$3",
 			"List.firstItem__overload$4",
 			"List.firstItems",
-			"List.group",
 			"List.hasItems__overload$1",
 			"List.hasItems__overload$2",
 			"List.hasNoItems",
