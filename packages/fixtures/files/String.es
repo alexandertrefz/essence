@@ -34,7 +34,7 @@ implementation {
 	Terminal.inspect(greeting::character(at 99)) § Optional#Empty
 	Terminal.inspect(greeting::characters()::length()) § 12
 
-	§ Indices count Unicode code points, so an emoji stays whole.
+	§ Positions count grapheme clusters, so an emoji stays whole.
 	constant emoji = "a😀b"
 	Terminal.inspect(emoji::length()) § 3
 	Terminal.inspect(emoji::character(at 1)) § Optional#Value("😀")
