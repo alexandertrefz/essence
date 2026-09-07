@@ -99,7 +99,7 @@ describe("Bundle Size", () => {
 		expect(await bundleSizeOf("Irrational.es")).toBeLessThan(39_600)
 	})
 
-	// NOTE: 47,631 measured. The two tests above watch a Dictionary being shaken
+	// NOTE: 47,748 measured. The two tests above watch a Dictionary being shaken
 	// away whole; this one records what a Program that DOES hold one carries —
 	// the store, every native the file reaches, the written form, the kind
 	// registry and the registration that fills it. The composite key encoding
