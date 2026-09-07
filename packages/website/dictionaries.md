@@ -278,9 +278,9 @@ Type the name has, and a proof is not it.
 
 ## A List becoming a Dictionary
 
-Three Methods cross from the first container to the second. None is a Method
-of `List`: what a List becomes here is a Dictionary, so the file that owns the
-answer owns them.
+Three Methods cross from the first container to the second, and a fourth
+crosses and comes back. None is a Method of `List`: what a List becomes here is
+a Dictionary, so the file that owns the answer owns them.
 
 `group(on:)` puts the items under a key read off each one. Every group holds an
 item, so a group's `firstItem()` is bare:
@@ -325,6 +325,11 @@ The groups stand in the order their keys first appear, and the items of a group
 keep the order they had. All three answer a `NonEmptyDictionary` when the
 receiver is a `NonEmptyList`: a List with an item in it puts that item
 somewhere.
+
+`removeDuplicates()` is the fourth, and it is `tally()`'s keys: the distinct
+items, in the order they were first met. It lives beside the three because it
+is written on them, and a `NonEmptyList` keeps its proof across the crossing
+and back.
 
 ## The three rules
 

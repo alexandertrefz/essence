@@ -18,11 +18,9 @@
 // Namespace's target bought. The proof is spent HERE, which is why neither of
 // those two could be written in Essence: the language has no way to be told it
 // holds.
-import type { BooleanType } from "./Boolean"
 import type { IntegerType } from "./Integer"
 import {
 	append__overload$2,
-	createList,
 	listRebuildingBack,
 	listRebuildingFront,
 	type ListType,
@@ -66,51 +64,9 @@ export { length } from "./List"
 // is re-exported straight through, so the two entries are one Function under two
 // names and can not come apart.
 //
-// NOTE: `removeDuplicates` is not one of those: `List` answers it in Essence, so
-// there is no native of its own to re-export and the walk is written out here.
-// The golden harness calls BOTH entries over the same inputs, which is what
-// keeps the two from drifting.
-//
-// NOTE: Quadratic, as `List`'s body is and as the native before it was — each
-// item is looked for among the ones kept so far, with the item Type's own `is`
-// arriving as the hidden conformance Argument. The FIRST of every group of equal
-// items is the one kept, so the original order survives and a receiver with
-// anything in it keeps at least that much.
-export function removeDuplicates<ItemType extends AnyType>(
-	originalList: ListType<ItemType>,
-	conformance: {
-		is: (first: ItemType, second: ItemType) => BooleanType
-	},
-): ListType<ItemType> {
-	let view = viewOf(originalList)
-	let kept: Array<ItemType> = []
-
-	for (let index = view.frontCount - 1; index >= 0; index--) {
-		keepWhenNew(view.front[index], kept, conformance)
-	}
-
-	for (let index = 0; index < view.backCount; index++) {
-		keepWhenNew(view.back[index], kept, conformance)
-	}
-
-	return createList(kept)
-}
-
-function keepWhenNew<ItemType extends AnyType>(
-	item: ItemType,
-	kept: Array<ItemType>,
-	conformance: {
-		is: (first: ItemType, second: ItemType) => BooleanType
-	},
-): void {
-	let isDuplicate = kept.some(
-		(candidate) => conformance.is(candidate, item).value,
-	)
-
-	if (!isDuplicate) {
-		kept.push(item)
-	}
-}
+// NOTE: `removeDuplicates` is not here. Both of its entries are written in
+// Essence on `tally` and `keys`, in `Dictionary.es`, under `GroupedList` and
+// `GroupedNonEmptyList` — the proof flows through the natives those read.
 
 // NOTE: `append(contentsOf:)` is `List`'s own second Overload entry under a name
 // with no `__overload$N` on it — this Namespace declares ONE `append`, so the
@@ -145,8 +101,8 @@ export {
 	sort__overload$3,
 } from "./List"
 
-// NOTE: The second entry with no native of `List`'s to hand the work to, for the
-// reason `removeDuplicates` has none: `List` answers `replace` in Essence. One
+// NOTE: The one entry with no native of `List`'s to hand the work to: `List`
+// answers `replace` in Essence, so the walk is written out here. One
 // item out and one item in, and nothing at all when the position names no item —
 // which is what that four-branch body says at greater length, since a position
 // reaching back past the first item and one standing at or past the end both

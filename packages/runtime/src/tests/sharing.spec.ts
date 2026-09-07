@@ -3,6 +3,8 @@ import { describe, expect, test } from "bun:test"
 import type { common } from "@essence-lang/interfaces"
 
 import { createBoolean } from "../Boolean"
+import { keys } from "../Dictionary"
+import { tally } from "../GroupedList"
 import type { IntegerType } from "../Integer"
 import {
 	compare as compareIntegers,
@@ -46,7 +48,6 @@ import {
 	firstItem,
 	lastItem,
 	prepend as prependContentsOf,
-	removeDuplicates,
 	replace__overload$1 as replace,
 } from "../NonEmptyList"
 import { createString } from "../String"
@@ -611,16 +612,21 @@ describe("NonEmptyList against an upgraded receiver", () => {
 		expect(Number(lastItem(onlyPrepended).value)).toBe(2)
 	})
 
-	test("removeDuplicates keeps the first of every group", () => {
+	// NOTE: `removeDuplicates` is `tally`'s keys, in Essence, so what is asked
+	// here is of the pair it is written on: the walk crosses the run boundary
+	// in logical order, and the first of every group of equal items is kept.
+	test("a tally's keys keep the first of every group", () => {
 		let repeated = prepend(
 			prepend(integers(1, 3, 2), createInteger(2n)),
 			createInteger(1n),
 		)
 
 		expect(itemsOf(repeated)).toEqual([1, 2, 1, 3, 2])
-		expect(itemsOf(removeDuplicates(repeated, integerEquality))).toEqual([
-			1, 2, 3,
-		])
+		expect(
+			itemsOf(
+				keys(tally(repeated, integerEquality)) as ListType<IntegerType>,
+			),
+		).toEqual([1, 2, 3])
 	})
 
 	test("replace across the run boundary", () => {

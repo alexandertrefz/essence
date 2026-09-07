@@ -680,25 +680,6 @@ declarations {
 			}
 		}
 
-		§§ Answers a new List keeping only the first occurrence of each item, in the original order.
-		§§
-		§§ Equality is the items' own `is`. The Method is available whenever the items conform to `Equatable`.
-		§§
-		§§ @returns — the List without duplicates.
-		removeDuplicates<infer ItemType is Equatable>() -> List<ItemType> {
-			§ Quadratic, as the native was: each item is looked for among the
-			§ ones kept so far.
-			constant kept: List<ItemType> = []
-
-			<- @::reduce(startingWith kept, (accumulated, item) {
-				if accumulated::contains(item) {
-					<- accumulated
-				} else {
-					<- accumulated::append(item)
-				}
-			})
-		}
-
 		§§ Answers a new List with the given item, or with the contents of the given List, added at the front.
 		overload prepend {
 			§ Native for the reason `append`'s single-item entry is, and with
@@ -1247,10 +1228,9 @@ declarations {
 	§ name a Type that is not in the signature. That is why it is not a Method
 	§ of `List`, for the reason `flatten` is not.
 	§
-	§ Written in Essence on `reduce` and `append`, which is the shape
-	§ `removeDuplicates` has and reaches only `List`'s own primitives. A native
-	§ would fill one Array of the answer's own size instead of a box per kept
-	§ item. Neither saves the other a walk.
+	§ Written in Essence on `reduce` and `append`, which reaches only `List`'s
+	§ own primitives. A native would fill one Array of the answer's own size
+	§ instead of a box per kept item. Neither saves the other a walk.
 	§
 	§ There is no proven twin. A List with something in it can hold nothing but
 	§ empty Optionals, so a proof about the receiver says nothing about the
@@ -1334,17 +1314,6 @@ declarations {
 		§§
 		§§ @returns — the List of Records, each holding a position under `index` and the item at it under `item`. It is never empty.
 		enumerate() -> NonEmptyList<{ index: Integer, item: ItemType }>
-
-		§ Removing duplicates keeps the first of every group of equal items, so
-		§ it keeps at least one of whatever it was handed.
-
-		§§ Answers a new List keeping only the first occurrence of each item, in the original order.
-		§§
-		§§ Equality is the items' own `is`. The Method is available whenever the items conform to `Equatable`.
-		§§
-		§§ @returns — the List without duplicates, which certainly has something in it.
-		removeDuplicates<infer ItemType is Equatable>()
-			-> NonEmptyList<ItemType>
 
 		§ Adding a whole List proves nothing on `List`, because the List added
 		§ can be the empty one. Here the receiver is the proof, and what is

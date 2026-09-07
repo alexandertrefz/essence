@@ -6145,22 +6145,21 @@ describe("Optimiser", () => {
 		// NOTE: The standard library's own bodies go through the same pass, in
 		// the prelude the Rewriter builds — which is where most of a Program's
 		// Record and List construction actually happens.
-		// NOTE: The List is BOUND. A written one proves it holds items, which
-		// sends `removeDuplicates` to `NonEmptyList`'s hand-written native —
-		// and the body this reads for is the one `List` writes in Essence.
+		// NOTE: The List is BOUND. A written one proves it holds items, and a
+		// count past the length is what makes `removeLast` answer the `[]` it
+		// writes — the body this reads for is the one `List` writes in Essence.
 		it("collapses the standard library's bodies too", () => {
 			const source = `implementation {
 				constant numbers: List<Integer> = [1, 2, 2]
 
-				Terminal.inspect(numbers::removeDuplicates())
+				Terminal.inspect(numbers::removeLast(9))
 			}`
 
 			let generated = generate(source)
 
-			// NOTE: `removeDuplicates` folds onto a `[]` it declares, and
-			// `append` builds a one-item List to concatenate — both of them
-			// Essence bodies, emitted as prelude consts.
-			expect(generated).toContain("$es_List_removeDuplicates")
+			// NOTE: `removeLast` answers a `[]` it writes for a count past the
+			// length — an Essence body, emitted as a prelude const.
+			expect(generated).toContain("$es_List_removeLast")
 			expect(generated).not.toContain("List.createList(")
 
 			let unoptimised = generate(source, {

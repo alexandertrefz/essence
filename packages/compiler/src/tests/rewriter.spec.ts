@@ -1112,11 +1112,12 @@ describe("Rewriter", () => {
 
 			// NOTE: isEmpty / firstItem (both forms) / lastItem / removeFirst (both
 			// forms) / removeEvery (both forms) / removeLast (both forms) /
-			// removeDuplicates / prepend (both forms) / append(_:) / contains /
-			// hasItems (all three) / count (both forms) / insert / replace /
-			// sorted / repeat are implemented in Essence now
+			// prepend (both forms) / append(_:) / contains / hasItems (all
+			// three) / count (both forms) / insert / replace / sorted / repeat
+			// are implemented in Essence now
 			// (packages/standard-library/sources/List.es), so there is no runtime Function left to call
-			// here. The golden harness covers them end to end; the entries of a
+			// here — and so is removeDuplicates, on `tally` in `Dictionary.es`.
+			// The golden harness covers them end to end; the entries of a
 			// mixed `overload` block that are still native keep their tests below.
 			// `remove(at:)` came BACK from Essence and has a describe of its own
 			// beside `slice`.

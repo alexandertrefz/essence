@@ -334,8 +334,8 @@ class Inlining {
 		// were never affected. Everything else that Namespace declares stays
 		// refused until somebody weighs it: `reverse`, `sort`, `pair` and
 		// `split` are re-exports this pass does not walk, and
-		// `prepend(contentsOf:)`, `removeDuplicates` and `replace` are not
-		// `List`'s Functions at all.
+		// `prepend(contentsOf:)` and `replace` are not `List`'s Functions at
+		// all.
 		if (node.base.name === "NonEmptyList") {
 			return node.member.name === "map" ? this.mapWalk(node) : null
 		}

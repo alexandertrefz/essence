@@ -461,11 +461,22 @@ declarations {
 	§ Dictionary, so the file that owns the answer owns them. That is why
 	§ `NumberList.es` owns the aggregates a List of Numbers answers.
 	§
+	§ The fourth, `removeDuplicates`, crosses and comes back. It is `tally`'s
+	§ keys: the distinct items in the order they were first met. The store
+	§ finds them, where a fold would scan the items kept so far. It is here
+	§ rather than in `List.es` because `List.es` can not import this file.
+	§ That import would close a second cycle in the library's graph, and the
+	§ loader refuses any cycle but the one it names. The numbers are over
+	§ 20,000 items with 2,000 distinct. The fold on `contains` it replaced
+	§ took 113 ms, and the native it replaced on `NonEmptyList` took 110 ms.
+	§ This body takes 0.5 ms on either receiver. The item's own `is` still
+	§ decides: a witness a Namespace wrote takes the scan path through the
+	§ store, as `contains` would.
+	§
 	§ `group(on:)` replaced a `List::group(on:)` that folded a List of group
-	§ Records, scanning the groups opened so far for each item. Over 20,000
-	§ items with 2,000 distinct keys it took 195 ms, where this native takes
-	§ 0.8 ms. The List of groups it answered is one `entries()` away from
-	§ this answer.
+	§ Records, scanning the groups opened so far for each item. Over the same
+	§ 20,000 items it took 195 ms, where this native takes 0.8 ms. The List
+	§ of groups it answered is one `entries()` away from this answer.
 	§
 	§ The name says what the receiver becomes, which is what a reader of a
 	§ grouping call has to be told. A `DictionaryList` would name the answer and
@@ -474,11 +485,11 @@ declarations {
 	§ name with any Namespace a List reaches. So the target decides nothing
 	§ here, and the name is the whole of what a reader has.
 	§
-	§ All three are native, and none could be anything else. Grouping promises
-	§ each group has an item in it, and tallying promises each count is above
-	§ zero. Indexing has a proven twin below whose promise is about the
-	§ answer. An Essence body building any of them out of `set` and `append`
-	§ would answer a bare `Dictionary` of bare Lists.
+	§ The three crossings are native, and none could be anything else. Grouping
+	§ promises each group has an item in it, and tallying promises each count
+	§ is above zero. Indexing has a proven twin below whose promise is about
+	§ the answer. An Essence body building any of them out of `set` and
+	§ `append` would answer a bare `Dictionary` of bare Lists.
 	namespace GroupedList<infer ItemType> for List<ItemType> {
 		§§ Answers the items grouped under the key the given Function reads off each one.
 		§§
@@ -507,18 +518,31 @@ declarations {
 		index<infer Key is Equatable>(
 			on key: (_: ItemType) -> Key,
 		) -> Dictionary<Key, ItemType>
+
+		§§ Answers a new List keeping only the first occurrence of each item, in the original order.
+		§§
+		§§ Equality is the items' own `is`. The Method is available whenever the items conform to `Equatable`.
+		§§
+		§§ @returns — the List without duplicates.
+		removeDuplicates<infer ItemType is Equatable>() -> List<ItemType> {
+			<- @::tally()::keys()
+		}
 	}
 
-	§ The same three crossings with the receiver's proof in hand, and the one
-	§ thing that proof changes. A List with an item in it puts that item in a
-	§ group, under a count, or at a key. So the Dictionary it answers holds an
-	§ entry. None of the entries above can promise that, because the empty
-	§ List groups into the empty Dictionary and tallies into it too.
+	§ The same crossings with the receiver's proof in hand, and the one thing
+	§ that proof changes. A List with an item in it puts that item in a group,
+	§ under a count, or at a key. So the Dictionary it answers holds an entry,
+	§ and the keys of that Dictionary are a List with something in it. None
+	§ of the entries above can promise that, because the empty List groups
+	§ into the empty Dictionary and tallies into it too.
 	§
 	§ It mirrors `GroupedList`, and sits after it for the reason every proven
-	§ Namespace sits after the one it narrows. All three entries are
-	§ `GroupedList`'s own natives under this Namespace's names, so each pair
-	§ is one Function under two names and can not come apart.
+	§ Namespace sits after the one it narrows. The three native entries are
+	§ `GroupedList`'s own natives under this Namespace's names. So each pair
+	§ is one Function under two names and can not come apart. The
+	§ `removeDuplicates` here is the same body a second time, and carries the
+	§ proof rather than minting one. On this receiver `tally()` answers a
+	§ `NonEmptyDictionary`, whose `keys()` answers a `NonEmptyList`.
 	namespace GroupedNonEmptyList<infer ItemType> for NonEmptyList<ItemType> {
 		§§ Answers the items grouped under the key the given Function reads off each one.
 		§§
@@ -547,6 +571,17 @@ declarations {
 		index<infer Key is Equatable>(
 			on key: (_: ItemType) -> Key,
 		) -> NonEmptyDictionary<Key, ItemType>
+
+		§§ Answers a new List keeping only the first occurrence of each item, in the original order.
+		§§
+		§§ Equality is the items' own `is`. The Method is available whenever the items conform to `Equatable`.
+		§§
+		§§ @returns — the List without duplicates, which certainly has something in it.
+		removeDuplicates<infer ItemType is Equatable>()
+			-> NonEmptyList<ItemType>
+		{
+			<- @::tally()::keys()
+		}
 	}
 }
 

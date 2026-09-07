@@ -158,19 +158,19 @@ Essence.
 purpose** — wherever it stands. A refinement erases before anything runs, so an
 entry whose promise is about the answer can not say it in Essence and has to be
 native; where the entry it stands beside is an Essence body, the runtime writes
-that operation out a second time rather than instead of it. Five do.
-`NonEmptyList` holds three — `prepend(contentsOf:)`, `removeDuplicates` and
-`replace(_:at:)`, each written in Essence on `List` — `List.repeat`'s
-`PositiveInteger` entry is the fourth, native because the entry beside it
-answers a `List`, and an expression that is not empty is not one the language
-can be told is not empty; and `NonZeroRational::reciprocal` is the fifth, for
-the same reason one level along. Every other refined entry added since READS
-off the native beside it instead — `NonNegativeInteger::squareRoot` is the
-shape to copy — and `reciprocal` can not, because the entry it stands beside is
-an Essence body and so exports no runtime Function to import. That is the exception the rule above allows, and it is
-only safe because `StdlibExhaustive.es` calls both entries over the same inputs,
-wherever they stand: the golden capture is what stops the two from drifting.
-Writing another one means adding those lines too.
+that operation out a second time rather than instead of it. Four do.
+`NonEmptyList` holds two — `prepend(contentsOf:)` and `replace(_:at:)`, each
+written in Essence on `List` — `List.repeat`'s `PositiveInteger` entry is the
+third, native because the entry beside it answers a `List`, and an expression
+that is not empty is not one the language can be told is not empty; and
+`NonZeroRational::reciprocal` is the fourth, for the same reason one level
+along. Every other refined entry added since READS off the native beside it
+instead — `NonNegativeInteger::squareRoot` is the shape to copy — and
+`reciprocal` can not, because the entry it stands beside is an Essence body and
+so exports no runtime Function to import. That is the exception the rule above
+allows, and it is only safe because `StdlibExhaustive.es` calls both entries
+over the same inputs, wherever they stand: the golden capture is what stops the
+two from drifting. Writing another one means adding those lines too.
 
 Most of `NonEmptyList` is native, but not all of it. `indices()` is written on
 `List.of(integersFrom:through:)`, which promises a non-empty answer already,
@@ -502,7 +502,7 @@ tower, and nearly doubled a Program that only compares two Integers.
 fold carries, and it is read before the callback is checked. So a seed that is
 an empty List or an empty Optional is bound to an annotated Constant first,
 and the Constant is what `startingWith` is given:
-`constant kept: List<ItemType> = []` in `removeDuplicates`,
+`constant kept: List<ItemType> = []` in `OptionalList::values`,
 `constant start: Optional<ItemType> = #Empty` in `firstItem(where:)`. A bare
 `[]` has no items to read the item Type from, and a bare `#Empty` fixes the fold
 to the empty Case alone.
