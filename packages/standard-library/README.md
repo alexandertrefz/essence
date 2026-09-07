@@ -96,7 +96,8 @@ and nothing is ever changed in place. `list::sort()` can only mean "give me the
 sorted List" — there is no mutating `sort` to confuse it with. Immutability is a
 global invariant, stated once here, not something each name re-encodes. `::`
 already lends the receiver-first feel; the imperative completes it and reads
-better (`1::add(2)`, not `1::added(2)`).
+better (`1::add(2)`, not `1::added(2)`). The last two participles here were
+`groupedBy` and `tallied`, and they are `group(on:)` and `tally()` now.
 
 **2. A preposition is a label, never fused into the verb.** When an Argument is
 reached through a preposition — *of* a thing, *on* a separator, *with* a prefix,
@@ -191,7 +192,12 @@ easy to break:
   true in English on the empty List: `hasItems(where:)` asks whether ANY item
   passes, `hasOnlyItems(where:)` whether EVERY item does, and
   `hasNoItems(where:)` whether NO item does. The filter is `everyItem(where:)`,
-  which answers the items themselves.
+  which answers the items themselves — `Dictionary::everyEntry(where:)` beside
+  it, over the thing a Dictionary is made of. `Optional::keep(where:)` is the
+  deliberate exception, and the reason is that an Optional holds at most one
+  value: `everyValue(where:)` would put a quantifier on a container that has no
+  room for one, and the name says instead what the call does with the value it
+  has.
 - **A key-reading Function is always labelled `on`** — `sort(on:)`,
   `group(on:)`, `lowestItem(on:)`, `highestItem(on:)`, `sum(on:)`,
   `average(on:)`. Each takes a Function of one Parameter answering the value the
@@ -201,7 +207,17 @@ easy to break:
   same-labelled entries told apart by arity alone would be a trap; `of` is not
   either, because `count(of item)` already means "of this VALUE". Write the path
   where the body is a pure read, and the Function literal where it is anything
-  else — `sort(on (_ line: Line) { <- line.total::rounded() })`.
+  else — `sort(on (_ line: Line) { <- line.total::round() })`.
+- **The grouping family answers a Dictionary, and its name says how many items
+  a key keeps.** `list::group(on .city)` keeps every item, under
+  `Dictionary<Key, NonEmptyList<Item>>`; `list::index(on .id)` keeps one, under
+  `Dictionary<Key, Item>`, the later item replacing the earlier; `list::tally()`
+  keeps neither and counts instead, under
+  `Dictionary<Item, PositiveInteger>`. All three are declared in
+  `Dictionary.es`, on `GroupedList`, because what the List becomes is a
+  Dictionary and the file that owns the answer owns the bridge to it. A List of
+  group Records is one `::entries()` away, which is what the deleted
+  `List::group(on:)` used to answer.
 - **An aggregate is reachable from the value it is about** —
   `[3, 1, 2]::sum()`, `::average()`, `::lowestNumber()`. `Number.sum` and its
   four siblings stay as the statics that implement them; what a List answers is
