@@ -1,7 +1,10 @@
 import {
 	from "./Boolean.es" { Boolean }
 	from "./Comparable.es" { Comparable }
-	from "./Integer.es" { Integer }
+	from "./Integer.es" {
+		Integer
+		NonNegativeInteger
+	}
 	from "./List.es" {
 		List
 		NonEmptyList
@@ -252,8 +255,8 @@ declarations {
 
 		§§ Answers how many characters the String has.
 		§§
-		§§ @returns — the number of characters.
-		length() -> Integer
+		§§ @returns — the number of characters, which is never negative.
+		length() -> NonNegativeInteger
 
 		§§ Answers the characters of the String, each as its own String.
 		§§

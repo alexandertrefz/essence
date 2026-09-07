@@ -251,6 +251,20 @@ export function negate(integer: IntegerType): IntegerType {
 	return createInteger(typeof value === "number" ? 0 - value : -value)
 }
 
+// NOTE: Native so that the answer can be declared a `NonNegativeInteger`: a
+// refinement erases before anything runs, and an Essence body could only
+// answer a bare Integer for the arm that negates. The value itself is handed
+// back where it is not negative — the same object, since an Integer is never
+// changed in place — so the ordinary call allocates nothing. `NonZeroInteger`
+// declares this Function again under its own name, where the same answer is a
+// `PositiveInteger`.
+//
+// NOTE: `0` rather than `0n`: an ordering comparison is exact across the two
+// representations, so one spelling asks both.
+export function absolute(integer: IntegerType): IntegerType {
+	return integer.value < 0 ? negate(integer) : integer
+}
+
 export function remainder__overload$1(
 	integer: IntegerType,
 	divisor: IntegerType,

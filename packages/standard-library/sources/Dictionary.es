@@ -1,7 +1,7 @@
 import {
 	from "./Boolean.es" { Boolean }
 	from "./Integer.es" {
-		NonZeroInteger
+		NonNegativeInteger
 		PositiveInteger
 	}
 	from "./List.es" {
@@ -152,8 +152,8 @@ declarations {
 
 		§§ Answers how many entries the Dictionary has.
 		§§
-		§§ @returns — the number of entries.
-		length() -> Integer
+		§§ @returns — the number of entries, which is never negative.
+		length() -> NonNegativeInteger
 
 		§§ Answers the value the given key holds.
 		§§
@@ -396,7 +396,7 @@ declarations {
 	§ answer better for having the proof.
 	§
 	§ Four spend it, and each is `Dictionary`'s own native under this
-	§ Namespace's name. The `length` entry answers a `NonZeroInteger`. The three
+	§ Namespace's name. The `length` entry answers a `PositiveInteger`. The three
 	§ halves a Dictionary is read as answer a `NonEmptyList`. There is one key,
 	§ one value and one entry for every entry the receiver holds. The fifth
 	§ entry, `map`, carries the proof rather than spending it, for the reason
@@ -423,8 +423,8 @@ declarations {
 	{
 		§§ Answers how many entries the Dictionary has, which is at least one.
 		§§
-		§§ @returns — the number of entries, which is never zero.
-		length() -> NonZeroInteger
+		§§ @returns — the number of entries, which is above zero.
+		length() -> PositiveInteger
 
 		§§ Answers the keys, in the order they were first set.
 		§§

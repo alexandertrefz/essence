@@ -10240,7 +10240,7 @@ describe("Enricher", () => {
 				"NonEmptyString",
 			)
 			expect(answerOf('constant length = "abc"::length()')).toBe(
-				"Integer",
+				"NonNegativeInteger",
 			)
 		})
 
@@ -10305,6 +10305,67 @@ describe("Enricher", () => {
 			expect(answerOf("constant product = 2::multiply(with 3)")).toBe(
 				"NonZeroInteger",
 			)
+		})
+
+		// NOTE: The proofs the library MINTS. A count is never negative, a count
+		// of something proven non-empty is above zero, a distance from zero is
+		// never negative and a denominator in lowest terms is always positive
+		// — and each of those answers says so, so that the next call can spend
+		// it: `2::raise(to items::length())` reaches the entry taking a
+		// `NonNegativeInteger` exponent and answers an Integer rather than the
+		// Union, and `absolute()::squareRoot()` answers the root itself rather
+		// than an Optional.
+		it("should mint the count and sign proofs a native answer carries", () => {
+			expect(
+				answerOf(`constant items: List<Integer> = [1, 2, 3]
+					constant count = items::length()`),
+			).toBe("NonNegativeInteger")
+			expect(
+				answerOf('constant count = "abc"::append("d")::length()'),
+			).toBe("NonNegativeInteger")
+			expect(
+				answerOf(`constant entries = Dictionary.of([{ key = "a", value = 1 }])
+					constant count = entries::length()`),
+			).toBe("NonNegativeInteger")
+			expect(
+				answerOf(`constant items: List<Integer> = [1, 2, 3]
+					constant count = items::count(of 2)`),
+			).toBe("NonNegativeInteger")
+			expect(
+				answerOf(`constant items: List<Integer> = [1, 2, 3]
+					constant count = items::count(where (item) { <- item::isEven() })`),
+			).toBe("NonNegativeInteger")
+			expect(
+				answerOf(`constant items: NonEmptyList<Integer> = [1, 2, 3]
+					constant count = items::length()`),
+			).toBe("PositiveInteger")
+			expect(
+				answerOf(`constant entries: NonEmptyDictionary<String, Integer> = ["a" = 1]
+					constant count = entries::length()`),
+			).toBe("PositiveInteger")
+			expect(
+				answerOf(`constant computed = 1::subtract(2)
+					constant distance = computed::absolute()`),
+			).toBe("NonNegativeInteger")
+			expect(
+				answerOf(`constant computed = 1/4::add(1/4)
+					constant denominator = computed::denominator()`),
+			).toBe("PositiveInteger")
+		})
+
+		it("should let the next call spend a minted proof", () => {
+			expect(
+				answerOf(`constant items: NonEmptyList<Integer> = [1, 2, 3]
+					constant power = 2::raise(to items::length())`),
+			).toBe("Integer")
+			expect(
+				answerOf(`constant computed = 1::subtract(2)
+					constant root = computed::absolute()::squareRoot()`),
+			).toBe("Integer | Algebraic")
+			expect(
+				answerOf(`constant computed = 1/4::add(1/4)
+					constant scaled = 10::raise(to computed::denominator())`),
+			).toBe("Integer")
 		})
 
 		// NOTE: A Program's own Alias is a candidate beside the builtins, and a

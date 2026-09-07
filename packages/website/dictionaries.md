@@ -263,7 +263,7 @@ if ages::hasEntries() {
 ```
 
 What the proof buys is the Methods that answer better for having it.
-`length()` answers a `NonZeroInteger`; `keys()`, `values()` and `entries()`
+`length()` answers a `PositiveInteger`; `keys()`, `values()` and `entries()`
 answer a `NonEmptyList`, so `firstItem()` on one of them is a value rather than
 an Optional; and `map` carries the proof through, since it answers one value
 per entry:

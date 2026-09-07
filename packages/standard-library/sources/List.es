@@ -3,7 +3,7 @@ import {
 	from "./Comparable.es" { Comparable }
 	from "./Integer.es" {
 		Integer
-		NonZeroInteger
+		NonNegativeInteger
 		PositiveInteger
 	}
 	from "./Optional.es" { Optional }
@@ -298,8 +298,8 @@ declarations {
 
 		§§ Answers how many items the List has.
 		§§
-		§§ @returns — the number of items.
-		length() -> Integer
+		§§ @returns — the number of items, which is never negative.
+		length() -> NonNegativeInteger
 
 		§ Every Method below that can answer empty offers a `defaultingTo:`
 		§ entry beside it, answering the bare Type. Each of those entries is
@@ -898,16 +898,18 @@ declarations {
 			§§ Equality is the items' own `is`. The entry is available whenever the items conform to `Equatable`.
 			§§
 			§§ @param of — the item to look for
-			§§ @returns — how many items equal it.
-			<infer ItemType is Equatable>(of item: ItemType) -> Integer {
+			§§ @returns — how many items equal it, which is never negative.
+			<infer ItemType is Equatable>(
+				of item: ItemType,
+			) -> NonNegativeInteger {
 				<- @::count(where (candidate) { <- candidate::is(item) })
 			}
 
 			§§ Answers how many items the check accepts.
 			§§
 			§§ @param where — the check each item is offered to
-			§§ @returns — how many items the check accepts.
-			(where check: (_: ItemType) -> Boolean) -> Integer {
+			§§ @returns — how many items the check accepts, which is never negative.
+			(where check: (_: ItemType) -> Boolean) -> NonNegativeInteger {
 				§ One fold carrying the total, over a filter whose length was
 				§ read: the filter built a List of every accepted item to throw
 				§ away. Counting has to see every item either way, so the walk
@@ -916,13 +918,23 @@ declarations {
 				§ thousand counts of 20,000 items with every item accepted
 				§ measured 155 ms on the filter and 78 ms on the fold. With
 				§ `isEven` they measured 275 ms and 231 ms.
-				<- @::reduce(startingWith 0, (total, item) {
+				§
+				§ The fold carries a bare Integer. What a fold carries is read
+				§ off the value it starts at, and that reading widens a
+				§ refinement away. So a proven zero would not keep the proof.
+				§ A count starts at none and only ever grows. So `absolute` is
+				§ the identity on the answer, and it is the entry that mints the
+				§ proof back. The body this replaced minted it the same way, out
+				§ of the native its chain ended on.
+				constant total = @::reduce(startingWith 0, (running, item) {
 					if check(item) {
-						<- total::add(1)
+						<- running::add(1)
 					} else {
-						<- total
+						<- running
 					}
 				})
+
+				<- total::absolute()
 			}
 		}
 
@@ -1290,8 +1302,8 @@ declarations {
 
 		§§ Answers how many items the List has, which is at least one.
 		§§
-		§§ @returns — the number of items, which is never zero.
-		length() -> NonZeroInteger
+		§§ @returns — the number of items, which is above zero.
+		length() -> PositiveInteger
 
 		§ Both carry the proof. There is one entry for every item and one
 		§ position for every item. So neither can answer nothing when it was
