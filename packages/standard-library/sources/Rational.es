@@ -169,14 +169,19 @@ declarations {
 							{
 								<- #Empty
 							} else {
+								§ The scale is ten to the count of digits
+								§ after the dot. Asking `length()` for that
+								§ count proves it is not negative, and a
+								§ written `10` proves the base is above zero.
+								§ So the power is above zero too. That is
+								§ what lets `Rational.of` reach the entry
+								§ over a denominator proven not to be zero,
+								§ and `map` stand where `andThen` had to.
 								<- Integer.parse(
 									wholeText::append(fractionalText),
-								)::andThen((digitsValue) {
-									constant scale = fractionalText
-										::characters()
-										::reduce(startingWith 1, (scaled, _) {
-											<- scaled::multiply(with 10)
-										})
+								)::map((digitsValue) {
+									constant scale = 10
+										::raise(to fractionalText::length())
 
 									<- Rational.of(
 										digitsValue::multiply(with signFactor),
