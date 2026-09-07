@@ -139,9 +139,9 @@ A native stays a member read off the plain import (`Boolean.negate(…)`), which
 esbuild rewrites to a direct symbol reference and can tree-shake; an
 Essence-implemented Method is not a member of anything, so nothing has to
 materialise the module namespace object. `namespaceMember` in
-`packages/compiler/src/rewriter/index.ts` picks the spelling, and all four emission sites — a
-plain call, a conformance witness, a Union dispatch target, a static Lookup —
-go through it, so every one works for both kinds.
+`packages/compiler/src/rewriter/rewrite.ts` picks the spelling, and all four
+emission sites — a plain call, a conformance witness, a Union dispatch target, a
+static Lookup — go through it, so every one works for both kinds.
 
 A PROTOCOL's provided Method is emitted the same way, under a DOUBLE separator
 — `$es_Orderable__isBetween` — and once for every conformer rather than once per
@@ -702,7 +702,8 @@ rule stated there.
 A new Namespace is a new runtime module. The Simplifier emits
 `<Namespace>.<method>(…)`, so each name needs
 
-1. an entry in `runtimeNamespaceNames` (`packages/compiler/src/rewriter/index.ts`),
+1. an entry in `runtimeNamespaceNames`
+   (`packages/compiler/src/rewriter/runtimeNamespaces.ts`),
 2. a `@essence-lang/runtime` module — a re-export of the implementation is
    enough,
 3. a place in `builtinMemberOrder` (`packages/compiler/src/enricher/builtins.ts`),
