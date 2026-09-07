@@ -111,6 +111,25 @@ export type StringNatives = {
 	slice: (self: StringType, from: IntegerType, to: IntegerType) => StringType
 }
 
+export type NonEmptyStringNatives = {
+	// length() -> PositiveInteger
+	length: (self: StringType) => IntegerType
+	// characters() -> NonEmptyList
+	characters: (self: StringType) => ListType<StringType>
+	// firstCharacter() -> String
+	firstCharacter: (self: StringType) => StringType
+	// lastCharacter() -> String
+	lastCharacter: (self: StringType) => StringType
+	// uppercase() -> NonEmptyString
+	uppercase: (self: StringType) => StringType
+	// lowercase() -> NonEmptyString
+	lowercase: (self: StringType) => StringType
+	// reverse() -> NonEmptyString
+	reverse: (self: StringType) => StringType
+	// repeat(times: PositiveInteger) -> NonEmptyString
+	repeat: (self: StringType, times: IntegerType) => StringType
+}
+
 export type BooleanNatives = {
 	// is(_: Boolean) -> Boolean
 	is: (self: BooleanType, argument1: BooleanType) => BooleanType
@@ -593,7 +612,7 @@ export const $TerminalArity: AssertArities<typeof import("./Terminal"), {
 
 declare const StringModule: typeof import("./String")
 export const $String: StringNatives = StringModule
-export const $StringAbsent: AssertNoEssenceExports<typeof import("./String"), "is__overload$1" | "is__overload$2" | "compare__overload$2" | "toString" | "isEmpty" | "hasCharacters" | "contains" | "doesNotContain" | "starts" | "doesNotStart" | "doesNotEnd" | "lines" | "characters" | "character__overload$2" | "firstIndex__overload$2" | "lastIndex__overload$2" | "prepend" | "replaceEvery" | "replaceFirst" | "pad"> = true
+export const $StringAbsent: AssertNoEssenceExports<typeof import("./String"), "is__overload$1" | "is__overload$2" | "compare__overload$2" | "toString" | "isEmpty" | "hasCharacters" | "contains" | "doesNotContain" | "starts" | "doesNotStart" | "doesNotEnd" | "lines" | "characters" | "character__overload$2" | "firstIndex__overload$2" | "lastIndex__overload$2" | "firstCharacter__overload$1" | "firstCharacter__overload$2" | "lastCharacter__overload$1" | "lastCharacter__overload$2" | "prepend" | "replaceEvery" | "replaceFirst" | "pad"> = true
 export const $StringArity: AssertArities<typeof import("./String"), {
 	compare__overload$1: 2
 	ends: 2
@@ -613,6 +632,19 @@ export const $StringArity: AssertArities<typeof import("./String"), {
 	repeat: 2
 	reverse: 1
 	slice: 3
+}> = true
+
+declare const NonEmptyStringModule: typeof import("./NonEmptyString")
+export const $NonEmptyString: NonEmptyStringNatives = NonEmptyStringModule
+export const $NonEmptyStringArity: AssertArities<typeof import("./NonEmptyString"), {
+	length: 1
+	characters: 1
+	firstCharacter: 1
+	lastCharacter: 1
+	uppercase: 1
+	lowercase: 1
+	reverse: 1
+	repeat: 2
 }> = true
 
 declare const BooleanModule: typeof import("./Boolean")

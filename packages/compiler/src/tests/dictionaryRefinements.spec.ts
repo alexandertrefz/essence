@@ -522,12 +522,23 @@ describe("The bridges from a List", () => {
 		// the tally an UNBRANDED witness, so the store scans through that `is`
 		// rather than encoding — and "Ada", "ada" and "ADA" are one item to it,
 		// exactly as `contains` would say. The spelling kept is the first met.
+		//
+		// NOTE: The two sides are read as plain Strings before they are
+		// compared. `namespace NonEmptyString` carries the proof through
+		// `lowercase`, so a lower-cased NonEmptyString is a NonEmptyString
+		// again — and asking IT `is` would reach this very Method, which
+		// answers by asking `is` once more. Declaring the Type the comparison
+		// is made at is what stops the witness from being written in terms of
+		// itself.
 		it("honours a written 'is' through the scan path", async () => {
 			expect(
 				await run(`implementation {
 					namespace Loose for NonEmptyString is Equatable {
 						is(_ other: NonEmptyString) -> Boolean {
-							<- @::lowercase()::is(other::lowercase())
+							constant mine: String   = @::lowercase()
+							constant theirs: String = other::lowercase()
+
+							<- mine::is(theirs)
 						}
 					}
 

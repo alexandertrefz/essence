@@ -664,12 +664,23 @@ describe("Dictionary", () => {
 		// and everything else walks the entries asking the witness. See
 		// `encodeKey` in `packages/runtime/src/Dictionary.ts` and
 		// `isStructurallyEquatable` in the Rewriter.
+		//
+		// NOTE: The two sides are read as plain Strings before they are
+		// compared. `namespace NonEmptyString` carries the proof through
+		// `lowercase`, so a lower-cased NonEmptyString is a NonEmptyString
+		// again — and asking IT `is` would reach this very Method, which
+		// answers by asking `is` once more. Declaring the Type the comparison
+		// is made at is what stops the witness from being written in terms of
+		// itself.
 		it("finds a refined String key through a written 'is'", async () => {
 			expect(
 				await run(`implementation {
 					namespace Loose for NonEmptyString is Equatable {
 						is(_ other: NonEmptyString) -> Boolean {
-							<- @::lowercase()::is(other::lowercase())
+							constant mine: String   = @::lowercase()
+							constant theirs: String = other::lowercase()
+
+							<- mine::is(theirs)
 						}
 					}
 

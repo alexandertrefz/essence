@@ -143,10 +143,17 @@ third"::lines())
 	show("String.count(of: String)", "banana"::count(of "a"))
 	show("String.count(of: String) [empty part]", "banana"::count(of ""))
 	show("String.count(of: String) [absent]", "banana"::count(of "zz"))
+	§ A RECEIVER written down proves it has a character in it, and reaches
+	§ the Namespace that spends the proof. So the calls that have to stay on
+	§ `String`'s own entries are given a computed receiver, and
+	§ `namespace NonEmptyString` is called under labels of its own below.
+	constant astralText = "a😀b"::append(emptyText)
+	constant abText     = "ab"::append(emptyText)
+
 	show("String.length()", greeting::length())
 	show("String.length() [empty]", emptyText::length())
-	show("String.length() [astral]", "a😀b"::length())
-	show("String.characters()", "a😀b"::characters())
+	show("String.length() [astral]", astralText::length())
+	show("String.characters()", astralText::characters())
 	show("String.characters() [empty]", emptyText::characters())
 	show("String.character(at: Integer)", greeting::character(at 1))
 	show("String.character(at: Integer) [zero]", greeting::character(at 0))
@@ -170,6 +177,26 @@ third"::lines())
 	show(
 		"String.character(at: Integer, defaultingTo: String) [outside]",
 		greeting::character(at 99, defaultingTo "?"),
+	)
+	show("String.firstCharacter()", greeting::firstCharacter())
+	show("String.firstCharacter() [empty]", emptyText::firstCharacter())
+	show(
+		"String.firstCharacter(defaultingTo: String)",
+		greeting::firstCharacter(defaultingTo "?"),
+	)
+	show(
+		"String.firstCharacter(defaultingTo: String) [empty]",
+		emptyText::firstCharacter(defaultingTo "?"),
+	)
+	show("String.lastCharacter()", greeting::lastCharacter())
+	show("String.lastCharacter() [empty]", emptyText::lastCharacter())
+	show(
+		"String.lastCharacter(defaultingTo: String)",
+		greeting::lastCharacter(defaultingTo "?"),
+	)
+	show(
+		"String.lastCharacter(defaultingTo: String) [empty]",
+		emptyText::lastCharacter(defaultingTo "?"),
 	)
 	show("String.uppercase()", greeting::uppercase())
 	show("String.uppercase() [empty]", emptyText::uppercase())
@@ -219,11 +246,11 @@ third"::lines())
 		"String.replaceFirst(_ String, with: String) [no match]",
 		greeting::replaceFirst("z", with "0"),
 	)
-	show("String.repeat(times: Integer)", "ab"::repeat(times 3))
-	show("String.repeat(times: Integer) [zero]", "ab"::repeat(times 0))
-	show("String.repeat(times: Integer) [negative]", "ab"::repeat(times -1))
+	show("String.repeat(times: Integer)", abText::repeat(times 3))
+	show("String.repeat(times: Integer) [zero]", abText::repeat(times 0))
+	show("String.repeat(times: Integer) [negative]", abText::repeat(times -1))
 	show("String.reverse()", greeting::reverse())
-	show("String.reverse() [astral]", "a😀b"::reverse())
+	show("String.reverse() [astral]", astralText::reverse())
 	show(
 		"String.slice(from?: Integer, to?: Integer)",
 		greeting::slice(from 0, to 5),
@@ -367,6 +394,20 @@ third"::lines())
 		"String.normalize(as?: NormalizationForm) [compatibility folds ligature]",
 		"ﬁle"::normalize(as NormalizationForm#ComposedCompatibility),
 	)
+
+	§ ——— NonEmptyString ———————————————————————————————————————————————————
+	§ What a String proven to have a character answers, and the sister of the
+	§ NonEmptyList block further down. A String written where it stands is
+	§ its own proof, so every call here is written. The count of the repeat
+	§ is written for the same reason: the entry asks for a count above zero.
+	show("NonEmptyString.length()", "a😀b"::length())
+	show("NonEmptyString.characters()", "a😀b"::characters())
+	show("NonEmptyString.firstCharacter()", "a😀b"::firstCharacter())
+	show("NonEmptyString.lastCharacter()", "a😀b"::lastCharacter())
+	show("NonEmptyString.uppercase()", "Hello, World"::uppercase())
+	show("NonEmptyString.lowercase()", "Hello, World"::lowercase())
+	show("NonEmptyString.reverse()", "a😀b"::reverse())
+	show("NonEmptyString.repeat(times: PositiveInteger)", "ab"::repeat(times 3))
 
 	§ ——— Boolean ——————————————————————————————————————————————————————————
 	show("Boolean.negate()", true::negate())

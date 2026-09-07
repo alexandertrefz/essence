@@ -1508,20 +1508,35 @@ describe("Hover over a written receiver", () => {
 		)
 	})
 
-	// NOTE: A written String proves `NonEmptyString`, which no Namespace
-	// targets — so the Hover names the proof and the call still reaches
-	// `String`'s own Method, which is what a refinement adding Methods and
-	// taking none away looks like from here.
-	it("names a proof no Namespace targets", () => {
+	// NOTE: A written String proves `NonEmptyString`, and the Namespace over
+	// that proof declares no `trim` — so the Hover names the proof and the
+	// call still reaches `String`'s own Method, which is what a refinement
+	// adding Methods and taking none away looks like from here.
+	it("names a proof the refined Namespace does not spend", () => {
 		let source = [
 			"implementation {",
-			'\tconstant length = "abc"::length()',
+			'\tconstant text = "abc"::trim()',
 			"}",
 		].join("\n")
 
 		expect(hover(source, { line: 2, column: 20 })).toBe("NonEmptyString")
-		expect(hover(source, { line: 2, column: 28 })).toBe(
-			"length() -> NonNegativeInteger",
+		expect(hover(source, { line: 2, column: 26 })).toBe(
+			"trim(at?: Side) -> String",
+		)
+	})
+
+	// NOTE: And the entry the proof DOES reach, under the Namespace that
+	// spends it.
+	it("names the entry a String's proof reaches", () => {
+		let source = [
+			"implementation {",
+			'\tconstant count = "abc"::length()',
+			"}",
+		].join("\n")
+
+		expect(hover(source, { line: 2, column: 21 })).toBe("NonEmptyString")
+		expect(hover(source, { line: 2, column: 29 })).toBe(
+			"length() -> PositiveInteger",
 		)
 	})
 

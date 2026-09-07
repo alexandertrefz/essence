@@ -289,7 +289,7 @@ groups, in this order:
    `length`, `numerator`, `denominator`, `absolute`, `item(at:)`, `firstItem`,
    `lastItem`, `firstIndex`, `lastIndex`, `indices`, `keys`, `values`,
    `entries`, `characters`, `words`, `lines`, `character(at:)`,
-   `value(defaultingTo:)`.
+   `firstCharacter`, `lastCharacter`, `value(defaultingTo:)`.
 6. **Transforms, and everything else** — `negate`, `round`, `clamp`,
    `reciprocal`, `map`, `reduce`, `everyItem`, `sort`, `slice`, `append`,
    `join`, `split`, `trim`, `pad`, `flatten`, `andThen`.

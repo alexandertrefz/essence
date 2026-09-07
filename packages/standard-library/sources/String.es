@@ -4,6 +4,7 @@ import {
 	from "./Integer.es" {
 		Integer
 		NonNegativeInteger
+		PositiveInteger
 	}
 	from "./List.es" {
 		List
@@ -325,6 +326,42 @@ declarations {
 			}
 		}
 
+		§ Both read `character(at:)`, the native that resolves a position.
+		§ `List` names its two ends `firstItem` and `lastItem`. A String had
+		§ to spell `character(at -1)` to reach its own.
+
+		§§ Answers the first character of the String.
+		§§
+		§§ The empty String has no first character and answers nothing. The `defaultingTo:` entry answers the given character instead.
+		overload firstCharacter {
+			§§ @returns — the first character, or nothing when the String is empty.
+			() -> Optional<String> {
+				<- @::character(at 0)
+			}
+
+			§§ @param defaultingTo — the character to answer with when the String is empty
+			§§ @returns — the first character, or the given one in its place.
+			(defaultingTo fallback: String) -> String {
+				<- @::character(at 0, defaultingTo fallback)
+			}
+		}
+
+		§§ Answers the last character of the String.
+		§§
+		§§ The empty String has no last character and answers nothing. The `defaultingTo:` entry answers the given character instead.
+		overload lastCharacter {
+			§§ @returns — the last character, or nothing when the String is empty.
+			() -> Optional<String> {
+				<- @::character(at -1)
+			}
+
+			§§ @param defaultingTo — the character to answer with when the String is empty
+			§§ @returns — the last character, or the given one in its place.
+			(defaultingTo fallback: String) -> String {
+				<- @::character(at -1, defaultingTo fallback)
+			}
+		}
+
 		§§ Joins another String onto the front of this one.
 		§§
 		§§ @param _ — the String to add to the front
@@ -541,6 +578,85 @@ declarations {
 				}
 			}
 		}
+	}
+
+	§ What a String proven to have a character answers that a bare one can
+	§ not, the sister of `namespace NonEmptyList`. Every entry is native, for
+	§ the reason that Namespace gives. A refinement erases before anything
+	§ runs, so an entry whose promise is about the answer can not be written
+	§ in Essence. And `@::length()` on a proven receiver is this Method rather
+	§ than the base's.
+	§
+	§ The proof changes the answer in three ways. A count of at least one
+	§ character is a PositiveInteger. The characters, the first one and the
+	§ last one are each a piece that is always there. So `characters` answers
+	§ a NonEmptyList, and the two ends answer a character rather than an
+	§ Optional. The last four entries carry the proof forward instead. None
+	§ of them can empty a String that was not empty, and `repeat` is handed a
+	§ count above zero.
+	§
+	§ `trim`, `slice` and `replaceEvery` are the Methods that can empty one,
+	§ so none of them is written here.
+	§
+	§ The four that carry the proof are what an `is` written for a proven
+	§ String has to be read against. A witness comparing two lower-cased
+	§ receivers with `is` is written in terms of itself, because the
+	§ lower-cased String is proven too. Naming the base Type at the
+	§ comparison is what stops that. The same edge has been on
+	§ `NonEmptyList::reverse` since it was written.
+	namespace NonEmptyString for NonEmptyString {
+		§§ Answers how many characters the String has, which is at least one.
+		§§
+		§§ @returns — the number of characters, which is above zero.
+		length() -> PositiveInteger
+
+		§§ Answers the characters of the String, each as its own String.
+		§§
+		§§ @returns — the List of characters, which always holds at least one.
+		characters() -> NonEmptyList<String>
+
+		§§ Answers the first character of the String.
+		§§
+		§§ The String has a character in it, so there is a first one to answer.
+		§§
+		§§ @returns — the first character.
+		firstCharacter() -> String
+
+		§§ Answers the last character of the String.
+		§§
+		§§ The String has a character in it, so there is a last one to answer.
+		§§
+		§§ @returns — the last character.
+		lastCharacter() -> String
+
+		§§ Answers the String with every character in upper case.
+		§§
+		§§ Case mapping answers a character for every character it is given, so the answer has one too.
+		§§
+		§§ @returns — the upper-cased String, which is never empty.
+		uppercase() -> NonEmptyString
+
+		§§ Answers the String with every character in lower case.
+		§§
+		§§ Case mapping answers a character for every character it is given, so the answer has one too.
+		§§
+		§§ @returns — the lower-cased String, which is never empty.
+		lowercase() -> NonEmptyString
+
+		§§ Answers the String with its characters in the opposite order.
+		§§
+		§§ Reversing keeps every character, so the answer has one too.
+		§§
+		§§ @returns — the reversed String, which is never empty.
+		reverse() -> NonEmptyString
+
+		§§ Answers the String joined to itself the given number of times.
+		§§
+		§§ The count is above zero, so the answer holds at least one copy of a String that has a character.
+		§§
+		§§ @param times — how many copies to join, proven to be above zero
+		§§ @returns — the repeated String, which is never empty.
+		repeat(times count: PositiveInteger) -> NonEmptyString
 	}
 }
 
