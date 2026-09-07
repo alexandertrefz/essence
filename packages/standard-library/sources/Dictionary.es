@@ -454,9 +454,11 @@ declarations {
 		) -> NonEmptyDictionary<KeyType, Result>
 	}
 
-	§ The bridge from the first container to the second, and the two Methods
-	§ that cross it. Neither is a Method of `List`. What a List becomes here is
-	§ a Dictionary, so the file that owns the answer owns them. That is why
+	§ The bridge from the first container to the second, and the Methods a List
+	§ answers through it. Three cross it: `group(on:)`, `tally()` and
+	§ `index(on:)` each answer a Dictionary keyed by something read off the
+	§ items. None is a Method of `List`. What a List becomes here is a
+	§ Dictionary, so the file that owns the answer owns them. That is why
 	§ `NumberList.es` owns the aggregates a List of Numbers answers.
 	§
 	§ `group(on:)` replaced a `List::group(on:)` that folded a List of group
@@ -472,10 +474,11 @@ declarations {
 	§ name with any Namespace a List reaches. So the target decides nothing
 	§ here, and the name is the whole of what a reader has.
 	§
-	§ Both are native, and neither could be anything else. Grouping promises
+	§ All three are native, and none could be anything else. Grouping promises
 	§ each group has an item in it, and tallying promises each count is above
-	§ zero. An Essence body building either out of `set` and `append` would
-	§ answer a bare `Dictionary` of bare Lists.
+	§ zero. Indexing has a proven twin below whose promise is about the
+	§ answer. An Essence body building any of them out of `set` and `append`
+	§ would answer a bare `Dictionary` of bare Lists.
 	namespace GroupedList<infer ItemType> for List<ItemType> {
 		§§ Answers the items grouped under the key the given Function reads off each one.
 		§§
@@ -494,18 +497,28 @@ declarations {
 		§§ @returns — the Dictionary of counts, each of which is above zero.
 		tally<infer ItemType is Equatable>()
 			-> Dictionary<ItemType, PositiveInteger>
+
+		§§ Answers the items under the key the given Function reads off each one, one item per key.
+		§§
+		§§ A later item with the same key replaces the earlier one as the value. The key keeps the place it was first met at, as `set` does. The keys stand in the order they first appear. Equality is the keys' own `is`. To keep every item under a key, use `group(on:)`.
+		§§
+		§§ @param on — the key read off each item
+		§§ @returns — the Dictionary of items, keyed by what the Function read off each.
+		index<infer Key is Equatable>(
+			on key: (_: ItemType) -> Key,
+		) -> Dictionary<Key, ItemType>
 	}
 
-	§ The same two crossings with the receiver's proof in hand, and the one
+	§ The same three crossings with the receiver's proof in hand, and the one
 	§ thing that proof changes. A List with an item in it puts that item in a
-	§ group, so the Dictionary it answers holds an entry. Neither entry above
-	§ can promise that, because the empty List groups into the empty Dictionary
-	§ and tallies into it too.
+	§ group, under a count, or at a key. So the Dictionary it answers holds an
+	§ entry. None of the entries above can promise that, because the empty
+	§ List groups into the empty Dictionary and tallies into it too.
 	§
 	§ It mirrors `GroupedList`, and sits after it for the reason every proven
-	§ Namespace sits after the one it narrows. Both entries are `GroupedList`'s
-	§ own natives under this Namespace's names, so the two are one Function
-	§ under two names and can not come apart.
+	§ Namespace sits after the one it narrows. All three entries are
+	§ `GroupedList`'s own natives under this Namespace's names, so each pair
+	§ is one Function under two names and can not come apart.
 	namespace GroupedNonEmptyList<infer ItemType> for NonEmptyList<ItemType> {
 		§§ Answers the items grouped under the key the given Function reads off each one.
 		§§
@@ -524,6 +537,16 @@ declarations {
 		§§ @returns — the Dictionary of counts, which certainly has a count in it.
 		tally<infer ItemType is Equatable>()
 			-> NonEmptyDictionary<ItemType, PositiveInteger>
+
+		§§ Answers the items under the key the given Function reads off each one, one item per key.
+		§§
+		§§ A later item with the same key replaces the earlier one as the value. The key keeps the place it was first met at, as `set` does. The keys stand in the order they first appear. Equality is the keys' own `is`.
+		§§
+		§§ @param on — the key read off each item
+		§§ @returns — the Dictionary of items, which certainly has an entry in it.
+		index<infer Key is Equatable>(
+			on key: (_: ItemType) -> Key,
+		) -> NonEmptyDictionary<Key, ItemType>
 	}
 }
 

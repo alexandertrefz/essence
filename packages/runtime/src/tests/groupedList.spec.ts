@@ -15,7 +15,7 @@ import {
 	toString as dictionaryToString,
 	values as valuesOf,
 } from "../Dictionary"
-import { group, tally } from "../GroupedList"
+import { group, index as indexBy, tally } from "../GroupedList"
 import type { IntegerType } from "../Integer"
 import { createInteger } from "../Integer"
 import { anyIs } from "../internalHelpers"
@@ -35,7 +35,7 @@ import { createTranscendental } from "../Transcendental"
 import { type AnyType, typeKeySymbol } from "../type"
 
 // NOTE: The same fixtures `dictionaries.spec.ts` builds its walk on, kept to
-// the shapes the two GATHERING natives are handed: the standard library's own
+// the shapes the three GATHERING natives are handed: the standard library's own
 // equality under the Compiler's brand, the same equality without it, a witness
 // a Namespace wrote that is COARSER than the encoding, and one that reads a
 // Record member so the scan path is the only path.
@@ -223,8 +223,9 @@ const expectGatheredShape = (box: DictionaryType<AnyType, AnyType>) => {
 
 // NOTE: THE MODEL. A plain Array of groups in first-appearance order, each
 // found by asking the witness about the keys already standing — which is the
-// specification of both natives read straight off the design, rather than a
-// second implementation of the store.
+// specification of all three natives read straight off the design, rather than
+// a second implementation of the store. A tally is the groups' sizes, and an
+// index is each group's LAST item under the group's own key box.
 type Group = { key: AnyType; items: Array<AnyType> }
 
 const modelGroup = (
@@ -282,7 +283,7 @@ const listOfBothEnds = (
 }
 
 describe("gathering a Dictionary out of a List, against a plain model", () => {
-	// NOTE: Four pools, one per witness the Compiler may hand a gathering call,
+	// NOTE: Five pools, one per witness the Compiler may hand a gathering call,
 	// each holding keys that are EQUAL but spelled differently — so the model
 	// collapses exactly where the store has to, and a scan that skipped a slot
 	// or an encoding that split one shows up as a group too many.
@@ -356,7 +357,7 @@ describe("gathering a Dictionary out of a List, against a plain model", () => {
 	]
 
 	for (let pool of pools) {
-		test(`groups and tallies as the model does, under ${pool.name}`, () => {
+		test(`groups, tallies and indexes as the model does, under ${pool.name}`, () => {
 			let next = seededRandom(0x5eed + pool.name.length)
 
 			for (let round = 0; round < 120; round++) {
@@ -376,6 +377,11 @@ describe("gathering a Dictionary out of a List, against a plain model", () => {
 				let logical = viewedItems(list)
 				let grouped = group(list, (item) => item, pool.witness as never)
 				let counted = tally(list, pool.witness as never)
+				let indexed = indexBy(
+					list,
+					(item) => item,
+					pool.witness as never,
+				)
 				let model = modelGroup(logical, (item) => item, pool.witness)
 
 				// NOTE: The KEY BOX the answer keeps is the one that arrived
@@ -385,16 +391,30 @@ describe("gathering a Dictionary out of a List, against a plain model", () => {
 				// differently and which of the two is kept is the claim.
 				let groupedKeys = keysOf(grouped).value
 				let countedKeys = keysOf(counted).value
+				let indexedKeys = keysOf(indexed).value
 
 				expect(groupedKeys).toHaveLength(model.length)
 				expect(countedKeys).toHaveLength(model.length)
+				expect(indexedKeys).toHaveLength(model.length)
 
 				for (let index = 0; index < model.length; index++) {
 					expect(groupedKeys[index]).toBe(model[index]!.key)
 					expect(countedKeys[index]).toBe(model[index]!.key)
+					expect(indexedKeys[index]).toBe(model[index]!.key)
 					expect(grouped.store.slots[index]!.key).toBe(
 						model[index]!.key,
 					)
+				}
+
+				// NOTE: An index keeps the LAST item met under a key, and it is
+				// that very box — the item that arrived, not a copy and not the
+				// key box the slot kept from the first.
+				let indexedValues = valuesOf(indexed).value
+
+				for (let index = 0; index < model.length; index++) {
+					let items = model[index]!.items
+
+					expect(indexedValues[index]).toBe(items[items.length - 1])
 				}
 
 				let groupItems = valuesOf(grouped).value.map((group) =>
@@ -425,11 +445,14 @@ describe("gathering a Dictionary out of a List, against a plain model", () => {
 
 				expect(Number(lengthOf(grouped).value)).toBe(model.length)
 				expect(Number(lengthOf(counted).value)).toBe(model.length)
+				expect(Number(lengthOf(indexed).value)).toBe(model.length)
 
 				expectStoreInvariants(grouped, pool.witness)
 				expectStoreInvariants(counted, pool.witness)
+				expectStoreInvariants(indexed, pool.witness)
 				expectGatheredShape(grouped)
 				expectGatheredShape(counted)
+				expectGatheredShape(indexed)
 
 				// NOTE: And every group holds an Array of its OWN. A group that
 				// shared one with a sibling, or with the List that was grouped,
@@ -499,8 +522,8 @@ describe("gathering a Dictionary out of a List, against a plain model", () => {
 	})
 
 	// NOTE: The empty List is the one input with no first item to open a group
-	// with, and both natives have to answer the empty Dictionary rather than
-	// something that merely prints like one.
+	// with, and all three natives have to answer the empty Dictionary rather
+	// than something that merely prints like one.
 	test("the empty List gathers into the empty Dictionary", () => {
 		for (let witness of [equality, witnessed, looseText, byIdentifier]) {
 			let grouped = group(
@@ -509,16 +532,49 @@ describe("gathering a Dictionary out of a List, against a plain model", () => {
 				witness as never,
 			)
 			let counted = tally(createList([]), witness as never)
+			let indexed = indexBy(
+				createList([]),
+				(item) => item,
+				witness as never,
+			)
 
 			expect(writtenForm(grouped)).toBe("[=]")
 			expect(writtenForm(counted)).toBe("[=]")
+			expect(writtenForm(indexed)).toBe("[=]")
 			expect(grouped.store.slots).toHaveLength(0)
 			expect(counted.store.slots).toHaveLength(0)
+			expect(indexed.store.slots).toHaveLength(0)
 			expectStoreInvariants(grouped, witness)
 			expectStoreInvariants(counted, witness)
+			expectStoreInvariants(indexed, witness)
 			expectGatheredShape(grouped)
 			expectGatheredShape(counted)
+			expectGatheredShape(indexed)
 		}
+	})
+
+	// NOTE: The one-to-one crossing's own rule, spelled out over a key that
+	// repeats: the later item is the value, and the key keeps the place — and
+	// the key BOX — it was first met at, which is what `Dictionary.of` and
+	// `set` promise about a repeated key.
+	test("indexes the last item under a key that keeps its first place", () => {
+		let first = createRecord({ id: integer(1), tag: text("first") })
+		let second = createRecord({ id: integer(2), tag: text("second") })
+		let third = createRecord({ id: integer(1), tag: text("third") })
+		let keyOf = (item: AnyType) => (item as RecordType).id as AnyType
+		let indexed = indexBy(
+			createList<AnyType>([first, second, third]),
+			keyOf,
+			equality as never,
+		)
+
+		expect(Number(lengthOf(indexed).value)).toBe(2)
+		expect(keysOf(indexed).value).toEqual([first.id, second.id])
+		expect(keysOf(indexed).value[0]).toBe(first.id)
+		expect(valuesOf(indexed).value[0]).toBe(third)
+		expect(valuesOf(indexed).value[1]).toBe(second)
+		expectStoreInvariants(indexed, equality)
+		expectGatheredShape(indexed)
 	})
 
 	// NOTE: The hazard `List.ts` states in its own words — `createList` TAKES
@@ -623,9 +679,9 @@ describe("gathering a Dictionary out of a List, against a plain model", () => {
 
 	// NOTE: The blocker shape an earlier review found — a Namespace writing its
 	// own `is` for a refinement of a kind whose keys encode. The witness is
-	// unbranded, so both natives must SCAN, and a grouping that encoded anyway
+	// unbranded, so every native must SCAN, and a grouping that encoded anyway
 	// would put "Ada" and "ada" in two groups the witness says are one.
-	test("honours a witness a Namespace wrote in both bridges", () => {
+	test("honours a witness a Namespace wrote in every bridge", () => {
 		let names = createList<AnyType>([
 			text("Ada"),
 			text("ada"),
@@ -634,11 +690,13 @@ describe("gathering a Dictionary out of a List, against a plain model", () => {
 		])
 		let grouped = group(names, (item) => item, looseText as never)
 		let counted = tally(names, looseText as never)
+		let indexed = indexBy(names, (item) => item, looseText as never)
 
 		expect(
 			keysOf(grouped).value.map((key) => (key as StringType).value),
 		).toEqual(["Ada", "Grace"])
 		expect(writtenForm(counted)).toBe(`["Ada" = 3, "Grace" = 1]`)
+		expect(writtenForm(indexed)).toBe(`["Ada" = "ADA", "Grace" = "Grace"]`)
 
 		for (let slot of grouped.store.slots as Array<Slot<AnyType, AnyType>>) {
 			expect(slot.encoded).toBeNull()
@@ -646,8 +704,10 @@ describe("gathering a Dictionary out of a List, against a plain model", () => {
 
 		expect(grouped.store.unencoded).toBe(2)
 		expect(grouped.store.index.size).toBe(0)
+		expect(indexed.store.unencoded).toBe(2)
 		expectStoreInvariants(grouped, looseText)
 		expectStoreInvariants(counted, looseText)
+		expectStoreInvariants(indexed, looseText)
 	})
 
 	// NOTE: The composition the fixture itself writes — a grouping mapped over —

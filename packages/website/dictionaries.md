@@ -278,7 +278,7 @@ Type the name has, and a proof is not it.
 
 ## A List becoming a Dictionary
 
-Two Methods cross from the first container to the second. Neither is a Method
+Three Methods cross from the first container to the second. None is a Method
 of `List`: what a List becomes here is a Dictionary, so the file that owns the
 answer owns them.
 
@@ -311,9 +311,20 @@ zero:
 constant colours = ["red", "blue", "red"]::tally()
 ```
 
+`index(on:)` keeps one item per key: the last one met, under the place the key
+was first met at, exactly as `set` treats a repeated key. It is the bridge for
+a List whose key is meant to be unique, and a lookup answers the item whole:
+
+```essence
+constant byTitle = loans::index(on .title)
+
+constant ruth = byTitle::value(at "Ruth")
+```
+
 The groups stand in the order their keys first appear, and the items of a group
-keep the order they had. Both answer a `NonEmptyDictionary` when the receiver
-is a `NonEmptyList`: a List with an item in it puts that item somewhere.
+keep the order they had. All three answer a `NonEmptyDictionary` when the
+receiver is a `NonEmptyList`: a List with an item in it puts that item
+somewhere.
 
 ## The three rules
 

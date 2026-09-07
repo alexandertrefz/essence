@@ -523,6 +523,8 @@ export type GroupedListNatives = {
 	group: <ItemType extends AnyType, Key extends AnyType>(self: ListType<ItemType>, on: (argument0: ItemType) => Key, Key__conformance: EquatableConformance<Key>) => DictionaryType<Key, ListType<ItemType>>
 	// tally<ItemType is Equatable>() -> Dictionary<ItemType, PositiveInteger>
 	tally: <ItemType extends AnyType>(self: ListType<ItemType>, ItemType__conformance: EquatableConformance<ItemType>) => DictionaryType<ItemType, IntegerType>
+	// index<ItemType, Key is Equatable>(on: (_: ItemType) -> Key) -> Dictionary<Key, ItemType>
+	index: <ItemType extends AnyType, Key extends AnyType>(self: ListType<ItemType>, on: (argument0: ItemType) => Key, Key__conformance: EquatableConformance<Key>) => DictionaryType<Key, ItemType>
 }
 
 export type GroupedNonEmptyListNatives = {
@@ -530,6 +532,8 @@ export type GroupedNonEmptyListNatives = {
 	group: <ItemType extends AnyType, Key extends AnyType>(self: ListType<ItemType>, on: (argument0: ItemType) => Key, Key__conformance: EquatableConformance<Key>) => DictionaryType<Key, ListType<ItemType>>
 	// tally<ItemType is Equatable>() -> NonEmptyDictionary
 	tally: <ItemType extends AnyType>(self: ListType<ItemType>, ItemType__conformance: EquatableConformance<ItemType>) => DictionaryType<ItemType, IntegerType>
+	// index<ItemType, Key is Equatable>(on: (_: ItemType) -> Key) -> NonEmptyDictionary
+	index: <ItemType extends AnyType, Key extends AnyType>(self: ListType<ItemType>, on: (argument0: ItemType) => Key, Key__conformance: EquatableConformance<Key>) => DictionaryType<Key, ItemType>
 }
 
 export type RandomnessNatives = {
@@ -886,6 +890,7 @@ export const $GroupedList: GroupedListNatives = GroupedListModule
 export const $GroupedListArity: AssertArities<typeof import("./GroupedList"), {
 	group: 3
 	tally: 2
+	index: 3
 }> = true
 
 declare const GroupedNonEmptyListModule: typeof import("./GroupedNonEmptyList")
@@ -893,6 +898,7 @@ export const $GroupedNonEmptyList: GroupedNonEmptyListNatives = GroupedNonEmptyL
 export const $GroupedNonEmptyListArity: AssertArities<typeof import("./GroupedNonEmptyList"), {
 	group: 3
 	tally: 2
+	index: 3
 }> = true
 
 declare const RandomnessModule: typeof import("./Randomness")

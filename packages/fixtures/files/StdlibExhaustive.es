@@ -3910,11 +3910,27 @@ third"::lines())
 	)
 	show("GroupedList.tally<ItemType is Equatable>()", votes::tally())
 	show("GroupedList.tally<ItemType is Equatable>() [empty]", noVotes::tally())
+	§ One item per key. A later item with the same key replaces the earlier
+	§ one as the value, and the key keeps the place it was first met at, which
+	§ is what the order of the keys pins.
+	show(
+		"GroupedList.index<ItemType, Key is Equatable>(on: (_ ItemType) -> Key)",
+		seatedGuests::index(on .home)::map(({ key, value }) { <- value.name }),
+	)
+	show(
+		"GroupedList.index<ItemType, Key is Equatable>(on: (_ ItemType) -> Key) [distinct keys]",
+		seatedGuests::index(on .name)::keys(),
+	)
+	show(
+		"GroupedList.index<ItemType, Key is Equatable>(on: (_ ItemType) -> Key) [empty]",
+		noVotes::index(on (vote) { <- vote }),
+	)
 
 	§ ——— GroupedNonEmptyList ——————————————————————————————————————————————
-	§ The same two crossings with the receiver's proof in hand. A List with an
-	§ item in it puts that item in a group, so the Dictionary each answers
-	§ holds an entry — which is what the total `length` reads off it.
+	§ The same crossings with the receiver's proof in hand. A List with an
+	§ item in it puts that item in a group, under a count, or at a key, so the
+	§ Dictionary each answers holds an entry — which is what the total `length`
+	§ reads off it.
 	constant provenVotes: NonEmptyList<String> = ["a", "b", "a"]
 
 	show(
@@ -3924,6 +3940,10 @@ third"::lines())
 	show(
 		"GroupedNonEmptyList.tally<ItemType is Equatable>()",
 		provenVotes::tally()::length(),
+	)
+	show(
+		"GroupedNonEmptyList.index<ItemType, Key is Equatable>(on: (_ ItemType) -> Key)",
+		provenVotes::index(on (vote) { <- vote })::length(),
 	)
 
 	§ ——— loop ————————————————————————————————————————————————————————————

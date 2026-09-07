@@ -446,12 +446,67 @@ describe("The bridges from a List", () => {
 		})
 	})
 
+	// NOTE: The one-to-one crossing. A key met again replaces the value and
+	// keeps its place, which is what `Dictionary.of` and `set` promise about a
+	// repeated key — so the keys come out in first-met order and the values
+	// are the last item met under each.
+	describe("index(on:)", () => {
+		it("keeps the last item under a key that keeps its first place", async () => {
+			expect(
+				await run(`implementation {
+					constant fixtures = [
+						{ name = "alex", home = "north" },
+						{ name = "sam", home = "south" },
+						{ name = "kim", home = "north" },
+					]
+					constant byHome = fixtures::index(on .home)
+
+					Terminal.inspect(byHome::keys())
+					Terminal.inspect(byHome::map(({ key, value }) { <- value.name }))
+					Terminal.inspect(fixtures::index(on .name)::keys())
+				}`),
+			).toEqual([
+				'[ "north", "south" ]',
+				'[ "north" = "kim", "south" = "sam" ]',
+				'[ "alex", "sam", "kim" ]',
+			])
+		})
+
+		it("answers the empty Dictionary for the empty List", async () => {
+			expect(
+				await run(`implementation {
+					constant none: List<String> = []
+
+					Terminal.inspect(none::index(on (vote) { <- vote }))
+				}`),
+			).toEqual(["[=]"])
+		})
+
+		// NOTE: The value is the item itself, so a lookup answers it whole and
+		// the item's own members are read off the answer.
+		it("answers the item under its key", async () => {
+			expect(
+				await run(`implementation {
+					constant products = [
+						{ sku = "a1", price = 3 },
+						{ sku = "b2", price = 5 },
+					]
+
+					Terminal.inspect(
+						products::index(on .sku)::value(at "b2")::map((p) { <- p.price }),
+					)
+					Terminal.inspect(products::index(on .sku)::hasKey("c3"))
+				}`),
+			).toEqual(["Optional#Value(5)", "false"])
+		})
+	})
+
 	// NOTE: The refined twins. A List with an item in it puts that item in a
-	// group, so the Dictionary either answers holds an entry — and a receiver
-	// nothing proved anything about reaches the base pair instead, whose answer
-	// can be the empty Dictionary.
+	// group, under a count, or at a key, so the Dictionary each answers holds
+	// an entry — and a receiver nothing proved anything about reaches the base
+	// entries instead, whose answer can be the empty Dictionary.
 	describe("A proven receiver", () => {
-		it("answers a NonEmptyDictionary from both", async () => {
+		it("answers a NonEmptyDictionary from all three", async () => {
 			expect(
 				await run(`implementation {
 					constant proven: NonEmptyList<String> = ["a", "b", "a"]
@@ -465,9 +520,12 @@ describe("The bridges from a List", () => {
 					Terminal.inspect(
 						proven::tally()::length()::raise(to -1),
 					)
+					Terminal.inspect(
+						proven::index(on (vote) { <- vote })::length()::raise(to -1),
+					)
 					Terminal.inspect(proven::tally()::keys()::firstItem())
 				}`),
-			).toEqual(["1/2", "1/2", '"a"'])
+			).toEqual(["1/2", "1/2", "1/2", '"a"'])
 		})
 
 		it("refuses the proof for a List nothing proved anything about", () => {
