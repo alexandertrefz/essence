@@ -6,16 +6,17 @@ Everything a Program can reach before its first line is declared here: the core
 Protocols (`Equatable`, `Printable`, `Comparable`, `Orderable`), `Boolean`,
 `Optional`, `Ordering`, `Record`, `String`, the whole numeric tower (`Integer`,
 `Rational`, `Algebraic`, `Transcendental` and the covering `Number`, which
-brings the `Number` and `Irrational` Union Types with it), and `List` together
-with `NestedList`, `OptionalList`, `NonEmptyList` and the `NonEmptyNestedList`
-that only both of those proofs together reach. A checked refinement is exported
-beside the base it narrows: `NonZeroInteger`, `NonNegativeInteger` and
-`PositiveInteger` beside `Integer`, `NonZeroRational` beside `Rational`,
-`NonEmptyString` beside `String`, `NonEmptyList` beside `List`. Each reaches
-everything its base reaches, and the tighter answers a proof affords on top —
-`DEVELOPMENT.md` has the rule a narrowed receiver is read by. A value written
-down is its own proof and reaches them without being narrowed at all:
-`4::squareRoot()` answers a number and `[1, 2]::firstItem()` answers an item.
+brings the `Number`, `Irrational` and `Scalar` Union Types with it), and `List`
+together with `NestedList`, `OptionalList`, `NonEmptyList` and the
+`NonEmptyNestedList` that only both of those proofs together reach. A checked
+refinement is exported beside the base it narrows: `NonZeroInteger`,
+`NonNegativeInteger` and `PositiveInteger` beside `Integer`, `NonZeroRational`
+beside `Rational`, `NonEmptyString` beside `String`, `NonEmptyList` beside
+`List`. Each reaches everything its base reaches, and the tighter answers a
+proof affords on top — `DEVELOPMENT.md` has the rule a narrowed receiver is read
+by. A value written down is its own proof and reaches them without being
+narrowed at all: `4::squareRoot()` answers a number and `[1, 2]::firstItem()`
+answers an item.
 The aggregates a List of numbers answers are reachable from the List itself,
 through six Namespaces of their own in `NumberList.es` — `IntegerList`,
 `RationalList` and `NumberList`, and the `NonEmptyIntegerList`,
@@ -24,6 +25,10 @@ instead, whose answers are bare rather than Optional.
 Two more read their numbers off a key rather than off the items:
 `KeyedNumberList`, whose target is the widest List there is, and
 `NonEmptyKeyedNumberList` beside it, where the same proof makes the mean bare.
+Values held under keys are `Dictionary` and the `NonEmptyDictionary` a proof of
+one entry reaches, and a List crosses to them through two Namespaces of its own
+— `GroupedList` and the `GroupedNonEmptyList` that same proof reaches — which
+`Dictionary.es` declares beside the container they answer.
 The modes a Method takes are Choices declared beside it: `Side`, `Rounding`,
 `NumberFormat`, `CaseSensitivity`, `NormalizationForm`, `SortOrder`, `Stream`
 and `Step`.
@@ -43,8 +48,8 @@ all, in `Loop.es`, as ordinary free Functions. Printing is a Namespace:
 `Terminal.inspect` shows a value's structure and answers with it unchanged, and
 `Terminal.write` is the raw primitive both are built on (`Terminal.es`).
 
-Two of every three declared Method entries are also IMPLEMENTED here, in
-Essence — 280 of 421 as this is written, counting one entry per Overload and
+Three of every five declared Method entries are also IMPLEMENTED here, in
+Essence — 292 of 479 as this is written, counting one entry per Overload and
 `loop`'s free Functions with them; the rest bind to `@essence-lang/runtime`.
 Seven more are written on a PROTOCOL rather than on a Namespace, once for every
 conformer: `Equatable.isNot`, and `Orderable`'s four inequalities, `isBetween`
@@ -63,9 +68,16 @@ the rest rest on (`List.reduce`, `item(at:)`, `slice`, the eager filter
 `String.split(on:)`, which is also the one native that decides what a
 "character" is: it segments into Unicode grapheme clusters (see `graphemesOf` in
 `String.ts`), so `length`, `slice`, `reverse`, `firstIndex` and the rest, all
-written on top of it, count and cut by grapheme). The short-circuiting
-`firstItem(where:)` is not among them: it is written in Essence on `reduce`'s
-early-stopping entry, and leaves the walk at the item that decides the answer.
+written on top of it, count and cut by grapheme). A fourth group joined those
+three for a measured reason rather than for a reason of principle: a search or
+an ordering whose Essence body built a whole List to answer a question about one
+position. `String.firstIndex`/`lastIndex`/`count(of:)` walk the grapheme view,
+`List.sort`, `List.lastIndex(where:)` and `List.partition` walk the runs, and
+`Dictionary.everyEntry`/`removeEvery` keep the encodings the receiver already
+holds. Each says at its own declaration what it measured. The short-circuiting
+`firstItem(where:)` is not among any of them: it is written in Essence on
+`reduce`'s early-stopping entry, and leaves the walk at the item that decides
+the answer.
 
 Two Methods are native for a reason worth reading before assuming otherwise:
 `List.is`, because the pairwise form trips an infinite recursion in generic

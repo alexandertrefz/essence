@@ -123,7 +123,7 @@ inside `packages/standard-library/sources` works normally.
 
 ## Native and Essence in one Namespace
 
-Every Namespace here is part native and part Essence — seven of every ten
+Every Namespace here is part native and part Essence — three of every five
 declared Method entries are written in Essence — and emitted user code can not
 tell the two apart. `packages/compiler/src/rewriter/stdlibPrelude.ts` simplifies the enriched
 sources once per process, and the Rewriter emits each Essence-implemented
@@ -159,26 +159,31 @@ Essence.
 **A refined entry that duplicates an Essence body is written twice, on
 purpose** — wherever it stands. A refinement erases before anything runs, so an
 entry whose promise is about the answer can not say it in Essence and has to be
-native; where the entry it stands beside is an Essence body, the runtime writes
-that operation out a second time rather than instead of it. Four do.
-`NonEmptyList` holds two — `prepend(contentsOf:)` and `replace(_:at:)`, each
-written in Essence on `List` — `List.repeat`'s `PositiveInteger` entry is the
-third, native because the entry beside it answers a `List`, and an expression
-that is not empty is not one the language can be told is not empty; and
-`NonZeroRational::reciprocal` is the fourth, for the same reason one level
-along. Every other refined entry added since READS off the native beside it
-instead — `NonNegativeInteger::squareRoot` is the shape to copy — and
-`reciprocal` can not, because the entry it stands beside is an Essence body and
-so exports no runtime Function to import. That is the exception the rule above
-allows, and it is only safe because `StdlibExhaustive.es` calls both entries
-over the same inputs, wherever they stand: the golden capture is what stops the
-two from drifting. Writing another one means adding those lines too.
+native; where the entry it stands beside is an Essence body performing the SAME
+operation, the runtime writes that operation out a second time rather than
+instead of it. Six do. `NonEmptyList` holds two — `prepend(contentsOf:)` and
+`replace(_:at:)`, each written in Essence on `List` — `List.repeat`'s
+`PositiveInteger` entry is the third, native because the entry beside it answers
+a `List`, and an expression that is not empty is not one the language can be
+told is not empty; `NonZeroRational::reciprocal` and `negate` are the fourth and
+fifth, for the same reason one level along; and `NonEmptyString::characters` is
+the sixth, spelled out of the `split(on "")` its own Essence twin is.
+`NonEmptyList::firstItem` and `NonEmptyString::firstCharacter` are on no such
+list, though each stands beside an Essence body: an entry that unwraps an
+Optional performs a different operation from the one that answers it. Every
+other refined entry READS off the native beside it instead —
+`NonNegativeInteger::squareRoot` is the shape to copy — and these six can not,
+because the entry each stands beside is an Essence body and so exports no
+runtime Function to import. That is the exception the rule above allows, and it
+is only safe because `StdlibExhaustive.es` calls both entries over the same
+inputs, wherever they stand: the golden capture is what stops the two from
+drifting. Writing another one means adding those lines too.
 
 Most of `NonEmptyList` is native, but not all of it. `indices()` is written on
 `List.of(integersFrom:through:)`, which promises a non-empty answer already,
-`sort(on:)` hands its key to the native `sort(by:)`, `replace(at:_:)` hands the
-transformed item to the native `replace(_:at:)`, and `lowestItem(on:)` and
-`highestItem(on:)` read `List`'s Optional answer off the native `firstItem()`.
+`replace(at:_:)` hands the transformed item to the native `replace(_:at:)`, and
+`lowestItem(on:)` and `highestItem(on:)` read `List`'s Optional answer off the
+native `firstItem()`.
 An Essence body can carry a proof another entry already holds; what it can not
 do is mint one.
 
@@ -239,12 +244,14 @@ Composition is not free, and four costs are easy to miss because no test fails:
   value is below its own negation exactly when it is negative, and an Algebraic
   is never zero); Transcendental declares no ordering to write either of its
   two on, so both went native. `Number.es` is out of the cycle entirely.
-- **Two Namespaces can end up written on each other.** `String` is written on
-  `List` throughout — `lines`, `repeat` and `replaceFirst` all route through it
-  — and `List::toString` was written on `String::append`, the one call back.
-  It is native now, so the edge points one way. Interpolating would not have
-  helped: a hole renders through its value's `Printable` conformance, and for a
-  String that is `String::toString`, the same edge under another name.
+- **Two Namespaces can end up written on each other.** `String` routes through
+  `List` wherever a body needs the pieces `split` answers, and `replaceEvery` —
+  `split(on part)::join(with replacement)` — is the one body left that does:
+  `lines` and `repeat` are native, and `replaceFirst` is written on `firstIndex`
+  and `slice` instead. `List::toString` was written on `String::append`, the one
+  call back. It is native now, so the edge points one way. Interpolating would
+  not have helped: a hole renders through its value's `Printable` conformance,
+  and for a String that is `String::toString`, the same edge under another name.
 - **A body can change complexity class.** `String.length` written as
   `@::characters()::length()` is correct, but builds a List of every character
   to count them, and pulls `List`'s whole import graph in behind it. It is
@@ -252,8 +259,10 @@ Composition is not free, and four costs are easy to miss because no test fails:
   Essence, but on `reduce`'s early-stopping entry rather than on the eager
   `everyItem(where:)`, so they stop at the item that decides the answer — the
   earlier filtering form lost that and measured ~0 ms → ~180 ms over 2000 calls
-  when the first item decides it. `count(where:)` is still on
-  `everyItem(where:)`, which is right: counting has to see every item.
+  when the first item decides it. `count(where:)` has to see every item whatever
+  it is written on, so what a fold saves there is the List the filter built to
+  be measured and dropped: two thousand counts of 20,000 items measured 155 ms
+  on the filter and 78 ms on the fold.
 - **A body can lose an invariant only the runtime holds.** `String::reverse` is
   native, and `@::characters()::reverse()::join(with "")` is not the same
   Method. A String carries the grapheme view `createSegmentedString`
@@ -261,13 +270,11 @@ Composition is not free, and four costs are easy to miss because no test fails:
   characters throws that view away, and segmenting the joined text again can
   re-pair three regional indicators into characters the original never had. The
   native reverses the view instead, which is what makes `reverse` its own
-  inverse — and `String::lastIndex(of:)`, which reverses the receiver and the
-  part and reads a `firstIndex` off the result, is only correct because it is.
-  Nothing in `String.es` says the view exists, so a body written from the
-  Essence side alone looks equivalent and is not.
+  inverse. Nothing in `String.es` says the view exists, so a body written from
+  the Essence side alone looks equivalent and is not.
 
 Prefer a body that reaches only its own Namespace's primitives. `packages/compiler/src/tests/bundleSize.spec.ts`
-guards two files, but it is a floor, not a substitute for measuring.
+guards three files, but it is a floor, not a substitute for measuring.
 
 ## Member order
 
@@ -376,13 +383,13 @@ rung.** `Equatable` writes `isNot` and `Orderable` writes six Methods, and every
 conformer answers them without declaring anything. A Namespace that declares a
 Method of the same name replaces the provided one entirely for its own target —
 no entry is merged in — and it has to hold an entry the provided signature
-accepts, which is the same check a requirement gets. Five declarations here do
-it, and each says why at its own site: `Optional::isNot` takes a bare item as
-well as an Optional; `Integer::isNot` and `Rational::isNot` carry the contrary
-of an equality entry over the OTHER numeric kind, which a provided Method over
-`Self` alone has no entry for; and `Integer::isLessThan` and
-`Rational::isLessThan` hold an entry for the other numeric kind and are written
-on their own `compare` rather than on the cross-kind table.
+accepts, which is the same check a requirement gets. Eleven declarations here do
+it, over five names, and each says why at its own site: `Optional::isNot` takes
+a bare item as well as an Optional; `Integer::isNot` and `Rational::isNot` carry
+the contrary of an equality entry over the OTHER numeric kind, which a provided
+Method over `Self` alone has no entry for; and each numeric kind's four
+inequalities hold an entry for the other kind and are written on their own
+`compare` rather than on the cross-kind table.
 
 It replaces nothing on another Namespace's rung. A provided Method is a candidate
 of every Namespace whose conformance offers it, ranked by that Namespace's target
@@ -393,8 +400,8 @@ offer all six, and a call Integer's rung rejects falls to Number's.
 An override answers a bounded call too. The witness a `<Item is Orderable>` bound
 is handed names the conformer's override where it wrote one and the Protocol's
 shared const where it did not, so `1::isLessThan(2)` and the same call inside a
-bounded Function run the same Method. The library's five overrides all say over
-`Self` what the provided body says — faster, or with an entry for a kind the
+bounded Function run the same Method. The library's eleven overrides all say
+over `Self` what the provided body says — faster, or with an entry for a kind the
 provided signature has no room for — which is now a promise about the library
 rather than one the language leans on.
 
@@ -433,10 +440,12 @@ knowing: `Optional::is` declares the whole Optional entry FIRST, so
 its refined entry after the general one, so it is numbered second of the three
 and still read first. Appending is the rule, because it leaves every earlier
 number alone — so the `defaultingTo:` entry is last only where nothing has been
-written since. Ten Overloads carry a refined entry written after one, and each
-of those is read first all the same: `Integer::divide` and `Integer::raise`,
-`Rational::divide` and `Rational::raise`, `Algebraic::multiply`, the
-irrationals' `divide`, `Number.average` and the two `Number` extrema.
+written since. Seventeen Overloads carry a refined entry written after one, and
+each of those is read first all the same: `String::split`, `Integer::divide`,
+`remainder`, `quotient` and `raise`, `NonZeroInteger::raise`, `Rational::of`,
+`divide` and `raise`, `Algebraic::multiply` and `divide`,
+`Transcendental::multiply` and `divide`, `List.repeat`, `Number.average` and the
+two `Number` extrema.
 
 **A predicate written as one call on `@` IS that call.** A Method answering a
 Boolean whose whole body is one call on `@` — optionally negated — is read off
