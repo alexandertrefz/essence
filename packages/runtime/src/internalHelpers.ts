@@ -180,19 +180,40 @@ export function anyIs(a: AnyType, b: AnyType): boolean {
 			)
 		case "Algebraic": {
 			// NOTE: Algebraic.is is written in Essence now — it reads
-			// `compare`, which decides the sign of the difference symbolically.
-			// Normal forms make that the same answer as comparing the
-			// representation directly, which is what the deleted native did.
+			// `compare`, which decides the sign of the difference
+			// symbolically, and this has to answer what that answers.
+			// Comparing the REPRESENTATION does not: the radicand is not
+			// canonical, because `extractSquarePart` trial-divides only up to
+			// 2^16 and leaves a `p²·q` whose p and q are both past that bound
+			// as written — so √(65537²·65539) and 65537·√65539 are one number
+			// held two ways. Compared field by field they came out unequal,
+			// while `is` called them equal: the same pair was equal on its own
+			// and unequal inside a Record, a Case or a List, and a Dictionary
+			// keyed by such a Record opened two slots for the one number.
+			//
+			// NOTE: `a + b·√d` is `a' + b'·√e` exactly when the rational parts
+			// are equal and `b·√d = b'·√e`. The coefficients are never zero and
+			// the radicands never 1, so that second half is the coefficients
+			// sharing a sign and `b²·d = b'²·e` — squaring is exact over two
+			// non-negative sides, and over the stored parts it is
+			// `bn²·b'd²·d = b'n²·bd²·e`. Denominators are positive by
+			// `reduced`'s invariant, so both cross-multiplications keep their
+			// sign, and the whole test is bigint multiplication: none of the
+			// interval arithmetic `compare` needs is imported here, which is
+			// what keeps this file out of a Program's bundle.
 			const other = b as AlgebraicType
 
 			return (
-				a.radicand === other.radicand &&
-				a.rationalPartNumerator === other.rationalPartNumerator &&
-				a.rationalPartDenominator === other.rationalPartDenominator &&
-				a.radicalCoefficientNumerator ===
-					other.radicalCoefficientNumerator &&
-				a.radicalCoefficientDenominator ===
-					other.radicalCoefficientDenominator
+				a.rationalPartNumerator * other.rationalPartDenominator ===
+					other.rationalPartNumerator * a.rationalPartDenominator &&
+				a.radicalCoefficientNumerator < 0n ===
+					other.radicalCoefficientNumerator < 0n &&
+				a.radicalCoefficientNumerator ** 2n *
+					other.radicalCoefficientDenominator ** 2n *
+					a.radicand ===
+					other.radicalCoefficientNumerator ** 2n *
+						a.radicalCoefficientDenominator ** 2n *
+						other.radicand
 			)
 		}
 		case "Transcendental": {

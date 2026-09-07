@@ -524,6 +524,40 @@ describe("Irrationals", () => {
 					"true",
 				])
 			})
+
+			// NOTE: The same pair one level down, which is where the
+			// universal comparison decides instead of `Algebraic::is`: a
+			// Record member, a List item, and the key of a Dictionary. That
+			// comparison used to read the five stored fields, so the pair was
+			// equal on its own and unequal in every structure — and a
+			// Dictionary keyed by such a Record opened two slots for the one
+			// number. Congruence is what `removeDuplicates`, `group`, `tally`
+			// and `contains` all rest on, so it is asserted where a Program
+			// meets it as well as through the comparison itself.
+			it("is one number inside a Record, a List and a Dictionary key", async () => {
+				const written = radical(65537n * 65537n * 65539n)
+				const normalised = algebraic.multiply(
+					radical(65539n),
+					integer.createInteger(65537n),
+				)
+
+				expect(anyIs(written, normalised)).toBeTrue()
+				expect(anyIsNot(written, normalised)).toBeFalse()
+
+				expect(
+					await run(`implementation {
+						constant written: Number = 281496452005891::squareRoot()
+						constant normalised: Number = 65539::squareRoot()::multiply(with 65537)
+
+						Terminal.inspect({ value = written }::is({ value = normalised }))
+						Terminal.inspect([written]::is([normalised]))
+						Terminal.inspect([{ value = written }]::is([{ value = normalised }]))
+						Terminal.inspect([written = 1]::set(normalised, to 2)::length())
+						Terminal.inspect([{ value = written } = 1]::set({ value = normalised }, to 2)::length())
+						Terminal.inspect([written, normalised]::removeDuplicates()::length())
+					}`),
+				).toEqual(["true", "true", "true", "1", "1", "1"])
+			})
 		})
 
 		// NOTE: The zero branch of the linear sign — |a| = |b|·√d with the signs
