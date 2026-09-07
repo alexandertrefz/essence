@@ -359,6 +359,15 @@ declarations {
 				with other: Dictionary<KeyType, ValueType>,
 				choosing choose: (_: ValueType, _: ValueType) -> ValueType,
 			) -> Dictionary<KeyType, ValueType> {
+				§ Two Dictionaries are in reach inside the fold. The
+				§ Function is asked about the one bound here: `mine` is the
+				§ receiver, and `merged` is what the fold has built so far.
+				§ Reading `merged` instead would hand the Function a value an
+				§ earlier round had already chosen. The two answer alike as
+				§ it happens, since `other`'s keys are distinct. No round
+				§ revisits a key an earlier one wrote. That is a theorem
+				§ about the Argument rather than the promise this entry
+				§ makes, and `mine` is the promise written down.
 				constant mine = @
 
 				<- other
