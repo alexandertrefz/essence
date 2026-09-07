@@ -36,6 +36,19 @@ const string = createString
 const integer = createInteger
 const value = createValue
 const countOf = (value: string) => length(createString(value)).value
+
+// NOTE: The TEXT a position answers rather than the Optional around it. A
+// character taken off an ASCII String carries the ASCII marker and the count
+// that follows from it — `asciiFastPath.spec.ts` is what holds those to
+// account — so a deep comparison against a freshly made String reads two keys
+// the answer has and the expectation does not.
+const characterAt = (value: string, position: bigint) => {
+	let answer = character(createString(value), createInteger(position))
+
+	return answer[typeKeySymbol] === "Optional#Empty"
+		? undefined
+		: answer.item.value
+}
 const orderOf = (first: string, second: string) =>
 	compare(createString(first), createString(second))[typeKeySymbol]
 
@@ -183,12 +196,8 @@ describe("positions", () => {
 		expect(slice(string("abcde"), integer(-2n), integer(5n)).value).toBe(
 			"de",
 		)
-		expect(character(string("abcde"), integer(-1n))).toEqual(
-			value(string("e")),
-		)
-		expect(character(string("abcde"), integer(-5n))).toEqual(
-			value(string("a")),
-		)
+		expect(characterAt("abcde", -1n)).toBe("e")
+		expect(characterAt("abcde", -5n)).toBe("a")
 	})
 
 	test("a position outside the String has no character", () => {

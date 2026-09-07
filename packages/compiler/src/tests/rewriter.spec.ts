@@ -715,20 +715,21 @@ describe("Rewriter", () => {
 				})
 			})
 
+			// NOTE: The TEXT of each piece, for the reason `append` gives: a
+			// piece of an ASCII String carries the ASCII marker and its count,
+			// and a piece of any other String carries the clusters it was cut
+			// into — `asciiFastPath.spec.ts` and `graphemes.spec.ts` hold
+			// those to account.
 			describe("split", () => {
 				it("splits correctly when splitting on an empty string", () => {
 					expect(
-						string.split__overload$1(
-							string.createString("abc"),
-							string.createString(""),
-						),
-					).toEqual(
-						list.createList([
-							string.createString("a"),
-							string.createString("b"),
-							string.createString("c"),
-						]),
-					)
+						string
+							.split__overload$1(
+								string.createString("abc"),
+								string.createString(""),
+							)
+							.value.map((piece) => piece.value),
+					).toEqual(["a", "b", "c"])
 				})
 
 				it("splits an empty splitter by code point, keeping astral characters whole", () => {
@@ -742,17 +743,10 @@ describe("Rewriter", () => {
 					let emoji = string.createString("a\u{1F600}b")
 
 					expect(
-						string.split__overload$1(
-							emoji,
-							string.createString(""),
-						),
-					).toEqual(
-						list.createList([
-							string.createString("a"),
-							string.createString("\u{1F600}"),
-							string.createString("b"),
-						]),
-					)
+						string
+							.split__overload$1(emoji, string.createString(""))
+							.value.map((piece) => piece.value),
+					).toEqual(["a", "\u{1F600}", "b"])
 				})
 
 				it("splits correctly using a substring", () => {
@@ -782,14 +776,16 @@ describe("Rewriter", () => {
 				})
 			})
 
+			// NOTE: The TEXT again: a case mapping or a trim of an ASCII
+			// String keeps the ASCII marker, for the reason `String.ts` gives.
 			describe("casing and trimming", () => {
 				it("upper- and lower-cases", () => {
-					expect(string.uppercase(string.createString("aB"))).toEqual(
-						string.createString("AB"),
-					)
-					expect(string.lowercase(string.createString("aB"))).toEqual(
-						string.createString("ab"),
-					)
+					expect(
+						string.uppercase(string.createString("aB")).value,
+					).toBe("AB")
+					expect(
+						string.lowercase(string.createString("aB")).value,
+					).toBe("ab")
 				})
 
 				it("trims from either end", () => {
@@ -797,17 +793,19 @@ describe("Rewriter", () => {
 					// Argument reaches it through the frame the Compiler
 					// synthesizes for the `at:` Parameter's default.
 					expect(
-						string.trim(string.createString("  hi  "), side.start),
-					).toEqual(string.createString("hi  "))
+						string.trim(string.createString("  hi  "), side.start)
+							.value,
+					).toBe("hi  ")
 					expect(
-						string.trim(string.createString("  hi  "), side.end),
-					).toEqual(string.createString("  hi"))
+						string.trim(string.createString("  hi  "), side.end)
+							.value,
+					).toBe("  hi")
 					expect(
 						string.trim(
 							string.createString("  hi  "),
 							side.bothEnds,
-						),
-					).toEqual(string.createString("hi"))
+						).value,
+					).toBe("hi")
 				})
 			})
 
