@@ -134,10 +134,16 @@ export function prepend<ItemType extends AnyType>(
 // said about it differs.
 export { map } from "./List"
 
-// NOTE: The two that only move items about, both `List`'s own natives. `sort`'s
-// entries bind by position exactly as they do there — `$1` takes the items'
-// `compare` as its hidden conformance Argument, `$2` the comparison outright.
-export { reverse, sort__overload$1, sort__overload$2 } from "./List"
+// NOTE: The two that only move items about, all four `List`'s own natives.
+// `sort`'s entries bind by position exactly as they do there — `$1` takes the
+// items' `compare` as its hidden conformance Argument, `$2` the comparison
+// outright, and `$3` the key with the KEY Type's `compare` as the conformance.
+export {
+	reverse,
+	sort__overload$1,
+	sort__overload$2,
+	sort__overload$3,
+} from "./List"
 
 // NOTE: The second entry with no native of `List`'s to hand the work to, for the
 // reason `removeDuplicates` has none: `List` answers `replace` in Essence. One
