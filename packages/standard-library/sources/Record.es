@@ -37,6 +37,8 @@ declarations {
 
 		§§ Answers the names of the Record's members.
 		§§
+		§§ The names are one third of a reflective trio. The other two, `entries` and `values`, answer a value of any Type, and there is no Type to write that with. So a Program can read the names and not what they name.
+		§§
 		§§ @returns — the member names, as a List of Strings.
 		keys() -> List<String>
 	}

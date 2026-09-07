@@ -48,7 +48,7 @@ declarations {
 
 		§§ Answers the exact sum of the Algebraic and a number.
 		§§
-		§§ Two Algebraics over the same radical stay in the slice. Their radical parts can also cancel, which leaves a Rational. The `defaultingTo:` entry answers the given value in place of empty.
+		§§ Two Algebraics over the same radical stay in the slice. Their radical parts can also cancel, which leaves a Rational. Two roots of different numbers have no sum in this slice, and the answer is empty. The `defaultingTo:` entry answers the given value in place of empty.
 		overload add {
 			§§ Answers the exact sum of the Algebraic and an Integer.
 			§§
@@ -91,7 +91,7 @@ declarations {
 
 		§§ Answers the exact difference of the Algebraic and a number.
 		§§
-		§§ Subtracting an equal radical part leaves a Rational. The `defaultingTo:` entry answers the given value in place of empty.
+		§§ Subtracting an equal radical part leaves a Rational. Two roots of different numbers have no difference in this slice, and the answer is empty. The `defaultingTo:` entry answers the given value in place of empty.
 		overload subtract {
 			§§ Answers the exact difference of the Algebraic and an Integer.
 			§§
