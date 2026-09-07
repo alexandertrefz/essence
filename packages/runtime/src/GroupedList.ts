@@ -1,9 +1,10 @@
 // NOTE: The runtime module of the `GroupedList` Namespace — the bridge from the
 // first container to the second (`packages/standard-library/sources/Dictionary.es`).
-// Both Methods walk a List once and answer a Dictionary keyed by something read
-// off its items, and both are native because each promises something about what
-// it built that no Essence expression can say: a group that has an item in it,
-// and a count that is above zero.
+// The three natives here each walk a List once and answer a Dictionary keyed by
+// something read off its items, and each is native because it promises
+// something about what it built that no Essence expression can say: a group
+// that has an item in it, a count that is above zero, and a Dictionary with an
+// entry in it for the proven twin.
 //
 // NOTE: The store is built through `Dictionary.ts`'s own three doors rather
 // than out of slots reached from here. A grouping is one walk that folds each
@@ -14,9 +15,9 @@
 //
 // NOTE: The List is walked as every List native walks one, with the two runs'
 // counts fixed before the first item is read — `runsOf` rather than `viewOf`,
-// because neither Method visits an item twice and there is no reason to trim the
-// caller's List for it. A List built at the front holds its first items in a
-// second run, stored reversed, which is what the backwards loop is.
+// because no Method here visits an item twice and there is no reason to trim
+// the caller's List for it. A List built at the front holds its first items in
+// a second run, stored reversed, which is what the backwards loop is.
 import type { DictionaryType, EquatableWitness, Store } from "./Dictionary"
 import {
 	dictionaryOverFreshStore,
@@ -29,14 +30,14 @@ import type { ListType } from "./List"
 import { append__overload$1, createList, runsOf } from "./List"
 import type { AnyType } from "./type"
 
-// NOTE: One item into its group, which is the whole of what either Method does
-// with an item. The group is a List and grows through `List`'s own `append`,
-// which pushes onto the Array in place while the group is the tip of its run —
-// and a group gathered here is only ever appended to, so it always is. The
-// alternative was a plain Array per group and one `createList` at the end, which
-// buys nothing: `createList` takes the Array over either way, and this keeps the
-// answer's Lists in the representation `List.ts` maintains rather than in one
-// this file would have to know about.
+// NOTE: One item into its group, which is the whole of what `group` does with
+// an item. The group is a List and grows through `List`'s own `append`, which
+// pushes onto the Array in place while the group is the tip of its run — and a
+// group gathered here is only ever appended to, so it always is. The
+// alternative was a plain Array per group and one `createList` at the end,
+// which buys nothing: `createList` takes the Array over either way, and this
+// keeps the answer's Lists in the representation `List.ts` maintains rather
+// than in one this file would have to know about.
 function gatherItem<Key extends AnyType, ItemType extends AnyType>(
 	store: Store<Key, ListType<ItemType>>,
 	key: Key,
@@ -64,14 +65,14 @@ export function group<ItemType extends AnyType, Key extends AnyType>(
 	let view = runsOf(originalList)
 	let store = freshStore<Key, ListType<ItemType>>()
 
-	for (let index = view.frontCount - 1; index >= 0; index--) {
-		let item = view.front[index]
+	for (let position = view.frontCount - 1; position >= 0; position--) {
+		let item = view.front[position]
 
 		gatherItem(store, keyOf(item), item, conformance)
 	}
 
-	for (let index = 0; index < view.backCount; index++) {
-		let item = view.back[index]
+	for (let position = 0; position < view.backCount; position++) {
+		let item = view.back[position]
 
 		gatherItem(store, keyOf(item), item, conformance)
 	}
@@ -92,12 +93,12 @@ export function tally<ItemType extends AnyType>(
 	let view = runsOf(originalList)
 	let store = freshStore<ItemType, IntegerType>()
 
-	for (let index = view.frontCount - 1; index >= 0; index--) {
-		countItem(store, view.front[index], conformance)
+	for (let position = view.frontCount - 1; position >= 0; position--) {
+		countItem(store, view.front[position], conformance)
 	}
 
-	for (let index = 0; index < view.backCount; index++) {
-		countItem(store, view.back[index], conformance)
+	for (let position = 0; position < view.backCount; position++) {
+		countItem(store, view.back[position], conformance)
 	}
 
 	return dictionaryOverFreshStore(store)
@@ -114,5 +115,55 @@ function countItem<ItemType extends AnyType>(
 		conformance,
 		() => createInteger(1),
 		(count) => createInteger((count.value as number) + 1),
+	)
+}
+
+// NOTE: The one-to-one crossing: the same walk as `group`, with the item itself
+// standing where a group would. A key met again REPLACES the value and keeps
+// its slot, which is what `Dictionary.of` and `set` promise about a repeated
+// key, and the fold's two halves say exactly that — the first item under a key
+// opens the slot, and every later one is written over it.
+//
+// NOTE: Native rather than `Dictionary.of(@::map(…))` in Essence, for the
+// proven twin's sake: the Essence spelling answers a bare `Dictionary` on any
+// receiver, and only a native can say that a List with an item in it indexes
+// into a Dictionary with an entry in it. The base entry is this same walk under
+// the wider name, so the two can not come apart — and it saves the List of
+// entry Records the Essence spelling would build and throw away.
+export function index<ItemType extends AnyType, Key extends AnyType>(
+	originalList: ListType<ItemType>,
+	keyOf: (item: ItemType) => Key,
+	conformance: EquatableWitness<Key>,
+): DictionaryType<Key, ItemType> {
+	let view = runsOf(originalList)
+	let store = freshStore<Key, ItemType>()
+
+	for (let position = view.frontCount - 1; position >= 0; position--) {
+		let item = view.front[position]
+
+		fileItem(store, keyOf(item), item, conformance)
+	}
+
+	for (let position = 0; position < view.backCount; position++) {
+		let item = view.back[position]
+
+		fileItem(store, keyOf(item), item, conformance)
+	}
+
+	return dictionaryOverFreshStore(store)
+}
+
+function fileItem<Key extends AnyType, ItemType extends AnyType>(
+	store: Store<Key, ItemType>,
+	key: Key,
+	item: ItemType,
+	conformance: EquatableWitness<Key>,
+): void {
+	foldIntoFreshStore(
+		store,
+		key,
+		conformance,
+		() => item,
+		() => item,
 	)
 }

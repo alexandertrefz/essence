@@ -5,6 +5,9 @@
 benchmark "A List becoming a Dictionary/groups ten thousand items"
 	396000 ns
 
+benchmark "A List becoming a Dictionary/indexes ten thousand items"
+	260000 ns
+
 benchmark "A List becoming a Dictionary/tallies ten thousand items"
 	292000 ns
 

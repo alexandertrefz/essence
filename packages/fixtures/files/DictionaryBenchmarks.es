@@ -22,9 +22,10 @@ implementation {
 	§     read out, `value(at:defaultingTo:)`           280 µs   28.0 ns/key
 	§     printed, `toString()`                         635 µs   63.5 ns/entry
 	§   Dictionary, a hundred writes from ONE base     32.7 ms    327 µs/fork
-	§   A List becoming a Dictionary, ten thousand items
+	§   A List becoming a Dictionary, ten thousand items over a hundred keys
 	§     `tally()`                                     254 µs   25.4 ns/item
 	§     `group(on:)`                                  337 µs   33.7 ns/item
+	§     `index(on:)`                                  225 µs   22.5 ns/item
 	§
 	§   A thousand keys, the same two questions, both containers
 	§                          Dictionary   List of entries    ratio
@@ -98,7 +99,7 @@ implementation {
 	§ measured for what it is.
 	type Tagged = { row: Integer, tags: List<String> }
 
-	§ One row of a season, for the two Methods that turn a List into a
+	§ One row of a season, for the Methods that turn a List into a
 	§ Dictionary.
 	type Result = { team: String, goals: Integer }
 
@@ -183,8 +184,9 @@ implementation {
 		(dictionary, key) { <- dictionary::set(key, to 1) },
 	)
 
-	§ Ten thousand results over a hundred teams, so grouping and tallying
-	§ have something to put together rather than one item under every key.
+	§ Ten thousand results over a hundred teams, so grouping, tallying and
+	§ indexing have something to put together rather than one item under
+	§ every key.
 	constant results: List<Result> = List.of(integersFrom 0, through 9999)
 		::map((number) {
 			<- {
@@ -394,7 +396,9 @@ tests {
 		}
 	}
 
-	§ The two Methods that cross from the first container to the second.
+	§ The three Methods that cross from the first container to the second.
+	§ Each walks the same ten thousand items into a hundred keys, so what
+	§ separates the three is what each does at a key it has already opened.
 	suite "A List becoming a Dictionary" {
 		benchmark "tallies ten thousand items" {
 			expect teams::tally()::length()::is(100)
@@ -402,6 +406,10 @@ tests {
 
 		benchmark "groups ten thousand items" {
 			expect results::group(on .team)::length()::is(100)
+		}
+
+		benchmark "indexes ten thousand items" {
+			expect results::index(on .team)::length()::is(100)
 		}
 	}
 }
