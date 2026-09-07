@@ -79,7 +79,7 @@ export type StringNatives = {
 	ends: (self: StringType, argument1: StringType) => BooleanType
 	// words() -> List<String>
 	words: (self: StringType) => ListType<StringType>
-	// length() -> Integer
+	// length() -> NonNegativeInteger
 	length: (self: StringType) => IntegerType
 	// character(at: Integer) -> Optional<String>
 	character__overload$1: (self: StringType, at: IntegerType) => OptionalType<StringType>
@@ -149,6 +149,8 @@ export type IntegerNatives = {
 	raise__overload$3: (self: IntegerType, to: IntegerType) => IntegerType
 	// squareRoot() -> Optional<Integer | Algebraic>
 	squareRoot__overload$1: (self: IntegerType) => OptionalType<IntegerType | AlgebraicType>
+	// absolute() -> NonNegativeInteger
+	absolute: (self: IntegerType) => IntegerType
 	// negate() -> Integer
 	negate: (self: IntegerType) => IntegerType
 }
@@ -198,7 +200,7 @@ export type RationalNatives = {
 	squareRoot__overload$1: (self: RationalType) => OptionalType<RationalType | AlgebraicType>
 	// numerator() -> Integer
 	numerator: (self: RationalType) => IntegerType
-	// denominator() -> NonZeroInteger
+	// denominator() -> PositiveInteger
 	denominator: (self: RationalType) => IntegerType
 }
 
@@ -349,7 +351,7 @@ export type ListNatives = {
 	compare: <ItemType extends AnyType>(self: ListType<ItemType>, to: ListType<ItemType>, ItemType__conformance: ComparableConformance<ItemType>) => OrderingType
 	// toString<ItemType is Printable>() -> String
 	toString: <ItemType extends AnyType>(self: ListType<ItemType>, ItemType__conformance: PrintableConformance<ItemType>) => StringType
-	// length<ItemType>() -> Integer
+	// length<ItemType>() -> NonNegativeInteger
 	length: <ItemType extends AnyType>(self: ListType<ItemType>) => IntegerType
 	// item<ItemType>(at: Integer) -> Optional<ItemType>
 	item__overload$1: <ItemType extends AnyType>(self: ListType<ItemType>, at: IntegerType) => OptionalType<ItemType>
@@ -409,7 +411,7 @@ export type NonEmptyListNatives = {
 	firstItem: <ItemType extends AnyType>(self: ListType<ItemType>) => ItemType
 	// lastItem<ItemType>() -> ItemType
 	lastItem: <ItemType extends AnyType>(self: ListType<ItemType>) => ItemType
-	// length<ItemType>() -> NonZeroInteger
+	// length<ItemType>() -> PositiveInteger
 	length: <ItemType extends AnyType>(self: ListType<ItemType>) => IntegerType
 	// enumerate<ItemType>() -> NonEmptyList
 	enumerate: <ItemType extends AnyType>(self: ListType<ItemType>) => ListType<RecordType & { index: IntegerType; item: ItemType }>
@@ -481,7 +483,7 @@ export type DictionaryNatives = {
 	toString: <KeyType extends AnyType, ValueType extends AnyType>(self: DictionaryType<KeyType, ValueType>, KeyType__conformance: PrintableConformance<KeyType>, ValueType__conformance: PrintableConformance<ValueType>) => StringType
 	// isEmpty<KeyType, ValueType>() -> Boolean
 	isEmpty: <KeyType extends AnyType, ValueType extends AnyType>(self: DictionaryType<KeyType, ValueType>) => BooleanType
-	// length<KeyType, ValueType>() -> Integer
+	// length<KeyType, ValueType>() -> NonNegativeInteger
 	length: <KeyType extends AnyType, ValueType extends AnyType>(self: DictionaryType<KeyType, ValueType>) => IntegerType
 	// value<ValueType, KeyType is Equatable>(at: KeyType) -> Optional<ValueType>
 	value__overload$1: <ValueType extends AnyType, KeyType extends AnyType>(self: DictionaryType<KeyType, ValueType>, at: KeyType, KeyType__conformance: EquatableConformance<KeyType>) => OptionalType<ValueType>
@@ -504,7 +506,7 @@ export type DictionaryNatives = {
 }
 
 export type NonEmptyDictionaryNatives = {
-	// length<KeyType, ValueType>() -> NonZeroInteger
+	// length<KeyType, ValueType>() -> PositiveInteger
 	length: <KeyType extends AnyType, ValueType extends AnyType>(self: DictionaryType<KeyType, ValueType>) => IntegerType
 	// keys<KeyType, ValueType>() -> NonEmptyList
 	keys: <KeyType extends AnyType, ValueType extends AnyType>(self: DictionaryType<KeyType, ValueType>) => ListType<KeyType>
@@ -598,7 +600,7 @@ export const $BooleanArity: AssertArities<typeof import("./Boolean"), {
 
 declare const IntegerModule: typeof import("./Integer")
 export const $Integer: IntegerNatives = IntegerModule
-export const $IntegerAbsent: AssertNoEssenceExports<typeof import("./Integer"), "parse__overload$1" | "parse__overload$2" | "is__overload$1" | "is__overload$2" | "isNot__overload$1" | "isNot__overload$2" | "add__overload$2" | "add__overload$3" | "add__overload$4" | "subtract__overload$1" | "subtract__overload$2" | "subtract__overload$3" | "subtract__overload$4" | "multiply__overload$2" | "multiply__overload$3" | "multiply__overload$4" | "divide__overload$1" | "divide__overload$2" | "divide__overload$5" | "divide__overload$6" | "divide__overload$7" | "remainder__overload$3" | "quotient__overload$3" | "raise__overload$2" | "squareRoot__overload$2" | "isLessThan__overload$1" | "isLessThan__overload$2" | "isLessThanOrEqualTo__overload$1" | "isLessThanOrEqualTo__overload$2" | "isGreaterThan__overload$1" | "isGreaterThan__overload$2" | "isGreaterThanOrEqualTo__overload$1" | "isGreaterThanOrEqualTo__overload$2" | "isEven" | "isOdd" | "isPositive" | "isNegative" | "isZero" | "isWholeNumber" | "isMultiple" | "absolute" | "round"> = true
+export const $IntegerAbsent: AssertNoEssenceExports<typeof import("./Integer"), "parse__overload$1" | "parse__overload$2" | "is__overload$1" | "is__overload$2" | "isNot__overload$1" | "isNot__overload$2" | "add__overload$2" | "add__overload$3" | "add__overload$4" | "subtract__overload$1" | "subtract__overload$2" | "subtract__overload$3" | "subtract__overload$4" | "multiply__overload$2" | "multiply__overload$3" | "multiply__overload$4" | "divide__overload$1" | "divide__overload$2" | "divide__overload$5" | "divide__overload$6" | "divide__overload$7" | "remainder__overload$3" | "quotient__overload$3" | "raise__overload$2" | "squareRoot__overload$2" | "isLessThan__overload$1" | "isLessThan__overload$2" | "isLessThanOrEqualTo__overload$1" | "isLessThanOrEqualTo__overload$2" | "isGreaterThan__overload$1" | "isGreaterThan__overload$2" | "isGreaterThanOrEqualTo__overload$1" | "isGreaterThanOrEqualTo__overload$2" | "isEven" | "isOdd" | "isPositive" | "isNegative" | "isZero" | "isWholeNumber" | "isMultiple" | "round"> = true
 export const $IntegerArity: AssertArities<typeof import("./Integer"), {
 	compare: 2
 	toString: 1
@@ -613,6 +615,7 @@ export const $IntegerArity: AssertArities<typeof import("./Integer"), {
 	raise__overload$1: 2
 	raise__overload$3: 2
 	squareRoot__overload$1: 1
+	absolute: 1
 	negate: 1
 }> = true
 

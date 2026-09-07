@@ -5,6 +5,7 @@ import {
 		Integer
 		NonNegativeInteger
 		NonZeroInteger
+		PositiveInteger
 	}
 	from "./List.es" {
 		List
@@ -727,8 +728,8 @@ declarations {
 
 		§§ Answers the denominator of the Rational in lowest terms.
 		§§
-		§§ The denominator is always positive, and never zero.
-		denominator() -> NonZeroInteger
+		§§ The denominator is always positive, and never zero. So the answer is a PositiveInteger, which fits every position that asks for a NonZeroInteger or a NonNegativeInteger.
+		denominator() -> PositiveInteger
 
 		§§ Answers the Rational without its sign, which is its distance from zero.
 		absolute() -> Rational {

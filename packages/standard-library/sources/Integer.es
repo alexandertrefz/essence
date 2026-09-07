@@ -663,14 +663,16 @@ declarations {
 			<- @::remainder(dividingBy divisor)::is(0)
 		}
 
+		§ Native, because the promise is about the answer. An Essence body is
+		§ an `if` asking `isNegative`. Its `else` proves the receiver is not
+		§ negative, but its other arm answers a negation nothing has proven
+		§ anything about. So the body answers a bare Integer, where a
+		§ distance from zero is never negative.
+
 		§§ Answers the Integer without its sign, which is its distance from zero.
-		absolute() -> Integer {
-			if @::isNegative() {
-				<- @::negate()
-			} else {
-				<- @
-			}
-		}
+		§§
+		§§ @returns — the distance, which is never negative.
+		absolute() -> NonNegativeInteger
 
 		§§ Answers the Integer with its sign flipped.
 		negate() -> Integer

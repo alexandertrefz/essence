@@ -1410,7 +1410,7 @@ Error: This predicate is not a Boolean
     │
  47 │     type Sized = Integer where @::absolute()
     │                                ──────┬──────  
-    │                                      ╰──────── this is Integer
+    │                                      ╰──────── this is NonNegativeInteger
     │ 
     │ Note: A 'where' clause is a question about the value being refined, so it has to answer 'true' or 'false'.
 ────╯

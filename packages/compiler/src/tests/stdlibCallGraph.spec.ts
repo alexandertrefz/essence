@@ -500,7 +500,6 @@ describe("Stdlib Call Graph", () => {
 			"Exact.multiply",
 			"GroupedList.removeDuplicates",
 			"GroupedNonEmptyList.removeDuplicates",
-			"Integer.absolute",
 			"Integer.add__overload$2",
 			"Integer.add__overload$3",
 			"Integer.add__overload$4",

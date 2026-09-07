@@ -1180,7 +1180,7 @@ describe("Default Parameter Values", () => {
 		].join("\n")
 
 		expect(hover(source, { line: 3, column: 30 })).toBe(
-			"length<ItemType>() -> Integer",
+			"length<ItemType>() -> NonNegativeInteger",
 		)
 	})
 
@@ -1519,7 +1519,7 @@ describe("Hover over a written receiver", () => {
 
 		expect(hover(source, { line: 2, column: 20 })).toBe("NonEmptyString")
 		expect(hover(source, { line: 2, column: 28 })).toBe(
-			"length() -> Integer",
+			"length() -> NonNegativeInteger",
 		)
 	})
 
