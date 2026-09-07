@@ -413,8 +413,6 @@ export type NonEmptyListNatives = {
 	length: <ItemType extends AnyType>(self: ListType<ItemType>) => IntegerType
 	// enumerate<ItemType>() -> NonEmptyList
 	enumerate: <ItemType extends AnyType>(self: ListType<ItemType>) => ListType<RecordType & { index: IntegerType; item: ItemType }>
-	// removeDuplicates<ItemType is Equatable>() -> NonEmptyList
-	removeDuplicates: <ItemType extends AnyType>(self: ListType<ItemType>, ItemType__conformance: EquatableConformance<ItemType>) => ListType<ItemType>
 	// prepend<ItemType>(contentsOf: List<ItemType>) -> NonEmptyList
 	prepend: <ItemType extends AnyType>(self: ListType<ItemType>, contentsOf: ListType<ItemType>) => ListType<ItemType>
 	// append<ItemType>(contentsOf: List<ItemType>) -> NonEmptyList
@@ -755,7 +753,7 @@ export const $RecordArity: AssertArities<typeof import("./Record"), {
 
 declare const ListModule: typeof import("./List")
 export const $List: ListNatives = ListModule
-export const $ListAbsent: AssertNoEssenceExports<typeof import("./List"), "repeat__overload$1" | "of__overload$2" | "hasItems__overload$1" | "hasItems__overload$2" | "isEmpty" | "contains" | "doesNotContain" | "hasOnlyItems" | "hasNoItems" | "firstItem__overload$1" | "firstItem__overload$2" | "firstItem__overload$3" | "firstItem__overload$4" | "lastItem__overload$1" | "lastItem__overload$2" | "lastItem__overload$3" | "lastItem__overload$4" | "item__overload$2" | "firstIndex__overload$1" | "firstIndex__overload$2" | "firstIndex__overload$3" | "firstIndex__overload$4" | "lastIndex__overload$1" | "lastIndex__overload$2" | "lastIndex__overload$4" | "indices" | "removeFirst" | "removeEvery__overload$1" | "removeEvery__overload$2" | "removeLast" | "removeDuplicates" | "prepend__overload$2" | "count__overload$1" | "count__overload$2" | "replace__overload$1" | "replace__overload$2" | "lowestItem__overload$1" | "lowestItem__overload$2" | "highestItem__overload$1" | "highestItem__overload$2" | "firstItems" | "lastItems"> = true
+export const $ListAbsent: AssertNoEssenceExports<typeof import("./List"), "repeat__overload$1" | "of__overload$2" | "hasItems__overload$1" | "hasItems__overload$2" | "isEmpty" | "contains" | "doesNotContain" | "hasOnlyItems" | "hasNoItems" | "firstItem__overload$1" | "firstItem__overload$2" | "firstItem__overload$3" | "firstItem__overload$4" | "lastItem__overload$1" | "lastItem__overload$2" | "lastItem__overload$3" | "lastItem__overload$4" | "item__overload$2" | "firstIndex__overload$1" | "firstIndex__overload$2" | "firstIndex__overload$3" | "firstIndex__overload$4" | "lastIndex__overload$1" | "lastIndex__overload$2" | "lastIndex__overload$4" | "indices" | "removeFirst" | "removeEvery__overload$1" | "removeEvery__overload$2" | "removeLast" | "prepend__overload$2" | "count__overload$1" | "count__overload$2" | "replace__overload$1" | "replace__overload$2" | "lowestItem__overload$1" | "lowestItem__overload$2" | "highestItem__overload$1" | "highestItem__overload$2" | "firstItems" | "lastItems"> = true
 export const $ListArity: AssertArities<typeof import("./List"), {
 	repeat__overload$2: 2
 	of__overload$1: 2
@@ -804,7 +802,6 @@ export const $NonEmptyListArity: AssertArities<typeof import("./NonEmptyList"), 
 	lastItem: 1
 	length: 1
 	enumerate: 1
-	removeDuplicates: 2
 	prepend: 2
 	append: 2
 	map: 2
@@ -887,6 +884,7 @@ export const $NonEmptyDictionaryArity: AssertArities<typeof import("./NonEmptyDi
 
 declare const GroupedListModule: typeof import("./GroupedList")
 export const $GroupedList: GroupedListNatives = GroupedListModule
+export const $GroupedListAbsent: AssertNoEssenceExports<typeof import("./GroupedList"), "removeDuplicates"> = true
 export const $GroupedListArity: AssertArities<typeof import("./GroupedList"), {
 	group: 3
 	tally: 2
@@ -895,6 +893,7 @@ export const $GroupedListArity: AssertArities<typeof import("./GroupedList"), {
 
 declare const GroupedNonEmptyListModule: typeof import("./GroupedNonEmptyList")
 export const $GroupedNonEmptyList: GroupedNonEmptyListNatives = GroupedNonEmptyListModule
+export const $GroupedNonEmptyListAbsent: AssertNoEssenceExports<typeof import("./GroupedNonEmptyList"), "removeDuplicates"> = true
 export const $GroupedNonEmptyListArity: AssertArities<typeof import("./GroupedNonEmptyList"), {
 	group: 3
 	tally: 2

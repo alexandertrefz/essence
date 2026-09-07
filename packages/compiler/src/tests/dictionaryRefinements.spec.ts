@@ -13,7 +13,7 @@ import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// NOTE: `NonEmptyDictionary` and the two bridges from a List, end to end. A
+// NOTE: `NonEmptyDictionary` and the bridges from a List, end to end. A
 // refinement erases before anything runs, so half of what is claimed here is
 // about which Method a call REACHES — a question about compiling — and half is
 // about what that Method then answers. Both halves are asked the same way: the
@@ -498,6 +498,76 @@ describe("The bridges from a List", () => {
 					Terminal.inspect(products::index(on .sku)::hasKey("c3"))
 				}`),
 			).toEqual(["Optional#Value(5)", "false"])
+		})
+	})
+
+	// NOTE: `removeDuplicates` is `tally`'s keys, so the questions asked of it
+	// are the ones a tally answers: first-met order, the item's own `is`, and
+	// the proof a NonEmptyList carries across the crossing and back.
+	describe("removeDuplicates()", () => {
+		it("keeps the first of every group of equal items", async () => {
+			expect(
+				await run(`implementation {
+					constant numbers: List<Integer> = [3, 1, 2, 1, 4, 3]
+					constant none: List<Integer> = []
+
+					Terminal.inspect(numbers::removeDuplicates())
+					Terminal.inspect(none::removeDuplicates())
+				}`),
+			).toEqual(["[ 3, 1, 2, 4 ]", "[]"])
+		})
+
+		// NOTE: The claim the rewrite rests on. A Namespace that writes its own
+		// `is` for a refinement of a kind the store knows how to encode hands
+		// the tally an UNBRANDED witness, so the store scans through that `is`
+		// rather than encoding — and "Ada", "ada" and "ADA" are one item to it,
+		// exactly as `contains` would say. The spelling kept is the first met.
+		it("honours a written 'is' through the scan path", async () => {
+			expect(
+				await run(`implementation {
+					namespace Loose for NonEmptyString is Equatable {
+						is(_ other: NonEmptyString) -> Boolean {
+							<- @::lowercase()::is(other::lowercase())
+						}
+					}
+
+					constant names: List<NonEmptyString> = ["Ada", "ada", "Grace", "ADA", "grace"]
+
+					Terminal.inspect(names::removeDuplicates())
+					Terminal.inspect(names::contains("ADA"))
+				}`),
+			).toEqual(['[ "Ada", "Grace" ]', "true"])
+		})
+
+		// NOTE: And the same over a refined Integer, so the scan path is not
+		// something only String's witness happens to take.
+		it("honours a written 'is' over a refined Integer", async () => {
+			expect(
+				await run(`implementation {
+					§ Two Integers are one item when they share a parity.
+					namespace Parity for PositiveInteger is Equatable {
+						is(_ other: PositiveInteger) -> Boolean {
+							<- @::remainder(dividingBy 2)
+								::is(other::remainder(dividingBy 2))
+						}
+					}
+
+					constant numbers: List<PositiveInteger> = [1, 4, 3, 2, 5]
+
+					Terminal.inspect(numbers::removeDuplicates())
+				}`),
+			).toEqual(["[ 1, 4 ]"])
+		})
+
+		it("carries the proof of a NonEmptyList across and back", async () => {
+			expect(
+				await run(`implementation {
+					constant proven: NonEmptyList<String> = ["a", "b", "a"]
+
+					Terminal.inspect(proven::removeDuplicates()::lastItem())
+					Terminal.inspect(proven::removeDuplicates()::length()::raise(to -1))
+				}`),
+			).toEqual(['"b"', "1/2"])
 		})
 	})
 

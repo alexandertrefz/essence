@@ -498,6 +498,8 @@ describe("Stdlib Call Graph", () => {
 			// bodies are emitted and reached exactly as the rest are.
 			"Exact.add",
 			"Exact.multiply",
+			"GroupedList.removeDuplicates",
+			"GroupedNonEmptyList.removeDuplicates",
 			"Integer.absolute",
 			"Integer.add__overload$2",
 			"Integer.add__overload$3",
@@ -587,7 +589,6 @@ describe("Stdlib Call Graph", () => {
 			"List.lowestItem__overload$2",
 			"List.of__overload$2",
 			"List.prepend__overload$2",
-			"List.removeDuplicates",
 			"List.removeEvery__overload$1",
 			"List.removeEvery__overload$2",
 			"List.removeFirst",

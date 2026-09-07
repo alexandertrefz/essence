@@ -4,7 +4,8 @@
 // something read off its items, and each is native because it promises
 // something about what it built that no Essence expression can say: a group
 // that has an item in it, a count that is above zero, and a Dictionary with an
-// entry in it for the proven twin.
+// entry in it for the proven twin. `removeDuplicates` is the Namespace's fourth
+// Method and is not here: it is written in Essence on `tally` and `keys`.
 //
 // NOTE: The store is built through `Dictionary.ts`'s own three doors rather
 // than out of slots reached from here. A grouping is one walk that folds each

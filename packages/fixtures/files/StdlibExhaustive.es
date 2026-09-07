@@ -2355,14 +2355,6 @@ third"::lines())
 		"List.removeLast<ItemType>(_? Integer) [past the end]",
 		numbers::removeLast(99),
 	)
-	show(
-		"List.removeDuplicates<ItemType is Equatable>()",
-		numbers::removeDuplicates(),
-	)
-	show(
-		"List.removeDuplicates<ItemType is Equatable>() [empty]",
-		noNumbers::removeDuplicates(),
-	)
 	show("List.prepend<ItemType>(_ ItemType)", numbers::prepend(9))
 	show(
 		"List.prepend<ItemType>(contentsOf: List<ItemType>)",
@@ -3042,14 +3034,6 @@ third"::lines())
 	§ answers. That second call is what pins the RETURN Type — an entry weakened
 	§ back to `List` would send the chained `firstItem` to `List`'s own and print
 	§ an Optional here.
-	show(
-		"NonEmptyList.removeDuplicates<ItemType is Equatable>()",
-		provenNumbers::removeDuplicates(),
-	)
-	show(
-		"NonEmptyList.removeDuplicates<ItemType is Equatable>() [proof carried]",
-		provenNumbers::removeDuplicates()::lastItem(),
-	)
 	show(
 		"NonEmptyList.prepend<ItemType>(contentsOf: List<ItemType>)",
 		provenOne::prepend(contentsOf [8, 9]),
@@ -3862,6 +3846,8 @@ third"::lines())
 	§ The bridge from the first container to the second: the receiver is a
 	§ List and the answer is a Dictionary. Each group holds an item and each
 	§ count is above zero, which only the native that built them can promise.
+	§ `removeDuplicates` crosses and comes back, and is shown over the same
+	§ receivers `List`'s other transforms are.
 	§
 	§ The receivers here are computed, because a List written where it stands
 	§ proves its own count and would reach the proven Namespace below instead.
@@ -3925,12 +3911,23 @@ third"::lines())
 		"GroupedList.index<ItemType, Key is Equatable>(on: (_ ItemType) -> Key) [empty]",
 		noVotes::index(on (vote) { <- vote }),
 	)
+	show(
+		"GroupedList.removeDuplicates<ItemType is Equatable>()",
+		numbers::removeDuplicates(),
+	)
+	show(
+		"GroupedList.removeDuplicates<ItemType is Equatable>() [empty]",
+		noNumbers::removeDuplicates(),
+	)
 
 	§ ——— GroupedNonEmptyList ——————————————————————————————————————————————
 	§ The same crossings with the receiver's proof in hand. A List with an
 	§ item in it puts that item in a group, under a count, or at a key, so the
 	§ Dictionary each answers holds an entry — which is what the total `length`
-	§ reads off it.
+	§ reads off it. `removeDuplicates` is shown twice, as the transforms that
+	§ carry the proof are: once for the value, which has to be the one the
+	§ entry above gives, and once chained into a Method only a NonEmptyList
+	§ answers.
 	constant provenVotes: NonEmptyList<String> = ["a", "b", "a"]
 
 	show(
@@ -3944,6 +3941,14 @@ third"::lines())
 	show(
 		"GroupedNonEmptyList.index<ItemType, Key is Equatable>(on: (_ ItemType) -> Key)",
 		provenVotes::index(on (vote) { <- vote })::length(),
+	)
+	show(
+		"GroupedNonEmptyList.removeDuplicates<ItemType is Equatable>()",
+		provenNumbers::removeDuplicates(),
+	)
+	show(
+		"GroupedNonEmptyList.removeDuplicates<ItemType is Equatable>() [proof carried]",
+		provenNumbers::removeDuplicates()::lastItem(),
 	)
 
 	§ ——— loop ————————————————————————————————————————————————————————————

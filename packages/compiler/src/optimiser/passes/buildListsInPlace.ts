@@ -42,8 +42,9 @@ import { rewriteNodes } from "../walk"
 // always correct, which is what makes a tight fence safe to widen later.
 //
 // NOTE: The two widenings are named in `optimisations.md` under "not done yet":
-// retention summaries for the prelude's own Functions, which would admit
-// `removeDuplicates`' `contains` read, and accumulators one Record member deep.
+// retention summaries for the prelude's own Functions, which would admit a
+// fold's `contains` read of its accumulator, and accumulators one Record member
+// deep.
 
 export const buildListsInPlace: OptimiserPass = {
 	name: "build-lists-in-place",

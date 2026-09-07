@@ -131,9 +131,10 @@ describe("Stdlib searching Methods", () => {
 			).toEqual(['"true"', '"false"', '"2"'])
 		})
 
-		// NOTE: `removeDuplicates` asks `contains` whether it has kept an item
-		// already, so it inherits the answer — with `contains` blind to a
-		// stored empty Optional it kept every one of them.
+		// NOTE: `removeDuplicates` is `tally`'s keys, and a tally finds an
+		// item's entry through the item's own `is` — so it inherits the
+		// answer the same way `contains` does, and an `is` blind to a stored
+		// empty Optional would have kept every one of them.
 		it("keeps one empty Optional when duplicates are removed", async () => {
 			expect(
 				await run(`implementation {

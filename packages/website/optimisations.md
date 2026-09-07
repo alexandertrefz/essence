@@ -627,8 +627,8 @@ two share: `everyItem` and both `reduce` entries can answer with fewer items tha
 they were handed, so a proven receiver reaches List's own entry by widening and
 arrives under List's own name. Everything else `NonEmptyList` declares is left
 alone — `reverse`, `sort`, `pair` and `split` are re-exports this pass does not
-walk anyway, and `prepend(contentsOf:)`, `removeDuplicates` and `replace` are not
-List's Functions at all.
+walk anyway, and `prepend(contentsOf:)` and `replace` are not List's Functions
+at all.
 
 **A callback is inlined only where it is WRITTEN at the call.** A
 Function-valued name is whatever was bound to it, which is not something a
@@ -914,10 +914,8 @@ exactly as it was, and the walks it does not read — `map`, `everyItem`, and ev
 walk threading anything but a List — are byte-identical with the pass on and off.
 
 **It fires nowhere in this repository's own Essence.** Every fixture bundle and
-the standard library are byte-identical with the pass on and off, because
-`removeDuplicates` — the one prelude fold that builds a List — declines on its
-`contains` read. So every figure above is measured on a Program written to
-measure it, and the first of the widenings below is what would change that.
+the standard library are byte-identical with the pass on and off. So every
+figure above is measured on a Program written to measure it.
 
 ### `fold-constants`
 
@@ -1678,10 +1676,11 @@ chain could end there, with its own test dropped as well.
 
 **Retention summaries for the standard library's own Functions.**
 `build-lists-in-place` declines every mention of an accumulator that is not a
-rebuilding chain, which includes reads that retain nothing at all —
-`removeDuplicates` is written as a fold that asks `accumulated::contains(item)`
-before appending, and its quadratic copying would go the way of the appending
-benchmark's if that read were admitted. What would admit it is one answer per
+rebuilding chain, which includes reads that retain nothing at all — a fold that
+asks `accumulated::contains(item)` before appending, which is how
+`removeDuplicates` was written before it became `tally`'s keys, copies its
+accumulator every turn, and that copying would go the way of the appending
+benchmark's if the read were admitted. What would admit it is one answer per
 prelude Function to "which Parameters can outlive this call?", computed once
 against the closed prelude the way the prelude is already optimised once per
 process. With `contains`, `length` and `item(at:)` summarised as retaining
