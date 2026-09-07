@@ -97,9 +97,10 @@ implementation {
 		loans::is(["brian" = 1, "alan" = 1, "grace" = 2, "ada" = 3]),
 	) § true
 
-	§ A key is any Equatable value, not only a String. A Record key is found by
-	§ asking the Record's own `is`, which is what a key with no canonical
-	§ encoding costs: a walk rather than a lookup.
+	§ A key is any Equatable value, not only a String. A Record key whose
+	§ members all encode is found in one step, exactly as a String key is; a
+	§ key with no canonical encoding is found by asking its own `is` over the
+	§ entries, which is a walk rather than a lookup.
 	constant seats = [
 		{ row = 1, seat = 2 } = "ada",
 		{ row = 4, seat = 1 } = "grace",

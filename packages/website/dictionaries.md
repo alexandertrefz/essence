@@ -332,12 +332,13 @@ The bound sits on the Methods that compare keys rather than on the Type, which
 is why `Dictionary<KeyType, ValueType>` itself asks nothing of its keys — a
 `List<ItemType>` is unbounded for the same reason.
 
-A key the runtime has a canonical encoding for — a String, an Integer, a whole
-Rational, a Boolean — is found in one step. Any other key is found by walking
-the entries and asking `is`, which is correct for every key Type the language
-has and costs a walk. It is invisible from Essence, and it is the reason a
-Record key is a fine key for a table of six teams and a poor one for a table of
-ten thousand.
+A key the runtime has a canonical encoding for is found in one step: a String,
+an Integer, a Rational, a Boolean, a Case of a Choice whose equality is the
+derived one, and a Record — the last two whenever every member of them encodes
+too. Any other key — one holding a List, say, or one whose Namespace writes an
+`is` of its own — is found by walking the entries and asking `is`, which is
+correct for every key Type the language has and costs a walk. It is invisible
+from Essence: the same Methods answer the same things, only slower.
 
 ### The order is the order the keys were FIRST set
 

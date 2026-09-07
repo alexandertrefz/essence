@@ -417,25 +417,166 @@ describe("Dictionary", () => {
 	})
 
 	describe("Keys of any Type", () => {
-		// NOTE: A Record has no canonical encoding, so it is found by walking
-		// the entries and asking the key Type's own `is` — the scan path. It is
-		// invisible from here: the same Methods answer the same things.
-		it("finds a Record key through its own equality", async () => {
+		// NOTE: `Record::is` is the universal structural comparison over the
+		// members — it never asks a member's own Namespace, which is what
+		// `Record.es` says of it — so its witness carries the `structural`
+		// brand and a Record whose members all encode is found in one step,
+		// under a text spelled from those members. The members can arrive in
+		// either order and spell one key. See `compositeText` in
+		// `packages/runtime/src/Dictionary.ts`.
+		it("finds a Record key by its members, on the encoded path", async () => {
+			let source = `implementation {
+				constant seats = Dictionary.of([
+					{ key = { row = 1, seat = 2 }, value = "alex" },
+					{ key = { row = 4, seat = 1 }, value = "sam" },
+				])
+
+				Terminal.inspect(seats::value(at { row = 4, seat = 1 }))
+				Terminal.inspect(seats::value(at { seat = 1, row = 4 }))
+				Terminal.inspect(seats::value(at { row = 9, seat = 9 }))
+				Terminal.inspect(seats::hasKey({ row = 1, seat = 2 }))
+				Terminal.inspect(
+					seats::set({ row = 1, seat = 2 }, to "kim")::length(),
+				)
+			}`
+
+			expect(generate(source)).toContain(
+				"is: Record.is,\n\tstructural: true",
+			)
+			expect(await run(source)).toEqual([
+				'Optional#Value("sam")',
+				'Optional#Value("sam")',
+				"Optional#Empty",
+				"true",
+				"2",
+			])
+		})
+
+		// NOTE: The equality the language derives for a Choice is its own —
+		// the tag decides the Case and the payload compares as a Record — so
+		// the derived witness is branded like `Record`'s, and a Case is found
+		// under a text spelled from its tag and its payload. A Dictionary keyed
+		// by a payload-free Choice is the most ordinary Dictionary there is,
+		// and this is what keeps it off the scan path.
+		it("finds a Choice key by its tag, on the encoded path", async () => {
+			let source = `implementation {
+				choice Colour { Red, Green, Blue }
+
+				constant none: Dictionary<Colour, Integer> = [=]
+				constant counts = none::set(#Red, to 1)::set(#Blue, to 2)
+
+				Terminal.inspect(counts::value(at #Red))
+				Terminal.inspect(counts::value(at #Green))
+				Terminal.inspect(counts::hasKey(#Blue))
+				Terminal.inspect(counts::set(#Red, to 3)::length())
+			}`
+
+			expect(generate(source)).toContain(
+				"is: $helpers.choiceIs,\n\tisNot: $helpers.choiceIsNot,\n\tstructural: true",
+			)
+			expect(await run(source)).toEqual([
+				"Optional#Value(1)",
+				"Optional#Empty",
+				"true",
+				"2",
+			])
+		})
+
+		// NOTE: A payload spelled two ways is one key exactly where the derived
+		// `is` calls the two equal: a whole Rational is the Integer it equals,
+		// and the members of a payload stand in any order.
+		it("finds a Choice key with a payload through every member", async () => {
 			expect(
 				await run(`implementation {
-					constant seats = Dictionary.of([
-						{ key = { row = 1, seat = 2 }, value = "alex" },
-						{ key = { row = 4, seat = 1 }, value = "sam" },
-					])
+					choice Box { Full { item: Number, label: String }, Empty }
 
-					Terminal.inspect(seats::value(at { row = 4, seat = 1 }))
-					Terminal.inspect(seats::value(at { row = 9, seat = 9 }))
-					Terminal.inspect(seats::hasKey({ row = 1, seat = 2 }))
+					constant none: Dictionary<Box, Integer> = [=]
+					constant boxes = none
+						::set(#Full({ item = 3, label = "three" }), to 1)
+						::set(#Empty, to 2)
+
 					Terminal.inspect(
-						seats::set({ row = 1, seat = 2 }, to "kim")::length(),
+						boxes::value(at #Full({ label = "three", item = 3/1 })),
+					)
+					Terminal.inspect(
+						boxes::value(at #Full({ item = 3, label = "four" })),
+					)
+					Terminal.inspect(boxes::value(at #Empty))
+					Terminal.inspect(
+						boxes::set(#Full({ item = 6/2, label = "three" }), to 9)
+							::length(),
 					)
 				}`),
-			).toEqual(['Optional#Value("sam")', "Optional#Empty", "true", "2"])
+			).toEqual([
+				"Optional#Value(1)",
+				"Optional#Empty",
+				"Optional#Value(2)",
+				"2",
+			])
+		})
+
+		// NOTE: A Namespace that writes an `is` for its Choice REPLACES the
+		// derivation, and its witness arrives under the Namespace's own name
+		// rather than the derived one — so it is not branded, and every lookup
+		// asks the written `is`. Every Colour is one key here, which no tag
+		// encoding could have said.
+		it("finds a Choice key through a written 'is' rather than by its tag", async () => {
+			let source = `implementation {
+				choice Colour { Red, Green, Blue }
+
+				namespace Colour for Colour is Equatable {
+					is(_ other: Colour) -> Boolean {
+						<- true
+					}
+				}
+
+				constant none: Dictionary<Colour, Integer> = [=]
+				constant counts = none::set(#Red, to 1)::set(#Blue, to 2)
+
+				Terminal.inspect(counts::length())
+				Terminal.inspect(counts::value(at #Green))
+				Terminal.inspect(counts::remove(at #Green)::isEmpty())
+			}`
+
+			expect(generate(source)).not.toContain("structural")
+			expect(await run(source)).toEqual([
+				"1",
+				"Optional#Value(2)",
+				"true",
+			])
+		})
+
+		// NOTE: A generic Choice's derived witness is conditional on its Type
+		// Arguments' witnesses, and a conditional witness is never branded —
+		// the Type Argument may carry a written `is` the payload has to be
+		// compared by. Such a key takes the scan path, and answers the same
+		// things there. The Integer witness curried onto it is branded, which
+		// is why the assertion reads the derived witness alone.
+		it("leaves a generic Choice key on the scan path", async () => {
+			let source = `implementation {
+				choice Wrap<Item> { Some { item: Item }, None }
+
+				constant none: Dictionary<Wrap<Integer>, Integer> = [=]
+				constant wrapped = none::set(#Some({ item = 1 }), to 1)
+
+				Terminal.inspect(wrapped::value(at #Some({ item = 1 })))
+				Terminal.inspect(wrapped::value(at #None))
+			}`
+			let generated = generate(source)
+			let witness = generated.slice(
+				generated.indexOf("$type.boundConformance({"),
+				generated.indexOf(
+					"}, [",
+					generated.indexOf("$type.boundConformance({"),
+				),
+			)
+
+			expect(witness).toContain("boundChoiceIs")
+			expect(witness).not.toContain("structural")
+			expect(await run(source)).toEqual([
+				"Optional#Value(1)",
+				"Optional#Empty",
+			])
 		})
 
 		// NOTE: `Number.is` answers by VALUE across the numeric kinds, so `3`
@@ -530,6 +671,39 @@ describe("Dictionary", () => {
 					Terminal.inspect(odds::value(at three))
 				}`),
 			).toEqual(["1", "[ 1 ]", 'Optional#Value("second")'])
+		})
+
+		// NOTE: A user Namespace may SHADOW one of the branded names inside a
+		// Function, and it arrives at the Rewriter under that name. The brand
+		// is decided by the same lexical answer every member read is decided
+		// by, so the shadowing Namespace's own `is` is what finds the keys —
+		// branding it would have put "Ada" and "ada" in two slots. The body
+		// reaches no String Method, because inside that scope `String` IS the
+		// shadowing Namespace.
+		it("finds a key through a written 'is' in a Namespace shadowing 'String'", async () => {
+			let source = `implementation {
+				function borrowers() -> Integer {
+					namespace String for NonEmptyString is Equatable {
+						is(_ other: NonEmptyString) -> Boolean {
+							<- true
+						}
+					}
+
+					constant a: NonEmptyString = "Ada"
+					constant b: NonEmptyString = "ada"
+					constant loans = Dictionary.of([
+						{ key = a, value = 1 },
+						{ key = b, value = 2 },
+					])
+
+					<- loans::length()
+				}
+
+				Terminal.inspect(borrowers())
+			}`
+
+			expect(generate(source)).not.toContain("structural")
+			expect(await run(source)).toEqual(["1"])
 		})
 	})
 

@@ -167,7 +167,7 @@ const expectStoreInvariants = (
 		expect(slot.encoded).toEqual(encodeKey(slot.key, witness))
 
 		if (slot.encoded !== null && typeof slot.encoded === "object") {
-			expect(store.fractions.get(slot.encoded.fraction)).toBe(slot)
+			expect(store.texts.get(slot.encoded.text)).toBe(slot)
 		} else if (slot.encoded !== null) {
 			expect(store.index.get(slot.encoded)).toBe(slot)
 		}
@@ -196,7 +196,7 @@ const expectStoreInvariants = (
 
 	expect(box.length).toBe(liveHere)
 	expect(store.dead).toBe(totalVersions - liveAtTip)
-	expect(store.index.size + store.fractions.size).toBe(
+	expect(store.index.size + store.texts.size).toBe(
 		store.slots.filter((slot) => slot.encoded !== null).length,
 	)
 	expect(store.unencoded).toBe(
@@ -483,7 +483,7 @@ describe("gathering a Dictionary out of a List, against a plain model", () => {
 
 		expect(counted.store.unencoded).toBe(2)
 		expect(counted.store.index.size).toBe(1)
-		expect(counted.store.fractions.size).toBe(1)
+		expect(counted.store.texts.size).toBe(1)
 		expect(Number(lengthOf(counted).value)).toBe(4)
 		expect(
 			valuesOf(counted).value.map((count) =>
@@ -713,6 +713,6 @@ describe("gathering a Dictionary out of a List, against a plain model", () => {
 		expect(writtenForm(gathered)).toBe(writtenForm(written))
 		expect(gathered.store.unencoded).toBe(written.store.unencoded)
 		expect(gathered.store.index.size).toBe(written.store.index.size)
-		expect(gathered.store.fractions.size).toBe(written.store.fractions.size)
+		expect(gathered.store.texts.size).toBe(written.store.texts.size)
 	})
 })

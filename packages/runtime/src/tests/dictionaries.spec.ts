@@ -20,6 +20,7 @@ import {
 	value__overload$1 as valueAt,
 	values as valuesOf,
 } from "../Dictionary"
+import { type Generator, generate } from "../Generators"
 import { groupedBy, tallied } from "../GroupedList"
 import type { IntegerType } from "../Integer"
 import { createInteger } from "../Integer"
@@ -31,6 +32,7 @@ import {
 	prepend__overload$1 as prepend,
 } from "../List"
 import type { OptionalType } from "../Optional"
+import { below, createRandomness, seedOf } from "../Randomness"
 import { createRational, formatAsFraction } from "../Rational"
 import type { RecordType } from "../Record"
 import { createRecord } from "../Record"
@@ -226,16 +228,16 @@ describe("key encoding", () => {
 
 	test("a non-whole Rational encodes as its reduced parts in a box of their own", () => {
 		expect(encodeKey(createRational(1n, 2n), equality)).toEqual({
-			fraction: "1/2",
+			text: "1/2",
 		})
 		expect(encodeKey(createRational(2n, 4n), equality)).toEqual({
-			fraction: "1/2",
+			text: "1/2",
 		})
 		expect(encodeKey(createRational(-1n, 2n), equality)).toEqual({
-			fraction: "-1/2",
+			text: "-1/2",
 		})
 		expect(encodeKey(createRational(1n, -2n), equality)).toEqual({
-			fraction: "-1/2",
+			text: "-1/2",
 		})
 		expect(encodeKey(createRational(2n, -4n), equality)).toEqual(
 			encodeKey(createRational(-1n, 2n), equality),
@@ -283,18 +285,105 @@ describe("key encoding", () => {
 		expect(encodeKey(createBoolean(false), equality)).toBe(false)
 	})
 
-	test("everything else takes the scan path", () => {
-		expect(encodeKey(createRecord({ x: integer(1) }), equality)).toBeNull()
-		expect(encodeKey(createList([integer(1)]), equality)).toBeNull()
+	// NOTE: A Case's text opens with its tag, length-prefixed, and closes over
+	// its payload members; a Record's opens with `R`. Every part inside is
+	// length-prefixed or terminated, which is what makes the text one per
+	// value — the tests further down hold it to that over drawn values.
+	test("a unit Case encodes as its tag, in a box of its own", () => {
+		expect(encodeKey(asValue(createCase("Colour#Red")), equality)).toEqual({
+			text: "c10:Colour#Red{};",
+		})
 		expect(
-			encodeKey(asValue(createCase("Colour#Red")), equality),
-		).toBeNull()
+			encodeKey(asValue(createCase("./Paint.es#Colour#Red")), equality),
+		).toEqual({ text: "c21:./Paint.es#Colour#Red{};" })
+	})
+
+	test("a Case with a payload encodes its tag and every member", () => {
 		expect(
 			encodeKey(
 				asValue(createCase("Box#Full", { item: integer(1) })),
 				equality,
 			),
+		).toEqual({ text: "c8:Box#Full{4:item=i1;};" })
+		expect(
+			encodeKey(
+				asValue(
+					createCase("Shape#Circle", {
+						centre: createRecord({ x: integer(0), y: integer(-2) }),
+						radius: createRational(1n, 2n),
+						label: text("unit"),
+						filled: createBoolean(true),
+					}),
+				),
+				equality,
+			),
+		).toEqual({
+			text: "c12:Shape#Circle{6:centre=R{1:x=i0;1:y=i-2;};6:filled=t;5:label=s4:unit6:radius=r1/2;};",
+		})
+	})
+
+	test("a Record encodes its members in name order", () => {
+		expect(encodeKey(createRecord({ x: integer(1) }), equality)).toEqual({
+			text: "R{1:x=i1;};",
+		})
+		expect(
+			encodeKey(createRecord({ b: integer(2), a: integer(1) }), equality),
+		).toEqual(
+			encodeKey(createRecord({ a: integer(1), b: integer(2) }), equality),
+		)
+	})
+
+	// NOTE: A part spells what the structural comparison calls it: a whole
+	// Rational is the Integer it equals, a String is its NFC form, and a nested
+	// Case is its tag before its members.
+	test("a part of a composite key spells the cross-kind rules", () => {
+		let whole = encodeKey(
+			createRecord({ n: createRational(6n, 2n) }),
+			equality,
+		)
+		let accented = encodeKey(
+			createRecord({ s: text(decomposedAccent) }),
+			equality,
+		)
+
+		expect(whole).toEqual(
+			encodeKey(createRecord({ n: integer(3) }), equality),
+		)
+		expect(accented).toEqual(
+			encodeKey(createRecord({ s: text(composedAccent) }), equality),
+		)
+		expect(
+			encodeKey(
+				createRecord({ inner: asValue(createCase("Colour#Red")) }),
+				equality,
+			),
+		).toEqual({ text: "R{5:inner=c10:Colour#Red{};};" })
+	})
+
+	// NOTE: A Case or a Record holding a part with no encoding has none itself,
+	// because such a part is compared by a rule no text spells — a List by its
+	// items through the universal comparison, a Function by identity.
+	test("everything else takes the scan path", () => {
+		expect(encodeKey(createList([integer(1)]), equality)).toBeNull()
+		expect(
+			encodeKey(
+				createRecord({ items: createList([integer(1)]) }),
+				equality,
+			),
 		).toBeNull()
+		expect(
+			encodeKey(
+				asValue(createCase("Box#Full", { item: createList([]) })),
+				equality,
+			),
+		).toBeNull()
+		expect(
+			encodeKey(
+				createRecord({ handler: asValue((() => integer(1)) as never) }),
+				equality,
+			),
+		).toBeNull()
+		expect(encodeKey(dictionary(), equality)).toBeNull()
 	})
 
 	// NOTE: The encoding is a claim about the STANDARD LIBRARY'S equality for a
@@ -381,6 +470,29 @@ describe("keys that encode alike are one key", () => {
 				createInteger(9007199254740993n),
 			],
 			[createBoolean(true), createBoolean(true)],
+			[
+				createRecord({ a: integer(1), b: createRational(2n, 4n) }),
+				createRecord({
+					b: createRational(1n, 2n),
+					a: createRational(2n, 2n),
+				}),
+			],
+			[
+				asValue(createCase("Colour#Red")),
+				asValue(createCase("Colour#Red")),
+			],
+			[
+				asValue(createCase("Box#Full", { item: text(composedAccent) })),
+				asValue(
+					createCase("Box#Full", { item: text(decomposedAccent) }),
+				),
+			],
+			[
+				createRecord({ inner: createRecord({ n: integer(3) }) }),
+				createRecord({
+					inner: createRecord({ n: createRational(3n, 1n) }),
+				}),
+			],
 		]
 
 		for (let [first, second] of pairs) {
@@ -397,6 +509,37 @@ describe("keys that encode alike are one key", () => {
 			[text("a"), text("A")],
 			[createInteger(9007199254740993n), integer(3)],
 			[createRational(1n, 2n), text("1/2")],
+			[
+				asValue(createCase("Colour#Red")),
+				asValue(createCase("Colour#Blue")),
+			],
+			[
+				asValue(createCase("Colour#Red")),
+				asValue(createCase("./Paint.es#Colour#Red")),
+			],
+			[
+				asValue(createCase("Box#Full", { item: integer(1) })),
+				asValue(createCase("Box#Full", { item: integer(2) })),
+			],
+			[
+				asValue(createCase("Box#Full", { item: integer(1) })),
+				asValue(createCase("Box#Empty")),
+			],
+			[createRecord({ a: integer(1) }), createRecord({ b: integer(1) })],
+			[
+				createRecord({ a: integer(1) }),
+				createRecord({ a: integer(1), b: integer(2) }),
+			],
+			[createRecord({ a: text("1") }), createRecord({ a: integer(1) })],
+			[
+				createRecord({ a: text("t;") }),
+				createRecord({ a: createBoolean(true) }),
+			],
+			[
+				createRecord({ ab: text("x"), c: text("y") }),
+				createRecord({ a: text("x"), bc: text("y") }),
+			],
+			[asValue(createCase("Colour#Red")), createRecord({})],
 		]
 
 		for (let [first, second] of pairs) {
@@ -406,19 +549,376 @@ describe("keys that encode alike are one key", () => {
 	})
 })
 
-describe("the scan path", () => {
-	test("a Record key is found through the witness rather than by encoding", () => {
-		let held = dictionary([
-			createRecord({ id: integer(1), note: text("first") }),
-			integer(10),
-		])
+// NOTE: THE CLAIM THE COMPOSITE ENCODING RESTS ON, held over drawn values
+// rather than over a table: two Cases or Records that the structural comparison
+// calls equal encode to one text, and two it calls unequal encode to two. The
+// values are drawn over a fixed seed, so the sequence is the same in every run,
+// and drawn SMALL, so that equal pairs turn up among the unequal ones.
+//
+// NOTE: Every drawn value is also RESPELLED — its Rationals written unreduced,
+// its Strings decomposed, its members reordered — into a second value the
+// comparison calls equal, so that the equal side of the claim is exercised on
+// every draw and not only where two draws happen to coincide.
+describe("the composite encoding agrees with the structural comparison", () => {
+	// NOTE: Leaves drawn from a vocabulary of three or four values each, so
+	// that distinct draws coincide often enough to exercise the equal half of
+	// the claim on composite values, and not only on a value beside itself.
+	const oneOf = (name: string, choices: Array<AnyType>): Generator => ({
+		kind: "generated",
+		name,
+		generate: (source) => choices[below(source, choices.length)]!,
+	})
+	const integers = oneOf("Integer", [integer(0), integer(1), integer(-2)])
+	const rationals = oneOf("Rational", [
+		createRational(1n, 2n),
+		createRational(2n, 4n),
+		createRational(3n, 1n),
+		createRational(-1n, 3n),
+	])
+	const strings = oneOf("String", [
+		text("a"),
+		text(""),
+		text(composedAccent),
+		text(decomposedAccent),
+	])
+	const booleans: Generator = { kind: "boolean" }
+	const point: Generator = {
+		kind: "record",
+		members: [
+			{ name: "x", generator: integers },
+			{ name: "y", generator: rationals },
+		],
+	}
+	const shade: Generator = {
+		kind: "union",
+		members: [
+			{ kind: "case", tag: "Shade#Light", members: [] },
+			{ kind: "case", tag: "Shade#Dark", members: [] },
+			{
+				kind: "case",
+				tag: "Shade#Named",
+				members: [{ name: "name", generator: strings }],
+			},
+		],
+	}
+	const shapes: Generator = {
+		kind: "union",
+		members: [
+			{ kind: "case", tag: "Shape#Point", members: [] },
+			{
+				kind: "case",
+				tag: "Shape#Circle",
+				members: [
+					{ name: "centre", generator: point },
+					{ name: "radius", generator: rationals },
+					{ name: "shade", generator: shade },
+				],
+			},
+			{
+				kind: "case",
+				tag: "Shape#Square",
+				members: [
+					{ name: "corner", generator: point },
+					{ name: "side", generator: integers },
+					{ name: "filled", generator: booleans },
+				],
+			},
+			{
+				kind: "record",
+				members: [
+					{ name: "shade", generator: shade },
+					{ name: "at", generator: point },
+				],
+			},
+		],
+	}
 
-		expect(held.store.slots[0].encoded).toBeNull()
+	const textOfEncoding = (value: AnyType): string =>
+		(encodeKey(value, equality) as { text: string }).text
+
+	// NOTE: An equal value spelled differently everywhere the encoding has a
+	// rule to keep: a whole Rational for an Integer and an unreduced pair for
+	// a Rational, the NFD form of a String, and the members in reverse order.
+	const respelled = (value: AnyType): AnyType => {
+		let tag = value[typeKeySymbol] as string
+
+		if (tag === "Integer") {
+			let held = BigInt((value as IntegerType).value)
+
+			return createRational(held * 2n, 2n)
+		}
+
+		if (tag === "Rational") {
+			let { numerator, denominator } = value as {
+				numerator: bigint
+				denominator: bigint
+			}
+
+			return createRational(numerator * -3n, denominator * -3n)
+		}
+
+		if (tag === "String") {
+			return text((value as StringType).value.normalize("NFD"))
+		}
+
+		if (tag === "Boolean") {
+			return value
+		}
+
+		let members: Record<string, AnyType> = {}
+
+		for (let name of Object.keys(value).reverse()) {
+			members[name] = respelled((value as Record<string, AnyType>)[name])
+		}
+
+		return tag === "Record"
+			? createRecord(members)
+			: asValue(createCase(tag, members))
+	}
+
+	test("equal values encode alike and unequal values apart", () => {
+		let source = createRandomness(seedOf("composite"))
+		let drawn: Array<AnyType> = []
+
+		for (let index = 0; index < 160; index++) {
+			drawn.push(generate(shapes, source, 1))
+		}
+
+		let equalPairs = 0
+
+		for (let first of drawn) {
+			let twin = respelled(first)
+
+			expect(anyIs(first, twin)).toBeTrue()
+			expect(textOfEncoding(twin)).toBe(textOfEncoding(first))
+
+			for (let second of drawn) {
+				let same = anyIs(first, second)
+
+				expect(textOfEncoding(first) === textOfEncoding(second)).toBe(
+					same,
+				)
+
+				if (same && first !== second) {
+					equalPairs++
+				}
+			}
+		}
+
+		// NOTE: The draw is small enough that distinct draws coincide, which is
+		// what makes the equal half of the claim about more than one value
+		// compared with itself.
+		expect(equalPairs).toBeGreaterThan(40)
+	})
+})
+
+// NOTE: A Record and a Case whose parts all encode are found in one step, the
+// witness never asked — which is the whole of what the `structural` brand on
+// `Record`'s witness and on a Choice's derived one buys. What decides which
+// two are one key is still exactly what the witness would have said.
+describe("composite keys", () => {
+	// NOTE: Counting the witness's calls is the deterministic guard on the
+	// encoded path: a lookup that took the scan path would ask it once per live
+	// slot, and one that encoded asks it never.
+	const counting = (): {
+		witness: typeof equality
+		calls: () => number
+	} => {
+		let calls = 0
+
+		return {
+			witness: {
+				is: (first, second) => {
+					calls++
+
+					return equality.is(first, second)
+				},
+				structural: true,
+			},
+			calls: () => calls,
+		}
+	}
+
+	test("a Record key is found by its encoding, the witness never asked", () => {
+		let { witness, calls } = counting()
+		let held = createDictionary<AnyType, AnyType>(
+			[
+				[
+					createRecord({ id: integer(1), note: text("first") }),
+					integer(10),
+				],
+			],
+			witness,
+		)
+
+		expect(held.store.slots[0].encoded).toEqual({
+			text: "R{2:id=i1;4:note=s5:first};",
+		})
+		expect(held.store.unencoded).toBe(0)
 		expect(
 			heldNumber(
 				valueAt(
 					held,
-					createRecord({ id: integer(1), note: text("first") }),
+					createRecord({ note: text("first"), id: integer(1) }),
+					witness,
+				),
+			),
+		).toBe(10)
+		expect(
+			valueAt(
+				held,
+				createRecord({ id: integer(1), note: text("other") }),
+				witness,
+			)[typeKeySymbol],
+		).toBe("Optional#Empty")
+		expect(calls()).toBe(0)
+	})
+
+	test("a unit Case is found by its encoding, the witness never asked", () => {
+		let { witness, calls } = counting()
+		let red = asValue(createCase("Colour#Red"))
+		let blue = asValue(createCase("Colour#Blue"))
+		let held = createDictionary<AnyType, AnyType>(
+			[
+				[red, integer(1)],
+				[blue, integer(2)],
+			],
+			witness,
+		)
+
+		expect(held.store.slots[0].encoded).toEqual({
+			text: "c10:Colour#Red{};",
+		})
+		expect(held.store.unencoded).toBe(0)
+		expect(lengthOf(held).value).toBe(2)
+		expect(
+			heldNumber(
+				valueAt(held, asValue(createCase("Colour#Red")), witness),
+			),
+		).toBe(1)
+		expect(
+			valueAt(held, asValue(createCase("Colour#Green")), witness)[
+				typeKeySymbol
+			],
+		).toBe("Optional#Empty")
+		expect(calls()).toBe(0)
+	})
+
+	test("a Case with a payload is one key with any spelling of equal parts", () => {
+		let { witness, calls } = counting()
+		let held = createDictionary<AnyType, AnyType>(
+			[
+				[
+					asValue(
+						createCase("Shape#Circle", {
+							radius: createRational(2n, 4n),
+							label: text(composedAccent),
+						}),
+					),
+					integer(1),
+				],
+			],
+			witness,
+		)
+
+		expect(
+			heldNumber(
+				valueAt(
+					held,
+					asValue(
+						createCase("Shape#Circle", {
+							label: text(decomposedAccent),
+							radius: createRational(1n, 2n),
+						}),
+					),
+					witness,
+				),
+			),
+		).toBe(1)
+		expect(
+			valueAt(
+				held,
+				asValue(
+					createCase("Shape#Square", {
+						radius: createRational(1n, 2n),
+						label: text(composedAccent),
+					}),
+				),
+				witness,
+			)[typeKeySymbol],
+		).toBe("Optional#Empty")
+		expect(calls()).toBe(0)
+	})
+
+	// NOTE: A thousand Case keys, every one found without the witness — the
+	// shape the benchmark file measures, asserted here by instrumentation rather
+	// than by a timing.
+	test("a thousand Case keys are all found on the encoded path", () => {
+		let { witness, calls } = counting()
+		let box = createDictionary<AnyType, AnyType>([], witness)
+
+		for (let index = 0; index < 1000; index++) {
+			box = setAt(
+				box,
+				asValue(createCase("Slot#At", { index: integer(index) })),
+				integer(index),
+				witness,
+			)
+		}
+
+		expect(lengthOf(box).value).toBe(1000)
+		expect(box.store.unencoded).toBe(0)
+		expect(box.store.texts.size).toBe(1000)
+
+		for (let index = 0; index < 1000; index++) {
+			expect(
+				heldNumber(
+					valueAt(
+						box,
+						asValue(
+							createCase("Slot#At", { index: integer(index) }),
+						),
+						witness,
+					),
+				),
+			).toBe(index)
+		}
+
+		expect(calls()).toBe(0)
+	})
+
+	// NOTE: A payload-free Case is one interned instance per tag, and its text
+	// is remembered on that instance — so the second encoding is the same
+	// String object as the first, and the memo is invisible to the members
+	// `Record::is` and the derived equality read.
+	test("a unit Case remembers its text on the interned instance", () => {
+		let red = asValue(createCase("Colour#Red"))
+		let first = encodeKey(red, equality) as { text: string }
+		let second = encodeKey(red, equality) as { text: string }
+
+		expect(first.text).toBe(second.text)
+		expect(Object.keys(red)).toEqual([])
+		expect(anyIs(red, asValue(createCase("Colour#Red")))).toBeTrue()
+	})
+})
+
+describe("the scan path", () => {
+	test("a Record holding a List is found through the witness", () => {
+		let held = dictionary([
+			createRecord({ id: integer(1), tags: createList([text("a")]) }),
+			integer(10),
+		])
+
+		expect(held.store.slots[0].encoded).toBeNull()
+		expect(held.store.unencoded).toBe(1)
+		expect(
+			heldNumber(
+				valueAt(
+					held,
+					createRecord({
+						id: integer(1),
+						tags: createList([text("a")]),
+					}),
 					equality,
 				),
 			),
@@ -445,18 +945,56 @@ describe("the scan path", () => {
 		expect(overwritten.store.slots[0].key).toBe(first)
 	})
 
-	test("a unit Case is a scan-path key", () => {
-		let red = asValue(createCase("Colour#Red"))
-		let blue = asValue(createCase("Colour#Blue"))
-		let held = dictionary([red, integer(1)], [blue, integer(2)])
+	// NOTE: One Record witness over Records that encode and Records that do
+	// not — a `{ id: Integer, tags: List<String> }` beside a `{ id: Integer }`
+	// under one `Record` key Type is not a Program the language admits, but
+	// a Case whose payload member is a `Number` holds an Integer in one value
+	// and an Algebraic in the next, and that is one Choice.
+	test("a store mixes encoded and scan-path Cases under one witness", () => {
+		let root = createAlgebraic(
+			{ numerator: 0n, denominator: 1n },
+			{ numerator: 1n, denominator: 1n },
+			2n,
+		) as AnyType
+		let held = dictionary(
+			[
+				asValue(createCase("Box#Full", { item: integer(3) })),
+				text("three"),
+			],
+			[asValue(createCase("Box#Full", { item: root })), text("root")],
+			[
+				asValue(
+					createCase("Box#Full", { item: createRational(6n, 2n) }),
+				),
+				text("three again"),
+			],
+		)
 
-		expect(held.store.slots[0].encoded).toBeNull()
 		expect(lengthOf(held).value).toBe(2)
+		expect(held.store.unencoded).toBe(1)
+		expect(held.store.texts.size).toBe(1)
 		expect(
-			heldNumber(
-				valueAt(held, asValue(createCase("Colour#Red")), equality),
+			textOf(
+				heldOf(
+					valueAt(
+						held,
+						asValue(createCase("Box#Full", { item: integer(3) })),
+						equality,
+					),
+				) as AnyType,
 			),
-		).toBe(1)
+		).toBe("three again")
+		expect(
+			textOf(
+				heldOf(
+					valueAt(
+						held,
+						asValue(createCase("Box#Full", { item: root })),
+						equality,
+					),
+				) as AnyType,
+			),
+		).toBe("root")
 	})
 
 	// NOTE: A `Number` key Type is one witness over kinds that encode and a kind
@@ -948,7 +1486,7 @@ describe("repacking", () => {
 
 		expect(repacked.store).not.toBe(original)
 		expect(repacked.store.slots.length).toBe(3)
-		expect(repacked.store.fractions.size).toBe(0)
+		expect(repacked.store.texts.size).toBe(0)
 		expect(repacked.store.index.get("a")).toBe(repacked.store.slots[0])
 		expect(writtenForm(repacked)).toBe(`["a" = 1, "c" = 3, "e" = 5]`)
 		expect(writtenForm(sibling)).toBe(`["a" = 1, "c" = 3, "d" = 4]`)
@@ -1451,7 +1989,7 @@ describe("map", () => {
 		expect(doubled.store.slots[0].key).toBe(held.store.slots[0].key)
 		expect(doubled.store.slots[0].encoded).toBe(held.store.slots[0].encoded)
 		expect(doubled.store.index.get("a")).toBe(doubled.store.slots[0])
-		expect(doubled.store.fractions.get("1/2")).toBe(doubled.store.slots[1])
+		expect(doubled.store.texts.get("1/2")).toBe(doubled.store.slots[1])
 	})
 
 	test("the transform is called once per live entry, in order, with the entry Record", () => {
@@ -1914,7 +2452,7 @@ describe("a random chain of writes against a Map model", () => {
 			expect(slot.encoded).toEqual(encodeKey(slot.key, equality))
 
 			if (slot.encoded !== null && typeof slot.encoded === "object") {
-				expect(store.fractions.get(slot.encoded.fraction)).toBe(slot)
+				expect(store.texts.get(slot.encoded.text)).toBe(slot)
 			} else if (slot.encoded !== null) {
 				expect(store.index.get(slot.encoded)).toBe(slot)
 			}
@@ -1943,7 +2481,7 @@ describe("a random chain of writes against a Map model", () => {
 
 		expect(box.length).toBe(liveHere)
 		expect(store.dead).toBe(totalVersions - liveAtTip)
-		expect(store.index.size + store.fractions.size).toBe(
+		expect(store.index.size + store.texts.size).toBe(
 			store.slots.filter((slot) => slot.encoded !== null).length,
 		)
 		expect(store.unencoded).toBe(

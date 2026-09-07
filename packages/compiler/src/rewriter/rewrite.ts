@@ -3435,8 +3435,18 @@ function rewriteCaseValue(
 // STRUCTURAL — it asks what the value IS and nothing else, which is exactly what
 // the Dictionary runtime's canonical key encoding stands in for. A String is its
 // characters, an Integer is its number, a Rational is its reduced pair, a
-// Boolean is one of two values, and `Number` covers the three numeric kinds by
-// the same rule.
+// Boolean is one of two values, `Number` covers the three numeric kinds by the
+// same rule, and a Record is its members compared by that same universal rule —
+// `Record::is` never asks a member's own Namespace, which is what makes its
+// witness structural rather than merely the library's (see `Record.es`).
+//
+// The equality the language DERIVES for a Choice is on the list under the name
+// the Enricher fabricates for it: it compares the tag and then the payload by
+// the universal rule, and no Namespace wrote it. A Namespace that writes an
+// `is` for its Choice REPLACES the derivation, so its witness arrives under the
+// Namespace's own name and is not branded. A generic Choice's derived witness
+// is conditional on its Type Arguments' witnesses and is excluded below with
+// every other conditional one.
 //
 // A refinement of one of those is not on the list and does not need to be: it
 // declares no `is` of its own, so its conformance RESOLVES to the base
@@ -3452,6 +3462,8 @@ const structurallyEquatableNamespaces = new Set([
 	"Rational",
 	"Boolean",
 	"Number",
+	"Record",
+	derivedEquatableNamespaceName,
 ])
 
 // NOTE: Whether this witness is one of those, and is the EQUATABLE one — a
@@ -3459,15 +3471,23 @@ const structurallyEquatableNamespaces = new Set([
 // handed to a Dictionary. `Equatable` declares exactly `is` and `isNot`, so the
 // two names it fulfils, wherever they come from, are what identify it.
 //
-// Conditional conformances are excluded outright. None of the five is one, and
-// `boundConformance` walks a witness's entries and curries each as a FUNCTION —
-// a `structural: true` standing among them would be called.
+// Conditional conformances are excluded outright. None of the six Namespaces
+// is one, and `boundConformance` walks a witness's entries and curries each as
+// a FUNCTION — a `structural: true` standing among them would be called.
+//
+// A user Namespace SHADOWING one of the six is excluded by the same lexical
+// answer every member read is decided by: `namespace String for NonEmptyString
+// is Equatable { is … }` declared inside a Function arrives here as `String`,
+// and branding it would hand the Dictionary an encoding that ignores the very
+// `is` the Program wrote. The derived name carries a `_` no Essence source can
+// spell, so it can not be shadowed.
 function isStructurallyEquatable(
 	node: common.typedSimple.ConformanceValueNode,
 ): boolean {
 	if (
 		!structurallyEquatableNamespaces.has(node.namespaceName) ||
-		node.conditions.length > 0
+		node.conditions.length > 0 ||
+		isShadowingUserNamespace(node.namespaceName)
 	) {
 		return false
 	}
