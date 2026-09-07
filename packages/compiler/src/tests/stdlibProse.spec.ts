@@ -14,6 +14,11 @@ import { readStdlibFiles } from "@essence-lang/standard-library"
 // - No ALL-CAPS emphasis. An acronym is written in capitals and is allowed;
 //   a Type or Namespace name is CamelCase and never matches.
 //
+// A fifth check is about WHERE the prose stands rather than how it reads: every
+// `choice` and every `type` alias here carries a `§§` block, because a `§` note
+// above one is read by the next editor of the file and by nobody who uses the
+// Type.
+//
 // All four rules are live. The documentation pass (Phase 3 of the plan) took
 // every source to zero findings, and a source that breaks one of them again
 // fails here.
@@ -51,11 +56,22 @@ const ACRONYMS = new Set([
 const abbreviationPattern = /\b(?:e\.g|i\.e|etc|vs|cf)\.$/
 
 type Finding = {
-	rule: "sentence-length" | "em-dash" | "may-should" | "all-caps"
+	rule:
+		| "sentence-length"
+		| "em-dash"
+		| "may-should"
+		| "all-caps"
+		| "undocumented-declaration"
 	file: string
 	line: number
 	detail: string
 }
+
+// NOTE: A `choice` or a `type` alias declared at the top of a `declarations`
+// body. Both are Types a user's Program writes down, so both are read by
+// somebody who never opens this directory, and a `§` note above one reaches
+// nobody but the next editor of the file.
+const declarationPattern = /^\t(choice|type)\s+([A-Za-z][A-Za-z0-9]*)/
 
 // NOTE: One run of Comment lines of the same sigil, with the line each started
 // on. A `§§` run is the block above a Declaration; a `§` run is one note.
@@ -257,6 +273,55 @@ export function proseFindings(): Array<Finding> {
 	return findings
 }
 
+// NOTE: The Types the sources declare, each with whether the Comment run
+// directly above it holds a `§§` block. The run is walked upwards over every
+// Comment line, `§` notes included, because the Parser reads the documentation
+// above the Statement whatever else stands between: a note that explains a
+// decision does not take the block away.
+export function undocumentedDeclarations(): Array<Finding> {
+	let findings: Array<Finding> = []
+
+	for (let { filePath, sourceText } of readStdlibFiles()) {
+		let file = path.basename(filePath)
+		let lines = sourceText.split("\n")
+
+		for (let [index, text] of lines.entries()) {
+			let declaration = declarationPattern.exec(text)
+
+			if (declaration === null) {
+				continue
+			}
+
+			let documented = false
+
+			for (let above = index - 1; above >= 0; above--) {
+				let comment = commentPattern.exec(lines[above] ?? "")
+
+				if (comment === null) {
+					break
+				}
+
+				if (comment[1] === "§§") {
+					documented = true
+
+					break
+				}
+			}
+
+			if (!documented) {
+				findings.push({
+					rule: "undocumented-declaration",
+					file,
+					line: index + 1,
+					detail: `${declaration[1]} ${declaration[2]} has no '§§' block`,
+				})
+			}
+		}
+	}
+
+	return findings
+}
+
 function findingsFor(rule: Finding["rule"]): Array<Finding> {
 	return proseFindings().filter((finding) => finding.rule === rule)
 }
@@ -346,6 +411,12 @@ describe("Standard Library Prose", () => {
 
 			console.log(`\n${rule}: ${found.length}\n${report(found)}`)
 		}
+
+		let undocumented = undocumentedDeclarations()
+
+		console.log(
+			`\nundocumented-declaration: ${undocumented.length}\n${report(undocumented)}`,
+		)
 	})
 
 	it("should keep every sentence to 25 words", () => {
@@ -362,5 +433,14 @@ describe("Standard Library Prose", () => {
 
 	it("should spend no ALL-CAPS on emphasis", () => {
 		expect(report(findingsFor("all-caps"))).toBe("")
+	})
+
+	// NOTE: A `§§` block is what a reader of the LANGUAGE sees and a `§` note
+	// is what the next editor of the file sees, so a Type documented by a note
+	// alone is documented for nobody who uses it. Every `choice` and every
+	// `type` alias here carries one, and this is what keeps that true: the
+	// library's Types are as much of its surface as its Methods are.
+	it("should give every Choice and Type Alias a '§§' block", () => {
+		expect(report(undocumentedDeclarations())).toBe("")
 	})
 })

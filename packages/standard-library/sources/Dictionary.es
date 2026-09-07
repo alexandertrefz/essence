@@ -17,17 +17,12 @@ import {
 
 declarations {
 
-	§ The Dictionaries that have something in them. It is a checked refinement:
-	§ the predicate is what a value has to be proven to satisfy, and the proof is
-	§ what the Type carries.
-	§
-	§ Three routes reach the proof. A Dictionary written down with an entry in it
-	§ is its own proof, and so is an update that sets one. A Dictionary a Program
-	§ is handed goes through an `if` asking `hasEntries`. And `set` puts an entry
-	§ into whatever it was given, so it answers with this Type.
-	§
 	§ The predicate asks nothing about the key Type or the value Type. One
 	§ predicate serves every Dictionary, and both Type Arguments stay in the base.
+
+	§§ A Dictionary proven to have an entry in it, as a checked refinement of `Dictionary`.
+	§§
+	§§ The proof is what lets `length` answer above zero, and `keys`, `values` and `entries` answer a List with something in it. A Dictionary written down with an entry in it carries the proof. A Dictionary a Program is handed earns it through an `if` asking `hasEntries`, and `set` answers with this Type whatever it was given.
 	type NonEmptyDictionary<KeyType, ValueType> = Dictionary<KeyType, ValueType>
 		where @::hasEntries()
 

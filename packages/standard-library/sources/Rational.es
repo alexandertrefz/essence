@@ -24,8 +24,11 @@ import {
 
 declarations {
 
-	§ The forms `Rational::toString` writes: `Fraction` is `"3/4"` and
-	§ `Decimal` is `"0.75"`. The Choice is declared beside its only user.
+	§ The Choice is declared beside its only user.
+
+	§§ The forms `Rational::toString` writes: `#Fraction` is `"3/4"` and `#Decimal` is `"0.75"`.
+	§§
+	§§ The plain `toString()` entry writes the fraction form, and the `as:` entries name one of the two.
 	choice NumberFormat {
 		Fraction,
 		Decimal,
@@ -36,9 +39,12 @@ declarations {
 	§ DEVELOPMENT.md, Why bodies look the way they do.
 	namespace NumberFormat for NumberFormat is Equatable, is Printable {}
 
-	§ Which step `round` reaches for a value that is not already on one. The
-	§ Choice is declared beside the Namespace that rounds most, and `#Nearest`
-	§ is the default. `Integer.es` imports it for its own `round`.
+	§ The Choice is declared beside the Namespace that rounds most, and
+	§ `Integer.es` imports it for its own `round`.
+
+	§§ Which step `round` reaches for a value that is not already on one.
+	§§
+	§§ `#Nearest` goes to the closest step, and away from zero for a value exactly halfway between two. The `#Down` Case answers the floor, `#Up` the ceiling, and `#TowardZero` the step towards zero. A call that names no rounding gets `#Nearest`.
 	choice Rounding {
 		Nearest,
 		Down,
@@ -48,11 +54,13 @@ declarations {
 
 	namespace Rounding for Rounding is Equatable, is Printable {}
 
-	§ The Rationals that are not zero, as a checked refinement, and the sister
-	§ of `NonZeroInteger`. The bound is written `0/1`, which is the house
-	§ spelling for a Rational zero. A bare `0` asks the same question: the
-	§ Compiler reads every Integer bound on a Rational as `n/1`, so both
-	§ spellings reach this Type.
+	§ The bound is written `0/1`, which is the house spelling for a Rational
+	§ zero. A bare `0` asks the same question: the Compiler reads every Integer
+	§ bound on a Rational as `n/1`, so both spellings reach this Type.
+
+	§§ The Rationals that are not zero, as a checked refinement of `Rational`, and the sister of `NonZeroInteger`.
+	§§
+	§§ The proof is what lets `reciprocal` answer a Rational rather than an Optional. The `numerator` is a NonZeroInteger, and `absolute`, `negate` and multiplication answer one of these again.
 	type NonZeroRational = Rational where @::isNot(0/1)
 
 	§ Exact ratios of Integers, kept in lowest terms with the sign on the

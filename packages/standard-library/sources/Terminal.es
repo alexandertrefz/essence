@@ -5,10 +5,12 @@ import {
 
 declarations {
 
-	§ Where written text lands. The `#Output` Stream carries what the Program
-	§ answers with, and `#Error` carries what it complains about. A terminal
-	§ offers those two and no more, so the pair is a `choice` rather than a
-	§ String naming a file handle.
+	§ A terminal offers those two and no more, so the pair is a `choice` rather
+	§ than a String naming a file handle.
+
+	§§ Where written text lands: `#Output` carries what the Program answers with, and `#Error` what it complains about.
+	§§
+	§§ `#Output` is what a call that names no Stream gets.
 	choice Stream {
 		Output,
 		Error,

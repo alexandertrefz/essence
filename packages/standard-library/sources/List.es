@@ -17,10 +17,11 @@ import {
 
 declarations {
 
-	§ Which way `sort` runs. The Choice is declared beside its only user, and
-	§ `#Ascending` is the default. Descending is not a sort followed by a
-	§ reverse. The comparison is turned around instead, so items the order
-	§ does not tell apart keep the order they had.
+	§ The Choice is declared beside its only user.
+
+	§§ Which way `sort` runs: `#Ascending` from the lowest, or `#Descending` from the highest.
+	§§
+	§§ `#Ascending` is what a call that names no order gets. Descending is not a sort followed by a reverse. The comparison is turned around instead, so items the order does not tell apart keep the order they had.
 	choice SortOrder {
 		Ascending,
 		Descending,
@@ -31,18 +32,14 @@ declarations {
 	§ DEVELOPMENT.md, Why bodies look the way they do.
 	namespace SortOrder for SortOrder is Equatable, is Printable {}
 
-	§ The Lists that have something in them. It is a checked refinement: the
-	§ predicate is what a value has to be proven to satisfy, and the proof is
-	§ what the Type carries.
-	§
-	§ Three routes reach the proof. A List written down with items in it is its
-	§ own proof. A List a Program is handed goes through an `if` asking
-	§ `hasItems`. And `append(_:)`, `prepend(_:)`, `insert(_:at:)` and
-	§ `of(integersFrom:through:)` each put something in what they were given,
-	§ so each answers with this Type.
-	§
 	§ The predicate asks nothing about the item Type, so one predicate serves
 	§ every List and the Type Argument stays in the base.
+
+	§§ A List proven to have an item in it, as a checked refinement of `List`.
+	§§
+	§§ The proof is what lets `firstItem` and `lastItem` answer an item rather than an Optional. A List written down with items in it carries the proof. A List a Program is handed earns it through an `if` asking `hasItems`.
+	§§
+	§§ `append(_:)`, `prepend(_:)`, `insert(_:at:)` and `of(integersFrom:through:)` each put something into what they were given, so each answers with this Type.
 	type NonEmptyList<ItemType> = List<ItemType> where @::hasItems()
 
 	§ The ordered sequence, and everything that reads or rebuilds one. Every

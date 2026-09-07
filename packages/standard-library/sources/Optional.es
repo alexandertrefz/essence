@@ -17,6 +17,10 @@ declarations {
 	§ no Namespace at all. A Choice has one spelling, because `Nothing` does
 	§ not exist. The cost is that widening is gone: a Method answering
 	§ `Optional<Integer>` writes `<- #Value(0)`, not `<- 0`.
+
+	§§ A value that is there or is not: `#Value` holds an item, and `#Empty` holds nothing.
+	§§
+	§§ Every Method that can come back empty answers one of these. The Choice nests, so `#Value(#Empty)` is not `#Empty`.
 	choice Optional<ItemType> {
 		Value { item: ItemType },
 		Empty,

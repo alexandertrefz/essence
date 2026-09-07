@@ -21,20 +21,22 @@ import {
 
 declarations {
 
-	§ The Integers that are not zero, as a checked refinement: a value carries
-	§ a proof of the predicate before it is one. The proof is what lets an
-	§ operation say it can not fail. A division by one of these answers a
-	§ Rational rather than an Optional.
+	§§ The Integers that are not zero, as a checked refinement of `Integer`.
+	§§
+	§§ A value carries a proof of the predicate before it is one of these. The proof is what lets an operation say it can not fail. A division by one of these answers a Rational rather than an Optional, and `negate` and `absolute` stay within the proof.
 	type NonZeroInteger = Integer where @::isNot(0)
 
-	§ The Integers from zero upward. An exponent proven to be one of these
-	§ raises any Integer to a whole power. A receiver proven to be one has a
-	§ real square root. Both operations answer an Optional without the proof.
+	§§ The Integers from zero upward, as a checked refinement of `Integer`.
+	§§
+	§§ An exponent proven to be one of these raises any Integer to a whole power. A receiver proven to be one has a real square root. Both operations answer an Optional without the proof.
 	type NonNegativeInteger = Integer where @::isGreaterThanOrEqualTo(0)
 
-	§ The Integers above zero. `isPositive` is written `@::isGreaterThan(0)`,
-	§ and a value above zero is neither zero nor below it. So a value proven
-	§ to be one of these is accepted wherever either Type above is wanted.
+	§ `isPositive` is written `@::isGreaterThan(0)`, which is the reading the
+	§ implication below rests on.
+
+	§§ The Integers above zero, as a checked refinement of `Integer`.
+	§§
+	§§ A value above zero is neither zero nor below it, so one of these is accepted wherever a NonZeroInteger or a NonNegativeInteger is wanted. Addition, multiplication and `raise` answer one of these again.
 	type PositiveInteger = Integer where @::isPositive()
 
 	§ Whole numbers of arbitrary size, and the exact arithmetic over them.
