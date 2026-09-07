@@ -68,9 +68,10 @@ declarations {
 	§ combining marks, a ZWJ emoji sequence, a flag's two regional
 	§ indicators. The native `split` decides the segmentation (`graphemesOf`
 	§ in `String.ts`), and `characters` is `split(on "")`. Every position
-	§ Method is written on one of those two, so none cuts a character in
-	§ half. Both sides of a comparison are normalized to NFC first, so an
-	§ accent composed and one decomposed count, order and compare the same.
+	§ Method is written on one of those two or reads the same view natively,
+	§ so none cuts a character in half. Both sides of a comparison are
+	§ normalized to NFC first, so an accent composed and one decomposed
+	§ count, order and compare the same.
 	namespace String for String is Equatable, is Printable, is Comparable {
 		§§ Answers whether the String has the same characters as another one.
 		§§
@@ -151,7 +152,26 @@ declarations {
 			<- @::isEmpty()::negate()
 		}
 
+		§ The empty part matches nowhere, except as a position at either end.
+		§ Every search below answers by that one rule. So `firstIndex(of "")`
+		§ is 0 and `lastIndex(of "")` is the length. So `contains("")` is
+		§ `true`. And `count(of "")` is 0, while `replaceEvery` and
+		§ `replaceFirst` leave the String unchanged. The alternative, an
+		§ occurrence between every two characters, would count the length plus
+		§ one and put a replacement between the characters. Each entry states
+		§ its own answer in its `§§` block; the natives in `String.ts` point
+		§ back here.
+		§
+		§ The three searches are native, so that a question about a position
+		§ never builds the pieces `split` builds. The two Booleans and the two
+		§ replacements are written on them. Measured on a 10,800-character
+		§ ASCII String, one `contains` of a part that does not occur: 504 µs
+		§ on `split`, 8 µs on the native `firstIndex`. A Program making
+		§ 20,000 of them took 1,856 ms and takes 33 ms.
+
 		§§ Answers whether the given String occurs anywhere in this one.
+		§§
+		§§ The empty String occurs in every String.
 		§§
 		§§ @example
 		§§   expect "Lions"::contains("ion")
@@ -262,30 +282,15 @@ declarations {
 			}
 		}
 
+		§ The first entry is native; see the note above `contains`.
+
 		§§ Answers the position of the first occurrence of the given String.
 		§§
 		§§ The empty String occurs at position 0. A String that does not occur answers nothing, and the `defaultingTo:` entry answers the given position instead.
 		overload firstIndex {
 			§§ @param of — the String to look for
 			§§ @returns — the zero-based position, or nothing when it does not occur.
-			(of part: String) -> Optional<Integer> {
-				§ The empty part occurs at the start of every String, and
-				§ splitting on it would answer the first character's length.
-				if part::isEmpty() {
-					<- #Value(0)
-				} else {
-					constant pieces = @::split(on part)
-
-					§ One piece means the separator was never found.
-					if pieces::length()::is(1) {
-						<- #Empty
-					} else {
-						§ The first piece is everything before the first
-						§ occurrence, so its length is that position.
-						<- #Value(pieces::firstItem()::length())
-					}
-				}
-			}
+			(of part: String) -> Optional<Integer>
 
 			§§ @param of — the String to look for
 			§§ @param defaultingTo — the position to answer with when the String does not occur
@@ -295,36 +300,19 @@ declarations {
 			}
 		}
 
+		§ The first entry is native, and walks the String from the end. The
+		§ occurrence it answers can overlap an earlier one, which a derivation
+		§ from `split(on:)` misses. Splitting consumes each match, so `"aaa"`
+		§ split on `"aa"` puts the last match at 0, where the last occurrence
+		§ begins at 1.
+
 		§§ Answers the position of the last occurrence of the given String.
 		§§
-		§§ The empty String occurs at the length. A String that does not occur answers nothing, and the `defaultingTo:` entry answers the given position instead.
+		§§ The occurrence can overlap an earlier one: `"aaa"::lastIndex(of "aa")` is 1. The empty String occurs at the length. A String that does not occur answers nothing, and the `defaultingTo:` entry answers the given position instead.
 		overload lastIndex {
 			§§ @param of — the String to look for
 			§§ @returns — the zero-based position, or nothing when it does not occur.
-			(of part: String) -> Optional<Integer> {
-				if part::isEmpty() {
-					<- #Value(@::length())
-				} else {
-					§ The last occurrence of the part is the first occurrence
-					§ of the reversed part in the reversed String, so
-					§ `firstIndex` answers it. A match that far into the
-					§ reversal is that far from the right end, so it begins
-					§ one part length before that.
-					§
-					§ Deriving it from `split(on:)` answers the last match
-					§ that does not overlap, because splitting consumes each
-					§ match. Splitting `"aaa"` on `"aa"` answers 0, where the
-					§ last occurrence begins at 1.
-					constant length     = @::length()
-					constant partLength = part::length()
-
-					<- @::reverse()
-						::firstIndex(of part::reverse())
-						::map((position) {
-							<- length::subtract(position)::subtract(partLength)
-						})
-				}
-			}
+			(of part: String) -> Optional<Integer>
 
 			§§ @param of — the String to look for
 			§§ @param defaultingTo — the position to answer with when the String does not occur
@@ -370,22 +358,19 @@ declarations {
 			(on separator: NonEmptyString) -> NonEmptyList<String>
 		}
 
+		§ Native; see the note above `contains`. A body on `split(on part)`
+		§ builds every piece to count them. A body on `firstIndex` and `slice`
+		§ cuts the rest of the String at every occurrence, which is quadratic
+		§ in the occurrences. Measured on a 10,800-character ASCII String with
+		§ 3,600 occurrences, one count: 537 µs on `split`, 33 µs native.
+
 		§§ Answers how many times the given String occurs in this one.
 		§§
-		§§ The occurrences do not overlap: `"aaa"::count(of "aa")` is 1. The empty part answers 0.
+		§§ The occurrences do not overlap: `"aaa"::count(of "aa")` is 1. The empty String occurs 0 times.
 		§§
 		§§ @param of — the String to count
 		§§ @returns — the number of occurrences.
-		count(of part: String) -> Integer {
-			§ Splitting on the part cuts at every occurrence, so there is
-			§ one more piece than occurrences. The empty part would cut
-			§ between the characters instead.
-			if part::isEmpty() {
-				<- 0
-			} else {
-				<- @::split(on part)::length()::subtract(1)
-			}
-		}
+		count(of part: String) -> Integer
 
 		§§ Answers the String with every character in upper case.
 		uppercase() -> String
@@ -411,15 +396,15 @@ declarations {
 
 		§§ Answers the String with every occurrence of one part replaced by another.
 		§§
-		§§ An empty part matches nothing and leaves the String unchanged.
+		§§ The occurrences do not overlap. The empty String matches nowhere, so the String comes back unchanged.
 		§§
 		§§ @param _ — the String to look for
 		§§ @param with — the String to put in its place
 		§§ @returns — the String with the replacements made.
 		replaceEvery(_ part: String, with replacement: String) -> String {
-			§ The empty part occurs at every position, and
+			§ The guard is the empty-part rule above `contains`:
 			§ `split(on "")::join` would put the replacement between the
-			§ characters. That is a different String, so nothing is replaced.
+			§ characters.
 			if part::isEmpty() {
 				<- @
 			} else {
@@ -427,30 +412,39 @@ declarations {
 			}
 		}
 
+		§ Written on `firstIndex` and `slice`, so that a String with one
+		§ occurrence in it is cut twice rather than split into pieces and
+		§ joined back. The guard is the empty-part rule above `contains`:
+		§ `firstIndex(of "")` is 0, and cutting there would put the
+		§ replacement in front. Measured as a Program making 5,000
+		§ replacements in a 10,800-character ASCII String: 629 ms on `split`,
+		§ 25 ms here.
+
 		§§ Answers the String with the first occurrence of one part replaced by another.
 		§§
-		§§ An empty part, or a part that does not occur, leaves the String unchanged.
+		§§ The empty String matches nowhere, so it and a part that does not occur leave the String unchanged.
 		§§
 		§§ @param _ — the String to look for
 		§§ @param with — the String to put in its place
 		§§ @returns — the String with the first replacement made.
 		replaceFirst(_ part: String, with replacement: String) -> String {
-			§ The empty part is a no-op, as in `replaceEvery`.
 			if part::isEmpty() {
 				<- @
-			} else {
-				constant pieces = @::split(on part)
+			}
 
-				§ One piece means the part never occurs.
-				if pieces::length()::is(1) {
-					<- @
-				} else {
-					§ The first piece is everything before the first
-					§ occurrence, and the rest rejoin on the original part.
-					constant head = pieces::firstItem()
+			§ `@` is rebound inside `match`; see DEVELOPMENT.md, Why bodies
+			§ look the way they do.
+			constant text = @
 
-					<- head::append(replacement)
-						::append(pieces::removeFirst()::join(with part))
+			<- match text::firstIndex(of part) -> String {
+				case #Empty { <- text }
+
+				case #Value(position) {
+					<- text::slice(to position)
+						::append(replacement)
+						::append(
+							text::slice(from position::add(part::length())),
+						)
 				}
 			}
 		}
@@ -464,8 +458,10 @@ declarations {
 		§§ @returns — the repeated String. A count below one answers the empty String.
 		repeat(times count: Integer) -> String
 
-		§ Native, and the `lastIndex` derivation above rests on it; see
-		§ DEVELOPMENT.md, What to weigh before writing the next one.
+		§ Native. The Essence body, `characters()::reverse()::join(with "")`,
+		§ segments the joined text afresh. That can pair three regional
+		§ indicators into characters the String never had; see DEVELOPMENT.md,
+		§ What to weigh before writing the next one.
 
 		§§ Answers the String with its characters in the opposite order.
 		reverse() -> String

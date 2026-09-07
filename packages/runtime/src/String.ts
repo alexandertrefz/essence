@@ -268,23 +268,23 @@ export function normalisedFormOf(string: StringType): string {
 // scanned again.
 function graphemeCountIn(string: StringType): number {
 	let measured = string as MeasuredString
-	let count = measured[graphemeCountKey]
+	let characterCount = measured[graphemeCountKey]
 
-	if (count === undefined) {
+	if (characterCount === undefined) {
 		let segments = measured[graphemesKey]
 
 		if (segments !== undefined) {
-			count = segments.length
+			characterCount = segments.length
 		} else if (isAsciiIn(string)) {
-			count = string.value.length
+			characterCount = string.value.length
 		} else {
-			count = graphemesIn(string).length
+			characterCount = graphemesIn(string).length
 		}
 
-		measured[graphemeCountKey] = count
+		measured[graphemeCountKey] = characterCount
 	}
 
-	return count
+	return characterCount
 }
 
 // NOTE: The joined String is a NEW String and remembers nothing of either
@@ -366,9 +366,10 @@ export function split__overload$1(
 ): ListType<StringType> {
 	// NOTE: The one place the runtime decides what a character is, and every
 	// position Method rests on it: `characters()` is `split("")`, and `length`,
-	// `character`, `slice`, `reverse`, `firstIndex`, `contains`, `pad` and the
-	// rest are written on top of those. Both sides are taken as grapheme
-	// clusters (see `graphemesOf`), so the empty separator splits into
+	// `character`, `slice`, `reverse`, `pad` and the rest are written on top
+	// of those, while the searches beside it — `firstIndex`, `lastIndex`,
+	// `count` — read the same view the same way. Both sides are taken as
+	// grapheme clusters (see `graphemesOf`), so the empty separator splits into
 	// characters and a non-empty one matches only as a WHOLE run of characters
 	// — a separator can never land inside a cluster and tear it, and the pieces
 	// come back on cluster boundaries. NFC on both sides means the match is by
@@ -427,15 +428,145 @@ export function split__overload$1(
 
 export const split__overload$2 = split__overload$1
 
+// NOTE: The three searches, native so that a question about a POSITION never
+// builds the pieces `split` builds. An Essence `firstIndex` on `split(on
+// part)` reads the first piece's length, so `contains` — written on it —
+// segments and copies a whole String to answer a Boolean: measured on a
+// 10,800-character ASCII String, one `contains` of an absent part, 504 µs
+// that way against 8 µs here.
+// Each search reads the view `split` reads, so an occurrence is a whole run
+// of characters on cluster boundaries, matched by canonical equivalence; and
+// each takes the intrinsic when both sides pass the ASCII scan, for the
+// reason `split` gives.
+//
+// NOTE: The empty part matches nowhere, except as a position at either end.
+// The rule is stated ONCE, above `contains` in `String.es`, and the three
+// guards below are its answers: 0, the length, and 0.
+//
+// NOTE: The first of two entries — the second takes a `defaultingTo:`
+// fallback and is written in Essence on this one.
+export function firstIndex__overload$1(
+	originalString: StringType,
+	part: StringType,
+): OptionalType<IntegerType> {
+	if (part.value === "") {
+		return createValue(createInteger(0))
+	}
+
+	let index: number
+
+	if (isAsciiIn(originalString) && isAsciiIn(part)) {
+		index = originalString.value.indexOf(part.value)
+	} else {
+		let characters = graphemesIn(originalString)
+		let separator = graphemesIn(part)
+
+		index = -1
+
+		for (
+			let position = 0;
+			position + separator.length <= characters.length;
+			position++
+		) {
+			if (separatorMatchesAt(characters, separator, position)) {
+				index = position
+				break
+			}
+		}
+	}
+
+	return index < 0 ? createEmpty() : createValue(createInteger(index))
+}
+
+// NOTE: The LAST occurrence, which can overlap an earlier one: `"aaa"` holds
+// `"aa"` at 0 and at 1, and the answer is 1, as `lastIndexOf` answers. The
+// walk runs from the last position the part fits at down to the first, so it
+// stops at the first match it meets. The first of two entries, as above.
+export function lastIndex__overload$1(
+	originalString: StringType,
+	part: StringType,
+): OptionalType<IntegerType> {
+	if (part.value === "") {
+		return createValue(createInteger(graphemeCountIn(originalString)))
+	}
+
+	let index: number
+
+	if (isAsciiIn(originalString) && isAsciiIn(part)) {
+		index = originalString.value.lastIndexOf(part.value)
+	} else {
+		let characters = graphemesIn(originalString)
+		let separator = graphemesIn(part)
+
+		index = -1
+
+		for (
+			let position = characters.length - separator.length;
+			position >= 0;
+			position--
+		) {
+			if (separatorMatchesAt(characters, separator, position)) {
+				index = position
+				break
+			}
+		}
+	}
+
+	return index < 0 ? createEmpty() : createValue(createInteger(index))
+}
+
+// NOTE: The occurrences that do NOT overlap — the ones `split` cuts at — so
+// `"aaa"::count(of "aa")` is 1: after a match the walk steps over the whole
+// part, exactly as `split` does, and the count is one less than the pieces
+// `split` would answer. An Essence body on `firstIndex` and `slice` would
+// cut the rest of the String at every occurrence found, which is quadratic
+// in the occurrences; this is one walk. Measured on a 10,800-character ASCII
+// String with 3,600 occurrences: 537 µs counting the pieces, 33 µs here.
+export function count(
+	originalString: StringType,
+	part: StringType,
+): IntegerType {
+	if (part.value === "") {
+		return createInteger(0)
+	}
+
+	let occurrences = 0
+
+	if (isAsciiIn(originalString) && isAsciiIn(part)) {
+		let text = originalString.value
+		let width = part.value.length
+		let index = text.indexOf(part.value)
+
+		while (index >= 0) {
+			occurrences++
+			index = text.indexOf(part.value, index + width)
+		}
+	} else {
+		let characters = graphemesIn(originalString)
+		let separator = graphemesIn(part)
+		let index = 0
+
+		while (index + separator.length <= characters.length) {
+			if (separatorMatchesAt(characters, separator, index)) {
+				occurrences++
+				index += separator.length
+			} else {
+				index++
+			}
+		}
+	}
+
+	return createInteger(occurrences)
+}
+
 // NOTE: The reversed String REMEMBERS its character view — the original's
 // clusters in the opposite order — rather than letting the joined text be
 // segmented afresh. Re-segmenting would hand back characters the original
 // never had: `"🇦🇧🇨"` holds the characters `🇦🇧` and `🇨`, and its reversal
 // spells the very code points a fresh segmentation reads as `🇨🇦` and `🇧`.
 // The remembered view is what keeps "the characters in the opposite order"
-// true as stated, makes a second `reverse` answer the original String back,
-// and is what the `lastIndex` derivation off `reverse` + `firstIndex` in
-// `String.es` rests on.
+// true as stated, and makes a second `reverse` answer the original String
+// back.
 export function reverse(originalString: StringType): StringType {
 	return createSegmentedString([...graphemesIn(originalString)].reverse())
 }
@@ -555,11 +686,13 @@ export function slice(
 ): StringType {
 	let ascii = isAsciiIn(originalString)
 	let characters = ascii ? null : graphemesIn(originalString)
-	let count = ascii ? originalString.value.length : characters!.length
-	let first = positionFromEnd(from.value, count)
-	let last = positionFromEnd(to.value, count)
-	let start = first < 0 ? 0 : first > count ? count : first
-	let end = last < 0 ? 0 : last > count ? count : last
+	let characterCount = ascii
+		? originalString.value.length
+		: characters!.length
+	let first = positionFromEnd(from.value, characterCount)
+	let last = positionFromEnd(to.value, characterCount)
+	let start = first < 0 ? 0 : first > characterCount ? characterCount : first
+	let end = last < 0 ? 0 : last > characterCount ? characterCount : last
 
 	if (ascii) {
 		return createAsciiString(

@@ -198,10 +198,9 @@ describe("reversing", () => {
 		}
 	})
 
-	// NOTE: What the `lastIndex` derivation in `String.es` rests on — a piece
-	// cut from a reversed String carries the clusters it was cut into, so its
-	// length is counted off them rather than off a fresh segmentation of the
-	// joined text.
+	// NOTE: A piece cut from a reversed String carries the clusters it was cut
+	// into, so its length is counted off them rather than off a fresh
+	// segmentation of the joined text.
 	test("a piece of a reversed String counts its own characters", () => {
 		let reversed = reverse(createString("🇦🇧🇨"))
 		let pieces = split(reversed, createString("🇨"))
