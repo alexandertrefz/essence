@@ -38,9 +38,26 @@ declarations {
 	§ `numbers::sum()` had no word for what it got back.
 	type Scalar = Integer | Rational
 
-	§ The one 2×2 dispatch in the file. A Union-typed receiver reaches no
-	§ member Namespace's `add`, and `Number` declares none, so the mixed
-	§ aggregates below fold on this Namespace instead.
+	§ The one 2×2 dispatch in the file, and the only shape that adds or
+	§ multiplies two Scalars. A Union-typed receiver does reach a member
+	§ Namespace's `add`. A Scalar receiver with an Integer Argument emits a
+	§ two-arm test on the receiver's tag. It is the Argument that no member
+	§ takes: each of `Integer::add`'s four overloads wants one kind, so a
+	§ Scalar Argument matches none of them. Both operands of the mixed
+	§ aggregates below are Scalars, which is why they fold here. A Program
+	§ adding two Scalars of its own reaches the same two bodies.
+	§
+	§ The alternative was `add` on `Number` itself, a 4×4 match whose answer
+	§ every caller would have to unwrap. An Algebraic sum over two radicals
+	§ answers empty, so a Number-level sum could not answer bare. Folding on
+	§ the covering `Number` also keeps the irrational arms in the bundle. A
+	§ 300 000-item fold over `List.of(integersFrom 1, through 300000)`
+	§ bundles to 16,812 bytes with the accumulator annotated as `Number`,
+	§ against 14,703 with it annotated as `Scalar`.
+	§
+	§ Specificity is what routes a call here rather than to a member's own
+	§ rung, since this target is the Union exactly. The mixed `sum` below
+	§ emits `$es_Scalar_add`, and so does the fold measured above.
 	§
 	§ `@` is rebound inside `match`, and `reduce` binds `Result` from
 	§ `startingWith`; see DEVELOPMENT.md, Why bodies look the way they do.
