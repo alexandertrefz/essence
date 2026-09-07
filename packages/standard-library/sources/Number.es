@@ -19,23 +19,28 @@ import {
 
 declarations {
 
-	§ The whole numeric tower under one name; see DEVELOPMENT.md, Editing
-	§ hazards, for what naming a Union does and does not do.
+	§ See DEVELOPMENT.md, Editing hazards, for what naming a Union does and
+	§ does not do.
+
+	§§ Every number the tower holds: an Integer, a Rational, an Algebraic or a Transcendental.
+	§§
+	§§ The name is for reading. Assignability ignores it, so a value of any member Type is a Number whether or not it was written as one.
 	type Number = Integer | Rational | Irrational
 
-	§ `Algebraic` and `Transcendental` are complements: transcendental means
-	§ not algebraic. The alias covers exactly the irrationals the tower holds.
+	§§ The numbers of the tower that are not ratios of Integers: an Algebraic or a Transcendental.
+	§§
+	§§ Algebraic and Transcendental are complements, since transcendental means not algebraic. The alias covers exactly the irrationals the tower holds.
 	type Irrational = Algebraic | Transcendental
 
-	§§ An Integer or a Rational: the two numeric kinds a Program computes with exactly.
-	§§
-	§§ Every Number is a Scalar or an Irrational. The two Methods below answer a Scalar for any two Scalars, which is what the mixed aggregates fold on.
-	§
 	§ The name is the author's pick over `Exact`, which this alias carried as a
 	§ helper of this file. Pi is exact as well, so `Exact` overclaimed the half
 	§ it names. That half is the rationals in either representation. The
 	§ sources spell `Integer | Rational` 54 times, and a Program that writes
 	§ `numbers::sum()` had no word for what it got back.
+
+	§§ An Integer or a Rational: the two numeric kinds a Program computes with exactly.
+	§§
+	§§ Every Number is a Scalar or an Irrational. The two Methods below answer a Scalar for any two Scalars, which is what the mixed aggregates fold on.
 	type Scalar = Integer | Rational
 
 	§ The one 2×2 dispatch in the file, and the only shape that adds or

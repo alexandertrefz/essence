@@ -20,8 +20,12 @@ import {
 
 declarations {
 
-	§ Which end of a String a Method works on. `trim(at:)` and `pad(…, at:)`
-	§ are its two users, so it is declared beside them.
+	§ `trim(at:)` and `pad(…, at:)` are its two users, so it is declared beside
+	§ them.
+
+	§§ Which end of a String a Method works on: the start, the end, or both ends.
+	§§
+	§§ `trim` works on both ends when a call names no side, and `pad` works on the start.
 	choice Side {
 		Start,
 		End,
@@ -33,7 +37,9 @@ declarations {
 	§ DEVELOPMENT.md, Why bodies look the way they do.
 	namespace Side for Side is Equatable, is Printable {}
 
-	§ Whether a String comparison treats upper and lower case as the same.
+	§§ Whether a String comparison treats upper and lower case as the same.
+	§§
+	§§ `#Sensitive` tells the two apart, and `#Insensitive` does not. A comparison that names no sensitivity is sensitive.
 	choice CaseSensitivity {
 		Sensitive,
 		Insensitive,
@@ -41,10 +47,9 @@ declarations {
 
 	namespace CaseSensitivity for CaseSensitivity is Equatable, is Printable {}
 
-	§ Which Unicode normalization form `normalize(as:)` produces. Canonical
-	§ (NFC and NFD) keeps the text as it reads, and Compatibility (NFKC and
-	§ NFKD) also folds ligatures and superscripts onto plain equivalents.
-	§ Composed joins a base and its marks; Decomposed splits them apart.
+	§§ Which Unicode normalization form `normalize(as:)` produces.
+	§§
+	§§ The canonical forms, NFC and NFD, keep the text as it reads. Composed joins a base and its marks, and Decomposed splits them apart. The compatibility forms, NFKC and NFKD, also fold ligatures and superscripts onto plain equivalents, which changes the text.
 	choice NormalizationForm {
 		ComposedCanonical,
 		DecomposedCanonical,
@@ -56,16 +61,11 @@ declarations {
 		is Equatable,
 		is Printable {}
 
-	§ The Strings that have a character in them. It is a checked refinement:
-	§ the predicate is what a value has to be proven to satisfy, and the proof
-	§ is what the Type carries.
-	§
-	§ Two routes reach the proof. A String written down with a character in it
-	§ is its own proof. A String a Program is handed goes through an `if`
-	§ asking `hasCharacters`, or the `else` of one asking `isEmpty`.
-	§
-	§ `split(on:)` is the one Method the proof changes. A separator with a
-	§ character in it always leaves a piece, so the answer is a `NonEmptyList`.
+	§§ A String proven to have a character in it, as a checked refinement of `String`.
+	§§
+	§§ The proof is what lets `length` answer above zero, and `firstCharacter` and `lastCharacter` answer a character rather than an Optional. A String written down with a character in it carries the proof. A String a Program is handed earns it through an `if` asking `hasCharacters`, or the `else` of one asking `isEmpty`.
+	§§
+	§§ `split(on:)` reads the proof on its separator rather than on the receiver. A separator with a character in it always leaves a piece, so the answer is a NonEmptyList.
 	type NonEmptyString = String where @::hasCharacters()
 
 	§ A character here is a Unicode grapheme cluster: a base with its

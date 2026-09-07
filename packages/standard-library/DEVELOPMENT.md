@@ -552,12 +552,28 @@ held to. The `"lenient"` half of the rule — the internal name, and a run that
 stops before the last Parameter — survives only as the alternative
 `documentationParameterProblems` can be asked for, and only
 `documentation.spec.ts` asks.
+**Every `choice` and every `type` alias carries a block too.** A Type is as much
+of the library's surface as a Method is — a Program writes `Step`, `SortOrder`
+and `NonEmptyList` down — so the first sentence says what the Type IS, and a
+second paragraph says what its Cases mean or what its proof unlocks. A `§` note
+above one of them reaches the next editor of this file and nobody else, which is
+why the two are not interchangeable there. The block goes directly above the
+declaration, under whatever note explains the decision behind it.
+
 `packages/compiler/src/tests/stdlibProse.spec.ts` enforces the four writing
 rules over these sources, and every one of them is live: a sentence over 25
 words, an em-dash aside inside a `§§` sentence, a ` may ` or a ` should `, and
-an ALL-CAPS word that is not an acronym each fail it.
+an ALL-CAPS word that is not an acronym each fail it. A fifth check is about
+where the prose stands rather than how it reads, and holds every `choice` and
+`type` alias to the rule above.
 `ESSENCE_PROSE_REPORT=1 bun test stdlibProse` prints what they find, per rule
 and per file.
+
+One trap in the checker is worth knowing, because it reads as a false positive:
+a sentence is split at a period followed by a capital, and a `code span` is
+masked to a lowercase word first. So a sentence that BEGINS with a code span
+joins the one before it and is counted as one long sentence. Open the paragraph
+with the span, or start the sentence with a word.
 
 ### `§` notes
 

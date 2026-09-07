@@ -7,9 +7,9 @@ import {
 
 declarations {
 
-	§ Three unit Cases, written `Ordering#Less`, `Ordering#Equal` and
-	§ `Ordering#Greater`, and matched as `case #Less`. A match over them is
-	§ checked for exhaustiveness like any other Choice.
+	§§ How one value stands against another: below it, equal to it, or above it.
+	§§
+	§§ `compare` answers one of the three Cases. They are written `Ordering#Less`, `Ordering#Equal` and `Ordering#Greater`, and matched as `case #Less`. A match over them is checked for exhaustiveness like any other Choice.
 	choice Ordering {
 		Less,
 		Equal,
