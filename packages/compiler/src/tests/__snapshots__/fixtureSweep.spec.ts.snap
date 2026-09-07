@@ -81,7 +81,7 @@ false
 Optional#Value(3)
 true
 [ 2, 4 ]
-{ matching = [ 2, 4 ], rest = [ 1, 3 ] }
+{ accepted = [ 2, 4 ], refused = [ 1, 3 ] }
 [
     { first = "a", second = 1 },
     { first = "b", second = 2 }

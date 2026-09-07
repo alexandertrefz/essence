@@ -458,12 +458,12 @@ describe("Patterns", () => {
 		it("binds every name a Pattern names", async () => {
 			expect(
 				await run(`implementation {
-					constant { matching, rest } = [1, 2, 3, 4]::partition(
+					constant { accepted, refused } = [1, 2, 3, 4]::partition(
 						where (n) { <- n::isEven() },
 					)
 
-					Terminal.inspect(matching)
-					Terminal.inspect(rest)
+					Terminal.inspect(accepted)
+					Terminal.inspect(refused)
 				}`),
 			).toEqual(["[ 2, 4 ]", "[ 1, 3 ]"])
 		})

@@ -5471,7 +5471,7 @@ function enrichVariableDeclarationStatement(
 	}
 }
 
-// NOTE: `constant { matching, rest } = list::partition(where …)` — the Pattern
+// NOTE: `constant { accepted, refused } = list::partition(where …)` — the Pattern
 // desugars into the Statements an author could have written instead: one
 // Constant holding the value, and one per name the Pattern binds, each reading
 // its way down that Constant.

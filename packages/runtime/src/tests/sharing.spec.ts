@@ -28,6 +28,7 @@ import {
 	materialise,
 	ownItemsOf,
 	pair,
+	partition,
 	prepend__overload$1 as prepend,
 	reduce__overload$1 as reduce,
 	reduce__overload$2 as reduceWithStep,
@@ -333,12 +334,12 @@ describe("stale views", () => {
 })
 
 describe("every native against an upgraded receiver", () => {
-	// NOTE: `removeFirst`, `removeLast`, `partition` and the rest of that family
-	// are written in Essence on `slice`, `item(at:)` and `length`, so there is
-	// no native of their own to hold here — the three they are written on are
-	// held instead. `remove(at:)` has a native again, and it and the three
-	// edits beside it are held in `edits.spec.ts`, against every shape a box can
-	// be in when one reaches it.
+	// NOTE: `removeFirst`, `removeLast` and the rest of that family are written
+	// in Essence on `slice`, `item(at:)` and `length`, so there is no native of
+	// their own to hold here — the three they are written on are held instead.
+	// `remove(at:)` has a native again, and it and the three edits beside it
+	// are held in `edits.spec.ts`, against every shape a box can be in when one
+	// reaches it.
 	test("length and positions across the run boundary", () => {
 		let built = upgraded()
 
@@ -426,6 +427,28 @@ describe("every native against an upgraded receiver", () => {
 			itemsOf(sortOn(integers(), key, ascending, integerOrder)),
 		).toEqual([])
 		expect(reads).toBe(10)
+	})
+
+	// NOTE: One walk over both runs, and the check is offered each item ONCE —
+	// which is what the two filters this replaces did not do — with both halves
+	// in the receiver's order.
+	test("partition offers each item to the check once, across the run boundary", () => {
+		let offered: Array<number> = []
+		let isEven = (item: IntegerType) => {
+			offered.push(Number(item.value))
+
+			return createBoolean(Number(item.value) % 2 === 0)
+		}
+		let halves = partition(upgraded(), isEven)
+
+		expect(itemsOf(halves.accepted)).toEqual([2, 4])
+		expect(itemsOf(halves.refused)).toEqual([1, 3, 5])
+		expect(offered).toEqual([1, 2, 3, 4, 5])
+
+		let empty = partition(integers(), isEven)
+
+		expect(itemsOf(empty.accepted)).toEqual([])
+		expect(itemsOf(empty.refused)).toEqual([])
 	})
 
 	// NOTE: The one walk that runs backwards: the last accepted item is found

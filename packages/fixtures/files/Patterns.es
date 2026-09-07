@@ -179,12 +179,12 @@ implementation {
 	§ irrefutable — a `constant` can not decline a value and has nowhere to fall
 	§ through to — so a member constrained by VALUE is refused there, while one
 	§ constrained by Type is an annotation and fails the way annotations do.
-	constant { matching, rest } = numbers::partition(where (n) {
+	constant { accepted, refused } = numbers::partition(where (n) {
 		<- n::isEven()
 	})
 
-	Terminal.print(matching) § [ 2, 4 ]
-	Terminal.print(rest) § [ 1, 3 ]
+	Terminal.print(accepted) § [ 2, 4 ]
+	Terminal.print(refused) § [ 1, 3 ]
 
 	constant point = { origin = { x = 1, y = 2 }, label = "p" }
 

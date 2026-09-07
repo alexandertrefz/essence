@@ -714,7 +714,7 @@ export interface RequireStatementNode {
 }
 
 // NOTE: `name` is a Pattern where the Declaration takes the value apart —
-// `constant { matching, rest } = list::partition(where …)`. A Declaration can
+// `constant { accepted, refused } = list::partition(where …)`. A Declaration can
 // not decline a value, so the Pattern there must be irrefutable: a member
 // constrained by value is refused, and so is a Case. A member constrained by
 // Type is not a test but an annotation, and fails the way any annotation does.

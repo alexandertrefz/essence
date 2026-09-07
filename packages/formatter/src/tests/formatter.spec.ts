@@ -291,7 +291,7 @@ describe("formatter", () => {
 			[
 				"a Declaration",
 				block(
-					"\tconstant { matching, rest } = list::partition(where predicate)",
+					"\tconstant { accepted, refused } = list::partition(where predicate)",
 					"\tconstant { width, height } as size: Rectangle = rect",
 					"\tvariable { index, total } = state",
 				),
