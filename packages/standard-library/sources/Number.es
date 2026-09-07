@@ -172,7 +172,7 @@ declarations {
 
 			§§ Adds up every Rational in the List.
 			§§
-			§§ The sum is a Rational, since it need not be whole. The empty List sums to zero.
+			§§ The sum is a Rational, since it need not be whole. A whole total stays a Rational here, so `[1/2, 1/2]::sum()` answers `1/1`. The mixed entry below collapses one to an Integer. The empty List sums to zero.
 			§§
 			§§ @param _ — the Rationals to add up
 			§§ @returns — the total.
@@ -230,7 +230,7 @@ declarations {
 
 			§§ Multiplies every Rational in the List together.
 			§§
-			§§ The product is a Rational, since it need not be whole. The empty List multiplies to one.
+			§§ The product is a Rational, since it need not be whole. A whole product stays a Rational here, as a whole sum does. The mixed entry below collapses one to an Integer. The empty List multiplies to one.
 			§§
 			§§ @param _ — the Rationals to multiply
 			§§ @returns — the product.

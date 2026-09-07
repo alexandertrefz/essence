@@ -758,7 +758,7 @@ declarations {
 
 			§§ Answers the items combined into a single value, starting from the given one, and can stop before the end.
 			§§
-			§§ The `step` combiner answers with a `Step`: `#Continue` carries the value forward, and `#Done` finishes at once with its own value. The empty List answers the starting value untouched.
+			§§ The `step` combiner answers with a `Step`: `#Continue` carries the value forward, and `#Done` finishes at once with its own value. Both of that `Step`'s Type Parameters are the `Result` here, so a fold stops with the Type it carries. The empty List answers the starting value untouched.
 			§§
 			§§ @param startingWith — the value the first combination builds on
 			§§ @param step — the combiner, handed the value so far and each item, answering with a `Step`

@@ -51,7 +51,7 @@ declarations {
 
 		§§ Answers whether the Optional is the given one, or whether it holds the given bare value.
 		§§
-		§§ Two Optionals are equal when they are the same Case and hold equal values. An empty Optional is never equal to a bare value. The Method is available whenever the payload conforms to `Equatable`.
+		§§ Two Optionals are equal when they are the same Case and hold equal values. An empty Optional is never equal to a bare value. An Optional holding an Optional reaches the first entry, so `#Value(#Empty)::is(#Empty)` asks about the receiver and answers `false`. The Method is available whenever the payload conforms to `Equatable`.
 		overload is {
 			§§ @param _ — the Optional to compare against
 			§§ @returns — `true` when both are empty, or both hold equal values.

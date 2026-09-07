@@ -422,6 +422,8 @@ declarations {
 		§§
 		§§ Two Strings that look the same can then compare and read the same. The default form is the one `is` and `compare` already work in.
 		§§
+		§§ The two canonical forms are one text to every other Method here. They differ in the bytes `Terminal.write` emits, so `normalize(as #DecomposedCanonical)::length()` answers what `length()` answered before. The two compatibility forms do change the text.
+		§§
 		§§ @param as — the normalization form to produce; `#ComposedCanonical` when it is left out.
 		§§ @returns — the normalized String.
 		normalize(as form: NormalizationForm = #ComposedCanonical) -> String

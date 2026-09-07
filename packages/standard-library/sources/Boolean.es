@@ -33,6 +33,8 @@ declarations {
 
 		§§ Answers the logical conjunction: `true` only when both Booleans are `true`.
 		§§
+		§§ Both sides are evaluated. A call reads its Argument before the Method runs, so a `false` receiver does not stop the other side. Where the other side is expensive, write `define { as other if flag otherwise false }`.
+		§§
 		§§ @example
 		§§   expect true::and(true)
 		§§   expect true::and(false)::negate()
@@ -45,6 +47,8 @@ declarations {
 		§ where the runtime does one `||`. The primitives `negate`, `is` and
 		§ `and` stay native for the same reason.
 		§§ Answers the logical disjunction: `true` when either Boolean is `true`.
+		§§
+		§§ Both sides are evaluated, as they are for `and`. Where the other side is expensive, write `define { as true if flag otherwise other }`.
 		§§
 		§§ @param _ — the other Boolean
 		or(_ other: Boolean) -> Boolean
