@@ -295,13 +295,16 @@ describe("Inlay Hints", () => {
 
 		// NOTE: The divisor is COMPUTED, deliberately — a written `2` is its
 		// own proof of not being zero and reaches `divide`'s total entry, whose
-		// Hint is the plain `Rational` asserted alongside. The List is bound to
-		// a `List` Type for the same reason: a written one proves it holds an
-		// item, and `firstItem` on a proven receiver answers no Optional.
+		// Hint is the `NonZeroRational` asserted alongside — neither operand
+		// is zero, so the quotient is not either. It is computed with
+		// a DIFFERENCE, the one operation no refinement of Integer closes
+		// over. The List is bound to a `List` Type for the same reason: a
+		// written one proves it holds an item, and `firstItem` on a proven
+		// receiver answers no Optional.
 		it("should describe builtin fallible Methods as `Optional`", () => {
 			let source = [
 				"implementation {",
-				"\tconstant two = 1::add(1)",
+				"\tconstant two = 3::subtract(1)",
 				"\tconstant numbers: List<Integer> = [1, 2, 3]",
 				"\tconstant half = 1110::divide(by two)",
 				"\tconstant sure = 1110::divide(by 2)",
@@ -312,7 +315,7 @@ describe("Inlay Hints", () => {
 			expect(hintsOf(source).map((hint) => hint.label)).toEqual([
 				": Integer",
 				": Optional<Rational>",
-				": Rational",
+				": NonZeroRational",
 				": Optional<Integer>",
 			])
 		})
@@ -403,10 +406,12 @@ describe("Inlay Hints", () => {
 			// `value(defaultingTo:)` to call — `sure` gets no Type and no Hint. A value
 			// that is fallible has to say so by being an `Optional` the whole
 			// way out.
-			// NOTE: The divisor is COMPUTED (`0::add(2)`), deliberately — a
-			// written `2` is its own proof of not being zero and reaches
-			// `divide`'s total entry, and this branch has to stay fallible for
-			// the Union to carry an `Optional` at all.
+			// NOTE: The divisor is COMPUTED (`4::subtract(2)`),
+			// deliberately — a written `2` is its own proof of not being zero
+			// and reaches `divide`'s total entry, and this branch has to stay
+			// fallible for the Union to carry an `Optional` at all. A
+			// difference, because a sum of two written Integers is proven
+			// itself.
 			let source = [
 				"implementation {",
 				"\tnamespace Picker for Integer {",
@@ -416,7 +421,7 @@ describe("Inlay Hints", () => {
 				"\t}",
 				"",
 				"\tconstant merged = 1::pick((value) {",
-				"\t\tif value::isGreaterThan(0) { <- value::divide(by 0::add(2)) }",
+				"\t\tif value::isGreaterThan(0) { <- value::divide(by 4::subtract(2)) }",
 				"",
 				"\t\t<- value",
 				"\t})",
@@ -448,13 +453,14 @@ describe("Inlay Hints", () => {
 			// payload (`Optional<Integer | Rational>`), which is what lets
 			// `value(defaultingTo:)` bind the payload in one piece.
 			//
-			// NOTE: The base is COMPUTED. A written one proves it is not zero,
-			// and a power is empty only where a zero base meets a negative
-			// exponent — so a written base answers the payload without a
-			// wrapper and leaves nothing to collapse.
+			// NOTE: The base is COMPUTED, with the difference no refinement of
+			// Integer closes over. A written one proves it is not zero, and a
+			// power is empty only where a zero base meets a negative exponent
+			// — so a written base answers the payload without a wrapper and
+			// leaves nothing to collapse.
 			let source = [
 				"implementation {",
-				"\tconstant two = 1::add(1)",
+				"\tconstant two = 3::subtract(1)",
 				"\tconstant power = two::raise(to -2)",
 				"\tconstant sure = power::value(defaultingTo 0)",
 				"}",

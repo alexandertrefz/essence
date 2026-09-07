@@ -6,6 +6,19 @@ import type { AlgebraicType } from "./Algebraic"
 import { type IntegerType, squareRoot__overload$1 } from "./Integer"
 import type { ValueType } from "./Optional"
 
+// NOTE: The sum and the product are `Integer`'s own, for the reason
+// `NonZeroInteger.ts` gives: a refinement erases before anything runs, so both
+// operands ARE `IntegerType`s here and the answer is the same arithmetic it
+// always was. `add` is an Overload of two entries — a positive summand makes
+// the sum positive, a non-negative one keeps it non-negative — and both bind to
+// the one sum, under the names their positions give them. `multiply` is a lone
+// entry and binds under the bare name.
+export {
+	add__overload$1,
+	add__overload$1 as add__overload$2,
+	multiply__overload$1 as multiply,
+} from "./Integer"
+
 // NOTE: A refinement erases before anything runs, so what arrives is an
 // ordinary `IntegerType` and the evidence the Type carried was spent while
 // compiling. A negative Integer is the one receiver `Integer::squareRoot`

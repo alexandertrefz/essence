@@ -497,10 +497,13 @@ describe("Irrationals", () => {
 		// be negative, so `squareRoot` answers an Optional there; a written one
 		// proves its own sign and reaches `namespace NonNegativeInteger`, whose
 		// entry answers the two kinds bare.
+		// NOTE: The receiver is a DIFFERENCE, which is the one operation no
+		// refinement of Integer closes over — a sum of two written Integers
+		// answers a `PositiveInteger` and reaches the total root beside it.
 		it("types squareRoot as Optional<Integer | Algebraic>", () => {
 			expect(
 				diagnosticsFor(`implementation {
-					constant two = 1::add(1)
+					constant two = 3::subtract(1)
 					constant root: Optional<Integer | Algebraic> = two::squareRoot()
 					constant written: Integer | Algebraic = 2::squareRoot()
 				}`),

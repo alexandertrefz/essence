@@ -857,17 +857,21 @@ declarations {
 	}
 
 	§ What a Rational proven not to be zero answers that a bare one can not,
-	§ the sister of `namespace NonZeroInteger`. Both entries are native: a
-	§ refinement erases before anything runs, so an entry whose promise is
-	§ about the answer can not be written in Essence. Multiplying is one
-	§ Function under two names and can not drift. Taking the reciprocal is
-	§ written a second time, because the Essence body beside it exports
-	§ nothing to import. See DEVELOPMENT.md, Native and Essence in one
-	§ Namespace.
+	§ the sister of `namespace NonZeroInteger`. A refinement erases before
+	§ anything runs, so an entry whose promise is about the answer can not
+	§ be written in Essence. Multiplying and reading the numerator are each
+	§ one Function under two names and can not drift. Taking the reciprocal
+	§ and negating are written a second time, because the Essence body
+	§ beside each exports nothing to import. See DEVELOPMENT.md, Native and
+	§ Essence in one Namespace. `absolute` alone is Essence. Both of its
+	§ arms carry the proof already, one through `negate` and one as the
+	§ receiver itself.
 	§
-	§ Multiplication closes over the proof, as it does for the Integers: a
-	§ product of two Rationals that are not zero is never zero. Addition does
-	§ not, as `1/2` and `-1/2` show, so nothing else here is written on it.
+	§ Multiplication, negation and the distance from zero close over the
+	§ proof, as they do for the Integers. A product of two Rationals that are
+	§ not zero is never zero. Neither of the other two can reach zero from a
+	§ value that is not. Addition does not, as `1/2` and `-1/2` show, so
+	§ nothing else here is written on it.
 	namespace NonZeroRational for NonZeroRational {
 		§§ Multiplies this NonZeroRational with another.
 		§§
@@ -877,12 +881,39 @@ declarations {
 		§§ @returns — the product, which is not zero.
 		multiply(with other: NonZeroRational) -> NonZeroRational
 
+		§§ Answers the numerator of this NonZeroRational in lowest terms.
+		§§
+		§§ A Rational is zero exactly when its numerator is, and the receiver is proven not to be zero. So the answer is a NonZeroInteger.
+		§§
+		§§ @returns — the numerator, which is not zero.
+		numerator() -> NonZeroInteger
+
+		§§ Answers this NonZeroRational without its sign, which is its distance from zero.
+		§§
+		§§ The receiver is not zero, so its distance from zero is not zero either.
+		§§
+		§§ @returns — the distance, which is not zero.
+		absolute() -> NonZeroRational {
+			if @::isNegative() {
+				<- @::negate()
+			} else {
+				<- @
+			}
+		}
+
 		§§ Answers the reciprocal of this NonZeroRational.
 		§§
 		§§ Zero is the one Rational with no reciprocal, and the receiver is proven not to be one. So the answer is the reciprocal itself rather than an Optional. Exchanging the two parts of a value that is not zero leaves a value that is not zero, so the answer is proven as well.
 		§§
 		§§ @returns — the reciprocal, which is not zero.
 		reciprocal() -> NonZeroRational
+
+		§§ Answers this NonZeroRational with its sign flipped.
+		§§
+		§§ Negation keeps a value away from zero, so the answer is a NonZeroRational too.
+		§§
+		§§ @returns — the negation, which is not zero.
+		negate() -> NonZeroRational
 	}
 }
 

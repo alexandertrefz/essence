@@ -46,10 +46,19 @@ export const builtinMemberOrder: Array<string> = [
 	// `NonZeroInteger::multiply` reads as the extra a proven Integer has.
 	"NonZeroInteger",
 	// NOTE: And the second refinement of `Integer` after the first, for the same
-	// reason. The two share no Method name, so their order decides nothing
-	// between them — they are listed together so that a reader meets what an
-	// Integer can be proven to be in one place.
+	// reason. The two share one Method name, `multiply`, and neither target is
+	// narrower than the other, so this order decides which of the two
+	// Completion names first for a receiver proving both — a call RESOLVES to
+	// neither, because the third refinement below is narrower than both and
+	// declares the name too. They are listed together so that a reader meets
+	// what an Integer can be proven to be in one place.
 	"NonNegativeInteger",
+	// NOTE: And the third after both, for the reason every proven Namespace
+	// sits after the ones it narrows — `PositiveInteger` is a `NonZeroInteger`
+	// and a `NonNegativeInteger` at once, so a receiver reaching it reaches
+	// those two as well, and has to meet them FIRST so that its own entries
+	// read as the extra holding both proofs adds.
+	"PositiveInteger",
 	"Rational",
 	// NOTE: Directly after `Rational`, for the reason `NonZeroInteger` sits
 	// directly after `Integer` — the two Namespaces one Rational value can

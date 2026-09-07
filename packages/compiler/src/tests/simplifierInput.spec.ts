@@ -29,8 +29,11 @@ function typedOf(source: string): common.typed.Program {
 	return enriched.program
 }
 
+// NOTE: The base of the power is COMPUTED, so that `raise` reaches the
+// Overload `Integer` declares rather than the lone entry a proven base has —
+// this file is about the suffix that Overload gives an emitted name.
 const SOURCE = `implementation {
-	constant power = 2::raise(to 10)
+	constant power = 3::subtract(1)::raise(to 10)
 	constant range = List.of(integersFrom 1, through 3)
 	constant counted = loop(
 		startingWith 0,

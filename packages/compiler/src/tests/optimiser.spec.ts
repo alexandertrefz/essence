@@ -966,7 +966,7 @@ const shadowedDiscardedAnswer = `implementation {
 			§§
 			§§ @param _ — ignored
 			§§ @returns — nine.
-			add(_ other: Integer) -> Integer {
+			subtract(_ other: Integer) -> Integer {
 				Terminal.inspect("the shadow ran")
 
 				<- 9
@@ -976,7 +976,7 @@ const shadowedDiscardedAnswer = `implementation {
 		constant scrutinee: Integer | String = 5
 
 		match scrutinee -> Integer {
-			case Integer { <- 1::add(2) }
+			case Integer { <- 1::subtract(2) }
 			case String { <- 0 }
 		}
 
@@ -999,14 +999,14 @@ const shadowedDeadCode = `implementation {
 			§§
 			§§ @param _ — ignored
 			§§ @returns — nine.
-			add(_ other: Integer) -> Integer {
+			subtract(_ other: Integer) -> Integer {
 				Terminal.inspect("the shadow ran")
 
 				<- 9
 			}
 		}
 
-		constant unread = 1::add(2)
+		constant unread = 1::subtract(2)
 
 		<- 0
 	}
@@ -1736,9 +1736,13 @@ const wholeRationalHoles = `implementation {
 	Terminal.inspect("{2/1}, {4/2}, {1/2}")
 }`
 
-// NOTE: A Program that declares a Namespace named after a builtin, whose `add`
-// answers something no arithmetic would — the shape that decides whether the
-// enumeration a fold rests on may be read by NAME.
+// NOTE: A Program that declares a Namespace named after a builtin, whose
+// `subtract` answers something no arithmetic would — the shape that decides
+// whether the enumeration a fold rests on may be read by NAME. A difference,
+// here and in the two fixtures above, because a refined Namespace beats the
+// base for a Method both declare: `1::add(2)` is `PositiveInteger`'s sum, and
+// a Namespace named `Integer` does not stand in front of that one. Subtraction
+// is the arithmetic no proof of Integer's closes over.
 const shadowedArithmetic = `implementation {
 	§§ Answers what a Namespace the Program wrote answers.
 	§§
@@ -1750,14 +1754,14 @@ const shadowedArithmetic = `implementation {
 			§§
 			§§ @param _ — ignored
 			§§ @returns — nine.
-			add(_ other: Integer) -> Integer {
+			subtract(_ other: Integer) -> Integer {
 				Terminal.inspect("the shadow ran")
 
 				<- 9
 			}
 		}
 
-		<- 1::add(2)
+		<- 1::subtract(2)
 	}
 
 	Terminal.inspect(trick())
@@ -3651,9 +3655,9 @@ describe("Optimiser", () => {
 
 		it("keeps the answer of a Handler answered by a Namespace the Program declares", async () => {
 			// NOTE: Whether answering can be OBSERVED is the question, and a
-			// Namespace named after a builtin answers it: `1::add(2)` under one
-			// is a Method the Program wrote, and it prints. Asked of the
-			// Program's own Namespaces rather than of the name alone.
+			// Namespace named after a builtin answers it: `1::subtract(2)`
+			// under one is a Method the Program wrote, and it prints. Asked of
+			// the Program's own Namespaces rather than of the name alone.
 			let generated = generate(shadowedDiscardedAnswer)
 
 			expect(await outputOf(generated)).toEqual(['"the shadow ran"', "0"])
@@ -5160,11 +5164,12 @@ describe("Optimiser", () => {
 
 		it("leaves the arithmetic of a Namespace the Program declares", async () => {
 			// NOTE: A Namespace named after a builtin stands in front of it for
-			// the rest of its block, so `1::add(2)` there is a Method the
-			// Program wrote — and it prints.
+			// the rest of its block, so `1::subtract(2)` there is a Method the
+			// Program wrote — and it prints. A difference and not a sum: the
+			// refined Namespaces beat a shadow on every name they declare.
 			let generated = generate(shadowedArithmetic)
 
-			expect(generated).not.toContain("Integer.createInteger(3)")
+			expect(generated).not.toContain("Integer.createInteger(-1)")
 			expect(await outputOf(generated)).toEqual(['"the shadow ran"', "9"])
 		})
 
@@ -5979,9 +5984,10 @@ describe("Optimiser", () => {
 
 		it("keeps a Constant answered by a Namespace the Program declares", async () => {
 			// NOTE: The same question, asked of a Program that answers it the
-			// other way: `1::add(2)` under a Namespace named after the builtin
-			// is a Method the Program wrote, and it prints — so the Declaration
-			// nothing reads is the only thing running it, and it stays.
+			// other way: `1::subtract(2)` under a Namespace named after the
+			// builtin is a Method the Program wrote, and it prints — so the
+			// Declaration nothing reads is the only thing running it, and it
+			// stays.
 			let generated = generate(shadowedDeadCode)
 
 			expect(generated).toContain("const unread")

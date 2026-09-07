@@ -11,14 +11,19 @@ implementation {
 
 	§ Division leaves the Integers behind — the result is a Rational. A divisor
 	§ written down is its own proof that it is not zero, so this division can
-	§ not fail and answers the Rational directly; only a divisor the Program
-	§ computes might be zero, and that division answers an Optional.
-	constant half = 1110::divide(by 2)
+	§ not fail and answers the Rational directly. The quotient carries the
+	§ proof on: neither of two values that are not zero can divide into one
+	§ that is, so dividing by `half` can not fail either. Only a divisor the
+	§ Program computes out of a subtraction might be zero, and that division
+	§ answers an Optional.
+	constant half        = 1110::divide(by 2)
+	constant mightBeZero = 555::subtract(554)
 
 	Terminal.inspect(half) § 555/1
 	Terminal.inspect(
 		100::add(11)::multiply(with 5)::subtract(1)::divide(by half),
-	) § Optional#Value(554/555)
+	) § 554/555
+	Terminal.inspect(1110::divide(by mightBeZero)) § Optional#Value(1110/1)
 
 	§ Integers are arbitrarily large — IEEE 754 puts no ceiling here.
 	Terminal.inspect(9_007_199_254_740_991::multiply(with 500)) § 4503599627370495500

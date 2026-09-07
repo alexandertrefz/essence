@@ -1741,7 +1741,7 @@ export {
 				// neither zero nor negative — so the refined Namespaces are in
 				// the search too, in the same table order the rest are in.
 				expect(unknownMethod?.notes[0]).toContain(
-					"'Integer', 'NonZeroInteger', 'NonNegativeInteger', 'Number', 'Alpha', 'Zulu'",
+					"'Integer', 'NonZeroInteger', 'NonNegativeInteger', 'PositiveInteger', 'Number', 'Alpha', 'Zulu'",
 				)
 			},
 		)

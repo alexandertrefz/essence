@@ -295,11 +295,16 @@ describe("Documentation Comments", () => {
 			"Joins another String onto the end of this one.",
 		)
 
+		// NOTE: The Documentation offered is the one the entry the call would
+		// REACH carries: a written `1` proves it is above zero, and
+		// `namespace PositiveInteger` declares a sum of its own.
 		let entry = findCompletions(
 			["implementation {", "\t1::", "}"].join("\n"),
 			{ line: 2, column: 5 },
 		).find((completion) => completion.label === "add")
 
-		expect(entry?.documentation).toBe("Adds a number to this Integer.")
+		expect(entry?.documentation).toContain(
+			"Adds an Integer proven not to be negative to this PositiveInteger.",
+		)
 	})
 })

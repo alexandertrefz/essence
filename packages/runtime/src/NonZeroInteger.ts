@@ -25,8 +25,19 @@
 // `Integer`'s own non-negative entry under a second name: a Namespace over a
 // refinement hides the base's Method of the same name, so the entry has to be
 // declared here to stay reachable, and it is the same whole power either way.
+//
+// NOTE: `divide`, `absolute` and `negate` are the same shape once more. Each
+// is `Integer`'s own native — the total division a proven divisor reaches, the
+// distance from zero and the negation — under the name this Namespace gives it,
+// and what the Namespace adds is only what the answer's Type says: a quotient
+// of two non-zero Integers is a `NonZeroRational`, a distance from zero of a
+// non-zero Integer is a `PositiveInteger`, and a negation stays away from zero.
+// `divide` is not an Overload here, so it binds under the bare name.
 export {
+	absolute,
+	divide__overload$4 as divide,
 	multiply__overload$1,
+	negate,
 	power as raise__overload$1,
 	raise__overload$3 as raise__overload$2,
 } from "./Integer"

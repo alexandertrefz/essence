@@ -158,14 +158,37 @@ export type IntegerNatives = {
 export type NonZeroIntegerNatives = {
 	// multiply(with: NonZeroInteger) -> NonZeroInteger
 	multiply__overload$1: (self: IntegerType, argument1: IntegerType) => IntegerType
+	// divide(by: NonZeroInteger) -> NonZeroRational
+	divide: (self: IntegerType, by: IntegerType) => RationalType
 	// raise(to: Integer) -> Integer | Rational
 	raise__overload$1: (self: IntegerType, to: IntegerType) => IntegerType | RationalType
 	// raise(to: NonNegativeInteger) -> Integer
 	raise__overload$2: (self: IntegerType, to: IntegerType) => IntegerType
+	// absolute() -> PositiveInteger
+	absolute: (self: IntegerType) => IntegerType
+	// negate() -> NonZeroInteger
+	negate: (self: IntegerType) => IntegerType
 }
 
 export type NonNegativeIntegerNatives = {
+	// add(_: PositiveInteger) -> PositiveInteger
+	add__overload$1: (self: IntegerType, argument1: IntegerType) => IntegerType
+	// add(_: NonNegativeInteger) -> NonNegativeInteger
+	add__overload$2: (self: IntegerType, argument1: IntegerType) => IntegerType
+	// multiply(with: NonNegativeInteger) -> NonNegativeInteger
+	multiply: (self: IntegerType, argument1: IntegerType) => IntegerType
 	// squareRoot() -> Integer | Algebraic
+	squareRoot: (self: IntegerType) => IntegerType | AlgebraicType
+}
+
+export type PositiveIntegerNatives = {
+	// add(_: NonNegativeInteger) -> PositiveInteger
+	add: (self: IntegerType, argument1: IntegerType) => IntegerType
+	// multiply(with: PositiveInteger) -> PositiveInteger
+	multiply: (self: IntegerType, argument1: IntegerType) => IntegerType
+	// raise(to: NonNegativeInteger) -> PositiveInteger
+	raise: (self: IntegerType, to: IntegerType) => IntegerType
+	// squareRoot() -> PositiveInteger | Algebraic
 	squareRoot: (self: IntegerType) => IntegerType | AlgebraicType
 }
 
@@ -207,8 +230,12 @@ export type RationalNatives = {
 export type NonZeroRationalNatives = {
 	// multiply(with: NonZeroRational) -> NonZeroRational
 	multiply: (self: RationalType, argument1: RationalType) => RationalType
+	// numerator() -> NonZeroInteger
+	numerator: (self: RationalType) => IntegerType
 	// reciprocal() -> NonZeroRational
 	reciprocal: (self: RationalType) => RationalType
+	// negate() -> NonZeroRational
+	negate: (self: RationalType) => RationalType
 }
 
 export type AlgebraicNatives = {
@@ -624,13 +651,28 @@ export const $NonZeroInteger: NonZeroIntegerNatives = NonZeroIntegerModule
 export const $NonZeroIntegerAbsent: AssertNoEssenceExports<typeof import("./NonZeroInteger"), "multiply__overload$2" | "multiply__overload$3"> = true
 export const $NonZeroIntegerArity: AssertArities<typeof import("./NonZeroInteger"), {
 	multiply__overload$1: 2
+	divide: 2
 	raise__overload$1: 2
 	raise__overload$2: 2
+	absolute: 1
+	negate: 1
 }> = true
 
 declare const NonNegativeIntegerModule: typeof import("./NonNegativeInteger")
 export const $NonNegativeInteger: NonNegativeIntegerNatives = NonNegativeIntegerModule
 export const $NonNegativeIntegerArity: AssertArities<typeof import("./NonNegativeInteger"), {
+	add__overload$1: 2
+	add__overload$2: 2
+	multiply: 2
+	squareRoot: 1
+}> = true
+
+declare const PositiveIntegerModule: typeof import("./PositiveInteger")
+export const $PositiveInteger: PositiveIntegerNatives = PositiveIntegerModule
+export const $PositiveIntegerArity: AssertArities<typeof import("./PositiveInteger"), {
+	add: 2
+	multiply: 2
+	raise: 2
 	squareRoot: 1
 }> = true
 
@@ -658,9 +700,12 @@ export const $RationalArity: AssertArities<typeof import("./Rational"), {
 
 declare const NonZeroRationalModule: typeof import("./NonZeroRational")
 export const $NonZeroRational: NonZeroRationalNatives = NonZeroRationalModule
+export const $NonZeroRationalAbsent: AssertNoEssenceExports<typeof import("./NonZeroRational"), "absolute"> = true
 export const $NonZeroRationalArity: AssertArities<typeof import("./NonZeroRational"), {
 	multiply: 2
+	numerator: 1
 	reciprocal: 1
+	negate: 1
 }> = true
 
 declare const AlgebraicModule: typeof import("./Algebraic")

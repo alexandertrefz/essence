@@ -199,24 +199,42 @@ function foldInvocation(
 		// reason: a refinement is erased before the first pass runs, so both
 		// operands are plain Integers here, but the Method the Simplifier
 		// emitted is still `NonZeroInteger`'s — which is where a written
-		// receiver's product goes now. `multiply` alone, because that is the
-		// only entry of that Namespace whose body is one bigint operation;
-		// `foldInteger` then demands two written Integers, so the entries
-		// scaling an Algebraic or a Transcendental fall out on their operands.
+		// receiver's product, negation and distance from zero go now. Those
+		// three alone, because they are the entries of that Namespace whose
+		// body is one bigint operation; `foldInteger` then demands written
+		// Integers, so the entries scaling an Algebraic or a Transcendental
+		// fall out on their operands, and `divide` answers a Rational nobody
+		// has weighed folding.
 		case "NonZeroInteger":
-			return member === "multiply"
+			return member === "multiply" ||
+				member === "negate" ||
+				member === "absolute"
+				? foldInteger(node, member, shadowed)
+				: node
+		// NOTE: The other two refinements of Integer, and the one holding both
+		// proofs, for the same reason: each closes over a sum or a product by
+		// re-exporting Integer's own, so a written `2::add(3)` is
+		// `PositiveInteger`'s sum now and folds to the same `5`.
+		case "NonNegativeInteger":
+		case "PositiveInteger":
+			return member === "add" || member === "multiply"
 				? foldInteger(node, member, shadowed)
 				: node
 		case "Rational":
 			return foldRational(node, member, shadowed)
 		// NOTE: The Rational sister of the rung above, for the same reason: a
-		// written `1/2` proves it is not zero, so its product is
-		// `NonZeroRational`'s and the name is all this pass has to go by.
-		// `multiply` alone again — `reciprocal` is the Namespace's other entry
-		// and it exchanges the two parts of ONE value, which `foldRational`
-		// takes by name and nobody has weighed yet.
+		// written `1/2` proves it is not zero, so its product and its negation
+		// are `NonZeroRational`'s and the name is all this pass has to go by.
+		// `negate` folds as Rational's does, through the lowest-terms parts —
+		// the native is spelled out of the same three reads — and `absolute`
+		// is Rational's own `if` written a second time over that `negate`, so
+		// the same fold follows it. `reciprocal` exchanges the two parts of
+		// ONE value, which `foldRational` takes by name and nobody has weighed
+		// yet.
 		case "NonZeroRational":
-			return member === "multiply"
+			return member === "multiply" ||
+				member === "negate" ||
+				member === "absolute"
 				? foldRational(node, member, shadowed)
 				: node
 		case "String":

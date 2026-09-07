@@ -266,7 +266,8 @@ exports[`Fixture Sweep Number.es should print what it printed before 1`] = `
 1000
 100000
 555/1
-Optional#Value(554/555)
+554/555
+Optional#Value(1110/1)
 4503599627370495500
 3/1
 1/6"

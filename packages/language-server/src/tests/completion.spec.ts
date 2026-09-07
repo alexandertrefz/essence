@@ -780,7 +780,7 @@ describe("Completion", () => {
 			})
 
 			// NOTE: The signature offered is the one the call would reach — the
-			// total entry `namespace NonNegativeInteger` writes, and not
+			// total entry `namespace PositiveInteger` writes, and not
 			// `Integer`'s, which answers an Optional for a receiver that might
 			// be negative.
 			it("should describe the entry the proof reaches", () => {
@@ -789,13 +789,16 @@ describe("Completion", () => {
 				expect(
 					entryFor(source, { line: 2, column: 5 }, "squareRoot")
 						?.detail,
-				).toBe("() -> Integer | Algebraic")
+				).toBe("() -> PositiveInteger | Algebraic")
 			})
 
+			// NOTE: The receiver is a DIFFERENCE, which is the arithmetic no
+			// refinement of Integer closes over: a sum of two written Integers
+			// answers a `PositiveInteger` and would carry the proof here.
 			it("should describe the base entry for a computed receiver", () => {
 				let source = [
 					"implementation {",
-					"\tconstant four = 2::add(2)",
+					"\tconstant four = 6::subtract(2)",
 					"\tfour::",
 					"}",
 				].join("\n")
