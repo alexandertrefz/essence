@@ -727,6 +727,50 @@ export function everyItem<ItemType extends AnyType>(
 	return createList(keptList)
 }
 
+// NOTE: The filter and its complement in ONE walk, so the check is offered each
+// item once. The Essence body this replaces was `everyItem(where:)` beside
+// `removeEvery(where:)`, two native walks offering every item to the check
+// twice; the one-`reduce` body that fixes that in Essence carries a Record of
+// the two halves and pays a Record spread and an `append` box per item, which
+// measured 202 ms against the two filters' 68 for two hundred partitions of
+// 20,000 items on `isEven`, best of three with the subprocess startup inside.
+// This walk measured 49 ms on the same run, and 361 ms against 655 with a
+// check costing a hundred loop turns — where the fold's 566 was already ahead.
+export function partition<ItemType extends AnyType>(
+	originalList: ListType<ItemType>,
+	check: (item: ItemType) => BooleanType,
+): RecordType & { accepted: ListType<ItemType>; refused: ListType<ItemType> } {
+	let view = viewOf(originalList)
+	let accepted: Array<ItemType> = []
+	let refused: Array<ItemType> = []
+
+	for (let index = view.frontCount - 1; index >= 0; index--) {
+		let item = view.front[index]
+
+		if (check(item).value) {
+			accepted.push(item)
+		} else {
+			refused.push(item)
+		}
+	}
+
+	for (let index = 0; index < view.backCount; index++) {
+		let item = view.back[index]
+
+		if (check(item).value) {
+			accepted.push(item)
+		} else {
+			refused.push(item)
+		}
+	}
+
+	return {
+		[typeKeySymbol]: "Record",
+		accepted: createList(accepted),
+		refused: createList(refused),
+	}
+}
+
 // NOTE: A negative position counts back from the end — -1 is the last item, and
 // -length the first. The arithmetic is a double's, which is exact for every
 // position a List can have and for every index a caller can pass: an out-of-

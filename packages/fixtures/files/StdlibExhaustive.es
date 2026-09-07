@@ -2862,8 +2862,8 @@ third"::lines())
 		singleNumber::join(with ", "),
 	)
 	§ LOAD-BEARING: `partition` returns a Record, and its printed form
-	§ `{ matching = [2, 4], rest = [3, 1, 1] }` sits at thirty-nine
-	§ characters — twenty-one under the sixty at which `getStringRepresentation`
+	§ `{ accepted = [2, 4], refused = [3, 1, 1] }` sits at forty-two
+	§ characters — eighteen under the sixty at which `getStringRepresentation`
 	§ trips its field-doubling bug and wraps across lines. A larger `numbers`
 	§ List here would cross that line and break the golden. Keep it short.
 	show(

@@ -1114,7 +1114,7 @@ describe("Rewriter", () => {
 			// forms) / removeEvery (both forms) / removeLast (both forms) /
 			// removeDuplicates / prepend (both forms) / append(_:) / contains /
 			// hasItems (all three) / count (both forms) / insert / replace /
-			// partition / sorted / repeat are implemented in Essence now
+			// sorted / repeat are implemented in Essence now
 			// (packages/standard-library/sources/List.es), so there is no runtime Function left to call
 			// here. The golden harness covers them end to end; the entries of a
 			// mixed `overload` block that are still native keep their tests below.

@@ -337,10 +337,10 @@ describe("Stdlib", () => {
 			).toEqual(bool(false))
 		})
 
-		// NOTE: `List.partition` is implemented in Essence now
-		// (`packages/standard-library/sources/List.es`), as `everyItem` beside `removeEvery(where:)`
-		// — the golden harness covers both halves and the empty List, so the
-		// runtime-direct test that lived here is retired.
+		// NOTE: `List.partition` is native again, one walk offering the check
+		// each item once (`packages/runtime/src/List.ts`); the golden harness
+		// covers both halves and the empty List, and `sharing.spec.ts` holds it
+		// against a two-run receiver, so no runtime-direct test lives here.
 
 		it("pairs position by position, stopping with the shorter List", () => {
 			const pairs = list.pair(
