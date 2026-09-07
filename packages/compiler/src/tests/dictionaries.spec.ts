@@ -292,6 +292,50 @@ describe("Dictionary", () => {
 			).toEqual(['"[\\"alex\\" = 39]"', '"[\\"sam\\" = 25]"', '"[=]"'])
 		})
 
+		// NOTE: Both filters are native and share the receiver's key encodings,
+		// so a filtered Dictionary answers a lookup the way the receiver did,
+		// whatever its keys are — and neither asks for an `Equatable` bound,
+		// since keeping some of the receiver's keys can not make two collide.
+		// The Function below holds an UNBOUNDED Dictionary, on which
+		// `remove(at:)` is `unsatisfied-bound`.
+		it("filters a Dictionary of any keys without asking for a bound", async () => {
+			expect(
+				await run(`implementation {
+					choice Colour { Red, Green, Blue }
+
+					function evens<infer Key>(
+						_ counts: Dictionary<Key, Integer>,
+					) -> Dictionary<Key, Integer> {
+						<- counts::everyEntry(where ({ value }) { <- value::isEven() })
+					}
+
+					constant noColours: Dictionary<Colour, Integer> = [=]
+					constant colours = noColours
+						::set(#Red, to 1)
+						::set(#Green, to 2)
+						::set(#Blue, to 4)
+					constant seats = Dictionary.of([
+						{ key = { row = 1, seat = 2 }, value = 1 },
+						{ key = { row = 4, seat = 1 }, value = 2 },
+					])
+
+					Terminal.inspect(evens(colours)::keys())
+					Terminal.inspect(evens(colours)::value(at #Blue))
+					Terminal.inspect(evens(colours)::removeEvery(where ({ key }) {
+						<- key::is(#Green)
+					})::keys())
+					Terminal.inspect(evens(seats)::value(at { seat = 1, row = 4 }))
+					Terminal.inspect(evens(seats)::hasKey({ row = 1, seat = 2 }))
+				}`),
+			).toEqual([
+				"[ Colour#Green, Colour#Blue ]",
+				"Optional#Value(4)",
+				"[ Colour#Blue ]",
+				"Optional#Value(2)",
+				"false",
+			])
+		})
+
 		it("transforms a key's value, or leaves the Dictionary alone", async () => {
 			expect(
 				await run(`implementation {

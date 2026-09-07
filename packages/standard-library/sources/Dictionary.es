@@ -271,40 +271,40 @@ declarations {
 			at key: KeyType,
 		) -> Dictionary<KeyType, ValueType>
 
+		§ The filter and its complement are native for the reason `map` is.
+		§ The answer reuses the receiver's key encodings rather than encoding
+		§ the kept keys a second time, which an Essence body through `of` did.
+		§ Neither needs an `Equatable` bound. The receiver's keys are distinct
+		§ already, and keeping some of them can not make two collide.
+		§
+		§ Measured on a thousand keys with half kept, best of five. String
+		§ keys take 29 µs through `of` and 23 µs native. Record keys take
+		§ 100 µs and 25 µs, and payload Case keys 75 µs and 29 µs. The gap
+		§ is one encoding per kept key, so it widens for a composite key.
+
 		§§ Answers a new Dictionary without every entry the check accepts.
 		§§
 		§§ Each entry is offered to the check, and the entries it rejects keep their order. A check that accepts every entry answers the empty Dictionary.
 		§§
 		§§ @param where — the check each entry is offered to
 		§§ @returns — the Dictionary of the entries the check rejects.
-		removeEvery<infer KeyType is Equatable>(
+		removeEvery(
 			where check: (_: { key: KeyType, value: ValueType }) -> Boolean,
-		) -> Dictionary<KeyType, ValueType> {
-			<- @::everyEntry(where (entry) { <- check(entry)::negate() })
-		}
-
-		§ The filter, and the complement of `removeEvery(where:)`. It is named
-		§ as `List::everyItem(where:)` is, and it rebuilds through `of`, which
-		§ encodes the kept keys a second time. A native sharing the receiver's
-		§ encodings is what `map` does, and it is worth writing here once a
-		§ measurement asks for it.
+		) -> Dictionary<KeyType, ValueType>
 
 		§§ Answers a new Dictionary of every entry the check accepts.
 		§§
-		§§ Each entry is offered to the check, and the accepted entries keep their order.
+		§§ Each entry is offered to the check, and the accepted entries keep their order. It is named as `List::everyItem(where:)` is.
 		§§
 		§§ @param where — the check each entry is offered to
 		§§ @returns — the Dictionary of accepted entries.
-		everyEntry<infer KeyType is Equatable>(
+		everyEntry(
 			where check: (_: { key: KeyType, value: ValueType }) -> Boolean,
-		) -> Dictionary<KeyType, ValueType> {
-			<- Dictionary.of(@::entries()::everyItem(where check))
-		}
+		) -> Dictionary<KeyType, ValueType>
 
-		§ Native so the answer reuses the receiver's key encodings rather than
-		§ encoding the same keys a second time. It needs no `Equatable` bound:
-		§ the receiver's keys are distinct already, and transforming the values
-		§ can not make two of them collide.
+		§ Native for the reason the two filters above are: the answer reuses
+		§ the receiver's key encodings. It needs no `Equatable` bound either,
+		§ since transforming the values can not make two keys collide.
 
 		§§ Answers a new Dictionary with the given transform applied to every entry.
 		§§

@@ -3739,23 +3739,23 @@ third"::lines())
 	§ Every callback here is handed the entry Record, so a Pattern takes it
 	§ apart where it stands.
 	show(
-		"Dictionary.removeEvery<ValueType, KeyType is Equatable>(where: (_ \{ key: KeyType, value: ValueType \}) -> Boolean)",
+		"Dictionary.removeEvery<KeyType, ValueType>(where: (_ \{ key: KeyType, value: ValueType \}) -> Boolean)",
 		ages::removeEvery(where ({ key, value }) {
 			<- value::isGreaterThan(30)
 		}),
 	)
 	show(
-		"Dictionary.removeEvery<ValueType, KeyType is Equatable>(where: (_ \{ key: KeyType, value: ValueType \}) -> Boolean) [nothing accepted]",
+		"Dictionary.removeEvery<KeyType, ValueType>(where: (_ \{ key: KeyType, value: ValueType \}) -> Boolean) [nothing accepted]",
 		ages::removeEvery(where ({ key, value }) { <- key::is("nobody") }),
 	)
 	show(
-		"Dictionary.everyEntry<ValueType, KeyType is Equatable>(where: (_ \{ key: KeyType, value: ValueType \}) -> Boolean)",
+		"Dictionary.everyEntry<KeyType, ValueType>(where: (_ \{ key: KeyType, value: ValueType \}) -> Boolean)",
 		ages::everyEntry(where ({ key, value }) {
 			<- value::isGreaterThan(30)
 		}),
 	)
 	show(
-		"Dictionary.everyEntry<ValueType, KeyType is Equatable>(where: (_ \{ key: KeyType, value: ValueType \}) -> Boolean) [nothing accepted]",
+		"Dictionary.everyEntry<KeyType, ValueType>(where: (_ \{ key: KeyType, value: ValueType \}) -> Boolean) [nothing accepted]",
 		ages::everyEntry(where ({ key, value }) { <- key::is("nobody") }),
 	)
 	show(
@@ -3795,7 +3795,7 @@ third"::lines())
 	§ entry answers the empty Dictionary, and the empty Dictionary has parts to
 	§ answer with as much as any other.
 	show(
-		"Dictionary.removeEvery<ValueType, KeyType is Equatable>(where: (_ \{ key: KeyType, value: ValueType \}) -> Boolean) [everything accepted]",
+		"Dictionary.removeEvery<KeyType, ValueType>(where: (_ \{ key: KeyType, value: ValueType \}) -> Boolean) [everything accepted]",
 		ages::removeEvery(where ({ key, value }) {
 			<- value::isGreaterThan(0)
 		}),
