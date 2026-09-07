@@ -492,12 +492,6 @@ describe("Stdlib Call Graph", () => {
 			"Dictionary.update__overload$2",
 			"Dictionary.value__overload$2",
 			"Equatable.isNot",
-			// NOTE: `Exact` is a helper Namespace of `Number.es` that
-			// `Prelude.es` does not re-export, so it is no builtin — but it is
-			// a Namespace of the standard library like any other, and its two
-			// bodies are emitted and reached exactly as the rest are.
-			"Exact.add",
-			"Exact.multiply",
 			"GroupedList.removeDuplicates",
 			"GroupedNonEmptyList.removeDuplicates",
 			"Integer.add__overload$2",
@@ -738,6 +732,13 @@ describe("Stdlib Call Graph", () => {
 			"RationalList.lowestNumber__overload$2",
 			"RationalList.product",
 			"RationalList.sum",
+			// NOTE: The Namespace of the Union `Integer | Rational`, whose two
+			// bodies are the one 2×2 dispatch of `Number.es` — emitted and
+			// reached exactly as the rest are, and named here for the same
+			// reason: a call graph Node is a body, whatever the target of the
+			// Namespace that holds it.
+			"Scalar.add",
+			"Scalar.multiply",
 			"String.character__overload$2",
 			"String.characters",
 			"String.compare__overload$2",

@@ -27,9 +27,16 @@ declarations {
 	§ not algebraic. The alias covers exactly the irrationals the tower holds.
 	type Irrational = Algebraic | Transcendental
 
-	§ The two numeric kinds the aggregates below fold over. `Prelude.es` does
-	§ not re-export it, so it stays a helper of this file.
-	type Exact = Integer | Rational
+	§§ An Integer or a Rational: the two numeric kinds a Program computes with exactly.
+	§§
+	§§ Every Number is a Scalar or an Irrational. The two Methods below answer a Scalar for any two Scalars, which is what the mixed aggregates fold on.
+	§
+	§ The name is the author's pick over `Exact`, which this alias carried as a
+	§ helper of this file. Pi is exact as well, so `Exact` overclaimed the half
+	§ it names. That half is the rationals in either representation. The
+	§ sources spell `Integer | Rational` 54 times, and a Program that writes
+	§ `numbers::sum()` had no word for what it got back.
+	type Scalar = Integer | Rational
 
 	§ The one 2×2 dispatch in the file. A Union-typed receiver reaches no
 	§ member Namespace's `add`, and `Number` declares none, so the mixed
@@ -37,19 +44,19 @@ declarations {
 	§
 	§ `@` is rebound inside `match`, and `reduce` binds `Result` from
 	§ `startingWith`; see DEVELOPMENT.md, Why bodies look the way they do.
-	namespace Exact for Exact {
-		§§ Adds two exact numbers.
+	namespace Scalar for Scalar {
+		§§ Adds two Scalars.
 		§§
 		§§ The answer is an Integer for two Integers, and a Rational for every other pair.
 		§§
-		§§ @param _ — the number to add
+		§§ @param _ — the Scalar to add
 		§§ @returns — the exact sum.
-		add(_ other: Exact) -> Exact {
-			<- match @ -> Exact {
+		add(_ other: Scalar) -> Scalar {
+			<- match @ -> Scalar {
 				case Integer {
 					constant integer = @
 
-					<- match other -> Exact {
+					<- match other -> Scalar {
 						case Integer  { <- integer::add(@) }
 
 						case Rational { <- integer::add(@) }
@@ -59,7 +66,7 @@ declarations {
 				case Rational {
 					constant rational = @
 
-					<- match other -> Exact {
+					<- match other -> Scalar {
 						case Integer  { <- rational::add(@) }
 
 						case Rational { <- rational::add(@) }
@@ -68,18 +75,18 @@ declarations {
 			}
 		}
 
-		§§ Multiplies two exact numbers.
+		§§ Multiplies two Scalars.
 		§§
 		§§ The answer is an Integer for two Integers, and a Rational for every other pair.
 		§§
-		§§ @param with — the number to multiply with
+		§§ @param with — the Scalar to multiply with
 		§§ @returns — the exact product.
-		multiply(with other: Exact) -> Exact {
-			<- match @ -> Exact {
+		multiply(with other: Scalar) -> Scalar {
+			<- match @ -> Scalar {
 				case Integer {
 					constant integer = @
 
-					<- match other -> Exact {
+					<- match other -> Scalar {
 						case Integer  { <- integer::multiply(with @) }
 
 						case Rational { <- integer::multiply(with @) }
@@ -89,7 +96,7 @@ declarations {
 				case Rational {
 					constant rational = @
 
-					<- match other -> Exact {
+					<- match other -> Scalar {
 						case Integer  { <- rational::multiply(with @) }
 
 						case Rational { <- rational::multiply(with @) }
@@ -121,7 +128,7 @@ declarations {
 		static GoldenRatio: Algebraic
 
 		§ Each aggregate is a fold over the members' own arithmetic. A mixed
-		§ entry folds on `Exact` above.
+		§ entry folds on `Scalar` above.
 
 		§§ Adds up every Number in the List.
 		§§
@@ -159,15 +166,15 @@ declarations {
 			§§
 			§§ @param _ — the Numbers to add up
 			§§ @returns — the total.
-			(_ numbers: List<Integer | Rational>) -> Integer | Rational {
-				constant start: Integer | Rational = 0
+			(_ numbers: List<Scalar>) -> Scalar {
+				constant start: Scalar = 0
 
 				constant total = numbers::reduce(
 					startingWith start,
 					(accumulated, number) { <- accumulated::add(number) },
 				)
 
-				<- match total -> Integer | Rational {
+				<- match total -> Scalar {
 					case Integer { <- @ }
 
 					case Rational {
@@ -217,8 +224,8 @@ declarations {
 			§§
 			§§ @param _ — the Numbers to multiply
 			§§ @returns — the product.
-			(_ numbers: List<Integer | Rational>) -> Integer | Rational {
-				constant start: Integer | Rational = 1
+			(_ numbers: List<Scalar>) -> Scalar {
+				constant start: Scalar = 1
 
 				constant total = numbers::reduce(
 					startingWith start,
@@ -227,7 +234,7 @@ declarations {
 					},
 				)
 
-				<- match total -> Integer | Rational {
+				<- match total -> Scalar {
 					case Integer { <- @ }
 
 					case Rational {
@@ -276,7 +283,7 @@ declarations {
 			§§
 			§§ @param _ — the Numbers to average
 			§§ @returns — the mean, or nothing for the empty List.
-			(_ numbers: List<Integer | Rational>) -> Optional<Rational> {
+			(_ numbers: List<Scalar>) -> Optional<Rational> {
 				constant count = numbers::length()
 
 				<- match Number.sum(numbers) -> Optional<Rational> {
@@ -316,7 +323,7 @@ declarations {
 			§§ @param defaultingTo — the value to answer with when there is no mean
 			§§ @returns — the mean, or the given value in its place.
 			(
-				_ numbers: List<Integer | Rational>,
+				_ numbers: List<Scalar>,
 				defaultingTo fallback: Rational,
 			) -> Rational {
 				<- Number.average(numbers)::value(defaultingTo fallback)
@@ -353,7 +360,7 @@ declarations {
 			§§
 			§§ @param _ — the Numbers to average
 			§§ @returns — the mean.
-			(_ numbers: NonEmptyList<Integer | Rational>) -> Rational {
+			(_ numbers: NonEmptyList<Scalar>) -> Rational {
 				constant count = numbers::length()
 
 				<- match Number.sum(numbers) -> Rational {
@@ -405,10 +412,7 @@ declarations {
 			§§ @param _ — the Integer to compare
 			§§ @param _ — the Rational to compare
 			§§ @returns — the lower Number.
-			(
-				_ firstNumber: Integer,
-				_ secondNumber: Rational,
-			) -> Integer | Rational {
+			(_ firstNumber: Integer, _ secondNumber: Rational) -> Scalar {
 				if firstNumber::isLessThanOrEqualTo(secondNumber) {
 					<- firstNumber
 				} else {
@@ -423,10 +427,7 @@ declarations {
 			§§ @param _ — the Rational to compare
 			§§ @param _ — the Integer to compare
 			§§ @returns — the lower Number.
-			(
-				_ firstNumber: Rational,
-				_ secondNumber: Integer,
-			) -> Integer | Rational {
+			(_ firstNumber: Rational, _ secondNumber: Integer) -> Scalar {
 				if firstNumber::isLessThanOrEqualTo(secondNumber) {
 					<- firstNumber
 				} else {
@@ -478,9 +479,8 @@ declarations {
 				})
 			}
 
-			§ The mixed entry needs no dispatch: an `Integer | Rational`
-			§ receiver reaches `Number::isLessThanOrEqualTo` for the
-			§ cross-kind order.
+			§ The mixed entry needs no dispatch: a `Scalar` receiver reaches
+			§ `Number::isLessThanOrEqualTo` for the cross-kind order.
 
 			§§ The lowest Number in a List holding both Integers and Rationals.
 			§§
@@ -488,13 +488,11 @@ declarations {
 			§§
 			§§ @param _ — the Numbers to compare
 			§§ @returns — the lowest Number, or nothing for the empty List.
-			(
-				_ numbers: List<Integer | Rational>,
-			) -> Optional<Integer | Rational> {
-				constant start: Optional<Integer | Rational> = #Empty
+			(_ numbers: List<Scalar>) -> Optional<Scalar> {
+				constant start: Optional<Scalar> = #Empty
 
 				<- numbers::reduce(startingWith start, (lowest, number) {
-					<- match lowest -> Optional<Integer | Rational> {
+					<- match lowest -> Optional<Scalar> {
 						case #Empty { <- #Value(number) }
 
 						case #Value(running) {
@@ -537,10 +535,7 @@ declarations {
 			§§ @param _ — the Numbers to compare
 			§§ @param defaultingTo — the value to answer with when there is no lowest
 			§§ @returns — the lowest Number, or the given value in its place.
-			(
-				_ numbers: List<Integer | Rational>,
-				defaultingTo fallback: Integer | Rational,
-			) -> Integer | Rational {
+			(_ numbers: List<Scalar>, defaultingTo fallback: Scalar) -> Scalar {
 				<- Number.lowestNumber(numbers)::value(defaultingTo fallback)
 			}
 
@@ -584,9 +579,7 @@ declarations {
 			§§
 			§§ @param _ — the Numbers to compare
 			§§ @returns — the lowest Number.
-			(
-				_ numbers: NonEmptyList<Integer | Rational>,
-			) -> Integer | Rational {
+			(_ numbers: NonEmptyList<Scalar>) -> Scalar {
 				<- numbers::reduce(
 					startingWith numbers::firstItem(),
 					(lowest, number) {
@@ -641,10 +634,7 @@ declarations {
 			§§ @param _ — the Integer to compare
 			§§ @param _ — the Rational to compare
 			§§ @returns — the higher Number.
-			(
-				_ firstNumber: Integer,
-				_ secondNumber: Rational,
-			) -> Integer | Rational {
+			(_ firstNumber: Integer, _ secondNumber: Rational) -> Scalar {
 				if firstNumber::isGreaterThanOrEqualTo(secondNumber) {
 					<- firstNumber
 				} else {
@@ -659,10 +649,7 @@ declarations {
 			§§ @param _ — the Rational to compare
 			§§ @param _ — the Integer to compare
 			§§ @returns — the higher Number.
-			(
-				_ firstNumber: Rational,
-				_ secondNumber: Integer,
-			) -> Integer | Rational {
+			(_ firstNumber: Rational, _ secondNumber: Integer) -> Scalar {
 				if firstNumber::isGreaterThanOrEqualTo(secondNumber) {
 					<- firstNumber
 				} else {
@@ -716,13 +703,11 @@ declarations {
 			§§
 			§§ @param _ — the Numbers to compare
 			§§ @returns — the highest Number, or nothing for the empty List.
-			(
-				_ numbers: List<Integer | Rational>,
-			) -> Optional<Integer | Rational> {
-				constant start: Optional<Integer | Rational> = #Empty
+			(_ numbers: List<Scalar>) -> Optional<Scalar> {
+				constant start: Optional<Scalar> = #Empty
 
 				<- numbers::reduce(startingWith start, (highest, number) {
-					<- match highest -> Optional<Integer | Rational> {
+					<- match highest -> Optional<Scalar> {
 						case #Empty { <- #Value(number) }
 
 						case #Value(running) {
@@ -765,10 +750,7 @@ declarations {
 			§§ @param _ — the Numbers to compare
 			§§ @param defaultingTo — the value to answer with when there is no highest
 			§§ @returns — the highest Number, or the given value in its place.
-			(
-				_ numbers: List<Integer | Rational>,
-				defaultingTo fallback: Integer | Rational,
-			) -> Integer | Rational {
+			(_ numbers: List<Scalar>, defaultingTo fallback: Scalar) -> Scalar {
 				<- Number.highestNumber(numbers)::value(defaultingTo fallback)
 			}
 
@@ -808,9 +790,7 @@ declarations {
 			§§
 			§§ @param _ — the Numbers to compare
 			§§ @returns — the highest Number.
-			(
-				_ numbers: NonEmptyList<Integer | Rational>,
-			) -> Integer | Rational {
+			(_ numbers: NonEmptyList<Scalar>) -> Scalar {
 				<- numbers::reduce(
 					startingWith numbers::firstItem(),
 					(highest, number) {
@@ -867,4 +847,5 @@ declarations {
 export {
 	Irrational
 	Number
+	Scalar
 }

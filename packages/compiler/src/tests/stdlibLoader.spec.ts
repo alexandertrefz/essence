@@ -1084,6 +1084,7 @@ describe("Standard Library Loader", () => {
 			"Ordering",
 			"Number",
 			"Irrational",
+			"Scalar",
 			"Rational",
 			"Algebraic",
 			"Transcendental",
@@ -1362,6 +1363,7 @@ describe("Standard Library Loader", () => {
 			// `Rational`, listed after it for the same reason — see
 			// `builtinMemberOrder`.
 			"NonZeroRational",
+			"Scalar",
 			"Algebraic",
 			"Transcendental",
 			"Number",

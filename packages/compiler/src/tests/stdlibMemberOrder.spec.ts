@@ -96,10 +96,12 @@ type Member = {
 	line: number
 }
 
-// NOTE: Every Namespace the sources declare, keyed by name — including the ones
-// `Prelude.es` does not forward, like `Exact`. `loadStdlib().members` holds the
-// PUBLIC surface, so an internal helper would quietly go unchecked; the typed
-// Programs carry each declaration's own complete Namespace Type instead.
+// NOTE: Every Namespace the sources declare, keyed by name — including any
+// `Prelude.es` does not forward. `loadStdlib().members` holds the PUBLIC
+// surface, so an internal helper would quietly go unchecked; the typed
+// Programs carry each declaration's own complete Namespace Type instead. There
+// is no such helper today — `Scalar` was the last one, and preluding it under
+// its own name is what took the level's only occupant away.
 function declaredNamespaces(): Map<string, common.NamespaceType> {
 	let namespaces = new Map<string, common.NamespaceType>()
 

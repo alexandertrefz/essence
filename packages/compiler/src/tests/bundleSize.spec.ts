@@ -58,7 +58,7 @@ async function bundleSizeOf(fixtureName: string): Promise<number> {
 }
 
 describe("Bundle Size", () => {
-	// NOTE: 73,678 measured. What this ceiling watches for is the numeric tower
+	// NOTE: 73,838 measured. What this ceiling watches for is the numeric tower
 	// arriving whole: a reintroduced `Number` spread measures over five
 	// kilobytes here, several times the headroom.
 	//
@@ -85,7 +85,7 @@ describe("Bundle Size", () => {
 		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(74_900)
 	})
 
-	// NOTE: 38,532 measured; a reintroduced `Number` spread was 54,849. The same
+	// NOTE: 38,690 measured; a reintroduced `Number` spread was 54,849. The same
 	// claim as Everyday's, on a Program that takes square roots rather than
 	// doing arithmetic — so it reads the other side of several trades. A pass
 	// that pays text for work on Everyday takes bytes OFF here, because a file

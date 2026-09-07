@@ -34,6 +34,7 @@ export {
 	from "./Number.es" {
 		Irrational
 		Number
+		Scalar
 	}
 	from "./NumberList.es" {
 		IntegerList

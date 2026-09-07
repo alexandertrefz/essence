@@ -38,6 +38,7 @@ import * as rational from "@essence-lang/runtime/Rational"
 import * as rationalList from "@essence-lang/runtime/RationalList"
 import * as record from "@essence-lang/runtime/Record"
 import * as rounding from "@essence-lang/runtime/Rounding"
+import * as scalar from "@essence-lang/runtime/Scalar"
 import * as side from "@essence-lang/runtime/Side"
 import * as sortOrder from "@essence-lang/runtime/SortOrder"
 import * as string from "@essence-lang/runtime/String"
@@ -65,6 +66,10 @@ const runtimeModules: Record<string, Record<string, unknown>> = {
 	PositiveInteger: positiveInteger,
 	Rational: rational,
 	NonZeroRational: nonZeroRational,
+	// NOTE: A Namespace with no native at all, so its module holds only the
+	// type a native taking a Scalar would spell — the row is here because the
+	// cross-check below is over the Rewriter's whole import list.
+	Scalar: scalar,
 	Algebraic: algebraic,
 	Transcendental: transcendental,
 	Number: number,

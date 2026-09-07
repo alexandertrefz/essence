@@ -370,7 +370,7 @@ Error: No Method named 'lenght' for this value
     │                                │    
     │                                ╰──── no Method of this name
     │ 
-    │ Note: Searched Namespaces 'Integer', 'NonZeroInteger', 'NonNegativeInteger', 'PositiveInteger', 'Number'.
+    │ Note: Searched Namespaces 'Integer', 'NonZeroInteger', 'NonNegativeInteger', 'PositiveInteger', 'Scalar', 'Number'.
 ────╯
 
 [no-matching-overload]

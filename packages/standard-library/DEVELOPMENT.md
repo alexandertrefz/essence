@@ -64,13 +64,15 @@ from its surface alone, so there are three levels of visibility:
 Adding a name to `Prelude.es` adds it to the language. A helper the library needs
 and the language should not grow simply stays off the list.
 
-A Namespace private to its own file — `Exact` in `Number.es`, which holds the
-one mixed-kind dispatch `Number.sum` and `Number.product` fold over — needs no
-loader change and no registration at all: the builtin tables are built from
-`Prelude.es`'s surface, so a name that is not on it reaches none of them. It is
-still a Namespace of the library like any other, its bodies are emitted and
-reached the same way, and it is a call-graph Node, so it is listed in
-`packages/compiler/src/tests/stdlibCallGraph.spec.ts` with the rest.
+A Namespace private to its own file needs no loader change and no registration
+at all: the builtin tables are built from `Prelude.es`'s surface, so a name that
+is not on it reaches none of them. It is still a Namespace of the library like
+any other, its bodies are emitted and reached the same way, and it is a
+call-graph Node, so it is listed in
+`packages/compiler/src/tests/stdlibCallGraph.spec.ts` with the rest. No
+Namespace is private to its file today: `Scalar` in `Number.es` — the Union
+`Number.sum` and `Number.product` fold over — was the last one, and preluding
+it under its own name cost it all six of the registration sites below.
 
 ### The shape of the graph is frozen
 

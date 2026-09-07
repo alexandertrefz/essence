@@ -70,6 +70,16 @@ export const builtinMemberOrder: Array<string> = [
 	// reach belong together, and the general one has to be met FIRST so that
 	// `NonZeroRational::reciprocal` reads as the extra a proven Rational has.
 	"NonZeroRational",
+	// NOTE: After both of the Types it covers, for the reason `NonEmptyList`
+	// sits after `List` — an Integer and a Rational each reach this Namespace
+	// as well as their own, and Completion dedupes members
+	// first-Namespace-wins, so `add` and `multiply` have to be offered from
+	// the member Namespace a single-kind receiver's call RESOLVES to. Which
+	// Namespace that is is not decided here: the member target beats this
+	// Union one regardless of this order. Listed with the two exact kinds
+	// rather than beside `Number` because a reader meets what covers them
+	// where they are declared.
+	"Scalar",
 	"Algebraic",
 	"Transcendental",
 	"Number",
@@ -238,6 +248,11 @@ export const builtinTypeOrder: Array<string> = [
 	// a tie on the FIRST candidate, so a typo near both still reads as the base
 	// Type.
 	"NonEmptyDictionary",
+	// NOTE: The two halves of the tower, and then the whole of it. `Scalar` is
+	// first because a Program meets the exact kinds first, and `closestMatch`
+	// breaks a tie on the FIRST candidate — which decides nothing between
+	// these three, since no two of them are one edit apart.
+	"Scalar",
 	"Irrational",
 	"Number",
 	"Optional",
